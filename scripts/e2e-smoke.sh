@@ -65,7 +65,6 @@ DB_USERNAME=sa \
 DB_PASSWORD="" \
 SERVER_PORT="$APP_PORT" \
 ASSISTANT_JWT_SECRET="$JWT_SECRET" \
-HERMES_BASE_URL="http://127.0.0.1:$HERMES_PORT" \
 HERMES_PROFILE_KEY_DIR="$WORK/keys" \
 SPRING_FLYWAY_ENABLED=false \
 SPRING_JPA_HIBERNATE_DDL_AUTO=create-drop \
@@ -108,14 +107,14 @@ echo "   HTTP $CODE $(cat "$WORK/nobind.json")"
 echo "== admin 이 dad 에게 profile 을 연결한다"
 curl -fsS -X POST "$API/admin/hermes-bindings" \
   -H "Authorization: Bearer $DAD" -H 'Content-Type: application/json' \
-  -d '{"email":"dad@example.com","profileName":"dad","provider":"openai-codex","model":"gpt-5.5","costMode":"SUBSCRIPTION"}' \
+  -d "{\"email\":\"dad@example.com\",\"profileName\":\"dad\",\"apiBaseUrl\":\"http://127.0.0.1:$HERMES_PORT/p/dad\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.5\",\"costMode\":\"SUBSCRIPTION\"}" \
   > "$WORK/binding.json"
 cat "$WORK/binding.json"; echo
 
 echo "== member 는 admin 전용 엔드포인트를 쓰지 못한다"
 CODE="$(curl -s -o "$WORK/forbidden.json" -w '%{http_code}' -X POST "$API/admin/hermes-bindings" \
   -H "Authorization: Bearer $KID" -H 'Content-Type: application/json' \
-  -d '{"email":"kid@example.com","profileName":"kid","provider":"x","model":"y","costMode":"API"}')"
+  -d '{"email":"kid@example.com","profileName":"kid","apiBaseUrl":"http://127.0.0.1:1/p/kid","provider":"x","model":"y","costMode":"API"}')"
 require_code 403 "$CODE" "$WORK/forbidden.json"
 echo "   HTTP $CODE"
 

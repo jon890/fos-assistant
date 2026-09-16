@@ -17,7 +17,6 @@ class HermesProfileKeyStoreTest {
     private HermesProfileKeyStore storeAt(Path dir) {
         return new HermesProfileKeyStore(
                 new HermesProperties(
-                        "http://hermes:8642",
                         dir.toString(),
                         Duration.ofMillis(10),
                         Duration.ofSeconds(1),

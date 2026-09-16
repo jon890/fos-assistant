@@ -59,7 +59,11 @@ public class ChatService {
             result =
                     hermes.runToCompletion(
                             new HermesRunCommand(
-                                    binding.profileName(), text, null, conversation.hermesSessionId()));
+                                    binding.profileName(),
+                                    binding.apiBaseUrl(),
+                                    text,
+                                    null,
+                                    conversation.hermesSessionId()));
         } catch (ApiException ex) {
             executions.recordFailure(user, conversation, binding, ex.code().name(), startedAt);
             throw ex;

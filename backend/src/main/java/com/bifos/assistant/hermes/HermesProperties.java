@@ -4,7 +4,6 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * @param baseUrl root of the Hermes API server, e.g. {@code http://hermes:8642}
  * @param profileKeyDir directory holding one mode-600 file per profile, named after the profile and
  *     containing that profile's {@code API_SERVER_KEY}
  * @param pollInterval delay between run status polls
@@ -15,7 +14,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "hermes")
 public record HermesProperties(
-        String baseUrl,
         String profileKeyDir,
         Duration pollInterval,
         Duration runTimeout,

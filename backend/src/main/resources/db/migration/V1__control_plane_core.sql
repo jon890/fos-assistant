@@ -14,6 +14,7 @@ CREATE TABLE hermes_profile_binding (
     id BIGINT NOT NULL AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
     profile_name VARCHAR(64) NOT NULL,
+    api_base_url VARCHAR(255) NOT NULL,
     provider VARCHAR(64) NOT NULL,
     model VARCHAR(128) NOT NULL,
     cost_mode VARCHAR(20) NOT NULL,

@@ -31,7 +31,6 @@ assistant:
     jwt-secret: ${ASSISTANT_JWT_SECRET}
 
 hermes:
-  base-url: ${HERMES_BASE_URL}
   profile-key-dir: ${HERMES_PROFILE_KEY_DIR}
   poll-interval: 700ms
   run-timeout: 5m

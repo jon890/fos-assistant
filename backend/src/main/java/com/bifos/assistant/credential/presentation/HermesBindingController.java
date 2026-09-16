@@ -60,6 +60,7 @@ public class HermesBindingController {
                         HermesProfileBinding.of(
                                 target.id(),
                                 request.profileName(),
+                                request.apiBaseUrl(),
                                 request.provider(),
                                 request.model(),
                                 request.costMode()));
@@ -81,13 +82,20 @@ public class HermesBindingController {
     public record CreateBindingRequest(
             @NotBlank String email,
             @NotBlank String profileName,
+            @NotBlank String apiBaseUrl,
             @NotBlank String provider,
             @NotBlank String model,
             @NotNull CostMode costMode) {
     }
 
     public record BindingView(
-            Long id, String email, String profileName, String provider, String model, String costMode,
+            Long id,
+            String email,
+            String profileName,
+            String apiBaseUrl,
+            String provider,
+            String model,
+            String costMode,
             String status) {
 
         static BindingView from(HermesProfileBinding binding, String email) {
@@ -95,6 +103,7 @@ public class HermesBindingController {
                     binding.id(),
                     email,
                     binding.profileName(),
+                    binding.apiBaseUrl(),
                     binding.provider(),
                     binding.model(),
                     binding.costMode().name(),

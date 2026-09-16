@@ -34,11 +34,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private final HermesProperties properties;
 
     public HttpHermesRunsClient(HermesProfileKeyStore keyStore, HermesProperties properties) {
-        this.restClient =
-                RestClient.builder()
-                        .baseUrl(properties.baseUrl())
-                        .requestFactory(requestFactory(properties))
-                        .build();
+        this.restClient = RestClient.builder().requestFactory(requestFactory(properties)).build();
         this.keyStore = keyStore;
         this.properties = properties;
     }
@@ -58,7 +54,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         if (runId == null) {
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "Hermes did not return a run id");
         }
-        return poll(command.profileName(), runId, apiKey);
+        return poll(command, runId, apiKey);
     }
 
     private JsonNode submit(HermesRunCommand command, String apiKey) {
@@ -73,7 +69,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         try {
             return restClient
                     .post()
-                    .uri("/p/{profile}/v1/runs", command.profileName())
+                    .uri(command.apiBaseUrl() + "/v1/runs")
                     .header("Authorization", "Bearer " + apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
@@ -85,10 +81,10 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
-    private HermesRunResult poll(String profileName, String runId, String apiKey) {
+    private HermesRunResult poll(HermesRunCommand command, String runId, String apiKey) {
         long deadline = System.nanoTime() + properties.runTimeout().toNanos();
         while (true) {
-            JsonNode run = fetch(profileName, runId, apiKey);
+            JsonNode run = fetch(command.apiBaseUrl(), runId, apiKey);
             String status = text(run, "status");
             if (status != null && TERMINAL.contains(status.toLowerCase())) {
                 return toResult(runId, status, run);
@@ -100,11 +96,11 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
-    private JsonNode fetch(String profileName, String runId, String apiKey) {
+    private JsonNode fetch(String apiBaseUrl, String runId, String apiKey) {
         try {
             return restClient
                     .get()
-                    .uri("/p/{profile}/v1/runs/{runId}", profileName, runId)
+                    .uri(apiBaseUrl + "/v1/runs/{runId}", runId)
                     .header("Authorization", "Bearer " + apiKey)
                     .retrieve()
                     .body(JsonNode.class);

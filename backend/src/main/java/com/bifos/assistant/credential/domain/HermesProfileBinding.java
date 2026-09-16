@@ -32,6 +32,16 @@ public class HermesProfileBinding {
     @Column(name = "profile_name", nullable = false, unique = true, length = 64)
     private String profileName;
 
+    /**
+     * Where this profile's API server answers, up to but not including {@code /v1}.
+     *
+     * <p>A profile with its own gateway port is {@code http://hermes:8644}; a profile behind a
+     * multiplexed server is {@code http://hermes:8642/p/dad}. Storing it per binding lets both
+     * layouts coexist, which matters because the home server already runs one profile per port.
+     */
+    @Column(name = "api_base_url", nullable = false, length = 255)
+    private String apiBaseUrl;
+
     @Column(name = "provider", nullable = false, length = 64)
     private String provider;
 
@@ -53,9 +63,15 @@ public class HermesProfileBinding {
     }
 
     private HermesProfileBinding(
-            Long userId, String profileName, String provider, String model, CostMode costMode) {
+            Long userId,
+            String profileName,
+            String apiBaseUrl,
+            String provider,
+            String model,
+            CostMode costMode) {
         this.userId = userId;
         this.profileName = profileName;
+        this.apiBaseUrl = stripTrailingSlash(apiBaseUrl);
         this.provider = provider;
         this.model = model;
         this.costMode = costMode;
@@ -64,8 +80,17 @@ public class HermesProfileBinding {
     }
 
     public static HermesProfileBinding of(
-            Long userId, String profileName, String provider, String model, CostMode costMode) {
-        return new HermesProfileBinding(userId, profileName, provider, model, costMode);
+            Long userId,
+            String profileName,
+            String apiBaseUrl,
+            String provider,
+            String model,
+            CostMode costMode) {
+        return new HermesProfileBinding(userId, profileName, apiBaseUrl, provider, model, costMode);
+    }
+
+    private static String stripTrailingSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     public Long id() {
@@ -78,6 +103,10 @@ public class HermesProfileBinding {
 
     public String profileName() {
         return profileName;
+    }
+
+    public String apiBaseUrl() {
+        return apiBaseUrl;
     }
 
     public String provider() {

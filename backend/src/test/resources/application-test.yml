@@ -16,7 +16,6 @@ assistant:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
 
 hermes:
-  base-url: http://localhost:1
   profile-key-dir: build/test-hermes-keys
   poll-interval: 10ms
   run-timeout: 1s
