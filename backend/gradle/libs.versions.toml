@@ -1,0 +1,49 @@
+[versions]
+spring-boot = "4.0.6"
+spring-dependency-management = "1.1.7"
+mysql-connector = "9.7.0"
+h2 = "2.4.240"
+jjwt = "0.13.0"
+springdoc-openapi = "3.0.3"
+lombok = "1.18.46"
+
+[libraries]
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+
+mysql-connector-j = { module = "com.mysql:mysql-connector-j", version.ref = "mysql-connector" }
+flyway-mysql = { module = "org.flywaydb:flyway-mysql" }
+h2-database = { module = "com.h2database:h2", version.ref = "h2" }
+
+jjwt-api = { module = "io.jsonwebtoken:jjwt-api", version.ref = "jjwt" }
+jjwt-impl = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jjwt" }
+jjwt-jackson = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jjwt" }
+
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc-openapi" }
+
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+
+spring-security-test = { module = "org.springframework.security:spring-security-test" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+
+[bundles]
+jwt = ["jjwt-api", "jjwt-impl", "jjwt-jackson"]
+spring-boot-starters = [
+  "spring-boot-starter-webmvc",
+  "spring-boot-starter-data-jpa",
+  "spring-boot-starter-security",
+  "spring-boot-starter-validation",
+  "spring-boot-starter-actuator",
+  "spring-boot-starter-flyway"
+]
+spring-test = ["spring-boot-starter-test", "spring-security-test"]
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

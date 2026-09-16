@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:assistant;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  flyway:
+    enabled: false
+
+assistant:
+  auth:
+    jwt-secret: test-secret-test-secret-test-secret-test-secret
+
+hermes:
+  base-url: http://localhost:1
+  profile-key-dir: build/test-hermes-keys
+  poll-interval: 10ms
+  run-timeout: 1s

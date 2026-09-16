@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: fos-assistant-backend
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+assistant:
+  auth:
+    jwt-secret: ${ASSISTANT_JWT_SECRET}
+
+hermes:
+  base-url: ${HERMES_BASE_URL}
+  profile-key-dir: ${HERMES_PROFILE_KEY_DIR}
+  poll-interval: 700ms
+  run-timeout: 5m
+
+logging:
+  level:
+    com.bifos.assistant: INFO

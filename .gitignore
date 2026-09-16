@@ -1,0 +1,20 @@
+# Java / Gradle
+backend/build/
+backend/.gradle/
+*.class
+
+# Node / Next.js
+web/node_modules/
+web/.next/
+web/out/
+web/next-env.d.ts
+web/tsconfig.tsbuildinfo
+
+# 비밀값
+.env
+.env.local
+*.env
+
+# 도구
+.DS_Store
+.omc/
