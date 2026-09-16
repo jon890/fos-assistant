@@ -1,6 +1,7 @@
 package com.bifos.assistant.credential.presentation;
 
 import com.bifos.assistant.credential.domain.CostMode;
+import com.bifos.assistant.credential.domain.CredentialScope;
 import com.bifos.assistant.credential.domain.HermesProfileBinding;
 import com.bifos.assistant.credential.infra.HermesProfileBindingRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -22,6 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>The profile's API key stays on the host: this endpoint only records which profile belongs to
  * whom, so no secret passes through the web tier.
+ *
+ * <p>{@code credentialScope} has no default. Whoever creates a binding has to say whether it runs
+ * on the household's shared account or on that member's own, so nobody arrives at a shared account
+ * by omission.
  */
 @RestController
 @RequestMapping("/api/v1/admin/hermes-bindings")
@@ -63,7 +68,8 @@ public class HermesBindingController {
                                 request.apiBaseUrl(),
                                 request.provider(),
                                 request.model(),
-                                request.costMode()));
+                                request.costMode(),
+                                request.credentialScope()));
         return BindingView.from(saved, target.email());
     }
 
@@ -85,7 +91,8 @@ public class HermesBindingController {
             @NotBlank String apiBaseUrl,
             @NotBlank String provider,
             @NotBlank String model,
-            @NotNull CostMode costMode) {
+            @NotNull CostMode costMode,
+            @NotNull CredentialScope credentialScope) {
     }
 
     public record BindingView(
@@ -96,6 +103,7 @@ public class HermesBindingController {
             String provider,
             String model,
             String costMode,
+            String credentialScope,
             String status) {
 
         static BindingView from(HermesProfileBinding binding, String email) {
@@ -107,6 +115,7 @@ public class HermesBindingController {
                     binding.provider(),
                     binding.model(),
                     binding.costMode().name(),
+                    binding.credentialScope().name(),
                     binding.status().name());
         }
     }

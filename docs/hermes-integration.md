@@ -25,7 +25,7 @@ v0.21.0 의 `tui_gateway/methods_profiles.py` 주석이 그것을 말한다.
 홈서버의 profile 넷은 모두 자기 `auth.json` 이 없어 한 로그인을 함께 쓰고 있다.
 그러므로 profile 을 나누는 것만으로 credential 이 갈렸다고 볼 수 없다.
 
-구성원의 profile 은 아래 둘 중 하나를 반드시 가져야 한다.
+profile 이 자기 credential 을 가지려면 둘 중 하나가 있어야 한다.
 
 - 자기 `auth.json`. `hermes -p <member> login` 이 만든다
 - 자기 `.env` 안의 provider API key. `API_SERVER_KEY` 는 여기 해당하지 않는다
@@ -33,9 +33,13 @@ v0.21.0 의 `tui_gateway/methods_profiles.py` 주석이 그것을 말한다.
 루트 `auth.json` 을 복사하는 방식은 쓰지 않는다.
 Hermes 주석에 따르면 복사하면 갱신 토큰이 둘로 갈라지고 한쪽 갱신이 다른 쪽을 무효로 만든다.
 
+지금은 가족이 구독 하나를 함께 쓰기로 정했다. ADR-002 가 그 결정을 담는다.
+그래서 격리를 강제하지 않고, 공유하고 있다는 사실을 데이터와 검사로 드러내기만 한다.
+
 ### 우리가 더하는 것
 
-- 바인딩을 만들기 전에 그 profile 의 credential 격리를 검사한다.
+- 바인딩마다 `credential_scope` 를 적는다. 기본값이 없어 만드는 사람이 반드시 고른다.
+- `configure-member-profile.sh verify` 가 격리 여부를 판정하고, 공유는 명시할 때만 넘어간다.
 - profile 마다 `fallback_providers` 를 비워 둔다. 한 사람의 요청이 다른 모델로 넘어가지 않는다.
 - Control Plane 이 요청자의 바인딩에서만 profile 이름을 꺼낸다. 요청 본문은 profile 을 정하지 못한다.
 

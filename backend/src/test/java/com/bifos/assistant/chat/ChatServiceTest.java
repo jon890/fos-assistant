@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.credential.domain.CostMode;
+import com.bifos.assistant.credential.domain.CredentialScope;
 import com.bifos.assistant.credential.domain.HermesProfileBinding;
 import com.bifos.assistant.credential.infra.HermesProfileBindingRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -78,7 +79,8 @@ class ChatServiceTest {
                             "http://hermes:8642/p/" + profileName,
                             "anthropic",
                             "claude-opus-5",
-                            CostMode.SUBSCRIPTION));
+                            CostMode.SUBSCRIPTION,
+                            CredentialScope.SHARED_HOUSEHOLD));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.role());
     }

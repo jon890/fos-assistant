@@ -18,6 +18,7 @@ CREATE TABLE hermes_profile_binding (
     provider VARCHAR(64) NOT NULL,
     model VARCHAR(128) NOT NULL,
     cost_mode VARCHAR(20) NOT NULL,
+    credential_scope VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),

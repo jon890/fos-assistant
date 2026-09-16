@@ -13,10 +13,12 @@ import java.time.Instant;
 /**
  * Binds one user to exactly one Hermes profile.
  *
- * <p>The profile owns the AI credential: Hermes resolves {@code ${VAR}} in a profile's config
- * against that profile's own {@code .env}, so one member's key is never visible to another. This
- * row therefore stores the profile name and its routing metadata, never a secret. The API key that
- * fronts the profile lives in host configuration keyed by profile name.
+ * <p>This row stores the profile name and its routing metadata, never a secret. The API key that
+ * fronts the profile lives in host configuration keyed by profile name, and the AI credential lives
+ * in the profile itself.
+ *
+ * <p>{@link CredentialScope} records whose AI account the turns run on, because a profile alone
+ * does not guarantee an isolated one.
  */
 @Entity
 @Table(name = "hermes_profile_binding")
@@ -53,6 +55,10 @@ public class HermesProfileBinding {
     private CostMode costMode;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "credential_scope", nullable = false, length = 20)
+    private CredentialScope credentialScope;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private BindingStatus status;
 
@@ -68,13 +74,15 @@ public class HermesProfileBinding {
             String apiBaseUrl,
             String provider,
             String model,
-            CostMode costMode) {
+            CostMode costMode,
+            CredentialScope credentialScope) {
         this.userId = userId;
         this.profileName = profileName;
         this.apiBaseUrl = stripTrailingSlash(apiBaseUrl);
         this.provider = provider;
         this.model = model;
         this.costMode = costMode;
+        this.credentialScope = credentialScope;
         this.status = BindingStatus.ACTIVE;
         this.createdAt = Instant.now();
     }
@@ -85,8 +93,10 @@ public class HermesProfileBinding {
             String apiBaseUrl,
             String provider,
             String model,
-            CostMode costMode) {
-        return new HermesProfileBinding(userId, profileName, apiBaseUrl, provider, model, costMode);
+            CostMode costMode,
+            CredentialScope credentialScope) {
+        return new HermesProfileBinding(
+                userId, profileName, apiBaseUrl, provider, model, costMode, credentialScope);
     }
 
     private static String stripTrailingSlash(String url) {
@@ -119,6 +129,10 @@ public class HermesProfileBinding {
 
     public CostMode costMode() {
         return costMode;
+    }
+
+    public CredentialScope credentialScope() {
+        return credentialScope;
     }
 
     public BindingStatus status() {
