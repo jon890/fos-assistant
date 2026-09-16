@@ -21,6 +21,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV AUTH_SECRET=build-time-placeholder
 ENV ASSISTANT_JWT_SECRET=build-time-placeholder
 ENV CONTROL_PLANE_BASE_URL=http://build-time-placeholder
+ENV AUTH_GOOGLE_ID=build-time-placeholder
+ENV AUTH_GOOGLE_SECRET=build-time-placeholder
 RUN pnpm build
 
 # Stage 3: runtime
