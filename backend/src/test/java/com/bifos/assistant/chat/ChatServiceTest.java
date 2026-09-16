@@ -145,6 +145,21 @@ class ChatServiceTest {
     }
 
     @Test
+    void records_the_bound_model_when_the_run_only_echoes_the_profile_name() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub()
+                .willReturn(
+                        new HermesRunResult(
+                                "run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "안녕");
+
+        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
+        assertThat(execution.model()).isEqualTo("claude-opus-5");
+        assertThat(execution.provider()).isEqualTo("anthropic");
+    }
+
+    @Test
     void refuses_a_member_with_no_profile_bound_and_never_calls_the_runtime() {
         CurrentUser kid = member("kid@example.com", null);
 

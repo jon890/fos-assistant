@@ -6,7 +6,7 @@
 | 단계 | 내용 | 상태 |
 | --- | --- | --- |
 | phase-01 | 대화 한 번이 Hermes 를 지나 돌아오고 실행 기록이 남는다 | 완료 |
-| phase-02 | 홈서버의 실제 Hermes 에 연결한다 | 진행 전 |
+| phase-02 | 홈서버의 실제 Hermes 에 연결한다 | 첫 구성원까지 완료 |
 | phase-03 | 실행 상태를 SSE 로 중계한다 | 진행 전 |
 | phase-04 | 개인 Memory 와 공용 Memory | 진행 전 |
 | phase-05 | 실행 Graph 화면 | 진행 전 |
@@ -25,13 +25,21 @@
 
 ## phase-02 실제 Hermes 연결
 
-1. 홈서버 Hermes 의 버전과 `/v1/capabilities` 를 확인한다
-2. 구성원마다 profile 을 만들고 `SOUL.md` 와 `config.yaml` 을 놓는다
-3. profile `.env` 에 `API_SERVER_*` 와 그 사람의 AI credential 을 넣는다
-4. `gateway.multiplex_profiles` 를 켠다
-5. profile key 파일을 Control Plane 이 읽는 디렉터리에 놓는다
-6. `fos-home-infra` 에 compose 와 nginx 항목을 더한다
-7. 스모크 테스트를 실제 Hermes 주소로 한 번 돌린다
+끝난 것은 아래와 같다.
+
+- 홈서버 Hermes v0.21.0 이 Runs API 를 지원하는 것을 확인했다
+- `bifos` profile 을 포트 8651 에 만들고 gateway 를 올렸다
+- profile key 를 `/home/bifos/.secrets/fos-assistant/hermes-profile-keys/bifos` 에 두었다
+- Control Plane 을 터널로 붙여 실제 대화 두 번을 왕복했다
+- 두 번째 대화가 첫 번째를 기억해 session 이 이어지는 것을 확인했다
+- 실제 토큰 수와 소요 시간이 `agent_execution` 에 남는 것을 확인했다
+
+남은 것은 아래와 같다.
+
+- 두 번째 구성원의 profile 과 그 사람 자신의 credential 연결
+- Control Plane 과 웹을 홈서버에 배포한다. compose 는 `hermes-agent_hermes-net` 에 붙인다
+- MySQL 스키마를 만들고 Flyway 를 실제로 한 번 돌린다
+- nginx 와 Cloudflare 경로를 더한다
 
 ## phase-03 실행 상태 중계
 

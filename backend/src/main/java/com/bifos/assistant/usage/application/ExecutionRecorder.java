@@ -32,7 +32,7 @@ public class ExecutionRecorder {
                 base(user, conversation, binding, startedAt)
                         .hermesRunId(result.runId())
                         .provider(firstNonBlank(result.provider(), binding.provider()))
-                        .model(firstNonBlank(result.model(), binding.model()))
+                        .model(modelOf(result, binding))
                         .status(ExecutionStatus.SUCCEEDED)
                         .tokens(
                                 usage.inputTokens(),
@@ -69,5 +69,21 @@ public class ExecutionRecorder {
 
     private static String firstNonBlank(String preferred, String fallback) {
         return preferred == null || preferred.isBlank() ? fallback : preferred;
+    }
+
+    /**
+     * Picks the model to record.
+     *
+     * <p>A run's {@code model} is the API server's model name, which defaults to the profile name.
+     * A real Hermes run on profile {@code bifos} reports {@code "model": "bifos"}, so taking it at
+     * face value would label every execution with the member's name instead of the model they used.
+     * When the run just echoes the profile, the binding's configured model is the truthful answer.
+     */
+    private static String modelOf(HermesRunResult result, HermesProfileBinding binding) {
+        String reported = result.model();
+        if (reported == null || reported.isBlank() || reported.equals(binding.profileName())) {
+            return binding.model();
+        }
+        return reported;
     }
 }
