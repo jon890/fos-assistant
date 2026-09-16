@@ -8,17 +8,34 @@ NousResearch 의 Hermes Agent 를 Agent Runtime 으로 쓴다.
 Hermes 는 profile 마다 아래를 따로 가진다.
 
 - `config.yaml` 과 `.env`
-- `auth.json` 의 OAuth credential
 - `SOUL.md` 로 정하는 에이전트 성격
 - `memories/`, `skills/`, session 과 메시지 기록
 
 `config.yaml` 안의 `${VAR}` 는 그 profile 의 `.env` 에서만 값을 찾는다.
 셸 환경 변수도, 다른 profile 의 `.env` 도 보지 않는다.
-그래서 "다른 사용자의 credential 로 자동 fallback 하지 않는다"는 요구는
-우리 코드가 아니라 런타임이 보장한다.
 
-우리는 여기에 두 가지를 더한다.
+### OAuth credential 은 여기서 빠진다
 
+`.env` 와 달리 OAuth 는 profile 로 갈리지 않는다.
+profile 에 `auth.json` 이 없으면 루트의 `~/.hermes/auth.json` 을 읽는다.
+v0.21.0 의 `tui_gateway/methods_profiles.py` 주석이 그것을 말한다.
+
+> profile reads fall back to the global store, and token refreshes write THROUGH to it
+
+홈서버의 profile 넷은 모두 자기 `auth.json` 이 없어 한 로그인을 함께 쓰고 있다.
+그러므로 profile 을 나누는 것만으로 credential 이 갈렸다고 볼 수 없다.
+
+구성원의 profile 은 아래 둘 중 하나를 반드시 가져야 한다.
+
+- 자기 `auth.json`. `hermes -p <member> login` 이 만든다
+- 자기 `.env` 안의 provider API key. `API_SERVER_KEY` 는 여기 해당하지 않는다
+
+루트 `auth.json` 을 복사하는 방식은 쓰지 않는다.
+Hermes 주석에 따르면 복사하면 갱신 토큰이 둘로 갈라지고 한쪽 갱신이 다른 쪽을 무효로 만든다.
+
+### 우리가 더하는 것
+
+- 바인딩을 만들기 전에 그 profile 의 credential 격리를 검사한다.
 - profile 마다 `fallback_providers` 를 비워 둔다. 한 사람의 요청이 다른 모델로 넘어가지 않는다.
 - Control Plane 이 요청자의 바인딩에서만 profile 이름을 꺼낸다. 요청 본문은 profile 을 정하지 못한다.
 
@@ -75,15 +92,17 @@ MVP 는 plugin 없이 설정만으로 성립한다.
 이 기계에는 이미 Orca 가 설치한 `orca-status` plugin 이 있다.
 그 plugin 이 hook 사건을 HTTP 로 내보내는 구조라서 우리 plugin 을 만들 때 본보기로 쓸 수 있다.
 
-## 확인하지 못한 것
+## 홈서버에서 확인한 것
 
-홈서버의 Hermes 버전이 Runs API 와 `gateway.multiplex_profiles` 를 지원하는지는
-아직 그 서버에서 직접 확인하지 못했다.
-연동을 시작하기 전에 확인해야 한다.
+2026년 9월 17일에 홈서버에서 직접 확인했다.
 
-```bash
-docker exec hermes /opt/hermes/.venv/bin/hermes --version
-curl -s localhost:8642/v1/capabilities -H "Authorization: Bearer <profile key>"
-```
+| 항목 | 결과 |
+| --- | --- |
+| 버전 | Hermes Agent v0.21.0 (2026.8.31) |
+| `run_submission`, `run_status` | true |
+| `run_events_sse`, `run_stop` | true |
+| 배치 | profile 마다 자기 포트. `brain-api` 가 8644 를 쓴다 |
 
-`/v1/capabilities` 가 `run_submission` 과 `run_status` 를 알려주면 이 설계가 그대로 선다.
+경로 멀티플렉스가 아니라 포트 분리를 쓰고 있으므로,
+Control Plane 은 profile 마다 주소를 따로 갖는다.
+그래서 API server 주소를 `hermes.base-url` 이 아니라 바인딩에 둔다.
