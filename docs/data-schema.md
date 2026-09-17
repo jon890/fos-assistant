@@ -149,7 +149,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `always_inject` | BOOLEAN | 본문을 매 실행에 실을지 정한다. 기본값은 `FALSE` |
 | `status` | VARCHAR(20) | `PROPOSED` 또는 `ACCEPTED` 또는 `REJECTED` |
 | `proposed_by_execution_id` | BIGINT NULL | 이 항목을 제안한 실행. 사람이 직접 적었으면 비어 있다 |
-| `proposal_dedup_key` | CHAR(64) NULL | 제안한 사용자·제목·본문의 해시. 직접 등록한 항목은 비어 있다 |
+| `proposal_dedup_key` | VARCHAR(64) NULL | 제안한 사용자·제목·본문의 해시. 직접 등록한 항목은 비어 있다 |
 | `accepted_by_user_id` | BIGINT NULL | 누가 받아들였는가 |
 | `accepted_at` | DATETIME(6) NULL | |
 | `created_at`, `updated_at` | DATETIME(6) | |
