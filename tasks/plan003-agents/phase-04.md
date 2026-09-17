@@ -42,9 +42,9 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 
 | 무엇 | 경로 |
 | --- | --- |
-| profile 만들기와 API server 켜기 | `fos-home-infra` 의 `services/hermes-assistant/configure-member-profile.sh` |
-| 이미 쓰는 포트 | `fos-home-infra` 의 `services/hermes-assistant/README.md` 가 목록을 갖는다 |
-| 페르소나 사본 | `fos-home-infra` 의 `services/hermes-assistant/personas/career/SOUL.md` |
+| profile 만들기와 API server 켜기 | `fos-home-infra` 의 구성원 profile 을 만드는 스크립트 |
+| 이미 쓰는 포트 | `fos-home-infra` 의 Hermes 운영 문서가 목록을 갖는다 |
+| 페르소나 사본 | `fos-home-infra` 가 보관하는 페르소나 사본 |
 
 **근거 문서**: `docs/hermes-integration.md`, `docs/adr/ADR-007-에이전트가-모델과-도구를-함께-정한다.md`
 
@@ -62,7 +62,7 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 
 ### 1. career profile 의 API server 를 켜는 스크립트를 더한다
 
-`fos-home-infra` 의 `services/hermes-assistant/enable-profile-api.sh` 를 만든다.
+`fos-home-infra` 에 profile 의 API server 를 켜는 스크립트를 만든다.
 브랜치는 `feat/career-agent` 를 쓴다.
 
 - 인자로 profile 이름과 포트를 받는다.
@@ -76,7 +76,7 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 
 ### 2. 스킬을 붙이는 스크립트를 더한다
 
-`services/hermes-assistant/link-workspace-skills.sh` 를 만든다.
+같은 자리에 스킬을 붙이는 스크립트를 만든다.
 
 - 인자로 profile 이름과 워크스페이스 이름을 받는다.
 - `<profile>/skills/<워크스페이스>/` 를 만들고 그 아래에 스킬마다 심볼릭 링크를 만든다.
@@ -89,14 +89,14 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 
 ### 3. 문서를 고친다
 
-`services/hermes-assistant/README.md` 에 절을 더한다.
+그 저장소의 Hermes 운영 문서에 절을 더한다.
 
 - 스킬을 붙이는 방법이 설정 키가 아니라 심볼릭 링크라는 것.
 - `skill_paths` 와 `external_skill_paths` 는 설정 키가 아니라는 것.
 - 도구가 열린 profile 을 가족 공개 에이전트로 두면 안 되는 이유.
 - 쓰이는 포트 목록에 이번에 고른 포트를 더한다.
 
-`services/assistant/README.md` 의 새 서비스를 붙일 때 절에도 포트를 반영한다.
+그 저장소의 배포 문서에도 포트를 반영한다.
 
 ### 4. 홈서버에 적용한다
 
@@ -144,28 +144,21 @@ Control Plane 의 관리 엔드포인트로 등록한다.
 
 ## 검증
 
-```bash
-# cwd: fos-home-infra 저장소 root
-bash -n services/hermes-assistant/enable-profile-api.sh
-bash -n services/hermes-assistant/link-workspace-skills.sh
-```
+`fos-home-infra` 에서 새로 만든 두 스크립트를 `bash -n` 으로 구문 검사하고,
+고친 문서를 한국어 검사기에 통과시킨다.
+경로는 그 저장소가 소유하므로 여기 적지 않는다.
 
-```bash
-# cwd: fos-home-infra 저장소 root
-~/personal/fos-skills/korean-check/scripts/check.sh services/hermes-assistant/README.md
-```
-
-실제 확인은 홈서버에서 돌린 명령과 그 출력을 보고에 적는다.
+실제 확인은 홈서버에서 돌린 결과를 보고에 적는다.
 돌리지 않은 것을 확인했다고 적지 않는다.
 
 ## Critical Files
 
 | 파일 | 변경 |
 | --- | --- |
-| `fos-home-infra` 의 `services/hermes-assistant/enable-profile-api.sh` | 신규 |
-| `fos-home-infra` 의 `services/hermes-assistant/link-workspace-skills.sh` | 신규 |
-| `fos-home-infra` 의 `services/hermes-assistant/README.md` | 수정 |
-| `fos-home-infra` 의 `services/assistant/README.md` | 수정 |
+| `fos-home-infra` 의 API server 를 켜는 스크립트 | 신규 |
+| `fos-home-infra` 의 스킬을 붙이는 스크립트 | 신규 |
+| `fos-home-infra` 의 Hermes 운영 문서 | 수정 |
+| `fos-home-infra` 의 배포 문서 | 수정 |
 
 ## 끝낸 뒤
 

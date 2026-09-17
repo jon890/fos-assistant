@@ -11,6 +11,8 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`docs/hermes-integration.md`](docs/hermes-integration.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
 | [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정을 할 때 |
 | [`tasks/plan001-mvp/index.md`](tasks/plan001-mvp/index.md) | 다음에 무엇을 만들지 정할 때 |
+| [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
+| [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 
 ## 지켜야 할 것
 
@@ -29,17 +31,20 @@ Hermes 를 쉽게 쓰는 화면으로 공개하는 것을 검토하고 있어 �
 
 **아래를 어느 파일에도 적지 않는다.** 코드, 문서, `tasks/`, 커밋 메시지, PR 본문이 모두 해당한다.
 
-| 적지 않는 것 | 예 |
-| --- | --- |
-| 홈서버의 주소와 계정 | |
-| 포트 번호 | `8651`, `8652` |
-| 컨테이너 이름 | `hermes`, `bifos-db` |
-| 컨테이너 안의 경로 | `/opt/data/...` |
-| 데이터베이스 이름과 접속 방법 | |
-| **key 나 토큰을 꺼내는 명령** | `grep API_SERVER_KEY ...` |
-| 그것들을 조합한 실행 명령 | `docker exec ... curl ...` |
+- 홈서버의 주소와 계정
+- 우리가 정한 포트 번호
+- 우리가 이름을 정한 컨테이너와 Docker 네트워크
+- 컨테이너 안의 마운트 경로와 홈서버의 디렉터리 경로
+- 애플리케이션 데이터베이스 이름과 접속 방법
+- key 나 토큰을 꺼내는 명령
+- 그것들을 조합해 홈서버에서 무언가를 돌리는 명령
 
 key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 어떻게 꺼내는지도 적지 않는다.**
+
+**이 목록에 값을 예시로 적지 않는다.**
+무엇을 감추는지 설명하려고 그 값을 적으면 감추려던 것이 공개된다.
+종류만 적고 실제 값은 `fos-home-infra` 의 목록이 갖는다.
+이 문서에서 실제로 그 실수를 두 번 했다.
 
 대신 이렇게 쓴다.
 
@@ -65,17 +70,6 @@ scripts/check-public-safe.sh
 조사는 `orchestration` 으로 워커에 직접 맡기고, 그 결과를 ADR 이나 `docs/` 에 남긴다.
 그 결론이 나온 뒤에 구현 계획을 세운다.
 
-## 기술 주의점
-
-- Spring Boot 4 는 Jackson 3 을 쓴다. `com.fasterxml.jackson` 이 아니라 `tools.jackson` 을 import 한다.
-- `RestClient.Builder` 는 자동 구성되지 않는다. `RestClient.builder()` 로 직접 만들고 timeout 을 준다.
-- `backend/src/test/resources/application-test.yml` 은 test profile 전용이다.
-  `application.yml` 이라는 이름으로 두면 `smokeRun` 이 실제 설정 대신 이 파일을 읽는다.
-- 테스트는 엔티티로 스키마를 만들고 운영은 Flyway 가 만든 스키마를 검증한다.
-  그래서 둘이 어긋나도 테스트는 통과한다.
-  엔티티를 바꾸면 마이그레이션도 함께 바꾸고, 배포 로그에서 `Schema validation` 을 확인한다.
-  실제로 `@Lob` 이 붙은 문자열이 MySQL 에서 `tinytext` 로 기대돼 기동에 실패한 적이 있다.
-
 ## 확인
 
 ```bash
@@ -91,29 +85,13 @@ scripts/check-public-safe.sh
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
-`gradlew` 는 `backend/` 안에 있다. 저장소 루트에서 `./gradlew` 를 부르면 없다.
+**네 명령을 적힌 순서대로 돌린다.**
+`test/e2e` 는 앞선 실행이 남긴 데이터에 걸려,
+`gradlew test` 를 건너뛰면 `this agent code is already used` 로 실패할 수 있다.
 
-`test/e2e` 는 앞선 실행이 남긴 데이터에 걸린다.
-`gradlew test` 를 건너뛰고 `run.ts` 만 돌리면
-`this agent code is already used` 로 실패할 수 있다. 실측으로 그랬다.
-네 명령을 적힌 순서대로 돌린다.
-
-**`pnpm build` 는 자리표시자 환경 변수가 있어야 통과한다.**
-없으면 `Failed to collect page data` 로 끝나는데, 그것은 코드 결함이 아니다.
-`web/Dockerfile` 이 쓰는 것과 같은 값을 준다.
-
-```bash
-# cwd: web/
-AUTH_SECRET=build-time-placeholder \
-ASSISTANT_JWT_SECRET=build-time-placeholder \
-CONTROL_PLANE_BASE_URL=http://build-time-placeholder \
-AUTH_GOOGLE_ID=build-time-placeholder \
-AUTH_GOOGLE_SECRET=build-time-placeholder \
-pnpm build
-```
-
-`test/browser` 는 그 위에 웹과 Chromium 을 띄워 화면을 검사한다.
-`mobile` 과 `desktop` 두 폭에서 돌고 각각 390px 와 1280px 다.
+디렉터리마다 걸리는 함정은 [`backend/AGENTS.md`](backend/AGENTS.md) 와
+[`web/AGENTS.md`](web/AGENTS.md) 가 갖는다.
+`gradlew` 의 위치와 `pnpm build` 가 요구하는 환경 변수가 거기 있다.
 
 `test/e2e` 는 Hermes 대역을 같은 프로세스에 띄워 홈서버 없이 전체 흐름을 검사한다.
 시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있고 `run.ts` 가 차례로 돌린다.
@@ -128,25 +106,19 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.1
 ## 코드 주석은 한국어로 쓴다
 
 이 저장소를 읽는 사람이 한국어 사용자다.
-
-- 주석과 Javadoc 을 한국어로 쓴다.
-- 코드 식별자, 타입, 라이브러리 이름, 명령, 경로는 원문 그대로 둔다.
-- 커밋 메시지도 한국어로 쓴다.
-
-영어로 남아 있던 주석은 그 파일을 고칠 때 함께 옮긴다.
-한 번에 전부 옮기려고 별도 커밋을 만들지 않는다. 읽는 사람이 diff 에서 무엇이 바뀌었는지 놓친다.
+주석과 Javadoc 을 한국어로 쓰고, 코드 식별자와 타입과 라이브러리 이름과 명령과 경로는 원문 그대로 둔다.
 
 ## 운영
 
-운영 절차는 이 저장소가 갖지 않는다. 별도의 비공개 저장소 `fos-home-infra` 가 소유한다.
+운영 절차는 이 저장소가 갖지 않는다. 비공개 저장소 `fos-home-infra` 가 소유한다.
+배포와 확인, Hermes profile 과 스킬 연결이 모두 그쪽에 있다.
 
-| 무엇 | 어디 |
-| --- | --- |
-| 배포와 확인 | `services/assistant/README.md` |
-| Hermes profile 과 스킬 연결 | `services/hermes-assistant/README.md` |
+**그 저장소의 디렉터리 구조와 홈서버에 붙는 방법을 여기 적지 않는다.**
+그것까지 적으면 비공개로 둔 뜻이 사라진다.
+어디를 봐야 하는지는 그 저장소를 열면 알 수 있고,
+워커에게는 지시문으로 준다.
 
-홈서버는 `ssh homeserver` 로 붙는다. 별칭은 `~/.ssh/config` 에 있다.
-**주소와 포트와 계정을 이 저장소에 적지 않는다.** 공개 저장소다.
+무엇을 적지 않는지는 위의 「공개 저장소」 절이 정한다.
 
 ### 배포했다고 말하기 전에 보는 것
 
