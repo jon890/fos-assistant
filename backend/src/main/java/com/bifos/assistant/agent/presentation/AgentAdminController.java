@@ -17,6 +17,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,22 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/admin/agents")
+@RequiredArgsConstructor
 public class AgentAdminController {
     private final AgentRepository agents;
     private final AppUserRepository users;
     private final CurrentUserProvider currentUser;
     private final HermesModelClient hermesModels;
     private final AgentModelSync modelSync;
-
-    public AgentAdminController(AgentRepository agents, AppUserRepository users,
-            CurrentUserProvider currentUser, HermesModelClient hermesModels,
-            AgentModelSync modelSync) {
-        this.agents = agents;
-        this.users = users;
-        this.currentUser = currentUser;
-        this.hermesModels = hermesModels;
-        this.modelSync = modelSync;
-    }
 
     @PostMapping
     public AdminAgentView create(@Valid @RequestBody CreateAgentRequest request) {

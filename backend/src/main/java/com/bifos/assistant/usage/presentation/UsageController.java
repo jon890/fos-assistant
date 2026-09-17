@@ -1,5 +1,7 @@
 package com.bifos.assistant.usage.presentation;
 
+import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCost;
@@ -8,6 +10,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/usage")
+@RequiredArgsConstructor
 public class UsageController {
 
     private static final int MAX_LIMIT = 200;
@@ -25,11 +29,7 @@ public class UsageController {
 
     private final AgentExecutionRepository executions;
     private final CurrentUserProvider currentUser;
-
-    public UsageController(AgentExecutionRepository executions, CurrentUserProvider currentUser) {
-        this.executions = executions;
-        this.currentUser = currentUser;
-    }
+    private final AgentService agents;
 
     /** 로그인한 사용자 자신의 실행만 준다. 구성원을 가로질러 보는 것은 admin 화면이 맡는다. */
     @GetMapping("/executions")
@@ -38,7 +38,7 @@ public class UsageController {
         return executions
                 .findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, size))
                 .stream()
-                .map(ExecutionView::from)
+                .map(execution -> ExecutionView.from(execution, agents.requireById(execution.agentId())))
                 .toList();
     }
 
@@ -79,6 +79,8 @@ public class UsageController {
     public record ExecutionView(
             Long id,
             Long conversationId,
+            String agentCode,
+            String agentName,
             String provider,
             String model,
             String costMode,
@@ -94,10 +96,12 @@ public class UsageController {
             String pricingVersion,
             Instant startedAt) {
 
-        static ExecutionView from(AgentExecution execution) {
+        static ExecutionView from(AgentExecution execution, Agent agent) {
             return new ExecutionView(
                     execution.id(),
                     execution.conversationId(),
+                    agent.code(),
+                    agent.name(),
                     execution.provider(),
                     execution.model(),
                     execution.costMode().name(),

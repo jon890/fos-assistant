@@ -10,9 +10,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "agent")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Agent {
 
     @Id
@@ -60,8 +65,6 @@ public class Agent {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
-
-    protected Agent() {}
 
     private Agent(String code, String name, String hermesProfile, String apiBaseUrl, String provider,
             String model, CostMode costMode, CredentialScope credentialScope,

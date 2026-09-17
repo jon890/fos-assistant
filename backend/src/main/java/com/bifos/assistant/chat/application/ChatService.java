@@ -18,6 +18,7 @@ import com.bifos.assistant.workspace.application.WorkspaceService;
 import com.bifos.assistant.workspace.domain.Workspace;
 import java.time.Instant;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
  * caller without an active binding is refused rather than served by someone else's credential.
  */
 @Service
+@RequiredArgsConstructor
 public class ChatService {
 
     private static final int TITLE_LIMIT = 60;
@@ -37,21 +39,6 @@ public class ChatService {
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
     private final WorkspaceService workspaces;
-
-    public ChatService(
-            ConversationRepository conversations,
-            ChatMessageRepository messages,
-            AgentService agents,
-            HermesRunsClient hermes,
-            ExecutionRecorder executions,
-            WorkspaceService workspaces) {
-        this.conversations = conversations;
-        this.messages = messages;
-        this.agents = agents;
-        this.hermes = hermes;
-        this.executions = executions;
-        this.workspaces = workspaces;
-    }
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String workspaceCode,
             String agentCode) {

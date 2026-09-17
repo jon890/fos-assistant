@@ -15,6 +15,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import jakarta.validation.Valid;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/chat")
+@RequiredArgsConstructor
 public class ChatController {
 
     private final ChatService chat;
@@ -31,19 +33,6 @@ public class ChatController {
     private final WorkspaceService workspaces;
     private final AppUserRepository users;
     private final AgentService agents;
-
-    public ChatController(
-            ChatService chat,
-            CurrentUserProvider currentUser,
-            WorkspaceService workspaces,
-            AppUserRepository users,
-            AgentService agents) {
-        this.chat = chat;
-        this.currentUser = currentUser;
-        this.workspaces = workspaces;
-        this.users = users;
-        this.agents = agents;
-    }
 
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {

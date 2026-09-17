@@ -21,6 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/usage" style={{ color: "var(--muted)" }}>
             사용량
           </Link>
+          <Link href="/admin/agents" style={{ color: "var(--muted)" }}>
+            에이전트 관리
+          </Link>
         </header>
         <main className="mx-auto w-full max-w-3xl px-4 py-6">{children}</main>
       </body>

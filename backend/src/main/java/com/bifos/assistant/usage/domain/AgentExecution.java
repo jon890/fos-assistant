@@ -10,6 +10,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * One agent turn, recorded for usage and cost reporting.
@@ -20,6 +23,8 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "agent_execution")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AgentExecution {
 
     @Id
@@ -93,9 +98,6 @@ public class AgentExecution {
 
     @Column(name = "finished_at", nullable = false)
     private Instant finishedAt;
-
-    protected AgentExecution() {
-    }
 
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;

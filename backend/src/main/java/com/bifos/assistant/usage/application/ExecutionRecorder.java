@@ -10,6 +10,7 @@ import com.bifos.assistant.usage.domain.EstimatedCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -19,15 +20,11 @@ import org.springframework.stereotype.Service;
  * 가격이 바뀔 때 지난달 합계가 따라 움직인다.
  */
 @Service
+@RequiredArgsConstructor
 public class ExecutionRecorder {
 
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;
-
-    public ExecutionRecorder(AgentExecutionRepository executions, CostEstimator costs) {
-        this.executions = executions;
-        this.costs = costs;
-    }
 
     public AgentExecution recordSuccess(
             CurrentUser user,

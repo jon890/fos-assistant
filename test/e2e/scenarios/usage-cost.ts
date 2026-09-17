@@ -15,6 +15,8 @@ import { CHAT_TURNS } from "./chat.ts";
 const MICROS_PER_RUN = 1440;
 
 type ExecutionView = {
+  agentCode: string;
+  agentName: string;
   provider: string | null;
   model: string | null;
   costMode: string;
@@ -47,6 +49,10 @@ export const usageCostScenario: Scenario = {
       `실행 ${CHAT_TURNS}건을 기대했는데 ${executions.length}건이다`,
     );
     for (const execution of executions) {
+      expect(
+        execution.agentCode === "dad" && execution.agentName === "Dad",
+        `사용량에 에이전트가 담기지 않았다: ${execution.agentCode} / ${execution.agentName}`,
+      );
       expect(
         execution.provider === DAD_BINDING.provider && execution.model === DAD_BINDING.model,
         `바인딩의 provider 와 모델이 기록되지 않았다: ${execution.provider} / ${execution.model}`,

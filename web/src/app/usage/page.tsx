@@ -4,6 +4,8 @@ import { callControlPlane } from "@/lib/control-plane";
 
 type Execution = {
   id: number;
+  agentCode: string;
+  agentName: string;
   provider: string | null;
   model: string | null;
   costMode: string;
@@ -88,6 +90,7 @@ export default async function UsagePage() {
             <thead style={{ color: "var(--muted)" }}>
               <tr>
                 <th className="py-2 pr-4">시각</th>
+                <th className="py-2 pr-4">에이전트</th>
                 <th className="py-2 pr-4">모델</th>
                 <th className="py-2 pr-4">상태</th>
                 <th className="py-2 pr-4">입력</th>
@@ -101,6 +104,7 @@ export default async function UsagePage() {
               {executions.map((execution) => (
                 <tr key={execution.id} className="border-t" style={{ borderColor: "var(--border)" }}>
                   <td className="py-2 pr-4">{new Date(execution.startedAt).toLocaleString("ko-KR")}</td>
+                  <td className="py-2 pr-4">{execution.agentName} ({execution.agentCode})</td>
                   <td className="py-2 pr-4">
                     {execution.provider ?? "-"} / {execution.model ?? "-"}
                   </td>

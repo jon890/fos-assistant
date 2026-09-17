@@ -11,6 +11,7 @@ type Turn = {
   senderName: string | null;
 };
 type Workspace = { code: string; name: string; visibility: string };
+type Agent = { code: string; name: string; model: string; visibility: string };
 type ErrorPayload = { code: string; message: string };
 
 async function readPayload<T>(response: Response): Promise<T> {
@@ -26,6 +27,8 @@ export function ChatPanel() {
   const [error, setError] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceCode, setWorkspaceCode] = useState<string>("");
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentCode, setAgentCode] = useState<string>("");
   const loadingConversation = useRef<number | null>(null);
   const selectionVersion = useRef(0);
 
@@ -34,6 +37,16 @@ export function ChatPanel() {
       .then((response) => (response.ok ? response.json() : []))
       .then((data: Workspace[]) => setWorkspaces(data))
       .catch(() => setWorkspaces([]));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/agents")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data: Agent[]) => {
+        setAgents(data);
+        setAgentCode((current) => current || data[0]?.code || "");
+      })
+      .catch(() => setAgents([]));
   }, []);
 
   useEffect(() => {
@@ -55,6 +68,7 @@ export function ChatPanel() {
 
         setConversationId(latest.id);
         setWorkspaceCode(latest.workspaceCode ?? "");
+        setAgentCode(latest.agentCode);
         loadingConversation.current = latest.id;
         const messagesResponse = await fetch(
           `/api/chat/conversations/${latest.id}/messages`,
@@ -83,6 +97,7 @@ export function ChatPanel() {
 
   // 대화가 시작된 뒤에는 그 대화의 영역이 고정된다. 요청 본문을 바꿔도 서버가 무시하므로 화면도 잠근다.
   const workspaceLocked = conversationId !== null;
+  const agentLocked = conversationId !== null;
 
   async function selectConversation(conversation: Conversation) {
     if (loadingConversation.current !== null || sending) return;
@@ -91,6 +106,7 @@ export function ChatPanel() {
     loadingConversation.current = conversation.id;
     setConversationId(conversation.id);
     setWorkspaceCode(conversation.workspaceCode ?? "");
+    setAgentCode(conversation.agentCode);
     setTurns([]);
     setError(null);
     try {
@@ -116,6 +132,7 @@ export function ChatPanel() {
     loadingConversation.current = null;
     setConversationId(null);
     setWorkspaceCode("");
+    setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
     setError(null);
   }
@@ -141,7 +158,7 @@ export function ChatPanel() {
   async function send(event: React.FormEvent) {
     event.preventDefault();
     const text = draft.trim();
-    if (text.length === 0 || sending) return;
+    if (text.length === 0 || sending || agentCode.length === 0) return;
 
     const pendingId = `pending-${Date.now()}`;
     setSending(true);
@@ -165,6 +182,7 @@ export function ChatPanel() {
           conversationId,
           text,
           workspaceCode: workspaceCode.length > 0 ? workspaceCode : null,
+          agentCode,
         }),
       });
       const payload = await readPayload<
@@ -208,6 +226,25 @@ export function ChatPanel() {
       />
 
       <div className="flex min-w-0 flex-col gap-4">
+        <label className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
+          에이전트
+          {!agentLocked && agents.length > 1 ? (
+            <select
+              value={agentCode}
+              onChange={(event) => setAgentCode(event.target.value)}
+              className="rounded-md border px-2 py-1 text-xs"
+              style={{ borderColor: "var(--border)", background: "transparent" }}
+            >
+              {agents.map((agent) => (
+                <option key={agent.code} value={agent.code}>{agent.name}</option>
+              ))}
+            </select>
+          ) : (
+            <span>{agents.find((agent) => agent.code === agentCode)?.name ?? "등록된 에이전트 없음"}</span>
+          )}
+          {agentLocked ? <span>이 대화는 에이전트가 고정됐다.</span> : null}
+        </label>
+
         <label className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
           작업 영역
           <select
@@ -256,18 +293,24 @@ export function ChatPanel() {
           </p>
         ) : null}
 
+        {agents.length === 0 ? (
+          <p className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--surface)" }}>
+            사용할 수 있는 에이전트가 없다. 관리자에게 에이전트 등록을 요청한다.
+          </p>
+        ) : null}
+
         <form onSubmit={send} className="flex gap-2">
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            disabled={sending}
+            disabled={sending || agents.length === 0}
             placeholder="무엇을 도와줄까요"
             className="flex-1 rounded-md border px-3 py-2 text-sm disabled:opacity-50"
             style={{ borderColor: "var(--border)", background: "transparent" }}
           />
           <button
             type="submit"
-            disabled={sending}
+            disabled={sending || agents.length === 0}
             className="rounded-md border px-4 py-2 text-sm disabled:opacity-50"
             style={{ borderColor: "var(--border)" }}
           >

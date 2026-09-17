@@ -7,9 +7,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "conversation")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Conversation {
 
     @Id
@@ -38,9 +43,6 @@ public class Conversation {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    protected Conversation() {
-    }
 
     private Conversation(Long userId, String title, Long workspaceId, Long agentId) {
         this.userId = userId;

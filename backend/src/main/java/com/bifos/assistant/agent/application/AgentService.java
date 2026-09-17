@@ -6,13 +6,13 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AgentService {
     private final AgentRepository agents;
-
-    public AgentService(AgentRepository agents) { this.agents = agents; }
 
     public List<Agent> readableBy(CurrentUser user) {
         return agents.findByEnabledTrueOrderByCodeAsc().stream()

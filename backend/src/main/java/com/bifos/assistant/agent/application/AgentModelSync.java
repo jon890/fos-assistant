@@ -5,19 +5,16 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesModelClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AgentModelSync {
     private static final Logger log = LoggerFactory.getLogger(AgentModelSync.class);
 
     private final HermesModelClient hermes;
     private final AgentRepository agents;
-
-    public AgentModelSync(HermesModelClient hermes, AgentRepository agents) {
-        this.hermes = hermes;
-        this.agents = agents;
-    }
 
     public SyncResult sync(Agent agent) {
         String model = hermes.readModel(agent.apiBaseUrl(), agent.hermesProfile());
