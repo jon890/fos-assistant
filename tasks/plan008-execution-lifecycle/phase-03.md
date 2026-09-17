@@ -85,6 +85,14 @@ List<AgentExecution> findByStatus(ExecutionStatus status);
 `test/browser/` 에 더한다.
 
 - 사용량 화면이 `RUNNING` 인 실행을 「도는 중」 으로 보이고 금액 자리가 비어 있다
+- browser fixture 의 가짜 Hermes 에 특정 실행을 완료 전 상태로 유지하고 테스트가 해제할 수 있는
+  제어를 더해, 화면이 완료 전에 `RUNNING` 을 읽는 것을 안정적으로 확인한다
+- `ORPHANED` 로 끝난 실행을 준비해 「중간에 끊김」으로 보이는지 확인한다
+
+`docs/data-schema.md` 의 「끝나지 않은 실행」 절과
+`docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md` 의
+사용량 설명을 실제 화면 계약에 맞춘다.
+`RUNNING` 은 사용량 목록에는 보이고 월 비용 합계에서만 빠진다고 적는다.
 
 ## 검증
 
@@ -105,6 +113,8 @@ node test/e2e/run.ts
 | `web/src/components/usage/` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/OrphanedExecutionSweeperTest.java` | 신규 |
 | `test/browser/` | 수정 |
+| `docs/data-schema.md` | 수정 |
+| `docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md` | 수정 |
 
 ## 끝낸 뒤
 

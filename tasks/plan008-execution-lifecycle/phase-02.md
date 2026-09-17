@@ -162,6 +162,7 @@ public AgentExecution fail(AgentExecution execution, String errorCode)
 `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java` 를 새로 만든다.
 
 - `start` 가 만든 줄이 `RUNNING` 이고 `finishedAt` 과 `latencyMs` 가 비어 있다
+- `start` 에 `parentExecutionId` 와 `rootExecutionId` 를 주면 같은 줄에 두 값이 저장된다
 - `complete` 뒤에 같은 `id` 의 줄이 `SUCCEEDED` 이고 토큰과 금액이 채워진다.
   **새 줄이 생기지 않는 것을 행 수로 확인한다**
 - `fail` 뒤에 같은 줄이 `FAILED` 이고 `errorCode` 가 적힌다
@@ -172,9 +173,14 @@ public AgentExecution fail(AgentExecution execution, String errorCode)
 - 대화 한 번이 실행 줄을 **하나만** 만든다
 - Hermes 가 실패를 돌려주면 그 줄이 `FAILED` 로 갱신되고 새 줄이 생기지 않는다
 
+`backend/src/test/java/com/bifos/assistant/usage/UsageCostRecordingTest.java` 의
+`recordSuccess` 와 `recordFailure` 호출도 새 lifecycle API 로 바꾼다.
+
 `test/e2e/scenarios/usage-cost.ts` 에 더한다.
 
 - `RUNNING` 인 실행이 있어도 `monthly.unpricedExecutions` 가 그것을 세지 않는다
+- 현재 가짜 Hermes 는 제출 직후 완료되므로, `test/e2e/fake-hermes.ts` 와 하네스에
+  특정 실행을 완료 전 상태로 유지하고 테스트가 해제할 수 있는 제어를 더한다
 
 ## 검증
 
@@ -209,4 +215,7 @@ cd backend && ./gradlew test --tests '*ExecutionLifecycleTest*'
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageCostRecordingTest.java` | 수정 |
 | `test/e2e/scenarios/usage-cost.ts` | 수정 |
+| `test/e2e/fake-hermes.ts` | 수정 |
+| `test/e2e/harness.ts` | 수정 |
