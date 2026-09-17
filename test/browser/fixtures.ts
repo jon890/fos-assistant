@@ -67,8 +67,8 @@ async function seedAgent(hermesBaseUrl: string): Promise<void> {
       provider: "openai-codex",
       costMode: "SUBSCRIPTION",
       credentialScope: "SHARED_HOUSEHOLD",
-      visibility: "FAMILY",
-      ownerEmail: null,
+      visibility: "PRIVATE",
+      ownerEmail: TEST_EMAIL,
     }),
   });
   if (!response.ok) {

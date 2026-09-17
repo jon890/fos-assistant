@@ -37,11 +37,35 @@ const LANGUAGE_ALIASES: Record<string, string> = {
 };
 
 function tokenClass(scopes: string[]): string {
-  if (scopes.some((scope) => scope.includes("comment"))) return "text-muted italic";
-  if (scopes.some((scope) => scope.includes("string") || scope.includes("constant.numeric"))) {
-    return "text-muted";
+  /*
+   * scopeName 은 Shiki 문법이 토큰의 역할을 설명하는 이름이다.
+   * comment 는 설명임을 드러내면서 본문과 거리를 두고, string 과 constant.numeric 은 값의 종류를 나눈다.
+   * keyword 와 storage.modifier 는 흐름과 선언을, function 계열은 호출 대상을, type 계열은 자료형과 클래스 이름을 나타낸다.
+   * 더 구체적인 역할부터 검사하며, 어느 역할에도 맞지 않는 식별자와 기호는 본문 색을 쓴다.
+   */
+  if (scopes.some((scope) => scope.includes("comment"))) return "text-code-comment italic";
+  if (scopes.some((scope) => scope.includes("string"))) return "text-code-string";
+  if (scopes.some((scope) => scope.includes("constant.numeric"))) return "text-code-number";
+  if (scopes.some((scope) => scope.includes("keyword") || scope.includes("storage.modifier"))) {
+    return "text-code-keyword";
   }
-  if (scopes.some((scope) => scope.includes("invalid"))) return "underline decoration-wavy";
+  if (scopes.some((scope) =>
+    scope.includes("entity.name.function")
+    || scope.includes("support.function")
+    || scope.includes("variable.function")
+    || scope.includes("meta.function-call"))) {
+    return "text-code-function";
+  }
+  if (scopes.some((scope) =>
+    scope.includes("entity.name.type")
+    || scope.includes("entity.name.class")
+    || scope.includes("entity.name.interface")
+    || scope.includes("entity.name.enum")
+    || scope.includes("support.type")
+    || scope.includes("support.class")
+    || scope.includes("storage.type"))) {
+    return "text-code-type";
+  }
   return "text-foreground";
 }
 

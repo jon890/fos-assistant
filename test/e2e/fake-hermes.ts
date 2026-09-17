@@ -50,7 +50,17 @@ function specialOutputFor(input: string): string | null {
     return Array.from({ length: 80 }, (_, index) => `${index + 1}번째 긴 답 줄`).join("\n\n");
   }
   if (input === "코드 블록 검사") {
-    return ["```java", "// 인사말", "String message = \"안녕하세요\";", "```"].join("\n");
+    return [
+      "```java",
+      "public class Greeting {",
+      "  // 인사 횟수",
+      "  private static final int COUNT = 3;",
+      "  void greet() {",
+      "    System.out.println(\"안녕하세요\");",
+      "  }",
+      "}",
+      "```",
+    ].join("\n");
   }
   return null;
 }
@@ -187,7 +197,9 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           session_id: submitted.session_id ?? `sess_${shortId()}`,
           // 실제 Hermes v0.21.0 이 내놓는 모양 그대로다. model 자리에는 API server 의 모델 이름이
           // 오는데 그 기본값이 profile 이름이고, provider 는 아예 없다.
-          model: profile,
+          model: submitted.input === "가격 없음 검사"
+            ? "unknown-model"
+            : submitted.input === "무료 모델 검사" ? "gpt-zero" : profile,
           output: specialOutputFor(submitted.input ?? "")
             ?? `[fake hermes on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
           input: submitted.input ?? "",

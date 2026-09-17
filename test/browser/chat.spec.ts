@@ -49,6 +49,33 @@ test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", asyn
   expect(await page.evaluate(() => (window as typeof window & { __unsafeAgentHtml?: boolean }).__unsafeAgentHtml)).toBeUndefined();
 });
 
+test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다", async ({ page }) => {
+  await page.goto("/");
+  const composer = page.getByPlaceholder("무엇을 도와줄까요");
+  await composer.fill("코드 블록 검사");
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const classes = ["keyword", "string", "number", "function", "type", "comment"];
+  for (const name of classes) {
+    await expect(page.locator(`.text-code-${name}`).first()).toBeVisible();
+  }
+
+  async function colors(dark: boolean) {
+    await page.locator("html").evaluate((html, enabled) => html.classList.toggle("dark", enabled), dark);
+    return page.evaluate((names) => Object.fromEntries(names.map((name) => {
+      const element = document.querySelector(`.text-code-${name}`);
+      return [name, element ? getComputedStyle(element).color : null];
+    })), classes);
+  }
+
+  const light = await colors(false);
+  const dark = await colors(true);
+  expect(new Set(Object.values(light)).size).toBe(classes.length);
+  expect(new Set(Object.values(dark)).size).toBe(classes.length);
+  for (const name of classes) expect(dark[name]).not.toBe(light[name]);
+  await expect(page.locator(".text-code-comment").first()).toHaveCSS("font-style", "italic");
+});
+
 test("위로 올려 읽는 동안 새 답이 와도 읽던 자리를 지킨다", async ({ page }) => {
   await page.goto("/");
   const composer = page.getByPlaceholder("무엇을 도와줄까요");
