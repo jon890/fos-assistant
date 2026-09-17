@@ -47,17 +47,22 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     }
 
     @Override
-    public HermesRunResult runToCompletion(HermesRunCommand command) {
+    public String submit(HermesRunCommand command) {
         String apiKey = keyStore.resolve(command.profileName());
-        JsonNode created = submit(command, apiKey);
+        JsonNode created = submitRequest(command, apiKey);
         String runId = text(created, "run_id");
         if (runId == null) {
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "Hermes did not return a run id");
         }
-        return poll(command, runId, apiKey);
+        return runId;
     }
 
-    private JsonNode submit(HermesRunCommand command, String apiKey) {
+    @Override
+    public HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
+        return poll(command, runId, keyStore.resolve(command.profileName()));
+    }
+
+    private JsonNode submitRequest(HermesRunCommand command, String apiKey) {
         Map<String, Object> body = new HashMap<>();
         body.put("input", command.input());
         if (command.sessionId() != null) {

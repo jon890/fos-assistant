@@ -1,6 +1,8 @@
 package com.bifos.assistant.shared.config;
 
 import com.bifos.assistant.shared.auth.ControlPlaneJwtFilter;
+import jakarta.servlet.DispatcherType;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,13 +14,24 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
+    public FilterRegistrationBean<ControlPlaneJwtFilter> disableDirectJwtFilterRegistration(
+            ControlPlaneJwtFilter jwtFilter) {
+        FilterRegistrationBean<ControlPlaneJwtFilter> registration =
+                new FilterRegistrationBean<>(jwtFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, ControlPlaneJwtFilter jwtFilter)
             throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(
                         auth ->
-                                auth.requestMatchers("/actuator/health", "/actuator/health/**")
+                                auth.dispatcherTypeMatchers(DispatcherType.ASYNC)
+                                        .permitAll()
+                                        .requestMatchers("/actuator/health", "/actuator/health/**")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
