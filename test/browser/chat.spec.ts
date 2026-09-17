@@ -38,6 +38,73 @@ test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({ page 
   await expect(page.getByRole("button", { name: "대화 목록 열기" })).toBeHidden();
 });
 
+test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을 알약 하나로 보인다", async ({ page }) => {
+  await page.goto("/");
+  const composer = page.getByPlaceholder("무엇을 도와줄까요");
+  const send = page.getByRole("button", { name: "보내기" });
+  await expect(send).toBeDisabled();
+
+  await composer.fill("말풍선 배치 검사");
+  await expect(send).toBeEnabled();
+  await page.mouse.move(0, 0);
+  const sendColors = await send.evaluate((button) => ({
+    background: getComputedStyle(button).backgroundColor,
+    brand: getComputedStyle(document.documentElement).getPropertyValue("--brand").trim(),
+  }));
+  expect(sendColors.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(sendColors.background).toBe("rgb(176, 90, 60)");
+  expect(sendColors.brand).toBe("#b05a3c");
+  await send.click();
+  await expect(composer).toBeEnabled();
+
+  const userMessage = page.getByTestId("user-message").last();
+  const assistantMessage = page.getByTestId("assistant-message").last();
+  await expect(userMessage).toBeVisible();
+  await expect(assistantMessage).toBeVisible();
+  const userTime = userMessage.locator("time");
+  const assistantTime = assistantMessage.locator("time");
+  await expect(userTime).toBeHidden();
+  await expect(assistantTime).toBeHidden();
+  await userMessage.hover();
+  await expect(userTime).toBeVisible();
+  await assistantMessage.focus();
+  await expect(assistantTime).toBeVisible();
+
+  const userBox = await userMessage.boundingBox();
+  const assistantBox = await assistantMessage.boundingBox();
+  expect(userBox).not.toBeNull();
+  expect(assistantBox).not.toBeNull();
+  expect(
+    Math.abs(
+      (userBox?.x ?? 0)
+      + (userBox?.width ?? 0)
+      - ((assistantBox?.x ?? 0) + (assistantBox?.width ?? 0)),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(userBox?.x ?? 0).toBeGreaterThan(assistantBox?.x ?? 0);
+  expect(userBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (assistantBox?.width ?? 0) * 0.7 + 1,
+  );
+
+  const composerShell = page.getByTestId("composer-shell");
+  const shellBox = await composerShell.boundingBox();
+  const sendBox = await send.boundingBox();
+  expect(shellBox).not.toBeNull();
+  expect(sendBox).not.toBeNull();
+  expect(sendBox?.x ?? 0).toBeGreaterThanOrEqual(
+    shellBox?.x ?? Number.POSITIVE_INFINITY,
+  );
+  expect((sendBox?.x ?? 0) + (sendBox?.width ?? 0)).toBeLessThanOrEqual(
+    (shellBox?.x ?? 0) + (shellBox?.width ?? 0),
+  );
+  expect(sendBox?.y ?? 0).toBeGreaterThanOrEqual(
+    shellBox?.y ?? Number.POSITIVE_INFINITY,
+  );
+  expect((sendBox?.y ?? 0) + (sendBox?.height ?? 0)).toBeLessThanOrEqual(
+    (shellBox?.y ?? 0) + (shellBox?.height ?? 0),
+  );
+});
+
 test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", async ({ page }) => {
   await page.goto("/");
   const composer = page.getByPlaceholder("무엇을 도와줄까요");

@@ -35,6 +35,7 @@ export async function setSession(
       name: user.name,
     },
   });
+  await context.clearCookies({ name: SESSION_COOKIE });
   await context.addCookies([
     {
       name: SESSION_COOKIE,
