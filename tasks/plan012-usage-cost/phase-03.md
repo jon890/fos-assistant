@@ -43,8 +43,15 @@ phase-01 이 금액을 둘로 나눴고 phase-02 가 실행 당시 상태를 남
 - 합계를 데이터베이스에서 낸다. 줄을 다 읽어 와서 더하지 않는다.
   한 달치 실행 수가 화면이 보여 주는 50줄보다 훨씬 많아질 수 있다.
   기존 `sumCostBetween` 이 같은 이유로 그렇게 돼 있다.
-- 자식을 포함한 합계는 `ADR-014` 가 정한 대로만 낸다.
-  자식 토큰이 부모에 이미 들어 있는지 확인되기 전에는 더한 값을 보이지 않는다.
+- **자식 토큰은 부모 usage 에 포함되지 않는다.** `ADR-016` 의 「자식 토큰 실측」 절이
+  부모 16,583 토큰과 자식 6,544 토큰을 따로 측정해 확정했다.
+  그러므로 실행 줄을 전부 세는 것이 실제 사용량이고, 두 번 세어지지 않는다.
+  뿌리만 세는 값을 따로 내지 않는다.
+- 지금은 자식 실행을 만드는 경로가 없다.
+  `ChatService` 가 `parentExecutionId` 와 `rootExecutionId` 를 모두 `null` 로 넘긴다.
+  그래서 이 phase 의 합계는 당분간 뿌리 실행만 세는 것과 같은 값이 나온다.
+- 기존 `sumCostBetween` 과 `MonthlyCost` 를 고치지 않는다. 새 메서드와 새 record 를 더한다.
+  같은 파일을 다른 작업이 동시에 고치고 있다.
 
 ## 작업 항목
 
@@ -77,12 +84,16 @@ List<CostByFingerprint> sumByFingerprintBetween(Long userId, Instant from, Insta
 | `actualMicros` | 실제 청구액 합계 |
 | `inputTokens`, `outputTokens` | 토큰 합계 |
 | `avgContextChars` | 문맥 글자 수 평균 |
+| `firstSeenAt` | 그 묶음에서 가장 이른 `started_at` |
+| `lastSeenAt` | 그 묶음에서 가장 늦은 `started_at` |
+
+`firstSeenAt` 과 `lastSeenAt` 은 「무엇이 달라졌나」 표가 지문의 구간을 그릴 때 쓴다.
 
 **`RUNNING` 을 모든 합계에서 뺀다.** plan008 의 phase-02 가 정한 규칙과 같다.
 
-**뿌리만 세는 것과 전부 세는 것을 나눈다.**
-자식 실행의 토큰이 부모에 이미 들어 있는지 확인되기 전까지,
-「전부」 쪽은 내되 화면에서 두 값을 나란히 보이고 어느 쪽이 무엇인지 적는다.
+**실행 줄을 전부 센다.** 뿌리만 세는 값을 따로 내지 않는다.
+자식 토큰이 부모 usage 에 포함되지 않는 것을 `ADR-016` 이 실측으로 확정했으므로
+전부 세는 것이 실제 사용량이고 두 번 세어지지 않는다.
 
 ### 2. 분석 API
 
@@ -126,6 +137,10 @@ List<CostByFingerprint> sumByFingerprintBetween(Long userId, Instant from, Insta
 설정을 바꾼 것이 비용에 어떤 영향을 줬는지 그 표 하나로 읽힌다.
 
 지문이 하나뿐이면 이 절을 그리지 않는다. 견줄 것이 없다.
+**지문이 하나도 없어도 그리지 않는다.**
+phase-02 가 `runtime_fingerprint` 를 항상 비워 두는 쪽으로 끝났으면 이 경우가 기본값이 된다.
+그때도 `fingerprint` 축 자체는 만든다. 값이 들어오기 시작하면 고칠 곳이 없어야 한다.
+지문이 `null` 인 실행은 그 축에서 한 묶음으로 모으지 않고 통째로 뺀다.
 
 ### 4. 실행 목록에 문맥 크기를 더한다
 
@@ -142,7 +157,18 @@ List<CostByFingerprint> sumByFingerprintBetween(Long userId, Instant from, Insta
 | 지문이 하나뿐 | 「무엇이 달라졌나」 절을 그리지 않는다 |
 | 실제 청구액이 전부 비어 있다 | 그 열에 「구독」 을 적고 금액을 쓰지 않는다 |
 
-### 6. 이 phase 를 검증하는 테스트
+### 6. 브라우저 테스트가 쓸 준비 경로
+
+지금 실행을 심는 수단은 `backend/src/test/java/com/bifos/assistant/testsupport/UsageTestSupportController.java`
+의 `last-execution/orphaned` 하나뿐이다. 그것으로는 축이 둘로 갈리는 화면을 만들 수 없다.
+
+같은 컨트롤러에 실행 여러 건을 심는 경로를 더한다.
+심을 값에 **에이전트, 지문, 시작 시각, 토큰, 두 금액**이 들어간다.
+
+**이 컨트롤러는 test profile 에서만 뜬다.** 운영 코드에 시험용 문을 만들지 않는다.
+기존 파일이 이미 그 조건을 갖고 있으면 그대로 따른다.
+
+### 7. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/usage/UsageBreakdownTest.java` 를 새로 만든다.
 
@@ -167,10 +193,14 @@ List<CostByFingerprint> sumByFingerprintBetween(Long userId, Instant from, Insta
 ```bash
 # cwd: 저장소 root
 cd backend && ./gradlew test
-node test/e2e/run.ts
-cd web && pnpm typecheck && pnpm build
+cd web && pnpm typecheck
+cd web && pnpm build
 cd web && pnpm test:browser
+node test/e2e/run.ts
+scripts/check-public-safe.sh
 ```
+
+`AGENTS.md` 의 「확인」 절이 정한 순서다.
 
 ```bash
 # cwd: 저장소 root
@@ -179,8 +209,10 @@ cd backend && ./gradlew test --tests '*UsageBreakdownTest*'
 
 ```bash
 # cwd: 저장소 root
-grep -rn 'style={{' web/src/components/usage/ | grep -iE 'background|color|border' && echo "실패: 색 인라인 스타일" || echo "통과"
+! grep -rn 'style={{' web/src/components/usage/ | grep -iE 'background|color|border'
 ```
+
+색 인라인 스타일이 하나라도 있으면 종료 코드가 1 이다.
 
 합계를 데이터베이스에서 내는지 확인한다.
 실행 100건을 넣고 축별 조회가 질의 몇 번을 내는지 세어 보고에 적는다.
@@ -198,8 +230,13 @@ grep -rn 'style={{' web/src/components/usage/ | grep -iE 'background|color|borde
 | `backend/src/main/java/com/bifos/assistant/usage/domain/CostByFingerprint.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageController.java` | 수정 |
 | `web/src/app/usage/page.tsx` | 수정 |
-| `web/src/components/usage/` 의 표 부품 | 신규 또는 수정 |
+| `web/src/components/usage/breakdown-section.tsx` | 신규 |
+| `web/src/components/usage/breakdown-table.tsx` | 신규 |
+| `web/src/components/usage/fingerprint-section.tsx` | 신규 |
+| `web/src/components/usage/execution-table.tsx` | 수정 |
+| `web/src/components/usage/execution-card.tsx` | 수정 |
 | `web/src/app/api/usage/breakdown/route.ts` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/UsageTestSupportController.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/UsageBreakdownTest.java` | 신규 |
 | `test/browser/usage-breakdown.spec.ts` | 신규 |
 

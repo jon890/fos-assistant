@@ -71,7 +71,9 @@ API 를 부르지 않고 도는 명령이다.
 **실행마다 이 명령을 부르지 않는다.** 그러면 실행이 느려지고 홈서버에 부담이 된다.
 에이전트별로 캐시하고, 캐시가 오래되면 다시 읽는다.
 
-### 2. `backend/src/main/resources/db/migration/V10__execution_fingerprint.sql` 신규
+### 2. `backend/src/main/resources/db/migration/V11__execution_fingerprint.sql` 신규
+
+`V9` 까지 적용돼 있고 `V10` 은 다른 작업이 쓴다. 그래서 이 파일은 `V11` 이다.
 
 ```sql
 ALTER TABLE agent_execution
@@ -120,24 +122,38 @@ Control Plane 이 홈서버에 ssh 로 붙어 명령을 돌리는 구조는 만�
 
 ### 4. `ExecutionRecorder` 가 적는다
 
-`start` 에서 `runtimeFingerprint` 와 `instructionsHash` 를 받아 적는다.
+`start` 가 지금 6개 인자를 받는다. 여기에 인자를 더 붙이지 않는다.
+**값을 담은 record 하나를 받는 오버로드를 더한다.** 기존 6인자 메서드는 남긴다.
+같은 메서드를 다른 작업이 동시에 고치고 있어 인자를 늘리면 머지할 때 충돌한다.
+
+```java
+/** 실행을 시작할 때 함께 적는 실행 당시의 상태. 모르는 값은 null 이다. */
+public record ExecutionContextSnapshot(
+        Long contextChars,
+        String runtimeFingerprint,
+        String instructionsHash) {
+}
+```
+
 `instructionsHash` 는 `ContextAssembler` 가 만든 문자열의 SHA-256 앞 16바이트다.
+16진수로 32글자가 된다.
 
 `instructions` 가 비어 있으면 이 칸도 비운다. 빈 문자열의 해시를 적지 않는다.
 
 ### 5. 사용량 조회가 낸다
 
-`ExecutionView` 에 `contextChars`, `runtimeFingerprint`, `instructionsHash` 를 더한다.
+`ExecutionView` 에 `runtimeFingerprint` 와 `instructionsHash` 를 더한다.
 `contextChars` 는 plan009 의 phase-02 가 이미 더했다.
 
-### 6. 이 phase 를 검증하는 테스트
+### 6. 스키마 문서를 함께 고친다
 
-`backend/src/test/java/com/bifos/assistant/agent/RuntimeFingerprintReaderTest.java` 를 새로 만든다.
+`docs/data-schema.md` 의 「agent_execution」 칸 표에 두 칸을 더한다.
+그 표가 `context_chars` 와 `actual_cost_micros` 까지 이미 적고 있어, 이번에 더하는 두 칸만 빠지면 안 된다.
 
-- **정상 경로**: 같은 구성이면 같은 지문이 나온다
-- 도구 수가 달라지면 지문이 달라진다
-- **이 phase 가 다루는 실패**: 읽지 못하면 `null` 을 내고 예외를 던지지 않는다
-- 캐시 수명 안에는 다시 읽지 않는다
+같은 문서의 「자식 실행의 토큰이 부모의 합계에 이미 들어 있는지는 아직 확인하지 못했다」 문단을
+`ADR-016` 의 실측에 맞춰 고친다. 자식 토큰은 부모 usage 에 포함되지 않는다.
+
+### 7. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java` 에 더한다.
 
@@ -151,23 +167,34 @@ Control Plane 이 홈서버에 ssh 로 붙어 명령을 돌리는 구조는 만�
 ```bash
 # cwd: 저장소 root
 cd backend && ./gradlew test
+cd web && pnpm typecheck
+cd web && pnpm build
+cd web && pnpm test:browser
 node test/e2e/run.ts
-cd web && pnpm typecheck && pnpm build
+scripts/check-public-safe.sh
 ```
+
+`AGENTS.md` 의 「확인」 절이 정한 순서다.
+`scripts/check-public-safe.sh` 는 이 phase 에서 특히 중요하다.
+홈서버와 Hermes profile 을 다루는 phase 라 운영 정보가 새기 쉽다.
 
 ```bash
 # cwd: 저장소 root
-cd backend && ./gradlew test --tests '*RuntimeFingerprintReaderTest*'
+cd backend && ./gradlew test --tests '*ExecutionLifecycleTest*'
 ```
 
-실행마다 홈서버를 부르지 않는지 확인한다.
-가짜를 호출 수를 세도록 만들고, 실행 셋을 돌렸을 때 호출이 한 번인 것을 본다.
+**Control Plane 이 홈서버로 나가는 새 호출을 만들지 않은 것을 확인한다.**
+
+```bash
+# cwd: 저장소 root
+! grep -rn 'ProcessBuilder\|Runtime.getRuntime\|ssh ' backend/src/main/java/
+```
 
 ## Critical Files
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V10__execution_fingerprint.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V11__execution_fingerprint.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/RuntimeFingerprintReader.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |
