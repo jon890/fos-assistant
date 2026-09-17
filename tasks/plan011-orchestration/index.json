@@ -1,0 +1,13 @@
+{
+  "name": "plan011-orchestration",
+  "description": "Hermes 의 orchestration 기능을 조사해 ADR 로 방식을 정하고, 가장 작은 다중 에이전트 실행 하나를 만든다",
+  "status": "pending",
+  "created_at": "2026-09-17",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+  ]
+}
