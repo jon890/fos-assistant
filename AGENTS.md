@@ -13,6 +13,36 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 
+## 용어
+
+**한 낱말이 한 가지만 가리키게 한다.**
+`구성원` 이 사람을 뜻하는지 권한 등급을 뜻하는지 갈려 실제로 혼란이 있었다.
+
+| 무엇 | 쓰는 말 | 쓰지 않는 말 |
+| --- | --- | --- |
+| 가족 한 사람 | **사용자** | 구성원, member |
+| 관리자가 아닌 권한 등급 | **`MEMBER` 역할** | 구성원 |
+| Hermes 쪽 격리 단위 | **profile** | |
+| 대화를 시작할 때 고르는 것 | **에이전트** | |
+| 사용자를 추가할 때 만드는 profile | **기본 profile** | 구성원 profile |
+| 역할용으로 따로 만든 profile | **역할 profile** | |
+
+`MEMBER` 는 코드의 값이므로 그대로 쓰되, 사람을 가리킬 때는 쓰지 않는다.
+
+층이 넷이고 서로 다르다.
+
+```
+사용자 (app_user)
+ └ 그 사용자의 profile 들
+     └ 각 profile 을 가리키는 에이전트 (agent 표)
+         └ 그 에이전트로 시작한 대화 (conversation)
+```
+
+**한 사용자가 profile 을 여럿 가질 수 있다.**
+기본 profile 하나에 역할 profile 을 더한다.
+둘은 만드는 방법이 달라 설정도 다르다.
+`fos-home-infra` 가 그 차이를 소유한다.
+
 ## 지켜야 할 것
 
 - **이 저장소는 공개 저장소다. 홈서버의 운영 정보를 적지 않는다.** 아래 「공개 저장소」 를 본다.

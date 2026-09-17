@@ -8,7 +8,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 ## app_user
 
-가족 구성원이다.
+사용자이다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -158,7 +158,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 `PROPOSED` 는 사람이 아직 보지 않은 것이고, 에이전트가 그것을 사실로 쓰면 안 된다.
 
 주입할 때 요청자의 `USER` 항목과 그 가족의 `FAMILY` 항목만 고른다.
-다른 구성원의 `USER` 항목은 고르는 단계에서 빠지므로 Hermes 로 나가는 문자열에 들어가지 않는다.
+다른 사용자의 `USER` 항목은 고르는 단계에서 빠지므로 Hermes 로 나가는 문자열에 들어가지 않는다.
 `proposal_dedup_key`에는 유일 제약이 있어 같은 제안이 동시에 들어와도 두 행이 생기지 않는다.
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md)과
 [ADR-012](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)에 있다.
@@ -170,7 +170,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
-| `user_id` | BIGINT | 이 토큰이 정하는 구성원 |
+| `user_id` | BIGINT | 이 토큰이 정하는 사용자 |
 | `token_hash` | VARCHAR(64) | 토큰 원문의 SHA-256 해시. 원문은 저장하지 않는다 |
 | `label` | VARCHAR(100) | 관리자가 토큰 용도를 구분하는 이름 |
 | `created_at` | DATETIME(6) | 발급 시각 |
