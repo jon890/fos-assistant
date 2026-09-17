@@ -29,6 +29,9 @@ management:
 assistant:
   auth:
     jwt-secret: ${ASSISTANT_JWT_SECRET}
+  pricing:
+    # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
+    catalog-path: ${ASSISTANT_PRICING_CATALOG:}
 
 hermes:
   profile-key-dir: ${HERMES_PROFILE_KEY_DIR}

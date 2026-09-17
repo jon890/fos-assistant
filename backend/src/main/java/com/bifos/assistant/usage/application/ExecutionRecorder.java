@@ -6,19 +6,27 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.EstimatedCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
 
-/** Writes one row per agent turn so usage stays attributable to a user, a model and a provider. */
+/**
+ * 에이전트 turn 하나를 한 줄로 남긴다. 그래야 사용량을 사용자, 모델, provider 로 되짚을 수 있다.
+ *
+ * <p>비용은 실행이 끝나는 이 자리에서 환산하고 쓴 가격표와 함께 저장한다. 조회할 때 다시 계산하면
+ * 가격이 바뀔 때 지난달 합계가 따라 움직인다.
+ */
 @Service
 public class ExecutionRecorder {
 
     private final AgentExecutionRepository executions;
+    private final CostEstimator costs;
 
-    public ExecutionRecorder(AgentExecutionRepository executions) {
+    public ExecutionRecorder(AgentExecutionRepository executions, CostEstimator costs) {
         this.executions = executions;
+        this.costs = costs;
     }
 
     public AgentExecution recordSuccess(
@@ -28,12 +36,15 @@ public class ExecutionRecorder {
             HermesRunResult result,
             Instant startedAt) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
+        String provider = firstNonBlank(result.provider(), binding.provider());
+        String model = modelOf(result, binding);
         return executions.save(
                 base(user, conversation, binding, startedAt)
                         .hermesRunId(result.runId())
-                        .provider(firstNonBlank(result.provider(), binding.provider()))
-                        .model(modelOf(result, binding))
+                        .provider(provider)
+                        .model(model)
                         .status(ExecutionStatus.SUCCEEDED)
+                        .cost(costs.estimate(provider, model, usage))
                         .tokens(
                                 usage.inputTokens(),
                                 usage.cachedInputTokens(),
@@ -54,6 +65,8 @@ public class ExecutionRecorder {
                         .model(binding.model())
                         .status(ExecutionStatus.FAILED)
                         .errorCode(errorCode)
+                        // 실패한 실행은 토큰 수를 보고하지 않으므로 환산할 것이 없다.
+                        .cost(EstimatedCost.unknown())
                         .build());
     }
 
