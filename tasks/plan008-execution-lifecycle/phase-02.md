@@ -86,7 +86,7 @@ public enum ExecutionStatus {
 | `parentExecutionId` | `Long` | |
 | `rootExecutionId` | `Long` | |
 | `contextChars` | `Long` | plan009 가 채운다 |
-| `actualCostMicros` | `Long` | plan012 가 채운다 |
+| `actualCostMicros` | `Long` | 종량 경로의 실제 청구액. 채우는 쪽은 만들어졌다 |
 
 `finishedAt` 을 `nullable = true` 로, `latencyMs` 를 `long` 에서 `Long` 으로 바꾼다.
 `Builder.timing(...)` 이 `finishedAt` 에서 `latencyMs` 를 계산하고 있는데,
