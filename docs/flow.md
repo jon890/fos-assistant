@@ -14,20 +14,44 @@ sequenceDiagram
 
     B->>W: 메시지와 대화 번호
     W->>W: 세션에서 메일 주소를 꺼내 짧은 수명의 토큰을 만든다
-    W->>C: POST /api/v1/chat/messages
+    alt 한 번에 받는 경로
+        W->>C: POST /api/v1/chat/messages
+    else 스트리밍 경로
+        W->>C: POST /api/v1/chat/messages/stream
+    end
     C->>C: 대화에 고정된 에이전트에서 profile 을 꺼낸다
     C->>C: 대화에 적힌 작업 영역의 안내문을 읽는다
     C->>H: POST {profile}/v1/runs
-    loop 끝날 때까지
+    alt 한 번에 받는 경로
+        loop 끝날 때까지
+            C->>H: GET {profile}/v1/runs/{id}
+        end
+    else 스트리밍 경로
+        C->>H: GET {profile}/v1/runs/{id}/events
+        loop 실행 중
+            H-->>C: 답 조각과 도구 사건
+            C-->>W: delta 와 tool 사건
+            W-->>B: 답 조각과 도구 상태
+        end
         C->>H: GET {profile}/v1/runs/{id}
     end
     C->>C: 메시지와 실행 기록을 남긴다
-    C-->>B: 답과 대화 번호
+    alt 한 번에 받는 경로
+        C-->>B: 답과 대화 번호
+    else 스트리밍 경로
+        C-->>W: done 과 저장된 메시지 번호
+        W-->>B: done
+        B->>W: 저장된 대화 이력 조회
+    end
 ```
 
 대화가 없으면 새로 만들고 첫 메시지가 에이전트와 작업 영역을 정한다.
 이어지는 요청이 에이전트나 영역을 다시 주더라도 대화에 적힌 값을 쓴다.
 `hermes_session_id` 가 특정 profile 안의 session 이라, 중간에 영역이나 에이전트가 바뀌면 그 session 이 가리키는 것이 없어진다.
+
+두 경로 모두 Hermes 실행 상태 조회가 돌려준 최종 `output` 과 `usage` 를 저장한다.
+스트리밍 경로의 답 조각은 화면에만 쓰며, 이벤트 연결이 중간에 끝나도 최종 상태를 조회해 메시지와 실행 기록을 남긴다.
+브라우저는 `done` 을 받으면 대화 이력을 다시 읽고 화면의 답 조각을 저장된 답으로 바꾼다.
 
 ## 대화 이력
 
