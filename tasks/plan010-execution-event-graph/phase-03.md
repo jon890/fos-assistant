@@ -76,7 +76,10 @@ Chief
 
 `execution-node.tsx` 가 재귀로 자신을 그린다.
 **깊이 상한을 화면에서도 둔다.** 서버가 8 에서 자르지만 화면도 자체로 멈춘다.
-서버가 `truncated` 를 참으로 주면 그 자리에 「여기부터 보이지 않는다」 를 한 줄로 적는다.
+
+노드의 `truncated` 가 참이면 **그 노드의 자식 자리에** 「여기부터 보이지 않는다」 를 한 줄로 적는다.
+phase-02 가 노드마다 그 값을 준다. 나무 전체의 `truncated` 는 잘린 자리를 가리키지 않으므로
+그 값으로 줄을 그리지 않는다.
 
 ### 3. 사건을 한 줄로 합친다
 
@@ -101,6 +104,9 @@ Chief
 
 `web/src/app/api/usage/executions/[id]/tree/route.ts` 다.
 브라우저가 Control Plane 토큰을 갖지 않으므로 서버 라우트가 토큰을 만들어 부른다.
+
+`web/src/app/api/usage/route.ts` 는 고치지 않는다.
+그 라우트가 응답을 `unknown[]` 으로 그대로 흘려 보내므로 `hasChildren` 이 저절로 따라온다.
 
 ### 5. 사용량 목록에서 들어가게 한다
 
@@ -128,9 +134,18 @@ phase-02 가 `hasChildren` 을 응답에 더했다.
 - `TOOL_STARTED` 와 `TOOL_COMPLETED` 가 한 줄로 합쳐진다
 - **이 phase 가 다루는 실패**: 사건이 없는 실행을 열면 「기록된 사건이 없다」 가 보이고
   요약은 그대로 보인다
-- 하위 에이전트 노드가 한 단 들여써서 보인다
+- 하위 에이전트 사건이 한 줄로 보인다
 - `mobile` 과 `desktop` 두 폭에서 가로로 넘치지 않는다.
   깊은 나무에서 들여쓰기가 화면을 밀어내지 않는지 본다
+
+**이 테스트가 볼 수 있는 것은 phase-01 의 가짜 Hermes 가 보내는 것뿐이다.**
+phase-01 이 도구 쌍 둘과 `subagent.start`·`subagent.complete` 를 보내도록 이미 더했다.
+**자식 실행을 만드는 경로는 아직 없다.**
+그래서 하위 에이전트는 자식 노드가 아니라 한 줄로 그려지고, 테스트도 그것을 본다.
+자식 노드의 들여쓰기는 plan011 이 그 경로를 만든 뒤에 검사한다.
+
+들여쓰기가 화면을 미는지는 서버 응답을 가로채 깊은 나무를 만들어 본다.
+`page.route` 로 `/api/usage/executions/*/tree` 를 가로채 깊이 5 짜리 응답을 돌려준다.
 
 ## 검증
 
@@ -158,8 +173,14 @@ grep -rn 'style={{' web/src/components/execution/ | grep -iE 'background|color|b
 | `web/src/components/execution/execution-tree.tsx` | 신규 |
 | `web/src/components/execution/execution-node.tsx` | 신규 |
 | `web/src/components/execution/execution-event-row.tsx` | 신규 |
-| `web/src/components/usage/` 의 실행 목록 | 수정 |
+| `web/src/app/usage/page.tsx` | 수정 (`hasChildren` 를 목록에 넘긴다) |
+| `web/src/components/usage/execution-list.tsx` | 수정 |
+| `web/src/components/usage/execution-table.tsx` | 수정 (누르면 들어간다) |
+| `web/src/components/usage/execution-card.tsx` | 수정 (누르면 들어간다) |
 | `test/browser/execution-tree.spec.ts` | 신규 |
+
+**`web/src/components/usage/` 와 `web/src/app/usage/page.tsx` 를 다른 plan 도 고친다.**
+칸과 줄을 더하는 방향으로만 간다.
 
 ## 끝낸 뒤
 

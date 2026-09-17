@@ -48,29 +48,37 @@ ADR-001 이 Hermes core 를 고치지 않기로 했으므로 그것을 막을 �
 
 ## 작업 항목
 
-### 1. 실제 사건 이름을 먼저 확인한다
+### 1. 실제 사건 이름은 이미 확인돼 있다
 
-**코드를 쓰기 전에 한다.** 지금 `forward` 가 `contains` 와 `startsWith` 로
-느슨하게 맞추고 있어, 실제로 어떤 이름이 오는지 이 저장소에 적힌 곳이 없다.
+**코드를 쓰기 전에 이 표를 읽는다. 짐작한 이름을 새로 만들지 않는다.**
 
-실제 실행 하나를 걸어 `GET /v1/runs/{id}/events` 가 보내는 사건 이름을 모은다.
-도구를 실제로 부르는 문장을 보내야 도구 계열 사건이 나온다.
+`docs/hermes-integration.md` 의 「실행 이벤트가 실제로 오는 형태」 절이
+v0.21.0 의 `gateway/platforms/api_server_runs.py` 를 실측해 아래를 적어 두었다.
+`test/e2e/fake-hermes.ts` 도 이 이름으로 보낸다.
 
-**이 저장소는 공개 저장소다. 실행 방법을 여기 적지 않는다.**
-홈서버의 주소와 포트와 컨테이너 구조와 key 가 있는 자리를 적지 않는다.
-운영 절차는 비공개 저장소 `fos-home-infra` 가 소유하고,
-이 phase 를 실행하는 사람은 그 저장소의 Hermes 운영 문서를 본다.
+| Hermes `event` | 함께 오는 칸 | 우리 이름 |
+| --- | --- | --- |
+| `message.delta` | `delta` | 저장하지 않는다 |
+| `tool.started` | `tool`, `preview` | `TOOL_STARTED` |
+| `tool.completed` | `tool`, `duration` (초), `error` | `TOOL_COMPLETED` |
+| `subagent.start` | `preview` | `SUBAGENT_STARTED` |
+| `subagent.complete` | `preview` | `SUBAGENT_COMPLETED` |
+| `reasoning.available` | `text` | 저장하지 않는다 |
+| `run.completed` | `output`, `usage` | `RUN_COMPLETED` |
+| `run.failed`, `run.cancelled` | 없음 | `RUN_FAILED` |
 
-확인한 것 중 아래 둘은 이미 알려져 있다.
+**사건 이름은 `type` 이 아니라 `event` 로 온다.**
+`HermesRunEventStream.emit` 이 그것을 `RunEvent.type` 으로 옮겨 담고 있으므로
+`ExecutionEventRecorder` 는 `RunEvent.type()` 을 읽으면 된다.
 
-| Hermes 사건 | 뜻 |
-| --- | --- |
-| `message.delta` | 답의 글자 조각 |
-| `run.completed` | 실행 종료 |
+`subagent.start` 는 `.started` 가 아니고 `subagent.complete` 는 `.completed` 가 아니다.
+도구 사건과 어미가 다르다.
 
-**모은 이름 목록을 `docs/hermes-integration.md` 에 적는다.**
-이것이 이 phase 의 첫 산출물이다. 다음에 읽는 사람이 근거 없이 짐작하지 않게 한다.
-**이름만 적고 그 이름을 얻은 명령은 적지 않는다.**
+**이 phase 에서 `docs/hermes-integration.md` 를 고치지 않는다.**
+그 문서가 이미 단일 소스다. 옮겨 적는 표는 `ExecutionEventRecorder` 안에 둔다.
+
+**이 저장소는 공개 저장소다.** 홈서버의 주소와 포트와 컨테이너 구조와
+key 가 있는 자리를 어느 파일에도 적지 않는다.
 
 ### 2. `backend/src/main/resources/db/migration/V10__execution_event.sql` 신규
 
@@ -89,22 +97,75 @@ CREATE TABLE execution_event (
     PRIMARY KEY (id),
     UNIQUE KEY uk_execution_event_seq (execution_id, sequence)
 );
-
-CREATE INDEX idx_execution_event_execution ON execution_event (execution_id, sequence);
 ```
+
+**인덱스를 따로 만들지 않는다.** `uk_execution_event_seq` 가 이미
+`(execution_id, sequence)` 를 그 순서로 포함한다.
+`findByExecutionIdOrderBySequenceAsc` 가 그 유일 키를 쓴다.
 
 `sequence` 는 MySQL 예약어가 아니지만 읽는 사람이 헷갈릴 수 있다.
 JPA 엔티티에서 `@Column(name = "sequence")` 로 명시한다.
 
-### 3. `usage` 패키지에 사건 모델을 더한다
+**`hermes_session_id` 는 이 plan 에서 언제나 비어 있다.**
+Hermes v0.21.0 의 하위 에이전트 사건은 `preview` 만 싣고 session 번호를 보내지 않는다.
+`docs/data-schema.md` 가 그 칸을 「하위 에이전트가 따로 session 을 가지면 적는다」 로
+적어 두었으므로 칸은 만들어 두고 채우는 것은 그 경로가 생길 때 한다.
+0 이나 빈 문자열로 채우지 않는다.
+
+`subagent_name` 도 같은 사정이다. `subagent.start` 가 이름을 보내면 채우고,
+보내지 않으면 비운다. 이름을 `preview` 에서 뽑아 만들지 않는다.
+
+**`V10` 이 맞는 번호다.** `main` 에 `V9` 까지 있고, 다른 plan 이 `V11` 을 쓴다.
+
+### 3. `RunEvent` 가 걸린 시간을 실어 나른다
+
+지금 `RunEvent` 는 넷만 담는다.
+
+```java
+public record RunEvent(String type, String text, String toolName, String detail) {
+}
+```
+
+`tool.completed` 가 보내는 `duration` 과 `error` 를 아무도 읽지 않아
+`execution_event.duration_ms` 를 채울 근거가 없다. phase-03 이 그 값을 화면에 그린다.
+
+`RunEvent` 에 칸 둘을 **더한다.** 기존 칸을 지우거나 순서를 바꾸지 않는다.
+
+```java
+public record RunEvent(
+        String type, String text, String toolName, String detail,
+        Long durationMs, Boolean failed) {
+}
+```
+
+`HermesRunEventStream.emit` 이 그 둘을 채운다.
+
+- `duration` 은 **초 단위 실수**다. 1000 을 곱해 밀리초 정수로 옮긴다. 없으면 `null` 이다
+- `error` 가 참이면 `failed` 가 참이다. 없으면 `null` 이다
+
+기존 호출부가 넷짜리 생성자를 쓰고 있으면 함께 고친다.
+**칸을 더하는 방향으로만 간다.** 다른 plan 이 같은 저장소를 병렬로 고치고 있다.
+
+### 4. `usage` 패키지에 사건 모델을 더한다
 
 `execution_event` 는 실행에 딸린 것이므로 `usage` 안에 둔다. 새 패키지를 만들지 않는다.
 
 | 파일 | 담는 것 |
 | --- | --- |
-| `domain/ExecutionEvent.java` | 엔티티 |
+| `domain/ExecutionEvent.java` | 엔티티. 모든 문자열 칸에 `length` 를 명시한다 |
 | `domain/ExecutionEventType.java` | 아래 일곱 값 |
 | `infra/ExecutionEventRepository.java` | |
+
+**엔티티의 길이를 마이그레이션과 글자까지 맞춘다.**
+`backend/AGENTS.md` 가 적은 대로 테스트는 엔티티로 스키마를 만들고 운영은 Flyway 가 만든 것을 검사한다.
+둘이 어긋나도 테스트는 통과하고 배포에서 `Schema validation` 이 실패한다.
+길이를 주지 않은 `@Lob` 문자열을 쓰지 않는다.
+
+| 칸 | 길이 |
+| --- | --- |
+| `eventType` | 40. `@Enumerated(EnumType.STRING)` 이다 |
+| `toolName`, `subagentName`, `hermesSessionId` | 128 |
+| `detail` | 500 |
 
 ```java
 public enum ExecutionEventType {
@@ -118,7 +179,7 @@ public enum ExecutionEventType {
 }
 ```
 
-### 4. 옮겨 적는 자리를 한 곳에 둔다
+### 5. 옮겨 적는 자리를 한 곳에 둔다
 
 `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionEventRecorder.java` 다.
 
@@ -146,34 +207,77 @@ public class ExecutionEventRecorder {
 모르는 사건을 만나면 `log.debug` 로 그 이름을 남기고 `null` 을 낸다.
 `warn` 이 아니라 `debug` 다. 모르는 사건이 자주 오면 로그가 그것으로 찬다.
 
-### 5. `ChatService` 가 중계하면서 저장한다
+칸을 어디서 채우는지다.
 
-`stream` 의 `forward` 자리에서 부른다.
+| 칸 | 어디서 |
+| --- | --- |
+| `toolName` | 도구 사건일 때 `RunEvent.toolName()`. 그 밖에는 비운다 |
+| `subagentName` | 하위 에이전트 사건일 때 `RunEvent.toolName()`. 비어 있으면 비운 채로 둔다 |
+| `durationMs` | `RunEvent.durationMs()`. 끝난 사건에만 온다 |
+| `detail` | `RunEvent.detail()` 을 500자로 자른다 |
+| `hermesSessionId` | 이 plan 에서는 언제나 비운다 |
+| `occurredAt` | 받은 시각 |
+
+`run.failed` 와 `run.cancelled` 가 둘 다 `RUN_FAILED` 로 간다.
+어느 쪽이었는지는 `detail` 에 원래 이름을 적어 남긴다.
+
+**이 클래스는 저장하지 않고 엔티티를 만들기만 한다.**
+저장을 부르는 쪽이 하면 실패를 감싸는 자리가 한 곳으로 모인다.
+
+### 6. `ChatService` 가 중계하면서 저장한다
+
+**사건을 적는 자리는 `ChatService` 하나다. `ExecutionRecorder` 를 고치지 않는다.**
+다른 plan 이 `ExecutionRecorder` 를 병렬로 고치고 있어 그쪽에 얹으면 충돌한다.
+`OrphanedExecutionSweeper` 가 버려진 실행을 정리하는 경로도 이 plan 의 범위 밖이다.
+그 경로로 끝난 실행에는 `RUN_FAILED` 가 남지 않는다. 그것이 맞다.
+
+지금 `forward` 는 `private static` 이라 `sequence` 도 recorder 도 받지 못한다.
+**인스턴스 메서드로 바꾼다.** 실행 하나마다 순서를 세는 자리가 필요하다.
 
 - `sequence` 는 그 실행 안에서 1부터 센다. `ChatService` 가 세어 넘긴다.
+  스트림을 읽는 스레드가 하나이므로 `int` 하나면 된다.
 - **저장이 실패해도 중계는 계속한다.** `try` 로 감싸고 `log.warn` 만 남긴다.
   사건은 관측용이고 그것 때문에 답이 끊기면 안 된다.
+  `record` 가 `null` 을 낼 때와 저장이 예외를 던질 때 **둘 다** 중계가 이어져야 한다.
 - `delta` 는 저장하지 않는다. 글자 조각이라 수가 많고 답은 이미 메시지에 남는다.
+  `record` 가 `null` 을 내므로 `ChatService` 가 따로 거르지 않는다.
 
-`RUN_STARTED` 는 Hermes 사건을 기다리지 않고 실행을 제출한 직후에 우리가 적는다.
-`RUN_COMPLETED` 와 `RUN_FAILED` 도 실행을 갱신하는 자리에서 우리가 적는다.
+우리가 직접 적는 사건이 셋이다. Hermes 사건을 기다리지 않는다.
+
+| 우리 이름 | 어디서 | 비고 |
+| --- | --- | --- |
+| `RUN_STARTED` | `submit` 이 `runId` 를 받은 직후 | `sequence` 는 1 이다 |
+| `RUN_COMPLETED` | `finish` 가 성공으로 갈 때 | |
+| `RUN_FAILED` | `submit` 과 `awaitCompletion` 과 `finish` 의 실패 경로 | `errorCode` 를 `detail` 에 적는다 |
+
+`stream` 과 `send` 가 그 셋을 함께 쓴다.
 그래야 한 번에 받는 경로에서도 최소한의 사건이 남는다.
 
-### 6. 한 번에 받는 경로
+`RUN_FAILED` 를 적은 뒤에도 원래 던지던 예외를 그대로 던진다.
+사건을 적으려고 실패를 삼키지 않는다.
+
+### 7. 한 번에 받는 경로
 
 `send` 는 스트림을 열지 않으므로 도구 사건이 오지 않는다.
 `RUN_STARTED` 와 `RUN_COMPLETED` 나 `RUN_FAILED` 만 남는다.
 그것이 맞다. 없는 것을 지어내지 않는다.
 
-### 7. 이 phase 를 검증하는 테스트
+### 8. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/usage/ExecutionEventRecorderTest.java` 를 새로 만든다.
 
-- **정상 경로**: 1번에서 확인한 실제 도구 사건 이름을 주면
-  `TOOL_STARTED` 로 옮겨지고 `toolName` 이 채워진다
+- **정상 경로**: `tool.started` 를 주면 `TOOL_STARTED` 로 옮겨지고 `toolName` 이 채워진다
+- `tool.completed` 를 주면 `TOOL_COMPLETED` 가 되고 `durationMs` 가 채워진다
 - **이 phase 가 다루는 실패**: 모르는 이름을 주면 `null` 을 내고 예외를 던지지 않는다
+- `message.delta` 와 `reasoning.available` 도 `null` 이 된다
 - `detail` 이 500자를 넘으면 잘린다
-- 하위 에이전트 사건이 `SUBAGENT_STARTED` 로 옮겨진다
+- `subagent.start` 가 `SUBAGENT_STARTED` 로, `subagent.complete` 가 `SUBAGENT_COMPLETED` 로 옮겨진다
+- `run.cancelled` 가 `RUN_FAILED` 가 되고 `detail` 에 원래 이름이 남는다
+
+`backend/src/test/java/com/bifos/assistant/hermes/HermesRunEventStreamTest.java` 를 본다.
+없으면 만들고, 있으면 더한다.
+
+- `duration` 이 초 실수로 오면 `durationMs` 가 밀리초 정수가 된다
 
 `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` 에 더한다.
 
@@ -182,10 +286,33 @@ public class ExecutionEventRecorder {
 - **사건 저장이 예외를 던져도 대화는 성공한다.**
   저장소를 던지도록 만들어 확인한다
 - `delta` 사건은 저장되지 않는다
+- 한 번에 받는 경로가 `RUN_STARTED` 와 `RUN_COMPLETED` 둘만 남긴다
+- Hermes 가 실패로 끝나면 `RUN_FAILED` 가 남고 예외는 그대로 올라간다
 
-`test/e2e/scenarios/streaming.ts` 에 더한다.
+`test/e2e/fake-hermes.ts` 에 더한다.
 
-- 스트리밍 실행 하나가 끝난 뒤 그 실행의 사건이 데이터베이스에 남아 있다
+- `tool.started` 와 `tool.completed` 쌍을 하나 더 보낸다. 도구 이름을 다르게 한다
+- `subagent.start` 와 `subagent.complete` 를 보낸다
+
+이 둘이 없으면 phase-03 의 화면 검사가 그릴 것을 갖지 못한다.
+**`message.delta` 와 `run.completed` 의 형태는 그대로 둔다.** 이미 실측과 맞다.
+
+**사건을 더하면 `test/e2e/scenarios/streaming.ts` 가 깨진다. 함께 고친다.**
+
+그 파일이 도구 사건을 정확히 2개로 센다.
+
+```typescript
+expect(received.filter((item) => item.type === "tool").length === 2, "도구 사건을 받지 못했다");
+```
+
+`ChatService.forward` 가 `tool.` 과 `subagent.` 를 **둘 다** `ChatEvent.tool` 로 내보내므로,
+도구 쌍 둘과 하위 에이전트 쌍 하나를 보내면 이 수가 6 이 된다.
+가짜 Hermes 에 실제로 넣은 사건 수를 세어 그 값으로 고친다.
+**수를 세지 않는 판정으로 바꾸지 않는다.** 그 판정이 중계 경로가 도는지를 지금 지키고 있다.
+
+**사건이 데이터베이스에 남았는지는 이 phase 에서 e2e 로 확인하지 않는다.**
+`test/e2e/harness.ts` 는 HTTP 만 부르고, 사건을 읽는 API 는 phase-02 가 연다.
+그 확인은 phase-02 의 e2e 가 한다.
 
 ## 검증
 
@@ -203,15 +330,22 @@ cd backend && ./gradlew test --tests '*ExecutionEventRecorderTest*'
 
 가짜 Hermes 가 실제와 다른 형태를 보내면 테스트가 통과해도 운영에서 동작하지 않는다.
 실제로 그렇게 스트리밍이 통째로 동작하지 않은 채 배포된 적이 있다.
-**그래서 1번에서 실제 사건 이름을 먼저 확인하고, 가짜 Hermes 가 그 이름을 보내도록 맞춘다.**
-가짜가 보내는 이름이 1번에서 모은 목록에 있는지 확인해 보고에 적는다.
+**그래서 옮겨 적는 표의 이름이 1번 표와 글자까지 같은지 확인해 보고에 적는다.**
+가짜 Hermes 에 더한 이름도 같은 표에 있어야 한다.
+
+```bash
+# cwd: 저장소 root
+grep -n 'tool\.\|subagent\.\|run\.\|message\.' \
+  backend/src/main/java/com/bifos/assistant/usage/application/ExecutionEventRecorder.java
+```
 
 ## Critical Files
 
 | 파일 | 변경 |
 |---|---|
-| `docs/hermes-integration.md` | 수정 (실제 사건 이름 목록) |
 | `backend/src/main/resources/db/migration/V10__execution_event.sql` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/hermes/dto/RunEvent.java` | 수정 (칸 추가) |
+| `backend/src/main/java/com/bifos/assistant/hermes/HermesRunEventStream.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionEvent.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionEventType.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/infra/ExecutionEventRepository.java` | 신규 |
@@ -219,4 +353,9 @@ cd backend && ./gradlew test --tests '*ExecutionEventRecorderTest*'
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionEventRecorderTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
-| `test/e2e/scenarios/streaming.ts` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/HermesRunEventStreamTest.java` | 신규 또는 수정 |
+| `test/e2e/fake-hermes.ts` | 수정 (도구 쌍 하나와 하위 에이전트 사건 추가) |
+| `test/e2e/scenarios/streaming.ts` | 수정 (도구 사건 수 판정을 늘어난 값으로) |
+
+**`docs/hermes-integration.md` 를 고치지 않는다.** 그 문서가 이미 사건 이름의 단일 소스다.
+**`backend/.../usage/application/ExecutionRecorder.java` 를 고치지 않는다.** 다른 plan 이 쓴다.
