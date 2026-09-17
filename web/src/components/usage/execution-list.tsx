@@ -14,12 +14,23 @@ export type UsageExecution = {
   inputTokens: number | null;
   cachedInputTokens: number | null;
   outputTokens: number | null;
-  latencyMs: number;
+  latencyMs: number | null;
   estimatedCostMicros: number | null;
   costCurrency: string | null;
   pricingVersion: string | null;
   startedAt: string;
 };
+
+export function isRunning(execution: UsageExecution): boolean {
+  return execution.status === "RUNNING";
+}
+
+export function executionStatusLabel(execution: UsageExecution): string {
+  if (isRunning(execution)) return "도는 중";
+  if (execution.errorCode === "ORPHANED") return "중간에 끊김";
+  if (execution.status === "FAILED" || execution.errorCode !== null) return execution.errorCode ?? "실패";
+  return "성공";
+}
 
 export function ExecutionList({ executions }: { executions: UsageExecution[] }) {
   if (executions.length === 0) {
