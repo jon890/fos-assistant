@@ -33,6 +33,8 @@ public class SecurityConfig {
                                         .permitAll()
                                         .requestMatchers("/actuator/health", "/actuator/health/**")
                                         .permitAll()
+                                        .requestMatchers("/api/v1/me")
+                                        .permitAll()
                                         .anyRequest()
                                         .authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
