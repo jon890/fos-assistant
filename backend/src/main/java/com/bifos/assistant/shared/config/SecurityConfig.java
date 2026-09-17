@@ -37,11 +37,6 @@ public class SecurityConfig {
             throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(
-                        exceptions ->
-                                exceptions.authenticationEntryPoint(
-                                        (request, response, exception) ->
-                                                response.sendError(401)))
                 .authorizeHttpRequests(
                         auth ->
                                 auth.dispatcherTypeMatchers(DispatcherType.ASYNC)
