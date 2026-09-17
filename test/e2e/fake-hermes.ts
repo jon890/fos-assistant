@@ -50,7 +50,17 @@ function specialOutputFor(input: string): string | null {
     return Array.from({ length: 80 }, (_, index) => `${index + 1}번째 긴 답 줄`).join("\n\n");
   }
   if (input === "코드 블록 검사") {
-    return ["```java", "// 인사말", "String message = \"안녕하세요\";", "```"].join("\n");
+    return [
+      "```java",
+      "public class Greeting {",
+      "  // 인사 횟수",
+      "  private static final int COUNT = 3;",
+      "  void greet() {",
+      "    System.out.println(\"안녕하세요\");",
+      "  }",
+      "}",
+      "```",
+    ].join("\n");
   }
   return null;
 }
