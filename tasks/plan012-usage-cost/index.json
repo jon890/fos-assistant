@@ -1,13 +1,13 @@
 {
   "name": "plan012-usage-cost",
   "description": "실제 청구액과 환산액을 나눠 적고, 실행 당시의 상태를 남겨 비용을 축별로 분석한다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-17",
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 3,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard", "status": "completed" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep", "status": "completed" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard", "status": "completed" }
   ]
 }
