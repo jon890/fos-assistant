@@ -30,13 +30,14 @@ profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 ## 로컬에서 돌리기
 
 홈서버 없이도 전체 흐름을 확인할 수 있다.
-`tools/fake-hermes` 가 Hermes Runs API 를 흉내 낸다.
+`test/e2e` 가 Hermes Runs API 대역을 같은 프로세스에 띄운다.
 
 ```bash
-./scripts/e2e-smoke.sh
+node test/e2e/run.ts
 ```
 
-이 스크립트는 로그인 토큰 발급부터 profile 연결, 대화 한 번, 사용량 기록까지 한 번에 돌린다.
+로그인 토큰 발급부터 profile 연결, 대화 한 번, 사용량 기록과 비용 환산까지 한 번에 돌린다.
+시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있다.
 
 개별 실행은 아래와 같다.
 
