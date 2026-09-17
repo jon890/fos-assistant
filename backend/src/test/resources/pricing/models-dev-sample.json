@@ -1,0 +1,51 @@
+{
+  "openai": {
+    "id": "openai",
+    "name": "OpenAI",
+    "models": {
+      "gpt-5.5": {
+        "id": "gpt-5.5",
+        "cost": {
+          "input": 5,
+          "output": 30,
+          "cache_read": 0.5,
+          "tiers": [
+            {
+              "input": 10,
+              "output": 45,
+              "cache_read": 1,
+              "tier": { "type": "context", "size": 272000 }
+            }
+          ],
+          "context_over_200k": { "input": 10, "output": 45, "cache_read": 1 }
+        }
+      },
+      "gpt-flat": {
+        "id": "gpt-flat",
+        "cost": { "input": 2, "output": 8 }
+      },
+      "gpt-legacy-band": {
+        "id": "gpt-legacy-band",
+        "cost": {
+          "input": 3,
+          "output": 9,
+          "context_over_200k": { "input": 6, "output": 12 }
+        }
+      },
+      "gpt-free-tool": {
+        "id": "gpt-free-tool",
+        "cost": {}
+      }
+    }
+  },
+  "anthropic": {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "models": {
+      "claude-opus-5": {
+        "id": "claude-opus-5",
+        "cost": { "input": 15, "output": 75, "cache_read": 1.5 }
+      }
+    }
+  }
+}

@@ -14,9 +14,9 @@ import java.time.Instant;
 /**
  * One agent turn, recorded for usage and cost reporting.
  *
- * <p>Token counts are stored for every run. Cost is left null while a binding runs on a flat-rate
- * plan, and filled in later for metered API bindings once a price table exists. Money is kept as an
- * integer number of micro-units so no rounding happens in the database.
+ * <p>토큰 수는 실행마다 남긴다. 비용은 가격표가 그 모델을 알 때 공개된 API 가격으로 환산해 적고,
+ * 모르면 비워 둔다. 구독형 바인딩도 같은 환산값을 받는다. 구성원이 그것을 구독료와 견주기 위해서다.
+ * 금액은 데이터베이스에서 반올림이 일어나지 않도록 마이크로 단위 정수로 둔다.
  */
 @Entity
 @Table(name = "agent_execution")
@@ -70,14 +70,14 @@ public class AgentExecution {
     @Column(name = "latency_ms", nullable = false)
     private long latencyMs;
 
-    /** Estimated spend in millionths of a currency unit. Null while the plan is flat-rate. */
+    /** 통화 단위의 100만분의 1로 적은 환산 금액. 가격을 찾지 못했으면 null 이다. */
     @Column(name = "estimated_cost_micros")
     private Long estimatedCostMicros;
 
     @Column(name = "cost_currency", length = 3)
     private String costCurrency;
 
-    /** Identifies the price table used, so a later price change does not rewrite history. */
+    /** 계산에 쓴 가격표를 적는다. 나중에 가격이 바뀌어도 지난 기록이 다시 쓰이지 않게 한다. */
     @Column(name = "pricing_version", length = 32)
     private String pricingVersion;
 
@@ -105,6 +105,9 @@ public class AgentExecution {
         this.outputTokens = builder.outputTokens;
         this.totalTokens = builder.totalTokens;
         this.latencyMs = builder.latencyMs;
+        this.estimatedCostMicros = builder.estimatedCostMicros;
+        this.costCurrency = builder.costCurrency;
+        this.pricingVersion = builder.pricingVersion;
         this.startedAt = builder.startedAt;
         this.finishedAt = builder.finishedAt;
     }
@@ -208,6 +211,9 @@ public class AgentExecution {
         private Long outputTokens;
         private Long totalTokens;
         private long latencyMs;
+        private Long estimatedCostMicros;
+        private String costCurrency;
+        private String pricingVersion;
         private Instant startedAt;
         private Instant finishedAt;
 
@@ -261,6 +267,14 @@ public class AgentExecution {
             this.cachedInputTokens = cachedInput;
             this.outputTokens = output;
             this.totalTokens = total;
+            return this;
+        }
+
+        /** 비용을 모르면 금액 칸을 모두 null 로 둔다. 어느 것도 공짜로 읽히지 않게 하기 위해서다. */
+        public Builder cost(EstimatedCost cost) {
+            this.estimatedCostMicros = cost.micros();
+            this.costCurrency = cost.currency();
+            this.pricingVersion = cost.pricingVersion();
             return this;
         }
 

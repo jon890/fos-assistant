@@ -1,0 +1,139 @@
+/**
+ * 홈서버 없이 돌리기 위한 Hermes Runs API 대역이다.
+ *
+ * <p>Control Plane 이 실제로 부르는 것만 구현한다. profile 경로로 실행을 제출하고, 그 실행의 상태와
+ * 토큰 수를 돌려준다. profile 마다 bearer key 도 검사한다. 라우팅을 잘못하면 조용히 성공하는 대신
+ * 여기서 401 이 나게 하기 위해서다.
+ */
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
+
+const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
+const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
+
+/**
+ * 실행 하나가 보고하는 토큰 수다.
+ *
+ * <p>입력 120 중 80 이 캐시이고 출력이 40 이다. 사용량 시나리오가 이 값으로 환산 금액을 계산한다.
+ */
+export const FAKE_USAGE = {
+  prompt_tokens: 120,
+  completion_tokens: 40,
+  total_tokens: 160,
+  prompt_tokens_details: { cached_tokens: 80 },
+} as const;
+
+type Run = {
+  run_id: string;
+  status: string;
+  session_id: string;
+  model: string;
+  output: string;
+  usage: typeof FAKE_USAGE;
+};
+
+function shortId(): string {
+  return randomUUID().replaceAll("-", "").slice(0, 12);
+}
+
+/**
+ * 본문을 읽는다.
+ *
+ * <p>Spring 의 `RestClient` 는 요청 본문을 chunked 로 흘려보낸다. Node 의 요청 스트림은 두 인코딩을
+ * 모두 같은 방식으로 내주므로, 여기서는 조각을 모으기만 하면 된다.
+ */
+async function readBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
+function send(response: ServerResponse, status: number, payload: unknown): void {
+  const body = JSON.stringify(payload);
+  response.writeHead(status, {
+    "Content-Type": "application/json",
+    "Content-Length": Buffer.byteLength(body),
+  });
+  response.end(body);
+}
+
+export type FakeHermes = {
+  readonly baseUrl: string;
+  close(): Promise<void>;
+};
+
+/**
+ * fake Hermes 를 띄우고 그 주소를 돌려준다.
+ *
+ * @param profileKeys profile 이름과 그 profile 의 API server key
+ */
+export function startFakeHermes(profileKeys: Record<string, string>): Promise<FakeHermes> {
+  const runs = new Map<string, Run>();
+
+  const authorized = (request: IncomingMessage, profile: string): boolean => {
+    const expected = profileKeys[profile];
+    return expected !== undefined && request.headers.authorization === `Bearer ${expected}`;
+  };
+
+  const server: Server = createServer((request, response) => {
+    void (async () => {
+      const path = request.url ?? "";
+
+      if (request.method === "POST") {
+        const match = RUN_PATH.exec(path);
+        if (!match) return send(response, 404, { error: "not found" });
+        const profile = match[1];
+        if (!authorized(request, profile)) {
+          return send(response, 401, { error: "bad key for this profile" });
+        }
+
+        const raw = await readBody(request);
+        const submitted = (raw.length > 0 ? JSON.parse(raw) : {}) as {
+          input?: string;
+          session_id?: string;
+        };
+        const runId = `run_${shortId()}`;
+        runs.set(runId, {
+          run_id: runId,
+          status: "completed",
+          session_id: submitted.session_id ?? `sess_${shortId()}`,
+          // 실제 Hermes v0.21.0 이 내놓는 모양 그대로다. model 자리에는 API server 의 모델 이름이
+          // 오는데 그 기본값이 profile 이름이고, provider 는 아예 없다.
+          model: profile,
+          output: `[fake hermes on profile ${profile}] ${submitted.input ?? ""}`,
+          usage: FAKE_USAGE,
+        });
+        return send(response, 200, { run_id: runId, status: "queued" });
+      }
+
+      const match = RUN_STATUS_PATH.exec(path);
+      if (!match) return send(response, 404, { error: "not found" });
+      const [, profile, runId] = match;
+      if (!authorized(request, profile)) {
+        return send(response, 401, { error: "bad key for this profile" });
+      }
+      const run = runs.get(runId);
+      if (!run) return send(response, 404, { error: "no such run" });
+      return send(response, 200, run);
+    })();
+  });
+
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (address === null || typeof address === "string") {
+        reject(new Error("fake Hermes 의 포트를 알 수 없다"));
+        return;
+      }
+      resolve({
+        baseUrl: `http://127.0.0.1:${address.port}`,
+        close: () =>
+          new Promise<void>((done) => {
+            server.closeAllConnections();
+            server.close(() => done());
+          }),
+      });
+    });
+  });
+}

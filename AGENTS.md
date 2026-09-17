@@ -37,10 +37,12 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 ```bash
 cd backend && ./gradlew test
 cd web && pnpm typecheck && pnpm build
-./scripts/e2e-smoke.sh
+node test/e2e/run.ts
 ```
 
-`e2e-smoke.sh` 는 `tools/fake-hermes` 를 써서 홈서버 없이 전체 흐름을 검사한다.
+`test/e2e` 는 Hermes 대역을 같은 프로세스에 띄워 홈서버 없이 전체 흐름을 검사한다.
+시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있고 `run.ts` 가 차례로 돌린다.
+Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.18 이상이 필요하다.
 
 ## 커밋
 

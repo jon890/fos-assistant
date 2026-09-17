@@ -2,8 +2,11 @@ package com.bifos.assistant.usage.presentation;
 
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +20,9 @@ public class UsageController {
 
     private static final int MAX_LIMIT = 200;
 
+    /** 가족이 사는 곳의 달력으로 달을 끊는다. 컨테이너의 {@code TZ} 가 바뀌어도 경계가 흔들리지 않는다. */
+    private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+
     private final AgentExecutionRepository executions;
     private final CurrentUserProvider currentUser;
 
@@ -25,7 +31,7 @@ public class UsageController {
         this.currentUser = currentUser;
     }
 
-    /** Executions of the signed-in user only. Cross-member reporting comes with the admin view. */
+    /** 로그인한 사용자 자신의 실행만 준다. 구성원을 가로질러 보는 것은 admin 화면이 맡는다. */
     @GetMapping("/executions")
     public List<ExecutionView> myExecutions(@RequestParam(defaultValue = "50") int limit) {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
@@ -34,6 +40,40 @@ public class UsageController {
                 .stream()
                 .map(ExecutionView::from)
                 .toList();
+    }
+
+    /**
+     * 이번 달 환산 금액의 합계다.
+     *
+     * <p>구독료와 견줄 숫자라서 화면이 목록과 함께 보여 준다. 저장된 금액을 더하기만 하고 여기서 다시
+     * 환산하지 않는다.
+     */
+    @GetMapping("/monthly-cost")
+    public MonthlyCostView thisMonthCost() {
+        YearMonth month = YearMonth.now(HOUSEHOLD_ZONE);
+        Instant from = month.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
+        Instant to = month.plusMonths(1).atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
+        MonthlyCost cost = executions.sumCostBetween(currentUser.require().id(), from, to);
+        return new MonthlyCostView(
+                month.toString(),
+                "USD",
+                cost.totalMicros(),
+                cost.pricedExecutions(),
+                cost.unpricedExecutions());
+    }
+
+    /**
+     * 한 달치 환산 금액.
+     *
+     * @param month {@code 2026-09} 형태의 대상 달
+     * @param unpricedExecutions 가격을 찾지 못해 합계에 들어가지 못한 실행 수
+     */
+    public record MonthlyCostView(
+            String month,
+            String currency,
+            Long estimatedCostMicros,
+            Long pricedExecutions,
+            Long unpricedExecutions) {
     }
 
     public record ExecutionView(
@@ -51,6 +91,7 @@ public class UsageController {
             long latencyMs,
             Long estimatedCostMicros,
             String costCurrency,
+            String pricingVersion,
             Instant startedAt) {
 
         static ExecutionView from(AgentExecution execution) {
@@ -69,6 +110,7 @@ public class UsageController {
                     execution.latencyMs(),
                     execution.estimatedCostMicros(),
                     execution.costCurrency(),
+                    execution.pricingVersion(),
                     execution.startedAt());
         }
     }
