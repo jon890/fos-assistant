@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { describeError } from "./error-message";
 
 type Turn = { role: "USER" | "ASSISTANT"; text: string };
+type Workspace = { code: string; name: string; visibility: string };
 
 export function ChatPanel() {
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -11,6 +12,18 @@ export function ChatPanel() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaceCode, setWorkspaceCode] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/workspaces")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data: Workspace[]) => setWorkspaces(data))
+      .catch(() => setWorkspaces([]));
+  }, []);
+
+  // 대화가 시작된 뒤에는 그 대화의 영역이 고정된다. 요청 본문을 바꿔도 서버가 무시하므로 화면도 잠근다.
+  const workspaceLocked = conversationId !== null;
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
@@ -26,7 +39,11 @@ export function ChatPanel() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, text }),
+        body: JSON.stringify({
+          conversationId,
+          text,
+          workspaceCode: workspaceCode.length > 0 ? workspaceCode : null,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -44,6 +61,25 @@ export function ChatPanel() {
 
   return (
     <section className="flex flex-col gap-4">
+      <label className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
+        작업 영역
+        <select
+          value={workspaceCode}
+          onChange={(event) => setWorkspaceCode(event.target.value)}
+          disabled={workspaceLocked}
+          className="rounded-md border px-2 py-1 text-xs disabled:opacity-50"
+          style={{ borderColor: "var(--border)", background: "transparent" }}
+        >
+          <option value="">영역 없음</option>
+          {workspaces.map((workspace) => (
+            <option key={workspace.code} value={workspace.code}>
+              {workspace.name}
+            </option>
+          ))}
+        </select>
+        {workspaceLocked ? <span>이 대화는 영역이 고정됐다.</span> : null}
+      </label>
+
       <ol className="flex flex-col gap-3">
         {turns.map((turn, index) => (
           <li
