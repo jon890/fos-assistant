@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.workspace.application.WorkspaceService;
 import com.bifos.assistant.workspace.domain.Workspace;
 import jakarta.validation.Valid;
@@ -26,11 +27,17 @@ public class ChatController {
     private final ChatService chat;
     private final CurrentUserProvider currentUser;
     private final WorkspaceService workspaces;
+    private final AppUserRepository users;
 
-    public ChatController(ChatService chat, CurrentUserProvider currentUser, WorkspaceService workspaces) {
+    public ChatController(
+            ChatService chat,
+            CurrentUserProvider currentUser,
+            WorkspaceService workspaces,
+            AppUserRepository users) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.workspaces = workspaces;
+        this.users = users;
     }
 
     @PostMapping("/messages")
@@ -55,13 +62,16 @@ public class ChatController {
 
     @GetMapping("/conversations/{conversationId}/messages")
     public List<MessageView> messages(@PathVariable Long conversationId) {
-        return chat.history(currentUser.require(), conversationId).stream()
+        CurrentUser user = currentUser.require();
+        String senderName = users.findById(user.id()).map(it -> it.displayName()).orElse(null);
+        return chat.history(user, conversationId).stream()
                 .map(
                         it ->
                                 new MessageView(
                                         it.id(),
                                         it.role().name(),
                                         it.content(),
+                                        it.senderUserId() == null ? null : senderName,
                                         it.executionId(),
                                         it.createdAt()))
                 .toList();

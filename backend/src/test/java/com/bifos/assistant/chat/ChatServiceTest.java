@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.credential.domain.CostMode;
 import com.bifos.assistant.credential.domain.CredentialScope;
 import com.bifos.assistant.credential.domain.HermesProfileBinding;
@@ -30,6 +31,7 @@ import com.bifos.assistant.workspace.infra.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -43,6 +45,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -66,6 +70,7 @@ class ChatServiceTest {
     }
 
     @Autowired ChatService chat;
+    @Autowired ChatController controller;
     @Autowired AppUserRepository users;
     @Autowired HermesProfileBindingRepository bindings;
     @Autowired ChatMessageRepository messages;
@@ -75,6 +80,11 @@ class ChatServiceTest {
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @BeforeEach
@@ -156,8 +166,38 @@ class ChatServiceTest {
         assertThat(execution.latencyMs()).isGreaterThanOrEqualTo(0);
 
         assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
-                .extracting(it -> it.role())
-                .containsExactly(MessageRole.USER, MessageRole.ASSISTANT);
+                .satisfiesExactly(
+                        message -> {
+                            assertThat(message.role()).isEqualTo(MessageRole.USER);
+                            assertThat(message.senderUserId()).isEqualTo(dad.id());
+                        },
+                        message -> {
+                            assertThat(message.role()).isEqualTo(MessageRole.ASSISTANT);
+                            assertThat(message.senderUserId()).isNull();
+                        });
+    }
+
+    @Test
+    void message_history_includes_the_user_display_name_only_on_user_messages() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub()
+                .willReturn(
+                        new HermesRunResult(
+                                "run-1", "sess-1", "completed", "반가워요", "m", "p", TokenUsage.empty()));
+        ChatTurn turn = chat.send(dad, null, "안녕", null);
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(dad, null));
+
+        assertThat(controller.messages(turn.conversationId()))
+                .satisfiesExactly(
+                        message -> {
+                            assertThat(message.role()).isEqualTo("USER");
+                            assertThat(message.senderName()).isEqualTo("dad@example.com");
+                        },
+                        message -> {
+                            assertThat(message.role()).isEqualTo("ASSISTANT");
+                            assertThat(message.senderName()).isNull();
+                        });
     }
 
     @Test

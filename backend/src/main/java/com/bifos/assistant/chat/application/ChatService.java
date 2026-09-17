@@ -56,7 +56,7 @@ public class ChatService {
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String workspaceCode) {
         HermesProfileBinding binding = requireActiveBinding(user);
         Conversation conversation = resolveConversation(user, conversationId, text, workspaceCode);
-        messages.save(ChatMessage.fromUser(conversation.id(), text));
+        messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
 
         // 이어지는 대화는 그 대화에 기록된 영역을 쓴다. 요청 본문이 중간에 영역을 바꾸지 못한다.
         Workspace workspace = workspaces.findByIdOrNull(conversation.workspaceId());
