@@ -166,3 +166,26 @@ Hermes 가 subagent 를 띄웠을 때 그 토큰이 부모 실행의 `usage` 에
 경로 멀티플렉스가 아니라 포트 분리를 쓰고 있으므로,
 Control Plane 은 profile 마다 주소를 따로 갖는다.
 그래서 API server 주소를 `hermes.base-url` 이 아니라 에이전트에 둔다.
+
+## gateway 는 s6 가 감독한다
+
+이 컨테이너는 profile 마다 gateway 를 하나씩 돌리고 그것을 s6 가 감독한다.
+`systemd` 와 같은 자리이고 컨테이너용으로 훨씬 작다.
+
+`hermes gateway run` 은 s6 에 넘기고 스스로 끝난다.
+그래서 이 명령의 종료를 gateway 가 죽은 것으로 읽으면 안 된다.
+
+| 명령 | 하는 일 |
+| --- | --- |
+| `s6-svstat /run/service/gateway-<profile>` | 돌고 있는지와 언제부터인지 |
+| `s6-svc -r /run/service/gateway-<profile>` | 다시 띄운다 |
+| `s6-svc -u /run/service/gateway-<profile>` | 띄운다 |
+
+이 명령들은 `PATH` 에 없다. `/command` 를 앞에 붙여야 한다.
+
+`hermes gateway start` 로 띄운 프로세스는 s6 밖에서 돈다.
+포트는 응답하지만 컨테이너를 다시 띄우면 사라지고 s6 가 되살리지 않는다.
+실측으로 `career` 를 그렇게 띄웠다가 감독 아래로 옮겼다.
+
+서비스는 `normally down` 이라 컨테이너가 뜰 때 자동으로 시작하지 않는다.
+사람이 켜야 하고, 켠 뒤에 죽으면 s6 가 되살린다.
