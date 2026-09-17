@@ -31,7 +31,25 @@ export function contextLabel(row: BreakdownRow): string {
   return row.avgContextChars === null ? "-" : `${row.avgContextChars.toLocaleString("ko-KR")}자`;
 }
 
-export function BreakdownTable({ rows, currency }: { rows: BreakdownRow[]; currency: string }) {
+/**
+ * 묶음 이름이다. 날짜 축만 화면에서 다시 그린다.
+ *
+ * Control Plane 이 주는 날짜는 `2026-09-15` 라 다른 곳이 쓰는 「9월 15일」 과 형식이 다르다.
+ * 응답의 `key` 는 줄을 구분하는 값이라 그대로 두고 보이는 글자만 바꾼다.
+ * 시간대에 따라 하루가 밀리지 않게 날짜 조각을 직접 끊어 만든다.
+ */
+export function rowLabel(row: BreakdownRow, axis: string): string {
+  if (axis !== "day") return row.label;
+  const parts = row.label.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return row.label;
+  const [year, month, day] = parts;
+  return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" })
+    .format(new Date(year, month - 1, day));
+}
+
+export function BreakdownTable(
+  { rows, currency, axis }: { rows: BreakdownRow[]; currency: string; axis: string },
+) {
   if (rows.length === 0) {
     return <EmptyState title="기록이 없다" description="그 달에는 끝난 실행이 없다." />;
   }
@@ -54,7 +72,7 @@ export function BreakdownTable({ rows, currency }: { rows: BreakdownRow[]; curre
           {rows.map((row) => (
             <tr key={row.key} className="border-t border-border align-top">
               <td className="max-w-48 py-3 pr-4">
-                <span className="block truncate font-medium">{row.label}</span>
+                <span className="block truncate font-medium">{rowLabel(row, axis)}</span>
                 {row.detail ? <span className="block truncate text-xs text-muted">{row.detail}</span> : null}
               </td>
               <td className="py-3 pr-4 text-right tabular-nums">{row.executions.toLocaleString("ko-KR")}건</td>
@@ -74,7 +92,7 @@ export function BreakdownTable({ rows, currency }: { rows: BreakdownRow[]; curre
           <article key={row.key} className="rounded-md border border-border p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="truncate font-semibold">{row.label}</h3>
+                <h3 className="truncate font-semibold">{rowLabel(row, axis)}</h3>
                 {row.detail ? <p className="truncate text-xs text-muted">{row.detail}</p> : null}
               </div>
               <span className="shrink-0 text-sm font-semibold tabular-nums">

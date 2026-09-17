@@ -46,9 +46,11 @@ export function MonthlySummary({ monthly }: Props) {
           className="sm:col-span-2 md:col-span-1"
         />
       ) : null}
-      <p className="text-xs text-muted sm:col-span-2 md:col-span-3">
-        두 금액 모두 공개 가격표로 계산한 것이고 청구서를 읽은 것이 아니다.
-      </p>
+      <div className="sm:col-span-2 md:col-span-3">
+        <p className="text-xs text-muted">
+          두 금액 모두 공개 가격표로 계산한 것이고 청구서를 읽은 것이 아니다.
+        </p>
+      </div>
     </dl>
   );
 }

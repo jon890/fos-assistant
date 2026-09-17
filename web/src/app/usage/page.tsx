@@ -25,7 +25,6 @@ export default async function UsagePage() {
 
   const executions = executionsResult.data;
   const monthly = monthlyResult.ok ? monthlyResult.data : null;
-  const breakdown = breakdownResult.ok ? breakdownResult.data : null;
   const fingerprints = fingerprintResult.ok ? fingerprintResult.data : null;
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -35,7 +34,9 @@ export default async function UsagePage() {
         보여, 모델을 옮길지 판단할 수 있게 한다.
       </p>
       {monthly ? <MonthlySummary monthly={monthly} /> : null}
-      {breakdown ? <BreakdownSection initial={breakdown} /> : null}
+      {breakdownResult.ok
+        ? <BreakdownSection initial={breakdownResult.data} />
+        : <p className="mb-8 text-sm">{breakdownResult.message}</p>}
       {fingerprints
         ? <FingerprintSection currency={fingerprints.currency} rows={fingerprints.rows} />
         : null}

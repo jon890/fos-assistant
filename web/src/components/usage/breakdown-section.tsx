@@ -29,6 +29,8 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
         return;
       }
       setBreakdown(await response.json() as Breakdown);
+    } catch {
+      setFailure("축별 합계를 불러오지 못했다.");
     } finally {
       setPending(false);
     }
@@ -52,7 +54,7 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
         </label>
       </div>
       {failure ? <p className="mb-3 text-sm">{failure}</p> : null}
-      <BreakdownTable currency={breakdown.currency} rows={breakdown.rows} />
+      <BreakdownTable axis={breakdown.axis} currency={breakdown.currency} rows={breakdown.rows} />
     </section>
   );
 }
