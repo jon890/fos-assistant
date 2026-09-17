@@ -26,7 +26,7 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 | `credential` | 사용자와 Hermes profile 의 바인딩 |
 | `hermes` | Runs API 호출과 profile key 조회 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름 |
-| `usage` | 실행 기록과 사용량 조회 |
+| `usage` | 실행 기록, 비용 환산, 사용량 조회 |
 
 ## 한 번의 대화가 지나는 길
 
@@ -34,8 +34,24 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 2. `ChatService` 가 그 사용자의 바인딩을 찾는다. 없으면 `HERMES_BINDING_MISSING` 으로 끝난다.
 3. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
 4. `HttpHermesRunsClient` 가 실행을 제출하고 끝날 때까지 조회한다.
-5. `ExecutionRecorder` 가 사용자, provider, 모델, 토큰, 소요 시간을 한 줄로 남긴다.
-6. 실패해도 5번은 남는다. 사용량 화면에서 실패까지 보인다.
+5. `CostEstimator` 가 그 토큰을 models.dev 가격표로 환산한다.
+6. `ExecutionRecorder` 가 사용자, provider, 모델, 토큰, 소요 시간, 환산 금액을 한 줄로 남긴다.
+7. 실패해도 6번은 남는다. 실패는 토큰을 보고하지 않으므로 금액만 비어 있다.
+
+환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다.
+조회할 때 다시 계산하면 가격이 바뀔 때 지난달 합계가 따라 움직인다.
+근거는 [`adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md`](adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 에 있다.
+
+## 가격표
+
+`usage/infra/ModelsDevPriceCatalog` 가 기동할 때 models.dev 카탈로그를 한 번 읽어 메모리에 둔다.
+경로는 `ASSISTANT_PRICING_CATALOG` 가 정한다.
+
+Hermes profile 디렉터리를 그대로 붙이지 않는다.
+그 디렉터리에는 `.env` 와 `auth.json` 이 함께 있어서 credential 까지 컨테이너에 들어간다.
+배포할 때 카탈로그 파일만 중립 경로로 복사하고 그쪽을 읽기 전용으로 붙인다.
+
+카탈로그가 없거나 읽히지 않아도 기동은 계속하고 금액만 비워 둔다.
 
 ## 비밀값을 두는 곳
 
@@ -52,6 +68,5 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 
 - Memory 와 Shared Memory
 - 실행 Graph 와 SSE 중계
-- 비용 계산과 가격표
 
 각각은 `tasks/plan001-mvp/` 에 단계로 나뉘어 있다.
