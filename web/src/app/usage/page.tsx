@@ -14,13 +14,31 @@ type Execution = {
   outputTokens: number | null;
   latencyMs: number;
   estimatedCostMicros: number | null;
+  costCurrency: string | null;
+  pricingVersion: string | null;
   startedAt: string;
 };
 
+type MonthlyCost = {
+  month: string;
+  currency: string;
+  estimatedCostMicros: number;
+  pricedExecutions: number;
+  unpricedExecutions: number;
+};
+
+/** 마이크로 단위 정수를 통화 금액으로 보인다. 한 번의 실행이 1센트 아래라서 네 자리까지 적는다. */
+function formatAmount(micros: number, currency: string | null): string {
+  const amount = (micros / 1_000_000).toLocaleString("ko-KR", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  });
+  return `${amount} ${currency ?? "USD"}`;
+}
+
 function formatCost(execution: Execution): string {
-  if (execution.costMode === "SUBSCRIPTION") return "구독 (미산정)";
-  if (execution.estimatedCostMicros === null) return "산정 전";
-  return `${(execution.estimatedCostMicros / 1_000_000).toFixed(4)}`;
+  if (execution.estimatedCostMicros === null) return "가격 없음";
+  return formatAmount(execution.estimatedCostMicros, execution.costCurrency);
 }
 
 export default async function UsagePage() {
@@ -29,15 +47,37 @@ export default async function UsagePage() {
     redirect("/signin");
   }
 
-  const result = await callControlPlane<Execution[]>("/api/v1/usage/executions?limit=50");
-  if (!result.ok) {
-    return <p className="text-sm">{result.message}</p>;
+  const [executionsResult, monthlyResult] = await Promise.all([
+    callControlPlane<Execution[]>("/api/v1/usage/executions?limit=50"),
+    callControlPlane<MonthlyCost>("/api/v1/usage/monthly-cost"),
+  ]);
+  if (!executionsResult.ok) {
+    return <p className="text-sm">{executionsResult.message}</p>;
   }
 
-  const executions = result.data;
+  const executions = executionsResult.data;
+  const monthly = monthlyResult.ok ? monthlyResult.data : null;
   return (
     <>
-      <h1 className="mb-4 text-lg font-semibold">사용량</h1>
+      <h1 className="mb-2 text-lg font-semibold">사용량</h1>
+      <p className="mb-4 text-sm" style={{ color: "var(--muted)" }}>
+        비용은 실제 청구액이 아니다. 구독제로 돌고 있어서, 같은 사용량을 해당 모델의 API 가격으로 환산한
+        금액이다.
+      </p>
+      {monthly ? (
+        <p className="mb-4 text-sm">
+          <span style={{ color: "var(--muted)" }}>{monthly.month} 환산 합계 </span>
+          <span className="font-semibold">
+            {formatAmount(monthly.estimatedCostMicros, monthly.currency)}
+          </span>
+          {monthly.unpricedExecutions > 0 ? (
+            <span style={{ color: "var(--muted)" }}>
+              {" "}
+              (가격을 찾지 못한 실행 {monthly.unpricedExecutions}건은 빠졌다)
+            </span>
+          ) : null}
+        </p>
+      ) : null}
       {executions.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--muted)" }}>
           아직 실행 기록이 없다.
@@ -54,7 +94,7 @@ export default async function UsagePage() {
                 <th className="py-2 pr-4">캐시</th>
                 <th className="py-2 pr-4">출력</th>
                 <th className="py-2 pr-4">소요</th>
-                <th className="py-2">비용</th>
+                <th className="py-2">API 환산 비용</th>
               </tr>
             </thead>
             <tbody>
@@ -69,7 +109,9 @@ export default async function UsagePage() {
                   <td className="py-2 pr-4">{execution.cachedInputTokens ?? "-"}</td>
                   <td className="py-2 pr-4">{execution.outputTokens ?? "-"}</td>
                   <td className="py-2 pr-4">{execution.latencyMs} ms</td>
-                  <td className="py-2">{formatCost(execution)}</td>
+                  <td className="py-2" title={execution.pricingVersion ?? undefined}>
+                    {formatCost(execution)}
+                  </td>
                 </tr>
               ))}
             </tbody>
