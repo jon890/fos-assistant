@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import playwright from "../../web/node_modules/@playwright/test/index.js";
+import playwright, { type BrowserContext } from "../../web/node_modules/@playwright/test/index.js";
 import { startFakeHermes, type FakeHermes } from "../e2e/fake-hermes.ts";
 import {
   AUTH_SECRET,
@@ -21,6 +21,30 @@ const { expect, test: base } = playwright;
 const ROOT = join(import.meta.dirname, "../..");
 const SESSION_COOKIE = "authjs.session-token";
 const HEALTH_TIMEOUT_MS = 90_000;
+
+export async function setSession(
+  context: BrowserContext,
+  user: { email: string; name: string },
+): Promise<void> {
+  const token = await encode({
+    salt: SESSION_COOKIE,
+    secret: AUTH_SECRET,
+    token: {
+      sub: user.email,
+      email: user.email,
+      name: user.name,
+    },
+  });
+  await context.addCookies([
+    {
+      name: SESSION_COOKIE,
+      value: token,
+      url: WEB_BASE_URL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+}
 
 async function waitForHealth(logPath: string): Promise<void> {
   const deadline = Date.now() + HEALTH_TIMEOUT_MS;
@@ -143,24 +167,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
 
 export const test = base.extend({
   page: async ({ context, page }, use) => {
-    const token = await encode({
-      salt: SESSION_COOKIE,
-      secret: AUTH_SECRET,
-      token: {
-        sub: TEST_EMAIL,
-        email: TEST_EMAIL,
-        name: "브라우저 테스트",
-      },
-    });
-    await context.addCookies([
-      {
-        name: SESSION_COOKIE,
-        value: token,
-        url: WEB_BASE_URL,
-        httpOnly: true,
-        sameSite: "Lax",
-      },
-    ]);
+    await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
     await use(page);
   },
 });
