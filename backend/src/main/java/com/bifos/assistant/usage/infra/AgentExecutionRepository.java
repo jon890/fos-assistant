@@ -3,6 +3,7 @@ package com.bifos.assistant.usage.infra;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
+import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
@@ -33,5 +34,21 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
             """)
     MonthlyCost sumCostBetween(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /** 환산액과 실제 청구액을 함께 합친다. RUNNING 은 빠진다. */
+    @Query(
+            """
+            select new com.bifos.assistant.usage.domain.MonthlyCostDetail(
+                sum(e.estimatedCostMicros),
+                sum(e.actualCostMicros),
+                sum(case when e.estimatedCostMicros is null then 0L else 1L end),
+                sum(case when e.estimatedCostMicros is null then 1L else 0L end),
+                sum(case when e.actualCostMicros is null then 1L else 0L end))
+            from AgentExecution e
+            where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+            """)
+    MonthlyCostDetail sumCostDetailBetween(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 }

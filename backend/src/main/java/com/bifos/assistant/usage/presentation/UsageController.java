@@ -4,7 +4,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.MonthlyCost;
+import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
 import java.time.YearMonth;
@@ -53,27 +53,33 @@ public class UsageController {
         YearMonth month = YearMonth.now(HOUSEHOLD_ZONE);
         Instant from = month.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
         Instant to = month.plusMonths(1).atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
-        MonthlyCost cost = executions.sumCostBetween(currentUser.require().id(), from, to);
+        MonthlyCostDetail cost = executions.sumCostDetailBetween(currentUser.require().id(), from, to);
         return new MonthlyCostView(
                 month.toString(),
                 "USD",
-                cost.totalMicros(),
+                cost.estimatedMicros(),
                 cost.pricedExecutions(),
-                cost.unpricedExecutions());
+                cost.unpricedExecutions(),
+                cost.actualMicros(),
+                cost.subscriptionExecutions());
     }
 
     /**
-     * 한 달치 환산 금액.
+     * 한 달치 환산액과 실제 청구액.
      *
      * @param month {@code 2026-09} 형태의 대상 달
      * @param unpricedExecutions 가격을 찾지 못해 합계에 들어가지 못한 실행 수
+     * @param actualCostMicros 실제 청구액의 합. 구독 경로에서는 종량 경로였다면 낼 금액이 청구되지 않는다
+     * @param subscriptionExecutions 실제 청구액이 비어 있는 실행 수
      */
     public record MonthlyCostView(
             String month,
             String currency,
             Long estimatedCostMicros,
             Long pricedExecutions,
-            Long unpricedExecutions) {
+            Long unpricedExecutions,
+            Long actualCostMicros,
+            Long subscriptionExecutions) {
     }
 
     public record ExecutionView(
@@ -93,6 +99,7 @@ public class UsageController {
             Long latencyMs,
             Long contextChars,
             Long estimatedCostMicros,
+            Long actualCostMicros,
             String costCurrency,
             String pricingVersion,
             Instant startedAt) {
@@ -115,6 +122,7 @@ public class UsageController {
                     execution.latencyMs(),
                     execution.contextChars(),
                     execution.estimatedCostMicros(),
+                    execution.actualCostMicros(),
                     execution.costCurrency(),
                     execution.pricingVersion(),
                     execution.startedAt());

@@ -2,9 +2,11 @@ package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.application.CostEstimator;
 import com.bifos.assistant.usage.domain.EstimatedCost;
+import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.infra.ModelsDevPriceCatalog;
 import com.bifos.assistant.usage.infra.PricingProperties;
 import java.io.IOException;
@@ -133,6 +135,39 @@ class CostEstimatorTest {
                 .isEqualTo(EstimatedCost.unknown());
         assertThat(notConfigured.estimate("openai", "gpt-5.5", usage(1000L, null, 500L)))
                 .isEqualTo(EstimatedCost.unknown());
+    }
+
+    @Test
+    void API_경로는_환산액과_실제_청구액이_같다() {
+        ExecutionCost cost = estimator.estimate("openai", "gpt-5.5", usage(1000L, null, 500L), CostMode.API);
+
+        assertThat(cost.estimatedMicros()).isEqualTo(20_000L);
+        assertThat(cost.actualMicros()).isEqualTo(20_000L);
+        assertThat(cost.currency()).isEqualTo("USD");
+        assertThat(cost.pricingVersion()).isEqualTo("models.dev@2026-09-17");
+    }
+
+    @Test
+    void 구독_경로는_환산액은_있고_실제_청구액은_비어_있다() {
+        ExecutionCost cost =
+                estimator.estimate("openai", "gpt-5.5", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
+
+        assertThat(cost.estimatedMicros()).isEqualTo(20_000L);
+        assertThat(cost.actualMicros()).isNull();
+    }
+
+    @Test
+    void 가격표에_없는_모델은_cost_mode_와_무관하게_둘_다_비어_있다() {
+        ExecutionCost apiCost =
+                estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.API);
+        ExecutionCost subscriptionCost =
+                estimator.estimate(
+                        "openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
+
+        assertThat(apiCost).isEqualTo(ExecutionCost.unknown());
+        assertThat(subscriptionCost).isEqualTo(ExecutionCost.unknown());
+        assertThat(apiCost.estimatedMicros()).isNull();
+        assertThat(apiCost.actualMicros()).isNull();
     }
 
     private static TokenUsage usage(Long input, Long cached, Long output) {

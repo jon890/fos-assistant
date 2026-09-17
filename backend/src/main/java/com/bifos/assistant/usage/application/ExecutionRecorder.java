@@ -6,7 +6,6 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.EstimatedCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
@@ -55,7 +54,8 @@ public class ExecutionRecorder {
         String provider = firstNonBlank(result.provider(), agent.provider());
         String model = modelOf(result, agent);
         execution.attachRunId(result.runId());
-        execution.markSucceeded(provider, model, usage, costs.estimate(provider, model, usage), Instant.now());
+        execution.markSucceeded(
+                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
         return executions.save(execution);
     }
 

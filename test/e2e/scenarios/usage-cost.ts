@@ -37,6 +37,8 @@ type MonthlyCostView = {
   estimatedCostMicros: number;
   pricedExecutions: number;
   unpricedExecutions: number;
+  actualCostMicros: number;
+  subscriptionExecutions: number;
 };
 
 export const usageCostScenario: Scenario = {
@@ -97,6 +99,16 @@ export const usageCostScenario: Scenario = {
       `가격을 찾지 못한 실행이 있다: ${JSON.stringify(monthly)}`,
     );
     expect(monthly.currency === "USD", `합계의 통화가 USD 가 아니다: ${monthly.currency}`);
+
+    step("이 시나리오의 실행은 전부 구독 경로라 실제 청구액이 없다");
+    expect(
+      monthly.actualCostMicros === 0,
+      `구독 경로만 있는데 실제 청구액이 0 이 아니다: ${monthly.actualCostMicros}`,
+    );
+    expect(
+      monthly.subscriptionExecutions === COMPLETED_TURNS,
+      `구독 경로 실행 수가 ${COMPLETED_TURNS} 이 아니다: ${monthly.subscriptionExecutions}`,
+    );
 
     step("돌고 있는 실행은 목록에 보이지만 가격을 찾지 못한 실행으로 세지 않는다");
     const pendingController = new AbortController();

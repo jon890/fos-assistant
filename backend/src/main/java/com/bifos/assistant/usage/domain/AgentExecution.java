@@ -251,6 +251,24 @@ public class AgentExecution {
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
+    /** 끝난 시각과 토큰과 환산액과 실제 청구액을 채우고 SUCCEEDED 로 옮긴다. */
+    public void markSucceeded(
+            String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
+        this.provider = provider;
+        this.model = model;
+        this.inputTokens = usage.inputTokens();
+        this.cachedInputTokens = usage.cachedInputTokens();
+        this.outputTokens = usage.outputTokens();
+        this.totalTokens = usage.totalTokens();
+        this.estimatedCostMicros = cost.estimatedMicros();
+        this.actualCostMicros = cost.actualMicros();
+        this.costCurrency = cost.currency();
+        this.pricingVersion = cost.pricingVersion();
+        this.finishedAt = finishedAt;
+        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        this.status = ExecutionStatus.SUCCEEDED;
+    }
+
     /** 끝난 시각과 오류 코드를 채우고 FAILED 로 옮긴다. */
     public void markFailed(String errorCode, Instant finishedAt) {
         this.errorCode = errorCode;
@@ -356,6 +374,15 @@ public class AgentExecution {
         /** 비용을 모르면 금액 칸을 모두 null 로 둔다. 어느 것도 공짜로 읽히지 않게 하기 위해서다. */
         public Builder cost(EstimatedCost cost) {
             this.estimatedCostMicros = cost.micros();
+            this.costCurrency = cost.currency();
+            this.pricingVersion = cost.pricingVersion();
+            return this;
+        }
+
+        /** 환산액과 실제 청구액을 함께 채운다. 구독 경로는 실제 청구액이 null 로 남는다. */
+        public Builder cost(ExecutionCost cost) {
+            this.estimatedCostMicros = cost.estimatedMicros();
+            this.actualCostMicros = cost.actualMicros();
             this.costCurrency = cost.currency();
             this.pricingVersion = cost.pricingVersion();
             return this;
