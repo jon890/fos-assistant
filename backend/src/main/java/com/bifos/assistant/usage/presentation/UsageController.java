@@ -31,7 +31,13 @@ public class UsageController {
 
     private static final int MAX_LIMIT = 200;
 
-    /** 가족이 사는 곳의 달력으로 달을 끊는다. 컨테이너의 {@code TZ} 가 바뀌어도 경계가 흔들리지 않는다. */
+    /**
+     * 가족이 사는 곳의 달력으로 달을 끊는다. 컨테이너의 {@code TZ} 가 바뀌어도 경계가 흔들리지 않는다.
+     *
+     * <p>같은 시간대를 {@code AgentExecutionRepository.sumByDayBetween} 의 질의도 갖는다. 그 질의는
+     * 표준시와의 차이 9시간을 식에 직접 적어 날짜를 뽑는다. 가족이 사는 곳이 바뀌면 두 자리를 함께
+     * 고친다.
+     */
     private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
 
     private final AgentExecutionRepository executions;
@@ -126,7 +132,7 @@ public class UsageController {
      * @param month {@code 2026-09} 형태의 대상 달
      * @param unpricedExecutions 가격을 찾지 못해 합계에 들어가지 못한 실행 수
      * @param actualCostMicros 실제 청구액의 합. 구독 경로에서는 종량 경로였다면 낼 금액이 청구되지 않는다
-     * @param subscriptionExecutions 실제 청구액이 비어 있는 실행 수
+     * @param subscriptionExecutions 구독 경로로 돈 실행 수
      */
     public record MonthlyCostView(
             String month,

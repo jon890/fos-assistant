@@ -158,7 +158,12 @@ class ExecutionLifecycleTest {
         return new AssembledContext(instructions, instructions.length());
     }
 
-    /** 저장된 실행 줄의 문자열 칸을 모두 모은다. 어느 칸에도 본문이 남지 않은 것을 확인하기 위해서다. */
+    /**
+     * 저장된 실행 줄의 문자열 칸을 모두 모은다. 어느 칸에도 본문이 남지 않은 것을 확인하기 위해서다.
+     *
+     * <p>{@code AgentExecution} 에 문자열 칸을 더하면 여기도 더한다. 빠뜨리면 그 칸에 본문이 남아도
+     * 이 단언이 보지 못한 채 테스트가 통과한다.
+     */
     private static List<String> stringColumnsOf(AgentExecution execution) {
         return Stream.of(
                         execution.profileName(),

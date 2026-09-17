@@ -40,7 +40,13 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     MonthlyCost sumCostBetween(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
-    /** 환산액과 실제 청구액을 함께 합친다. RUNNING 은 빠진다. */
+    /**
+     * 환산액과 실제 청구액을 함께 합친다. RUNNING 은 빠진다.
+     *
+     * <p>구독 경로 실행은 실제 청구액이 비어 있는지가 아니라 {@code costMode} 로 센다. 가격표에 없는
+     * 모델로 돈 API 경로 실행은 환산액과 실제 청구액이 모두 비어 있어, 금액으로 세면 구독 경로로
+     * 잘못 세어진다. 그런 실행은 {@code unpricedExecutions} 로만 세어진다.
+     */
     @Query(
             """
             select new com.bifos.assistant.usage.domain.MonthlyCostDetail(
@@ -48,7 +54,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 sum(e.actualCostMicros),
                 sum(case when e.estimatedCostMicros is null then 0L else 1L end),
                 sum(case when e.estimatedCostMicros is null then 1L else 0L end),
-                sum(case when e.actualCostMicros is null then 1L else 0L end))
+                sum(case when e.costMode = com.bifos.assistant.agent.domain.CostMode.SUBSCRIPTION then 1L else 0L end))
             from AgentExecution e
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
                 and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
@@ -119,6 +125,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 뽑기 전에 9시간을 더한다. {@code Asia/Seoul} 은 일광 절약 시간이 없어 표준시와의 차이가 늘 9시간
      * 이다. 그 값을 파라미터로 넘기면 H2 가 {@code group by} 의 식을 {@code select} 의 식과 같은
      * 것으로 보지 않아 질의가 거절된다.
+     *
+     * <p>같은 시간대를 {@code UsageController.HOUSEHOLD_ZONE} 도 갖는다. 그쪽은 달의 경계를 끊는 데
+     * 쓰고 여기는 날짜를 뽑는 데 쓴다. 가족이 사는 곳이 바뀌면 두 자리를 함께 고친다.
      */
     @Query(
             """

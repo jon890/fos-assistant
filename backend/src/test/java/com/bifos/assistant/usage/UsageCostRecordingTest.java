@@ -126,6 +126,20 @@ class UsageCostRecordingTest {
         assertThat(cost.subscriptionExecutions()).isEqualTo(2L);
     }
 
+    @Test
+    void 가격표에_없는_모델로_돈_API_경로_실행은_구독_경로로_세지_않는다() {
+        AgentExecution unpriced = complete(run(1_000L, null, 500L), unpricedApiAgent());
+
+        MonthlyCostDetail cost =
+                executions.sumCostDetailBetween(
+                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+
+        assertThat(unpriced.estimatedCostMicros()).isNull();
+        assertThat(unpriced.actualCostMicros()).isNull();
+        assertThat(cost.subscriptionExecutions()).isZero();
+        assertThat(cost.unpricedExecutions()).isEqualTo(1L);
+    }
+
     private static CurrentUser caller() {
         return new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
     }
@@ -166,6 +180,21 @@ class UsageCostRecordingTest {
                 "http://127.0.0.1:1/p/dad",
                 "openai-codex",
                 "gpt-5.5",
+                CostMode.API,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID);
+    }
+
+    /** 가격표에 없는 모델을 쓰는 API 경로 바인딩이다. 두 금액이 모두 비어 있게 된다. */
+    private static Agent unpricedApiAgent() {
+        return Agent.of(
+                "dad-unpriced",
+                "Dad Unpriced",
+                "dad",
+                "http://127.0.0.1:1/p/dad",
+                "openai-codex",
+                "gpt-가격표에-없는-모델",
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
