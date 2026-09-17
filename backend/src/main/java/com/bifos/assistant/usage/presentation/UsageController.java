@@ -3,6 +3,8 @@ package com.bifos.assistant.usage.presentation;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.usage.application.ExecutionTree;
+import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -10,9 +12,11 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,16 +34,46 @@ public class UsageController {
     private final AgentExecutionRepository executions;
     private final CurrentUserProvider currentUser;
     private final AgentService agents;
+    private final ExecutionTreeService executionTrees;
 
     /** 로그인한 사용자 자신의 실행만 준다. 구성원을 가로질러 보는 것은 admin 화면이 맡는다. */
     @GetMapping("/executions")
     public List<ExecutionView> myExecutions(@RequestParam(defaultValue = "50") int limit) {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
-        return executions
-                .findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, size))
-                .stream()
-                .map(execution -> ExecutionView.from(execution, agents.requireById(execution.agentId())))
+        List<AgentExecution> page =
+                executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, size));
+        Set<Long> withChildren = idsHavingChildren(page);
+        return page.stream()
+                .map(execution ->
+                        ExecutionView.from(
+                                execution,
+                                agents.requireById(execution.agentId()),
+                                withChildren.contains(execution.id())))
                 .toList();
+    }
+
+    /**
+     * 목록의 실행 중 자식을 가진 것을 한 번에 읽는다.
+     *
+     * <p>실행마다 세면 질의가 목록 길이만큼 늘어난다. 목록이 비면 부르지 않는다. 빈 {@code in} 절은
+     * 데이터베이스마다 다르게 동작한다.
+     */
+    private Set<Long> idsHavingChildren(List<AgentExecution> page) {
+        if (page.isEmpty()) {
+            return Set.of();
+        }
+        return Set.copyOf(
+                executions.findParentIdsHavingChildren(page.stream().map(AgentExecution::id).toList()));
+    }
+
+    /**
+     * 그 실행이 속한 나무를 낸다.
+     *
+     * <p>자식 실행의 번호로 물어도 뿌리부터 낸다. 없는 실행과 남의 실행은 같은 응답으로 숨긴다.
+     */
+    @GetMapping("/executions/{id}/tree")
+    public ExecutionTree executionTree(@PathVariable Long id) {
+        return executionTrees.of(currentUser.require(), id);
     }
 
     /**
@@ -76,6 +110,11 @@ public class UsageController {
             Long unpricedExecutions) {
     }
 
+    /**
+     * 사용량 목록의 한 줄.
+     *
+     * @param hasChildren 이 실행이 부른 실행이 있는가. 화면이 나무로 들어갈 곳을 고를 때 쓴다
+     */
     public record ExecutionView(
             Long id,
             Long conversationId,
@@ -95,9 +134,10 @@ public class UsageController {
             Long estimatedCostMicros,
             String costCurrency,
             String pricingVersion,
-            Instant startedAt) {
+            Instant startedAt,
+            boolean hasChildren) {
 
-        static ExecutionView from(AgentExecution execution, Agent agent) {
+        static ExecutionView from(AgentExecution execution, Agent agent, boolean hasChildren) {
             return new ExecutionView(
                     execution.id(),
                     execution.conversationId(),
@@ -117,7 +157,8 @@ public class UsageController {
                     execution.estimatedCostMicros(),
                     execution.costCurrency(),
                     execution.pricingVersion(),
-                    execution.startedAt());
+                    execution.startedAt(),
+                    hasChildren);
         }
     }
 }
