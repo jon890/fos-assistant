@@ -83,7 +83,6 @@ public class ExecutionRecorder {
         return AgentExecution.builder()
                 .userId(user.id())
                 .conversationId(conversation.id())
-                .workspaceId(conversation.workspaceId())
                 .agentId(agent.id())
                 .profileName(agent.hermesProfile())
                 .costMode(agent.costMode())
@@ -95,12 +94,12 @@ public class ExecutionRecorder {
     }
 
     /**
-     * Picks the model to record.
+     * 기록할 모델을 고른다.
      *
-     * <p>A run's {@code model} is the API server's model name, which defaults to the profile name.
-     * A real Hermes run on profile {@code bifos} reports {@code "model": "bifos"}, so taking it at
-     * face value would label every execution with the member's name instead of the model they used.
-     * When the run just echoes the profile, the binding's configured model is the truthful answer.
+     * <p>실행의 {@code model}은 API server가 보고한 모델 이름이며, 기본값은 profile 이름이다.
+     * 실제 Hermes 실행에서 profile {@code bifos}는 {@code "model": "bifos"}를 보고하므로,
+     * 이를 그대로 쓰면 사용한 모델이 아니라 구성원 이름으로 실행을 표시하게 된다.
+     * 실행이 profile만 되풀이하면 바인딩에 설정한 모델이 정확한 값이다.
      */
     private static String modelOf(HermesRunResult result, Agent agent) {
         String reported = result.model();

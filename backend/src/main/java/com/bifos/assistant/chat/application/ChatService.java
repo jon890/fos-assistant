@@ -16,8 +16,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.workspace.application.WorkspaceService;
-import com.bifos.assistant.workspace.domain.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
@@ -27,10 +25,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Turns a chat message into one Hermes run and records what it cost.
+ * 대화 메시지 하나를 Hermes 실행으로 바꾸고 비용을 기록한다.
  *
- * <p>Routing is decided here and nowhere else: the conversation's agent selects the profile, and
- * the request body cannot replace that profile after the conversation starts.
+ * <p>라우팅은 여기에서만 정한다. 대화의 에이전트가 profile을 고르고, 대화가 시작된 뒤 요청 본문은
+ * 그 profile을 바꾸지 못한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -45,11 +43,8 @@ public class ChatService {
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
     private final ExecutionRecorder executions;
-    private final WorkspaceService workspaces;
-
-    public ChatTurn send(CurrentUser user, Long conversationId, String text, String workspaceCode,
-            String agentCode) {
-        PendingTurn pending = prepare(user, conversationId, text, workspaceCode, agentCode);
+    public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
+        PendingTurn pending = prepare(user, conversationId, text, agentCode);
         HermesRunResult result = runToCompletion(pending);
         return finish(pending, result).turn();
     }
@@ -58,10 +53,9 @@ public class ChatService {
             CurrentUser user,
             Long conversationId,
             String text,
-            String workspaceCode,
             String agentCode,
             Consumer<ChatEvent> onEvent) {
-        PendingTurn pending = prepare(user, conversationId, text, workspaceCode, agentCode);
+        PendingTurn pending = prepare(user, conversationId, text, agentCode);
         String runId = submit(pending);
         try {
             eventStream.open(
@@ -82,23 +76,19 @@ public class ChatService {
     }
 
     private PendingTurn prepare(
-            CurrentUser user, Long conversationId, String text, String workspaceCode,
-            String agentCode) {
-        Conversation conversation = resolveConversation(user, conversationId, text, workspaceCode, agentCode);
+            CurrentUser user, Long conversationId, String text, String agentCode) {
+        Conversation conversation = resolveConversation(user, conversationId, text, agentCode);
         Agent agent = agents.requireById(conversation.agentId());
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
 
-        // 이어지는 대화는 그 대화에 기록된 영역을 쓴다. 요청 본문이 중간에 영역을 바꾸지 못한다.
-        Workspace workspace = workspaces.findByIdOrNull(conversation.workspaceId());
-        String instructions = workspace == null ? null : workspaces.briefing(workspace);
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
                 text,
-                instructions,
+                null,
                 conversation.hermesSessionId());
         return new PendingTurn(user, conversation, agent, command, Instant.now());
     }
@@ -166,10 +156,8 @@ public class ChatService {
     }
 
     private Conversation resolveConversation(
-            CurrentUser user, Long conversationId, String firstText, String workspaceCode,
-            String agentCode) {
+            CurrentUser user, Long conversationId, String firstText, String agentCode) {
         if (conversationId == null) {
-            Long workspaceId = resolveNewWorkspaceId(user, workspaceCode);
             if (agentCode == null || agentCode.isBlank()) {
                 throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
             }
@@ -178,17 +166,9 @@ public class ChatService {
                 throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
             }
             return conversations.save(
-                    Conversation.startedBy(user.id(), titleFrom(firstText), workspaceId, agent.id()));
+                    Conversation.startedBy(user.id(), titleFrom(firstText), agent.id()));
         }
         return requireOwnConversation(user, conversationId);
-    }
-
-    /** No code means no workspace. It never falls back to a default; that default would be a leak. */
-    private Long resolveNewWorkspaceId(CurrentUser user, String workspaceCode) {
-        if (workspaceCode == null || workspaceCode.isBlank()) {
-            return null;
-        }
-        return workspaces.requireReadable(user, workspaceCode).id();
     }
 
     private Conversation requireOwnConversation(CurrentUser user, Long conversationId) {

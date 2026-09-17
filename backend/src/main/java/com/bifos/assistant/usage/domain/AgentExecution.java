@@ -15,7 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * One agent turn, recorded for usage and cost reporting.
+ * 사용량과 비용 보고를 위해 남기는 에이전트 turn 하나다.
  *
  * <p>토큰 수는 실행마다 남긴다. 비용은 가격표가 그 모델을 알 때 공개된 API 가격으로 환산해 적고,
  * 모르면 비워 둔다. 구독형 바인딩도 같은 환산값을 받는다. 구성원이 그것을 구독료와 견주기 위해서다.
@@ -36,10 +36,6 @@ public class AgentExecution {
 
     @Column(name = "conversation_id", nullable = false)
     private Long conversationId;
-
-    /** Workspace the conversation ran in. Null when the conversation has none. */
-    @Column(name = "workspace_id")
-    private Long workspaceId;
 
     @Column(name = "agent_id")
     private Long agentId;
@@ -102,7 +98,6 @@ public class AgentExecution {
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;
         this.conversationId = builder.conversationId;
-        this.workspaceId = builder.workspaceId;
         this.agentId = builder.agentId;
         this.profileName = builder.profileName;
         this.hermesRunId = builder.hermesRunId;
@@ -137,10 +132,6 @@ public class AgentExecution {
 
     public Long conversationId() {
         return conversationId;
-    }
-
-    public Long workspaceId() {
-        return workspaceId;
     }
 
     public Long agentId() { return agentId; }
@@ -216,7 +207,6 @@ public class AgentExecution {
     public static final class Builder {
         private Long userId;
         private Long conversationId;
-        private Long workspaceId;
         private Long agentId;
         private String profileName;
         private String hermesRunId;
@@ -243,11 +233,6 @@ public class AgentExecution {
 
         public Builder conversationId(Long conversationId) {
             this.conversationId = conversationId;
-            return this;
-        }
-
-        public Builder workspaceId(Long workspaceId) {
-            this.workspaceId = workspaceId;
             return this;
         }
 

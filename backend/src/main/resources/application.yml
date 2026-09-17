@@ -32,11 +32,6 @@ assistant:
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}
-  workspace:
-    # 에이전트 정의 저장소를 읽기 전용으로 마운트한 경로
-    root: ${ASSISTANT_WORKSPACE_ROOT}
-    briefing-limit: ${ASSISTANT_WORKSPACE_BRIEFING_LIMIT:32000}
-
 hermes:
   profile-key-dir: ${HERMES_PROFILE_KEY_DIR}
   poll-interval: 700ms
