@@ -66,7 +66,9 @@ export const streamingScenario: Scenario = {
     );
     const received = await events(response);
     expect(received.filter((item) => item.type === "delta").length === 2, "delta 두 개를 받지 못했다");
-    expect(received.filter((item) => item.type === "tool").length === 2, "도구 사건을 받지 못했다");
+    // 가짜 Hermes 가 도구 쌍 둘과 하위 에이전트 쌍 하나를 보낸다.
+    // Control Plane 이 `tool.` 과 `subagent.` 를 둘 다 `tool` 로 중계하므로 여섯이 된다.
+    expect(received.filter((item) => item.type === "tool").length === 6, "도구 사건을 받지 못했다");
     expect(received.every((item) => item.type !== (":" as ChatEvent["type"])), "keepalive 가 사건에 섞였다");
     const done = received.at(-1);
     expect(done?.type === "done", `마지막 사건이 done 이 아니다: ${JSON.stringify(done)}`);

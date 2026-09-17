@@ -64,8 +64,14 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 를 실측해 아래를 적�
 | `subagent.start` | `preview` | `SUBAGENT_STARTED` |
 | `subagent.complete` | `preview` | `SUBAGENT_COMPLETED` |
 | `reasoning.available` | `text` | 저장하지 않는다 |
-| `run.completed` | `output`, `usage` | `RUN_COMPLETED` |
-| `run.failed`, `run.cancelled` | 없음 | `RUN_FAILED` |
+| `run.completed` | `output`, `usage` | 저장하지 않는다 |
+| `run.failed`, `run.cancelled` | 없음 | 저장하지 않는다 |
+
+**`run.` 계열을 옮겨 적지 않는다. 우리가 직접 적는다.**
+스트림을 열지 않는 `send` 경로에도 실행의 시작과 끝이 남아야 하므로
+`ChatService` 가 항목 6 의 세 자리에서 직접 적는다.
+여기서도 옮겨 적으면 스트리밍 경로에만 `RUN_COMPLETED` 가 두 줄 남는다.
+우리가 적는 쪽이 `errorCode` 를 알고 있어 더 많은 것을 담는다.
 
 **사건 이름은 `type` 이 아니라 `event` 로 온다.**
 `HermesRunEventStream.emit` 이 그것을 `RunEvent.type` 으로 옮겨 담고 있으므로
@@ -218,8 +224,8 @@ public class ExecutionEventRecorder {
 | `hermesSessionId` | 이 plan 에서는 언제나 비운다 |
 | `occurredAt` | 받은 시각 |
 
-`run.failed` 와 `run.cancelled` 가 둘 다 `RUN_FAILED` 로 간다.
-어느 쪽이었는지는 `detail` 에 원래 이름을 적어 남긴다.
+**이 클래스가 옮겨 적는 것은 `tool.` 과 `subagent.` 계열 넷뿐이다.**
+`run.` 계열은 항목 6 에서 `ChatService` 가 직접 적는다.
 
 **이 클래스는 저장하지 않고 엔티티를 만들기만 한다.**
 저장을 부르는 쪽이 하면 실패를 감싸는 자리가 한 곳으로 모인다.
@@ -270,9 +276,10 @@ public class ExecutionEventRecorder {
 - `tool.completed` 를 주면 `TOOL_COMPLETED` 가 되고 `durationMs` 가 채워진다
 - **이 phase 가 다루는 실패**: 모르는 이름을 주면 `null` 을 내고 예외를 던지지 않는다
 - `message.delta` 와 `reasoning.available` 도 `null` 이 된다
+- **`run.completed` 와 `run.failed` 와 `run.cancelled` 도 `null` 이 된다.**
+  우리가 직접 적는 것이라 여기서 옮기면 스트리밍 경로에 두 줄이 남는다
 - `detail` 이 500자를 넘으면 잘린다
 - `subagent.start` 가 `SUBAGENT_STARTED` 로, `subagent.complete` 가 `SUBAGENT_COMPLETED` 로 옮겨진다
-- `run.cancelled` 가 `RUN_FAILED` 가 되고 `detail` 에 원래 이름이 남는다
 
 `backend/src/test/java/com/bifos/assistant/hermes/HermesRunEventStreamTest.java` 를 본다.
 없으면 만들고, 있으면 더한다.
@@ -287,6 +294,8 @@ public class ExecutionEventRecorder {
   저장소를 던지도록 만들어 확인한다
 - `delta` 사건은 저장되지 않는다
 - 한 번에 받는 경로가 `RUN_STARTED` 와 `RUN_COMPLETED` 둘만 남긴다
+- **스트리밍 한 번이 `RUN_COMPLETED` 를 한 줄만 남긴다.**
+  Hermes 도 `run.completed` 를 보내므로 두 줄이 되기 쉽다. 이 검사가 그것을 막는다
 - Hermes 가 실패로 끝나면 `RUN_FAILED` 가 남고 예외는 그대로 올라간다
 
 `test/e2e/fake-hermes.ts` 에 더한다.
