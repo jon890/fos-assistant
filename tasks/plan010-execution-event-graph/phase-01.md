@@ -72,7 +72,7 @@ ADR-001 이 Hermes core 를 고치지 않기로 했으므로 그것을 막을 �
 이것이 이 phase 의 첫 산출물이다. 다음에 읽는 사람이 근거 없이 짐작하지 않게 한다.
 **이름만 적고 그 이름을 얻은 명령은 적지 않는다.**
 
-### 2. `backend/src/main/resources/db/migration/V9__execution_event.sql` 신규
+### 2. `backend/src/main/resources/db/migration/V10__execution_event.sql` 신규
 
 ```sql
 CREATE TABLE execution_event (
@@ -211,7 +211,7 @@ cd backend && ./gradlew test --tests '*ExecutionEventRecorderTest*'
 | 파일 | 변경 |
 |---|---|
 | `docs/hermes-integration.md` | 수정 (실제 사건 이름 목록) |
-| `backend/src/main/resources/db/migration/V9__execution_event.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V10__execution_event.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionEvent.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionEventType.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/infra/ExecutionEventRepository.java` | 신규 |

@@ -11,7 +11,9 @@
 
 [ADR-003](ADR-003-memory-권한은-주입으로-강제한다.md) 이
 Memory 의 단일 소스를 Control Plane 으로 정하고
-에이전트에게 memory 조회 도구를 주지 않기로 했다.
+Hermes 내장 memory 조회 도구를 주지 않기로 했다.
+제목 색인의 본문을 읽는 제한된 Control Plane MCP 도구는
+[ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md)가 그 결정을 보완한다.
 
 그런데 실제 운영이 그것과 어긋나 있다.
 `career` profile 은 `memory` toolset 이 켜져 있고

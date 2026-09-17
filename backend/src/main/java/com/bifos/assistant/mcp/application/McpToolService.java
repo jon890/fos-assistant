@@ -4,6 +4,7 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,12 @@ public class McpToolService {
     public Map<String, Object> call(CurrentUser user, String name, Long id) {
         if (!"memory_read".equals(name)) throw new UnknownToolException();
         try { Memory memory = memories.bodyFor(user, id); log.info("memory read userId={} memoryId={}", user.id(), id); return result(memory.content(), false); }
-        catch (ApiException ex) { return result("Memory 항목을 읽을 수 없습니다.", true); }
+        catch (ApiException ex) {
+            if (ex.code() == ErrorCode.MEMORY_NOT_FOUND) {
+                return result("Memory 항목을 읽을 수 없습니다.", true);
+            }
+            throw ex;
+        }
     }
     private static Map<String, Object> result(String text, boolean error) { Map<String, Object> result = new LinkedHashMap<>(); result.put("content", List.of(Map.of("type", "text", "text", text))); result.put("isError", error); return result; }
     public static class UnknownToolException extends RuntimeException {}

@@ -40,6 +40,14 @@ sequenceDiagram
     end
     alt Hermes 실행 성공
         C->>C: 메시지를 남기고 같은 실행 줄을 SUCCEEDED 로 갱신한다
+        opt Memory 제안 설정이 켜짐
+            C->>H: 방금 대화에서 남길 개인 사실 제안 요청
+            alt 제안 실행 성공
+                C->>C: 제안을 PROPOSED 로 저장한다
+            else 제안 실행 실패
+                C->>C: 제안 실행만 FAILED 로 남기고 원래 대화 성공은 유지한다
+            end
+        end
         alt 한 번에 받는 경로
             C-->>B: 답과 대화 번호
         else 스트리밍 경로

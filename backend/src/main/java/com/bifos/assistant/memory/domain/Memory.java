@@ -50,6 +50,9 @@ public class Memory {
     @Column(name = "proposed_by_execution_id")
     private Long proposedByExecutionId;
 
+    @Column(name = "proposal_dedup_key", unique = true, length = 64)
+    private String proposalDedupKey;
+
     @Column(name = "accepted_by_user_id")
     private Long acceptedByUserId;
 
@@ -86,9 +89,11 @@ public class Memory {
     }
 
     public static Memory proposedUser(Long ownerUserId, String title, String content,
-            Long proposedByExecutionId) {
-        return new Memory(MemoryScope.USER, ownerUserId, null, title, content, false,
+            Long proposedByExecutionId, String proposalDedupKey) {
+        Memory memory = new Memory(MemoryScope.USER, ownerUserId, null, title, content, false,
                 MemoryStatus.PROPOSED, proposedByExecutionId);
+        memory.proposalDedupKey = proposalDedupKey;
+        return memory;
     }
 
     /** 사람이 받아들인다. 이때부터 주입 대상이 된다. */
@@ -127,6 +132,7 @@ public class Memory {
     public boolean alwaysInject() { return alwaysInject; }
     public MemoryStatus status() { return status; }
     public Long proposedByExecutionId() { return proposedByExecutionId; }
+    public String proposalDedupKey() { return proposalDedupKey; }
     public Long acceptedByUserId() { return acceptedByUserId; }
     public Instant acceptedAt() { return acceptedAt; }
     public Instant createdAt() { return createdAt; }

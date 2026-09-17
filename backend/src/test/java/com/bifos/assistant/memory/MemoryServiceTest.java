@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
 /** Memory 의 공개 범위, 승인 상태, 쓰기 권한을 확인한다. */
@@ -100,10 +101,21 @@ class MemoryServiceTest {
     @Test
     void 같은_제목과_본문을_제안하면_한_행만_남는다() {
         Memory first = memories.proposeUser(ADMIN, "제안", "내용", 99L);
+        memories.accept(ADMIN, first.id());
         Memory duplicate = memories.proposeUser(ADMIN, "제안", "내용", 100L);
 
         assertThat(duplicate.id()).isEqualTo(first.id());
         assertThat(repository.count()).isOne();
+    }
+
+    @Test
+    void 저장소도_동시에_들어온_중복_제안을_막는다() {
+        String key = "a".repeat(64);
+        repository.saveAndFlush(Memory.proposedUser(ADMIN.id(), "제안", "내용", 99L, key));
+
+        assertThatThrownBy(() -> repository.saveAndFlush(
+                Memory.proposedUser(ADMIN.id(), "제안", "내용", 100L, key)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private static CurrentUser user(Long id, Long familyId, UserRole role) {

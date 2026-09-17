@@ -14,6 +14,8 @@
 「memory 가 많아지면 도구 방식으로 옮긴다」 와
 「그때도 권한 검사는 도구 구현이 아니라 Control Plane 이 맡는다」 를 함께 적었다.
 이 ADR 은 그 조건을 구체화한다.
+ADR-003과 ADR-012의 **Hermes 내장 memory 도구 금지**는 유지한다.
+대신 제목 색인에 실린 항목만 Control Plane MCP 도구로 읽도록 두 결정의 범위를 보완한다.
 
 전부 주입하면 실행마다 그 양이 실린다.
 `career` profile 의 `MEMORY.md` 가 10,192 바이트로 자란 상태였고,

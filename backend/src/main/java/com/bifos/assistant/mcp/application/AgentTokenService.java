@@ -14,6 +14,9 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +38,17 @@ public class AgentTokenService {
         return new IssuedToken(saved, user.email(), raw);
     }
     public List<TokenWithUser> list() {
-        return tokens.findAll().stream().map(token -> new TokenWithUser(token, users.findById(token.userId()).map(AppUser::email).orElse(""))).toList();
+        List<AgentToken> allTokens = tokens.findAll();
+        Map<Long, AppUser> usersById = users.findAllById(
+                        allTokens.stream().map(AgentToken::userId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(AppUser::id, Function.identity()));
+        return allTokens.stream()
+                .map(token -> {
+                    AppUser user = usersById.get(token.userId());
+                    return new TokenWithUser(token, user == null ? "" : user.email());
+                })
+                .toList();
     }
     @Transactional
     public void revoke(Long id) { tokens.findById(id).orElseThrow(() -> new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such token")).revoke(); }
@@ -53,4 +66,5 @@ public class AgentTokenService {
     }
     public record IssuedToken(AgentToken token, String userEmail, String rawToken) {}
     public record TokenWithUser(AgentToken token, String userEmail) {}
+
 }

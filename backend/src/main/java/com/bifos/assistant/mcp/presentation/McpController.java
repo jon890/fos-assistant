@@ -5,6 +5,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,9 @@ import tools.jackson.databind.JsonNode;
 @RestController
 @RequiredArgsConstructor
 public class McpController {
-    private final McpToolService tools; private final CurrentUserProvider currentUser;
+    private final McpToolService tools;
+    private final CurrentUserProvider currentUser;
+    private final BuildProperties buildProperties;
     @PostMapping("/mcp")
     public ResponseEntity<?> handle(
             @RequestHeader(value = HttpHeaders.ORIGIN, required = false) String origin,
@@ -28,7 +31,7 @@ public class McpController {
         JsonNode id = request.get("id"); String method = request.path("method").asString();
         if ("notifications/initialized".equals(method)) return ResponseEntity.status(HttpStatus.ACCEPTED).build();
         return ResponseEntity.ok(switch (method) {
-            case "initialize" -> response(id, Map.of("protocolVersion", "2025-03-26", "capabilities", Map.of("tools", Map.of("listChanged", false)), "serverInfo", Map.of("name", "fos-assistant-memory", "version", "0.1.0-SNAPSHOT")));
+            case "initialize" -> response(id, Map.of("protocolVersion", "2025-03-26", "capabilities", Map.of("tools", Map.of("listChanged", false)), "serverInfo", Map.of("name", "fos-assistant-memory", "version", buildProperties.getVersion())));
             case "tools/list" -> response(id, Map.of("tools", tools.tools()));
             case "tools/call" -> call(id, request.path("params"));
             default -> error(id, -32601, "Method not found");

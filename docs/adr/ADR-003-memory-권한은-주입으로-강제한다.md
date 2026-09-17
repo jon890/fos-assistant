@@ -20,22 +20,25 @@ Hermes 의 내장 memory 는 개인 Memory 로 쓰지 않는다.
 Runs API 의 `instructions` 로 넣는다.
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
 
-Hermes 에게 memory 조회 도구를 주지 않는다.
-LLM 이 남의 memory 에 닿을 경로 자체가 없다.
+Hermes 내장 memory 조회 도구는 주지 않는다.
+제목만 주입한 항목은 [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md)에서 정한
+Control Plane MCP 도구로만 읽는다.
+Control Plane 이 토큰의 사용자를 먼저 정하고 그 사용자가 볼 수 있는 본문만 응답한다.
 
 ### 거절한 대안
 
 - Hermes 내장 memory 를 개인 Memory 로 쓰는 방식은
   개인과 공용의 저장 위치가 갈라지고 화면에서 개인 Memory 를 보여주려면 Hermes 파일을 따로 읽어야 하므로 쓰지 않는다.
-- 에이전트에게 memory 조회 도구를 주고 그 안에서 권한을 검사하는 방식은
+- Hermes 내장 memory 조회 도구에서 권한을 검사하는 방식은
   MVP 에서 필요하지 않은 왕복을 더하므로 지금은 쓰지 않는다.
   나중에 memory 가 커져 전부 주입하기 어려워지면 그때 도입한다.
-  그때도 권한 검사는 도구 구현이 아니라 Control Plane 이 맡는다.
+  그때도 권한 검사는 Hermes 도구가 아니라 Control Plane 이 맡는다.
 
 ### 결과
 
 권한 경계가 한 곳에 모인다.
-주입한 문자열이 곧 에이전트가 볼 수 있는 전부이므로 검사하기 쉽다.
+항상 싣는 본문과 제목 색인은 주입 문자열로 검사하고,
+색인 본문은 Control Plane MCP 응답으로 검사한다.
 
 대신 memory 가 많아지면 주입할 양이 실행마다 늘어난다.
 그 시점에 도구 방식으로 옮긴다.

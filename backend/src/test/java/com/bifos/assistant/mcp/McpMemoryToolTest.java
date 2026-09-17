@@ -24,6 +24,7 @@ import java.util.Date;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
@@ -40,6 +41,7 @@ class McpMemoryToolTest {
     @Autowired AppUserRepository users;
     @Autowired MemoryRepository memoryRepository;
     @Autowired MemoryService memories;
+    @Autowired BuildProperties buildProperties;
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
@@ -60,7 +62,8 @@ class McpMemoryToolTest {
         assertThat(initialized.path("result").path("protocolVersion").asString()).isEqualTo("2025-03-26");
         assertThat(initialized.path("result").path("capabilities").path("tools").path("listChanged").asBoolean()).isFalse();
         assertThat(initialized.path("result").path("serverInfo").path("name").asString()).isEqualTo("fos-assistant-memory");
-        assertThat(initialized.path("result").path("serverInfo").path("version").asString()).isNotBlank();
+        assertThat(initialized.path("result").path("serverInfo").path("version").asString())
+                .isEqualTo(buildProperties.getVersion());
         JsonNode listed = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/list\"}"));
         assertThat(listed.path("id").asInt()).isEqualTo(18);
         assertThat(listed.path("result").path("tools")).hasSize(1);

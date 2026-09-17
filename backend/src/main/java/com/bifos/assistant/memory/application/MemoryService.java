@@ -8,6 +8,10 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -62,10 +66,10 @@ public class MemoryService {
     /** 에이전트가 제안한 개인 항목을 만든다. FAMILY 제안은 만들지 않는다. */
     @Transactional
     public Memory proposeUser(CurrentUser user, String title, String content, Long proposedByExecutionId) {
-        return memories.findFirstByOwnerUserIdAndTitleAndContentAndStatus(
-                        user.id(), title, content, MemoryStatus.PROPOSED)
+        String dedupKey = proposalDedupKey(user.id(), title, content);
+        return memories.findByProposalDedupKey(dedupKey)
                 .orElseGet(() -> memories.save(Memory.proposedUser(
-                        user.id(), title, content, proposedByExecutionId)));
+                        user.id(), title, content, proposedByExecutionId, dedupKey)));
     }
 
     @Transactional
@@ -133,5 +137,15 @@ public class MemoryService {
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such memory");
+    }
+
+    private static String proposalDedupKey(Long ownerUserId, String title, String content) {
+        try {
+            String value = ownerUserId + "\u0000" + title + "\u0000" + content;
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
     }
 }

@@ -161,14 +161,23 @@ export const memoryScenario: Scenario = {
       200,
       "MCP 대상 Memory 생성",
     ).json<MemoryView>();
-    const issued = expectStatus(
+    const kidToken = expectStatus(
       await call(context, "/admin/agent-tokens", {
         method: "POST",
         token: context.tokens.dad,
-        body: { userEmail: "kid@example.com", label: "e2e" },
+        body: { userEmail: "kid@example.com", label: "e2e-kid" },
       }),
       200,
-      "MCP 토큰 발급",
+      "아이 MCP 토큰 발급",
+    ).json<AgentToken>();
+    const dadToken = expectStatus(
+      await call(context, "/admin/agent-tokens", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { userEmail: "dad@example.com", label: "e2e-dad" },
+      }),
+      200,
+      "아빠 MCP 토큰 발급",
     ).json<AgentToken>();
     const kidOwn = expectStatus(
       await call(context, "/memories", {
@@ -179,21 +188,36 @@ export const memoryScenario: Scenario = {
       200,
       "MCP 본인 Memory 생성",
     ).json<MemoryView>();
-    const mcp = await fetch(context.api.replace("/api/v1", "/mcp"), {
+    const kidReadsDad = await fetch(context.api.replace("/api/v1", "/mcp"), {
       method: "POST",
-      headers: { Authorization: `Bearer ${issued.token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${kidToken.token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: dadOnly.id, user_id: 1 } } }),
     });
-    const mcpBody = await mcp.text();
-    expect(mcp.status === 200, "MCP 요청이 처리되지 않았다");
-    expect(!mcpBody.includes(dadOnly.content), "다른 사용자의 Memory 본문이 MCP 응답에 있다");
-    const ownMcp = await fetch(context.api.replace("/api/v1", "/mcp"), {
+    const kidReadsDadBody = await kidReadsDad.text();
+    expect(kidReadsDad.status === 200, "아이 MCP 요청이 처리되지 않았다");
+    expect(!kidReadsDadBody.includes(dadOnly.content), "아이 토큰에 아빠 Memory 본문이 있다");
+    const kidReadsOwn = await fetch(context.api.replace("/api/v1", "/mcp"), {
       method: "POST",
-      headers: { Authorization: `Bearer ${issued.token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${kidToken.token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "memory_read", arguments: { id: kidOwn.id } } }),
     });
-    const ownMcpBody = await ownMcp.text();
-    expect(ownMcp.status === 200 && ownMcpBody.includes(kidOwn.content), "MCP 토큰의 사용자 본문이 오지 않는다");
+    const kidReadsOwnBody = await kidReadsOwn.text();
+    expect(kidReadsOwn.status === 200 && kidReadsOwnBody.includes(kidOwn.content), "아이 토큰의 본문이 오지 않는다");
+    const dadReadsKid = await fetch(context.api.replace("/api/v1", "/mcp"), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${dadToken.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "memory_read", arguments: { id: kidOwn.id, user_id: 2 } } }),
+    });
+    const dadReadsKidBody = await dadReadsKid.text();
+    expect(dadReadsKid.status === 200, "아빠 MCP 요청이 처리되지 않았다");
+    expect(!dadReadsKidBody.includes(kidOwn.content), "아빠 토큰에 아이 Memory 본문이 있다");
+    const dadReadsOwn = await fetch(context.api.replace("/api/v1", "/mcp"), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${dadToken.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "memory_read", arguments: { id: dadOnly.id } } }),
+    });
+    const dadReadsOwnBody = await dadReadsOwn.text();
+    expect(dadReadsOwn.status === 200 && dadReadsOwnBody.includes(dadOnly.content), "아빠 토큰의 본문이 오지 않는다");
     expectStatus(
       await call(context, `/memories/${dadOnly.id}`, { method: "DELETE", token: context.tokens.dad }),
       200,
