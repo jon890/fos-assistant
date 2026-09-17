@@ -38,10 +38,11 @@ Hermes 주석에 따르면 복사하면 갱신 토큰이 둘로 갈라지고 한
 
 ### 우리가 더하는 것
 
-- 바인딩마다 `credential_scope` 를 적는다. 기본값이 없어 만드는 사람이 반드시 고른다.
+- 에이전트마다 `credential_scope` 를 적는다. 기본값이 없어 만드는 사람이 반드시 고른다.
 - `configure-member-profile.sh verify` 가 격리 여부를 판정하고, 공유는 명시할 때만 넘어간다.
 - profile 마다 `fallback_providers` 를 비워 둔다. 한 사람의 요청이 다른 모델로 넘어가지 않는다.
-- Control Plane 이 요청자의 바인딩에서만 profile 이름을 꺼낸다. 요청 본문은 profile 을 정하지 못한다.
+- Control Plane 은 대화를 시작할 때 사용자가 쓸 수 있는 에이전트에서 profile 이름을 꺼낸다.
+  이어지는 요청은 에이전트나 profile 을 바꾸지 못한다.
 
 ## API server
 
@@ -164,4 +165,4 @@ Hermes 가 subagent 를 띄웠을 때 그 토큰이 부모 실행의 `usage` 에
 
 경로 멀티플렉스가 아니라 포트 분리를 쓰고 있으므로,
 Control Plane 은 profile 마다 주소를 따로 갖는다.
-그래서 API server 주소를 `hermes.base-url` 이 아니라 바인딩에 둔다.
+그래서 API server 주소를 `hermes.base-url` 이 아니라 에이전트에 둔다.

@@ -23,7 +23,7 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 | `shared/auth` | 토큰 검사와 현재 사용자 |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `user` | 가족 구성원과 첫 로그인 처리 |
-| `credential` | 사용자와 Hermes profile 의 바인딩 |
+| `agent` | 에이전트 등록, 공개 범위, Hermes profile 연결, 모델 동기화 |
 | `hermes` | Runs API 호출과 profile key 조회 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름 |
 | `usage` | 실행 기록, 비용 환산, 사용량 조회 |
@@ -32,7 +32,8 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 ## 한 번의 대화가 지나는 길
 
 1. `ChatController` 가 현재 사용자를 확인한다.
-2. `ChatService` 가 그 사용자의 바인딩을 찾는다. 없으면 `HERMES_BINDING_MISSING` 으로 끝난다.
+2. `ChatService` 가 요청한 에이전트를 사용자가 쓸 수 있는지 확인하고 `conversation` 에 기록한다.
+   이어지는 대화는 요청의 `agentCode` 를 무시하고 처음 기록한 에이전트를 쓴다.
 3. 새 대화면 요청의 `workspaceCode` 를 `WorkspaceService.requireReadable` 로 확인해 `conversation` 에 기록한다.
    이어지는 대화는 요청의 `workspaceCode` 를 무시하고 그 대화에 이미 기록된 영역을 쓴다.
 4. `WorkspaceService.briefing` 이 그 영역의 `AGENTS.md` 를 읽어 실행의 `instructions` 로 넣는다.
@@ -40,7 +41,7 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
 6. `HttpHermesRunsClient` 가 실행을 제출하고 끝날 때까지 조회한다.
 7. `CostEstimator` 가 그 토큰을 models.dev 가격표로 환산한다.
-8. `ExecutionRecorder` 가 사용자, 영역, provider, 모델, 토큰, 소요 시간, 환산 금액을 한 줄로 남긴다.
+8. `ExecutionRecorder` 가 사용자, 에이전트, 영역, provider, 모델, 토큰, 소요 시간, 환산 금액을 한 줄로 남긴다.
 9. 실패해도 8번은 남는다. 실패는 토큰을 보고하지 않으므로 금액만 비어 있다.
 
 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다.
@@ -84,7 +85,8 @@ Hermes profile 디렉터리를 그대로 붙이지 않는다.
 | 웹과 Control Plane 이 나눠 가지는 HMAC 비밀값 | 두 서비스의 환경 변수 |
 
 데이터베이스에는 어떤 비밀값도 넣지 않는다.
-`hermes_profile_binding` 은 누구의 profile 이 무엇인지만 적는다.
+`agent` 는 profile 이름과 주소만 적는다.
+profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 ## 문서
 

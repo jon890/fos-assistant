@@ -18,25 +18,30 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `family_id` | BIGINT | 지금은 한 가구뿐이다 |
 | `role` | VARCHAR(20) | `ADMIN` 또는 `MEMBER`. 첫 사용자가 `ADMIN` 이 된다 |
 
-## hermes_profile_binding
+## agent
 
-사용자 하나를 Hermes profile 하나에 붙인다.
-비밀값은 없고 어느 profile 이 누구 것인지만 적는다.
+사용자가 대화를 시작할 때 고르는 실행 단위다.
+에이전트 하나가 Hermes profile 하나를 가리키고, 공개 범위가 누가 쓸 수 있는지 정한다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
-| `user_id` | BIGINT | 유일하다. 사용자 하나에 profile 하나 |
-| `profile_name` | VARCHAR(64) | 유일하다. 호스트의 key 파일 이름과 같다 |
+| `code` | VARCHAR(64) | 유일하다. 요청과 화면에서 에이전트를 가리킨다 |
+| `name` | VARCHAR(100) | 화면에 보일 이름 |
+| `hermes_profile` | VARCHAR(64) | 유일하다. 호스트의 key 파일 이름과 같다 |
 | `api_base_url` | VARCHAR(255) | 그 profile 의 API server 주소. `/v1` 앞까지 |
 | `provider` | VARCHAR(64) | 실행이 올라타는 credential 의 이름 |
-| `model` | VARCHAR(128) | 실행이 profile 이름만 돌려줄 때 쓰는 모델 이름 |
+| `model` | VARCHAR(128) | Hermes 에서 마지막으로 읽은 모델 이름 |
+| `model_synced_at` | DATETIME(6) NULL | Hermes 에서 모델을 읽은 시각 |
 | `cost_mode` | VARCHAR(20) | `SUBSCRIPTION` 또는 `API` |
 | `credential_scope` | VARCHAR(20) | `SHARED_HOUSEHOLD` 또는 `DEDICATED` |
-| `status` | VARCHAR(20) | `ACTIVE` 또는 `DISABLED` |
+| `visibility` | VARCHAR(20) | `PRIVATE` 또는 `FAMILY`. 기본값이 없다 |
+| `owner_user_id` | BIGINT NULL | `PRIVATE` 일 때 필요하다 |
+| `enabled` | BOOLEAN | 거짓이면 새 실행을 막는다 |
 
-`model` 이 이 표와 Hermes profile 설정 두 곳에 적힌다.
-한쪽만 바꾸면 실제 모델과 환산 가격이 어긋난다.
-근거는 [ADR-004](adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)에 있다.
+`model` 은 등록할 때와 관리자가 동기화를 요청할 때 Hermes 에서 읽는다.
+읽지 못하면 마지막 값을 유지해 기존 실행과 비용 기록을 계속 해석할 수 있게 한다.
+공개 범위가 접근 권한을 정하는 이유는
+[ADR-007](adr/ADR-007-에이전트가-모델과-도구를-함께-정한다.md)에 있다.
 
 ## workspace
 
@@ -61,11 +66,12 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | --- | --- | --- |
 | `user_id` | BIGINT | 이 대화의 주인. 다른 사용자는 읽지 못한다 |
 | `workspace_id` | BIGINT NULL | 첫 메시지가 정한다. 뒤에 바뀌지 않는다 |
+| `agent_id` | BIGINT | 첫 메시지가 정한다. 뒤에 바뀌지 않는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 첫 실행이 돌려준 session. 특정 profile 안의 값이다 |
 | `title` | VARCHAR(200) | 첫 메시지의 앞부분 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다 |
 
-`hermes_session_id` 가 특정 profile 안의 값이라, 대화의 영역과 profile 은 중간에 바뀌지 않는다.
+`hermes_session_id` 가 특정 profile 안의 값이라, 대화의 영역과 에이전트는 중간에 바뀌지 않는다.
 
 ## chat_message
 
@@ -95,9 +101,10 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `user_id` | BIGINT | 누가 물었는가 |
 | `conversation_id` | BIGINT | |
 | `workspace_id` | BIGINT NULL | 어느 영역의 작업이었는가 |
+| `agent_id` | BIGINT | 어느 에이전트의 실행이었는가 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | |
-| `provider`, `model` | VARCHAR | 실행이 돌려준 것이 profile 이름이면 바인딩의 값을 쓴다 |
+| `provider`, `model` | VARCHAR | 실행이 돌려준 것이 profile 이름이면 에이전트의 값을 쓴다 |
 | `status` | VARCHAR(20) | `SUCCEEDED` 또는 `FAILED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
