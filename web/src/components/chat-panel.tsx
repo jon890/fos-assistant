@@ -316,14 +316,13 @@ export function ChatPanel() {
       />
 
       <div className="flex min-w-0 flex-col gap-4">
-        <label className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
+        <label className="flex items-center gap-2 text-xs text-muted">
           에이전트
           {!agentLocked && agents.length > 1 ? (
             <select
               value={agentCode}
               onChange={(event) => setAgentCode(event.target.value)}
-              className="rounded-md border px-2 py-1 text-xs"
-              style={{ borderColor: "var(--border)", background: "transparent" }}
+              className="rounded-md border border-border bg-transparent px-2 py-1 text-xs"
             >
               {agents.map((agent) => (
                 <option key={agent.code} value={agent.code}>{agent.name}</option>
@@ -335,14 +334,13 @@ export function ChatPanel() {
           {agentLocked ? <span>이 대화는 에이전트가 고정됐다.</span> : null}
         </label>
 
-        <label className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
+        <label className="flex items-center gap-2 text-xs text-muted">
           작업 영역
           <select
             value={workspaceCode}
             onChange={(event) => setWorkspaceCode(event.target.value)}
             disabled={workspaceLocked}
-            className="rounded-md border px-2 py-1 text-xs disabled:opacity-50"
-            style={{ borderColor: "var(--border)", background: "transparent" }}
+            className="rounded-md border border-border bg-transparent px-2 py-1 text-xs disabled:opacity-50"
           >
             <option value="">영역 없음</option>
             {workspaces.map((workspace) => (
@@ -358,38 +356,36 @@ export function ChatPanel() {
           {turns.map((turn) => (
             <li
               key={turn.id}
-              className="rounded-lg px-3 py-2 text-sm whitespace-pre-wrap"
-              style={{
-                background: turn.role === "USER" ? "var(--surface)" : "transparent",
-                border: turn.role === "ASSISTANT" ? "1px solid var(--border)" : "none",
-              }}
+              className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                turn.role === "USER" ? "bg-surface" : "border border-border"
+              }`}
             >
-              <span className="mb-1 block text-xs" style={{ color: "var(--muted)" }}>
+              <span className="mb-1 block text-xs text-muted">
                 {turn.role === "USER" ? turn.senderName : "비서"}
               </span>
               {turn.content}
             </li>
           ))}
           {sending ? (
-            <li className="text-sm" style={{ color: "var(--muted)" }}>
+            <li className="text-sm text-muted">
               비서가 실행 중이다.
             </li>
           ) : null}
           {toolEvents.map((tool, index) => (
-            <li key={`${tool}-${index}`} className="text-xs" style={{ color: "var(--muted)" }}>
+            <li key={`${tool}-${index}`} className="text-xs text-muted">
               {tool}
             </li>
           ))}
         </ol>
 
         {error ? (
-          <p className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--surface)" }}>
+          <p className="rounded-md bg-surface px-3 py-2 text-sm">
             {error}
           </p>
         ) : null}
 
         {agents.length === 0 ? (
-          <p className="rounded-md px-3 py-2 text-sm" style={{ background: "var(--surface)" }}>
+          <p className="rounded-md bg-surface px-3 py-2 text-sm">
             사용할 수 있는 에이전트가 없다. 관리자에게 에이전트 등록을 요청한다.
           </p>
         ) : null}
@@ -400,14 +396,12 @@ export function ChatPanel() {
             onChange={(event) => setDraft(event.target.value)}
             disabled={sending || agents.length === 0}
             placeholder="무엇을 도와줄까요"
-            className="flex-1 rounded-md border px-3 py-2 text-sm disabled:opacity-50"
-            style={{ borderColor: "var(--border)", background: "transparent" }}
+            className="flex-1 rounded-md border border-border bg-transparent px-3 py-2 text-sm disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={sending || agents.length === 0}
-            className="rounded-md border px-4 py-2 text-sm disabled:opacity-50"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-md border border-border px-4 py-2 text-sm disabled:opacity-50"
           >
             보내기
           </button>

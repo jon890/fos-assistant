@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+}
+
 :root {
   --background: #ffffff;
   --foreground: #16181d;
@@ -8,18 +18,14 @@
   --border: #e3e5ea;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #101216;
-    --foreground: #eceef2;
-    --muted: #9aa1ad;
-    --surface: #191c22;
-    --border: #2a2e37;
-  }
+.dark {
+  --background: #101216;
+  --foreground: #eceef2;
+  --muted: #9aa1ad;
+  --surface: #191c22;
+  --border: #2a2e37;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: system-ui, -apple-system, "Pretendard", sans-serif;
 }

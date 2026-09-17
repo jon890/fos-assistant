@@ -102,12 +102,12 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
   return (
     <>
       <h1 className="mb-4 text-lg font-semibold">에이전트 관리</h1>
-      <p className="mb-4 text-sm" style={{ color: "var(--muted)" }}>
+      <p className="mb-4 text-sm text-muted">
         공개 범위는 보안 설정이다. FAMILY로 바꾸면 모든 가족 구성원이 이 에이전트에 연결된 도구를 쓸 수
         있다. 터미널이나 파일 도구가 열린 에이전트는 웹에서 홈서버를 조작할 수 있으므로 공개하면 안 된다.
       </p>
 
-      <form onSubmit={create} className="mb-8 grid gap-3 rounded-lg border p-4" style={{ borderColor: "var(--border)" }}>
+      <form onSubmit={create} className="mb-8 grid gap-3 rounded-lg border border-border p-4">
         <h2 className="font-semibold">에이전트 등록</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <input name="code" required pattern="[a-z0-9][a-z0-9-]*" placeholder="코드" className="rounded-md border px-3 py-2" />
@@ -128,17 +128,17 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
             </select>
           </label>
         </div>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>모델은 등록할 때 Hermes에서 읽는다.</p>
+        <p className="text-xs text-muted">모델은 등록할 때 Hermes에서 읽는다.</p>
         <button disabled={busy} className="w-fit rounded-md border px-4 py-2 text-sm disabled:opacity-50">등록</button>
       </form>
 
-      {error ? <p className="mb-4 rounded-md p-3 text-sm" style={{ background: "var(--surface)" }}>{error}</p> : null}
+      {error ? <p className="mb-4 rounded-md bg-surface p-3 text-sm">{error}</p> : null}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead><tr><th>코드</th><th>이름</th><th>모델</th><th>공개 범위</th><th>사용</th><th>마지막 확인</th><th>작업</th></tr></thead>
           <tbody>{agents.map((agent) => (
-            <tr key={agent.code} className="border-t" style={{ borderColor: "var(--border)" }}>
+            <tr key={agent.code} className="border-t border-border">
               <td className="py-2 pr-3">{agent.code}</td><td className="py-2 pr-3">{agent.name}</td>
               <td className="py-2 pr-3">{agent.model}</td>
               <td className="py-2 pr-3"><button disabled={busy} onClick={() => void update(agent, { visibility: agent.visibility === "PRIVATE" ? "FAMILY" : "PRIVATE" })}>{agent.visibility}</button></td>

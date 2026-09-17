@@ -187,8 +187,14 @@ Control Plane 은 profile 마다 주소를 따로 갖는다.
 포트는 응답하지만 컨테이너를 다시 띄우면 사라지고 s6 가 되살리지 않는다.
 실측으로 `career` 를 그렇게 띄웠다가 감독 아래로 옮겼다.
 
-서비스는 `normally down` 이라 컨테이너가 뜰 때 자동으로 시작하지 않는다.
-사람이 켜야 하고, 켠 뒤에 죽으면 s6 가 되살린다.
+컨테이너가 다시 뜰 때 그 profile 의 gateway 가 함께 뜨는지는
+`~/.hermes/profiles/<profile>/gateway_state.json` 의 `desired_state` 가 정한다.
+
+한 번 켜 두면 그 파일이 `running` 으로 남아 다음 기동에서 자동으로 뜬다.
+일부러 멈춘 gateway 는 멈춘 채로 남는다. 켜고 끈 것을 컨테이너 기동이 뒤집지 않는다.
+
+`career` 를 붙인 뒤 그 파일에 `desired_state` 가 `running` 이고
+`api_server` 가 `connected` 인 것을 확인했다.
 
 ## 실행 이벤트가 실제로 오는 형태
 
