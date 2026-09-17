@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
-import { executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
+import { actualCostLabel, executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
 
 export function ExecutionCard({ execution }: { execution: UsageExecution }) {
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
@@ -31,6 +31,9 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         <span>{formatWhen(execution.startedAt)}</span>
         <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
       </div>
+      <p className="mt-2 text-xs text-muted" data-testid="execution-actual-cost">
+        실제 청구액 {actualCostLabel(execution)}
+      </p>
     </article>
   );
 }

@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
-import { executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
+import { actualCostLabel, executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
 
 export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
   return (
@@ -15,7 +15,8 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
           <th className="pb-3 pr-4 text-right font-medium">캐시</th>
           <th className="pb-3 pr-4 text-right font-medium">출력</th>
           <th className="pb-3 pr-4 text-right font-medium">소요</th>
-          <th className="pb-3 text-right font-medium">API 환산 비용</th>
+          <th className="pb-3 pr-4 text-right font-medium">API 환산 비용</th>
+          <th className="pb-3 text-right font-medium">실제 청구액</th>
         </tr>
       </thead>
       <tbody>
@@ -43,11 +44,14 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 {running ? "" : formatDuration(execution.latencyMs ?? 0)}
               </td>
               <td
-                className="py-3 text-right whitespace-nowrap"
+                className="py-3 pr-4 text-right whitespace-nowrap"
                 data-testid="execution-cost"
                 title={execution.pricingVersion ?? undefined}
               >
                 {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
+              </td>
+              <td className="py-3 text-right whitespace-nowrap" data-testid="execution-actual-cost">
+                {actualCostLabel(execution)}
               </td>
             </tr>
           );
