@@ -189,3 +189,25 @@ Control Plane 은 profile 마다 주소를 따로 갖는다.
 
 서비스는 `normally down` 이라 컨테이너가 뜰 때 자동으로 시작하지 않는다.
 사람이 켜야 하고, 켠 뒤에 죽으면 s6 가 되살린다.
+
+## 실행 이벤트가 실제로 오는 형태
+
+v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측으로 확인했다.
+
+**사건 이름은 `type` 이 아니라 `event` 다.** 중계하는 쪽이 `type` 을 읽으면 아무것도 받지 못한다.
+
+| `event` | 함께 오는 칸 |
+| --- | --- |
+| `message.delta` | `delta` 에 답의 조각 |
+| `tool.started` | `tool` 에 도구 이름, `preview` 에 인자 앞부분 |
+| `tool.completed` | `tool`, `duration` 초, `error` 참거짓 |
+| `subagent.start`, `subagent.complete` | `preview` |
+| `reasoning.available` | `text` 에 그때까지의 답 전체 |
+| `run.completed` | `output` 과 `usage` |
+| `run.failed`, `run.cancelled` | 끝 |
+
+`data:` 줄의 JSON 안에 `event` 가 들어 있다. SSE 의 `event:` 줄로 오지 않는다.
+10초마다 `: keepalive` 주석이 온다.
+
+**가짜 Hermes 를 이 형태로 맞춰 둔다.**
+어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다. 실측으로 그렇게 한 번 놓쳤다.

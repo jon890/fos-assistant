@@ -111,15 +111,18 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
             Connection: "keep-alive",
           });
           response.write(": keepalive\n\n");
-          event(response, { type: "message.delta", text: "화면에서만 " });
+          // 실제 Hermes v0.21.0 이 보내는 형태다.
+          // 사건 이름은 `event`, 조각은 `delta`, 도구 이름은 `tool`, 설명은 `preview` 다.
+          // 여기가 실제와 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
+          event(response, { event: "message.delta", delta: "화면에서만 " });
           if (run.interruptEvents) {
             response.end();
             return;
           }
-          event(response, { type: "message.delta", text: `보이는 조각: ${run.input}` });
-          event(response, { type: "tool.started", tool_name: "fake-tool", detail: "started" });
-          event(response, { type: "tool.completed", tool_name: "fake-tool", detail: "completed" });
-          event(response, { type: "run.completed" });
+          event(response, { event: "message.delta", delta: `보이는 조각: ${run.input}` });
+          event(response, { event: "tool.started", tool: "fake-tool", preview: "started" });
+          event(response, { event: "tool.completed", tool: "fake-tool", duration: 0.1, error: false });
+          event(response, { event: "run.completed" });
           response.end();
           return;
         }

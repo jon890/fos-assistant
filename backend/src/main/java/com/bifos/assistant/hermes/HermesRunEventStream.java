@@ -87,11 +87,13 @@ public class HermesRunEventStream {
         try {
             JsonNode root = objectMapper.readTree(raw);
             JsonNode payload = root.path("data");
+            // Hermes 는 사건 이름을 `event` 로 보낸다. 실측으로 확인했다.
+            // `type` 을 함께 보는 것은 다른 형태로 보내는 구현이 섞일 때를 위한 것이다.
             onEvent.accept(new RunEvent(
-                    firstText(root, payload, "type"),
-                    firstText(root, payload, "text", "delta", "output"),
-                    firstText(root, payload, "tool_name", "toolName", "name"),
-                    firstText(root, payload, "detail", "status", "result")));
+                    firstText(root, payload, "event", "type"),
+                    firstText(root, payload, "delta", "text", "output"),
+                    firstText(root, payload, "tool", "tool_name", "toolName", "name"),
+                    firstText(root, payload, "preview", "detail", "status", "result")));
         } catch (JacksonException ex) {
             throw new IOException("Hermes sent an invalid event", ex);
         }
