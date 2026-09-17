@@ -83,6 +83,33 @@ cd backend && ./gradlew test
 cd web && pnpm typecheck && pnpm build
 cd web && pnpm test:browser
 node test/e2e/run.ts
+scripts/check-public-safe.sh
+```
+
+**네 검사가 통과하면 머지한다. 머지마다 승인을 받지 않는다.**
+다만 통과를 **직접 돌려 확인한 것**이라야 한다.
+워커의 보고를 읽는 것은 확인이 아니다.
+실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
+
+`gradlew` 는 `backend/` 안에 있다. 저장소 루트에서 `./gradlew` 를 부르면 없다.
+
+`test/e2e` 는 앞선 실행이 남긴 데이터에 걸린다.
+`gradlew test` 를 건너뛰고 `run.ts` 만 돌리면
+`this agent code is already used` 로 실패할 수 있다. 실측으로 그랬다.
+네 명령을 적힌 순서대로 돌린다.
+
+**`pnpm build` 는 자리표시자 환경 변수가 있어야 통과한다.**
+없으면 `Failed to collect page data` 로 끝나는데, 그것은 코드 결함이 아니다.
+`web/Dockerfile` 이 쓰는 것과 같은 값을 준다.
+
+```bash
+# cwd: web/
+AUTH_SECRET=build-time-placeholder \
+ASSISTANT_JWT_SECRET=build-time-placeholder \
+CONTROL_PLANE_BASE_URL=http://build-time-placeholder \
+AUTH_GOOGLE_ID=build-time-placeholder \
+AUTH_GOOGLE_SECRET=build-time-placeholder \
+pnpm build
 ```
 
 `test/browser` 는 그 위에 웹과 Chromium 을 띄워 화면을 검사한다.
