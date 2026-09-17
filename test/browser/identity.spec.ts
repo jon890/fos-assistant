@@ -72,6 +72,6 @@ test("Pretendard와 테마별 브랜드 색을 자체 글꼴 단추에 적용한
   });
   expect(primaryColors.background).not.toBe("rgba(0, 0, 0, 0)");
   expect(parseRgb(primaryColors.background)).toEqual(parseRgb(primaryColors.brand));
-  await expect(page.getByRole("button", { name: "가족 공개로 변경" })).toHaveAttribute("type", "button");
+  await expect(page.getByRole("button", { name: /^(가족 공개|나만)으로 변경$/ })).toHaveAttribute("type", "button");
   expect(externalFontRequests).toEqual([]);
 });
