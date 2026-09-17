@@ -32,7 +32,7 @@ career-os 스킬이 `bun career-os/scripts/...` 를 실행하므로 그 도구�
 ~/.hermes/profiles/<profile>/skills/<범주>/<스킬> -> <마운트된 스킬 디렉터리>
 ```
 
-`fos-agents` 는 hermes 컨테이너에 `/opt/data/fos-agents` 로 이미 붙어 있다.
+`fos-agents` 는 Hermes 컨테이너에 이미 붙어 있다. 그 마운트 경로는 `fos-home-infra` 가 소유한다.
 링크를 만든 뒤 gateway 를 다시 띄우면 `GET /v1/skills` 에 나타난다. 실측으로 확인했다.
 
 **`skill_paths` 와 `external_skill_paths` 는 설정 키가 아니다.**
@@ -43,7 +43,7 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 | 무엇 | 경로 |
 | --- | --- |
 | profile 만들기와 API server 켜기 | `fos-home-infra` 의 `services/hermes-assistant/configure-member-profile.sh` |
-| 이미 쓰는 포트 | `brain-api` 8644, `bifos` 8651 |
+| 이미 쓰는 포트 | `fos-home-infra` 의 `services/hermes-assistant/README.md` 가 목록을 갖는다 |
 | 페르소나 사본 | `fos-home-infra` 의 `services/hermes-assistant/personas/career/SOUL.md` |
 
 **근거 문서**: `docs/hermes-integration.md`, `docs/adr/ADR-007-에이전트가-모델과-도구를-함께-정한다.md`
@@ -72,7 +72,7 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 - key 는 `$ASSISTANT_PROFILE_KEY_DIR/<profile>` 에 mode 600 으로 만든다.
   이미 있으면 다시 만들지 않는다.
 - **`config.yaml` 을 건드리지 않는다.** 도구 설정과 모델을 그대로 둔다.
-- 포트는 8652 를 쓴다. 8644 와 8651 이 쓰이고 있다.
+- 포트는 `fos-home-infra` 의 쓰이는 포트 목록에서 비어 있는 것을 고른다.
 
 ### 2. 스킬을 붙이는 스크립트를 더한다
 
@@ -80,7 +80,7 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 
 - 인자로 profile 이름과 워크스페이스 이름을 받는다.
 - `<profile>/skills/<워크스페이스>/` 를 만들고 그 아래에 스킬마다 심볼릭 링크를 만든다.
-- 링크 대상은 컨테이너 안의 경로다. `/opt/data/fos-agents/<워크스페이스>/.claude/skills/<스킬>`
+- 링크 대상은 컨테이너 안의 경로다. 그 경로는 `fos-home-infra` 가 소유한다.
 - 붙인 뒤 gateway 를 다시 띄운다.
 - `GET /v1/skills` 로 확인해 붙은 스킬 수를 출력한다.
 
@@ -94,7 +94,7 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 - 스킬을 붙이는 방법이 설정 키가 아니라 심볼릭 링크라는 것.
 - `skill_paths` 와 `external_skill_paths` 는 설정 키가 아니라는 것.
 - 도구가 열린 profile 을 가족 공개 에이전트로 두면 안 되는 이유.
-- 쓰이는 포트 목록에 8652 를 더한다.
+- 쓰이는 포트 목록에 이번에 고른 포트를 더한다.
 
 `services/assistant/README.md` 의 새 서비스를 붙일 때 절에도 포트를 반영한다.
 
@@ -122,7 +122,7 @@ Control Plane 의 관리 엔드포인트로 등록한다.
 | --- | --- |
 | `code` | `career` |
 | `hermesProfile` | `career` |
-| `apiBaseUrl` | `http://hermes:8652` |
+| `apiBaseUrl` | 그 profile 의 API server 주소. `fos-home-infra` 가 정한다 |
 | `visibility` | **`PRIVATE`** |
 | `ownerEmail` | 홈서버 주인 |
 | `costMode` | `SUBSCRIPTION` |

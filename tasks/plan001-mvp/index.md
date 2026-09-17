@@ -32,7 +32,7 @@ phase-07 이 만든 작업 영역은 한 번도 쓰이지 않아 제거하기로
 끝난 것은 아래와 같다.
 
 - 홈서버 Hermes v0.21.0 이 Runs API 를 지원하는 것을 확인했다
-- `bifos` profile 을 포트 8651 에 만들고 gateway 를 올렸다
+- `bifos` profile 을 만들고 gateway 를 올렸다
 - profile key 를 홈서버의 비밀값 디렉터리에 mode 600 으로 두었다
 - Control Plane 을 터널로 붙여 실제 대화 두 번을 왕복했다
 - 두 번째 대화가 첫 번째를 기억해 session 이 이어지는 것을 확인했다
