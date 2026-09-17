@@ -33,11 +33,30 @@ public class ExecutionRecorder {
             Long parentExecutionId,
             Long rootExecutionId,
             Long contextChars) {
+        return start(
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                ExecutionContextSnapshot.ofChars(contextChars));
+    }
+
+    /** 실행 당시의 상태를 함께 적으며 RUNNING 으로 만들어 돌려준다. */
+    public AgentExecution start(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            ExecutionContextSnapshot context) {
         return executions.save(
                 base(user, conversation, agent)
                         .parentExecutionId(parentExecutionId)
                         .rootExecutionId(rootExecutionId)
-                        .contextChars(contextChars)
+                        .contextChars(context.contextChars())
+                        .runtimeFingerprint(context.runtimeFingerprint())
+                        .instructionsHash(context.instructionsHash())
                         .status(ExecutionStatus.RUNNING)
                         .build());
     }
