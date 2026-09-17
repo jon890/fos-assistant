@@ -1,0 +1,14 @@
+{
+  "name": "plan009-memory",
+  "description": "개인과 가족 공용 Memory 를 Control Plane 이 갖고, 요청자가 볼 수 있는 것만 골라 주입한다",
+  "status": "pending",
+  "created_at": "2026-09-17",
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" }
+  ]
+}
