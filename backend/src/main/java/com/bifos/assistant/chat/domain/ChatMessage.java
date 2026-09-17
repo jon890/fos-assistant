@@ -7,7 +7,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
@@ -26,8 +25,9 @@ public class ChatMessage {
     @Column(name = "role", nullable = false, length = 20)
     private MessageRole role;
 
-    @Lob
-    @Column(name = "content", nullable = false)
+    // Declared outright rather than with @Lob: Hibernate maps an unsized @Lob String to tinytext on
+    // MySQL, which does not match the LONGTEXT the migration creates, and startup validation fails.
+    @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
     /** The execution that produced this message. Null for user messages. */
