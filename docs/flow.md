@@ -20,8 +20,10 @@ sequenceDiagram
         W->>C: POST /api/v1/chat/messages/stream
     end
     C->>C: 대화에 고정된 에이전트에서 profile 을 꺼낸다
-    C->>C: 대화에 적힌 작업 영역의 안내문을 읽는다
+    C->>C: 요청자가 볼 수 있는 Memory 만 골라 instructions 를 조립한다
+    C->>C: 실행 한 줄을 RUNNING 으로 만든다
     C->>H: POST {profile}/v1/runs
+    C->>C: 받은 run_id 를 그 줄에 적는다
     alt 한 번에 받는 경로
         loop 끝날 때까지
             C->>H: GET {profile}/v1/runs/{id}
@@ -31,11 +33,12 @@ sequenceDiagram
         loop 실행 중
             H-->>C: 답 조각과 도구 사건
             C-->>W: delta 와 tool 사건
+            C->>C: 사건을 execution_event 로 옮겨 적는다
             W-->>B: 답 조각과 도구 상태
         end
         C->>H: GET {profile}/v1/runs/{id}
     end
-    C->>C: 메시지와 실행 기록을 남긴다
+    C->>C: 메시지를 남기고 실행 줄을 SUCCEEDED 로 갱신한다
     alt 한 번에 받는 경로
         C-->>B: 답과 대화 번호
     else 스트리밍 경로
@@ -45,9 +48,12 @@ sequenceDiagram
     end
 ```
 
-대화가 없으면 새로 만들고 첫 메시지가 에이전트와 작업 영역을 정한다.
-이어지는 요청이 에이전트나 영역을 다시 주더라도 대화에 적힌 값을 쓴다.
-`hermes_session_id` 가 특정 profile 안의 session 이라, 중간에 영역이나 에이전트가 바뀌면 그 session 이 가리키는 것이 없어진다.
+대화가 없으면 새로 만들고 첫 메시지가 에이전트를 정한다.
+이어지는 요청이 에이전트를 다시 주더라도 대화에 적힌 값을 쓴다.
+`hermes_session_id` 가 특정 profile 안의 session 이라, 중간에 에이전트가 바뀌면 그 session 이 가리키는 것이 없어진다.
+
+실행 줄은 Hermes 를 부르기 전에 `RUNNING` 으로 먼저 만들어진다.
+그래서 오래 도는 실행도 사용량 화면에서 보이고, 서버가 중간에 죽어도 그 실행이 기록에 남는다.
 
 두 경로 모두 Hermes 실행 상태 조회가 돌려준 최종 `output` 과 `usage` 를 저장한다.
 스트리밍 경로의 답 조각은 화면에만 쓰며, 이벤트 연결이 중간에 끝나도 최종 상태를 조회해 메시지와 실행 기록을 남긴다.
@@ -99,7 +105,7 @@ flowchart TD
 ┌─ 머리 ────────────────────────────────┐
 │ 우리집 비서   사용량  관리      ☾ 밝기  │
 ├──────────┬────────────────────────────┤
-│ 대화 목록 │ 에이전트 · 작업 영역         │
+│ 대화 목록 │ 에이전트                    │
 │          ├────────────────────────────┤
 │  · 대화1  │ 메시지                      │  ← 여기만 스크롤한다
 │  · 대화2  │                            │
@@ -158,7 +164,6 @@ flowchart TD
 | `HERMES_BINDING_MISSING` | 이 사용자에게 연결된 AI 계정이 없다 | 관리자에게 연결을 요청하도록 안내한다 |
 | `HERMES_PROFILE_KEY_MISSING` | profile 의 key 가 준비되지 않았다 | 서버 설정 문제로 안내한다 |
 | `HERMES_RUN_TIMEOUT` | 제한 시간 안에 끝나지 않았다 | 다시 보내도록 안내한다 |
-| `WORKSPACE_NOT_FOUND` | 없는 영역이거나 남의 개인 영역이다 | 영역 선택을 비우고 목록을 다시 읽는다 |
 
 실패한 실행도 기록에 남는다.
 사용량 화면에서 무엇이 실패했는지 볼 수 있다.
