@@ -16,12 +16,18 @@ export type UsageExecution = {
   cachedInputTokens: number | null;
   outputTokens: number | null;
   latencyMs: number | null;
+  contextChars: number | null;
   estimatedCostMicros: number | null;
   actualCostMicros: number | null;
   costCurrency: string | null;
   pricingVersion: string | null;
   startedAt: string;
 };
+
+/** 같은 질문인데 문맥이 커진 실행을 눈으로 찾을 수 있게 글자 수를 적는다. */
+export function contextCharsLabel(execution: UsageExecution): string {
+  return execution.contextChars === null ? "-" : `${execution.contextChars.toLocaleString("ko-KR")}자`;
+}
 
 export function isRunning(execution: UsageExecution): boolean {
   return execution.status === "RUNNING";

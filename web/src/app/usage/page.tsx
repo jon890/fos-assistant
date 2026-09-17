@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { BreakdownSection } from "@/components/usage/breakdown-section";
+import type { Breakdown } from "@/components/usage/breakdown-table";
 import { ExecutionList, type UsageExecution } from "@/components/usage/execution-list";
+import { FingerprintSection } from "@/components/usage/fingerprint-section";
 import { MonthlySummary, type MonthlyCost } from "@/components/usage/monthly-summary";
 import { callControlPlane } from "@/lib/control-plane";
 
@@ -10,9 +13,11 @@ export default async function UsagePage() {
     redirect("/signin");
   }
 
-  const [executionsResult, monthlyResult] = await Promise.all([
+  const [executionsResult, monthlyResult, breakdownResult, fingerprintResult] = await Promise.all([
     callControlPlane<UsageExecution[]>("/api/v1/usage/executions?limit=50"),
     callControlPlane<MonthlyCost>("/api/v1/usage/monthly-cost"),
+    callControlPlane<Breakdown>("/api/v1/usage/breakdown?axis=agent"),
+    callControlPlane<Breakdown>("/api/v1/usage/breakdown?axis=fingerprint"),
   ]);
   if (!executionsResult.ok) {
     return <p className="text-sm">{executionsResult.message}</p>;
@@ -20,6 +25,8 @@ export default async function UsagePage() {
 
   const executions = executionsResult.data;
   const monthly = monthlyResult.ok ? monthlyResult.data : null;
+  const breakdown = breakdownResult.ok ? breakdownResult.data : null;
+  const fingerprints = fingerprintResult.ok ? fingerprintResult.data : null;
   return (
     <div className="mx-auto w-full max-w-5xl">
       <h1 className="mb-2 text-xl font-semibold">사용량</h1>
@@ -28,6 +35,10 @@ export default async function UsagePage() {
         보여, 모델을 옮길지 판단할 수 있게 한다.
       </p>
       {monthly ? <MonthlySummary monthly={monthly} /> : null}
+      {breakdown ? <BreakdownSection initial={breakdown} /> : null}
+      {fingerprints
+        ? <FingerprintSection currency={fingerprints.currency} rows={fingerprints.rows} />
+        : null}
       <ExecutionList executions={executions} />
     </div>
   );

@@ -1,6 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
-import { actualCostLabel, executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
+import {
+  actualCostLabel,
+  contextCharsLabel,
+  executionStatusLabel,
+  isRunning,
+  type UsageExecution,
+} from "./execution-list";
 
 export function ExecutionCard({ execution }: { execution: UsageExecution }) {
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
@@ -27,6 +33,7 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         <span title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}>
           {formatTokens(execution.inputTokens)} → {formatTokens(execution.outputTokens)}
         </span>
+        <span data-testid="execution-context-chars">문맥 {contextCharsLabel(execution)}</span>
         <span data-testid="execution-duration">{running ? "" : formatDuration(execution.latencyMs ?? 0)}</span>
         <span>{formatWhen(execution.startedAt)}</span>
         <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>

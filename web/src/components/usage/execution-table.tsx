@@ -1,6 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
-import { actualCostLabel, executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
+import {
+  actualCostLabel,
+  contextCharsLabel,
+  executionStatusLabel,
+  isRunning,
+  type UsageExecution,
+} from "./execution-list";
 
 export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
   return (
@@ -14,6 +20,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
           <th className="pb-3 pr-4 text-right font-medium">입력</th>
           <th className="pb-3 pr-4 text-right font-medium">캐시</th>
           <th className="pb-3 pr-4 text-right font-medium">출력</th>
+          <th className="pb-3 pr-4 text-right font-medium">문맥</th>
           <th className="pb-3 pr-4 text-right font-medium">소요</th>
           <th className="pb-3 pr-4 text-right font-medium">API 환산 비용</th>
           <th className="pb-3 text-right font-medium">실제 청구액</th>
@@ -40,6 +47,12 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.inputTokens)}</td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.outputTokens)}</td>
+              <td
+                className="py-3 pr-4 text-right whitespace-nowrap tabular-nums"
+                data-testid="execution-context-chars"
+              >
+                {contextCharsLabel(execution)}
+              </td>
               <td className="py-3 pr-4 text-right whitespace-nowrap" data-testid="execution-duration">
                 {running ? "" : formatDuration(execution.latencyMs ?? 0)}
               </td>
