@@ -1,13 +1,13 @@
 {
   "name": "plan008-execution-lifecycle",
   "description": "실행 기록을 시작할 때 만들어 lifecycle 의 정본으로 삼고, 쓰이지 않는 작업 영역을 제거한다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-17",
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 3,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard", "status": "completed" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep", "status": "completed" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard", "status": "completed" }
   ]
 }

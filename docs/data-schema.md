@@ -123,13 +123,16 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 ### 끝나지 않은 실행
 
-`RUNNING` 인 줄은 사용량 목록과 월 비용 합계에서 빠진다.
+`RUNNING` 인 줄은 사용량 목록에는 「도는 중」으로 보인다.
+끝나지 않아 소요 시간과 금액은 비워 둔다.
+월 비용 합계에서는 뺀다.
 빼지 않으면 「가격을 찾지 못한 실행」 으로 세어져,
 아직 안 끝난 것과 가격을 모르는 것이 한 숫자에 섞인다.
 
 기동할 때 `RUNNING` 으로 남아 있는 줄은 `FAILED` 로 바꾸고
 `error_code` 를 `ORPHANED` 로 적는다.
 이 Control Plane 은 한 대만 도므로 기동 시점에 돌고 있는 실행이 없다.
+이렇게 끝난 줄은 사용량 목록에서 「중간에 끊김」으로 보인다.
 
 ## memory
 
