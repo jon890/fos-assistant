@@ -29,6 +29,9 @@ management:
 assistant:
   context:
     max-chars: 8000
+  memory:
+    propose:
+      enabled: false
   auth:
     jwt-secret: ${ASSISTANT_JWT_SECRET}
   pricing:

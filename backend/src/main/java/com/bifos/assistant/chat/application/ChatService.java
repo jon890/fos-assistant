@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.memory.application.MemoryProposer;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
@@ -45,6 +46,7 @@ public class ChatService {
     private final HermesRunEventStream eventStream;
     private final ExecutionRecorder executions;
     private final ContextAssembler contextAssembler;
+    private final MemoryProposer memoryProposer;
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         PendingTurn pending = prepare(user, conversationId, text, agentCode);
         String runId = submit(pending);
@@ -131,6 +133,7 @@ public class ChatService {
         String answer = result.output() == null ? "" : result.output();
         ChatMessage message = messages.save(
                 ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
+        memoryProposer.proposeFrom(pending.user(), pending.conversation(), pending.agent(), execution, answer);
         return new CompletedTurn(
                 new ChatTurn(pending.conversation().id(), execution.id(), answer), message.id());
     }
