@@ -10,6 +10,8 @@ type MemoryView = {
   status: string;
 };
 
+type AgentToken = { token: string };
+
 /** 사용량 시나리오보다 먼저 Memory 권한 확인을 위해 실행하는 대화 수다. */
 export const MEMORY_CONTEXT_TURNS = 1;
 
@@ -147,6 +149,60 @@ export const memoryScenario: Scenario = {
       await call(context, `/memories/${family.id}`, { method: "DELETE", token: context.tokens.dad }),
       200,
       "가족 Memory 정리",
+    );
+
+    step("MCP 토큰은 발급된 사용자만 정하고 다른 사람의 본문은 읽지 못한다");
+    const dadOnly = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "MCP 개인", content: "MCP 에서도 숨겨야 하는 내용" },
+      }),
+      200,
+      "MCP 대상 Memory 생성",
+    ).json<MemoryView>();
+    const issued = expectStatus(
+      await call(context, "/admin/agent-tokens", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { userEmail: "kid@example.com", label: "e2e" },
+      }),
+      200,
+      "MCP 토큰 발급",
+    ).json<AgentToken>();
+    const kidOwn = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.kid,
+        body: { scope: "USER", title: "MCP 본인", content: "아이 MCP 본문" },
+      }),
+      200,
+      "MCP 본인 Memory 생성",
+    ).json<MemoryView>();
+    const mcp = await fetch(context.api.replace("/api/v1", "/mcp"), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${issued.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: dadOnly.id, user_id: 1 } } }),
+    });
+    const mcpBody = await mcp.text();
+    expect(mcp.status === 200, "MCP 요청이 처리되지 않았다");
+    expect(!mcpBody.includes(dadOnly.content), "다른 사용자의 Memory 본문이 MCP 응답에 있다");
+    const ownMcp = await fetch(context.api.replace("/api/v1", "/mcp"), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${issued.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "memory_read", arguments: { id: kidOwn.id } } }),
+    });
+    const ownMcpBody = await ownMcp.text();
+    expect(ownMcp.status === 200 && ownMcpBody.includes(kidOwn.content), "MCP 토큰의 사용자 본문이 오지 않는다");
+    expectStatus(
+      await call(context, `/memories/${dadOnly.id}`, { method: "DELETE", token: context.tokens.dad }),
+      200,
+      "MCP 대상 Memory 정리",
+    );
+    expectStatus(
+      await call(context, `/memories/${kidOwn.id}`, { method: "DELETE", token: context.tokens.kid }),
+      200,
+      "MCP 본인 Memory 정리",
     );
   },
 };

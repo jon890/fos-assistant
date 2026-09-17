@@ -161,6 +161,20 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md)과
 [ADR-012](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)에 있다.
 
+## agent_token
+
+Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다.
+토큰 원문은 발급 응답에서 한 번만 내고 데이터베이스에는 SHA-256 해시만 저장한다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `user_id` | BIGINT | 이 토큰이 정하는 구성원 |
+| `token_hash` | VARCHAR(64) | 토큰 원문의 SHA-256 해시. 원문은 저장하지 않는다 |
+| `label` | VARCHAR(100) | 관리자가 토큰 용도를 구분하는 이름 |
+| `created_at` | DATETIME(6) | 발급 시각 |
+| `last_used_at` | DATETIME(6) NULL | 마지막 MCP 요청 시각 |
+| `revoked_at` | DATETIME(6) NULL | 폐기 시각. 행은 삭제하지 않는다 |
+
 ## execution_event
 
 실행 하나가 도는 동안 일어난 일을 우리 이름으로 옮겨 적은 것이다.
