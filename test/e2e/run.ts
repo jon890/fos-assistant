@@ -20,6 +20,7 @@ import { readFile } from "node:fs/promises";
 import { mintToken, ScenarioFailure, type Context, type Scenario } from "./harness.ts";
 import { startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
 import { authScenario } from "./scenarios/auth.ts";
+import { meScenario } from "./scenarios/me.ts";
 import { bindingScenario, DAD_BINDING } from "./scenarios/binding.ts";
 import { agentsScenario } from "./scenarios/agents.ts";
 import { chatScenario } from "./scenarios/chat.ts";
@@ -52,6 +53,7 @@ const PRICING_CATALOG = join(
 
 const SCENARIOS: readonly Scenario[] = [
   authScenario,
+  meScenario,
   bindingScenario,
   agentsScenario,
   chatScenario,
