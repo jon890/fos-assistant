@@ -1,6 +1,6 @@
 package com.bifos.assistant.usage.domain;
 
-import com.bifos.assistant.credential.domain.CostMode;
+import com.bifos.assistant.agent.domain.CostMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,6 +10,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * One agent turn, recorded for usage and cost reporting.
@@ -20,6 +23,8 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "agent_execution")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AgentExecution {
 
     @Id
@@ -35,6 +40,9 @@ public class AgentExecution {
     /** Workspace the conversation ran in. Null when the conversation has none. */
     @Column(name = "workspace_id")
     private Long workspaceId;
+
+    @Column(name = "agent_id")
+    private Long agentId;
 
     @Column(name = "profile_name", nullable = false, length = 64)
     private String profileName;
@@ -91,13 +99,11 @@ public class AgentExecution {
     @Column(name = "finished_at", nullable = false)
     private Instant finishedAt;
 
-    protected AgentExecution() {
-    }
-
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;
         this.conversationId = builder.conversationId;
         this.workspaceId = builder.workspaceId;
+        this.agentId = builder.agentId;
         this.profileName = builder.profileName;
         this.hermesRunId = builder.hermesRunId;
         this.provider = builder.provider;
@@ -136,6 +142,8 @@ public class AgentExecution {
     public Long workspaceId() {
         return workspaceId;
     }
+
+    public Long agentId() { return agentId; }
 
     public String profileName() {
         return profileName;
@@ -209,6 +217,7 @@ public class AgentExecution {
         private Long userId;
         private Long conversationId;
         private Long workspaceId;
+        private Long agentId;
         private String profileName;
         private String hermesRunId;
         private String provider;
@@ -239,6 +248,11 @@ public class AgentExecution {
 
         public Builder workspaceId(Long workspaceId) {
             this.workspaceId = workspaceId;
+            return this;
+        }
+
+        public Builder agentId(Long agentId) {
+            this.agentId = agentId;
             return this;
         }
 

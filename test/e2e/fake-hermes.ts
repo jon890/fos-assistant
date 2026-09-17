@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
+const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
 
 /**
  * 실행 하나가 보고하는 토큰 수다.
@@ -78,6 +79,17 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = request.url ?? "";
+
+      if (request.method === "GET") {
+        const modelMatch = MODEL_OPTIONS_PATH.exec(path);
+        if (modelMatch) {
+          const profile = modelMatch[1];
+          if (!authorized(request, profile)) {
+            return send(response, 401, { error: "bad key for this profile" });
+          }
+          return send(response, 200, { model: "gpt-5.5", provider: "openai-codex", providers: [] });
+        }
+      }
 
       if (request.method === "POST") {
         const match = RUN_PATH.exec(path);

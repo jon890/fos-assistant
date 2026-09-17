@@ -90,7 +90,7 @@ export const workspaceScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: "오늘 뭐 하지?", workspaceCode: HOME_WORKSPACE.code },
+        body: { text: "오늘 뭐 하지?", workspaceCode: HOME_WORKSPACE.code, agentCode: "dad" },
       }),
       200,
       "영역을 준 대화",
@@ -120,7 +120,7 @@ export const workspaceScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: "그냥 물어볼게" },
+        body: { text: "그냥 물어볼게", agentCode: "dad" },
       }),
       200,
       "영역 없는 대화",
@@ -136,7 +136,7 @@ export const workspaceScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: "몰래 봐야지", workspaceCode: KID_PRIVATE_WORKSPACE.code },
+        body: { text: "몰래 봐야지", workspaceCode: KID_PRIVATE_WORKSPACE.code, agentCode: "dad" },
       }),
       404,
       "dad 가 kid 의 개인 영역을 쓰려는 대화",

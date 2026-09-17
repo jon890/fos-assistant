@@ -16,7 +16,7 @@ export const chatScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: question },
+        body: { text: question, agentCode: "dad" },
       }),
       200,
       "첫 대화",
@@ -30,7 +30,7 @@ export const chatScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { conversationId: first.conversationId, text: "재료는 뭐가 필요해?" },
+        body: { conversationId: first.conversationId, text: "재료는 뭐가 필요해?", agentCode: "missing" },
       }),
       200,
       "이어지는 대화",
@@ -39,6 +39,7 @@ export const chatScenario: Scenario = {
       next.conversationId === first.conversationId,
       "이어 보낸 메시지가 다른 대화로 갔다",
     );
+    expect(next.assistantText.includes("profile dad"), "이어지는 대화가 처음 에이전트를 유지하지 않았다");
 
     step("다른 사용자는 그 대화를 읽지 못한다");
     expectStatus(

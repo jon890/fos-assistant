@@ -10,7 +10,8 @@ public final class ChatDtos {
     }
 
     public record SendMessageRequest(
-            Long conversationId, @NotBlank @Size(max = 8000) String text, String workspaceCode) {
+            Long conversationId, @NotBlank @Size(max = 8000) String text, String workspaceCode,
+            String agentCode) {
     }
 
     public record SendMessageResponse(Long conversationId, Long executionId, String assistantText) {
@@ -25,6 +26,7 @@ public final class ChatDtos {
             Instant createdAt) {
     }
 
-    public record ConversationView(Long id, String title, String workspaceCode, Instant updatedAt) {
+    public record ConversationView(Long id, String title, String workspaceCode, String agentCode,
+            String agentName, Instant updatedAt) {
     }
 }

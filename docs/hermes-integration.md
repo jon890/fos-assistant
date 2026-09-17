@@ -38,10 +38,11 @@ Hermes 주석에 따르면 복사하면 갱신 토큰이 둘로 갈라지고 한
 
 ### 우리가 더하는 것
 
-- 바인딩마다 `credential_scope` 를 적는다. 기본값이 없어 만드는 사람이 반드시 고른다.
+- 에이전트마다 `credential_scope` 를 적는다. 기본값이 없어 만드는 사람이 반드시 고른다.
 - `configure-member-profile.sh verify` 가 격리 여부를 판정하고, 공유는 명시할 때만 넘어간다.
 - profile 마다 `fallback_providers` 를 비워 둔다. 한 사람의 요청이 다른 모델로 넘어가지 않는다.
-- Control Plane 이 요청자의 바인딩에서만 profile 이름을 꺼낸다. 요청 본문은 profile 을 정하지 못한다.
+- Control Plane 은 대화를 시작할 때 사용자가 쓸 수 있는 에이전트에서 profile 이름을 꺼낸다.
+  이어지는 요청은 에이전트나 profile 을 바꾸지 못한다.
 
 ## API server
 
@@ -96,6 +97,61 @@ MVP 는 plugin 없이 설정만으로 성립한다.
 이 기계에는 이미 Orca 가 설치한 `orca-status` plugin 이 있다.
 그 plugin 이 hook 사건을 HTTP 로 내보내는 구조라서 우리 plugin 을 만들 때 본보기로 쓸 수 있다.
 
+## 스킬을 profile 에 붙이는 방법
+
+**`skill_paths` 와 `external_skill_paths` 는 설정 키가 아니다.**
+v0.21.0 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로만 나온다.
+
+실제로 되는 방법은 둘이다.
+
+| 방법 | 내용 |
+| --- | --- |
+| `hermes skills trust <경로>` | 그 저장소의 `./.hermes/skills` 와 `./.agents/skills` 를 읽는다 |
+| profile 의 `skills/` 에 심볼릭 링크 | 외부 디렉터리를 직접 가리킨다 |
+
+에이전트 정의 저장소의 스킬은 `.claude/skills` 에 있어 `trust` 가 보는 경로가 아니다.
+그래서 심볼릭 링크를 쓴다. 구조는 `skills/<범주>/<스킬>` 이다.
+
+```
+~/.hermes/profiles/<profile>/skills/career-os/position-recommender
+  -> /opt/data/fos-agents/career-os/.claude/skills/position-recommender
+```
+
+링크 대상은 **컨테이너 안의 경로**여야 한다. 호스트 경로로 걸면 컨테이너 안에서 끊긴 링크가 된다.
+붙인 뒤 gateway 를 다시 띄워야 인식된다. `GET /v1/skills` 로 확인한다.
+실측으로 확인했다.
+
+## 다중 에이전트는 kanban 이 이미 갖고 있다
+
+`hermes kanban` 이 profile 을 작업자로 받는 작업 보드다.
+
+> Durable SQLite-backed task board shared across Hermes profiles.
+> Tasks are claimed atomically, can depend on other tasks, and are executed by a named profile.
+
+| 필요한 것 | kanban 이 주는 것 |
+| --- | --- |
+| 작업 의존 그래프 | `kanban link` 로 부모에서 자식으로 |
+| 병렬 작업자와 검증자와 종합자 | `kanban swarm` 이 그 형태의 그래프를 만든다 |
+| 전문 에이전트 | profile 이 곧 전문 에이전트다 |
+| 부모와 자식 실행 기록 | `kanban runs`, `log`, `tail` |
+
+`swarm` 의 인자가 `--worker PROFILE:TITLE` 과 `--verifier PROFILE` 과 `--synthesizer PROFILE` 이다.
+즉 등록한 에이전트가 그대로 작업자 후보가 된다.
+
+**다만 HTTP API 가 없다.** `/v1/capabilities` 의 엔드포인트 목록에 kanban 이 없다.
+Control Plane 이 쓰려면 CLI 를 부르거나 plugin 으로 도구를 등록해야 한다.
+다중 에이전트로 넘어가기 전에 이것부터 정해야 한다.
+
+## 아직 확인하지 못한 것
+
+**subagent 의 토큰이 실행 합계에 포함되는지 모른다.**
+Hermes 가 subagent 를 띄웠을 때 그 토큰이 부모 실행의 `usage` 에 더해지는지 확인하지 못했다.
+소스에서 집계 지점을 찾지 못했다.
+
+빠진다면 다중 에이전트에서 **비용이 실제보다 작게 보인다.**
+지금은 단일 에이전트라 문제가 없다.
+확인하는 방법은 subagent 를 쓰는 실행 하나와 쓰지 않는 실행 하나의 토큰을 견주는 것이다.
+
 ## 홈서버에서 확인한 것
 
 2026년 9월 17일에 홈서버에서 직접 확인했다.
@@ -109,4 +165,4 @@ MVP 는 plugin 없이 설정만으로 성립한다.
 
 경로 멀티플렉스가 아니라 포트 분리를 쓰고 있으므로,
 Control Plane 은 profile 마다 주소를 따로 갖는다.
-그래서 API server 주소를 `hermes.base-url` 이 아니라 바인딩에 둔다.
+그래서 API server 주소를 `hermes.base-url` 이 아니라 에이전트에 둔다.

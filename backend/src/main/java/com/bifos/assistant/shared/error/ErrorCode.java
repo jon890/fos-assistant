@@ -8,6 +8,9 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN),
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     WORKSPACE_NOT_FOUND(HttpStatus.NOT_FOUND),
+    AGENT_NOT_FOUND(HttpStatus.NOT_FOUND),
+    AGENT_DISABLED(HttpStatus.CONFLICT),
+    AGENT_MODEL_UNKNOWN(HttpStatus.BAD_GATEWAY),
     /** The caller has no Hermes profile bound. We never borrow another user's profile. */
     HERMES_BINDING_MISSING(HttpStatus.CONFLICT),
     /** A binding exists but its API key is not provisioned on this host. */

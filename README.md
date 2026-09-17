@@ -8,7 +8,7 @@ Hermes Agent 를 Agent Runtime 으로 그대로 두고, 이 저장소는 그 앞
 | 층 | 무엇을 맡는가 |
 | --- | --- |
 | Hermes Agent | 에이전트 실행, 도구 호출, subagent, session |
-| Control Plane (`backend/`) | 사용자, Memory 접근 권한, credential 바인딩, 모델 라우팅, 사용량 집계 |
+| Control Plane (`backend/`) | 사용자, 에이전트 접근 권한, Memory 접근 권한, 모델 라우팅, 사용량 집계 |
 | Web (`web/`) | 대화, 실행 상태, Memory 확인, 사용량 확인 |
 
 Hermes core 는 수정하지 않는다.
@@ -36,7 +36,7 @@ profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 node test/e2e/run.ts
 ```
 
-로그인 토큰 발급부터 profile 연결, 대화 한 번, 사용량 기록과 비용 환산까지 한 번에 돌린다.
+로그인 토큰 발급부터 에이전트 등록, 대화 한 번, 사용량 기록과 비용 환산까지 한 번에 돌린다.
 시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있다.
 
 개별 실행은 아래와 같다.

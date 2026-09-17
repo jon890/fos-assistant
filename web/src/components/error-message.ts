@@ -1,5 +1,8 @@
 /** Turns a Control Plane error code into something a family member can act on. */
 const MESSAGES: Record<string, string> = {
+  AGENT_NOT_FOUND: "없는 에이전트이거나 이 계정에서 쓸 수 없는 에이전트다.",
+  AGENT_DISABLED: "이 에이전트는 지금 쓰지 않도록 되어 있다.",
+  AGENT_MODEL_UNKNOWN: "Hermes에서 모델을 읽지 못했다. profile API 상태를 확인한다.",
   HERMES_BINDING_MISSING: "아직 이 계정에 연결된 AI 계정이 없다. 관리자에게 Hermes profile 연결을 요청한다.",
   HERMES_BINDING_DISABLED: "연결된 AI 계정이 사용 중지 상태다.",
   HERMES_PROFILE_KEY_MISSING: "연결된 profile 의 API key 가 서버에 준비돼 있지 않다.",

@@ -7,9 +7,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "conversation")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Conversation {
 
     @Id
@@ -22,6 +27,9 @@ public class Conversation {
     /** Workspace this conversation runs in. Null means no workspace, and stays null for its life. */
     @Column(name = "workspace_id")
     private Long workspaceId;
+
+    @Column(name = "agent_id")
+    private Long agentId;
 
     /** Hermes session this conversation continues. Null until the first run reports one. */
     @Column(name = "hermes_session_id", length = 128)
@@ -36,19 +44,17 @@ public class Conversation {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected Conversation() {
-    }
-
-    private Conversation(Long userId, String title, Long workspaceId) {
+    private Conversation(Long userId, String title, Long workspaceId, Long agentId) {
         this.userId = userId;
         this.title = title;
         this.workspaceId = workspaceId;
+        this.agentId = agentId;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
 
-    public static Conversation startedBy(Long userId, String title, Long workspaceId) {
-        return new Conversation(userId, title, workspaceId);
+    public static Conversation startedBy(Long userId, String title, Long workspaceId, Long agentId) {
+        return new Conversation(userId, title, workspaceId, agentId);
     }
 
     public Long id() {
@@ -63,6 +69,8 @@ public class Conversation {
     public Long workspaceId() {
         return workspaceId;
     }
+
+    public Long agentId() { return agentId; }
 
     public String hermesSessionId() {
         return hermesSessionId;

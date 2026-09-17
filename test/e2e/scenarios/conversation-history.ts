@@ -14,7 +14,7 @@ export const conversationHistoryScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: "첫 번째 새 대화" },
+        body: { text: "첫 번째 새 대화", agentCode: "dad" },
       }),
       200,
       "첫 번째 새 대화",
@@ -23,7 +23,7 @@ export const conversationHistoryScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: "두 번째 새 대화" },
+        body: { text: "두 번째 새 대화", agentCode: "dad" },
       }),
       200,
       "두 번째 새 대화",

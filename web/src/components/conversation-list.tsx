@@ -2,6 +2,8 @@ export type Conversation = {
   id: number;
   title: string;
   workspaceCode: string | null;
+  agentCode: string;
+  agentName: string;
   updatedAt: string;
 };
 

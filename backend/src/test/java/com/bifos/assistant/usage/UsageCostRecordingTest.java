@@ -4,9 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.credential.domain.CostMode;
-import com.bifos.assistant.credential.domain.CredentialScope;
-import com.bifos.assistant.credential.domain.HermesProfileBinding;
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -61,14 +62,14 @@ class UsageCostRecordingTest {
     @BeforeEach
     void startFromAnEmptyLedger() {
         executions.deleteAll();
-        conversation = conversations.save(Conversation.startedBy(USER_ID, "저녁 메뉴", null));
+        conversation = conversations.save(Conversation.startedBy(USER_ID, "저녁 메뉴", null, null));
     }
 
     @Test
     void 구독형_바인딩의_실행도_API_가격으로_환산해_저장한다() {
         AgentExecution execution =
                 recorder.recordSuccess(
-                        caller(), conversation, subscriptionBinding(), run(1_000L, 800L, 500L), Instant.now());
+                        caller(), conversation, subscriptionAgent(), run(1_000L, 800L, 500L), Instant.now());
 
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isEqualTo(16_400L);
@@ -80,7 +81,7 @@ class UsageCostRecordingTest {
     void 실패한_실행은_금액을_남기지_않는다() {
         AgentExecution execution =
                 recorder.recordFailure(
-                        caller(), conversation, subscriptionBinding(), "HERMES_RUN_FAILED", Instant.now());
+                        caller(), conversation, subscriptionAgent(), "HERMES_RUN_FAILED", Instant.now());
 
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.pricingVersion()).isNull();
@@ -89,11 +90,11 @@ class UsageCostRecordingTest {
     @Test
     void 한_달_합계는_금액이_잡힌_실행만_더하고_나머지는_따로_센다() {
         recorder.recordSuccess(
-                caller(), conversation, subscriptionBinding(), run(1_000L, null, 500L), Instant.now());
+                caller(), conversation, subscriptionAgent(), run(1_000L, null, 500L), Instant.now());
         recorder.recordSuccess(
-                caller(), conversation, subscriptionBinding(), run(1_000L, null, 500L), Instant.now());
+                caller(), conversation, subscriptionAgent(), run(1_000L, null, 500L), Instant.now());
         recorder.recordFailure(
-                caller(), conversation, subscriptionBinding(), "HERMES_RUN_FAILED", Instant.now());
+                caller(), conversation, subscriptionAgent(), "HERMES_RUN_FAILED", Instant.now());
 
         MonthlyCost cost =
                 executions.sumCostBetween(
@@ -119,15 +120,18 @@ class UsageCostRecordingTest {
         return new CurrentUser(USER_ID, "dad@example.com", "dad", UserRole.ADMIN);
     }
 
-    private static HermesProfileBinding subscriptionBinding() {
-        return HermesProfileBinding.of(
-                USER_ID,
+    private static Agent subscriptionAgent() {
+        return Agent.of(
+                "dad",
+                "Dad",
                 "dad",
                 "http://127.0.0.1:1/p/dad",
                 "openai-codex",
                 "gpt-5.5",
                 CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD);
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID);
     }
 
     private static HermesRunResult run(Long input, Long cached, Long output) {

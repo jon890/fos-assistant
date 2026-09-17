@@ -1,7 +1,7 @@
 package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.credential.domain.HermesProfileBinding;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -10,6 +10,7 @@ import com.bifos.assistant.usage.domain.EstimatedCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -19,27 +20,23 @@ import org.springframework.stereotype.Service;
  * 가격이 바뀔 때 지난달 합계가 따라 움직인다.
  */
 @Service
+@RequiredArgsConstructor
 public class ExecutionRecorder {
 
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;
 
-    public ExecutionRecorder(AgentExecutionRepository executions, CostEstimator costs) {
-        this.executions = executions;
-        this.costs = costs;
-    }
-
     public AgentExecution recordSuccess(
             CurrentUser user,
             Conversation conversation,
-            HermesProfileBinding binding,
+            Agent agent,
             HermesRunResult result,
             Instant startedAt) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        String provider = firstNonBlank(result.provider(), binding.provider());
-        String model = modelOf(result, binding);
+        String provider = firstNonBlank(result.provider(), agent.provider());
+        String model = modelOf(result, agent);
         return executions.save(
-                base(user, conversation, binding, startedAt)
+                base(user, conversation, agent, startedAt)
                         .hermesRunId(result.runId())
                         .provider(provider)
                         .model(model)
@@ -56,13 +53,13 @@ public class ExecutionRecorder {
     public AgentExecution recordFailure(
             CurrentUser user,
             Conversation conversation,
-            HermesProfileBinding binding,
+            Agent agent,
             String errorCode,
             Instant startedAt) {
         return executions.save(
-                base(user, conversation, binding, startedAt)
-                        .provider(binding.provider())
-                        .model(binding.model())
+                base(user, conversation, agent, startedAt)
+                        .provider(agent.provider())
+                        .model(agent.model())
                         .status(ExecutionStatus.FAILED)
                         .errorCode(errorCode)
                         // 실패한 실행은 토큰 수를 보고하지 않으므로 환산할 것이 없다.
@@ -71,13 +68,14 @@ public class ExecutionRecorder {
     }
 
     private AgentExecution.Builder base(
-            CurrentUser user, Conversation conversation, HermesProfileBinding binding, Instant startedAt) {
+            CurrentUser user, Conversation conversation, Agent agent, Instant startedAt) {
         return AgentExecution.builder()
                 .userId(user.id())
                 .conversationId(conversation.id())
                 .workspaceId(conversation.workspaceId())
-                .profileName(binding.profileName())
-                .costMode(binding.costMode())
+                .agentId(agent.id())
+                .profileName(agent.hermesProfile())
+                .costMode(agent.costMode())
                 .timing(startedAt, Instant.now());
     }
 
@@ -93,10 +91,10 @@ public class ExecutionRecorder {
      * face value would label every execution with the member's name instead of the model they used.
      * When the run just echoes the profile, the binding's configured model is the truthful answer.
      */
-    private static String modelOf(HermesRunResult result, HermesProfileBinding binding) {
+    private static String modelOf(HermesRunResult result, Agent agent) {
         String reported = result.model();
-        if (reported == null || reported.isBlank() || reported.equals(binding.profileName())) {
-            return binding.model();
+        if (reported == null || reported.isBlank() || reported.equals(agent.hermesProfile())) {
+            return agent.model();
         }
         return reported;
     }
