@@ -101,24 +101,26 @@ export const usageCostScenario: Scenario = {
       body: { text: "실행 중 상태 검사", agentCode: "dad" },
     });
     await context.hermes.waitForHeldRun();
+    try {
+      const running = expectStatus(
+        await call(context, "/usage/executions?limit=10", { token: context.tokens.dad }),
+        200,
+        "실행 중 사용량 조회",
+      ).json<ExecutionView[]>();
+      expect(running.some((execution) => execution.status === "RUNNING"), "RUNNING 실행이 목록에 없다");
 
-    const running = expectStatus(
-      await call(context, "/usage/executions?limit=10", { token: context.tokens.dad }),
-      200,
-      "실행 중 사용량 조회",
-    ).json<ExecutionView[]>();
-    expect(running.some((execution) => execution.status === "RUNNING"), "RUNNING 실행이 목록에 없다");
-
-    const whileRunning = expectStatus(
-      await call(context, "/usage/monthly-cost", { token: context.tokens.dad }),
-      200,
-      "실행 중 합계 조회",
-    ).json<MonthlyCostView>();
-    expect(
-      whileRunning.unpricedExecutions === 0,
-      `RUNNING 실행이 가격 미확인으로 세어졌다: ${JSON.stringify(whileRunning)}`,
-    );
-    context.hermes.releaseHeldRun();
-    expectStatus(await pendingTurn, 200, "유지했던 대화");
+      const whileRunning = expectStatus(
+        await call(context, "/usage/monthly-cost", { token: context.tokens.dad }),
+        200,
+        "실행 중 합계 조회",
+      ).json<MonthlyCostView>();
+      expect(
+        whileRunning.unpricedExecutions === 0,
+        `RUNNING 실행이 가격 미확인으로 세어졌다: ${JSON.stringify(whileRunning)}`,
+      );
+    } finally {
+      context.hermes.releaseHeldRun();
+      expectStatus(await pendingTurn, 200, "유지했던 대화");
+    }
   },
 };

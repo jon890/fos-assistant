@@ -66,7 +66,8 @@ test("돌고 있는 실행은 시간과 금액 없이 보이고 완료 뒤에 �
     const container = testInfo.project.name === "mobile"
       ? running.locator("xpath=ancestor::article")
       : running.locator("xpath=ancestor::tr");
-    await expect(container).not.toContainText("USD");
+    await expect(container.getByTestId("execution-duration")).toHaveText("");
+    await expect(container.getByTestId("execution-cost")).toHaveText("");
   } finally {
     await hermes.releaseHeldRun();
   }

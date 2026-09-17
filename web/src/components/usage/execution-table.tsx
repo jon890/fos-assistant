@@ -39,10 +39,14 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.inputTokens)}</td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.outputTokens)}</td>
-              <td className="py-3 pr-4 text-right whitespace-nowrap">
+              <td className="py-3 pr-4 text-right whitespace-nowrap" data-testid="execution-duration">
                 {running ? "" : formatDuration(execution.latencyMs ?? 0)}
               </td>
-              <td className="py-3 text-right whitespace-nowrap" title={execution.pricingVersion ?? undefined}>
+              <td
+                className="py-3 text-right whitespace-nowrap"
+                data-testid="execution-cost"
+                title={execution.pricingVersion ?? undefined}
+              >
                 {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
               </td>
             </tr>

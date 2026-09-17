@@ -12,7 +12,11 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
           <h2 className="truncate font-semibold">{execution.agentName}</h2>
           <p className="truncate text-xs text-muted">{execution.agentCode}</p>
         </div>
-        <span className="shrink-0 text-sm font-semibold" title={execution.pricingVersion ?? undefined}>
+        <span
+          className="shrink-0 text-sm font-semibold"
+          data-testid="execution-cost"
+          title={execution.pricingVersion ?? undefined}
+        >
           {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
         </span>
       </div>
@@ -23,7 +27,7 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         <span title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}>
           {formatTokens(execution.inputTokens)} → {formatTokens(execution.outputTokens)}
         </span>
-        <span>{running ? "" : formatDuration(execution.latencyMs ?? 0)}</span>
+        <span data-testid="execution-duration">{running ? "" : formatDuration(execution.latencyMs ?? 0)}</span>
         <span>{formatWhen(execution.startedAt)}</span>
         <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
       </div>

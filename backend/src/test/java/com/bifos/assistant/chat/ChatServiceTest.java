@@ -112,6 +112,13 @@ class ChatServiceTest {
                                 "claude-opus-5",
                                 "anthropic",
                                 new TokenUsage(120L, 80L, 40L, 160L)));
+        stub().beforeAwait(() ->
+                assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
+                        .singleElement()
+                        .satisfies(execution -> {
+                            assertThat(execution.status()).isEqualTo(ExecutionStatus.RUNNING);
+                            assertThat(execution.hermesRunId()).isEqualTo("run-1");
+                        }));
 
         ChatTurn turn = chat.send(dad, null, "오늘 저녁 뭐 먹을까?", "dad");
 

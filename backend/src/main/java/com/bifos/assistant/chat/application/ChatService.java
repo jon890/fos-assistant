@@ -44,7 +44,8 @@ public class ChatService {
     private final ExecutionRecorder executions;
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         PendingTurn pending = prepare(user, conversationId, text, agentCode);
-        HermesRunResult result = runToCompletion(pending);
+        String runId = submit(pending);
+        HermesRunResult result = awaitCompletion(pending, runId);
         return finish(pending, result).turn();
     }
 
@@ -91,17 +92,6 @@ public class ChatService {
                 conversation.hermesSessionId());
         AgentExecution execution = executions.start(user, conversation, agent, null, null);
         return new PendingTurn(user, conversation, agent, command, execution);
-    }
-
-    private HermesRunResult runToCompletion(PendingTurn pending) {
-        try {
-            HermesRunResult result = hermes.runToCompletion(pending.command());
-            executions.attachRunId(pending.execution(), result.runId());
-            return result;
-        } catch (ApiException ex) {
-            executions.fail(pending.execution(), ex.code().name());
-            throw ex;
-        }
     }
 
     private String submit(PendingTurn pending) {
