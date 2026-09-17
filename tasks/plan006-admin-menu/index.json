@@ -1,0 +1,11 @@
+{
+  "name": "plan006-admin-menu",
+  "description": "화면이 현재 사용자의 역할을 알고 관리 메뉴를 관리자에게만 보인다",
+  "status": "pending",
+  "created_at": "2026-09-17",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard", "status": "pending" }
+  ]
+}
