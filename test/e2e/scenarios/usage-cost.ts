@@ -1,5 +1,5 @@
 /** 구독형 바인딩의 실행도 API 가격으로 환산해 기록하고 합계를 내는지 본다. */
-import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { DAD_BINDING } from "./binding.ts";
 import { CHAT_TURNS } from "./chat.ts";
 
@@ -13,6 +13,7 @@ import { CHAT_TURNS } from "./chat.ts";
  * `40 × 5 + 80 × 0.5 + 40 × 30` 이 되어 1440 마이크로 달러다.
  */
 const MICROS_PER_RUN = 1440;
+const HELD_RUN_TIMEOUT_MS = 5_000;
 
 type ExecutionView = {
   id: number;
@@ -94,14 +95,16 @@ export const usageCostScenario: Scenario = {
     expect(monthly.currency === "USD", `합계의 통화가 USD 가 아니다: ${monthly.currency}`);
 
     step("돌고 있는 실행은 목록에 보이지만 가격을 찾지 못한 실행으로 세지 않는다");
-    context.hermes.holdNextRun();
-    const pendingTurn = call(context, "/chat/messages", {
-      method: "POST",
-      token: context.tokens.dad,
-      body: { text: "실행 중 상태 검사", agentCode: "dad" },
-    });
-    await context.hermes.waitForHeldRun();
+    let pendingTurn: Promise<Response> | undefined;
     try {
+      context.hermes.holdNextRun();
+      pendingTurn = call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: "실행 중 상태 검사", agentCode: "dad" },
+      });
+      await waitForHeldRun(context);
+
       const running = expectStatus(
         await call(context, "/usage/executions?limit=10", { token: context.tokens.dad }),
         200,
@@ -119,8 +122,31 @@ export const usageCostScenario: Scenario = {
         `RUNNING 실행이 가격 미확인으로 세어졌다: ${JSON.stringify(whileRunning)}`,
       );
     } finally {
-      context.hermes.releaseHeldRun();
-      expectStatus(await pendingTurn, 200, "유지했던 대화");
+      const cleanup = await Promise.allSettled([
+        Promise.resolve().then(() => context.hermes.releaseHeldRun()),
+        pendingTurn === undefined
+          ? Promise.resolve()
+          : pendingTurn.then((response) => expectStatus(response, 200, "유지했던 대화")),
+      ]);
+      const failure = cleanup.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
     }
   },
 };
+
+async function waitForHeldRun(context: Parameters<Scenario["run"]>[0]): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      context.hermes.waitForHeldRun(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`Hermes 가 ${HELD_RUN_TIMEOUT_MS}ms 안에 보류 실행을 받지 못했다`)),
+          HELD_RUN_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}

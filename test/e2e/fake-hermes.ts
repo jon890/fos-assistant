@@ -145,10 +145,14 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
       }
 
       if (request.method === "POST" && path === TEST_RELEASE_HELD_RUN_PATH) {
-        if (heldRunId === undefined) return send(response, 409, { error: "no held run is active" });
+        holdNextRun = false;
+        if (heldRunId === undefined) {
+          heldRunReady = undefined;
+          heldRunWaiter = undefined;
+          return send(response, 204, null);
+        }
         const run = runs.get(heldRunId);
-        if (run === undefined) return send(response, 404, { error: "no such held run" });
-        run.status = "completed";
+        if (run !== undefined) run.status = "completed";
         heldRunId = undefined;
         heldRunReady = undefined;
         heldRunWaiter = undefined;
@@ -280,10 +284,14 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
         },
         waitForHeldRun: () => heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
         releaseHeldRun: () => {
-          if (heldRunId === undefined) throw new Error("유지 중인 실행이 없다");
+          holdNextRun = false;
+          if (heldRunId === undefined) {
+            heldRunReady = undefined;
+            heldRunWaiter = undefined;
+            return;
+          }
           const run = runs.get(heldRunId);
-          if (run === undefined) throw new Error("유지 중인 실행을 찾을 수 없다");
-          run.status = "completed";
+          if (run !== undefined) run.status = "completed";
           heldRunId = undefined;
           heldRunReady = undefined;
           heldRunWaiter = undefined;

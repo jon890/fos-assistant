@@ -139,9 +139,9 @@ public AgentExecution fail(AgentExecution execution, String errorCode)
 
 - `prepare` 가 `executions.start(...)` 를 불러 `PendingTurn` 에 `AgentExecution` 을 담는다.
   부모가 없으므로 `parentExecutionId` 와 `rootExecutionId` 는 `null` 이다.
-- `submit` 이 `runId` 를 받은 직후 `executions.attachRunId(...)` 를 부른다.
-- `runToCompletion` 이 결과를 받은 뒤 `runId` 를 붙인다.
-  이 경로는 제출과 완료가 한 호출에 묶여 있어 그 앞에 붙일 자리가 없다.
+- 스트리밍과 한 번에 받는 경로 모두 `submit` 으로 `runId` 를 받은 직후
+  `executions.attachRunId(...)` 를 부르고, 그다음 `awaitCompletion` 으로 완료를 기다린다.
+  실행 중에도 Hermes 실행과 연결할 수 있도록 제출과 완료 대기를 한 호출로 묶지 않는다.
 - `finish` 가 `executions.complete(...)` 를 부른다.
 - 실패하는 모든 자리가 `executions.fail(...)` 을 부른다.
   지금 `recordFailure` 를 부르는 네 자리다.
