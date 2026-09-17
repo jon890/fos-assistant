@@ -3,22 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.22.0",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:browser": "playwright test --config ../test/browser/playwright.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "jose": "^6.1.0",
     "next": "16.0.10",
     "next-auth": "5.0.0-beta.31",
+    "next-themes": "^0.4.6",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.7",
