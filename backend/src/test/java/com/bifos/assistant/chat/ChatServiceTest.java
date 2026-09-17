@@ -96,7 +96,7 @@ class ChatServiceTest {
                             AgentVisibility.PRIVATE,
                             user.id()));
         }
-        return new CurrentUser(user.id(), user.email(), user.displayName(), user.role());
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
     }
 
     @Test

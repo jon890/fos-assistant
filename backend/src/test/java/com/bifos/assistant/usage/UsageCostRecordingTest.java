@@ -112,7 +112,7 @@ class UsageCostRecordingTest {
     }
 
     private static CurrentUser caller() {
-        return new CurrentUser(USER_ID, "dad@example.com", "dad", UserRole.ADMIN);
+        return new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
     }
 
     private AgentExecution complete(HermesRunResult result) {

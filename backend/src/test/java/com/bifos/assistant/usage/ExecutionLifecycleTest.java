@@ -102,7 +102,7 @@ class ExecutionLifecycleTest {
     }
 
     private static CurrentUser user() {
-        return new CurrentUser(USER_ID, "dad@example.com", "dad", UserRole.ADMIN);
+        return new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
     }
 
     private static Agent agent() {

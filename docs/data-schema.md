@@ -144,7 +144,9 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `scope` | VARCHAR(20) | `USER` 또는 `FAMILY`. 기본값이 없다 |
 | `owner_user_id` | BIGINT NULL | `USER` 일 때 필요하다. 그 사람만 본다 |
 | `family_id` | BIGINT NULL | `FAMILY` 일 때 필요하다 |
+| `title` | VARCHAR(200) | 색인에 실을 제목 한 줄 |
 | `content` | TEXT | 사실 한 줄 |
+| `always_inject` | BOOLEAN | 본문을 매 실행에 실을지 정한다. 기본값은 `FALSE` |
 | `status` | VARCHAR(20) | `PROPOSED` 또는 `ACCEPTED` 또는 `REJECTED` |
 | `proposed_by_execution_id` | BIGINT NULL | 이 항목을 제안한 실행. 사람이 직접 적었으면 비어 있다 |
 | `accepted_by_user_id` | BIGINT NULL | 누가 받아들였는가 |
