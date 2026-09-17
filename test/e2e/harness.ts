@@ -69,6 +69,7 @@ type CallOptions = {
   readonly method?: string;
   readonly token?: string;
   readonly body?: unknown;
+  readonly signal?: AbortSignal;
 };
 
 /** Control Plane 을 부른다. 상태 코드를 던지지 않고 그대로 돌려주므로 거절도 검사할 수 있다. */
@@ -85,6 +86,7 @@ export async function call(
     method: options.method ?? "GET",
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    signal: options.signal,
   });
   const body = await response.text();
   return {

@@ -146,6 +146,7 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
 
       if (request.method === "POST" && path === TEST_RELEASE_HELD_RUN_PATH) {
         holdNextRun = false;
+        heldRunWaiter?.();
         if (heldRunId === undefined) {
           heldRunReady = undefined;
           heldRunWaiter = undefined;
@@ -285,6 +286,7 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
         waitForHeldRun: () => heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
         releaseHeldRun: () => {
           holdNextRun = false;
+          heldRunWaiter?.();
           if (heldRunId === undefined) {
             heldRunReady = undefined;
             heldRunWaiter = undefined;
@@ -298,6 +300,10 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
         },
         close: () =>
           new Promise<void>((done) => {
+            holdNextRun = false;
+            heldRunWaiter?.();
+            heldRunReady = undefined;
+            heldRunWaiter = undefined;
             server.closeAllConnections();
             server.close(() => done());
           }),

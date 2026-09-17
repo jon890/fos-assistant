@@ -95,6 +95,7 @@ export const usageCostScenario: Scenario = {
     expect(monthly.currency === "USD", `합계의 통화가 USD 가 아니다: ${monthly.currency}`);
 
     step("돌고 있는 실행은 목록에 보이지만 가격을 찾지 못한 실행으로 세지 않는다");
+    const pendingController = new AbortController();
     let pendingTurn: Promise<Response> | undefined;
     try {
       context.hermes.holdNextRun();
@@ -102,6 +103,7 @@ export const usageCostScenario: Scenario = {
         method: "POST",
         token: context.tokens.dad,
         body: { text: "실행 중 상태 검사", agentCode: "dad" },
+        signal: pendingController.signal,
       });
       await waitForHeldRun(context);
 
@@ -122,17 +124,34 @@ export const usageCostScenario: Scenario = {
         `RUNNING 실행이 가격 미확인으로 세어졌다: ${JSON.stringify(whileRunning)}`,
       );
     } finally {
-      const cleanup = await Promise.allSettled([
-        Promise.resolve().then(() => context.hermes.releaseHeldRun()),
-        pendingTurn === undefined
-          ? Promise.resolve()
-          : pendingTurn.then((response) => expectStatus(response, 200, "유지했던 대화")),
-      ]);
-      const failure = cleanup.find((result) => result.status === "rejected");
-      if (failure?.status === "rejected") throw failure.reason;
+      context.hermes.releaseHeldRun();
+      if (pendingTurn !== undefined) {
+        const response = await waitForPendingTurn(pendingTurn, pendingController);
+        expectStatus(response, 200, "유지했던 대화");
+      }
     }
   },
 };
+
+async function waitForPendingTurn(
+  pendingTurn: Promise<Response>,
+  controller: AbortController,
+): Promise<Response> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pendingTurn,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(new Error(`보류 실행 요청이 ${HELD_RUN_TIMEOUT_MS}ms 안에 끝나지 않았다`));
+        }, HELD_RUN_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
 
 async function waitForHeldRun(context: Parameters<Scenario["run"]>[0]): Promise<void> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
