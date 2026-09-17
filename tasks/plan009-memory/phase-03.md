@@ -9,7 +9,8 @@
 
 **범위 외**:
 에이전트가 실제로 제안을 만들어 내는 경로는 이 phase 가 마지막 작업 항목으로 만든다.
-`career` 의 Hermes 내장 memory 를 옮기는 것은 phase-04 가 한다.
+`career` 의 Hermes 내장 memory 이전과 toolset 변경은 공개 저장소 범위 밖이다.
+구현이 끝난 뒤 `fos-home-infra` 가 별도 운영 작업으로 수행하고 실제 왕복을 검증한다.
 
 ## 컨텍스트
 
@@ -62,14 +63,18 @@ Memory 는 사람이 받아들인 것만 저장된다.
 
 `memory-form.tsx` 는 `scope` 를 반드시 고르게 한다.
 **기본으로 선택된 값을 두지 않는다.** 고르지 않으면 보내기 단추를 잠근다.
-`agent-form.tsx` 가 `visibility` 를 다루는 방식과 같다.
+
+`alwaysInject` 는 새 항목과 기존 항목에서 사람이 명시적으로 켜고 끌 수 있게 한다.
+선택하지 않으면 거짓이고, 항목을 수정할 때 본문과 함께 바꿀 수 있다.
 
 `FAMILY` 를 고르는 것은 관리자에게만 보인다.
 구성원에게는 그 선택지를 그리지 않는다. 서버도 거절하지만 화면에서 먼저 막는다.
 
 ### 3. 서버 라우트를 만든다
 
-`web/src/app/api/memories/route.ts` 와 `web/src/app/api/memories/[id]/route.ts` 다.
+`web/src/app/api/memories/route.ts`, `web/src/app/api/memories/[id]/route.ts`,
+`web/src/app/api/memories/[id]/accept/route.ts`,
+`web/src/app/api/memories/[id]/reject/route.ts` 다.
 `web/src/app/api/workspaces/route.ts` 가 쓰던 모양을 따른다.
 그 파일은 plan008 이 지웠으므로 `web/src/app/api/chat/route.ts` 를 본보기로 삼는다.
 
@@ -108,6 +113,17 @@ public class MemoryProposer {
 답 안에 사용자가 알려준 사실이 있는지를 같은 에이전트에게 한 번 더 물어 뽑는다.
 그 호출도 실행 기록에 남으므로 `parentExecutionId` 를 그 실행의 `id` 로 준다.
 `rootExecutionId` 도 같다. plan008 의 phase-02 가 그 칸을 만들어 두었다.
+
+제안 실행은 원래 실행과 같은 agent, profile, API 주소를 사용하고 새 session 으로 시작한다.
+입력은 원래 답과 아래 기준을 담은 지시문이며, 응답은 다음 둘 중 하나만 받는다.
+
+```json
+{"title":"200자 이하 제목","content":"남길 사실 하나"}
+```
+
+남길 것이 없으면 `NONE` 을 받는다.
+JSON 파싱 실패, 빈 title 또는 content, title 200자 초과는 제안을 만들지 않고 경고만 남긴다.
+제안의 scope 는 항상 `USER` 이고 `MemoryService.proposeUser(...)` 로 저장한다.
 
 **무엇을 뽑을지의 기준을 그 프롬프트에 못 박는다.**
 
@@ -154,12 +170,21 @@ public class MemoryProposer {
 
 - **정상 경로**: 제안이 만들어지면 `PROPOSED` 이고 `proposedByExecutionId` 가 그 실행을 가리킨다
 - **이 phase 가 다루는 실패**: 제안을 만드는 도중 오류가 나도 예외가 밖으로 나가지 않는다
+- 제안 실행이 실패하면 자식 실행 행이 `FAILED`로 남고 부모와 뿌리 번호가 원래 실행을 가리킨다
 - 설정이 꺼져 있으면 아무것도 만들지 않고 LLM 을 부르지도 않는다
+- `NONE` 과 잘못된 JSON 은 아무것도 만들지 않는다
+
+`ChatServiceTest` 에 일반 응답과 스트리밍 응답이 성공한 뒤 각각 proposer 를 한 번 호출하고,
+그 제안 실행의 `parentExecutionId` 와 `rootExecutionId` 가 원래 실행을 가리키는지 검사한다.
 
 `test/browser/memory.spec.ts` 를 새로 만든다.
 
 - `/memory` 가 세 절을 그리고, 제안이 없으면 첫 절이 없다
 - 새 항목을 적을 때 `scope` 를 고르기 전에는 보내기 단추가 잠겨 있다
+- 제안을 받아들이거나 물리면 해당 절에서 사라진다
+- 항목의 본문과 `alwaysInject` 를 수정하고 항목을 삭제할 수 있다
+- 관리자에게만 `FAMILY` 선택지가 보이고 구성원에게는 보이지 않는다
+- 처리하지 않은 제안 수가 머리에 보이고 0 이면 표시되지 않는다
 - `mobile` 과 `desktop` 두 폭에서 가로로 넘치지 않는다
 
 ## 검증
@@ -186,6 +211,8 @@ grep -rn 'style={{' web/src/components/memory/ | grep -iE 'background|color|bord
 | `web/src/app/memory/page.tsx` | 신규 |
 | `web/src/app/api/memories/route.ts` | 신규 |
 | `web/src/app/api/memories/[id]/route.ts` | 신규 |
+| `web/src/app/api/memories/[id]/accept/route.ts` | 신규 |
+| `web/src/app/api/memories/[id]/reject/route.ts` | 신규 |
 | `web/src/components/memory/memory-list.tsx` | 신규 |
 | `web/src/components/memory/memory-item.tsx` | 신규 |
 | `web/src/components/memory/memory-proposal.tsx` | 신규 |
@@ -195,4 +222,5 @@ grep -rn 'style={{' web/src/components/memory/ | grep -iE 'background|color|bord
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/memory/MemoryProposerTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
 | `test/browser/memory.spec.ts` | 신규 |

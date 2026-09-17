@@ -117,6 +117,11 @@ public record AssembledContext(String instructions, long chars) {
 `assistant.context.max-chars` 로 정한다. 기본값은 8000 이다.
 넘으면 자르고 `log.warn` 으로 몇 글자를 잘랐는지 남긴다.
 
+항목은 `id` 오름차순으로 정렬한다.
+가족 공용 항상 층, 개인 항상 층, 색인 층 순서로 넣는다.
+다음 항목을 더하면 상한을 넘을 때는 그 항목부터 뒤의 항목을 넣지 않는다.
+제목이나 항목 중간을 자르지 않고, 실제로 넣은 문자열의 길이만 `chars` 에 기록한다.
+
 `WorkspaceProperties.briefingLimit` 이 쓰던 방식과 같다.
 그 클래스는 plan008 이 지웠으므로 `ContextProperties` 를 새로 만든다.
 
@@ -125,6 +130,7 @@ public record AssembledContext(String instructions, long chars) {
 - `prepare` 가 `contextAssembler.assemble(user)` 를 부른다.
 - 그 결과의 `instructions` 를 `HermesRunCommand` 에 넣는다.
 - `ExecutionRecorder.start(...)` 에 `contextChars` 를 넘겨 실행 줄에 적는다.
+- `AgentExecution.Builder` 에 `contextChars(Long)` 를 더해 시작 시점의 행에 저장한다.
 
 `ExecutionRecorder.start` 의 서명이 바뀐다.
 
@@ -152,11 +158,14 @@ public AgentExecution start(
 - 넣을 것이 하나도 없으면 `instructions` 가 `null` 이고 `chars` 가 0 이다
 - 한쪽만 있으면 그쪽 제목만 나온다
 - 상한을 넘으면 잘리고 `chars` 가 자른 뒤의 길이다
+- 역순으로 저장한 항목도 `id` 오름차순으로 나온다
+- 다음 항목이 상한을 넘으면 그 항목의 제목과 본문 일부가 모두 들어가지 않는다
 
 `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` 에 더한다.
 
 - 대화 한 번이 조립한 `instructions` 를 `HermesRunCommand` 에 실어 보낸다
 - 그 실행 줄의 `contextChars` 가 조립한 길이와 같다
+- 저장소에서 다시 읽은 실행 줄의 `contextChars` 가 조립한 길이와 같다
 
 `test/e2e/scenarios/memory.ts` 에 더한다.
 
@@ -192,6 +201,7 @@ cd backend && ./gradlew test --tests '*ContextAssemblerTest*'
 | `backend/src/main/java/com/bifos/assistant/context/ContextProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageController.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
