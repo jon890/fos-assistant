@@ -5,7 +5,7 @@ import type { UsageExecution } from "./execution-list";
 export function ExecutionCard({ execution }: { execution: UsageExecution }) {
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
   return (
-    <article className={`rounded-lg border p-4 ${failed ? "border-foreground" : "border-border"}`}>
+    <article className={`rounded-md border p-4 ${failed ? "border-foreground" : "border-border"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate font-semibold">{execution.agentName}</h2>

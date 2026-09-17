@@ -1,4 +1,5 @@
 import type { AdminAgent } from "@/lib/agent";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   agent: AdminAgent;
@@ -14,7 +15,7 @@ export function VisibilityConfirm({ agent, busy, onCancel, onConfirm }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="visibility-confirm-title"
-        className="w-full max-w-md rounded-xl border border-border bg-background p-5 shadow-xl"
+        className="w-full max-w-md rounded-md border border-border bg-background p-5 shadow-xl"
       >
         <h2 id="visibility-confirm-title" className="text-lg font-semibold">{agent.name} 에이전트를 가족에게 공개할까요?</h2>
         <p className="mt-3 text-sm leading-6 text-muted">
@@ -22,12 +23,12 @@ export function VisibilityConfirm({ agent, busy, onCancel, onConfirm }: Props) {
           확인한 뒤 공개한다.
         </p>
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} disabled={busy} className="rounded-md border border-border px-4 py-2 text-sm disabled:opacity-50">
+          <Button onClick={onCancel} disabled={busy} variant="secondary">
             취소
-          </button>
-          <button type="button" onClick={onConfirm} disabled={busy} className="rounded-md bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">
+          </Button>
+          <Button onClick={onConfirm} disabled={busy}>
             가족 공개
-          </button>
+          </Button>
         </div>
       </section>
     </div>

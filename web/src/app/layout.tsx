@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import Link from "next/link";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteNav } from "@/components/ui/site-nav";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { readMe } from "@/lib/me";
 import "./globals.css";
+
+const pretendard = localFont({
+  src: "../../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
+  display: "swap",
+  variable: "--font-pretendard",
+  weight: "45 920",
+});
 
 export const metadata: Metadata = {
   title: "우리집 비서",
@@ -15,7 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const me = await readMe();
 
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
       <body className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
         <ThemeProvider>
           <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-sm sm:gap-4 sm:px-4">

@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import { Button } from "@/components/ui/button";
 
 export default function SignInPage() {
   return (
@@ -11,9 +12,9 @@ export default function SignInPage() {
           await signIn("google", { redirectTo: "/" });
         }}
       >
-        <button type="submit" className="rounded-md border border-border px-4 py-2 text-sm">
+        <Button type="submit" variant="secondary">
           Google 계정으로 로그인
-        </button>
+        </Button>
       </form>
     </section>
   );
