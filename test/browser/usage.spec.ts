@@ -1,8 +1,18 @@
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
+import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
 import { expect, test } from "./fixtures.ts";
-import { AUTH_SECRET, WEB_BASE_URL } from "./settings.ts";
+import { AUTH_SECRET, CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL, WEB_BASE_URL } from "./settings.ts";
 
 const SESSION_COOKIE = "authjs.session-token";
+
+async function controlPlaneToken(): Promise<string> {
+  return new SignJWT({ name: "브라우저 테스트" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(TEST_EMAIL)
+    .setIssuedAt()
+    .setExpirationTime("2m")
+    .sign(new TextEncoder().encode(JWT_SECRET));
+}
 
 test("화면 폭에 맞춰 실행 기록을 카드나 표로 보인다", async ({ page }, testInfo) => {
   const response = await page.request.post("/api/chat", {
@@ -39,6 +49,44 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("가격 없음").first()).toBeVisible();
   await expect(records.getByText("0.0000 USD").first()).toBeVisible();
+});
+
+test("돌고 있는 실행은 시간과 금액 없이 보이고 완료 뒤에 끝난다", async ({ page, hermes }, testInfo) => {
+  await hermes.holdNextRun();
+  const chat = page.request.post("/api/chat", {
+    data: { text: "진행 중 실행 검사", agentCode: "browser" },
+  });
+  try {
+    await hermes.waitForHeldRun();
+
+    await page.goto("/usage");
+    const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
+    const running = records.getByText("도는 중", { exact: true });
+    await expect(running).toBeVisible();
+    const container = testInfo.project.name === "mobile"
+      ? running.locator("xpath=ancestor::article")
+      : running.locator("xpath=ancestor::tr");
+    await expect(container).not.toContainText("USD");
+  } finally {
+    await hermes.releaseHeldRun();
+  }
+  expect((await chat).ok()).toBeTruthy();
+});
+
+test("고아 실행은 중간에 끊겼다고 보인다", async ({ page }, testInfo) => {
+  const response = await page.request.post("/api/chat", {
+    data: { text: "고아 실행 검사", agentCode: "browser" },
+  });
+  expect(response.ok()).toBeTruthy();
+  const orphan = await page.request.post(
+    `${CONTROL_PLANE_BASE_URL}/api/v1/test-support/usage/last-execution/orphaned`,
+    { headers: { Authorization: `Bearer ${await controlPlaneToken()}` } },
+  );
+  expect(orphan.ok()).toBeTruthy();
+  await page.goto("/usage");
+
+  const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
+  await expect(records.getByText("중간에 끊김", { exact: true }).first()).toBeVisible();
 });
 
 test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, page }) => {

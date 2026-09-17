@@ -12,6 +12,9 @@ const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
 const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/;
 const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
+const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
+const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
+const TEST_RELEASE_HELD_RUN_PATH = "/__test/release-held-run";
 
 /**
  * 실행 하나가 보고하는 토큰 수다.
@@ -126,6 +129,31 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = request.url ?? "";
+
+      if (request.method === "POST" && path === TEST_HOLD_NEXT_RUN_PATH) {
+        holdNextRun = true;
+        heldRunReady = new Promise<void>((done) => {
+          heldRunWaiter = done;
+        });
+        return send(response, 204, null);
+      }
+
+      if (request.method === "GET" && path === TEST_WAIT_HELD_RUN_PATH) {
+        if (heldRunReady === undefined) return send(response, 409, { error: "no held run is pending" });
+        await heldRunReady;
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_RELEASE_HELD_RUN_PATH) {
+        if (heldRunId === undefined) return send(response, 409, { error: "no held run is active" });
+        const run = runs.get(heldRunId);
+        if (run === undefined) return send(response, 404, { error: "no such held run" });
+        run.status = "completed";
+        heldRunId = undefined;
+        heldRunReady = undefined;
+        heldRunWaiter = undefined;
+        return send(response, 204, null);
+      }
 
       if (request.method === "GET") {
         const modelMatch = MODEL_OPTIONS_PATH.exec(path);

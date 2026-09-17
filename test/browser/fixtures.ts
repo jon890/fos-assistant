@@ -21,6 +21,26 @@ const { expect, test: base } = playwright;
 const ROOT = join(import.meta.dirname, "../..");
 const SESSION_COOKIE = "authjs.session-token";
 const HEALTH_TIMEOUT_MS = 90_000;
+const HERMES_CONTROL_PATH = join(tmpdir(), `fos-assistant-browser-hermes-${CONTROL_PLANE_PORT}.url`);
+
+export type FakeHermesControl = {
+  holdNextRun(): Promise<void>;
+  waitForHeldRun(): Promise<void>;
+  releaseHeldRun(): Promise<void>;
+};
+
+async function fakeHermesControl(): Promise<FakeHermesControl> {
+  const baseUrl = (await readFile(HERMES_CONTROL_PATH, "utf-8")).trim();
+  const call = async (path: string, method: "GET" | "POST") => {
+    const response = await fetch(`${baseUrl}${path}`, { method });
+    if (!response.ok) throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
+  };
+  return {
+    holdNextRun: () => call("/__test/hold-next-run", "POST"),
+    waitForHeldRun: () => call("/__test/wait-held-run", "GET"),
+    releaseHeldRun: () => call("/__test/release-held-run", "POST"),
+  };
+}
 
 export async function setSession(
   context: BrowserContext,
@@ -120,6 +140,7 @@ function startControlPlane(keyDir: string, logPath: string): ChildProcess {
       SPRING_FLYWAY_ENABLED: "true",
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
+      ASSISTANT_TESTSUPPORT_ENABLED: "true",
     },
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -146,12 +167,14 @@ export default async function setupServices(): Promise<() => Promise<void>> {
 
   try {
     hermes = await startFakeHermes({ browser: "browser-profile-key" });
+    await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
     app = startControlPlane(await writeProfileKeys(work), logPath);
     await waitForHealth(logPath);
     await seedAgent(hermes.baseUrl);
   } catch (error) {
     await stopProcess(app);
     await hermes?.close();
+    await rm(HERMES_CONTROL_PATH, { force: true });
     await rm(work, { recursive: true, force: true });
     throw error;
   }
@@ -159,11 +182,15 @@ export default async function setupServices(): Promise<() => Promise<void>> {
   return async () => {
     await stopProcess(app);
     await hermes?.close();
+    await rm(HERMES_CONTROL_PATH, { force: true });
     await rm(work, { recursive: true, force: true });
   };
 }
 
-export const test = base.extend({
+export const test = base.extend<{ hermes: FakeHermesControl }>({
+  hermes: async ({}, use) => {
+    await use(await fakeHermesControl());
+  },
   page: async ({ context, page }, use) => {
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
     await use(page);
