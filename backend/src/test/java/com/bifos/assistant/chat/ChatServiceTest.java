@@ -120,7 +120,7 @@ class ChatServiceTest {
                             profileName,
                             profileName,
                             profileName,
-                            "http://hermes:8642/p/" + profileName,
+                            "http://agent-runtime.test/p/" + profileName,
                             "anthropic",
                             "claude-opus-5",
                             CostMode.SUBSCRIPTION,
@@ -149,7 +149,7 @@ class ChatServiceTest {
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("dad");
-            assertThat(command.apiBaseUrl()).isEqualTo("http://hermes:8642/p/dad");
+            assertThat(command.apiBaseUrl()).isEqualTo("http://agent-runtime.test/p/dad");
             assertThat(command.input()).isEqualTo("오늘 저녁 뭐 먹을까?");
             assertThat(command.sessionId()).isNull();
         });

@@ -173,9 +173,11 @@ prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 �
 그래서 심볼릭 링크를 쓴다. 구조는 `skills/<범주>/<스킬>` 이다.
 
 ```
-~/.hermes/profiles/<profile>/skills/career-os/position-recommender
-  -> /opt/data/fos-agents/career-os/.claude/skills/position-recommender
+~/.hermes/profiles/<profile>/skills/<범주>/<스킬>
+  -> <컨테이너에 마운트된 에이전트 정의 저장소>/<범주>/.claude/skills/<스킬>
 ```
+
+마운트 경로는 `fos-home-infra` 가 정한다.
 
 링크 대상은 **컨테이너 안의 경로**여야 한다. 호스트 경로로 걸면 컨테이너 안에서 끊긴 링크가 된다.
 붙인 뒤 gateway 를 다시 띄워야 인식된다. `GET /v1/skills` 로 확인한다.
@@ -221,7 +223,7 @@ Hermes 가 subagent 를 띄웠을 때 그 토큰이 부모 실행의 `usage` 에
 | 버전 | Hermes Agent v0.21.0 (2026.8.31) |
 | `run_submission`, `run_status` | true |
 | `run_events_sse`, `run_stop` | true |
-| 배치 | profile 마다 자기 포트. `brain-api` 가 8644 를 쓴다 |
+| 배치 | 경로 멀티플렉스가 아니라 profile 마다 자기 포트를 쓴다 |
 
 경로 멀티플렉스가 아니라 포트 분리를 쓰고 있으므로,
 Control Plane 은 profile 마다 주소를 따로 갖는다.
