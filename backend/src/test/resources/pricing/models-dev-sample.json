@@ -35,6 +35,10 @@
       "gpt-free-tool": {
         "id": "gpt-free-tool",
         "cost": {}
+      },
+      "gpt-zero": {
+        "id": "gpt-zero",
+        "cost": { "input": 0, "output": 0, "cache_read": 0 }
       }
     }
   },

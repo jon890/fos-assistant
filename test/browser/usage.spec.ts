@@ -28,12 +28,17 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
     data: { text: "가격 없음 검사", agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
+  const freeResponse = await page.request.post("/api/chat", {
+    data: { text: "무료 모델 검사", agentCode: "browser" },
+  });
+  expect(freeResponse.ok()).toBeTruthy();
   await page.goto("/usage");
 
   await expect(page.getByText("이번 달 환산 합계", { exact: false })).toBeVisible();
   await expect(page.getByText("가격을 찾지 못한 실행", { exact: true })).toBeVisible();
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("가격 없음").first()).toBeVisible();
+  await expect(records.getByText("0.0000 USD").first()).toBeVisible();
 });
 
 test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, page }) => {
