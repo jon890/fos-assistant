@@ -30,7 +30,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/** 실행이 끝나는 자리에서 금액이 저장되고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
+/** 실행이 끝날 때 금액을 저장하고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class UsageCostRecordingTest {
@@ -68,8 +68,7 @@ class UsageCostRecordingTest {
     @Test
     void 구독형_바인딩의_실행도_API_가격으로_환산해_저장한다() {
         AgentExecution execution =
-                recorder.recordSuccess(
-                        caller(), conversation, subscriptionAgent(), run(1_000L, 800L, 500L), Instant.now());
+                complete(run(1_000L, 800L, 500L));
 
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isEqualTo(16_400L);
@@ -80,8 +79,7 @@ class UsageCostRecordingTest {
     @Test
     void 실패한_실행은_금액을_남기지_않는다() {
         AgentExecution execution =
-                recorder.recordFailure(
-                        caller(), conversation, subscriptionAgent(), "HERMES_RUN_FAILED", Instant.now());
+                fail();
 
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.pricingVersion()).isNull();
@@ -89,12 +87,9 @@ class UsageCostRecordingTest {
 
     @Test
     void 한_달_합계는_금액이_잡힌_실행만_더하고_나머지는_따로_센다() {
-        recorder.recordSuccess(
-                caller(), conversation, subscriptionAgent(), run(1_000L, null, 500L), Instant.now());
-        recorder.recordSuccess(
-                caller(), conversation, subscriptionAgent(), run(1_000L, null, 500L), Instant.now());
-        recorder.recordFailure(
-                caller(), conversation, subscriptionAgent(), "HERMES_RUN_FAILED", Instant.now());
+        complete(run(1_000L, null, 500L));
+        complete(run(1_000L, null, 500L));
+        fail();
 
         MonthlyCost cost =
                 executions.sumCostBetween(
@@ -118,6 +113,16 @@ class UsageCostRecordingTest {
 
     private static CurrentUser caller() {
         return new CurrentUser(USER_ID, "dad@example.com", "dad", UserRole.ADMIN);
+    }
+
+    private AgentExecution complete(HermesRunResult result) {
+        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null);
+        return recorder.complete(execution, subscriptionAgent(), result);
+    }
+
+    private AgentExecution fail() {
+        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null);
+        return recorder.fail(execution, "HERMES_RUN_FAILED");
     }
 
     private static Agent subscriptionAgent() {

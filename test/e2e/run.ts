@@ -147,6 +147,7 @@ async function main(): Promise<void> {
         kid: mintToken("kid@example.com", JWT_SECRET),
       },
       hermesBaseUrl: hermes.baseUrl,
+      hermes,
     };
 
     for (const scenario of SCENARIOS) {

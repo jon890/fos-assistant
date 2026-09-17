@@ -115,6 +115,8 @@ class ChatServiceTest {
 
         ChatTurn turn = chat.send(dad, null, "오늘 저녁 뭐 먹을까?", "dad");
 
+        assertThat(executions.count()).isOne();
+
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("dad");
             assertThat(command.apiBaseUrl()).isEqualTo("http://hermes:8642/p/dad");
@@ -245,5 +247,25 @@ class ChatServiceTest {
             assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
             assertThat(execution.errorCode()).isEqualTo("HERMES_UNAVAILABLE");
         });
+    }
+
+    @Test
+    void Hermes가_실패_결과를_돌려줘도_실행_줄_하나를_FAILED로_갱신한다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(
+                new HermesRunResult("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
+
+        assertThatThrownBy(() -> chat.send(dad, null, "안녕", "dad"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.HERMES_RUN_FAILED);
+
+        assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
+                .singleElement()
+                .satisfies(execution -> {
+                    assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
+                    assertThat(execution.hermesRunId()).isEqualTo("run-1");
+                    assertThat(execution.errorCode()).isEqualTo("FAILED");
+                });
     }
 }

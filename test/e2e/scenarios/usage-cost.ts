@@ -15,11 +15,13 @@ import { CHAT_TURNS } from "./chat.ts";
 const MICROS_PER_RUN = 1440;
 
 type ExecutionView = {
+  id: number;
   agentCode: string;
   agentName: string;
   provider: string | null;
   model: string | null;
   costMode: string;
+  status: string;
   estimatedCostMicros: number | null;
   costCurrency: string | null;
   pricingVersion: string | null;
@@ -90,5 +92,33 @@ export const usageCostScenario: Scenario = {
       `가격을 찾지 못한 실행이 있다: ${JSON.stringify(monthly)}`,
     );
     expect(monthly.currency === "USD", `합계의 통화가 USD 가 아니다: ${monthly.currency}`);
+
+    step("돌고 있는 실행은 목록에 보이지만 가격을 찾지 못한 실행으로 세지 않는다");
+    context.hermes.holdNextRun();
+    const pendingTurn = call(context, "/chat/messages", {
+      method: "POST",
+      token: context.tokens.dad,
+      body: { text: "실행 중 상태 검사", agentCode: "dad" },
+    });
+    await context.hermes.waitForHeldRun();
+
+    const running = expectStatus(
+      await call(context, "/usage/executions?limit=10", { token: context.tokens.dad }),
+      200,
+      "실행 중 사용량 조회",
+    ).json<ExecutionView[]>();
+    expect(running.some((execution) => execution.status === "RUNNING"), "RUNNING 실행이 목록에 없다");
+
+    const whileRunning = expectStatus(
+      await call(context, "/usage/monthly-cost", { token: context.tokens.dad }),
+      200,
+      "실행 중 합계 조회",
+    ).json<MonthlyCostView>();
+    expect(
+      whileRunning.unpricedExecutions === 0,
+      `RUNNING 실행이 가격 미확인으로 세어졌다: ${JSON.stringify(whileRunning)}`,
+    );
+    context.hermes.releaseHeldRun();
+    expectStatus(await pendingTurn, 200, "유지했던 대화");
   },
 };
