@@ -23,6 +23,9 @@ public class Conversation {
     @Column(name = "workspace_id")
     private Long workspaceId;
 
+    @Column(name = "agent_id")
+    private Long agentId;
+
     /** Hermes session this conversation continues. Null until the first run reports one. */
     @Column(name = "hermes_session_id", length = 128)
     private String hermesSessionId;
@@ -39,16 +42,17 @@ public class Conversation {
     protected Conversation() {
     }
 
-    private Conversation(Long userId, String title, Long workspaceId) {
+    private Conversation(Long userId, String title, Long workspaceId, Long agentId) {
         this.userId = userId;
         this.title = title;
         this.workspaceId = workspaceId;
+        this.agentId = agentId;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
 
-    public static Conversation startedBy(Long userId, String title, Long workspaceId) {
-        return new Conversation(userId, title, workspaceId);
+    public static Conversation startedBy(Long userId, String title, Long workspaceId, Long agentId) {
+        return new Conversation(userId, title, workspaceId, agentId);
     }
 
     public Long id() {
@@ -63,6 +67,8 @@ public class Conversation {
     public Long workspaceId() {
         return workspaceId;
     }
+
+    public Long agentId() { return agentId; }
 
     public String hermesSessionId() {
         return hermesSessionId;

@@ -4,8 +4,8 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.credential.domain.HermesProfileBinding;
-import com.bifos.assistant.credential.infra.HermesProfileBindingRepository;
+import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
@@ -33,7 +33,7 @@ public class ChatService {
 
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
-    private final HermesProfileBindingRepository bindings;
+    private final AgentService agents;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
     private final WorkspaceService workspaces;
@@ -41,21 +41,25 @@ public class ChatService {
     public ChatService(
             ConversationRepository conversations,
             ChatMessageRepository messages,
-            HermesProfileBindingRepository bindings,
+            AgentService agents,
             HermesRunsClient hermes,
             ExecutionRecorder executions,
             WorkspaceService workspaces) {
         this.conversations = conversations;
         this.messages = messages;
-        this.bindings = bindings;
+        this.agents = agents;
         this.hermes = hermes;
         this.executions = executions;
         this.workspaces = workspaces;
     }
 
-    public ChatTurn send(CurrentUser user, Long conversationId, String text, String workspaceCode) {
-        HermesProfileBinding binding = requireActiveBinding(user);
-        Conversation conversation = resolveConversation(user, conversationId, text, workspaceCode);
+    public ChatTurn send(CurrentUser user, Long conversationId, String text, String workspaceCode,
+            String agentCode) {
+        Conversation conversation = resolveConversation(user, conversationId, text, workspaceCode, agentCode);
+        Agent agent = agents.requireById(conversation.agentId());
+        if (!agent.enabled()) {
+            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
+        }
         messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
 
         // 이어지는 대화는 그 대화에 기록된 영역을 쓴다. 요청 본문이 중간에 영역을 바꾸지 못한다.
@@ -68,25 +72,25 @@ public class ChatService {
             result =
                     hermes.runToCompletion(
                             new HermesRunCommand(
-                                    binding.profileName(),
-                                    binding.apiBaseUrl(),
+                                    agent.hermesProfile(),
+                                    agent.apiBaseUrl(),
                                     text,
                                     instructions,
                                     conversation.hermesSessionId()));
         } catch (ApiException ex) {
-            executions.recordFailure(user, conversation, binding, ex.code().name(), startedAt);
+            executions.recordFailure(user, conversation, agent, ex.code().name(), startedAt);
             throw ex;
         }
 
         if (!result.succeeded()) {
-            executions.recordFailure(user, conversation, binding, hermesStatus(result), startedAt);
+            executions.recordFailure(user, conversation, agent, hermesStatus(result), startedAt);
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
         }
 
         conversation.rememberSession(result.sessionId());
         conversations.save(conversation);
 
-        AgentExecution execution = executions.recordSuccess(user, conversation, binding, result, startedAt);
+        AgentExecution execution = executions.recordSuccess(user, conversation, agent, result, startedAt);
         String answer = result.output() == null ? "" : result.output();
         messages.save(ChatMessage.fromAssistant(conversation.id(), answer, execution.id()));
         return new ChatTurn(conversation.id(), execution.id(), answer);
@@ -101,28 +105,20 @@ public class ChatService {
         return conversations.findByUserIdOrderByUpdatedAtDesc(user.id());
     }
 
-    private HermesProfileBinding requireActiveBinding(CurrentUser user) {
-        HermesProfileBinding binding =
-                bindings
-                        .findByUserId(user.id())
-                        .orElseThrow(
-                                () ->
-                                        new ApiException(
-                                                ErrorCode.HERMES_BINDING_MISSING,
-                                                "no AI account is connected to this user yet"));
-        if (!binding.isActive()) {
-            throw new ApiException(
-                    ErrorCode.HERMES_BINDING_DISABLED, "the AI account connected to this user is disabled");
-        }
-        return binding;
-    }
-
     private Conversation resolveConversation(
-            CurrentUser user, Long conversationId, String firstText, String workspaceCode) {
+            CurrentUser user, Long conversationId, String firstText, String workspaceCode,
+            String agentCode) {
         if (conversationId == null) {
             Long workspaceId = resolveNewWorkspaceId(user, workspaceCode);
+            if (agentCode == null || agentCode.isBlank()) {
+                throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
+            }
+            Agent agent = agents.requireReadable(user, agentCode);
+            if (!agent.enabled()) {
+                throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
+            }
             return conversations.save(
-                    Conversation.startedBy(user.id(), titleFrom(firstText), workspaceId));
+                    Conversation.startedBy(user.id(), titleFrom(firstText), workspaceId, agent.id()));
         }
         return requireOwnConversation(user, conversationId);
     }

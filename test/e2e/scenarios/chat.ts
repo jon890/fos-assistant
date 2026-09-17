@@ -16,7 +16,7 @@ export const chatScenario: Scenario = {
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: question },
+        body: { text: question, agentCode: "dad" },
       }),
       200,
       "첫 대화",
