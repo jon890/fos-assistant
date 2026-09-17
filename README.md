@@ -30,13 +30,14 @@ profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 ## 로컬에서 돌리기
 
 홈서버 없이도 전체 흐름을 확인할 수 있다.
-`tools/fake-hermes` 가 Hermes Runs API 를 흉내 낸다.
+`test/e2e` 가 Hermes Runs API 대역을 같은 프로세스에 띄운다.
 
 ```bash
-./scripts/e2e-smoke.sh
+node test/e2e/run.ts
 ```
 
-이 스크립트는 로그인 토큰 발급부터 profile 연결, 대화 한 번, 사용량 기록까지 한 번에 돌린다.
+로그인 토큰 발급부터 profile 연결, 대화 한 번, 사용량 기록과 비용 환산까지 한 번에 돌린다.
+시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있다.
 
 개별 실행은 아래와 같다.
 
@@ -54,6 +55,7 @@ Backend 는 `backend/src/main/resources/application.yml`, Web 은 `web/.env.exam
 | `ASSISTANT_JWT_SECRET` | 양쪽 | 웹이 발급하고 Control Plane 이 검증하는 토큰의 HMAC 비밀값 |
 | `HERMES_BASE_URL` | Backend | Hermes API server 주소 |
 | `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |
+| `ASSISTANT_PRICING_CATALOG` | Backend | models.dev 가격표를 복사해 둔 파일. 없으면 비용을 비워 둔다 |
 | `ASSISTANT_ALLOWED_EMAILS` | Web | 로그인을 허용할 가족 구성원 메일 주소 |
 
 AI credential 은 이 저장소와 데이터베이스 어디에도 두지 않는다.

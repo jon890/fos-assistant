@@ -21,7 +21,7 @@
 - Runs API 로 실행을 제출하고 끝날 때까지 조회한다
 - 실행 하나를 `agent_execution` 에 남기고 사용량 화면에서 본다
 
-확인 방법은 `scripts/e2e-smoke.sh` 다.
+확인 방법은 `node test/e2e/run.ts` 다.
 
 ## phase-02 실제 Hermes 연결
 

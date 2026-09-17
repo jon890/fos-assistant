@@ -1,0 +1,10 @@
+{
+  "name": "fos-assistant-test",
+  "private": true,
+  "type": "module",
+  "description": "홈서버 없이 전체 흐름을 검사한다. Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다.",
+  "scripts": {
+    "e2e": "node e2e/run.ts",
+    "typecheck": "../web/node_modules/.bin/tsc -p tsconfig.json"
+  }
+}
