@@ -1,15 +1,19 @@
 # Phase 02. 실행 당시의 상태를 함께 남긴다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
-실행마다 그때의 설정과 문맥이 어땠는지를 남긴다.
+실행마다 그때의 문맥이 어땠는지를 남긴다.
 비용이 달라졌을 때 무엇이 달라져서인지 되짚을 수 있게 한다.
+
+이 phase 가 실제로 채우는 것은 `instructions_hash` 하나다.
+`runtime_fingerprint` 는 칸만 만들고 비워 둔다. 아래 「컨텍스트」 가 그 이유를 갖는다.
 
 **범위 외**:
 축별 분석 화면은 phase-03 이 만든다.
 모델을 자동으로 고르는 기능을 만들지 않는다.
+Hermes 의 고정 프롬프트 구성을 읽는 경로를 만들지 않는다.
 
 ## 컨텍스트
 
@@ -31,7 +35,12 @@ Memory 를 Control Plane 이 주입하기 시작하면 그 양이 실행마다 �
 **무엇이 달라져서 비용이 움직였는지를 기록이 스스로 말해야 한다.**
 
 plan009 의 phase-02 가 `context_chars` 를 이미 채운다.
-이 phase 는 그 옆에 설정 지문을 더한다.
+이 phase 는 그 옆에 `instructions_hash` 를 더한다.
+길이가 같아도 내용이 다를 수 있어서, 길이만으로는 같은 문맥으로 돌았는지 알 수 없다.
+
+설정 지문은 이번에 채우지 못한다.
+그 값을 계산해 주는 것이 CLI 명령 하나뿐이고 Control Plane 이 부를 수 있는 HTTP 경로가 없다.
+칸만 만들어 두고 값은 비운다. 「작업 항목 1」 이 그 판단의 근거를 갖는다.
 
 **근거 문서**: `docs/adr/ADR-014-실제-청구액과-환산액을-나눠-적는다.md`,
 `docs/data-schema.md` 의 「agent_execution」 절,
@@ -45,31 +54,34 @@ plan009 의 phase-02 가 `context_chars` 를 이미 채운다.
 - 작업 영역의 git SHA 는 남길 것이 없다. 작업 영역은 제거됐다.
   대신 에이전트가 가리키는 Hermes profile 의 상태를 남긴다.
 - 지문을 만들 수 없으면 비워 둔다. 실행을 실패시키지 않는다.
-  Hermes 에 물어보는 값이라 그 호출이 실패할 수 있다.
+  지금은 만들 수 없으므로 항상 비어 있다.
+- **Control Plane 이 홈서버의 셸을 갖게 하지 않는다.**
+  ssh 로 붙어 명령을 돌리거나 `ProcessBuilder` 로 외부 명령을 부르는 구조를 만들지 않는다.
+  값 하나를 얻으려고 그 경로를 여는 것은 값에 견줘 대가가 너무 크다.
+- 칸은 지금 만든다. 값을 넣을 수 있게 되는 날 마이그레이션을 다시 하지 않기 위해서다.
 
 ## 작업 항목
 
-### 1. 무엇을 지문으로 삼을지 정한다
+### 1. `runtime_fingerprint` 는 비워 둔다
 
-Hermes 의 `prompt-size` 가 고정 프롬프트의 구성을 계산해 준다.
-API 를 부르지 않고 도는 명령이다.
+원래 의도는 Hermes 가 계산한 고정 프롬프트 구성을 지문으로 삼는 것이었다.
+system prompt 글자 수, 스킬 수, 도구 수, 도구 정의 바이트 넷을 이어 붙여 해시를 만든다.
 
-**이 저장소는 공개 저장소다. 실행 방법을 여기 적지 않는다.**
-그 명령과 홈서버 구조는 비공개 저장소 `fos-home-infra` 가 소유한다.
+**그 넷을 주는 것은 CLI 명령 하나뿐이고 HTTP API 에는 그 경로가 없다.**
+Control Plane 이 Hermes 에 쓰는 경로는 `/v1/runs` 계열과 `/v1/skills` 와 `/v1/capabilities` 다.
+`/v1/skills` 는 스킬 수만 주고 나머지 셋을 주지 않는다.
+`/v1/capabilities` 는 엔드포인트 목록이라 프롬프트 구성을 담지 않는다.
 
-그 응답에서 아래를 뽑아 지문으로 삼는다.
+Control Plane 은 그 CLI 가 도는 곳 밖에 있다.
+붙어서 명령을 돌리는 구조를 만들면 Control Plane 이 그쪽의 셸을 갖게 된다.
+**그 대가가 값보다 커서 만들지 않는다.**
 
-| 값 | 어디서 |
-| --- | --- |
-| system prompt 글자 수 | `system_prompt.chars` |
-| 스킬 수 | `skills_breakdown` 의 길이 |
-| 도구 수 | `tools.count` |
-| 도구 정의 바이트 | `tools.json_bytes` |
+그러므로 이 phase 는 `runtime_fingerprint` 칸을 만들기만 하고 값을 넣지 않는다.
+`RuntimeFingerprintReader` 와 그 캐시 설정과 그 테스트를 만들지 않는다.
 
-이 넷을 이어 붙여 해시를 만든다. 그것이 `runtime_fingerprint` 다.
-
-**실행마다 이 명령을 부르지 않는다.** 그러면 실행이 느려지고 홈서버에 부담이 된다.
-에이전트별로 캐시하고, 캐시가 오래되면 다시 읽는다.
+**칸은 지금 만든다.** Hermes 가 그 값을 HTTP 로 주기 시작하면
+읽는 자리 하나만 더하면 되고 마이그레이션을 다시 하지 않는다.
+phase-03 의 `fingerprint` 축도 같은 이유로 지금 만든다.
 
 ### 2. `backend/src/main/resources/db/migration/V11__execution_fingerprint.sql` 신규
 
@@ -90,35 +102,19 @@ CREATE INDEX idx_agent_execution_fingerprint ON agent_execution (runtime_fingerp
 **`instructions` 본문을 저장하지 않는다.** 그 안에 Memory 가 들어 있고 그것은 개인 기록이다.
 해시만 남기면 같은 문맥으로 돌았는지는 알 수 있고 내용은 남지 않는다.
 
-### 3. 지문을 읽는 자리
+### 3. `instructions` 의 해시를 만드는 자리
 
-`backend/src/main/java/com/bifos/assistant/agent/application/RuntimeFingerprintReader.java` 다.
+`ContextAssembler` 가 만든 문자열의 SHA-256 을 앞 16바이트만 남기고 16진수로 적는다.
+32글자가 된다.
 
-```java
-/**
- * 에이전트가 가리키는 Hermes profile 의 고정 프롬프트 구성을 지문으로 만든다.
- *
- * <p>실행마다 읽지 않는다. 에이전트별로 캐시하고 오래되면 다시 읽는다.
- * 읽지 못하면 비워 둔다. 실행을 막을 값이 아니다.
- */
-@Service
-public class RuntimeFingerprintReader {
+같은 `instructions` 는 같은 해시를 내고 다른 `instructions` 는 다른 해시를 낸다.
+`context_chars` 가 길이를 말하고 이 칸이 내용이 같은지를 말한다.
 
-    /** 읽지 못하면 null 을 낸다. */
-    public String fingerprintOf(Agent agent);
-}
-```
+**`instructions` 가 `null` 이거나 빈 문자열이면 해시를 적지 않는다.**
+빈 문자열의 해시는 언제나 같은 값이라, 그것을 적으면
+문맥 없이 돈 실행들이 모두 한 지문으로 묶여 잘못 읽힌다.
 
-캐시 수명은 `assistant.fingerprint.ttl` 로 정한다. 기본값은 1시간이다.
-
-**Hermes API 로 읽을 방법이 있으면 그것을 쓴다.**
-`prompt-size` 는 CLI 명령이고 Control Plane 은 컨테이너 밖에 있다.
-`GET /v1/capabilities` 나 다른 경로로 같은 값을 얻을 수 있는지 먼저 확인한다.
-없으면 그 사실을 적고 이 칸을 비워 두는 쪽으로 간다.
-
-**확인하기 전에 구현하지 않는다.**
-Control Plane 이 홈서버에 ssh 로 붙어 명령을 돌리는 구조는 만들지 않는다.
-그 경로를 열면 Control Plane 이 홈서버의 셸을 갖게 된다.
+Hermes 로 나가는 새 호출을 만들지 않는다. 이 값은 Control Plane 이 가진 문자열로만 계산한다.
 
 ### 4. `ExecutionRecorder` 가 적는다
 
@@ -157,10 +153,13 @@ public record ExecutionContextSnapshot(
 
 `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java` 에 더한다.
 
-- 실행 줄에 `instructionsHash` 가 적히고, 같은 `instructions` 는 같은 해시다
-- `instructions` 가 `null` 이면 그 칸도 `null` 이다
+- **정상 경로**: 실행 줄에 `instructionsHash` 가 적히고, 같은 `instructions` 는 같은 해시다
+- 다른 `instructions` 는 다른 해시다
+- **이 phase 가 다루는 실패**: `instructions` 가 `null` 이거나 빈 문자열이면 그 칸도 `null` 이다.
+  빈 문자열의 해시가 적히지 않는다
 - **`instructions` 본문이 어느 칸에도 저장되지 않는다.**
   저장된 실행 줄의 모든 문자열 칸에 Memory 내용이 없는 것을 단언문으로 고정한다
+- `runtimeFingerprint` 는 `null` 이다. 읽는 경로를 만들지 않았기 때문이다
 
 ## 검증
 
@@ -195,11 +194,9 @@ cd backend && ./gradlew test --tests '*ExecutionLifecycleTest*'
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/resources/db/migration/V11__execution_fingerprint.sql` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/agent/application/RuntimeFingerprintReader.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageController.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
-| `backend/src/main/resources/application.yml` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/agent/RuntimeFingerprintReaderTest.java` | 신규 |
+| `docs/data-schema.md` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java` | 수정 |
