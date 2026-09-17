@@ -9,6 +9,7 @@ const MESSAGES: Record<string, string> = {
   HERMES_RUN_TIMEOUT: "응답이 제한 시간 안에 끝나지 않았다. 잠시 뒤에 다시 보낸다.",
   HERMES_UNAVAILABLE: "Hermes 런타임에 연결하지 못했다.",
   HERMES_RUN_FAILED: "실행이 끝나지 못했다. 사용량 화면에서 기록을 확인할 수 있다.",
+  STREAM_INTERRUPTED: "응답 연결이 끊겼다. 실행은 계속될 수 있으니 잠시 뒤 대화 이력을 다시 확인한다.",
   CONVERSATION_NOT_FOUND: "대화를 찾지 못했다. 대화 목록으로 돌아가 다시 골라 주세요.",
   UNAUTHENTICATED: "로그인이 필요하다.",
 };

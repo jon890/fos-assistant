@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ConversationList, type Conversation } from "./conversation-list";
 import { describeError } from "./error-message";
+import { readEventStream } from "@/lib/stream";
 
 type Turn = {
   id: number | string;
@@ -13,6 +14,17 @@ type Turn = {
 type Workspace = { code: string; name: string; visibility: string };
 type Agent = { code: string; name: string; model: string; visibility: string };
 type ErrorPayload = { code: string; message: string };
+type ChatEvent = {
+  type: "delta" | "tool" | "done" | "error";
+  text?: string | null;
+  toolName?: string | null;
+  detail?: string | null;
+  conversationId?: number | null;
+  messageId?: number | null;
+  executionId?: number | null;
+  code?: string | null;
+  message?: string | null;
+};
 
 async function readPayload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
@@ -24,6 +36,7 @@ export function ChatPanel() {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [toolEvents, setToolEvents] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceCode, setWorkspaceCode] = useState<string>("");
@@ -108,6 +121,7 @@ export function ChatPanel() {
     setWorkspaceCode(conversation.workspaceCode ?? "");
     setAgentCode(conversation.agentCode);
     setTurns([]);
+    setToolEvents([]);
     setError(null);
     try {
       const response = await fetch(`/api/chat/conversations/${conversation.id}/messages`);
@@ -134,6 +148,7 @@ export function ChatPanel() {
     setWorkspaceCode("");
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
+    setToolEvents([]);
     setError(null);
   }
 
@@ -161,9 +176,11 @@ export function ChatPanel() {
     if (text.length === 0 || sending || agentCode.length === 0) return;
 
     const pendingId = `pending-${Date.now()}`;
+    const assistantPendingId = `assistant-${Date.now()}`;
     setSending(true);
     setError(null);
     setDraft("");
+    setToolEvents([]);
     setTurns((previous) => [
       ...previous,
       { id: pendingId, role: "USER", content: text, senderName: null },
@@ -171,19 +188,23 @@ export function ChatPanel() {
 
     const restoreFailedMessage = () => {
       setDraft(text);
-      setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+      setTurns((previous) =>
+        previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId),
+      );
     };
 
-    try {
+    const requestBody = {
+      conversationId,
+      text,
+      workspaceCode: workspaceCode.length > 0 ? workspaceCode : null,
+      agentCode,
+    };
+
+    const sendWithoutStream = async () => {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId,
-          text,
-          workspaceCode: workspaceCode.length > 0 ? workspaceCode : null,
-          agentCode,
-        }),
+        body: JSON.stringify(requestBody),
       });
       const payload = await readPayload<
         ErrorPayload & { conversationId: number; assistantText: string }
@@ -191,7 +212,7 @@ export function ChatPanel() {
       if (!response.ok) {
         restoreFailedMessage();
         setError(describeError(payload.code, payload.message));
-        return;
+        return false;
       }
       setConversationId(payload.conversationId);
       setTurns((previous) => [
@@ -203,14 +224,83 @@ export function ChatPanel() {
           senderName: null,
         },
       ]);
+      await Promise.all([refreshConversations(), refreshMessages(payload.conversationId)]);
+      return true;
+    };
+
+    try {
+      let response: Response;
       try {
-        await Promise.all([refreshConversations(), refreshMessages(payload.conversationId)]);
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "대화 이력을 다시 읽지 못했다.");
+        response = await fetch("/api/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        });
+      } catch {
+        await sendWithoutStream();
+        return;
       }
-    } catch {
+
+      if (!response.ok) {
+        if ([404, 405, 415, 501].includes(response.status)) {
+          await sendWithoutStream();
+          return;
+        }
+        const payload = await readPayload<ErrorPayload>(response);
+        restoreFailedMessage();
+        setError(describeError(payload.code, payload.message));
+        return;
+      }
+
+      let done = false;
+      let reportedError = false;
+      try {
+        await readEventStream<ChatEvent>(response, async (streamEvent) => {
+          if (streamEvent.type === "delta" && streamEvent.text) {
+            setTurns((previous) => {
+              const current = previous.find((turn) => turn.id === assistantPendingId);
+              if (!current) {
+                return [
+                  ...previous,
+                  { id: assistantPendingId, role: "ASSISTANT", content: streamEvent.text ?? "", senderName: null },
+                ];
+              }
+              return previous.map((turn) =>
+                turn.id === assistantPendingId
+                  ? { ...turn, content: turn.content + (streamEvent.text ?? "") }
+                  : turn,
+              );
+            });
+          } else if (streamEvent.type === "tool") {
+            const name = streamEvent.toolName ?? "도구";
+            const status = streamEvent.detail ?? "진행 중";
+            setToolEvents((previous) => [...previous, `${name}: ${status}`]);
+          } else if (streamEvent.type === "done" && streamEvent.conversationId) {
+            done = true;
+            setConversationId(streamEvent.conversationId);
+            await Promise.all([
+              refreshConversations(),
+              refreshMessages(streamEvent.conversationId),
+            ]);
+            setToolEvents([]);
+          } else if (streamEvent.type === "error") {
+            reportedError = true;
+            restoreFailedMessage();
+            setError(describeError(streamEvent.code ?? "INTERNAL_ERROR", streamEvent.message ?? "요청을 처리하지 못했다."));
+          }
+        });
+      } catch {
+        if (!done && !reportedError) {
+          setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+        }
+        return;
+      }
+      if (!done && !reportedError) {
+        setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+      }
+    } catch (reason) {
       restoreFailedMessage();
-      setError("요청을 보내지 못했다.");
+      setError(reason instanceof Error ? reason.message : "요청을 보내지 못했다.");
     } finally {
       setSending(false);
     }
@@ -285,6 +375,11 @@ export function ChatPanel() {
               비서가 실행 중이다.
             </li>
           ) : null}
+          {toolEvents.map((tool, index) => (
+            <li key={`${tool}-${index}`} className="text-xs" style={{ color: "var(--muted)" }}>
+              {tool}
+            </li>
+          ))}
         </ol>
 
         {error ? (
