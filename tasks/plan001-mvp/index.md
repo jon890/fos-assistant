@@ -7,11 +7,14 @@
 | --- | --- | --- |
 | phase-01 | 대화 한 번이 Hermes 를 지나 돌아오고 실행 기록이 남는다 | 완료 |
 | phase-02 | 홈서버의 실제 Hermes 에 연결하고 배포한다 | 완료 |
-| phase-03 | 실행 상태를 SSE 로 중계한다 | 진행 전 |
-| phase-04 | 개인 Memory 와 공용 Memory | 진행 전 |
-| phase-05 | 실행 Graph 화면 | 진행 전 |
+| phase-03 | 실행 상태를 SSE 로 중계한다 | 완료 |
+| phase-04 | 개인 Memory 와 공용 Memory | 별도 plan 으로 옮겼다 |
+| phase-05 | 실행 Graph 화면 | 별도 plan 으로 옮겼다 |
 | phase-06 | 비용 계산 | 완료 |
-| phase-07 | 작업 영역으로 도메인 지식을 싣는다 | 완료 |
+| phase-07 | 작업 영역으로 도메인 지식을 싣는다 | 되돌렸다 |
+
+phase-07 이 만든 작업 영역은 한 번도 쓰이지 않아 제거하기로 했다.
+근거는 [ADR-010](../../docs/adr/ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md) 에 있다.
 
 ## phase-01 대화 한 번 (완료)
 
@@ -48,25 +51,21 @@
 - `ASSISTANT_ALLOWED_EMAILS` 에 그 주소를 더한다
 - 그 사람의 Hermes profile 을 만들고 바인딩한다
 
-## phase-03 실행 상태 중계
+## phase-03 실행 상태 중계 (완료)
 
 - `GET /v1/runs/{id}/events` 를 Control Plane 이 받아 브라우저로 다시 보낸다
 - 대화 화면이 도구 호출과 subagent 시작을 실시간으로 보여준다
-- 중계하는 동안 실행 기록을 채운다
 
-이 단계가 끝나면 `HttpHermesRunsClient` 의 조회 반복은 대비 경로로만 남는다.
+`HermesRunEventStream` 이 받고 `ChatService.stream` 이 화면으로 중계한다.
+저장하는 답은 스트림 조각이 아니라 실행 결과에서 가져온다.
+근거는 [ADR-008](../../docs/adr/ADR-008-스트리밍은-보여주기용이고-저장은-실행-결과로-한다.md) 에 있다.
 
-## phase-04 Memory
+## phase-04 와 phase-05 는 옮겼다
 
-- `memory` 표를 더한다. 소유자는 사용자이거나 가족이다
-- 실행 전에 요청자가 볼 수 있는 항목만 골라 `instructions` 로 넣는다
-- 화면에서 개인 Memory 와 공용 Memory 를 보고 고친다
-- 다른 구성원의 개인 Memory 가 주입되지 않는 것을 테스트로 고정한다
+Memory 와 실행 Graph 는 이 plan 에서 빼고 각각 별도 plan 으로 다시 세웠다.
+설계를 더 해야 한다고 판단해 한 번 멈춘 뒤, 정하지 못했던 것을 정하고 다시 연 것이다.
 
-## phase-05 실행 Graph
-
-- phase-03 에서 받은 사건을 `execution_event` 로 남긴다
-- 실행 하나를 도구와 subagent 의 나무로 그린다
+`tasks/` 아래에서 그 plan 의 `index.json` 을 찾아 읽는다.
 
 ## phase-06 비용 (완료)
 
@@ -75,7 +74,11 @@
 - 구독형 바인딩도 같은 방식으로 환산해 적는다. 구독료와 견줄 수 있게 하기 위해서다
 - 가격을 찾지 못하면 금액 칸을 비우고, 기동은 계속한다
 
-## phase-07 작업 영역 (완료)
+## phase-07 작업 영역 (되돌렸다)
+
+아래는 만들었던 것이다.
+등록된 영역이 0 이고 그것을 쓴 대화와 실행도 0 이라 제거하기로 했다.
+근거는 [ADR-010](../../docs/adr/ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md) 에 있다.
 
 - `workspace` 표를 두고 `conversation`, `agent_execution` 에 `workspace_id` 를 더한다
 - 관리자가 영역을 하나씩 등록한다. 공개 범위는 기본값이 없다
