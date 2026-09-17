@@ -17,6 +17,7 @@ import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.util.List;
@@ -96,7 +97,8 @@ public class ChatService {
                 text,
                 context.instructions(),
                 conversation.hermesSessionId());
-        AgentExecution execution = executions.start(user, conversation, agent, null, null, context.chars());
+        AgentExecution execution = executions.start(user, conversation, agent, null, null,
+                new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
         return new PendingTurn(user, conversation, agent, command, execution);
     }
 

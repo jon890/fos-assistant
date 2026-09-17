@@ -6,7 +6,6 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.EstimatedCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
@@ -34,11 +33,30 @@ public class ExecutionRecorder {
             Long parentExecutionId,
             Long rootExecutionId,
             Long contextChars) {
+        return start(
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                ExecutionContextSnapshot.ofChars(contextChars));
+    }
+
+    /** 실행 당시의 상태를 함께 적으며 RUNNING 으로 만들어 돌려준다. */
+    public AgentExecution start(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            ExecutionContextSnapshot context) {
         return executions.save(
                 base(user, conversation, agent)
                         .parentExecutionId(parentExecutionId)
                         .rootExecutionId(rootExecutionId)
-                        .contextChars(contextChars)
+                        .contextChars(context.contextChars())
+                        .runtimeFingerprint(context.runtimeFingerprint())
+                        .instructionsHash(context.instructionsHash())
                         .status(ExecutionStatus.RUNNING)
                         .build());
     }
@@ -55,7 +73,8 @@ public class ExecutionRecorder {
         String provider = firstNonBlank(result.provider(), agent.provider());
         String model = modelOf(result, agent);
         execution.attachRunId(result.runId());
-        execution.markSucceeded(provider, model, usage, costs.estimate(provider, model, usage), Instant.now());
+        execution.markSucceeded(
+                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
         return executions.save(execution);
     }
 

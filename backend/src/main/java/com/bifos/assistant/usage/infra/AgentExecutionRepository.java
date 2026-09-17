@@ -1,8 +1,13 @@
 package com.bifos.assistant.usage.infra;
 
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.CostByAgent;
+import com.bifos.assistant.usage.domain.CostByDay;
+import com.bifos.assistant.usage.domain.CostByFingerprint;
+import com.bifos.assistant.usage.domain.CostByModel;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
+import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
@@ -33,5 +38,151 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
             """)
     MonthlyCost sumCostBetween(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * 환산액과 실제 청구액을 함께 합친다. RUNNING 은 빠진다.
+     *
+     * <p>구독 경로 실행은 실제 청구액이 비어 있는지가 아니라 {@code costMode} 로 센다. 가격표에 없는
+     * 모델로 돈 API 경로 실행은 환산액과 실제 청구액이 모두 비어 있어, 금액으로 세면 구독 경로로
+     * 잘못 세어진다. 그런 실행은 {@code unpricedExecutions} 로만 세어진다.
+     */
+    @Query(
+            """
+            select new com.bifos.assistant.usage.domain.MonthlyCostDetail(
+                sum(e.estimatedCostMicros),
+                sum(e.actualCostMicros),
+                sum(case when e.estimatedCostMicros is null then 0L else 1L end),
+                sum(case when e.estimatedCostMicros is null then 1L else 0L end),
+                sum(case when e.costMode = com.bifos.assistant.agent.domain.CostMode.SUBSCRIPTION then 1L else 0L end))
+            from AgentExecution e
+            where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+            """)
+    MonthlyCostDetail sumCostDetailBetween(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * 에이전트별 합계. RUNNING 은 빠진다.
+     *
+     * <p>에이전트 이름을 같은 질의에서 함께 읽는다. 줄마다 에이전트를 다시 찾으면 축 하나에 질의가
+     * 실행 수만큼 늘어난다.
+     *
+     * <p>실행 줄을 전부 센다. 자식 토큰이 부모의 usage 에 포함되지 않는 것을 ADR-016 이 실측으로
+     * 확정했으므로, 전부 세는 것이 실제 사용량이고 두 번 세어지지 않는다.
+     */
+    @Query(
+            """
+            select new com.bifos.assistant.usage.domain.CostByAgent(
+                e.agentId,
+                a.code,
+                a.name,
+                count(e),
+                sum(e.estimatedCostMicros),
+                sum(e.actualCostMicros),
+                sum(e.inputTokens),
+                sum(e.outputTokens),
+                avg(e.contextChars),
+                min(e.startedAt),
+                max(e.startedAt))
+            from AgentExecution e
+                left join Agent a on a.id = e.agentId
+            where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+            group by e.agentId, a.code, a.name
+            order by sum(coalesce(e.estimatedCostMicros, 0L)) desc, e.agentId asc
+            """)
+    List<CostByAgent> sumByAgentBetween(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /** 모델과 provider 별 합계. RUNNING 은 빠진다. */
+    @Query(
+            """
+            select new com.bifos.assistant.usage.domain.CostByModel(
+                e.provider,
+                e.model,
+                count(e),
+                sum(e.estimatedCostMicros),
+                sum(e.actualCostMicros),
+                sum(e.inputTokens),
+                sum(e.outputTokens),
+                avg(e.contextChars),
+                min(e.startedAt),
+                max(e.startedAt))
+            from AgentExecution e
+            where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+            group by e.provider, e.model
+            order by sum(coalesce(e.estimatedCostMicros, 0L)) desc, e.model asc
+            """)
+    List<CostByModel> sumByModelBetween(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * 날짜별 합계. 하루 단위로 묶는다. RUNNING 은 빠진다.
+     *
+     * <p>저장된 값은 시간대가 없는 순간이고 화면이 보이려는 날짜는 가족이 사는 곳의 달력이라, 날짜를
+     * 뽑기 전에 9시간을 더한다. {@code Asia/Seoul} 은 일광 절약 시간이 없어 표준시와의 차이가 늘 9시간
+     * 이다. 그 값을 파라미터로 넘기면 H2 가 {@code group by} 의 식을 {@code select} 의 식과 같은
+     * 것으로 보지 않아 질의가 거절된다.
+     *
+     * <p>같은 시간대를 {@code UsageController.HOUSEHOLD_ZONE} 도 갖는다. 그쪽은 달의 경계를 끊는 데
+     * 쓰고 여기는 날짜를 뽑는 데 쓴다. 가족이 사는 곳이 바뀌면 두 자리를 함께 고친다.
+     */
+    @Query(
+            """
+            select new com.bifos.assistant.usage.domain.CostByDay(
+                year(e.startedAt + 9 hour),
+                month(e.startedAt + 9 hour),
+                day(e.startedAt + 9 hour),
+                count(e),
+                sum(e.estimatedCostMicros),
+                sum(e.actualCostMicros),
+                sum(e.inputTokens),
+                sum(e.outputTokens),
+                avg(e.contextChars),
+                min(e.startedAt),
+                max(e.startedAt))
+            from AgentExecution e
+            where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+            group by
+                year(e.startedAt + 9 hour),
+                month(e.startedAt + 9 hour),
+                day(e.startedAt + 9 hour)
+            order by
+                year(e.startedAt + 9 hour) asc,
+                month(e.startedAt + 9 hour) asc,
+                day(e.startedAt + 9 hour) asc
+            """)
+    List<CostByDay> sumByDayBetween(
+            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * 설정 지문별 합계. 무엇이 달라져서 비용이 움직였는지 본다. RUNNING 은 빠진다.
+     *
+     * <p>지문이 비어 있는 실행은 한 묶음으로 모으지 않고 통째로 뺀다. 지문을 모르는 것끼리 묶어도
+     * 견줄 것이 없기 때문이다.
+     */
+    @Query(
+            """
+            select new com.bifos.assistant.usage.domain.CostByFingerprint(
+                e.runtimeFingerprint,
+                count(e),
+                sum(e.estimatedCostMicros),
+                sum(e.actualCostMicros),
+                sum(e.inputTokens),
+                sum(e.outputTokens),
+                avg(e.contextChars),
+                min(e.startedAt),
+                max(e.startedAt))
+            from AgentExecution e
+            where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+                and e.runtimeFingerprint is not null
+            group by e.runtimeFingerprint
+            order by max(e.startedAt) desc, e.runtimeFingerprint asc
+            """)
+    List<CostByFingerprint> sumByFingerprintBetween(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 }

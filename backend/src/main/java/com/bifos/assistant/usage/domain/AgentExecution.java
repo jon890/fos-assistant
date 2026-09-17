@@ -88,6 +88,24 @@ public class AgentExecution {
     @Column(name = "context_chars")
     private Long contextChars;
 
+    /**
+     * 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문.
+     *
+     * <p>그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있다. 값을 얻게 되는 날 칸을 다시 만들지
+     * 않도록 미리 둔다.
+     */
+    @Column(name = "runtime_fingerprint", length = 64)
+    private String runtimeFingerprint;
+
+    /**
+     * 이 실행에 넣은 {@code instructions} 의 SHA-256 앞 16바이트를 16진수로 적은 값.
+     *
+     * <p>{@code context_chars} 가 길이를 말하고 이 칸이 내용이 같은지를 말한다. 본문에 개인 Memory 가
+     * 들어 있어 본문 자체는 어디에도 저장하지 않는다. 넣은 문맥이 없으면 비운다.
+     */
+    @Column(name = "instructions_hash", length = 64)
+    private String instructionsHash;
+
     /** 통화 단위의 100만분의 1로 적은 환산 금액. 가격을 찾지 못했으면 null 이다. */
     @Column(name = "estimated_cost_micros")
     private Long estimatedCostMicros;
@@ -127,6 +145,8 @@ public class AgentExecution {
         this.totalTokens = builder.totalTokens;
         this.latencyMs = builder.latencyMs;
         this.contextChars = builder.contextChars;
+        this.runtimeFingerprint = builder.runtimeFingerprint;
+        this.instructionsHash = builder.instructionsHash;
         this.estimatedCostMicros = builder.estimatedCostMicros;
         this.actualCostMicros = builder.actualCostMicros;
         this.costCurrency = builder.costCurrency;
@@ -207,6 +227,10 @@ public class AgentExecution {
 
     public Long contextChars() { return contextChars; }
 
+    public String runtimeFingerprint() { return runtimeFingerprint; }
+
+    public String instructionsHash() { return instructionsHash; }
+
     public Long estimatedCostMicros() {
         return estimatedCostMicros;
     }
@@ -251,6 +275,24 @@ public class AgentExecution {
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
+    /** 끝난 시각과 토큰과 환산액과 실제 청구액을 채우고 SUCCEEDED 로 옮긴다. */
+    public void markSucceeded(
+            String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
+        this.provider = provider;
+        this.model = model;
+        this.inputTokens = usage.inputTokens();
+        this.cachedInputTokens = usage.cachedInputTokens();
+        this.outputTokens = usage.outputTokens();
+        this.totalTokens = usage.totalTokens();
+        this.estimatedCostMicros = cost.estimatedMicros();
+        this.actualCostMicros = cost.actualMicros();
+        this.costCurrency = cost.currency();
+        this.pricingVersion = cost.pricingVersion();
+        this.finishedAt = finishedAt;
+        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        this.status = ExecutionStatus.SUCCEEDED;
+    }
+
     /** 끝난 시각과 오류 코드를 채우고 FAILED 로 옮긴다. */
     public void markFailed(String errorCode, Instant finishedAt) {
         this.errorCode = errorCode;
@@ -278,6 +320,8 @@ public class AgentExecution {
         private Long totalTokens;
         private Long latencyMs;
         private Long contextChars;
+        private String runtimeFingerprint;
+        private String instructionsHash;
         private Long estimatedCostMicros;
         private Long actualCostMicros;
         private String costCurrency;
@@ -361,6 +405,15 @@ public class AgentExecution {
             return this;
         }
 
+        /** 환산액과 실제 청구액을 함께 채운다. 구독 경로는 실제 청구액이 null 로 남는다. */
+        public Builder cost(ExecutionCost cost) {
+            this.estimatedCostMicros = cost.estimatedMicros();
+            this.actualCostMicros = cost.actualMicros();
+            this.costCurrency = cost.currency();
+            this.pricingVersion = cost.pricingVersion();
+            return this;
+        }
+
         public Builder timing(Instant startedAt, Instant finishedAt) {
             this.startedAt = startedAt;
             this.finishedAt = finishedAt;
@@ -370,6 +423,16 @@ public class AgentExecution {
 
         public Builder contextChars(Long contextChars) {
             this.contextChars = contextChars;
+            return this;
+        }
+
+        public Builder runtimeFingerprint(String runtimeFingerprint) {
+            this.runtimeFingerprint = runtimeFingerprint;
+            return this;
+        }
+
+        public Builder instructionsHash(String instructionsHash) {
+            this.instructionsHash = instructionsHash;
             return this;
         }
 

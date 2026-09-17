@@ -1,7 +1,9 @@
 package com.bifos.assistant.usage.application;
 
+import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.domain.EstimatedCost;
+import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ModelPrice;
 import com.bifos.assistant.usage.domain.PriceCatalog;
 import java.math.BigDecimal;
@@ -64,6 +66,20 @@ public class CostEstimator {
 
         return new EstimatedCost(
                 micros.setScale(0, RoundingMode.HALF_UP).longValueExact(), CURRENCY, catalog.version());
+    }
+
+    /**
+     * 환산액과 실제 청구액을 함께 낸다.
+     *
+     * <p>구독 경로는 실제 청구액이 비어 있다. 그 금액이 실제로 빠져나가지 않기 때문이다.
+     */
+    public ExecutionCost estimate(String provider, String model, TokenUsage usage, CostMode costMode) {
+        EstimatedCost estimated = estimate(provider, model, usage);
+        if (!estimated.isKnown()) {
+            return ExecutionCost.unknown();
+        }
+        Long actualMicros = costMode == CostMode.API ? estimated.micros() : null;
+        return new ExecutionCost(estimated.micros(), actualMicros, estimated.currency(), estimated.pricingVersion());
     }
 
     private static long nonNegative(Long value) {

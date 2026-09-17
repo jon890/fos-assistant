@@ -143,7 +143,7 @@ public AgentExecution start(
 ### 4. 사용량 조회가 `context_chars` 를 낸다
 
 `usage/presentation/UsageController.java` 의 `ExecutionView` 에 `contextChars` 를 더한다.
-화면이 그 값을 보이는 것은 plan012 가 한다. 여기서는 응답에 싣기만 한다.
+여기서는 응답에 싣기만 한다. 화면이 그 값을 보이는 것은 뒤에 만들어졌다.
 
 ### 5. 이 phase 를 검증하는 테스트
 

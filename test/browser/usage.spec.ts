@@ -44,7 +44,7 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
   expect(freeResponse.ok()).toBeTruthy();
   await page.goto("/usage");
 
-  await expect(page.getByText("이번 달 환산 합계", { exact: false })).toBeVisible();
+  await expect(page.getByText("API 로 돌렸다면", { exact: false })).toBeVisible();
   await expect(page.getByText("가격을 찾지 못한 실행", { exact: true })).toBeVisible();
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("가격 없음").first()).toBeVisible();

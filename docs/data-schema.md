@@ -100,6 +100,8 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
 | `context_chars` | BIGINT NULL | 이 실행의 `instructions` 로 넣은 글자 수 |
+| `runtime_fingerprint` | VARCHAR(64) NULL | 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문. 그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있고, 그동안 사용량 화면의 지문 축은 빈 목록을 돌려준다 |
+| `instructions_hash` | VARCHAR(64) NULL | `instructions` 의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory 를 담고 있어 저장하지 않는다. 넣은 문맥이 없으면 비어 있다 |
 | `latency_ms` | BIGINT NULL | 끝나지 않은 실행은 비어 있다 |
 | `estimated_cost_micros` | BIGINT NULL | 공개 API 가격으로 환산한 금액. 통화 단위의 100만분의 1 |
 | `actual_cost_micros` | BIGINT NULL | 실제로 청구되는 금액. 구독 경로는 비어 있다 |
@@ -111,8 +113,11 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 토큰 수는 실행 한 번의 **합계**다.
 실행 안에서 LLM 호출이 여러 번 일어나고 그 내역은 오지 않는다.
 
-자식 실행의 토큰이 부모의 합계에 이미 들어 있는지는 아직 확인하지 못했다.
-확인하기 전까지 부모와 자식을 더한 합계를 화면에 보이지 않는다.
+자식 실행의 토큰은 부모의 합계에 들어 있지 않다.
+Hermes Agent v0.21.0 배포본으로 측정했고 근거는
+[ADR-016](adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md)의 「자식 토큰 실측」 절에 있다.
+그래서 부모와 자식을 더한 합계는 실행 나무의 줄을 더해서 만든다.
+어느 줄도 두 번 세지 않는다.
 
 `CANCELLED` 는 상태값으로만 둔다. 지금은 실행을 취소하는 경로가 없다.
 

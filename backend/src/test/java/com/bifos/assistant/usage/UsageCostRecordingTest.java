@@ -14,6 +14,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCost;
+import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.io.IOException;
@@ -111,13 +112,45 @@ class UsageCostRecordingTest {
         assertThat(cost.unpricedExecutions()).isZero();
     }
 
+    @Test
+    void 구독_경로_실행_둘과_API_경로_실행_하나의_합계는_API_경로_하나의_금액과_같다() {
+        complete(run(1_000L, null, 500L), subscriptionAgent());
+        complete(run(1_000L, null, 500L), subscriptionAgent());
+        AgentExecution apiExecution = complete(run(1_000L, null, 500L), apiAgent());
+
+        MonthlyCostDetail cost =
+                executions.sumCostDetailBetween(
+                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+
+        assertThat(cost.actualMicros()).isEqualTo(apiExecution.actualCostMicros());
+        assertThat(cost.subscriptionExecutions()).isEqualTo(2L);
+    }
+
+    @Test
+    void 가격표에_없는_모델로_돈_API_경로_실행은_구독_경로로_세지_않는다() {
+        AgentExecution unpriced = complete(run(1_000L, null, 500L), unpricedApiAgent());
+
+        MonthlyCostDetail cost =
+                executions.sumCostDetailBetween(
+                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+
+        assertThat(unpriced.estimatedCostMicros()).isNull();
+        assertThat(unpriced.actualCostMicros()).isNull();
+        assertThat(cost.subscriptionExecutions()).isZero();
+        assertThat(cost.unpricedExecutions()).isEqualTo(1L);
+    }
+
     private static CurrentUser caller() {
         return new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
     }
 
     private AgentExecution complete(HermesRunResult result) {
-        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null, 0L);
-        return recorder.complete(execution, subscriptionAgent(), result);
+        return complete(result, subscriptionAgent());
+    }
+
+    private AgentExecution complete(HermesRunResult result, Agent agent) {
+        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        return recorder.complete(execution, agent, result);
     }
 
     private AgentExecution fail() {
@@ -134,6 +167,35 @@ class UsageCostRecordingTest {
                 "openai-codex",
                 "gpt-5.5",
                 CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID);
+    }
+
+    private static Agent apiAgent() {
+        return Agent.of(
+                "dad-api",
+                "Dad API",
+                "dad",
+                "http://127.0.0.1:1/p/dad",
+                "openai-codex",
+                "gpt-5.5",
+                CostMode.API,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID);
+    }
+
+    /** 가격표에 없는 모델을 쓰는 API 경로 바인딩이다. 두 금액이 모두 비어 있게 된다. */
+    private static Agent unpricedApiAgent() {
+        return Agent.of(
+                "dad-unpriced",
+                "Dad Unpriced",
+                "dad",
+                "http://127.0.0.1:1/p/dad",
+                "openai-codex",
+                "gpt-가격표에-없는-모델",
+                CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 USER_ID);
