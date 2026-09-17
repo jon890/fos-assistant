@@ -1,6 +1,7 @@
 package com.bifos.assistant.usage.infra;
 
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import java.time.Instant;
 import java.util.List;
@@ -12,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 public interface AgentExecutionRepository extends JpaRepository<AgentExecution, Long> {
 
     List<AgentExecution> findByUserIdOrderByIdDesc(Long userId, Pageable pageable);
+
+    List<AgentExecution> findByStatus(ExecutionStatus status);
 
     /**
      * 한 구간의 환산 금액을 데이터베이스에서 합친다.
