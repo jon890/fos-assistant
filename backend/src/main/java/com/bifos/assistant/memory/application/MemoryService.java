@@ -92,7 +92,10 @@ public class MemoryService {
     public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject) {
         Memory memory = requireReadable(user, id);
         requireWritable(user, memory);
-        memory.updateContentAndInjection(content, alwaysInject);
+        String dedupKey = memory.proposalDedupKey() == null
+                ? null
+                : proposalDedupKey(memory.ownerUserId(), memory.title(), content);
+        memory.updateContentAndInjection(content, alwaysInject, dedupKey);
         return memories.save(memory);
     }
 

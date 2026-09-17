@@ -110,9 +110,13 @@ public class Memory {
         updatedAt = Instant.now();
     }
 
-    public void updateContentAndInjection(String content, boolean alwaysInject) {
+    public void updateContentAndInjection(
+            String content, boolean alwaysInject, String updatedProposalDedupKey) {
         this.content = content;
         this.alwaysInject = alwaysInject;
+        if (proposalDedupKey != null) {
+            proposalDedupKey = updatedProposalDedupKey;
+        }
         this.updatedAt = Instant.now();
     }
 

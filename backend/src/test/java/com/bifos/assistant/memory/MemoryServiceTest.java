@@ -102,7 +102,8 @@ class MemoryServiceTest {
     void 같은_제목과_본문을_제안하면_한_행만_남는다() {
         Memory first = memories.proposeUser(ADMIN, "제안", "내용", 99L);
         memories.accept(ADMIN, first.id());
-        Memory duplicate = memories.proposeUser(ADMIN, "제안", "내용", 100L);
+        memories.update(ADMIN, first.id(), "수정한 내용", false);
+        Memory duplicate = memories.proposeUser(ADMIN, "제안", "수정한 내용", 100L);
 
         assertThat(duplicate.id()).isEqualTo(first.id());
         assertThat(repository.count()).isOne();

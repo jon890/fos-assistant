@@ -149,6 +149,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `always_inject` | BOOLEAN | 본문을 매 실행에 실을지 정한다. 기본값은 `FALSE` |
 | `status` | VARCHAR(20) | `PROPOSED` 또는 `ACCEPTED` 또는 `REJECTED` |
 | `proposed_by_execution_id` | BIGINT NULL | 이 항목을 제안한 실행. 사람이 직접 적었으면 비어 있다 |
+| `proposal_dedup_key` | CHAR(64) NULL | 제안한 사용자·제목·본문의 해시. 직접 등록한 항목은 비어 있다 |
 | `accepted_by_user_id` | BIGINT NULL | 누가 받아들였는가 |
 | `accepted_at` | DATETIME(6) NULL | |
 | `created_at`, `updated_at` | DATETIME(6) | |
@@ -158,6 +159,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 주입할 때 요청자의 `USER` 항목과 그 가족의 `FAMILY` 항목만 고른다.
 다른 구성원의 `USER` 항목은 고르는 단계에서 빠지므로 Hermes 로 나가는 문자열에 들어가지 않는다.
+`proposal_dedup_key`에는 유일 제약이 있어 같은 제안이 동시에 들어와도 두 행이 생기지 않는다.
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md)과
 [ADR-012](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)에 있다.
 

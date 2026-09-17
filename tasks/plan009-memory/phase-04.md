@@ -57,7 +57,9 @@ Control Plane 은 요청이 오는 순간 누구인지 안다. 요청 본문이 
 
 `backend/src/main/resources/db/migration/V8__agent_token.sql` 신규.
 
-아직 구현되지 않은 실행 사건 계획의 마이그레이션은 `V9` 로 함께 고친다.
+제안 상태가 바뀐 뒤에도 중복 저장을 막기 위해
+`V9__memory_proposal_dedup.sql`에서 제안 중복 키와 유일 제약을 추가한다.
+아직 구현되지 않은 실행 사건 계획의 마이그레이션은 `V10` 으로 함께 고친다.
 
 ```sql
 CREATE TABLE agent_token (
