@@ -16,3 +16,5 @@
 | [ADR-012](ADR-012-memory-는-사람이-승인한-것만-남는다.md) | Memory 는 사람이 승인한 것만 남는다 | Accepted |
 | [ADR-013](ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) | 실행 사건은 우리 모델로 정규화해 저장한다 | Accepted |
 | [ADR-014](ADR-014-실제-청구액과-환산액을-나눠-적는다.md) | 실제 청구액과 환산액을 나눠 적는다 | Accepted |
+| [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) | Memory 는 층을 나눠 싣는다 | Accepted |
+| [ADR-016](ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) | 다중 에이전트 조율은 Control Plane이 맡는다 | Accepted |
