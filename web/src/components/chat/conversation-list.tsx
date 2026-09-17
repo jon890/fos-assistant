@@ -26,7 +26,7 @@ export function ConversationList({
   onNew,
 }: Props) {
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3 rounded-md bg-surface-raised p-3">
       <Button
         onClick={onNew}
         size="sm"

@@ -336,7 +336,7 @@ export function ChatPanel() {
         />
       </ConversationDrawer>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:border-l md:border-border md:pl-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:pl-4">
         <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
           <IconButton
             label="대화 목록 열기"

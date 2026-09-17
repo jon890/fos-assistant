@@ -59,32 +59,34 @@ export function MessageList({ turns, loading, sending, toolEvents, conversationI
         }}
         className="h-full overflow-y-auto px-1 py-3"
       >
-        {loading ? (
-          <div aria-label="메시지를 읽는 중" className="flex flex-col gap-3">
-            <Skeleton className="h-[4.25rem]" />
-            <Skeleton className="h-[4.25rem]" />
-          </div>
-        ) : turns.length === 0 && !sending ? (
-          <p className="py-8 text-center text-sm text-muted">무엇이든 물어보세요.</p>
-        ) : (
-          <ol className="flex flex-col gap-3">
-            {turns.map((turn) => {
-              const pendingAssistant =
-                typeof turn.id === "string" && turn.id.startsWith("assistant-");
-              return (
-                <Fragment key={turn.id}>
-                  {pendingAssistant ? (
-                    <RunStatus waiting={false} toolEvents={toolEvents} />
-                  ) : null}
-                  <MessageBubble turn={turn} />
-                </Fragment>
-              );
-            })}
-            {!streamedAnswer ? (
-              <RunStatus waiting={sending} toolEvents={toolEvents} />
-            ) : null}
-          </ol>
-        )}
+        <div className="mx-auto w-full max-w-3xl">
+          {loading ? (
+            <div aria-label="메시지를 읽는 중" className="flex flex-col gap-5">
+              <Skeleton className="h-[4.25rem]" />
+              <Skeleton className="h-[4.25rem]" />
+            </div>
+          ) : turns.length === 0 && !sending ? (
+            <p className="py-8 text-center text-sm text-muted">무엇이든 물어보세요.</p>
+          ) : (
+            <ol className="flex flex-col gap-6">
+              {turns.map((turn) => {
+                const pendingAssistant =
+                  typeof turn.id === "string" && turn.id.startsWith("assistant-");
+                return (
+                  <Fragment key={turn.id}>
+                    {pendingAssistant ? (
+                      <RunStatus waiting={false} toolEvents={toolEvents} />
+                    ) : null}
+                    <MessageBubble turn={turn} />
+                  </Fragment>
+                );
+              })}
+              {!streamedAnswer ? (
+                <RunStatus waiting={sending} toolEvents={toolEvents} />
+              ) : null}
+            </ol>
+          )}
+        </div>
       </div>
       {hasNewMessage ? (
         <button
