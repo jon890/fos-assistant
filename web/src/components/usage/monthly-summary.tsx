@@ -18,7 +18,11 @@ export function MonthlySummary({ monthly }: Props) {
     <dl className="mb-6 grid gap-5 rounded-md border border-border bg-surface p-4 sm:grid-cols-2 md:grid-cols-3">
       <Stat
         label="이번 달 환산 합계"
-        value={formatAmount(monthly.estimatedCostMicros, monthly.currency)}
+        value={
+          <span className="text-brand">
+            {formatAmount(monthly.estimatedCostMicros, monthly.currency)}
+          </span>
+        }
         detail={`${monthly.month} 사용량을 API 가격으로 계산한 금액`}
       />
       <Stat
