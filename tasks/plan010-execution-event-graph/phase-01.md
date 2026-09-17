@@ -53,20 +53,24 @@ ADR-001 이 Hermes core 를 고치지 않기로 했으므로 그것을 막을 �
 **코드를 쓰기 전에 한다.** 지금 `forward` 가 `contains` 와 `startsWith` 로
 느슨하게 맞추고 있어, 실제로 어떤 이름이 오는지 이 저장소에 적힌 곳이 없다.
 
-홈서버에서 실제 실행 하나를 걸어 사건 이름을 모은다.
+실제 실행 하나를 걸어 `GET /v1/runs/{id}/events` 가 보내는 사건 이름을 모은다.
+도구를 실제로 부르는 문장을 보내야 도구 계열 사건이 나온다.
 
-```bash
-# cwd: 저장소 root
-ssh homeserver 'K=$(grep "^API_SERVER_KEY=" ~/.hermes/profiles/career/.env | cut -d= -f2-); docker exec hermes sh -c "curl -sN http://127.0.0.1:8652/v1/runs/<run_id>/events -H \"Authorization: Bearer $K\"" | head -50'
-```
+**이 저장소는 공개 저장소다. 실행 방법을 여기 적지 않는다.**
+홈서버의 주소와 포트와 컨테이너 구조와 key 가 있는 자리를 적지 않는다.
+운영 절차는 비공개 저장소 `fos-home-infra` 가 소유하고,
+이 phase 를 실행하는 사람은 그쪽의 `services/hermes-assistant/README.md` 를 본다.
 
-`run_id` 는 먼저 실행 하나를 제출해 받는다.
-도구를 실제로 부르는 문장을 보내야 `tool.` 계열이 나온다.
+확인한 것 중 아래 둘은 이미 알려져 있다.
+
+| Hermes 사건 | 뜻 |
+| --- | --- |
+| `message.delta` | 답의 글자 조각 |
+| `run.completed` | 실행 종료 |
 
 **모은 이름 목록을 `docs/hermes-integration.md` 에 적는다.**
 이것이 이 phase 의 첫 산출물이다. 다음에 읽는 사람이 근거 없이 짐작하지 않게 한다.
-
-API 키를 출력하거나 커밋하지 않는다.
+**이름만 적고 그 이름을 얻은 명령은 적지 않는다.**
 
 ### 2. `backend/src/main/resources/db/migration/V8__execution_event.sql` 신규
 

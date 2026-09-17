@@ -18,3 +18,6 @@ web/tsconfig.tsbuildinfo
 # 도구
 .DS_Store
 .omc/
+
+# 워커가 쓰는 워크트리
+worktrees/
