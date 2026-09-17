@@ -8,6 +8,8 @@ import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.workspace.application.WorkspaceService;
+import com.bifos.assistant.workspace.domain.Workspace;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,23 +25,31 @@ public class ChatController {
 
     private final ChatService chat;
     private final CurrentUserProvider currentUser;
+    private final WorkspaceService workspaces;
 
-    public ChatController(ChatService chat, CurrentUserProvider currentUser) {
+    public ChatController(ChatService chat, CurrentUserProvider currentUser, WorkspaceService workspaces) {
         this.chat = chat;
         this.currentUser = currentUser;
+        this.workspaces = workspaces;
     }
 
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
-        ChatTurn turn = chat.send(user, request.conversationId(), request.text());
+        ChatTurn turn =
+                chat.send(user, request.conversationId(), request.text(), request.workspaceCode());
         return new SendMessageResponse(turn.conversationId(), turn.executionId(), turn.assistantText());
     }
 
     @GetMapping("/conversations")
     public List<ConversationView> conversations() {
         return chat.conversationsOf(currentUser.require()).stream()
-                .map(it -> new ConversationView(it.id(), it.title(), it.updatedAt()))
+                .map(
+                        it -> {
+                            Workspace workspace = workspaces.findByIdOrNull(it.workspaceId());
+                            return new ConversationView(
+                                    it.id(), it.title(), workspace == null ? null : workspace.code(), it.updatedAt());
+                        })
                 .toList();
     }
 
