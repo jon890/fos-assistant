@@ -36,6 +36,29 @@ type Run = {
   usage: typeof FAKE_USAGE;
 };
 
+function specialOutputFor(input: string): string | null {
+  if (input === "마크다운 보안 검사") {
+    return [
+      "| 항목 | 값 |",
+      "| --- | --- |",
+      "| 표 | 정상 |",
+      "",
+      "<script>window.__unsafeAgentHtml = true</script>",
+    ].join("\n");
+  }
+  if (input === "긴 답 스트림 검사") {
+    return Array.from({ length: 80 }, (_, index) => `${index + 1}번째 긴 답 줄`).join("\n\n");
+  }
+  if (input === "코드 블록 검사") {
+    return ["```java", "// 인사말", "String message = \"안녕하세요\";", "```"].join("\n");
+  }
+  return null;
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function shortId(): string {
   return randomUUID().replaceAll("-", "").slice(0, 12);
 }
@@ -114,12 +137,23 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           // 실제 Hermes v0.21.0 이 보내는 형태다.
           // 사건 이름은 `event`, 조각은 `delta`, 도구 이름은 `tool`, 설명은 `preview` 다.
           // 여기가 실제와 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
-          event(response, { event: "message.delta", delta: "화면에서만 " });
+          const streamedOutput = specialOutputFor(run.input);
+          event(response, {
+            event: "message.delta",
+            delta: streamedOutput === null ? "화면에서만 " : streamedOutput.slice(0, 80),
+          });
           if (run.interruptEvents) {
             response.end();
             return;
           }
-          event(response, { event: "message.delta", delta: `보이는 조각: ${run.input}` });
+          if (streamedOutput === null) {
+            event(response, { event: "message.delta", delta: `보이는 조각: ${run.input}` });
+          } else {
+            for (let offset = 80; offset < streamedOutput.length; offset += 80) {
+              if (run.input === "긴 답 스트림 검사") await wait(25);
+              event(response, { event: "message.delta", delta: streamedOutput.slice(offset, offset + 80) });
+            }
+          }
           event(response, { event: "tool.started", tool: "fake-tool", preview: "started" });
           event(response, { event: "tool.completed", tool: "fake-tool", duration: 0.1, error: false });
           event(response, { event: "run.completed" });
@@ -154,7 +188,8 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           // 실제 Hermes v0.21.0 이 내놓는 모양 그대로다. model 자리에는 API server 의 모델 이름이
           // 오는데 그 기본값이 profile 이름이고, provider 는 아예 없다.
           model: profile,
-          output: `[fake hermes on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
+          output: specialOutputFor(submitted.input ?? "")
+            ?? `[fake hermes on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
           input: submitted.input ?? "",
           interruptEvents: submitted.input === "스트림 중단 검사",
           usage: FAKE_USAGE,
