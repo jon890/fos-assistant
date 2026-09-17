@@ -1,0 +1,12 @@
+{
+  "name": "plan004-streaming",
+  "description": "답이 오는 동안 글자를 흘려 보이고 실행 상태를 함께 보인다",
+  "status": "pending",
+  "created_at": "2026-09-17",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}
