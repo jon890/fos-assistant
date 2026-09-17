@@ -45,7 +45,7 @@ class ExecutionLifecycleTest {
 
     @Test
     void 시작한_실행은_종료_정보_없이_RUNNING이고_부모와_뿌리를_저장한다() {
-        AgentExecution execution = recorder.start(user(), conversation, agent(), 12L, 3L);
+        AgentExecution execution = recorder.start(user(), conversation, agent(), 12L, 3L, 0L);
 
         assertThat(execution.status()).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(execution.finishedAt()).isNull();
@@ -56,7 +56,7 @@ class ExecutionLifecycleTest {
 
     @Test
     void 완료는_같은_줄에_토큰과_금액을_갱신한다() {
-        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null);
+        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null, 0L);
         Long id = execution.id();
 
         AgentExecution completed = recorder.complete(execution, agent(), result());
@@ -74,7 +74,7 @@ class ExecutionLifecycleTest {
 
     @Test
     void 실패와_run_번호_연결은_같은_줄을_갱신한다() {
-        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null);
+        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null, 0L);
         Long id = execution.id();
 
         recorder.attachRunId(execution, "run-1");
@@ -91,7 +91,7 @@ class ExecutionLifecycleTest {
 
     @Test
     void 실행_중인_줄은_가격_미확인_실행으로_세지_않는다() {
-        recorder.start(user(), conversation, agent(), null, null);
+        recorder.start(user(), conversation, agent(), null, null, 0L);
 
         MonthlyCost cost = executions.sumCostBetween(
                 USER_ID, Instant.now().minusSeconds(60), Instant.now().plusSeconds(60));

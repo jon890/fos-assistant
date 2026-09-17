@@ -10,6 +10,9 @@ type MemoryView = {
   status: string;
 };
 
+/** 사용량 시나리오보다 먼저 Memory 권한 확인을 위해 실행하는 대화 수다. */
+export const MEMORY_CONTEXT_TURNS = 1;
+
 export const memoryScenario: Scenario = {
   name: "Memory 공개 범위",
 
@@ -92,6 +95,58 @@ export const memoryScenario: Scenario = {
       }),
       403,
       "member 가족 Memory 삭제",
+    );
+
+    step("다른 구성원의 개인 항목은 Hermes 요청 instructions 에 들어가지 않는다");
+    const dadMemory = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "아빠 선호", content: "아빠만 아는 내용", alwaysInject: true },
+      }),
+      200,
+      "아빠 개인 Memory 생성",
+    ).json<MemoryView>();
+    const kidMemory = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.kid,
+        body: { scope: "USER", title: "아이 비밀", content: "아이만 아는 비밀 내용", alwaysInject: true },
+      }),
+      200,
+      "아이 개인 Memory 생성",
+    ).json<MemoryView>();
+    expect(dadMemory.id !== kidMemory.id, "개인 Memory 식별자가 겹친다");
+    expectStatus(
+      await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: "Memory 권한 검사", agentCode: "dad" },
+      }),
+      200,
+      "아빠 대화",
+    );
+    const instructions = context.hermes.lastSubmittedInstructions();
+    expect(instructions !== undefined, "Hermes 요청에 instructions 가 없다");
+    expect(instructions.includes(dadMemory.content), "내 개인 Memory 가 Hermes 요청에 없다");
+    expect(
+      !instructions.includes(kidMemory.content),
+      "다른 구성원의 개인 Memory 가 Hermes 요청에 들어갔다",
+    );
+    expectStatus(
+      await call(context, `/memories/${dadMemory.id}`, { method: "DELETE", token: context.tokens.dad }),
+      200,
+      "아빠 개인 Memory 정리",
+    );
+    expectStatus(
+      await call(context, `/memories/${kidMemory.id}`, { method: "DELETE", token: context.tokens.kid }),
+      200,
+      "아이 개인 Memory 정리",
+    );
+    expectStatus(
+      await call(context, `/memories/${family.id}`, { method: "DELETE", token: context.tokens.dad }),
+      200,
+      "가족 Memory 정리",
     );
   },
 };

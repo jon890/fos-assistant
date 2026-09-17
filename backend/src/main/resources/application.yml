@@ -27,6 +27,8 @@ management:
         include: health
 
 assistant:
+  context:
+    max-chars: 8000
   auth:
     jwt-secret: ${ASSISTANT_JWT_SECRET}
   pricing:

@@ -6,6 +6,8 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.context.AssembledContext;
+import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
@@ -42,6 +44,7 @@ public class ChatService {
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
     private final ExecutionRecorder executions;
+    private final ContextAssembler contextAssembler;
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         PendingTurn pending = prepare(user, conversationId, text, agentCode);
         String runId = submit(pending);
@@ -84,13 +87,14 @@ public class ChatService {
         }
         messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
 
+        AssembledContext context = contextAssembler.assemble(user);
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
                 text,
-                null,
+                context.instructions(),
                 conversation.hermesSessionId());
-        AgentExecution execution = executions.start(user, conversation, agent, null, null);
+        AgentExecution execution = executions.start(user, conversation, agent, null, null, context.chars());
         return new PendingTurn(user, conversation, agent, command, execution);
     }
 

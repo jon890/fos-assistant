@@ -116,12 +116,12 @@ class UsageCostRecordingTest {
     }
 
     private AgentExecution complete(HermesRunResult result) {
-        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null);
+        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null, 0L);
         return recorder.complete(execution, subscriptionAgent(), result);
     }
 
     private AgentExecution fail() {
-        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null);
+        AgentExecution execution = recorder.start(caller(), conversation, subscriptionAgent(), null, null, 0L);
         return recorder.fail(execution, "HERMES_RUN_FAILED");
     }
 
