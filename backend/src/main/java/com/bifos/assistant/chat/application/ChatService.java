@@ -14,6 +14,8 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.workspace.application.WorkspaceService;
+import com.bifos.assistant.workspace.domain.Workspace;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -34,24 +36,31 @@ public class ChatService {
     private final HermesProfileBindingRepository bindings;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
+    private final WorkspaceService workspaces;
 
     public ChatService(
             ConversationRepository conversations,
             ChatMessageRepository messages,
             HermesProfileBindingRepository bindings,
             HermesRunsClient hermes,
-            ExecutionRecorder executions) {
+            ExecutionRecorder executions,
+            WorkspaceService workspaces) {
         this.conversations = conversations;
         this.messages = messages;
         this.bindings = bindings;
         this.hermes = hermes;
         this.executions = executions;
+        this.workspaces = workspaces;
     }
 
-    public ChatTurn send(CurrentUser user, Long conversationId, String text) {
+    public ChatTurn send(CurrentUser user, Long conversationId, String text, String workspaceCode) {
         HermesProfileBinding binding = requireActiveBinding(user);
-        Conversation conversation = resolveConversation(user, conversationId, text);
+        Conversation conversation = resolveConversation(user, conversationId, text, workspaceCode);
         messages.save(ChatMessage.fromUser(conversation.id(), text));
+
+        // 이어지는 대화는 그 대화에 기록된 영역을 쓴다. 요청 본문이 중간에 영역을 바꾸지 못한다.
+        Workspace workspace = workspaces.findByIdOrNull(conversation.workspaceId());
+        String instructions = workspace == null ? null : workspaces.briefing(workspace);
 
         Instant startedAt = Instant.now();
         HermesRunResult result;
@@ -62,7 +71,7 @@ public class ChatService {
                                     binding.profileName(),
                                     binding.apiBaseUrl(),
                                     text,
-                                    null,
+                                    instructions,
                                     conversation.hermesSessionId()));
         } catch (ApiException ex) {
             executions.recordFailure(user, conversation, binding, ex.code().name(), startedAt);
@@ -108,11 +117,22 @@ public class ChatService {
         return binding;
     }
 
-    private Conversation resolveConversation(CurrentUser user, Long conversationId, String firstText) {
+    private Conversation resolveConversation(
+            CurrentUser user, Long conversationId, String firstText, String workspaceCode) {
         if (conversationId == null) {
-            return conversations.save(Conversation.startedBy(user.id(), titleFrom(firstText)));
+            Long workspaceId = resolveNewWorkspaceId(user, workspaceCode);
+            return conversations.save(
+                    Conversation.startedBy(user.id(), titleFrom(firstText), workspaceId));
         }
         return requireOwnConversation(user, conversationId);
+    }
+
+    /** No code means no workspace. It never falls back to a default; that default would be a leak. */
+    private Long resolveNewWorkspaceId(CurrentUser user, String workspaceCode) {
+        if (workspaceCode == null || workspaceCode.isBlank()) {
+            return null;
+        }
+        return workspaces.requireReadable(user, workspaceCode).id();
     }
 
     private Conversation requireOwnConversation(CurrentUser user, Long conversationId) {

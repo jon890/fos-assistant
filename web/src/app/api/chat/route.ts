@@ -8,14 +8,22 @@ type SendMessageResponse = {
 };
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { conversationId?: number; text?: string };
+  const body = (await request.json()) as {
+    conversationId?: number;
+    text?: string;
+    workspaceCode?: string;
+  };
   if (!body.text || body.text.trim().length === 0) {
     return NextResponse.json({ code: "VALIDATION_FAILED", message: "보낼 내용을 입력해 주세요." }, { status: 400 });
   }
 
   const result = await callControlPlane<SendMessageResponse>("/api/v1/chat/messages", {
     method: "POST",
-    body: { conversationId: body.conversationId ?? null, text: body.text },
+    body: {
+      conversationId: body.conversationId ?? null,
+      text: body.text,
+      workspaceCode: body.workspaceCode ?? null,
+    },
   });
 
   if (!result.ok) {

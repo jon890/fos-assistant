@@ -32,6 +32,10 @@ public class AgentExecution {
     @Column(name = "conversation_id", nullable = false)
     private Long conversationId;
 
+    /** Workspace the conversation ran in. Null when the conversation has none. */
+    @Column(name = "workspace_id")
+    private Long workspaceId;
+
     @Column(name = "profile_name", nullable = false, length = 64)
     private String profileName;
 
@@ -93,6 +97,7 @@ public class AgentExecution {
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;
         this.conversationId = builder.conversationId;
+        this.workspaceId = builder.workspaceId;
         this.profileName = builder.profileName;
         this.hermesRunId = builder.hermesRunId;
         this.provider = builder.provider;
@@ -126,6 +131,10 @@ public class AgentExecution {
 
     public Long conversationId() {
         return conversationId;
+    }
+
+    public Long workspaceId() {
+        return workspaceId;
     }
 
     public String profileName() {
@@ -199,6 +208,7 @@ public class AgentExecution {
     public static final class Builder {
         private Long userId;
         private Long conversationId;
+        private Long workspaceId;
         private String profileName;
         private String hermesRunId;
         private String provider;
@@ -224,6 +234,11 @@ public class AgentExecution {
 
         public Builder conversationId(Long conversationId) {
             this.conversationId = conversationId;
+            return this;
+        }
+
+        public Builder workspaceId(Long workspaceId) {
+            this.workspaceId = workspaceId;
             return this;
         }
 

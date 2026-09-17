@@ -24,11 +24,20 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.workspace.domain.Workspace;
+import com.bifos.assistant.workspace.domain.WorkspaceVisibility;
+import com.bifos.assistant.workspace.infra.WorkspaceRepository;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -49,12 +58,20 @@ class ChatServiceTest {
         }
     }
 
+    @TempDir static Path workspaceRoot;
+
+    @DynamicPropertySource
+    static void pointAtTheMountRoot(DynamicPropertyRegistry registry) {
+        registry.add("assistant.workspace.root", () -> workspaceRoot.toString());
+    }
+
     @Autowired ChatService chat;
     @Autowired AppUserRepository users;
     @Autowired HermesProfileBindingRepository bindings;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
     @Autowired HermesRunsClient hermes;
+    @Autowired WorkspaceRepository workspaces;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -67,6 +84,21 @@ class ChatServiceTest {
         messages.deleteAll();
         bindings.deleteAll();
         users.deleteAll();
+        workspaces.deleteAll();
+    }
+
+    private Workspace familyWorkspace(String code, String guideBody) throws IOException {
+        Path dir = workspaceRoot.resolve(code);
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("AGENTS.md"), guideBody);
+        return workspaces.save(Workspace.of(code, code, code, WorkspaceVisibility.FAMILY, null));
+    }
+
+    private Workspace privateWorkspace(String code, Long ownerUserId, String guideBody) throws IOException {
+        Path dir = workspaceRoot.resolve(code);
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("AGENTS.md"), guideBody);
+        return workspaces.save(Workspace.of(code, code, code, WorkspaceVisibility.PRIVATE, ownerUserId));
     }
 
     private CurrentUser member(String email, String profileName) {
@@ -99,7 +131,7 @@ class ChatServiceTest {
                                 "anthropic",
                                 new TokenUsage(120L, 80L, 40L, 160L)));
 
-        ChatTurn turn = chat.send(dad, null, "오늘 저녁 뭐 먹을까?");
+        ChatTurn turn = chat.send(dad, null, "오늘 저녁 뭐 먹을까?", null);
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("dad");
@@ -135,13 +167,13 @@ class ChatServiceTest {
                 .willReturn(
                         new HermesRunResult(
                                 "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
-        ChatTurn first = chat.send(dad, null, "안녕");
+        ChatTurn first = chat.send(dad, null, "안녕", null);
 
         stub()
                 .willReturn(
                         new HermesRunResult(
                                 "run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
-        chat.send(dad, first.conversationId(), "하나 더");
+        chat.send(dad, first.conversationId(), "하나 더", null);
 
         assertThat(stub().received().get(1).sessionId()).isEqualTo("sess-1");
     }
@@ -154,7 +186,7 @@ class ChatServiceTest {
                         new HermesRunResult(
                                 "run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
-        ChatTurn turn = chat.send(dad, null, "안녕");
+        ChatTurn turn = chat.send(dad, null, "안녕", null);
 
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
         assertThat(execution.model()).isEqualTo("claude-opus-5");
@@ -165,7 +197,7 @@ class ChatServiceTest {
     void refuses_a_member_with_no_profile_bound_and_never_calls_the_runtime() {
         CurrentUser kid = member("kid@example.com", null);
 
-        assertThatThrownBy(() -> chat.send(kid, null, "숙제 도와줘"))
+        assertThatThrownBy(() -> chat.send(kid, null, "숙제 도와줘", null))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.HERMES_BINDING_MISSING);
@@ -180,7 +212,7 @@ class ChatServiceTest {
                 .willReturn(
                         new HermesRunResult(
                                 "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
-        ChatTurn dadTurn = chat.send(dad, null, "비밀 얘기");
+        ChatTurn dadTurn = chat.send(dad, null, "비밀 얘기", null);
 
         assertThatThrownBy(() -> chat.history(mom, dadTurn.conversationId()))
                 .isInstanceOf(ApiException.class)
@@ -193,12 +225,73 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
-        assertThatThrownBy(() -> chat.send(dad, null, "안녕")).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> chat.send(dad, null, "안녕", null)).isInstanceOf(ApiException.class);
 
         var recorded = executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10));
         assertThat(recorded).singleElement().satisfies(execution -> {
             assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
             assertThat(execution.errorCode()).isEqualTo("HERMES_UNAVAILABLE");
         });
+    }
+
+    @Test
+    void 영역을_주면_그_영역의_AGENTSMD_가_instructions_로_넘어간다() throws IOException {
+        CurrentUser dad = member("dad@example.com", "dad");
+        familyWorkspace("home", "이 영역의 규칙: 존댓말을 쓴다.");
+        stub()
+                .willReturn(
+                        new HermesRunResult(
+                                "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+
+        chat.send(dad, null, "안녕", "home");
+
+        assertThat(stub().received()).singleElement().satisfies(command ->
+                assertThat(command.instructions()).contains("이 영역의 규칙: 존댓말을 쓴다."));
+    }
+
+    @Test
+    void 영역을_주지_않으면_instructions_가_비어_있다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub()
+                .willReturn(
+                        new HermesRunResult(
+                                "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+
+        chat.send(dad, null, "안녕", null);
+
+        assertThat(stub().received()).singleElement().satisfies(command ->
+                assertThat(command.instructions()).isNull());
+    }
+
+    @Test
+    void 남의_개인_영역으로_대화를_시작하면_WORKSPACE_NOT_FOUND_다() throws IOException {
+        CurrentUser dad = member("dad@example.com", "dad");
+        CurrentUser mom = member("mom@example.com", "mom");
+        privateWorkspace("mom-journal", mom.id(), "엄마만 보는 것");
+
+        assertThatThrownBy(() -> chat.send(dad, null, "안녕", "mom-journal"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.WORKSPACE_NOT_FOUND);
+        assertThat(stub().received()).isEmpty();
+    }
+
+    @Test
+    void 이어지는_대화는_요청이_영역을_다시_주지_않아도_첫_영역을_유지한다() throws IOException {
+        CurrentUser dad = member("dad@example.com", "dad");
+        familyWorkspace("home", "이 영역의 규칙: 존댓말을 쓴다.");
+        stub()
+                .willReturn(
+                        new HermesRunResult(
+                                "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        ChatTurn first = chat.send(dad, null, "안녕", "home");
+
+        stub()
+                .willReturn(
+                        new HermesRunResult(
+                                "run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        chat.send(dad, first.conversationId(), "하나 더", null);
+
+        assertThat(stub().received().get(1).instructions()).contains("이 영역의 규칙: 존댓말을 쓴다.");
     }
 }

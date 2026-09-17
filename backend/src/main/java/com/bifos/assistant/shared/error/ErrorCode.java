@@ -7,6 +7,7 @@ public enum ErrorCode {
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED),
     FORBIDDEN(HttpStatus.FORBIDDEN),
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND),
+    WORKSPACE_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** The caller has no Hermes profile bound. We never borrow another user's profile. */
     HERMES_BINDING_MISSING(HttpStatus.CONFLICT),
     /** A binding exists but its API key is not provisioned on this host. */
