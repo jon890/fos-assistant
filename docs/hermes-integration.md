@@ -99,15 +99,24 @@ MVP 는 plugin 없이 설정만으로 성립한다.
 
 ## 스킬을 profile 에 붙이는 방법
 
-**`skill_paths` 와 `external_skill_paths` 는 설정 키가 아니다.**
-v0.21.0 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로만 나온다.
+**정식 설정 키는 `skills.external_dirs` 다.**
+`hermes_cli/config_defaults.py` 에 있고 기본값은 빈 목록이다.
+`skill_paths` 와 `external_skill_paths` 라는 이름의 키는 없다.
 
-실제로 되는 방법은 둘이다.
+스킬이 실리는 경로가 셋이다.
 
 | 방법 | 내용 |
 | --- | --- |
+| `config.yaml` 의 `skills.external_dirs` | 디렉터리 목록을 그대로 읽는다 |
 | `hermes skills trust <경로>` | 그 저장소의 `./.hermes/skills` 와 `./.agents/skills` 를 읽는다 |
 | profile 의 `skills/` 에 심볼릭 링크 | 외부 디렉터리를 직접 가리킨다 |
+
+**스킬 수가 곧 실행 비용이다.**
+스킬 설명이 매 대화마다 입력으로 함께 실린다.
+실측으로 스킬 97개인 profile 이 입력 34,715 토큰, 6개인 profile 이 570 토큰이었다.
+같은 질문에 60배 차이다. 비용의 97% 가 입력이었다.
+
+그러므로 에이전트마다 그 에이전트가 쓰는 스킬만 붙인다.
 
 에이전트 정의 저장소의 스킬은 `.claude/skills` 에 있어 `trust` 가 보는 경로가 아니다.
 그래서 심볼릭 링크를 쓴다. 구조는 `skills/<범주>/<스킬>` 이다.

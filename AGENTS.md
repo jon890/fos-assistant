@@ -37,8 +37,12 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 ```bash
 cd backend && ./gradlew test
 cd web && pnpm typecheck && pnpm build
+cd web && pnpm test:browser
 node test/e2e/run.ts
 ```
+
+`test/browser` 는 그 위에 웹과 Chromium 을 띄워 화면을 검사한다.
+`mobile` 과 `desktop` 두 폭에서 돌고 각각 390px 와 1280px 다.
 
 `test/e2e` 는 Hermes 대역을 같은 프로세스에 띄워 홈서버 없이 전체 흐름을 검사한다.
 시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있고 `run.ts` 가 차례로 돌린다.
@@ -60,3 +64,26 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.1
 
 영어로 남아 있던 주석은 그 파일을 고칠 때 함께 옮긴다.
 한 번에 전부 옮기려고 별도 커밋을 만들지 않는다. 읽는 사람이 diff 에서 무엇이 바뀌었는지 놓친다.
+
+## 운영
+
+운영 절차는 이 저장소가 갖지 않는다. 별도의 비공개 저장소 `fos-home-infra` 가 소유한다.
+
+| 무엇 | 어디 |
+| --- | --- |
+| 배포와 확인 | `services/assistant/README.md` |
+| Hermes profile 과 스킬 연결 | `services/hermes-assistant/README.md` |
+
+홈서버는 `ssh homeserver` 로 붙는다. 별칭은 `~/.ssh/config` 에 있다.
+**주소와 포트와 계정을 이 저장소에 적지 않는다.** 공개 저장소다.
+
+### 배포했다고 말하기 전에 보는 것
+
+- 컨테이너가 실제로 새로 만들어졌는가. `docker ps` 의 생성 시각으로 본다
+- 기동 로그에 `Started Assistant` 가 있는가
+- 스키마를 바꿨으면 `Schema validation` 이 실패하지 않았는가
+
+**테스트가 모두 통과해도 운영에서 동작하지 않을 수 있다.**
+가짜 Hermes 가 실제와 다른 형태를 보내도록 쓰여 있으면 테스트는 통과한다.
+실제로 그렇게 스트리밍이 통째로 동작하지 않은 채 배포된 적이 있다.
+Hermes 와 주고받는 것을 바꿨으면 배포한 뒤 실제 실행을 한 번 왕복시켜 본다.
