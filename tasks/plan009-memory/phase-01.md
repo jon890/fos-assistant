@@ -100,7 +100,7 @@ public void accept(Long userId, Instant at)
 /** 사람이 물린다. 주입되지 않는다. */
 public void reject()
 
-public void updateContent(String content)
+public void updateContentAndInjection(String content, boolean alwaysInject)
 ```
 
 `Agent` 와 `Workspace` 가 쓰던 `isReadableBy` 와 같은 모양을 `Memory` 에도 둔다.
@@ -109,6 +109,9 @@ public void updateContent(String content)
 /** USER 는 주인만, FAMILY 는 같은 가구의 구성원이 본다. */
 public boolean isReadableBy(Long userId, Long familyId)
 ```
+
+`CurrentUser` 에 `familyId` 를 더하고 `ControlPlaneJwtFilter` 가 `AppUser.familyId()` 를 넣는다.
+Memory 권한 검사는 JWT 본문이 아니라 데이터베이스에서 읽은 이 값을 쓴다.
 
 ### 3. `MemoryService` 가 권한을 정한다
 
@@ -122,13 +125,15 @@ public List<Memory> alwaysInjectedFor(CurrentUser user)
 /** 제목만 싣는 항목. ACCEPTED 이고 alwaysInject 가 아닌 것이다. */
 public List<Memory> indexedFor(CurrentUser user)
 
-/** 제목만 실렸던 항목의 본문을 낸다. 볼 수 없는 것을 요구하면 MEMORY_NOT_FOUND 다. */
+/** 제목만 실렸던 ACCEPTED 항목의 본문을 낸다. 볼 수 없거나 승인 전이면 MEMORY_NOT_FOUND 다. */
 public Memory bodyFor(CurrentUser user, Long id)
 
 public Memory create(CurrentUser user, MemoryScope scope, String title, String content, boolean alwaysInject)
+/** 에이전트가 제안한 개인 항목을 만든다. FAMILY 제안은 만들지 않는다. */
+public Memory proposeUser(CurrentUser user, String title, String content, Long proposedByExecutionId)
 public Memory accept(CurrentUser user, Long id)
 public Memory reject(CurrentUser user, Long id)
-public Memory update(CurrentUser user, Long id, String content)
+public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject)
 public void delete(CurrentUser user, Long id)
 ```
 
@@ -140,6 +145,10 @@ public void delete(CurrentUser user, Long id)
 
 `FAMILY` 항목을 만들고 고치는 것은 관리자만 한다. 구성원은 읽는다.
 `AgentAdminController` 가 쓰는 `requireAdmin` 과 같은 검사를 쓴다.
+
+에이전트 제안은 항상 요청자의 `USER` 항목이다.
+다른 가족에게 영향을 주는 `FAMILY` 항목은 관리자가 화면에서 직접 만든다.
+같은 사용자의 제안 가운데 `title` 과 `content` 가 모두 같은 항목이 있으면 새 행을 만들지 않는다.
 
 ### 4. API 를 연다
 
@@ -154,7 +163,11 @@ public void delete(CurrentUser user, Long id)
 
 손으로 적은 항목은 바로 `ACCEPTED` 로 만든다. 사람이 쓴 것이므로 승인 단계가 필요 없다.
 
-### 5. 이 phase 를 검증하는 테스트
+### 5. 스키마 문서를 갱신한다
+
+`docs/data-schema.md` 의 `memory` 절에 `title`, `always_inject` 와 각 칸의 기본값을 반영한다.
+
+### 6. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/memory/MemoryServiceTest.java` 를 새로 만든다.
 
@@ -166,11 +179,18 @@ public void delete(CurrentUser user, Long id)
 - `accept` 뒤에 `alwaysInject` 가 참이면 `alwaysInjectedFor`, 거짓이면 `indexedFor` 에 들어간다
 - `alwaysInject` 를 주지 않고 만들면 거짓이다. 기본으로 항상 실리지 않는다
 - 남의 항목은 `bodyFor` 에서도 `MEMORY_NOT_FOUND` 다
+- `PROPOSED` 항목은 `bodyFor` 에서도 `MEMORY_NOT_FOUND` 다
 - 구성원이 `FAMILY` 항목을 만들려 하면 거절된다
+- 에이전트 제안은 요청자의 `USER`, `PROPOSED` 로 저장되고 같은 제목과 본문의 중복 제안은 한 행만 남는다
 
 `test/e2e/scenarios/memory.ts` 를 새로 만들고 `test/e2e/run.ts` 의 목록에 더한다.
 
 - 두 사용자를 만들어, 한 사람의 `USER` 항목이 다른 사람의 `GET /api/v1/memories` 에 없다
+- 생성, 수정, 삭제의 정상 경로를 검사한다
+- 구성원이 `FAMILY` 항목을 생성, 수정, 삭제하려 하면 모두 403 이다
+
+`MemoryControllerTest` 에서는 `proposeUser`로 제안 행을 준비한 뒤 승인과 거절 API의 정상 경로를 검사한다.
+제안을 만드는 시험용 공개 API는 추가하지 않는다.
 
 ## 검증
 
@@ -197,7 +217,11 @@ cd backend && ./gradlew test --tests '*MemoryServiceTest*'
 | `backend/src/main/java/com/bifos/assistant/memory/application/MemoryService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/memory/presentation/MemoryController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/memory/presentation/MemoryDtos.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/shared/auth/CurrentUser.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
+| `docs/data-schema.md` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/memory/MemoryServiceTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/memory/MemoryControllerTest.java` | 신규 |
 | `test/e2e/scenarios/memory.ts` | 신규 |
 | `test/e2e/run.ts` | 수정 |

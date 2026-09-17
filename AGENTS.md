@@ -20,7 +20,8 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
   고쳐야 할 것 같으면 ADR-001 의 검토 순서를 따른다.
 - 비밀값을 데이터베이스에 넣지 않는다. profile key 는 홈서버 파일에 둔다.
 - 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 을 정하지 못한다.
-- Memory 접근 권한은 Control Plane 이 주입으로 정한다. 에이전트에게 memory 조회 도구를 주지 않는다.
+- Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
+  제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다.
 - 실행 기록은 실패해도 남긴다.
 
 ## 공개 저장소

@@ -17,6 +17,9 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -60,6 +63,8 @@ class ChatServiceTest {
     @Autowired AgentRepository agents;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
+    @Autowired MemoryService memories;
+    @Autowired MemoryRepository memoryRepository;
     @Autowired HermesRunsClient hermes;
 
     private StubHermesRunsClient stub() {
@@ -77,6 +82,7 @@ class ChatServiceTest {
         executions.deleteAll();
         messages.deleteAll();
         agents.deleteAll();
+        memoryRepository.deleteAll();
         users.deleteAll();
     }
 
@@ -96,7 +102,7 @@ class ChatServiceTest {
                             AgentVisibility.PRIVATE,
                             user.id()));
         }
-        return new CurrentUser(user.id(), user.email(), user.displayName(), user.role());
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
     }
 
     @Test
@@ -146,6 +152,7 @@ class ChatServiceTest {
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.latencyMs()).isGreaterThanOrEqualTo(0);
+        assertThat(execution.contextChars()).isZero();
 
         assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
                 .satisfiesExactly(
@@ -157,6 +164,21 @@ class ChatServiceTest {
                             assertThat(message.role()).isEqualTo(MessageRole.ASSISTANT);
                             assertThat(message.senderUserId()).isNull();
                         });
+    }
+
+    @Test
+    void 조립한_Memory를_Hermes에_보내고_실행_기록에도_길이를_남긴다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
+        stub().willReturn(
+                new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
+
+        String instructions = stub().received().getFirst().instructions();
+        assertThat(instructions).contains("국수는 맵지 않게 먹는다");
+        assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
+                .isEqualTo((long) instructions.length());
     }
 
     @Test

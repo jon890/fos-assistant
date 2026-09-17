@@ -23,6 +23,7 @@ import { authScenario } from "./scenarios/auth.ts";
 import { meScenario } from "./scenarios/me.ts";
 import { bindingScenario, DAD_BINDING } from "./scenarios/binding.ts";
 import { agentsScenario } from "./scenarios/agents.ts";
+import { memoryScenario } from "./scenarios/memory.ts";
 import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
@@ -55,6 +56,7 @@ const SCENARIOS: readonly Scenario[] = [
   meScenario,
   bindingScenario,
   agentsScenario,
+  memoryScenario,
   chatScenario,
   usageCostScenario,
   conversationHistoryScenario,

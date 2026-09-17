@@ -43,6 +43,11 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "/mcp".equals(request.getRequestURI());
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
@@ -63,7 +68,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             }
             AppUser user = users.resolve(email, name == null || name.isBlank() ? email : name);
             CurrentUser principal =
-                    new CurrentUser(user.id(), user.email(), user.displayName(), user.role());
+                    new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
             var authentication =
                     new UsernamePasswordAuthenticationToken(
                             principal,

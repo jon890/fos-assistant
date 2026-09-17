@@ -8,6 +8,8 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN),
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     AGENT_NOT_FOUND(HttpStatus.NOT_FOUND),
+    MEMORY_NOT_FOUND(HttpStatus.NOT_FOUND),
+    MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     AGENT_MODEL_UNKNOWN(HttpStatus.BAD_GATEWAY),
     /** 호출자에게 연결한 Hermes profile이 없다. 다른 사용자의 profile을 빌리지 않는다. */

@@ -12,6 +12,8 @@ spring:
     enabled: false
 
 assistant:
+  context:
+    max-chars: 8000
   auth:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
 hermes:

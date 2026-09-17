@@ -2,6 +2,7 @@
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { DAD_BINDING } from "./binding.ts";
 import { CHAT_TURNS } from "./chat.ts";
+import { MEMORY_CONTEXT_TURNS } from "./memory.ts";
 
 /**
  * 실행 한 번의 환산 금액이다.
@@ -14,6 +15,7 @@ import { CHAT_TURNS } from "./chat.ts";
  */
 const MICROS_PER_RUN = 1440;
 const HELD_RUN_TIMEOUT_MS = 5_000;
+const COMPLETED_TURNS = CHAT_TURNS + MEMORY_CONTEXT_TURNS;
 
 type ExecutionView = {
   id: number;
@@ -23,6 +25,7 @@ type ExecutionView = {
   model: string | null;
   costMode: string;
   status: string;
+  contextChars: number;
   estimatedCostMicros: number | null;
   costCurrency: string | null;
   pricingVersion: string | null;
@@ -48,8 +51,8 @@ export const usageCostScenario: Scenario = {
     ).json<ExecutionView[]>();
 
     expect(
-      executions.length === CHAT_TURNS,
-      `실행 ${CHAT_TURNS}건을 기대했는데 ${executions.length}건이다`,
+      executions.length === COMPLETED_TURNS,
+      `실행 ${COMPLETED_TURNS}건을 기대했는데 ${executions.length}건이다`,
     );
     for (const execution of executions) {
       expect(
@@ -60,6 +63,7 @@ export const usageCostScenario: Scenario = {
         execution.provider === DAD_BINDING.provider && execution.model === DAD_BINDING.model,
         `바인딩의 provider 와 모델이 기록되지 않았다: ${execution.provider} / ${execution.model}`,
       );
+      expect(typeof execution.contextChars === "number", "사용량 응답에 contextChars 가 없다");
     }
 
     step("구독형 바인딩의 실행도 API 가격으로 환산해 적는다");
@@ -83,10 +87,10 @@ export const usageCostScenario: Scenario = {
       "합계 조회",
     ).json<MonthlyCostView>();
 
-    const expected = MICROS_PER_RUN * CHAT_TURNS;
+    const expected = MICROS_PER_RUN * COMPLETED_TURNS;
     expect(
-      monthly.estimatedCostMicros === expected && monthly.pricedExecutions === CHAT_TURNS,
-      `합계가 실행 ${CHAT_TURNS}건의 ${expected} 이 아니다: ${JSON.stringify(monthly)}`,
+      monthly.estimatedCostMicros === expected && monthly.pricedExecutions === COMPLETED_TURNS,
+      `합계가 실행 ${COMPLETED_TURNS}건의 ${expected} 이 아니다: ${JSON.stringify(monthly)}`,
     );
     expect(
       monthly.unpricedExecutions === 0,

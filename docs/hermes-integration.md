@@ -78,6 +78,22 @@ MVP 는 제출과 조회만 쓴다.
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
 Control Plane 이 Memory 를 주입하는 자리가 여기다.
 
+## Memory MCP
+
+제목만 `instructions` 에 실린 Memory 본문은 Control Plane 의 MCP 서버에서 읽는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 서버 이름 | `fos-assistant-memory` |
+| 경로 | `/mcp` |
+| 프로토콜 | Streamable HTTP `2025-03-26` |
+| 인증 | profile마다 다른 Bearer 토큰 |
+| 도구 | `memory_read` |
+
+토큰이 요청자를 정한다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
+Control Plane 은 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
+실제 MCP 서버 등록과 토큰 전달은 비공개 저장소 `fos-home-infra`가 맡는다.
+
 ## plugin hook
 
 plugin 은 `~/.hermes/plugins/<이름>/` 에 `plugin.yaml` 과 `__init__.py` 를 두고

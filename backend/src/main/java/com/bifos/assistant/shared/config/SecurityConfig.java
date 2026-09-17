@@ -1,6 +1,7 @@
 package com.bifos.assistant.shared.config;
 
 import com.bifos.assistant.shared.auth.ControlPlaneJwtFilter;
+import com.bifos.assistant.mcp.infra.AgentTokenAuthenticationFilter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -23,7 +24,16 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, ControlPlaneJwtFilter jwtFilter)
+    public FilterRegistrationBean<AgentTokenAuthenticationFilter> disableDirectAgentTokenFilterRegistration(
+            AgentTokenAuthenticationFilter agentTokenFilter) {
+        FilterRegistrationBean<AgentTokenAuthenticationFilter> registration =
+                new FilterRegistrationBean<>(agentTokenFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, ControlPlaneJwtFilter jwtFilter, AgentTokenAuthenticationFilter agentTokenFilter)
             throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -38,6 +48,7 @@ public class SecurityConfig {
                                         .anyRequest()
                                         .authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(agentTokenFilter, ControlPlaneJwtFilter.class)
                 .build();
     }
 }

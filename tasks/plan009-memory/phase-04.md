@@ -57,6 +57,10 @@ Control Plane 은 요청이 오는 순간 누구인지 안다. 요청 본문이 
 
 `backend/src/main/resources/db/migration/V8__agent_token.sql` 신규.
 
+제안 상태가 바뀐 뒤에도 중복 저장을 막기 위해
+`V9__memory_proposal_dedup.sql`에서 제안 중복 키와 유일 제약을 추가한다.
+아직 구현되지 않은 실행 사건 계획의 마이그레이션은 `V10` 으로 함께 고친다.
+
 ```sql
 CREATE TABLE agent_token (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -77,6 +81,11 @@ CREATE TABLE agent_token (
 
 발급과 폐기는 관리자만 한다.
 
+`AgentTokenAdminController` 와 관리자 API 요청·응답 DTO를 만든다.
+발급 요청은 `userEmail` 과 `label` 을 받고 `AppUserRepository`에서 사용자를 찾는다.
+발급 응답만 `token` 원문을 한 번 포함하고, 목록 응답은 `id`, `userEmail`, `label`,
+`createdAt`, `lastUsedAt`, `revokedAt` 만 포함한다.
+
 | 메서드 | 경로 | 하는 일 |
 | --- | --- | --- |
 | `POST` | `/api/v1/admin/agent-tokens` | 사용자를 정해 발급. 원문을 한 번만 낸다 |
@@ -90,7 +99,8 @@ CREATE TABLE agent_token (
 
 `backend/src/main/java/com/bifos/assistant/mcp/` 아래다.
 
-MCP 는 JSON-RPC 2.0 을 쓴다. Hermes 가 `--url` 로 붙으므로 HTTP 경로 하나면 된다.
+MCP 는 JSON-RPC 2.0 과 Streamable HTTP protocol version `2025-03-26` 을 쓴다.
+Hermes 가 `--url` 로 붙으므로 HTTP 경로 하나면 된다.
 
 ```
 POST /mcp
@@ -103,6 +113,17 @@ POST /mcp
 | `initialize` | 서버 이름과 프로토콜 판, `tools` capability |
 | `tools/list` | 아래 도구 하나 |
 | `tools/call` | 그 도구의 결과 |
+
+`initialize` 결과는 protocol version `2025-03-26`을 돌려준다.
+`capabilities.tools.listChanged` 는 `false`, `serverInfo.name` 은 `fos-assistant-memory`,
+`serverInfo.version` 은 애플리케이션 version 이다.
+`notifications/initialized` 는 본문 없는 HTTP 202로 끝낸다.
+
+성공한 `tools/call` 은 `result.content` 에 `type: "text"` 한 개와 본문을 넣고
+`isError: false` 를 낸다.
+없는 도구는 JSON-RPC `-32601`, 잘못된 인자는 `-32602` 로 응답한다.
+볼 수 없거나 없는 Memory는 같은 `result.content`와 `isError: true`를 돌려 존재를 구분하지 않는다.
+모든 응답은 요청의 JSON-RPC `id`를 그대로 돌려준다.
 
 도구 하나만 낸다.
 
@@ -129,6 +150,9 @@ POST /mcp
 
 `Authorization: Bearer <토큰>` 을 받아 `agent_token` 에서 찾는다.
 
+발급 원문은 `SecureRandom` 32바이트를 URL-safe Base64로 만들고 padding을 빼서 만든다.
+저장할 때는 UTF-8 원문의 SHA-256을 소문자 16진수로 바꿔 `token_hash`에만 넣는다.
+
 - 해시가 맞지 않으면 401
 - `revoked_at` 이 있으면 401
 - 맞으면 그 `user_id` 가 이 요청의 사용자다
@@ -140,14 +164,19 @@ POST /mcp
 
 `SecurityConfig` 에 `/mcp` 를 더한다.
 기존 `ControlPlaneJwtFilter` 를 타지 않는다. 다른 인증이다.
+`AgentTokenAuthenticationFilter` 를 JWT filter 앞에 두고 `/mcp` 요청에서만 동작시킨다.
+`ControlPlaneJwtFilter.shouldNotFilter()`는 `/mcp`에서 참을 돌려 MCP 토큰을 JWT로 파싱하지 않는다.
+토큰이 가리키는 `AppUser`를 데이터베이스에서 읽어 `CurrentUser`를 만들며,
+요청 JSON의 어떤 필드도 사용자 선택에 쓰지 않는다.
+Hermes는 브라우저가 아니므로 `Origin` header가 붙은 `/mcp` 요청은 403으로 거절한다.
 
-### 4. 호출을 실행 기록에 남긴다
+### 4. 호출을 서버 로그에 남긴다
 
 도구가 불릴 때마다 그 사실을 남긴다.
 어느 항목이 실제로 읽히는지 알아야 항상 층으로 올릴 것을 고를 수 있다.
 
-plan010 이 `execution_event` 를 만들었으면 거기에 `TOOL_STARTED` 로 남긴다.
-아직 없으면 `log.info` 로 남기고, 무엇을 남겼는지 보고에 적는다.
+이번 phase 에서는 `log.info` 로 Memory 번호와 사용자 번호만 남긴다.
+MCP 요청에는 연결할 실행 번호가 없으므로 실행 사건에는 기록하지 않는다.
 
 **본문을 로그에 남기지 않는다.** 번호와 사용자만 남긴다.
 
@@ -167,7 +196,11 @@ plan010 이 `execution_event` 를 만들었으면 거기에 `TOOL_STARTED` 로 �
 홈서버의 주소와 포트와 컨테이너 이름을 적지 않는다.
 발급한 토큰을 어디에도 적지 않는다.
 
-### 6. 이 phase 를 검증하는 테스트
+### 6. 스키마 문서를 갱신한다
+
+`docs/data-schema.md` 에 `agent_token` 표와 원문을 저장하지 않는 규칙을 반영한다.
+
+### 7. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` 를 새로 만든다.
 
@@ -179,12 +212,17 @@ plan010 이 `execution_event` 를 만들었으면 거기에 `TOOL_STARTED` 로 �
 - 폐기된 토큰이면 401
 - 요청 본문에 `user_id` 를 실어 보내도 무시된다. 토큰의 사용자로만 답한다
 - `PROPOSED` 인 항목은 본문이 오지 않는다
+- `initialize` 와 `notifications/initialized`, `tools/list`, `tools/call` 응답이 위 JSON-RPC 계약과 맞는다
+- 모르는 method, 없는 도구와 잘못된 인자의 오류 코드가 계약과 맞는다
+- MCP 토큰 요청이 `ControlPlaneJwtFilter`를 지나지 않는다
+- `Origin` header가 있는 요청은 403이고 없는 Hermes 요청은 정상 처리된다
 
 `backend/src/test/java/com/bifos/assistant/mcp/AgentTokenServiceTest.java` 를 새로 만든다.
 
 - 발급하면 원문이 한 번 오고 데이터베이스에는 해시만 있다
 - **저장된 행의 어느 칸에도 원문이 없는 것을 단언문으로 고정한다**
 - 폐기한 토큰은 행이 남고 `revoked_at` 이 채워진다
+- 발급, 목록, 폐기 API는 관리자만 쓸 수 있고 구성원은 403 이다
 
 `test/e2e/scenarios/memory.ts` 에 더한다.
 
@@ -228,7 +266,12 @@ grep -rn "token" backend/src/main/java/com/bifos/assistant/mcp/ | grep -iE "log\
 | `backend/src/main/java/com/bifos/assistant/mcp/application/AgentTokenService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/mcp/domain/AgentToken.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/mcp/infra/AgentTokenRepository.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/mcp/infra/AgentTokenAuthenticationFilter.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/mcp/presentation/AgentTokenAdminController.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/mcp/presentation/AgentTokenDtos.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/config/SecurityConfig.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
+| `docs/data-schema.md` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/AgentTokenServiceTest.java` | 신규 |
 | `test/e2e/scenarios/memory.ts` | 수정 |

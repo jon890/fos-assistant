@@ -8,6 +8,10 @@ group = "com.bifos"
 version = "0.1.0-SNAPSHOT"
 java.sourceCompatibility = JavaVersion.VERSION_21
 
+springBoot {
+    buildInfo()
+}
+
 configurations {
     compileOnly {
         extendsFrom(configurations.annotationProcessor.get())

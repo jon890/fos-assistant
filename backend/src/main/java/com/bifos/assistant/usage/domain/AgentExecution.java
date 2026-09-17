@@ -368,6 +368,11 @@ public class AgentExecution {
             return this;
         }
 
+        public Builder contextChars(Long contextChars) {
+            this.contextChars = contextChars;
+            return this;
+        }
+
         public Builder startedAt(Instant startedAt) {
             this.startedAt = startedAt;
             return this;

@@ -32,11 +32,13 @@ public class ExecutionRecorder {
             Conversation conversation,
             Agent agent,
             Long parentExecutionId,
-            Long rootExecutionId) {
+            Long rootExecutionId,
+            Long contextChars) {
         return executions.save(
                 base(user, conversation, agent)
                         .parentExecutionId(parentExecutionId)
                         .rootExecutionId(rootExecutionId)
+                        .contextChars(contextChars)
                         .status(ExecutionStatus.RUNNING)
                         .build());
     }

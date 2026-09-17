@@ -103,6 +103,7 @@ function event(response: ServerResponse, payload: unknown): void {
 
 export type FakeHermes = {
   readonly baseUrl: string;
+  lastSubmittedInstructions(): string | undefined;
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -120,6 +121,7 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
+  let lastSubmittedInstructions: string | undefined;
 
   const authorized = (request: IncomingMessage, profile: string): boolean => {
     const expected = profileKeys[profile];
@@ -226,6 +228,7 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           instructions?: string;
           session_id?: string;
         };
+        lastSubmittedInstructions = submitted.instructions;
         const runId = `run_${shortId()}`;
         const instructionsEcho =
           submitted.instructions && submitted.instructions.length > 0
@@ -277,6 +280,7 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
       }
       resolve({
         baseUrl: `http://127.0.0.1:${address.port}`,
+        lastSubmittedInstructions: () => lastSubmittedInstructions,
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {
