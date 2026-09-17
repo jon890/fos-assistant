@@ -29,7 +29,7 @@
 
 - 홈서버 Hermes v0.21.0 이 Runs API 를 지원하는 것을 확인했다
 - `bifos` profile 을 포트 8651 에 만들고 gateway 를 올렸다
-- profile key 를 `/home/bifos/.secrets/fos-assistant/hermes-profile-keys/bifos` 에 두었다
+- profile key 를 홈서버의 비밀값 디렉터리에 mode 600 으로 두었다
 - Control Plane 을 터널로 붙여 실제 대화 두 번을 왕복했다
 - 두 번째 대화가 첫 번째를 기억해 session 이 이어지는 것을 확인했다
 - 실제 토큰 수와 소요 시간이 `agent_execution` 에 남는 것을 확인했다
@@ -38,7 +38,7 @@
 
 - MySQL 에 `assistant_db` 를 만들고 Flyway V1 을 적용했다
 - Control Plane 과 웹을 홈서버 compose 로 올렸다
-- Cloudflare Tunnel 과 Nginx Proxy Manager 로 `https://assistant.fosworld.co.kr` 을 열었다
+- Cloudflare Tunnel 과 Nginx Proxy Manager 로 외부 주소를 열었다
 - 브라우저에서 Google 로그인, 대화, 사용량 확인까지 왕복했다
 
 남은 것은 가족 구성원을 더하는 일이다.
