@@ -62,7 +62,7 @@ class UsageCostRecordingTest {
     @BeforeEach
     void startFromAnEmptyLedger() {
         executions.deleteAll();
-        conversation = conversations.save(Conversation.startedBy(USER_ID, "저녁 메뉴", null, null));
+        conversation = conversations.save(Conversation.startedBy(USER_ID, "저녁 메뉴", null));
     }
 
     @Test

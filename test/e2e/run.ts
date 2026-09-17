@@ -26,7 +26,6 @@ import { agentsScenario } from "./scenarios/agents.ts";
 import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
-import { workspaceScenario } from "./scenarios/workspace.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -59,7 +58,6 @@ const SCENARIOS: readonly Scenario[] = [
   chatScenario,
   usageCostScenario,
   conversationHistoryScenario,
-  workspaceScenario,
   streamingScenario,
 ];
 
@@ -88,7 +86,7 @@ async function writeProfileKeys(work: string): Promise<string> {
   return keyDir;
 }
 
-function startControlPlane(keyDir: string, workspaceRoot: string, logPath: string): ChildProcess {
+function startControlPlane(keyDir: string, logPath: string): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
     cwd: join(ROOT, "backend"),
@@ -101,7 +99,6 @@ function startControlPlane(keyDir: string, workspaceRoot: string, logPath: strin
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       HERMES_PROFILE_KEY_DIR: keyDir,
       ASSISTANT_PRICING_CATALOG: PRICING_CATALOG,
-      ASSISTANT_WORKSPACE_ROOT: workspaceRoot,
       SPRING_FLYWAY_ENABLED: "true",
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
@@ -139,9 +136,7 @@ async function main(): Promise<void> {
     console.log(`   ${hermes.baseUrl}`);
 
     console.log("== Control Plane 기동");
-    const workspaceRoot = join(work, "workspaces");
-    await mkdir(workspaceRoot, { recursive: true });
-    app = startControlPlane(await writeProfileKeys(work), workspaceRoot, logPath);
+    app = startControlPlane(await writeProfileKeys(work), logPath);
     await waitForHealth(`http://127.0.0.1:${APP_PORT}/actuator/health`, logPath);
     console.log(`   http://127.0.0.1:${APP_PORT}`);
 
@@ -152,7 +147,6 @@ async function main(): Promise<void> {
         kid: mintToken("kid@example.com", JWT_SECRET),
       },
       hermesBaseUrl: hermes.baseUrl,
-      workspaceRoot,
     };
 
     for (const scenario of SCENARIOS) {

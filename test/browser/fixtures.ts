@@ -101,7 +101,7 @@ async function seedAgent(hermesBaseUrl: string): Promise<void> {
   }
 }
 
-function startControlPlane(keyDir: string, workspaceRoot: string, logPath: string): ChildProcess {
+function startControlPlane(keyDir: string, logPath: string): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
     cwd: join(ROOT, "backend"),
@@ -117,7 +117,6 @@ function startControlPlane(keyDir: string, workspaceRoot: string, logPath: strin
         ROOT,
         "backend/src/test/resources/pricing/models-dev-sample.json",
       ),
-      ASSISTANT_WORKSPACE_ROOT: workspaceRoot,
       SPRING_FLYWAY_ENABLED: "true",
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
@@ -147,9 +146,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
 
   try {
     hermes = await startFakeHermes({ browser: "browser-profile-key" });
-    const workspaceRoot = join(work, "workspaces");
-    await mkdir(workspaceRoot, { recursive: true });
-    app = startControlPlane(await writeProfileKeys(work), workspaceRoot, logPath);
+    app = startControlPlane(await writeProfileKeys(work), logPath);
     await waitForHealth(logPath);
     await seedAgent(hermes.baseUrl);
   } catch (error) {

@@ -14,10 +14,6 @@ spring:
 assistant:
   auth:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
-  workspace:
-    root: build/test-workspaces
-    briefing-limit: 32000
-
 hermes:
   profile-key-dir: build/test-hermes-keys
   poll-interval: 10ms
