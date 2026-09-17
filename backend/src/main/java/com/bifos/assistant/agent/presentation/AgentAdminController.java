@@ -1,10 +1,12 @@
 package com.bifos.assistant.agent.presentation;
 
+import com.bifos.assistant.agent.application.AgentModelSync;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -29,12 +31,17 @@ public class AgentAdminController {
     private final AgentRepository agents;
     private final AppUserRepository users;
     private final CurrentUserProvider currentUser;
+    private final HermesModelClient hermesModels;
+    private final AgentModelSync modelSync;
 
     public AgentAdminController(AgentRepository agents, AppUserRepository users,
-            CurrentUserProvider currentUser) {
+            CurrentUserProvider currentUser, HermesModelClient hermesModels,
+            AgentModelSync modelSync) {
         this.agents = agents;
         this.users = users;
         this.currentUser = currentUser;
+        this.hermesModels = hermesModels;
+        this.modelSync = modelSync;
     }
 
     @PostMapping
@@ -44,9 +51,15 @@ public class AgentAdminController {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this agent code is already used");
         }
         Long ownerId = ownerId(request.visibility(), request.ownerEmail());
-        return AdminAgentView.from(agents.save(Agent.of(request.code(), request.name(),
-                request.hermesProfile(), request.apiBaseUrl(), request.provider(), request.model(),
-                request.costMode(), request.credentialScope(), request.visibility(), ownerId)));
+        String model = hermesModels.readModel(request.apiBaseUrl(), request.hermesProfile());
+        if (model == null) {
+            throw new ApiException(ErrorCode.AGENT_MODEL_UNKNOWN, "could not read the agent model");
+        }
+        Agent agent = Agent.of(request.code(), request.name(),
+                request.hermesProfile(), request.apiBaseUrl(), request.provider(), model,
+                request.costMode(), request.credentialScope(), request.visibility(), ownerId);
+        agent.syncModel(model);
+        return AdminAgentView.from(agents.save(agent));
     }
 
     @GetMapping
@@ -73,6 +86,18 @@ public class AgentAdminController {
         return AdminAgentView.from(agents.save(agent));
     }
 
+    @PostMapping("/{code}/sync-model")
+    public ModelSyncView syncModel(@PathVariable String code) {
+        currentUser.requireAdmin();
+        Agent agent = agents.findByCode(code)
+                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+        AgentModelSync.SyncResult result = modelSync.sync(agent);
+        if (!result.read()) {
+            throw new ApiException(ErrorCode.AGENT_MODEL_UNKNOWN, "could not read the agent model");
+        }
+        return new ModelSyncView(agent.code(), agent.model(), agent.modelSyncedAt(), result.changed());
+    }
+
     private Long ownerId(AgentVisibility visibility, String ownerEmail) {
         if (visibility != AgentVisibility.PRIVATE) return null;
         if (ownerEmail == null || ownerEmail.isBlank()) {
@@ -89,7 +114,6 @@ public class AgentAdminController {
             @NotBlank String hermesProfile,
             @NotBlank String apiBaseUrl,
             @NotBlank String provider,
-            @NotBlank String model,
             @NotNull CostMode costMode,
             @NotNull CredentialScope credentialScope,
             @NotNull AgentVisibility visibility,
@@ -99,6 +123,8 @@ public class AgentAdminController {
             @NotNull Boolean enabled,
             @NotNull AgentVisibility visibility,
             String ownerEmail) {}
+
+    public record ModelSyncView(String code, String model, Instant modelSyncedAt, boolean changed) {}
 
     public record AdminAgentView(Long id, String code, String name, String hermesProfile,
             String apiBaseUrl, String provider, String model, Instant modelSyncedAt,

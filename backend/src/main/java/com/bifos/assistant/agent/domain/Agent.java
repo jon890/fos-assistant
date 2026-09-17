@@ -114,4 +114,11 @@ public class Agent {
         this.visibility = visibility;
         this.ownerUserId = ownerUserId;
     }
+
+    public boolean syncModel(String model) {
+        boolean changed = !Objects.equals(this.model, model);
+        this.model = model;
+        this.modelSyncedAt = Instant.now();
+        return changed;
+    }
 }

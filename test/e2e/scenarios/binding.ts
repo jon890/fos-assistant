@@ -38,7 +38,6 @@ export const bindingScenario: Scenario = {
           hermesProfile: DAD_BINDING.profileName,
           apiBaseUrl: `${context.hermesBaseUrl}/p/${DAD_BINDING.profileName}`,
           provider: DAD_BINDING.provider,
-          model: DAD_BINDING.model,
           costMode: "SUBSCRIPTION",
           credentialScope: "SHARED_HOUSEHOLD",
           visibility: "PRIVATE",
