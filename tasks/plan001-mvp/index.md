@@ -6,7 +6,7 @@
 | 단계 | 내용 | 상태 |
 | --- | --- | --- |
 | phase-01 | 대화 한 번이 Hermes 를 지나 돌아오고 실행 기록이 남는다 | 완료 |
-| phase-02 | 홈서버의 실제 Hermes 에 연결한다 | 첫 구성원까지 완료 |
+| phase-02 | 홈서버의 실제 Hermes 에 연결하고 배포한다 | 완료 |
 | phase-03 | 실행 상태를 SSE 로 중계한다 | 진행 전 |
 | phase-04 | 개인 Memory 와 공용 Memory | 진행 전 |
 | phase-05 | 실행 Graph 화면 | 진행 전 |
@@ -34,12 +34,18 @@
 - 두 번째 대화가 첫 번째를 기억해 session 이 이어지는 것을 확인했다
 - 실제 토큰 수와 소요 시간이 `agent_execution` 에 남는 것을 확인했다
 
-남은 것은 아래와 같다.
+배포까지 끝났다.
 
-- 두 번째 구성원의 profile 과 그 사람 자신의 credential 연결
-- Control Plane 과 웹을 홈서버에 배포한다. compose 는 `hermes-agent_hermes-net` 에 붙인다
-- MySQL 스키마를 만들고 Flyway 를 실제로 한 번 돌린다
-- nginx 와 Cloudflare 경로를 더한다
+- MySQL 에 `assistant_db` 를 만들고 Flyway V1 을 적용했다
+- Control Plane 과 웹을 홈서버 compose 로 올렸다
+- Cloudflare Tunnel 과 Nginx Proxy Manager 로 `https://assistant.fosworld.co.kr` 을 열었다
+- 브라우저에서 Google 로그인, 대화, 사용량 확인까지 왕복했다
+
+남은 것은 가족 구성원을 더하는 일이다.
+
+- Google 동의 화면의 테스트 사용자에 그 사람 주소를 더한다
+- `ASSISTANT_ALLOWED_EMAILS` 에 그 주소를 더한다
+- 그 사람의 Hermes profile 을 만들고 바인딩한다
 
 ## phase-03 실행 상태 중계
 
