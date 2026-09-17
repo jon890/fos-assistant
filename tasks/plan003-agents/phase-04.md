@@ -102,10 +102,7 @@ Hermes 소스에 그런 키가 없다. 빌드 스크립트의 지역 변수로�
 
 스크립트를 홈서버로 옮겨 실제로 돌린다.
 
-```bash
-# cwd: fos-home-infra 저장소 root
-scp -P <포트> services/hermes-assistant/*.sh <사용자>@<홈서버>:/home/bifos/apps/fos-home-infra/services/hermes-assistant/
-```
+스크립트를 옮기는 방법은 `fos-home-infra` 의 배포 절차가 소유한다.
 
 그다음 홈서버에서 차례로 돌린다.
 

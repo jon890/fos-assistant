@@ -40,7 +40,7 @@ phase-07 이 만든 작업 영역은 한 번도 쓰이지 않아 제거하기로
 
 배포까지 끝났다.
 
-- MySQL 에 `assistant_db` 를 만들고 Flyway V1 을 적용했다
+- MySQL 에 이 서비스의 데이터베이스를 만들고 Flyway V1 을 적용했다
 - Control Plane 과 웹을 홈서버 compose 로 올렸다
 - Cloudflare Tunnel 과 Nginx Proxy Manager 로 외부 주소를 열었다
 - 브라우저에서 Google 로그인, 대화, 사용량 확인까지 왕복했다

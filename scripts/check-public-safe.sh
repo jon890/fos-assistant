@@ -10,7 +10,7 @@
 #   형태 패턴   key 를 꺼내는 명령처럼 값이 아니라 모양인 것. 이 파일이 갖는다
 #   값 목록     컨테이너 이름, 포트, 경로처럼 우리 환경의 값. 비공개 저장소가 갖는다
 #
-# 값 목록은 fos-home-infra 의 `secrets/public-repo-denylist.txt` 에서 읽는다.
+# 값 목록은 fos-home-infra 의 `config/public-repo-denylist.txt` 에서 읽는다.
 # 한 줄에 확장 정규식 하나이고 `#` 로 시작하는 줄은 건너뛴다.
 # 그 저장소가 없으면 형태 패턴만 검사하고 그 사실을 알린다.
 #
@@ -22,7 +22,7 @@ set -Eeuo pipefail
 
 cd "$(dirname "$0")/.."
 
-DENYLIST="${PUBLIC_REPO_DENYLIST:-$HOME/personal/fos-home-infra/secrets/public-repo-denylist.txt}"
+DENYLIST="${PUBLIC_REPO_DENYLIST:-$HOME/personal/fos-home-infra/config/public-repo-denylist.txt}"
 
 EXCLUDES=(
   ':(exclude)scripts/check-public-safe.sh'

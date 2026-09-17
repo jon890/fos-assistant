@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Pins the shape a real Hermes v0.21.0 run status returns.
  *
- * <p>Captured from the home server on 2026-09-17, profile {@code bifos} on port 8651. It reports
+ * <p>Captured from the home server on 2026-09-17. It reports
  * neither a provider nor cached tokens, and its {@code model} is the API server's model name, which
  * defaults to the profile name.
  */
