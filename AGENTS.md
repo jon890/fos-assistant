@@ -10,7 +10,6 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`docs/code-architecture.md`](docs/code-architecture.md) | 패키지와 경계를 바꿀 때 |
 | [`docs/hermes-integration.md`](docs/hermes-integration.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
 | [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정을 할 때 |
-| [`tasks/plan001-mvp/index.md`](tasks/plan001-mvp/index.md) | 다음에 무엇을 만들지 정할 때 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 
@@ -62,6 +61,10 @@ scripts/check-public-safe.sh
 ## tasks 는 구현 문서만 담는다
 
 `tasks/` 는 이 대화를 보지 못한 구현자가 읽고 실행하는 곳이다.
+**구현이 끝난 계획서는 지운다.**
+남겨 두면 다음에 읽는 사람이 끝난 것과 앞으로 할 것을 구분하지 못하고,
+이미 바뀐 설계를 그대로 읽는다.
+오래 남을 것은 지우기 전에 `docs/` 나 ADR 로 옮긴다.
 
 조사를 phase 로 만들지 않는다.
 조사 절차를 phase 에 적으면 구현 문서에 홈서버 접근 명령이 섞이고,
