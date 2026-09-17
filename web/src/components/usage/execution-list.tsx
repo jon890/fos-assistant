@@ -19,6 +19,7 @@ export type UsageExecution = {
   costCurrency: string | null;
   pricingVersion: string | null;
   startedAt: string;
+  hasChildren: boolean;
 };
 
 export function isRunning(execution: UsageExecution): boolean {

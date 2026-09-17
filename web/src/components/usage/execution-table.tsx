@@ -1,8 +1,12 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import { executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
 
 export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
+  const router = useRouter();
   return (
     <table className="hidden w-full text-left text-sm md:table" data-testid="execution-table">
       <thead className="text-xs text-muted">
@@ -23,10 +27,24 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
           const running = isRunning(execution);
           const failed = execution.status === "FAILED" || execution.errorCode !== null;
           return (
-            <tr key={execution.id} className="border-t border-border align-top">
+            <tr
+              key={execution.id}
+              className="cursor-pointer border-t border-border align-top hover:bg-surface"
+              tabIndex={0}
+              role="link"
+              onClick={() => router.push(`/executions/${execution.id}`)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") router.push(`/executions/${execution.id}`);
+              }}
+            >
               <td className="py-3 pr-4 whitespace-nowrap">{formatWhen(execution.startedAt)}</td>
               <td className="py-3 pr-4">
                 <span className="font-medium">{execution.agentName}</span>
+                {execution.hasChildren ? (
+                  <span className="ml-1 text-muted" title="하위 실행 있음">
+                    ▸
+                  </span>
+                ) : null}
                 <span className="block text-xs text-muted">{execution.agentCode}</span>
               </td>
               <td className="max-w-40 py-3 pr-4">
