@@ -3,6 +3,54 @@
 화면 전환과 호출 순서를 담는다.
 모듈 배치는 [`code-architecture.md`](code-architecture.md), 저장 모델은 [`data-schema.md`](data-schema.md)가 가진다.
 
+## 두 방향과 두 토큰
+
+요청이 한 방향으로만 흐르지 않는다.
+Control Plane 이 Hermes 를 부르고, Hermes 가 다시 Control Plane 을 부른다.
+**그 둘이 쓰는 토큰이 다르다.**
+
+```mermaid
+flowchart LR
+    B["브라우저"]
+    W["Next.js<br/>서버 라우트"]
+    C["Control Plane"]
+    H["Hermes<br/>API server"]
+    M["모델"]
+
+    B -->|"세션 쿠키"| W
+    W -->|"①짧은 수명 JWT"| C
+    C -->|"②API_SERVER_KEY<br/>POST /v1/runs"| H
+    H --> M
+    M -.->|"본문이 필요하다"| H
+    H -->|"③agent_token<br/>POST /mcp"| C
+
+    style C fill:#B05A3C,color:#fff
+    style H fill:#5A6B7C,color:#fff
+```
+
+| 번호 | 누가 누구를 | 토큰 | 그 토큰이 말하는 것 |
+| --- | --- | --- | --- |
+| ① | 웹 → Control Plane | 짧은 수명 JWT | 이 사람이 로그인했다 |
+| ② | Control Plane → Hermes | `API_SERVER_KEY` | 이 profile 을 쓸 자격이 있다 |
+| ③ | Hermes → Control Plane | `agent_token` | 이 요청이 누구의 것이다 |
+
+**①과 ③이 둘 다 사용자를 정하지만 성질이 다르다.**
+
+| 축 | ① 웹 토큰 | ③ agent_token |
+| --- | --- | --- |
+| 만드는 때 | 요청마다 새로 | 한 번 발급하고 계속 씀 |
+| 수명 | 짧다 | 폐기할 때까지 |
+| 저장 | 저장하지 않는다 | 해시만 저장한다 |
+| 두는 곳 | 만들어 바로 쓰고 버린다 | 홈서버 파일과 profile 의 `.env` |
+
+②는 사용자를 정하지 않는다. profile 을 정할 뿐이다.
+어느 사용자의 실행인지는 Control Plane 이 이미 알고 있고, 그것을 Hermes 에게 알리지 않는다.
+
+③이 필요한 이유가 여기 있다.
+Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주인을 모른다.
+**요청 본문에 사용자를 적게 하면 모델이 그것을 바꿀 수 있다.**
+그래서 토큰만이 사용자를 정한다.
+
 ## 대화 한 번
 
 ```mermaid
@@ -71,6 +119,56 @@ sequenceDiagram
 두 경로 모두 Hermes 실행 상태 조회가 돌려준 최종 `output` 과 `usage` 를 저장한다.
 스트리밍 경로의 답 조각은 화면에만 쓰며, 이벤트 연결이 중간에 끝나도 최종 상태를 조회해 메시지와 실행 기록을 남긴다.
 브라우저는 `done` 을 받으면 대화 이력을 다시 읽고 화면의 답 조각을 저장된 답으로 바꾼다.
+
+## Memory 본문을 읽는 길
+
+대화 한 번에 Memory 가 실리는데 전부 싣지 않는다.
+본문까지 싣는 항상 층과 제목만 싣는 색인 층으로 나눈다.
+
+색인에 실린 항목의 본문이 필요해지면 에이전트가 도구로 읽는다.
+**그때 요청이 Hermes 에서 Control Plane 으로 거꾸로 온다.**
+
+```mermaid
+sequenceDiagram
+    participant C as Control Plane
+    participant H as Hermes
+    participant M as 모델
+
+    C->>C: 항상 층은 본문까지, 색인 층은 제목과 번호만 조립
+    C->>H: POST {profile}/v1/runs (instructions 에 실어 보냄)
+    H->>M: 그 instructions 와 도구 목록을 준다
+    M-->>H: 12번 본문이 필요하다
+    H->>C: POST /mcp  memory_read(id=12)
+    Note over H,C: Authorization 에 그 profile 의 agent_token
+    C->>C: 토큰으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
+    C-->>H: 본문 또는 읽을 수 없다는 응답
+    H->>M: 도구 결과를 준다
+    M-->>H: 그 본문으로 답한다
+    H-->>C: 최종 답과 usage
+```
+
+**요청 본문에는 항목 번호만 있고 사용자가 없다.**
+토큰만이 사용자를 정한다.
+모델이 만든 JSON 에 사용자를 넣게 하면 모델이 남의 Memory 를 읽을 수 있다.
+
+볼 수 없는 항목과 없는 항목은 **같은 응답**으로 답한다.
+다르게 답하면 그 항목이 있다는 사실 자체가 새어 나간다.
+
+### 이 왕복은 비싸다
+
+실측한 것이다. 도구를 한 번 부르면 입력 토큰이 그 시점 프롬프트의 배수로 는다.
+
+| 조건 | 입력 토큰 |
+| --- | --- |
+| 도구를 부르지 않음 | 7,381 |
+| 도구를 한 번 부름 | 22,609 부터 22,644 |
+
+**추가 호출 하나가 그 시점 프롬프트 하나만큼 든다.**
+도구를 부르겠다고 판단하는 호출과 결과를 받아 답하는 호출이 더해져 세 번이 된다.
+
+그러므로 **문맥이 클수록 도구 호출이 비싸진다.**
+긴 대화에서 부르면 그만큼 더 든다.
+항목이 적을 때는 `always_inject` 를 켜서 항상 싣는 쪽이 싸다.
 
 ## 기동할 때 남은 실행 정리
 
