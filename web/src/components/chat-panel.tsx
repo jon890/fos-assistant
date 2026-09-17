@@ -10,7 +10,6 @@ import type { Turn } from "./chat/message-bubble";
 import { IconButton } from "./ui/icon-button";
 import { readEventStream } from "@/lib/stream";
 
-type Workspace = { code: string; name: string; visibility: string };
 type Agent = { code: string; name: string; model: string; visibility: string };
 type ErrorPayload = { code: string; message: string };
 type ChatEvent = {
@@ -37,8 +36,6 @@ export function ChatPanel() {
   const [sending, setSending] = useState(false);
   const [toolEvents, setToolEvents] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [workspaceCode, setWorkspaceCode] = useState<string>("");
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentCode, setAgentCode] = useState<string>("");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -46,13 +43,6 @@ export function ChatPanel() {
   const [messagesLoading, setMessagesLoading] = useState(true);
   const loadingConversation = useRef<number | null>(null);
   const selectionVersion = useRef(0);
-
-  useEffect(() => {
-    fetch("/api/workspaces")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data: Workspace[]) => setWorkspaces(data))
-      .catch(() => setWorkspaces([]));
-  }, []);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -85,7 +75,6 @@ export function ChatPanel() {
         }
 
         setConversationId(latest.id);
-        setWorkspaceCode(latest.workspaceCode ?? "");
         setAgentCode(latest.agentCode);
         loadingConversation.current = latest.id;
         const messagesResponse = await fetch(
@@ -117,8 +106,6 @@ export function ChatPanel() {
     };
   }, []);
 
-  // 대화가 시작된 뒤에는 그 대화의 영역이 고정된다. 요청 본문을 바꿔도 서버가 무시하므로 화면도 잠근다.
-  const workspaceLocked = conversationId !== null;
   const agentLocked = conversationId !== null;
 
   async function selectConversation(conversation: Conversation) {
@@ -129,7 +116,6 @@ export function ChatPanel() {
     setDrawerOpen(false);
     setMessagesLoading(true);
     setConversationId(conversation.id);
-    setWorkspaceCode(conversation.workspaceCode ?? "");
     setAgentCode(conversation.agentCode);
     setTurns([]);
     setToolEvents([]);
@@ -159,7 +145,6 @@ export function ChatPanel() {
     selectionVersion.current += 1;
     loadingConversation.current = null;
     setConversationId(null);
-    setWorkspaceCode("");
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
     setToolEvents([]);
@@ -211,7 +196,6 @@ export function ChatPanel() {
     const requestBody = {
       conversationId,
       text,
-      workspaceCode: workspaceCode.length > 0 ? workspaceCode : null,
       agentCode,
     };
 
@@ -362,31 +346,6 @@ export function ChatPanel() {
                 <span className="truncate" title={agents.find((agent) => agent.code === agentCode)?.name}>
                   {agents.find((agent) => agent.code === agentCode)?.name ?? "등록된 에이전트 없음"}
                 </span>
-              )}
-            </label>
-            <span aria-hidden="true">·</span>
-            <label className="flex min-w-0 items-center gap-2">
-              <span className="shrink-0">작업 영역</span>
-              {workspaceLocked ? (
-                <span
-                  className="truncate"
-                  title={workspaces.find((workspace) => workspace.code === workspaceCode)?.name ?? "영역 없음"}
-                >
-                  {workspaces.find((workspace) => workspace.code === workspaceCode)?.name ?? "영역 없음"}
-                </span>
-              ) : (
-                <select
-                  value={workspaceCode}
-                  onChange={(event) => setWorkspaceCode(event.target.value)}
-                  className="min-w-0 max-w-44 truncate rounded-md border border-border bg-transparent px-2 py-1 text-xs"
-                >
-                  <option value="">영역 없음</option>
-                  {workspaces.map((workspace) => (
-                    <option key={workspace.code} value={workspace.code}>
-                      {workspace.name}
-                    </option>
-                  ))}
-                </select>
               )}
             </label>
           </div>

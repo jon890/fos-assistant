@@ -11,7 +11,6 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     conversationId?: number;
     text?: string;
-    workspaceCode?: string;
     agentCode?: string;
   };
   if (!body.text || body.text.trim().length === 0) {
@@ -23,7 +22,6 @@ export async function POST(request: Request) {
     body: {
       conversationId: body.conversationId ?? null,
       text: body.text,
-      workspaceCode: body.workspaceCode ?? null,
       agentCode: body.agentCode ?? null,
     },
   });

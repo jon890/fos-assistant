@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 export type Conversation = {
   id: number;
   title: string;
-  workspaceCode: string | null;
   agentCode: string;
   agentName: string;
   updatedAt: string;
@@ -65,7 +64,6 @@ export function ConversationList({
                     </span>
                     <span className="mt-1 block truncate text-xs text-muted">
                       {new Date(conversation.updatedAt).toLocaleString("ko-KR")}
-                      {conversation.workspaceCode ? ` · ${conversation.workspaceCode}` : ""}
                     </span>
                   </Button>
                 </li>
