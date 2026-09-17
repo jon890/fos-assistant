@@ -22,6 +22,7 @@ import { startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
 import { authScenario } from "./scenarios/auth.ts";
 import { bindingScenario, DAD_BINDING } from "./scenarios/binding.ts";
 import { chatScenario } from "./scenarios/chat.ts";
+import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { workspaceScenario } from "./scenarios/workspace.ts";
 
@@ -52,6 +53,7 @@ const SCENARIOS: readonly Scenario[] = [
   bindingScenario,
   chatScenario,
   usageCostScenario,
+  conversationHistoryScenario,
   workspaceScenario,
 ];
 
@@ -94,8 +96,8 @@ function startControlPlane(keyDir: string, workspaceRoot: string, logPath: strin
       HERMES_PROFILE_KEY_DIR: keyDir,
       ASSISTANT_PRICING_CATALOG: PRICING_CATALOG,
       ASSISTANT_WORKSPACE_ROOT: workspaceRoot,
-      SPRING_FLYWAY_ENABLED: "false",
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "create-drop",
+      SPRING_FLYWAY_ENABLED: "true",
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
     },
     // gradle 이 JVM 을 자식으로 띄운다. 프로세스 그룹으로 묶어야 끝낼 때 그 JVM 까지 함께 내려간다.
