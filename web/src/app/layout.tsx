@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className="min-h-screen bg-background text-foreground">
+      <body className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
         <ThemeProvider>
-          <header className="flex items-center gap-4 border-b border-border px-4 py-3 text-sm">
+          <header className="flex shrink-0 items-center gap-4 border-b border-border px-4 py-3 text-sm">
             <Link href="/" className="font-semibold">
               우리집 비서
             </Link>
@@ -26,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <ThemeToggle />
           </header>
-          <main className="mx-auto w-full max-w-3xl px-4 py-6">{children}</main>
+          <main className="mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto px-4 py-4">
+            {children}
+          </main>
         </ThemeProvider>
       </body>
     </html>

@@ -8,10 +8,5 @@ export default async function HomePage() {
     redirect("/signin");
   }
 
-  return (
-    <>
-      <h1 className="mb-4 text-lg font-semibold">대화</h1>
-      <ChatPanel />
-    </>
-  );
+  return <ChatPanel />;
 }
