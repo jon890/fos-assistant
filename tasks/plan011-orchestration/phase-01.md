@@ -31,10 +31,10 @@ ADR-016 이 그것을 「확인」 으로 적었다.
 
 | 무엇 | 어디 |
 | --- | --- |
-| 실행을 시작할 때 만들고 끝날 때 갱신 | plan008 |
-| `parent_execution_id` 와 `root_execution_id` | plan008 |
-| 요청자가 볼 수 있는 Memory 만 조립 | plan009 의 `ContextAssembler` |
-| 실행 사건 저장 | plan010 |
+| 실행을 시작할 때 만들고 끝날 때 갱신 | `ExecutionRecorder` |
+| `parent_execution_id` 와 `root_execution_id` | `agent_execution` 표 |
+| 요청자가 볼 수 있는 Memory 만 조립 | `ContextAssembler` |
+| 실행 사건 저장 | `execution_event` 표 |
 
 **근거 문서**: `docs/adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md`,
 `docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md`,
