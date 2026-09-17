@@ -30,6 +30,10 @@ public class ChatMessage {
     @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
+    /** The user who wrote this message. Null for assistant messages. */
+    @Column(name = "sender_user_id")
+    private Long senderUserId;
+
     /** The execution that produced this message. Null for user messages. */
     @Column(name = "execution_id")
     private Long executionId;
@@ -40,20 +44,22 @@ public class ChatMessage {
     protected ChatMessage() {
     }
 
-    private ChatMessage(Long conversationId, MessageRole role, String content, Long executionId) {
+    private ChatMessage(
+            Long conversationId, MessageRole role, String content, Long senderUserId, Long executionId) {
         this.conversationId = conversationId;
         this.role = role;
         this.content = content;
+        this.senderUserId = senderUserId;
         this.executionId = executionId;
         this.createdAt = Instant.now();
     }
 
-    public static ChatMessage fromUser(Long conversationId, String content) {
-        return new ChatMessage(conversationId, MessageRole.USER, content, null);
+    public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content) {
+        return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null);
     }
 
     public static ChatMessage fromAssistant(Long conversationId, String content, Long executionId) {
-        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, executionId);
+        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId);
     }
 
     public Long id() {
@@ -70,6 +76,10 @@ public class ChatMessage {
 
     public String content() {
         return content;
+    }
+
+    public Long senderUserId() {
+        return senderUserId;
     }
 
     public Long executionId() {
