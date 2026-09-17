@@ -54,6 +54,7 @@ tasks.jar {
 tasks.register<JavaExec>("smokeRun") {
     group = "application"
     description = "Runs the app against an in-memory database for the end-to-end smoke test."
+    dependsOn(tasks.classes, tasks.testClasses)
     mainClass.set("com.bifos.assistant.AssistantApplication")
     classpath = sourceSets["test"].runtimeClasspath
 }

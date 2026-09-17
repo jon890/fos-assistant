@@ -6,9 +6,11 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -18,29 +20,69 @@ import com.bifos.assistant.workspace.application.WorkspaceService;
 import com.bifos.assistant.workspace.domain.Workspace;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
  * Turns a chat message into one Hermes run and records what it cost.
  *
- * <p>Routing is decided here and nowhere else: the caller's own binding selects the profile, and a
- * caller without an active binding is refused rather than served by someone else's credential.
+ * <p>Routing is decided here and nowhere else: the conversation's agent selects the profile, and
+ * the request body cannot replace that profile after the conversation starts.
  */
 @Service
 @RequiredArgsConstructor
 public class ChatService {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     private static final int TITLE_LIMIT = 60;
 
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
     private final AgentService agents;
     private final HermesRunsClient hermes;
+    private final HermesRunEventStream eventStream;
     private final ExecutionRecorder executions;
     private final WorkspaceService workspaces;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String workspaceCode,
+            String agentCode) {
+        PendingTurn pending = prepare(user, conversationId, text, workspaceCode, agentCode);
+        HermesRunResult result = runToCompletion(pending);
+        return finish(pending, result).turn();
+    }
+
+    public void stream(
+            CurrentUser user,
+            Long conversationId,
+            String text,
+            String workspaceCode,
+            String agentCode,
+            Consumer<ChatEvent> onEvent) {
+        PendingTurn pending = prepare(user, conversationId, text, workspaceCode, agentCode);
+        String runId = submit(pending);
+        try {
+            eventStream.open(
+                    pending.command().apiBaseUrl(),
+                    pending.command().profileName(),
+                    runId,
+                    event -> forward(event, onEvent));
+        } catch (ApiException ex) {
+            log.warn("Hermes event stream ended before final status runId={}", runId, ex);
+        }
+
+        HermesRunResult result = awaitCompletion(pending, runId);
+        CompletedTurn completed = finish(pending, result);
+        onEvent.accept(ChatEvent.done(
+                completed.turn().conversationId(),
+                completed.messageId(),
+                completed.turn().executionId()));
+    }
+
+    private PendingTurn prepare(
+            CurrentUser user, Long conversationId, String text, String workspaceCode,
             String agentCode) {
         Conversation conversation = resolveConversation(user, conversationId, text, workspaceCode, agentCode);
         Agent agent = agents.requireById(conversation.agentId());
@@ -52,35 +94,66 @@ public class ChatService {
         // 이어지는 대화는 그 대화에 기록된 영역을 쓴다. 요청 본문이 중간에 영역을 바꾸지 못한다.
         Workspace workspace = workspaces.findByIdOrNull(conversation.workspaceId());
         String instructions = workspace == null ? null : workspaces.briefing(workspace);
+        HermesRunCommand command = new HermesRunCommand(
+                agent.hermesProfile(),
+                agent.apiBaseUrl(),
+                text,
+                instructions,
+                conversation.hermesSessionId());
+        return new PendingTurn(user, conversation, agent, command, Instant.now());
+    }
 
-        Instant startedAt = Instant.now();
-        HermesRunResult result;
+    private HermesRunResult runToCompletion(PendingTurn pending) {
         try {
-            result =
-                    hermes.runToCompletion(
-                            new HermesRunCommand(
-                                    agent.hermesProfile(),
-                                    agent.apiBaseUrl(),
-                                    text,
-                                    instructions,
-                                    conversation.hermesSessionId()));
+            return hermes.runToCompletion(pending.command());
         } catch (ApiException ex) {
-            executions.recordFailure(user, conversation, agent, ex.code().name(), startedAt);
+            executions.recordFailure(
+                    pending.user(), pending.conversation(), pending.agent(), ex.code().name(),
+                    pending.startedAt(), null);
             throw ex;
         }
+    }
 
+    private String submit(PendingTurn pending) {
+        try {
+            return hermes.submit(pending.command());
+        } catch (ApiException ex) {
+            executions.recordFailure(
+                    pending.user(), pending.conversation(), pending.agent(), ex.code().name(),
+                    pending.startedAt(), null);
+            throw ex;
+        }
+    }
+
+    private HermesRunResult awaitCompletion(PendingTurn pending, String runId) {
+        try {
+            return hermes.awaitCompletion(pending.command(), runId);
+        } catch (ApiException ex) {
+            executions.recordFailure(
+                    pending.user(), pending.conversation(), pending.agent(), ex.code().name(),
+                    pending.startedAt(), runId);
+            throw ex;
+        }
+    }
+
+    private CompletedTurn finish(PendingTurn pending, HermesRunResult result) {
         if (!result.succeeded()) {
-            executions.recordFailure(user, conversation, agent, hermesStatus(result), startedAt);
+            executions.recordFailure(
+                    pending.user(), pending.conversation(), pending.agent(), hermesStatus(result),
+                    pending.startedAt(), result.runId());
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
         }
 
-        conversation.rememberSession(result.sessionId());
-        conversations.save(conversation);
+        pending.conversation().rememberSession(result.sessionId());
+        conversations.save(pending.conversation());
 
-        AgentExecution execution = executions.recordSuccess(user, conversation, agent, result, startedAt);
+        AgentExecution execution = executions.recordSuccess(
+                pending.user(), pending.conversation(), pending.agent(), result, pending.startedAt());
         String answer = result.output() == null ? "" : result.output();
-        messages.save(ChatMessage.fromAssistant(conversation.id(), answer, execution.id()));
-        return new ChatTurn(conversation.id(), execution.id(), answer);
+        ChatMessage message = messages.save(
+                ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
+        return new CompletedTurn(
+                new ChatTurn(pending.conversation().id(), execution.id(), answer), message.id());
     }
 
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {
@@ -134,5 +207,25 @@ public class ChatService {
 
     private static String hermesStatus(HermesRunResult result) {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+    }
+
+    private static void forward(RunEvent event, Consumer<ChatEvent> onEvent) {
+        String type = event.type() == null ? "" : event.type().toLowerCase();
+        if (type.contains("delta") && event.text() != null) {
+            onEvent.accept(ChatEvent.delta(event.text()));
+        } else if (type.startsWith("tool.") || type.startsWith("subagent.")) {
+            onEvent.accept(ChatEvent.tool(event.toolName(), event.detail() == null ? event.type() : event.detail()));
+        }
+    }
+
+    private record PendingTurn(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            HermesRunCommand command,
+            Instant startedAt) {
+    }
+
+    private record CompletedTurn(ChatTurn turn, Long messageId) {
     }
 }

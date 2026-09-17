@@ -12,6 +12,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private final List<HermesRunCommand> received = new ArrayList<>();
     private HermesRunResult nextResult;
     private ApiException nextFailure;
+    private String submittedRunId;
 
     public void willReturn(HermesRunResult result) {
         this.nextResult = result;
@@ -31,11 +32,21 @@ public class StubHermesRunsClient implements HermesRunsClient {
         received.clear();
         nextResult = null;
         nextFailure = null;
+        submittedRunId = null;
     }
 
     @Override
-    public HermesRunResult runToCompletion(HermesRunCommand command) {
+    public String submit(HermesRunCommand command) {
         received.add(command);
+        if (nextFailure != null) {
+            throw nextFailure;
+        }
+        submittedRunId = nextResult == null ? "run-stub" : nextResult.runId();
+        return submittedRunId;
+    }
+
+    @Override
+    public HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
         if (nextFailure != null) {
             throw nextFailure;
         }

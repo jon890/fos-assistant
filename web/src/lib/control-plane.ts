@@ -16,7 +16,7 @@ function baseUrl(): string {
   return value.replace(/\/$/, "");
 }
 
-async function mintToken(email: string, name: string): Promise<string> {
+export async function mintToken(email: string, name: string): Promise<string> {
   return new SignJWT({ name })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(email)
@@ -29,6 +29,35 @@ export type ControlPlaneResult<T> =
   | { ok: true; status: number; data: T }
   | { ok: false; status: number; code: string; message: string };
 
+export type ControlPlaneResponse =
+  | { ok: true; response: Response }
+  | { ok: false; status: number; code: string; message: string };
+
+export async function requestControlPlane(
+  path: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<ControlPlaneResponse> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) {
+    return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다." };
+  }
+
+  const token = await mintToken(email, session.user?.name ?? email);
+  return {
+    ok: true,
+    response: await fetch(`${baseUrl()}${path}`, {
+      method: init.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      cache: "no-store",
+    }),
+  };
+}
+
 /**
  * Calls the Control Plane as the signed-in family member.
  *
@@ -39,22 +68,9 @@ export async function callControlPlane<T>(
   path: string,
   init: { method?: string; body?: unknown } = {},
 ): Promise<ControlPlaneResult<T>> {
-  const session = await auth();
-  const email = session?.user?.email;
-  if (!email) {
-    return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다." };
-  }
-
-  const token = await mintToken(email, session.user?.name ?? email);
-  const response = await fetch(`${baseUrl()}${path}`, {
-    method: init.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
-    },
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    cache: "no-store",
-  });
+  const opened = await requestControlPlane(path, init);
+  if (!opened.ok) return opened;
+  const response = opened.response;
 
   const text = await response.text();
   const payload = text.length > 0 ? JSON.parse(text) : null;

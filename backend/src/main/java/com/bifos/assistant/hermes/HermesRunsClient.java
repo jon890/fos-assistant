@@ -11,5 +11,11 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
  */
 public interface HermesRunsClient {
 
-    HermesRunResult runToCompletion(HermesRunCommand command);
+    String submit(HermesRunCommand command);
+
+    HermesRunResult awaitCompletion(HermesRunCommand command, String runId);
+
+    default HermesRunResult runToCompletion(HermesRunCommand command) {
+        return awaitCompletion(command, submit(command));
+    }
 }

@@ -56,8 +56,19 @@ public class ExecutionRecorder {
             Agent agent,
             String errorCode,
             Instant startedAt) {
+        return recordFailure(user, conversation, agent, errorCode, startedAt, null);
+    }
+
+    public AgentExecution recordFailure(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            String errorCode,
+            Instant startedAt,
+            String hermesRunId) {
         return executions.save(
                 base(user, conversation, agent, startedAt)
+                        .hermesRunId(hermesRunId)
                         .provider(agent.provider())
                         .model(agent.model())
                         .status(ExecutionStatus.FAILED)
