@@ -78,7 +78,7 @@ public class AgentExecution {
     @Column(name = "estimated_cost_micros")
     private Long estimatedCostMicros;
 
-    @Column(name = "cost_currency", length = 3)
+    @Column(name = "cost_currency", length = 3, columnDefinition = "CHAR(3)")
     private String costCurrency;
 
     /** 계산에 쓴 가격표를 적는다. 나중에 가격이 바뀌어도 지난 기록이 다시 쓰이지 않게 한다. */
