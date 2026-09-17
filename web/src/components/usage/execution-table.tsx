@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
-import type { UsageExecution } from "./execution-list";
+import { executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
 
 export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
   return (
@@ -20,6 +20,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
       </thead>
       <tbody>
         {executions.map((execution) => {
+          const running = isRunning(execution);
           const failed = execution.status === "FAILED" || execution.errorCode !== null;
           return (
             <tr key={execution.id} className="border-t border-border align-top">
@@ -33,14 +34,20 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 <span className="block truncate text-xs text-muted">{execution.provider ?? "-"}</span>
               </td>
               <td className="py-3 pr-4">
-                <Badge emphasis={failed}>{execution.errorCode ?? (failed ? "실패" : "성공")}</Badge>
+                <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
               </td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.inputTokens)}</td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.outputTokens)}</td>
-              <td className="py-3 pr-4 text-right whitespace-nowrap">{formatDuration(execution.latencyMs)}</td>
-              <td className="py-3 text-right whitespace-nowrap" title={execution.pricingVersion ?? undefined}>
-                {formatCost(execution.estimatedCostMicros, execution.costCurrency)}
+              <td className="py-3 pr-4 text-right whitespace-nowrap" data-testid="execution-duration">
+                {running ? "" : formatDuration(execution.latencyMs ?? 0)}
+              </td>
+              <td
+                className="py-3 text-right whitespace-nowrap"
+                data-testid="execution-cost"
+                title={execution.pricingVersion ?? undefined}
+              >
+                {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
               </td>
             </tr>
           );

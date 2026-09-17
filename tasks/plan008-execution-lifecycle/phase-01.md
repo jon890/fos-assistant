@@ -85,7 +85,7 @@ presentation/WorkspaceController.java
 ### 5. 요청과 응답 형태에서 지운다
 
 - `chat/presentation/ChatDtos.java` 의 `workspaceCode`
-- `chat/presentation/ChatController.java` 가 그 값을 넘기는 자리
+- `chat/presentation/ChatController.java` 가 그 값을 넘기는 자리와 대화 응답의 작업 영역 조회 의존성
 - `shared/error/ErrorCode.java` 의 `WORKSPACE_NOT_FOUND`
 
 ### 6. 설정에서 지운다
@@ -110,8 +110,10 @@ presentation/WorkspaceController.java
 - `backend/src/test/java/com/bifos/assistant/workspace/WorkspaceServiceTest.java` 삭제
 - `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` 에서 작업 영역을 쓰는 대목
 - `test/e2e/scenarios/workspace.ts` 삭제하고 `test/e2e/run.ts` 의 목록에서 뺀다
-- `test/e2e/harness.ts` 에서 작업 영역을 준비하는 대목
+- `test/e2e/run.ts` 와 `test/e2e/harness.ts` 에서 `workspaceRoot` 를 준비하고 넘기는 대목
 - `test/browser/fixtures.ts` 에서 같은 대목
+- `backend/src/test/java/com/bifos/assistant/usage/UsageCostRecordingTest.java` 의
+  `Conversation.startedBy` 호출을 작업 영역 없는 인자로 바꾼다
 
 ### 9. 이 phase 를 검증하는 테스트
 
@@ -120,8 +122,11 @@ presentation/WorkspaceController.java
 
 - **정상 경로**: 영역을 주지 않은 대화 한 번이 Hermes 를 지나 실행 기록을 남긴다.
   `HermesRunCommand` 의 `instructions` 가 `null` 로 나간다.
-- **이 phase 가 다루는 실패**: 요청 본문에 `workspaceCode` 를 실어 보내도 오류가 나지 않고
-  그 값이 무시된다. 그 칸이 없어졌으므로 어떤 이름의 여분 필드도 실행을 막지 않아야 한다.
+- **이 phase 가 다루는 실패**: 기존 웹 클라이언트처럼 요청 본문에 `workspaceCode` 를 실어 보내도
+  HTTP 요청이 성공하고 그 값이 무시된다. 서비스 직접 호출은 JSON 역직렬화를 거치지 않으므로
+  저장소가 이미 쓰는 MockMvc 테스트가 있으면 그 방식을 따르고, 없으면 e2e HTTP 시나리오에서 확인한다.
+  먼저 현재 Spring Boot 4 와 Jackson 3 설정의 실제 응답을 확인한다.
+  알 수 없는 필드가 400 으로 거절되면 테스트 기대값을 바꾸지 말고 배포 순서를 정하도록 중단한다.
 
 `test/e2e/scenarios/chat.ts` 가 영역 없이 도는 것을 이미 확인하고 있으면 그대로 둔다.
 `workspace.ts` 를 지운 뒤 `run.ts` 가 나머지 시나리오를 끝까지 도는 것이 판정 기준이다.
@@ -140,15 +145,11 @@ cd web && pnpm test:browser
 
 ```bash
 # cwd: 저장소 root
-grep -rn -i "workspace" backend/src web/src test --include=*.java --include=*.ts --include=*.tsx --include=*.yml
+grep -rn -i "workspace" --include='*.java' --include='*.ts' --include='*.tsx' --include='*.yml' backend/src web/src test
 ```
 
-마이그레이션이 실제로 적용되는지 확인한다.
-
-```bash
-# cwd: 저장소 root
-cd backend && ./gradlew test --tests '*Flyway*' || cd backend && ./gradlew test
-```
+`node test/e2e/run.ts` 가 실제 애플리케이션을 띄울 때 Flyway 마이그레이션을 적용한다.
+전체 시나리오가 끝까지 통과하고 기동 로그에 Flyway 오류가 없는 것으로 적용 여부를 확인한다.
 
 ## Critical Files
 
@@ -167,6 +168,7 @@ cd backend && ./gradlew test --tests '*Flyway*' || cd backend && ./gradlew test
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/workspace/WorkspaceServiceTest.java` | 삭제 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageCostRecordingTest.java` | 수정 |
 | `web/src/app/api/workspaces/route.ts` | 삭제 |
 | `web/src/app/api/chat/route.ts` | 수정 |
 | `web/src/app/api/chat/stream/route.ts` | 수정 |

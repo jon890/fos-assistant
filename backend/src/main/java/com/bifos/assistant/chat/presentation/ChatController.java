@@ -11,8 +11,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import com.bifos.assistant.workspace.application.WorkspaceService;
-import com.bifos.assistant.workspace.domain.Workspace;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import jakarta.validation.Valid;
@@ -39,7 +37,6 @@ public class ChatController {
 
     private final ChatService chat;
     private final CurrentUserProvider currentUser;
-    private final WorkspaceService workspaces;
     private final AppUserRepository users;
     private final AgentService agents;
 
@@ -47,8 +44,7 @@ public class ChatController {
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
         ChatTurn turn =
-                chat.send(user, request.conversationId(), request.text(), request.workspaceCode(),
-                        request.agentCode());
+                chat.send(user, request.conversationId(), request.text(), request.agentCode());
         return new SendMessageResponse(turn.conversationId(), turn.executionId(), turn.assistantText());
     }
 
@@ -63,7 +59,6 @@ public class ChatController {
                         user,
                         request.conversationId(),
                         request.text(),
-                        request.workspaceCode(),
                         request.agentCode(),
                         event -> send(emitter, event, clientConnected));
             } catch (ApiException ex) {
@@ -99,11 +94,9 @@ public class ChatController {
         return chat.conversationsOf(currentUser.require()).stream()
                 .map(
                         it -> {
-                            Workspace workspace = workspaces.findByIdOrNull(it.workspaceId());
                             Agent agent = agents.requireById(it.agentId());
                             return new ConversationView(
-                                    it.id(), it.title(), workspace == null ? null : workspace.code(),
-                                    agent.code(), agent.name(), it.updatedAt());
+                                    it.id(), it.title(), agent.code(), agent.name(), it.updatedAt());
                         })
                 .toList();
     }

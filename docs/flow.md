@@ -38,13 +38,18 @@ sequenceDiagram
         end
         C->>H: GET {profile}/v1/runs/{id}
     end
-    C->>C: 메시지를 남기고 실행 줄을 SUCCEEDED 로 갱신한다
-    alt 한 번에 받는 경로
-        C-->>B: 답과 대화 번호
-    else 스트리밍 경로
-        C-->>W: done 과 저장된 메시지 번호
-        W-->>B: done
-        B->>W: 저장된 대화 이력 조회
+    alt Hermes 실행 성공
+        C->>C: 메시지를 남기고 같은 실행 줄을 SUCCEEDED 로 갱신한다
+        alt 한 번에 받는 경로
+            C-->>B: 답과 대화 번호
+        else 스트리밍 경로
+            C-->>W: done 과 저장된 메시지 번호
+            W-->>B: done
+            B->>W: 저장된 대화 이력 조회
+        end
+    else 제출이나 실행 상태 조회 실패
+        C->>C: 같은 실행 줄을 FAILED 로 갱신하고 오류 코드를 적는다
+        C-->>W: 오류 응답이나 error 사건
     end
 ```
 
@@ -58,6 +63,24 @@ sequenceDiagram
 두 경로 모두 Hermes 실행 상태 조회가 돌려준 최종 `output` 과 `usage` 를 저장한다.
 스트리밍 경로의 답 조각은 화면에만 쓰며, 이벤트 연결이 중간에 끝나도 최종 상태를 조회해 메시지와 실행 기록을 남긴다.
 브라우저는 `done` 을 받으면 대화 이력을 다시 읽고 화면의 답 조각을 저장된 답으로 바꾼다.
+
+## 기동할 때 남은 실행 정리
+
+애플리케이션 준비가 끝나면 이전 프로세스가 남긴 `RUNNING` 실행을 한 번 정리한다.
+Flyway가 끝난 뒤 실행해야 하므로 `ApplicationReadyEvent`에서 시작한다.
+
+```mermaid
+flowchart TD
+    A[ApplicationReadyEvent] --> B[RUNNING 실행 조회]
+    B --> C{남은 실행이 있는가}
+    C -- 없다 --> D[끝낸다]
+    C -- 있다 --> E[모두 FAILED로 바꾼다]
+    E --> F[error_code를 ORPHANED로 적는다]
+    F --> G[finished_at을 현재 시각으로 적고 정리 건수를 로그에 남긴다]
+```
+
+이 방식은 Control Plane이 한 대만 돈다는 전제를 쓴다.
+여러 대로 늘리면 다른 인스턴스가 처리 중인 실행을 실패로 바꾸지 않도록 정리 방식을 다시 정해야 한다.
 
 ## 대화 이력
 

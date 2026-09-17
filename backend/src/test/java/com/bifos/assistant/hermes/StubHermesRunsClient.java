@@ -6,13 +6,14 @@ import com.bifos.assistant.shared.error.ApiException;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Lets the Control Plane be exercised without a live Hermes runtime. */
+/** 실제 Hermes Runtime 없이 Control Plane 을 검사하는 대역이다. */
 public class StubHermesRunsClient implements HermesRunsClient {
 
     private final List<HermesRunCommand> received = new ArrayList<>();
     private HermesRunResult nextResult;
     private ApiException nextFailure;
     private String submittedRunId;
+    private Runnable beforeAwait = () -> {};
 
     public void willReturn(HermesRunResult result) {
         this.nextResult = result;
@@ -28,11 +29,17 @@ public class StubHermesRunsClient implements HermesRunsClient {
         return received;
     }
 
+    /** 완료를 기다리기 직전에 실행해 제출 뒤 저장된 상태를 검사한다. */
+    public void beforeAwait(Runnable action) {
+        this.beforeAwait = action;
+    }
+
     public void reset() {
         received.clear();
         nextResult = null;
         nextFailure = null;
         submittedRunId = null;
+        beforeAwait = () -> {};
     }
 
     @Override
@@ -47,6 +54,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     @Override
     public HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
+        beforeAwait.run();
         if (nextFailure != null) {
             throw nextFailure;
         }

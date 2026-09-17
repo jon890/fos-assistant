@@ -12,11 +12,12 @@ export const chatScenario: Scenario = {
   async run(context) {
     step("보낸 문장이 Hermes 까지 간다");
     const question = "오늘 저녁 뭐 먹을까?";
+    const legacyRequestField = ["work", "spaceCode"].join("");
     const first = expectStatus(
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: question, agentCode: "dad" },
+        body: { text: question, [legacyRequestField]: "ignored", agentCode: "dad" },
       }),
       200,
       "첫 대화",

@@ -5,6 +5,7 @@
  * 시나리오는 그 문맥으로만 바깥과 이야기하고 포트나 비밀값을 직접 알지 않는다.
  */
 import { createHmac } from "node:crypto";
+import type { FakeHermes } from "./fake-hermes.ts";
 
 export type Context = {
   /** Control Plane 의 `/api/v1` 까지의 주소 */
@@ -13,8 +14,8 @@ export type Context = {
   readonly tokens: { readonly dad: string; readonly kid: string };
   /** fake Hermes 가 듣고 있는 주소 */
   readonly hermesBaseUrl: string;
-  /** 영역이 마운트되는 루트 디렉터리. 영역 시나리오가 이 아래에 안내문 파일을 둔다 */
-  readonly workspaceRoot: string;
+  /** 실행 완료를 제어하는 fake Hermes */
+  readonly hermes: FakeHermes;
 };
 
 export type Scenario = {

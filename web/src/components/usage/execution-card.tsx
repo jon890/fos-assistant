@@ -1,9 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
-import type { UsageExecution } from "./execution-list";
+import { executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
 
 export function ExecutionCard({ execution }: { execution: UsageExecution }) {
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
+  const running = isRunning(execution);
   return (
     <article className={`rounded-md border p-4 ${failed ? "border-foreground" : "border-border"}`}>
       <div className="flex items-start justify-between gap-3">
@@ -11,8 +12,12 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
           <h2 className="truncate font-semibold">{execution.agentName}</h2>
           <p className="truncate text-xs text-muted">{execution.agentCode}</p>
         </div>
-        <span className="shrink-0 text-sm font-semibold" title={execution.pricingVersion ?? undefined}>
-          {formatCost(execution.estimatedCostMicros, execution.costCurrency)}
+        <span
+          className="shrink-0 text-sm font-semibold"
+          data-testid="execution-cost"
+          title={execution.pricingVersion ?? undefined}
+        >
+          {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
         </span>
       </div>
       <p className="mt-3 truncate text-sm text-muted">
@@ -22,9 +27,9 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         <span title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}>
           {formatTokens(execution.inputTokens)} → {formatTokens(execution.outputTokens)}
         </span>
-        <span>{formatDuration(execution.latencyMs)}</span>
+        <span data-testid="execution-duration">{running ? "" : formatDuration(execution.latencyMs ?? 0)}</span>
         <span>{formatWhen(execution.startedAt)}</span>
-        <Badge emphasis={failed}>{execution.errorCode ?? (failed ? "실패" : "성공")}</Badge>
+        <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
       </div>
     </article>
   );

@@ -24,14 +24,10 @@ public class Conversation {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    /** Workspace this conversation runs in. Null means no workspace, and stays null for its life. */
-    @Column(name = "workspace_id")
-    private Long workspaceId;
-
     @Column(name = "agent_id")
     private Long agentId;
 
-    /** Hermes session this conversation continues. Null until the first run reports one. */
+    /** 첫 실행이 session을 보고할 때까지 비어 있는 Hermes session이다. */
     @Column(name = "hermes_session_id", length = 128)
     private String hermesSessionId;
 
@@ -44,17 +40,16 @@ public class Conversation {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    private Conversation(Long userId, String title, Long workspaceId, Long agentId) {
+    private Conversation(Long userId, String title, Long agentId) {
         this.userId = userId;
         this.title = title;
-        this.workspaceId = workspaceId;
         this.agentId = agentId;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
 
-    public static Conversation startedBy(Long userId, String title, Long workspaceId, Long agentId) {
-        return new Conversation(userId, title, workspaceId, agentId);
+    public static Conversation startedBy(Long userId, String title, Long agentId) {
+        return new Conversation(userId, title, agentId);
     }
 
     public Long id() {
@@ -63,11 +58,6 @@ public class Conversation {
 
     public Long userId() {
         return userId;
-    }
-
-    /** Fixed at the first turn. A later message cannot move a conversation into another workspace. */
-    public Long workspaceId() {
-        return workspaceId;
     }
 
     public Long agentId() { return agentId; }

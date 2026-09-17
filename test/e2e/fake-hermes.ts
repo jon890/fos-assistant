@@ -12,6 +12,9 @@ const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
 const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/;
 const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
+const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
+const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
+const TEST_RELEASE_HELD_RUN_PATH = "/__test/release-held-run";
 
 /**
  * 실행 하나가 보고하는 토큰 수다.
@@ -100,6 +103,9 @@ function event(response: ServerResponse, payload: unknown): void {
 
 export type FakeHermes = {
   readonly baseUrl: string;
+  holdNextRun(): void;
+  waitForHeldRun(): Promise<void>;
+  releaseHeldRun(): void;
   close(): Promise<void>;
 };
 
@@ -110,6 +116,10 @@ export type FakeHermes = {
  */
 export function startFakeHermes(profileKeys: Record<string, string>): Promise<FakeHermes> {
   const runs = new Map<string, Run>();
+  let holdNextRun = false;
+  let heldRunId: string | undefined;
+  let heldRunWaiter: (() => void) | undefined;
+  let heldRunReady: Promise<void> | undefined;
 
   const authorized = (request: IncomingMessage, profile: string): boolean => {
     const expected = profileKeys[profile];
@@ -119,6 +129,31 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = request.url ?? "";
+
+      if (request.method === "POST" && path === TEST_HOLD_NEXT_RUN_PATH) {
+        holdNextRun = true;
+        heldRunReady = new Promise<void>((done) => {
+          heldRunWaiter = done;
+        });
+        return send(response, 204, null);
+      }
+
+      if (request.method === "GET" && path === TEST_WAIT_HELD_RUN_PATH) {
+        if (heldRunReady === undefined) return send(response, 409, { error: "no held run is pending" });
+        await heldRunReady;
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_RELEASE_HELD_RUN_PATH) {
+        if (heldRunId === undefined) return send(response, 409, { error: "no held run is active" });
+        const run = runs.get(heldRunId);
+        if (run === undefined) return send(response, 404, { error: "no such held run" });
+        run.status = "completed";
+        heldRunId = undefined;
+        heldRunReady = undefined;
+        heldRunWaiter = undefined;
+        return send(response, 204, null);
+      }
 
       if (request.method === "GET") {
         const modelMatch = MODEL_OPTIONS_PATH.exec(path);
@@ -191,9 +226,11 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           submitted.instructions && submitted.instructions.length > 0
             ? ` [instructions: ${submitted.instructions}]`
             : "";
+        const held = holdNextRun;
+        holdNextRun = false;
         runs.set(runId, {
           run_id: runId,
-          status: "completed",
+          status: held ? "running" : "completed",
           session_id: submitted.session_id ?? `sess_${shortId()}`,
           // 실제 Hermes v0.21.0 이 내놓는 모양 그대로다. model 자리에는 API server 의 모델 이름이
           // 오는데 그 기본값이 profile 이름이고, provider 는 아예 없다.
@@ -206,6 +243,10 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           interruptEvents: submitted.input === "스트림 중단 검사",
           usage: FAKE_USAGE,
         });
+        if (held) {
+          heldRunId = runId;
+          heldRunWaiter?.();
+        }
         return send(response, 200, { run_id: runId, status: "queued" });
       }
 
@@ -231,6 +272,22 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
       }
       resolve({
         baseUrl: `http://127.0.0.1:${address.port}`,
+        holdNextRun: () => {
+          holdNextRun = true;
+          heldRunReady = new Promise<void>((done) => {
+            heldRunWaiter = done;
+          });
+        },
+        waitForHeldRun: () => heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
+        releaseHeldRun: () => {
+          if (heldRunId === undefined) throw new Error("유지 중인 실행이 없다");
+          const run = runs.get(heldRunId);
+          if (run === undefined) throw new Error("유지 중인 실행을 찾을 수 없다");
+          run.status = "completed";
+          heldRunId = undefined;
+          heldRunReady = undefined;
+          heldRunWaiter = undefined;
+        },
         close: () =>
           new Promise<void>((done) => {
             server.closeAllConnections();
