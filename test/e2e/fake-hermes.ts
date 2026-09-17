@@ -90,9 +90,14 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
         const raw = await readBody(request);
         const submitted = (raw.length > 0 ? JSON.parse(raw) : {}) as {
           input?: string;
+          instructions?: string;
           session_id?: string;
         };
         const runId = `run_${shortId()}`;
+        const instructionsEcho =
+          submitted.instructions && submitted.instructions.length > 0
+            ? ` [instructions: ${submitted.instructions}]`
+            : "";
         runs.set(runId, {
           run_id: runId,
           status: "completed",
@@ -100,7 +105,7 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           // 실제 Hermes v0.21.0 이 내놓는 모양 그대로다. model 자리에는 API server 의 모델 이름이
           // 오는데 그 기본값이 profile 이름이고, provider 는 아예 없다.
           model: profile,
-          output: `[fake hermes on profile ${profile}] ${submitted.input ?? ""}`,
+          output: `[fake hermes on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
           usage: FAKE_USAGE,
         });
         return send(response, 200, { run_id: runId, status: "queued" });

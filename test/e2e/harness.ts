@@ -13,6 +13,8 @@ export type Context = {
   readonly tokens: { readonly dad: string; readonly kid: string };
   /** fake Hermes 가 듣고 있는 주소 */
   readonly hermesBaseUrl: string;
+  /** 영역이 마운트되는 루트 디렉터리. 영역 시나리오가 이 아래에 안내문 파일을 둔다 */
+  readonly workspaceRoot: string;
 };
 
 export type Scenario = {
