@@ -105,7 +105,7 @@ class ChatServiceTest {
     }
 
     private List<ExecutionEvent> eventsOf(Long executionId) {
-        return executionEvents.findByExecutionIdOrderBySequenceAsc(executionId);
+        return executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId));
     }
 
     private static List<ExecutionEventType> typesOf(List<ExecutionEvent> events) {

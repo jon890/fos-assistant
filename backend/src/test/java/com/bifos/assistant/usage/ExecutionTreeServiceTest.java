@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -26,8 +30,10 @@ import com.bifos.assistant.user.domain.UserRole;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -52,8 +58,14 @@ class ExecutionTreeServiceTest {
 
     private Agent agent;
 
+    /** 어긋난 자료를 알리는 경고가 나갔는지 보려고 서비스의 로그를 받아 둔다. */
+    private ListAppender<ILoggingEvent> logs;
+
     @BeforeEach
     void 준비한다() {
+        logs = new ListAppender<>();
+        logs.start();
+        serviceLogger().addAppender(logs);
         events.deleteAll();
         executions.deleteAll();
         agent = agents.findByCode("tree-dad").orElseGet(() -> agents.save(Agent.of(
@@ -67,6 +79,24 @@ class ExecutionTreeServiceTest {
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 OWNER_ID)));
+    }
+
+    @AfterEach
+    void 로그를_떼어_낸다() {
+        serviceLogger().detachAppender(logs);
+        logs.stop();
+    }
+
+    private static Logger serviceLogger() {
+        return (Logger) LoggerFactory.getLogger(ExecutionTreeService.class);
+    }
+
+    /** 어긋난 자료를 알린 경고만 고른다. */
+    private List<String> warnings() {
+        return logs.list.stream()
+                .filter(event -> event.getLevel().toInt() >= Level.WARN_INT)
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
     }
 
     @Test
@@ -184,6 +214,8 @@ class ExecutionTreeServiceTest {
         assertThat(shown).isEqualTo(chain.subList(0, MAX_DEPTH));
         assertThat(node.truncated()).isTrue();
         assertThat(tree.truncated()).isTrue();
+        // 일부러 자른 것이므로 어긋난 자료로 알리지 않는다.
+        assertThat(warnings()).isEmpty();
     }
 
     @Test
@@ -198,6 +230,10 @@ class ExecutionTreeServiceTest {
                 .containsExactly(root.id(), child.id())
                 .doesNotContain(orphan.id());
         assertThat(tree.truncated()).isFalse();
+        assertThat(warnings())
+                .singleElement()
+                .asString()
+                .contains(String.valueOf(orphan.id()));
     }
 
     private static List<Long> flatten(ExecutionNode node) {

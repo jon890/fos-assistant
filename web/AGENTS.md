@@ -17,6 +17,7 @@ src/
     ui/                   버튼, 입력, 표, 뼈대, 아이콘
     chat/                 대화 화면의 부품
     usage/                사용량 화면의 부품
+    execution/            실행 나무 화면의 부품
     admin/                관리 화면의 부품
   lib/                    Control Plane 호출과 형식 변환
 ```

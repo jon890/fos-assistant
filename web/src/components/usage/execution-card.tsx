@@ -1,24 +1,18 @@
-"use client";
-
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import { executionStatusLabel, isRunning, type UsageExecution } from "./execution-list";
 
 export function ExecutionCard({ execution }: { execution: UsageExecution }) {
-  const router = useRouter();
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
   const running = isRunning(execution);
   return (
-    <article
-      className={`cursor-pointer rounded-md border p-4 ${failed ? "border-foreground" : "border-border"}`}
-      tabIndex={0}
-      role="link"
-      onClick={() => router.push(`/executions/${execution.id}`)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") router.push(`/executions/${execution.id}`);
-      }}
-    >
+    <article className={`relative rounded-md border p-4 ${failed ? "border-foreground" : "border-border"}`}>
+      <Link
+        href={`/executions/${execution.id}`}
+        className="absolute inset-0"
+        aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)`}
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate font-semibold">

@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 실행 하나를 그 사건과 자식 실행까지 묶어 낸다.
@@ -48,6 +49,13 @@ public class ExecutionTreeService {
     private final ExecutionEventRepository events;
     private final AgentService agents;
 
+    /**
+     * 질의를 여럿 내므로 한 트랜잭션으로 묶는다.
+     *
+     * <p>뿌리를 찾고, 자손을 읽고, 사건을 읽고, 노드마다 에이전트를 읽는다. 따로 돌면 그 사이에 바뀐
+     * 자료를 섞어 읽는다.
+     */
+    @Transactional(readOnly = true)
     public ExecutionTree of(CurrentUser user, Long executionId) {
         AgentExecution asked = executions.findById(executionId).orElseThrow(ExecutionTreeService::notFound);
         requireOwner(user, asked);
@@ -58,9 +66,11 @@ public class ExecutionTreeService {
         requireOwner(user, root);
 
         List<AgentExecution> descendants = executions.findByRootExecutionId(root.id());
+        Map<Long, List<AgentExecution>> byParent = byParent(descendants);
         Set<Long> used = new LinkedHashSet<>();
-        Branch rootBranch = branch(root, byParent(descendants), used, 1);
-        warnAboutUnreachable(root, descendants, used);
+        Set<Long> cut = new LinkedHashSet<>();
+        Branch rootBranch = branch(root, byParent, used, cut, 1);
+        warnAboutUnreachable(root, descendants, used, cut);
 
         ExecutionNode rootNode = node(rootBranch, eventsOf(used));
         return new ExecutionTree(rootNode, ascent.truncated() || isTruncatedSomewhere(rootBranch));
@@ -108,12 +118,14 @@ public class ExecutionTreeService {
      * 한 실행과 그 아래를 잇는다.
      *
      * <p>이미 붙인 실행은 다시 붙이지 않는다. 그러지 않으면 같은 가지가 무한히 자란다. 상한 깊이에서
-     * 자식이 남아 있으면 그 노드에 잘랐다고 적는다.
+     * 자식이 남아 있으면 그 노드에 잘랐다고 적고, 잘라 낸 가지를 {@code cut} 에 모은다. 일부러 자른
+     * 것을 데이터가 어긋난 것과 섞어 경고하지 않기 위해서다.
      */
     private Branch branch(
             AgentExecution execution,
             Map<Long, List<AgentExecution>> byParent,
             Set<Long> used,
+            Set<Long> cut,
             int depth) {
         used.add(execution.id());
         List<AgentExecution> waiting =
@@ -124,6 +136,7 @@ public class ExecutionTreeService {
             return new Branch(execution, false, List.of());
         }
         if (depth == MAX_DEPTH) {
+            waiting.forEach(child -> markCut(child, byParent, cut));
             return new Branch(execution, true, List.of());
         }
         List<Branch> children = new ArrayList<>();
@@ -131,9 +144,19 @@ public class ExecutionTreeService {
             if (used.contains(child.id())) {
                 continue;
             }
-            children.add(branch(child, byParent, used, depth + 1));
+            children.add(branch(child, byParent, used, cut, depth + 1));
         }
         return new Branch(execution, false, List.copyOf(children));
+    }
+
+    /** 상한에서 잘라 낸 가지를 통째로 모은다. 같은 실행을 두 번 밟지 않아 순환에서도 끝난다. */
+    private static void markCut(
+            AgentExecution execution, Map<Long, List<AgentExecution>> byParent, Set<Long> cut) {
+        if (!cut.add(execution.id())) {
+            return;
+        }
+        byParent.getOrDefault(execution.id(), List.of())
+                .forEach(child -> markCut(child, byParent, cut));
     }
 
     /**
@@ -141,13 +164,16 @@ public class ExecutionTreeService {
      *
      * <p>{@code root_execution_id} 로 읽어 왔지만 부모 사슬이 뿌리까지 닿지 않는 줄이다. 데이터가 어긋난
      * 것이고, 그것 때문에 응답이 끝나지 않으면 안 되므로 나무에 넣지 않는다.
+     *
+     * <p>상한 깊이에서 우리가 일부러 자른 가지는 여기서 뺀다. 원인이 달라서다. 그쪽은 노드의
+     * {@code truncated} 가 화면에 알린다.
      */
     private static void warnAboutUnreachable(
-            AgentExecution root, List<AgentExecution> descendants, Set<Long> used) {
+            AgentExecution root, List<AgentExecution> descendants, Set<Long> used, Set<Long> cut) {
         List<Long> dropped =
                 descendants.stream()
                         .map(AgentExecution::id)
-                        .filter(id -> !used.contains(id))
+                        .filter(id -> !used.contains(id) && !cut.contains(id))
                         .toList();
         if (!dropped.isEmpty()) {
             log.warn("뿌리에 닿지 않아 나무에서 뺀 실행이 있다 rootExecutionId={} executionIds={}",

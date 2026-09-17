@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
@@ -30,16 +31,18 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
             <tr
               key={execution.id}
               className="cursor-pointer border-t border-border align-top hover:bg-surface"
-              tabIndex={0}
-              role="link"
               onClick={() => router.push(`/executions/${execution.id}`)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") router.push(`/executions/${execution.id}`);
-              }}
             >
               <td className="py-3 pr-4 whitespace-nowrap">{formatWhen(execution.startedAt)}</td>
               <td className="py-3 pr-4">
-                <span className="font-medium">{execution.agentName}</span>
+                <Link
+                  href={`/executions/${execution.id}`}
+                  className="font-medium hover:underline"
+                  aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)`}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {execution.agentName}
+                </Link>
                 {execution.hasChildren ? (
                   <span className="ml-1 text-muted" title="하위 실행 있음">
                     ▸

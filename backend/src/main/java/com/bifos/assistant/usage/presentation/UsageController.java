@@ -137,6 +137,11 @@ public class UsageController {
             Instant startedAt,
             boolean hasChildren) {
 
+        /** 자식을 세지 않고 부르는 자리를 위한 것이다. 자식이 없는 것으로 본다. */
+        static ExecutionView from(AgentExecution execution, Agent agent) {
+            return from(execution, agent, false);
+        }
+
         static ExecutionView from(AgentExecution execution, Agent agent, boolean hasChildren) {
             return new ExecutionView(
                     execution.id(),

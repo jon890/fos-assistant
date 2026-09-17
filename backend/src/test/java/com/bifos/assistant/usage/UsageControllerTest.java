@@ -91,14 +91,25 @@ class UsageControllerTest {
                 .isEqualTo(false);
     }
 
+    /**
+     * 목록 조회가 내는 질의 수다.
+     *
+     * <p>목록을 읽는 것 하나와 자식을 확인하는 것 하나다. 실행마다 읽는 에이전트는 {@code findById} 라
+     * 엔티티 적재로 세어지고 이 지표에 들어오지 않는다.
+     */
+    private static final long QUERIES_PER_LIST = 2;
+
     @Test
     void 목록이_길어져도_자식을_확인하는_질의는_늘지_않는다() {
         long few = queriesForList(2);
         long many = queriesForList(10);
 
+        assertThat(few)
+                .as("실행 2개일 때 %d 번 질의했다", few)
+                .isEqualTo(QUERIES_PER_LIST);
         assertThat(many)
-                .as("실행 2개일 때 %d 번, 10개일 때 %d 번 질의했다", few, many)
-                .isEqualTo(few);
+                .as("실행 10개일 때 %d 번 질의했다. 2개일 때는 %d 번이었다", many, few)
+                .isEqualTo(QUERIES_PER_LIST);
     }
 
     /** 실행을 그만큼 넣고 목록을 한 번 부르면서 질의 수를 센다. */
