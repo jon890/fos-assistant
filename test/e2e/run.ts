@@ -26,6 +26,7 @@ import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { workspaceScenario } from "./scenarios/workspace.ts";
+import { streamingScenario } from "./scenarios/streaming.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const APP_PORT = 18080;
@@ -57,6 +58,7 @@ const SCENARIOS: readonly Scenario[] = [
   usageCostScenario,
   conversationHistoryScenario,
   workspaceScenario,
+  streamingScenario,
 ];
 
 async function waitForHealth(url: string, logPath: string): Promise<void> {

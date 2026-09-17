@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
+const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/;
 const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
 
 /**
@@ -30,6 +31,8 @@ type Run = {
   session_id: string;
   model: string;
   output: string;
+  input: string;
+  interruptEvents: boolean;
   usage: typeof FAKE_USAGE;
 };
 
@@ -56,6 +59,10 @@ function send(response: ServerResponse, status: number, payload: unknown): void 
     "Content-Length": Buffer.byteLength(body),
   });
   response.end(body);
+}
+
+function event(response: ServerResponse, payload: unknown): void {
+  response.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
 export type FakeHermes = {
@@ -89,6 +96,33 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           }
           return send(response, 200, { model: "gpt-5.5", provider: "openai-codex", providers: [] });
         }
+
+        const eventMatch = RUN_EVENTS_PATH.exec(path);
+        if (eventMatch) {
+          const [, profile, runId] = eventMatch;
+          if (!authorized(request, profile)) {
+            return send(response, 401, { error: "bad key for this profile" });
+          }
+          const run = runs.get(runId);
+          if (!run) return send(response, 404, { error: "no such run" });
+          response.writeHead(200, {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          });
+          response.write(": keepalive\n\n");
+          event(response, { type: "message.delta", text: "화면에서만 " });
+          if (run.interruptEvents) {
+            response.end();
+            return;
+          }
+          event(response, { type: "message.delta", text: `보이는 조각: ${run.input}` });
+          event(response, { type: "tool.started", tool_name: "fake-tool", detail: "started" });
+          event(response, { type: "tool.completed", tool_name: "fake-tool", detail: "completed" });
+          event(response, { type: "run.completed" });
+          response.end();
+          return;
+        }
       }
 
       if (request.method === "POST") {
@@ -118,6 +152,8 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           // 오는데 그 기본값이 profile 이름이고, provider 는 아예 없다.
           model: profile,
           output: `[fake hermes on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
+          input: submitted.input ?? "",
+          interruptEvents: submitted.input === "스트림 중단 검사",
           usage: FAKE_USAGE,
         });
         return send(response, 200, { run_id: runId, status: "queued" });
