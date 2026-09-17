@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
+import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
 import playwright from "../../web/node_modules/@playwright/test/index.js";
 import { startFakeHermes, type FakeHermes } from "../e2e/fake-hermes.ts";
 import {
@@ -43,6 +44,36 @@ async function writeProfileKeys(work: string): Promise<string> {
   await writeFile(keyFile, "browser-profile-key");
   await chmod(keyFile, 0o600);
   return keyDir;
+}
+
+async function seedAgent(hermesBaseUrl: string): Promise<void> {
+  const token = await new SignJWT({ name: "브라우저 테스트" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(TEST_EMAIL)
+    .setIssuedAt()
+    .setExpirationTime("2m")
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      code: "browser",
+      name: "브라우저 비서",
+      hermesProfile: "browser",
+      apiBaseUrl: `${hermesBaseUrl}/p/browser`,
+      provider: "openai-codex",
+      costMode: "SUBSCRIPTION",
+      credentialScope: "SHARED_HOUSEHOLD",
+      visibility: "FAMILY",
+      ownerEmail: null,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`브라우저 테스트 에이전트를 등록하지 못했다: ${response.status} ${await response.text()}`);
+  }
 }
 
 function startControlPlane(keyDir: string, workspaceRoot: string, logPath: string): ChildProcess {
@@ -95,6 +126,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
     await mkdir(workspaceRoot, { recursive: true });
     app = startControlPlane(await writeProfileKeys(work), workspaceRoot, logPath);
     await waitForHealth(logPath);
+    await seedAgent(hermes.baseUrl);
   } catch (error) {
     await stopProcess(app);
     await hermes?.close();

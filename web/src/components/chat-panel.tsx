@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ConversationList, type Conversation } from "./conversation-list";
 import { describeError } from "./error-message";
+import { Composer } from "./chat/composer";
+import { ConversationDrawer } from "./chat/conversation-drawer";
+import { ConversationList, type Conversation } from "./chat/conversation-list";
+import { MessageList } from "./chat/message-list";
+import type { Turn } from "./chat/message-bubble";
+import { IconButton } from "./ui/icon-button";
 import { readEventStream } from "@/lib/stream";
 
-type Turn = {
-  id: number | string;
-  role: "USER" | "ASSISTANT";
-  content: string;
-  senderName: string | null;
-};
 type Workspace = { code: string; name: string; visibility: string };
 type Agent = { code: string; name: string; model: string; visibility: string };
 type ErrorPayload = { code: string; message: string };
@@ -42,6 +41,9 @@ export function ChatPanel() {
   const [workspaceCode, setWorkspaceCode] = useState<string>("");
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentCode, setAgentCode] = useState<string>("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(true);
   const loadingConversation = useRef<number | null>(null);
   const selectionVersion = useRef(0);
 
@@ -77,7 +79,10 @@ export function ChatPanel() {
         if (cancelled || selectionVersion.current !== version) return;
         setConversations(loaded);
         const latest = loaded[0];
-        if (!latest) return;
+        if (!latest) {
+          setMessagesLoading(false);
+          return;
+        }
 
         setConversationId(latest.id);
         setWorkspaceCode(latest.workspaceCode ?? "");
@@ -98,6 +103,10 @@ export function ChatPanel() {
           setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
         }
       } finally {
+        if (!cancelled) {
+          setConversationsLoading(false);
+          setMessagesLoading(false);
+        }
         if (selectionVersion.current === version) loadingConversation.current = null;
       }
     }
@@ -117,6 +126,8 @@ export function ChatPanel() {
 
     const version = ++selectionVersion.current;
     loadingConversation.current = conversation.id;
+    setDrawerOpen(false);
+    setMessagesLoading(true);
     setConversationId(conversation.id);
     setWorkspaceCode(conversation.workspaceCode ?? "");
     setAgentCode(conversation.agentCode);
@@ -136,7 +147,10 @@ export function ChatPanel() {
         setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
       }
     } finally {
-      if (selectionVersion.current === version) loadingConversation.current = null;
+      if (selectionVersion.current === version) {
+        loadingConversation.current = null;
+        setMessagesLoading(false);
+      }
     }
   }
 
@@ -150,6 +164,8 @@ export function ChatPanel() {
     setTurns([]);
     setToolEvents([]);
     setError(null);
+    setDrawerOpen(false);
+    setMessagesLoading(false);
   }
 
   async function refreshConversations() {
@@ -170,8 +186,7 @@ export function ChatPanel() {
     setTurns(await readPayload<Turn[]>(response));
   }
 
-  async function send(event: React.FormEvent) {
-    event.preventDefault();
+  async function send() {
     const text = draft.trim();
     if (text.length === 0 || sending || agentCode.length === 0) return;
 
@@ -291,11 +306,13 @@ export function ChatPanel() {
         });
       } catch {
         if (!done && !reportedError) {
+          restoreFailedMessage();
           setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
         }
         return;
       }
       if (!done && !reportedError) {
+        restoreFailedMessage();
         setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
       }
     } catch (reason) {
@@ -307,105 +324,94 @@ export function ChatPanel() {
   }
 
   return (
-    <section className="grid gap-6 md:grid-cols-[16rem_minmax(0,1fr)]">
-      <ConversationList
-        conversations={conversations}
-        selectedId={conversationId}
-        onSelect={(conversation) => void selectConversation(conversation)}
-        onNew={startNewConversation}
-      />
+    <section className="flex h-full min-h-0 min-w-0">
+      <h1 className="sr-only">대화</h1>
+      <ConversationDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <ConversationList
+          conversations={conversations}
+          selectedId={conversationId}
+          loading={conversationsLoading}
+          onSelect={(conversation) => void selectConversation(conversation)}
+          onNew={startNewConversation}
+        />
+      </ConversationDrawer>
 
-      <div className="flex min-w-0 flex-col gap-4">
-        <label className="flex items-center gap-2 text-xs text-muted">
-          에이전트
-          {!agentLocked && agents.length > 1 ? (
-            <select
-              value={agentCode}
-              onChange={(event) => setAgentCode(event.target.value)}
-              className="rounded-md border border-border bg-transparent px-2 py-1 text-xs"
-            >
-              {agents.map((agent) => (
-                <option key={agent.code} value={agent.code}>{agent.name}</option>
-              ))}
-            </select>
-          ) : (
-            <span>{agents.find((agent) => agent.code === agentCode)?.name ?? "등록된 에이전트 없음"}</span>
-          )}
-          {agentLocked ? <span>이 대화는 에이전트가 고정됐다.</span> : null}
-        </label>
-
-        <label className="flex items-center gap-2 text-xs text-muted">
-          작업 영역
-          <select
-            value={workspaceCode}
-            onChange={(event) => setWorkspaceCode(event.target.value)}
-            disabled={workspaceLocked}
-            className="rounded-md border border-border bg-transparent px-2 py-1 text-xs disabled:opacity-50"
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:border-l md:border-border md:pl-4">
+        <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
+          <IconButton
+            label="대화 목록 열기"
+            onClick={() => setDrawerOpen(true)}
+            className="md:hidden"
           >
-            <option value="">영역 없음</option>
-            {workspaces.map((workspace) => (
-              <option key={workspace.code} value={workspace.code}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-          {workspaceLocked ? <span>이 대화는 영역이 고정됐다.</span> : null}
-        </label>
+            <span aria-hidden="true">☰</span>
+          </IconButton>
+          <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-xs text-muted">
+            <label className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0">에이전트</span>
+              {!agentLocked && agents.length > 1 ? (
+                <select
+                  value={agentCode}
+                  onChange={(event) => setAgentCode(event.target.value)}
+                  className="min-w-0 max-w-44 truncate rounded-md border border-border bg-transparent px-2 py-1 text-xs"
+                >
+                  {agents.map((agent) => (
+                    <option key={agent.code} value={agent.code}>{agent.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="truncate" title={agents.find((agent) => agent.code === agentCode)?.name}>
+                  {agents.find((agent) => agent.code === agentCode)?.name ?? "등록된 에이전트 없음"}
+                </span>
+              )}
+            </label>
+            <span aria-hidden="true">·</span>
+            <label className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0">작업 영역</span>
+              {workspaceLocked ? (
+                <span
+                  className="truncate"
+                  title={workspaces.find((workspace) => workspace.code === workspaceCode)?.name ?? "영역 없음"}
+                >
+                  {workspaces.find((workspace) => workspace.code === workspaceCode)?.name ?? "영역 없음"}
+                </span>
+              ) : (
+                <select
+                  value={workspaceCode}
+                  onChange={(event) => setWorkspaceCode(event.target.value)}
+                  className="min-w-0 max-w-44 truncate rounded-md border border-border bg-transparent px-2 py-1 text-xs"
+                >
+                  <option value="">영역 없음</option>
+                  {workspaces.map((workspace) => (
+                    <option key={workspace.code} value={workspace.code}>
+                      {workspace.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+          </div>
+        </div>
 
-        <ol className="flex flex-col gap-3">
-          {turns.map((turn) => (
-            <li
-              key={turn.id}
-              className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                turn.role === "USER" ? "bg-surface" : "border border-border"
-              }`}
-            >
-              <span className="mb-1 block text-xs text-muted">
-                {turn.role === "USER" ? turn.senderName : "비서"}
-              </span>
-              {turn.content}
-            </li>
-          ))}
-          {sending ? (
-            <li className="text-sm text-muted">
-              비서가 실행 중이다.
-            </li>
-          ) : null}
-          {toolEvents.map((tool, index) => (
-            <li key={`${tool}-${index}`} className="text-xs text-muted">
-              {tool}
-            </li>
-          ))}
-        </ol>
+        <MessageList
+          turns={turns}
+          loading={messagesLoading}
+          sending={sending}
+          toolEvents={toolEvents}
+          conversationId={conversationId}
+        />
 
-        {error ? (
-          <p className="rounded-md bg-surface px-3 py-2 text-sm">
-            {error}
-          </p>
-        ) : null}
-
-        {agents.length === 0 ? (
-          <p className="rounded-md bg-surface px-3 py-2 text-sm">
+        {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}
+        {agents.length === 0 && !conversationsLoading ? (
+          <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">
             사용할 수 있는 에이전트가 없다. 관리자에게 에이전트 등록을 요청한다.
           </p>
         ) : null}
-
-        <form onSubmit={send} className="flex gap-2">
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            disabled={sending || agents.length === 0}
-            placeholder="무엇을 도와줄까요"
-            className="flex-1 rounded-md border border-border bg-transparent px-3 py-2 text-sm disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={sending || agents.length === 0}
-            className="rounded-md border border-border px-4 py-2 text-sm disabled:opacity-50"
-          >
-            보내기
-          </button>
-        </form>
+        <Composer
+          value={draft}
+          onChange={setDraft}
+          onSend={() => void send()}
+          disabled={sending || agents.length === 0}
+        />
       </div>
     </section>
   );
