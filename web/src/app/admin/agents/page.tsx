@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { AgentAdminPanel } from "./agent-admin-panel";
+import type { AdminAgent } from "@/lib/agent";
 import { callControlPlane } from "@/lib/control-plane";
-import { AgentAdminPanel, type AdminAgent } from "./agent-admin-panel";
 
 export default async function AgentAdminPage() {
   const session = await auth();
