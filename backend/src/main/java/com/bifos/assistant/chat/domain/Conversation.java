@@ -19,6 +19,10 @@ public class Conversation {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /** Workspace this conversation runs in. Null means no workspace, and stays null for its life. */
+    @Column(name = "workspace_id")
+    private Long workspaceId;
+
     /** Hermes session this conversation continues. Null until the first run reports one. */
     @Column(name = "hermes_session_id", length = 128)
     private String hermesSessionId;
@@ -35,15 +39,16 @@ public class Conversation {
     protected Conversation() {
     }
 
-    private Conversation(Long userId, String title) {
+    private Conversation(Long userId, String title, Long workspaceId) {
         this.userId = userId;
         this.title = title;
+        this.workspaceId = workspaceId;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
 
-    public static Conversation startedBy(Long userId, String title) {
-        return new Conversation(userId, title);
+    public static Conversation startedBy(Long userId, String title, Long workspaceId) {
+        return new Conversation(userId, title, workspaceId);
     }
 
     public Long id() {
@@ -52,6 +57,11 @@ public class Conversation {
 
     public Long userId() {
         return userId;
+    }
+
+    /** Fixed at the first turn. A later message cannot move a conversation into another workspace. */
+    public Long workspaceId() {
+        return workspaceId;
     }
 
     public String hermesSessionId() {

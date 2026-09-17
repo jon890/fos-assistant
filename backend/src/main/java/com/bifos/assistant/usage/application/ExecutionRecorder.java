@@ -75,6 +75,7 @@ public class ExecutionRecorder {
         return AgentExecution.builder()
                 .userId(user.id())
                 .conversationId(conversation.id())
+                .workspaceId(conversation.workspaceId())
                 .profileName(binding.profileName())
                 .costMode(binding.costMode())
                 .timing(startedAt, Instant.now());

@@ -62,6 +62,17 @@ public class WorkspaceService {
     }
 
     /**
+     * Looks up the workspace a conversation already recorded, without a readability check.
+     *
+     * <p>The check already happened once, when that conversation started. A later member removal or
+     * visibility change must not retroactively break a conversation already under way; it only stops
+     * new conversations from entering that workspace.
+     */
+    public Workspace findByIdOrNull(Long id) {
+        return id == null ? null : workspaces.findById(id).orElse(null);
+    }
+
+    /**
      * Reads the workspace guide as run instructions.
      *
      * <p>Returns null when the guide cannot be read. A missing file must not stop the turn: the
