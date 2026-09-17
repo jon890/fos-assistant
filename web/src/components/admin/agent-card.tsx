@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
 import { formatWhen } from "@/lib/format";
 
@@ -12,7 +13,7 @@ type Props = {
 
 export function AgentCard({ agent, busy, onVisibilityChange, onEnabledChange, onSyncModel }: Props) {
   return (
-    <article className="rounded-lg border border-border p-4">
+    <article className="rounded-md border border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">{agent.name}</h2>
@@ -30,15 +31,15 @@ export function AgentCard({ agent, busy, onVisibilityChange, onEnabledChange, on
         <div><dt className="text-xs text-muted">모델을 마지막으로 읽은 시각</dt><dd className="mt-1">{agent.modelSyncedAt ? formatWhen(agent.modelSyncedAt) : "-"}</dd></div>
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" disabled={busy} onClick={() => onVisibilityChange(agent)} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">
+        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onVisibilityChange(agent)}>
           {agent.visibility === PRIVATE_VISIBILITY ? "가족 공개로 변경" : "나만으로 변경"}
-        </button>
-        <button type="button" disabled={busy} onClick={() => onEnabledChange(agent)} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => onEnabledChange(agent)}>
           {agent.enabled ? "사용 중지" : "다시 사용"}
-        </button>
-        <button type="button" disabled={busy} onClick={() => onSyncModel(agent)} className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50">
+        </Button>
+        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onSyncModel(agent)}>
           모델 다시 읽기
-        </button>
+        </Button>
       </div>
     </article>
   );

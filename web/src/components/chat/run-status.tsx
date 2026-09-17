@@ -15,7 +15,7 @@ export function RunStatus({ waiting, toolEvents }: Props) {
       {waiting ? (
         <li
           aria-label="비서의 답을 기다리는 중"
-          className="rounded-lg border border-border px-3 py-2 text-sm text-muted"
+          className="rounded-md border border-border px-3 py-2 text-sm text-muted"
         >
           <span className="motion-reduce:hidden" aria-hidden="true">
             비서&nbsp;

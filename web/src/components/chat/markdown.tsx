@@ -205,7 +205,7 @@ export function Markdown({ children }: { children: string }) {
               return <CodeBlock code={text} language={language ?? "text"} />;
             }
             return (
-              <code {...props} className="rounded bg-surface px-1 py-0.5 font-mono text-[0.9em]">
+              <code {...props} className="rounded-sm bg-surface px-1 py-0.5 font-mono text-[0.9em]">
                 {source}
               </code>
             );

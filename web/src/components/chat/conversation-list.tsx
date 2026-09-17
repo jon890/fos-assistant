@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 export type Conversation = {
   id: number;
@@ -26,13 +27,14 @@ export function ConversationList({
 }: Props) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <button
-        type="button"
+      <Button
         onClick={onNew}
-        className="rounded-md border border-border px-3 py-2 text-left text-sm"
+        size="sm"
+        variant="secondary"
+        className="justify-start"
       >
         새 대화
-      </button>
+      </Button>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
@@ -49,11 +51,12 @@ export function ConversationList({
               const selected = conversation.id === selectedId;
               return (
                 <li key={conversation.id}>
-                  <button
-                    type="button"
+                  <Button
                     onClick={() => onSelect(conversation)}
                     aria-current={selected ? "true" : undefined}
-                    className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                    size="sm"
+                    variant="secondary"
+                    className={`h-auto w-full justify-start text-left ${
                       selected ? "border-foreground bg-surface" : "border-border"
                     }`}
                   >
@@ -64,7 +67,7 @@ export function ConversationList({
                       {new Date(conversation.updatedAt).toLocaleString("ko-KR")}
                       {conversation.workspaceCode ? ` · ${conversation.workspaceCode}` : ""}
                     </span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}

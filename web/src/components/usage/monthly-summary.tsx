@@ -15,7 +15,7 @@ type Props = {
 
 export function MonthlySummary({ monthly }: Props) {
   return (
-    <dl className="mb-6 grid gap-5 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2 md:grid-cols-3">
+    <dl className="mb-6 grid gap-5 rounded-md border border-border bg-surface p-4 sm:grid-cols-2 md:grid-cols-3">
       <Stat
         label="이번 달 환산 합계"
         value={formatAmount(monthly.estimatedCostMicros, monthly.currency)}
