@@ -86,6 +86,15 @@ Hermes profile 디렉터리를 그대로 붙이지 않는다.
 데이터베이스에는 어떤 비밀값도 넣지 않는다.
 `hermes_profile_binding` 은 누구의 profile 이 무엇인지만 적는다.
 
+## 문서
+
+| 문서 | 담는 것 |
+| --- | --- |
+| [`flow.md`](flow.md) | 화면 전환과 호출 순서 |
+| [`data-schema.md`](data-schema.md) | 표와 칸의 뜻 |
+| [`hermes-integration.md`](hermes-integration.md) | Hermes 확장 지점 |
+| [`adr/INDEX.md`](adr/INDEX.md) | 되돌리기 어려운 결정 |
+
 ## 아직 만들지 않은 것
 
 - Memory 와 Shared Memory

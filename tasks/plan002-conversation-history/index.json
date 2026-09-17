@@ -1,0 +1,12 @@
+{
+  "name": "plan002-conversation-history",
+  "description": "대화 이력을 화면에 되살린다 — 새로 고쳐도 이어서 말할 수 있고 보낸 사람 이름이 보인다",
+  "status": "pending",
+  "created_at": "2026-09-17",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}
