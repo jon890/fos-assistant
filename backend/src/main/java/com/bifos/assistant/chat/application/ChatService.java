@@ -16,7 +16,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
@@ -90,27 +89,28 @@ public class ChatService {
                 text,
                 null,
                 conversation.hermesSessionId());
-        return new PendingTurn(user, conversation, agent, command, Instant.now());
+        AgentExecution execution = executions.start(user, conversation, agent, null, null);
+        return new PendingTurn(user, conversation, agent, command, execution);
     }
 
     private HermesRunResult runToCompletion(PendingTurn pending) {
         try {
-            return hermes.runToCompletion(pending.command());
+            HermesRunResult result = hermes.runToCompletion(pending.command());
+            executions.attachRunId(pending.execution(), result.runId());
+            return result;
         } catch (ApiException ex) {
-            executions.recordFailure(
-                    pending.user(), pending.conversation(), pending.agent(), ex.code().name(),
-                    pending.startedAt(), null);
+            executions.fail(pending.execution(), ex.code().name());
             throw ex;
         }
     }
 
     private String submit(PendingTurn pending) {
         try {
-            return hermes.submit(pending.command());
+            String runId = hermes.submit(pending.command());
+            executions.attachRunId(pending.execution(), runId);
+            return runId;
         } catch (ApiException ex) {
-            executions.recordFailure(
-                    pending.user(), pending.conversation(), pending.agent(), ex.code().name(),
-                    pending.startedAt(), null);
+            executions.fail(pending.execution(), ex.code().name());
             throw ex;
         }
     }
@@ -119,26 +119,21 @@ public class ChatService {
         try {
             return hermes.awaitCompletion(pending.command(), runId);
         } catch (ApiException ex) {
-            executions.recordFailure(
-                    pending.user(), pending.conversation(), pending.agent(), ex.code().name(),
-                    pending.startedAt(), runId);
+            executions.fail(pending.execution(), ex.code().name());
             throw ex;
         }
     }
 
     private CompletedTurn finish(PendingTurn pending, HermesRunResult result) {
         if (!result.succeeded()) {
-            executions.recordFailure(
-                    pending.user(), pending.conversation(), pending.agent(), hermesStatus(result),
-                    pending.startedAt(), result.runId());
+            executions.fail(pending.execution(), hermesStatus(result));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
         }
 
         pending.conversation().rememberSession(result.sessionId());
         conversations.save(pending.conversation());
 
-        AgentExecution execution = executions.recordSuccess(
-                pending.user(), pending.conversation(), pending.agent(), result, pending.startedAt());
+        AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result);
         String answer = result.output() == null ? "" : result.output();
         ChatMessage message = messages.save(
                 ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
@@ -203,7 +198,7 @@ public class ChatService {
             Conversation conversation,
             Agent agent,
             HermesRunCommand command,
-            Instant startedAt) {
+            AgentExecution execution) {
     }
 
     private record CompletedTurn(ChatTurn turn, Long messageId) {

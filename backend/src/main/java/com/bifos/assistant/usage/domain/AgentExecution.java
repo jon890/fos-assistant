@@ -1,6 +1,7 @@
 package com.bifos.assistant.usage.domain;
 
 import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.hermes.dto.TokenUsage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -40,6 +41,12 @@ public class AgentExecution {
     @Column(name = "agent_id")
     private Long agentId;
 
+    @Column(name = "parent_execution_id")
+    private Long parentExecutionId;
+
+    @Column(name = "root_execution_id")
+    private Long rootExecutionId;
+
     @Column(name = "profile_name", nullable = false, length = 64)
     private String profileName;
 
@@ -75,12 +82,18 @@ public class AgentExecution {
     @Column(name = "total_tokens")
     private Long totalTokens;
 
-    @Column(name = "latency_ms", nullable = false)
-    private long latencyMs;
+    @Column(name = "latency_ms")
+    private Long latencyMs;
+
+    @Column(name = "context_chars")
+    private Long contextChars;
 
     /** 통화 단위의 100만분의 1로 적은 환산 금액. 가격을 찾지 못했으면 null 이다. */
     @Column(name = "estimated_cost_micros")
     private Long estimatedCostMicros;
+
+    @Column(name = "actual_cost_micros")
+    private Long actualCostMicros;
 
     @Column(name = "cost_currency", length = 3, columnDefinition = "CHAR(3)")
     private String costCurrency;
@@ -92,13 +105,15 @@ public class AgentExecution {
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
 
-    @Column(name = "finished_at", nullable = false)
+    @Column(name = "finished_at")
     private Instant finishedAt;
 
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;
         this.conversationId = builder.conversationId;
         this.agentId = builder.agentId;
+        this.parentExecutionId = builder.parentExecutionId;
+        this.rootExecutionId = builder.rootExecutionId;
         this.profileName = builder.profileName;
         this.hermesRunId = builder.hermesRunId;
         this.provider = builder.provider;
@@ -111,7 +126,9 @@ public class AgentExecution {
         this.outputTokens = builder.outputTokens;
         this.totalTokens = builder.totalTokens;
         this.latencyMs = builder.latencyMs;
+        this.contextChars = builder.contextChars;
         this.estimatedCostMicros = builder.estimatedCostMicros;
+        this.actualCostMicros = builder.actualCostMicros;
         this.costCurrency = builder.costCurrency;
         this.pricingVersion = builder.pricingVersion;
         this.startedAt = builder.startedAt;
@@ -135,6 +152,10 @@ public class AgentExecution {
     }
 
     public Long agentId() { return agentId; }
+
+    public Long parentExecutionId() { return parentExecutionId; }
+
+    public Long rootExecutionId() { return rootExecutionId; }
 
     public String profileName() {
         return profileName;
@@ -180,13 +201,17 @@ public class AgentExecution {
         return totalTokens;
     }
 
-    public long latencyMs() {
+    public Long latencyMs() {
         return latencyMs;
     }
+
+    public Long contextChars() { return contextChars; }
 
     public Long estimatedCostMicros() {
         return estimatedCostMicros;
     }
+
+    public Long actualCostMicros() { return actualCostMicros; }
 
     public String costCurrency() {
         return costCurrency;
@@ -204,10 +229,42 @@ public class AgentExecution {
         return finishedAt;
     }
 
+    /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */
+    public void attachRunId(String hermesRunId) {
+        this.hermesRunId = hermesRunId;
+    }
+
+    /** 끝난 시각과 토큰과 금액을 채우고 SUCCEEDED 로 옮긴다. */
+    public void markSucceeded(
+            String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
+        this.provider = provider;
+        this.model = model;
+        this.inputTokens = usage.inputTokens();
+        this.cachedInputTokens = usage.cachedInputTokens();
+        this.outputTokens = usage.outputTokens();
+        this.totalTokens = usage.totalTokens();
+        this.estimatedCostMicros = cost.micros();
+        this.costCurrency = cost.currency();
+        this.pricingVersion = cost.pricingVersion();
+        this.finishedAt = finishedAt;
+        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        this.status = ExecutionStatus.SUCCEEDED;
+    }
+
+    /** 끝난 시각과 오류 코드를 채우고 FAILED 로 옮긴다. */
+    public void markFailed(String errorCode, Instant finishedAt) {
+        this.errorCode = errorCode;
+        this.finishedAt = finishedAt;
+        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        this.status = ExecutionStatus.FAILED;
+    }
+
     public static final class Builder {
         private Long userId;
         private Long conversationId;
         private Long agentId;
+        private Long parentExecutionId;
+        private Long rootExecutionId;
         private String profileName;
         private String hermesRunId;
         private String provider;
@@ -219,8 +276,10 @@ public class AgentExecution {
         private Long cachedInputTokens;
         private Long outputTokens;
         private Long totalTokens;
-        private long latencyMs;
+        private Long latencyMs;
+        private Long contextChars;
         private Long estimatedCostMicros;
+        private Long actualCostMicros;
         private String costCurrency;
         private String pricingVersion;
         private Instant startedAt;
@@ -238,6 +297,16 @@ public class AgentExecution {
 
         public Builder agentId(Long agentId) {
             this.agentId = agentId;
+            return this;
+        }
+
+        public Builder parentExecutionId(Long parentExecutionId) {
+            this.parentExecutionId = parentExecutionId;
+            return this;
+        }
+
+        public Builder rootExecutionId(Long rootExecutionId) {
+            this.rootExecutionId = rootExecutionId;
             return this;
         }
 
@@ -296,6 +365,11 @@ public class AgentExecution {
             this.startedAt = startedAt;
             this.finishedAt = finishedAt;
             this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+            return this;
+        }
+
+        public Builder startedAt(Instant startedAt) {
+            this.startedAt = startedAt;
             return this;
         }
 

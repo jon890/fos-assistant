@@ -27,6 +27,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 sum(case when e.estimatedCostMicros is null then 1L else 0L end))
             from AgentExecution e
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
             """)
     MonthlyCost sumCostBetween(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);

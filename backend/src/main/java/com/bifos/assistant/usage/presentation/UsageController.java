@@ -90,7 +90,7 @@ public class UsageController {
             Long cachedInputTokens,
             Long outputTokens,
             Long totalTokens,
-            long latencyMs,
+            Long latencyMs,
             Long estimatedCostMicros,
             String costCurrency,
             String pricingVersion,
