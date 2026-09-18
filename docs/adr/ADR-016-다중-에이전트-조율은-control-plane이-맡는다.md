@@ -1,6 +1,11 @@
 ## ADR-016: 다중 에이전트 조율은 Control Plane이 맡는다
 
-- **status**: `accepted`
+- **status**: `superseded`
+- 조율 주체를 [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 이 바꿨다.
+  어느 에이전트를 부를지는 이제 Hermes 가 정한다.
+  **경계에 대한 결정과 아래 실측은 그대로 유효하다.**
+  요청 본문과 모델의 출력이 profile 이나 credential 을 정하지 못한다는 규칙,
+  자식 토큰이 부모 사용량에 포함되지 않는다는 실측이 여기 해당한다.
 - **결정**: Task 분해, 에이전트 선택, 의존 관계, 병렬 실행, 재시도와 결과 종합을
   Control Plane이 맡는다.
   Hermes는 `agent_execution` 하나를 실행하는 런타임으로만 쓴다.
