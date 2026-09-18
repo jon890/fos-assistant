@@ -9,6 +9,8 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryProposer;
+import com.bifos.assistant.orchestration.application.Flow;
+import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
@@ -25,6 +27,8 @@ import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import lombok.RequiredArgsConstructor;
@@ -55,12 +59,17 @@ public class ChatService {
     private final ExecutionEventRepository executionEvents;
     private final ContextAssembler contextAssembler;
     private final MemoryProposer memoryProposer;
+    private final FlowRegistry flows;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
-        PendingTurn pending = prepare(user, conversationId, text, agentCode);
+        Routed routed = route(user, conversationId, text, agentCode);
+        if (routed.flow() != null) {
+            return routed.flow().run(user, routed.conversation(), routed.agent(), text, event -> {});
+        }
+        PendingTurn pending = prepare(user, routed, text);
         String runId = submit(pending);
         HermesRunResult result = awaitCompletion(pending, runId);
-        return finish(pending, result).turn();
+        return finish(pending, result);
     }
 
     public void stream(
@@ -69,7 +78,12 @@ public class ChatService {
             String text,
             String agentCode,
             Consumer<ChatEvent> onEvent) {
-        PendingTurn pending = prepare(user, conversationId, text, agentCode);
+        Routed routed = route(user, conversationId, text, agentCode);
+        if (routed.flow() != null) {
+            streamFlow(user, routed, text, onEvent);
+            return;
+        }
+        PendingTurn pending = prepare(user, routed, text);
         String runId = submit(pending);
         try {
             eventStream.open(
@@ -82,20 +96,43 @@ public class ChatService {
         }
 
         HermesRunResult result = awaitCompletion(pending, runId);
-        CompletedTurn completed = finish(pending, result);
-        onEvent.accept(ChatEvent.done(
-                completed.turn().conversationId(),
-                completed.messageId(),
-                completed.turn().executionId()));
+        ChatTurn turn = finish(pending, result);
+        onEvent.accept(
+                ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
     }
 
-    private PendingTurn prepare(
-            CurrentUser user, Long conversationId, String text, String agentCode) {
+    /**
+     * 흐름으로 도는 turn 을 중계한다.
+     *
+     * <p>흐름은 단계 사건만 흘리고 답은 끝난 뒤에 한 번에 온다. 중간 단계의 답까지 흘리면 읽을 수
+     * 없기 때문이다. 근거는 ADR-016 과 plan011 의 phase-03 에 있다.
+     */
+    private void streamFlow(
+            CurrentUser user, Routed routed, String text, Consumer<ChatEvent> onEvent) {
+        ChatTurn turn = routed.flow().run(user, routed.conversation(), routed.agent(), text, onEvent);
+        onEvent.accept(ChatEvent.delta(turn.assistantText()));
+        onEvent.accept(
+                ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+    }
+
+    /**
+     * 대화와 에이전트를 정하고 어느 경로로 갈지 고른다.
+     *
+     * <p>에이전트에 {@code flow} 가 적혀 있으면 그 흐름으로 간다. 비어 있으면 지금처럼 Hermes 를 한
+     * 번 부른다. 모르는 이름은 기동할 때 이미 걸러졌다.
+     */
+    private Routed route(CurrentUser user, Long conversationId, String text, String agentCode) {
         Conversation conversation = resolveConversation(user, conversationId, text, agentCode);
         Agent agent = agents.requireById(conversation.agentId());
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
+        return new Routed(conversation, agent, flows.find(agent.flow()));
+    }
+
+    private PendingTurn prepare(CurrentUser user, Routed routed, String text) {
+        Conversation conversation = routed.conversation();
+        Agent agent = routed.agent();
         messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
 
         AssembledContext context = contextAssembler.assemble(user);
@@ -133,7 +170,7 @@ public class ChatService {
         }
     }
 
-    private CompletedTurn finish(PendingTurn pending, HermesRunResult result) {
+    private ChatTurn finish(PendingTurn pending, HermesRunResult result) {
         if (!result.succeeded()) {
             executions.fail(pending.execution(), hermesStatus(result));
             append(pending, ExecutionEventType.RUN_FAILED, hermesStatus(result));
@@ -149,8 +186,26 @@ public class ChatService {
         ChatMessage message = messages.save(
                 ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
         memoryProposer.proposeFrom(pending.user(), pending.conversation(), pending.agent(), execution, answer);
-        return new CompletedTurn(
-                new ChatTurn(pending.conversation().id(), execution.id(), answer), message.id());
+        return new ChatTurn(pending.conversation().id(), execution.id(), answer, message.id());
+    }
+
+    /**
+     * 이 실행들 중 자식을 가진 것을 낸다.
+     *
+     * <p>대화 이력이 「이 답이 어떻게 만들어졌는지 보기」 를 어느 답에 붙일지 정하는 데 쓴다. 실행마다
+     * 세지 않고 한 번에 읽는다. 빈 {@code in} 절은 데이터베이스마다 다르게 동작하므로 목록이 비면
+     * 부르지 않는다.
+     */
+    public Set<Long> executionIdsHavingChildren(List<ChatMessage> history) {
+        List<Long> executionIds = history.stream()
+                .map(ChatMessage::executionId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (executionIds.isEmpty()) {
+            return Set.of();
+        }
+        return Set.copyOf(executions.idsHavingChildren(executionIds));
     }
 
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {
@@ -257,6 +312,7 @@ public class ChatService {
             SequenceCounter counter) {
     }
 
-    private record CompletedTurn(ChatTurn turn, Long messageId) {
+    /** 이 turn 이 어느 대화와 에이전트의 것인지, 그리고 어느 흐름으로 갈지. 흐름이 없으면 null 이다. */
+    private record Routed(Conversation conversation, Agent agent, Flow flow) {
     }
 }

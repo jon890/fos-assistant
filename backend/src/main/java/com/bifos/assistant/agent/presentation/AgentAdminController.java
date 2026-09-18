@@ -9,6 +9,7 @@ import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.ModelSyncView;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
 import com.bifos.assistant.hermes.HermesModelClient;
+import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -33,6 +34,7 @@ public class AgentAdminController {
     private final CurrentUserProvider currentUser;
     private final HermesModelClient hermesModels;
     private final AgentModelSync modelSync;
+    private final FlowRegistry flows;
 
     @PostMapping
     public AdminAgentView create(@Valid @RequestBody CreateAgentRequest request) {
@@ -49,7 +51,21 @@ public class AgentAdminController {
                 request.hermesProfile(), request.apiBaseUrl(), request.provider(), model,
                 request.costMode(), request.credentialScope(), request.visibility(), ownerId);
         agent.syncModel(model);
+        agent.assignFlow(requireKnownFlow(request.flow()));
         return AdminAgentView.from(agents.save(agent));
+    }
+
+    /**
+     * 모르는 흐름 이름을 저장하지 못하게 막는다.
+     *
+     * <p>기동할 때도 같은 것을 확인한다. 여기서 막는 것은 이미 도는 서버를 다음 기동에서 세우지 않기
+     * 위해서다.
+     */
+    private String requireKnownFlow(String flow) {
+        if (flow == null || flow.isBlank() || flows.find(flow) != null) {
+            return flow;
+        }
+        throw new ApiException(ErrorCode.VALIDATION_FAILED, "no such flow");
     }
 
     @GetMapping

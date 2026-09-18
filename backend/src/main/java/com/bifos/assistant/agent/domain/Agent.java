@@ -63,6 +63,15 @@ public class Agent {
     @Column(nullable = false)
     private boolean enabled;
 
+    /**
+     * 이 에이전트를 묶어 둔 다중 에이전트 흐름의 이름. 비어 있으면 Hermes 를 한 번 부른다.
+     *
+     * <p>모르는 이름이 적혀 있으면 기동할 때 {@code FlowRegistry} 가 실패시킨다. 잘못 적힌 이름을
+     * 사용자가 그 에이전트를 고를 때 알게 되면 늦기 때문이다.
+     */
+    @Column(name = "flow", length = 64)
+    private String flow;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -107,6 +116,12 @@ public class Agent {
     public AgentVisibility visibility() { return visibility; }
     public Long ownerUserId() { return ownerUserId; }
     public boolean enabled() { return enabled; }
+    public String flow() { return flow; }
+
+    /** 흐름 이름을 붙이거나 뗀다. 빈 문자열은 비운 것과 같게 본다. */
+    public void assignFlow(String flow) {
+        this.flow = flow == null || flow.isBlank() ? null : flow.strip();
+    }
 
     public boolean isReadableBy(Long userId) {
         return visibility == AgentVisibility.FAMILY || Objects.equals(ownerUserId, userId);

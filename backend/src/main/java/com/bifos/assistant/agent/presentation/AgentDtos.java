@@ -35,7 +35,8 @@ public final class AgentDtos {
             @NotNull CostMode costMode,
             @NotNull CredentialScope credentialScope,
             @NotNull AgentVisibility visibility,
-            String ownerEmail) {}
+            String ownerEmail,
+            @Pattern(regexp = "[a-z0-9][a-z0-9-]{0,63}") String flow) {}
 
     public record UpdateAgentRequest(
             @NotNull Boolean enabled,
@@ -47,12 +48,12 @@ public final class AgentDtos {
     public record AdminAgentView(Long id, String code, String name, String hermesProfile,
             String apiBaseUrl, String provider, String model, Instant modelSyncedAt,
             String costMode, String credentialScope, String visibility, Long ownerUserId,
-            boolean enabled) {
+            boolean enabled, String flow) {
         static AdminAgentView from(Agent agent) {
             return new AdminAgentView(agent.id(), agent.code(), agent.name(), agent.hermesProfile(),
                     agent.apiBaseUrl(), agent.provider(), agent.model(), agent.modelSyncedAt(),
                     agent.costMode().name(), agent.credentialScope().name(), agent.visibility().name(),
-                    agent.ownerUserId(), agent.enabled());
+                    agent.ownerUserId(), agent.enabled(), agent.flow());
         }
     }
 }

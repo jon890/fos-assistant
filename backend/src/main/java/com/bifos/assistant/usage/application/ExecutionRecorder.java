@@ -9,6 +9,8 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -76,6 +78,16 @@ public class ExecutionRecorder {
         execution.markSucceeded(
                 provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
         return executions.save(execution);
+    }
+
+    /**
+     * 이 번호들 중 자식을 가진 것만 낸다.
+     *
+     * <p>대화 이력이 어느 답에 실행 나무로 가는 길을 붙일지 정하는 데 쓴다. 실행마다 세지 않고 한 번에
+     * 읽는다.
+     */
+    public List<Long> idsHavingChildren(Collection<Long> executionIds) {
+        return executions.findParentIdsHavingChildren(executionIds);
     }
 
     /** 끝난 실행을 FAILED 로 갱신한다. */
