@@ -29,6 +29,7 @@ import { conversationHistoryScenario } from "./scenarios/conversation-history.ts
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
 import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
+import { modelSelectionScenario } from "./scenarios/model-selection.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -64,6 +65,8 @@ const SCENARIOS: readonly Scenario[] = [
   conversationHistoryScenario,
   streamingScenario,
   orchestrationScenario,
+  // 막힌 provider 를 만들어 두고 끝나므로 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
+  modelSelectionScenario,
 ];
 
 async function waitForHealth(url: string, logPath: string): Promise<void> {

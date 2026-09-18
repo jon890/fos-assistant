@@ -22,6 +22,10 @@ public enum ErrorCode {
     HERMES_RUN_FAILED(HttpStatus.BAD_GATEWAY),
     HERMES_RUN_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT),
     HERMES_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
+    /** 그 provider 의 계정이 전부 막혀 다음 모델로 넘어갔다. 실행 줄에 남는 이름이기도 하다. */
+    PROVIDER_BLOCKED(HttpStatus.BAD_GATEWAY),
+    /** 이 에이전트가 지금 쓸 수 있는 모델이 하나도 없다. 목록이 비었거나 전부 막혔다. */
+    NO_MODEL_AVAILABLE(HttpStatus.CONFLICT),
     /** 자식 실행이 다시 자식을 부르려 했다. 깊이를 1로 제한한다. */
     ORCHESTRATION_DEPTH_EXCEEDED(HttpStatus.CONFLICT),
     /** 흐름의 한 단계가 정한 출력 계약을 지키지 않았다. 원문을 그대로 다음 단계로 넘기지 않는다. */

@@ -3,6 +3,9 @@ package com.bifos.assistant.orchestration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.agent.application.AgentModelSelector;
+import com.bifos.assistant.agent.domain.ModelOption;
+import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -62,6 +65,8 @@ class ChildExecutionRunnerTest {
     @Autowired ExecutionRecorder recorder;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
+    @Autowired AgentModelSelector modelSelector;
+    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
@@ -100,7 +105,7 @@ class ChildExecutionRunnerTest {
     private CurrentUser member(String email, String agentCode) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         if (agentCode != null) {
-            agents.save(Agent.of(
+            Agent saved = agents.save(Agent.of(
                     agentCode,
                     agentCode,
                     agentCode,
@@ -111,6 +116,7 @@ class ChildExecutionRunnerTest {
                     CredentialScope.SHARED_HOUSEHOLD,
                     AgentVisibility.PRIVATE,
                     user.id()));
+            modelSelector.seedFirst(saved, new ModelOption("anthropic", "claude-opus-5"));
         }
         return new CurrentUser(
                 user.id(), user.email(), user.displayName(), user.familyId(), user.role());
@@ -128,7 +134,7 @@ class ChildExecutionRunnerTest {
     }
 
     private static HermesRunResult completed(String runId, String output) {
-        return new HermesRunResult(
+        return HermesRunResult.of(
                 runId, "sess-child", "completed", output, "claude-opus-5", "anthropic",
                 new TokenUsage(30L, 10L, 5L, 35L));
     }
@@ -154,6 +160,34 @@ class ChildExecutionRunnerTest {
             // 자식은 부모의 session 을 잇지 않는다. 중간 산출물이 대화 session 에 쌓이면 안 된다.
             assertThat(command.sessionId()).isNull();
         });
+    }
+
+    /**
+     * 자식은 자기 에이전트가 정한 1순위를 쓴다. 부모의 것을 물려받지 않는다.
+     *
+     * <p>자식이 다른 에이전트면 그 에이전트가 정한 모델이 맞다.
+     */
+    @Test
+    void 자식_실행이_자기_에이전트의_1순위를_쓴다() {
+        CurrentUser dad = member("child-dad@example.com", "child-dad");
+        CurrentUser mom = member("child-mom@example.com", "child-mom");
+        Agent childAgent = agents.findByCode("child-mom").orElseThrow();
+        modelSelector.replace(childAgent, java.util.List.of(new ModelOption("nvidia", "nemotron")));
+        agents.save(childAgent);
+        Agent shared = agents.findByCode("child-mom").orElseThrow();
+        shared.changeAccess(true, com.bifos.assistant.agent.domain.AgentVisibility.FAMILY, null);
+        agents.save(shared);
+        Conversation conversation = conversationOf(dad, "child-dad");
+        AgentExecution parent = parentOf(dad, conversation, "child-dad");
+        stub().willReturn(completed("run-child", "조사 결과"));
+
+        children.run(dad, conversation, parent, "child-mom", "이것을 조사해라");
+
+        assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.provider()).isEqualTo("nvidia");
+            assertThat(command.model()).isEqualTo("nemotron");
+        });
+        assertThat(mom.id()).isNotNull();
     }
 
     @Test

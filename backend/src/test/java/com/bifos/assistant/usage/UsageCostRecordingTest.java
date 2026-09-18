@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -38,7 +41,11 @@ class UsageCostRecordingTest {
 
     private static final Long USER_ID = 4_101L;
 
+
     @Autowired ExecutionRecorder recorder;
+
+    /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
+    @MockitoBean HermesRunsClient hermes;
     @Autowired AgentExecutionRepository executions;
     @Autowired ConversationRepository conversations;
 
@@ -144,13 +151,22 @@ class UsageCostRecordingTest {
         return new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
     }
 
+    /**
+     * 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다.
+     *
+     * <p>이 검사는 세션 조회를 하지 않으므로 그 에이전트의 1순위를 그대로 요청 값으로 둔다.
+     */
+    private static ModelOption requested(Agent agent) {
+        return new ModelOption(agent.provider(), agent.model());
+    }
+
     private AgentExecution complete(HermesRunResult result) {
         return complete(result, subscriptionAgent());
     }
 
     private AgentExecution complete(HermesRunResult result, Agent agent) {
         AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
-        return recorder.complete(execution, agent, result);
+        return recorder.complete(execution, agent, result, requested(agent));
     }
 
     private AgentExecution fail() {
@@ -203,7 +219,7 @@ class UsageCostRecordingTest {
 
     private static HermesRunResult run(Long input, Long cached, Long output) {
         long total = (input == null ? 0 : input) + (output == null ? 0 : output);
-        return new HermesRunResult(
+        return HermesRunResult.of(
                 "run-1",
                 "session-1",
                 "completed",

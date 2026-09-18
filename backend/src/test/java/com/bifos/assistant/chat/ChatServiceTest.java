@@ -12,6 +12,9 @@ import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.agent.application.AgentModelSelector;
+import com.bifos.assistant.agent.domain.ModelOption;
+import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -80,6 +83,8 @@ class ChatServiceTest {
     @Autowired MemoryService memories;
     @Autowired MemoryRepository memoryRepository;
     @Autowired HermesRunsClient hermes;
+    @Autowired AgentModelSelector modelSelector;
+    @Autowired AgentModelOptionRepository modelOptions;
 
     /** 실행 사건을 검사하려면 스트림을 우리가 열어 주어야 한다. */
     @MockitoBean HermesRunEventStream eventStream;
@@ -123,6 +128,7 @@ class ChatServiceTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
+        modelOptions.deleteAll();
         agents.deleteAll();
         memoryRepository.deleteAll();
         users.deleteAll();
@@ -131,7 +137,7 @@ class ChatServiceTest {
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         if (profileName != null) {
-            agents.save(
+            Agent saved = agents.save(
                     Agent.of(
                             profileName,
                             profileName,
@@ -143,6 +149,7 @@ class ChatServiceTest {
                             CredentialScope.SHARED_HOUSEHOLD,
                             AgentVisibility.PRIVATE,
                             user.id()));
+            modelSelector.seedFirst(saved, new ModelOption("anthropic", "claude-opus-5"));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
     }
@@ -152,7 +159,7 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
-                        new HermesRunResult(
+                        HermesRunResult.of(
                                 "run-1",
                                 "sess-1",
                                 "completed",
@@ -213,7 +220,7 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
         ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
 
@@ -228,7 +235,7 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
-                        new HermesRunResult(
+                        HermesRunResult.of(
                                 "run-1", "sess-1", "completed", "반가워요", "m", "p", TokenUsage.empty()));
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
         SecurityContextHolder.getContext()
@@ -251,13 +258,13 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
-                        new HermesRunResult(
+                        HermesRunResult.of(
                                 "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
         ChatTurn first = chat.send(dad, null, "안녕", "dad");
 
         stub()
                 .willReturn(
-                        new HermesRunResult(
+                        HermesRunResult.of(
                                 "run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
         chat.send(dad, first.conversationId(), "하나 더", "mom");
 
@@ -269,7 +276,7 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
-                        new HermesRunResult(
+                        HermesRunResult.of(
                                 "run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
@@ -296,7 +303,7 @@ class ChatServiceTest {
         CurrentUser mom = member("mom@example.com", "mom");
         stub()
                 .willReturn(
-                        new HermesRunResult(
+                        HermesRunResult.of(
                                 "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
         ChatTurn dadTurn = chat.send(dad, null, "비밀 얘기", "dad");
 
@@ -324,7 +331,7 @@ class ChatServiceTest {
     void Hermes가_실패_결과를_돌려줘도_실행_줄_하나를_FAILED로_갱신한다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(dad, null, "안녕", "dad"))
                 .isInstanceOf(ApiException.class)
@@ -344,7 +351,7 @@ class ChatServiceTest {
     void 스트리밍_한_번이_RUN_STARTED로_시작해_RUN_COMPLETED로_끝나는_사건을_남긴다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("message.delta", "조각", null, null, null, null),
                 new RunEvent("tool.started", null, "web_search", "started", null, null),
@@ -381,7 +388,7 @@ class ChatServiceTest {
     void 스트리밍_한_번이_RUN_COMPLETED를_한_줄만_남긴다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("tool.started", null, "web_search", "started", null, null),
                 new RunEvent("run.completed", null, null, null, null, null));
@@ -398,7 +405,7 @@ class ChatServiceTest {
     void 글자_조각은_사건으로_저장하지_않는다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("message.delta", "조각 하나", null, null, null, null),
                 new RunEvent("message.delta", "조각 둘", null, null, null, null));
@@ -415,7 +422,7 @@ class ChatServiceTest {
     void 사건_저장이_예외를_던져도_대화는_성공하고_중계도_이어진다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "completed", "저녁은 김치찌개", "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "completed", "저녁은 김치찌개", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("message.delta", "저녁은 ", null, null, null, null),
                 new RunEvent("tool.started", null, "web_search", "started", null, null));
@@ -440,7 +447,7 @@ class ChatServiceTest {
     void 한_번에_받는_경로는_RUN_STARTED와_RUN_COMPLETED_둘만_남긴다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 
@@ -454,7 +461,7 @@ class ChatServiceTest {
     void Hermes가_실패로_끝나면_RUN_FAILED가_남고_예외는_그대로_올라간다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                new HermesRunResult("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
+                HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(dad, null, "안녕", "dad"))
                 .isInstanceOf(ApiException.class)

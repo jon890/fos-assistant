@@ -4,11 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.domain.ModelOption;
+import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -57,21 +61,25 @@ class MemoryProposerTest {
     @Autowired AgentExecutionRepository executions;
     @Autowired MemoryRepository memories;
     @Autowired HermesRunsClient hermes;
+    @Autowired AgentModelSelector modelSelector;
+    @Autowired AgentModelOptionRepository modelOptions;
     private Agent agent;
     private Conversation conversation;
 
     @BeforeEach
     void 준비한다() {
-        memories.deleteAll(); executions.deleteAll(); conversations.deleteAll(); agents.deleteAll();
+        memories.deleteAll(); executions.deleteAll(); conversations.deleteAll();
+        modelOptions.deleteAll(); agents.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
         agent = agents.save(Agent.of("test", "검사", "test", "http://runtime.test", "provider", "model", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, USER.id()));
+        modelSelector.seedFirst(agent, new ModelOption("provider", "model"));
         conversation = conversations.save(Conversation.startedBy(USER.id(), "대화", agent.id()));
     }
 
     @Test
     void 제안을_만들면_부모와_뿌리_실행을_기록하고_PROPOSED로_저장한다() {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
-        ((StubHermesRunsClient) hermes).willReturn(new HermesRunResult("proposal", "new", "completed", "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}", "model", "provider", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("proposal", "new", "completed", "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}", "model", "provider", TokenUsage.empty()));
 
         proposer.proposeFrom(USER, conversation, agent, parent, "국수 이야기");
 
@@ -104,7 +112,7 @@ class MemoryProposerTest {
     @Test
     void NONE과_잘못된_JSON은_Memory를_만들지_않는다() {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
-        ((StubHermesRunsClient) hermes).willReturn(new HermesRunResult("proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));
         proposer.proposeFrom(USER, conversation, agent, parent, "답");
         assertThat(memories.findAll()).isEmpty();
     }
@@ -115,9 +123,14 @@ class MemoryProposerTest {
         doThrow(new IllegalStateException("database unavailable")).when(failingRecorder)
                 .start(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong());
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        AgentModelSelector selector = mock(AgentModelSelector.class);
+        when(selector.availableFor(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.List.of(new ModelOption("provider", "model")));
         MemoryProposer isolated = new MemoryProposer(new MemoryProposalProperties(true),
-                mock(MemoryService.class), mock(HermesRunsClient.class), failingRecorder, new ObjectMapper());
+                mock(MemoryService.class), mock(HermesRunsClient.class), selector, failingRecorder,
+                new ObjectMapper());
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
 
         assertThatCode(() -> isolated.proposeFrom(USER, conversation, agent, parent, "답"))

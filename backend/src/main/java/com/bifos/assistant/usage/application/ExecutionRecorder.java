@@ -2,7 +2,10 @@ package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.ModelOption;
+import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -12,6 +15,8 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -24,8 +29,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ExecutionRecorder {
 
+    private static final Logger log = LoggerFactory.getLogger(ExecutionRecorder.class);
+
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;
+    private final HermesRunsClient hermes;
 
     /** 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다. */
     public AgentExecution start(
@@ -52,10 +60,34 @@ public class ExecutionRecorder {
             Long parentExecutionId,
             Long rootExecutionId,
             ExecutionContextSnapshot context) {
+        return start(user, conversation, agent, parentExecutionId, rootExecutionId, context, null, null);
+    }
+
+    /**
+     * 요청에 실을 모델과 다시 시도한 직전 실행까지 적으며 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>{@code requested} 를 시작할 때 적어 두면 실패로 끝난 실행도 어느 provider 로 시도한 것인지
+     * 남는다. 성공하면 실제로 돈 값으로 덮인다.
+     *
+     * @param requested 이 실행에 실을 provider 와 모델. 고르지 못했으면 null
+     * @param retryOfExecutionId 막혀서 넘어오며 대신하는 직전 실행. 첫 시도면 null
+     */
+    public AgentExecution start(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            ExecutionContextSnapshot context,
+            ModelOption requested,
+            Long retryOfExecutionId) {
         return executions.save(
                 base(user, conversation, agent)
                         .parentExecutionId(parentExecutionId)
                         .rootExecutionId(rootExecutionId)
+                        .retryOfExecutionId(retryOfExecutionId)
+                        .provider(requested == null ? null : requested.provider())
+                        .model(requested == null ? null : requested.model())
                         .contextChars(context.contextChars())
                         .contextOmittedItems(context.contextOmittedItems())
                         .runtimeFingerprint(context.runtimeFingerprint())
@@ -70,11 +102,26 @@ public class ExecutionRecorder {
         executions.save(execution);
     }
 
-    /** 끝난 실행을 SUCCEEDED 로 갱신한다. */
-    public AgentExecution complete(AgentExecution execution, Agent agent, HermesRunResult result) {
+    /**
+     * 끝난 실행을 SUCCEEDED 로 갱신한다.
+     *
+     * <p>기록할 모델은 {@code GET /api/sessions/{session_id}} 가 정한다. 실행 조회의 {@code model} 은
+     * 우리가 보낸 값을 되돌려 줄 뿐이라, 넘김이 일어난 실행에서는 실제와 어긋난다. 세션 조회가 실패해도
+     * 실행은 성공으로 남기고 요청에 보낸 값을 적는다. 모델 이름을 모르는 것이 답을 버릴 이유가 되지
+     * 않는다.
+     *
+     * @param requested 이 실행에 실어 보낸 provider 와 모델
+     */
+    public AgentExecution complete(
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelOption requested) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        String provider = firstNonBlank(result.provider(), agent.provider());
-        String model = modelOf(result, agent);
+        SessionRuntime actual = readActualRuntime(agent, result);
+        String provider = firstNonBlank(
+                actual == null ? null : actual.provider(),
+                requested == null ? null : requested.provider());
+        String model = firstNonBlank(
+                actual == null ? null : actual.model(),
+                requested == null ? null : requested.model());
         execution.attachRunId(result.runId());
         execution.markSucceeded(
                 provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
@@ -97,6 +144,18 @@ public class ExecutionRecorder {
         return executions.save(execution);
     }
 
+    private SessionRuntime readActualRuntime(Agent agent, HermesRunResult result) {
+        SessionRuntime actual =
+                hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), result.sessionId());
+        if (actual == null) {
+            log.info(
+                    "실제로 돈 모델을 읽지 못해 요청에 보낸 값을 적는다 profile={} sessionId={}",
+                    agent.hermesProfile(),
+                    result.sessionId());
+        }
+        return actual;
+    }
+
     private AgentExecution.Builder base(CurrentUser user, Conversation conversation, Agent agent) {
         return AgentExecution.builder()
                 .userId(user.id())
@@ -109,21 +168,5 @@ public class ExecutionRecorder {
 
     private static String firstNonBlank(String preferred, String fallback) {
         return preferred == null || preferred.isBlank() ? fallback : preferred;
-    }
-
-    /**
-     * 기록할 모델을 고른다.
-     *
-     * <p>실행의 {@code model}은 API server가 보고한 모델 이름이며, 기본값은 profile 이름이다.
-     * 실제 Hermes 실행에서 profile {@code bifos}는 {@code "model": "bifos"}를 보고하므로,
-     * 이를 그대로 쓰면 사용한 모델이 아니라 구성원 이름으로 실행을 표시하게 된다.
-     * 실행이 profile만 되풀이하면 바인딩에 설정한 모델이 정확한 값이다.
-     */
-    private static String modelOf(HermesRunResult result, Agent agent) {
-        String reported = result.model();
-        if (reported == null || reported.isBlank() || reported.equals(agent.hermesProfile())) {
-            return agent.model();
-        }
-        return reported;
     }
 }

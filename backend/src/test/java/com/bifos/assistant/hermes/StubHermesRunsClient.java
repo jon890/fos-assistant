@@ -2,6 +2,7 @@ package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.shared.error.ApiException;
 import java.util.ArrayDeque;
 import java.util.Collections;
@@ -28,6 +29,10 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private volatile ApiException nextFailure;
     private volatile Runnable beforeAwait = () -> {};
 
+    /** 세션 조회가 답할 값이다. 비어 있으면 읽지 못한 것으로 본다. */
+    private volatile SessionRuntime sessionRuntime;
+    private final List<String> sessionLookups = new CopyOnWriteArrayList<>();
+
     public void willReturn(HermesRunResult result) {
         this.nextResult = result;
         this.nextFailure = null;
@@ -51,6 +56,16 @@ public class StubHermesRunsClient implements HermesRunsClient {
     public void willAnswer(Function<HermesRunCommand, HermesRunResult> answer) {
         this.answer = answer;
         this.nextFailure = null;
+    }
+
+    /** 세션 조회가 실제로 돈 provider 와 모델을 이렇게 답하게 한다. */
+    public void willReportSessionRuntime(SessionRuntime runtime) {
+        this.sessionRuntime = runtime;
+    }
+
+    /** 세션 조회를 부른 session 번호들. */
+    public List<String> sessionLookups() {
+        return sessionLookups;
     }
 
     public void willFail(ApiException failure) {
@@ -77,6 +92,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         answer = null;
         nextFailure = null;
         beforeAwait = () -> {};
+        sessionRuntime = null;
+        sessionLookups.clear();
     }
 
     @Override
@@ -100,6 +117,12 @@ public class StubHermesRunsClient implements HermesRunsClient {
             throw nextFailure;
         }
         return submittedResults.getOrDefault(runId, nextResult);
+    }
+
+    @Override
+    public SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
+        sessionLookups.add(sessionId);
+        return sessionRuntime;
     }
 
     private HermesRunResult resultFor(HermesRunCommand command) {
