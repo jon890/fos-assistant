@@ -83,7 +83,7 @@ export function ExecutionNode({ node, depth }: { node: ExecutionTreeNode; depth:
   const showsTruncated = node.truncated || (stoppedByScreen && node.children.length > 0);
 
   return (
-    <li className="min-w-0" style={{ marginLeft: depth === 0 ? 0 : 12 }} data-testid="execution-node">
+    <li className={`min-w-0 ${depth === 0 ? "" : "ml-3"}`} data-testid="execution-node">
       <div className="min-w-0 border-l border-border pl-3">
         <p className="truncate text-sm font-medium">{label}</p>
         <ul className="min-w-0">

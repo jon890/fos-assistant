@@ -241,9 +241,11 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 ## 아직 만들지 않은 것
 
-- 여러 에이전트를 잇는 실행 구조.
-  `parent_execution_id` 와 `root_execution_id` 가 있고 나무 조회와 화면도 자식을 담을 수 있지만,
-  자식 실행을 실제로 만드는 경로가 아직 없다
+- Hermes 하위 에이전트가 자식 실행 줄을 남기는 경로.
+  지금 자식 실행을 만드는 자리는 Memory 제안 하나뿐이고,
+  그것도 `assistant.memory.propose.enabled` 를 켠 곳에서만 돈다.
+  기본값은 꺼짐이다.
+  `parent_execution_id` 와 `root_execution_id` 는 있고 나무 조회와 화면도 자식을 담을 수 있다
 - 실제 청구액과 환산액을 나눠 보는 비용 분석
 
 SSE 중계와 스트리밍은 끝났다.

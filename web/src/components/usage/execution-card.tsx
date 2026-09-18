@@ -11,14 +11,16 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
       <Link
         href={`/executions/${execution.id}`}
         className="absolute inset-0"
-        aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)`}
+        aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)${
+          execution.hasChildren ? ", 하위 실행 있음" : ""
+        }`}
       />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate font-semibold">
             {execution.agentName}
             {execution.hasChildren ? (
-              <span className="ml-1 text-muted" title="하위 실행 있음">
+              <span className="pointer-events-none ml-1 text-muted" aria-hidden="true">
                 ▸
               </span>
             ) : null}

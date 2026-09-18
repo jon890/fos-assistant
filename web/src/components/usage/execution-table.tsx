@@ -38,13 +38,15 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 <Link
                   href={`/executions/${execution.id}`}
                   className="font-medium hover:underline"
-                  aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)`}
+                  aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)${
+                    execution.hasChildren ? ", 하위 실행 있음" : ""
+                  }`}
                   onClick={(event) => event.stopPropagation()}
                 >
                   {execution.agentName}
                 </Link>
                 {execution.hasChildren ? (
-                  <span className="ml-1 text-muted" title="하위 실행 있음">
+                  <span className="ml-1 text-muted" aria-hidden="true">
                     ▸
                   </span>
                 ) : null}
