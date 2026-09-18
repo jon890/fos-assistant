@@ -14,6 +14,8 @@ export type Context = {
   readonly tokens: { readonly dad: string; readonly kid: string };
   /** fake Hermes 가 듣고 있는 주소 */
   readonly hermesBaseUrl: string;
+  /** profile 마다 쓰는 API server key. 대역을 하나 더 띄우는 시나리오가 같은 값을 받아야 한다 */
+  readonly hermesProfileKey: string;
   /** 실행 완료를 제어하는 fake Hermes */
   readonly hermes: FakeHermes;
 };
