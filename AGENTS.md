@@ -7,6 +7,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 
 | 문서 | 언제 보는지 |
 | --- | --- |
+| [`docs/prd.md`](docs/prd.md) | 새 기능이 이 제품에 속하는지 판단할 때 |
 | [`docs/code-architecture.md`](docs/code-architecture.md) | 패키지와 경계를 바꿀 때 |
 | [`docs/hermes-integration.md`](docs/hermes-integration.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
 | [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정을 할 때 |
