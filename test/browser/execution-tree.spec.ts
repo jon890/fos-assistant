@@ -245,6 +245,12 @@ test("나무가 위쪽에서 잘렸으면 뿌리 위에 안내가 보인다", as
   await expect(page.getByText("여기부터 보이지 않는다")).toHaveCount(0);
 });
 
+/**
+ * 이 검사는 회귀를 잡는 것이 아니다. 고치기 전 코드에서도 통과한다.
+ *
+ * <p>위쪽 안내를 「언제나 그린다」 로 잘못 고치는 것을 막는 짝이다.
+ * 바로 위의 검사가 이번 결함을 잡고, 이것은 그 고침이 지나치지 않았는지를 본다.
+ */
 test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아 같은 말을 두 번 하지 않는다", async ({ page }) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: singleNodeTreeFixture({ treeTruncated: true, nodeTruncated: true }) });

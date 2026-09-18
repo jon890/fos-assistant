@@ -40,6 +40,9 @@ public class ExecutionTreeService {
      * 위로 올라가는 횟수와 아래로 내려가는 깊이의 상한이다.
      *
      * <p>잘못 적힌 {@code parent_execution_id} 하나로 순환이 생기면 응답이 끝나지 않는다.
+     *
+     * <p>화면의 {@code execution-node.tsx} 가 같은 값을 따로 갖는다. 여기를 키우면 화면이 그리지
+     * 않는 깊이에 {@code truncated} 가 실려, 잘렸다는 것이 아무 데도 보이지 않게 된다. 함께 바꾼다.
      */
     static final int MAX_DEPTH = 8;
 
