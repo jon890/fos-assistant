@@ -89,6 +89,15 @@ public class AgentExecution {
     private Long contextChars;
 
     /**
+     * 자리가 없어 이 실행의 문맥에서 빠진 Memory 항목 수.
+     *
+     * <p>0 보다 크면 요청자가 볼 수 있는 Memory 를 전부 싣지 못한 실행이다. 이 칸이 생기기 전의
+     * 기록과 문맥을 조립하지 않은 실행은 비어 있다.
+     */
+    @Column(name = "context_omitted_items")
+    private Integer contextOmittedItems;
+
+    /**
      * 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문.
      *
      * <p>그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있다. 값을 얻게 되는 날 칸을 다시 만들지
@@ -145,6 +154,7 @@ public class AgentExecution {
         this.totalTokens = builder.totalTokens;
         this.latencyMs = builder.latencyMs;
         this.contextChars = builder.contextChars;
+        this.contextOmittedItems = builder.contextOmittedItems;
         this.runtimeFingerprint = builder.runtimeFingerprint;
         this.instructionsHash = builder.instructionsHash;
         this.estimatedCostMicros = builder.estimatedCostMicros;
@@ -226,6 +236,8 @@ public class AgentExecution {
     }
 
     public Long contextChars() { return contextChars; }
+
+    public Integer contextOmittedItems() { return contextOmittedItems; }
 
     public String runtimeFingerprint() { return runtimeFingerprint; }
 
@@ -320,6 +332,7 @@ public class AgentExecution {
         private Long totalTokens;
         private Long latencyMs;
         private Long contextChars;
+        private Integer contextOmittedItems;
         private String runtimeFingerprint;
         private String instructionsHash;
         private Long estimatedCostMicros;
@@ -423,6 +436,11 @@ public class AgentExecution {
 
         public Builder contextChars(Long contextChars) {
             this.contextChars = contextChars;
+            return this;
+        }
+
+        public Builder contextOmittedItems(Integer contextOmittedItems) {
+            this.contextOmittedItems = contextOmittedItems;
             return this;
         }
 

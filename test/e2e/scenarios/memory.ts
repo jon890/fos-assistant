@@ -8,12 +8,13 @@ type MemoryView = {
   scope: string;
   alwaysInject: boolean;
   status: string;
+  omittedFromContext: boolean;
 };
 
 type AgentToken = { token: string };
 
-/** 사용량 시나리오보다 먼저 Memory 권한 확인을 위해 실행하는 대화 수다. */
-export const MEMORY_CONTEXT_TURNS = 1;
+/** 사용량 시나리오보다 먼저 Memory 권한과 주입 확인을 위해 실행하는 대화 수다. */
+export const MEMORY_CONTEXT_TURNS = 2;
 
 export const memoryScenario: Scenario = {
   name: "Memory 공개 범위",
@@ -150,6 +151,75 @@ export const memoryScenario: Scenario = {
       200,
       "가족 Memory 정리",
     );
+
+    step("본문이 상한을 넘는 항목이 있어도 나머지와 색인이 instructions 에 들어간다");
+    const tooLong = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "너무 긴 항목", content: "가".repeat(9_000), alwaysInject: true },
+      }),
+      200,
+      "상한을 넘는 Memory 생성",
+    ).json<MemoryView>();
+    const alsoInjected = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "짧은 항목", content: "짧게 남긴 사실", alwaysInject: true },
+      }),
+      200,
+      "짧은 Memory 생성",
+    ).json<MemoryView>();
+    const indexedOnly = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "색인만 하는 제목", content: "색인 본문", alwaysInject: false },
+      }),
+      200,
+      "색인 Memory 생성",
+    ).json<MemoryView>();
+    expectStatus(
+      await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: "긴 Memory 주입 검사", agentCode: "dad" },
+      }),
+      200,
+      "긴 Memory 가 있는 대화",
+    );
+    const withLongMemory = context.hermes.lastSubmittedInstructions();
+    expect(withLongMemory !== undefined, "긴 Memory 가 있는 요청에 instructions 가 없다");
+    expect(
+      !withLongMemory.includes(tooLong.content),
+      "상한을 넘는 Memory 본문이 instructions 에 들어갔다",
+    );
+    expect(
+      withLongMemory.includes(alsoInjected.content),
+      "상한을 넘는 항목 때문에 다른 항목까지 빠졌다",
+    );
+    expect(
+      withLongMemory.includes(`[${indexedOnly.id}] ${indexedOnly.title}`),
+      "상한을 넘는 항목 때문에 색인이 통째로 빠졌다",
+    );
+    const omittedList = expectStatus(
+      await call(context, "/memories", { token: context.tokens.dad }),
+      200,
+      "빠진 항목 표시 확인",
+    ).json<MemoryView[]>();
+    expect(
+      omittedList.filter((memory) => memory.omittedFromContext).map((memory) => memory.id).join() ===
+        String(tooLong.id),
+      "빠진 항목 표시가 상한을 넘는 항목 하나에만 붙지 않았다",
+    );
+    for (const memory of [tooLong, alsoInjected, indexedOnly]) {
+      expectStatus(
+        await call(context, `/memories/${memory.id}`, { method: "DELETE", token: context.tokens.dad }),
+        200,
+        "긴 Memory 검사 정리",
+      );
+    }
 
     step("MCP 토큰은 발급된 사용자만 정하고 다른 사람의 본문은 읽지 못한다");
     const dadOnly = expectStatus(

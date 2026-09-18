@@ -7,14 +7,22 @@ package com.bifos.assistant.usage.application;
  * 본문은 개인 Memory 를 담고 있어 어느 칸에도 저장하지 않는다.
  *
  * <p>{@code runtimeFingerprint} 는 아직 값을 얻는 경로가 없어 항상 null 로 들어온다.
+ *
+ * <p>{@code contextOmittedItems} 는 자리가 없어 그 실행의 문맥에서 빠진 Memory 항목 수다.
  */
 public record ExecutionContextSnapshot(
         Long contextChars,
         String runtimeFingerprint,
-        String instructionsHash) {
+        String instructionsHash,
+        Integer contextOmittedItems) {
+
+    /** 빠진 항목 수를 모르는 경로가 쓴다. */
+    public ExecutionContextSnapshot(Long contextChars, String runtimeFingerprint, String instructionsHash) {
+        this(contextChars, runtimeFingerprint, instructionsHash, null);
+    }
 
     /** 남길 상태가 글자 수뿐일 때 쓴다. */
     public static ExecutionContextSnapshot ofChars(Long contextChars) {
-        return new ExecutionContextSnapshot(contextChars, null, null);
+        return new ExecutionContextSnapshot(contextChars, null, null, null);
     }
 }

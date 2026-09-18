@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.presentation.MemoryController;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -17,7 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 사람이 제안을 승인하거나 거절하는 API 응답을 확인한다. */
+/** 사람이 제안을 승인하거나 거절하는 API 응답과 목록의 주입 여부 표시를 확인한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class MemoryControllerTest {
@@ -27,13 +30,14 @@ class MemoryControllerTest {
 
     @Autowired MemoryService memories;
     @Autowired MemoryRepository repository;
+    @Autowired ContextAssembler context;
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private MemoryController controller;
 
     @BeforeEach
     void 준비한다() {
         repository.deleteAll();
-        controller = new MemoryController(memories, currentUser);
+        controller = new MemoryController(memories, context, currentUser);
         when(currentUser.require()).thenReturn(ADMIN);
     }
 
@@ -44,5 +48,19 @@ class MemoryControllerTest {
 
         assertThat(controller.accept(accepted.id()).status()).isEqualTo("ACCEPTED");
         assertThat(controller.reject(rejected.id()).status()).isEqualTo("REJECTED");
+    }
+
+    @Test
+    void 자리가_없어_실리지_않는_항목에만_표시를_단다() {
+        Memory tooLong = memories.create(ADMIN, MemoryScope.FAMILY, "너무 긴 항목", "가".repeat(9_000), true);
+        Memory shortOne = memories.create(ADMIN, MemoryScope.FAMILY, "짧은 항목", "짧은 내용", true);
+
+        assertThat(controller.readable())
+                .filteredOn(MemoryView::omittedFromContext)
+                .extracting(MemoryView::id)
+                .containsExactly(tooLong.id());
+        assertThat(controller.readable())
+                .filteredOn(view -> view.id().equals(shortOne.id()))
+                .allMatch(view -> !view.omittedFromContext());
     }
 }
