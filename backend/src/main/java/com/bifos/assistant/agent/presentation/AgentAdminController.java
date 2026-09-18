@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.presentation;
 
+import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentModelSync;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -34,6 +35,7 @@ public class AgentAdminController {
     private final CurrentUserProvider currentUser;
     private final HermesModelClient hermesModels;
     private final AgentModelSync modelSync;
+    private final AgentEndpointProbe endpointProbe;
     private final FlowRegistry flows;
 
     @PostMapping
@@ -89,7 +91,26 @@ public class AgentAdminController {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a private agent needs an owner");
         }
         agent.changeAccess(request.enabled(), request.visibility(), ownerId);
+        applyApiBaseUrl(agent, request.apiBaseUrl());
         return AdminAgentView.from(agents.save(agent));
+    }
+
+    /**
+     * 주소를 바꾸는 요청이면 닿는지 본 뒤에 바꾼다.
+     *
+     * <p>비어 있거나 지금 값과 같으면 아무것도 하지 않는다. 다른 것만 고치는 요청이 주소를 지우거나
+     * 쓸데없이 Hermes 를 부르지 않게 한다. 끝의 {@code /} 만 다른 것도 같은 값으로 본다.
+     */
+    private void applyApiBaseUrl(Agent agent, String apiBaseUrl) {
+        if (apiBaseUrl == null || apiBaseUrl.isBlank()) return;
+        String next = stripTrailingSlash(apiBaseUrl.strip());
+        if (next.equals(agent.apiBaseUrl())) return;
+        endpointProbe.requireReachable(next, agent.hermesProfile());
+        agent.changeApiBaseUrl(next);
+    }
+
+    private static String stripTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
     @PostMapping("/{code}/sync-model")

@@ -133,6 +133,15 @@ public class Agent {
         this.ownerUserId = ownerUserId;
     }
 
+    /**
+     * Hermes API 주소를 바꾼다.
+     *
+     * <p>생성자와 같게 끝의 {@code /} 를 떼고 저장한다. 그러지 않으면 {@code //v1/runs} 처럼 부르게 된다.
+     */
+    public void changeApiBaseUrl(String apiBaseUrl) {
+        this.apiBaseUrl = stripTrailingSlash(apiBaseUrl.strip());
+    }
+
     public boolean syncModel(String model) {
         boolean changed = !Objects.equals(this.model, model);
         this.model = model;
