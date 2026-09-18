@@ -78,6 +78,91 @@ MVP 는 제출과 조회만 쓴다.
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
 Control Plane 이 Memory 를 주입하는 자리가 여기다.
 
+### 모델은 실행마다 정한다
+
+`POST /v1/runs` 는 요청 본문의 `provider` 와 `model` 을 그 실행에만 적용한다.
+profile 의 `config.yaml` 이 정한 것은 기본값일 뿐이다.
+
+**둘을 함께 보내야 한다.**
+`provider` 만 주고 `model` 을 빼면 Hermes 가 config 의 모델 문자열을 새 provider 에 그대로
+넘겨 `No LLM provider configured` 로 끝난다.
+
+provider 해석이 실패하면 이전 provider 가 남고 모델만 요청 값으로 바뀌는 중간 상태가 된다.
+그 상태에서 오는 404 는 provider 가 아니라 모델을 찾지 못한 것이다.
+
+### 조회 응답의 `model` 은 실제로 돈 모델이 아니다
+
+**`GET /v1/runs/{run_id}` 의 `model` 은 우리가 보낸 값을 되돌려 줄 뿐이다.**
+Hermes 안에서 다른 모델로 넘어가도 이 값은 바뀌지 않는다.
+
+실제로 돈 모델은 `GET /api/sessions/{session_id}` 의 `model` 이 담는다.
+fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
+
+`POST /api/sessions/{id}/chat` 은 응답에 `runtime` 을 담아 요청한 것과 실제로 돈 것을
+한 응답에서 대조할 수 있다. 그 블록은 `/v1/runs` 에는 없다.
+
+### 소진은 본문으로만 알 수 있다
+
+HTTP 상태로는 판정하지 못한다. 제출은 늘 202 이고 조회는 늘 200 이다.
+
+| 상황 | 무엇이 오나 |
+| --- | --- |
+| 그 provider 의 계정이 전부 막힘 | `status` 가 `failed`, `error` 가 `⚠️ Provider authentication failed:` 로 시작 |
+| 모델 이름이 그 provider 에 없음 | `HTTP 404` 로 시작하는 상류 본문 |
+| 잔액 부족 | `HTTP 402` 로 시작하는 상류 본문 |
+
+**첫 줄의 접두사만 판정 근거로 쓴다.** Hermes 가 붙이는 고정 문자열이고 한 경로만 탄다.
+나머지는 상류 provider 가 보낸 것이라 문구가 바뀔 수 있다.
+
+**한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 한다.**
+`hermes auth` 가 provider 마다 credential 을 여럿 두고 막힌 것과 남은 시간을 기억한다.
+그래서 위 접두사가 오는 시점은 **그 provider 의 계정이 전부 막혔을 때**다.
+Control Plane 은 그 위층만 맡는다. credential 을 다루는 코드를 우리가 갖지 않는다.
+
+소진 상태를 HTTP 로 읽는 경로는 없다. `hermes auth list` 는 정확히 알지만 CLI 뿐이다.
+
+### 모델을 바꿔 이어도 맥락이 남는다
+
+같은 `session_id` 로 모델만 바꿔 이어 보내면 앞 turn 의 내용이 그대로 실려 간다.
+도구 호출이 있던 turn 이 섞여도 `tool_calls` 와 `tool_call_id` 가 복원된다.
+시스템 프롬프트만 새 모델 기준으로 다시 만든다.
+
+깨질 수 있는 자리는 도구 호출 형식이 아니라 Responses 계열의 암호화된 reasoning 조각이다.
+Responses 에서 일반 OpenAI 호환 provider 로 갈 때는 그 조각을 걸러 내므로 문제가 없다.
+Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으면 400 이 날 수 있다.
+
+### profile 접두
+
+`gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
+
+**접두는 multiplex 를 켜지 않아도 동작한다.**
+profile 별 gateway 도 자기 이름의 접두를 통과시키고 남의 이름은 404 로 거절한다.
+그래서 공유 listener 를 세우기 전에 주소에 접두만 먼저 붙여 볼 수 있다.
+
+| 요청 | 응답 |
+| --- | --- |
+| 자기 이름의 접두 | 200 |
+| 남의 이름의 접두 | 404 `Unknown or unconfigured profile` |
+| 남의 profile 의 key | 401 `gateway_auth_failed` |
+| 남의 profile 의 `run_id` 조회 | 404. 존재 여부를 알리지 않는다 |
+
+**listener 를 세우는 것과 밖에서 닿게 하는 것은 다른 일이다.**
+바인딩 주소를 따로 정하지 않으면 컨테이너 안에서만 열린다.
+
+### 동시 실행 한도는 listener 단위다
+
+`gateway.api_server.max_concurrent_runs` 가 동시에 도는 실행을 제한한다.
+그 값은 listener 주인 profile 의 설정에서 한 번 읽고, listener 가 하나면 한도도 하나다.
+
+**공유 listener 로 옮기면 모든 profile 이 그 한도를 나눠 쓴다.**
+넘으면 429 와 `rate_limit_exceeded` 가 온다.
+
+한도를 끄면 실행이 메모리 한도까지 쌓이고, 그때 죽는 것은 프로세스 하나라
+모든 profile 이 함께 끊긴다. 유한한 값을 두는 편이 낫다.
+
+`gateway.max_concurrent_sessions` 는 다른 것이다.
+그쪽은 platform 대화 turn 을 제한하고 `/v1/runs` 에는 걸리지 않는다.
+
 ## Memory MCP
 
 제목만 `instructions` 에 실린 Memory 본문은 Control Plane 의 MCP 서버에서 읽는다.
