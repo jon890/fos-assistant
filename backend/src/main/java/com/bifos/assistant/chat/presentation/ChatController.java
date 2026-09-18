@@ -16,6 +16,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
@@ -109,6 +110,7 @@ public class ChatController {
         String senderName = users.findById(user.id()).map(it -> it.displayName()).orElse(null);
         List<ChatMessage> history = chat.history(user, conversationId);
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
+        Map<Long, String> switched = chat.switchedLabels(history);
         return history.stream()
                 .map(
                         it ->
@@ -120,6 +122,7 @@ public class ChatController {
                                         it.executionId(),
                                         // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
                                         it.executionId() != null && withChildren.contains(it.executionId()),
+                                        it.executionId() == null ? null : switched.get(it.executionId()),
                                         it.createdAt()))
                 .toList();
     }

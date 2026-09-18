@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
+import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.application.AgentModelSync;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -40,11 +41,12 @@ class AgentApiBaseUrlUpdateTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final HermesModelClient hermesModels = mock(HermesModelClient.class);
     private final AgentModelSync modelSync = mock(AgentModelSync.class);
+    private final AgentModelSelector models = mock(AgentModelSelector.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
     private final FlowRegistry flows = mock(FlowRegistry.class);
 
     private final AgentAdminController controller = new AgentAdminController(
-            agents, users, currentUser, hermesModels, modelSync, endpointProbe, flows);
+            agents, users, currentUser, hermesModels, modelSync, models, endpointProbe, flows);
 
     private Agent agent;
 
@@ -55,6 +57,7 @@ class AgentApiBaseUrlUpdateTest {
                 AgentVisibility.FAMILY, null);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
+        when(models.optionsOf(any(Agent.class))).thenReturn(java.util.List.of());
     }
 
     @Test

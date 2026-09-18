@@ -14,6 +14,8 @@ export type Turn = {
   executionId?: number | null;
   /** 이 답이 여러 실행으로 만들어졌다. 그때만 실행 나무로 가는 길을 보인다 */
   hasChildren?: boolean;
+  /** 앞 provider 가 막혀 넘어갔으면 그 답을 만든 provider 와 모델. 아니면 null 이다 */
+  switchedTo?: string | null;
 };
 
 export function MessageBubble({ turn }: { turn: Turn }) {
@@ -66,6 +68,11 @@ export function MessageBubble({ turn }: { turn: Turn }) {
         비
       </span>
       <div className="min-w-0">
+        {turn.switchedTo ? (
+          <p className="mb-1 text-xs text-muted" data-testid="provider-switched">
+            ── 여기부터 {turn.switchedTo} 로 돈다 ──
+          </p>
+        ) : null}
         <div className="mb-1 flex min-h-8 items-center gap-2">
           <span className="text-sm font-medium">비서</span>
           {sentAt && detailsVisible ? (

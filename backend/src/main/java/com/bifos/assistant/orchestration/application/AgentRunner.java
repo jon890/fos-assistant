@@ -1,6 +1,8 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
@@ -10,6 +12,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -17,6 +20,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +49,7 @@ public class AgentRunner {
     private static final String UNKNOWN_ERROR = "ORCHESTRATION_STEP_FAILED";
 
     private final ContextAssembler contextAssembler;
+    private final AgentModelSelector modelSelector;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
@@ -70,15 +75,29 @@ public class AgentRunner {
             Long rootExecutionId,
             String sessionId) {
         AssembledContext context = contextAssembler.assemble(user);
+        ExecutionContextSnapshot snapshot =
+                new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
+        // 자식은 자기 에이전트의 1순위를 쓴다. 부모의 것을 물려받지 않는다.
+        List<ModelOption> available = modelSelector.availableFor(agent);
+        if (available.isEmpty()) {
+            AgentExecution empty = executions.start(
+                    user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, null, null);
+            AgentExecution failed = executions.fail(empty, ErrorCode.NO_MODEL_AVAILABLE.name());
+            append(failed, ExecutionEventType.RUN_FAILED, ErrorCode.NO_MODEL_AVAILABLE.name(), 1);
+            return new Run(
+                    failed, ChildResult.failed(failed.id(), ErrorCode.NO_MODEL_AVAILABLE.name()), null);
+        }
+        ModelOption option = available.getFirst();
         AgentExecution execution = executions.start(
-                user,
-                conversation,
-                agent,
-                parentExecutionId,
-                rootExecutionId,
-                new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
+                user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, option, null);
         HermesRunCommand command = new HermesRunCommand(
-                agent.hermesProfile(), agent.apiBaseUrl(), task, context.instructions(), sessionId);
+                agent.hermesProfile(),
+                agent.apiBaseUrl(),
+                task,
+                context.instructions(),
+                sessionId,
+                option.provider(),
+                option.model());
 
         String runId;
         try {
@@ -103,7 +122,7 @@ public class AgentRunner {
             return new Run(failed, ChildResult.failed(failed.id(), status), null);
         }
 
-        AgentExecution completed = executions.complete(execution, agent, result);
+        AgentExecution completed = executions.complete(execution, agent, result, option);
         append(completed, ExecutionEventType.RUN_COMPLETED, null, 2);
         return new Run(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
     }

@@ -1,0 +1,33 @@
+import { NextResponse } from "next/server";
+import { callControlPlane } from "@/lib/control-plane";
+
+const CODE = /^[a-z0-9][a-z0-9-]*$/;
+
+function reject(): NextResponse {
+  return NextResponse.json(
+    { code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않습니다." },
+    { status: 400 },
+  );
+}
+
+function response(result: Awaited<ReturnType<typeof callControlPlane>>) {
+  if (!result.ok) {
+    return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
+  }
+  return NextResponse.json(result.data);
+}
+
+export async function GET(_request: Request, context: { params: Promise<{ code: string }> }) {
+  const { code } = await context.params;
+  if (!CODE.test(code)) return reject();
+  return response(await callControlPlane(`/api/v1/admin/agents/${code}/models`));
+}
+
+export async function PUT(request: Request, context: { params: Promise<{ code: string }> }) {
+  const { code } = await context.params;
+  if (!CODE.test(code)) return reject();
+  const body = await request.json();
+  return response(
+    await callControlPlane(`/api/v1/admin/agents/${code}/models`, { method: "PUT", body }),
+  );
+}

@@ -3,6 +3,9 @@ package com.bifos.assistant.orchestration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.agent.application.AgentModelSelector;
+import com.bifos.assistant.agent.domain.ModelOption;
+import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -102,6 +105,8 @@ class ResearchAndBuildFlowTest {
     @Autowired UsageController usage;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
+    @Autowired AgentModelSelector modelSelector;
+    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
@@ -151,13 +156,14 @@ class ResearchAndBuildFlowTest {
                 AgentVisibility.PRIVATE,
                 user.id());
         agent.assignFlow(flow);
-        agents.save(agent);
+        Agent saved = agents.save(agent);
+        modelSelector.seedFirst(saved, new ModelOption("anthropic", "claude-opus-5"));
         return new CurrentUser(
                 user.id(), user.email(), user.displayName(), user.familyId(), user.role());
     }
 
     private static HermesRunResult completed(String runId, String output) {
-        return new HermesRunResult(
+        return HermesRunResult.of(
                 runId, "sess-" + runId, "completed", output, "claude-opus-5", "anthropic",
                 new TokenUsage(100L, 0L, 20L, 120L));
     }
@@ -254,7 +260,7 @@ class ResearchAndBuildFlowTest {
                 return completed("run-chief", SPLIT_JSON);
             }
             if (input.contains("조사해")) {
-                return new HermesRunResult(
+                return HermesRunResult.of(
                         "run-researcher", null, "failed", null, "claude-opus-5", "anthropic",
                         TokenUsage.empty());
             }

@@ -18,6 +18,8 @@ public final class ChatDtos {
 
     /**
      * @param hasChildren 이 답이 여러 실행으로 만들어졌다. 화면이 이때만 실행 나무로 가는 길을 보인다
+     * @param switchedTo 앞 provider 가 막혀 넘어간 경우 그 답을 만든 provider 와 모델. 넘어가지
+     *     않았으면 null
      */
     public record MessageView(
             Long id,
@@ -26,6 +28,7 @@ public final class ChatDtos {
             String senderName,
             Long executionId,
             boolean hasChildren,
+            String switchedTo,
             Instant createdAt) {
     }
 

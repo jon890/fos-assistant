@@ -3,12 +3,14 @@ package com.bifos.assistant.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.context.AssembledContext;
+import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 실행 시작과 종료가 하나의 기록을 상태 전이하는지 확인한다. */
 @SpringBootTest
@@ -36,10 +39,14 @@ class ExecutionLifecycleTest {
 
     private static final Long USER_ID = 4_102L;
 
+
     /** 실행 줄 어디에도 남으면 안 되는 개인 기록을 흉내낸 문자열이다. */
     private static final String SECRET_MEMORY = "아빠는 매주 목요일에 병원에 간다";
 
     @Autowired ExecutionRecorder recorder;
+
+    /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
+    @MockitoBean HermesRunsClient hermes;
     @Autowired AgentExecutionRepository executions;
     @Autowired ConversationRepository conversations;
 
@@ -67,7 +74,7 @@ class ExecutionLifecycleTest {
         AgentExecution execution = recorder.start(user(), conversation, agent(), null, null, 0L);
         Long id = execution.id();
 
-        AgentExecution completed = recorder.complete(execution, agent(), result());
+        AgentExecution completed = recorder.complete(execution, agent(), result(), requested(agent()));
 
         assertThat(completed.id()).isEqualTo(id);
         assertThat(executions.count()).isOne();
@@ -190,8 +197,13 @@ class ExecutionLifecycleTest {
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, USER_ID);
     }
 
+    /** 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다. */
+    private static ModelOption requested(Agent agent) {
+        return new ModelOption(agent.provider(), agent.model());
+    }
+
     private static HermesRunResult result() {
-        return new HermesRunResult("run-1", "session-1", "completed", "끝", "claude-opus-5", "anthropic",
+        return HermesRunResult.of("run-1", "session-1", "completed", "끝", "claude-opus-5", "anthropic",
                 new TokenUsage(120L, 80L, 40L, 160L));
     }
 }

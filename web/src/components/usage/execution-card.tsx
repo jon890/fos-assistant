@@ -7,6 +7,7 @@ import {
   contextOmittedLabel,
   executionStatusLabel,
   isRunning,
+  retryOfLabel,
   type UsageExecution,
 } from "./execution-list";
 
@@ -14,6 +15,7 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
   const running = isRunning(execution);
   const omitted = contextOmittedLabel(execution);
+  const retryOf = retryOfLabel(execution);
   return (
     <article className={`relative rounded-md border p-4 ${failed ? "border-foreground" : "border-border"}`}>
       <Link
@@ -58,6 +60,11 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
       <p className="mt-2 text-xs text-muted" data-testid="execution-actual-cost">
         실제 청구액 {actualCostLabel(execution)}
       </p>
+      {retryOf ? (
+        <p className="mt-1 text-xs text-muted" data-testid="execution-retry-of">
+          {retryOf}
+        </p>
+      ) : null}
       {omitted ? (
         <p className="mt-1 text-xs text-danger" data-testid="execution-context-omitted">
           {omitted}

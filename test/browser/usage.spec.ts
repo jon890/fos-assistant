@@ -1,6 +1,6 @@
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import { expect, test } from "./fixtures.ts";
+import { expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
 import { AUTH_SECRET, CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL, WEB_BASE_URL } from "./settings.ts";
 
 const SESSION_COOKIE = "authjs.session-token";
@@ -109,4 +109,32 @@ test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, pag
 
   await page.goto("/usage");
   await expect(page.getByText("아직 실행 기록이 없다", { exact: true })).toBeVisible();
+});
+
+test("막혀서 넘어간 실패와 보통 실패를 다르게 보인다", async ({ page, hermes }, testInfo) => {
+  const blockedProvider = `usage-blocked-${testInfo.project.name}`;
+  await page.request.put(`/api/admin/agents/${SWITCH_AGENT_CODE}/models`, {
+    data: {
+      models: [
+        { provider: blockedProvider, model: "blocked-model" },
+        { provider: "openai-codex", model: "gpt-5.5" },
+      ],
+    },
+  });
+  await hermes.blockProvider(blockedProvider);
+  try {
+    const response = await page.request.post("/api/chat", {
+      data: { text: "사용량 넘김 검사", agentCode: SWITCH_AGENT_CODE },
+    });
+    expect(response.ok()).toBeTruthy();
+  } finally {
+    await hermes.clearBlockedProviders();
+  }
+
+  await page.goto("/usage");
+  const records = page.getByTestId(
+    testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
+  );
+  await expect(records.getByText("막혀서 다음 모델로 넘어감").first()).toBeVisible();
+  await expect(records.getByTestId("execution-retry-of").first()).toBeVisible();
 });

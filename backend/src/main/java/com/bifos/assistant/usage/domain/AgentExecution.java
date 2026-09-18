@@ -47,6 +47,15 @@ public class AgentExecution {
     @Column(name = "root_execution_id")
     private Long rootExecutionId;
 
+    /**
+     * 막혀서 다음 모델로 넘어갈 때 만든 실행이 가리키는 직전 실행.
+     *
+     * <p>자식이 아니라 같은 turn 을 다시 시도한 것이라 {@code parentExecutionId} 를 쓰지 않는다. 첫
+     * 시도는 비어 있다.
+     */
+    @Column(name = "retry_of_execution_id")
+    private Long retryOfExecutionId;
+
     @Column(name = "profile_name", nullable = false, length = 64)
     private String profileName;
 
@@ -141,6 +150,7 @@ public class AgentExecution {
         this.agentId = builder.agentId;
         this.parentExecutionId = builder.parentExecutionId;
         this.rootExecutionId = builder.rootExecutionId;
+        this.retryOfExecutionId = builder.retryOfExecutionId;
         this.profileName = builder.profileName;
         this.hermesRunId = builder.hermesRunId;
         this.provider = builder.provider;
@@ -186,6 +196,8 @@ public class AgentExecution {
     public Long parentExecutionId() { return parentExecutionId; }
 
     public Long rootExecutionId() { return rootExecutionId; }
+
+    public Long retryOfExecutionId() { return retryOfExecutionId; }
 
     public String profileName() {
         return profileName;
@@ -319,6 +331,7 @@ public class AgentExecution {
         private Long agentId;
         private Long parentExecutionId;
         private Long rootExecutionId;
+        private Long retryOfExecutionId;
         private String profileName;
         private String hermesRunId;
         private String provider;
@@ -364,6 +377,11 @@ public class AgentExecution {
 
         public Builder rootExecutionId(Long rootExecutionId) {
             this.rootExecutionId = rootExecutionId;
+            return this;
+        }
+
+        public Builder retryOfExecutionId(Long retryOfExecutionId) {
+            this.retryOfExecutionId = retryOfExecutionId;
             return this;
         }
 

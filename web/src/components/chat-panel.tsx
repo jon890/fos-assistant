@@ -14,7 +14,7 @@ import { readEventStream } from "@/lib/stream";
 type Agent = { code: string; name: string; model: string; visibility: string };
 type ErrorPayload = { code: string; message: string };
 type ChatEvent = {
-  type: "delta" | "tool" | "step" | "done" | "error";
+  type: "delta" | "tool" | "step" | "switched" | "reset" | "done" | "error";
   text?: string | null;
   toolName?: string | null;
   detail?: string | null;
@@ -306,6 +306,12 @@ export function ChatPanel() {
             const name = streamEvent.stepName;
             const state = streamEvent.stepState;
             setFlowSteps((previous) => ({ ...(previous ?? {}), [name]: state }));
+          } else if (streamEvent.type === "reset") {
+            // 막혀서 넘어간 시도의 조각이다. 화면에 남으면 읽는 사람이 그것을 답으로 읽는다.
+            setTurns((previous) => previous.filter((turn) => turn.id !== assistantPendingId));
+            setToolEvents([]);
+          } else if (streamEvent.type === "switched") {
+            setToolEvents((previous) => [...previous, `여기부터 ${streamEvent.text ?? ""} 로 돈다`]);
           } else if (streamEvent.type === "tool") {
             const name = streamEvent.toolName ?? "도구";
             const status = streamEvent.detail ?? "진행 중";

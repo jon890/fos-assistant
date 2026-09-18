@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
 import { formatWhen } from "@/lib/format";
+import { AgentModelList } from "./agent-model-list";
 
 type Props = {
   agent: AdminAgent;
@@ -10,6 +11,7 @@ type Props = {
   onVisibilityChange(agent: AdminAgent): void;
   onEnabledChange(agent: AdminAgent): void;
   onSyncModel(agent: AdminAgent): void;
+  onSaveModels(agent: AdminAgent, models: { provider: string; model: string }[]): void;
   /** 주소를 바꾼다. 실패하면 그 이유를, 저장했으면 null 을 돌려준다 */
   onApiBaseUrlChange(agent: AdminAgent, apiBaseUrl: string): Promise<string | null>;
 };
@@ -20,6 +22,7 @@ export function AgentCard({
   onVisibilityChange,
   onEnabledChange,
   onSyncModel,
+  onSaveModels,
   onApiBaseUrlChange,
 }: Props) {
   const [addressError, setAddressError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export function AgentCard({
       </div>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div><dt className="text-xs text-muted">Hermes profile</dt><dd className="mt-1 break-all">{agent.hermesProfile}</dd></div>
-        <div><dt className="text-xs text-muted">provider / 모델</dt><dd className="mt-1 break-all">{agent.provider} / {agent.model}</dd></div>
+        <div><dt className="text-xs text-muted">지난 기록이 쓰는 provider / 모델</dt><dd className="mt-1 break-all">{agent.provider} / {agent.model}</dd></div>
         <div><dt className="text-xs text-muted">모델을 마지막으로 읽은 시각</dt><dd className="mt-1">{agent.modelSyncedAt ? formatWhen(agent.modelSyncedAt) : "-"}</dd></div>
       </dl>
       <form onSubmit={(event) => void submitAddress(event)} className="mt-4">
@@ -78,6 +81,12 @@ export function AgentCard({
           모델 다시 읽기
         </Button>
       </div>
+      <AgentModelList
+        agentCode={agent.code}
+        models={agent.models}
+        busy={busy}
+        onSave={(models) => onSaveModels(agent, models)}
+      />
     </article>
   );
 }

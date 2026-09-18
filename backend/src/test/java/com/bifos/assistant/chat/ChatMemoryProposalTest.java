@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 
+import com.bifos.assistant.agent.application.AgentModelSelector;
+import com.bifos.assistant.agent.domain.ModelOption;
+import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -47,6 +50,8 @@ class ChatMemoryProposalTest {
     @Autowired ChatService chat;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
+    @Autowired AgentModelSelector modelSelector;
+    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired MemoryRepository memories;
     @Autowired AgentExecutionRepository executions;
     @Autowired HermesRunsClient hermes;
@@ -55,11 +60,12 @@ class ChatMemoryProposalTest {
 
     @BeforeEach
     void 준비한다() {
-        memories.deleteAll(); executions.deleteAll(); agents.deleteAll(); users.deleteAll();
+        memories.deleteAll(); executions.deleteAll(); modelOptions.deleteAll(); agents.deleteAll(); users.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
         AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.familyId(), saved.role());
-        agents.save(Agent.of("proposal", "제안", "proposal", "http://runtime.test", "provider", "model", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, user.id()));
+        Agent savedAgent = agents.save(Agent.of("proposal", "제안", "proposal", "http://runtime.test", "provider", "model", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, user.id()));
+        modelSelector.seedFirst(savedAgent, new ModelOption("provider", "model"));
         doNothing().when(events).open(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
     }
 
@@ -79,8 +85,8 @@ class ChatMemoryProposalTest {
 
     private void runWithProposal() {
         ((StubHermesRunsClient) hermes).willReturnInOrder(
-                new HermesRunResult("parent", "session", "completed", "원래 답", "model", "provider", TokenUsage.empty()),
-                new HermesRunResult("proposal", "new", "completed", "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}", "model", "provider", TokenUsage.empty()));
+                HermesRunResult.of("parent", "session", "completed", "원래 답", "model", "provider", TokenUsage.empty()),
+                HermesRunResult.of("proposal", "new", "completed", "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}", "model", "provider", TokenUsage.empty()));
     }
 
     private void assertProposalExecution() {

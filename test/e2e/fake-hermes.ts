@@ -12,8 +12,11 @@ const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
 const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/;
 const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
+const SESSION_PATH = /^\/p\/([a-z0-9-]+)\/api\/sessions\/([A-Za-z0-9_-]+)$/;
 /** Control Plane 이 주소를 저장하기 전에 닿는지 확인할 때 부른다. */
 const CAPABILITIES_PATH = /^\/p\/([a-z0-9-]+)\/v1\/capabilities$/;
+const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)$/;
+const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
 const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
 const TEST_RELEASE_HELD_RUN_PATH = "/__test/release-held-run";
@@ -34,12 +37,42 @@ type Run = {
   run_id: string;
   status: string;
   session_id: string;
+  /** 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다. */
   model: string;
+  provider: string | null;
+  error?: string;
   output: string;
   input: string;
   interruptEvents: boolean;
   usage: typeof FAKE_USAGE;
 };
+
+/**
+ * 세션 하나가 마지막으로 실제로 쓴 provider 와 모델이다.
+ *
+ * <p>실제 Hermes 에서 이 값만 넘김이 일어난 뒤의 모델을 담는다. `GET /v1/runs/{id}` 는 담지 않는다.
+ */
+type Session = { model: string; provider: string | null };
+
+/** 이 글을 입력으로 보내면 세션 조회가 실행에 실어 보낸 것과 다른 모델을 답한다. */
+const SESSION_MODEL_PROBE = "세션 모델 검사";
+
+/**
+ * 그 실행이 실제로 쓴 모델을 정한다. 세션 행만 이 값을 갖는다.
+ *
+ * <p>가격을 검사하는 화면 검사들이 입력으로 모델을 고른다. 요청에 실어 보낸 모델과 다르게 답해야 실제로
+ * 돈 모델을 읽고 있는지 알 수 있다.
+ */
+function actualModelFor(input: string, requested: string): string {
+  if (input === SESSION_MODEL_PROBE) return "nvidia/nemotron-3.5-lightning-30b-a3b";
+  if (input === "가격 없음 검사") return "unknown-model";
+  if (input === "무료 모델 검사") return "gpt-zero";
+  return requested;
+}
+
+/** 계정이 전부 막혔을 때 Hermes 가 붙이는 고정 접두사다. 실측한 문장이다. */
+const PROVIDER_AUTH_FAILED =
+  "\u26a0\ufe0f Provider authentication failed: No Codex credentials stored. Run `hermes auth` to authenticate.";
 
 /**
  * Chief 에게만 주는 지시에 들어 있는 말이다.
@@ -128,6 +161,10 @@ function event(response: ServerResponse, payload: unknown): void {
 export type FakeHermes = {
   readonly baseUrl: string;
   lastSubmittedInstructions(): string | undefined;
+  /** 마지막 실행 요청이 실어 온 provider 와 모델 */
+  lastSubmittedRuntime(): { provider?: string; model?: string };
+  blockProvider(provider: string): void;
+  clearBlockedProviders(): void;
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -147,6 +184,9 @@ export function startFakeHermes(
 ): Promise<FakeHermes> {
   const who = label === undefined ? "fake hermes" : `fake hermes ${label}`;
   const runs = new Map<string, Run>();
+  const sessions = new Map<string, Session>();
+  const blockedProviders = new Set<string>();
+  let lastSubmittedRuntime: { provider?: string; model?: string } = {};
   let holdNextRun = false;
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
@@ -161,6 +201,17 @@ export function startFakeHermes(
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = request.url ?? "";
+
+      const blockMatch = TEST_BLOCK_PROVIDER_PATH.exec(path);
+      if (request.method === "POST" && blockMatch) {
+        blockedProviders.add(blockMatch[1]!);
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_CLEAR_BLOCKED_PATH) {
+        blockedProviders.clear();
+        return send(response, 204, null);
+      }
 
       if (request.method === "POST" && path === TEST_HOLD_NEXT_RUN_PATH) {
         holdNextRun = true;
@@ -200,6 +251,17 @@ export function startFakeHermes(
             return send(response, 401, { error: "bad key for this profile" });
           }
           return send(response, 200, { model: "gpt-5.5", provider: "openai-codex", providers: [] });
+        }
+
+        const sessionMatch = SESSION_PATH.exec(path);
+        if (sessionMatch) {
+          const [, profile, sessionId] = sessionMatch;
+          if (!authorized(request, profile!)) {
+            return send(response, 401, { error: "bad key for this profile" });
+          }
+          const session = sessions.get(sessionId!);
+          if (!session) return send(response, 404, { error: "no such session" });
+          return send(response, 200, { session_id: sessionId, ...session });
         }
 
         const capabilitiesMatch = CAPABILITIES_PATH.exec(path);
@@ -272,9 +334,47 @@ export function startFakeHermes(
           input?: string;
           instructions?: string;
           session_id?: string;
+          provider?: string;
+          model?: string;
         };
         lastSubmittedInstructions = submitted.instructions;
+        lastSubmittedRuntime = { provider: submitted.provider, model: submitted.model };
         const runId = `run_${shortId()}`;
+        const sessionId = submitted.session_id ?? `sess_${shortId()}`;
+
+        // 실제 Hermes 는 provider 만 받으면 config 의 모델 문자열을 그대로 써서 실패한다.
+        if (submitted.provider !== undefined && submitted.model === undefined) {
+          runs.set(runId, {
+            run_id: runId,
+            status: "failed",
+            session_id: sessionId,
+            model: submitted.model ?? profile!,
+            provider: submitted.provider ?? null,
+            error: "No LLM provider configured. Run `hermes model` to select a provider.",
+            output: "",
+            input: submitted.input ?? "",
+            interruptEvents: false,
+            usage: FAKE_USAGE,
+          });
+          return send(response, 200, { run_id: runId, status: "queued" });
+        }
+
+        // 그 provider 의 계정이 전부 막힌 상태다. 접수는 되고 나중에 failed 로 바뀐다.
+        if (submitted.provider !== undefined && blockedProviders.has(submitted.provider)) {
+          runs.set(runId, {
+            run_id: runId,
+            status: "failed",
+            session_id: sessionId,
+            model: submitted.model ?? profile!,
+            provider: submitted.provider,
+            error: PROVIDER_AUTH_FAILED,
+            output: "",
+            input: submitted.input ?? "",
+            interruptEvents: false,
+            usage: FAKE_USAGE,
+          });
+          return send(response, 200, { run_id: runId, status: "queued" });
+        }
         const instructionsEcho =
           submitted.instructions && submitted.instructions.length > 0
             ? ` [instructions: ${submitted.instructions}]`
@@ -284,17 +384,21 @@ export function startFakeHermes(
         runs.set(runId, {
           run_id: runId,
           status: held ? "running" : "completed",
-          session_id: submitted.session_id ?? `sess_${shortId()}`,
-          // 실제 Hermes v0.21.0 이 내놓는 모양 그대로다. model 자리에는 API server 의 모델 이름이
-          // 오는데 그 기본값이 profile 이름이고, provider 는 아예 없다.
-          model: submitted.input === "가격 없음 검사"
-            ? "unknown-model"
-            : submitted.input === "무료 모델 검사" ? "gpt-zero" : profile,
+          session_id: sessionId,
+                  // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
+          model: submitted.model ?? profile!,
           output: specialOutputFor(submitted.input ?? "")
             ?? `[${who} on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
           input: submitted.input ?? "",
+          provider: submitted.provider ?? null,
           interruptEvents: submitted.input === "스트림 중단 검사",
           usage: FAKE_USAGE,
+        });
+        // 실제로 돈 모델은 세션 행에만 남는다.
+        sessions.set(sessionId, {
+          model: actualModelFor(submitted.input ?? "", submitted.model ?? profile!),
+          provider:
+            submitted.input === SESSION_MODEL_PROBE ? "nvidia" : submitted.provider ?? null,
         });
         if (held) {
           heldRunId = runId;
@@ -326,6 +430,9 @@ export function startFakeHermes(
       resolve({
         baseUrl: `http://127.0.0.1:${address.port}`,
         lastSubmittedInstructions: () => lastSubmittedInstructions,
+        lastSubmittedRuntime: () => lastSubmittedRuntime,
+        blockProvider: (provider: string) => blockedProviders.add(provider),
+        clearBlockedProviders: () => blockedProviders.clear(),
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {
