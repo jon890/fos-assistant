@@ -6,6 +6,7 @@ import { Composer } from "./chat/composer";
 import { ConversationDrawer } from "./chat/conversation-drawer";
 import { ConversationList, type Conversation } from "./chat/conversation-list";
 import { MessageList } from "./chat/message-list";
+import type { FlowStepStates } from "./chat/flow-progress";
 import type { Turn } from "./chat/message-bubble";
 import { IconButton } from "./ui/icon-button";
 import { readEventStream } from "@/lib/stream";
@@ -13,7 +14,7 @@ import { readEventStream } from "@/lib/stream";
 type Agent = { code: string; name: string; model: string; visibility: string };
 type ErrorPayload = { code: string; message: string };
 type ChatEvent = {
-  type: "delta" | "tool" | "done" | "error";
+  type: "delta" | "tool" | "step" | "done" | "error";
   text?: string | null;
   toolName?: string | null;
   detail?: string | null;
@@ -22,11 +23,21 @@ type ChatEvent = {
   executionId?: number | null;
   code?: string | null;
   message?: string | null;
+  stepName?: string | null;
+  stepState?: "started" | "completed" | "failed" | null;
 };
 
 async function readPayload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
+
+/**
+ * 흐름이 오래 걸린다고 알리기까지 기다리는 시간이다.
+ *
+ * <p>실측한 포지션 추천 하나가 15분 넘게 걸렸고, 넷으로 나누면 더 걸릴 수도 있다. 2분이 지나면 한 번만
+ * 알리고 그 뒤로는 다시 알리지 않는다.
+ */
+const SLOW_FLOW_MS = 120_000;
 
 export function ChatPanel() {
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -35,6 +46,8 @@ export function ChatPanel() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [toolEvents, setToolEvents] = useState<string[]>([]);
+  const [flowSteps, setFlowSteps] = useState<FlowStepStates | null>(null);
+  const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentCode, setAgentCode] = useState<string>("");
@@ -106,6 +119,19 @@ export function ChatPanel() {
     };
   }, []);
 
+  /**
+   * 흐름이 시작되고 2분이 지나면 한 번 알린다.
+   *
+   * <p>첫 단계 사건이 올 때 재기 시작한다. 그전에는 이 turn 이 흐름인지 알 수 없다.
+   */
+  const flowActive = flowSteps !== null;
+
+  useEffect(() => {
+    if (!flowActive || flowIsSlow) return;
+    const timer = setTimeout(() => setFlowIsSlow(true), SLOW_FLOW_MS);
+    return () => clearTimeout(timer);
+  }, [flowActive, flowIsSlow]);
+
   const agentLocked = conversationId !== null;
 
   async function selectConversation(conversation: Conversation) {
@@ -119,6 +145,8 @@ export function ChatPanel() {
     setAgentCode(conversation.agentCode);
     setTurns([]);
     setToolEvents([]);
+    setFlowSteps(null);
+    setFlowIsSlow(false);
     setError(null);
     try {
       const response = await fetch(`/api/chat/conversations/${conversation.id}/messages`);
@@ -148,6 +176,8 @@ export function ChatPanel() {
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
     setToolEvents([]);
+    setFlowSteps(null);
+    setFlowIsSlow(false);
     setError(null);
     setDrawerOpen(false);
     setMessagesLoading(false);
@@ -181,6 +211,8 @@ export function ChatPanel() {
     setError(null);
     setDraft("");
     setToolEvents([]);
+    setFlowSteps(null);
+    setFlowIsSlow(false);
     setTurns((previous) => [
       ...previous,
       { id: pendingId, role: "USER", content: text, senderName: null },
@@ -270,6 +302,10 @@ export function ChatPanel() {
                   : turn,
               );
             });
+          } else if (streamEvent.type === "step" && streamEvent.stepName && streamEvent.stepState) {
+            const name = streamEvent.stepName;
+            const state = streamEvent.stepState;
+            setFlowSteps((previous) => ({ ...(previous ?? {}), [name]: state }));
           } else if (streamEvent.type === "tool") {
             const name = streamEvent.toolName ?? "도구";
             const status = streamEvent.detail ?? "진행 중";
@@ -282,6 +318,8 @@ export function ChatPanel() {
               refreshMessages(streamEvent.conversationId),
             ]);
             setToolEvents([]);
+            setFlowSteps(null);
+            setFlowIsSlow(false);
           } else if (streamEvent.type === "error") {
             reportedError = true;
             restoreFailedMessage();
@@ -357,6 +395,8 @@ export function ChatPanel() {
           sending={sending}
           toolEvents={toolEvents}
           conversationId={conversationId}
+          flowSteps={flowSteps}
+          flowIsSlow={flowIsSlow}
         />
 
         {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}

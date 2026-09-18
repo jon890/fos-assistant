@@ -48,12 +48,17 @@ public class UsageController {
     private final AgentService agents;
     private final ExecutionTreeService executionTrees;
 
-    /** 로그인한 사용자 자신의 실행만 준다. 구성원을 가로질러 보는 것은 admin 화면이 맡는다. */
+    /**
+     * 로그인한 사용자 자신의 실행만 준다. 구성원을 가로질러 보는 것은 admin 화면이 맡는다.
+     *
+     * <p>뿌리만 낸다. 흐름 하나가 실행 넷을 남기므로 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행
+     * 나무 화면에서 본다.
+     */
     @GetMapping("/executions")
     public List<ExecutionView> myExecutions(@RequestParam(defaultValue = "50") int limit) {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
-        List<AgentExecution> page =
-                executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, size));
+        List<AgentExecution> page = executions.findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(
+                currentUser.require().id(), PageRequest.of(0, size));
         Set<Long> withChildren = idsHavingChildren(page);
         return page.stream()
                 .map(execution ->

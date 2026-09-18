@@ -23,6 +23,15 @@ const SESSION_COOKIE = "authjs.session-token";
 const HEALTH_TIMEOUT_MS = 90_000;
 const HERMES_CONTROL_PATH = join(tmpdir(), `fos-assistant-browser-hermes-${CONTROL_PLANE_PORT}.url`);
 
+/** 흐름이 붙은 에이전트의 코드다. 흐름 검사가 이 코드로 대화를 시작한다. */
+export const FLOW_AGENT_CODE = "browserflow";
+
+/** profile 이름과 그 profile 의 key 다. 가짜 Hermes 와 key 디렉터리가 같은 표를 쓴다. */
+const PROFILE_KEYS: Record<string, string> = {
+  browser: "browser-profile-key",
+  browserflow: "browser-flow-profile-key",
+};
+
 export type FakeHermesControl = {
   holdNextRun(): Promise<void>;
   waitForHeldRun(): Promise<void>;
@@ -85,39 +94,50 @@ async function waitForHealth(logPath: string): Promise<void> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  const keyFile = join(keyDir, "browser");
-  await writeFile(keyFile, "browser-profile-key");
-  await chmod(keyFile, 0o600);
+  for (const profile of Object.keys(PROFILE_KEYS)) {
+    const keyFile = join(keyDir, profile);
+    await writeFile(keyFile, PROFILE_KEYS[profile]!);
+    await chmod(keyFile, 0o600);
+  }
   return keyDir;
 }
 
-async function seedAgent(hermesBaseUrl: string): Promise<void> {
+async function seedAgents(hermesBaseUrl: string): Promise<void> {
   const token = await new SignJWT({ name: "브라우저 테스트" })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(TEST_EMAIL)
     .setIssuedAt()
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
-  const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      code: "browser",
-      name: "브라우저 비서",
-      hermesProfile: "browser",
-      apiBaseUrl: `${hermesBaseUrl}/p/browser`,
-      provider: "openai-codex",
-      costMode: "SUBSCRIPTION",
-      credentialScope: "SHARED_HOUSEHOLD",
-      visibility: "PRIVATE",
-      ownerEmail: TEST_EMAIL,
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`브라우저 테스트 에이전트를 등록하지 못했다: ${response.status} ${await response.text()}`);
+  for (const agent of [
+    { code: "browser", name: "브라우저 비서", profile: "browser", flow: null },
+    // 흐름 검사 전용이다. 하나만 두면 흐름이 붙지 않은 대화를 함께 검사할 수 없다.
+    { code: FLOW_AGENT_CODE, name: "흐름 비서", profile: "browserflow", flow: "research-and-build" },
+  ]) {
+    const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        code: agent.code,
+        name: agent.name,
+        hermesProfile: agent.profile,
+        apiBaseUrl: `${hermesBaseUrl}/p/${agent.profile}`,
+        provider: "openai-codex",
+        costMode: "SUBSCRIPTION",
+        credentialScope: "SHARED_HOUSEHOLD",
+        visibility: "PRIVATE",
+        ownerEmail: TEST_EMAIL,
+        flow: agent.flow,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `브라우저 테스트 에이전트를 등록하지 못했다: ${agent.code} ${response.status} ${await response.text()}`,
+      );
+    }
   }
 }
 
@@ -166,11 +186,11 @@ export default async function setupServices(): Promise<() => Promise<void>> {
   let app: ChildProcess | undefined;
 
   try {
-    hermes = await startFakeHermes({ browser: "browser-profile-key" });
+    hermes = await startFakeHermes(PROFILE_KEYS);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
     app = startControlPlane(await writeProfileKeys(work), logPath);
     await waitForHealth(logPath);
-    await seedAgent(hermes.baseUrl);
+    await seedAgents(hermes.baseUrl);
   } catch (error) {
     await stopProcess(app);
     await hermes?.close();

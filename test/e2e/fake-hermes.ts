@@ -39,7 +39,29 @@ type Run = {
   usage: typeof FAKE_USAGE;
 };
 
+/**
+ * Chief 에게만 주는 지시에 들어 있는 말이다.
+ *
+ * <p>Control Plane 의 `ResearchAndBuildFlow` 가 만드는 지시와 같아야 한다. 어긋나면 흐름 검사가
+ * 계약을 지키지 않는 답을 받아 실패한다.
+ */
+const CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
+
+/**
+ * 흐름의 첫 단계가 돌려줄 답을 정한다.
+ *
+ * <p>Chief 의 지시에는 사용자가 보낸 글이 그대로 들어 있어, 그 글로 어떤 답을 줄지 고른다.
+ */
+function chiefOutputFor(input: string): string {
+  if (input.includes("흐름 계약 위반 검사")) return "JSON 이 아니라 그냥 문장이다";
+  if (input.includes("흐름 단독 검사")) return '{"research":"","build":""}';
+  return '{"research":"전기차 보조금을 조사한다","build":"비교 표를 만든다"}';
+}
+
 function specialOutputFor(input: string): string | null {
+  if (input.includes(CHIEF_MARK)) {
+    return chiefOutputFor(input);
+  }
   if (input === "마크다운 보안 검사") {
     return [
       "| 항목 | 값 |",

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Markdown } from "./markdown";
 import { formatWhen } from "@/lib/format";
@@ -10,6 +11,9 @@ export type Turn = {
   content: string;
   senderName: string | null;
   createdAt?: string;
+  executionId?: number | null;
+  /** 이 답이 여러 실행으로 만들어졌다. 그때만 실행 나무로 가는 길을 보인다 */
+  hasChildren?: boolean;
 };
 
 export function MessageBubble({ turn }: { turn: Turn }) {
@@ -76,6 +80,15 @@ export function MessageBubble({ turn }: { turn: Turn }) {
         <div className="leading-7">
           <Markdown>{turn.content}</Markdown>
         </div>
+        {turn.hasChildren && turn.executionId ? (
+          <Link
+            href={`/executions/${turn.executionId}`}
+            data-testid="flow-tree-link"
+            className="mt-2 inline-block text-xs text-muted underline underline-offset-4"
+          >
+            이 답이 어떻게 만들어졌는지 보기
+          </Link>
+        ) : null}
       </div>
     </li>
   );

@@ -16,12 +16,16 @@ public final class ChatDtos {
     public record SendMessageResponse(Long conversationId, Long executionId, String assistantText) {
     }
 
+    /**
+     * @param hasChildren 이 답이 여러 실행으로 만들어졌다. 화면이 이때만 실행 나무로 가는 길을 보인다
+     */
     public record MessageView(
             Long id,
             String role,
             String content,
             String senderName,
             Long executionId,
+            boolean hasChildren,
             Instant createdAt) {
     }
 

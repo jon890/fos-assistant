@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.presentation;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
@@ -15,6 +16,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -105,7 +107,9 @@ public class ChatController {
     public List<MessageView> messages(@PathVariable Long conversationId) {
         CurrentUser user = currentUser.require();
         String senderName = users.findById(user.id()).map(it -> it.displayName()).orElse(null);
-        return chat.history(user, conversationId).stream()
+        List<ChatMessage> history = chat.history(user, conversationId);
+        Set<Long> withChildren = chat.executionIdsHavingChildren(history);
+        return history.stream()
                 .map(
                         it ->
                                 new MessageView(
@@ -114,6 +118,8 @@ public class ChatController {
                                         it.content(),
                                         it.senderUserId() == null ? null : senderName,
                                         it.executionId(),
+                                        // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
+                                        it.executionId() != null && withChildren.contains(it.executionId()),
                                         it.createdAt()))
                 .toList();
     }

@@ -22,6 +22,12 @@ public enum ErrorCode {
     HERMES_RUN_FAILED(HttpStatus.BAD_GATEWAY),
     HERMES_RUN_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT),
     HERMES_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
+    /** 자식 실행이 다시 자식을 부르려 했다. 깊이를 1로 제한한다. */
+    ORCHESTRATION_DEPTH_EXCEEDED(HttpStatus.CONFLICT),
+    /** 흐름의 한 단계가 정한 출력 계약을 지키지 않았다. 원문을 그대로 다음 단계로 넘기지 않는다. */
+    ORCHESTRATION_CONTRACT_BROKEN(HttpStatus.BAD_GATEWAY),
+    /** 흐름의 한 단계가 실패했다. 어느 단계인지는 실행 줄의 {@code error_code} 가 적는다. */
+    ORCHESTRATION_STEP_FAILED(HttpStatus.BAD_GATEWAY),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 

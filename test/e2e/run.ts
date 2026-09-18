@@ -28,6 +28,7 @@ import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
+import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -62,6 +63,7 @@ const SCENARIOS: readonly Scenario[] = [
   usageCostScenario,
   conversationHistoryScenario,
   streamingScenario,
+  orchestrationScenario,
 ];
 
 async function waitForHealth(url: string, logPath: string): Promise<void> {
@@ -83,9 +85,11 @@ async function waitForHealth(url: string, logPath: string): Promise<void> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  const keyFile = join(keyDir, DAD_BINDING.profileName);
-  await writeFile(keyFile, PROFILE_KEY);
-  await chmod(keyFile, 0o600);
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName]) {
+    const keyFile = join(keyDir, profileName);
+    await writeFile(keyFile, PROFILE_KEY);
+    await chmod(keyFile, 0o600);
+  }
   return keyDir;
 }
 
@@ -135,7 +139,10 @@ async function main(): Promise<void> {
 
   try {
     console.log("== fake Hermes 기동");
-    hermes = await startFakeHermes({ [DAD_BINDING.profileName]: PROFILE_KEY });
+    hermes = await startFakeHermes({
+      [DAD_BINDING.profileName]: PROFILE_KEY,
+      [FLOW_BINDING.profileName]: PROFILE_KEY,
+    });
     console.log(`   ${hermes.baseUrl}`);
 
     console.log("== Control Plane 기동");

@@ -20,6 +20,15 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
 
     List<AgentExecution> findByUserIdOrderByIdDesc(Long userId, Pageable pageable);
 
+    /**
+     * 뿌리 실행만 낸다.
+     *
+     * <p>흐름 하나가 실행 넷을 남기므로, 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행 나무 화면에서
+     * 본다. 월 비용 합계는 자식을 포함하고, 그 이유는 {@link #sumCostBetween} 이 적는다.
+     */
+    List<AgentExecution> findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(
+            Long userId, Pageable pageable);
+
     List<AgentExecution> findByStatus(ExecutionStatus status);
 
     /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
