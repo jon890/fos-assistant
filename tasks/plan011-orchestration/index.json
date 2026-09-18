@@ -1,13 +1,28 @@
 {
   "name": "plan011-orchestration",
   "description": "Control Plane 이 Task 를 나눠 여러 에이전트에 돌리고 결과를 합치는 흐름 하나를 만든다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-18",
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 3,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep",
+      "status": "completed"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep",
+      "status": "completed"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "status": "completed"
+    }
   ]
 }

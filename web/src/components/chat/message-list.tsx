@@ -4,6 +4,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageBubble, type Turn } from "./message-bubble";
 import { RunStatus } from "./run-status";
+import { FlowProgress, type FlowStepStates } from "./flow-progress";
 
 type Props = {
   turns: Turn[];
@@ -11,16 +12,28 @@ type Props = {
   sending: boolean;
   toolEvents: string[];
   conversationId: number | null;
+  /** 흐름으로 도는 turn 의 단계 상태. 흐름이 아니면 null 이다 */
+  flowSteps: FlowStepStates | null;
+  /** 흐름이 오래 걸린다고 한 번 알렸는지 */
+  flowIsSlow: boolean;
 };
 
-export function MessageList({ turns, loading, sending, toolEvents, conversationId }: Props) {
+export function MessageList({
+  turns,
+  loading,
+  sending,
+  toolEvents,
+  conversationId,
+  flowSteps,
+  flowIsSlow,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const streamedAnswer = turns.some(
     (turn) => typeof turn.id === "string" && turn.id.startsWith("assistant-") && turn.content,
   );
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${toolEvents.length}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${toolEvents.length}:${JSON.stringify(flowSteps)}`;
 
   useEffect(() => {
     shouldFollow.current = true;
@@ -65,7 +78,7 @@ export function MessageList({ turns, loading, sending, toolEvents, conversationI
               <Skeleton className="h-[4.25rem]" />
               <Skeleton className="h-[4.25rem]" />
             </div>
-          ) : turns.length === 0 && !sending ? (
+          ) : turns.length === 0 && !sending && !flowSteps ? (
             <p className="py-8 text-center text-sm text-muted">무엇이든 물어보세요.</p>
           ) : (
             <ol className="flex flex-col gap-6">
@@ -81,8 +94,19 @@ export function MessageList({ turns, loading, sending, toolEvents, conversationI
                   </Fragment>
                 );
               })}
+              {!streamedAnswer && flowSteps ? (
+                <FlowProgress states={flowSteps} latestTool={toolEvents.at(-1) ?? null} />
+              ) : null}
+              {!streamedAnswer && flowSteps && flowIsSlow ? (
+                <li data-testid="flow-slow-notice" className="grid grid-cols-[2rem_minmax(0,1fr)] gap-2 text-xs text-muted">
+                  <span aria-hidden="true" />
+                  <span>
+                    오래 걸릴 수 있다. 이 화면을 떠나도 된다. 실행은 계속 돌고, 나중에 다시 열면 저장된 답이 보인다.
+                  </span>
+                </li>
+              ) : null}
               {!streamedAnswer ? (
-                <RunStatus waiting={sending} toolEvents={toolEvents} />
+                <RunStatus waiting={sending} toolEvents={flowSteps ? [] : toolEvents} />
               ) : null}
             </ol>
           )}
