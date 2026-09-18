@@ -105,7 +105,7 @@ public class ChatService {
      * 흐름으로 도는 turn 을 중계한다.
      *
      * <p>흐름은 단계 사건만 흘리고 답은 끝난 뒤에 한 번에 온다. 중간 단계의 답까지 흘리면 읽을 수
-     * 없기 때문이다. 근거는 ADR-016 과 plan011 의 phase-03 에 있다.
+     * 없기 때문이다. 근거는 ADR-016 에 있다.
      */
     private void streamFlow(
             CurrentUser user, Routed routed, String text, Consumer<ChatEvent> onEvent) {
