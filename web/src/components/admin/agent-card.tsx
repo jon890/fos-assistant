@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
 import { formatWhen } from "@/lib/format";
+import { AgentModelList } from "./agent-model-list";
 
 type Props = {
   agent: AdminAgent;
@@ -9,9 +10,17 @@ type Props = {
   onVisibilityChange(agent: AdminAgent): void;
   onEnabledChange(agent: AdminAgent): void;
   onSyncModel(agent: AdminAgent): void;
+  onSaveModels(agent: AdminAgent, models: { provider: string; model: string }[]): void;
 };
 
-export function AgentCard({ agent, busy, onVisibilityChange, onEnabledChange, onSyncModel }: Props) {
+export function AgentCard({
+  agent,
+  busy,
+  onVisibilityChange,
+  onEnabledChange,
+  onSyncModel,
+  onSaveModels,
+}: Props) {
   return (
     <article className="rounded-md border border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -27,7 +36,7 @@ export function AgentCard({ agent, busy, onVisibilityChange, onEnabledChange, on
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div><dt className="text-xs text-muted">Hermes profile</dt><dd className="mt-1 break-all">{agent.hermesProfile}</dd></div>
         <div><dt className="text-xs text-muted">Hermes API 주소</dt><dd className="mt-1 break-all">{agent.apiBaseUrl}</dd></div>
-        <div><dt className="text-xs text-muted">provider / 모델</dt><dd className="mt-1 break-all">{agent.provider} / {agent.model}</dd></div>
+        <div><dt className="text-xs text-muted">지난 기록이 쓰는 provider / 모델</dt><dd className="mt-1 break-all">{agent.provider} / {agent.model}</dd></div>
         <div><dt className="text-xs text-muted">모델을 마지막으로 읽은 시각</dt><dd className="mt-1">{agent.modelSyncedAt ? formatWhen(agent.modelSyncedAt) : "-"}</dd></div>
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -41,6 +50,12 @@ export function AgentCard({ agent, busy, onVisibilityChange, onEnabledChange, on
           모델 다시 읽기
         </Button>
       </div>
+      <AgentModelList
+        agentCode={agent.code}
+        models={agent.models}
+        busy={busy}
+        onSave={(models) => onSaveModels(agent, models)}
+      />
     </article>
   );
 }

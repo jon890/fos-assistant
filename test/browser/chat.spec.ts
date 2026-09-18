@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.ts";
+import { expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
 
 test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
@@ -158,4 +158,38 @@ test("위로 올려 읽는 동안 새 답이 와도 읽던 자리를 지킨다",
   const position = await scroll.evaluate((element) => element.scrollTop);
   await expect(page.getByRole("button", { name: "새 메시지" })).toBeVisible();
   expect(await scroll.evaluate((element) => element.scrollTop)).toBe(position);
+});
+
+test("막혀서 넘어가면 그 답 위에 넘어간 곳을 한 줄로 알린다", async ({ page, hermes }, testInfo) => {
+  const blockedProvider = `blocked-${testInfo.project.name}`;
+  await page.request.put(`/api/admin/agents/${SWITCH_AGENT_CODE}/models`, {
+    data: {
+      models: [
+        { provider: blockedProvider, model: "blocked-model" },
+        { provider: "openai-codex", model: "gpt-5.5" },
+      ],
+    },
+  });
+  await hermes.blockProvider(blockedProvider);
+  try {
+    const response = await page.request.post("/api/chat", {
+      data: { text: "넘김 화면 검사", agentCode: SWITCH_AGENT_CODE },
+    });
+    expect(response.ok()).toBeTruthy();
+  } finally {
+    await hermes.clearBlockedProviders();
+  }
+
+  await page.goto("/");
+  // 같은 초에 만들어진 대화가 여럿이라 목록의 첫 줄이 이 대화라고 볼 수 없다. 이름으로 고른다.
+  const opener = page.getByRole("button", { name: "대화 목록 열기" });
+  if (await opener.isVisible()) await opener.click();
+  await page
+    .getByRole("complementary", { name: "대화 목록" })
+    .getByRole("button", { name: /넘김 화면 검사/ })
+    // 다른 폭에서 같은 이름의 대화를 이미 만들었다. 목록은 최근 순서라 첫 줄이 이번 것이다.
+    .first()
+    .click();
+  const notice = page.getByTestId("provider-switched").last();
+  await expect(notice).toHaveText(/여기부터 openai-codex\/gpt-5\.5 로 돈다/);
 });

@@ -24,6 +24,8 @@ export type UsageExecution = {
   pricingVersion: string | null;
   startedAt: string;
   hasChildren: boolean;
+  /** 막혀서 넘어오며 이 실행이 대신한 직전 실행. 첫 시도면 null */
+  retryOfExecutionId: number | null;
 };
 
 /** 같은 질문인데 문맥이 커진 실행을 눈으로 찾을 수 있게 글자 수를 적는다. */
@@ -61,8 +63,21 @@ export function actualCostLabel(execution: UsageExecution): string {
 export function executionStatusLabel(execution: UsageExecution): string {
   if (isRunning(execution)) return "도는 중";
   if (execution.errorCode === "ORPHANED") return "중간에 끊김";
+  if (execution.errorCode === "PROVIDER_BLOCKED") return "막혀서 다음 모델로 넘어감";
+  if (execution.errorCode === "NO_MODEL_AVAILABLE") return "쓸 수 있는 모델이 없음";
   if (execution.status === "FAILED" || execution.errorCode !== null) return execution.errorCode ?? "실패";
   return "성공";
+}
+
+/**
+ * 앞 실행에서 이어진 것임을 적는다. 첫 시도면 빈 문자열이다.
+ *
+ * <p>막혀서 만든 실행은 토큰을 쓰지 않아 금액이 0 이지만 목록에는 남아야 무엇이 있었는지 안다.
+ */
+export function retryOfLabel(execution: UsageExecution): string {
+  return execution.retryOfExecutionId === null
+    ? ""
+    : `${execution.retryOfExecutionId}번 실행에서 이어짐`;
 }
 
 export function ExecutionList({ executions }: { executions: UsageExecution[] }) {

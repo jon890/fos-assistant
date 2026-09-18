@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AgentForm } from "@/components/admin/agent-form";
 import { AgentList } from "@/components/admin/agent-list";
 import { VisibilityConfirm } from "@/components/admin/visibility-confirm";
@@ -8,7 +8,9 @@ import { describeError } from "@/components/error-message";
 import {
   FAMILY_VISIBILITY,
   PRIVATE_VISIBILITY,
+  formatRemaining,
   type AdminAgent,
+  type BlockedProvider,
 } from "@/lib/agent";
 
 export type { AdminAgent } from "@/lib/agent";
@@ -24,11 +26,22 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmingAgent, setConfirmingAgent] = useState<AdminAgent | null>(null);
+  const [blocked, setBlocked] = useState<BlockedProvider[]>([]);
+
+  const reloadBlocked = useCallback(async () => {
+    const response = await fetch("/api/admin/providers/blocked");
+    setBlocked(response.ok ? await payload<BlockedProvider[]>(response) : []);
+  }, []);
+
+  useEffect(() => {
+    void reloadBlocked();
+  }, [reloadBlocked]);
 
   async function reload() {
     const response = await fetch("/api/admin/agents");
     if (!response.ok) throw await payload<{ code: string; message: string }>(response);
     setAgents(await payload<AdminAgent[]>(response));
+    await reloadBlocked();
   }
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
@@ -102,6 +115,25 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
     }
   }
 
+  async function saveModels(agent: AdminAgent, models: { provider: string; model: string }[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/agents/${agent.code}/models`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ models }),
+      });
+      if (response.ok) await reload();
+      else {
+        const result = await payload<{ code: string; message: string }>(response);
+        setError(describeError(result.code, result.message));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function requestVisibilityChange(agent: AdminAgent) {
     if (agent.visibility === PRIVATE_VISIBILITY) setConfirmingAgent(agent);
     else void update(agent, { visibility: PRIVATE_VISIBILITY });
@@ -121,6 +153,14 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
         공개 범위는 보안 설정이다. 가족 공개로 바꾸면 모든 가족 구성원이 이 에이전트로 대화할 수 있다.
         연결된 도구와 자료도 함께 쓸 수 있는지 확인해야 한다.
       </p>
+      {blocked.length > 0 ? (
+        <p className="mb-4 rounded-md bg-surface p-3 text-sm" data-testid="blocked-providers">
+          막힌 provider:{" "}
+          {blocked
+            .map((row) => `${row.provider} (${formatRemaining(row.remainingSeconds)})`)
+            .join(", ")}
+        </p>
+      ) : null}
       <AgentForm ownerEmail={ownerEmail} busy={busy} onCreate={(event) => void create(event)} />
       {error ? <p className="mb-4 rounded-md bg-surface p-3 text-sm">{error}</p> : null}
       <AgentList
@@ -129,6 +169,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
         onVisibilityChange={requestVisibilityChange}
         onEnabledChange={(agent) => void update(agent, { enabled: !agent.enabled })}
         onSyncModel={(agent) => void syncModel(agent)}
+        onSaveModels={(agent, models) => void saveModels(agent, models)}
       />
       {confirmingAgent ? (
         <VisibilityConfirm agent={confirmingAgent} busy={busy} onCancel={() => setConfirmingAgent(null)} onConfirm={() => void confirmFamilyVisibility()} />

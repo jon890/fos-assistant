@@ -10,6 +10,7 @@ import {
   contextOmittedLabel,
   executionStatusLabel,
   isRunning,
+  retryOfLabel,
   type UsageExecution,
 } from "./execution-list";
 
@@ -65,8 +66,13 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 <span className="block truncate">{execution.model ?? "-"}</span>
                 <span className="block truncate text-xs text-muted">{execution.provider ?? "-"}</span>
               </td>
-              <td className="py-3 pr-4">
+              <td className="max-w-40 py-3 pr-4">
                 <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
+                {retryOfLabel(execution) ? (
+                  <span className="mt-1 block text-xs text-muted" data-testid="execution-retry-of">
+                    {retryOfLabel(execution)}
+                  </span>
+                ) : null}
               </td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.inputTokens)}</td>
               <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</td>

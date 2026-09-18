@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.ts";
+import { expect, test, MODELS_AGENT_CODE } from "./fixtures.ts";
 
 test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영한다", async ({ page }) => {
   const reset = await page.request.patch("/api/admin/agents/browser", {
@@ -24,4 +24,40 @@ test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
   await card.getByRole("button", { name: "가족 공개로 변경" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "가족 공개" }).click();
   await expect(card.getByText("가족 공개", { exact: true })).toBeVisible();
+});
+
+test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ page }) => {
+  await page.request.put(`/api/admin/agents/${MODELS_AGENT_CODE}/models`, {
+    data: { models: [{ provider: "openai-codex", model: "gpt-5.5" }] },
+  });
+  await page.goto("/admin/agents");
+  const card = page
+    .getByRole("region", { name: "등록된 에이전트" })
+    .locator("article")
+    .filter({ hasText: "모델 목록 비서" });
+  const list = card.getByTestId("agent-model-list");
+
+  await expect(list.getByRole("button", { name: "지우기" })).toBeDisabled();
+
+  await list.getByRole("button", { name: "모델 추가" }).click();
+  await list.getByLabel("2순위 provider").fill("nvidia");
+  await list.getByLabel("2순위 모델").fill("nemotron");
+  await list.getByRole("button", { name: "모델 목록 저장" }).click();
+  await expect(list.getByLabel("2순위 provider")).toHaveValue("nvidia");
+
+  await list.getByRole("button", { name: "아래로" }).first().click();
+  await list.getByRole("button", { name: "모델 목록 저장" }).click();
+  await expect(list.getByLabel("1순위 provider")).toHaveValue("nvidia");
+
+  await page.reload();
+  await expect(list.getByLabel("1순위 provider")).toHaveValue("nvidia");
+  await expect(list.getByLabel("2순위 provider")).toHaveValue("openai-codex");
+});
+
+test("막힌 provider 가 없으면 그 줄을 그리지 않고 목록이 가로로 넘치지 않는다", async ({ page }, testInfo) => {
+  await page.goto("/admin/agents");
+
+  await expect(page.getByTestId("blocked-providers")).toHaveCount(0);
+  const width = testInfo.project.name === "mobile" ? 390 : 1280;
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 });

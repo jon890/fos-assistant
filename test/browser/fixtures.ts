@@ -26,16 +26,27 @@ const HERMES_CONTROL_PATH = join(tmpdir(), `fos-assistant-browser-hermes-${CONTR
 /** 흐름이 붙은 에이전트의 코드다. 흐름 검사가 이 코드로 대화를 시작한다. */
 export const FLOW_AGENT_CODE = "browserflow";
 
+/** 모델 목록을 고치는 검사 전용이다. 다른 검사가 쓰는 에이전트를 건드리지 않는다. */
+export const MODELS_AGENT_CODE = "browsermodels";
+
+/** 막혀서 넘어가는 검사 전용이다. 여기서만 막힌 provider 를 만든다. */
+export const SWITCH_AGENT_CODE = "browserswitch";
+
 /** profile 이름과 그 profile 의 key 다. 가짜 Hermes 와 key 디렉터리가 같은 표를 쓴다. */
 const PROFILE_KEYS: Record<string, string> = {
   browser: "browser-profile-key",
   browserflow: "browser-flow-profile-key",
+  browsermodels: "browser-models-profile-key",
+  browserswitch: "browser-switch-profile-key",
 };
 
 export type FakeHermesControl = {
   holdNextRun(): Promise<void>;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): Promise<void>;
+  /** 그 provider 의 계정이 전부 막힌 것처럼 답하게 한다. */
+  blockProvider(provider: string): Promise<void>;
+  clearBlockedProviders(): Promise<void>;
 };
 
 async function fakeHermesControl(): Promise<FakeHermesControl> {
@@ -48,6 +59,8 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
     holdNextRun: () => call("/__test/hold-next-run", "POST"),
     waitForHeldRun: () => call("/__test/wait-held-run", "GET"),
     releaseHeldRun: () => call("/__test/release-held-run", "POST"),
+    blockProvider: (provider: string) => call(`/__test/block-provider/${provider}`, "POST"),
+    clearBlockedProviders: () => call("/__test/clear-blocked-providers", "POST"),
   };
 }
 
@@ -113,6 +126,9 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
     { code: "browser", name: "브라우저 비서", profile: "browser", flow: null },
     // 흐름 검사 전용이다. 하나만 두면 흐름이 붙지 않은 대화를 함께 검사할 수 없다.
     { code: FLOW_AGENT_CODE, name: "흐름 비서", profile: "browserflow", flow: "research-and-build" },
+    // 모델 목록과 넘김을 고치는 검사 전용이다. 다른 검사가 쓰는 에이전트와 섞이지 않게 나눈다.
+    { code: MODELS_AGENT_CODE, name: "모델 목록 비서", profile: "browsermodels", flow: null },
+    { code: SWITCH_AGENT_CODE, name: "넘김 비서", profile: "browserswitch", flow: null },
   ]) {
     const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents`, {
       method: "POST",
@@ -161,6 +177,8 @@ function startControlPlane(keyDir: string, logPath: string): ChildProcess {
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
       ASSISTANT_TESTSUPPORT_ENABLED: "true",
+      // 막힌 provider 를 오래 기억하면 다음 검사가 1순위를 건너뛴다. 검사에서만 짧게 둔다.
+      ASSISTANT_MODEL_PROVIDER_COOLDOWN: "PT1S",
     },
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
