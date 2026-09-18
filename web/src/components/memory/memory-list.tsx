@@ -5,7 +5,7 @@ import { MemoryForm } from "./memory-form";
 import { MemoryItem } from "./memory-item";
 import { MemoryProposal } from "./memory-proposal";
 
-export type Memory = { id: number; scope: "USER" | "FAMILY"; ownerUserId: number | null; title: string; content: string; alwaysInject: boolean; status: "PROPOSED" | "ACCEPTED" | "REJECTED" };
+export type Memory = { id: number; scope: "USER" | "FAMILY"; ownerUserId: number | null; title: string; content: string; alwaysInject: boolean; status: "PROPOSED" | "ACCEPTED" | "REJECTED"; omittedFromContext?: boolean };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mb-8"><h2 className="mb-3 text-lg font-semibold">{title}</h2><div className="grid gap-3">{children}</div></section>; }
 

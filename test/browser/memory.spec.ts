@@ -101,3 +101,22 @@ test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인�
   await expect(item.getByRole("alert")).toHaveText("Memory를 고치지 못했습니다.");
   await expect(item.getByRole("textbox")).toBeVisible();
 });
+
+test("문맥에 실리지 않은 항목에 표시가 보인다", async ({ page }) => {
+  const list = [
+    { id: 920, scope: "USER", ownerUserId: 1, title: "너무 긴 항목", content: "가".repeat(200), alwaysInject: true, status: "ACCEPTED", omittedFromContext: true },
+    { id: 921, scope: "USER", ownerUserId: 1, title: "실린 항목", content: "짧게 남긴 사실", alwaysInject: true, status: "ACCEPTED", omittedFromContext: false },
+  ];
+  await page.route("**/api/memories", async (route) => route.request().method() === "GET"
+    ? route.fulfill({ json: list }) : route.fulfill({ status: 201, json: list[0] }));
+  await page.goto("/memory");
+  await page.getByLabel("범위").selectOption("USER");
+  await page.getByLabel("제목").fill("새 항목");
+  await page.getByLabel("내용").fill("내용");
+  await page.getByRole("button", { name: "저장" }).click();
+
+  const omitted = page.getByRole("heading", { name: "너무 긴 항목" }).locator("xpath=ancestor::article");
+  await expect(omitted.getByTestId("memory-omitted")).toHaveText("길어서 실리지 않음");
+  const kept = page.getByRole("heading", { name: "실린 항목" }).locator("xpath=ancestor::article");
+  await expect(kept.getByTestId("memory-omitted")).toHaveCount(0);
+});
