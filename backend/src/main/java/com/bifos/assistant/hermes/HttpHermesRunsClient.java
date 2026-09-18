@@ -133,7 +133,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                     .body(JsonNode.class);
         } catch (RestClientException ex) {
             log.warn("hermes run submit failed profile={}", command.profileName(), ex);
-            throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not reach the Hermes runtime", ex);
+            throw HermesCallFailure.of(ex, "could not reach the Hermes runtime");
         }
     }
 
@@ -161,7 +161,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                     .retrieve()
                     .body(JsonNode.class);
         } catch (RestClientException ex) {
-            throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not read the run status", ex);
+            throw HermesCallFailure.of(ex, "could not read the run status");
         }
     }
 

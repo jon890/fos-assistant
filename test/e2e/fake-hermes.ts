@@ -20,6 +20,21 @@ const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
 const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
 const TEST_RELEASE_HELD_RUN_PATH = "/__test/release-held-run";
+const TEST_BUSY_PATH = "/__test/busy";
+const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
+
+/**
+ * 동시 실행 한도를 넘겼을 때 실제 Hermes 가 내는 본문이다.
+ *
+ * <p>공유 gateway 는 이 한도를 모든 profile 이 나눠 쓴다. 한 사람이 채우면 다른 사람이 이것을 받는다.
+ */
+const RATE_LIMITED = {
+  error: {
+    message: "Too many concurrent runs (max 16)",
+    type: "rate_limit_error",
+    code: "rate_limit_exceeded",
+  },
+} as const;
 
 /**
  * 실행 하나가 보고하는 토큰 수다.
@@ -165,6 +180,11 @@ export type FakeHermes = {
   lastSubmittedRuntime(): { provider?: string; model?: string };
   blockProvider(provider: string): void;
   clearBlockedProviders(): void;
+  /** 실행 제출을 429 로 거절하게 한다. 공유 gateway 가 한도에 닿은 상태를 흉내 낸다. */
+  busy(): void;
+  clearBusy(): void;
+  /** 실행 제출을 받은 횟수다. 429 뒤에 다시 보내지 않는 것을 이 수로 본다. */
+  submitCount(): number;
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -186,6 +206,8 @@ export function startFakeHermes(
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
   const blockedProviders = new Set<string>();
+  let busy = false;
+  let submitCount = 0;
   let lastSubmittedRuntime: { provider?: string; model?: string } = {};
   let holdNextRun = false;
   let heldRunId: string | undefined;
@@ -210,6 +232,16 @@ export function startFakeHermes(
 
       if (request.method === "POST" && path === TEST_CLEAR_BLOCKED_PATH) {
         blockedProviders.clear();
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_BUSY_PATH) {
+        busy = true;
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_CLEAR_BUSY_PATH) {
+        busy = false;
         return send(response, 204, null);
       }
 
@@ -328,6 +360,9 @@ export function startFakeHermes(
         if (!authorized(request, profile)) {
           return send(response, 401, { error: "bad key for this profile" });
         }
+        submitCount += 1;
+        // 한도에 닿은 gateway 는 본문을 읽기 전에 거절한다. 실행을 만들지 않는다.
+        if (busy) return send(response, 429, RATE_LIMITED);
 
         const raw = await readBody(request);
         const submitted = (raw.length > 0 ? JSON.parse(raw) : {}) as {
@@ -433,6 +468,13 @@ export function startFakeHermes(
         lastSubmittedRuntime: () => lastSubmittedRuntime,
         blockProvider: (provider: string) => blockedProviders.add(provider),
         clearBlockedProviders: () => blockedProviders.clear(),
+        busy: () => {
+          busy = true;
+        },
+        clearBusy: () => {
+          busy = false;
+        },
+        submitCount: () => submitCount,
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {

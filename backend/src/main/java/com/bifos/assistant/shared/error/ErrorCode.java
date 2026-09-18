@@ -22,6 +22,14 @@ public enum ErrorCode {
     HERMES_RUN_FAILED(HttpStatus.BAD_GATEWAY),
     HERMES_RUN_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT),
     HERMES_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
+    /**
+     * Hermes 가 동시 실행 한도에 닿아 429 로 거절했다.
+     *
+     * <p>공유 gateway 는 한도를 모든 profile 이 나눠 쓰므로, 한 사람이 한도를 채우면 다른 사람의
+     * 대화가 이 코드로 실패한다. Hermes 에 닿지 못한 것과 원인이 달라 따로 적는다. 여기서 다시
+     * 보내지 않는다. 붐비는데 다시 보내면 더 붐빈다.
+     */
+    HERMES_BUSY(HttpStatus.TOO_MANY_REQUESTS),
     /** 그 provider 의 계정이 전부 막혀 다음 모델로 넘어갔다. 실행 줄에 남는 이름이기도 하다. */
     PROVIDER_BLOCKED(HttpStatus.BAD_GATEWAY),
     /** 이 에이전트가 지금 쓸 수 있는 모델이 하나도 없다. 목록이 비었거나 전부 막혔다. */

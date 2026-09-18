@@ -49,7 +49,9 @@ public class HermesRunEventStream {
                 throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an empty event stream");
             }
             readEvents(body, onEvent);
-        } catch (IOException | RestClientException ex) {
+        } catch (RestClientException ex) {
+            throw HermesCallFailure.of(ex, "could not read the Hermes event stream");
+        } catch (IOException ex) {
             throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not read the Hermes event stream", ex);
         }
     }
