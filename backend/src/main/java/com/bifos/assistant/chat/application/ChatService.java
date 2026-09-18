@@ -106,7 +106,8 @@ public class ChatService {
                 context.instructions(),
                 conversation.hermesSessionId());
         AgentExecution execution = executions.start(user, conversation, agent, null, null,
-                new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
+                new ExecutionContextSnapshot(
+                        context.chars(), null, context.instructionsHash(), context.omittedItems()));
         return new PendingTurn(user, conversation, agent, command, execution, new SequenceCounter());
     }
 

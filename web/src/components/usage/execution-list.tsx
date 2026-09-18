@@ -17,6 +17,7 @@ export type UsageExecution = {
   outputTokens: number | null;
   latencyMs: number | null;
   contextChars: number | null;
+  contextOmittedItems: number | null;
   estimatedCostMicros: number | null;
   actualCostMicros: number | null;
   costCurrency: string | null;
@@ -28,6 +29,17 @@ export type UsageExecution = {
 /** 같은 질문인데 문맥이 커진 실행을 눈으로 찾을 수 있게 글자 수를 적는다. */
 export function contextCharsLabel(execution: UsageExecution): string {
   return execution.contextChars === null ? "-" : `${execution.contextChars.toLocaleString("ko-KR")}자`;
+}
+
+/**
+ * 자리가 없어 그 실행의 문맥에서 빠진 Memory 항목이 있으면 그 수를 적는다.
+ *
+ * <p>빠진 것이 없거나 값을 모르는 지난 기록은 빈 문자열이다. 이 줄이 없으면 문맥 글자 수만 보고
+ * 항목을 지운 실행과 구분할 수 없다.
+ */
+export function contextOmittedLabel(execution: UsageExecution): string {
+  const omitted = execution.contextOmittedItems;
+  return omitted === null || omitted <= 0 ? "" : `기억 ${omitted.toLocaleString("ko-KR")}개가 길어서 빠짐`;
 }
 
 export function isRunning(execution: UsageExecution): boolean {

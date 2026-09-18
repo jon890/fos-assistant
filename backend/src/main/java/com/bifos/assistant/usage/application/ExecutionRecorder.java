@@ -55,6 +55,7 @@ public class ExecutionRecorder {
                         .parentExecutionId(parentExecutionId)
                         .rootExecutionId(rootExecutionId)
                         .contextChars(context.contextChars())
+                        .contextOmittedItems(context.contextOmittedItems())
                         .runtimeFingerprint(context.runtimeFingerprint())
                         .instructionsHash(context.instructionsHash())
                         .status(ExecutionStatus.RUNNING)

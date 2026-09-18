@@ -7,6 +7,7 @@ import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/form
 import {
   actualCostLabel,
   contextCharsLabel,
+  contextOmittedLabel,
   executionStatusLabel,
   isRunning,
   type UsageExecution,
@@ -74,7 +75,12 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 className="py-3 pr-4 text-right whitespace-nowrap tabular-nums"
                 data-testid="execution-context-chars"
               >
-                {contextCharsLabel(execution)}
+                <span className="block">{contextCharsLabel(execution)}</span>
+                {contextOmittedLabel(execution) ? (
+                  <span className="block text-xs text-danger" data-testid="execution-context-omitted">
+                    {contextOmittedLabel(execution)}
+                  </span>
+                ) : null}
               </td>
               <td className="py-3 pr-4 text-right whitespace-nowrap" data-testid="execution-duration">
                 {running ? "" : formatDuration(execution.latencyMs ?? 0)}

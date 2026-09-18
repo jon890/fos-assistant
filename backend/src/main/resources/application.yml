@@ -29,6 +29,7 @@ management:
 assistant:
   context:
     max-chars: 8000
+    index-budget-ratio: 4
   memory:
     propose:
       enabled: false
