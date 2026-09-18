@@ -85,6 +85,10 @@ AUTH_GOOGLE_SECRET=build-time-placeholder \
 pnpm build
 ```
 
+**포트는 다투지 않는다.** 기본값이 비어 있으면 그것을 쓰고, 다른 워크트리가 쥐고 있으면
+빈 포트를 받아 쓴다. `test/support/pick-port.ts` 가 그 판단을 갖는다.
+고정하고 싶으면 `BROWSER_WEB_PORT` 와 `BROWSER_CONTROL_PLANE_PORT` 를 준다.
+
 `test/browser` 는 웹과 Chromium 을 띄워 화면을 검사한다.
 `mobile` 과 `desktop` 두 폭에서 돌고 각각 390px 와 1280px 다.
 

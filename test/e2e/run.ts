@@ -28,9 +28,10 @@ import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
+import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const APP_PORT = 18080;
+const APP_PORT = pickPort("E2E_APP_PORT", 18_080);
 const JWT_SECRET = "smoke-secret-smoke-secret-smoke-secret";
 const PROFILE_KEY = "dad-key";
 const HEALTH_TIMEOUT_MS = 90_000;
