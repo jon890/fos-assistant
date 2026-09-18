@@ -17,6 +17,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.presentation.UsageController;
+import com.bifos.assistant.usage.presentation.UsageDtos;
 import com.bifos.assistant.user.domain.UserRole;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
@@ -77,17 +78,17 @@ class UsageControllerTest {
         execution(parent.id(), parent.id());
         AgentExecution alone = execution(null, null);
 
-        List<UsageController.ExecutionView> page = controller.myExecutions(50);
+        List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
 
         assertThat(page)
                 .filteredOn(view -> view.id().equals(parent.id()))
                 .singleElement()
-                .extracting(UsageController.ExecutionView::hasChildren)
+                .extracting(UsageDtos.ExecutionView::hasChildren)
                 .isEqualTo(true);
         assertThat(page)
                 .filteredOn(view -> view.id().equals(alone.id()))
                 .singleElement()
-                .extracting(UsageController.ExecutionView::hasChildren)
+                .extracting(UsageDtos.ExecutionView::hasChildren)
                 .isEqualTo(false);
     }
 
@@ -121,7 +122,7 @@ class UsageControllerTest {
         Statistics statistics = entityManagers.unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
 
-        List<UsageController.ExecutionView> page = controller.myExecutions(200);
+        List<UsageDtos.ExecutionView> page = controller.myExecutions(200);
 
         assertThat(page).hasSize(howMany);
         return statistics.getQueryExecutionCount();

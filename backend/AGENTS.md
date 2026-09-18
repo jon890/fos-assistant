@@ -10,6 +10,22 @@ Control Plane 이다. Spring Boot 4 와 MySQL 8.4 를 쓴다.
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application`, `domain`, `infra` 로만 흐른다.
 자세한 것은 [`docs/code-architecture.md`](../docs/code-architecture.md) 에 있다.
 
+### 데이터 클래스는 컨트롤러 안에 두지 않는다
+
+**`presentation` 의 요청과 응답 모양은 그 패키지의 `*Dtos.java` 하나에 모은다.**
+컨트롤러 파일에는 경로와 권한과 흐름만 남긴다.
+record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모양을 다른 컨트롤러가 쓸 때
+컨트롤러를 import 하게 된다.
+
+한 패키지에 컨트롤러가 여럿이어도 `*Dtos.java` 는 하나다.
+`AgentController` 와 `AgentAdminController` 가 `AgentDtos` 를 함께 쓴다.
+
+`application` 과 `domain` 은 타입 하나에 파일 하나다.
+서비스가 돌려주는 결과 타입도 그 서비스 안에 두지 않고 따로 뺀다.
+
+예외는 **그 타입 밖에서 쓰이지 않는 값**이다.
+`ModelPrice.ContextTier` 처럼 바깥 record 의 일부인 것은 그 안에 둔다.
+
 ## 기술 주의점
 
 - **Spring Boot 4 는 Jackson 3 을 쓴다.**

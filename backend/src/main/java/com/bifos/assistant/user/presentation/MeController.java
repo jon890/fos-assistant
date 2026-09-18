@@ -1,7 +1,7 @@
 package com.bifos.assistant.user.presentation;
 
-import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.user.presentation.UserDtos.MeView;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,11 +16,5 @@ public class MeController {
     @GetMapping
     public MeView read() {
         return MeView.from(currentUser.require());
-    }
-
-    public record MeView(Long id, String email, String displayName, String role) {
-        static MeView from(CurrentUser user) {
-            return new MeView(user.id(), user.email(), user.displayName(), user.role().name());
-        }
     }
 }

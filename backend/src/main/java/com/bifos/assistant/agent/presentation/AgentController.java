@@ -1,7 +1,7 @@
 package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -19,11 +19,5 @@ public class AgentController {
     @GetMapping
     public List<AgentView> readable() {
         return agents.readableBy(currentUser.require()).stream().map(AgentView::from).toList();
-    }
-
-    public record AgentView(String code, String name, String model, String visibility) {
-        static AgentView from(Agent agent) {
-            return new AgentView(agent.code(), agent.name(), agent.model(), agent.visibility().name());
-        }
     }
 }
