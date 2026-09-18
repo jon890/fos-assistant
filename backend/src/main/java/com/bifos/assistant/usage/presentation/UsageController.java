@@ -137,11 +137,12 @@ public class UsageController {
             Instant startedAt,
             boolean hasChildren) {
 
-        /** 자식을 세지 않고 부르는 자리를 위한 것이다. 자식이 없는 것으로 본다. */
-        static ExecutionView from(AgentExecution execution, Agent agent) {
-            return from(execution, agent, false);
-        }
-
+        /**
+         * 자식 여부를 받아서만 만든다.
+         *
+         * <p>{@code hasChildren} 을 거짓으로 채워 주는 짧은 형태를 두지 않는다. 그것을 부르면 자식이
+         * 있는 실행이 목록에 표시 없이 보이고, 컴파일은 통과한다. 부르는 쪽이 자식을 셀지 정하게 한다.
+         */
         static ExecutionView from(AgentExecution execution, Agent agent, boolean hasChildren) {
             return new ExecutionView(
                     execution.id(),

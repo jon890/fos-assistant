@@ -23,7 +23,7 @@ sequenceDiagram
     C->>C: 요청자가 볼 수 있는 Memory 만 골라 instructions 를 조립한다
     C->>C: 실행 한 줄을 RUNNING 으로 만든다
     C->>H: POST {profile}/v1/runs
-    C->>C: 받은 run_id 를 그 줄에 적는다
+    C->>C: 받은 run_id 를 그 줄에 적고 RUN_STARTED 를 남긴다
     alt 한 번에 받는 경로
         loop 끝날 때까지
             C->>H: GET {profile}/v1/runs/{id}
@@ -33,13 +33,13 @@ sequenceDiagram
         loop 실행 중
             H-->>C: 답 조각과 도구 사건
             C-->>W: delta 와 tool 사건
-            C->>C: 사건을 execution_event 로 옮겨 적는다
+            C->>C: 도구와 하위 에이전트 사건을 execution_event 로 옮겨 적는다
             W-->>B: 답 조각과 도구 상태
         end
         C->>H: GET {profile}/v1/runs/{id}
     end
     alt Hermes 실행 성공
-        C->>C: 메시지를 남기고 같은 실행 줄을 SUCCEEDED 로 갱신한다
+        C->>C: 메시지를 남기고 같은 실행 줄을 SUCCEEDED 로 갱신하며 RUN_COMPLETED 를 남긴다
         opt Memory 제안 설정이 켜짐
             C->>H: 방금 대화에서 남길 개인 사실 제안 요청
             alt 제안 실행 성공
@@ -56,7 +56,7 @@ sequenceDiagram
             B->>W: 저장된 대화 이력 조회
         end
     else 제출이나 실행 상태 조회 실패
-        C->>C: 같은 실행 줄을 FAILED 로 갱신하고 오류 코드를 적는다
+        C->>C: 같은 실행 줄을 FAILED 로 갱신하고 오류 코드를 적으며 RUN_FAILED 를 남긴다
         C-->>W: 오류 응답이나 error 사건
     end
 ```
@@ -71,6 +71,16 @@ sequenceDiagram
 두 경로 모두 Hermes 실행 상태 조회가 돌려준 최종 `output` 과 `usage` 를 저장한다.
 스트리밍 경로의 답 조각은 화면에만 쓰며, 이벤트 연결이 중간에 끝나도 최종 상태를 조회해 메시지와 실행 기록을 남긴다.
 브라우저는 `done` 을 받으면 대화 이력을 다시 읽고 화면의 답 조각을 저장된 답으로 바꾼다.
+
+**실행의 시작과 끝은 두 경로 모두 남는다.**
+`RUN_STARTED` 와 `RUN_COMPLETED` 와 `RUN_FAILED` 는 Hermes 사건을 옮겨 적은 것이 아니라
+Control Plane 이 직접 적는 것이다.
+그래서 스트림을 열지 않는 경로에도 실행의 시작과 끝이 남는다.
+도구와 하위 에이전트 사건은 스트리밍 경로에만 온다. 그것이 맞다.
+
+**사건 저장이 실패해도 대화는 성공으로 끝난다.**
+사건은 관측용이고 그것 때문에 답이 사라지면 안 된다.
+기동할 때 남은 실행을 정리하는 경로로 끝난 실행에는 `RUN_FAILED` 가 남지 않는다.
 
 ## 기동할 때 남은 실행 정리
 

@@ -68,6 +68,80 @@ function deepTreeFixture(depth: number) {
   return { root: node(0), truncated: false };
 }
 
+/**
+ * 자식 노드가 있는 실행에 `SUBAGENT_STARTED` 사건도 함께 담은 나무다.
+ *
+ * <p>자식은 Memory 제안 실행처럼 하위 에이전트와 무관하게 달릴 수 있다. 그런 자식이 있어도
+ * `SUBAGENT_STARTED` 줄이 사라지면 안 된다는 것을 이 나무로 확인한다.
+ */
+function treeWithChildAndSubagentFixture() {
+  return {
+    truncated: false,
+    root: {
+      truncated: false,
+      executionId: 950,
+      agentCode: "부모-에이전트",
+      agentName: "부모 에이전트",
+      status: "SUCCEEDED",
+      model: "gpt-5.5",
+      inputTokens: 10,
+      outputTokens: 20,
+      estimatedCostMicros: 1000,
+      latencyMs: 500,
+      startedAt: new Date().toISOString(),
+      events: [
+        {
+          sequence: 1,
+          eventType: "SUBAGENT_STARTED",
+          toolName: null,
+          subagentName: null,
+          durationMs: null,
+          detail: "하위 에이전트가 찾기 시작했다",
+          occurredAt: new Date().toISOString(),
+        },
+        {
+          sequence: 2,
+          eventType: "SUBAGENT_COMPLETED",
+          toolName: null,
+          subagentName: null,
+          durationMs: null,
+          detail: "하위 에이전트가 찾기를 마쳤다",
+          occurredAt: new Date().toISOString(),
+        },
+      ],
+      children: [
+        {
+          truncated: false,
+          executionId: 951,
+          agentCode: "자식-에이전트",
+          agentName: "Memory 제안 실행",
+          status: "SUCCEEDED",
+          model: "gpt-5.5",
+          inputTokens: 5,
+          outputTokens: 5,
+          estimatedCostMicros: 500,
+          latencyMs: 200,
+          startedAt: new Date().toISOString(),
+          events: [],
+          children: [],
+        },
+      ],
+    },
+  };
+}
+
+test("자식 노드가 있어도 하위 에이전트 사건 줄이 사라지지 않는다", async ({ page }) => {
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: treeWithChildAndSubagentFixture() });
+  });
+  await page.goto("/executions/950");
+
+  const tree = page.getByTestId("execution-tree");
+  await expect(tree).toBeVisible();
+  expect(await tree.locator("[data-testid=execution-node]").count()).toBe(2);
+  await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(1);
+});
+
 test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보인다", async ({ page }) => {
   const response = await page.request.post("/api/chat/stream", {
     data: { text: "실행 나무 검사", agentCode: "browser" },

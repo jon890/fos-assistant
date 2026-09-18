@@ -8,9 +8,15 @@ const MAX_DEPTH = 8;
  * `TOOL_STARTED` 를 그 뒤의 `TOOL_COMPLETED` 와 짝지어 한 줄로 만든다.
  *
  * <p>짝이 없으면 그대로 한 줄로 남는다. 도구 이름별로 큐를 둬 겹친 호출도 순서대로 짝짓는다.
- * `SUBAGENT_STARTED` 는 이 노드에 자식이 있으면 그 자식 노드로 이미 그리므로 줄로 만들지 않는다.
+ *
+ * <p>`SUBAGENT_STARTED` 는 자식 노드 유무와 관계없이 언제나 한 줄로 그린다. 자식 실행이 그 하위
+ * 에이전트에서 났는지 짝지을 방법이 없어서다. 자식 실행에는 어느 사건에서 났는지가 적혀 있지 않고,
+ * Hermes v0.21.0 은 하위 에이전트 이름조차 보내지 않아 이름으로도 맞출 수 없다. 실제 하위 에이전트가
+ * 자식 실행 줄을 남기는 경로가 생기면 이 줄과 한 번 겹쳐 보일 수 있는데, 겹쳐 보이는 쪽이 사건이
+ * 통째로 사라지는 쪽보다 낫다. Memory 제안 실행처럼 하위 에이전트가 아닌 자식이 달려도 이 줄이
+ * 사라지면 안 되기 때문이다.
  */
-export function mergeEvents(events: ExecutionEventView[], hasChildren: boolean): MergedEventRow[] {
+export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
   const rows: MergedEventRow[] = [];
   const pendingByTool = new Map<string, Extract<MergedEventRow, { kind: "tool" }>[]>();
 
@@ -58,14 +64,12 @@ export function mergeEvents(events: ExecutionEventView[], hasChildren: boolean):
         break;
       }
       case "SUBAGENT_STARTED":
-        if (!hasChildren) {
-          rows.push({
-            kind: "subagent",
-            key: event.sequence,
-            subagentName: event.subagentName,
-            detail: event.detail,
-          });
-        }
+        rows.push({
+          kind: "subagent",
+          key: event.sequence,
+          subagentName: event.subagentName,
+          detail: event.detail,
+        });
         break;
       case "SUBAGENT_COMPLETED":
         // 시작 사건에서 이미 한 줄로 그렸다.
@@ -78,7 +82,7 @@ export function mergeEvents(events: ExecutionEventView[], hasChildren: boolean):
 /** 노드 하나다. 자기 자신을 자식으로 다시 그린다. */
 export function ExecutionNode({ node, depth }: { node: ExecutionTreeNode; depth: number }) {
   const stoppedByScreen = depth >= MAX_DEPTH;
-  const rows = mergeEvents(node.events, node.children.length > 0);
+  const rows = mergeEvents(node.events);
   const label = node.agentName ?? node.agentCode ?? `실행 #${node.executionId}`;
   const showsTruncated = node.truncated || (stoppedByScreen && node.children.length > 0);
 

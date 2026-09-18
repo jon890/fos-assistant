@@ -32,11 +32,12 @@ src/
 
 ## 색과 간격은 테마 토큰이 소유한다
 
-색을 `style={{ background: "var(--surface)" }}` 처럼 인라인으로 적지 않는다.
-`globals.css` 의 `@theme` 에 토큰을 선언하고 `bg-surface` 같은 Tailwind 클래스로 쓴다.
+색과 간격을 `style={{ background: "var(--surface)" }}` 처럼 인라인으로 적지 않는다.
+`globals.css` 의 `@theme` 에 토큰을 선언하고 `bg-surface` 나 `ml-3` 같은 Tailwind 클래스로 쓴다.
 
 인라인 스타일에는 `hover:` 와 `md:` 와 `disabled:` 를 붙일 수 없다.
-그래서 인라인으로 적은 색 하나가 그 요소의 반응형과 상태 변화를 함께 막는다.
+그래서 인라인으로 적은 값 하나가 그 요소의 반응형과 상태 변화를 함께 막는다.
+색이든 여백이든 이유가 같다.
 
 **브랜드 색을 본문 글자에 쓰지 않는다.**
 읽는 글이 색을 가지면 무엇이 누를 수 있는 것인지 알 수 없게 된다.
@@ -45,8 +46,11 @@ src/
 
 ```bash
 # cwd: 저장소 root
-grep -rn 'style={{' web/src/ | grep -iE 'background|color|border'
+grep -rn 'style={{' web/src/
 ```
+
+값이 이어지는 수라서 클래스로 만들 수 없는 것만 예외다.
+그때는 왜 인라인인지 주석으로 남긴다.
 
 ## 화면 밖에서 오는 글은 마크다운으로 읽는다
 
