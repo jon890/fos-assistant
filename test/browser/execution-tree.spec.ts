@@ -25,8 +25,8 @@ async function lastExecutionId(page: import("../../web/node_modules/@playwright/
 /**
  * 깊이 `depth` 짜리 가짜 나무를 만든다.
  *
- * <p>자식 실행을 만드는 경로가 아직 없어, 들여쓰기가 화면을 미는지는 이렇게 서버 응답을 가로채
- * 확인한다.
+ * <p>가짜 Hermes 로는 깊은 나무를 만들 수 없어 서버 응답을 가로채 만든다. 도구 이름과 상세를
+ * 길게 넣어 좁은 화면에서 가로로 미는지 본다.
  */
 function deepTreeFixture(depth: number) {
   function node(level: number) {
@@ -183,4 +183,74 @@ test("깊은 나무를 열어도 좁은 화면과 넓은 화면 모두 가로로
   const viewportWidth = page.viewportSize()?.width;
   expect(viewportWidth).toBeDefined();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewportWidth!);
+});
+
+/**
+ * 노드 하나짜리 나무다. `treeTruncated` 와 `nodeTruncated` 를 따로 받아
+ * 나무 전체가 잘린 것과 그 노드 아래가 잘린 것을 가르는 화면 판정을 확인하는 데 쓴다.
+ */
+function singleNodeTreeFixture({
+  treeTruncated,
+  nodeTruncated,
+}: {
+  treeTruncated: boolean;
+  nodeTruncated: boolean;
+}) {
+  return {
+    truncated: treeTruncated,
+    root: {
+      truncated: nodeTruncated,
+      executionId: 970,
+      agentCode: "단일-에이전트",
+      agentName: "단일 에이전트",
+      status: "SUCCEEDED",
+      model: "gpt-5.5",
+      inputTokens: 10,
+      outputTokens: 20,
+      estimatedCostMicros: 1000,
+      latencyMs: 500,
+      startedAt: new Date().toISOString(),
+      events: [
+        {
+          sequence: 1,
+          eventType: "TOOL_STARTED",
+          toolName: "fake-tool",
+          subagentName: null,
+          durationMs: null,
+          detail: "시작",
+          occurredAt: new Date().toISOString(),
+        },
+        {
+          sequence: 2,
+          eventType: "TOOL_COMPLETED",
+          toolName: "fake-tool",
+          subagentName: null,
+          durationMs: 100,
+          detail: null,
+          occurredAt: new Date().toISOString(),
+        },
+      ],
+      children: [],
+    },
+  };
+}
+
+test("나무가 위쪽에서 잘렸으면 뿌리 위에 안내가 보인다", async ({ page }) => {
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: singleNodeTreeFixture({ treeTruncated: true, nodeTruncated: false }) });
+  });
+  await page.goto("/executions/970");
+
+  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveText("위쪽이 잘려 여기가 뿌리가 아닐 수 있다");
+  await expect(page.getByText("여기부터 보이지 않는다")).toHaveCount(0);
+});
+
+test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아 같은 말을 두 번 하지 않는다", async ({ page }) => {
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: singleNodeTreeFixture({ treeTruncated: true, nodeTruncated: true }) });
+  });
+  await page.goto("/executions/970");
+
+  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveCount(0);
+  await expect(page.getByText("여기부터 보이지 않는다")).toHaveCount(1);
 });

@@ -124,6 +124,7 @@ export const streamingScenario: Scenario = {
     expect(tree.root.executionId === done!.executionId, "물어본 실행이 뿌리로 나오지 않았다");
     expect(tree.truncated === false, "자를 것이 없는데 나무가 잘렸다고 나왔다");
     expect(tree.root.truncated === false, "자를 것이 없는데 노드가 잘렸다고 나왔다");
+    // Memory 제안이 꺼져 있어 이 실행에는 자식이 달리지 않는다. 켜면 제안 실행이 자식이 된다.
     expect(tree.root.children.length === 0, "자식이 없는데 children 이 비어 있지 않다");
 
     const sequences = tree.root.events.map((event) => event.sequence);
