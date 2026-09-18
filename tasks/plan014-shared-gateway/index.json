@@ -1,7 +1,7 @@
 {
   "name": "plan014-shared-gateway",
   "description": "profile 마다 포트와 gateway 를 두지 않고 공유 gateway 하나의 profile 접두로 옮긴다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-18",
   "total_phases": 2,
   "current_phase": 2,
@@ -12,6 +12,11 @@
       "execution_profile": "standard",
       "status": "completed"
     },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "status": "completed"
+    }
   ]
 }
