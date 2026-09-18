@@ -23,6 +23,7 @@ import { authScenario } from "./scenarios/auth.ts";
 import { meScenario } from "./scenarios/me.ts";
 import { bindingScenario, DAD_BINDING } from "./scenarios/binding.ts";
 import { agentsScenario } from "./scenarios/agents.ts";
+import { agentAddressScenario } from "./scenarios/agent-address.ts";
 import { memoryScenario } from "./scenarios/memory.ts";
 import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
@@ -59,6 +60,7 @@ const SCENARIOS: readonly Scenario[] = [
   meScenario,
   bindingScenario,
   agentsScenario,
+  agentAddressScenario,
   memoryScenario,
   chatScenario,
   usageCostScenario,
@@ -160,6 +162,7 @@ async function main(): Promise<void> {
         kid: mintToken("kid@example.com", JWT_SECRET),
       },
       hermesBaseUrl: hermes.baseUrl,
+      hermesProfileKey: PROFILE_KEY,
       hermes,
     };
 

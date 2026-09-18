@@ -13,6 +13,8 @@ const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
 const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/;
 const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
 const SESSION_PATH = /^\/p\/([a-z0-9-]+)\/api\/sessions\/([A-Za-z0-9_-]+)$/;
+/** Control Plane 이 주소를 저장하기 전에 닿는지 확인할 때 부른다. */
+const CAPABILITIES_PATH = /^\/p\/([a-z0-9-]+)\/v1\/capabilities$/;
 const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)$/;
 const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
@@ -173,8 +175,14 @@ export type FakeHermes = {
  * fake Hermes 를 띄우고 그 주소를 돌려준다.
  *
  * @param profileKeys profile 이름과 그 profile 의 API server key
+ * @param label 이 대역을 다른 대역과 구분하는 이름. 실행의 답에 그대로 실린다. 주소를 옮기는 검사가
+ *     답이 어느 대역에서 왔는지 보는 데 쓴다
  */
-export function startFakeHermes(profileKeys: Record<string, string>): Promise<FakeHermes> {
+export function startFakeHermes(
+  profileKeys: Record<string, string>,
+  label?: string,
+): Promise<FakeHermes> {
+  const who = label === undefined ? "fake hermes" : `fake hermes ${label}`;
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
   const blockedProviders = new Set<string>();
@@ -254,6 +262,15 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           const session = sessions.get(sessionId!);
           if (!session) return send(response, 404, { error: "no such session" });
           return send(response, 200, { session_id: sessionId, ...session });
+        }
+
+        const capabilitiesMatch = CAPABILITIES_PATH.exec(path);
+        if (capabilitiesMatch) {
+          const profile = capabilitiesMatch[1];
+          if (!authorized(request, profile)) {
+            return send(response, 401, { error: "bad key for this profile" });
+          }
+          return send(response, 200, { model: "gpt-5.5", tools: [] });
         }
 
         const eventMatch = RUN_EVENTS_PATH.exec(path);
@@ -371,7 +388,7 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
           output: specialOutputFor(submitted.input ?? "")
-            ?? `[fake hermes on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
+            ?? `[${who} on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
           input: submitted.input ?? "",
           provider: submitted.provider ?? null,
           interruptEvents: submitted.input === "스트림 중단 검사",

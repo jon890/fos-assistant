@@ -50,7 +50,7 @@ export type FakeHermesControl = {
 };
 
 async function fakeHermesControl(): Promise<FakeHermesControl> {
-  const baseUrl = (await readFile(HERMES_CONTROL_PATH, "utf-8")).trim();
+  const baseUrl = await hermesBaseUrl();
   const call = async (path: string, method: "GET" | "POST") => {
     const response = await fetch(`${baseUrl}${path}`, { method });
     if (!response.ok) throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
@@ -62,6 +62,11 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
     blockProvider: (provider: string) => call(`/__test/block-provider/${provider}`, "POST"),
     clearBlockedProviders: () => call("/__test/clear-blocked-providers", "POST"),
   };
+}
+
+/** 가짜 Hermes 가 듣고 있는 주소다. 에이전트 주소를 고치는 검사가 이 값으로 새 주소를 만든다. */
+export async function hermesBaseUrl(): Promise<string> {
+  return (await readFile(HERMES_CONTROL_PATH, "utf-8")).trim();
 }
 
 export async function setSession(

@@ -100,6 +100,36 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
     }
   }
 
+  /**
+   * 에이전트의 Hermes 주소를 바꾼다.
+   *
+   * <p>실패 이유는 그 카드 안에 적어야 해서 전역 오류로 올리지 않고 돌려준다. 「저장하지 못했다」만
+   * 으로는 주소가 틀린 것인지 Hermes 가 내려간 것인지 모른다.
+   */
+  async function changeApiBaseUrl(agent: AdminAgent, apiBaseUrl: string): Promise<string | null> {
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/admin/agents/${agent.code}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: agent.enabled,
+          visibility: agent.visibility,
+          ownerEmail: agent.visibility === PRIVATE_VISIBILITY ? ownerEmail : null,
+          apiBaseUrl,
+        }),
+      });
+      if (!response.ok) {
+        const result = await payload<{ code: string; message: string }>(response);
+        return describeError(result.code, result.message);
+      }
+      await reload();
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function syncModel(agent: AdminAgent) {
     setBusy(true);
     setError(null);
@@ -170,6 +200,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
         onEnabledChange={(agent) => void update(agent, { enabled: !agent.enabled })}
         onSyncModel={(agent) => void syncModel(agent)}
         onSaveModels={(agent, models) => void saveModels(agent, models)}
+        onApiBaseUrlChange={changeApiBaseUrl}
       />
       {confirmingAgent ? (
         <VisibilityConfirm agent={confirmingAgent} busy={busy} onCancel={() => setConfirmingAgent(null)} onConfirm={() => void confirmFamilyVisibility()} />

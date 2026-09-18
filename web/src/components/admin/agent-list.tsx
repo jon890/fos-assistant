@@ -9,6 +9,7 @@ type Props = {
   onEnabledChange(agent: AdminAgent): void;
   onSyncModel(agent: AdminAgent): void;
   onSaveModels(agent: AdminAgent, models: { provider: string; model: string }[]): void;
+  onApiBaseUrlChange(agent: AdminAgent, apiBaseUrl: string): Promise<string | null>;
 };
 
 export function AgentList(props: Props) {
@@ -26,6 +27,7 @@ export function AgentList(props: Props) {
           onEnabledChange={props.onEnabledChange}
           onSyncModel={props.onSyncModel}
           onSaveModels={props.onSaveModels}
+          onApiBaseUrlChange={props.onApiBaseUrlChange}
         />
       ))}
     </section>

@@ -1,6 +1,7 @@
 /** 구독형 바인딩의 실행도 API 가격으로 환산해 기록하고 합계를 내는지 본다. */
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { DAD_BINDING } from "./binding.ts";
+import { ADDRESS_TURNS } from "./agent-address.ts";
 import { CHAT_TURNS } from "./chat.ts";
 import { MEMORY_CONTEXT_TURNS } from "./memory.ts";
 
@@ -15,7 +16,7 @@ import { MEMORY_CONTEXT_TURNS } from "./memory.ts";
  */
 const MICROS_PER_RUN = 1440;
 const HELD_RUN_TIMEOUT_MS = 5_000;
-const COMPLETED_TURNS = CHAT_TURNS + MEMORY_CONTEXT_TURNS;
+const COMPLETED_TURNS = CHAT_TURNS + MEMORY_CONTEXT_TURNS + ADDRESS_TURNS;
 
 type ExecutionView = {
   id: number;
