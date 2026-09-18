@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import {
@@ -12,10 +13,24 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
   const running = isRunning(execution);
   return (
-    <article className={`rounded-md border p-4 ${failed ? "border-foreground" : "border-border"}`}>
+    <article className={`relative rounded-md border p-4 ${failed ? "border-foreground" : "border-border"}`}>
+      <Link
+        href={`/executions/${execution.id}`}
+        className="absolute inset-0"
+        aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)${
+          execution.hasChildren ? ", 하위 실행 있음" : ""
+        }`}
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate font-semibold">{execution.agentName}</h2>
+          <h2 className="truncate font-semibold">
+            {execution.agentName}
+            {execution.hasChildren ? (
+              <span className="pointer-events-none ml-1 text-muted" aria-hidden="true">
+                ▸
+              </span>
+            ) : null}
+          </h2>
           <p className="truncate text-xs text-muted">{execution.agentCode}</p>
         </div>
         <span

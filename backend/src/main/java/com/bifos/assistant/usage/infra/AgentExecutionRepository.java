@@ -9,6 +9,7 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,6 +21,16 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     List<AgentExecution> findByUserIdOrderByIdDesc(Long userId, Pageable pageable);
 
     List<AgentExecution> findByStatus(ExecutionStatus status);
+
+    /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
+    List<AgentExecution> findByRootExecutionId(Long rootExecutionId);
+
+    /** 이 번호들 중 자식을 가진 것만 낸다. 목록이 실행마다 세지 않게 한 번에 읽는다. */
+    @Query("""
+            select distinct e.parentExecutionId from AgentExecution e
+            where e.parentExecutionId in :parentIds
+            """)
+    List<Long> findParentIdsHavingChildren(@Param("parentIds") Collection<Long> parentIds);
 
     /**
      * 한 구간의 환산 금액을 데이터베이스에서 합친다.

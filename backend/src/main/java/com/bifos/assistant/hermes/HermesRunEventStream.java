@@ -85,18 +85,55 @@ public class HermesRunEventStream {
         String raw = data.toString();
         data.setLength(0);
         try {
-            JsonNode root = objectMapper.readTree(raw);
-            JsonNode payload = root.path("data");
-            // Hermes 는 사건 이름을 `event` 로 보낸다. 실측으로 확인했다.
-            // `type` 을 함께 보는 것은 다른 형태로 보내는 구현이 섞일 때를 위한 것이다.
-            onEvent.accept(new RunEvent(
-                    firstText(root, payload, "event", "type"),
-                    firstText(root, payload, "delta", "text", "output"),
-                    firstText(root, payload, "tool", "tool_name", "toolName", "name"),
-                    firstText(root, payload, "preview", "detail", "status", "result")));
+            onEvent.accept(toRunEvent(objectMapper.readTree(raw)));
         } catch (JacksonException ex) {
             throw new IOException("Hermes sent an invalid event", ex);
         }
+    }
+
+    /**
+     * 사건 하나의 JSON 을 {@link RunEvent} 로 옮긴다.
+     *
+     * <p>Hermes 는 사건 이름을 {@code event} 로 보낸다. 실측으로 확인했다. {@code type} 을 함께 보는
+     * 것은 다른 형태로 보내는 구현이 섞일 때를 위한 것이다.
+     */
+    static RunEvent toRunEvent(JsonNode root) {
+        JsonNode payload = root.path("data");
+        return new RunEvent(
+                firstText(root, payload, "event", "type"),
+                firstText(root, payload, "delta", "text", "output"),
+                firstText(root, payload, "tool", "tool_name", "toolName", "name"),
+                firstText(root, payload, "preview", "detail", "status", "result"),
+                durationMs(root, payload),
+                failed(root, payload));
+    }
+
+    /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 1000 을 곱해 밀리초 정수로 옮긴다. */
+    private static Long durationMs(JsonNode root, JsonNode payload) {
+        JsonNode value = number(root, "duration");
+        if (value == null) {
+            value = number(payload, "duration");
+        }
+        return value == null ? null : Math.round(value.asDouble() * 1000);
+    }
+
+    /** {@code error} 를 보내지 않으면 실패인지 아닌지 모른다는 뜻으로 null 을 낸다. */
+    private static Boolean failed(JsonNode root, JsonNode payload) {
+        JsonNode value = bool(root, "error");
+        if (value == null) {
+            value = bool(payload, "error");
+        }
+        return value == null ? null : value.asBoolean();
+    }
+
+    private static JsonNode number(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        return value != null && value.isNumber() ? value : null;
+    }
+
+    private static JsonNode bool(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        return value != null && value.isBoolean() ? value : null;
     }
 
     private static String firstText(JsonNode root, JsonNode payload, String... names) {

@@ -18,10 +18,15 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
+import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionEvent;
+import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +51,11 @@ public class ChatService {
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
     private final ExecutionRecorder executions;
+    private final ExecutionEventRecorder eventRecorder;
+    private final ExecutionEventRepository executionEvents;
     private final ContextAssembler contextAssembler;
     private final MemoryProposer memoryProposer;
+
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         PendingTurn pending = prepare(user, conversationId, text, agentCode);
         String runId = submit(pending);
@@ -68,7 +76,7 @@ public class ChatService {
                     pending.command().apiBaseUrl(),
                     pending.command().profileName(),
                     runId,
-                    event -> forward(event, onEvent));
+                    event -> forward(pending, event, onEvent));
         } catch (ApiException ex) {
             log.warn("Hermes event stream ended before final status runId={}", runId, ex);
         }
@@ -99,16 +107,18 @@ public class ChatService {
                 conversation.hermesSessionId());
         AgentExecution execution = executions.start(user, conversation, agent, null, null,
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
-        return new PendingTurn(user, conversation, agent, command, execution);
+        return new PendingTurn(user, conversation, agent, command, execution, new SequenceCounter());
     }
 
     private String submit(PendingTurn pending) {
         try {
             String runId = hermes.submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
+            append(pending, ExecutionEventType.RUN_STARTED, null);
             return runId;
         } catch (ApiException ex) {
             executions.fail(pending.execution(), ex.code().name());
+            append(pending, ExecutionEventType.RUN_FAILED, ex.code().name());
             throw ex;
         }
     }
@@ -118,6 +128,7 @@ public class ChatService {
             return hermes.awaitCompletion(pending.command(), runId);
         } catch (ApiException ex) {
             executions.fail(pending.execution(), ex.code().name());
+            append(pending, ExecutionEventType.RUN_FAILED, ex.code().name());
             throw ex;
         }
     }
@@ -125,6 +136,7 @@ public class ChatService {
     private CompletedTurn finish(PendingTurn pending, HermesRunResult result) {
         if (!result.succeeded()) {
             executions.fail(pending.execution(), hermesStatus(result));
+            append(pending, ExecutionEventType.RUN_FAILED, hermesStatus(result));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
         }
 
@@ -132,6 +144,7 @@ public class ChatService {
         conversations.save(pending.conversation());
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result);
+        append(pending, ExecutionEventType.RUN_COMPLETED, null);
         String answer = result.output() == null ? "" : result.output();
         ChatMessage message = messages.save(
                 ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
@@ -183,7 +196,9 @@ public class ChatService {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
     }
 
-    private static void forward(RunEvent event, Consumer<ChatEvent> onEvent) {
+    /** 스트림으로 온 사건을 화면으로 중계하면서 우리 이름으로도 옮겨 적는다. */
+    private void forward(PendingTurn pending, RunEvent event, Consumer<ChatEvent> onEvent) {
+        append(pending, event);
         String type = event.type() == null ? "" : event.type().toLowerCase();
         if (type.contains("delta") && event.text() != null) {
             onEvent.accept(ChatEvent.delta(event.text()));
@@ -192,12 +207,54 @@ public class ChatService {
         }
     }
 
+    private void append(PendingTurn pending, ExecutionEventType type, String detail) {
+        store(pending, sequence -> eventRecorder.record(pending.execution(), type, detail, sequence));
+    }
+
+    private void append(PendingTurn pending, RunEvent event) {
+        store(pending, sequence -> eventRecorder.record(pending.execution(), event, sequence));
+    }
+
+    /**
+     * 사건 하나를 저장한다.
+     *
+     * <p>저장이 실패해도 중계와 대화는 그대로 이어진다. 사건은 관측용이고 그것 때문에 답이 끊기면 안
+     * 된다. 옮겨 적지 못한 사건과 저장에 실패한 사건은 순서를 소비하지 않아, 번호가 1부터 빈틈없이
+     * 이어진다.
+     */
+    private void store(PendingTurn pending, IntFunction<ExecutionEvent> build) {
+        try {
+            ExecutionEvent event = build.apply(pending.counter().peek());
+            if (event == null) {
+                return;
+            }
+            executionEvents.save(event);
+            pending.counter().advance();
+        } catch (RuntimeException ex) {
+            log.warn("could not record an execution event executionId={}", pending.execution().id(), ex);
+        }
+    }
+
+    /** 실행 하나 안에서 사건 순서를 1부터 센다. 스트림을 읽는 스레드가 하나라 잠금이 필요 없다. */
+    private static final class SequenceCounter {
+        private int next = 1;
+
+        int peek() {
+            return next;
+        }
+
+        void advance() {
+            next++;
+        }
+    }
+
     private record PendingTurn(
             CurrentUser user,
             Conversation conversation,
             Agent agent,
             HermesRunCommand command,
-            AgentExecution execution) {
+            AgentExecution execution,
+            SequenceCounter counter) {
     }
 
     private record CompletedTurn(ChatTurn turn, Long messageId) {

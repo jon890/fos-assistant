@@ -208,6 +208,12 @@ export function startFakeHermes(profileKeys: Record<string, string>): Promise<Fa
           }
           event(response, { event: "tool.started", tool: "fake-tool", preview: "started" });
           event(response, { event: "tool.completed", tool: "fake-tool", duration: 0.1, error: false });
+          event(response, { event: "tool.started", tool: "fake-reader", preview: "started" });
+          event(response, { event: "tool.completed", tool: "fake-reader", duration: 0.25, error: false });
+          // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
+          // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
+          event(response, { event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다" });
+          event(response, { event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다" });
           event(response, { event: "run.completed" });
           response.end();
           return;

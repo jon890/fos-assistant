@@ -201,6 +201,13 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 `execution_id` 와 `sequence` 를 함께 유일하게 둔다.
 
+**`subagent_name` 과 `hermes_session_id` 는 지금 언제나 비어 있다.**
+Hermes v0.21.0 의 `subagent.start` 와 `subagent.complete` 는 `preview` 만 싣고
+하위 에이전트의 이름도 session 번호도 보내지 않는다.
+비워 두는 쪽을 골랐다. `preview` 에서 이름처럼 보이는 글자를 뽑아 채우면
+그것이 실제 이름인지 우리가 만든 것인지 나중에 구분할 수 없다.
+Hermes 가 보내기 시작하면 그때 채운다.
+
 | `event_type` | 언제 |
 | --- | --- |
 | `RUN_STARTED` | 실행이 시작됐다 |

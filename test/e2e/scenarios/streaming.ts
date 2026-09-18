@@ -13,6 +13,21 @@ type ChatEvent = {
 type Message = { id: number; role: "USER" | "ASSISTANT"; content: string; executionId: number | null };
 type Execution = { id: number; conversationId: number; status: string };
 
+type ExecutionEventView = {
+  sequence: number;
+  eventType: string;
+  toolName: string | null;
+  subagentName: string | null;
+};
+type ExecutionNode = {
+  truncated: boolean;
+  executionId: number;
+  agentCode: string;
+  events: ExecutionEventView[];
+  children: ExecutionNode[];
+};
+type ExecutionTree = { root: ExecutionNode; truncated: boolean };
+
 async function events(response: Response): Promise<ChatEvent[]> {
   const received: ChatEvent[] = [];
   await readEventStream<ChatEvent>(
@@ -66,7 +81,9 @@ export const streamingScenario: Scenario = {
     );
     const received = await events(response);
     expect(received.filter((item) => item.type === "delta").length === 2, "delta 두 개를 받지 못했다");
-    expect(received.filter((item) => item.type === "tool").length === 2, "도구 사건을 받지 못했다");
+    // 가짜 Hermes 가 도구 쌍 둘과 하위 에이전트 쌍 하나를 보낸다.
+    // Control Plane 이 `tool.` 과 `subagent.` 를 둘 다 `tool` 로 중계하므로 여섯이 된다.
+    expect(received.filter((item) => item.type === "tool").length === 6, "도구 사건을 받지 못했다");
     expect(received.every((item) => item.type !== (":" as ChatEvent["type"])), "keepalive 가 사건에 섞였다");
     const done = received.at(-1);
     expect(done?.type === "done", `마지막 사건이 done 이 아니다: ${JSON.stringify(done)}`);
@@ -94,5 +111,41 @@ export const streamingScenario: Scenario = {
       interruptedDone!,
       "[fake hermes on profile dad] 스트림 중단 검사",
     );
+
+    step("실행 하나를 나무로 조회하면 사건이 순서대로 들어 있다");
+    const tree = expectStatus(
+      await call(context, `/usage/executions/${done!.executionId}/tree`, {
+        token: context.tokens.dad,
+      }),
+      200,
+      "실행 나무 조회",
+    ).json<ExecutionTree>();
+
+    expect(tree.root.executionId === done!.executionId, "물어본 실행이 뿌리로 나오지 않았다");
+    expect(tree.truncated === false, "자를 것이 없는데 나무가 잘렸다고 나왔다");
+    expect(tree.root.truncated === false, "자를 것이 없는데 노드가 잘렸다고 나왔다");
+    // Memory 제안이 꺼져 있어 이 실행에는 자식이 달리지 않는다. 켜면 제안 실행이 자식이 된다.
+    expect(tree.root.children.length === 0, "자식이 없는데 children 이 비어 있지 않다");
+
+    const sequences = tree.root.events.map((event) => event.sequence);
+    expect(
+      sequences.every((sequence, index) => index === 0 || sequences[index - 1]! < sequence),
+      `사건이 순서대로 나오지 않았다: ${sequences.join(",")}`,
+    );
+    expect(tree.root.events[0]?.eventType === "RUN_STARTED", "첫 사건이 RUN_STARTED 가 아니다");
+    // 가짜 Hermes 가 `fake-tool` 과 `fake-reader` 를 쌍으로 보낸다.
+    const toolNames = tree.root.events.map((event) => event.toolName);
+    expect(toolNames.includes("fake-tool"), "도구 사건이 가짜 Hermes 가 보낸 이름으로 들어 있지 않다");
+    expect(toolNames.includes("fake-reader"), "두 번째 도구 사건이 들어 있지 않다");
+
+    step("남의 토큰으로 같은 번호를 물으면 없는 것과 같은 오류다");
+    const stolen = expectStatus(
+      await call(context, `/usage/executions/${done!.executionId}/tree`, {
+        token: context.tokens.kid,
+      }),
+      404,
+      "남의 실행 나무 조회",
+    ).json<{ code: string }>();
+    expect(stolen.code === "EXECUTION_NOT_FOUND", `오류 코드가 다르다: ${stolen.code}`);
   },
 };

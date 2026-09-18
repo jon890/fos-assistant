@@ -22,6 +22,7 @@ export type UsageExecution = {
   costCurrency: string | null;
   pricingVersion: string | null;
   startedAt: string;
+  hasChildren: boolean;
 };
 
 /** 같은 질문인데 문맥이 커진 실행을 눈으로 찾을 수 있게 글자 수를 적는다. */

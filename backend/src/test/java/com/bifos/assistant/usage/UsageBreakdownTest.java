@@ -15,6 +15,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
@@ -48,6 +49,7 @@ class UsageBreakdownTest {
     @Autowired AgentExecutionRepository executions;
     @Autowired AgentRepository agents;
     @Autowired AgentService agentService;
+    @Autowired ExecutionTreeService trees;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
@@ -59,7 +61,7 @@ class UsageBreakdownTest {
         executions.deleteAll();
         career = agent("breakdown-career", "진로 비서", "gpt-5.5");
         chore = agent("breakdown-chore", "집안일 비서", "gpt-5.5-mini");
-        controller = new UsageController(executions, currentUser, agentService);
+        controller = new UsageController(executions, currentUser, agentService, trees);
         when(currentUser.require())
                 .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
     }

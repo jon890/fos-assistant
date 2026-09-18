@@ -1,3 +1,7 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import {
@@ -9,6 +13,7 @@ import {
 } from "./execution-list";
 
 export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
+  const router = useRouter();
   return (
     <table className="hidden w-full text-left text-sm md:table" data-testid="execution-table">
       <thead className="text-xs text-muted">
@@ -31,10 +36,28 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
           const running = isRunning(execution);
           const failed = execution.status === "FAILED" || execution.errorCode !== null;
           return (
-            <tr key={execution.id} className="border-t border-border align-top">
+            <tr
+              key={execution.id}
+              className="cursor-pointer border-t border-border align-top hover:bg-surface"
+              onClick={() => router.push(`/executions/${execution.id}`)}
+            >
               <td className="py-3 pr-4 whitespace-nowrap">{formatWhen(execution.startedAt)}</td>
               <td className="py-3 pr-4">
-                <span className="font-medium">{execution.agentName}</span>
+                <Link
+                  href={`/executions/${execution.id}`}
+                  className="font-medium hover:underline"
+                  aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)${
+                    execution.hasChildren ? ", 하위 실행 있음" : ""
+                  }`}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {execution.agentName}
+                </Link>
+                {execution.hasChildren ? (
+                  <span className="ml-1 text-muted" aria-hidden="true">
+                    ▸
+                  </span>
+                ) : null}
                 <span className="block text-xs text-muted">{execution.agentCode}</span>
               </td>
               <td className="max-w-40 py-3 pr-4">
