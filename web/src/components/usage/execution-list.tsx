@@ -65,6 +65,8 @@ export function executionStatusLabel(execution: UsageExecution): string {
   if (execution.errorCode === "ORPHANED") return "중간에 끊김";
   if (execution.errorCode === "PROVIDER_BLOCKED") return "막혀서 다음 모델로 넘어감";
   if (execution.errorCode === "NO_MODEL_AVAILABLE") return "쓸 수 있는 모델이 없음";
+  // 공유 gateway 의 동시 실행 한도에 닿아 거절당한 것이다. Hermes 가 내려간 것과 원인이 다르다.
+  if (execution.errorCode === "HERMES_BUSY") return "붐벼서 거절됨";
   if (execution.status === "FAILED" || execution.errorCode !== null) return execution.errorCode ?? "실패";
   return "성공";
 }

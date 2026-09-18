@@ -138,3 +138,26 @@ test("막혀서 넘어간 실패와 보통 실패를 다르게 보인다", async
   await expect(records.getByText("막혀서 다음 모델로 넘어감").first()).toBeVisible();
   await expect(records.getByTestId("execution-retry-of").first()).toBeVisible();
 });
+
+/**
+ * 공유 gateway 의 동시 실행 한도에 닿아 거절당한 실행을 보통 실패와 다르게 보이는지 본다.
+ *
+ * <p>같은 문구로 보이면 한도를 올려야 하는지 이 화면으로 판단할 수 없다.
+ */
+test("붐벼서 거절된 실행은 다른 실패와 다르게 보인다", async ({ page, hermes }, testInfo) => {
+  await hermes.busy();
+  try {
+    const response = await page.request.post("/api/chat", {
+      data: { text: "붐빔 화면 검사", agentCode: "browser" },
+    });
+    expect(response.status()).toBe(429);
+  } finally {
+    await hermes.clearBusy();
+  }
+
+  await page.goto("/usage");
+  const records = page.getByTestId(
+    testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
+  );
+  await expect(records.getByText("붐벼서 거절됨", { exact: true }).first()).toBeVisible();
+});

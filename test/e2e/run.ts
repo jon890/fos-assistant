@@ -31,6 +31,7 @@ import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
 import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
 import { modelSelectionScenario } from "./scenarios/model-selection.ts";
+import { busyScenario } from "./scenarios/busy.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -67,6 +68,8 @@ const SCENARIOS: readonly Scenario[] = [
   conversationHistoryScenario,
   streamingScenario,
   orchestrationScenario,
+  // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
+  busyScenario,
   // 막힌 provider 를 만들어 두고 끝나므로 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
   modelSelectionScenario,
 ];

@@ -47,6 +47,9 @@ export type FakeHermesControl = {
   /** 그 provider 의 계정이 전부 막힌 것처럼 답하게 한다. */
   blockProvider(provider: string): Promise<void>;
   clearBlockedProviders(): Promise<void>;
+  /** 동시 실행 한도에 닿아 실행 제출을 429 로 거절하게 한다. */
+  busy(): Promise<void>;
+  clearBusy(): Promise<void>;
 };
 
 async function fakeHermesControl(): Promise<FakeHermesControl> {
@@ -61,6 +64,8 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
     releaseHeldRun: () => call("/__test/release-held-run", "POST"),
     blockProvider: (provider: string) => call(`/__test/block-provider/${provider}`, "POST"),
     clearBlockedProviders: () => call("/__test/clear-blocked-providers", "POST"),
+    busy: () => call("/__test/busy", "POST"),
+    clearBusy: () => call("/__test/clear-busy", "POST"),
   };
 }
 
