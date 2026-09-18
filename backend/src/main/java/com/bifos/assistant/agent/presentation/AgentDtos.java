@@ -38,10 +38,17 @@ public final class AgentDtos {
             String ownerEmail,
             @Pattern(regexp = "[a-z0-9][a-z0-9-]{0,63}") String flow) {}
 
+    /**
+     * 에이전트의 접근 범위와 Hermes 주소를 고치는 요청이다.
+     *
+     * @param apiBaseUrl 새 Hermes API 주소. 비어 있으면 지금 값을 그대로 둔다. 다른 것만 고치는 요청이
+     *     주소를 지우면 안 되기 때문이다
+     */
     public record UpdateAgentRequest(
             @NotNull Boolean enabled,
             @NotNull AgentVisibility visibility,
-            String ownerEmail) {}
+            String ownerEmail,
+            String apiBaseUrl) {}
 
     public record ModelSyncView(String code, String model, Instant modelSyncedAt, boolean changed) {}
 
