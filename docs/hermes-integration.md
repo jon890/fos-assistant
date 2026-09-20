@@ -744,6 +744,153 @@ worker 에게는 환경 변수로 전달돼 안내문에 적힐 뿐이다.
 worker 가 받는 것은 작업 본문과 몇 가지 환경 변수뿐이고,
 `instructions` 에 해당하는 입구가 kanban 경로에는 없다.
 
+## profile 을 HTTP 로 만드는 길
+
+대시보드 웹서버에 profile 관리 API 가 있다.
+v0.21.0 의 `hermes_cli/web_routers/profiles.py` 를 읽고 실제로 불러 확인했다.
+
+| 메서드와 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/profiles` | profile 목록과 각각의 모델, 스킬 수, gateway 상태 |
+| `POST /api/profiles` | profile 을 만든다 |
+| `PATCH /api/profiles/{name}` | 이름을 바꾼다 |
+| `DELETE /api/profiles/{name}` | profile 과 wrapper 와 gateway 서비스를 지운다 |
+| `PUT /api/profiles/{name}/soul` | `SOUL.md` 를 쓴다 |
+| `PUT /api/env` | 본문의 `profile` 이 가리키는 profile 의 `.env` 에 한 줄을 쓴다 |
+
+기본 상태에서 이 경로들은 대시보드의 사람용 로그인 쿠키만 받는다.
+쿠키 없이 부르면 401 이 오고 응답의 `reason` 이 `no_cookie` 다.
+
+### 기계용 인증 자리가 따로 있다
+
+`hermes_cli/dashboard_auth/token_auth.py` 가 그 자리다.
+`register_token_route(path)` 로 등록한 경로만 `Authorization: Bearer` 를 받고,
+등록하지 않은 경로는 이 미들웨어가 그대로 통과시켜 쿠키 검사로 넘긴다.
+
+**배포본의 core 안에서 이 함수를 부르는 곳이 없다.**
+부르는 것은 번들 plugin `plugins/dashboard_auth/drain` 하나뿐이고,
+등록하는 경로도 `/api/gateway/drain` 하나다.
+그래서 `POST /api/profiles` 는 등록돼 있지 않다.
+
+경로를 등록하면 그 경로의 인증은 토큰만으로 정해진다.
+토큰이 맞으면 통과하고, 토큰이 없거나 틀리면 401 이고,
+provider 가 검증에 쓰는 저장소에 닿지 못하면 503 이다. 열린 채로 통과하는 분기는 없다.
+
+### plugin 이 token provider 를 붙일 수 있다
+
+`ctx.register_dashboard_auth_provider(provider)` 가 그 입구다.
+provider 는 `DashboardAuthProvider` 를 상속하고 `supports_token` 을 True 로 두고
+`verify_token` 을 구현한다. 로그인과 세션에 해당하는 나머지 메서드는
+`NotImplementedError` 로 두어도 된다. drain plugin 이 그 형태를 그대로 보여 준다.
+
+provider 는 프로세스 전역 슬롯에 등록되고, profile 별 plugin manager 가 내려가도 남는다.
+token provider 가 여럿이면 등록 순서대로 물어보고 하나가 principal 을 돌려주면 거기서 끝난다.
+
+측정용 대시보드를 따로 띄워, 경로 둘을 등록하는 plugin 하나를 붙여 확인했다.
+
+| 요청 | 응답 |
+| --- | --- |
+| 토큰 없이 `GET /api/profiles` | 401 |
+| 틀린 토큰으로 같은 경로 | 401 |
+| 맞는 토큰으로 같은 경로 | 200 과 목록 |
+| 맞는 토큰으로 `POST /api/profiles` | 200. profile 이 만들어졌다 |
+| 맞는 토큰으로 `PUT /api/env` | 200. 그 profile 의 `.env` 에 값이 들어갔다 |
+| 맞는 토큰으로 등록하지 않은 `GET /api/sessions` | 401 |
+
+Hermes core 는 한 줄도 고치지 않았다.
+plugin 디렉터리 하나와 `plugins.enabled` 한 줄이 전부다.
+
+### 경로는 문자열이 정확히 같아야 한다
+
+`is_token_route` 는 등록한 집합에 그 경로 문자열이 있는지만 본다.
+`/api/profiles/{name}` 처럼 자리표시자를 담은 문자열은 어떤 요청과도 맞지 않는다.
+
+| 경로 | plugin 이 열 수 있는가 |
+| --- | --- |
+| `/api/profiles` | 등록 한 번으로 열린다. 만들기와 목록 조회가 같은 경로다 |
+| `/api/env` | 등록 한 번으로 열린다 |
+| `/api/profiles/<이름>` | 그 이름을 알 때 그 이름마다 따로 등록해야 한다 |
+| `/api/profiles/<이름>/soul` | 위와 같다 |
+
+맞는 토큰으로 `DELETE /api/profiles/<이름>` 과 `PUT /api/profiles/<이름>/soul` 을 불러
+둘 다 401 이 오는 것을 확인했다.
+`register_token_route` 자체는 잠금을 걸고 집합에 넣기만 하므로 기동 뒤에도 부를 수 있다.
+이름을 아는 시점에 그 이름의 경로를 더 등록하는 것은 막히지 않는다.
+
+### plugin 이 대시보드에 자기 경로를 더하는 hook 은 없다
+
+`ctx` 의 등록 메서드 어디에도 대시보드 라우트를 더하는 것이 없다.
+API server 쪽에는 `register_platform_handler("api_server", factory)` 가 있지만
+대시보드 웹서버에는 대응하는 자리가 없다.
+그래서 plugin 이 할 수 있는 것은 이미 있는 경로를 기계에게 여는 것까지다.
+
+### `POST /api/profiles` 가 실제로 만드는 것
+
+본문은 `name` 하나가 필수이고 나머지는 선택이다.
+`clone_from`, `clone_all`, `no_skills`, `description`, `provider`, `model`,
+`mcp_servers`, `keep_skills`, `hub_skills` 를 받는다.
+핸들러는 `hermes_cli/profiles.py` 의 `create_profile` 을 부른다.
+
+`clone_from` 없이 만들면 아래를 한다.
+
+- profile 디렉터리와 하위 디렉터리를 만든다
+- `config.yaml` 에 기본 모델 설정을 쓴다
+- `.env` 를 주석 세 줄만 담아 mode 600 으로 만든다
+- `SOUL.md` 에 기본 내용을 쓴다
+- 번들 스킬을 심는다. `no_skills` 를 true 로 주면 건너뛴다
+- 이름이 겹치지 않으면 실행 wrapper 를 만든다
+- 컨테이너 안에서는 그 profile 의 gateway 를 s6 서비스로 등록한다
+
+**CLI 의 `--no-alias` 에 해당하는 본문 필드가 없다.**
+API 로 만들면 wrapper 가 함께 생긴다.
+`DELETE` 로 지우면 wrapper 와 s6 서비스가 함께 사라지는 것까지 확인했다.
+
+`clone_from` 을 주면 원본의 `config.yaml` 과 `.env` 와 `SOUL.md` 와 `skills/` 와
+`memories/MEMORY.md` 와 `memories/USER.md` 를 복사한다.
+`clone_all` 을 주면 원본 전체를 복사하고 runtime 파일과 단일 사용 OAuth 파일만 뺀다.
+
+### `clone_from` 은 원본의 `API_SERVER_KEY` 까지 복사한다
+
+profile 을 하나 만들어 `API_SERVER_KEY` 를 넣고,
+그 profile 을 `clone_from` 으로 복제해 확인했다.
+두 `.env` 의 `API_SERVER_KEY` 가 같은 값이었고, 그 값 하나로 두 접두가 모두 200 을 돌려줬다.
+
+**그러면 key 가 profile 을 구분하는 값이 아니게 된다.**
+사용자를 더할 때 `clone_from` 을 쓰지 않거나, 쓴 직후에 그 profile 의 key 를 새 값으로 덮어야 한다.
+
+### `API_SERVER_KEY` 는 `PUT /api/env` 로 넣는다
+
+본문에 `profile` 과 `key` 와 `value` 를 준다.
+쓰기 금지 목록에 `API_SERVER_` 로 시작하는 이름이 없다.
+그 목록이 막는 것은 `PATH` 와 `PYTHONPATH` 처럼 하위 프로세스 실행에 영향을 주는 이름과
+`HERMES_HOME` 처럼 Hermes 의 위치와 보안 정책을 정하는 이름이다.
+
+`API_SERVER_KEY` 와 `API_SERVER_MODEL_NAME` 을 이 경로로 넣어 실제로 들어가는 것을 확인했다.
+
+### 넣은 직후 공유 listener 가 답한다
+
+key 를 넣고 gateway 를 다시 띄우지 않은 채로 불렀다.
+
+| 요청 | 응답 |
+| --- | --- |
+| 방금 넣은 key 로 `/p/<profile>/v1/capabilities` | 200 |
+| 틀린 key 로 같은 경로 | 401 |
+
+공유 listener 가 요청마다 profile 디렉터리를 훑기 때문이다.
+
+### 파일로만 되는 것이 남는다
+
+Control Plane 이 읽는 key 파일은 Hermes 밖의 파일이고 Hermes 의 API 가 닿지 않는다.
+그 파일을 두는 자리는 `fos-home-infra` 가 소유한다.
+`config.yaml` 전체를 우리 템플릿으로 덮는 것은 `PUT /api/config/raw` 가 열려 있지만 확인하지 않았다.
+
+### 대시보드 인증이 켜지는 조건
+
+대시보드가 loopback 이 아닌 주소에 붙거나 `dashboard.public_url` 이 설정돼 있으면 인증이 켜진다.
+켜진 상태에서 등록된 auth provider 가 하나도 없으면 대시보드가 기동을 거부한다.
+token provider 하나만 있어도 이 조건을 채운다.
+측정용 대시보드를 loopback 에 붙이고 `dashboard.public_url` 만 넣어 인증을 켠 채로 확인했다.
+
 ## 홈서버에서 확인한 것
 
 2026년 9월 17일에 홈서버에서 직접 확인했다.
