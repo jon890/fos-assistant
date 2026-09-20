@@ -64,27 +64,54 @@ NextAuth 의 `signIn` 콜백은 아직 아무 사용자도 없는 시점에 돈�
 
 `com.bifos.assistant.user.domain.AppUser` 의 엔티티 작성 방식을 그대로 따른다.
 
+#### 이메일은 저장할 때 소문자로 맞춘다
+
+**정규화하는 자리는 `AllowedPerson` 엔티티 하나다.**
+행을 만들 때 소문자로 바꿔 넣고, 찾을 때도 소문자로 바꿔 찾는다.
+
+읽는 쪽에서만 맞추면 대문자가 섞인 주소가 `existsByEmail` 을 빠져나가
+같은 사람이 두 행으로 들어온다. phase-03 의 `PersonRegistrar` 가 그 검사를 쓴다.
+
 ### 3. 로그인 판정 경로를 연다
 
 `presentation/SignInController.java` 에 하나를 둔다.
 
 ```
-POST /api/signin/allowed
+POST /api/v1/signin/allowed
 요청  { "email": "..." }
 응답  { "allowed": true,  "displayName": "...", "hermesProfile": "..." }
       { "allowed": false }
 ```
 
+**경로에 `/v1` 이 들어간다.** 이 저장소의 컨트롤러는 모두 `/api/v1/...` 이다.
+
 **이 경로는 사용자를 만들지 않는다.** 판정만 한다.
 
-`backend/.../shared/auth/ControlPlaneJwtFilter.java` 의 `shouldNotFilter` 에 이 경로를 더한다.
-지금 `/mcp` 하나가 그렇게 빠져 있다.
+#### 두 곳을 함께 열어야 닿는다
 
-그 대신 이 경로만 보는 검사를 둔다. 같은 `AuthProperties.jwtSecret()` 으로 서명한 토큰을 받되
+`shouldNotFilter` 만 고치면 컨트롤러에 닿지 못한다.
+`backend/.../shared/config/SecurityConfig.java` 가 `anyRequest().authenticated()` 라
+필터에서 빠지기만 한 경로는 Spring Security 가 앞에서 거절한다.
+
+| 파일 | 무엇 |
+| --- | --- |
+| `ControlPlaneJwtFilter.java` 의 `shouldNotFilter` | 이 경로를 더한다. 지금 `/mcp` 하나가 그렇게 빠져 있다 |
+| `SecurityConfig.java` 의 `authorizeHttpRequests` | 이 경로를 `permitAll()` 로 둔다. 지금 `/api/v1/me` 가 그렇게 열려 있다 |
+
+#### 상태 코드는 그 경로가 직접 낸다
+
+`permitAll()` 로 열면 Spring Security 가 더 이상 상태 코드를 정하지 않는다.
+**그 대신 이 경로만 보는 검사를 컨트롤러 안에 둔다.**
+같은 `AuthProperties.jwtSecret()` 으로 서명한 토큰을 받되
 `purpose` 가 `signin` 인 것만 통과시킨다. **그 토큰에 사용자 신원을 담지 않는다.**
 
 - 토큰이 없거나 서명이 틀리면 401
 - `purpose` 가 다르면 401. 대화용 토큰으로 이 경로를 부를 수 없다
+
+**401 을 직접 내야 한다.** 그러지 않으면 403 이 나온다.
+403 을 내는 것은 `SecurityConfig` 의 `anyRequest().authenticated()` 다.
+`ControlPlaneJwtFilter` 는 토큰이 없으면 아무것도 하지 않고 지나간다.
+`test/e2e/scenarios/auth.ts` 가 서명이 틀린 토큰에 403 을 기대하는 것이 그 증거다.
 
 ### 4. `web/src/auth.ts` 가 그 경로를 부르게 한다
 
@@ -95,8 +122,11 @@ POST /api/signin/allowed
 - `purpose: "signin"` 토큰을 만드는 자리는 지금 대화용 토큰을 만드는 자리 옆에 둔다
 
 `ASSISTANT_ALLOWED_EMAILS` 를 읽는 코드를 남기지 않는다.
-`web/.env.example` 과 `test/browser` 와 `test/e2e` 에서도 함께 뺀다.
-어디에 남아 있는지는 `grep -rn ASSISTANT_ALLOWED_EMAILS` 로 찾는다.
+`web/.env.example` 과 `test/browser/playwright.config.ts` 와 `README.md` 에서도 함께 뺀다.
+
+**`docs/adr/ADR-018` 의 그 낱말은 그대로 둔다.**
+옛 절차를 적은 맥락 절이라 지우면 결정의 근거가 사라진다.
+`tasks/` 아래도 건드리지 않는다. 계획서 자신이 그 낱말을 담는다.
 
 ### 5. 이 phase 를 검증하는 테스트
 
@@ -121,8 +151,24 @@ POST /api/signin/allowed
 마지막 줄이 이 phase 의 핵심이다. 판정 경로가 사용자를 만들면 안 된다.
 
 `test/e2e/scenarios/` 에도 하나 더한다.
-허용 목록에 없는 주소로 로그인을 시도하면 막히는 것을 본다.
-기존 시나리오 파일의 짜임을 따른다.
+기존 시나리오 파일의 짜임을 따르고, **`test/e2e/run.ts` 의 `SCENARIOS` 배열에 넣는다.**
+배열에 넣지 않으면 그 시나리오는 돌지 않는다.
+
+**e2e 는 웹 계층을 띄우지 않는다.** `run.ts` 가 띄우는 것은 Control Plane 과 가짜 Hermes 다.
+그래서 「로그인을 시도한다」가 아니라 `POST /api/v1/signin/allowed` 를 직접 부르는 것으로 적는다.
+
+| 무엇 | 기대 |
+| --- | --- |
+| 허용 목록에 없는 주소로 부른다 | `allowed` 가 거짓이다 |
+| `purpose` 가 `signin` 이 아닌 토큰으로 부른다 | 401 |
+
+**허용된 주소가 통과하는 것은 여기서 보지 않는다.**
+e2e 에서 `allowed_person` 에 행을 넣을 길이 없기 때문이다.
+그 행을 만드는 `PersonRegistrar` 와 `POST /api/v1/admin/people` 이 둘 다 phase-03 이고,
+`test/e2e/run.ts` 는 `ASSISTANT_TESTSUPPORT_ENABLED` 를 넘기지 않아 시험용 경로도 닫혀 있다.
+
+**허용된 주소의 통과는 phase-03 의 e2e 시나리오가 본다.** 거기서는 사람을 먼저 더한다.
+`SignInPolicyTest` 와 `SignInControllerTest` 는 repository 에 직접 저장하므로 이 제약이 없다.
 
 ## 검증
 
@@ -141,8 +187,12 @@ scripts/check-public-safe.sh
 
 ```bash
 # cwd: 저장소 root
-grep -rn "ASSISTANT_ALLOWED_EMAILS" --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.next .
+grep -rn "ASSISTANT_ALLOWED_EMAILS" \
+  --exclude-dir=node_modules --exclude-dir=.next \
+  web/ backend/ test/ README.md
 ```
+
+**저장소 전체를 훑지 않는다.** `docs/adr/ADR-018` 과 `tasks/` 가 그 낱말을 정당하게 담는다.
 
 ## Critical Files
 
@@ -155,11 +205,15 @@ grep -rn "ASSISTANT_ALLOWED_EMAILS" --exclude-dir=.git --exclude-dir=node_module
 | `backend/src/main/java/com/bifos/assistant/people/presentation/SignInController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/people/presentation/PeopleDtos.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/config/SecurityConfig.java` | 수정 |
 | `web/src/auth.ts` | 수정 |
 | `web/.env.example` | 수정 |
+| `README.md` | 수정 |
+| `test/browser/playwright.config.ts` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/people/SignInPolicyTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/people/SignInControllerTest.java` | 신규 |
 | `test/e2e/scenarios/` | 추가 |
+| `test/e2e/run.ts` | 수정 |
 
 ## 끝낸 뒤
 
