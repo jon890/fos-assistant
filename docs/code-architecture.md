@@ -324,6 +324,24 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 | `people` | 허용 목록, 사람을 더하는 흐름 전체의 조립 |
 | `hermes` | 대시보드 호출과 key 파일 쓰기 |
 | `user` | 첫 로그인에 에이전트까지 만든다 |
+
+### 첫 에이전트의 과금 설정은 `people` 이 갖는다
+
+첫 로그인에 만드는 에이전트의 `cost_mode` 와 `credential_scope` 를 설정에서 읽는다.
+
+| 설정 | 기본값 |
+| --- | --- |
+| `assistant.people.default-cost-mode` | `SUBSCRIPTION` |
+| `assistant.people.default-credential-scope` | `SHARED_HOUSEHOLD` |
+
+`people` 패키지가 갖는다. Hermes 를 부르는 값이 아니라 `hermes` 쪽에 두지 않는다.
+
+두 값이 사람마다 다르지 않은 근거는
+[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
+profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓴다.
+
+`provider` 와 `model` 은 설정에 두지 않는다. Hermes 에서 읽는다.
+읽지 못하면 에이전트를 만들지 않는다.
 | `agent` | 지금 있는 등록 경로를 그대로 쓴다 |
 
 **`people` 이 순서를 안다.** 허용 목록에 넣고 profile 을 만들고 key 를 넣는 차례와,

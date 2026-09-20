@@ -109,10 +109,10 @@ phase-01 이 허용 목록 표와 로그인 판정을, phase-02 가 profile 을 
 | `name` | 허용 목록의 `display_name` |
 | `hermesProfile` | 허용 목록의 `hermes_profile` |
 | `apiBaseUrl` | **아래를 본다** |
-| `provider` | `readOptions` 가 준다. 비어 오면 **아래 결정을 본다** |
+| `provider` | `readOptions` 가 준다. 비어 오면 에이전트를 만들지 않는다 |
 | `model` | `readOptions` 가 준다 |
-| `costMode` | **정해지지 않았다. 아래 결정을 본다** |
-| `credentialScope` | **정해지지 않았다. 아래 결정을 본다** |
+| `costMode` | 설정의 `assistant.people.default-cost-mode` |
+| `credentialScope` | 설정의 `assistant.people.default-credential-scope` |
 | `visibility` | 자기만 보는 것 |
 | `ownerUserId` | 방금 만든 사용자 |
 | `enabled` | 참 |
@@ -120,6 +120,25 @@ phase-01 이 허용 목록 표와 로그인 판정을, phase-02 가 profile 을 
 **넷은 비울 수 없다.** `backend/.../agent/domain/Agent.java` 에서
 `provider` 와 `model` 과 `costMode` 와 `credentialScope` 가 모두 `nullable = false` 다.
 비우고 저장하면 첫 로그인이 실패한다.
+
+#### 설정 둘을 `people` 쪽에 새로 둔다
+
+`HermesProperties` 에 넣지 않는다. Hermes 를 부르는 설정이 아니다.
+`people` 패키지에 `ConfigurationProperties` 를 하나 만든다.
+
+| 이름 | 기본값 |
+| --- | --- |
+| `assistant.people.default-cost-mode` | `SUBSCRIPTION` |
+| `assistant.people.default-credential-scope` | `SHARED_HOUSEHOLD` |
+
+**기본값을 코드에 둔다.** 없다고 기동을 막을 값이 아니다.
+`HermesProperties` 의 compact 생성자가 `pollInterval` 을 채우는 방식을 그대로 따른다.
+
+근거는 `docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md` 다.
+profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓰기로 이미 정해져 있다.
+그래서 이 둘은 사람마다 다를 값이 아니다.
+
+다르게 써야 하면 관리자가 기존 에이전트 관리 화면에서 고친다. 그 폼에 둘이 이미 있다.
 
 **`apiBaseUrl` 을 이 저장소가 정하지 않는다.**
 공유 listener 의 주소는 비공개 저장소가 소유한다.
@@ -157,7 +176,11 @@ phase-02 의 `dashboardBaseUrl` 과 `dashboardToken` 처럼 `${...}` 로 두면 
 
 **`provider` 가 비어 올 수 있다.** `HermesModelClient` 의 Javadoc 이 그것을 적었다.
 `AgentModelSync` 는 그때 지금 1순위의 provider 로 되돌아가는데,
-첫 로그인에는 되돌아갈 1순위가 없다. 그 경우에 무엇을 쓸지는 아래 결정에 달려 있다.
+첫 로그인에는 되돌아갈 1순위가 없다.
+
+**그때는 기본값으로 메우지 않고 에이전트를 만들지 않는다.**
+틀린 provider 로 만들어진 에이전트는 실행할 때마다 실패하고 그 원인이 화면에 드러나지 않는다.
+만들지 않은 것을 로그에 남긴다. `app_user` 는 정상으로 만든다.
 
 **`seedFirst` 를 빠뜨리면 그 사람의 첫 대화가 `NO_MODEL_AVAILABLE` 로 실패한다.**
 
@@ -240,6 +263,9 @@ phase-02 의 `dashboardBaseUrl` 과 `dashboardToken` 처럼 `${...}` 로 두면 
 | 같은 사람의 두 번째 요청 | 에이전트가 늘지 않았다 |
 | 허용 목록에 없는 이메일의 토큰 | 사용자만 생기고 에이전트는 없다 |
 | 만들어진 에이전트 | 주인이 그 사람이고 자기만 본다 |
+| 만들어진 에이전트의 `costMode` 와 `credentialScope` | 설정의 기본값과 같다 |
+| `readOptions` 가 실패한다 | **사용자만 생기고 에이전트는 없다.** 로그인은 막히지 않는다 |
+| `readOptions` 가 `provider` 를 비워서 준다 | 같다. 기본값으로 메우지 않는다 |
 
 `test/browser` 에 화면 검사를 하나 더한다.
 관리자로 들어가 사람을 더하면 목록에 한 줄이 늘어나는 것을 본다.
@@ -292,6 +318,8 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/people/presentation/PeopleDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/user/domain/UserProvisioningService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesProperties.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/people/application/PeopleProperties.java` | 신규 |
+| `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `web/src/app/admin/people/page.tsx` | 신규 |
 | `web/src/app/admin/people/people-admin-panel.tsx` | 신규 |
