@@ -18,6 +18,39 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `family_id` | BIGINT | 지금은 한 가구뿐이다 |
 | `role` | VARCHAR(20) | `ADMIN` 또는 `MEMBER`. 첫 사용자가 `ADMIN` 이 된다 |
 
+## allowed_person
+
+로그인할 수 있는 사람의 목록이다.
+**여기 없는 주소는 토큰을 받지 못한다.**
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | |
+| `email` | VARCHAR(320) | 유일하다. 로그인에 쓸 Google 계정 |
+| `display_name` | VARCHAR(100) | 화면에 보일 이름 |
+| `hermes_profile` | VARCHAR(64) | 유일하다. 관리자가 적는다 |
+| `enabled` | BOOLEAN | 내리면 들어오지 못한다 |
+| `created_at` | DATETIME(6) | |
+
+`app_user` 와 나누어 둔다. 둘이 뜻하는 것이 다르다.
+
+| 표 | 뜻 |
+| --- | --- |
+| `allowed_person` | 들어와도 된다고 정한 사람 |
+| `app_user` | 실제로 들어온 적이 있는 사람 |
+
+**둘을 잇는 것은 `email` 이다.** 외래 키를 두지 않는다.
+허용한 시점에는 `app_user` 가 없고, 지운 뒤에도 실행 기록은 `app_user` 를 가리켜야 한다.
+
+`hermes_profile` 이 유일한 이유는 두 사람이 같은 profile 을 쓰면 격리가 깨지기 때문이다.
+`agent` 표의 `hermes_profile` 도 유일하므로 같은 제약이 두 곳에 있다.
+
+### 비어 있으면 아무도 들어오지 못한다
+
+이 표가 로그인의 유일한 근거다.
+배포할 때 지금 쓰는 주소를 한 번 넣고, 그 뒤 환경 변수를 지운다.
+**넣는 절차는 비공개 저장소가 소유한다.** 이 저장소에 주소를 적지 않는다.
+
 ## agent
 
 사용자가 대화를 시작할 때 고르는 실행 단위다.
@@ -228,3 +261,7 @@ Hermes 가 보내기 시작하면 그때 채운다.
 실행 기록이 그것을 가리키고 있고, 기록은 남아야 한다.
 
 사용자를 지우는 흐름은 아직 없다.
+
+허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다.
+그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
+그 사람의 Hermes profile 도 지우지 않는다. 다시 들일 때 그것을 다시 만들지 않아도 된다.

@@ -51,6 +51,88 @@ Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주�
 **요청 본문에 사용자를 적게 하면 모델이 그것을 바꿀 수 있다.**
 그래서 토큰만이 사용자를 정한다.
 
+## 사람을 더할 때
+
+두 시점에 나뉘어 일어난다.
+**관리자가 더할 때 Hermes 쪽이 끝나고, 그 사람이 처음 로그인할 때 우리 쪽이 끝난다.**
+
+한 시점에 몰지 않는 이유는 하나다.
+자기 profile 만 쓰는 에이전트는 주인이 있어야 하고,
+주인은 그 사람이 로그인하기 전에는 존재하지 않는다.
+
+### 관리자가 더할 때
+
+```mermaid
+sequenceDiagram
+    participant A as 관리자 브라우저
+    participant C as Control Plane
+    participant D as Hermes 대시보드
+    participant F as key 디렉터리
+
+    A->>C: POST /api/admin/people<br/>이메일, 이름, profile 이름
+    C->>C: 허용 목록에 행을 만든다
+    C->>D: POST /api/profiles
+    D-->>C: 만들어졌다
+    C->>C: key 를 만든다
+    C->>D: PUT /api/env (API_SERVER_KEY 와 listener 설정)
+    D-->>C: 들어갔다
+    C->>F: 같은 key 를 파일로 쓴다
+    C-->>A: 더해졌다
+```
+
+`clone_from` 을 쓰지 않는다.
+그 값을 주면 본뜬 profile 의 `API_SERVER_KEY` 까지 복사되어
+key 하나로 두 profile 이 열린다. 실측으로 확인했다.
+
+### 그 사람이 처음 로그인할 때
+
+```mermaid
+sequenceDiagram
+    participant U as 새 사용자 브라우저
+    participant W as Next.js 서버 라우트
+    participant C as Control Plane
+
+    U->>W: Google 로그인
+    W->>C: 허용 목록에 있는가
+    C-->>W: 있다. profile 이름은 이것이다
+    W->>C: 짧은 수명 JWT 로 첫 요청
+    C->>C: app_user 를 만든다
+    C->>C: 그 profile 을 가리키는 에이전트를 만든다
+    C-->>U: 에이전트 목록에 하나가 보인다
+```
+
+에이전트는 자기만 보는 것으로 만들고 주인을 그 사람으로 둔다.
+`API_SERVER_KEY` 를 파일에서 찾는 규칙은 바뀌지 않는다. profile 이름으로 찾는다.
+
+### 어긋나는 지점
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| 이미 있는 이메일 | 거절한다. 허용 목록의 이메일은 하나뿐이다 |
+| 이미 있는 profile 이름 | 거절한다. 우리 표에서도 Hermes 에서도 본다 |
+| profile 은 만들었는데 key 주입이 실패 | **만든 profile 을 지운다.** 아무것도 남기지 않는다 |
+| key 파일 쓰기가 실패 | 같다. profile 을 지우고 허용 목록 행도 되돌린다 |
+| Hermes 가 응답하지 않는다 | 허용 목록 행을 만들기 전이므로 아무것도 남지 않는다 |
+| 같은 요청이 두 번 온다 | 뒤의 것이 이메일 유니크 제약에 걸려 거절된다 |
+| 허용 목록에 없는 사람이 로그인 | 지금과 같다. 토큰을 만들지 않는다 |
+| 허용 목록에는 있는데 profile 이 없어졌다 | 실행할 때 key 를 찾지 못해 실패한다. 관리자가 다시 더한다 |
+
+**되돌리는 순서가 만드는 순서의 역순이다.**
+Hermes 쪽을 먼저 지우고 우리 표를 나중에 지운다.
+반대로 하면 우리 표에 없는 profile 이 Hermes 에 남는다.
+
+### 관리자가 아닌 사람
+
+사람을 더하는 화면은 `ADMIN` 만 연다.
+`MEMBER` 는 그 화면도 그 API 도 보지 못한다.
+
+### 아무도 없을 때
+
+허용 목록이 비면 아무도 로그인하지 못한다.
+**마이그레이션이 지금 쓰는 주소를 옮겨 넣으므로 배포 직후에는 비지 않는다.**
+데이터베이스를 새로 만들거나 그 표를 비우면 들어갈 길이 사라진다.
+그때는 데이터베이스에 직접 행을 넣어야 한다.
+
 ## 대화 한 번
 
 ```mermaid
