@@ -284,6 +284,209 @@ prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 �
 붙인 뒤 gateway 를 다시 띄워야 인식된다. `GET /v1/skills` 로 확인한다.
 실측으로 확인했다.
 
+## 내장 delegation 이 실제로 하는 것
+
+2026년 9월 18일에 v0.21.0 배포본에서 측정했다.
+운영 profile 을 건드리지 않으려고 컨테이너 안에 격리된 `HERMES_HOME` 을 따로 만들고
+그 아래 측정용 profile 로만 실행했다. 측정이 끝난 뒤 만든 것을 모두 지웠다.
+
+`delegate_task` 가 그 도구다. 부모 실행이 이 도구를 부르면 Hermes 가 자식 agent 를 만든다.
+
+### 부모의 `instructions` 는 자식에게 가지 않는다
+
+**Control Plane 이 `instructions` 로 주입한 Memory 는 subagent 로 넘어가지 않는다.**
+
+부모에게 `instructions` 로 `MEMORYMARK-7731` 로 시작하는 줄 하나를 주고
+부모와 자식에게 같은 질문을 던졌다.
+
+| 누구에게 물었나 | 답 |
+| --- | --- |
+| 부모 | `MEMORYMARK-7731: the user is allergic to peanuts.` |
+| 자식 | `NOMARK` |
+
+`tools/delegate_tool.py` 의 `_build_child_agent` 가 자식을 `skip_memory=True` 와
+`skip_context_files=True` 로 만들고 자식 system prompt 를 goal 로 새로 쓰기 때문이다.
+소스와 실행이 같은 결과를 낸다.
+
+privacy 로는 이쪽이 안전하다. 부모에 넣은 개인 Memory 가 자식으로 새지 않는다.
+대신 자식에게 무언가를 알려야 하면 goal 본문에 직접 적어야 하고,
+그 본문은 Control Plane 이 무엇을 담을지 정해야 한다.
+
+### 자식은 한 단계 더 자식을 만든다
+
+**ADR-016 이 적은 「leaf 한 단계만 된다」 는 이 버전에서 맞지 않는다.**
+
+배포 설정과 같은 `max_spawn_depth: 1` 과 `orchestrator_enabled: true` 로 두고
+부모에게 `role=orchestrator` 로 자식을 만들게 한 뒤 그 자식이 다시 위임하도록 시켰다.
+손자가 실제로 떴고 SSE 에 아래가 찍혔다.
+
+```json
+{"event": "subagent.start", "subagent_id": "sa-0-4cac90e1",
+ "parent_id": "sa-0-58f24d06", "depth": 1,
+ "child_session_id": "20260918_104940_bf9c03"}
+```
+
+자식이 `depth: 0`, 손자가 `depth: 1` 이고 `parent_id` 가 둘을 잇는다.
+`max_spawn_depth` 는 상한이 없는 설정 값이라 더 깊게도 열 수 있다.
+
+### 자식 토큰을 SSE 로 받을 수 있다
+
+**ADR-016 이 「자식 토큰을 잃는다」 고 적은 근거가 이 버전에서는 바뀐다.**
+부모 Runs API 의 `usage` 에 자식이 더해지지 않는 것은 그대로다.
+다만 자식의 사용량이 사건으로 따로 나온다.
+
+| 사건 | 함께 오는 칸 |
+| --- | --- |
+| `subagent.start` | `subagent_id`, `child_session_id`, `delegation_id`, `parent_id`, `depth`, `model`, `goal`, `task_index`, `task_count` |
+| `subagent.complete` | 위의 것 전부와 `status`, `summary`, `duration_seconds`, `input_tokens`, `output_tokens`, `reasoning_tokens`, `api_calls`, `cost_usd`, `files_read`, `files_written` |
+
+실측한 `subagent.complete` 하나다.
+
+```json
+{"status": "completed", "duration_seconds": 0.93,
+ "input_tokens": 10337, "output_tokens": 68,
+ "reasoning_tokens": 0, "api_calls": 1, "cost_usd": 0.0,
+ "child_session_id": "20260918_104444_6c460e"}
+```
+
+**`cost_usd` 를 비용 근거로 쓰지 않는다.** 가격표가 없는 provider 에서는 0 으로 온다.
+위 실행도 토큰은 맞게 왔지만 `cost_usd` 가 0 이었다. 토큰을 저장하고 비용은 우리가 환산한다.
+
+`child_session_id` 로 `GET /api/sessions/{id}` 를 부르면 cache 토큰까지 나온다.
+그 응답의 `parent_session_id` 가 부모 실행을 가리킨다.
+
+```json
+{"id": "20260918_103840_ac00e1", "source": "subagent",
+ "input_tokens": 9193, "output_tokens": 79, "cache_read_tokens": 960,
+ "reasoning_tokens": 75, "estimated_cost_usd": 0.0054140625,
+ "parent_session_id": "run_e4f5549bd5b04545985670d3457d830c"}
+```
+
+Runs API 의 `usage` 에는 cache 칸이 없지만 이 경로에는 있다.
+
+### 다만 동기 위임일 때만 받는다
+
+`delegate_task` 의 `background` 가 참이면 자식이 백그라운드로 돌고
+**부모 실행이 자식보다 먼저 끝난다.** 그 시점에 SSE 가 닫혀 `subagent.complete` 를 놓친다.
+실측으로 `run.completed` 뒤에 스트림이 닫혔고 자식 사건은 오지 않았다.
+
+`background=false` 로 시킨 실행에서는 `subagent.start` 와 `subagent.complete` 가 모두 왔다.
+
+**실행의 자식 목록을 주는 API 는 없다.**
+`GET /api/sessions` 는 `parent_session_id` 질의 인자를 무시하고
+`source` 가 `subagent` 인 session 을 목록에서 제외한다.
+`/v1/runs/{id}/subagents` 같은 경로도 없다. 404 다.
+
+그러므로 자식 사용량을 남기려면 **SSE 를 끝까지 받아야 하고 위임이 동기여야 한다.**
+둘 중 하나가 빠지면 그만큼이 기록에서 사라진다.
+
+### 자식의 모델은 부모의 것이 아니다
+
+부모를 `openai/gpt-oss-20b` 로 돌린 실행에서 자식이 `z-ai/glm-5.2` 로 돌았다.
+자식 모델은 `delegation.provider` 와 `delegation.model` 이 정하고,
+비어 있으면 부모가 아니라 별도 기본값으로 떨어진다.
+실행별 비용을 보려면 이 값을 명시해야 한다.
+
+## Control Plane 의 MCP 도구로 다른 실행을 부를 때
+
+`memory_read` 를 두고 있는 그 자리에 실행을 시작하는 도구를 하나 더 두는 구조를
+같은 날 측정했다. 측정용 MCP 서버를 하나 띄워 Hermes 가 그것을 부르게 하고,
+그 서버가 다시 Runs API 를 부르게 했다.
+
+### 도구 호출에는 실행을 가리키는 값이 없다
+
+`tools/call` 요청이 들고 온 것은 우리가 설정에 적은 `Authorization` 헤더와
+MCP 규약 헤더뿐이었다. `params._meta` 는 빈 객체였다.
+
+```json
+{"name": "echo_context", "arguments": {"note": "hello"}, "_meta": {}}
+```
+
+**도구가 아는 것은 어느 profile 이 불렀는지까지다.** 어느 실행에서 왔는지는 오지 않는다.
+그러므로 이 경로로 만든 실행을 부모 `agent_execution` 에 잇는 값은 우리가 만들어야 한다.
+
+### 제한 시간은 우리가 정하지만 상한은 있다
+
+| 항목 | 값 |
+| --- | --- |
+| 호출 하나의 제한 시간 | 기본 300초 |
+| 서버마다 바꾸는 자리 | 그 서버 설정의 `timeout` |
+| 전역으로 바꾸는 자리 | `timeouts.mcp.tool_call` |
+| 연결 제한 시간 | 기본 60초 |
+
+제한 시간을 20초로 줄이고 30초 걸리는 도구를 부르자 아래가 도구 결과로 돌아왔고
+실행 자체는 정상 종료했다.
+
+```text
+MCP call failed: TimeoutError: MCP call timed out after 20.0s (configured timeout: 20.0s)
+```
+
+**실행을 기다리는 도구는 이 시간 안에 끝나야 한다.**
+오래 걸리는 작업을 그 안에서 기다리면 제한 시간에 걸린다.
+아래 「기다리는 도구는 실제로 끊긴다」 가 그 실측이다.
+
+### 재귀를 막는 자리가 Hermes 에 없다
+
+도구 안에서 다시 Runs API 를 부르게 하고 깊이를 하나씩 올렸다.
+깊이 2, 3, 4 가 모두 실행됐고 5가 시작되려 할 때 **측정용 서버가 스스로 끊었다.**
+Hermes 는 한 번도 개입하지 않았다.
+
+Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
+도구 호출은 그저 외부 HTTP 호출이다.
+**멈추는 자리를 Control Plane 이 가져야 한다.** 실행 나무의 깊이를 우리가 세고 우리가 거절한다.
+
+### 기다리는 도구는 실제로 끊긴다
+
+위 재귀 측정에서 제한 시간을 120초로 두었는데, 뿌리 실행의 도구 호출이 그 시간에 걸렸다.
+아래가 뿌리 실행의 대화에 남은 도구 결과다.
+
+```text
+{"error": "MCP call failed: TimeoutError: MCP call timed out after 120.0s ..."}
+```
+
+**끊긴 뒤에도 그 아래 실행들은 계속 돌았다.** 깊이 2와 3과 4가 모두 완료로 끝났다.
+도구 호출이 끊기는 것과 그 도구가 시작한 실행이 멈추는 것은 별개다.
+
+뿌리 실행은 그 뒤 `Service temporarily overloaded` 로 실패했다.
+겹쳐 도는 실행이 쌓여 한 gateway 와 provider 에 몰린 결과다.
+`gateway.api_server.max_concurrent_runs` 의 기본값이 10 이고 넘으면 429 를 준다.
+
+그래서 이 구조를 쓴다면 도구가 실행이 끝날 때까지 기다리게 만들지 않는다.
+실행 번호를 바로 돌려주고 진행은 따로 묻는 형태여야 한다.
+
+### 취소가 아래로 내려가지 않는다
+
+`POST /v1/runs/{run_id}/stop` 은 동작한다.
+`{"status": "stopping"}` 을 주고 잠시 뒤 조회하면 `cancelled` 다.
+
+**그러나 그 실행의 도구가 시작한 실행은 멈추지 않는다.**
+뿌리 실행을 취소한 뒤에도 그 도구가 만든 아래 실행이 완료로 끝나고
+다시 그 아래를 시작하는 것을 실측했다.
+취소를 아래로 전파하는 것도 Control Plane 의 몫이다.
+
+### 긴 결과는 잘리지 않고 파일로 빠진다
+
+20만 자를 돌려주는 도구를 불렀다.
+전체가 spillover 파일로 저장되고 대화에는 2천 자 남짓만 들어갔다.
+
+```text
+This tool result was too large (200,014 characters, 195.3 KB).
+Full output saved to: <spillover 파일>
+Use the read_file tool with offset and limit to access specific ...
+```
+
+| 구간 | 무슨 일이 일어나나 |
+| --- | --- |
+| 약 5만 자 이하 | 그대로 대화에 들어간다 |
+| 약 5만 자부터 200만 자까지 | 전체를 파일로 저장하고 대화에는 미리보기만 넣는다 |
+| 200만 자 초과 | 앞 40%와 뒤 60%만 남기고 잘라 낸다 |
+
+**미리보기만 본 모델이 본문을 읽으려면 `read_file` 을 쓸 수 있어야 한다.**
+파일 도구를 잠근 에이전트는 그 본문에 닿지 못한다.
+
+MCP 결과는 `<untrusted_tool_result>` 로 감싸여 들어간다.
+그 안의 내용을 지시가 아니라 데이터로 다루라는 안내가 함께 붙는다.
+
 ## 다중 에이전트는 kanban 이 이미 갖고 있다
 
 `hermes kanban` 이 profile 을 작업자로 받는 작업 보드다.
@@ -301,9 +504,112 @@ prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 �
 `swarm` 의 인자가 `--worker PROFILE:TITLE` 과 `--verifier PROFILE` 과 `--synthesizer PROFILE` 이다.
 즉 등록한 에이전트가 그대로 작업자 후보가 된다.
 
-**다만 HTTP API 가 없다.** `/v1/capabilities` 의 엔드포인트 목록에 kanban 이 없다.
-Control Plane 이 쓰려면 CLI 를 부르거나 plugin 으로 도구를 등록해야 한다.
-다중 에이전트로 넘어가기 전에 이것부터 정해야 한다.
+**다만 Runs API 에는 kanban 이 없다.** `/v1/capabilities` 의 엔드포인트 목록에 없다.
+HTTP 로 부를 길이 아주 없는 것은 아니고, 어디에 열려 있고 무엇을 막지 못하는지는
+아래 「kanban 을 HTTP 로 부르는 길」 이 갖는다.
+
+## kanban 을 HTTP 로 부르는 길
+
+같은 날 같은 격리 환경에서 측정했다.
+
+### 대시보드 웹서버에는 kanban API 가 있다
+
+배포본에 kanban 대시보드 plugin 이 들어 있고 그 plugin 이 HTTP 경로 47개를 연다.
+경로는 `/api/plugins/kanban/...` 이고 보드 조회, 작업 생성과 수정, 링크,
+dispatch, 실행 조회, 담당자 목록, 분해 요청이 모두 들어 있다.
+
+측정용 대시보드를 하나 띄워 실제로 불렀다.
+
+| 요청 | 응답 |
+| --- | --- |
+| 토큰 없이 `/api/plugins/kanban/board` | 401 |
+| 토큰과 함께 같은 경로 | 200 과 보드 전체 |
+| 토큰과 함께 `POST /api/plugins/kanban/tasks` | 201 상당. 작업이 만들어졌다 |
+
+**이 인증은 사용자를 구분하지 못한다.**
+프로세스마다 하나씩 만들어지는 세션 토큰이고 그 토큰 하나가 보드 전체를 연다.
+profile 별 구분이 없고 `API_SERVER_KEY` 와도 다른 값이다.
+
+`PUT /api/plugins/kanban/orchestration` 은 Hermes 루트의 `config.yaml` 을 고친다.
+보드를 읽게 열어 준 토큰이 설정 파일까지 연다.
+
+### API server 에는 없지만 plugin 이 더할 수 있다
+
+API server 에 kanban 경로는 없다. 넷 다 404 였다.
+
+plugin 은 `ctx.register_platform_handler("api_server", factory)` 로 경로를 더할 수 있다.
+그 factory 가 API server 의 aiohttp 애플리케이션을 그대로 받는다.
+측정용 plugin 을 하나 만들어 보드를 돌려주는 경로를 붙였고 실제로 동작했다.
+
+**다만 그 경로는 기본적으로 인증을 거치지 않는다.**
+API server 의 인증은 미들웨어가 아니라 핸들러마다 `_check_auth` 를 부르는 방식이다.
+그래서 plugin 이 부르지 않으면 열려 있다.
+
+| plugin 경로 | 키 없이 | 틀린 키 | 맞는 키 |
+| --- | --- | --- | --- |
+| `_check_auth` 를 부르지 않음 | 200 | 200 | 200 |
+| `_check_auth` 를 부름 | 401 | 401 | 200 |
+
+`_check_auth` 는 공개된 계약이 아니라 adapter 의 내부 메서드다.
+버전이 오르면 사라질 수 있는 자리에 인증을 얹는 셈이다.
+
+**`/p/<profile>/` 접두도 붙지 않는다.** 그 경로로 부르면 404 다.
+Hermes 는 자기가 등록한 경로에만 접두 사본을 만든다.
+공유 gateway 로 옮기는 길과 맞지 않는다.
+
+### 실행을 이을 수 있지만 정상 종료일 때만 된다
+
+worker 는 Runs API 실행이 아니라 `hermes -p <profile> chat -q` 하위 프로세스다.
+그래서 우리가 아는 실행 번호가 처음부터 없다.
+
+이을 수 있는 값은 `task_runs.metadata` 의 `worker_session_id` 하나다.
+
+```json
+{"id": 5, "profile": "kbw", "status": "done", "outcome": "completed",
+ "metadata": {"worker_session_id": "20260918_101428_9e11e7"}}
+```
+
+그 번호로 session 을 조회하면 사용량이 나온다.
+
+```json
+{"id": "20260918_101428_9e11e7", "source": "kanban",
+ "input_tokens": 49548, "output_tokens": 212,
+ "estimated_cost_usd": 0.0015140000000000002, "api_call_count": 3}
+```
+
+**그런데 이 값은 worker 가 스스로 적는다.**
+`kanban_complete` 와 `kanban_block` 만 적고, 그것도 자기 작업일 때만 적는다.
+worker 가 죽거나 시간 초과로 끊기면 `metadata` 가 비어 있다.
+실측한 실패 실행 둘이 모두 그랬다.
+
+`tasks.session_id` 는 작업을 **만든** 쪽의 session 이다. worker 의 것이 아니다.
+`agent_execution` 을 가리키는 칸은 어디에도 없다.
+
+### 사용량 칸은 지금도 없다
+
+`task_runs` 에 토큰과 비용 칸이 없다.
+공개 저장소의 최신 릴리스 `v2026.9.14` 를 받아 같은 스키마를 확인했다. 그대로였다.
+그 릴리스의 API server 에도 kanban 경로가 없다.
+배포본은 `v2026.8.31` 이다.
+
+### `tenant` 는 아무것도 막지 않는다
+
+`tenant` 는 자유 문자열 칸이고 조회할 때 쓰는 선택 인자다.
+강제되는 자리가 없다. 작업을 만드는 쪽이 값을 정하고,
+worker 에게는 환경 변수로 전달돼 안내문에 적힐 뿐이다.
+
+토큰 하나로 아래를 그대로 했다.
+
+| 한 일 | 결과 |
+| --- | --- |
+| 다른 profile 을 담당자로 지정 | 만들어졌다 |
+| `tenant` 에 임의의 값을 지정 | 그대로 저장됐다 |
+| 인자 없이 보드 조회 | 모든 tenant 의 작업이 함께 나왔다 |
+
+보드는 Hermes 루트 하나를 profile 들이 함께 쓴다.
+**Task 본문에 넣지 않고 그 사용자의 Memory 를 주입하는 길은 없다.**
+worker 가 받는 것은 작업 본문과 몇 가지 환경 변수뿐이고,
+`instructions` 에 해당하는 입구가 kanban 경로에는 없다.
 
 ## 홈서버에서 확인한 것
 
