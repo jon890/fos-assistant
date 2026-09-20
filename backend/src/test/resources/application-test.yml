@@ -18,5 +18,8 @@ assistant:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
 hermes:
   profile-key-dir: build/test-hermes-keys
+  # 실재하지 않는 주소다. 이 값으로 대시보드를 부르는 테스트가 없고, 부르면 닿지 못해 실패한다
+  dashboard-base-url: https://hermes-dashboard.example.com
+  dashboard-token: test-dashboard-token
   poll-interval: 10ms
   run-timeout: 1s

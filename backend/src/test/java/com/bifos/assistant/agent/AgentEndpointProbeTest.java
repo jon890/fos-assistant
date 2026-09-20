@@ -92,6 +92,7 @@ class AgentEndpointProbeTest {
     private AgentEndpointProbe probe(Path keyDir, String profile, String key) throws IOException {
         Files.writeString(keyDir.resolve(profile), key);
         HermesProperties properties = new HermesProperties(keyDir.toString(),
+                "https://hermes-dashboard.example.com", "test-dashboard-token",
                 Duration.ofMillis(10), Duration.ofSeconds(1), Duration.ofSeconds(1),
                 Duration.ofSeconds(2));
         return new AgentEndpointProbe(new HermesProfileKeyStore(properties), properties);
