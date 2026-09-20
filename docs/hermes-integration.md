@@ -867,6 +867,17 @@ profile 을 하나 만들어 `API_SERVER_KEY` 를 넣고,
 
 `API_SERVER_KEY` 와 `API_SERVER_MODEL_NAME` 을 이 경로로 넣어 실제로 들어가는 것을 확인했다.
 
+### 공유 listener 를 쓰는 profile 에는 listener 설정을 넣지 않는다
+
+`.env` 에 넣는 것은 `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 둘뿐이다.
+
+`API_SERVER_ENABLED` 와 `API_SERVER_HOST` 와 `API_SERVER_PORT` 를 함께 적으면
+gateway 가 뜰 때 `SecondaryPortBindingConfigError` 로 그 profile 을 건너뛴다.
+공유 listener 하나가 모든 profile 을 받는 구성에서 그 셋은 두 번째 listener 를 세우라는 뜻이 되기 때문이다.
+
+건너뛴 것은 기동 로그에 남고, 그 profile 은 접두를 붙여 불러도 답하지 않는다.
+profile 을 만드는 쪽이 그 셋을 넣지 않는 것을 테스트로 고정한다.
+
 ### 넣은 직후 공유 listener 가 답한다
 
 key 를 넣고 gateway 를 다시 띄우지 않은 채로 불렀다.
