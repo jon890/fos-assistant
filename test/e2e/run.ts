@@ -24,7 +24,7 @@ import {
   type Context,
   type Scenario,
 } from "./harness.ts";
-import { startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
+import { FAKE_DASHBOARD_TOKEN, startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
 import { authScenario } from "./scenarios/auth.ts";
 import { signInScenario } from "./scenarios/signin.ts";
 import { meScenario } from "./scenarios/me.ts";
@@ -109,7 +109,11 @@ async function writeProfileKeys(work: string): Promise<string> {
   return keyDir;
 }
 
-function startControlPlane(keyDir: string, logPath: string): ChildProcess {
+function startControlPlane(
+  keyDir: string,
+  dashboardBaseUrl: string,
+  logPath: string,
+): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
     cwd: join(ROOT, "backend"),
@@ -121,6 +125,8 @@ function startControlPlane(keyDir: string, logPath: string): ChildProcess {
       SERVER_PORT: String(APP_PORT),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       HERMES_PROFILE_KEY_DIR: keyDir,
+      HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
+      HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
       ASSISTANT_PRICING_CATALOG: PRICING_CATALOG,
       SPRING_FLYWAY_ENABLED: "true",
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
@@ -162,7 +168,7 @@ async function main(): Promise<void> {
     console.log(`   ${hermes.baseUrl}`);
 
     console.log("== Control Plane 기동");
-    app = startControlPlane(await writeProfileKeys(work), logPath);
+    app = startControlPlane(await writeProfileKeys(work), hermes.baseUrl, logPath);
     await waitForHealth(`http://127.0.0.1:${APP_PORT}/actuator/health`, logPath);
     console.log(`   http://127.0.0.1:${APP_PORT}`);
 

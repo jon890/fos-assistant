@@ -15,6 +15,10 @@ const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
 const SESSION_PATH = /^\/p\/([a-z0-9-]+)\/api\/sessions\/([A-Za-z0-9_-]+)$/;
 /** Control Plane 이 주소를 저장하기 전에 닿는지 확인할 때 부른다. */
 const CAPABILITIES_PATH = /^\/p\/([a-z0-9-]+)\/v1\/capabilities$/;
+/** 대시보드의 profile 관리 경로다. 실행 경로와 달리 profile 접두가 붙지 않는다. */
+const PROFILES_PATH = "/api/profiles";
+const PROFILE_PATH = /^\/api\/profiles\/(.+)$/;
+const ENV_PATH = "/api/env";
 const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)$/;
 const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
@@ -22,6 +26,14 @@ const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
 const TEST_RELEASE_HELD_RUN_PATH = "/__test/release-held-run";
 const TEST_BUSY_PATH = "/__test/busy";
 const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
+
+/**
+ * 대시보드가 기계에게 여는 토큰이다.
+ *
+ * <p>Hermes 쪽 plugin 이 경로 몇 개를 `Authorization: Bearer` 로 여는 것을 흉내 낸다. 실행 경로가
+ * 쓰는 profile 별 key 와 다른 값이라, 둘을 바꿔 보내면 여기서 401 이 난다.
+ */
+export const FAKE_DASHBOARD_TOKEN = "fake-dashboard-token";
 
 /**
  * 동시 실행 한도를 넘겼을 때 실제 Hermes 가 내는 본문이다.
@@ -185,6 +197,10 @@ export type FakeHermes = {
   clearBusy(): void;
   /** 실행 제출을 받은 횟수다. 429 뒤에 다시 보내지 않는 것을 이 수로 본다. */
   submitCount(): number;
+  /** 대시보드로 만들어져 아직 남아 있는 profile 이름들 */
+  profiles(): string[];
+  /** 그 profile 의 `.env` 에 들어간 값이다. 없는 profile 이면 비어 있다. */
+  profileEnv(name: string): Record<string, string>;
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -205,6 +221,8 @@ export function startFakeHermes(
   const who = label === undefined ? "fake hermes" : `fake hermes ${label}`;
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
+  /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
+  const profiles = new Map<string, Record<string, string>>();
   const blockedProviders = new Set<string>();
   let busy = false;
   let submitCount = 0;
@@ -218,6 +236,76 @@ export function startFakeHermes(
   const authorized = (request: IncomingMessage, profile: string): boolean => {
     const expected = profileKeys[profile];
     return expected !== undefined && request.headers.authorization === `Bearer ${expected}`;
+  };
+
+  /** 대시보드 경로는 profile 별 key 가 아니라 기계용 토큰 하나로 열린다. */
+  const dashboardAuthorized = (request: IncomingMessage): boolean =>
+    request.headers.authorization === `Bearer ${FAKE_DASHBOARD_TOKEN}`;
+
+  /**
+   * 대시보드의 profile 관리 경로다.
+   *
+   * <p>Control Plane 이 부르는 셋만 흉내 낸다. 여기서 맡은 경로면 true 를 돌려주고, 아니면 false 를
+   * 돌려줘 실행 경로로 넘긴다.
+   */
+  const handleDashboard = async (
+    request: IncomingMessage,
+    response: ServerResponse,
+    path: string,
+  ): Promise<boolean> => {
+    const profileMatch = PROFILE_PATH.exec(path);
+    const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || profileMatch !== null;
+    if (!isDashboardPath) return false;
+
+    if (!dashboardAuthorized(request)) {
+      send(response, 401, { reason: "no_token" });
+      return true;
+    }
+
+    if (request.method === "POST" && path === PROFILES_PATH) {
+      const body = JSON.parse((await readBody(request)) || "{}") as { name?: string };
+      const name = body.name ?? "";
+      if (name.length === 0) {
+        send(response, 400, { error: "name is required" });
+        return true;
+      }
+      if (profiles.has(name)) {
+        send(response, 409, { error: "profile already exists" });
+        return true;
+      }
+      profiles.set(name, {});
+      send(response, 200, { name });
+      return true;
+    }
+
+    if (request.method === "PUT" && path === ENV_PATH) {
+      const body = JSON.parse((await readBody(request)) || "{}") as {
+        profile?: string;
+        key?: string;
+        value?: string;
+      };
+      const env = body.profile === undefined ? undefined : profiles.get(body.profile);
+      if (env === undefined || body.key === undefined || body.value === undefined) {
+        send(response, 404, { error: "no such profile" });
+        return true;
+      }
+      env[body.key] = body.value;
+      send(response, 200, { profile: body.profile, key: body.key });
+      return true;
+    }
+
+    if (request.method === "DELETE" && profileMatch !== null) {
+      const name = decodeURIComponent(profileMatch[1]!);
+      if (!profiles.delete(name)) {
+        send(response, 404, { error: "no such profile" });
+        return true;
+      }
+      send(response, 200, { name });
+      return true;
+    }
+
+    send(response, 404, { error: "not found" });
+    return true;
   };
 
   const server: Server = createServer((request, response) => {
@@ -274,6 +362,8 @@ export function startFakeHermes(
         heldRunWaiter = undefined;
         return send(response, 204, null);
       }
+
+      if (await handleDashboard(request, response, path)) return;
 
       if (request.method === "GET") {
         const modelMatch = MODEL_OPTIONS_PATH.exec(path);
@@ -475,6 +565,8 @@ export function startFakeHermes(
           busy = false;
         },
         submitCount: () => submitCount,
+        profiles: () => [...profiles.keys()],
+        profileEnv: (name: string) => ({ ...(profiles.get(name) ?? {}) }),
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {
