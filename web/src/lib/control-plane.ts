@@ -1,7 +1,7 @@
 import { SignJWT } from "jose";
 import { auth } from "@/auth";
 
-/** The Control Plane token lives for one request. The browser never sees it. */
+/** Control Plane 토큰은 한 요청 동안만 산다. 브라우저는 이 토큰을 보지 않는다. */
 const TOKEN_LIFETIME = "2m";
 
 function secret(): Uint8Array {
@@ -23,6 +23,47 @@ export async function mintToken(email: string, name: string): Promise<string> {
     .setIssuedAt()
     .setExpirationTime(TOKEN_LIFETIME)
     .sign(secret());
+}
+
+/**
+ * 로그인 판정만 물을 수 있는 토큰이다.
+ *
+ * <p>이 판정은 아직 아무 사용자도 없는 시점에 돌아서 신원을 담지 않는다. 누구를 묻는지는 요청 본문이
+ * 적는다. Control Plane 은 `purpose` 가 이 값인 토큰만 그 경로에서 받는다.
+ */
+async function mintSignInToken(): Promise<string> {
+  return new SignJWT({ purpose: "signin" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(TOKEN_LIFETIME)
+    .sign(secret());
+}
+
+/**
+ * 이 주소가 들어와도 되는지 Control Plane 에 묻는다.
+ *
+ * <p>허용 목록은 데이터베이스에 있고 실행 중에 바뀐다. 그래서 로그인마다 묻는다.
+ *
+ * <p>**답을 받지 못하면 거짓을 돌려준다.** 판정하지 못하는 동안 들여보내지 않는다. 이 경로는 사용자를
+ * 만들지 않으므로, 거절된 주소가 `app_user` 를 남기지 않는다.
+ */
+export async function isSignInAllowed(email: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${baseUrl()}/api/v1/signin/allowed`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await mintSignInToken()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+      cache: "no-store",
+    });
+    if (!response.ok) return false;
+    const payload = (await response.json()) as { allowed?: boolean };
+    return payload.allowed === true;
+  } catch {
+    return false;
+  }
 }
 
 export type ControlPlaneResult<T> =
@@ -59,10 +100,10 @@ export async function requestControlPlane(
 }
 
 /**
- * Calls the Control Plane as the signed-in family member.
+ * 로그인한 가족 구성원으로서 Control Plane 을 부른다.
  *
- * <p>Runs only on the server: the caller's identity comes from the session, never from the request
- * body, so a member cannot ask for another member's data by editing a payload.
+ * <p>서버에서만 돈다. 부르는 사람이 누구인지는 세션이 정하고 요청 본문이 정하지 않는다. 그래서
+ * 사용자가 본문을 고쳐 다른 사용자의 자료를 달라고 할 수 없다.
  */
 export async function callControlPlane<T>(
   path: string,
