@@ -42,7 +42,7 @@ Control Plane 이 닿지 못했다. 인프라가 그것을 열어 이 phase 가 
 
 ### 확인된 것
 
-인프라 쪽에서 `assistant-backend` 컨테이너로 보내 확인했다.
+인프라 쪽에서 Control Plane 이 도는 자리에서 보내 확인했다.
 
 | 요청 | 응답 |
 | --- | --- |
