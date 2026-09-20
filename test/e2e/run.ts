@@ -17,9 +17,16 @@ import { fileURLToPath } from "node:url";
 import { createWriteStream } from "node:fs";
 import { readFile } from "node:fs/promises";
 
-import { mintToken, ScenarioFailure, type Context, type Scenario } from "./harness.ts";
+import {
+  mintSignInToken,
+  mintToken,
+  ScenarioFailure,
+  type Context,
+  type Scenario,
+} from "./harness.ts";
 import { startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
 import { authScenario } from "./scenarios/auth.ts";
+import { signInScenario } from "./scenarios/signin.ts";
 import { meScenario } from "./scenarios/me.ts";
 import { bindingScenario, DAD_BINDING } from "./scenarios/binding.ts";
 import { agentsScenario } from "./scenarios/agents.ts";
@@ -58,6 +65,7 @@ const PRICING_CATALOG = join(
 
 const SCENARIOS: readonly Scenario[] = [
   authScenario,
+  signInScenario,
   meScenario,
   bindingScenario,
   agentsScenario,
@@ -163,6 +171,7 @@ async function main(): Promise<void> {
       tokens: {
         dad: mintToken("dad@example.com", JWT_SECRET),
         kid: mintToken("kid@example.com", JWT_SECRET),
+        signin: mintSignInToken(JWT_SECRET),
       },
       hermesBaseUrl: hermes.baseUrl,
       hermesProfileKey: PROFILE_KEY,
