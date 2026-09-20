@@ -103,23 +103,27 @@ profile 하나를 끝까지 만드는 자리다. **순서와 되돌리기를 이
 ```
 1. createProfile(name)
 2. key = ProfileKeyFactory.next()
-3. putEnv(name, "API_SERVER_KEY", key)
-4. putEnv 로 listener 설정을 넣는다
+3. putEnv(name, "API_SERVER_MODEL_NAME", name)
+4. putEnv(name, "API_SERVER_KEY", key)
 5. keyStore.write(name, key)
 ```
 
-4번에 넣을 이름과 값은 **이 저장소가 정하지 않는다.**
-공유 listener 를 쓰는 profile 이 무엇을 `.env` 에 담아야 하는지는
-비공개 저장소 `fos-home-infra` 의 `services/hermes-assistant/README.md` 가 소유한다.
-**구현 전에 그 목록을 받아서 넣는다.** 받지 못했으면 아래 Blocked 조건을 따른다.
+**`.env` 에 넣는 것은 그 둘뿐이다.**
+
+`API_SERVER_ENABLED` 와 `API_SERVER_HOST` 와 `API_SERVER_PORT` 를 **넣으면 안 된다.**
+공유 listener 를 쓰는 profile 이 그 셋을 적으면 gateway 가 뜰 때
+`SecondaryPortBindingConfigError` 로 그 profile 을 건너뛴다.
+비공개 저장소 `fos-home-infra` 의 `enable-profile-api.sh` 가 그것을 실측으로 적어 두었고,
+그 스크립트도 공유 listener 를 쓸 때는 셋을 빼고 둘만 쓴다.
+
+**이 셋을 넣지 않는 것을 테스트로 고정한다.** 실수로 들어가면 그 profile 이 조용히 빠진다.
 
 되돌리기는 만든 순서의 역순이다.
 
 | 어디서 실패하면 | 무엇을 되돌리나 |
 | --- | --- |
 | 1번 | 없다 |
-| 2번부터 4번 | `deleteProfile(name)` |
-| 5번 | `deleteProfile(name)` |
+| 2번부터 5번 | `deleteProfile(name)` |
 
 되돌리다 또 실패하면 **원래 오류를 던지고 되돌리기 실패를 로그로 남긴다.**
 되돌리기 실패로 원인이 가려지면 안 된다.
@@ -145,6 +149,8 @@ profile 하나를 끝까지 만드는 자리다. **순서와 되돌리기를 이
 | `keyStore.write` 가 실패한다 | `deleteProfile` 이 불렸다 |
 | 되돌리기도 실패한다 | 원래 오류가 올라온다. 되돌리기 실패는 로그로만 |
 | 이미 있는 이름 | `HERMES_PROFILE_EXISTS` |
+| 성공했을 때 넣은 `.env` 항목 | `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 둘뿐이다 |
+| 같은 경우 | `API_SERVER_ENABLED` 와 `API_SERVER_HOST` 와 `API_SERVER_PORT` 를 넣지 않았다 |
 
 `HermesProfileKeyStoreTest` 도 만든다.
 
@@ -157,11 +163,6 @@ profile 하나를 끝까지 만드는 자리다. **순서와 되돌리기를 이
 
 `test/e2e` 의 Hermes 대역에 대시보드 경로 셋을 더한다.
 `test/e2e/` 의 기존 대역이 `/v1/runs` 를 흉내 내는 방식을 그대로 따른다.
-
-## Blocked 조건
-
-- `fos-home-infra` 에서 listener 설정 항목 목록을 받지 못했다
-  → `PHASE_BLOCKED: 공유 listener 를 쓰는 profile 의 .env 항목 목록이 필요하다` 를 내고 멈춘다
 
 ## 검증
 
