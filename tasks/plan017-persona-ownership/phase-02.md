@@ -47,7 +47,8 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 브라우저가 Control Plane 을 직접 부르지 않는다. `web/AGENTS.md` 가 그렇게 정한다.
 
 **본보기는 `web/src/app/api/admin/agents/[code]/route.ts` 다.**
-경로 변수와 PUT 본문과 오류 코드를 넘기는 방식이 거기 있다.
+경로 변수와 요청 본문과 오류 코드를 넘기는 방식이 거기 있다.
+**그 파일이 내는 것은 `PATCH` 다.** 메서드만 `PUT` 으로 바꾸고 짜임은 그대로 쓴다.
 같은 디렉터리의 `route.ts` 는 경로 변수도 본문도 없는 GET 하나라 본보기가 되지 않는다.
 
 | 파일 | 부르는 것 |
@@ -133,6 +134,9 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 주인이 `TEST_EMAIL` 인 것으로 만든다. 그 계정은 `ADMIN` 이라 언제나 고칠 수 있고,
 `MEMBER` 세션으로 열면 `PRIVATE` 이라 아예 보이지 않는다.
 **`FAMILY` 공개 에이전트 하나를 씨 데이터에 더하고 그것을 `MEMBER` 세션으로 연다.**
+
+`MEMBER` 세션은 `setSession(context, { email: "member@example.com", name: "가족 구성원" })` 로 만든다.
+`people.spec.ts` 와 `memory.spec.ts` 와 `nav.spec.ts` 가 모두 그 한 줄을 쓴다.
 
 | 무엇 | 기대 |
 | --- | --- |

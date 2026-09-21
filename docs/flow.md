@@ -153,12 +153,12 @@ sequenceDiagram
     participant C as Control Plane
     participant D as Hermes 대시보드
 
-    U->>W: 고친 본문과 화면이 받아 갔던 본문
+    U->>W: 고친 본문과 화면이 받아 갔던 본문의 해시
     W->>C: PUT /api/v1/agents/{code}/persona
     C->>C: 고칠 수 있는 사람인지 본다
     C->>D: GET /api/profiles/{이름}/soul
     D-->>C: 지금 본문
-    C->>C: 화면이 받아 갔던 본문과 같은지 본다
+    C->>C: 그 본문의 해시가 받은 해시와 같은지 본다
     C->>D: PUT /api/profiles/{이름}/soul
     D-->>C: 들어갔다
     C-->>U: 저장됨
