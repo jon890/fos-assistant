@@ -20,3 +20,4 @@
 | [ADR-016](ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) | 다중 에이전트 조율은 Control Plane이 맡는다 | Superseded ([ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md)) |
 | [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) | 무엇을 할지는 Hermes 가 정하고 Control Plane 은 경계만 갖는다 | Accepted |
 | [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) | 사람을 더하는 것을 Control Plane 이 끝낸다 | Accepted |
+| [ADR-019](ADR-019-페르소나는-control-plane-이-갖고-hermes-에-민다.md) | 페르소나는 Control Plane 이 갖고 Hermes 에 민다 | Accepted |
