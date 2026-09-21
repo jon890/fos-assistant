@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.dto.SoulDocument;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Map;
@@ -88,6 +89,57 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
         } catch (RestClientException ex) {
             log.warn("Hermes profile 을 지우지 못했다 profile={}", name, ex);
             throw HermesCallFailure.of(ex, "could not remove the Hermes profile");
+        }
+    }
+
+    @Override
+    public SoulDocument readSoul(String profileName) {
+        requireValidProfileName(profileName);
+        try {
+            SoulDocument soul = restClient
+                    .get()
+                    .uri(baseUrl + "/api/profiles/{name}/soul", profileName)
+                    .header("Authorization", "Bearer " + token)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(SoulDocument.class);
+            return soul == null ? new SoulDocument("", false) : soul;
+        } catch (RestClientException ex) {
+            log.warn("Hermes profile 의 SOUL.md 를 읽지 못했다 profile={}", profileName, ex);
+            throw HermesCallFailure.of(ex, "could not read the persona of this profile");
+        }
+    }
+
+    @Override
+    public void putSoul(String profileName, String content) {
+        requireValidProfileName(profileName);
+        try {
+            restClient
+                    .put()
+                    .uri(baseUrl + "/api/profiles/{name}/soul", profileName)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("content", content))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException ex) {
+            // 본문은 적지 않는다. 사람이 쓴 글이라 로그에 남기지 않는다.
+            log.warn("Hermes profile 의 SOUL.md 를 쓰지 못했다 profile={}", profileName, ex);
+            throw HermesCallFailure.of(ex, "could not write the persona of this profile");
+        }
+    }
+
+    /**
+     * profile 이름이 규칙에 맞는지 보고 아니면 거절한다.
+     *
+     * <p>{@code RestClient.uri(template, var)} 는 기본 인코딩에서 {@code /} 를 {@code %2F} 로 바꾸므로
+     * 이 검사가 없어도 경로를 벗어나지는 않는다. 검사를 두는 것은 대시보드에 닿기 전에 거절해 헛된
+     * 호출을 없애기 위해서다.
+     */
+    private static void requireValidProfileName(String profileName) {
+        if (!HermesProfileName.isValid(profileName)) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "profile name is not a valid Hermes profile");
         }
     }
 
