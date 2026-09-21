@@ -6,7 +6,15 @@
   "total_phases": 2,
   "current_phase": 1,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard"
+    }
   ]
 }

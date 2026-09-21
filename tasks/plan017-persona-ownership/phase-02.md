@@ -44,8 +44,11 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 ### 1. 서버 라우트
 
 `web/src/app/api/agents/` 아래에 둔다.
-같은 디렉터리의 `route.ts` 가 Control Plane 을 부르는 방식을 그대로 따른다.
 브라우저가 Control Plane 을 직접 부르지 않는다. `web/AGENTS.md` 가 그렇게 정한다.
+
+**본보기는 `web/src/app/api/admin/agents/[code]/route.ts` 다.**
+경로 변수와 PUT 본문과 오류 코드를 넘기는 방식이 거기 있다.
+같은 디렉터리의 `route.ts` 는 경로 변수도 본문도 없는 GET 하나라 본보기가 되지 않는다.
 
 | 파일 | 부르는 것 |
 | --- | --- |
@@ -61,7 +64,12 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 한 줄에 이름과 모델을 보이고, 그 줄에서 `/agents/{code}` 로 간다.
 
 빈 상태는 `components/ui/empty-state.tsx` 를 쓴다.
-쓸 수 있는 에이전트가 없으면 「쓸 수 있는 에이전트가 없습니다」 를 보인다.
+그 부품은 `title` 과 `description` 을 모두 요구한다.
+
+| 인자 | 값 |
+| --- | --- |
+| `title` | 쓸 수 있는 에이전트가 없습니다 |
+| `description` | 관리자가 에이전트를 연결하면 여기에 나타납니다 |
 
 ### 3. `/agents/{code}` 화면
 
@@ -70,6 +78,11 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 - 본문 편집창. 아래에 남은 글자 수를 보인다. 상한은 응답의 `maxChars` 가 준다
 - 저장 단추. `editable` 이 거짓이면 그리지 않고 편집창을 읽기 전용으로 둔다
 - **저장을 누르면 확인을 한 번 받는다.** 앞 본문이 사라지고 돌아갈 자리가 없다
+
+확인 대화는 `web/src/components/admin/visibility-confirm.tsx` 의 짜임을 그대로 따른다.
+`role="dialog"` 를 가진 부품이고 `test/browser/admin.spec.ts` 가 그 형태로 검사한다.
+**`window.confirm` 을 쓰지 마라.** Playwright 가 기본으로 그 대화를 자동으로 닫아
+「저장한다」 와 「취소한다」 두 검사가 함께 어긋난다.
 
 응답의 `bodyHash` 를 들고 있다가 저장할 때 `baseHash` 로 돌려보낸다.
 화면이 그 값을 만들지 않는다. 받은 것을 그대로 보낸다.
@@ -91,6 +104,10 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 | 길이 초과 | 몇 자를 줄여야 하는지 보인다 |
 | `HERMES_UNAVAILABLE` | 닿지 못했다고 알린다. 쓴 글이 편집창에 그대로 남아 다시 누를 수 있다 |
 
+**코드별 문장은 `web/src/components/error-message.ts` 의 `MESSAGES` 가 갖는다.**
+`HERMES_UNAVAILABLE` 은 이미 거기 있다. `PERSONA_STALE` 을 그 표에 더하고 `describeError` 로 꺼낸다.
+화면 안에 문장을 따로 적지 않는다. 두 벌이 되면 한쪽만 고쳐진다.
+
 **남은 글자 수의 표시 형식을 하나로 정한다.**
 상한을 넘으면 음수가 드러나야 하므로 「남은 N자」 로 적고, 넘으면 저장 단추를 잠근다.
 「N / 8000자」 로 적으면 넘긴 것이 표시에 드러나지 않는다.
@@ -108,7 +125,14 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 ### 5. 이 phase 를 검증하는 테스트
 
 `test/browser` 에 화면 검사를 더한다.
-기존 검사 파일의 짜임을 따르고 `mobile` 과 `desktop` 두 폭에서 돈다.
+기존 검사 파일의 짜임을 따른다. `playwright.config.ts` 의 projects 가 `mobile` 과 `desktop`
+두 폭으로 돌리므로 검사 파일이 폭을 따로 지정하지 않는다.
+
+**「고칠 수 없는 에이전트」 를 지금 씨 데이터로 만들 수 없다.**
+`test/browser/fixtures.ts` 의 `seedAgents` 가 네 에이전트를 모두 `PRIVATE` 이고
+주인이 `TEST_EMAIL` 인 것으로 만든다. 그 계정은 `ADMIN` 이라 언제나 고칠 수 있고,
+`MEMBER` 세션으로 열면 `PRIVATE` 이라 아예 보이지 않는다.
+**`FAMILY` 공개 에이전트 하나를 씨 데이터에 더하고 그것을 `MEMBER` 세션으로 연다.**
 
 | 무엇 | 기대 |
 | --- | --- |
@@ -120,10 +144,22 @@ phase-01 이 읽고 쓰는 경로를 만들었다. 이 phase 가 화면을 붙�
 | 본문이 비어 있는 에이전트를 연다 | 「아직 성격을 쓰지 않았습니다」 가 보인다 |
 
 `test/e2e/` 의 Hermes 대역에 `GET` 과 `PUT /api/profiles/{이름}/soul` 을 더한다.
-`fake-hermes.ts` 의 `handleDashboard` 가 다른 대시보드 경로를 흉내 내는 방식을 그대로 따른다.
 **대역이 받은 본문을 되읽을 수 있게 둔다.** 쓴 본문이 맞는지 시나리오가 보게 한다.
 
+`handleDashboard` 의 다른 분기를 그대로 베끼면 검사가 돈다. 둘을 지킨다.
+
+- **soul 전용 정규식을 `PROFILE_PATH` 분기보다 앞에 둔다.**
+  `PROFILE_PATH` 의 `.+` 가 `<이름>/soul` 까지 함께 먹는다
+- **본문을 `profiles` Map 이 아니라 별도 Map 에 둔다.**
+  씨 뿌린 profile 은 `profiles` 가 아니라 `keys` 에만 들어간다.
+  `profiles` 로 존재를 판정하면 기존 에이전트가 404 를 받아 `HERMES_UNAVAILABLE` 이 된다.
+  없는 이름은 404 가 아니라 `content` 가 빈 문자열이고 `exists` 가 거짓인 응답으로 답한다
+
 `test/e2e/scenarios/` 에 하나 더한다. 기존 시나리오 파일의 짜임을 따른다.
+
+**파일만 더하면 돌지 않는다.** `test/e2e/run.ts` 의 `SCENARIOS` 배열이 import 로 하나씩 나열한다.
+그 배열에 더해야 돈다. 순서가 뜻을 갖고 `busyScenario` 와 `modelSelectionScenario` 를
+뒤에 두는 까닭이 그 파일의 주석에 있다. **그 둘보다 앞에 넣는다.**
 
 | 무엇 | 기대 |
 | --- | --- |
@@ -142,6 +178,9 @@ node test/e2e/run.ts
 scripts/check-public-safe.sh
 ```
 
+`pnpm build` 가 요구하는 환경 변수는 `web/AGENTS.md` 의 「검사」 절이 갖는다.
+빠뜨리면 `Failed to collect page data` 로 끝난다.
+
 아래가 아무것도 내지 않아야 한다. 인라인 스타일을 쓰지 않는다.
 
 ```bash
@@ -158,9 +197,12 @@ grep -rn 'style={{' web/src/
 | `web/src/app/api/agents/[code]/persona/route.ts` | 신규 |
 | `web/src/components/agent/` | 신규 |
 | `web/src/components/ui/site-nav.tsx` | 수정 |
+| `web/src/components/error-message.ts` | 수정 |
 | `web/src/app/admin/agents/agent-admin-panel.tsx` | 수정 |
+| `test/browser/fixtures.ts` | 수정 |
 | `test/browser/` | 추가 |
 | `test/e2e/fake-hermes.ts` | 수정 |
+| `test/e2e/run.ts` | 수정 |
 | `test/e2e/scenarios/` | 추가 |
 
 ## 끝낸 뒤

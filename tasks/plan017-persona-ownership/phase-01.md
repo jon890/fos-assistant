@@ -1,6 +1,6 @@
 # Phase 01. 성격을 읽고 쓰는 경로
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -63,7 +63,26 @@ Hermes 대시보드에 그 파일을 읽고 쓰는 경로가 둘 다 있다.
 
 ## 작업 항목
 
-### 1. `hermes/dto/SoulDocument.java`
+### 1. `shared/util/Sha256.java`
+
+앞 본문의 해시를 만드는 자리다.
+
+```
+public static String hex16(String value)
+```
+
+- SHA-256 의 앞 16바이트를 16진수 32글자로 적는다
+- **빈 문자열에도 그 값을 돌려준다.** null 을 돌려주지 않는다
+- `value` 가 null 이면 빈 문자열과 같게 다룬다
+
+`AssembledContext.instructionsHash()` 가 같은 형식을 쓰지만 record 의 인스턴스 메서드라
+임의의 문자열에 쓸 수 없고, 넣은 문맥이 없을 때 null 을 돌려준다.
+**여기서는 null 을 돌려주면 안 된다.** 빈 본문에도 해시가 있어야 첫 저장의 대조가 성립한다.
+
+`AssembledContext` 와 `AgentTokenService.hash` 와 `MemoryService.proposalDedupKey` 를
+이 클래스로 모으지 않는다. **이 phase 의 범위 밖이다.** 셋은 자리마다 자릿수와 null 규칙이 다르다.
+
+### 2. `hermes/dto/SoulDocument.java`
 
 `GET` 이 돌려주는 것을 담는다.
 
@@ -74,7 +93,7 @@ Hermes 대시보드에 그 파일을 읽고 쓰는 경로가 둘 다 있다.
 
 같은 디렉터리의 `HermesModelOptions` 가 record 를 쓰는 방식을 그대로 따른다.
 
-### 2. `hermes/HermesDashboardClient.java` 에 둘을 더한다
+### 3. `hermes/HermesDashboardClient.java` 에 둘을 더한다
 
 ```
 SoulDocument readSoul(String profileName)
@@ -88,12 +107,28 @@ void putSoul(String profileName, String content)
 - 경로는 `{baseUrl}/api/profiles/{name}/soul` 이다
 - `PUT` 의 본문은 `content` 한 칸이다. 칸 이름을 바꾸지 않는다
 - `profileName` 에 `HermesProfileKeyStore` 와 같은 정규식 검사를 건다.
-  이름이 경로에 들어가므로 검사가 없으면 경로를 벗어나는 값이 들어갈 수 있다.
   그 필드는 `private static final` 이라 그대로 쓸 수 없다.
   **`hermes` 패키지에 `HermesProfileName` 을 만들어 두 곳이 함께 쓰게 한다.**
   `HermesProfileKeyStore` 도 그것을 쓰도록 고친다. 같은 정규식을 두 벌 두지 않는다
 
-### 3. `agent/application/PersonaService.java`
+`HermesProfileName` 은 **판정만 내고 던지지 않는다.**
+
+```
+public static boolean isValid(String name)
+```
+
+`HermesProfileKeyStore.keyFile` 은 부르는 자리마다 다른 `ErrorCode` 를 던진다.
+읽을 때 `HERMES_PROFILE_KEY_MISSING` 이고 쓰고 지울 때 `VALIDATION_FAILED` 다.
+새 클래스가 코드 하나를 고정해 던지면 그 구분이 사라지고 `HermesProfileKeyStoreTest` 가 깨진다.
+**던지는 것은 부르는 쪽이 하고 이 클래스는 참거짓만 낸다.**
+
+이름 검사를 두는 까닭을 정확히 적는다.
+`RestClient.uri(template, var)` 는 기본 인코딩에서 `/` 를 `%2F` 로 바꾸므로
+검사가 없어도 경로를 벗어나지는 않는다.
+**검사를 두는 것은 대시보드에 닿기 전에 거절해 헛된 호출을 없애기 위해서다.**
+그 까닭을 주석에도 그대로 적는다. 틀린 근거를 코드에 남기지 않는다
+
+### 4. `agent/application/PersonaService.java`
 
 성격을 읽고 쓰는 순서를 안다. `hermes` 는 부르는 방법만 알고 순서는 여기가 안다.
 
@@ -105,6 +140,10 @@ void putSoul(String profileName, String content)
 둘 다 `AgentService.requireReadable(user, code)` 로 에이전트를 얻는다.
 그것이 이미 볼 수 없는 에이전트를 `AGENT_NOT_FOUND` 로 숨긴다.
 **같은 판정을 하는 클래스를 새로 만들지 않는다.**
+
+**대시보드에 넘기는 것은 `code` 가 아니라 `agent.hermesProfile()` 이다.**
+둘이 다른 값이다. `code` 를 그대로 넘겨도 검사는 모두 통과한다.
+브라우저와 e2e 의 씨 데이터가 둘을 같은 값으로 두고 있어 운영에서만 남의 profile 을 읽는다.
 
 쓰기 권한은 이 클래스가 판정한다.
 
@@ -122,24 +161,26 @@ void putSoul(String profileName, String content)
 6. `putSoul` 로 쓴다
 7. 쓴 본문과 그 해시를 돌려준다
 
+**해시는 언제나 `readSoul` 이 돌려준 원문 그대로에 건다.** 공백을 떼고 걸지 않는다.
+`read` 와 `write` 가 다른 쪽을 고르면 줄바꿈으로 끝나는 `SOUL.md` 의 첫 저장이 언제나 `PERSONA_STALE` 이다.
+대역은 정확한 문자열을 돌려주므로 어느 검사도 이것을 잡지 못한다.
+7번이 돌려주는 해시도 쓴 본문 그대로에 건 것이다.
+
 **4번과 6번 사이에 트랜잭션이 없다.** 데이터베이스를 쓰지 않으므로 걸 것이 없고,
 그 사이에 다른 사람이 쓰면 그 글이 덮어쓰인다.
 가족 다섯이 쓰는 서비스에서 그 창이 실제로 문제가 될 만큼 넓지 않다고 보고 그대로 둔다.
 
-해시는 `agent_execution.instructions_hash` 와 같은 방식으로 만든다.
-그 코드가 어디 있는지 찾아 그 함수를 함께 쓴다. **새로 쓰지 말고 찾아 쓴다.**
-
-```bash
-# cwd: 저장소 root
-grep -rn "instructions_hash\|instructionsHash" backend/src/main/java
-```
+해시는 작업 항목 1 의 `Sha256.hex16` 으로 만든다.
 
 `baseHash` 가 비어 있을 때의 규칙이다.
 
 - 지금 본문이 있으면 `PERSONA_STALE`. 보지 않고 덮어쓰는 것을 막는다
 - 지금 본문이 없으면(`exists` 가 거짓이거나 공백뿐) 통과한다. 처음 쓰는 것이다
 
-### 4. `agent/presentation/AgentPersonaController.java`
+**화면은 언제나 `GET` 을 먼저 하므로 이 경로로 오지 않는다.**
+화면을 거치지 않고 부르는 쪽을 위한 규칙이다.
+
+### 5. `agent/presentation/AgentPersonaController.java`
 
 경로와 응답 모양은 `docs/code-architecture.md` 의 「경로」가 정한다.
 
@@ -156,7 +197,7 @@ grep -rn "instructions_hash\|instructionsHash" backend/src/main/java
 | 칸 | 뜻 |
 | --- | --- |
 | `body` | 지금 본문. 파일이 없으면 빈 문자열 |
-| `bodyHash` | 그 본문의 해시. 화면이 저장할 때 그대로 돌려보낸다 |
+| `bodyHash` | 그 본문의 해시. 화면이 저장할 때 그대로 돌려보낸다. **빈 본문에도 값이 있다** |
 | `editable` | 지금 요청자가 고칠 수 있는가 |
 | `maxChars` | 본문 상한. 화면이 남은 글자 수를 보인다 |
 
@@ -164,7 +205,10 @@ grep -rn "instructions_hash\|instructionsHash" backend/src/main/java
 `body` 는 `@NotBlank` 이고 `@Size(max = 8000)` 이다.
 상한은 `docs/code-architecture.md` 의 「페르소나」가 정한다.
 
-### 5. 오류 코드를 하나 더한다
+**`baseHash` 에 `@NotBlank` 를 붙이지 않는다.** 비어 있는 것이 뜻을 갖는 값이고
+그 규칙은 작업 항목 4 가 갖는다.
+
+### 6. 오류 코드를 하나 더한다
 
 `shared/error/ErrorCode.java` 에 더한다. 기존 이름 짓는 방식과 주석 방식을 따른다.
 
@@ -175,10 +219,14 @@ grep -rn "instructions_hash\|instructionsHash" backend/src/main/java
 **대시보드에 닿지 못한 것을 새 코드로 만들지 않는다.**
 `HermesCallFailure` 가 이미 `HERMES_UNAVAILABLE` 로 옮긴다.
 
-### 6. 이 phase 를 검증하는 테스트
+### 7. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/agent/PersonaServiceTest.java`
-`HermesDashboardClient` 를 대역으로 바꿔 넣는다.
+`HermesDashboardClient` 의 대역을 쓴다.
+
+**대역은 이미 있다.** `backend/src/test/java/com/bifos/assistant/hermes/StubHermesDashboardClient.java` 다.
+인터페이스에 메서드를 더하면 그 파일이 컴파일되지 않으므로 **함께 고친다.**
+받은 본문을 되읽을 수 있게 두어 검사가 무엇이 넘어갔는지 보게 한다.
 
 | 무엇 | 기대 |
 | --- | --- |
@@ -193,8 +241,16 @@ grep -rn "instructions_hash\|instructionsHash" backend/src/main/java
 | profile 이름이 규칙에 안 맞는다 | `putSoul` 이 대시보드를 부르지 않는다 |
 
 마지막 줄은 대역으로는 검증되지 않는다.
-**`HttpHermesDashboardClient` 를 대상으로 하는 검사로 따로 둔다.**
+**`backend/src/test/java/com/bifos/assistant/hermes/HermesDashboardRequestTest.java` 에 더한다.**
+그 파일이 이미 메서드와 경로와 본문과 토큰을 보는 검사다. 새 파일을 만들지 않는다.
 그 검사가 없으면 이름 검사를 통째로 지워도 테스트가 통과한다.
+
+같은 파일에 `readSoul` 과 `putSoul` 의 경로와 본문 검사도 더한다.
+
+| 무엇 | 기대 |
+| --- | --- |
+| `readSoul` | `GET {baseUrl}/api/profiles/{이름}/soul` 로 가고 토큰이 붙는다 |
+| `putSoul` | `PUT` 이고 본문이 `content` 한 칸이다 |
 
 `backend/src/test/java/com/bifos/assistant/agent/AgentPersonaControllerTest.java`
 
@@ -232,13 +288,14 @@ git status --short backend/src/main/resources/db/migration/
 
 ```bash
 # cwd: 저장소 root
-grep -rn "api/profiles" backend/src/main/java --include=*.java | grep -v HermesDashboardClient
+grep -rn "api/profiles" backend/src/main/java --include='*.java' | grep -v HermesDashboardClient
 ```
 
 ## Critical Files
 
 | 파일 | 변경 |
 |---|---|
+| `backend/src/main/java/com/bifos/assistant/shared/util/Sha256.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/dto/SoulDocument.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesProfileName.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesDashboardClient.java` | 수정 |
@@ -248,6 +305,8 @@ grep -rn "api/profiles" backend/src/main/java --include=*.java | grep -v HermesD
 | `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentPersonaController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/StubHermesDashboardClient.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/HermesDashboardRequestTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/PersonaServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentPersonaControllerTest.java` | 신규 |
 
