@@ -60,12 +60,12 @@ Control Plane 은 실행할 때 성격을 보내지 않는다. Hermes 가 자기
    `register_token_route` 는 경로 문자열이 같은지만 보므로 자리표시자로는 열리지 않는다.
    **되돌리기용 삭제 경로와 달리 이것은 계속 열려 있어야 한다.** 성격을 고치는 일은 반복된다.
    새 profile 이 생긴 뒤 그 이름의 경로가 언제 열리는지도 그 저장소가 정한다.
-2. `services/hermes-assistant/personas/` 의 `SOUL.md` 사본을 처분한다.
-   데이터베이스가 정본이 된 뒤 그 사본은 읽히지 않는다.
-   **이관이 끝난 profile 의 것부터 지운다.** 폐기된 profile 의 사본도 함께 본다.
-3. `default-SOUL.md` 를 어떻게 할지 정한다.
-   새 profile 은 `POST /api/profiles` 가 Hermes 기본 `SOUL.md` 를 넣으므로
-   이 저장소는 기본 본문을 갖지 않는다.
+2. **`default-SOUL.md` 는 그대로 둔다.** 옮기는 것은 사람이 쓴 성격뿐이다.
+   판이 없는 에이전트에는 아무것도 밀지 않으므로,
+   아직 아무도 성격을 쓰지 않은 profile 이 처음에 무엇을 들고 뜨는지는 그쪽이 계속 정한다.
+
+성격 사본을 담은 디렉터리의 처분은 여기서 하지 않는다.
+이관이 끝나야 지울 수 있고, 그 절차는 phase-03 의 「지금 도는 profile 의 이관」이 갖는다.
 
 ### 1. `hermes/HermesDashboardClient.java` 에 `putSoul` 을 더한다
 
