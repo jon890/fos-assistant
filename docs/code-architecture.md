@@ -27,8 +27,8 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `shared/auth` | 토큰 검사와 현재 사용자 |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `user` | 사용자과 첫 로그인 처리 |
-| `agent` | 에이전트 등록, 공개 범위, Hermes profile 연결, 모델 동기화 |
-| `hermes` | Runs API 호출과 profile key 조회 |
+| `agent` | 에이전트 등록, 공개 범위, Hermes profile 연결, 모델 동기화, 페르소나 |
+| `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름 |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회 |
 | `memory` | 개인과 가족 공용 Memory, 제안과 승인 |
@@ -109,6 +109,54 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 층을 나누는 근거는
 [`adr/ADR-015-memory-는-층을-나눠-싣는다.md`](adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.
 
+## 페르소나
+
+에이전트의 성격이다. Hermes 의 `SOUL.md` 에 들어가는 본문을 Control Plane 이 갖는다.
+정본은 `agent_persona` 표이고 `SOUL.md` 는 사본이다.
+근거는 [`adr/ADR-019-페르소나는-control-plane-이-갖고-hermes-에-민다.md`](adr/ADR-019-페르소나는-control-plane-이-갖고-hermes-에-민다.md) 에 있다.
+
+- 고치면 판이 하나 는다. 행을 고쳐 쓰지 않고 지우지도 않는다.
+- 저장하는 자리에서 Hermes 에 민다. 밀지 못해도 행은 남고 그 판이 미반영으로 보인다.
+- **판이 하나도 없는 에이전트에는 아무것도 밀지 않는다.** 그 에이전트는 홈서버 파일을 그대로 쓴다.
+- 실행을 시작할 때 마지막으로 반영된 판을 실행 줄에 적는다.
+  Hermes 가 읽는 것이 그 판이라 데이터베이스의 마지막 판과 다를 수 있다.
+- 본문 상한은 8000자다. 매 실행의 고정 프롬프트에 들어가므로 길이가 곧 비용이다.
+
+### 누가 고칠 수 있나
+
+| 무엇 | 누구 |
+| --- | --- |
+| 읽기 | 그 에이전트를 쓸 수 있는 사람. 목록에 보이는 것과 같은 기준이다 |
+| 쓰기 | 그 에이전트의 주인, 그리고 `ADMIN` |
+
+자기만 보는 에이전트는 주인이 자기 성격을 쓴다.
+가족이 함께 쓰는 에이전트는 `ADMIN` 만 고친다. 여럿이 함께 쓰는 글이기 때문이다.
+
+### 경로
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/agents/{code}/persona` | 지금 판의 본문과 반영 상태 |
+| `PUT /api/v1/agents/{code}/persona` | 새 판을 만들고 민다. 보고 있던 판 번호를 함께 받는다 |
+| `POST /api/v1/agents/{code}/persona/sync` | 판을 만들지 않고 마지막 판을 다시 민다 |
+| `GET /api/v1/agents/{code}/persona/revisions` | 판 목록 |
+| `GET /api/v1/agents/{code}/persona/revisions/{revision}` | 그 판의 본문 |
+
+**보고 있던 판 번호를 함께 받는 이유는 두 사람이 같은 에이전트를 고칠 수 있기 때문이다.**
+지금 판과 다르면 거절하고 화면이 새 본문을 다시 읽는다.
+나중에 고친 쪽이 앞사람의 글을 말없이 덮지 않게 한다.
+
+### 어느 클래스가 무엇을 하나
+
+| 무엇 | 어디 |
+| --- | --- |
+| 판을 만들고 고르는 규칙 | `agent/application` |
+| Hermes 에 미는 순서와 실패 처리 | `agent/application` |
+| `PUT /api/profiles/{이름}/soul` 호출 | `hermes` |
+
+**`agent` 가 순서를 알고 `hermes` 는 부르는 방법만 안다.**
+사람을 더할 때 `people` 과 `hermes` 를 나눈 것과 같은 규칙이다.
+
 ## 실행 사건
 
 Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execution_event` 에 적는다.
@@ -178,6 +226,8 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/usage` | 사용량 |
 | `/memory` | 개인과 가족 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
+| `/agents` | 내가 쓸 수 있는 에이전트 목록 |
+| `/agents/{code}` | 그 에이전트의 성격 |
 | `/admin/agents` | 에이전트 관리 |
 
 ### 사용량 화면의 절
@@ -225,6 +275,7 @@ web/src/
     chat/                 대화 화면의 부품
     usage/                사용량 화면의 부품
     execution/            실행 나무 화면의 부품
+    agent/                에이전트와 성격 화면의 부품
     admin/                관리 화면의 부품
   lib/                    Control Plane 호출과 형식 변환
 ```
