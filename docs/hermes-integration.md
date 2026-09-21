@@ -119,9 +119,42 @@ fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 
 `/v1/capabilities` 가 알리는 것도 같은 값이다. **두 칸은 같은 출처다.**
 
-**한 listener 가 접두로 여러 profile 을 서비스해도 이 값은 접두를 따라가지 않는다.**
+**`/v1/capabilities` 와 `/v1/runs` 에서는 한 listener 가 접두로 여러 profile 을
+서비스해도 이 값이 접두를 따라가지 않는다.**
 platform 을 만들 때 listener 주인의 범위에서 한 번 정해지기 때문이다.
 주인에게 `API_SERVER_MODEL_NAME` 이 없으면 셋째 단계인 `hermes-agent` 가 나온다.
+
+#### 경로마다 다르다
+
+세 경로가 같은 값을 주지 않는다.
+
+| 경로 | 무엇을 주는가 |
+| --- | --- |
+| `/v1/capabilities` | platform 을 만들 때 담아 둔 이름 하나 |
+| `/v1/runs` 응답 | 요청이 준 문자열. 주지 않았으면 위와 같은 이름 |
+| `/v1/models` | 접두가 있으면 그 자리에서 다시 정한다 |
+
+`_handle_models` 만 이름 정하는 함수를 다시 부른다.
+앞의 둘은 platform 을 만들 때 담아 둔 값을 그대로 쓴다.
+
+```python
+model_name = (
+    self._resolve_model_name("")
+    if _api_request_profile.get()
+    else self._model_name
+)
+```
+
+**그래서 접두를 따라가는 것은 `/v1/models` 뿐이다.**
+
+**다시 부를 때 넘기는 첫 인자가 비어 있다.**
+우선순위 1 인 `API_SERVER_MODEL_NAME` 을 건너뛰고 2 인 활성 profile 이름으로 간다.
+그러므로 `/v1/models` 가 주는 것은 그 profile 의 `API_SERVER_MODEL_NAME` 이 아니라
+그 profile 의 **이름**이다.
+두 값을 같게 적어 둔 배포에서는 구별되지 않으므로 관측만으로는 판정할 수 없다.
+
+**어느 경로도 실제로 쓴 provider 모델을 주지 않는다.**
+접두를 따라가는 경로가 주는 것도 profile 이름이지 모델 이름이 아니다.
 
 실제 모델을 알아야 하면 `/api/model/options` 가 그 profile 의 것을 답한다.
 
