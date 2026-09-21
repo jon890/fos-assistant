@@ -27,6 +27,7 @@ import {
 import { FAKE_DASHBOARD_TOKEN, startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
 import { authScenario } from "./scenarios/auth.ts";
 import { signInScenario } from "./scenarios/signin.ts";
+import { peopleScenario, NEW_PERSON } from "./scenarios/people.ts";
 import { meScenario } from "./scenarios/me.ts";
 import { bindingScenario, DAD_BINDING } from "./scenarios/binding.ts";
 import { agentsScenario } from "./scenarios/agents.ts";
@@ -66,6 +67,7 @@ const PRICING_CATALOG = join(
 const SCENARIOS: readonly Scenario[] = [
   authScenario,
   signInScenario,
+  peopleScenario,
   meScenario,
   bindingScenario,
   agentsScenario,
@@ -127,6 +129,8 @@ function startControlPlane(
       HERMES_PROFILE_KEY_DIR: keyDir,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
+      // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
+      HERMES_SHARED_LISTENER_BASE_URL: dashboardBaseUrl,
       ASSISTANT_PRICING_CATALOG: PRICING_CATALOG,
       SPRING_FLYWAY_ENABLED: "true",
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
@@ -177,6 +181,7 @@ async function main(): Promise<void> {
       tokens: {
         dad: mintToken("dad@example.com", JWT_SECRET),
         kid: mintToken("kid@example.com", JWT_SECRET),
+        aunt: mintToken(NEW_PERSON.email, JWT_SECRET),
         signin: mintSignInToken(JWT_SECRET),
       },
       hermesBaseUrl: hermes.baseUrl,

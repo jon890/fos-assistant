@@ -36,6 +36,14 @@ const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
 export const FAKE_DASHBOARD_TOKEN = "fake-dashboard-token";
 
 /**
+ * 그 profile 의 gateway 가 요청마다 검사하는 값이 들어오는 `.env` 칸의 이름이다.
+ *
+ * <p>대역이 key 를 스스로 만들지 않고 이 칸으로 들어온 값을 그대로 쓴다. 스스로 만들면 Control Plane
+ * 이 key 파일에 쓴 값과 어긋나 그 profile 의 실행이 401 을 받는다.
+ */
+const API_KEY_ENV_NAME = "API_SERVER_KEY";
+
+/**
  * 동시 실행 한도를 넘겼을 때 실제 Hermes 가 내는 본문이다.
  *
  * <p>공유 gateway 는 이 한도를 모든 profile 이 나눠 쓴다. 한 사람이 채우면 다른 사람이 이것을 받는다.
@@ -219,6 +227,14 @@ export function startFakeHermes(
   label?: string,
 ): Promise<FakeHermes> {
   const who = label === undefined ? "fake hermes" : `fake hermes ${label}`;
+  /**
+   * profile 이름과 그 profile 의 key 다.
+   *
+   * <p>미리 고정해 넘긴 것으로 시작하고, 대시보드로 새로 만들어진 profile 은 그 profile 의 `.env` 로
+   * 들어온 key 가 여기 더해진다. 받은 표를 그대로 쓰지 않고 복사하는 것은 부르는 쪽의 상수를 대역이
+   * 고치지 않게 하기 위해서다.
+   */
+  const keys: Record<string, string> = { ...profileKeys };
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
@@ -234,7 +250,7 @@ export function startFakeHermes(
   let lastSubmittedInstructions: string | undefined;
 
   const authorized = (request: IncomingMessage, profile: string): boolean => {
-    const expected = profileKeys[profile];
+    const expected = keys[profile];
     return expected !== undefined && request.headers.authorization === `Bearer ${expected}`;
   };
 
@@ -290,6 +306,9 @@ export function startFakeHermes(
         return true;
       }
       env[body.key] = body.value;
+      // 이 칸으로 들어온 값이 그 profile 의 key 가 된다. 대역이 스스로 만들면 Control Plane 이 key
+      // 파일에 쓴 값과 어긋나 그 profile 의 실행이 401 을 받는다.
+      if (body.key === API_KEY_ENV_NAME) keys[body.profile!] = body.value;
       send(response, 200, { profile: body.profile, key: body.key });
       return true;
     }
@@ -300,6 +319,7 @@ export function startFakeHermes(
         send(response, 404, { error: "no such profile" });
         return true;
       }
+      delete keys[name];
       send(response, 200, { name });
       return true;
     }

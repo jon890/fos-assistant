@@ -185,6 +185,8 @@ function startControlPlane(
       HERMES_PROFILE_KEY_DIR: keyDir,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
+      // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
+      HERMES_SHARED_LISTENER_BASE_URL: dashboardBaseUrl,
       ASSISTANT_PRICING_CATALOG: join(
         ROOT,
         "backend/src/test/resources/pricing/models-dev-sample.json",

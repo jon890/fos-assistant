@@ -18,6 +18,8 @@ export type Context = {
   readonly tokens: {
     readonly dad: string;
     readonly kid: string;
+    /** 화면에서 더해진 뒤 처음 들어오는 사람. 그 첫 요청에 사용자와 에이전트가 함께 생긴다 */
+    readonly aunt: string;
     readonly signin: string;
   };
   /** fake Hermes 가 듣고 있는 주소 */
