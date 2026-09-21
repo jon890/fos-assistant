@@ -75,6 +75,7 @@ class HermesDashboardRequestTest {
                         "keys",
                         baseUrl,
                         TOKEN,
+                        "https://hermes-listener.example.com",
                         Duration.ofMillis(10),
                         Duration.ofSeconds(1),
                         Duration.ofSeconds(1),
