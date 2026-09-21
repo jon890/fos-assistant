@@ -21,3 +21,5 @@ web/tsconfig.tsbuildinfo
 
 # 워커가 쓰는 워크트리
 worktrees/
+
+.idea
