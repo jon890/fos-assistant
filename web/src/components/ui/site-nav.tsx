@@ -25,7 +25,7 @@ export function SiteNav({ isAdmin }: { isAdmin: boolean }) {
     return () => window.removeEventListener("memory-proposal-count", update);
   }, []);
   const links = isAdmin
-    ? [...LINKS, { href: "/admin/agents", label: "에이전트 관리" }]
+    ? [...LINKS, { href: "/admin/agents", label: "에이전트 관리" }, { href: "/admin/people", label: "사람 관리" }]
     : LINKS;
   return (
     <nav aria-label="주요 화면" className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap sm:gap-3">

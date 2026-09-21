@@ -45,6 +45,10 @@ public class SecurityConfig {
                                         .permitAll()
                                         .requestMatchers("/api/v1/me")
                                         .permitAll()
+                                        // 로그인 판정은 아직 아무 사용자도 없는 시점에 돈다.
+                                        // 그 경로가 받는 토큰은 따로라 SignInController 가 직접 검사한다.
+                                        .requestMatchers("/api/v1/signin/allowed")
+                                        .permitAll()
                                         .anyRequest()
                                         .authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

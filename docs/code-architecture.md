@@ -330,6 +330,24 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 중간에 실패했을 때 되돌리는 역순이 그 패키지 하나에 있다.
 `hermes` 는 부르는 방법만 알고 순서를 모른다.
 
+### 첫 에이전트의 과금 설정은 `people` 이 갖는다
+
+첫 로그인에 만드는 에이전트의 `cost_mode` 와 `credential_scope` 를 설정에서 읽는다.
+
+| 설정 | 기본값 |
+| --- | --- |
+| `assistant.people.default-cost-mode` | `SUBSCRIPTION` |
+| `assistant.people.default-credential-scope` | `SHARED_HOUSEHOLD` |
+
+`people` 패키지가 갖는다. Hermes 를 부르는 값이 아니라 `hermes` 쪽에 두지 않는다.
+
+두 값이 사람마다 다르지 않은 근거는
+[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
+profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓴다.
+
+`provider` 와 `model` 은 설정에 두지 않는다. Hermes 에서 읽는다.
+읽지 못하면 에이전트를 만들지 않는다.
+
 ### key 를 두 곳에 같이 쓴다
 
 같은 값을 Hermes 의 `.env` 와 우리 key 디렉터리에 각각 쓴다.

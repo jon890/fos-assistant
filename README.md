@@ -55,8 +55,10 @@ Backend 는 `backend/src/main/resources/application.yml`, Web 은 `web/.env.exam
 | `ASSISTANT_JWT_SECRET` | 양쪽 | 웹이 발급하고 Control Plane 이 검증하는 토큰의 HMAC 비밀값 |
 | `HERMES_BASE_URL` | Backend | Hermes API server 주소 |
 | `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |
+| `HERMES_DASHBOARD_BASE_URL` | Backend | profile 을 만드는 Hermes 대시보드 주소 |
+| `HERMES_DASHBOARD_TOKEN` | Backend | 그 대시보드가 기계에게 여는 경로에 보낼 토큰 |
+| `HERMES_SHARED_LISTENER_BASE_URL` | Backend | profile 접두를 붙여 부르는 공유 listener 주소 |
 | `ASSISTANT_PRICING_CATALOG` | Backend | models.dev 가격표를 복사해 둔 파일. 없으면 비용을 비워 둔다 |
-| `ASSISTANT_ALLOWED_EMAILS` | Web | 로그인을 허용할 사용자 메일 주소 |
 
 AI credential 은 이 저장소와 데이터베이스 어디에도 두지 않는다.
 각 사용자의 credential 은 그 사람의 Hermes profile `.env` 안에만 있다.

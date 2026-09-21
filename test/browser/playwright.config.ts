@@ -5,7 +5,6 @@ import {
   AUTH_SECRET,
   CONTROL_PLANE_BASE_URL,
   JWT_SECRET,
-  TEST_EMAIL,
   WEB_BASE_URL,
   WEB_PORT,
 } from "./settings.ts";
@@ -46,7 +45,6 @@ export default defineConfig({
       AUTH_GOOGLE_SECRET: "browser-google-secret",
       AUTH_TRUST_HOST: "true",
       AUTH_URL: WEB_BASE_URL,
-      ASSISTANT_ALLOWED_EMAILS: `${TEST_EMAIL},empty@example.com`,
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       CONTROL_PLANE_BASE_URL,
     },

@@ -47,6 +47,9 @@ class HermesBusyTest {
                 keyStore,
                 new HermesProperties(
                         "keys",
+                        "https://hermes-dashboard.example.com",
+                        "test-dashboard-token",
+                        "https://hermes-listener.example.com",
                         Duration.ofMillis(10),
                         Duration.ofSeconds(1),
                         Duration.ofSeconds(2),

@@ -10,8 +10,18 @@ import type { FakeHermes } from "./fake-hermes.ts";
 export type Context = {
   /** Control Plane 의 `/api/v1` 까지의 주소 */
   readonly api: string;
-  /** 가족 구성원의 토큰. 먼저 부른 쪽이 admin 이 된다 */
-  readonly tokens: { readonly dad: string; readonly kid: string };
+  /**
+   * 가족 구성원의 토큰. 먼저 부른 쪽이 admin 이 된다.
+   *
+   * `signin` 은 로그인 판정 경로만 부르는 토큰이라 신원을 담지 않는다.
+   */
+  readonly tokens: {
+    readonly dad: string;
+    readonly kid: string;
+    /** 화면에서 더해진 뒤 처음 들어오는 사람. 그 첫 요청에 사용자와 에이전트가 함께 생긴다 */
+    readonly aunt: string;
+    readonly signin: string;
+  };
   /** fake Hermes 가 듣고 있는 주소 */
   readonly hermesBaseUrl: string;
   /** profile 마다 쓰는 API server key. 대역을 하나 더 띄우는 시나리오가 같은 값을 받아야 한다 */
@@ -47,14 +57,26 @@ export function expect(condition: boolean, message: string): void {
  * 누구인지 정하므로, 서명을 망가뜨린 토큰은 거절되어야 한다.
  */
 export function mintToken(email: string, secret: string): string {
+  return sign({ sub: email, name: email }, secret);
+}
+
+/**
+ * 웹이 로그인 판정을 물을 때 쓰는 토큰을 만든다.
+ *
+ * <p>아직 아무 사용자도 없는 시점에 쓰는 토큰이라 신원을 담지 않는다. 누구를 묻는지는 요청 본문이
+ * 적고, Control Plane 은 `purpose` 가 이 값인 것만 그 경로에서 받는다.
+ */
+export function mintSignInToken(secret: string): string {
+  return sign({ purpose: "signin" }, secret);
+}
+
+function sign(claims: Record<string, unknown>, secret: string): string {
   const base64url = (raw: Buffer | string): string =>
     Buffer.from(raw).toString("base64url");
 
   const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const now = Math.floor(Date.now() / 1000);
-  const payload = base64url(
-    JSON.stringify({ sub: email, name: email, iat: now, exp: now + 600 }),
-  );
+  const payload = base64url(JSON.stringify({ ...claims, iat: now, exp: now + 600 }));
   const signature = createHmac("sha256", secret)
     .update(`${header}.${payload}`)
     .digest("base64url");

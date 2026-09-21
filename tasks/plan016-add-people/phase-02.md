@@ -37,7 +37,21 @@ Hermes 쪽 plugin 이 없으면 대시보드가 401 을 돌려준다.
 그 plugin 이 `POST /api/profiles` 와 `PUT /api/env` 를 토큰으로 여는 자리를 만든다.
 key 디렉터리를 쓰기로 붙이는 것도 그 저장소가 한다.
 
-**둘 다 없어도 이 phase 를 끝낼 수 있다.** 테스트는 대역을 쓴다.
+#### 되돌리기에 쓰는 삭제 경로는 따로 열린다
+
+`DELETE /api/profiles/{이름}` 은 위 둘과 같이 열리지 않는다.
+`docs/hermes-integration.md` 의 「경로는 문자열이 정확히 같아야 한다」가
+맞는 토큰으로 불러도 401 이 오는 것을 실측으로 적었다.
+`register_token_route` 가 경로 문자열이 같은지만 보기 때문에
+`/api/profiles/<이름>` 은 그 이름마다 따로 등록해야 한다.
+
+ADR-018 이 그것을 **만든 직후에 그 이름만 등록하고 되돌린 뒤 거두는 것**으로 정했다.
+그 등록을 하는 것은 `fos-home-infra` 의 plugin 이다.
+
+**이것이 없으면 대역은 통과하고 운영에서만 되돌리기가 실패한다.**
+반만 만들어진 profile 이 남는다. 배포 요청에 이 선행 조건을 함께 적는다.
+
+**셋 다 없어도 이 phase 를 끝낼 수 있다.** 테스트는 대역을 쓴다.
 운영에서 실제로 도는 것은 phase-03 을 끝낸 뒤에 확인한다.
 
 ## 의도 메모
@@ -56,7 +70,21 @@ key 디렉터리를 쓰기로 붙이는 것도 그 저장소가 한다.
 
 대시보드를 부르는 한 벌이다. `hermes` 패키지에 둔다.
 
-같은 패키지의 `HttpHermesRunsClient` 가 `RestClient` 를 쓰는 방식을 그대로 따른다.
+**인터페이스와 구현으로 나눈다.** 같은 패키지의 `HermesRunsClient` 가 그 형태다.
+
+| 파일 | 무엇 |
+| --- | --- |
+| `HermesDashboardClient.java` | 인터페이스 |
+| `HttpHermesDashboardClient.java` | `RestClient` 로 실제로 부르는 구현 |
+| `backend/src/test/java/.../hermes/StubHermesDashboardClient.java` | 테스트가 쓰는 대역 |
+
+`hermes` 패키지가 이미 인터페이스와 `Http*` 구현으로 나뉘어 있다. 그 짜임을 따른다.
+
+**mockito 도 쓸 수 있다.** `spring-boot-starter-test` 가 끌고 오고
+`AgentModelSyncTest` 와 `AgentApiBaseUrlUpdateTest` 가 `mock(HermesModelClient.class)` 를 쓴다.
+인터페이스가 아닌 구체 클래스를 대역으로 바꿔야 할 때는 그 방식을 쓴다.
+
+`HttpHermesRunsClient` 가 `RestClient` 를 쓰는 방식을 그대로 따른다.
 실패를 오류 코드로 옮기는 것은 `HermesCallFailure` 가 이미 한다. 그것을 쓴다.
 
 낼 메서드 셋이다.
@@ -76,6 +104,20 @@ key 디렉터리를 쓰기로 붙이는 것도 그 저장소가 한다.
 
 **둘 다 기본값을 두지 않는다.** 비어 있으면 기동할 때 알아차려야 한다.
 `application.yml` 에는 환경 변수를 읽는 자리만 두고 값을 적지 않는다.
+지금 `hermes.profile-key-dir: ${HERMES_PROFILE_KEY_DIR}` 이 그 형태다.
+
+#### 그 형태로 두면 테스트가 기동하지 못한다
+
+`${...}` 를 풀 값이 없으면 백엔드 테스트와 `test/e2e/run.ts` 와 `test/browser` 가 모두 뜨지 못한다.
+**값을 주는 자리를 셋 다 함께 고친다.** `profile-key-dir` 이 이미 그렇게 되어 있다.
+
+| 파일 | 무엇 |
+| --- | --- |
+| `backend/src/test/resources/application-test.yml` | 두 값을 적는다 |
+| `test/e2e/run.ts` 의 `startControlPlane` | 넘기는 env 에 두 값을 더한다 |
+| `test/browser/fixtures.ts` 의 `startControlPlane` | 같다 |
+
+**실제 주소와 토큰을 적지 않는다.** 대역이 듣는 주소와 아무 값이나 쓴다.
 
 ### 2. `hermes/HermesProfileKeyStore.java` 에 쓰는 경로를 더한다
 
@@ -113,10 +155,11 @@ profile 하나를 끝까지 만드는 자리다. **순서와 되돌리기를 이
 `API_SERVER_ENABLED` 와 `API_SERVER_HOST` 와 `API_SERVER_PORT` 를 **넣으면 안 된다.**
 공유 listener 를 쓰는 profile 이 그 셋을 적으면 gateway 가 뜰 때
 `SecondaryPortBindingConfigError` 로 그 profile 을 건너뛴다.
-비공개 저장소 `fos-home-infra` 의 `enable-profile-api.sh` 가 그것을 실측으로 적어 두었고,
-그 스크립트도 공유 listener 를 쓸 때는 셋을 빼고 둘만 쓴다.
+근거는 `docs/hermes-integration.md` 의
+「공유 listener 를 쓰는 profile 에는 listener 설정을 넣지 않는다」가 갖는다.
 
-**이 셋을 넣지 않는 것을 테스트로 고정한다.** 실수로 들어가면 그 profile 이 조용히 빠진다.
+**이 셋을 넣지 않는 것을 테스트로 고정한다.**
+실수로 들어가면 그 profile 이 기동할 때 빠지고, 그 사람이 처음 대화할 때 발견된다.
 
 되돌리기는 만든 순서의 역순이다.
 
@@ -179,23 +222,28 @@ scripts/check-public-safe.sh
 
 ```bash
 # cwd: 저장소 root
-grep -rn "dashboardToken\s*=\s*\"" backend/src/main
+grep -rnE 'dashboardToken[[:space:]]*=[[:space:]]*"' backend/src/main
 ```
 
 ## Critical Files
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/java/com/bifos/assistant/hermes/HermesDashboardClient.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/hermes/HermesDashboardClient.java` | 신규 (인터페이스) |
+| `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesDashboardClient.java` | 신규 (구현) |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesProfileKeyStore.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesProperties.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/people/application/ProfileKeyFactory.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/people/application/HermesProfileProvisioner.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
+| `backend/src/test/resources/application-test.yml` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/StubHermesDashboardClient.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/people/HermesProfileProvisionerTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/hermes/HermesProfileKeyStoreTest.java` | 신규 |
-| `test/e2e/` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/hermes/HermesProfileKeyStoreTest.java` | 수정 (이미 있다) |
+| `test/e2e/fake-hermes.ts` | 수정 |
+| `test/e2e/run.ts` | 수정 |
+| `test/browser/fixtures.ts` | 수정 |
 
 ## 끝낸 뒤
 

@@ -43,6 +43,11 @@ assistant:
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}
 hermes:
   profile-key-dir: ${HERMES_PROFILE_KEY_DIR}
+  # profile 을 만드는 대시보드 주소와 그 대시보드에 보낼 토큰. 기본값을 두지 않아 없으면 기동에 실패한다
+  dashboard-base-url: ${HERMES_DASHBOARD_BASE_URL}
+  dashboard-token: ${HERMES_DASHBOARD_TOKEN}
+  # 모든 profile 을 /p/<profile> 로 받는 listener 의 주소. 첫 로그인에 만드는 에이전트가 이 주소를 쓴다
+  shared-listener-base-url: ${HERMES_SHARED_LISTENER_BASE_URL}
   poll-interval: 700ms
   run-timeout: 5m
 

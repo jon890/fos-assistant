@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
 import playwright, { type BrowserContext } from "../../web/node_modules/@playwright/test/index.js";
-import { startFakeHermes, type FakeHermes } from "../e2e/fake-hermes.ts";
+import { FAKE_DASHBOARD_TOKEN, startFakeHermes, type FakeHermes } from "../e2e/fake-hermes.ts";
 import {
   AUTH_SECRET,
   CONTROL_PLANE_BASE_URL,
@@ -167,7 +167,11 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
   }
 }
 
-function startControlPlane(keyDir: string, logPath: string): ChildProcess {
+function startControlPlane(
+  keyDir: string,
+  dashboardBaseUrl: string,
+  logPath: string,
+): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
     cwd: join(ROOT, "backend"),
@@ -179,6 +183,10 @@ function startControlPlane(keyDir: string, logPath: string): ChildProcess {
       SERVER_PORT: String(CONTROL_PLANE_PORT),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       HERMES_PROFILE_KEY_DIR: keyDir,
+      HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
+      HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
+      // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
+      HERMES_SHARED_LISTENER_BASE_URL: dashboardBaseUrl,
       ASSISTANT_PRICING_CATALOG: join(
         ROOT,
         "backend/src/test/resources/pricing/models-dev-sample.json",
@@ -216,7 +224,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
   try {
     hermes = await startFakeHermes(PROFILE_KEYS);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
-    app = startControlPlane(await writeProfileKeys(work), logPath);
+    app = startControlPlane(await writeProfileKeys(work), hermes.baseUrl, logPath);
     await waitForHealth(logPath);
     await seedAgents(hermes.baseUrl);
   } catch (error) {

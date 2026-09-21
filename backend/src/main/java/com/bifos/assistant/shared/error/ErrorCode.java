@@ -19,6 +19,20 @@ public enum ErrorCode {
     /** 바인딩은 있지만 이 호스트에 API key가 준비되지 않았다. */
     HERMES_PROFILE_KEY_MISSING(HttpStatus.CONFLICT),
     HERMES_BINDING_DISABLED(HttpStatus.CONFLICT),
+    /** 그 이름의 profile 이 Hermes 에 이미 있다. 덮지 않고 멈춘다. */
+    HERMES_PROFILE_EXISTS(HttpStatus.CONFLICT),
+    /** 그 메일 주소가 허용 목록에 이미 있다. 무엇이 겹쳤는지 화면이 말할 수 있게 따로 적는다. */
+    PERSON_EMAIL_TAKEN(HttpStatus.CONFLICT),
+    /** 그 profile 이름을 허용 목록이나 에이전트가 이미 쓴다. */
+    PERSON_PROFILE_TAKEN(HttpStatus.CONFLICT),
+    PERSON_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /**
+     * profile 을 만들다 실패해 만든 것을 되돌렸다.
+     *
+     * <p>되돌렸으므로 같은 이름으로 다시 시도할 수 있다. 되돌리기까지 실패한 경우는 이 코드가 아니라
+     * 원래 실패한 오류가 그대로 올라오고, 되돌리기 실패는 로그에만 남는다.
+     */
+    HERMES_PROVISION_FAILED(HttpStatus.BAD_GATEWAY),
     HERMES_RUN_FAILED(HttpStatus.BAD_GATEWAY),
     HERMES_RUN_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT),
     HERMES_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
