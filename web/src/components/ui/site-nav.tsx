@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 const LINKS = [
   { href: "/", label: "대화" },
+  { href: "/agents", label: "에이전트" },
   { href: "/memory", label: "기억" },
   { href: "/usage", label: "사용량" },
 ] as const;

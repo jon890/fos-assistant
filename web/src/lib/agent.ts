@@ -32,6 +32,22 @@ export type AdminAgent = {
   models: AgentModel[];
 };
 
+/** 가족 구성원이 쓸 수 있는 에이전트 한 줄이다. 관리 화면의 `AdminAgent` 보다 정보가 적다. */
+export type AgentView = {
+  code: string;
+  name: string;
+  model: string;
+  visibility: "PRIVATE" | "FAMILY";
+};
+
+/** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */
+export type PersonaView = {
+  body: string;
+  bodyHash: string;
+  editable: boolean;
+  maxChars: number;
+};
+
 export const PRIVATE_VISIBILITY: AdminAgent["visibility"] = "PRIVATE";
 export const FAMILY_VISIBILITY: AdminAgent["visibility"] = "FAMILY";
 

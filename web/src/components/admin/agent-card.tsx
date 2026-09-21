@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
@@ -80,6 +81,12 @@ export function AgentCard({
         <Button size="sm" variant="secondary" disabled={busy} onClick={() => onSyncModel(agent)}>
           모델 다시 읽기
         </Button>
+        <Link
+          href={`/agents/${agent.code}`}
+          className="inline-flex items-center justify-center rounded-md px-control-x-sm py-control-y-sm text-sm font-medium text-muted underline hover:text-foreground"
+        >
+          성격 보기
+        </Link>
       </div>
       <AgentModelList
         agentCode={agent.code}

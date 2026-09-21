@@ -18,6 +18,7 @@ const MESSAGES: Record<string, string> = {
   STREAM_INTERRUPTED: "응답 연결이 끊겼다. 실행은 계속될 수 있으니 잠시 뒤 대화 이력을 다시 확인한다.",
   CONVERSATION_NOT_FOUND: "대화를 찾지 못했다. 대화 목록으로 돌아가 다시 골라 주세요.",
   UNAUTHENTICATED: "로그인이 필요하다.",
+  PERSONA_STALE: "그 사이 다른 사람이 이 성격을 고쳤다. 최신 본문을 다시 불러왔다.",
 };
 
 export function describeError(code: string, fallback: string): string {
