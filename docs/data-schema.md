@@ -76,40 +76,6 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 공개 범위가 접근 권한을 정하는 이유는
 [ADR-007](adr/ADR-007-에이전트가-모델과-도구를-함께-정한다.md)에 있다.
 
-## agent_persona
-
-에이전트의 성격을 적은 글이다. **한 행이 한 판이고 고치면 새 행이 생긴다.**
-Hermes 의 `SOUL.md` 에 들어가는 본문이 여기 있다.
-
-| 칸 | 타입 | 뜻 |
-| --- | --- | --- |
-| `id` | BIGINT | |
-| `agent_id` | BIGINT | 어느 에이전트의 성격인가 |
-| `revision` | INT | 그 에이전트 안에서의 판 번호. 1부터 센다 |
-| `body` | TEXT | 본문. 8000자까지 받는다 |
-| `author_user_id` | BIGINT | 이 판을 쓴 사람 |
-| `created_at` | DATETIME(6) | |
-| `synced_at` | DATETIME(6) NULL | 이 판이 Hermes 에 들어간 시각. 비어 있으면 아직 아니다 |
-
-`agent_id` 와 `revision` 을 함께 유일하게 둔다.
-
-두 판을 갈라 본다.
-
-| 무엇 | 어느 행인가 |
-| --- | --- |
-| 지금 판 | 그 에이전트의 `revision` 이 가장 큰 행 |
-| 반영된 판 | `synced_at` 이 있는 행 중 `revision` 이 가장 큰 행 |
-
-**둘이 다르면 아직 반영되지 않은 것이다.** 반영 실패를 따로 적는 칸을 두지 않는다.
-다시 밀면 되고, 실패한 까닭은 로그가 갖는다.
-
-**행이 하나도 없는 에이전트에는 아무것도 밀지 않는다.**
-그 에이전트는 홈서버 파일의 `SOUL.md` 를 그대로 쓴다.
-빈 본문을 밀면 그 사람이 쓴 성격이 지워진다.
-
-행을 지우지 않는다. 옛 판으로 되돌리는 것도 그 본문으로 새 판을 만드는 것이다.
-근거는 [ADR-019](adr/ADR-019-페르소나는-control-plane-이-갖고-hermes-에-민다.md) 에 있다.
-
 ## conversation
 
 주고받는 하나의 스레드다.
@@ -169,7 +135,6 @@ Hermes 의 `SOUL.md` 에 들어가는 본문이 여기 있다.
 | `context_chars` | BIGINT NULL | 이 실행의 `instructions` 로 넣은 글자 수 |
 | `runtime_fingerprint` | VARCHAR(64) NULL | 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문. 그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있고, 그동안 사용량 화면의 지문 축은 빈 목록을 돌려준다 |
 | `instructions_hash` | VARCHAR(64) NULL | `instructions` 의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory 를 담고 있어 저장하지 않는다. 넣은 문맥이 없으면 비어 있다 |
-| `persona_revision_id` | BIGINT NULL | 이 실행이 쓴 페르소나 판. `agent_persona` 의 행을 가리킨다. 반영된 판이 없으면 비어 있고, 그때는 홈서버 파일의 `SOUL.md` 로 돈 것이다 |
 | `latency_ms` | BIGINT NULL | 끝나지 않은 실행은 비어 있다 |
 | `estimated_cost_micros` | BIGINT NULL | 공개 API 가격으로 환산한 금액. 통화 단위의 100만분의 1 |
 | `actual_cost_micros` | BIGINT NULL | 실제로 청구되는 금액. 구독 경로는 비어 있다 |
@@ -297,8 +262,8 @@ Hermes 가 보내기 시작하면 그때 채운다.
 
 사용자를 지우는 흐름은 아직 없다.
 
-페르소나도 지우지 않는다. 고치면 판이 하나 늘 뿐이고 옛 판은 남는다.
-실행 줄이 그 판을 가리키고 있고, 어느 성격으로 돈 실행인지 남아야 한다.
+페르소나는 이 데이터베이스에 없다. 본문은 그 profile 의 `SOUL.md` 가 갖는다.
+근거는 [ADR-019](adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
 
 허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
