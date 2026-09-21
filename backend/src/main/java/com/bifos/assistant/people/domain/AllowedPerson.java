@@ -94,4 +94,14 @@ public class AllowedPerson {
     public void disable() {
         this.enabled = false;
     }
+
+    /**
+     * 다시 들어올 수 있게 한다.
+     *
+     * <p>이미 만들어진 profile 과 에이전트는 그대로 두고 판정만 되돌린다. 막을 때 그 둘을 거두지 않기
+     * 때문에 다시 켜는 데 되살릴 것이 없다.
+     */
+    public void enable() {
+        this.enabled = true;
+    }
 }
