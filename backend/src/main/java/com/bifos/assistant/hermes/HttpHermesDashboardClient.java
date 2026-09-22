@@ -103,7 +103,15 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(SoulDocument.class);
-            return soul == null ? new SoulDocument("", false) : soul;
+            if (soul == null) {
+                // 아직 쓰지 않은 성격은 `exists=false` 인 본문으로 온다. 본문이 통째로 비어 오는 것은
+                // 그것과 다른 계약 위반이라서 「성격이 없다」로 바꾸지 않고 실패로 올린다.
+                log.warn("Hermes 대시보드가 SOUL.md 응답 본문을 주지 않았다 profile={}", profileName);
+                throw HermesCallFailure.of(
+                        new RestClientException("the dashboard returned an empty SOUL.md body"),
+                        "could not read the persona of this profile");
+            }
+            return soul;
         } catch (RestClientException ex) {
             log.warn("Hermes profile 의 SOUL.md 를 읽지 못했다 profile={}", profileName, ex);
             throw HermesCallFailure.of(ex, "could not read the persona of this profile");

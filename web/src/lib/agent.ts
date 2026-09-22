@@ -32,7 +32,7 @@ export type AdminAgent = {
   models: AgentModel[];
 };
 
-/** 가족 구성원이 쓸 수 있는 에이전트 한 줄이다. 관리 화면의 `AdminAgent` 보다 정보가 적다. */
+/** 사용자가 쓸 수 있는 에이전트 한 줄이다. 관리 화면의 `AdminAgent` 보다 정보가 적다. */
 export type AgentView = {
   code: string;
   name: string;

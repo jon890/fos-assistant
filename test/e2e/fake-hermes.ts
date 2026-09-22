@@ -304,7 +304,8 @@ export function startFakeHermes(
       if (request.method === "PUT") {
         const body = JSON.parse((await readBody(request)) || "{}") as { content?: string };
         souls.set(name, body.content ?? "");
-        send(response, 200, { content: body.content ?? "", exists: true });
+        // 실제 대시보드는 쓴 본문을 되돌려주지 않고 `{"ok": true}` 만 준다.
+        send(response, 200, { ok: true });
         return true;
       }
     }

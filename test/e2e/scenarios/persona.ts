@@ -31,6 +31,10 @@ export const personaScenario: Scenario = {
       context.hermes.soulOf(DAD_BINDING.profileName) === "차분하게 설명하는 성격이다",
       "대역이 받은 본문이 저장한 것과 다르다",
     );
+    expect(
+      context.hermes.soulOf("dad") === undefined,
+      "에이전트 code 를 profile 이름으로 넘겨 대시보드를 불렀다",
+    );
 
     step("다시 읽으면 저장한 본문이 온다");
     const reread = expectStatus(

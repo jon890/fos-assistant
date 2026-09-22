@@ -1,6 +1,7 @@
 /** 스트림 조각은 화면에만 쓰고, 최종 상태의 답과 실행 기록을 저장하는지 본다. */
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
+import { DAD_BINDING } from "./binding.ts";
 
 type ChatEvent = {
   type: "delta" | "tool" | "done" | "error";
@@ -89,7 +90,7 @@ export const streamingScenario: Scenario = {
     expect(done?.type === "done", `마지막 사건이 done 이 아니다: ${JSON.stringify(done)}`);
 
     const streamed = received.filter((item) => item.type === "delta").map((item) => item.text).join("");
-    const saved = `[fake hermes on profile dad] ${question}`;
+    const saved = `[fake hermes on profile ${DAD_BINDING.profileName}] ${question}`;
     expect(streamed !== saved, "스트림 조각과 저장할 답이 달라야 검사가 성립한다");
     await assertSaved(context, done!, saved);
 
@@ -109,7 +110,7 @@ export const streamingScenario: Scenario = {
     await assertSaved(
       context,
       interruptedDone!,
-      "[fake hermes on profile dad] 스트림 중단 검사",
+      `[fake hermes on profile ${DAD_BINDING.profileName}] 스트림 중단 검사`,
     );
 
     step("실행 하나를 나무로 조회하면 사건이 순서대로 들어 있다");

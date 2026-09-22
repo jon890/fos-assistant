@@ -29,22 +29,28 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /** 다른 곳에서 먼저 저장돼 다시 읽어 온 본문이다. 편집창의 글을 덮지 않고 나란히 보여 준다. */
+  const [serverBody, setServerBody] = useState<string | null>(null);
 
   const editable = initialPersona.editable;
   const maxChars = initialPersona.maxChars;
-  const remaining = maxChars - body.length;
-  const isEmpty = body.trim().length === 0;
+  // 백엔드가 앞뒤 공백을 떼고 저장하므로 화면도 다듬은 길이로 센다.
+  const trimmedLength = body.trim().length;
+  const remaining = maxChars - trimmedLength;
+  const isEmpty = trimmedLength === 0;
   const busy = saveState === "saving";
 
   function edit(value: string) {
     setBody(value);
     setSaveState("idle");
+    setError(null);
   }
 
   async function save() {
     setConfirming(false);
     setSaveState("saving");
     setError(null);
+    setServerBody(null);
     try {
       const response = await fetch(`/api/agents/${code}/persona`, {
         method: "PUT",
@@ -54,10 +60,11 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
       if (!response.ok) {
         const failure = (await response.json()) as ErrorPayload;
         if (failure.code === "PERSONA_STALE") {
+          // 쓰던 글을 덮지 않는다. 지문만 최신으로 바꾸고 서버 본문은 따로 보여 준다.
           const fresh = await readPersona(code);
           if (fresh !== null) {
-            setBody(fresh.body);
             setBodyHash(fresh.bodyHash);
+            setServerBody(fresh.body);
           }
         }
         setError(describeError(failure.code, failure.message));
@@ -69,7 +76,7 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
       setBodyHash(saved.bodyHash);
       setSaveState("saved");
     } catch {
-      setError(describeError("HERMES_UNAVAILABLE", "저장하지 못했다."));
+      setError(describeError("HERMES_UNAVAILABLE", "저장하지 못했습니다."));
       setSaveState("idle");
     }
   }
@@ -78,7 +85,7 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="mb-2 text-xl font-semibold">{name}</h1>
       <p className="mb-6 text-sm leading-6 text-muted">
-        이 에이전트가 대화마다 지키는 성격이다. 저장하면 곧바로 다음 대화부터 반영된다.
+        이 에이전트가 대화마다 지키는 성격입니다. 저장하면 곧바로 다음 대화부터 반영됩니다.
       </p>
       {isEmpty ? <p className="mb-3 text-sm text-muted">아직 성격을 쓰지 않았습니다.</p> : null}
       <textarea
@@ -95,11 +102,20 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
           {error}
         </p>
       ) : null}
+      {serverBody !== null ? (
+        <section className="mt-3 rounded-md border border-border p-3">
+          <h2 className="text-sm font-semibold">지금 저장되어 있는 성격</h2>
+          <p className="mt-1 text-xs text-muted">
+            쓰던 글은 위 편집창에 그대로 있습니다. 둘을 견주어 남길 내용을 정한 뒤 다시 저장해 주세요.
+          </p>
+          <pre className="mt-2 text-sm leading-6 whitespace-pre-wrap break-all">{serverBody}</pre>
+        </section>
+      ) : null}
       {saveState === "saved" ? <p className="mt-2 text-sm">저장되었습니다.</p> : null}
       {editable ? (
         <Button
           onClick={() => setConfirming(true)}
-          disabled={busy || remaining < 0}
+          disabled={busy || remaining < 0 || isEmpty}
           className="mt-4"
         >
           {busy ? "저장 중…" : "저장"}
