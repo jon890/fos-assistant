@@ -10,7 +10,6 @@ import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,8 +24,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class HermesProfileKeyStore {
-
-    private static final Pattern PROFILE_NAME = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
 
     /** 주인만 읽고 쓴다. 이 컨테이너 안의 다른 프로세스에게도 열지 않는다. */
     private static final FileAttribute<Set<PosixFilePermission>> OWNER_ONLY =
@@ -93,10 +90,11 @@ public class HermesProfileKeyStore {
      * profile 이름이 규칙에 맞는지 보고 key 파일 경로를 만든다.
      *
      * <p>읽을 때와 쓸 때가 같은 규칙을 쓴다. 규칙을 통과하지 않은 이름은 경로를 만들지 않으므로 key
-     * 디렉터리 밖으로 나갈 수 없다.
+     * 디렉터리 밖으로 나갈 수 없다. 규칙 자체는 {@link HermesProfileName} 이 갖는다. 대시보드 경로에
+     * 이름을 넣는 자리와 같은 것을 쓴다.
      */
     private Path keyFile(String profileName, ErrorCode code) {
-        if (profileName == null || !PROFILE_NAME.matcher(profileName).matches()) {
+        if (!HermesProfileName.isValid(profileName)) {
             throw new ApiException(code, "profile name is not a valid Hermes profile");
         }
         return keyDir.resolve(profileName);

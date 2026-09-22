@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.presentation;
 
+import com.bifos.assistant.agent.application.PersonaSnapshot;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentModelOption;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -12,6 +13,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -24,8 +26,40 @@ import java.util.List;
  */
 public final class AgentDtos {
 
+    /**
+     * 페르소나 본문의 상한이다.
+     *
+     * <p>매 실행의 고정 프롬프트에 그대로 들어가므로 길이가 곧 비용이다. 근거는 {@code
+     * docs/code-architecture.md} 의 「페르소나」가 갖는다.
+     */
+    public static final int PERSONA_MAX_CHARS = 8000;
+
     private AgentDtos() {
     }
+
+    /**
+     * 에이전트의 성격 화면이 받는 것이다.
+     *
+     * @param body 지금 본문. 파일이 없으면 빈 문자열
+     * @param bodyHash 그 본문의 지문. 저장할 때 그대로 돌려보낸다. 빈 본문에도 값이 있다
+     * @param editable 지금 요청자가 고칠 수 있는가
+     * @param maxChars 본문 상한. 화면이 남은 글자 수를 보인다
+     */
+    public record PersonaView(String body, String bodyHash, boolean editable, int maxChars) {
+        static PersonaView from(PersonaSnapshot snapshot) {
+            return new PersonaView(
+                    snapshot.body(), snapshot.bodyHash(), snapshot.editable(), PERSONA_MAX_CHARS);
+        }
+    }
+
+    /**
+     * 성격을 쓰는 요청이다.
+     *
+     * @param baseHash 화면이 받아 간 본문의 지문. 비어 있는 것이 뜻을 갖는 값이라 필수로 두지 않는다.
+     *     비었을 때의 규칙은 {@code PersonaService} 가 갖는다
+     */
+    public record WritePersonaRequest(
+            @NotBlank @Size(max = PERSONA_MAX_CHARS) String body, String baseHash) {}
 
     public record AgentView(String code, String name, String model, String visibility) {
         static AgentView from(Agent agent) {

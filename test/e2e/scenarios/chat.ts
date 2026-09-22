@@ -1,5 +1,6 @@
 /** 대화 한 번이 Hermes 까지 갔다 오고, 남의 대화는 읽히지 않는 것을 본다. */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
+import { DAD_BINDING } from "./binding.ts";
 
 /** 대화 두 번을 보낸다. 사용량 시나리오가 그 횟수로 합계를 검사한다. */
 export const CHAT_TURNS = 2;
@@ -40,7 +41,7 @@ export const chatScenario: Scenario = {
       next.conversationId === first.conversationId,
       "이어 보낸 메시지가 다른 대화로 갔다",
     );
-    expect(next.assistantText.includes("profile dad"), "이어지는 대화가 처음 에이전트를 유지하지 않았다");
+    expect(next.assistantText.includes(`profile ${DAD_BINDING.profileName}`), "이어지는 대화가 처음 에이전트를 유지하지 않았다");
 
     step("다른 사용자는 그 대화를 읽지 못한다");
     expectStatus(

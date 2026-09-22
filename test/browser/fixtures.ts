@@ -32,12 +32,36 @@ export const MODELS_AGENT_CODE = "browsermodels";
 /** 막혀서 넘어가는 검사 전용이다. 여기서만 막힌 provider 를 만든다. */
 export const SWITCH_AGENT_CODE = "browserswitch";
 
+/** 성격을 읽고 쓰는 검사 전용이다. `TEST_EMAIL` 이 주인이라 admin 세션이 언제나 고칠 수 있다. */
+export const PERSONA_AGENT_CODE = "browserpersona";
+
+/**
+ * 「고칠 수 없는 에이전트」 검사가 잠깐 가족에게 공개하는 에이전트다.
+ *
+ * <p>씨 뿌릴 때는 다른 에이전트와 같이 `PRIVATE` 이고 주인이 `TEST_EMAIL` 이다. 그 검사가
+ * `setAgentVisibility` 로 `FAMILY` 로 바꿔 `MEMBER` 세션에서 읽기 전용으로 열고, 끝나면 되돌린다.
+ * 여기서 바로 `FAMILY` 로 씨 뿌리면 관리 화면에 가족 공개 에이전트가 하나 늘어, 정확히 하나만
+ * 있다고 가정하는 `identity.spec.ts` 가 어긋난다.
+ */
+export const PERSONA_FAMILY_AGENT_CODE = "browserpersonafamily";
+
+/**
+ * 본문이 비어 있는 채로 두는 검사 전용이다.
+ *
+ * <p>다른 성격 검사가 저장을 걸어 두면 이 에이전트까지 함께 비어 있지 않게 될 수 있어 따로 둔다. 이
+ * 에이전트에는 끝까지 아무도 쓰지 않는다.
+ */
+export const PERSONA_EMPTY_AGENT_CODE = "browserpersonaempty";
+
 /** profile 이름과 그 profile 의 key 다. 가짜 Hermes 와 key 디렉터리가 같은 표를 쓴다. */
 const PROFILE_KEYS: Record<string, string> = {
   browser: "browser-profile-key",
   browserflow: "browser-flow-profile-key",
   browsermodels: "browser-models-profile-key",
   browserswitch: "browser-switch-profile-key",
+  browserpersona: "browser-persona-profile-key",
+  browserpersonafamily: "browser-persona-family-profile-key",
+  browserpersonaempty: "browser-persona-empty-profile-key",
 };
 
 export type FakeHermesControl = {
@@ -72,6 +96,36 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
 /** 가짜 Hermes 가 듣고 있는 주소다. 에이전트 주소를 고치는 검사가 이 값으로 새 주소를 만든다. */
 export async function hermesBaseUrl(): Promise<string> {
   return (await readFile(HERMES_CONTROL_PATH, "utf-8")).trim();
+}
+
+/**
+ * admin 세션과 무관하게 그 에이전트의 공개 범위를 직접 바꾼다.
+ *
+ * <p>브라우저의 세션 쿠키를 보지 않고 Control Plane 을 바로 부른다. 검사가 `setSession` 으로 세션을
+ * `MEMBER` 로 바꾼 뒤에도 이 함수로 원래 범위를 되돌릴 수 있어야 하기 때문이다.
+ */
+export async function setAgentVisibility(
+  code: string,
+  visibility: "PRIVATE" | "FAMILY",
+  ownerEmail: string | null,
+): Promise<void> {
+  const token = await new SignJWT({ name: "브라우저 테스트" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(TEST_EMAIL)
+    .setIssuedAt()
+    .setExpirationTime("2m")
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents/${code}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ enabled: true, visibility, ownerEmail }),
+  });
+  if (!response.ok) {
+    throw new Error(`에이전트 공개 범위를 바꾸지 못했다: ${code} ${response.status} ${await response.text()}`);
+  }
 }
 
 export async function setSession(
@@ -133,12 +187,20 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
   for (const agent of [
-    { code: "browser", name: "브라우저 비서", profile: "browser", flow: null },
+    { code: "browser", name: "브라우저 비서", profile: "browser", flow: null, visibility: "PRIVATE" as const },
     // 흐름 검사 전용이다. 하나만 두면 흐름이 붙지 않은 대화를 함께 검사할 수 없다.
-    { code: FLOW_AGENT_CODE, name: "흐름 비서", profile: "browserflow", flow: "research-and-build" },
+    { code: FLOW_AGENT_CODE, name: "흐름 비서", profile: "browserflow", flow: "research-and-build", visibility: "PRIVATE" as const },
     // 모델 목록과 넘김을 고치는 검사 전용이다. 다른 검사가 쓰는 에이전트와 섞이지 않게 나눈다.
-    { code: MODELS_AGENT_CODE, name: "모델 목록 비서", profile: "browsermodels", flow: null },
-    { code: SWITCH_AGENT_CODE, name: "넘김 비서", profile: "browserswitch", flow: null },
+    { code: MODELS_AGENT_CODE, name: "모델 목록 비서", profile: "browsermodels", flow: null, visibility: "PRIVATE" as const },
+    { code: SWITCH_AGENT_CODE, name: "넘김 비서", profile: "browserswitch", flow: null, visibility: "PRIVATE" as const },
+    // 성격을 읽고 쓰는 검사 전용이다. 주인이 TEST_EMAIL 이라 admin 세션이 언제나 고칠 수 있다.
+    { code: PERSONA_AGENT_CODE, name: "성격 비서", profile: "browserpersona", flow: null, visibility: "PRIVATE" as const },
+    // 가족에게 공개할 에이전트다. 검사가 실행 중에만 FAMILY 로 바꿨다 되돌린다. 여기서 바로 FAMILY 로
+    // 씨 뿌리면 관리 화면에 "가족 공개로 변경"/"나만으로 변경" 단추가 하나 더 생겨, 정확히 하나만
+    // 있다고 가정하는 identity.spec.ts 가 어긋난다.
+    { code: PERSONA_FAMILY_AGENT_CODE, name: "가족 성격 비서", profile: "browserpersonafamily", flow: null, visibility: "PRIVATE" as const },
+    // 본문이 비어 있는 채로 두는 검사 전용이다.
+    { code: PERSONA_EMPTY_AGENT_CODE, name: "빈 성격 비서", profile: "browserpersonaempty", flow: null, visibility: "PRIVATE" as const },
   ]) {
     const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents`, {
       method: "POST",
@@ -154,8 +216,8 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
         provider: "openai-codex",
         costMode: "SUBSCRIPTION",
         credentialScope: "SHARED_HOUSEHOLD",
-        visibility: "PRIVATE",
-        ownerEmail: TEST_EMAIL,
+        visibility: agent.visibility,
+        ownerEmail: agent.visibility === "PRIVATE" ? TEST_EMAIL : null,
         flow: agent.flow,
       }),
     });

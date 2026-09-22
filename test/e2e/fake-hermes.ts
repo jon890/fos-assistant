@@ -18,6 +18,11 @@ const CAPABILITIES_PATH = /^\/p\/([a-z0-9-]+)\/v1\/capabilities$/;
 /** 대시보드의 profile 관리 경로다. 실행 경로와 달리 profile 접두가 붙지 않는다. */
 const PROFILES_PATH = "/api/profiles";
 const PROFILE_PATH = /^\/api\/profiles\/(.+)$/;
+/**
+ * 성격 경로다. `PROFILE_PATH` 보다 앞에서 검사해야 한다. `PROFILE_PATH` 의 `.+` 가
+ * `<이름>/soul` 까지 함께 먹어 이 경로를 DELETE 분기로 잘못 보낸다.
+ */
+const SOUL_PATH = /^\/api\/profiles\/([^/]+)\/soul$/;
 const ENV_PATH = "/api/env";
 const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)$/;
 const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
@@ -209,6 +214,8 @@ export type FakeHermes = {
   profiles(): string[];
   /** 그 profile 의 `.env` 에 들어간 값이다. 없는 profile 이면 비어 있다. */
   profileEnv(name: string): Record<string, string>;
+  /** 그 profile 의 `SOUL.md` 본문을 대역이 실제로 받은 그대로 돌려준다. 쓴 적이 없으면 `undefined` 다. */
+  soulOf(name: string): string | undefined;
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -239,6 +246,13 @@ export function startFakeHermes(
   const sessions = new Map<string, Session>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
   const profiles = new Map<string, Record<string, string>>();
+  /**
+   * profile 이름과 그 profile 의 `SOUL.md` 본문이다.
+   *
+   * <p>`profiles` 와 따로 둔다. 씨 뿌린 에이전트는 `profiles` 에 없고 `keys` 에만 있어서, `profiles`
+   * 로 존재를 판정하면 기존 에이전트가 404 를 받아 `HERMES_UNAVAILABLE` 이 된다.
+   */
+  const souls = new Map<string, string>();
   const blockedProviders = new Set<string>();
   let busy = false;
   let submitCount = 0;
@@ -269,6 +283,7 @@ export function startFakeHermes(
     response: ServerResponse,
     path: string,
   ): Promise<boolean> => {
+    const soulMatch = SOUL_PATH.exec(path);
     const profileMatch = PROFILE_PATH.exec(path);
     const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || profileMatch !== null;
     if (!isDashboardPath) return false;
@@ -276,6 +291,23 @@ export function startFakeHermes(
     if (!dashboardAuthorized(request)) {
       send(response, 401, { reason: "no_token" });
       return true;
+    }
+
+    // `PROFILE_PATH` 의 `.+` 가 이 경로도 함께 먹으므로 그 분기보다 앞에서 처리한다.
+    if (soulMatch !== null) {
+      const name = decodeURIComponent(soulMatch[1]!);
+      if (request.method === "GET") {
+        const content = souls.get(name);
+        send(response, 200, { content: content ?? "", exists: content !== undefined });
+        return true;
+      }
+      if (request.method === "PUT") {
+        const body = JSON.parse((await readBody(request)) || "{}") as { content?: string };
+        souls.set(name, body.content ?? "");
+        // 실제 대시보드는 쓴 본문을 되돌려주지 않고 `{"ok": true}` 만 준다.
+        send(response, 200, { ok: true });
+        return true;
+      }
     }
 
     if (request.method === "POST" && path === PROFILES_PATH) {
@@ -587,6 +619,7 @@ export function startFakeHermes(
         submitCount: () => submitCount,
         profiles: () => [...profiles.keys()],
         profileEnv: (name: string) => ({ ...(profiles.get(name) ?? {}) }),
+        soulOf: (name: string) => souls.get(name),
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {

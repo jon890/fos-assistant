@@ -3,7 +3,8 @@ import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 
 /** 이 바인딩의 provider 와 모델이 사용량 시나리오의 환산 금액을 정한다. */
 export const DAD_BINDING = {
-  profileName: "dad",
+  // 에이전트 code(`dad`) 와 일부러 다르게 둔다. 둘이 같으면 대시보드에 code 를 넘겨도 검사가 통과한다.
+  profileName: "dad-profile",
   provider: "openai-codex",
   model: "gpt-5.5",
 } as const;

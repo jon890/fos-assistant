@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.hermes.dto.SoulDocument;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;
@@ -47,6 +48,8 @@ class HermesDashboardRequestTest {
                             new String(
                                     exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] payload = responseBody.getBytes(StandardCharsets.UTF_8);
+            // 대시보드는 JSON 으로 답한다. 이 머리글이 없으면 응답을 읽는 호출만 변환기를 찾지 못한다.
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, payload.length);
             exchange.getResponseBody().write(payload);
             exchange.close();
@@ -118,6 +121,46 @@ class HermesDashboardRequestTest {
             assertThat(call.path()).isEqualTo("/api/profiles/kid");
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
         });
+    }
+
+    @Test
+    void SOUL_을_읽을_때_그_이름이_경로에_붙는다() {
+        respondWith(200, "{\"content\":\"너는 아빠다\",\"exists\":true}");
+
+        SoulDocument soul = client.readSoul("kid");
+
+        assertThat(soul).isEqualTo(new SoulDocument("너는 아빠다", true));
+        assertThat(calls).singleElement().satisfies(call -> {
+            assertThat(call.method()).isEqualTo("GET");
+            assertThat(call.path()).isEqualTo("/api/profiles/kid/soul");
+            assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
+        });
+    }
+
+    @Test
+    void SOUL_을_쓸_때_본문이_content_한_칸이다() {
+        client.putSoul("kid", "너는 아빠다");
+
+        assertThat(calls).singleElement().satisfies(call -> {
+            assertThat(call.method()).isEqualTo("PUT");
+            assertThat(call.path()).isEqualTo("/api/profiles/kid/soul");
+            assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
+            assertThat(call.body()).isEqualTo("{\"content\":\"너는 아빠다\"}");
+        });
+    }
+
+    @Test
+    void 규칙에_맞지_않는_profile_이름은_대시보드를_부르지_않는다() {
+        assertThatThrownBy(() -> client.readSoul("../etc"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThatThrownBy(() -> client.putSoul("Kid/soul", "너는 아빠다"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+
+        assertThat(calls).isEmpty();
     }
 
     @Test

@@ -54,6 +54,13 @@ public enum ErrorCode {
     ORCHESTRATION_CONTRACT_BROKEN(HttpStatus.BAD_GATEWAY),
     /** 흐름의 한 단계가 실패했다. 어느 단계인지는 실행 줄의 {@code error_code} 가 적는다. */
     ORCHESTRATION_STEP_FAILED(HttpStatus.BAD_GATEWAY),
+    /**
+     * 화면이 보고 있던 본문이 지금 본문이 아니다.
+     *
+     * <p>{@code SOUL.md} 에는 판 번호가 없어 값으로만 달라진 것을 안다. 쓰기 직전에 다시 읽어 화면이
+     * 받아 간 지문과 다르면 거절하고, 화면이 새 본문을 다시 읽는다.
+     */
+    PERSONA_STALE(HttpStatus.CONFLICT),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 

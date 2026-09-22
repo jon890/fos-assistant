@@ -900,6 +900,7 @@ v0.21.0 의 `hermes_cli/web_routers/profiles.py` 를 읽고 실제로 불러 확
 | `POST /api/profiles` | profile 을 만든다 |
 | `PATCH /api/profiles/{name}` | 이름을 바꾼다 |
 | `DELETE /api/profiles/{name}` | profile 과 wrapper 와 gateway 서비스를 지운다 |
+| `GET /api/profiles/{name}/soul` | `SOUL.md` 를 읽는다 |
 | `PUT /api/profiles/{name}/soul` | `SOUL.md` 를 쓴다 |
 | `PUT /api/env` | 본문의 `profile` 이 가리키는 profile 의 `.env` 에 한 줄을 쓴다 |
 
@@ -968,6 +969,24 @@ plugin 디렉터리 하나와 `plugins.enabled` 한 줄이 전부다.
 API server 쪽에는 `register_platform_handler("api_server", factory)` 가 있지만
 대시보드 웹서버에는 대응하는 자리가 없다.
 그래서 plugin 이 할 수 있는 것은 이미 있는 경로를 기계에게 여는 것까지다.
+
+### `SOUL.md` 를 읽고 쓰는 두 경로
+
+v0.21.0 의 `hermes_cli/web_routers/profiles.py` 와 `hermes_cli/web_models.py` 를 읽어 확인했다.
+
+| 경로 | 본문 | 응답 |
+| --- | --- | --- |
+| `GET /api/profiles/{name}/soul` | 없다 | `content` 와 `exists` |
+| `PUT /api/profiles/{name}/soul` | `content` 하나. 문자열이고 필수다 | `ok` |
+
+`GET` 은 파일이 없으면 `content` 를 빈 문자열로 두고 `exists` 를 거짓으로 돌려준다.
+읽다가 실패하면 500 이고, 그때는 빈 본문이 아니라 오류가 온다.
+
+`PUT` 은 받은 `content` 로 파일 전체를 바꾼다. 일부를 고치는 것이 아니다.
+임시 파일에 쓰고 fsync 한 뒤 원본 자리에 옮기므로, 쓰다가 끊겨도 앞 내용이 반쯤 남지 않는다.
+
+**읽는 경로가 있다.** 이 저장소가 앞서 「쓰는 경로만 있다」 로 적어 그 위에 설계를 세운 적이 있다.
+근거로 삼은 것이 코드가 아니라 이 문서의 표였고, 그 표에 `GET` 이 빠져 있었다.
 
 ### `POST /api/profiles` 가 실제로 만드는 것
 
