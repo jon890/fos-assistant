@@ -279,6 +279,29 @@ compact constructor 가 비었는지 확인해 예외를 던진다.**
 
 **검사는 그 메서드를 직접 불러서 한다.** 일정이 돌기를 기다리지 않는다.
 
+### 8-2. 첫 사진을 올릴 때 빈 대화를 만든다
+
+새 대화는 지금 첫 메시지를 보낼 때 생긴다. 올리는 경로에는 대화 번호가 필요하므로
+**그대로면 새 대화의 첫 메시지에 사진을 붙일 수 없다.**
+사진을 올리며 무엇을 해 달라고 하는 것이 이 기능의 주 용도라서 그 경우를 막으면 안 된다.
+
+**`POST /api/v1/chat/conversations` 를 더한다.** 본문은 `agentCode` 하나이고 대화 번호를 돌려준다.
+
+- `ChatController` 에 두고 요청과 응답 record 는 `ChatDtos.java` 에 둔다
+- `ChatService.startEmpty(CurrentUser, String agentCode)` 가 만든다.
+  에이전트를 고르는 판정은 지금 `resolveConversation` 이 새 대화를 만들 때 쓰는 것을 그대로 쓴다.
+  `requireReadable`, `enabled` 확인이 그것이다. 새로 만들지 않고 한 메서드로 뽑아 둘이 함께 쓴다
+- 그 에이전트가 첨부를 받지 않으면 `VALIDATION_FAILED` 다. 흐름이 붙은 에이전트가 그렇다.
+  판정은 `agent/domain/Agent.java` 에 `acceptsAttachments()` 하나로 둔다. 흐름이 비어 있으면 참이다.
+  phase-02 의 거절과 화면용 칸도 이 메서드를 부른다. 조건이 한 곳에만 있게 한다
+  이 경로는 사진을 올리려고만 쓰므로 받지 않는 에이전트에 빈 대화를 남기지 않는다
+- **제목은 비워 둔다.** 빈 문자열로 만든다
+- 그 대화에 첫 메시지가 오면 제목이 비어 있을 때만 지금 규칙(`titleFrom`)으로 채운다.
+  `Conversation` 에 `titleIfBlank(String)` 을 더한다. 제목을 정하는 규칙은 지금 것 하나다
+
+만들고 메시지를 보내지 않은 대화도 목록에 남는다. 제목이 비어 있으므로 화면이 「새 대화」 로 보인다.
+화면은 phase-03 이 한다.
+
 ### 9. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/chat/AttachmentServiceTest.java`
@@ -298,6 +321,16 @@ compact constructor 가 비었는지 확인해 예외를 던진다.**
 | 보낸 10장이 있는 대화에 새로 한 장을 올린다 | 성공한다. 묶이지 않은 것만 센다 |
 | `requireAttachable` 에 남의 것, 묶인 것, 지워진 것, 없는 번호 | 넷 모두 `VALIDATION_FAILED` |
 | `attach` 로 이미 묶인 첨부를 다시 묶는다 | `VALIDATION_FAILED`. 처음 묶인 메시지를 그대로 가리킨다 |
+
+`backend/src/test/java/com/bifos/assistant/chat/EmptyConversationTest.java`
+
+| 무엇 | 기대 |
+| --- | --- |
+| 쓸 수 있는 에이전트로 빈 대화를 만든다 | 대화가 생기고 제목이 비어 있다. 메시지는 없다 |
+| 그 대화에 첫 메시지를 보낸다 | 제목이 그 글로 채워진다 |
+| 둘째 메시지를 보낸다 | 제목이 바뀌지 않는다 |
+| 읽을 수 없는 에이전트, 꺼진 에이전트 | 지금 새 대화를 만들 때와 같은 오류다 |
+| 흐름이 붙은 에이전트 | `VALIDATION_FAILED`. 대화가 생기지 않았다 |
 
 파일 쓰기 실패는 그 대화 번호 자리에 일반 파일을 먼저 만들어 두어 디렉터리를 만들지 못하게 해서 일으킨다.
 
@@ -369,6 +402,10 @@ grep -rln "Paths.get\|Path.of" backend/src/main/java/com/bifos/assistant/chat | 
 | `test/browser/fixtures.ts` | 수정. 환경 변수 하나 |
 | `backend/src/test/java/com/bifos/assistant/chat/AttachmentServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/AttachmentUploadLimitTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/EmptyConversationTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java` | 수정. 빈 대화를 만드는 경로 |
+| `backend/src/main/java/com/bifos/assistant/chat/domain/Conversation.java` | 수정. `titleIfBlank` |
+| `backend/src/main/java/com/bifos/assistant/agent/domain/Agent.java` | 수정. `acceptsAttachments()` |
 | `backend/src/test/java/com/bifos/assistant/chat/AttachmentCleanerTest.java` | 신규 |
 
 ## 끝낸 뒤

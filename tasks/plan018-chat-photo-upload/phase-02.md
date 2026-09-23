@@ -71,7 +71,8 @@ grep -rn "conversationId" backend/src/main/java/com/bifos/assistant/chat/present
 **하나라도 거절되면 메시지가 저장되지 않고 대화도 새로 생기지 않는다.** 그래서 순서가 정해진다.
 
 1. 첨부가 있는데 `conversationId` 가 비었으면 `VALIDATION_FAILED`.
-   새 대화에는 아직 첨부가 있을 수 없다. `resolveConversation` 이 대화를 만들기 전에 판정한다
+   첨부는 대화에 올리므로 첨부가 있으면 대화 번호도 있다. 화면은 첫 사진을 올릴 때
+   phase-01 의 빈 대화 경로로 번호를 먼저 받는다. `resolveConversation` 이 대화를 만들기 전에 판정한다
 2. `route` 로 대화와 에이전트를 정한다
 3. 첨부가 있는데 그 에이전트에 흐름이 붙었으면 `VALIDATION_FAILED`.
    흐름은 `runTurn` 을 거치지 않아 사진 자리를 덧붙일 수 없다. 오류 없이 무시되게 두지 않는다
@@ -153,7 +154,7 @@ grep -rn "conversations" backend/src/main/java/com/bifos/assistant/chat/presenta
 대화 화면은 `/api/v1/agents` 로 사용자용 `AgentView` 를 받는다. 거기에는 흐름 여부가 없다.
 `agent/presentation/AgentDtos.java` 의 `AgentView` 에 `acceptsAttachments` 참거짓 칸을 더한다.
 그 에이전트에 흐름이 붙지 않았으면 참이다. 흐름 이름 자체는 내보내지 않는다.
-판정은 위 2번의 거절과 같은 조건을 쓴다. 두 곳이 서로 다른 조건을 갖지 않게 한다.
+값은 phase-01 이 만든 `Agent.acceptsAttachments()` 다. 위 2번의 거절도 그 메서드를 부른다.
 
 ### 5. 이 phase 를 검증하는 테스트
 

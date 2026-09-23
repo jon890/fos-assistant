@@ -184,6 +184,9 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 `POST /api/v1/chat/messages` 가 첨부 번호 목록을 함께 받는다.
 
+새 대화에서 첫 사진을 올리려면 대화 번호가 먼저 있어야 한다.
+`POST /api/v1/chat/conversations` 가 제목이 빈 대화를 만들고, 제목은 첫 메시지가 정한다.
+
 ### 에이전트에게 알리는 법
 
 **사용자가 쓴 메시지를 고치지 않는다.** `chat_message.content` 는 그대로 둔다.

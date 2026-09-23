@@ -70,6 +70,11 @@ forwardControlPlane(path: string, init: {
 `POST` 는 multipart 를 그대로 흘려보낸다. 본문을 읽어 다시 만들지 마라.
 `GET` 은 이미지 본문을 그대로 흘려보내고 `Content-Type` 과 `Cache-Control` 을 함께 넘긴다.
 
+`web/src/app/api/chat/conversations/route.ts` 에 `POST` 를 더한다.
+`POST /api/v1/chat/conversations` 에 `agentCode` 를 넘기고 대화 번호를 돌려준다. JSON 이므로 `callControlPlane` 을 쓴다.
+
+제목이 빈 대화는 대화 목록에 「새 대화」 로 보인다. `conversation-list.tsx` 가 그렇게 그린다.
+
 ### 1-1. 메시지를 보내는 두 라우트가 첨부 번호를 넘긴다
 
 `web/src/app/api/chat/route.ts` 와 `web/src/app/api/chat/stream/route.ts` 는 본문을
@@ -91,7 +96,7 @@ forwardControlPlane(path: string, init: {
 | 미리보기 | 입력창 위에 가로로 늘어놓는다. 각각에 지우는 단추를 둔다 |
 | 올리는 중 | 그 자리에 도는 표시를 두고 **보내기를 잠근다** |
 | 올리기 실패 | 그 미리보기에 `describeError` 문장을 보이고 지우는 단추를 둔다. 지울 때까지 보내기를 잠근다 |
-| 새 대화 | 대화 번호가 없으면 사진 단추를 잠그고 「첫 메시지를 보낸 뒤 사진을 올릴 수 있습니다」 를 보인다 |
+| 새 대화 | 대화 번호가 없으면 첫 사진을 올리기 전에 빈 대화를 만들어 번호를 받는다. 그 뒤 에이전트는 잠긴다 |
 | 흐름이 붙은 에이전트 | 사진 단추를 두지 않는다. `AgentView.acceptsAttachments` 가 거짓이면 그렇다 |
 
 상한은 한 번에 10장이고 한 장 10MB 다.
@@ -153,7 +158,7 @@ forwardControlPlane(path: string, init: {
 | 11장을 고른다 | 10장만 올라가고 넘은 것을 알린다 |
 | 보관 기간이 지난 첨부가 달린 대화 | 「보관 기간이 지나 볼 수 없습니다」 가 보이고 그 자리가 남는다 |
 | 이미지가 아닌 파일 | 고르기에서 걸린다 |
-| 새 대화 | 사진 단추가 잠겨 있다 |
+| 새 대화에서 사진을 고르고 글과 함께 보낸다 | 첫 메시지 아래에 그 사진이 보이고 대화 목록의 제목이 그 글이다 |
 | 흐름이 붙은 에이전트의 대화 | 사진 단추가 없다. `FLOW_AGENT_CODE` 로 연다 |
 | 10MB 를 넘는 파일 | 올라가지 않고 그 사실을 알린다 |
 
@@ -196,6 +201,8 @@ grep -rn 'style={{' web/src/
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/error-message.ts` | 수정 |
+| `web/src/app/api/chat/conversations/route.ts` | 수정. `POST` |
+| `web/src/components/chat/conversation-list.tsx` | 수정. 빈 제목을 「새 대화」 로 |
 | `web/src/lib/control-plane.ts` | 수정. `forwardControlPlane` |
 | `web/src/lib/agent.ts` | 수정. `AgentView` 타입에 `acceptsAttachments` |
 | `web/src/app/api/chat/route.ts` | 수정. `attachmentIds` |
