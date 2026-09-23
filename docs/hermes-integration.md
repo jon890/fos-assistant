@@ -279,6 +279,8 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 ### profile 접두
 
 `gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
+default profile 의 listener 에는 각 경로가 접두 없는 형태와 `/p/<profile>` 접두 형태로 함께 등록된다.
+`connect()` 가 경로 표를 한 번 순회하며 두 형태를 모두 등록한다.
 
 multiplex 사용 여부는 아래 순서로 정한다.
 
@@ -316,6 +318,9 @@ multiplex 를 끄면 profile `.env` 에 없는 credential 을 프로세스 환�
 multiplex 를 켜면 profile `.env` 에 없는 credential 을 프로세스 환경으로 내려가 찾지 않는다.
 profile scope 없이 credential 을 읽으려 하면 예외가 난다.
 
+`API_SERVER_KEY` 는 접두로 고른 profile scope 에서 읽는다.
+값을 읽지 못하거나 16자보다 짧으면 빈 값이 되고, 그 profile 의 요청을 모두 거절한다.
+
 예외는 둘이다.
 
 - `API_SERVER_ENABLED`, `API_SERVER_HOST`, `API_SERVER_PORT` 는 배포 설정이므로 프로세스 환경에서 읽는다.
@@ -335,7 +340,11 @@ listener 주인 profile 의 Discord adapter 는 그대로 동작한다.
 multiplex 를 켜면 cron scheduler 가 제공 대상인 모든 profile 을 순회한다.
 개별 gateway 를 시작하지 않는 방법으로 어느 profile 의 cron 을 멈출 수 없다.
 
-Hermes 는 기동할 때 이름이 붙은 profile 의 개별 gateway 자리는 만들지만 자동으로 시작하지 않는다.
+컨테이너가 기동할 때 profile 마다 s6 service 자리를 다시 만든다.
+이 자리는 tmpfs 에 있어 컨테이너가 다시 뜰 때마다 사라진다.
+multiplex 를 끄면 default profile 과 이름이 붙은 profile 을 모두 저장된 `desired_state` 에 따라 시작한다.
+multiplex 를 켜면 default profile 만 `desired_state` 에 따라 시작하고,
+이름이 붙은 profile 의 자리는 만들기만 한다.
 다만 운영자가 개별 gateway 를 직접 시작하면 공유 listener 와 함께 돌 수 있고 Hermes 가 이를 막지 않는다.
 
 #### 실행 소유자는 profile 과 key 가 함께 정한다
