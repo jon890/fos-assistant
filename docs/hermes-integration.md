@@ -528,6 +528,29 @@ pool 을 키우는 것만으로는 메모리가 늘지 않는다. 스레드를 �
 Control Plane 은 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 실제 MCP 서버 등록과 토큰 전달은 비공개 저장소 `fos-home-infra`가 맡는다.
 
+### API server 에서 MCP 도구를 여는 범위
+
+`platform_toolsets.api_server` 의 `no_mcp` 는 API server 로 들어온 실행에서 MCP 도구를 통째로 막는다.
+`no_mcp` 대신 서버 이름을 허용 목록으로 적으면 그 서버의 도구만 모델에 전달하고 나머지는 막는다.
+
+도구가 없던 profile 에 MCP 서버를 처음 열면 Hermes 가 `tool_search`, `tool_describe`, `tool_call` 중계를 함께 싣는다.
+도구 정의가 약 59 토큰이어도 중계 때문에 입력이 약 1,800 토큰 늘 수 있다.
+이미 이 중계를 쓰는 profile 은 MCP 서버를 더해도 서버의 도구 정의만큼만 늘어난다.
+
+### 입력 비용은 API 콜 수가 정한다
+
+실행의 입력 토큰은 provider 에 보낸 모든 API 콜의 입력을 더한 값이다.
+추가 API 콜 하나는 그 시점의 전체 프롬프트 하나만큼 들기 때문에 대화가 길수록 도구 호출도 비싸진다.
+
+도구를 부르지 않는 턴은 API 콜이 한 번이고, `memory_read` 를 부른 턴은 두 번이나 세 번이었다.
+한 턴에서 항목을 한 개 읽든 세 개를 병렬로 읽든 API 콜 수는 같았다.
+항목 수보다 도구를 부르는 턴 수가 입력 비용을 정한다.
+
+Memory 색인 한 줄은 약 12 토큰이고, `always_inject` 본문은 한 글자당 약 0.49 토큰이다.
+`always_inject` 는 API 콜 수를 늘리지 않는다.
+Control Plane 이 두 방식을 고르는 기준은
+[`flow.md`](flow.md#도구와-always_inject-를-고르는-기준)에 둔다.
+
 ## plugin hook
 
 plugin 은 `~/.hermes/plugins/<이름>/` 에 `plugin.yaml` 과 `__init__.py` 를 두고
