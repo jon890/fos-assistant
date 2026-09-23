@@ -100,6 +100,42 @@ export async function requestControlPlane(
 }
 
 /**
+ * 로그인한 가족 구성원으로서 Control Plane 을 부르되, 본문을 손대지 않고 그대로 흘려보낸다.
+ *
+ * <p>multipart 업로드나 이미지 응답처럼 JSON 으로 다시 감싸면 안 되는 본문에 쓴다. `callControlPlane` 과
+ * 달리 응답을 읽지 않고 `Response` 그대로 돌려주므로, 부르는 쪽이 스트림을 그대로 옮길 수 있다.
+ */
+export async function forwardControlPlane(
+  path: string,
+  init: { method: string; body?: ReadableStream<Uint8Array> | null; contentType?: string | null },
+): Promise<ControlPlaneResponse> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) {
+    return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다." };
+  }
+
+  const token = await mintToken(email, session.user?.name ?? email);
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (init.contentType) headers["Content-Type"] = init.contentType;
+
+  // 본문이 스트림이면 Node 의 fetch 에 duplex 를 함께 줘야 한다. 없으면 요청이 거절된다. 표준
+  // RequestInit 타입에는 아직 이 칸이 없어 따로 넓혀 쓴다.
+  const requestInit: RequestInit & { duplex?: "half" } = {
+    method: init.method,
+    headers,
+    body: init.body ?? undefined,
+    cache: "no-store",
+  };
+  if (init.body) requestInit.duplex = "half";
+
+  return {
+    ok: true,
+    response: await fetch(`${baseUrl()}${path}`, requestInit),
+  };
+}
+
+/**
  * 로그인한 가족 구성원으로서 Control Plane 을 부른다.
  *
  * <p>서버에서만 돈다. 부르는 사람이 누구인지는 세션이 정하고 요청 본문이 정하지 않는다. 그래서

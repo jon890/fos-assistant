@@ -11,7 +11,13 @@ import type { Turn } from "./chat/message-bubble";
 import { IconButton } from "./ui/icon-button";
 import { readEventStream } from "@/lib/stream";
 
-type Agent = { code: string; name: string; model: string; visibility: string };
+type Agent = {
+  code: string;
+  name: string;
+  model: string;
+  visibility: string;
+  acceptsAttachments: boolean;
+};
 type ErrorPayload = { code: string; message: string };
 type ChatEvent = {
   type: "delta" | "tool" | "step" | "switched" | "reset" | "done" | "error";
@@ -201,7 +207,7 @@ export function ChatPanel() {
     setTurns(await readPayload<Turn[]>(response));
   }
 
-  async function send() {
+  async function send(attachmentIds: number[]) {
     const text = draft.trim();
     if (text.length === 0 || sending || agentCode.length === 0) return;
 
@@ -229,6 +235,7 @@ export function ChatPanel() {
       conversationId,
       text,
       agentCode,
+      attachmentIds,
     };
 
     const sendWithoutStream = async () => {
@@ -414,8 +421,12 @@ export function ChatPanel() {
         <Composer
           value={draft}
           onChange={setDraft}
-          onSend={() => void send()}
+          onSend={(attachmentIds) => void send(attachmentIds)}
           disabled={sending || agents.length === 0}
+          conversationId={conversationId}
+          agentCode={agentCode}
+          acceptsAttachments={agents.find((agent) => agent.code === agentCode)?.acceptsAttachments ?? false}
+          onConversationCreated={(id) => setConversationId(id)}
         />
       </div>
     </section>
