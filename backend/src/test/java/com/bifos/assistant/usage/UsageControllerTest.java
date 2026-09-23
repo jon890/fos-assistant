@@ -62,7 +62,7 @@ class UsageControllerTest {
                 "dad",
                 "http://127.0.0.1:1/p/dad",
                 "openai-codex",
-                "gpt-5.5",
+                "gpt-5.6-sol",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,

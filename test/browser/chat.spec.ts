@@ -166,7 +166,7 @@ test("막혀서 넘어가면 그 답 위에 넘어간 곳을 한 줄로 알린�
     data: {
       models: [
         { provider: blockedProvider, model: "blocked-model" },
-        { provider: "openai-codex", model: "gpt-5.5" },
+        { provider: "openai-codex", model: "gpt-5.6-sol" },
       ],
     },
   });

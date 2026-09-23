@@ -52,7 +52,7 @@ class AgentApiBaseUrlUpdateTest {
 
     @BeforeEach
     void seed() {
-        agent = Agent.of("dad", "Dad", "dad", CURRENT_URL, "openai-codex", "gpt-5.5",
+        agent = Agent.of("dad", "Dad", "dad", CURRENT_URL, "openai-codex", "gpt-5.6-sol",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.FAMILY, null);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));

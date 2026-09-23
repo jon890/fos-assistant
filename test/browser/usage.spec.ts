@@ -117,7 +117,7 @@ test("막혀서 넘어간 실패와 보통 실패를 다르게 보인다", async
     data: {
       models: [
         { provider: blockedProvider, model: "blocked-model" },
-        { provider: "openai-codex", model: "gpt-5.5" },
+        { provider: "openai-codex", model: "gpt-5.6-sol" },
       ],
     },
   });

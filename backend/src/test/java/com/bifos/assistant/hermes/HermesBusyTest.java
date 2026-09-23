@@ -114,6 +114,6 @@ class HermesBusyTest {
 
     private HermesRunCommand command() {
         return new HermesRunCommand(
-                "dad", baseUrl, "안녕", null, null, "openai-codex", "gpt-5.5");
+                "dad", baseUrl, "안녕", null, null, "openai-codex", "gpt-5.6-sol");
     }
 }
