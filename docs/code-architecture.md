@@ -306,7 +306,8 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 `ChatService` 가 turn 을 시작할 때 등록하고 끝날 때 지운다.
 provider 를 넘어가 새 실행 줄로 다시 시도하면 열쇠를 새 번호로 옮긴다.
 중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
-같은 대화에 도는 turn 이 있는지도 여기서 본다. 다시 생성과 수정이 `CONVERSATION_BUSY` 를 판정하는 자리다.
+같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성과 수정이 `CONVERSATION_BUSY` 를 판정하는 자리다.
+같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.
 
 `ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다.
 
