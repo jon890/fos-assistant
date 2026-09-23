@@ -85,6 +85,8 @@ export function useConversations(): ConversationsValue
 
 `enabled` 가 거짓이면(로그인 화면) 부르지 않는다. 오류 문구는 `components/error-message.ts` 의 `describeError` 를 쓴다.
 `Conversation` 타입은 지금 `components/chat/conversation-list.tsx` 에 있다. 여기로 옮기고 옛 파일은 지운다.
+**옛 파일이 가진 동작을 함께 옮긴다.** 사진 첨부 구현이 제목이 빈 대화를 「새 대화」 로 보이게 그 파일을 고쳤다.
+`conversation-nav.tsx` 가 같은 규칙으로 그린다. 제목 검색은 빈 제목을 「새 대화」 로 보고 거른다.
 
 ### 2. `web/src/components/shell/group-by-date.ts` 신규
 
@@ -172,9 +174,16 @@ export function AppShell(props: { isAdmin: boolean; displayName?: string; childr
   - `conversationId` 가 아직 null 이면 그것을 적고 `window.history.replaceState(null, "", \`/c/${id}\`)`
   - 받은 `executionId` 를 ref 에 둔다. 여러 번 오면 마지막 것이 남는다
   - `refresh()` 를 부른다
-- **주소가 `/` 인데 `conversationId` 를 들고 있으면 상태를 비운다.** `usePathname()` 을 보는 `useEffect` 에서
-  `pathname === "/" && conversationId !== null` 이면 `conversationId`, 메시지, 입력 중 상태, 오류를 비우고
-  `selectionVersion` 을 올린다. 사이드바의 `새 대화` 와 뒤에 올 단축키가 `/` 로 보내기만 해도 새 대화가 된다
+- **대화 번호를 얻는 자리는 둘이다.** `started` 와, 사진 첨부가 새 대화에서 첫 사진을 올리기 전에 부르는
+  빈 대화 만들기(`POST /api/v1/chat/conversations`, 화면 쪽 호출은 사진 첨부 구현이 만든 것을 코드에서 찾는다)다.
+  **두 자리 모두 번호를 받은 같은 처리 안에서 `replaceState` 로 주소를 먼저 바꾸고** 그다음 `conversationId` 를 적는다.
+  빈 대화를 만든 뒤에도 `refresh()` 를 불러 목록에 「새 대화」 로 넣는다
+- **주소가 `/` 로 바뀌었을 때만 상태를 비운다.** `usePathname()` 의 앞 값을 ref 에 두고,
+  앞 값이 `/` 가 아니었는데 지금 `/` 이거나, 사이드바의 `새 대화` 와 뒤에 올 단축키가 부르는 context 의
+  `startNew()` 가 불렸을 때 `conversationId`, 메시지, 입력 중 상태, 첨부 목록, 오류를 비우고 `selectionVersion` 을 올린다.
+  `pathname === "/" && conversationId !== null` 만으로 판정하지 않는다.
+  `/` 에서 사진을 먼저 올려 빈 대화가 생기는 순간에도 그 조건이 참이 되어 올린 사진과 번호가 지워진다.
+  `replaceState` 뒤에도 Next 의 `usePathname` 이 바로 따라오는지 브라우저 검사로 확인한다
 - 실패 처리: `started` 를 받기 전의 실패는 지금처럼 `restoreFailedMessage` 로 입력창에 되돌린다.
   `started` 를 받은 뒤의 실패(`error` 사건, 스트림 끊김)는 되돌리지 않는다. 입력창을 비운 채로 두고
   메시지를 다시 읽은 뒤, 마지막 사용자 메시지 아래에 `data-testid="turn-error"` 로 오류 문구를 보인다
@@ -220,6 +229,12 @@ export function AppShell(props: { isAdmin: boolean; displayName?: string; childr
 - `/c/999999` 는 `conversation-not-found` 를 보이고 `새 대화` 링크가 `/` 로 간다
 - `/usage` 에서도 사이드바가 보인다. `/signin` 에서는 `사이드바` 가 없다
 - `desktop` 과 `mobile` 두 폭에서 `document.documentElement.scrollWidth` 가 창 폭을 넘지 않는다
+
+
+**사진을 먼저 올리는 새 대화 검사**를 `shell.spec.ts` 에 더한다.
+`/` 에서 사진을 고르면 주소가 `/c/{id}` 로 바뀌고 올린 사진이 그대로 있으며 사이드바에 「새 대화」 한 줄이 생긴다.
+그 뒤 보내면 같은 대화에 붙고 제목이 첫 메시지로 바뀐다.
+사진 올리기의 셀렉터와 픽스처는 사진 첨부 구현이 만든 `test/browser/` 의 검사에서 가져온다.
 
 ## 검증
 
