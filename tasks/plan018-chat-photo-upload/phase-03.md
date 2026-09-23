@@ -48,12 +48,33 @@ phase-01 이 받아 두는 경로를, phase-02 가 에이전트에게 알리는 
 | `attachments/route.ts` | `POST /api/v1/chat/conversations/{id}/attachments` |
 | `attachments/[attachmentId]/route.ts` | `GET` 과 `DELETE` |
 
-**본보기는 `web/src/app/api/admin/agents/[code]/route.ts` 다.**
-경로 변수와 오류 코드를 넘기는 방식이 거기 있다. 그 파일이 내는 것은 `PATCH` 이므로
-메서드만 바꾸고 짜임은 그대로 쓴다.
+`callControlPlane` 은 쓸 수 없다. 본문을 언제나 `JSON.stringify` 하고 응답을 `JSON.parse` 한다.
+
+**`web/src/lib/control-plane.ts` 에 `forwardControlPlane` 을 더한다.**
+`requestControlPlane` 과 같이 세션에서 토큰을 만들고, 본문과 `Content-Type` 을 받은 그대로 넘긴다.
+
+```ts
+forwardControlPlane(path: string, init: {
+  method: string;
+  body?: ReadableStream<Uint8Array> | null;
+  contentType?: string | null;
+}): Promise<ControlPlaneResponse>
+```
+
+본문이 스트림이면 Node 의 `fetch` 에 `duplex: "half"` 를 함께 준다. 없으면 요청이 거절된다.
+
+**본보기는 `web/src/app/api/chat/stream/route.ts` 다.**
+받은 응답 본문을 그대로 넘기는 방식과 실패 응답을 옮기는 방식이 거기 있다.
+경로 변수를 받는 방식은 `web/src/app/api/chat/conversations/[conversationId]/messages/route.ts` 를 따른다.
 
 `POST` 는 multipart 를 그대로 흘려보낸다. 본문을 읽어 다시 만들지 마라.
-`GET` 은 이미지 본문을 그대로 흘려보내고 `Content-Type` 을 함께 넘긴다.
+`GET` 은 이미지 본문을 그대로 흘려보내고 `Content-Type` 과 `Cache-Control` 을 함께 넘긴다.
+
+### 1-1. 메시지를 보내는 두 라우트가 첨부 번호를 넘긴다
+
+`web/src/app/api/chat/route.ts` 와 `web/src/app/api/chat/stream/route.ts` 는 본문을
+`conversationId`, `text`, `agentCode` 셋으로 다시 만들어 보낸다. 그대로 두면 첨부 번호가 Control Plane 에 닿지 않는다.
+둘 다 `attachmentIds` 를 받아 넘긴다. 없으면 빈 목록을 보낸다.
 
 ### 2. 입력창에 사진 단추를 더한다
 
@@ -69,9 +90,19 @@ phase-01 이 받아 두는 경로를, phase-02 가 에이전트에게 알리는 
 | 여러 장 | 한 번에 고를 수 있게 한다 |
 | 미리보기 | 입력창 위에 가로로 늘어놓는다. 각각에 지우는 단추를 둔다 |
 | 올리는 중 | 그 자리에 도는 표시를 두고 **보내기를 잠근다** |
+| 올리기 실패 | 그 미리보기에 `describeError` 문장을 보이고 지우는 단추를 둔다. 지울 때까지 보내기를 잠근다 |
+| 새 대화 | 대화 번호가 없으면 사진 단추를 잠그고 「첫 메시지를 보낸 뒤 사진을 올릴 수 있습니다」 를 보인다 |
+| 흐름이 붙은 에이전트 | 사진 단추를 두지 않는다. 그 에이전트는 첨부를 거절한다 |
 
 상한은 한 번에 10장이고 한 장 10MB 다.
 **넘게 고르면 넘는 것을 올리지 않고 그 사실을 알린다.** 조용히 버리지 않는다.
+
+**미리보기를 원본으로 그리지 않는다.** 고른 파일을 `createImageBitmap` 으로 읽어
+긴 변 192px 의 canvas 에 줄여 그리고, 그 `toBlob` 결과의 object URL 을 쓴다.
+미리보기를 지우거나 보낸 뒤에는 `URL.revokeObjectURL` 로 놓는다.
+
+`chat-panel.tsx` 가 첨부 번호 목록을 갖고, 보낼 때 본문에 `attachmentIds` 로 싣는다.
+보낸 뒤 미리보기를 비운다.
 
 ### 3. 지난 대화의 사진을 보인다
 
@@ -81,7 +112,13 @@ phase-01 이 받아 두는 경로를, phase-02 가 에이전트에게 알리는 
 | 상태 | 무엇을 보이나 |
 | --- | --- |
 | `visible` 이 참 | 사진. 누르면 큰 화면으로 본다 |
-| `visible` 이 거짓 | 자리를 남기고 「보관 기간이 지나 볼 수 없습니다」 |
+| `visible` 이 거짓 | 자리를 남기고 `describeError("ATTACHMENT_GONE", ...)` 의 문장 |
+
+`Turn` 타입에 `attachments` 칸을 더한다. 대화 이력의 `MessageView.attachments` 를 그대로 받는다.
+사진 주소는 `/api/chat/conversations/{대화 번호}/attachments/{첨부 번호}` 다.
+`Turn` 에 대화 번호가 없으므로 `MessageBubble` 이 대화 번호를 prop 으로 받는다.
+
+말풍선 안의 사진은 `loading="lazy"` 로 두고 크기를 클래스로 제한한다.
 
 **거짓일 때 그 자리를 없애지 마라.** 무엇이 있었는지가 남아야
 지난 대화를 읽는 사람이 에이전트가 무엇을 보고 답했는지 안다.
@@ -92,9 +129,11 @@ phase-01 이 받아 두는 경로를, phase-02 가 에이전트에게 알리는 
 
 | 코드 | 문장 |
 | --- | --- |
-| `ATTACHMENT_GONE` | 보관 기간이 지나 이 사진은 볼 수 없다 |
+| `ATTACHMENT_GONE` | 보관 기간이 지나 볼 수 없습니다. |
 
 화면 안에 문장을 따로 적지 않는다. 두 벌이 되면 한쪽만 고쳐진다.
+말풍선도 `visible` 이 거짓일 때 이 문장을 `describeError` 로 가져온다.
+문장은 `docs/` 의 ADR-020 과 `flow.md` 가 적은 그대로다.
 
 길이와 형식과 장수가 상한을 넘는 것은 모두 `VALIDATION_FAILED` 로 온다.
 **그 코드 하나로는 무엇이 잘못됐는지 알 수 없으므로 화면이 고르기 전에 막는다.**
@@ -112,8 +151,14 @@ phase-01 이 받아 두는 경로를, phase-02 가 에이전트에게 알리는 
 | 미리보기의 지우는 단추 | 그 사진만 빠진다 |
 | 사진을 붙여 보낸다 | 보낸 메시지 아래에 그 사진이 보인다 |
 | 11장을 고른다 | 10장만 올라가고 넘은 것을 알린다 |
-| 보관 기간이 지난 첨부가 달린 대화 | 「보관 기간이 지나 볼 수 없습니다」 가 보인다 |
+| 보관 기간이 지난 첨부가 달린 대화 | 「보관 기간이 지나 볼 수 없습니다」 가 보이고 그 자리가 남는다 |
 | 이미지가 아닌 파일 | 고르기에서 걸린다 |
+| 새 대화 | 사진 단추가 잠겨 있다 |
+| 10MB 를 넘는 파일 | 올라가지 않고 그 사실을 알린다 |
+
+**보관 기간이 지난 첨부는 운영 API 로 만든다.** 사진을 붙여 보낸 뒤 검사가
+`page.request` 로 웹의 `DELETE` 라우트를 불러 지우고 다시 연다. `visible` 이 거짓인 상태가 만료와 같다.
+운영 코드에 시험용 문을 두지 않고, `src/test` 의 지원 컨트롤러도 더하지 않는다.
 
 파일을 고르는 것은 Playwright 의 파일 고르기 기능을 쓴다.
 **실제 이미지 파일을 검사 안에서 만든다.** 저장소에 이미지를 넣지 마라.
@@ -150,7 +195,9 @@ grep -rn 'style={{' web/src/
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/error-message.ts` | 수정 |
-| `web/src/lib/` | 수정 |
+| `web/src/lib/control-plane.ts` | 수정. `forwardControlPlane` |
+| `web/src/app/api/chat/route.ts` | 수정. `attachmentIds` |
+| `web/src/app/api/chat/stream/route.ts` | 수정. `attachmentIds` |
 | `test/browser/` | 추가 |
 
 ## 끝낸 뒤

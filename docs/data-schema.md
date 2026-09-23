@@ -212,7 +212,7 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 | `message_id` | BIGINT NULL | 함께 보낸 메시지. 아직 보내지 않았으면 비어 있다 |
 | `uploaded_by_user_id` | BIGINT | 올린 사람 |
 | `original_name` | VARCHAR(255) | 올릴 때의 파일 이름. 화면이 보인다 |
-| `stored_name` | VARCHAR(255) | 디스크에 둔 이름. `{id}.{확장자}` 다 |
+| `stored_name` | VARCHAR(255) NULL | 디스크에 둔 이름. `{id}.{확장자}` 다. 번호를 받은 직후 같은 트랜잭션에서 채우므로 커밋된 행에는 언제나 있다 |
 | `content_type` | VARCHAR(100) | |
 | `byte_size` | BIGINT | |
 | `expires_at` | DATETIME(6) | 이 시각이 지나면 파일을 지운다 |
