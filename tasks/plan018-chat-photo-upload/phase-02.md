@@ -65,6 +65,7 @@ grep -rn "conversationId" backend/src/main/java/com/bifos/assistant/chat/present
 
 **인자가 지나가는 길이다.** `ChatController` 의 `send` 와 `stream` 이 `request.attachmentIds()` 를 넘기고,
 `ChatService.send` 와 `ChatService.stream` 이 `List<Long> attachmentIds` 인자를 하나 더 받는다.
+기존 네 인자 메서드는 빈 목록을 넘기는 오버로드로 남긴다. 테스트의 기존 호출을 고치지 않는다.
 
 판정은 phase-01 이 만든 `AttachmentService.requireAttachable` 과 `attach` 가 갖는다. 여기서 다시 하지 않는다.
 **하나라도 거절되면 메시지가 저장되지 않고 대화도 새로 생기지 않는다.** 그래서 순서가 정해진다.
@@ -117,6 +118,7 @@ provider 가 막혀 다음 모델로 넘어가는 시도도 같은 입력을 쓴
 
 **그래서 에이전트 쪽 경로를 설정으로 따로 받는다.**
 `AttachmentProperties` 에 `agentRoot` 를 더한다. 비면 기동을 실패시킨다.
+`root` 와 같이 compact constructor 가 빈 문자열도 막는다.
 `application.yml` 은 `agent-root: ${ASSISTANT_ATTACHMENT_AGENT_ROOT}` 로 받는다.
 
 같은 값을 둘로 두는 것이 아니라 **다른 두 컨테이너가 같은 디렉터리를 다른 이름으로 보는 것**이다.
@@ -146,6 +148,13 @@ grep -rn "conversations" backend/src/main/java/com/bifos/assistant/chat/presenta
 `MessageView` 에 `attachments` 칸을 더한다. 첨부가 없으면 빈 목록이다.
 응답의 첨부 한 줄은 phase-01 이 만든 `AttachmentView` 를 그대로 쓴다.
 
+### 4-1. 화면이 사진 단추를 둘지 알게 한다
+
+대화 화면은 `/api/v1/agents` 로 사용자용 `AgentView` 를 받는다. 거기에는 흐름 여부가 없다.
+`agent/presentation/AgentDtos.java` 의 `AgentView` 에 `acceptsAttachments` 참거짓 칸을 더한다.
+그 에이전트에 흐름이 붙지 않았으면 참이다. 흐름 이름 자체는 내보내지 않는다.
+판정은 위 2번의 거절과 같은 조건을 쓴다. 두 곳이 서로 다른 조건을 갖지 않게 한다.
+
 ### 5. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java`
@@ -163,8 +172,9 @@ grep -rn "conversations" backend/src/main/java/com/bifos/assistant/chat/presenta
 | 대화 번호 없이 첨부를 붙여 보낸다 | 거절. 대화가 새로 생기지 않았다 |
 | 흐름이 붙은 에이전트의 대화에 첨부를 붙여 보낸다 | 거절. 메시지가 저장되지 않았다 |
 | 대화 이력을 읽는다 | 그 메시지에 첨부 둘이 달리고, 다른 메시지는 빈 목록이다 |
+| 에이전트 목록을 읽는다 | 흐름이 붙은 에이전트만 `acceptsAttachments` 가 거짓이다 |
 
-**마지막 줄이 중요하다.** 사람이 쓴 것과 우리가 덧붙인 것이 섞이지 않는 것을 고정한다.
+**「저장된 메시지 본문」 줄이 중요하다.** 사람이 쓴 것과 우리가 덧붙인 것이 섞이지 않는 것을 고정한다.
 
 `test/e2e/scenarios/` 에 하나 더한다. 기존 시나리오 파일의 짜임을 따른다.
 
@@ -208,6 +218,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/chat/application/AttachmentService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/AttachmentProperties.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentDtos.java` | 수정. `acceptsAttachments` |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java` | 신규 |
 | `test/e2e/run.ts` | 수정 |

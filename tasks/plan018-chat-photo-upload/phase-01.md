@@ -274,6 +274,8 @@ Spring 은 cron 값 `-` 를 「돌지 않는다」 로 읽는다.
 
 `run.ts` 와 `fixtures.ts` 는 `startControlPlane` 이 넘기는 환경 변수에 `ASSISTANT_ATTACHMENT_ROOT` 를 더한다.
 `application.yml` 은 `root: ${ASSISTANT_ATTACHMENT_ROOT}` 로 받는다.
+그 표기는 환경 변수가 아예 없을 때만 기동을 멈춘다. **빈 문자열도 막도록 `AttachmentProperties` 의
+compact constructor 가 비었는지 확인해 예외를 던진다.**
 
 **검사는 그 메서드를 직접 불러서 한다.** 일정이 돌기를 기다리지 않는다.
 
@@ -287,7 +289,7 @@ Spring 은 cron 값 `-` 를 「돌지 않는다」 로 읽는다.
 | 남의 대화에 올린다 | `CONVERSATION_NOT_FOUND`. 파일이 생기지 않았다 |
 | 받지 않는 형식 | 거절. 행이 생기지 않았다 |
 | 상한을 넘는 크기 | 거절. 행이 생기지 않았다 |
-| 이미 10장이 있는 대화에 한 장 더 | 거절 |
+| 묶이지 않은 10장이 있는 대화에 한 장 더 | 거절 |
 | 지운 첨부를 읽는다 | `ATTACHMENT_GONE` |
 | 없는 번호를 읽는다 | `CONVERSATION_NOT_FOUND`. `ATTACHMENT_GONE` 이 아니다 |
 | 사용자가 지운다 | 파일이 사라지고 행은 남는다. `deleted_at` 이 찼다 |
@@ -299,12 +301,18 @@ Spring 은 cron 값 `-` 를 「돌지 않는다」 로 읽는다.
 
 파일 쓰기 실패는 그 대화 번호 자리에 일반 파일을 먼저 만들어 두어 디렉터리를 만들지 못하게 해서 일으킨다.
 
-`backend/src/test/java/com/bifos/assistant/chat/AttachmentControllerTest.java`
+`backend/src/test/java/com/bifos/assistant/chat/AttachmentUploadLimitTest.java`
+
+**MockMvc 로 쓰지 않는다.** MockMvc 의 multipart 요청은 Tomcat 과 `StandardServletMultipartResolver` 의
+크기 상한을 거치지 않아, `max-file-size` 를 빠뜨려도 통과한다.
+`@SpringBootTest(webEnvironment = RANDOM_PORT)` 로 실제 서버를 띄우고 실제 HTTP 클라이언트로 올린다.
+토큰은 `ASSISTANT_JWT_SECRET` 과 같은 값으로 검사 안에서 만든다.
 
 | 무엇 | 기대 |
 | --- | --- |
-| 1MB 를 넘고 10MB 이하인 본문을 실제 multipart 로 올린다 | 성공한다 |
-| 10MB 를 넘는 본문을 multipart 로 올린다 | 400 `VALIDATION_FAILED`. 500 이 아니다 |
+| 2MB 본문을 multipart 로 올린다 | 성공한다. 기본 상한 1MB 에 걸리지 않는다 |
+| 10MB 를 조금 넘는 본문 | 400 `VALIDATION_FAILED`. 서비스 판정에 걸린다 |
+| 12MB 를 넘는 본문 | 400 `VALIDATION_FAILED`. 500 이 아니다 |
 
 `backend/src/test/java/com/bifos/assistant/chat/AttachmentCleanerTest.java`
 
@@ -360,7 +368,7 @@ grep -rln "Paths.get\|Path.of" backend/src/main/java/com/bifos/assistant/chat | 
 | `test/e2e/run.ts` | 수정. 환경 변수 하나 |
 | `test/browser/fixtures.ts` | 수정. 환경 변수 하나 |
 | `backend/src/test/java/com/bifos/assistant/chat/AttachmentServiceTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/chat/AttachmentControllerTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/AttachmentUploadLimitTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/AttachmentCleanerTest.java` | 신규 |
 
 ## 끝낸 뒤

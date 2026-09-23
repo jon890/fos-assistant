@@ -92,7 +92,7 @@ forwardControlPlane(path: string, init: {
 | 올리는 중 | 그 자리에 도는 표시를 두고 **보내기를 잠근다** |
 | 올리기 실패 | 그 미리보기에 `describeError` 문장을 보이고 지우는 단추를 둔다. 지울 때까지 보내기를 잠근다 |
 | 새 대화 | 대화 번호가 없으면 사진 단추를 잠그고 「첫 메시지를 보낸 뒤 사진을 올릴 수 있습니다」 를 보인다 |
-| 흐름이 붙은 에이전트 | 사진 단추를 두지 않는다. 그 에이전트는 첨부를 거절한다 |
+| 흐름이 붙은 에이전트 | 사진 단추를 두지 않는다. `AgentView.acceptsAttachments` 가 거짓이면 그렇다 |
 
 상한은 한 번에 10장이고 한 장 10MB 다.
 **넘게 고르면 넘는 것을 올리지 않고 그 사실을 알린다.** 조용히 버리지 않는다.
@@ -154,6 +154,7 @@ forwardControlPlane(path: string, init: {
 | 보관 기간이 지난 첨부가 달린 대화 | 「보관 기간이 지나 볼 수 없습니다」 가 보이고 그 자리가 남는다 |
 | 이미지가 아닌 파일 | 고르기에서 걸린다 |
 | 새 대화 | 사진 단추가 잠겨 있다 |
+| 흐름이 붙은 에이전트의 대화 | 사진 단추가 없다. `FLOW_AGENT_CODE` 로 연다 |
 | 10MB 를 넘는 파일 | 올라가지 않고 그 사실을 알린다 |
 
 **보관 기간이 지난 첨부는 운영 API 로 만든다.** 사진을 붙여 보낸 뒤 검사가
@@ -196,6 +197,7 @@ grep -rn 'style={{' web/src/
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/error-message.ts` | 수정 |
 | `web/src/lib/control-plane.ts` | 수정. `forwardControlPlane` |
+| `web/src/lib/agent.ts` | 수정. `AgentView` 타입에 `acceptsAttachments` |
 | `web/src/app/api/chat/route.ts` | 수정. `attachmentIds` |
 | `web/src/app/api/chat/stream/route.ts` | 수정. `attachmentIds` |
 | `test/browser/` | 추가 |
