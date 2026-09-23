@@ -16,9 +16,20 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+  servlet:
+    multipart:
+      # 기본 상한 1MB 로는 휴대폰 사진 대부분이 서비스 판정 전에 걸린다.
+      # 한 장 상한 10MB 보다 조금 크게 두어, 조금 넘는 것은 서비스가 입력 오류로 거절하게 한다
+      max-file-size: 11MB
+      max-request-size: 12MB
 
 server:
   port: ${SERVER_PORT:8080}
+  tomcat:
+    # 요청 상한을 넘은 본문은 읽기 전에 거절되고, 남은 본문이 이 값보다 크면 Tomcat 이 연결을 끊는다.
+    # 그러면 입력 오류 응답이 클라이언트에 닿지 못한다. 요청 상한보다 넉넉히 두어 사진 몇 장 크기까지는
+    # 응답을 돌려준다
+    max-swallow-size: 16MB
 
 management:
   endpoints:
@@ -38,6 +49,14 @@ assistant:
     provider-cooldown: PT30M
   auth:
     jwt-secret: ${ASSISTANT_JWT_SECRET}
+  attachment:
+    # 대화에 올린 사진을 두는 공유 디렉터리. 기본값을 두지 않아 없으면 기동에 실패한다
+    root: ${ASSISTANT_ATTACHMENT_ROOT}
+    max-files: 10
+    max-bytes: 10485760
+    retention-days: 30
+    # 보관 기간이 지난 사진을 지우는 시각. Control Plane 의 시간대를 따른다
+    cleanup-cron: "0 0 4 * * *"
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

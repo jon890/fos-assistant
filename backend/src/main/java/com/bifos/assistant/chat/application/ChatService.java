@@ -59,6 +59,7 @@ public class ChatService {
     private static final int TITLE_LIMIT = 60;
 
     private final ConversationRepository conversations;
+    private final ConversationAccess access;
     private final ChatMessageRepository messages;
     private final AgentService agents;
     private final AgentModelSelector modelSelector;
@@ -206,6 +207,10 @@ public class ChatService {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
+        if (conversation.title().isBlank()) {
+            conversation.titleIfBlank(titleFrom(text));
+            conversations.save(conversation);
+        }
         return new Routed(conversation, agent, flows.find(agent.flow()));
     }
 
@@ -327,7 +332,7 @@ public class ChatService {
     }
 
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {
-        Conversation conversation = requireOwnConversation(user, conversationId);
+        Conversation conversation = access.requireOwn(user, conversationId);
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
     }
 
@@ -335,29 +340,42 @@ public class ChatService {
         return conversations.findByUserIdOrderByUpdatedAtDesc(user.id());
     }
 
+    /**
+     * 메시지 없이 제목이 빈 대화를 만든다.
+     *
+     * <p>사진을 올리는 경로에 대화 번호가 필요해, 새 대화의 첫 메시지에 사진을 붙이려면 대화가 먼저 있어야
+     * 한다. 이 경로는 그 용도로만 쓰므로 사진을 받지 않는 에이전트에는 대화를 남기지 않는다. 제목은 첫
+     * 메시지가 정한다.
+     */
+    public Conversation startEmpty(CurrentUser user, String agentCode) {
+        Agent agent = requireStartableAgent(user, agentCode);
+        if (!agent.acceptsAttachments()) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
+        }
+        return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
+    }
+
     private Conversation resolveConversation(
             CurrentUser user, Long conversationId, String firstText, String agentCode) {
         if (conversationId == null) {
-            if (agentCode == null || agentCode.isBlank()) {
-                throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
-            }
-            Agent agent = agents.requireReadable(user, agentCode);
-            if (!agent.enabled()) {
-                throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
-            }
+            Agent agent = requireStartableAgent(user, agentCode);
             return conversations.save(
                     Conversation.startedBy(user.id(), titleFrom(firstText), agent.id()));
         }
-        return requireOwnConversation(user, conversationId);
+        return access.requireOwn(user, conversationId);
     }
 
-    private Conversation requireOwnConversation(CurrentUser user, Long conversationId) {
-        return conversations
-                .findByIdAndUserId(conversationId, user.id())
-                .orElseThrow(
-                        () ->
-                                new ApiException(
-                                        ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
+    /** 새 대화를 시작할 에이전트를 고른다. 요청자가 읽을 수 있고 켜져 있어야 한다. */
+    private Agent requireStartableAgent(CurrentUser user, String agentCode) {
+        if (agentCode == null || agentCode.isBlank()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
+        }
+        Agent agent = agents.requireReadable(user, agentCode);
+        if (!agent.enabled()) {
+            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
+        }
+        return agent;
     }
 
     private static String titleFrom(String text) {

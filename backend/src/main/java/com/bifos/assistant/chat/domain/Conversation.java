@@ -74,6 +74,13 @@ public class Conversation {
         return updatedAt;
     }
 
+    /** 제목이 비어 있을 때만 채운다. 사진을 먼저 올리려고 만든 대화는 첫 메시지가 제목을 정한다. */
+    public void titleIfBlank(String title) {
+        if (this.title == null || this.title.isBlank()) {
+            this.title = title;
+        }
+    }
+
     public void rememberSession(String sessionId) {
         if (sessionId != null && !sessionId.isBlank()) {
             this.hermesSessionId = sessionId;

@@ -8,6 +8,8 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
+import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationRequest;
+import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -90,6 +92,12 @@ public class ChatController {
             clientConnected.set(false);
             log.debug("could not send a chat event", ex);
         }
+    }
+
+    @PostMapping("/conversations")
+    public StartConversationResponse start(@RequestBody StartConversationRequest request) {
+        return new StartConversationResponse(
+                chat.startEmpty(currentUser.require(), request.agentCode()).id());
     }
 
     @GetMapping("/conversations")

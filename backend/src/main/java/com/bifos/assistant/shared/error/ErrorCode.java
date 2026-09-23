@@ -61,6 +61,14 @@ public enum ErrorCode {
      * 받아 간 지문과 다르면 거절하고, 화면이 새 본문을 다시 읽는다.
      */
     PERSONA_STALE(HttpStatus.CONFLICT),
+    /**
+     * 그 첨부가 있었지만 보관 기간이 지났거나 사용자가 지워 파일이 없다.
+     *
+     * <p>있었다는 것을 알리는 응답이라 없는 첨부와 남의 첨부에는 쓰지 않는다. 그 둘은
+     * {@code CONVERSATION_NOT_FOUND} 로 숨긴다. 없는 번호에 이 코드를 내면 번호를 훑어 남의 것이 있는지
+     * 알아낼 수 있다.
+     */
+    ATTACHMENT_GONE(HttpStatus.GONE),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 

@@ -233,6 +233,7 @@ function startControlPlane(
   keyDir: string,
   dashboardBaseUrl: string,
   logPath: string,
+  attachmentRoot: string,
 ): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
@@ -245,6 +246,8 @@ function startControlPlane(
       SERVER_PORT: String(CONTROL_PLANE_PORT),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       HERMES_PROFILE_KEY_DIR: keyDir,
+      // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.
+      ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
@@ -286,7 +289,12 @@ export default async function setupServices(): Promise<() => Promise<void>> {
   try {
     hermes = await startFakeHermes(PROFILE_KEYS);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
-    app = startControlPlane(await writeProfileKeys(work), hermes.baseUrl, logPath);
+    app = startControlPlane(
+      await writeProfileKeys(work),
+      hermes.baseUrl,
+      logPath,
+      join(work, "attachments"),
+    );
     await waitForHealth(logPath);
     await seedAgents(hermes.baseUrl);
   } catch (error) {

@@ -123,6 +123,16 @@ public class Agent {
         this.flow = flow == null || flow.isBlank() ? null : flow.strip();
     }
 
+    /**
+     * 이 에이전트의 대화에 사진을 붙일 수 있다.
+     *
+     * <p>흐름은 Hermes 를 한 번 부르는 경로를 거치지 않아 사진이 놓인 자리를 입력에 덧붙일 수 없다. 그래서
+     * 흐름이 붙은 에이전트는 받지 않는다. 받을지 판정하는 곳은 모두 이 메서드를 부른다.
+     */
+    public boolean acceptsAttachments() {
+        return flow == null || flow.isBlank();
+    }
+
     public boolean isReadableBy(Long userId) {
         return visibility == AgentVisibility.FAMILY || Objects.equals(ownerUserId, userId);
     }
