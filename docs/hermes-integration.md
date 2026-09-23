@@ -1142,8 +1142,9 @@ profile 을 하나 만들어 `API_SERVER_KEY` 를 넣고,
 gateway 가 뜰 때 `SecondaryPortBindingConfigError` 로 그 profile 을 건너뛴다.
 공유 listener 하나가 모든 profile 을 받는 구성에서 그 셋은 두 번째 listener 를 세우라는 뜻이 되기 때문이다.
 
-건너뛴 것은 기동 로그에 남고, 그 profile 은 접두를 붙여 불러도 답하지 않는다.
-profile 을 만드는 쪽이 그 셋을 넣지 않는 것을 테스트로 고정한다.
+건너뛴 것은 기동 로그에 남지만, 그 profile 의 `/p/<profile>/` 라우팅은 정상으로 동작한다.
+접두 라우팅은 adapter 목록이 아니라 profile 디렉터리 목록으로 정하기 때문이다.
+불필요한 경고를 남기지 않도록 profile 을 만드는 쪽이 그 셋을 넣지 않는 것을 테스트로 고정한다.
 
 ### 넣은 직후 공유 listener 가 답한다
 
@@ -1178,7 +1179,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 | 버전 | Hermes Agent v0.21.0 (2026.8.31) |
 | `run_submission`, `run_status` | true |
 | `run_events_sse`, `run_stop` | true |
-| 배치 | 경로 멀티플렉스가 아니라 profile 마다 자기 포트를 쓴다 |
+| 배치 | 공유 listener 하나가 `/p/<profile>/...` 경로로 모든 profile 을 받는다 |
 | subagent 토큰 | 부모 실행의 `usage` 에 포함되지 않는다 |
 
 **subagent 토큰이 부모에 포함되지 않으므로 실행 줄을 전부 더해야 실제 사용량이 나온다.**
@@ -1186,38 +1187,29 @@ subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고
 근거는 [ADR-016](adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) 의 「자식 토큰 실측」 절에 있다.
 부모 usage 만 저장하면 그만큼이 기록에서 빠진다.
 
-경로 멀티플렉스가 아니라 포트 분리를 쓰고 있으므로,
-Control Plane 은 profile 마다 주소를 따로 갖는다.
-그래서 API server 주소를 `hermes.base-url` 이 아니라 에이전트에 둔다.
+공유 listener 를 쓰더라도 profile 마다 접두가 다르고,
+나중에는 profile 마다 다른 노드를 가리킬 수 있어야 한다.
+그래서 Control Plane 은 API server 주소를 `hermes.base-url` 이 아니라 에이전트의 `api_base_url` 에 둔다.
 
 ## gateway 는 s6 가 감독한다
 
-이 컨테이너는 profile 마다 gateway 를 하나씩 돌리고 그것을 s6 가 감독한다.
+이 컨테이너는 listener 주인의 gateway 하나를 돌리고 s6 가 감독한다.
+이름이 붙은 profile 은 s6 service 자리를 만들기만 하며, 개별 gateway 를 자동으로 띄우지 않는다.
 `systemd` 와 같은 자리이고 컨테이너용으로 훨씬 작다.
 
 `hermes gateway run` 은 s6 에 넘기고 스스로 끝난다.
 그래서 이 명령의 종료를 gateway 가 죽은 것으로 읽으면 안 된다.
 
-| 명령 | 하는 일 |
-| --- | --- |
-| `s6-svstat /run/service/gateway-<profile>` | 돌고 있는지와 언제부터인지 |
-| `s6-svc -r /run/service/gateway-<profile>` | 다시 띄운다 |
-| `s6-svc -u /run/service/gateway-<profile>` | 띄운다 |
-
-이 명령들은 `PATH` 에 없다. `/command` 를 앞에 붙여야 한다.
+상태 확인과 다시 시작 같은 운영 명령은 비공개 저장소 `fos-home-infra` 가 갖는다.
 
 `hermes gateway start` 로 띄운 프로세스는 s6 밖에서 돈다.
 포트는 응답하지만 컨테이너를 다시 띄우면 사라지고 s6 가 되살리지 않는다.
-실측으로 `career` 를 그렇게 띄웠다가 감독 아래로 옮겼다.
 
-컨테이너가 다시 뜰 때 그 profile 의 gateway 가 함께 뜨는지는
-`~/.hermes/profiles/<profile>/gateway_state.json` 의 `desired_state` 가 정한다.
-
-한 번 켜 두면 그 파일이 `running` 으로 남아 다음 기동에서 자동으로 뜬다.
-일부러 멈춘 gateway 는 멈춘 채로 남는다. 켜고 끈 것을 컨테이너 기동이 뒤집지 않는다.
-
-`career` 를 붙인 뒤 그 파일에 `desired_state` 가 `running` 이고
-`api_server` 가 `connected` 인 것을 확인했다.
+컨테이너가 다시 뜰 때 gateway 를 함께 띄울지는 저장된 `desired_state` 가 정한다.
+multiplex 를 켜면 listener 주인의 gateway 만 이 값에 따라 시작하고,
+이름이 붙은 profile 의 s6 service 자리는 만들기만 한다.
+한 번 켜 두면 `running` 이 남아 다음 기동에서 자동으로 뜨며,
+일부러 멈춘 gateway 는 멈춘 채로 남는다.
 
 ## 실행 이벤트가 실제로 오는 형태
 
