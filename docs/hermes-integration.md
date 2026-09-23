@@ -280,6 +280,22 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 
 `gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
 
+multiplex 사용 여부는 아래 순서로 정한다.
+
+1. 환경 변수 `GATEWAY_MULTIPLEX_PROFILES`
+2. 기본 profile `config.yaml` 의 `gateway.multiplex_profiles`
+3. 기본값 `false`
+
+환경 변수에서는 `true`, `1`, `yes`, `on` 을 참으로 읽는다.
+빈 문자열이나 알 수 없는 값은 무시하고 `config.yaml` 값을 쓴다.
+
+`gateway.multiplex_profile_allowlist` 를 적지 않으면 이름이 유효하고 삭제 표시가 없는 profile 을 모두 제공한다.
+빈 목록을 적으면 기본 profile 만 제공하고, 이름을 적으면 그 profile 만 제공한다.
+허용 목록을 쓰면 profile 을 만들 때마다 목록도 고쳐야 한다.
+
+**새 profile 은 gateway 를 다시 띄우지 않아도 접두 아래에 열린다.**
+접두를 검사하는 middleware 가 요청마다 profile 디렉터리를 다시 훑고 목록을 캐시하지 않기 때문이다.
+
 **접두는 multiplex 를 켜지 않아도 동작한다.**
 profile 별 gateway 도 자기 이름의 접두를 통과시키고 남의 이름은 404 로 거절한다.
 그래서 공유 listener 를 세우기 전에 주소에 접두만 먼저 붙여 볼 수 있다.
@@ -293,6 +309,61 @@ profile 별 gateway 도 자기 이름의 접두를 통과시키고 남의 이름
 
 **listener 를 세우는 것과 밖에서 닿게 하는 것은 다른 일이다.**
 바인딩 주소를 따로 정하지 않으면 컨테이너 안에서만 열린다.
+
+#### credential 을 푸는 규칙이 달라진다
+
+multiplex 를 끄면 profile `.env` 에 없는 credential 을 프로세스 환경에서 찾는다.
+multiplex 를 켜면 profile `.env` 에 없는 credential 을 프로세스 환경으로 내려가 찾지 않는다.
+profile scope 없이 credential 을 읽으려 하면 예외가 난다.
+
+예외는 둘이다.
+
+- `API_SERVER_ENABLED`, `API_SERVER_HOST`, `API_SERVER_PORT` 는 배포 설정이므로 프로세스 환경에서 읽는다.
+  `API_SERVER_KEY` 는 credential 이므로 이 예외에 들어가지 않는다.
+- 도구 하위 프로세스의 환경은 프로세스 환경을 바탕으로 만들고 provider credential 만 빼낸다.
+  도구가 쓰는 일반 환경 변수는 계속 전달된다.
+
+#### 보조 profile 경고와 실행 범위
+
+보조 profile 에 port-binding 설정이 있다고 경고하며 그 profile 의 adapter 를 건너뛰어도
+`/p/<profile>/` 라우팅은 동작한다.
+접두 라우팅은 adapter 목록이 아니라 profile 디렉터리 목록으로 정하기 때문이다.
+
+같은 Discord credential 을 여러 profile 에 적으면 나중 profile 의 Discord adapter 는 시작하지 않는다.
+listener 주인 profile 의 Discord adapter 는 그대로 동작한다.
+
+multiplex 를 켜면 cron scheduler 가 제공 대상인 모든 profile 을 순회한다.
+개별 gateway 를 시작하지 않는 방법으로 어느 profile 의 cron 을 멈출 수 없다.
+
+Hermes 는 기동할 때 이름이 붙은 profile 의 개별 gateway 자리는 만들지만 자동으로 시작하지 않는다.
+다만 운영자가 개별 gateway 를 직접 시작하면 공유 listener 와 함께 돌 수 있고 Hermes 가 이를 막지 않는다.
+
+#### 실행 소유자는 profile 과 key 가 함께 정한다
+
+Hermes 는 실행을 만들 때 아래 값을 줄여 소유자 표에 남긴다.
+
+```text
+sha256(profile + "\0" + expected_api_key)
+```
+
+요청의 값이 소유자 표와 다르거나 소유자 표가 없으면 실행이 있는지 확인하지 않고 404 를 돌려준다.
+조회, 사건 SSE, 중단, 승인과 steer 가 모두 같은 판정을 쓴다.
+그래서 다른 profile 은 실행 번호를 알아도 그 실행의 존재 여부를 확인할 수 없다.
+
+#### 공유 listener 가 바꾸는 경계
+
+| 경계 | 정하는 곳 | 공유 listener 의 영향 |
+| --- | --- | --- |
+| 사용자 | Control Plane 의 실행 주인 | 없다 |
+| 쓸 수 있는 에이전트 | Control Plane 의 권한 검사 | 없다 |
+| Memory | Control Plane 이 실행마다 조립하는 `instructions` | 없다 |
+| AI credential | 접두로 고른 profile scope | 유지된다 |
+| API key | 접두로 고른 profile 의 `.env` | 유지된다 |
+| 사용량 | Control Plane 의 실행 기록 | 없다 |
+| 동시 실행 한도와 event loop | listener 와 프로세스 | 모든 profile 이 함께 쓴다 |
+
+요청 본문은 어느 profile 로 실행할지 정하지 못한다.
+Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 key 를 꺼내는 규칙은 그대로다.
 
 ### 동시 실행 한도는 listener 단위다
 
