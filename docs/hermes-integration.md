@@ -279,6 +279,24 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 ### profile 접두
 
 `gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
+default profile 의 listener 에는 각 경로가 접두 없는 형태와 `/p/<profile>` 접두 형태로 함께 등록된다.
+`connect()` 가 경로 표를 한 번 순회하며 두 형태를 모두 등록한다.
+
+multiplex 사용 여부는 아래 순서로 정한다.
+
+1. 환경 변수 `GATEWAY_MULTIPLEX_PROFILES`
+2. 기본 profile `config.yaml` 의 `gateway.multiplex_profiles`
+3. 기본값 `false`
+
+환경 변수에서는 `true`, `1`, `yes`, `on` 을 참으로 읽는다.
+빈 문자열이나 알 수 없는 값은 무시하고 `config.yaml` 값을 쓴다.
+
+`gateway.multiplex_profile_allowlist` 를 적지 않으면 이름이 유효하고 삭제 표시가 없는 profile 을 모두 제공한다.
+빈 목록을 적으면 기본 profile 만 제공하고, 이름을 적으면 그 profile 만 제공한다.
+허용 목록을 쓰면 profile 을 만들 때마다 목록도 고쳐야 한다.
+
+**새 profile 은 gateway 를 다시 띄우지 않아도 접두 아래에 열린다.**
+접두를 검사하는 middleware 가 요청마다 profile 디렉터리를 다시 훑고 목록을 캐시하지 않기 때문이다.
 
 **접두는 multiplex 를 켜지 않아도 동작한다.**
 profile 별 gateway 도 자기 이름의 접두를 통과시키고 남의 이름은 404 로 거절한다.
@@ -293,6 +311,68 @@ profile 별 gateway 도 자기 이름의 접두를 통과시키고 남의 이름
 
 **listener 를 세우는 것과 밖에서 닿게 하는 것은 다른 일이다.**
 바인딩 주소를 따로 정하지 않으면 컨테이너 안에서만 열린다.
+
+#### credential 을 푸는 규칙이 달라진다
+
+multiplex 를 끄면 profile `.env` 에 없는 credential 을 프로세스 환경에서 찾는다.
+multiplex 를 켜면 profile `.env` 에 없는 credential 을 프로세스 환경으로 내려가 찾지 않는다.
+profile scope 없이 credential 을 읽으려 하면 예외가 난다.
+
+`API_SERVER_KEY` 는 접두로 고른 profile scope 에서 읽는다.
+값을 읽지 못하거나 16자보다 짧으면 빈 값이 되고, 그 profile 의 요청을 모두 거절한다.
+
+예외는 둘이다.
+
+- `API_SERVER_ENABLED`, `API_SERVER_HOST`, `API_SERVER_PORT` 는 배포 설정이므로 프로세스 환경에서 읽는다.
+  `API_SERVER_KEY` 는 credential 이므로 이 예외에 들어가지 않는다.
+- 도구 하위 프로세스의 환경은 프로세스 환경을 바탕으로 만들고 provider credential 만 빼낸다.
+  도구가 쓰는 일반 환경 변수는 계속 전달된다.
+
+#### 보조 profile 경고와 실행 범위
+
+보조 profile 에 port-binding 설정이 있다고 경고하며 그 profile 의 adapter 를 건너뛰어도
+`/p/<profile>/` 라우팅은 동작한다.
+접두 라우팅은 adapter 목록이 아니라 profile 디렉터리 목록으로 정하기 때문이다.
+
+같은 Discord credential 을 여러 profile 에 적으면 나중 profile 의 Discord adapter 는 시작하지 않는다.
+listener 주인 profile 의 Discord adapter 는 그대로 동작한다.
+
+multiplex 를 켜면 cron scheduler 가 제공 대상인 모든 profile 을 순회한다.
+개별 gateway 를 시작하지 않는 방법으로 어느 profile 의 cron 을 멈출 수 없다.
+
+컨테이너가 기동할 때 profile 마다 s6 service 자리를 다시 만든다.
+이 자리는 tmpfs 에 있어 컨테이너가 다시 뜰 때마다 사라진다.
+multiplex 를 끄면 default profile 과 이름이 붙은 profile 을 모두 저장된 `desired_state` 에 따라 시작한다.
+multiplex 를 켜면 default profile 만 `desired_state` 에 따라 시작하고,
+이름이 붙은 profile 의 자리는 만들기만 한다.
+다만 운영자가 개별 gateway 를 직접 시작하면 공유 listener 와 함께 돌 수 있고 Hermes 가 이를 막지 않는다.
+
+#### 실행 소유자는 profile 과 key 가 함께 정한다
+
+Hermes 는 실행을 만들 때 아래 값을 줄여 소유자 표에 남긴다.
+
+```text
+sha256(profile + "\0" + expected_api_key)
+```
+
+요청의 값이 소유자 표와 다르거나 소유자 표가 없으면 실행이 있는지 확인하지 않고 404 를 돌려준다.
+조회, 사건 SSE, 중단, 승인과 steer 가 모두 같은 판정을 쓴다.
+그래서 다른 profile 은 실행 번호를 알아도 그 실행의 존재 여부를 확인할 수 없다.
+
+#### 공유 listener 가 바꾸는 경계
+
+| 경계 | 정하는 곳 | 공유 listener 의 영향 |
+| --- | --- | --- |
+| 사용자 | Control Plane 의 실행 주인 | 없다 |
+| 쓸 수 있는 에이전트 | Control Plane 의 권한 검사 | 없다 |
+| Memory | Control Plane 이 실행마다 조립하는 `instructions` | 없다 |
+| AI credential | 접두로 고른 profile scope | 유지된다 |
+| API key | 접두로 고른 profile 의 `.env` | 유지된다 |
+| 사용량 | Control Plane 의 실행 기록 | 없다 |
+| 동시 실행 한도와 event loop | listener 와 프로세스 | 모든 profile 이 함께 쓴다 |
+
+요청 본문은 어느 profile 로 실행할지 정하지 못한다.
+Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 key 를 꺼내는 규칙은 그대로다.
 
 ### 동시 실행 한도는 listener 단위다
 
@@ -456,6 +536,29 @@ pool 을 키우는 것만으로는 메모리가 늘지 않는다. 스레드를 �
 토큰이 요청자를 정한다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
 Control Plane 은 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 실제 MCP 서버 등록과 토큰 전달은 비공개 저장소 `fos-home-infra`가 맡는다.
+
+### API server 에서 MCP 도구를 여는 범위
+
+`platform_toolsets.api_server` 의 `no_mcp` 는 API server 로 들어온 실행에서 MCP 도구를 통째로 막는다.
+`no_mcp` 대신 서버 이름을 허용 목록으로 적으면 그 서버의 도구만 모델에 전달하고 나머지는 막는다.
+
+도구가 없던 profile 에 MCP 서버를 처음 열면 Hermes 가 `tool_search`, `tool_describe`, `tool_call` 중계를 함께 싣는다.
+도구 정의가 약 59 토큰이어도 중계 때문에 입력이 약 1,800 토큰 늘 수 있다.
+이미 이 중계를 쓰는 profile 은 MCP 서버를 더해도 서버의 도구 정의만큼만 늘어난다.
+
+### 입력 비용은 API 콜 수가 정한다
+
+실행의 입력 토큰은 provider 에 보낸 모든 API 콜의 입력을 더한 값이다.
+추가 API 콜 하나는 그 시점의 전체 프롬프트 하나만큼 들기 때문에 대화가 길수록 도구 호출도 비싸진다.
+
+도구를 부르지 않는 턴은 API 콜이 한 번이고, `memory_read` 를 부른 턴은 두 번이나 세 번이었다.
+한 턴에서 항목을 한 개 읽든 세 개를 병렬로 읽든 API 콜 수는 같았다.
+항목 수보다 도구를 부르는 턴 수가 입력 비용을 정한다.
+
+Memory 색인 한 줄은 약 12 토큰이고, `always_inject` 본문은 한 글자당 약 0.49 토큰이다.
+`always_inject` 는 API 콜 수를 늘리지 않는다.
+Control Plane 이 두 방식을 고르는 기준은
+[`flow.md`](flow.md#도구와-always_inject-를-고르는-기준)에 둔다.
 
 ## plugin hook
 
