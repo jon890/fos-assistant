@@ -18,6 +18,8 @@ assistant:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
   attachment:
     root: build/test-attachments
+    # 검사는 이 경로를 열지 않고 Hermes 로 간 입력에 적힌 글자만 본다
+    agent-root: /agent-side/attachments
     # 검사가 뜰 때마다 지우는 일이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     cleanup-cron: "-"
 hermes:

@@ -10,9 +10,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamSource;
 import org.springframework.stereotype.Service;
@@ -111,10 +113,12 @@ public class AttachmentService {
      *
      * <p>어느 까닭으로 거절했는지 갈라 알리지 않는다. 남의 번호와 없는 번호가 같은 응답이어야 번호를
      * 훑어 남의 것을 알아낼 수 없다.
+     *
+     * @return 판정을 통과한 첨부들. 요청한 번호 순서다. 목록이 비었으면 빈 목록이다
      */
-    public void requireAttachable(Long conversationId, List<Long> attachmentIds) {
+    public List<ChatAttachment> requireAttachable(Long conversationId, List<Long> attachmentIds) {
         if (attachmentIds == null || attachmentIds.isEmpty()) {
-            return;
+            return List.of();
         }
         if (attachmentIds.size() > properties.maxFiles()
                 || new HashSet<>(attachmentIds).size() != attachmentIds.size()) {
@@ -127,6 +131,9 @@ public class AttachmentService {
         if (!allFree) {
             throw notAttachable();
         }
+        return found.stream()
+                .sorted(Comparator.comparingInt(it -> attachmentIds.indexOf(it.id())))
+                .toList();
     }
 
     /**
@@ -146,6 +153,33 @@ public class AttachmentService {
         }
     }
 
+    /**
+     * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름을 사용자가 쓴 글 앞에 붙인다.
+     *
+     * <p>{@code /v1/runs} 가 이미지 항목을 받지 않아 사진을 본문에 싣지 못한다. 대신 에이전트가 파일로
+     * 읽게 자리를 알린다. 근거는 ADR-020 에 있다. 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot}
+     * 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의 이름은 알아보라고 괄호로만 붙인다.
+     *
+     * <p>사진이 없으면 한 글자도 붙이지 않는다. 붙이면 그만큼이 매 실행에 실린다. 저장하는 메시지 본문에는
+     * 이것을 쓰지 않는다.
+     */
+    public String agentInput(Long conversationId, List<ChatAttachment> attached, String text) {
+        if (attached == null || attached.isEmpty()) {
+            return text;
+        }
+        String directory = stripTrailingSlash(properties.agentRoot()) + "/" + conversationId;
+        String files = attached.stream()
+                .map(it -> "- " + it.storedName() + " (올린 이름: " + it.originalName() + ")")
+                .collect(Collectors.joining("\n"));
+        return "[이번 메시지에 올린 사진]\n"
+                + directory + "\n"
+                + files + "\n"
+                + "\n"
+                + "이미지는 read_file 로 읽지 말고 vision_analyze 로 본다.\n"
+                + "\n"
+                + text;
+    }
+
     /** 그 대화의 첨부를 번호 순으로 돌려준다. 지난 대화에 자리를 남기려고 지워진 것도 담는다. */
     public List<ChatAttachment> allOf(Long conversationId) {
         return attachments.findByConversationIdOrderByIdAsc(conversationId);
@@ -158,6 +192,14 @@ public class AttachmentService {
                 .findByIdAndConversationId(attachmentId, conversationId)
                 .orElseThrow(() -> new ApiException(
                         ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
+    }
+
+    private static String stripTrailingSlash(String path) {
+        String stripped = path.strip();
+        while (stripped.length() > 1 && stripped.endsWith("/")) {
+            stripped = stripped.substring(0, stripped.length() - 1);
+        }
+        return stripped;
     }
 
     private static ApiException notAttachable() {

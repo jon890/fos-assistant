@@ -3,7 +3,9 @@ package com.bifos.assistant.chat.presentation;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
@@ -48,8 +50,12 @@ public class ChatController {
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
-        ChatTurn turn =
-                chat.send(user, request.conversationId(), request.text(), request.agentCode());
+        ChatTurn turn = chat.send(
+                user,
+                request.conversationId(),
+                request.text(),
+                request.agentCode(),
+                request.attachmentIds());
         return new SendMessageResponse(turn.conversationId(), turn.executionId(), turn.assistantText());
     }
 
@@ -65,6 +71,7 @@ public class ChatController {
                         request.conversationId(),
                         request.text(),
                         request.agentCode(),
+                        request.attachmentIds(),
                         event -> send(emitter, event, clientConnected));
             } catch (ApiException ex) {
                 send(emitter, ChatEvent.error(ex.code().name(), ex.getMessage()), clientConnected);
@@ -119,6 +126,7 @@ public class ChatController {
         List<ChatMessage> history = chat.history(user, conversationId);
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
+        Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(conversationId);
         return history.stream()
                 .map(
                         it ->
@@ -131,7 +139,10 @@ public class ChatController {
                                         // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
                                         it.executionId() != null && withChildren.contains(it.executionId()),
                                         it.executionId() == null ? null : switched.get(it.executionId()),
-                                        it.createdAt()))
+                                        it.createdAt(),
+                                        attached.getOrDefault(it.id(), List.of()).stream()
+                                                .map(AttachmentView::from)
+                                                .toList()))
                 .toList();
     }
 }

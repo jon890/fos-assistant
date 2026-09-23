@@ -61,9 +61,21 @@ public final class AgentDtos {
     public record WritePersonaRequest(
             @NotBlank @Size(max = PERSONA_MAX_CHARS) String body, String baseHash) {}
 
-    public record AgentView(String code, String name, String model, String visibility) {
+    /**
+     * 사용자가 대화를 시작할 때 고르는 에이전트 한 줄.
+     *
+     * @param acceptsAttachments 이 에이전트의 대화에 사진을 붙일 수 있다. 화면이 이때만 사진 단추를
+     *     둔다. 흐름 이름은 내보내지 않는다
+     */
+    public record AgentView(
+            String code, String name, String model, String visibility, boolean acceptsAttachments) {
         static AgentView from(Agent agent) {
-            return new AgentView(agent.code(), agent.name(), agent.model(), agent.visibility().name());
+            return new AgentView(
+                    agent.code(),
+                    agent.name(),
+                    agent.model(),
+                    agent.visibility().name(),
+                    agent.acceptsAttachments());
         }
     }
 

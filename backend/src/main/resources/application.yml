@@ -52,6 +52,9 @@ assistant:
   attachment:
     # 대화에 올린 사진을 두는 공유 디렉터리. 기본값을 두지 않아 없으면 기동에 실패한다
     root: ${ASSISTANT_ATTACHMENT_ROOT}
+    # 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 값을 둘로 두는 것이 아니라 두 컨테이너가 같은
+    # 디렉터리를 다른 마운트 지점으로 보는 것이다. 에이전트에게는 이 경로를 알린다. 기본값이 없다
+    agent-root: ${ASSISTANT_ATTACHMENT_AGENT_ROOT}
     max-files: 10
     max-bytes: 10485760
     retention-days: 30

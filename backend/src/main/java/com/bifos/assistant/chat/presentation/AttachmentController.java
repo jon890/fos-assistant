@@ -61,11 +61,6 @@ public class AttachmentController {
     }
 
     private static AttachmentView view(ChatAttachment attachment) {
-        return new AttachmentView(
-                attachment.id(),
-                attachment.originalName(),
-                attachment.byteSize(),
-                attachment.isVisible(),
-                attachment.expiresAt());
+        return AttachmentView.from(attachment);
     }
 }
