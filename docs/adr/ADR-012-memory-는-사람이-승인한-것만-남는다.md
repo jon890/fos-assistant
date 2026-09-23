@@ -33,7 +33,7 @@ Hermes 가 이미 자동으로 쌓는 쪽을 택하고 있어 그 결과물을 �
 - Short-Term Memory - 2026-06-11: ... 커밋/푸시 `9484996 fix(career-os): ...` 완료.
   [score=0.815 recalls=0 avg=0.620 source=memory/2026-06-11.md:3-6]
 - 2026-06-14 Memory: 2026-06-14 Memory: Plan072 HTML report planning was started in a
-  separate worktree/branch... Worktree: `/home/bifos/ai-nodes-worktrees/plan072-...`
+  separate worktree/branch... Worktree: `<worktree 경로>/plan072-...`
 ```
 
 커밋 해시와 worktree 경로와 plan 진행 상태가 남았고,
