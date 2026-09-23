@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 /**
  * 구독제로 돌고 있어도 화면이 금액을 보이려면 이 환산이 맞아야 한다.
  *
- * <p>표본 카탈로그는 models.dev 가 실제로 내려 주는 모양을 그대로 줄인 것이다. {@code gpt-5.5} 항목은
+ * <p>표본 카탈로그는 models.dev 가 실제로 내려 주는 모양을 그대로 줄인 것이다. {@code gpt-5.6-sol} 항목은
  * 단가와 구간까지 실제 값이다.
  */
 class CostEstimatorTest {
@@ -43,7 +43,7 @@ class CostEstimatorTest {
     @Test
     void 카탈로그에서_가격을_찾아_금액을_계산한다() {
         // 입력 1000 × 5 + 출력 500 × 30 = 20000 마이크로 달러
-        EstimatedCost cost = estimator.estimate("openai", "gpt-5.5", usage(1000L, null, 500L));
+        EstimatedCost cost = estimator.estimate("openai", "gpt-5.6-sol", usage(1000L, null, 500L));
 
         assertThat(cost.micros()).isEqualTo(20_000L);
         assertThat(cost.currency()).isEqualTo("USD");
@@ -53,7 +53,7 @@ class CostEstimatorTest {
     @Test
     void 캐시된_입력은_캐시_단가로_세고_나머지만_입력_단가로_센다() {
         // 입력 1000 중 800 이 캐시다. 200 × 5 + 800 × 0.5 + 500 × 30 = 16400
-        EstimatedCost cost = estimator.estimate("openai", "gpt-5.5", usage(1000L, 800L, 500L));
+        EstimatedCost cost = estimator.estimate("openai", "gpt-5.6-sol", usage(1000L, 800L, 500L));
 
         assertThat(cost.micros()).isEqualTo(16_400L);
     }
@@ -69,7 +69,7 @@ class CostEstimatorTest {
     @Test
     void 구간_경계를_넘으면_그_구간의_단가를_쓴다() {
         // 경계는 272000 이다. 300000 × 10 + 1000 × 45 = 3045000
-        EstimatedCost cost = estimator.estimate("openai", "gpt-5.5", usage(300_000L, null, 1_000L));
+        EstimatedCost cost = estimator.estimate("openai", "gpt-5.6-sol", usage(300_000L, null, 1_000L));
 
         assertThat(cost.micros()).isEqualTo(3_045_000L);
     }
@@ -77,7 +77,7 @@ class CostEstimatorTest {
     @Test
     void 구간_경계와_같으면_아직_기본_단가를_쓴다() {
         // 272000 × 5 = 1360000. 경계를 넘을 때만 올라간다
-        EstimatedCost cost = estimator.estimate("openai", "gpt-5.5", usage(272_000L, null, 0L));
+        EstimatedCost cost = estimator.estimate("openai", "gpt-5.6-sol", usage(272_000L, null, 0L));
 
         assertThat(cost.micros()).isEqualTo(1_360_000L);
     }
@@ -93,10 +93,10 @@ class CostEstimatorTest {
     @Test
     void provider_별칭이_동작한다() {
         // 바인딩은 openai-codex 를 적지만 카탈로그는 그 모델을 openai 아래에 둔다
-        EstimatedCost aliased = estimator.estimate(CODEX_PROVIDER, "gpt-5.5", usage(1000L, null, 500L));
+        EstimatedCost aliased = estimator.estimate(CODEX_PROVIDER, "gpt-5.6-sol", usage(1000L, null, 500L));
 
         assertThat(aliased.micros()).isEqualTo(20_000L);
-        assertThat(aliased).isEqualTo(estimator.estimate("openai", "gpt-5.5", usage(1000L, null, 500L)));
+        assertThat(aliased).isEqualTo(estimator.estimate("openai", "gpt-5.6-sol", usage(1000L, null, 500L)));
     }
 
     @Test
@@ -109,7 +109,7 @@ class CostEstimatorTest {
     @Test
     void 가격을_찾지_못하면_금액이_비어_있다() {
         EstimatedCost unknownModel = estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L));
-        EstimatedCost unknownProvider = estimator.estimate("some-vendor", "gpt-5.5", usage(1000L, null, 500L));
+        EstimatedCost unknownProvider = estimator.estimate("some-vendor", "gpt-5.6-sol", usage(1000L, null, 500L));
         EstimatedCost noRates = estimator.estimate("openai", "gpt-free-tool", usage(1000L, null, 500L));
 
         assertThat(unknownModel).isEqualTo(EstimatedCost.unknown());
@@ -121,7 +121,7 @@ class CostEstimatorTest {
 
     @Test
     void 토큰을_하나도_보고하지_않은_실행은_금액이_비어_있다() {
-        assertThat(estimator.estimate("openai", "gpt-5.5", TokenUsage.empty()))
+        assertThat(estimator.estimate("openai", "gpt-5.6-sol", TokenUsage.empty()))
                 .isEqualTo(EstimatedCost.unknown());
     }
 
@@ -131,15 +131,15 @@ class CostEstimatorTest {
                 new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties("/tmp/no-such-catalog.json")));
         CostEstimator notConfigured = new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties("")));
 
-        assertThat(noCatalog.estimate("openai", "gpt-5.5", usage(1000L, null, 500L)))
+        assertThat(noCatalog.estimate("openai", "gpt-5.6-sol", usage(1000L, null, 500L)))
                 .isEqualTo(EstimatedCost.unknown());
-        assertThat(notConfigured.estimate("openai", "gpt-5.5", usage(1000L, null, 500L)))
+        assertThat(notConfigured.estimate("openai", "gpt-5.6-sol", usage(1000L, null, 500L)))
                 .isEqualTo(EstimatedCost.unknown());
     }
 
     @Test
     void API_경로는_환산액과_실제_청구액이_같다() {
-        ExecutionCost cost = estimator.estimate("openai", "gpt-5.5", usage(1000L, null, 500L), CostMode.API);
+        ExecutionCost cost = estimator.estimate("openai", "gpt-5.6-sol", usage(1000L, null, 500L), CostMode.API);
 
         assertThat(cost.estimatedMicros()).isEqualTo(20_000L);
         assertThat(cost.actualMicros()).isEqualTo(20_000L);
@@ -150,7 +150,7 @@ class CostEstimatorTest {
     @Test
     void 구독_경로는_환산액은_있고_실제_청구액은_비어_있다() {
         ExecutionCost cost =
-                estimator.estimate("openai", "gpt-5.5", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
+                estimator.estimate("openai", "gpt-5.6-sol", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
 
         assertThat(cost.estimatedMicros()).isEqualTo(20_000L);
         assertThat(cost.actualMicros()).isNull();

@@ -424,7 +424,7 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          return send(response, 200, { model: "gpt-5.5", provider: "openai-codex", providers: [] });
+          return send(response, 200, { model: "gpt-5.6-sol", provider: "openai-codex", providers: [] });
         }
 
         const sessionMatch = SESSION_PATH.exec(path);
@@ -444,7 +444,7 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          return send(response, 200, { model: "gpt-5.5", tools: [] });
+          return send(response, 200, { model: "gpt-5.6-sol", tools: [] });
         }
 
         const eventMatch = RUN_EVENTS_PATH.exec(path);

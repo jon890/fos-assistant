@@ -123,7 +123,7 @@ class ModelSelectionTest {
                 AGENT_CODE,
                 "http://agent-runtime.test/p/" + AGENT_CODE,
                 "openai-codex",
-                "gpt-5.5",
+                "gpt-5.6-sol",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
@@ -131,7 +131,7 @@ class ModelSelectionTest {
         modelSelector.replace(
                 agent,
                 List.of(
-                        new ModelOption("openai-codex", "gpt-5.5"),
+                        new ModelOption("openai-codex", "gpt-5.6-sol"),
                         new ModelOption("nvidia", "nvidia/nemotron-3-super-120b-a12b")));
     }
 
@@ -143,7 +143,7 @@ class ModelSelectionTest {
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.provider()).isEqualTo("openai-codex");
-            assertThat(command.model()).isEqualTo("gpt-5.5");
+            assertThat(command.model()).isEqualTo("gpt-5.6-sol");
         });
     }
 
@@ -172,7 +172,7 @@ class ModelSelectionTest {
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
         assertThat(execution.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(execution.provider()).isEqualTo("openai-codex");
-        assertThat(execution.model()).isEqualTo("gpt-5.5");
+        assertThat(execution.model()).isEqualTo("gpt-5.6-sol");
     }
 
     @Test
@@ -242,7 +242,7 @@ class ModelSelectionTest {
         modelSelector.replace(
                 agent,
                 List.of(
-                        new ModelOption("openai-codex", "gpt-5.5"),
+                        new ModelOption("openai-codex", "gpt-5.6-luna"),
                         new ModelOption("openai-codex", "gpt-5.6-sol")));
         stub().willReturnInOrder(blocked("run-1", "sess-1"), succeeded("run-2", "sess-1"));
 
@@ -256,7 +256,7 @@ class ModelSelectionTest {
     void 다른_실패는_넘기지_않고_한_번만_실패한다() {
         stub().willReturn(
                 new HermesRunResult(
-                        "run-1", "sess-1", "failed", null, "gpt-5.5", "openai-codex",
+                        "run-1", "sess-1", "failed", null, "gpt-5.6-sol", "openai-codex",
                         "HTTP 404: 404 page not found", TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(user, null, "안녕", AGENT_CODE))
@@ -323,11 +323,11 @@ class ModelSelectionTest {
     }
 
     private static HermesRunResult succeeded(String runId, String sessionId) {
-        return HermesRunResult.of(runId, sessionId, "completed", "네", "gpt-5.5", null, TokenUsage.empty());
+        return HermesRunResult.of(runId, sessionId, "completed", "네", "gpt-5.6-sol", null, TokenUsage.empty());
     }
 
     private static HermesRunResult blocked(String runId, String sessionId) {
         return new HermesRunResult(
-                runId, sessionId, "failed", null, "gpt-5.5", null, BLOCKED_ERROR, TokenUsage.empty());
+                runId, sessionId, "failed", null, "gpt-5.6-sol", null, BLOCKED_ERROR, TokenUsage.empty());
     }
 }

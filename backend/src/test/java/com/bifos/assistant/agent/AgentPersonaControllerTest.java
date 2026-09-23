@@ -150,7 +150,7 @@ class AgentPersonaControllerTest {
     private static Agent agent(
             String code, String profile, AgentVisibility visibility, Long ownerUserId) {
         return Agent.of(code, code, profile, "http://127.0.0.1:1/p/" + profile, "openai-codex",
-                "gpt-5.5", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility,
+                "gpt-5.6-sol", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility,
                 ownerUserId);
     }
 }
