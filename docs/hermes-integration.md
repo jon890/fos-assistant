@@ -330,9 +330,28 @@ profile scope 없이 credential 을 읽으려 하면 예외가 난다.
 
 #### 보조 profile 경고와 실행 범위
 
-보조 profile 에 port-binding 설정이 있다고 경고하며 그 profile 의 adapter 를 건너뛰어도
-`/p/<profile>/` 라우팅은 동작한다.
+이름이 붙은 profile 의 `.env` 에 `API_SERVER_KEY` 가 있으면 Hermes 는 그 profile 의
+API server platform 을 자동으로 켠다.
+`config.yaml` 에 `api_server` 를 적지 않거나 `API_SERVER_ENABLED`, `API_SERVER_HOST`,
+`API_SERVER_PORT` 를 모두 빼도 같다.
+
+multiplex 에서는 `SecondaryPortBindingConfigError` 경고를 남기고 그 profile 의 adapter 를 건너뛴다.
+그래도 `/p/<profile>/` 라우팅은 동작한다.
 접두 라우팅은 adapter 목록이 아니라 profile 디렉터리 목록으로 정하기 때문이다.
+
+자동 활성화를 막으려면 그 profile 의 `config.yaml` 최상위에 아래처럼 명시한다.
+
+```yaml
+platforms:
+  api_server:
+    enabled: false
+```
+
+이 설정을 적용해도 올바른 profile key 로 `/p/<profile>/` 를 호출하면 200,
+다른 profile key 로 호출하면 401 이 온다.
+
+`platform_toolsets.api_server` 는 API server 로 들어온 실행에 허용할 도구를 정한다.
+이름이 비슷하지만 platform 활성화 설정과는 다르며, 이 항목을 지우면 실행의 도구 범위가 달라진다.
 
 같은 Discord credential 을 여러 profile 에 적으면 나중 profile 의 Discord adapter 는 시작하지 않는다.
 listener 주인 profile 의 Discord adapter 는 그대로 동작한다.
@@ -1136,15 +1155,21 @@ profile 을 하나 만들어 `API_SERVER_KEY` 를 넣고,
 
 ### 공유 listener 를 쓰는 profile 에는 listener 설정을 넣지 않는다
 
-`.env` 에 넣는 것은 `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 둘뿐이다.
+`.env` 에는 `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 를 넣고,
+`API_SERVER_ENABLED`, `API_SERVER_HOST`, `API_SERVER_PORT` 는 넣지 않는다.
+그러나 listener 설정 세 개를 빼는 것만으로는 충분하지 않다.
+`API_SERVER_KEY` 가 있으면 API server platform 이 자동으로 켜지기 때문이다.
 
-`API_SERVER_ENABLED` 와 `API_SERVER_HOST` 와 `API_SERVER_PORT` 를 함께 적으면
-gateway 가 뜰 때 `SecondaryPortBindingConfigError` 로 그 profile 을 건너뛴다.
-공유 listener 하나가 모든 profile 을 받는 구성에서 그 셋은 두 번째 listener 를 세우라는 뜻이 되기 때문이다.
+이름이 붙은 profile 의 `config.yaml` 최상위에 `platforms.api_server.enabled: false` 를 명시한다.
+그러지 않으면 gateway 가 뜰 때 `SecondaryPortBindingConfigError` 로 그 profile 의 adapter 를 건너뛴다.
+공유 listener 하나가 모든 profile 을 받는데 두 번째 API server platform 도 활성화됐기 때문이다.
 
 건너뛴 것은 기동 로그에 남지만, 그 profile 의 `/p/<profile>/` 라우팅은 정상으로 동작한다.
 접두 라우팅은 adapter 목록이 아니라 profile 디렉터리 목록으로 정하기 때문이다.
-불필요한 경고를 남기지 않도록 profile 을 만드는 쪽이 그 셋을 넣지 않는 것을 테스트로 고정한다.
+`platforms.api_server.enabled: false` 로 자동 활성화를 막아도 접두 라우팅은 그대로 동작한다.
+profile 을 만드는 쪽이 listener 설정 세 개를 넣지 않는 것은 테스트로 고정돼 있다.
+Control Plane 은 자동 활성화를 막는 설정을 넣지 않으므로, Control Plane 이 만든 profile 은
+기동할 때 이 경고를 남긴다. 접두 라우팅과 key 경계에는 영향이 없다.
 
 ### 넣은 직후 공유 listener 가 답한다
 
