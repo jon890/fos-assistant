@@ -31,7 +31,7 @@ class HermesRunRequestTest {
 
     @Test
     void provider_가_비면_Hermes_를_부르지_않고_실패한다() {
-        assertThatThrownBy(() -> client.submit(command(null, "gpt-5.6-sol")))
+        assertThatThrownBy(() -> client.submit(command(null, "example-model")))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
@@ -66,7 +66,7 @@ class HermesRunRequestTest {
     @Test
     void 성공한_실행은_넘김_대상이_아니다() {
         HermesRunResult completed = new HermesRunResult(
-                "run-1", "sess-1", "completed", "네", "gpt-5.6-sol", "openai-codex",
+                "run-1", "sess-1", "completed", "네", "example-model", "openai-codex",
                 HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " 남아 있는 글", TokenUsage.empty());
 
         assertThat(completed.providerBlocked()).isFalse();
@@ -74,7 +74,7 @@ class HermesRunRequestTest {
 
     private static HermesRunResult failed(String error) {
         return new HermesRunResult(
-                "run-1", "sess-1", "failed", null, "gpt-5.6-sol", "openai-codex", error, TokenUsage.empty());
+                "run-1", "sess-1", "failed", null, "example-model", "openai-codex", error, TokenUsage.empty());
     }
 
     private static HermesRunCommand command(String provider, String model) {

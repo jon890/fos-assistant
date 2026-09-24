@@ -144,12 +144,12 @@ class ChatServiceTest {
                             profileName,
                             "http://agent-runtime.test/p/" + profileName,
                             "anthropic",
-                            "claude-opus-5",
+                            "example-model-large",
                             CostMode.SUBSCRIPTION,
                             CredentialScope.SHARED_HOUSEHOLD,
                             AgentVisibility.PRIVATE,
                             user.id()));
-            modelSelector.seedFirst(saved, new ModelOption("anthropic", "claude-opus-5"));
+            modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
     }
@@ -164,7 +164,7 @@ class ChatServiceTest {
                                 "sess-1",
                                 "completed",
                                 "저녁은 김치찌개가 좋겠어요.",
-                                "claude-opus-5",
+                                "example-model-large",
                                 "anthropic",
                                 new TokenUsage(120L, 80L, 40L, 160L)));
         stub().beforeAwait(() ->
@@ -192,7 +192,7 @@ class ChatServiceTest {
         assertThat(execution.userId()).isEqualTo(dad.id());
         assertThat(execution.profileName()).isEqualTo("dad");
         assertThat(execution.provider()).isEqualTo("anthropic");
-        assertThat(execution.model()).isEqualTo("claude-opus-5");
+        assertThat(execution.model()).isEqualTo("example-model-large");
         assertThat(execution.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(execution.inputTokens()).isEqualTo(120);
         assertThat(execution.cachedInputTokens()).isEqualTo(80);
@@ -282,7 +282,7 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
-        assertThat(execution.model()).isEqualTo("claude-opus-5");
+        assertThat(execution.model()).isEqualTo("example-model-large");
         assertThat(execution.provider()).isEqualTo("anthropic");
     }
 

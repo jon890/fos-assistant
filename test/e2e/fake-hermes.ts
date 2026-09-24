@@ -104,7 +104,7 @@ const SESSION_MODEL_PROBE = "세션 모델 검사";
  * 돈 모델을 읽고 있는지 알 수 있다.
  */
 function actualModelFor(input: string, requested: string): string {
-  if (input === SESSION_MODEL_PROBE) return "nvidia/nemotron-3.5-lightning-30b-a3b";
+  if (input === SESSION_MODEL_PROBE) return "example-provider/example-model-c";
   if (input === "가격 없음 검사") return "unknown-model";
   if (input === "무료 모델 검사") return "gpt-zero";
   return requested;
@@ -427,7 +427,7 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          return send(response, 200, { model: "gpt-5.6-sol", provider: "openai-codex", providers: [] });
+          return send(response, 200, { model: "example-model", provider: "openai-codex", providers: [] });
         }
 
         const sessionMatch = SESSION_PATH.exec(path);
@@ -447,7 +447,7 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          return send(response, 200, { model: "gpt-5.6-sol", tools: [] });
+          return send(response, 200, { model: "example-model", tools: [] });
         }
 
         const eventMatch = RUN_EVENTS_PATH.exec(path);

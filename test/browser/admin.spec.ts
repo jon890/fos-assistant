@@ -33,7 +33,7 @@ test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
 
 test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ page }) => {
   await page.request.put(`/api/admin/agents/${MODELS_AGENT_CODE}/models`, {
-    data: { models: [{ provider: "openai-codex", model: "gpt-5.6-sol" }] },
+    data: { models: [{ provider: "openai-codex", model: "example-model" }] },
   });
   await page.goto("/admin/agents");
   const card = page
@@ -46,7 +46,7 @@ test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ pa
 
   await list.getByRole("button", { name: "모델 추가" }).click();
   await list.getByLabel("2순위 provider").fill("nvidia");
-  await list.getByLabel("2순위 모델").fill("nemotron");
+  await list.getByLabel("2순위 모델").fill("example-model-b");
   await list.getByRole("button", { name: "모델 목록 저장" }).click();
   await expect(list.getByLabel("2순위 provider")).toHaveValue("nvidia");
 

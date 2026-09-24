@@ -150,21 +150,21 @@ class ResearchAndBuildFlowTest {
                 agentCode,
                 "http://agent-runtime.test/p/" + agentCode,
                 "anthropic",
-                "claude-opus-5",
+                "example-model-large",
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 user.id());
         agent.assignFlow(flow);
         Agent saved = agents.save(agent);
-        modelSelector.seedFirst(saved, new ModelOption("anthropic", "claude-opus-5"));
+        modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         return new CurrentUser(
                 user.id(), user.email(), user.displayName(), user.familyId(), user.role());
     }
 
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(
-                runId, "sess-" + runId, "completed", output, "claude-opus-5", "anthropic",
+                runId, "sess-" + runId, "completed", output, "example-model-large", "anthropic",
                 new TokenUsage(100L, 0L, 20L, 120L));
     }
 
@@ -261,7 +261,7 @@ class ResearchAndBuildFlowTest {
             }
             if (input.contains("조사해")) {
                 return HermesRunResult.of(
-                        "run-researcher", null, "failed", null, "claude-opus-5", "anthropic",
+                        "run-researcher", null, "failed", null, "example-model-large", "anthropic",
                         TokenUsage.empty());
             }
             if (input.contains("만든다")) {

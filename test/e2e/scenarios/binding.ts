@@ -6,7 +6,7 @@ export const DAD_BINDING = {
   // 에이전트 code(`dad`) 와 일부러 다르게 둔다. 둘이 같으면 대시보드에 code 를 넘겨도 검사가 통과한다.
   profileName: "dad-profile",
   provider: "openai-codex",
-  model: "gpt-5.6-sol",
+  model: "example-model",
 } as const;
 
 export const bindingScenario: Scenario = {

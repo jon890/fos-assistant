@@ -60,7 +60,7 @@ class FirstSignInTest {
         people.deleteAll();
         people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
         when(hermesModels.readOptions(anyString(), anyString()))
-                .thenReturn(new HermesModelOptions("gpt-5.6-sol", "openai-codex"));
+                .thenReturn(new HermesModelOptions("example-model", "openai-codex"));
     }
 
     private String expectedApiBaseUrl() {
@@ -75,7 +75,7 @@ class FirstSignInTest {
         assertThat(agents.findByCode(PROFILE))
                 .get()
                 .extracting(Agent::name, Agent::hermesProfile, Agent::apiBaseUrl, Agent::provider, Agent::model)
-                .containsExactly(NAME, PROFILE, expectedApiBaseUrl(), "openai-codex", "gpt-5.6-sol");
+                .containsExactly(NAME, PROFILE, expectedApiBaseUrl(), "openai-codex", "example-model");
     }
 
     /**
@@ -101,7 +101,7 @@ class FirstSignInTest {
         assertThat(options)
                 .singleElement()
                 .extracting(AgentModelOption::rank, AgentModelOption::provider, AgentModelOption::model)
-                .containsExactly(1, "openai-codex", "gpt-5.6-sol");
+                .containsExactly(1, "openai-codex", "example-model");
     }
 
     @Test
@@ -158,7 +158,7 @@ class FirstSignInTest {
     @Test
     void provider_를_비워서_주면_기본값으로_메우지_않고_에이전트를_만들지_않는다() {
         when(hermesModels.readOptions(any(), any()))
-                .thenReturn(new HermesModelOptions("gpt-5.6-sol", null));
+                .thenReturn(new HermesModelOptions("example-model", null));
 
         AppUser created = provisioning.resolve(EMAIL, NAME);
 

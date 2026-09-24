@@ -123,7 +123,7 @@ class ModelSelectionTest {
                 AGENT_CODE,
                 "http://agent-runtime.test/p/" + AGENT_CODE,
                 "openai-codex",
-                "gpt-5.6-sol",
+                "example-model",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
@@ -131,8 +131,8 @@ class ModelSelectionTest {
         modelSelector.replace(
                 agent,
                 List.of(
-                        new ModelOption("openai-codex", "gpt-5.6-sol"),
-                        new ModelOption("nvidia", "nvidia/nemotron-3-super-120b-a12b")));
+                        new ModelOption("openai-codex", "example-model"),
+                        new ModelOption("nvidia", "example-provider/example-model-b")));
     }
 
     @Test
@@ -143,7 +143,7 @@ class ModelSelectionTest {
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.provider()).isEqualTo("openai-codex");
-            assertThat(command.model()).isEqualTo("gpt-5.6-sol");
+            assertThat(command.model()).isEqualTo("example-model");
         });
     }
 
@@ -152,12 +152,12 @@ class ModelSelectionTest {
     void 세션_조회가_요청과_다른_모델을_주면_그_값을_기록한다() {
         stub().willReturn(succeeded("run-1", "sess-1"));
         stub().willReportSessionRuntime(
-                new SessionRuntime("nvidia/nemotron-3.5-lightning-30b-a3b", "nvidia"));
+                new SessionRuntime("example-provider/example-model-c", "nvidia"));
 
         ChatTurn turn = chat.send(user, null, "안녕", AGENT_CODE);
 
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
-        assertThat(execution.model()).isEqualTo("nvidia/nemotron-3.5-lightning-30b-a3b");
+        assertThat(execution.model()).isEqualTo("example-provider/example-model-c");
         assertThat(execution.provider()).isEqualTo("nvidia");
         assertThat(stub().sessionLookups()).containsExactly("sess-1");
     }
@@ -172,7 +172,7 @@ class ModelSelectionTest {
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
         assertThat(execution.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(execution.provider()).isEqualTo("openai-codex");
-        assertThat(execution.model()).isEqualTo("gpt-5.6-sol");
+        assertThat(execution.model()).isEqualTo("example-model");
     }
 
     @Test
@@ -216,7 +216,7 @@ class ModelSelectionTest {
                         List.of(turn.executionId()));
         assertThat(events.getFirst().eventType()).isEqualTo(ExecutionEventType.PROVIDER_SWITCHED);
         assertThat(events.getFirst().detail())
-                .isEqualTo("nvidia/nvidia/nemotron-3-super-120b-a12b");
+                .isEqualTo("nvidia/example-provider/example-model-b");
     }
 
     @Test
@@ -242,8 +242,8 @@ class ModelSelectionTest {
         modelSelector.replace(
                 agent,
                 List.of(
-                        new ModelOption("openai-codex", "gpt-5.6-luna"),
-                        new ModelOption("openai-codex", "gpt-5.6-sol")));
+                        new ModelOption("openai-codex", "example-model-b"),
+                        new ModelOption("openai-codex", "example-model")));
         stub().willReturnInOrder(blocked("run-1", "sess-1"), succeeded("run-2", "sess-1"));
 
         chat.send(user, null, "안녕", AGENT_CODE);
@@ -256,7 +256,7 @@ class ModelSelectionTest {
     void 다른_실패는_넘기지_않고_한_번만_실패한다() {
         stub().willReturn(
                 new HermesRunResult(
-                        "run-1", "sess-1", "failed", null, "gpt-5.6-sol", "openai-codex",
+                        "run-1", "sess-1", "failed", null, "example-model", "openai-codex",
                         "HTTP 404: 404 page not found", TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(user, null, "안녕", AGENT_CODE))
@@ -323,11 +323,11 @@ class ModelSelectionTest {
     }
 
     private static HermesRunResult succeeded(String runId, String sessionId) {
-        return HermesRunResult.of(runId, sessionId, "completed", "네", "gpt-5.6-sol", null, TokenUsage.empty());
+        return HermesRunResult.of(runId, sessionId, "completed", "네", "example-model", null, TokenUsage.empty());
     }
 
     private static HermesRunResult blocked(String runId, String sessionId) {
         return new HermesRunResult(
-                runId, sessionId, "failed", null, "gpt-5.6-sol", null, BLOCKED_ERROR, TokenUsage.empty());
+                runId, sessionId, "failed", null, "example-model", null, BLOCKED_ERROR, TokenUsage.empty());
     }
 }

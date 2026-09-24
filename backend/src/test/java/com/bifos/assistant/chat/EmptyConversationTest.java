@@ -143,12 +143,12 @@ class EmptyConversationTest {
                 code,
                 "http://agent-runtime.test/p/" + code,
                 "anthropic",
-                "claude-opus-5",
+                "example-model-large",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 owner.id()));
-        modelSelector.seedFirst(saved, new ModelOption("anthropic", "claude-opus-5"));
+        modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         return saved;
     }
 

@@ -149,7 +149,7 @@ class PersonaServiceTest {
 
     private static Agent agent(String code, String profile, Long ownerUserId) {
         return Agent.of(code, "아빠", profile, "http://127.0.0.1:1/p/" + profile, "openai-codex",
-                "gpt-5.6-sol", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
+                "example-model", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE, ownerUserId);
     }
 }

@@ -38,7 +38,7 @@ class AgentModelOptionMigrationTest {
                         code, name, hermes_profile, api_base_url, provider, model, model_synced_at,
                         cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at
                     ) VALUES (
-                        'dad', 'Dad', 'dad', 'http://runtime.test/p/dad', 'openai-codex', 'gpt-5.6-sol', NULL,
+                        'dad', 'Dad', 'dad', 'http://runtime.test/p/dad', 'openai-codex', 'example-model', NULL,
                         'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', NULL, TRUE, CURRENT_TIMESTAMP(6)
                     )
                     """);
@@ -62,7 +62,7 @@ class AgentModelOptionMigrationTest {
             assertThat(rows.next()).isTrue();
             assertThat(rows.getInt("option_rank")).isEqualTo(1);
             assertThat(rows.getString("provider")).isEqualTo("openai-codex");
-            assertThat(rows.getString("model")).isEqualTo("gpt-5.6-sol");
+            assertThat(rows.getString("model")).isEqualTo("example-model");
             assertThat(rows.next()).isFalse();
         }
     }
