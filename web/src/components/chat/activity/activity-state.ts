@@ -104,7 +104,7 @@ export function fromTree(tree: ExecutionTreeResponse): ActivityItem[] {
       kind: "subagent", name: node.agentName ?? node.agentCode ?? "하위 에이전트", detail: null,
       model: node.model, inputTokens: node.inputTokens, outputTokens: node.outputTokens,
       durationMs: node.latencyMs, state: node.status === "FAILED" ? "failed" :
-        node.status === "CANCELLED" ? "stopped" : "done", pairKey: `${node.executionId}`,
+        node.status === "SUCCEEDED" ? "done" : "stopped", pairKey: `${node.executionId}`,
     }) };
     for (const event of node.events) {
       switch (event.eventType) {

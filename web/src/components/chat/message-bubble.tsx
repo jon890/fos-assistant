@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Markdown } from "./markdown";
 import { describeError } from "../error-message";
@@ -24,7 +23,7 @@ export type Turn = {
   senderName: string | null;
   createdAt?: string;
   executionId?: number | null;
-  /** 이 답이 여러 실행으로 만들어졌다. 그때만 실행 나무로 가는 길을 보인다 */
+  /** 이 답이 여러 실행으로 만들어졌는지 서버가 알려준다 */
   hasChildren?: boolean;
   /** 앞 provider 가 막혀 넘어갔으면 그 답을 만든 provider 와 모델. 아니면 null 이다 */
   switchedTo?: string | null;
@@ -76,9 +75,11 @@ function AttachmentGallery({
 export function MessageBubble({
   turn,
   conversationId,
+  onOpenSaved,
 }: {
   turn: Turn;
   conversationId: number | null;
+  onOpenSaved(executionId: number): void;
 }) {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const user = turn.role === "USER";
@@ -148,21 +149,13 @@ export function MessageBubble({
           ) : null}
         </div>
         {turn.activity && turn.executionId ? (
-          <div className="mb-2"><ActivityBlock mode="saved" summary={turn.activity} executionId={turn.executionId} /></div>
+          <div className="mb-2"><ActivityBlock mode="saved" summary={turn.activity} executionId={turn.executionId}
+            onOpenPanel={() => onOpenSaved(turn.executionId!)} /></div>
         ) : null}
         <div className="leading-7">
           <Markdown>{turn.content}</Markdown>
         </div>
         <AttachmentGallery conversationId={conversationId} attachments={attachments} />
-        {turn.hasChildren && turn.executionId ? (
-          <Link
-            href={`/executions/${turn.executionId}`}
-            data-testid="flow-tree-link"
-            className="mt-2 inline-block text-xs text-muted underline underline-offset-4"
-          >
-            이 답이 어떻게 만들어졌는지 보기
-          </Link>
-        ) : null}
       </div>
     </li>
   );

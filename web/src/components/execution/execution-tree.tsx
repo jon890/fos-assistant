@@ -1,6 +1,6 @@
 import { ExecutionNode } from "./execution-node";
 
-/** Hermes 사건을 우리 이름으로 옮겨 적은 값이다. `docs/adr/ADR-013` 근거로 화면은 이 일곱 값만 안다. */
+/** Hermes 사건을 우리 이름으로 옮겨 적은 값이다. 화면은 Hermes 의 원래 사건 이름을 읽지 않는다. */
 export type ExecutionEventType =
   | "RUN_STARTED"
   | "RUN_COMPLETED"

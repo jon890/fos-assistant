@@ -7,6 +7,7 @@ import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
 import { MessageList } from "./chat/message-list";
 import { applyChatEvent, emptyActivity, type ActivityState } from "./chat/activity/activity-state";
+import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
 import { useShellTitle } from "./shell/app-shell";
@@ -42,6 +43,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [activity, setActivity] = useState<ActivityState | null>(null);
+  const [panelTarget, setPanelTarget] = useState<ActivityPanelTarget | null>(null);
+  const currentExecutionId = useRef<number | null>(null);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
@@ -82,6 +85,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setTurnError(null);
     setTurns([]);
     setActivity(null);
+    setPanelTarget(null);
+    currentExecutionId.current = null;
     setComposerGeneration((generation) => generation + 1);
     void (async () => {
       try {
@@ -131,11 +136,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
-      // 더 안쪽의 화면과 중지 동작이 추가될 때 이 처리기에서 우선순위를 정한다.
+      if (panelTarget) {
+        event.preventDefault();
+        setPanelTarget(null);
+      }
+      // 중지 동작이 생기면 패널 처리 뒤에 둔다.
     };
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
-  }, []);
+  }, [panelTarget]);
 
   /**
    * 흐름이 시작되고 2분이 지나면 한 번 알린다.
@@ -160,6 +169,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
     setActivity(null);
+    setPanelTarget(null);
+    currentExecutionId.current = null;
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
@@ -192,6 +203,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setTurnError(null);
     setDraft("");
     setActivity(emptyActivity(Date.now()));
+    currentExecutionId.current = null;
     setFlowIsSlow(false);
     setTurns((previous) => [
       ...previous,
@@ -276,6 +288,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           if (selectionVersion.current !== version) return;
           if (streamEvent.type === "started" && streamEvent.conversationId) {
             started = true;
+            currentExecutionId.current = streamEvent.executionId ?? null;
             if (conversationIdRef.current === null) {
               window.history.replaceState(null, "", `/c/${streamEvent.conversationId}`);
             }
@@ -303,8 +316,13 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
           } else if (["tool", "subagent", "step", "switched"].includes(streamEvent.type)) {
             setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
-          } else if (streamEvent.type === "done" && streamEvent.conversationId) {
+          } else if ((streamEvent.type === "done" || streamEvent.type === "stopped") && streamEvent.conversationId) {
             done = true;
+            const finishedExecutionId = streamEvent.executionId ?? currentExecutionId.current;
+            if (finishedExecutionId !== null) {
+              setPanelTarget((previous) => previous?.mode === "live"
+                ? { mode: "saved", executionId: finishedExecutionId } : previous);
+            }
             conversationIdRef.current = streamEvent.conversationId;
             setConversationId(streamEvent.conversationId);
             await Promise.all([
@@ -374,7 +392,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   }
 
   return (
-    <section className="flex h-full min-h-0 min-w-0">
+    <section className="relative flex h-full min-h-0 min-w-0">
       <h1 className="sr-only">대화</h1>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
@@ -408,6 +426,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           conversationId={conversationId}
           flowIsSlow={flowIsSlow}
           turnError={turnError}
+          onOpenSaved={(executionId) => setPanelTarget({ mode: "saved", executionId })}
+          onOpenLive={() => { if (activity) setPanelTarget({ mode: "live", state: activity }); }}
         />
 
         {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}
@@ -435,6 +455,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           }}
         />
       </div>
+      {panelTarget ? <ActivityPanel target={panelTarget.mode === "live" && activity
+        ? { mode: "live", state: activity } : panelTarget} onClose={() => setPanelTarget(null)} /> : null}
     </section>
   );
 }

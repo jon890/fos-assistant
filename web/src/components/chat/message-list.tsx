@@ -17,6 +17,8 @@ type Props = {
   /** 흐름이 오래 걸린다고 한 번 알렸는지 */
   flowIsSlow: boolean;
   turnError: string | null;
+  onOpenSaved(executionId: number): void;
+  onOpenLive(): void;
 };
 
 export function MessageList({
@@ -27,6 +29,8 @@ export function MessageList({
   conversationId,
   flowIsSlow,
   turnError,
+  onOpenSaved,
+  onOpenLive,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -91,17 +95,17 @@ export function MessageList({
                     {pendingAssistant && activity && activity.items.length > 0 ? (
                       <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
                         <span aria-hidden="true" />
-                        <ActivityBlock mode="live" state={activity} slow={flowIsSlow} />
+                        <ActivityBlock mode="live" state={activity} slow={flowIsSlow} onOpenPanel={onOpenLive} />
                       </li>
                     ) : null}
-                    <MessageBubble turn={turn} conversationId={conversationId} />
+                    <MessageBubble turn={turn} conversationId={conversationId} onOpenSaved={onOpenSaved} />
                   </Fragment>
                 );
               })}
               {!streamedAnswer && activity && activity.items.length > 0 ? (
                 <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
                   <span aria-hidden="true" />
-                  <ActivityBlock mode="live" state={activity} slow={flowIsSlow} />
+                  <ActivityBlock mode="live" state={activity} slow={flowIsSlow} onOpenPanel={onOpenLive} />
                 </li>
               ) : null}
               {!streamedAnswer && sending && (!activity || activity.items.length === 0) ? (

@@ -27,7 +27,13 @@ test("흐름 중에는 도착한 단계만 보이고 끝난 답에 작업 과정
     await hermes.releaseHeldRun();
     released = true;
     await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last()).toBeVisible();
+    const saved = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+    await expect(saved).toBeVisible();
+    await saved.getByTestId("activity-toggle").click();
+    await saved.getByTestId("activity-open-panel").click();
+    await expect(page.getByTestId("activity-panel").getByTestId("flow-tree-link")).toBeVisible();
+    await page.getByTestId("activity-panel").getByTestId("flow-tree-link").click();
+    await expect(page).toHaveURL(/\/executions\/\d+$/);
   } finally {
     if (!released) await hermes.releaseHeldRun();
   }
