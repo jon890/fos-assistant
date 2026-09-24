@@ -48,6 +48,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const [expandedOnDone, setExpandedOnDone] = useState<{ executionId: number; expanded: boolean } | null>(null);
   const [panelTarget, setPanelTarget] = useState<ActivityPanelTarget | null>(null);
   const currentExecutionId = useRef<number | null>(null);
+  const [executionId, setExecutionId] = useState<number | null>(null);
+  const [stopRequested, setStopRequested] = useState(false);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
@@ -93,6 +95,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setExpandedOnDone(null);
     setPanelTarget(null);
     currentExecutionId.current = null;
+    setExecutionId(null);
+    setStopRequested(false);
     setComposerGeneration((generation) => generation + 1);
     void (async () => {
       try {
@@ -145,12 +149,16 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       if (panelTarget) {
         event.preventDefault();
         setPanelTarget(null);
+        return;
       }
-      // 중지 동작이 생기면 패널 처리 뒤에 둔다.
+      if (sending && currentExecutionId.current !== null && !stopRequested) {
+        event.preventDefault();
+        void stop();
+      }
     };
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
-  }, [panelTarget]);
+  }, [panelTarget, sending, stopRequested]);
 
   /**
    * 흐름이 시작되고 2분이 지나면 한 번 알린다.
@@ -180,6 +188,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setExpandedOnDone(null);
     setPanelTarget(null);
     currentExecutionId.current = null;
+    setExecutionId(null);
+    setStopRequested(false);
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
@@ -216,6 +226,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     liveExpandedRef.current = false;
     setExpandedOnDone(null);
     currentExecutionId.current = null;
+    setExecutionId(null);
+    setStopRequested(false);
     setFlowIsSlow(false);
     const finishFailedActivity = () => {
       if (selectionVersion.current !== version) return;
@@ -308,6 +320,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           if (streamEvent.type === "started" && streamEvent.conversationId) {
             started = true;
             currentExecutionId.current = streamEvent.executionId ?? null;
+            setExecutionId(streamEvent.executionId ?? null);
             if (conversationIdRef.current === null) {
               window.history.replaceState(null, "", `/c/${streamEvent.conversationId}`);
             }
@@ -337,6 +350,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
           } else if ((streamEvent.type === "done" || streamEvent.type === "stopped") && streamEvent.conversationId) {
             done = true;
+            if (streamEvent.type === "stopped") {
+              setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
+            }
             const finishedExecutionId = streamEvent.executionId ?? currentExecutionId.current;
             if (finishedExecutionId !== null) {
               setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
@@ -399,6 +415,23 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       return false;
     } finally {
       if (selectionVersion.current === version) setSending(false);
+    }
+  }
+
+  async function stop() {
+    const executionId = currentExecutionId.current;
+    if (executionId === null || stopRequested) return;
+    setStopRequested(true);
+    try {
+      const response = await fetch(`/api/chat/executions/${executionId}/stop`, { method: "POST" });
+      if (response.status === 202) return;
+      const payload = await readPayload<ErrorPayload>(response);
+      if (payload.code === "EXECUTION_NOT_RUNNING") return;
+      setStopRequested(false);
+      setError(describeError(payload.code, payload.message));
+    } catch {
+      setStopRequested(false);
+      setError(describeError("HERMES_UNAVAILABLE", "중지 요청을 보내지 못했다."));
     }
   }
 
@@ -468,7 +501,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           value={draft}
           onChange={setDraft}
           onSend={(attachmentIds) => send(attachmentIds)}
-          disabled={sending || (conversationId === null && agents.length === 0)}
+          disabled={conversationId === null && agents.length === 0}
           conversationId={conversationId}
           agentCode={agentCode}
           acceptsAttachments={agents.find((agent) => agent.code === agentCode)?.acceptsAttachments ?? false}
@@ -480,6 +513,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             setConversationId(id);
             void refresh();
           }}
+          running={sending}
+          canStop={executionId !== null && !stopRequested}
+          onStop={() => { void stop(); }}
         />
       </div>
       {panelTarget ? <ActivityPanel target={panelTarget.mode === "live" && activity

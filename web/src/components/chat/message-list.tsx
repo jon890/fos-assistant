@@ -21,6 +21,7 @@ type Props = {
   turnError: string | null;
   onOpenSaved(executionId: number): void;
   onOpenLive(): void;
+  onRetry?(): void;
 };
 
 export function MessageList({
@@ -36,6 +37,7 @@ export function MessageList({
   turnError,
   onOpenSaved,
   onOpenLive,
+  onRetry,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -95,6 +97,8 @@ export function MessageList({
               {turns.map((turn) => {
                 const pendingAssistant =
                   typeof turn.id === "string" && turn.id.startsWith("assistant-");
+                const isLast = turns.at(-1)?.id === turn.id;
+                const hasNoAnswer = isLast && turn.role === "USER" && !sending;
                 return (
                   <Fragment key={turn.id}>
                     {pendingAssistant && activity && activity.items.length > 0 ? (
@@ -107,7 +111,15 @@ export function MessageList({
                     ) : null}
                     <MessageBubble turn={turn} conversationId={conversationId} onOpenSaved={onOpenSaved}
                       initialActivityExpanded={turn.executionId === expandedOnDone?.executionId
-                        && (expandedOnDone?.expanded ?? false)} />
+                        && (expandedOnDone?.expanded ?? false)}
+                      latest={isLast}
+                      streaming={pendingAssistant && sending} />
+                    {hasNoAnswer ? (
+                      <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted">
+                        <span>답을 받지 못했다</span>
+                        {onRetry ? <button type="button" onClick={onRetry} className="underline underline-offset-2">다시 시도</button> : null}
+                      </li>
+                    ) : null}
                   </Fragment>
                 );
               })}

@@ -267,6 +267,7 @@ export function startFakeHermes(
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
   const stoppedRuns: string[] = [];
+  const emptyUntilStopped = new Map<string, ServerResponse>();
   let lastSubmittedInstructions: string | undefined;
   let lastSubmittedInput: string | undefined;
 
@@ -471,6 +472,15 @@ export function startFakeHermes(
             Connection: "keep-alive",
           });
           response.write(": keepalive\n\n");
+          if (run.input === "중지 조각 전 검사") {
+            if (run.status === "cancelled") {
+              response.end();
+            } else {
+              emptyUntilStopped.set(runId!, response);
+              response.on("close", () => emptyUntilStopped.delete(runId!));
+            }
+            return;
+          }
           // 실제 Hermes v0.21.0 이 보내는 형태다.
           // 사건 이름은 `event`, 조각은 `delta`, 도구 이름은 `tool`, 설명은 `preview` 다.
           // 여기가 실제와 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
@@ -540,7 +550,9 @@ export function startFakeHermes(
           const run = runs.get(runId!);
           if (!run) return send(response, 404, { error: "no such run" });
           run.status = "cancelled";
-          if (run.input === "중지 빈 답 검사") run.output = "";
+          if (run.input === "중지 빈 답 검사" || run.input === "중지 조각 전 검사") run.output = "";
+          emptyUntilStopped.get(runId!)?.end();
+          emptyUntilStopped.delete(runId!);
           stoppedRuns.push(runId!);
           if (heldRunId === runId) releaseHeldRun();
           return send(response, 200, { status: "stopping" });

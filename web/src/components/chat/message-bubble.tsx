@@ -6,6 +6,7 @@ import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { ActivityBlock } from "./activity/activity-block";
+import { MessageActions } from "./message-actions";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -30,6 +31,7 @@ export type Turn = {
   /** 이 메시지에 붙은 사진들. 지워진 것도 자리를 남기려고 담는다 */
   attachments?: MessageAttachment[];
   activity?: ActivitySummary | null;
+  status?: "SUCCEEDED" | "FAILED" | "CANCELLED" | "RUNNING" | null;
 };
 
 function AttachmentGallery({
@@ -77,11 +79,15 @@ export function MessageBubble({
   conversationId,
   onOpenSaved,
   initialActivityExpanded,
+  latest,
+  streaming,
 }: {
   turn: Turn;
   conversationId: number | null;
   onOpenSaved(executionId: number): void;
   initialActivityExpanded: boolean;
+  latest: boolean;
+  streaming: boolean;
 }) {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const user = turn.role === "USER";
@@ -158,6 +164,8 @@ export function MessageBubble({
         <div className="leading-7">
           <Markdown>{turn.content}</Markdown>
         </div>
+        {turn.status === "CANCELLED" ? <p data-testid="stopped-mark" className="mt-2 text-xs text-muted">중지됨</p> : null}
+        {!streaming ? <MessageActions content={turn.content} latest={latest} /> : null}
         <AttachmentGallery conversationId={conversationId} attachments={attachments} />
       </div>
     </li>
