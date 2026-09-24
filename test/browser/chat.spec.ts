@@ -144,19 +144,25 @@ test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다",
   await expect(page.locator(".text-code-comment").first()).toHaveCSS("font-style", "italic");
 });
 
-test("위로 올려 읽는 동안 새 답이 와도 읽던 자리를 지킨다", async ({ page }) => {
+test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨다", async ({ page }) => {
   await page.goto("/");
   const composer = page.getByPlaceholder("무엇을 도와줄까요");
   await composer.fill("긴 답 스트림 검사");
   await page.getByRole("button", { name: "보내기" }).click();
 
   const scroll = page.getByTestId("message-scroll");
-  await expect(page.getByText("1번째 긴 답 줄", { exact: true }).last()).toBeVisible();
+  await expect(page.getByTestId("assistant-message")).toHaveCount(1);
+  await composer.fill("읽는 중 다음 답 검사");
+  await expect(page.getByRole("button", { name: "보내기" })).toBeEnabled();
+  await expect.poll(async () => scroll.evaluate((element) => element.scrollHeight - element.clientHeight))
+    .toBeGreaterThan(100);
   await scroll.evaluate((element) => {
     element.scrollTop = 0;
     element.dispatchEvent(new Event("scroll"));
   });
   const position = await scroll.evaluate((element) => element.scrollTop);
+  await page.getByRole("button", { name: "보내기" }).click();
+  await expect(page.getByTestId("assistant-message")).toHaveCount(2);
   await expect(page.getByRole("button", { name: "새 메시지" })).toBeVisible();
   expect(await scroll.evaluate((element) => element.scrollTop)).toBe(position);
 });
