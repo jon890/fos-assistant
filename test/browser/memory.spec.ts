@@ -8,7 +8,7 @@ test("Memory 화면에서 개인 항목을 만들고 고치고 지운다", async
   await expect(page.getByRole("button", { name: "저장" })).toBeDisabled();
 
   await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목").fill(title);
+  await page.getByLabel("제목", { exact: true }).fill(title);
   await page.getByLabel("내용").fill("국수는 맵지 않게 먹는다");
   await page.getByLabel("항상 답에 함께 넣기").check();
   await page.getByRole("button", { name: "저장" }).click();
@@ -36,7 +36,7 @@ test("구성원은 가족 공용 Memory의 범위와 편집 제어를 보지 않
   const title = "구성원 편집 금지";
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("FAMILY");
-  await page.getByLabel("제목").fill(title);
+  await page.getByLabel("제목", { exact: true }).fill(title);
   await page.getByLabel("내용").fill("가족만 아는 내용");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
@@ -60,7 +60,7 @@ test("제안을 처리하면 목록과 머리의 미처리 수가 함께 갱신�
   await page.route("**/api/memories/910/reject", async (route) => { state = []; await route.fulfill({ json: proposed[0] }); });
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목").fill("새 항목");
+  await page.getByLabel("제목", { exact: true }).fill("새 항목");
   await page.getByLabel("내용").fill("내용");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: "받을지 정할 것" })).toBeVisible();
@@ -78,7 +78,7 @@ test("제안을 물리면 제안 절과 머리의 미처리 수가 사라진다"
   await page.route("**/api/memories/911/reject", async (route) => { state = []; await route.fulfill({ json: proposed[0] }); });
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목").fill("새 항목");
+  await page.getByLabel("제목", { exact: true }).fill("새 항목");
   await page.getByLabel("내용").fill("내용");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByTestId("memory-proposal-count")).toHaveText("1");
@@ -90,7 +90,7 @@ test("제안을 물리면 제안 절과 머리의 미처리 수가 사라진다"
 test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인다", async ({ page }) => {
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목").fill("실패 검사");
+  await page.getByLabel("제목", { exact: true }).fill("실패 검사");
   await page.getByLabel("내용").fill("원래 내용");
   await page.getByRole("button", { name: "저장" }).click();
   const item = page.getByRole("heading", { name: "실패 검사" }).locator("xpath=ancestor::article");
@@ -111,7 +111,7 @@ test("문맥에 실리지 않은 항목에 표시가 보인다", async ({ page }
     ? route.fulfill({ json: list }) : route.fulfill({ status: 201, json: list[0] }));
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목").fill("새 항목");
+  await page.getByLabel("제목", { exact: true }).fill("새 항목");
   await page.getByLabel("내용").fill("내용");
   await page.getByRole("button", { name: "저장" }).click();
 

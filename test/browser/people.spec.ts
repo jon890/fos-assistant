@@ -39,7 +39,7 @@ test("관리자가 사람을 더하면 목록에 한 줄이 늘어난다", async
   await expect(list.getByText(person.email)).toHaveCount(0);
 
   await page.getByLabel("이메일").fill(person.email);
-  await page.getByLabel("이름").fill(person.displayName);
+  await page.getByLabel("이름", { exact: true }).fill(person.displayName);
   await page.getByLabel("Hermes profile").fill(person.hermesProfile);
   await page.getByRole("button", { name: "더하기" }).click();
 
@@ -58,7 +58,7 @@ test("이미 쓰는 profile 이름으로 더하면 무엇이 겹쳤는지 알린
   await page.goto("/admin/people");
 
   await page.getByLabel("이메일").fill(`uncle-twin-${testInfo.project.name}@example.com`);
-  await page.getByLabel("이름").fill("삼촌의 쌍둥이");
+  await page.getByLabel("이름", { exact: true }).fill("삼촌의 쌍둥이");
   await page.getByLabel("Hermes profile").fill(owner.hermesProfile);
   await page.getByRole("button", { name: "더하기" }).click();
 
