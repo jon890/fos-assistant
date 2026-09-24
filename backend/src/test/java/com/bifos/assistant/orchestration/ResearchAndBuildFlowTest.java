@@ -249,6 +249,35 @@ class ResearchAndBuildFlowTest {
                         "synthesizer:started",
                         "synthesizer:completed");
         assertThat(relayed.getLast().type()).isEqualTo("done");
+        assertThat(relayed.stream().filter(event -> "started".equals(event.type())).toList())
+                .singleElement()
+                .satisfies(started -> {
+                    assertThat(started.conversationId()).isEqualTo(relayed.getLast().conversationId());
+                    assertThat(started.executionId()).isEqualTo(relayed.getLast().executionId());
+                });
+    }
+
+    @Test
+    void Chief가_도는_동안_대화를_지워도_끝난_뒤에_지운_채다() {
+        CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
+        List<ChatEvent> relayed = new ArrayList<>();
+        stub().willAnswer(command -> {
+            if (command.input().contains(CHIEF_MARK)) {
+                ChatEvent started = relayed.stream()
+                        .filter(event -> "started".equals(event.type())).findFirst().orElseThrow();
+                chat.delete(dad, started.conversationId());
+                return completed("run-chief", "{\"research\":\"\",\"build\":\"\"}");
+            }
+            return completed("run-other", "답");
+        });
+
+        chat.stream(dad, null, "첫 질문", MY_AGENT, relayed::add);
+
+        ChatEvent started = relayed.stream()
+                .filter(event -> "started".equals(event.type())).findFirst().orElseThrow();
+        assertThat(conversations.findById(started.conversationId()).orElseThrow().deletedAt())
+                .isNotNull();
+        assertThat(chat.conversationsOf(dad)).isEmpty();
     }
 
     @Test

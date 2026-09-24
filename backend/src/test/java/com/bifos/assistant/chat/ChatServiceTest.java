@@ -435,7 +435,7 @@ class ChatServiceTest {
 
         ChatEvent done = relayed.getLast();
         assertThat(done.type()).isEqualTo("done");
-        assertThat(relayed).extracting(ChatEvent::type).containsExactly("delta", "tool", "done");
+        assertThat(relayed).extracting(ChatEvent::type).containsExactly("started", "delta", "tool", "done");
         assertThat(executions.findById(done.executionId()).orElseThrow().status())
                 .isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(messages.findByConversationIdOrderByIdAsc(done.conversationId()))

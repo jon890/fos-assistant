@@ -24,6 +24,11 @@ public record ChatEvent(
         return new ChatEvent("delta", text, null, null, null, null, null, null, null, null, null);
     }
 
+    /** 이 turn 의 실행 줄이 만들어졌다. 흐름이면 뿌리 실행의 번호다. */
+    public static ChatEvent started(Long conversationId, Long executionId) {
+        return new ChatEvent("started", null, null, null, conversationId, null, executionId, null, null, null, null);
+    }
+
     public static ChatEvent tool(String toolName, String status) {
         return new ChatEvent("tool", null, toolName, status, null, null, null, null, null, null, null);
     }

@@ -21,6 +21,7 @@ import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.List;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +75,19 @@ public class AgentRunner {
             Long parentExecutionId,
             Long rootExecutionId,
             String sessionId) {
+        return run(user, conversation, agent, task, parentExecutionId, rootExecutionId,
+                sessionId, execution -> {});
+    }
+
+    public Run run(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            String task,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            String sessionId,
+            Consumer<AgentExecution> onStarted) {
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
@@ -82,6 +96,7 @@ public class AgentRunner {
         if (available.isEmpty()) {
             AgentExecution empty = executions.start(
                     user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, null, null);
+            onStarted.accept(empty);
             AgentExecution failed = executions.fail(empty, ErrorCode.NO_MODEL_AVAILABLE.name());
             append(failed, ExecutionEventType.RUN_FAILED, ErrorCode.NO_MODEL_AVAILABLE.name(), 1);
             return new Run(
@@ -90,6 +105,7 @@ public class AgentRunner {
         ModelOption option = available.getFirst();
         AgentExecution execution = executions.start(
                 user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, option, null);
+        onStarted.accept(execution);
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
