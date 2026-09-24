@@ -186,6 +186,59 @@ model_name = (
 
 실제 모델을 알아야 하면 `/api/model/options` 가 그 profile 의 것을 답한다.
 
+### `/api/model/options` 는 provider 와 모델 목록을 함께 준다
+
+2026-09-24 에 `openai-codex` 를 쓰는 profile 두 곳에서 불러 확인했다.
+두 응답의 모양이 같았다.
+
+```text
+{
+  "provider": "<지금 provider>",
+  "model": "<지금 모델>",
+  "providers": [
+    {
+      "slug": "<provider>", "name": "<표시 이름>",
+      "is_current": true, "is_user_defined": false,
+      "authenticated": true, "source": "hermes",
+      "models": ["<모델>", ...], "total_models": <정수>,
+      "capabilities": {"<모델>": {"fast": true, "reasoning": true}},
+      "featured_models": []
+    },
+    {
+      "slug": "<설정하지 않은 provider>", "authenticated": false, "source": "canonical",
+      "models": [], "total_models": 0,
+      "auth_type": "api_key", "key_env": "<환경 변수 이름>", "warning": "<설정 안내>"
+    }
+  ]
+}
+```
+
+| 칸 | 뜻 |
+| --- | --- |
+| `provider`, `model` | 그 profile 의 기본값. `config.yaml` 의 `model.provider` 와 `model.default` 다 |
+| `providers[].slug` | 실행 요청의 `provider` 에 넣는 값 |
+| `providers[].authenticated` | 그 provider 로 실제로 부를 수 있는가 |
+| `providers[].models` | 그 provider 로 고를 수 있는 모델 |
+| `providers[].is_current` | 기본 provider 인가 |
+
+**설정하지 않은 provider 도 목록에 나온다.**
+API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 것을 빈 행으로 채운다.
+그 행은 `authenticated: false`, `models: []` 이다.
+목록에 있다고 부를 수 있는 것은 아니므로 `authenticated` 가 참인 행만 골라야 한다.
+
+`key_env` 는 환경 변수 이름이지 값이 아니다.
+`pricing`, `free_tier`, `unavailable_models` 는 provider 에 따라 붙을 수 있지만 이번 두 응답에는 없었다.
+
+목록은 그 profile 의 `config.yaml` 에서 온다.
+`model` 절, `providers`, 이전 형식의 `custom_providers`, `model_catalog.excluded_providers` 를 읽는다.
+`fallback_providers` 는 목록에 영향을 주지 않는다.
+쿼리는 `refresh` 하나만 읽는다.
+
+다른 경로는 이 목록을 대신하지 못한다.
+`/v1/models` 는 위에 적었듯 profile 이름과 모델 별칭만 준다.
+대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
+둘 다 provider 별 모델 목록이 아니다.
+
 ### 승인 방식 `smart` 는 추론 모델에서 `manual` 과 같아진다
 
 `approvals.mode` 가 `smart` 이면 위험한 모양으로 분류된 명령마다
