@@ -54,8 +54,11 @@ public final class ChatDtos {
             String switchedTo,
             Instant createdAt,
             List<AttachmentView> attachments,
-            ActivitySummary activity) {
+            ActivitySummary activity,
+            String status) {
     }
+
+    public record StopResponse(String status) {}
 
     /**
      * 첨부 한 장이다. 본문과 주소를 담지 않는다. 화면이 대화 번호와 첨부 번호로 본문 경로를 만든다.

@@ -325,6 +325,29 @@ public class AgentExecution {
         this.status = ExecutionStatus.FAILED;
     }
 
+    /** 끝난 시각과 토큰과 금액을 채우고 CANCELLED 로 옮긴다. */
+    public void markCancelled(
+            String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
+        this.provider = provider;
+        this.model = model;
+        this.inputTokens = usage.inputTokens();
+        this.cachedInputTokens = usage.cachedInputTokens();
+        this.outputTokens = usage.outputTokens();
+        this.totalTokens = usage.totalTokens();
+        this.estimatedCostMicros = cost.estimatedMicros();
+        this.actualCostMicros = cost.actualMicros();
+        this.costCurrency = cost.currency();
+        this.pricingVersion = cost.pricingVersion();
+        markCancelled(finishedAt);
+    }
+
+    /** 이미 토큰을 적은 실행의 상태만 CANCELLED 로 옮긴다. */
+    public void markCancelled(Instant finishedAt) {
+        this.finishedAt = finishedAt;
+        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        this.status = ExecutionStatus.CANCELLED;
+    }
+
     public static final class Builder {
         private Long userId;
         private Long conversationId;

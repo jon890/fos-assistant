@@ -420,6 +420,81 @@ class ResearchAndBuildFlowTest {
         assertThat(bothSubmitted.getCount()).isZero();
     }
 
+    @Test
+    void Chief가_도는_중에_멈추면_Chief를_멈추고_자식을_시작하지_않는다() {
+        CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
+        List<ChatEvent> relayed = new ArrayList<>();
+        stub().willAnswer(command -> HermesRunResult.of(
+                "run-chief",
+                null,
+                "cancelled",
+                "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}",
+                "example-model-large",
+                "anthropic",
+                TokenUsage.empty()));
+        stub().beforeAwait(() -> {
+            ChatEvent started = relayed.stream()
+                    .filter(event -> "started".equals(event.type()))
+                    .findFirst()
+                    .orElseThrow();
+            chat.stop(dad, started.executionId());
+        });
+
+        chat.stream(dad, null, "전기차를 사는 게 나을까?", MY_AGENT, relayed::add);
+
+        assertThat(stub().stopped()).containsExactly("run-chief");
+        assertThat(stub().received()).singleElement();
+        assertThat(executionsOf(dad)).singleElement().satisfies(root ->
+                assertThat(root.status()).isEqualTo(ExecutionStatus.CANCELLED));
+        assertThat(relayed.getLast().type()).isEqualTo("stopped");
+    }
+
+    @Test
+    void 자식_둘이_도는_중에_멈추면_둘을_멈추고_합치기를_시작하지_않는다() {
+        CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
+        List<ChatEvent> relayed = new ArrayList<>();
+        java.util.concurrent.CountDownLatch childrenSubmitted = new java.util.concurrent.CountDownLatch(2);
+        java.util.concurrent.atomic.AtomicBoolean stopped = new java.util.concurrent.atomic.AtomicBoolean();
+        stub().willAnswer(command -> {
+            String input = command.input();
+            if (input.contains(CHIEF_MARK)) {
+                return completed("run-chief", SPLIT_JSON);
+            }
+            if (input.contains("조사해") || input.contains("만든다")) {
+                childrenSubmitted.countDown();
+                await(childrenSubmitted);
+                return HermesRunResult.of(
+                        input.contains("조사해") ? "run-researcher" : "run-engineer",
+                        null,
+                        "cancelled",
+                        null,
+                        "example-model-large",
+                        "anthropic",
+                        TokenUsage.empty());
+            }
+            return completed("run-synthesizer", "합친 답");
+        });
+        stub().beforeAwait(() -> {
+            if (stub().received().size() != 3 || !stopped.compareAndSet(false, true)) return;
+            ChatEvent started = relayed.stream()
+                    .filter(event -> "started".equals(event.type()))
+                    .findFirst()
+                    .orElseThrow();
+            chat.stop(dad, started.executionId());
+        });
+
+        chat.stream(dad, null, "전기차를 사는 게 나을까?", MY_AGENT, relayed::add);
+
+        assertThat(stub().stopped()).containsExactlyInAnyOrder("run-researcher", "run-engineer");
+        assertThat(stub().received()).hasSize(3).noneMatch(command ->
+                command.input().contains("중간 산출물을 합쳐"));
+        assertThat(executionsOf(dad))
+                .filteredOn(execution -> execution.rootExecutionId() == null)
+                .singleElement()
+                .satisfies(root -> assertThat(root.status()).isEqualTo(ExecutionStatus.CANCELLED));
+        assertThat(relayed.getLast().type()).isEqualTo("stopped");
+    }
+
     /** 둘 다 제출될 때까지 기다린다. 줄서면 여기서 끝나지 않고 검사가 실패한다. */
     private static void await(java.util.concurrent.CountDownLatch latch) {
         try {

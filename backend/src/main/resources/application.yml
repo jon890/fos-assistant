@@ -38,6 +38,8 @@ management:
         include: health
 
 assistant:
+  chat:
+    stop-stream-grace: 10s
   context:
     max-chars: 8000
     index-budget-ratio: 4

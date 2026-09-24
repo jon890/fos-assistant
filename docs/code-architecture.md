@@ -263,6 +263,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `activity` | 작업 과정의 요약. `{ toolCount, subagentCount, durationMs }`. 사건이 없는 답과 사용자 메시지는 null |
 
 `activity` 는 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 모두 센다.
+provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 실행 줄을 갖는다. 요약은 답을 만든 실행만 세고 막힌 시도의 사건은 넣지 않는다. 화면이 reset 때 그 줄을 비우는 것과 같다.
 
 | 칸 | 세는 것 |
 | --- | --- |

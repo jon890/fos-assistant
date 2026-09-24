@@ -29,6 +29,7 @@ import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Duration;
@@ -82,6 +83,7 @@ public class ChatService {
     private final MemoryProposer memoryProposer;
     private final FlowRegistry flows;
     private final AttachmentService attachments;
+    private final TurnCancellation turns;
     private final TransactionTemplate transactions;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
@@ -101,8 +103,7 @@ public class ChatService {
             List<Long> attachmentIds) {
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         if (routed.flow() != null) {
-            fillBlankTitle(routed.conversation(), text);
-            return routed.flow().run(user, routed.conversation(), routed.agent(), text, event -> {});
+            return runFlow(user, routed, text, event -> {}, false);
         }
         return runTurn(user, routed, text, event -> {}, false);
     }
@@ -125,13 +126,13 @@ public class ChatService {
             Consumer<ChatEvent> onEvent) {
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         if (routed.flow() != null) {
-            fillBlankTitle(routed.conversation(), text);
-            streamFlow(user, routed, text, onEvent);
+            runFlow(user, routed, text, onEvent, true);
             return;
         }
         ChatTurn turn = runTurn(user, routed, text, onEvent, true);
-        onEvent.accept(
-                ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+        onEvent.accept(turn.cancelled()
+                ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
+                : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
     }
 
     /**
@@ -155,11 +156,13 @@ public class ChatService {
         Agent agent = routed.agent();
         List<Long> attachmentIds =
                 routed.attached().stream().map(ChatAttachment::id).toList();
-        transactions.executeWithoutResult(status -> {
-            fillBlankTitle(conversation, text);
-            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
-            attachments.attach(saved.id(), conversation.id(), attachmentIds);
-        });
+        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        try {
+            transactions.executeWithoutResult(status -> {
+                fillBlankTitle(conversation, text);
+                ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+                attachments.attach(saved.id(), conversation.id(), attachmentIds);
+            });
         String input = attachments.agentInput(conversation.id(), routed.attached(), text);
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
@@ -167,7 +170,7 @@ public class ChatService {
 
         List<ModelOption> options = modelSelector.availableFor(agent);
         if (options.isEmpty()) {
-            throw noModelAvailable(user, routed, snapshot, onEvent, streaming);
+            throw noModelAvailable(user, routed, snapshot, handle, onEvent, streaming);
         }
 
         Long previousExecutionId = null;
@@ -175,6 +178,7 @@ public class ChatService {
             ModelOption option = options.get(index);
             boolean last = index == options.size() - 1;
             PendingTurn pending = begin(user, routed, input, context, snapshot, option, previousExecutionId);
+            turns.rekey(handle, pending.execution().id());
             if (streaming) {
                 onEvent.accept(ChatEvent.started(conversation.id(), pending.execution().id()));
             }
@@ -183,12 +187,21 @@ public class ChatService {
                 onEvent.accept(ChatEvent.switched(option.label()));
             }
 
+            if (handle.cancelled().get()) return cancel(pending, null, option);
             String runId = submit(pending);
-            if (streaming) {
-                relay(pending, runId, onEvent);
+            HermesRunResult result;
+            try {
+                if (streaming) {
+                    relay(pending, runId, handle, onEvent);
+                }
+                result = awaitCompletion(pending, runId);
+            } finally {
+                turns.untrackRun(pending.execution().id(), runId);
             }
-            HermesRunResult result = awaitCompletion(pending, runId);
 
+            if (handle.cancelled().get() || "cancelled".equalsIgnoreCase(result.status())) {
+                return cancel(pending, result, option);
+            }
             if (result.succeeded()) {
                 blocklist.release(option.provider());
                 return finish(pending, result, option);
@@ -213,6 +226,9 @@ public class ChatService {
             previousExecutionId = pending.execution().id();
         }
         throw new ApiException(ErrorCode.NO_MODEL_AVAILABLE, "every model this agent can use is blocked");
+        } finally {
+            turns.close(handle);
+        }
     }
 
     /**
@@ -223,14 +239,16 @@ public class ChatService {
      */
     private ApiException noModelAvailable(
             CurrentUser user, Routed routed, ExecutionContextSnapshot snapshot,
+            TurnCancellation.TurnHandle handle,
             Consumer<ChatEvent> onEvent, boolean streaming) {
         AgentExecution execution = executions.start(
                 user, routed.conversation(), routed.agent(), null, null, snapshot, null, null);
+        turns.rekey(handle, execution.id());
         if (streaming) {
             onEvent.accept(ChatEvent.started(routed.conversation().id(), execution.id()));
         }
         PendingTurn pending = new PendingTurn(
-                user, routed.conversation(), routed.agent(), null, execution, new SequenceCounter());
+                user, routed.conversation(), routed.agent(), null, execution, new SequenceCounter(), new StringBuilder());
         executions.fail(execution, ErrorCode.NO_MODEL_AVAILABLE.name());
         append(pending, ExecutionEventType.RUN_FAILED, ErrorCode.NO_MODEL_AVAILABLE.name());
         return new ApiException(
@@ -243,12 +261,27 @@ public class ChatService {
      * <p>흐름은 단계 사건만 흘리고 답은 끝난 뒤에 한 번에 온다. 중간 단계의 답까지 흘리면 읽을 수
      * 없기 때문이다. 근거는 ADR-016 에 있다.
      */
-    private void streamFlow(
-            CurrentUser user, Routed routed, String text, Consumer<ChatEvent> onEvent) {
-        ChatTurn turn = routed.flow().run(user, routed.conversation(), routed.agent(), text, onEvent);
-        onEvent.accept(ChatEvent.delta(turn.assistantText()));
-        onEvent.accept(
-                ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+    private ChatTurn runFlow(CurrentUser user, Routed routed, String text,
+            Consumer<ChatEvent> onEvent, boolean streaming) {
+        Conversation conversation = routed.conversation();
+        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        try {
+            fillBlankTitle(conversation, text);
+            ChatTurn turn = routed.flow().run(user, conversation, routed.agent(), text,
+                    execution -> {
+                        turns.rekey(handle, execution.id());
+                        if (streaming) onEvent.accept(ChatEvent.started(conversation.id(), execution.id()));
+                    }, onEvent);
+            if (streaming) {
+                if (!turn.cancelled()) onEvent.accept(ChatEvent.delta(turn.assistantText()));
+                onEvent.accept(turn.cancelled()
+                        ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
+                        : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+            }
+            return turn;
+        } finally {
+            turns.close(handle);
+        }
     }
 
     /**
@@ -320,7 +353,7 @@ public class ChatService {
                 option.model());
         AgentExecution execution = executions.start(
                 user, conversation, agent, null, null, snapshot, option, retryOfExecutionId);
-        return new PendingTurn(user, conversation, agent, command, execution, new SequenceCounter());
+        return new PendingTurn(user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder());
     }
 
     private String submit(PendingTurn pending) {
@@ -328,6 +361,7 @@ public class ChatService {
             String runId = hermes.submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);
+            turns.trackRun(pending.execution().id(), pending.command().apiBaseUrl(), pending.command().profileName(), runId);
             return runId;
         } catch (ApiException ex) {
             executions.fail(pending.execution(), ex.code().name());
@@ -336,16 +370,29 @@ public class ChatService {
         }
     }
 
-    private void relay(PendingTurn pending, String runId, Consumer<ChatEvent> onEvent) {
-        try {
-            eventStream.open(
-                    pending.command().apiBaseUrl(),
-                    pending.command().profileName(),
-                    runId,
-                    event -> forward(pending, event, onEvent));
-        } catch (ApiException ex) {
-            log.warn("Hermes event stream ended before final status runId={}", runId, ex);
-        }
+    private void relay(PendingTurn pending, String runId, TurnCancellation.TurnHandle handle,
+            Consumer<ChatEvent> onEvent) {
+        // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
+        // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
+        java.util.concurrent.CompletableFuture<Void> streamDone = new java.util.concurrent.CompletableFuture<>();
+        Thread.startVirtualThread(() -> {
+            try {
+                eventStream.open(
+                        pending.command().apiBaseUrl(),
+                        pending.command().profileName(),
+                        runId,
+                        event -> {
+                            if (!handle.cancelled().get()) forward(pending, event, onEvent);
+                        },
+                        stream -> turns.attachStream(handle, stream));
+            } catch (ApiException ex) {
+                log.warn("Hermes event stream ended before final status runId={}", runId, ex);
+            } finally {
+                turns.detachStream(handle);
+                streamDone.complete(null);
+            }
+        });
+        turns.awaitStreamOrGrace(handle, streamDone);
     }
 
     private HermesRunResult awaitCompletion(PendingTurn pending, String runId) {
@@ -370,7 +417,50 @@ public class ChatService {
         ChatMessage message = messages.save(
                 ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
         memoryProposer.proposeFrom(pending.user(), pending.conversation(), pending.agent(), execution, answer);
-        return new ChatTurn(pending.conversation().id(), execution.id(), answer, message.id());
+        return new ChatTurn(pending.conversation().id(), execution.id(), answer, message.id(), false);
+    }
+
+    private ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelOption option) {
+        AgentExecution execution = executions.cancel(pending.execution(), pending.agent(), result, option);
+        append(pending, ExecutionEventType.RUN_CANCELLED, null);
+        String answer = result != null && result.output() != null && !result.output().isBlank()
+                ? result.output() : pending.streamed().toString();
+        ChatMessage message = answer.isBlank() ? null : messages.save(
+                ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
+        if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
+            pending.conversation().rememberSession(result.sessionId());
+            conversations.touchSession(pending.conversation().id(), result.sessionId(), Instant.now());
+        }
+        return new ChatTurn(pending.conversation().id(), execution.id(), answer,
+                message == null ? null : message.id(), true);
+    }
+
+    public void stop(CurrentUser user, Long executionId) {
+        TurnCancellation.TurnHandle handle = turns.find(executionId).orElseGet(() -> {
+            AgentExecution execution = executionRepository.findById(executionId)
+                    .orElseThrow(() -> new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "execution not found"));
+            if (!execution.userId().equals(user.id())) {
+                throw new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "execution not found");
+            }
+            throw new ApiException(ErrorCode.EXECUTION_NOT_RUNNING, "execution is not running");
+        });
+        if (!handle.userId().equals(user.id())) {
+            throw new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "execution not found");
+        }
+        turns.cancel(handle);
+        boolean hadRuns = turns.hasRuns(handle);
+        boolean failed = false;
+        for (TurnCancellation.RunRef run : turns.pendingStops(handle)) {
+            if (!turns.stopRun(run)) failed = true;
+        }
+        for (AgentExecution child : executionRepository.findByRootExecutionId(executionId)) {
+            if (child.status() != ExecutionStatus.RUNNING || child.hermesRunId() == null) continue;
+            Agent childAgent = agents.requireById(child.agentId());
+            if (!turns.trackRun(executionId, childAgent.apiBaseUrl(),
+                    child.profileName(), child.hermesRunId())) failed = true;
+        }
+        if (!hadRuns && !turns.awaitFirstStop(handle)) failed = true;
+        if (failed) throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
     }
 
     /**
@@ -390,6 +480,14 @@ public class ChatService {
             return Set.of();
         }
         return Set.copyOf(executions.idsHavingChildren(executionIds));
+    }
+
+    /** 답 메시지의 실행 상태를 한 번에 읽는다. */
+    public Map<Long, ExecutionStatus> statuses(List<ChatMessage> history) {
+        List<Long> ids = history.stream().map(ChatMessage::executionId).filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) return Map.of();
+        return executionRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(AgentExecution::id, AgentExecution::status));
     }
 
     /**
@@ -572,6 +670,7 @@ public class ChatService {
         append(pending, event);
         String type = event.type() == null ? "" : event.type().toLowerCase();
         if (type.contains("delta") && event.text() != null) {
+            pending.streamed().append(event.text());
             onEvent.accept(ChatEvent.delta(event.text()));
         } else if ("tool.started".equals(type)) {
             onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.STARTED, null, null));
@@ -637,7 +736,8 @@ public class ChatService {
             Agent agent,
             HermesRunCommand command,
             AgentExecution execution,
-            SequenceCounter counter) {
+            SequenceCounter counter,
+            StringBuilder streamed) {
     }
 
     /**

@@ -21,6 +21,8 @@ import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -76,7 +78,7 @@ public class AgentRunner {
             Long rootExecutionId,
             String sessionId) {
         return run(user, conversation, agent, task, parentExecutionId, rootExecutionId,
-                sessionId, execution -> {});
+                sessionId, execution -> {}, (execution, runId) -> {}, () -> false);
     }
 
     public Run run(
@@ -88,6 +90,31 @@ public class AgentRunner {
             Long rootExecutionId,
             String sessionId,
             Consumer<AgentExecution> onStarted) {
+        return run(
+                user,
+                conversation,
+                agent,
+                task,
+                parentExecutionId,
+                rootExecutionId,
+                sessionId,
+                onStarted,
+                (execution, runId) -> {},
+                () -> false);
+    }
+
+    /** 실행 줄과 Hermes run 번호가 모두 생긴 직후 호출한다. */
+    public Run run(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            String task,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            String sessionId,
+            Consumer<AgentExecution> onStarted,
+            BiConsumer<AgentExecution, String> onSubmitted,
+            BooleanSupplier cancelled) {
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
@@ -119,6 +146,7 @@ public class AgentRunner {
         try {
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
+            onSubmitted.accept(execution, runId);
             append(execution, ExecutionEventType.RUN_STARTED, null, 1);
         } catch (RuntimeException ex) {
             return fail(execution, ex, 1);
@@ -129,6 +157,14 @@ public class AgentRunner {
             result = hermes.awaitCompletion(command, runId);
         } catch (RuntimeException ex) {
             return fail(execution, ex, 2);
+        }
+
+        if (cancelled.getAsBoolean() || "cancelled".equalsIgnoreCase(result.status())) {
+            AgentExecution cancelledExecution = executions.cancel(execution, agent, result, option);
+            return new Run(
+                    cancelledExecution,
+                    ChildResult.failed(cancelledExecution.id(), "CANCELLED"),
+                    null);
         }
 
         if (!result.succeeded()) {

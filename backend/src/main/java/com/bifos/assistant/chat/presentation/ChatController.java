@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationResponse;
+import com.bifos.assistant.chat.presentation.ChatDtos.StopResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -30,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +40,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -63,6 +66,13 @@ public class ChatController {
                 request.agentCode(),
                 request.attachmentIds());
         return new SendMessageResponse(turn.conversationId(), turn.executionId(), turn.assistantText());
+    }
+
+    @PostMapping("/executions/{executionId}/stop")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public StopResponse stop(@PathVariable Long executionId) {
+        chat.stop(currentUser.require(), executionId);
+        return new StopResponse("stopping");
     }
 
     @PostMapping(path = "/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -146,6 +156,7 @@ public class ChatController {
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
         Map<Long, ActivitySummary> activity = chat.activitySummaries(history);
+        Map<Long, com.bifos.assistant.usage.domain.ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, conversationId);
         return history.stream()
                 .map(
@@ -163,7 +174,9 @@ public class ChatController {
                                         attached.getOrDefault(it.id(), List.of()).stream()
                                                 .map(AttachmentView::from)
                                                 .toList(),
-                                        it.executionId() == null ? null : activity.get(it.executionId())))
+                                        it.executionId() == null ? null : activity.get(it.executionId()),
+                                        it.executionId() == null || statuses.get(it.executionId()) == null
+                                                ? null : statuses.get(it.executionId()).name()))
                 .toList();
     }
 }
