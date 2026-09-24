@@ -57,6 +57,9 @@ public class ExecutionEvent {
     @Column(name = "duration_ms")
     private Long durationMs;
 
+    @Column(name = "failed")
+    private Boolean failed;
+
     @Column(name = "detail", length = DETAIL_LIMIT)
     private String detail;
 
@@ -80,6 +83,7 @@ public class ExecutionEvent {
         this.subagentName = builder.subagentName;
         this.hermesSessionId = builder.hermesSessionId;
         this.durationMs = builder.durationMs;
+        this.failed = builder.failed;
         this.detail = builder.detail;
         this.model = builder.model;
         this.inputTokens = builder.inputTokens;
@@ -123,6 +127,10 @@ public class ExecutionEvent {
         return durationMs;
     }
 
+    public Boolean failed() {
+        return failed;
+    }
+
     public String detail() {
         return detail;
     }
@@ -151,6 +159,7 @@ public class ExecutionEvent {
         private String subagentName;
         private String hermesSessionId;
         private Long durationMs;
+        private Boolean failed;
         private String detail;
         private String model;
         private Long inputTokens;
@@ -189,6 +198,11 @@ public class ExecutionEvent {
 
         public Builder durationMs(Long durationMs) {
             this.durationMs = durationMs;
+            return this;
+        }
+
+        public Builder failed(Boolean failed) {
+            this.failed = failed;
             return this;
         }
 

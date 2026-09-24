@@ -102,4 +102,13 @@ class HermesRunEventStreamTest {
         assertThat(event.durationMs()).isEqualTo(250L);
         assertThat(event.failed()).isTrue();
     }
+
+    @Test
+    void 목표와_preview가_없으면_상태를_목표_대신_쓰지_않는다() {
+        RunEvent event = parse("{\"event\":\"subagent.complete\",\"status\":\"completed\"}");
+
+        assertThat(event.goal()).isNull();
+        assertThat(event.detail()).isNull();
+        assertThat(event.status()).isEqualTo("completed");
+    }
 }

@@ -276,6 +276,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `subagent_name` | VARCHAR(128) NULL | 하위 에이전트 사건일 때 채운다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 하위 에이전트가 따로 session 을 가지면 적는다 |
 | `duration_ms` | BIGINT NULL | 끝난 사건에만 있다 |
+| `failed` | BOOLEAN NULL | 완료 사건의 실패 여부. Hermes 가 알려주지 않으면 비운다 |
 | `detail` | VARCHAR(500) NULL | 화면에 한 줄로 보일 만큼만. 하위 에이전트 사건이면 그 목표 |
 | `model` | VARCHAR(128) NULL | 하위 에이전트가 돈 모델. 하위 에이전트 사건에만 있다 |
 | `input_tokens`, `output_tokens` | BIGINT NULL | 하위 에이전트가 쓴 토큰. `SUBAGENT_COMPLETED` 에만 있다 |
@@ -283,12 +284,9 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 `execution_id` 와 `sequence` 를 함께 유일하게 둔다.
 
-**`subagent_name` 과 `hermes_session_id` 는 지금 언제나 비어 있다.**
-Hermes v0.21.0 의 `subagent.start` 와 `subagent.complete` 는 `preview` 만 싣고
-하위 에이전트의 이름도 session 번호도 보내지 않는다.
-비워 두는 쪽을 골랐다. `preview` 에서 이름처럼 보이는 글자를 뽑아 채우면
-그것이 실제 이름인지 우리가 만든 것인지 나중에 구분할 수 없다.
-Hermes 가 보내기 시작하면 그때 채운다.
+**`subagent_name` 은 Hermes 가 이름을 보낼 때만 채운다.**
+이름이 없는 사건의 `preview` 에서 이름처럼 보이는 글자를 뽑아 채우지 않는다.
+그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 
 **`hermes_session_id` 와 `model` 과 토큰은 Hermes 가 실어 보낼 때만 채운다.**
 [`hermes-integration.md`](hermes-integration.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이

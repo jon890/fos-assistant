@@ -105,7 +105,7 @@ public class HermesRunEventStream {
                 firstText(root, payload, "event", "type"),
                 firstText(root, payload, "delta", "text", "output"),
                 firstText(root, payload, "tool", "tool_name", "toolName", "name"),
-                firstText(root, payload, "preview", "detail", "status", "result"),
+                firstText(root, payload, "preview", "detail", "result"),
                 durationMs(root, payload),
                 failed(root, payload),
                 firstText(root, payload, "subagent_id"),

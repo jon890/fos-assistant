@@ -66,6 +66,8 @@ public class ExecutionEventRecorder {
                 .subagentName(type.isSubagent() ? event.toolName() : null)
                 .hermesSessionId(type.isSubagent() ? event.childSessionId() : null)
                 .durationMs(event.durationMs())
+                .failed(type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
+                        ? event.failed() : null)
                 .detail(type.isSubagent() && event.goal() != null ? event.goal() : event.detail())
                 .model(type.isSubagent() ? event.model() : null)
                 .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
