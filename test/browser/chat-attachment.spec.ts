@@ -14,14 +14,10 @@ function pngFile(name: string) {
 /** 새 대화를 열고 입력창을 쓸 수 있는 상태로 만든다. */
 async function openNewConversation(page: Page, testInfo: TestInfo): Promise<void> {
   await page.goto("/");
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "대화 목록 열기" }).click();
-  }
-  await page.getByRole("button", { name: "새 대화", exact: true }).click();
 }
 
 async function openConversationListDrawer(page: Page): Promise<void> {
-  const opener = page.getByRole("button", { name: "대화 목록 열기" });
+  const opener = page.getByRole("button", { name: "사이드바 열기" });
   if (await opener.isVisible()) await opener.click();
 }
 
@@ -130,8 +126,8 @@ test("새 대화에서 사진을 고르고 글과 함께 보내면 사진이 보
   await openConversationListDrawer(page);
   await expect(
     page
-      .getByRole("complementary", { name: "대화 목록" })
-      .getByRole("button", { name: new RegExp(text) })
+      .getByRole("complementary", { name: "사이드바" })
+      .getByRole("link", { name: new RegExp(text) })
       .first(),
   ).toBeVisible();
 });
@@ -199,8 +195,8 @@ test("흐름이 붙은 에이전트의 대화에는 사진 단추가 없다", as
   await page.reload();
   await openConversationListDrawer(page);
   await page
-    .getByRole("complementary", { name: "대화 목록" })
-    .getByRole("button", { name: new RegExp(text) })
+    .getByRole("complementary", { name: "사이드바" })
+    .getByRole("link", { name: new RegExp(text) })
     .first()
     .click();
 
@@ -237,8 +233,8 @@ test("보관 기간이 지난 첨부는 자리를 남기고 알린다", async ({
   await page.reload();
   await openConversationListDrawer(page);
   await page
-    .getByRole("complementary", { name: "대화 목록" })
-    .getByRole("button", { name: new RegExp(text) })
+    .getByRole("complementary", { name: "사이드바" })
+    .getByRole("link", { name: new RegExp(text) })
     .first()
     .click();
 
@@ -263,8 +259,8 @@ test("대화를 바꾸면 미리보기가 비워진다", async ({ page }, testIn
   // 원래 대화로 돌아가면 미리보기가 비워져야 한다. 다른 대화로 옮겨가면 안 된다.
   await openConversationListDrawer(page);
   await page
-    .getByRole("complementary", { name: "대화 목록" })
-    .getByRole("button", { name: new RegExp(firstText) })
+    .getByRole("complementary", { name: "사이드바" })
+    .getByRole("link", { name: new RegExp(firstText) })
     .first()
     .click();
 
@@ -293,8 +289,8 @@ async function selectConversationByText(page: Page, text: string): Promise<numbe
       && response.request().method() === "GET",
   );
   await page
-    .getByRole("complementary", { name: "대화 목록" })
-    .getByRole("button", { name: new RegExp(text) })
+    .getByRole("complementary", { name: "사이드바" })
+    .getByRole("link", { name: new RegExp(text) })
     .first()
     .click();
   await loaded;

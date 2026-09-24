@@ -36,6 +36,7 @@ import { personaScenario } from "./scenarios/persona.ts";
 import { memoryScenario } from "./scenarios/memory.ts";
 import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
+import { conversationManageScenario } from "./scenarios/conversation-manage.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
 import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
@@ -79,6 +80,7 @@ const SCENARIOS: readonly Scenario[] = [
   chatScenario,
   usageCostScenario,
   conversationHistoryScenario,
+  conversationManageScenario,
   streamingScenario,
   orchestrationScenario,
   chatAttachmentScenario,

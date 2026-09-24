@@ -21,7 +21,7 @@ public class ConversationAccess {
 
     public Conversation requireOwn(CurrentUser user, Long conversationId) {
         return conversations
-                .findByIdAndUserId(conversationId, user.id())
+                .findByIdAndUserIdAndDeletedAtIsNull(conversationId, user.id())
                 .orElseThrow(
                         () ->
                                 new ApiException(

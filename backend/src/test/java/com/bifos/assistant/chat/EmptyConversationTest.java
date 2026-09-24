@@ -115,7 +115,7 @@ class EmptyConversationTest {
                 () -> chat.startEmpty(dad, "kid"), () -> chat.send(dad, null, "안녕", "kid"), ErrorCode.AGENT_NOT_FOUND);
         assertSameCode(
                 () -> chat.startEmpty(dad, "off"), () -> chat.send(dad, null, "안녕", "off"), ErrorCode.AGENT_DISABLED);
-        assertThat(conversations.findByUserIdOrderByUpdatedAtDesc(dad.id())).isEmpty();
+        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id())).isEmpty();
     }
 
     @Test
@@ -128,7 +128,7 @@ class EmptyConversationTest {
         assertThatThrownBy(() -> chat.startEmpty(dad, "flowed"))
                 .isInstanceOfSatisfying(ApiException.class,
                         ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
-        assertThat(conversations.findByUserIdOrderByUpdatedAtDesc(dad.id())).isEmpty();
+        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id())).isEmpty();
     }
 
     private CurrentUser member(String email) {

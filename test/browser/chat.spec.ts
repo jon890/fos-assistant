@@ -17,14 +17,15 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
   expect(box).not.toBeNull();
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
 
-  await page.getByRole("button", { name: "대화 목록 열기" }).click();
-  const drawer = page.getByRole("complementary", { name: "대화 목록" });
+  await page.getByRole("button", { name: "사이드바 열기" }).click();
+  const drawer = page.getByRole("complementary", { name: "사이드바" });
   await expect.poll(async () => (await drawer.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
-  await drawer.getByRole("button", { name: /모바일 대화 5/ }).click();
+  await drawer.getByRole("link", { name: /모바일 대화 5/ }).click();
+  await expect(page).toHaveURL(/\/c\/\d+$/);
   await expect.poll(async () => (await drawer.boundingBox())?.x ?? 0).toBeLessThan(0);
 
-  await page.getByRole("button", { name: "대화 목록 열기" }).click();
-  await page.getByRole("button", { name: "대화 목록 닫기" }).click({ position: { x: 380, y: 400 } });
+  await page.getByRole("button", { name: "사이드바 열기" }).click();
+  await page.getByRole("button", { name: "사이드바 닫기" }).click({ position: { x: 380, y: 400 } });
   await expect.poll(async () => (await drawer.boundingBox())?.x ?? 0).toBeLessThan(0);
 });
 
@@ -32,10 +33,10 @@ test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({ page 
   test.skip(testInfo.project.name !== "desktop");
   await page.goto("/");
 
-  const drawer = page.getByRole("complementary", { name: "대화 목록" });
+  const drawer = page.getByRole("complementary", { name: "사이드바" });
   await expect(drawer).toBeVisible();
   await expect.poll(async () => (await drawer.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
-  await expect(page.getByRole("button", { name: "대화 목록 열기" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "사이드바 열기" })).toBeHidden();
 });
 
 test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을 알약 하나로 보인다", async ({ page }) => {
@@ -143,19 +144,25 @@ test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다",
   await expect(page.locator(".text-code-comment").first()).toHaveCSS("font-style", "italic");
 });
 
-test("위로 올려 읽는 동안 새 답이 와도 읽던 자리를 지킨다", async ({ page }) => {
+test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨다", async ({ page }) => {
   await page.goto("/");
   const composer = page.getByPlaceholder("무엇을 도와줄까요");
   await composer.fill("긴 답 스트림 검사");
   await page.getByRole("button", { name: "보내기" }).click();
 
   const scroll = page.getByTestId("message-scroll");
-  await expect(page.getByText("1번째 긴 답 줄", { exact: true }).last()).toBeVisible();
+  await expect(page.getByTestId("assistant-message")).toHaveCount(1);
+  await composer.fill("읽는 중 다음 답 검사");
+  await expect(page.getByRole("button", { name: "보내기" })).toBeEnabled();
+  await expect.poll(async () => scroll.evaluate((element) => element.scrollHeight - element.clientHeight))
+    .toBeGreaterThan(100);
   await scroll.evaluate((element) => {
     element.scrollTop = 0;
     element.dispatchEvent(new Event("scroll"));
   });
   const position = await scroll.evaluate((element) => element.scrollTop);
+  await page.getByRole("button", { name: "보내기" }).click();
+  await expect(page.getByTestId("assistant-message")).toHaveCount(2);
   await expect(page.getByRole("button", { name: "새 메시지" })).toBeVisible();
   expect(await scroll.evaluate((element) => element.scrollTop)).toBe(position);
 });
@@ -182,11 +189,11 @@ test("막혀서 넘어가면 그 답 위에 넘어간 곳을 한 줄로 알린�
 
   await page.goto("/");
   // 같은 초에 만들어진 대화가 여럿이라 목록의 첫 줄이 이 대화라고 볼 수 없다. 이름으로 고른다.
-  const opener = page.getByRole("button", { name: "대화 목록 열기" });
+  const opener = page.getByRole("button", { name: "사이드바 열기" });
   if (await opener.isVisible()) await opener.click();
   await page
-    .getByRole("complementary", { name: "대화 목록" })
-    .getByRole("button", { name: /넘김 화면 검사/ })
+    .getByRole("complementary", { name: "사이드바" })
+    .getByRole("link", { name: /넘김 화면 검사/ })
     // 다른 폭에서 같은 이름의 대화를 이미 만들었다. 목록은 최근 순서라 첫 줄이 이번 것이다.
     .first()
     .click();

@@ -8,10 +8,6 @@ async function sendWithTheFlowAgent(
   text: string,
 ): Promise<void> {
   await page.goto("/");
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "대화 목록 열기" }).click();
-  }
-  await page.getByRole("button", { name: "새 대화", exact: true }).click();
   await page.getByRole("combobox").selectOption({ label: "흐름 비서" });
   await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
@@ -73,10 +69,6 @@ test("한 단계가 실패하면 그 단계에 오류 표시가 남고 나머지
 
 test("흐름이 아닌 대화에는 단계 목록이 보이지 않는다", async ({ page }, testInfo) => {
   await page.goto("/");
-  if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "대화 목록 열기" }).click();
-  }
-  await page.getByRole("button", { name: "새 대화", exact: true }).click();
   await page.getByRole("combobox").selectOption({ label: "브라우저 비서" });
   await page.getByPlaceholder("무엇을 도와줄까요").fill("그냥 대화");
   await page.getByRole("button", { name: "보내기" }).click();

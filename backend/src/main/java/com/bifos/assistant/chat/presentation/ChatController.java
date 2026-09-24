@@ -5,9 +5,11 @@ import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
+import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationRequest;
@@ -27,8 +29,11 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -110,13 +115,26 @@ public class ChatController {
     @GetMapping("/conversations")
     public List<ConversationView> conversations() {
         return chat.conversationsOf(currentUser.require()).stream()
-                .map(
-                        it -> {
-                            Agent agent = agents.requireById(it.agentId());
-                            return new ConversationView(
-                                    it.id(), it.title(), agent.code(), agent.name(), it.updatedAt());
-                        })
+                .map(this::viewOf)
                 .toList();
+    }
+
+    @PatchMapping("/conversations/{conversationId}")
+    public ConversationView rename(@PathVariable Long conversationId,
+            @Valid @RequestBody RenameConversationRequest request) {
+        return viewOf(chat.rename(currentUser.require(), conversationId, request.title()));
+    }
+
+    @DeleteMapping("/conversations/{conversationId}")
+    public ResponseEntity<Void> delete(@PathVariable Long conversationId) {
+        chat.delete(currentUser.require(), conversationId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private ConversationView viewOf(Conversation conversation) {
+        Agent agent = agents.requireById(conversation.agentId());
+        return new ConversationView(conversation.id(), conversation.title(), agent.code(),
+                agent.name(), conversation.updatedAt());
     }
 
     @GetMapping("/conversations/{conversationId}/messages")

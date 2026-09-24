@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
@@ -74,5 +75,8 @@ public final class ChatDtos {
 
     public record ConversationView(Long id, String title, String agentCode, String agentName,
             Instant updatedAt) {
+    }
+
+    public record RenameConversationRequest(@NotNull String title) {
     }
 }

@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -40,6 +42,9 @@ public class Conversation {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     private Conversation(Long userId, String title, Long agentId) {
         this.userId = userId;
         this.title = title;
@@ -72,6 +77,18 @@ public class Conversation {
 
     public Instant updatedAt() {
         return updatedAt;
+    }
+
+    public Instant deletedAt() {
+        return deletedAt;
+    }
+
+    public static String normalizedTitle(String title) {
+        String normalized = title == null ? "" : title.strip();
+        if (normalized.isEmpty() || normalized.length() > 200) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "conversation title must have 1 to 200 characters");
+        }
+        return normalized;
     }
 
     /** 제목이 비어 있을 때만 채운다. 사진을 먼저 올리려고 만든 대화는 첫 메시지가 제목을 정한다. */

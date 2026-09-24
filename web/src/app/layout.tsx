@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
-import { SiteHeader } from "@/components/ui/site-header";
+import { AppShell } from "@/components/shell/app-shell";
 import { readMe } from "@/lib/me";
 import "./globals.css";
 
@@ -22,12 +22,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
-      <body className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+      <body className="flex h-dvh overflow-hidden bg-background text-foreground">
         <ThemeProvider>
-          <SiteHeader isAdmin={me?.role === "ADMIN"} displayName={me?.displayName} />
-          <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
+          <AppShell isAdmin={me?.role === "ADMIN"} displayName={me?.displayName}>
             {children}
-          </main>
+          </AppShell>
         </ThemeProvider>
       </body>
     </html>

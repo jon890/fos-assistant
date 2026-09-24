@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
-import { ConversationDrawer } from "./chat/conversation-drawer";
-import { ConversationList, type Conversation } from "./chat/conversation-list";
 import { MessageList } from "./chat/message-list";
 import type { FlowStepStates } from "./chat/flow-progress";
 import type { Turn } from "./chat/message-bubble";
-import { IconButton } from "./ui/icon-button";
+import { useConversations } from "./shell/conversations-provider";
+import { useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 
 type Agent = {
@@ -20,7 +21,7 @@ type Agent = {
 };
 type ErrorPayload = { code: string; message: string };
 type ChatEvent = {
-  type: "delta" | "tool" | "step" | "switched" | "reset" | "done" | "error";
+  type: "started" | "delta" | "tool" | "step" | "switched" | "reset" | "done" | "error";
   text?: string | null;
   toolName?: string | null;
   detail?: string | null;
@@ -45,23 +46,26 @@ async function readPayload<T>(response: Response): Promise<T> {
  */
 const SLOW_FLOW_MS = 120_000;
 
-export function ChatPanel() {
+export function ChatPanel({ initialConversationId }: { initialConversationId: number | null }) {
+  const pathname = usePathname();
+  const { conversations, loading: conversationsLoading, refresh, newConversationVersion } = useConversations();
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [conversationId, setConversationId] = useState<number | null>(initialConversationId);
+  const conversationIdRef = useRef<number | null>(initialConversationId);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [toolEvents, setToolEvents] = useState<string[]>([]);
   const [flowSteps, setFlowSteps] = useState<FlowStepStates | null>(null);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [turnError, setTurnError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentCode, setAgentCode] = useState<string>("");
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [conversationsLoading, setConversationsLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(true);
-  const loadingConversation = useRef<number | null>(null);
+  const [messagesLoading, setMessagesLoading] = useState(initialConversationId !== null);
   const selectionVersion = useRef(0);
+  const previousPathname = useRef(pathname);
+  const previousNewVersion = useRef(newConversationVersion);
   /**
    * 사용자가 대화를 전환할 때만 올린다. `Composer` 의 `key` 로 써서 그때만 다시 만든다.
    *
@@ -82,55 +86,68 @@ export function ChatPanel() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadInitialConversation() {
-      const version = selectionVersion.current;
+    if (initialConversationId === null) return;
+    const version = ++selectionVersion.current;
+    conversationIdRef.current = initialConversationId;
+    setConversationId(initialConversationId);
+    setMessagesLoading(true);
+    setNotFound(false);
+    setError(null);
+    setTurnError(null);
+    setTurns([]);
+    setComposerGeneration((generation) => generation + 1);
+    void (async () => {
       try {
-        const response = await fetch("/api/chat/conversations");
+        const response = await fetch(`/api/chat/conversations/${initialConversationId}/messages`);
         if (!response.ok) {
           const payload = await readPayload<ErrorPayload>(response);
+          if (payload.code === "CONVERSATION_NOT_FOUND") {
+            if (selectionVersion.current === version) setNotFound(true);
+            return;
+          }
           throw new Error(describeError(payload.code, payload.message));
         }
-        const loaded = await readPayload<Conversation[]>(response);
-        if (cancelled || selectionVersion.current !== version) return;
-        setConversations(loaded);
-        const latest = loaded[0];
-        if (!latest) {
-          setMessagesLoading(false);
-          return;
-        }
-
-        setConversationId(latest.id);
-        setAgentCode(latest.agentCode);
-        loadingConversation.current = latest.id;
-        const messagesResponse = await fetch(
-          `/api/chat/conversations/${latest.id}/messages`,
-        );
-        if (!messagesResponse.ok) {
-          const payload = await readPayload<ErrorPayload>(messagesResponse);
-          throw new Error(describeError(payload.code, payload.message));
-        }
-        const messages = await readPayload<Turn[]>(messagesResponse);
-        if (!cancelled && selectionVersion.current === version) setTurns(messages);
+        const messages = await readPayload<Turn[]>(response);
+        if (selectionVersion.current === version) setTurns(messages);
       } catch (reason) {
-        if (!cancelled && selectionVersion.current === version) {
-          setTurns([]);
+        if (selectionVersion.current === version) {
           setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
         }
       } finally {
-        if (!cancelled) {
-          setConversationsLoading(false);
+        if (selectionVersion.current === version) {
           setMessagesLoading(false);
         }
-        if (selectionVersion.current === version) loadingConversation.current = null;
       }
-    }
+    })();
+  }, [initialConversationId]);
 
-    void loadInitialConversation();
-    return () => {
-      cancelled = true;
+  useEffect(() => {
+    const selected = conversations.find((item) => item.id === conversationId);
+    if (selected) setAgentCode(selected.agentCode);
+  }, [conversations, conversationId]);
+
+  useEffect(() => {
+    const previous = previousPathname.current;
+    previousPathname.current = pathname;
+    if (previous !== "/" && pathname === "/" && conversationIdRef.current !== null) {
+      startNewConversation();
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (newConversationVersion !== previousNewVersion.current) {
+      previousNewVersion.current = newConversationVersion;
+      startNewConversation();
+    }
+  }, [newConversationVersion]);
+
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+      // 더 안쪽의 화면과 중지 동작이 추가될 때 이 처리기에서 우선순위를 정한다.
     };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
   }, []);
 
   /**
@@ -148,46 +165,10 @@ export function ChatPanel() {
 
   const agentLocked = conversationId !== null;
 
-  async function selectConversation(conversation: Conversation) {
-    if (loadingConversation.current !== null || sending) return;
-
-    const version = ++selectionVersion.current;
-    setComposerGeneration((generation) => generation + 1);
-    loadingConversation.current = conversation.id;
-    setDrawerOpen(false);
-    setMessagesLoading(true);
-    setConversationId(conversation.id);
-    setAgentCode(conversation.agentCode);
-    setTurns([]);
-    setToolEvents([]);
-    setFlowSteps(null);
-    setFlowIsSlow(false);
-    setError(null);
-    try {
-      const response = await fetch(`/api/chat/conversations/${conversation.id}/messages`);
-      if (!response.ok) {
-        const payload = await readPayload<ErrorPayload>(response);
-        throw new Error(describeError(payload.code, payload.message));
-      }
-      const messages = await readPayload<Turn[]>(response);
-      if (selectionVersion.current === version) setTurns(messages);
-    } catch (reason) {
-      if (selectionVersion.current === version) {
-        setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
-      }
-    } finally {
-      if (selectionVersion.current === version) {
-        loadingConversation.current = null;
-        setMessagesLoading(false);
-      }
-    }
-  }
-
   function startNewConversation() {
-    if (sending) return;
     selectionVersion.current += 1;
+    conversationIdRef.current = null;
     setComposerGeneration((generation) => generation + 1);
-    loadingConversation.current = null;
     setConversationId(null);
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
@@ -195,37 +176,34 @@ export function ChatPanel() {
     setFlowSteps(null);
     setFlowIsSlow(false);
     setError(null);
-    setDrawerOpen(false);
+    setTurnError(null);
+    setNotFound(false);
+    setDraft("");
+    setSending(false);
     setMessagesLoading(false);
   }
 
-  async function refreshConversations() {
-    const response = await fetch("/api/chat/conversations");
-    if (!response.ok) {
-      const payload = await readPayload<ErrorPayload>(response);
-      throw new Error(describeError(payload.code, payload.message));
-    }
-    setConversations(await readPayload<Conversation[]>(response));
-  }
-
-  async function refreshMessages(id: number) {
+  async function refreshMessages(id: number, version: number) {
     const response = await fetch(`/api/chat/conversations/${id}/messages`);
     if (!response.ok) {
       const payload = await readPayload<ErrorPayload>(response);
       throw new Error(describeError(payload.code, payload.message));
     }
-    setTurns(await readPayload<Turn[]>(response));
+    const loaded = await readPayload<Turn[]>(response);
+    if (selectionVersion.current === version) setTurns(loaded);
   }
 
   /** 전송이 실제로 끝났는지를 돌려준다. `Composer` 는 이 값을 보고 실패했을 때 미리보기를 남긴다 */
   async function send(attachmentIds: number[]): Promise<boolean> {
     const text = draft.trim();
-    if (text.length === 0 || sending || agentCode.length === 0) return false;
+    if (text.length === 0 || sending || (conversationId === null && agentCode.length === 0)) return false;
 
+    const version = selectionVersion.current;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
     setSending(true);
     setError(null);
+    setTurnError(null);
     setDraft("");
     setToolEvents([]);
     setFlowSteps(null);
@@ -236,6 +214,7 @@ export function ChatPanel() {
     ]);
 
     const restoreFailedMessage = () => {
+      if (selectionVersion.current !== version) return;
       setDraft(text);
       setTurns((previous) =>
         previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId),
@@ -263,6 +242,11 @@ export function ChatPanel() {
         setError(describeError(payload.code, payload.message));
         return false;
       }
+      if (selectionVersion.current !== version) return true;
+      if (conversationIdRef.current === null) {
+        window.history.replaceState(null, "", `/c/${payload.conversationId}`);
+      }
+      conversationIdRef.current = payload.conversationId;
       setConversationId(payload.conversationId);
       setTurns((previous) => [
         ...previous,
@@ -273,7 +257,7 @@ export function ChatPanel() {
           senderName: null,
         },
       ]);
-      await Promise.all([refreshConversations(), refreshMessages(payload.conversationId)]);
+      await Promise.all([refresh(), refreshMessages(payload.conversationId, version)]);
       return true;
     };
 
@@ -300,10 +284,20 @@ export function ChatPanel() {
       }
 
       let done = false;
+      let started = false;
       let reportedError = false;
       try {
         await readEventStream<ChatEvent>(response, async (streamEvent) => {
-          if (streamEvent.type === "delta" && streamEvent.text) {
+          if (selectionVersion.current !== version) return;
+          if (streamEvent.type === "started" && streamEvent.conversationId) {
+            started = true;
+            if (conversationIdRef.current === null) {
+              window.history.replaceState(null, "", `/c/${streamEvent.conversationId}`);
+            }
+            conversationIdRef.current = streamEvent.conversationId;
+            setConversationId(streamEvent.conversationId);
+            void refresh();
+          } else if (streamEvent.type === "delta" && streamEvent.text) {
             setTurns((previous) => {
               const current = previous.find((turn) => turn.id === assistantPendingId);
               if (!current) {
@@ -334,67 +328,82 @@ export function ChatPanel() {
             setToolEvents((previous) => [...previous, `${name}: ${status}`]);
           } else if (streamEvent.type === "done" && streamEvent.conversationId) {
             done = true;
+            conversationIdRef.current = streamEvent.conversationId;
             setConversationId(streamEvent.conversationId);
             await Promise.all([
-              refreshConversations(),
-              refreshMessages(streamEvent.conversationId),
+              refresh(),
+              refreshMessages(streamEvent.conversationId, version),
             ]);
             setToolEvents([]);
             setFlowSteps(null);
             setFlowIsSlow(false);
           } else if (streamEvent.type === "error") {
             reportedError = true;
-            restoreFailedMessage();
-            setError(describeError(streamEvent.code ?? "INTERNAL_ERROR", streamEvent.message ?? "요청을 처리하지 못했다."));
+            const message = describeError(streamEvent.code ?? "INTERNAL_ERROR", streamEvent.message ?? "요청을 처리하지 못했다.");
+            if (started && conversationIdRef.current !== null) {
+              await refreshMessages(conversationIdRef.current, version);
+              setTurnError(message);
+            } else {
+              restoreFailedMessage();
+              setError(message);
+            }
           }
         });
       } catch {
         if (!done && !reportedError) {
-          restoreFailedMessage();
-          setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
-          return false;
+          const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
+          if (started && conversationIdRef.current !== null) {
+            await refreshMessages(conversationIdRef.current, version).catch(() => {});
+            if (selectionVersion.current === version) setTurnError(message);
+          } else {
+            restoreFailedMessage();
+            if (selectionVersion.current === version) setError(message);
+          }
+          return started;
         }
-        return done && !reportedError;
+        return started || done;
       }
       if (!done && !reportedError) {
-        restoreFailedMessage();
-        setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
-        return false;
+        const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
+        if (started && conversationIdRef.current !== null) {
+          await refreshMessages(conversationIdRef.current, version).catch(() => {});
+          if (selectionVersion.current === version) setTurnError(message);
+        } else {
+          restoreFailedMessage();
+          if (selectionVersion.current === version) setError(message);
+        }
+        return started;
       }
-      return done && !reportedError;
+      return started || done;
     } catch (reason) {
       restoreFailedMessage();
       setError(reason instanceof Error ? reason.message : "요청을 보내지 못했다.");
       return false;
     } finally {
-      setSending(false);
+      if (selectionVersion.current === version) setSending(false);
     }
+  }
+
+  const selectedAgent = conversations.find((item) => item.id === conversationId)?.agentName
+    ?? agents.find((agent) => agent.code === agentCode)?.name;
+  useShellTitle(selectedAgent ?? null);
+
+  if (notFound) {
+    return (
+      <section data-testid="conversation-not-found" className="mx-auto max-w-3xl py-12 text-center">
+        <h1 className="text-lg font-semibold">대화를 찾을 수 없다</h1>
+        <Link href="/" className="mt-4 inline-block rounded-md bg-surface px-3 py-2 text-sm">새 대화</Link>
+      </section>
+    );
   }
 
   return (
     <section className="flex h-full min-h-0 min-w-0">
       <h1 className="sr-only">대화</h1>
-      <ConversationDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <ConversationList
-          conversations={conversations}
-          selectedId={conversationId}
-          loading={conversationsLoading}
-          onSelect={(conversation) => void selectConversation(conversation)}
-          onNew={startNewConversation}
-        />
-      </ConversationDrawer>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:pl-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
-          <IconButton
-            label="대화 목록 열기"
-            onClick={() => setDrawerOpen(true)}
-            className="md:hidden"
-          >
-            <span aria-hidden="true">☰</span>
-          </IconButton>
           <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-xs text-muted">
-            <label className="flex min-w-0 items-center gap-2">
+            <label className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
               <span className="shrink-0">에이전트</span>
               {!agentLocked && agents.length > 1 ? (
                 <select
@@ -423,6 +432,7 @@ export function ChatPanel() {
           conversationId={conversationId}
           flowSteps={flowSteps}
           flowIsSlow={flowIsSlow}
+          turnError={turnError}
         />
 
         {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}
@@ -436,11 +446,18 @@ export function ChatPanel() {
           value={draft}
           onChange={setDraft}
           onSend={(attachmentIds) => send(attachmentIds)}
-          disabled={sending || agents.length === 0}
+          disabled={sending || (conversationId === null && agents.length === 0)}
           conversationId={conversationId}
           agentCode={agentCode}
           acceptsAttachments={agents.find((agent) => agent.code === agentCode)?.acceptsAttachments ?? false}
-          onConversationCreated={(id) => setConversationId(id)}
+          onConversationCreated={(id) => {
+            if (conversationIdRef.current === null) {
+              window.history.replaceState(null, "", `/c/${id}`);
+            }
+            conversationIdRef.current = id;
+            setConversationId(id);
+            void refresh();
+          }}
         />
       </div>
     </section>

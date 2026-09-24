@@ -1,13 +1,13 @@
 {
   "name": "plan019-app-shell",
   "description": "대화 화면을 ChatGPT 식 사이드바 화면 틀로 바꾸고 대화마다 주소를 준다. 대화 이름 바꾸기와 지우기, started 사건, 단축키를 더한다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-23",
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 3,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard", "status": "completed" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep", "status": "completed" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard", "status": "completed" }
   ]
 }

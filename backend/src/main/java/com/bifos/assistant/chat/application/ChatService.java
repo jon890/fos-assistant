@@ -31,6 +31,7 @@ import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.HashMap;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,6 +43,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -161,7 +163,7 @@ public class ChatService {
 
         List<ModelOption> options = modelSelector.availableFor(agent);
         if (options.isEmpty()) {
-            throw noModelAvailable(user, routed, snapshot);
+            throw noModelAvailable(user, routed, snapshot, onEvent, streaming);
         }
 
         Long previousExecutionId = null;
@@ -169,6 +171,9 @@ public class ChatService {
             ModelOption option = options.get(index);
             boolean last = index == options.size() - 1;
             PendingTurn pending = begin(user, routed, input, context, snapshot, option, previousExecutionId);
+            if (streaming) {
+                onEvent.accept(ChatEvent.started(conversation.id(), pending.execution().id()));
+            }
             if (previousExecutionId != null) {
                 append(pending, ExecutionEventType.PROVIDER_SWITCHED, option.label());
                 onEvent.accept(ChatEvent.switched(option.label()));
@@ -213,9 +218,13 @@ public class ChatService {
      * 없으면 사용량 화면에서 이 turn 이 통째로 사라진다.
      */
     private ApiException noModelAvailable(
-            CurrentUser user, Routed routed, ExecutionContextSnapshot snapshot) {
+            CurrentUser user, Routed routed, ExecutionContextSnapshot snapshot,
+            Consumer<ChatEvent> onEvent, boolean streaming) {
         AgentExecution execution = executions.start(
                 user, routed.conversation(), routed.agent(), null, null, snapshot, null, null);
+        if (streaming) {
+            onEvent.accept(ChatEvent.started(routed.conversation().id(), execution.id()));
+        }
         PendingTurn pending = new PendingTurn(
                 user, routed.conversation(), routed.agent(), null, execution, new SequenceCounter());
         executions.fail(execution, ErrorCode.NO_MODEL_AVAILABLE.name());
@@ -280,8 +289,9 @@ public class ChatService {
      */
     private void fillBlankTitle(Conversation conversation, String text) {
         if (conversation.title().isBlank()) {
-            conversation.titleIfBlank(titleFrom(text));
-            conversations.save(conversation);
+            String title = titleFrom(text);
+            conversations.fillTitleIfBlank(conversation.id(), title);
+            conversation.titleIfBlank(title);
         }
     }
 
@@ -346,7 +356,8 @@ public class ChatService {
 
     private ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelOption requested) {
         pending.conversation().rememberSession(result.sessionId());
-        conversations.save(pending.conversation());
+        conversations.touchSession(pending.conversation().id(),
+                result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(), Instant.now());
 
         AgentExecution execution =
                 executions.complete(pending.execution(), pending.agent(), result, requested);
@@ -421,7 +432,25 @@ public class ChatService {
     }
 
     public List<Conversation> conversationsOf(CurrentUser user) {
-        return conversations.findByUserIdOrderByUpdatedAtDesc(user.id());
+        return conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user.id());
+    }
+
+    @Transactional
+    public Conversation rename(CurrentUser user, Long conversationId, String title) {
+        String normalized = Conversation.normalizedTitle(title);
+        access.requireOwn(user, conversationId);
+        if (conversations.renameIfActive(conversationId, user.id(), normalized, Instant.now()) == 0) {
+            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
+        }
+        return access.requireOwn(user, conversationId);
+    }
+
+    @Transactional
+    public void delete(CurrentUser user, Long conversationId) {
+        access.requireOwn(user, conversationId);
+        if (conversations.deleteIfActive(conversationId, user.id(), Instant.now()) == 0) {
+            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
+        }
     }
 
     /**

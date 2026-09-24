@@ -96,6 +96,18 @@ class AttachmentCleanerTest {
     }
 
     @Test
+    void 지운_대화의_보내지_않은_첨부도_기간이_지나면_지운다() {
+        ChatAttachment unbound = stored(EXPIRED);
+        conversations.deleteIfActive(conversationId, 9201L, NOW.minus(Duration.ofHours(2)));
+
+        int deleted = cleaner.cleanExpired(NOW);
+
+        assertThat(deleted).isEqualTo(1);
+        assertThat(fileOf(unbound)).doesNotExist();
+        assertThat(reload(unbound).deletedAt()).isEqualTo(NOW);
+    }
+
+    @Test
     void 한_건이_실패해도_나머지를_지운다() throws IOException {
         ChatAttachment broken = stored(EXPIRED);
         ChatAttachment fine = stored(EXPIRED);

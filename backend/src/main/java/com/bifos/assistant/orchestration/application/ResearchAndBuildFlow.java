@@ -14,6 +14,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -87,13 +88,15 @@ public class ResearchAndBuildFlow implements Flow {
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));
         AgentRunner.Run chief = runner.run(
-                user, conversation, agent, chiefPrompt(text), null, null, conversation.hermesSessionId());
+                user, conversation, agent, chiefPrompt(text), null, null, conversation.hermesSessionId(),
+                execution -> onEvent.accept(ChatEvent.started(conversation.id(), execution.id())));
         if (!chief.result().succeeded()) {
             onEvent.accept(ChatEvent.step(CHIEF, FAILED));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the flow could not start");
         }
         conversation.rememberSession(chief.sessionId());
-        conversations.save(conversation);
+        conversations.touchSession(conversation.id(),
+                chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(), Instant.now());
         onEvent.accept(ChatEvent.step(CHIEF, COMPLETED));
 
         AgentExecution root = chief.execution();
