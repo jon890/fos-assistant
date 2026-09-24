@@ -1167,8 +1167,9 @@ profile 을 하나 만들어 `API_SERVER_KEY` 를 넣고,
 건너뛴 것은 기동 로그에 남지만, 그 profile 의 `/p/<profile>/` 라우팅은 정상으로 동작한다.
 접두 라우팅은 adapter 목록이 아니라 profile 디렉터리 목록으로 정하기 때문이다.
 `platforms.api_server.enabled: false` 로 자동 활성화를 막아도 접두 라우팅은 그대로 동작한다.
-불필요한 경고를 남기지 않도록 profile 을 만드는 쪽이 listener 설정 세 개를 빼고
-자동 활성화를 막는 설정을 넣는 것을 테스트로 고정한다.
+profile 을 만드는 쪽이 listener 설정 세 개를 넣지 않는 것은 테스트로 고정돼 있다.
+Control Plane 은 자동 활성화를 막는 설정을 넣지 않으므로, Control Plane 이 만든 profile 은
+기동할 때 이 경고를 남긴다. 접두 라우팅과 key 경계에는 영향이 없다.
 
 ### 넣은 직후 공유 listener 가 답한다
 
