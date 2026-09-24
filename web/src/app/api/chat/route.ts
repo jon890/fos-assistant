@@ -12,6 +12,7 @@ export async function POST(request: Request) {
     conversationId?: number;
     text?: string;
     agentCode?: string;
+    attachmentIds?: number[];
   };
   if (!body.text || body.text.trim().length === 0) {
     return NextResponse.json({ code: "VALIDATION_FAILED", message: "보낼 내용을 입력해 주세요." }, { status: 400 });
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
       conversationId: body.conversationId ?? null,
       text: body.text,
       agentCode: body.agentCode ?? null,
+      attachmentIds: body.attachmentIds ?? [],
     },
   });
 

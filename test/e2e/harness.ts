@@ -123,6 +123,44 @@ export async function call(
   };
 }
 
+/**
+ * 파일 하나를 multipart 로 올린다. {@link call} 은 JSON 본문만 보내므로 따로 둔다.
+ *
+ * <p>상태 코드를 던지지 않고 그대로 돌려준다.
+ */
+export async function upload(
+  context: Context,
+  path: string,
+  options: {
+    readonly token: string;
+    readonly field: string;
+    readonly fileName: string;
+    readonly contentType: string;
+    readonly bytes: Uint8Array;
+  },
+): Promise<Response> {
+  const form = new FormData();
+  form.append(
+    options.field,
+    new Blob([options.bytes], { type: options.contentType }),
+    options.fileName,
+  );
+  const response = await fetch(`${context.api}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${options.token}` },
+    body: form,
+  });
+  const body = await response.text();
+  return {
+    status: response.status,
+    body,
+    json<T>(): T {
+      if (body.length === 0) fail(`${path} 가 빈 본문을 돌려줬다`);
+      return JSON.parse(body) as T;
+    },
+  };
+}
+
 /** 기대한 상태 코드가 아니면 받은 본문까지 붙여 세운다. */
 export function expectStatus(
   response: Response,

@@ -201,6 +201,8 @@ function event(response: ServerResponse, payload: unknown): void {
 export type FakeHermes = {
   readonly baseUrl: string;
   lastSubmittedInstructions(): string | undefined;
+  /** 마지막 실행 요청의 `input`. Control Plane 이 사용자가 쓴 글 앞에 덧붙인 것까지 담는다 */
+  lastSubmittedInput(): string | undefined;
   /** 마지막 실행 요청이 실어 온 provider 와 모델 */
   lastSubmittedRuntime(): { provider?: string; model?: string };
   blockProvider(provider: string): void;
@@ -262,6 +264,7 @@ export function startFakeHermes(
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
   let lastSubmittedInstructions: string | undefined;
+  let lastSubmittedInput: string | undefined;
 
   const authorized = (request: IncomingMessage, profile: string): boolean => {
     const expected = keys[profile];
@@ -515,6 +518,7 @@ export function startFakeHermes(
           model?: string;
         };
         lastSubmittedInstructions = submitted.instructions;
+        lastSubmittedInput = submitted.input;
         lastSubmittedRuntime = { provider: submitted.provider, model: submitted.model };
         const runId = `run_${shortId()}`;
         const sessionId = submitted.session_id ?? `sess_${shortId()}`;
@@ -607,6 +611,7 @@ export function startFakeHermes(
       resolve({
         baseUrl: `http://127.0.0.1:${address.port}`,
         lastSubmittedInstructions: () => lastSubmittedInstructions,
+        lastSubmittedInput: () => lastSubmittedInput,
         lastSubmittedRuntime: () => lastSubmittedRuntime,
         blockProvider: (provider: string) => blockedProviders.add(provider),
         clearBlockedProviders: () => blockedProviders.clear(),

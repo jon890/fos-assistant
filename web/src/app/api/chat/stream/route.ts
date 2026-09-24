@@ -6,6 +6,7 @@ export async function POST(request: Request) {
     conversationId?: number;
     text?: string;
     agentCode?: string;
+    attachmentIds?: number[];
   };
   if (!body.text || body.text.trim().length === 0) {
     return NextResponse.json(
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
       conversationId: body.conversationId ?? null,
       text: body.text,
       agentCode: body.agentCode ?? null,
+      attachmentIds: body.attachmentIds ?? [],
     },
   });
   if (!opened.ok) {

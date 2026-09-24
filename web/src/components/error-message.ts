@@ -19,6 +19,7 @@ const MESSAGES: Record<string, string> = {
   CONVERSATION_NOT_FOUND: "대화를 찾지 못했다. 대화 목록으로 돌아가 다시 골라 주세요.",
   UNAUTHENTICATED: "로그인이 필요하다.",
   PERSONA_STALE: "그 사이 다른 사람이 이 성격을 고쳤다. 최신 본문을 다시 불러왔다.",
+  ATTACHMENT_GONE: "보관 기간이 지나 볼 수 없습니다.",
 };
 
 export function describeError(code: string, fallback: string): string {

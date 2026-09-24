@@ -38,6 +38,8 @@ export type AgentView = {
   name: string;
   model: string;
   visibility: "PRIVATE" | "FAMILY";
+  /** 이 에이전트의 대화에 사진을 붙일 수 있다. 흐름이 붙은 에이전트는 거짓이다 */
+  acceptsAttachments: boolean;
 };
 
 /** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */

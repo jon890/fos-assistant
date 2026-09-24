@@ -59,8 +59,8 @@ export function ConversationList({
                       selected ? "border-foreground bg-surface" : "border-border"
                     }`}
                   >
-                    <span className="block truncate font-medium" title={conversation.title}>
-                      {conversation.title}
+                    <span className="block truncate font-medium" title={conversation.title || "새 대화"}>
+                      {conversation.title || "새 대화"}
                     </span>
                     <span className="mt-1 block truncate text-xs text-muted">
                       {new Date(conversation.updatedAt).toLocaleString("ko-KR")}

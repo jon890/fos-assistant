@@ -90,7 +90,7 @@ export function MessageList({
                     {pendingAssistant ? (
                       <RunStatus waiting={false} toolEvents={toolEvents} />
                     ) : null}
-                    <MessageBubble turn={turn} />
+                    <MessageBubble turn={turn} conversationId={conversationId} />
                   </Fragment>
                 );
               })}

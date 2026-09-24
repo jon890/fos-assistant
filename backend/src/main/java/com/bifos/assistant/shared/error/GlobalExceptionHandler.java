@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -27,6 +28,19 @@ public class GlobalExceptionHandler {
                 .orElse("invalid request");
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
                 .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), message));
+    }
+
+    /**
+     * multipart 상한을 넘은 요청을 입력 오류로 돌려준다.
+     *
+     * <p>상한은 서비스의 한 장 상한보다 조금 크게 두었다. 그보다 큰 요청이 여기 걸리며, 그대로 두면
+     * 500 으로 끝나 화면이 까닭을 알 수 없다.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        log.warn("upload rejected by the multipart limit: {}", ex.getMessage());
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
+                .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "the upload is larger than the limit"));
     }
 
     @ExceptionHandler(Exception.class)

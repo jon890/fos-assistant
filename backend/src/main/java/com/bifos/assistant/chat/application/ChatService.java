@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -36,10 +37,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 대화 메시지 하나를 Hermes 실행으로 바꾸고 비용을 기록한다.
@@ -59,6 +62,7 @@ public class ChatService {
     private static final int TITLE_LIMIT = 60;
 
     private final ConversationRepository conversations;
+    private final ConversationAccess access;
     private final ChatMessageRepository messages;
     private final AgentService agents;
     private final AgentModelSelector modelSelector;
@@ -71,10 +75,27 @@ public class ChatService {
     private final ContextAssembler contextAssembler;
     private final MemoryProposer memoryProposer;
     private final FlowRegistry flows;
+    private final AttachmentService attachments;
+    private final TransactionTemplate transactions;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
-        Routed routed = route(user, conversationId, text, agentCode);
+        return send(user, conversationId, text, agentCode, List.of());
+    }
+
+    /**
+     * 메시지 하나를 보낸다. 첨부 번호가 있으면 그 메시지에 묶고 사진이 놓인 자리를 Hermes 입력에 알린다.
+     *
+     * <p>첨부가 하나라도 거절되면 메시지를 저장하지 않고 대화도 새로 만들지 않는다.
+     */
+    public ChatTurn send(
+            CurrentUser user,
+            Long conversationId,
+            String text,
+            String agentCode,
+            List<Long> attachmentIds) {
+        Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         if (routed.flow() != null) {
+            fillBlankTitle(routed.conversation(), text);
             return routed.flow().run(user, routed.conversation(), routed.agent(), text, event -> {});
         }
         return runTurn(user, routed, text, event -> {}, false);
@@ -86,8 +107,19 @@ public class ChatService {
             String text,
             String agentCode,
             Consumer<ChatEvent> onEvent) {
-        Routed routed = route(user, conversationId, text, agentCode);
+        stream(user, conversationId, text, agentCode, List.of(), onEvent);
+    }
+
+    public void stream(
+            CurrentUser user,
+            Long conversationId,
+            String text,
+            String agentCode,
+            List<Long> attachmentIds,
+            Consumer<ChatEvent> onEvent) {
+        Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         if (routed.flow() != null) {
+            fillBlankTitle(routed.conversation(), text);
             streamFlow(user, routed, text, onEvent);
             return;
         }
@@ -105,12 +137,24 @@ public class ChatService {
      *
      * <p>넘김은 그 provider 의 계정이 전부 막혔을 때만 한다. 모델 이름이 틀렸거나 입력이 잘못된 것은
      * 다음 provider 에서도 똑같이 실패하므로 넘기면 같은 실패를 목록 수만큼 되풀이한다.
+     *
+     * <p>사용자 메시지를 저장하고 첨부를 묶는 것은 한 트랜잭션이다. 그 사이에 다른 요청이 같은 첨부를
+     * 먼저 묶으면 메시지 저장도 되돌린다. 빈 제목을 채우는 것도 같은 트랜잭션이라 함께 되돌린다.
+     * Hermes 호출은 그 트랜잭션 밖이다. 저장하는 본문은 사용자가 쓴
+     * 그대로이고, 사진 자리는 Hermes 입력에만 붙인다.
      */
     private ChatTurn runTurn(
             CurrentUser user, Routed routed, String text, Consumer<ChatEvent> onEvent, boolean streaming) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
-        messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+        List<Long> attachmentIds =
+                routed.attached().stream().map(ChatAttachment::id).toList();
+        transactions.executeWithoutResult(status -> {
+            fillBlankTitle(conversation, text);
+            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+            attachments.attach(saved.id(), conversation.id(), attachmentIds);
+        });
+        String input = attachments.agentInput(conversation.id(), routed.attached(), text);
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                 context.chars(), null, context.instructionsHash(), context.omittedItems());
@@ -124,7 +168,7 @@ public class ChatService {
         for (int index = 0; index < options.size(); index++) {
             ModelOption option = options.get(index);
             boolean last = index == options.size() - 1;
-            PendingTurn pending = begin(user, routed, text, context, snapshot, option, previousExecutionId);
+            PendingTurn pending = begin(user, routed, input, context, snapshot, option, previousExecutionId);
             if (previousExecutionId != null) {
                 append(pending, ExecutionEventType.PROVIDER_SWITCHED, option.label());
                 onEvent.accept(ChatEvent.switched(option.label()));
@@ -199,14 +243,46 @@ public class ChatService {
      *
      * <p>에이전트에 {@code flow} 가 적혀 있으면 그 흐름으로 간다. 비어 있으면 지금처럼 Hermes 를 한
      * 번 부른다. 모르는 이름은 기동할 때 이미 걸러졌다.
+     *
+     * <p>첨부 판정을 메시지를 저장하기 전에 모두 끝낸다. 첨부는 대화에 올리므로 첨부가 있으면 대화
+     * 번호도 있어야 하고, 그것을 대화를 만들기 전에 본다. 거절은 모두 {@code VALIDATION_FAILED} 다.
      */
-    private Routed route(CurrentUser user, Long conversationId, String text, String agentCode) {
+    private Routed route(
+            CurrentUser user,
+            Long conversationId,
+            String text,
+            String agentCode,
+            List<Long> attachmentIds) {
+        boolean withAttachments = attachmentIds != null && !attachmentIds.isEmpty();
+        if (withAttachments && conversationId == null) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "attachments need an existing conversation");
+        }
         Conversation conversation = resolveConversation(user, conversationId, text, agentCode);
         Agent agent = agents.requireById(conversation.agentId());
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        return new Routed(conversation, agent, flows.find(agent.flow()));
+        // 흐름은 사진 자리를 덧붙이는 경로를 거치지 않는다. 오류 없이 사진을 버리지 않게 거절한다.
+        if (withAttachments && !agent.acceptsAttachments()) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
+        }
+        List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
+        return new Routed(conversation, agent, flows.find(agent.flow()), attached);
+    }
+
+    /**
+     * 빈 대화를 먼저 만든 경우 첫 메시지로 제목을 채운다.
+     *
+     * <p>{@link #route} 에서 채우지 않는다. 그 뒤 첨부 묶기가 실패해 메시지가 되돌려져도 제목만 남기
+     * 때문이다. 첨부를 받는 경로는 메시지 저장과 같은 트랜잭션에서 부른다.
+     */
+    private void fillBlankTitle(Conversation conversation, String text) {
+        if (conversation.title().isBlank()) {
+            conversation.titleIfBlank(titleFrom(text));
+            conversations.save(conversation);
+        }
     }
 
     /** 시도 하나를 위한 명령과 실행 줄을 만든다. 사용자 메시지는 이미 저장돼 있다. */
@@ -326,8 +402,21 @@ public class ChatService {
         return labels;
     }
 
+    /**
+     * 이 대화의 첨부를 메시지 번호로 나눈다. 아직 메시지에 묶이지 않은 것은 뺀다.
+     *
+     * <p>메시지마다 묻지 않고 한 번에 읽는다. 지워진 첨부도 담아 지난 대화에 자리를 남긴다. 부르는
+     * 순서에 기대지 않도록 여기서도 대화 주인을 확인한다.
+     */
+    public Map<Long, List<ChatAttachment>> attachmentsByMessage(CurrentUser user, Long conversationId) {
+        Conversation conversation = access.requireOwn(user, conversationId);
+        return attachments.allOf(conversation.id()).stream()
+                .filter(it -> it.messageId() != null)
+                .collect(Collectors.groupingBy(ChatAttachment::messageId));
+    }
+
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {
-        Conversation conversation = requireOwnConversation(user, conversationId);
+        Conversation conversation = access.requireOwn(user, conversationId);
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
     }
 
@@ -335,29 +424,42 @@ public class ChatService {
         return conversations.findByUserIdOrderByUpdatedAtDesc(user.id());
     }
 
+    /**
+     * 메시지 없이 제목이 빈 대화를 만든다.
+     *
+     * <p>사진을 올리는 경로에 대화 번호가 필요해, 새 대화의 첫 메시지에 사진을 붙이려면 대화가 먼저 있어야
+     * 한다. 이 경로는 그 용도로만 쓰므로 사진을 받지 않는 에이전트에는 대화를 남기지 않는다. 제목은 첫
+     * 메시지가 정한다.
+     */
+    public Conversation startEmpty(CurrentUser user, String agentCode) {
+        Agent agent = requireStartableAgent(user, agentCode);
+        if (!agent.acceptsAttachments()) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
+        }
+        return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
+    }
+
     private Conversation resolveConversation(
             CurrentUser user, Long conversationId, String firstText, String agentCode) {
         if (conversationId == null) {
-            if (agentCode == null || agentCode.isBlank()) {
-                throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
-            }
-            Agent agent = agents.requireReadable(user, agentCode);
-            if (!agent.enabled()) {
-                throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
-            }
+            Agent agent = requireStartableAgent(user, agentCode);
             return conversations.save(
                     Conversation.startedBy(user.id(), titleFrom(firstText), agent.id()));
         }
-        return requireOwnConversation(user, conversationId);
+        return access.requireOwn(user, conversationId);
     }
 
-    private Conversation requireOwnConversation(CurrentUser user, Long conversationId) {
-        return conversations
-                .findByIdAndUserId(conversationId, user.id())
-                .orElseThrow(
-                        () ->
-                                new ApiException(
-                                        ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
+    /** 새 대화를 시작할 에이전트를 고른다. 요청자가 읽을 수 있고 켜져 있어야 한다. */
+    private Agent requireStartableAgent(CurrentUser user, String agentCode) {
+        if (agentCode == null || agentCode.isBlank()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
+        }
+        Agent agent = agents.requireReadable(user, agentCode);
+        if (!agent.enabled()) {
+            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
+        }
+        return agent;
     }
 
     private static String titleFrom(String text) {
@@ -430,7 +532,10 @@ public class ChatService {
             SequenceCounter counter) {
     }
 
-    /** 이 turn 이 어느 대화와 에이전트의 것인지, 그리고 어느 흐름으로 갈지. 흐름이 없으면 null 이다. */
-    private record Routed(Conversation conversation, Agent agent, Flow flow) {
+    /**
+     * 이 turn 이 어느 대화와 에이전트의 것인지, 그리고 어느 흐름으로 갈지. 흐름이 없으면 null 이다.
+     * {@code attached} 는 판정을 통과해 이 메시지에 묶을 첨부이고 없으면 빈 목록이다.
+     */
+    private record Routed(Conversation conversation, Agent agent, Flow flow, List<ChatAttachment> attached) {
     }
 }

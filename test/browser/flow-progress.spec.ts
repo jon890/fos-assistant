@@ -11,7 +11,7 @@ async function sendWithTheFlowAgent(
   if (testInfo.project.name === "mobile") {
     await page.getByRole("button", { name: "대화 목록 열기" }).click();
   }
-  await page.getByRole("button", { name: "새 대화" }).click();
+  await page.getByRole("button", { name: "새 대화", exact: true }).click();
   await page.getByRole("combobox").selectOption({ label: "흐름 비서" });
   await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
@@ -76,7 +76,7 @@ test("흐름이 아닌 대화에는 단계 목록이 보이지 않는다", async
   if (testInfo.project.name === "mobile") {
     await page.getByRole("button", { name: "대화 목록 열기" }).click();
   }
-  await page.getByRole("button", { name: "새 대화" }).click();
+  await page.getByRole("button", { name: "새 대화", exact: true }).click();
   await page.getByRole("combobox").selectOption({ label: "브라우저 비서" });
   await page.getByPlaceholder("무엇을 도와줄까요").fill("그냥 대화");
   await page.getByRole("button", { name: "보내기" }).click();

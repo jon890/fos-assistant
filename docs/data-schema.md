@@ -83,9 +83,9 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `user_id` | BIGINT | 이 대화의 주인. 다른 사용자는 읽지 못한다 |
-| `agent_id` | BIGINT | 첫 메시지가 정한다. 뒤에 바뀌지 않는다 |
+| `agent_id` | BIGINT | 대화를 만들 때 정한다. 뒤에 바뀌지 않는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 첫 실행이 돌려준 session. 특정 profile 안의 값이다 |
-| `title` | VARCHAR(200) | 첫 메시지의 앞부분 |
+| `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
@@ -201,6 +201,39 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md)과
 [ADR-012](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md)에 있다.
 
+## chat_attachment
+
+대화에 올린 사진 한 장이 한 행이다. 본문은 파일로 두고 여기에는 그 사진을 가리키는 것만 둔다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | |
+| `conversation_id` | BIGINT | 어느 대화에 올렸는가. 디렉터리 이름이기도 하다 |
+| `message_id` | BIGINT NULL | 함께 보낸 메시지. 아직 보내지 않았으면 비어 있다 |
+| `uploaded_by_user_id` | BIGINT | 올린 사람 |
+| `original_name` | VARCHAR(255) | 올릴 때의 파일 이름. 화면이 보인다 |
+| `stored_name` | VARCHAR(255) NULL | 디스크에 둔 이름. `{id}.{확장자}` 다. 번호를 받은 직후 같은 트랜잭션에서 채우므로 커밋된 행에는 언제나 있다 |
+| `content_type` | VARCHAR(100) | |
+| `byte_size` | BIGINT | |
+| `expires_at` | DATETIME(6) | 이 시각이 지나면 파일을 지운다 |
+| `deleted_at` | DATETIME(6) NULL | 파일을 실제로 지운 시각. 비어 있으면 아직 있다 |
+| `created_at` | DATETIME(6) | |
+
+**행을 지우지 않는다.** 파일을 지우고 `deleted_at` 만 적는다.
+그래야 지난 대화를 열었을 때 그 자리에 사진이 있었다는 것이 남고,
+화면이 「보관 기간이 지나 볼 수 없습니다」를 보일 수 있다.
+
+`deleted_at` 이 비어 있는지가 볼 수 있는지를 정한다. `expires_at` 은 언제 지울지만 정한다.
+둘로 판정하면 지우는 일이 늦었을 때 화면과 디스크가 어긋난다.
+
+`message_id` 가 비어 있는 행은 올렸지만 보내지 않은 것이다.
+그 행도 `expires_at` 이 지나면 함께 지운다.
+
+한 사용자가 남의 대화의 첨부를 읽지 못한다.
+`conversation.user_id` 가 그 경계를 갖고, 첨부는 그 대화를 통해서만 닿는다.
+
+근거는 [ADR-020](adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) 에 있다.
+
 ## agent_token
 
 Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다.
@@ -264,6 +297,9 @@ Hermes 가 보내기 시작하면 그때 채운다.
 
 페르소나는 이 데이터베이스에 없다. 본문은 그 profile 의 `SOUL.md` 가 갖는다.
 근거는 [ADR-019](adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
+
+첨부도 행을 지우지 않는다. 파일만 지우고 `deleted_at` 을 적는다.
+그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 
 허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
