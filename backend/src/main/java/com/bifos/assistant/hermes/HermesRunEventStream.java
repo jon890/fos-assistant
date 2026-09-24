@@ -107,7 +107,14 @@ public class HermesRunEventStream {
                 firstText(root, payload, "tool", "tool_name", "toolName", "name"),
                 firstText(root, payload, "preview", "detail", "status", "result"),
                 durationMs(root, payload),
-                failed(root, payload));
+                failed(root, payload),
+                firstText(root, payload, "subagent_id"),
+                firstText(root, payload, "goal"),
+                firstText(root, payload, "model"),
+                firstText(root, payload, "child_session_id"),
+                firstNumber(root, payload, "input_tokens"),
+                firstNumber(root, payload, "output_tokens"),
+                firstText(root, payload, "status"));
     }
 
     /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 1000 을 곱해 밀리초 정수로 옮긴다. */
@@ -115,6 +122,12 @@ public class HermesRunEventStream {
         JsonNode value = number(root, "duration");
         if (value == null) {
             value = number(payload, "duration");
+        }
+        if (value == null) {
+            value = number(root, "duration_seconds");
+        }
+        if (value == null) {
+            value = number(payload, "duration_seconds");
         }
         return value == null ? null : Math.round(value.asDouble() * 1000);
     }
@@ -125,7 +138,19 @@ public class HermesRunEventStream {
         if (value == null) {
             value = bool(payload, "error");
         }
-        return value == null ? null : value.asBoolean();
+        if (value != null) {
+            return value.asBoolean();
+        }
+        String status = firstText(root, payload, "status");
+        return status == null ? null : !"completed".equalsIgnoreCase(status);
+    }
+
+    private static Long firstNumber(JsonNode root, JsonNode payload, String field) {
+        JsonNode value = number(root, field);
+        if (value == null) {
+            value = number(payload, field);
+        }
+        return value == null ? null : value.asLong();
     }
 
     private static JsonNode number(JsonNode node, String field) {

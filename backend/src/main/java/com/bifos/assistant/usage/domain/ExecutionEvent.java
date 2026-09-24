@@ -60,6 +60,15 @@ public class ExecutionEvent {
     @Column(name = "detail", length = DETAIL_LIMIT)
     private String detail;
 
+    @Column(name = "model", length = 128)
+    private String model;
+
+    @Column(name = "input_tokens")
+    private Long inputTokens;
+
+    @Column(name = "output_tokens")
+    private Long outputTokens;
+
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
@@ -72,6 +81,9 @@ public class ExecutionEvent {
         this.hermesSessionId = builder.hermesSessionId;
         this.durationMs = builder.durationMs;
         this.detail = builder.detail;
+        this.model = builder.model;
+        this.inputTokens = builder.inputTokens;
+        this.outputTokens = builder.outputTokens;
         this.occurredAt = builder.occurredAt;
     }
 
@@ -115,6 +127,18 @@ public class ExecutionEvent {
         return detail;
     }
 
+    public String model() {
+        return model;
+    }
+
+    public Long inputTokens() {
+        return inputTokens;
+    }
+
+    public Long outputTokens() {
+        return outputTokens;
+    }
+
     public Instant occurredAt() {
         return occurredAt;
     }
@@ -128,6 +152,9 @@ public class ExecutionEvent {
         private String hermesSessionId;
         private Long durationMs;
         private String detail;
+        private String model;
+        private Long inputTokens;
+        private Long outputTokens;
         private Instant occurredAt;
 
         public Builder executionId(Long executionId) {
@@ -171,6 +198,21 @@ public class ExecutionEvent {
                     detail == null || detail.length() <= DETAIL_LIMIT
                             ? detail
                             : detail.substring(0, DETAIL_LIMIT);
+            return this;
+        }
+
+        public Builder model(String model) {
+            this.model = model;
+            return this;
+        }
+
+        public Builder inputTokens(Long inputTokens) {
+            this.inputTokens = inputTokens;
+            return this;
+        }
+
+        public Builder outputTokens(Long outputTokens) {
+            this.outputTokens = outputTokens;
             return this;
         }
 

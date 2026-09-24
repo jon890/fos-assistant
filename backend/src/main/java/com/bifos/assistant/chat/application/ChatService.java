@@ -30,6 +30,9 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.time.Instant;
 import java.util.List;
@@ -74,6 +77,7 @@ public class ChatService {
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
+    private final AgentExecutionRepository executionRepository;
     private final ContextAssembler contextAssembler;
     private final MemoryProposer memoryProposer;
     private final FlowRegistry flows;
@@ -413,6 +417,69 @@ public class ChatService {
         return labels;
     }
 
+    /** 답마다 도구와 하위 에이전트 사건을 한 번에 읽어 작업 과정 요약을 만든다. */
+    public Map<Long, ActivitySummary> activitySummaries(List<ChatMessage> history) {
+        List<Long> rootIds = history.stream()
+                .map(ChatMessage::executionId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (rootIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, AgentExecution> roots = executionRepository.findAllById(rootIds).stream()
+                .collect(Collectors.toMap(AgentExecution::id, it -> it));
+        List<AgentExecution> descendants = executionRepository.findByRootExecutionIdIn(rootIds);
+        Map<Long, Long> rootByExecution = new HashMap<>();
+        rootIds.forEach(id -> rootByExecution.put(id, id));
+        descendants.forEach(it -> rootByExecution.put(it.id(), it.rootExecutionId()));
+        Map<Long, List<ExecutionEvent>> eventsByExecution = executionEvents
+                .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(rootByExecution.keySet())
+                .stream()
+                .collect(Collectors.groupingBy(ExecutionEvent::executionId));
+        Map<Long, ActivitySummary> summaries = new HashMap<>();
+        for (Long rootId : rootIds) {
+            AgentExecution root = roots.get(rootId);
+            if (root == null) {
+                continue;
+            }
+            List<AgentExecution> tree = new ArrayList<>();
+            tree.add(root);
+            descendants.stream().filter(it -> rootId.equals(it.rootExecutionId())).forEach(tree::add);
+            int toolCount = 0;
+            int subagentCount = 0;
+            Instant latestFinish = null;
+            for (AgentExecution execution : tree) {
+                List<ExecutionEvent> events = eventsByExecution.getOrDefault(execution.id(), List.of());
+                int toolStarts = 0;
+                int toolCompletes = 0;
+                int subagentStarts = 0;
+                for (ExecutionEvent event : events) {
+                    switch (event.eventType()) {
+                        case TOOL_STARTED -> toolStarts++;
+                        case TOOL_COMPLETED -> toolCompletes++;
+                        case SUBAGENT_STARTED -> subagentStarts++;
+                        default -> { }
+                    }
+                }
+                toolCount += Math.max(toolStarts, toolCompletes);
+                subagentCount += subagentStarts;
+                if (!rootId.equals(execution.id()) && !events.isEmpty()) {
+                    subagentCount++;
+                }
+                if (execution.finishedAt() != null &&
+                        (latestFinish == null || execution.finishedAt().isAfter(latestFinish))) {
+                    latestFinish = execution.finishedAt();
+                }
+            }
+            if (toolCount + subagentCount > 0) {
+                Long durationMs = latestFinish == null ? null : Duration.between(root.startedAt(), latestFinish).toMillis();
+                summaries.put(rootId, new ActivitySummary(toolCount, subagentCount, durationMs));
+            }
+        }
+        return summaries;
+    }
+
     /**
      * 이 대화의 첨부를 메시지 번호로 나눈다. 아직 메시지에 묶이지 않은 것은 뺀다.
      *
@@ -506,8 +573,20 @@ public class ChatService {
         String type = event.type() == null ? "" : event.type().toLowerCase();
         if (type.contains("delta") && event.text() != null) {
             onEvent.accept(ChatEvent.delta(event.text()));
-        } else if (type.startsWith("tool.") || type.startsWith("subagent.")) {
-            onEvent.accept(ChatEvent.tool(event.toolName(), event.detail() == null ? event.type() : event.detail()));
+        } else if ("tool.started".equals(type)) {
+            onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.STARTED, null, null));
+        } else if ("tool.completed".equals(type)) {
+            onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.COMPLETED,
+                    event.durationMs(), event.failed()));
+        } else if ("subagent.start".equals(type)) {
+            onEvent.accept(ChatEvent.subagent(event.subagentId(),
+                    event.goal() == null ? event.detail() : event.goal(), event.model(),
+                    ChatEvent.STARTED, null, null, null, null));
+        } else if ("subagent.complete".equals(type)) {
+            onEvent.accept(ChatEvent.subagent(event.subagentId(),
+                    event.goal() == null ? event.detail() : event.goal(), event.model(),
+                    ChatEvent.COMPLETED, event.inputTokens(), event.outputTokens(),
+                    event.durationMs(), event.failed()));
         }
     }
 

@@ -490,8 +490,15 @@ export function startFakeHermes(
           event(response, { event: "tool.completed", tool: "fake-reader", duration: 0.25, error: false });
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
           // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
-          event(response, { event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다" });
-          event(response, { event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다" });
+          if (run.input === "하위 에이전트 칸 검사") {
+            const subagent = { subagent_id: "sa-1", goal: "숙소 후보를 조사한다", model: "z-ai/glm-5.2", child_session_id: "child-1" };
+            event(response, { event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다", ...subagent });
+            event(response, { event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다", ...subagent,
+              status: "completed", duration_seconds: 1.5, input_tokens: 12300, output_tokens: 410 });
+          } else {
+            event(response, { event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다" });
+            event(response, { event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다" });
+          }
           event(response, { event: "run.completed" });
           response.end();
           return;

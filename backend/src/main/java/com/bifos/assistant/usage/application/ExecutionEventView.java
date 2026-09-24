@@ -16,6 +16,9 @@ public record ExecutionEventView(
         String subagentName,
         Long durationMs,
         String detail,
+        String model,
+        Long inputTokens,
+        Long outputTokens,
         Instant occurredAt) {
 
     static ExecutionEventView from(ExecutionEvent event) {
@@ -26,6 +29,9 @@ public record ExecutionEventView(
                 event.subagentName(),
                 event.durationMs(),
                 event.detail(),
+                event.model(),
+                event.inputTokens(),
+                event.outputTokens(),
                 event.occurredAt());
     }
 }

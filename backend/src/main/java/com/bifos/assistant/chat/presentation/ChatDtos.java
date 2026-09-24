@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.application.ActivitySummary;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -52,7 +53,8 @@ public final class ChatDtos {
             boolean hasChildren,
             String switchedTo,
             Instant createdAt,
-            List<AttachmentView> attachments) {
+            List<AttachmentView> attachments,
+            ActivitySummary activity) {
     }
 
     /**

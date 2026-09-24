@@ -81,6 +81,25 @@ class ExecutionEventRecorderTest {
         assertThat(event.toolName()).isNull();
     }
 
+    @Test
+    void 하위_에이전트의_목표와_session과_모델과_토큰만_옮긴다() {
+        RunEvent completed = new RunEvent("subagent.complete", null, "researcher", "preview", 1500L,
+                false, "sa-1", "숙소 조사", "model-a", "child-1", 123L, 45L, "completed");
+        ExecutionEvent event = record(completed);
+
+        assertThat(event.detail()).isEqualTo("숙소 조사");
+        assertThat(event.hermesSessionId()).isEqualTo("child-1");
+        assertThat(event.model()).isEqualTo("model-a");
+        assertThat(event.inputTokens()).isEqualTo(123L);
+        assertThat(event.outputTokens()).isEqualTo(45L);
+        assertThat(record(hermes("subagent.start", null, "preview")).detail()).isEqualTo("preview");
+        ExecutionEvent tool = record(new RunEvent("tool.completed", null, "search", "preview", 1L, false,
+                "sa-1", "숙소 조사", "model-a", "child-1", 123L, 45L, "completed"));
+        assertThat(tool.model()).isNull();
+        assertThat(tool.inputTokens()).isNull();
+        assertThat(tool.hermesSessionId()).isNull();
+    }
+
     /**
      * 실행의 시작과 끝은 {@code ChatService} 가 직접 적는다. 여기서도 옮기면 스트리밍 경로에만 같은
      * 사건이 두 줄 남는다.

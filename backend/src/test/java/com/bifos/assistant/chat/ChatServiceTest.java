@@ -378,6 +378,28 @@ class ChatServiceTest {
         assertThat(recorded.get(2).durationMs()).isEqualTo(1500L);
         assertThat(recorded.get(3).subagentName()).isEqualTo("researcher");
         assertThat(recorded.get(3).toolName()).isNull();
+        assertThat(relayed.stream().filter(it -> "tool".equals(it.type())).toList())
+                .extracting(ChatEvent::phase).containsExactly("started", "completed");
+        assertThat(relayed.stream().filter(it -> "subagent".equals(it.type())).toList())
+                .extracting(ChatEvent::phase).containsExactly("started", "completed");
+        var summary = chat.activitySummaries(chat.history(dad, relayed.getLast().conversationId())).get(executionId);
+        assertThat(summary.toolCount()).isEqualTo(1);
+        assertThat(summary.subagentCount()).isEqualTo(1);
+        assertThat(summary.durationMs()).isNotNull();
+    }
+
+    @Test
+    void 사건이_없는_자손은_작업_과정에_세지_않는다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+        AgentExecution root = executions.findById(turn.executionId()).orElseThrow();
+        executions.save(AgentExecution.builder()
+                .userId(dad.id()).conversationId(turn.conversationId()).agentId(root.agentId())
+                .parentExecutionId(root.id()).rootExecutionId(root.id()).profileName(root.profileName())
+                .costMode(root.costMode()).status(ExecutionStatus.RUNNING).startedAt(root.startedAt()).build());
+
+        assertThat(chat.activitySummaries(chat.history(dad, turn.conversationId()))).isEmpty();
     }
 
     /**

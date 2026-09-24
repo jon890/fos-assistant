@@ -68,4 +68,38 @@ class HermesRunEventStreamTest {
         assertThat(event.failed()).isTrue();
         assertThat(event.detail()).isEqualTo("찾지 못했다");
     }
+
+    @Test
+    void 하위_에이전트의_목표와_모델과_토큰을_읽는다() {
+        RunEvent event = parse("{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-1\","
+                + "\"goal\":\"숙소 조사\",\"model\":\"model-a\",\"child_session_id\":\"child-1\","
+                + "\"input_tokens\":12300,\"output_tokens\":410,\"status\":\"completed\",\"duration_seconds\":1.5}");
+
+        assertThat(event.subagentId()).isEqualTo("sa-1");
+        assertThat(event.goal()).isEqualTo("숙소 조사");
+        assertThat(event.model()).isEqualTo("model-a");
+        assertThat(event.childSessionId()).isEqualTo("child-1");
+        assertThat(event.inputTokens()).isEqualTo(12300L);
+        assertThat(event.outputTokens()).isEqualTo(410L);
+        assertThat(event.status()).isEqualTo("completed");
+        assertThat(event.durationMs()).isEqualTo(1500L);
+        assertThat(event.failed()).isFalse();
+    }
+
+    @Test
+    void data_안의_상태가_실패면_error_없이도_실패로_읽는다() {
+        RunEvent event = parse("{\"data\":{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-2\","
+                + "\"goal\":\"조사\",\"model\":\"model-b\",\"child_session_id\":\"child-2\","
+                + "\"input_tokens\":5,\"output_tokens\":2,\"status\":\"failed\",\"duration_seconds\":0.25}}");
+
+        assertThat(event.subagentId()).isEqualTo("sa-2");
+        assertThat(event.goal()).isEqualTo("조사");
+        assertThat(event.model()).isEqualTo("model-b");
+        assertThat(event.childSessionId()).isEqualTo("child-2");
+        assertThat(event.inputTokens()).isEqualTo(5L);
+        assertThat(event.outputTokens()).isEqualTo(2L);
+        assertThat(event.status()).isEqualTo("failed");
+        assertThat(event.durationMs()).isEqualTo(250L);
+        assertThat(event.failed()).isTrue();
+    }
 }
