@@ -28,7 +28,7 @@ phase 01 이 끝나 있어야 한다. `TurnCancellation`, `ChatTurn.cancelled`, 
 | 사용자 메시지 저장 | `ChatService.runTurn` 과 `ResearchAndBuildFlow.run` 이 각자 `messages.save(ChatMessage.fromUser(...))` 를 부른다 |
 | 실행 입력 | `ChatService.begin` 이 `new HermesRunCommand(profile, apiBaseUrl, text, context.instructions(), sessionId, provider, model)` 를 만든다 |
 | `instructions` | `ContextAssembler.assemble(user)` 가 돌려주는 `AssembledContext.instructions()` |
-| 대화 확인 | `ChatService.requireOwnConversation(user, conversationId)` |
+| 대화 확인 | `ConversationAccess.requireOwn(user, conversationId)` |
 | 메시지 목록 | `ChatMessageRepository.findByConversationIdOrderByIdAsc(Long)` |
 | 메시지 엔티티 | `chat/domain/ChatMessage.java`. 생성은 `fromUser`, `fromAssistant` 두 정적 메서드뿐이다 |
 | 스트림 경로 | `ChatController.stream` 이 가상 스레드에서 `chat.stream(...)` 을 부르고 `SseEmitter` 로 보낸다 |
@@ -91,7 +91,7 @@ public sealed interface TurnIntent {
 public void regenerate(CurrentUser user, Long conversationId, Consumer<ChatEvent> onEvent)
 ```
 
-1. `requireOwnConversation` 으로 대화를 확인한다. 지운 대화이면 거기서 `CONVERSATION_NOT_FOUND` 가 난다.
+1. `ConversationAccess.requireOwn` 으로 대화를 확인한다. 지운 대화이면 거기서 `CONVERSATION_NOT_FOUND` 가 난다.
 2. `turns.open(user.id(), conversationId)` 로 turn 을 등록한다. 도는 turn 이 있으면 여기서 `CONVERSATION_BUSY` 가 난다.
    아래 검사에서 거절하면 `finally` 에서 `close` 한다.
 3. 메시지 목록에서 **판으로 대신된 것을 뺀 마지막 메시지**를 찾는다. 다른 메시지의 `replacesMessageId` 로 가리켜진 메시지가 대신된 것이다.

@@ -92,7 +92,7 @@ key 는 `submit` 과 같은 방법으로 `HermesProfileKeyStore` 에서 profile 
 | `Optional<TurnHandle> find(Long executionId)` | 실행 번호로 turn 을 찾는다 |
 | `void close(TurnHandle handle)` | turn 이 어떻게 끝나든 `finally` 에서 부른다 |
 | `boolean isCancelled(Long rootExecutionId)` | 흐름이 본다. 등록되지 않은 번호는 거짓이다 |
-| `void trackRun(Long rootExecutionId, String apiBaseUrl, String profileName, String runId)` | 제출한 run 을 그 turn 에 더한다. **더한 직후 표시가 서 있으면 그 자리에서 `hermes.stop` 을 보낸다** |
+| `boolean trackRun(Long rootExecutionId, String apiBaseUrl, String profileName, String runId)` | 제출한 run 을 그 turn 에 더한다. **더한 직후 표시가 서 있으면 그 자리에서 `hermes.stop` 을 보낸다.** 중지 전송이 실패하면 거짓을 돌려준다 |
 | `List<RunRef> pendingStops(TurnHandle handle)` | 아직 중지를 보내지 않았거나 보내다 실패한 run 들 |
 | `void markStopSent(RunRef run)` | 그 run 에 중지를 보냈다고 적는다 |
 | `void attachStream(TurnHandle handle, Closeable stream)` / `detachStream(TurnHandle handle)` | 지금 읽고 있는 스트림을 걸어 둔다. 중지 뒤 10초 안에 끝나지 않으면 닫기 위해서다 |
@@ -105,8 +105,11 @@ run 은 `RunRef(apiBaseUrl, profileName, runId)` 와 그 run 에 중지를 보�
 **`open` 은 대화 확인과 등록을 한 번에 한다.** 대화 번호마다 turn 하나를 `ConcurrentHashMap<Long, TurnHandle>` 의 `putIfAbsent` 로 넣고,
 이미 있으면 `CONVERSATION_BUSY` 를 던진다. 확인과 등록 사이에 다시 생성 둘이 함께 들어와 같은 답을 가리키는 판이 둘 생기지 않게 한다.
 
-`TurnCancellation` 은 `HermesRunsClient` 를 주입받아 `trackRun` 안에서 중지를 보낸다. `trackRun` 이 보낸 중지가 실패하면 `stopSent` 를 세우지 않고 로그만 남긴다.
+`TurnCancellation` 은 `HermesRunsClient` 를 주입받아 `trackRun` 안에서 중지를 보낸다. `trackRun` 이 보낸 중지가 실패하면 `stopSent` 를 세우지 않고 로그를 남기고 거짓을 돌려준다. 중지 표시가 없거나 전송에 성공하면 참을 돌려준다.
 그 run 은 다음 중지 요청의 `pendingStops` 에 다시 나온다.
+중지 요청 시점에 등록된 run 이 하나도 없으면 `stop` 은 handle 의 첫 run 중지 결과를 최대 10초 기다린다.
+`trackRun` 은 중지 전송 결과로 이 대기를 깨운다. 전송이 실패하거나 10초 안에 run 이 등록되지 않으면 `HERMES_UNAVAILABLE` 을 돌려 화면이 중지를 다시 누를 수 있게 한다.
+대기 시간이 끝난 뒤 run 이 등록되더라도 `trackRun` 은 중지 표시를 보고 즉시 중지를 보낸다. 따라서 시간 초과와 제출이 엇갈려도 중지 요청이 사라지지 않는다.
 `rekey` 는 앞 시도의 run 을 목록에서 지운다. 앞 시도는 끝난 실행이라 멈출 것이 없다.
 `isCancelled` 는 turn 의 지금 번호로 찾는다. 흐름은 Chief 가 뿌리이고 전환하지 않으므로 뿌리 번호가 곧 지금 번호다.
 저장소는 실행 번호로 찾는 `ConcurrentHashMap<Long, TurnHandle>` 과 대화 번호로 찾는 것 둘이다. 잠금 없이 여러 스레드가 읽고 쓴다.
@@ -125,11 +128,12 @@ run 은 `RunRef(apiBaseUrl, profileName, runId)` 와 그 run 에 중지를 보�
 5. 흐름의 자식이 `trackRun` 을 부르기 전에 이미 실행 줄과 `hermesRunId` 를 적었을 수 있다.
    `findByRootExecutionId(rootExecutionId)` 로 찾은 줄 가운데 `status == RUNNING` 이고 `hermesRunId` 가 있는데 handle 에 없는 것을 `trackRun` 으로 더한다.
    `apiBaseUrl` 은 그 줄의 `agentId` 로 `AgentService.requireById` 해서 얻고 profile 은 줄의 `profileName` 이다.
-   `trackRun` 이 표시를 보고 곧바로 보낸다.
+   `trackRun` 이 표시를 보고 곧바로 보낸다. 거짓을 돌려준 run 이 하나라도 있으면 6번의 실패 목록에 넣는다. 새로 찾은 run 을 같은 요청의 4번에서 다시 보내지 않는다.
 6. Hermes 호출 하나가 실패해도 나머지를 계속 보낸다. 하나라도 실패했으면 모두 보낸 뒤 `HERMES_UNAVAILABLE` 을 던진다.
    화면은 이 오류를 받으면 중지 단추를 다시 풀고, 다시 누르면 3번부터 다시 돈다.
 7. 표시를 처음 세운 요청이면 10초 뒤 `attachStream` 으로 걸린 스트림이 아직 있을 때 그것을 닫는 일을 예약한다.
    `ScheduledExecutorService` 하나를 `TurnCancellation` 이 갖는다. 닫는 것은 `Closeable.close()` 다.
+   등록된 run 이 없어 기다리는 경우에는 7번의 예약을 먼저 하고 첫 run 의 중지 결과를 기다린다.
 
 **스트림을 닫는 방법.** `HermesRunEventStream.open` 은 `try (InputStream body = ...)` 안에서 `readEvents` 가 `readLine` 을 돈다.
 밖에서 끊으려면 그 `InputStream` 에 닿아야 한다. `open` 에 인자 하나를 더한 판을 둔다.
@@ -261,6 +265,7 @@ public StopResponse stop(@PathVariable Long executionId)
 | 두 번 누른다 | 첫 중지가 성공했으면 Hermes 에 한 번만 간다 |
 | 첫 중지가 실패하고 다시 누른다. 대역의 `onStop` 이 첫 호출에만 예외를 던진다 | 첫 요청은 `HERMES_UNAVAILABLE`. 둘째 요청이 같은 run 에 다시 보내고 `stopped()` 에 그 번호가 있다 |
 | `started` 뒤, 제출 전에 멈춘다. `turns.open` 뒤 `submit` 전에 테스트가 `stop` 을 부른다 | `trackRun` 이 곧바로 그 run 에 중지를 보낸다. 줄이 `CANCELLED` |
+| `started` 뒤, 제출 전에 멈췄는데 첫 run 중지 전송이 실패한다 | 대기 중인 중지 요청이 `HERMES_UNAVAILABLE` 을 받고 다시 누를 수 있다. 다음 요청은 그 run 에 중지를 재전송한다 |
 | 중지 뒤 스트림이 닫히지 않는다 | 10초 안에 스트림이 닫히고 상태 조회로 넘어가 `CANCELLED`. 테스트는 예약 시간을 설정으로 줄여 돌린다 |
 | 한 번에 받는 경로의 turn 을 멈춘다 | 등록돼 있어 멈춘다. `EXECUTION_NOT_RUNNING` 이 아니다 |
 | 같은 대화에 turn 이 도는 중에 두 번째 turn 을 연다 | `open` 이 `CONVERSATION_BUSY` 를 던진다 |
