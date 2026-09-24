@@ -70,6 +70,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `visibility` | VARCHAR(20) | `PRIVATE` 또는 `FAMILY`. 기본값이 없다 |
 | `owner_user_id` | BIGINT NULL | `PRIVATE` 일 때 필요하다 |
 | `enabled` | BOOLEAN | 거짓이면 새 실행을 막는다 |
+| `tagline` | VARCHAR(200) NULL | 새 대화 화면에 보일 한 줄 소개 |
 
 `model` 은 등록할 때와 관리자가 동기화를 요청할 때 Hermes 에서 읽는다.
 읽지 못하면 마지막 값을 유지해 기존 실행과 비용 기록을 계속 해석할 수 있게 한다.
@@ -87,8 +88,11 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `hermes_session_id` | VARCHAR(128) NULL | 첫 실행이 돌려준 session. 특정 profile 안의 값이다 |
 | `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다 |
+| `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
+
+`title` 은 사용자가 고칠 수 있다. 앞뒤 공백을 떼고 1자에서 200자까지 받는다.
 
 작업 영역(workspace)은 제거됐다.
 근거는 [ADR-010](adr/ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md)에 있다.
@@ -104,9 +108,19 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `content` | LONGTEXT | |
 | `sender_user_id` | BIGINT NULL | 이 줄을 쓴 사람. `ASSISTANT` 는 비어 있다 |
 | `execution_id` | BIGINT NULL | 이 답을 만든 실행. `USER` 는 비어 있다 |
+| `replaces_message_id` | BIGINT NULL | 이 메시지가 새 판으로 대신하는 이전 메시지. 같은 대화, 같은 `role` 이다 |
 
 `content` 를 `LONGTEXT` 로 못 박는다.
 길이를 주지 않은 `@Lob` 문자열을 Hibernate 가 MySQL 에서 `tinytext` 로 기대해 기동이 실패한다.
+
+`replaces_message_id` 는 다시 생성과 수정이 채운다.
+다시 생성한 답은 이전 답을, 고친 사용자 메시지는 고치기 전 메시지를 가리킨다.
+고친 메시지 뒤에 온 답은 새 turn 의 첫 답이라 비어 있다.
+**이전 판을 지우지 않는다.** 화면이 넘겨 볼 수 있어야 하고, 그 판을 만든 실행이 그것을 가리킨다.
+근거는 [ADR-022](adr/ADR-022-다시-생성과-수정은-같은-session-에-판으로-쌓는다.md) 에 있다.
+
+중지한 실행의 답도 한 줄로 남는다.
+근거는 [ADR-021](adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 에 있다.
 
 `sender_user_id` 는 화면이 보낸 사람 이름을 보이기 위한 것이다.
 대화는 여전히 주인 한 사람의 것이고, 여러 사람이 같은 대화를 읽고 쓰는 것은 아직 만들지 않았다.
@@ -262,7 +276,9 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `subagent_name` | VARCHAR(128) NULL | 하위 에이전트 사건일 때 채운다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 하위 에이전트가 따로 session 을 가지면 적는다 |
 | `duration_ms` | BIGINT NULL | 끝난 사건에만 있다 |
-| `detail` | VARCHAR(500) NULL | 화면에 한 줄로 보일 만큼만 |
+| `detail` | VARCHAR(500) NULL | 화면에 한 줄로 보일 만큼만. 하위 에이전트 사건이면 그 목표 |
+| `model` | VARCHAR(128) NULL | 하위 에이전트가 돈 모델. 하위 에이전트 사건에만 있다 |
+| `input_tokens`, `output_tokens` | BIGINT NULL | 하위 에이전트가 쓴 토큰. `SUBAGENT_COMPLETED` 에만 있다 |
 | `occurred_at` | DATETIME(6) | |
 
 `execution_id` 와 `sequence` 를 함께 유일하게 둔다.
@@ -274,11 +290,21 @@ Hermes v0.21.0 의 `subagent.start` 와 `subagent.complete` 는 `preview` 만 �
 그것이 실제 이름인지 우리가 만든 것인지 나중에 구분할 수 없다.
 Hermes 가 보내기 시작하면 그때 채운다.
 
+**`hermes_session_id` 와 `model` 과 토큰은 Hermes 가 실어 보낼 때만 채운다.**
+[`hermes-integration.md`](hermes-integration.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
+`subagent.start` 와 `subagent.complete` 에 오는 칸을 적는다.
+`child_session_id` 를 `hermes_session_id` 에, `goal` 을 `detail` 에 옮긴다.
+싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.
+
+이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓴다.
+사용량 합계에 더하지 않는다. 합계는 여전히 `agent_execution` 한 줄씩의 값이다.
+
 | `event_type` | 언제 |
 | --- | --- |
 | `RUN_STARTED` | 실행이 시작됐다 |
 | `RUN_COMPLETED` | 실행이 끝났다 |
 | `RUN_FAILED` | 실행이 실패했다 |
+| `RUN_CANCELLED` | 사용자가 중지했다 |
 | `TOOL_STARTED` | 도구를 부르기 시작했다 |
 | `TOOL_COMPLETED` | 도구 호출이 끝났다 |
 | `SUBAGENT_STARTED` | 하위 에이전트가 시작됐다 |
@@ -287,9 +313,30 @@ Hermes 가 보내기 시작하면 그때 채운다.
 우리가 모르는 사건은 저장하지 않고 버린다. 버렸다는 사실만 로그로 남긴다.
 근거는 [ADR-013](adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md)에 있다.
 
+## agent_starter_prompt
+
+새 대화 화면에서 그 에이전트를 골랐을 때 보이는 추천 질문 한 줄이다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `agent_id` | BIGINT | 어느 에이전트의 것인가 |
+| `position` | INT | 보이는 차례. 0부터 센다 |
+| `text` | VARCHAR(300) | 누르면 그대로 보내는 글 |
+
+`agent_id` 와 `position` 을 함께 유일하게 둔다. 한 에이전트에 넷까지다.
+고칠 때는 그 에이전트의 줄을 모두 지우고 새로 넣는다. 차례를 바꾸는 것이 곧 전체를 다시 쓰는 것이다.
+
+에이전트의 한 줄 소개는 `agent.tagline` 이 갖는다. `VARCHAR(200) NULL` 이다.
+소개와 추천 질문을 고칠 수 있는 사람은 성격을 고칠 수 있는 사람과 같다.
+그 규칙은 [`code-architecture.md`](code-architecture.md) 의 「누가 고칠 수 있나」 절이 갖는다.
+
 ## 지울 때
 
 에이전트나 영역을 지우지 않는다.
+
+대화도 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
+메시지와 실행 기록과 Hermes session 은 그대로 둔다.
+사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 `enabled` 를 내려 쓰지 않게 한다.
 실행 기록이 그것을 가리키고 있고, 기록은 남아야 한다.
 

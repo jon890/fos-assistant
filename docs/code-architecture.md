@@ -148,6 +148,21 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 본문 대신 해시를 주고받는다. 상한이 8000자라 본문을 되보내면 그만큼이 요청에 실린다.
 
+### 소개와 추천 질문
+
+새 대화 화면에 보이는 한 줄 소개와 추천 질문 넷까지다.
+성격과 달리 **데이터베이스에 둔다.** Hermes 가 쓰지 않는 값이고 화면만 읽는다.
+저장 모델은 [`data-schema.md`](data-schema.md) 의 「agent_starter_prompt」 절이 갖는다.
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/agents` | 목록의 한 줄마다 `tagline` 과 `starterPrompts` 를 함께 준다 |
+| `GET /api/v1/agents/{code}/starters` | 소개와 추천 질문과 고칠 수 있는지 |
+| `PUT /api/v1/agents/{code}/starters` | 둘을 한꺼번에 쓴다. 본문 `{ "tagline": "...", "starterPrompts": ["..."] }` |
+
+읽고 쓸 수 있는 사람은 위 「누가 고칠 수 있나」 표와 같다.
+소개는 앞뒤 공백을 떼고 비면 null 로 둔다. 추천 질문은 빈 줄을 버리고 넷을 넘으면 거절한다.
+
 ### 어느 클래스가 무엇을 하나
 
 | 무엇 | 어디 |
@@ -209,6 +224,107 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 | 보관 기간이 지난 것을 지운다 | `chat/application` 의 일정 실행 |
 
 **파일을 다루는 것이 한 곳이다.** 경로를 만드는 규칙이 흩어지면 지우는 쪽이 놓친다.
+
+## 대화
+
+`chat` 패키지가 대화와 메시지를 갖는다.
+한 번의 대화가 지나는 길은 위의 「한 번의 대화가 지나는 길」 절이, 화면 흐름은
+[`flow.md`](flow.md) 의 「대화 이력」 부터 「새 대화 화면」 까지의 절이 갖는다.
+
+### 경로
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/chat/conversations` | 내 대화 목록. 지운 대화는 빠진다 |
+| `PATCH /api/v1/chat/conversations/{id}` | 이름을 바꾼다. 본문 `{ "title": "..." }`. 바뀐 대화 한 줄을 돌려준다 |
+| `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204 |
+| `GET /api/v1/chat/conversations/{id}/messages` | 메시지 목록. 이전 판도 모두 온다 |
+| `POST /api/v1/chat/messages` | 한 번에 받는다 |
+| `POST /api/v1/chat/messages/stream` | 사건으로 받는다. `editOfMessageId` 를 주면 수정이다 |
+| `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
+| `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
+
+지운 대화와 남의 대화는 모든 경로에서 `CONVERSATION_NOT_FOUND` 다. 둘을 가리지 않는다.
+
+**turn 이 끝날 때 대화를 통째로 다시 저장하지 않는다.**
+지금은 요청 시작에 읽은 `Conversation` 을 끝에서 `save` 한다. 그 사이에 사용자가 이름을 바꾸거나 지우면
+옛 값으로 덮여 지운 대화가 되살아난다.
+turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 둘만 고치는 질의로 쓴다.
+남의 실행과 없는 실행은 `EXECUTION_NOT_FOUND` 다.
+
+### 메시지 한 줄
+
+`GET .../messages` 가 주는 한 줄이다. 이미 있는 칸에 셋을 더한다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `status` | 답을 만든 실행의 상태. `SUCCEEDED`, `FAILED`, `CANCELLED`, `RUNNING` 중 하나. 사용자 메시지는 null |
+| `replacesMessageId` | 이 메시지가 새 판으로 대신하는 이전 메시지. 없으면 null |
+| `activity` | 작업 과정의 요약. `{ toolCount, subagentCount, durationMs }`. 사건이 없는 답과 사용자 메시지는 null |
+
+`activity` 는 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 모두 센다.
+
+| 칸 | 세는 것 |
+| --- | --- |
+| `toolCount` | `TOOL_STARTED` 수와 `TOOL_COMPLETED` 수 가운데 큰 값. 한쪽이 빠져 와도 줄지 않게 한다 |
+| `subagentCount` | `SUBAGENT_STARTED` 사건 수와 자식 실행 수를 더한 값. Memory 제안 실행은 세지 않는다 |
+| `durationMs` | 뿌리가 시작한 때부터 나무에서 가장 늦게 끝난 실행이 끝난 때까지. 흐름은 Chief 가 끝난 뒤에도 돈다 |
+
+흐름으로 돈 답은 하위 에이전트 사건 없이 자식 실행만 남는다. 자식 실행을 더하지 않으면 요약이 0 이 되고 블록이 사라진다.
+한 하위 에이전트가 사건과 자식 실행 둘 다 남기면 두 번 센다.
+그 겹침은 [`flow.md`](flow.md) 의 「실행 하나를 다시 볼 때」 절에서 나무가 이미 받아들인 것과 같다.
+대화 하나를 열 때 질의가 답 수만큼 늘지 않도록, 실행 번호 목록으로 한 번에 센다.
+
+### 화면으로 보내는 사건
+
+스트리밍 경로가 보내는 `ChatEvent` 의 `type` 이다.
+화면은 이 값만 안다. Hermes 의 원래 사건 이름을 읽지 않는다.
+
+| `type` | 언제 | 싣는 칸 |
+| --- | --- | --- |
+| `started` | 실행 줄을 만든 직후. provider 를 넘어가 새 줄로 다시 시도하면 다시 보낸다 | `conversationId`, `executionId` |
+| `delta` | 답 조각 | `text` |
+| `tool` | 도구가 시작되거나 끝났다 | `toolName`, `detail`, `phase`, `durationMs`, `failed` |
+| `subagent` | 하위 에이전트가 시작되거나 끝났다 | `subagentId`, `goal`, `model`, `phase`, `inputTokens`, `outputTokens`, `durationMs`, `failed` |
+| `step` | 흐름의 단계가 시작되거나 끝났다 | `stepName`, `stepState` |
+| `switched` | provider 가 막혀 다음 모델로 넘어갔다 | `text` |
+| `reset` | 지금까지 흘린 조각을 지우라 | |
+| `done` | 끝나서 저장했다 | `conversationId`, `messageId`, `executionId` |
+| `stopped` | 중지로 끝나서 저장했다 | `conversationId`, `messageId`, `executionId`. 남긴 답이 없으면 `messageId` 가 null |
+| `error` | 실패했다 | `code`, `message` |
+
+`phase` 는 `started` 와 `completed` 둘이다.
+`subagent` 의 칸은 Hermes 가 실어 보낼 때만 찬다. `goal` 이 비어 오면 Hermes 의 `preview` 를 그 자리에 싣는다.
+
+**`started` 는 흐름으로 도는 turn 에서도 뿌리 실행의 번호를 싣는다.**
+중지는 뿌리 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다.
+화면은 마지막으로 받은 `started` 의 번호를 쓴다. 넘어가기 전 실행은 이미 `FAILED` 다.
+
+### 중지
+
+`chat/application` 의 `TurnCancellation` 이 도는 turn 마다 중지 표시를 하나 갖는다. 뿌리 실행 번호가 열쇠다.
+`ChatService` 가 turn 을 시작할 때 등록하고 끝날 때 지운다.
+provider 를 넘어가 새 실행 줄로 다시 시도하면 열쇠를 새 번호로 옮긴다.
+중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
+같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성과 수정이 `CONVERSATION_BUSY` 를 판정하는 자리다.
+같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.
+
+`ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다.
+
+| 규칙 | 까닭 |
+| --- | --- |
+| 등록과 해제는 `ChatService` 만 한다. 흐름 경로도, 한 번에 받는 경로도 등록한다 | 등록되지 않은 turn 은 중지도 `CONVERSATION_BUSY` 도 받지 못한다 |
+| 같은 대화에 도는 turn 이 있는지 보는 것과 등록하는 것을 한 번에 한다 | 둘 사이에 다시 생성 두 개가 함께 들어오면 같은 답을 가리키는 판이 둘 생긴다 |
+| Hermes 에 제출한 직후 run 번호를 등록한다. `AgentRunner` 는 제출 뒤 부르는 콜백으로 알린다 | 흐름의 Chief 는 `AgentRunner` 안에서 제출된다. 알리지 않으면 Chief 를 멈출 수 없다 |
+| run 을 등록할 때 이미 중지 표시가 서 있으면 그 자리에서 중지를 보낸다 | `started` 뒤 제출 전에 들어온 중지가 사라지지 않게 한다 |
+| run 마다 중지를 보냈는지 적는다. 다시 부르면 보내지 못한 run 에만 다시 보낸다 | 보내다 실패한 뒤 다시 눌러도 아무 일이 없으면 안 된다 |
+| 중지를 보낸 뒤 스트림이 10초 안에 끝나지 않으면 중계 쪽이 스트림을 닫고 상태 조회로 넘어간다 | 취소된 run 의 스트림이 닫히는지 실제 Hermes 로 확인하지 못했다 |
+
+Hermes 에 중지를 보내는 것은 `hermes` 가, 누구의 무엇을 멈출지 정하는 것은 `chat` 이 한다.
+뿌리 아래에서 도는 실행은 `root_execution_id` 로 찾는다.
+
+**표시는 한 프로세스의 메모리에 있다.** Control Plane 이 하나라서 그것으로 된다.
+둘 이상으로 늘리면 이 표시를 데이터베이스로 옮겨야 한다.
 
 ## 실행 사건
 
@@ -274,7 +390,8 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 
 | 경로 | 화면 |
 | --- | --- |
-| `/` | 대화 |
+| `/` | 새 대화 화면 |
+| `/c/{id}` | 대화 하나 |
 | `/signin` | 로그인 |
 | `/usage` | 사용량 |
 | `/memory` | 개인과 가족 공용 Memory |
@@ -325,7 +442,9 @@ web/src/
   app/                    경로, 서버 컴포넌트, 서버 라우트
   components/
     ui/                   버튼, 입력, 표, 뼈대, 아이콘
+    shell/                모든 화면을 감싸는 사이드바와 대화 목록
     chat/                 대화 화면의 부품
+      activity/           작업 과정 블록과 패널
     usage/                사용량 화면의 부품
     execution/            실행 나무 화면의 부품
     agent/                에이전트와 성격 화면의 부품
@@ -371,10 +490,18 @@ web/src/
 
 | 요소 | 규칙 |
 | --- | --- |
+| 화면 틀 | 왼쪽 사이드바 하나. 위쪽 가로 메뉴를 두지 않는다 |
 | 대화 열 | 가운데 정렬한 좁은 열. 화면 폭을 다 쓰지 않는다 |
 | 내가 보낸 줄 | 오른쪽 정렬 말풍선. 폭은 열의 70% 까지 |
 | 비서가 답한 줄 | 열 전체 폭. 배경과 테두리가 없다 |
-| 입력창 | 둥근 알약 하나. 그 안 오른쪽에 원형 보내기 단추 |
+| 입력창 | 둥근 알약 하나. 그 안 오른쪽에 원형 보내기 단추. 답을 만드는 동안 중지 단추로 바뀐다 |
+| 작업 과정 | 답 위에 접힌 블록 하나. 펼치거나 오른쪽 패널로 연다 |
+| 메시지 동작 | 답 아래 한 줄. 복사, 다시 생성, 판 넘기기 |
+| 새 대화 | 입력창이 가운데. 위에 에이전트 카드, 아래에 추천 질문 |
+
+**사이드바의 대화 목록은 화면 틀이 갖는다.** 대화 화면이 갖지 않는다.
+다른 화면에서도 목록이 보여야 하고, 대화 화면은 보낸 뒤 목록에 알리기만 한다.
+`components/shell/` 의 목록 context 가 목록을 읽고, 대화 화면이 그 context 의 갱신 함수를 부른다.
 
 비서의 답만 폭을 다 쓰는 이유는 표와 코드 블록이 오기 때문이다.
 좁은 말풍선에 넣으면 그 안에서 가로로 밀어야 읽힌다.
@@ -484,6 +611,11 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 ## 아직 만들지 않은 것
 
+- 대화 화면 개선. 위에 정한 것 가운데 아래는 아직 코드에 없다. 만들면 이 줄에서 뺀다
+  - 사이드바 화면 틀과 `/c/{id}` 주소, 대화 이름 바꾸기와 지우기
+  - `tool` 과 `subagent` 사건의 나눔, 작업 과정 블록과 패널, 메시지의 `activity`
+  - 중지와 `stopped` 사건, 다시 생성과 수정, 메시지 동작
+  - 에이전트 소개와 추천 질문, 새 대화 화면
 - Hermes 하위 에이전트가 자식 실행 줄을 남기는 경로.
   지금 자식 실행을 만드는 자리는 Memory 제안 하나뿐이고,
   그것도 `assistant.memory.propose.enabled` 를 켠 곳에서만 돈다.
