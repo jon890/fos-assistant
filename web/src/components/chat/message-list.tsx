@@ -16,6 +16,7 @@ type Props = {
   flowSteps: FlowStepStates | null;
   /** 흐름이 오래 걸린다고 한 번 알렸는지 */
   flowIsSlow: boolean;
+  turnError: string | null;
 };
 
 export function MessageList({
@@ -26,6 +27,7 @@ export function MessageList({
   conversationId,
   flowSteps,
   flowIsSlow,
+  turnError,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -33,7 +35,7 @@ export function MessageList({
   const streamedAnswer = turns.some(
     (turn) => typeof turn.id === "string" && turn.id.startsWith("assistant-") && turn.content,
   );
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${toolEvents.length}:${JSON.stringify(flowSteps)}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${toolEvents.length}:${JSON.stringify(flowSteps)}:${turnError}`;
 
   useEffect(() => {
     shouldFollow.current = true;
@@ -108,6 +110,7 @@ export function MessageList({
               {!streamedAnswer ? (
                 <RunStatus waiting={sending} toolEvents={flowSteps ? [] : toolEvents} />
               ) : null}
+              {turnError ? <li data-testid="turn-error" className="rounded-md bg-surface px-3 py-2 text-sm">{turnError}</li> : null}
             </ol>
           )}
         </div>

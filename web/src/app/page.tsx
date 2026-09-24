@@ -8,5 +8,5 @@ export default async function HomePage() {
     redirect("/signin");
   }
 
-  return <ChatPanel />;
+  return <ChatPanel initialConversationId={null} />;
 }

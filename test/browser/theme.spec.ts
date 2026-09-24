@@ -1,15 +1,17 @@
 import { expect, test } from "./fixtures.ts";
 
-test("밝기 단추로 어두움 모드를 고르고 새로 고쳐도 유지한다", async ({ page }) => {
+test("밝기 단추로 어두움 모드를 고르고 새로 고쳐도 유지한다", async ({ page }, testInfo) => {
   await page.goto("/");
   await page.evaluate(() => localStorage.setItem("theme", "light"));
   await page.reload();
+  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
 
   await page.getByRole("button", { name: /밝기 모드: 밝음/ }).click();
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
 
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   await expect(page.getByRole("button", { name: /밝기 모드: 어두움/ })).toBeVisible();
 });
 
