@@ -2,10 +2,10 @@ import { formatDuration, formatTokens } from "@/lib/format";
 import type { ActivityItem, ActivityItemState } from "./activity-state";
 
 const MARKS: Record<ActivityItemState, string> = {
-  running: "⟳", done: "✓", failed: "!", stopped: "■",
+  running: "⟳", done: "✓", failed: "!", stopped: "■", unfinished: "■",
 };
 const SPOKEN: Record<ActivityItemState, string> = {
-  running: "도는 중", done: "끝남", failed: "실패", stopped: "중지됨",
+  running: "도는 중", done: "끝남", failed: "실패", stopped: "중지됨", unfinished: "끝나지 않음",
 };
 
 export function ActivityTimeline({ items }: { items: ActivityItem[] }) {

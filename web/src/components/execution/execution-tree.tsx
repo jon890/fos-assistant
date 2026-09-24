@@ -16,7 +16,9 @@ export type ExecutionEventView = {
   eventType: ExecutionEventType;
   toolName: string | null;
   subagentName: string | null;
+  hermesSessionId: string | null;
   durationMs: number | null;
+  failed: boolean | null;
   detail: string | null;
   model: string | null;
   inputTokens: number | null;

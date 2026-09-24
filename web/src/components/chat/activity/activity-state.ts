@@ -2,7 +2,7 @@ import type { ChatEvent } from "@/lib/chat-event";
 import type { ExecutionTreeNode, ExecutionTreeResponse } from "@/components/execution/execution-tree";
 
 export type ActivityItemKind = "tool" | "subagent" | "step" | "switched";
-export type ActivityItemState = "running" | "done" | "failed" | "stopped";
+export type ActivityItemState = "running" | "done" | "failed" | "stopped" | "unfinished";
 
 export type ActivityItem = {
   key: string;
@@ -17,7 +17,7 @@ export type ActivityItem = {
   pairKey: string | null;
 };
 
-export type ActivityState = { items: ActivityItem[]; startedAt: number };
+export type ActivityState = { items: ActivityItem[]; startedAt: number; endedAt: number | null };
 
 export const STEP_LABELS: Record<string, string> = {
   chief: "정리",
@@ -27,7 +27,12 @@ export const STEP_LABELS: Record<string, string> = {
 };
 
 export function emptyActivity(startedAt: number): ActivityState {
-  return { items: [], startedAt };
+  return { items: [], startedAt, endedAt: null };
+}
+
+export function failActivity(state: ActivityState, endedAt: number): ActivityState {
+  return { ...state, endedAt, items: state.items.map((item) => item.state === "running"
+    ? { ...item, state: "unfinished" } : item) };
 }
 
 function append(items: ActivityItem[], item: Omit<ActivityItem, "key">): ActivityItem[] {
@@ -100,7 +105,7 @@ export function applyChatEvent(state: ActivityState, event: ChatEvent): Activity
 export function fromTree(tree: ExecutionTreeResponse): ActivityItem[] {
   let state = emptyActivity(Date.parse(tree.root.startedAt));
   const visit = (node: ExecutionTreeNode, isRoot: boolean) => {
-    if (!isRoot) state = { ...state, items: append(state.items, {
+    if (!isRoot && node.events.length > 0) state = { ...state, items: append(state.items, {
       kind: "subagent", name: node.agentName ?? node.agentCode ?? "하위 에이전트", detail: null,
       model: node.model, inputTokens: node.inputTokens, outputTokens: node.outputTokens,
       durationMs: node.latencyMs, state: node.status === "FAILED" ? "failed" :
@@ -111,14 +116,15 @@ export function fromTree(tree: ExecutionTreeResponse): ActivityItem[] {
         case "TOOL_STARTED":
         case "TOOL_COMPLETED":
           state = applyChatEvent(state, { type: "tool", toolName: event.toolName,
-            detail: event.detail, durationMs: event.durationMs,
+            detail: event.detail, durationMs: event.durationMs, failed: event.failed,
             phase: event.eventType === "TOOL_STARTED" ? "started" : "completed" });
           break;
         case "SUBAGENT_STARTED":
         case "SUBAGENT_COMPLETED":
           state = applyChatEvent(state, { type: "subagent", goal: event.detail,
+            subagentId: event.hermesSessionId,
             model: event.model, inputTokens: event.inputTokens, outputTokens: event.outputTokens,
-            durationMs: event.durationMs,
+            durationMs: event.durationMs, failed: event.failed,
             phase: event.eventType === "SUBAGENT_STARTED" ? "started" : "completed" });
           break;
         case "PROVIDER_SWITCHED":
@@ -130,11 +136,4 @@ export function fromTree(tree: ExecutionTreeResponse): ActivityItem[] {
   };
   visit(tree.root, true);
   return state.items.map((item) => item.state === "running" ? { ...item, state: "stopped" } : item);
-}
-
-export function countOf(items: ActivityItem[]): { toolCount: number; subagentCount: number } {
-  return {
-    toolCount: items.filter((item) => item.kind === "tool").length,
-    subagentCount: items.filter((item) => item.kind === "subagent").length,
-  };
 }

@@ -76,10 +76,12 @@ export function MessageBubble({
   turn,
   conversationId,
   onOpenSaved,
+  initialActivityExpanded,
 }: {
   turn: Turn;
   conversationId: number | null;
   onOpenSaved(executionId: number): void;
+  initialActivityExpanded: boolean;
 }) {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const user = turn.role === "USER";
@@ -150,6 +152,7 @@ export function MessageBubble({
         </div>
         {turn.activity && turn.executionId ? (
           <div className="mb-2"><ActivityBlock mode="saved" summary={turn.activity} executionId={turn.executionId}
+            initialExpanded={initialActivityExpanded}
             onOpenPanel={() => onOpenSaved(turn.executionId!)} /></div>
         ) : null}
         <div className="leading-7">

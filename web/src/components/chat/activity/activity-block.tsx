@@ -8,22 +8,25 @@ import { ActivityTimeline } from "./activity-timeline";
 import { fromTree, type ActivityItem, type ActivityState } from "./activity-state";
 
 type Props =
-  | { mode: "live"; state: ActivityState; slow: boolean; onOpenPanel?(): void }
-  | { mode: "saved"; summary: ActivitySummary; executionId: number; onOpenPanel?(): void };
+  | { mode: "live"; state: ActivityState; slow: boolean; expanded: boolean;
+      onExpandedChange(value: boolean): void; onOpenPanel?(): void }
+  | { mode: "saved"; summary: ActivitySummary; executionId: number; initialExpanded?: boolean;
+      onOpenPanel?(): void };
 
 export function ActivityBlock(props: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [savedExpanded, setSavedExpanded] = useState(props.mode === "saved" && props.initialExpanded === true);
   const [savedItems, setSavedItems] = useState<ActivityItem[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadVersion, setLoadVersion] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (props.mode !== "live") return;
+    if (props.mode !== "live" || props.state.endedAt !== null) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
-  }, [props.mode]);
+  }, [props.mode, props.mode === "live" ? props.state.endedAt : null]);
 
+  const expanded = props.mode === "live" ? props.expanded : savedExpanded;
   const executionId = props.mode === "saved" ? props.executionId : null;
   useEffect(() => {
     if (!expanded || executionId === null || savedItems !== null) return;
@@ -41,9 +44,14 @@ export function ActivityBlock(props: Props) {
   }, [expanded, executionId, loadVersion, savedItems]);
 
   const live = props.mode === "live";
-  const latest = live ? props.state.items.findLast((item) => item.state === "running") : null;
+  const latest = live && props.state.endedAt === null
+    ? props.state.items.findLast((item) => item.state === "running") : null;
   const title = live
-    ? `작업 과정${latest ? ` · ${latest.name}` : ""} · ${formatElapsed(now - props.state.startedAt)}`
+    ? props.state.endedAt === null
+      ? `작업 과정${latest ? ` · ${latest.name}` : ""} · ${formatElapsed(now - props.state.startedAt)}`
+      : ["작업 과정", `도구 ${props.state.items.filter((item) => item.kind === "tool").length}`,
+        `하위 에이전트 ${props.state.items.filter((item) => item.kind === "subagent").length}`,
+        formatElapsed(props.state.endedAt - props.state.startedAt)].join(" · ")
     : ["작업 과정", props.summary.toolCount ? `도구 ${props.summary.toolCount}` : null,
       props.summary.subagentCount ? `하위 에이전트 ${props.summary.subagentCount}` : null,
       props.summary.durationMs === null ? null : formatElapsed(props.summary.durationMs)]
@@ -54,12 +62,12 @@ export function ActivityBlock(props: Props) {
     <div data-testid="activity-block" data-mode={props.mode}
       className="min-w-0 rounded-lg border border-border bg-surface text-foreground">
       <button type="button" data-testid="activity-toggle" aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => props.mode === "live" ? props.onExpandedChange(!expanded) : setSavedExpanded(!expanded)}
         className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-xs">
         <span aria-hidden="true" className="shrink-0">{expanded ? "▾" : "▸"}</span>
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </button>
-      {live && props.slow ? (
+      {live && props.slow && props.state.endedAt === null ? (
         <p data-testid="flow-slow-notice" className="px-3 pb-2 text-xs text-muted">
           오래 걸릴 수 있다. 이 화면을 떠나도 된다. 실행은 계속 돌고, 나중에 다시 열면 저장된 답이 보인다.
         </p>

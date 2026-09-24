@@ -13,9 +13,11 @@ type Props = {
   sending: boolean;
   activity: ActivityState | null;
   conversationId: number | null;
-  /** 흐름으로 도는 turn 의 단계 상태. 흐름이 아니면 null 이다 */
   /** 흐름이 오래 걸린다고 한 번 알렸는지 */
   flowIsSlow: boolean;
+  liveExpanded: boolean;
+  onLiveExpandedChange(value: boolean): void;
+  expandedOnDone: { executionId: number; expanded: boolean } | null;
   turnError: string | null;
   onOpenSaved(executionId: number): void;
   onOpenLive(): void;
@@ -28,6 +30,9 @@ export function MessageList({
   activity,
   conversationId,
   flowIsSlow,
+  liveExpanded,
+  onLiveExpandedChange,
+  expandedOnDone,
   turnError,
   onOpenSaved,
   onOpenLive,
@@ -95,17 +100,23 @@ export function MessageList({
                     {pendingAssistant && activity && activity.items.length > 0 ? (
                       <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
                         <span aria-hidden="true" />
-                        <ActivityBlock mode="live" state={activity} slow={flowIsSlow} onOpenPanel={onOpenLive} />
+                        <ActivityBlock mode="live" state={activity} slow={flowIsSlow}
+                          expanded={liveExpanded} onExpandedChange={onLiveExpandedChange}
+                          onOpenPanel={onOpenLive} />
                       </li>
                     ) : null}
-                    <MessageBubble turn={turn} conversationId={conversationId} onOpenSaved={onOpenSaved} />
+                    <MessageBubble turn={turn} conversationId={conversationId} onOpenSaved={onOpenSaved}
+                      initialActivityExpanded={turn.executionId === expandedOnDone?.executionId
+                        && (expandedOnDone?.expanded ?? false)} />
                   </Fragment>
                 );
               })}
               {!streamedAnswer && activity && activity.items.length > 0 ? (
                 <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
                   <span aria-hidden="true" />
-                  <ActivityBlock mode="live" state={activity} slow={flowIsSlow} onOpenPanel={onOpenLive} />
+                  <ActivityBlock mode="live" state={activity} slow={flowIsSlow}
+                    expanded={liveExpanded} onExpandedChange={onLiveExpandedChange}
+                    onOpenPanel={onOpenLive} />
                 </li>
               ) : null}
               {!streamedAnswer && sending && (!activity || activity.items.length === 0) ? (

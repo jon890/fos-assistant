@@ -6,7 +6,7 @@ import Link from "next/link";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
 import { MessageList } from "./chat/message-list";
-import { applyChatEvent, emptyActivity, type ActivityState } from "./chat/activity/activity-state";
+import { applyChatEvent, emptyActivity, failActivity, type ActivityState } from "./chat/activity/activity-state";
 import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
@@ -43,6 +43,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [activity, setActivity] = useState<ActivityState | null>(null);
+  const [liveExpanded, setLiveExpanded] = useState(false);
+  const liveExpandedRef = useRef(false);
+  const [expandedOnDone, setExpandedOnDone] = useState<{ executionId: number; expanded: boolean } | null>(null);
   const [panelTarget, setPanelTarget] = useState<ActivityPanelTarget | null>(null);
   const currentExecutionId = useRef<number | null>(null);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
@@ -85,6 +88,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setTurnError(null);
     setTurns([]);
     setActivity(null);
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
     setPanelTarget(null);
     currentExecutionId.current = null;
     setComposerGeneration((generation) => generation + 1);
@@ -169,6 +175,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
     setActivity(null);
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
     setPanelTarget(null);
     currentExecutionId.current = null;
     setFlowIsSlow(false);
@@ -203,8 +212,18 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setTurnError(null);
     setDraft("");
     setActivity(emptyActivity(Date.now()));
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
     currentExecutionId.current = null;
     setFlowIsSlow(false);
+    const finishFailedActivity = () => {
+      if (selectionVersion.current !== version) return;
+      setActivity((previous) => previous && failActivity(previous, Date.now()));
+      setLiveExpanded(false);
+      liveExpandedRef.current = false;
+      setFlowIsSlow(false);
+    };
     setTurns((previous) => [
       ...previous,
       { id: pendingId, role: "USER", content: text, senderName: null },
@@ -320,6 +339,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             done = true;
             const finishedExecutionId = streamEvent.executionId ?? currentExecutionId.current;
             if (finishedExecutionId !== null) {
+              setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
               setPanelTarget((previous) => previous?.mode === "live"
                 ? { mode: "saved", executionId: finishedExecutionId } : previous);
             }
@@ -333,6 +353,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             setFlowIsSlow(false);
           } else if (streamEvent.type === "error") {
             reportedError = true;
+            finishFailedActivity();
             const message = describeError(streamEvent.code ?? "INTERNAL_ERROR", streamEvent.message ?? "요청을 처리하지 못했다.");
             if (started && conversationIdRef.current !== null) {
               await refreshMessages(conversationIdRef.current, version);
@@ -345,6 +366,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         });
       } catch {
         if (!done && !reportedError) {
+          finishFailedActivity();
           const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
           if (started && conversationIdRef.current !== null) {
             await refreshMessages(conversationIdRef.current, version).catch(() => {});
@@ -358,6 +380,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         return started || done;
       }
       if (!done && !reportedError) {
+        finishFailedActivity();
         const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
         if (started && conversationIdRef.current !== null) {
           await refreshMessages(conversationIdRef.current, version).catch(() => {});
@@ -370,6 +393,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       }
       return started || done;
     } catch (reason) {
+      finishFailedActivity();
       restoreFailedMessage();
       setError(reason instanceof Error ? reason.message : "요청을 보내지 못했다.");
       return false;
@@ -425,6 +449,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           activity={activity}
           conversationId={conversationId}
           flowIsSlow={flowIsSlow}
+          liveExpanded={liveExpanded}
+          onLiveExpandedChange={(value) => { liveExpandedRef.current = value; setLiveExpanded(value); }}
+          expandedOnDone={expandedOnDone}
           turnError={turnError}
           onOpenSaved={(executionId) => setPanelTarget({ mode: "saved", executionId })}
           onOpenLive={() => { if (activity) setPanelTarget({ mode: "live", state: activity }); }}
