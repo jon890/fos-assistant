@@ -13,6 +13,7 @@ import { useConversations } from "./shell/conversations-provider";
 import { useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 import type { ChatEvent } from "@/lib/chat-event";
+import { foldVersions } from "@/lib/message-versions";
 
 type Agent = {
   code: string;
@@ -22,6 +23,14 @@ type Agent = {
   acceptsAttachments: boolean;
 };
 type ErrorPayload = { code: string; message: string };
+type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
+type TurnStreamCallbacks = {
+  onStarted?(event: ChatEvent): void | Promise<void>;
+  onDelta?(text: string): void;
+  onReset?(): void;
+  onDone?(event: ChatEvent): void | Promise<void>;
+  onError?(event: ChatEvent): void | Promise<void>;
+};
 async function readPayload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
@@ -50,6 +59,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const currentExecutionId = useRef<number | null>(null);
   const [executionId, setExecutionId] = useState<number | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
+  const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editText, setEditText] = useState<string | null>(null);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
@@ -97,6 +109,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     currentExecutionId.current = null;
     setExecutionId(null);
     setStopRequested(false);
+    setSelectedVersions({});
+    setEditingMessageId(null);
+    setEditText(null);
     setComposerGeneration((generation) => generation + 1);
     void (async () => {
       try {
@@ -190,6 +205,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     currentExecutionId.current = null;
     setExecutionId(null);
     setStopRequested(false);
+    setSelectedVersions({});
+    setEditingMessageId(null);
+    setEditText(null);
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
@@ -199,7 +217,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setMessagesLoading(false);
   }
 
-  async function refreshMessages(id: number, version: number) {
+  async function refreshMessages(id: number, version: number): Promise<Turn[]> {
     const response = await fetch(`/api/chat/conversations/${id}/messages`);
     if (!response.ok) {
       const payload = await readPayload<ErrorPayload>(response);
@@ -207,20 +225,80 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     }
     const loaded = await readPayload<Turn[]>(response);
     if (selectionVersion.current === version) setTurns(loaded);
+    return loaded;
+  }
+
+  function latestSlots() {
+    const saved = turns.filter((turn): turn is Turn & { id: number } => typeof turn.id === "number")
+      .map((turn) => ({ ...turn, replacesMessageId: turn.replacesMessageId ?? null }));
+    return foldVersions(saved, {}).at(-1);
+  }
+
+  function clearSelectedSlot(slotId: number | undefined) {
+    if (slotId === undefined) return;
+    setSelectedVersions((previous) => {
+      const next = { ...previous };
+      delete next[slotId];
+      return next;
+    });
+  }
+
+  /** 모든 turn 요청이 같은 사건과 실행 상태를 처리한다. 메시지 저장 방식만 호출자가 정한다. */
+  async function consumeTurnStream(
+    response: Response,
+    version: number,
+    state: TurnStreamState,
+    callbacks: TurnStreamCallbacks,
+  ) {
+    await readEventStream<ChatEvent>(response, async (event) => {
+      if (selectionVersion.current !== version) return;
+      if (event.type === "started") {
+        state.started = true;
+        currentExecutionId.current = event.executionId ?? null;
+        setExecutionId(event.executionId ?? null);
+        await callbacks.onStarted?.(event);
+      } else if (event.type === "delta" && event.text) {
+        callbacks.onDelta?.(event.text);
+      } else if (event.type === "reset") {
+        callbacks.onReset?.();
+        setActivity((previous) => previous && applyChatEvent(previous, event));
+      } else if (["tool", "subagent", "step", "switched"].includes(event.type)) {
+        setActivity((previous) => previous && applyChatEvent(previous, event));
+      } else if ((event.type === "done" || event.type === "stopped") && event.conversationId) {
+        state.done = true;
+        const finishedExecutionId = event.executionId ?? currentExecutionId.current;
+        if (finishedExecutionId !== null) {
+          setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
+          setPanelTarget((previous) => previous?.mode === "live"
+            ? { mode: "saved", executionId: finishedExecutionId } : previous);
+        }
+        await callbacks.onDone?.(event);
+        setActivity(null);
+        setFlowIsSlow(false);
+      } else if (event.type === "error") {
+        state.reportedError = true;
+        setActivity((previous) => previous && failActivity(previous, Date.now()));
+        setLiveExpanded(false);
+        liveExpandedRef.current = false;
+        setFlowIsSlow(false);
+        await callbacks.onError?.(event);
+      }
+    });
   }
 
   /** 전송이 실제로 끝났는지를 돌려준다. `Composer` 는 이 값을 보고 실패했을 때 미리보기를 남긴다 */
-  async function send(attachmentIds: number[]): Promise<boolean> {
-    const text = draft.trim();
+  async function send(attachmentIds: number[], editOfMessageId?: number, replacementText?: string): Promise<boolean> {
+    const text = (replacementText ?? draft).trim();
     if (text.length === 0 || sending || (conversationId === null && agentCode.length === 0)) return false;
 
     const version = selectionVersion.current;
-    const pendingId = `pending-${Date.now()}`;
+    const editedSlotId = editOfMessageId === undefined ? undefined : latestSlots()?.userVersion.slotId;
+    const pendingId = `${editOfMessageId === undefined ? "pending" : "edit-pending"}-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
     setSending(true);
     setError(null);
     setTurnError(null);
-    setDraft("");
+    if (editOfMessageId === undefined) setDraft("");
     setActivity(emptyActivity(Date.now()));
     setLiveExpanded(false);
     liveExpandedRef.current = false;
@@ -243,10 +321,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
 
     const restoreFailedMessage = () => {
       if (selectionVersion.current !== version) return;
-      setDraft(text);
+      if (editOfMessageId === undefined) setDraft(text);
       setTurns((previous) =>
         previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId),
       );
+    };
+    const keepEditDraft = (loaded: Turn[]) => {
+      if (editOfMessageId === undefined || selectionVersion.current !== version) return;
+      const latestUser = loaded.findLast((turn) => turn.role === "USER" && typeof turn.id === "number");
+      if (latestUser && typeof latestUser.id === "number") setEditingMessageId(latestUser.id);
     };
 
     const requestBody = {
@@ -254,6 +337,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       text,
       agentCode,
       attachmentIds,
+      ...(editOfMessageId === undefined ? {} : { editOfMessageId }),
     };
 
     const sendWithoutStream = async () => {
@@ -298,116 +382,111 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           body: JSON.stringify(requestBody),
         });
       } catch {
+        if (editOfMessageId !== undefined) {
+          restoreFailedMessage();
+          setError("수정 요청을 보내지 못했다.");
+          return false;
+        }
         return await sendWithoutStream();
       }
 
       if (!response.ok) {
         if ([404, 405, 415, 501].includes(response.status)) {
+          if (editOfMessageId !== undefined) {
+            restoreFailedMessage();
+            setError("수정 스트림을 열지 못했다.");
+            return false;
+          }
           return await sendWithoutStream();
         }
         const payload = await readPayload<ErrorPayload>(response);
         restoreFailedMessage();
         setError(describeError(payload.code, payload.message));
+        if (payload.code === "MESSAGE_NOT_LATEST" && conversationIdRef.current !== null) {
+          await refreshMessages(conversationIdRef.current, version);
+        }
         return false;
       }
 
-      let done = false;
-      let started = false;
-      let reportedError = false;
+      const stream = { started: false, done: false, reportedError: false };
       try {
-        await readEventStream<ChatEvent>(response, async (streamEvent) => {
-          if (selectionVersion.current !== version) return;
-          if (streamEvent.type === "started" && streamEvent.conversationId) {
-            started = true;
-            currentExecutionId.current = streamEvent.executionId ?? null;
-            setExecutionId(streamEvent.executionId ?? null);
-            if (conversationIdRef.current === null) {
-              window.history.replaceState(null, "", `/c/${streamEvent.conversationId}`);
-            }
-            conversationIdRef.current = streamEvent.conversationId;
-            setConversationId(streamEvent.conversationId);
+        await consumeTurnStream(response, version, stream, {
+          onStarted: (event) => {
+            if (!event.conversationId) return;
+            if (conversationIdRef.current === null) window.history.replaceState(null, "", `/c/${event.conversationId}`);
+            conversationIdRef.current = event.conversationId;
+            setConversationId(event.conversationId);
             void refresh();
-          } else if (streamEvent.type === "delta" && streamEvent.text) {
+          },
+          onDelta: (textDelta) => {
             setTurns((previous) => {
               const current = previous.find((turn) => turn.id === assistantPendingId);
-              if (!current) {
-                return [
-                  ...previous,
-                  { id: assistantPendingId, role: "ASSISTANT", content: streamEvent.text ?? "", senderName: null },
-                ];
-              }
+              if (!current) return [...previous,
+                { id: assistantPendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
               return previous.map((turn) =>
-                turn.id === assistantPendingId
-                  ? { ...turn, content: turn.content + (streamEvent.text ?? "") }
-                  : turn,
+                turn.id === assistantPendingId ? { ...turn, content: turn.content + textDelta } : turn,
               );
             });
-          } else if (streamEvent.type === "reset") {
+          },
+          onReset: () => {
             // 막혀서 넘어간 시도의 조각이다. 화면에 남으면 읽는 사람이 그것을 답으로 읽는다.
             setTurns((previous) => previous.filter((turn) => turn.id !== assistantPendingId));
-            setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
-          } else if (["tool", "subagent", "step", "switched"].includes(streamEvent.type)) {
-            setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
-          } else if ((streamEvent.type === "done" || streamEvent.type === "stopped") && streamEvent.conversationId) {
-            done = true;
-            if (streamEvent.type === "stopped") {
-              setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
-            }
-            const finishedExecutionId = streamEvent.executionId ?? currentExecutionId.current;
-            if (finishedExecutionId !== null) {
-              setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
-              setPanelTarget((previous) => previous?.mode === "live"
-                ? { mode: "saved", executionId: finishedExecutionId } : previous);
-            }
-            conversationIdRef.current = streamEvent.conversationId;
-            setConversationId(streamEvent.conversationId);
+          },
+          onDone: async (event) => {
+            conversationIdRef.current = event.conversationId!;
+            setConversationId(event.conversationId!);
             await Promise.all([
               refresh(),
-              refreshMessages(streamEvent.conversationId, version),
+              refreshMessages(event.conversationId!, version),
             ]);
-            setActivity(null);
-            setFlowIsSlow(false);
-          } else if (streamEvent.type === "error") {
-            reportedError = true;
-            finishFailedActivity();
-            const message = describeError(streamEvent.code ?? "INTERNAL_ERROR", streamEvent.message ?? "요청을 처리하지 못했다.");
-            if (started && conversationIdRef.current !== null) {
+            clearSelectedSlot(editedSlotId);
+          },
+          onError: async (event) => {
+            const message = describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다.");
+            if (event.code === "MESSAGE_NOT_LATEST" && conversationIdRef.current !== null) {
               await refreshMessages(conversationIdRef.current, version);
+            }
+            if (stream.started && conversationIdRef.current !== null) {
+              keepEditDraft(await refreshMessages(conversationIdRef.current, version));
               setTurnError(message);
             } else {
               restoreFailedMessage();
               setError(message);
             }
-          }
+          },
         });
       } catch {
-        if (!done && !reportedError) {
+        if (!stream.done && !stream.reportedError) {
           finishFailedActivity();
           const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
-          if (started && conversationIdRef.current !== null) {
-            await refreshMessages(conversationIdRef.current, version).catch(() => {});
+          if (stream.started && conversationIdRef.current !== null) {
+            const loaded = await refreshMessages(conversationIdRef.current, version).catch(() => null);
+            if (loaded) keepEditDraft(loaded);
             if (selectionVersion.current === version) setTurnError(message);
           } else {
             restoreFailedMessage();
             if (selectionVersion.current === version) setError(message);
           }
-          return started;
+          return editOfMessageId === undefined && stream.started;
         }
-        return started || done;
+        return editOfMessageId === undefined
+          ? stream.started || stream.done : stream.done && !stream.reportedError;
       }
-      if (!done && !reportedError) {
+      if (!stream.done && !stream.reportedError) {
         finishFailedActivity();
         const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
-        if (started && conversationIdRef.current !== null) {
-          await refreshMessages(conversationIdRef.current, version).catch(() => {});
+        if (stream.started && conversationIdRef.current !== null) {
+          const loaded = await refreshMessages(conversationIdRef.current, version).catch(() => null);
+          if (loaded) keepEditDraft(loaded);
           if (selectionVersion.current === version) setTurnError(message);
         } else {
           restoreFailedMessage();
           if (selectionVersion.current === version) setError(message);
         }
-        return started;
+        return editOfMessageId === undefined && stream.started;
       }
-      return started || done;
+      return editOfMessageId === undefined
+        ? stream.started || stream.done : stream.done && !stream.reportedError;
     } catch (reason) {
       finishFailedActivity();
       restoreFailedMessage();
@@ -415,6 +494,69 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       return false;
     } finally {
       if (selectionVersion.current === version) setSending(false);
+    }
+  }
+
+  async function regenerate() {
+    if (conversationId === null || sending) return;
+    const version = selectionVersion.current;
+    const regeneratedSlotId = latestSlots()?.answers.at(-1)?.version.slotId;
+    const pendingId = `assistant-regenerate-${Date.now()}`;
+    const stream = { started: false, done: false, reportedError: false };
+    setSending(true);
+    setError(null);
+    setTurnError(null);
+    setActivity(emptyActivity(Date.now()));
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
+    currentExecutionId.current = null;
+    setExecutionId(null);
+    setStopRequested(false);
+    setFlowIsSlow(false);
+    try {
+      const response = await fetch(`/api/chat/conversations/${conversationId}/regenerate`, { method: "POST" });
+      if (!response.ok) {
+        const payload = await readPayload<ErrorPayload>(response);
+        setError(describeError(payload.code, payload.message));
+        if (payload.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
+        return;
+      }
+      await consumeTurnStream(response, version, stream, {
+        onDelta: (textDelta) => {
+          setTurns((previous) => {
+            const current = previous.find((turn) => turn.id === pendingId);
+            return current ? previous.map((turn) => turn.id === pendingId ? { ...turn, content: turn.content + textDelta } : turn)
+              : [...previous, { id: pendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
+          });
+        },
+        onReset: () => {
+          setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+        },
+        onError: async (event) => {
+          setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+          setTurnError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다."));
+          if (event.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
+        },
+        onDone: async (event) => {
+          setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+          await Promise.all([refresh(), refreshMessages(event.conversationId!, version)]);
+          clearSelectedSlot(regeneratedSlotId);
+        },
+      });
+      if (!stream.done && !stream.reportedError) throw new Error(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+    } catch (reason) {
+      if (selectionVersion.current === version) {
+        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+        setActivity((previous) => previous && failActivity(previous, Date.now()));
+        setTurnError(reason instanceof Error ? reason.message : "다시 생성하지 못했다.");
+        await refreshMessages(conversationId, version).catch(() => {});
+      }
+    } finally {
+      if (selectionVersion.current === version) {
+        setSending(false);
+        setFlowIsSlow(false);
+      }
     }
   }
 
@@ -488,6 +630,19 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           turnError={turnError}
           onOpenSaved={(executionId) => setPanelTarget({ mode: "saved", executionId })}
           onOpenLive={() => { if (activity) setPanelTarget({ mode: "live", state: activity }); }}
+          selectedVersions={selectedVersions}
+          onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
+          onRegenerate={() => { void regenerate(); }}
+          editingMessageId={editingMessageId}
+          editText={editText}
+          onEditTextChange={setEditText}
+          onStartEdit={(id, text) => { setEditingMessageId(id); setEditText(text); }}
+          onEdit={async (id, text) => {
+            const ok = await send([], id, text);
+            if (ok) { setEditingMessageId(null); setEditText(null); }
+          }}
+          onEditCancel={() => { setEditingMessageId(null); setEditText(null); }}
+          onRetry={() => { void regenerate(); }}
         />
 
         {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}

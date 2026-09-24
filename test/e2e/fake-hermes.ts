@@ -472,7 +472,7 @@ export function startFakeHermes(
             Connection: "keep-alive",
           });
           response.write(": keepalive\n\n");
-          if (run.input === "중지 조각 전 검사") {
+          if (run.input === "중지 조각 전 검사" && run.status !== "completed") {
             if (run.status === "cancelled") {
               response.end();
             } else {
