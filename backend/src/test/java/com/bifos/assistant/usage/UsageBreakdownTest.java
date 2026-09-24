@@ -60,8 +60,8 @@ class UsageBreakdownTest {
     @BeforeEach
     void 준비한다() {
         executions.deleteAll();
-        career = agent("breakdown-career", "진로 비서", "gpt-5.6-sol");
-        chore = agent("breakdown-chore", "집안일 비서", "gpt-5.6-luna");
+        career = agent("breakdown-career", "진로 비서", "example-model");
+        chore = agent("breakdown-chore", "집안일 비서", "example-model-b");
         controller = new UsageController(executions, currentUser, agentService, trees);
         when(currentUser.require())
                 .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
@@ -95,7 +95,7 @@ class UsageBreakdownTest {
 
         List<BreakdownRow> rows = controller.breakdown("model", MONTH).rows();
 
-        assertThat(rows).extracting(BreakdownRow::label).containsExactly("gpt-5.6-sol", "gpt-5.6-luna");
+        assertThat(rows).extracting(BreakdownRow::label).containsExactly("example-model", "example-model-b");
         assertThat(rows).extracting(BreakdownRow::detail).containsOnly("openai-codex");
     }
 

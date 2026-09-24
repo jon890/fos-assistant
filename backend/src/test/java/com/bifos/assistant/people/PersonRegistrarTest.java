@@ -121,7 +121,7 @@ class PersonRegistrarTest {
                 PROFILE,
                 "https://hermes-listener.example.com/p/" + PROFILE,
                 "openai-codex",
-                "gpt-5.6-sol",
+                "example-model",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.FAMILY,

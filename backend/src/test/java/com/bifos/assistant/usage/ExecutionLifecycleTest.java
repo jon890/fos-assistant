@@ -193,7 +193,7 @@ class ExecutionLifecycleTest {
     }
 
     private static Agent agent() {
-        return Agent.of("dad", "Dad", "dad", "http://127.0.0.1:1/p/dad", "anthropic", "claude-opus-5",
+        return Agent.of("dad", "Dad", "dad", "http://127.0.0.1:1/p/dad", "anthropic", "example-model-large",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, USER_ID);
     }
 
@@ -203,7 +203,7 @@ class ExecutionLifecycleTest {
     }
 
     private static HermesRunResult result() {
-        return HermesRunResult.of("run-1", "session-1", "completed", "끝", "claude-opus-5", "anthropic",
+        return HermesRunResult.of("run-1", "session-1", "completed", "끝", "example-model-large", "anthropic",
                 new TokenUsage(120L, 80L, 40L, 160L));
     }
 }

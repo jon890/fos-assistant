@@ -29,9 +29,9 @@ class AgentModelSyncTest {
 
     @Test
     void 모델이_바뀌면_1순위와_확인_시각을_갱신한다() {
-        Agent agent = agent("gpt-5.6-luna");
+        Agent agent = agent("example-model-b");
         when(hermes.readOptions(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(new HermesModelOptions("gpt-5.6-sol", "openai-codex"));
+                .thenReturn(new HermesModelOptions("example-model", "openai-codex"));
         when(models.syncFirst(eq(agent), any())).thenReturn(true);
 
         AgentModelSync.SyncResult result = sync.sync(agent);
@@ -39,17 +39,17 @@ class AgentModelSyncTest {
         assertThat(result.read()).isTrue();
         assertThat(result.changed()).isTrue();
         assertThat(result.providerRead()).isTrue();
-        verify(models).syncFirst(agent, new ModelOption("openai-codex", "gpt-5.6-sol"));
-        assertThat(agent.model()).isEqualTo("gpt-5.6-sol");
+        verify(models).syncFirst(agent, new ModelOption("openai-codex", "example-model"));
+        assertThat(agent.model()).isEqualTo("example-model");
         assertThat(agent.modelSyncedAt()).isNotNull();
         verify(agents).save(agent);
     }
 
     @Test
     void 같은_모델도_확인_시각은_갱신한다() {
-        Agent agent = agent("gpt-5.6-sol");
+        Agent agent = agent("example-model");
         when(hermes.readOptions(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(new HermesModelOptions("gpt-5.6-sol", "openai-codex"));
+                .thenReturn(new HermesModelOptions("example-model", "openai-codex"));
         when(models.syncFirst(eq(agent), any())).thenReturn(false);
 
         AgentModelSync.SyncResult result = sync.sync(agent);
@@ -61,13 +61,13 @@ class AgentModelSyncTest {
 
     @Test
     void 모델을_읽지_못하면_기존_값을_유지하고_1순위를_건드리지_않는다() {
-        Agent agent = agent("gpt-5.6-sol");
+        Agent agent = agent("example-model");
         when(hermes.readOptions(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(null);
 
         AgentModelSync.SyncResult result = sync.sync(agent);
 
         assertThat(result.read()).isFalse();
-        assertThat(agent.model()).isEqualTo("gpt-5.6-sol");
+        assertThat(agent.model()).isEqualTo("example-model");
         assertThat(agent.modelSyncedAt()).isNull();
         verify(models, never()).syncFirst(any(), any());
     }
@@ -78,18 +78,18 @@ class AgentModelSyncTest {
      */
     @Test
     void provider_를_주지_않으면_지금_1순위의_provider_를_그대로_둔다() {
-        Agent agent = agent("gpt-5.6-luna");
+        Agent agent = agent("example-model-b");
         when(hermes.readOptions(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(new HermesModelOptions("gpt-5.6-sol", null));
+                .thenReturn(new HermesModelOptions("example-model", null));
         when(models.optionsOf(agent))
                 .thenReturn(List.of(
                         com.bifos.assistant.agent.domain.AgentModelOption.of(
-                                1L, 1, new ModelOption("nvidia", "gpt-5.6-luna"))));
+                                1L, 1, new ModelOption("nvidia", "example-model-b"))));
 
         AgentModelSync.SyncResult result = sync.sync(agent);
 
         assertThat(result.providerRead()).isFalse();
-        verify(models).syncFirst(agent, new ModelOption("nvidia", "gpt-5.6-sol"));
+        verify(models).syncFirst(agent, new ModelOption("nvidia", "example-model"));
     }
 
     private static Agent agent(String model) {

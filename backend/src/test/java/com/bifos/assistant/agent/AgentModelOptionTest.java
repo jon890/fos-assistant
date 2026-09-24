@@ -52,7 +52,7 @@ class AgentModelOptionTest {
                 AGENT_CODE,
                 "http://agent-runtime.test/p/" + AGENT_CODE,
                 "openai-codex",
-                "gpt-5.6-sol",
+                "example-model",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
@@ -63,7 +63,7 @@ class AgentModelOptionTest {
     void 받은_순서가_그대로_순위가_된다() {
         selector.replace(
                 agent,
-                List.of(new ModelOption("nvidia", "nemotron"), new ModelOption("openai-codex", "gpt-5.6-sol")));
+                List.of(new ModelOption("nvidia", "example-model-b"), new ModelOption("openai-codex", "example-model")));
 
         assertThat(selector.optionsOf(agent))
                 .extracting(AgentModelOption::rank, AgentModelOption::provider)
@@ -74,7 +74,7 @@ class AgentModelOptionTest {
 
     @Test
     void 빈_목록은_거절한다() {
-        selector.seedFirst(agent, new ModelOption("openai-codex", "gpt-5.6-sol"));
+        selector.seedFirst(agent, new ModelOption("openai-codex", "example-model"));
 
         assertThatThrownBy(() -> selector.replace(agent, List.of()))
                 .isInstanceOf(ApiException.class)
@@ -93,11 +93,11 @@ class AgentModelOptionTest {
     void 막힌_provider_는_쓸_수_있는_목록에서_빠진다() {
         selector.replace(
                 agent,
-                List.of(new ModelOption("openai-codex", "gpt-5.6-sol"), new ModelOption("nvidia", "nemotron")));
+                List.of(new ModelOption("openai-codex", "example-model"), new ModelOption("nvidia", "example-model-b")));
         blocklist.block("openai-codex", "provider authentication failed");
 
         assertThat(selector.availableFor(agent))
-                .containsExactly(new ModelOption("nvidia", "nemotron"));
+                .containsExactly(new ModelOption("nvidia", "example-model-b"));
         assertThat(blocklist.blockedProviders()).containsExactly("openai-codex");
     }
 
@@ -106,19 +106,19 @@ class AgentModelOptionTest {
     void 식는_시간이_지나면_다시_1순위부터_시도한다() {
         selector.replace(
                 agent,
-                List.of(new ModelOption("openai-codex", "gpt-5.6-sol"), new ModelOption("nvidia", "nemotron")));
+                List.of(new ModelOption("openai-codex", "example-model"), new ModelOption("nvidia", "example-model-b")));
         providerStates.save(ProviderState.blocked(
                 "openai-codex", Instant.now().minus(1, ChronoUnit.MINUTES), "지난 막힘"));
 
         assertThat(selector.availableFor(agent))
                 .first()
-                .isEqualTo(new ModelOption("openai-codex", "gpt-5.6-sol"));
+                .isEqualTo(new ModelOption("openai-codex", "example-model"));
         assertThat(blocklist.blocked()).isEmpty();
     }
 
     @Test
     void 막힘을_풀면_다시_쓸_수_있다() {
-        selector.seedFirst(agent, new ModelOption("openai-codex", "gpt-5.6-sol"));
+        selector.seedFirst(agent, new ModelOption("openai-codex", "example-model"));
         blocklist.block("openai-codex", "provider authentication failed");
 
         blocklist.release("openai-codex");

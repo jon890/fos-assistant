@@ -111,12 +111,12 @@ class ChildExecutionRunnerTest {
                     agentCode,
                     "http://agent-runtime.test/p/" + agentCode,
                     "anthropic",
-                    "claude-opus-5",
+                    "example-model-large",
                     CostMode.SUBSCRIPTION,
                     CredentialScope.SHARED_HOUSEHOLD,
                     AgentVisibility.PRIVATE,
                     user.id()));
-            modelSelector.seedFirst(saved, new ModelOption("anthropic", "claude-opus-5"));
+            modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         }
         return new CurrentUser(
                 user.id(), user.email(), user.displayName(), user.familyId(), user.role());
@@ -135,7 +135,7 @@ class ChildExecutionRunnerTest {
 
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(
-                runId, "sess-child", "completed", output, "claude-opus-5", "anthropic",
+                runId, "sess-child", "completed", output, "example-model-large", "anthropic",
                 new TokenUsage(30L, 10L, 5L, 35L));
     }
 
