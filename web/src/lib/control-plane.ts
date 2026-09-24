@@ -74,23 +74,35 @@ export type ControlPlaneResponse =
   | { ok: true; response: Response }
   | { ok: false; status: number; code: string; message: string };
 
-export async function requestControlPlane(
-  path: string,
-  init: { method?: string; body?: unknown } = {},
-): Promise<ControlPlaneResponse> {
+type Authorized = { ok: true; token: string } | { ok: false; status: number; code: string; message: string };
+
+/**
+ * 세션에서 메일 주소를 꺼내 Control Plane 토큰을 만든다.
+ *
+ * <p>`requestControlPlane` 과 `forwardControlPlane` 이 이 확인과 토큰 발급을 같이 쓴다.
+ */
+async function authorize(): Promise<Authorized> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email) {
     return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다." };
   }
+  return { ok: true, token: await mintToken(email, session.user?.name ?? email) };
+}
 
-  const token = await mintToken(email, session.user?.name ?? email);
+export async function requestControlPlane(
+  path: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<ControlPlaneResponse> {
+  const authorized = await authorize();
+  if (!authorized.ok) return authorized;
+
   return {
     ok: true,
     response: await fetch(`${baseUrl()}${path}`, {
       method: init.method ?? "GET",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${authorized.token}`,
         ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
@@ -100,7 +112,7 @@ export async function requestControlPlane(
 }
 
 /**
- * 로그인한 가족 구성원으로서 Control Plane 을 부르되, 본문을 손대지 않고 그대로 흘려보낸다.
+ * 로그인한 사용자로서 Control Plane 을 부르되, 본문을 손대지 않고 그대로 흘려보낸다.
  *
  * <p>multipart 업로드나 이미지 응답처럼 JSON 으로 다시 감싸면 안 되는 본문에 쓴다. `callControlPlane` 과
  * 달리 응답을 읽지 않고 `Response` 그대로 돌려주므로, 부르는 쪽이 스트림을 그대로 옮길 수 있다.
@@ -109,14 +121,10 @@ export async function forwardControlPlane(
   path: string,
   init: { method: string; body?: ReadableStream<Uint8Array> | null; contentType?: string | null },
 ): Promise<ControlPlaneResponse> {
-  const session = await auth();
-  const email = session?.user?.email;
-  if (!email) {
-    return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다." };
-  }
+  const authorized = await authorize();
+  if (!authorized.ok) return authorized;
 
-  const token = await mintToken(email, session.user?.name ?? email);
-  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  const headers: Record<string, string> = { Authorization: `Bearer ${authorized.token}` };
   if (init.contentType) headers["Content-Type"] = init.contentType;
 
   // 본문이 스트림이면 Node 의 fetch 에 duplex 를 함께 줘야 한다. 없으면 요청이 거절된다. 표준
@@ -129,10 +137,12 @@ export async function forwardControlPlane(
   };
   if (init.body) requestInit.duplex = "half";
 
-  return {
-    ok: true,
-    response: await fetch(`${baseUrl()}${path}`, requestInit),
-  };
+  // 연결이 끊기면 fetch 가 던진다. 라우트가 JSON 이 아닌 500 을 내지 않게 오류 결과로 바꿔 돌려준다.
+  try {
+    return { ok: true, response: await fetch(`${baseUrl()}${path}`, requestInit) };
+  } catch {
+    return { ok: false, status: 502, code: "INTERNAL_ERROR", message: "요청을 처리하지 못했습니다." };
+  }
 }
 
 /**

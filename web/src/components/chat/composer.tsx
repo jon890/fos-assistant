@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { describeError } from "../error-message";
@@ -9,7 +9,8 @@ type Props = {
   value: string;
   disabled: boolean;
   onChange(value: string): void;
-  onSend(attachmentIds: number[]): void;
+  /** 전송이 실제로 끝났는지를 돌려준다. 실패하면 미리보기를 지우지 않는다 */
+  onSend(attachmentIds: number[]): Promise<boolean>;
   /** 대화가 아직 없으면 null. 사진을 고르면 이 값이 없는 채로 첫 사진을 올릴 수 없다 */
   conversationId: number | null;
   agentCode: string;
@@ -30,6 +31,8 @@ type AttachmentItem = {
   status: "uploading" | "done" | "error";
   attachmentId: number | null;
   errorMessage: string | null;
+  /** 이 첨부가 올라간 대화 번호다. 지울 때 이 번호로 서버 DELETE 를 부른다 */
+  conversationId: number;
 };
 
 async function buildThumbnail(file: File): Promise<string> {
@@ -74,6 +77,42 @@ export function Composer({
   const composing = useRef(false);
   const [items, setItems] = useState<AttachmentItem[]>([]);
   const [pickNotice, setPickNotice] = useState<string | null>(null);
+  /** 빈 대화를 만드는 요청이 진행 중이면 그 Promise 를 담아 다시 쓴다. 연달아 고르면 두 번 도는 것을 막는다 */
+  const creatingConversationRef = useRef<Promise<number | null> | null>(null);
+  /** 올리는 중에 지운 첨부의 key 다. 올리기 응답을 받으면 그때 서버 DELETE 를 부른다 */
+  const pendingRemovalRef = useRef<Set<string>>(new Set());
+  /**
+   * 이 Composer 가 화면에 붙어 있는지다. 대화를 바꾸면 부모가 Composer 를 새로 만든다. 그 뒤에 끝난
+   * 요청이 부모의 선택을 바꾸거나 사라진 목록에 첨부를 더하지 못하게 이 값으로 막는다.
+   */
+  const mountedRef = useRef(false);
+  /** 정리할 때 읽는 최신 목록이다. unmount 정리는 마지막 렌더의 `items` 를 볼 수 없어 따로 둔다 */
+  const itemsRef = useRef<AttachmentItem[]>([]);
+  /** 전송 요청에 실은 첨부다. 응답을 기다리는 동안에는 메시지에 묶일 수 있어 정리에서 지우지 않는다 */
+  const sendingItemsRef = useRef<AttachmentItem[]>([]);
+
+  useLayoutEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const pendingRemoval = pendingRemovalRef.current;
+    return () => {
+      mountedRef.current = false;
+      // 대화를 바꿔 이 Composer 가 사라진다. 메시지에 묶이지 않은 첨부가 남으면 원래 대화의 상한을
+      // 보관 기간 내내 차지하므로 여기서 지운다. 올리는 중인 것은 `uploadOne` 이 응답을 받은 뒤 지운다.
+      const sending = new Set(sendingItemsRef.current.map((item) => item.key));
+      for (const item of itemsRef.current) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+        if (item.status === "done" && item.attachmentId !== null && !sending.has(item.key)) {
+          void deleteAttachment(item.conversationId, item.attachmentId);
+        }
+      }
+      itemsRef.current = [];
+      pendingRemoval.clear();
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -92,18 +131,50 @@ export function Composer({
 
   async function ensureConversationId(): Promise<number | null> {
     if (conversationId !== null) return conversationId;
+    if (creatingConversationRef.current) return creatingConversationRef.current;
+
+    const promise = (async () => {
+      try {
+        const response = await fetch("/api/chat/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agentCode }),
+        });
+        const payload = (await response.json()) as { conversationId?: number; code?: string; message?: string };
+        if (!response.ok || !payload.conversationId) {
+          setPickNotice("대화를 시작하지 못했다. 잠시 뒤 다시 시도해 주세요.");
+          return null;
+        }
+        // 요청 도중 대화를 바꿨으면 부모는 이미 다른 대화를 보고 있다. 그 선택을 덮지 않는다.
+        if (!mountedRef.current) return null;
+        onConversationCreated(payload.conversationId);
+        return payload.conversationId;
+      } catch {
+        setPickNotice("대화를 시작하지 못했다. 잠시 뒤 다시 시도해 주세요.");
+        return null;
+      } finally {
+        creatingConversationRef.current = null;
+      }
+    })();
+    creatingConversationRef.current = promise;
+    return promise;
+  }
+
+  /** 지우는 단추가 눌린 첨부다. 업로드 응답이 오면 DELETE 로 마무리한다 */
+  function finalizeRemovalIfRequested(key: string, targetConversationId: number, attachmentId: number | null) {
+    if (!pendingRemovalRef.current.has(key)) return false;
+    pendingRemovalRef.current.delete(key);
+    if (attachmentId !== null) void deleteAttachment(targetConversationId, attachmentId);
+    return true;
+  }
+
+  async function deleteAttachment(targetConversationId: number, attachmentId: number) {
     try {
-      const response = await fetch("/api/chat/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentCode }),
+      await fetch(`/api/chat/conversations/${targetConversationId}/attachments/${attachmentId}`, {
+        method: "DELETE",
       });
-      const payload = (await response.json()) as { conversationId?: number; code?: string; message?: string };
-      if (!response.ok || !payload.conversationId) return null;
-      onConversationCreated(payload.conversationId);
-      return payload.conversationId;
     } catch {
-      return null;
+      // 지우기 요청이 실패해도 화면은 이미 그 미리보기를 치웠다. 사용자가 다시 시도할 자리가 없어 조용히 넘어간다.
     }
   }
 
@@ -115,9 +186,13 @@ export function Composer({
     } catch {
       previewUrl = "";
     }
+    if (!mountedRef.current) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      return;
+    }
     setItems((previous) => [
       ...previous,
-      { key, previewUrl, status: "uploading", attachmentId: null, errorMessage: null },
+      { key, previewUrl, status: "uploading", attachmentId: null, errorMessage: null, conversationId: targetConversationId },
     ]);
 
     try {
@@ -128,15 +203,23 @@ export function Composer({
         body: form,
       });
       const payload = (await response.json()) as { id?: number; code?: string; message?: string };
+      if (!mountedRef.current) {
+        // 올리는 동안 대화를 바꿨다. 이 첨부를 보낼 자리가 사라졌으므로 서버에서도 지운다.
+        if (response.ok && payload.id) void deleteAttachment(targetConversationId, payload.id);
+        return;
+      }
       if (!response.ok || !payload.id) {
+        finalizeRemovalIfRequested(key, targetConversationId, null);
         updateItem(key, {
           status: "error",
           errorMessage: describeError(payload.code ?? "INTERNAL_ERROR", payload.message ?? "올리지 못했습니다."),
         });
         return;
       }
+      if (finalizeRemovalIfRequested(key, targetConversationId, payload.id)) return;
       updateItem(key, { status: "done", attachmentId: payload.id });
     } catch {
+      finalizeRemovalIfRequested(key, targetConversationId, null);
       updateItem(key, { status: "error", errorMessage: "올리지 못했습니다. 다시 시도해 주세요." });
     }
   }
@@ -146,13 +229,19 @@ export function Composer({
     event.target.value = "";
     if (files.length === 0) return;
 
+    const rejectedFormatCount = files.filter((file) => !ACCEPTED_TYPES.includes(file.type)).length;
     const accepted = files.filter((file) => ACCEPTED_TYPES.includes(file.type));
-    const overflowCount = Math.max(0, accepted.length - MAX_ATTACHMENTS);
-    const capped = accepted.slice(0, MAX_ATTACHMENTS);
+    // 상한은 한 번에 고를 때만 센다. 이미 붙은 첨부를 빼고 남은 자리만큼만 올린다.
+    const remainingSlots = Math.max(0, MAX_ATTACHMENTS - items.length);
+    const overflowCount = Math.max(0, accepted.length - remainingSlots);
+    const capped = accepted.slice(0, remainingSlots);
     const oversize = capped.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
     const toUpload = capped.filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
 
     const notices: string[] = [];
+    if (rejectedFormatCount > 0) {
+      notices.push(`이미지 파일만 올릴 수 있다. ${rejectedFormatCount}장은 올리지 않았다.`);
+    }
     if (overflowCount > 0) {
       notices.push(`한 번에 ${MAX_ATTACHMENTS}장까지 올릴 수 있다. ${overflowCount}장은 올리지 않았다.`);
     }
@@ -164,10 +253,7 @@ export function Composer({
     if (toUpload.length === 0) return;
 
     const targetConversationId = await ensureConversationId();
-    if (targetConversationId === null) {
-      setPickNotice("대화를 시작하지 못했다. 잠시 뒤 다시 시도해 주세요.");
-      return;
-    }
+    if (targetConversationId === null || !mountedRef.current) return;
 
     for (const file of toUpload) {
       void uploadOne(file, targetConversationId);
@@ -175,22 +261,46 @@ export function Composer({
   }
 
   function removeItem(key: string) {
-    setItems((previous) => {
-      const target = previous.find((item) => item.key === key);
-      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
-      return previous.filter((item) => item.key !== key);
-    });
+    // 부수 효과는 updater 밖에서 한 번만 부른다. 개발 모드의 StrictMode 는 updater 를 두 번 돌린다.
+    const target = itemsRef.current.find((item) => item.key === key);
+    if (!target) return;
+    if (target.previewUrl) URL.revokeObjectURL(target.previewUrl);
+    if (target.status === "uploading") {
+      pendingRemovalRef.current.add(key);
+    } else if (target.status === "done" && target.attachmentId !== null) {
+      void deleteAttachment(target.conversationId, target.attachmentId);
+    }
+    itemsRef.current = itemsRef.current.filter((item) => item.key !== key);
+    setItems((previous) => previous.filter((item) => item.key !== key));
   }
 
-  function trySend() {
+  async function trySend() {
     if (sendDisabled) return;
-    const attachmentIds = items
-      .filter((item): item is AttachmentItem & { attachmentId: number } => item.status === "done" && item.attachmentId !== null)
-      .map((item) => item.attachmentId);
-    onSend(attachmentIds);
+    const sendingItems = items.filter(
+      (item): item is AttachmentItem & { attachmentId: number } => item.status === "done" && item.attachmentId !== null,
+    );
+    sendingItemsRef.current = sendingItems;
+    let succeeded = false;
+    try {
+      succeeded = await onSend(sendingItems.map((item) => item.attachmentId));
+    } finally {
+      sendingItemsRef.current = [];
+    }
+    if (!mountedRef.current) {
+      // 기다리는 동안 이 Composer 가 사라졌다. 실패로 끝나도 지우지 않는다. 서버가 메시지를 저장하고 첨부를
+      // 묶은 뒤에 스트림만 끊긴 경우도 실패로 오므로, 지우면 보낸 사진이 사라질 수 있다. 묶이지 않았다면
+      // 보관 기간이 지나 정리된다.
+      for (const item of sendingItems) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      }
+      return;
+    }
+    if (!succeeded) return;
     for (const item of items) {
       if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
     }
+    // 보낸 첨부는 메시지에 묶였다. 이 뒤에 unmount 정리가 돌아도 지우지 않게 ref 를 먼저 비운다.
+    itemsRef.current = [];
     setItems([]);
     setPickNotice(null);
   }
@@ -199,7 +309,7 @@ export function Composer({
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        trySend();
+        void trySend();
       }}
       className="mx-auto w-full max-w-3xl pt-3"
     >
@@ -232,7 +342,9 @@ export function Composer({
                 type="button"
                 aria-label="사진 지우기"
                 onClick={() => removeItem(item.key)}
-                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs leading-none"
+                // 보내는 동안 지우면 막 메시지에 묶인 첨부에 DELETE 가 간다.
+                disabled={disabled}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs leading-none disabled:opacity-50"
               >
                 ×
               </button>
@@ -272,7 +384,7 @@ export function Composer({
               return;
             }
             event.preventDefault();
-            trySend();
+            void trySend();
           }}
           disabled={disabled}
           placeholder="무엇을 도와줄까요"

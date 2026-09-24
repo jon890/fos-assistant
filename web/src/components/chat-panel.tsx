@@ -62,6 +62,14 @@ export function ChatPanel() {
   const [messagesLoading, setMessagesLoading] = useState(true);
   const loadingConversation = useRef<number | null>(null);
   const selectionVersion = useRef(0);
+  /**
+   * 사용자가 대화를 전환할 때만 올린다. `Composer` 의 `key` 로 써서 그때만 다시 만든다.
+   *
+   * <p>`conversationId` 를 그대로 key 로 쓰면 안 된다. 새 대화에서 첫 사진을 올릴 때 Composer 가 빈
+   * 대화를 만들어 `conversationId` 가 null 에서 번호로 바뀌는데, 그 순간 Composer 가 다시 만들어져
+   * 올리는 중인 사진이 사라진다.
+   */
+  const [composerGeneration, setComposerGeneration] = useState(0);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -144,6 +152,7 @@ export function ChatPanel() {
     if (loadingConversation.current !== null || sending) return;
 
     const version = ++selectionVersion.current;
+    setComposerGeneration((generation) => generation + 1);
     loadingConversation.current = conversation.id;
     setDrawerOpen(false);
     setMessagesLoading(true);
@@ -177,6 +186,7 @@ export function ChatPanel() {
   function startNewConversation() {
     if (sending) return;
     selectionVersion.current += 1;
+    setComposerGeneration((generation) => generation + 1);
     loadingConversation.current = null;
     setConversationId(null);
     setAgentCode(agents[0]?.code ?? "");
@@ -207,9 +217,10 @@ export function ChatPanel() {
     setTurns(await readPayload<Turn[]>(response));
   }
 
-  async function send(attachmentIds: number[]) {
+  /** 전송이 실제로 끝났는지를 돌려준다. `Composer` 는 이 값을 보고 실패했을 때 미리보기를 남긴다 */
+  async function send(attachmentIds: number[]): Promise<boolean> {
     const text = draft.trim();
-    if (text.length === 0 || sending || agentCode.length === 0) return;
+    if (text.length === 0 || sending || agentCode.length === 0) return false;
 
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
@@ -275,19 +286,17 @@ export function ChatPanel() {
           body: JSON.stringify(requestBody),
         });
       } catch {
-        await sendWithoutStream();
-        return;
+        return await sendWithoutStream();
       }
 
       if (!response.ok) {
         if ([404, 405, 415, 501].includes(response.status)) {
-          await sendWithoutStream();
-          return;
+          return await sendWithoutStream();
         }
         const payload = await readPayload<ErrorPayload>(response);
         restoreFailedMessage();
         setError(describeError(payload.code, payload.message));
-        return;
+        return false;
       }
 
       let done = false;
@@ -343,16 +352,20 @@ export function ChatPanel() {
         if (!done && !reportedError) {
           restoreFailedMessage();
           setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+          return false;
         }
-        return;
+        return done && !reportedError;
       }
       if (!done && !reportedError) {
         restoreFailedMessage();
         setError(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+        return false;
       }
+      return done && !reportedError;
     } catch (reason) {
       restoreFailedMessage();
       setError(reason instanceof Error ? reason.message : "요청을 보내지 못했다.");
+      return false;
     } finally {
       setSending(false);
     }
@@ -419,9 +432,10 @@ export function ChatPanel() {
           </p>
         ) : null}
         <Composer
+          key={composerGeneration}
           value={draft}
           onChange={setDraft}
-          onSend={(attachmentIds) => void send(attachmentIds)}
+          onSend={(attachmentIds) => send(attachmentIds)}
           disabled={sending || agents.length === 0}
           conversationId={conversationId}
           agentCode={agentCode}

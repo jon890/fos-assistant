@@ -62,7 +62,7 @@ function AttachmentGallery({
             data-testid="message-attachment-gone"
             className="flex h-24 w-24 items-center justify-center rounded-md border border-border bg-surface p-2 text-center text-xs text-muted"
           >
-            {describeError("ATTACHMENT_GONE", "보관 기간이 지나 볼 수 없습니다.")}
+            {describeError("ATTACHMENT_GONE", "사진을 표시할 수 없습니다.")}
           </div>
         ),
       )}

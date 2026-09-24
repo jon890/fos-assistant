@@ -29,6 +29,22 @@ export async function POST(request: Request, context: RouteContext) {
 
   const upstream = opened.response;
   const text = await upstream.text();
-  const payload = text.length > 0 ? JSON.parse(text) : null;
+  // 역방향 프록시가 413 을 HTML 로 돌려주는 등 JSON 이 아닌 응답이 올 수 있다. 그때는 그대로 던지지
+  // 않고 VALIDATION_FAILED 로 옮긴다.
+  if (upstream.status === 413) {
+    return NextResponse.json(
+      { code: "VALIDATION_FAILED", message: "사진이 너무 큽니다." },
+      { status: 400 },
+    );
+  }
+  let payload: unknown = null;
+  try {
+    payload = text.length > 0 ? JSON.parse(text) : null;
+  } catch {
+    return NextResponse.json(
+      { code: "VALIDATION_FAILED", message: "요청을 처리하지 못했습니다." },
+      { status: 400 },
+    );
+  }
   return NextResponse.json(payload, { status: upstream.status });
 }
