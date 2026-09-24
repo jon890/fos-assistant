@@ -437,16 +437,20 @@ public class ChatService {
 
     @Transactional
     public Conversation rename(CurrentUser user, Long conversationId, String title) {
-        Conversation conversation = access.requireOwn(user, conversationId);
-        conversation.rename(title);
-        return conversations.save(conversation);
+        String normalized = Conversation.normalizedTitle(title);
+        access.requireOwn(user, conversationId);
+        if (conversations.renameIfActive(conversationId, user.id(), normalized, Instant.now()) == 0) {
+            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
+        }
+        return access.requireOwn(user, conversationId);
     }
 
     @Transactional
     public void delete(CurrentUser user, Long conversationId) {
-        Conversation conversation = access.requireOwn(user, conversationId);
-        conversation.delete();
-        conversations.save(conversation);
+        access.requireOwn(user, conversationId);
+        if (conversations.deleteIfActive(conversationId, user.id(), Instant.now()) == 0) {
+            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
+        }
     }
 
     /**

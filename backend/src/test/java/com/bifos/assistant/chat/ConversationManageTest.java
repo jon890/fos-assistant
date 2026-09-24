@@ -209,14 +209,20 @@ class ConversationManageTest {
         CurrentUser dad = member("manage-dad");
         successfulAnswer();
         Long deletedId = chat.send(dad, null, "첫 질문", "manage-dad").conversationId();
+        stub().willReturn(HermesRunResult.of("run-two", "session-two", "completed", "둘째 답",
+                "example-model-large", "anthropic", TokenUsage.empty()));
         stub().beforeAwait(() -> chat.delete(dad, deletedId));
         chat.send(dad, deletedId, "이어 보내기", "manage-dad");
         assertThat(conversations.findById(deletedId).orElseThrow().deletedAt()).isNotNull();
         assertThat(conversations.findById(deletedId).orElseThrow().hermesSessionId())
-                .isEqualTo("session-one");
+                .isEqualTo("session-two");
 
+        stub().willReturn(HermesRunResult.of("run-three", "session-three", "completed", "셋째 답",
+                "example-model-large", "anthropic", TokenUsage.empty()));
         stub().beforeAwait(() -> chat.rename(dad, chat.conversationsOf(dad).getFirst().id(), "바뀐 이름"));
         Long renamedId = chat.send(dad, null, "다른 질문", "manage-dad").conversationId();
         assertThat(conversations.findById(renamedId).orElseThrow().title()).isEqualTo("바뀐 이름");
+        assertThat(conversations.findById(renamedId).orElseThrow().hermesSessionId())
+                .isEqualTo("session-three");
     }
 }

@@ -25,4 +25,21 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     @Transactional
     @Query("update Conversation c set c.title = :title where c.id = :id and c.title = ''")
     int fillTitleIfBlank(@Param("id") Long id, @Param("title") String title);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query("""
+            update Conversation c set c.title = :title, c.updatedAt = :now
+             where c.id = :id and c.userId = :userId and c.deletedAt is null
+            """)
+    int renameIfActive(@Param("id") Long id, @Param("userId") Long userId,
+            @Param("title") String title, @Param("now") Instant now);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query("""
+            update Conversation c set c.deletedAt = :now
+             where c.id = :id and c.userId = :userId and c.deletedAt is null
+            """)
+    int deleteIfActive(@Param("id") Long id, @Param("userId") Long userId, @Param("now") Instant now);
 }

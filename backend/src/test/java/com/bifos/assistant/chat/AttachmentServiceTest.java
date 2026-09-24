@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -78,6 +79,18 @@ class AttachmentServiceTest {
 
         assertThat(attachments.findByConversationIdOrderByIdAsc(theirs)).isEmpty();
         assertThat(root.resolve(String.valueOf(theirs))).doesNotExist();
+    }
+
+    @Test
+    void 지운_대화의_첨부는_올리기_읽기_지우기_모두_404이다() {
+        ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
+        conversations.deleteIfActive(mine, OWNER.id(), Instant.now());
+
+        assertCode(() -> upload(OWNER, mine, "image/png", IMAGE), ErrorCode.CONVERSATION_NOT_FOUND);
+        assertCode(() -> service.read(OWNER, mine, saved.id()), ErrorCode.CONVERSATION_NOT_FOUND);
+        assertCode(() -> service.deleteByUser(OWNER, mine, saved.id()), ErrorCode.CONVERSATION_NOT_FOUND);
+        assertThat(ErrorCode.CONVERSATION_NOT_FOUND.status().value()).isEqualTo(404);
+        assertThat(attachments.findById(saved.id()).orElseThrow().isVisible()).isTrue();
     }
 
     @Test

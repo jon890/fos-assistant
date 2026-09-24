@@ -83,19 +83,12 @@ public class Conversation {
         return deletedAt;
     }
 
-    public void rename(String title) {
+    public static String normalizedTitle(String title) {
         String normalized = title == null ? "" : title.strip();
         if (normalized.isEmpty() || normalized.length() > 200) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "conversation title must have 1 to 200 characters");
         }
-        this.title = normalized;
-        this.updatedAt = Instant.now();
-    }
-
-    public void delete() {
-        if (deletedAt == null) {
-            deletedAt = Instant.now();
-        }
+        return normalized;
     }
 
     /** 제목이 비어 있을 때만 채운다. 사진을 먼저 올리려고 만든 대화는 첫 메시지가 제목을 정한다. */
