@@ -64,8 +64,14 @@ public class ExecutionEventRecorder {
                 .eventType(type)
                 .toolName(type.isTool() ? event.toolName() : null)
                 .subagentName(type.isSubagent() ? event.toolName() : null)
+                .hermesSessionId(type.isSubagent() ? event.childSessionId() : null)
                 .durationMs(event.durationMs())
-                .detail(event.detail())
+                .failed(type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
+                        ? event.failed() : null)
+                .detail(type.isSubagent() && event.goal() != null ? event.goal() : event.detail())
+                .model(type.isSubagent() ? event.model() : null)
+                .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
+                .outputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.outputTokens() : null)
                 .occurredAt(Instant.now())
                 .build();
     }

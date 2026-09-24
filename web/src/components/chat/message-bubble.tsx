@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Markdown } from "./markdown";
 import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
+import type { ActivitySummary } from "@/lib/chat-event";
+import { ActivityBlock } from "./activity/activity-block";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -22,12 +23,13 @@ export type Turn = {
   senderName: string | null;
   createdAt?: string;
   executionId?: number | null;
-  /** 이 답이 여러 실행으로 만들어졌다. 그때만 실행 나무로 가는 길을 보인다 */
+  /** 이 답이 여러 실행으로 만들어졌는지 서버가 알려준다 */
   hasChildren?: boolean;
   /** 앞 provider 가 막혀 넘어갔으면 그 답을 만든 provider 와 모델. 아니면 null 이다 */
   switchedTo?: string | null;
   /** 이 메시지에 붙은 사진들. 지워진 것도 자리를 남기려고 담는다 */
   attachments?: MessageAttachment[];
+  activity?: ActivitySummary | null;
 };
 
 function AttachmentGallery({
@@ -73,9 +75,13 @@ function AttachmentGallery({
 export function MessageBubble({
   turn,
   conversationId,
+  onOpenSaved,
+  initialActivityExpanded,
 }: {
   turn: Turn;
   conversationId: number | null;
+  onOpenSaved(executionId: number): void;
+  initialActivityExpanded: boolean;
 }) {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const user = turn.role === "USER";
@@ -144,19 +150,15 @@ export function MessageBubble({
             </time>
           ) : null}
         </div>
+        {turn.activity && turn.executionId ? (
+          <div className="mb-2"><ActivityBlock mode="saved" summary={turn.activity} executionId={turn.executionId}
+            initialExpanded={initialActivityExpanded}
+            onOpenPanel={() => onOpenSaved(turn.executionId!)} /></div>
+        ) : null}
         <div className="leading-7">
           <Markdown>{turn.content}</Markdown>
         </div>
         <AttachmentGallery conversationId={conversationId} attachments={attachments} />
-        {turn.hasChildren && turn.executionId ? (
-          <Link
-            href={`/executions/${turn.executionId}`}
-            data-testid="flow-tree-link"
-            className="mt-2 inline-block text-xs text-muted underline underline-offset-4"
-          >
-            이 답이 어떻게 만들어졌는지 보기
-          </Link>
-        ) : null}
       </div>
     </li>
   );

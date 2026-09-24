@@ -57,8 +57,20 @@ public class ExecutionEvent {
     @Column(name = "duration_ms")
     private Long durationMs;
 
+    @Column(name = "failed")
+    private Boolean failed;
+
     @Column(name = "detail", length = DETAIL_LIMIT)
     private String detail;
+
+    @Column(name = "model", length = 128)
+    private String model;
+
+    @Column(name = "input_tokens")
+    private Long inputTokens;
+
+    @Column(name = "output_tokens")
+    private Long outputTokens;
 
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
@@ -71,7 +83,11 @@ public class ExecutionEvent {
         this.subagentName = builder.subagentName;
         this.hermesSessionId = builder.hermesSessionId;
         this.durationMs = builder.durationMs;
+        this.failed = builder.failed;
         this.detail = builder.detail;
+        this.model = builder.model;
+        this.inputTokens = builder.inputTokens;
+        this.outputTokens = builder.outputTokens;
         this.occurredAt = builder.occurredAt;
     }
 
@@ -111,8 +127,24 @@ public class ExecutionEvent {
         return durationMs;
     }
 
+    public Boolean failed() {
+        return failed;
+    }
+
     public String detail() {
         return detail;
+    }
+
+    public String model() {
+        return model;
+    }
+
+    public Long inputTokens() {
+        return inputTokens;
+    }
+
+    public Long outputTokens() {
+        return outputTokens;
     }
 
     public Instant occurredAt() {
@@ -127,7 +159,11 @@ public class ExecutionEvent {
         private String subagentName;
         private String hermesSessionId;
         private Long durationMs;
+        private Boolean failed;
         private String detail;
+        private String model;
+        private Long inputTokens;
+        private Long outputTokens;
         private Instant occurredAt;
 
         public Builder executionId(Long executionId) {
@@ -165,12 +201,32 @@ public class ExecutionEvent {
             return this;
         }
 
+        public Builder failed(Boolean failed) {
+            this.failed = failed;
+            return this;
+        }
+
         /** 길이가 넘으면 자른다. 잘랐다는 표시는 남기지 않는다. */
         public Builder detail(String detail) {
             this.detail =
                     detail == null || detail.length() <= DETAIL_LIMIT
                             ? detail
                             : detail.substring(0, DETAIL_LIMIT);
+            return this;
+        }
+
+        public Builder model(String model) {
+            this.model = model;
+            return this;
+        }
+
+        public Builder inputTokens(Long inputTokens) {
+            this.inputTokens = inputTokens;
+            return this;
+        }
+
+        public Builder outputTokens(Long outputTokens) {
+            this.outputTokens = outputTokens;
             return this;
         }
 

@@ -34,6 +34,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);
 
+    /** 여러 답의 자손 실행을 한 번에 읽는다. */
+    List<AgentExecution> findByRootExecutionIdIn(Collection<Long> rootExecutionIds);
+
     /** 이 번호들 중 자식을 가진 것만 낸다. 목록이 실행마다 세지 않게 한 번에 읽는다. */
     @Query("""
             select distinct e.parentExecutionId from AgentExecution e

@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -144,6 +145,7 @@ public class ChatController {
         List<ChatMessage> history = chat.history(user, conversationId);
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
+        Map<Long, ActivitySummary> activity = chat.activitySummaries(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, conversationId);
         return history.stream()
                 .map(
@@ -160,7 +162,8 @@ public class ChatController {
                                         it.createdAt(),
                                         attached.getOrDefault(it.id(), List.of()).stream()
                                                 .map(AttachmentView::from)
-                                                .toList()))
+                                                .toList(),
+                                        it.executionId() == null ? null : activity.get(it.executionId())))
                 .toList();
     }
 }

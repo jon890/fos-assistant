@@ -31,6 +31,7 @@ import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,7 @@ class MemoryProposerTest {
     @Autowired AgentRepository agents;
     @Autowired ConversationRepository conversations;
     @Autowired AgentExecutionRepository executions;
+    @Autowired ExecutionEventRepository executionEvents;
     @Autowired MemoryRepository memories;
     @Autowired HermesRunsClient hermes;
     @Autowired AgentModelSelector modelSelector;
@@ -91,6 +93,8 @@ class MemoryProposerTest {
             assertThat(child.parentExecutionId()).isEqualTo(parent.id());
             assertThat(child.rootExecutionId()).isEqualTo(parent.id());
             assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+            assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
+                    java.util.List.of(child.id()))).isEmpty();
         });
     }
 

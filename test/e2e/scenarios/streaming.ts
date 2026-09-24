@@ -4,14 +4,19 @@ import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { DAD_BINDING } from "./binding.ts";
 
 type ChatEvent = {
-  type: "delta" | "tool" | "done" | "error";
+  type: "delta" | "tool" | "subagent" | "done" | "error";
   text?: string;
+  goal?: string;
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
   conversationId?: number;
   messageId?: number;
   executionId?: number;
 };
 
-type Message = { id: number; role: "USER" | "ASSISTANT"; content: string; executionId: number | null };
+type Message = { id: number; role: "USER" | "ASSISTANT"; content: string; executionId: number | null;
+  activity: { toolCount: number; subagentCount: number; durationMs: number | null } | null };
 type Execution = { id: number; conversationId: number; status: string };
 
 type ExecutionEventView = {
@@ -19,6 +24,9 @@ type ExecutionEventView = {
   eventType: string;
   toolName: string | null;
   subagentName: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
 };
 type ExecutionNode = {
   truncated: boolean;
@@ -38,7 +46,8 @@ async function events(response: Response): Promise<ChatEvent[]> {
   return received;
 }
 
-async function assertSaved(context: Parameters<Scenario["run"]>[0], done: ChatEvent, expected: string) {
+async function assertSaved(context: Parameters<Scenario["run"]>[0], done: ChatEvent, expected: string,
+  withActivity = false) {
   expect(done.conversationId !== undefined, "done 에 대화 번호가 없다");
   const messages = expectStatus(
     await call(context, `/chat/conversations/${done.conversationId}/messages`, {
@@ -50,6 +59,10 @@ async function assertSaved(context: Parameters<Scenario["run"]>[0], done: ChatEv
   const assistant = messages.find((message) => message.id === done.messageId);
   expect(assistant?.content === expected, `최종 상태의 답이 저장되지 않았다: ${assistant?.content}`);
   expect(assistant?.executionId === done.executionId, "저장된 메시지와 실행 기록이 연결되지 않았다");
+  if (withActivity) {
+    expect(assistant?.activity?.toolCount === 2, "답의 도구 수가 다르다");
+    expect((assistant?.activity?.subagentCount ?? 0) >= 1, "답의 하위 에이전트 수가 없다");
+  }
 
   const executions = expectStatus(
     await call(context, "/usage/executions?limit=20", { token: context.tokens.dad }),
@@ -83,8 +96,8 @@ export const streamingScenario: Scenario = {
     const received = await events(response);
     expect(received.filter((item) => item.type === "delta").length === 2, "delta 두 개를 받지 못했다");
     // 가짜 Hermes 가 도구 쌍 둘과 하위 에이전트 쌍 하나를 보낸다.
-    // Control Plane 이 `tool.` 과 `subagent.` 를 둘 다 `tool` 로 중계하므로 여섯이 된다.
-    expect(received.filter((item) => item.type === "tool").length === 6, "도구 사건을 받지 못했다");
+    expect(received.filter((item) => item.type === "tool").length === 4, "도구 사건을 받지 못했다");
+    expect(received.filter((item) => item.type === "subagent").length === 2, "하위 에이전트 사건을 받지 못했다");
     expect(received.every((item) => item.type !== (":" as ChatEvent["type"])), "keepalive 가 사건에 섞였다");
     const done = received.at(-1);
     expect(done?.type === "done", `마지막 사건이 done 이 아니다: ${JSON.stringify(done)}`);
@@ -92,7 +105,26 @@ export const streamingScenario: Scenario = {
     const streamed = received.filter((item) => item.type === "delta").map((item) => item.text).join("");
     const saved = `[fake hermes on profile ${DAD_BINDING.profileName}] ${question}`;
     expect(streamed !== saved, "스트림 조각과 저장할 답이 달라야 검사가 성립한다");
-    await assertSaved(context, done!, saved);
+    await assertSaved(context, done!, saved, true);
+
+    step("하위 에이전트의 목표와 모델과 토큰을 중계하고 저장한다");
+    const rich = await events(expectStatus(
+      await call(context, "/chat/messages/stream", {
+        method: "POST", token: context.tokens.dad,
+        body: { text: "하위 에이전트 칸 검사", agentCode: "dad" },
+      }), 200, "하위 에이전트 스트림",
+    ));
+    const completed = rich.filter((item) => item.type === "subagent").at(-1);
+    expect(completed?.goal === "숙소 후보를 조사한다", "하위 에이전트 목표가 중계되지 않았다");
+    expect(completed?.model === "z-ai/glm-5.2", "하위 에이전트 모델이 중계되지 않았다");
+    expect(completed?.inputTokens === 12300 && completed.outputTokens === 410, "하위 에이전트 토큰이 중계되지 않았다");
+    const richDone = rich.at(-1)!;
+    const richTree = expectStatus(await call(context, `/usage/executions/${richDone.executionId}/tree`, {
+      token: context.tokens.dad,
+    }), 200, "하위 에이전트 실행 나무").json<ExecutionTree>();
+    const savedSubagent = richTree.root.events.find((item) => item.eventType === "SUBAGENT_COMPLETED");
+    expect(savedSubagent?.model === "z-ai/glm-5.2", "하위 에이전트 모델이 저장되지 않았다");
+    expect(savedSubagent?.inputTokens === 12300 && savedSubagent.outputTokens === 410, "하위 에이전트 토큰이 저장되지 않았다");
 
     step("Hermes 이벤트 스트림이 중간에 끝나도 최종 답과 실행 기록을 남긴다");
     const interrupted = await events(expectStatus(

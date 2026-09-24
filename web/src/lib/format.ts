@@ -12,6 +12,13 @@ export function formatDuration(milliseconds: number): string {
   })}초`;
 }
 
+/** 긴 작업의 흐른 시간을 초 단위로 보인다. */
+export function formatElapsed(milliseconds: number): string {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1_000));
+  const minutes = Math.floor(seconds / 60);
+  return minutes === 0 ? `${seconds}초` : `${minutes}분 ${seconds % 60}초`;
+}
+
 /** 마이크로 단위 정수를 통화 금액으로 보인다. 한 번의 실행이 1센트 아래라서 네 자리까지 적는다. */
 export function formatAmount(micros: number, currency: string | null): string {
   const amount = (micros / 1_000_000).toLocaleString("ko-KR", {

@@ -161,7 +161,9 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(): void; que
       )}
       <dialog ref={dialogRef} aria-label="대화 지우기"
         onCancel={(event) => { event.preventDefault(); event.stopPropagation(); closeDialog(); }}
-        onKeyDown={(event) => { if (event.key === "Escape") event.stopPropagation(); }}
+        onKeyDown={(event) => { if (event.key === "Escape") {
+          event.preventDefault(); event.stopPropagation(); closeDialog();
+        } }}
         className="m-auto max-w-[calc(100%-2rem)] rounded-lg border border-border bg-background p-6 text-foreground shadow-xl backdrop:bg-foreground/40">
         <p className="mb-5 text-sm">{deleteTarget?.title || "새 대화"} 를 목록에서 지운다. 사용량 기록은 남는다.</p>
         <div className="flex justify-end gap-2">

@@ -485,13 +485,30 @@ export function startFakeHermes(
             }
           }
           event(response, { event: "tool.started", tool: "fake-tool", preview: "started" });
-          event(response, { event: "tool.completed", tool: "fake-tool", duration: 0.1, error: false });
+          event(response, { event: "tool.completed", tool: "fake-tool", duration: 0.1,
+            error: run.input === "병렬 하위 에이전트 검사" });
           event(response, { event: "tool.started", tool: "fake-reader", preview: "started" });
           event(response, { event: "tool.completed", tool: "fake-reader", duration: 0.25, error: false });
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
           // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
-          event(response, { event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다" });
-          event(response, { event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다" });
+          if (run.input === "병렬 하위 에이전트 검사") {
+            const first = { goal: "첫째 조사", child_session_id: "child-first" };
+            const second = { goal: "둘째 조사", child_session_id: "child-second" };
+            event(response, { event: "subagent.start", ...first });
+            event(response, { event: "subagent.start", ...second });
+            event(response, { event: "subagent.complete", ...second, model: "model-second",
+              status: "completed", duration_seconds: 2, input_tokens: 200, output_tokens: 20 });
+            event(response, { event: "subagent.complete", ...first, model: "model-first",
+              status: "completed", duration_seconds: 1, input_tokens: 100, output_tokens: 10 });
+          } else if (run.input === "하위 에이전트 칸 검사") {
+            const subagent = { subagent_id: "sa-1", goal: "숙소 후보를 조사한다", model: "z-ai/glm-5.2", child_session_id: "child-1" };
+            event(response, { event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다", ...subagent });
+            event(response, { event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다", ...subagent,
+              status: "completed", duration_seconds: 1.5, input_tokens: 12300, output_tokens: 410 });
+          } else {
+            event(response, { event: "subagent.start", preview: "하위 에이전트가 찾기 시작했다" });
+            event(response, { event: "subagent.complete", preview: "하위 에이전트가 찾기를 마쳤다" });
+          }
           event(response, { event: "run.completed" });
           response.end();
           return;

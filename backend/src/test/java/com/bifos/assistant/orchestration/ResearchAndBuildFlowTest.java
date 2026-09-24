@@ -214,6 +214,12 @@ class ResearchAndBuildFlowTest {
                     assertThat(child.parentExecutionId()).isEqualTo(chief.id());
                     assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
                 });
+        var summary = chat.activitySummaries(chat.history(dad, turn.conversationId())).get(chief.id());
+        assertThat(summary.subagentCount()).isEqualTo(3);
+        assertThat(summary.durationMs()).isGreaterThan(chief.latencyMs());
+        assertThat(summary.durationMs()).isEqualTo(all.stream()
+                .map(AgentExecution::finishedAt).filter(Objects::nonNull)
+                .max(Instant::compareTo).orElseThrow().toEpochMilli() - chief.startedAt().toEpochMilli());
     }
 
     @Test

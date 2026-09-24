@@ -6,11 +6,13 @@ import Link from "next/link";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
 import { MessageList } from "./chat/message-list";
-import type { FlowStepStates } from "./chat/flow-progress";
+import { applyChatEvent, emptyActivity, failActivity, type ActivityState } from "./chat/activity/activity-state";
+import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
 import { useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
+import type { ChatEvent } from "@/lib/chat-event";
 
 type Agent = {
   code: string;
@@ -20,20 +22,6 @@ type Agent = {
   acceptsAttachments: boolean;
 };
 type ErrorPayload = { code: string; message: string };
-type ChatEvent = {
-  type: "started" | "delta" | "tool" | "step" | "switched" | "reset" | "done" | "error";
-  text?: string | null;
-  toolName?: string | null;
-  detail?: string | null;
-  conversationId?: number | null;
-  messageId?: number | null;
-  executionId?: number | null;
-  code?: string | null;
-  message?: string | null;
-  stepName?: string | null;
-  stepState?: "started" | "completed" | "failed" | null;
-};
-
 async function readPayload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
@@ -54,8 +42,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const conversationIdRef = useRef<number | null>(initialConversationId);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [toolEvents, setToolEvents] = useState<string[]>([]);
-  const [flowSteps, setFlowSteps] = useState<FlowStepStates | null>(null);
+  const [activity, setActivity] = useState<ActivityState | null>(null);
+  const [liveExpanded, setLiveExpanded] = useState(false);
+  const liveExpandedRef = useRef(false);
+  const [expandedOnDone, setExpandedOnDone] = useState<{ executionId: number; expanded: boolean } | null>(null);
+  const [panelTarget, setPanelTarget] = useState<ActivityPanelTarget | null>(null);
+  const currentExecutionId = useRef<number | null>(null);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
@@ -95,6 +87,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setError(null);
     setTurnError(null);
     setTurns([]);
+    setActivity(null);
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
+    setPanelTarget(null);
+    currentExecutionId.current = null;
     setComposerGeneration((generation) => generation + 1);
     void (async () => {
       try {
@@ -144,18 +142,22 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
-      // 더 안쪽의 화면과 중지 동작이 추가될 때 이 처리기에서 우선순위를 정한다.
+      if (panelTarget) {
+        event.preventDefault();
+        setPanelTarget(null);
+      }
+      // 중지 동작이 생기면 패널 처리 뒤에 둔다.
     };
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
-  }, []);
+  }, [panelTarget]);
 
   /**
    * 흐름이 시작되고 2분이 지나면 한 번 알린다.
    *
    * <p>첫 단계 사건이 올 때 재기 시작한다. 그전에는 이 turn 이 흐름인지 알 수 없다.
    */
-  const flowActive = flowSteps !== null;
+  const flowActive = activity?.items.some((item) => item.kind === "step") ?? false;
 
   useEffect(() => {
     if (!flowActive || flowIsSlow) return;
@@ -172,8 +174,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setConversationId(null);
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
-    setToolEvents([]);
-    setFlowSteps(null);
+    setActivity(null);
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
+    setPanelTarget(null);
+    currentExecutionId.current = null;
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
@@ -205,9 +211,19 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setError(null);
     setTurnError(null);
     setDraft("");
-    setToolEvents([]);
-    setFlowSteps(null);
+    setActivity(emptyActivity(Date.now()));
+    setLiveExpanded(false);
+    liveExpandedRef.current = false;
+    setExpandedOnDone(null);
+    currentExecutionId.current = null;
     setFlowIsSlow(false);
+    const finishFailedActivity = () => {
+      if (selectionVersion.current !== version) return;
+      setActivity((previous) => previous && failActivity(previous, Date.now()));
+      setLiveExpanded(false);
+      liveExpandedRef.current = false;
+      setFlowIsSlow(false);
+    };
     setTurns((previous) => [
       ...previous,
       { id: pendingId, role: "USER", content: text, senderName: null },
@@ -291,6 +307,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           if (selectionVersion.current !== version) return;
           if (streamEvent.type === "started" && streamEvent.conversationId) {
             started = true;
+            currentExecutionId.current = streamEvent.executionId ?? null;
             if (conversationIdRef.current === null) {
               window.history.replaceState(null, "", `/c/${streamEvent.conversationId}`);
             }
@@ -312,33 +329,31 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
                   : turn,
               );
             });
-          } else if (streamEvent.type === "step" && streamEvent.stepName && streamEvent.stepState) {
-            const name = streamEvent.stepName;
-            const state = streamEvent.stepState;
-            setFlowSteps((previous) => ({ ...(previous ?? {}), [name]: state }));
           } else if (streamEvent.type === "reset") {
             // 막혀서 넘어간 시도의 조각이다. 화면에 남으면 읽는 사람이 그것을 답으로 읽는다.
             setTurns((previous) => previous.filter((turn) => turn.id !== assistantPendingId));
-            setToolEvents([]);
-          } else if (streamEvent.type === "switched") {
-            setToolEvents((previous) => [...previous, `여기부터 ${streamEvent.text ?? ""} 로 돈다`]);
-          } else if (streamEvent.type === "tool") {
-            const name = streamEvent.toolName ?? "도구";
-            const status = streamEvent.detail ?? "진행 중";
-            setToolEvents((previous) => [...previous, `${name}: ${status}`]);
-          } else if (streamEvent.type === "done" && streamEvent.conversationId) {
+            setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
+          } else if (["tool", "subagent", "step", "switched"].includes(streamEvent.type)) {
+            setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
+          } else if ((streamEvent.type === "done" || streamEvent.type === "stopped") && streamEvent.conversationId) {
             done = true;
+            const finishedExecutionId = streamEvent.executionId ?? currentExecutionId.current;
+            if (finishedExecutionId !== null) {
+              setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
+              setPanelTarget((previous) => previous?.mode === "live"
+                ? { mode: "saved", executionId: finishedExecutionId } : previous);
+            }
             conversationIdRef.current = streamEvent.conversationId;
             setConversationId(streamEvent.conversationId);
             await Promise.all([
               refresh(),
               refreshMessages(streamEvent.conversationId, version),
             ]);
-            setToolEvents([]);
-            setFlowSteps(null);
+            setActivity(null);
             setFlowIsSlow(false);
           } else if (streamEvent.type === "error") {
             reportedError = true;
+            finishFailedActivity();
             const message = describeError(streamEvent.code ?? "INTERNAL_ERROR", streamEvent.message ?? "요청을 처리하지 못했다.");
             if (started && conversationIdRef.current !== null) {
               await refreshMessages(conversationIdRef.current, version);
@@ -351,6 +366,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         });
       } catch {
         if (!done && !reportedError) {
+          finishFailedActivity();
           const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
           if (started && conversationIdRef.current !== null) {
             await refreshMessages(conversationIdRef.current, version).catch(() => {});
@@ -364,6 +380,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         return started || done;
       }
       if (!done && !reportedError) {
+        finishFailedActivity();
         const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
         if (started && conversationIdRef.current !== null) {
           await refreshMessages(conversationIdRef.current, version).catch(() => {});
@@ -376,6 +393,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       }
       return started || done;
     } catch (reason) {
+      finishFailedActivity();
       restoreFailedMessage();
       setError(reason instanceof Error ? reason.message : "요청을 보내지 못했다.");
       return false;
@@ -398,7 +416,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   }
 
   return (
-    <section className="flex h-full min-h-0 min-w-0">
+    <section className="relative flex h-full min-h-0 min-w-0">
       <h1 className="sr-only">대화</h1>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
@@ -428,11 +446,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           turns={turns}
           loading={messagesLoading}
           sending={sending}
-          toolEvents={toolEvents}
+          activity={activity}
           conversationId={conversationId}
-          flowSteps={flowSteps}
           flowIsSlow={flowIsSlow}
+          liveExpanded={liveExpanded}
+          onLiveExpandedChange={(value) => { liveExpandedRef.current = value; setLiveExpanded(value); }}
+          expandedOnDone={expandedOnDone}
           turnError={turnError}
+          onOpenSaved={(executionId) => setPanelTarget({ mode: "saved", executionId })}
+          onOpenLive={() => { if (activity) setPanelTarget({ mode: "live", state: activity }); }}
         />
 
         {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}
@@ -460,6 +482,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           }}
         />
       </div>
+      {panelTarget ? <ActivityPanel target={panelTarget.mode === "live" && activity
+        ? { mode: "live", state: activity } : panelTarget} onClose={() => setPanelTarget(null)} /> : null}
     </section>
   );
 }

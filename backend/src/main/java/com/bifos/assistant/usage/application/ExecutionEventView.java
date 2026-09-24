@@ -14,8 +14,13 @@ public record ExecutionEventView(
         String eventType,
         String toolName,
         String subagentName,
+        String hermesSessionId,
         Long durationMs,
+        Boolean failed,
         String detail,
+        String model,
+        Long inputTokens,
+        Long outputTokens,
         Instant occurredAt) {
 
     static ExecutionEventView from(ExecutionEvent event) {
@@ -24,8 +29,13 @@ public record ExecutionEventView(
                 event.eventType().name(),
                 event.toolName(),
                 event.subagentName(),
+                event.hermesSessionId(),
                 event.durationMs(),
+                event.failed(),
                 event.detail(),
+                event.model(),
+                event.inputTokens(),
+                event.outputTokens(),
                 event.occurredAt());
     }
 }

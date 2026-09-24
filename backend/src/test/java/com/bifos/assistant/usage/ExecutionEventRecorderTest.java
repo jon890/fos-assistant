@@ -50,6 +50,7 @@ class ExecutionEventRecorderTest {
         assertThat(event.detail()).isEqualTo("started");
         assertThat(event.sequence()).isEqualTo(1);
         assertThat(event.hermesSessionId()).isNull();
+        assertThat(event.failed()).isNull();
     }
 
     @Test
@@ -60,6 +61,7 @@ class ExecutionEventRecorderTest {
         assertThat(event.eventType()).isEqualTo(ExecutionEventType.TOOL_COMPLETED);
         assertThat(event.toolName()).isEqualTo("web_search");
         assertThat(event.durationMs()).isEqualTo(1500L);
+        assertThat(event.failed()).isFalse();
     }
 
     @Test
@@ -79,6 +81,26 @@ class ExecutionEventRecorderTest {
 
         assertThat(event.subagentName()).isEqualTo("researcher");
         assertThat(event.toolName()).isNull();
+    }
+
+    @Test
+    void 하위_에이전트의_목표와_session과_모델과_토큰만_옮긴다() {
+        RunEvent completed = new RunEvent("subagent.complete", null, "researcher", "preview", 1500L,
+                false, "sa-1", "숙소 조사", "model-a", "child-1", 123L, 45L, "completed");
+        ExecutionEvent event = record(completed);
+
+        assertThat(event.detail()).isEqualTo("숙소 조사");
+        assertThat(event.hermesSessionId()).isEqualTo("child-1");
+        assertThat(event.model()).isEqualTo("model-a");
+        assertThat(event.inputTokens()).isEqualTo(123L);
+        assertThat(event.outputTokens()).isEqualTo(45L);
+        assertThat(event.failed()).isFalse();
+        assertThat(record(hermes("subagent.start", null, "preview")).detail()).isEqualTo("preview");
+        ExecutionEvent tool = record(new RunEvent("tool.completed", null, "search", "preview", 1L, false,
+                "sa-1", "숙소 조사", "model-a", "child-1", 123L, 45L, "completed"));
+        assertThat(tool.model()).isNull();
+        assertThat(tool.inputTokens()).isNull();
+        assertThat(tool.hermesSessionId()).isNull();
     }
 
     /**
@@ -105,6 +127,13 @@ class ExecutionEventRecorderTest {
     void 글자_조각과_추론_사건은_저장하지_않는다() {
         assertThat(record(new RunEvent("message.delta", "안녕", null, null, null, null))).isNull();
         assertThat(record(new RunEvent("reasoning.available", "생각", null, null, null, null))).isNull();
+    }
+
+    @Test
+    void 실패한_도구의_완료_사건은_실패로_저장한다() {
+        ExecutionEvent event = record(new RunEvent("tool.completed", null, "search", "실패", 5L, true));
+
+        assertThat(event.failed()).isTrue();
     }
 
     @Test
