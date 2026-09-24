@@ -29,6 +29,7 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   const [collapsed, setCollapsed] = useState(false);
   const [title, setTitle] = useState("우리집 비서");
   const searchRef = useRef<HTMLInputElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     try { setCollapsed(localStorage.getItem("sidebar-collapsed") === "1"); } catch { /* 저장소를 막은 브라우저에서도 화면을 연다. */ }
@@ -56,14 +57,16 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
     document.body.style.overflow = "hidden";
     const close = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+      // 메뉴·입력칸·확인 창은 Esc 를 직접 처리한다. 서랍은 그 밖에서 먼저 받는다.
+      if (sidebarRef.current?.querySelector('[role="menu"], input[aria-label="대화 이름"], dialog[open]')) return;
       event.preventDefault();
       event.stopPropagation();
       setDrawerOpen(false);
     };
-    window.addEventListener("keydown", close);
+    window.addEventListener("keydown", close, true);
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", close);
+      window.removeEventListener("keydown", close, true);
     };
   }, [drawerOpen]);
 
@@ -77,7 +80,7 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
         <button type="button" aria-label="사이드바 닫기" onClick={() => setDrawerOpen(false)}
           tabIndex={drawerOpen ? 0 : -1}
           className={`fixed inset-0 z-30 bg-foreground/35 md:hidden ${drawerOpen ? "" : "pointer-events-none opacity-0"}`} />
-        <aside aria-label="사이드바"
+        <aside ref={sidebarRef} aria-label="사이드바"
           className={`fixed inset-y-0 left-0 z-40 w-72 shrink-0 border-r border-border bg-surface transition-transform md:static md:translate-x-0 ${collapsed ? "md:hidden" : "md:w-64"} ${
             drawerOpen ? "translate-x-0" : "-translate-x-full"
           }`}>

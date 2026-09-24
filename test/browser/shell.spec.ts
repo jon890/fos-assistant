@@ -88,9 +88,14 @@ test("사진을 먼저 올려 번호가 생겨도 미리보기가 남고 다른 
   expect(first.ok()).toBeTruthy();
   const firstId = ((await first.json()) as { conversationId: number }).conversationId;
   await page.reload();
+  const uploaded = page.waitForResponse((response) => response.request().method() === "POST"
+    && /\/api\/chat\/conversations\/\d+\/attachments$/.test(response.url()));
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "shell.png", mimeType: "image/png", buffer: PNG_1X1 },
   ]);
+  const uploadedResponse = await uploaded;
+  expect(uploadedResponse.ok()).toBeTruthy();
+  const attachmentId = ((await uploadedResponse.json()) as { id: number }).id;
   await expect(page).toHaveURL(/\/c\/\d+$/);
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
   await expect(page.getByTestId("attachment-previews")).toBeVisible();
@@ -99,15 +104,62 @@ test("사진을 먼저 올려 번호가 생겨도 미리보기가 남고 다른 
   expect(listed.ok()).toBeTruthy();
   expect((await listed.json() as { id: number; title: string }[])
     .some((item) => item.id === uploadedId && item.title === "")).toBeTruthy();
+  await openSidebar(page, testInfo);
+  await expect(conversationNav(page).locator(`a[href="/c/${uploadedId}"]`)).toHaveText("새 대화");
 
   const deleted = page.waitForResponse((response) =>
     response.request().method() === "DELETE"
     && new RegExp(`/api/chat/conversations/${uploadedId}/attachments/\\d+$`).test(response.url()));
-  await openSidebar(page, testInfo);
-  await page.getByRole("navigation", { name: "대화 목록" })
-    .locator(`a[href="/c/${firstId}"]`).click();
-  await deleted;
+  await conversationNav(page).locator(`a[href="/c/${firstId}"]`).click();
+  expect((await deleted).status()).toBe(204);
   await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
+  const afterDelete = await page.request.get(`/api/chat/conversations/${uploadedId}/attachments/${attachmentId}`);
+  expect(afterDelete.status()).toBe(410);
+});
+
+test("사진을 먼저 올리고 보내면 같은 대화에 첫 메시지와 제목이 남는다", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const title = `사진 첫 메시지 ${testInfo.project.name} ${Date.now()}`;
+  await page.getByTestId("attachment-input").setInputFiles([
+    { name: "shell.png", mimeType: "image/png", buffer: PNG_1X1 },
+  ]);
+  await expect(page).toHaveURL(/\/c\/\d+$/);
+  await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  const id = Number(page.url().match(/\/c\/(\d+)$/)?.[1]);
+  await openSidebar(page, testInfo);
+  await expect(conversationNav(page).locator(`a[href="/c/${id}"]`)).toHaveText("새 대화");
+  if (testInfo.project.name === "mobile") {
+    await page.keyboard.press("Escape");
+  }
+  const before = await page.request.get("/api/chat/conversations");
+  expect(before.ok()).toBeTruthy();
+  const beforeCount = (await before.json() as { id: number }[]).length;
+  await send(page, title);
+  await expect(page).toHaveURL(new RegExp(`/c/${id}$`));
+  await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
+  await openSidebar(page, testInfo);
+  await expect(conversationNav(page).locator(`a[href="/c/${id}"]`)).toHaveText(title);
+  const after = await page.request.get("/api/chat/conversations");
+  expect(after.ok()).toBeTruthy();
+  expect((await after.json() as { id: number }[]).length).toBe(beforeCount);
+});
+
+test("사진을 올린 뒤 같은 대화 링크를 눌러도 미리보기와 파일이 남는다", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const uploaded = page.waitForResponse((response) => response.request().method() === "POST"
+    && /\/api\/chat\/conversations\/\d+\/attachments$/.test(response.url()));
+  await page.getByTestId("attachment-input").setInputFiles([
+    { name: "shell.png", mimeType: "image/png", buffer: PNG_1X1 },
+  ]);
+  const attachmentId = ((await (await uploaded).json()) as { id: number }).id;
+  await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  const id = Number(page.url().match(/\/c\/(\d+)$/)?.[1]);
+  await openSidebar(page, testInfo);
+  await conversationNav(page).locator(`a[href="/c/${id}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`/c/${id}$`));
+  await expect(page.getByTestId("attachment-previews")).toBeVisible();
+  const file = await page.request.get(`/api/chat/conversations/${id}/attachments/${attachmentId}`);
+  expect(file.status()).toBe(200);
 });
 
 test("서랍은 Esc 한 번에 닫힌다", async ({ page }, testInfo) => {
@@ -118,6 +170,22 @@ test("서랍은 Esc 한 번에 닫힌다", async ({ page }, testInfo) => {
   await expect.poll(async () => (await sidebar.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
   await page.keyboard.press("Escape");
   await expect.poll(async () => (await sidebar.boundingBox())?.x ?? 0).toBeLessThan(0);
+});
+
+test("서랍의 Esc 는 대화 화면의 버블 처리기보다 먼저 돈다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile");
+  await page.goto("/");
+  await page.evaluate(() => {
+    (window as Window & { escapeReachedChat?: boolean }).escapeReachedChat = false;
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") (window as Window & { escapeReachedChat?: boolean }).escapeReachedChat = true;
+    });
+  });
+  await openSidebar(page, testInfo);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await page.getByRole("complementary", { name: "사이드바" }).boundingBox())?.x ?? 0)
+    .toBeLessThan(0);
+  expect(await page.evaluate(() => (window as Window & { escapeReachedChat?: boolean }).escapeReachedChat)).toBe(false);
 });
 
 test("started 뒤 실패하면 입력은 비고 저장된 질문은 하나다", async ({ page }) => {
@@ -275,4 +343,26 @@ test("모바일 이름 입력과 지우기 창의 Esc 는 서랍을 닫지 않�
   await expect(page.getByRole("complementary", { name: "사이드바" })).toBeInViewport();
   await expect(page).toHaveURL(new RegExp(`/c/${id}$`));
   await expect(nav.getByRole("button", { name: `${title} 메뉴` })).toBeFocused();
+});
+
+test("대화 메뉴는 Esc 와 바깥 클릭으로 닫히고 서랍은 유지한다", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const title = `메뉴 닫기 ${testInfo.project.name} ${Date.now()}`;
+  const id = await createConversation(page, title);
+  await page.goto(`/c/${id}`);
+  await openSidebar(page, testInfo);
+  const nav = conversationNav(page);
+  const menuButton = nav.getByRole("button", { name: `${title} 메뉴` });
+  await menuButton.click();
+  await expect(nav.getByRole("menu", { name: `${title} 메뉴` })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(nav.getByRole("menu", { name: `${title} 메뉴` })).toHaveCount(0);
+  await expect(menuButton).toBeFocused();
+  if (testInfo.project.name === "mobile") {
+    await expect(page.getByRole("complementary", { name: "사이드바" })).toBeInViewport();
+  }
+  await menuButton.click();
+  await page.getByRole("searchbox", { name: "대화 검색" }).click();
+  await expect(nav.getByRole("menu", { name: `${title} 메뉴` })).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`/c/${id}$`));
 });

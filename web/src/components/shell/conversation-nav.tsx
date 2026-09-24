@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConversations, type Conversation } from "./conversations-provider";
 import { groupByDate } from "./group-by-date";
@@ -22,6 +22,29 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(): void; que
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const visible = conversations.filter((item) =>
     (item.title || "새 대화").toLocaleLowerCase("ko-KR").includes(normalizedQuery));
+
+  useEffect(() => {
+    if (openMenu === null) return;
+    const closeOutside = (event: PointerEvent) => {
+      const row = menuButtons.current.get(openMenu)?.parentElement;
+      if (event.target instanceof Node && !row?.contains(event.target)) setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [openMenu]);
+
+  useEffect(() => {
+    if (openMenu === null) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+      event.preventDefault();
+      event.stopPropagation();
+      menuButtons.current.get(openMenu)?.focus();
+      setOpenMenu(null);
+    };
+    window.addEventListener("keydown", closeOnEscape, true);
+    return () => window.removeEventListener("keydown", closeOnEscape, true);
+  }, [openMenu]);
 
   function beginEdit(conversation: Conversation) {
     setOpenMenu(null);
@@ -104,7 +127,11 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(): void; que
                       }}
                       className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-2 text-sm" />
                   ) : (
-                    <Link href={`/c/${conversation.id}`} onClick={onNavigate}
+                    <Link href={`/c/${conversation.id}`} onClick={(event) => {
+                      // 사진을 먼저 올리며 주소만 바뀐 경우 같은 대화로 다시 이동하지 않는다.
+                      if (window.location.pathname === `/c/${conversation.id}`) event.preventDefault();
+                      onNavigate();
+                    }}
                       aria-current={pathname === `/c/${conversation.id}` ? "page" : undefined}
                       className={`min-w-0 flex-1 truncate rounded-md px-2 py-2 text-sm hover:bg-surface-raised ${
                         pathname === `/c/${conversation.id}` ? "bg-surface-raised font-medium" : ""
