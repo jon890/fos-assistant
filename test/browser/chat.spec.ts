@@ -166,7 +166,7 @@ test("막혀서 넘어가면 그 답 위에 넘어간 곳을 한 줄로 알린�
     data: {
       models: [
         { provider: blockedProvider, model: "blocked-model" },
-        { provider: "openai-codex", model: "gpt-5.6-sol" },
+        { provider: "openai-codex", model: "example-model" },
       ],
     },
   });
@@ -191,5 +191,5 @@ test("막혀서 넘어가면 그 답 위에 넘어간 곳을 한 줄로 알린�
     .first()
     .click();
   const notice = page.getByTestId("provider-switched").last();
-  await expect(notice).toHaveText(/여기부터 openai-codex\/gpt-5\.6-sol 로 돈다/);
+  await expect(notice).toHaveText(/여기부터 openai-codex\/example-model 로 돈다/);
 });

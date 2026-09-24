@@ -9,9 +9,9 @@ import { MEMORY_CONTEXT_TURNS } from "./memory.ts";
  * 실행 한 번의 환산 금액이다.
  *
  * <p>fake Hermes 는 실제 Hermes 처럼 model 자리에 profile 이름을 넣고 provider 를 주지 않는다.
- * 그래서 기록에 남는 것은 바인딩의 `openai-codex` 와 `gpt-5.6-sol` 다.
+ * 그래서 기록에 남는 것은 바인딩의 `openai-codex` 와 `example-model` 다.
  *
- * <p>입력 120 중 80 이 캐시이고 출력이 40 이다. 표본 카탈로그의 `gpt-5.6-sol` 단가로 환산하면
+ * <p>입력 120 중 80 이 캐시이고 출력이 40 이다. 표본 카탈로그의 `example-model` 단가로 환산하면
  * `40 × 5 + 80 × 0.5 + 40 × 30` 이 되어 1440 마이크로 달러다.
  */
 const MICROS_PER_RUN = 1440;

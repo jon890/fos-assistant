@@ -18,7 +18,7 @@ type ExecutionView = {
 type Turn = { conversationId: number; executionId: number; assistantText: string };
 
 /** 막힘을 검사할 때 2순위로 쓸 것이다. */
-const SECOND = { provider: "nvidia", model: "nvidia/nemotron-3-super-120b-a12b" } as const;
+const SECOND = { provider: "nvidia", model: "example-provider/example-model-b" } as const;
 
 export const modelSelectionScenario: Scenario = {
   name: "모델 선택과 넘김",
@@ -66,7 +66,7 @@ export const modelSelectionScenario: Scenario = {
     const afterProbe = await executionsOf(context);
     const probed = afterProbe.find((execution) => execution.id === probe.executionId);
     expect(
-      probed?.model === "nvidia/nemotron-3.5-lightning-30b-a3b" && probed?.provider === "nvidia",
+      probed?.model === "example-provider/example-model-c" && probed?.provider === "nvidia",
       `실제로 돈 모델을 적지 않았다: ${JSON.stringify(probed)}`,
     );
 
