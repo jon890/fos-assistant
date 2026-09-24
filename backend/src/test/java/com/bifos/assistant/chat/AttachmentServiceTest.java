@@ -128,6 +128,23 @@ class AttachmentServiceTest {
     }
 
     @Test
+    void 행은_보이는데_파일이_없으면_지워진_첨부로_알린다() throws IOException {
+        ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
+        // 정리 작업이 파일을 지우고 지운 시각을 아직 적지 않은 순간이다.
+        Files.delete(root.resolve(String.valueOf(mine)).resolve(saved.id() + ".png"));
+
+        assertCode(() -> service.read(OWNER, mine, saved.id()), ErrorCode.ATTACHMENT_GONE);
+    }
+
+    @Test
+    void 제어_문자만으로_된_이름은_대체_이름이_된다() {
+        ChatAttachment saved = service.upload(
+                OWNER, mine, "\n\r\t\u0000", "image/png", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
+
+        assertThat(attachments.findById(saved.id()).orElseThrow().originalName()).isEqualTo("image");
+    }
+
+    @Test
     void 없는_번호를_읽으면_없는_대화와_같은_응답이다() {
         assertCode(() -> service.read(OWNER, mine, 987654321L), ErrorCode.CONVERSATION_NOT_FOUND);
     }

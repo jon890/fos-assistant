@@ -126,7 +126,7 @@ public class ChatController {
         List<ChatMessage> history = chat.history(user, conversationId);
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
-        Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(conversationId);
+        Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, conversationId);
         return history.stream()
                 .map(
                         it ->

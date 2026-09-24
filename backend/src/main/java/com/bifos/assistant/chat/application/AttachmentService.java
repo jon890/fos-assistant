@@ -217,11 +217,20 @@ public class AttachmentService {
         return bare.strip().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 화면과 Hermes 입력에 보일 이름을 만든다.
+     *
+     * <p>이 이름은 Hermes 입력에 그대로 실린다. 줄바꿈이 섞이면 올린 이름으로 입력에 줄을 끼워 넣을 수
+     * 있어 제어 문자와 줄 구분 문자를 모두 공백으로 바꾼다.
+     */
     private static String displayName(String originalName) {
-        if (originalName == null || originalName.isBlank()) {
+        if (originalName == null) {
             return FALLBACK_NAME;
         }
-        String name = originalName.strip();
+        String name = originalName.replaceAll("[\\p{Cc}\\u2028\\u2029]", " ").strip();
+        if (name.isEmpty()) {
+            return FALLBACK_NAME;
+        }
         return name.length() <= ORIGINAL_NAME_LIMIT ? name : name.substring(0, ORIGINAL_NAME_LIMIT);
     }
 }

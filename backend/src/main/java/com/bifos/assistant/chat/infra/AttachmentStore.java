@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -61,9 +62,16 @@ public class AttachmentStore {
         }
     }
 
+    /**
+     * 파일을 연다. 행은 보이는데 파일이 없으면 지워진 첨부로 알린다.
+     *
+     * <p>정리 작업이 파일을 지운 뒤 행에 지운 시각을 적기 전에 읽으면 이렇게 된다.
+     */
     public InputStream open(ChatAttachment attachment) {
         try {
             return Files.newInputStream(resolve(attachment.conversationId(), attachment.storedName()));
+        } catch (NoSuchFileException ex) {
+            throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept", ex);
         } catch (IOException ex) {
             throw new UncheckedIOException("could not open attachment " + attachment.id(), ex);
         }
