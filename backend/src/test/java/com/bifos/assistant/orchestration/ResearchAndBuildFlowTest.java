@@ -38,6 +38,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -217,9 +218,10 @@ class ResearchAndBuildFlowTest {
         var summary = chat.activitySummaries(chat.history(dad, turn.conversationId())).get(chief.id());
         assertThat(summary.subagentCount()).isEqualTo(3);
         assertThat(summary.durationMs()).isGreaterThan(chief.latencyMs());
-        assertThat(summary.durationMs()).isEqualTo(all.stream()
+        // 밀리초로 각각 바꾼 뒤 빼면 밀리초 경계에서 1 이 어긋난다. 요약과 같은 방법으로 잰다.
+        assertThat(summary.durationMs()).isEqualTo(Duration.between(chief.startedAt(), all.stream()
                 .map(AgentExecution::finishedAt).filter(Objects::nonNull)
-                .max(Instant::compareTo).orElseThrow().toEpochMilli() - chief.startedAt().toEpochMilli());
+                .max(Instant::compareTo).orElseThrow()).toMillis());
     }
 
     @Test
