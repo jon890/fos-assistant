@@ -133,6 +133,23 @@ export function filterAgents(agents: AgentView[], query: string): AgentView[]
 
 ### 5. `web/src/components/chat/composer.tsx`
 
+**입력창을 새로 만드는 것은 사용자가 대화를 바꿀 때뿐이다.** 사진 첨부 구현이 정한 규칙이고 지금 코드에 있다.
+
+- `chat-panel.tsx` 가 `<Composer key={composerGeneration}>` 로 넘긴다. `composerGeneration` 은 사용자가 다른 대화를 고르거나 새 대화를 시작할 때만 올라간다
+- `conversationId` 를 `key` 로 쓰지 않는다. 새 대화에서 첫 사진을 올리는 중에 대화 번호가 생기면 입력창이 새로 만들어져 사진이 사라진다
+- `Composer` 가 첨부 상태(미리보기, 올리기, 첨부 번호)를 직접 갖는다. unmount 될 때 올려 두고 보내지 않은 첨부를 서버에서 지우고, 보내는 중인 것은 남긴다
+- `onSend(attachmentIds)` 는 `Promise<boolean>` 이다. 참일 때만 미리보기를 비운다
+- 새 대화에서 첫 사진을 올리면 `Composer` 가 빈 대화를 만들고 `onConversationCreated` 로 알린다
+
+**배치를 바꾸려고 `Composer` 를 두 번 그리거나 부모를 갈아 끼우지 않는다.** 한 자리에 그대로 두고 감싸는 요소의 클래스만 바꾼다.
+React 는 부모가 바뀌면 자식을 새로 만든다. 그러면 unmount 정리가 돌아 올린 사진이 지워진다.
+정리가 빠지거나 입력창이 너무 자주 새로 만들어지면 올린 첨부가 쌓이거나 사라진다. 한 번에 10장인 서버 상한이 찰 수 있다.
+
+새 대화 화면에서 입력창은 가운데에 있다가 첫 메시지 뒤 아래로 간다. 이 이동도 같은 `Composer` 한 개의 자리를 감싸는 클래스로만 한다.
+`StartScreen` 이 `composer` 를 `React.ReactNode` 로 받아 제 안에 그리는 설계가 부모를 갈아 끼우게 되면 이 규칙을 어긴다.
+그러면 `StartScreen` 은 입력창 위와 아래의 내용만 그리고, 입력창은 `chat-panel.tsx` 의 한 자리에 둔다.
+검사: 새 대화 화면에서 사진을 고르고 보낸 뒤 첨부가 메시지에 묶여 있고 지워지지 않았다.
+
 `mention?: { agents: AgentView[]; onPick(code: string): void }` 를 선택 속성으로 더한다.
 주지 않으면 지금과 같다. 이미 시작한 대화에서는 주지 않는다.
 

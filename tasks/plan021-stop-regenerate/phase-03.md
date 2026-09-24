@@ -29,7 +29,7 @@ Control Plane 은 고치지 않는다. phase 01 과 02 가 끝냈다.
 | 파일 | 하는 일 |
 | --- | --- |
 | `web/src/components/chat-panel.tsx` | 스트림 사건을 받아 `turns` 를 고친다. `send` 가 `/api/chat/stream` 을 열고 `readEventStream` 으로 읽는다. `sending` 이 참인 동안 입력을 잠근다 |
-| `web/src/components/chat/composer.tsx` | `Composer({ value, disabled, onChange, onSend })`. 한글 조합 중에는 `composing` ref 와 `event.nativeEvent.isComposing` 으로 Enter 를 무시한다. 보내기는 `aria-label="보내기"` 인 원형 `Button` 이다 |
+| `web/src/components/chat/composer.tsx` | 이 표는 사진 첨부 전의 모양이다. 지금은 `onSend(attachmentIds): Promise<boolean>`, `conversationId`, `agentCode`, `acceptsAttachments`, `onConversationCreated` 가 더해졌고 `key={composerGeneration}` 으로 그려진다. 구현 전에 다시 읽는다. 한글 조합 중에는 `composing` ref 와 `event.nativeEvent.isComposing` 으로 Enter 를 무시한다. 보내기는 `aria-label="보내기"` 인 원형 `Button` 이다 |
 | `web/src/components/chat/message-bubble.tsx` | `Turn` 타입과 `MessageBubble`. 답 줄은 마우스를 올리거나 초점이 가면 `detailsVisible` 로 시각을 보인다 |
 | `web/src/components/chat/markdown.tsx` | `CodeBlock({ code, language })` 가 `<pre>` 를 그린다. 복사 단추가 없다 |
 | `web/src/components/error-message.ts` | 오류 코드마다 문구. `describeError(code, fallback)` |

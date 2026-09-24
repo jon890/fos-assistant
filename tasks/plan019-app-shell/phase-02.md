@@ -31,6 +31,19 @@
 그 동작을 그대로 둔다. `/` 에서도 `/c/{id}` 에서도 첨부가 지금과 같이 돌아야 한다.
 첨부 쪽 식별자는 코드에서 읽은 것만 쓴다.
 
+**입력창을 새로 만드는 것은 사용자가 대화를 바꿀 때뿐이다.** 사진 첨부 구현이 정한 규칙이고 지금 코드에 있다.
+
+- `chat-panel.tsx` 가 `<Composer key={composerGeneration}>` 로 넘긴다. `composerGeneration` 은 사용자가 다른 대화를 고르거나 새 대화를 시작할 때만 올라간다
+- `conversationId` 를 `key` 로 쓰지 않는다. 새 대화에서 첫 사진을 올리는 중에 대화 번호가 생기면 입력창이 새로 만들어져 사진이 사라진다
+- `Composer` 가 첨부 상태(미리보기, 올리기, 첨부 번호)를 직접 갖는다. unmount 될 때 올려 두고 보내지 않은 첨부를 서버에서 지우고, 보내는 중인 것은 남긴다
+- `onSend(attachmentIds)` 는 `Promise<boolean>` 이다. 참일 때만 미리보기를 비운다
+- 새 대화에서 첫 사진을 올리면 `Composer` 가 빈 대화를 만들고 `onConversationCreated` 로 알린다
+
+**배치를 바꾸려고 `Composer` 를 두 번 그리거나 부모를 갈아 끼우지 않는다.** 한 자리에 그대로 두고 감싸는 요소의 클래스만 바꾼다.
+React 는 부모가 바뀌면 자식을 새로 만든다. 그러면 unmount 정리가 돌아 올린 사진이 지워진다.
+정리가 빠지거나 입력창이 너무 자주 새로 만들어지면 올린 첨부가 쌓이거나 사라진다. 한 번에 10장인 서버 상한이 찰 수 있다.
+
+
 ### 지금 구조
 
 - `web/src/app/layout.tsx` 가 `SiteHeader` 와 `<main>` 을 그린다. `readMe()` 로 `isAdmin` 과 `displayName` 을 넘긴다
@@ -177,10 +190,12 @@ export function AppShell(props: { isAdmin: boolean; displayName?: string; childr
 - **대화 번호를 얻는 자리는 둘이다.** `started` 와, 사진 첨부가 새 대화에서 첫 사진을 올리기 전에 부르는
   빈 대화 만들기(`POST /api/v1/chat/conversations`, 화면 쪽 호출은 사진 첨부 구현이 만든 것을 코드에서 찾는다)다.
   **두 자리 모두 번호를 받은 같은 처리 안에서 `replaceState` 로 주소를 먼저 바꾸고** 그다음 `conversationId` 를 적는다.
+  빈 대화를 만든 쪽은 `Composer` 이고 `onConversationCreated` 로 알린다. 그 콜백에서 주소를 바꾼다.
   빈 대화를 만든 뒤에도 `refresh()` 를 불러 목록에 「새 대화」 로 넣는다
 - **주소가 `/` 로 바뀌었을 때만 상태를 비운다.** `usePathname()` 의 앞 값을 ref 에 두고,
   앞 값이 `/` 가 아니었는데 지금 `/` 이거나, 사이드바의 `새 대화` 와 뒤에 올 단축키가 부르는 context 의
-  `startNew()` 가 불렸을 때 `conversationId`, 메시지, 입력 중 상태, 첨부 목록, 오류를 비우고 `selectionVersion` 을 올린다.
+  `startNew()` 가 불렸을 때 `conversationId`, 메시지, 입력 중 상태, 오류를 비우고 `selectionVersion` 과 `composerGeneration` 을 올린다.
+  첨부는 `Composer` 가 갖고 있어 `composerGeneration` 을 올리면 unmount 정리가 지운다. 대화 번호를 얻었을 때는 `composerGeneration` 을 올리지 않는다.
   `pathname === "/" && conversationId !== null` 만으로 판정하지 않는다.
   `/` 에서 사진을 먼저 올려 빈 대화가 생기는 순간에도 그 조건이 참이 되어 올린 사진과 번호가 지워진다.
   `replaceState` 뒤에도 Next 의 `usePathname` 이 바로 따라오는지 브라우저 검사로 확인한다
@@ -235,6 +250,10 @@ export function AppShell(props: { isAdmin: boolean; displayName?: string; childr
 `/` 에서 사진을 고르면 주소가 `/c/{id}` 로 바뀌고 올린 사진이 그대로 있으며 사이드바에 「새 대화」 한 줄이 생긴다.
 그 뒤 보내면 같은 대화에 붙고 제목이 첫 메시지로 바뀐다.
 사진 올리기의 셀렉터와 픽스처는 사진 첨부 구현이 만든 `test/browser/` 의 검사에서 가져온다.
+
+**입력창 보존 검사**를 `shell.spec.ts` 에 더한다.
+`/` 에서 사진을 고른 뒤 주소가 `/c/{id}` 로 바뀌어도 미리보기가 남는다.
+사이드바에서 다른 대화를 고르면 미리보기가 사라지고, 그 첨부가 서버에서 지워졌는지 첨부 조회로 확인한다.
 
 ## 검증
 
