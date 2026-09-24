@@ -59,6 +59,8 @@ Backend 는 `backend/src/main/resources/application.yml`, Web 은 `web/.env.exam
 | `HERMES_DASHBOARD_TOKEN` | Backend | 그 대시보드가 기계에게 여는 경로에 보낼 토큰 |
 | `HERMES_SHARED_LISTENER_BASE_URL` | Backend | profile 접두를 붙여 부르는 공유 listener 주소 |
 | `ASSISTANT_PRICING_CATALOG` | Backend | models.dev 가격표를 복사해 둔 파일. 없으면 비용을 비워 둔다 |
+| `ASSISTANT_ATTACHMENT_ROOT` | Backend | 대화에 올린 사진을 두는 디렉터리. Control Plane 이 쓴다. 비면 기동이 실패한다 |
+| `ASSISTANT_ATTACHMENT_AGENT_ROOT` | Backend | 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 실행 입력에 적는다. 비면 기동이 실패한다 |
 
 AI credential 은 이 저장소와 데이터베이스 어디에도 두지 않는다.
 각 사용자의 credential 은 그 사람의 Hermes profile `.env` 안에만 있다.

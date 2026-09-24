@@ -83,9 +83,9 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `user_id` | BIGINT | 이 대화의 주인. 다른 사용자는 읽지 못한다 |
-| `agent_id` | BIGINT | 첫 메시지가 정한다. 뒤에 바뀌지 않는다 |
+| `agent_id` | BIGINT | 대화를 만들 때 정한다. 뒤에 바뀌지 않는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 첫 실행이 돌려준 session. 특정 profile 안의 값이다 |
-| `title` | VARCHAR(200) | 첫 메시지의 앞부분 |
+| `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
