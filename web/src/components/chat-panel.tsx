@@ -6,11 +6,12 @@ import Link from "next/link";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
 import { MessageList } from "./chat/message-list";
-import type { FlowStepStates } from "./chat/flow-progress";
+import { applyChatEvent, emptyActivity, type ActivityState } from "./chat/activity/activity-state";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
 import { useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
+import type { ChatEvent } from "@/lib/chat-event";
 
 type Agent = {
   code: string;
@@ -20,20 +21,6 @@ type Agent = {
   acceptsAttachments: boolean;
 };
 type ErrorPayload = { code: string; message: string };
-type ChatEvent = {
-  type: "started" | "delta" | "tool" | "step" | "switched" | "reset" | "done" | "error";
-  text?: string | null;
-  toolName?: string | null;
-  detail?: string | null;
-  conversationId?: number | null;
-  messageId?: number | null;
-  executionId?: number | null;
-  code?: string | null;
-  message?: string | null;
-  stepName?: string | null;
-  stepState?: "started" | "completed" | "failed" | null;
-};
-
 async function readPayload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
@@ -54,8 +41,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const conversationIdRef = useRef<number | null>(initialConversationId);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [toolEvents, setToolEvents] = useState<string[]>([]);
-  const [flowSteps, setFlowSteps] = useState<FlowStepStates | null>(null);
+  const [activity, setActivity] = useState<ActivityState | null>(null);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
@@ -95,6 +81,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setError(null);
     setTurnError(null);
     setTurns([]);
+    setActivity(null);
     setComposerGeneration((generation) => generation + 1);
     void (async () => {
       try {
@@ -155,7 +142,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
    *
    * <p>첫 단계 사건이 올 때 재기 시작한다. 그전에는 이 turn 이 흐름인지 알 수 없다.
    */
-  const flowActive = flowSteps !== null;
+  const flowActive = activity?.items.some((item) => item.kind === "step") ?? false;
 
   useEffect(() => {
     if (!flowActive || flowIsSlow) return;
@@ -172,8 +159,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setConversationId(null);
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
-    setToolEvents([]);
-    setFlowSteps(null);
+    setActivity(null);
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
@@ -205,8 +191,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setError(null);
     setTurnError(null);
     setDraft("");
-    setToolEvents([]);
-    setFlowSteps(null);
+    setActivity(emptyActivity(Date.now()));
     setFlowIsSlow(false);
     setTurns((previous) => [
       ...previous,
@@ -312,20 +297,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
                   : turn,
               );
             });
-          } else if (streamEvent.type === "step" && streamEvent.stepName && streamEvent.stepState) {
-            const name = streamEvent.stepName;
-            const state = streamEvent.stepState;
-            setFlowSteps((previous) => ({ ...(previous ?? {}), [name]: state }));
           } else if (streamEvent.type === "reset") {
             // 막혀서 넘어간 시도의 조각이다. 화면에 남으면 읽는 사람이 그것을 답으로 읽는다.
             setTurns((previous) => previous.filter((turn) => turn.id !== assistantPendingId));
-            setToolEvents([]);
-          } else if (streamEvent.type === "switched") {
-            setToolEvents((previous) => [...previous, `여기부터 ${streamEvent.text ?? ""} 로 돈다`]);
-          } else if (streamEvent.type === "tool") {
-            const name = streamEvent.toolName ?? "도구";
-            const status = streamEvent.detail ?? "진행 중";
-            setToolEvents((previous) => [...previous, `${name}: ${status}`]);
+            setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
+          } else if (["tool", "subagent", "step", "switched"].includes(streamEvent.type)) {
+            setActivity((previous) => previous && applyChatEvent(previous, streamEvent));
           } else if (streamEvent.type === "done" && streamEvent.conversationId) {
             done = true;
             conversationIdRef.current = streamEvent.conversationId;
@@ -334,8 +311,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
               refresh(),
               refreshMessages(streamEvent.conversationId, version),
             ]);
-            setToolEvents([]);
-            setFlowSteps(null);
+            setActivity(null);
             setFlowIsSlow(false);
           } else if (streamEvent.type === "error") {
             reportedError = true;
@@ -428,9 +404,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           turns={turns}
           loading={messagesLoading}
           sending={sending}
-          toolEvents={toolEvents}
+          activity={activity}
           conversationId={conversationId}
-          flowSteps={flowSteps}
           flowIsSlow={flowIsSlow}
           turnError={turnError}
         />

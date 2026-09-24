@@ -3,17 +3,17 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageBubble, type Turn } from "./message-bubble";
-import { RunStatus } from "./run-status";
-import { FlowProgress, type FlowStepStates } from "./flow-progress";
+import { ActivityBlock } from "./activity/activity-block";
+import type { ActivityState } from "./activity/activity-state";
+import { WaitingIndicator } from "./waiting-indicator";
 
 type Props = {
   turns: Turn[];
   loading: boolean;
   sending: boolean;
-  toolEvents: string[];
+  activity: ActivityState | null;
   conversationId: number | null;
   /** 흐름으로 도는 turn 의 단계 상태. 흐름이 아니면 null 이다 */
-  flowSteps: FlowStepStates | null;
   /** 흐름이 오래 걸린다고 한 번 알렸는지 */
   flowIsSlow: boolean;
   turnError: string | null;
@@ -23,9 +23,8 @@ export function MessageList({
   turns,
   loading,
   sending,
-  toolEvents,
+  activity,
   conversationId,
-  flowSteps,
   flowIsSlow,
   turnError,
 }: Props) {
@@ -35,7 +34,7 @@ export function MessageList({
   const streamedAnswer = turns.some(
     (turn) => typeof turn.id === "string" && turn.id.startsWith("assistant-") && turn.content,
   );
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${toolEvents.length}:${JSON.stringify(flowSteps)}:${turnError}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}`;
 
   useEffect(() => {
     shouldFollow.current = true;
@@ -80,7 +79,7 @@ export function MessageList({
               <Skeleton className="h-[4.25rem]" />
               <Skeleton className="h-[4.25rem]" />
             </div>
-          ) : turns.length === 0 && !sending && !flowSteps ? (
+          ) : turns.length === 0 && !sending && !activity ? (
             <p className="py-8 text-center text-sm text-muted">무엇이든 물어보세요.</p>
           ) : (
             <ol className="flex flex-col gap-6">
@@ -89,26 +88,24 @@ export function MessageList({
                   typeof turn.id === "string" && turn.id.startsWith("assistant-");
                 return (
                   <Fragment key={turn.id}>
-                    {pendingAssistant ? (
-                      <RunStatus waiting={false} toolEvents={toolEvents} />
+                    {pendingAssistant && activity && activity.items.length > 0 ? (
+                      <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
+                        <span aria-hidden="true" />
+                        <ActivityBlock mode="live" state={activity} slow={flowIsSlow} />
+                      </li>
                     ) : null}
                     <MessageBubble turn={turn} conversationId={conversationId} />
                   </Fragment>
                 );
               })}
-              {!streamedAnswer && flowSteps ? (
-                <FlowProgress states={flowSteps} latestTool={toolEvents.at(-1) ?? null} />
-              ) : null}
-              {!streamedAnswer && flowSteps && flowIsSlow ? (
-                <li data-testid="flow-slow-notice" className="grid grid-cols-[2rem_minmax(0,1fr)] gap-2 text-xs text-muted">
+              {!streamedAnswer && activity && activity.items.length > 0 ? (
+                <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
                   <span aria-hidden="true" />
-                  <span>
-                    오래 걸릴 수 있다. 이 화면을 떠나도 된다. 실행은 계속 돌고, 나중에 다시 열면 저장된 답이 보인다.
-                  </span>
+                  <ActivityBlock mode="live" state={activity} slow={flowIsSlow} />
                 </li>
               ) : null}
-              {!streamedAnswer ? (
-                <RunStatus waiting={sending} toolEvents={flowSteps ? [] : toolEvents} />
+              {!streamedAnswer && sending && (!activity || activity.items.length === 0) ? (
+                <WaitingIndicator />
               ) : null}
               {turnError ? <li data-testid="turn-error" className="rounded-md bg-surface px-3 py-2 text-sm">{turnError}</li> : null}
             </ol>

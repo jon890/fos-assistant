@@ -80,6 +80,8 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
       case "SUBAGENT_COMPLETED":
         // 시작 사건에서 이미 한 줄로 그렸다.
         break;
+      case "PROVIDER_SWITCHED":
+        break;
     }
   }
   return rows;

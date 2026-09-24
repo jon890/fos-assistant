@@ -8,7 +8,8 @@ export type ExecutionEventType =
   | "TOOL_STARTED"
   | "TOOL_COMPLETED"
   | "SUBAGENT_STARTED"
-  | "SUBAGENT_COMPLETED";
+  | "SUBAGENT_COMPLETED"
+  | "PROVIDER_SWITCHED";
 
 export type ExecutionEventView = {
   sequence: number;
@@ -17,6 +18,9 @@ export type ExecutionEventView = {
   subagentName: string | null;
   durationMs: number | null;
   detail: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
   occurredAt: string;
 };
 

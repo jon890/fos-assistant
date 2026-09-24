@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Markdown } from "./markdown";
 import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
+import type { ActivitySummary } from "@/lib/chat-event";
+import { ActivityBlock } from "./activity/activity-block";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -28,6 +30,7 @@ export type Turn = {
   switchedTo?: string | null;
   /** 이 메시지에 붙은 사진들. 지워진 것도 자리를 남기려고 담는다 */
   attachments?: MessageAttachment[];
+  activity?: ActivitySummary | null;
 };
 
 function AttachmentGallery({
@@ -144,6 +147,9 @@ export function MessageBubble({
             </time>
           ) : null}
         </div>
+        {turn.activity && turn.executionId ? (
+          <div className="mb-2"><ActivityBlock mode="saved" summary={turn.activity} executionId={turn.executionId} /></div>
+        ) : null}
         <div className="leading-7">
           <Markdown>{turn.content}</Markdown>
         </div>
