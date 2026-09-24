@@ -1,0 +1,13 @@
+{
+  "name": "plan024-design-screens",
+  "description": "에이전트, 기억, 사용량, 실행 나무, 관리, 로그인 화면을 shadcn/ui 부품으로 옮기고 옛 부품을 지운다",
+  "status": "pending",
+  "created_at": "2026-09-24",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+  ]
+}
