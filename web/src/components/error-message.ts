@@ -18,6 +18,8 @@ const MESSAGES: Record<string, string> = {
   EXECUTION_NOT_RUNNING: "이미 끝난 답이다.",
   STREAM_INTERRUPTED: "응답 연결이 끊겼다. 실행은 계속될 수 있으니 잠시 뒤 대화 이력을 다시 확인한다.",
   CONVERSATION_NOT_FOUND: "대화를 찾지 못했다. 대화 목록으로 돌아가 다시 골라 주세요.",
+  MESSAGE_NOT_LATEST: "그 사이 대화가 바뀌었다. 최신 대화를 다시 불러왔다.",
+  CONVERSATION_BUSY: "아직 답을 만드는 중이다. 끝난 뒤에 다시 누른다.",
   UNAUTHENTICATED: "로그인이 필요하다.",
   PERSONA_STALE: "그 사이 다른 사람이 이 성격을 고쳤다. 최신 본문을 다시 불러왔다.",
   ATTACHMENT_GONE: "보관 기간이 지나 볼 수 없습니다.",

@@ -38,6 +38,10 @@ public class ChatMessage {
     @Column(name = "execution_id")
     private Long executionId;
 
+    /** 이 메시지가 대신한 바로 앞 판의 메시지 번호다. */
+    @Column(name = "replaces_message_id")
+    private Long replacesMessageId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -45,21 +49,39 @@ public class ChatMessage {
     }
 
     private ChatMessage(
-            Long conversationId, MessageRole role, String content, Long senderUserId, Long executionId) {
+            Long conversationId,
+            MessageRole role,
+            String content,
+            Long senderUserId,
+            Long executionId,
+            Long replacesMessageId) {
         this.conversationId = conversationId;
         this.role = role;
         this.content = content;
         this.senderUserId = senderUserId;
         this.executionId = executionId;
+        this.replacesMessageId = replacesMessageId;
         this.createdAt = Instant.now();
     }
 
     public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content) {
-        return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null);
+        return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null);
     }
 
     public static ChatMessage fromAssistant(Long conversationId, String content, Long executionId) {
-        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId);
+        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, null);
+    }
+
+    public static ChatMessage regeneratedAnswer(
+            Long conversationId, String content, Long executionId, Long replacesMessageId) {
+        return new ChatMessage(
+                conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId);
+    }
+
+    public static ChatMessage editedFromUser(
+            Long conversationId, Long senderUserId, String content, Long replacesMessageId) {
+        return new ChatMessage(
+                conversationId, MessageRole.USER, content, senderUserId, null, replacesMessageId);
     }
 
     public Long id() {
@@ -84,6 +106,10 @@ public class ChatMessage {
 
     public Long executionId() {
         return executionId;
+    }
+
+    public Long replacesMessageId() {
+        return replacesMessageId;
     }
 
     public Instant createdAt() {

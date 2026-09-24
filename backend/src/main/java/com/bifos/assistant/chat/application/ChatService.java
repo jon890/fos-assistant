@@ -103,9 +103,9 @@ public class ChatService {
             List<Long> attachmentIds) {
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         if (routed.flow() != null) {
-            return runFlow(user, routed, text, event -> {}, false);
+            return runFlow(user, routed, text, new TurnIntent.Fresh(), event -> {}, false, null);
         }
-        return runTurn(user, routed, text, event -> {}, false);
+        return runTurn(user, routed, text, new TurnIntent.Fresh(), event -> {}, false, null);
     }
 
     public void stream(
@@ -114,7 +114,7 @@ public class ChatService {
             String text,
             String agentCode,
             Consumer<ChatEvent> onEvent) {
-        stream(user, conversationId, text, agentCode, List.of(), onEvent);
+        stream(user, conversationId, text, agentCode, List.of(), null, onEvent);
     }
 
     public void stream(
@@ -124,12 +124,27 @@ public class ChatService {
             String agentCode,
             List<Long> attachmentIds,
             Consumer<ChatEvent> onEvent) {
-        Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
-        if (routed.flow() != null) {
-            runFlow(user, routed, text, onEvent, true);
+        stream(user, conversationId, text, agentCode, attachmentIds, null, onEvent);
+    }
+
+    public void stream(
+            CurrentUser user,
+            Long conversationId,
+            String text,
+            String agentCode,
+            List<Long> attachmentIds,
+            Long editOfMessageId,
+            Consumer<ChatEvent> onEvent) {
+        if (editOfMessageId != null) {
+            edit(user, conversationId, text, attachmentIds, editOfMessageId, onEvent);
             return;
         }
-        ChatTurn turn = runTurn(user, routed, text, onEvent, true);
+        Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
+        if (routed.flow() != null) {
+            runFlow(user, routed, text, new TurnIntent.Fresh(), onEvent, true, null);
+            return;
+        }
+        ChatTurn turn = runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, null);
         onEvent.accept(turn.cancelled()
                 ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
                 : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
@@ -151,18 +166,22 @@ public class ChatService {
      * 그대로이고, 사진 자리는 Hermes 입력에만 붙인다.
      */
     private ChatTurn runTurn(
-            CurrentUser user, Routed routed, String text, Consumer<ChatEvent> onEvent, boolean streaming) {
+            CurrentUser user,
+            Routed routed,
+            String text,
+            TurnIntent intent,
+            Consumer<ChatEvent> onEvent,
+            boolean streaming,
+            TurnCancellation.TurnHandle existingHandle) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
         List<Long> attachmentIds =
                 routed.attached().stream().map(ChatAttachment::id).toList();
-        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        TurnCancellation.TurnHandle handle = existingHandle == null
+                ? turns.open(user.id(), conversation.id()) : existingHandle;
+        boolean closesHandle = existingHandle == null;
         try {
-            transactions.executeWithoutResult(status -> {
-                fillBlankTitle(conversation, text);
-                ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
-                attachments.attach(saved.id(), conversation.id(), attachmentIds);
-            });
+            saveQuestion(user, conversation, text, attachmentIds, intent);
         String input = attachments.agentInput(conversation.id(), routed.attached(), text);
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
@@ -177,7 +196,7 @@ public class ChatService {
         for (int index = 0; index < options.size(); index++) {
             ModelOption option = options.get(index);
             boolean last = index == options.size() - 1;
-            PendingTurn pending = begin(user, routed, input, context, snapshot, option, previousExecutionId);
+            PendingTurn pending = begin(user, routed, input, context, snapshot, option, previousExecutionId, intent);
             turns.rekey(handle, pending.execution().id());
             if (streaming) {
                 onEvent.accept(ChatEvent.started(conversation.id(), pending.execution().id()));
@@ -227,7 +246,9 @@ public class ChatService {
         }
         throw new ApiException(ErrorCode.NO_MODEL_AVAILABLE, "every model this agent can use is blocked");
         } finally {
-            turns.close(handle);
+            if (closesHandle) {
+                turns.close(handle);
+            }
         }
     }
 
@@ -248,7 +269,14 @@ public class ChatService {
             onEvent.accept(ChatEvent.started(routed.conversation().id(), execution.id()));
         }
         PendingTurn pending = new PendingTurn(
-                user, routed.conversation(), routed.agent(), null, execution, new SequenceCounter(), new StringBuilder());
+                user,
+                routed.conversation(),
+                routed.agent(),
+                null,
+                execution,
+                new SequenceCounter(),
+                new StringBuilder(),
+                new TurnIntent.Fresh());
         executions.fail(execution, ErrorCode.NO_MODEL_AVAILABLE.name());
         append(pending, ExecutionEventType.RUN_FAILED, ErrorCode.NO_MODEL_AVAILABLE.name());
         return new ApiException(
@@ -261,13 +289,25 @@ public class ChatService {
      * <p>흐름은 단계 사건만 흘리고 답은 끝난 뒤에 한 번에 온다. 중간 단계의 답까지 흘리면 읽을 수
      * 없기 때문이다. 근거는 ADR-016 에 있다.
      */
-    private ChatTurn runFlow(CurrentUser user, Routed routed, String text,
-            Consumer<ChatEvent> onEvent, boolean streaming) {
+    private ChatTurn runFlow(
+            CurrentUser user,
+            Routed routed,
+            String text,
+            TurnIntent intent,
+            Consumer<ChatEvent> onEvent,
+            boolean streaming,
+            TurnCancellation.TurnHandle existingHandle) {
         Conversation conversation = routed.conversation();
-        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        TurnCancellation.TurnHandle handle = existingHandle == null
+                ? turns.open(user.id(), conversation.id()) : existingHandle;
+        boolean closesHandle = existingHandle == null;
         try {
-            fillBlankTitle(conversation, text);
-            ChatTurn turn = routed.flow().run(user, conversation, routed.agent(), text,
+            if (intent instanceof TurnIntent.Fresh) {
+                fillBlankTitle(conversation, text);
+            }
+            String input = attachments.agentInput(conversation.id(), routed.attached(), text);
+            ChatTurn turn = routed.flow().run(user, conversation, routed.agent(), text, input,
+                    intent,
                     execution -> {
                         turns.rekey(handle, execution.id());
                         if (streaming) onEvent.accept(ChatEvent.started(conversation.id(), execution.id()));
@@ -280,7 +320,9 @@ public class ChatService {
             }
             return turn;
         } finally {
-            turns.close(handle);
+            if (closesHandle) {
+                turns.close(handle);
+            }
         }
     }
 
@@ -340,20 +382,22 @@ public class ChatService {
             AssembledContext context,
             ExecutionContextSnapshot snapshot,
             ModelOption option,
-            Long retryOfExecutionId) {
+            Long retryOfExecutionId,
+            TurnIntent intent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
                 text,
-                context.instructions(),
+                TurnIntent.appendTo(context.instructions(), intent),
                 conversation.hermesSessionId(),
                 option.provider(),
                 option.model());
         AgentExecution execution = executions.start(
                 user, conversation, agent, null, null, snapshot, option, retryOfExecutionId);
-        return new PendingTurn(user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder());
+        return new PendingTurn(
+                user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder(), intent);
     }
 
     private String submit(PendingTurn pending) {
@@ -415,7 +459,7 @@ public class ChatService {
         append(pending, ExecutionEventType.RUN_COMPLETED, null);
         String answer = result.output() == null ? "" : result.output();
         ChatMessage message = messages.save(
-                ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
+                answerMessage(pending, answer, execution.id()));
         memoryProposer.proposeFrom(pending.user(), pending.conversation(), pending.agent(), execution, answer);
         return new ChatTurn(pending.conversation().id(), execution.id(), answer, message.id(), false);
     }
@@ -426,13 +470,149 @@ public class ChatService {
         String answer = result != null && result.output() != null && !result.output().isBlank()
                 ? result.output() : pending.streamed().toString();
         ChatMessage message = answer.isBlank() ? null : messages.save(
-                ChatMessage.fromAssistant(pending.conversation().id(), answer, execution.id()));
+                answerMessage(pending, answer, execution.id()));
         if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
             pending.conversation().rememberSession(result.sessionId());
             conversations.touchSession(pending.conversation().id(), result.sessionId(), Instant.now());
         }
         return new ChatTurn(pending.conversation().id(), execution.id(), answer,
                 message == null ? null : message.id(), true);
+    }
+
+    /** 마지막 답을 새 실행으로 다시 만든다. */
+    public void regenerate(CurrentUser user, Long conversationId, Consumer<ChatEvent> onEvent) {
+        Conversation conversation = access.requireOwn(user, conversationId);
+        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        try {
+            List<ChatMessage> active = activeMessages(conversation.id());
+            if (active.isEmpty()) {
+                throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "there is no message to regenerate");
+            }
+            ChatMessage last = active.getLast();
+            ChatMessage previousAnswer = last.role() == com.bifos.assistant.chat.domain.MessageRole.ASSISTANT
+                    ? last : null;
+            ChatMessage question = previousAnswer == null ? last : previousQuestion(active, previousAnswer);
+            if (question == null || question.role() != com.bifos.assistant.chat.domain.MessageRole.USER) {
+                throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
+            }
+            List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
+                    .filter(attachment -> question.id().equals(attachment.messageId()))
+                    .toList();
+            Routed routed = routeExisting(user, conversation, attached);
+            TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
+            if (routed.flow() != null) {
+                runFlow(user, routed, question.content(), intent, onEvent, true, handle);
+                return;
+            }
+            ChatTurn turn = runTurn(user, routed, question.content(), intent, onEvent, true, handle);
+            onEvent.accept(turn.cancelled()
+                    ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
+                    : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+        } finally {
+            turns.close(handle);
+        }
+    }
+
+    private void edit(
+            CurrentUser user,
+            Long conversationId,
+            String text,
+            List<Long> attachmentIds,
+            Long editOfMessageId,
+            Consumer<ChatEvent> onEvent) {
+        if (conversationId == null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "an edit needs an existing conversation");
+        }
+        Conversation conversation = access.requireOwn(user, conversationId);
+        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        try {
+            if (attachmentIds != null && !attachmentIds.isEmpty()) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "an edit cannot include attachments");
+            }
+            List<ChatMessage> active = activeMessages(conversation.id());
+            ChatMessage lastUser = active.stream()
+                    .filter(message -> message.role() == com.bifos.assistant.chat.domain.MessageRole.USER)
+                    .reduce((first, second) -> second)
+                    .orElseThrow(() -> new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "there is no question to edit"));
+            if (!editOfMessageId.equals(lastUser.id())) {
+                throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "only the latest question can be edited");
+            }
+            boolean hasAttachment = attachments.allOf(conversation.id()).stream()
+                    .anyMatch(attachment -> editOfMessageId.equals(attachment.messageId()));
+            if (hasAttachment) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "a question with attachments cannot be edited");
+            }
+            Routed routed = routeExisting(user, conversation, List.of());
+            TurnIntent intent = new TurnIntent.Edit(lastUser);
+            if (routed.flow() != null) {
+                runFlow(user, routed, text, intent, onEvent, true, handle);
+                return;
+            }
+            ChatTurn turn = runTurn(user, routed, text, intent, onEvent, true, handle);
+            onEvent.accept(turn.cancelled()
+                    ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
+                    : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+        } finally {
+            turns.close(handle);
+        }
+    }
+
+    private List<ChatMessage> activeMessages(Long conversationId) {
+        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
+        Set<Long> replaced = history.stream()
+                .map(ChatMessage::replacesMessageId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return history.stream().filter(message -> !replaced.contains(message.id())).toList();
+    }
+
+    private static ChatMessage previousQuestion(List<ChatMessage> active, ChatMessage answer) {
+        int answerIndex = active.indexOf(answer);
+        for (int index = answerIndex - 1; index >= 0; index--) {
+            ChatMessage candidate = active.get(index);
+            if (candidate.role() == com.bifos.assistant.chat.domain.MessageRole.USER) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private Routed routeExisting(CurrentUser user, Conversation conversation, List<ChatAttachment> attached) {
+        Agent agent = agents.requireById(conversation.agentId());
+        if (!agent.enabled()) {
+            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
+        }
+        return new Routed(conversation, agent, flows.find(agent.flow()), attached);
+    }
+
+    private void saveQuestion(
+            CurrentUser user,
+            Conversation conversation,
+            String text,
+            List<Long> attachmentIds,
+            TurnIntent intent) {
+        if (intent instanceof TurnIntent.Regenerate) {
+            return;
+        }
+        transactions.executeWithoutResult(status -> {
+            if (intent instanceof TurnIntent.Fresh) {
+                fillBlankTitle(conversation, text);
+                ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+                attachments.attach(saved.id(), conversation.id(), attachmentIds);
+            } else if (intent instanceof TurnIntent.Edit edit) {
+                messages.save(ChatMessage.editedFromUser(
+                        conversation.id(), user.id(), text, edit.previousQuestion().id()));
+            }
+        });
+    }
+
+    private static ChatMessage answerMessage(PendingTurn pending, String answer, Long executionId) {
+        if (pending.intent() instanceof TurnIntent.Regenerate regenerate
+                && regenerate.previousAnswer() != null) {
+            return ChatMessage.regeneratedAnswer(
+                    pending.conversation().id(), answer, executionId, regenerate.previousAnswer().id());
+        }
+        return ChatMessage.fromAssistant(pending.conversation().id(), answer, executionId);
     }
 
     public void stop(CurrentUser user, Long executionId) {
@@ -596,6 +776,11 @@ public class ChatService {
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
     }
 
+    /** SSE 응답을 열기 전에 대화 주인을 확인한다. */
+    public void requireConversation(CurrentUser user, Long conversationId) {
+        access.requireOwn(user, conversationId);
+    }
+
     public List<Conversation> conversationsOf(CurrentUser user) {
         return conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user.id());
     }
@@ -737,7 +922,8 @@ public class ChatService {
             HermesRunCommand command,
             AgentExecution execution,
             SequenceCounter counter,
-            StringBuilder streamed) {
+            StringBuilder streamed,
+            TurnIntent intent) {
     }
 
     /**

@@ -3,6 +3,7 @@ package com.bifos.assistant.orchestration.application;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatTurn;
+import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -86,14 +87,21 @@ public class ResearchAndBuildFlow implements Flow {
             Conversation conversation,
             Agent agent,
             String text,
+            String input,
+            TurnIntent intent,
             Consumer<AgentExecution> onRootStarted,
             Consumer<ChatEvent> onEvent) {
-        messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+        if (intent instanceof TurnIntent.Fresh) {
+            messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+        } else if (intent instanceof TurnIntent.Edit edit) {
+            messages.save(ChatMessage.editedFromUser(
+                    conversation.id(), user.id(), text, edit.previousQuestion().id()));
+        }
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));
         AtomicReference<Long> rootExecutionId = new AtomicReference<>();
         AgentRunner.Run chief = runner.run(
-                user, conversation, agent, chiefPrompt(text), null, null, conversation.hermesSessionId(),
+                user, conversation, agent, chiefPrompt(input), null, null, conversation.hermesSessionId(),
                 execution -> {
                     rootExecutionId.set(execution.id());
                     onRootStarted.accept(execution);
@@ -103,7 +111,7 @@ public class ResearchAndBuildFlow implements Flow {
                 () -> {
                     Long executionId = rootExecutionId.get();
                     return executionId != null && cancellation.isCancelled(executionId);
-                });
+                }, TurnIntent.instructionFor(intent));
         AgentExecution root = chief.execution();
         cancellation.untrackRun(root.id(), root.hermesRunId());
         if (cancellation.isCancelled(root.id())) {
@@ -126,12 +134,12 @@ public class ResearchAndBuildFlow implements Flow {
 
         if (split.isEmpty()) {
             // 나눌 것이 없으면 Chief 의 답이 그대로 최종 답이다. 실행은 하나만 남는다.
-            return answer(conversation, root, chief.result().output());
+            return answer(conversation, root, chief.result().output(), intent);
         }
 
         List<Step> planned = plan(split);
         planned.forEach(step -> onEvent.accept(ChatEvent.step(step.name(), STARTED)));
-        List<ChildResult> done = runInParallel(user, conversation, root, agent, planned);
+        List<ChildResult> done = runInParallel(user, conversation, root, agent, planned, intent);
         if (cancellation.isCancelled(root.id())) {
             return cancelled(conversation, root);
         }
@@ -155,7 +163,7 @@ public class ResearchAndBuildFlow implements Flow {
 
         onEvent.accept(ChatEvent.step(SYNTHESIZER, STARTED));
         ChildResult synthesis = runChild(
-                user, conversation, root, agent, synthesizerPrompt(text, done));
+                user, conversation, root, agent, synthesizerPrompt(text, done), intent);
         if (cancellation.isCancelled(root.id())) {
             return cancelled(conversation, root);
         }
@@ -165,7 +173,7 @@ public class ResearchAndBuildFlow implements Flow {
         }
         onEvent.accept(ChatEvent.step(SYNTHESIZER, COMPLETED));
 
-        return answer(conversation, root, synthesis.output());
+        return answer(conversation, root, synthesis.output(), intent);
     }
 
     /** 나눈 결과에서 실제로 돌릴 단계를 고른다. 갈래가 빈 단계는 건너뛴다. */
@@ -194,7 +202,8 @@ public class ResearchAndBuildFlow implements Flow {
             Conversation conversation,
             AgentExecution root,
             Agent agent,
-            List<Step> planned) {
+            List<Step> planned,
+            TurnIntent intent) {
         try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
             List<CompletableFuture<ChildResult>> pending = planned.stream()
                     .map(step -> CompletableFuture.supplyAsync(
@@ -202,7 +211,7 @@ public class ResearchAndBuildFlow implements Flow {
                                 if (cancellation.isCancelled(root.id())) {
                                     return ChildResult.failed(null, "CANCELLED");
                                 }
-                                return runChild(user, conversation, root, agent, step.task());
+                                return runChild(user, conversation, root, agent, step.task(), intent);
                             },
                             workers))
                     .toList();
@@ -211,7 +220,7 @@ public class ResearchAndBuildFlow implements Flow {
     }
 
     private ChildResult runChild(CurrentUser user, Conversation conversation,
-            AgentExecution root, Agent agent, String task) {
+            AgentExecution root, Agent agent, String task, TurnIntent intent) {
         AtomicReference<String> submittedRunId = new AtomicReference<>();
         try {
             return children.run(user, conversation, root, agent.code(), task,
@@ -219,7 +228,8 @@ public class ResearchAndBuildFlow implements Flow {
                         submittedRunId.set(runId);
                         cancellation.trackRun(root.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId);
                     },
-                    () -> cancellation.isCancelled(root.id()));
+                    () -> cancellation.isCancelled(root.id()),
+                    TurnIntent.instructionFor(intent));
         } finally {
             cancellation.untrackRun(root.id(), submittedRunId.get());
         }
@@ -256,10 +266,14 @@ public class ResearchAndBuildFlow implements Flow {
      * <p>이력에 붙이는 실행 번호는 뿌리다. 그 번호로 실행 나무를 열면 네 단계를 모두 볼 수 있다.
      * 마지막 단계를 붙이면 잎 하나만 보인다.
      */
-    private ChatTurn answer(Conversation conversation, AgentExecution root, String output) {
+    private ChatTurn answer(
+            Conversation conversation, AgentExecution root, String output, TurnIntent intent) {
         String text = output == null ? "" : output;
-        ChatMessage saved =
-                messages.save(ChatMessage.fromAssistant(conversation.id(), text, root.id()));
+        ChatMessage saved = messages.save(intent instanceof TurnIntent.Regenerate regenerate
+                        && regenerate.previousAnswer() != null
+                ? ChatMessage.regeneratedAnswer(
+                        conversation.id(), text, root.id(), regenerate.previousAnswer().id())
+                : ChatMessage.fromAssistant(conversation.id(), text, root.id()));
         return new ChatTurn(conversation.id(), root.id(), text, saved.id(), false);
     }
 

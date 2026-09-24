@@ -100,7 +100,8 @@ public class AgentRunner {
                 sessionId,
                 onStarted,
                 (execution, runId) -> {},
-                () -> false);
+                () -> false,
+                null);
     }
 
     /** 실행 줄과 Hermes run 번호가 모두 생긴 직후 호출한다. */
@@ -115,6 +116,33 @@ public class AgentRunner {
             Consumer<AgentExecution> onStarted,
             BiConsumer<AgentExecution, String> onSubmitted,
             BooleanSupplier cancelled) {
+        return run(
+                user,
+                conversation,
+                agent,
+                task,
+                parentExecutionId,
+                rootExecutionId,
+                sessionId,
+                onStarted,
+                onSubmitted,
+                cancelled,
+                null);
+    }
+
+    /** 실행 문맥 뒤에 turn 에만 적용하는 지시를 덧붙인다. 실행 기록의 문맥 값은 덧붙이기 전 값이다. */
+    public Run run(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            String task,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            String sessionId,
+            Consumer<AgentExecution> onStarted,
+            BiConsumer<AgentExecution, String> onSubmitted,
+            BooleanSupplier cancelled,
+            String instructionAddition) {
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
@@ -137,7 +165,7 @@ public class AgentRunner {
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
                 task,
-                context.instructions(),
+                appendInstruction(context.instructions(), instructionAddition),
                 sessionId,
                 option.provider(),
                 option.model());
@@ -195,6 +223,13 @@ public class AgentRunner {
         append(failed, ExecutionEventType.RUN_FAILED, code, sequence);
         log.warn("흐름의 한 단계가 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
         return new Run(failed, ChildResult.failed(failed.id(), code), null);
+    }
+
+    private static String appendInstruction(String instructions, String addition) {
+        if (addition == null || addition.isBlank()) {
+            return instructions;
+        }
+        return instructions == null || instructions.isBlank() ? addition : instructions + "\n\n" + addition;
     }
 
     /**

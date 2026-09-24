@@ -78,17 +78,31 @@ public class ChatController {
     @PostMapping(path = "/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
+        return stream(event -> chat.stream(
+                user,
+                request.conversationId(),
+                request.text(),
+                request.agentCode(),
+                request.attachmentIds(),
+                request.editOfMessageId(),
+                event));
+    }
+
+    @PostMapping(path = "/conversations/{conversationId}/regenerate/stream",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter regenerate(@PathVariable Long conversationId) {
+        CurrentUser user = currentUser.require();
+        // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
+        chat.requireConversation(user, conversationId);
+        return stream(event -> chat.regenerate(user, conversationId, event));
+    }
+
+    private SseEmitter stream(java.util.function.Consumer<java.util.function.Consumer<ChatEvent>> work) {
         SseEmitter emitter = new SseEmitter(0L);
         AtomicBoolean clientConnected = new AtomicBoolean(true);
         Thread.ofVirtual().name("chat-stream-").start(() -> {
             try {
-                chat.stream(
-                        user,
-                        request.conversationId(),
-                        request.text(),
-                        request.agentCode(),
-                        request.attachmentIds(),
-                        event -> send(emitter, event, clientConnected));
+                work.accept(event -> send(emitter, event, clientConnected));
             } catch (ApiException ex) {
                 send(emitter, ChatEvent.error(ex.code().name(), ex.getMessage()), clientConnected);
             } catch (Exception ex) {
@@ -170,6 +184,7 @@ public class ChatController {
                                         // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
                                         it.executionId() != null && withChildren.contains(it.executionId()),
                                         it.executionId() == null ? null : switched.get(it.executionId()),
+                                        it.replacesMessageId(),
                                         it.createdAt(),
                                         attached.getOrDefault(it.id(), List.of()).stream()
                                                 .map(AttachmentView::from)

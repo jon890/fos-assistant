@@ -454,6 +454,9 @@ class ResearchAndBuildFlowTest {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         List<ChatEvent> relayed = new ArrayList<>();
         java.util.concurrent.CountDownLatch childrenSubmitted = new java.util.concurrent.CountDownLatch(2);
+        java.util.concurrent.CountDownLatch childrenAwaiting = new java.util.concurrent.CountDownLatch(2);
+        java.util.concurrent.CountDownLatch stopSent = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger awaitCalls = new java.util.concurrent.atomic.AtomicInteger();
         java.util.concurrent.atomic.AtomicBoolean stopped = new java.util.concurrent.atomic.AtomicBoolean();
         stub().willAnswer(command -> {
             String input = command.input();
@@ -475,12 +478,22 @@ class ResearchAndBuildFlowTest {
             return completed("run-synthesizer", "합친 답");
         });
         stub().beforeAwait(() -> {
-            if (stub().received().size() != 3 || !stopped.compareAndSet(false, true)) return;
-            ChatEvent started = relayed.stream()
-                    .filter(event -> "started".equals(event.type()))
-                    .findFirst()
-                    .orElseThrow();
-            chat.stop(dad, started.executionId());
+            if (awaitCalls.incrementAndGet() == 1) return;
+            childrenAwaiting.countDown();
+            await(childrenAwaiting);
+            if (stopped.compareAndSet(false, true)) {
+                try {
+                    ChatEvent started = relayed.stream()
+                            .filter(event -> "started".equals(event.type()))
+                            .findFirst()
+                            .orElseThrow();
+                    chat.stop(dad, started.executionId());
+                } finally {
+                    stopSent.countDown();
+                }
+            } else {
+                await(stopSent);
+            }
         });
 
         chat.stream(dad, null, "전기차를 사는 게 나을까?", MY_AGENT, relayed::add);

@@ -1,33 +1,24 @@
 import { NextResponse } from "next/server";
 import { requestControlPlane } from "@/lib/control-plane";
 
-export async function POST(request: Request) {
-  const body = (await request.json()) as {
-    conversationId?: number;
-    text?: string;
-    agentCode?: string;
-    attachmentIds?: number[];
-    editOfMessageId?: unknown;
-  };
-  if (!body.text || body.text.trim().length === 0) {
+type RouteContext = {
+  params: Promise<{ conversationId: string }>;
+};
+
+/** 마지막 답을 다시 만드는 SSE 연결을 Control Plane 에서 그대로 전달한다. */
+export async function POST(_request: Request, context: RouteContext) {
+  const { conversationId } = await context.params;
+  if (!/^\d+$/.test(conversationId)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "보낼 내용을 입력해 주세요." },
+      { code: "VALIDATION_FAILED", message: "대화 번호가 올바르지 않습니다." },
       { status: 400 },
     );
   }
 
-  const opened = await requestControlPlane("/api/v1/chat/messages/stream", {
-    method: "POST",
-    body: {
-      conversationId: body.conversationId ?? null,
-      text: body.text,
-      agentCode: body.agentCode ?? null,
-      attachmentIds: body.attachmentIds ?? [],
-      ...(typeof body.editOfMessageId === "number" && Number.isSafeInteger(body.editOfMessageId)
-        ? { editOfMessageId: body.editOfMessageId }
-        : {}),
-    },
-  });
+  const opened = await requestControlPlane(
+    `/api/v1/chat/conversations/${conversationId}/regenerate/stream`,
+    { method: "POST" },
+  );
   if (!opened.ok) {
     return NextResponse.json(
       { code: opened.code, message: opened.message },

@@ -68,6 +68,19 @@ public class ChildExecutionRunner {
             String task,
             BiConsumer<AgentExecution, String> onSubmitted,
             BooleanSupplier cancelled) {
+        return run(user, conversation, parent, agentCode, task, onSubmitted, cancelled, null);
+    }
+
+    /** turn 에만 적용할 지시는 자식의 문맥 뒤에도 같은 문구로 붙인다. */
+    public ChildResult run(
+            CurrentUser user,
+            Conversation conversation,
+            AgentExecution parent,
+            String agentCode,
+            String task,
+            BiConsumer<AgentExecution, String> onSubmitted,
+            BooleanSupplier cancelled,
+            String instructionAddition) {
         requireNotAChild(parent);
         Agent agent = agents.requireReadable(user, agentCode);
         return runner.run(
@@ -80,7 +93,8 @@ public class ChildExecutionRunner {
                         null,
                         execution -> {},
                         onSubmitted,
-                        cancelled)
+                        cancelled,
+                        instructionAddition)
                 .result();
     }
 
