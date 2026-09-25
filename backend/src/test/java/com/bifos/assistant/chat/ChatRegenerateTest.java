@@ -202,6 +202,54 @@ class ChatRegenerateTest {
     }
 
     @Test
+    void 다시_생성은_대화가_기억한_Hermes_session을_이어서_쓴다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturnInOrder(
+                HermesRunResult.of("first", "shared-session", "completed", "첫 답", "model", "provider", TokenUsage.empty()),
+                HermesRunResult.of("second", "shared-session", "completed", "새 답", "model", "provider", TokenUsage.empty()));
+        Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
+
+        chat.regenerate(dad, conversationId, event -> {});
+
+        assertThat(stub().received().getLast().sessionId()).isEqualTo("shared-session");
+    }
+
+    @Test
+    void 지운_대화에서는_다시_생성과_수정을_모두_거절한다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(result("first", "첫 답"));
+        Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
+        Long questionId = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst().id();
+        chat.delete(dad, conversationId);
+
+        assertThatThrownBy(() -> chat.regenerate(dad, conversationId, event -> {}))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+        assertThatThrownBy(() -> chat.stream(
+                dad, conversationId, "고친 질문", null, List.of(), questionId, event -> {}))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+    }
+
+    @Test
+    void 다른_사용자의_대화에서_질문_수정을_거절한다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        CurrentUser mom = member("mom@example.com", "mom");
+        stub().willReturn(result("first", "첫 답"));
+        Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
+        Long questionId = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst().id();
+
+        assertThatThrownBy(() -> chat.stream(
+                mom, conversationId, "남의 질문 수정", null, List.of(), questionId, event -> {}))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).hasSize(2);
+    }
+
+    @Test
     void 도는_재생성_중에는_둘째_재생성을_거절한다() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("regenerated", "새 답"));

@@ -19,6 +19,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.StopResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -59,6 +60,11 @@ public class ChatController {
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
+        if (request.editOfMessageId() != null) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "editOfMessageId requires the streaming endpoint");
+        }
         ChatTurn turn = chat.send(
                 user,
                 request.conversationId(),
