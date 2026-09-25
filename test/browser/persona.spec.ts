@@ -12,21 +12,21 @@ import { TEST_EMAIL } from "./settings.ts";
 test("자기 에이전트의 성격 화면을 연다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   await expect(page.getByRole("textbox", { name: "성격 비서 성격" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "저장" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeVisible();
 });
 
 test("성격을 저장한다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   const textarea = page.getByRole("textbox", { name: "성격 비서 성격" });
   await textarea.fill("차분하고 다정하게 설명하는 성격이다");
-  await page.getByRole("button", { name: "저장" }).click();
+  await page.getByRole("button", { name: "저장", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "성격 비서의 성격을 저장할까요?" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "저장한다" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("저장되었습니다")).toBeVisible();
+  await expect(page.getByText("저장되었습니다.", { exact: true })).toBeVisible();
 });
 
 test("확인에서 취소한다", async ({ page }) => {
@@ -40,7 +40,7 @@ test("확인에서 취소한다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   const textarea = page.getByRole("textbox", { name: "성격 비서 성격" });
   await textarea.fill("저장하면 안 되는 성격이다");
-  await page.getByRole("button", { name: "저장" }).click();
+  await page.getByRole("button", { name: "저장", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "성격 비서의 성격을 저장할까요?" });
   await expect(dialog).toBeVisible();
@@ -56,7 +56,7 @@ test("8000자를 넘겨 적는다", async ({ page }) => {
   await textarea.fill("가".repeat(8005));
 
   await expect(page.getByText("남은 -5자")).toBeVisible();
-  await expect(page.getByRole("button", { name: "저장" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
 });
 
 test("고칠 수 없는 에이전트를 연다", async ({ context, page }) => {
@@ -70,7 +70,7 @@ test("고칠 수 없는 에이전트를 연다", async ({ context, page }) => {
     const textarea = page.getByRole("textbox", { name: "가족 성격 비서 성격" });
     await expect(textarea).toBeVisible();
     await expect(textarea).toHaveAttribute("readonly", "");
-    await expect(page.getByRole("button", { name: "저장" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "저장", exact: true })).toHaveCount(0);
   } finally {
     await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "PRIVATE", TEST_EMAIL);
   }

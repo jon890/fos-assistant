@@ -46,7 +46,7 @@ test("사진을 고르면 미리보기가 붙고 올리는 동안 보내기가 �
 
   try {
     const send = page.getByRole("button", { name: "보내기" });
-    await page.getByPlaceholder("무엇을 도와줄까요").fill("사진 미리보기 검사");
+    await page.getByRole("textbox", { name: "메시지" }).fill("사진 미리보기 검사");
     await expect(send).toBeEnabled();
 
     await page.getByTestId("attachment-input").setInputFiles([pngFile("photo.png")]);
@@ -117,7 +117,7 @@ test("새 대화에서 사진을 고르고 글과 함께 보내면 사진이 보
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
 
   const text = `사진 전송 검사 ${testInfo.project.name}`;
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 
   const userMessage = page.getByTestId("user-message").last();
@@ -186,9 +186,9 @@ test("이미지가 아닌 파일은 고르기에서 걸린다", async ({ page },
 test("흐름이 붙은 에이전트의 대화에는 사진 단추가 없다", async ({ page }, testInfo) => {
   // 방금 만든 대화가 아니라, 흐름 에이전트로 이미 만들어진 기존 대화를 목록에서 열어 확인한다.
   await openNewConversation(page, testInfo);
-  await page.getByRole("combobox").selectOption({ label: "흐름 비서" });
+  await page.getByRole("radio", { name: "흐름 비서" }).click();
   const text = `흐름 대화 사진 단추 검사 ${testInfo.project.name}`;
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
 
@@ -221,7 +221,7 @@ test("보관 기간이 지난 첨부는 자리를 남기고 알린다", async ({
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
 
   const text = `만료 검사 ${testInfo.project.name}`;
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expectImageLoaded(page.getByTestId("message-attachment").last());
 
@@ -246,7 +246,7 @@ test("대화를 바꾸면 미리보기가 비워진다", async ({ page }, testIn
   // 먼저 대화 하나를 만들어 목록에 남긴다.
   await openNewConversation(page, testInfo);
   const firstText = `전환 검사 원래 대화 ${testInfo.project.name}`;
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(firstText);
+  await page.getByRole("textbox", { name: "메시지" }).fill(firstText);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
 
@@ -300,7 +300,7 @@ async function selectConversationByText(page: Page, text: string): Promise<numbe
 /** 글만 보내 대화 하나를 만든다. */
 async function createConversationWithText(page: Page, testInfo: TestInfo, text: string): Promise<void> {
   await openNewConversation(page, testInfo);
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
 }
@@ -313,7 +313,7 @@ async function sendTextAndReadRequest(
   const sent = page.waitForRequest(
     (request) => /\/api\/chat(\/stream)?$/.test(request.url()) && request.method() === "POST",
   );
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   const body = (await sent).postDataJSON() as { conversationId: number | null; attachmentIds: number[] };
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });

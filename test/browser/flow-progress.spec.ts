@@ -4,8 +4,8 @@ import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 /** 흐름 에이전트로 새 대화를 열고 한 마디를 보낸다. */
 async function sendWithTheFlowAgent(page: Page, text: string): Promise<void> {
   await page.goto("/");
-  await page.getByRole("combobox").selectOption({ label: "흐름 비서" });
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }
 
@@ -62,8 +62,8 @@ test("실패한 단계만 실패로 보이고 오지 않은 단계는 그리지 
 
 test("연결이 끊기면 실패 줄은 남고 끝나지 않은 줄은 멈춘다", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("combobox").selectOption({ label: "브라우저 비서" });
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("첫 답");
+  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("첫 답");
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last()).toBeVisible();
   const conversationId = Number(new URL(page.url()).pathname.split("/").at(-1));
@@ -78,7 +78,7 @@ test("연결이 끊기면 실패 줄은 남고 끝나지 않은 줄은 멈춘다
     contentType: "text/event-stream",
     body: events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
   }));
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("연결 중단 검사");
+  await page.getByRole("textbox", { name: "메시지" }).fill("연결 중단 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const block = page.locator('[data-testid="activity-block"][data-mode="live"]');
   await expect(page.getByTestId("turn-error")).toBeVisible();
@@ -95,8 +95,8 @@ test("연결이 끊기면 실패 줄은 남고 끝나지 않은 줄은 멈춘다
 
 test("사건 없는 자식은 저장된 줄에서 빼고 머리의 수와 맞춘다", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("combobox").selectOption({ label: "브라우저 비서" });
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("사건 없는 자식 검사");
+  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("사건 없는 자식 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
   await expect(block).toBeVisible({ timeout: 30_000 });
@@ -113,8 +113,8 @@ test("사건 없는 자식은 저장된 줄에서 빼고 머리의 수와 맞춘
 
 test("병렬 하위 에이전트가 거꾸로 끝나도 저장된 줄의 토큰과 시간이 맞는다", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("combobox").selectOption({ label: "브라우저 비서" });
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("병렬 하위 에이전트 검사");
+  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("병렬 하위 에이전트 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
   await expect(block).toBeVisible({ timeout: 30_000 });
@@ -135,8 +135,8 @@ test("병렬 하위 에이전트가 거꾸로 끝나도 저장된 줄의 토큰�
 
 test("일반 대화에는 단계 없이 도구 줄이 남고 읽기 실패를 다시 시도할 수 있다", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("combobox").selectOption({ label: "브라우저 비서" });
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("그냥 대화");
+  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("그냥 대화");
   await page.getByRole("button", { name: "보내기" }).click();
 
   const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();

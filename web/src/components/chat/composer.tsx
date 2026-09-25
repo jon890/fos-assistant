@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
+import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
 
 type Props = {
   value: string;
@@ -22,6 +24,16 @@ type Props = {
   /** `started` 사건 뒤, 아직 중지를 누르지 않았을 때 참이다. */
   canStop: boolean;
   onStop(): void;
+  /**
+   * 입력칸에 `@` 를 치면 에이전트를 고르는 목록을 띄운다. 새 대화에서만 준다.
+   * 대화의 에이전트는 첫 메시지가 정하고 그 뒤로 바뀌지 않는다.
+   */
+  mention?: { agents: AgentView[]; onPick(code: string): void };
+  /**
+   * 보내기를 막는 일이 도는지 알린다. 빈 대화를 만드는 요청이나 끝나지 않은 첨부가 그렇다.
+   * 입력창을 거치지 않고 보내는 추천 질문도 이 동안은 막아야 대화가 둘 생기지 않는다.
+   */
+  onBlockingChange?(blocking: boolean): void;
 };
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -79,12 +91,16 @@ export function Composer({
   running,
   canStop,
   onStop,
+  mention,
+  onBlockingChange,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const [items, setItems] = useState<AttachmentItem[]>([]);
   const [pickNotice, setPickNotice] = useState<string | null>(null);
+  /** 빈 대화를 만드는 요청이 도는 중이다. 아직 첨부 목록에 아무것도 없어 `items` 로는 알 수 없다 */
+  const [creatingConversation, setCreatingConversation] = useState(false);
   /** 빈 대화를 만드는 요청이 진행 중이면 그 Promise 를 담아 다시 쓴다. 연달아 고르면 두 번 도는 것을 막는다 */
   const creatingConversationRef = useRef<Promise<number | null> | null>(null);
   /** 올리는 중에 지운 첨부의 key 다. 올리기 응답을 받으면 그때 서버 DELETE 를 부른다 */
@@ -98,6 +114,14 @@ export function Composer({
   const itemsRef = useRef<AttachmentItem[]>([]);
   /** 전송 요청에 실은 첨부다. 응답을 기다리는 동안에는 메시지에 묶일 수 있어 정리에서 지우지 않는다 */
   const sendingItemsRef = useRef<AttachmentItem[]>([]);
+  const mentionListId = useId();
+  /** 입력칸의 커서 자리다. `@` 목록은 커서 앞의 글만 본다 */
+  const [caret, setCaret] = useState(0);
+  /** `Esc` 로 닫은 `@` 의 자리다. 같은 `@` 뒤에 글을 더 쳐도 다시 띄우지 않는다 */
+  const [dismissedMentionStart, setDismissedMentionStart] = useState<number | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  /** 고른 뒤 `@` 부터 커서까지를 뺀 글이 그려지면 커서를 이 자리에 둔다 */
+  const pendingCaretRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     itemsRef.current = items;
@@ -129,9 +153,44 @@ export function Composer({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
   }, [value]);
 
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    const nextCaret = pendingCaretRef.current;
+    if (!textarea || nextCaret === null) return;
+    pendingCaretRef.current = null;
+    textarea.focus();
+    textarea.setSelectionRange(nextCaret, nextCaret);
+  }, [value]);
+
+  const found = mention ? findMention(value, caret) : null;
+  const openMention = found !== null && found.start !== dismissedMentionStart ? found : null;
+  const mentionMatches = mention && openMention ? filterAgents(mention.agents, openMention.query) : [];
+  const activeMentionIndex = Math.min(mentionIndex, Math.max(0, mentionMatches.length - 1));
+
+  function changeValue(nextValue: string, nextCaret: number) {
+    const next = mention ? findMention(nextValue, nextCaret) : null;
+    if (next === null || next.start !== dismissedMentionStart) setDismissedMentionStart(null);
+    setCaret(nextCaret);
+    setMentionIndex(0);
+    onChange(nextValue);
+  }
+
+  function pickMention(code: string) {
+    if (!mention || !openMention) return;
+    const end = textareaRef.current?.selectionStart ?? caret;
+    pendingCaretRef.current = openMention.start;
+    mention.onPick(code);
+    changeValue(value.slice(0, openMention.start) + value.slice(end), openMention.start);
+  }
+
   const uploading = items.some((item) => item.status === "uploading");
   const hasBlockingAttachment = items.some((item) => item.status !== "done");
-  const sendDisabled = disabled || value.trim().length === 0 || hasBlockingAttachment;
+  const blocking = creatingConversation || hasBlockingAttachment;
+  const sendDisabled = disabled || value.trim().length === 0 || blocking;
+
+  useEffect(() => {
+    onBlockingChange?.(blocking);
+  }, [blocking, onBlockingChange]);
 
   function updateItem(key: string, patch: Partial<AttachmentItem>) {
     setItems((previous) => previous.map((item) => (item.key === key ? { ...item, ...patch } : item)));
@@ -142,6 +201,7 @@ export function Composer({
     if (creatingConversationRef.current) return creatingConversationRef.current;
 
     const promise = (async () => {
+      setCreatingConversation(true);
       try {
         const response = await fetch("/api/chat/conversations", {
           method: "POST",
@@ -162,6 +222,7 @@ export function Composer({
         return null;
       } finally {
         creatingConversationRef.current = null;
+        if (mountedRef.current) setCreatingConversation(false);
       }
     })();
     creatingConversationRef.current = promise;
@@ -371,13 +432,27 @@ export function Composer({
 
       <div
         data-testid="composer-shell"
-        className="flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-brand"
+        className="relative flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-brand"
       >
+        {mention && openMention ? (
+          <AgentMention
+            id={mentionListId}
+            agents={mention.agents}
+            query={openMention.query}
+            activeIndex={activeMentionIndex}
+            onPick={pickMention}
+          />
+        ) : null}
         <textarea
           ref={textareaRef}
           rows={1}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          aria-label="메시지"
+          aria-controls={openMention ? mentionListId : undefined}
+          aria-activedescendant={openMention && mentionMatches.length > 0
+            ? mentionOptionId(mentionListId, activeMentionIndex) : undefined}
+          onChange={(event) => changeValue(event.target.value, event.target.selectionStart)}
+          onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
           onCompositionStart={() => {
             composing.current = true;
           }}
@@ -385,6 +460,33 @@ export function Composer({
             composing.current = false;
           }}
           onKeyDown={(event) => {
+            const imeComposing = composing.current || event.nativeEvent.isComposing;
+            if (openMention && event.key === "Escape") {
+              // 대화 화면의 Esc 처리기가 이 사건을 건너뛰게 한다. 목록만 닫고 중지나 패널 닫기로 넘기지 않는다.
+              // 한글 조합 중에도 같다. 조합 중이라고 넘기면 목록이 떠 있는데 패널이 닫힌다.
+              event.preventDefault();
+              event.stopPropagation();
+              setDismissedMentionStart(openMention.start);
+              return;
+            }
+            if (openMention && !imeComposing) {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                if (mentionMatches.length > 0) {
+                  const step = event.key === "ArrowDown" ? 1 : -1;
+                  setMentionIndex((activeMentionIndex + step + mentionMatches.length) % mentionMatches.length);
+                }
+                return;
+              }
+              if ((event.key === "Enter" && !event.shiftKey) || (event.key === "Tab" && mentionMatches.length > 0)) {
+                // 목록이 떠 있는 동안의 Enter 는 고르기다. 맞는 것이 없어도 보내지 않는다.
+                // Shift+Enter 는 고르지 않고 평소처럼 줄을 바꾼다. 줄이 바뀌면 `@` 뒤에 공백이 생겨 목록이 닫힌다.
+                event.preventDefault();
+                const picked = mentionMatches[activeMentionIndex];
+                if (picked) pickMention(picked.code);
+                return;
+              }
+            }
             if (
               event.key !== "Enter"
               || event.shiftKey
@@ -398,7 +500,7 @@ export function Composer({
             void trySend();
           }}
           disabled={disabled}
-          placeholder="무엇을 도와줄까요"
+          placeholder={mention ? "@ 로 에이전트를 부른다" : "무엇을 도와줄까요"}
           className="max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto bg-transparent py-2 text-base leading-6 outline-none disabled:opacity-50"
         />
         {acceptsAttachments ? (

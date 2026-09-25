@@ -12,7 +12,7 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
   }
   await page.reload();
 
-  const composer = page.getByPlaceholder("무엇을 도와줄까요");
+  const composer = page.getByRole("textbox", { name: "메시지" });
   const box = await composer.boundingBox();
   expect(box).not.toBeNull();
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(844);
@@ -41,7 +41,7 @@ test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({ page 
 
 test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을 알약 하나로 보인다", async ({ page }) => {
   await page.goto("/");
-  const composer = page.getByPlaceholder("무엇을 도와줄까요");
+  const composer = page.getByRole("textbox", { name: "메시지" });
   const send = page.getByRole("button", { name: "보내기" });
   await expect(send).toBeDisabled();
 
@@ -64,12 +64,21 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
   await expect(assistantMessage).toBeVisible();
   const userTime = userMessage.locator("time");
   const assistantTime = assistantMessage.locator("time");
+  // 저장된 이력을 다시 읽어 시각과 수정 단추가 생긴 뒤에 잰다. 그 전에 재면 그 줄이 늘어난 것까지 섞인다.
+  await expect(userTime).toHaveCount(1);
+  await expect(assistantTime).toHaveCount(1);
+  await expect(userMessage.getByRole("button", { name: "수정" })).toBeVisible();
   await expect(userTime).toBeHidden();
   await expect(assistantTime).toBeHidden();
+  // 시각이 보였다 숨었다 해도 말풍선과 답의 크기가 그대로여야 한다. 아래 메시지가 밀리면 안 된다.
+  const userBefore = await userMessage.boundingBox();
+  const assistantBefore = await assistantMessage.boundingBox();
   await userMessage.hover();
   await expect(userTime).toBeVisible();
+  expect(await userMessage.boundingBox()).toEqual(userBefore);
   await assistantMessage.focus();
   await expect(assistantTime).toBeVisible();
+  expect(await assistantMessage.boundingBox()).toEqual(assistantBefore);
 
   const userBox = await userMessage.boundingBox();
   const assistantBox = await assistantMessage.boundingBox();
@@ -108,7 +117,7 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
 
 test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", async ({ page }) => {
   await page.goto("/");
-  const composer = page.getByPlaceholder("무엇을 도와줄까요");
+  const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("마크다운 보안 검사");
   await page.getByRole("button", { name: "보내기" }).click();
 
@@ -119,7 +128,7 @@ test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", asyn
 
 test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다", async ({ page }) => {
   await page.goto("/");
-  const composer = page.getByPlaceholder("무엇을 도와줄까요");
+  const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("코드 블록 검사");
   await page.getByRole("button", { name: "보내기" }).click();
 
@@ -146,7 +155,7 @@ test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다",
 
 test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨다", async ({ page }) => {
   await page.goto("/");
-  const composer = page.getByPlaceholder("무엇을 도와줄까요");
+  const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("긴 답 스트림 검사");
   await page.getByRole("button", { name: "보내기" }).click();
 

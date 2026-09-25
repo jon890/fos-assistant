@@ -8,6 +8,12 @@ import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
 
 const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(null);
+/** 레이아웃이 한 번 읽은 사용자 이름이다. 화면마다 다시 읽지 않고 여기서 꺼낸다. 읽지 못했으면 null 이다 */
+const DisplayNameContext = createContext<string | null>(null);
+
+export function useShellDisplayName(): string | null {
+  return useContext(DisplayNameContext);
+}
 
 export function useShellTitle(title: string | null): void {
   const setTitle = useContext(TitleContext);
@@ -117,10 +123,12 @@ export function AppShell({ isAdmin, displayName, children }: {
   const pathname = usePathname();
   const signedIn = pathname !== "/signin";
   return (
-    <ConversationsProvider enabled={signedIn}>
-      <ShellBody isAdmin={isAdmin} displayName={displayName} signedIn={signedIn}>
-        {children}
-      </ShellBody>
-    </ConversationsProvider>
+    <DisplayNameContext.Provider value={displayName || null}>
+      <ConversationsProvider enabled={signedIn}>
+        <ShellBody isAdmin={isAdmin} displayName={displayName} signedIn={signedIn}>
+          {children}
+        </ShellBody>
+      </ConversationsProvider>
+    </DisplayNameContext.Provider>
   );
 }

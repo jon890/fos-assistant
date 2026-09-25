@@ -1,6 +1,8 @@
 package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.PersonaSnapshot;
+import com.bifos.assistant.agent.application.StarterService;
+import com.bifos.assistant.agent.application.StarterSnapshot;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentModelOption;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -62,20 +64,61 @@ public final class AgentDtos {
             @NotBlank @Size(max = PERSONA_MAX_CHARS) String body, String baseHash) {}
 
     /**
+     * 에이전트의 소개와 추천 질문 화면이 받는 것이다.
+     *
+     * @param tagline 한 줄 소개. 비어 있으면 {@code null}
+     * @param starterPrompts 추천 질문. 보이는 차례대로다
+     * @param editable 지금 요청자가 고칠 수 있는가
+     * @param maxPrompts 추천 질문의 최대 수. 화면이 입력 칸 수를 정한다
+     */
+    public record StartersView(
+            String tagline, List<String> starterPrompts, boolean editable, int maxPrompts) {
+        static StartersView from(StarterSnapshot snapshot) {
+            return new StartersView(
+                    snapshot.tagline(),
+                    snapshot.starterPrompts(),
+                    snapshot.editable(),
+                    StarterService.MAX_STARTER_PROMPTS);
+        }
+    }
+
+    /**
+     * 소개와 추천 질문을 한꺼번에 쓰는 요청이다.
+     *
+     * <p>수와 길이에 요청 본문 검증을 걸지 않는다. 둘 다 앞뒤 공백과 빈 줄을 버린 뒤에 세야 하므로 그 판정은
+     * {@code StarterService} 가 갖는다. 여기서 세면 공백이 붙은 200자 소개처럼 저장하면 상한 안인 값을
+     * 거절한다. 목록 안의 {@code null} 줄도 거기서 빈 줄처럼 버린다.
+     *
+     * @param tagline 한 줄 소개. 비우면 소개를 지운다
+     * @param starterPrompts 추천 질문 전체. 이 목록으로 통째로 바꾼다. 비우면 모두 지운다
+     */
+    public record WriteStartersRequest(String tagline, List<String> starterPrompts) {}
+
+    /**
      * 사용자가 대화를 시작할 때 고르는 에이전트 한 줄.
      *
      * @param acceptsAttachments 이 에이전트의 대화에 사진을 붙일 수 있다. 화면이 이때만 사진 단추를
      *     둔다. 흐름 이름은 내보내지 않는다
+     * @param tagline 새 대화 화면에 보일 한 줄 소개. 비어 있으면 {@code null}
+     * @param starterPrompts 새 대화 화면에 보일 추천 질문. 보이는 차례대로다. 없으면 빈 목록
      */
     public record AgentView(
-            String code, String name, String model, String visibility, boolean acceptsAttachments) {
-        static AgentView from(Agent agent) {
+            String code,
+            String name,
+            String model,
+            String visibility,
+            boolean acceptsAttachments,
+            String tagline,
+            List<String> starterPrompts) {
+        static AgentView from(Agent agent, List<String> starterPrompts) {
             return new AgentView(
                     agent.code(),
                     agent.name(),
                     agent.model(),
                     agent.visibility().name(),
-                    agent.acceptsAttachments());
+                    agent.acceptsAttachments(),
+                    agent.tagline(),
+                    starterPrompts);
         }
     }
 

@@ -72,6 +72,10 @@ public class Agent {
     @Column(name = "flow", length = 64)
     private String flow;
 
+    /** 새 대화 화면에 보일 한 줄 소개. 비어 있으면 {@code null} 이다. */
+    @Column(name = "tagline", length = 200)
+    private String tagline;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -117,10 +121,17 @@ public class Agent {
     public Long ownerUserId() { return ownerUserId; }
     public boolean enabled() { return enabled; }
     public String flow() { return flow; }
+    public String tagline() { return tagline; }
 
     /** 흐름 이름을 붙이거나 뗀다. 빈 문자열은 비운 것과 같게 본다. */
     public void assignFlow(String flow) {
         this.flow = flow == null || flow.isBlank() ? null : flow.strip();
+    }
+
+    /** 한 줄 소개를 바꾼다. 앞뒤 공백을 떼고, 비면 {@code null} 로 둔다. */
+    public void changeTagline(String tagline) {
+        String stripped = tagline == null ? "" : tagline.strip();
+        this.tagline = stripped.isEmpty() ? null : stripped;
     }
 
     /**

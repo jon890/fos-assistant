@@ -30,7 +30,8 @@ public class PersonaService {
     public PersonaSnapshot read(CurrentUser user, String code) {
         Agent agent = agents.requireReadable(user, code);
         SoulDocument soul = dashboard.readSoul(agent.hermesProfile());
-        return new PersonaSnapshot(soul.content(), Sha256.hex16(soul.content()), editable(user, agent));
+        return new PersonaSnapshot(
+                soul.content(), Sha256.hex16(soul.content()), agents.isEditableBy(user, agent));
     }
 
     /**
@@ -45,7 +46,7 @@ public class PersonaService {
      */
     public PersonaSnapshot write(CurrentUser user, String code, String body, String baseHash) {
         Agent agent = agents.requireReadable(user, code);
-        if (!editable(user, agent)) {
+        if (!agents.isEditableBy(user, agent)) {
             throw new ApiException(
                     ErrorCode.FORBIDDEN, "only the owner of this agent or the family admin can edit it");
         }
@@ -83,10 +84,5 @@ public class PersonaService {
     private static ApiException stale() {
         return new ApiException(
                 ErrorCode.PERSONA_STALE, "this persona changed since it was read; read it again");
-    }
-
-    /** 주인과 {@code ADMIN} 만 고친다. 가족이 함께 쓰는 에이전트는 여럿이 함께 읽는 글이다. */
-    private static boolean editable(CurrentUser user, Agent agent) {
-        return user.isAdmin() || Objects.equals(agent.ownerUserId(), user.id());
     }
 }

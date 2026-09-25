@@ -1,4 +1,4 @@
-import { expect, FLOW_AGENT_CODE, test } from "./fixtures.ts";
+import { expect, test } from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 
 const PNG_1X1 = Buffer.from(
@@ -8,7 +8,7 @@ const PNG_1X1 = Buffer.from(
 
 async function beginHeldTurn(page: Page, text: string) {
   await page.goto("/");
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }
 
@@ -38,7 +38,7 @@ test("사진을 실은 실행 중에는 사진을 지우거나 다음 사진을 
   const conversationId = Number(page.url().match(/\/c\/(\d+)$/)?.[1]);
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
   await hermes.holdNextRun();
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("사진 중지 검사");
+  await page.getByRole("textbox", { name: "메시지" }).fill("사진 중지 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();
   await expect(page.getByTestId("attachment-input")).toBeDisabled();
@@ -81,7 +81,7 @@ test("남긴 답이 없으면 사용자 메시지 아래에 안내를 보인다"
 test("답과 코드 블록의 원문을 복사한다", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("코드 블록 검사");
+  await page.getByRole("textbox", { name: "메시지" }).fill("코드 블록 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const answerCopy = page.getByRole("button", { name: "답 복사" }).last();
   await expect(answerCopy).toBeVisible({ timeout: 30_000 });
@@ -96,8 +96,8 @@ test("답과 코드 블록의 원문을 복사한다", async ({ context, page })
 test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({ page, hermes }) => {
   await hermes.holdNextRun();
   await page.goto("/");
-  await page.getByRole("combobox").selectOption(FLOW_AGENT_CODE);
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("중지 패널 Esc 검사");
+  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("중지 패널 Esc 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();
   const block = page.locator('[data-testid="activity-block"][data-mode="live"]');
@@ -117,7 +117,7 @@ test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({ pa
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 입력 Esc 검사");
   await hermes.waitForHeldRun();
-  await page.getByPlaceholder("무엇을 도와줄까요").focus();
+  await page.getByRole("textbox", { name: "메시지" }).focus();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
 });

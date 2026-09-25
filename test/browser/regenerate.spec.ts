@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures.ts";
 
 async function ask(page: import("../../web/node_modules/@playwright/test/index.js").Page, text: string) {
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
 }
@@ -94,7 +94,7 @@ test("오래된 질문 수정 오류를 보이고 편집 글을 남긴다", asyn
   await expect(page.getByText("그 사이 대화가 바뀌었다. 최신 대화를 다시 불러왔다.")).toBeVisible();
   await expect(editor).toHaveValue("고치던 글은 그대로 남아야 한다");
   await expect.poll(() => reads).toBeGreaterThan(0);
-  await expect(page.getByPlaceholder("무엇을 도와줄까요")).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
 });
 
 test("수정 실행이 시작된 뒤 실패하면 편집칸을 닫고 다시 시도만 보인다", async ({ page }) => {
@@ -175,7 +175,7 @@ test("새 질문을 보내는 동안 이전 turn 을 계속 보인다", async ({
   await page.goto("/");
   await ask(page, "이전 turn 유지 검사");
   await hermes.holdNextRun();
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("새 질문 대기 검사");
+  await page.getByRole("textbox", { name: "메시지" }).fill("새 질문 대기 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();
   await expect(page.getByTestId("user-message")).toHaveCount(2);
@@ -193,7 +193,7 @@ test("같은 글은 수정 전송할 수 없다", async ({ page }) => {
 test("답 없는 질문을 다시 시도해 같은 질문에 답을 붙인다", async ({ page, hermes }) => {
   await hermes.holdNextRun();
   await page.goto("/");
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("중지 조각 전 검사");
+  await page.getByRole("textbox", { name: "메시지" }).fill("중지 조각 전 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();
   await page.getByTestId("composer-shell").getByRole("button", { name: "중지" }).click();

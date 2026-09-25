@@ -8,8 +8,8 @@ const PNG_1X1 = Buffer.from(
 
 async function send(page: Page, text: string, agent = "브라우저 비서") {
   await page.goto("/");
-  await page.getByRole("combobox").selectOption({ label: agent });
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("radio", { name: agent }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }
 
@@ -29,7 +29,7 @@ test("끝난 답의 패널에서 실행 나무를 보고 단추와 Esc 로 닫�
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
     .toBeLessThanOrEqual(0);
   if (testInfo.project.name === "desktop") {
-    await expect(page.getByPlaceholder("무엇을 도와줄까요")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "메시지" })).toBeVisible();
   } else {
     const bounds = await panel.boundingBox();
     expect(bounds?.width).toBeGreaterThanOrEqual(390);
@@ -40,7 +40,7 @@ test("끝난 답의 패널에서 실행 나무를 보고 단추와 Esc 로 닫�
     .getByTestId("activity-open-panel").click();
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
-  await expect(page.getByPlaceholder("무엇을 도와줄까요")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "메시지" })).toBeVisible();
 });
 
 test("도는 중 패널은 사건을 보이고 끝나면 같은 자리에서 나무로 바뀐다", async ({ page, hermes }) => {
@@ -93,7 +93,7 @@ test("다른 답에서 열면 같은 패널이 그 답의 나무로 바뀐다", 
   test.skip(testInfo.project.name !== "desktop", "패널 옆에서 다른 답을 누를 수 있는 폭에서 검사한다");
   await send(page, "첫 번째 패널 검사");
   await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]')).toHaveCount(1);
-  await page.getByPlaceholder("무엇을 도와줄까요").fill("두 번째 패널 검사");
+  await page.getByRole("textbox", { name: "메시지" }).fill("두 번째 패널 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const blocks = page.locator('[data-testid="activity-block"][data-mode="saved"]');
   await expect(blocks).toHaveCount(2);
