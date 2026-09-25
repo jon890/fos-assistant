@@ -3,6 +3,8 @@ package com.bifos.assistant.orchestration.application;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatTurn;
+import com.bifos.assistant.chat.application.TurnIntent;
+import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -12,15 +14,21 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.ArrayList;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -53,6 +61,8 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class ResearchAndBuildFlow implements Flow {
 
+    private static final Logger log = LoggerFactory.getLogger(ResearchAndBuildFlow.class);
+
     /** {@code agent.flow} 에 적는 이름이다. */
     public static final String NAME = "research-and-build";
 
@@ -70,6 +80,9 @@ public class ResearchAndBuildFlow implements Flow {
     private final AgentRunner runner;
     private final ChildExecutionRunner children;
     private final ExecutionRecorder executions;
+    private final ExecutionEventRecorder eventRecorder;
+    private final ExecutionEventRepository executionEvents;
+    private final TurnCancellation cancellation;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -83,13 +96,36 @@ public class ResearchAndBuildFlow implements Flow {
             Conversation conversation,
             Agent agent,
             String text,
+            String input,
+            TurnIntent intent,
+            Consumer<AgentExecution> onRootStarted,
             Consumer<ChatEvent> onEvent) {
-        messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+        if (intent instanceof TurnIntent.Fresh) {
+            messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+        } else if (intent instanceof TurnIntent.Edit edit) {
+            messages.save(ChatMessage.editedFromUser(
+                    conversation.id(), user.id(), text, edit.previousQuestion().id()));
+        }
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));
+        AtomicReference<Long> rootExecutionId = new AtomicReference<>();
         AgentRunner.Run chief = runner.run(
-                user, conversation, agent, chiefPrompt(text), null, null, conversation.hermesSessionId(),
-                execution -> onEvent.accept(ChatEvent.started(conversation.id(), execution.id())));
+                user, conversation, agent, chiefPrompt(input), null, null, conversation.hermesSessionId(),
+                execution -> {
+                    rootExecutionId.set(execution.id());
+                    onRootStarted.accept(execution);
+                },
+                (execution, runId) -> cancellation.trackRun(
+                        execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId),
+                () -> {
+                    Long executionId = rootExecutionId.get();
+                    return executionId != null && shouldStop(executionId);
+                }, TurnIntent.instructionFor(intent));
+        AgentExecution root = chief.execution();
+        cancellation.untrackRun(root.id(), root.hermesRunId());
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, chief.sessionId());
+        }
         if (!chief.result().succeeded()) {
             onEvent.accept(ChatEvent.step(CHIEF, FAILED));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the flow could not start");
@@ -99,17 +135,23 @@ public class ResearchAndBuildFlow implements Flow {
                 chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(), Instant.now());
         onEvent.accept(ChatEvent.step(CHIEF, COMPLETED));
 
-        AgentExecution root = chief.execution();
         Split split = split(root, chief.result().output(), onEvent);
+
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
+        }
 
         if (split.isEmpty()) {
             // 나눌 것이 없으면 Chief 의 답이 그대로 최종 답이다. 실행은 하나만 남는다.
-            return answer(conversation, root, chief.result().output());
+            return answer(conversation, root, chief.result().output(), intent);
         }
 
         List<Step> planned = plan(split);
         planned.forEach(step -> onEvent.accept(ChatEvent.step(step.name(), STARTED)));
-        List<ChildResult> done = runInParallel(user, conversation, root, agent, planned);
+        List<ChildResult> done = runInParallel(user, conversation, root, agent, planned, intent);
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
+        }
         for (int index = 0; index < planned.size(); index++) {
             ChildResult result = done.get(index);
             onEvent.accept(
@@ -118,19 +160,29 @@ public class ResearchAndBuildFlow implements Flow {
         ChildResult firstFailure =
                 done.stream().filter(result -> !result.succeeded()).findFirst().orElse(null);
         if (firstFailure != null) {
+            if (shouldStop(root.id())) {
+                return cancelled(conversation, root, null);
+            }
             throw stop(root, firstFailure.errorCode());
         }
 
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
+        }
+
         onEvent.accept(ChatEvent.step(SYNTHESIZER, STARTED));
-        ChildResult synthesis = children.run(
-                user, conversation, root, agent.code(), synthesizerPrompt(text, done));
+        ChildResult synthesis = runChild(
+                user, conversation, root, agent, synthesizerPrompt(text, done), intent);
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
+        }
         if (!synthesis.succeeded()) {
             onEvent.accept(ChatEvent.step(SYNTHESIZER, FAILED));
             throw stop(root, synthesis.errorCode());
         }
         onEvent.accept(ChatEvent.step(SYNTHESIZER, COMPLETED));
 
-        return answer(conversation, root, synthesis.output());
+        return answer(conversation, root, synthesis.output(), intent);
     }
 
     /** 나눈 결과에서 실제로 돌릴 단계를 고른다. 갈래가 빈 단계는 건너뛴다. */
@@ -159,15 +211,41 @@ public class ResearchAndBuildFlow implements Flow {
             Conversation conversation,
             AgentExecution root,
             Agent agent,
-            List<Step> planned) {
+            List<Step> planned,
+            TurnIntent intent) {
         try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
             List<CompletableFuture<ChildResult>> pending = planned.stream()
                     .map(step -> CompletableFuture.supplyAsync(
-                            () -> children.run(user, conversation, root, agent.code(), step.task()),
+                            () -> {
+                                if (shouldStop(root.id())) {
+                                    return ChildResult.failed(null, "CANCELLED");
+                                }
+                                return runChild(user, conversation, root, agent, step.task(), intent);
+                            },
                             workers))
                     .toList();
             return pending.stream().map(CompletableFuture::join).toList();
         }
+    }
+
+    private ChildResult runChild(CurrentUser user, Conversation conversation,
+            AgentExecution root, Agent agent, String task, TurnIntent intent) {
+        AtomicReference<String> submittedRunId = new AtomicReference<>();
+        try {
+            return children.run(user, conversation, root, agent.code(), task,
+                    (execution, runId) -> {
+                        submittedRunId.set(runId);
+                        cancellation.trackRun(root.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId);
+                    },
+                    () -> shouldStop(root.id()),
+                    TurnIntent.instructionFor(intent));
+        } finally {
+            cancellation.untrackRun(root.id(), submittedRunId.get());
+        }
+    }
+
+    private boolean shouldStop(Long executionId) {
+        return cancellation.isStopConfirmed(executionId) || cancellation.shouldStopBeforeSubmit(executionId);
     }
 
     /**
@@ -201,11 +279,37 @@ public class ResearchAndBuildFlow implements Flow {
      * <p>이력에 붙이는 실행 번호는 뿌리다. 그 번호로 실행 나무를 열면 네 단계를 모두 볼 수 있다.
      * 마지막 단계를 붙이면 잎 하나만 보인다.
      */
-    private ChatTurn answer(Conversation conversation, AgentExecution root, String output) {
+    private ChatTurn answer(
+            Conversation conversation, AgentExecution root, String output, TurnIntent intent) {
         String text = output == null ? "" : output;
-        ChatMessage saved =
-                messages.save(ChatMessage.fromAssistant(conversation.id(), text, root.id()));
-        return new ChatTurn(conversation.id(), root.id(), text, saved.id());
+        ChatMessage saved = messages.save(intent instanceof TurnIntent.Regenerate regenerate
+                        && regenerate.previousAnswer() != null
+                ? ChatMessage.regeneratedAnswer(
+                        conversation.id(), text, root.id(), regenerate.previousAnswer().id())
+                : ChatMessage.fromAssistant(conversation.id(), text, root.id()));
+        return new ChatTurn(conversation.id(), root.id(), text, saved.id(), false);
+    }
+
+    /** 중지한 turn 은 답과 기억을 더 만들지 않고 Chief 를 취소 상태로 남긴다. */
+    private ChatTurn cancelled(Conversation conversation, AgentExecution root, String sessionId) {
+        executions.cancel(root);
+        try {
+            boolean alreadyRecorded = executionEvents
+                    .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(root.id()))
+                    .stream().anyMatch(event -> event.eventType() == ExecutionEventType.RUN_CANCELLED);
+            if (!alreadyRecorded) {
+                var event = eventRecorder.record(root, ExecutionEventType.RUN_CANCELLED, null, 99);
+                if (event != null) executionEvents.save(event);
+            }
+        } catch (RuntimeException ex) {
+            // 사건 기록 실패가 중지를 실패로 바꾸면 안 된다.
+            log.warn("취소 실행 사건을 남기지 못했다 executionId={}", root.id(), ex);
+        }
+        if (sessionId != null && !sessionId.isBlank()) {
+            conversation.rememberSession(sessionId);
+            conversations.touchSession(conversation.id(), sessionId, Instant.now());
+        }
+        return new ChatTurn(conversation.id(), root.id(), "", null, true);
     }
 
     /**

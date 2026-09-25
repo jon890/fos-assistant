@@ -6,6 +6,7 @@ import { MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
+import { foldVersions, isLatestView, type VersionSlot } from "@/lib/message-versions";
 
 type Props = {
   turns: Turn[];
@@ -21,6 +22,16 @@ type Props = {
   turnError: string | null;
   onOpenSaved(executionId: number): void;
   onOpenLive(): void;
+  onRetry?(): void;
+  selectedVersions: Record<number, number>;
+  onVersionChange(slotId: number, index: number): void;
+  onRegenerate(): void;
+  editingMessageId: number | null;
+  editText: string | null;
+  onEditTextChange(text: string): void;
+  onStartEdit(id: number, text: string): void;
+  onEdit(id: number, text: string): Promise<void>;
+  onEditCancel(): void;
 };
 
 export function MessageList({
@@ -36,6 +47,9 @@ export function MessageList({
   turnError,
   onOpenSaved,
   onOpenLive,
+  onRetry,
+  selectedVersions, onVersionChange, onRegenerate, editingMessageId, editText, onEditTextChange,
+  onStartEdit, onEdit, onEditCancel,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -43,6 +57,29 @@ export function MessageList({
   const streamedAnswer = turns.some(
     (turn) => typeof turn.id === "string" && turn.id.startsWith("assistant-") && turn.content,
   );
+  const persisted = turns
+    .filter((turn): turn is Turn & { id: number } => typeof turn.id === "number")
+    .map((turn) => ({ ...turn, replacesMessageId: turn.replacesMessageId ?? null }));
+  const folded = foldVersions(persisted, selectedVersions);
+  const latestView = isLatestView(folded);
+  const lastUserId = folded.at(-1)?.user.id;
+  const pendingVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot }[] = turns.filter((turn): turn is Turn & { id: string } => typeof turn.id === "string").map((turn) => ({
+    turn, userVersion: undefined as VersionSlot | undefined, answerVersion: undefined as VersionSlot | undefined,
+  }));
+  const pendingEdit = pendingVisible.some(({ turn }) => String(turn.id).startsWith("edit-pending-"));
+  const regenerating = pendingVisible.some(({ turn }) => String(turn.id).startsWith("assistant-regenerate-"));
+  const foldedVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot }[] = folded.flatMap((fold, turnIndex) => {
+    if (pendingEdit && turnIndex === folded.length - 1) return [];
+    return [
+      { turn: fold.user, userVersion: fold.userVersion },
+      ...fold.answers.flatMap((answer, answerIndex) =>
+        regenerating && turnIndex === folded.length - 1 && answerIndex === fold.answers.length - 1
+          ? [] : [{ turn: answer.message, answerVersion: answer.version }]),
+    ];
+  });
+  const visible = [...foldedVisible, ...pendingVisible];
+  const lastVisible = visible.at(-1)?.turn;
+  const hasNoAnswer = lastVisible?.role === "USER" && latestView && !sending;
   const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}`;
 
   useEffect(() => {
@@ -92,9 +129,9 @@ export function MessageList({
             <p className="py-8 text-center text-sm text-muted">무엇이든 물어보세요.</p>
           ) : (
             <ol className="flex flex-col gap-6">
-              {turns.map((turn) => {
-                const pendingAssistant =
-                  typeof turn.id === "string" && turn.id.startsWith("assistant-");
+              {visible.map(({ turn, userVersion, answerVersion }) => {
+                const pendingAssistant = typeof turn.id === "string" && turn.id.startsWith("assistant-");
+                const isLast = visible.at(-1)?.turn.id === turn.id;
                 return (
                   <Fragment key={turn.id}>
                     {pendingAssistant && activity && activity.items.length > 0 ? (
@@ -107,7 +144,22 @@ export function MessageList({
                     ) : null}
                     <MessageBubble turn={turn} conversationId={conversationId} onOpenSaved={onOpenSaved}
                       initialActivityExpanded={turn.executionId === expandedOnDone?.executionId
-                        && (expandedOnDone?.expanded ?? false)} />
+                        && (expandedOnDone?.expanded ?? false)}
+                      latest={isLast}
+                      streaming={pendingAssistant && sending}
+                      userVersion={userVersion} answerVersion={answerVersion} onVersionChange={onVersionChange}
+                      canEdit={turn.role === "USER" && turn.id === lastUserId && latestView && (turn.attachments?.length ?? 0) === 0 && !sending}
+                      editing={editingMessageId === turn.id} editText={editText ?? undefined}
+                      onEditTextChange={onEditTextChange} onStartEdit={() => onStartEdit(turn.id as number, turn.content)}
+                      onEdit={(text) => onEdit(turn.id as number, text)} onEditCancel={onEditCancel}
+                      canRegenerate={isLast && turn.role === "ASSISTANT" && latestView && !sending}
+                      onRegenerate={onRegenerate} />
+                    {isLast && hasNoAnswer ? (
+                      <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted">
+                        <span>답을 받지 못했다</span>
+                        {onRetry ? <button type="button" onClick={onRetry} className="underline underline-offset-2">다시 시도</button> : null}
+                      </li>
+                    ) : null}
                   </Fragment>
                 );
               })}
@@ -122,7 +174,13 @@ export function MessageList({
               {!streamedAnswer && sending && (!activity || activity.items.length === 0) ? (
                 <WaitingIndicator />
               ) : null}
-              {turnError ? <li data-testid="turn-error" className="rounded-md bg-surface px-3 py-2 text-sm">{turnError}</li> : null}
+              {turnError ? (
+                <li data-testid="turn-error" className="rounded-md bg-surface px-3 py-2 text-sm">
+                  {turnError}
+                  {onRetry && !hasNoAnswer ? <button type="button" data-testid="turn-error-retry"
+                    onClick={onRetry} className="ml-2 text-xs underline underline-offset-2">다시 시도</button> : null}
+                </li>
+              ) : null}
             </ol>
           )}
         </div>

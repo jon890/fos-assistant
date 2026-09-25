@@ -65,6 +65,11 @@ function finish(items: ActivityItem[], kind: ActivityItemKind, pairKey: string |
 
 export function applyChatEvent(state: ActivityState, event: ChatEvent): ActivityState {
   if (event.type === "reset") return { ...state, items: [] };
+  if (event.type === "stopped") return {
+    ...state,
+    endedAt: Date.now(),
+    items: state.items.map((item) => item.state === "running" ? { ...item, state: "stopped" } : item),
+  };
   const items = state.items;
   if (event.type === "tool") {
     const name = event.toolName ?? "도구";

@@ -16,6 +16,9 @@ public interface HermesRunsClient {
 
     HermesRunResult awaitCompletion(HermesRunCommand command, String runId);
 
+    /** 그 실행을 멈추라고 보낸다. */
+    void stop(String apiBaseUrl, String profileName, String runId);
+
     /**
      * 그 세션이 마지막으로 실제로 쓴 provider 와 모델을 읽는다.
      *

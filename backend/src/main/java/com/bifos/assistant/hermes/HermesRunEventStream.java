@@ -37,6 +37,12 @@ public class HermesRunEventStream {
 
     public void open(
             String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
+        open(apiBaseUrl, profileName, runId, onEvent, stream -> {});
+    }
+
+    public void open(
+            String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent,
+            Consumer<java.io.Closeable> onOpened) {
         String apiKey = keyStore.resolve(profileName);
         try (InputStream body = restClient
                 .get()
@@ -48,6 +54,7 @@ public class HermesRunEventStream {
             if (body == null) {
                 throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an empty event stream");
             }
+            onOpened.accept(body);
             readEvents(body, onEvent);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not read the Hermes event stream");
