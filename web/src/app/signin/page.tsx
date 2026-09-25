@@ -13,7 +13,7 @@ export default function SignInPage() {
         </span>
         <h1 className="mt-4 text-2xl font-semibold">우리집 비서</h1>
         <p className="mt-2 text-sm leading-6 text-muted">
-          가족 구성원으로 등록된 Google 계정으로 로그인한다.
+          사용자로 등록된 Google 계정으로 로그인한다.
         </p>
         <form
           className="mt-6 w-full"

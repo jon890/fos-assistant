@@ -20,7 +20,7 @@ export const memoryScenario: Scenario = {
   name: "Memory 공개 범위",
 
   async run(context) {
-    step("한 사람의 개인 항목은 다른 구성원의 목록에 없다");
+    step("한 사람의 개인 항목은 다른 사용자의 목록에 없다");
     const personal = expectStatus(
       await call(context, "/memories", {
         method: "POST",
@@ -37,7 +37,7 @@ export const memoryScenario: Scenario = {
     ).json<MemoryView[]>();
     expect(
       memberMemories.every((memory) => memory.id !== personal.id),
-      "다른 구성원의 개인 Memory 가 목록에 보인다",
+      "다른 사용자의 개인 Memory 가 목록에 보인다",
     );
 
     step("생성, 수정, 삭제가 정상 동작한다");
@@ -100,7 +100,7 @@ export const memoryScenario: Scenario = {
       "member 가족 Memory 삭제",
     );
 
-    step("다른 구성원의 개인 항목은 Hermes 요청 instructions 에 들어가지 않는다");
+    step("다른 사용자의 개인 항목은 Hermes 요청 instructions 에 들어가지 않는다");
     const dadMemory = expectStatus(
       await call(context, "/memories", {
         method: "POST",
@@ -134,7 +134,7 @@ export const memoryScenario: Scenario = {
     expect(instructions.includes(dadMemory.content), "내 개인 Memory 가 Hermes 요청에 없다");
     expect(
       !instructions.includes(kidMemory.content),
-      "다른 구성원의 개인 Memory 가 Hermes 요청에 들어갔다",
+      "다른 사용자의 개인 Memory 가 Hermes 요청에 들어갔다",
     );
     expectStatus(
       await call(context, `/memories/${dadMemory.id}`, { method: "DELETE", token: context.tokens.dad }),

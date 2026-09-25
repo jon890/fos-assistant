@@ -98,7 +98,7 @@ class ResearchAndBuildFlowTest {
         }
     }
 
-    /** 이 검사가 쓰는 에이전트와 구성원이다. 다른 검사 클래스와 겹치지 않는 이름으로 둔다. */
+    /** 이 검사가 쓰는 에이전트와 사용자다. 다른 검사 클래스와 겹치지 않는 이름으로 둔다. */
     private static final String MY_AGENT = "flow-dad";
     private static final String MY_EMAIL = "flow-dad@example.com";
 
@@ -142,7 +142,7 @@ class ResearchAndBuildFlowTest {
         SecurityContextHolder.clearContext();
     }
 
-    /** 흐름이 붙은 에이전트 하나를 가진 구성원을 만든다. */
+    /** 흐름이 붙은 에이전트 하나를 가진 사용자를 만든다. */
     private CurrentUser member(String email, String agentCode, String flow) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         Agent agent = Agent.of(

@@ -49,7 +49,7 @@ public class UsageController {
     private final ExecutionTreeService executionTrees;
 
     /**
-     * 로그인한 사용자 자신의 실행만 준다. 구성원을 가로질러 보는 것은 admin 화면이 맡는다.
+     * 로그인한 사용자 자신의 실행만 준다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
      *
      * <p>뿌리만 낸다. 흐름 하나가 실행 넷을 남기므로 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행
      * 나무 화면에서 본다.
@@ -121,7 +121,7 @@ public class UsageController {
      * <p>네 축이 같은 줄 모양을 쓴다. 화면이 표 하나로 네 축을 모두 그릴 수 있게 하려는 것이다.
      * 합계는 데이터베이스가 내고 축 하나에 질의 하나만 나간다.
      *
-     * <p>자기 것만 낸다. 구성원을 가로질러 보는 것은 admin 화면이 맡는다.
+     * <p>자기 것만 낸다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
      *
      * @param axis {@code agent}, {@code model}, {@code day}, {@code fingerprint} 중 하나
      * @param month {@code 2026-09} 형태의 대상 달. 없으면 이번 달

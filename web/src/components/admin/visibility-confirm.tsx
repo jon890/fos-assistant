@@ -19,7 +19,7 @@ export function VisibilityConfirm({ agent, busy, onCancel, onConfirm }: Props) {
       >
         <h2 id="visibility-confirm-title" className="text-lg font-semibold">{agent.name} 에이전트를 가족에게 공개할까요?</h2>
         <p className="mt-3 text-sm leading-6 text-muted">
-          가족 구성원 누구나 이 에이전트를 골라 대화할 수 있게 된다. 연결된 도구와 자료를 함께 쓸 수 있는지
+          모든 사용자가 이 에이전트를 골라 대화할 수 있게 된다. 연결된 도구와 자료를 함께 쓸 수 있는지
           확인한 뒤 공개한다.
         </p>
         <div className="mt-5 flex justify-end gap-2">
