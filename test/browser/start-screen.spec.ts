@@ -208,6 +208,34 @@ test("새 대화 화면에서 사진과 글을 보내면 입력창이 아래로 
   await expectImageLoaded(page.getByTestId("user-message").last().getByTestId("message-attachment"));
 });
 
+test("사진을 올려 두고 추천 질문으로 새 대화 화면을 벗어나도 사진이 입력창에 남는다", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible();
+
+  await page.getByTestId("attachment-input").setInputFiles([
+    { name: "kept.png", mimeType: "image/png", buffer: PNG_1X1 },
+  ]);
+  const previews = page.getByTestId("attachment-previews").locator("> div");
+  await expect(previews).toHaveCount(1);
+  await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+
+  // 추천 질문은 첨부를 싣지 않는다. 새 대화 화면이 사라질 때 입력창이 새로 만들어지면 정리가 사진을 지운다.
+  await page.getByRole("button", { name: PROMPT, exact: true }).click();
+  await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
+  await expect(page.getByTestId("user-message").first().getByTestId("message-attachment")).toHaveCount(0);
+  await expect(previews).toHaveCount(1);
+
+  await composer(page).fill(`남은 사진 검사 ${testInfo.project.name}`);
+  await page.getByRole("button", { name: "보내기" }).click();
+  await expectImageLoaded(page.getByTestId("user-message").last().getByTestId("message-attachment"));
+  await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByTestId("user-message")).toHaveCount(2);
+  await expectImageLoaded(page.getByTestId("user-message").last().getByTestId("message-attachment"));
+});
+
 test("사진 때문에 빈 대화를 만드는 동안에는 추천 질문을 누를 수 없어 대화가 하나만 생긴다", async ({ page }) => {
   let release!: () => void;
   const released = new Promise<void>((resolve) => {
