@@ -21,8 +21,7 @@ public final class ChatDtos {
             Long conversationId,
             @NotBlank @Size(max = 8000) String text,
             String agentCode,
-            List<Long> attachmentIds,
-            Long editOfMessageId) {
+            List<Long> attachmentIds) {
 
         public SendMessageRequest {
             attachmentIds = attachmentIds == null ? List.of() : attachmentIds;

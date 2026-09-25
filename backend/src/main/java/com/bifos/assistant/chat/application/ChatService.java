@@ -114,7 +114,7 @@ public class ChatService {
             String text,
             String agentCode,
             Consumer<ChatEvent> onEvent) {
-        stream(user, conversationId, text, agentCode, List.of(), null, onEvent);
+        stream(user, conversationId, text, agentCode, List.of(), onEvent);
     }
 
     public void stream(
@@ -124,21 +124,6 @@ public class ChatService {
             String agentCode,
             List<Long> attachmentIds,
             Consumer<ChatEvent> onEvent) {
-        stream(user, conversationId, text, agentCode, attachmentIds, null, onEvent);
-    }
-
-    public void stream(
-            CurrentUser user,
-            Long conversationId,
-            String text,
-            String agentCode,
-            List<Long> attachmentIds,
-            Long editOfMessageId,
-            Consumer<ChatEvent> onEvent) {
-        if (editOfMessageId != null) {
-            edit(user, conversationId, text, attachmentIds, editOfMessageId, onEvent);
-            return;
-        }
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         if (routed.flow() != null) {
             runFlow(user, routed, text, new TurnIntent.Fresh(), onEvent, true, null);
@@ -525,50 +510,6 @@ public class ChatService {
         }
     }
 
-    private void edit(
-            CurrentUser user,
-            Long conversationId,
-            String text,
-            List<Long> attachmentIds,
-            Long editOfMessageId,
-            Consumer<ChatEvent> onEvent) {
-        if (conversationId == null) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "an edit needs an existing conversation");
-        }
-        Conversation conversation = access.requireOwn(user, conversationId);
-        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
-        try {
-            if (attachmentIds != null && !attachmentIds.isEmpty()) {
-                throw new ApiException(ErrorCode.VALIDATION_FAILED, "an edit cannot include attachments");
-            }
-            List<ChatMessage> active = activeMessages(conversation.id());
-            ChatMessage lastUser = active.stream()
-                    .filter(message -> message.role() == com.bifos.assistant.chat.domain.MessageRole.USER)
-                    .reduce((first, second) -> second)
-                    .orElseThrow(() -> new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "there is no question to edit"));
-            if (!editOfMessageId.equals(lastUser.id())) {
-                throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "only the latest question can be edited");
-            }
-            boolean hasAttachment = attachments.allOf(conversation.id()).stream()
-                    .anyMatch(attachment -> editOfMessageId.equals(attachment.messageId()));
-            if (hasAttachment) {
-                throw new ApiException(ErrorCode.VALIDATION_FAILED, "a question with attachments cannot be edited");
-            }
-            Routed routed = routeExisting(user, conversation, List.of());
-            TurnIntent intent = new TurnIntent.Edit(lastUser);
-            if (routed.flow() != null) {
-                runFlow(user, routed, text, intent, onEvent, true, handle);
-                return;
-            }
-            ChatTurn turn = runTurn(user, routed, text, intent, onEvent, true, handle);
-            onEvent.accept(turn.cancelled()
-                    ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
-                    : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
-        } finally {
-            turns.close(handle);
-        }
-    }
-
     private List<ChatMessage> activeMessages(Long conversationId) {
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
         Set<Long> replaced = history.stream()
@@ -611,9 +552,6 @@ public class ChatService {
                 fillBlankTitle(conversation, text);
                 ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
                 attachments.attach(saved.id(), conversation.id(), attachmentIds);
-            } else if (intent instanceof TurnIntent.Edit edit) {
-                messages.save(ChatMessage.editedFromUser(
-                        conversation.id(), user.id(), text, edit.previousQuestion().id()));
             }
         });
     }

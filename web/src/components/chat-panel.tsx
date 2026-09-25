@@ -56,8 +56,6 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const [executionId, setExecutionId] = useState<number | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
   const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
-  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
-  const [editText, setEditText] = useState<string | null>(null);
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
@@ -117,8 +115,6 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setExecutionId(null);
     setStopRequested(false);
     setSelectedVersions({});
-    setEditingMessageId(null);
-    setEditText(null);
     setComposerGeneration((generation) => generation + 1);
     void (async () => {
       try {
@@ -214,8 +210,6 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setExecutionId(null);
     setStopRequested(false);
     setSelectedVersions({});
-    setEditingMessageId(null);
-    setEditText(null);
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
@@ -298,18 +292,17 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   }
 
   /** 전송이 실제로 끝났는지를 돌려준다. `Composer` 는 이 값을 보고 실패했을 때 미리보기를 남긴다 */
-  async function send(attachmentIds: number[], editOfMessageId?: number, replacementText?: string): Promise<boolean> {
+  async function send(attachmentIds: number[], replacementText?: string): Promise<boolean> {
     const text = (replacementText ?? draft).trim();
     if (text.length === 0 || sending || (conversationId === null && agentCode.length === 0)) return false;
 
     const version = selectionVersion.current;
-    const editedSlotId = editOfMessageId === undefined ? undefined : latestSlots()?.userVersion.slotId;
-    const pendingId = `${editOfMessageId === undefined ? "pending" : "edit-pending"}-${Date.now()}`;
+    const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
     setSending(true);
     setError(null);
     setTurnError(null);
-    // 글을 인자로 받았으면 입력창의 글과 무관하게 보낸다. 수정과 추천 질문이 그렇다.
+    // 글을 인자로 받았으면 입력창의 글과 무관하게 보낸다. 추천 질문이 그렇다.
     if (replacementText === undefined) setDraft("");
     setActivity(emptyActivity(Date.now()));
     setLiveExpanded(false);
@@ -338,11 +331,6 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId),
       );
     };
-    const closeEditAfterStartedFailure = () => {
-      if (editOfMessageId === undefined || selectionVersion.current !== version) return;
-      setEditingMessageId(null);
-      setEditText(null);
-    };
     const refreshAfterStartedFailure = async (): Promise<boolean> => {
       if (conversationIdRef.current === null) return false;
       try {
@@ -364,7 +352,6 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       text,
       agentCode,
       attachmentIds,
-      ...(editOfMessageId === undefined ? {} : { editOfMessageId }),
     };
 
     const sendWithoutStream = async () => {
@@ -409,29 +396,16 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           body: JSON.stringify(requestBody),
         });
       } catch {
-        if (editOfMessageId !== undefined) {
-          restoreFailedMessage();
-          setError("수정 요청을 보내지 못했다.");
-          return false;
-        }
         return await sendWithoutStream();
       }
 
       if (!response.ok) {
         if ([404, 405, 415, 501].includes(response.status)) {
-          if (editOfMessageId !== undefined) {
-            restoreFailedMessage();
-            setError("수정 스트림을 열지 못했다.");
-            return false;
-          }
           return await sendWithoutStream();
         }
         const payload = await readPayload<ErrorPayload>(response);
         restoreFailedMessage();
         setError(describeError(payload.code, payload.message));
-        if (payload.code === "MESSAGE_NOT_LATEST" && conversationIdRef.current !== null) {
-          await refreshMessages(conversationIdRef.current, version);
-        }
         return false;
       }
 
@@ -466,15 +440,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
               refresh(),
               refreshMessages(event.conversationId!, version),
             ]);
-            clearSelectedSlot(editedSlotId);
           },
           onError: async (event) => {
             const message = describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다.");
-            if (!stream.started && event.code === "MESSAGE_NOT_LATEST" && conversationIdRef.current !== null) {
-              await refreshMessages(conversationIdRef.current, version);
-            }
             if (stream.started && conversationIdRef.current !== null) {
-              closeEditAfterStartedFailure();
               const refreshed = await refreshAfterStartedFailure();
               setTurnError(startedFailureMessage(message, refreshed));
             } else {
@@ -488,33 +457,29 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           finishFailedActivity();
           const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
           if (stream.started && conversationIdRef.current !== null) {
-            closeEditAfterStartedFailure();
             const refreshed = await refreshAfterStartedFailure();
             if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
           } else {
             restoreFailedMessage();
             if (selectionVersion.current === version) setError(message);
           }
-          return editOfMessageId === undefined && stream.started;
+          return stream.started;
         }
-        return editOfMessageId === undefined
-          ? stream.started || stream.done : stream.done && !stream.reportedError;
+        return stream.started || stream.done;
       }
       if (!stream.done && !stream.reportedError) {
         finishFailedActivity();
         const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
         if (stream.started && conversationIdRef.current !== null) {
-          closeEditAfterStartedFailure();
           const refreshed = await refreshAfterStartedFailure();
           if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
         } else {
           restoreFailedMessage();
           if (selectionVersion.current === version) setError(message);
         }
-        return editOfMessageId === undefined && stream.started;
+        return stream.started;
       }
-      return editOfMessageId === undefined
-        ? stream.started || stream.done : stream.done && !stream.reportedError;
+      return stream.started || stream.done;
     } catch (reason) {
       finishFailedActivity();
       restoreFailedMessage();
@@ -655,15 +620,6 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           selectedVersions={selectedVersions}
           onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
           onRegenerate={() => { void regenerate(); }}
-          editingMessageId={editingMessageId}
-          editText={editText}
-          onEditTextChange={setEditText}
-          onStartEdit={(id, text) => { setEditingMessageId(id); setEditText(text); }}
-          onEdit={async (id, text) => {
-            const ok = await send([], id, text);
-            if (ok) { setEditingMessageId(null); setEditText(null); }
-          }}
-          onEditCancel={() => { setEditingMessageId(null); setEditText(null); }}
           onRetry={() => { void regenerate(); }}
         />}
 
@@ -707,7 +663,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             <StarterPrompts
               prompts={currentAgent?.starterPrompts ?? []}
               disabled={sending || composerBlocking}
-              onPrompt={(text) => { void send([], undefined, text); }}
+              onPrompt={(text) => { void send([], text); }}
             />
           ) : null}
         </div>
