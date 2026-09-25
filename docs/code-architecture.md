@@ -241,7 +241,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 | `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204 |
 | `GET /api/v1/chat/conversations/{id}/messages` | 메시지 목록. 이전 판도 모두 온다 |
 | `POST /api/v1/chat/messages` | 한 번에 받는다 |
-| `POST /api/v1/chat/messages/stream` | 사건으로 받는다. `editOfMessageId` 를 주면 수정이다 |
+| `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |
 | `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
 | `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
 
@@ -308,7 +308,7 @@ provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 
 `ChatService` 가 turn 을 시작할 때 등록하고 끝날 때 지운다.
 provider 를 넘어가 새 실행 줄로 다시 시도하면 열쇠를 새 번호로 옮긴다.
 중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
-같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성과 수정이 `CONVERSATION_BUSY` 를 판정하는 자리다.
+같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성이 `CONVERSATION_BUSY` 를 판정하는 자리다.
 같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.
 
 `ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다.

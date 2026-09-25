@@ -26,12 +26,6 @@ type Props = {
   selectedVersions: Record<number, number>;
   onVersionChange(slotId: number, index: number): void;
   onRegenerate(): void;
-  editingMessageId: number | null;
-  editText: string | null;
-  onEditTextChange(text: string): void;
-  onStartEdit(id: number, text: string): void;
-  onEdit(id: number, text: string): Promise<void>;
-  onEditCancel(): void;
 };
 
 export function MessageList({
@@ -48,8 +42,7 @@ export function MessageList({
   onOpenSaved,
   onOpenLive,
   onRetry,
-  selectedVersions, onVersionChange, onRegenerate, editingMessageId, editText, onEditTextChange,
-  onStartEdit, onEdit, onEditCancel,
+  selectedVersions, onVersionChange, onRegenerate,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -62,14 +55,11 @@ export function MessageList({
     .map((turn) => ({ ...turn, replacesMessageId: turn.replacesMessageId ?? null }));
   const folded = foldVersions(persisted, selectedVersions);
   const latestView = isLatestView(folded);
-  const lastUserId = folded.at(-1)?.user.id;
   const pendingVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot }[] = turns.filter((turn): turn is Turn & { id: string } => typeof turn.id === "string").map((turn) => ({
     turn, userVersion: undefined as VersionSlot | undefined, answerVersion: undefined as VersionSlot | undefined,
   }));
-  const pendingEdit = pendingVisible.some(({ turn }) => String(turn.id).startsWith("edit-pending-"));
   const regenerating = pendingVisible.some(({ turn }) => String(turn.id).startsWith("assistant-regenerate-"));
   const foldedVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot }[] = folded.flatMap((fold, turnIndex) => {
-    if (pendingEdit && turnIndex === folded.length - 1) return [];
     return [
       { turn: fold.user, userVersion: fold.userVersion },
       ...fold.answers.flatMap((answer, answerIndex) =>
@@ -148,10 +138,6 @@ export function MessageList({
                       latest={isLast}
                       streaming={pendingAssistant && sending}
                       userVersion={userVersion} answerVersion={answerVersion} onVersionChange={onVersionChange}
-                      canEdit={turn.role === "USER" && turn.id === lastUserId && latestView && (turn.attachments?.length ?? 0) === 0 && !sending}
-                      editing={editingMessageId === turn.id} editText={editText ?? undefined}
-                      onEditTextChange={onEditTextChange} onStartEdit={() => onStartEdit(turn.id as number, turn.content)}
-                      onEdit={(text) => onEdit(turn.id as number, text)} onEditCancel={onEditCancel}
                       canRegenerate={isLast && turn.role === "ASSISTANT" && latestView && !sending}
                       onRegenerate={onRegenerate} />
                     {isLast && hasNoAnswer ? (

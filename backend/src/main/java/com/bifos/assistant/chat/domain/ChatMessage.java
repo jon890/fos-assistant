@@ -78,12 +78,6 @@ public class ChatMessage {
                 conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId);
     }
 
-    public static ChatMessage editedFromUser(
-            Long conversationId, Long senderUserId, String content, Long replacesMessageId) {
-        return new ChatMessage(
-                conversationId, MessageRole.USER, content, senderUserId, null, replacesMessageId);
-    }
-
     public Long id() {
         return id;
     }
