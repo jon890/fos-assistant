@@ -29,7 +29,9 @@ export function StartScreenHeader({ displayName, agents, loading, selectedCode, 
         {displayName ? `${displayName}님, 무엇을 도와줄까요` : "무엇을 도와줄까요"}
       </h1>
       {loading ? (
-        <div aria-label="에이전트를 읽는 중" className="flex gap-2 overflow-hidden pb-1">
+        // 뼈대는 낭독기에서 숨겨져 있다. 읽는 중이라는 것은 status 안의 글로 알린다.
+        <div role="status" className="flex gap-2 overflow-hidden pb-1">
+          <span className="sr-only">에이전트를 읽는 중</span>
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
