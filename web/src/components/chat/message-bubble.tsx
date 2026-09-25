@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Markdown } from "./markdown";
 import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
@@ -109,7 +108,6 @@ export function MessageBubble({
   onEditTextChange?(text: string): void; onStartEdit?(): void; onEditCancel?(): void;
   canRegenerate?: boolean; onRegenerate?(): void;
 }) {
-  const [detailsVisible, setDetailsVisible] = useState(false);
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
   const attachments = turn.attachments ?? [];
@@ -119,14 +117,10 @@ export function MessageBubble({
       <li
         className="group flex min-w-0 justify-end focus-visible:outline-none"
         tabIndex={0}
-        onMouseEnter={() => setDetailsVisible(true)}
-        onMouseLeave={() => setDetailsVisible(false)}
-        onFocus={() => setDetailsVisible(true)}
-        onBlur={() => setDetailsVisible(false)}
       >
         <div
           data-testid="user-message"
-          className="max-w-[70%] rounded-3xl bg-brand-soft px-4 py-2.5 group-focus-visible:outline-2 group-focus-visible:outline-brand"
+          className="relative max-w-[70%] rounded-3xl bg-brand-soft px-4 py-2.5 group-focus-visible:outline-2 group-focus-visible:outline-brand"
         >
           {editing && onEdit && onEditCancel && editText !== undefined && onEditTextChange
             ? <MessageEditor initialValue={turn.content} value={editText} onChange={onEditTextChange}
@@ -139,10 +133,11 @@ export function MessageBubble({
             </div>
           ) : null}
           <AttachmentGallery conversationId={conversationId} attachments={attachments} />
-          {sentAt && detailsVisible ? (
+          {sentAt ? (
+            // 말풍선 바깥 왼쪽에 겹쳐 둔다. 안에 두면 보일 때마다 말풍선이 한 줄 늘어 아래가 밀린다.
             <time
               dateTime={turn.createdAt}
-              className="mt-1 block text-right text-xs text-muted"
+              className="invisible absolute bottom-2 right-full mr-2 whitespace-nowrap text-xs text-muted group-hover:visible group-focus-within:visible"
             >
               {sentAt}
             </time>
@@ -157,10 +152,6 @@ export function MessageBubble({
       data-testid="assistant-message"
       className="group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2 focus-visible:outline-2 focus-visible:outline-brand"
       tabIndex={0}
-      onMouseEnter={() => setDetailsVisible(true)}
-      onMouseLeave={() => setDetailsVisible(false)}
-      onFocus={() => setDetailsVisible(true)}
-      onBlur={() => setDetailsVisible(false)}
     >
       <span
         aria-hidden="true"
@@ -176,10 +167,10 @@ export function MessageBubble({
         ) : null}
         <div className="mb-1 flex min-h-8 items-center gap-2">
           <span className="text-sm font-medium">비서</span>
-          {sentAt && detailsVisible ? (
+          {sentAt ? (
             <time
               dateTime={turn.createdAt}
-              className="text-xs text-muted"
+              className="invisible text-xs text-muted group-hover:visible group-focus-within:visible"
             >
               {sentAt}
             </time>
