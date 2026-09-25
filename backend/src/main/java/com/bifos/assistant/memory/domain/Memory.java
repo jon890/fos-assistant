@@ -120,7 +120,7 @@ public class Memory {
         this.updatedAt = Instant.now();
     }
 
-    /** USER 는 주인만, FAMILY 는 같은 가구의 구성원이 본다. */
+    /** USER 는 주인만, FAMILY 는 같은 가족의 사용자가 본다. */
     public boolean isReadableBy(Long userId, Long familyId) {
         return scope == MemoryScope.USER
                 ? Objects.equals(ownerUserId, userId)

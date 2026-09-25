@@ -85,7 +85,7 @@ test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInf
 });
 
 test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않는다", async ({ context, page }) => {
-  await setSession(context, { email: "member@example.com", name: "가족 구성원" });
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
 
   await page.goto("/");
   await expect(page.getByRole("link", { name: "사람 관리" })).toHaveCount(0);

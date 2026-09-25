@@ -75,7 +75,7 @@ class ChildExecutionRunnerTest {
     @Autowired MemoryRepository memoryRepository;
     @Autowired HermesRunsClient hermes;
 
-    /** 이 검사가 쓰는 에이전트와 구성원이다. 다른 검사 클래스와 겹치지 않는 이름으로 둔다. */
+    /** 이 검사가 쓰는 에이전트와 사용자다. 다른 검사 클래스와 겹치지 않는 이름으로 둔다. */
     private static final List<String> MY_AGENTS = List.of("child-dad", "child-mom");
     private static final List<String> MY_EMAILS =
             List.of("child-dad@example.com", "child-mom@example.com");
@@ -235,7 +235,7 @@ class ChildExecutionRunnerTest {
     }
 
     @Test
-    void 경계3_자식의_instructions에_다른_구성원의_개인_Memory가_없다() {
+    void 경계3_자식의_instructions에_다른_사용자의_개인_Memory가_없다() {
         CurrentUser dad = member("child-dad@example.com", "child-dad");
         CurrentUser mom = member("child-mom@example.com", "child-mom");
         memories.create(dad, MemoryScope.USER, "아빠", "아빠는 국수를 맵지 않게 먹는다", true);

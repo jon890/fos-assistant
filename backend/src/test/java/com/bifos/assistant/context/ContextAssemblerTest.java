@@ -45,7 +45,7 @@ class ContextAssemblerTest {
     }
 
     @Test
-    void 다른_구성원의_개인_항목과_승인_전_항목은_조립하지_않는다() {
+    void 다른_사용자의_개인_항목과_승인_전_항목은_조립하지_않는다() {
         memories.create(ADMIN, MemoryScope.USER, "아빠 제목", "아빠만 아는 내용", true);
         memories.proposeUser(MEMBER, "제안 제목", "승인 전 내용", 1L);
 

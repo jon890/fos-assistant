@@ -21,7 +21,7 @@ test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
   await card.getByRole("button", { name: "가족 공개로 변경" }).click();
   const dialog = page.getByRole("dialog", { name: "브라우저 비서 에이전트를 가족에게 공개할까요?" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/가족 구성원 누구나 이 에이전트를 골라 대화/)).toBeVisible();
+  await expect(dialog.getByText(/모든 사용자가 이 에이전트를 골라 대화/)).toBeVisible();
   await dialog.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
   await expect(card.getByText("나만", { exact: true })).toBeVisible();

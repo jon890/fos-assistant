@@ -146,7 +146,7 @@ export async function forwardControlPlane(
 }
 
 /**
- * 로그인한 가족 구성원으로서 Control Plane 을 부른다.
+ * 로그인한 사용자로서 Control Plane 을 부른다.
  *
  * <p>서버에서만 돈다. 부르는 사람이 누구인지는 세션이 정하고 요청 본문이 정하지 않는다. 그래서
  * 사용자가 본문을 고쳐 다른 사용자의 자료를 달라고 할 수 없다.

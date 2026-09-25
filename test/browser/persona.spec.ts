@@ -64,7 +64,7 @@ test("고칠 수 없는 에이전트를 연다", async ({ context, page }) => {
   // 가족 공개 에이전트가 정확히 하나라고 가정하고 있어, 여기서 하나를 더 남겨 두면 그 검사가 어긋난다.
   await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "FAMILY", null);
   try {
-    await setSession(context, { email: "member@example.com", name: "가족 구성원" });
+    await setSession(context, { email: "member@example.com", name: "가족 사용자" });
     await page.goto(`/agents/${PERSONA_FAMILY_AGENT_CODE}`);
 
     const textarea = page.getByRole("textbox", { name: "가족 성격 비서 성격" });
