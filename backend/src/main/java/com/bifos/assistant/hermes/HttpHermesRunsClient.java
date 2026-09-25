@@ -64,6 +64,19 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         return poll(command, runId, keyStore.resolve(command.profileName()));
     }
 
+    @Override
+    public void stop(String apiBaseUrl, String profileName, String runId) {
+        try {
+            restClient.post().uri(apiBaseUrl + "/v1/runs/{runId}/stop", runId)
+                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                    .retrieve().toBodilessEntity();
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound ex) {
+            log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
+        } catch (RestClientException ex) {
+            throw HermesCallFailure.of(ex, "could not stop the Hermes run");
+        }
+    }
+
     /**
      * 실제로 돈 provider 와 모델을 세션 행에서 읽는다.
      *

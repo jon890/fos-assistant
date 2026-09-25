@@ -32,8 +32,8 @@ test("관리자에게만 가족 공용 범위를 보인다", async ({ page }) =>
   await expect(page.getByRole("option", { name: "가족 공용" })).toHaveCount(1);
 });
 
-test("구성원은 가족 공용 Memory의 범위와 편집 제어를 보지 않는다", async ({ context, page }) => {
-  const title = "구성원 편집 금지";
+test("MEMBER 역할은 가족 공용 Memory의 범위와 편집 제어를 보지 않는다", async ({ context, page }) => {
+  const title = "MEMBER 편집 금지";
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("FAMILY");
   await page.getByLabel("제목", { exact: true }).fill(title);
@@ -41,7 +41,7 @@ test("구성원은 가족 공용 Memory의 범위와 편집 제어를 보지 않
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
-  await setSession(context, { email: "member@example.com", name: "가족 구성원" });
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   await page.goto("/memory");
   await expect(page.getByRole("option", { name: "가족 공용" })).toHaveCount(0);
   const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");

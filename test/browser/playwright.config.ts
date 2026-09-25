@@ -17,7 +17,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: "list",
-  outputDir: join(tmpdir(), "fos-assistant-playwright-results"),
+  // 워크트리 여럿이 함께 돌 때 서로의 결과를 지우지 않게 포트로 나눈다. 실행을 시작할 때 이 디렉터리를 비운다.
+  outputDir: join(tmpdir(), `fos-assistant-playwright-results-${WEB_PORT}`),
   globalSetup: "./fixtures.ts",
   use: {
     baseURL: WEB_BASE_URL,

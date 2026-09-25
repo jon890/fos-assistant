@@ -11,7 +11,7 @@ export type Context = {
   /** Control Plane 의 `/api/v1` 까지의 주소 */
   readonly api: string;
   /**
-   * 가족 구성원의 토큰. 먼저 부른 쪽이 admin 이 된다.
+   * 가족 사용자의 토큰. 먼저 부른 쪽이 admin 이 된다.
    *
    * `signin` 은 로그인 판정 경로만 부르는 토큰이라 신원을 담지 않는다.
    */

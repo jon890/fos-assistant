@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * profile 별 API server key 를 호스트 설정에서 읽고 쓴다.
  *
  * <p>key 는 데이터베이스에 두지 않는다. 어느 profile 의 key 가 없는 것은 그 profile 하나의 오류다.
- * 다른 profile 의 key 로 대신하지 않는다. 대신하면 한 가족 구성원의 요청이 다른 구성원의 AI
+ * 다른 profile 의 key 로 대신하지 않는다. 대신하면 한 사용자의 요청이 다른 사용자의 AI
  * credential 로 돌아간다.
  *
  * <p>읽는 규칙과 쓰는 규칙을 한 파일에 둔다. 파일 이름 규칙이 두 곳으로 갈리면 쓴 자리를 읽는 쪽이

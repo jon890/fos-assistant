@@ -90,7 +90,7 @@ class MemoryServiceTest {
     }
 
     @Test
-    void 구성원은_가족_항목을_만들거나_고치거나_지우지_못한다() {
+    void MEMBER_역할은_가족_항목을_만들거나_고치거나_지우지_못한다() {
         Memory family = memories.create(ADMIN, MemoryScope.FAMILY, "가족", "내용", false);
 
         assertForbidden(() -> memories.create(MEMBER, MemoryScope.FAMILY, "새 가족", "내용", false));

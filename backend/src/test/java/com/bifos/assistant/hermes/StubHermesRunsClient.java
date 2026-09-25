@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
+import java.util.function.Consumer;
 
 /**
  * 실제 Hermes Runtime 없이 Control Plane 을 검사하는 대역이다.
@@ -28,6 +29,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private volatile Function<HermesRunCommand, HermesRunResult> answer;
     private volatile ApiException nextFailure;
     private volatile Runnable beforeAwait = () -> {};
+    private final List<String> stopped = new CopyOnWriteArrayList<>();
+    private volatile Consumer<String> onStop = runId -> {};
 
     /** 세션 조회가 답할 값이다. 비어 있으면 읽지 못한 것으로 본다. */
     private volatile SessionRuntime sessionRuntime;
@@ -82,6 +85,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
         this.beforeAwait = action;
     }
 
+    public void onStop(Consumer<String> action) { this.onStop = action; }
+    public List<String> stopped() { return stopped; }
+
     public void reset() {
         received.clear();
         nextResult = null;
@@ -94,6 +100,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         beforeAwait = () -> {};
         sessionRuntime = null;
         sessionLookups.clear();
+        stopped.clear();
+        onStop = runId -> {};
     }
 
     @Override
@@ -117,6 +125,12 @@ public class StubHermesRunsClient implements HermesRunsClient {
             throw nextFailure;
         }
         return submittedResults.getOrDefault(runId, nextResult);
+    }
+
+    @Override
+    public void stop(String apiBaseUrl, String profileName, String runId) {
+        stopped.add(runId);
+        onStop.accept(runId);
     }
 
     @Override

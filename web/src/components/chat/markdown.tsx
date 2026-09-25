@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { CopyButton } from "@/components/ui/copy-button";
 
 type HighlightedToken = {
   content: string;
@@ -131,8 +132,10 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   }, [code, language]);
 
   return (
-    <pre className="my-3 overflow-x-auto rounded-md bg-surface p-3 font-mono text-sm leading-6">
-      <code className="block min-w-max">
+    <div className="relative my-3">
+      <div className="absolute right-2 top-2 z-10"><CopyButton text={code} label="코드 복사" /></div>
+      <pre className="overflow-x-auto rounded-md bg-surface px-3 pb-3 pt-12 font-mono text-sm leading-6">
+        <code className="block min-w-max">
         {lines.length > 0
           ? lines.map((line, lineIndex) => (
               <span key={lineIndex} className="block min-h-6">
@@ -144,8 +147,9 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
               </span>
             ))
           : code}
-      </code>
-    </pre>
+        </code>
+      </pre>
+    </div>
   );
 }
 

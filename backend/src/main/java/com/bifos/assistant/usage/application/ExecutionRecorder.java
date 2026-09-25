@@ -144,6 +144,27 @@ public class ExecutionRecorder {
         return executions.save(execution);
     }
 
+    /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
+    public AgentExecution cancel(
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelOption requested) {
+        if (result == null) {
+            return cancel(execution);
+        }
+        TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
+        SessionRuntime actual = readActualRuntime(agent, result);
+        String provider = firstNonBlank(actual == null ? null : actual.provider(), requested == null ? null : requested.provider());
+        String model = firstNonBlank(actual == null ? null : actual.model(), requested == null ? null : requested.model());
+        execution.attachRunId(result.runId());
+        execution.markCancelled(provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+        return executions.save(execution);
+    }
+
+    /** 이미 적은 토큰을 보존하며 실행을 취소로 남긴다. */
+    public AgentExecution cancel(AgentExecution execution) {
+        execution.markCancelled(Instant.now());
+        return executions.save(execution);
+    }
+
     private SessionRuntime readActualRuntime(Agent agent, HermesRunResult result) {
         SessionRuntime actual =
                 hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), result.sessionId());

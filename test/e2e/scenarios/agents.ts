@@ -15,7 +15,7 @@ export const agentsScenario: Scenario = {
     ).json<AgentView[]>();
     expect(privateList.every((agent) => agent.code !== "dad"), "남의 개인 에이전트가 목록에 보인다");
 
-    step("관리자가 가족 공개로 바꾸면 다른 구성원도 에이전트를 볼 수 있다");
+    step("관리자가 가족 공개로 바꾸면 다른 사용자도 에이전트를 볼 수 있다");
     expectStatus(
       await call(context, "/admin/agents/dad", {
         method: "PATCH",

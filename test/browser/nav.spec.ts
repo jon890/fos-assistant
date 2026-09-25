@@ -6,18 +6,18 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toBeVisible();
   await expect(page.getByText("브라우저 테스트", { exact: true })).toBeVisible();
 
-  await setSession(context, { email: "member@example.com", name: "가족 구성원" });
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   const me = await page.request.get("/api/me");
   expect(me.ok()).toBeTruthy();
   expect(await me.json()).toMatchObject({
     email: "member@example.com",
-    displayName: "가족 구성원",
+    displayName: "가족 사용자",
     role: "MEMBER",
   });
   await page.goto("/");
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
-  await expect(page.getByText("가족 구성원", { exact: true })).toBeVisible();
+  await expect(page.getByText("가족 사용자", { exact: true })).toBeVisible();
 });
 
 test("머리의 이름을 한 번만 읽고 좁은 화면에서도 한 줄을 유지한다", async ({ page }, testInfo) => {

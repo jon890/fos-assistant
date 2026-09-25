@@ -106,7 +106,7 @@ class ChatServiceTest {
             return null;
         })
                 .when(eventStream)
-                .open(any(), any(), any(), any());
+                .open(any(), any(), any(), any(), any());
     }
 
     private List<ExecutionEvent> eventsOf(Long executionId) {
@@ -477,6 +477,37 @@ class ChatServiceTest {
         assertThat(typesOf(recorded))
                 .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
         assertThat(recorded).extracting(ExecutionEvent::sequence).containsExactly(1, 2);
+    }
+
+    @Test
+    void provider를_넘어간_turn의_작업_과정은_답을_만든_시도만_센다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        modelSelector.replace(agent, List.of(
+                new ModelOption("anthropic", "example-model-large"),
+                new ModelOption("nvidia", "example-model-small")));
+        stub().willReturnInOrder(
+                new HermesRunResult("run-blocked", "sess-1", "failed", null, null, null,
+                        HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
+                HermesRunResult.of("run-answer", "sess-1", "completed", "답", null, null, TokenUsage.empty()));
+        doAnswer(invocation -> {
+            String runId = invocation.getArgument(2);
+            Consumer<RunEvent> onEvent = invocation.getArgument(3);
+            int toolCount = "run-blocked".equals(runId) ? 2 : 1;
+            for (int index = 0; index < toolCount; index++) {
+                onEvent.accept(new RunEvent("tool.started", null, "search", null, null, null));
+                onEvent.accept(new RunEvent("tool.completed", null, "search", null, 1L, false));
+            }
+            return null;
+        }).when(eventStream).open(any(), any(), any(), any(), any());
+
+        List<ChatEvent> relayed = new ArrayList<>();
+        chat.stream(dad, null, "찾아 줘", "dad", relayed::add);
+
+        ChatEvent done = relayed.getLast();
+        assertThat(done.type()).isEqualTo("done");
+        assertThat(chat.activitySummaries(chat.history(dad, done.conversationId())).get(done.executionId())
+                .toolCount()).isEqualTo(1);
     }
 
     @Test

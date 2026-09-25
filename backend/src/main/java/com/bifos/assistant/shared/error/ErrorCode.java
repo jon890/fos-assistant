@@ -11,6 +11,9 @@ public enum ErrorCode {
     MEMORY_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 없는 실행과 남의 실행을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다. */
     EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),
+    EXECUTION_NOT_RUNNING(HttpStatus.CONFLICT),
+    CONVERSATION_BUSY(HttpStatus.CONFLICT),
+    MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     AGENT_MODEL_UNKNOWN(HttpStatus.BAD_GATEWAY),

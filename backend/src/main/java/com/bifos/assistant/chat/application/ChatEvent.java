@@ -93,6 +93,12 @@ public record ChatEvent(
                 null, null, null, null, null, null, null, null);
     }
 
+    public static ChatEvent stopped(Long conversationId, Long messageId, Long executionId) {
+        return new ChatEvent(
+                "stopped", null, null, null, conversationId, messageId, executionId, null, null, null, null,
+                null, null, null, null, null, null, null, null);
+    }
+
     public static ChatEvent error(String code, String message) {
         return new ChatEvent("error", null, null, null, null, null, null, code, message, null, null,
                 null, null, null, null, null, null, null, null);
