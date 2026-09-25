@@ -446,6 +446,14 @@ export function Composer({
           }}
           onKeyDown={(event) => {
             const imeComposing = composing.current || event.nativeEvent.isComposing;
+            if (openMention && event.key === "Escape") {
+              // 대화 화면의 Esc 처리기가 이 사건을 건너뛰게 한다. 목록만 닫고 중지나 패널 닫기로 넘기지 않는다.
+              // 한글 조합 중에도 같다. 조합 중이라고 넘기면 목록이 떠 있는데 패널이 닫힌다.
+              event.preventDefault();
+              event.stopPropagation();
+              setDismissedMentionStart(openMention.start);
+              return;
+            }
             if (openMention && !imeComposing) {
               if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
@@ -460,13 +468,6 @@ export function Composer({
                 event.preventDefault();
                 const picked = mentionMatches[activeMentionIndex];
                 if (picked) pickMention(picked.code);
-                return;
-              }
-              if (event.key === "Escape") {
-                // 대화 화면의 Esc 처리기가 이 사건을 건너뛰게 한다. 목록만 닫고 중지나 패널 닫기로 넘기지 않는다.
-                event.preventDefault();
-                event.stopPropagation();
-                setDismissedMentionStart(openMention.start);
                 return;
               }
             }
