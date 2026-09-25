@@ -327,6 +327,51 @@ class ChatStopTest {
     }
 
     @Test
+    void 제출이_보낸_중지가_실패해도_같은_중지_요청이_다시_보내_성공하면_성공으로_답한다() throws Exception {
+        CurrentUser dad = member("dad@example.com", "dad");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Future<?>> firstStop = new AtomicReference<>();
+        AtomicInteger attempts = new AtomicInteger();
+        stub().onStop(runId -> {
+            if (attempts.getAndIncrement() == 0) {
+                throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "temporary failure");
+            }
+        });
+        // 중지 요청이 취소 표시를 남긴 뒤 run 이 있는지 보는 것을, 제출이 run 을 등록하며 보낸 중지가 실패할 때까지 미룬다.
+        // 그 요청이 같은 run 에 다시 보내 Hermes 가 받아들였으므로 중지는 성공이다.
+        doAnswer(invocation -> {
+            long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+            while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+            return invocation.callRealMethod();
+        }).when(turns).hasRuns(any());
+        stub().willAnswer(command -> {
+            Long executionId = latestExecution(dad).id();
+            firstStop.set(executor.submit(() -> chat.stop(dad, executionId)));
+            assertThat(awaitCancelled(executionId)).isTrue();
+            return HermesRunResult.of(
+                    "run-retried-by-stop", "session", "completed", "", "model", "provider", TokenUsage.empty());
+        });
+        stub().beforeAwait(() -> {
+            try {
+                firstStop.get().get(1, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                throw new AssertionError(ex);
+            }
+        });
+        ChatTurn turn;
+        try {
+            turn = chat.send(dad, null, "제출과 중지가 겹쳐도 멈춰 줘", "dad");
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(stub().stopped()).containsExactly("run-retried-by-stop", "run-retried-by-stop");
+        assertThat(turn.cancelled()).isTrue();
+        assertThat(executions.findById(turn.executionId()).orElseThrow().status())
+                .isEqualTo(ExecutionStatus.CANCELLED);
+    }
+
+    @Test
     void provider_전환_뒤에는_새_실행만_중지_대상이고_이전_실행은_끝난_것으로_응답한다() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
