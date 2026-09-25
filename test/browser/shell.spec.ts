@@ -19,7 +19,7 @@ async function newConversation(page: Page, testInfo: TestInfo): Promise<void> {
 }
 
 async function send(page: Page, text: string): Promise<void> {
-  await page.getByPlaceholder("무엇을 도와줄까요").fill(text);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }
 
@@ -56,7 +56,7 @@ test("시작 사건 뒤 새 대화를 누르면 기존 메시지와 입력이 �
   const firstUrl = page.url();
   await newConversation(page, testInfo);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
-  await expect(page.getByPlaceholder("무엇을 도와줄까요")).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
   await send(page, `다음 대화 ${testInfo.project.name} ${Date.now()}`);
   await expect(page).toHaveURL(/\/c\/\d+$/);
   expect(page.url()).not.toBe(firstUrl);
@@ -203,7 +203,7 @@ test("started 뒤 실패하면 입력은 비고 저장된 질문은 하나다", 
   await send(page, text);
   await expect(page).toHaveURL(/\/c\/\d+$/);
   await expect(page.getByTestId("turn-error")).toBeVisible();
-  await expect(page.getByPlaceholder("무엇을 도와줄까요")).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
   await page.reload();
   await expect(page.getByTestId("user-message")).toHaveCount(1);
   await expect(page.getByTestId("user-message").first()).toContainText(text);
@@ -317,7 +317,7 @@ test("단축키로 홈으로 가고 검색에 초점을 준다", async ({ page }
   await page.keyboard.press("Control+Shift+O");
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
-  await expect(page.getByPlaceholder("무엇을 도와줄까요")).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
   await page.keyboard.press("Control+K");
   await expect(page.getByRole("searchbox", { name: "대화 검색" })).toBeFocused();
 });

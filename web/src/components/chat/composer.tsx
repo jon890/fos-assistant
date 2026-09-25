@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
+import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
 
 type Props = {
   value: string;
@@ -22,6 +24,11 @@ type Props = {
   /** `started` 사건 뒤, 아직 중지를 누르지 않았을 때 참이다. */
   canStop: boolean;
   onStop(): void;
+  /**
+   * 입력칸에 `@` 를 치면 에이전트를 고르는 목록을 띄운다. 새 대화에서만 준다.
+   * 대화의 에이전트는 첫 메시지가 정하고 그 뒤로 바뀌지 않는다.
+   */
+  mention?: { agents: AgentView[]; onPick(code: string): void };
 };
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -79,6 +86,7 @@ export function Composer({
   running,
   canStop,
   onStop,
+  mention,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,6 +106,14 @@ export function Composer({
   const itemsRef = useRef<AttachmentItem[]>([]);
   /** 전송 요청에 실은 첨부다. 응답을 기다리는 동안에는 메시지에 묶일 수 있어 정리에서 지우지 않는다 */
   const sendingItemsRef = useRef<AttachmentItem[]>([]);
+  const mentionListId = useId();
+  /** 입력칸의 커서 자리다. `@` 목록은 커서 앞의 글만 본다 */
+  const [caret, setCaret] = useState(0);
+  /** `Esc` 로 닫은 `@` 의 자리다. 같은 `@` 뒤에 글을 더 쳐도 다시 띄우지 않는다 */
+  const [dismissedMentionStart, setDismissedMentionStart] = useState<number | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  /** 고른 뒤 `@` 부터 커서까지를 뺀 글이 그려지면 커서를 이 자리에 둔다 */
+  const pendingCaretRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     itemsRef.current = items;
@@ -128,6 +144,36 @@ export function Composer({
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
   }, [value]);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    const nextCaret = pendingCaretRef.current;
+    if (!textarea || nextCaret === null) return;
+    pendingCaretRef.current = null;
+    textarea.focus();
+    textarea.setSelectionRange(nextCaret, nextCaret);
+  }, [value]);
+
+  const found = mention ? findMention(value, caret) : null;
+  const openMention = found !== null && found.start !== dismissedMentionStart ? found : null;
+  const mentionMatches = mention && openMention ? filterAgents(mention.agents, openMention.query) : [];
+  const activeMentionIndex = Math.min(mentionIndex, Math.max(0, mentionMatches.length - 1));
+
+  function changeValue(nextValue: string, nextCaret: number) {
+    const next = mention ? findMention(nextValue, nextCaret) : null;
+    if (next === null || next.start !== dismissedMentionStart) setDismissedMentionStart(null);
+    setCaret(nextCaret);
+    setMentionIndex(0);
+    onChange(nextValue);
+  }
+
+  function pickMention(code: string) {
+    if (!mention || !openMention) return;
+    const end = textareaRef.current?.selectionStart ?? caret;
+    pendingCaretRef.current = openMention.start;
+    mention.onPick(code);
+    changeValue(value.slice(0, openMention.start) + value.slice(end), openMention.start);
+  }
 
   const uploading = items.some((item) => item.status === "uploading");
   const hasBlockingAttachment = items.some((item) => item.status !== "done");
@@ -371,13 +417,27 @@ export function Composer({
 
       <div
         data-testid="composer-shell"
-        className="flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-brand"
+        className="relative flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-brand"
       >
+        {mention && openMention ? (
+          <AgentMention
+            id={mentionListId}
+            agents={mention.agents}
+            query={openMention.query}
+            activeIndex={activeMentionIndex}
+            onPick={pickMention}
+          />
+        ) : null}
         <textarea
           ref={textareaRef}
           rows={1}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          aria-label="메시지"
+          aria-controls={openMention ? mentionListId : undefined}
+          aria-activedescendant={openMention && mentionMatches.length > 0
+            ? mentionOptionId(mentionListId, activeMentionIndex) : undefined}
+          onChange={(event) => changeValue(event.target.value, event.target.selectionStart)}
+          onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
           onCompositionStart={() => {
             composing.current = true;
           }}
@@ -385,6 +445,31 @@ export function Composer({
             composing.current = false;
           }}
           onKeyDown={(event) => {
+            const imeComposing = composing.current || event.nativeEvent.isComposing;
+            if (openMention && !imeComposing) {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                if (mentionMatches.length > 0) {
+                  const step = event.key === "ArrowDown" ? 1 : -1;
+                  setMentionIndex((activeMentionIndex + step + mentionMatches.length) % mentionMatches.length);
+                }
+                return;
+              }
+              if (event.key === "Enter" || (event.key === "Tab" && mentionMatches.length > 0)) {
+                // 목록이 떠 있는 동안의 Enter 는 고르기다. 맞는 것이 없어도 보내지 않는다.
+                event.preventDefault();
+                const picked = mentionMatches[activeMentionIndex];
+                if (picked) pickMention(picked.code);
+                return;
+              }
+              if (event.key === "Escape") {
+                // 대화 화면의 Esc 처리기가 이 사건을 건너뛰게 한다. 목록만 닫고 중지나 패널 닫기로 넘기지 않는다.
+                event.preventDefault();
+                event.stopPropagation();
+                setDismissedMentionStart(openMention.start);
+                return;
+              }
+            }
             if (
               event.key !== "Enter"
               || event.shiftKey
@@ -398,7 +483,7 @@ export function Composer({
             void trySend();
           }}
           disabled={disabled}
-          placeholder="무엇을 도와줄까요"
+          placeholder={mention ? "@ 로 에이전트를 부른다" : "무엇을 도와줄까요"}
           className="max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto bg-transparent py-2 text-base leading-6 outline-none disabled:opacity-50"
         />
         {acceptsAttachments ? (
