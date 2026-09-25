@@ -30,6 +30,9 @@ const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
 const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
 const TEST_RELEASE_HELD_RUN_PATH = "/__test/release-held-run";
+/** 다음 `GET /api/profiles/{이름}/soul` 응답을 붙잡아 화면의 뼈대 검사가 서버를 실제로 늦출 수 있게 한다. */
+const TEST_HOLD_NEXT_SOUL_PATH = "/__test/hold-next-soul";
+const TEST_RELEASE_HELD_SOUL_PATH = "/__test/release-held-soul";
 const TEST_BUSY_PATH = "/__test/busy";
 const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
 
@@ -222,6 +225,9 @@ export type FakeHermes = {
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
+  /** 다음 성격 읽기 응답을 붙잡는다. `releaseHeldSoul` 을 부를 때까지 요청이 끝나지 않는다. */
+  holdNextSoul(): void;
+  releaseHeldSoul(): void;
   /** 중지 요청을 받은 실행 번호들이다. */
   stoppedRuns(): readonly string[];
   close(): Promise<void>;
@@ -266,6 +272,9 @@ export function startFakeHermes(
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
+  let holdNextSoul = false;
+  /** 붙잡아 둔 성격 읽기 요청의 응답 객체와 보낼 본문이다. 풀릴 때 이것으로 응답을 끝낸다. */
+  let heldSoul: { response: ServerResponse; payload: unknown } | undefined;
   const stoppedRuns: string[] = [];
   const emptyUntilStopped = new Map<string, ServerResponse>();
   let lastSubmittedInstructions: string | undefined;
@@ -316,7 +325,13 @@ export function startFakeHermes(
       const name = decodeURIComponent(soulMatch[1]!);
       if (request.method === "GET") {
         const content = souls.get(name);
-        send(response, 200, { content: content ?? "", exists: content !== undefined });
+        const payload = { content: content ?? "", exists: content !== undefined };
+        if (holdNextSoul) {
+          holdNextSoul = false;
+          heldSoul = { response, payload };
+          return true;
+        }
+        send(response, 200, payload);
         return true;
       }
       if (request.method === "PUT") {
@@ -423,6 +438,21 @@ export function startFakeHermes(
         if (releasedRunId === undefined) return send(response, 204, null);
         const run = runs.get(releasedRunId);
         if (run !== undefined) run.status = "completed";
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_HOLD_NEXT_SOUL_PATH) {
+        holdNextSoul = true;
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_RELEASE_HELD_SOUL_PATH) {
+        // 대기 표시는 붙잡은 응답이 없어도 끈다. 클릭 전에 실패한 검사가 남긴 홀드 때문에 다음 검사가
+        // 걸리지 않게 하기 위해서다.
+        holdNextSoul = false;
+        const held = heldSoul;
+        heldSoul = undefined;
+        if (held !== undefined) send(held.response, 200, held.payload);
         return send(response, 204, null);
       }
 
@@ -697,11 +727,22 @@ export function startFakeHermes(
           const run = runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
         },
+        holdNextSoul: () => {
+          holdNextSoul = true;
+        },
+        releaseHeldSoul: () => {
+          holdNextSoul = false;
+          const held = heldSoul;
+          heldSoul = undefined;
+          if (held !== undefined) send(held.response, 200, held.payload);
+        },
         stoppedRuns: () => [...stoppedRuns],
         close: () =>
           new Promise<void>((done) => {
             holdNextRun = false;
             releaseHeldRun();
+            holdNextSoul = false;
+            heldSoul = undefined;
             server.closeAllConnections();
             server.close(() => done());
           }),

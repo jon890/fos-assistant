@@ -69,6 +69,10 @@ export type FakeHermesControl = {
   holdNextRun(): Promise<void>;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): Promise<void>;
+  /** 다음 `GET /api/profiles/{이름}/soul` 응답을 붙잡는다. 성격 화면의 서버를 실제로 늦출 때 쓴다. */
+  holdNextSoul(): Promise<void>;
+  /** 붙잡은 성격 읽기 응답을 보낸다. 붙잡은 것이 없어도 대기 표시를 끄고 끝난다. */
+  releaseHeldSoul(): Promise<void>;
   /** 그 provider 의 계정이 전부 막힌 것처럼 답하게 한다. */
   blockProvider(provider: string): Promise<void>;
   clearBlockedProviders(): Promise<void>;
@@ -87,6 +91,8 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
     holdNextRun: () => call("/__test/hold-next-run", "POST"),
     waitForHeldRun: () => call("/__test/wait-held-run", "GET"),
     releaseHeldRun: () => call("/__test/release-held-run", "POST"),
+    holdNextSoul: () => call("/__test/hold-next-soul", "POST"),
+    releaseHeldSoul: () => call("/__test/release-held-soul", "POST"),
     blockProvider: (provider: string) => call(`/__test/block-provider/${provider}`, "POST"),
     clearBlockedProviders: () => call("/__test/clear-blocked-providers", "POST"),
     busy: () => call("/__test/busy", "POST"),
@@ -316,12 +322,31 @@ export default async function setupServices(): Promise<() => Promise<void>> {
   };
 }
 
+/**
+ * `loading.tsx` 가 있는 경로를 `goto` 로 열면 본문이 `<body>` 끝의 숨은 `S:` 조각으로 먼저 흘러오고,
+ * React 가 조금 뒤에 제자리로 옮긴다. `goto` 가 끝난 뒤에도 그 옮김이 남아 있어서,
+ * 그 사이에는 같은 요소가 숨어 있거나 두 벌이라 strict 검사가 곧바로 실패한다.
+ * 그래서 `goto` 뒤에는 사용자가 보는 상태, 곧 숨은 조각이 모두 옮겨진 뒤까지 기다린다.
+ * 조각이 없는 경로는 곧바로 지나가고, 시간 안에 옮겨지지 않으면 그 검사를 실패시킨다.
+ */
+function waitForStreamedContentAfterGoto(page: import("../../web/node_modules/@playwright/test/index.js").Page) {
+  const goto = page.goto.bind(page);
+  page.goto = async (...args) => {
+    const response = await goto(...args);
+    await page.waitForFunction(() => document.querySelector('div[hidden][id^="S:"]') === null, undefined, {
+      timeout: 10_000,
+    });
+    return response;
+  };
+}
+
 export const test = base.extend<{ hermes: FakeHermesControl }>({
   hermes: async ({}, use) => {
     await use(await fakeHermesControl());
   },
   page: async ({ context, page }, use) => {
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+    waitForStreamedContentAfterGoto(page);
     await use(page);
   },
 });
