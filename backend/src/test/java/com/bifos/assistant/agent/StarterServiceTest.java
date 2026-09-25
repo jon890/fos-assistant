@@ -150,6 +150,18 @@ class StarterServiceTest {
     }
 
     @Test
+    void 앞뒤_공백을_떼면_상한_안인_소개와_줄은_쓴다() {
+        String tagline = "가".repeat(StarterService.MAX_TAGLINE_CHARS);
+        String prompt = "나".repeat(StarterService.MAX_PROMPT_CHARS);
+
+        StarterSnapshot written =
+                starters.write(OWNER, OWNED, "  " + tagline + "  ", List.of("  " + prompt + "  "));
+
+        assertThat(written.tagline()).isEqualTo(tagline);
+        assertThat(written.starterPrompts()).containsExactly(prompt);
+    }
+
+    @Test
     void 주인이_아닌_MEMBER_가_쓰면_거절하고_쓰지_않는다() {
         assertCode(
                 () -> starters.write(MEMBER, SHARED_OWNED, "소개", List.of("a")),

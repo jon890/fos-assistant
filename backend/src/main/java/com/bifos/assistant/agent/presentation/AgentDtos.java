@@ -85,15 +85,14 @@ public final class AgentDtos {
     /**
      * 소개와 추천 질문을 한꺼번에 쓰는 요청이다.
      *
-     * <p>목록의 수에는 상한을 걸지 않는다. 빈 줄을 버린 뒤에 세야 하므로 그 판정은 {@code StarterService}
-     * 가 갖는다. 목록 안의 {@code null} 줄도 거기서 빈 줄처럼 버린다.
+     * <p>수와 길이에 요청 본문 검증을 걸지 않는다. 둘 다 앞뒤 공백과 빈 줄을 버린 뒤에 세야 하므로 그 판정은
+     * {@code StarterService} 가 갖는다. 여기서 세면 공백이 붙은 200자 소개처럼 저장하면 상한 안인 값을
+     * 거절한다. 목록 안의 {@code null} 줄도 거기서 빈 줄처럼 버린다.
      *
      * @param tagline 한 줄 소개. 비우면 소개를 지운다
      * @param starterPrompts 추천 질문 전체. 이 목록으로 통째로 바꾼다. 비우면 모두 지운다
      */
-    public record WriteStartersRequest(
-            @Size(max = StarterService.MAX_TAGLINE_CHARS) String tagline,
-            List<@Size(max = StarterService.MAX_PROMPT_CHARS) String> starterPrompts) {}
+    public record WriteStartersRequest(String tagline, List<String> starterPrompts) {}
 
     /**
      * 사용자가 대화를 시작할 때 고르는 에이전트 한 줄.

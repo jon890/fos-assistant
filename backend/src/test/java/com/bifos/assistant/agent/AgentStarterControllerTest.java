@@ -93,6 +93,17 @@ class AgentStarterControllerTest {
         Assertions.assertThat(saved).isEmpty();
     }
 
+    /** 길이의 상한은 앞뒤 공백을 뗀 뒤에 센다. 요청 본문 검증이 공백까지 세어 거절하면 안 된다. */
+    @Test
+    void 앞뒤_공백이_붙은_상한_길이의_소개와_줄은_쓴다() throws Exception {
+        String tagline = "가".repeat(200);
+        String prompt = "나".repeat(300);
+        mvc.perform(write("{\"tagline\":\"  " + tagline + "  \",\"starterPrompts\":[\"  " + prompt + "  \"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tagline").value(tagline))
+                .andExpect(jsonPath("$.starterPrompts[0]").value(prompt));
+    }
+
     /** 수의 상한은 빈 줄을 버린 뒤에 센다. 요청 본문 검증이 다섯 줄이라는 것만으로 거절하면 안 된다. */
     @Test
     void 빈_줄을_포함한_다섯_줄은_넷으로_쓴다() throws Exception {
