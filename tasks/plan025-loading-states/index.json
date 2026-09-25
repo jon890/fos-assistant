@@ -1,0 +1,12 @@
+{
+  "name": "plan025-loading-states",
+  "description": "화면을 옮길 때 뼈대와 누른 메뉴 표시를 보여 누른 것이 먹혔는지 알게 한다",
+  "status": "pending",
+  "created_at": "2026-09-25",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}

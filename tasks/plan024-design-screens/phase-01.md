@@ -12,6 +12,10 @@
 
 ## 컨텍스트
 
+**요청을 보내는 단추는 `Button` 의 `loading` 을 쓴다.** `disabled={busy}` 만으로 두지 않는다.
+이 phase 가 옮기는 화면에서 `disabled={busy` 처럼 보내는 중에 잠그는 단추를 모두 찾아 `loading={busy}` 와 지금 하는 일을 적은 `loadingText`(「저장 중」, 「지우는 중」 처럼)를 준다.
+근거는 `docs/flow.md` 「기다리는 동안 보이는 것」 이다. 브라우저 검사가 단추 이름으로 찾는 곳은 `loadingText` 때문에 보내는 중에 이름이 바뀐다. 누른 뒤의 기대를 이름이 아니라 결과로 보게 고친다.
+
 **근거 문서**: `docs/adr/ADR-023-화면-부품은-shadcn-ui-를-저장소에-복사해-쓴다.md`,
 `docs/code-architecture.md` 「디렉터리」 「색과 간격은 테마 토큰이 소유한다」 「우리 화면의 정체성」,
 `web/AGENTS.md` 「색과 간격은 테마 토큰이 소유한다」.
