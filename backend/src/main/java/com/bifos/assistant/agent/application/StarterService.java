@@ -81,6 +81,9 @@ public class StarterService {
                     "a tagline can be at most " + MAX_TAGLINE_CHARS + " characters");
         }
 
+        // 같은 에이전트의 저장이 동시에 오면 한 번에 하나씩 돈다. 둘이 함께 지우고 넣으면 한쪽이
+        // (agent_id, position) 유일 제약이나 이미 지워진 줄에 걸린다. 뒤에 온 저장의 목록이 남는다.
+        agentRepository.findByIdForUpdate(agent.id()).orElseThrow();
         agent.changeTagline(tagline);
         agentRepository.save(agent);
 

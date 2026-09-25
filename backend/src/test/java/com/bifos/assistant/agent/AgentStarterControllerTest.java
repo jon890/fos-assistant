@@ -59,10 +59,12 @@ class AgentStarterControllerTest {
 
     @BeforeEach
     void 준비한다() {
-        when(agents.findByCode("dad")).thenReturn(Optional.of(Agent.of("dad", "dad", "dad-profile",
+        Agent dad = Agent.of("dad", "dad", "dad-profile",
                 "http://127.0.0.1:1/p/dad-profile", "openai-codex", "example-model",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
-                OWNER.id())));
+                OWNER.id());
+        when(agents.findByCode("dad")).thenReturn(Optional.of(dad));
+        when(agents.findByIdForUpdate(any())).thenReturn(Optional.of(dad));
         when(prompts.save(any())).thenAnswer(invocation -> {
             AgentStarterPrompt prompt = invocation.getArgument(0);
             saved.add(prompt);

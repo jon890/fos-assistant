@@ -16,9 +16,15 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -181,6 +187,35 @@ class StarterServiceTest {
 
         assertThat(byAgent.get(owned.id())).containsExactly("a", "b");
         assertThat(byAgent.get(family.id())).isEmpty();
+    }
+
+    @Test
+    void 두_저장이_동시에_와도_둘_다_끝나고_한쪽_목록만_남는다() throws Exception {
+        starters.write(OWNER, OWNED, "소개", List.of("처음 하나", "처음 둘"));
+        List<List<String>> lists = List.of(List.of("왼쪽 하나", "왼쪽 둘"), List.of("오른쪽 하나"));
+
+        for (int round = 0; round < 20; round++) {
+            CyclicBarrier start = new CyclicBarrier(lists.size());
+            ExecutorService pool = Executors.newFixedThreadPool(lists.size());
+            try {
+                List<Future<StarterSnapshot>> results = new ArrayList<>();
+                for (List<String> list : lists) {
+                    results.add(pool.submit(() -> {
+                        start.await(5, TimeUnit.SECONDS);
+                        return starters.write(OWNER, OWNED, "소개", list);
+                    }));
+                }
+                for (Future<StarterSnapshot> result : results) {
+                    // 한쪽이 유일 제약이나 이미 지워진 줄에 걸려 실패하면 여기서 그 예외가 드러난다.
+                    result.get(10, TimeUnit.SECONDS);
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+
+            List<String> stored = storedOf(OWNED).stream().map(AgentStarterPrompt::text).toList();
+            assertThat(lists).as("%d번째 동시 저장 뒤 남은 목록", round).contains(stored);
+        }
     }
 
     private List<AgentStarterPrompt> storedOf(String code) {
