@@ -629,8 +629,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 - 화면 부품을 shadcn/ui 로 옮기는 일. 토큰 이름 교체, `components/ui/` 교체, 아이콘 교체가 모두 아직이다.
   [ADR-023](adr/ADR-023-화면-부품은-shadcn-ui-를-저장소에-복사해-쓴다.md) 이 정한 대로 만들면 이 줄에서 뺀다
-- 대화 화면 개선. 위에 정한 것 가운데 아래는 아직 코드에 없다. 만들면 이 줄에서 뺀다
-  - 에이전트 소개와 추천 질문, 새 대화 화면
 - Hermes 하위 에이전트가 자식 실행 줄을 남기는 경로.
   지금 자식 실행을 만드는 자리는 Memory 제안 하나뿐이고,
   그것도 `assistant.memory.propose.enabled` 를 켠 곳에서만 돈다.

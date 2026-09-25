@@ -5,23 +5,18 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
+import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
 import { MessageList } from "./chat/message-list";
 import { applyChatEvent, emptyActivity, failActivity, type ActivityState } from "./chat/activity/activity-state";
 import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
-import { useShellTitle } from "./shell/app-shell";
+import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 import type { ChatEvent } from "@/lib/chat-event";
 import { foldVersions } from "@/lib/message-versions";
+import type { AgentView } from "@/lib/agent";
 
-type Agent = {
-  code: string;
-  name: string;
-  model: string;
-  visibility: string;
-  acceptsAttachments: boolean;
-};
 type ErrorPayload = { code: string; message: string };
 type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
 type TurnStreamCallbacks = {
@@ -45,7 +40,8 @@ const SLOW_FLOW_MS = 120_000;
 
 export function ChatPanel({ initialConversationId }: { initialConversationId: number | null }) {
   const pathname = usePathname();
-  const { conversations, loading: conversationsLoading, refresh, newConversationVersion } = useConversations();
+  const { conversations, refresh, newConversationVersion } = useConversations();
+  const displayName = useShellDisplayName();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(initialConversationId);
   const conversationIdRef = useRef<number | null>(initialConversationId);
@@ -66,8 +62,17 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agents, setAgents] = useState<AgentView[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(true);
   const [agentCode, setAgentCode] = useState<string>("");
+  /** 입력창이 보내기를 막고 있다. 빈 대화를 만들거나 사진을 올리는 중이면 추천 질문도 막는다 */
+  const [composerBlocking, setComposerBlocking] = useState(false);
+  /**
+   * 새 대화로 시작했는지다. 메시지가 없는 동안 새 대화 화면을 그린다.
+   *
+   * <p>사진을 먼저 올려 대화 번호가 생겨도 참으로 남는다. 주소로 연 대화는 메시지를 읽는 동안에도 거짓이다.
+   */
+  const [freshStart, setFreshStart] = useState(initialConversationId === null);
   const [messagesLoading, setMessagesLoading] = useState(initialConversationId !== null);
   const selectionVersion = useRef(0);
   const previousPathname = useRef(pathname);
@@ -84,11 +89,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   useEffect(() => {
     fetch("/api/agents")
       .then((response) => (response.ok ? response.json() : []))
-      .then((data: Agent[]) => {
+      .then((data: AgentView[]) => {
         setAgents(data);
         setAgentCode((current) => current || data[0]?.code || "");
       })
-      .catch(() => setAgents([]));
+      .catch(() => setAgents([]))
+      .finally(() => setAgentsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -96,6 +102,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     const version = ++selectionVersion.current;
     conversationIdRef.current = initialConversationId;
     setConversationId(initialConversationId);
+    setFreshStart(false);
     setMessagesLoading(true);
     setNotFound(false);
     setError(null);
@@ -195,6 +202,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     conversationIdRef.current = null;
     setComposerGeneration((generation) => generation + 1);
     setConversationId(null);
+    setFreshStart(true);
     setAgentCode(agents[0]?.code ?? "");
     setTurns([]);
     setActivity(null);
@@ -301,7 +309,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setSending(true);
     setError(null);
     setTurnError(null);
-    if (editOfMessageId === undefined) setDraft("");
+    // 글을 인자로 받았으면 입력창의 글과 무관하게 보낸다. 수정과 추천 질문이 그렇다.
+    if (replacementText === undefined) setDraft("");
     setActivity(emptyActivity(Date.now()));
     setLiveExpanded(false);
     liveExpandedRef.current = false;
@@ -324,7 +333,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
 
     const restoreFailedMessage = () => {
       if (selectionVersion.current !== version) return;
-      if (editOfMessageId === undefined) setDraft(text);
+      if (replacementText === undefined) setDraft(text);
       setTurns((previous) =>
         previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId),
       );
@@ -599,6 +608,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const selectedAgent = conversations.find((item) => item.id === conversationId)?.agentName
     ?? agents.find((agent) => agent.code === agentCode)?.name;
   useShellTitle(selectedAgent ?? null);
+  const startScreen = freshStart && turns.length === 0 && !sending;
+  const currentAgent = agents.find((agent) => agent.code === agentCode);
 
   if (notFound) {
     return (
@@ -609,34 +620,26 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     );
   }
 
+  // 입력창은 첫 메시지 전후로 같은 자리에 하나만 둔다. 앞뒤 형제만 조건부로 그리고, 가운데에서 아래로
+  // 옮기는 것은 감싸는 요소의 클래스로만 한다. 부모가 바뀌면 입력창이 새로 만들어져 올린 사진이 지워진다.
   return (
     <section className="relative flex h-full min-h-0 min-w-0">
-      <h1 className="sr-only">대화</h1>
+      {startScreen ? null : <h1 className="sr-only">대화</h1>}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-xs text-muted">
-            <label className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
-              <span className="shrink-0">에이전트</span>
-              {!agentLocked && agents.length > 1 ? (
-                <select
-                  value={agentCode}
-                  onChange={(event) => setAgentCode(event.target.value)}
-                  className="min-w-0 max-w-44 truncate rounded-md border border-border bg-transparent px-2 py-1 text-xs"
-                >
-                  {agents.map((agent) => (
-                    <option key={agent.code} value={agent.code}>{agent.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="truncate" title={agents.find((agent) => agent.code === agentCode)?.name}>
-                  {agents.find((agent) => agent.code === agentCode)?.name ?? "등록된 에이전트 없음"}
+        {startScreen ? null : (
+          <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-xs text-muted">
+              <div className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
+                <span className="shrink-0">에이전트</span>
+                <span className="truncate" title={currentAgent?.name}>
+                  {currentAgent?.name ?? "등록된 에이전트 없음"}
                 </span>
-              )}
-            </label>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        <MessageList
+        {startScreen ? null : <MessageList
           turns={turns}
           loading={messagesLoading}
           sending={sending}
@@ -662,35 +665,52 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           }}
           onEditCancel={() => { setEditingMessageId(null); setEditText(null); }}
           onRetry={() => { void regenerate(); }}
-        />
+        />}
 
-        {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}
-        {agents.length === 0 && !conversationsLoading ? (
-          <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">
-            사용할 수 있는 에이전트가 없다. 관리자에게 에이전트 등록을 요청한다.
-          </p>
-        ) : null}
-        <Composer
-          key={composerGeneration}
-          value={draft}
-          onChange={setDraft}
-          onSend={(attachmentIds) => send(attachmentIds)}
-          disabled={conversationId === null && agents.length === 0}
-          conversationId={conversationId}
-          agentCode={agentCode}
-          acceptsAttachments={agents.find((agent) => agent.code === agentCode)?.acceptsAttachments ?? false}
-          onConversationCreated={(id) => {
-            if (conversationIdRef.current === null) {
-              window.history.replaceState(null, "", `/c/${id}`);
-            }
-            conversationIdRef.current = id;
-            setConversationId(id);
-            void refresh();
-          }}
-          running={sending}
-          canStop={executionId !== null && !stopRequested}
-          onStop={() => { void stop(); }}
-        />
+        <div className={startScreen ? "flex min-h-0 flex-1 flex-col overflow-y-auto" : "shrink-0"}>
+          {startScreen ? (
+            <StartScreenHeader
+              displayName={displayName}
+              agents={agents}
+              loading={agentsLoading}
+              selectedCode={agentCode}
+              onSelect={setAgentCode}
+              locked={agentLocked}
+            />
+          ) : null}
+          {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}
+          <Composer
+            key={composerGeneration}
+            value={draft}
+            onChange={setDraft}
+            onSend={(attachmentIds) => send(attachmentIds)}
+            disabled={conversationId === null && agents.length === 0}
+            conversationId={conversationId}
+            agentCode={agentCode}
+            acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
+            onConversationCreated={(id) => {
+              if (conversationIdRef.current === null) {
+                window.history.replaceState(null, "", `/c/${id}`);
+              }
+              conversationIdRef.current = id;
+              setConversationId(id);
+              void refresh();
+            }}
+            running={sending}
+            canStop={executionId !== null && !stopRequested}
+            onStop={() => { void stop(); }}
+            mention={startScreen && !agentLocked && agents.length > 0
+              ? { agents, onPick: setAgentCode } : undefined}
+            onBlockingChange={setComposerBlocking}
+          />
+          {startScreen ? (
+            <StarterPrompts
+              prompts={currentAgent?.starterPrompts ?? []}
+              disabled={sending || composerBlocking}
+              onPrompt={(text) => { void send([], undefined, text); }}
+            />
+          ) : null}
+        </div>
       </div>
       {panelTarget ? <ActivityPanel target={panelTarget.mode === "live" && activity
         ? { mode: "live", state: activity } : panelTarget} onClose={() => setPanelTarget(null)} /> : null}

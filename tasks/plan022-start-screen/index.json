@@ -1,13 +1,28 @@
 {
   "name": "plan022-start-screen",
   "description": "새 대화 화면에 에이전트 카드와 소개와 추천 질문과 @ 고르기를 둔다. 에이전트를 고르고 첫 질문을 쉽게 보내게 한다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-23",
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 3,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "status": "completed"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "status": "completed"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep",
+      "status": "completed"
+    }
   ]
 }

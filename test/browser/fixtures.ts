@@ -129,6 +129,32 @@ export async function setAgentVisibility(
   }
 }
 
+/**
+ * 그 에이전트의 소개와 추천 질문을 직접 쓴다.
+ *
+ * <p>`setAgentVisibility` 와 같이 브라우저 세션을 거치지 않고 Control Plane 을 바로 부른다. 새 대화
+ * 화면 검사가 화면을 열기 전에 보일 값을 정해 두려고 쓴다.
+ */
+export async function setStarters(code: string, tagline: string | null, starterPrompts: string[]): Promise<void> {
+  const token = await new SignJWT({ name: "브라우저 테스트" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(TEST_EMAIL)
+    .setIssuedAt()
+    .setExpirationTime("2m")
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/agents/${code}/starters`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ tagline, starterPrompts }),
+  });
+  if (!response.ok) {
+    throw new Error(`소개와 추천 질문을 쓰지 못했다: ${code} ${response.status} ${await response.text()}`);
+  }
+}
+
 export async function setSession(
   context: BrowserContext,
   user: { email: string; name: string },
