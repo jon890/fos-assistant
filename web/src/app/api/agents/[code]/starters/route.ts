@@ -7,7 +7,7 @@ export async function GET(_request: Request, context: { params: Promise<{ code: 
   if (!AGENT_CODE_PATTERN.test(code)) {
     return NextResponse.json({ code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않습니다." }, { status: 400 });
   }
-  const result = await callControlPlane(`/api/v1/agents/${code}/persona`);
+  const result = await callControlPlane(`/api/v1/agents/${code}/starters`);
   if (!result.ok) {
     return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
   }
@@ -25,7 +25,7 @@ export async function PUT(request: Request, context: { params: Promise<{ code: s
   } catch {
     return NextResponse.json({ code: "VALIDATION_FAILED", message: "요청 본문이 올바르지 않습니다." }, { status: 400 });
   }
-  const result = await callControlPlane(`/api/v1/agents/${code}/persona`, {
+  const result = await callControlPlane(`/api/v1/agents/${code}/starters`, {
     method: "PUT",
     body,
   });
