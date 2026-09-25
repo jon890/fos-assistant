@@ -29,6 +29,11 @@ type Props = {
    * 대화의 에이전트는 첫 메시지가 정하고 그 뒤로 바뀌지 않는다.
    */
   mention?: { agents: AgentView[]; onPick(code: string): void };
+  /**
+   * 보내기를 막는 일이 도는지 알린다. 빈 대화를 만드는 요청이나 끝나지 않은 첨부가 그렇다.
+   * 입력창을 거치지 않고 보내는 추천 질문도 이 동안은 막아야 대화가 둘 생기지 않는다.
+   */
+  onBlockingChange?(blocking: boolean): void;
 };
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -87,12 +92,15 @@ export function Composer({
   canStop,
   onStop,
   mention,
+  onBlockingChange,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const [items, setItems] = useState<AttachmentItem[]>([]);
   const [pickNotice, setPickNotice] = useState<string | null>(null);
+  /** 빈 대화를 만드는 요청이 도는 중이다. 아직 첨부 목록에 아무것도 없어 `items` 로는 알 수 없다 */
+  const [creatingConversation, setCreatingConversation] = useState(false);
   /** 빈 대화를 만드는 요청이 진행 중이면 그 Promise 를 담아 다시 쓴다. 연달아 고르면 두 번 도는 것을 막는다 */
   const creatingConversationRef = useRef<Promise<number | null> | null>(null);
   /** 올리는 중에 지운 첨부의 key 다. 올리기 응답을 받으면 그때 서버 DELETE 를 부른다 */
@@ -177,7 +185,12 @@ export function Composer({
 
   const uploading = items.some((item) => item.status === "uploading");
   const hasBlockingAttachment = items.some((item) => item.status !== "done");
-  const sendDisabled = disabled || value.trim().length === 0 || hasBlockingAttachment;
+  const blocking = creatingConversation || hasBlockingAttachment;
+  const sendDisabled = disabled || value.trim().length === 0 || blocking;
+
+  useEffect(() => {
+    onBlockingChange?.(blocking);
+  }, [blocking, onBlockingChange]);
 
   function updateItem(key: string, patch: Partial<AttachmentItem>) {
     setItems((previous) => previous.map((item) => (item.key === key ? { ...item, ...patch } : item)));
@@ -188,6 +201,7 @@ export function Composer({
     if (creatingConversationRef.current) return creatingConversationRef.current;
 
     const promise = (async () => {
+      setCreatingConversation(true);
       try {
         const response = await fetch("/api/chat/conversations", {
           method: "POST",
@@ -208,6 +222,7 @@ export function Composer({
         return null;
       } finally {
         creatingConversationRef.current = null;
+        if (mountedRef.current) setCreatingConversation(false);
       }
     })();
     creatingConversationRef.current = promise;

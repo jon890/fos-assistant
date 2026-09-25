@@ -207,3 +207,44 @@ test("새 대화 화면에서 사진과 글을 보내면 입력창이 아래로 
   await page.reload();
   await expectImageLoaded(page.getByTestId("user-message").last().getByTestId("message-attachment"));
 });
+
+test("사진 때문에 빈 대화를 만드는 동안에는 추천 질문을 누를 수 없어 대화가 하나만 생긴다", async ({ page }) => {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const createdIds: number[] = [];
+  // route 는 goto 보다 먼저 건다. 대화 목록을 읽는 GET 은 그대로 보낸다.
+  await page.route((url) => url.pathname === "/api/chat/conversations", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    await released;
+    const response = await route.fetch();
+    const body = (await response.json()) as { conversationId: number };
+    createdIds.push(body.conversationId);
+    await route.fulfill({ response, json: body });
+  });
+  await page.goto("/");
+  const promptButton = page.getByRole("button", { name: PROMPT, exact: true });
+  await expect(promptButton).toBeEnabled();
+
+  await page.getByTestId("attachment-input").setInputFiles([
+    { name: "slow.png", mimeType: "image/png", buffer: PNG_1X1 },
+  ]);
+  await expect(promptButton).toBeDisabled();
+
+  release();
+  await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(1);
+  await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  await expect(promptButton).toBeEnabled();
+  expect(createdIds, "사진을 고르며 만든 빈 대화").toHaveLength(1);
+
+  await promptButton.click();
+  await expect(page.getByTestId("user-message").last()).toContainText(PROMPT);
+  await expect(page).toHaveURL(new RegExp(`/c/${createdIds[0]}$`));
+  await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveURL(new RegExp(`/c/${createdIds[0]}$`));
+  expect(createdIds, "추천 질문을 보낸 뒤 만든 대화").toHaveLength(1);
+});

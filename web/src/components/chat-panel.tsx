@@ -65,6 +65,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
   const [agents, setAgents] = useState<AgentView[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
   const [agentCode, setAgentCode] = useState<string>("");
+  /** 입력창이 보내기를 막고 있다. 빈 대화를 만들거나 사진을 올리는 중이면 추천 질문도 막는다 */
+  const [composerBlocking, setComposerBlocking] = useState(false);
   /**
    * 새 대화로 시작했는지다. 메시지가 없는 동안 새 대화 화면을 그린다.
    *
@@ -699,11 +701,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             onStop={() => { void stop(); }}
             mention={startScreen && !agentLocked && agents.length > 0
               ? { agents, onPick: setAgentCode } : undefined}
+            onBlockingChange={setComposerBlocking}
           />
           {startScreen ? (
             <StarterPrompts
               prompts={currentAgent?.starterPrompts ?? []}
-              disabled={sending}
+              disabled={sending || composerBlocking}
               onPrompt={(text) => { void send([], undefined, text); }}
             />
           ) : null}
