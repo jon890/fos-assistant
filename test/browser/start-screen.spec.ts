@@ -105,6 +105,20 @@ test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르�
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("@ 목록이 떠 있을 때 Shift+Enter 는 고르지 않고 줄을 바꾼다", async ({ page }) => {
+  await page.goto("/");
+
+  await composer(page).fill("@흐름");
+  const list = page.getByRole("listbox", { name: "에이전트 고르기" });
+  await expect(list.getByRole("option", { name: /흐름 비서/ })).toBeVisible();
+  await composer(page).press("Shift+Enter");
+
+  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expect(composer(page)).toHaveValue("@흐름\n");
+  await expect(list).toHaveCount(0);
+  await expect(page.getByTestId("user-message")).toHaveCount(0);
+});
+
 test("@ 목록은 Esc 로 닫고 입력한 글은 남긴다", async ({ page }) => {
   await page.goto("/");
 

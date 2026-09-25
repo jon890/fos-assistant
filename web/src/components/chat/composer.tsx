@@ -478,8 +478,9 @@ export function Composer({
                 }
                 return;
               }
-              if (event.key === "Enter" || (event.key === "Tab" && mentionMatches.length > 0)) {
+              if ((event.key === "Enter" && !event.shiftKey) || (event.key === "Tab" && mentionMatches.length > 0)) {
                 // 목록이 떠 있는 동안의 Enter 는 고르기다. 맞는 것이 없어도 보내지 않는다.
+                // Shift+Enter 는 고르지 않고 평소처럼 줄을 바꾼다. 줄이 바뀌면 `@` 뒤에 공백이 생겨 목록이 닫힌다.
                 event.preventDefault();
                 const picked = mentionMatches[activeMentionIndex];
                 if (picked) pickMention(picked.code);
