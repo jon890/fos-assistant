@@ -78,16 +78,16 @@ test("남긴 답이 없으면 사용자 메시지 아래에 안내를 보인다"
   await expect(page.getByTestId("no-answer")).toBeVisible();
 });
 
-test("답과 코드 블록의 원문을 복사한다", async ({ context, page }, testInfo) => {
+test("답과 코드 블록의 원문을 복사한다", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
   await page.getByPlaceholder("무엇을 도와줄까요").fill("코드 블록 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const answerCopy = page.getByRole("button", { name: "답 복사" }).last();
   await expect(answerCopy).toBeVisible({ timeout: 30_000 });
-  if (testInfo.project.name === "mobile") await expect(answerCopy).toBeVisible();
   await answerCopy.click();
   await expect(answerCopy).toHaveText("복사됨");
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("public class Greeting");
   const codeCopy = page.getByRole("button", { name: "코드 복사" }).first();
   await codeCopy.click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain("public class Greeting");
@@ -120,4 +120,19 @@ test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({ pa
   await page.getByPlaceholder("무엇을 도와줄까요").focus();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
+});
+
+test("좁은 화면에서 열린 서랍은 Esc 로 닫고 실행은 계속한다", async ({ page, hermes }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "좁은 화면 서랍 동작만 확인한다");
+  await hermes.holdNextRun();
+  await beginHeldTurn(page, "서랍 Esc 실행 유지 검사");
+  await hermes.waitForHeldRun();
+  await page.getByRole("button", { name: "사이드바 열기" }).click();
+  const drawer = page.getByRole("complementary", { name: "사이드바" });
+  await expect.poll(async () => (await drawer.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await drawer.boundingBox())?.x ?? 0).toBeLessThan(0);
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  await hermes.releaseHeldRun();
+  await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
 });

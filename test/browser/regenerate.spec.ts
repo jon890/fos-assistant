@@ -97,7 +97,7 @@ test("오래된 질문 수정 오류를 보이고 편집 글을 남긴다", asyn
   await expect(page.getByPlaceholder("무엇을 도와줄까요")).toHaveValue("");
 });
 
-test("수정 실행이 시작된 뒤 실패해도 편집하던 글을 보인다", async ({ page }) => {
+test("수정 실행이 시작된 뒤 실패하면 편집칸을 닫고 다시 시도만 보인다", async ({ page }) => {
   await page.goto("/");
   await ask(page, "수정 실행 실패 검사");
   const conversationId = Number(page.url().match(/\/c\/(\d+)$/)?.[1]);
@@ -128,8 +128,40 @@ test("수정 실행이 시작된 뒤 실패해도 편집하던 글을 보인다"
   await page.getByRole("textbox", { name: "질문 수정" }).fill("실패한 수정 글");
   await page.getByTestId("user-message").last().getByRole("button", { name: "보내기", exact: true }).click();
   await expect(page.getByTestId("turn-error")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "질문 수정" })).toHaveValue("실패한 수정 글");
+  await expect(page.getByRole("textbox", { name: "질문 수정" })).toHaveCount(0);
+  await expect(page.getByTestId("no-answer")).toBeVisible();
+  await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible();
   await expect.poll(() => reads).toBeGreaterThan(0);
+});
+
+test("수정 실행 뒤 이력을 다시 읽지 못해도 편집칸을 닫고 오류를 보인다", async ({ page }) => {
+  await page.goto("/");
+  await ask(page, "수정 이력 실패 검사");
+  const conversationId = Number(page.url().match(/\/c\/(\d+)$/)?.[1]);
+  await page.route("**/api/chat/conversations/*/messages", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ code: "INTERNAL_ERROR", message: "이력을 읽지 못했다" }),
+  }));
+  await page.route("**/api/chat/stream", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/event-stream",
+    body: `data: ${JSON.stringify({ type: "started", conversationId, executionId: 999 })}\n\n`
+      + 'data: {"type":"error","code":"HERMES_RUN_FAILED","message":"실행 실패"}\n\n',
+  }));
+  await page.getByTestId("user-message").last().getByRole("button", { name: "수정", exact: true }).click();
+  await page.getByRole("textbox", { name: "질문 수정" }).fill("이력 실패 수정 글");
+  await page.getByTestId("user-message").last().getByRole("button", { name: "보내기", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "질문 수정" })).toHaveCount(0);
+  await expect(page.getByTestId("turn-error")).toBeVisible();
+  await expect(page.getByTestId("turn-error")).toContainText("대화 이력을 다시 읽지 못했다");
+  await expect(page.getByTestId("no-answer")).toHaveCount(0);
+  const retry = page.getByTestId("turn-error-retry");
+  await expect(retry).toBeVisible();
+  const retried = page.waitForRequest((request) => request.method() === "POST"
+    && /\/api\/chat\/conversations\/\d+\/regenerate$/.test(request.url()));
+  await retry.click();
+  await retried;
 });
 
 test("앞선 사용자 메시지는 수정할 수 없다", async ({ page }) => {

@@ -132,10 +132,12 @@ export function MessageBubble({
             ? <MessageEditor initialValue={turn.content} value={editText} onChange={onEditTextChange}
               onSave={onEdit} onCancel={onEditCancel} />
             : <p className="whitespace-pre-wrap break-words text-sm leading-6">{turn.content}</p>}
-          <div className="mt-2 flex gap-2">
-            {userVersion && onVersionChange ? <VersionSwitcher slot={userVersion} onChange={(index) => onVersionChange(userVersion.slotId, index)} /> : null}
-            {canEdit && !editing ? <button type="button" aria-label="수정" onClick={onStartEdit} className="text-xs text-muted underline">수정</button> : null}
-          </div>
+          {((userVersion && onVersionChange) || (canEdit && !editing)) ? (
+            <div className="mt-2 flex gap-2">
+              {userVersion && onVersionChange ? <VersionSwitcher slot={userVersion} onChange={(index) => onVersionChange(userVersion.slotId, index)} /> : null}
+              {canEdit && !editing ? <button type="button" aria-label="수정" onClick={onStartEdit} className="text-xs text-muted underline">수정</button> : null}
+            </div>
+          ) : null}
           <AttachmentGallery conversationId={conversationId} attachments={attachments} />
           {sentAt && detailsVisible ? (
             <time

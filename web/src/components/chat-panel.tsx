@@ -266,6 +266,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         setActivity((previous) => previous && applyChatEvent(previous, event));
       } else if ((event.type === "done" || event.type === "stopped") && event.conversationId) {
         state.done = true;
+        if (event.type === "stopped") {
+          setActivity((previous) => previous && applyChatEvent(previous, event));
+        }
         const finishedExecutionId = event.executionId ?? currentExecutionId.current;
         if (finishedExecutionId !== null) {
           setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
@@ -326,11 +329,26 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId),
       );
     };
-    const keepEditDraft = (loaded: Turn[]) => {
+    const closeEditAfterStartedFailure = () => {
       if (editOfMessageId === undefined || selectionVersion.current !== version) return;
-      const latestUser = loaded.findLast((turn) => turn.role === "USER" && typeof turn.id === "number");
-      if (latestUser && typeof latestUser.id === "number") setEditingMessageId(latestUser.id);
+      setEditingMessageId(null);
+      setEditText(null);
     };
+    const refreshAfterStartedFailure = async (): Promise<boolean> => {
+      if (conversationIdRef.current === null) return false;
+      try {
+        await refreshMessages(conversationIdRef.current, version);
+        return true;
+      } catch {
+        // `started` 뒤에는 서버에 질문이 남는다. 다만 새 이력을 못 받았을 때 임시 질문을 저장된 판처럼
+        // 보이면 다음 다시 시도가 무엇을 대상으로 하는지 알 수 없으므로 화면에서 치운다.
+        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId));
+        return false;
+      }
+    };
+    const startedFailureMessage = (message: string, refreshed: boolean) => refreshed
+      ? message
+      : `${message} 대화 이력을 다시 읽지 못했다. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
 
     const requestBody = {
       conversationId,
@@ -443,12 +461,13 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           },
           onError: async (event) => {
             const message = describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다.");
-            if (event.code === "MESSAGE_NOT_LATEST" && conversationIdRef.current !== null) {
+            if (!stream.started && event.code === "MESSAGE_NOT_LATEST" && conversationIdRef.current !== null) {
               await refreshMessages(conversationIdRef.current, version);
             }
             if (stream.started && conversationIdRef.current !== null) {
-              keepEditDraft(await refreshMessages(conversationIdRef.current, version));
-              setTurnError(message);
+              closeEditAfterStartedFailure();
+              const refreshed = await refreshAfterStartedFailure();
+              setTurnError(startedFailureMessage(message, refreshed));
             } else {
               restoreFailedMessage();
               setError(message);
@@ -460,9 +479,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
           finishFailedActivity();
           const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
           if (stream.started && conversationIdRef.current !== null) {
-            const loaded = await refreshMessages(conversationIdRef.current, version).catch(() => null);
-            if (loaded) keepEditDraft(loaded);
-            if (selectionVersion.current === version) setTurnError(message);
+            closeEditAfterStartedFailure();
+            const refreshed = await refreshAfterStartedFailure();
+            if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
           } else {
             restoreFailedMessage();
             if (selectionVersion.current === version) setError(message);
@@ -476,9 +495,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         finishFailedActivity();
         const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
         if (stream.started && conversationIdRef.current !== null) {
-          const loaded = await refreshMessages(conversationIdRef.current, version).catch(() => null);
-          if (loaded) keepEditDraft(loaded);
-          if (selectionVersion.current === version) setTurnError(message);
+          closeEditAfterStartedFailure();
+          const refreshed = await refreshAfterStartedFailure();
+          if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
         } else {
           restoreFailedMessage();
           if (selectionVersion.current === version) setError(message);

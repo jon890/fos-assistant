@@ -78,6 +78,8 @@ export function MessageList({
     ];
   });
   const visible = [...foldedVisible, ...pendingVisible];
+  const lastVisible = visible.at(-1)?.turn;
+  const hasNoAnswer = lastVisible?.role === "USER" && latestView && !sending;
   const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}`;
 
   useEffect(() => {
@@ -130,7 +132,6 @@ export function MessageList({
               {visible.map(({ turn, userVersion, answerVersion }) => {
                 const pendingAssistant = typeof turn.id === "string" && turn.id.startsWith("assistant-");
                 const isLast = visible.at(-1)?.turn.id === turn.id;
-                const hasNoAnswer = isLast && turn.role === "USER" && latestView && !sending;
                 return (
                   <Fragment key={turn.id}>
                     {pendingAssistant && activity && activity.items.length > 0 ? (
@@ -153,7 +154,7 @@ export function MessageList({
                       onEdit={(text) => onEdit(turn.id as number, text)} onEditCancel={onEditCancel}
                       canRegenerate={isLast && turn.role === "ASSISTANT" && latestView && !sending}
                       onRegenerate={onRegenerate} />
-                    {hasNoAnswer ? (
+                    {isLast && hasNoAnswer ? (
                       <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted">
                         <span>답을 받지 못했다</span>
                         {onRetry ? <button type="button" onClick={onRetry} className="underline underline-offset-2">다시 시도</button> : null}
@@ -173,7 +174,13 @@ export function MessageList({
               {!streamedAnswer && sending && (!activity || activity.items.length === 0) ? (
                 <WaitingIndicator />
               ) : null}
-              {turnError ? <li data-testid="turn-error" className="rounded-md bg-surface px-3 py-2 text-sm">{turnError}</li> : null}
+              {turnError ? (
+                <li data-testid="turn-error" className="rounded-md bg-surface px-3 py-2 text-sm">
+                  {turnError}
+                  {onRetry && !hasNoAnswer ? <button type="button" data-testid="turn-error-retry"
+                    onClick={onRetry} className="ml-2 text-xs underline underline-offset-2">다시 시도</button> : null}
+                </li>
+              ) : null}
             </ol>
           )}
         </div>
