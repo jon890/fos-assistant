@@ -12,6 +12,7 @@ import {
   CONTROL_PLANE_BASE_URL,
   CONTROL_PLANE_PORT,
   JWT_SECRET,
+  RUN_ID,
   TEST_EMAIL,
   WEB_BASE_URL,
 } from "./settings.ts";
@@ -21,7 +22,7 @@ const { expect, test: base } = playwright;
 const ROOT = join(import.meta.dirname, "../..");
 const SESSION_COOKIE = "authjs.session-token";
 const HEALTH_TIMEOUT_MS = 90_000;
-const HERMES_CONTROL_PATH = join(tmpdir(), `fos-assistant-browser-hermes-${CONTROL_PLANE_PORT}.url`);
+const HERMES_CONTROL_PATH = join(tmpdir(), `fos-assistant-browser-hermes-${RUN_ID}.url`);
 
 /** 흐름이 붙은 에이전트의 코드다. 흐름 검사가 이 코드로 대화를 시작한다. */
 export const FLOW_AGENT_CODE = "browserflow";

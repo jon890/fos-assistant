@@ -1,4 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { closeSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * 검사가 쓸 포트를 정한다.
@@ -11,6 +14,12 @@ import { execFileSync } from "node:child_process";
  * 1. 환경 변수가 있으면 그 값을 쓴다. 고정하고 싶을 때의 길이다
  * 2. 없으면 기본 포트를 먼저 본다. 비어 있으면 그것을 쓴다
  * 3. 기본 포트를 다른 곳이 쥐고 있으면 운영체제에게 빈 포트를 받는다
+ *
+ * **비어 있다고 본 포트는 잠금 파일로 먼저 차지한다.**
+ * 열어 보고 닫은 뒤 서버가 실제로 그 포트를 잡기까지 수십 초가 걸린다.
+ * 그 사이 다른 워크트리가 같은 기본 포트를 열어 보면 역시 비어 있다고 보고, 두 실행이 같은 포트와
+ * 같은 임시 파일을 쓰게 된다. 실제로 그렇게 한쪽의 검사 15건이 `ENOENT` 로 실패했다.
+ * 잠금 파일은 살아 있는 프로세스의 것일 때만 존중하고, 고른 프로세스가 끝나면 지운다.
  *
  * **고른 값은 환경 변수에 적어 둔다.**
  * Playwright 는 spec 을 별도 worker 프로세스에서 돌리고 그 프로세스가 이 파일을 다시 읽는다.
@@ -26,9 +35,64 @@ export function pickPort(envKey: string, preferred: number): number {
     return Number(fromEnv);
   }
 
-  const chosen = probe(preferred);
+  let chosen = probe(preferred);
+  if (!claim(chosen)) {
+    chosen = probe(0);
+    claim(chosen);
+  }
   process.env[envKey] = String(chosen);
   return chosen;
+}
+
+/**
+ * 포트 하나를 이 프로세스의 것으로 적어 둔다.
+ *
+ * <p>다른 살아 있는 프로세스가 이미 적어 두었으면 거짓이다. 적어 둔 프로세스가 죽었으면 넘겨받는다.
+ * 운영체제가 준 포트(`probe(0)`)는 다른 실행과 겹치지 않으므로 잠금이 실패해도 그대로 쓴다.
+ */
+function claim(port: number): boolean {
+  const path = join(tmpdir(), `fos-assistant-port-${port}.lock`);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const fd = openSync(path, "wx");
+      writeSync(fd, String(process.pid));
+      closeSync(fd);
+      process.once("exit", () => rmSync(path, { force: true }));
+      return true;
+    } catch {
+      const owner = ownerOf(path);
+      if (owner === "self") {
+        return true;
+      }
+      if (owner === "other") {
+        return false;
+      }
+      rmSync(path, { force: true });
+    }
+  }
+  return false;
+}
+
+/** 잠금 파일을 적은 프로세스가 이 프로세스인지, 살아 있는 다른 프로세스인지, 이미 없는지. */
+function ownerOf(path: string): "self" | "other" | "gone" {
+  let pid: number;
+  try {
+    pid = Number(readFileSync(path, "utf8").trim());
+  } catch {
+    return "gone";
+  }
+  if (pid === process.pid) {
+    return "self";
+  }
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return "gone";
+  }
+  try {
+    process.kill(pid, 0);
+    return "other";
+  } catch {
+    return "gone";
+  }
 }
 
 /**
