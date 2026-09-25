@@ -102,9 +102,6 @@ public class ResearchAndBuildFlow implements Flow {
             Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.Fresh) {
             messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
-        } else if (intent instanceof TurnIntent.Edit edit) {
-            messages.save(ChatMessage.editedFromUser(
-                    conversation.id(), user.id(), text, edit.previousQuestion().id()));
         }
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));

@@ -144,39 +144,6 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 마지막_질문을_고치면_새_질문은_이전_판을_가리키고_새_답은_가리키지_않는다() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturnInOrder(result("first", "첫 답"), result("edited", "고친 답"));
-        Long conversationId = chat.send(dad, null, "원래 질문", "dad").conversationId();
-        Long originalQuestion = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst().id();
-
-        chat.stream(dad, conversationId, "고친 질문", null, List.of(), originalQuestion, event -> {});
-
-        List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
-        assertThat(history).extracting(ChatMessage::content)
-                .containsExactly("원래 질문", "첫 답", "고친 질문", "고친 답");
-        assertThat(history.get(2).replacesMessageId()).isEqualTo(originalQuestion);
-        assertThat(history.getLast().replacesMessageId()).isNull();
-        assertThat(stub().received().getLast().input()).isEqualTo("고친 질문");
-        assertThat(stub().received().getLast().instructions())
-                .endsWith("사용자가 바로 앞 질문을 아래 글로 고쳤다. 고치기 전 질문과 그 답은 무시하고 고친 질문에 답한다.");
-    }
-
-    @Test
-    void 앞선_질문은_고칠_수_없다() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturnInOrder(result("first", "첫 답"), result("second", "둘째 답"));
-        Long conversationId = chat.send(dad, null, "첫 질문", "dad").conversationId();
-        Long firstQuestion = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst().id();
-        chat.send(dad, conversationId, "둘째 질문", null);
-
-        assertThatThrownBy(() -> chat.stream(dad, conversationId, "고친 질문", null, List.of(), firstQuestion, event -> {}))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.MESSAGE_NOT_LATEST);
-    }
-
-    @Test
     void 빈_대화는_다시_만들_답이_없다() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
@@ -215,38 +182,16 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 지운_대화에서는_다시_생성과_수정을_모두_거절한다() {
+    void 지운_대화에서는_다시_생성을_거절한다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
-        Long questionId = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst().id();
         chat.delete(dad, conversationId);
 
         assertThatThrownBy(() -> chat.regenerate(dad, conversationId, event -> {}))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
-        assertThatThrownBy(() -> chat.stream(
-                dad, conversationId, "고친 질문", null, List.of(), questionId, event -> {}))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
-    }
-
-    @Test
-    void 다른_사용자의_대화에서_질문_수정을_거절한다() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        CurrentUser mom = member("mom@example.com", "mom");
-        stub().willReturn(result("first", "첫 답"));
-        Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
-        Long questionId = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst().id();
-
-        assertThatThrownBy(() -> chat.stream(
-                mom, conversationId, "남의 질문 수정", null, List.of(), questionId, event -> {}))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).hasSize(2);
     }
 
     @Test
@@ -323,25 +268,6 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 첨부가_달린_질문은_수정할_수_없다() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(result("first", "첫 답"));
-        Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
-        ChatMessage question = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst();
-        ChatAttachment attachment = attachmentRows.save(ChatAttachment.of(
-                conversationId, dad.id(), "image.png", "image/png", 1, Instant.now().plus(Duration.ofDays(1))));
-        attachment.nameStoredFile(attachment.id() + ".png");
-        attachmentRows.save(attachment);
-        attachments.attach(question.id(), conversationId, List.of(attachment.id()));
-
-        assertThatThrownBy(() -> chat.stream(
-                dad, conversationId, "고친 질문", null, List.of(), question.id(), event -> {}))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
-    }
-
-    @Test
     void 다시_생성을_거듭하면_새_답이_직전_답을_가리킨다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "둘째 답"), result("third", "셋째 답"));
@@ -374,26 +300,6 @@ class ChatRegenerateTest {
                         "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다."));
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId).getLast().replacesMessageId())
                 .isEqualTo(originalAnswer);
-    }
-
-    @Test
-    void 흐름_수정은_모든_실행의_지시에_문구를_붙이고_질문_판을_잇는다() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(result("first", "첫 답"));
-        Long conversationId = chat.send(dad, null, "원래 질문", "dad").conversationId();
-        Long originalQuestion = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst().id();
-        enableFlow("dad");
-        flowAnswers();
-        int before = stub().received().size();
-
-        chat.stream(dad, conversationId, "고친 질문", null, List.of(), originalQuestion, event -> {});
-
-        List<HermesRunCommand> commands = stub().received().subList(before, stub().received().size());
-        assertThat(commands).hasSize(4).allSatisfy(command ->
-                assertThat(command.instructions()).endsWith(
-                        "사용자가 바로 앞 질문을 아래 글로 고쳤다. 고치기 전 질문과 그 답은 무시하고 고친 질문에 답한다."));
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId).get(2).replacesMessageId())
-                .isEqualTo(originalQuestion);
     }
 
     @Test
