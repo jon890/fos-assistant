@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -64,7 +65,9 @@ public class TurnCancellation {
     public void close(TurnHandle handle) {
         byConversation.remove(handle.conversationId, handle);
         if (handle.executionId != null) byExecution.remove(handle.executionId, handle);
-        handle.firstStop.complete(false);
+        // 실행 번호가 붙기 전에 중지한 turn 은 새 run 없이 끝날 수 있다. 이 경우 중지 요청은
+        // 성공으로 끝난 것이며, 이미 끝난 turn 과 구분해야 한다.
+        handle.firstStop.complete(handle.cancelled.get() && !handle.finished.get());
     }
 
     public boolean isCancelled(Long executionId) {
@@ -72,15 +75,53 @@ public class TurnCancellation {
         return handle != null && handle.cancelled.get();
     }
 
+    /** Hermes 가 중지 요청을 받아들여 실제 취소로 전환된 turn 인지 본다. */
+    public boolean isStopConfirmed(Long executionId) {
+        TurnHandle handle = byExecution.get(executionId);
+        return handle != null && handle.cancelled.get() && handle.stopConfirmed.get();
+    }
+
     public boolean cancel(TurnHandle handle) {
-        boolean first = handle.cancelled.compareAndSet(false, true);
-        if (first) {
-            scheduler.schedule(() -> {
-                handle.streamGraceExpired.complete(null);
-                Thread.startVirtualThread(() -> closeStream(handle));
-            }, streamGrace.toMillis(), TimeUnit.MILLISECONDS);
-        }
-        return first;
+        return handle.cancelled.compareAndSet(false, true);
+    }
+
+    /** 정상 완료 저장을 끝낸 turn 은 뒤늦은 중지 요청을 성공으로 답하지 않는다. */
+    public void markFinished(TurnHandle handle) {
+        handle.finished.set(true);
+    }
+
+    public boolean isFinished(TurnHandle handle) {
+        return handle.finished.get();
+    }
+
+    /** Hermes 에 중지 요청을 보내지 못하면 turn 을 원래 실행 상태로 되돌린다. */
+    public void resume(TurnHandle handle) {
+        if (!handle.cancelled.compareAndSet(true, false)) return;
+        ScheduledFuture<?> closeTask = handle.closeTask;
+        if (closeTask != null) closeTask.cancel(false);
+        handle.streamGraceExpired = new CompletableFuture<>();
+        handle.firstStop = new CompletableFuture<>();
+        handle.stopConfirmed.set(false);
+    }
+
+    /** Hermes 중지 요청이 모두 받아들여진 뒤에만 실행 경로가 취소로 분기한다. */
+    public void confirmStop(TurnHandle handle) {
+        if (!handle.cancelled.get() || !handle.stopConfirmed.compareAndSet(false, true)) return;
+        handle.closeTask = scheduler.schedule(() -> {
+            handle.streamGraceExpired.complete(null);
+            Thread.startVirtualThread(() -> closeStream(handle));
+        }, streamGrace.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /** 중지 요청은 시작됐지만 Hermes 가 아직 받아들이지 않았는지 본다. */
+    public boolean isStopConfirmed(TurnHandle handle) {
+        return handle.stopConfirmed.get();
+    }
+
+    /** 실행 번호가 아직 없어 Hermes 에 보낼 대상 없이 끝날 취소인지 본다. */
+    public boolean shouldStopBeforeSubmit(Long executionId) {
+        TurnHandle handle = byExecution.get(executionId);
+        return handle != null && handle.cancelled.get() && handle.runs.isEmpty();
     }
 
     public boolean trackRun(Long executionId, String apiBaseUrl, String profileName, String runId) {
@@ -96,6 +137,7 @@ public class TurnCancellation {
         }
         if (!handle.cancelled.get()) return true;
         boolean sent = stopRun(run);
+        if (sent) confirmStop(handle);
         handle.firstStop.complete(sent);
         return sent;
     }
@@ -128,6 +170,11 @@ public class TurnCancellation {
 
     public boolean hasRuns(TurnHandle handle) {
         return !handle.runs.isEmpty();
+    }
+
+    /** 일부 run 에 중지가 이미 전달됐으면 이전 실행 상태로 안전하게 되돌릴 수 없다. */
+    public boolean hasStoppedRuns(TurnHandle handle) {
+        return handle.runs.stream().anyMatch(run -> run.stopSent.get());
     }
 
     /** 중지가 제출보다 먼저 왔으면 첫 실행의 중지 결과를 기다린다. */
@@ -173,11 +220,14 @@ public class TurnCancellation {
         private final Long userId;
         private final Long conversationId;
         private final AtomicBoolean cancelled = new AtomicBoolean();
+        private final AtomicBoolean stopConfirmed = new AtomicBoolean();
+        private final AtomicBoolean finished = new AtomicBoolean();
         private final List<RunRef> runs = new java.util.concurrent.CopyOnWriteArrayList<>();
         private volatile Long executionId;
         private volatile Closeable stream;
-        private final CompletableFuture<Boolean> firstStop = new CompletableFuture<>();
-        private final CompletableFuture<Void> streamGraceExpired = new CompletableFuture<>();
+        private volatile CompletableFuture<Boolean> firstStop = new CompletableFuture<>();
+        private volatile CompletableFuture<Void> streamGraceExpired = new CompletableFuture<>();
+        private volatile ScheduledFuture<?> closeTask;
         private TurnHandle(Long userId, Long conversationId) { this.userId = userId; this.conversationId = conversationId; }
         public Long userId() { return userId; }
         public AtomicBoolean cancelled() { return cancelled; }

@@ -343,8 +343,12 @@ public class AgentExecution {
 
     /** 이미 토큰을 적은 실행의 상태만 CANCELLED 로 옮긴다. */
     public void markCancelled(Instant finishedAt) {
-        this.finishedAt = finishedAt;
-        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        // Chief 가 끝난 뒤 자식 단계에서 취소될 수 있다. 그 경우 Chief 자신의 소요 시간과
+        // 토큰·비용은 이미 확정됐으므로 상태만 바꾼다.
+        if (this.finishedAt == null) {
+            this.finishedAt = finishedAt;
+            this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
+        }
         this.status = ExecutionStatus.CANCELLED;
     }
 

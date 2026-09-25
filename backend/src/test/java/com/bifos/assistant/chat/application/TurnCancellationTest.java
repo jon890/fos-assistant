@@ -28,9 +28,26 @@ class TurnCancellationTest {
         Closeable stream = closed::countDown;
 
         turns.cancel(handle);
+        turns.confirmStop(handle);
         turns.awaitStreamOrGrace(handle, new CompletableFuture<>());
         turns.attachStream(handle, stream);
 
         assertThat(closed.await(1, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void Hermes_중지가_확정되기_전에는_유예_시간으로_스트림을_닫지_않는다() throws InterruptedException {
+        TurnCancellation delayed = new TurnCancellation(mock(HermesRunsClient.class), Duration.ofMillis(10));
+        try {
+            TurnCancellation.TurnHandle handle = delayed.open(1L, 2L);
+            CountDownLatch closed = new CountDownLatch(1);
+
+            delayed.cancel(handle);
+            delayed.attachStream(handle, closed::countDown);
+
+            assertThat(closed.await(50, TimeUnit.MILLISECONDS)).isFalse();
+        } finally {
+            delayed.shutdown();
+        }
     }
 }

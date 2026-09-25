@@ -206,7 +206,9 @@ public class ChatService {
                 onEvent.accept(ChatEvent.switched(option.label()));
             }
 
-            if (handle.cancelled().get()) return cancel(pending, null, option);
+            if (turns.isStopConfirmed(handle) || turns.shouldStopBeforeSubmit(pending.execution().id())) {
+                return cancel(pending, null, option);
+            }
             String runId = submit(pending);
             HermesRunResult result;
             try {
@@ -218,12 +220,14 @@ public class ChatService {
                 turns.untrackRun(pending.execution().id(), runId);
             }
 
-            if (handle.cancelled().get() || "cancelled".equalsIgnoreCase(result.status())) {
+            if (turns.isStopConfirmed(handle) || "cancelled".equalsIgnoreCase(result.status())) {
                 return cancel(pending, result, option);
             }
             if (result.succeeded()) {
                 blocklist.release(option.provider());
-                return finish(pending, result, option);
+                ChatTurn completed = finish(pending, result, option);
+                turns.markFinished(handle);
+                return completed;
             }
             if (!result.providerBlocked()) {
                 executions.fail(pending.execution(), hermesStatus(result));
@@ -312,6 +316,7 @@ public class ChatService {
                         turns.rekey(handle, execution.id());
                         if (streaming) onEvent.accept(ChatEvent.started(conversation.id(), execution.id()));
                     }, onEvent);
+            if (!turn.cancelled()) turns.markFinished(handle);
             if (streaming) {
                 if (!turn.cancelled()) onEvent.accept(ChatEvent.delta(turn.assistantText()));
                 onEvent.accept(turn.cancelled()
@@ -426,7 +431,11 @@ public class ChatService {
                         pending.command().profileName(),
                         runId,
                         event -> {
-                            if (!handle.cancelled().get()) forward(pending, event, onEvent);
+                            synchronized (pending) {
+                                if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
+                                    forward(pending, event, onEvent);
+                                }
+                            }
                         },
                         stream -> turns.attachStream(handle, stream));
             } catch (ApiException ex) {
@@ -466,9 +475,12 @@ public class ChatService {
 
     private ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelOption option) {
         AgentExecution execution = executions.cancel(pending.execution(), pending.agent(), result, option);
-        append(pending, ExecutionEventType.RUN_CANCELLED, null);
-        String answer = result != null && result.output() != null && !result.output().isBlank()
-                ? result.output() : pending.streamed().toString();
+        String answer;
+        synchronized (pending) {
+            append(pending, ExecutionEventType.RUN_CANCELLED, null);
+            answer = result != null && result.output() != null && !result.output().isBlank()
+                    ? result.output() : pending.streamed().toString();
+        }
         ChatMessage message = answer.isBlank() ? null : messages.save(
                 answerMessage(pending, answer, execution.id()));
         if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
@@ -496,7 +508,7 @@ public class ChatService {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
             }
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
-                    .filter(attachment -> question.id().equals(attachment.messageId()))
+                    .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
                     .toList();
             Routed routed = routeExisting(user, conversation, attached);
             TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
@@ -639,8 +651,17 @@ public class ChatService {
             if (!turns.trackRun(executionId, childAgent.apiBaseUrl(),
                     child.profileName(), child.hermesRunId())) failed = true;
         }
-        if (!hadRuns && !turns.awaitFirstStop(handle)) failed = true;
-        if (failed) throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
+        if (!hadRuns && !turns.awaitFirstStop(handle)) {
+            if (turns.isFinished(handle)) {
+                throw new ApiException(ErrorCode.EXECUTION_NOT_RUNNING, "execution is not running");
+            }
+            failed = true;
+        }
+        if (failed) {
+            if (!turns.hasStoppedRuns(handle)) turns.resume(handle);
+            throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
+        }
+        turns.confirmStop(handle);
     }
 
     /**
@@ -855,8 +876,10 @@ public class ChatService {
         append(pending, event);
         String type = event.type() == null ? "" : event.type().toLowerCase();
         if (type.contains("delta") && event.text() != null) {
-            pending.streamed().append(event.text());
-            onEvent.accept(ChatEvent.delta(event.text()));
+            synchronized (pending) {
+                pending.streamed().append(event.text());
+                onEvent.accept(ChatEvent.delta(event.text()));
+            }
         } else if ("tool.started".equals(type)) {
             onEvent.accept(ChatEvent.tool(event.toolName(), event.detail(), ChatEvent.STARTED, null, null));
         } else if ("tool.completed".equals(type)) {

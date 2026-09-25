@@ -14,7 +14,10 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.ArrayList;
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +27,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -56,6 +61,8 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class ResearchAndBuildFlow implements Flow {
 
+    private static final Logger log = LoggerFactory.getLogger(ResearchAndBuildFlow.class);
+
     /** {@code agent.flow} 에 적는 이름이다. */
     public static final String NAME = "research-and-build";
 
@@ -73,6 +80,8 @@ public class ResearchAndBuildFlow implements Flow {
     private final AgentRunner runner;
     private final ChildExecutionRunner children;
     private final ExecutionRecorder executions;
+    private final ExecutionEventRecorder eventRecorder;
+    private final ExecutionEventRepository executionEvents;
     private final TurnCancellation cancellation;
     private final ObjectMapper objectMapper;
 
@@ -110,12 +119,12 @@ public class ResearchAndBuildFlow implements Flow {
                         execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId),
                 () -> {
                     Long executionId = rootExecutionId.get();
-                    return executionId != null && cancellation.isCancelled(executionId);
+                    return executionId != null && shouldStop(executionId);
                 }, TurnIntent.instructionFor(intent));
         AgentExecution root = chief.execution();
         cancellation.untrackRun(root.id(), root.hermesRunId());
-        if (cancellation.isCancelled(root.id())) {
-            return cancelled(conversation, root);
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, chief.sessionId());
         }
         if (!chief.result().succeeded()) {
             onEvent.accept(ChatEvent.step(CHIEF, FAILED));
@@ -128,8 +137,8 @@ public class ResearchAndBuildFlow implements Flow {
 
         Split split = split(root, chief.result().output(), onEvent);
 
-        if (cancellation.isCancelled(root.id())) {
-            return cancelled(conversation, root);
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
         }
 
         if (split.isEmpty()) {
@@ -140,8 +149,8 @@ public class ResearchAndBuildFlow implements Flow {
         List<Step> planned = plan(split);
         planned.forEach(step -> onEvent.accept(ChatEvent.step(step.name(), STARTED)));
         List<ChildResult> done = runInParallel(user, conversation, root, agent, planned, intent);
-        if (cancellation.isCancelled(root.id())) {
-            return cancelled(conversation, root);
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
         }
         for (int index = 0; index < planned.size(); index++) {
             ChildResult result = done.get(index);
@@ -151,21 +160,21 @@ public class ResearchAndBuildFlow implements Flow {
         ChildResult firstFailure =
                 done.stream().filter(result -> !result.succeeded()).findFirst().orElse(null);
         if (firstFailure != null) {
-            if (cancellation.isCancelled(root.id())) {
-                return cancelled(conversation, root);
+            if (shouldStop(root.id())) {
+                return cancelled(conversation, root, null);
             }
             throw stop(root, firstFailure.errorCode());
         }
 
-        if (cancellation.isCancelled(root.id())) {
-            return cancelled(conversation, root);
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
         }
 
         onEvent.accept(ChatEvent.step(SYNTHESIZER, STARTED));
         ChildResult synthesis = runChild(
                 user, conversation, root, agent, synthesizerPrompt(text, done), intent);
-        if (cancellation.isCancelled(root.id())) {
-            return cancelled(conversation, root);
+        if (shouldStop(root.id())) {
+            return cancelled(conversation, root, null);
         }
         if (!synthesis.succeeded()) {
             onEvent.accept(ChatEvent.step(SYNTHESIZER, FAILED));
@@ -208,7 +217,7 @@ public class ResearchAndBuildFlow implements Flow {
             List<CompletableFuture<ChildResult>> pending = planned.stream()
                     .map(step -> CompletableFuture.supplyAsync(
                             () -> {
-                                if (cancellation.isCancelled(root.id())) {
+                                if (shouldStop(root.id())) {
                                     return ChildResult.failed(null, "CANCELLED");
                                 }
                                 return runChild(user, conversation, root, agent, step.task(), intent);
@@ -228,11 +237,15 @@ public class ResearchAndBuildFlow implements Flow {
                         submittedRunId.set(runId);
                         cancellation.trackRun(root.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId);
                     },
-                    () -> cancellation.isCancelled(root.id()),
+                    () -> shouldStop(root.id()),
                     TurnIntent.instructionFor(intent));
         } finally {
             cancellation.untrackRun(root.id(), submittedRunId.get());
         }
+    }
+
+    private boolean shouldStop(Long executionId) {
+        return cancellation.isStopConfirmed(executionId) || cancellation.shouldStopBeforeSubmit(executionId);
     }
 
     /**
@@ -278,8 +291,24 @@ public class ResearchAndBuildFlow implements Flow {
     }
 
     /** 중지한 turn 은 답과 기억을 더 만들지 않고 Chief 를 취소 상태로 남긴다. */
-    private ChatTurn cancelled(Conversation conversation, AgentExecution root) {
+    private ChatTurn cancelled(Conversation conversation, AgentExecution root, String sessionId) {
         executions.cancel(root);
+        try {
+            boolean alreadyRecorded = executionEvents
+                    .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(root.id()))
+                    .stream().anyMatch(event -> event.eventType() == ExecutionEventType.RUN_CANCELLED);
+            if (!alreadyRecorded) {
+                var event = eventRecorder.record(root, ExecutionEventType.RUN_CANCELLED, null, 99);
+                if (event != null) executionEvents.save(event);
+            }
+        } catch (RuntimeException ex) {
+            // 사건 기록 실패가 중지를 실패로 바꾸면 안 된다.
+            log.warn("취소 실행 사건을 남기지 못했다 executionId={}", root.id(), ex);
+        }
+        if (sessionId != null && !sessionId.isBlank()) {
+            conversation.rememberSession(sessionId);
+            conversations.touchSession(conversation.id(), sessionId, Instant.now());
+        }
         return new ChatTurn(conversation.id(), root.id(), "", null, true);
     }
 

@@ -2,6 +2,8 @@ package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.ModelOption;
@@ -14,6 +16,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
+import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -27,6 +30,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -59,6 +63,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 흐름 하나가 실행 넷을 남기고 그 넷이 부모의 경계를 물려받는 것을 고정한다. */
 @SpringBootTest
@@ -114,6 +119,7 @@ class ResearchAndBuildFlowTest {
     @Autowired ExecutionEventRepository executionEvents;
     @Autowired MemoryRepository memoryRepository;
     @Autowired HermesRunsClient hermes;
+    @MockitoSpyBean TurnCancellation turns;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -188,6 +194,16 @@ class ResearchAndBuildFlowTest {
 
     private List<AgentExecution> executionsOf(CurrentUser user) {
         return executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 20));
+    }
+
+    private List<ExecutionEventType> eventTypes(Long executionId) {
+        return executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId)).stream()
+                .map(event -> event.eventType()).toList();
+    }
+
+    private List<ExecutionEventType> cancelledEvents(Long executionId) {
+        return eventTypes(executionId).stream()
+                .filter(type -> type == ExecutionEventType.RUN_CANCELLED).toList();
     }
 
     @Test
@@ -426,7 +442,7 @@ class ResearchAndBuildFlowTest {
         List<ChatEvent> relayed = new ArrayList<>();
         stub().willAnswer(command -> HermesRunResult.of(
                 "run-chief",
-                null,
+                "sess-chief",
                 "cancelled",
                 "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}",
                 "example-model-large",
@@ -446,7 +462,64 @@ class ResearchAndBuildFlowTest {
         assertThat(stub().received()).singleElement();
         assertThat(executionsOf(dad)).singleElement().satisfies(root ->
                 assertThat(root.status()).isEqualTo(ExecutionStatus.CANCELLED));
+        ChatEvent started = relayed.stream().filter(event -> "started".equals(event.type())).findFirst().orElseThrow();
+        assertThat(cancelledEvents(started.executionId())).containsExactly(ExecutionEventType.RUN_CANCELLED);
+        assertThat(conversations.findById(started.conversationId()).orElseThrow().hermesSessionId())
+                .isEqualTo("sess-chief");
         assertThat(relayed.getLast().type()).isEqualTo("stopped");
+    }
+
+    @Test
+    void Chief가_끝난_뒤_자식_제출_전에_멈추면_자식을_만들지_않는다() throws Exception {
+        CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
+        hermesAnswersEachStep(SPLIT_JSON);
+        List<ChatEvent> relayed = new ArrayList<>();
+        java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>> stop = new java.util.concurrent.atomic.AtomicReference<>();
+        try {
+            chat.stream(dad, null, "전기차를 사는 게 나을까?", MY_AGENT, event -> {
+                relayed.add(event);
+                if ("step".equals(event.type()) && "chief".equals(event.stepName())
+                        && "completed".equals(event.stepState())) {
+                    Long rootId = relayed.stream().filter(it -> "started".equals(it.type())).findFirst()
+                            .orElseThrow().executionId();
+                    stop.set(worker.submit(() -> chat.stop(dad, rootId)));
+                    awaitCancellation(rootId);
+                }
+            });
+
+            stop.get().get(1, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(stub().received()).singleElement();
+            assertThat(executionsOf(dad)).singleElement().satisfies(root ->
+                    assertThat(root.status()).isEqualTo(ExecutionStatus.CANCELLED));
+            assertThat(relayed.getLast().type()).isEqualTo("stopped");
+        } finally {
+            worker.shutdownNow();
+        }
+    }
+
+    @Test
+    void 자식_runId가_저장된_뒤_trackRun_전에_중지해도_그_자식을_멈춘다() {
+        CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
+        java.util.concurrent.atomic.AtomicBoolean intercepted = new java.util.concurrent.atomic.AtomicBoolean();
+        stub().willAnswer(command -> {
+            if (command.input().contains(CHIEF_MARK)) return completed("run-chief", SPLIT_JSON);
+            return HermesRunResult.of("run-child", null, "cancelled", "", "example-model-large", "anthropic", TokenUsage.empty());
+        });
+        doAnswer(invocation -> {
+            String runId = invocation.getArgument(3);
+            if ("run-child".equals(runId) && intercepted.compareAndSet(false, true)) {
+                Long rootId = executionsOf(dad).stream().filter(execution -> execution.rootExecutionId() == null)
+                        .findFirst().orElseThrow().id();
+                chat.stop(dad, rootId);
+            }
+            return invocation.callRealMethod();
+        }).when(turns).trackRun(any(), any(), any(), any());
+
+        chat.stream(dad, null, "전기차를 사는 게 나을까?", MY_AGENT, event -> {});
+
+        assertThat(intercepted).isTrue();
+        assertThat(stub().stopped()).contains("run-child");
     }
 
     @Test
@@ -458,6 +531,8 @@ class ResearchAndBuildFlowTest {
         java.util.concurrent.CountDownLatch stopSent = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger awaitCalls = new java.util.concurrent.atomic.AtomicInteger();
         java.util.concurrent.atomic.AtomicBoolean stopped = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicReference<Instant> chiefFinishedAt = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Long> chiefLatencyMs = new java.util.concurrent.atomic.AtomicReference<>();
         stub().willAnswer(command -> {
             String input = command.input();
             if (input.contains(CHIEF_MARK)) {
@@ -487,6 +562,9 @@ class ResearchAndBuildFlowTest {
                             .filter(event -> "started".equals(event.type()))
                             .findFirst()
                             .orElseThrow();
+                    AgentExecution chief = executions.findById(started.executionId()).orElseThrow();
+                    chiefFinishedAt.set(chief.finishedAt());
+                    chiefLatencyMs.set(chief.latencyMs());
                     chat.stop(dad, started.executionId());
                 } finally {
                     stopSent.countDown();
@@ -504,7 +582,17 @@ class ResearchAndBuildFlowTest {
         assertThat(executionsOf(dad))
                 .filteredOn(execution -> execution.rootExecutionId() == null)
                 .singleElement()
-                .satisfies(root -> assertThat(root.status()).isEqualTo(ExecutionStatus.CANCELLED));
+                .satisfies(root -> {
+                    assertThat(root.status()).isEqualTo(ExecutionStatus.CANCELLED);
+                    assertThat(root.totalTokens()).isEqualTo(120L);
+                    assertThat(root.finishedAt()).isEqualTo(chiefFinishedAt.get());
+                    assertThat(root.latencyMs()).isEqualTo(chiefLatencyMs.get());
+                    assertThat(root.estimatedCostMicros()).isNotNull();
+                    assertThat(cancelledEvents(root.id())).containsExactly(ExecutionEventType.RUN_CANCELLED);
+                });
+        assertThat(executionsOf(dad)).filteredOn(execution -> execution.rootExecutionId() != null)
+                .allSatisfy(child -> assertThat(cancelledEvents(child.id()))
+                        .containsExactly(ExecutionEventType.RUN_CANCELLED));
         assertThat(relayed.getLast().type()).isEqualTo("stopped");
     }
 
@@ -518,5 +606,14 @@ class ResearchAndBuildFlowTest {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(ex);
         }
+    }
+
+    private void awaitCancellation(Long executionId) {
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(1).toNanos();
+        while (System.nanoTime() < deadline) {
+            if (turns.isCancelled(executionId)) return;
+            Thread.onSpinWait();
+        }
+        throw new AssertionError("중지 요청이 turn 에 등록되지 않았다");
     }
 }

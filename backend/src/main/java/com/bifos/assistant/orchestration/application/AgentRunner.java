@@ -161,6 +161,11 @@ public class AgentRunner {
         AgentExecution execution = executions.start(
                 user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, option, null);
         onStarted.accept(execution);
+        if (cancelled.getAsBoolean()) {
+            AgentExecution cancelledExecution = executions.cancel(execution);
+            append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 1);
+            return new Run(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
+        }
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
@@ -184,15 +189,21 @@ public class AgentRunner {
         try {
             result = hermes.awaitCompletion(command, runId);
         } catch (RuntimeException ex) {
+            if (cancelled.getAsBoolean()) {
+                AgentExecution cancelledExecution = executions.cancel(execution);
+                append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
+                return new Run(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
+            }
             return fail(execution, ex, 2);
         }
 
         if (cancelled.getAsBoolean() || "cancelled".equalsIgnoreCase(result.status())) {
             AgentExecution cancelledExecution = executions.cancel(execution, agent, result, option);
+            append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
             return new Run(
                     cancelledExecution,
                     ChildResult.failed(cancelledExecution.id(), "CANCELLED"),
-                    null);
+                    result.sessionId());
         }
 
         if (!result.succeeded()) {
