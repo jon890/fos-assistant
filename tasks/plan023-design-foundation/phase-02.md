@@ -99,6 +99,7 @@ pnpm dlx shadcn@latest add button badge skeleton input textarea label dialog ale
 | 부품 | 고칠 것 |
 | --- | --- |
 | `button.tsx` | `default` 의 누름과 마우스 올림을 `bg-primary-strong` 으로. `size` 의 `sm` 과 `default` 여백을 `px-control-x-sm py-control-y-sm`, `px-control-x-md py-control-y-md` 로. 모서리 `rounded-md`. `type` 기본값 `"button"` 을 지금처럼 둔다(폼 안에서 뜻하지 않게 보내지 않게) |
+| `button.tsx` (보내는 중) | `loading?: boolean` 과 `loadingText?: string` 을 더한다. 참이면 `disabled` 와 `aria-busy="true"` 를 켜고, 글자 앞에 `Loader2`(`animate-spin`, `motion-reduce:animate-none`, `aria-hidden`)를 두고, 글자를 `loadingText` 로 바꾼다. 폭이 줄지 않게 `loadingText` 를 주지 않으면 원래 글자를 그대로 둔다. 근거는 `docs/flow.md` 「기다리는 동안 보이는 것」 이다 |
 | `badge.tsx` | 지금의 두 모양을 `variant` 둘로 옮긴다: 흐린 것(`outline` 에 `bg-muted text-muted-foreground`)과 강조(`border-foreground font-semibold`). `emphasis` 속성은 지우고 부르는 곳을 `variant` 로 바꾼다 |
 | `skeleton.tsx` | `motion-reduce:animate-none` 과 `aria-hidden` 을 지금처럼 둔다 |
 | `input.tsx`, `textarea.tsx` | 모서리 `rounded-md`, 초점 테두리 `ring-ring` |
@@ -122,6 +123,7 @@ pnpm dlx shadcn@latest add button badge skeleton input textarea label dialog ale
 ### 5. 아이콘을 `lucide-react` 로 바꾼다
 
 위 「지금 있는 부품」 의 명령으로 만든 목록을 모두 바꾼다. 아래는 대응이다. 목록에 없는 글자는 뜻이 같은 `lucide-react` 아이콘을 고른다.
+`web/src/components/shell/nav-pending.tsx` 가 테두리로 그린 회전 표시도 `Loader2` 로 바꾼다.
 
 | 글자 | 아이콘 |
 | --- | --- |
