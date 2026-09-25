@@ -66,7 +66,8 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
       setPrompts(fillPrompts(saved.starterPrompts, saved.maxPrompts));
       setSaveState("saved");
     } catch {
-      setError(describeError("HERMES_UNAVAILABLE", "저장하지 못했습니다."));
+      // 소개와 추천 질문은 Control Plane 에만 저장하고 Hermes 를 부르지 않는다. 요청 자체가 닿지 못한 경우다.
+      setError("저장하지 못했다. 잠시 뒤 다시 시도해 주세요.");
       setSaveState("idle");
     }
   }
