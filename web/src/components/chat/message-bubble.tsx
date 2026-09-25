@@ -6,6 +6,10 @@ import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { ActivityBlock } from "./activity/activity-block";
+import { MessageActions } from "./message-actions";
+import type { VersionSlot } from "@/lib/message-versions";
+import { VersionSwitcher } from "./version-switcher";
+import { MessageEditor } from "./message-editor";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -30,6 +34,8 @@ export type Turn = {
   /** 이 메시지에 붙은 사진들. 지워진 것도 자리를 남기려고 담는다 */
   attachments?: MessageAttachment[];
   activity?: ActivitySummary | null;
+  status?: "SUCCEEDED" | "FAILED" | "CANCELLED" | "RUNNING" | null;
+  replacesMessageId?: number | null;
 };
 
 function AttachmentGallery({
@@ -77,11 +83,31 @@ export function MessageBubble({
   conversationId,
   onOpenSaved,
   initialActivityExpanded,
+  latest,
+  streaming,
+  userVersion,
+  answerVersion,
+  onVersionChange,
+  canEdit = false,
+  editing = false,
+  onEdit,
+  editText,
+  onEditTextChange,
+  onStartEdit,
+  onEditCancel,
+  canRegenerate = false,
+  onRegenerate,
 }: {
   turn: Turn;
   conversationId: number | null;
   onOpenSaved(executionId: number): void;
   initialActivityExpanded: boolean;
+  latest: boolean;
+  streaming: boolean;
+  userVersion?: VersionSlot; answerVersion?: VersionSlot; onVersionChange?(slotId: number, index: number): void;
+  canEdit?: boolean; editing?: boolean; onEdit?(text: string): Promise<void>; editText?: string;
+  onEditTextChange?(text: string): void; onStartEdit?(): void; onEditCancel?(): void;
+  canRegenerate?: boolean; onRegenerate?(): void;
 }) {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const user = turn.role === "USER";
@@ -102,7 +128,16 @@ export function MessageBubble({
           data-testid="user-message"
           className="max-w-[70%] rounded-3xl bg-brand-soft px-4 py-2.5 group-focus-visible:outline-2 group-focus-visible:outline-brand"
         >
-          <p className="whitespace-pre-wrap break-words text-sm leading-6">{turn.content}</p>
+          {editing && onEdit && onEditCancel && editText !== undefined && onEditTextChange
+            ? <MessageEditor initialValue={turn.content} value={editText} onChange={onEditTextChange}
+              onSave={onEdit} onCancel={onEditCancel} />
+            : <p className="whitespace-pre-wrap break-words text-sm leading-6">{turn.content}</p>}
+          {((userVersion && onVersionChange) || (canEdit && !editing)) ? (
+            <div className="mt-2 flex gap-2">
+              {userVersion && onVersionChange ? <VersionSwitcher slot={userVersion} onChange={(index) => onVersionChange(userVersion.slotId, index)} /> : null}
+              {canEdit && !editing ? <button type="button" aria-label="수정" onClick={onStartEdit} className="text-xs text-muted underline">수정</button> : null}
+            </div>
+          ) : null}
           <AttachmentGallery conversationId={conversationId} attachments={attachments} />
           {sentAt && detailsVisible ? (
             <time
@@ -158,6 +193,10 @@ export function MessageBubble({
         <div className="leading-7">
           <Markdown>{turn.content}</Markdown>
         </div>
+        {turn.status === "CANCELLED" ? <p data-testid="stopped-mark" className="mt-2 text-xs text-muted">중지됨</p> : null}
+        {!streaming ? <MessageActions content={turn.content} latest={latest} version={answerVersion}
+          onVersionChange={(index) => answerVersion && onVersionChange?.(answerVersion.slotId, index)}
+          canRegenerate={canRegenerate} onRegenerate={onRegenerate} /> : null}
         <AttachmentGallery conversationId={conversationId} attachments={attachments} />
       </div>
     </li>

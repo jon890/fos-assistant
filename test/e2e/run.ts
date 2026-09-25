@@ -39,6 +39,8 @@ import { conversationHistoryScenario } from "./scenarios/conversation-history.ts
 import { conversationManageScenario } from "./scenarios/conversation-manage.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
+import { stopScenario } from "./scenarios/stop.ts";
+import { regenerateScenario } from "./scenarios/regenerate.ts";
 import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
 import { modelSelectionScenario } from "./scenarios/model-selection.ts";
 import { busyScenario } from "./scenarios/busy.ts";
@@ -82,6 +84,8 @@ const SCENARIOS: readonly Scenario[] = [
   conversationHistoryScenario,
   conversationManageScenario,
   streamingScenario,
+  stopScenario,
+  regenerateScenario,
   orchestrationScenario,
   chatAttachmentScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.

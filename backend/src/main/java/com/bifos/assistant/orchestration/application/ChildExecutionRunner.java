@@ -8,6 +8,8 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -54,10 +56,45 @@ public class ChildExecutionRunner {
             AgentExecution parent,
             String agentCode,
             String task) {
+        return run(user, conversation, parent, agentCode, task, (execution, runId) -> {}, () -> false);
+    }
+
+    /** Hermes run 번호를 붙인 직후 부모 흐름에 알린다. */
+    public ChildResult run(
+            CurrentUser user,
+            Conversation conversation,
+            AgentExecution parent,
+            String agentCode,
+            String task,
+            BiConsumer<AgentExecution, String> onSubmitted,
+            BooleanSupplier cancelled) {
+        return run(user, conversation, parent, agentCode, task, onSubmitted, cancelled, null);
+    }
+
+    /** turn 에만 적용할 지시는 자식의 문맥 뒤에도 같은 문구로 붙인다. */
+    public ChildResult run(
+            CurrentUser user,
+            Conversation conversation,
+            AgentExecution parent,
+            String agentCode,
+            String task,
+            BiConsumer<AgentExecution, String> onSubmitted,
+            BooleanSupplier cancelled,
+            String instructionAddition) {
         requireNotAChild(parent);
         Agent agent = agents.requireReadable(user, agentCode);
-        return runner
-                .run(user, conversation, agent, task, parent.id(), rootOf(parent), null)
+        return runner.run(
+                        user,
+                        conversation,
+                        agent,
+                        task,
+                        parent.id(),
+                        rootOf(parent),
+                        null,
+                        execution -> {},
+                        onSubmitted,
+                        cancelled,
+                        instructionAddition)
                 .result();
     }
 

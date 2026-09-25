@@ -15,9 +15,11 @@ import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationResponse;
+import com.bifos.assistant.chat.presentation.ChatDtos.StopResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -30,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +41,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -56,6 +60,11 @@ public class ChatController {
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
+        if (request.editOfMessageId() != null) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "editOfMessageId requires the streaming endpoint");
+        }
         ChatTurn turn = chat.send(
                 user,
                 request.conversationId(),
@@ -65,20 +74,41 @@ public class ChatController {
         return new SendMessageResponse(turn.conversationId(), turn.executionId(), turn.assistantText());
     }
 
+    @PostMapping("/executions/{executionId}/stop")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public StopResponse stop(@PathVariable Long executionId) {
+        chat.stop(currentUser.require(), executionId);
+        return new StopResponse("stopping");
+    }
+
     @PostMapping(path = "/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
+        return stream(event -> chat.stream(
+                user,
+                request.conversationId(),
+                request.text(),
+                request.agentCode(),
+                request.attachmentIds(),
+                request.editOfMessageId(),
+                event));
+    }
+
+    @PostMapping(path = "/conversations/{conversationId}/regenerate/stream",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter regenerate(@PathVariable Long conversationId) {
+        CurrentUser user = currentUser.require();
+        // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
+        chat.requireConversation(user, conversationId);
+        return stream(event -> chat.regenerate(user, conversationId, event));
+    }
+
+    private SseEmitter stream(java.util.function.Consumer<java.util.function.Consumer<ChatEvent>> work) {
         SseEmitter emitter = new SseEmitter(0L);
         AtomicBoolean clientConnected = new AtomicBoolean(true);
         Thread.ofVirtual().name("chat-stream-").start(() -> {
             try {
-                chat.stream(
-                        user,
-                        request.conversationId(),
-                        request.text(),
-                        request.agentCode(),
-                        request.attachmentIds(),
-                        event -> send(emitter, event, clientConnected));
+                work.accept(event -> send(emitter, event, clientConnected));
             } catch (ApiException ex) {
                 send(emitter, ChatEvent.error(ex.code().name(), ex.getMessage()), clientConnected);
             } catch (Exception ex) {
@@ -146,6 +176,7 @@ public class ChatController {
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
         Map<Long, ActivitySummary> activity = chat.activitySummaries(history);
+        Map<Long, com.bifos.assistant.usage.domain.ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, conversationId);
         return history.stream()
                 .map(
@@ -159,11 +190,14 @@ public class ChatController {
                                         // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
                                         it.executionId() != null && withChildren.contains(it.executionId()),
                                         it.executionId() == null ? null : switched.get(it.executionId()),
+                                        it.replacesMessageId(),
                                         it.createdAt(),
                                         attached.getOrDefault(it.id(), List.of()).stream()
                                                 .map(AttachmentView::from)
                                                 .toList(),
-                                        it.executionId() == null ? null : activity.get(it.executionId())))
+                                        it.executionId() == null ? null : activity.get(it.executionId()),
+                                        it.executionId() == null || statuses.get(it.executionId()) == null
+                                                ? null : statuses.get(it.executionId()).name()))
                 .toList();
     }
 }

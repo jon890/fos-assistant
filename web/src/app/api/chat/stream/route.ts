@@ -7,6 +7,7 @@ export async function POST(request: Request) {
     text?: string;
     agentCode?: string;
     attachmentIds?: number[];
+    editOfMessageId?: unknown;
   };
   if (!body.text || body.text.trim().length === 0) {
     return NextResponse.json(
@@ -22,6 +23,9 @@ export async function POST(request: Request) {
       text: body.text,
       agentCode: body.agentCode ?? null,
       attachmentIds: body.attachmentIds ?? [],
+      ...(typeof body.editOfMessageId === "number" && Number.isSafeInteger(body.editOfMessageId)
+        ? { editOfMessageId: body.editOfMessageId }
+        : {}),
     },
   });
   if (!opened.ok) {

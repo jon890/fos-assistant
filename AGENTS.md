@@ -129,15 +129,16 @@ cd backend && ./gradlew test
 cd web && pnpm typecheck && pnpm build
 cd web && pnpm test:browser
 node test/e2e/run.ts
+node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
 ```
 
-**네 검사가 통과하면 머지한다. 머지마다 승인을 받지 않는다.**
+**여섯 검사가 통과하면 머지한다. 머지마다 승인을 받지 않는다.**
 다만 통과를 **직접 돌려 확인한 것**이라야 한다.
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
-**네 명령을 적힌 순서대로 돌린다.**
+**여섯 명령을 적힌 순서대로 돌린다.**
 `test/e2e` 는 앞선 실행이 남긴 데이터에 걸려,
 `gradlew test` 를 건너뛰면 `this agent code is already used` 로 실패할 수 있다.
 

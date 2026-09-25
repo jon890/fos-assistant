@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
 const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/;
+const RUN_STOP_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/stop$/;
 const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
 const SESSION_PATH = /^\/p\/([a-z0-9-]+)\/api\/sessions\/([A-Za-z0-9_-]+)$/;
 /** Control Plane 이 주소를 저장하기 전에 닿는지 확인할 때 부른다. */
@@ -221,6 +222,8 @@ export type FakeHermes = {
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
+  /** 중지 요청을 받은 실행 번호들이다. */
+  stoppedRuns(): readonly string[];
   close(): Promise<void>;
 };
 
@@ -263,6 +266,8 @@ export function startFakeHermes(
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
+  const stoppedRuns: string[] = [];
+  const emptyUntilStopped = new Map<string, ServerResponse>();
   let lastSubmittedInstructions: string | undefined;
   let lastSubmittedInput: string | undefined;
 
@@ -274,6 +279,16 @@ export function startFakeHermes(
   /** 대시보드 경로는 profile 별 key 가 아니라 기계용 토큰 하나로 열린다. */
   const dashboardAuthorized = (request: IncomingMessage): boolean =>
     request.headers.authorization === `Bearer ${FAKE_DASHBOARD_TOKEN}`;
+
+  /** 붙잡은 실행을 풀되 실행 상태는 바꾸지 않는다. */
+  const releaseHeldRun = (): string | undefined => {
+    const runId = heldRunId;
+    heldRunWaiter?.();
+    heldRunId = undefined;
+    heldRunReady = undefined;
+    heldRunWaiter = undefined;
+    return runId;
+  };
 
   /**
    * 대시보드의 profile 관리 경로다.
@@ -404,17 +419,10 @@ export function startFakeHermes(
 
       if (request.method === "POST" && path === TEST_RELEASE_HELD_RUN_PATH) {
         holdNextRun = false;
-        heldRunWaiter?.();
-        if (heldRunId === undefined) {
-          heldRunReady = undefined;
-          heldRunWaiter = undefined;
-          return send(response, 204, null);
-        }
-        const run = runs.get(heldRunId);
+        const releasedRunId = releaseHeldRun();
+        if (releasedRunId === undefined) return send(response, 204, null);
+        const run = runs.get(releasedRunId);
         if (run !== undefined) run.status = "completed";
-        heldRunId = undefined;
-        heldRunReady = undefined;
-        heldRunWaiter = undefined;
         return send(response, 204, null);
       }
 
@@ -464,6 +472,15 @@ export function startFakeHermes(
             Connection: "keep-alive",
           });
           response.write(": keepalive\n\n");
+          if (run.input === "중지 조각 전 검사" && run.status !== "completed") {
+            if (run.status === "cancelled") {
+              response.end();
+            } else {
+              emptyUntilStopped.set(runId!, response);
+              response.on("close", () => emptyUntilStopped.delete(runId!));
+            }
+            return;
+          }
           // 실제 Hermes v0.21.0 이 보내는 형태다.
           // 사건 이름은 `event`, 조각은 `delta`, 도구 이름은 `tool`, 설명은 `preview` 다.
           // 여기가 실제와 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
@@ -472,6 +489,14 @@ export function startFakeHermes(
             event: "message.delta",
             delta: streamedOutput === null ? "화면에서만 " : streamedOutput.slice(0, 80),
           });
+          // 중지 뒤에도 Hermes 사건 스트림이 닫히지 않는 경우를 재현한다. Control Plane 이 유예 시간 뒤
+          // 이 연결을 직접 닫아야 한다.
+          if (run.input === "중지 스트림 유지 검사") return;
+          // 취소 뒤 Hermes 가 최종 output 을 비워도, 이미 화면으로 보낸 첫 조각은 남겨야 한다.
+          if (run.input === "중지 빈 답 검사") {
+            response.end();
+            return;
+          }
           if (run.interruptEvents) {
             response.end();
             return;
@@ -516,6 +541,22 @@ export function startFakeHermes(
       }
 
       if (request.method === "POST") {
+        const stopMatch = RUN_STOP_PATH.exec(path);
+        if (stopMatch) {
+          const [, profile, runId] = stopMatch;
+          if (!authorized(request, profile!)) {
+            return send(response, 401, { error: "bad key for this profile" });
+          }
+          const run = runs.get(runId!);
+          if (!run) return send(response, 404, { error: "no such run" });
+          run.status = "cancelled";
+          if (run.input === "중지 빈 답 검사" || run.input === "중지 조각 전 검사") run.output = "";
+          emptyUntilStopped.get(runId!)?.end();
+          emptyUntilStopped.delete(runId!);
+          stoppedRuns.push(runId!);
+          if (heldRunId === runId) releaseHeldRun();
+          return send(response, 200, { status: "stopping" });
+        }
         const match = RUN_PATH.exec(path);
         if (!match) return send(response, 404, { error: "not found" });
         const profile = match[1];
@@ -651,24 +692,16 @@ export function startFakeHermes(
         waitForHeldRun: () => heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
         releaseHeldRun: () => {
           holdNextRun = false;
-          heldRunWaiter?.();
-          if (heldRunId === undefined) {
-            heldRunReady = undefined;
-            heldRunWaiter = undefined;
-            return;
-          }
-          const run = runs.get(heldRunId);
+          const releasedRunId = releaseHeldRun();
+          if (releasedRunId === undefined) return;
+          const run = runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
-          heldRunId = undefined;
-          heldRunReady = undefined;
-          heldRunWaiter = undefined;
         },
+        stoppedRuns: () => [...stoppedRuns],
         close: () =>
           new Promise<void>((done) => {
             holdNextRun = false;
-            heldRunWaiter?.();
-            heldRunReady = undefined;
-            heldRunWaiter = undefined;
+            releaseHeldRun();
             server.closeAllConnections();
             server.close(() => done());
           }),

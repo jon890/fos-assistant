@@ -4,6 +4,7 @@ import { ExecutionNode } from "./execution-node";
 export type ExecutionEventType =
   | "RUN_STARTED"
   | "RUN_COMPLETED"
+  | "RUN_CANCELLED"
   | "RUN_FAILED"
   | "TOOL_STARTED"
   | "TOOL_COMPLETED"

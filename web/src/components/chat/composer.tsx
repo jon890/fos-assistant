@@ -17,6 +17,11 @@ type Props = {
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 거짓이면 사진 단추를 그리지 않는다 */
   acceptsAttachments: boolean;
   onConversationCreated(id: number): void;
+  /** 답을 만드는 중이다. 참이면 보내기 자리에서 중지를 보인다. */
+  running: boolean;
+  /** `started` 사건 뒤, 아직 중지를 누르지 않았을 때 참이다. */
+  canStop: boolean;
+  onStop(): void;
 };
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -71,6 +76,9 @@ export function Composer({
   agentCode,
   acceptsAttachments,
   onConversationCreated,
+  running,
+  canStop,
+  onStop,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -225,6 +233,7 @@ export function Composer({
   }
 
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
+    if (running) return;
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (files.length === 0) return;
@@ -261,6 +270,7 @@ export function Composer({
   }
 
   function removeItem(key: string) {
+    if (running) return;
     // 부수 효과는 updater 밖에서 한 번만 부른다. 개발 모드의 StrictMode 는 updater 를 두 번 돌린다.
     const target = itemsRef.current.find((item) => item.key === key);
     if (!target) return;
@@ -343,7 +353,7 @@ export function Composer({
                 aria-label="사진 지우기"
                 onClick={() => removeItem(item.key)}
                 // 보내는 동안 지우면 막 메시지에 묶인 첨부에 DELETE 가 간다.
-                disabled={disabled}
+                disabled={disabled || running}
                 className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs leading-none disabled:opacity-50"
               >
                 ×
@@ -380,6 +390,7 @@ export function Composer({
               || event.shiftKey
               || composing.current
               || event.nativeEvent.isComposing
+              || running
             ) {
               return;
             }
@@ -398,13 +409,14 @@ export function Composer({
               accept={ACCEPTED_TYPES.join(",")}
               multiple
               hidden
+              disabled={disabled || running}
               data-testid="attachment-input"
               onChange={(event) => void handleFiles(event)}
             />
             <IconButton
               label="사진 첨부"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
+              disabled={disabled || running}
               className="h-10 w-10 shrink-0 rounded-full"
             >
               <svg
@@ -422,28 +434,42 @@ export function Composer({
             </IconButton>
           </>
         ) : null}
-        <Button
-          type="submit"
-          aria-label="보내기"
-          disabled={sendDisabled}
-          className="h-10 w-10 shrink-0 rounded-full !p-0"
-        >
-          {uploading ? (
-            <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-on-brand/40 border-t-on-brand" />
-          ) : (
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              className="h-5 w-5 fill-none stroke-current stroke-2"
-            >
-              <path
-                d="M12 19V5m0 0-6 6m6-6 6 6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+        {running ? (
+          <Button
+            type="button"
+            aria-label="중지"
+            disabled={!canStop}
+            onClick={onStop}
+            className="h-10 w-10 shrink-0 rounded-full !p-0"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
+              <rect x="7" y="7" width="10" height="10" rx="1" />
             </svg>
-          )}
-        </Button>
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            aria-label="보내기"
+            disabled={sendDisabled}
+            className="h-10 w-10 shrink-0 rounded-full !p-0"
+          >
+            {uploading ? (
+              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-on-brand/40 border-t-on-brand" />
+            ) : (
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-5 w-5 fill-none stroke-current stroke-2"
+              >
+                <path
+                  d="M12 19V5m0 0-6 6m6-6 6 6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </Button>
+        )}
       </div>
     </form>
   );

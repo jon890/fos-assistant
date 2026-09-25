@@ -31,6 +31,9 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
       case "RUN_STARTED":
       case "RUN_COMPLETED":
         break;
+      case "RUN_CANCELLED":
+        rows.push({ kind: "cancelled", key: event.sequence });
+        break;
       case "RUN_FAILED":
         rows.push({ kind: "error", key: event.sequence, detail: event.detail });
         break;

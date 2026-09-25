@@ -11,7 +11,8 @@ export type MergedEventRow =
       finished: boolean;
     }
   | { kind: "subagent"; key: number; subagentName: string | null; detail: string | null }
-  | { kind: "error"; key: number; detail: string | null };
+  | { kind: "error"; key: number; detail: string | null }
+  | { kind: "cancelled"; key: number };
 
 export function ExecutionEventRow({ row }: { row: MergedEventRow }) {
   if (row.kind === "error") {
@@ -20,6 +21,9 @@ export function ExecutionEventRow({ row }: { row: MergedEventRow }) {
         실행 실패{row.detail ? `: ${row.detail}` : ""}
       </li>
     );
+  }
+  if (row.kind === "cancelled") {
+    return <li className="truncate text-sm text-muted" data-testid="execution-event-row">중지됨</li>;
   }
   if (row.kind === "subagent") {
     return (
