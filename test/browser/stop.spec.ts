@@ -122,6 +122,18 @@ test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({ pa
   await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
 });
 
+test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답을 중지한다", async ({ page, hermes }) => {
+  await hermes.holdNextRun();
+  await beginHeldTurn(page, "중지 풀이 Esc 검사");
+  await hermes.waitForHeldRun();
+  await page.getByTestId("composer-shell").getByRole("button", { name: "중지" }).hover();
+  await expect(page.getByRole("tooltip")).toHaveText("중지");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  // 멈춘 답은 받은 조각이 있으면 중지 표시를, 없으면 답이 없다는 안내를 남긴다. 어느 쪽이든 멈춘 것이다.
+  await expect(page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first()).toBeVisible({ timeout: 30_000 });
+});
+
 test("좁은 화면에서 열린 서랍은 Esc 로 닫고 실행은 계속한다", async ({ page, hermes }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "좁은 화면 서랍 동작만 확인한다");
   await hermes.holdNextRun();

@@ -12,6 +12,7 @@ import { applyChatEvent, emptyActivity, failActivity, type ActivityState } from 
 import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
+import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
 import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 import type { ChatEvent } from "@/lib/chat-event";
@@ -164,7 +165,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+      if (event.key !== "Escape" || event.isComposing) return;
+      // 「중지」 의 풀이만 닫은 Esc 는 막혀 있어도 받는다. 마우스를 올려 둔 채 누른 첫 Esc 가 답을 멈춰야 한다.
+      if (event.defaultPrevented && !escapeOnlyClosedTooltip(event)) return;
       if (panelTarget) {
         event.preventDefault();
         setPanelTarget(null);
