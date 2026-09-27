@@ -349,19 +349,28 @@ export default async function setupServices(): Promise<() => Promise<void>> {
 }
 
 /**
- * `loading.tsx` 가 있는 경로를 `goto` 로 열면 본문이 `<body>` 끝의 숨은 `S:` 조각으로 먼저 흘러오고,
- * React 가 조금 뒤에 제자리로 옮긴다. `goto` 가 끝난 뒤에도 그 옮김이 남아 있어서,
+ * `loading.tsx` 가 있는 경로를 `goto` 나 `reload` 로 열면 본문이 `<body>` 끝의 숨은 `S:` 조각으로 먼저 흘러오고,
+ * React 가 조금 뒤에 제자리로 옮긴다. 문서를 다 읽은 뒤에도 그 옮김이 남아 있어서,
  * 그 사이에는 같은 요소가 숨어 있거나 두 벌이라 strict 검사가 곧바로 실패한다.
- * 그래서 `goto` 뒤에는 사용자가 보는 상태, 곧 숨은 조각이 모두 옮겨진 뒤까지 기다린다.
+ * 그래서 문서를 새로 읽은 뒤에는 사용자가 보는 상태, 곧 숨은 조각이 모두 옮겨진 뒤까지 기다린다.
  * 조각이 없는 경로는 곧바로 지나가고, 시간 안에 옮겨지지 않으면 그 검사를 실패시킨다.
+ * 링크를 눌러 옮기는 것은 RSC 로 오므로 숨은 조각이 생기지 않는다.
  */
-function waitForStreamedContentAfterGoto(page: import("../../web/node_modules/@playwright/test/index.js").Page) {
+function waitForStreamedContentAfterLoad(page: import("../../web/node_modules/@playwright/test/index.js").Page) {
+  const streamedContentPlaced = () =>
+    page.waitForFunction(() => document.querySelector('div[hidden][id^="S:"]') === null, undefined, {
+      timeout: 10_000,
+    });
   const goto = page.goto.bind(page);
   page.goto = async (...args) => {
     const response = await goto(...args);
-    await page.waitForFunction(() => document.querySelector('div[hidden][id^="S:"]') === null, undefined, {
-      timeout: 10_000,
-    });
+    await streamedContentPlaced();
+    return response;
+  };
+  const reload = page.reload.bind(page);
+  page.reload = async (...args) => {
+    const response = await reload(...args);
+    await streamedContentPlaced();
     return response;
   };
 }
@@ -372,7 +381,7 @@ export const test = base.extend<{ hermes: FakeHermesControl }>({
   },
   page: async ({ context, page }, use) => {
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
-    waitForStreamedContentAfterGoto(page);
+    waitForStreamedContentAfterLoad(page);
     await use(page);
   },
 });
