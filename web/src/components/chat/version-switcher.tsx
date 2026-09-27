@@ -10,13 +10,13 @@ export function VersionSwitcher({ slot, onChange }: Props) {
   if (slot.count <= 1) return null;
 
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted">
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <button
         type="button"
         aria-label="이전 판"
         disabled={slot.index === 0}
         onClick={() => onChange(slot.index - 1)}
-        className="rounded px-1.5 py-1 hover:bg-surface-raised disabled:opacity-40"
+        className="rounded px-1.5 py-1 hover:bg-accent disabled:opacity-40"
       >
         ‹
       </button>
@@ -26,7 +26,7 @@ export function VersionSwitcher({ slot, onChange }: Props) {
         aria-label="다음 판"
         disabled={slot.index === slot.count - 1}
         onClick={() => onChange(slot.index + 1)}
-        className="rounded px-1.5 py-1 hover:bg-surface-raised disabled:opacity-40"
+        className="rounded px-1.5 py-1 hover:bg-accent disabled:opacity-40"
       >
         ›
       </button>

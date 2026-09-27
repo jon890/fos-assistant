@@ -116,7 +116,7 @@ export function MessageList({
               <Skeleton className="h-[4.25rem]" />
             </div>
           ) : turns.length === 0 && !sending && !activity ? (
-            <p className="py-8 text-center text-sm text-muted">무엇이든 물어보세요.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">무엇이든 물어보세요.</p>
           ) : (
             <ol className="flex flex-col gap-6">
               {visible.map(({ turn, userVersion, answerVersion }) => {
@@ -141,7 +141,7 @@ export function MessageList({
                       canRegenerate={isLast && turn.role === "ASSISTANT" && latestView && !sending}
                       onRegenerate={onRegenerate} />
                     {isLast && hasNoAnswer ? (
-                      <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted">
+                      <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground">
                         <span>답을 받지 못했다</span>
                         {onRetry ? <button type="button" onClick={onRetry} className="underline underline-offset-2">다시 시도</button> : null}
                       </li>
@@ -161,7 +161,7 @@ export function MessageList({
                 <WaitingIndicator />
               ) : null}
               {turnError ? (
-                <li data-testid="turn-error" className="rounded-md bg-surface px-3 py-2 text-sm">
+                <li data-testid="turn-error" className="rounded-md bg-muted px-3 py-2 text-sm">
                   {turnError}
                   {onRetry && !hasNoAnswer ? <button type="button" data-testid="turn-error-retry"
                     onClick={onRetry} className="ml-2 text-xs underline underline-offset-2">다시 시도</button> : null}

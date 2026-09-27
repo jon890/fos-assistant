@@ -48,7 +48,7 @@ export function AgentMention({ id, agents, query, activeIndex, onPick }: Props) 
       className="absolute inset-x-0 bottom-full z-10 mb-2 max-h-60 overflow-y-auto rounded-2xl border border-border bg-background p-1 shadow"
     >
       {matches.length === 0 ? (
-        <li role="option" aria-selected={false} aria-disabled="true" className="px-3 py-2 text-sm text-muted">
+        <li role="option" aria-selected={false} aria-disabled="true" className="px-3 py-2 text-sm text-muted-foreground">
           맞는 에이전트가 없다
         </li>
       ) : (
@@ -61,10 +61,10 @@ export function AgentMention({ id, agents, query, activeIndex, onPick }: Props) 
             // 누르는 동안 입력칸이 초점을 잃으면 커서 자리를 알 수 없다.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onPick(agent.code)}
-            className={`cursor-pointer rounded-xl px-3 py-2 hover:bg-surface ${index === activeIndex ? "bg-surface" : ""}`}
+            className={`cursor-pointer rounded-xl px-3 py-2 hover:bg-muted ${index === activeIndex ? "bg-muted" : ""}`}
           >
             <span className="block truncate text-sm font-medium">{agent.name}</span>
-            {agent.tagline ? <span className="block truncate text-xs text-muted">{agent.tagline}</span> : null}
+            {agent.tagline ? <span className="block truncate text-xs text-muted-foreground">{agent.tagline}</span> : null}
           </li>
         ))
       )}

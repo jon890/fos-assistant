@@ -87,7 +87,7 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
           tabIndex={drawerOpen ? 0 : -1}
           className={`fixed inset-0 z-30 bg-foreground/35 md:hidden ${drawerOpen ? "" : "pointer-events-none opacity-0"}`} />
         <aside ref={sidebarRef} aria-label="사이드바"
-          className={`fixed inset-y-0 left-0 z-40 w-72 shrink-0 border-r border-border bg-surface transition-transform md:static md:translate-x-0 ${collapsed ? "md:hidden" : "md:w-64"} ${
+          className={`fixed inset-y-0 left-0 z-40 w-72 shrink-0 border-r border-border bg-muted transition-transform md:static md:translate-x-0 ${collapsed ? "md:hidden" : "md:w-64"} ${
             drawerOpen ? "translate-x-0" : "-translate-x-full"
           }`}>
           <Sidebar isAdmin={isAdmin} displayName={displayName} onNavigate={() => setDrawerOpen(false)}
@@ -96,15 +96,15 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {collapsed ? <header className="hidden h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:flex">
             <button type="button" aria-label="사이드바 펴기" onClick={() => updateCollapsed(false)}
-              className="rounded-md px-2 py-1.5 hover:bg-surface">☰</button>
-            <Link href="/" onClick={startNew} className="rounded-md px-2 py-1.5 text-sm hover:bg-surface">새 대화</Link>
+              className="rounded-md px-2 py-1.5 hover:bg-muted">☰</button>
+            <Link href="/" onClick={startNew} className="rounded-md px-2 py-1.5 text-sm hover:bg-muted">새 대화</Link>
           </header> : null}
           <header className="flex h-14 shrink-0 flex-nowrap items-center gap-3 border-b border-border px-4 md:hidden">
             <button type="button" aria-label="사이드바 열기" onClick={() => setDrawerOpen(true)}
-              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-surface">☰</button>
+              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-muted">☰</button>
             <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">{title}</span>
             <Link href="/" aria-label="새 대화" onClick={startNew}
-              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-surface">✎</Link>
+              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-muted">✎</Link>
           </header>
           <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
             {children}

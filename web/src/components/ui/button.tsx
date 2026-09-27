@@ -9,9 +9,9 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-on-brand hover:bg-brand-strong active:bg-brand-strong",
-  secondary: "border border-border bg-transparent text-foreground hover:bg-surface-raised active:bg-surface",
-  ghost: "bg-transparent text-foreground hover:bg-surface-raised active:bg-surface",
+  primary: "bg-primary text-primary-foreground hover:bg-primary-strong active:bg-primary-strong",
+  secondary: "border border-border bg-transparent text-foreground hover:bg-accent active:bg-muted",
+  ghost: "bg-transparent text-foreground hover:bg-accent active:bg-muted",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

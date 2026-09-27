@@ -464,8 +464,8 @@ web/src/
 
 ### 색과 간격은 테마 토큰이 소유한다
 
-색과 간격을 `style={{ background: "var(--surface)" }}` 처럼 인라인으로 적지 않는다.
-`globals.css` 의 `@theme` 에 토큰을 선언하고 `bg-surface` 나 `ml-3` 같은 Tailwind 클래스로 쓴다.
+색과 간격을 `style={{ background: "var(--muted)" }}` 처럼 인라인으로 적지 않는다.
+`globals.css` 의 `@theme` 에 토큰을 선언하고 `bg-muted` 나 `ml-3` 같은 Tailwind 클래스로 쓴다.
 
 인라인 스타일에는 `hover:` 와 `md:` 와 `disabled:` 를 붙일 수 없다.
 그래서 인라인으로 적은 값 하나가 그 요소의 반응형과 상태 변화를 함께 막는다.
@@ -473,10 +473,7 @@ web/src/
 
 토큰은 `globals.css` 한 곳에서만 선언한다. 밝기 모드도 거기서 갈린다.
 
-**토큰 이름을 shadcn 의 이름 체계로 옮기기로 했다.** 이름 대응표와 근거는
-[ADR-023](adr/ADR-023-화면-부품은-shadcn-ui-를-저장소에-복사해-쓴다.md) 이 갖는다.
-**옮기기 전까지는 지금 이름을 쓴다.** 새 이름은 `globals.css` 에 아직 없어, 먼저 쓰면 색이 빠진다.
-옮기는 변경이 이 절과 아래 「우리 화면의 정체성」 의 토큰 이름, [`web/AGENTS.md`](../web/AGENTS.md) 의 예시를 함께 고친다.
+토큰 이름은 shadcn 의 이름 체계를 쓴다. 옛 이름과의 대응표와 근거는 [ADR-023](adr/ADR-023-화면-부품은-shadcn-ui-를-저장소에-복사해-쓴다.md) 이 갖는다.
 
 검사 명령과 예외는 [`web/AGENTS.md`](../web/AGENTS.md) 가 갖는다.
 
@@ -487,10 +484,11 @@ web/src/
 
 | 토큰 | 쓰는 곳 |
 | --- | --- |
-| `brand` | 보내기 단추, 고른 항목, 링크, 상태 표시 |
-| `brand-strong` | 눌렀을 때와 마우스를 올렸을 때 |
-| `brand-soft` | 내 말풍선 배경 |
-| `on-brand` | 브랜드 색 위에 얹는 글자 |
+| `primary` | 보내기 단추, 고른 항목, 링크, 상태 표시 |
+| `primary-strong` | 눌렀을 때와 마우스를 올렸을 때 |
+| `primary-soft` | 내 말풍선 배경 |
+| `primary-foreground` | 브랜드 색 위에 얹는 글자 |
+| `destructive` | 되돌릴 수 없는 동작의 단추와 오류 글자 |
 
 브랜드 색을 본문 글자에 쓰지 않는다.
 읽는 글이 색을 가지면 무엇이 누를 수 있는 것인지 알 수 없게 된다.

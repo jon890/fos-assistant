@@ -9,7 +9,7 @@ export function Badge({ children, emphasis = false }: Props) {
   return (
     <span
       className={`inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-xs ${
-        emphasis ? "border-foreground font-semibold text-foreground" : "border-border bg-surface text-muted"
+        emphasis ? "border-foreground font-semibold text-foreground" : "border-border bg-muted text-muted-foreground"
       }`}
     >
       {children}

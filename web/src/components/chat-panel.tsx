@@ -580,7 +580,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     return (
       <section data-testid="conversation-not-found" className="mx-auto max-w-3xl py-12 text-center">
         <h1 className="text-lg font-semibold">대화를 찾을 수 없다</h1>
-        <Link href="/" className="mt-4 inline-block rounded-md bg-surface px-3 py-2 text-sm">새 대화</Link>
+        <Link href="/" className="mt-4 inline-block rounded-md bg-muted px-3 py-2 text-sm">새 대화</Link>
       </section>
     );
   }
@@ -593,7 +593,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {startScreen ? null : (
           <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
-            <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-xs text-muted">
+            <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-xs text-muted-foreground">
               <div className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
                 <span className="shrink-0">에이전트</span>
                 <span className="truncate" title={currentAgent?.name}>
@@ -634,7 +634,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
               locked={agentLocked}
             />
           ) : null}
-          {error ? <p className="mb-2 rounded-md bg-surface px-3 py-2 text-sm">{error}</p> : null}
+          {error ? <p className="mb-2 rounded-md bg-muted px-3 py-2 text-sm">{error}</p> : null}
           <Composer
             key={composerGeneration}
             value={draft}

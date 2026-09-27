@@ -36,13 +36,13 @@ export function MainNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate(
       {links.map((link) => (
         <Link key={link.href} href={link.href} onClick={onNavigate}
           aria-current={pathname === link.href || pathname.startsWith(`${link.href}/`) ? "page" : undefined}
-          className={`rounded-md px-3 py-2 text-sm hover:bg-surface-raised hover:text-foreground ${
+          className={`rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
             pathname === link.href || pathname.startsWith(`${link.href}/`)
-              ? "bg-surface-raised font-medium text-foreground" : "text-muted"
+              ? "bg-accent font-medium text-foreground" : "text-muted-foreground"
           }`}
         >
           {link.label}{link.href === "/memory" && proposalCount > 0 ? (
-            <span className="ml-2 rounded-full bg-surface px-1.5 py-0.5 text-xs text-foreground"
+            <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs text-foreground"
               data-testid="memory-proposal-count">{proposalCount}</span>
           ) : null}
           <NavPending />

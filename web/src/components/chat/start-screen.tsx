@@ -37,13 +37,13 @@ export function StartScreenHeader({ displayName, agents, loading, selectedCode, 
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
         </div>
       ) : agents.length === 0 ? (
-        <p className="rounded-md bg-surface px-3 py-2 text-center text-sm">
+        <p className="rounded-md bg-muted px-3 py-2 text-center text-sm">
           쓸 수 있는 에이전트가 없다. 관리자에게 등록을 요청한다.
         </p>
       ) : only ? (
         <div className="text-center">
           <p className="text-sm font-medium">{only.name}</p>
-          {only.tagline ? <p className="mt-1 text-sm text-muted">{only.tagline}</p> : null}
+          {only.tagline ? <p className="mt-1 text-sm text-muted-foreground">{only.tagline}</p> : null}
         </div>
       ) : (
         <AgentPicker agents={agents} selectedCode={selectedCode} onSelect={onSelect} disabled={locked} />
@@ -71,7 +71,7 @@ export function StarterPrompts({ prompts, disabled, onPrompt }: PromptsProps) {
                 type="button"
                 disabled={disabled}
                 onClick={() => onPrompt(prompt)}
-                className="max-w-full rounded-full border border-border px-3 py-1.5 text-left text-sm hover:bg-surface disabled:opacity-50"
+                className="max-w-full rounded-full border border-border px-3 py-1.5 text-left text-sm hover:bg-muted disabled:opacity-50"
               >
                 {prompt}
               </button>

@@ -18,7 +18,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
   const router = useRouter();
   return (
     <table className="hidden w-full text-left text-sm md:table" data-testid="execution-table">
-      <thead className="text-xs text-muted">
+      <thead className="text-xs text-muted-foreground">
         <tr>
           <th className="pb-3 pr-4 font-medium">시각</th>
           <th className="pb-3 pr-4 font-medium">에이전트</th>
@@ -40,7 +40,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
           return (
             <tr
               key={execution.id}
-              className="cursor-pointer border-t border-border align-top hover:bg-surface"
+              className="cursor-pointer border-t border-border align-top hover:bg-muted"
               onClick={() => router.push(`/executions/${execution.id}`)}
             >
               <td className="py-3 pr-4 whitespace-nowrap">{formatWhen(execution.startedAt)}</td>
@@ -56,20 +56,20 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                   {execution.agentName}
                 </Link>
                 {execution.hasChildren ? (
-                  <span className="ml-1 text-muted" aria-hidden="true">
+                  <span className="ml-1 text-muted-foreground" aria-hidden="true">
                     ▸
                   </span>
                 ) : null}
-                <span className="block text-xs text-muted">{execution.agentCode}</span>
+                <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
               </td>
               <td className="max-w-40 py-3 pr-4">
                 <span className="block truncate">{execution.model ?? "-"}</span>
-                <span className="block truncate text-xs text-muted">{execution.provider ?? "-"}</span>
+                <span className="block truncate text-xs text-muted-foreground">{execution.provider ?? "-"}</span>
               </td>
               <td className="max-w-40 py-3 pr-4">
                 <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
                 {retryOfLabel(execution) ? (
-                  <span className="mt-1 block text-xs text-muted" data-testid="execution-retry-of">
+                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-retry-of">
                     {retryOfLabel(execution)}
                   </span>
                 ) : null}
@@ -83,7 +83,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
               >
                 <span className="block">{contextCharsLabel(execution)}</span>
                 {contextOmittedLabel(execution) ? (
-                  <span className="block text-xs text-danger" data-testid="execution-context-omitted">
+                  <span className="block text-xs text-destructive" data-testid="execution-context-omitted">
                     {contextOmittedLabel(execution)}
                   </span>
                 ) : null}

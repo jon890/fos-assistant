@@ -110,7 +110,7 @@ export function ExecutionNode({ node, depth }: { node: ExecutionTreeNode; depth:
               <ExecutionNode key={child.executionId} node={child} depth={depth + 1} />
             ))}
           {showsTruncated ? (
-            <li className="truncate text-xs text-muted">여기부터 보이지 않는다</li>
+            <li className="truncate text-xs text-muted-foreground">여기부터 보이지 않는다</li>
           ) : null}
         </ul>
       </div>

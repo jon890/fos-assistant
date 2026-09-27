@@ -389,11 +389,11 @@ export function Composer({
           {items.map((item) => (
             <div key={item.key} className="relative shrink-0">
               {item.status === "error" ? (
-                <div className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-md border border-border bg-surface p-1 text-center text-[0.625rem] leading-tight text-muted">
+                <div className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-md border border-border bg-muted p-1 text-center text-[0.625rem] leading-tight text-muted-foreground">
                   <span>{item.errorMessage}</span>
                 </div>
               ) : (
-                <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border bg-surface">
+                <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border bg-muted">
                   {item.previewUrl ? (
                     // eslint 설정이 없는 저장소라 next/image 대신 object URL 을 바로 그린다.
                     <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />
@@ -404,7 +404,7 @@ export function Composer({
                       aria-hidden="true"
                       className="absolute inset-0 flex items-center justify-center bg-background/60"
                     >
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-brand" />
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-primary" />
                     </span>
                   ) : null}
                 </div>
@@ -425,14 +425,14 @@ export function Composer({
       ) : null}
 
       {pickNotice ? (
-        <p data-testid="attachment-notice" className="mb-2 text-xs text-muted">
+        <p data-testid="attachment-notice" className="mb-2 text-xs text-muted-foreground">
           {pickNotice}
         </p>
       ) : null}
 
       <div
         data-testid="composer-shell"
-        className="relative flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-brand"
+        className="relative flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-primary"
       >
         {mention && openMention ? (
           <AgentMention
@@ -556,7 +556,7 @@ export function Composer({
             className="h-10 w-10 shrink-0 rounded-full !p-0"
           >
             {uploading ? (
-              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-on-brand/40 border-t-on-brand" />
+              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
             ) : (
               <svg
                 viewBox="0 0 24 24"

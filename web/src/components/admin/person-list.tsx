@@ -17,7 +17,7 @@ export function PersonList({ people, busy, onEnabledChange }: Props) {
   return (
     <div className="overflow-x-auto rounded-md border border-border">
       <table aria-label="더해진 사람" className="w-full border-collapse text-sm">
-        <thead className="bg-surface text-left text-muted">
+        <thead className="bg-muted text-left text-muted-foreground">
           <tr>
             <th scope="col" className={cellClass}>이름</th>
             <th scope="col" className={cellClass}>이메일</th>

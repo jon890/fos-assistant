@@ -39,14 +39,14 @@ export function ActivityPanel({ target, onClose }: Props) {
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">작업 과정</h2>
         {executionId !== null ? (
           <Link href={`/executions/${executionId}`} data-testid="flow-tree-link"
-            className="shrink-0 text-xs text-muted underline underline-offset-4">전체 화면으로 보기</Link>
+            className="shrink-0 text-xs text-muted-foreground underline underline-offset-4">전체 화면으로 보기</Link>
         ) : null}
         <button type="button" aria-label="작업 과정 닫기" onClick={onClose}
-          className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-surface">✕</button>
+          className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-muted">✕</button>
       </header>
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
         {target.mode === "live" ? <ActivityTimeline items={target.state.items} /> :
-          failedId === executionId ? <p className="text-sm text-muted">실행 나무를 읽지 못했다
+          failedId === executionId ? <p className="text-sm text-muted-foreground">실행 나무를 읽지 못했다
             <button type="button" className="ml-2 underline" onClick={() => {
               setFailedId(null); setLoaded(null); setRetry((value) => value + 1);
             }}>다시 읽기</button>

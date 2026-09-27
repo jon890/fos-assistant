@@ -134,7 +134,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   return (
     <div className="relative my-3">
       <div className="absolute right-2 top-2 z-10"><CopyButton text={code} label="코드 복사" /></div>
-      <pre className="overflow-x-auto rounded-md bg-surface px-3 pb-3 pt-12 font-mono text-sm leading-6">
+      <pre className="overflow-x-auto rounded-md bg-muted px-3 pb-3 pt-12 font-mono text-sm leading-6">
         <code className="block min-w-max">
         {lines.length > 0
           ? lines.map((line, lineIndex) => (
@@ -177,7 +177,7 @@ export function Markdown({ children }: { children: string }) {
             </div>
           ),
           th: ({ children: cell, ...props }) => (
-            <th {...props} className="border border-border bg-surface px-3 py-2 font-semibold">
+            <th {...props} className="border border-border bg-muted px-3 py-2 font-semibold">
               {cell}
             </th>
           ),
@@ -209,7 +209,7 @@ export function Markdown({ children }: { children: string }) {
               return <CodeBlock code={text} language={language ?? "text"} />;
             }
             return (
-              <code {...props} className="rounded-sm bg-surface px-1 py-0.5 font-mono text-[0.9em]">
+              <code {...props} className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.9em]">
                 {source}
               </code>
             );

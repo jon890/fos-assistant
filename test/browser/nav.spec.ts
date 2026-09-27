@@ -56,9 +56,9 @@ test("로그인 화면은 메뉴 없이 가운데 카드와 브랜드 단추만 
   const button = page.getByRole("button", { name: "Google 계정으로 로그인" });
   const colors = await button.evaluate((element) => ({
     background: getComputedStyle(element).backgroundColor,
-    brand: getComputedStyle(document.documentElement).getPropertyValue("--brand").trim(),
+    primary: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
   }));
   expect(colors.background).not.toBe("rgba(0, 0, 0, 0)");
   expect(colors.background).toBe("rgb(176, 90, 60)");
-  expect(colors.brand).toBe("#b05a3c");
+  expect(colors.primary).toBe("#b05a3c");
 });

@@ -84,10 +84,10 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
   return (
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="mb-2 text-xl font-semibold">{name}</h1>
-      <p className="mb-6 text-sm leading-6 text-muted">
+      <p className="mb-6 text-sm leading-6 text-muted-foreground">
         이 에이전트가 대화마다 지키는 성격입니다. 저장하면 곧바로 다음 대화부터 반영됩니다.
       </p>
-      {isEmpty ? <p className="mb-3 text-sm text-muted">아직 성격을 쓰지 않았습니다.</p> : null}
+      {isEmpty ? <p className="mb-3 text-sm text-muted-foreground">아직 성격을 쓰지 않았습니다.</p> : null}
       <textarea
         value={body}
         onChange={(event) => edit(event.target.value)}
@@ -96,16 +96,16 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
         aria-label={`${name} 성격`}
         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm leading-6"
       />
-      <p className="mt-2 text-xs text-muted">남은 {remaining}자</p>
+      <p className="mt-2 text-xs text-muted-foreground">남은 {remaining}자</p>
       {error ? (
-        <p role="alert" className="mt-2 rounded-md bg-surface p-3 text-sm break-all">
+        <p role="alert" className="mt-2 rounded-md bg-muted p-3 text-sm break-all">
           {error}
         </p>
       ) : null}
       {serverBody !== null ? (
         <section className="mt-3 rounded-md border border-border p-3">
           <h2 className="text-sm font-semibold">지금 저장되어 있는 성격</h2>
-          <p className="mt-1 text-xs text-muted">
+          <p className="mt-1 text-xs text-muted-foreground">
             쓰던 글은 위 편집창에 그대로 있습니다. 둘을 견주어 남길 내용을 정한 뒤 다시 저장해 주세요.
           </p>
           <pre className="mt-2 text-sm leading-6 whitespace-pre-wrap break-all">{serverBody}</pre>

@@ -105,7 +105,7 @@ function ListBody() {
 function TableBody() {
   return (
     <>
-      <div className="mb-6 grid gap-5 rounded-md border border-border bg-surface p-4 sm:grid-cols-2 md:grid-cols-3">
+      <div className="mb-6 grid gap-5 rounded-md border border-border bg-muted p-4 sm:grid-cols-2 md:grid-cols-3">
         <Skeleton className="h-14 w-full" />
         <Skeleton className="h-14 w-full" />
         <Skeleton className="h-14 w-full" />

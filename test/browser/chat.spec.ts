@@ -50,11 +50,11 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
   await page.mouse.move(0, 0);
   const sendColors = await send.evaluate((button) => ({
     background: getComputedStyle(button).backgroundColor,
-    brand: getComputedStyle(document.documentElement).getPropertyValue("--brand").trim(),
+    primary: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
   }));
   expect(sendColors.background).not.toBe("rgba(0, 0, 0, 0)");
   expect(sendColors.background).toBe("rgb(176, 90, 60)");
-  expect(sendColors.brand).toBe("#b05a3c");
+  expect(sendColors.primary).toBe("#b05a3c");
   await send.click();
   await expect(composer).toBeEnabled();
 

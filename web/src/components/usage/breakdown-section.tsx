@@ -41,9 +41,9 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">어디에 썼나</h2>
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted">묶는 기준</span>
+          <span className="text-muted-foreground">묶는 기준</span>
           <select
-            className="rounded-md border border-border bg-surface px-control-x-sm py-control-y-sm text-sm"
+            className="rounded-md border border-border bg-muted px-control-x-sm py-control-y-sm text-sm"
             data-testid="breakdown-axis"
             disabled={pending}
             onChange={(event) => changeAxis(event.target.value)}

@@ -33,8 +33,8 @@ src/
 
 ## 색과 간격은 테마 토큰이 소유한다
 
-색과 간격을 `style={{ background: "var(--surface)" }}` 처럼 인라인으로 적지 않는다.
-`globals.css` 의 `@theme` 에 토큰을 선언하고 `bg-surface` 나 `ml-3` 같은 Tailwind 클래스로 쓴다.
+색과 간격을 `style={{ background: "var(--muted)" }}` 처럼 인라인으로 적지 않는다.
+`globals.css` 의 `@theme` 에 토큰을 선언하고 `bg-muted` 나 `ml-3` 같은 Tailwind 클래스로 쓴다.
 
 인라인 스타일에는 `hover:` 와 `md:` 와 `disabled:` 를 붙일 수 없다.
 그래서 인라인으로 적은 값 하나가 그 요소의 반응형과 상태 변화를 함께 막는다.

@@ -75,7 +75,7 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
   return (
     <div className="mx-auto mt-8 w-full max-w-2xl">
       <h2 className="mb-2 text-lg font-semibold">새 대화 화면</h2>
-      <p className="mb-4 text-sm leading-6 text-muted">새 대화에서 이 에이전트를 고르면 보인다.</p>
+      <p className="mb-4 text-sm leading-6 text-muted-foreground">새 대화에서 이 에이전트를 고르면 보인다.</p>
       <input
         type="text"
         value={tagline}
@@ -100,7 +100,7 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
         ))}
       </div>
       {error ? (
-        <p role="alert" className="mt-2 rounded-md bg-surface p-3 text-sm break-all">
+        <p role="alert" className="mt-2 rounded-md bg-muted p-3 text-sm break-all">
           {error}
         </p>
       ) : null}

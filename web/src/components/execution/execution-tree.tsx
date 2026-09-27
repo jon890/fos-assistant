@@ -85,7 +85,7 @@ export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
   // 않는다」 를 그렸으면 여기서 또 적어 두 번 말하지 않는다.
   const truncatedAbove = tree.truncated && !anyNodeTruncated(tree.root);
   const aboveNotice = truncatedAbove ? (
-    <p className="mb-2 text-xs text-muted" data-testid="execution-tree-truncated-above">
+    <p className="mb-2 text-xs text-muted-foreground" data-testid="execution-tree-truncated-above">
       위쪽이 잘려 여기가 뿌리가 아닐 수 있다
     </p>
   ) : null;
@@ -94,7 +94,7 @@ export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
     return (
       <>
         {aboveNotice}
-        <p className="text-sm text-muted">기록된 사건이 없다</p>
+        <p className="text-sm text-muted-foreground">기록된 사건이 없다</p>
       </>
     );
   }

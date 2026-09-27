@@ -19,17 +19,17 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
           <span className="sr-only">{SPOKEN[item.state]}</span>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline gap-2">
-              {item.kind === "subagent" ? <span className="shrink-0 text-muted">하위 에이전트</span> : null}
+              {item.kind === "subagent" ? <span className="shrink-0 text-muted-foreground">하위 에이전트</span> : null}
               <span className="min-w-0 break-words">{item.name}</span>
               {item.durationMs !== null && item.state !== "running" ? (
-                <span className="ml-auto shrink-0 text-muted">{formatDuration(item.durationMs)}</span>
+                <span className="ml-auto shrink-0 text-muted-foreground">{formatDuration(item.durationMs)}</span>
               ) : null}
             </div>
             {item.kind === "tool" && item.detail ? (
-              <p className="break-words text-muted">{item.detail}</p>
+              <p className="break-words text-muted-foreground">{item.detail}</p>
             ) : null}
             {item.kind === "subagent" && (item.model || item.inputTokens !== null || item.outputTokens !== null) ? (
-              <p className="break-words text-muted">
+              <p className="break-words text-muted-foreground">
                 {[item.model, item.inputTokens === null ? null : `입력 ${formatTokens(item.inputTokens)}`,
                   item.outputTokens === null ? null : `출력 ${formatTokens(item.outputTokens)}`]
                   .filter(Boolean).join(" · ")}
