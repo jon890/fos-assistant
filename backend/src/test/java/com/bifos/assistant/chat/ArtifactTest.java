@@ -342,6 +342,24 @@ class ArtifactTest {
     }
 
     @Test
+    void 대화_폴더_자체가_다른_대화의_폴더를_가리키는_링크면_ARTIFACT_NOT_FOUND_다() throws Exception {
+        Conversation other = chat.startEmpty(dad, "dad");
+        writeAt(other.id(), "a/index.html", "SECRET", Instant.now());
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        Path folder = root.resolve(String.valueOf(conversation.id()));
+        if (Files.exists(folder, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            Files.delete(folder);
+        }
+        Files.createSymbolicLink(folder, root.resolve(String.valueOf(other.id())));
+
+        HttpResponse<String> response = file(conversation, "a/index.html");
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(code(response)).isEqualTo("ARTIFACT_NOT_FOUND");
+        assertThat(response.body()).doesNotContain("SECRET");
+    }
+
+    @Test
     void 허용된_이름의_링크가_폴더_안의_사진을_가리키면_실제_파일의_형식으로_준다() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/b.png", "png", Instant.now());

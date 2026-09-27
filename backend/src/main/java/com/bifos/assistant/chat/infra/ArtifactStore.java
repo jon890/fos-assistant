@@ -141,10 +141,11 @@ public class ArtifactStore {
                 return Optional.empty();
             }
             Path folder = folderOf(conversationId);
-            if (!Files.isDirectory(folder)) {
+            // 대화 폴더 자체가 링크면 판정 기준까지 링크를 따라가 다른 대화나 폴더 밖을 내준다. 링크를 따라가지 않고 본다.
+            if (!Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS)) {
                 return Optional.empty();
             }
-            Path realFolder = folder.toRealPath();
+            Path realFolder = root.toRealPath().resolve(String.valueOf(conversationId));
             Path realFile = folder.resolve(requested).toRealPath();
             if (!realFile.startsWith(realFolder)
                     || !Files.isRegularFile(realFile)
