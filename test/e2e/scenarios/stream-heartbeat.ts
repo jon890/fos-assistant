@@ -24,11 +24,19 @@ export const streamHeartbeatScenario: Scenario = {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let received = "";
-    const deadline = Date.now() + 5_000;
-    while (!/^:ping$/m.test(received) && Date.now() < deadline) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      received += decoder.decode(value, { stream: true });
+    // 붙잡은 동안에는 heartbeat 말고 오는 바이트가 없다. 제한 시간을 read() 와 경쟁시켜야
+    // heartbeat 가 깨졌을 때 read() 가 끝없이 기다리지 않고 5초 뒤 실패한다.
+    const timedOut = Symbol("timed out");
+    const timeout = new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), 5_000));
+    while (!/^:ping$/m.test(received)) {
+      const chunk = await Promise.race([reader.read(), timeout]);
+      if (chunk === timedOut || chunk.done) break;
+      received += decoder.decode(chunk.value, { stream: true });
+    }
+    if (!/^:ping$/m.test(received)) {
+      // 뒤 시나리오가 붙잡힌 실행에 막히지 않게 풀고 연결을 닫은 뒤 실패로 끝낸다.
+      context.hermes.releaseHeldRun();
+      await reader.cancel();
     }
     expect(/^:ping$/m.test(received), `붙잡은 동안 주석 줄이 오지 않았다: ${JSON.stringify(received.slice(-300))}`);
 
