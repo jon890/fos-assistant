@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
+import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.RunningTurn;
@@ -46,6 +47,8 @@ public final class ChatDtos {
      * @param switchedTo 앞 provider 가 막혀 넘어간 경우 그 답을 만든 provider 와 모델. 넘어가지
      *     않았으면 null
      * @param attachments 이 메시지에 붙은 첨부. 지워진 것도 자리를 남기려고 담는다. 없으면 빈 목록
+     * @param artifacts 이 답의 turn 이 대화 폴더에 만든 HTML. 지워진 것도 담는다. 사용자 메시지와 결과물이 없는
+     *     답은 빈 목록
      */
     public record MessageView(
             Long id,
@@ -58,6 +61,7 @@ public final class ChatDtos {
             Long replacesMessageId,
             Instant createdAt,
             List<AttachmentView> attachments,
+            List<ArtifactView> artifacts,
             ActivitySummary activity,
             String status) {
     }
@@ -91,6 +95,19 @@ public final class ChatDtos {
                     attachment.byteSize(),
                     attachment.isVisible(),
                     attachment.expiresAt());
+        }
+    }
+
+    /**
+     * 답에 묶인 결과물 파일 하나다. 화면이 대화의 공개 식별자와 이 경로로 본문 주소를 만든다.
+     *
+     * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다
+     * @param byteSize 답에 묶을 때의 크기
+     * @param deleted 보관 기간이 지나 파일을 지웠다
+     */
+    public record ArtifactView(String path, long byteSize, boolean deleted) {
+        static ArtifactView from(ChatArtifact artifact) {
+            return new ArtifactView(artifact.path(), artifact.byteSize(), artifact.isDeleted());
         }
     }
 

@@ -72,6 +72,14 @@ public enum ErrorCode {
      * 알아낼 수 있다.
      */
     ATTACHMENT_GONE(HttpStatus.GONE),
+    /**
+     * 대화 폴더에 그 파일이 없거나, 내주지 않는 확장자이거나, 실제 경로가 대화 폴더 밖이다.
+     *
+     * <p>세 경우를 가르지 않는다. 가르면 폴더 밖에 무엇이 있는지 훑어 알아낼 수 있다.
+     */
+    ARTIFACT_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 그 결과물이 있었지만 보관 기간이 지나 파일을 지웠다. 행에 지운 시각이 적힌 경로에만 쓴다. */
+    ARTIFACT_GONE(HttpStatus.GONE),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),

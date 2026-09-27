@@ -1,8 +1,10 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.application.AgentModelSelector;
@@ -83,6 +85,8 @@ public class ChatService {
     private final MemoryProposer memoryProposer;
     private final FlowRegistry flows;
     private final AttachmentService attachments;
+    private final ArtifactStore artifactStore;
+    private final ArtifactService artifacts;
     private final TurnCancellation turns;
     private final TransactionTemplate transactions;
 
@@ -167,7 +171,11 @@ public class ChatService {
         boolean closesHandle = existingHandle == null;
         try {
             saveQuestion(user, conversation, text, attachmentIds, intent);
-        String input = attachments.agentInput(conversation.id(), routed.attached(), text);
+        // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
+        Instant startedAt = Instant.now();
+        artifactStore.ensureFolder(conversation.id());
+        String input = artifacts.agentPreamble(conversation.id())
+                + attachments.agentInput(conversation.id(), routed.attached(), text);
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                 context.chars(), null, context.instructionsHash(), context.omittedItems());
@@ -192,7 +200,7 @@ public class ChatService {
             }
 
             if (turns.isStopConfirmed(handle) || turns.shouldStopBeforeSubmit(pending.execution().id())) {
-                return cancel(pending, null, option);
+                return recorded(cancel(pending, null, option), startedAt);
             }
             String runId = submit(pending);
             HermesRunResult result;
@@ -206,13 +214,13 @@ public class ChatService {
             }
 
             if (turns.isStopConfirmed(handle) || "cancelled".equalsIgnoreCase(result.status())) {
-                return cancel(pending, result, option);
+                return recorded(cancel(pending, result, option), startedAt);
             }
             if (result.succeeded()) {
                 blocklist.release(option.provider());
                 ChatTurn completed = finish(pending, result, option);
                 turns.markFinished(handle);
-                return completed;
+                return recorded(completed, startedAt);
             }
             if (!result.providerBlocked()) {
                 executions.fail(pending.execution(), hermesStatus(result));
@@ -294,7 +302,10 @@ public class ChatService {
             if (intent instanceof TurnIntent.Fresh) {
                 fillBlankTitle(conversation, text);
             }
-            String input = attachments.agentInput(conversation.id(), routed.attached(), text);
+            Instant startedAt = Instant.now();
+            artifactStore.ensureFolder(conversation.id());
+            String input = artifacts.agentPreamble(conversation.id())
+                    + attachments.agentInput(conversation.id(), routed.attached(), text);
             ChatTurn turn = routed.flow().run(user, conversation, routed.agent(), text, input,
                     intent,
                     execution -> {
@@ -302,6 +313,7 @@ public class ChatService {
                         if (streaming) onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
                     }, onEvent);
             if (!turn.cancelled()) turns.markFinished(handle);
+            recorded(turn, startedAt);
             if (streaming) {
                 if (!turn.cancelled()) onEvent.accept(ChatEvent.delta(turn.assistantText()));
                 onEvent.accept(turn.cancelled()
@@ -314,6 +326,17 @@ public class ChatService {
                 turns.close(handle);
             }
         }
+    }
+
+    /**
+     * 이 turn 이 대화 폴더에 만든 HTML 을 답에 묶고 turn 을 그대로 돌려준다.
+     *
+     * <p>turn 을 돌려주는 자리마다 부른다. 끝 사건을 보내는 자리에 두면 스트림이 아닌 경로가 빠진다. 묶기가
+     * 실패해도 turn 은 성공으로 끝난다. 근거는 ADR-027 에 있다.
+     */
+    private ChatTurn recorded(ChatTurn turn, Instant startedAt) {
+        artifacts.recordTurn(turn.conversationId(), turn.messageId(), startedAt);
+        return turn;
     }
 
     /**
@@ -731,6 +754,18 @@ public class ChatService {
         return attachments.allOf(conversation.id()).stream()
                 .filter(it -> it.messageId() != null)
                 .collect(Collectors.groupingBy(ChatAttachment::messageId));
+    }
+
+    /**
+     * 답 메시지마다 그 turn 이 만든 결과물을 한 번에 읽는다. 사용자 메시지는 결과물이 없어 묻지 않는다.
+     *
+     * <p>{@link #history} 로 주인을 확인한 메시지 목록을 받는다.
+     */
+    public Map<Long, List<ChatArtifact>> artifactsByMessage(List<ChatMessage> history) {
+        return artifacts.byMessage(history.stream()
+                .filter(message -> message.role() == com.bifos.assistant.chat.domain.MessageRole.ASSISTANT)
+                .map(ChatMessage::id)
+                .toList());
     }
 
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {

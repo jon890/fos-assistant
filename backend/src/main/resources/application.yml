@@ -64,6 +64,14 @@ assistant:
     retention-days: 30
     # 보관 기간이 지난 사진을 지우는 시각. Control Plane 의 시간대를 따른다
     cleanup-cron: "0 0 4 * * *"
+  artifact:
+    # 에이전트가 대화마다 결과물 파일을 두는 공유 디렉터리. 기본값을 두지 않아 없으면 기동에 실패한다.
+    # 보관 기간이 지난 파일을 Control Plane 이 지우므로 쓰기로 붙인다
+    root: ${ASSISTANT_ARTIFACT_ROOT}
+    # 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 에이전트에게는 이 경로를 알린다. 기본값이 없다
+    agent-root: ${ASSISTANT_ARTIFACT_AGENT_ROOT}
+    # 파일이 마지막으로 바뀐 때부터 센다. 지우는 시각은 첨부의 cleanup-cron 을 함께 쓴다
+    retention-days: 30
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

@@ -91,7 +91,12 @@ class RegenerateDeletedAttachmentTest {
         chat.regenerate(dad, first.conversationId(), event -> {});
 
         assertThat(stub().received()).hasSize(2);
-        assertThat(stub().received().get(1).input()).isEqualTo("사진을 설명해 줘");
+        // 지운 사진의 단락은 빠지고 결과물 폴더 단락만 사용자가 쓴 글 앞에 붙는다.
+        assertThat(stub().received().get(1).input()).isEqualTo("[결과물 폴더]\n"
+                + "/agent-side/artifacts/" + first.conversationId() + "\n"
+                + "파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
+                + "\n"
+                + "사진을 설명해 줘");
     }
 
     private CurrentUser member() {

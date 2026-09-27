@@ -1,6 +1,7 @@
 package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.TurnIntent;
@@ -83,6 +84,7 @@ public class ResearchAndBuildFlow implements Flow {
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
     private final TurnCancellation cancellation;
+    private final ArtifactService artifacts;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -225,11 +227,18 @@ public class ResearchAndBuildFlow implements Flow {
         }
     }
 
+    /**
+     * 하위 실행 하나를 돌린다.
+     *
+     * <p>지시 맨 앞에 결과물 폴더 단락을 붙인다. 파일을 실제로 만드는 쪽은 하위 실행이고 폴더는 대화마다 하나라
+     * Chief 와 같은 폴더를 알린다. Chief 는 요청 본문 안에서 이미 이 단락을 받는다.
+     */
     private ChildResult runChild(CurrentUser user, Conversation conversation,
             AgentExecution root, Agent agent, String task, TurnIntent intent) {
         AtomicReference<String> submittedRunId = new AtomicReference<>();
         try {
-            return children.run(user, conversation, root, agent.code(), task,
+            return children.run(user, conversation, root, agent.code(),
+                    artifacts.agentPreamble(conversation.id()) + task,
                     (execution, runId) -> {
                         submittedRunId.set(runId);
                         cancellation.trackRun(root.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId);

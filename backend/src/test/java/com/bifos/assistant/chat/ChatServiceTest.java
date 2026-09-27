@@ -185,7 +185,12 @@ class ChatServiceTest {
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("dad");
             assertThat(command.apiBaseUrl()).isEqualTo("http://agent-runtime.test/p/dad");
-            assertThat(command.input()).isEqualTo("오늘 저녁 뭐 먹을까?");
+            // 사용자가 쓴 글 앞에 결과물 폴더 단락이 매 turn 붙는다.
+            assertThat(command.input()).isEqualTo("[결과물 폴더]\n"
+                    + "/agent-side/artifacts/" + turn.conversationId() + "\n"
+                    + "파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
+                    + "\n"
+                    + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
             assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
             assertThat(command.sessionId()).isNull();
