@@ -32,7 +32,7 @@ phase-01 이 Control Plane 을 바꿨다. 대화 경로의 `{id}` 와 응답의 
 | `web/src/components/shell/conversations-provider.tsx` | `export type Conversation` 에 `id` |
 | `web/src/components/shell/conversation-nav.tsx` | `` `/c/${conversation.id}` `` 로 링크와 현재 경로 비교 |
 | `web/src/components/ui/page-skeleton.tsx` | 주석에 `/c/{id}` |
-| `test/unit/loading-routes.test.ts` | `ROUTE_FRAMES` 에 뼈대를 두는 여덟 경로. `"c/[conversationId]"` 가 있다. `callControlPlane` 을 부르는 `page.tsx` 마다 `loading.tsx` 가 있는지도 본다 |
+| `test/unit/loading-routes.test.ts` | `ROUTE_FRAMES` 에 뼈대를 두는 경로. 주석이 경로 개수를 적고 있다. `"c/[conversationId]"` 가 있다. `callControlPlane` 을 부르는 `page.tsx` 마다 `loading.tsx` 가 있는지도 본다 |
 | `test/browser/` | `shell.spec.ts`, `loading.spec.ts`, `start-screen.spec.ts` 등이 `/c/${id}` 로 주소와 링크를 본다. `shell.spec.ts` 는 `/c/999999` 로 없는 대화를 연다 |
 
 ## 의도 메모
@@ -85,7 +85,7 @@ export function isConversationId(value: string): boolean { return CONVERSATION_I
 
 ### 6. 이 phase 를 검증하는 테스트
 
-- `test/unit/loading-routes.test.ts`: `ROUTE_FRAMES` 에 `"chat/[conversationId]"` 를 더하고 `"c/[conversationId]"` 도 남긴다. 「여덟」 을 「아홉」 으로 고친다
+- `test/unit/loading-routes.test.ts`: `ROUTE_FRAMES` 에 `"chat/[conversationId]"` 를 더하고 `"c/[conversationId]"` 도 남긴다. 주석에 적힌 경로 개수는 개수를 적지 않는 표현으로 바꾼다. 경로를 더할 때마다 낡는다
 - `test/unit/` 에 `isConversationId` 검사: 만든 UUID 는 참, 숫자 `120` 과 빈 문자열과 36자가 아닌 값은 거짓
 - `test/browser/` 의 `/c/${id}` 를 `/chat/${id}` 로 고친다. 없는 대화를 여는 검사는 형식이 맞는 임의 UUID 로 연다
 - 새 브라우저 검사
