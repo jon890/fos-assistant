@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
@@ -28,6 +29,17 @@ public class GlobalExceptionHandler {
                 .orElse("invalid request");
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
                 .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), message));
+    }
+
+    /**
+     * 경로 변수나 요청 인자의 형식이 틀린 요청을 입력 오류로 돌려준다.
+     *
+     * <p>대화의 공개 식별자 자리에 UUID 가 아닌 값이 오면 여기 걸린다. 그대로 두면 500 으로 끝난다.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
+                .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), ex.getName() + " has an invalid format"));
     }
 
     /**
