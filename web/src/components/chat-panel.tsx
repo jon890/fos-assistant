@@ -628,6 +628,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
           onRegenerate={() => { void regenerate(); }}
           onRetry={() => { void regenerate(); }}
+          onAnswer={(text) => { void send([], text); }}
         />}
 
         <div className={startScreen ? "flex min-h-0 flex-1 flex-col overflow-y-auto" : "shrink-0"}>

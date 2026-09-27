@@ -11,6 +11,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.AttachmentService;
@@ -140,7 +141,7 @@ class ChatRegenerateTest {
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
         assertThat(history).hasSize(2);
         assertThat(history.getLast().replacesMessageId()).isNull();
-        assertThat(stub().received().getLast().instructions()).isNull();
+        assertThat(stub().received().getLast().instructions()).isEqualTo(AskFormat.GUIDE);
     }
 
     @Test
