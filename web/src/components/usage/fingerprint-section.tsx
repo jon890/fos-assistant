@@ -43,7 +43,7 @@ export function FingerprintSection({ rows, currency }: { rows: BreakdownRow[]; c
               <span className="font-medium">지문 {shortFingerprint(row.key)}</span>
               <span className="text-sm font-semibold tabular-nums">{perExecution(row, currency)}</span>
             </div>
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-2 text-xs text-muted-foreground">
               실행 {row.executions.toLocaleString("ko-KR")}건 · {formatSpan(row)}
             </p>
           </li>

@@ -28,7 +28,7 @@ export default async function AgentPersonaPage({
     return (
       <div className="mx-auto w-full max-w-2xl">
         <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-        <p role="alert" className="rounded-md border border-border bg-surface p-3 text-sm">
+        <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm">
           {describeError(personaResult.code, personaResult.message)}
         </p>
       </div>
@@ -42,7 +42,7 @@ export default async function AgentPersonaPage({
         <StarterEditor code={code} name={name} initialStarters={startersResult.data} />
       ) : (
         <div className="mx-auto mt-8 w-full max-w-2xl">
-          <p role="alert" className="rounded-md border border-border bg-surface p-3 text-sm">
+          <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm">
             {describeError(startersResult.code, startersResult.message)}
           </p>
         </div>

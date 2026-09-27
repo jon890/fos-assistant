@@ -1,8 +1,16 @@
+import type { ReactNode } from "react";
+import { Check, CircleAlert, LoaderCircle, Square } from "lucide-react";
 import { formatDuration, formatTokens } from "@/lib/format";
 import type { ActivityItem, ActivityItemState } from "./activity-state";
 
-const MARKS: Record<ActivityItemState, string> = {
-  running: "⟳", done: "✓", failed: "!", stopped: "■", unfinished: "■",
+const ICON_CLASS = "size-3.5";
+
+const MARKS: Record<ActivityItemState, ReactNode> = {
+  running: <LoaderCircle aria-hidden="true" className={`${ICON_CLASS} animate-spin motion-reduce:animate-none`} />,
+  done: <Check aria-hidden="true" className={ICON_CLASS} />,
+  failed: <CircleAlert aria-hidden="true" className={ICON_CLASS} />,
+  stopped: <Square aria-hidden="true" className={`${ICON_CLASS} fill-current`} />,
+  unfinished: <Square aria-hidden="true" className={`${ICON_CLASS} fill-current`} />,
 };
 const SPOKEN: Record<ActivityItemState, string> = {
   running: "도는 중", done: "끝남", failed: "실패", stopped: "중지됨", unfinished: "끝나지 않음",
@@ -15,21 +23,21 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
         <li key={item.key} data-testid="activity-item" data-kind={item.kind}
           data-state={item.state} data-step={item.kind === "step" ? item.pairKey ?? undefined : undefined}
           className="flex min-w-0 gap-2 text-xs">
-          <span aria-hidden="true" className="w-4 shrink-0 text-center">{MARKS[item.state]}</span>
+          <span aria-hidden="true" className="flex h-4 w-4 shrink-0 items-center justify-center">{MARKS[item.state]}</span>
           <span className="sr-only">{SPOKEN[item.state]}</span>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline gap-2">
-              {item.kind === "subagent" ? <span className="shrink-0 text-muted">하위 에이전트</span> : null}
+              {item.kind === "subagent" ? <span className="shrink-0 text-muted-foreground">하위 에이전트</span> : null}
               <span className="min-w-0 break-words">{item.name}</span>
               {item.durationMs !== null && item.state !== "running" ? (
-                <span className="ml-auto shrink-0 text-muted">{formatDuration(item.durationMs)}</span>
+                <span className="ml-auto shrink-0 text-muted-foreground">{formatDuration(item.durationMs)}</span>
               ) : null}
             </div>
             {item.kind === "tool" && item.detail ? (
-              <p className="break-words text-muted">{item.detail}</p>
+              <p className="break-words text-muted-foreground">{item.detail}</p>
             ) : null}
             {item.kind === "subagent" && (item.model || item.inputTokens !== null || item.outputTokens !== null) ? (
-              <p className="break-words text-muted">
+              <p className="break-words text-muted-foreground">
                 {[item.model, item.inputTokens === null ? null : `입력 ${formatTokens(item.inputTokens)}`,
                   item.outputTokens === null ? null : `출력 ${formatTokens(item.outputTokens)}`]
                   .filter(Boolean).join(" · ")}

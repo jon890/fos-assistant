@@ -1,3 +1,5 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { TooltipButton } from "@/components/ui/tooltip-button";
 import type { VersionSlot } from "@/lib/message-versions";
 
 type Props = {
@@ -10,26 +12,14 @@ export function VersionSwitcher({ slot, onChange }: Props) {
   if (slot.count <= 1) return null;
 
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted">
-      <button
-        type="button"
-        aria-label="이전 판"
-        disabled={slot.index === 0}
-        onClick={() => onChange(slot.index - 1)}
-        className="rounded px-1.5 py-1 hover:bg-surface-raised disabled:opacity-40"
-      >
-        ‹
-      </button>
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <TooltipButton label="이전 판" size="icon-xs" disabled={slot.index === 0} onClick={() => onChange(slot.index - 1)}>
+        <ChevronLeft aria-hidden="true" />
+      </TooltipButton>
       <span data-testid="version-label">{slot.index + 1}/{slot.count}</span>
-      <button
-        type="button"
-        aria-label="다음 판"
-        disabled={slot.index === slot.count - 1}
-        onClick={() => onChange(slot.index + 1)}
-        className="rounded px-1.5 py-1 hover:bg-surface-raised disabled:opacity-40"
-      >
-        ›
-      </button>
+      <TooltipButton label="다음 판" size="icon-xs" disabled={slot.index === slot.count - 1} onClick={() => onChange(slot.index + 1)}>
+        <ChevronRight aria-hidden="true" />
+      </TooltipButton>
     </span>
   );
 }

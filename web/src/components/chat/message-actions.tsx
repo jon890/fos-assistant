@@ -11,7 +11,7 @@ export function MessageActions({ content, latest, version, onVersionChange, canR
       {version && onVersionChange ? <VersionSwitcher slot={version} onChange={onVersionChange} /> : null}
       <CopyButton text={content} label="답 복사" />
       {canRegenerate && onRegenerate ? <button type="button" aria-label="다시 생성" onClick={onRegenerate}
-        className="ml-2 rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-raised">다시 생성</button> : null}
+        className="ml-2 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent">다시 생성</button> : null}
     </div>
   );
 }

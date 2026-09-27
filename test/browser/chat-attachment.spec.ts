@@ -294,6 +294,8 @@ async function selectConversationByText(page: Page, text: string): Promise<numbe
     .first()
     .click();
   await loaded;
+  // 좁은 폭의 서랍은 옮긴 뒤에 닫힌다. 다 닫힐 때까지 기다려야 다음에 서랍을 다시 열 수 있다.
+  await expect(page.getByRole("dialog", { name: "사이드바" })).toHaveCount(0);
   return id;
 }
 

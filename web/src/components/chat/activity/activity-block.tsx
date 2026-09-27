@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { formatElapsed } from "@/lib/format";
 import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
@@ -60,32 +61,34 @@ export function ActivityBlock(props: Props) {
 
   return (
     <div data-testid="activity-block" data-mode={props.mode}
-      className="min-w-0 rounded-lg border border-border bg-surface text-foreground">
+      className="min-w-0 rounded-lg border border-border bg-muted text-foreground">
       <button type="button" data-testid="activity-toggle" aria-expanded={expanded}
         onClick={() => props.mode === "live" ? props.onExpandedChange(!expanded) : setSavedExpanded(!expanded)}
         className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-xs">
-        <span aria-hidden="true" className="shrink-0">{expanded ? "▾" : "▸"}</span>
+        {expanded
+          ? <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
+          : <ChevronRight aria-hidden="true" className="size-4 shrink-0" />}
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </button>
       {live && props.slow && props.state.endedAt === null ? (
-        <p data-testid="flow-slow-notice" className="px-3 pb-2 text-xs text-muted">
+        <p data-testid="flow-slow-notice" className="px-3 pb-2 text-xs text-muted-foreground">
           오래 걸릴 수 있다. 이 화면을 떠나도 된다. 실행은 계속 돌고, 나중에 다시 열면 저장된 답이 보인다.
         </p>
       ) : null}
       {expanded ? (
         <div className="min-w-0 border-t border-border px-3 py-2">
           {items ? <ActivityTimeline items={items} /> : loadFailed ? (
-            <p data-testid="activity-load-error" className="text-xs text-muted">
+            <p data-testid="activity-load-error" className="text-xs text-muted-foreground">
               작업 과정을 읽지 못했다
               <button type="button" className="ml-2 underline" onClick={() => {
                 setLoadFailed(false); setLoadVersion((value) => value + 1);
               }}>다시 읽기</button>
             </p>
-          ) : <p className="text-xs text-muted">작업 과정을 읽는 중</p>}
+          ) : <p className="text-xs text-muted-foreground">작업 과정을 읽는 중</p>}
           {props.onOpenPanel ? (
             <div className="mt-2 text-right">
               <button type="button" data-testid="activity-open-panel" onClick={props.onOpenPanel}
-                className="text-xs text-muted underline underline-offset-4">나무로 보기 →</button>
+                className="text-xs text-muted-foreground underline underline-offset-4">나무로 보기 →</button>
             </div>
           ) : null}
         </div>

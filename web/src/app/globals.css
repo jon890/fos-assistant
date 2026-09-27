@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -6,13 +8,24 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-border: var(--border);
-  --color-brand: var(--brand);
-  --color-brand-strong: var(--brand-strong);
-  --color-brand-soft: var(--brand-soft);
-  --color-on-brand: var(--on-brand);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-code-keyword: var(--code-keyword);
   --color-code-string: var(--code-string);
   --color-code-number: var(--code-number);
@@ -29,16 +42,28 @@
 }
 
 :root {
+  --radius: 0.625rem;
   --background: #ffffff;
   --foreground: #16181d;
-  --muted: #6b7280;
-  --surface: #f5f6f8;
-  --surface-raised: #eef0f3;
+  --muted: #f5f6f8;
+  --muted-foreground: #6b7280;
+  --accent: #eef0f3;
+  --accent-foreground: #16181d;
+  --secondary: #eef0f3;
+  --secondary-foreground: #16181d;
+  --card: #ffffff;
+  --card-foreground: #16181d;
+  --popover: #ffffff;
+  --popover-foreground: #16181d;
   --border: #e3e5ea;
-  --brand: #b05a3c;
-  --brand-strong: #8f4530;
-  --brand-soft: #f5e6e0;
-  --on-brand: #ffffff;
+  --input: #e3e5ea;
+  --ring: #b05a3c;
+  --primary: #b05a3c;
+  --primary-foreground: #ffffff;
+  --primary-strong: #8f4530;
+  --primary-soft: #f5e6e0;
+  --destructive: #c62828;
+  --destructive-foreground: #ffffff;
   --code-keyword: #6d28d9;
   --code-string: #166534;
   --code-number: #9a3412;
@@ -50,14 +75,25 @@
 .dark {
   --background: #101216;
   --foreground: #eceef2;
-  --muted: #9aa1ad;
-  --surface: #191c22;
-  --surface-raised: #20242b;
+  --muted: #191c22;
+  --muted-foreground: #9aa1ad;
+  --accent: #20242b;
+  --accent-foreground: #eceef2;
+  --secondary: #20242b;
+  --secondary-foreground: #eceef2;
+  --card: #101216;
+  --card-foreground: #eceef2;
+  --popover: #101216;
+  --popover-foreground: #eceef2;
   --border: #2a2e37;
-  --brand: #c96f52;
-  --brand-strong: #e08a69;
-  --brand-soft: #3a241d;
-  --on-brand: #21130e;
+  --input: #2a2e37;
+  --ring: #c96f52;
+  --primary: #c96f52;
+  --primary-foreground: #21130e;
+  --primary-strong: #e08a69;
+  --primary-soft: #3a241d;
+  --destructive: #f87171;
+  --destructive-foreground: #1f0a0a;
   --code-keyword: #c4b5fd;
   --code-string: #86efac;
   --code-number: #fdba74;

@@ -52,11 +52,11 @@ export function AgentModelList({ agentCode, models, busy, onSave }: Props) {
 
   return (
     <section aria-label={`${agentCode} 모델 목록`} data-testid="agent-model-list" className="mt-4">
-      <h3 className="text-xs text-muted">모델 목록</h3>
+      <h3 className="text-xs text-muted-foreground">모델 목록</h3>
       <ol className="mt-2 grid gap-2">
         {rows.map((row, index) => (
           <li key={index} className="grid gap-2 sm:grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-center">
-            <span className="text-xs text-muted">{index + 1}순위</span>
+            <span className="text-xs text-muted-foreground">{index + 1}순위</span>
             <input
               aria-label={`${index + 1}순위 provider`}
               value={row.provider}
@@ -103,7 +103,7 @@ export function AgentModelList({ agentCode, models, busy, onSave }: Props) {
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
           size="sm"
-          variant="secondary"
+          variant="outline"
           disabled={busy}
           onClick={() => setRows([...rows, { provider: "", model: "" }])}
         >

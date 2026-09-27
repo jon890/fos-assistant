@@ -30,7 +30,7 @@ export function PersonForm({ busy, onCreate }: Props) {
           />
         </label>
       </div>
-      <p className="mt-3 text-xs text-muted">
+      <p className="mt-3 text-xs text-muted-foreground">
         profile 이름은 소문자와 숫자와 붙임표만 쓴다. 더하면 Hermes profile 과 key 가 함께 만들어진다.
       </p>
       <Button type="submit" disabled={busy} className="mt-4">

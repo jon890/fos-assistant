@@ -26,10 +26,10 @@ export default async function AgentsPage() {
             <li key={agent.code}>
               <Link
                 href={`/agents/${agent.code}`}
-                className="flex items-center justify-between rounded-md border border-border p-4 hover:bg-surface-raised"
+                className="flex items-center justify-between rounded-md border border-border p-4 hover:bg-accent"
               >
                 <span className="font-medium">{agent.name}</span>
-                <span className="text-sm text-muted">{agent.model}</span>
+                <span className="text-sm text-muted-foreground">{agent.model}</span>
               </Link>
             </li>
           ))}

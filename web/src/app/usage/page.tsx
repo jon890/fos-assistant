@@ -29,7 +29,7 @@ export default async function UsagePage() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       <h1 className="mb-2 text-xl font-semibold">사용량</h1>
-      <p className="mb-6 max-w-2xl text-sm leading-6 text-muted">
+      <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
         구독제로 도는 실행은 실제로 추가 청구되지 않는다. 종량 모델로 옮기면 얼마가 나갈지도 함께
         보여, 모델을 옮길지 판단할 수 있게 한다.
       </p>

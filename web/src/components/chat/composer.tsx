@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
-import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
+import { ArrowUp, ImagePlus, LoaderCircle, Square, X } from "lucide-react";
+import { TooltipButton } from "@/components/ui/tooltip-button";
+import { cn } from "cn";
+import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
 import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
@@ -389,11 +391,11 @@ export function Composer({
           {items.map((item) => (
             <div key={item.key} className="relative shrink-0">
               {item.status === "error" ? (
-                <div className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-md border border-border bg-surface p-1 text-center text-[0.625rem] leading-tight text-muted">
+                <div className={attachmentPlaceholder({ size: "preview" })}>
                   <span>{item.errorMessage}</span>
                 </div>
               ) : (
-                <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border bg-surface">
+                <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border bg-muted">
                   {item.previewUrl ? (
                     // eslint 설정이 없는 저장소라 next/image 대신 object URL 을 바로 그린다.
                     <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />
@@ -404,35 +406,37 @@ export function Composer({
                       aria-hidden="true"
                       className="absolute inset-0 flex items-center justify-center bg-background/60"
                     >
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-brand" />
+                      <LoaderCircle className="size-4 animate-spin text-primary motion-reduce:animate-none" />
                     </span>
                   ) : null}
                 </div>
               )}
-              <button
-                type="button"
-                aria-label="사진 지우기"
+              <TooltipButton
+                label="사진 지우기"
+                variant="outline"
+                size="icon-xs"
                 onClick={() => removeItem(item.key)}
                 // 보내는 동안 지우면 막 메시지에 묶인 첨부에 DELETE 가 간다.
                 disabled={disabled || running}
-                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs leading-none disabled:opacity-50"
+                className="absolute -right-1.5 -top-1.5 size-5 rounded-full bg-background"
               >
-                ×
-              </button>
+                <X aria-hidden="true" />
+              </TooltipButton>
             </div>
           ))}
         </div>
       ) : null}
 
       {pickNotice ? (
-        <p data-testid="attachment-notice" className="mb-2 text-xs text-muted">
+        <p data-testid="attachment-notice" className="mb-2 text-xs text-muted-foreground">
           {pickNotice}
         </p>
       ) : null}
 
       <div
         data-testid="composer-shell"
-        className="relative flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-brand"
+        className={cn("relative flex items-end gap-2 p-1.5 pl-4",
+          "rounded-3xl border border-border bg-background focus-within:border-primary")}
       >
         {mention && openMention ? (
           <AgentMention
@@ -501,7 +505,8 @@ export function Composer({
           }}
           disabled={disabled}
           placeholder={mention ? "@ 로 에이전트를 부른다" : "무엇을 도와줄까요"}
-          className="max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto bg-transparent py-2 text-base leading-6 outline-none disabled:opacity-50"
+          className={cn("max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
+            "bg-transparent text-base leading-6 outline-none disabled:opacity-50")}
         />
         {acceptsAttachments ? (
           <>
@@ -515,62 +520,44 @@ export function Composer({
               data-testid="attachment-input"
               onChange={(event) => void handleFiles(event)}
             />
-            <IconButton
+            <TooltipButton
               label="사진 첨부"
+              variant="outline"
+              size="icon"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || running}
-              className="h-10 w-10 shrink-0 rounded-full"
+              className="size-10 shrink-0 rounded-full"
             >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="h-5 w-5 fill-none stroke-current stroke-2"
-              >
-                <path
-                  d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="14" r="3.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </IconButton>
+              <ImagePlus aria-hidden="true" className="size-5" />
+            </TooltipButton>
           </>
         ) : null}
         {running ? (
-          <Button
-            type="button"
-            aria-label="중지"
+          <TooltipButton
+            label="중지"
+            variant="default"
             disabled={!canStop}
             onClick={onStop}
-            className="h-10 w-10 shrink-0 rounded-full !p-0"
+            size="icon"
+            className="size-10 shrink-0 rounded-full"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
-              <rect x="7" y="7" width="10" height="10" rx="1" />
-            </svg>
-          </Button>
+            <Square aria-hidden="true" className="size-4 fill-current" />
+          </TooltipButton>
         ) : (
-          <Button
+          <TooltipButton
+            label="보내기"
+            variant="default"
             type="submit"
-            aria-label="보내기"
             disabled={sendDisabled}
-            className="h-10 w-10 shrink-0 rounded-full !p-0"
+            size="icon"
+            className="size-10 shrink-0 rounded-full"
           >
             {uploading ? (
-              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-on-brand/40 border-t-on-brand" />
+              <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
             ) : (
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="h-5 w-5 fill-none stroke-current stroke-2"
-              >
-                <path
-                  d="M12 19V5m0 0-6 6m6-6 6 6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <ArrowUp aria-hidden="true" className="size-5" />
             )}
-          </Button>
+          </TooltipButton>
         )}
       </div>
     </form>

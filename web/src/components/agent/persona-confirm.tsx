@@ -19,11 +19,11 @@ export function PersonaConfirm({ agentName, busy, onCancel, onConfirm }: Props) 
         <h2 id="persona-confirm-title" className="text-lg font-semibold">
           {agentName}의 성격을 저장할까요?
         </h2>
-        <p className="mt-3 text-sm leading-6 text-muted">
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
           저장하면 앞의 본문이 사라지고 되돌릴 수 없습니다. 이 성격으로 앞으로의 대화가 답합니다.
         </p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button onClick={onCancel} disabled={busy} variant="secondary">
+          <Button onClick={onCancel} disabled={busy} variant="outline">
             취소
           </Button>
           <Button onClick={onConfirm} disabled={busy}>

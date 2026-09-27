@@ -22,7 +22,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
 
   return (
     <button type="button" aria-label={label} onClick={() => void copy()}
-      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted hover:bg-surface-raised">
+      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent">
       <span aria-live="polite">{notice ?? label}</span>
     </button>
   );

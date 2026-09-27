@@ -23,7 +23,7 @@ export function AgentForm({ ownerEmail, busy, onCreate }: Props) {
         <label className="text-sm">credential 범위<select name="credentialScope" defaultValue="SHARED_HOUSEHOLD" className={fieldClass}><option value="SHARED_HOUSEHOLD">가족 공유 credential</option><option value="DEDICATED">전용 credential</option></select></label>
         <label className="text-sm">공개 범위<select name="visibility" defaultValue="PRIVATE" className={fieldClass}><option value="PRIVATE">나만</option><option value="FAMILY">가족 공개</option></select></label>
       </div>
-      <p className="mt-3 text-xs text-muted">모델은 등록할 때 Hermes에서 읽는다.</p>
+      <p className="mt-3 text-xs text-muted-foreground">모델은 등록할 때 Hermes에서 읽는다.</p>
       <Button type="submit" disabled={busy} className="mt-4">등록</Button>
     </form>
   );

@@ -18,11 +18,11 @@ type Props = {
 export function MonthlySummary({ monthly }: Props) {
   const totalExecutions = monthly.pricedExecutions + monthly.unpricedExecutions;
   return (
-    <dl className="mb-6 grid gap-5 rounded-md border border-border bg-surface p-4 sm:grid-cols-2 md:grid-cols-3">
+    <dl className="mb-6 grid gap-5 rounded-md border border-border bg-muted p-4 sm:grid-cols-2 md:grid-cols-3">
       <Stat
         label="실제로 나간 돈"
         value={
-          <span className="text-brand">
+          <span className="text-primary">
             {formatAmount(monthly.actualCostMicros, monthly.currency)}
           </span>
         }
@@ -47,7 +47,7 @@ export function MonthlySummary({ monthly }: Props) {
         />
       ) : null}
       <div className="sm:col-span-2 md:col-span-3">
-        <p className="text-xs text-muted">
+        <p className="text-xs text-muted-foreground">
           두 금액 모두 공개 가격표로 계산한 것이고 청구서를 읽은 것이 아니다.
         </p>
       </div>

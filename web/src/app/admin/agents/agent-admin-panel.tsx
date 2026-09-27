@@ -179,12 +179,12 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
   return (
     <div className="mx-auto w-full max-w-4xl">
       <h1 className="mb-2 text-xl font-semibold">에이전트 관리</h1>
-      <p className="mb-6 max-w-2xl text-sm leading-6 text-muted">
+      <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
         공개 범위는 보안 설정이다. 가족 공개로 바꾸면 모든 사용자가 이 에이전트로 대화할 수 있다.
         연결된 도구와 자료도 함께 쓸 수 있는지 확인해야 한다.
       </p>
       {blocked.length > 0 ? (
-        <p className="mb-4 rounded-md bg-surface p-3 text-sm" data-testid="blocked-providers">
+        <p className="mb-4 rounded-md bg-muted p-3 text-sm" data-testid="blocked-providers">
           막힌 provider:{" "}
           {blocked
             .map((row) => `${row.provider} (${formatRemaining(row.remainingSeconds)})`)
@@ -192,7 +192,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
         </p>
       ) : null}
       <AgentForm ownerEmail={ownerEmail} busy={busy} onCreate={(event) => void create(event)} />
-      {error ? <p className="mb-4 rounded-md bg-surface p-3 text-sm">{error}</p> : null}
+      {error ? <p className="mb-4 rounded-md bg-muted p-3 text-sm">{error}</p> : null}
       <AgentList
         agents={agents}
         busy={busy}

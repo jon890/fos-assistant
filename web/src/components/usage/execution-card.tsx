@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import {
@@ -30,12 +31,10 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
           <h2 className="truncate font-semibold">
             {execution.agentName}
             {execution.hasChildren ? (
-              <span className="pointer-events-none ml-1 text-muted" aria-hidden="true">
-                ▸
-              </span>
+              <ChevronRight aria-hidden="true" className="pointer-events-none ml-1 inline-block size-4 text-muted-foreground" />
             ) : null}
           </h2>
-          <p className="truncate text-xs text-muted">{execution.agentCode}</p>
+          <p className="truncate text-xs text-muted-foreground">{execution.agentCode}</p>
         </div>
         <span
           className="shrink-0 text-sm font-semibold"
@@ -45,7 +44,7 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
           {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
         </span>
       </div>
-      <p className="mt-3 truncate text-sm text-muted">
+      <p className="mt-3 truncate text-sm text-muted-foreground">
         {execution.provider ?? "-"} / {execution.model ?? "-"}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
@@ -55,18 +54,18 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         <span data-testid="execution-context-chars">문맥 {contextCharsLabel(execution)}</span>
         <span data-testid="execution-duration">{running ? "" : formatDuration(execution.latencyMs ?? 0)}</span>
         <span>{formatWhen(execution.startedAt)}</span>
-        <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
+        <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
       </div>
-      <p className="mt-2 text-xs text-muted" data-testid="execution-actual-cost">
+      <p className="mt-2 text-xs text-muted-foreground" data-testid="execution-actual-cost">
         실제 청구액 {actualCostLabel(execution)}
       </p>
       {retryOf ? (
-        <p className="mt-1 text-xs text-muted" data-testid="execution-retry-of">
+        <p className="mt-1 text-xs text-muted-foreground" data-testid="execution-retry-of">
           {retryOf}
         </p>
       ) : null}
       {omitted ? (
-        <p className="mt-1 text-xs text-danger" data-testid="execution-context-omitted">
+        <p className="mt-1 text-xs text-destructive" data-testid="execution-context-omitted">
           {omitted}
         </p>
       ) : null}

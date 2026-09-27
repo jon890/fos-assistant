@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useTheme } from "next-themes";
+import { Moon, Sun, SunMoon, type LucideProps } from "lucide-react";
+import { TooltipButton } from "@/components/ui/tooltip-button";
 
 const THEMES = ["light", "dark", "system"] as const;
 type Theme = (typeof THEMES)[number];
@@ -12,10 +14,10 @@ const THEME_LABEL: Record<Theme, string> = {
   system: "시스템",
 };
 
-const THEME_ICON: Record<Theme, string> = {
-  light: "☀",
-  dark: "☾",
-  system: "◐",
+const THEME_ICON: Record<Theme, ComponentType<LucideProps>> = {
+  light: Sun,
+  dark: Moon,
+  system: SunMoon,
 };
 
 function isTheme(value: string | undefined): value is Theme {
@@ -33,15 +35,15 @@ export function ThemeToggle() {
   }
 
   const nextTheme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  const Icon = THEME_ICON[theme];
   return (
-    <button
-      type="button"
+    <TooltipButton
+      label={`밝기 모드: ${THEME_LABEL[theme]}. 다음은 ${THEME_LABEL[nextTheme]}`}
+      variant="outline"
+      size="icon"
       onClick={() => setTheme(nextTheme)}
-      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border"
-      aria-label={`밝기 모드: ${THEME_LABEL[theme]}. 다음은 ${THEME_LABEL[nextTheme]}`}
-      title={`밝기 모드: ${THEME_LABEL[theme]}`}
     >
-      <span aria-hidden="true">{THEME_ICON[theme]}</span>
-    </button>
+      <Icon aria-hidden="true" />
+    </TooltipButton>
   );
 }

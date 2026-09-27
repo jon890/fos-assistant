@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "cn";
+import { assistantAvatar, attachmentPlaceholder, revealedTime } from "./variants";
 import { Markdown } from "./markdown";
 import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
@@ -66,7 +68,7 @@ function AttachmentGallery({
           <div
             key={attachment.id}
             data-testid="message-attachment-gone"
-            className="flex h-24 w-24 items-center justify-center rounded-md border border-border bg-surface p-2 text-center text-xs text-muted"
+            className={attachmentPlaceholder({ size: "message" })}
           >
             {describeError("ATTACHMENT_GONE", "사진을 표시할 수 없습니다.")}
           </div>
@@ -110,7 +112,8 @@ export function MessageBubble({
       >
         <div
           data-testid="user-message"
-          className="relative max-w-[70%] rounded-3xl bg-brand-soft px-4 py-2.5 group-focus-visible:outline-2 group-focus-visible:outline-brand"
+          className={cn("relative max-w-[70%] rounded-3xl bg-primary-soft px-4 py-2.5",
+            "group-focus-visible:outline-2 group-focus-visible:outline-primary")}
         >
           <p className="whitespace-pre-wrap break-words text-sm leading-6">{turn.content}</p>
           {userVersion && onVersionChange ? (
@@ -123,7 +126,7 @@ export function MessageBubble({
             // 말풍선 바깥 왼쪽에 겹쳐 둔다. 안에 두면 보일 때마다 말풍선이 한 줄 늘어 아래가 밀린다.
             <time
               dateTime={turn.createdAt}
-              className="invisible absolute bottom-2 right-full mr-2 whitespace-nowrap text-xs text-muted group-hover:visible group-focus-within:visible"
+              className={cn(revealedTime(), "absolute bottom-2 right-full mr-2 whitespace-nowrap")}
             >
               {sentAt}
             </time>
@@ -136,18 +139,19 @@ export function MessageBubble({
   return (
     <li
       data-testid="assistant-message"
-      className="group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2 focus-visible:outline-2 focus-visible:outline-brand"
+      className={cn("group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2",
+        "focus-visible:outline-2 focus-visible:outline-primary")}
       tabIndex={0}
     >
       <span
         aria-hidden="true"
-        className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-semibold text-on-brand"
+        className={assistantAvatar()}
       >
         비
       </span>
       <div className="min-w-0">
         {turn.switchedTo ? (
-          <p className="mb-1 text-xs text-muted" data-testid="provider-switched">
+          <p className="mb-1 text-xs text-muted-foreground" data-testid="provider-switched">
             ── 여기부터 {turn.switchedTo} 로 돈다 ──
           </p>
         ) : null}
@@ -156,7 +160,7 @@ export function MessageBubble({
           {sentAt ? (
             <time
               dateTime={turn.createdAt}
-              className="invisible text-xs text-muted group-hover:visible group-focus-within:visible"
+              className={revealedTime()}
             >
               {sentAt}
             </time>
@@ -170,7 +174,7 @@ export function MessageBubble({
         <div className="leading-7">
           <Markdown>{turn.content}</Markdown>
         </div>
-        {turn.status === "CANCELLED" ? <p data-testid="stopped-mark" className="mt-2 text-xs text-muted">중지됨</p> : null}
+        {turn.status === "CANCELLED" ? <p data-testid="stopped-mark" className="mt-2 text-xs text-muted-foreground">중지됨</p> : null}
         {!streaming ? <MessageActions content={turn.content} latest={latest} version={answerVersion}
           onVersionChange={(index) => answerVersion && onVersionChange?.(answerVersion.slotId, index)}
           canRegenerate={canRegenerate} onRegenerate={onRegenerate} /> : null}

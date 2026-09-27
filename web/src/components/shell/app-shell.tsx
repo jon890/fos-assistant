@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { Menu, PanelLeft, SquarePen } from "lucide-react";
 import { ConversationsProvider, useConversations } from "./conversations-provider";
 import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
+import { cn } from "cn";
+import { TooltipButton } from "@/components/ui/tooltip-button";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/components/ui/use-media-query";
 
 const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(null);
 /** 레이아웃이 한 번 읽은 사용자 이름이다. 화면마다 다시 읽지 않고 여기서 꺼낸다. 읽지 못했으면 null 이다 */
@@ -34,8 +40,13 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [title, setTitle] = useState("우리집 비서");
-  const searchRef = useRef<HTMLInputElement>(null);
-  const sidebarRef = useRef<HTMLElement>(null);
+  // 붙박이 사이드바와 서랍이 각자 검색칸을 가진다. 서랍이 닫히면 서랍 쪽 ref 는 null 이 된다.
+  const pinnedSearchRef = useRef<HTMLInputElement>(null);
+  const drawerSearchRef = useRef<HTMLInputElement>(null);
+  /** 단축키로 서랍을 열었으면 서랍이 열릴 때 첫 링크 대신 검색칸에 초점을 준다 */
+  const focusSearchOnOpen = useRef(false);
+  // 첫 그림에서 폭을 모르면(null) 붙박이 사이드바를 그리고 CSS 가 좁은 폭에서 숨긴다.
+  const wide = useMediaQuery("(min-width: 768px)");
 
   useEffect(() => {
     try { setCollapsed(localStorage.getItem("sidebar-collapsed") === "1"); } catch { /* 저장소를 막은 브라우저에서도 화면을 연다. */ }
@@ -50,31 +61,29 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
     else setDrawerOpen((open) => !open);
   }, [collapsed, updateCollapsed]);
   const focusSearch = useCallback(() => {
-    if (window.matchMedia("(min-width: 768px)").matches) updateCollapsed(false);
-    else setDrawerOpen(true);
-    requestAnimationFrame(() => searchRef.current?.focus());
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      updateCollapsed(false);
+      requestAnimationFrame(() => pinnedSearchRef.current?.focus());
+    } else if (drawerSearchRef.current) {
+      drawerSearchRef.current.focus();
+    } else {
+      focusSearchOnOpen.current = true;
+      setDrawerOpen(true);
+    }
   }, [updateCollapsed]);
   useShortcuts(signedIn, startNew, toggleSidebar, focusSearch);
 
+  // 서랍은 옮기는 동안 열어 둔다. 누른 줄의 회전 표시와 「옮기는 중」 안내가 옮기는 내내 서랍 안에 남는다.
+  // 경로가 바뀌면 여기서 닫는다.
   useEffect(() => setDrawerOpen(false), [pathname]);
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const close = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
-      // 메뉴·입력칸·확인 창은 Esc 를 직접 처리한다. 서랍은 그 밖에서 먼저 받는다.
-      if (sidebarRef.current?.querySelector('[role="menu"], input[aria-label="대화 이름"], dialog[open]')) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setDrawerOpen(false);
-    };
-    window.addEventListener("keydown", close, true);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", close, true);
-    };
-  }, [drawerOpen]);
+  // 서랍이 열린 채 넓은 폭이 되면 닫아 둔다. 그대로 두면 다시 좁힐 때 서랍이 저절로 열린다.
+  useEffect(() => { if (wide) setDrawerOpen(false); }, [wide]);
+  // 목적지가 지금 경로와 같으면 경로가 바뀌지 않으므로 곧바로 닫는다. 사진을 먼저 올려 주소만 바꾼 경우가
+  // 있어 usePathname 대신 주소창의 경로와 견준다.
+  const closeIfSamePath = useCallback((href: string) => {
+    if (href === window.location.pathname) setDrawerOpen(false);
+  }, []);
+  const drawerShown = drawerOpen && wide !== true;
 
   if (!signedIn) {
     return <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">{children}</main>;
@@ -83,28 +92,52 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   return (
     <TitleContext.Provider value={setTitle}>
       <div className="flex h-full min-h-0 min-w-0 flex-1">
-        <button type="button" aria-label="사이드바 닫기" onClick={() => setDrawerOpen(false)}
-          tabIndex={drawerOpen ? 0 : -1}
-          className={`fixed inset-0 z-30 bg-foreground/35 md:hidden ${drawerOpen ? "" : "pointer-events-none opacity-0"}`} />
-        <aside ref={sidebarRef} aria-label="사이드바"
-          className={`fixed inset-y-0 left-0 z-40 w-72 shrink-0 border-r border-border bg-surface transition-transform md:static md:translate-x-0 ${collapsed ? "md:hidden" : "md:w-64"} ${
-            drawerOpen ? "translate-x-0" : "-translate-x-full"
-          }`}>
-          <Sidebar isAdmin={isAdmin} displayName={displayName} onNavigate={() => setDrawerOpen(false)}
-            searchRef={searchRef} onCollapse={() => updateCollapsed(true)} />
-        </aside>
+        {/* 좁은 폭에서는 CSS 가 숨긴다. 서랍이 열린 동안은 같은 사이드바가 두 벌 생기지 않게 그리지 않는다. */}
+        {wide === false && drawerShown ? null : (
+          <aside aria-label="사이드바"
+            className={cn("hidden w-64 shrink-0 border-r border-border bg-muted", !collapsed && "md:block")}>
+            <Sidebar isAdmin={isAdmin} displayName={displayName} onNavigate={closeIfSamePath}
+              searchRef={pinnedSearchRef} onCollapse={() => updateCollapsed(true)} />
+          </aside>
+        )}
+        <Sheet open={drawerShown} onOpenChange={setDrawerOpen}>
+          <SheetContent side="left" closeLabel="사이드바 닫기"
+            className="gap-0 bg-muted data-[side=left]:w-72 data-[side=left]:sm:max-w-72"
+            onOpenAutoFocus={(event) => {
+              if (!focusSearchOnOpen.current) return;
+              focusSearchOnOpen.current = false;
+              event.preventDefault();
+              drawerSearchRef.current?.focus();
+            }}
+            onEscapeKeyDown={(event) => {
+              // Radix 는 document 캡처 단계에서 Esc 를 먼저 받는다. 이름 입력칸은 Esc 로 편집만 취소하므로 서랍을 닫지 않는다.
+              if (event.target instanceof Element && event.target.matches("[data-rename-input]")) event.preventDefault();
+            }}>
+            <SheetTitle className="sr-only">사이드바</SheetTitle>
+            <aside aria-label="사이드바" className="h-full min-h-0">
+              {/* 닫히며 사라지는 동안에는 붙박이 쪽이 안내 영역을 갖는다. 안내 영역이 한 번에 하나만 있다. */}
+              <Sidebar isAdmin={isAdmin} displayName={displayName} onNavigate={closeIfSamePath}
+                searchRef={drawerSearchRef} onCollapse={() => updateCollapsed(true)} showStatus={drawerOpen} />
+            </aside>
+          </SheetContent>
+        </Sheet>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {collapsed ? <header className="hidden h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:flex">
-            <button type="button" aria-label="사이드바 펴기" onClick={() => updateCollapsed(false)}
-              className="rounded-md px-2 py-1.5 hover:bg-surface">☰</button>
-            <Link href="/" onClick={startNew} className="rounded-md px-2 py-1.5 text-sm hover:bg-surface">새 대화</Link>
+            <TooltipButton label="사이드바 펴기" onClick={() => updateCollapsed(false)}><PanelLeft aria-hidden="true" /></TooltipButton>
+            <Link href="/" onClick={startNew} className="rounded-md px-2 py-1.5 text-sm hover:bg-muted">새 대화</Link>
           </header> : null}
-          <header className="flex h-14 shrink-0 flex-nowrap items-center gap-3 border-b border-border px-4 md:hidden">
-            <button type="button" aria-label="사이드바 열기" onClick={() => setDrawerOpen(true)}
-              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-surface">☰</button>
+          <header className={cn(
+            "flex flex-nowrap items-center gap-3 md:hidden",
+            "h-14 shrink-0 px-4",
+            "border-b border-border",
+          )}>
+            <TooltipButton label="사이드바 열기" size="icon" onClick={() => setDrawerOpen(true)}>
+              <Menu aria-hidden="true" className="size-5" />
+            </TooltipButton>
             <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">{title}</span>
-            <Link href="/" aria-label="새 대화" onClick={startNew}
-              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-surface">✎</Link>
+            <TooltipButton label="새 대화" size="icon" asChild>
+              <Link href="/" onClick={startNew}><SquarePen aria-hidden="true" className="size-5" /></Link>
+            </TooltipButton>
           </header>
           <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
             {children}
@@ -123,12 +156,14 @@ export function AppShell({ isAdmin, displayName, children }: {
   const pathname = usePathname();
   const signedIn = pathname !== "/signin";
   return (
-    <DisplayNameContext.Provider value={displayName || null}>
-      <ConversationsProvider enabled={signedIn}>
-        <ShellBody isAdmin={isAdmin} displayName={displayName} signedIn={signedIn}>
-          {children}
-        </ShellBody>
-      </ConversationsProvider>
-    </DisplayNameContext.Provider>
+    <TooltipProvider>
+      <DisplayNameContext.Provider value={displayName || null}>
+        <ConversationsProvider enabled={signedIn}>
+          <ShellBody isAdmin={isAdmin} displayName={displayName} signedIn={signedIn}>
+            {children}
+          </ShellBody>
+        </ConversationsProvider>
+      </DisplayNameContext.Provider>
+    </TooltipProvider>
   );
 }

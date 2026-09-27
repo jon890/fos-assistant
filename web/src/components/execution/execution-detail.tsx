@@ -63,14 +63,14 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
   }, [state.kind, router]);
 
   if (state.kind === "loading" || state.kind === "not-found") {
-    return <p className="text-sm text-muted">불러오는 중이다.</p>;
+    return <p className="text-sm text-muted-foreground">불러오는 중이다.</p>;
   }
 
   if (state.kind === "error") {
     return (
       <div>
         <h1 className="mb-2 text-xl font-semibold">{`실행 #${executionId}`}</h1>
-        <p className="text-sm text-muted" role="alert">
+        <p className="text-sm text-muted-foreground" role="alert">
           실행 정보를 불러오지 못했다.
         </p>
       </div>
@@ -88,31 +88,31 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
         </h1>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-muted">에이전트</dt>
+            <dt className="text-muted-foreground">에이전트</dt>
             <dd>{summary.agentName ?? "-"}</dd>
           </div>
           <div>
-            <dt className="text-muted">상태</dt>
+            <dt className="text-muted-foreground">상태</dt>
             <dd>{statusLabel(summary.status)}</dd>
           </div>
           <div>
-            <dt className="text-muted">모델</dt>
+            <dt className="text-muted-foreground">모델</dt>
             <dd className="truncate">{summary.model ?? "-"}</dd>
           </div>
           <div>
-            <dt className="text-muted">입력 토큰</dt>
+            <dt className="text-muted-foreground">입력 토큰</dt>
             <dd className="tabular-nums">{formatTokens(summary.inputTokens)}</dd>
           </div>
           <div>
-            <dt className="text-muted">출력 토큰</dt>
+            <dt className="text-muted-foreground">출력 토큰</dt>
             <dd className="tabular-nums">{formatTokens(summary.outputTokens)}</dd>
           </div>
           <div>
-            <dt className="text-muted">환산 금액</dt>
+            <dt className="text-muted-foreground">환산 금액</dt>
             <dd>{formatCost(summary.estimatedCostMicros, null)}</dd>
           </div>
           <div>
-            <dt className="text-muted">걸린 시간</dt>
+            <dt className="text-muted-foreground">걸린 시간</dt>
             <dd>{running || summary.latencyMs === null ? "" : formatDuration(summary.latencyMs)}</dd>
           </div>
         </dl>
