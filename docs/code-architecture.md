@@ -240,6 +240,82 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 
 **파일을 다루는 것이 한 곳이다.** 경로를 만드는 규칙이 흩어지면 지우는 쪽이 놓친다.
 
+## 결과물 파일
+
+에이전트가 turn 안에 만든 HTML 과 그것이 부르는 사진이다. 본문은 공유 디렉터리에 두고 데이터베이스에는 HTML 을 가리키는 행만 둔다.
+근거는 [`adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md`](adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
+
+- 뿌리 설정은 사진 첨부와 같은 모양으로 둘이다. `assistant.artifact.root` 는 Control Plane 이 보는 경로, `assistant.artifact.agent-root` 는 같은 디렉터리를 Hermes 컨테이너에서 보는 경로다.
+  둘 다 기본값이 없어 비면 기동이 실패한다. 붙이는 일은 `fos-home-infra` 가 소유한다
+- 대화 하나가 폴더 하나다. 이름은 대화 번호다. 폴더는 Control Plane 이 turn 을 시작할 때 만든다
+- 파일은 Hermes 가 쓴다. Control Plane 은 읽고, 보관 기간이 지난 것을 지운다
+- 보관 기간은 30일이다. 마지막으로 바뀐 때부터 센다
+
+### 에이전트에게 알리는 법
+
+실행 입력의 맨 앞에 한 단락을 붙인다. 사용자가 쓴 메시지는 고치지 않는다.
+
+```text
+[결과물 폴더]
+{agent-root}/{대화 번호}
+파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
+```
+
+사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 한 줄이 늘어 입력이 조금 커지지만,
+에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다.
+
+### 답에 묶는 법
+
+**모델이 답에 적은 경로를 읽지 않는다.** turn 이 끝나면 폴더를 훑는다.
+
+- 그 turn 이 시작한 뒤에 바뀐 `.html` 파일을 찾는다. 하위 폴더까지 본다
+- 찾은 파일마다 `chat_artifact` 행을 그 turn 의 답 메시지에 묶어 만든다
+- 답 메시지가 없는 turn(빈 답으로 중지)은 묶지 않는다
+- 흐름으로 돈 turn 도 같다. 폴더는 대화마다 하나이므로 Chief 와 하위 에이전트가 같은 폴더를 쓴다
+- 훑다가 실패해도 turn 은 실패하지 않는다. 경고 로그만 남긴다
+
+### 경로
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/chat/conversations/{id}/files/**` | 대화 폴더 안의 파일 본문 |
+
+`{id}` 는 대화의 공개 식별자이고 그 뒤가 폴더 안의 상대 경로다. 주인만 받는다.
+
+| 판정 | 응답 |
+| --- | --- |
+| 남의 대화, 없는 대화 | `CONVERSATION_NOT_FOUND` |
+| 확장자가 `html`, `css`, `png`, `jpg`, `jpeg`, `gif`, `webp` 가 아니다 | 404 `ARTIFACT_NOT_FOUND` |
+| 심볼릭 링크를 따라간 실제 경로가 대화 폴더 밖이다 | 404 `ARTIFACT_NOT_FOUND` |
+| 파일이 없다. 그 경로의 `chat_artifact` 행이 지워졌다고 적혀 있다 | 410 `ARTIFACT_GONE` |
+| 파일이 없다. 행도 없다 | 404 `ARTIFACT_NOT_FOUND` |
+
+응답 머리글은 모든 파일에 같다.
+
+| 머리글 | 값 |
+| --- | --- |
+| `Content-Type` | 확장자로 정한다. HTML 은 `text/html; charset=utf-8` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Content-Security-Policy` | `sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'` |
+| `Cache-Control` | `private, no-cache` |
+
+web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않으면 주소를 직접 열었을 때 스크립트가 돈다.
+
+### 메시지 한 줄의 `artifacts`
+
+`GET .../messages` 의 한 줄에 `artifacts` 를 더한다. `[{ "path", "byteSize", "deleted" }]` 이고 없으면 빈 배열이다.
+`deleted` 는 `chat_artifact.deleted_at` 이 채워졌는지다.
+
+### 어느 클래스가 무엇을 하나
+
+| 무엇 | 어디 |
+| --- | --- |
+| 폴더를 만들고 훑고 파일을 읽고 지운다 | `chat/infra` 의 `ArtifactStore` |
+| turn 이 끝나면 행을 만들고, 파일을 줄 때 판정한다 | `chat/application` 의 `ArtifactService` |
+| 보관 기간이 지난 것을 지운다 | `chat/application` 의 `ArtifactCleaner`. 첨부의 정리와 같은 시각에 돈다 |
+
+**경로를 만드는 규칙이 `ArtifactStore` 한 곳에 있다.** 대화 폴더 밖인지 판정하는 것도 거기서 한다.
+
 ## 대화
 
 `chat` 패키지가 대화와 메시지를 갖는다.
@@ -283,13 +359,14 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 ### 메시지 한 줄
 
-`GET .../messages` 가 주는 한 줄이다. 이미 있는 칸에 셋을 더한다.
+`GET .../messages` 가 주는 한 줄이다. 이미 있는 칸에 아래를 더한다.
 
 | 칸 | 뜻 |
 | --- | --- |
 | `status` | 답을 만든 실행의 상태. `SUCCEEDED`, `FAILED`, `CANCELLED`, `RUNNING` 중 하나. 사용자 메시지는 null |
 | `replacesMessageId` | 이 메시지가 새 판으로 대신하는 이전 메시지. 없으면 null |
 | `activity` | 작업 과정의 요약. `{ toolCount, subagentCount, durationMs }`. 사건이 없는 답과 사용자 메시지는 null |
+| `artifacts` | 그 답의 turn 이 만든 결과물 파일. 위 「결과물 파일」 절이 모양을 갖는다 |
 
 `activity` 는 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 모두 센다.
 provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 실행 줄을 갖는다. 요약은 답을 만든 실행만 세고 막힌 시도의 사건은 넣지 않는다. 화면이 reset 때 그 줄을 비우는 것과 같다.
