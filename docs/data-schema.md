@@ -146,7 +146,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
-| `context_chars` | BIGINT NULL | 이 실행의 `instructions` 로 넣은 글자 수 |
+| `context_chars` | BIGINT NULL | 이 실행의 `instructions` 에 넣은 Memory 문맥의 글자 수. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다 |
 | `runtime_fingerprint` | VARCHAR(64) NULL | 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문. 그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있고, 그동안 사용량 화면의 지문 축은 빈 목록을 돌려준다 |
 | `instructions_hash` | VARCHAR(64) NULL | 넣은 Memory 문맥의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory 를 담고 있어 저장하지 않는다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다. 넣은 Memory 가 없으면 비어 있다 |
 | `latency_ms` | BIGINT NULL | 끝나지 않은 실행은 비어 있다 |
