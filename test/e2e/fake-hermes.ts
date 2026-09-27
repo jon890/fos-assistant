@@ -289,7 +289,6 @@ export function startFakeHermes(
   const dashboardAuthorized = (request: IncomingMessage): boolean =>
     request.headers.authorization === `Bearer ${FAKE_DASHBOARD_TOKEN}`;
 
-  /** 붙잡은 실행을 풀되 실행 상태는 바꾸지 않는다. */
   /** 붙잡은 성격 읽기 응답을 보내고 대기 표시를 끈다. 붙잡은 것이 없어도 대기 표시는 끈다. */
   const releaseHeldSoul = () => {
     holdNextSoul = false;
@@ -297,6 +296,7 @@ export function startFakeHermes(
     heldSoul = undefined;
     if (held !== undefined) send(held.response, 200, held.payload);
   };
+  /** 붙잡은 실행을 풀되 실행 상태는 바꾸지 않는다. */
   const releaseHeldRun = (): string | undefined => {
     const runId = heldRunId;
     heldRunWaiter?.();
