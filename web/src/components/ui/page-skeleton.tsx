@@ -25,8 +25,8 @@ const WIDTH_CLASS: Record<PageSkeletonWidth, string> = {
 };
 
 /**
- * 입력 폼 자리의 높이다. 390px 와 1280px 에서 잰 실제 폼 높이이고, `md` 에서 입력칸이 두 줄로 나뉘어 낮아진다.
- * 아래 여백은 세 폼 모두 `mb-8` 이다. 폼의 칸이 바뀌면 이 값도 다시 잰다.
+ * 입력 폼 자리의 높이다. 390px 와 1280px 에서 측정한 실제 폼 높이이고, `md` 에서 입력칸이 두 줄로 나뉘어 낮아진다.
+ * 아래 여백은 세 폼 모두 `mb-8` 이다. 폼의 칸이 바뀌면 이 값도 다시 측정한다.
  */
 const FORM_CLASS: Record<PageSkeletonForm, string> = {
   memory: "h-[26.1875rem] md:h-[21.4375rem]",
