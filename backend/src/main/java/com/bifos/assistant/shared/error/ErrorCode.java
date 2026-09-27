@@ -73,6 +73,8 @@ public enum ErrorCode {
      */
     ATTACHMENT_GONE(HttpStatus.GONE),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
+    /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;
