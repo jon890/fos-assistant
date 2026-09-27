@@ -19,6 +19,8 @@ export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollaps
   const [query, setQuery] = useState("");
   // 옮기는 중인 링크의 개수다. 링크마다 하나씩 NavPending 이 두고, 이동이 끝나거나 그 링크가
   // 사라지면 줄어든다. 0보다 크면 사이드바 전체에서 무언가 옮기는 중이다.
+  // 켜짐과 꺼짐은 짝을 이뤄 오지만, 사이드바가 켜짐을 받기 전에 올라온 링크가 꺼짐만 보내는 경우에도
+  // 안내가 음수로 남지 않게 0 에서 멈춘다.
   const [pendingCount, setPendingCount] = useState(0);
   useEffect(() => {
     const update = (event: Event) => {

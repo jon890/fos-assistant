@@ -290,6 +290,13 @@ export function startFakeHermes(
     request.headers.authorization === `Bearer ${FAKE_DASHBOARD_TOKEN}`;
 
   /** 붙잡은 실행을 풀되 실행 상태는 바꾸지 않는다. */
+  /** 붙잡은 성격 읽기 응답을 보내고 대기 표시를 끈다. 붙잡은 것이 없어도 대기 표시는 끈다. */
+  const releaseHeldSoul = () => {
+    holdNextSoul = false;
+    const held = heldSoul;
+    heldSoul = undefined;
+    if (held !== undefined) send(held.response, 200, held.payload);
+  };
   const releaseHeldRun = (): string | undefined => {
     const runId = heldRunId;
     heldRunWaiter?.();
@@ -449,10 +456,7 @@ export function startFakeHermes(
       if (request.method === "POST" && path === TEST_RELEASE_HELD_SOUL_PATH) {
         // 대기 표시는 붙잡은 응답이 없어도 끈다. 클릭 전에 실패한 검사가 남긴 홀드 때문에 다음 검사가
         // 걸리지 않게 하기 위해서다.
-        holdNextSoul = false;
-        const held = heldSoul;
-        heldSoul = undefined;
-        if (held !== undefined) send(held.response, 200, held.payload);
+        releaseHeldSoul();
         return send(response, 204, null);
       }
 
@@ -730,12 +734,7 @@ export function startFakeHermes(
         holdNextSoul: () => {
           holdNextSoul = true;
         },
-        releaseHeldSoul: () => {
-          holdNextSoul = false;
-          const held = heldSoul;
-          heldSoul = undefined;
-          if (held !== undefined) send(held.response, 200, held.payload);
-        },
+        releaseHeldSoul,
         stoppedRuns: () => [...stoppedRuns],
         close: () =>
           new Promise<void>((done) => {

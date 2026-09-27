@@ -31,7 +31,7 @@ export function NavPending() {
     <span
       aria-hidden="true"
       data-testid="nav-pending"
-      className="ml-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted border-t-transparent motion-reduce:animate-none"
+      className="ml-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none"
     />
   );
 }
