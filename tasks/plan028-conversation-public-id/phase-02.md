@@ -109,11 +109,18 @@ export function isConversationId(value: string): boolean { return CONVERSATION_I
 
 - `GET /api/v1/test-support/chat/conversations/{공개 식별자}/number` → `{ "number": <대화 번호> }`. 없는 공개 식별자는 404
 - 부르는 사람의 대화인지 보지 않는다. 남의 대화 번호를 얻는 데도 쓴다
+- `ConversationRepository` 에는 사용자를 함께 받는 조회만 있다. 운영 코드에 조회를 더하지 않고, 이 컨트롤러가 `EntityManager` 로 JPQL `select c.id from Conversation c where c.publicId = :id` 를 부른다
+- 브라우저 검사가 부를 때의 토큰은 `test/browser/usage.spec.ts` 의 `controlPlaneToken()` 을 새 spec 에 옮겨 쓴다. export 되지 않은 함수다
 
 옛 주소 검사는 새 spec 파일 `test/browser/legacy-conversation-url.spec.ts` 하나에 모은다.
 
 - 내 대화: 기본 세션으로 대화를 만들고 주소에서 UUID 를 얻어 test-support 로 번호를 받은 뒤 `/c/{번호}` 로 연다
-- 남의 대화: `setSession(context, { email: "member@example.com", name: "가족 사용자" })` 로 대화를 만들고 번호를 받은 뒤, 기본 세션으로 되돌려 `/c/{번호}` 로 연다. 없는 번호로 대신하지 않는다. 주인 확인을 검사하는 경우다
+- 남의 대화: 없는 번호로 대신하지 않는다. 주인 확인을 검사하는 경우다. `test/browser/starters.spec.ts` 의 「가족에게 공개된 에이전트는 소개와 추천 질문이 읽기 전용이다」 를 본보기로 이렇게 준비한다
+  - fixtures 가 심는 에이전트는 모두 `TEST_EMAIL` 의 `PRIVATE` 라 member 세션은 대화를 시작하지 못한다(`AGENT_NOT_FOUND`). `setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "FAMILY", null)` 로 잠깐 가족에게 공개한다
+  - `setSession(context, { email: "member@example.com", name: "가족 사용자" })` 뒤 `page.request.post("/api/chat/conversations", { data: { agentCode: PERSONA_FAMILY_AGENT_CODE } })` 로 빈 대화를 만든다. 빈 대화라 Hermes 실행이 돌지 않는다
+  - 받은 공개 식별자로 test-support 에서 번호를 얻고, `setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" })` 로 기본 세션으로 되돌려 `/c/{번호}` 로 연다
+  - `finally` 에서 `setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "PRIVATE", TEST_EMAIL)` 로 되돌린다. `identity.spec.ts` 가 가족 공개 에이전트가 하나라고 가정한다
+  - 이 준비는 Playwright 설정의 `workers: 1` 에 기댄다. 다른 spec 과 동시에 돌면 공개 상태가 섞인다
 
 ## 검증
 
