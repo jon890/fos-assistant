@@ -14,7 +14,8 @@ export default async function LegacyConversationPage({ params }: {
   const session = await auth();
   if (!session?.user?.email) redirect("/signin");
   const { conversationId } = await params;
-  if (!/^\d+$/.test(conversationId)) redirect("/");
+  // Long 범위를 넘는 번호는 Control Plane 이 400 을 준다. 없는 대화와 같게 첫 화면으로 보낸다.
+  if (!/^\d{1,18}$/.test(conversationId)) redirect("/");
   const result = await callControlPlane<{ id: string }>(
     `/api/v1/chat/conversations/by-number/${conversationId}`,
   );

@@ -79,6 +79,11 @@ test("남의 대화 번호로 옛 주소를 열면 첫 화면으로 간다", asy
   }
 });
 
+test("Long 범위를 넘는 옛 번호 주소는 오류 화면 없이 첫 화면으로 간다", async ({ page }) => {
+  await page.goto("/c/12345678901234567890");
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test("공개 식별자 모양이 아닌 대화 주소는 첫 화면으로 간다", async ({ page }) => {
   await page.goto("/chat/abc");
   await expect(page).toHaveURL(/\/$/);
