@@ -18,7 +18,11 @@ jobs:
          github.event.pull_request.head.repo.full_name == github.repository) ||
         (github.event_name == 'issue_comment' &&
          github.event.issue.pull_request != null &&
-         contains(github.event.comment.body, '/review') &&
+         (github.event.comment.body == '/review' ||
+          startsWith(github.event.comment.body, '/review ') ||
+          startsWith(github.event.comment.body, format('/review{0}', fromJSON('"\t"'))) ||
+          startsWith(github.event.comment.body, format('/review{0}', fromJSON('"\n"'))) ||
+          startsWith(github.event.comment.body, format('/review{0}', fromJSON('"\r"')))) &&
          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
       )
     runs-on: ubuntu-latest
@@ -39,6 +43,7 @@ jobs:
       - name: 저장소 체크아웃
         uses: actions/checkout@v6
         with:
+          ref: refs/pull/${{ env.PR_NUMBER }}/head
           fetch-depth: 1
 
       # /review 댓글 트리거는 PR Checks 탭에 자동 등록되지 않으므로
