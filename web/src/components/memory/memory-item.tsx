@@ -15,12 +15,26 @@ export function MemoryItem({ memory, canEdit, onChanged }: { memory: Memory; can
 
   async function update(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); setPending("update"); setError(undefined);
-    const response = await fetch(`/api/memories/${memory.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: form.get("content"), alwaysInject: form.get("alwaysInject") === "on" }) });
-    setPending(null);
+    let response: Response;
+    try {
+      response = await fetch(`/api/memories/${memory.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: form.get("content"), alwaysInject: form.get("alwaysInject") === "on" }) });
+    } catch {
+      setError("Memory를 고치지 못했습니다."); return;
+    } finally { setPending(null); }
     if (!response.ok) { setError("Memory를 고치지 못했습니다."); return; }
     setEditing(false); await onChanged();
   }
-  async function remove() { setPending("remove"); setError(undefined); const response = await fetch(`/api/memories/${memory.id}`, { method: "DELETE" }); setPending(null); if (!response.ok) { setError("Memory를 지우지 못했습니다."); return; } await onChanged(); }
+  async function remove() {
+    setPending("remove"); setError(undefined);
+    let response: Response;
+    try {
+      response = await fetch(`/api/memories/${memory.id}`, { method: "DELETE" });
+    } catch {
+      setError("Memory를 지우지 못했습니다."); return;
+    } finally { setPending(null); }
+    if (!response.ok) { setError("Memory를 지우지 못했습니다."); return; }
+    await onChanged();
+  }
 
   return <article className="rounded-md border border-border p-4">
     <h3 className="font-semibold">{memory.title}</h3>

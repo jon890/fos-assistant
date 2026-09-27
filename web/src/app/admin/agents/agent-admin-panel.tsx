@@ -212,7 +212,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
         onApiBaseUrlChange={changeApiBaseUrl}
       />
       {confirmingAgent ? (
-        <VisibilityConfirm agent={confirmingAgent} busy={busy} onCancel={() => setConfirmingAgent(null)} onConfirm={() => void confirmFamilyVisibility()} />
+        <VisibilityConfirm agent={confirmingAgent} busy={pending?.action === "family"} onCancel={() => setConfirmingAgent(null)} onConfirm={() => void confirmFamilyVisibility()} />
       ) : null}
     </div>
   );

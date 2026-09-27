@@ -31,7 +31,7 @@ const WIDTH_CLASS: Record<PageSkeletonWidth, string> = {
  * 아래 여백은 세 폼 모두 `mb-8` 이다. 폼의 칸이 바뀌면 이 값도 다시 측정한다.
  */
 const FORM_CLASS: Record<PageSkeletonForm, string> = {
-  memory: "h-[26.1875rem] md:h-[21.4375rem]",
+  memory: "h-[24.875rem] md:h-[19.875rem]",
   person: "h-[22.375rem] md:h-[12.875rem]",
   agent: "h-[46.875rem] md:h-[29.875rem]",
 };

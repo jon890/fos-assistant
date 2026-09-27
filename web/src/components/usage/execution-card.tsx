@@ -25,7 +25,8 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
       <Card className={cn("relative gap-0 px-4", failed && "ring-foreground")}>
         <Link
           href={`/executions/${execution.id}`}
-          className="absolute inset-0"
+          // Card 가 overflow-hidden 이라 바깥으로 그린 초점 테두리가 잘린다. 브라우저의 초점 테두리를 안쪽으로 들인다.
+          className="absolute inset-0 rounded-xl -outline-offset-2"
           aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)${
             execution.hasChildren ? ", 하위 실행 있음" : ""
           }`}
