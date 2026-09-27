@@ -698,12 +698,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
 
     /** 끝 사건 없이 끊긴 스트림을 마무리한다. 돌고 있거나 답이 저장됐으면 오류로 끝내지 않는다. */
     const finishInterrupted = async (): Promise<boolean> => {
+      // 질문이 이미 저장돼 글을 되돌리지 않았으면 전송이 끝난 것으로 알린다. 입력창이 첨부 미리보기를 남기지 않게 한다.
+      let questionKept = false;
       const kind = await settleInterruptedStream(version, savedBefore, assistantPendingId, {
         onMissing: async (history) => {
           finishFailedActivity();
           const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
           const questionSaved = stream.started || (history !== null && lastQuestionIsNew(history, savedBefore));
           if (questionSaved && conversationIdRef.current !== null) {
+            questionKept = true;
             const refreshed = history !== null || await refreshAfterStartedFailure();
             if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
           } else {
@@ -713,7 +716,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         },
       });
       if (kind === "observing") handedOff = true;
-      return kind === "observing" || kind === "answered" || stream.started;
+      return kind === "observing" || kind === "answered" || stream.started || questionKept;
     };
 
     const requestBody = {
