@@ -7,7 +7,8 @@
 web 이 대화를 공개 식별자(UUID 문자열)로 다루고, 대화 주소를 `/chat/{id}` 로 바꾼다.
 옛 주소 `/c/{번호}` 는 주인에게만 새 주소로 넘겨 준다. 이 plan 의 마지막 phase 다.
 
-**범위 외**: Control Plane(phase-01 이 끝냈다). 메시지, 첨부, 실행 번호는 그대로 숫자다.
+**범위 외**: Control Plane 운영 코드(phase-01 이 끝냈다). 메시지, 첨부, 실행 번호는 그대로 숫자다.
+예외로 `backend/src/test/java/com/bifos/assistant/testsupport/` 에 브라우저 검사용 test-support 경로를 더한다(작업 항목 6). 테스트 소스라 운영에 실리지 않는다.
 
 ## 컨텍스트
 
@@ -29,11 +30,15 @@ phase-01 이 Control Plane 을 바꿨다. 대화 경로의 `{id}` 와 응답의 
 | `web/src/app/c/[conversationId]/page.tsx` | 로그인을 보고 `/^\d+$/` 가 아니면 `/` 로 보낸 뒤 `<ChatPanel initialConversationId={Number(conversationId)} />` |
 | `web/src/app/c/[conversationId]/loading.tsx` | 대화 화면의 뼈대 |
 | `web/src/components/chat-panel.tsx` | `initialConversationId: number \| null`, `useState<number \| null>`, `useRef<number \| null>`. `window.history.replaceState(null, "", \`/c/${...}\`)` 세 곳 |
-| `web/src/components/shell/conversations-provider.tsx` | `export type Conversation` 에 `id` |
-| `web/src/components/shell/conversation-nav.tsx` | `` `/c/${conversation.id}` `` 로 링크와 현재 경로 비교 |
+| `web/src/components/shell/conversations-provider.tsx` | `export type Conversation` 에 `id: number`. `rename(id: number)`, `remove(id: number)` |
+| `web/src/components/shell/conversation-nav.tsx` | `` `/c/${conversation.id}` `` 로 링크와 현재 경로 비교. `useState<number \| null>`, `new Map<number, ...>`, `useRef<number \| null>` |
+| `web/src/components/chat/composer.tsx` | `conversationId: number \| null`, `onConversationCreated(id: number)`, `ensureConversationId(): Promise<number \| null>`, 빈 대화를 만든 응답의 `conversationId?: number` |
+| `web/src/components/chat/message-bubble.tsx`, `message-list.tsx` | `conversationId: number \| null` 을 받아 첨부 주소를 만든다 |
 | `web/src/components/ui/page-skeleton.tsx` | 주석에 `/c/{id}` |
 | `test/unit/loading-routes.test.ts` | `ROUTE_FRAMES` 에 뼈대를 두는 경로. 주석이 경로 개수를 적고 있다. `"c/[conversationId]"` 가 있다. `callControlPlane` 을 부르는 `page.tsx` 마다 `loading.tsx` 가 있는지도 본다 |
 | `test/browser/` | `shell.spec.ts`, `loading.spec.ts`, `start-screen.spec.ts` 등이 `/c/${id}` 로 주소와 링크를 본다. `shell.spec.ts` 는 `/c/999999` 로 없는 대화를 연다 |
+| `test/browser/` 의 번호 전제 | `/\/c\/\d+$/`, `/\/c\/(\d+)$/`, `/conversations\/\d+\/attachments$/`, `/conversations\/(\d+)\/attachments$/` 같은 정규식과 `Number(page.url().match(...))` 가 `start-screen`, `shell`, `activity-panel`, `flow-progress`, `chat-attachment`, `chat`, `stop` spec 에 있다. `flow-progress.spec.ts` 는 주소 끝을 `Number(...)` 로 바꿔 가짜 `started` 사건에 싣는다 |
+| test-support | `backend/src/test/java/com/bifos/assistant/testsupport/UsageTestSupportController.java` 하나다. 브라우저 검사는 `test/browser/usage.spec.ts` 처럼 `CONTROL_PLANE_BASE_URL` 에 `Authorization: Bearer ${await controlPlaneToken()}` 를 붙여 부른다 |
 
 ## 의도 메모
 
@@ -41,7 +46,8 @@ phase-01 이 Control Plane 을 바꿨다. 대화 경로의 `{id}` 와 응답의 
 - **옛 주소는 서버에서 넘긴다.** `/c/[conversationId]/page.tsx` 를 넘겨 주기만 하는 서버 컴포넌트로 바꾼다. 화면을 그리지 않는다
 - 옛 주소에서 없는 대화와 남의 대화를 가리지 않는다. 둘 다 `/` 로 보낸다
 - `/chat/{id}` 에서 없는 대화는 지금 `/c/{id}` 와 같은 화면(「대화를 찾을 수 없다」)이다
-- 서버 라우트의 오류 문구 「대화 번호가 올바르지 않습니다.」 는 「대화 주소가 올바르지 않습니다.」 로 바꾼다
+- 서버 라우트의 오류 문구 「대화 번호가 올바르지 않습니다.」 는 「대화 주소가 올바르지 않습니다.」 로, 첨부 경로의 「대화 번호나 첨부 번호가 올바르지 않습니다.」 는 「대화 주소나 첨부 번호가 올바르지 않습니다.」 로 바꾼다
+- 첨부 경로의 `attachmentId` 는 번호이므로 `/^\d+$/` 검사를 그대로 둔다
 
 ## Blocked 조건
 
@@ -76,18 +82,19 @@ export function isConversationId(value: string): boolean { return CONVERSATION_I
 - 성공이면 `redirect(\`/chat/${result.data.id}\`)`, 실패면 `redirect("/")`
 - `callControlPlane` 을 부르므로 `loading.tsx` 가 같은 자리에 있어야 한다(`test/unit/loading-routes.test.ts`). 3 에서 옮긴 것과 같은 뼈대를 둔다
 
-### 5. `chat-panel.tsx` 와 `conversation-nav.tsx`
+### 5. `chat-panel.tsx`, `conversation-nav.tsx`, 대화 부품
 
-- 대화 식별자 타입을 `string \| null` 로 바꾼다
+- 대화 식별자 타입을 `string \| null`(없을 수 없는 자리는 `string`)로 바꾼다. `chat-panel.tsx`, `conversation-nav.tsx`, `conversations-provider.tsx` 의 `rename`, `remove`, `composer.tsx`, `message-bubble.tsx`, `message-list.tsx` 가 모두 대상이다
 - `replaceState` 세 곳과 링크, 현재 경로 비교를 `/chat/${id}` 로 바꾼다
 - 숫자를 전제한 코드(`Number(...)`, 숫자 비교)가 남지 않게 한다
 - `page-skeleton.tsx` 의 주석을 `/chat/{id}` 로 고친다
 
 ### 6. 이 phase 를 검증하는 테스트
 
-- `test/unit/loading-routes.test.ts`: `ROUTE_FRAMES` 에 `"chat/[conversationId]"` 를 더하고 `"c/[conversationId]"` 도 남긴다. 주석에 적힌 경로 개수는 개수를 적지 않는 표현으로 바꾼다. 경로를 더할 때마다 낡는다
+- `test/unit/loading-routes.test.ts`: `ROUTE_FRAMES` 에 `"chat/[conversationId]"` 를 더하고 `"c/[conversationId]"` 도 남긴다. 주석과 검사 이름(`"loading.tsx 는 뼈대를 두기로 한 여덟 경로에만 있다"`)에 적힌 경로 개수는 개수를 적지 않는 표현으로 바꾼다. 경로를 더할 때마다 낡는다
 - `test/unit/` 에 `isConversationId` 검사: 만든 UUID 는 참, 숫자 `120` 과 빈 문자열과 36자가 아닌 값은 거짓
 - `test/browser/` 의 `/c/${id}` 를 `/chat/${id}` 로 고친다. 없는 대화를 여는 검사는 형식이 맞는 임의 UUID 로 연다
+- `test/browser/` 에서 대화 식별자를 `\d+` 정규식이나 `Number(...)` 로 다루는 곳을 모두 UUID 문자열로 바꾼다. 컨텍스트 표의 「번호 전제」 줄이 그 자리다. 첨부 번호를 보는 `\d+` 는 그대로 둔다. `flow-progress.spec.ts` 의 가짜 `started` 사건에는 주소 끝의 UUID 문자열을 그대로 싣는다
 - 새 브라우저 검사
 
 | 경우 | 기대 |
@@ -97,18 +104,29 @@ export function isConversationId(value: string): boolean { return CONVERSATION_I
 | 남의 대화 번호로 `/c/{번호}` | `/` 로 옮겨진다 |
 | `/chat/abc` | `/` 로 옮겨진다 |
 
-내 대화의 번호는 브라우저 검사에서 얻기 어렵다. `test/browser/fixtures.ts` 의 기존 도구와 test-support 경로를 먼저 본다.
-없으면 `backend/src/test/java/com/bifos/assistant/testsupport/` 에 대화 번호를 알려 주는 test-support 경로를 더한다. 운영 코드에 더하지 않는다.
+대화 번호는 브라우저 검사에서 얻을 길이 없다. 지금 test-support 에 대화를 다루는 경로가 없다.
+`backend/src/test/java/com/bifos/assistant/testsupport/` 에 `ChatTestSupportController` 를 더한다. `UsageTestSupportController` 와 같은 `@ConditionalOnProperty` 를 단다.
+
+- `GET /api/v1/test-support/chat/conversations/{공개 식별자}/number` → `{ "number": <대화 번호> }`. 없는 공개 식별자는 404
+- 부르는 사람의 대화인지 보지 않는다. 남의 대화 번호를 얻는 데도 쓴다
+
+옛 주소 검사는 새 spec 파일 `test/browser/legacy-conversation-url.spec.ts` 하나에 모은다.
+
+- 내 대화: 기본 세션으로 대화를 만들고 주소에서 UUID 를 얻어 test-support 로 번호를 받은 뒤 `/c/{번호}` 로 연다
+- 남의 대화: `setSession(context, { email: "member@example.com", name: "가족 사용자" })` 로 대화를 만들고 번호를 받은 뒤, 기본 세션으로 되돌려 `/c/{번호}` 로 연다. 없는 번호로 대신하지 않는다. 주인 확인을 검사하는 경우다
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-grep -rn '/c/\${' web/src test/browser
-grep -rn 'd+\$/' web/src/app/api/chat/conversations
+grep -rn '/c/\${' web/src
+grep -rln '/c/\${' test/browser
+grep -rn 'd+\$/.test(conversationId' web/src/app/api/chat/conversations
+grep -rnE '\\/c\\/\(?\\d|conversations\\/\(?\\d' test/browser
 ```
 
-둘 다 아무것도 내지 않아야 한다. `/c/[conversationId]/page.tsx` 의 번호 검사는 첫째 grep 에 걸리지 않는다.
+둘째는 `test/browser/legacy-conversation-url.spec.ts` 하나만 내야 한다. 옛 주소를 여는 검사가 그 파일에만 있다.
+나머지는 아무것도 내지 않아야 한다. `/c/[conversationId]/page.tsx` 의 번호 검사는 첫째 grep 에 걸리지 않는다.
 
 AGENTS.md 의 「확인」 절 명령을 적힌 순서대로 모두 돌린다. 이 plan 의 마지막 phase 다.
 `pnpm build` 는 `web/AGENTS.md` 의 자리표시자 환경 변수가 필요하다.
@@ -128,7 +146,10 @@ AGENTS.md 의 「확인」 절 명령을 적힌 순서대로 모두 돌린다. �
 | `web/src/app/c/[conversationId]/page.tsx` | 수정. 넘겨 주기만 한다 |
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/shell/conversations-provider.tsx`, `conversation-nav.tsx` | 수정 |
+| `web/src/components/chat/composer.tsx`, `message-bubble.tsx`, `message-list.tsx` | 수정 |
 | `web/src/components/ui/page-skeleton.tsx` | 주석 수정 |
 | `test/unit/loading-routes.test.ts` | 수정 |
 | `test/unit/` 의 `isConversationId` 검사 | 신규 |
-| `test/browser/` 의 `/c/` 를 쓰는 spec 과 새 spec | 수정, 신규 |
+| `test/browser/` 의 `/c/` 와 번호 정규식을 쓰는 spec | 수정 |
+| `test/browser/legacy-conversation-url.spec.ts` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/ChatTestSupportController.java` | 신규 |
