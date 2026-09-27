@@ -17,7 +17,9 @@ async function payload<T>(response: Response): Promise<T> {
 export function PeopleAdminPanel({ initialPeople }: Props) {
   const [people, setPeople] = useState(initialPeople);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  /** 도는 요청이다. 누른 단추에만 회전 표시를 두려고 더하기인지 누구를 켜고 끄는지 기억한다. */
+  const [pending, setPending] = useState<{ action: "create" } | { action: "enabled"; id: Person["id"] } | null>(null);
+  const busy = pending !== null;
 
   async function reload() {
     const response = await fetch("/api/admin/people");
@@ -28,7 +30,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
-    setBusy(true);
+    setPending({ action: "create" });
     setError(null);
     try {
       const form = new FormData(formElement);
@@ -49,12 +51,12 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
         setError(describeError(result.code, result.message));
       }
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   }
 
   async function changeEnabled(person: Person) {
-    setBusy(true);
+    setPending({ action: "enabled", id: person.id });
     setError(null);
     try {
       const response = await fetch(`/api/admin/people/${person.id}`, {
@@ -68,7 +70,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
         setError(describeError(result.code, result.message));
       }
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   }
 
@@ -79,7 +81,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
         여기서 더하면 그 사람의 Hermes profile 까지 만들어진다. 사용자와 에이전트는 그 사람이 처음
         로그인할 때 생긴다.
       </p>
-      <PersonForm busy={busy} onCreate={(event) => void create(event)} />
+      <PersonForm busy={busy} creating={pending?.action === "create"} onCreate={(event) => void create(event)} />
       {error ? (
         <p role="alert" data-testid="people-error" className="mb-4 rounded-md bg-muted p-3 text-sm">
           {error}
@@ -88,6 +90,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
       <PersonList
         people={people}
         busy={busy}
+        pendingId={pending?.action === "enabled" ? pending.id : null}
         onEnabledChange={(person) => void changeEnabled(person)}
       />
     </div>

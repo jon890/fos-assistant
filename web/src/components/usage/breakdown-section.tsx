@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { BreakdownTable, type Breakdown } from "./breakdown-table";
 
 /** 화면이 고를 수 있는 축이다. Control Plane 이 받는 값과 같아야 한다. */
@@ -42,15 +43,15 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
         <h2 className="text-lg font-semibold">어디에 썼나</h2>
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">묶는 기준</span>
-          <select
-            className="rounded-md border border-border bg-muted px-control-x-sm py-control-y-sm text-sm"
+          <NativeSelect
+            className="w-auto"
             data-testid="breakdown-axis"
             disabled={pending}
             onChange={(event) => changeAxis(event.target.value)}
             value={breakdown.axis}
           >
             {AXES.map((axis) => <option key={axis.value} value={axis.value}>{axis.label}</option>)}
-          </select>
+          </NativeSelect>
         </label>
       </div>
       {failure ? <p className="mb-3 text-sm">{failure}</p> : null}

@@ -47,6 +47,7 @@ function TooltipContent({
         {...props}
       >
         {children}
+        {/* shadcn 원본이다. 다시 받을 때 대조하려고 고치지 않는다. */}
         <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground" />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>

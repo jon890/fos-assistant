@@ -535,6 +535,7 @@ export function Composer({
         {running ? (
           <TooltipButton
             label="중지"
+            passEscape
             variant="default"
             disabled={!canStop}
             onClick={onStop}

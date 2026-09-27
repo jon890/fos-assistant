@@ -26,13 +26,28 @@ export function focusWithoutTooltip(element: HTMLElement | null | undefined): vo
   }
 }
 
+/** 풀이만 닫고 대화 화면에 넘길 `Esc` 사건이다 */
+const escapesPassedThrough = new WeakSet<Event>();
+
+/**
+ * 이 `Esc` 가 풀이만 닫았는지 알린다. 참이면 기본 동작이 막혀 있어도 대화 화면이 처리한다.
+ *
+ * <p>Radix 는 풀이를 `Esc` 로 닫을 때 반드시 `preventDefault` 를 부른다. `onEscapeKeyDown` 에서 막지 않으면
+ * 스스로 막고 닫으며, 막으면 닫지 않는다. 그래서 기본 동작으로는 풀이만 닫은 사건을 가려낼 수 없어 따로 적어 둔다.
+ */
+export function escapeOnlyClosedTooltip(event: Event): boolean {
+  return escapesPassedThrough.has(event);
+}
+
 /**
  * 글자 없이 아이콘만 있는 단추다. 접근성 이름과 마우스를 올렸을 때의 풀이 글이 같은 `label` 에서 나온다.
  *
  * <p>`title` 속성은 쓰지 않는다. 풀이는 Tooltip 이 보인다. 화면 틀 맨 위의 `TooltipProvider` 안에서 쓴다.
+ * `passEscape` 를 주면 풀이가 열려 있어도 첫 `Esc` 가 풀이를 닫으며 대화 화면에도 간다. 「중지」 가 그렇다.
+ * 마우스를 올려 둔 채 `Esc` 를 눌렀는데 풀이만 닫히고 답이 계속 흐르면 안 된다.
  */
-export function TooltipButton({ label, children, variant = "ghost", size = "icon-sm", ...props }:
-  ComponentProps<typeof Button> & { label: string }) {
+export function TooltipButton({ label, children, variant = "ghost", size = "icon-sm", passEscape = false, ...props }:
+  ComponentProps<typeof Button> & { label: string; passEscape?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Tooltip open={open} onOpenChange={(next) => {
@@ -42,7 +57,9 @@ export function TooltipButton({ label, children, variant = "ghost", size = "icon
       <TooltipTrigger asChild>
         <Button variant={variant} size={size} aria-label={label} {...props}>{children}</Button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent onEscapeKeyDown={passEscape ? (event) => { escapesPassedThrough.add(event); } : undefined}>
+        {label}
+      </TooltipContent>
     </Tooltip>
   );
 }

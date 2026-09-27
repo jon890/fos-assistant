@@ -31,9 +31,9 @@ const WIDTH_CLASS: Record<PageSkeletonWidth, string> = {
  * 아래 여백은 세 폼 모두 `mb-8` 이다. 폼의 칸이 바뀌면 이 값도 다시 측정한다.
  */
 const FORM_CLASS: Record<PageSkeletonForm, string> = {
-  memory: "h-[26.1875rem] md:h-[21.4375rem]",
-  person: "h-[24.25rem] md:h-[13.5rem]",
-  agent: "h-[52.125rem] md:h-[32.75rem]",
+  memory: "h-[24.875rem] md:h-[19.875rem]",
+  person: "h-[22.375rem] md:h-[12.875rem]",
+  agent: "h-[46.875rem] md:h-[29.875rem]",
 };
 
 function FormBlock({ form }: { form: PageSkeletonForm }) {
@@ -73,10 +73,10 @@ function TitleBlock({ description }: { description?: PageSkeletonDescription }) 
 
 /**
  * 카드 목록이다. 폼이 있는 `/admin/agents` 는 관리 카드처럼 정보가 많아 더 높고,
- * `/agents` 는 한 줄짜리 카드(`p-4` 와 글자 한 줄, 테두리)라 58px 다.
+ * `/agents` 는 한 줄짜리 `Card`(위아래 `py-4` 와 글자 한 줄)라 56px 다. `Card` 의 테두리는 `ring` 이라 높이에 들지 않는다.
  */
 function CardsBody({ tall }: { tall: boolean }) {
-  const cardHeight = tall ? "h-40" : "h-[3.625rem]";
+  const cardHeight = tall ? "h-40" : "h-14";
   return (
     <>
       <div className="grid gap-3">
@@ -101,14 +101,18 @@ function ListBody() {
   );
 }
 
-/** `/usage` 다. `MonthlySummary` 같은 합계 칸 하나와 표 줄 다섯이다. */
+/**
+ * `/usage` 다. `MonthlySummary` 의 합계 칸 셋과 그 아래 안내 한 줄, 표 줄 다섯이다.
+ * 합계 칸 하나는 `Stat` 의 `Card`(위아래 `py-4`, 이름표·값·설명 세 줄)라 104px 다. `Card` 의 테두리는 `ring` 이라 높이에 들지 않는다.
+ */
 function TableBody() {
   return (
     <>
-      <div className="mb-6 grid gap-5 rounded-md border border-border bg-muted p-4 sm:grid-cols-2 md:grid-cols-3">
-        <Skeleton className="h-14 w-full" />
-        <Skeleton className="h-14 w-full" />
-        <Skeleton className="h-14 w-full" />
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <Skeleton className="h-26 w-full" />
+        <Skeleton className="h-26 w-full" />
+        <Skeleton className="h-26 w-full" />
+        <Skeleton className="h-4 w-2/3 sm:col-span-2 md:col-span-3" />
       </div>
       <div className="grid gap-2">
         <Skeleton className="h-10 w-full" />
@@ -126,15 +130,18 @@ function EditorBody() {
   return <Skeleton className="h-[25.125rem] w-full" />;
 }
 
-/** `/executions/{id}` 다. 제목은 이 컴포넌트의 `title` 이 아니라 요약 자리 안에 직접 둔다. */
+/**
+ * `/executions/{id}` 다. 제목은 이 컴포넌트의 `title` 이 아니라 요약 자리 안에 직접 둔다.
+ * 요약의 첫 줄은 상태 `Badge` 가 있어 42px 이고 나머지 줄은 40px 다. 좁은 폭은 두 칸, `sm` 부터 세 칸이 첫 줄이다.
+ */
 function TreeBody() {
   return (
     <div>
       <Skeleton className="mb-4 h-7 w-56" />
       <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-[2.625rem] w-full" />
+        <Skeleton className="h-[2.625rem] w-full" />
+        <Skeleton className="h-10 w-full sm:h-[2.625rem]" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />

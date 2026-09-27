@@ -14,7 +14,7 @@
 src/
   app/                    경로, 서버 컴포넌트, 서버 라우트
   components/
-    ui/                   버튼, 입력, 표, 뼈대, 아이콘
+    ui/                   shadcn/ui 에서 받은 부품과 우리가 만든 조각
     chat/                 대화 화면의 부품
     usage/                사용량 화면의 부품
     execution/            실행 나무 화면의 부품

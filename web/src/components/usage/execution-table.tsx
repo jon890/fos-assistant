@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import {
   actualCostLabel,
@@ -18,34 +19,34 @@ import {
 export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
   const router = useRouter();
   return (
-    <table className="hidden w-full text-left text-sm md:table" data-testid="execution-table">
-      <thead className="text-xs text-muted-foreground">
-        <tr>
-          <th className="pb-3 pr-4 font-medium">시각</th>
-          <th className="pb-3 pr-4 font-medium">에이전트</th>
-          <th className="pb-3 pr-4 font-medium">모델</th>
-          <th className="pb-3 pr-4 font-medium">상태</th>
-          <th className="pb-3 pr-4 text-right font-medium">입력</th>
-          <th className="pb-3 pr-4 text-right font-medium">캐시</th>
-          <th className="pb-3 pr-4 text-right font-medium">출력</th>
-          <th className="pb-3 pr-4 text-right font-medium">문맥</th>
-          <th className="pb-3 pr-4 text-right font-medium">소요</th>
-          <th className="pb-3 pr-4 text-right font-medium">API 환산 비용</th>
-          <th className="pb-3 text-right font-medium">실제 청구액</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table className="hidden text-left md:table" data-testid="execution-table">
+      <TableHeader className="text-xs">
+        <TableRow className="hover:bg-transparent">
+          <TableHead>시각</TableHead>
+          <TableHead>에이전트</TableHead>
+          <TableHead>모델</TableHead>
+          <TableHead>상태</TableHead>
+          <TableHead className="text-right">입력</TableHead>
+          <TableHead className="text-right">캐시</TableHead>
+          <TableHead className="text-right">출력</TableHead>
+          <TableHead className="text-right">문맥</TableHead>
+          <TableHead className="text-right">소요</TableHead>
+          <TableHead className="text-right">API 환산 비용</TableHead>
+          <TableHead className="text-right">실제 청구액</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {executions.map((execution) => {
           const running = isRunning(execution);
           const failed = execution.status === "FAILED" || execution.errorCode !== null;
           return (
-            <tr
+            <TableRow
               key={execution.id}
-              className="cursor-pointer border-t border-border align-top hover:bg-muted"
+              className="cursor-pointer align-top hover:bg-muted"
               onClick={() => router.push(`/executions/${execution.id}`)}
             >
-              <td className="py-3 pr-4 whitespace-nowrap">{formatWhen(execution.startedAt)}</td>
-              <td className="py-3 pr-4">
+              <TableCell className="py-3">{formatWhen(execution.startedAt)}</TableCell>
+              <TableCell className="py-3 whitespace-normal">
                 <Link
                   href={`/executions/${execution.id}`}
                   className="font-medium hover:underline"
@@ -60,24 +61,24 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                   <ChevronRight aria-hidden="true" className="ml-1 inline-block size-4 text-muted-foreground" />
                 ) : null}
                 <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
-              </td>
-              <td className="max-w-40 py-3 pr-4">
+              </TableCell>
+              <TableCell className="max-w-40 py-3">
                 <span className="block truncate">{execution.model ?? "-"}</span>
                 <span className="block truncate text-xs text-muted-foreground">{execution.provider ?? "-"}</span>
-              </td>
-              <td className="max-w-40 py-3 pr-4">
+              </TableCell>
+              <TableCell className="max-w-40 py-3 whitespace-normal">
                 <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
                 {retryOfLabel(execution) ? (
                   <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-retry-of">
                     {retryOfLabel(execution)}
                   </span>
                 ) : null}
-              </td>
-              <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.inputTokens)}</td>
-              <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</td>
-              <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(execution.outputTokens)}</td>
-              <td
-                className="py-3 pr-4 text-right whitespace-nowrap tabular-nums"
+              </TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.inputTokens)}</TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.outputTokens)}</TableCell>
+              <TableCell
+                className="py-3 text-right tabular-nums"
                 data-testid="execution-context-chars"
               >
                 <span className="block">{contextCharsLabel(execution)}</span>
@@ -86,24 +87,24 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                     {contextOmittedLabel(execution)}
                   </span>
                 ) : null}
-              </td>
-              <td className="py-3 pr-4 text-right whitespace-nowrap" data-testid="execution-duration">
+              </TableCell>
+              <TableCell className="py-3 text-right" data-testid="execution-duration">
                 {running ? "" : formatDuration(execution.latencyMs ?? 0)}
-              </td>
-              <td
-                className="py-3 pr-4 text-right whitespace-nowrap"
+              </TableCell>
+              <TableCell
+                className="py-3 text-right"
                 data-testid="execution-cost"
                 title={execution.pricingVersion ?? undefined}
               >
                 {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
-              </td>
-              <td className="py-3 text-right whitespace-nowrap" data-testid="execution-actual-cost">
+              </TableCell>
+              <TableCell className="py-3 text-right" data-testid="execution-actual-cost">
                 {actualCostLabel(execution)}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           );
         })}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

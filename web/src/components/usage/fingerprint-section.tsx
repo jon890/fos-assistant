@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { formatAmount } from "@/lib/format";
 import type { BreakdownRow } from "./breakdown-table";
 
@@ -38,14 +39,16 @@ export function FingerprintSection({ rows, currency }: { rows: BreakdownRow[]; c
       <h2 className="mb-3 text-lg font-semibold">무엇이 달라졌나</h2>
       <ul className="grid gap-3">
         {rows.map((row) => (
-          <li key={row.key} className="rounded-md border border-border p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <span className="font-medium">지문 {shortFingerprint(row.key)}</span>
-              <span className="text-sm font-semibold tabular-nums">{perExecution(row, currency)}</span>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              실행 {row.executions.toLocaleString("ko-KR")}건 · {formatSpan(row)}
-            </p>
+          <li key={row.key}>
+            <Card className="gap-0 px-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="text-base font-medium">지문 {shortFingerprint(row.key)}</span>
+                <span className="text-sm font-semibold tabular-nums">{perExecution(row, currency)}</span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                실행 {row.executions.toLocaleString("ko-KR")}건 · {formatSpan(row)}
+              </p>
+            </Card>
           </li>
         ))}
       </ul>
