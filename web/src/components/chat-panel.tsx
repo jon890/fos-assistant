@@ -122,6 +122,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setFreshStart(false);
     setMessagesLoading(true);
     setNotFound(false);
+    setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
     setTurns([]);
@@ -226,7 +227,18 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       let running: RunningTurn | null = null;
       try {
         const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
-        if (response.ok) running = await readPayload<RunningTurn>(response);
+        if (response.ok) {
+          running = await readPayload<RunningTurn>(response);
+        } else if (response.status === 404) {
+          const payload = await readPayload<ErrorPayload>(response).catch(() => null);
+          if (payload?.code === "CONVERSATION_NOT_FOUND") {
+            // 보는 동안 대화가 지워졌다. 되풀이해 물어도 돌아오지 않으므로 곧바로 멈추고 첫 조회와 같은 화면으로 간다.
+            if (!current()) return false;
+            releaseObserving();
+            setNotFound(true);
+            return false;
+          }
+        }
       } catch {
         // 아래에서 실패로 센다.
       }
@@ -396,6 +408,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     currentExecutionId.current = null;
     setExecutionId(null);
     setStopRequested(false);
+    setFlowIsSlow(false);
   }
 
   async function refreshMessages(id: string, version: number): Promise<Turn[]> {

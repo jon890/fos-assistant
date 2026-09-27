@@ -111,6 +111,25 @@ test("도는 turn 조회가 이어 실패하면 오류 없이 기다리는 표�
   }
 });
 
+test("보는 동안 대화가 지워지면 대화를 찾을 수 없다는 화면으로 간다", async ({ context, page, hermes }) => {
+  const conversationId = await startHeldTurn(page, hermes, "다른 창 대화 지움 검사");
+  try {
+    const other = await openOtherWindow(context, conversationId);
+    await expect(other.getByTestId("observing-notice")).toBeVisible();
+    await other.route(`**/api/chat/conversations/${conversationId}/running`, (route) => route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "CONVERSATION_NOT_FOUND", message: "대화가 없다" }),
+    }));
+    // route 를 걸기 직전에 떠난 조회는 정상 응답을 받으므로 주기 두 번에 여유를 더해 기다린다.
+    // 404 를 실패로만 세었다면 이력을 다시 읽어 이 화면이 아니라 대화가 보이므로, 화면으로 둘을 구분한다.
+    await expect(other.getByTestId("conversation-not-found")).toBeVisible({ timeout: OBSERVE_INTERVAL_MS * 2 + 3_000 });
+    await expect(other.getByTestId("observing-notice")).toHaveCount(0);
+  } finally {
+    await releaseAndSettle(page, hermes);
+  }
+});
+
 test("도는 turn 이 없는 대화는 조회를 되풀이하지 않는다", async ({ page }, testInfo) => {
   const created = await page.request.post("/api/chat", {
     data: { text: `도는 turn 없는 대화 검사 ${testInfo.project.name} ${Date.now()}`, agentCode: "browser" },
