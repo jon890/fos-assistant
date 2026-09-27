@@ -235,7 +235,7 @@ API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 
 쿼리는 `refresh` 하나만 읽는다.
 
 다른 경로는 이 목록을 대신하지 못한다.
-`/v1/models` 는 위에 적었듯 profile 이름과 모델 별칭만 준다.
+`/v1/models` 는 위에 적었듯 profile 이름만 준다.
 대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
 둘 다 provider 별 모델 목록이 아니다.
 
