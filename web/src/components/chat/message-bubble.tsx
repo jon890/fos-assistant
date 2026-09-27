@@ -2,7 +2,7 @@
 
 import { cn } from "cn";
 import { assistantAvatar, attachmentPlaceholder, revealedTime } from "./variants";
-import { Markdown } from "./markdown";
+import { AnswerBody } from "./answer-body";
 import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
 import type { ActivitySummary } from "@/lib/chat-event";
@@ -90,6 +90,7 @@ export function MessageBubble({
   onVersionChange,
   canRegenerate = false,
   onRegenerate,
+  onAnswer,
 }: {
   turn: Turn;
   conversationId: number | null;
@@ -99,6 +100,8 @@ export function MessageBubble({
   streaming: boolean;
   userVersion?: VersionSlot; answerVersion?: VersionSlot; onVersionChange?(slotId: number, index: number): void;
   canRegenerate?: boolean; onRegenerate?(): void;
+  /** 이 답 끝의 질문에 답할 수 있을 때만 준다. 마지막 답이고 돌고 있는 turn 이 없을 때다 */
+  onAnswer?(text: string): void;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
@@ -172,7 +175,7 @@ export function MessageBubble({
             onOpenPanel={() => onOpenSaved(turn.executionId!)} /></div>
         ) : null}
         <div className="leading-7">
-          <Markdown>{turn.content}</Markdown>
+          <AnswerBody content={turn.content} streaming={streaming} onAnswer={streaming ? undefined : onAnswer} />
         </div>
         {turn.status === "CANCELLED" ? <p data-testid="stopped-mark" className="mt-2 text-xs text-muted-foreground">중지됨</p> : null}
         {!streaming ? <MessageActions content={turn.content} latest={latest} version={answerVersion}
