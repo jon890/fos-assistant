@@ -11,6 +11,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -51,6 +52,7 @@ class UsageBreakdownTest {
     @Autowired AgentRepository agents;
     @Autowired AgentService agentService;
     @Autowired ExecutionTreeService trees;
+    @Autowired ConversationRepository conversations;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
@@ -62,7 +64,7 @@ class UsageBreakdownTest {
         executions.deleteAll();
         career = agent("breakdown-career", "진로 비서", "example-model");
         chore = agent("breakdown-chore", "집안일 비서", "example-model-b");
-        controller = new UsageController(executions, currentUser, agentService, trees);
+        controller = new UsageController(executions, currentUser, agentService, trees, conversations);
         when(currentUser.require())
                 .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
     }

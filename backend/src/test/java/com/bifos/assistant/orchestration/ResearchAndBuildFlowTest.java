@@ -17,6 +17,7 @@ import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -48,6 +49,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -201,6 +203,13 @@ class ResearchAndBuildFlowTest {
                 .map(event -> event.eventType()).toList();
     }
 
+    /** 사건이 싣는 공개 식별자로 대화를 찾는다. 지운 대화도 찾아야 해서 주인 확인을 거치지 않는다. */
+    private Conversation conversationOf(UUID publicId) {
+        return conversations.findAll().stream()
+                .filter(conversation -> publicId.equals(conversation.publicId()))
+                .findFirst().orElseThrow();
+    }
+
     private List<ExecutionEventType> cancelledEvents(Long executionId) {
         return eventTypes(executionId).stream()
                 .filter(type -> type == ExecutionEventType.RUN_CANCELLED).toList();
@@ -289,7 +298,7 @@ class ResearchAndBuildFlowTest {
             if (command.input().contains(CHIEF_MARK)) {
                 ChatEvent started = relayed.stream()
                         .filter(event -> "started".equals(event.type())).findFirst().orElseThrow();
-                chat.delete(dad, started.conversationId());
+                chat.delete(dad, conversationOf(started.conversationId()).id());
                 return completed("run-chief", "{\"research\":\"\",\"build\":\"\"}");
             }
             return completed("run-other", "답");
@@ -299,7 +308,7 @@ class ResearchAndBuildFlowTest {
 
         ChatEvent started = relayed.stream()
                 .filter(event -> "started".equals(event.type())).findFirst().orElseThrow();
-        assertThat(conversations.findById(started.conversationId()).orElseThrow().deletedAt())
+        assertThat(conversationOf(started.conversationId()).deletedAt())
                 .isNotNull();
         assertThat(chat.conversationsOf(dad)).isEmpty();
     }
@@ -464,7 +473,7 @@ class ResearchAndBuildFlowTest {
                 assertThat(root.status()).isEqualTo(ExecutionStatus.CANCELLED));
         ChatEvent started = relayed.stream().filter(event -> "started".equals(event.type())).findFirst().orElseThrow();
         assertThat(cancelledEvents(started.executionId())).containsExactly(ExecutionEventType.RUN_CANCELLED);
-        assertThat(conversations.findById(started.conversationId()).orElseThrow().hermesSessionId())
+        assertThat(conversationOf(started.conversationId()).hermesSessionId())
                 .isEqualTo("sess-chief");
         assertThat(relayed.getLast().type()).isEqualTo("stopped");
     }
