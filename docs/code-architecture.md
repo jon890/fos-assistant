@@ -77,8 +77,12 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 
 ## 가격표
 
-`usage/infra/ModelsDevPriceCatalog` 가 기동할 때 models.dev 카탈로그를 한 번 읽어 메모리에 둔다.
+`usage/infra/ModelsDevPriceCatalog` 가 models.dev 카탈로그를 읽어 메모리에 둔다.
 경로는 `ASSISTANT_PRICING_CATALOG` 가 정한다.
+
+**파일이 바뀌면 재기동 없이 다시 읽는다.** 조회할 때 1분에 한 번 파일의 수정 시각을 보고, 바뀌었으면 다시 읽는다.
+기동할 때만 읽었을 때는 새로 받은 가격표에 있는 모델의 금액이 재기동 전까지 비어 있었다.
+새 파일이 읽히지 않거나 가격이 하나도 없으면 이전 가격을 계속 쓴다.
 
 Hermes profile 디렉터리를 그대로 붙이지 않는다.
 그 디렉터리에는 `.env` 와 `auth.json` 이 함께 있어서 credential 까지 컨테이너에 들어간다.
