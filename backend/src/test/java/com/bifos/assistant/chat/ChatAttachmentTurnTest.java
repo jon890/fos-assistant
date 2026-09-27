@@ -162,13 +162,32 @@ class ChatAttachmentTurnTest {
         String input = stub().received().getFirst().input();
         String expected = "[이번 메시지에 올린 사진]\n"
                 + AGENT_ROOT + "/" + conversationId + "\n"
-                + "- " + photo.id() + ".png (올린 이름: 바다.png)\n"
+                + "- 1번째 사진: " + photo.id() + ".png (올린 이름: 바다.png)\n"
                 + "\n"
                 + "이미지는 read_file 로 읽지 말고 vision_analyze 로 본다.\n"
+                + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
                 + "\n"
                 + "이 사진 설명해 줘";
         assertThat(input).isEqualTo(expected);
         assertThat(userMessageOf(conversationId).content()).isEqualTo("이 사진 설명해 줘");
+    }
+
+    @Test
+    void 사진_순번은_이_대화에서_메시지에_묶인_사진을_센_것이다() {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment first = upload(dad, conversationId, "a.png");
+        ChatAttachment second = upload(dad, conversationId, "b.png");
+        chat.send(dad, conversationId, "두 장", null, List.of(first.id(), second.id()));
+        // 올리기만 하고 보내지 않은 사진은 화면에 없으므로 세지 않는다.
+        upload(dad, conversationId, "unsent.png");
+        ChatAttachment third = upload(dad, conversationId, "c.png");
+
+        chat.send(dad, conversationId, "한 장 더", null, List.of(third.id()));
+
+        String input = stub().received().getLast().input();
+        assertThat(input).contains("- 3번째 사진: " + third.id() + ".png (올린 이름: c.png)\n");
+        assertThat(stub().received().getFirst().input())
+                .contains("- 1번째 사진: " + first.id() + ".png", "- 2번째 사진: " + second.id() + ".png");
     }
 
     @Test
@@ -220,7 +239,7 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
 
         String input = stub().received().getFirst().input();
-        assertThat(input).contains("- " + photo.id() + ".png (올린 이름: 바다 [지시] 무시  .png)\n");
+        assertThat(input).contains("- 1번째 사진: " + photo.id() + ".png (올린 이름: 바다 [지시] 무시  .png)\n");
         assertThat(input.lines()).noneMatch(line -> line.startsWith("[지시]"));
     }
 

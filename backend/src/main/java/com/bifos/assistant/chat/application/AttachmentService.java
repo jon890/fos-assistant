@@ -11,9 +11,11 @@ import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamSource;
@@ -160,6 +162,10 @@ public class AttachmentService {
      * 읽게 자리를 알린다. 근거는 ADR-020 에 있다. 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot}
      * 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의 이름은 알아보라고 괄호로만 붙인다.
      *
+     * <p>사진마다 이 대화에서 몇 번째 사진인지 붙인다. 디스크 이름은 첨부 번호라 여러 대화에 걸쳐 커지고,
+     * 에이전트가 그 이름으로 사진을 가리키면 사용자는 화면에서 어느 사진인지 찾지 못한다. 순번은 메시지에
+     * 묶인 첨부를 번호 순으로 센 것이라 화면에 보이는 순서와 같고, 다시 생성해도 바뀌지 않는다.
+     *
      * <p>사진이 없으면 한 글자도 붙이지 않는다. 붙이면 그만큼이 매 실행에 실린다. 저장하는 메시지 본문에는
      * 이것을 쓰지 않는다.
      */
@@ -168,16 +174,30 @@ public class AttachmentService {
             return text;
         }
         String directory = stripTrailingSlash(properties.agentRoot()) + "/" + conversationId;
+        Map<Long, Integer> order = orderInConversation(conversationId);
         String files = attached.stream()
-                .map(it -> "- " + it.storedName() + " (올린 이름: " + it.originalName() + ")")
+                .map(it -> "- " + order.get(it.id()) + "번째 사진: " + it.storedName()
+                        + " (올린 이름: " + it.originalName() + ")")
                 .collect(Collectors.joining("\n"));
         return "[이번 메시지에 올린 사진]\n"
                 + directory + "\n"
                 + files + "\n"
                 + "\n"
                 + "이미지는 read_file 로 읽지 말고 vision_analyze 로 본다.\n"
+                + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
                 + "\n"
                 + text;
+    }
+
+    /** 메시지에 묶인 첨부를 번호 순으로 세어 첨부 번호마다 1부터 매긴 순번을 돌려준다. */
+    private Map<Long, Integer> orderInConversation(Long conversationId) {
+        Map<Long, Integer> order = new HashMap<>();
+        for (ChatAttachment attachment : attachments.findByConversationIdOrderByIdAsc(conversationId)) {
+            if (attachment.messageId() != null) {
+                order.put(attachment.id(), order.size() + 1);
+            }
+        }
+        return order;
     }
 
     /** 그 대화의 첨부를 번호 순으로 돌려준다. 지난 대화에 자리를 남기려고 지워진 것도 담는다. */
