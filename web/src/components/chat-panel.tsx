@@ -32,19 +32,19 @@ type ObservedTurn = { conversationId: string; version: number; sentHere: boolean
 /**
  * 끝 사건 없이 끊긴 스트림을 도는 turn 조회로 넘긴 결과다.
  *
- * <p>`historyRead` 는 판단하면서 이력을 이미 다시 읽었는지다. 읽었으면 호출자가 한 번 더 읽지 않는다. `gone` 은
+ * <p>`history` 는 판단하면서 다시 읽은 이력이고, 읽지 못했으면 null 이다. 읽었으면 호출자가 한 번 더 읽지 않는다. `gone` 은
  * 대화가 지워졌거나 그사이 다른 대화로 옮겨 이 turn 에 할 일이 남지 않은 것이다.
  */
 type InterruptedOutcome =
   | { kind: "observing" }
   | { kind: "answered"; executionId: number | null }
-  | { kind: "missing"; historyRead: boolean }
+  | { kind: "missing"; history: Turn[] | null }
   | { kind: "gone" };
 type InterruptedHandlers = {
   /** 답이 저장돼 있었다. 공통 정리 뒤에 호출자만 할 일을 한다. */
   onAnswered?(): void;
   /** 돌지 않고 답도 없다. 끊김 문구를 보이는 방식은 호출자가 정한다. */
-  onMissing(historyRead: boolean): Promise<void>;
+  onMissing(history: Turn[] | null): Promise<void>;
 };
 type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
 type TurnStreamCallbacks = {
@@ -72,6 +72,15 @@ function answerAfterLastQuestion(loaded: Turn[], savedBefore: ReadonlySet<Turn["
     else if (!savedBefore.has(turn.id)) answer = turn;
   }
   return answer;
+}
+
+/**
+ * 마지막 질문이 보내기 전에 없던 새 행인지다. `started` 를 받기 전에 끊겨도 서버가 질문을 저장했을 수 있다.
+ * 그때 보낸 글을 입력창에 되돌리면 저장된 질문과 함께 보이고, 다시 보내면 두 번 저장된다.
+ */
+function lastQuestionIsNew(loaded: Turn[], savedBefore: ReadonlySet<Turn["id"]>): boolean {
+  const question = loaded.findLast((turn) => turn.role === "USER");
+  return question !== undefined && !savedBefore.has(question.id);
 }
 
 /** 화면에 있는 저장된 메시지의 번호다. 끊긴 뒤 새로 저장된 답을 가려낼 때 쓴다. */
@@ -468,7 +477,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   async function handOffInterruptedStream(version: number, savedBefore: ReadonlySet<Turn["id"]>, streamedId: string)
     : Promise<InterruptedOutcome> {
     const id = conversationIdRef.current;
-    if (id === null) return { kind: "missing", historyRead: false };
+    if (id === null) return { kind: "missing", history: null };
     let running: RunningTurn | null = null;
     try {
       const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
@@ -499,11 +508,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     try {
       loaded = await refreshMessages(id, version);
     } catch {
-      return { kind: "missing", historyRead: false };
+      return { kind: "missing", history: null };
     }
     if (selectionVersion.current !== version) return { kind: "gone" };
     const answer = answerAfterLastQuestion(loaded, savedBefore);
-    return answer ? { kind: "answered", executionId: answer.executionId ?? null } : { kind: "missing", historyRead: true };
+    return answer ? { kind: "answered", executionId: answer.executionId ?? null } : { kind: "missing", history: loaded };
   }
 
   /**
@@ -520,17 +529,23 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     if (outcome.kind === "answered") {
       setActivity(null);
       setFlowIsSlow(false);
-      settleLivePanel(outcome.executionId);
+      settleFinishedActivity(outcome.executionId);
       void refresh();
       handlers.onAnswered?.();
     } else if (outcome.kind === "missing") {
-      await handlers.onMissing(outcome.historyRead);
+      await handlers.onMissing(outcome.history);
     }
     return outcome.kind;
   }
 
-  /** 끝난 turn 의 live 작업 과정 패널을 저장된 나무로 바꾼다. 답의 실행 번호가 없으면 보일 것이 없어 닫는다. */
-  function settleLivePanel(finishedExecutionId: number | null) {
+  /**
+   * 끝난 turn 의 작업 과정을 저장된 답으로 넘긴다. 펼쳐 둔 상태를 저장된 블록이 이어받고, live 패널은 저장된
+   * 나무로 바뀐다. 답의 실행 번호가 없으면 보일 것이 없어 live 패널을 닫는다.
+   */
+  function settleFinishedActivity(finishedExecutionId: number | null) {
+    if (finishedExecutionId !== null) {
+      setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
+    }
     setPanelTarget((previous) => {
       if (previous?.mode !== "live") return previous;
       return finishedExecutionId !== null ? { mode: "saved", executionId: finishedExecutionId } : null;
@@ -543,7 +558,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    * @param finishedExecutionId 끝난 답의 실행 번호다. 없으면 live 작업 과정 패널을 닫는다.
    */
   function releaseObserving(finishedExecutionId: number | null = null) {
-    settleLivePanel(finishedExecutionId);
+    settleFinishedActivity(finishedExecutionId);
     setSending(false);
     setObserving(null);
     setActivity(null);
@@ -606,10 +621,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           setActivity((previous) => previous && applyChatEvent(previous, event));
         }
         const finishedExecutionId = event.executionId ?? currentExecutionId.current;
-        if (finishedExecutionId !== null) {
-          setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
-        }
-        settleLivePanel(finishedExecutionId);
+        settleFinishedActivity(finishedExecutionId);
         await callbacks.onDone?.(event);
         setActivity(null);
         setFlowIsSlow(false);
@@ -687,11 +699,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     /** 끝 사건 없이 끊긴 스트림을 마무리한다. 돌고 있거나 답이 저장됐으면 오류로 끝내지 않는다. */
     const finishInterrupted = async (): Promise<boolean> => {
       const kind = await settleInterruptedStream(version, savedBefore, assistantPendingId, {
-        onMissing: async (historyRead) => {
+        onMissing: async (history) => {
           finishFailedActivity();
           const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
-          if (stream.started && conversationIdRef.current !== null) {
-            const refreshed = historyRead || await refreshAfterStartedFailure();
+          const questionSaved = stream.started || (history !== null && lastQuestionIsNew(history, savedBefore));
+          if (questionSaved && conversationIdRef.current !== null) {
+            const refreshed = history !== null || await refreshAfterStartedFailure();
             if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
           } else {
             restoreFailedMessage();
@@ -883,8 +896,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       if (!stream.done && !stream.reportedError) {
         const kind = await settleInterruptedStream(version, savedBefore, pendingId, {
           onAnswered: () => clearSelectedSlot(regeneratedSlotId),
-          onMissing: async (read) => {
-            historyRead = read;
+          onMissing: async (history) => {
+            historyRead = history !== null;
           },
         });
         if (kind === "observing") handedOff = true;

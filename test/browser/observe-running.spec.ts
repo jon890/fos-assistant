@@ -107,8 +107,18 @@ async function cutChatStream(page: Page) {
 /** 도는 turn 이 없다는 응답이다. */
 const NOT_RUNNING = { running: false, executionId: null, startedAt: null };
 
-/** 푼 run 이 끝났는지 Control Plane 에 되물을 최대 횟수다. 한 번 묻는 데 드는 왕복만큼 사이가 벌어진다. */
-const MAX_FINISH_CHECKS = 200;
+/** 푼 run 이 끝나기를 기다리는 한계다. 붙잡힌 turn 을 기다리는 다른 검사와 같다. */
+const FINISH_TIMEOUT_MS = 30_000;
+
+/** 푼 run 이 끝났는지 되묻는 사이의 간격이다. */
+const FINISH_CHECK_INTERVAL_MS = 200;
+
+/** 그 대화에 도는 turn 이 있는지 Control Plane 에 실제로 묻는다. 화면에 건 route 를 거치지 않는다. */
+async function isRunning(page: Page, conversationId: string): Promise<boolean> {
+  const response = await page.request.get(`/api/chat/conversations/${conversationId}/running`);
+  expect(response.ok(), `도는 turn 조회가 실패했다: ${response.status()}`).toBeTruthy();
+  return ((await response.json()) as { running: boolean }).running;
+}
 
 test("다른 창에서 답하는 중이면 기다리는 표시와 중지를 보이고 끝나면 답을 읽는다", async ({ context, page, hermes }) => {
   const conversationId = await startHeldTurn(page, hermes, "다른 창 보기 검사");
@@ -286,12 +296,15 @@ test("스트림이 끊겼을 때 turn 이 이미 끝나 답이 저장됐으면 �
     // 끊긴 창이 묻는 순간에는 turn 이 끝나 있게 한다. 붙잡은 run 을 풀고 실제로 끝난 뒤의 응답을 넘긴다.
     await page.route(`**/api/chat/conversations/${conversationId}/running`, async (route) => {
       await hermes.releaseHeldRun();
-      for (let check = 0; check < MAX_FINISH_CHECKS; check += 1) {
+      const deadline = Date.now() + FINISH_TIMEOUT_MS;
+      while (Date.now() < deadline) {
         const response = await route.fetch();
         if (!((await response.json()) as { running: boolean }).running) {
           await route.fulfill({ response });
           return;
         }
+        // route handler 안이라 expect.poll 로 기다릴 수 없다. 되묻는 사이만 짧게 쉰다.
+        await new Promise((done) => setTimeout(done, FINISH_CHECK_INTERVAL_MS));
       }
       // 끝내 끝나지 않았다. 조회를 실패시켜 아래 단언이 답이 없다는 것으로 분명히 실패하게 한다.
       await route.abort();
@@ -331,8 +344,9 @@ test("스트림이 끊기고 turn 이 돌지 않는데 답도 없으면 끊김 �
 test("스트림이 끊긴 뒤 대화가 지워졌으면 대화를 찾을 수 없다는 화면으로 간다", async ({ page, hermes }) => {
   await makeChatStreamCuttable(page);
   const conversationId = await startHeldTurn(page, hermes, "스트림 끊김 대화 지움 검사");
+  const runningPath = `**/api/chat/conversations/${conversationId}/running`;
   try {
-    await page.route(`**/api/chat/conversations/${conversationId}/running`, (route) => route.fulfill({
+    await page.route(runningPath, (route) => route.fulfill({
       status: 404,
       contentType: "application/json",
       body: JSON.stringify({ code: "CONVERSATION_NOT_FOUND", message: "대화가 없다" }),
@@ -341,6 +355,9 @@ test("스트림이 끊긴 뒤 대화가 지워졌으면 대화를 찾을 수 없
     await expect(page.getByTestId("conversation-not-found")).toBeVisible();
     await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
   } finally {
+    // 대화를 찾을 수 없다는 화면에는 보내기 단추가 없어 화면으로 끝을 볼 수 없다. 실제 조회로 turn 이 끝난 것을 본다.
     await hermes.releaseHeldRun();
+    await page.unroute(runningPath);
+    await expect.poll(() => isRunning(page, conversationId), { timeout: FINISH_TIMEOUT_MS }).toBe(false);
   }
 });
