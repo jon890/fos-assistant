@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 import { contrast, parseRgb } from "./color.ts";
 import { expect, test } from "./fixtures.ts";
 
@@ -181,4 +181,67 @@ test("어두움 모드의 outline 단추는 테두리가 border 색이고 바탕
   expect(colors.borderWidth, "outline 단추 테두리 두께").toBe("1px");
   expect(parseRgb(colors.border), `outline 단추 테두리가 --border(${colors.token}) 이어야 한다`).toEqual(parseRgb(colors.token));
   expect(colors.background, "outline 단추 바탕은 투명해야 한다").toBe("rgba(0, 0, 0, 0)");
+});
+
+type BorderSide = "left" | "right";
+
+/**
+ * 두 밝기 모드에서 그 요소의 한쪽 테두리 색과 `--border` 를 읽는다. 끝나면 처음 밝기로 돌려 둔다.
+ *
+ * <p>Sheet 는 색 바뀜을 transition 으로 보인다. 밝기를 바꾼 바로 뒤에 읽으면 바뀌는 중의 색이 나오므로 끈다.
+ */
+async function readBorder(element: Locator, side: BorderSide) {
+  return element.evaluate((node, borderSide) => {
+    const html = document.documentElement;
+    const wasDark = html.classList.contains("dark");
+    (node as HTMLElement).style.transition = "none";
+    const read = () => {
+      const own = getComputedStyle(node);
+      return {
+        width: own.getPropertyValue(`border-${borderSide}-width`),
+        color: own.getPropertyValue(`border-${borderSide}-color`),
+        token: getComputedStyle(html).getPropertyValue("--border").trim(),
+      };
+    };
+    html.classList.remove("dark");
+    const light = read();
+    html.classList.add("dark");
+    const dark = read();
+    html.classList.toggle("dark", wasDark);
+    return { light, dark };
+  }, side);
+}
+
+function expectBorderToken(colors: Awaited<ReturnType<typeof readBorder>>, name: string) {
+  for (const theme of ["light", "dark"] as const) {
+    const { width, color, token } = colors[theme];
+    expect(width, `${theme} ${name} 테두리 두께`).toBe("1px");
+    expect(parseRgb(color), `${theme} ${name} 테두리가 --border(${token}) 이어야 한다`).toEqual(parseRgb(token));
+  }
+}
+
+test("두 밝기 모드에서 사이드바와 작업 과정 패널의 테두리는 border 색이다", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await page.getByRole("radio", { name: "브라우저 비서" }).click();
+  await page.getByRole("textbox", { name: "메시지" }).fill("테두리 색 검사");
+  await page.getByRole("button", { name: "보내기" }).click();
+  const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+  await expect(block).toBeVisible({ timeout: 30_000 });
+  await block.getByTestId("activity-toggle").click();
+  await block.getByTestId("activity-open-panel").click();
+  const panel = page.getByTestId("activity-panel");
+  await expect(panel).toBeVisible();
+  // 좁은 폭은 Sheet, 넓은 폭은 대화 옆에 붙는 aside 다. 어느 쪽이든 왼쪽 테두리를 가진다.
+  expectBorderToken(await readBorder(panel, "left"), "작업 과정 패널");
+
+  if (testInfo.project.name === "mobile") {
+    await panel.getByRole("button", { name: "작업 과정 닫기" }).click();
+    await expect(panel).toHaveCount(0);
+    await openSidebar(page, testInfo);
+    const drawer = page.locator('[data-slot="sheet-content"][data-side="left"]');
+    await expect(drawer).toBeVisible();
+    expectBorderToken(await readBorder(drawer, "right"), "사이드바 서랍");
+  } else {
+    expectBorderToken(await readBorder(page.locator('aside[aria-label="사이드바"]'), "right"), "사이드바");
+  }
 });

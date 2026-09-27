@@ -102,6 +102,15 @@
   --code-comment: #94a3b8;
 }
 
+/* 색을 적지 않은 테두리는 글자색이 된다. 기본을 border 토큰으로 두고, 색을 정한 클래스가 그 위에 온다. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+}
+
 html {
   font-family: var(--font-pretendard), system-ui, -apple-system, sans-serif;
 }

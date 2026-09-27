@@ -28,6 +28,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
@@ -43,6 +44,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -116,7 +118,8 @@ class ConversationPublicIdTest {
         memories.deleteAll();
         users.deleteAll();
         mvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(chat, currentUser, users, agentService, access))
+                .standaloneSetup(new ChatController(chat, currentUser, users, agentService, access,
+                        new ChatEventStreams(Duration.ofSeconds(20))))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

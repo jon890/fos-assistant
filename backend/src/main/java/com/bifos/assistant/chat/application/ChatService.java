@@ -380,7 +380,7 @@ public class ChatService {
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
                 text,
-                TurnIntent.appendTo(context.instructions(), intent),
+                TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
                 conversation.hermesSessionId(),
                 option.provider(),
                 option.model());

@@ -66,7 +66,11 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | 1 | 가족 공용 Memory 중 `ACCEPTED` 이고 항상 주입하는 본문 |
 | 2 | 요청자 개인 Memory 중 `ACCEPTED` 이고 항상 주입하는 본문 |
 | 3 | 나머지 접근 가능한 항목의 제목과 번호 색인 |
-| 4 | 이 실행에만 필요한 문맥 |
+| 4 | 묻는 형식 안내(`chat/application/AskFormat`). 사용자가 직접 답하는 대화 실행에만 붙는다 |
+| 5 | 이 실행에만 필요한 문맥. 다시 생성이면 그 지시 |
+
+1 부터 3 까지가 Memory 의 글자 상한 안에서 고르는 몫이고, 4 는 상한과 따로 붙는다.
+묻는 형식은 `web/src/lib/ask.ts` 가 카드로 읽는다. 둘이 같은 형식을 말해야 한다.
 
 다른 사용자의 개인 Memory 는 고르는 단계에서 빠진다.
 문자열을 만든 뒤에 지우는 것이 아니라 애초에 넣지 않는다.
@@ -77,8 +81,12 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 
 ## 가격표
 
-`usage/infra/ModelsDevPriceCatalog` 가 기동할 때 models.dev 카탈로그를 한 번 읽어 메모리에 둔다.
+`usage/infra/ModelsDevPriceCatalog` 가 models.dev 카탈로그를 읽어 메모리에 둔다.
 경로는 `ASSISTANT_PRICING_CATALOG` 가 정한다.
+
+**파일이 바뀌면 재기동 없이 다시 읽는다.** 조회할 때 1분에 한 번 파일의 수정 시각을 보고, 바뀌었으면 다시 읽는다.
+기동할 때만 읽었을 때는 새로 받은 가격표에 있는 모델의 금액이 재기동 전까지 비어 있었다.
+새 파일이 읽히지 않거나 가격이 하나도 없으면 이전 가격을 계속 쓴다.
 
 Hermes profile 디렉터리를 그대로 붙이지 않는다.
 그 디렉터리에는 `.env` 와 `auth.json` 이 함께 있어서 credential 까지 컨테이너에 들어간다.

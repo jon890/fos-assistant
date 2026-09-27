@@ -137,7 +137,48 @@ function chiefOutputFor(input: string): string {
   return '{"research":"전기차 보조금을 조사한다","build":"비교 표를 만든다"}';
 }
 
+/**
+ * Control Plane 이 모든 대화 실행에 붙이는 묻는 형식 안내의 첫 줄이다. `AskFormat.GUIDE` 와 같아야 한다.
+ *
+ * <p>대역은 받은 instructions 를 답에 되돌려 준다. 안내에는 `<ask>` 예시가 있어서 그대로 두면 모든 답에 카드가 그려진다.
+ * 그래서 되돌릴 때 그 구역만 뺀다. 안내가 붙었는지는 `lastSubmittedInstructions()` 로 따로 본다.
+ */
+export const ASK_GUIDE_HEADER = "# 사용자에게 물을 때";
+
+/** 안내의 마지막 줄 앞머리다. 안내 구역이 어디서 끝나는지 이것으로 안다. */
+const ASK_GUIDE_LAST_LINE = "- 왜 묻는지는";
+
+function withoutAskGuide(instructions: string): string {
+  const start = instructions.indexOf(ASK_GUIDE_HEADER);
+  if (start < 0) return instructions;
+  const last = instructions.indexOf(ASK_GUIDE_LAST_LINE, start);
+  if (last < 0) {
+    // 안내의 마지막 줄이 바뀐 것이다. 끝을 짐작해 뒤에 붙은 다시 생성 지시까지 지우지 말고 곧바로 드러낸다.
+    throw new Error(`묻는 형식 안내의 끝 줄 "${ASK_GUIDE_LAST_LINE}" 을 찾지 못했다. AskFormat.GUIDE 와 맞춘다`);
+  }
+  const lineEnd = instructions.indexOf("\n", last);
+  const end = lineEnd < 0 ? instructions.length : lineEnd;
+  return (instructions.slice(0, start).replace(/\n+$/, "") + instructions.slice(end)).replace(/^\n+/, "");
+}
+
+/** 묻는 카드를 그리는지 보는 검사가 보내는 글이다. 이 글에는 답 끝에 `<ask>` 를 둔 답을 준다. */
+export const ASK_CARD_PROBE = "묻는 카드 검사";
+
 function specialOutputFor(input: string): string | null {
+  if (input === ASK_CARD_PROBE) {
+    return [
+      "사진을 다 봤어. 두 가지만 알려 줘.",
+      "",
+      "<ask>",
+      '<question header="식당 이름">어느 식당에 다녀왔어?</question>',
+      "<option>행복담</option>",
+      '<option description="사진의 간판 글자">행복한 담벼락</option>',
+      '<question header="먹은 메뉴" multiple="true">무엇을 먹었어?</question>',
+      "<option>국밥</option>",
+      "<option>수육</option>",
+      "</ask>",
+    ].join("\n");
+  }
   if (input.includes(CHIEF_MARK)) {
     return chiefOutputFor(input);
   }
@@ -648,10 +689,8 @@ export function startFakeHermes(
           });
           return send(response, 200, { run_id: runId, status: "queued" });
         }
-        const instructionsEcho =
-          submitted.instructions && submitted.instructions.length > 0
-            ? ` [instructions: ${submitted.instructions}]`
-            : "";
+        const echoed = withoutAskGuide(submitted.instructions ?? "");
+        const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
         const held = holdNextRun;
         holdNextRun = false;
         runs.set(runId, {

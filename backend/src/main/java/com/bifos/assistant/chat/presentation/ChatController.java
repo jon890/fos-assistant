@@ -3,7 +3,6 @@ package com.bifos.assistant.chat.presentation;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.ChatTurn;
-import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -21,7 +20,6 @@ import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StopResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -30,10 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -53,13 +48,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
-
     private final ChatService chat;
     private final CurrentUserProvider currentUser;
     private final AppUserRepository users;
     private final AgentService agents;
     private final ConversationAccess access;
+    private final ChatEventStreams streams;
 
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
@@ -84,7 +78,7 @@ public class ChatController {
     public SseEmitter stream(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
         // 스트림 안에서 바꿔야 없는 대화가 지금처럼 SSE error 사건으로 알려진다.
-        return stream(event -> chat.stream(
+        return streams.open(event -> chat.stream(
                 user,
                 numberOf(user, request.conversationId()),
                 request.text(),
@@ -99,46 +93,12 @@ public class ChatController {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
         Long id = access.requireOwnId(user, conversationId);
-        return stream(event -> chat.regenerate(user, id, event));
+        return streams.open(event -> chat.regenerate(user, id, event));
     }
 
     /** 본문의 공개 식별자를 서비스가 받는 대화 번호로 바꾼다. 비어 있으면 새 대화다. */
     private Long numberOf(CurrentUser user, UUID publicId) {
         return publicId == null ? null : access.requireOwnId(user, publicId);
-    }
-
-    private SseEmitter stream(java.util.function.Consumer<java.util.function.Consumer<ChatEvent>> work) {
-        SseEmitter emitter = new SseEmitter(0L);
-        AtomicBoolean clientConnected = new AtomicBoolean(true);
-        Thread.ofVirtual().name("chat-stream-").start(() -> {
-            try {
-                work.accept(event -> send(emitter, event, clientConnected));
-            } catch (ApiException ex) {
-                send(emitter, ChatEvent.error(ex.code().name(), ex.getMessage()), clientConnected);
-            } catch (Exception ex) {
-                log.error("chat stream failed", ex);
-                send(emitter, ChatEvent.error("INTERNAL_ERROR", "internal error"), clientConnected);
-            } finally {
-                if (clientConnected.get()) {
-                    emitter.complete();
-                }
-            }
-        });
-        return emitter;
-    }
-
-    private static void send(
-            SseEmitter emitter, ChatEvent event, AtomicBoolean clientConnected) {
-        if (!clientConnected.get()) {
-            return;
-        }
-        try {
-            emitter.send(SseEmitter.event().data(event, MediaType.APPLICATION_JSON));
-        } catch (Exception ex) {
-            // 브라우저가 끊겨도 Hermes 실행의 최종 상태를 읽고 실행 기록을 남긴다.
-            clientConnected.set(false);
-            log.debug("could not send a chat event", ex);
-        }
     }
 
     @PostMapping("/conversations")

@@ -2,6 +2,7 @@ package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.EstimatedCost;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ModelPrice;
@@ -32,8 +33,8 @@ public class CostEstimator {
         if (usage == null) {
             return EstimatedCost.unknown();
         }
-        Optional<ModelPrice> found = catalog.find(provider, model);
-        if (found.isEmpty() || found.get().isUnusable()) {
+        Optional<CatalogPrice> found = catalog.find(provider, model);
+        if (found.isEmpty() || found.get().price().isUnusable()) {
             return EstimatedCost.unknown();
         }
 
@@ -44,7 +45,7 @@ public class CostEstimator {
             return EstimatedCost.unknown();
         }
 
-        ModelPrice price = found.get().atContextSize(inputTokens);
+        ModelPrice price = found.get().price().atContextSize(inputTokens);
 
         // 우리가 읽는 provider 는 캐시된 토큰 수를 입력 토큰 수 안에 넣어 보고한다. 그래서 입력 단가로
         // 세는 것은 입력에서 캐시를 뺀 나머지다. 캐시 토큰을 보고하지 않는 provider 는 입력 전체가
@@ -65,7 +66,7 @@ public class CostEstimator {
                         .add(ModelPrice.microsFor(outputTokens, price.outputUsdPerMillion()));
 
         return new EstimatedCost(
-                micros.setScale(0, RoundingMode.HALF_UP).longValueExact(), CURRENCY, catalog.version());
+                micros.setScale(0, RoundingMode.HALF_UP).longValueExact(), CURRENCY, found.get().version());
     }
 
     /**
