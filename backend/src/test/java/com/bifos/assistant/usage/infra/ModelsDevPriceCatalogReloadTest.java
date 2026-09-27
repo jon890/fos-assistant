@@ -55,6 +55,34 @@ class ModelsDevPriceCatalogReloadTest {
     }
 
     @Test
+    void 읽지_못한_파일은_수정_시각이_같아도_다음_확인_때_다시_읽는다() throws IOException {
+        Path file = write(catalog("old-model"), FIRST);
+        ModelsDevPriceCatalog catalog = catalogOf(file);
+        Files.delete(file);
+        now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
+        assertThat(catalog.find("openai", "old-model")).as("사라진 동안에도 이전 가격을 쓴다").isPresent();
+
+        write(catalog("new-model"), SECOND);
+        now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
+
+        assertThat(catalog.find("openai", "new-model")).isPresent();
+    }
+
+    @Test
+    void 내용이_틀린_파일을_고쳐_다시_쓰면_읽는다() throws IOException {
+        Path file = write(catalog("old-model"), FIRST);
+        ModelsDevPriceCatalog catalog = catalogOf(file);
+        write("{ 받다가 끊긴 파일", SECOND);
+        now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
+        catalog.find("openai", "old-model");
+
+        write(catalog("new-model"), SECOND.plusSeconds(60));
+        now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
+
+        assertThat(catalog.find("openai", "new-model")).isPresent();
+    }
+
+    @Test
     void 가격이_하나도_없는_파일은_받아들이지_않는다() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);

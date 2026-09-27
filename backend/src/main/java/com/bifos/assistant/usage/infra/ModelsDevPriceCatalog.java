@@ -122,13 +122,13 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
         if (!reloadLock.tryLock()) {
             return;
         }
+        Instant modifiedAt = null;
         try {
             nextCheck = clock.instant().plus(CHECK_INTERVAL);
-            Instant modifiedAt = capturedAt(file);
+            modifiedAt = capturedAt(file);
             if (modifiedAt.equals(snapshot.modifiedAt()) || modifiedAt.equals(failedModifiedAt)) {
                 return;
             }
-            failedModifiedAt = modifiedAt;
             JsonNode root = JsonMapper.builder().build().readTree(Files.readString(file));
             Map<String, Map<String, ModelPrice>> parsed = readProviders(root);
             if (parsed.isEmpty()) {
@@ -139,6 +139,10 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
             failedModifiedAt = null;
             log.info("{} 에서 provider {} 개의 가격을 읽었다", file, parsed.size());
         } catch (IOException | RuntimeException ex) {
+            // 내용이 틀린 파일은 바뀌기 전까지 다시 읽어도 같다. 읽기 자체가 실패한 것은 일시적일 수 있어 다음에 다시 본다.
+            if (!(ex instanceof IOException)) {
+                failedModifiedAt = modifiedAt;
+            }
             // 1분마다 다시 보므로 같은 실패는 처음 한 번만 경고로 남긴다.
             String failure = ex.getClass().getName() + ": " + ex.getMessage();
             if (failure.equals(lastFailure)) {
