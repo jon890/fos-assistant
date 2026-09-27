@@ -50,7 +50,7 @@ type AttachmentItem = {
   status: "uploading" | "done" | "error";
   attachmentId: number | null;
   errorMessage: string | null;
-  /** 이 첨부가 올라간 대화 번호다. 지울 때 이 번호로 서버 DELETE 를 부른다 */
+  /** 이 첨부가 올라간 대화의 공개 식별자다. 지울 때 이 식별자로 서버 DELETE 를 부른다 */
   conversationId: string;
 };
 

@@ -83,3 +83,23 @@ test("공개 식별자 모양이 아닌 대화 주소는 첫 화면으로 간다
   await page.goto("/chat/abc");
   await expect(page).toHaveURL(/\/$/);
 });
+
+test("대문자 공개 식별자로 대화를 열면 소문자 주소로 옮겨진다", async ({ page }, testInfo) => {
+  const text = `대문자 주소 ${testInfo.project.name} ${Date.now()}`;
+  await sendFirstMessage(page, text);
+  const conversationId = conversationIdOf(page.url());
+
+  await page.goto(`/chat/${conversationId.toUpperCase()}`);
+  await expect(page).toHaveURL(new RegExp(`/chat/${conversationId}$`));
+  await expect(page.getByTestId("user-message").last()).toContainText(text);
+});
+
+for (const path of ["/api/chat", "/api/chat/stream"]) {
+  test(`${path} 는 공개 식별자 모양이 아닌 대화로 보내면 400 으로 답한다`, async ({ page }) => {
+    const response = await page.request.post(path, {
+      data: { conversationId: "abc", text: "모양이 틀린 대화", agentCode: PERSONA_FAMILY_AGENT_CODE },
+    });
+    expect(response.status(), `${path} 응답 상태`).toBe(400);
+    expect(((await response.json()) as { code: string }).code, `${path} 오류 코드`).toBe("VALIDATION_FAILED");
+  });
+}
