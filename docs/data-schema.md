@@ -83,6 +83,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
+| `public_id` | BINARY(16) UNIQUE | 화면 주소와 API 에 쓰는 UUID. 만들 때 정하고 바뀌지 않는다 |
 | `user_id` | BIGINT | 이 대화의 주인. 다른 사용자는 읽지 못한다 |
 | `agent_id` | BIGINT | 대화를 만들 때 정한다. 뒤에 바뀌지 않는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 첫 실행이 돌려준 session. 특정 profile 안의 값이다 |
@@ -91,6 +92,11 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
+
+**`id` 는 Control Plane 밖으로 나가지 않는다.** 화면과 API 는 대화를 `public_id` 로만 가리킨다.
+다른 표는 지금처럼 `id` 로 대화를 참조한다.
+새 대화는 UUID v7 을 받고, 마이그레이션 전에 있던 대화는 임의 값(v4)을 받았다.
+근거는 [ADR-025](adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)에 있다.
 
 `title` 은 사용자가 고칠 수 있다. 앞뒤 공백을 떼고 1자에서 200자까지 받는다.
 
