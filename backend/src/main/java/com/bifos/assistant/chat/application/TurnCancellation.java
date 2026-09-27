@@ -58,6 +58,12 @@ public class TurnCancellation {
         byExecution.put(executionId, handle);
     }
 
+    /** 대화 번호로 도는 turn 표시를 읽는다. 표시를 바꾸지 않는다. */
+    public TurnMark markOf(Long conversationId) {
+        TurnHandle handle = byConversation.get(conversationId);
+        return handle == null ? TurnMark.NONE : new TurnMark(true, handle.executionId);
+    }
+
     public Optional<TurnHandle> find(Long executionId) {
         return Optional.ofNullable(byExecution.get(executionId));
     }

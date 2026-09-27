@@ -738,6 +738,28 @@ public class ChatService {
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
     }
 
+    /**
+     * 대화에 지금 도는 turn 을 알려 준다.
+     *
+     * <p>주인 확인을 표시보다 먼저 한다. 남의 대화에 도는 turn 이 있는지 새지 않게 하려는 것이다.
+     * 도는지는 실행 줄의 상태가 아니라 메모리 표시로 본다. 흐름은 뿌리 줄이 끝난 뒤에도 자식이 돈다.
+     */
+    @Transactional(readOnly = true)
+    public RunningTurn running(CurrentUser user, Long conversationId) {
+        Conversation conversation = access.requireOwn(user, conversationId);
+        TurnMark mark = turns.markOf(conversation.id());
+        if (!mark.running()) {
+            return new RunningTurn(false, null, null);
+        }
+        if (mark.executionId() == null) {
+            return new RunningTurn(true, null, null);
+        }
+        Instant startedAt = executionRepository.findById(mark.executionId())
+                .map(AgentExecution::startedAt)
+                .orElse(null);
+        return new RunningTurn(true, mark.executionId(), startedAt);
+    }
+
     public List<Conversation> conversationsOf(CurrentUser user) {
         return conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user.id());
     }

@@ -369,7 +369,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
  * 조각이 없는 경로는 곧바로 지나가고, 시간 안에 옮겨지지 않으면 그 검사를 실패시킨다.
  * 링크를 눌러 옮기는 것은 RSC 로 오므로 숨은 조각이 생기지 않는다.
  */
-function waitForStreamedContentAfterLoad(page: import("../../web/node_modules/@playwright/test/index.js").Page) {
+export function waitForStreamedContentAfterLoad(page: import("../../web/node_modules/@playwright/test/index.js").Page) {
   const streamedContentPlaced = () =>
     page.waitForFunction(() => document.querySelector('div[hidden][id^="S:"]') === null, undefined, {
       timeout: 10_000,

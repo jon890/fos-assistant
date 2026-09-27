@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
+import com.bifos.assistant.chat.presentation.ChatDtos.RunningTurnView;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationRequest;
@@ -141,6 +142,17 @@ public class ChatController {
         Agent agent = agents.requireById(conversation.agentId());
         return new ConversationView(conversation.publicId(), conversation.title(), agent.code(),
                 agent.name(), conversation.updatedAt());
+    }
+
+    /**
+     * 대화에 지금 도는 turn 이 있는지 알려 준다. 같은 대화를 연 다른 창이 주기적으로 부른다.
+     *
+     * <p>주인 확인을 먼저 해 남의 대화에 도는 turn 이 있는지 새지 않게 한다.
+     */
+    @GetMapping("/conversations/{conversationId}/running")
+    public RunningTurnView running(@PathVariable UUID conversationId) {
+        CurrentUser user = currentUser.require();
+        return RunningTurnView.from(chat.running(user, access.requireOwnId(user, conversationId)));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")

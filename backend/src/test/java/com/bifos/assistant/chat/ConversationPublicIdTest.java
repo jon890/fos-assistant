@@ -216,6 +216,26 @@ class ConversationPublicIdTest {
     }
 
     @Test
+    void 공개_식별자로_도는_turn을_물으면_돌지_않는_대화는_running이_false이고_나머지는_null이다() throws Exception {
+        UUID id = started(member("public-dad"));
+
+        mvc.perform(get("/api/v1/chat/conversations/{id}/running", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.running").value(false))
+                .andExpect(jsonPath("$.executionId").doesNotExist())
+                .andExpect(jsonPath("$.startedAt").doesNotExist());
+    }
+
+    @Test
+    void 도는_turn을_물을_때_모양이_틀린_식별자는_입력_오류다() throws Exception {
+        signedIn(member("public-dad"));
+
+        mvc.perform(get("/api/v1/chat/conversations/abc/running"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+    }
+
+    @Test
     void 옛_번호로는_주인에게만_공개_식별자를_알려_준다() throws Exception {
         CurrentUser dad = member("public-dad");
         CurrentUser kid = member("public-kid");

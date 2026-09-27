@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.application.ActivitySummary;
+import com.bifos.assistant.chat.application.RunningTurn;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -62,6 +63,18 @@ public final class ChatDtos {
     }
 
     public record StopResponse(String status) {}
+
+    /**
+     * 대화에 지금 도는 turn 이다. 같은 대화를 연 다른 창이 이것으로 답이 오는 중인지 안다.
+     *
+     * @param executionId 그 turn 의 뿌리 실행 번호. 돌지 않거나 아직 번호가 붙기 전이면 null
+     * @param startedAt 그 실행이 시작한 시각. 번호가 없거나 실행 줄을 찾지 못하면 null
+     */
+    public record RunningTurnView(boolean running, Long executionId, Instant startedAt) {
+        static RunningTurnView from(RunningTurn turn) {
+            return new RunningTurnView(turn.running(), turn.executionId(), turn.startedAt());
+        }
+    }
 
     /**
      * 첨부 한 장이다. 본문과 주소를 담지 않는다. 화면이 대화의 공개 식별자와 첨부 번호로 본문 경로를 만든다.
