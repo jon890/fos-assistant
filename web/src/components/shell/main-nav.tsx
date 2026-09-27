@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { NavPending } from "./nav-pending";
 
 const LINKS = [
   { href: "/agents", label: "에이전트" },
@@ -44,6 +45,7 @@ export function MainNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate(
             <span className="ml-2 rounded-full bg-surface px-1.5 py-0.5 text-xs text-foreground"
               data-testid="memory-proposal-count">{proposalCount}</span>
           ) : null}
+          <NavPending />
         </Link>
       ))}
     </nav>

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
+import { NAV_PENDING_EVENT } from "./nav-pending";
 import { useConversations } from "./conversations-provider";
 
 export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollapse }: {
@@ -16,9 +17,23 @@ export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollaps
 }) {
   const { startNew } = useConversations();
   const [query, setQuery] = useState("");
+  // 옮기는 중인 링크의 개수다. 링크마다 하나씩 NavPending 이 두고, 이동이 끝나거나 그 링크가
+  // 사라지면 줄어든다. 0보다 크면 사이드바 전체에서 무언가 옮기는 중이다.
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    const update = (event: Event) => {
+      const pending = (event as CustomEvent<boolean>).detail;
+      setPendingCount((count) => Math.max(0, count + (pending ? 1 : -1)));
+    };
+    window.addEventListener(NAV_PENDING_EVENT, update);
+    return () => window.removeEventListener(NAV_PENDING_EVENT, update);
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface px-3 py-4">
+      <span role="status" aria-live="polite" className="sr-only">
+        {pendingCount > 0 ? "옮기는 중" : ""}
+      </span>
       <div className="mb-5 flex items-center justify-between gap-2 px-2">
         <Link href="/" aria-label="우리집 비서 홈" onClick={() => { startNew(); onNavigate(); }}
           className="truncate text-base font-semibold">우리집 비서</Link>

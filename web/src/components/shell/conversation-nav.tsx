@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConversations, type Conversation } from "./conversations-provider";
 import { groupByDate } from "./group-by-date";
+import { NavPending } from "./nav-pending";
 
 export function ConversationNav({ onNavigate, query }: { onNavigate(): void; query: string }) {
   const pathname = usePathname();
@@ -133,10 +134,13 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(): void; que
                       onNavigate();
                     }}
                       aria-current={pathname === `/c/${conversation.id}` ? "page" : undefined}
-                      className={`min-w-0 flex-1 truncate rounded-md px-2 py-2 text-sm hover:bg-surface-raised ${
+                      className={`flex min-w-0 flex-1 items-center rounded-md px-2 py-2 text-sm hover:bg-surface-raised ${
                         pathname === `/c/${conversation.id}` ? "bg-surface-raised font-medium" : ""
                       }`}
-                      title={title}>{title}</Link>
+                      title={title}>
+                      <span className="min-w-0 flex-1 truncate">{title}</span>
+                      <NavPending />
+                    </Link>
                   )}
                   <button type="button" aria-label={`${title} 메뉴`} aria-expanded={openMenu === conversation.id}
                     ref={(node) => { if (node) menuButtons.current.set(conversation.id, node); else menuButtons.current.delete(conversation.id); }}
