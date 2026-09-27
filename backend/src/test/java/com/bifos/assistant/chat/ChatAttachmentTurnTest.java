@@ -32,6 +32,7 @@ import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -52,6 +53,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
@@ -322,7 +324,7 @@ class ChatAttachmentTurnTest {
     private ChatController chatController(CurrentUser user) {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
-        return new ChatController(chat, provider, users, agentService);
+        return new ChatController(chat, provider, users, agentService, new ChatEventStreams(Duration.ofSeconds(20)));
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {

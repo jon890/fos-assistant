@@ -41,6 +41,7 @@ import { conversationManageScenario } from "./scenarios/conversation-manage.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
 import { stopScenario } from "./scenarios/stop.ts";
+import { E2E_STREAM_HEARTBEAT, streamHeartbeatScenario } from "./scenarios/stream-heartbeat.ts";
 import { regenerateScenario } from "./scenarios/regenerate.ts";
 import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
 import { modelSelectionScenario } from "./scenarios/model-selection.ts";
@@ -87,6 +88,7 @@ const SCENARIOS: readonly Scenario[] = [
   conversationManageScenario,
   streamingScenario,
   stopScenario,
+  streamHeartbeatScenario,
   regenerateScenario,
   orchestrationScenario,
   chatAttachmentScenario,
@@ -149,6 +151,8 @@ function startControlPlane(
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
       HERMES_SHARED_LISTENER_BASE_URL: dashboardBaseUrl,
       ASSISTANT_PRICING_CATALOG: PRICING_CATALOG,
+      // 조용한 실행에서 주석 줄이 오는지 기본값 20초를 기다리지 않고 본다. 다른 시나리오의 스트림에도 섞여 흐른다.
+      ASSISTANT_CHAT_STREAM_HEARTBEAT: E2E_STREAM_HEARTBEAT,
       SPRING_FLYWAY_ENABLED: "true",
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
