@@ -26,7 +26,7 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 | 같은 파일 | 도는 turn 의 상태는 `sending`, `activity`(`ActivityState`), `currentExecutionId`(ref), `executionId`(state), `stopRequested` 다. `stop()` 은 `currentExecutionId.current` 로 중지를 보낸다. `refreshMessages(id, version)` 이 이력을 다시 읽는다 |
 | 같은 파일 | `<Composer running={sending} canStop={executionId !== null && !stopRequested} onStop=...>` |
 | `web/src/components/chat/message-list.tsx` | `sending` 이고 작업 과정 항목이 없으면 `WaitingIndicator` 를 그린다 |
-| `web/src/components/chat/activity/activity-state.ts` | `fromTree(tree)` 가 실행 나무를 `ActivityItem[]` 로 바꾼다. 마지막 줄에서 `running` 인 항목을 모두 `stopped` 로 바꾼다. 끝난 답을 다시 볼 때를 위한 것이다 |
+| `web/src/components/chat/activity/activity-state.ts` | `fromTree(tree)` 가 실행 나무를 `ActivityItem[]` 로 바꾼다. 끝난 답을 다시 볼 때를 위해 도는 것을 두 곳에서 `stopped` 로 바꾼다. `visit` 안에서 뿌리가 아닌 노드는 상태가 `SUCCEEDED` 도 `FAILED` 도 아니면 `stopped` 가 되고, 마지막 줄에서 `running` 인 항목을 모두 `stopped` 로 바꾼다 |
 | `web/src/components/chat/activity/activity-block.tsx` | `/api/usage/executions/${executionId}/tree` 를 `cache: "no-store"` 로 읽는다. 나무를 읽는 본보기다 |
 | `test/browser/fixtures.ts` | 가짜 Hermes 조작 `holdNextRun()` 과 `releaseHeldRun()` |
 
@@ -60,12 +60,17 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 
 ### 2. `fromTree` 의 선택지
 
-두 번째 인자로 끝나지 않은 나무임을 알린다. 그때는 `running` 항목을 그대로 둔다.
+두 번째 인자로 끝나지 않은 나무임을 알린다. 그때는 도는 것을 `stopped` 로 바꾸지 않는다.
+
+**선택지를 두 곳에 모두 건다.** `visit` 안의 자식 노드 분기와 마지막 줄이다.
+마지막 줄에만 걸면 흐름에서 아직 도는 자식 에이전트가 보는 창에 「중지됨」 으로 보인다.
+선택지가 있으면 자식 노드는 `SUCCEEDED` 면 `done`, `FAILED` 면 `failed`, 그 밖이면 `running` 이다.
 `activity-block.tsx` 의 기존 호출은 인자 없이 두어 결과가 같다.
 
 ### 3. `chat-panel.tsx` 의 보는 창
 
-- 대화를 여는 effect 에서 이력을 읽은 뒤 도는 turn 을 묻는다
+- 대화를 여는 effect 에서 도는 turn 을 먼저 묻고 이력을 그 뒤에 읽는다
+  - 이력을 먼저 읽으면 두 호출 사이에 turn 이 끝났을 때 답이 빠진 이력과 `running=false` 를 함께 받는다. 그러면 다시 읽을 계기가 없어 새로 고칠 때까지 답이 보이지 않는다
 - 돌고 있으면 위 의도 메모대로 상태를 채우고 되풀이 조회를 시작한다
 - `Composer` 위에 「다른 창에서 답하는 중」 을 보인다. `data-testid="observing-notice"` 를 붙인다
 
@@ -89,6 +94,7 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 3초 주기를 기다리는 검사는 `expect.poll` 로 조건을 기다리고 고정 대기를 쓰지 않는다.
 
 `fromTree` 의 선택지는 `test/unit/` 에 검사를 더한다. 선택지가 없으면 `running` 이 `stopped` 가 되고, 있으면 그대로다.
+뿌리는 `SUCCEEDED` 이고 자식 노드가 `RUNNING` 인 나무를 넣어, 선택지가 있을 때 그 자식이 `running` 인지 본다.
 
 ## 검증
 

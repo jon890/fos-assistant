@@ -784,11 +784,11 @@ sequenceDiagram
     participant C as Control Plane
 
     A->>C: 메시지 보내기. 스트림이 열린다
-    B->>W: 대화 이력 조회
     B->>W: 도는 turn 조회
     W->>C: GET /api/v1/chat/conversations/{id}/running
     C->>C: 대화 주인인지 보고 그 대화의 중지 표시를 찾는다
     C-->>B: running true, 실행 번호, 시작 시각
+    B->>W: 대화 이력 조회. 도는 turn 을 먼저 물어야 그 사이에 끝난 답을 놓치지 않는다
     B->>B: 기다리는 표시. 입력창에 「다른 창에서 답하는 중」
     loop 3초마다. 창이 가려져 있으면 쉰다
         B->>W: 도는 turn 조회
