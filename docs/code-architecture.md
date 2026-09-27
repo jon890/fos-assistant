@@ -244,6 +244,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 | `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |
 | `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
 | `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
+| `GET /api/v1/chat/conversations/{id}/running` | 이 대화에 지금 도는 turn. `{ "running", "executionId", "startedAt" }`. 돌지 않으면 `running` 이 false 이고 나머지는 null |
 
 지운 대화와 남의 대화는 모든 경로에서 `CONVERSATION_NOT_FOUND` 다. 둘을 가리지 않는다.
 
@@ -324,6 +325,12 @@ provider 를 넘어가 새 실행 줄로 다시 시도하면 열쇠를 새 번�
 
 Hermes 에 중지를 보내는 것은 `hermes` 가, 누구의 무엇을 멈출지 정하는 것은 `chat` 이 한다.
 뿌리 아래에서 도는 실행은 `root_execution_id` 로 찾는다.
+
+**다른 창이 도는 turn 을 물을 때도 이 표시를 본다.** 실행 줄의 상태로 보지 않는다.
+흐름으로 도는 turn 은 Chief 가 끝나면 뿌리 줄이 `SUCCEEDED` 가 되고 그 뒤에 자식이 돈다.
+줄 상태로 보면 자식이 도는 동안 「돌지 않는다」고 답하게 된다. 중지 판정과 같은 까닭이다.
+`running` 경로는 대화의 표시가 가진 뿌리 실행 번호를 돌려주고, `startedAt` 은 그 실행 줄에서 읽는다.
+표시가 있는데 실행 번호가 아직 붙지 않았으면 `running` 은 true 이고 `executionId` 와 `startedAt` 은 null 이다.
 
 **표시는 한 프로세스의 메모리에 있다.** Control Plane 이 하나라서 그것으로 된다.
 둘 이상으로 늘리면 이 표시를 데이터베이스로 옮겨야 한다.
