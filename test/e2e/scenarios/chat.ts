@@ -1,5 +1,6 @@
 /** 대화 한 번이 Hermes 까지 갔다 오고, 남의 대화는 읽히지 않는 것을 본다. */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
+import { ASK_GUIDE_HEADER } from "../fake-hermes.ts";
 import { DAD_BINDING } from "./binding.ts";
 
 /** 대화 두 번을 보낸다. 사용량 시나리오가 그 횟수로 합계를 검사한다. */
@@ -27,6 +28,13 @@ export const chatScenario: Scenario = {
       first.assistantText.includes(question),
       `보낸 문장이 Hermes 까지 가지 않았다: ${first.assistantText}`,
     );
+
+    step("대화 실행의 instructions 에 묻는 형식 안내가 붙는다");
+    const instructions = context.hermes.lastSubmittedInstructions() ?? "";
+    expect(instructions.includes(ASK_GUIDE_HEADER), "Hermes 요청에 묻는 형식 안내가 없다");
+    expect(instructions.includes("<ask>"), "묻는 형식 안내에 <ask> 예시가 없다");
+    expect(!first.assistantText.includes(ASK_GUIDE_HEADER), "대역이 형식 안내를 답에 되돌려 줬다");
+
     step("같은 대화를 이어서 보낸다");
     const next = expectStatus(
       await call(context, "/chat/messages", {

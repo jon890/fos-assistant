@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 
+import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
@@ -183,7 +184,8 @@ class ChatServiceTest {
             assertThat(command.profileName()).isEqualTo("dad");
             assertThat(command.apiBaseUrl()).isEqualTo("http://agent-runtime.test/p/dad");
             assertThat(command.input()).isEqualTo("오늘 저녁 뭐 먹을까?");
-            assertThat(command.instructions()).isNull();
+            // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
+            assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
             assertThat(command.sessionId()).isNull();
         });
         assertThat(turn.assistantText()).isEqualTo("저녁은 김치찌개가 좋겠어요.");
@@ -225,9 +227,10 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
 
         String instructions = stub().received().getFirst().instructions();
-        assertThat(instructions).contains("국수는 맵지 않게 먹는다");
+        assertThat(instructions).contains("국수는 맵지 않게 먹는다").endsWith("\n\n" + AskFormat.GUIDE);
+        // 실행 기록의 길이는 Memory 몫만 센다. 형식 안내는 Memory 상한과 무관하게 붙는다.
         assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
-                .isEqualTo((long) instructions.length());
+                .isEqualTo((long) (instructions.length() - ("\n\n" + AskFormat.GUIDE).length()));
     }
 
     @Test
