@@ -46,6 +46,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -347,7 +348,7 @@ class ArtifactTest {
         writeAt(other.id(), "a/index.html", "SECRET", Instant.now());
         Conversation conversation = chat.startEmpty(dad, "dad");
         Path folder = root.resolve(String.valueOf(conversation.id()));
-        if (Files.exists(folder, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        if (Files.exists(folder, LinkOption.NOFOLLOW_LINKS)) {
             Files.delete(folder);
         }
         Files.createSymbolicLink(folder, root.resolve(String.valueOf(other.id())));
@@ -377,7 +378,8 @@ class ArtifactTest {
         Conversation conversation = chat.startEmpty(dad, "dad");
         Instant startedAt = Instant.now().minus(Duration.ofMinutes(1));
         writeAt(conversation.id(), "ok.html", HTML, Instant.now());
-        writeAt(conversation.id(), "old/old.html", HTML, Instant.now().minus(Duration.ofDays(40)));
+        Conversation stale = chat.startEmpty(dad, "dad");
+        writeAt(stale.id(), "old/old.html", HTML, Instant.now().minus(Duration.ofDays(40)));
         writeAt(conversation.id(), "locked/hidden.html", HTML, Instant.now());
         Path locked = root.resolve(String.valueOf(conversation.id())).resolve("locked");
         // 권한을 빼도 root 로 도는 실행은 그 폴더를 읽는다. 그래서 읽지 못한 폴더의 파일이 빠졌는지는 단언하지 않고,
@@ -386,8 +388,7 @@ class ArtifactTest {
         try {
             assertThat(store.changedHtmlSince(conversation.id(), startedAt))
                     .extracting(ArtifactStore.FoundFile::path)
-                    .contains("ok.html")
-                    .doesNotContain("old/old.html");
+                    .contains("ok.html");
 
             List<ArtifactStore.Removed> removed = store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
 
@@ -396,6 +397,19 @@ class ArtifactTest {
         } finally {
             Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
         }
+    }
+
+    @Test
+    void 폴더에_최근에_바뀐_파일이_있으면_그_폴더의_오래된_사진도_지우지_않는다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        writeAt(conversation.id(), "a/photo.png", "png", Instant.now().minus(Duration.ofDays(40)));
+        writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
+
+        List<ArtifactStore.Removed> removed = store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
+
+        assertThat(removed).isEmpty();
+        assertThat(Files.exists(root.resolve(String.valueOf(conversation.id())).resolve("a").resolve("photo.png")))
+                .isTrue();
     }
 
     @Test

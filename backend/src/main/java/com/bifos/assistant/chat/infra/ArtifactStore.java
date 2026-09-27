@@ -11,6 +11,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -174,10 +175,12 @@ public class ArtifactStore {
         if (!Files.isDirectory(root)) {
             return List.of();
         }
-        List<Removed> removed = new ArrayList<>();
+        // 보관 기간은 대화 폴더 단위로 센다. 파일마다 세면 다음 turn 이 HTML 만 고쳤을 때 그 HTML 이 부르는
+        // 옛 사진이 먼저 지워져 사진이 깨진 초안이 남는다. 폴더에서 가장 늦게 바뀐 파일이 기간을 넘기면 함께 지운다.
+        Map<Long, List<Path>> filesByConversation = new HashMap<>();
+        Map<Long, Instant> latestByConversation = new HashMap<>();
         for (WalkedFile walked : regularFilesUnder(root)) {
-            Path file = walked.path();
-            Path relative = root.relativize(file);
+            Path relative = root.relativize(walked.path());
             if (relative.getNameCount() < 2) {
                 continue;
             }
@@ -185,14 +188,24 @@ public class ArtifactStore {
             if (conversationId == null) {
                 continue;
             }
-            if (!walked.modified().isBefore(cutoff)) {
+            filesByConversation.computeIfAbsent(conversationId, id -> new ArrayList<>()).add(walked.path());
+            latestByConversation.merge(conversationId, walked.modified(),
+                    (left, right) -> left.isAfter(right) ? left : right);
+        }
+        List<Removed> removed = new ArrayList<>();
+        for (Map.Entry<Long, List<Path>> entry : filesByConversation.entrySet()) {
+            Long conversationId = entry.getKey();
+            if (!latestByConversation.get(conversationId).isBefore(cutoff)) {
                 continue;
             }
-            try {
-                Files.deleteIfExists(file);
-                removed.add(new Removed(conversationId, relativeOf(root.resolve(relative.getName(0)), file)));
-            } catch (IOException | RuntimeException ex) {
-                log.warn("could not delete an expired artifact file conversationId={}", conversationId, ex);
+            Path folder = folderOf(conversationId);
+            for (Path file : entry.getValue()) {
+                try {
+                    Files.deleteIfExists(file);
+                    removed.add(new Removed(conversationId, relativeOf(folder, file)));
+                } catch (IOException | RuntimeException ex) {
+                    log.warn("could not delete an expired artifact file conversationId={}", conversationId, ex);
+                }
             }
         }
         return removed;
