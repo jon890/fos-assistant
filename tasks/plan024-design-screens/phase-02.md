@@ -60,6 +60,18 @@ grep -rn '<table\|<select\|<dl\|Badge\|EmptyState\|Stat\b' web/src/components/us
 
 - `web/src/components/ui/native-select.tsx` 나 `card.tsx` 가 없다 → `PHASE_BLOCKED: phase-01 이 끝나지 않았다`
 
+## 구현 전 검토에서 정한 것
+
+계획을 쓴 뒤 코드가 바뀌어 아래와 어긋나는 곳이 있다. **이 절이 아래 작업 항목보다 우선한다.**
+
+- **이 phase 의 화면에는 요청을 보내는 단추가 없다.** 위 `loading` 규칙의 대상이 없다. `breakdown-section.tsx` 의 `disabled={pending}` 인 `<select>` 는 그대로 둔다
+- **`Badge` 의 강조 variant 는 `default` 다.** `execution-table.tsx` 와 `execution-card.tsx` 가 이미 `Badge variant={failed ? "default" : "outline"}` 을 쓴다. `emphasis` 는 코드에 없다. 그대로 둔다
+- **실행 나무의 노드에는 상태 표시가 없다.** 새로 더하지 않는다. 상태는 `execution-detail.tsx` 머리의 `<dd>{statusLabel(...)}</dd>` 에 있고 그것을 `Badge` 로 바꾼다. 실패면 `default`, 아니면 `outline` 이다.
+  노드 테두리는 이미 `border-border` 라 고칠 것이 없다
+- **합계 칸의 틀은 하나만 남긴다.** `monthly-summary.tsx` 의 `<dl>` 이 가진 `border bg-muted p-4` 틀을 지우고 그리드만 남긴다. `Stat` 하나하나가 `Card` 의 모양(테두리와 바탕과 안쪽 여백)을 갖는다.
+  `web/src/components/ui/page-skeleton.tsx` 의 사용량 뼈대가 같은 `<dl>` 클래스를 복사해 두었으므로 함께 고쳐 뼈대와 실제 화면의 모양을 맞춘다
+- **`className={`...`}` 꼴도 본다.** 검증에 `grep -rnE 'className=\{`[^`]{80,}`\}' web/src/components/usage web/src/components/execution web/src/app/usage` 를 더한다. `execution-card.tsx` 에 걸리는 줄이 있다. 이것도 아무것도 내지 않아야 한다
+
 ## 작업 항목
 
 ### 1. `web/src/components/ui/table.tsx` 신규
@@ -134,3 +146,4 @@ pnpm test:browser usage.spec.ts usage-breakdown.spec.ts execution-tree.spec.ts a
 | `web/src/components/execution/execution-node.tsx` | 수정 |
 | `web/src/components/execution/execution-event-row.tsx` | 수정 |
 | `web/src/components/execution/execution-detail.tsx` | 수정 |
+| `web/src/components/ui/page-skeleton.tsx` | 수정 |

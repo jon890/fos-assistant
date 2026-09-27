@@ -59,6 +59,27 @@ grep -rnoE '<(select|input|textarea|table)\b|role="dialog"|aria-modal' web/src/c
 
 - `web/src/components/ui/native-select.tsx` 나 `table.tsx` 가 없다 → `PHASE_BLOCKED: 앞 phase 가 끝나지 않았다`
 
+## 구현 전 검토에서 정한 것
+
+계획을 쓴 뒤 코드가 바뀌어 아래와 어긋나는 곳이 있다. **이 절이 아래 작업 항목보다 우선한다.**
+
+- **공개 확인 창의 「가족 공개」 는 `AlertDialogAction` 을 쓰지 않는다.** 누르면 Radix 가 곧바로 창을 닫아, 공개 요청이 실패해도 창이 사라진다. 지금은 실패하면 창이 남는다.
+  `web/src/components/shell/conversation-nav.tsx` 의 대화 지우기 창과 같이 「취소」 는 `AlertDialogCancel asChild`, 「가족 공개」 는 `loading={busy}` 와 `loadingText` 를 준 일반 `Button` 이다.
+  `onOpenChange` 는 `busy` 가 아닐 때만 `onCancel` 을 부르고, `onEscapeKeyDown` 은 `busy` 이면 `preventDefault` 한다. AlertDialog 는 원래 바깥을 눌러도 닫히지 않으므로 바깥 클릭은 따로 막지 않는다
+- **공개 확인 창 검사를 둘 더한다.** 공개 요청을 `page.route` 로 붙잡아 둔 채 `Esc` 를 눌러도 창이 남는 경우와, 공개 요청이 실패 응답을 받으면 창이 남는 경우다. `test/browser/shell.spec.ts` 의 지우기 창 검사가 요청을 붙잡는 방식의 선례다
+- **요청을 보낸 단추에만 `loading` 을 준다.** 관리 화면은 카드 전부가 panel 의 `busy` 하나를 함께 받는다. 그대로 두면 요청 하나에 모든 카드의 단추가 함께 회전한다.
+  panel 이 지금 도는 동작을 기억하게 한다(예: `pending: { code, action } | null`). 그 동작의 단추에만 `loading` 과 loadingText 를 주고 나머지는 지금처럼 `disabled` 만 준다.
+  「위로」 「아래로」 「지우기」 「모델 추가」 는 요청을 보내지 않으므로 `loading` 을 주지 않는다. 사람 관리 화면(`person-list.tsx`)도 같은 규칙이다
+- **`agent-model-list.tsx` 의 「지우기」 는 저장 전의 줄을 빼는 동작이라 되돌릴 수 있다.** `destructive` 가 아니다. 「위로」 「아래로」 와 같이 `variant="ghost"` 와 `size="icon"` 에 `lucide-react` 아이콘을 두고 지금 접근성 이름을 `aria-label` 로 둔다
+- **`agent-card.tsx` 의 긴 className 은 「성격 보기」 `Link` 에 있다.** `<Button asChild variant="outline" size="sm"><Link …>` 로 옮긴다
+- **`app/signin/page.tsx` 의 제출 단추는 지금 `<Button type="submit" className="w-full">` 이다.** `variant="primary"` 는 없다. 그대로 두고 감싸는 틀을 `Card` 로 옮긴다.
+  긴 className 가운데 하나는 `aria-hidden` 인 머리글자 `<span>` 이다. 한 번만 쓰는 배치이므로 줄이지 못하면 바로 위에 까닭을 한 줄 주석으로 둔다
+- **지울 후보에서 shadcn 에서 받은 파일은 빼고 남긴다.** 쓰이지 않아도 지우지 않는다.
+  받은 파일은 `button`, `badge`, `skeleton`, `input`, `textarea`, `label`, `dialog`, `alert-dialog`, `dropdown-menu`, `sheet`, `tooltip`, `separator`, `card`, `table` 이다. `native-select` 는 우리가 만들었지만 쓰이므로 남는다
+- **긴 className 검사가 내는 부품 셋의 처리다.** shadcn 원본 `tooltip.tsx` 는 고치지 않고 바로 위에 「shadcn 원본이다」 한 줄 주석을 둔다. 우리 부품 `copy-button.tsx` 와 `page-skeleton.tsx` 는 부품과 variant 로 줄이고, 한 번만 쓰는 배치만 까닭을 주석으로 남긴다
+- **「아직 만들지 않은 것」 에서 지울 항목의 실제 첫 문구는 「나머지 화면(에이전트, 성격, 기억, …)의 부품 교체.」 다.** 이 항목을 지운다. 검증에 `grep -n '나머지 화면(에이전트' docs/code-architecture.md` 를 더하고 아무것도 내지 않아야 한다
+- **`web/AGENTS.md` 「디렉터리」 의 트리도 고친다.** `ui/` 설명을 `docs/code-architecture.md` 와 같이 「shadcn/ui 에서 받은 부품과 우리가 만든 조각」 으로 맞춘다
+
 ## 작업 항목
 
 ### 1. `components/admin/visibility-confirm.tsx` 를 AlertDialog 로
@@ -156,4 +177,5 @@ AGENTS.md 의 「확인」 절 명령을 적힌 순서대로 모두 돌린다. �
 | `web/src/components/ui/` 의 쓰이지 않는 옛 부품 | 삭제 |
 | `web/src/components/` 의 긴 className 이 남은 파일 | 수정 |
 | `docs/code-architecture.md` | 수정 |
+| `web/AGENTS.md` | 수정 |
 | `test/browser/admin.spec.ts` | 수정 |

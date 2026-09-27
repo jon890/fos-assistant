@@ -67,6 +67,32 @@ grep -rln '@/components/ui/' web/src/components/agent web/src/components/memory 
 - `web/src/lib/utils.ts` 에 `cn` 이 없다 → `PHASE_BLOCKED: 디자인 기반의 cn 이 아직 없다`
 - `grep -rn 'text-muted\b' web/src` 가 `text-muted-foreground` 가 아닌 줄을 낸다 → `PHASE_BLOCKED: 토큰 이름이 아직 옮겨지지 않았다`
 
+## 구현 전 검토에서 정한 것
+
+계획을 쓴 뒤 코드가 바뀌어 아래 작업 항목과 어긋나는 곳이 있다. **이 절이 아래 작업 항목보다 우선한다.**
+
+- **확인 창의 확인 단추는 `AlertDialogAction` 을 쓰지 않는다.** `AlertDialogAction` 은 `Button asChild` 라 `loading` 이 동작하지 않고, 누르면 Radix 가 곧바로 창을 닫는다.
+  `web/src/components/shell/conversation-nav.tsx` 의 대화 지우기 창과 같이 둔다. 「취소」 는 `<AlertDialogCancel asChild><Button variant="outline" disabled={busy}>`, 「저장한다」 는 `loading={busy}` 와 `loadingText="저장 중"` 을 준 일반 `Button` 이다.
+  `onOpenChange` 에서 닫힘이 오면 `busy` 가 아닐 때만 `onCancel` 을 부르고, `AlertDialogContent` 의 `onEscapeKeyDown` 에서 `busy` 이면 `preventDefault` 한다.
+  `persona-editor.tsx` 의 `save()` 는 확인 창을 먼저 닫으므로 이 화면에서 `busy` 중에 창이 열려 있는 일은 없다. 그래도 부품은 `busy` 를 받는 서명이므로 위 두 줄을 둔다
+- **`cn` 은 `import { cn } from "cn"` 으로 가져온다.** `components/ui/` 의 다른 부품과 같다
+- **`native-select.tsx` 의 클래스는 `input.tsx` 의 실제 클래스를 옮겨 쓴다.** 바탕은 `bg-transparent`, 초점은 `focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50` 이다. 계획 본문의 `bg-background` 는 틀렸다.
+  props 는 `value` 와 `onChange` 를 포함해 모두 그대로 넘긴다. `memory-form.tsx` 의 범위 `<select>` 는 `value` 와 `onChange` 로 제어된다
+- **`card.tsx` 는 이 phase 에서 반드시 받는다.** `pnpm dlx shadcn@latest add card` 다. 뒤 phase 가 쓴다. `agents/page.tsx` 에서 Card 를 쓰든 Button variant 를 쓰든 받아 둔다
+- **이름표 원소가 없고 `aria-label` 만 있는 입력은 `aria-label` 을 그대로 둔다.** `persona-editor.tsx` 와 `starter-editor.tsx` 가 그렇다. 보이는 `Label` 을 새로 더하지 않는다. 보이는 모양을 새로 정하는 일이라 이 phase 밖이다
+- **`<label>` 이 입력을 감싸던 곳은 `htmlFor` 와 `useId` 로 바꾼다.** `Label` 의 기본 클래스가 `flex items-center gap-2` 라 감싼 채 두면 이름과 입력이 옆으로 놓인다.
+  이름표와 입력을 `grid gap-1.5` 인 `<div>` 로 묶는다. `memory-item.tsx` 는 항목마다 그려지므로 `useId` 로 id 가 겹치지 않게 한다. 체크박스는 `Label` 이 감싼 채 옆으로 놓여도 된다
+- **`rows` 를 준 `Textarea` 에는 `field-sizing-fixed` 를 덧붙인다.** `Textarea` 의 기본 `field-sizing-content` 가 `rows` 를 무시해 16줄 편집창이 작게 시작한다
+- **`memory-item.tsx` 에는 `fieldClass` 가 없다.** 인라인 긴 문자열을 `Input` 과 `Textarea` 로 바꾼다.
+  Badge 로 바꾸는 것은 지금 상태를 보이는 원소뿐이다. 「항상 답에 함께 넣음」 표시와 `data-testid="memory-omitted"` 가 있으면 그것이다. 새 표시를 더하지 않는다
+- **여러 단추가 `busy` 하나를 함께 쓰면 누른 단추에만 `loading` 을 준다.** `memory-proposal.tsx` 의 「받아들이기」 「물리기」 가 그렇다.
+  어느 단추를 눌렀는지 기억하는 상태(예: `pending: "accept" | "reject" | null`)를 두고, 누르지 않은 단추는 `disabled` 만 준다. `docs/flow.md` 「기다리는 동안 보이는 것」 이 「그 단추 안에」 라고 적었다.
+  요청을 보내지 않는 단추에는 `loading` 을 주지 않는다
+- **Blocked 조건 셋째 줄의 grep 은 `grep -rnP '(text|placeholder|decoration)-muted(?![\w-])' web/src` 로 본다.** 이것이 무엇이든 내면 막힌다. 원래 식은 `text-muted-foreground` 에도 맞는다
+- **`loading` 을 확인하는 브라우저 검사를 `persona.spec.ts` 에 하나 더한다.** 성격 편집의 「저장」 단추는 지금 `{busy ? "저장 중…" : "저장"}` 으로 글자를 손으로 바꾼다. 이것을 `loading={busy}` 와 `loadingText="저장 중"` 으로 옮긴다.
+  검사는 `page.route` 로 `PUT /api/agents/*/persona` 를 붙잡아 둔 채 확인 창에서 「저장한다」 를 누르고, 편집 화면의 단추가 `aria-busy="true"` 이고 「저장 중」 을 보이는지 본다. 요청을 놓아 준 뒤 「저장되었습니다.」 가 보이는지도 본다.
+  `test/browser/shell.spec.ts` 의 지우기 창 검사가 요청을 붙잡는 방식의 선례다. `memory.spec.ts` 는 고치지 않는다
+
 ## 작업 항목
 
 ### 1. `web/src/components/ui/native-select.tsx` 신규
