@@ -5,7 +5,7 @@ import { call, expect, expectStatus, step, upload, type Context, type Scenario }
 /** run.ts 가 Control Plane 에 넘긴 에이전트 쪽 경로다. */
 const AGENT_ROOT = "/agent-side/attachments";
 
-type Started = { conversationId: number };
+type Started = { conversationId: string };
 type Attachment = { id: number; originalName: string; visible: boolean };
 type Message = { id: number; role: "USER" | "ASSISTANT"; content: string; attachments: Attachment[] };
 
@@ -50,7 +50,8 @@ export const chatAttachmentScenario: Scenario = {
     );
     const input = context.hermes.lastSubmittedInput() ?? "";
     expect(
-      input.includes(`${AGENT_ROOT}/${conversationId}`) && input.includes(`${photo.id}.png`),
+      // 사진이 놓이는 디렉터리 이름은 공개 식별자가 아니라 대화 번호 그대로다(ADR-025).
+      new RegExp(`${AGENT_ROOT}/\\d+$`, "m").test(input) && input.includes(`${photo.id}.png`),
       `Hermes 입력에 사진 자리나 파일 이름이 없다: ${input}`,
     );
     expect(input.endsWith(text), `Hermes 입력이 사용자가 쓴 글로 끝나지 않는다: ${input}`);
@@ -94,7 +95,7 @@ export const chatAttachmentScenario: Scenario = {
 async function history(
   context: Context,
   token: string,
-  conversationId: number,
+  conversationId: string,
 ): Promise<Message[]> {
   return expectStatus(
     await call(context, `/chat/conversations/${conversationId}/messages`, { token }),
