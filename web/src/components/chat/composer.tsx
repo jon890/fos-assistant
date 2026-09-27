@@ -16,11 +16,11 @@ type Props = {
   /** 전송이 실제로 끝났는지를 돌려준다. 실패하면 미리보기를 지우지 않는다 */
   onSend(attachmentIds: number[]): Promise<boolean>;
   /** 대화가 아직 없으면 null. 사진을 고르면 이 값이 없는 채로 첫 사진을 올릴 수 없다 */
-  conversationId: number | null;
+  conversationId: string | null;
   agentCode: string;
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 거짓이면 사진 단추를 그리지 않는다 */
   acceptsAttachments: boolean;
-  onConversationCreated(id: number): void;
+  onConversationCreated(id: string): void;
   /** 답을 만드는 중이다. 참이면 보내기 자리에서 중지를 보인다. */
   running: boolean;
   /** `started` 사건 뒤, 아직 중지를 누르지 않았을 때 참이다. */
@@ -51,7 +51,7 @@ type AttachmentItem = {
   attachmentId: number | null;
   errorMessage: string | null;
   /** 이 첨부가 올라간 대화 번호다. 지울 때 이 번호로 서버 DELETE 를 부른다 */
-  conversationId: number;
+  conversationId: string;
 };
 
 async function buildThumbnail(file: File): Promise<string> {
@@ -104,7 +104,7 @@ export function Composer({
   /** 빈 대화를 만드는 요청이 도는 중이다. 아직 첨부 목록에 아무것도 없어 `items` 로는 알 수 없다 */
   const [creatingConversation, setCreatingConversation] = useState(false);
   /** 빈 대화를 만드는 요청이 진행 중이면 그 Promise 를 담아 다시 쓴다. 연달아 고르면 두 번 도는 것을 막는다 */
-  const creatingConversationRef = useRef<Promise<number | null> | null>(null);
+  const creatingConversationRef = useRef<Promise<string | null> | null>(null);
   /** 올리는 중에 지운 첨부의 key 다. 올리기 응답을 받으면 그때 서버 DELETE 를 부른다 */
   const pendingRemovalRef = useRef<Set<string>>(new Set());
   /**
@@ -198,7 +198,7 @@ export function Composer({
     setItems((previous) => previous.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
 
-  async function ensureConversationId(): Promise<number | null> {
+  async function ensureConversationId(): Promise<string | null> {
     if (conversationId !== null) return conversationId;
     if (creatingConversationRef.current) return creatingConversationRef.current;
 
@@ -210,7 +210,7 @@ export function Composer({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ agentCode }),
         });
-        const payload = (await response.json()) as { conversationId?: number; code?: string; message?: string };
+        const payload = (await response.json()) as { conversationId?: string; code?: string; message?: string };
         if (!response.ok || !payload.conversationId) {
           setPickNotice("대화를 시작하지 못했다. 잠시 뒤 다시 시도해 주세요.");
           return null;
@@ -232,14 +232,14 @@ export function Composer({
   }
 
   /** 지우는 단추가 눌린 첨부다. 업로드 응답이 오면 DELETE 로 마무리한다 */
-  function finalizeRemovalIfRequested(key: string, targetConversationId: number, attachmentId: number | null) {
+  function finalizeRemovalIfRequested(key: string, targetConversationId: string, attachmentId: number | null) {
     if (!pendingRemovalRef.current.has(key)) return false;
     pendingRemovalRef.current.delete(key);
     if (attachmentId !== null) void deleteAttachment(targetConversationId, attachmentId);
     return true;
   }
 
-  async function deleteAttachment(targetConversationId: number, attachmentId: number) {
+  async function deleteAttachment(targetConversationId: string, attachmentId: number) {
     try {
       await fetch(`/api/chat/conversations/${targetConversationId}/attachments/${attachmentId}`, {
         method: "DELETE",
@@ -249,7 +249,7 @@ export function Composer({
     }
   }
 
-  async function uploadOne(file: File, targetConversationId: number) {
+  async function uploadOne(file: File, targetConversationId: string) {
     const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     let previewUrl = "";
     try {
