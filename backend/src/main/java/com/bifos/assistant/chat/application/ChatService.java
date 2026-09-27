@@ -579,22 +579,24 @@ public class ChatService {
         }
         turns.cancel(handle);
         boolean hadRuns = turns.hasRuns(handle);
-        boolean failed = false;
         for (TurnCancellation.RunRef run : turns.pendingStops(handle)) {
-            if (!turns.stopRun(run)) failed = true;
+            turns.stopRun(run);
         }
         for (AgentExecution child : executionRepository.findByRootExecutionId(executionId)) {
             if (child.status() != ExecutionStatus.RUNNING || child.hermesRunId() == null) continue;
             Agent childAgent = agents.requireById(child.agentId());
-            if (!turns.trackRun(executionId, childAgent.apiBaseUrl(),
-                    child.profileName(), child.hermesRunId())) failed = true;
+            turns.trackRun(executionId, childAgent.apiBaseUrl(), child.profileName(), child.hermesRunId());
         }
-        if (!hadRuns && !turns.awaitFirstStop(handle)) {
-            if (turns.isFinished(handle)) {
-                throw new ApiException(ErrorCode.EXECUTION_NOT_RUNNING, "execution is not running");
-            }
-            failed = true;
+        boolean firstStopSent = hadRuns || turns.awaitFirstStop(handle);
+        if (!firstStopSent && turns.isFinished(handle)) {
+            throw new ApiException(ErrorCode.EXECUTION_NOT_RUNNING, "execution is not running");
         }
+        // 시도마다의 성패가 아니라 끝난 뒤의 상태로 정한다.
+        // 제출과 이 요청이 같은 run 에 함께 보내 한쪽만 받아들여져도 그 run 은 멈췄다.
+        // 시도 결과로 정하면 먼저 실패한 쪽 때문에 멈춘 run 을 두고 HERMES_UNAVAILABLE 로 답한다.
+        // 멈춘 run 은 끝나면 목록에서 빠지므로 목록이 비었다고 실패로 보지 않는다.
+        boolean stopped = firstStopSent || turns.hasStoppedRuns(handle);
+        boolean failed = !stopped || !turns.pendingStops(handle).isEmpty();
         if (failed) {
             if (!turns.hasStoppedRuns(handle)) turns.resume(handle);
             throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
