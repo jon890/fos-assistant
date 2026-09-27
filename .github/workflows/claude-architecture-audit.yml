@@ -1,0 +1,97 @@
+name: Claude 아키텍처 점검
+
+# main 전체를 주마다 한 번 보고, 찾은 것을 GitHub 이슈로 연다.
+# PR 리뷰는 바뀐 줄만 보므로 여러 PR 에 걸쳐 쌓이는 문제를 놓친다.
+# 경계가 조금씩 무너지는 것, 한 곳씩 늘어난 자원 누수, 문서와 코드가 서서히 어긋나는 것이 여기 해당한다.
+
+on:
+  schedule:
+    # 일요일 03:00 KST. 구현이 거의 없는 시간이라 구독 한도를 구현 워커와 덜 다툰다.
+    - cron: "0 18 * * 6"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "지난 7일 동안 바뀐 것이 없어도 돌린다"
+        type: boolean
+        default: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    # 같은 점검이 겹쳐 돌면 같은 이슈를 두 번 연다.
+    concurrency:
+      group: claude-architecture-audit
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # 바뀐 것이 없는 주에는 돌지 않는다. 같은 코드를 다시 보면 한도만 쓴다.
+      - name: 지난 7일의 변경 확인
+        id: changes
+        env:
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          COUNT=$(git log --since="7 days ago" --oneline origin/main | wc -l | tr -d ' ')
+          echo "지난 7일 커밋: $COUNT" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$COUNT" -gt 0 ] || [ "$FORCE" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "바뀐 것이 없어 건너뛴다." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          git log --since="7 days ago" --name-only --format= origin/main | sort -u | grep -v '^$' \
+            > "$RUNNER_TEMP/changed-files.txt" || true
+
+      - name: 점검 라벨 준비
+        if: steps.changes.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "점검" --repo "${{ github.repository }}" --color 5319e7 \
+            --description "주간 아키텍처 점검이 연 이슈" 2>/dev/null || true
+          for label in "점검:아키텍처" "점검:보안" "점검:자원" "점검:문서" "점검:테스트"; do
+            gh label create "$label" --repo "${{ github.repository }}" --color c5def5 2>/dev/null || true
+          done
+
+      - name: 점검 프롬프트 준비
+        if: steps.changes.outputs.run == 'true'
+        id: prompt
+        env:
+          REPO: ${{ github.repository }}
+          CHANGED_FILES: ${{ runner.temp }}/changed-files.txt
+        run: |
+          {
+            echo 'text<<PROMPT_EOF'
+            envsubst '$REPO $CHANGED_FILES' < .github/workflows/architecture-audit-prompt.txt
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Claude 아키텍처 점검 실행
+        if: steps.changes.outputs.run == 'true'
+        id: audit
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.prompt.outputs.text }}
+          # 읽기와 이슈 쓰기만 한다. 코드를 고치지 않는다.
+          claude_args: '--model opus --allowedTools "Bash,Read,Grep,Glob,Agent,Task" --disallowedTools "Write,Edit"'
+
+      - name: 점검에 쓰인 모델 기록
+        if: always() && steps.changes.outputs.run == 'true'
+        env:
+          EXECUTION_FILE: ${{ steps.audit.outputs.execution_file }}
+        run: |
+          MODEL=""
+          if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
+            MODEL=$(jq -r '(if type == "array" then .[] else . end)
+              | select(.type == "system" and .subtype == "init") | .model // empty' "$EXECUTION_FILE" 2>/dev/null | head -n 1)
+          fi
+          echo "점검 모델: \`${MODEL:-읽지 못함}\`" >> "$GITHUB_STEP_SUMMARY"
