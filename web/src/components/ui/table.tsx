@@ -22,7 +22,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      // 고침: 테두리 색을 border 토큰으로 준다. 이 저장소는 기본 테두리 색을 따로 두지 않아 글자색이 된다.
+      // 고침: 테두리 색을 border 토큰으로 준다.
       className={cn("[&_tr]:border-b [&_tr]:border-border", className)}
       {...props}
     />
