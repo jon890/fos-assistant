@@ -10,6 +10,7 @@ import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
 import { MessageList } from "./chat/message-list";
 import { applyChatEvent, emptyActivity, failActivity, fromTree, type ActivityState } from "./chat/activity/activity-state";
 import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
+import { ArtifactPanel } from "./chat/artifact/artifact-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
 import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
@@ -21,6 +22,11 @@ import type { AgentView } from "@/lib/agent";
 import type { ExecutionTreeResponse } from "./execution/execution-tree";
 
 type ErrorPayload = { code: string; message: string };
+
+/** 옆 패널에 띄운 것이다. 작업 과정이거나, 답이 만든 결과물 파일 하나다 */
+type SidePanelTarget =
+  | { kind: "activity"; target: ActivityPanelTarget }
+  | { kind: "artifact"; messageId: Turn["id"]; path: string };
 /** 대화에 지금 도는 turn 이다. 실행 번호가 아직 붙지 않았으면 `running` 이 참이어도 나머지가 null 이다. */
 type RunningTurn = { running: boolean; executionId: number | null; startedAt: string | null };
 /**
@@ -115,7 +121,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   const [liveExpanded, setLiveExpanded] = useState(false);
   const liveExpandedRef = useRef(false);
   const [expandedOnDone, setExpandedOnDone] = useState<{ executionId: number; expanded: boolean } | null>(null);
-  const [panelTarget, setPanelTarget] = useState<ActivityPanelTarget | null>(null);
+  // 옆 패널은 한 번에 하나다. 작업 과정과 결과물을 한 상태에 담아 둘이 같이 열리지 않게 한다.
+  const [panelTarget, setPanelTarget] = useState<SidePanelTarget | null>(null);
   const currentExecutionId = useRef<number | null>(null);
   const [executionId, setExecutionId] = useState<number | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
@@ -546,9 +553,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     if (finishedExecutionId !== null) {
       setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
     }
+    // 결과물 패널은 turn 이 끝나도 그대로 둔다.
     setPanelTarget((previous) => {
-      if (previous?.mode !== "live") return previous;
-      return finishedExecutionId !== null ? { mode: "saved", executionId: finishedExecutionId } : null;
+      if (previous?.kind !== "activity" || previous.target.mode !== "live") return previous;
+      return finishedExecutionId !== null
+        ? { kind: "activity", target: { mode: "saved", executionId: finishedExecutionId } }
+        : null;
     });
   }
 
@@ -987,8 +997,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           onLiveExpandedChange={(value) => { liveExpandedRef.current = value; setLiveExpanded(value); }}
           expandedOnDone={expandedOnDone}
           turnError={turnError}
-          onOpenSaved={(executionId) => setPanelTarget({ mode: "saved", executionId })}
-          onOpenLive={() => { if (activity) setPanelTarget({ mode: "live", state: activity }); }}
+          onOpenSaved={(executionId) => setPanelTarget({ kind: "activity", target: { mode: "saved", executionId } })}
+          onOpenLive={() => {
+            if (activity) setPanelTarget({ kind: "activity", target: { mode: "live", state: activity } });
+          }}
+          onOpenArtifact={(messageId, path) => setPanelTarget({ kind: "artifact", messageId, path })}
           selectedVersions={selectedVersions}
           onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
           onRegenerate={() => { void regenerate(); }}
@@ -1048,8 +1061,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           ) : null}
         </div>
       </div>
-      {panelTarget ? <ActivityPanel target={panelTarget.mode === "live" && activity
-        ? { mode: "live", state: activity } : panelTarget} onClose={() => setPanelTarget(null)} /> : null}
+      {panelTarget?.kind === "activity" ? <ActivityPanel target={panelTarget.target.mode === "live" && activity
+        ? { mode: "live", state: activity } : panelTarget.target} onClose={() => setPanelTarget(null)} /> : null}
+      {panelTarget?.kind === "artifact" && conversationId !== null ? <ArtifactPanel key={panelTarget.path}
+        conversationId={conversationId} path={panelTarget.path} onClose={() => setPanelTarget(null)} /> : null}
     </section>
   );
 }
