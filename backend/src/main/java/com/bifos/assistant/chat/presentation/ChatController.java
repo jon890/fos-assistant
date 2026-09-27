@@ -4,10 +4,12 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
+import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
@@ -26,6 +28,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -55,17 +58,18 @@ public class ChatController {
     private final CurrentUserProvider currentUser;
     private final AppUserRepository users;
     private final AgentService agents;
+    private final ConversationAccess access;
 
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
         ChatTurn turn = chat.send(
                 user,
-                request.conversationId(),
+                numberOf(user, request.conversationId()),
                 request.text(),
                 request.agentCode(),
                 request.attachmentIds());
-        return new SendMessageResponse(turn.conversationId(), turn.executionId(), turn.assistantText());
+        return new SendMessageResponse(turn.conversationPublicId(), turn.executionId(), turn.assistantText());
     }
 
     @PostMapping("/executions/{executionId}/stop")
@@ -78,9 +82,10 @@ public class ChatController {
     @PostMapping(path = "/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
+        // 스트림 안에서 바꿔야 없는 대화가 지금처럼 SSE error 사건으로 알려진다.
         return stream(event -> chat.stream(
                 user,
-                request.conversationId(),
+                numberOf(user, request.conversationId()),
                 request.text(),
                 request.agentCode(),
                 request.attachmentIds(),
@@ -89,11 +94,16 @@ public class ChatController {
 
     @PostMapping(path = "/conversations/{conversationId}/regenerate/stream",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter regenerate(@PathVariable Long conversationId) {
+    public SseEmitter regenerate(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
-        chat.requireConversation(user, conversationId);
-        return stream(event -> chat.regenerate(user, conversationId, event));
+        Long id = access.requireOwnId(user, conversationId);
+        return stream(event -> chat.regenerate(user, id, event));
+    }
+
+    /** 본문의 공개 식별자를 서비스가 받는 대화 번호로 바꾼다. 비어 있으면 새 대화다. */
+    private Long numberOf(CurrentUser user, UUID publicId) {
+        return publicId == null ? null : access.requireOwnId(user, publicId);
     }
 
     private SseEmitter stream(java.util.function.Consumer<java.util.function.Consumer<ChatEvent>> work) {
@@ -133,7 +143,7 @@ public class ChatController {
     @PostMapping("/conversations")
     public StartConversationResponse start(@RequestBody StartConversationRequest request) {
         return new StartConversationResponse(
-                chat.startEmpty(currentUser.require(), request.agentCode()).id());
+                chat.startEmpty(currentUser.require(), request.agentCode()).publicId());
     }
 
     @GetMapping("/conversations")
@@ -144,33 +154,46 @@ public class ChatController {
     }
 
     @PatchMapping("/conversations/{conversationId}")
-    public ConversationView rename(@PathVariable Long conversationId,
+    public ConversationView rename(@PathVariable UUID conversationId,
             @Valid @RequestBody RenameConversationRequest request) {
-        return viewOf(chat.rename(currentUser.require(), conversationId, request.title()));
+        CurrentUser user = currentUser.require();
+        return viewOf(chat.rename(user, access.requireOwnId(user, conversationId), request.title()));
     }
 
     @DeleteMapping("/conversations/{conversationId}")
-    public ResponseEntity<Void> delete(@PathVariable Long conversationId) {
-        chat.delete(currentUser.require(), conversationId);
+    public ResponseEntity<Void> delete(@PathVariable UUID conversationId) {
+        CurrentUser user = currentUser.require();
+        chat.delete(user, access.requireOwnId(user, conversationId));
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 옛 주소의 대화 번호로 공개 식별자를 찾는다.
+     *
+     * <p>옛 링크를 새 주소로 넘겨 주는 데만 쓴다. 주인이 아니거나 지운 대화면 다른 경로와 같은 응답이다.
+     */
+    @GetMapping("/conversations/by-number/{number}")
+    public ConversationRefView byNumber(@PathVariable Long number) {
+        return new ConversationRefView(access.requireOwn(currentUser.require(), number).publicId());
     }
 
     private ConversationView viewOf(Conversation conversation) {
         Agent agent = agents.requireById(conversation.agentId());
-        return new ConversationView(conversation.id(), conversation.title(), agent.code(),
+        return new ConversationView(conversation.publicId(), conversation.title(), agent.code(),
                 agent.name(), conversation.updatedAt());
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
-    public List<MessageView> messages(@PathVariable Long conversationId) {
+    public List<MessageView> messages(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
+        Long number = access.requireOwnId(user, conversationId);
         String senderName = users.findById(user.id()).map(it -> it.displayName()).orElse(null);
-        List<ChatMessage> history = chat.history(user, conversationId);
+        List<ChatMessage> history = chat.history(user, number);
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
         Map<Long, ActivitySummary> activity = chat.activitySummaries(history);
         Map<Long, com.bifos.assistant.usage.domain.ExecutionStatus> statuses = chat.statuses(history);
-        Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, conversationId);
+        Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         return history.stream()
                 .map(
                         it ->

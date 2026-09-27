@@ -2,10 +2,12 @@ package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.AttachmentContent;
 import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.CacheControl;
@@ -28,14 +30,15 @@ public class AttachmentController {
 
     private final AttachmentService attachments;
     private final CurrentUserProvider currentUser;
+    private final ConversationAccess access;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AttachmentView upload(
-            @PathVariable Long conversationId, @RequestParam("file") MultipartFile file) {
+            @PathVariable UUID conversationId, @RequestParam("file") MultipartFile file) {
         CurrentUser user = currentUser.require();
         ChatAttachment saved = attachments.upload(
                 user,
-                conversationId,
+                access.requireOwnId(user, conversationId),
                 file.getOriginalFilename(),
                 file.getContentType(),
                 file.getSize(),
@@ -45,9 +48,10 @@ public class AttachmentController {
 
     @GetMapping("/{attachmentId}")
     public ResponseEntity<InputStreamResource> read(
-            @PathVariable Long conversationId, @PathVariable Long attachmentId) {
+            @PathVariable UUID conversationId, @PathVariable Long attachmentId) {
+        CurrentUser user = currentUser.require();
         AttachmentContent content =
-                attachments.read(currentUser.require(), conversationId, attachmentId);
+                attachments.read(user, access.requireOwnId(user, conversationId), attachmentId);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(content.contentType()))
                 .contentLength(content.byteSize())
@@ -56,8 +60,9 @@ public class AttachmentController {
     }
 
     @DeleteMapping("/{attachmentId}")
-    public void delete(@PathVariable Long conversationId, @PathVariable Long attachmentId) {
-        attachments.deleteByUser(currentUser.require(), conversationId, attachmentId);
+    public void delete(@PathVariable UUID conversationId, @PathVariable Long attachmentId) {
+        CurrentUser user = currentUser.require();
+        attachments.deleteByUser(user, access.requireOwnId(user, conversationId), attachmentId);
     }
 
     private static AttachmentView view(ChatAttachment attachment) {

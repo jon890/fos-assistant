@@ -738,11 +738,6 @@ public class ChatService {
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
     }
 
-    /** SSE 응답을 열기 전에 대화 주인을 확인한다. */
-    public void requireConversation(CurrentUser user, Long conversationId) {
-        access.requireOwn(user, conversationId);
-    }
-
     public List<Conversation> conversationsOf(CurrentUser user) {
         return conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user.id());
     }
