@@ -152,7 +152,11 @@ function withoutAskGuide(instructions: string): string {
   const start = instructions.indexOf(ASK_GUIDE_HEADER);
   if (start < 0) return instructions;
   const last = instructions.indexOf(ASK_GUIDE_LAST_LINE, start);
-  const lineEnd = last < 0 ? instructions.length : instructions.indexOf("\n", last);
+  if (last < 0) {
+    // 안내의 마지막 줄이 바뀐 것이다. 끝을 짐작해 뒤에 붙은 다시 생성 지시까지 지우지 말고 곧바로 드러낸다.
+    throw new Error(`묻는 형식 안내의 끝 줄 "${ASK_GUIDE_LAST_LINE}" 을 찾지 못했다. AskFormat.GUIDE 와 맞춘다`);
+  }
+  const lineEnd = instructions.indexOf("\n", last);
   const end = lineEnd < 0 ? instructions.length : lineEnd;
   return (instructions.slice(0, start).replace(/\n+$/, "") + instructions.slice(end)).replace(/^\n+/, "");
 }
