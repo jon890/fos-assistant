@@ -36,12 +36,18 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
   대화를 열 때 한 번 묻고, 도는 turn 이 있을 때만 되풀이한다
 - 보는 창의 상태는 기존 상태를 그대로 쓴다. `sending=true`, `activity` 의 시작 시각은 받은 `startedAt` 이다, `currentExecutionId` 와 `executionId` 에 받은 번호를 넣는다.
   그러면 기다리는 표시와 중지 단추가 보낸 창과 같이 동작한다
+- `running=true` 인데 `executionId` 와 `startedAt` 이 null 이면 번호가 아직 붙지 않은 것이다.
+  `activity` 는 `emptyActivity(Date.now())` 로 두고 나무를 읽지 않는다. `currentExecutionId` 와 `executionId` 는 null 로 두어 중지 단추가 잠긴다.
+  다음 조회에서 번호가 오면 그때 `startedAt` 으로 시작 시각을 바꾸고 나무를 읽는다
 - 보는 중이라는 것은 별도 상태 하나로 둔다. 입력창 위에 「다른 창에서 답하는 중」 을 보인다.
   입력창은 `running` 으로 이미 잠긴다
 - **`fromTree` 에 도는 중인 나무를 위한 선택지를 더한다.** 지금은 `running` 을 `stopped` 로 바꾼다.
   보는 창은 끝나지 않은 나무를 읽으므로 그 바꿈을 건너뛰어야 한다. 기존 호출의 결과는 바뀌지 않아야 한다
 - 3초마다 도는 turn 과 나무를 묻는다. `document.hidden` 인 동안은 쉬고, 보이게 되면 곧바로 한 번 묻는다
 - 받은 번호가 이전과 다르면 provider 를 넘어간 것이다. 새 번호로 나무를 읽고 중지 대상도 바꾼다
+- **「보는 상태를 푼다」 는 아래 상태를 모두 되돌리는 것이다.** `sending=false`, 보는 중 표시 끔, `activity=null`, `currentExecutionId.current=null`, `executionId=null`, `stopRequested=false`.
+  끝났을 때, 조회가 세 번 이어 실패했을 때, 대화를 옮길 때 모두 이것을 한다
+- **대화를 여는 effect 는 위 상태를 모두 비운다.** 지금은 `setSending(false)` 를 부르지 않아, 보는 중에 다른 대화로 옮기면 입력창이 잠긴 채 남는다. `startNewConversation()` 은 이미 `setSending(false)` 를 부르므로 보는 중 표시만 더 끈다
 - `running=false` 가 오면 조회를 멈추고 보는 상태를 풀고 `refreshMessages` 를 부른다
 - 조회가 세 번 이어 실패하면 보는 상태를 풀고 이력을 다시 읽는다. 오류 문구는 띄우지 않는다
 - **조회를 멈추는 자리는 셋이다.** `selectionVersion` 이 바뀔 때, 컴포넌트가 사라질 때, 끝났을 때다.
@@ -71,6 +77,8 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 
 - 대화를 여는 effect 에서 도는 turn 을 먼저 묻고 이력을 그 뒤에 읽는다
   - 이력을 먼저 읽으면 두 호출 사이에 turn 이 끝났을 때 답이 빠진 이력과 `running=false` 를 함께 받는다. 그러면 다시 읽을 계기가 없어 새로 고칠 때까지 답이 보이지 않는다
+  - 첫 `/running` 조회가 404 `CONVERSATION_NOT_FOUND` 면 이력 읽기와 같게 `notFound` 화면으로 가고 이력을 읽지 않는다
+  - 그 밖의 실패(네트워크 오류, 5xx)는 돌지 않는 것으로 보고 이력을 그대로 읽는다. 오류 문구를 띄우지 않는다. 이력 읽기가 실패하면 지금처럼 이력 읽기의 오류가 뜬다
 - 돌고 있으면 위 의도 메모대로 상태를 채우고 되풀이 조회를 시작한다
 - `Composer` 위에 「다른 창에서 답하는 중」 을 보인다. `data-testid="observing-notice"` 를 붙인다
 
@@ -87,11 +95,14 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 | 첫 page 에서 `holdNextRun()` 뒤 보내고, 둘째 page 로 같은 대화를 연다 | 둘째 page 에 `observing-notice` 와 기다리는 표시. 보내기 단추 대신 중지 단추 |
 | 그 상태에서 `releaseHeldRun()` | 둘째 page 에 답이 나타나고 `observing-notice` 가 사라진다 |
 | 둘째 page 에서 중지를 누른다 | 두 page 모두 이력에서 「중지됨」 |
-| 도는 turn 이 없는 대화를 연다 | `observing-notice` 가 없다. running 조회가 한 번만 간다 |
-| 보는 중에 다른 대화로 옮긴다 | 옮긴 뒤 running 조회가 더 가지 않는다 |
+| 보는 중에 `page.route` 로 `/running` 을 이어 실패시킨다 | `observing-notice` 가 사라지고 보내기 단추가 돌아온다. 오류 문구가 없다 |
+| 도는 turn 이 없는 대화를 연다 | `observing-notice` 가 없다. 첫 조회 뒤 3초 주기를 넘겨 기다려도 `/running` 요청 수가 늘지 않는다 |
+| 보는 중에 다른 대화로 옮긴다 | 옮긴 대화에 `observing-notice` 가 없고 보내기 단추가 돌아온다. 옮긴 뒤 3초 주기를 넘겨 기다려도 옮기기 전 대화의 `/running` 요청이 더 가지 않는다 |
 
 조회 횟수는 `page.on("request")` 로 `/running` 요청을 센다.
-3초 주기를 기다리는 검사는 `expect.poll` 로 조건을 기다리고 고정 대기를 쓰지 않는다.
+개발 서버는 `reactStrictMode` 로 effect 를 마운트 때 두 번 돌리므로 첫 조회가 한 번인지는 세지 않는다. 늘지 않는 것만 본다. StrictMode 를 피하는 편법을 넣지 않는다.
+늘지 않는 것을 보는 검사는 3초 주기를 넘길 만큼 기다려야 하므로 그 자리에 한해 `page.waitForTimeout` 을 쓰고 까닭을 주석에 적는다.
+무언가가 나타나거나 사라지기를 기다리는 검사는 `expect.poll` 이나 Playwright 의 자동 대기로 조건을 기다리고 고정 대기를 쓰지 않는다.
 
 `fromTree` 의 선택지는 `test/unit/` 에 검사를 더한다. 선택지가 없으면 `running` 이 `stopped` 가 되고, 있으면 그대로다.
 뿌리는 `SUCCEEDED` 이고 자식 노드가 `RUNNING` 인 나무를 넣어, 선택지가 있을 때 그 자식이 `running` 인지 본다.
