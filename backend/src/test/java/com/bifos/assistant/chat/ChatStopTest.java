@@ -372,6 +372,60 @@ class ChatStopTest {
     }
 
     @Test
+    void 제출_전에_run_없음을_본_중지_요청이_같은_run을_다시_멈추면_첫_중지가_실패했어도_성공으로_답한다() throws Exception {
+        CurrentUser dad = member("dad@example.com", "dad");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Future<?>> firstStop = new AtomicReference<>();
+        CountDownLatch sawNoRuns = new CountDownLatch(1);
+        AtomicInteger attempts = new AtomicInteger();
+        stub().onStop(runId -> {
+            if (attempts.getAndIncrement() == 0) {
+                throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "temporary failure");
+            }
+        });
+        // 중지 요청이 run 이 없다고 본 뒤, 제출이 run 을 등록하며 보낸 첫 중지가 실패할 때까지 다시 보내기를 미룬다.
+        // 그 뒤 요청이 같은 run 에 다시 보내 Hermes 가 받아들였으므로 중지는 성공이다.
+        doAnswer(invocation -> {
+            Object result = invocation.callRealMethod();
+            sawNoRuns.countDown();
+            return result;
+        }).when(turns).hasRuns(any());
+        doAnswer(invocation -> {
+            long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+            while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+            return invocation.callRealMethod();
+        }).when(turns).pendingStops(any());
+        stub().willAnswer(command -> {
+            Long executionId = latestExecution(dad).id();
+            firstStop.set(executor.submit(() -> chat.stop(dad, executionId)));
+            try {
+                assertThat(sawNoRuns.await(1, TimeUnit.SECONDS)).isTrue();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(ex);
+            }
+            return HermesRunResult.of(
+                    "run-raced-before-submit", "session", "cancelled", "", "model", "provider", TokenUsage.empty());
+        });
+        stub().beforeAwait(() -> {
+            try {
+                firstStop.get().get(1, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                throw new AssertionError("멈춘 run 을 두고 중지 요청이 실패로 답했다", ex);
+            }
+        });
+        ChatTurn turn;
+        try {
+            turn = chat.send(dad, null, "run 을 보기 전에 멈춰 줘", "dad");
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(stub().stopped()).containsExactly("run-raced-before-submit", "run-raced-before-submit");
+        assertThat(turn.cancelled()).isTrue();
+    }
+
+    @Test
     void provider_전환_뒤에는_새_실행만_중지_대상이고_이전_실행은_끝난_것으로_응답한다() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
