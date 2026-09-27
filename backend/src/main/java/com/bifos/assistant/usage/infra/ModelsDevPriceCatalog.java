@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.infra;
 
+import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.ModelPrice;
 import com.bifos.assistant.usage.domain.PriceCatalog;
 import java.io.IOException;
@@ -84,14 +85,17 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
     }
 
     @Override
-    public Optional<ModelPrice> find(String provider, String model) {
+    public Optional<CatalogPrice> find(String provider, String model) {
         if (provider == null || model == null) {
             return Optional.empty();
         }
         String key = provider.toLowerCase(Locale.ROOT);
         String catalogProvider = PROVIDER_ALIASES.getOrDefault(key, key);
-        return Optional.ofNullable(current().pricesByProvider().get(catalogProvider))
-                .map(models -> models.get(model.toLowerCase(Locale.ROOT)));
+        // 스냅숏을 한 번만 꺼내 가격과 버전을 같은 가격표에서 읽는다.
+        Snapshot read = current();
+        return Optional.ofNullable(read.pricesByProvider().get(catalogProvider))
+                .map(models -> models.get(model.toLowerCase(Locale.ROOT)))
+                .map(price -> new CatalogPrice(price, read.version()));
     }
 
     @Override

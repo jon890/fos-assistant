@@ -5,8 +5,8 @@ import java.util.Optional;
 /** provider 와 모델의 단가를 찾는다. */
 public interface PriceCatalog {
 
-    /** 그 provider 와 모델의 가격이 없으면 비어 있다. */
-    Optional<ModelPrice> find(String provider, String model);
+    /** 그 provider 와 모델의 가격과, 그 가격을 읽은 가격표의 버전이다. 가격이 없으면 비어 있다. */
+    Optional<CatalogPrice> find(String provider, String model);
 
     /**
      * 가격표와 그것을 받아 온 시점을 적는다. 예를 들면 {@code models.dev@2026-09-17} 이다. 금액마다 함께

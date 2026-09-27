@@ -5,16 +5,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.application.CostEstimator;
+import com.bifos.assistant.usage.domain.CatalogPrice;
 import com.bifos.assistant.usage.domain.EstimatedCost;
 import com.bifos.assistant.usage.domain.ExecutionCost;
+import com.bifos.assistant.usage.domain.ModelPrice;
+import com.bifos.assistant.usage.domain.PriceCatalog;
 import com.bifos.assistant.usage.infra.ModelsDevPriceCatalog;
 import com.bifos.assistant.usage.infra.PricingProperties;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URISyntaxException;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -168,6 +174,32 @@ class CostEstimatorTest {
         assertThat(subscriptionCost).isEqualTo(ExecutionCost.unknown());
         assertThat(apiCost.estimatedMicros()).isNull();
         assertThat(apiCost.actualMicros()).isNull();
+    }
+
+    @Test
+    void 금액에는_그_가격을_찾은_가격표의_버전을_적는다() {
+        // 조회한 뒤 가격표가 다시 읽혀 버전이 바뀐 상황이다. 금액에는 가격을 찾은 쪽의 버전이 붙어야 한다.
+        ModelPrice price = new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), null, List.of());
+        PriceCatalog reloadedBetween = new PriceCatalog() {
+            @Override
+            public Optional<CatalogPrice> find(String provider, String model) {
+                return Optional.of(new CatalogPrice(price, "models.dev@2026-09-17"));
+            }
+
+            @Override
+            public String version() {
+                return "models.dev@2026-09-28";
+            }
+
+            @Override
+            public boolean isAvailable() {
+                return true;
+            }
+        };
+
+        EstimatedCost cost = new CostEstimator(reloadedBetween).estimate("openai", "m", usage(1000L, null, 500L));
+
+        assertThat(cost.pricingVersion()).isEqualTo("models.dev@2026-09-17");
     }
 
     private static TokenUsage usage(Long input, Long cached, Long output) {
