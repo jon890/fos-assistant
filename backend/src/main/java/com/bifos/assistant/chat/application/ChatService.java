@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -763,7 +764,7 @@ public class ChatService {
      */
     public Map<Long, List<ChatArtifact>> artifactsByMessage(List<ChatMessage> history) {
         return artifacts.byMessage(history.stream()
-                .filter(message -> message.role() == com.bifos.assistant.chat.domain.MessageRole.ASSISTANT)
+                .filter(message -> message.role() == MessageRole.ASSISTANT)
                 .map(ChatMessage::id)
                 .toList());
     }

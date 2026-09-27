@@ -268,7 +268,8 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 
 **모델이 답에 적은 경로를 읽지 않는다.** turn 이 끝나면 폴더를 훑는다.
 
-- 그 turn 이 시작한 뒤에 바뀐 `.html` 파일을 찾는다. 하위 폴더까지 본다
+- 그 turn 이 시작한 뒤에 바뀐 `.html` 파일을 찾는다. 하위 폴더까지 본다. 읽지 못한 폴더는 건너뛰고 나머지를 묶는다
+- 파일의 마지막 수정 시각을 Control Plane 의 시계로 잡은 turn 시작 시각과 견준다. Hermes 와 Control Plane 이 같은 기계의 로컬 디스크를 함께 쓴다는 전제다. 다른 기계나 네트워크 파일 시스템에 두면 두 시계가 어긋난 만큼 결과물이 빠질 수 있다
 - 찾은 파일마다 `chat_artifact` 행을 그 turn 의 답 메시지에 묶어 만든다
 - 답 메시지가 없는 turn(빈 답으로 중지)은 묶지 않는다
 - 흐름으로 돈 turn 도 같다. 폴더는 대화마다 하나이므로 Chief 와 하위 에이전트가 같은 폴더를 쓴다
@@ -287,6 +288,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 | 남의 대화, 없는 대화 | `CONVERSATION_NOT_FOUND` |
 | 확장자가 `html`, `css`, `png`, `jpg`, `jpeg`, `gif`, `webp` 가 아니다 | 404 `ARTIFACT_NOT_FOUND` |
 | 심볼릭 링크를 따라간 실제 경로가 대화 폴더 밖이다 | 404 `ARTIFACT_NOT_FOUND` |
+| 경로에 `..` 처럼 정규화되지 않은 조각이 있다 | 컨트롤러에 닿기 전에 Spring Security 가 403 으로 거절한다. web 서버 라우트는 빈 조각과 `..` 를 400 `VALIDATION_FAILED` 로 먼저 막는다 |
 | 파일이 없다. 그 경로의 `chat_artifact` 행이 지워졌다고 적혀 있다 | 410 `ARTIFACT_GONE` |
 | 파일이 없다. 행도 없다 | 404 `ARTIFACT_NOT_FOUND` |
 
@@ -294,7 +296,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 
 | 머리글 | 값 |
 | --- | --- |
-| `Content-Type` | 확장자로 정한다. HTML 은 `text/html; charset=utf-8` |
+| `Content-Type` | 링크를 따라간 실제 파일의 확장자로 정한다. HTML 은 `text/html; charset=utf-8` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Content-Security-Policy` | `sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'` |
 | `Cache-Control` | `private, no-cache` |

@@ -48,7 +48,7 @@ public class ArtifactController {
         CurrentUser user = currentUser.require();
         Long number = access.requireOwnId(user, conversationId);
         String relativePath = path.startsWith("/") ? path.substring(1) : path;
-        ArtifactContent content = artifacts.open(user, number, relativePath);
+        ArtifactContent content = artifacts.open(number, relativePath);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(content.contentType()))
                 .contentLength(content.byteSize())

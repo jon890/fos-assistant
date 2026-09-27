@@ -48,12 +48,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -303,11 +305,10 @@ class ArtifactTest {
         Files.writeString(outside, "SECRET");
         String base = "/api/v1/chat/conversations/" + conversation.publicId() + "/files/";
 
-        // 방화벽이 거절하면 400 을 내려고 오류 화면으로 넘기는데, 그 경로는 로그인 토큰을 다시 보지 않아 403 으로 끝난다.
-        // 어느 쪽이든 컨트롤러에 닿지 않는다. 이 검사가 보는 것은 폴더 밖 파일이 나가지 않는다는 것이다.
+        // 방화벽이 거절한 요청은 /error 로 넘어가고, 그 경로가 인증에 걸려 403 으로 끝난다. 컨트롤러에는 닿지 않는다.
         for (String raw : List.of("../other/a.html", "%2e%2e/other/a.html", "a/../../other/a.html")) {
             HttpResponse<String> response = get(base + raw);
-            assertThat(response.statusCode()).as(raw).isIn(400, 403, 404);
+            assertThat(response.statusCode()).as(raw).isEqualTo(403);
             assertThat(response.body()).as(raw).doesNotContain("SECRET");
         }
     }
@@ -338,6 +339,45 @@ class ArtifactTest {
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(code(response)).isEqualTo("ARTIFACT_NOT_FOUND");
         assertThat(response.body()).doesNotContain("SECRET");
+    }
+
+    @Test
+    void 허용된_이름의_링크가_폴더_안의_사진을_가리키면_실제_파일의_형식으로_준다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        writeAt(conversation.id(), "a/b.png", "png", Instant.now());
+        Path folder = root.resolve(String.valueOf(conversation.id())).resolve("a");
+        Files.createSymbolicLink(folder.resolve("a.html"), folder.resolve("b.png"));
+
+        HttpResponse<String> response = file(conversation, "a/a.html");
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
+        assertThat(header(response, "Content-Type")).isEqualTo("image/png");
+    }
+
+    @Test
+    void 읽지_못하는_하위_폴더가_있어도_나머지_HTML_은_찾고_오래된_파일은_지운다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        Instant startedAt = Instant.now().minus(Duration.ofMinutes(1));
+        writeAt(conversation.id(), "ok.html", HTML, Instant.now());
+        writeAt(conversation.id(), "old/old.html", HTML, Instant.now().minus(Duration.ofDays(40)));
+        writeAt(conversation.id(), "locked/hidden.html", HTML, Instant.now());
+        Path locked = root.resolve(String.valueOf(conversation.id())).resolve("locked");
+        // 권한을 빼도 root 로 도는 실행은 그 폴더를 읽는다. 그래서 읽지 못한 폴더의 파일이 빠졌는지는 단언하지 않고,
+        // 나머지를 놓치지 않는다는 것만 본다. 어느 사용자로 돌아도 같은 단언이 성립한다.
+        Files.setPosixFilePermissions(locked, Set.of());
+        try {
+            assertThat(store.changedHtmlSince(conversation.id(), startedAt))
+                    .extracting(ArtifactStore.FoundFile::path)
+                    .contains("ok.html")
+                    .doesNotContain("old/old.html");
+
+            List<ArtifactStore.Removed> removed = store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
+
+            assertThat(removed).extracting(ArtifactStore.Removed::path).containsExactly("old/old.html");
+            assertThat(Files.exists(root.resolve(String.valueOf(conversation.id())).resolve("ok.html"))).isTrue();
+        } finally {
+            Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
+        }
     }
 
     @Test

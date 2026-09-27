@@ -23,6 +23,7 @@ import com.bifos.assistant.agent.presentation.AgentController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -82,7 +83,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 class ChatAttachmentTurnTest {
 
     private static final String AGENT_ROOT = "/agent-side/attachments";
-    private static final String ARTIFACT_AGENT_ROOT = "/agent-side/artifacts";
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
 
     @TestConfiguration
@@ -95,6 +95,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Autowired ChatService chat;
+    /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
+    @Autowired ArtifactService artifactService;
     @Autowired ConversationAccess access;
     @Autowired AgentService agentService;
     @Autowired StarterService starterService;
@@ -356,11 +358,8 @@ class ChatAttachmentTurnTest {
     }
 
     /** 사진 단락보다 앞에 매 turn 붙는 결과물 폴더 단락이다. */
-    private static String artifactPreamble(Long conversationId) {
-        return "[결과물 폴더]\n"
-                + ARTIFACT_AGENT_ROOT + "/" + conversationId + "\n"
-                + "파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
-                + "\n";
+    private String artifactPreamble(Long conversationId) {
+        return artifactService.agentPreamble(conversationId);
     }
 
     private StubHermesRunsClient stub() {

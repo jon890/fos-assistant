@@ -2,11 +2,13 @@ package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.application.ArtifactProperties;
 import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +16,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,20 +115,11 @@ public class ArtifactStore {
             return List.of();
         }
         List<FoundFile> found = new ArrayList<>();
-        try (Stream<Path> walk = Files.walk(folder)) {
-            for (Path file : walk.toList()) {
-                if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
-                        || !HTML.equals(extensionOf(file.getFileName().toString()))) {
-                    continue;
-                }
-                Instant modified = Files.getLastModifiedTime(file, LinkOption.NOFOLLOW_LINKS).toInstant();
-                if (modified.isBefore(since)) {
-                    continue;
-                }
-                found.add(new FoundFile(relativeOf(folder, file), Files.size(file)));
+        for (WalkedFile file : regularFilesUnder(folder)) {
+            if (HTML.equals(extensionOf(file.path().getFileName().toString()))
+                    && !file.modified().isBefore(since)) {
+                found.add(new FoundFile(relativeOf(folder, file.path()), file.byteSize()));
             }
-        } catch (IOException ex) {
-            throw new UncheckedIOException("could not scan the artifact folder of conversation " + conversationId, ex);
         }
         return found;
     }
@@ -182,14 +174,8 @@ public class ArtifactStore {
             return List.of();
         }
         List<Removed> removed = new ArrayList<>();
-        List<Path> files;
-        try (Stream<Path> walk = Files.walk(root)) {
-            files = walk.filter(file -> Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)).toList();
-        } catch (IOException | UncheckedIOException ex) {
-            log.warn("could not walk the artifact root", ex);
-            return removed;
-        }
-        for (Path file : files) {
+        for (WalkedFile walked : regularFilesUnder(root)) {
+            Path file = walked.path();
             Path relative = root.relativize(file);
             if (relative.getNameCount() < 2) {
                 continue;
@@ -198,11 +184,10 @@ public class ArtifactStore {
             if (conversationId == null) {
                 continue;
             }
+            if (!walked.modified().isBefore(cutoff)) {
+                continue;
+            }
             try {
-                Instant modified = Files.getLastModifiedTime(file, LinkOption.NOFOLLOW_LINKS).toInstant();
-                if (!modified.isBefore(cutoff)) {
-                    continue;
-                }
                 Files.deleteIfExists(file);
                 removed.add(new Removed(conversationId, relativeOf(root.resolve(relative.getName(0)), file)));
             } catch (IOException | RuntimeException ex) {
@@ -210,6 +195,49 @@ public class ArtifactStore {
             }
         }
         return removed;
+    }
+
+    /** 걸음에서 만난 일반 파일 하나와 그때 읽은 속성이다. */
+    private record WalkedFile(Path path, Instant modified, long byteSize) {
+    }
+
+    /**
+     * {@code start} 아래의 일반 파일을 하위 폴더까지 모은다. 심볼릭 링크는 따라가지 않는다.
+     *
+     * <p>읽지 못한 폴더나 파일은 경고 로그만 남기고 건너뛴다. 하나 때문에 나머지를 놓치지 않으려는 것이다.
+     */
+    private static List<WalkedFile> regularFilesUnder(Path start) {
+        List<WalkedFile> files = new ArrayList<>();
+        try {
+            Files.walkFileTree(start, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                    if (attributes.isRegularFile()) {
+                        files.add(new WalkedFile(file, attributes.lastModifiedTime().toInstant(), attributes.size()));
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException ex) {
+                    log.warn("could not read an artifact path while walking, skipped", ex);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                /** 폴더 목록을 읽는 도중 실패해도 그 폴더만 두고 걸음을 이어 간다. */
+                @Override
+                public FileVisitResult postVisitDirectory(Path directory, IOException ex) {
+                    if (ex != null) {
+                        log.warn("could not read an artifact path while walking, skipped", ex);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException ex) {
+            // 방문기가 실패를 삼키므로 여기로 오는 것은 걸음을 시작하지도 못한 경우다.
+            log.warn("could not walk the artifact folder", ex);
+        }
+        return files;
     }
 
     private Path folderOf(Long conversationId) {

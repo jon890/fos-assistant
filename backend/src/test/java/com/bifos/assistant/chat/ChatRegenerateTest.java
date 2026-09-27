@@ -13,6 +13,7 @@ import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -59,6 +60,8 @@ import org.springframework.test.context.ActiveProfiles;
 class ChatRegenerateTest {
 
     @Autowired ChatService chat;
+    /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
+    @Autowired ArtifactService artifactService;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
     @Autowired AgentModelSelector modelSelector;
@@ -103,11 +106,7 @@ class ChatRegenerateTest {
                 .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.ASSISTANT);
         assertThat(history.getLast().replacesMessageId()).isEqualTo(history.get(1).id());
         // 다시 생성도 같은 결과물 폴더 단락을 붙인 같은 질문을 보낸다.
-        String expected = "[결과물 폴더]\n"
-                + "/agent-side/artifacts/" + conversationId + "\n"
-                + "파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
-                + "\n"
-                + "원래 질문";
+        String expected = artifactService.agentPreamble(conversationId) + "원래 질문";
         assertThat(stub().received()).extracting(HermesRunCommand::input)
                 .containsExactly(expected, expected);
         assertThat(stub().received().getLast().instructions())

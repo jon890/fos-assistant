@@ -4,7 +4,6 @@ import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactStore.FoundFile;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
-import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
@@ -37,7 +36,6 @@ public class ArtifactService {
 
     private static final Logger log = LoggerFactory.getLogger(ArtifactService.class);
 
-    private final ConversationAccess access;
     private final ArtifactStore store;
     private final ChatArtifactRepository artifacts;
 
@@ -105,13 +103,15 @@ public class ArtifactService {
      * 대화 폴더 안의 파일 하나를 연다.
      *
      * <p>행을 찾지 않는다. HTML 이 부르는 사진은 행이 없다. 폴더 안에 있고 확장자가 허용되면 준다. 행은 없는 파일이
-     * 보관 기간이 지나 지워진 것인지 가릴 때만 본다. 부르는 순서에 기대지 않도록 여기서도 대화 주인을 확인한다.
+     * 보관 기간이 지나 지워진 것인지 가릴 때만 본다. 대화 주인 확인은 컨트롤러가 대화 번호를 얻을 때 이미 했다.
+     *
+     * <p>형식은 링크를 따라간 실제 파일의 확장자로 정한다. 요청한 이름으로 정하면 {@code a.html} 이름의 링크가
+     * 사진을 가리킬 때 사진을 HTML 로 내준다.
      */
-    public ArtifactContent open(CurrentUser user, Long conversationId, String relativePath) {
-        access.requireOwn(user, conversationId);
+    public ArtifactContent open(Long conversationId, String relativePath) {
         Path file = store.resolveInside(conversationId, relativePath)
                 .orElseThrow(() -> missing(conversationId, relativePath));
-        String contentType = ArtifactStore.contentTypeOf(relativePath)
+        String contentType = ArtifactStore.contentTypeOf(file.getFileName().toString())
                 .orElseThrow(() -> missing(conversationId, relativePath));
         try {
             long size = Files.size(file);
