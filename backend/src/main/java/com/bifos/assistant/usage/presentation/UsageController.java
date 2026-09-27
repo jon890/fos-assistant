@@ -1,6 +1,8 @@
 package com.bifos.assistant.usage.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -18,7 +20,11 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,6 +53,7 @@ public class UsageController {
     private final CurrentUserProvider currentUser;
     private final AgentService agents;
     private final ExecutionTreeService executionTrees;
+    private final ConversationRepository conversations;
 
     /**
      * 로그인한 사용자 자신의 실행만 준다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
@@ -60,13 +67,32 @@ public class UsageController {
         List<AgentExecution> page = executions.findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(
                 currentUser.require().id(), PageRequest.of(0, size));
         Set<Long> withChildren = idsHavingChildren(page);
+        Map<Long, UUID> publicIds = conversationPublicIds(page);
         return page.stream()
                 .map(execution ->
                         ExecutionView.from(
                                 execution,
                                 agents.requireById(execution.agentId()),
+                                execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
                                 withChildren.contains(execution.id())))
                 .toList();
+    }
+
+    /**
+     * 목록의 대화 번호를 공개 식별자로 한 번에 바꾼다.
+     *
+     * <p>실행마다 읽으면 질의가 목록 길이만큼 늘어난다. 대화 번호가 하나도 없으면 부르지 않는다.
+     */
+    private Map<Long, UUID> conversationPublicIds(List<AgentExecution> page) {
+        Set<Long> ids = page.stream()
+                .map(AgentExecution::conversationId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return conversations.findAllById(ids).stream()
+                .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
     }
 
     /**

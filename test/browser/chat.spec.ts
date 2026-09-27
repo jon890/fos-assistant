@@ -1,4 +1,4 @@
-import { expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
+import { CONVERSATION_URL, expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
 
 test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
@@ -21,7 +21,7 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
   const drawer = page.getByRole("complementary", { name: "사이드바" });
   await expect(drawer).toBeInViewport();
   await drawer.getByRole("link", { name: /모바일 대화 5/ }).click();
-  await expect(page).toHaveURL(/\/c\/\d+$/);
+  await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(drawer).toBeHidden();
 
   await page.getByRole("button", { name: "사이드바 열기" }).click();

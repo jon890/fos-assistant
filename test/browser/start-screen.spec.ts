@@ -1,4 +1,4 @@
-import { expect, setStarters, test } from "./fixtures.ts";
+import { CONVERSATION_URL, expect, setStarters, test } from "./fixtures.ts";
 import type { Locator, Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 실제로 디코딩되는 1x1 PNG 다. 저장소에 이미지를 넣지 않으려고 바이트로 만들어 쓴다. */
@@ -70,7 +70,7 @@ test("추천 질문을 누르면 그 글로 바로 보내고 입력창의 글은
   await page.getByRole("button", { name: PROMPT, exact: true }).click();
 
   await expect(page.getByTestId("user-message").last()).toContainText(PROMPT);
-  await expect(page).toHaveURL(/\/c\/\d+$/);
+  await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
   await expect(composer(page)).toHaveValue("쓰던 글");
   // 첫 메시지 뒤에는 새 대화 화면이 사라지고 입력창이 아래로 간다.
@@ -185,7 +185,7 @@ test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴�
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
 
   // 빈 대화가 생겨도 메시지가 없는 동안은 새 대화 화면 모양 그대로다.
-  await expect(page).toHaveURL(/\/c\/\d+$/);
+  await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와줄까요$/ })).toBeVisible();
   const flowCard = page.getByRole("radio", { name: "흐름 비서" });
   await expect(flowCard).toBeDisabled();
@@ -255,7 +255,7 @@ test("사진 때문에 빈 대화를 만드는 동안에는 추천 질문을 누
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const createdIds: number[] = [];
+  const createdIds: string[] = [];
   // route 는 goto 보다 먼저 건다. 대화 목록을 읽는 GET 은 그대로 보낸다.
   await page.route((url) => url.pathname === "/api/chat/conversations", async (route) => {
     if (route.request().method() !== "POST") {
@@ -264,7 +264,7 @@ test("사진 때문에 빈 대화를 만드는 동안에는 추천 질문을 누
     }
     await released;
     const response = await route.fetch();
-    const body = (await response.json()) as { conversationId: number };
+    const body = (await response.json()) as { conversationId: string };
     createdIds.push(body.conversationId);
     await route.fulfill({ response, json: body });
   });
@@ -285,8 +285,8 @@ test("사진 때문에 빈 대화를 만드는 동안에는 추천 질문을 누
 
   await promptButton.click();
   await expect(page.getByTestId("user-message").last()).toContainText(PROMPT);
-  await expect(page).toHaveURL(new RegExp(`/c/${createdIds[0]}$`));
+  await expect(page).toHaveURL(new RegExp(`/chat/${createdIds[0]}$`));
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
-  await expect(page).toHaveURL(new RegExp(`/c/${createdIds[0]}$`));
+  await expect(page).toHaveURL(new RegExp(`/chat/${createdIds[0]}$`));
   expect(createdIds, "추천 질문을 보낸 뒤 만든 대화").toHaveLength(1);
 });

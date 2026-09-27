@@ -110,9 +110,9 @@ test("지금 열린 대화 줄을 다시 누르면 옮기지 않는다", async (
     data: { text: `같은 대화 재클릭 검사 ${testInfo.project.name} ${Date.now()}`, agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
-  const { conversationId } = (await response.json()) as { conversationId: number };
+  const { conversationId } = (await response.json()) as { conversationId: string };
 
-  await page.goto(`/c/${conversationId}`);
+  await page.goto(`/chat/${conversationId}`);
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
 
   const rscPaths: string[] = [];
@@ -123,12 +123,12 @@ test("지금 열린 대화 줄을 다시 누르면 옮기지 않는다", async (
 
   try {
     const conversationLink = page.getByRole("navigation", { name: "대화 목록" })
-      .locator(`a[href="/c/${conversationId}"]`);
+      .locator(`a[href="/chat/${conversationId}"]`);
     await conversationLink.click();
     // 이 단언은 첫 조회에서 곧바로 통과하므로 표시가 잠깐 떴다 사라지는 것까지는 잡지 못한다.
     // 이동이 실제로 일어났는지는 아래의 RSC 요청 기록이 판정한다.
     await expect(conversationLink.getByTestId("nav-pending")).toHaveCount(0);
-    await expect(page).toHaveURL(new RegExp(`/c/${conversationId}$`));
+    await expect(page).toHaveURL(new RegExp(`/chat/${conversationId}$`));
     await expect(sidebarStatus(page)).toHaveText("");
 
     // 기준점: 뒤이어 다른 화면으로 옮기는 요청이 나간 것을 본 뒤에 판정한다.
@@ -140,7 +140,7 @@ test("지금 열린 대화 줄을 다시 누르면 옮기지 않는다", async (
     await mainNavLink(page, "사용량").click();
     await usageRequest;
 
-    expect(rscPaths).not.toContain(`/c/${conversationId}`);
+    expect(rscPaths).not.toContain(`/chat/${conversationId}`);
   } finally {
     page.off("request", recordRsc);
   }

@@ -5,12 +5,12 @@ import { readEventStream } from "../../../web/src/lib/stream.ts";
 type ChatEvent = {
   type: "delta" | "started" | "stopped" | "error";
   text?: string;
-  conversationId?: number;
+  conversationId?: string;
   messageId?: number | null;
   executionId?: number;
 };
 
-type Execution = { id: number; conversationId: number; status: string };
+type Execution = { id: number; conversationId: string; status: string };
 type Message = { id: number; role: "USER" | "ASSISTANT"; content: string; executionId: number | null };
 
 type Stream = {

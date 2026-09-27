@@ -10,14 +10,14 @@ type ChatEvent = {
   model?: string;
   inputTokens?: number;
   outputTokens?: number;
-  conversationId?: number;
+  conversationId?: string;
   messageId?: number;
   executionId?: number;
 };
 
 type Message = { id: number; role: "USER" | "ASSISTANT"; content: string; executionId: number | null;
   activity: { toolCount: number; subagentCount: number; durationMs: number | null } | null };
-type Execution = { id: number; conversationId: number; status: string };
+type Execution = { id: number; conversationId: string; status: string };
 
 type ExecutionEventView = {
   sequence: number;

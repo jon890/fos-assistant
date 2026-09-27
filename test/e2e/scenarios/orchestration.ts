@@ -13,7 +13,7 @@ type ChatEvent = {
   text?: string;
   stepName?: string;
   stepState?: string;
-  conversationId?: number;
+  conversationId?: string;
   messageId?: number;
   executionId?: number;
   code?: string;
