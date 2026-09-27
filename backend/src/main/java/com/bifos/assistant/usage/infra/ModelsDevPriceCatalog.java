@@ -133,7 +133,13 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
             if (modifiedAt.equals(snapshot.modifiedAt()) || modifiedAt.equals(failedModifiedAt)) {
                 return;
             }
-            JsonNode root = JsonMapper.builder().build().readTree(Files.readString(file));
+            String body = Files.readString(file);
+            if (!modifiedAt.equals(capturedAt(file))) {
+                // 읽는 사이에 파일이 바뀌었다. 새 내용에 옛 시각의 버전을 붙이지 않게 버리고 다음 확인에 맡긴다.
+                nextCheck = Instant.MIN;
+                return;
+            }
+            JsonNode root = JsonMapper.builder().build().readTree(body);
             Map<String, Map<String, ModelPrice>> parsed = readProviders(root);
             if (parsed.isEmpty()) {
                 throw new IllegalStateException("no provider has a usable price");
