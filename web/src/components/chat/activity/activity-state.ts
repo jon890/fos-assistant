@@ -107,14 +107,21 @@ export function applyChatEvent(state: ActivityState, event: ChatEvent): Activity
   return state;
 }
 
-export function fromTree(tree: ExecutionTreeResponse): ActivityItem[] {
+/**
+ * 실행 나무를 작업 과정 항목으로 바꾼다.
+ *
+ * <p>기본은 끝난 답을 다시 볼 때라서 끝나지 않은 것을 「중지됨」 으로 보인다. 다른 창에서 아직 도는
+ * turn 을 볼 때는 `running` 을 주어 도는 것을 그대로 둔다.
+ */
+export function fromTree(tree: ExecutionTreeResponse, options: { running?: boolean } = {}): ActivityItem[] {
+  const openNodeState: ActivityItemState = options.running ? "running" : "stopped";
   let state = emptyActivity(Date.parse(tree.root.startedAt));
   const visit = (node: ExecutionTreeNode, isRoot: boolean) => {
     if (!isRoot && node.events.length > 0) state = { ...state, items: append(state.items, {
       kind: "subagent", name: node.agentName ?? node.agentCode ?? "하위 에이전트", detail: null,
       model: node.model, inputTokens: node.inputTokens, outputTokens: node.outputTokens,
       durationMs: node.latencyMs, state: node.status === "FAILED" ? "failed" :
-        node.status === "SUCCEEDED" ? "done" : "stopped", pairKey: `${node.executionId}`,
+        node.status === "SUCCEEDED" ? "done" : openNodeState, pairKey: `${node.executionId}`,
     }) };
     for (const event of node.events) {
       switch (event.eventType) {
@@ -140,5 +147,6 @@ export function fromTree(tree: ExecutionTreeResponse): ActivityItem[] {
     node.children.forEach((child) => visit(child, false));
   };
   visit(tree.root, true);
+  if (options.running) return state.items;
   return state.items.map((item) => item.state === "running" ? { ...item, state: "stopped" } : item);
 }

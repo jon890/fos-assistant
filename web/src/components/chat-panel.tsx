@@ -8,7 +8,7 @@ import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
 import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
 import { MessageList } from "./chat/message-list";
-import { applyChatEvent, emptyActivity, failActivity, type ActivityState } from "./chat/activity/activity-state";
+import { applyChatEvent, emptyActivity, failActivity, fromTree, type ActivityState } from "./chat/activity/activity-state";
 import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
@@ -18,8 +18,13 @@ import { readEventStream } from "@/lib/stream";
 import type { ChatEvent } from "@/lib/chat-event";
 import { foldVersions } from "@/lib/message-versions";
 import type { AgentView } from "@/lib/agent";
+import type { ExecutionTreeResponse } from "./execution/execution-tree";
 
 type ErrorPayload = { code: string; message: string };
+/** 대화에 지금 도는 turn 이다. 실행 번호가 아직 붙지 않았으면 `running` 이 참이어도 나머지가 null 이다. */
+type RunningTurn = { running: boolean; executionId: number | null; startedAt: string | null };
+/** 다른 창이 보낸 turn 을 보고 있는 대화와, 보기 시작할 때의 선택 판이다. */
+type ObservedTurn = { conversationId: string; version: number };
 type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
 type TurnStreamCallbacks = {
   onStarted?(event: ChatEvent): void | Promise<void>;
@@ -40,6 +45,12 @@ async function readPayload<T>(response: Response): Promise<T> {
  */
 const SLOW_FLOW_MS = 120_000;
 
+/** 다른 창에서 도는 turn 과 그 실행 나무를 다시 묻는 주기다. */
+const OBSERVE_INTERVAL_MS = 3_000;
+
+/** 도는 turn 조회가 이만큼 이어 실패하면 기다리는 표시를 거두고 이력을 다시 읽는다. */
+const OBSERVE_MAX_FAILURES = 3;
+
 export function ChatPanel({ initialConversationId }: { initialConversationId: string | null }) {
   const pathname = usePathname();
   const { conversations, refresh, newConversationVersion } = useConversations();
@@ -57,6 +68,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   const currentExecutionId = useRef<number | null>(null);
   const [executionId, setExecutionId] = useState<number | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
+  /**
+   * 다른 창이 보낸 turn 이 도는 대화를 보고 있다.
+   *
+   * <p>보낸 창은 자기 스트림으로 끝을 알므로 이 값을 쓰지 않는다. 대화를 열 때 도는 turn 이 있을 때만 채운다.
+   */
+  const [observing, setObserving] = useState<ObservedTurn | null>(null);
   const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +125,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setError(null);
     setTurnError(null);
     setTurns([]);
+    setSending(false);
+    setObserving(null);
     setActivity(null);
     setLiveExpanded(false);
     liveExpandedRef.current = false;
@@ -120,6 +139,26 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setComposerGeneration((generation) => generation + 1);
     void (async () => {
       try {
+        // 도는 turn 을 이력보다 먼저 묻는다. 거꾸로 하면 두 호출 사이에 turn 이 끝났을 때 답이 빠진
+        // 이력과 `running=false` 를 함께 받아, 새로 고칠 때까지 답이 보이지 않는다.
+        let running: RunningTurn | null = null;
+        try {
+          const runningResponse = await fetch(`/api/chat/conversations/${initialConversationId}/running`,
+            { cache: "no-store" });
+          if (runningResponse.ok) {
+            running = await readPayload<RunningTurn>(runningResponse);
+          } else if (runningResponse.status === 404) {
+            const payload = await readPayload<ErrorPayload>(runningResponse).catch(() => null);
+            if (payload?.code === "CONVERSATION_NOT_FOUND") {
+              if (selectionVersion.current === version) setNotFound(true);
+              return;
+            }
+          }
+        } catch {
+          // 묻지 못하면 돌지 않는 것으로 보고 이력을 읽는다. 이력 읽기가 실패하면 그 오류가 뜬다.
+        }
+        if (selectionVersion.current !== version) return;
+        if (running?.running) beginObserving(initialConversationId, version, running);
         const response = await fetch(`/api/chat/conversations/${initialConversationId}/messages`);
         if (!response.ok) {
           const payload = await readPayload<ErrorPayload>(response);
@@ -142,6 +181,121 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       }
     })();
   }, [initialConversationId]);
+
+  /**
+   * 다른 창에서 도는 turn 을 주기마다 다시 묻고 작업 과정을 다시 그린다.
+   *
+   * <p>창이 가려진 동안은 쉬고, 보이게 되면 곧바로 한 번 묻는다. 대화를 옮기거나 화면이 사라지면 정리 함수가
+   * 타이머를 지우고, 그 뒤에 온 응답은 선택 판으로 버린다.
+   */
+  useEffect(() => {
+    if (observing === null) return;
+    const { conversationId: id, version } = observing;
+    let active = true;
+    let inFlight = false;
+    let failures = 0;
+    let timer: number | undefined;
+    const current = () => active && selectionVersion.current === version;
+
+    const loadTree = async (treeExecutionId: number) => {
+      try {
+        const response = await fetch(`/api/usage/executions/${treeExecutionId}/tree`, { cache: "no-store" });
+        if (!response.ok) return;
+        const tree = await readPayload<ExecutionTreeResponse>(response);
+        if (!current() || currentExecutionId.current !== treeExecutionId) return;
+        const items = fromTree(tree, { running: true });
+        setActivity((previous) => previous && { ...previous, items });
+      } catch {
+        // 작업 과정은 다음 주기에 다시 읽는다. 기다리는 표시는 그대로 둔다.
+      }
+    };
+
+    const finish = async () => {
+      releaseObserving();
+      try {
+        await refreshMessages(id, version);
+      } catch (reason) {
+        if (selectionVersion.current === version) {
+          setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
+        }
+      }
+    };
+
+    /** 한 번 묻고, 다음 주기에도 물을지를 돌려준다. */
+    const pollOnce = async (): Promise<boolean> => {
+      let running: RunningTurn | null = null;
+      try {
+        const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
+        if (response.ok) running = await readPayload<RunningTurn>(response);
+      } catch {
+        // 아래에서 실패로 센다.
+      }
+      if (!current()) return false;
+      if (running === null) {
+        failures += 1;
+        if (failures < OBSERVE_MAX_FAILURES) return true;
+        await finish();
+        return false;
+      }
+      failures = 0;
+      if (!running.running) {
+        await finish();
+        return false;
+      }
+      if (running.executionId === null) {
+        // 번호가 아직 붙지 않았다. 중지 단추를 잠가 두고 다음 조회에서 번호를 받는다.
+        currentExecutionId.current = null;
+        setExecutionId(null);
+        return true;
+      }
+      if (running.executionId !== currentExecutionId.current) {
+        // 처음 번호를 받았거나 provider 를 넘어가 번호가 바뀌었다. 중지도 새 번호로 보낸다.
+        currentExecutionId.current = running.executionId;
+        setExecutionId(running.executionId);
+        const startedAt = running.startedAt ? Date.parse(running.startedAt) : Date.now();
+        setActivity((previous) => previous && { ...previous, startedAt });
+      }
+      await loadTree(running.executionId);
+      return current();
+    };
+
+    const schedule = () => {
+      if (!active || document.hidden) return;
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        void run(pollOnce);
+      }, OBSERVE_INTERVAL_MS);
+    };
+
+    const run = async (step: () => Promise<boolean>) => {
+      inFlight = true;
+      let keepGoing = false;
+      try {
+        keepGoing = await step();
+      } finally {
+        inFlight = false;
+      }
+      if (keepGoing) schedule();
+    };
+
+    const onVisibilityChange = () => {
+      window.clearTimeout(timer);
+      timer = undefined;
+      if (!document.hidden && !inFlight) void run(pollOnce);
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    void run(async () => {
+      // 대화를 열 때 이미 도는 turn 을 물었다. 번호가 있으면 작업 과정만 곧바로 읽는다.
+      if (currentExecutionId.current !== null) await loadTree(currentExecutionId.current);
+      return current();
+    });
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [observing]);
 
   useEffect(() => {
     const selected = conversations.find((item) => item.id === conversationId);
@@ -200,6 +354,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   function startNewConversation() {
     selectionVersion.current += 1;
     conversationIdRef.current = null;
+    setObserving(null);
     setComposerGeneration((generation) => generation + 1);
     setConversationId(null);
     setFreshStart(true);
@@ -221,6 +376,26 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setDraft("");
     setSending(false);
     setMessagesLoading(false);
+  }
+
+  /** 다른 창이 보낸 turn 을 보기 시작한다. 보낸 창과 같은 상태를 채워 기다리는 표시와 중지가 같이 동작한다. */
+  function beginObserving(id: string, version: number, running: RunningTurn) {
+    setSending(true);
+    setStopRequested(false);
+    currentExecutionId.current = running.executionId;
+    setExecutionId(running.executionId);
+    setActivity(emptyActivity(running.startedAt ? Date.parse(running.startedAt) : Date.now()));
+    setObserving({ conversationId: id, version });
+  }
+
+  /** 보는 상태를 모두 되돌린다. 끝났을 때와 조회가 이어 실패했을 때 쓴다. */
+  function releaseObserving() {
+    setSending(false);
+    setObserving(null);
+    setActivity(null);
+    currentExecutionId.current = null;
+    setExecutionId(null);
+    setStopRequested(false);
   }
 
   async function refreshMessages(id: string, version: number): Promise<Turn[]> {
@@ -642,6 +817,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             />
           ) : null}
           {error ? <p className="mb-2 rounded-md bg-muted px-3 py-2 text-sm">{error}</p> : null}
+          {observing ? (
+            <p data-testid="observing-notice" className="mb-2 text-xs text-muted-foreground">
+              다른 창에서 답하는 중이다. 끝나면 이 창에도 답이 나타난다.
+            </p>
+          ) : null}
           <Composer
             key={composerGeneration}
             value={draft}

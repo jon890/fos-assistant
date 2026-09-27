@@ -1,12 +1,12 @@
 {
   "name": "plan026-running-other-tab",
   "description": "같은 대화를 연 다른 창에서도 답하는 중인 turn 을 보이고, 끝나면 이력을 다시 읽는다",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-27",
   "total_phases": 2,
   "current_phase": 2,
   "phases": [
     { "number": 1, "file": "phase-01.md", "execution_profile": "standard", "status": "completed" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard", "status": "completed" }
   ]
 }
