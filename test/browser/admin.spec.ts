@@ -19,7 +19,7 @@ test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
 
   await expect(card.getByText("나만", { exact: true })).toBeVisible();
   await card.getByRole("button", { name: "가족 공개로 변경" }).click();
-  const dialog = page.getByRole("dialog", { name: "브라우저 비서 에이전트를 가족에게 공개할까요?" });
+  const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 가족에게 공개할까요?" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/모든 사용자가 이 에이전트를 골라 대화/)).toBeVisible();
   await dialog.getByRole("button", { name: "취소" }).click();
@@ -27,8 +27,79 @@ test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
   await expect(card.getByText("나만", { exact: true })).toBeVisible();
 
   await card.getByRole("button", { name: "가족 공개로 변경" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "가족 공개" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "가족 공개" }).click();
   await expect(card.getByText("가족 공개", { exact: true })).toBeVisible();
+});
+
+/** 브라우저 비서를 「나만」 으로 되돌리고 관리 화면에서 공개 확인 창을 연다. */
+async function openVisibilityConfirm(page: Page) {
+  const reset = await page.request.patch("/api/admin/agents/browser", {
+    data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
+  });
+  expect(reset.ok()).toBeTruthy();
+  await page.goto("/admin/agents");
+  await browserCard(page).getByRole("button", { name: "가족 공개로 변경" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 가족에게 공개할까요?" });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+test("공개 확인 창에서 Esc 를 누르면 창이 닫히고 공개 범위가 그대로다", async ({ page }) => {
+  const dialog = await openVisibilityConfirm(page);
+
+  await page.keyboard.press("Escape");
+
+  await expect(dialog).toBeHidden();
+  await expect(browserCard(page).getByText("나만", { exact: true })).toBeVisible();
+});
+
+test("공개 요청이 실패하면 창이 남고 실패 까닭이 보인다", async ({ page }) => {
+  // 실패 응답에도 본문을 준다. 화면은 실패 응답의 본문에서 오류 코드와 문구를 읽는다.
+  await page.route("**/api/admin/agents/browser", (route) => route.request().method() === "PATCH"
+    ? route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "INTERNAL_ERROR", message: "공개 범위를 바꾸지 못했다" }),
+    })
+    : route.continue());
+  const dialog = await openVisibilityConfirm(page);
+
+  await dialog.getByRole("button", { name: "가족 공개" }).click();
+
+  await expect(page.getByText("공개 범위를 바꾸지 못했다", { exact: true })).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "가족 공개" })).toBeEnabled();
+  // 창이 열린 동안에는 Radix 가 바깥을 접근성 나무에서 가리므로, 닫은 뒤에 카드를 본다.
+  await dialog.getByRole("button", { name: "취소" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(browserCard(page).getByText("나만", { exact: true })).toBeVisible();
+});
+
+test("공개 요청이 도는 동안 Esc 로 닫히지 않고 끝나면 창이 닫힌다", async ({ page }) => {
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let patchSeen = false;
+  await page.route("**/api/admin/agents/browser", async (route) => {
+    if (route.request().method() !== "PATCH") return route.continue();
+    patchSeen = true;
+    await held;
+    await route.continue();
+  });
+  const dialog = await openVisibilityConfirm(page);
+
+  await dialog.getByRole("button", { name: "가족 공개" }).click();
+  await expect.poll(() => patchSeen).toBe(true);
+  // 누른 뒤에는 단추 이름이 「공개하는 중」 으로 바뀐다.
+  const busy = dialog.getByRole("button", { name: "공개하는 중" });
+  await expect(busy).toHaveAttribute("aria-busy", "true");
+  await expect(busy).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "취소" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+
+  release();
+  await expect(dialog).toBeHidden();
+  await expect(browserCard(page).getByText("가족 공개", { exact: true })).toBeVisible();
 });
 
 test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ page }) => {

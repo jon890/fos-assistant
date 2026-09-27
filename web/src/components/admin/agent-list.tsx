@@ -1,10 +1,12 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import type { AdminAgent } from "@/lib/agent";
-import { AgentCard } from "./agent-card";
+import { AgentCard, type AgentAction } from "./agent-card";
 
 type Props = {
   agents: AdminAgent[];
   busy: boolean;
+  /** 도는 요청과 그 대상 에이전트다. 그 카드의 그 단추에만 회전 표시를 둔다. */
+  pending: { code: string; action: AgentAction } | null;
   onVisibilityChange(agent: AdminAgent): void;
   onEnabledChange(agent: AdminAgent): void;
   onSyncModel(agent: AdminAgent): void;
@@ -23,6 +25,7 @@ export function AgentList(props: Props) {
           key={agent.code}
           agent={agent}
           busy={props.busy}
+          pendingAction={props.pending?.code === agent.code ? props.pending.action : null}
           onVisibilityChange={props.onVisibilityChange}
           onEnabledChange={props.onEnabledChange}
           onSyncModel={props.onSyncModel}

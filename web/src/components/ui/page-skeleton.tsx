@@ -32,8 +32,8 @@ const WIDTH_CLASS: Record<PageSkeletonWidth, string> = {
  */
 const FORM_CLASS: Record<PageSkeletonForm, string> = {
   memory: "h-[26.1875rem] md:h-[21.4375rem]",
-  person: "h-[24.25rem] md:h-[13.5rem]",
-  agent: "h-[52.125rem] md:h-[32.75rem]",
+  person: "h-[22.375rem] md:h-[12.875rem]",
+  agent: "h-[46.875rem] md:h-[29.875rem]",
 };
 
 function FormBlock({ form }: { form: PageSkeletonForm }) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function CopyButton({ text, label }: { text: string; label: string }) {
   const [notice, setNotice] = useState<string | null>(null);
@@ -21,9 +22,10 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
   }
 
   return (
-    <button type="button" aria-label={label} onClick={() => void copy()}
-      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent">
+    // 코드 블록 위에도 놓이므로 바탕을 채워 글자가 코드와 겹쳐 보이지 않게 한다.
+    <Button variant="outline" size="xs" aria-label={label} onClick={() => void copy()}
+      className="bg-background text-muted-foreground">
       <span aria-live="polite">{notice ?? label}</span>
-    </button>
+    </Button>
   );
 }

@@ -63,7 +63,7 @@ export function AgentMention({ id, agents, query, activeIndex, onPick }: Props) 
             // 누르는 동안 입력칸이 초점을 잃으면 커서 자리를 알 수 없다.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onPick(agent.code)}
-            className={`cursor-pointer rounded-xl px-3 py-2 hover:bg-muted ${index === activeIndex ? "bg-muted" : ""}`}
+            className="cursor-pointer rounded-xl px-3 py-2 hover:bg-muted aria-selected:bg-muted"
           >
             <span className="block truncate text-sm font-medium">{agent.name}</span>
             {agent.tagline ? <span className="block truncate text-xs text-muted-foreground">{agent.tagline}</span> : null}
