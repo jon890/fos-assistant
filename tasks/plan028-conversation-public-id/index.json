@@ -1,0 +1,12 @@
+{
+  "name": "plan028-conversation-public-id",
+  "description": "대화를 주소와 API 에서 UUID 공개 식별자로만 가리키고 번호는 Control Plane 안에만 둔다. 옛 /c/{번호} 는 주인에게 /chat/{id} 로 넘긴다",
+  "status": "pending",
+  "created_at": "2026-09-27",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" }
+  ]
+}
