@@ -57,8 +57,10 @@ export function splitAnswer(content: string, streaming = false): AnswerSegment[]
     }
     const fenceMark = /^(`{3,}|~{3,})/.exec(trimmed)?.[1];
     if (fenceMark) {
+      // 여는 펜스는 뒤에 언어 이름이 붙어도 된다. 닫는 펜스는 같은 문자로 같거나 긴 펜스만 있는 줄이다.
+      // 열린 블록 안의 "```js" 는 CommonMark 에서 코드 블록의 내용이다.
       if (fence === null) fence = fenceMark;
-      else if (fenceMark.startsWith(fence)) fence = null;
+      else if (/^(`{3,}|~{3,})\s*$/.test(trimmed) && fenceMark.startsWith(fence)) fence = null;
       markdown.push(line);
       continue;
     }

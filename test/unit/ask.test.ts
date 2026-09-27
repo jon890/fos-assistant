@@ -110,3 +110,9 @@ test("원문 안에 펜스가 있어도 감싸는 코드 블록이 일찍 닫히
 
   assert.ok(segment.kind === "markdown" && segment.text.startsWith("````text\n") && segment.text.endsWith("\n````"));
 });
+
+test("열린 코드 블록 안의 언어 이름이 붙은 펜스 줄은 블록을 닫지 않는다", () => {
+  const segments = splitAnswer("예시\n```\n```js\n" + BLOCK + "\n```");
+
+  assert.ok(segments.every((segment) => segment.kind === "markdown"));
+});
