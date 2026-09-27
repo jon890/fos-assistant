@@ -38,8 +38,9 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
+      // 고침: 덮개를 bg-black/10 에서 전의 서랍 덮개와 같은 토큰 bg-foreground/35 로 바꿨다. 밝기 모드는 토큰이 나눈다.
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-foreground/35 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -51,9 +52,12 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeLabel = "닫기",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** 고침: 닫기 단추의 접근성 이름이다. 받은 그대로는 영문 「Close」 였다. 부르는 곳이 무엇을 닫는지 적는다. */
+  closeLabel?: string
 }) {
   return (
     <DialogPortal>
@@ -76,7 +80,7 @@ function DialogContent({
             >
               <XIcon
               />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{closeLabel}</span>
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -98,10 +102,13 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 function DialogFooter({
   className,
   showCloseButton = false,
+  closeLabel = "닫기",
   children,
   ...props
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean
+  /** 고침: 닫기 단추의 글자다. 받은 그대로는 영문 「Close」 였다. */
+  closeLabel?: string
 }) {
   return (
     <div
@@ -115,7 +122,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">{closeLabel}</Button>
         </DialogPrimitive.Close>
       )}
     </div>

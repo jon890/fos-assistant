@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures.ts";
-import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Request, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 const PNG_1X1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
@@ -27,6 +27,13 @@ async function createConversation(page: Page, title: string): Promise<number> {
   const response = await page.request.post("/api/chat", { data: { text: title, agentCode: "browser" } });
   expect(response.ok()).toBeTruthy();
   return ((await response.json()) as { conversationId: number }).conversationId;
+}
+
+/** RSC 로 화면을 옮기는 요청만 참이다. 정적 자원과 API 호출, 미리 읽기는 걸러진다. */
+function isRscNavigationRequest(request: Request): boolean {
+  const headers = request.headers();
+  if (headers["next-router-prefetch"]) return false;
+  return headers["rsc"] === "1" || new URL(request.url()).searchParams.has("_rsc");
 }
 
 function conversationNav(page: Page) {
@@ -428,6 +435,22 @@ async function expectRunContinues(page: Page, hermes: { releaseHeldRun(): Promis
   await expect(page.getByTestId("stopped-mark")).toHaveCount(0);
 }
 
+/**
+ * 안쪽이 받은 Esc 뒤에 답이 계속 흐르는지 본다. 넓은 폭에서는 한 번 더 누른 Esc 가 곧바로 답을 멈추는지도 본다.
+ * 초점을 되돌려 받은 단추의 Tooltip 이 그 Esc 를 가져가면 답이 멈추지 않는다.
+ */
+async function expectNextEscapeStopsOrRunContinues(page: Page, hermes: { releaseHeldRun(): Promise<void> }, testInfo: TestInfo) {
+  if (testInfo.project.name !== "desktop") {
+    await expectRunContinues(page, hermes, testInfo);
+    return;
+  }
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  await page.keyboard.press("Escape");
+  // 멈춘 답은 받은 조각이 있으면 중지 표시를, 없으면 답이 없다는 안내를 남긴다. 어느 쪽이든 멈춘 것이다.
+  await expect(page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first()).toBeVisible({ timeout: 30_000 });
+}
+
 test("답을 만드는 중에 대화 메뉴를 Esc 로 닫으면 메뉴만 닫히고 답은 계속 흐른다", async ({ page, hermes }, testInfo) => {
   await hermes.holdNextRun();
   await page.goto("/");
@@ -444,7 +467,7 @@ test("답을 만드는 중에 대화 메뉴를 Esc 로 닫으면 메뉴만 닫�
   await expect(menuButton).toBeFocused();
   // Radix 는 Esc 로 닫으며 기본 동작을 막는다. 그래서 대화 화면의 처리기가 중지로 넘기지 않는다.
   expect(await escapes()).toEqual([true]);
-  await expectRunContinues(page, hermes, testInfo);
+  await expectNextEscapeStopsOrRunContinues(page, hermes, testInfo);
 });
 
 test("답을 만드는 중에 지우기 확인 창을 Esc 로 닫으면 창만 닫히고 답은 계속 흐른다", async ({ page, hermes }, testInfo) => {
@@ -459,13 +482,16 @@ test("답을 만드는 중에 지우기 확인 창을 Esc 로 닫으면 창만 �
   await page.getByRole("menuitem", { name: "지우기" }).click();
   const dialog = page.getByRole("alertdialog", { name: "대화 지우기" });
   await expect(dialog).toBeVisible();
+  // 창이 열리면 되돌릴 수 있는 「취소」 가 먼저 초점을 받는다.
+  await expect(dialog.getByRole("button", { name: "취소" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+  await expect(conversationNav(page).getByRole("button", { name: `${title} 메뉴` })).toBeFocused();
   expect(await escapes()).toEqual([true]);
   if (testInfo.project.name === "mobile") {
     await expect(page.getByRole("complementary", { name: "사이드바" })).toBeInViewport();
   }
-  await expectRunContinues(page, hermes, testInfo);
+  await expectNextEscapeStopsOrRunContinues(page, hermes, testInfo);
 });
 
 test("서랍 안에서 Tab 을 거듭 눌러도 초점이 서랍 밖으로 나가지 않는다", async ({ page }, testInfo) => {
@@ -525,8 +551,10 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
   let release: () => void = () => {};
   const held = new Promise<void>((resolve) => { release = resolve; });
   await page.route((url) => url.pathname === "/usage", async (route) => {
-    const headers = route.request().headers();
-    if (!headers["next-router-prefetch"] && headers["rsc"] === "1") await held;
+    // 화면을 옮기는 요청만 붙잡는다. 같은 주소로 문서와 미리 읽기 요청도 오므로, Next 가 옮길 때 붙이는
+    // 요청 표시(`rsc` 헤더나 `_rsc` 인자)로 가르고 미리 읽기(`next-router-prefetch`)는 흘려보낸다.
+    // loading.spec.ts 의 isRscNavigationRequest 와 같은 기준이다.
+    if (isRscNavigationRequest(route.request())) await held;
     await route.continue();
   });
   try {
@@ -540,4 +568,17 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
   } finally {
     release();
   }
+});
+
+test("서랍을 연 채 넓혔다가 다시 좁히면 서랍은 닫혀 있다", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile");
+  await page.goto("/");
+  await openSidebar(page, testInfo);
+  await expect(page.getByRole("dialog", { name: "사이드바" })).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await expect(page.getByRole("dialog", { name: "사이드바" })).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "사이드바" })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "사이드바 열기" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "사이드바" })).toHaveCount(0);
 });

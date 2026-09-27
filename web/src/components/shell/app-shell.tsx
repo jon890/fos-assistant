@@ -76,6 +76,8 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   // 서랍은 옮기는 동안 열어 둔다. 누른 줄의 회전 표시와 「옮기는 중」 안내가 옮기는 내내 서랍 안에 남는다.
   // 경로가 바뀌면 여기서 닫는다.
   useEffect(() => setDrawerOpen(false), [pathname]);
+  // 서랍이 열린 채 넓은 폭이 되면 닫아 둔다. 그대로 두면 다시 좁힐 때 서랍이 저절로 열린다.
+  useEffect(() => { if (wide) setDrawerOpen(false); }, [wide]);
   // 목적지가 지금 경로와 같으면 경로가 바뀌지 않으므로 곧바로 닫는다. 사진을 먼저 올려 주소만 바꾼 경우가
   // 있어 usePathname 대신 주소창의 경로와 견준다.
   const closeIfSamePath = useCallback((href: string) => {
@@ -109,7 +111,7 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
             }}
             onEscapeKeyDown={(event) => {
               // Radix 는 document 캡처 단계에서 Esc 를 먼저 받는다. 이름 입력칸은 Esc 로 편집만 취소하므로 서랍을 닫지 않는다.
-              if (event.target instanceof Element && event.target.matches('input[aria-label="대화 이름"]')) event.preventDefault();
+              if (event.target instanceof Element && event.target.matches("[data-rename-input]")) event.preventDefault();
             }}>
             <SheetTitle className="sr-only">사이드바</SheetTitle>
             <aside aria-label="사이드바" className="h-full min-h-0">
@@ -124,7 +126,11 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
             <TooltipButton label="사이드바 펴기" onClick={() => updateCollapsed(false)}><PanelLeft aria-hidden="true" /></TooltipButton>
             <Link href="/" onClick={startNew} className="rounded-md px-2 py-1.5 text-sm hover:bg-muted">새 대화</Link>
           </header> : null}
-          <header className={cn("flex h-14 shrink-0 flex-nowrap items-center gap-3 px-4 md:hidden", "border-b border-border")}>
+          <header className={cn(
+            "flex flex-nowrap items-center gap-3 md:hidden",
+            "h-14 shrink-0 px-4",
+            "border-b border-border",
+          )}>
             <TooltipButton label="사이드바 열기" size="icon" onClick={() => setDrawerOpen(true)}>
               <Menu aria-hidden="true" className="size-5" />
             </TooltipButton>

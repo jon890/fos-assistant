@@ -5,10 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Ellipsis } from "lucide-react";
 import {
-  AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle,
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { TooltipButton } from "@/components/ui/tooltip-button";
+import { focusWithoutTooltip, TooltipButton } from "@/components/ui/tooltip-button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -30,6 +30,8 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
   const cancelledEdit = useRef(false);
   /** 메뉴에서 이름 바꾸기를 골랐다. 메뉴가 닫히며 초점을 메뉴 단추로 옮기면 입력칸이 blur 되어 편집이 끝나므로 그때는 막는다 */
   const renameChosen = useRef(false);
+  /** 메뉴 바깥을 눌러 닫았다. 그때는 누른 쪽의 초점을 빼앗지 않는다 */
+  const menuInteractedOutside = useRef(false);
   /** 지우기 창을 닫은 뒤 초점을 돌려줄 메뉴 단추다. 창은 메뉴 단추가 아니라 메뉴 항목에서 열리므로 직접 돌려준다 */
   const menuButtons = useRef(new Map<number, HTMLButtonElement>());
   const lastDeleteId = useRef<number | null>(null);
@@ -98,7 +100,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
                 const title = conversation.title || "새 대화";
                 return <li key={conversation.id} className="group relative flex min-w-0 items-center">
                   {editingId === conversation.id ? (
-                    <input autoFocus aria-label="대화 이름" value={editValue}
+                    <input autoFocus aria-label="대화 이름" data-rename-input="" value={editValue}
                       onChange={(event) => setEditValue(event.target.value)}
                       onBlur={() => void finishEdit(conversation)}
                       onKeyDown={(event) => {
@@ -120,9 +122,8 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
                       onNavigate(`/c/${conversation.id}`);
                     }}
                       aria-current={pathname === `/c/${conversation.id}` ? "page" : undefined}
-                      className={`flex min-w-0 flex-1 items-center rounded-md px-2 py-2 text-sm hover:bg-accent ${
-                        pathname === `/c/${conversation.id}` ? "bg-accent font-medium" : ""
-                      }`}
+                      className={cn("flex min-w-0 flex-1 items-center rounded-md px-2 py-2 text-sm hover:bg-accent",
+                        pathname === `/c/${conversation.id}` && "bg-accent font-medium")}
                       title={title}>
                       <span className="min-w-0 flex-1 truncate">{title}</span>
                       <NavPending />
@@ -138,10 +139,15 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
                       </TooltipButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" aria-label={`${title} 메뉴`}
+                      onInteractOutside={() => { menuInteractedOutside.current = true; }}
                       onCloseAutoFocus={(event) => {
-                        if (!renameChosen.current) return;
-                        renameChosen.current = false;
+                        // Radix 의 기본 되돌리기는 Tooltip 을 연다. 직접 되돌리되 기본 동작처럼 바깥을 눌러 닫았으면
+                        // 그쪽 초점을 두고, 이름 바꾸기를 골랐으면 입력칸의 초점을 둔다.
                         event.preventDefault();
+                        const keepFocus = renameChosen.current || menuInteractedOutside.current;
+                        renameChosen.current = false;
+                        menuInteractedOutside.current = false;
+                        if (!keepFocus) focusWithoutTooltip(menuButtons.current.get(conversation.id));
                       }}>
                       <DropdownMenuItem onSelect={() => beginEdit(conversation)}>이름 바꾸기</DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => {
@@ -165,14 +171,17 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
             const button = id === null ? undefined : menuButtons.current.get(id);
             if (!button) return;
             event.preventDefault();
-            button.focus();
+            focusWithoutTooltip(button);
           }}>
           <AlertDialogTitle>대화 지우기</AlertDialogTitle>
           <AlertDialogDescription className="text-foreground">
             {deleteTarget?.title || "새 대화"} 를 목록에서 지운다. 사용량 기록은 남는다.
           </AlertDialogDescription>
           <AlertDialogFooter>
-            <Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>취소</Button>
+            {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}
+            <AlertDialogCancel asChild>
+              <Button variant="outline" disabled={deleting}>취소</Button>
+            </AlertDialogCancel>
             <Button variant="destructive" loading={deleting} loadingText="지우는 중"
               onClick={() => void confirmDelete()}>지우기</Button>
           </AlertDialogFooter>

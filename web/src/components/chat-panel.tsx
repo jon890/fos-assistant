@@ -594,7 +594,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {startScreen ? null : (
           <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
-            <div className={cn("flex min-w-0 flex-1 items-center gap-3 overflow-hidden", "text-xs text-muted-foreground")}>
+            <div className={cn(
+              "flex min-w-0 flex-1 items-center gap-3 overflow-hidden",
+              "text-xs text-muted-foreground",
+            )}>
               <div className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
                 <span className="shrink-0">에이전트</span>
                 <span className="truncate" title={currentAgent?.name}>

@@ -3,6 +3,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun, SunMoon, type LucideProps } from "lucide-react";
+import { TooltipButton } from "@/components/ui/tooltip-button";
 
 const THEMES = ["light", "dark", "system"] as const;
 type Theme = (typeof THEMES)[number];
@@ -36,14 +37,13 @@ export function ThemeToggle() {
   const nextTheme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
   const Icon = THEME_ICON[theme];
   return (
-    <button
-      type="button"
+    <TooltipButton
+      label={`밝기 모드: ${THEME_LABEL[theme]}. 다음은 ${THEME_LABEL[nextTheme]}`}
+      variant="outline"
+      size="icon"
       onClick={() => setTheme(nextTheme)}
-      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border"
-      aria-label={`밝기 모드: ${THEME_LABEL[theme]}. 다음은 ${THEME_LABEL[nextTheme]}`}
-      title={`밝기 모드: ${THEME_LABEL[theme]}`}
     >
-      <Icon aria-hidden="true" className="size-4" />
-    </button>
+      <Icon aria-hidden="true" />
+    </TooltipButton>
   );
 }
