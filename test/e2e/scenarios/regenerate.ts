@@ -4,7 +4,7 @@ import { readEventStream } from "../../../web/src/lib/stream.ts";
 
 type ChatEvent = {
   type: string;
-  conversationId?: number;
+  conversationId?: string;
   messageId?: number;
 };
 

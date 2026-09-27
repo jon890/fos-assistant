@@ -1,8 +1,11 @@
 package com.bifos.assistant.chat.application;
 
+import java.util.UUID;
+
 /**
  * 대화 한 turn 이 도는 동안 화면으로 보내는 사건이다.
  *
+ * @param conversationId 대화의 공개 식별자. 대화 번호는 화면에 내보내지 않는다
  * @param stepName 흐름의 단계 이름. 단계 사건이 아니면 null
  * @param stepState {@code started}, {@code completed}, {@code failed} 셋이다. 단계 사건이 아니면 null
  * @param phase 도구나 하위 에이전트 사건의 시작 또는 완료 단계
@@ -19,7 +22,7 @@ public record ChatEvent(
         String text,
         String toolName,
         String detail,
-        Long conversationId,
+        UUID conversationId,
         Long messageId,
         Long executionId,
         String code,
@@ -44,7 +47,7 @@ public record ChatEvent(
     }
 
     /** 이 turn 의 실행 줄이 만들어졌다. 흐름이면 뿌리 실행의 번호다. */
-    public static ChatEvent started(Long conversationId, Long executionId) {
+    public static ChatEvent started(UUID conversationId, Long executionId) {
         return new ChatEvent("started", null, null, null, conversationId, null, executionId, null, null, null, null,
                 null, null, null, null, null, null, null, null);
     }
@@ -87,13 +90,13 @@ public record ChatEvent(
                 null, null, null, null, null, null, null, null);
     }
 
-    public static ChatEvent done(Long conversationId, Long messageId, Long executionId) {
+    public static ChatEvent done(UUID conversationId, Long messageId, Long executionId) {
         return new ChatEvent(
                 "done", null, null, null, conversationId, messageId, executionId, null, null, null, null,
                 null, null, null, null, null, null, null, null);
     }
 
-    public static ChatEvent stopped(Long conversationId, Long messageId, Long executionId) {
+    public static ChatEvent stopped(UUID conversationId, Long messageId, Long executionId) {
         return new ChatEvent(
                 "stopped", null, null, null, conversationId, messageId, executionId, null, null, null, null,
                 null, null, null, null, null, null, null, null);

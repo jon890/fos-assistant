@@ -1,21 +1,25 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { isConversationId } from "@/lib/conversation-id";
 
 type SendMessageResponse = {
-  conversationId: number;
+  conversationId: string;
   executionId: number;
   assistantText: string;
 };
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
-    conversationId?: number;
+    conversationId?: string;
     text?: string;
     agentCode?: string;
     attachmentIds?: number[];
   };
   if (!body.text || body.text.trim().length === 0) {
     return NextResponse.json({ code: "VALIDATION_FAILED", message: "보낼 내용을 입력해 주세요." }, { status: 400 });
+  }
+  if (body.conversationId != null && !isConversationId(body.conversationId)) {
+    return NextResponse.json({ code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." }, { status: 400 });
   }
 
   const result = await callControlPlane<SendMessageResponse>("/api/v1/chat/messages", {

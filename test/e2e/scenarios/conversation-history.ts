@@ -1,8 +1,8 @@
 /** 대화 목록과 메시지 이력을 사용자의 소유권과 함께 검사한다. */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 
-type Turn = { conversationId: number };
-type Conversation = { id: number; title: string };
+type Turn = { conversationId: string };
+type Conversation = { id: string; title: string };
 type Message = { role: "USER" | "ASSISTANT"; content: string; senderName: string | null };
 
 export const conversationHistoryScenario: Scenario = {

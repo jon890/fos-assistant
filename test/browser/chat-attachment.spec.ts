@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.ts";
+import { CONVERSATION_ID, expect, test } from "./fixtures.ts";
 import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 실제로 디코딩되는 1x1 PNG 다. 저장소에 이미지를 넣지 않으려고 바이트로 만들어 쓴다. */
@@ -93,7 +93,7 @@ test("지운 첨부는 서버 상한을 계속 차지하지 않아 지운 뒤 �
   // DELETE 가 끝나기 전에 다음 사진을 올리면 순서에 따라 상한에 걸린다. 응답을 기다린 뒤 고른다.
   const deleted = page.waitForResponse(
     (response) =>
-      /\/api\/chat\/conversations\/\d+\/attachments\/\d+$/.test(response.url())
+      new RegExp(`/api/chat/conversations/${CONVERSATION_ID}/attachments/\\d+$`).test(response.url())
       && response.request().method() === "DELETE",
   );
   await items.first().getByRole("button", { name: "사진 지우기" }).click();
@@ -209,12 +209,12 @@ test("보관 기간이 지난 첨부는 자리를 남기고 알린다", async ({
 
   const uploadResponse = page.waitForResponse(
     (response) =>
-      /\/api\/chat\/conversations\/\d+\/attachments$/.test(response.url())
+      new RegExp(`/api/chat/conversations/${CONVERSATION_ID}/attachments$`).test(response.url())
       && response.request().method() === "POST",
   );
   await page.getByTestId("attachment-input").setInputFiles([pngFile("expire.png")]);
   const response = await uploadResponse;
-  const conversationId = response.url().match(/conversations\/(\d+)\/attachments$/)?.[1];
+  const conversationId = response.url().match(new RegExp(`conversations/(${CONVERSATION_ID})/attachments$`))?.[1];
   expect(conversationId).toBeTruthy();
   const attachment = (await response.json()) as { id: number };
 
@@ -268,14 +268,14 @@ test("대화를 바꾸면 미리보기가 비워진다", async ({ page }, testIn
 });
 
 /**
- * 목록에서 제목이 `text` 인 대화를 열고 그 번호를 돌려준다.
+ * 목록에서 제목이 `text` 인 대화를 열고 그 공개 식별자를 돌려준다.
  *
- * <p>번호는 목록 API 에서 제목으로 찾는다. 앞선 전송이 늦게 부른 메시지 읽기가 섞일 수 있어, 아무 메시지
- * 요청이나 기다리지 않고 그 번호의 메시지 응답만 기다린다.
+ * <p>식별자는 목록 API 에서 제목으로 찾는다. 앞선 전송이 늦게 부른 메시지 읽기가 섞일 수 있어, 아무 메시지
+ * 요청이나 기다리지 않고 그 대화의 메시지 응답만 기다린다.
  */
-async function selectConversationByText(page: Page, text: string): Promise<number> {
+async function selectConversationByText(page: Page, text: string): Promise<string> {
   const listed = (await (await page.request.get("/api/chat/conversations")).json()) as Array<{
-    id: number;
+    id: string;
     title: string;
   }>;
   const conversation = listed.find((candidate) => candidate.title.includes(text));
@@ -311,13 +311,13 @@ async function createConversationWithText(page: Page, testInfo: TestInfo, text: 
 async function sendTextAndReadRequest(
   page: Page,
   text: string,
-): Promise<{ conversationId: number | null; attachmentIds: number[] }> {
+): Promise<{ conversationId: string | null; attachmentIds: number[] }> {
   const sent = page.waitForRequest(
     (request) => /\/api\/chat(\/stream)?$/.test(request.url()) && request.method() === "POST",
   );
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
-  const body = (await sent).postDataJSON() as { conversationId: number | null; attachmentIds: number[] };
+  const body = (await sent).postDataJSON() as { conversationId: string | null; attachmentIds: number[] };
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
   return body;
 }
@@ -333,7 +333,7 @@ test("올리는 중에 대화를 바꾸면 그 사진은 새 대화에 붙지 �
 
   const originId = await selectConversationByText(page, originText);
 
-  let targetId = 0;
+  let targetId = "";
   const heldUploads: Array<() => void> = [];
   await page.route("**/api/chat/conversations/*/attachments", async (route) => {
     if (route.request().method() !== "POST") {
@@ -404,7 +404,7 @@ test("빈 대화를 만드는 중에 대화를 바꾸면 고른 대화가 그대
     await route.continue();
   });
 
-  let originId = 0;
+  let originId = "";
   try {
     const created = page.waitForResponse(
       (response) => /\/api\/chat\/conversations$/.test(response.url()) && response.request().method() === "POST",

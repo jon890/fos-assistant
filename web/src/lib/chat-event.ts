@@ -4,7 +4,7 @@ export type ChatEvent = {
   text?: string | null;
   toolName?: string | null;
   detail?: string | null;
-  conversationId?: number | null;
+  conversationId?: string | null;
   messageId?: number | null;
   executionId?: number | null;
   code?: string | null;

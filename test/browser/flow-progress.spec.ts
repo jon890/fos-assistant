@@ -1,4 +1,4 @@
-import { expect, test, FLOW_AGENT_CODE } from "./fixtures.ts";
+import { conversationIdOf, expect, test, FLOW_AGENT_CODE } from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 흐름 에이전트로 새 대화를 열고 한 마디를 보낸다. */
@@ -66,7 +66,7 @@ test("연결이 끊기면 실패 줄은 남고 끝나지 않은 줄은 멈춘다
   await page.getByRole("textbox", { name: "메시지" }).fill("첫 답");
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last()).toBeVisible();
-  const conversationId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const conversationId = conversationIdOf(page.url());
   const events = [
     { type: "started", conversationId, executionId: 1 },
     { type: "tool", phase: "started", toolName: "실패 도구" },

@@ -9,9 +9,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "conversation")
@@ -22,6 +26,17 @@ public class Conversation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /**
+     * 주소와 API 에 내보내는 식별자다. 번호는 Control Plane 안에서만 쓴다.
+     *
+     * <p>넣을 때 Hibernate 가 v7 을 채운다. {@code BINARY} 로 못 박아 테스트의 H2 와 운영의 MySQL 이 같은
+     * 바이트 16개로 저장한다.
+     */
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "public_id", nullable = false, updatable = false, unique = true, columnDefinition = "BINARY(16)")
+    private UUID publicId;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -59,6 +74,10 @@ public class Conversation {
 
     public Long id() {
         return id;
+    }
+
+    public UUID publicId() {
+        return publicId;
     }
 
     public Long userId() {

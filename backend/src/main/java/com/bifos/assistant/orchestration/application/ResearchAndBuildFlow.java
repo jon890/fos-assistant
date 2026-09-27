@@ -284,7 +284,7 @@ public class ResearchAndBuildFlow implements Flow {
                 ? ChatMessage.regeneratedAnswer(
                         conversation.id(), text, root.id(), regenerate.previousAnswer().id())
                 : ChatMessage.fromAssistant(conversation.id(), text, root.id()));
-        return new ChatTurn(conversation.id(), root.id(), text, saved.id(), false);
+        return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), text, saved.id(), false);
     }
 
     /** 중지한 turn 은 답과 기억을 더 만들지 않고 Chief 를 취소 상태로 남긴다. */
@@ -306,7 +306,7 @@ public class ResearchAndBuildFlow implements Flow {
             conversation.rememberSession(sessionId);
             conversations.touchSession(conversation.id(), sessionId, Instant.now());
         }
-        return new ChatTurn(conversation.id(), root.id(), "", null, true);
+        return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), "", null, true);
     }
 
     /**
