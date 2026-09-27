@@ -215,7 +215,7 @@ model_name = (
 
 | 칸 | 뜻 |
 | --- | --- |
-| `provider`, `model` | 그 profile 의 기본값. `config.yaml` 의 `model.provider` 와 `model.default` 다 |
+| `provider`, `model` | 그 profile 의 기본값. `config.yaml` 의 `model.provider` 와 `model.default` 다. `provider` 는 Hermes 판에 따라 빠질 수 있다 |
 | `providers[].slug` | 실행 요청의 `provider` 에 넣는 값 |
 | `providers[].authenticated` | 그 provider 로 실제로 부를 수 있는가 |
 | `providers[].models` | 그 provider 로 고를 수 있는 모델 |
