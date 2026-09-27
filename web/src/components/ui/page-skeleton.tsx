@@ -3,12 +3,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 export type PageSkeletonShape = "cards" | "list" | "table" | "editor" | "tree" | "chat";
 export type PageSkeletonWidth = "2xl" | "3xl" | "4xl" | "5xl";
 export type PageSkeletonForm = "memory" | "person" | "agent";
+export type PageSkeletonDescription = "usage" | "memory" | "agent" | "person" | "persona";
 
 type Props = {
   shape: PageSkeletonShape;
   width: PageSkeletonWidth;
   title?: boolean;
-  description?: boolean;
+  /** 제목 아래 설명 문단이 있는 화면이면 그 화면이다. 화면마다 접히는 줄 수가 다르다. */
+  description?: PageSkeletonDescription;
   /** 목록 위에 입력 폼이 먼저 오는 화면이면 그 폼이다. */
   form?: PageSkeletonForm;
 };
@@ -38,12 +40,33 @@ function FormBlock({ form }: { form: PageSkeletonForm }) {
   return <Skeleton className={`mb-8 w-full ${FORM_CLASS[form]}`} />;
 }
 
+/**
+ * 설명 문단(`max-w-2xl text-sm leading-6`)의 줄마다 둘 자리다. 한 줄은 24px 이다.
+ * 390px 와 1280px 에서 측정한 실제 줄 수에 맞춰, 좁은 폭에서만 접히는 줄은 `md:hidden` 으로 둔다.
+ * 설명 글이 바뀌면 이 값도 다시 측정한다.
+ */
+const DESCRIPTION_LINES: Record<PageSkeletonDescription, readonly string[]> = {
+  usage: ["flex", "flex", "flex md:hidden"],
+  memory: ["flex"],
+  agent: ["flex", "flex", "flex md:hidden"],
+  person: ["flex", "flex md:hidden"],
+  persona: ["flex", "flex md:hidden"],
+};
+
 /** 제목과, 있으면 그 아래 설명 문단 자리다. `page.tsx` 의 `h1` 여백과 같게 맞춘다. */
-function TitleBlock({ description }: { description: boolean }) {
+function TitleBlock({ description }: { description?: PageSkeletonDescription }) {
   return (
     <>
       <Skeleton className={`h-7 w-48 ${description ? "mb-2" : "mb-6"}`} />
-      {description ? <Skeleton className="mb-6 h-5 w-full max-w-2xl" /> : null}
+      {description ? (
+        <div className="mb-6 max-w-2xl">
+          {DESCRIPTION_LINES[description].map((lineClass, index) => (
+            <div key={index} className={`h-6 items-center ${lineClass}`}>
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+        </div>
+      ) : null}
     </>
   );
 }
@@ -98,9 +121,9 @@ function TableBody() {
   );
 }
 
-/** `/agents/{code}` 다. `PersonaEditor` 의 긴 입력칸(`rows={16}`) 자리다. */
+/** `/agents/{code}` 다. `PersonaEditor` 의 긴 입력칸 자리다. `rows={16}` 에 `leading-6` 과 `py-2`, 테두리를 더해 402px 다. */
 function EditorBody() {
-  return <Skeleton className="h-96 w-full" />;
+  return <Skeleton className="h-[25.125rem] w-full" />;
 }
 
 /** `/executions/{id}` 다. 제목은 이 컴포넌트의 `title` 이 아니라 요약 자리 안에 직접 둔다. */
@@ -149,7 +172,7 @@ function ChatSkeleton({ width }: { width: PageSkeletonWidth }) {
   );
 }
 
-export function PageSkeleton({ shape, width, title = false, description = false, form }: Props) {
+export function PageSkeleton({ shape, width, title = false, description, form }: Props) {
   if (shape === "chat") return <ChatSkeleton width={width} />;
 
   return (

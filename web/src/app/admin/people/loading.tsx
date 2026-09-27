@@ -1,5 +1,5 @@
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 
 export default function Loading() {
-  return <PageSkeleton shape="list" width="4xl" title description form="person" />;
+  return <PageSkeleton shape="list" width="4xl" title description="person" form="person" />;
 }
