@@ -21,7 +21,7 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 
 | 위치 | 지금 모양 |
 | --- | --- |
-| `web/src/app/api/chat/conversations/[conversationId]/messages/route.ts` | 번호를 `/^\d+$/` 로 보고 `callControlPlane` 으로 넘기는 서버 라우트. 새 라우트의 본보기다 |
+| `web/src/app/api/chat/conversations/[conversationId]/messages/route.ts` | 대화 식별자가 UUID 모양인지 보고 `callControlPlane` 으로 넘기는 서버 라우트. 새 라우트의 본보기다. 모양 검사는 대화 공개 식별자 계획이 더한 공용 함수를 쓴다 |
 | `web/src/components/chat-panel.tsx` | `useEffect(..., [initialConversationId])` 가 대화를 열 때 상태를 비우고 `selectionVersion` 을 올린 뒤 이력을 읽는다. `startNewConversation()` 도 `selectionVersion` 을 올린다. 늦게 온 응답은 `selectionVersion.current === version` 으로 버린다 |
 | 같은 파일 | 도는 turn 의 상태는 `sending`, `activity`(`ActivityState`), `currentExecutionId`(ref), `executionId`(state), `stopRequested` 다. `stop()` 은 `currentExecutionId.current` 로 중지를 보낸다. `refreshMessages(id, version)` 이 이력을 다시 읽는다 |
 | 같은 파일 | `<Composer running={sending} canStop={executionId !== null && !stopRequested} onStop=...>` |

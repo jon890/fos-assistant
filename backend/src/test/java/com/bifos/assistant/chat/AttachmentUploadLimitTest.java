@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,7 @@ class AttachmentUploadLimitTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser user;
     private Long conversationId;
+    private UUID conversationPublicId;
 
     @BeforeEach
     void 준비한다() throws IOException {
@@ -67,7 +69,9 @@ class AttachmentUploadLimitTest {
         deleteTree(Path.of(properties.root()).toAbsolutePath());
         user = users.findByEmail(EMAIL)
                 .orElseGet(() -> users.save(AppUser.of(EMAIL, "올리는 사람", 1L, UserRole.MEMBER)));
-        conversationId = conversations.save(Conversation.startedBy(user.id(), "사진 대화", null)).id();
+        Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "사진 대화", null));
+        conversationId = conversation.id();
+        conversationPublicId = conversation.publicId();
     }
 
     @Test
@@ -109,7 +113,7 @@ class AttachmentUploadLimitTest {
         body.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(
-                        "http://localhost:" + port + "/api/v1/chat/conversations/" + conversationId + "/attachments"))
+                        "http://localhost:" + port + "/api/v1/chat/conversations/" + conversationPublicId + "/attachments"))
                 .header("Authorization", "Bearer " + jwt())
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))

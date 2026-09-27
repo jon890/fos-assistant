@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
@@ -47,6 +48,7 @@ class UsageControllerTest {
     @Autowired AgentRepository agents;
     @Autowired AgentService agentService;
     @Autowired ExecutionTreeService trees;
+    @Autowired ConversationRepository conversations;
     @Autowired EntityManagerFactory entityManagers;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
@@ -67,7 +69,7 @@ class UsageControllerTest {
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 USER_ID)));
-        controller = new UsageController(executions, currentUser, agentService, trees);
+        controller = new UsageController(executions, currentUser, agentService, trees, conversations);
         when(currentUser.require())
                 .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
     }
@@ -95,10 +97,10 @@ class UsageControllerTest {
     /**
      * 목록 조회가 내는 질의 수다.
      *
-     * <p>목록을 읽는 것 하나와 자식을 확인하는 것 하나다. 실행마다 읽는 에이전트는 {@code findById} 라
+     * <p>목록을 읽는 것 하나와 자식을 확인하는 것 하나, 대화 번호를 공개 식별자로 바꾸는 것 하나다. 실행마다 읽는 에이전트는 {@code findById} 라
      * 엔티티 적재로 세어지고 이 지표에 들어오지 않는다.
      */
-    private static final long QUERIES_PER_LIST = 2;
+    private static final long QUERIES_PER_LIST = 3;
 
     @Test
     void 목록이_길어져도_자식을_확인하는_질의는_늘지_않는다() {

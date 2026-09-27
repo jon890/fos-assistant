@@ -24,6 +24,7 @@ import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -93,6 +94,7 @@ class ChatAttachmentTurnTest {
     }
 
     @Autowired ChatService chat;
+    @Autowired ConversationAccess access;
     @Autowired AgentService agentService;
     @Autowired StarterService starterService;
     @Autowired AppUserRepository users;
@@ -319,7 +321,7 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "사진 없음", null);
         attachments.deleteByUser(dad, conversationId, second.id());
 
-        List<MessageView> history = chatController(dad).messages(conversationId);
+        List<MessageView> history = chatController(dad).messages(conversations.findById(conversationId).orElseThrow().publicId());
 
         MessageView withPhotos = history.stream().filter(it -> "사진 둘".equals(it.content())).findFirst().orElseThrow();
         assertThat(withPhotos.attachments())
@@ -357,7 +359,7 @@ class ChatAttachmentTurnTest {
     private ChatController chatController(CurrentUser user) {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
-        return new ChatController(chat, provider, users, agentService, new ChatEventStreams(Duration.ofSeconds(20)));
+        return new ChatController(chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)));
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {

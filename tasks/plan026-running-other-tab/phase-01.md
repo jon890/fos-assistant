@@ -49,6 +49,8 @@ web 은 다음 phase 가 고친다.
 
 - `tasks/plan023-design-foundation/` 이나 `tasks/plan024-design-screens/` 가 main 에 남아 있다 → `PHASE_BLOCKED: 디자인 계획이 끝나지 않았다`.
   두 계획이 채팅 화면의 부품을 바꾼다. 다음 phase 가 그 위에 얹힌다
+- `tasks/plan028-conversation-public-id/` 가 main 에 남아 있다 → `PHASE_BLOCKED: 대화 공개 식별자 계획이 끝나지 않았다`.
+  그 계획이 대화 경로와 식별자 타입을 바꾼다. 이 phase 가 그 위에 얹힌다
 
 ## 작업 항목
 
@@ -66,6 +68,10 @@ web 은 다음 phase 가 고친다.
 
 `ChatDtos` 에 `RunningTurnView` 를 더하고, `ChatController` 에
 `@GetMapping("/conversations/{conversationId}/running")` 을 더한다.
+
+**`{conversationId}` 는 대화의 공개 식별자(UUID)다.** 같은 컨트롤러의 다른 대화 경로와 같게
+`@PathVariable UUID conversationId` 로 받아 `ConversationAccess.requireOwnId` 로 번호를 얻은 뒤 `ChatService.running` 에 넘긴다.
+근거는 `docs/code-architecture.md` 「대화」 의 「경로」 표 아래 문단이다.
 
 ### 4. 이 phase 를 검증하는 테스트
 

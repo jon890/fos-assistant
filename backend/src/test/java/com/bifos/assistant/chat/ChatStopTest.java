@@ -17,6 +17,7 @@ import com.bifos.assistant.agent.infra.ProviderStateRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
+import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -67,6 +68,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 class ChatStopTest {
 
     @Autowired ChatService chat;
+    @Autowired ConversationAccess access;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
     @Autowired AgentModelSelector modelSelector;
@@ -142,7 +144,7 @@ class ChatStopTest {
         assertThat(stub().stopped()).containsExactly("run-stop");
         assertThat(executions.findById(stopped.executionId()).orElseThrow().status())
                 .isEqualTo(ExecutionStatus.CANCELLED);
-        assertThat(messages.findByConversationIdOrderByIdAsc(stopped.conversationId())).last()
+        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, stopped.conversationId()))).last()
                 .satisfies(message -> {
                     assertThat(message.role()).isEqualTo(MessageRole.ASSISTANT);
                     assertThat(message.content()).isEqualTo("절반");
@@ -161,7 +163,7 @@ class ChatStopTest {
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "멈춰 줘", "dad", relayed::add);
 
-        assertThat(messages.findByConversationIdOrderByIdAsc(relayed.getLast().conversationId())).last()
+        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, relayed.getLast().conversationId()))).last()
                 .satisfies(message -> assertThat(message.content()).isEqualTo("앞부분"));
     }
 
@@ -178,7 +180,7 @@ class ChatStopTest {
         ChatEvent stopped = relayed.getLast();
         assertThat(stopped.type()).isEqualTo("stopped");
         assertThat(stopped.messageId()).isNull();
-        assertThat(messages.findByConversationIdOrderByIdAsc(stopped.conversationId()))
+        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, stopped.conversationId())))
                 .singleElement().satisfies(message -> assertThat(message.role()).isEqualTo(MessageRole.USER));
     }
 

@@ -15,7 +15,7 @@ type ExecutionView = {
   errorCode: string | null;
   retryOfExecutionId: number | null;
 };
-type Turn = { conversationId: number; executionId: number; assistantText: string };
+type Turn = { conversationId: string; executionId: number; assistantText: string };
 
 /** 막힘을 검사할 때 2순위로 쓸 것이다. */
 const SECOND = { provider: "nvidia", model: "example-provider/example-model-b" } as const;

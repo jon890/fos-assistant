@@ -9,6 +9,7 @@ import com.bifos.assistant.usage.domain.CostByModel;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 사용량 화면이 받는 모양이다.
@@ -140,12 +141,13 @@ public final class UsageDtos {
     /**
      * 사용량 목록의 한 줄.
      *
+     * @param conversationId 이 실행이 속한 대화의 공개 식별자. 대화 없이 돈 실행이면 null
      * @param hasChildren 이 실행이 부른 실행이 있는가. 화면이 나무로 들어갈 곳을 고를 때 쓴다
      * @param retryOfExecutionId 막혀서 넘어오며 이 실행이 대신한 직전 실행. 첫 시도면 null
      */
     public record ExecutionView(
             Long id,
-            Long conversationId,
+            UUID conversationId,
             String agentCode,
             String agentName,
             String provider,
@@ -176,10 +178,11 @@ public final class UsageDtos {
          * <p>{@code hasChildren} 을 거짓으로 채워 주는 짧은 형태를 두지 않는다. 그것을 부르면 자식이
          * 있는 실행이 목록에 표시 없이 보이고, 컴파일은 통과한다. 부르는 쪽이 자식을 셀지 정하게 한다.
          */
-        static ExecutionView from(AgentExecution execution, Agent agent, boolean hasChildren) {
+        static ExecutionView from(
+                AgentExecution execution, Agent agent, UUID conversationPublicId, boolean hasChildren) {
             return new ExecutionView(
                     execution.id(),
-                    execution.conversationId(),
+                    conversationPublicId,
                     agent.code(),
                     agent.name(),
                     execution.provider(),

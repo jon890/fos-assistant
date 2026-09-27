@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.ts";
+import { CONVERSATION_ID, conversationIdOf, expect, test } from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 
 const PNG_1X1 = Buffer.from(
@@ -115,12 +115,12 @@ test("패널을 열고 닫아도 입력창에 올린 사진이 남는다", async
   await send(page, "사진 유지 검사");
   await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]')).toHaveCount(1);
   const uploaded = page.waitForResponse((response) => response.request().method() === "POST"
-    && /\/api\/chat\/conversations\/\d+\/attachments$/.test(response.url()));
+    && new RegExp(`/api/chat/conversations/${CONVERSATION_ID}/attachments$`).test(response.url()));
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "panel.png", mimeType: "image/png", buffer: PNG_1X1 },
   ]);
   const attachmentId = ((await (await uploaded).json()) as { id: number }).id;
-  const conversationId = Number(page.url().match(/\/c\/(\d+)$/)?.[1]);
+  const conversationId = conversationIdOf(page.url());
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
   const panel = await openSavedPanel(page);
   await expect(panel).toBeVisible();
