@@ -39,6 +39,8 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
 `shared/error` 의 `GlobalExceptionHandler` 가 `MethodArgumentTypeMismatchException` 을 받는다.
 숫자를 받는 자리에 `abc` 가 오거나 UUID 를 받는 자리에 번호가 와도 500 이 아니라 400 이다.
+요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다.
+본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
 
 ## 한 번의 대화가 지나는 길
 
