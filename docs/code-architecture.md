@@ -36,6 +36,10 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `mcp` | 제목만 주입한 Memory 본문 조회와 장기 토큰 인증 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
 
+**경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
+`shared/error` 의 `GlobalExceptionHandler` 가 `MethodArgumentTypeMismatchException` 을 받는다.
+숫자를 받는 자리에 `abc` 가 오거나 UUID 를 받는 자리에 번호가 와도 500 이 아니라 400 이다.
+
 ## 한 번의 대화가 지나는 길
 
 1. `ChatController` 가 현재 사용자를 확인한다.
@@ -256,7 +260,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 
 컨트롤러가 `ConversationAccess.requireOwnId(user, publicId)` 로 주인을 확인하며 번호로 바꾸고,
 `application` 안쪽은 지금처럼 번호를 쓴다. 사건과 응답에 싣는 공개 식별자는 `Conversation.publicId()` 에서 읽는다.
-UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다.
+UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. 「backend 패키지」 의 형식 오류 규칙이 모든 경로에 걸린다.
 
 `by-number` 경로는 옛 링크가 쓰이지 않게 되면 지운다.
 근거는 [ADR-025](adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)에 있다.
