@@ -9,8 +9,10 @@ public interface PriceCatalog {
     Optional<CatalogPrice> find(String provider, String model);
 
     /**
-     * 가격표와 그것을 받아 온 시점을 적는다. 예를 들면 {@code models.dev@2026-09-17} 이다. 금액마다 함께
-     * 저장하므로 나중에 가격이 바뀌어도 지난 기록이 다시 계산되지 않는다.
+     * 지금 들고 있는 가격표와 그것을 받아 온 시점이다. 예를 들면 {@code models.dev@2026-09-17} 이다.
+     *
+     * <p>금액에 적을 버전은 이것을 따로 부르지 말고 {@link #find} 가 돌려준 {@link CatalogPrice#version()} 을
+     * 쓴다. 두 번 물으면 그 사이에 가격표가 다시 읽혀 옛 가격으로 낸 금액에 새 버전이 붙을 수 있다.
      */
     String version();
 
