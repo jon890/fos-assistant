@@ -204,14 +204,14 @@ jobs:
           # 정리 조건 (하나라도 만족하면 삭제):
           #   1) 본문 길이 12자 미만
           #   2) /^test\s*\d*$/i 같은 단순 placeholder (test, test1, sample, foo 등)
-          #   3) 🔴 / 🟡 severity 마커 부재 (정상 review 형식 미준수)
+          #   3) 등급 표시(색 원과 P1~P5) 부재 (정상 review 형식 미준수)
           ids=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/comments?per_page=100" --jq '
             .[]
             | select(.user.login == "claude[bot]")
             | select(
                 (.body | length < 12) or
                 (.body | test("^(test|sample|placeholder|foo|bar|example)\\s*[0-9]*$"; "i")) or
-                ((.body | test("🔴|🟡")) | not)
+                ((.body | test("(🔴|🟠|🟡|🔵|⚪) \\*\\*P[1-5]")) | not)
               )
             | .id
           ')
