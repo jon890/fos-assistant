@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const body = (await request.json()) as { agentCode?: string };
 
-  const result = await callControlPlane<{ conversationId: number }>("/api/v1/chat/conversations", {
+  const result = await callControlPlane<{ conversationId: string }>("/api/v1/chat/conversations", {
     method: "POST",
     body: { agentCode: body.agentCode ?? null },
   });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane, forwardControlPlane } from "@/lib/control-plane";
+import { isConversationId } from "@/lib/conversation-id";
 
 type RouteContext = {
   params: Promise<{ conversationId: string; attachmentId: string }>;
@@ -7,7 +8,7 @@ type RouteContext = {
 
 function badId() {
   return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: "대화 번호나 첨부 번호가 올바르지 않습니다." },
+    { code: "VALIDATION_FAILED", message: "대화 주소나 첨부 번호가 올바르지 않습니다." },
     { status: 400 },
   );
 }
@@ -15,7 +16,7 @@ function badId() {
 /** 사진 본문을 그대로 흘려보낸다. 지워졌으면 Control Plane 이 410 을 준다. */
 export async function GET(_request: Request, context: RouteContext) {
   const { conversationId, attachmentId } = await context.params;
-  if (!/^\d+$/.test(conversationId) || !/^\d+$/.test(attachmentId)) return badId();
+  if (!isConversationId(conversationId) || !/^\d+$/.test(attachmentId)) return badId();
 
   const opened = await forwardControlPlane(
     `/api/v1/chat/conversations/${conversationId}/attachments/${attachmentId}`,
@@ -45,7 +46,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   const { conversationId, attachmentId } = await context.params;
-  if (!/^\d+$/.test(conversationId) || !/^\d+$/.test(attachmentId)) return badId();
+  if (!isConversationId(conversationId) || !/^\d+$/.test(attachmentId)) return badId();
 
   const result = await callControlPlane(
     `/api/v1/chat/conversations/${conversationId}/attachments/${attachmentId}`,

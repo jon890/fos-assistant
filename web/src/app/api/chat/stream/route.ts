@@ -3,7 +3,7 @@ import { requestControlPlane } from "@/lib/control-plane";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
-    conversationId?: number;
+    conversationId?: string;
     text?: string;
     agentCode?: string;
     attachmentIds?: number[];
