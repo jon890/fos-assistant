@@ -23,8 +23,14 @@ import type { ExecutionTreeResponse } from "./execution/execution-tree";
 type ErrorPayload = { code: string; message: string };
 /** 대화에 지금 도는 turn 이다. 실행 번호가 아직 붙지 않았으면 `running` 이 참이어도 나머지가 null 이다. */
 type RunningTurn = { running: boolean; executionId: number | null; startedAt: string | null };
-/** 다른 창이 보낸 turn 을 보고 있는 대화와, 보기 시작할 때의 선택 판이다. */
-type ObservedTurn = { conversationId: string; version: number };
+/**
+ * 도는 turn 을 보고 있는 대화와, 보기 시작할 때의 선택 판이다.
+ *
+ * <p>`sentHere` 는 이 창이 보낸 turn 의 스트림이 끊겨 넘어온 것인지다. 안내 문구만 이 값으로 고른다.
+ */
+type ObservedTurn = { conversationId: string; version: number; sentHere: boolean };
+/** 끝 사건 없이 끊긴 스트림을 도는 turn 조회로 넘긴 결과다. */
+type InterruptedOutcome = "observing" | "answered" | "missing";
 type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
 type TurnStreamCallbacks = {
   onStarted?(event: ChatEvent): void | Promise<void>;
@@ -69,9 +75,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   const [executionId, setExecutionId] = useState<number | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
   /**
-   * 다른 창이 보낸 turn 이 도는 대화를 보고 있다.
+   * 이 창의 스트림 없이 도는 turn 을 보고 있다.
    *
-   * <p>보낸 창은 자기 스트림으로 끝을 알므로 이 값을 쓰지 않는다. 대화를 열 때 도는 turn 이 있을 때만 채운다.
+   * <p>보낸 창은 스트림이 이어지는 동안 자기 스트림으로 끝을 알므로 이 값을 쓰지 않는다. 대화를 열 때 도는
+   * turn 이 있거나, 보낸 창의 스트림이 끝 사건 없이 끊겼는데 turn 이 아직 돌 때만 채운다.
    */
   const [observing, setObserving] = useState<ObservedTurn | null>(null);
   const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
@@ -390,14 +397,61 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setMessagesLoading(false);
   }
 
-  /** 다른 창이 보낸 turn 을 보기 시작한다. 보낸 창과 같은 상태를 채워 기다리는 표시와 중지가 같이 동작한다. */
-  function beginObserving(id: string, version: number, running: RunningTurn) {
+  /**
+   * 도는 turn 을 보기 시작한다. 보낸 창과 같은 상태를 채워 기다리는 표시와 중지가 같이 동작한다.
+   *
+   * <p>스트림이 끊겨 넘어온 창은 이미 받은 작업 과정을 그대로 두고, 다음 나무 조회가 그것을 덮는다.
+   */
+  function beginObserving(id: string, version: number, running: RunningTurn, sentHere = false) {
+    const startedAt = running.startedAt ? Date.parse(running.startedAt) : Date.now();
     setSending(true);
     setStopRequested(false);
     currentExecutionId.current = running.executionId;
     setExecutionId(running.executionId);
-    setActivity(emptyActivity(running.startedAt ? Date.parse(running.startedAt) : Date.now()));
-    setObserving({ conversationId: id, version });
+    setActivity((previous) => ({ ...emptyActivity(startedAt), items: previous?.items ?? [] }));
+    setObserving({ conversationId: id, version, sentHere });
+  }
+
+  /**
+   * 보낸 창의 스트림이 `done`, `stopped`, `error` 없이 끝났을 때 도는 turn 을 묻는다.
+   *
+   * <p>스트림이 끊겨도 실행은 계속될 수 있다. 실제로 끊긴 뒤 13분을 더 돌아 성공했는데 화면은 그동안 실패로
+   * 보였다. 돌고 있으면 보는 창으로 넘어가고, 돌지 않으면 이력을 다시 읽어 답이 저장됐는지 본다.
+   *
+   * <p>도는 turn 을 이력보다 먼저 묻는다. 대화를 열 때와 같은 까닭이다. 넘어갈 때 받던 답 조각은 치운다.
+   * 저장된 답이 아니고, 남으면 기다리는 표시 대신 멈춘 답으로 보인다. 이력을 다시 읽으면 임시 질문도 저장된
+   * 질문으로 바뀌고, 보기가 끝나면 이력을 한 번 더 읽어 저장된 것만 남는다.
+   *
+   * @param savedBefore 보내기 전에 화면에 있던 저장된 메시지 수다. 이보다 늘고 마지막이 답이면 답이 저장된 것이다.
+   * @param streamedId 받던 답 조각의 임시 식별자다.
+   */
+  async function handOffInterruptedStream(version: number, savedBefore: number, streamedId: string)
+    : Promise<InterruptedOutcome> {
+    const id = conversationIdRef.current;
+    if (id === null) return "missing";
+    let running: RunningTurn | null = null;
+    try {
+      const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
+      if (response.ok) running = await readPayload<RunningTurn>(response);
+    } catch {
+      // 묻지 못하면 돌지 않는 것으로 보고 이력으로 판단한다.
+    }
+    if (selectionVersion.current !== version) return "missing";
+    if (running?.running) {
+      setTurns((previous) => previous.filter((turn) => turn.id !== streamedId));
+      await refreshMessages(id, version).catch(() => {
+        // 이력을 못 읽으면 임시 질문을 둔 채 본다. 보기가 끝날 때 이력을 다시 읽는다.
+      });
+      if (selectionVersion.current !== version) return "missing";
+      beginObserving(id, version, running, true);
+      return "observing";
+    }
+    try {
+      const loaded = await refreshMessages(id, version);
+      return loaded.length > savedBefore && loaded.at(-1)?.role === "ASSISTANT" ? "answered" : "missing";
+    } catch {
+      return "missing";
+    }
   }
 
   /** 보는 상태를 모두 되돌린다. 끝났을 때와 조회가 이어 실패했을 때 쓴다. */
@@ -491,6 +545,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const version = selectionVersion.current;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
+    const savedBefore = turns.filter((turn) => typeof turn.id === "number").length;
+    /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
+    let handedOff = false;
     setSending(true);
     setError(null);
     setTurnError(null);
@@ -535,9 +592,35 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         return false;
       }
     };
+    const stream: TurnStreamState = { started: false, done: false, reportedError: false };
     const startedFailureMessage = (message: string, refreshed: boolean) => refreshed
       ? message
       : `${message} 대화 이력을 다시 읽지 못했다. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
+
+    /** 끝 사건 없이 끊긴 스트림을 마무리한다. 돌고 있거나 답이 저장됐으면 오류로 끝내지 않는다. */
+    const settleInterruptedStream = async (): Promise<boolean> => {
+      const outcome = await handOffInterruptedStream(version, savedBefore, assistantPendingId);
+      if (selectionVersion.current !== version) return stream.started;
+      if (outcome === "observing") {
+        handedOff = true;
+        return true;
+      }
+      if (outcome === "answered") {
+        setActivity(null);
+        setFlowIsSlow(false);
+        return true;
+      }
+      finishFailedActivity();
+      const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
+      if (stream.started && conversationIdRef.current !== null) {
+        const refreshed = await refreshAfterStartedFailure();
+        if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
+      } else {
+        restoreFailedMessage();
+        if (selectionVersion.current === version) setError(message);
+      }
+      return stream.started;
+    };
 
     const requestBody = {
       conversationId,
@@ -601,7 +684,6 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         return false;
       }
 
-      const stream = { started: false, done: false, reportedError: false };
       try {
         await consumeTurnStream(response, version, stream, {
           onStarted: (event) => {
@@ -645,32 +727,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           },
         });
       } catch {
-        if (!stream.done && !stream.reportedError) {
-          finishFailedActivity();
-          const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
-          if (stream.started && conversationIdRef.current !== null) {
-            const refreshed = await refreshAfterStartedFailure();
-            if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
-          } else {
-            restoreFailedMessage();
-            if (selectionVersion.current === version) setError(message);
-          }
-          return stream.started;
-        }
+        if (!stream.done && !stream.reportedError) return await settleInterruptedStream();
         return stream.started || stream.done;
       }
-      if (!stream.done && !stream.reportedError) {
-        finishFailedActivity();
-        const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
-        if (stream.started && conversationIdRef.current !== null) {
-          const refreshed = await refreshAfterStartedFailure();
-          if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
-        } else {
-          restoreFailedMessage();
-          if (selectionVersion.current === version) setError(message);
-        }
-        return stream.started;
-      }
+      if (!stream.done && !stream.reportedError) return await settleInterruptedStream();
       return stream.started || stream.done;
     } catch (reason) {
       finishFailedActivity();
@@ -678,7 +738,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       setError(reason instanceof Error ? reason.message : "요청을 보내지 못했다.");
       return false;
     } finally {
-      if (selectionVersion.current === version) setSending(false);
+      if (selectionVersion.current === version && !handedOff) setSending(false);
     }
   }
 
@@ -688,6 +748,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const regeneratedSlotId = latestSlots()?.answers.at(-1)?.version.slotId;
     const pendingId = `assistant-regenerate-${Date.now()}`;
     const stream = { started: false, done: false, reportedError: false };
+    const savedBefore = turns.filter((turn) => typeof turn.id === "number").length;
+    /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
+    let handedOff = false;
     setSending(true);
     setError(null);
     setTurnError(null);
@@ -707,29 +770,47 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         if (payload.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
         return;
       }
-      await consumeTurnStream(response, version, stream, {
-        onDelta: (textDelta) => {
-          setTurns((previous) => {
-            const current = previous.find((turn) => turn.id === pendingId);
-            return current ? previous.map((turn) => turn.id === pendingId ? { ...turn, content: turn.content + textDelta } : turn)
-              : [...previous, { id: pendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
-          });
-        },
-        onReset: () => {
-          setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-        },
-        onError: async (event) => {
-          setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-          setTurnError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다."));
-          if (event.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
-        },
-        onDone: async (event) => {
-          setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-          await Promise.all([refresh(), refreshMessages(event.conversationId!, version)]);
+      try {
+        await consumeTurnStream(response, version, stream, {
+          onDelta: (textDelta) => {
+            setTurns((previous) => {
+              const current = previous.find((turn) => turn.id === pendingId);
+              return current ? previous.map((turn) => turn.id === pendingId ? { ...turn, content: turn.content + textDelta } : turn)
+                : [...previous, { id: pendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
+            });
+          },
+          onReset: () => {
+            setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+          },
+          onError: async (event) => {
+            setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+            setTurnError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다."));
+            if (event.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
+          },
+          onDone: async (event) => {
+            setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+            await Promise.all([refresh(), refreshMessages(event.conversationId!, version)]);
+            clearSelectedSlot(regeneratedSlotId);
+          },
+        });
+      } catch (reason) {
+        // 끝 사건을 받은 뒤의 실패는 그대로 올린다. 받기 전에 읽기가 깨졌으면 끊긴 것으로 보고 아래에서 묻는다.
+        if (stream.done || stream.reportedError) throw reason;
+      }
+      if (!stream.done && !stream.reportedError) {
+        const outcome = await handOffInterruptedStream(version, savedBefore, pendingId);
+        if (selectionVersion.current !== version) return;
+        if (outcome === "observing") {
+          handedOff = true;
+          return;
+        }
+        if (outcome === "answered") {
+          setActivity(null);
           clearSelectedSlot(regeneratedSlotId);
-        },
-      });
-      if (!stream.done && !stream.reportedError) throw new Error(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+          return;
+        }
+        throw new Error(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+      }
     } catch (reason) {
       if (selectionVersion.current === version) {
         setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
@@ -738,7 +819,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         await refreshMessages(conversationId, version).catch(() => {});
       }
     } finally {
-      if (selectionVersion.current === version) {
+      if (selectionVersion.current === version && !handedOff) {
         setSending(false);
         setFlowIsSlow(false);
       }
@@ -833,7 +914,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           {error ? <p className="mb-2 rounded-md bg-muted px-3 py-2 text-sm">{error}</p> : null}
           {observing ? (
             <p data-testid="observing-notice" className="mb-2 text-xs text-muted-foreground">
-              다른 창에서 답하는 중이다. 끝나면 이 창에도 답이 나타난다.
+              {observing.sentHere
+                ? "응답 연결이 끊겨 답을 기다리는 중이다. 끝나면 답이 나타난다."
+                : "다른 창에서 답하는 중이다. 끝나면 이 창에도 답이 나타난다."}
             </p>
           ) : null}
           <Composer

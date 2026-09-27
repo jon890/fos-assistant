@@ -54,6 +54,59 @@ function composer(page: Page) {
   return page.getByTestId("composer-shell");
 }
 
+/** 끊김 문구의 앞부분이다. 넘어간 창에는 나오지 않아야 한다. */
+const INTERRUPTED_MESSAGE = "응답 연결이 끊겼다";
+
+/**
+ * 그 창의 `/api/chat/stream` 응답을 시험이 끊을 수 있게 감싼다. `cutChatStream()` 을 부르면 화면은 읽던 스트림이
+ * 깨지고, 받아 오던 연결은 취소된다.
+ *
+ * <p>`route.fetch()` 는 붙잡은 실행이 끝날 때까지 응답 전체를 기다리므로 흘러오는 중에 끊을 수 없다. 그래서
+ * 화면의 fetch 를 감싸 흘러오는 본문을 그대로 넘기다가 그 자리에서 끊는다. 시험만 이 감싸기를 넣고 운영
+ * 코드에는 아무 문도 두지 않는다.
+ */
+async function makeChatStreamCuttable(page: Page) {
+  await page.addInitScript(() => {
+    const original = window.fetch.bind(window);
+    const cuts: Array<() => void> = [];
+    (window as unknown as { cutChatStream(): void }).cutChatStream = () => {
+      for (const cut of cuts.splice(0)) cut();
+    };
+    window.fetch = async (input, init) => {
+      const response = await original(input, init);
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (new URL(url, location.href).pathname !== "/api/chat/stream" || !response.body) return response;
+      const reader = response.body.getReader();
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          cuts.push(() => {
+            controller.error(new TypeError("시험이 끊은 연결"));
+            void reader.cancel().catch(() => {});
+          });
+        },
+        async pull(controller) {
+          try {
+            const { value, done } = await reader.read();
+            if (done) controller.close();
+            else controller.enqueue(value);
+          } catch (reason) {
+            // 끊은 뒤에 끝난 읽기다. 이미 깨진 스트림이면 아무 일도 하지 않는다.
+            controller.error(reason);
+          }
+        },
+      });
+      return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+    };
+  });
+}
+
+async function cutChatStream(page: Page) {
+  await page.evaluate(() => (window as unknown as { cutChatStream(): void }).cutChatStream());
+}
+
+/** 도는 turn 이 없다는 응답이다. */
+const NOT_RUNNING = { running: false, executionId: null, startedAt: null };
+
 test("다른 창에서 답하는 중이면 기다리는 표시와 중지를 보이고 끝나면 답을 읽는다", async ({ context, page, hermes }) => {
   const conversationId = await startHeldTurn(page, hermes, "다른 창 보기 검사");
   try {
@@ -171,6 +224,99 @@ test("보는 중에 다른 대화로 옮기면 입력창이 풀리고 옮기기 
     // 요청이 더 가지 않는 것을 보려면 기다릴 조건이 없다. 주기 한 번을 넘길 만큼 고정으로 기다린다.
     await other.waitForTimeout(OBSERVE_INTERVAL_MS + 1_500);
     expect(runningRequests(), "옮긴 뒤에도 옮기기 전 대화를 물었다").toBe(afterMove);
+  } finally {
+    await releaseAndSettle(page, hermes);
+  }
+});
+
+test("보낸 창을 새로 고치면 기다리는 표시를 보이고 끝나면 답을 읽는다", async ({ page, hermes }) => {
+  await startHeldTurn(page, hermes, "새로 고친 창 보기 검사");
+  try {
+    await page.reload();
+    await expect(page.getByTestId("observing-notice")).toBeVisible();
+    await expect(page.getByLabel("비서의 답을 기다리는 중")
+      .or(page.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
+    await expect(page.getByTestId("no-answer")).toHaveCount(0);
+    await expect(page.getByTestId("turn-error")).toHaveCount(0);
+
+    await hermes.releaseHeldRun();
+    await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
+    await expect(page.getByTestId("observing-notice")).toHaveCount(0);
+    await expect(page.getByTestId("no-answer")).toHaveCount(0);
+  } finally {
+    await releaseAndSettle(page, hermes);
+  }
+});
+
+test("보낸 창의 스트림이 끊겨도 turn 이 돌면 기다리는 표시로 바뀌고 끝나면 저장된 것만 남는다", async ({ page, hermes }) => {
+  await makeChatStreamCuttable(page);
+  const text = "스트림 끊김 넘어가기 검사";
+  await startHeldTurn(page, hermes, text);
+  try {
+    await cutChatStream(page);
+    const notice = page.getByTestId("observing-notice");
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText("답을 기다리는 중");
+    await expect(notice).not.toContainText("다른 창");
+    await expect(page.getByLabel("비서의 답을 기다리는 중")
+      .or(page.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
+    await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
+    await expect(page.getByTestId("turn-error")).toHaveCount(0);
+    await expect(page.getByTestId("user-message")).toHaveCount(1);
+
+    await hermes.releaseHeldRun();
+    await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
+    await expect(notice).toHaveCount(0);
+    await expect(page.getByTestId("user-message")).toHaveCount(1);
+    await expect(page.getByTestId("user-message").first()).toContainText(text);
+    await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
+    await expect(composer(page).getByRole("button", { name: "보내기" })).toBeVisible();
+  } finally {
+    await releaseAndSettle(page, hermes);
+  }
+});
+
+test("스트림이 끊겼을 때 turn 이 이미 끝나 답이 저장됐으면 오류 없이 답을 보인다", async ({ page, hermes }) => {
+  await makeChatStreamCuttable(page);
+  const conversationId = await startHeldTurn(page, hermes, "스트림 끊김 뒤 답 있음 검사");
+  try {
+    // 끊긴 창이 묻는 순간에는 turn 이 끝나 있게 한다. 붙잡은 run 을 풀고 실제로 끝난 뒤의 응답을 넘긴다.
+    await page.route(`**/api/chat/conversations/${conversationId}/running`, async (route) => {
+      await hermes.releaseHeldRun();
+      let last = await route.fetch();
+      await expect.poll(async () => {
+        last = await route.fetch();
+        return ((await last.json()) as { running: boolean }).running;
+      }, { timeout: 30_000 }).toBe(false);
+      await route.fulfill({ response: last });
+    });
+    await cutChatStream(page);
+    await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
+    await expect(page.getByTestId("user-message")).toHaveCount(1);
+    await expect(page.getByTestId("observing-notice")).toHaveCount(0);
+    await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
+    await expect(page.getByTestId("turn-error")).toHaveCount(0);
+    await expect(composer(page).getByRole("button", { name: "보내기" })).toBeVisible();
+  } finally {
+    await releaseAndSettle(page, hermes);
+  }
+});
+
+test("스트림이 끊기고 turn 이 돌지 않는데 답도 없으면 끊김 문구를 보인다", async ({ page, hermes }) => {
+  await makeChatStreamCuttable(page);
+  const conversationId = await startHeldTurn(page, hermes, "스트림 끊김 답 없음 검사");
+  try {
+    await page.route(`**/api/chat/conversations/${conversationId}/running`, (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(NOT_RUNNING),
+    }));
+    await cutChatStream(page);
+    await expect(page.getByTestId("turn-error")).toContainText(INTERRUPTED_MESSAGE);
+    await expect(page.getByTestId("observing-notice")).toHaveCount(0);
+    await expect(page.getByTestId("assistant-message")).toHaveCount(0);
+    await expect(page.getByTestId("user-message")).toHaveCount(1);
+    await expect(composer(page).getByRole("button", { name: "보내기" })).toBeVisible();
   } finally {
     await releaseAndSettle(page, hermes);
   }
