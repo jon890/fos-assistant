@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { forwardControlPlane } from "@/lib/control-plane";
+import { isConversationId } from "@/lib/conversation-id";
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
@@ -8,9 +9,9 @@ type RouteContext = {
 /** 사진을 올린다. multipart 본문을 읽어 다시 만들지 않고 그대로 흘려보낸다. */
 export async function POST(request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
-  if (!/^\d+$/.test(conversationId)) {
+  if (!isConversationId(conversationId)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "대화 번호가 올바르지 않습니다." },
+      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." },
       { status: 400 },
     );
   }

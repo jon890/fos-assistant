@@ -131,8 +131,8 @@ public class ChatService {
         }
         ChatTurn turn = runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, null);
         onEvent.accept(turn.cancelled()
-                ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
-                : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
     }
 
     /**
@@ -184,7 +184,7 @@ public class ChatService {
             PendingTurn pending = begin(user, routed, input, context, snapshot, option, previousExecutionId, intent);
             turns.rekey(handle, pending.execution().id());
             if (streaming) {
-                onEvent.accept(ChatEvent.started(conversation.id(), pending.execution().id()));
+                onEvent.accept(ChatEvent.started(conversation.publicId(), pending.execution().id()));
             }
             if (previousExecutionId != null) {
                 append(pending, ExecutionEventType.PROVIDER_SWITCHED, option.label());
@@ -255,7 +255,7 @@ public class ChatService {
                 user, routed.conversation(), routed.agent(), null, null, snapshot, null, null);
         turns.rekey(handle, execution.id());
         if (streaming) {
-            onEvent.accept(ChatEvent.started(routed.conversation().id(), execution.id()));
+            onEvent.accept(ChatEvent.started(routed.conversation().publicId(), execution.id()));
         }
         PendingTurn pending = new PendingTurn(
                 user,
@@ -299,14 +299,14 @@ public class ChatService {
                     intent,
                     execution -> {
                         turns.rekey(handle, execution.id());
-                        if (streaming) onEvent.accept(ChatEvent.started(conversation.id(), execution.id()));
+                        if (streaming) onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
                     }, onEvent);
             if (!turn.cancelled()) turns.markFinished(handle);
             if (streaming) {
                 if (!turn.cancelled()) onEvent.accept(ChatEvent.delta(turn.assistantText()));
                 onEvent.accept(turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
             }
             return turn;
         } finally {
@@ -455,7 +455,8 @@ public class ChatService {
         ChatMessage message = messages.save(
                 answerMessage(pending, answer, execution.id()));
         memoryProposer.proposeFrom(pending.user(), pending.conversation(), pending.agent(), execution, answer);
-        return new ChatTurn(pending.conversation().id(), execution.id(), answer, message.id(), false);
+        return new ChatTurn(pending.conversation().id(), pending.conversation().publicId(), execution.id(),
+                answer, message.id(), false);
     }
 
     private ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelOption option) {
@@ -472,8 +473,8 @@ public class ChatService {
             pending.conversation().rememberSession(result.sessionId());
             conversations.touchSession(pending.conversation().id(), result.sessionId(), Instant.now());
         }
-        return new ChatTurn(pending.conversation().id(), execution.id(), answer,
-                message == null ? null : message.id(), true);
+        return new ChatTurn(pending.conversation().id(), pending.conversation().publicId(), execution.id(),
+                answer, message == null ? null : message.id(), true);
     }
 
     /** 마지막 답을 새 실행으로 다시 만든다. */
@@ -503,8 +504,8 @@ public class ChatService {
             }
             ChatTurn turn = runTurn(user, routed, question.content(), intent, onEvent, true, handle);
             onEvent.accept(turn.cancelled()
-                    ? ChatEvent.stopped(turn.conversationId(), turn.messageId(), turn.executionId())
-                    : ChatEvent.done(turn.conversationId(), turn.messageId(), turn.executionId()));
+                    ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                    : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
         } finally {
             turns.close(handle);
         }
@@ -735,11 +736,6 @@ public class ChatService {
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {
         Conversation conversation = access.requireOwn(user, conversationId);
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
-    }
-
-    /** SSE 응답을 열기 전에 대화 주인을 확인한다. */
-    public void requireConversation(CurrentUser user, Long conversationId) {
-        access.requireOwn(user, conversationId);
     }
 
     public List<Conversation> conversationsOf(CurrentUser user) {

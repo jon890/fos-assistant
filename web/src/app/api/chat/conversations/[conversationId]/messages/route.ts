@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { isConversationId } from "@/lib/conversation-id";
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
@@ -7,9 +8,9 @@ type RouteContext = {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
-  if (!/^\d+$/.test(conversationId)) {
+  if (!isConversationId(conversationId)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "대화 번호가 올바르지 않습니다." },
+      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." },
       { status: 400 },
     );
   }

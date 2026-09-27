@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 public final class ChatDtos {
 
@@ -14,11 +15,12 @@ public final class ChatDtos {
     }
 
     /**
+     * @param conversationId 이어 쓸 대화의 공개 식별자. 없으면 새 대화를 만든다
      * @param attachmentIds 이 메시지와 함께 보낼 첨부 번호들. 화면이 비워 보내든 빼고 보내든 같게 다루려고
      *     null 을 빈 목록으로 바꾼다
      */
     public record SendMessageRequest(
-            Long conversationId,
+            UUID conversationId,
             @NotBlank @Size(max = 8000) String text,
             String agentCode,
             List<Long> attachmentIds) {
@@ -32,10 +34,10 @@ public final class ChatDtos {
     public record StartConversationRequest(String agentCode) {
     }
 
-    public record StartConversationResponse(Long conversationId) {
+    public record StartConversationResponse(UUID conversationId) {
     }
 
-    public record SendMessageResponse(Long conversationId, Long executionId, String assistantText) {
+    public record SendMessageResponse(UUID conversationId, Long executionId, String assistantText) {
     }
 
     /**
@@ -62,7 +64,7 @@ public final class ChatDtos {
     public record StopResponse(String status) {}
 
     /**
-     * 첨부 한 장이다. 본문과 주소를 담지 않는다. 화면이 대화 번호와 첨부 번호로 본문 경로를 만든다.
+     * 첨부 한 장이다. 본문과 주소를 담지 않는다. 화면이 대화의 공개 식별자와 첨부 번호로 본문 경로를 만든다.
      *
      * @param visible 아직 볼 수 있다. 보관 기간이 지났거나 사용자가 지웠으면 false
      * @param expiresAt 파일을 지울 시각
@@ -79,8 +81,13 @@ public final class ChatDtos {
         }
     }
 
-    public record ConversationView(Long id, String title, String agentCode, String agentName,
+    /** @param id 대화의 공개 식별자 */
+    public record ConversationView(UUID id, String title, String agentCode, String agentName,
             Instant updatedAt) {
+    }
+
+    /** 옛 대화 번호로 찾은 대화의 공개 식별자다. 옛 링크를 새 주소로 넘길 때만 쓴다. */
+    public record ConversationRefView(UUID id) {
     }
 
     public record RenameConversationRequest(@NotNull String title) {

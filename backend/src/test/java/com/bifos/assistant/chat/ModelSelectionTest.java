@@ -17,6 +17,7 @@ import com.bifos.assistant.agent.infra.ProviderStateRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
+import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunEventStream;
@@ -90,6 +91,7 @@ class ModelSelectionTest {
     @Autowired ProviderStateRepository providerStates;
     @Autowired ChatMessageRepository messages;
     @Autowired ConversationRepository conversations;
+    @Autowired ConversationAccess access;
     @Autowired AgentExecutionRepository executions;
     @Autowired ExecutionEventRepository executionEvents;
     @Autowired HermesRunsClient hermes;
@@ -305,7 +307,7 @@ class ModelSelectionTest {
         List<String> types = relayed.stream().map(ChatEvent::type).toList();
         assertThat(types).contains("reset", "switched");
         assertThat(types.indexOf("reset")).isLessThan(types.indexOf("switched"));
-        assertThat(messages.findByConversationIdOrderByIdAsc(relayed.getLast().conversationId()))
+        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(user, relayed.getLast().conversationId())))
                 .last()
                 .satisfies(message -> assertThat(message.content()).isEqualTo("네"));
     }

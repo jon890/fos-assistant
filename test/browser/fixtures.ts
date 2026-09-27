@@ -54,6 +54,19 @@ export const PERSONA_FAMILY_AGENT_CODE = "browserpersonafamily";
  */
 export const PERSONA_EMPTY_AGENT_CODE = "browserpersonaempty";
 
+/** 대화 공개 식별자(UUID)의 정규식 조각이다. 대화 번호는 주소와 API 에 나오지 않는다. */
+export const CONVERSATION_ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+/** 대화 화면의 주소다. 첫째 묶음이 공개 식별자다. */
+export const CONVERSATION_URL = new RegExp(`/chat/(${CONVERSATION_ID})$`);
+
+/** 대화 화면 주소에서 공개 식별자를 꺼낸다. 대화 화면이 아니면 실패한다. */
+export function conversationIdOf(url: string): string {
+  const id = new URL(url).pathname.match(CONVERSATION_URL)?.[1];
+  if (!id) throw new Error(`대화 화면 주소가 아니다: ${url}`);
+  return id;
+}
+
 /** profile 이름과 그 profile 의 key 다. 가짜 Hermes 와 key 디렉터리가 같은 표를 쓴다. */
 const PROFILE_KEYS: Record<string, string> = {
   browser: "browser-profile-key",

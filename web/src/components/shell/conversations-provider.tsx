@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { describeError } from "@/components/error-message";
 
 export type Conversation = {
-  id: number;
+  id: string;
   title: string;
   agentCode: string;
   agentName: string;
@@ -20,8 +20,8 @@ type ConversationsValue = {
   newConversationVersion: number;
   refresh(): Promise<void>;
   startNew(): void;
-  rename(id: number, title: string): Promise<void>;
-  remove(id: number): Promise<void>;
+  rename(id: string, title: string): Promise<void>;
+  remove(id: string): Promise<void>;
 };
 
 const ConversationsContext = createContext<ConversationsValue | null>(null);
@@ -60,7 +60,7 @@ export function ConversationsProvider({ enabled, children }: {
 
   const startNew = useCallback(() => setNewConversationVersion((version) => version + 1), []);
 
-  const rename = useCallback(async (id: number, title: string) => {
+  const rename = useCallback(async (id: string, title: string) => {
     const response = await fetch(`/api/chat/conversations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -71,7 +71,7 @@ export function ConversationsProvider({ enabled, children }: {
     setConversations((current) => current.map((item) => item.id === id ? updated : item));
   }, []);
 
-  const remove = useCallback(async (id: number) => {
+  const remove = useCallback(async (id: string) => {
     const response = await fetch(`/api/chat/conversations/${id}`, { method: "DELETE" });
     if (!response.ok) throw await failure(response);
     setConversations((current) => current.filter((item) => item.id !== id));
