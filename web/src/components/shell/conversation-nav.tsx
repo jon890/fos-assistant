@@ -129,6 +129,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
                       <NavPending />
                     </Link>
                   )}
+                  {/* 모달로 두면 열린 동안 body 의 pointer-events 가 꺼져, 메뉴 바깥을 누른 첫 클릭이 그 자리에 닿지 않는다. 바깥을 누르면 닫히는 것은 모달이 아니어도 같다. */}
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <TooltipButton label={`${title} 메뉴`}
