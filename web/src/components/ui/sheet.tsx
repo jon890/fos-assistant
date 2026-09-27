@@ -50,10 +50,13 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  closeLabel = "닫기",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  /** 고침: 닫기 단추의 접근성 이름이다. 받은 그대로는 영문 「Close」 였다. 부르는 곳이 무엇을 닫는지 적는다. */
+  closeLabel?: string
 }) {
   return (
     <SheetPortal>
@@ -77,7 +80,7 @@ function SheetContent({
             >
               <XIcon
               />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{closeLabel}</span>
             </Button>
           </SheetPrimitive.Close>
         )}

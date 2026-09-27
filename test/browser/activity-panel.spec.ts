@@ -81,10 +81,14 @@ test("중간 폭에서는 패널이 대화 위 오른쪽에 겹친다", async ({
   await page.setViewportSize({ width: 800, height: 800 });
   await send(page, "중간 폭 검사");
   const panel = await openSavedPanel(page);
+  // Sheet 는 오른쪽에서 밀려 들어온다. 움직임이 끝난 자리를 본다.
+  await expect.poll(async () => {
+    const box = await panel.boundingBox();
+    return box ? box.x + box.width : Infinity;
+  }).toBeLessThanOrEqual(800);
   const bounds = await panel.boundingBox();
   expect(bounds).not.toBeNull();
-  expect(bounds!.width).toBe(384);
-  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(800);
+  expect(bounds!.width).toBeCloseTo(384, 0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
     .toBeLessThanOrEqual(0);
 });
@@ -136,4 +140,50 @@ test("사이드바의 이름 입력칸 Esc 는 열린 패널을 닫지 않는다
   await page.getByRole("menuitem", { name: "이름 바꾸기" }).click();
   await page.getByRole("textbox", { name: "대화 이름" }).press("Escape");
   await expect(panel).toBeVisible();
+});
+
+async function openLivePanel(page: Page) {
+  const block = page.locator('[data-testid="activity-block"][data-mode="live"]');
+  await expect(block).toBeVisible();
+  await block.getByTestId("activity-toggle").click();
+  await block.getByTestId("activity-open-panel").click();
+  const panel = page.getByTestId("activity-panel");
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+test("좁은 폭에서 도는 중 패널을 Esc 로 닫으면 패널만 닫히고 답은 계속 흐른다", async ({ page, hermes }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "패널이 Sheet 로 덮는 폭에서 검사한다");
+  await hermes.holdNextRun();
+  let released = false;
+  try {
+    await send(page, "좁은 폭 패널 Esc 검사", "흐름 비서");
+    await hermes.waitForHeldRun();
+    const panel = await openLivePanel(page);
+    await expect(page.getByRole("dialog", { name: "작업 과정" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "작업 과정 닫기" })).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+    await hermes.releaseHeldRun();
+    released = true;
+    await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
+    await expect(page.getByTestId("stopped-mark")).toHaveCount(0);
+  } finally {
+    if (!released) await hermes.releaseHeldRun();
+  }
+});
+
+test("넓은 폭에서 패널을 Esc 로 닫고 한 번 더 누르면 답이 멈춘다", async ({ page, hermes }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "패널이 대화 옆에 붙는 폭에서 검사한다");
+  await hermes.holdNextRun();
+  await send(page, "넓은 폭 패널 Esc 검사", "흐름 비서");
+  await hermes.waitForHeldRun();
+  const panel = await openLivePanel(page);
+  await expect(page.getByRole("complementary", { name: "작업 과정" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
 });

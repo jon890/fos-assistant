@@ -11,7 +11,7 @@ const LINKS = [
   { href: "/usage", label: "사용량" },
 ] as const;
 
-export function MainNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate(): void }) {
+export function MainNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate(href: string): void }) {
   const pathname = usePathname();
   const [proposalCount, setProposalCount] = useState(0);
   useEffect(() => {
@@ -34,7 +34,7 @@ export function MainNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate(
   return (
     <nav aria-label="주요 화면" className="flex flex-col gap-1">
       {links.map((link) => (
-        <Link key={link.href} href={link.href} onClick={onNavigate}
+        <Link key={link.href} href={link.href} onClick={() => onNavigate(link.href)}
           aria-current={pathname === link.href || pathname.startsWith(`${link.href}/`) ? "page" : undefined}
           className={`rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-foreground ${
             pathname === link.href || pathname.startsWith(`${link.href}/`)

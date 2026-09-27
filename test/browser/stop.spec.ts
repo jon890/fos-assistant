@@ -129,9 +129,9 @@ test("좁은 화면에서 열린 서랍은 Esc 로 닫고 실행은 계속한다
   await hermes.waitForHeldRun();
   await page.getByRole("button", { name: "사이드바 열기" }).click();
   const drawer = page.getByRole("complementary", { name: "사이드바" });
-  await expect.poll(async () => (await drawer.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
+  await expect(drawer).toBeInViewport();
   await page.keyboard.press("Escape");
-  await expect.poll(async () => (await drawer.boundingBox())?.x ?? 0).toBeLessThan(0);
+  await expect(drawer).toBeHidden();
   await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
   await hermes.releaseHeldRun();
   await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });

@@ -2,7 +2,9 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import { ArrowUp, ImagePlus, LoaderCircle, Square, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { TooltipButton } from "@/components/ui/tooltip-button";
+import { cn } from "cn";
+import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
 import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
@@ -389,7 +391,7 @@ export function Composer({
           {items.map((item) => (
             <div key={item.key} className="relative shrink-0">
               {item.status === "error" ? (
-                <div className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-md border border-border bg-muted p-1 text-center text-[0.625rem] leading-tight text-muted-foreground">
+                <div className={attachmentPlaceholder({ size: "preview" })}>
                   <span>{item.errorMessage}</span>
                 </div>
               ) : (
@@ -409,16 +411,17 @@ export function Composer({
                   ) : null}
                 </div>
               )}
-              <button
-                type="button"
-                aria-label="사진 지우기"
+              <TooltipButton
+                label="사진 지우기"
+                variant="outline"
+                size="icon-xs"
                 onClick={() => removeItem(item.key)}
                 // 보내는 동안 지우면 막 메시지에 묶인 첨부에 DELETE 가 간다.
                 disabled={disabled || running}
-                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs leading-none disabled:opacity-50"
+                className="absolute -right-1.5 -top-1.5 size-5 rounded-full bg-background"
               >
-                <X aria-hidden="true" className="size-3" />
-              </button>
+                <X aria-hidden="true" />
+              </TooltipButton>
             </div>
           ))}
         </div>
@@ -432,7 +435,8 @@ export function Composer({
 
       <div
         data-testid="composer-shell"
-        className="relative flex items-end gap-2 rounded-3xl border border-border bg-background p-1.5 pl-4 focus-within:border-primary"
+        className={cn("relative flex items-end gap-2 p-1.5 pl-4",
+          "rounded-3xl border border-border bg-background focus-within:border-primary")}
       >
         {mention && openMention ? (
           <AgentMention
@@ -501,7 +505,8 @@ export function Composer({
           }}
           disabled={disabled}
           placeholder={mention ? "@ 로 에이전트를 부른다" : "무엇을 도와줄까요"}
-          className="max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto bg-transparent py-2 text-base leading-6 outline-none disabled:opacity-50"
+          className={cn("max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
+            "bg-transparent text-base leading-6 outline-none disabled:opacity-50")}
         />
         {acceptsAttachments ? (
           <>
@@ -515,34 +520,34 @@ export function Composer({
               data-testid="attachment-input"
               onChange={(event) => void handleFiles(event)}
             />
-            <Button
+            <TooltipButton
+              label="사진 첨부"
               variant="outline"
               size="icon"
-              aria-label="사진 첨부"
-              title="사진 첨부"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || running}
               className="size-10 shrink-0 rounded-full"
             >
               <ImagePlus aria-hidden="true" className="size-5" />
-            </Button>
+            </TooltipButton>
           </>
         ) : null}
         {running ? (
-          <Button
-            type="button"
-            aria-label="중지"
+          <TooltipButton
+            label="중지"
+            variant="default"
             disabled={!canStop}
             onClick={onStop}
             size="icon"
             className="size-10 shrink-0 rounded-full"
           >
             <Square aria-hidden="true" className="size-4 fill-current" />
-          </Button>
+          </TooltipButton>
         ) : (
-          <Button
+          <TooltipButton
+            label="보내기"
+            variant="default"
             type="submit"
-            aria-label="보내기"
             disabled={sendDisabled}
             size="icon"
             className="size-10 shrink-0 rounded-full"
@@ -552,7 +557,7 @@ export function Composer({
             ) : (
               <ArrowUp aria-hidden="true" className="size-5" />
             )}
-          </Button>
+          </TooltipButton>
         )}
       </div>
     </form>

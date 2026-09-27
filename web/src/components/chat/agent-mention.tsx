@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "cn";
 import type { AgentView } from "@/lib/agent";
 
 type Props = {
@@ -45,7 +46,8 @@ export function AgentMention({ id, agents, query, activeIndex, onPick }: Props) 
       id={id}
       role="listbox"
       aria-label="에이전트 고르기"
-      className="absolute inset-x-0 bottom-full z-10 mb-2 max-h-60 overflow-y-auto rounded-2xl border border-border bg-background p-1 shadow"
+      className={cn("absolute inset-x-0 bottom-full z-10 mb-2 max-h-60 overflow-y-auto",
+        "rounded-2xl border border-border bg-background p-1 shadow")}
     >
       {matches.length === 0 ? (
         <li role="option" aria-selected={false} aria-disabled="true" className="px-3 py-2 text-sm text-muted-foreground">

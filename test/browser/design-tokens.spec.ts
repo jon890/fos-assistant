@@ -107,12 +107,14 @@ test("대화 지우기 확인 창의 지우기 단추는 destructive 바탕에 d
   await openSidebar(page, testInfo);
   const nav = page.getByRole("navigation", { name: "대화 목록" });
   await nav.getByRole("button", { name: `${title} 메뉴` }).click();
-  await nav.getByRole("menuitem", { name: "지우기" }).click();
-  const confirm = page.getByRole("dialog", { name: "대화 지우기" }).getByRole("button", { name: "지우기" });
+  await page.getByRole("menuitem", { name: "지우기" }).click();
+  const confirm = page.getByRole("alertdialog", { name: "대화 지우기" }).getByRole("button", { name: "지우기" });
   await expect(confirm).toBeVisible();
 
   const colors = await confirm.evaluate((button) => {
     const html = document.documentElement;
+    // Button 은 색 바뀜을 transition 으로 보인다. 밝기를 바꾼 바로 뒤에 읽으면 바뀌는 중의 색이 나오므로 끈다.
+    (button as HTMLElement).style.transition = "none";
     const read = () => {
       const root = getComputedStyle(html);
       const own = getComputedStyle(button);

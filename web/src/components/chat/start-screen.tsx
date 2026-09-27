@@ -1,6 +1,8 @@
 "use client";
 
 import type { AgentView } from "@/lib/agent";
+import { Button } from "@/components/ui/button";
+import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AGENT_CARD_HEIGHT, AgentPicker } from "./agent-picker";
 
@@ -67,14 +69,11 @@ export function StarterPrompts({ prompts, disabled, onPrompt }: PromptsProps) {
         <ul aria-label="추천 질문" className="flex flex-wrap justify-center gap-2">
           {prompts.map((prompt, index) => (
             <li key={index} className="max-w-full">
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onPrompt(prompt)}
-                className="max-w-full rounded-full border border-border px-3 py-1.5 text-left text-sm hover:bg-muted disabled:opacity-50"
-              >
+              <Button variant="outline" disabled={disabled} onClick={() => onPrompt(prompt)}
+                className={cn("max-w-full justify-start whitespace-normal text-left",
+                  "rounded-full px-3 py-1.5 font-normal")}>
                 {prompt}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

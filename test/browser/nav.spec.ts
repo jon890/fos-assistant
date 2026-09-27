@@ -23,11 +23,15 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
 test("머리의 이름을 한 번만 읽고 좁은 화면에서도 한 줄을 유지한다", async ({ page }, testInfo) => {
   await page.goto("/");
 
+  // 좁은 폭의 서랍은 닫혀 있으면 그리지 않는다. 열어서 본다.
+  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   const home = page.getByRole("link", { name: "우리집 비서 홈" });
   await expect(home).toHaveCount(1);
   await expect(home).toHaveText("우리집 비서");
 
   if (testInfo.project.name === "mobile") {
+    await page.getByRole("button", { name: "사이드바 닫기" }).click();
+    await expect(home).toHaveCount(0);
     const header = page.locator("header");
     await expect(header).toHaveCSS("flex-wrap", "nowrap");
     const headerBox = await header.boundingBox();

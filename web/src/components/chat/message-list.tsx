@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
@@ -175,7 +176,8 @@ export function MessageList({
         <button
           type="button"
           onClick={scrollToBottom}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border bg-background px-3 py-1.5 text-xs shadow"
+          className={cn("absolute bottom-3 left-1/2 -translate-x-1/2",
+          "rounded-full border border-border bg-background px-3 py-1.5 text-xs shadow")}
         >
           새 메시지
         </button>

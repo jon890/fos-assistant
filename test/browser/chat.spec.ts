@@ -19,14 +19,20 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
 
   await page.getByRole("button", { name: "사이드바 열기" }).click();
   const drawer = page.getByRole("complementary", { name: "사이드바" });
-  await expect.poll(async () => (await drawer.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
+  await expect(drawer).toBeInViewport();
   await drawer.getByRole("link", { name: /모바일 대화 5/ }).click();
   await expect(page).toHaveURL(/\/c\/\d+$/);
-  await expect.poll(async () => (await drawer.boundingBox())?.x ?? 0).toBeLessThan(0);
+  await expect(drawer).toBeHidden();
 
   await page.getByRole("button", { name: "사이드바 열기" }).click();
-  await page.getByRole("button", { name: "사이드바 닫기" }).click({ position: { x: 380, y: 400 } });
-  await expect.poll(async () => (await drawer.boundingBox())?.x ?? 0).toBeLessThan(0);
+  await page.getByRole("button", { name: "사이드바 닫기" }).click();
+  await expect(drawer).toBeHidden();
+
+  // 서랍 오른쪽 바깥의 덮개를 눌러도 닫힌다.
+  await page.getByRole("button", { name: "사이드바 열기" }).click();
+  await expect(drawer).toBeInViewport();
+  await page.mouse.click(370, 400);
+  await expect(drawer).toBeHidden();
 });
 
 test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({ page }, testInfo) => {

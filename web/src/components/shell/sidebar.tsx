@@ -3,18 +3,23 @@
 import Link from "next/link";
 import { useEffect, useState, type RefObject } from "react";
 import { PanelLeftClose } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TooltipButton } from "@/components/ui/tooltip-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
 import { NAV_PENDING_EVENT } from "./nav-pending";
 import { useConversations } from "./conversations-provider";
 
-export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollapse }: {
+export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollapse, showStatus = true }: {
   isAdmin: boolean;
   displayName?: string;
-  onNavigate(): void;
+  /** 링크를 누를 때 그 목적지를 받는다. 서랍은 목적지가 지금 경로와 같을 때만 곧바로 닫는다 */
+  onNavigate(href: string): void;
   searchRef: RefObject<HTMLInputElement | null>;
   onCollapse(): void;
+  /** 옮기는 중 안내 영역을 그린다. 붙박이 사이드바와 서랍 가운데 한쪽만 그린다 */
+  showStatus?: boolean;
 }) {
   const { startNew } = useConversations();
   const [query, setQuery] = useState("");
@@ -34,19 +39,21 @@ export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollaps
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-muted px-3 py-4">
-      <span role="status" aria-live="polite" className="sr-only">
-        {pendingCount > 0 ? "옮기는 중" : ""}
-      </span>
+      {showStatus ? (
+        <span role="status" aria-live="polite" className="sr-only">
+          {pendingCount > 0 ? "옮기는 중" : ""}
+        </span>
+      ) : null}
       <div className="mb-5 flex items-center justify-between gap-2 px-2">
-        <Link href="/" aria-label="우리집 비서 홈" onClick={() => { startNew(); onNavigate(); }}
+        <Link href="/" aria-label="우리집 비서 홈" onClick={() => { startNew(); onNavigate("/"); }}
           className="truncate text-base font-semibold">우리집 비서</Link>
-        <button type="button" aria-label="사이드바 접기" onClick={onCollapse}
-          className="hidden rounded-md px-2 py-1 text-sm hover:bg-accent md:block"><PanelLeftClose aria-hidden="true" className="size-4" /></button>
+        <TooltipButton label="사이드바 접기" onClick={onCollapse} className="hidden hover:bg-accent md:inline-flex">
+          <PanelLeftClose aria-hidden="true" />
+        </TooltipButton>
       </div>
-      <Link href="/" data-testid="new-conversation-link" onClick={() => { startNew(); onNavigate(); }}
-        className="mb-4 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-accent">
-        새 대화
-      </Link>
+      <Button asChild variant="outline" className="mb-4 justify-start bg-background hover:bg-accent">
+        <Link href="/" data-testid="new-conversation-link" onClick={() => { startNew(); onNavigate("/"); }}>새 대화</Link>
+      </Button>
       <input ref={searchRef} type="search" aria-label="대화 검색" value={query}
         onChange={(event) => setQuery(event.target.value)} placeholder="대화 검색"
         className="mb-4 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
