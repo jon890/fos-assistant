@@ -8,7 +8,7 @@ const APP_ROOT = join(import.meta.dirname, "../../web/src/app");
 const SRC_ROOT = join(APP_ROOT, "..");
 
 /**
- * 뼈대를 두기로 한 여덟 경로와, 그 화면의 바깥 틀(`mx-auto w-full max-w-*`)을 그리는 파일이다.
+ * 뼈대를 두기로 한 경로와, 그 화면의 바깥 틀(`mx-auto w-full max-w-*`)을 그리는 파일이다.
  *
  * `/agents/{code}` 처럼 대괄호 세그먼트가 있는 경로는 `web/src/app` 아래 디렉터리 이름 그대로 적는다.
  * 틀 파일은 `web/src` 기준이다. 바깥 틀이 `page.tsx` 가 아니라 그 화면의 첫 부품에 있는 경로가 있다.
@@ -21,6 +21,7 @@ const ROUTE_FRAMES: Record<string, string> = {
   "executions/[id]": "app/executions/[id]/page.tsx",
   "admin/agents": "app/admin/agents/agent-admin-panel.tsx",
   "admin/people": "app/admin/people/people-admin-panel.tsx",
+  "chat/[conversationId]": "components/chat/message-list.tsx",
   "c/[conversationId]": "components/chat/message-list.tsx",
 };
 
@@ -75,7 +76,7 @@ test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같
   }
 });
 
-test("loading.tsx 는 뼈대를 두기로 한 여덟 경로에만 있다", async () => {
+test("loading.tsx 는 뼈대를 두기로 한 경로에만 있다", async () => {
   const loadingFiles = await findFiles(APP_ROOT, "loading.tsx");
   const routes = loadingFiles.map((file) => relative(APP_ROOT, join(file, "..")).split(sep).join("/")).sort();
   assert.deepEqual(routes, Object.keys(ROUTE_FRAMES).sort());

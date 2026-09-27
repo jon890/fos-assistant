@@ -42,7 +42,7 @@ function AttachmentGallery({
   conversationId,
   attachments,
 }: {
-  conversationId: number | null;
+  conversationId: string | null;
   attachments: MessageAttachment[];
 }) {
   if (attachments.length === 0 || conversationId === null) return null;
@@ -93,7 +93,7 @@ export function MessageBubble({
   onAnswer,
 }: {
   turn: Turn;
-  conversationId: number | null;
+  conversationId: string | null;
   onOpenSaved(executionId: number): void;
   initialActivityExpanded: boolean;
   latest: boolean;

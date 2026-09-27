@@ -6,7 +6,7 @@ import { DAD_BINDING } from "./binding.ts";
 /** 대화 두 번을 보낸다. 사용량 시나리오가 그 횟수로 합계를 검사한다. */
 export const CHAT_TURNS = 2;
 
-type Turn = { conversationId: number; executionId: number; assistantText: string };
+type Turn = { conversationId: string; executionId: number; assistantText: string };
 
 export const chatScenario: Scenario = {
   name: "대화",

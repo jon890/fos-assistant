@@ -14,7 +14,7 @@ type Props = {
   loading: boolean;
   sending: boolean;
   activity: ActivityState | null;
-  conversationId: number | null;
+  conversationId: string | null;
   /** 흐름이 오래 걸린다고 한 번 알렸는지 */
   flowIsSlow: boolean;
   liveExpanded: boolean;

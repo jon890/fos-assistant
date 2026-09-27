@@ -2,9 +2,9 @@
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 
-type Conversation = { id: number; title: string };
-type Turn = { conversationId: number };
-type ChatEvent = { type: string; conversationId?: number; executionId?: number };
+type Conversation = { id: string; title: string };
+type Turn = { conversationId: string };
+type ChatEvent = { type: string; conversationId?: string; executionId?: number };
 
 async function events(response: Response): Promise<ChatEvent[]> {
   const received: ChatEvent[] = [];

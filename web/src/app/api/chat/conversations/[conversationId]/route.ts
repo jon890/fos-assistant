@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { isConversationId } from "@/lib/conversation-id";
 
 type RouteContext = { params: Promise<{ conversationId: string }> };
 
-async function idOf(context: RouteContext): Promise<number | null> {
+async function idOf(context: RouteContext): Promise<string | null> {
   const { conversationId } = await context.params;
-  return /^\d+$/.test(conversationId) ? Number(conversationId) : null;
+  return isConversationId(conversationId) ? conversationId : null;
 }
 
 function invalid() {
-  return NextResponse.json({ code: "VALIDATION_FAILED", message: "대화 번호가 올바르지 않습니다." }, { status: 400 });
+  return NextResponse.json({ code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." }, { status: 400 });
 }
 
 function response(result: Awaited<ReturnType<typeof callControlPlane>>) {

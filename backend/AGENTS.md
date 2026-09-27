@@ -44,6 +44,12 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 실제로 `@Lob` 이 붙은 문자열이 MySQL 에서 `tinytext` 로 기대돼 기동에 실패한 적이 있다.
 길이를 주지 않은 `@Lob` 문자열을 쓰지 말고 `columnDefinition` 으로 못 박는다.
 
+**다만 마이그레이션 검사는 모든 마이그레이션을 H2 의 MySQL 모드에서 돌린다.**
+`AgentModelOptionMigrationTest` 같은 `*MigrationTest` 가 그렇다.
+그래서 마이그레이션 SQL 은 MySQL 과 H2 에 함께 있는 함수만 쓴다.
+`RANDOM_BYTES` 처럼 H2 에 없는 함수가 필요하면 `db.migration` 패키지에 Java 마이그레이션으로 쓴다.
+`V23__ConversationPublicId` 가 그 본보기다.
+
 이미 적용된 마이그레이션 파일을 고치지 않는다. Flyway 의 검사가 실패한다.
 새 번호로 파일을 하나 더 만든다.
 

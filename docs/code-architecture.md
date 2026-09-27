@@ -36,6 +36,12 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `mcp` | 제목만 주입한 Memory 본문 조회와 장기 토큰 인증 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
 
+**경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
+`shared/error` 의 `GlobalExceptionHandler` 가 `MethodArgumentTypeMismatchException` 을 받는다.
+숫자를 받는 자리에 `abc` 가 오거나 UUID 를 받는 자리에 번호가 와도 500 이 아니라 400 이다.
+요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다.
+본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
+
 ## 한 번의 대화가 지나는 길
 
 1. `ChatController` 가 현재 사용자를 확인한다.
@@ -210,7 +216,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 `POST /api/v1/chat/messages` 가 첨부 번호 목록을 함께 받는다.
 
-새 대화에서 첫 사진을 올리려면 대화 번호가 먼저 있어야 한다.
+새 대화에서 첫 사진을 올리려면 대화의 공개 식별자가 먼저 있어야 한다.
 `POST /api/v1/chat/conversations` 가 제목이 빈 대화를 만들고, 제목은 첫 메시지가 정한다.
 
 ### 에이전트에게 알리는 법
@@ -249,8 +255,21 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 | `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
 | `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
 | `GET /api/v1/chat/conversations/{id}/running` | 이 대화에 지금 도는 turn. `{ "running", "executionId", "startedAt" }`. 돌지 않으면 `running` 이 false 이고 나머지는 null |
+| `GET /api/v1/chat/conversations/by-number/{number}` | 옛 주소 `/c/{번호}` 를 넘겨 주려고 번호로 대화를 찾는다. `{ "id": "<공개 식별자>" }` |
 
 지운 대화와 남의 대화는 모든 경로에서 `CONVERSATION_NOT_FOUND` 다. 둘을 가리지 않는다.
+
+**대화 경로의 `{id}` 는 대화의 공개 식별자(UUID)다.** 대화 표의 번호가 아니다.
+응답에서 대화를 가리키는 칸도 모두 공개 식별자다. 대화 목록의 `id`, 보내기 응답과 사건의 `conversationId`,
+실행 목록의 `conversationId` 가 여기 해당한다. 보내기 요청의 `conversationId` 도 공개 식별자를 받는다.
+메시지, 첨부, 실행의 번호는 그대로 숫자다.
+
+컨트롤러가 `ConversationAccess.requireOwnId(user, publicId)` 로 주인을 확인하며 번호로 바꾸고,
+`application` 안쪽은 지금처럼 번호를 쓴다. 사건과 응답에 싣는 공개 식별자는 `Conversation.publicId()` 에서 읽는다.
+UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. 「backend 패키지」 의 형식 오류 규칙이 모든 경로에 걸린다.
+
+`by-number` 경로는 옛 링크가 쓰이지 않게 되면 지운다.
+근거는 [ADR-025](adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)에 있다.
 
 **turn 이 끝날 때 대화를 통째로 다시 저장하지 않는다.**
 지금은 요청 시작에 읽은 `Conversation` 을 끝에서 `save` 한다. 그 사이에 사용자가 이름을 바꾸거나 지우면
@@ -404,7 +423,8 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | 경로 | 화면 |
 | --- | --- |
 | `/` | 새 대화 화면 |
-| `/c/{id}` | 대화 하나 |
+| `/chat/{id}` | 대화 하나. `{id}` 는 대화의 공개 식별자 |
+| `/c/{번호}` | 옛 주소. 주인이면 `/chat/{id}` 로, 없거나 남의 대화면 `/` 로 넘긴다. 그 밖의 실패는 오류 화면이다 |
 | `/signin` | 로그인 |
 | `/usage` | 사용량 |
 | `/memory` | 개인과 가족 공용 Memory |

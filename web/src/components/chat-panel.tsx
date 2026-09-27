@@ -40,13 +40,13 @@ async function readPayload<T>(response: Response): Promise<T> {
  */
 const SLOW_FLOW_MS = 120_000;
 
-export function ChatPanel({ initialConversationId }: { initialConversationId: number | null }) {
+export function ChatPanel({ initialConversationId }: { initialConversationId: string | null }) {
   const pathname = usePathname();
   const { conversations, refresh, newConversationVersion } = useConversations();
   const displayName = useShellDisplayName();
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [conversationId, setConversationId] = useState<number | null>(initialConversationId);
-  const conversationIdRef = useRef<number | null>(initialConversationId);
+  const [conversationId, setConversationId] = useState<string | null>(initialConversationId);
+  const conversationIdRef = useRef<string | null>(initialConversationId);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [activity, setActivity] = useState<ActivityState | null>(null);
@@ -81,7 +81,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
    * 사용자가 대화를 전환할 때만 올린다. `Composer` 의 `key` 로 써서 그때만 다시 만든다.
    *
    * <p>`conversationId` 를 그대로 key 로 쓰면 안 된다. 새 대화에서 첫 사진을 올릴 때 Composer 가 빈
-   * 대화를 만들어 `conversationId` 가 null 에서 번호로 바뀌는데, 그 순간 Composer 가 다시 만들어져
+   * 대화를 만들어 `conversationId` 가 null 에서 공개 식별자로 바뀌는데, 그 순간 Composer 가 다시 만들어져
    * 올리는 중인 사진이 사라진다.
    */
   const [composerGeneration, setComposerGeneration] = useState(0);
@@ -223,7 +223,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
     setMessagesLoading(false);
   }
 
-  async function refreshMessages(id: number, version: number): Promise<Turn[]> {
+  async function refreshMessages(id: string, version: number): Promise<Turn[]> {
     const response = await fetch(`/api/chat/conversations/${id}/messages`);
     if (!response.ok) {
       const payload = await readPayload<ErrorPayload>(response);
@@ -365,7 +365,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         body: JSON.stringify(requestBody),
       });
       const payload = await readPayload<
-        ErrorPayload & { conversationId: number; assistantText: string }
+        ErrorPayload & { conversationId: string; assistantText: string }
       >(response);
       if (!response.ok) {
         restoreFailedMessage();
@@ -374,7 +374,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
       }
       if (selectionVersion.current !== version) return true;
       if (conversationIdRef.current === null) {
-        window.history.replaceState(null, "", `/c/${payload.conversationId}`);
+        window.history.replaceState(null, "", `/chat/${payload.conversationId}`);
       }
       conversationIdRef.current = payload.conversationId;
       setConversationId(payload.conversationId);
@@ -418,7 +418,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
         await consumeTurnStream(response, version, stream, {
           onStarted: (event) => {
             if (!event.conversationId) return;
-            if (conversationIdRef.current === null) window.history.replaceState(null, "", `/c/${event.conversationId}`);
+            if (conversationIdRef.current === null) window.history.replaceState(null, "", `/chat/${event.conversationId}`);
             conversationIdRef.current = event.conversationId;
             setConversationId(event.conversationId);
             void refresh();
@@ -654,7 +654,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: nu
             acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
             onConversationCreated={(id) => {
               if (conversationIdRef.current === null) {
-                window.history.replaceState(null, "", `/c/${id}`);
+                window.history.replaceState(null, "", `/chat/${id}`);
               }
               conversationIdRef.current = id;
               setConversationId(id);

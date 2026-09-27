@@ -22,7 +22,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
   const pathname = usePathname();
   const router = useRouter();
   const { conversations, loading, error, rename, remove, startNew } = useConversations();
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -33,8 +33,8 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
   /** 메뉴 바깥을 눌러 닫았다. 그때는 누른 쪽의 초점을 빼앗지 않는다 */
   const menuInteractedOutside = useRef(false);
   /** 지우기 창을 닫은 뒤 초점을 돌려줄 메뉴 단추다. 창은 메뉴 단추가 아니라 메뉴 항목에서 열리므로 직접 돌려준다 */
-  const menuButtons = useRef(new Map<number, HTMLButtonElement>());
-  const lastDeleteId = useRef<number | null>(null);
+  const menuButtons = useRef(new Map<string, HTMLButtonElement>());
+  const lastDeleteId = useRef<string | null>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const visible = conversations.filter((item) =>
     (item.title || "새 대화").toLocaleLowerCase("ko-KR").includes(normalizedQuery));
@@ -67,7 +67,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
     try {
       await remove(id);
       setActionError(null);
-      if (pathname === `/c/${id}`) {
+      if (pathname === `/chat/${id}`) {
         startNew();
         router.push("/");
       }
@@ -116,14 +116,14 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
                       }}
                       className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-2 text-sm" />
                   ) : (
-                    <Link href={`/c/${conversation.id}`} onClick={(event) => {
+                    <Link href={`/chat/${conversation.id}`} onClick={(event) => {
                       // 사진을 먼저 올리며 주소만 바뀐 경우 같은 대화로 다시 이동하지 않는다.
-                      if (window.location.pathname === `/c/${conversation.id}`) event.preventDefault();
-                      onNavigate(`/c/${conversation.id}`);
+                      if (window.location.pathname === `/chat/${conversation.id}`) event.preventDefault();
+                      onNavigate(`/chat/${conversation.id}`);
                     }}
-                      aria-current={pathname === `/c/${conversation.id}` ? "page" : undefined}
+                      aria-current={pathname === `/chat/${conversation.id}` ? "page" : undefined}
                       className={cn("flex min-w-0 flex-1 items-center rounded-md px-2 py-2 text-sm hover:bg-accent",
-                        pathname === `/c/${conversation.id}` && "bg-accent font-medium")}
+                        pathname === `/chat/${conversation.id}` && "bg-accent font-medium")}
                       title={title}>
                       <span className="min-w-0 flex-1 truncate">{title}</span>
                       <NavPending />

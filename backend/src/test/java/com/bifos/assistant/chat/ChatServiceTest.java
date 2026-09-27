@@ -10,6 +10,7 @@ import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
+import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
@@ -77,6 +78,7 @@ class ChatServiceTest {
 
     @Autowired ChatService chat;
     @Autowired ChatController controller;
+    @Autowired ConversationAccess access;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
     @Autowired ChatMessageRepository messages;
@@ -244,7 +246,7 @@ class ChatServiceTest {
         SecurityContextHolder.getContext()
                 .setAuthentication(new UsernamePasswordAuthenticationToken(dad, null));
 
-        assertThat(controller.messages(turn.conversationId()))
+        assertThat(controller.messages(turn.conversationPublicId()))
                 .satisfiesExactly(
                         message -> {
                             assertThat(message.role()).isEqualTo("USER");
@@ -385,7 +387,7 @@ class ChatServiceTest {
                 .extracting(ChatEvent::phase).containsExactly("started", "completed");
         assertThat(relayed.stream().filter(it -> "subagent".equals(it.type())).toList())
                 .extracting(ChatEvent::phase).containsExactly("started", "completed");
-        var summary = chat.activitySummaries(chat.history(dad, relayed.getLast().conversationId())).get(executionId);
+        var summary = chat.activitySummaries(chat.history(dad, access.requireOwnId(dad, relayed.getLast().conversationId()))).get(executionId);
         assertThat(summary.toolCount()).isEqualTo(1);
         assertThat(summary.subagentCount()).isEqualTo(1);
         assertThat(summary.durationMs()).isNotNull();
@@ -463,7 +465,7 @@ class ChatServiceTest {
         assertThat(relayed).extracting(ChatEvent::type).containsExactly("started", "delta", "tool", "done");
         assertThat(executions.findById(done.executionId()).orElseThrow().status())
                 .isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(messages.findByConversationIdOrderByIdAsc(done.conversationId()))
+        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, done.conversationId())))
                 .last()
                 .satisfies(message -> assertThat(message.content()).isEqualTo("저녁은 김치찌개"));
     }
@@ -509,7 +511,7 @@ class ChatServiceTest {
 
         ChatEvent done = relayed.getLast();
         assertThat(done.type()).isEqualTo("done");
-        assertThat(chat.activitySummaries(chat.history(dad, done.conversationId())).get(done.executionId())
+        assertThat(chat.activitySummaries(chat.history(dad, access.requireOwnId(dad, done.conversationId()))).get(done.executionId())
                 .toolCount()).isEqualTo(1);
     }
 
