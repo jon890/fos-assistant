@@ -90,7 +90,7 @@ async function makeChatStreamCuttable(page: Page) {
             if (done) controller.close();
             else controller.enqueue(value);
           } catch (reason) {
-            // 끊은 뒤에 끝난 읽기다. 이미 깨진 스트림이면 아무 일도 하지 않는다.
+            // 끊은 뒤 끝난 읽기다. 이미 깨진 스트림이면 error() 는 아무 일도 하지 않는다.
             controller.error(reason);
           }
         },
@@ -106,6 +106,9 @@ async function cutChatStream(page: Page) {
 
 /** 도는 turn 이 없다는 응답이다. */
 const NOT_RUNNING = { running: false, executionId: null, startedAt: null };
+
+/** 푼 run 이 끝났는지 Control Plane 에 되물을 최대 횟수다. 한 번 묻는 데 드는 왕복만큼 사이가 벌어진다. */
+const MAX_FINISH_CHECKS = 200;
 
 test("다른 창에서 답하는 중이면 기다리는 표시와 중지를 보이고 끝나면 답을 읽는다", async ({ context, page, hermes }) => {
   const conversationId = await startHeldTurn(page, hermes, "다른 창 보기 검사");
@@ -283,12 +286,15 @@ test("스트림이 끊겼을 때 turn 이 이미 끝나 답이 저장됐으면 �
     // 끊긴 창이 묻는 순간에는 turn 이 끝나 있게 한다. 붙잡은 run 을 풀고 실제로 끝난 뒤의 응답을 넘긴다.
     await page.route(`**/api/chat/conversations/${conversationId}/running`, async (route) => {
       await hermes.releaseHeldRun();
-      let last = await route.fetch();
-      await expect.poll(async () => {
-        last = await route.fetch();
-        return ((await last.json()) as { running: boolean }).running;
-      }, { timeout: 30_000 }).toBe(false);
-      await route.fulfill({ response: last });
+      for (let check = 0; check < MAX_FINISH_CHECKS; check += 1) {
+        const response = await route.fetch();
+        if (!((await response.json()) as { running: boolean }).running) {
+          await route.fulfill({ response });
+          return;
+        }
+      }
+      // 끝내 끝나지 않았다. 조회를 실패시켜 아래 단언이 답이 없다는 것으로 분명히 실패하게 한다.
+      await route.abort();
     });
     await cutChatStream(page);
     await expect(page.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
@@ -319,5 +325,22 @@ test("스트림이 끊기고 turn 이 돌지 않는데 답도 없으면 끊김 �
     await expect(composer(page).getByRole("button", { name: "보내기" })).toBeVisible();
   } finally {
     await releaseAndSettle(page, hermes);
+  }
+});
+
+test("스트림이 끊긴 뒤 대화가 지워졌으면 대화를 찾을 수 없다는 화면으로 간다", async ({ page, hermes }) => {
+  await makeChatStreamCuttable(page);
+  const conversationId = await startHeldTurn(page, hermes, "스트림 끊김 대화 지움 검사");
+  try {
+    await page.route(`**/api/chat/conversations/${conversationId}/running`, (route) => route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "CONVERSATION_NOT_FOUND", message: "대화가 없다" }),
+    }));
+    await cutChatStream(page);
+    await expect(page.getByTestId("conversation-not-found")).toBeVisible();
+    await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
+  } finally {
+    await hermes.releaseHeldRun();
   }
 });

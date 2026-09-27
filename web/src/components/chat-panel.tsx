@@ -29,8 +29,23 @@ type RunningTurn = { running: boolean; executionId: number | null; startedAt: st
  * <p>`sentHere` 는 이 창이 보낸 turn 의 스트림이 끊겨 넘어온 것인지다. 안내 문구만 이 값으로 고른다.
  */
 type ObservedTurn = { conversationId: string; version: number; sentHere: boolean };
-/** 끝 사건 없이 끊긴 스트림을 도는 turn 조회로 넘긴 결과다. */
-type InterruptedOutcome = "observing" | "answered" | "missing";
+/**
+ * 끝 사건 없이 끊긴 스트림을 도는 turn 조회로 넘긴 결과다.
+ *
+ * <p>`historyRead` 는 판단하면서 이력을 이미 다시 읽었는지다. 읽었으면 호출자가 한 번 더 읽지 않는다. `gone` 은
+ * 대화가 지워졌거나 그사이 다른 대화로 옮겨 이 turn 에 할 일이 남지 않은 것이다.
+ */
+type InterruptedOutcome =
+  | { kind: "observing" }
+  | { kind: "answered"; executionId: number | null }
+  | { kind: "missing"; historyRead: boolean }
+  | { kind: "gone" };
+type InterruptedHandlers = {
+  /** 답이 저장돼 있었다. 공통 정리 뒤에 호출자만 할 일을 한다. */
+  onAnswered?(): void;
+  /** 돌지 않고 답도 없다. 끊김 문구를 보이는 방식은 호출자가 정한다. */
+  onMissing(historyRead: boolean): Promise<void>;
+};
 type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
 type TurnStreamCallbacks = {
   onStarted?(event: ChatEvent): void | Promise<void>;
@@ -41,6 +56,27 @@ type TurnStreamCallbacks = {
 };
 async function readPayload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
+}
+
+/**
+ * 마지막 질문 뒤에 새로 저장된 답을 찾는다.
+ *
+ * <p>Control Plane 은 답 행을 성공한 turn 과, 멈춘 자리까지의 답이 있는 중지에서만 저장한다. 실패한 turn 에는
+ * 질문만 남는다(`ChatService` 의 `finish` 와 `cancel`). 그래서 마지막 질문 뒤의 답 행은 끝난 답이다. 다시
+ * 생성은 이전 답이 이미 그 자리에 있으므로 보내기 전에 저장돼 있던 행은 뺀다.
+ */
+function answerAfterLastQuestion(loaded: Turn[], savedBefore: ReadonlySet<Turn["id"]>): Turn | undefined {
+  let answer: Turn | undefined;
+  for (const turn of loaded) {
+    if (turn.role === "USER") answer = undefined;
+    else if (!savedBefore.has(turn.id)) answer = turn;
+  }
+  return answer;
+}
+
+/** 화면에 있는 저장된 메시지의 번호다. 끊긴 뒤 새로 저장된 답을 가려낼 때 쓴다. */
+function savedIdsOf(turns: Turn[]): Set<Turn["id"]> {
+  return new Set(turns.filter((turn) => typeof turn.id === "number").map((turn) => turn.id));
 }
 
 /**
@@ -219,14 +255,18 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     };
 
     const finish = async () => {
-      releaseObserving();
+      // 이력을 먼저 읽어 끝난 답의 실행 번호로 작업 과정 패널을 저장된 나무로 바꾼다.
+      let loaded: Turn[] | null = null;
       try {
-        await refreshMessages(id, version);
+        loaded = await refreshMessages(id, version);
       } catch (reason) {
         if (selectionVersion.current === version) {
           setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
         }
       }
+      if (selectionVersion.current !== version) return;
+      releaseObserving(loaded ? answerAfterLastQuestion(loaded, new Set())?.executionId ?? null : null);
+      void refresh();
     };
 
     /** 한 번 묻고, 다음 주기에도 물을지를 돌려준다. */
@@ -422,40 +462,88 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    * 저장된 답이 아니고, 남으면 기다리는 표시 대신 멈춘 답으로 보인다. 이력을 다시 읽으면 임시 질문도 저장된
    * 질문으로 바뀌고, 보기가 끝나면 이력을 한 번 더 읽어 저장된 것만 남는다.
    *
-   * @param savedBefore 보내기 전에 화면에 있던 저장된 메시지 수다. 이보다 늘고 마지막이 답이면 답이 저장된 것이다.
+   * @param savedBefore 보내기 전에 화면에 있던 저장된 메시지의 번호다. 그 밖의 답이 마지막 질문 뒤에 있으면 답이 저장된 것이다.
    * @param streamedId 받던 답 조각의 임시 식별자다.
    */
-  async function handOffInterruptedStream(version: number, savedBefore: number, streamedId: string)
+  async function handOffInterruptedStream(version: number, savedBefore: ReadonlySet<Turn["id"]>, streamedId: string)
     : Promise<InterruptedOutcome> {
     const id = conversationIdRef.current;
-    if (id === null) return "missing";
+    if (id === null) return { kind: "missing", historyRead: false };
     let running: RunningTurn | null = null;
     try {
       const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
-      if (response.ok) running = await readPayload<RunningTurn>(response);
+      if (response.ok) {
+        running = await readPayload<RunningTurn>(response);
+      } else if (response.status === 404) {
+        const payload = await readPayload<ErrorPayload>(response).catch(() => null);
+        if (payload?.code === "CONVERSATION_NOT_FOUND") {
+          // 대화를 열 때와 보는 중과 같게 대화를 찾을 수 없다는 화면으로 간다.
+          if (selectionVersion.current === version) setNotFound(true);
+          return { kind: "gone" };
+        }
+      }
     } catch {
       // 묻지 못하면 돌지 않는 것으로 보고 이력으로 판단한다.
     }
-    if (selectionVersion.current !== version) return "missing";
+    if (selectionVersion.current !== version) return { kind: "gone" };
     if (running?.running) {
       setTurns((previous) => previous.filter((turn) => turn.id !== streamedId));
       await refreshMessages(id, version).catch(() => {
         // 이력을 못 읽으면 임시 질문을 둔 채 본다. 보기가 끝날 때 이력을 다시 읽는다.
       });
-      if (selectionVersion.current !== version) return "missing";
+      if (selectionVersion.current !== version) return { kind: "gone" };
       beginObserving(id, version, running, true);
-      return "observing";
+      return { kind: "observing" };
     }
+    let loaded: Turn[];
     try {
-      const loaded = await refreshMessages(id, version);
-      return loaded.length > savedBefore && loaded.at(-1)?.role === "ASSISTANT" ? "answered" : "missing";
+      loaded = await refreshMessages(id, version);
     } catch {
-      return "missing";
+      return { kind: "missing", historyRead: false };
     }
+    if (selectionVersion.current !== version) return { kind: "gone" };
+    const answer = answerAfterLastQuestion(loaded, savedBefore);
+    return answer ? { kind: "answered", executionId: answer.executionId ?? null } : { kind: "missing", historyRead: true };
   }
 
-  /** 보는 상태를 모두 되돌린다. 끝났을 때와 조회가 이어 실패했을 때 쓴다. */
-  function releaseObserving() {
+  /**
+   * 끊긴 스트림의 결과를 보내기와 다시 생성이 같은 방식으로 마무리한다. 넘어가면 보는 창이 입력창을 풀고, 답이
+   * 저장돼 있으면 끝 사건을 받았을 때처럼 정리하며, 답이 없을 때만 호출자에게 넘긴다.
+   */
+  async function settleInterruptedStream(
+    version: number,
+    savedBefore: ReadonlySet<Turn["id"]>,
+    streamedId: string,
+    handlers: InterruptedHandlers,
+  ): Promise<InterruptedOutcome["kind"]> {
+    const outcome = await handOffInterruptedStream(version, savedBefore, streamedId);
+    if (outcome.kind === "answered") {
+      setActivity(null);
+      setFlowIsSlow(false);
+      settleLivePanel(outcome.executionId);
+      void refresh();
+      handlers.onAnswered?.();
+    } else if (outcome.kind === "missing") {
+      await handlers.onMissing(outcome.historyRead);
+    }
+    return outcome.kind;
+  }
+
+  /** 끝난 turn 의 live 작업 과정 패널을 저장된 나무로 바꾼다. 답의 실행 번호가 없으면 보일 것이 없어 닫는다. */
+  function settleLivePanel(finishedExecutionId: number | null) {
+    setPanelTarget((previous) => {
+      if (previous?.mode !== "live") return previous;
+      return finishedExecutionId !== null ? { mode: "saved", executionId: finishedExecutionId } : null;
+    });
+  }
+
+  /**
+   * 보는 상태를 모두 되돌린다. 끝났을 때와 조회가 이어 실패했을 때 쓴다.
+   *
+   * @param finishedExecutionId 끝난 답의 실행 번호다. 없으면 live 작업 과정 패널을 닫는다.
+   */
+  function releaseObserving(finishedExecutionId: number | null = null) {
+    settleLivePanel(finishedExecutionId);
     setSending(false);
     setObserving(null);
     setActivity(null);
@@ -520,9 +608,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         const finishedExecutionId = event.executionId ?? currentExecutionId.current;
         if (finishedExecutionId !== null) {
           setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
-          setPanelTarget((previous) => previous?.mode === "live"
-            ? { mode: "saved", executionId: finishedExecutionId } : previous);
         }
+        settleLivePanel(finishedExecutionId);
         await callbacks.onDone?.(event);
         setActivity(null);
         setFlowIsSlow(false);
@@ -545,7 +632,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const version = selectionVersion.current;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
-    const savedBefore = turns.filter((turn) => typeof turn.id === "number").length;
+    const savedBefore = savedIdsOf(turns);
     /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
     let handedOff = false;
     setSending(true);
@@ -598,28 +685,22 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       : `${message} 대화 이력을 다시 읽지 못했다. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
 
     /** 끝 사건 없이 끊긴 스트림을 마무리한다. 돌고 있거나 답이 저장됐으면 오류로 끝내지 않는다. */
-    const settleInterruptedStream = async (): Promise<boolean> => {
-      const outcome = await handOffInterruptedStream(version, savedBefore, assistantPendingId);
-      if (selectionVersion.current !== version) return stream.started;
-      if (outcome === "observing") {
-        handedOff = true;
-        return true;
-      }
-      if (outcome === "answered") {
-        setActivity(null);
-        setFlowIsSlow(false);
-        return true;
-      }
-      finishFailedActivity();
-      const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
-      if (stream.started && conversationIdRef.current !== null) {
-        const refreshed = await refreshAfterStartedFailure();
-        if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
-      } else {
-        restoreFailedMessage();
-        if (selectionVersion.current === version) setError(message);
-      }
-      return stream.started;
+    const finishInterrupted = async (): Promise<boolean> => {
+      const kind = await settleInterruptedStream(version, savedBefore, assistantPendingId, {
+        onMissing: async (historyRead) => {
+          finishFailedActivity();
+          const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
+          if (stream.started && conversationIdRef.current !== null) {
+            const refreshed = historyRead || await refreshAfterStartedFailure();
+            if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
+          } else {
+            restoreFailedMessage();
+            if (selectionVersion.current === version) setError(message);
+          }
+        },
+      });
+      if (kind === "observing") handedOff = true;
+      return kind === "observing" || kind === "answered" || stream.started;
     };
 
     const requestBody = {
@@ -727,10 +808,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           },
         });
       } catch {
-        if (!stream.done && !stream.reportedError) return await settleInterruptedStream();
+        if (!stream.done && !stream.reportedError) return await finishInterrupted();
         return stream.started || stream.done;
       }
-      if (!stream.done && !stream.reportedError) return await settleInterruptedStream();
+      if (!stream.done && !stream.reportedError) return await finishInterrupted();
       return stream.started || stream.done;
     } catch (reason) {
       finishFailedActivity();
@@ -748,9 +829,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const regeneratedSlotId = latestSlots()?.answers.at(-1)?.version.slotId;
     const pendingId = `assistant-regenerate-${Date.now()}`;
     const stream = { started: false, done: false, reportedError: false };
-    const savedBefore = turns.filter((turn) => typeof turn.id === "number").length;
+    const savedBefore = savedIdsOf(turns);
     /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
     let handedOff = false;
+    /** 끊긴 turn 을 판단하며 이력을 이미 다시 읽었다. 실패 처리에서 한 번 더 읽지 않는다. */
+    let historyRead = false;
     setSending(true);
     setError(null);
     setTurnError(null);
@@ -798,17 +881,14 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         if (stream.done || stream.reportedError) throw reason;
       }
       if (!stream.done && !stream.reportedError) {
-        const outcome = await handOffInterruptedStream(version, savedBefore, pendingId);
-        if (selectionVersion.current !== version) return;
-        if (outcome === "observing") {
-          handedOff = true;
-          return;
-        }
-        if (outcome === "answered") {
-          setActivity(null);
-          clearSelectedSlot(regeneratedSlotId);
-          return;
-        }
+        const kind = await settleInterruptedStream(version, savedBefore, pendingId, {
+          onAnswered: () => clearSelectedSlot(regeneratedSlotId),
+          onMissing: async (read) => {
+            historyRead = read;
+          },
+        });
+        if (kind === "observing") handedOff = true;
+        if (kind !== "missing") return;
         throw new Error(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
       }
     } catch (reason) {
@@ -816,7 +896,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
         setActivity((previous) => previous && failActivity(previous, Date.now()));
         setTurnError(reason instanceof Error ? reason.message : "다시 생성하지 못했다.");
-        await refreshMessages(conversationId, version).catch(() => {});
+        if (!historyRead) await refreshMessages(conversationId, version).catch(() => {});
       }
     } finally {
       if (selectionVersion.current === version && !handedOff) {
