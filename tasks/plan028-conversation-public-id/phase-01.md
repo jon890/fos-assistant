@@ -58,7 +58,13 @@
 
 ## 작업 항목
 
-### 1. 마이그레이션 `V23__conversation_public_id.sql`
+### 1. 마이그레이션 `V23__ConversationPublicId.java`
+
+**구현은 SQL 이 아니라 Java 마이그레이션 `backend/src/main/java/db/migration/V23__ConversationPublicId.java` 다.**
+마이그레이션 검사가 H2 의 MySQL 모드에서 모든 마이그레이션을 돌리는데, 아래 SQL 이 쓰는 `RANDOM_BYTES` 가 H2 에 없다.
+Java 마이그레이션이 `UUID.randomUUID()` 로 같은 v4 값을 채운다. 그 규칙은 `backend/AGENTS.md` 에 있고,
+`backend/src/test/java/com/bifos/assistant/chat/ConversationPublicIdMigrationTest.java` 가 H2 에서 검사한다.
+아래 SQL 은 채우는 값의 모양을 보이는 참고로 둔다.
 
 맨 위에 한국어 주석 두 줄로 까닭을 적는다. 기존 마이그레이션 파일들처럼.
 
@@ -181,7 +187,9 @@ docker 가 없으면 그 사실을 phase 보고에 적는다. 배포할 때 Flyw
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V23__conversation_public_id.sql` | 신규 |
+| `backend/src/main/java/db/migration/V23__ConversationPublicId.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationPublicIdMigrationTest.java` | 신규 |
+| `backend/AGENTS.md` | 수정. 두 DB 에 함께 없는 함수는 Java 마이그레이션으로 쓴다는 규칙 |
 | `backend/src/main/java/com/bifos/assistant/chat/domain/Conversation.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ConversationRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ConversationAccess.java` | 수정 |

@@ -48,8 +48,9 @@ web 은 다음 phase 가 고친다.
 ## Blocked 조건
 
 - `tasks/plan023-design-foundation/` 이나 `tasks/plan024-design-screens/` 가 main 에 남아 있다 → `PHASE_BLOCKED: 디자인 계획이 끝나지 않았다`.
-- `tasks/plan028-conversation-public-id/` 가 main 에 남아 있다 → `PHASE_BLOCKED: 대화 공개 식별자 계획이 끝나지 않았다`.
   두 계획이 채팅 화면의 부품을 바꾼다. 다음 phase 가 그 위에 얹힌다
+- `tasks/plan028-conversation-public-id/` 가 main 에 남아 있다 → `PHASE_BLOCKED: 대화 공개 식별자 계획이 끝나지 않았다`.
+  그 계획이 대화 경로와 식별자 타입을 바꾼다. 이 phase 가 그 위에 얹힌다
 
 ## 작업 항목
 
