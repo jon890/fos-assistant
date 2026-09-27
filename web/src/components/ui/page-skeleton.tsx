@@ -73,10 +73,10 @@ function TitleBlock({ description }: { description?: PageSkeletonDescription }) 
 
 /**
  * 카드 목록이다. 폼이 있는 `/admin/agents` 는 관리 카드처럼 정보가 많아 더 높고,
- * `/agents` 는 한 줄짜리 카드(`p-4` 와 글자 한 줄, 테두리)라 58px 다.
+ * `/agents` 는 한 줄짜리 `Card`(위아래 `py-4` 와 글자 한 줄)라 56px 다. `Card` 의 테두리는 `ring` 이라 높이에 들지 않는다.
  */
 function CardsBody({ tall }: { tall: boolean }) {
-  const cardHeight = tall ? "h-40" : "h-[3.625rem]";
+  const cardHeight = tall ? "h-40" : "h-14";
   return (
     <>
       <div className="grid gap-3">

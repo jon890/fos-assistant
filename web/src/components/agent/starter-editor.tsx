@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { describeError } from "@/components/error-message";
 import type { StartersView } from "@/lib/agent";
 
@@ -76,18 +77,17 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
     <div className="mx-auto mt-8 w-full max-w-2xl">
       <h2 className="mb-2 text-lg font-semibold">새 대화 화면</h2>
       <p className="mb-4 text-sm leading-6 text-muted-foreground">새 대화에서 이 에이전트를 고르면 보인다.</p>
-      <input
+      <Input
         type="text"
         value={tagline}
         onChange={(event) => editTagline(event.target.value)}
         readOnly={!editable}
         maxLength={200}
         aria-label={`${name} 소개`}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
       />
       <div className="mt-3 flex flex-col gap-2">
         {prompts.map((prompt, index) => (
-          <input
+          <Input
             key={index}
             type="text"
             value={prompt}
@@ -95,7 +95,6 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
             readOnly={!editable}
             maxLength={300}
             aria-label={`추천 질문 ${index + 1}`}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
         ))}
       </div>
@@ -106,8 +105,8 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
       ) : null}
       {saveState === "saved" ? <p className="mt-2 text-sm">소개와 추천 질문이 저장되었습니다.</p> : null}
       {editable ? (
-        <Button onClick={() => void save()} disabled={busy} className="mt-4">
-          {busy ? "저장 중…" : "소개와 추천 질문 저장"}
+        <Button onClick={() => void save()} loading={busy} loadingText="저장 중" className="mt-4">
+          소개와 추천 질문 저장
         </Button>
       ) : null}
     </div>

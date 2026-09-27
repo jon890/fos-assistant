@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { callControlPlane } from "@/lib/control-plane";
 import type { AgentView } from "@/lib/agent";
@@ -24,12 +25,11 @@ export default async function AgentsPage() {
         <ul aria-label="쓸 수 있는 에이전트" className="grid gap-3">
           {result.data.map((agent) => (
             <li key={agent.code}>
-              <Link
-                href={`/agents/${agent.code}`}
-                className="flex items-center justify-between rounded-md border border-border p-4 hover:bg-accent"
-              >
-                <span className="font-medium">{agent.name}</span>
-                <span className="text-sm text-muted-foreground">{agent.model}</span>
+              <Link href={`/agents/${agent.code}`} className="block rounded-xl">
+                <Card className="flex-row items-center justify-between px-4 hover:bg-accent">
+                  <span className="text-base font-medium">{agent.name}</span>
+                  <span className="text-muted-foreground">{agent.model}</span>
+                </Card>
               </Link>
             </li>
           ))}

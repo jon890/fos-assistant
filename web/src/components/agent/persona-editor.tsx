@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { describeError } from "@/components/error-message";
 import type { PersonaView } from "@/lib/agent";
 import { PersonaConfirm } from "./persona-confirm";
@@ -88,13 +89,14 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
         이 에이전트가 대화마다 지키는 성격입니다. 저장하면 곧바로 다음 대화부터 반영됩니다.
       </p>
       {isEmpty ? <p className="mb-3 text-sm text-muted-foreground">아직 성격을 쓰지 않았습니다.</p> : null}
-      <textarea
+      {/* Textarea 의 기본 field-sizing-content 는 rows 를 무시해 편집창이 작게 시작하므로 고정으로 되돌린다. */}
+      <Textarea
         value={body}
         onChange={(event) => edit(event.target.value)}
         readOnly={!editable}
         rows={16}
         aria-label={`${name} 성격`}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm leading-6"
+        className="field-sizing-fixed leading-6"
       />
       <p className="mt-2 text-xs text-muted-foreground">남은 {remaining}자</p>
       {error ? (
@@ -115,10 +117,12 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
       {editable ? (
         <Button
           onClick={() => setConfirming(true)}
-          disabled={busy || remaining < 0 || isEmpty}
+          disabled={remaining < 0 || isEmpty}
+          loading={busy}
+          loadingText="저장 중"
           className="mt-4"
         >
-          {busy ? "저장 중…" : "저장"}
+          저장
         </Button>
       ) : null}
       {confirming ? (
