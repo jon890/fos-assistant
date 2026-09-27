@@ -55,7 +55,25 @@ class ModelsDevPriceCatalogReloadTest {
     }
 
     @Test
-    void 읽지_못한_파일은_수정_시각이_같아도_다음_확인_때_다시_읽는다() throws IOException {
+    void 읽기에_실패한_파일은_수정_시각이_같아도_다음_확인_때_다시_읽는다() throws IOException {
+        Path file = write(catalog("old-model"), FIRST);
+        ModelsDevPriceCatalog catalog = catalogOf(file);
+        // 그 자리에 디렉터리를 두면 수정 시각은 읽히고 Files.readString 만 입출력 오류로 실패한다.
+        Files.delete(file);
+        Files.createDirectory(file);
+        Files.setLastModifiedTime(file, FileTime.from(SECOND));
+        now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
+        assertThat(catalog.find("openai", "old-model")).as("읽지 못하는 동안에도 이전 가격을 쓴다").isPresent();
+
+        Files.delete(file);
+        write(catalog("new-model"), SECOND);
+        now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
+
+        assertThat(catalog.find("openai", "new-model")).as("수정 시각이 같아도 입출력 오류였으므로 다시 읽는다").isPresent();
+    }
+
+    @Test
+    void 사라진_파일이_돌아오면_읽는다() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);
         Files.delete(file);
