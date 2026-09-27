@@ -1,4 +1,6 @@
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatAmount, formatCost, formatTokens } from "@/lib/format";
 
 export type BreakdownRow = {
@@ -56,43 +58,43 @@ export function BreakdownTable(
 
   return (
     <>
-      <table className="hidden w-full text-left text-sm md:table" data-testid="breakdown-table">
-        <thead className="text-xs text-muted-foreground">
-          <tr>
-            <th className="pb-3 pr-4 font-medium">묶음</th>
-            <th className="pb-3 pr-4 text-right font-medium">실행</th>
-            <th className="pb-3 pr-4 text-right font-medium">API 환산 비용</th>
-            <th className="pb-3 pr-4 text-right font-medium">실제 청구액</th>
-            <th className="pb-3 pr-4 text-right font-medium">입력</th>
-            <th className="pb-3 pr-4 text-right font-medium">출력</th>
-            <th className="pb-3 text-right font-medium">문맥 평균</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table className="hidden text-left md:table" data-testid="breakdown-table">
+        <TableHeader className="text-xs">
+          <TableRow className="hover:bg-transparent">
+            <TableHead>묶음</TableHead>
+            <TableHead className="text-right">실행</TableHead>
+            <TableHead className="text-right">API 환산 비용</TableHead>
+            <TableHead className="text-right">실제 청구액</TableHead>
+            <TableHead className="text-right">입력</TableHead>
+            <TableHead className="text-right">출력</TableHead>
+            <TableHead className="text-right">문맥 평균</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((row) => (
-            <tr key={row.key} className="border-t border-border align-top">
-              <td className="max-w-48 py-3 pr-4">
+            <TableRow key={row.key} className="align-top">
+              <TableCell className="max-w-48 py-3">
                 <span className="block truncate font-medium">{rowLabel(row, axis)}</span>
                 {row.detail ? <span className="block truncate text-xs text-muted-foreground">{row.detail}</span> : null}
-              </td>
-              <td className="py-3 pr-4 text-right tabular-nums">{row.executions.toLocaleString("ko-KR")}건</td>
-              <td className="py-3 pr-4 text-right whitespace-nowrap tabular-nums">
+              </TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{row.executions.toLocaleString("ko-KR")}건</TableCell>
+              <TableCell className="py-3 text-right tabular-nums">
                 {formatCost(row.estimatedCostMicros, currency)}
-              </td>
-              <td className="py-3 pr-4 text-right whitespace-nowrap tabular-nums">{actualLabel(row, currency)}</td>
-              <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(row.inputTokens)}</td>
-              <td className="py-3 pr-4 text-right tabular-nums">{formatTokens(row.outputTokens)}</td>
-              <td className="py-3 text-right whitespace-nowrap tabular-nums">{contextLabel(row)}</td>
-            </tr>
+              </TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{actualLabel(row, currency)}</TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{formatTokens(row.inputTokens)}</TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{formatTokens(row.outputTokens)}</TableCell>
+              <TableCell className="py-3 text-right tabular-nums">{contextLabel(row)}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
       <div className="grid gap-3 md:hidden" data-testid="breakdown-cards">
         {rows.map((row) => (
-          <article key={row.key} className="rounded-md border border-border p-4">
+          <Card key={row.key} className="gap-0 px-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="truncate font-semibold">{rowLabel(row, axis)}</h3>
+                <h3 className="truncate text-base font-semibold">{rowLabel(row, axis)}</h3>
                 {row.detail ? <p className="truncate text-xs text-muted-foreground">{row.detail}</p> : null}
               </div>
               <span className="shrink-0 text-sm font-semibold tabular-nums">
@@ -106,7 +108,7 @@ export function BreakdownTable(
               실제 청구액 {actualLabel(row, currency)} · 입력 {formatTokens(row.inputTokens)} → 출력{" "}
               {formatTokens(row.outputTokens)}
             </p>
-          </article>
+          </Card>
         ))}
       </div>
     </>

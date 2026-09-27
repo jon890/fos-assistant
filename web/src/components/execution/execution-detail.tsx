@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens } from "@/lib/format";
 import { ExecutionTree, type ExecutionTreeNode, type ExecutionTreeResponse } from "./execution-tree";
 
@@ -70,7 +71,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
     return (
       <div>
         <h1 className="mb-2 text-xl font-semibold">{`실행 #${executionId}`}</h1>
-        <p className="text-sm text-muted-foreground" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           실행 정보를 불러오지 못했다.
         </p>
       </div>
@@ -93,7 +94,9 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
           </div>
           <div>
             <dt className="text-muted-foreground">상태</dt>
-            <dd>{statusLabel(summary.status)}</dd>
+            <dd>
+              <Badge variant={summary.status === "FAILED" ? "default" : "outline"}>{statusLabel(summary.status)}</Badge>
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">모델</dt>

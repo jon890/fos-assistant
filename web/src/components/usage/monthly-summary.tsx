@@ -18,7 +18,7 @@ type Props = {
 export function MonthlySummary({ monthly }: Props) {
   const totalExecutions = monthly.pricedExecutions + monthly.unpricedExecutions;
   return (
-    <dl className="mb-6 grid gap-5 rounded-md border border-border bg-muted p-4 sm:grid-cols-2 md:grid-cols-3">
+    <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
       <Stat
         label="실제로 나간 돈"
         value={
