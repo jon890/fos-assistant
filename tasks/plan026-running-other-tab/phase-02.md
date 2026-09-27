@@ -34,6 +34,10 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 
 - **보는 창과 보낸 창을 구분한다.** 보낸 창은 자기 스트림으로 끝을 알므로 이 조회를 하지 않는다.
   대화를 열 때 한 번 묻고, 도는 turn 이 있을 때만 되풀이한다
+- **보낸 창의 스트림이 끊기면 보는 창으로 넘어간다.** `STREAM_INTERRUPTED` 를 내는 자리에서 오류로 끝내지 않고 도는 turn 을 묻는다
+  - 돌고 있으면 보는 창과 같은 상태로 바꾸고 되풀이 조회를 시작한다. 이미 받은 작업 과정은 다음 나무 조회가 덮는다
+  - 돌지 않으면 `refreshMessages` 를 부른다. 답이 이력에 있으면 오류 문구를 띄우지 않는다. 답이 없을 때만 지금의 끊김 문구를 보인다
+  - 실제로 스트림이 끊긴 뒤 실행이 13분을 더 돌아 성공했는데 화면은 그동안 「답을 받지 못했다」 였다
 - 보는 창의 상태는 기존 상태를 그대로 쓴다. `sending=true`, `activity` 의 시작 시각은 받은 `startedAt` 이다, `currentExecutionId` 와 `executionId` 에 받은 번호를 넣는다.
   그러면 기다리는 표시와 중지 단추가 보낸 창과 같이 동작한다
 - 보는 중이라는 것은 별도 상태 하나로 둔다. 입력창 위에 「다른 창에서 답하는 중」 을 보인다.
@@ -73,6 +77,9 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
   - 이력을 먼저 읽으면 두 호출 사이에 turn 이 끝났을 때 답이 빠진 이력과 `running=false` 를 함께 받는다. 그러면 다시 읽을 계기가 없어 새로 고칠 때까지 답이 보이지 않는다
 - 돌고 있으면 위 의도 메모대로 상태를 채우고 되풀이 조회를 시작한다
 - `Composer` 위에 「다른 창에서 답하는 중」 을 보인다. `data-testid="observing-notice"` 를 붙인다
+- 스트림이 `done`, `stopped`, `error` 없이 끝나는 자리에서 위 의도 메모의 넘어가기를 한다
+  - `STREAM_INTERRUPTED` 를 만드는 자리가 여럿이다. `grep -n STREAM_INTERRUPTED web/src/components/chat-panel.tsx` 로 모두 찾는다
+  - 넘어간 창의 안내는 보는 창과 같은 `observing-notice` 를 쓴다. 문구는 「답을 기다리는 중」 처럼 다른 창을 가리키지 않게 고른다
 
 ### 4. 문서
 
@@ -89,8 +96,11 @@ phase-01 이 `GET /api/v1/chat/conversations/{conversationId}/running` 을 더�
 | 둘째 page 에서 중지를 누른다 | 두 page 모두 이력에서 「중지됨」 |
 | 도는 turn 이 없는 대화를 연다 | `observing-notice` 가 없다. running 조회가 한 번만 간다 |
 | 보는 중에 다른 대화로 옮긴다 | 옮긴 뒤 running 조회가 더 가지 않는다 |
+| 첫 page 에서 `holdNextRun()` 뒤 보내고 그 page 를 새로 고친다 | 새로 고친 page 에 기다리는 표시가 보이고 「답을 받지 못했다」 가 없다. 풀어 주면 답이 나타난다 |
+| 첫 page 에서 `holdNextRun()` 뒤 보내고 스트림 응답만 끊는다 | 끊김 문구 대신 기다리는 표시로 바뀐다. 풀어 주면 답이 나타난다 |
 
 조회 횟수는 `page.on("request")` 로 `/running` 요청을 센다.
+스트림만 끊는 방법은 구현자가 정한다. `route.fetch()` 는 붙잡은 실행이 끝날 때까지 응답을 기다리므로 그대로는 쓰지 못한다.
 3초 주기를 기다리는 검사는 `expect.poll` 로 조건을 기다리고 고정 대기를 쓰지 않는다.
 
 `fromTree` 의 선택지는 `test/unit/` 에 검사를 더한다. 선택지가 없으면 `running` 이 `stopped` 가 되고, 있으면 그대로다.
