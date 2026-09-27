@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Ellipsis } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConversations, type Conversation } from "./conversations-provider";
 import { groupByDate } from "./group-by-date";
@@ -145,7 +146,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(): void; que
                   <button type="button" aria-label={`${title} 메뉴`} aria-expanded={openMenu === conversation.id}
                     ref={(node) => { if (node) menuButtons.current.set(conversation.id, node); else menuButtons.current.delete(conversation.id); }}
                     onClick={() => setOpenMenu(openMenu === conversation.id ? null : conversation.id)}
-                    className="rounded-md px-2 py-1 text-sm hover:bg-accent focus:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">⋯</button>
+                    className="rounded-md px-2 py-1 text-sm hover:bg-accent focus:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"><Ellipsis aria-hidden="true" className="size-4" /></button>
                   {openMenu === conversation.id ? <div role="menu" aria-label={`${title} 메뉴`}
                     className="absolute right-0 top-full z-10 min-w-32 rounded-md border border-border bg-background p-1 shadow-lg">
                     <button type="button" role="menuitem" onClick={() => beginEdit(conversation)}

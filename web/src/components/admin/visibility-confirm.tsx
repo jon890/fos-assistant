@@ -23,7 +23,7 @@ export function VisibilityConfirm({ agent, busy, onCancel, onConfirm }: Props) {
           확인한 뒤 공개한다.
         </p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button onClick={onCancel} disabled={busy} variant="secondary">
+          <Button onClick={onCancel} disabled={busy} variant="outline">
             취소
           </Button>
           <Button onClick={onConfirm} disabled={busy}>

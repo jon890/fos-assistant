@@ -2,6 +2,7 @@
 
 import { useLinkStatus } from "next/link";
 import { useEffect } from "react";
+import { LoaderCircle } from "lucide-react";
 
 /** `Sidebar` 의 `role="status"` 영역에 옮기는 중임을 알리는 사건 이름이다. */
 export const NAV_PENDING_EVENT = "nav-pending";
@@ -28,10 +29,10 @@ export function NavPending() {
 
   if (!pending) return null;
   return (
-    <span
+    <LoaderCircle
       aria-hidden="true"
       data-testid="nav-pending"
-      className="ml-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none"
+      className="ml-2 inline-block size-3 animate-spin motion-reduce:animate-none"
     />
   );
 }

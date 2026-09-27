@@ -39,7 +39,7 @@ export function PersonList({ people, busy, onEnabledChange }: Props) {
               <td className={cellClass}>{person.enabled ? "켜짐" : "꺼짐"}</td>
               <td className={cellClass}>
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   disabled={busy}
                   aria-label={`${person.displayName} ${person.enabled ? "사용 중지" : "다시 허용"}`}

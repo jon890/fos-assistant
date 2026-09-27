@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, type RefObject } from "react";
+import { PanelLeftClose } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
@@ -40,7 +41,7 @@ export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollaps
         <Link href="/" aria-label="우리집 비서 홈" onClick={() => { startNew(); onNavigate(); }}
           className="truncate text-base font-semibold">우리집 비서</Link>
         <button type="button" aria-label="사이드바 접기" onClick={onCollapse}
-          className="hidden rounded-md px-2 py-1 text-sm hover:bg-accent md:block">◀</button>
+          className="hidden rounded-md px-2 py-1 text-sm hover:bg-accent md:block"><PanelLeftClose aria-hidden="true" className="size-4" /></button>
       </div>
       <Link href="/" data-testid="new-conversation-link" onClick={() => { startNew(); onNavigate(); }}
         className="mb-4 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-accent">

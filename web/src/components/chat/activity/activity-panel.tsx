@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExecutionTree, type ExecutionTreeResponse } from "@/components/execution/execution-tree";
 import { ActivityTimeline } from "./activity-timeline";
@@ -42,7 +43,7 @@ export function ActivityPanel({ target, onClose }: Props) {
             className="shrink-0 text-xs text-muted-foreground underline underline-offset-4">전체 화면으로 보기</Link>
         ) : null}
         <button type="button" aria-label="작업 과정 닫기" onClick={onClose}
-          className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-muted">✕</button>
+          className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-muted"><X aria-hidden="true" className="size-4" /></button>
       </header>
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
         {target.mode === "live" ? <ActivityTimeline items={target.state.items} /> :

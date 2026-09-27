@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { Menu, PanelLeft, SquarePen } from "lucide-react";
 import { ConversationsProvider, useConversations } from "./conversations-provider";
 import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
@@ -96,15 +97,15 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {collapsed ? <header className="hidden h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:flex">
             <button type="button" aria-label="사이드바 펴기" onClick={() => updateCollapsed(false)}
-              className="rounded-md px-2 py-1.5 hover:bg-muted">☰</button>
+              className="rounded-md px-2 py-1.5 hover:bg-muted"><PanelLeft aria-hidden="true" className="size-4" /></button>
             <Link href="/" onClick={startNew} className="rounded-md px-2 py-1.5 text-sm hover:bg-muted">새 대화</Link>
           </header> : null}
           <header className="flex h-14 shrink-0 flex-nowrap items-center gap-3 border-b border-border px-4 md:hidden">
             <button type="button" aria-label="사이드바 열기" onClick={() => setDrawerOpen(true)}
-              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-muted">☰</button>
+              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-muted"><Menu aria-hidden="true" className="size-5" /></button>
             <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">{title}</span>
             <Link href="/" aria-label="새 대화" onClick={startNew}
-              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-muted">✎</Link>
+              className="shrink-0 rounded-md px-2 py-1.5 text-xl hover:bg-muted"><SquarePen aria-hidden="true" className="size-5" /></Link>
           </header>
           <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
             {children}

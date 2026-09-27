@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { formatElapsed } from "@/lib/format";
 import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
@@ -64,7 +65,9 @@ export function ActivityBlock(props: Props) {
       <button type="button" data-testid="activity-toggle" aria-expanded={expanded}
         onClick={() => props.mode === "live" ? props.onExpandedChange(!expanded) : setSavedExpanded(!expanded)}
         className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-xs">
-        <span aria-hidden="true" className="shrink-0">{expanded ? "▾" : "▸"}</span>
+        {expanded
+          ? <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
+          : <ChevronRight aria-hidden="true" className="size-4 shrink-0" />}
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </button>
       {live && props.slow && props.state.endedAt === null ? (

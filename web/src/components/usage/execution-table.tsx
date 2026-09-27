@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import {
@@ -56,9 +57,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                   {execution.agentName}
                 </Link>
                 {execution.hasChildren ? (
-                  <span className="ml-1 text-muted-foreground" aria-hidden="true">
-                    ▸
-                  </span>
+                  <ChevronRight aria-hidden="true" className="ml-1 inline-block size-4 text-muted-foreground" />
                 ) : null}
                 <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
               </td>
@@ -67,7 +66,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 <span className="block truncate text-xs text-muted-foreground">{execution.provider ?? "-"}</span>
               </td>
               <td className="max-w-40 py-3 pr-4">
-                <Badge emphasis={failed}>{executionStatusLabel(execution)}</Badge>
+                <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
                 {retryOfLabel(execution) ? (
                   <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-retry-of">
                     {retryOfLabel(execution)}

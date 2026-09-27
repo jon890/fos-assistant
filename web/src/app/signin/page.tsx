@@ -22,7 +22,7 @@ export default function SignInPage() {
             await signIn("google", { redirectTo: "/" });
           }}
         >
-          <Button type="submit" variant="primary" className="w-full">
+          <Button type="submit" className="w-full">
             Google 계정으로 로그인
           </Button>
         </form>

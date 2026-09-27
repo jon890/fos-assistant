@@ -42,8 +42,8 @@ export function AgentCard({
           <p className="text-xs text-muted-foreground">{agent.code}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge>{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "가족 공개"}</Badge>
-          <Badge emphasis={!agent.enabled}>{agent.enabled ? "사용 중" : "사용 중지"}</Badge>
+          <Badge variant="outline">{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "가족 공개"}</Badge>
+          <Badge variant={agent.enabled ? "outline" : "default"}>{agent.enabled ? "사용 중" : "사용 중지"}</Badge>
         </div>
       </div>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -67,18 +67,18 @@ export function AgentCard({
         {addressError ? (
           <p role="alert" className="mt-2 rounded-md bg-muted p-3 text-sm break-all">{addressError}</p>
         ) : null}
-        <Button type="submit" size="sm" variant="secondary" disabled={busy} className="mt-2">
+        <Button type="submit" size="sm" variant="outline" disabled={busy} className="mt-2">
           주소 저장
         </Button>
       </form>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onVisibilityChange(agent)}>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => onVisibilityChange(agent)}>
           {agent.visibility === PRIVATE_VISIBILITY ? "가족 공개로 변경" : "나만으로 변경"}
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => onEnabledChange(agent)}>
           {agent.enabled ? "사용 중지" : "다시 사용"}
         </Button>
-        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onSyncModel(agent)}>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => onSyncModel(agent)}>
           모델 다시 읽기
         </Button>
         <Link

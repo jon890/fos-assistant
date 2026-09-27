@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
+import { ArrowUp, ImagePlus, LoaderCircle, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
 import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
@@ -404,7 +404,7 @@ export function Composer({
                       aria-hidden="true"
                       className="absolute inset-0 flex items-center justify-center bg-background/60"
                     >
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-primary" />
+                      <LoaderCircle className="size-4 animate-spin text-primary motion-reduce:animate-none" />
                     </span>
                   ) : null}
                 </div>
@@ -417,7 +417,7 @@ export function Composer({
                 disabled={disabled || running}
                 className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs leading-none disabled:opacity-50"
               >
-                ×
+                <X aria-hidden="true" className="size-3" />
               </button>
             </div>
           ))}
@@ -515,25 +515,17 @@ export function Composer({
               data-testid="attachment-input"
               onChange={(event) => void handleFiles(event)}
             />
-            <IconButton
-              label="사진 첨부"
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="사진 첨부"
+              title="사진 첨부"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || running}
-              className="h-10 w-10 shrink-0 rounded-full"
+              className="size-10 shrink-0 rounded-full"
             >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="h-5 w-5 fill-none stroke-current stroke-2"
-              >
-                <path
-                  d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="14" r="3.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </IconButton>
+              <ImagePlus aria-hidden="true" className="size-5" />
+            </Button>
           </>
         ) : null}
         {running ? (
@@ -542,33 +534,23 @@ export function Composer({
             aria-label="중지"
             disabled={!canStop}
             onClick={onStop}
-            className="h-10 w-10 shrink-0 rounded-full !p-0"
+            size="icon"
+            className="size-10 shrink-0 rounded-full"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
-              <rect x="7" y="7" width="10" height="10" rx="1" />
-            </svg>
+            <Square aria-hidden="true" className="size-4 fill-current" />
           </Button>
         ) : (
           <Button
             type="submit"
             aria-label="보내기"
             disabled={sendDisabled}
-            className="h-10 w-10 shrink-0 rounded-full !p-0"
+            size="icon"
+            className="size-10 shrink-0 rounded-full"
           >
             {uploading ? (
-              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
+              <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
             ) : (
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="h-5 w-5 fill-none stroke-current stroke-2"
-              >
-                <path
-                  d="M12 19V5m0 0-6 6m6-6 6 6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <ArrowUp aria-hidden="true" className="size-5" />
             )}
           </Button>
         )}

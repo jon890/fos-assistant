@@ -103,7 +103,7 @@ export function AgentModelList({ agentCode, models, busy, onSave }: Props) {
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
           size="sm"
-          variant="secondary"
+          variant="outline"
           disabled={busy}
           onClick={() => setRows([...rows, { provider: "", model: "" }])}
         >

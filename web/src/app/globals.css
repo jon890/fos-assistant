@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -40,6 +42,7 @@
 }
 
 :root {
+  --radius: 0.625rem;
   --background: #ffffff;
   --foreground: #16181d;
   --muted: #f5f6f8;

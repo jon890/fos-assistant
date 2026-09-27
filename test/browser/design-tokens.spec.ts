@@ -137,3 +137,46 @@ test("대화 지우기 확인 창의 지우기 단추는 destructive 바탕에 d
     expect(parseRgb(color), `${theme} 지우기 단추 글자`).toEqual(parseRgb(destructiveForeground));
   }
 });
+
+test("보내기 단추에 마우스를 올리면 바탕이 primary-strong 이다", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  await page.goto("/");
+  // 빈 입력이면 보내기가 잠겨 마우스 올림 모양이 그려지지 않는다.
+  await page.getByRole("textbox", { name: "메시지" }).fill("마우스 올림 확인");
+  const send = page.getByRole("button", { name: "보내기" });
+  await expect(send).toBeEnabled();
+
+  const primaryStrong = await page.locator("html").evaluate((html) => getComputedStyle(html).getPropertyValue("--primary-strong").trim());
+  const primary = await page.locator("html").evaluate((html) => getComputedStyle(html).getPropertyValue("--primary").trim());
+  expect(parseRgb(primaryStrong), "primary-strong 과 primary 는 다른 색이어야 이 검사가 뜻이 있다").not.toEqual(parseRgb(primary));
+
+  await send.hover();
+  // 단추의 색 전환 효과가 끝날 때까지 기다린다.
+  await expect
+    .poll(async () => parseRgb(await send.evaluate((button) => getComputedStyle(button).backgroundColor)), {
+      message: `보내기 단추 마우스 올림 바탕이 --primary-strong(${primaryStrong}) 이어야 한다`,
+    })
+    .toEqual(parseRgb(primaryStrong));
+});
+
+test("어두움 모드의 outline 단추는 테두리가 border 색이고 바탕이 비어 있다", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "dark"));
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+  const attach = page.getByRole("button", { name: "사진 첨부" });
+  await expect(attach).toHaveAttribute("data-variant", "outline");
+
+  const colors = await attach.evaluate((button) => {
+    const own = getComputedStyle(button);
+    return {
+      border: own.borderTopColor,
+      borderWidth: own.borderTopWidth,
+      background: own.backgroundColor,
+      token: getComputedStyle(document.documentElement).getPropertyValue("--border").trim(),
+    };
+  });
+
+  expect(colors.borderWidth, "outline 단추 테두리 두께").toBe("1px");
+  expect(parseRgb(colors.border), `outline 단추 테두리가 --border(${colors.token}) 이어야 한다`).toEqual(parseRgb(colors.token));
+  expect(colors.background, "outline 단추 바탕은 투명해야 한다").toBe("rgba(0, 0, 0, 0)");
+});
