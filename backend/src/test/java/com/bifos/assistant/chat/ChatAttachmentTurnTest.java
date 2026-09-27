@@ -191,6 +191,20 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
+    void 먼저_올리고_나중에_보낸_사진은_화면_차례대로_뒤의_순번을_받는다() {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        // 한 창에서 먼저 올려 두고, 다른 창에서 올린 사진을 먼저 보낸다.
+        ChatAttachment uploadedFirst = upload(dad, conversationId, "a.png");
+        ChatAttachment sentFirst = upload(dad, conversationId, "b.png");
+        chat.send(dad, conversationId, "먼저 보낸 사진", null, List.of(sentFirst.id()));
+
+        chat.send(dad, conversationId, "나중에 보낸 사진", null, List.of(uploadedFirst.id()));
+
+        assertThat(stub().received().getLast().input())
+                .contains("- 2번째 사진: " + uploadedFirst.id() + ".png (올린 이름: a.png)\n");
+    }
+
+    @Test
     void 같은_첨부를_두_메시지에_붙이면_둘째가_거절되고_저장되지_않는다() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, conversationId, "a.png");

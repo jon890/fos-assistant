@@ -189,14 +189,18 @@ public class AttachmentService {
                 + text;
     }
 
-    /** 메시지에 묶인 첨부를 번호 순으로 세어 첨부 번호마다 1부터 매긴 순번을 돌려준다. */
+    /**
+     * 메시지에 묶인 첨부를 화면에 보이는 차례로 세어 첨부 번호마다 1부터 매긴 순번을 돌려준다.
+     *
+     * <p>화면은 메시지 순서로 묶고 한 메시지 안에서는 첨부 번호 순으로 보인다. 그래서 메시지 번호로 먼저 줄
+     * 세운다. 첨부 번호로만 세면 한 창에서 올려 둔 사진을 다른 창의 사진보다 늦게 보냈을 때 순번이 어긋난다.
+     */
     private Map<Long, Integer> orderInConversation(Long conversationId) {
         Map<Long, Integer> order = new HashMap<>();
-        for (ChatAttachment attachment : attachments.findByConversationIdOrderByIdAsc(conversationId)) {
-            if (attachment.messageId() != null) {
-                order.put(attachment.id(), order.size() + 1);
-            }
-        }
+        attachments.findByConversationIdOrderByIdAsc(conversationId).stream()
+                .filter(attachment -> attachment.messageId() != null)
+                .sorted(Comparator.comparing(ChatAttachment::messageId).thenComparing(ChatAttachment::id))
+                .forEach(attachment -> order.put(attachment.id(), order.size() + 1));
         return order;
     }
 
