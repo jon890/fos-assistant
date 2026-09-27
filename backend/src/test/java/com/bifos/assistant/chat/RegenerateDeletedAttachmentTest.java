@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.MessageRole;
@@ -48,6 +49,8 @@ class RegenerateDeletedAttachmentTest {
     }
 
     @Autowired ChatService chat;
+    /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
+    @Autowired ArtifactService artifactService;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
     @Autowired AgentModelSelector modelSelector;
@@ -91,7 +94,9 @@ class RegenerateDeletedAttachmentTest {
         chat.regenerate(dad, first.conversationId(), event -> {});
 
         assertThat(stub().received()).hasSize(2);
-        assertThat(stub().received().get(1).input()).isEqualTo("사진을 설명해 줘");
+        // 지운 사진의 단락은 빠지고 결과물 폴더 단락만 사용자가 쓴 글 앞에 붙는다.
+        assertThat(stub().received().get(1).input())
+                .isEqualTo(artifactService.agentPreamble(first.conversationId()) + "사진을 설명해 줘");
     }
 
     private CurrentUser member() {

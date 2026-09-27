@@ -23,6 +23,7 @@ import com.bifos.assistant.agent.presentation.AgentController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -94,6 +95,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Autowired ChatService chat;
+    /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
+    @Autowired ArtifactService artifactService;
     @Autowired ConversationAccess access;
     @Autowired AgentService agentService;
     @Autowired StarterService starterService;
@@ -145,13 +148,14 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 사진_없이_보내면_Hermes_입력이_사용자가_쓴_것과_같다() {
+    void 사진_없이_보내면_Hermes_입력은_결과물_폴더_단락과_사용자가_쓴_것이다() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
 
         chat.send(dad, conversationId, "안녕", null, List.of());
         chat.send(dad, conversationId, "또 안녕", null);
 
-        assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly("안녕", "또 안녕");
+        assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(
+                artifactPreamble(conversationId) + "안녕", artifactPreamble(conversationId) + "또 안녕");
     }
 
     @Test
@@ -162,7 +166,8 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "이 사진 설명해 줘", null, List.of(photo.id()));
 
         String input = stub().received().getFirst().input();
-        String expected = "[이번 메시지에 올린 사진]\n"
+        String expected = artifactPreamble(conversationId)
+                + "[이번 메시지에 올린 사진]\n"
                 + AGENT_ROOT + "/" + conversationId + "\n"
                 + "- 1번째 사진: " + photo.id() + ".png (올린 이름: 바다.png)\n"
                 + "\n"
@@ -350,6 +355,11 @@ class ChatAttachmentTurnTest {
                 .containsExactlyInAnyOrder(
                         tuple("dad", true),
                         tuple("flowed", false));
+    }
+
+    /** 사진 단락보다 앞에 매 turn 붙는 결과물 폴더 단락이다. */
+    private String artifactPreamble(Long conversationId) {
+        return artifactService.agentPreamble(conversationId);
     }
 
     private StubHermesRunsClient stub() {

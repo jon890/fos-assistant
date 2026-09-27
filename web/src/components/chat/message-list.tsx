@@ -29,6 +29,8 @@ type Props = {
   onRegenerate(): void;
   /** 마지막 답 끝의 질문에 답한다. 고른 답을 글로 만들어 다음 메시지로 보낸다 */
   onAnswer?(text: string): void;
+  /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
+  onOpenArtifact(messageId: Turn["id"], path: string): void;
 };
 
 export function MessageList({
@@ -45,7 +47,7 @@ export function MessageList({
   onOpenSaved,
   onOpenLive,
   onRetry,
-  selectedVersions, onVersionChange, onRegenerate, onAnswer,
+  selectedVersions, onVersionChange, onRegenerate, onAnswer, onOpenArtifact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -143,7 +145,8 @@ export function MessageList({
                       userVersion={userVersion} answerVersion={answerVersion} onVersionChange={onVersionChange}
                       canRegenerate={isLast && turn.role === "ASSISTANT" && latestView && !sending}
                       onRegenerate={onRegenerate}
-                      onAnswer={isLast && turn.role === "ASSISTANT" && latestView && !sending ? onAnswer : undefined} />
+                      onAnswer={isLast && turn.role === "ASSISTANT" && latestView && !sending ? onAnswer : undefined}
+                      onOpenArtifact={onOpenArtifact} />
                     {isLast && hasNoAnswer ? (
                       <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground">
                         <span>답을 받지 못했다</span>

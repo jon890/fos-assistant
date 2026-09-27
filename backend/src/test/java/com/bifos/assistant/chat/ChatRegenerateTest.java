@@ -13,6 +13,7 @@ import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -59,6 +60,8 @@ import org.springframework.test.context.ActiveProfiles;
 class ChatRegenerateTest {
 
     @Autowired ChatService chat;
+    /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
+    @Autowired ArtifactService artifactService;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
     @Autowired AgentModelSelector modelSelector;
@@ -102,8 +105,10 @@ class ChatRegenerateTest {
         assertThat(history).extracting(ChatMessage::role)
                 .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.ASSISTANT);
         assertThat(history.getLast().replacesMessageId()).isEqualTo(history.get(1).id());
+        // 다시 생성도 같은 결과물 폴더 단락을 붙인 같은 질문을 보낸다.
+        String expected = artifactService.agentPreamble(conversationId) + "원래 질문";
         assertThat(stub().received()).extracting(HermesRunCommand::input)
-                .containsExactly("원래 질문", "원래 질문");
+                .containsExactly(expected, expected);
         assertThat(stub().received().getLast().instructions())
                 .endsWith("사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.");
         assertThat(events.getLast().type()).isEqualTo("done");

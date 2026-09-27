@@ -1,5 +1,6 @@
 "use client";
 
+import { FileText } from "lucide-react";
 import { cn } from "cn";
 import { assistantAvatar, attachmentPlaceholder, revealedTime } from "./variants";
 import { AnswerBody } from "./answer-body";
@@ -20,6 +21,29 @@ export type MessageAttachment = {
   expiresAt: string;
 };
 
+/** 답의 turn 이 결과물 폴더에 만든 HTML 하나다. `ChatDtos.ArtifactView` 를 그대로 받는다 */
+export type MessageArtifact = {
+  /** 대화 결과물 폴더 안의 상대 경로다 */
+  path: string;
+  byteSize: number;
+  /** 보관 기간이 지나 파일이 지워졌다 */
+  deleted: boolean;
+};
+
+/**
+ * 결과물 줄에 보일 이름이다. 경로의 마지막 조각이고, 같은 이름이 둘 이상이면 앞 폴더를 붙인다.
+ */
+function artifactNames(paths: string[]): Map<string, string> {
+  const last = (path: string) => path.split("/").at(-1) ?? path;
+  const counts = new Map<string, number>();
+  for (const path of paths) counts.set(last(path), (counts.get(last(path)) ?? 0) + 1);
+  return new Map(paths.map((path) => {
+    const segments = path.split("/");
+    const name = last(path);
+    return [path, (counts.get(name) ?? 0) > 1 && segments.length > 1 ? segments.slice(-2).join("/") : name];
+  }));
+}
+
 export type Turn = {
   id: number | string;
   role: "USER" | "ASSISTANT";
@@ -33,6 +57,8 @@ export type Turn = {
   switchedTo?: string | null;
   /** 이 메시지에 붙은 사진들. 지워진 것도 자리를 남기려고 담는다 */
   attachments?: MessageAttachment[];
+  /** 이 답의 turn 이 만든 결과물 파일들. 보관 기간이 지난 것도 자리를 남기려고 담는다 */
+  artifacts?: MessageArtifact[];
   activity?: ActivitySummary | null;
   status?: "SUCCEEDED" | "FAILED" | "CANCELLED" | "RUNNING" | null;
   replacesMessageId?: number | null;
@@ -78,6 +104,47 @@ function AttachmentGallery({
   );
 }
 
+function ArtifactList({
+  artifacts,
+  onOpen,
+}: {
+  artifacts: MessageArtifact[];
+  onOpen?(path: string): void;
+}) {
+  if (artifacts.length === 0) return null;
+  const names = artifactNames(artifacts.map((artifact) => artifact.path));
+  return (
+    <ul className="mt-2 flex flex-col gap-1">
+      {artifacts.map((artifact) => {
+        const name = names.get(artifact.path) ?? artifact.path;
+        const content = (
+          <>
+            <FileText aria-hidden="true" className="size-4 shrink-0" />
+            <span className="min-w-0 truncate">{name}</span>
+          </>
+        );
+        return (
+          <li key={artifact.path} data-testid="message-artifact" className="flex min-w-0 items-center gap-2 text-sm">
+            {artifact.deleted || !onOpen ? (
+              <span aria-disabled="true" className="flex min-w-0 items-center gap-2 text-muted-foreground opacity-60">
+                {content}
+              </span>
+            ) : (
+              <button type="button" onClick={() => onOpen(artifact.path)}
+                className="flex min-w-0 items-center gap-2 rounded-sm underline-offset-4 hover:underline">
+                {content}
+              </button>
+            )}
+            {artifact.deleted ? (
+              <span className="shrink-0 text-xs text-muted-foreground">보관 기간이 지나 볼 수 없습니다</span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function MessageBubble({
   turn,
   conversationId,
@@ -91,6 +158,7 @@ export function MessageBubble({
   canRegenerate = false,
   onRegenerate,
   onAnswer,
+  onOpenArtifact,
 }: {
   turn: Turn;
   conversationId: string | null;
@@ -102,6 +170,8 @@ export function MessageBubble({
   canRegenerate?: boolean; onRegenerate?(): void;
   /** 이 답 끝의 질문에 답할 수 있을 때만 준다. 마지막 답이고 돌고 있는 turn 이 없을 때다 */
   onAnswer?(text: string): void;
+  /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
+  onOpenArtifact?(messageId: Turn["id"], path: string): void;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
@@ -182,6 +252,8 @@ export function MessageBubble({
           onVersionChange={(index) => answerVersion && onVersionChange?.(answerVersion.slotId, index)}
           canRegenerate={canRegenerate} onRegenerate={onRegenerate} /> : null}
         <AttachmentGallery conversationId={conversationId} attachments={attachments} />
+        <ArtifactList artifacts={turn.artifacts ?? []}
+          onOpen={onOpenArtifact ? (path) => onOpenArtifact(turn.id, path) : undefined} />
       </div>
     </li>
   );

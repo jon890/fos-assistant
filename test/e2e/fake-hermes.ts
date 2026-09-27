@@ -7,6 +7,8 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
@@ -161,6 +163,53 @@ function withoutAskGuide(instructions: string): string {
   return (instructions.slice(0, start).replace(/\n+$/, "") + instructions.slice(end)).replace(/^\n+/, "");
 }
 
+/** Control Plane 이 모든 실행 입력 맨 앞에 붙이는 결과물 폴더 단락의 첫 줄이다. `ArtifactService` 와 같아야 한다. */
+const ARTIFACT_HEADER = "[결과물 폴더]";
+
+/**
+ * 입력 맨 앞의 결과물 폴더 단락을 떼고, 단락의 둘째 줄인 폴더를 함께 돌려준다.
+ *
+ * <p>단락은 빈 줄 하나로 끝난다. 맨 앞에 단락이 없으면 아무것도 떼지 않는다. Chief 는 요청 본문 안에서 이 단락을
+ * 받아 맨 앞이 아니므로 그대로 둔다. 떼지 않으면 입력을 글자 그대로 견주는 분기와 입력을 되돌려 주는 답이 모두
+ * 어긋난다.
+ */
+function splitArtifactPreamble(input: string): { folder?: string; rest: string } {
+  if (!input.startsWith(`${ARTIFACT_HEADER}\n`)) return { rest: input };
+  const end = input.indexOf("\n\n");
+  if (end < 0) return { rest: input };
+  return { folder: input.slice(0, end).split("\n")[1], rest: input.slice(end + 2) };
+}
+
+/** 이 글을 보내면 결과물 폴더에 HTML 과 그것이 부르는 사진을 쓰고 답한다. */
+export const ARTIFACT_PROBE = "결과물 파일 검사";
+
+/** HTML 이 부르는 사진이다. 1픽셀짜리 PNG 다. */
+const ONE_PIXEL_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
+
+/**
+ * 에이전트가 초안을 만든 것처럼 폴더에 쓴다.
+ *
+ * <p>스크립트 한 줄을 품는다. 화면 검사가 제목이 바뀌지 않은 것으로 스크립트가 돌지 않았음을 본다.
+ */
+function writeArtifactDraft(folder: string): void {
+  const draft = join(folder, "초안");
+  mkdirSync(draft, { recursive: true });
+  writeFileSync(
+    join(draft, "index.html"),
+    [
+      "<!doctype html>",
+      "<html><head><meta charset=\"utf-8\"><title>초안</title></head>",
+      "<body><h1>초안</h1><img src=\"photo.png\" alt=\"사진\">",
+      "<script>document.title=\"스크립트가 돌았다\"</script>",
+      "</body></html>",
+    ].join("\n"),
+  );
+  writeFileSync(join(draft, "photo.png"), ONE_PIXEL_PNG);
+}
+
 /** 묻는 카드를 그리는지 보는 검사가 보내는 글이다. 이 글에는 답 끝에 `<ask>` 를 둔 답을 준다. */
 export const ASK_CARD_PROBE = "묻는 카드 검사";
 
@@ -181,6 +230,9 @@ function specialOutputFor(input: string): string | null {
   }
   if (input.includes(CHIEF_MARK)) {
     return chiefOutputFor(input);
+  }
+  if (input === ARTIFACT_PROBE) {
+    return "초안을 만들었다.";
   }
   if (input === "마크다운 보안 검사") {
     return [
@@ -651,7 +703,10 @@ export function startFakeHermes(
           model?: string;
         };
         lastSubmittedInstructions = submitted.instructions;
+        // 되돌려 받는 쪽은 원문을 본다. 결과물 폴더 단락이 붙었는지 검사가 이것으로 안다.
         lastSubmittedInput = submitted.input;
+        const { folder: artifactFolder, rest: input } = splitArtifactPreamble(submitted.input ?? "");
+        if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         lastSubmittedRuntime = { provider: submitted.provider, model: submitted.model };
         const runId = `run_${shortId()}`;
         const sessionId = submitted.session_id ?? `sess_${shortId()}`;
@@ -666,7 +721,7 @@ export function startFakeHermes(
             provider: submitted.provider ?? null,
             error: "No LLM provider configured. Run `hermes model` to select a provider.",
             output: "",
-            input: submitted.input ?? "",
+            input,
             interruptEvents: false,
             usage: FAKE_USAGE,
           });
@@ -683,7 +738,7 @@ export function startFakeHermes(
             provider: submitted.provider,
             error: PROVIDER_AUTH_FAILED,
             output: "",
-            input: submitted.input ?? "",
+            input,
             interruptEvents: false,
             usage: FAKE_USAGE,
           });
@@ -699,18 +754,18 @@ export function startFakeHermes(
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
-          output: specialOutputFor(submitted.input ?? "")
-            ?? `[${who} on profile ${profile}]${instructionsEcho} ${submitted.input ?? ""}`,
-          input: submitted.input ?? "",
+          output: specialOutputFor(input)
+            ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
+          input,
           provider: submitted.provider ?? null,
-          interruptEvents: submitted.input === "스트림 중단 검사",
+          interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
         });
         // 실제로 돈 모델은 세션 행에만 남는다.
         sessions.set(sessionId, {
-          model: actualModelFor(submitted.input ?? "", submitted.model ?? profile!),
+          model: actualModelFor(input, submitted.model ?? profile!),
           provider:
-            submitted.input === SESSION_MODEL_PROBE ? "nvidia" : submitted.provider ?? null,
+            input === SESSION_MODEL_PROBE ? "nvidia" : submitted.provider ?? null,
         });
         if (held) {
           heldRunId = runId;

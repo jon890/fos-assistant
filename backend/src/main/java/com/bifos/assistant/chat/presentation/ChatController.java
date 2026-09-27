@@ -4,9 +4,11 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.presentation.ChatDtos.ArtifactView;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
@@ -166,6 +168,7 @@ public class ChatController {
         Map<Long, ActivitySummary> activity = chat.activitySummaries(history);
         Map<Long, com.bifos.assistant.usage.domain.ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
+        Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
         return history.stream()
                 .map(
                         it ->
@@ -182,6 +185,9 @@ public class ChatController {
                                         it.createdAt(),
                                         attached.getOrDefault(it.id(), List.of()).stream()
                                                 .map(AttachmentView::from)
+                                                .toList(),
+                                        produced.getOrDefault(it.id(), List.of()).stream()
+                                                .map(ArtifactView::from)
                                                 .toList(),
                                         it.executionId() == null ? null : activity.get(it.executionId()),
                                         it.executionId() == null || statuses.get(it.executionId()) == null

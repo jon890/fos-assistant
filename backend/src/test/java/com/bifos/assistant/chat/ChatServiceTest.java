@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doThrow;
 
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
@@ -77,6 +78,8 @@ class ChatServiceTest {
     }
 
     @Autowired ChatService chat;
+    /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
+    @Autowired ArtifactService artifactService;
     @Autowired ChatController controller;
     @Autowired ConversationAccess access;
     @Autowired AppUserRepository users;
@@ -185,7 +188,9 @@ class ChatServiceTest {
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("dad");
             assertThat(command.apiBaseUrl()).isEqualTo("http://agent-runtime.test/p/dad");
-            assertThat(command.input()).isEqualTo("오늘 저녁 뭐 먹을까?");
+            // 사용자가 쓴 글 앞에 결과물 폴더 단락이 매 turn 붙는다.
+            assertThat(command.input())
+                    .isEqualTo(artifactService.agentPreamble(turn.conversationId()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
             assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
             assertThat(command.sessionId()).isNull();

@@ -47,6 +47,7 @@ import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.t
 import { modelSelectionScenario } from "./scenarios/model-selection.ts";
 import { busyScenario } from "./scenarios/busy.ts";
 import { chatAttachmentScenario } from "./scenarios/chat-attachment.ts";
+import { artifactScenario } from "./scenarios/artifact.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -92,6 +93,7 @@ const SCENARIOS: readonly Scenario[] = [
   regenerateScenario,
   orchestrationScenario,
   chatAttachmentScenario,
+  artifactScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
   busyScenario,
   // 막힌 provider 를 만들어 두고 끝나므로 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
@@ -113,6 +115,17 @@ async function waitForHealth(url: string, logPath: string): Promise<void> {
   throw new Error(`Control Plane 이 뜨지 않았다\n${log.split("\n").slice(-40).join("\n")}`);
 }
 
+/**
+ * 결과물 폴더의 뿌리를 실행마다 만든다.
+ *
+ * <p>Control Plane 이 보는 경로와 에이전트가 보는 경로가 같은 기계의 같은 디렉터리다. 대역이 입력에 적힌 폴더에 곧바로 쓴다.
+ */
+async function makeArtifactRoot(work: string): Promise<string> {
+  const artifactRoot = join(work, "artifacts");
+  await mkdir(artifactRoot, { recursive: true });
+  return artifactRoot;
+}
+
 /** profile 이름을 파일 이름으로 쓰는 mode 600 key 디렉터리를 만든다. 운영과 같은 모양이다. */
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
@@ -130,6 +143,7 @@ function startControlPlane(
   dashboardBaseUrl: string,
   logPath: string,
   attachmentRoot: string,
+  artifactRoot: string,
 ): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
@@ -146,6 +160,9 @@ function startControlPlane(
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
       // 에이전트 쪽에서 보는 경로다. 검사는 그 경로를 열지 않고 입력에 적힌 글자만 본다.
       ASSISTANT_ATTACHMENT_AGENT_ROOT: "/agent-side/attachments",
+      // 결과물 폴더는 두 뿌리에 같은 경로를 준다. 대역이 같은 기계에서 입력에 적힌 폴더에 파일을 쓴다.
+      ASSISTANT_ARTIFACT_ROOT: artifactRoot,
+      ASSISTANT_ARTIFACT_AGENT_ROOT: artifactRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
@@ -198,6 +215,7 @@ async function main(): Promise<void> {
       hermes.baseUrl,
       logPath,
       join(work, "attachments"),
+      await makeArtifactRoot(work),
     );
     await waitForHealth(`http://127.0.0.1:${APP_PORT}/actuator/health`, logPath);
     console.log(`   http://127.0.0.1:${APP_PORT}`);
