@@ -285,34 +285,37 @@ class ChatStopTest {
         CurrentUser dad = member("dad@example.com", "dad");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         AtomicReference<Future<?>> firstStop = new AtomicReference<>();
-        CountDownLatch requested = new CountDownLatch(1);
+        CountDownLatch awaitingFirstStop = new CountDownLatch(1);
         AtomicInteger attempts = new AtomicInteger();
         stub().onStop(runId -> {
             if (attempts.getAndIncrement() == 0) {
                 throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "temporary failure");
             }
         });
+        doAnswer(invocation -> {
+            awaitingFirstStop.countDown();
+            return invocation.callRealMethod();
+        }).when(turns).awaitFirstStop(any());
+        // 첫 중지 요청이 run 없이 첫 중지 결과를 기다리기 시작한 뒤에 제출을 끝낸다.
+        // 제출이 먼저 run 을 등록하면 그 요청이 run 을 직접 다시 멈춰 성공할 수 있다.
         stub().willAnswer(command -> {
             Long executionId = latestExecution(dad).id();
-            firstStop.set(executor.submit(() -> {
-                requested.countDown();
-                chat.stop(dad, executionId);
-            }));
-            return HermesRunResult.of(
-                    "run-before-submit-retry", "session", "cancelled", "", "model", "provider", TokenUsage.empty());
-        });
-        stub().beforeAwait(() -> {
+            firstStop.set(executor.submit(() -> chat.stop(dad, executionId)));
             try {
-                assertThat(requested.await(1, TimeUnit.SECONDS)).isTrue();
-                assertThatThrownBy(() -> firstStop.get().get(1, TimeUnit.SECONDS))
-                        .hasCauseInstanceOf(ApiException.class)
-                        .satisfies(ex -> assertThat(((ApiException) ex.getCause()).code())
-                                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
-                chat.stop(dad, latestExecution(dad).id());
+                assertThat(awaitingFirstStop.await(1, TimeUnit.SECONDS)).isTrue();
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 throw new AssertionError(ex);
             }
+            return HermesRunResult.of(
+                    "run-before-submit-retry", "session", "cancelled", "", "model", "provider", TokenUsage.empty());
+        });
+        stub().beforeAwait(() -> {
+            assertThatThrownBy(() -> firstStop.get().get(1, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(ApiException.class)
+                    .satisfies(ex -> assertThat(((ApiException) ex.getCause()).code())
+                            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+            chat.stop(dad, latestExecution(dad).id());
         });
         try {
             chat.send(dad, null, "제출 전에 실패해도 멈춰 줘", "dad");
@@ -321,6 +324,51 @@ class ChatStopTest {
         }
 
         assertThat(stub().stopped()).containsExactly("run-before-submit-retry", "run-before-submit-retry");
+    }
+
+    @Test
+    void 제출이_보낸_중지가_실패해도_같은_중지_요청이_다시_보내_성공하면_성공으로_답한다() throws Exception {
+        CurrentUser dad = member("dad@example.com", "dad");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Future<?>> firstStop = new AtomicReference<>();
+        AtomicInteger attempts = new AtomicInteger();
+        stub().onStop(runId -> {
+            if (attempts.getAndIncrement() == 0) {
+                throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "temporary failure");
+            }
+        });
+        // 중지 요청이 취소 표시를 남긴 뒤 run 이 있는지 보는 것을, 제출이 run 을 등록하며 보낸 중지가 실패할 때까지 미룬다.
+        // 그 요청이 같은 run 에 다시 보내 Hermes 가 받아들였으므로 중지는 성공이다.
+        doAnswer(invocation -> {
+            long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+            while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+            return invocation.callRealMethod();
+        }).when(turns).hasRuns(any());
+        stub().willAnswer(command -> {
+            Long executionId = latestExecution(dad).id();
+            firstStop.set(executor.submit(() -> chat.stop(dad, executionId)));
+            assertThat(awaitCancelled(executionId)).isTrue();
+            return HermesRunResult.of(
+                    "run-retried-by-stop", "session", "completed", "", "model", "provider", TokenUsage.empty());
+        });
+        stub().beforeAwait(() -> {
+            try {
+                firstStop.get().get(1, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                throw new AssertionError(ex);
+            }
+        });
+        ChatTurn turn;
+        try {
+            turn = chat.send(dad, null, "제출과 중지가 겹쳐도 멈춰 줘", "dad");
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(stub().stopped()).containsExactly("run-retried-by-stop", "run-retried-by-stop");
+        assertThat(turn.cancelled()).isTrue();
+        assertThat(executions.findById(turn.executionId()).orElseThrow().status())
+                .isEqualTo(ExecutionStatus.CANCELLED);
     }
 
     @Test
