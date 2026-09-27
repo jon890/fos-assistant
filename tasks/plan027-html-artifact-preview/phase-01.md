@@ -97,12 +97,18 @@ H2 의 MySQL 모드에서도 도는 DDL 만 쓴다. `V22__agent_starter.sql` 이
 
 - `ChatService` 의 두 `agentInput` 자리에서 turn 을 시작할 때 `artifactStore.ensureFolder` 를 부르고, 입력 맨 앞에 `artifacts.agentPreamble(conversation.id())` 를 붙인다. 사진 단락은 그 뒤다
 - 같은 자리에서 turn 의 시작 시각 `Instant` 를 잡는다. 폴더를 만들기 전이다
-- `ChatEvent.done/stopped` 를 보내는 세 곳 바로 앞에서 `artifacts.recordTurn(conversationId, turn.messageId(), 시작 시각)` 을 부른다
-- 다시 생성(`regenerate`)도 같은 규칙이다. 세 곳 가운데 하나가 그 경로다
+- **`artifacts.recordTurn(conversation.id(), turn.messageId(), 시작 시각)` 은 `runTurn` 과 `runFlow` 가 `ChatTurn` 을 돌려주는 모든 자리 바로 앞에서 부른다.** 중지로 돌려주는 자리도 포함한다
+  - 끝 사건(`ChatEvent.done/stopped`)을 보내는 자리에 두지 않는다. 스트림이 아닌 `send()` 경로는 끝 사건을 보내지 않아 거기서 빠진다
+  - `runTurn` 이 돌려준 뒤에 `stream()`, `regenerate()` 가 끝 사건을 보내므로 행은 끝 사건보다 먼저 생긴다. `runFlow` 는 끝 사건을 보내기 전에 부른다
+  - 다시 생성(`regenerate`)도 두 함수를 거치므로 같은 규칙이다
+- **흐름 turn 의 하위 실행도 같은 폴더를 안다.** `orchestration/application/ResearchAndBuildFlow.java` 의 `runChild` 가 넘기는 `task` 맨 앞에 `artifacts.agentPreamble(conversation.id())` 를 붙인다. Researcher, Engineer, Synthesizer 가 모두 이 자리를 지난다
+  - Chief 는 `input` 으로 이미 단락을 받는다. 파일을 실제로 만드는 쪽은 Engineer 다
+  - `ChildExecutionRunner` 는 고치지 않는다. 받은 `task` 를 그대로 보내므로 `ChildExecutionRunnerTest` 의 입력 비교는 그대로 맞는다
 
 ### 6. 경로와 DTO
 
-- `ChatController` 나 새 컨트롤러에 `GET /api/v1/chat/conversations/{conversationId}/files/**` 를 둔다. `{conversationId}` 는 공개 식별자이고 같은 컨트롤러의 다른 대화 경로처럼 `ConversationAccess.requireOwnId` 로 번호를 얻는다. `/files/` 뒤를 상대 경로로 꺼낸다
+- 새 `chat/presentation/ArtifactController.java` 에 `GET /api/v1/chat/conversations/{conversationId}/files/{*path}` 를 둔다. 메서드의 매핑 문자열에 `conversations/{conversationId}/files` 가 그대로 들어가게 한다. 다음 phase 의 Blocked 조건이 이 문자열을 찾는다 `{conversationId}` 는 공개 식별자이고 같은 컨트롤러의 다른 대화 경로처럼 `ConversationAccess.requireOwnId` 로 번호를 얻는다. `{*path}` 가 디코딩한 상대 경로를 준다. 앞의 `/` 는 뗀다. 한국어 폴더 이름(`초안`)도 그대로 받는다
+- **Spring Security 의 `StrictHttpFirewall` 설정을 바꾸지 않는다.** 정규화되지 않은 경로(`/../`, `%2e`)는 컨트롤러 앞에서 400 으로 거절된다. 그것으로 충분하다
 - 응답 머리글은 `docs/code-architecture.md` 「결과물 파일」 의 머리글 표 그대로다. 본문은 `AttachmentController.GET` 처럼 스트림으로 준다
 - `ChatDtos.MessageView` 에 `List<ArtifactView> artifacts` 를 `attachments` 다음에 더한다. `ArtifactView(String path, long byteSize, boolean deleted)`. 사용자 메시지와 결과물이 없는 답은 빈 목록
 - `messages` 는 답마다 한 번씩 읽지 않고 `byMessage` 로 한 번에 읽는다
@@ -110,35 +116,46 @@ H2 의 MySQL 모드에서도 도는 DDL 만 쓴다. `V22__agent_starter.sql` 이
 ### 7. `chat/application/ArtifactCleaner.java`
 
 `AttachmentCleaner` 와 같은 모양이다. 같은 `assistant.attachment.cleanup-cron` 으로 돈다.
-`cleanExpired(Instant now)` 가 `deleteOlderThan(now - retentionDays)` 을 부르고 지운 HTML 의 행에 `deleted_at` 을 적는다. 지운 건수를 돌려준다.
+`cleanExpired(Instant now)` 가 `deleteOlderThan(now - retentionDays)` 을 부르고 지운 HTML 의 행에 `deleted_at` 을 적는다. 같은 파일이 여러 답에 묶였으면 그 `(conversation_id, path)` 의 행 모두에 적는다. 지운 건수를 돌려준다.
 
 ### 8. 테스트 도구
 
-- `test/e2e/fake-hermes.ts`: 입력을 견주기 전에 맨 앞의 `[결과물 폴더]` 단락을 떼는 함수를 두고, 지금 `run.input` 을 견주는 모든 자리가 뗀 글을 견주게 한다. 사진 단락은 지금처럼 둔다
-- 같은 파일: 뗀 글이 `결과물 파일 검사` 이면 단락의 둘째 줄 폴더에 `초안/index.html` 과 `초안/photo.png` 를 쓰고 답한다. HTML 은 `<img src="photo.png">` 로 사진을 부르고 `<script>` 한 줄을 품는다. PNG 는 1픽셀짜리 바이트 상수로 충분하다
+- `test/e2e/fake-hermes.ts`: 맨 앞의 `[결과물 폴더]` 단락을 떼는 함수를 둔다. 실행 요청을 받은 직후 한 번 떼고, 입력을 견주는 자리와 입력을 답에 되돌려 주는 자리(`[fake hermes on profile ...] ${...input}`, `보이는 조각: ...` 처럼)가 모두 뗀 글을 쓰게 한다. `lastSubmittedInput()` 은 뗀 글이 아니라 원문을 준다. 사진 단락은 지금처럼 둔다
+  - 되돌려 주는 답에 단락이 섞이면 `test/e2e/scenarios/streaming.ts` 처럼 답을 글자 그대로 견주는 시나리오가 실패한다
+- 같은 파일: 뗀 글이 `결과물 파일 검사` 이면 단락의 둘째 줄 폴더에 `초안/index.html` 과 `초안/photo.png` 를 쓰고 답한다. HTML 은 `<title>초안</title>` 을 두고 `<img src="photo.png">` 로 사진을 부르고 `<script>document.title="스크립트가 돌았다"</script>` 한 줄을 품는다. 다음 phase 의 브라우저 검사가 이 두 값을 본다. PNG 는 1픽셀짜리 바이트 상수로 충분하다
 - `test/e2e/run.ts`, `test/browser/fixtures.ts`: 실행마다 임시 디렉터리를 하나 더 만들어 `ASSISTANT_ARTIFACT_ROOT` 와 `ASSISTANT_ARTIFACT_AGENT_ROOT` 에 **같은 경로**를 준다. 대역이 같은 기계에서 그 폴더에 쓰기 때문이다
 - `backend/src/test/java` 에서 Hermes 로 간 입력을 통째로 견주는 검사는 새 단락을 반영한다. `grep -rln "input()" backend/src/test/java` 로 찾는다
+- `test/browser/` 의 spec 가운데 대역 입력을 `===` 로 견주는 것(`ASK_CARD_PROBE` 처럼)이 뗀 글로 견주는지 확인한다
 
-### 9. 이 phase 를 검증하는 테스트
+### 9. README 의 환경 변수
+
+`README.md` 의 환경 변수 표에 `ASSISTANT_ARTIFACT_ROOT`, `ASSISTANT_ARTIFACT_AGENT_ROOT` 를 첨부 두 줄과 같은 모양으로 더한다. 값의 예시로 실제 경로를 적지 않는다.
+둘 다 필수라 운영에 설정과 쓰기 가능한 폴더가 먼저 있어야 기동한다. 그 일은 `fos-home-infra` 가 소유하므로 여기서는 「비면 기동이 실패한다」 까지만 적는다.
+
+### 10. 이 phase 를 검증하는 테스트
 
 `backend/src/test/java/com/bifos/assistant/chat/` 에 `ArtifactTest`:
 
 | 경우 | 기대 |
 | --- | --- |
 | turn 을 붙잡아 둔 사이 대화 폴더에 `a/index.html` 을 쓰고 끝낸다 | 답의 `artifacts` 에 `a/index.html` 하나 |
+| 스트림이 아닌 `POST /chat/messages` 로 보낸 turn 이 같은 파일을 쓴다 | 그 답에도 한 행 |
+| 흐름 turn 의 하위 실행으로 간 입력 | 맨 앞이 `[결과물 폴더]` 단락 |
 | turn 시작 전에 이미 있던 HTML | 묶이지 않는다 |
 | 같은 파일을 다음 turn 이 다시 고친다 | 두 답에 각각 한 행 |
 | Hermes 로 간 입력 | 맨 앞이 `[결과물 폴더]` 와 `/agent-side/artifacts/{대화 번호}` |
 | `GET .../files/a/index.html` | 200, `text/html`, 머리글 표의 CSP 와 `nosniff` |
 | `GET .../files/a/photo.png` (행 없음, 파일 있음) | 200 |
-| `GET .../files/a/x.svg`, `.../files/../other/a.html` | 404 `ARTIFACT_NOT_FOUND` |
+| `GET .../files/a/x.svg` | 404 `ARTIFACT_NOT_FOUND` |
+| `GET .../files/../other/a.html` | 400 또는 404. 본문에 파일 내용이 없다 |
+| `ArtifactStore.resolveInside` 를 `../other/a.html` 로 직접 부른다 | 빈 값 |
 | 폴더 밖을 가리키는 심볼릭 링크 | 404 `ARTIFACT_NOT_FOUND` |
 | 남의 대화 | `CONVERSATION_NOT_FOUND` |
 | `cleanExpired` 뒤 그 HTML | 행에 `deleted_at`, 파일 요청은 410 `ARTIFACT_GONE`, `artifacts[].deleted` 가 true |
 
 `V24` 는 기존 `*MigrationTest` 가 H2 에서 함께 돌린다. 새 표를 확인하는 줄을 그 검사에 더하거나 `ArtifactMigrationTest` 를 둔다.
 
-`test/e2e/scenarios/` 에 `artifact.ts` 시나리오를 더하고 `run.ts` 의 목록에 넣는다. `결과물 파일 검사` 를 보내고, 답의 `artifacts` 와 파일 요청의 머리글을 본다.
+`test/e2e/scenarios/` 에 `artifact.ts` 시나리오를 더하고 `run.ts` 의 목록에 넣는다. `결과물 파일 검사` 를 스트림 경로(`POST /api/v1/chat/messages/stream`)로 보내고, 이력의 답 `artifacts` 와 파일 요청의 머리글을 본다. 화면이 쓰는 경로가 스트림이다.
 
 ## 검증
 
@@ -146,10 +163,12 @@ H2 의 MySQL 모드에서도 도는 DDL 만 쓴다. `V22__agent_starter.sql` 이
 # cwd: 저장소 root
 cd backend && ./gradlew test
 node test/e2e/run.ts
+cd web && pnpm test:browser
 scripts/check-public-safe.sh
 ```
 
 모두 통과해야 한다. `gradlew` 의 위치는 `backend/AGENTS.md` 를 본다.
+`pnpm test:browser` 는 이 phase 가 고친 대역과 기동 설정이 기존 브라우저 검사를 깨지 않는지 본다.
 운영 MySQL 에서 `V24` 와 스키마 검증이 통과하는지는 docker 가 있으면 `mysql:8.4` 컨테이너로 확인한다. 없으면 phase 보고에 적는다.
 
 끝나면 `tasks/plan027-html-artifact-preview/index.json` 의 이 phase 를 `completed` 로, `current_phase` 를 2 로 바꾼다.
@@ -166,10 +185,13 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ChatArtifactRepository.java` | 신규 |
 | `backend/src/main/resources/db/migration/V24__chat_artifact.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java` 또는 새 컨트롤러 | 수정 또는 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/presentation/ArtifactController.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/resources/application.yml`, `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` | 신규 |
 | `test/e2e/fake-hermes.ts`, `test/e2e/run.ts`, `test/browser/fixtures.ts` | 수정 |
 | `test/e2e/scenarios/artifact.ts` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/ResearchAndBuildFlow.java` | 수정 |
+| `README.md` | 수정 |
