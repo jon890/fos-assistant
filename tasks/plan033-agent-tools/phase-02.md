@@ -14,7 +14,7 @@
 
 - **에이전트 메뉴 통합이 main 에 들어간 뒤에 시작한다.** 상세 화면(`web/src/app/agents/[code]/page.tsx`)과 `ADMIN` 관리 절이 그 작업에서 생긴다. 시작 전에 `git merge origin/main` 을 하고 지금 모양을 읽는다
 - 웹 API 경로는 기존 `web/src/app/api/agents/[code]/persona/route.ts` 와 `web/src/app/api/admin/agents/[code]/route.ts` 가 본보기다. 브라우저는 Control Plane 토큰을 갖지 않는다(`web/AGENTS.md`)
-- 새 문구는 `web/AGENTS.md` 「화면 문구」 절(해요체)을 따른다
+- 새 문구는 기존 에이전트 설정 화면처럼 해요체로 쓴다
 
 ## 의도 메모
 
@@ -69,4 +69,6 @@ scripts/check-public-safe.sh
 | `web/src/components/error-message.ts` | 수정 |
 | `web/src/lib/agent.ts` | 수정 |
 | `test/browser/agent-tools.spec.ts` | 신규 |
+| `test/browser/fixtures.ts` | 수정 |
+| `docs/code-architecture.md` | 수정 |
 | `tasks/plan033-agent-tools/index.json` | 수정 |
