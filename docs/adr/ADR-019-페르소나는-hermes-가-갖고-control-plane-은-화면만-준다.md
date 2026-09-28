@@ -18,7 +18,7 @@ Accepted
 
 Hermes 대시보드에 `SOUL.md` 를 읽는 경로와 쓰는 경로가 모두 있다.
 두 경로가 받고 돌려주는 것은
-[`hermes-integration.md`](../hermes-integration.md) 의 「`SOUL.md` 를 읽고 쓰는 두 경로」가 갖는다.
+[`hermes/profiles.md`](../hermes/profiles.md) 의 「`SOUL.md` 를 읽고 쓰는 두 경로」가 갖는다.
 
 ### 이 ADR 을 한 번 고쳐 썼다
 
@@ -101,7 +101,7 @@ profile 디렉터리에는 `.env` 와 `auth.json` 이 함께 있다.
 
 **Hermes 안에서 갈라지는 자식에게 성격이 가지 않아서 버렸다.**
 부모 실행의 `instructions` 는 `delegate_task` 로 만든 자식에게 전달되지 않는다.
-근거는 [`hermes-integration.md`](../hermes-integration.md) 의
+근거는 [`hermes/delegation.md`](../hermes/delegation.md) 의
 「부모의 `instructions` 는 자식에게 가지 않는다」 절이 갖는다.
 부모에게 표식이 든 줄을 넣고 부모와 자식에게 같은 것을 물어, 자식만 그 줄을 모르는 것을 확인했다.
 `SOUL.md` 는 그 자식도 읽는다.

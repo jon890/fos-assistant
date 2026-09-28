@@ -13,7 +13,7 @@ Hermes Agent 를 Agent Runtime 으로 그대로 두고, 이 저장소는 그 앞
 
 Hermes core 는 수정하지 않는다.
 profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
-자세한 조사 결과는 [`docs/hermes-integration.md`](docs/hermes-integration.md)에 있다.
+자세한 조사 결과는 [`docs/hermes/README.md`](docs/hermes/README.md)에 있다.
 
 ## 기술 스택
 

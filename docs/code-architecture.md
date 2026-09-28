@@ -738,7 +738,7 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 | --- | --- |
 | [`flow.md`](flow.md) | 화면 전환과 호출 순서 |
 | [`data-schema.md`](data-schema.md) | 표와 칸의 뜻 |
-| [`hermes-integration.md`](hermes-integration.md) | Hermes 확장 지점 |
+| [`hermes/README.md`](hermes/README.md) | Hermes 확장 지점 |
 | [`adr/INDEX.md`](adr/INDEX.md) | 되돌리기 어려운 결정 |
 
 ## 아직 만들지 않은 것

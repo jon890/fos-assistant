@@ -9,7 +9,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | --- | --- |
 | [`docs/prd.md`](docs/prd.md) | 새 기능이 이 제품에 속하는지 판단할 때 |
 | [`docs/code-architecture.md`](docs/code-architecture.md) | 패키지와 경계를 바꿀 때 |
-| [`docs/hermes-integration.md`](docs/hermes-integration.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
+| [`docs/hermes/README.md`](docs/hermes/README.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
 | [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정을 할 때 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
@@ -87,7 +87,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 ### 주제가 아니라 내용으로 나눈다
 
 **Hermes 가 어떻게 동작하는지는 이 저장소가 소유한다.**
-[`docs/hermes-integration.md`](docs/hermes-integration.md) 가 그 자리다.
+[`docs/hermes/README.md`](docs/hermes/README.md) 가 그 자리다.
 우리 환경의 값만 비공개 저장소로 간다.
 
 | 성격 | 어디 | 예 |

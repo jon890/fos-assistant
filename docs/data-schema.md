@@ -295,7 +295,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 
 **`hermes_session_id` 와 `model` 과 토큰은 Hermes 가 실어 보낼 때만 채운다.**
-[`hermes-integration.md`](hermes-integration.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
+[`hermes/delegation.md`](hermes/delegation.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
 `subagent.start` 와 `subagent.complete` 에 오는 칸을 적는다.
 `child_session_id` 를 `hermes_session_id` 에, `goal` 을 `detail` 에 옮긴다.
 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.

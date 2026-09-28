@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Hermes 사건을 우리 이름으로 옮기는 표를 검사한다.
  *
- * <p>여기 쓰는 Hermes 이름은 `docs/hermes-integration.md` 의 「실행 이벤트가 실제로 오는 형태」 절이
+ * <p>여기 쓰는 Hermes 이름은 `docs/hermes/runs-api.md` 의 「실행 이벤트가 실제로 오는 형태」 절이
  * 실측해 적은 것이다. 짐작한 이름을 넣지 않는다.
  */
 class ExecutionEventRecorderTest {

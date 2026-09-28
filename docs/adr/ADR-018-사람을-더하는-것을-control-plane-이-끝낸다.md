@@ -27,7 +27,7 @@ Control Plane 이 그것을 할 길이 없다고 보았다.
 
 **그 전제가 틀렸다는 것을 실측으로 확인했다.**
 Hermes 대시보드에 profile 관리 API 가 있고, 기계용 인증 자리가 따로 열려 있다.
-확인한 내용은 [`hermes-integration.md`](../hermes-integration.md) 의
+확인한 내용은 [`hermes/profiles.md`](../hermes/profiles.md) 의
 「profile 을 HTTP 로 만드는 길」이 갖는다.
 
 ## 결정

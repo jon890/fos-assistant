@@ -36,7 +36,7 @@ public class HermesProfileProvisioner {
      *
      * <p>{@code .env} 에 넣는 것은 {@code API_SERVER_MODEL_NAME} 과 {@code API_SERVER_KEY} 둘뿐이다.
      * listener 설정을 함께 적으면 공유 listener 를 쓰는 구성에서 gateway 가 뜰 때 그 profile 을
-     * 건너뛰고, 그 사람이 처음 대화할 때에야 드러난다. 근거는 {@code docs/hermes-integration.md} 의
+     * 건너뛰고, 그 사람이 처음 대화할 때에야 드러난다. 근거는 {@code docs/hermes/profiles.md} 의
      * 「공유 listener 를 쓰는 profile 에는 listener 설정을 넣지 않는다」가 갖는다.
      */
     public void provision(String profileName) {
