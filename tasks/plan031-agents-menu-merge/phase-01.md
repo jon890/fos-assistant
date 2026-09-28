@@ -47,6 +47,7 @@
 `test/browser/admin.spec.ts` 에 목록과 등록 검사를 새로 추가하고, 기존 관리 동작 검사의 시작 주소를 `/agents` 로 바꾼다.
 `test/browser/nav.spec.ts` 에서 관리자 메뉴가 「에이전트 관리」 를 따로 보인다는 옛 기대값을 지우고, 「에이전트」 하나로 목록에 닿는지 검사한다.
 `test/browser/loading.spec.ts` 의 메뉴 이름 검사도 같은 기대값으로 고친다. `page-skeleton.tsx` 의 카드 높이 설명에서 옛 `/admin/agents` 주소를 빼고 관리자와 일반 사용자 목록의 차이로 적는다.
+`test/unit/loading-routes.test.ts` 의 `ROUTE_FRAMES` 에서 옛 `/admin/agents` 경로를 뺀다. 넘기기 전용 페이지에는 `loading.tsx` 가 없으며, 목록의 뼈대는 `/agents` 가 맡는다.
 - 정상: `ADMIN` 세션에서 `/agents` 에 새 에이전트 등록이 보이고, 등록하면 목록에 나타난다. 다른 사람의 비공개 에이전트에 「다른 사람 것」 표시가 있다
 - 실패 쪽: `MEMBER` 세션에서 `/agents` 에 등록 폼과 다른 사람의 비공개 에이전트가 보이지 않고, 메뉴에 「에이전트 관리」 가 없다. `/admin/agents` 로 가면 `/agents` 에 닿는다
 
@@ -57,6 +58,7 @@
 cd web && pnpm typecheck
 cd web && AUTH_SECRET=build-time-placeholder ASSISTANT_JWT_SECRET=build-time-placeholder CONTROL_PLANE_BASE_URL=http://build-time-placeholder AUTH_GOOGLE_ID=build-time-placeholder AUTH_GOOGLE_SECRET=build-time-placeholder pnpm build
 cd web && pnpm test:browser
+node --test test/unit/loading-routes.test.ts
 grep -rn '에이전트 관리' web/src
 ```
 
@@ -78,3 +80,4 @@ grep -rn '에이전트 관리' web/src
 | `test/browser/nav.spec.ts` | 수정 |
 | `test/browser/loading.spec.ts` | 수정 |
 | `web/src/components/ui/page-skeleton.tsx` | 수정 |
+| `test/unit/loading-routes.test.ts` | 수정 |
