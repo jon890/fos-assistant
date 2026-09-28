@@ -104,4 +104,25 @@ class AgentToolServiceTest {
                 .containsExactly("web");
         org.assertj.core.api.Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
     }
+
+    @Test
+    void 저장_뒤_자동으로_켜진_미분류_toolset은_성공_응답에_남긴다() {
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenReturn(List.of(), List.of("web", "fos-assistant-memory", "connections"));
+
+        AgentToolService.ToolsetsView result = service.write(owner, agent, List.of("web"));
+
+        org.assertj.core.api.Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
+    }
+
+    @Test
+    void 저장_뒤_예상하지_않은_policy_known_toolset은_거절한다() {
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenReturn(List.of(), List.of("web", "terminal", "fos-assistant-memory"));
+
+        assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_NOT_APPLIED);
+    }
 }

@@ -44,7 +44,13 @@ public class AgentToolService {
         List<String> desired = AgentToolPolicy.requestedForWrite(user, agent, requested, current);
         toolsets.writeApiServer(agent.hermesProfile(), desired);
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        if (!new LinkedHashSet<>(applied).equals(new LinkedHashSet<>(desired))) {
+        List<String> controlledApplied = applied.stream()
+                .filter(name -> AgentToolPolicy.isKnown(name)
+                        || AgentToolPolicy.MEMORY.equals(name)
+                        || AgentToolPolicy.MEMORY_MCP.equals(name))
+                .toList();
+        if (controlledApplied.contains(AgentToolPolicy.MEMORY)
+                || !new LinkedHashSet<>(controlledApplied).equals(new LinkedHashSet<>(desired))) {
             List<String> missing = requested.stream().filter(name -> !applied.contains(name)).toList();
             throw new ApiException(
                     ErrorCode.AGENT_TOOLS_NOT_APPLIED, "Hermes did not apply the requested toolsets", missing);

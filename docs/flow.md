@@ -203,8 +203,8 @@ sequenceDiagram
     D-->>C: 저장됐다
     C->>L: GET /p/{profile}/v1/toolsets
     L-->>C: API 실행 기준의 켜짐
-    C->>C: 보낸 목록과 같은가
-    C-->>U: 도구 목록
+    C->>C: 분류된 도구와 기억 MCP 가 요청과 같은가
+    C-->>U: 도구 목록과 켜진 미분류 이름
 ```
 
 **저장한 것은 다음 실행부터 쓰인다.** 재시작이 필요 없다. 이미 돌고 있는 실행은 시작할 때의 도구를 쓴다.
@@ -222,7 +222,7 @@ sequenceDiagram
 | 등급 표에 없는 이름이 온다 | 거절한다 |
 | Hermes 가 쓰기 없이 미분류 도구를 켰다 | 도구 조회가 그 이름을 따로 알리고 화면은 관리자에게 알리라고 경고한다. Hermes 를 올릴 때 `fos-home-infra` 가 모든 profile 의 켜진 목록을 검사한다 |
 | `memory` 를 켜거나 기억 MCP 를 빼려 한다 | Control Plane 과 plugin 이 모두 거절한다 |
-| 쓴 뒤 다시 읽은 목록이 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 `GET /api/v1/agents/{code}/tools` 를 다시 호출하고, profile 설정에서 막힌 도구는 관리자에게 알리라고 안내한다 |
+| 요청한 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 도구 목록을 다시 읽고, profile 설정에서 막힌 도구는 관리자에게 알리라고 안내한다. 미분류 도구만 더 켜진 것은 성공 응답의 `unclassifiedEnabled` 로 따로 알린다 |
 | 대시보드나 listener 가 멈춰 있다 | 도구 절만 열리지 않는다. 대화는 그대로 돈다 |
 
 ## 사진을 올려 보낼 때
