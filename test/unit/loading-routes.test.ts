@@ -19,7 +19,6 @@ const ROUTE_FRAMES: Record<string, string> = {
   memory: "components/memory/memory-list.tsx",
   usage: "app/usage/page.tsx",
   "executions/[id]": "app/executions/[id]/page.tsx",
-  "admin/agents": "app/admin/agents/agent-admin-panel.tsx",
   "admin/people": "app/admin/people/people-admin-panel.tsx",
   "chat/[conversationId]": "components/chat/message-list.tsx",
   "c/[conversationId]": "components/chat/message-list.tsx",
