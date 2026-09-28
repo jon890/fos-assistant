@@ -99,6 +99,7 @@ DNS 와 전송 대기용 공유 실행기는 최대 4개의 daemon thread 와 �
 ### 4. `ArtifactWriteService` 에 주소 방식을 연결한다
 
 대화 주인을 확인한 뒤 경로와 이미지 확장자를 판정하고 `ArtifactSourceFetcher` 를 부른다.
+`ArtifactStore` 의 쓰기 경로 규칙을 파일시스템에 닿지 않는 검사로 분리해 다운로드 전에 호출한다. 잘못된 경로가 DNS 나 HTTP 를 시작하거나 폴더를 만들지 않아야 한다.
 `png`, `jpg`, `jpeg`, `gif`, `webp` 만 URL 방식으로 저장한다.
 `ArtifactStore.contentTypeOf` 의 MIME 에 매개변수가 있으면 비교 전에 제거한다.
 받은 이미지도 본문 방식과 같은 `ArtifactStore.write` 로 저장한다.
@@ -150,6 +151,8 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/chat/application/ArtifactSourceProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactSourceFetcher.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ArtifactWriteService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactStore.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactSourceFetcherTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactWriteServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ArtifactStoreWriteTest.java` | 수정 |
