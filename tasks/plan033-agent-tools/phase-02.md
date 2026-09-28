@@ -22,6 +22,7 @@
 - 관리자 등급을 켤 때 확인 창을 띄운다. 무엇에 닿는지(예: 「홈서버 파일과 셸에 닿아요」) 한 줄과 함께 묻는다. 허락은 이때 한 번이다
 - `GROUP` 에이전트에서는 셸·파일 계열을 누를 수 없게 두고 「그룹 공개 에이전트에는 켤 수 없어요」 를 보인다
 - 저장은 누를 때마다 한다. 실패하면 서버가 다시 읽은 목록으로 되돌린다
+- 저장 실패 뒤 `GET` 으로 현재 목록을 다시 읽는다. `AGENT_TOOLS_NOT_APPLIED` 의 `missingToolsets` 에 든 도구에는 「이 도구는 profile 설정에서 막혀 있어요. 관리자에게 알려 주세요.」 를 보인다
 - `ADMIN` 이 다른 사람의 비공개 에이전트를 볼 때는 관리 절 안에서 `/api/v1/admin/agents/{code}/tools` 로 다룬다
 
 ## 작업 항목
@@ -37,7 +38,7 @@
 ### 3. 이 phase 를 검증하는 브라우저 검사 `test/browser/agent-tools.spec.ts`
 
 - 정상: 주인이 `web` 을 켜면 다시 열어도 켜져 있다. `ADMIN` 이 비공개 에이전트에 `terminal` 을 켤 때 확인 창이 뜬다
-- 실패 쪽: 주인 화면에서 `terminal` 을 누를 수 없다. 그룹 공개 에이전트에서 셸·파일 계열을 누를 수 없다
+- 실패 쪽: 주인 화면에서 `terminal` 을 누를 수 없다. 그룹 공개 에이전트에서 셸·파일 계열을 누를 수 없다. 저장 뒤 재조회에서 요청한 도구가 빠지면 실패 안내와 다시 읽은 토글 상태를 보인다
 
 ## 검증
 
@@ -46,7 +47,8 @@
 ```bash
 # cwd: 저장소 root
 cd backend && ./gradlew test
-cd web && pnpm typecheck && pnpm build
+cd web && pnpm typecheck
+cd web && AUTH_SECRET=build-time-placeholder ASSISTANT_JWT_SECRET=build-time-placeholder CONTROL_PLANE_BASE_URL=http://build-time-placeholder AUTH_GOOGLE_ID=build-time-placeholder AUTH_GOOGLE_SECRET=build-time-placeholder pnpm build
 cd web && pnpm test:browser
 node test/e2e/run.ts
 node --test 'test/unit/**/*.test.ts'

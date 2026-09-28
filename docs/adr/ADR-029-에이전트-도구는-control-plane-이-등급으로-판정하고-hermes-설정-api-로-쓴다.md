@@ -3,6 +3,7 @@
 - **status**: `accepted`
 - **결정**: 에이전트가 쓸 도구를 화면에서 고른다.
   누가 어느 도구를 켤 수 있는지는 Control Plane 이 도구 등급으로 판정하고, 고른 목록은 Hermes 공식 `PUT /api/config` 로 그 profile 의 `platform_toolsets.api_server` 에 쓴다.
+  `agent.disabled_toolsets` 는 다른 platform 에도 적용되므로 쓰지 않고 profile 의 기존 값을 둔다.
   도구 목록의 정본은 계속 profile 의 설정이다. Control Plane 은 도구 선택을 데이터베이스에 따로 두지 않고 쓸 때와 보일 때 Hermes 에서 읽는다.
   대시보드 plugin 은 공유 서비스 토큰 하나를 그대로 쓰고, 요청 본문이 도구 목록만 담는지와 profile 하나만 가리키는지를 강제한다.
 
@@ -46,3 +47,4 @@ profile 분리는 이 도구의 파일 접근을 격리하지 않아, 그룹에 
   - 공유 토큰이 새면 다른 profile 의 도구 목록을 바꿀 수 있다. 모델, 승인 방식, MCP 서버는 plugin 의 키 검사 때문에 바꾸지 못한다. 이 토큰은 이미 profile 을 만들고 `.env` 를 쓸 수 있다([ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md))
   - plugin 의 검사와 Control Plane 의 등급 판정이 함께 있어야 경계가 선다. 어느 한쪽을 바꾸면 다른 쪽도 본다
   - Hermes 가 새 toolset 을 더하면 등급 표에 넣기 전까지 쓰지 못한다
+  - profile 의 공통 비활성화 목록이 막은 toolset 은 API 실행에서도 켤 수 없다. 쓰고 다시 읽어 켜지지 않은 이름을 오류 응답에 담고 관리자에게 알리도록 안내한다

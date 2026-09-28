@@ -30,8 +30,7 @@
 ```json
 PUT /api/config
 { "profile": "<profile>", "config": {
-    "platform_toolsets": { "api_server": ["web", "vision", "fos-assistant-memory"] },
-    "agent": { "disabled_toolsets": ["memory"] } } }
+    "platform_toolsets": { "api_server": ["web", "vision", "fos-assistant-memory"] } } }
 ```
 
 plugin 은 다른 키, query 와 본문의 profile 불일치, `memory` 포함, `fos-assistant-memory` 누락, 모르는 이름을 거절한다. `GET /api/tools/toolsets` 도 연다.
@@ -41,8 +40,11 @@ plugin 은 다른 키, query 와 본문의 profile 불일치, `memory` 포함, `
 - 등급 표는 `AgentToolPolicy` 한 곳에 둔다. 표는 ADR-029 「도구 등급」 과 같다. 표에 없는 toolset 은 목록에 보이지 않고 늘 꺼 둔다
 - 도구 선택을 데이터베이스에 저장하지 않는다. 읽을 때와 쓸 때 Hermes 에서 읽는다(ADR-029)
 - `PUT` 본문의 `enabled` 는 켤 toolset 전체다. 요청자가 바꿀 수 없는 등급의 toolset 은 지금 켜짐과 같아야 한다. 다르면 `FORBIDDEN`
-- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)은 `GROUP` 에이전트에 켤 수 없다. 공개 범위를 `GROUP` 으로 바꿀 때 그 계열이 켜져 있으면 거절한다. 새 오류 코드 `AGENT_TOOLS_REQUIRE_PRIVATE` 를 둔다(409)
-- 쓴 뒤 다시 읽은 목록이 보낸 것과 다르면 새 오류 코드 `AGENT_TOOLS_NOT_APPLIED` 로 알린다(502). 되돌리려 하지 않는다. 화면이 다시 읽은 목록을 보인다
+- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)은 `GROUP` 에이전트에 켤 수 없다. `GROUP` 생성과 수정에는 최종 listener 주소의 현재 목록을 읽어 검사한다. 새 오류 코드 `AGENT_TOOLS_REQUIRE_PRIVATE` 를 둔다(409)
+- 그룹 독자는 도구를 쓸 수 없다. 주인 또는 `ADMIN` 인지 도구를 읽기 전에 확인한다
+- 도구 `PUT` 과 에이전트 `PATCH` 는 같은 에이전트 행에 쓰기 잠금을 잡고 검사한다. 대기 시간이 지나면 `AGENT_BUSY`(409)로 알린다. 생성은 트랜잭션에서 검사와 저장을 마친 뒤에만 다른 요청에 보인다
+- `agent.disabled_toolsets` 는 모든 platform 에 적용되므로 요청에 넣지 않는다. profile 의 기존 공통 비활성화 목록은 그대로 둔다
+- 쓴 뒤 다시 읽은 목록이 보낸 것과 다르면 새 오류 코드 `AGENT_TOOLS_NOT_APPLIED` 로 알린다(502). 요청했지만 켜지지 않은 이름은 응답의 `missingToolsets` 목록에 담는다. 되돌리려 하지 않는다. 화면은 다시 `GET` 으로 읽고, 켜지지 않은 도구에는 profile 설정이 막고 있다는 안내를 보인다
 - 대시보드나 listener 를 부르지 못하면 `HERMES_UNAVAILABLE`
 - 에이전트의 listener 주소는 `Agent.apiBaseUrl()` 이다. `{apiBaseUrl}/v1/toolsets` 를 그 profile 의 key 로 부른다
 
@@ -70,20 +72,22 @@ plugin 은 다른 키, query 와 본문의 profile 불일치, `memory` 포함, `
 - `GET`, `PUT /api/v1/admin/agents/{code}/tools`: `ADMIN` 만. 읽기 권한 검사 없이 에이전트를 찾는다
 - 응답 한 줄: `name`, `label`, `description`, `tier`, `enabled`, `editable`, `requiresPrivate`
 - `ErrorCode` 에 `AGENT_TOOLS_REQUIRE_PRIVATE`, `AGENT_TOOLS_NOT_APPLIED` 를 더한다
+- `AGENT_TOOLS_NOT_APPLIED` 오류 응답에 `missingToolsets` 를 더한다. 기존 오류의 `code` 와 `message` 는 유지한다
 
-### 4. 공개 범위를 바꿀 때 셸·파일 계열을 본다
+### 4. 에이전트를 만들거나 공개 범위를 바꿀 때 셸·파일 계열을 본다
 
-`AgentAdminController.update` 가 `GROUP` 으로 바꿀 때 `readEnabled` 로 지금 목록을 읽어 셸·파일 계열이 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 읽지 못하면 바꾸지 않고 `HERMES_UNAVAILABLE`
+`AgentAdminController.create` 와 `update` 가 `GROUP` 을 저장할 때 `readEnabled` 로 최종 listener 주소의 목록을 읽어 셸·파일 계열이 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 읽지 못하면 바꾸지 않고 `HERMES_UNAVAILABLE`. 도구 `PUT` 과 접근 범위 `PATCH` 는 같은 에이전트 행의 쓰기 잠금 아래에서 검사해 동시 요청으로 제한을 우회하지 못하게 한다
 
 ### 5. e2e 가짜 Hermes 에 세 경로를 더한다
 
-`test/e2e/fake-hermes.ts` 에 `GET /api/tools/toolsets`, `PUT /api/config`(plugin 규칙과 같게 거절), `GET /p/<profile>/v1/toolsets` 를 더하고 `test/e2e/scenarios/agent-tools.ts` 를 만든다. 주인이 `web` 을 켜고, `terminal` 을 켜려다 거절되고, `ADMIN` 이 `PRIVATE` 에이전트에 `terminal` 을 켜고, 그 에이전트를 `GROUP` 으로 바꾸려다 거절되는 흐름이다
+`test/e2e/fake-hermes.ts` 에 `GET /api/tools/toolsets`, `PUT /api/config`(plugin 규칙과 같게 거절), `GET /p/<profile>/v1/toolsets` 를 더한다. 허용 목록이 없는 profile 의 기본 도구에는 셸·파일 계열을 포함한다. `test/e2e/scenarios/agent-tools.ts` 는 주인의 `web` 변경, 그룹 독자의 쓰기 거절, 관리자의 `terminal` 변경, 위험한 도구가 켜진 profile 의 `GROUP` 생성과 변경 거절을 본다
 
 ### 6. 이 phase 를 검증하는 backend 검사
 
 - `AgentToolPolicyTest`: 등급별 허용과 거절, `memory` 거절, 기억 MCP 가 늘 들어가는 것, `GROUP` 에 셸·파일 계열 거절
 - `HermesToolsetRequestTest`: `HermesDashboardRequestTest` 처럼 가짜 서버로 세 요청의 경로, 머리, 본문 모양을 본다
-- `AgentToolServiceTest`: 쓴 뒤 다시 읽은 목록이 다르면 `AGENT_TOOLS_NOT_APPLIED`, 대시보드 실패는 `HERMES_UNAVAILABLE`
+- `AgentToolServiceTest`: 쓴 뒤 다시 읽은 목록이 다르면 `AGENT_TOOLS_NOT_APPLIED` 와 켜지지 않은 이름, 대시보드 실패는 `HERMES_UNAVAILABLE`
+- 동시 요청 검사: 도구 `PUT` 과 `GROUP` 변경을 함께 보내도 둘 다 통과하지 않고, 최종 상태가 `GROUP` 과 셸·파일 계열 켜짐을 함께 갖지 않는다
 
 ## 검증
 
@@ -101,16 +105,22 @@ scripts/check-public-safe.sh
 | 파일 | 변경 |
 | --- | --- |
 | `backend/src/main/java/com/bifos/assistant/agent/domain/AgentToolPolicy.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/agent/application/AgentService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesToolsetClient.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesToolsetClient.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentToolController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentAdminController.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/agent/infra/AgentRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/error/ApiException.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/error/ErrorResponse.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/error/GlobalExceptionHandler.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentToolPolicyTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesToolsetRequestTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/agent-tools.ts` | 신규 |
 | `test/e2e/run.ts` | 수정 |

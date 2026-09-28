@@ -193,10 +193,12 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 데이터베이스에 사본을 두지 않는다. 근거는 [`adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md`](adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
 
 - 등급 표는 코드 한 곳(`agent/domain/AgentToolPolicy`)이 갖는다. 표와 이유는 ADR-029 의 「도구 등급」 이다
-- 쓸 때는 `platform_toolsets.api_server` 를 켤 toolset 과 `fos-assistant-memory` 로, `agent.disabled_toolsets` 를 `["memory"]` 로 통째로 쓴다. 다른 설정 키는 보내지 않는다
+- 쓸 때는 `platform_toolsets.api_server` 만 켤 toolset 과 `fos-assistant-memory` 로 통째로 쓴다. `agent.disabled_toolsets` 는 모든 platform 에 적용되므로 보내지 않고 기존 값을 둔다
 - 쓴 뒤 공유 listener 의 `GET /p/{profile}/v1/toolsets` 로 다시 읽어 보낸 목록과 대조한다
+- profile 의 공통 비활성화 목록이 막아 켜지지 않은 toolset 은 `AGENT_TOOLS_NOT_APPLIED` 응답의 `missingToolsets` 로 알린다. 화면은 `GET` 으로 현재 목록을 다시 읽는다
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
-- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. 도구를 켤 때와 공개 범위를 바꿀 때 모두 본다
+- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 읽지 못하면 변경하지 않는다
+- 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 잠금을 기다리다 제한 시간을 넘으면 `AGENT_BUSY` 로 알린다
 
 | 경로 | 누가 | 무엇 |
 | --- | --- | --- |
