@@ -63,9 +63,13 @@ jobs:
         run: pnpm build
 
   browser:
-    name: browser
+    name: browser-${{ matrix.project }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [mobile, desktop]
     defaults:
       run:
         working-directory: web
@@ -90,12 +94,12 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:browser
-      - name: 실패한 브라우저 검사 결과
-        if: failure()
+      - run: pnpm test:browser --project=${{ matrix.project }}
+      - name: 실패하거나 취소된 브라우저 검사 결과
+        if: failure() || cancelled()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: browser-results
+          name: browser-results-${{ matrix.project }}
           # Playwright 설정의 outputDir 은 os.tmpdir() 아래에 있다.
           path: /tmp/fos-assistant-playwright-results-*
           if-no-files-found: ignore
