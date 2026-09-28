@@ -51,7 +51,7 @@ export function AgentMention({ id, agents, query, activeIndex, onPick }: Props) 
     >
       {matches.length === 0 ? (
         <li role="option" aria-selected={false} aria-disabled="true" className="px-3 py-2 text-sm text-muted-foreground">
-          맞는 에이전트가 없다
+          맞는 에이전트가 없어요
         </li>
       ) : (
         matches.map((agent, index) => (

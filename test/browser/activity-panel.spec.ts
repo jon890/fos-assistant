@@ -52,7 +52,7 @@ for (const cancelled of [false, true]) {
     await expect(item).toContainText(goal);
     await expect(item).toContainText(cancelled ? "중지됨" : "결과를 받지 못함");
     if (!cancelled) {
-      await expect(item).toContainText("결과 - · 입력 - · 출력 -");
+      await expect(item).toContainText("결과를 받지 못함 · 입력 - · 출력 -");
       await expect(item).not.toContainText("입력 0");
       await expect(item).not.toContainText("출력 0");
     }
@@ -119,7 +119,7 @@ test("패널이 나무를 읽지 못하면 다시 읽을 수 있다", async ({ p
   await send(page, "패널 재시도 검사");
   await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ status: 500, body: "{}" }));
   const panel = await openSavedPanel(page);
-  await expect(panel.getByText("실행 나무를 읽지 못했다")).toBeVisible();
+  await expect(panel.getByText("작업 과정을 불러오지 못했어요")).toBeVisible();
   await page.unroute("**/api/usage/executions/*/tree");
   await panel.getByRole("button", { name: "다시 읽기" }).click();
   await expect(panel.getByTestId("execution-tree")).toBeVisible();

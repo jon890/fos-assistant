@@ -16,7 +16,7 @@ const FORWARDED_HEADERS = ["content-type", "content-security-policy", "x-content
 
 function badRequest() {
   return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: "대화 주소나 파일 경로가 올바르지 않습니다." },
+    { code: "VALIDATION_FAILED", message: "대화 주소나 파일 경로가 올바르지 않아요." },
     { status: 400 },
   );
 }
@@ -39,7 +39,7 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!upstream.ok || !upstream.body) {
     const payload = await upstream.json().catch(() => ({
       code: "INTERNAL_ERROR",
-      message: "파일을 읽지 못했습니다.",
+      message: "파일을 불러오지 못했어요.",
     }));
     return NextResponse.json(payload, { status: upstream.status });
   }

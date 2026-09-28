@@ -85,7 +85,7 @@ async function authorize(): Promise<Authorized> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email) {
-    return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다." };
+    return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요해요." };
   }
   return { ok: true, token: await mintToken(email, session.user?.name ?? email) };
 }
@@ -141,7 +141,7 @@ export async function forwardControlPlane(
   try {
     return { ok: true, response: await fetch(`${baseUrl()}${path}`, requestInit) };
   } catch {
-    return { ok: false, status: 502, code: "INTERNAL_ERROR", message: "요청을 처리하지 못했습니다." };
+    return { ok: false, status: 502, code: "INTERNAL_ERROR", message: "요청을 처리하지 못했어요." };
   }
 }
 
@@ -166,7 +166,7 @@ export async function callControlPlane<T>(
       ok: false,
       status: response.status,
       code: payload?.code ?? "INTERNAL_ERROR",
-      message: payload?.message ?? "요청을 처리하지 못했습니다.",
+      message: payload?.message ?? "요청을 처리하지 못했어요.",
     };
   }
   return { ok: true, status: response.status, data: payload as T };

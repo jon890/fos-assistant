@@ -56,7 +56,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
       await rename(conversation.id, title);
       setActionError(null);
     } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : "대화 이름을 바꾸지 못했다.");
+      setActionError(reason instanceof Error ? reason.message : "대화 이름을 바꾸지 못했어요.");
     }
   }
 
@@ -72,7 +72,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
         router.push("/");
       }
     } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : "대화를 지우지 못했다.");
+      setActionError(reason instanceof Error ? reason.message : "대화를 지우지 못했어요.");
     } finally {
       // 성공이든 실패든 창을 닫는다. 실패한 까닭은 목록 위 알림에 보인다.
       setDeleting(false);
@@ -84,13 +84,13 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
     <nav aria-label="대화 목록" className="min-h-0 flex-1 overflow-y-auto px-2">
       {actionError ? <p role="alert" className="mb-2 px-2 text-sm text-destructive">{actionError}</p> : null}
       {loading ? (
-        <div aria-label="대화 목록을 읽는 중" className="flex flex-col gap-2 px-1">
+        <div aria-label="대화 목록을 읽고 있어요" className="flex flex-col gap-2 px-1">
           <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" />
         </div>
       ) : error ? (
         <p className="px-2 text-sm text-muted-foreground">{error}</p>
       ) : visible.length === 0 ? (
-        <p className="px-2 text-sm text-muted-foreground">{normalizedQuery ? "맞는 대화가 없다" : "아직 대화가 없다."}</p>
+        <p className="px-2 text-sm text-muted-foreground">{normalizedQuery ? "맞는 대화가 없어요" : "아직 대화가 없어요."}</p>
       ) : (
         groupByDate(visible, new Date()).map((group) => (
           <section key={group.label} className="mb-5">
@@ -176,7 +176,7 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
           }}>
           <AlertDialogTitle>대화 지우기</AlertDialogTitle>
           <AlertDialogDescription className="text-foreground">
-            {deleteTarget?.title || "새 대화"} 를 목록에서 지운다. 사용량 기록은 남는다.
+            {deleteTarget?.title || "새 대화"} 를 목록에서 지워요. 사용량 기록은 남아요.
           </AlertDialogDescription>
           <AlertDialogFooter>
             {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}

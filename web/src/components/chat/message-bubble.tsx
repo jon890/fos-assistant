@@ -96,7 +96,7 @@ function AttachmentGallery({
             data-testid="message-attachment-gone"
             className={attachmentPlaceholder({ size: "message" })}
           >
-            {describeError("ATTACHMENT_GONE", "사진을 표시할 수 없습니다.")}
+            {describeError("ATTACHMENT_GONE", "사진을 표시할 수 없어요.")}
           </div>
         ),
       )}
@@ -136,7 +136,7 @@ function ArtifactList({
               </button>
             )}
             {artifact.deleted ? (
-              <span className="shrink-0 text-xs text-muted-foreground">보관 기간이 지나 볼 수 없습니다</span>
+              <span className="shrink-0 text-xs text-muted-foreground">보관 기간이 지나 볼 수 없어요.</span>
             ) : null}
           </li>
         );
@@ -228,7 +228,7 @@ export function MessageBubble({
       <div className="min-w-0">
         {turn.switchedTo ? (
           <p className="mb-1 text-xs text-muted-foreground" data-testid="provider-switched">
-            ── 여기부터 {turn.switchedTo} 로 돈다 ──
+            여기부터 {turn.switchedTo}로 실행해요
           </p>
         ) : null}
         <div className="mb-1 flex min-h-8 items-center gap-2">

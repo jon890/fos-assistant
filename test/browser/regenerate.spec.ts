@@ -10,13 +10,13 @@ test("다시 생성 아이콘 단추에 접근성 이름과 풀이가 있다", a
   await page.goto("/");
   await ask(page, "다시 생성 아이콘 검사");
   const answer = page.getByTestId("assistant-message").last();
-  const regenerate = answer.getByRole("button", { name: "다시 생성", exact: true });
+  const regenerate = answer.getByRole("button", { name: "답 다시 만들기", exact: true });
   const copy = answer.getByRole("button", { name: "답 복사", exact: true });
 
   for (const theme of ["light", "dark"]) {
     await page.locator("html").evaluate((html, dark) => html.classList.toggle("dark", dark), theme === "dark");
     await expect(regenerate).toBeVisible();
-    await expect(regenerate).toHaveAccessibleName("다시 생성");
+    await expect(regenerate).toHaveAccessibleName("답 다시 만들기");
     await expect(regenerate).toHaveText("");
     await expect(regenerate.locator("svg[aria-hidden='true']")).toBeVisible();
     const regenerateBox = await regenerate.boundingBox();
@@ -25,14 +25,14 @@ test("다시 생성 아이콘 단추에 접근성 이름과 풀이가 있다", a
     expect(regenerateBox?.width).toBe(regenerateBox?.height);
 
     await regenerate.hover();
-    await expect(page.getByRole("tooltip")).toHaveText("다시 생성");
+    await expect(page.getByRole("tooltip")).toHaveText("답 다시 만들기");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("tooltip")).toHaveCount(0);
     await copy.hover();
     await copy.focus();
     await page.keyboard.press("Tab");
     await expect(regenerate).toBeFocused();
-    await expect(page.getByRole("tooltip")).toHaveText("다시 생성");
+    await expect(page.getByRole("tooltip")).toHaveText("답 다시 만들기");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("tooltip")).toHaveCount(0);
     await copy.focus();
@@ -43,15 +43,15 @@ test("마지막 답을 다시 생성하고 이전 판을 볼 수 있다", async 
   await page.goto("/");
   await ask(page, "다시 생성 화면 검사");
   const answer = page.getByTestId("assistant-message").last().locator("div.leading-7");
-  await expect(page.getByTestId("assistant-message").last().getByRole("button", { name: "다시 생성", exact: true })).toBeVisible();
+  await expect(page.getByTestId("assistant-message").last().getByRole("button", { name: "답 다시 만들기", exact: true })).toBeVisible();
   const firstAnswer = await answer.innerText();
-  await page.getByTestId("assistant-message").last().getByRole("button", { name: "다시 생성", exact: true }).click();
+  await page.getByTestId("assistant-message").last().getByRole("button", { name: "답 다시 만들기", exact: true }).click();
   await expect(page.getByTestId("version-label")).toHaveText("2/2", { timeout: 30_000 });
   await expect(answer).not.toHaveText(firstAnswer);
-  await page.getByRole("button", { name: "이전 판" }).last().click();
+  await page.getByRole("button", { name: "이전 답" }).last().click();
   await expect(page.getByTestId("version-label")).toHaveText("1/2");
   await expect(answer).toHaveText(firstAnswer);
-  await expect(page.getByTestId("assistant-message").getByRole("button", { name: "다시 생성", exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("assistant-message").getByRole("button", { name: "답 다시 만들기", exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId("version-label")).toHaveText("2/2");
 });
@@ -64,7 +64,7 @@ test("다시 생성 중 오류가 나면 임시 답을 버리고 이전 답을 �
     contentType: "text/event-stream",
     body: 'data: {"type":"delta","text":"버릴 임시 답"}\n\ndata: {"type":"error","code":"HERMES_UNAVAILABLE","message":"다시 만들지 못했다"}\n\n',
   }));
-  await page.getByTestId("assistant-message").last().getByRole("button", { name: "다시 생성", exact: true }).click();
+  await page.getByTestId("assistant-message").last().getByRole("button", { name: "답 다시 만들기", exact: true }).click();
   await expect(page.getByTestId("turn-error")).toBeVisible();
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
   await expect(page.getByTestId("assistant-message").last()).toContainText("다시 생성 실패 검사");
@@ -76,9 +76,9 @@ test("다시 생성도 실행 중지로 끝낼 수 있다", async ({ page, herme
   await page.goto("/");
   await ask(page, "재생성 중지 검사");
   const answer = page.getByTestId("assistant-message").last();
-  await expect(answer.getByRole("button", { name: "다시 생성", exact: true })).toBeVisible();
+  await expect(answer.getByRole("button", { name: "답 다시 만들기", exact: true })).toBeVisible();
   await hermes.holdNextRun();
-  await answer.getByRole("button", { name: "다시 생성", exact: true }).click();
+  await answer.getByRole("button", { name: "답 다시 만들기", exact: true }).click();
   await hermes.waitForHeldRun();
   await page.getByTestId("composer-shell").getByRole("button", { name: "중지" }).click();
   await expect(page.getByTestId("stopped-mark").last()).toBeVisible({ timeout: 30_000 });

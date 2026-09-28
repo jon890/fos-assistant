@@ -35,7 +35,7 @@ export function ActivityBlock(props: Props) {
     let active = true;
     fetch(`/api/usage/executions/${executionId}/tree`, { cache: "no-store" })
       .then((response) => {
-        if (!response.ok) throw new Error("실행 나무를 읽지 못했다");
+        if (!response.ok) throw new Error("작업 과정을 불러오지 못했어요");
         return response.json() as Promise<ExecutionTreeResponse>;
       })
       .then((tree) => {
@@ -73,23 +73,23 @@ export function ActivityBlock(props: Props) {
       </button>
       {live && props.slow && props.state.endedAt === null ? (
         <p data-testid="flow-slow-notice" className="px-3 pb-2 text-xs text-muted-foreground">
-          오래 걸릴 수 있다. 이 화면을 떠나도 된다. 실행은 계속 돌고, 나중에 다시 열면 저장된 답이 보인다.
+          오래 걸릴 수 있어요. 이 화면을 떠나도 실행은 계속돼요. 나중에 대화를 다시 열면 저장된 답을 볼 수 있어요.
         </p>
       ) : null}
       {expanded ? (
         <div className="min-w-0 border-t border-border px-3 py-2">
           {items ? <ActivityTimeline items={items} /> : loadFailed ? (
             <p data-testid="activity-load-error" className="text-xs text-muted-foreground">
-              작업 과정을 읽지 못했다
+              작업 과정을 읽지 못했어요
               <button type="button" className="ml-2 underline" onClick={() => {
                 setLoadFailed(false); setLoadVersion((value) => value + 1);
               }}>다시 읽기</button>
             </p>
-          ) : <p className="text-xs text-muted-foreground">작업 과정을 읽는 중</p>}
+          ) : <p className="text-xs text-muted-foreground">작업 과정을 읽고 있어요</p>}
           {props.onOpenPanel ? (
             <div className="mt-2 text-right">
               <button type="button" data-testid="activity-open-panel" onClick={props.onOpenPanel}
-                className="text-xs text-muted-foreground underline underline-offset-4">나무로 보기 →</button>
+                className="text-xs text-muted-foreground underline underline-offset-4">작업 과정 자세히 보기</button>
             </div>
           ) : null}
         </div>

@@ -7,7 +7,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const { id } = await context.params;
   if (!ID.test(id)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "사람 번호 형식이 올바르지 않습니다." },
+      { code: "VALIDATION_FAILED", message: "사용자 번호 형식이 올바르지 않아요." },
       { status: 400 },
     );
   }

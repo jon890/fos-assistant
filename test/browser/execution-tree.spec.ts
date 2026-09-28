@@ -158,7 +158,7 @@ test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보�
   await expect(tree.getByText("끝나지 않음")).toHaveCount(0);
 });
 
-test("사건이 없는 실행을 열면 기록된 사건이 없다고 보이고 요약은 그대로 보인다", async ({ page }) => {
+test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이고 요약은 그대로 보인다", async ({ page }) => {
   const response = await page.request.post("/api/chat", {
     data: { text: "실행 나무 빈 사건 검사", agentCode: "browser" },
   });
@@ -166,7 +166,7 @@ test("사건이 없는 실행을 열면 기록된 사건이 없다고 보이고 
   const id = await lastExecutionId(page);
 
   await page.goto(`/executions/${id}`);
-  await expect(page.getByText("기록된 사건이 없다", { exact: true })).toBeVisible();
+  await expect(page.getByText("기록된 작업이 없어요", { exact: true })).toBeVisible();
   await expect(page.getByText("성공", { exact: true })).toBeVisible();
 });
 
@@ -241,8 +241,8 @@ test("나무가 위쪽에서 잘렸으면 뿌리 위에 안내가 보인다", as
   });
   await page.goto("/executions/970");
 
-  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveText("위쪽이 잘려 여기가 뿌리가 아닐 수 있다");
-  await expect(page.getByText("여기부터 보이지 않는다")).toHaveCount(0);
+  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveText("위쪽 기록이 없어 이곳이 첫 실행이 아닐 수 있어요");
+  await expect(page.getByText("이전 실행은 표시되지 않아요")).toHaveCount(0);
 });
 
 /**
@@ -258,5 +258,5 @@ test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아
   await page.goto("/executions/970");
 
   await expect(page.getByTestId("execution-tree-truncated-above")).toHaveCount(0);
-  await expect(page.getByText("여기부터 보이지 않는다")).toHaveCount(1);
+  await expect(page.getByText("이전 실행은 표시되지 않아요")).toHaveCount(1);
 });

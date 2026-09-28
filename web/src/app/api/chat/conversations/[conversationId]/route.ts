@@ -10,7 +10,7 @@ async function idOf(context: RouteContext): Promise<string | null> {
 }
 
 function invalid() {
-  return NextResponse.json({ code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." }, { status: 400 });
+  return NextResponse.json({ code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않아요." }, { status: 400 });
 }
 
 function response(result: Awaited<ReturnType<typeof callControlPlane>>) {

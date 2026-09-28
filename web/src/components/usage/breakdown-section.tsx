@@ -9,7 +9,7 @@ const AXES = [
   { value: "agent", label: "에이전트" },
   { value: "model", label: "모델" },
   { value: "day", label: "날짜" },
-  { value: "fingerprint", label: "설정 지문" },
+  { value: "fingerprint", label: "설정별 사용량" },
 ] as const;
 
 export function BreakdownSection({ initial }: { initial: Breakdown }) {
@@ -26,21 +26,21 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
         { cache: "no-store" },
       );
       if (!response.ok) {
-        setFailure("축별 합계를 불러오지 못했다.");
+        setFailure("묶음별 합계를 불러오지 못했어요.");
         return;
       }
       setBreakdown(await response.json() as Breakdown);
     } catch {
-      setFailure("축별 합계를 불러오지 못했다.");
+      setFailure("묶음별 합계를 불러오지 못했어요.");
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <section aria-label="어디에 썼나" className="mb-8">
+    <section aria-label="사용량 내역" className="mb-8">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">어디에 썼나</h2>
+        <h2 className="text-lg font-semibold">사용량 내역</h2>
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">묶는 기준</span>
           <NativeSelect

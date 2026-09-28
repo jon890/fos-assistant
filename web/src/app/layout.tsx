@@ -14,7 +14,7 @@ const pretendard = localFont({
 
 export const metadata: Metadata = {
   title: "우리집 비서",
-  description: "가족이 함께 쓰는 개인 AI 비서",
+  description: "함께 쓰는 AI 비서",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

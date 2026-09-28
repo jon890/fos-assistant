@@ -38,7 +38,7 @@ export function ThemeToggle() {
   const Icon = THEME_ICON[theme];
   return (
     <TooltipButton
-      label={`밝기 모드: ${THEME_LABEL[theme]}. 다음은 ${THEME_LABEL[nextTheme]}`}
+      label={`밝기 모드: ${THEME_LABEL[theme]}. 다음 선택: ${THEME_LABEL[nextTheme]}`}
       variant="outline"
       size="icon"
       onClick={() => setTheme(nextTheme)}

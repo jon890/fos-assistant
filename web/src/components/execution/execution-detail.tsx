@@ -22,7 +22,7 @@ function findNode(node: ExecutionTreeNode, executionId: number): ExecutionTreeNo
 }
 
 function statusLabel(status: string): string {
-  if (status === "RUNNING") return "도는 중";
+  if (status === "RUNNING") return "실행 중";
   if (status === "SUCCEEDED") return "성공";
   if (status === "FAILED") return "실패";
   if (status === "CANCELLED") return "취소됨";
@@ -64,7 +64,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
   }, [state.kind, router]);
 
   if (state.kind === "loading" || state.kind === "not-found") {
-    return <p className="text-sm text-muted-foreground">불러오는 중이다.</p>;
+    return <p className="text-sm text-muted-foreground">불러오고 있어요.</p>;
   }
 
   if (state.kind === "error") {
@@ -72,7 +72,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
       <div>
         <h1 className="mb-2 text-xl font-semibold">{`실행 #${executionId}`}</h1>
         <p className="text-sm text-destructive" role="alert">
-          실행 정보를 불러오지 못했다.
+          실행 정보를 불러오지 못했어요.
         </p>
       </div>
     );

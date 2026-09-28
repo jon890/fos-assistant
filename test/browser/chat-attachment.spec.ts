@@ -143,7 +143,7 @@ test("11장을 고르면 10장만 올라가고 넘은 것을 알린다", async (
   // 개수만 세면 통과하지만 실제로는 열 장 모두가 올라가는 중 오류로 빠졌을 수도 있다.
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
   await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(10);
-  await expect(page.getByText("올리지 못했습니다")).toHaveCount(0);
+  await expect(page.getByText("사진을 올리지 못했어요.")).toHaveCount(0);
 });
 
 test("이미 여섯 장을 붙인 뒤 여섯 장을 더 고르면 네 장만 올라가고 알린다", async ({ page }, testInfo) => {
@@ -239,7 +239,7 @@ test("보관 기간이 지난 첨부는 자리를 남기고 알린다", async ({
     .click();
 
   await expect(page.getByTestId("message-attachment-gone").last()).toBeVisible();
-  await expect(page.getByText("보관 기간이 지나 볼 수 없습니다.").last()).toBeVisible();
+  await expect(page.getByText("보관 기간이 지나 볼 수 없어요.").last()).toBeVisible();
 });
 
 test("대화를 바꾸면 미리보기가 비워진다", async ({ page }, testInfo) => {
@@ -386,7 +386,7 @@ test("올리는 중에 대화를 바꾸면 그 사진은 새 대화에 붙지 �
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
   await expect(page.getByTestId("attachment-previews").locator("> div")).toHaveCount(10);
   await expect(page.getByText("too many images are waiting to be sent")).toHaveCount(0);
-  await expect(page.getByText("올리지 못했습니다")).toHaveCount(0);
+  await expect(page.getByText("사진을 올리지 못했어요.")).toHaveCount(0);
 });
 
 test("빈 대화를 만드는 중에 대화를 바꾸면 고른 대화가 그대로 남는다", async ({ page }, testInfo) => {

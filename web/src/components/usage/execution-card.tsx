@@ -62,7 +62,7 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
           <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
         </div>
         <p className="mt-2 text-xs text-muted-foreground" data-testid="execution-actual-cost">
-          실제 청구액 {actualCostLabel(execution)}
+          예상 추가 사용 요금 {actualCostLabel(execution)}
         </p>
         {retryOf ? (
           <p className="mt-1 text-xs text-muted-foreground" data-testid="execution-retry-of">

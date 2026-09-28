@@ -30,8 +30,7 @@ export default async function UsagePage() {
     <div className="mx-auto w-full max-w-5xl">
       <h1 className="mb-2 text-xl font-semibold">사용량</h1>
       <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
-        구독제로 도는 실행은 실제로 추가 청구되지 않는다. 종량 모델로 옮기면 얼마가 나갈지도 함께
-        보여, 모델을 옮길지 판단할 수 있게 한다.
+        구독 경로로 실행한 항목은 추가 사용 요금이 없어요. 같은 사용량을 API 가격으로 계산한 금액도 보여 드려요.
       </p>
       {monthly ? <MonthlySummary monthly={monthly} /> : null}
       {breakdownResult.ok

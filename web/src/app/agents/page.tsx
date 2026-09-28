@@ -27,8 +27,8 @@ export default async function AgentsPage() {
       <h1 className="mb-6 text-xl font-semibold">에이전트</h1>
       {result.data.length === 0 ? (
         <EmptyState
-          title="쓸 수 있는 에이전트가 없습니다"
-          description="관리자가 에이전트를 연결하면 여기에 나타납니다"
+          title="사용할 수 있는 에이전트가 없어요"
+          description="관리자가 에이전트를 연결하면 여기에 표시돼요"
         />
       ) : (
         <ul aria-label="쓸 수 있는 에이전트" className="grid gap-3">

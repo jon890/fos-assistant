@@ -90,10 +90,10 @@ test("사이드바에서 다른 화면으로 옮기는 동안 누른 줄과 사�
     if (testInfo.project.name !== "mobile") {
       await expect(usageLink.getByTestId("nav-pending")).toBeVisible();
     }
-    await expect(status).toHaveText("옮기는 중");
+    await expect(status).toHaveText("이동하는 중");
 
     releaseRequest();
-    await expect(page.getByRole("heading", { name: "사용량" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "사용량", exact: true })).toBeVisible();
 
     if (testInfo.project.name !== "mobile") {
       await expect(usageLink.getByTestId("nav-pending")).toHaveCount(0);

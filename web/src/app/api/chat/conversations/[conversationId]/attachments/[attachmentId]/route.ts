@@ -8,7 +8,7 @@ type RouteContext = {
 
 function badId() {
   return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: "대화 주소나 첨부 번호가 올바르지 않습니다." },
+    { code: "VALIDATION_FAILED", message: "대화 주소나 첨부 파일 번호가 올바르지 않아요." },
     { status: 400 },
   );
 }
@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!upstream.ok || !upstream.body) {
     const payload = await upstream.json().catch(() => ({
       code: "INTERNAL_ERROR",
-      message: "사진을 읽지 못했습니다.",
+      message: "사진을 불러오지 못했어요.",
     }));
     return NextResponse.json(payload, { status: upstream.status });
   }
