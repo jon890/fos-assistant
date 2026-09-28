@@ -10,9 +10,9 @@ import { AgentModelList } from "./agent-model-list";
 
 /**
  * 에이전트 하나에 보내는 요청이다. 도는 요청의 단추에만 회전 표시를 두려고 어느 것인지 가린다.
- * `family` 는 카드가 아니라 공개 확인 창이 보낸다.
+ * `group` 은 카드가 아니라 공개 확인 창이 보낸다.
  */
-export type AgentAction = "private" | "family" | "enabled" | "address" | "sync" | "models";
+export type AgentAction = "private" | "group" | "enabled" | "address" | "sync" | "models";
 
 type Props = {
   agent: AdminAgent;
@@ -55,7 +55,7 @@ export function AgentCard({
           <p className="text-xs text-muted-foreground">{agent.code}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "가족 공개"}</Badge>
+          <Badge variant="outline">{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}</Badge>
           <Badge variant={agent.enabled ? "outline" : "default"}>{agent.enabled ? "사용 중" : "사용 중지"}</Badge>
         </div>
       </div>
@@ -101,7 +101,7 @@ export function AgentCard({
           loadingText="바꾸는 중"
           onClick={() => onVisibilityChange(agent)}
         >
-          {agent.visibility === PRIVATE_VISIBILITY ? "가족 공개로 변경" : "나만으로 변경"}
+          {agent.visibility === PRIVATE_VISIBILITY ? "그룹 공개로 변경" : "나만으로 변경"}
         </Button>
         <Button
           size="sm"

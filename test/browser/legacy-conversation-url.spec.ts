@@ -4,7 +4,7 @@ import {
   CONVERSATION_URL,
   conversationIdOf,
   expect,
-  PERSONA_FAMILY_AGENT_CODE,
+  PERSONA_GROUP_AGENT_CODE,
   setAgentVisibility,
   setSession,
   test,
@@ -58,14 +58,14 @@ test("내 대화의 옛 번호 주소는 공개 식별자 주소로 넘어가고
 
 test("남의 대화 번호로 옛 주소를 열면 첫 화면으로 간다", async ({ context, page }) => {
   // 씨 뿌린 에이전트는 모두 TEST_EMAIL 만 쓰는 PRIVATE 라 다른 사용자가 대화를 시작하지 못한다.
-  // 이 검사 동안만 가족에게 공개하고 끝나면 되돌린다. identity.spec.ts 가 가족 공개 에이전트가
+  // 이 검사 동안만 그룹에 공개하고 끝나면 되돌린다. identity.spec.ts 가 그룹 공개 에이전트가
   // 정확히 하나라고 가정하고 있고, Playwright 설정의 workers: 1 이 다른 spec 과 겹치지 않게 한다.
-  await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "FAMILY", null);
+  await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "GROUP", null);
   try {
     await setSession(context, { email: "member@example.com", name: "가족 사용자" });
     // 빈 대화라 Hermes 실행이 돌지 않는다.
     const created = await page.request.post("/api/chat/conversations", {
-      data: { agentCode: PERSONA_FAMILY_AGENT_CODE },
+      data: { agentCode: PERSONA_GROUP_AGENT_CODE },
     });
     expect(created.ok(), `남의 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
     const { conversationId } = (await created.json()) as { conversationId: string };
@@ -75,7 +75,7 @@ test("남의 대화 번호로 옛 주소를 열면 첫 화면으로 간다", asy
     await page.goto(`/c/${number}`);
     await expect(page).toHaveURL(/\/$/);
   } finally {
-    await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "PRIVATE", TEST_EMAIL);
+    await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "PRIVATE", TEST_EMAIL);
   }
 });
 
@@ -102,7 +102,7 @@ test("대문자 공개 식별자로 대화를 열면 소문자 주소로 옮겨�
 for (const path of ["/api/chat", "/api/chat/stream"]) {
   test(`${path} 는 공개 식별자 모양이 아닌 대화로 보내면 400 으로 답한다`, async ({ page }) => {
     const response = await page.request.post(path, {
-      data: { conversationId: "abc", text: "모양이 틀린 대화", agentCode: PERSONA_FAMILY_AGENT_CODE },
+      data: { conversationId: "abc", text: "모양이 틀린 대화", agentCode: PERSONA_GROUP_AGENT_CODE },
     });
     expect(response.status(), `${path} 응답 상태`).toBe(400);
     expect(((await response.json()) as { code: string }).code, `${path} 오류 코드`).toBe("VALIDATION_FAILED");

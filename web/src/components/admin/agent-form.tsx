@@ -27,7 +27,7 @@ export function AgentForm({ ownerEmail, busy, creating, onCreate }: Props) {
         <div className="grid gap-1.5"><Label htmlFor={`${id}-owner`}>개인 소유자 이메일</Label><Input id={`${id}-owner`} name="ownerEmail" defaultValue={ownerEmail} /></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-cost`}>비용 방식</Label><NativeSelect id={`${id}-cost`} name="costMode" defaultValue="SUBSCRIPTION"><option value="SUBSCRIPTION">구독</option><option value="API">API</option></NativeSelect></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-credential`}>credential 범위</Label><NativeSelect id={`${id}-credential`} name="credentialScope" defaultValue="SHARED_HOUSEHOLD"><option value="SHARED_HOUSEHOLD">가족 공유 credential</option><option value="DEDICATED">전용 credential</option></NativeSelect></div>
-        <div className="grid gap-1.5"><Label htmlFor={`${id}-visibility`}>공개 범위</Label><NativeSelect id={`${id}-visibility`} name="visibility" defaultValue="PRIVATE"><option value="PRIVATE">나만</option><option value="FAMILY">가족 공개</option></NativeSelect></div>
+        <div className="grid gap-1.5"><Label htmlFor={`${id}-visibility`}>공개 범위</Label><NativeSelect id={`${id}-visibility`} name="visibility" defaultValue="PRIVATE"><option value="PRIVATE">나만</option><option value="GROUP">그룹 공개</option></NativeSelect></div>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">모델은 등록할 때 Hermes에서 읽는다.</p>
       <Button type="submit" disabled={busy} loading={creating} loadingText="등록 중" className="mt-4">등록</Button>

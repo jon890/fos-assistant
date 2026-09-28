@@ -37,14 +37,14 @@ export const SWITCH_AGENT_CODE = "browserswitch";
 export const PERSONA_AGENT_CODE = "browserpersona";
 
 /**
- * 「고칠 수 없는 에이전트」 검사가 잠깐 가족에게 공개하는 에이전트다.
+ * 「고칠 수 없는 에이전트」 검사가 잠깐 그룹에 공개하는 에이전트다.
  *
  * <p>씨 뿌릴 때는 다른 에이전트와 같이 `PRIVATE` 이고 주인이 `TEST_EMAIL` 이다. 그 검사가
- * `setAgentVisibility` 로 `FAMILY` 로 바꿔 `MEMBER` 세션에서 읽기 전용으로 열고, 끝나면 되돌린다.
- * 여기서 바로 `FAMILY` 로 씨 뿌리면 관리 화면에 가족 공개 에이전트가 하나 늘어, 정확히 하나만
+ * `setAgentVisibility` 로 `GROUP` 으로 바꿔 `MEMBER` 세션에서 읽기 전용으로 열고, 끝나면 되돌린다.
+ * 여기서 바로 `GROUP` 으로 씨 뿌리면 관리 화면에 그룹 공개 에이전트가 하나 늘어, 정확히 하나만
  * 있다고 가정하는 `identity.spec.ts` 가 어긋난다.
  */
-export const PERSONA_FAMILY_AGENT_CODE = "browserpersonafamily";
+export const PERSONA_GROUP_AGENT_CODE = "browserpersonagroup";
 
 /**
  * 본문이 비어 있는 채로 두는 검사 전용이다.
@@ -74,7 +74,7 @@ const PROFILE_KEYS: Record<string, string> = {
   browsermodels: "browser-models-profile-key",
   browserswitch: "browser-switch-profile-key",
   browserpersona: "browser-persona-profile-key",
-  browserpersonafamily: "browser-persona-family-profile-key",
+  browserpersonagroup: "browser-persona-group-profile-key",
   browserpersonaempty: "browser-persona-empty-profile-key",
 };
 
@@ -126,7 +126,7 @@ export async function hermesBaseUrl(): Promise<string> {
  */
 export async function setAgentVisibility(
   code: string,
-  visibility: "PRIVATE" | "FAMILY",
+  visibility: "PRIVATE" | "GROUP",
   ownerEmail: string | null,
 ): Promise<void> {
   const token = await new SignJWT({ name: "브라우저 테스트" })
@@ -252,10 +252,10 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
     { code: SWITCH_AGENT_CODE, name: "넘김 비서", profile: "browserswitch", flow: null, visibility: "PRIVATE" as const },
     // 성격을 읽고 쓰는 검사 전용이다. 주인이 TEST_EMAIL 이라 admin 세션이 언제나 고칠 수 있다.
     { code: PERSONA_AGENT_CODE, name: "성격 비서", profile: "browserpersona", flow: null, visibility: "PRIVATE" as const },
-    // 가족에게 공개할 에이전트다. 검사가 실행 중에만 FAMILY 로 바꿨다 되돌린다. 여기서 바로 FAMILY 로
-    // 씨 뿌리면 관리 화면에 "가족 공개로 변경"/"나만으로 변경" 단추가 하나 더 생겨, 정확히 하나만
+    // 그룹에 공개할 에이전트다. 검사가 실행 중에만 GROUP 으로 바꿨다 되돌린다. 여기서 바로 GROUP 으로
+    // 씨 뿌리면 관리 화면에 "그룹 공개로 변경"/"나만으로 변경" 단추가 하나 더 생겨, 정확히 하나만
     // 있다고 가정하는 identity.spec.ts 가 어긋난다.
-    { code: PERSONA_FAMILY_AGENT_CODE, name: "가족 성격 비서", profile: "browserpersonafamily", flow: null, visibility: "PRIVATE" as const },
+    { code: PERSONA_GROUP_AGENT_CODE, name: "그룹 성격 비서", profile: "browserpersonagroup", flow: null, visibility: "PRIVATE" as const },
     // 본문이 비어 있는 채로 두는 검사 전용이다.
     { code: PERSONA_EMPTY_AGENT_CODE, name: "빈 성격 비서", profile: "browserpersonaempty", flow: null, visibility: "PRIVATE" as const },
   ]) {
