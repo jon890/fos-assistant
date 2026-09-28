@@ -124,9 +124,10 @@ export function MessageList({
             <p className="py-8 text-center text-sm text-muted-foreground">무엇이든 물어보세요.</p>
           ) : (
             <ol className="flex flex-col gap-6">
-              {visible.map(({ turn, userVersion, answerVersion }) => {
+              {visible.map(({ turn, userVersion, answerVersion }, index) => {
                 const pendingAssistant = typeof turn.id === "string" && turn.id.startsWith("assistant-");
                 const isLast = visible.at(-1)?.turn.id === turn.id;
+                const nextTurn = visible[index + 1]?.turn;
                 return (
                   <Fragment key={turn.id}>
                     {pendingAssistant && activity && activity.items.length > 0 ? (
@@ -146,6 +147,8 @@ export function MessageList({
                       canRegenerate={isLast && turn.role === "ASSISTANT" && latestView && !sending}
                       onRegenerate={onRegenerate}
                       onAnswer={isLast && turn.role === "ASSISTANT" && latestView && !sending ? onAnswer : undefined}
+                      nextUserMessage={turn.role === "ASSISTANT" && nextTurn?.role === "USER"
+                        ? nextTurn.content : undefined}
                       onOpenArtifact={onOpenArtifact} />
                     {isLast && hasNoAnswer ? (
                       <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground">

@@ -13,10 +13,15 @@ type Choice = string | typeof CUSTOM;
 /**
  * 에이전트가 답 끝에 둔 질문을 선택 카드로 그린다.
  *
- * 마지막 답의 카드만 누를 수 있다. 지난 답의 카드는 무엇을 물었는지만 보인다. 이미 다음 메시지가 그 답이다.
+ * 마지막 답의 카드만 누를 수 있다. 지난 카드의 답은 다음 사용자 메시지에서 되찾아 보여 준다.
  * 고른 답은 평범한 사용자 메시지로 보낸다. 실행이 멈춰 기다리지 않으므로, 답하지 않고 다른 글을 보내도 된다.
  */
-export function AskCard({ ask, active, onSubmit }: { ask: Ask; active: boolean; onSubmit(text: string): void }) {
+export function AskCard({ ask, active, answered, onSubmit }: {
+  ask: Ask;
+  active: boolean;
+  answered: string[][] | null;
+  onSubmit(text: string): void;
+}) {
   const [choices, setChoices] = useState<Choice[][]>(() => ask.questions.map(() => []));
   const [custom, setCustom] = useState<string[]>(() => ask.questions.map(() => ""));
   // 보내는 동안은 돌고 있는 turn 이 있어 `active` 가 꺼진다. 따로 「보냈다」 상태를 두지 않는다.
@@ -45,12 +50,18 @@ export function AskCard({ ask, active, onSubmit }: { ask: Ask; active: boolean; 
       className="my-3 flex flex-col gap-4 rounded-lg border border-border bg-muted/40 p-4"
       onSubmit={(event) => { event.preventDefault(); submit(); }}
     >
-      {ask.questions.map((question, index) => (
-        <QuestionField key={index} question={question} enabled={enabled}
-          chosen={choices[index]} customText={custom[index]}
+      {ask.questions.map((question, index) => {
+        const restored = active ? null : answered?.[index];
+        const typed = restored?.find((value) => !question.options.some((option) => option.label === value)) ?? "";
+        const restoredChoices: Choice[] = restored?.filter((value) =>
+          question.options.some((option) => option.label === value)) ?? [];
+        if (typed) restoredChoices.push(CUSTOM);
+        const chosen = active ? choices[index] : restoredChoices;
+        return <QuestionField key={index} question={question} enabled={enabled}
+          chosen={chosen} customText={active ? custom[index] : typed}
           onToggle={(choice) => toggle(index, choice)}
-          onCustomChange={(text) => setCustom((previous) => previous.map((value, at) => (at === index ? text : value)))} />
-      ))}
+          onCustomChange={(text) => setCustom((previous) => previous.map((value, at) => (at === index ? text : value)))} />;
+      })}
       {active ? (
         <div className="flex justify-end">
           <Button type="submit" size="sm" disabled={!enabled || !complete} data-testid="ask-submit">
@@ -103,10 +114,12 @@ function QuestionField({ question, enabled, chosen, customText, onToggle, onCust
           직접 입력
         </label>
       )}
-      {customOpen && enabled ? (
+      {customOpen && (enabled ? (
         <Input aria-label={`${question.header ?? question.text} 직접 입력`} data-testid="ask-custom-input"
           value={customText} onChange={(event) => onCustomChange(event.target.value)} />
-      ) : null}
+      ) : customText ? (
+        <p className="break-words rounded-md border border-border bg-background px-3 py-2 text-sm">{customText}</p>
+      ) : null)}
     </fieldset>
   );
 }
