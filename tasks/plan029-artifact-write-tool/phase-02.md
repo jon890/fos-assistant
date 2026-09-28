@@ -87,7 +87,8 @@ Control Plane 의 토큰, 쿠키와 다른 인증 정보를 보내지 않으며 
 | MIME | 매개변수를 빼고 확장자에 맞는 이미지 MIME 과 정확히 비교 |
 | 압축된 응답 | 거절. 압축 해제로 크기 제한이 달라지는 것을 막음 |
 | `Content-Length` 초과 | 본문을 읽기 전에 거절 |
-| 길이가 없거나 실제 길이가 다름 | 실제 본문을 5MB 에서 1바이트까지만 더 읽고 초과를 판정 |
+| 길이가 없는 본문 | chunked 또는 연결 종료까지 읽고 5MB 를 넘는 순간 거절 |
+| 선언 길이보다 짧은 본문 | 조기 EOF 를 거절. 선언 길이 뒤의 바이트는 해당 응답 본문에 넣지 않음 |
 | 연결, TLS, 읽기 오류와 제한 시간 초과 | 스트림과 socket 을 닫고 저장하지 않음 |
 | 느린 본문과 느린 DNS | 읽기 제한과 별도로 호출 전체 30초 제한을 적용 |
 
@@ -154,5 +155,6 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactStore.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactSourceFetcherTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/ArtifactSourceTlsTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactWriteServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactStoreWriteTest.java` | 수정 |
