@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatAnswers, parseAsk, splitAnswer } from "../../web/src/lib/ask.ts";
+import { formatAnswers, parseAsk, recoverAnswers, splitAnswer } from "../../web/src/lib/ask.ts";
 
 const BLOCK = [
   "<ask>",
@@ -82,6 +82,39 @@ test("이름표와 고른 답을 한 줄씩 적는다. 이름표가 없으면 �
   const ask = parseAsk(BLOCK.replace(' header="먹은 메뉴"', ""))!;
 
   assert.equal(formatAnswers(ask, [["행복담"], ["국밥", "수육"]]), "식당 이름: 행복담\n무엇을 먹었어?: 국밥, 수육");
+});
+
+test("한 질문의 고른 답을 되찾는다", () => {
+  const ask = parseAsk('<ask>\n<question header="식당 이름">어디야?</question>\n<option>행복담</option>\n</ask>')!;
+  assert.deepEqual(recoverAnswers(ask, "식당 이름: 행복담"), [["행복담"]]);
+});
+
+test("여러 질문은 순서와 이름표가 맞을 때만 되찾는다", () => {
+  const ask = parseAsk(BLOCK)!;
+  assert.deepEqual(recoverAnswers(ask, "식당 이름: 행복담\n먹은 메뉴: 국밥, 수육"), [["행복담"], ["국밥", "수육"]]);
+  assert.equal(recoverAnswers(ask, "먹은 메뉴: 국밥, 수육\n식당 이름: 행복담"), null);
+  assert.equal(recoverAnswers(ask, "식당 이름: 행복담\n다른 이름: 국밥"), null);
+});
+
+test("쉼표가 든 선택지 이름은 한 선택지로 되찾는다", () => {
+  const ask = parseAsk('<ask>\n<question multiple="true">메뉴?</question>\n<option>국밥, 수육</option>\n<option>만두</option>\n</ask>')!;
+  assert.deepEqual(recoverAnswers(ask, "메뉴?: 국밥, 수육, 만두"), [["국밥, 수육", "만두"]]);
+});
+
+test("선택지에 없는 값은 직접 입력한 답으로 되찾는다", () => {
+  const ask = parseAsk(BLOCK)!;
+  assert.deepEqual(recoverAnswers(ask, "식당 이름: 새 식당\n먹은 메뉴: 국밥, 만두, 찐빵"),
+    [["새 식당"], ["국밥", "만두, 찐빵"]]);
+  const freeOnly = parseAsk("<ask>\n<question>언제 갔어?</question>\n</ask>")!;
+  assert.deepEqual(recoverAnswers(freeOnly, "언제 갔어?: 지난주"), [["지난주"]]);
+});
+
+test("카드와 맞지 않는 다음 메시지는 답으로 보지 않는다", () => {
+  const ask = parseAsk(BLOCK)!;
+  assert.equal(recoverAnswers(ask, "잘 모르겠어"), null);
+  assert.equal(recoverAnswers(ask, "식당 이름: 행복담"), null);
+  assert.equal(recoverAnswers(ask, "식당 이름: 행복담\n먹은 메뉴: "), null);
+  assert.equal(recoverAnswers(ask, "식당 이름: 행복담\n먹은 메뉴: 국밥, "), null);
 });
 
 test("속성과 본문의 이스케이프를 푼다", () => {

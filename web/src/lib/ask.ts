@@ -138,6 +138,46 @@ export function formatAnswers(ask: Ask, answers: string[][]): string {
     .join("\n");
 }
 
+/** 바로 다음 사용자 메시지가 이 카드의 답이면 질문 순서대로 고른 값을 되찾는다. */
+export function recoverAnswers(ask: Ask, content: string): string[][] | null {
+  const lines = content.split("\n");
+  if (lines.length !== ask.questions.length) return null;
+
+  const answers: string[][] = [];
+  for (const [index, question] of ask.questions.entries()) {
+    const prefix = `${question.header ?? question.text}: `;
+    const line = lines[index];
+    if (!line.startsWith(prefix) || line.length === prefix.length) return null;
+    const value = line.slice(prefix.length);
+    if (!question.multiple) {
+      answers.push([value]);
+      continue;
+    }
+
+    const picked: string[] = [];
+    let remaining = value;
+    let lastOption = -1;
+    while (remaining.length > 0) {
+      // 긴 이름을 먼저 본다. 쉼표가 든 선택지를 둘로 잘못 나누지 않기 위해서다.
+      const match = question.options
+        .map((option, optionIndex) => ({ label: option.label, optionIndex }))
+        .filter(({ label, optionIndex }) => optionIndex > lastOption
+          && (remaining === label || remaining.startsWith(`${label}, `)))
+        .sort((left, right) => right.label.length - left.label.length)[0];
+      if (!match) {
+        picked.push(remaining); // 목록에 없는 나머지는 직접 입력한 답이다.
+        break;
+      }
+      picked.push(match.label);
+      lastOption = match.optionIndex;
+      remaining = remaining === match.label ? "" : remaining.slice(match.label.length + 2);
+      if (remaining.length === 0 && value.endsWith(", ")) return null;
+    }
+    answers.push(picked);
+  }
+  return answers;
+}
+
 function readAttributes(source: string): Record<string, string> {
   const attributes: Record<string, string> = {};
   for (const match of source.matchAll(/([a-z]+)="([^"]*)"/g)) {
