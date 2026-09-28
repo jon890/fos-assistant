@@ -2,6 +2,9 @@
 
 NousResearch 의 Hermes Agent 를 Agent Runtime 으로 쓴다.
 이 문서는 core 를 수정하지 않고 쓸 수 있는 확장 지점을 정리한다.
+운영값과 실행 절차는 비공개 저장소 `fos-home-infra` 에 둔다.
+버전이 붙은 설명은 그 버전에서 확인한 계약이다.
+2026-09-28 조사로 확인한 버전 차이는 「버전을 올릴 때 달라지는 계약」 에 모았다.
 
 ## profile 이 곧 사용자 격리 단위다
 
@@ -119,6 +122,9 @@ provider 해석이 실패하면 이전 provider 가 남고 모델만 요청 값�
 그 상태에서 오는 404 는 provider 가 아니라 모델을 찾지 못한 것이다.
 
 ### 조회 응답의 `model` 은 실제로 돈 모델이 아니다
+
+아래는 v0.21.0 과 v0.21.3 의 계약이다.
+v0.21.5 에서 추가한 실제 실행 `runtime` 과의 차이는 「Runs 응답과 사건의 버전 차이」 에 있다.
 
 **`GET /v1/runs/{run_id}` 의 `model` 은 우리가 보낸 값을 되돌려 줄 뿐이다.**
 Hermes 안에서 다른 모델로 넘어가도 이 값은 바뀌지 않는다.
@@ -330,6 +336,11 @@ Responses 에서 일반 OpenAI 호환 provider 로 갈 때는 그 조각을 걸�
 Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으면 400 이 날 수 있다.
 
 ### profile 접두
+
+아래 설정 우선순위와 허용 목록은 v0.21.0 의 동작이다.
+v0.21.3 은 `gateway.multiplex_profile_allowlist` 를 제거했고,
+v0.21.4 이후에는 multiplex 기본값과 gateway 실행 방식도 바뀐다.
+버전별 차이는 「버전을 올릴 때 달라지는 계약」 을 따른다.
 
 `gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
 default profile 의 listener 에는 각 경로가 접두 없는 형태와 `/p/<profile>` 접두 형태로 함께 등록된다.
@@ -593,6 +604,146 @@ pool 을 키우는 것만으로는 메모리가 늘지 않는다. 스레드를 �
 
 **3.1 MB 는 하한이다.** 스킬만 올리고 MCP 서버와 대화 기록이 없는 profile 에서 측정한 값이다.
 
+## 도구와 스킬과 승인 설정을 HTTP 로 쓰는 길
+
+2026-09-28 에 v0.21.0 소스로 확인했다.
+도구 목록과 스킬 입력 크기는 함수에 설정을 넣어 계산한 결과다.
+설정 변경 뒤 실제 실행으로 적용 시점을 검증한 것은 아니다.
+
+### 대시보드 설정 API
+
+대시보드 웹서버는 `_profile_scope(profile)` 안에서 profile 의 설정을 읽고 쓴다.
+아래 경로는 API server 의 `/v1/runs` 와 다른 서버가 처리한다.
+
+| 경로 | 동작 | 근거 함수 |
+| --- | --- | --- |
+| `GET /api/config/raw` | `config.yaml` 원문을 읽는다 | `hermes_cli/web_server.py` 의 `get_config_raw` |
+| `GET /api/config` | 환경 변수 참조를 펼친 설정을 읽는다 | 같은 파일의 `get_config`, `load_config` |
+| `PUT /api/config` | 받은 값을 디스크 원문에 병합한다. 쓸 수 있는 키를 제한하지 않는다 | 같은 파일의 `update_config`, `hermes_cli/config.py` 의 `_deep_merge` |
+| `PUT /api/config/raw` | 받은 YAML 로 설정 파일 전체를 바꾼다 | `update_config_raw` |
+| `GET /api/tools/toolsets` | toolset 의 이름, 설명, 도구 목록을 읽는다 | `hermes_cli/web_routers/tools.py` 의 `get_toolsets` |
+| `PUT /api/tools/toolsets/{name}` | 보통 `platform_toolsets.cli` 를 바꾼다. Discord 전용은 `discord` 에 저장한다 | 같은 파일의 `toggle_toolset`, `_toolset_configuration_platform` |
+| `GET /api/skills` | 스킬 목록, 켜짐 여부와 출처를 읽는다 | `hermes_cli/web_routers/skills.py` 의 `get_skills` |
+| `PUT /api/skills/toggle` | `skills.disabled` 에 이름을 넣거나 뺀다 | 같은 파일의 `toggle_skill`, `save_disabled_skills` |
+| `POST /api/skills`, `PUT /api/skills/content` | profile 로컬 스킬을 만들거나 본문을 바꾼다 | 같은 파일의 `create_skill`, `update_skill_content` |
+| `/api/mcp/servers` 계열 | `mcp_servers` 를 조회, 추가하고 `enabled` 를 바꾼다 | `hermes_cli/web_routers/mcp.py` |
+
+`PUT /api/config` 는 객체를 재귀로 병합하고 목록은 받은 값으로 통째로 바꾼다.
+따라서 `platform_toolsets.api_server`, `agent.disabled_toolsets`, `skills.external_dirs` 를
+각각 원하는 목록으로 쓸 수 있다.
+병합의 바탕은 `read_raw_config()` 의 원문이라 `${VAR}` 참조는 그대로 남는다.
+반면 `GET /api/config` 는 `_expand_env_vars` 가 펼친 비밀값도 응답에 싣는다.
+기계용 설정 조회에는 `GET /api/config/raw` 를 쓰되 원문도 민감한 설정으로 취급한다.
+
+**대시보드 toolset 토글은 API 실행의 도구를 바꾸지 않는다.**
+API 실행은 `platform_toolsets.api_server` 를 읽는다.
+`GET /api/tools/toolsets` 는 목록 원본으로 쓸 수 있지만, 토글 응답의 `enabled` 는 CLI 기준이다.
+스킬 토글의 `skills.disabled` 는 그 profile 의 모든 platform 에 적용된다.
+platform 별 `skills.platform_disabled.<platform>` 은 이 토글 경로로 쓰지 않는다.
+필수 스킬 `hermes-agent` 는 `agent/skill_utils.py` 의 `ESSENTIAL_SKILLS` 로 보호되어 끌 수 없다.
+
+기계용 인증은 「profile 을 HTTP 로 만드는 길」 의 token provider 를 쓴다.
+`register_token_route` 는 메서드를 보지 않고 경로 문자열만 맞춘다.
+본문이나 query 로 profile 을 고르는 설정 경로를 열면 모든 profile 에 열린다.
+`PUT /api/config` 에서 `model`, `approvals`, `mcp_servers`, `terminal`, `memory` 등의
+키를 골라 허용하는 기능은 Hermes 에 없다.
+plugin 이 본문을 먼저 읽은 뒤 처리기가 다시 읽는 방식은 이 조사에서 검증하지 않았다.
+
+근거는 [v0.21.0 web_server.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/web_server.py),
+[tools router](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/web_routers/tools.py),
+[skills router](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/web_routers/skills.py) 다.
+
+### 변경이 적용되는 시점
+
+| 바꾸는 것 | 적용 시점 | 근거 |
+| --- | --- | --- |
+| `platform_toolsets.api_server`, `agent.disabled_toolsets` | 다음 실행. 재시작이 필요 없다 | `_create_agent` 가 실행마다 새 agent 를 만들고 `_load_gateway_config` 가 profile 설정을 읽는다 |
+| 도구 정의 | 다음 실행 | `model_tools.get_tool_definitions` 캐시 키에 toolset 목록과 설정 파일 지문이 들어 있다 |
+| `skills.external_dirs`, `skills.disabled` | 다음 실행 | 외부 경로 캐시가 config mtime 을 보고 스킬 색인 캐시 키에 경로와 비활성화 목록이 들어 있다 |
+| 연결된 디렉터리 안의 스킬 추가·삭제, 색인 설명 변경 | gateway 재시작 뒤 | `agent/prompt_builder.py` 의 `_SKILLS_PROMPT_CACHE` 키에 디렉터리 내용이 없다 |
+| 대시보드로 스킬 생성·수정 | gateway 색인은 재시작 뒤 | `create_skill` 이 비우는 캐시는 대시보드 프로세스에만 있다 |
+| `SKILL.md` 본문 | 다음 `skill_view`. 재시작이 필요 없다 | `skill_view` 가 파일을 직접 읽는다 |
+| `mcp_servers` 추가 | gateway 재시작 뒤 | `_discover_gateway_mcp_tools` 가 기동 때 도구를 발견한다 |
+| 이미 연결된 MCP 서버의 허용 목록 | 다음 실행 | `_get_platform_tools` 가 실행마다 교집합을 만든다 |
+| `approvals.mode`, `deny`, `timeout`, `cron_mode`, `unattended_mode`, `single_query_mode` | 다음 명령 판정 | `tools/approval.py` 의 읽기 함수가 `load_config_readonly()` 를 부른다 |
+| `delegation.subagent_auto_approve` | 다음 위임 | `tools/delegate_tool.py` 의 `_get_subagent_approval_callback` |
+| `command_allowlist` | 실행마다 다시 읽지 않는다 | `load_permanent_allowlist` 가 import 때 `_permanent_approved` 를 만든다 |
+
+진행 중인 실행은 이미 만든 agent 의 도구 목록을 계속 쓴다.
+`approvals.deny` 는 mode 와 yolo 판정보다 먼저 검사한다.
+`approvals.mode` 를 바꾸며 보내는 `session.info` 는 대시보드 자기 profile 의 대화에만 간다.
+API 경로에서 새 승인 설정을 읽는 것과는 별개다.
+
+공유 listener 의 요청 문맥은 `gateway/run.py` 의 `_profile_runtime_scope` 가 만들고,
+contextvar 를 통해 작업 스레드로 전달된다.
+도구·스킬·승인 설정은 요청 profile 의 파일을 읽지만 다음 항목은 프로세스가 공유한다.
+
+| 공유 항목 | 영향 |
+| --- | --- |
+| `command_allowlist` | listener 주인 profile 의 값이 모든 profile 에 적용된다. 보조 profile 의 값은 읽히지 않는다 |
+| MCP 연결 | 기동 때 한 번 연결하고 profile 별 허용 목록과 교집합을 만든다 |
+| 스킬 색인 캐시 | profile 별 키를 쓰지만 디렉터리 내용 변경은 알아채지 못한다 |
+| gateway 재시작 | 그 listener 가 제공하는 모든 profile 의 실행에 영향을 준다 |
+
+### toolset 의 목록과 접근 범위
+
+v0.21.0 의 `toolsets.py` 의 `TOOLSETS` 와
+`hermes_cli/tools_config.py` 의 `CONFIGURABLE_TOOLSETS` 를 대조한 결과다.
+**profile 분리는 셸이나 파일 도구의 파일 접근을 격리하지 않는다.**
+이 도구를 주면 같은 컨테이너 안의 다른 profile 파일에도 닿을 수 있다.
+
+| toolset | 대표 도구 | 접근 범위 | 설정 목록 |
+| --- | --- | --- | --- |
+| `terminal` | `terminal`, `process_manage` | 셸이 닿는 파일, 네트워크와 프로세스 | 있다 |
+| `file` | `read_file`, `write_file`, `patch`, `search_files` | 컨테이너 파일 시스템 읽기·쓰기 | 있다 |
+| `code_execution` | `execute_code` | Python 에서 열린 다른 도구를 호출한다 | 있다 |
+| `browser` | `browser_navigate`, `browser_exec`, `web_search` 등 | 브라우저 조작, 페이지 스크립트와 외부 웹 | 있다 |
+| `computer_use` | `computer_use` | 데스크톱 화면과 입력 | 있다 |
+| `web`, `x_search` | `web_search`, `web_extract`, `x_search` | 외부 검색·추출 API. `x_search` 는 기본 꺼짐 | 있다 |
+| `memory`, `session_search` | 같은 이름의 도구 | profile 기억 읽기·쓰기와 지난 대화 검색 | 있다 |
+| `skills` | `skills_list`, `skill_view`, `skill_manage` | 스킬 읽기·쓰기. 외부 스킬도 쓰기 가능하면 수정할 수 있다 | 있다 |
+| `cronjob`, `delegation` | `cronjob_manage`, `delegate_task` | 무인 예약 실행과 자식 agent 생성 | 있다 |
+| `image_gen`, `video_gen` | `image_generate`, `video_generate`, `xai_video_edit`, `xai_video_extend` | 외부 유료 생성 API. `video_gen` 은 기본 꺼짐 | 있다 |
+| `tts`, `stt` | `text_to_speech`. `stt` 는 도구가 없다 | 음성 합성·인식 API. 인식은 `stt.enabled` 로 켠다 | 있다 |
+| `vision`, `video` | `vision_analyze`, `video_analyze` | 이미지·영상 분석. `video` 는 기본 꺼짐 | 있다 |
+| `todo`, `clarify` | `todo_list`, `clarify` | 실행 안의 할 일과 사용자 질문 | 있다 |
+| `context_engine` | 엔진이 정한다 | 기본 엔진이 아닐 때 도구가 생긴다 | 있다 |
+| `homeassistant`, `spotify` | `ha_*`, `spotify_*` | 스마트홈 기기와 Spotify 계정. 기본 꺼짐 | 있다 |
+| `discord`, `discord_admin` | 같은 이름의 도구 | Discord 읽기·참여·관리. 기본 꺼짐, Discord 전용 | 있다 |
+| `yuanbao` | `yb_*` | Yuanbao 메시지 | 있다 |
+| `kanban` | `kanban_*` | 디스패처가 띄운 작업자의 작업판 | 없다 |
+| `a2a`, `google_meet` | plugin 이 정한다 | plugin toolset. `a2a` 는 기본 꺼짐 | 없다 |
+| `project`, `desktop_ui`, `feishu_*`, `bot_room` | GUI 또는 해당 platform 전용 | API 경로와 관계없다 | 없다 |
+
+`_get_platform_tools` 는 모든 활성화 규칙을 적용한 뒤 `agent.disabled_toolsets` 를 뺀다.
+없는 비활성화 이름은 집합에서 빠질 것이 없어 오류 없이 무시된다.
+허용 목록의 잘못된 이름은 목록 전체가 무효일 때만 마지막 검사에서 알린다.
+
+`platform_toolsets.api_server` 에 이름을 명시해도 그 목록만 켜지는 것은 아니다.
+
+- `_enable_recently_shipped_toolsets` 가 새 toolset 을 더할 수 있다. v0.21.0 의 추가 목록은 비어 있다.
+  `known_builtin_toolsets` 에 적힌 이름은 이미 확인하고 거절한 것으로 본다.
+- `known_plugin_toolsets` 에 없는 plugin toolset 은 기본 꺼짐 목록을 제외하고 켜진다.
+- MCP 서버 이름을 하나도 지정하지 않으면 등록된 MCP 서버가 모두 통과한다.
+  전부 막으려면 `no_mcp` 를 둔다.
+
+허용 목록 키를 없애면 `hermes-api-server` 복합 toolset 을 쓴다.
+v0.21.0 에서 기본 꺼짐 목록을 뺀 결과는 다음과 같다.
+
+```text
+browser, code_execution, cronjob, delegation, file, image_gen, memory,
+session_search, skills, terminal, todo, vision, web
+```
+
+managed scope 의 `apply_managed_overlay` 는 설정 leaf 마다 사용자 값보다 우선한다.
+목록은 통째로 바뀌고 managed scope 는 프로세스에 하나다.
+여기에 `agent.disabled_toolsets` 를 두면 모든 profile 에 같은 목록이 적용되어
+profile 별 목록을 대신한다.
+
+근거는 [v0.21.0 tools_config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/tools_config.py),
+[toolsets.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/toolsets.py),
+[managed_scope.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/managed_scope.py) 다.
+
 ## Memory MCP
 
 제목만 `instructions` 에 실린 Memory 본문은 Control Plane 의 MCP 서버에서 읽는다.
@@ -645,7 +796,8 @@ hook 은 27종이 있고 그중 아래가 우리에게 쓸모 있다.
 | `subagent_start`, `subagent_stop` | subagent 실행 경계 |
 
 Runs API 의 `usage` 는 실행 하나의 합계만 준다.
-cached token 과 호출 단위 모델 구분이 필요해지면 그때 plugin 을 만든다.
+v0.21.0 과 v0.21.3 은 cached token 을 내보내지 않지만 v0.21.5 는 cache 칸을 더한다.
+LLM 호출마다 모델과 사용량을 구분해야 하면 plugin hook 을 쓴다.
 MVP 는 plugin 없이 설정만으로 성립한다.
 
 이 기계에는 이미 Orca 가 설치한 `orca-status` plugin 이 있다.
@@ -667,6 +819,49 @@ MVP 는 plugin 없이 설정만으로 성립한다.
 
 스킬 설명이 매 대화마다 입력으로 함께 실린다.
 그러므로 에이전트마다 그 에이전트가 쓰는 스킬만 붙인다.
+
+### 스킬의 출처와 색인 입력
+
+2026-09-28 에 v0.21.0 소스와 색인 계산으로 확인했다.
+
+| 출처 | 연결·제외 단위 |
+| --- | --- |
+| profile 의 `skills/` | 범주 아래 스킬 디렉터리와 링크를 읽는다. `skills.disabled` 로 제외한다 |
+| Hermes 번들 | profile 생성과 `tools/skills_sync.py` 의 기동 동기화가 심는다. `.no-bundled-skills` 는 일반 번들을 막지만 필수 스킬은 남긴다 |
+| `skills.external_dirs` | 연결 디렉터리 아래 `SKILL.md` 를 읽는다. 경로를 빼거나 `skills.disabled` 로 제외한다 |
+| 신뢰한 저장소 | `./.hermes/skills`, `./.agents/skills` 를 읽는다. 신뢰를 거두면 제외된다 |
+| hub 설치 | 스킬 하나를 설치·제거하거나 비활성화한다 |
+
+같은 이름이면 신뢰한 저장소, profile 로컬, 외부 디렉터리 순으로 앞의 것을 쓴다.
+`agent/system_prompt.py` 는 실행 도구에 `skills_list`, `skill_view`, `skill_manage` 중
+하나라도 있을 때만 `build_skills_system_prompt` 를 부른다.
+**`skills` toolset 을 닫으면 스킬 파일이 있어도 색인이 입력에 들어가지 않는다.**
+
+색인은 고정 안내문, 범주별 한 줄, 스킬별 이름과 설명 한 줄로 구성된다.
+설명은 `SKILL_PROMPT_DESC_LIMIT` 인 60자에서 자른다.
+본문은 `skill_view` 로 읽을 때 들어가고, 조건부 스킬은 `_skill_should_show` 가
+도구와 platform 으로 거른다.
+
+`o200k_base` 로 색인을 계산한 크기다. provider 의 토크나이저에 따라 달라질 수 있다.
+
+| 설명 구성 | 스킬 수 | 전체 색인 | 스킬 한 줄 | 고정 부분 |
+| --- | --- | --- | --- | --- |
+| 한국어 위주 | 6 | 476 토큰 | 33~42 토큰 | 238 토큰 |
+| 한국어·영어 혼합 | 7 | 490 토큰 | 18~44 토큰 | 292 토큰 |
+
+스킬 하나는 API 호출 한 번의 입력에 대략 20~45 토큰을 더한다.
+한국어 설명은 40 토큰 안팎이며 실행 안의 API 호출마다 다시 실린다.
+
+**`skills` 는 읽기 전용 toolset 이 아니다.**
+`skill_manage` 는 profile 로컬 스킬을 만들고 고친다.
+외부 디렉터리가 쓰기 가능하면 사용자가 지시한 외부 스킬 수정도 가능하다.
+`tools/skill_manager_tool.py` 의 외부 스킬 보호는 백그라운드 curator 의 쓰기만 막는다.
+
+근거는 [v0.21.0 system_prompt.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/system_prompt.py),
+[skill_utils.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/skill_utils.py),
+[skill_manager_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/skill_manager_tool.py) 다.
+
+### 스킬 수를 줄인 실측
 
 **다만 스킬이 입력 비용의 대부분은 아니다.**
 같은 문장을 `career` profile 에 보내 스킬 97개일 때와 6개일 때를 측정했다.
@@ -718,8 +913,8 @@ system prompt 가 22,799 글자에서 13,123 글자로 줄었다.
 짧은 대화 한 번의 279배다. 그 실행은 활성 공고 122건을 비교했다.
 `career` 의 `max_turns` 는 60 이다.
 
-API server 의 `usage` 에는 cache 항목이 없다.
-`prompt_tokens` 와 `completion_tokens` 와 `total_tokens` 뿐이다.
+v0.21.0 과 v0.21.3 Runs API 의 `usage` 에는 cache 항목이 없다.
+`input_tokens`, `output_tokens`, `total_tokens` 뿐이다.
 `cached_input_tokens` 가 실행 기록에서 비어 있는 것은
 prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 때문이다.
 
@@ -736,6 +931,7 @@ prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 �
 링크 대상은 **컨테이너 안의 경로**여야 한다. 호스트 경로로 걸면 컨테이너 안에서 끊긴 링크가 된다.
 붙인 뒤 gateway 를 다시 띄워야 인식된다. `GET /v1/skills` 로 확인한다.
 실측으로 확인했다.
+이미 연결한 스킬의 본문과 색인 변경은 「변경이 적용되는 시점」 에서 구분한다.
 
 ## 내장 delegation 이 실제로 하는 것
 
@@ -767,6 +963,28 @@ prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 �
 privacy 로는 이쪽이 안전하다. 부모에 넣은 개인 Memory 가 자식으로 새지 않는다.
 대신 자식에게 무언가를 알려야 하면 goal 본문에 직접 적어야 하고,
 그 본문은 Control Plane 이 무엇을 담을지 정해야 한다.
+
+### 자식 도구의 허용 범위
+
+2026-09-28 에 v0.21.0 의 `tools/delegate_tool.py` 의 `_build_child_agent` 를 읽어 확인했다.
+
+| 항목 | 동작 |
+| --- | --- |
+| toolset | 모델이 지정한 목록도 부모의 `enabled_toolsets` 와 교집합을 만든다. 부모에 없는 `terminal`, `file` 을 받지 못한다 |
+| 항상 제외하는 도구 | `DELEGATE_BLOCKED_TOOLS` 의 `delegate_task`, `clarify`, `memory`, `send_message`, `cronjob_manage` |
+| orchestrator 예외 | `delegation` 을 다시 넣는다. 위임 시작에는 부모의 `delegation` 이 필요하고, 깊이는 `delegation.max_spawn_depth` 가 제한한다 |
+| `disabled_toolsets` | 부모 목록을 물려준다. orchestrator 는 여기서 `delegation` 만 뺀다 |
+| MCP | `delegation.inherit_mcp_toolsets` 가 참이면 부모 MCP toolset 을 유지한다. 기본값은 참이다 |
+| 기억·문맥 파일 | `skip_memory=True`, `skip_context_files=True` 로 자식을 만든다 |
+| 위험한 명령 | `delegation.subagent_auto_approve` 가 거짓이면 자식 스레드에 자동 거절 콜백을 건다. gateway 세션은 승인 큐를 쓴다는 주석이 있다 |
+
+API server 의 `_create_agent` 는 `disabled_toolsets` 를 따로 넘기지 않지만,
+이미 제외한 도구 목록을 `enabled_toolsets` 로 주므로 자식의 교집합도 같은 범위를 지킨다.
+부모의 `approvals.mode: off` 가 자식에게 그대로 적용되는지와 자식 스킬 색인 구성은
+이 조사에서 확인하지 못했다.
+자식 system prompt 는 `_build_child_system_prompt` 가 별도로 만든다.
+
+근거는 [v0.21.0 delegate_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/delegate_tool.py) 다.
 
 ### 자식은 한 단계 더 자식을 만든다
 
@@ -809,7 +1027,10 @@ privacy 로는 이쪽이 안전하다. 부모에 넣은 개인 Memory 가 자식
 위 실행도 토큰은 맞게 왔지만 `cost_usd` 가 0 이었다. 토큰을 저장하고 비용은 우리가 환산한다.
 
 `child_session_id` 로 `GET /api/sessions/{id}` 를 부르면 cache 토큰까지 나온다.
-그 응답의 `parent_session_id` 가 부모 실행을 가리킨다.
+응답은 `object=hermes.session` 과 중첩된 `session` 객체이고, 아래는 그 안의 필드다.
+`session.parent_session_id` 가 부모 session 을 가리킨다.
+Runs API 가 처음 만든 session 은 첫 실행의 `run_id` 를 쓸 수 있지만,
+이어지는 실행의 번호와 부모 session 번호를 같은 것으로 취급하면 안 된다.
 
 ```json
 {"id": "20260918_103840_ac00e1", "source": "subagent",
@@ -818,7 +1039,7 @@ privacy 로는 이쪽이 안전하다. 부모에 넣은 개인 Memory 가 자식
  "parent_session_id": "run_e4f5549bd5b04545985670d3457d830c"}
 ```
 
-Runs API 의 `usage` 에는 cache 칸이 없지만 이 경로에는 있다.
+v0.21.0 과 v0.21.3 Runs API 의 `usage` 에는 cache 칸이 없지만 이 경로에는 있다.
 
 ### 최상위 위임의 완료 사건은 부모 스트림으로 받지 못할 수 있다
 
@@ -830,14 +1051,111 @@ Runs API 의 `usage` 에는 cache 칸이 없지만 이 경로에는 있다.
 2026-09-18 에 적은 「`background=false` 로 시킨 실행에서는 시작과 완료 사건이 모두 왔다」 는
 이번 v0.21.0 측정에서 재현되지 않았다. 이 인자로 동기 위임을 보장할 수 없다.
 
-**실행의 자식 목록을 주는 API 는 없다.**
-`GET /api/sessions` 는 `parent_session_id` 질의 인자를 무시하고
+**v0.21.0 실측에서는 실행의 자식 목록을 얻지 못했다.**
+그 버전의 `GET /api/sessions` 는 `parent_session_id` 질의 인자를 무시하고
 `source` 가 `subagent` 인 session 을 목록에서 제외한다.
 `/v1/runs/{id}/subagents` 같은 경로도 없다. 404 다.
+v0.21.3 과 v0.21.5 의 session 목록은 자식 포함 옵션과 source 필터를 지원한다.
+조회 형식과 사용량 보완 방법은 아래 「자식 session 으로 결과와 토큰을 보완한다」 를 따른다.
 
 그러므로 부모 SSE 를 끝까지 받아도 자식 사용량이 모두 기록된다고 보장할 수 없다.
 완료 사건을 받지 못한 자식의 결과와 토큰은 모르는 값으로 남긴다.
 부모가 끝났다는 이유로 자식이 중지됐다고 판정하거나 토큰을 0 으로 채우지 않는다.
+
+### 공유 listener 의 완료 watcher 결함과 수정
+
+2026-09-28 에 v0.21.0 배포본의 코드와 기존 기록을 읽어 원인을 확인했다.
+HTTP 요청과 부모·자식 session 저장은 요청 profile 의 DB 를 쓴다.
+그러나 완료 watcher 는 새 `Context` 에서 시작해 요청 profile 문맥을 잃는다.
+그 결과 listener 주인 profile 의 DB 에서 부모를 찾고, 없으면 완료 결과를 버린다.
+
+| 단계 | 근거 함수 |
+| --- | --- |
+| HTTP 요청 문맥 | `api_server.py` 의 `_make_profile_prefix_middleware`, `_profile_scope` |
+| session 저장 DB | 같은 파일의 `_ensure_session_db`, `_open_and_cache_session_db`, `delegate_tool.py` 의 `_build_child_agent` |
+| watcher 생성과 부모 판정 | `gateway/run.py` 의 `_spawn_supervised`, `_async_delegation_watcher`, `_deliver_completion_notification`, `_classify_completion_target` |
+| 전달 상태 갱신 | `tools/async_delegation.py` 의 `_db_path`, `claim_completion_delivery`, `drop_completion_delivery` |
+
+`get_hermes_home` 과 `hermes_state.py` 의 `_default_db_path` 는 활성 문맥으로 DB 를 고른다.
+자식은 `propagate_context_to_thread` 로 문맥을 물려받아 올바른 DB 에 결과를 저장한다.
+watcher 의 claim·drop 은 다른 DB 를 볼 수 있고, claim 은 행이 없으면 이전 형식 사건으로
+간주해 성공을 반환한다.
+따라서 로그에 폐기 경고가 있어도 원래 profile 의 전달 행은 `pending` 으로 남을 수 있다.
+부모 session 이 실제로 삭제된 경우와 구분해야 한다.
+
+**v0.21.3 은 완료 사건의 profile 문맥에서 부모 판정, claim, 결과 주입과 정산을 수행한다.**
+시작할 때 보조 profile 의 미전달 기록도 복구한다.
+근거는 [수정 commit `c632437c3bb3`](https://github.com/NousResearch/hermes-agent/commit/c632437c3bb3fcd19e755882ce346b270ef3d151) 과
+[v0.21.3 run_notifications.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/run_notifications.py) 의
+`_completion_event_scope`, `_deliver_async_delegation_group`, `_restore_secondary_completion_ledgers` 다.
+
+v0.21.0 에서 공유 listener 를 유지하며 완료 watcher 만 profile 별로 고르는 설정은 확인하지 못했다.
+별도 gateway 를 쓰면 기본 문맥과 요청 profile 이 같아져 결함을 피할 수 있다는 소스상 판단은 있지만,
+회피안을 실제로 적용해 검증하지 않았다.
+DB 를 합치는 방식은 profile 분리를 바꾸므로 회피안으로 삼지 않는다.
+최상위 위임은 `_dispatch_delegate_task` 가 `background=True` 로 보내므로
+모델에게 동기 위임을 요구해도 회피가 보장되지 않는다.
+
+### API 위임 결과는 delivery 기록으로 남는다
+
+2026-09-28 에 v0.21.0 배포본과 v0.21.3, v0.21.5 소스를 대조했다.
+**API 비동기 위임 완료는 부모의 새 모델 turn 이나 새 run 을 자동으로 만들지 않는다.**
+`APIServerAdapter.supports_async_delivery` 는 거짓이다.
+완료 결과는 `_inject_watch_notification` 에서 `gateway/wake.py` 의
+`persist_delegation_delivery` 로 가며, 부모 session 에 `role=user`,
+`display_kind=async_delegation_complete` 인 메시지를 한 번 기록한다.
+실제 사용자의 새 질문과 구분해야 하는 delivery 기록이다.
+
+다음 클라이언트 turn 이 server history 를 읽을 때 이 결과를 문맥으로 사용한다.
+일반 백그라운드 작업 알림의 `_self_post_chat_completion` 과 다른 분기다.
+제품에서 부모의 이어 답을 원하면 Control Plane 이 새 run 을 명시적으로 제출하고 추적해야 한다.
+upstream 이슈에서 자동 후속 답을 관찰했다는 기록만으로 API 경로도 그렇다고 판정하지 않는다.
+
+v0.21.3 과 v0.21.5 에서 비동기 위임 여부는 session history 를 어떻게 쓰는지도 따른다.
+Runs 가 server history 를 다시 읽는 session 을 만들면 `session_history_delivery` 를 전달한다.
+`_resolve_async_wake_sid` 는 그 권한이 있는 raw session 에서 detached 결과를 허용한다.
+caller 가 history 를 직접 주거나 response chain snapshot 을 쓰는 요청,
+finite single-query 요청은 동기로 돌아갈 수 있다.
+내부 변수 이름의 wake 는 API 모델 자동 실행을 뜻하지 않는다.
+
+근거는 [v0.21.3 wake.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/wake.py),
+[delegate_tool_dispatch.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/delegate_tool_dispatch.py),
+[API 위임 계약 테스트](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tests/gateway/test_api_delegation_delivery_contract.py) 다.
+조사에서 upstream 테스트를 읽었지만 실행하지는 않았다.
+
+### 자식 session 으로 결과와 토큰을 보완한다
+
+v0.21.0 배포본에서 원인을 조사하고 v0.21.3 과 v0.21.5 의 조회 형식도 확인했다.
+부모 run 이 끝나면 종료 sentinel 이 SSE 를 닫고 queue 를 제거한다.
+뒤늦은 자식 callback 이 원래 스트림을 복구하거나 완료 사건을 재생하는 API 는 없다.
+완료한 run 조회 응답에 자식 결과를 덧붙이는 계약도 확인하지 못했다.
+소비자는 별도 session 조회로 완료 표시와 사용량을 보완해야 한다.
+
+| 경로 | 얻는 것과 한계 |
+| --- | --- |
+| `GET /api/sessions/{id}` | 중첩 `session` 의 모델, 부모, 종료 이유, 입력·출력·cache 토큰. `provider` 는 safe key 에 없다 |
+| `GET /api/sessions/{id}/messages` | 자식 답 또는 부모에게 전달된 위임 결과. `display_kind` 는 나오지만 `display_metadata` 는 나오지 않는다 |
+| `GET /api/sessions` | v0.21.3·v0.21.5 는 `include_children=true` 와 `source=subagent` 를 지원한다. 기본은 자식을 제외한다. 목록은 `object=list`, `data`, `limit`, `offset`, `has_more` 다 |
+| 내부 위임 영구 기록 | `async_delegation.py` 의 `get_durable_delegation` 에 상태, 작업별 결과, 모델, 토큰과 소요 시간이 있다. 공개 HTTP endpoint 는 아니다 |
+| 자식 로그·manifest | 답 일부와 종료 상태가 있으나 보관 기간과 글자 제한이 있어 영구 기록을 대신하지 못한다 |
+
+메시지 목록은 `object=list`, 실제 continuation 의 `session_id`, `data`, `pagination` 이다.
+기본 최신 500개이며 `order`, `limit`, `offset` 을 받는다.
+부모 메시지의 delivery 식별자로 중복 수입을 막을 수 있지만,
+메시지 API 만으로 작업별 위임 식별자와 토큰을 모두 얻을 수 있다고 가정하면 안 된다.
+자식 session 의 `agent_close` 만으로 작업 성공을 단정하지 않는다.
+
+**완료 사건의 입력 토큰과 session 입력 토큰은 합산 기준이 다르다.**
+`delegate_tool.py` 의 `_run_single_child` 는 `session_prompt_tokens` 를 사건의 `input_tokens` 로 보낸다.
+session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적한다.
+사건의 입력 토큰과 맞추려면 session 의 입력, cache read, cache write 를 합산한다.
+비용 계산에서는 cache 토큰에 일반 입력 단가를 일괄 적용하지 않는다.
+부모 usage 에 자식 usage 가 포함되지 않으므로 부모와 각 자식의 기록을 중복 없이 더한다.
+조회하지 못한 사용량은 모르는 값으로 남긴다.
+
+근거는 [v0.21.3 session 직렬화](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의
+`_session_response`, `_message_response`, `_handle_list_sessions` 와
+`agent/conversation_loop.py`, `agent/turn_finalizer.py` 의 토큰 누적이다.
 
 ### 자식의 모델은 부모의 것이 아니다
 
@@ -925,7 +1243,8 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 
 ### 취소한 실행의 조회 응답
 
-2026-09-25 에 운영 배포에서 실제 중지를 한 번 왕복시켜 확인했다.
+2026-09-25 에 v0.21.0 에서 실제 중지를 한 번 왕복시켜 확인했다.
+v0.21.5 의 중단·미완료 응답 차이는 「Runs 응답과 사건의 버전 차이」 에 있다.
 
 | 무엇 | 실측 |
 | --- | --- |
@@ -1076,7 +1395,7 @@ worker 가 죽거나 시간 초과로 끊기면 `metadata` 가 비어 있다.
 ### 사용량 칸은 지금도 없다
 
 `task_runs` 에 토큰과 비용 칸이 없다.
-공개 저장소의 최신 릴리스 `v2026.9.14` 를 받아 같은 스키마를 확인했다. 그대로였다.
+2026-09-18 조사 당시 최신 릴리스 `v2026.9.14` 를 받아 같은 스키마를 확인했다. 그대로였다.
 그 릴리스의 API server 에도 kanban 경로가 없다.
 배포본은 `v2026.8.31` 이다.
 
@@ -1179,6 +1498,8 @@ plugin 디렉터리 하나와 `plugins.enabled` 한 줄이 전부다.
 API server 쪽에는 `register_platform_handler("api_server", factory)` 가 있지만
 대시보드 웹서버에는 대응하는 자리가 없다.
 그래서 plugin 이 할 수 있는 것은 이미 있는 경로를 기계에게 여는 것까지다.
+기존 대시보드 미들웨어를 감싸 생성 처리 앞뒤에 코드를 두는 방법은 별개이며,
+아래 「profile 을 만드는 요청 안에서 도구 설정을 검증한다」 에 그 근거를 적었다.
 
 ### `SOUL.md` 를 읽고 쓰는 두 경로
 
@@ -1216,7 +1537,8 @@ v0.21.0 의 `hermes_cli/web_routers/profiles.py` 와 `hermes_cli/web_models.py` 
 - 컨테이너 안에서는 그 profile 의 gateway 를 s6 서비스로 등록한다
 
 **Control Plane 은 `no_skills` 를 true 로 보낸다.**
-번들 스킬이 심기면 그 설명이 매 대화의 입력에 실린다. 그 profile 이 쓰는 스킬은 「스킬을 profile 에 붙이는 방법」 대로 따로 붙인다.
+번들 스킬이 심기고 `skills` toolset 이 열리면 그 설명이 입력에 실린다.
+그 profile 이 쓰는 스킬은 「스킬을 profile 에 붙이는 방법」 대로 따로 붙인다.
 
 **CLI 의 `--no-alias` 에 해당하는 본문 필드가 없다.**
 API 로 만들면 wrapper 가 함께 생긴다.
@@ -1225,6 +1547,67 @@ API 로 만들면 wrapper 가 함께 생긴다.
 `clone_from` 을 주면 원본의 `config.yaml` 과 `.env` 와 `SOUL.md` 와 `skills/` 와
 `memories/MEMORY.md` 와 `memories/USER.md` 를 복사한다.
 `clone_all` 을 주면 원본 전체를 복사하고 runtime 파일과 단일 사용 OAuth 파일만 뺀다.
+
+### 틀 없이 만든 profile 은 API 도구가 넓게 열린다
+
+2026-09-28 에 v0.21.0 소스로 확인했다.
+`hermes_cli/profiles.py` 의 `_seed_model_config` 는 활성 profile 의 `model` 블록만 쓴다.
+`platform_toolsets.api_server` 와 `agent.disabled_toolsets` 는 생성되지 않는다.
+따라서 「toolset 의 목록과 접근 범위」 의 `hermes-api-server` 기본 목록이 적용되어
+`terminal`, `file`, `memory`, `delegation` 등을 포함한 도구가 열린다.
+`no_skills` 는 번들 스킬 심기를 막는 값이며 도구 설정을 제한하는 값은 아니다.
+새 profile 을 만들면 key 를 주기 전에 도구 설정을 적용하고 검증해야 한다.
+
+### profile 을 만드는 요청 안에서 도구 설정을 검증한다
+
+2026-09-28 에 v0.21.0 소스로 검토한 방식이다.
+**아래는 Hermes 가 제공하는 동작을 조합한 설계이며, 이 조사에서 구현하거나 실행하지 않았다.**
+profile 생성 뒤의 공식 plugin hook 은 없다.
+대신 기존 `hermes_cli/dashboard_auth/token_auth.py` 의 `token_auth_middleware` 를
+모듈 속성으로 감싸면 다음 대시보드 요청부터 기존 생성 처리 앞뒤에 코드를 둘 수 있다.
+
+| 필요한 동작 | Hermes 근거 |
+| --- | --- |
+| 생성된 profile 판별 | `hermes_cli.profiles.list_profile_names` 의 생성 전후 차이 |
+| profile 문맥 선택 | `hermes_constants.set_hermes_home_override` 와 reset. 대시보드 `_profile_scope` 와 같은 방식 |
+| 설정 저장 | `hermes_cli.config.save_config`. 원래 `model` 블록을 남기고 나머지 설정에 template 을 적용한다 |
+| 실제 API 도구 계산 | `hermes_cli.tools_config._get_platform_tools(config, "api_server")` |
+| 실패한 생성 정리 | `hermes_cli.profiles.delete_profile(name, yes=True)` |
+
+처리 순서는 다음과 같다.
+
+1. 생성 전 목록을 읽고 기존 생성 처리기를 호출한다. 400 이상이면 응답을 그대로 돌려준다.
+2. 새 이름이 정확히 하나인지 확인한다. 판별하지 못하면 성공으로 보고하지 않는다.
+3. 그 profile 문맥에서 설정 template 과 `.no-bundled-skills` 표식을 쓴다.
+4. `_get_platform_tools` 로 계산해 금지 도구가 없는지 확인한다.
+5. 저장이나 계산이 실패하면 새 profile 을 지우고 실패 응답을 돌려준다.
+6. 검증이 끝난 뒤 별도 요청으로 key 를 넣는다.
+
+**clone 없이 만드는 경우 설정 검증 중에는 key 가 없어 공유 listener 의 접두 요청이 거절된다.**
+이 순서로 생성과 설정 검증을 같은 요청 안에서 끝낼 수 있다.
+이 내부 함수가 업그레이드로 달라지면 생성 성공을 반환하지 않도록 처리해야 한다.
+plugin 로딩은 기동 때 이뤄져 plugin 변경에는 대시보드 재시작이 필요하다.
+설정 적용만을 위해 gateway 를 다시 띄울 필요는 없다.
+
+표식은 다음 번들 동기화를 막을 뿐 이미 심은 스킬을 지우지 않는다.
+처음부터 심지 않으려면 생성 본문에 `no_skills: true` 를 준다.
+`skills` toolset 을 닫으면 이미 있는 스킬 색인은 입력에 들어가지 않는다.
+이 wrapper 는 `clone_from` 으로 이미 복사한 `.env` 를 되돌리지 않으므로,
+clone 의 key 복사 문제까지 해결하는 것으로 해석하면 안 된다.
+
+별도 `PUT /api/config` 로 template 을 쓰는 방식은 두 번째 요청 누락 시 넓은 도구가 남고,
+해당 경로를 열면 모든 profile 의 설정 키를 쓸 수 있다.
+안전한 profile 을 clone 하는 방식도 원본 `.env` 에 뒤에 추가된 값이 복사될 수 있다.
+`pre_tool_call` 의 `{"action": "block"}` 은 실행 시점의 추가 차단에 쓸 수 있지만
+모델에 실리는 도구 정의와 입력 비용을 줄이지 않는다.
+managed scope 는 프로세스 전체에 적용되므로 profile 별 template 을 대신하지 못한다.
+이미 존재하는 listener 주인 profile 의 접두 없는 요청은 생성 wrapper 의 대상이 아니다.
+그 범위는 `platform_toolsets.api_server` 또는 별도 실행 차단으로 정해야 한다.
+
+근거는 [v0.21.0 profiles.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/profiles.py),
+[token_auth.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/dashboard_auth/token_auth.py),
+[plugins.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/plugins.py),
+`model_tools.py` 의 `_dispatch_pre_tool_call_hooks` 다.
 
 ### `clone_from` 은 원본의 `API_SERVER_KEY` 까지 복사한다
 
@@ -1309,6 +1692,9 @@ subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고
 
 ## gateway 는 s6 가 감독한다
 
+아래는 v0.21.0 과 v0.21.3 의 동작이다.
+v0.21.4 이후의 host singleton 과 multiplex 정책은 다음 절에서 구분한다.
+
 이 컨테이너는 listener 주인의 gateway 하나를 돌리고 s6 가 감독한다.
 이름이 붙은 profile 은 s6 service 자리를 만들기만 하며, 개별 gateway 를 자동으로 띄우지 않는다.
 `systemd` 와 같은 자리이고 컨테이너용으로 훨씬 작다.
@@ -1327,6 +1713,81 @@ multiplex 를 켜면 listener 주인의 gateway 만 이 값에 따라 시작하�
 한 번 켜 두면 `running` 이 남아 다음 기동에서 자동으로 뜨며,
 일부러 멈춘 gateway 는 멈춘 채로 남는다.
 
+## 버전을 올릴 때 달라지는 계약
+
+2026-09-28 에 v0.21.3 과 v0.21.5 의 태그 소스와 변경 이력을 대조했다.
+v0.21.3 은 `v2026.9.14`, commit `345cd2b057a452236de401d3534b8502a7465e8d` 이다.
+조사 당시 최신 안정판 v0.21.5 는 `v2026.9.24`, commit `f97608f178d1ffeca59860195ab7da295f7c8e5f` 이다.
+최신판 표시는 조회 날짜의 결과이며 계속 최신이라고 가정하지 않는다.
+소스 호환 판정과 실제 배포 검증은 구분한다. 운영 절차는 `fos-home-infra` 에 둔다.
+
+### 연동에 영향을 주는 변경
+
+| 버전·대상 | 변경과 영향 | 근거 |
+| --- | --- | --- |
+| v0.21.1 내부 모듈 | 큰 파일을 분리했다. 내부 함수를 import 하는 plugin 은 모듈 위치를 확인해야 한다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.7) |
+| v0.21.2 DB | 중복 writer, 정상 DB 손상 오판, profile DB 혼선과 불필요한 기동 write lock 을 고쳤다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.11), `SessionDB`, `hermes_state_registry.acquire` |
+| v0.21.3 완료 전달 | 공유 profile 문맥 누락을 고쳤다. API 완료는 여전히 delivery 기록이며 자동 모델 실행이 아니다 | 「공유 listener 의 완료 watcher 결함과 수정」 |
+| v0.21.3 공유 제공 | `gateway.multiplex_profile_allowlist` 를 제거했다. 살아 있는 모든 profile 을 공유 제공한다 | [commit `9848e22ed659`](https://github.com/NousResearch/hermes-agent/commit/9848e22ed659d2e90ff3126f4dfcf78d9028efeb), `config_migrations` v43 |
+| v0.21.3 cron·curator | `cron.model_drift_guard` 를 없애고 생성 당시 모델로 cron 을 실행한다. curator 의 이전 기본 기간을 stale 30→14일, archive 90→30일로 바꾼다. 명시한 다른 값은 보존한다 | `config_migrations` v42·v44, [commit `be2f7e9c3616`](https://github.com/NousResearch/hermes-agent/commit/be2f7e9c3616) |
+| v0.21.3 DB schema | 29→30 migration 과 자식 transcript 의 trigram 검색 제외가 있다. 첫 DB open 이 index·DDL 을 바꿀 수 있다 | [commit `2b55ded1ac5f`](https://github.com/NousResearch/hermes-agent/commit/2b55ded1ac5f3b41cdc580974e745631dac1bb53), `hermes_state_schema` 의 `_init_schema`, `_reconcile_columns` |
+| v0.21.3 DB 연결 | writer registry·읽기 전용 handle 을 보완했다. cross-VM 파일 시스템에서는 WAL 을 거절하거나 DELETE 모드를 쓴다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.14), `hermes_state_wal._enable_wal` |
+| v0.21.4 이후 gateway | multiplex 기본값과 host singleton 이 들어왔다. v0.21.5 는 명시적 `multiplex_profiles: false` 도 true 로 고친다. `gateway.standalone` 은 임시 호환 수단이다 | [v0.21.4](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.21), [v0.21.5 정책](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/gateway_multiplex_mode.py) |
+| v0.21.5 설정 | config version 46. 일부 명시적 도구 목록에 `connections` 를 추가하고 MCP `disabled` 를 `enabled: false` 로 바꾼다. version 없는 설정에는 legacy key 단계만 적용한다 | [config_migrations.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/config_migrations.py) 의 `_migrate_to_45`, `_migrate_to_46`, `LEGACY_KEY_STEPS` |
+
+설정 migration 은 명시적 허용 목록도 바꿀 수 있다.
+`connections` 를 비활성화했거나 이미 제공받고 제외한 기록이 있으면 추가하지 않는다.
+DB migration 은 누락 column 과 잘못된 PK 도 조정하므로 이미지 버전만 되돌려도
+데이터가 이전 형태로 복구된다고 보장할 수 없다.
+
+v0.21.3 과 v0.21.5 에서 `_get_platform_tools(config, platform, include_default_mcp_servers=...)`,
+`save_config(..., strip_defaults=False)`, profile 목록·삭제 함수와 home override 함수를 유지한다.
+token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/value`, SOUL 의 `content` 도 유지한다.
+`platform_toolsets.api_server`, `agent.disabled_toolsets`, `approvals.*`, `skills.external_dirs` 의
+관련 코드 경로도 남아 있다.
+함수 이름과 인자 유지가 plugin 의 실제 HTTP 동작 검증을 대신하지 않는다.
+
+근거는 [v0.21.3 tools_config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/tools_config.py),
+[config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/config.py),
+[profiles.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/profiles.py),
+[hermes_constants.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_constants.py) 다.
+
+### 설정 migration 과 DB migration 의 범위
+
+2026-09-28 의 v0.21.3 격리 검증에서 확인했다.
+Docker 이미지의 `docker/stage2-hook.sh` 는 루트 `HERMES_HOME` 의 config 만 자동 migration 한다.
+**이름 붙은 profile 의 `config.yaml` 은 자동 migration 되지 않아 `_config_version` 이 그대로 남는다.**
+그 profile 에 옛 기본값을 명시한 curator 기간 등의 설정은 새 기본값으로 바뀌지 않는다.
+이름 붙은 profile 의 session DB 는 공식 `SessionDB` 를 처음 열 때 schema 29→30 으로
+지연 migration 된다. config 와 DB 의 적용 시점이 다르다.
+
+공식 진단 API `POST /api/ops/config-migrate` 에는 profile 선택자가 없다.
+이 경로만으로 이름 붙은 profile 을 골라 migration 할 수 없다.
+이미지를 올렸다는 사실만으로 모든 profile 의 저장 설정이 갱신됐다고 판정하면 안 된다.
+
+근거는 [v0.21.3 stage2-hook.sh](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/docker/stage2-hook.sh),
+[status.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/status.py) 의
+config migration 처리기와 `SessionDB` 의 schema 초기화다.
+
+### Runs 응답과 사건의 버전 차이
+
+| 계약 | v0.21.3 | v0.21.5 |
+| --- | --- | --- |
+| 생성·조회 | 생성은 202 와 `run_id/status`. 조회는 `run_id/status/session_id/model/output/error/usage/last_event` 등의 flat object | 기본 필드에 실제 실행 `runtime`, 중단·미완료 정보를 더한다 |
+| SSE envelope | JSON 최상위의 `event`, `run_id`, `timestamp` | 유지한다 |
+| 자식 사건 | `subagent_id`, `child_session_id`, `delegation_id`, `task_index`, `parent_id`, `depth`, `model`, `status`, 토큰 등 값이 있는 필드 | 기존 필드를 유지한다. 모든 필드가 항상 오는 것은 아니다 |
+| 도구 완료 | `tool`, `duration`, `error` | 비밀값을 제거하고 길이를 제한한 `preview` 를 더한다 |
+| 메시지·종료 사건 | `message.delta`, `reasoning.available`, `approval.request`, `run.steered`, `run.completed`, `run.failed`, `run.cancelled` | `message.interim`, `run.interrupted` 를 더한다 |
+| run 사용량 | `input_tokens`, `output_tokens`, `total_tokens` | `cache_read_tokens`, `cache_write_tokens` 를 더한다. input 은 cache 를 포함한 전체 prompt 토큰이다 |
+| stop | 활동 중이면 `stopping` 과 hard interrupt 요청. 최종 상태는 별도 조회 | 같은 비동기 중단 계약을 유지한다 |
+
+소비자는 v0.21.5 의 `interrupted` 도 종료 상태로 처리해야 한다.
+run 입력 토큰에 cache read·write 를 다시 더하면 중복 합산이 된다.
+session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
+근거는 [v0.21.3 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server_runs.py) 와
+[v0.21.5 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의
+`terminal_run_status`, `_execute_run`, `_mark_shutdown_interrupted_runs` 다.
+
 ## 실행 이벤트가 실제로 오는 형태
 
 v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측으로 확인했다.
@@ -1338,7 +1799,7 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 | `message.delta` | `delta` 에 답의 조각 |
 | `tool.started` | `tool` 에 도구 이름, `preview` 에 인자 앞부분 |
 | `tool.completed` | `tool`, `duration` 초, `error` 참거짓 |
-| `subagent.start`, `subagent.complete` | `preview` |
+| `subagent.start`, `subagent.complete` | 위 「자식 토큰을 SSE 로 받을 수 있다」 의 식별자와 작업·사용량 필드 |
 | `reasoning.available` | `text` 에 그때까지의 답 전체 |
 | `run.completed` | `output` 과 `usage` |
 | `run.failed`, `run.cancelled` | 끝 |
