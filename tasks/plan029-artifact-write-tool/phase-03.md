@@ -34,6 +34,7 @@
 - 도구 인자는 권한 증명이 아니다. UUID 를 맞춰도 토큰 사용자 소유 대화만 쓴다
 - 도구 입력 안내는 저장하는 사용자 메시지에 섞지 않는다. 내부 번호를 새 MCP 인자로 내보내지 않는다
 - URL 허용 목록이 비어도 도구 목록에서 `artifact_write` 를 빼지 않는다. 본문 방식은 쓸 수 있다
+- Hermes 에서 이 도구가 보이는 것은 `fos-assistant-memory` MCP 서버가 등록된 profile 에 한정된다. 등록 유무는 이 저장소의 대역이 검증하지 않고 PR 에 적용 범위를 적는다
 - PRD 는 기존 HTML 결과물 요구의 구현 방법이 바뀌므로 영향이 없다.
   데이터 스키마는 기존 `conversation` 과 `chat_artifact` 를 재사용해 영향이 없다
 
@@ -166,7 +167,6 @@ Node 는 22.18 이상을 쓴다.
 | 관측 | 충족 조건 |
 | --- | --- |
 | `file` 과 `terminal` 을 쓰지 않는 대역 | 실제 MCP HTTP 호출로 `test/index.html` 을 만들고 그 turn 의 답에 path 가 붙음 |
-| MCP 서버 등록 범위 | `fos-assistant-memory` 가 등록된 profile 에서만 도구가 보임 |
 | 실행 입력의 `publicId` | MCP 의 `conversation_id` 와 일치하고 내부 번호를 넘기지 않음 |
 | 같은 경로 재작성 | 최신 본문을 읽고 실패하면 이전 파일 보존 |
 | 이미지 URL | 허용한 공개 IP 와 MIME 만 저장하며 SSRF 거절과 5MB 상한 검사 통과 |
