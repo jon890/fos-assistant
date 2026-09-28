@@ -425,7 +425,7 @@ sequenceDiagram
 Hermes 는 도구를 부른 턴의 API 콜을 한 번에서 두 번이나 세 번으로 늘린다.
 추가 API 콜 하나는 그 시점의 전체 프롬프트 하나만큼 들기 때문에 긴 대화일수록 도구 호출이 비싸다.
 한 턴에서 항목을 한 개 읽든 세 개를 읽든 API 콜 수는 같고, 색인 한 줄은 약 12 토큰이다.
-자세한 Hermes 동작은 [`hermes-integration.md`](hermes-integration.md#입력-비용은-api-콜-수가-정한다)에 둔다.
+자세한 Hermes 동작은 [`hermes/tools-and-skills.md`](hermes/tools-and-skills.md#입력-비용은-api-콜-수가-정한다)에 둔다.
 
 ### 도구와 `always_inject` 를 고르는 기준
 
