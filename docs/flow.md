@@ -820,7 +820,6 @@ stateDiagram-v2
 
 ## 결과물을 MCP 로 쓸 때
 
-`artifact_write` 구현 뒤의 흐름이다.
 일반 파일 도구가 없는 에이전트도 결과물을 저장한다.
 도구 계약은 [`tools-and-skills.md`](hermes/tools-and-skills.md#결과물-쓰기-도구),
 권한 결정은 [ADR-028](adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
@@ -869,7 +868,7 @@ CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로
 에이전트가 turn 안에 HTML 파일을 만들면 그 답 아래에 파일이 보이고, 누르면 옆 패널에 그 페이지가 뜬다.
 근거는 [ADR-027](adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
 
-아래 저장 요청은 `artifact_write` 구현 뒤의 흐름이다. 현재 Hermes 가 파일을 직접 쓰는 경우에도 저장 뒤의 조회 흐름은 같다.
+아래 저장 요청은 `artifact_write` 의 흐름이다. Hermes 가 파일을 직접 쓰는 경우에도 저장 뒤의 조회 흐름은 같다.
 
 ```mermaid
 sequenceDiagram

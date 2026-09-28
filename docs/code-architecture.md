@@ -248,7 +248,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 - 뿌리 설정은 사진 첨부와 같은 모양으로 둘이다. `assistant.artifact.root` 는 Control Plane 이 보는 경로, `assistant.artifact.agent-root` 는 같은 디렉터리를 Hermes 컨테이너에서 보는 경로다.
   둘 다 기본값이 없어 비면 기동이 실패한다. 붙이는 일은 `fos-home-infra` 가 소유한다
 - 대화 하나가 폴더 하나다. 이름은 대화 번호다. 폴더는 Control Plane 이 turn 을 시작할 때 만든다
-- 현재 파일은 Hermes 가 쓴다. `artifact_write` 구현 뒤에는 일반 파일 도구가 없는 profile 도 MCP 로 Control Plane 에 쓰기를 요청한다.
+- 파일 도구가 있는 profile 은 Hermes 가 직접 쓸 수 있다. 파일 도구가 없는 profile 은 `artifact_write` 로 Control Plane 에 쓰기를 요청한다.
   Control Plane 은 대화 주인을 확인하고 저장하며, 읽기와 보관 기간 정리도 맡는다
 - 보관 기간은 30일이다. 대화 폴더 단위로 센다. 폴더에서 가장 늦게 바뀐 파일이 30일을 넘기면 그 폴더의 파일을 함께 지운다.
   파일마다 세면 다음 turn 이 HTML 만 고쳤을 때 그 HTML 이 부르는 옛 사진이 먼저 지워진다
@@ -272,9 +272,8 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 한 줄이 늘어 입력이 조금 커지지만,
 에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다.
 
-위 단락은 `artifact_write` 구현 뒤의 계약이다.
-현재 `ArtifactService.agentPreamble(Long conversationId)` 를 `agentPreamble(Conversation conversation)` 으로 바꿔
-폴더를 만드는 내부 번호와 도구에 넘길 공개 UUID 를 한 대화에서 가져온다.
+`ArtifactService.agentPreamble(Conversation conversation)` 은 폴더를 만드는 내부 번호와
+도구에 넘길 공개 UUID 를 같은 대화에서 가져온다.
 `ChatService` 의 일반 실행과 흐름 실행, `ResearchAndBuildFlow` 의 하위 실행이 같은 단락을 받는다.
 사용자 메시지의 저장 본문에는 이 단락을 넣지 않는다.
 
@@ -283,7 +282,7 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 **주인 확인과 저장은 `chat`, MCP 응답과 도구별 인자 검사는 `mcp` 가 맡는다.**
 `mcp/application` 의 `McpToolService` 가 `chat/application` 의 `ArtifactWriteService` 를 부른다.
 `chat` 은 MCP 프로토콜을 알지 않는다.
-아래 신규 타입은 구현할 배치이며 현재 코드는 아직 제공하지 않는다.
+관련 타입의 책임은 아래와 같다.
 
 | 타입 | 책임 |
 | --- | --- |
@@ -299,12 +298,12 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 `ArtifactWriteService.write(CurrentUser, ArtifactWriteRequest)` 는 대화 주인을 확인하기 전에는
 폴더 생성이나 URL 조회를 하지 않는다.
 `ArtifactStore.ensureFolder` 가 실패를 경고 로그로만 남기므로 쓰기 경로는 실제 폴더 생성 여부를 확인하고 오류로 돌려준다.
-`resolveInside` 는 기존 파일을 읽는 용도로 유지하고 쓰기용 판정을 같은 클래스에 더한다.
+`resolveInside` 는 기존 파일을 읽는 용도로 유지하고 쓰기용 판정은 같은 클래스에 둔다.
 부모 생성 전후의 실제 경로, 대화 폴더 자체의 링크, 최종 대상의 링크를 검사한다.
 같은 폴더에 임시 파일을 완성한 뒤 교체하고 실패하면 임시 파일을 지운다.
 
-`McpController` 의 기존 `tools/call` 은 모든 도구에 정수 `id` 를 요구한다.
-이 검사를 도구별로 바꾸되 `memory_read` 의 입력과 오류 계약은 유지한다.
+`McpController` 의 `tools/call` 은 도구별로 인자를 검사한다.
+`memory_read` 의 정수 `id` 입력과 오류 계약은 유지한다.
 `AgentTokenService.authenticate` 가 반환하는 `CurrentUser` 를 그대로 쓰며 대화나 실행 바인딩을 토큰에 더하지 않는다.
 인자와 응답, SSRF 조건은 [`tools-and-skills.md`](hermes/tools-and-skills.md#결과물-쓰기-도구) 가 정한다.
 같은 사용자의 다른 대화에 쓸 때 답에 묶이는 시점과 실패 분기는
