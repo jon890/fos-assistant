@@ -66,6 +66,7 @@ test("callControlPlane 을 부르는 page.tsx 마다 같은 자리에 loading.ts
 
 test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같다", async () => {
   for (const [route, frameFile] of Object.entries(ROUTE_FRAMES)) {
+    if (route === "agents") continue;
     const expectedWidth = frameWidth(await readFile(join(SRC_ROOT, frameFile), "utf-8"));
     assert.ok(expectedWidth, `${frameFile} 에서 mx-auto 와 max-w-* 가 있는 바깥 틀을 찾지 못했다`);
     const content = await readFile(join(APP_ROOT, route, "loading.tsx"), "utf-8");
@@ -73,6 +74,16 @@ test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같
     assert.ok(match, `${route} 의 loading.tsx 에 width 가 없다`);
     assert.equal(match?.[1], expectedWidth, `${route} 의 width 가 ${frameFile} 의 max-w-${expectedWidth} 와 다르다`);
   }
+});
+
+test("에이전트 목록은 관리자에게 등록 폼과 설명을 포함한 4xl 뼈대, 일반 사용자에게 2xl 뼈대를 보인다", async () => {
+  const content = await readFile(join(APP_ROOT, "agents/loading.tsx"), "utf-8");
+  const adminFrame = await readFile(join(SRC_ROOT, "components/agent/agent-admin-panel.tsx"), "utf-8");
+  const memberFrame = await readFile(join(APP_ROOT, "agents/page.tsx"), "utf-8");
+  assert.equal(frameWidth(adminFrame), "4xl");
+  assert.equal(frameWidth(memberFrame), "2xl");
+  assert.match(content, /me\?\.role === "ADMIN"[\s\S]*?width="4xl" title description="agent" form="agent"/);
+  assert.match(content, /return <PageSkeleton shape="cards" width="2xl" title \/>/);
 });
 
 test("loading.tsx 는 뼈대를 두기로 한 경로에만 있다", async () => {

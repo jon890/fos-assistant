@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { callControlPlane } from "@/lib/control-plane";
-import { AgentAdminPanel } from "@/app/admin/agents/agent-admin-panel";
+import { AgentAdminPanel } from "@/components/agent/agent-admin-panel";
 import type { AdminAgent, AgentView } from "@/lib/agent";
 import { readMe } from "@/lib/me";
 

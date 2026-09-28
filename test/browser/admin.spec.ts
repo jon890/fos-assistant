@@ -94,21 +94,28 @@ test("그룹 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
     data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
   });
   expect(reset.ok()).toBeTruthy();
-  await page.goto("/agents/browser");
-  const section = adminSection(page);
+  try {
+    await page.goto("/agents/browser");
+    const section = adminSection(page);
 
-  await expect(section.getByText("나만", { exact: true })).toBeVisible();
-  await section.getByRole("button", { name: "그룹 공개로 변경" }).click();
-  const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 그룹에 공개할까요?" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/모든 사용자가 이 에이전트를 골라 대화/)).toBeVisible();
-  await dialog.getByRole("button", { name: "취소" }).click();
-  await expect(dialog).toBeHidden();
-  await expect(section.getByText("나만", { exact: true })).toBeVisible();
+    await expect(section.getByText("나만", { exact: true })).toBeVisible();
+    await section.getByRole("button", { name: "그룹 공개로 변경" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 그룹에 공개할까요?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/모든 사용자가 이 에이전트를 골라 대화/)).toBeVisible();
+    await dialog.getByRole("button", { name: "취소" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(section.getByText("나만", { exact: true })).toBeVisible();
 
-  await section.getByRole("button", { name: "그룹 공개로 변경" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "그룹 공개" }).click();
-  await expect(section.getByText("그룹 공개", { exact: true })).toBeVisible();
+    await section.getByRole("button", { name: "그룹 공개로 변경" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "그룹 공개" }).click();
+    await expect(section.getByText("그룹 공개", { exact: true })).toBeVisible();
+  } finally {
+    const restored = await page.request.patch("/api/admin/agents/browser", {
+      data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
+    });
+    expect(restored.ok()).toBeTruthy();
+  }
 });
 
 /** 브라우저 비서를 「나만」 으로 되돌리고 관리 화면에서 공개 확인 창을 연다. */
@@ -250,21 +257,28 @@ test("닿지 않는 주소를 저장하려 하면 실패 이유가 그 자리에
 });
 
 test("상세 관리 절에서 사용 여부를 바꾸고 모델을 다시 읽는다", async ({ page }) => {
-  await page.goto("/agents/browser");
-  const section = adminSection(page);
+  try {
+    await page.goto("/agents/browser");
+    const section = adminSection(page);
 
-  await section.getByRole("button", { name: "사용 중지" }).click();
-  await expect(section.getByText("꺼짐", { exact: true })).toBeVisible();
-  await section.getByRole("button", { name: "다시 사용" }).click();
-  await expect(section.getByText("사용 중", { exact: true })).toBeVisible();
+    await section.getByRole("button", { name: "사용 중지" }).click();
+    await expect(section.getByText("꺼짐", { exact: true })).toBeVisible();
+    await section.getByRole("button", { name: "다시 사용" }).click();
+    await expect(section.getByText("사용 중", { exact: true })).toBeVisible();
 
-  const sync = page.waitForResponse((response) =>
-    response.url().endsWith("/api/admin/agents/browser/sync-model")
-      && response.request().method() === "POST",
-  );
-  await section.getByRole("button", { name: "모델 다시 읽기" }).click();
-  expect((await sync).ok()).toBeTruthy();
-  await expect(section.getByRole("button", { name: "모델 다시 읽기" })).toBeEnabled();
+    const sync = page.waitForResponse((response) =>
+      response.url().endsWith("/api/admin/agents/browser/sync-model")
+        && response.request().method() === "POST",
+    );
+    await section.getByRole("button", { name: "모델 다시 읽기" }).click();
+    expect((await sync).ok()).toBeTruthy();
+    await expect(section.getByRole("button", { name: "모델 다시 읽기" })).toBeEnabled();
+  } finally {
+    const restored = await page.request.patch("/api/admin/agents/browser", {
+      data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
+    });
+    expect(restored.ok()).toBeTruthy();
+  }
 });
 
 test("다른 사람의 비공개 에이전트도 관리하고 수정 뒤 주인을 보존한다", async ({ context, page }) => {
