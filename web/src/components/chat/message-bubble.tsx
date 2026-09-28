@@ -158,6 +158,7 @@ export function MessageBubble({
   canRegenerate = false,
   onRegenerate,
   onAnswer,
+  nextUserMessage,
   onOpenArtifact,
 }: {
   turn: Turn;
@@ -170,6 +171,8 @@ export function MessageBubble({
   canRegenerate?: boolean; onRegenerate?(): void;
   /** 이 답 끝의 질문에 답할 수 있을 때만 준다. 마지막 답이고 돌고 있는 turn 이 없을 때다 */
   onAnswer?(text: string): void;
+  /** 이 답 바로 다음의 사용자 메시지다. 카드 답을 복원할 때 쓴다 */
+  nextUserMessage?: string;
   /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
   onOpenArtifact?(messageId: Turn["id"], path: string): void;
 }) {
@@ -246,7 +249,8 @@ export function MessageBubble({
             onOpenPanel={() => onOpenSaved(turn.executionId!)} /></div>
         ) : null}
         <div className="leading-7">
-          <AnswerBody content={turn.content} streaming={streaming} onAnswer={streaming ? undefined : onAnswer} />
+          <AnswerBody content={turn.content} streaming={streaming} nextUserMessage={nextUserMessage}
+            onAnswer={streaming ? undefined : onAnswer} />
         </div>
         {turn.status === "CANCELLED" ? <p data-testid="stopped-mark" className="mt-2 text-xs text-muted-foreground">중지됨</p> : null}
         {!streaming ? <MessageActions content={turn.content} latest={latest} version={answerVersion}
