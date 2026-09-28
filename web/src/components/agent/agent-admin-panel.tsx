@@ -75,12 +75,12 @@ export function AgentAdminPanel({ initialAgents, ownerEmail, currentUserId }: Pr
     <div className="mx-auto w-full max-w-4xl">
       <h1 className="mb-2 text-xl font-semibold">에이전트</h1>
       <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
-        공개 범위는 보안 설정이다. 그룹 공개로 바꾸면 그룹의 모든 사용자가 이 에이전트로 대화할 수 있다.
-        연결된 도구와 자료도 함께 쓸 수 있는지 확인해야 한다.
+        공개 범위는 보안 설정이에요. 그룹에 공개하면 그룹의 모든 사용자가 이 에이전트로 대화할 수 있어요.
+        연결된 도구와 자료를 함께 써도 되는지 확인해 주세요.
       </p>
       {blocked.length > 0 ? (
         <p className="mb-4 rounded-md bg-muted p-3 text-sm" data-testid="blocked-providers">
-          막힌 provider:{" "}
+          막힌 모델 제공사:{" "}
           {blocked
             .map((row) => `${row.provider} (${formatRemaining(row.remainingSeconds)})`)
             .join(", ")}

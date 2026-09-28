@@ -64,7 +64,7 @@ export function AgentModelList({ agentCode, models, busy, saving, onSave }: Prop
           <li key={index} className="grid gap-2 sm:grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-center">
             <span className="text-xs text-muted-foreground">{index + 1}순위</span>
             <Input
-              aria-label={`${index + 1}순위 provider`}
+              aria-label={`${index + 1}순위 모델 제공사`}
               value={row.provider}
               disabled={busy}
               onChange={(event) => change(index, { provider: event.target.value })}

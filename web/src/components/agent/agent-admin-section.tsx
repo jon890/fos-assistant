@@ -134,16 +134,16 @@ export function AgentAdminSection({ initialAgent, ownerEmail }: Props) {
       {error ? <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">{error}</p> : null}
       <form onSubmit={(event) => void saveAddress(event)} className="mt-4">
         <div className="grid gap-1.5">
-          <Label htmlFor="agent-api-base-url">Hermes API 주소</Label>
+          <Label htmlFor="agent-api-base-url">에이전트 연결 주소</Label>
           <Input
             id="agent-api-base-url"
             name="apiBaseUrl"
             key={agent.apiBaseUrl}
             defaultValue={agent.apiBaseUrl}
-            aria-label={`${agent.name} Hermes API 주소`}
+            aria-label={`${agent.name} 에이전트 연결 주소`}
           />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">저장하기 전에 이 주소가 응답하는지 확인해요.</p>
+        <p className="mt-2 text-xs text-muted-foreground">저장하기 전에 이 주소에 연결되는지 확인해 주세요.</p>
         <Button type="submit" size="sm" variant="outline" disabled={busy} loading={pending === "address"} loadingText="확인하는 중" className="mt-2">주소 저장</Button>
       </form>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -154,7 +154,7 @@ export function AgentAdminSection({ initialAgent, ownerEmail }: Props) {
           {agent.enabled ? "사용 중지" : "다시 사용"}
         </Button>
         <Button size="sm" variant="outline" disabled={busy} loading={pending === "sync"} loadingText="읽는 중" onClick={() => void syncModel()}>
-          모델 다시 읽기
+          모델 목록 다시 읽기
         </Button>
       </div>
       <AgentModelList agentCode={agent.code} models={agent.models} busy={busy} saving={pending === "models"} onSave={(models) => void saveModels(models)} />

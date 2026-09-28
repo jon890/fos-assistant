@@ -58,7 +58,7 @@ export default async function AgentPersonaPage({
         </p>
         {adminError ? (
           <p role="alert" className="mt-4 rounded-md border border-border bg-muted p-3 text-sm">
-            관리 정보를 불러오지 못했습니다. {adminError}
+            관리 정보를 불러오지 못했어요. {adminError}
           </p>
         ) : null}
       </div>
@@ -70,7 +70,7 @@ export default async function AgentPersonaPage({
       {adminError ? (
         <div className="mx-auto mb-8 w-full max-w-2xl">
           <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm">
-            관리 정보를 불러오지 못했습니다. {adminError}
+            관리 정보를 불러오지 못했어요. {adminError}
           </p>
         </div>
       ) : null}

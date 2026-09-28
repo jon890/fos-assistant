@@ -42,9 +42,9 @@ test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", 
   const form = page.getByRole("heading", { name: "에이전트 등록" }).locator("xpath=ancestor::form");
   await form.getByLabel("코드").fill(registered.code);
   await form.getByLabel("이름").fill(registered.name);
-  await form.getByLabel("Hermes profile").fill(registered.hermesProfile);
-  await form.getByLabel("Hermes API 주소").fill(registered.apiBaseUrl);
-  await form.getByLabel("provider").fill(registered.provider);
+  await form.getByLabel("profile").fill(registered.hermesProfile);
+  await form.getByLabel("에이전트 연결 주소").fill(registered.apiBaseUrl);
+  await form.getByLabel("모델 제공사").fill(registered.provider);
   await form.getByRole("button", { name: "등록" }).click();
 
   const card = page.getByRole("region", { name: "등록된 에이전트" }).locator("article");
@@ -102,7 +102,7 @@ test("그룹 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
     await section.getByRole("button", { name: "그룹 공개로 변경" }).click();
     const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 그룹에 공개할까요?" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/모든 사용자가 이 에이전트를 골라 대화/)).toBeVisible();
+    await expect(dialog.getByText(/그룹의 모든 사용자가 이 에이전트로 대화/)).toBeVisible();
     await dialog.getByRole("button", { name: "취소" }).click();
     await expect(dialog).toBeHidden();
     await expect(section.getByText("나만", { exact: true })).toBeVisible();
@@ -199,18 +199,18 @@ test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ pa
   await expect(list.getByRole("button", { name: "지우기" })).toBeDisabled();
 
   await list.getByRole("button", { name: "모델 추가" }).click();
-  await list.getByLabel("2순위 provider").fill("nvidia");
-  await list.getByLabel("2순위 모델").fill("example-model-b");
+  await list.getByLabel("2순위 모델 제공사").fill("nvidia");
+  await list.getByLabel("2순위 모델", { exact: true }).fill("example-model-b");
   await list.getByRole("button", { name: "모델 목록 저장" }).click();
-  await expect(list.getByLabel("2순위 provider")).toHaveValue("nvidia");
+  await expect(list.getByLabel("2순위 모델 제공사")).toHaveValue("nvidia");
 
   await list.getByRole("button", { name: "아래로" }).first().click();
   await list.getByRole("button", { name: "모델 목록 저장" }).click();
-  await expect(list.getByLabel("1순위 provider")).toHaveValue("nvidia");
+  await expect(list.getByLabel("1순위 모델 제공사")).toHaveValue("nvidia");
 
   await page.reload();
-  await expect(list.getByLabel("1순위 provider")).toHaveValue("nvidia");
-  await expect(list.getByLabel("2순위 provider")).toHaveValue("openai-codex");
+  await expect(list.getByLabel("1순위 모델 제공사")).toHaveValue("nvidia");
+  await expect(list.getByLabel("2순위 모델 제공사")).toHaveValue("openai-codex");
 });
 
 test("막힌 provider 가 없으면 그 줄을 그리지 않고 목록이 가로로 넘치지 않는다", async ({ page }, testInfo) => {
@@ -228,7 +228,7 @@ test("Hermes 주소를 고쳐 저장하면 화면에 새 값이 보인다", asyn
   const moved = `${original.replace("127.0.0.1", "localhost")}/`;
 
   await page.goto("/agents/browser");
-  const address = adminSection(page).getByLabel("브라우저 비서 Hermes API 주소");
+  const address = adminSection(page).getByLabel("브라우저 비서 에이전트 연결 주소");
   await expect(address).toHaveValue(original);
 
   await address.fill(moved);
@@ -246,14 +246,14 @@ test("닿지 않는 주소를 저장하려 하면 실패 이유가 그 자리에
 
   await page.goto("/agents/browser");
   const section = adminSection(page);
-  await section.getByLabel("브라우저 비서 Hermes API 주소").fill("http://127.0.0.1:1/p/browser");
+  await section.getByLabel("브라우저 비서 에이전트 연결 주소").fill("http://127.0.0.1:1/p/browser");
   await section.getByRole("button", { name: "주소 저장" }).click();
 
   await expect(section.getByRole("alert")).toContainText("could not reach");
 
   // 저장되지 않았으므로 다시 열면 지금 값이 그대로다.
   await page.goto("/agents/browser");
-  await expect(adminSection(page).getByLabel("브라우저 비서 Hermes API 주소")).toHaveValue(original);
+  await expect(adminSection(page).getByLabel("브라우저 비서 에이전트 연결 주소")).toHaveValue(original);
 });
 
 test("상세 관리 절에서 사용 여부를 바꾸고 모델을 다시 읽는다", async ({ page }) => {
@@ -270,9 +270,9 @@ test("상세 관리 절에서 사용 여부를 바꾸고 모델을 다시 읽는
       response.url().endsWith("/api/admin/agents/browser/sync-model")
         && response.request().method() === "POST",
     );
-    await section.getByRole("button", { name: "모델 다시 읽기" }).click();
+    await section.getByRole("button", { name: "모델 목록 다시 읽기" }).click();
     expect((await sync).ok()).toBeTruthy();
-    await expect(section.getByRole("button", { name: "모델 다시 읽기" })).toBeEnabled();
+    await expect(section.getByRole("button", { name: "모델 목록 다시 읽기" })).toBeEnabled();
   } finally {
     const restored = await page.request.patch("/api/admin/agents/browser", {
       data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
@@ -307,7 +307,7 @@ test("다른 사람의 비공개 에이전트도 관리하고 수정 뒤 주인�
     await expect(page.getByRole("textbox", { name: "브라우저 비서 성격" })).toHaveCount(0);
     await expect(section).toBeVisible();
 
-    await section.getByLabel("브라우저 비서 Hermes API 주소").fill(moved);
+    await section.getByLabel("브라우저 비서 에이전트 연결 주소").fill(moved);
     await section.getByRole("button", { name: "주소 저장" }).click();
     await section.getByRole("button", { name: "사용 중지" }).click();
     await section.getByRole("button", { name: "다시 사용" }).click();

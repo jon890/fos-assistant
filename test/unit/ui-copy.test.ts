@@ -6,7 +6,6 @@ import ts from "../../web/node_modules/typescript/lib/typescript.js";
 
 const SRC_ROOT = join(import.meta.dirname, "../../web/src");
 const DECLARATIVE_ENDING = /[가-힣][^.!?\n]*다\.?$/u;
-const EXCLUDED_ADMIN_PATHS = ["app/admin/", "app/agents/[code]/", "components/admin/", "components/agent/"];
 
 async function sourceFiles(dir: string): Promise<string[]> {
   const found: string[] = [];
@@ -50,7 +49,6 @@ test("웹 화면의 한국어 문구에 평서체 문장이 없다", async () =>
   const violations: string[] = [];
   for (const file of await sourceFiles(SRC_ROOT)) {
     const path = relative(SRC_ROOT, file);
-    if (EXCLUDED_ADMIN_PATHS.some((prefix) => path.startsWith(prefix))) continue;
     violations.push(...declarativeLines(await readFile(file, "utf-8"), path));
   }
   assert.deepEqual(violations, []);

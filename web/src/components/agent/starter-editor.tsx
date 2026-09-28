@@ -68,7 +68,7 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
       setSaveState("saved");
     } catch {
       // 소개와 추천 질문은 Control Plane 에만 저장하고 Hermes 를 부르지 않는다. 요청 자체가 닿지 못한 경우다.
-      setError("저장하지 못했다. 잠시 뒤 다시 시도해 주세요.");
+      setError("저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
       setSaveState("idle");
     }
   }
@@ -76,7 +76,7 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
   return (
     <div className="mx-auto mt-8 w-full max-w-2xl">
       <h2 className="mb-2 text-lg font-semibold">새 대화 화면</h2>
-      <p className="mb-4 text-sm leading-6 text-muted-foreground">새 대화에서 이 에이전트를 고르면 보인다.</p>
+      <p className="mb-4 text-sm leading-6 text-muted-foreground">새 대화에서 이 에이전트를 고르면 보여요.</p>
       <Input
         type="text"
         value={tagline}
@@ -103,7 +103,7 @@ export function StarterEditor({ code, name, initialStarters }: Props) {
           {error}
         </p>
       ) : null}
-      {saveState === "saved" ? <p className="mt-2 text-sm">소개와 추천 질문이 저장되었습니다.</p> : null}
+      {saveState === "saved" ? <p className="mt-2 text-sm">소개와 추천 질문을 저장했어요.</p> : null}
       {editable ? (
         <Button onClick={() => void save()} loading={busy} loadingText="저장 중" className="mt-4">
           소개와 추천 질문 저장
