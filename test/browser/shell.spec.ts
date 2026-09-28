@@ -29,11 +29,9 @@ async function createConversation(page: Page, title: string): Promise<string> {
   return ((await response.json()) as { conversationId: string }).conversationId;
 }
 
-/** RSC 로 화면을 옮기는 요청만 참이다. 정적 자원과 API 호출, 미리 읽기는 걸러진다. */
-function isRscNavigationRequest(request: Request): boolean {
-  const headers = request.headers();
-  if (headers["next-router-prefetch"]) return false;
-  return headers["rsc"] === "1" || new URL(request.url()).searchParams.has("_rsc");
+/** RSC 요청이면 참이다. 화면을 옮기는 요청과 미리 읽기가 모두 해당하고 정적 자원과 API 호출은 걸러진다. */
+function isRscRequest(request: Request): boolean {
+  return request.headers()["rsc"] === "1" || new URL(request.url()).searchParams.has("_rsc");
 }
 
 function conversationNav(page: Page) {
@@ -537,6 +535,16 @@ test("아이콘 단추에 마우스를 올리면 접근성 이름과 같은 풀�
 
 test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 경로를 누르면 곧바로 닫힌다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route((url) => url.pathname === "/usage", async (route) => {
+    // 목적지의 RSC 요청을 미리 읽기까지 붙잡는다. 같은 주소의 문서 요청은 흘려보낸다. 빌드한 서버는 서랍이
+    // 열려 링크가 보이면 미리 읽는데, 그 결과에 loading 화면이 들어 있으면 누르자마자 그 화면으로 옮겨
+    // 경로가 곧바로 바뀌고 서랍이 닫힌다. 서랍을 남기는 것은 목적지를 아직 받지 못했을 때를 위한 것이다.
+    // 서랍을 처음 열기 전에 걸어야 첫 미리 읽기부터 붙잡는다.
+    if (isRscRequest(route.request())) await held;
+    await route.continue();
+  });
   await page.goto("/");
   const sidebar = page.getByRole("complementary", { name: "사이드바" });
 
@@ -548,15 +556,6 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
   await expect(page).toHaveURL(/\/$/);
 
   // 다른 경로로 옮기는 동안에는 서랍이 남고, 옮긴 화면이 보인 뒤 닫힌다.
-  let release: () => void = () => {};
-  const held = new Promise<void>((resolve) => { release = resolve; });
-  await page.route((url) => url.pathname === "/usage", async (route) => {
-    // 화면을 옮기는 요청만 붙잡는다. 같은 주소로 문서와 미리 읽기 요청도 오므로, Next 가 옮길 때 붙이는
-    // 요청 표시(`rsc` 헤더나 `_rsc` 인자)로 가르고 미리 읽기(`next-router-prefetch`)는 흘려보낸다.
-    // loading.spec.ts 의 isRscNavigationRequest 와 같은 기준이다.
-    if (isRscNavigationRequest(route.request())) await held;
-    await route.continue();
-  });
   try {
     await openSidebar(page, testInfo);
     await page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "사용량", exact: true }).click();
