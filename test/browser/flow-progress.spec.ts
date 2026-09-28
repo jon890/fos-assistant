@@ -60,7 +60,7 @@ test("실패한 단계만 실패로 보이고 오지 않은 단계는 그리지 
   await expect(block.locator('[data-step="synthesizer"]')).toHaveCount(0);
 });
 
-test("연결이 끊기면 실패 줄은 남고 끝나지 않은 줄은 멈춘다", async ({ page }) => {
+test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인다", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill("첫 답");
@@ -88,7 +88,9 @@ test("연결이 끊기면 실패 줄은 남고 끝나지 않은 줄은 멈춘다
   expect(await block.getByTestId("activity-toggle").textContent()).toBe(stoppedTitle);
   await block.getByTestId("activity-toggle").click();
   await expect(block.locator('[data-kind="tool"][data-state="failed"]')).toHaveCount(1);
-  await expect(block.locator('[data-kind="subagent"][data-state="unfinished"]')).toContainText("끝나지 않음");
+  const child = block.locator('[data-kind="subagent"][data-state="result-missing"]');
+  await expect(child).toContainText("결과를 받지 못함");
+  await expect(child).toContainText("결과 - · 입력 - · 출력 -");
   await page.reload();
   await expect(page.locator('[data-testid="activity-block"][data-mode="live"]')).toHaveCount(0);
 });
