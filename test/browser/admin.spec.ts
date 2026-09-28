@@ -268,7 +268,8 @@ test("상세 관리 절에서 사용 여부를 바꾸고 모델을 다시 읽는
 });
 
 test("다른 사람의 비공개 에이전트도 관리하고 수정 뒤 주인을 보존한다", async ({ context, page }) => {
-  const moved = `${(await hermesBaseUrl()).replace("127.0.0.1", "localhost")}/p/browser`;
+  const original = `${await hermesBaseUrl()}/p/browser`;
+  const moved = `${original.replace("127.0.0.1", "localhost")}/`;
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   expect((await page.request.get("/api/me")).ok()).toBeTruthy();
   await setSession(context, { email: "browser@example.com", name: "브라우저 테스트" });
@@ -305,7 +306,7 @@ test("다른 사람의 비공개 에이전트도 관리하고 수정 뒤 주인�
   } finally {
     await setSession(context, { email: "browser@example.com", name: "브라우저 테스트" });
     const reset = await page.request.patch("/api/admin/agents/browser", {
-      data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
+      data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com", apiBaseUrl: original },
     });
     expect(reset.ok()).toBeTruthy();
   }
