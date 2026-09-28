@@ -43,7 +43,7 @@ platform 별 `skills.platform_disabled.<platform>` 은 이 토글 경로로 쓰�
 본문이나 query 로 profile 을 고르는 설정 경로를 열면 모든 profile 에 열린다.
 `PUT /api/config` 에서 `model`, `approvals`, `mcp_servers`, `terminal`, `memory` 등의
 키를 골라 허용하는 기능은 Hermes 에 없다.
-plugin 이 본문을 먼저 읽은 뒤 처리기가 다시 읽는 방식은 이 조사에서 검증하지 않았다.
+plugin 이 본문을 먼저 읽은 뒤 처리기가 다시 읽는 방식은 v0.21.3 에서 동작한다. [「설정 API와 profile 경계」](#설정-api와-profile-경계) 를 본다.
 
 근거는 [v0.21.0 web_server.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/web_server.py),
 [tools router](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/web_routers/tools.py),
@@ -139,6 +139,114 @@ profile 별 목록을 대신한다.
 근거는 [v0.21.0 tools_config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/tools_config.py),
 [toolsets.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/toolsets.py),
 [managed_scope.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/managed_scope.py) 다.
+
+## v0.21.3 에서 확인한 쓰기 경로
+
+2026-09-28 에 v0.21.3 코드와 네트워크가 없는 일회용 컨테이너로 확인했다. 에이전트 도구 선택과 스킬 올리기가 이 경로에 기댄다.
+
+### 설정 API와 profile 경계
+
+`hermes_cli.web_routers.config_env.update_config`는 `ConfigUpdate`의 `config`를 기존 원문에 재귀 병합한다.
+목록은 받은 목록으로 바뀌며, `model`, `approvals`, `mcp_servers` 같은 다른 키도 막지 않는다.
+본문에 `profile`이 있으면 query의 `profile`보다 먼저 선택한다.
+`_profile_scope`는 선택한 profile의 설정과 스킬 경로를 가리키지만 요청자가 그 profile의 주인인지는 판단하지 않는다.
+`token_auth_middleware`도 등록된 경로의 토큰만 인증하고 본문을 제한하지 않는다.
+근거는 [설정 처리기](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/config_env.py), [profile 범위](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_server_profiles.py), [토큰 인증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/dashboard_auth/token_auth.py)이다.
+
+일회성 컨테이너에서 미들웨어가 `await request.json()`으로 본문을 읽고 같은 요청을 `update_config`에 넘겼다.
+설정은 200으로 저장됐다.
+`?profile=alpha`와 본문 `profile=beta`를 함께 보냈을 때 `beta`의 설정이 바뀌었고 `alpha`는 바뀌지 않았다.
+따라서 plugin은 JSON 객체의 최상위 키와 `config` 아래 키를 정확히 검사하고, query와 본문의 profile이 모두 토큰에 묶인 대상과 같은지 확인해야 한다.
+본문을 읽는 것 자체는 이 버전의 FastAPI 경로에서 처리기의 재읽기를 막지 않았다.
+
+현재와 같은 단일 서비스 토큰에는 profile 신원이 들어 있지 않다.
+그 토큰으로 요청한 서로 다른 사용자 사이의 profile 경계를 plugin만으로 증명하려면 profile별 토큰 또는 서버가 검증하는 profile 신원값이 추가로 필요하다.
+Control Plane이 주인을 검사해 정확한 profile만 보낼 수는 있지만, 공유 토큰 자체가 유출되면 다른 profile을 지정할 수 있다.
+`GET /api/config`는 환경 변수 참조를 펼친 설정을 돌려줄 수 있으므로 도구 화면의 조회 경로로 열지 않는다.
+
+도구 선택값을 저장할 때는 제품이 허용한 이름만 받아 목록 전체를 계산하고, `memory`를 항상 제거해야 한다.
+기억 MCP 서버 이름은 API 허용 목록에 계속 남겨야 한다.
+등록된 MCP 서버 이름이 하나도 없는 목록은 모든 활성 MCP 서버를 통과시킬 수 있으므로, 알 수 없는 이름만 남은 목록을 허용해서는 안 된다.
+`_get_platform_tools`로 저장 뒤 실제 목록을 계산해 허용 목록과 대조한다.
+새 plugin toolset은 저장 목록에 없어도 자동으로 켜질 수 있고, `agent.disabled_toolsets`는 마지막에 적용되므로 둘 다 확인해야 한다.
+근거는 [도구 설정 계산](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/tools_config.py)이다.
+
+### 도구 목록 조회와 버전 차이
+
+`GET /api/tools/toolsets`는 `name`, `label`, `description`, `tools`, `enabled`, `configured`, `platform`을 돌려준다.
+격리 컨테이너에서 29개 항목을 받았다.
+`enabled`는 `_toolset_configuration_platform`을 따른다. 대부분의 도구에서는 `cli`라 API 실행의 켜짐 상태와 다를 수 있다.
+v0.21.3의 API server는 별도 `GET /v1/toolsets`를 제공하며 같은 설명과 도구 목록에 **`api_server` 기준 `enabled`**를 붙인다.
+근거는 [대시보드 도구 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/tools.py), [API server 도구 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py)다.
+
+v0.21.0과 비교하면 v0.21.3의 설정 가능한 목록에 `connections`와 `kanban`이 들어왔다.
+`kanban`은 기본 꺼짐이다.
+아무 목록도 저장하지 않은 API server의 기본 계산에는 v0.21.0의 목록에 없던 `connections`가 들어간다.
+새 profile에 허용 목록 키를 빠뜨리면 도구가 넓게 열리는 이유다.
+근거는 [v0.21.0 도구 목록](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/tools_config.py), [v0.21.3 도구 목록](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/tools_config.py), [v0.21.3 릴리스](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.14)다.
+
+### 스킬 파일과 색인 적용 시점
+
+대시보드의 `POST /api/skills`와 `PUT /api/skills/content`는 `SKILL.md` 하나만 만들거나 바꾼다.
+생성에는 YAML frontmatter의 `name`, `description`, 비어 있지 않은 본문이 필요하다.
+스킬 이름과 범주 이름은 최대 64자이며 소문자, 숫자, 점, 밑줄, 붙임표를 쓴다.
+새 스킬의 설명은 색인 예산에 맞춰 60자 이하여야 하고 `SKILL.md`는 최대 100,000자다.
+이 두 HTTP 경로에는 `references/`, `templates/`, `assets/`, `scripts/` 파일 인자가 없다.
+`skill_manage(write_file)`는 해당 네 하위 디렉터리의 텍스트 파일을 다루며 파일당 1 MiB와 100,000자 제한이 있지만, 대시보드 HTTP 경로로 노출되지 않았다.
+근거는 [스킬 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/skills.py), [스킬 쓰기와 검증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/skill_manager_tool.py)이다.
+
+공식 `POST /api/files/upload`는 data URL로 파일 하나를 올리고, `POST /api/files/upload-stream`은 multipart로 올린다.
+둘 다 하위 디렉터리를 만들 수 있고 개별 파일의 Hermes 한도는 100 MiB다.
+이 경로 자체는 스킬 전용도 profile 전용도 아니므로 plugin에서 대상 경로를 profile의 승인된 업로드 디렉터리로 제한해야 한다.
+업로드 경로를 분리해도 같은 컨테이너에서 `file`이나 `terminal` 도구가 다른 경로를 읽을 수 있으면 파일 자체는 profile 간에 격리되지 않는다.
+제품에는 더 작은 파일 및 전체 묶음 한도를 둘 수 있다.
+`DELETE /api/skills`는 없으므로 삭제는 `skills.external_dirs`에서 경로를 빼고 파일 경로를 제한한 `DELETE /api/files`로 정리하는 흐름이 필요하다.
+근거는 [파일 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/files.py), [파일 루트 제한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_server_files.py)이다.
+
+대시보드가 스킬을 만들면 자기 프로세스의 색인 캐시만 비운다.
+공유 gateway의 `build_skills_system_prompt` 메모리 캐시 키에는 스킬 디렉터리 경로와 비활성화 목록은 있지만 디렉터리 내용은 없다.
+격리 컨테이너에서 별도 프로세스의 `POST /api/skills`가 200으로 파일을 만든 뒤에도 이미 색인을 계산한 프로세스의 다음 색인에는 새 스킬이 없었다.
+별도 프로세스의 `PUT /api/skills/content`로 설명을 고쳐도 기존 설명이 남았다.
+반면 `skills.external_dirs`에 새로운 버전 경로를 더하자 같은 프로세스의 다음 색인에 새 스킬이 나타났다.
+`PUT /api/skills/toggle`로 `skills.disabled`를 바꾸면 캐시 키가 달라져 다음 색인에서 빠졌다.
+`/reload-skills`는 명령 목록을 다시 훑지만 시스템 프롬프트 캐시는 비우지 않는다.
+근거는 [색인 캐시](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/agent/prompt_builder.py), [스킬 경로 계산](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/agent/skill_utils.py), [다시 읽기 명령](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/slash_commands.py)이다.
+
+따라서 스킬 묶음은 profile 전용의 새 버전 디렉터리에 전부 올린 뒤 검사하고, 마지막 `PUT /api/config`에서 해당 디렉터리만 `skills.external_dirs`에 게시하는 편이 적용 시점을 확실하게 만든다.
+수정도 기존 경로를 덮어쓰지 않고 새 버전을 게시한다.
+profile 로컬 스킬이 같은 이름이면 외부 스킬보다 먼저 선택되므로 이 경로와 `POST /api/skills`를 같은 이름에 섞지 않는다.
+실행 중인 요청은 이미 만든 프롬프트를 계속 쓸 수 있다.
+`skill_view`는 파일을 직접 읽지만 색인 갱신을 대신하지 않는다.
+
+### profile 생성과 Memory MCP
+
+`POST /api/profiles`가 받는 이름은 정규화 뒤 `[a-z0-9][a-z0-9_-]{0,63}`에 맞아야 하며 예약 이름은 거절한다.
+생성 함수에는 profile 개수 상한이 없다. 서비스 자체의 자원 한도는 별도로 정해야 한다.
+`no_skills: true`는 번들 스킬 심기를 건너뛰고, clone 옵션과 함께 쓸 수 없다.
+clone은 설정과 `.env`를 복사하므로 사용자별 profile을 만들 때 쓰지 않는다.
+`API_SERVER_KEY`를 `PUT /api/env`로 넣으면 공유 listener는 다음 요청부터 새 key를 읽는다.
+v0.21.3 공유 gateway는 profile 추가를 감지해 adapter를 추가하며, 새 profile에는 MCP 발견도 시도한다.
+근거는 [profile 생성](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/profiles.py), [생성 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/profiles.py), [공유 gateway의 profile 감지](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/run_profile_reconcile.py)다.
+
+생성 HTTP 본문에는 `mcp_servers`도 있으나, 생성 처리기는 profile을 게시하고 gateway에 알린 다음 MCP 설정을 best effort로 쓴다.
+MCP 설정 쓰기 실패가 profile 생성 실패로 바뀌지 않는다.
+따라서 이 인자만으로 새 profile의 Memory MCP 연결을 원자적으로 보장할 수 없다.
+기존 profile의 `POST /api/mcp/servers`도 설정 저장이지 gateway 연결 완료가 아니다.
+공유 gateway에는 profile 대화의 `/reload-mcp`가 있으며 재시작 없이 MCP를 다시 발견하지만, 기본적으로 확인 절차를 거치고 이 기능을 직접 호출하는 전용 HTTP 경로는 찾지 못했다.
+새 profile의 자동 발견 또는 이 명령을 쓸 수 없는 경우에는 공유 gateway 재시작이 확실한 적용 경로다.
+근거는 [MCP 설정 API](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/mcp.py), [MCP 재발견](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/run_turn.py)이다.
+
+v0.21.3에서는 공유 gateway의 MCP 연결이 profile 범위의 키를 사용한다.
+같은 서버 이름을 두 profile이 써도 서로 다른 credential의 연결을 구분하도록 고쳤다.
+이는 [profile별 공유 MCP 가시성 수정](https://github.com/NousResearch/hermes-agent/pull/106314)과 [동일 이름 연결 분리 수정](https://github.com/NousResearch/hermes-agent/pull/108352)에 해당한다.
+설정 파일 분리만 믿지 말고, 새 profile의 실제 API 실행에 Memory 도구가 나타나는지 검증해야 한다.
+
+### 검증 범위
+
+격리 실험은 운영 이미지와 같은 이미지 ID의 일회성 컨테이너에서 `--network none`으로 실행했다.
+FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파일은 컨테이너와 함께 없어졌다.
+본문 재읽기, profile 우선순위, 도구 목록 29개, 스킬 생성·수정·비활성화와 색인 경로 변경을 확인했다.
+공유 gateway의 MCP 자동 발견과 새 profile의 실제 대화 실행은 이 조사에서 구동하지 않았으므로 코드 판정으로 구분했다.
 
 ## Memory MCP
 

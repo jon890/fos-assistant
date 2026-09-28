@@ -187,6 +187,23 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 **`agent` 가 순서를 알고 `hermes` 는 부르는 방법만 안다.**
 사람을 더할 때 `people` 과 `hermes` 를 나눈 것과 같은 규칙이다.
 
+## 에이전트 도구
+
+에이전트가 쓸 toolset 이다. 목록은 그 profile 설정의 `platform_toolsets.api_server` 가 갖고, 이 저장소는 등급 판정과 화면을 준다.
+데이터베이스에 사본을 두지 않는다. 근거는 [`adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md`](adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
+
+- 등급 표는 코드 한 곳(`agent/domain/AgentToolPolicy`)이 갖는다. 표와 이유는 ADR-029 의 「도구 등급」 이다
+- 쓸 때는 `platform_toolsets.api_server` 를 켤 toolset 과 `fos-assistant-memory` 로, `agent.disabled_toolsets` 를 `["memory"]` 로 통째로 쓴다. 다른 설정 키는 보내지 않는다
+- 쓴 뒤 공유 listener 의 `GET /p/{profile}/v1/toolsets` 로 다시 읽어 보낸 목록과 대조한다
+- 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
+- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. 도구를 켤 때와 공개 범위를 바꿀 때 모두 본다
+
+| 경로 | 누가 | 무엇 |
+| --- | --- | --- |
+| `GET /api/v1/agents/{code}/tools` | 그 에이전트를 쓸 수 있는 사람 | 등급 표에 있는 toolset 마다 이름, 설명, 등급, 켜짐, 요청자가 바꿀 수 있는지 |
+| `PUT /api/v1/agents/{code}/tools` | 주인은 주인 등급, `ADMIN` 은 전부 | 본문 `{ "enabled": ["web", "vision"] }`. 켤 toolset 전체다. 바꿀 수 없는 등급은 지금 값과 같아야 한다 |
+| `GET`, `PUT /api/v1/admin/agents/{code}/tools` | `ADMIN` | 위와 같은 모양. 다른 사람의 비공개 에이전트는 이 경로로만 다룬다 |
+
 ## 사진 첨부
 
 대화에 올린 사진이다. 본문은 공유 디렉터리에 두고 데이터베이스에는 그것을 가리키는 행만 둔다.
