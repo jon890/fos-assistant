@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PersonForm } from "@/components/admin/person-form";
 import { PersonList } from "@/components/admin/person-list";
-import { describeError } from "@/components/error-message";
+import { describeAdminError } from "@/components/error-message";
 import type { Person } from "@/lib/people";
 
 type Props = { initialPeople: Person[] };
@@ -48,7 +48,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
         await reload();
       } else {
         const result = await payload<Failure>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
       }
     } finally {
       setPending(null);
@@ -67,7 +67,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
       if (response.ok) await reload();
       else {
         const result = await payload<Failure>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
       }
     } finally {
       setPending(null);
@@ -76,10 +76,9 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <h1 className="mb-2 text-xl font-semibold">사람 관리</h1>
+      <h1 className="mb-2 text-xl font-semibold">사용자 관리</h1>
       <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
-        여기서 더하면 그 사람의 Hermes profile 까지 만들어진다. 사용자와 에이전트는 그 사람이 처음
-        로그인할 때 생긴다.
+        여기서 사용자를 추가하면 기본 profile이 만들어져요. 에이전트는 그 사용자가 처음 로그인할 때 만들어져요.
       </p>
       <PersonForm busy={busy} creating={pending?.action === "create"} onCreate={(event) => void create(event)} />
       {error ? (

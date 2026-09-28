@@ -41,7 +41,7 @@ export function contextCharsLabel(execution: UsageExecution): string {
  */
 export function contextOmittedLabel(execution: UsageExecution): string {
   const omitted = execution.contextOmittedItems;
-  return omitted === null || omitted <= 0 ? "" : `기억 ${omitted.toLocaleString("ko-KR")}개가 길어서 빠짐`;
+  return omitted === null || omitted <= 0 ? "" : `기억 ${omitted.toLocaleString("ko-KR")}개가 길어서 답에 포함되지 않았어요`;
 }
 
 export function isRunning(execution: UsageExecution): boolean {
@@ -61,12 +61,12 @@ export function actualCostLabel(execution: UsageExecution): string {
 }
 
 export function executionStatusLabel(execution: UsageExecution): string {
-  if (isRunning(execution)) return "도는 중";
-  if (execution.errorCode === "ORPHANED") return "중간에 끊김";
-  if (execution.errorCode === "PROVIDER_BLOCKED") return "막혀서 다음 모델로 넘어감";
-  if (execution.errorCode === "NO_MODEL_AVAILABLE") return "쓸 수 있는 모델이 없음";
+  if (isRunning(execution)) return "실행 중";
+  if (execution.errorCode === "ORPHANED") return "중간에 중단됨";
+  if (execution.errorCode === "PROVIDER_BLOCKED") return "다음 모델로 다시 시도함";
+  if (execution.errorCode === "NO_MODEL_AVAILABLE") return "사용할 수 있는 모델 없음";
   // 공유 gateway 의 동시 실행 한도에 닿아 거절당한 것이다. Hermes 가 내려간 것과 원인이 다르다.
-  if (execution.errorCode === "HERMES_BUSY") return "붐벼서 거절됨";
+  if (execution.errorCode === "HERMES_BUSY") return "요청이 많아 거절됨";
   if (execution.status === "FAILED" || execution.errorCode !== null) return execution.errorCode ?? "실패";
   return "성공";
 }
@@ -79,12 +79,12 @@ export function executionStatusLabel(execution: UsageExecution): string {
 export function retryOfLabel(execution: UsageExecution): string {
   return execution.retryOfExecutionId === null
     ? ""
-    : `${execution.retryOfExecutionId}번 실행에서 이어짐`;
+    : `${execution.retryOfExecutionId}번 실행에 이어서 시작함`;
 }
 
 export function ExecutionList({ executions }: { executions: UsageExecution[] }) {
   if (executions.length === 0) {
-    return <EmptyState title="아직 실행 기록이 없다" description="에이전트와 대화하면 사용량이 여기에 쌓인다." />;
+    return <EmptyState title="아직 실행 기록이 없어요" description="에이전트와 대화하면 사용량이 여기에 쌓여요." />;
   }
 
   return (

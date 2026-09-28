@@ -18,7 +18,7 @@ test("소개와 추천 질문을 저장하고 새로고침해도 남는다", asy
   await page.getByRole("textbox", { name: "추천 질문 4" }).fill("사진 정리해줘");
   await page.getByRole("button", { name: "소개와 추천 질문 저장" }).click();
 
-  await expect(page.getByText("소개와 추천 질문이 저장되었습니다.")).toBeVisible();
+  await expect(page.getByText("소개와 추천 질문을 저장했어요.")).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("textbox", { name: "성격 비서 소개" })).toHaveValue(
@@ -43,7 +43,7 @@ test("가운데 칸을 비우고 저장하면 앞으로 당겨져 채워진다",
   await page.getByRole("textbox", { name: "추천 질문 4" }).fill("사진 정리해줘");
   await page.getByRole("button", { name: "소개와 추천 질문 저장" }).click();
 
-  await expect(page.getByText("소개와 추천 질문이 저장되었습니다.")).toBeVisible();
+  await expect(page.getByText("소개와 추천 질문을 저장했어요.")).toBeVisible();
   // 가운데 칸(추천 질문 2)이 빈 채로 저장되면 뒤의 값이 앞으로 당겨진다.
   await expect(page.getByRole("textbox", { name: "추천 질문 1" })).toHaveValue("오늘 일정 알려줘");
   await expect(page.getByRole("textbox", { name: "추천 질문 2" })).toHaveValue("맛집 추천해줘");

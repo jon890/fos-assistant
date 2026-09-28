@@ -11,7 +11,7 @@ export function WaitingIndicator() {
         <span className="inline-block animate-pulse text-primary [animation-delay:150ms]">●</span>
         <span className="inline-block animate-pulse text-primary [animation-delay:300ms]">●</span>
       </span>
-      <span className="hidden min-h-8 items-center motion-reduce:flex">비서가 답을 준비하고 있다.</span>
+      <span className="hidden min-h-8 items-center motion-reduce:flex">비서가 답을 준비하고 있어요.</span>
     </li>
   );
 }

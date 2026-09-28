@@ -232,7 +232,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         if (selectionVersion.current === version) setTurns(messages);
       } catch (reason) {
         if (selectionVersion.current === version) {
-          setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
+          setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했어요.");
         }
       } finally {
         if (selectionVersion.current === version) {
@@ -277,7 +277,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         loaded = await refreshMessages(id, version);
       } catch (reason) {
         if (selectionVersion.current === version) {
-          setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했다.");
+          setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했어요.");
         }
       }
       if (selectionVersion.current !== version) return;
@@ -493,7 +493,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       } else if (response.status === 404) {
         const payload = await readPayload<ErrorPayload>(response).catch(() => null);
         if (payload?.code === "CONVERSATION_NOT_FOUND") {
-          // 대화를 열 때와 보는 중과 같게 대화를 찾을 수 없다는 화면으로 간다.
+          // 대화를 열 때와 보는 중과 같게 대화를 찾을 수 없어요는 화면으로 간다.
           if (selectionVersion.current === version) setNotFound(true);
           return { kind: "gone" };
         }
@@ -702,7 +702,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const stream: TurnStreamState = { started: false, done: false, reportedError: false };
     const startedFailureMessage = (message: string, refreshed: boolean) => refreshed
       ? message
-      : `${message} 대화 이력을 다시 읽지 못했다. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
+      : `${message} 대화 이력을 다시 읽지 못했어요. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
 
     /** 끝 사건 없이 끊긴 스트림을 마무리한다. 돌고 있거나 답이 저장됐으면 오류로 끝내지 않는다. */
     const finishInterrupted = async (): Promise<boolean> => {
@@ -711,7 +711,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       const kind = await settleInterruptedStream(version, savedBefore, assistantPendingId, {
         onMissing: async (history) => {
           finishFailedActivity();
-          const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다.");
+          const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼어요.");
           const questionSaved = stream.started || (history !== null && lastQuestionIsNew(history, savedBefore));
           if (questionSaved && conversationIdRef.current !== null) {
             questionKept = true;
@@ -821,7 +821,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             ]);
           },
           onError: async (event) => {
-            const message = describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다.");
+            const message = describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했어요.");
             if (stream.started && conversationIdRef.current !== null) {
               const refreshed = await refreshAfterStartedFailure();
               setTurnError(startedFailureMessage(message, refreshed));
@@ -840,7 +840,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     } catch (reason) {
       finishFailedActivity();
       restoreFailedMessage();
-      setError(reason instanceof Error ? reason.message : "요청을 보내지 못했다.");
+      setError(reason instanceof Error ? reason.message : "요청을 보내지 못했어요.");
       return false;
     } finally {
       if (selectionVersion.current === version && !handedOff) setSending(false);
@@ -891,7 +891,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           },
           onError: async (event) => {
             setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-            setTurnError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했다."));
+            setTurnError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했어요."));
             if (event.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
           },
           onDone: async (event) => {
@@ -913,13 +913,13 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         });
         if (kind === "observing") handedOff = true;
         if (kind !== "missing") return;
-        throw new Error(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼다."));
+        throw new Error(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼어요."));
       }
     } catch (reason) {
       if (selectionVersion.current === version) {
         setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
         setActivity((previous) => previous && failActivity(previous, Date.now()));
-        setTurnError(reason instanceof Error ? reason.message : "다시 생성하지 못했다.");
+        setTurnError(reason instanceof Error ? reason.message : "답을 다시 만들지 못했어요.");
         if (!historyRead) await refreshMessages(conversationId, version).catch(() => {});
       }
     } finally {
@@ -943,7 +943,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       setError(describeError(payload.code, payload.message));
     } catch {
       setStopRequested(false);
-      setError(describeError("HERMES_UNAVAILABLE", "중지 요청을 보내지 못했다."));
+      setError(describeError("HERMES_UNAVAILABLE", "중지 요청을 보내지 못했어요."));
     }
   }
 
@@ -956,7 +956,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   if (notFound) {
     return (
       <section data-testid="conversation-not-found" className="mx-auto max-w-3xl py-12 text-center">
-        <h1 className="text-lg font-semibold">대화를 찾을 수 없다</h1>
+        <h1 className="text-lg font-semibold">대화를 찾을 수 없어요</h1>
         <Link href="/" className="mt-4 inline-block rounded-md bg-muted px-3 py-2 text-sm">새 대화</Link>
       </section>
     );
@@ -977,7 +977,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
               <div className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
                 <span className="shrink-0">에이전트</span>
                 <span className="truncate" title={currentAgent?.name}>
-                  {currentAgent?.name ?? "등록된 에이전트 없음"}
+                  {currentAgent?.name ?? "등록된 에이전트가 없어요"}
                 </span>
               </div>
             </div>
@@ -1022,8 +1022,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           {observing ? (
             <p data-testid="observing-notice" className="mb-2 text-xs text-muted-foreground">
               {observing.sentHere
-                ? "응답 연결이 끊겨 답을 기다리는 중이다. 끝나면 답이 나타난다."
-                : "다른 창에서 답하는 중이다. 끝나면 이 창에도 답이 나타난다."}
+                ? "응답 연결이 끊겨 답을 기다리고 있어요. 답이 완성되면 여기에 나타나요."
+                : "다른 창에서 답을 만들고 있어요. 완성되면 이 창에도 나타나요."}
             </p>
           ) : null}
           <Composer

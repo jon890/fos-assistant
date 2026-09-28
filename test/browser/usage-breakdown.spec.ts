@@ -134,7 +134,7 @@ test("지문이 둘이면 구간마다 실행당 평균을 보인다", async ({ 
   await page.goto("/usage");
 
   const section = page.getByTestId("fingerprint-section");
-  await expect(section.getByText("지문 a3f2bbbb…", { exact: true })).toBeVisible();
+  await expect(section.getByText("설정 구분값 a3f2bbbb…", { exact: true })).toBeVisible();
   await expect(section.getByText("0.1000 USD/실행", { exact: true })).toBeVisible();
   await expect(section.getByText("0.0600 USD/실행", { exact: true })).toBeVisible();
 });

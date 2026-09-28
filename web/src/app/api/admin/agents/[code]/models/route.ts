@@ -5,7 +5,7 @@ const CODE = /^[a-z0-9][a-z0-9-]*$/;
 
 function reject(): NextResponse {
   return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않습니다." },
+    { code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않아요." },
     { status: 400 },
   );
 }

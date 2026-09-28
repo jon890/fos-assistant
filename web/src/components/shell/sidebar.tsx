@@ -18,13 +18,13 @@ export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollaps
   onNavigate(href: string): void;
   searchRef: RefObject<HTMLInputElement | null>;
   onCollapse(): void;
-  /** 옮기는 중 안내 영역을 그린다. 붙박이 사이드바와 서랍 가운데 한쪽만 그린다 */
+  /** 이동하는 중 안내 영역을 그린다. 붙박이 사이드바와 서랍 가운데 한쪽만 그린다 */
   showStatus?: boolean;
 }) {
   const { startNew } = useConversations();
   const [query, setQuery] = useState("");
-  // 옮기는 중인 링크의 개수다. 링크마다 하나씩 NavPending 이 두고, 이동이 끝나거나 그 링크가
-  // 사라지면 줄어든다. 0보다 크면 사이드바 전체에서 무언가 옮기는 중이다.
+  // 이동하는 중인 링크의 개수다. 링크마다 하나씩 NavPending 이 두고, 이동이 끝나거나 그 링크가
+  // 사라지면 줄어든다. 0보다 크면 사이드바 전체에서 무언가 이동하는 중이다.
   // 켜짐과 꺼짐은 짝을 이뤄 오지만, 사이드바가 켜짐을 받기 전에 올라온 링크가 꺼짐만 보내는 경우에도
   // 안내가 음수로 남지 않게 0 에서 멈춘다.
   const [pendingCount, setPendingCount] = useState(0);
@@ -41,7 +41,7 @@ export function Sidebar({ isAdmin, displayName, onNavigate, searchRef, onCollaps
     <div className="flex h-full min-h-0 flex-col bg-muted px-3 py-4">
       {showStatus ? (
         <span role="status" aria-live="polite" className="sr-only">
-          {pendingCount > 0 ? "옮기는 중" : ""}
+          {pendingCount > 0 ? "이동하는 중" : ""}
         </span>
       ) : null}
       <div className="mb-5 flex items-center justify-between gap-2 px-2">

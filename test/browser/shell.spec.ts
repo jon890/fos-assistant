@@ -265,7 +265,7 @@ test("열어 둔 대화를 지우면 홈으로 가고 다시 열 수 없다", as
   await conversationNav(page).getByRole("button", { name: `${title} 메뉴` }).click();
   await page.getByRole("menuitem", { name: "지우기" }).click();
   const dialog = page.getByRole("alertdialog", { name: "대화 지우기" });
-  await expect(dialog).toContainText("사용량 기록은 남는다");
+  await expect(dialog).toContainText("사용량 기록은 남아요");
   await dialog.getByRole("button", { name: "지우기" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(conversationNav(page).locator(`a[href="/chat/${id}"]`)).toHaveCount(0);
@@ -333,7 +333,7 @@ test("제목 검색은 맞는 대화만 남기고 날짜 묶음을 유지한다"
   await expect(conversationNav(page).locator(`a[href="/chat/${second}"]`)).toHaveCount(0);
   await expect(conversationNav(page).getByRole("heading", { name: "오늘" })).toBeVisible();
   await page.getByRole("searchbox", { name: "대화 검색" }).fill("없는 제목 123456");
-  await expect(conversationNav(page)).toContainText("맞는 대화가 없다");
+  await expect(conversationNav(page)).toContainText("맞는 대화가 없어요");
 });
 
 test("넓은 화면에서 사이드바를 접고 새로 고쳐도 유지한다", async ({ page }, testInfo) => {
@@ -560,10 +560,10 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
   try {
     await openSidebar(page, testInfo);
     await page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "사용량", exact: true }).click();
-    await expect(sidebar.getByRole("status")).toHaveText("옮기는 중");
+    await expect(sidebar.getByRole("status")).toHaveText("이동하는 중");
     await expect(sidebar).toBeInViewport();
     release();
-    await expect(page.getByRole("heading", { name: "사용량" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "사용량", exact: true })).toBeVisible();
     await expect(sidebar).toBeHidden();
   } finally {
     release();

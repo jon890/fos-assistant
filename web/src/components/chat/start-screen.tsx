@@ -28,7 +28,7 @@ export function StartScreenHeader({ displayName, agents, loading, selectedCode, 
   return (
     <div className="mx-auto mt-auto w-full max-w-3xl pb-2">
       <h1 className="mb-6 text-center text-2xl font-semibold">
-        {displayName ? `${displayName}님, 무엇을 도와줄까요` : "무엇을 도와줄까요"}
+        {displayName ? `${displayName}님, 무엇을 도와드릴까요?` : "무엇을 도와드릴까요?"}
       </h1>
       {loading ? (
         // 뼈대는 낭독기에서 숨겨져 있다. 읽는 중이라는 것은 status 안의 글로 알린다.
@@ -40,7 +40,7 @@ export function StartScreenHeader({ displayName, agents, loading, selectedCode, 
         </div>
       ) : agents.length === 0 ? (
         <p className="rounded-md bg-muted px-3 py-2 text-center text-sm">
-          쓸 수 있는 에이전트가 없다. 관리자에게 등록을 요청한다.
+          사용할 수 있는 에이전트가 없어요. 관리자에게 등록을 요청해 주세요.
         </p>
       ) : only ? (
         <div className="text-center">

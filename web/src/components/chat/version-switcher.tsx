@@ -13,11 +13,11 @@ export function VersionSwitcher({ slot, onChange }: Props) {
 
   return (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      <TooltipButton label="이전 판" size="icon-xs" disabled={slot.index === 0} onClick={() => onChange(slot.index - 1)}>
+      <TooltipButton label="이전 답" size="icon-xs" disabled={slot.index === 0} onClick={() => onChange(slot.index - 1)}>
         <ChevronLeft aria-hidden="true" />
       </TooltipButton>
       <span data-testid="version-label">{slot.index + 1}/{slot.count}</span>
-      <TooltipButton label="다음 판" size="icon-xs" disabled={slot.index === slot.count - 1} onClick={() => onChange(slot.index + 1)}>
+      <TooltipButton label="다음 답" size="icon-xs" disabled={slot.index === slot.count - 1} onClick={() => onChange(slot.index + 1)}>
         <ChevronRight aria-hidden="true" />
       </TooltipButton>
     </span>

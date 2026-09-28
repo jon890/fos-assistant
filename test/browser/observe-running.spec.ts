@@ -55,7 +55,7 @@ function composer(page: Page) {
 }
 
 /** 끊김 문구의 앞부분이다. 넘어간 창에는 나오지 않아야 한다. */
-const INTERRUPTED_MESSAGE = "응답 연결이 끊겼다";
+const INTERRUPTED_MESSAGE = "응답 연결이 끊겼어요";
 
 /**
  * 그 창의 `/api/chat/stream` 응답을 시험이 끊을 수 있게 감싼다. `cutChatStream()` 을 부르면 화면은 읽던 스트림이
@@ -126,7 +126,7 @@ test("다른 창에서 답하는 중이면 기다리는 표시와 중지를 보�
     const other = await openOtherWindow(context, conversationId);
     await expect(other.getByTestId("observing-notice")).toBeVisible();
     // 붙잡힌 run 이 이미 사건을 남겼으면 작업 과정이, 아니면 기다리는 점이 보인다. 어느 쪽이든 기다리는 표시다.
-    await expect(other.getByLabel("비서의 답을 기다리는 중")
+    await expect(other.getByLabel("비서의 답을 기다리고 있어요")
       .or(other.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(composer(other).getByRole("button", { name: "중지" })).toBeEnabled({ timeout: 10_000 });
     await expect(composer(other).getByRole("button", { name: "보내기" })).toHaveCount(0);
@@ -169,7 +169,7 @@ test("도는 turn 조회가 이어 실패하면 오류 없이 기다리는 표�
     // 세 번 이어 실패해야 거두므로 주기 세 번보다 넉넉히 기다린다.
     await expect(other.getByTestId("observing-notice")).toHaveCount(0, { timeout: OBSERVE_INTERVAL_MS * 3 + 10_000 });
     await expect(composer(other).getByRole("button", { name: "보내기" })).toBeVisible();
-    await expect(other.getByText("Hermes 런타임에 연결하지 못했다.")).toHaveCount(0);
+    await expect(other.getByText("연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.")).toHaveCount(0);
     await expect(other.getByText(FAILED_RUNNING_MESSAGE)).toHaveCount(0);
     await expect(other.getByTestId("turn-error")).toHaveCount(0);
   } finally {
@@ -247,7 +247,7 @@ test("보낸 창을 새로 고치면 기다리는 표시를 보이고 끝나면 
   try {
     await page.reload();
     await expect(page.getByTestId("observing-notice")).toBeVisible();
-    await expect(page.getByLabel("비서의 답을 기다리는 중")
+    await expect(page.getByLabel("비서의 답을 기다리고 있어요")
       .or(page.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(page.getByTestId("no-answer")).toHaveCount(0);
     await expect(page.getByTestId("turn-error")).toHaveCount(0);
@@ -269,9 +269,9 @@ test("보낸 창의 스트림이 끊겨도 turn 이 돌면 기다리는 표시�
     await cutChatStream(page);
     const notice = page.getByTestId("observing-notice");
     await expect(notice).toBeVisible();
-    await expect(notice).toContainText("답을 기다리는 중");
+    await expect(notice).toContainText("답을 기다리고 있어요");
     await expect(notice).not.toContainText("다른 창");
-    await expect(page.getByLabel("비서의 답을 기다리는 중")
+    await expect(page.getByLabel("비서의 답을 기다리고 있어요")
       .or(page.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
     await expect(page.getByTestId("turn-error")).toHaveCount(0);

@@ -3,7 +3,7 @@ import { callControlPlane } from "@/lib/control-plane";
 
 function invalid() {
   return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: "실행 번호가 올바르지 않다." },
+    { code: "VALIDATION_FAILED", message: "실행 번호가 올바르지 않아요." },
     { status: 400 },
   );
 }

@@ -1,4 +1,4 @@
-import { expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
+import { expect, PERSONA_AGENT_CODE, setSession, test } from "./fixtures.ts";
 import type { Page, Request, Route } from "../../web/node_modules/@playwright/test/index.js";
 
 /** RSC 로 화면을 옮기는 요청만 참이다. 정적 자원과 API 호출, 미리 읽기는 걸러진다. */
@@ -17,6 +17,32 @@ function mainNavLink(page: Page, name: string) {
 function sidebarStatus(page: Page) {
   return page.locator('aside[aria-label="사이드바"] [role="status"]');
 }
+
+test("에이전트 목록은 조회 중에도 역할에 맞는 뼈대를 곧바로 보인다", async ({ page }) => {
+  await page.addInitScript(() => {
+    const record = () => {
+      const skeleton = document.querySelector<HTMLElement>('main [data-testid="page-skeleton"]');
+      if (skeleton) {
+        (window as Window & { agentSkeleton?: string }).agentSkeleton = skeleton.outerHTML;
+      }
+    };
+    new MutationObserver(record).observe(document, { childList: true, subtree: true });
+  });
+
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
+  const skeleton = await page.evaluate(() => (window as Window & { agentSkeleton?: string }).agentSkeleton);
+  expect(skeleton).toContain("max-w-4xl");
+  expect(skeleton).toContain("h-[46.875rem]");
+
+  await setSession(page.context(), { email: "member@example.com", name: "가족 사용자" });
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
+  const memberSkeleton = await page.evaluate(() => (window as Window & { agentSkeleton?: string }).agentSkeleton);
+  expect(memberSkeleton).toContain("max-w-2xl");
+  expect(memberSkeleton).toContain("h-14");
+  expect(memberSkeleton).not.toContain("h-[46.875rem]");
+});
 
 test("화면을 옮기면 뼈대가 먼저 보이고 이전 화면의 제목은 사라진다", async ({ page, hermes }) => {
   await page.goto("/agents");
@@ -90,10 +116,10 @@ test("사이드바에서 다른 화면으로 옮기는 동안 누른 줄과 사�
     if (testInfo.project.name !== "mobile") {
       await expect(usageLink.getByTestId("nav-pending")).toBeVisible();
     }
-    await expect(status).toHaveText("옮기는 중");
+    await expect(status).toHaveText("이동하는 중");
 
     releaseRequest();
-    await expect(page.getByRole("heading", { name: "사용량" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "사용량", exact: true })).toBeVisible();
 
     if (testInfo.project.name !== "mobile") {
       await expect(usageLink.getByTestId("nav-pending")).toHaveCount(0);

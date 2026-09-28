@@ -29,7 +29,7 @@ export function ActivityPanel({ target, onClose }: Props) {
     let active = true;
     fetch(`/api/usage/executions/${executionId}/tree`, { cache: "no-store" })
       .then((response) => {
-        if (!response.ok) throw new Error("실행 나무를 읽지 못했다");
+        if (!response.ok) throw new Error("작업 과정을 불러오지 못했어요");
         return response.json() as Promise<ExecutionTreeResponse>;
       })
       .then((value) => { if (active) { setLoaded({ executionId, tree: value }); setFailedId(null); } })
@@ -55,12 +55,12 @@ export function ActivityPanel({ target, onClose }: Props) {
   const body = (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
       {target.mode === "live" ? <ActivityTimeline items={target.state.items} /> :
-        failedId === executionId ? <p className="text-sm text-muted-foreground">실행 나무를 읽지 못했다
+        failedId === executionId ? <p className="text-sm text-muted-foreground">작업 과정을 불러오지 못했어요
           <button type="button" className="ml-2 underline" onClick={() => {
             setFailedId(null); setLoaded(null); setRetry((value) => value + 1);
           }}>다시 읽기</button>
         </p> : loaded?.executionId === executionId ? <ExecutionTree tree={loaded.tree} /> : (
-          <div aria-label="실행 나무를 읽는 중" className="flex flex-col gap-3">
+          <div aria-label="작업 과정을 불러오고 있어요" className="flex flex-col gap-3">
             <Skeleton className="h-8" /><Skeleton className="h-20" /><Skeleton className="h-20" />
           </div>
         )}

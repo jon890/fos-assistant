@@ -11,7 +11,7 @@ export async function POST(request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
   if (!isConversationId(conversationId)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." },
+      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않아요." },
       { status: 400 },
     );
   }
@@ -34,7 +34,7 @@ export async function POST(request: Request, context: RouteContext) {
   // 않고 VALIDATION_FAILED 로 옮긴다.
   if (upstream.status === 413) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "사진이 너무 큽니다." },
+      { code: "VALIDATION_FAILED", message: "사진이 너무 커요." },
       { status: 400 },
     );
   }
@@ -43,7 +43,7 @@ export async function POST(request: Request, context: RouteContext) {
     payload = text.length > 0 ? JSON.parse(text) : null;
   } catch {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "요청을 처리하지 못했습니다." },
+      { code: "VALIDATION_FAILED", message: "요청을 처리하지 못했어요." },
       { status: 400 },
     );
   }

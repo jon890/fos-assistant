@@ -28,7 +28,7 @@ const ConversationsContext = createContext<ConversationsValue | null>(null);
 
 async function failure(response: Response): Promise<Error> {
   const payload = (await response.json().catch(() => ({}))) as ErrorPayload;
-  return new Error(describeError(payload.code ?? "INTERNAL_ERROR", payload.message ?? "대화 목록을 읽지 못했다."));
+  return new Error(describeError(payload.code ?? "INTERNAL_ERROR", payload.message ?? "대화 목록을 읽지 못했어요."));
 }
 
 export function ConversationsProvider({ enabled, children }: {
@@ -48,7 +48,7 @@ export function ConversationsProvider({ enabled, children }: {
       setConversations((await response.json()) as Conversation[]);
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "대화 목록을 읽지 못했다.");
+      setError(reason instanceof Error ? reason.message : "대화 목록을 읽지 못했어요.");
     } finally {
       setLoading(false);
     }

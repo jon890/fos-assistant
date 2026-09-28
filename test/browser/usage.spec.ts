@@ -44,7 +44,7 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
   expect(freeResponse.ok()).toBeTruthy();
   await page.goto("/usage");
 
-  await expect(page.getByText("API 로 돌렸다면", { exact: false })).toBeVisible();
+  await expect(page.getByText("API 가격으로 계산한 금액", { exact: true })).toBeVisible();
   await expect(page.getByText("가격을 찾지 못한 실행", { exact: true })).toBeVisible();
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("가격 없음").first()).toBeVisible();
@@ -61,7 +61,7 @@ test("돌고 있는 실행은 시간과 금액 없이 보이고 완료 뒤에 �
 
     await page.goto("/usage");
     const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
-    const running = records.getByText("도는 중", { exact: true });
+    const running = records.getByText("실행 중", { exact: true });
     await expect(running).toBeVisible();
     const container = testInfo.project.name === "mobile"
       ? running.locator("xpath=ancestor::article")
@@ -87,7 +87,7 @@ test("고아 실행은 중간에 끊겼다고 보인다", async ({ page }, testI
   await page.goto("/usage");
 
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
-  await expect(records.getByText("중간에 끊김", { exact: true }).first()).toBeVisible();
+  await expect(records.getByText("중간에 중단됨", { exact: true }).first()).toBeVisible();
 });
 
 test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, page }) => {
@@ -108,7 +108,7 @@ test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, pag
   expect(provision.ok()).toBeTruthy();
 
   await page.goto("/usage");
-  await expect(page.getByText("아직 실행 기록이 없다", { exact: true })).toBeVisible();
+  await expect(page.getByText("아직 실행 기록이 없어요", { exact: true })).toBeVisible();
 });
 
 test("막혀서 넘어간 실패와 보통 실패를 다르게 보인다", async ({ page, hermes }, testInfo) => {
@@ -135,7 +135,7 @@ test("막혀서 넘어간 실패와 보통 실패를 다르게 보인다", async
   const records = page.getByTestId(
     testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
   );
-  await expect(records.getByText("막혀서 다음 모델로 넘어감").first()).toBeVisible();
+  await expect(records.getByText("다음 모델로 다시 시도함").first()).toBeVisible();
   await expect(records.getByTestId("execution-retry-of").first()).toBeVisible();
 });
 
@@ -159,5 +159,5 @@ test("붐벼서 거절된 실행은 다른 실패와 다르게 보인다", async
   const records = page.getByTestId(
     testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
   );
-  await expect(records.getByText("붐벼서 거절됨", { exact: true }).first()).toBeVisible();
+  await expect(records.getByText("요청이 많아 거절됨", { exact: true }).first()).toBeVisible();
 });

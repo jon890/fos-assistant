@@ -86,7 +86,7 @@ export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
   const truncatedAbove = tree.truncated && !anyNodeTruncated(tree.root);
   const aboveNotice = truncatedAbove ? (
     <p className="mb-2 text-xs text-muted-foreground" data-testid="execution-tree-truncated-above">
-      위쪽이 잘려 여기가 뿌리가 아닐 수 있다
+      위쪽 기록이 없어 이곳이 첫 실행이 아닐 수 있어요
     </p>
   ) : null;
 
@@ -94,7 +94,7 @@ export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
     return (
       <>
         {aboveNotice}
-        <p className="text-sm text-muted-foreground">기록된 사건이 없다</p>
+        <p className="text-sm text-muted-foreground">기록된 작업이 없어요</p>
       </>
     );
   }

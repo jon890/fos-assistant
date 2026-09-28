@@ -20,23 +20,23 @@ export function MonthlySummary({ monthly }: Props) {
   return (
     <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
       <Stat
-        label="실제로 나간 돈"
+        label="예상 추가 사용 요금"
         value={
           <span className="text-primary">
             {formatAmount(monthly.actualCostMicros, monthly.currency)}
           </span>
         }
-        detail={`${monthly.month} 실제로 청구되는 금액`}
+        detail={`${monthly.month}의 예상 추가 사용 요금`}
       />
       <Stat
-        label="API 로 돌렸다면"
+        label="API 가격으로 계산한 금액"
         value={formatAmount(monthly.estimatedCostMicros, monthly.currency)}
         detail="같은 사용량을 API 가격으로 계산한 금액"
       />
       <Stat
         label="실행 건수"
         value={`${totalExecutions.toLocaleString("ko-KR")}건`}
-        detail={`${monthly.subscriptionExecutions.toLocaleString("ko-KR")}건이 구독 경로다`}
+        detail={`${monthly.subscriptionExecutions.toLocaleString("ko-KR")}건은 구독 경로로 실행했어요`}
       />
       {monthly.unpricedExecutions > 0 ? (
         <Stat
@@ -48,7 +48,7 @@ export function MonthlySummary({ monthly }: Props) {
       ) : null}
       <div className="sm:col-span-2 md:col-span-3">
         <p className="text-xs text-muted-foreground">
-          두 금액 모두 공개 가격표로 계산한 것이고 청구서를 읽은 것이 아니다.
+          두 금액은 공개 가격표를 이용한 계산값이에요. 실제 청구 금액과 다를 수 있어요.
         </p>
       </div>
     </dl>

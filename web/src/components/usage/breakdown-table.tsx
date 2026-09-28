@@ -24,7 +24,7 @@ export type Breakdown = {
   rows: BreakdownRow[];
 };
 
-/** 실제 청구액이 비어 있는 묶음은 구독 경로만 있었다는 뜻이라 금액을 쓰지 않는다. */
+/** 예상 추가 사용 요금이 비어 있는 묶음은 구독 경로만 있었다는 뜻이라 금액을 쓰지 않는다. */
 export function actualLabel(row: BreakdownRow, currency: string): string {
   return row.actualCostMicros === null ? "구독" : formatAmount(row.actualCostMicros, currency);
 }
@@ -53,7 +53,7 @@ export function BreakdownTable(
   { rows, currency, axis }: { rows: BreakdownRow[]; currency: string; axis: string },
 ) {
   if (rows.length === 0) {
-    return <EmptyState title="기록이 없다" description="그 달에는 끝난 실행이 없다." />;
+    return <EmptyState title="기록이 없어요" description="그 달에는 완료된 실행이 없어요." />;
   }
 
   return (
@@ -64,7 +64,7 @@ export function BreakdownTable(
             <TableHead>묶음</TableHead>
             <TableHead className="text-right">실행</TableHead>
             <TableHead className="text-right">API 환산 비용</TableHead>
-            <TableHead className="text-right">실제 청구액</TableHead>
+            <TableHead className="text-right">예상 추가 사용 요금</TableHead>
             <TableHead className="text-right">입력</TableHead>
             <TableHead className="text-right">출력</TableHead>
             <TableHead className="text-right">문맥 평균</TableHead>
@@ -105,7 +105,7 @@ export function BreakdownTable(
               실행 {row.executions.toLocaleString("ko-KR")}건 · 문맥 평균 {contextLabel(row)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              실제 청구액 {actualLabel(row, currency)} · 입력 {formatTokens(row.inputTokens)} → 출력{" "}
+              예상 추가 사용 요금 {actualLabel(row, currency)} · 입력 {formatTokens(row.inputTokens)} → 출력{" "}
               {formatTokens(row.outputTokens)}
             </p>
           </Card>

@@ -54,12 +54,12 @@ test.afterAll(async () => {
 test("새 대화 화면에 인사와 첫 에이전트 카드와 추천 질문이 보인다", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1, name: /님, 무엇을 도와줄까요$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /님, 무엇을 도와드릴까요\?$/ })).toBeVisible();
   const picker = page.getByRole("radiogroup", { name: "에이전트" });
   await expect(picker.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
   await expect(picker.getByRole("radio", { name: "브라우저 비서" })).toContainText(TAGLINE);
   await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible();
-  await expect(composer(page)).toHaveAttribute("placeholder", "@ 로 에이전트를 부른다");
+  await expect(composer(page)).toHaveAttribute("placeholder", "@로 에이전트를 불러요");
   await expectNoHorizontalScroll(page);
 });
 
@@ -136,7 +136,7 @@ test("@ 뒤 글자에 맞는 에이전트가 없으면 목록에 알린다", asy
 
   await composer(page).fill("@없는이름");
 
-  await expect(page.getByRole("listbox", { name: "에이전트 고르기" })).toContainText("맞는 에이전트가 없다");
+  await expect(page.getByRole("listbox", { name: "에이전트 고르기" })).toContainText("맞는 에이전트가 없어요");
 });
 
 test("공백 없이 글자에 붙은 @ 에서는 목록이 뜨지 않는다", async ({ page }) => {
@@ -154,7 +154,7 @@ test("쓸 수 있는 에이전트가 없으면 알리고 입력창을 잠근다"
   });
   await page.goto("/");
 
-  await expect(page.getByText("쓸 수 있는 에이전트가 없다. 관리자에게 등록을 요청한다.")).toBeVisible();
+  await expect(page.getByText("사용할 수 있는 에이전트가 없어요. 관리자에게 등록을 요청해 주세요.")).toBeVisible();
   await expect(composer(page)).toBeDisabled();
   await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
 });
@@ -186,7 +186,7 @@ test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴�
 
   // 빈 대화가 생겨도 메시지가 없는 동안은 새 대화 화면 모양 그대로다.
   await expect(page).toHaveURL(CONVERSATION_URL);
-  await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와줄까요$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
   const flowCard = page.getByRole("radio", { name: "흐름 비서" });
   await expect(flowCard).toBeDisabled();
   await flowCard.click({ force: true });

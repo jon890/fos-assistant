@@ -14,13 +14,13 @@ const MARKS: Record<ActivityItemState, ReactNode> = {
   "result-missing": <CircleHelp aria-hidden="true" className={ICON_CLASS} />,
 };
 const SPOKEN: Record<ActivityItemState, string> = {
-  running: "도는 중", done: "끝남", failed: "실패", stopped: "중지됨", unfinished: "끝나지 않음",
+  running: "실행 중", done: "끝남", failed: "실패", stopped: "중지됨", unfinished: "끝나지 않음",
   "result-missing": "결과를 받지 못함",
 };
 
 export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
   return (
-    <ol className="flex min-w-0 flex-col gap-2" aria-label="작업 과정의 사건">
+    <ol className="flex min-w-0 flex-col gap-2" aria-label="작업 과정">
       {items.map((item) => (
         <li key={item.key} data-testid="activity-item" data-kind={item.kind}
           data-state={item.state} data-step={item.kind === "step" ? item.pairKey ?? undefined : undefined}
@@ -44,7 +44,7 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
             {item.kind === "subagent" && (item.model || item.inputTokens !== null || item.outputTokens !== null
               || item.state === "result-missing") ? (
               <p className="break-words text-muted-foreground">
-                {[item.model, item.state === "result-missing" ? "결과 -" : null,
+                {[item.model, item.state === "result-missing" ? "결과를 받지 못함" : null,
                   item.inputTokens === null && item.state !== "result-missing" ? null : `입력 ${formatTokens(item.inputTokens)}`,
                   item.outputTokens === null && item.state !== "result-missing" ? null : `출력 ${formatTokens(item.outputTokens)}`]
                   .filter(Boolean).join(" · ")}

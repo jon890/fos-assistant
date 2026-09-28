@@ -77,7 +77,7 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
       setBodyHash(saved.bodyHash);
       setSaveState("saved");
     } catch {
-      setError(describeError("HERMES_UNAVAILABLE", "저장하지 못했습니다."));
+      setError(describeError("HERMES_UNAVAILABLE", "저장하지 못했어요."));
       setSaveState("idle");
     }
   }
@@ -86,9 +86,9 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="mb-2 text-xl font-semibold">{name}</h1>
       <p className="mb-6 text-sm leading-6 text-muted-foreground">
-        이 에이전트가 대화마다 지키는 성격입니다. 저장하면 곧바로 다음 대화부터 반영됩니다.
+        이 에이전트가 대화마다 따르는 성격이에요. 저장한 내용은 다음 대화부터 반영돼요.
       </p>
-      {isEmpty ? <p className="mb-3 text-sm text-muted-foreground">아직 성격을 쓰지 않았습니다.</p> : null}
+      {isEmpty ? <p className="mb-3 text-sm text-muted-foreground">아직 성격을 쓰지 않았어요.</p> : null}
       {/* Textarea 의 기본 field-sizing-content 는 rows 를 무시해 편집창이 작게 시작하므로 고정으로 되돌린다. */}
       <Textarea
         value={body}
@@ -108,12 +108,12 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
         <section className="mt-3 rounded-md border border-border p-3">
           <h2 className="text-sm font-semibold">지금 저장되어 있는 성격</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            쓰던 글은 위 편집창에 그대로 있습니다. 둘을 견주어 남길 내용을 정한 뒤 다시 저장해 주세요.
+            작성하던 글은 위 편집창에 그대로 있어요. 현재 저장된 글과 비교해 남길 내용을 정한 뒤 다시 저장해 주세요.
           </p>
           <pre className="mt-2 text-sm leading-6 whitespace-pre-wrap break-all">{serverBody}</pre>
         </section>
       ) : null}
-      {saveState === "saved" ? <p className="mt-2 text-sm">저장되었습니다.</p> : null}
+      {saveState === "saved" ? <p className="mt-2 text-sm">저장했어요.</p> : null}
       {editable ? (
         <Button
           onClick={() => setConfirming(true)}
