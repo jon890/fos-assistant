@@ -14,12 +14,13 @@ public final class AgentToolPolicy {
     public static final String MEMORY_MCP = "fos-assistant-memory";
 
     private static final Set<String> OWNER_TOOLSETS = Set.of(
-            "web", "vision", "todo", "clarify", "session_search", "skills", "tts", "delegation");
+            "web", "vision", "todo", "clarify", "skills", "tts", "delegation");
     private static final Set<String> ADMIN_TOOLSETS = Set.of(
             "terminal", "file", "code_execution", "browser", "computer_use", "cronjob", "image_gen",
-            "video_gen", "homeassistant", "spotify", "discord");
+            "video_gen", "homeassistant", "spotify", "discord", "session_search");
+    // session_search 는 그 profile 의 모든 플랫폼 대화와, `profile` 인자로 다른 profile 의 대화까지 읽는다.
     private static final Set<String> PRIVATE_ONLY_TOOLSETS = Set.of(
-            "terminal", "file", "code_execution", "browser", "computer_use");
+            "terminal", "file", "code_execution", "browser", "computer_use", "session_search");
     private static final Set<String> CONFIGURABLE_TOOLSETS;
 
     static {

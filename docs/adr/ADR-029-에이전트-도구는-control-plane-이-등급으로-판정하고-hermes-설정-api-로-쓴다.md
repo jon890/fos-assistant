@@ -20,8 +20,8 @@ v0.21.3 에서 plugin 이 본문을 먼저 읽고 같은 요청을 처리기에 
 
 | 등급 | toolset | 켜는 사람 |
 | --- | --- | --- |
-| 주인 | `web`, `vision`, `todo`, `clarify`, `session_search`, `skills`, `tts`, `delegation` | 그 에이전트의 주인과 `ADMIN` |
-| 관리자 | `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `cronjob`, `image_gen`, `video_gen`, `homeassistant`, `spotify`, `discord` | `ADMIN` 만 |
+| 주인 | `web`, `vision`, `todo`, `clarify`, `skills`, `tts`, `delegation` | 그 에이전트의 주인과 `ADMIN` |
+| 관리자 | `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `cronjob`, `image_gen`, `video_gen`, `homeassistant`, `spotify`, `discord`, `session_search` | `ADMIN` 만 |
 | 항상 끔 | `memory` | 아무도. 기억은 Control Plane 이 갖는다([ADR-003](ADR-003-memory-권한은-주입으로-강제한다.md)) |
 | 항상 켬 | 기억 MCP `fos-assistant-memory` | 아무도 끄지 못한다 |
 
@@ -31,8 +31,14 @@ Hermes 를 올릴 때는 `fos-home-infra` 의 기능 검사가 모든 profile �
 Hermes 가 쓰기 없이 toolset 을 자동으로 켤 수도 있어, 도구 조회 응답은 켜진 미분류 이름을 따로 알리고 화면은 관리자에게 알리라고 안내한다.
 허락은 켜는 시점에 한 번이다. 쓸 때마다 묻지 않는다. 관리자 등급을 켤 때는 확인 창을 거친다.
 
-**셸과 파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다.**
+**셸과 파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)과 `session_search` 가 켜진 에이전트는 `PRIVATE` 만 된다.**
 profile 분리는 이 도구의 파일 접근을 격리하지 않아, 그룹에 공개하면 다른 사용자가 그 에이전트로 홈서버 파일에 닿는다.
+
+`session_search` 는 처음에 주인 등급에 두었다가 관리자 등급으로 옮겼다(2026-09-29).
+이 도구는 그 profile 의 모든 플랫폼 대화를 찾고, `profile` 인자를 주면 다른 profile 의 대화 기록을 읽기 전용으로 연다.
+Hermes 는 그 profile 이 있는지만 본다. 그룹에 공개된 에이전트에서 켜면 그룹 사용자가 주인의 다른 대화를 읽고,
+주인 등급이면 누구나 자기 에이전트에서 켜서 다른 사용자의 대화를 읽는다. 근거는 [`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md#지난-대화-검색의-범위) 에 있다.
+사용자마다 자기 대화만 찾게 하는 기능은 Hermes 의 이 도구가 아니라 Control Plane 이 권한을 거는 도구로 따로 만든다.
 
 ### 대안 기각
 

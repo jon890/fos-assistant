@@ -77,6 +77,41 @@ class AgentToolPolicyTest {
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
     }
 
+    @Test
+    void 지난_대화_검색은_관리자만_켜고_그룹_에이전트에는_둘_수_없다() {
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        ADMIN, agent(AgentVisibility.GROUP), List.of("session_search"), List.of()))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+        assertThat(AgentToolPolicy.requestedForWrite(
+                ADMIN, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
+                .containsExactly("session_search", AgentToolPolicy.MEMORY_MCP);
+    }
+
+    @Test
+    void 지난_대화_검색이_이미_켜진_그룹_에이전트는_관리자가_끌_때까지_주인이_다른_도구를_바꾸지_못한다() {
+        // 등급을 옮기기 전에 켜 둔 에이전트다. 주인은 그 도구를 끄지 못하고, 남긴 채 저장하면 그룹 제약에 걸린다.
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.GROUP), List.of("session_search", "web"), List.of("session_search")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThat(AgentToolPolicy.requestedForWrite(
+                ADMIN, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search")))
+                .containsExactly("web", AgentToolPolicy.MEMORY_MCP);
+    }
+
     private static Agent agent(AgentVisibility visibility) {
         return Agent.of("tool-agent", "도구", "tool-profile", "http://example.test/p/tool-profile",
                 "provider", "model", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, 1L);

@@ -37,6 +37,8 @@ function confirmationDescription(name: string): string {
       return "이 도구는 홈서버 파일과 셸에 닿을 수 있어요.";
     case "browser":
       return "이 도구는 웹 브라우저를 조작할 수 있어요.";
+    case "session_search":
+      return "이 도구는 다른 사람과 나눈 대화까지 찾아 읽을 수 있어요.";
     case "computer_use":
       return "이 도구는 컴퓨터 화면과 입력을 조작할 수 있어요.";
     case "cronjob":
