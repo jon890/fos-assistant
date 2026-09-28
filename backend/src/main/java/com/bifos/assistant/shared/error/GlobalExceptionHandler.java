@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.dao.PessimisticLockingFailureException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -20,7 +21,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleApi(ApiException ex) {
         log.warn("api error code={} message={}", ex.code(), ex.getMessage());
         return ResponseEntity.status(ex.code().status())
-                .body(new ErrorResponse(ex.code().name(), ex.getMessage()));
+                .body(new ErrorResponse(ex.code().name(), ex.getMessage(), ex.missingToolsets()));
+    }
+
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleAgentLock(PessimisticLockingFailureException ex) {
+        return ResponseEntity.status(ErrorCode.AGENT_BUSY.status())
+                .body(new ErrorResponse(ErrorCode.AGENT_BUSY.name(), "the agent is being updated"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

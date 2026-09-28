@@ -20,8 +20,10 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentAdminController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
+import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
 import com.bifos.assistant.hermes.HermesModelClient;
+import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -40,13 +42,14 @@ class AgentApiBaseUrlUpdateTest {
     private final AppUserRepository users = mock(AppUserRepository.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final HermesModelClient hermesModels = mock(HermesModelClient.class);
+    private final HermesToolsetClient hermesToolsets = mock(HermesToolsetClient.class);
     private final AgentModelSync modelSync = mock(AgentModelSync.class);
     private final AgentModelSelector models = mock(AgentModelSelector.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
     private final FlowRegistry flows = mock(FlowRegistry.class);
 
     private final AgentAdminController controller = new AgentAdminController(
-            agents, users, currentUser, hermesModels, modelSync, models, endpointProbe, flows);
+            agents, users, currentUser, hermesModels, hermesToolsets, modelSync, models, endpointProbe, flows);
 
     private Agent agent;
 
@@ -56,6 +59,7 @@ class AgentApiBaseUrlUpdateTest {
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP, null);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
+        when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
         when(models.optionsOf(any(Agent.class))).thenReturn(java.util.List.of());
     }
@@ -103,6 +107,58 @@ class AgentApiBaseUrlUpdateTest {
         controller.update("dad", request("http://127.0.0.1:2/p/dad"));
 
         verify(endpointProbe).requireReachable("http://127.0.0.1:2/p/dad", "dad");
+    }
+
+    @Test
+    void 그룹_공개_전에_도구를_읽지_못하면_접근_범위를_바꾸지_않는다() {
+        agent = Agent.of("dad", "Dad", "dad", CURRENT_URL, "openai-codex", "example-model",
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+        when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
+        when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
+        doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "invalid toolset response"))
+                .when(hermesToolsets).readEnabled(CURRENT_URL, "dad");
+
+        assertThatThrownBy(() -> controller.update("dad", request(null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+
+        assertThat(agent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        verify(agents, never()).save(agent);
+    }
+
+    @Test
+    void 그룹_공개와_주소_변경을_함께_보내도_새_주소의_도구를_검사한다() {
+        agent = Agent.of("dad", "Dad", "dad", CURRENT_URL, "openai-codex", "example-model",
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+        when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
+        when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
+        when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/dad", "dad")).thenReturn(java.util.List.of("terminal"));
+
+        assertThatThrownBy(() -> controller.update("dad", request("http://127.0.0.1:2/p/dad")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+
+        assertThat(agent.apiBaseUrl()).isEqualTo(CURRENT_URL);
+        assertThat(agent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        verify(agents, never()).save(agent);
+    }
+
+    @Test
+    void 그룹_에이전트를_새로_만들_때도_private_toolset을_거절한다() {
+        when(agents.findByCode("group")).thenReturn(Optional.empty());
+        when(hermesModels.readModel("http://127.0.0.1:2/p/group", "group-profile")).thenReturn("example-model");
+        when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/group", "group-profile"))
+                .thenReturn(java.util.List.of("terminal"));
+
+        assertThatThrownBy(() -> controller.create(new CreateAgentRequest(
+                        "group", "Group", "group-profile", "http://127.0.0.1:2/p/group", "provider",
+                        CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null, null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+        verify(agents, never()).save(any(Agent.class));
     }
 
     private static UpdateAgentRequest request(String apiBaseUrl) {

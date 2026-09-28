@@ -30,6 +30,13 @@ public class AgentService {
         return agent;
     }
 
+    /** 쓰기 전에 행 잠금을 잡고, 잠금을 잡은 뒤의 접근 범위를 다시 확인한다. */
+    public Agent requireReadableForUpdate(CurrentUser user, String code) {
+        Agent locked = agents.findByCodeForUpdate(code).orElseThrow(() -> notFound());
+        if (!locked.isReadableBy(user.id())) throw notFound();
+        return locked;
+    }
+
     /**
      * 요청자가 이 에이전트의 성격과 소개, 추천 질문을 고칠 수 있는가.
      *

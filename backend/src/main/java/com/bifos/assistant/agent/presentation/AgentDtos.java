@@ -146,6 +146,20 @@ public final class AgentDtos {
             String ownerEmail,
             String apiBaseUrl) {}
 
+    /** 에이전트 API 실행에 켤 toolset 전체다. */
+    public record UpdateToolsetsRequest(@NotNull List<@NotBlank String> enabled) {}
+
+    /** 도구 선택 화면이 보여 주는 toolset 한 줄이다. */
+    public record ToolsetView(
+            String name, String label, String description, String tier,
+            boolean enabled, boolean editable, boolean requiresPrivate) {
+        static ToolsetView from(com.bifos.assistant.agent.application.AgentToolService.ToolView source) {
+            return new ToolsetView(
+                    source.name(), source.label(), source.description(), source.tier().name(),
+                    source.enabled(), source.editable(), source.requiresPrivate());
+        }
+    }
+
     /**
      * @param providerRead Hermes 가 provider 도 함께 줬는가. 거짓이면 provider 는 그대로 두었다
      */

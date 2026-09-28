@@ -16,7 +16,13 @@ public enum ErrorCode {
     MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     AGENT_DISABLED(HttpStatus.CONFLICT),
+    /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
+    AGENT_BUSY(HttpStatus.CONFLICT),
     AGENT_MODEL_UNKNOWN(HttpStatus.BAD_GATEWAY),
+    /** 셸이나 파일에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
+    AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
+    /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */
+    AGENT_TOOLS_NOT_APPLIED(HttpStatus.BAD_GATEWAY),
     /** 호출자에게 연결한 Hermes profile이 없다. 다른 사용자의 profile을 빌리지 않는다. */
     HERMES_BINDING_MISSING(HttpStatus.CONFLICT),
     /** 바인딩은 있지만 이 호스트에 API key가 준비되지 않았다. */
