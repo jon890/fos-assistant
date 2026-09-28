@@ -141,6 +141,7 @@ scripts/check-public-safe.sh
 GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 여섯 검사를 돌린다.
 PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사하고, main 에 push 하면 main 을 검사한다.
 각 검사는 독립된 job 으로 나란히 돈다. 로컬 직접 확인과 위 규칙은 그대로 유지한다.
+브라우저 검사는 `browser-mobile` 과 `browser-desktop` 으로 나눠 두 폭을 나란히 검사한다.
 
 공개 정보 검사는 repository secret `PUBLIC_REPO_DENYLIST` 를 값 목록으로 쓴다.
 `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣어야 한다.
@@ -161,7 +162,7 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.1
 ## 머지는 PR 로 한다
 
 브랜치를 push 하고 PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
-PR 의 merge ref 에서 CI 의 `backend`, `web`, `browser`, `e2e`, `unit`, `public-safe` 가 모두 통과했는지 확인한다.
+PR 의 merge ref 에서 CI 의 `backend`, `web`, `browser-mobile`, `browser-desktop`, `e2e`, `unit`, `public-safe` 가 모두 통과했는지 확인한다.
 브랜치 보호의 필수 검사는 CI 가 여러 번 안정되게 돈 뒤 따로 정한다.
 PR 을 열면 `.github/workflows/claude-code-review.yml` 이 Claude 코드 리뷰를 돌린다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖고, 그 파일은 이 문서와 `docs/` 를 가리킨다.
