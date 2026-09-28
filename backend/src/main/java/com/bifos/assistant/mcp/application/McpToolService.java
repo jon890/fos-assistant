@@ -1,5 +1,8 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.chat.application.ArtifactWriteRequest;
+import com.bifos.assistant.chat.application.ArtifactWriteResult;
+import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -12,15 +15,37 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
 public class McpToolService {
     private static final Logger log = LoggerFactory.getLogger(McpToolService.class);
+    private static final JsonMapper json = JsonMapper.builder().build();
     private final MemoryService memories;
-    public List<Map<String, Object>> tools() { return List.of(Map.of("name", "memory_read", "description", "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 색인에 있다.", "inputSchema", Map.of("type", "object", "properties", Map.of("id", Map.of("type", "integer")), "required", List.of("id")))); }
-    public Map<String, Object> call(CurrentUser user, String name, Long id) {
-        if (!"memory_read".equals(name)) throw new UnknownToolException();
+    private final ArtifactWriteService artifacts;
+
+    public List<Map<String, Object>> tools() {
+        return List.of(
+                Map.of("name", "memory_read", "description", "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 색인에 있다.",
+                        "inputSchema", Map.of("type", "object", "properties", Map.of("id", Map.of("type", "integer")), "required", List.of("id"))),
+                Map.of("name", "artifact_write",
+                        "description", "대화의 결과물에 쓸 파일을 저장한다. conversation_id에는 대화 UUID, path에는 폴더 안 상대 경로를 준다. content로 HTML 또는 CSS 본문을 쓰거나 source_url로 이미지를 가져온다. 두 방식은 하나만 쓰며 파일 하나는 5MB를 넘을 수 없다. 같은 path는 새 내용으로 바뀐다.",
+                        "inputSchema", Map.of(
+                                "type", "object",
+                                "additionalProperties", false,
+                                "properties", Map.of(
+                                        "conversation_id", Map.of("type", "string"),
+                                        "path", Map.of("type", "string"),
+                                        "content", Map.of("type", "string"),
+                                        "source_url", Map.of("type", "string")),
+                                "required", List.of("conversation_id", "path"),
+                                "oneOf", List.of(
+                                        Map.of("required", List.of("content"), "not", Map.of("required", List.of("source_url"))),
+                                        Map.of("required", List.of("source_url"), "not", Map.of("required", List.of("content")))))));
+    }
+
+    public Map<String, Object> readMemory(CurrentUser user, Long id) {
         try { Memory memory = memories.bodyFor(user, id); log.info("memory read userId={} memoryId={}", user.id(), id); return result(memory.content(), false); }
         catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_NOT_FOUND) {
@@ -29,6 +54,25 @@ public class McpToolService {
             throw ex;
         }
     }
+
+    public Map<String, Object> writeArtifact(CurrentUser user, ArtifactWriteRequest request) {
+        try {
+            ArtifactWriteResult written = artifacts.write(user, request);
+            return result(toJson(written), false);
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.VALIDATION_FAILED) {
+                throw ex;
+            }
+            log.warn("artifact write failed userId={}", user.id());
+            return result("결과물을 저장할 수 없습니다.", true);
+        } catch (RuntimeException ex) {
+            log.warn("artifact write failed userId={}", user.id());
+            return result("결과물을 저장할 수 없습니다.", true);
+        }
+    }
+
+    private static String toJson(ArtifactWriteResult result) {
+        return json.writeValueAsString(Map.of("path", result.path(), "byteSize", result.byteSize()));
+    }
     private static Map<String, Object> result(String text, boolean error) { Map<String, Object> result = new LinkedHashMap<>(); result.put("content", List.of(Map.of("type", "text", "text", text))); result.put("isError", error); return result; }
-    public static class UnknownToolException extends RuntimeException {}
 }

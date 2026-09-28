@@ -22,6 +22,7 @@ import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -88,7 +89,9 @@ class ArtifactTest {
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
     private static final String AGENT_ARTIFACT_ROOT = "/agent-side/artifacts";
     private static final String PREAMBLE_GUIDE =
-            "파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.";
+            "결과물은 artifact_write 로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
+                    + "HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
+                    + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.";
     private static final String CSP = "sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; "
             + "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; "
             + "form-action 'none'";
@@ -116,6 +119,7 @@ class ArtifactTest {
     @Autowired AgentModelSelector modelSelector;
     @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ChatMessageRepository messages;
+    @Autowired ConversationRepository conversations;
     @Autowired AgentExecutionRepository executions;
     @Autowired ExecutionEventRepository executionEvents;
     @Autowired HermesRunsClient hermes;
@@ -182,6 +186,7 @@ class ArtifactTest {
         assertThat(stub().received()).singleElement().extracting(HermesRunCommand::input).isEqualTo(
                 "[결과물 폴더]\n"
                         + AGENT_ARTIFACT_ROOT + "/" + conversation.id() + "\n"
+                        + "대화 식별자: " + conversation.publicId() + "\n"
                         + PREAMBLE_GUIDE + "\n"
                         + "\n"
                         + "안녕");
@@ -201,7 +206,8 @@ class ArtifactTest {
         chat.send(mom, null, "보조금 비교해 줘", "flow-mom");
 
         Long conversationId = executions.findAll().getFirst().conversationId();
-        String preamble = "[결과물 폴더]\n" + AGENT_ARTIFACT_ROOT + "/" + conversationId + "\n";
+        Conversation conversation = conversations.findById(conversationId).orElseThrow();
+        String preamble = artifactService.agentPreamble(conversation);
         List<String> inputs = stub().received().stream().map(HermesRunCommand::input).toList();
         List<String> children = inputs.stream().filter(input -> !input.contains(CHIEF_MARK)).toList();
         assertThat(children).as("Researcher, Engineer, Synthesizer").hasSize(3)
