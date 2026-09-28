@@ -22,8 +22,12 @@ function declarativeLines(source: string, file: string): string[] {
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const found: string[] = [];
   function visit(node: ts.Node) {
-    if ((ts.isStringLiteral(node) && ts.isNewExpression(node.parent)
-        && node.parent.expression.getText(parsed) === "Error")) return;
+    // 화면에 표시하지 않는 Provider 사용 오류만 검사에서 제외한다.
+    if (file === "components/shell/conversations-provider.tsx"
+        && ts.isStringLiteral(node)
+        && ts.isNewExpression(node.parent)
+        && node.parent.expression.getText(parsed) === "Error"
+        && node.text === "ConversationsProvider 가 필요하다.") return;
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
         || ts.isJsxText(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node)
         || ts.isTemplateTail(node)) {
@@ -43,6 +47,8 @@ test("화면 문구는 해요체를 쓰고 코드 주석은 검사하지 않는�
   assert.deepEqual(declarativeLines('const message = "아직 대화가 없어요."; // 아직 대화가 없다.', "sample.ts"), []);
   assert.deepEqual(declarativeLines('const message = "아직 대화가 없다.";', "sample.ts"),
     ["sample.ts:1: 아직 대화가 없다."]);
+  assert.deepEqual(declarativeLines('throw new Error("대화가 없다.");', "sample.ts"),
+    ["sample.ts:1: 대화가 없다."]);
 });
 
 test("웹 화면의 한국어 문구에 평서체 문장이 없다", async () => {
