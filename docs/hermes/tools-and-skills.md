@@ -38,7 +38,7 @@ API 실행은 `platform_toolsets.api_server` 를 읽는다.
 platform 별 `skills.platform_disabled.<platform>` 은 이 토글 경로로 쓰지 않는다.
 필수 스킬 `hermes-agent` 는 `agent/skill_utils.py` 의 `ESSENTIAL_SKILLS` 로 보호되어 끌 수 없다.
 
-기계용 인증은 「profile 을 HTTP 로 만드는 길」 의 token provider 를 쓴다.
+기계용 인증은 [「profile 을 HTTP 로 만드는 길」](profiles.md#profile-을-http-로-만드는-길) 의 token provider 를 쓴다.
 `register_token_route` 는 메서드를 보지 않고 경로 문자열만 맞춘다.
 본문이나 query 로 profile 을 고르는 설정 경로를 열면 모든 profile 에 열린다.
 `PUT /api/config` 에서 `model`, `approvals`, `mcp_servers`, `terminal`, `memory` 등의

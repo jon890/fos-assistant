@@ -60,7 +60,7 @@ provider 해석이 실패하면 이전 provider 가 남고 모델만 요청 값�
 ### 조회 응답의 `model` 은 실제로 돈 모델이 아니다
 
 아래는 v0.21.0 과 v0.21.3 의 계약이다.
-v0.21.5 에서 추가한 실제 실행 `runtime` 과의 차이는 「Runs 응답과 사건의 버전 차이」 에 있다.
+v0.21.5 에서 추가한 실제 실행 `runtime` 과의 차이는 [「Runs 응답과 사건의 버전 차이」](upgrades.md#runs-응답과-사건의-버전-차이) 에 있다.
 
 **`GET /v1/runs/{run_id}` 의 `model` 은 우리가 보낸 값을 되돌려 줄 뿐이다.**
 Hermes 안에서 다른 모델로 넘어가도 이 값은 바뀌지 않는다.
@@ -282,7 +282,7 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 | `message.delta` | `delta` 에 답의 조각 |
 | `tool.started` | `tool` 에 도구 이름, `preview` 에 인자 앞부분 |
 | `tool.completed` | `tool`, `duration` 초, `error` 참거짓 |
-| `subagent.start`, `subagent.complete` | 위 「자식 토큰을 SSE 로 받을 수 있다」 의 식별자와 작업·사용량 필드 |
+| `subagent.start`, `subagent.complete` | [「자식 토큰을 SSE 로 받을 수 있다」](delegation.md#자식-토큰을-sse-로-받을-수-있다) 의 식별자와 작업·사용량 필드 |
 | `reasoning.available` | `text` 에 그때까지의 답 전체 |
 | `run.completed` | `output` 과 `usage` |
 | `run.failed`, `run.cancelled` | 끝 |

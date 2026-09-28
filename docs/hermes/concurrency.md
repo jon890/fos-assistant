@@ -5,7 +5,7 @@
 아래 설정 우선순위와 허용 목록은 v0.21.0 의 동작이다.
 v0.21.3 은 `gateway.multiplex_profile_allowlist` 를 제거했고,
 v0.21.4 이후에는 multiplex 기본값과 gateway 실행 방식도 바뀐다.
-버전별 차이는 「버전을 올릴 때 달라지는 계약」 을 따른다.
+버전별 차이는 [「버전을 올릴 때 달라지는 계약」](upgrades.md#버전을-올릴-때-달라지는-계약) 을 따른다.
 
 `gateway.multiplex_profiles` 를 켜면 listener 하나가 `/p/<profile>/...` 로 모든 profile 을 받는다.
 default profile 의 listener 에는 각 경로가 접두 없는 형태와 `/p/<profile>` 접두 형태로 함께 등록된다.

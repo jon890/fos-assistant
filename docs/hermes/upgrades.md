@@ -14,7 +14,7 @@ v0.21.3 은 `v2026.9.14`, commit `345cd2b057a452236de401d3534b8502a7465e8d` 이�
 | --- | --- | --- |
 | v0.21.1 내부 모듈 | 큰 파일을 분리했다. 내부 함수를 import 하는 plugin 은 모듈 위치를 확인해야 한다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.7) |
 | v0.21.2 DB | 중복 writer, 정상 DB 손상 오판, profile DB 혼선과 불필요한 기동 write lock 을 고쳤다 | [release note](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.11), `SessionDB`, `hermes_state_registry.acquire` |
-| v0.21.3 완료 전달 | 공유 profile 문맥 누락을 고쳤다. API 완료는 여전히 delivery 기록이며 자동 모델 실행이 아니다 | 「공유 listener 의 완료 watcher 결함과 수정」 |
+| v0.21.3 완료 전달 | 공유 profile 문맥 누락을 고쳤다. API 완료는 여전히 delivery 기록이며 자동 모델 실행이 아니다 | [「공유 listener 의 완료 watcher 결함과 수정」](delegation.md#공유-listener-의-완료-watcher-결함과-수정) |
 | v0.21.3 공유 제공 | `gateway.multiplex_profile_allowlist` 를 제거했다. 살아 있는 모든 profile 을 공유 제공한다 | [commit `9848e22ed659`](https://github.com/NousResearch/hermes-agent/commit/9848e22ed659d2e90ff3126f4dfcf78d9028efeb), `config_migrations` v43 |
 | v0.21.3 cron·curator | `cron.model_drift_guard` 를 없애고 생성 당시 모델로 cron 을 실행한다. curator 의 이전 기본 기간을 stale 30→14일, archive 90→30일로 바꾼다. 명시한 다른 값은 보존한다 | `config_migrations` v42·v44, [commit `be2f7e9c3616`](https://github.com/NousResearch/hermes-agent/commit/be2f7e9c3616) |
 | v0.21.3 DB schema | 29→30 migration 과 자식 transcript 의 trigram 검색 제외가 있다. 첫 DB open 이 index·DDL 을 바꿀 수 있다 | [commit `2b55ded1ac5f`](https://github.com/NousResearch/hermes-agent/commit/2b55ded1ac5f3b41cdc580974e745631dac1bb53), `hermes_state_schema` 의 `_init_schema`, `_reconcile_columns` |
@@ -89,7 +89,7 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 
 **subagent 토큰이 부모에 포함되지 않으므로 실행 줄을 전부 더해야 실제 사용량이 나온다.**
 subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고,
-근거는 [ADR-016](../adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) 의 「자식 토큰 실측」 절에 있다.
+근거는 [ADR-016의 「자식 토큰 실측」 절](../adr/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md#자식-토큰-실측)에 있다.
 부모 usage 만 저장하면 그만큼이 기록에서 빠진다.
 
 공유 listener 를 쓰더라도 profile 마다 접두가 다르고,

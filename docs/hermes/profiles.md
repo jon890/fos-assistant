@@ -120,7 +120,7 @@ v0.21.0 의 `hermes_cli/web_routers/profiles.py` 와 `hermes_cli/web_models.py` 
 
 **Control Plane 은 `no_skills` 를 true 로 보낸다.**
 번들 스킬이 심기고 `skills` toolset 이 열리면 그 설명이 입력에 실린다.
-그 profile 이 쓰는 스킬은 「스킬을 profile 에 붙이는 방법」 대로 따로 붙인다.
+그 profile 이 쓰는 스킬은 [「스킬을 profile 에 붙이는 방법」](tools-and-skills.md#스킬을-profile-에-붙이는-방법) 대로 따로 붙인다.
 
 **CLI 의 `--no-alias` 에 해당하는 본문 필드가 없다.**
 API 로 만들면 wrapper 가 함께 생긴다.
@@ -135,7 +135,7 @@ API 로 만들면 wrapper 가 함께 생긴다.
 2026-09-28 에 v0.21.0 소스로 확인했다.
 `hermes_cli/profiles.py` 의 `_seed_model_config` 는 활성 profile 의 `model` 블록만 쓴다.
 `platform_toolsets.api_server` 와 `agent.disabled_toolsets` 는 생성되지 않는다.
-따라서 「toolset 의 목록과 접근 범위」 의 `hermes-api-server` 기본 목록이 적용되어
+따라서 [「toolset 의 목록과 접근 범위」](tools-and-skills.md#toolset-의-목록과-접근-범위) 의 `hermes-api-server` 기본 목록이 적용되어
 `terminal`, `file`, `memory`, `delegation` 등을 포함한 도구가 열린다.
 `no_skills` 는 번들 스킬 심기를 막는 값이며 도구 설정을 제한하는 값은 아니다.
 새 profile 을 만들면 key 를 주기 전에 도구 설정을 적용하고 검증해야 한다.
