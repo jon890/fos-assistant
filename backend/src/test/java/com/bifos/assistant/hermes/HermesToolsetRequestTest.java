@@ -76,7 +76,8 @@ class HermesToolsetRequestTest {
 
     @Test
     void listener_목록은_profile_key로_켜진_이름만_읽는다() {
-        response = "[{\"name\":\"web\",\"enabled\":true},{\"name\":\"terminal\",\"enabled\":false}]";
+        response = "{\"object\":\"list\",\"platform\":\"api_server\",\"data\":["
+                + "{\"name\":\"web\",\"enabled\":true},{\"name\":\"terminal\",\"enabled\":false}]}";
 
         assertThat(client.readEnabled(baseUrl() + "/p/kid", "kid")).containsExactly("web");
         assertThat(calls).singleElement().satisfies(call -> {
@@ -102,8 +103,18 @@ class HermesToolsetRequestTest {
     }
 
     @Test
+    void listener_목록이_data_로_감싸지_않은_배열이면_받지_않는다() {
+        response = "[{\"name\":\"web\",\"enabled\":true}]";
+
+        assertThatThrownBy(() -> client.readEnabled(baseUrl() + "/p/kid", "kid"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+    }
+
+    @Test
     void listener가_빈_목록을_성공으로_돌려도_도구가_모두_꺼진_것으로_읽지_않는다() {
-        response = "[]";
+        response = "{\"object\":\"list\",\"platform\":\"api_server\",\"data\":[]}";
 
         assertThatThrownBy(() -> client.readEnabled(baseUrl() + "/p/kid", "kid"))
                 .isInstanceOf(ApiException.class)
