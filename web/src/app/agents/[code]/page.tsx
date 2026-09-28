@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { describeError } from "@/components/error-message";
+import { describeAdminError, describeError } from "@/components/error-message";
 import { PersonaEditor } from "@/components/agent/persona-editor";
 import { StarterEditor } from "@/components/agent/starter-editor";
 import { AgentAdminSection } from "@/components/agent/agent-admin-section";
@@ -30,7 +30,7 @@ export default async function AgentPersonaPage({
     ? adminAgentsResult.data.find((agent) => agent.code === code)
     : undefined;
   const adminError = me?.role === "ADMIN" && adminAgentsResult && !adminAgentsResult.ok
-    ? describeError(adminAgentsResult.code, adminAgentsResult.message)
+    ? describeAdminError(adminAgentsResult.code, adminAgentsResult.message)
     : null;
   const name = adminAgent?.name ?? (agentsResult.ok
     ? (agentsResult.data.find((agent) => agent.code === code)?.name ?? code)

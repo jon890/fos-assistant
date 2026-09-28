@@ -76,15 +76,19 @@ test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같
   }
 });
 
-test("에이전트 목록 뼈대는 조회를 기다리지 않고 관리자 등록 폼 크기로 표시된다", async () => {
+test("에이전트 목록 뼈대는 레이아웃 역할로 관리자와 일반 사용자 크기를 고른다", async () => {
   const content = await readFile(join(APP_ROOT, "agents/loading.tsx"), "utf-8");
   const adminFrame = await readFile(join(SRC_ROOT, "components/agent/agent-admin-panel.tsx"), "utf-8");
   const memberFrame = await readFile(join(APP_ROOT, "agents/page.tsx"), "utf-8");
+  const shell = await readFile(join(SRC_ROOT, "components/shell/app-shell.tsx"), "utf-8");
   assert.equal(frameWidth(adminFrame), "4xl");
   assert.equal(frameWidth(memberFrame), "2xl");
   assert.match(content, /function Loading\(\)/);
+  assert.match(content, /useShellIsAdmin\(\)/);
   assert.doesNotMatch(content, /readMe|await/);
-  assert.match(content, /width="4xl" title description="agent" form="agent"/);
+  assert.match(content, /isAdmin[\s\S]*?width="4xl" title description="agent" form="agent"/);
+  assert.match(content, /width="2xl" title/);
+  assert.match(shell, /AdminContext\.Provider value=\{isAdmin\}/);
 });
 
 test("loading.tsx 는 뼈대를 두기로 한 경로에만 있다", async () => {
