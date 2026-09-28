@@ -692,9 +692,12 @@ export function startFakeHermes(
           const profile = enabledToolsetsMatch[1]!;
           if (!authorized(request, profile)) return send(response, 401, { error: "bad key for this profile" });
           const enabled = new Set(apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS);
-          return send(response, 200, [
-            ...TOOLSET_CATALOG.map((toolset) => ({ ...toolset, enabled: enabled.has(toolset.name) })),
-          ]);
+          // 실제 listener 는 목록을 `data` 로 감싼다(v0.21.3 `gateway/platforms/api_server.py` 의 `_handle_toolsets`).
+          return send(response, 200, {
+            object: "list",
+            platform: "api_server",
+            data: TOOLSET_CATALOG.map((toolset) => ({ ...toolset, enabled: enabled.has(toolset.name) })),
+          });
         }
         const modelMatch = MODEL_OPTIONS_PATH.exec(path);
         if (modelMatch) {
