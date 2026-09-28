@@ -33,7 +33,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회 |
 | `memory` | 개인과 가족 공용 Memory, 제안과 승인 |
 | `context` | 실행에 넣을 `instructions` 조립 |
-| `mcp` | 제목만 주입한 Memory 본문 조회와 장기 토큰 인증 |
+| `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사와 장기 토큰 인증 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
 
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
@@ -248,12 +248,13 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 - 뿌리 설정은 사진 첨부와 같은 모양으로 둘이다. `assistant.artifact.root` 는 Control Plane 이 보는 경로, `assistant.artifact.agent-root` 는 같은 디렉터리를 Hermes 컨테이너에서 보는 경로다.
   둘 다 기본값이 없어 비면 기동이 실패한다. 붙이는 일은 `fos-home-infra` 가 소유한다
 - 대화 하나가 폴더 하나다. 이름은 대화 번호다. 폴더는 Control Plane 이 turn 을 시작할 때 만든다
-- 파일은 Hermes 가 쓴다. Control Plane 은 읽고, 보관 기간이 지난 것을 지운다
+- 현재 파일은 Hermes 가 쓴다. `artifact_write` 구현 뒤에는 일반 파일 도구가 없는 profile 도 MCP 로 Control Plane 에 쓰기를 요청한다.
+  Control Plane 은 대화 주인을 확인하고 저장하며, 읽기와 보관 기간 정리도 맡는다
 - 보관 기간은 30일이다. 대화 폴더 단위로 센다. 폴더에서 가장 늦게 바뀐 파일이 30일을 넘기면 그 폴더의 파일을 함께 지운다.
   파일마다 세면 다음 turn 이 HTML 만 고쳤을 때 그 HTML 이 부르는 옛 사진이 먼저 지워진다
 - 지우는 단위는 폴더 안의 파일 하나다. 사진 첨부처럼 행 단위로 지우지 않는다. 지운 HTML 의 `chat_artifact` 행에는 `deleted_at` 을 적고, 같은 파일이 여러 답에 묶였으면 그 행 모두에 적는다. 빈 폴더는 남는다
 - 파일을 줄 때는 행을 보지 않는다. 대화 폴더 안에 있고 확장자가 허용되면 준다. HTML 이 부르는 사진은 행이 없다. 행은 없는 파일이 410 인지 404 인지 구분할 때만 본다
-- 파일 크기에 상한을 두지 않는다. 본문은 스트림으로 준다
+- 파일을 읽는 경로에는 크기 상한을 두지 않고 스트림으로 준다. MCP 로 쓰는 파일은 5MB 로 제한한다
 
 ### 에이전트에게 알리는 법
 
@@ -262,11 +263,52 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 ```text
 [결과물 폴더]
 {agent-root}/{대화 번호}
-파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
+대화 식별자: {publicId}
+결과물은 artifact_write 로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.
+HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.
+HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 ```
 
 사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 한 줄이 늘어 입력이 조금 커지지만,
 에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다.
+
+위 단락은 `artifact_write` 구현 뒤의 계약이다.
+현재 `ArtifactService.agentPreamble(Long conversationId)` 를 `agentPreamble(Conversation conversation)` 으로 바꿔
+폴더를 만드는 내부 번호와 도구에 넘길 공개 UUID 를 한 대화에서 가져온다.
+`ChatService` 의 일반 실행과 흐름 실행, `ResearchAndBuildFlow` 의 하위 실행이 같은 단락을 받는다.
+사용자 메시지의 저장 본문에는 이 단락을 넣지 않는다.
+
+### MCP 로 쓰는 자리
+
+**주인 확인과 저장은 `chat`, MCP 응답과 도구별 인자 검사는 `mcp` 가 맡는다.**
+`mcp/application` 의 `McpToolService` 가 `chat/application` 의 `ArtifactWriteService` 를 부른다.
+`chat` 은 MCP 프로토콜을 알지 않는다.
+아래 신규 타입은 구현할 배치이며 현재 코드는 아직 제공하지 않는다.
+
+| 타입 | 책임 |
+| --- | --- |
+| `mcp/presentation/McpDtos` | `memory_read` 와 `artifact_write` 의 요청 형태. 데이터 record 를 컨트롤러 안에 두지 않는다 |
+| `mcp/presentation/McpController` | 도구 이름에 따라 인자를 검사하고 JSON-RPC 오류로 바꾼다 |
+| `mcp/application/McpToolService` | 도구 목록과 MCP `content`, `isError` 결과를 만든다 |
+| `chat/application/ArtifactWriteRequest`, `ArtifactWriteResult` | 각각 UUID, 상대 경로와 입력 방식, 저장된 경로와 바이트 수를 전달한다 |
+| `chat/application/ArtifactWriteService` | `ConversationAccess.requireOwn` 으로 주인을 확인한 뒤 본문 또는 내려받은 이미지를 저장한다 |
+| `chat/application/ArtifactSourceProperties` | 허용 호스트와 연결, 읽기, 호출 전체 제한 시간을 받는다 |
+| `chat/infra/ArtifactStore` | 쓰기용 경로 판정, 부모 폴더 생성, 임시 파일 저장과 교체를 기존 경로 규칙과 함께 갖는다 |
+| `chat/infra/ArtifactSourceFetcher` | URL 과 DNS 를 검사하고 검증한 IP 에 HTTPS 로 연결해 제한된 이미지 본문만 반환한다 |
+
+`ArtifactWriteService.write(CurrentUser, ArtifactWriteRequest)` 는 대화 주인을 확인하기 전에는
+폴더 생성이나 URL 조회를 하지 않는다.
+`ArtifactStore.ensureFolder` 가 실패를 경고 로그로만 남기므로 쓰기 경로는 실제 폴더 생성 여부를 확인하고 오류로 돌려준다.
+`resolveInside` 는 기존 파일을 읽는 용도로 유지하고 쓰기용 판정을 같은 클래스에 더한다.
+부모 생성 전후의 실제 경로, 대화 폴더 자체의 링크, 최종 대상의 링크를 검사한다.
+같은 폴더에 임시 파일을 완성한 뒤 교체하고 실패하면 임시 파일을 지운다.
+
+`McpController` 의 기존 `tools/call` 은 모든 도구에 정수 `id` 를 요구한다.
+이 검사를 도구별로 바꾸되 `memory_read` 의 입력과 오류 계약은 유지한다.
+`AgentTokenService.authenticate` 가 반환하는 `CurrentUser` 를 그대로 쓰며 대화나 실행 바인딩을 토큰에 더하지 않는다.
+인자와 응답, SSRF 조건은 [`hermes-integration.md`](hermes-integration.md#결과물-쓰기-도구) 가 정한다.
+같은 사용자의 다른 대화에 쓸 때 답에 묶이는 시점과 실패 분기는
+[`flow.md`](flow.md#결과물을-mcp-로-쓸-때) 에 있다.
 
 ### 답에 묶는 법
 

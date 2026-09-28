@@ -803,10 +803,58 @@ stateDiagram-v2
 | 닫기 단추나 `Esc` | 닫힌다. 답을 만드는 중에는 `Esc` 가 중지보다 패널 닫기를 먼저 한다 |
 | 다른 대화로 간다 | 닫힌다 |
 
+## 결과물을 MCP 로 쓸 때
+
+`artifact_write` 구현 뒤의 흐름이다.
+일반 파일 도구가 없는 에이전트도 결과물을 저장한다.
+도구 계약은 [`hermes-integration.md`](hermes-integration.md#결과물-쓰기-도구),
+권한 결정은 [ADR-028](adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
+
+```mermaid
+flowchart TD
+    A[실행 입력에 publicId 와 도구 안내] --> B[Hermes 가 artifact_write 호출]
+    B --> T{MCP 토큰 인증}
+    T -->|실패| U[HTTP 401]
+    T -->|성공| P{도구별 인자 검사}
+    P -->|실패| I[JSON-RPC -32602]
+    P -->|성공| C{UUID 로 토큰 사용자의 활성 대화 조회}
+    C -->|없는 대화, 지운 대화, 남의 대화| R[isError true]
+    C -->|주인이다| D{대화 폴더 생성과 쓰기 경로 판정}
+    D -->|실패 또는 심볼릭 링크| R
+    D -->|통과| M{본문 방식}
+    M -->|content| S{UTF-8 본문이 5MB 이하}
+    S -->|초과| F[임시 파일 정리와 기존 파일 보존]
+    S -->|이하| W[임시 파일 완성 후 대상 파일 교체]
+    M -->|source_url| V{HTTPS, 허용 호스트와 DNS 검사}
+    V -->|거절| R
+    V -->|통과| H[검사한 IP 로 HTTPS 연결, 원래 호스트 인증]
+    H --> Q{200, 이미지 MIME, 크기와 제한 시간 검사}
+    Q -->|redirect 또는 다운로드 실패| F
+    Q -->|통과| W
+    W -->|저장 실패| F
+    W -->|저장 성공| O[isError false, path 와 byteSize]
+    F --> R
+    O --> E[turn 끝에 현재 대화의 바뀐 HTML 을 답에 묶는다]
+```
+
+URL 검사가 실패하면 다운로드와 저장 단계로 넘어가지 않는다.
+redirect, 잘못된 상태나 MIME, 크기 초과, 연결 실패와 제한 시간 초과는 모두 다운로드 실패다.
+모델은 도구 오류를 받고 요청을 고치거나 만들지 못한 이유를 답한다.
+도구 실패 자체가 이미 돌고 있는 Hermes 실행을 중단하지는 않는다.
+
+**쓰기는 답에 결과물을 연결하지 않는다.**
+현재 대화에 쓴 HTML 은 turn 끝에 `ArtifactService.recordTurn` 이 찾아 그 답에 묶는다.
+CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로 읽는다.
+같은 사용자의 다른 대화에 쓴 파일은 현재 대화의 답에 붙지 않는다.
+그 다른 대화의 turn 시작 뒤 바뀐 HTML 일 때만 그 대화의 답에 붙는다.
+같은 경로에 동시에 쓰면 마지막으로 성공한 파일 교체가 남는다.
+
 ## 결과물 파일을 볼 때
 
 에이전트가 turn 안에 HTML 파일을 만들면 그 답 아래에 파일이 보이고, 누르면 옆 패널에 그 페이지가 뜬다.
 근거는 [ADR-027](adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
+
+아래 저장 요청은 `artifact_write` 구현 뒤의 흐름이다. 현재 Hermes 가 파일을 직접 쓰는 경우에도 저장 뒤의 조회 흐름은 같다.
 
 ```mermaid
 sequenceDiagram
@@ -818,7 +866,8 @@ sequenceDiagram
 
     C->>D: turn 을 시작할 때 대화 폴더를 만든다
     C->>H: 실행 입력 맨 앞에 결과물 폴더 단락
-    H->>D: HTML 과 사진을 쓴다
+    H->>C: artifact_write 로 HTML 과 사진 저장을 요청한다
+    C->>D: 토큰 사용자와 대화 주인을 확인하고 저장한다
     H-->>C: turn 이 끝난다
     C->>D: 이번 turn 이 시작한 뒤 바뀐 .html 을 찾는다
     C->>C: 답 메시지에 chat_artifact 행으로 묶는다
