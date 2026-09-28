@@ -627,9 +627,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         setActivity((previous) => previous && applyChatEvent(previous, event));
       } else if ((event.type === "done" || event.type === "stopped") && event.conversationId) {
         state.done = true;
-        if (event.type === "stopped") {
-          setActivity((previous) => previous && applyChatEvent(previous, event));
-        }
+        setActivity((previous) => previous && applyChatEvent(previous, event));
         const finishedExecutionId = event.executionId ?? currentExecutionId.current;
         settleFinishedActivity(finishedExecutionId);
         await callbacks.onDone?.(event);

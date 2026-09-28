@@ -21,6 +21,54 @@ async function openSavedPanel(page: Page) {
   return page.getByTestId("activity-panel");
 }
 
+for (const cancelled of [false, true]) {
+  test(`완료 사건이 없는 자식은 ${cancelled ? "사용자가 중지했을 때만 중지됨" : "결과를 받지 못함"}으로 보인다`, async ({ page }) => {
+    const goal = "이름 없이 자료를 찾는 하위 에이전트";
+    await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: {
+      truncated: false,
+      root: { truncated: false, executionId: 950, agentCode: "browser", agentName: "비서",
+        status: "SUCCEEDED", model: "example-model", inputTokens: 10, outputTokens: 20,
+        estimatedCostMicros: null, latencyMs: 500, startedAt: "2026-09-28T00:00:00Z", children: [],
+        events: [{ sequence: 1, eventType: "SUBAGENT_STARTED", toolName: null, subagentName: null,
+          hermesSessionId: "child-session", detail: goal, model: "child-model", inputTokens: null,
+          outputTokens: null, durationMs: null, failed: null, occurredAt: "2026-09-28T00:00:01Z" }],
+      },
+    } }));
+    if (cancelled) {
+      // 흐름에서는 뿌리 실행이 끝난 뒤 중지할 수 있어 답의 취소 상태도 읽어야 한다.
+      await page.route("**/api/chat/conversations/*/messages", async (route) => {
+        const response = await route.fetch();
+        const turns = await response.json();
+        for (const turn of turns) if (turn.role === "ASSISTANT") turn.status = "CANCELLED";
+        await route.fulfill({ response, json: turns });
+      });
+    }
+    await send(page, "완료 누락 검사");
+    const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+    await expect(block).toBeVisible({ timeout: 30_000 });
+    await block.getByTestId("activity-toggle").click();
+    const item = block.locator('[data-kind="subagent"]');
+    await expect(item).toHaveAttribute("data-state", cancelled ? "stopped" : "result-missing");
+    await expect(item).toContainText(goal);
+    await expect(item).toContainText(cancelled ? "중지됨" : "결과를 받지 못함");
+    if (!cancelled) {
+      await expect(item).toContainText("결과 - · 입력 - · 출력 -");
+      await expect(item).not.toContainText("입력 0");
+      await expect(item).not.toContainText("출력 0");
+    }
+    await block.getByTestId("activity-open-panel").click();
+    const panel = page.getByTestId("activity-panel");
+    await expect(panel.getByText(`하위 에이전트: ${goal}`, { exact: true })).toBeVisible();
+    await expect(panel).not.toContainText("이름 없음");
+    await page.reload();
+    const reloaded = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+    await expect(reloaded).toBeVisible();
+    await reloaded.getByTestId("activity-toggle").click();
+    await expect(reloaded.locator('[data-kind="subagent"]')).toHaveAttribute("data-state",
+      cancelled ? "stopped" : "result-missing");
+  });
+}
+
 test("끝난 답의 패널에서 실행 나무를 보고 단추와 Esc 로 닫는다", async ({ page }, testInfo) => {
   await send(page, "패널 검사");
   const panel = await openSavedPanel(page);

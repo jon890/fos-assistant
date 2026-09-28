@@ -11,7 +11,7 @@ import { fromTree, type ActivityItem, type ActivityState } from "./activity-stat
 type Props =
   | { mode: "live"; state: ActivityState; slow: boolean; expanded: boolean;
       onExpandedChange(value: boolean): void; onOpenPanel?(): void }
-  | { mode: "saved"; summary: ActivitySummary; executionId: number; initialExpanded?: boolean;
+  | { mode: "saved"; summary: ActivitySummary; executionId: number; initialExpanded?: boolean; cancelled?: boolean;
       onOpenPanel?(): void };
 
 export function ActivityBlock(props: Props) {
@@ -29,6 +29,7 @@ export function ActivityBlock(props: Props) {
 
   const expanded = props.mode === "live" ? props.expanded : savedExpanded;
   const executionId = props.mode === "saved" ? props.executionId : null;
+  const cancelled = props.mode === "saved" && props.cancelled === true;
   useEffect(() => {
     if (!expanded || executionId === null || savedItems !== null) return;
     let active = true;
@@ -38,11 +39,11 @@ export function ActivityBlock(props: Props) {
         return response.json() as Promise<ExecutionTreeResponse>;
       })
       .then((tree) => {
-        if (active) { setSavedItems(fromTree(tree)); setLoadFailed(false); }
+        if (active) { setSavedItems(fromTree(tree, { cancelled })); setLoadFailed(false); }
       })
       .catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [expanded, executionId, loadVersion, savedItems]);
+  }, [expanded, executionId, cancelled, loadVersion, savedItems]);
 
   const live = props.mode === "live";
   const latest = live && props.state.endedAt === null

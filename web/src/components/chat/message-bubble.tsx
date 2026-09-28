@@ -241,6 +241,7 @@ export function MessageBubble({
         </div>
         {turn.activity && turn.executionId ? (
           <div className="mb-2"><ActivityBlock mode="saved" summary={turn.activity} executionId={turn.executionId}
+            cancelled={turn.status === "CANCELLED"}
             initialExpanded={initialActivityExpanded}
             onOpenPanel={() => onOpenSaved(turn.executionId!)} /></div>
         ) : null}
