@@ -761,6 +761,9 @@ prompt cache 가 붙지 않아서가 아니라 이 API 가 보고하지 않기 �
 `skip_context_files=True` 로 만들고 자식 system prompt 를 goal 로 새로 쓰기 때문이다.
 소스와 실행이 같은 결과를 낸다.
 
+자식의 도구는 `_build_child_agent` 에서 부모 toolset 과의 교집합만 받고,
+`DELEGATE_BLOCKED_TOOLS` 에 포함된 `memory` 등의 도구를 한 번 더 뺀다.
+
 privacy 로는 이쪽이 안전하다. 부모에 넣은 개인 Memory 가 자식으로 새지 않는다.
 대신 자식에게 무언가를 알려야 하면 goal 본문에 직접 적어야 하고,
 그 본문은 Control Plane 이 무엇을 담을지 정해야 한다.
@@ -817,21 +820,24 @@ privacy 로는 이쪽이 안전하다. 부모에 넣은 개인 Memory 가 자식
 
 Runs API 의 `usage` 에는 cache 칸이 없지만 이 경로에는 있다.
 
-### 다만 동기 위임일 때만 받는다
+### 최상위 위임의 완료 사건은 부모 스트림으로 받지 못할 수 있다
 
-`delegate_task` 의 `background` 가 참이면 자식이 백그라운드로 돌고
-**부모 실행이 자식보다 먼저 끝난다.** 그 시점에 SSE 가 닫혀 `subagent.complete` 를 놓친다.
-실측으로 `run.completed` 뒤에 스트림이 닫혔고 자식 사건은 오지 않았다.
+**2026-09-28 에 Hermes v0.21.0 에서 다시 측정했다.**
+`delegate_task` 는 `background` 인자를 무시하며, 그 인자는 도구 스키마에서도 빠져 있다.
+최상위 위임은 항상 비동기로 돌고 **부모 실행이 자식보다 먼저 끝난다.**
+그 시점에 SSE 가 닫혀 `subagent.start` 는 받지만 `subagent.complete` 와 자식 토큰은 받지 못한다.
 
-`background=false` 로 시킨 실행에서는 `subagent.start` 와 `subagent.complete` 가 모두 왔다.
+2026-09-18 에 적은 「`background=false` 로 시킨 실행에서는 시작과 완료 사건이 모두 왔다」 는
+이번 v0.21.0 측정에서 재현되지 않았다. 이 인자로 동기 위임을 보장할 수 없다.
 
 **실행의 자식 목록을 주는 API 는 없다.**
 `GET /api/sessions` 는 `parent_session_id` 질의 인자를 무시하고
 `source` 가 `subagent` 인 session 을 목록에서 제외한다.
 `/v1/runs/{id}/subagents` 같은 경로도 없다. 404 다.
 
-그러므로 자식 사용량을 남기려면 **SSE 를 끝까지 받아야 하고 위임이 동기여야 한다.**
-둘 중 하나가 빠지면 그만큼이 기록에서 사라진다.
+그러므로 부모 SSE 를 끝까지 받아도 자식 사용량이 모두 기록된다고 보장할 수 없다.
+완료 사건을 받지 못한 자식의 결과와 토큰은 모르는 값으로 남긴다.
+부모가 끝났다는 이유로 자식이 중지됐다고 판정하거나 토큰을 0 으로 채우지 않는다.
 
 ### 자식의 모델은 부모의 것이 아니다
 
@@ -938,8 +944,13 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 
 중지한 실행은 그 session 으로 실제로 돈 모델을 읽지 못했다. Control Plane 은 그때 요청에 보낸 모델을 적는다.
 
-API server 로 돌린 실행에서 에이전트가 위임 도구를 찾지 못했다. 같은 profile 의 도구 설정에 `delegation` 이 있었는데도 두 번 모두 그랬다.
-API server 경로에 위임 도구가 드러나지 않는 것으로 보이지만 확정하지 못했다. 그래서 `subagent.start` 와 `subagent.complete` 가 운영에서 오는지는 아직 확인하지 못했다.
+### API server 에서 위임 도구가 빠지는 원인
+
+2026-09-28 에 Hermes v0.21.0 의 소스로 원인을 확인했다.
+API 경로의 도구 목록을 계산하는 `_get_platform_tools` 는 마지막에 `agent.disabled_toolsets` 를 뺀다.
+그래서 도구 설정에 `delegation` 이 있어도 비활성화 목록에 포함되면 위임 도구가 실행에 노출되지 않는다.
+같은 날 실제 실행에서 `subagent.start` 가 오는 것을 확인했지만,
+최상위 위임은 부모가 먼저 끝나 부모 스트림으로 `subagent.complete` 를 받지 못했다.
 
 ### 긴 결과는 잘리지 않고 파일로 빠진다
 
