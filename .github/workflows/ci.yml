@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+      - name: 백엔드 테스트
+        working-directory: backend
+        run: ./gradlew test
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.22.0
+          package_json_file: web/package.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: 웹 빌드
+        env:
+          AUTH_SECRET: build-time-placeholder
+          ASSISTANT_JWT_SECRET: build-time-placeholder
+          CONTROL_PLANE_BASE_URL: http://build-time-placeholder
+          AUTH_GOOGLE_ID: build-time-placeholder
+          AUTH_GOOGLE_SECRET: build-time-placeholder
+        run: pnpm build
+
+  browser:
+    name: browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      # 브라우저 검사의 globalSetup 이 Control Plane 도 띄운다.
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.22.0
+          package_json_file: web/package.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser
+      - name: 실패한 브라우저 검사 결과
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-results
+          # Playwright 설정의 outputDir 은 os.tmpdir() 아래에 있다.
+          path: /tmp/fos-assistant-playwright-results-*
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - run: node test/e2e/run.ts
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - run: node --test 'test/unit/**/*.test.ts'
+
+  public-safe:
+    name: public-safe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: 공개 정보 검사
+        env:
+          DENYLIST_PATTERNS: ${{ secrets.PUBLIC_REPO_DENYLIST }}
+        shell: bash
+        run: |
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          chmod 700 "$work"
+          printf '%s\n' "$DENYLIST_PATTERNS" > "$work/denylist"
+          chmod 600 "$work/denylist"
+          if [ -z "$DENYLIST_PATTERNS" ]; then
+            printf '%s\n' '알림: PUBLIC_REPO_DENYLIST secret 이 비어 형태 패턴만 검사한다.'
+          fi
+          unset DENYLIST_PATTERNS
+          # 위반한 줄에도 비공개 값이 있을 수 있어 검사 원문은 로그에 내지 않는다.
+          if PUBLIC_REPO_DENYLIST="$work/denylist" scripts/check-public-safe.sh > "$work/check.log" 2>&1; then
+            printf '%s\n' '통과: 공개 저장소에 적으면 안 되는 것을 찾지 못했다.'
+          else
+            status=$?
+            printf '%s\n' '::error::공개 정보 검사에 실패했다. 비공개 값 보호를 위해 상세 출력은 생략한다.'
+            exit "$status"
+          fi
