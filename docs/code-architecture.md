@@ -187,6 +187,27 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 **`agent` 가 순서를 알고 `hermes` 는 부르는 방법만 안다.**
 사람을 더할 때 `people` 과 `hermes` 를 나눈 것과 같은 규칙이다.
 
+## 에이전트 도구
+
+에이전트가 쓸 toolset 이다. 목록은 그 profile 설정의 `platform_toolsets.api_server` 가 갖고, 이 저장소는 등급 판정과 화면을 준다.
+데이터베이스에 사본을 두지 않는다. 근거는 [`adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md`](adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
+
+- 등급 표는 코드 한 곳(`agent/domain/AgentToolPolicy`)이 갖는다. 표와 이유는 ADR-029 의 「도구 등급」 이다
+- 설정을 쓸 때 대시보드 plugin 은 허용 목록 밖의 이름을 거절한다. Hermes 를 올릴 때 `fos-home-infra` 의 기능 검사는 모든 profile 의 켜진 목록을 허용 목록과 대조한다. 실행마다 검사하지 않는다
+- 쓸 때는 `platform_toolsets.api_server` 만 켤 toolset 과 `fos-assistant-memory` 로 통째로 쓴다. `agent.disabled_toolsets` 는 모든 platform 에 적용되므로 보내지 않고 기존 값을 둔다
+- 쓴 뒤 공유 listener 의 `GET /p/{profile}/v1/toolsets` 로 내장 도구를 다시 읽는다. 이 경로에는 MCP 서버 이름이 없으므로 기억 MCP 는 비교하지 않는다. 요청한 내장 도구가 빠지거나 분류된 도구가 예상과 다르면 적용 실패다. 추가로 켜진 미분류 도구는 적용 실패로 세지 않고 `unclassifiedEnabled` 로 알린다
+- profile 의 공통 비활성화 목록이 막아 켜지지 않은 toolset 은 `AGENT_TOOLS_NOT_APPLIED` 응답의 `missingToolsets` 로 알린다. 화면은 `GET` 으로 현재 목록을 다시 읽는다
+- 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
+- Hermes 가 쓰기 없이 미분류 toolset 을 켤 수 있다. 도구 응답의 `unclassifiedEnabled` 는 listener 에서 켜진 미분류 이름이고, 화면은 관리자에게 알리라는 경고를 보인다
+- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 읽지 못하면 변경하지 않는다
+- 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다
+
+| 경로 | 누가 | 무엇 |
+| --- | --- | --- |
+| `GET /api/v1/agents/{code}/tools` | 그 에이전트의 주인 또는 `ADMIN` | 응답 `{ "toolsets": [...], "unclassifiedEnabled": [...] }`. `toolsets` 는 등급 표에 있는 이름, 설명, 등급, 켜짐과 요청자의 변경 가능 여부다 |
+| `PUT /api/v1/agents/{code}/tools` | 주인은 주인 등급, `ADMIN` 은 전부 | 본문 `{ "enabled": ["web", "vision"] }`. 켤 toolset 전체다. 바꿀 수 없는 등급은 지금 값과 같아야 한다. 응답은 `GET` 과 같은 모양이다 |
+| `GET`, `PUT /api/v1/admin/agents/{code}/tools` | `ADMIN` | 위와 같은 모양. 다른 사람의 비공개 에이전트는 이 경로로만 다룬다 |
+
 ## 사진 첨부
 
 대화에 올린 사진이다. 본문은 공유 디렉터리에 두고 데이터베이스에는 그것을 가리키는 행만 둔다.
@@ -559,7 +580,7 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/memory` | 개인과 그룹 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
 | `/agents` | 에이전트 목록. `ADMIN` 에게는 모든 에이전트와 새 에이전트 등록이 보인다 |
-| `/agents/{code}` | 에이전트 하나의 설정. 성격, 소개와 추천 질문, `ADMIN` 에게만 관리 절 |
+| `/agents/{code}` | 에이전트 하나의 설정. 성격, 소개와 추천 질문, 도구, `ADMIN` 에게만 관리 절 |
 | `/admin/agents` | 옛 주소. `/agents` 로 넘긴다 |
 
 ### 에이전트 화면
@@ -572,6 +593,7 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | 목록 | 모두 | 내가 쓸 수 있는 에이전트. 누르면 상세로 간다 |
 | 목록 | `ADMIN` | 위에 더해 다른 사람의 비공개 에이전트와 꺼 둔 에이전트도 보인다. 「다른 사람 것」, 「꺼짐」 표시를 붙인다. 목록 위에 막힌 provider 알림과 새 에이전트 등록이 있다 |
 | 상세의 성격, 소개와 추천 질문 | 그 에이전트를 쓸 수 있는 사람. 고치는 것은 주인과 `ADMIN` | 읽기와 쓰기 권한은 [「페르소나」](#페르소나) 의 「누가 고칠 수 있나」 와 같다 |
+| 상세의 도구 | 그 에이전트의 주인과 `ADMIN` | 도구의 켜짐을 보고, 주인은 주인 등급을, `ADMIN` 은 모든 등급을 바꾼다. 다른 사람의 비공개 에이전트는 관리자 경로로 읽고 쓴다 |
 | 상세의 관리 절 | `ADMIN` | 사용 여부, 공개 범위(그룹 공개는 확인 창을 거친다), Hermes 주소, 모델 다시 읽기와 모델 목록 |
 
 **`ADMIN` 이라도 다른 사람의 비공개 에이전트는 성격과 추천 질문을 읽지 못한다.**

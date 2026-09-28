@@ -48,6 +48,7 @@ import { modelSelectionScenario } from "./scenarios/model-selection.ts";
 import { busyScenario } from "./scenarios/busy.ts";
 import { chatAttachmentScenario } from "./scenarios/chat-attachment.ts";
 import { artifactScenario } from "./scenarios/artifact.ts";
+import { AGENT_TOOLS_PROFILE, agentToolsScenario } from "./scenarios/agent-tools.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -94,6 +95,7 @@ const SCENARIOS: readonly Scenario[] = [
   orchestrationScenario,
   chatAttachmentScenario,
   artifactScenario,
+  agentToolsScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
   busyScenario,
   // 막힌 provider 를 만들어 두고 끝나므로 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
@@ -130,7 +132,7 @@ async function makeArtifactRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -206,6 +208,10 @@ async function main(): Promise<void> {
     hermes = await startFakeHermes({
       [DAD_BINDING.profileName]: PROFILE_KEY,
       [FLOW_BINDING.profileName]: PROFILE_KEY,
+      [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
+    }, undefined, {
+      [DAD_BINDING.profileName]: ["fos-assistant-memory"],
+      [AGENT_TOOLS_PROFILE]: ["fos-assistant-memory"],
     });
     console.log(`   ${hermes.baseUrl}`);
 

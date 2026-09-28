@@ -27,6 +27,9 @@ const PROFILE_PATH = /^\/api\/profiles\/(.+)$/;
  */
 const SOUL_PATH = /^\/api\/profiles\/([^/]+)\/soul$/;
 const ENV_PATH = "/api/env";
+const TOOLSET_CATALOG_PATH = "/api/tools/toolsets";
+const CONFIG_PATH = "/api/config";
+const ENABLED_TOOLSETS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/toolsets$/;
 const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)$/;
 const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
@@ -37,6 +40,8 @@ const TEST_HOLD_NEXT_SOUL_PATH = "/__test/hold-next-soul";
 const TEST_RELEASE_HELD_SOUL_PATH = "/__test/release-held-soul";
 const TEST_BUSY_PATH = "/__test/busy";
 const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
+const TEST_HOLD_NEXT_CONFIG_PATH = "/__test/hold-next-config";
+const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 
 /**
  * 대시보드가 기계에게 여는 토큰이다.
@@ -53,6 +58,34 @@ export const FAKE_DASHBOARD_TOKEN = "fake-dashboard-token";
  * 이 key 파일에 쓴 값과 어긋나 그 profile 의 실행이 401 을 받는다.
  */
 const API_KEY_ENV_NAME = "API_SERVER_KEY";
+
+const TOOLSET_CATALOG = [
+  { name: "web", label: "Web", description: "웹을 검색한다" },
+  { name: "vision", label: "Vision", description: "이미지를 읽는다" },
+  { name: "todo", label: "Todo", description: "할 일을 관리한다" },
+  { name: "clarify", label: "Clarify", description: "질문을 명확하게 한다" },
+  { name: "session_search", label: "Session search", description: "대화를 검색한다" },
+  { name: "skills", label: "Skills", description: "스킬을 쓴다" },
+  { name: "tts", label: "Text to speech", description: "글을 읽는다" },
+  { name: "delegation", label: "Delegation", description: "하위 작업을 맡긴다" },
+  { name: "terminal", label: "Terminal", description: "명령을 실행한다" },
+  { name: "file", label: "File", description: "파일을 읽고 쓴다" },
+  { name: "code_execution", label: "Code execution", description: "코드를 실행한다" },
+  { name: "browser", label: "Browser", description: "브라우저를 조작한다" },
+  { name: "computer_use", label: "Computer use", description: "컴퓨터를 조작한다" },
+  { name: "cronjob", label: "Cronjob", description: "일정을 실행한다" },
+  { name: "image_gen", label: "Image generation", description: "이미지를 만든다" },
+  { name: "video_gen", label: "Video generation", description: "동영상을 만든다" },
+  { name: "homeassistant", label: "Home Assistant", description: "집 기기를 제어한다" },
+  { name: "spotify", label: "Spotify", description: "음악을 제어한다" },
+  { name: "discord", label: "Discord", description: "Discord를 제어한다" },
+] as const;
+const MEMORY_MCP = "fos-assistant-memory";
+/** 허용 목록이 없는 API server의 v0.21.3 기본 toolset이다. */
+const DEFAULT_API_SERVER_TOOLSETS = [
+  "browser", "code_execution", "cronjob", "delegation", "file", "image_gen", "memory",
+  "session_search", "skills", "terminal", "todo", "vision", "web", MEMORY_MCP,
+];
 
 /**
  * 동시 실행 한도를 넘겼을 때 실제 Hermes 가 내는 본문이다.
@@ -328,6 +361,10 @@ export type FakeHermes = {
   releaseHeldSoul(): void;
   /** 중지 요청을 받은 실행 번호들이다. */
   stoppedRuns(): readonly string[];
+  holdNextConfig(): void;
+  waitForHeldConfig(): Promise<void>;
+  releaseHeldConfig(): void;
+  dropNextAppliedToolset(name: string): void;
   close(): Promise<void>;
   setArtifactWriteMcp(endpoint: string, token: string): void;
 };
@@ -342,6 +379,7 @@ export type FakeHermes = {
 export function startFakeHermes(
   profileKeys: Record<string, string>,
   label?: string,
+  initialApiServerToolsets: Record<string, string[]> = {},
 ): Promise<FakeHermes> {
   const who = label === undefined ? "fake hermes" : `fake hermes ${label}`;
   /**
@@ -356,6 +394,9 @@ export function startFakeHermes(
   const sessions = new Map<string, Session>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
   const profiles = new Map<string, Record<string, string>>();
+  const apiServerToolsets = new Map(
+    Object.entries(initialApiServerToolsets).map(([profile, toolsets]) => [profile, [...toolsets]]),
+  );
   /**
    * profile 이름과 그 profile 의 `SOUL.md` 본문이다.
    *
@@ -378,6 +419,11 @@ export function startFakeHermes(
   const emptyUntilStopped = new Map<string, ServerResponse>();
   let lastSubmittedInstructions: string | undefined;
   let lastSubmittedInput: string | undefined;
+  let holdNextConfig = false;
+  let heldConfigWaiter: (() => void) | undefined;
+  let heldConfigReady: Promise<void> | undefined;
+  let releaseConfig: (() => void) | undefined;
+  let droppedToolset: string | undefined;
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
 
   const writeArtifactViaMcp = async (conversationId: string): Promise<void> => {
@@ -444,14 +490,53 @@ export function startFakeHermes(
     request: IncomingMessage,
     response: ServerResponse,
     path: string,
+    queryProfile: string | null,
   ): Promise<boolean> => {
     const soulMatch = SOUL_PATH.exec(path);
     const profileMatch = PROFILE_PATH.exec(path);
-    const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || profileMatch !== null;
+    const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || path === TOOLSET_CATALOG_PATH
+      || path === CONFIG_PATH || profileMatch !== null;
     if (!isDashboardPath) return false;
 
     if (!dashboardAuthorized(request)) {
       send(response, 401, { reason: "no_token" });
+      return true;
+    }
+
+    if (request.method === "GET" && path === TOOLSET_CATALOG_PATH) {
+      send(response, 200, TOOLSET_CATALOG.map((toolset) => ({ ...toolset, enabled: false })));
+      return true;
+    }
+
+    if (request.method === "PUT" && path === CONFIG_PATH) {
+      const body = JSON.parse((await readBody(request)) || "{}") as {
+        profile?: string;
+        config?: {
+          platform_toolsets?: { api_server?: unknown };
+        };
+      };
+      const toolsets = body.config?.platform_toolsets?.api_server;
+      const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), MEMORY_MCP]);
+      const exactKeys = Object.keys(body).length === 2 && Object.keys(body).every((key) => key === "profile" || key === "config")
+        && Object.keys(body.config ?? {}).length === 1
+        && Object.keys(body.config ?? {}).every((key) => key === "platform_toolsets")
+        && Object.keys(body.config?.platform_toolsets ?? {}).length === 1;
+      if (body.profile === undefined || queryProfile !== null && queryProfile !== body.profile
+          || !keys[body.profile] || !Array.isArray(toolsets)
+          || !toolsets.includes(MEMORY_MCP) || !toolsets.every((name) => typeof name === "string" && validNames.has(name))
+          || !exactKeys) {
+        send(response, 400, { error: "invalid toolset configuration" });
+        return true;
+      }
+      if (holdNextConfig) {
+        holdNextConfig = false;
+        heldConfigWaiter?.();
+        await new Promise<void>((done) => { releaseConfig = done; });
+        releaseConfig = undefined;
+      }
+      apiServerToolsets.set(body.profile, toolsets.filter((name) => name !== droppedToolset));
+      droppedToolset = undefined;
+      send(response, 200, { ok: true });
       return true;
     }
 
@@ -530,7 +615,8 @@ export function startFakeHermes(
 
   const server: Server = createServer((request, response) => {
     void (async () => {
-      const path = request.url ?? "";
+      const requestUrl = new URL(request.url ?? "/", "http://fake-hermes.test");
+      const path = requestUrl.pathname;
 
       const blockMatch = TEST_BLOCK_PROVIDER_PATH.exec(path);
       if (request.method === "POST" && blockMatch) {
@@ -550,6 +636,16 @@ export function startFakeHermes(
 
       if (request.method === "POST" && path === TEST_CLEAR_BUSY_PATH) {
         busy = false;
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_HOLD_NEXT_CONFIG_PATH) {
+        holdNextConfig = true;
+        heldConfigReady = new Promise<void>((done) => { heldConfigWaiter = done; });
+        return send(response, 204, null);
+      }
+      if (request.method === "POST" && path === TEST_RELEASE_HELD_CONFIG_PATH) {
+        releaseConfig?.();
         return send(response, 204, null);
       }
 
@@ -588,9 +684,18 @@ export function startFakeHermes(
         return send(response, 204, null);
       }
 
-      if (await handleDashboard(request, response, path)) return;
+      if (await handleDashboard(request, response, path, requestUrl.searchParams.get("profile"))) return;
 
       if (request.method === "GET") {
+        const enabledToolsetsMatch = ENABLED_TOOLSETS_PATH.exec(path);
+        if (enabledToolsetsMatch) {
+          const profile = enabledToolsetsMatch[1]!;
+          if (!authorized(request, profile)) return send(response, 401, { error: "bad key for this profile" });
+          const enabled = new Set(apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS);
+          return send(response, 200, [
+            ...TOOLSET_CATALOG.map((toolset) => ({ ...toolset, enabled: enabled.has(toolset.name) })),
+          ]);
+        }
         const modelMatch = MODEL_OPTIONS_PATH.exec(path);
         if (modelMatch) {
           const profile = modelMatch[1];
@@ -866,6 +971,13 @@ export function startFakeHermes(
         },
         releaseHeldSoul,
         stoppedRuns: () => [...stoppedRuns],
+        holdNextConfig: () => {
+          holdNextConfig = true;
+          heldConfigReady = new Promise<void>((done) => { heldConfigWaiter = done; });
+        },
+        waitForHeldConfig: () => heldConfigReady ?? Promise.reject(new Error("유지할 설정을 먼저 지정해야 한다")),
+        releaseHeldConfig: () => releaseConfig?.(),
+        dropNextAppliedToolset: (name) => { droppedToolset = name; },
         setArtifactWriteMcp: (endpoint: string, token: string) => {
           artifactWriteMcp = { endpoint, token };
         },

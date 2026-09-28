@@ -14,6 +14,8 @@ import com.bifos.assistant.agent.presentation.AgentDtos.ModelSyncView;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateModelOptionsRequest;
 import com.bifos.assistant.hermes.HermesModelClient;
+import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/v1/admin/agents")
@@ -39,12 +42,14 @@ public class AgentAdminController {
     private final AppUserRepository users;
     private final CurrentUserProvider currentUser;
     private final HermesModelClient hermesModels;
+    private final HermesToolsetClient hermesToolsets;
     private final AgentModelSync modelSync;
     private final AgentModelSelector models;
     private final AgentEndpointProbe endpointProbe;
     private final FlowRegistry flows;
 
     @PostMapping
+    @Transactional
     public AdminAgentView create(@Valid @RequestBody CreateAgentRequest request) {
         currentUser.requireAdmin();
         if (agents.findByCode(request.code()).isPresent()) {
@@ -55,6 +60,7 @@ public class AgentAdminController {
         if (model == null) {
             throw new ApiException(ErrorCode.AGENT_MODEL_UNKNOWN, "could not read the agent model");
         }
+        requireGroupSafe(request.visibility(), request.apiBaseUrl(), request.hermesProfile());
         Agent agent = Agent.of(request.code(), request.name(),
                 request.hermesProfile(), request.apiBaseUrl(), request.provider(), model,
                 request.costMode(), request.credentialScope(), request.visibility(), ownerId);
@@ -88,10 +94,11 @@ public class AgentAdminController {
     }
 
     @PatchMapping("/{code}")
+    @Transactional
     public AdminAgentView update(@PathVariable String code,
             @Valid @RequestBody UpdateAgentRequest request) {
         currentUser.requireAdmin();
-        Agent agent = requireAgent(code);
+        Agent agent = requireAgentForUpdate(code);
         Long ownerId = request.visibility() == AgentVisibility.PRIVATE
                 ? (request.ownerEmail() == null || request.ownerEmail().isBlank()
                         ? agent.ownerUserId()
@@ -100,8 +107,12 @@ public class AgentAdminController {
         if (request.visibility() == AgentVisibility.PRIVATE && ownerId == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a private agent needs an owner");
         }
+        String apiBaseUrl = effectiveApiBaseUrl(agent, request.apiBaseUrl());
+        if (request.enabled() && request.visibility() == AgentVisibility.GROUP) {
+            requireGroupSafe(request.visibility(), apiBaseUrl, agent.hermesProfile());
+        }
         agent.changeAccess(request.enabled(), request.visibility(), ownerId);
-        applyApiBaseUrl(agent, request.apiBaseUrl());
+        if (!apiBaseUrl.equals(agent.apiBaseUrl())) agent.changeApiBaseUrl(apiBaseUrl);
         Agent saved = agents.save(agent);
         return AdminAgentView.from(saved, models.optionsOf(saved));
     }
@@ -134,12 +145,21 @@ public class AgentAdminController {
      * <p>비어 있거나 지금 값과 같으면 아무것도 하지 않는다. 다른 것만 고치는 요청이 주소를 지우거나
      * 쓸데없이 Hermes 를 부르지 않게 한다. 끝의 {@code /} 만 다른 것도 같은 값으로 본다.
      */
-    private void applyApiBaseUrl(Agent agent, String apiBaseUrl) {
-        if (apiBaseUrl == null || apiBaseUrl.isBlank()) return;
+    private String effectiveApiBaseUrl(Agent agent, String apiBaseUrl) {
+        if (apiBaseUrl == null || apiBaseUrl.isBlank()) return agent.apiBaseUrl();
         String next = stripTrailingSlash(apiBaseUrl.strip());
-        if (next.equals(agent.apiBaseUrl())) return;
+        if (next.equals(agent.apiBaseUrl())) return agent.apiBaseUrl();
         endpointProbe.requireReachable(next, agent.hermesProfile());
-        agent.changeApiBaseUrl(next);
+        return next;
+    }
+
+    private void requireGroupSafe(AgentVisibility visibility, String apiBaseUrl, String profileName) {
+        if (visibility != AgentVisibility.GROUP) return;
+        if (AgentToolPolicy.hasPrivateOnlyToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
+            throw new ApiException(
+                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE,
+                    "shell and file toolsets require a private agent");
+        }
     }
 
     private static String stripTrailingSlash(String value) {
@@ -160,6 +180,11 @@ public class AgentAdminController {
 
     private Agent requireAgent(String code) {
         return agents.findByCode(code)
+                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+    }
+
+    private Agent requireAgentForUpdate(String code) {
+        return agents.findByCodeForUpdate(code)
                 .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
     }
 

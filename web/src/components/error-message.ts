@@ -22,6 +22,9 @@ const MESSAGES: Record<string, string> = {
   CONVERSATION_BUSY: "아직 답을 만들고 있어요. 답이 끝난 뒤 다시 눌러 주세요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
   PERSONA_STALE: "그사이 다른 사용자가 이 성격을 고쳤어요. 최신 본문을 다시 불러왔어요.",
+  AGENT_TOOLS_REQUIRE_PRIVATE: "그룹 공개 에이전트에는 셸과 파일 도구를 켤 수 없어요.",
+  AGENT_TOOLS_NOT_APPLIED: "도구 설정을 적용하지 못했어요. 현재 목록을 다시 읽었어요.",
+  AGENT_BUSY: "다른 설정 변경이 끝날 때까지 기다린 뒤 다시 시도해 주세요.",
   ATTACHMENT_GONE: "보관 기간이 지나 볼 수 없어요.",
 };
 
