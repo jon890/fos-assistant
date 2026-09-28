@@ -100,7 +100,8 @@ public class McpController {
     private static boolean exactlyOneText(JsonNode arguments, String first, String second) {
         boolean hasFirst = arguments.has(first);
         boolean hasSecond = arguments.has(second);
-        return hasFirst != hasSecond && text(arguments, hasFirst ? first : second);
+        return hasFirst != hasSecond && text(arguments, hasFirst ? first : second)
+                && (!hasSecond || !arguments.get(second).asString().isBlank());
     }
 
     private static Map<String, Object> response(JsonNode id, Map<String, Object> result) { Map<String, Object> body = base(id); body.put("result", result); return body; }

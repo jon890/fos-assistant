@@ -31,6 +31,19 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
+    void 빈_허용_목록과_userinfo는_DNS_전에_거절한다() throws Exception {
+        AtomicInteger dns = new AtomicInteger();
+        ArtifactSourceFetcher empty = new ArtifactSourceFetcher(new ArtifactSourceProperties(List.of(), null, null, null),
+                host -> { dns.incrementAndGet(); return new InetAddress[] {InetAddress.getByName("8.8.8.8")}; },
+                (address, host, source, connect, read, cancellation) -> { throw new AssertionError(); });
+        assertThatThrownBy(() -> empty.fetch(URI.create("https://images.example.com/a.png"), "image/png")).isInstanceOf(RuntimeException.class);
+        ArtifactSourceFetcher allowed = fetcher(host -> { dns.incrementAndGet(); return new InetAddress[0]; },
+                (address, host, source, connect, read, cancellation) -> { throw new AssertionError(); });
+        assertThatThrownBy(() -> allowed.fetch(URI.create("https://user@images.example.com/a.png"), "image/png")).isInstanceOf(RuntimeException.class);
+        assertThat(dns).hasValue(0);
+    }
+
+    @Test
     void 허용한_호스트의_공개_IP와_맞는_MIME_이미지만_받는다() throws Exception {
         AtomicInteger connects = new AtomicInteger();
         ArtifactSourceFetcher fetcher = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
@@ -44,6 +57,26 @@ class ArtifactSourceFetcherTest {
         assertThat(fetcher.fetch(URI.create("https://images.example.com/a.png?x=1"), "image/png"))
                 .containsExactly(1, 2, 3);
         assertThat(connects).hasValue(1);
+    }
+
+    @Test
+    void 공개_주소와_특수_용도_주소의_경계를_구분한다() throws Exception {
+        AtomicInteger connects = new AtomicInteger();
+        for (String address : List.of("192.0.1.1", "192.0.0.9", "192.0.0.10", "192.31.196.1", "192.52.193.1")) {
+            ArtifactSourceFetcher publicAddress = fetcher(host -> new InetAddress[] {InetAddress.getByName(address)},
+                    (resolved, host, source, connect, read, cancellation) -> {
+                        connects.incrementAndGet();
+                        return new ArtifactSourceFetcher.Response(200, Map.of("content-type", "image/png"),
+                                new ByteArrayInputStream(new byte[] {1}));
+                    });
+            assertThat(publicAddress.fetch(URI.create("https://images.example.com/a.png"), "image/png"))
+                    .containsExactly(1);
+        }
+        ArtifactSourceFetcher reserved = fetcher(host -> new InetAddress[] {InetAddress.getByName("192.0.0.1")},
+                (resolved, host, source, connect, read, cancellation) -> { throw new AssertionError(); });
+        assertThatThrownBy(() -> reserved.fetch(URI.create("https://images.example.com/a.png"), "image/png"))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(connects).hasValue(5);
     }
 
     @Test
@@ -79,6 +112,48 @@ class ArtifactSourceFetcherTest {
         ArtifactSourceFetcher truncated = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                 (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200, Map.of("content-type", "image/png", "content-length", "2"), new ByteArrayInputStream(new byte[] {1})));
         assertThatThrownBy(() -> truncated.fetch(URI.create("https://images.example.com/a.png"), "image/png")).isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void 이미지_확장자별_MIME와_정확히_5MiB_본문만_받고_실패_응답은_닫는다() throws Exception {
+        Map<String, String> types = Map.of("png", "image/png", "jpg", "image/jpeg", "jpeg", "image/jpeg", "gif", "image/gif", "webp", "image/webp");
+        for (var entry : types.entrySet()) {
+            ArtifactSourceFetcher fetcher = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
+                    (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200, Map.of("content-type", entry.getValue(), "content-length", "1"), new ByteArrayInputStream(new byte[] {1})));
+            assertThat(fetcher.fetch(URI.create("https://images.example.com/a." + entry.getKey()), entry.getValue())).containsExactly(1);
+        }
+        AtomicInteger closed = new AtomicInteger();
+        ArtifactSourceFetcher mismatch = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200, Map.of("content-type", "text/html"), new ByteArrayInputStream(new byte[0]) { @Override public void close() { closed.incrementAndGet(); } }));
+        assertThatThrownBy(() -> mismatch.fetch(URI.create("https://images.example.com/a.png"), "image/png")).isInstanceOf(RuntimeException.class);
+        assertThat(closed).hasValue(1);
+        ArtifactSourceFetcher limit = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200, Map.of("content-type", "image/png", "content-length", String.valueOf(ArtifactSourceFetcher.MAX_BYTES)), new ByteArrayInputStream(new byte[ArtifactSourceFetcher.MAX_BYTES])));
+        assertThat(limit.fetch(URI.create("https://images.example.com/a.png"), "image/png")).hasSize(ArtifactSourceFetcher.MAX_BYTES);
+    }
+
+    @Test
+    void 잘못된_MIME와_초과_길이는_본문을_읽기_전에_거절한다() throws Exception {
+        for (Map<String, String> headers : List.<Map<String, String>>of(
+                Map.of(), Map.of("content-type", "image/jpeg"), Map.of("content-type", "text/html"),
+                Map.of("content-type", "image/svg+xml"),
+                Map.of("content-type", "image/png", "content-length", String.valueOf(ArtifactSourceFetcher.MAX_BYTES + 1)))) {
+            AtomicInteger reads = new AtomicInteger();
+            AtomicInteger closes = new AtomicInteger();
+            ArtifactSourceFetcher invalid = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
+                    (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200,
+                            headers, new ByteArrayInputStream(new byte[] {1}) {
+                                @Override public synchronized int read(byte[] bytes, int offset, int length) {
+                                    reads.incrementAndGet();
+                                    return super.read(bytes, offset, length);
+                                }
+                                @Override public void close() { closes.incrementAndGet(); }
+                            }));
+            assertThatThrownBy(() -> invalid.fetch(URI.create("https://images.example.com/a.png"), "image/png"))
+                    .isInstanceOf(RuntimeException.class);
+            assertThat(reads).hasValue(0);
+            assertThat(closes).hasValue(1);
+        }
     }
 
     @Test
@@ -118,6 +193,8 @@ class ArtifactSourceFetcherTest {
                 "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\n\r\n",
                 "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nTransfer-Encoding: chunked\r\n\r\nZ\r\n",
                 "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nTransfer-Encoding: chunked\r\n\r\n500001\r\nx",
+                "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n"
+                        + ("X: " + "x".repeat(1000) + "\r\n").repeat(20) + "\r\n",
                 "HTTP/1.1 302 Found\r\nLocation: https://127.0.0.1/a\r\n\r\n")) {
             ArtifactSourceFetcher invalid = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                     (address, host, source, connect, read, cancellation) -> parsed(response));

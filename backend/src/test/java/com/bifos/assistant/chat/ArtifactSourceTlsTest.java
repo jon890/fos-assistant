@@ -71,6 +71,32 @@ class ArtifactSourceTlsTest {
         }
     }
 
+    @Test
+    void TLS_응답_머리글이_늦으면_읽기_제한으로_실패한다(@TempDir Path directory) throws Exception {
+        TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
+        try (TlsServer server = new TlsServer(material.serverContext(), Duration.ofMillis(1200), false)) {
+            ArtifactSourceFetcher.SocketTransport transport = new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());
+            assertThatThrownBy(() -> transport.get(InetAddress.getByName("127.0.0.1"), ORIGINAL_HOST,
+                    URI.create("https://" + ORIGINAL_HOST + "/image.png"), Duration.ofSeconds(1),
+                    Duration.ofMillis(300), new ArtifactSourceFetcher.Cancellation())).isInstanceOf(IOException.class);
+            server.await();
+            assertThat(server.hostHeader()).isEqualTo(ORIGINAL_HOST);
+        }
+    }
+
+    @Test
+    void TLS_본문이_조금씩_오면_각_읽기에_제한을_적용한다(@TempDir Path directory) throws Exception {
+        TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
+        try (TlsServer server = new TlsServer(material.serverContext(), Duration.ofMillis(1200), true)) {
+            ArtifactSourceFetcher.SocketTransport transport = new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());
+            try (ArtifactSourceFetcher.Response response = transport.get(InetAddress.getByName("127.0.0.1"), ORIGINAL_HOST,
+                    URI.create("https://" + ORIGINAL_HOST + "/image.png"), Duration.ofSeconds(1),
+                    Duration.ofMillis(300), new ArtifactSourceFetcher.Cancellation())) {
+                assertThatThrownBy(() -> response.body().readAllBytes()).isInstanceOf(IOException.class);
+            }
+        }
+    }
+
     private static TlsMaterial tlsMaterial(Path directory, String subjectAlternativeName) throws Exception {
         Path keyStore = directory.resolve("server.p12");
         Process process = new ProcessBuilder(keytool(), "-genkeypair", "-alias", "server", "-storetype", "PKCS12",
@@ -114,10 +140,18 @@ class ArtifactSourceTlsTest {
         private final AtomicReference<String> requestedSni = new AtomicReference<>();
         private final AtomicReference<String> hostHeader = new AtomicReference<>();
         private final AtomicReference<Throwable> failure = new AtomicReference<>();
+        private final Duration delayedBody;
+        private final boolean splitBody;
 
         TlsServer(SSLContext context) throws IOException {
+            this(context, Duration.ZERO, false);
+        }
+
+        TlsServer(SSLContext context, Duration delayedBody, boolean splitBody) throws IOException {
             socket = (SSLServerSocket) context.getServerSocketFactory().createServerSocket(0, 1,
                     InetAddress.getByName("127.0.0.1"));
+            this.delayedBody = delayedBody;
+            this.splitBody = splitBody;
             worker = Thread.startVirtualThread(this::serve);
         }
 
@@ -155,8 +189,19 @@ class ArtifactSourceTlsTest {
                             .orElse(null));
                 }
                 hostHeader.set(readHostHeader(connection.getInputStream()));
-                connection.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: 2\r\n\r\nok"
+                if (!splitBody && !delayedBody.isZero()) Thread.sleep(delayedBody);
+                connection.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: 2\r\n\r\n"
                         .getBytes(StandardCharsets.US_ASCII));
+                if (splitBody) {
+                    connection.getOutputStream().write('o');
+                    connection.getOutputStream().flush();
+                }
+                if (splitBody && !delayedBody.isZero()) Thread.sleep(delayedBody);
+                if (splitBody) {
+                    connection.getOutputStream().write('k');
+                } else {
+                    connection.getOutputStream().write("ok".getBytes(StandardCharsets.US_ASCII));
+                }
                 connection.getOutputStream().flush();
             } catch (Throwable ex) {
                 failure.set(ex);

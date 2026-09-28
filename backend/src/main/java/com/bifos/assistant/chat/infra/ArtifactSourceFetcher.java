@@ -176,8 +176,9 @@ public class ArtifactSourceFetcher {
 
     private static boolean isPublicV4(int a, int b, int c, int d) {
         if (a == 0 || a == 10 || a == 127 || a >= 224 || (a == 100 && b >= 64 && b <= 127) || (a == 169 && b == 254)
-                || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168) || (a == 192 && b == 0)
-                || (a == 192 && b == 31 && c == 196) || (a == 192 && b == 52 && c == 193) || (a == 192 && b == 88 && c == 99)
+                || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168)
+                || (a == 192 && b == 0 && c == 0 && d != 9 && d != 10)
+                || (a == 192 && b == 88 && c == 99)
                 || (a == 198 && (b == 18 || b == 19)) || (a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113)) return false;
         return true;
     }
@@ -255,9 +256,19 @@ public class ArtifactSourceFetcher {
             } catch (IOException | RuntimeException ex) { try { socket.close(); } catch (IOException ignored) { } throw ex; }
         }
         public static Response parse(Socket socket, InputStream input) throws IOException {
-            ByteArrayOutputStream header = new ByteArrayOutputStream(); int previous = -1, current;
+            ByteArrayOutputStream header = new ByteArrayOutputStream();
+            int ending = 0;
+            int current;
             boolean complete = false;
-            while ((current = input.read()) >= 0) { header.write(current); if (header.size() > MAX_HEADERS) throw new IOException("response headers are too large"); if (previous == '\r' && current == '\n' && header.toString(StandardCharsets.ISO_8859_1).endsWith("\r\n\r\n")) { complete = true; break; } previous = current; }
+            while ((current = input.read()) >= 0) {
+                header.write(current);
+                if (header.size() > MAX_HEADERS) throw new IOException("response headers are too large");
+                ending = (ending << 8) | current;
+                if (header.size() >= 4 && ending == 0x0d0a0d0a) {
+                    complete = true;
+                    break;
+                }
+            }
             if (!complete) throw new IOException("truncated response headers");
             String[] lines = header.toString(StandardCharsets.ISO_8859_1).split("\r\n");
             if (lines.length == 0 || !lines[0].matches("HTTP/1\\.[01] 200 .*")) return new Response(0, Map.of(), closeOnClose(input, socket));
@@ -288,7 +299,22 @@ public class ArtifactSourceFetcher {
         ChunkedInputStream(InputStream input) { this.input = input; }
         @Override public int read() throws IOException { byte[] one = new byte[1]; return read(one) < 0 ? -1 : one[0] & 255; }
         @Override public int read(byte[] bytes, int off, int len) throws IOException { if (done) return -1; if (remaining == 0 || remaining < 0) next(); if (done) return -1; int count = input.read(bytes, off, (int) Math.min(len, remaining)); if (count < 0) throw new IOException("truncated chunk"); remaining -= count; if (remaining == 0) { if (input.read() != '\r' || input.read() != '\n') throw new IOException("invalid chunk ending"); } return count; }
-        private void next() throws IOException { String line = readLine(input); try { remaining = Long.parseLong(line.split(";", 2)[0], 16); } catch (NumberFormatException ex) { throw new IOException("invalid chunk size", ex); } if (remaining < 0) throw new IOException("invalid chunk size"); if (remaining == 0) { while (!readLine(input).isEmpty()) { } done = true; } }
+        private void next() throws IOException {
+            String line = readLine(input);
+            try { remaining = Long.parseLong(line.split(";", 2)[0], 16); }
+            catch (NumberFormatException ex) { throw new IOException("invalid chunk size", ex); }
+            if (remaining < 0) throw new IOException("invalid chunk size");
+            if (remaining == 0) {
+                int trailerBytes = 0;
+                String trailer;
+                do {
+                    trailer = readLine(input);
+                    trailerBytes += trailer.length() + 2;
+                    if (trailerBytes > MAX_HEADERS) throw new IOException("chunk trailer is too large");
+                } while (!trailer.isEmpty());
+                done = true;
+            }
+        }
         private static String readLine(InputStream input) throws IOException { ByteArrayOutputStream line = new ByteArrayOutputStream(); int previous = -1, current; while ((current = input.read()) >= 0) { if (previous == '\r' && current == '\n') { byte[] b = line.toByteArray(); return new String(b, 0, b.length - 1, StandardCharsets.US_ASCII); } if (line.size() >= 1024) throw new IOException("chunk line too long"); line.write(current); previous = current; } throw new IOException("truncated chunk"); }
     }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
+import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
@@ -37,6 +38,7 @@ class McpArtifactWriteToolTest {
     @Autowired AppUserRepository users;
     @Autowired ConversationRepository conversations;
     @Autowired ArtifactStore store;
+    @Autowired ChatArtifactRepository artifacts;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -63,6 +65,7 @@ class McpArtifactWriteToolTest {
         assertThat(output.path("path").asString()).isEqualTo("test/index.html");
         assertThat(output.path("byteSize").asLong()).isEqualTo("<h1>안녕</h1>".getBytes(StandardCharsets.UTF_8).length);
         assertThat(store.resolveInside(conversation.id(), "test/index.html")).isPresent();
+        assertThat(artifacts.count()).isZero();
     }
 
     @Test
@@ -99,7 +102,8 @@ class McpArtifactWriteToolTest {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
         String prefix = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"path\":\"a.html\"";
 
-        for (String suffix : java.util.List.of("}}}", ",\"content\":null}}}", ",\"content\":1}}}", ",\"source_url\":null}}}")) {
+        for (String suffix : java.util.List.of("}}}", ",\"content\":null}}}", ",\"content\":1}}}",
+                ",\"source_url\":null}}}", ",\"source_url\":\"\"}}}", ",\"source_url\":\"  \"}}}")) {
             assertThat(body(raw(dadToken, prefix + suffix)).path("error").path("code").asInt()).isEqualTo(-32602);
         }
     }
@@ -145,11 +149,30 @@ class McpArtifactWriteToolTest {
     }
 
     @Test
+    void 대상이_심볼릭_링크면_저장_실패로_돌리고_기존_파일을_보존한다() throws Exception {
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        store.write(conversation.id(), "original.html", "보존".getBytes(StandardCharsets.UTF_8));
+        String path = "linked-" + UUID.randomUUID() + ".html";
+        var target = store.resolveForWrite(conversation.id(), path);
+        Files.createSymbolicLink(target, target.getParent().resolve("original.html"));
+        try {
+            JsonNode response = body(call(dadToken, conversation.publicId().toString(), path, "덮어쓰기"));
+
+            assertThat(response.path("error").isMissingNode()).isTrue();
+            assertThat(response.path("result").path("isError").asBoolean()).isTrue();
+            assertThat(Files.readString(target.getParent().resolve("original.html"))).isEqualTo("보존");
+        } finally {
+            Files.deleteIfExists(target);
+        }
+    }
+
+    @Test
     void 도구_설명은_5MB_상한과_엄격한_schema를_공개한다() throws Exception {
         JsonNode tools = body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"));
         JsonNode artifact = tools.path("result").path("tools").get(1);
 
         assertThat(artifact.path("description").asString()).contains("5MB를 넘을 수 없다");
+        assertThat(artifact.path("description").asString()).contains("html", "css", "png", "jpg", "jpeg", "gif", "webp");
         assertThat(artifact.path("inputSchema").path("additionalProperties").asBoolean()).isFalse();
         assertThat(artifact.path("inputSchema").path("oneOf")).hasSize(2);
     }

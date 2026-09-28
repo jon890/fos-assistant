@@ -117,16 +117,26 @@ class ArtifactStoreWriteTest {
         Files.writeString(outside.resolve("secret.html"), "비밀");
 
         Files.createSymbolicLink(root.resolve("10"), outside);
-        assertValidation(() -> store.write(10L, "index.html", new byte[0]));
+        assertStoreFailure(() -> store.write(10L, "index.html", new byte[0]));
         Files.delete(root.resolve("10"));
 
         Files.createDirectories(root.resolve("10"));
         Files.createSymbolicLink(root.resolve("10/parent"), outside);
-        assertValidation(() -> store.write(10L, "parent/index.html", new byte[0]));
+        assertStoreFailure(() -> store.write(10L, "parent/index.html", new byte[0]));
 
         Files.createSymbolicLink(root.resolve("10/index.html"), outside.resolve("secret.html"));
-        assertValidation(() -> store.write(10L, "index.html", new byte[0]));
+        assertStoreFailure(() -> store.write(10L, "index.html", new byte[0]));
         assertThat(Files.readString(outside.resolve("secret.html"))).isEqualTo("비밀");
+    }
+
+    @Test
+    void 저장소_루트를_만들지_못하면_저장_실패를_돌린다(@TempDir Path root) throws IOException {
+        Path blockedRoot = root.resolve("blocked");
+        Files.writeString(blockedRoot, "기존 파일");
+        ArtifactStore store = store(blockedRoot, true);
+
+        assertStoreFailure(() -> store.write(10L, "index.html", new byte[0]));
+        assertThat(Files.readString(blockedRoot)).isEqualTo("기존 파일");
     }
 
     private static ArtifactStore store(Path root, boolean forceAtomicMoveFallback) {
@@ -136,6 +146,11 @@ class ArtifactStoreWriteTest {
     private static void assertValidation(ThrowingRunnable action) {
         assertThatThrownBy(action::run)
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+    }
+
+    private static void assertStoreFailure(ThrowingRunnable action) {
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
     }
 
     @FunctionalInterface

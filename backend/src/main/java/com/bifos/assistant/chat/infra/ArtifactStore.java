@@ -359,14 +359,16 @@ public class ArtifactStore {
         if (conversationId == null) {
             throw validation("conversation id is required");
         }
-        Path folder = ensureFolder(conversationId);
+        Path folder = folderOf(conversationId);
+        // 대화 준비에서는 생성 실패를 기록하고 계속하지만, 명시적인 쓰기는 실패를 호출자에게 돌린다.
+        Files.createDirectories(folder);
         if (!Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(folder)) {
-            throw validation("artifact conversation folder is not a directory");
+            throw storeFailure(new IOException("artifact conversation folder is not a directory"));
         }
         Path realRoot = root.toRealPath();
         Path realFolder = folder.toRealPath();
         if (!realFolder.equals(realRoot.resolve(String.valueOf(conversationId)))) {
-            throw validation("artifact conversation folder escapes the root");
+            throw storeFailure(new IOException("artifact conversation folder escapes the root"));
         }
         return realFolder;
     }
@@ -401,25 +403,25 @@ public class ArtifactStore {
         Path child = parent.resolve(name);
         if (Files.exists(child, LinkOption.NOFOLLOW_LINKS)) {
             if (!Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(child)) {
-                throw validation("artifact parent is not a directory");
+                throw storeFailure(new IOException("artifact parent is not a directory"));
             }
         } else {
             Files.createDirectory(child);
         }
         Path realChild = child.toRealPath();
         if (!realChild.startsWith(folder)) {
-            throw validation("artifact parent escapes the conversation folder");
+            throw storeFailure(new IOException("artifact parent escapes the conversation folder"));
         }
         return realChild;
     }
 
     private static void verifyParent(Path parent, Path folder) throws IOException {
         if (!Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(parent)) {
-            throw validation("artifact parent is not a directory");
+            throw storeFailure(new IOException("artifact parent is not a directory"));
         }
         Path realParent = parent.toRealPath();
         if (!realParent.startsWith(folder)) {
-            throw validation("artifact parent escapes the conversation folder");
+            throw storeFailure(new IOException("artifact parent escapes the conversation folder"));
         }
     }
 
@@ -428,7 +430,7 @@ public class ArtifactStore {
             return;
         }
         if (Files.isSymbolicLink(target) || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
-            throw validation("artifact target is not a regular file");
+            throw storeFailure(new IOException("artifact target is not a regular file"));
         }
     }
 
@@ -489,7 +491,7 @@ public class ArtifactStore {
         try {
             BasicFileAttributes attributes = view.readAttributes();
             if (attributes.isSymbolicLink() || !attributes.isRegularFile()) {
-                throw validation("artifact target is not a regular file");
+                throw storeFailure(new IOException("artifact target is not a regular file"));
             }
         } catch (NoSuchFileException ignored) {
             // 대상이 없으면 새 파일로 바꿀 수 있다.
