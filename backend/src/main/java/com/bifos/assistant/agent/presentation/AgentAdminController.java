@@ -108,7 +108,9 @@ public class AgentAdminController {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a private agent needs an owner");
         }
         String apiBaseUrl = effectiveApiBaseUrl(agent, request.apiBaseUrl());
-        requireGroupSafe(request.visibility(), apiBaseUrl, agent.hermesProfile());
+        if (request.enabled() && request.visibility() == AgentVisibility.GROUP) {
+            requireGroupSafe(request.visibility(), apiBaseUrl, agent.hermesProfile());
+        }
         agent.changeAccess(request.enabled(), request.visibility(), ownerId);
         if (!apiBaseUrl.equals(agent.apiBaseUrl())) agent.changeApiBaseUrl(apiBaseUrl);
         Agent saved = agents.save(agent);

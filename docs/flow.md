@@ -203,7 +203,7 @@ sequenceDiagram
     D-->>C: 저장됐다
     C->>L: GET /p/{profile}/v1/toolsets
     L-->>C: API 실행 기준의 켜짐
-    C->>C: 분류된 도구와 기억 MCP 가 요청과 같은가
+    C->>C: 분류된 내장 도구가 요청과 같은가
     C-->>U: 도구 목록과 켜진 미분류 이름
 ```
 

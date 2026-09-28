@@ -694,7 +694,6 @@ export function startFakeHermes(
           const enabled = new Set(apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS);
           return send(response, 200, [
             ...TOOLSET_CATALOG.map((toolset) => ({ ...toolset, enabled: enabled.has(toolset.name) })),
-            { name: MEMORY_MCP, label: "Assistant memory", description: "Control Plane memory", enabled: enabled.has(MEMORY_MCP) },
           ]);
         }
         const modelMatch = MODEL_OPTIONS_PATH.exec(path);

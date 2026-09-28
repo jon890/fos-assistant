@@ -1,9 +1,11 @@
 package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentToolService;
@@ -40,7 +42,7 @@ class AgentToolServiceTest {
     @Test
     void 저장_뒤_다른_목록이_오면_적용되지_않은_오류를_돌린다() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of(), List.of("web"));
+                .thenReturn(List.of(), List.of());
 
         assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
                 .isInstanceOf(ApiException.class)
@@ -96,7 +98,7 @@ class AgentToolServiceTest {
     @Test
     void policy에_없는_켜진_toolset은_별도_목록으로_돌린다() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of("web", "connections", "memory", "fos-assistant-memory"));
+                .thenReturn(List.of("web", "connections", "memory"));
 
         AgentToolService.ToolsetsView result = service.read(owner, agent);
 
@@ -108,17 +110,18 @@ class AgentToolServiceTest {
     @Test
     void 저장_뒤_자동으로_켜진_미분류_toolset은_성공_응답에_남긴다() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of(), List.of("web", "fos-assistant-memory", "connections"));
+                .thenReturn(List.of(), List.of("web", "connections"));
 
         AgentToolService.ToolsetsView result = service.write(owner, agent, List.of("web"));
 
-        org.assertj.core.api.Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
+        assertThat(result.unclassifiedEnabled()).containsExactly("connections");
+        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant-memory"));
     }
 
     @Test
     void 저장_뒤_예상하지_않은_policy_known_toolset은_거절한다() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of(), List.of("web", "terminal", "fos-assistant-memory"));
+                .thenReturn(List.of(), List.of("web", "terminal"));
 
         assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
                 .isInstanceOf(ApiException.class)

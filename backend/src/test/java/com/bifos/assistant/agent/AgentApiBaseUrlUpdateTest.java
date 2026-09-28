@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
@@ -159,6 +160,28 @@ class AgentApiBaseUrlUpdateTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
         verify(agents, never()).save(any(Agent.class));
+    }
+
+    @Test
+    void 그룹_에이전트를_끄는_요청은_도구를_읽지_않는다() {
+        AdminAgentView view = controller.update("dad", new UpdateAgentRequest(false, AgentVisibility.GROUP, null, null));
+
+        assertThat(view.enabled()).isFalse();
+        verifyNoInteractions(hermesToolsets);
+    }
+
+    @Test
+    void 꺼진_그룹_에이전트를_켜기_전에는_private_toolset을_검사한다() {
+        agent.changeAccess(false, AgentVisibility.GROUP, null);
+        when(hermesToolsets.readEnabled(CURRENT_URL, "dad")).thenReturn(java.util.List.of("terminal"));
+
+        assertThatThrownBy(() -> controller.update("dad", request(null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+
+        assertThat(agent.enabled()).isFalse();
+        verify(agents, never()).save(agent);
     }
 
     private static UpdateAgentRequest request(String apiBaseUrl) {
