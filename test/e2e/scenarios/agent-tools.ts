@@ -53,7 +53,7 @@ export const agentToolsScenario: Scenario = {
       headers: { Authorization: `Bearer ${context.hermesProfileKey}` },
     });
     expect(builtinToolsets.status === 200, "API 실행 도구 목록을 읽지 못했다");
-    const builtinNames = (await builtinToolsets.json() as { name: string }[]).map((entry) => entry.name);
+    const builtinNames = (await builtinToolsets.json() as { data: { name: string }[] }).data.map((entry) => entry.name);
     expect(!builtinNames.includes("fos-assistant-memory"), "MCP 서버가 내장 도구 목록에 들어 있다");
 
     step("주인은 자기 등급의 web만 켤 수 있다");

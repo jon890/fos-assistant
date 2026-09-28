@@ -46,6 +46,7 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
                     .retrieve()
                     .body(JsonNode.class);
             List<ToolsetCatalogEntry> result = new ArrayList<>();
+            // 대시보드 `GET /api/tools/toolsets` 는 항목 배열을 그대로 돌려준다.
             for (JsonNode entry : entries(response)) {
                 String name = text(entry, "name");
                 if (name == null) throw malformedResponse();
@@ -67,8 +68,9 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(JsonNode.class);
+            // listener `GET /v1/toolsets` 는 `{"object": "list", "platform": "api_server", "data": [...]}` 로 감싼다.
             List<String> enabled = new ArrayList<>();
-            for (JsonNode entry : entries(response)) {
+            for (JsonNode entry : entries(response == null ? null : response.get("data"))) {
                 String name = text(entry, "name");
                 JsonNode enabledValue = entry.get("enabled");
                 if (name == null || enabledValue == null || !enabledValue.isBoolean()) {
@@ -102,9 +104,7 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         }
     }
 
-    private static Iterable<JsonNode> entries(JsonNode response) {
-        if (response == null) throw malformedResponse();
-        JsonNode values = response.isArray() ? response : response.get("toolsets");
+    private static Iterable<JsonNode> entries(JsonNode values) {
         if (values == null || !values.isArray() || values.isEmpty()) throw malformedResponse();
         List<JsonNode> result = new ArrayList<>();
         values.forEach(result::add);
