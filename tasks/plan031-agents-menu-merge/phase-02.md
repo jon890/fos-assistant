@@ -61,11 +61,12 @@ cd web && pnpm test:browser
 node test/e2e/run.ts
 node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
-grep -rn 'admin/agents' web/src
+grep -rn '에이전트 관리' web/src
+grep -rn 'href: "/admin/agents"' web/src
 ```
 
 - 여섯 명령이 통과한다
-- 마지막 grep 은 `web/src/app/admin/agents/page.tsx` 의 넘기기와 `web/src/app/api/admin/agents/**` 경로만 가리킨다. 브라우저 검사의 관리 API 요청은 그대로 둔다
+- 두 grep 은 아무것도 가리키지 않는다. `/admin/agents` 옛 주소를 넘기는 파일과 관리 API 요청 문자열은 그대로 둔다
 - 모두 통과하면 `tasks/plan031-agents-menu-merge/index.json` 의 `status` 를 `completed` 로, `current_phase` 를 `2` 로 바꾼다
 
 ## 변경 파일
