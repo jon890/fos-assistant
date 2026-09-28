@@ -48,7 +48,7 @@ public class PersonaService {
         Agent agent = agents.requireReadable(user, code);
         if (!agents.isEditableBy(user, agent)) {
             throw new ApiException(
-                    ErrorCode.FORBIDDEN, "only the owner of this agent or the family admin can edit it");
+                    ErrorCode.FORBIDDEN, "only the owner of this agent or the group admin can edit it");
         }
         String trimmed = body == null ? "" : body.strip();
         if (trimmed.isEmpty()) {

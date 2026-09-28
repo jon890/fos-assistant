@@ -10,7 +10,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: [MCP 계약](../../docs/hermes-integration.md#결과물-쓰기-도구), [쓰기 흐름](../../docs/flow.md#결과물을-mcp-로-쓸-때), [실행 입력 안내](../../docs/code-architecture.md#에이전트에게-알리는-법-1), [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md).
+**근거 문서**: [MCP 계약](../../docs/hermes/tools-and-skills.md#결과물-쓰기-도구), [쓰기 흐름](../../docs/flow.md#결과물을-mcp-로-쓸-때), [실행 입력 안내](../../docs/code-architecture.md#에이전트에게-알리는-법-1), [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md).
 
 본문과 URL 저장 서비스가 구현되고 검사를 통과한 뒤 연결한다.
 현재 코드는 아래와 같다. MCP 서버 이름과 프로토콜, 인증 경계는 바꾸지 않는다.
@@ -49,7 +49,7 @@ Spring Boot 4 의 Jackson 3 인 `tools.jackson` 을 사용한다.
 `McpController.call` 은 먼저 이름이 문자열이고 `arguments` 가 객체인지 검사한다.
 이름으로 분기해 `memory_read` 는 지금처럼 정수 `id` 와 Long 범위를 검사한다.
 모르는 이름은 다른 도구의 필수 인자를 요구하지 않고 `-32601` 로 답한다.
-`artifact_write` 는 [MCP 계약](../../docs/hermes-integration.md#결과물-쓰기-도구) 의 인자만 받는다.
+`artifact_write` 는 [MCP 계약](../../docs/hermes/tools-and-skills.md#결과물-쓰기-도구) 의 인자만 받는다.
 UUID 는 36자 표준 문자열 모양을 검사한 뒤 `UUID.fromString` 으로 변환한다.
 숫자 내부 번호와 Java 가 받아들이는 축약 UUID 를 거절한다.
 `content` 와 `source_url` 의 배타 조건과 JSON 타입, `null`, 필수 값과 추가 인자를 검사한다.

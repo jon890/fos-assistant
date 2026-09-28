@@ -4,7 +4,7 @@ test("Memory 화면에서 개인 항목을 만들고 고치고 지운다", async
   const title = `${testInfo.project.name} 음식 선호`;
   await page.goto("/memory");
   await expect(page.getByRole("heading", { name: "받을지 정할 것" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "우리 가족이 함께 아는 것" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "우리 그룹이 함께 아는 것" })).toBeVisible();
   await expect(page.getByRole("button", { name: "저장" })).toBeDisabled();
 
   await page.getByLabel("범위").selectOption("USER");
@@ -27,23 +27,23 @@ test("Memory 화면에서 개인 항목을 만들고 고치고 지운다", async
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewportWidth!);
 });
 
-test("관리자에게만 가족 공용 범위를 보인다", async ({ page }) => {
+test("관리자에게만 그룹 공용 범위를 보인다", async ({ page }) => {
   await page.goto("/memory");
-  await expect(page.getByRole("option", { name: "가족 공용" })).toHaveCount(1);
+  await expect(page.getByRole("option", { name: "그룹 공용" })).toHaveCount(1);
 });
 
-test("MEMBER 역할은 가족 공용 Memory의 범위와 편집 제어를 보지 않는다", async ({ context, page }) => {
+test("MEMBER 역할은 그룹 공용 Memory의 범위와 편집 제어를 보지 않는다", async ({ context, page }) => {
   const title = "MEMBER 편집 금지";
   await page.goto("/memory");
-  await page.getByLabel("범위").selectOption("FAMILY");
+  await page.getByLabel("범위").selectOption("GROUP");
   await page.getByLabel("제목", { exact: true }).fill(title);
-  await page.getByLabel("내용").fill("가족만 아는 내용");
+  await page.getByLabel("내용").fill("그룹만 아는 내용");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   await page.goto("/memory");
-  await expect(page.getByRole("option", { name: "가족 공용" })).toHaveCount(0);
+  await expect(page.getByRole("option", { name: "그룹 공용" })).toHaveCount(0);
   const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
   await expect(item.getByRole("button", { name: "고치기" })).toHaveCount(0);
   await expect(item.getByRole("button", { name: "지우기" })).toHaveCount(0);

@@ -4,7 +4,7 @@ import {
   setSession,
   test,
   PERSONA_AGENT_CODE,
-  PERSONA_FAMILY_AGENT_CODE,
+  PERSONA_GROUP_AGENT_CODE,
 } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
 
@@ -51,20 +51,20 @@ test("가운데 칸을 비우고 저장하면 앞으로 당겨져 채워진다",
   await expect(page.getByRole("textbox", { name: "추천 질문 4" })).toHaveValue("");
 });
 
-test("가족에게 공개된 에이전트는 소개와 추천 질문이 읽기 전용이다", async ({ context, page }) => {
-  // 이 검사 동안만 가족 공개로 두고 끝나면 되돌린다. identity.spec.ts 가 가족 공개 에이전트가
+test("그룹에 공개된 에이전트는 소개와 추천 질문이 읽기 전용이다", async ({ context, page }) => {
+  // 이 검사 동안만 그룹 공개로 두고 끝나면 되돌린다. identity.spec.ts 가 그룹 공개 에이전트가
   // 정확히 하나라고 가정하고 있어, 여기서 하나를 더 남겨 두면 그 검사가 어긋난다.
-  await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "FAMILY", null);
+  await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "GROUP", null);
   try {
-    await setSession(context, { email: "member@example.com", name: "가족 구성원" });
-    await page.goto(`/agents/${PERSONA_FAMILY_AGENT_CODE}`);
+    await setSession(context, { email: "member@example.com", name: "그룹 사용자" });
+    await page.goto(`/agents/${PERSONA_GROUP_AGENT_CODE}`);
 
-    const tagline = page.getByRole("textbox", { name: "가족 성격 비서 소개" });
+    const tagline = page.getByRole("textbox", { name: "그룹 성격 비서 소개" });
     await expect(tagline).toBeVisible();
     await expect(tagline).toHaveAttribute("readonly", "");
     await expect(page.getByRole("textbox", { name: "추천 질문 1" })).toHaveAttribute("readonly", "");
     await expect(page.getByRole("button", { name: "소개와 추천 질문 저장" })).toHaveCount(0);
   } finally {
-    await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "PRIVATE", TEST_EMAIL);
+    await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "PRIVATE", TEST_EMAIL);
   }
 });

@@ -169,7 +169,7 @@ public class AgentAdminController {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a private agent needs an owner");
         }
         return users.findByEmail(ownerEmail)
-                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "no such family member"))
+                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "no such user"))
                 .id();
     }
 }

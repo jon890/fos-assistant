@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 가족을 더하고 목록을 보는 자리다.
+ * 그룹에 사람을 더하고 목록을 보는 자리다.
  *
  * <p>{@code ADMIN} 만 부른다. 여기서 더한 사람은 아직 {@code app_user} 가 없고, 그 사람이 처음
  * 로그인할 때 사용자와 에이전트가 함께 생긴다.
@@ -44,7 +44,7 @@ public class PeopleAdminController {
      * 허용 목록 전체를 준다.
      *
      * <p>들어온 적이 있는지는 {@code app_user} 의 메일 주소를 한 번에 읽어 맞춘다. 사람마다 따로 묻지
-     * 않는 것은 가족 수만큼 질의가 늘어나기 때문이다.
+     * 않는 것은 사용자 수만큼 질의가 늘어나기 때문이다.
      */
     @GetMapping
     public List<PersonView> list() {

@@ -31,8 +31,8 @@ public class Memory {
     @Column(name = "owner_user_id")
     private Long ownerUserId;
 
-    @Column(name = "family_id")
-    private Long familyId;
+    @Column(name = "group_id")
+    private Long groupId;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -65,11 +65,11 @@ public class Memory {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    private Memory(MemoryScope scope, Long ownerUserId, Long familyId, String title, String content,
+    private Memory(MemoryScope scope, Long ownerUserId, Long groupId, String title, String content,
             boolean alwaysInject, MemoryStatus status, Long proposedByExecutionId) {
         this.scope = scope;
         this.ownerUserId = ownerUserId;
-        this.familyId = familyId;
+        this.groupId = groupId;
         this.title = title;
         this.content = content;
         this.alwaysInject = alwaysInject;
@@ -79,9 +79,9 @@ public class Memory {
         this.updatedAt = this.createdAt;
     }
 
-    public static Memory accepted(MemoryScope scope, Long ownerUserId, Long familyId, String title,
+    public static Memory accepted(MemoryScope scope, Long ownerUserId, Long groupId, String title,
             String content, boolean alwaysInject, Long acceptedByUserId) {
-        Memory memory = new Memory(scope, ownerUserId, familyId, title, content, alwaysInject,
+        Memory memory = new Memory(scope, ownerUserId, groupId, title, content, alwaysInject,
                 MemoryStatus.ACCEPTED, null);
         memory.acceptedByUserId = acceptedByUserId;
         memory.acceptedAt = memory.createdAt;
@@ -120,17 +120,17 @@ public class Memory {
         this.updatedAt = Instant.now();
     }
 
-    /** USER 는 주인만, FAMILY 는 같은 가족의 사용자가 본다. */
-    public boolean isReadableBy(Long userId, Long familyId) {
+    /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. */
+    public boolean isReadableBy(Long userId, Long groupId) {
         return scope == MemoryScope.USER
                 ? Objects.equals(ownerUserId, userId)
-                : Objects.equals(this.familyId, familyId);
+                : Objects.equals(this.groupId, groupId);
     }
 
     public Long id() { return id; }
     public MemoryScope scope() { return scope; }
     public Long ownerUserId() { return ownerUserId; }
-    public Long familyId() { return familyId; }
+    public Long groupId() { return groupId; }
     public String title() { return title; }
     public String content() { return content; }
     public boolean alwaysInject() { return alwaysInject; }

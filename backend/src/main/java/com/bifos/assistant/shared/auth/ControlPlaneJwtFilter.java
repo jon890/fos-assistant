@@ -79,7 +79,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             }
             AppUser user = users.resolve(email, name == null || name.isBlank() ? email : name);
             CurrentUser principal =
-                    new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
+                    new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
             var authentication =
                     new UsernamePasswordAuthenticationToken(
                             principal,

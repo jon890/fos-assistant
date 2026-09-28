@@ -1,4 +1,4 @@
-/** Turns a Control Plane error code into something a family member can act on. */
+/** Control Plane 의 오류 코드를 사용자가 행동할 수 있는 문구로 바꾼다. */
 const MESSAGES: Record<string, string> = {
   AGENT_NOT_FOUND: "없는 에이전트이거나 이 계정에서 쓸 수 없는 에이전트다.",
   AGENT_DISABLED: "이 에이전트는 지금 쓰지 않도록 되어 있다.",

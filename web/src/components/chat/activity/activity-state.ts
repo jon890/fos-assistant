@@ -1,8 +1,9 @@
 import type { ChatEvent } from "@/lib/chat-event";
 import type { ExecutionTreeNode, ExecutionTreeResponse } from "@/components/execution/execution-tree";
+import { subagentLabel } from "../../../lib/format.ts";
 
 export type ActivityItemKind = "tool" | "subagent" | "step" | "switched";
-export type ActivityItemState = "running" | "done" | "failed" | "stopped" | "unfinished";
+export type ActivityItemState = "running" | "done" | "failed" | "stopped" | "unfinished" | "result-missing";
 
 export type ActivityItem = {
   key: string;
@@ -32,7 +33,7 @@ export function emptyActivity(startedAt: number): ActivityState {
 
 export function failActivity(state: ActivityState, endedAt: number): ActivityState {
   return { ...state, endedAt, items: state.items.map((item) => item.state === "running"
-    ? { ...item, state: "unfinished" } : item) };
+    ? { ...item, state: item.kind === "subagent" ? "result-missing" : "unfinished" } : item) };
 }
 
 function append(items: ActivityItem[], item: Omit<ActivityItem, "key">): ActivityItem[] {
@@ -45,7 +46,7 @@ function finish(items: ActivityItem[], kind: ActivityItemKind, pairKey: string |
     && (kind === "subagent" && !pairKey ? true : item.pairKey === pairKey));
   if (index < 0) {
     return append(items, {
-      kind, name: kind === "tool" ? event.toolName ?? "도구" : event.goal ?? "하위 에이전트",
+      kind, name: kind === "tool" ? event.toolName ?? "도구" : subagentLabel(null, event.goal ?? event.detail),
       detail: kind === "tool" ? event.detail ?? null : null,
       model: event.model ?? null, inputTokens: event.inputTokens ?? null,
       outputTokens: event.outputTokens ?? null, durationMs: event.durationMs ?? null,
@@ -65,6 +66,7 @@ function finish(items: ActivityItem[], kind: ActivityItemKind, pairKey: string |
 
 export function applyChatEvent(state: ActivityState, event: ChatEvent): ActivityState {
   if (event.type === "reset") return { ...state, items: [] };
+  if (event.type === "done") return failActivity(state, Date.now());
   if (event.type === "stopped") return {
     ...state,
     endedAt: Date.now(),
@@ -81,7 +83,7 @@ export function applyChatEvent(state: ActivityState, event: ChatEvent): Activity
   }
   if (event.type === "subagent") {
     if (event.phase === "started") return { ...state, items: append(items, {
-      kind: "subagent", name: event.goal ?? "하위 에이전트", detail: null,
+      kind: "subagent", name: subagentLabel(null, event.goal ?? event.detail), detail: null,
       model: event.model ?? null, inputTokens: null, outputTokens: null,
       durationMs: null, state: "running", pairKey: event.subagentId ?? null,
     }) };
@@ -110,18 +112,24 @@ export function applyChatEvent(state: ActivityState, event: ChatEvent): Activity
 /**
  * 실행 나무를 작업 과정 항목으로 바꾼다.
  *
- * <p>기본은 끝난 답을 다시 볼 때라서 끝나지 않은 것을 「중지됨」 으로 보인다. 다른 창에서 아직 도는
- * turn 을 볼 때는 `running` 을 주어 도는 것을 그대로 둔다.
+ * <p>끝난 답에서 완료 사건이 없는 자식은 결과를 받지 못한 것으로 보인다. 사용자가 중지한 답만
+ * 「중지됨」 으로 보이고, 다른 창에서 도는 turn 은 `running` 을 주어 그대로 둔다.
  */
-export function fromTree(tree: ExecutionTreeResponse, options: { running?: boolean } = {}): ActivityItem[] {
-  const openNodeState: ActivityItemState = options.running ? "running" : "stopped";
+export function fromTree(tree: ExecutionTreeResponse,
+  options: { running?: boolean; cancelled?: boolean } = {}): ActivityItem[] {
+  const cancelled = (node: ExecutionTreeNode) => node.status === "CANCELLED"
+    || node.events.some((event) => event.eventType === "RUN_CANCELLED");
+  const turnCancelled = options.cancelled || cancelled(tree.root);
   let state = emptyActivity(Date.parse(tree.root.startedAt));
   const visit = (node: ExecutionTreeNode, isRoot: boolean) => {
+    const firstItem = state.items.length;
+    const nodeCancelled = turnCancelled || cancelled(node);
     if (!isRoot && node.events.length > 0) state = { ...state, items: append(state.items, {
-      kind: "subagent", name: node.agentName ?? node.agentCode ?? "하위 에이전트", detail: null,
+      kind: "subagent", name: subagentLabel(node.agentName ?? node.agentCode, null), detail: null,
       model: node.model, inputTokens: node.inputTokens, outputTokens: node.outputTokens,
       durationMs: node.latencyMs, state: node.status === "FAILED" ? "failed" :
-        node.status === "SUCCEEDED" ? "done" : openNodeState, pairKey: `${node.executionId}`,
+        node.status === "SUCCEEDED" ? "done" : node.status === "CANCELLED" ? "stopped" : "running",
+      pairKey: `${node.executionId}`,
     }) };
     for (const event of node.events) {
       switch (event.eventType) {
@@ -133,7 +141,7 @@ export function fromTree(tree: ExecutionTreeResponse, options: { running?: boole
           break;
         case "SUBAGENT_STARTED":
         case "SUBAGENT_COMPLETED":
-          state = applyChatEvent(state, { type: "subagent", goal: event.detail,
+          state = applyChatEvent(state, { type: "subagent", goal: subagentLabel(event.subagentName, event.detail),
             subagentId: event.hermesSessionId,
             model: event.model, inputTokens: event.inputTokens, outputTokens: event.outputTokens,
             durationMs: event.durationMs, failed: event.failed,
@@ -144,9 +152,11 @@ export function fromTree(tree: ExecutionTreeResponse, options: { running?: boole
           break;
       }
     }
+    state = { ...state, items: state.items.map((item, index) => index < firstItem || item.state !== "running"
+      || (options.running && !nodeCancelled) ? item : { ...item,
+        state: nodeCancelled ? "stopped" : item.kind === "subagent" ? "result-missing" : "unfinished" }) };
     node.children.forEach((child) => visit(child, false));
   };
   visit(tree.root, true);
-  if (options.running) return state.items;
-  return state.items.map((item) => item.state === "running" ? { ...item, state: "stopped" } : item);
+  return state.items;
 }

@@ -124,7 +124,7 @@ class PersonRegistrarTest {
                 "example-model",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.FAMILY,
+                AgentVisibility.GROUP,
                 null));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))

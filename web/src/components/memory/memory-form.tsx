@@ -30,7 +30,7 @@ export function MemoryForm({ isAdmin, onCreated }: { isAdmin: boolean; onCreated
   return <form onSubmit={(event) => void submit(event)} className="mb-8 rounded-md border border-border p-4">
     <h2 className="font-semibold">새 Memory</h2>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
-      <div className="grid gap-1.5"><Label htmlFor={`${id}-scope`}>범위</Label><NativeSelect id={`${id}-scope`} name="scope" value={scope} onChange={(event) => setScope(event.target.value)} required><option value="" disabled>고르세요</option><option value="USER">나만</option>{isAdmin ? <option value="FAMILY">가족 공용</option> : null}</NativeSelect></div>
+      <div className="grid gap-1.5"><Label htmlFor={`${id}-scope`}>범위</Label><NativeSelect id={`${id}-scope`} name="scope" value={scope} onChange={(event) => setScope(event.target.value)} required><option value="" disabled>고르세요</option><option value="USER">나만</option>{isAdmin ? <option value="GROUP">그룹 공용</option> : null}</NativeSelect></div>
       <div className="grid gap-1.5"><Label htmlFor={`${id}-title`}>제목</Label><Input id={`${id}-title`} name="title" required maxLength={200} /></div>
     </div>
     {/* Textarea 의 기본 field-sizing-content 는 rows 를 무시하므로 고정으로 되돌린다. */}

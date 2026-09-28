@@ -15,7 +15,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `id` | BIGINT | |
 | `email` | VARCHAR(320) | 유일하다. 로그인한 Google 계정 |
 | `display_name` | VARCHAR(100) | 화면에 보일 이름 |
-| `family_id` | BIGINT | 지금은 한 가구뿐이다 |
+| `group_id` | BIGINT | 사용자가 속한 그룹. 지금은 그룹이 하나뿐이다 |
 | `role` | VARCHAR(20) | `ADMIN` 또는 `MEMBER`. 첫 사용자가 `ADMIN` 이 된다 |
 
 ## allowed_person
@@ -67,7 +67,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `model_synced_at` | DATETIME(6) NULL | Hermes 에서 모델을 읽은 시각 |
 | `cost_mode` | VARCHAR(20) | `SUBSCRIPTION` 또는 `API` |
 | `credential_scope` | VARCHAR(20) | `SHARED_HOUSEHOLD` 또는 `DEDICATED` |
-| `visibility` | VARCHAR(20) | `PRIVATE` 또는 `FAMILY`. 기본값이 없다 |
+| `visibility` | VARCHAR(20) | `PRIVATE` 또는 `GROUP`. 기본값이 없다 |
 | `owner_user_id` | BIGINT NULL | `PRIVATE` 일 때 필요하다 |
 | `enabled` | BOOLEAN | 거짓이면 새 실행을 막는다 |
 | `tagline` | VARCHAR(200) NULL | 새 대화 화면에 보일 한 줄 소개 |
@@ -199,9 +199,9 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
-| `scope` | VARCHAR(20) | `USER` 또는 `FAMILY`. 기본값이 없다 |
+| `scope` | VARCHAR(20) | `USER` 또는 `GROUP`. 기본값이 없다 |
 | `owner_user_id` | BIGINT NULL | `USER` 일 때 필요하다. 그 사람만 본다 |
-| `family_id` | BIGINT NULL | `FAMILY` 일 때 필요하다 |
+| `group_id` | BIGINT NULL | `GROUP` 일 때 필요하다 |
 | `title` | VARCHAR(200) | 색인에 실을 제목 한 줄 |
 | `content` | TEXT | 사실 한 줄 |
 | `always_inject` | BOOLEAN | 본문을 매 실행에 실을지 정한다. 기본값은 `FALSE` |
@@ -215,7 +215,7 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 **`ACCEPTED` 인 항목만 주입한다.**
 `PROPOSED` 는 사람이 아직 보지 않은 것이고, 에이전트가 그것을 사실로 쓰면 안 된다.
 
-주입할 때 요청자의 `USER` 항목과 그 가족의 `FAMILY` 항목만 고른다.
+주입할 때 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목만 고른다.
 다른 사용자의 `USER` 항목은 고르는 단계에서 빠지므로 Hermes 로 나가는 문자열에 들어가지 않는다.
 `proposal_dedup_key`에는 유일 제약이 있어 같은 제안이 동시에 들어와도 두 행이 생기지 않는다.
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md)과
@@ -295,7 +295,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 
 **`hermes_session_id` 와 `model` 과 토큰은 Hermes 가 실어 보낼 때만 채운다.**
-[`hermes-integration.md`](hermes-integration.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
+[`hermes/delegation.md`](hermes/delegation.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
 `subagent.start` 와 `subagent.complete` 에 오는 칸을 적는다.
 `child_session_id` 를 `hermes_session_id` 에, `goal` 을 `detail` 에 옮긴다.
 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.

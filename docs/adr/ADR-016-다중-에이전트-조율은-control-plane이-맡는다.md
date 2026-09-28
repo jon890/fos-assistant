@@ -9,7 +9,7 @@
   중첩 위임이 열리지 않는다는 서술과, 자식 토큰을 받을 길이 없다는 서술이다.
   실제로는 손자가 뜨고 `subagent.complete` 가 자식 토큰을 준다.
   그래서 비용은 더 이상 Kanban 을 기각하는 이유가 아니다. 경계 하나가 남는다.
-  고친 값은 [`hermes-integration.md`](../hermes-integration.md) 가 갖는다.
+  고친 값은 [`hermes/delegation.md`](../hermes/delegation.md) 가 갖는다.
 - **결정**: Task 분해, 에이전트 선택, 의존 관계, 병렬 실행, 재시도와 결과 종합을
   Control Plane이 맡는다.
   Hermes는 `agent_execution` 하나를 실행하는 런타임으로만 쓴다.

@@ -21,11 +21,22 @@ test("답 끝의 질문을 카드로 그리고 고른 답을 다음 메시지로
   await card.getByRole("textbox", { name: "먹은 메뉴 직접 입력" }).fill("만두");
   await submit.click();
 
-  await expect(page.getByTestId("user-message").last()).toHaveText("식당 이름: 행복담\n먹은 메뉴: 국밥, 만두");
-  // 답이 온 뒤 지난 카드는 무엇을 물었는지만 보이고 누를 수 없다.
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText("식당 이름: 행복담\n먹은 메뉴: 국밥, 만두");
+  // 답이 온 뒤 지난 카드에도 고른 답이 남고 누를 수 없다.
   await expect(page.getByTestId("assistant-message")).toHaveCount(2);
   await expect(card.getByTestId("ask-submit")).toHaveCount(0);
   await expect(card.getByRole("radio", { name: "행복담" })).toBeDisabled();
+  await expect(card.getByRole("radio", { name: "행복담" })).toBeChecked();
+  await expect(card.getByRole("checkbox", { name: "국밥" })).toBeChecked();
+  await expect(card.getByRole("checkbox", { name: "직접 입력" })).toBeChecked();
+  await expect(card).toContainText("만두");
+
+  await page.reload();
+  const restored = page.getByTestId("ask-card");
+  await expect(restored.getByRole("radio", { name: "행복담" })).toBeChecked();
+  await expect(restored.getByRole("checkbox", { name: "국밥" })).toBeChecked();
+  await expect(restored.getByRole("checkbox", { name: "직접 입력" })).toBeChecked();
+  await expect(restored).toContainText("만두");
 });
 
 test("카드 대신 입력창으로 답해도 된다", async ({ page }) => {
@@ -40,8 +51,9 @@ test("카드 대신 입력창으로 답해도 된다", async ({ page }) => {
   await composer.fill("잘 모르겠어");
   await page.getByRole("button", { name: "보내기", exact: true }).click();
 
-  await expect(page.getByTestId("user-message").last()).toHaveText("잘 모르겠어");
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText("잘 모르겠어");
   await expect(page.getByTestId("ask-submit")).toHaveCount(0);
+  await expect(page.getByTestId("ask-card").getByRole("radio", { name: "행복담" })).not.toBeChecked();
 });
 
 test("보낸 답이 전송에 실패하면 카드를 다시 누를 수 있다", async ({ page }) => {
@@ -62,5 +74,5 @@ test("보낸 답이 전송에 실패하면 카드를 다시 누를 수 있다", 
   await expect(card.getByTestId("ask-submit")).toBeEnabled();
   await expect(card.getByRole("radio", { name: "행복담" })).toBeChecked();
   await card.getByTestId("ask-submit").click();
-  await expect(page.getByTestId("user-message").last()).toHaveText("식당 이름: 행복담\n먹은 메뉴: 국밥");
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText("식당 이름: 행복담\n먹은 메뉴: 국밥");
 });

@@ -9,7 +9,7 @@ function browserCard(page: Page) {
     .filter({ hasText: "브라우저 비서" });
 }
 
-test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영한다", async ({ page }) => {
+test("그룹 공개로 바꾸기 전에 확인하고 취소와 확인을 반영한다", async ({ page }) => {
   const reset = await page.request.patch("/api/admin/agents/browser", {
     data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
   });
@@ -18,17 +18,17 @@ test("가족 공개로 바꾸기 전에 확인하고 취소와 확인을 반영�
   const card = browserCard(page);
 
   await expect(card.getByText("나만", { exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "가족 공개로 변경" }).click();
-  const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 가족에게 공개할까요?" });
+  await card.getByRole("button", { name: "그룹 공개로 변경" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 그룹에 공개할까요?" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/모든 사용자가 이 에이전트를 골라 대화/)).toBeVisible();
   await dialog.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
   await expect(card.getByText("나만", { exact: true })).toBeVisible();
 
-  await card.getByRole("button", { name: "가족 공개로 변경" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "가족 공개" }).click();
-  await expect(card.getByText("가족 공개", { exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "그룹 공개로 변경" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "그룹 공개" }).click();
+  await expect(card.getByText("그룹 공개", { exact: true })).toBeVisible();
 });
 
 /** 브라우저 비서를 「나만」 으로 되돌리고 관리 화면에서 공개 확인 창을 연다. */
@@ -38,8 +38,8 @@ async function openVisibilityConfirm(page: Page) {
   });
   expect(reset.ok()).toBeTruthy();
   await page.goto("/admin/agents");
-  await browserCard(page).getByRole("button", { name: "가족 공개로 변경" }).click();
-  const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 가족에게 공개할까요?" });
+  await browserCard(page).getByRole("button", { name: "그룹 공개로 변경" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 그룹에 공개할까요?" });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -64,11 +64,11 @@ test("공개 요청이 실패하면 창이 남고 실패 까닭이 보인다", a
     : route.continue());
   const dialog = await openVisibilityConfirm(page);
 
-  await dialog.getByRole("button", { name: "가족 공개" }).click();
+  await dialog.getByRole("button", { name: "그룹 공개" }).click();
 
   await expect(page.getByText("공개 범위를 바꾸지 못했다", { exact: true })).toBeVisible();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "가족 공개" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "그룹 공개" })).toBeEnabled();
   // 창이 열린 동안에는 Radix 가 바깥을 접근성 나무에서 가리므로, 닫은 뒤에 카드를 본다.
   await dialog.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
@@ -87,7 +87,7 @@ test("공개 요청이 도는 동안 Esc 로 닫히지 않고 끝나면 창이 �
   });
   const dialog = await openVisibilityConfirm(page);
 
-  await dialog.getByRole("button", { name: "가족 공개" }).click();
+  await dialog.getByRole("button", { name: "그룹 공개" }).click();
   await expect.poll(() => patchSeen).toBe(true);
   // 누른 뒤에는 단추 이름이 「공개하는 중」 으로 바뀐다.
   const busy = dialog.getByRole("button", { name: "공개하는 중" });
@@ -99,7 +99,7 @@ test("공개 요청이 도는 동안 Esc 로 닫히지 않고 끝나면 창이 �
 
   release();
   await expect(dialog).toBeHidden();
-  await expect(browserCard(page).getByText("가족 공개", { exact: true })).toBeVisible();
+  await expect(browserCard(page).getByText("그룹 공개", { exact: true })).toBeVisible();
 });
 
 test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ page }) => {

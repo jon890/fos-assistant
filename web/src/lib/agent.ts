@@ -23,7 +23,7 @@ export type AdminAgent = {
   modelSyncedAt: string | null;
   costMode: string;
   credentialScope: string;
-  visibility: "PRIVATE" | "FAMILY";
+  visibility: "PRIVATE" | "GROUP";
   ownerUserId: number | null;
   enabled: boolean;
   /** 이 에이전트를 묶어 둔 다중 에이전트 흐름의 이름. 없으면 null 이다 */
@@ -37,7 +37,7 @@ export type AgentView = {
   code: string;
   name: string;
   model: string;
-  visibility: "PRIVATE" | "FAMILY";
+  visibility: "PRIVATE" | "GROUP";
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 흐름이 붙은 에이전트는 거짓이다 */
   acceptsAttachments: boolean;
   /** 새 대화 화면에 보일 한 줄 소개. 비어 있으면 null 이다 */
@@ -66,7 +66,7 @@ export type StartersView = {
 };
 
 export const PRIVATE_VISIBILITY: AdminAgent["visibility"] = "PRIVATE";
-export const FAMILY_VISIBILITY: AdminAgent["visibility"] = "FAMILY";
+export const GROUP_VISIBILITY: AdminAgent["visibility"] = "GROUP";
 
 /** 막힘이 풀리기까지 남은 시간을 사람이 읽는 말로 적는다. */
 export function formatRemaining(seconds: number): string {

@@ -120,7 +120,7 @@ class ChildExecutionRunnerTest {
             modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         }
         return new CurrentUser(
-                user.id(), user.email(), user.displayName(), user.familyId(), user.role());
+                user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private Conversation conversationOf(CurrentUser user, String agentCode) {
@@ -176,7 +176,7 @@ class ChildExecutionRunnerTest {
         modelSelector.replace(childAgent, java.util.List.of(new ModelOption("nvidia", "nemotron")));
         agents.save(childAgent);
         Agent shared = agents.findByCode("child-mom").orElseThrow();
-        shared.changeAccess(true, com.bifos.assistant.agent.domain.AgentVisibility.FAMILY, null);
+        shared.changeAccess(true, com.bifos.assistant.agent.domain.AgentVisibility.GROUP, null);
         agents.save(shared);
         Conversation conversation = conversationOf(dad, "child-dad");
         AgentExecution parent = parentOf(dad, conversation, "child-dad");

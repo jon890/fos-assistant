@@ -5,7 +5,7 @@ import {
   test,
   PERSONA_AGENT_CODE,
   PERSONA_EMPTY_AGENT_CODE,
-  PERSONA_FAMILY_AGENT_CODE,
+  PERSONA_GROUP_AGENT_CODE,
 } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
 
@@ -112,19 +112,19 @@ test("8000자를 넘겨 적는다", async ({ page }) => {
 });
 
 test("고칠 수 없는 에이전트를 연다", async ({ context, page }) => {
-  // 이 검사 동안만 가족 공개로 두고 끝나면 되돌린다. 다른 검사(예: identity.spec.ts)가 관리 화면에
-  // 가족 공개 에이전트가 정확히 하나라고 가정하고 있어, 여기서 하나를 더 남겨 두면 그 검사가 어긋난다.
-  await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "FAMILY", null);
+  // 이 검사 동안만 그룹 공개로 두고 끝나면 되돌린다. 다른 검사(예: identity.spec.ts)가 관리 화면에
+  // 그룹 공개 에이전트가 정확히 하나라고 가정하고 있어, 여기서 하나를 더 남겨 두면 그 검사가 어긋난다.
+  await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "GROUP", null);
   try {
     await setSession(context, { email: "member@example.com", name: "가족 사용자" });
-    await page.goto(`/agents/${PERSONA_FAMILY_AGENT_CODE}`);
+    await page.goto(`/agents/${PERSONA_GROUP_AGENT_CODE}`);
 
-    const textarea = page.getByRole("textbox", { name: "가족 성격 비서 성격" });
+    const textarea = page.getByRole("textbox", { name: "그룹 성격 비서 성격" });
     await expect(textarea).toBeVisible();
     await expect(textarea).toHaveAttribute("readonly", "");
     await expect(page.getByRole("button", { name: "저장", exact: true })).toHaveCount(0);
   } finally {
-    await setAgentVisibility(PERSONA_FAMILY_AGENT_CODE, "PRIVATE", TEST_EMAIL);
+    await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "PRIVATE", TEST_EMAIL);
   }
 });
 

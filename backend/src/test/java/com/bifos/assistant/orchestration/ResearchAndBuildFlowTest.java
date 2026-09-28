@@ -168,7 +168,7 @@ class ResearchAndBuildFlowTest {
         Agent saved = agents.save(agent);
         modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         return new CurrentUser(
-                user.id(), user.email(), user.displayName(), user.familyId(), user.role());
+                user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private static HermesRunResult completed(String runId, String output) {

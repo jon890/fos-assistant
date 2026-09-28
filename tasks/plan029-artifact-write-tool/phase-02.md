@@ -10,7 +10,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: [연동 계약의 SSRF 방어](../../docs/hermes-integration.md#주소-방식과-ssrf-방어), [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md), [쓰기 모듈 배치](../../docs/code-architecture.md#mcp-로-쓰는-자리).
+**근거 문서**: [연동 계약의 SSRF 방어](../../docs/hermes/tools-and-skills.md#주소-방식과-ssrf-방어), [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md), [쓰기 모듈 배치](../../docs/code-architecture.md#mcp-로-쓰는-자리).
 
 본문 저장과 쓰기 경로 판정이 구현되고 검사를 통과한 뒤 수행한다.
 그 기반은 `chat/application/ArtifactWriteService`, `chat/infra/ArtifactStore` 다.

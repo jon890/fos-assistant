@@ -1,4 +1,4 @@
-import { formatDuration } from "@/lib/format";
+import { formatDuration, subagentLabel } from "@/lib/format";
 
 /** 여러 사건을 합쳐 그리려고 만든 한 줄이다. */
 export type MergedEventRow =
@@ -28,8 +28,8 @@ export function ExecutionEventRow({ row }: { row: MergedEventRow }) {
   if (row.kind === "subagent") {
     return (
       <li className="truncate text-sm text-muted-foreground" data-testid="execution-event-row">
-        하위 에이전트: {row.subagentName ?? "이름 없음"}
-        {row.detail ? ` · ${row.detail}` : ""}
+        하위 에이전트: {subagentLabel(row.subagentName, row.detail)}
+        {row.subagentName?.trim() && row.detail ? ` · ${row.detail}` : ""}
       </li>
     );
   }

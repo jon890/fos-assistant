@@ -118,7 +118,7 @@ class ModelSelectionTest {
         users.findByEmail("selection@example.com").ifPresent(users::delete);
 
         AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER));
-        user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.familyId(), saved.role());
+        user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agent = agents.save(Agent.of(
                 AGENT_CODE,
                 "고름",

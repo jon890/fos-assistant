@@ -9,7 +9,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | --- | --- |
 | [`docs/prd.md`](docs/prd.md) | 새 기능이 이 제품에 속하는지 판단할 때 |
 | [`docs/code-architecture.md`](docs/code-architecture.md) | 패키지와 경계를 바꿀 때 |
-| [`docs/hermes-integration.md`](docs/hermes-integration.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
+| [`docs/hermes/README.md`](docs/hermes/README.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
 | [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정을 할 때 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
@@ -22,6 +22,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | 무엇 | 쓰는 말 | 쓰지 않는 말 |
 | --- | --- | --- |
 | 가족 한 사람 | **사용자** | 구성원, member |
+| 사용자들이 모인 단위 | **그룹**, 코드는 `group` | 가족, `family` |
 | 관리자가 아닌 권한 등급 | **`MEMBER` 역할** | 구성원 |
 | Hermes 쪽 격리 단위 | **profile** | |
 | 대화를 시작할 때 고르는 것 | **에이전트** | |
@@ -86,7 +87,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 ### 주제가 아니라 내용으로 나눈다
 
 **Hermes 가 어떻게 동작하는지는 이 저장소가 소유한다.**
-[`docs/hermes-integration.md`](docs/hermes-integration.md) 가 그 자리다.
+[`docs/hermes/README.md`](docs/hermes/README.md) 가 그 자리다.
 우리 환경의 값만 비공개 저장소로 간다.
 
 | 성격 | 어디 | 예 |
@@ -138,6 +139,15 @@ scripts/check-public-safe.sh
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
+GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 여섯 검사를 돌린다.
+PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사하고, main 에 push 하면 main 을 검사한다.
+각 검사는 독립된 job 으로 나란히 돈다. 로컬 직접 확인과 위 규칙은 그대로 유지한다.
+브라우저 검사는 `browser-mobile` 과 `browser-desktop` 으로 나눠 두 폭을 나란히 검사한다.
+
+공개 정보 검사는 repository secret `PUBLIC_REPO_DENYLIST` 를 값 목록으로 쓴다.
+`fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣어야 한다.
+fork PR 처럼 secret 을 받지 못하는 실행은 형태 패턴만 검사하고 그 사실을 로그에 남긴다.
+
 **위 명령을 적힌 순서대로 모두 돌린다.**
 `test/e2e` 는 앞선 실행이 남긴 데이터에 걸려,
 `gradlew test` 를 건너뛰면 `this agent code is already used` 로 실패할 수 있다.
@@ -153,6 +163,8 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.1
 ## 머지는 PR 로 한다
 
 브랜치를 push 하고 PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
+PR 의 merge ref 에서 CI 의 `backend`, `web`, `browser-mobile`, `browser-desktop`, `e2e`, `unit`, `public-safe` 가 모두 통과했는지 확인한다.
+브랜치 보호의 필수 검사는 CI 가 여러 번 안정되게 돈 뒤 따로 정한다.
 PR 을 열면 `.github/workflows/claude-code-review.yml` 이 Claude 코드 리뷰를 돌린다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖고, 그 파일은 이 문서와 `docs/` 를 가리킨다.
 

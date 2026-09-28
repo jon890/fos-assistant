@@ -163,5 +163,5 @@ class McpMemoryToolTest {
                 .compact();
     }
     private JsonNode body(HttpResponse<String> response) { assertThat(response.statusCode()).isEqualTo(200); return json.readTree(response.body()); }
-    private static CurrentUser current(AppUser user) { return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role()); }
+    private static CurrentUser current(AppUser user) { return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()); }
 }

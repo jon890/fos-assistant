@@ -10,7 +10,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md), [연동 계약](../../docs/hermes-integration.md#결과물-쓰기-도구), [패키지 배치](../../docs/code-architecture.md#mcp-로-쓰는-자리).
+**근거 문서**: [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md), [연동 계약](../../docs/hermes/tools-and-skills.md#결과물-쓰기-도구), [패키지 배치](../../docs/code-architecture.md#mcp-로-쓰는-자리).
 
 기존 코드는 `origin/main` 에서 읽었다. 아래 이름은 현재 코드이고 신규 타입은 작업 항목에서 따로 표시한다.
 

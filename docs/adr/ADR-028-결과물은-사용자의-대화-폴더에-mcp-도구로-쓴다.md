@@ -18,7 +18,7 @@
 
 Hermes v0.21.0 의 `HERMES_WRITE_SAFE_ROOT` 는 프로세스 환경값이다.
 profile 별 쓰기 범위를 정하지 못하며, 읽는 범위를 대화 폴더로 제한하는 기능도 아니다.
-근거와 MCP 계약은 [`hermes-integration.md`](../hermes-integration.md#결과물-쓰기-도구) 에 있다.
+근거와 MCP 계약은 [`tools-and-skills.md`](../hermes/tools-and-skills.md#결과물-쓰기-도구) 에 있다.
 
 ### 사용자가 정하는 범위
 
