@@ -1,5 +1,4 @@
-import { formatDuration } from "@/lib/format";
-import { subagentLabel } from "../chat/activity/activity-state";
+import { formatDuration, subagentLabel } from "@/lib/format";
 
 /** 여러 사건을 합쳐 그리려고 만든 한 줄이다. */
 export type MergedEventRow =
