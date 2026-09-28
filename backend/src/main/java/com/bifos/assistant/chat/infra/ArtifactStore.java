@@ -219,6 +219,11 @@ public class ArtifactStore {
         }
     }
 
+    /** 파일 시스템을 열지 않고 결과물 쓰기 경로의 형식과 확장자만 검사한다. */
+    public static void requireWritablePath(String relativePath) {
+        writableParts(relativePath);
+    }
+
     /**
      * 검증한 대화 폴더 안에서 임시 파일을 완성한 뒤 원자적으로 바꾼다.
      *

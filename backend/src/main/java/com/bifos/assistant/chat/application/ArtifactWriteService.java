@@ -2,23 +2,29 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
+import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /** 대화 주인을 확인한 뒤 HTML 또는 CSS 본문을 결과물 폴더에 쓴다. */
 @Service
-@RequiredArgsConstructor
 public class ArtifactWriteService {
 
     static final int MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
     private final ConversationAccess conversations;
     private final ArtifactStore store;
+    private final ArtifactSourceFetcher sourceFetcher;
+
+    public ArtifactWriteService(ConversationAccess conversations, ArtifactStore store, ArtifactSourceFetcher sourceFetcher) {
+        this.conversations = conversations;
+        this.store = store;
+        this.sourceFetcher = sourceFetcher;
+    }
 
     /**
      * 요청한 대화에 본문 파일 하나를 원자적으로 쓴다.
@@ -29,15 +35,24 @@ public class ArtifactWriteService {
     public ArtifactWriteResult write(CurrentUser user, ArtifactWriteRequest request) {
         Conversation conversation = conversations.requireOwn(user, request.conversationId());
         byte[] content = contentOf(request);
-        requireWritableExtension(request.path());
         long byteSize = store.write(conversation.id(), request.path(), content);
         return new ArtifactWriteResult(request.path(), byteSize);
     }
 
-    private static byte[] contentOf(ArtifactWriteRequest request) {
-        if (request.content() == null || request.sourceUrl() != null) {
-            throw validation("exactly one inline content request is required");
+    private byte[] contentOf(ArtifactWriteRequest request) {
+        if ((request.content() == null) == (request.sourceUrl() == null)) {
+            throw validation("exactly one artifact content request is required");
         }
+        if (request.sourceUrl() != null) {
+            ArtifactStore.requireWritablePath(request.path());
+            String contentType = imageContentType(request.path());
+            try {
+                return sourceFetcher.fetch(java.net.URI.create(request.sourceUrl()), contentType);
+            } catch (IllegalArgumentException ex) {
+                throw validation("artifact source URL is invalid");
+            }
+        }
+        requireInlineExtension(request.path());
         byte[] content = request.content().getBytes(StandardCharsets.UTF_8);
         if (content.length > MAX_CONTENT_BYTES) {
             throw validation("artifact content must not exceed 5 MiB");
@@ -45,7 +60,7 @@ public class ArtifactWriteService {
         return content;
     }
 
-    private static void requireWritableExtension(String path) {
+    private static void requireInlineExtension(String path) {
         if (path == null) {
             throw validation("artifact path is required");
         }
@@ -55,6 +70,14 @@ public class ArtifactWriteService {
         if (!extension.equals("html") && !extension.equals("css")) {
             throw validation("inline artifact content must be HTML or CSS");
         }
+    }
+
+    private static String imageContentType(String path) {
+        if (path == null) throw validation("artifact path is required");
+        String contentType = ArtifactStore.contentTypeOf(path).orElseThrow(() -> validation("URL artifact path must be an image"));
+        String mediaType = contentType.split(";", 2)[0];
+        if (!mediaType.startsWith("image/")) throw validation("URL artifact path must be an image");
+        return mediaType;
     }
 
     private static ApiException validation(String message) {
