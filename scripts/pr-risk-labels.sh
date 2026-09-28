@@ -37,7 +37,7 @@ while IFS= read -r path; do
   case "$path" in
     backend/src/main/java/com/bifos/assistant/hermes/* | \
     test/e2e/fake-hermes.ts | \
-    docs/hermes-integration.md)
+    docs/hermes/*)
       hermes=1 ;;
   esac
   case "$path" in
