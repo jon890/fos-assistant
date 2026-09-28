@@ -1,3 +1,10 @@
+/** 이름이 없는 사건은 목표나 preview로 구분하고, 긴 본문은 코드 포인트 단위로 줄인다. */
+export function subagentLabel(name: string | null | undefined, goal: string | null | undefined): string {
+  const label = name?.trim() || goal?.trim() || "하위 에이전트";
+  const codePoints = Array.from(label);
+  return codePoints.length > 80 ? `${codePoints.slice(0, 79).join("")}…` : label;
+}
+
 /** 토큰 수를 자릿수 구분이 있는 문자열로 바꾼다. */
 export function formatTokens(tokens: number | null): string {
   return tokens === null ? "-" : tokens.toLocaleString("ko-KR");

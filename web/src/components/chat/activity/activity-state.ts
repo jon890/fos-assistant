@@ -1,5 +1,6 @@
 import type { ChatEvent } from "@/lib/chat-event";
 import type { ExecutionTreeNode, ExecutionTreeResponse } from "@/components/execution/execution-tree";
+import { subagentLabel } from "../../../lib/format.ts";
 
 export type ActivityItemKind = "tool" | "subagent" | "step" | "switched";
 export type ActivityItemState = "running" | "done" | "failed" | "stopped" | "unfinished" | "result-missing";
@@ -28,12 +29,6 @@ export const STEP_LABELS: Record<string, string> = {
 
 export function emptyActivity(startedAt: number): ActivityState {
   return { items: [], startedAt, endedAt: null };
-}
-
-/** 이름이 없는 사건은 목표나 preview로 구분하고, 긴 본문은 줄인다. */
-export function subagentLabel(name: string | null | undefined, goal: string | null | undefined): string {
-  const label = name?.trim() || goal?.trim() || "하위 에이전트";
-  return label.length > 80 ? `${label.slice(0, 79)}…` : label;
 }
 
 export function failActivity(state: ActivityState, endedAt: number): ActivityState {
