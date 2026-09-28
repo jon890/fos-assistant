@@ -19,7 +19,7 @@ public enum ErrorCode {
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),
     AGENT_MODEL_UNKNOWN(HttpStatus.BAD_GATEWAY),
-    /** 셸이나 파일에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
+    /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */
     AGENT_TOOLS_NOT_APPLIED(HttpStatus.BAD_GATEWAY),

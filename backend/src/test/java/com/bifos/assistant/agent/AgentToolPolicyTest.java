@@ -77,6 +77,23 @@ class AgentToolPolicyTest {
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
     }
 
+    @Test
+    void 지난_대화_검색은_관리자만_켜고_그룹_에이전트에는_둘_수_없다() {
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        OWNER, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.FORBIDDEN);
+        assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
+                        ADMIN, agent(AgentVisibility.GROUP), List.of("session_search"), List.of()))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
+        assertThat(AgentToolPolicy.requestedForWrite(
+                ADMIN, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
+                .containsExactly("session_search", AgentToolPolicy.MEMORY_MCP);
+    }
+
     private static Agent agent(AgentVisibility visibility) {
         return Agent.of("tool-agent", "도구", "tool-profile", "http://example.test/p/tool-profile",
                 "provider", "model", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, 1L);
