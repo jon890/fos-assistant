@@ -223,6 +223,19 @@ class ResearchAndBuildFlowTest {
         ChatTurn turn = chat.send(dad, null, "전기차를 사는 게 나을까?", MY_AGENT);
 
         assertThat(turn.assistantText()).isEqualTo("합친 답");
+        Conversation conversation = conversations.findById(turn.conversationId()).orElseThrow();
+        assertThat(stub().received()).hasSize(4)
+                .allSatisfy(command -> {
+                    if (command.input().contains(CHIEF_MARK)) {
+                        assertThat(command.input()).contains("요청:\n[결과물 폴더]\n");
+                    } else {
+                        assertThat(command.input()).startsWith("[결과물 폴더]\n");
+                    }
+                    assertThat(command.input()).contains("대화 식별자: " + conversation.publicId() + "\n");
+                });
+        assertThat(messages.findAll().stream().filter(message -> message.role() == MessageRole.USER))
+                .singleElement().satisfies(message ->
+                        assertThat(message.content()).isEqualTo("전기차를 사는 게 나을까?"));
         List<AgentExecution> all = executionsOf(dad);
         assertThat(all).hasSize(4);
 

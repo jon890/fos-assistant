@@ -175,7 +175,7 @@ public class ChatService {
         // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
         Instant startedAt = Instant.now();
         artifactStore.ensureFolder(conversation.id());
-        String input = artifacts.agentPreamble(conversation.id())
+        String input = artifacts.agentPreamble(conversation)
                 + attachments.agentInput(conversation.id(), routed.attached(), text);
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
@@ -305,7 +305,7 @@ public class ChatService {
             }
             Instant startedAt = Instant.now();
             artifactStore.ensureFolder(conversation.id());
-            String input = artifacts.agentPreamble(conversation.id())
+            String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), text);
             ChatTurn turn = routed.flow().run(user, conversation, routed.agent(), text, input,
                     intent,

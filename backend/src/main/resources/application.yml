@@ -72,6 +72,12 @@ assistant:
     agent-root: ${ASSISTANT_ARTIFACT_AGENT_ROOT}
     # 파일이 마지막으로 바뀐 때부터 센다. 지우는 시각은 첨부의 cleanup-cron 을 함께 쓴다
     retention-days: 30
+    source:
+      # 실제 이미지 공급자 호스트는 운영 설정에서 검토해 넣는다. 비어 있으면 주소 방식만 거절한다.
+      allowed-hosts: []
+      connect-timeout: 5s
+      read-timeout: 10s
+      total-timeout: 30s
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

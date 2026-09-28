@@ -206,15 +206,20 @@ const ARTIFACT_HEADER = "[결과물 폴더]";
  * 받아 맨 앞이 아니므로 그대로 둔다. 떼지 않으면 입력을 글자 그대로 견주는 분기와 입력을 되돌려 주는 답이 모두
  * 어긋난다.
  */
-function splitArtifactPreamble(input: string): { folder?: string; rest: string } {
+function splitArtifactPreamble(input: string): { folder?: string; conversationId?: string; rest: string } {
   if (!input.startsWith(`${ARTIFACT_HEADER}\n`)) return { rest: input };
   const end = input.indexOf("\n\n");
   if (end < 0) return { rest: input };
-  return { folder: input.slice(0, end).split("\n")[1], rest: input.slice(end + 2) };
+  const lines = input.slice(0, end).split("\n");
+  const identifier = lines.find((line) => line.startsWith("대화 식별자: "));
+  return { folder: lines[1], conversationId: identifier?.slice("대화 식별자: ".length), rest: input.slice(end + 2) };
 }
 
 /** 이 글을 보내면 결과물 폴더에 HTML 과 그것이 부르는 사진을 쓰고 답한다. */
 export const ARTIFACT_PROBE = "결과물 파일 검사";
+
+/** 실제 MCP 호출로 HTML과 CSS를 저장하는지 보는 입력이다. */
+export const ARTIFACT_WRITE_PROBE = "MCP 결과물 파일 검사";
 
 /** HTML 이 부르는 사진이다. 1픽셀짜리 PNG 다. */
 const ONE_PIXEL_PNG = Buffer.from(
@@ -361,6 +366,7 @@ export type FakeHermes = {
   releaseHeldConfig(): void;
   dropNextAppliedToolset(name: string): void;
   close(): Promise<void>;
+  setArtifactWriteMcp(endpoint: string, token: string): void;
 };
 
 /**
@@ -418,6 +424,35 @@ export function startFakeHermes(
   let heldConfigReady: Promise<void> | undefined;
   let releaseConfig: (() => void) | undefined;
   let droppedToolset: string | undefined;
+  let artifactWriteMcp: { endpoint: string; token: string } | undefined;
+
+  const writeArtifactViaMcp = async (conversationId: string): Promise<void> => {
+    if (artifactWriteMcp === undefined) throw new Error("artifact_write MCP runtime is not configured");
+    const request = async (body: unknown): Promise<unknown> => {
+      const response = await fetch(artifactWriteMcp.endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${artifactWriteMcp.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error(`artifact_write MCP HTTP ${response.status}`);
+      return response.json();
+    };
+    await request({ jsonrpc: "2.0", id: 1, method: "initialize" });
+    const notification = await fetch(artifactWriteMcp.endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${artifactWriteMcp.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    });
+    if (notification.status !== 202) throw new Error(`artifact_write MCP notification ${notification.status}`);
+    const listed = await request({ jsonrpc: "2.0", id: 2, method: "tools/list" }) as { result?: { tools?: { name?: string }[] } };
+    if (!listed.result?.tools?.some((tool) => tool.name === "artifact_write")) throw new Error("artifact_write MCP tool was not discovered");
+    for (const [path, content] of [["test/index.html", "<!doctype html><title>MCP 초안</title><h1>MCP 결과물</h1>"], ["test/style.css", "h1 { color: navy; }"]] as const) {
+      const result = await request({ jsonrpc: "2.0", id: path, method: "tools/call", params: { name: "artifact_write", arguments: { conversation_id: conversationId, path, content } } }) as { result?: { content?: { text?: string }[]; isError?: boolean } };
+      if (result.result?.isError === true || result.result?.content?.[0]?.text === undefined) throw new Error("artifact_write MCP call failed");
+      const written = JSON.parse(result.result.content[0].text) as { path?: string; byteSize?: number };
+      if (written.path !== path || typeof written.byteSize !== "number") throw new Error("artifact_write MCP response is invalid");
+    }
+  };
 
   const authorized = (request: IncomingMessage, profile: string): boolean => {
     const expected = keys[profile];
@@ -811,8 +846,9 @@ export function startFakeHermes(
         lastSubmittedInstructions = submitted.instructions;
         // 되돌려 받는 쪽은 원문을 본다. 결과물 폴더 단락이 붙었는지 검사가 이것으로 안다.
         lastSubmittedInput = submitted.input;
-        const { folder: artifactFolder, rest: input } = splitArtifactPreamble(submitted.input ?? "");
+        const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
+        if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId);
         lastSubmittedRuntime = { provider: submitted.provider, model: submitted.model };
         const runId = `run_${shortId()}`;
         const sessionId = submitted.session_id ?? `sess_${shortId()}`;
@@ -943,6 +979,9 @@ export function startFakeHermes(
         waitForHeldConfig: () => heldConfigReady ?? Promise.reject(new Error("유지할 설정을 먼저 지정해야 한다")),
         releaseHeldConfig: () => releaseConfig?.(),
         dropNextAppliedToolset: (name) => { droppedToolset = name; },
+        setArtifactWriteMcp: (endpoint: string, token: string) => {
+          artifactWriteMcp = { endpoint, token };
+        },
         close: () =>
           new Promise<void>((done) => {
             holdNextRun = false;

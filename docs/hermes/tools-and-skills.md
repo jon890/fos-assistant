@@ -258,7 +258,7 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰 |
-| 도구 | `memory_read` |
+| 도구 | `memory_read`, `artifact_write` |
 
 토큰이 요청자를 정한다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
 Control Plane 은 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
@@ -286,6 +286,80 @@ Memory 색인 한 줄은 약 12 토큰이고, `always_inject` 본문은 한 글�
 `always_inject` 는 API 콜 수를 늘리지 않는다.
 Control Plane 이 두 방식을 고르는 기준은
 [`flow.md`](../flow.md#도구와-always_inject-를-고르는-기준)에 둔다.
+
+## 결과물 쓰기 도구
+
+`artifact_write` 는 일반 파일 도구가 없는 profile 에 결과물 저장만 연다.
+`fos-assistant-memory` 서버가 등록된 profile 에서만 보인다. 기존 서버에 도구를 추가하므로 Hermes 서버 등록과 허용 목록을 바꾸지 않는다.
+실행 입력은 이 도구가 있으면 MCP 로 저장하고, 도구가 없고 파일 도구가 있으면 대화 폴더에 직접 쓰도록 안내한다.
+결정은 [ADR-028](../adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
+
+| 인자 | 계약 |
+| --- | --- |
+| `conversation_id` | 필수 UUID 문자열. `Conversation.publicId` 를 가리킨다. 내부 번호를 받지 않는다 |
+| `path` | 필수 상대 경로. 대화 폴더 밖을 가리키지 않는다 |
+| `content` | 선택 문자열. UTF-8 로 저장한다. `html`, `css` 만 받는다 |
+| `source_url` | 선택 HTTPS URL. `png`, `jpg`, `jpeg`, `gif`, `webp` 만 받는다 |
+
+`content` 와 `source_url` 은 정확히 하나만 있어야 한다.
+`content` 는 빈 문자열도 파일 본문으로 인정한다. `source_url` 은 빈 값을 받지 않는다.
+선택 인자에 `null` 을 넣거나 두 방식의 확장자를 섞으면 인자 오류다.
+base64 인자와 정의하지 않은 인자는 거절한다.
+`path` 는 빈 값, 절대 경로, 역슬래시, NUL, 빈 경로 조각과 `.` 또는 `..` 조각을 거절한다.
+확장자의 대소문자는 가리지 않는다.
+공통 상한은 **5MB(5 × 1024 × 1024 바이트)** 이고 본문은 문자 수 대신 UTF-8 바이트 수로 센다.
+경로는 기존 `chat_artifact.path` 에 맞춰 500자까지 받는다.
+
+토큰의 사용자로 `ConversationAccess.requireOwn(CurrentUser, UUID)` 를 호출한다.
+확인 전에는 폴더 생성과 URL 조회를 하지 않는다.
+없는 대화, 지운 대화, 다른 사용자의 대화는 같은 `isError: true` 결과로 숨긴다.
+같은 사용자의 다른 대화는 허용한다.
+도구 입력에 사용자 번호나 profile 을 넣어 요청자를 바꿀 수 없다.
+실행 연결값을 받지 않는 이유는 [도구 호출에는 실행을 가리키는 값이 없다](delegation.md#도구-호출에는-실행을-가리키는-값이-없다) 절이 갖는다.
+
+성공은 기존 MCP 결과의 `content[0].text` 에 JSON 문자열을 담아 반환한다.
+그 JSON 은 `{"path":"test/index.html","byteSize":123}` 모양이며 `isError` 는 `false` 다.
+호스트 경로와 내부 대화 번호는 반환하지 않는다.
+잘못된 인자는 JSON-RPC `-32602`, 모르는 도구는 `-32601` 로 답한다.
+인자 오류의 `error.data` 에는 확장자, 경로 형식, 크기 초과처럼 정해 둔 이유만 담고 입력 경로나 URL query 는 넣지 않는다.
+주인 확인 실패, 파일 저장 실패, URL 방어와 다운로드 실패는 `isError: true` 로 답한다.
+URL 의 query, 응답 본문, 파일시스템 경로를 오류나 로그에 노출하지 않는다.
+
+같은 경로를 덮어쓸 때도 임시 파일을 완성한 뒤 교체한다.
+상한 초과나 다운로드 실패는 임시 파일을 지우고 기존 파일을 보존한다.
+HTML 을 답에 묶는 일은 쓰기 도구가 하지 않는다.
+turn 끝의 `ArtifactService.recordTurn` 이 기존대로 바뀐 HTML 을 찾는다.
+
+### 주소 방식과 SSRF 방어
+
+| 항목 | 계약 |
+| --- | --- |
+| URL | `https` 만. userinfo, fragment, IP 리터럴을 거절한다. 포트는 생략하거나 HTTPS 표준 포트만 받는다 |
+| 호스트 설정 | `assistant.artifact.source.allowed-hosts`. 소문자 ASCII 호스트의 정확한 일치만 허용한다. wildcard 와 접미사 일치를 쓰지 않는다 |
+| 기본 허용 목록 | 빈 목록. 설정 전에는 모든 `source_url` 을 거절하고 `content` 는 허용한다 |
+| DNS | A 와 AAAA 결과를 모두 검사한다. 사설, loopback, link-local, unspecified, multicast, IPv6 ULA 와 IPv4 를 담은 IPv6 의 비공개 주소를 거절한다 |
+| 연결 | 검사한 IP 로 연결한다. 재시도도 검사한 주소만 쓰며 TLS 인증서, SNI 와 HTTP Host 는 원래 호스트를 쓴다 |
+| HTTP | redirect 를 따라가지 않고 200 응답만 받는다. 서버의 인증 헤더와 쿠키를 보내지 않는다 |
+| 형식 | `png` 는 `image/png`, `jpg` 와 `jpeg` 는 `image/jpeg`, `gif` 는 `image/gif`, `webp` 는 `image/webp`. MIME 의 매개변수는 제외하고 비교한다 |
+| 크기 | `Content-Length` 가 상한보다 크면 읽기 전에 거절한다. 길이가 있으면 선언된 바이트만 읽고 조기 EOF 를 거절한다. 길이가 없으면 chunked 또는 연결 종료까지 읽되 5MB 를 넘는 순간 거절한다 |
+| 제한 시간 | 연결 5초, 읽기 10초, DNS 를 포함한 호출 전체 30초. 느린 본문이 읽기 제한만 피해도 전체 제한으로 끝낸다 |
+
+DNS 검사 뒤 원래 호스트 URL 을 일반 HTTP 클라이언트로 다시 부르는 구현은 쓰지 않는다.
+클라이언트가 이름을 다시 풀면 검사한 IP 와 연결한 IP 가 달라질 수 있다.
+연결 시점에도 IP 를 고정하고 원래 호스트 인증을 유지해야 한다.
+
+Hermes v0.21.0 의 태그는 `v2026.8.31` 이다.
+[해당 버전의 이미지 생성 소스](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/image_generation_tool.py) 는
+FAL 응답의 첫 이미지 URL 을 `success`, `image` 결과로 돌려준다.
+소스는 출력 호스트를 고정하지 않는다.
+[FAL 공식 응답 예시](https://fal.ai/models/fal-ai/flux/dev/api#output) 의 `images[].url` 은 빈 값이다.
+이 근거로는 실제 출력 호스트를 확정할 수 없어 허용 목록의 기본값을 비워 둔다.
+운영 호스트 확인과 설정은 `fos-home-infra` 에서 맡는다.
+
+[같은 버전의 파일 안전 소스](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/file_safety.py) 의
+`get_safe_write_roots()` 는 `HERMES_WRITE_SAFE_ROOT` 를 프로세스 환경에서 읽는다.
+이 값은 profile 별 쓰기 권한을 정하지 못한다.
+읽기 거절 규칙도 결과물 폴더만 읽게 하는 경계가 아니다.
 
 ## 스킬을 profile 에 붙이는 방법
 

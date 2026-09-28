@@ -14,6 +14,7 @@ import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.ModelOption;
@@ -84,6 +85,7 @@ class ChatServiceTest {
     @Autowired ConversationAccess access;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
+    @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
     @Autowired MemoryService memories;
@@ -190,7 +192,7 @@ class ChatServiceTest {
             assertThat(command.apiBaseUrl()).isEqualTo("http://agent-runtime.test/p/dad");
             // 사용자가 쓴 글 앞에 결과물 폴더 단락이 매 turn 붙는다.
             assertThat(command.input())
-                    .isEqualTo(artifactService.agentPreamble(turn.conversationId()) + "오늘 저녁 뭐 먹을까?");
+                    .isEqualTo(artifactService.agentPreamble(conversations.findById(turn.conversationId()).orElseThrow()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
             assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
             assertThat(command.sessionId()).isNull();

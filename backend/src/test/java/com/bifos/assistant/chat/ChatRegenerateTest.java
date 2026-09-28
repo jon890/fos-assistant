@@ -106,7 +106,7 @@ class ChatRegenerateTest {
                 .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.ASSISTANT);
         assertThat(history.getLast().replacesMessageId()).isEqualTo(history.get(1).id());
         // 다시 생성도 같은 결과물 폴더 단락을 붙인 같은 질문을 보낸다.
-        String expected = artifactService.agentPreamble(conversationId) + "원래 질문";
+        String expected = artifactService.agentPreamble(conversations.findById(conversationId).orElseThrow()) + "원래 질문";
         assertThat(stub().received()).extracting(HermesRunCommand::input)
                 .containsExactly(expected, expected);
         assertThat(stub().received().getLast().instructions())

@@ -6,7 +6,7 @@
  */
 import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
-import { ARTIFACT_PROBE } from "../fake-hermes.ts";
+import { ARTIFACT_PROBE, ARTIFACT_WRITE_PROBE } from "../fake-hermes.ts";
 
 type ChatEvent = { type: string; conversationId?: string; messageId?: number };
 type Message = {
@@ -51,6 +51,8 @@ export const artifactScenario: Scenario = {
 
     const input = context.hermes.lastSubmittedInput() ?? "";
     expect(input.startsWith("[결과물 폴더]\n"), `Hermes 입력이 결과물 폴더 단락으로 시작하지 않는다: ${input}`);
+    expect(input.includes("artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다."),
+      "파일 도구만 있는 에이전트에게 직접 저장할 폴더를 안내하지 않는다");
 
     const messages = expectStatus(
       await call(context, `/chat/conversations/${conversationId}/messages`, { token: context.tokens.dad }),
@@ -99,5 +101,54 @@ export const artifactScenario: Scenario = {
     const otherBody = await other.text();
     expect(other.status === 404 && otherBody.includes("CONVERSATION_NOT_FOUND"),
       `남의 대화 파일 요청이 거절되지 않았다: ${other.status} ${otherBody}`);
+
+    step("MCP 도구가 같은 turn 의 HTML과 CSS를 저장하고 HTML만 답에 묶는다");
+    const issued = expectStatus(
+      await call(context, "/admin/agent-tokens", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { userEmail: "dad@example.com", label: "artifact-e2e" },
+      }),
+      200,
+      "결과물 MCP 토큰 발급",
+    ).json<{ id: number; token: string }>();
+    context.hermes.setArtifactWriteMcp(context.api.replace(/\/api\/v1$/, "") + "/mcp", issued.token);
+    try {
+      const mcpResponse = expectStatus(
+        await call(context, "/chat/messages/stream", {
+          method: "POST",
+          token: context.tokens.dad,
+          body: { text: ARTIFACT_WRITE_PROBE, agentCode: "dad" },
+        }),
+        200,
+        "MCP 결과물 파일 스트림",
+      );
+      const mcpEvents: ChatEvent[] = [];
+      await readEventStream<ChatEvent>(
+        new globalThis.Response(mcpResponse.body, { headers: { "Content-Type": "text/event-stream" } }),
+        (event) => mcpEvents.push(event),
+      );
+      const mcpDone = mcpEvents.find((event) => event.type === "done");
+      expect(mcpDone?.conversationId !== undefined, `MCP 결과물 done 사건이 없다: ${JSON.stringify(mcpEvents)}`);
+      expect((context.hermes.lastSubmittedInput() ?? "").includes("artifact_write 도구가 있으면 그것으로 저장한다."),
+        "MCP 도구가 있는 에이전트에게 저장 방법을 안내하지 않는다");
+      const mcpConversationId = mcpDone!.conversationId!;
+      const mcpMessages = expectStatus(
+        await call(context, `/chat/conversations/${mcpConversationId}/messages`, { token: context.tokens.dad }),
+        200,
+        "MCP 결과물 대화 이력",
+      ).json<Message[]>();
+      const mcpAnswer = mcpMessages.find((message) => message.id === mcpDone!.messageId);
+      expect(mcpAnswer?.artifacts.length === 1 && mcpAnswer.artifacts[0]?.path === "test/index.html",
+        `MCP HTML 결과물이 답에 묶이지 않았다: ${JSON.stringify(mcpAnswer?.artifacts)}`);
+      const mcpHtml = await fetchFile(context, mcpConversationId, "test/index.html");
+      expect(mcpHtml.status === 200 && (await mcpHtml.text()).includes("MCP 결과물"), "MCP HTML 본문이 다르다");
+      const mcpCss = await fetchFile(context, mcpConversationId, "test/style.css");
+      expect(mcpCss.status === 200 && (await mcpCss.text()).includes("color: navy"), "MCP CSS 본문이 다르다");
+    } finally {
+      expectStatus(await call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad }),
+        200,
+        "결과물 MCP 토큰 폐기");
+    }
   },
 };

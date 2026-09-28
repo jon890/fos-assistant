@@ -238,7 +238,7 @@ public class ResearchAndBuildFlow implements Flow {
         AtomicReference<String> submittedRunId = new AtomicReference<>();
         try {
             return children.run(user, conversation, root, agent.code(),
-                    artifacts.agentPreamble(conversation.id()) + task,
+                    artifacts.agentPreamble(conversation) + task,
                     (execution, runId) -> {
                         submittedRunId.set(runId);
                         cancellation.trackRun(root.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId);

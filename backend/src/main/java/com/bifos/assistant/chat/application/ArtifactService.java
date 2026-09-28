@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.ChatArtifact;
+import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactStore.FoundFile;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
@@ -45,10 +46,14 @@ public class ArtifactService {
      * <p>매 turn 붙인다. 에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다. 사진 단락이 있으면 그 앞에 둔다.
      * 저장하는 메시지 본문에는 쓰지 않는다.
      */
-    public String agentPreamble(Long conversationId) {
+    public String agentPreamble(Conversation conversation) {
         return "[결과물 폴더]\n"
-                + store.agentFolder(conversationId) + "\n"
-                + "파일로 결과물을 만들면 이 폴더에 둔다. HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
+                + store.agentFolder(conversation.id()) + "\n"
+                + "대화 식별자: " + conversation.publicId() + "\n"
+                + "artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
+                + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
+                + "artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
+                + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
                 + "\n";
     }
 
