@@ -11,6 +11,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,23 @@ import tools.jackson.databind.json.JsonMapper;
 public class McpToolService {
     private static final Logger log = LoggerFactory.getLogger(McpToolService.class);
     private static final JsonMapper json = JsonMapper.builder().build();
+    private static final Set<String> SAFE_ARTIFACT_FAILURE_MESSAGES = Set.of(
+            "this conversation does not exist",
+            "could not store artifact",
+            "artifact source download is busy",
+            "artifact source download interrupted",
+            "artifact source download timed out",
+            "could not download artifact source",
+            "artifact source host has no addresses",
+            "artifact source host resolves to a non-public address",
+            "could not connect to artifact source",
+            "artifact source did not return success",
+            "artifact source content type is invalid",
+            "artifact source length is invalid",
+            "artifact source length is truncated",
+            "artifact source is too large",
+            "artifact source URL is invalid",
+            "artifact source host is not allowed");
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
 
@@ -63,12 +81,19 @@ public class McpToolService {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
                 throw ex;
             }
-            log.warn("artifact write failed userId={}", user.id());
+            log.warn("artifact write failed userId={} exceptionClass={} errorCode={} reason={}",
+                    user.id(), ex.getClass().getSimpleName(), ex.code(), safeArtifactFailureMessage(ex));
             return result("결과물을 저장할 수 없습니다.", true);
         } catch (RuntimeException ex) {
-            log.warn("artifact write failed userId={}", user.id());
+            log.warn("artifact write failed userId={} exceptionClass={} errorCode={} reason={}",
+                    user.id(), ex.getClass().getSimpleName(), ErrorCode.INTERNAL_ERROR, "unexpected artifact write failure");
             return result("결과물을 저장할 수 없습니다.", true);
         }
+    }
+
+    private static String safeArtifactFailureMessage(ApiException exception) {
+        String message = exception.getMessage();
+        return message != null && SAFE_ARTIFACT_FAILURE_MESSAGES.contains(message) ? message : "artifact write failed";
     }
 
     private static String toJson(ArtifactWriteResult result) {
