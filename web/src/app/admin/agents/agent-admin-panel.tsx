@@ -7,7 +7,7 @@ import { AgentList } from "@/components/admin/agent-list";
 import { VisibilityConfirm } from "@/components/admin/visibility-confirm";
 import { describeError } from "@/components/error-message";
 import {
-  FAMILY_VISIBILITY,
+  GROUP_VISIBILITY,
   PRIVATE_VISIBILITY,
   formatRemaining,
   type AdminAgent,
@@ -177,9 +177,9 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
     else void update(agent, { visibility: PRIVATE_VISIBILITY }, "private");
   }
 
-  async function confirmFamilyVisibility() {
+  async function confirmGroupVisibility() {
     if (!confirmingAgent) return;
-    if (await update(confirmingAgent, { visibility: FAMILY_VISIBILITY }, "family")) {
+    if (await update(confirmingAgent, { visibility: GROUP_VISIBILITY }, "group")) {
       setConfirmingAgent(null);
     }
   }
@@ -188,7 +188,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
     <div className="mx-auto w-full max-w-4xl">
       <h1 className="mb-2 text-xl font-semibold">에이전트 관리</h1>
       <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
-        공개 범위는 보안 설정이다. 가족 공개로 바꾸면 모든 사용자가 이 에이전트로 대화할 수 있다.
+        공개 범위는 보안 설정이다. 그룹 공개로 바꾸면 그룹의 모든 사용자가 이 에이전트로 대화할 수 있다.
         연결된 도구와 자료도 함께 쓸 수 있는지 확인해야 한다.
       </p>
       {blocked.length > 0 ? (
@@ -212,7 +212,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail }: Props) {
         onApiBaseUrlChange={changeApiBaseUrl}
       />
       {confirmingAgent ? (
-        <VisibilityConfirm agent={confirmingAgent} busy={pending?.action === "family"} onCancel={() => setConfirmingAgent(null)} onConfirm={() => void confirmFamilyVisibility()} />
+        <VisibilityConfirm agent={confirmingAgent} busy={pending?.action === "group"} onCancel={() => setConfirmingAgent(null)} onConfirm={() => void confirmGroupVisibility()} />
       ) : null}
     </div>
   );

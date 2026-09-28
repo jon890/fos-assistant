@@ -44,7 +44,7 @@ class StarterServiceTest {
 
     private static final String OWNED = "starter-owned";
     private static final String SHARED_OWNED = "starter-shared-owned";
-    private static final String FAMILY = "starter-family";
+    private static final String GROUP = "starter-group";
     private static final String OTHERS = "starter-others";
 
     private static final CurrentUser OWNER =
@@ -60,15 +60,15 @@ class StarterServiceTest {
 
     @BeforeEach
     void 준비한다() {
-        for (String code : List.of(OWNED, SHARED_OWNED, FAMILY, OTHERS)) {
+        for (String code : List.of(OWNED, SHARED_OWNED, GROUP, OTHERS)) {
             agents.findByCode(code).ifPresent(agent -> {
                 prompts.deleteAll(prompts.findByAgentIdOrderByPositionAsc(agent.id()));
                 agents.delete(agent);
             });
         }
         agents.save(agent(OWNED, AgentVisibility.PRIVATE, OWNER.id()));
-        agents.save(agent(SHARED_OWNED, AgentVisibility.FAMILY, OWNER.id()));
-        agents.save(agent(FAMILY, AgentVisibility.FAMILY, null));
+        agents.save(agent(SHARED_OWNED, AgentVisibility.GROUP, OWNER.id()));
+        agents.save(agent(GROUP, AgentVisibility.GROUP, null));
         agents.save(agent(OTHERS, AgentVisibility.PRIVATE, ADMIN.id()));
     }
 
@@ -180,25 +180,25 @@ class StarterServiceTest {
     }
 
     @Test
-    void 가족_공개_에이전트는_MEMBER_는_못_쓰고_ADMIN_은_쓴다() {
-        assertCode(() -> starters.write(MEMBER, FAMILY, "소개", List.of("a")), ErrorCode.FORBIDDEN);
+    void 그룹_공개_에이전트는_MEMBER_는_못_쓰고_ADMIN_은_쓴다() {
+        assertCode(() -> starters.write(MEMBER, GROUP, "소개", List.of("a")), ErrorCode.FORBIDDEN);
 
-        StarterSnapshot written = starters.write(ADMIN, FAMILY, "소개", List.of("a"));
+        StarterSnapshot written = starters.write(ADMIN, GROUP, "소개", List.of("a"));
 
         assertThat(written.starterPrompts()).containsExactly("a");
-        assertThat(starters.read(MEMBER, FAMILY).starterPrompts()).containsExactly("a");
+        assertThat(starters.read(MEMBER, GROUP).starterPrompts()).containsExactly("a");
     }
 
     @Test
     void 여러_에이전트의_추천_질문을_번호별로_주고_없는_것은_빈_목록이다() {
         starters.write(OWNER, OWNED, null, List.of("a", "b"));
         Agent owned = agents.findByCode(OWNED).orElseThrow();
-        Agent family = agents.findByCode(FAMILY).orElseThrow();
+        Agent group = agents.findByCode(GROUP).orElseThrow();
 
-        Map<Long, List<String>> byAgent = starters.promptsOf(List.of(owned, family));
+        Map<Long, List<String>> byAgent = starters.promptsOf(List.of(owned, group));
 
         assertThat(byAgent.get(owned.id())).containsExactly("a", "b");
-        assertThat(byAgent.get(family.id())).isEmpty();
+        assertThat(byAgent.get(group.id())).isEmpty();
     }
 
     @Test

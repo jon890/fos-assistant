@@ -399,7 +399,7 @@ class ChatAttachmentTurnTest {
 
     private CurrentUser member(String email) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private Agent agentOf(CurrentUser owner, String code) {

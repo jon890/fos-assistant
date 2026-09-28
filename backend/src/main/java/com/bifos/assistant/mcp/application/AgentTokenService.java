@@ -58,7 +58,7 @@ public class AgentTokenService {
                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "invalid agent token"));
         AppUser user = users.findById(token.userId()).orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "invalid agent token"));
         token.markUsed();
-        return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
     public static String hash(String raw) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8))); }

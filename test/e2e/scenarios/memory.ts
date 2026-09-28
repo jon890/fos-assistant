@@ -63,41 +63,41 @@ export const memoryScenario: Scenario = {
       "개인 Memory 삭제",
     );
 
-    step("member 는 가족 항목을 생성, 수정, 삭제하지 못한다");
-    const family = expectStatus(
+    step("member 는 그룹 항목을 생성, 수정, 삭제하지 못한다");
+    const group = expectStatus(
       await call(context, "/memories", {
         method: "POST",
         token: context.tokens.dad,
-        body: { scope: "FAMILY", title: "가족", content: "가족 내용", alwaysInject: false },
+        body: { scope: "GROUP", title: "그룹", content: "그룹 내용", alwaysInject: false },
       }),
       200,
-      "가족 Memory 생성",
+      "그룹 Memory 생성",
     ).json<MemoryView>();
     expectStatus(
       await call(context, "/memories", {
         method: "POST",
         token: context.tokens.kid,
-        body: { scope: "FAMILY", title: "허용 안 됨", content: "내용", alwaysInject: false },
+        body: { scope: "GROUP", title: "허용 안 됨", content: "내용", alwaysInject: false },
       }),
       403,
-      "member 가족 Memory 생성",
+      "member 그룹 Memory 생성",
     );
     expectStatus(
-      await call(context, `/memories/${family.id}`, {
+      await call(context, `/memories/${group.id}`, {
         method: "PATCH",
         token: context.tokens.kid,
         body: { content: "허용 안 됨", alwaysInject: true },
       }),
       403,
-      "member 가족 Memory 수정",
+      "member 그룹 Memory 수정",
     );
     expectStatus(
-      await call(context, `/memories/${family.id}`, {
+      await call(context, `/memories/${group.id}`, {
         method: "DELETE",
         token: context.tokens.kid,
       }),
       403,
-      "member 가족 Memory 삭제",
+      "member 그룹 Memory 삭제",
     );
 
     step("다른 사용자의 개인 항목은 Hermes 요청 instructions 에 들어가지 않는다");
@@ -147,9 +147,9 @@ export const memoryScenario: Scenario = {
       "아이 개인 Memory 정리",
     );
     expectStatus(
-      await call(context, `/memories/${family.id}`, { method: "DELETE", token: context.tokens.dad }),
+      await call(context, `/memories/${group.id}`, { method: "DELETE", token: context.tokens.dad }),
       200,
-      "가족 Memory 정리",
+      "그룹 Memory 정리",
     );
 
     step("본문이 상한을 넘는 항목이 있어도 나머지와 색인이 instructions 에 들어간다");

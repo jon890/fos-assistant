@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 부르는 사람을 저장된 사용자로 바꾼다.
  *
- * <p>웹 계층은 허용 목록에 있는 주소에만 토큰을 만들어 준다. 그래서 처음 들어온 사람이 가족을 열고 그
- * 가족의 관리자가 된다.
+ * <p>웹 계층은 허용 목록에 있는 주소에만 토큰을 만들어 준다. 그래서 처음 들어온 사람이 그룹을 열고 그
+ * 그룹의 관리자가 된다.
  *
  * <p>사용자를 새로 만드는 그 순간에 그 사람의 에이전트도 함께 만든다. 자기만 보는 에이전트는 주인이
  * 있어야 하는데, 주인은 그 사람이 로그인하기 전에는 존재하지 않기 때문이다. 순서와 어긋나는 지점은
@@ -34,8 +34,8 @@ public class UserProvisioningService {
 
     private static final Logger log = LoggerFactory.getLogger(UserProvisioningService.class);
 
-    /** Single household for the MVP. Multi-family support would replace this with a lookup. */
-    public static final long DEFAULT_FAMILY_ID = 1L;
+    /** 지금은 그룹이 하나뿐이다. 그룹을 여럿 두려면 이 값을 조회로 바꾼다. */
+    public static final long DEFAULT_GROUP_ID = 1L;
 
     private final AppUserRepository users;
     private final SignInPolicy signInPolicy;
@@ -63,7 +63,7 @@ public class UserProvisioningService {
 
     private AppUser createUser(String email, String displayName) {
         AppUser created =
-                users.save(AppUser.of(email, displayName, DEFAULT_FAMILY_ID, firstUserRole()));
+                users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole()));
         signInPolicy.admit(email).ifPresent(person -> createFirstAgent(created, person));
         return created;
     }
@@ -106,6 +106,6 @@ public class UserProvisioningService {
     }
 
     private UserRole firstUserRole() {
-        return users.existsByFamilyId(DEFAULT_FAMILY_ID) ? UserRole.MEMBER : UserRole.ADMIN;
+        return users.existsByGroupId(DEFAULT_GROUP_ID) ? UserRole.MEMBER : UserRole.ADMIN;
     }
 }

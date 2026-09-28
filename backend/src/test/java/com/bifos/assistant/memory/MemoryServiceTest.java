@@ -26,7 +26,7 @@ class MemoryServiceTest {
 
     private static final CurrentUser ADMIN = user(1L, 10L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
-    private static final CurrentUser OTHER_FAMILY = user(3L, 20L, UserRole.ADMIN);
+    private static final CurrentUser OTHER_GROUP = user(3L, 20L, UserRole.ADMIN);
 
     @Autowired MemoryService memories;
     @Autowired MemoryRepository repository;
@@ -37,14 +37,14 @@ class MemoryServiceTest {
     }
 
     @Test
-    void 개인_항목은_주인만_보고_가족_항목은_같은_가구가_본다() {
+    void 개인_항목은_주인만_보고_그룹_항목은_같은_그룹이_본다() {
         Memory personal = memories.create(ADMIN, MemoryScope.USER, "개인", "내용", false);
-        Memory family = memories.create(ADMIN, MemoryScope.FAMILY, "가족", "내용", false);
+        Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹", "내용", false);
 
-        assertThat(personal.familyId()).isNull();
-        assertThat(memories.readableBy(ADMIN)).extracting(Memory::id).contains(personal.id(), family.id());
-        assertThat(memories.readableBy(MEMBER)).extracting(Memory::id).containsExactly(family.id());
-        assertThat(memories.readableBy(OTHER_FAMILY)).isEmpty();
+        assertThat(personal.groupId()).isNull();
+        assertThat(memories.readableBy(ADMIN)).extracting(Memory::id).contains(personal.id(), group.id());
+        assertThat(memories.readableBy(MEMBER)).extracting(Memory::id).containsExactly(group.id());
+        assertThat(memories.readableBy(OTHER_GROUP)).isEmpty();
     }
 
     @Test
@@ -73,7 +73,7 @@ class MemoryServiceTest {
         Memory proposed = memories.proposeUser(ADMIN, "제안", "내용", 99L);
 
         assertThat(proposed.scope()).isEqualTo(MemoryScope.USER);
-        assertThat(proposed.familyId()).isNull();
+        assertThat(proposed.groupId()).isNull();
         assertThat(proposed.status()).isEqualTo(MemoryStatus.PROPOSED);
         assertThat(memories.alwaysInjectedFor(ADMIN)).isEmpty();
         assertThat(memories.indexedFor(ADMIN)).isEmpty();
@@ -90,12 +90,12 @@ class MemoryServiceTest {
     }
 
     @Test
-    void MEMBER_역할은_가족_항목을_만들거나_고치거나_지우지_못한다() {
-        Memory family = memories.create(ADMIN, MemoryScope.FAMILY, "가족", "내용", false);
+    void MEMBER_역할은_그룹_항목을_만들거나_고치거나_지우지_못한다() {
+        Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹", "내용", false);
 
-        assertForbidden(() -> memories.create(MEMBER, MemoryScope.FAMILY, "새 가족", "내용", false));
-        assertForbidden(() -> memories.update(MEMBER, family.id(), "수정", true));
-        assertForbidden(() -> memories.delete(MEMBER, family.id()));
+        assertForbidden(() -> memories.create(MEMBER, MemoryScope.GROUP, "새 그룹", "내용", false));
+        assertForbidden(() -> memories.update(MEMBER, group.id(), "수정", true));
+        assertForbidden(() -> memories.delete(MEMBER, group.id()));
     }
 
     @Test
@@ -119,8 +119,8 @@ class MemoryServiceTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    private static CurrentUser user(Long id, Long familyId, UserRole role) {
-        return new CurrentUser(id, "user" + id + "@example.com", "user" + id, familyId, role);
+    private static CurrentUser user(Long id, Long groupId, UserRole role) {
+        return new CurrentUser(id, "user" + id + "@example.com", "user" + id, groupId, role);
     }
 
     private static void assertNotFound(ThrowingAction action) {

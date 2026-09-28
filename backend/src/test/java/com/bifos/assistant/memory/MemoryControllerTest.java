@@ -52,8 +52,8 @@ class MemoryControllerTest {
 
     @Test
     void 자리가_없어_실리지_않는_항목에만_표시를_단다() {
-        Memory tooLong = memories.create(ADMIN, MemoryScope.FAMILY, "너무 긴 항목", "가".repeat(9_000), true);
-        Memory shortOne = memories.create(ADMIN, MemoryScope.FAMILY, "짧은 항목", "짧은 내용", true);
+        Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
+        Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
 
         assertThat(controller.readable())
                 .filteredOn(MemoryView::omittedFromContext)

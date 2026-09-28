@@ -31,7 +31,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름 |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회 |
-| `memory` | 개인과 가족 공용 Memory, 제안과 승인 |
+| `memory` | 개인과 그룹 공용 Memory, 제안과 승인 |
 | `context` | 실행에 넣을 `instructions` 조립 |
 | `mcp` | 제목만 주입한 Memory 본문 조회와 장기 토큰 인증 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
@@ -63,7 +63,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 
 | 순서 | 담는 것 |
 | --- | --- |
-| 1 | 가족 공용 Memory 중 `ACCEPTED` 이고 항상 주입하는 본문 |
+| 1 | 그룹 공용 Memory 중 `ACCEPTED` 이고 항상 주입하는 본문 |
 | 2 | 요청자 개인 Memory 중 `ACCEPTED` 이고 항상 주입하는 본문 |
 | 3 | 나머지 접근 가능한 항목의 제목과 번호 색인 |
 | 4 | 묻는 형식 안내(`chat/application/AskFormat`). 사용자가 직접 답하는 대화 실행에만 붙는다 |
@@ -99,10 +99,10 @@ Hermes profile 디렉터리를 그대로 붙이지 않는다.
 Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 단일 소스는 Control Plane 데이터베이스이고, Hermes 의 내장 memory 는 쓰지 않는다.
 
-- 범위는 `USER` 와 `FAMILY` 둘뿐이고 등록할 때 반드시 명시한다.
+- 범위는 `USER` 와 `GROUP` 둘뿐이고 등록할 때 반드시 명시한다.
 - 에이전트가 제안하면 `PROPOSED` 로 들어오고, 사람이 받아들여야 `ACCEPTED` 가 된다.
   주입되는 것은 `ACCEPTED` 뿐이다.
-- `ContextAssembler` 가 요청자의 `USER` 항목과 그 가족의 `FAMILY` 항목만 골라 조립한다.
+- `ContextAssembler` 가 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목만 골라 조립한다.
   다른 사용자의 개인 항목은 고르는 단계에서 빠진다.
 - `always_inject` 가 참이면 본문을 싣고, 거짓이면 제목과 번호만 색인에 싣는다.
 - 색인의 본문은 `memory_read` MCP 도구로 읽는다.
@@ -144,7 +144,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | 쓰기 | 그 에이전트의 주인, 그리고 `ADMIN` |
 
 자기만 보는 에이전트는 주인이 자기 성격을 쓴다.
-가족이 함께 쓰는 에이전트는 `ADMIN` 만 고친다. 여럿이 함께 쓰는 글이기 때문이다.
+그룹에 공개한 에이전트는 `ADMIN` 만 고친다. 여럿이 함께 쓰는 글이기 때문이다.
 
 **볼 수 없는 에이전트는 없는 에이전트와 같은 응답을 준다.**
 `code` 를 훑어 남의 에이전트가 있는지 알아낼 수 없게 한다.
@@ -514,7 +514,7 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/c/{번호}` | 옛 주소. 주인이면 `/chat/{id}` 로, 없거나 남의 대화면 `/` 로 넘긴다. 그 밖의 실패는 오류 화면이다 |
 | `/signin` | 로그인 |
 | `/usage` | 사용량 |
-| `/memory` | 개인과 가족 공용 Memory |
+| `/memory` | 개인과 그룹 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
 | `/agents` | 내가 쓸 수 있는 에이전트 목록 |
 | `/agents/{code}` | 그 에이전트의 성격 |

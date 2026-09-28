@@ -8,5 +8,5 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findByEmail(String email);
 
-    boolean existsByFamilyId(Long familyId);
+    boolean existsByGroupId(Long groupId);
 }

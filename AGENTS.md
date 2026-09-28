@@ -22,6 +22,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | 무엇 | 쓰는 말 | 쓰지 않는 말 |
 | --- | --- | --- |
 | 가족 한 사람 | **사용자** | 구성원, member |
+| 사용자들이 모인 단위 | **그룹**, 코드는 `group` | 가족, `family` |
 | 관리자가 아닌 권한 등급 | **`MEMBER` 역할** | 구성원 |
 | Hermes 쪽 격리 단위 | **profile** | |
 | 대화를 시작할 때 고르는 것 | **에이전트** | |

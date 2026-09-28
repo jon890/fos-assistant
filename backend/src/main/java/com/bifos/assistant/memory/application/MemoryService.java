@@ -54,16 +54,16 @@ public class MemoryService {
         if (scope == null) {
             throw new ApiException(ErrorCode.MEMORY_SCOPE_REQUIRED, "memory scope is required");
         }
-        if (scope == MemoryScope.FAMILY) {
+        if (scope == MemoryScope.GROUP) {
             requireAdmin(user);
-            return memories.save(Memory.accepted(scope, null, user.familyId(), title, content,
+            return memories.save(Memory.accepted(scope, null, user.groupId(), title, content,
                     alwaysInject, user.id()));
         }
         return memories.save(Memory.accepted(scope, user.id(), null, title, content,
                 alwaysInject, user.id()));
     }
 
-    /** 에이전트가 제안한 개인 항목을 만든다. FAMILY 제안은 만들지 않는다. */
+    /** 에이전트가 제안한 개인 항목을 만든다. GROUP 제안은 만들지 않는다. */
     @Transactional
     public Memory proposeUser(CurrentUser user, String title, String content, Long proposedByExecutionId) {
         String dedupKey = proposalDedupKey(user.id(), title, content);
@@ -123,18 +123,18 @@ public class MemoryService {
     }
 
     private boolean readable(Memory memory, CurrentUser user) {
-        return memory.isReadableBy(user.id(), user.familyId());
+        return memory.isReadableBy(user.id(), user.groupId());
     }
 
     private static void requireAdmin(CurrentUser user) {
         if (!user.isAdmin()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the family admin");
+            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
     }
 
     private static void requireWritable(CurrentUser user, Memory memory) {
-        if (memory.scope() == MemoryScope.FAMILY && !user.isAdmin()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the family admin");
+        if (memory.scope() == MemoryScope.GROUP && !user.isAdmin()) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
     }
 

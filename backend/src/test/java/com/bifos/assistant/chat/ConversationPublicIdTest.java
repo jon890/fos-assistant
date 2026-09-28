@@ -131,7 +131,7 @@ class ConversationPublicIdTest {
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE, user.id()));
         modelSelector.seedFirst(agent, new ModelOption("anthropic", "example-model-large"));
-        return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private void signedIn(CurrentUser user) {

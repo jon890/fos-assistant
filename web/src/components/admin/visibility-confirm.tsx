@@ -26,7 +26,7 @@ export function VisibilityConfirm({ agent, busy, onCancel, onConfirm }: Props) {
     <AlertDialog open onOpenChange={(open) => { if (!open && !busy) onCancel(); }}>
       <AlertDialogContent onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}>
         <AlertDialogHeader>
-          <AlertDialogTitle>{agent.name} 에이전트를 가족에게 공개할까요?</AlertDialogTitle>
+          <AlertDialogTitle>{agent.name} 에이전트를 그룹에 공개할까요?</AlertDialogTitle>
           <AlertDialogDescription>
             모든 사용자가 이 에이전트를 골라 대화할 수 있게 된다. 연결된 도구와 자료를 함께 쓸 수 있는지
             확인한 뒤 공개한다.
@@ -38,7 +38,7 @@ export function VisibilityConfirm({ agent, busy, onCancel, onConfirm }: Props) {
             <Button variant="outline" disabled={busy}>취소</Button>
           </AlertDialogCancel>
           {/* AlertDialogAction 은 누르는 즉시 창을 닫아, 공개가 실패해도 창이 사라지므로 일반 Button 으로 둔다. */}
-          <Button loading={busy} loadingText="공개하는 중" onClick={onConfirm}>가족 공개</Button>
+          <Button loading={busy} loadingText="공개하는 중" onClick={onConfirm}>그룹 공개</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

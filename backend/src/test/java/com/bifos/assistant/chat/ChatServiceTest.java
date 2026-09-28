@@ -157,7 +157,7 @@ class ChatServiceTest {
                             user.id()));
             modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         }
-        return new CurrentUser(user.id(), user.email(), user.displayName(), user.familyId(), user.role());
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     @Test

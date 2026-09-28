@@ -24,7 +24,7 @@ public final class MemoryDtos {
      * 본문이 상한을 넘거나 앞선 항목들이 자리를 다 쓴 경우가 여기 해당한다. 목록을 조회할 때만
      * 판정하고, 한 항목만 돌려주는 응답은 언제나 거짓이다.
      */
-    public record MemoryView(Long id, String scope, Long ownerUserId, Long familyId, String title,
+    public record MemoryView(Long id, String scope, Long ownerUserId, Long groupId, String title,
             String content, boolean alwaysInject, String status, Long proposedByExecutionId,
             Long acceptedByUserId, Instant acceptedAt, Instant createdAt, Instant updatedAt,
             boolean omittedFromContext) {
@@ -34,7 +34,7 @@ public final class MemoryDtos {
 
         static MemoryView from(Memory memory, boolean omittedFromContext) {
             return new MemoryView(memory.id(), memory.scope().name(), memory.ownerUserId(),
-                    memory.familyId(), memory.title(), memory.content(), memory.alwaysInject(),
+                    memory.groupId(), memory.title(), memory.content(), memory.alwaysInject(),
                     memory.status().name(), memory.proposedByExecutionId(), memory.acceptedByUserId(),
                     memory.acceptedAt(), memory.createdAt(), memory.updatedAt(), omittedFromContext);
         }

@@ -24,8 +24,8 @@ public class AppUser {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
-    @Column(name = "family_id", nullable = false)
-    private Long familyId;
+    @Column(name = "group_id", nullable = false)
+    private Long groupId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
@@ -37,16 +37,16 @@ public class AppUser {
     protected AppUser() {
     }
 
-    private AppUser(String email, String displayName, Long familyId, UserRole role) {
+    private AppUser(String email, String displayName, Long groupId, UserRole role) {
         this.email = email;
         this.displayName = displayName;
-        this.familyId = familyId;
+        this.groupId = groupId;
         this.role = role;
         this.createdAt = Instant.now();
     }
 
-    public static AppUser of(String email, String displayName, Long familyId, UserRole role) {
-        return new AppUser(email, displayName, familyId, role);
+    public static AppUser of(String email, String displayName, Long groupId, UserRole role) {
+        return new AppUser(email, displayName, groupId, role);
     }
 
     public Long id() {
@@ -61,8 +61,8 @@ public class AppUser {
         return displayName;
     }
 
-    public Long familyId() {
-        return familyId;
+    public Long groupId() {
+        return groupId;
     }
 
     public UserRole role() {

@@ -15,29 +15,29 @@ export const agentsScenario: Scenario = {
     ).json<AgentView[]>();
     expect(privateList.every((agent) => agent.code !== "dad"), "남의 개인 에이전트가 목록에 보인다");
 
-    step("관리자가 가족 공개로 바꾸면 다른 사용자도 에이전트를 볼 수 있다");
+    step("관리자가 그룹 공개로 바꾸면 다른 사용자도 에이전트를 볼 수 있다");
     expectStatus(
       await call(context, "/admin/agents/dad", {
         method: "PATCH",
         token: context.tokens.dad,
-        body: { enabled: true, visibility: "FAMILY", ownerEmail: null },
+        body: { enabled: true, visibility: "GROUP", ownerEmail: null },
       }),
       200,
-      "가족 공개 변경",
+      "그룹 공개 변경",
     );
-    const familyList = expectStatus(
+    const groupList = expectStatus(
       await call(context, "/agents", { token: context.tokens.kid }),
       200,
-      "가족 공개 에이전트 목록",
+      "그룹 공개 에이전트 목록",
     ).json<AgentView[]>();
-    expect(familyList.some((agent) => agent.code === "dad"), "가족 공개 에이전트가 목록에 없다");
+    expect(groupList.some((agent) => agent.code === "dad"), "그룹 공개 에이전트가 목록에 없다");
 
     step("member는 에이전트 공개 범위를 바꾸지 못한다");
     expectStatus(
       await call(context, "/admin/agents/dad", {
         method: "PATCH",
         token: context.tokens.kid,
-        body: { enabled: false, visibility: "FAMILY", ownerEmail: null },
+        body: { enabled: false, visibility: "GROUP", ownerEmail: null },
       }),
       403,
       "member의 에이전트 변경",
