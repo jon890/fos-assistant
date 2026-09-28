@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AgentForm } from "@/components/admin/agent-form";
 import { AgentList } from "@/components/admin/agent-list";
-import { describeError } from "@/components/error-message";
+import { describeAdminError } from "@/components/error-message";
 import {
   PRIVATE_VISIBILITY,
   formatRemaining,
@@ -64,7 +64,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail, currentUserId }: Pr
         await reload();
       } else {
         const result = await payload<{ code: string; message: string }>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
       }
     } finally {
       setCreating(false);

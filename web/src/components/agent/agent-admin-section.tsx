@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { describeError } from "@/components/error-message";
+import { describeAdminError } from "@/components/error-message";
 import {
   GROUP_VISIBILITY,
   PRIVATE_VISIBILITY,
@@ -56,7 +56,7 @@ export function AgentAdminSection({ initialAgent, ownerEmail }: Props) {
       });
       if (!response.ok) {
         const result = await payload<{ code: string; message: string }>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
         return false;
       }
       setAgent(await payload<AdminAgent>(response));
@@ -80,7 +80,7 @@ export function AgentAdminSection({ initialAgent, ownerEmail }: Props) {
       const response = await fetch(`/api/admin/agents/${agent.code}/sync-model`, { method: "POST" });
       if (!response.ok) {
         const result = await payload<{ code: string; message: string }>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
       } else {
         const result = await payload<{ model: string; modelSyncedAt: string }>(response);
         setAgent((current) => ({ ...current, model: result.model, modelSyncedAt: result.modelSyncedAt }));
@@ -106,7 +106,7 @@ export function AgentAdminSection({ initialAgent, ownerEmail }: Props) {
         }));
       } else {
         const result = await payload<{ code: string; message: string }>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
       }
     } finally {
       setPending(null);

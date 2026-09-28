@@ -18,6 +18,24 @@ function sidebarStatus(page: Page) {
   return page.locator('aside[aria-label="사이드바"] [role="status"]');
 }
 
+test("에이전트 목록은 조회 중에도 관리자 폼 크기의 뼈대를 곧바로 보인다", async ({ page }) => {
+  await page.addInitScript(() => {
+    const record = () => {
+      const skeleton = document.querySelector<HTMLElement>('main [data-testid="page-skeleton"]');
+      if (skeleton) {
+        (window as Window & { agentSkeleton?: string }).agentSkeleton = skeleton.outerHTML;
+      }
+    };
+    new MutationObserver(record).observe(document, { childList: true, subtree: true });
+  });
+
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
+  const skeleton = await page.evaluate(() => (window as Window & { agentSkeleton?: string }).agentSkeleton);
+  expect(skeleton).toContain("max-w-4xl");
+  expect(skeleton).toContain("h-[46.875rem]");
+});
+
 test("화면을 옮기면 뼈대가 먼저 보이고 이전 화면의 제목은 사라진다", async ({ page, hermes }) => {
   await page.goto("/agents");
   await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();

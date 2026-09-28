@@ -33,8 +33,10 @@ function declarativeLines(source: string, file: string): string[] {
         || ts.isTemplateTail(node)) {
       const start = parsed.getLineAndCharacterOfPosition(node.getStart(parsed)).line + 1;
       node.text.split("\n").forEach((line, index) => {
-        const value = line.trim();
-        if (DECLARATIVE_ENDING.test(value)) found.push(`${file}:${start + index}: ${value}`);
+        for (const sentence of line.split(/(?<=[.!?])\s*/u)) {
+          const value = sentence.trim();
+          if (DECLARATIVE_ENDING.test(value)) found.push(`${file}:${start + index}: ${value}`);
+        }
       });
     }
     ts.forEachChild(node, visit);
@@ -49,6 +51,8 @@ test("화면 문구는 해요체를 쓰고 코드 주석은 검사하지 않는�
     ["sample.ts:1: 아직 대화가 없다."]);
   assert.deepEqual(declarativeLines('throw new Error("대화가 없다.");', "sample.ts"),
     ["sample.ts:1: 대화가 없다."]);
+  assert.deepEqual(declarativeLines('const message = "앞 문장은 평서체다. 뒤 문장은 해요체예요.";', "sample.ts"),
+    ["sample.ts:1: 앞 문장은 평서체다."]);
 });
 
 test("웹 화면의 한국어 문구에 평서체 문장이 없다", async () => {

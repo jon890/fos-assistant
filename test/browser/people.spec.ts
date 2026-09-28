@@ -62,7 +62,7 @@ test("이미 쓰는 profile 이름으로 더하면 무엇이 겹쳤는지 알린
   await page.getByLabel("profile").fill(owner.hermesProfile);
   await page.getByRole("button", { name: "추가" }).click();
 
-  await expect(page.getByTestId("people-error")).toContainText("이미 사용 중인 이름이에요");
+  await expect(page.getByTestId("people-error")).toContainText("profile 이름을 이미 쓰고 있어요");
 });
 
 test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInfo) => {

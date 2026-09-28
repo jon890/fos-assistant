@@ -76,14 +76,15 @@ test("경로마다 loading.tsx 의 width 가 그 화면의 바깥 틀 폭과 같
   }
 });
 
-test("에이전트 목록은 관리자에게 등록 폼과 설명을 포함한 4xl 뼈대, 일반 사용자에게 2xl 뼈대를 보인다", async () => {
+test("에이전트 목록 뼈대는 조회를 기다리지 않고 관리자 등록 폼 크기로 표시된다", async () => {
   const content = await readFile(join(APP_ROOT, "agents/loading.tsx"), "utf-8");
   const adminFrame = await readFile(join(SRC_ROOT, "components/agent/agent-admin-panel.tsx"), "utf-8");
   const memberFrame = await readFile(join(APP_ROOT, "agents/page.tsx"), "utf-8");
   assert.equal(frameWidth(adminFrame), "4xl");
   assert.equal(frameWidth(memberFrame), "2xl");
-  assert.match(content, /me\?\.role === "ADMIN"[\s\S]*?width="4xl" title description="agent" form="agent"/);
-  assert.match(content, /return <PageSkeleton shape="cards" width="2xl" title \/>/);
+  assert.match(content, /function Loading\(\)/);
+  assert.doesNotMatch(content, /readMe|await/);
+  assert.match(content, /width="4xl" title description="agent" form="agent"/);
 });
 
 test("loading.tsx 는 뼈대를 두기로 한 경로에만 있다", async () => {

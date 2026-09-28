@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PersonForm } from "@/components/admin/person-form";
 import { PersonList } from "@/components/admin/person-list";
-import { describeError } from "@/components/error-message";
+import { describeAdminError } from "@/components/error-message";
 import type { Person } from "@/lib/people";
 
 type Props = { initialPeople: Person[] };
@@ -48,7 +48,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
         await reload();
       } else {
         const result = await payload<Failure>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
       }
     } finally {
       setPending(null);
@@ -67,7 +67,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
       if (response.ok) await reload();
       else {
         const result = await payload<Failure>(response);
-        setError(describeError(result.code, result.message));
+        setError(describeAdminError(result.code, result.message));
       }
     } finally {
       setPending(null);
