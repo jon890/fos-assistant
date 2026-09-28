@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 public class ContextAssembler {
 
     private static final Logger log = LoggerFactory.getLogger(ContextAssembler.class);
-    private static final String FAMILY_HEADER = "# 우리 가족이 함께 아는 것";
+    private static final String GROUP_HEADER = "# 우리 그룹이 함께 아는 것";
     private static final String USER_HEADER = "# 지금 묻는 사람에 대해 아는 것";
     private static final String INDEX_HEADER = """
             # 더 물어볼 수 있는 것
@@ -49,7 +49,7 @@ public class ContextAssembler {
 
         ContextBuilder builder = new ContextBuilder(maxChars);
         builder.limit(maxChars - indexBudget);
-        appendAlways(builder, FAMILY_HEADER, always, MemoryScope.FAMILY);
+        appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP);
         appendAlways(builder, USER_HEADER, always, MemoryScope.USER);
         builder.limit(maxChars);
         appendIndex(builder, indexed);

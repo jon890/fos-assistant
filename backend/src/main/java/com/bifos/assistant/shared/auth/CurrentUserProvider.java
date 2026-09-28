@@ -20,7 +20,7 @@ public class CurrentUserProvider {
     public CurrentUser requireAdmin() {
         CurrentUser user = require();
         if (!user.isAdmin()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the family admin");
+            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
         return user;
     }

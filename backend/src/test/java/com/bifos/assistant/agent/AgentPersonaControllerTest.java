@@ -63,7 +63,7 @@ class AgentPersonaControllerTest {
         when(agents.findByCode("dad")).thenReturn(Optional.of(
                 agent("dad", "dad-profile", AgentVisibility.PRIVATE, OWNER.id())));
         when(agents.findByCode("home")).thenReturn(Optional.of(
-                agent("home", "home-profile", AgentVisibility.FAMILY, null)));
+                agent("home", "home-profile", AgentVisibility.GROUP, null)));
         dashboard.seedSoul("dad-profile", SOUL);
         dashboard.seedSoul("home-profile", SOUL);
         when(currentUser.require()).thenReturn(OWNER);
@@ -89,7 +89,7 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 가족_공용_에이전트를_MEMBER_가_읽으면_고칠_수_없다() throws Exception {
+    void 그룹_공용_에이전트를_MEMBER_가_읽으면_고칠_수_없다() throws Exception {
         when(currentUser.require()).thenReturn(OTHER);
 
         mvc.perform(get("/api/v1/agents/home/persona"))
@@ -98,7 +98,7 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 가족_공용_에이전트를_MEMBER_가_쓰면_거절하고_쓰지_않는다() throws Exception {
+    void 그룹_공용_에이전트를_MEMBER_가_쓰면_거절하고_쓰지_않는다() throws Exception {
         when(currentUser.require()).thenReturn(OTHER);
 
         mvc.perform(write("home", "새 성격", Sha256.hex16(SOUL)))
@@ -109,7 +109,7 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 가족_공용_에이전트를_ADMIN_은_쓸_수_있다() throws Exception {
+    void 그룹_공용_에이전트를_ADMIN_은_쓸_수_있다() throws Exception {
         when(currentUser.require()).thenReturn(ADMIN);
 
         mvc.perform(write("home", "새 성격", Sha256.hex16(SOUL)))

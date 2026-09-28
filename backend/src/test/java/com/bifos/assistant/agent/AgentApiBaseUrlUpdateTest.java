@@ -54,7 +54,7 @@ class AgentApiBaseUrlUpdateTest {
     void seed() {
         agent = Agent.of("dad", "Dad", "dad", CURRENT_URL, "openai-codex", "example-model",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.FAMILY, null);
+                AgentVisibility.GROUP, null);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
         when(models.optionsOf(any(Agent.class))).thenReturn(java.util.List.of());
@@ -106,6 +106,6 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     private static UpdateAgentRequest request(String apiBaseUrl) {
-        return new UpdateAgentRequest(true, AgentVisibility.FAMILY, null, apiBaseUrl);
+        return new UpdateAgentRequest(true, AgentVisibility.GROUP, null, apiBaseUrl);
     }
 }

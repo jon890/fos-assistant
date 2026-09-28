@@ -63,7 +63,7 @@ class ChatMemoryProposalTest {
         memories.deleteAll(); executions.deleteAll(); modelOptions.deleteAll(); agents.deleteAll(); users.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
         AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER));
-        user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.familyId(), saved.role());
+        user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         Agent savedAgent = agents.save(Agent.of("proposal", "제안", "proposal", "http://runtime.test", "provider", "model", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, user.id()));
         modelSelector.seedFirst(savedAgent, new ModelOption("provider", "model"));
         doNothing().when(events).open(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());

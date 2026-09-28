@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 가족을 더하고 목록을 보는 자리다.
+ * 그룹에 사람을 더하고 목록을 보는 자리다.
  *
  * <p>{@code ADMIN} 만 부른다. 여기서 더한 사람은 아직 {@code app_user} 가 없고, 그 사람이 처음
  * 로그인할 때 사용자와 에이전트가 함께 생긴다.

@@ -145,7 +145,7 @@ public class Agent {
     }
 
     public boolean isReadableBy(Long userId) {
-        return visibility == AgentVisibility.FAMILY || Objects.equals(ownerUserId, userId);
+        return visibility == AgentVisibility.GROUP || Objects.equals(ownerUserId, userId);
     }
 
     public void changeAccess(boolean enabled, AgentVisibility visibility, Long ownerUserId) {
