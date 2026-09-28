@@ -189,6 +189,19 @@ v0.21.0과 비교하면 v0.21.3의 설정 가능한 목록에 `connections`와 `
 새 profile에 허용 목록 키를 빠뜨리면 도구가 넓게 열리는 이유다.
 근거는 [v0.21.0 도구 목록](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/hermes_cli/tools_config.py), [v0.21.3 도구 목록](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/tools_config.py), [v0.21.3 릴리스](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.9.14)다.
 
+### 지난 대화 검색의 범위
+
+`session_search` 는 profile 하나에 갇히지 않는다.
+
+| 호출 | 읽는 범위 |
+| --- | --- |
+| `profile` 인자 없음 | 지금 profile 의 `state.db` 에 있는 모든 대화. API, Discord, CLI 를 가리지 않고, 그룹 공개 에이전트로 다른 사용자가 나눈 대화도 들어 있다 |
+| `profile` 인자 있음 | 그 이름의 profile 의 `state.db` 를 읽기 전용으로 연다. profile 이 있는지만 확인한다 |
+
+`kanban`, `subagent`, `tool` 에서 시작한 세션만 목록에서 뺀다.
+근거는 [v0.21.3 `tools/session_search_tool.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/session_search_tool.py) 의 `_resolve_profile_db`, `_dispatch` 와 도구 설명의 `profile` 항목이다.
+그래서 이 도구는 관리자 등급이고 켜진 에이전트는 비공개로만 둔다([ADR-029](../adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)).
+
 ### 스킬 파일과 색인 적용 시점
 
 대시보드의 `POST /api/skills`와 `PUT /api/skills/content`는 `SKILL.md` 하나만 만들거나 바꾼다.
