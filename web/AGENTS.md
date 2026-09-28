@@ -110,6 +110,27 @@ AUTH_GOOGLE_SECRET=build-time-placeholder \
 pnpm build
 ```
 
+**브라우저 검사는 빌드한 서버를 띄운다.**
+`test/browser/web-server.ts` 가 위와 같은 자리표시자로 `pnpm build` 를 돌린다.
+그다음 `Dockerfile` 처럼 `.next/static` 과 `public` 을 standalone 결과에 옮기고 `node .next/standalone/server.js` 를 띄운다.
+검사용 환경 변수는 서버를 띄울 때만 준다.
+운영 이미지도 자리표시자로 빌드하고 실행할 때 값을 받으므로, 빌드 때 값을 읽어 굳히는 코드가 생기면 검사에서 드러난다.
+
+검사할 때마다 먼저 빌드한다. 이미 있는 빌드가 지금 소스와 같은지 확실히 알 수 없기 때문이다.
+수정 시각으로 비교하면 지운 파일과 브랜치 전환을 놓친다. 빌드는 10초 남짓 걸린다.
+
+화면을 고치며 같은 검사를 되풀이할 때는 개발 서버를 띄운다.
+
+```bash
+# cwd: web/
+BROWSER_WEB_SERVER=dev pnpm test:browser
+```
+
+개발 서버는 화면에 보이는 링크를 미리 읽지 않는다.
+빌드한 서버는 미리 읽고, 그 결과에 `loading.tsx` 화면이 있으면 누르자마자 그 화면으로 옮긴다.
+그래서 `useLinkStatus` 의 이동 표시는 목적지를 아직 받지 못했을 때만 켜진다.
+이 차이에 걸리는 검사는 빌드한 서버에서 확인하고, 머지 전 확인도 빌드한 서버로 돌린다.
+
 **포트는 다투지 않는다.** 기본값이 비어 있으면 그것을 쓰고, 다른 워크트리가 쥐고 있으면
 빈 포트를 받아 쓴다. `test/support/pick-port.ts` 가 그 판단을 갖는다.
 고정하고 싶으면 `BROWSER_WEB_PORT` 와 `BROWSER_CONTROL_PLANE_PORT` 를 준다.
