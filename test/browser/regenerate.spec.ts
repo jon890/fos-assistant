@@ -6,6 +6,39 @@ async function ask(page: import("../../web/node_modules/@playwright/test/index.j
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
 }
 
+test("다시 생성 아이콘 단추에 접근성 이름과 풀이가 있다", async ({ page }) => {
+  await page.goto("/");
+  await ask(page, "다시 생성 아이콘 검사");
+  const answer = page.getByTestId("assistant-message").last();
+  const regenerate = answer.getByRole("button", { name: "다시 생성", exact: true });
+  const copy = answer.getByRole("button", { name: "답 복사", exact: true });
+
+  for (const theme of ["light", "dark"]) {
+    await page.locator("html").evaluate((html, dark) => html.classList.toggle("dark", dark), theme === "dark");
+    await expect(regenerate).toBeVisible();
+    await expect(regenerate).toHaveAccessibleName("다시 생성");
+    await expect(regenerate).toHaveText("");
+    await expect(regenerate.locator("svg[aria-hidden='true']")).toBeVisible();
+    const regenerateBox = await regenerate.boundingBox();
+    const copyBox = await copy.boundingBox();
+    expect(regenerateBox?.height).toBe(copyBox?.height);
+    expect(regenerateBox?.width).toBe(regenerateBox?.height);
+
+    await regenerate.hover();
+    await expect(page.getByRole("tooltip")).toHaveText("다시 생성");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await copy.hover();
+    await copy.focus();
+    await page.keyboard.press("Tab");
+    await expect(regenerate).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveText("다시 생성");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await copy.focus();
+  }
+});
+
 test("마지막 답을 다시 생성하고 이전 판을 볼 수 있다", async ({ page }) => {
   await page.goto("/");
   await ask(page, "다시 생성 화면 검사");
