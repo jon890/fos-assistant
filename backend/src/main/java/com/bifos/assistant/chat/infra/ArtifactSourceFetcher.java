@@ -188,12 +188,7 @@ public class ArtifactSourceFetcher {
     private static boolean is6to4(byte[] bytes) { return bytes[0] == 0x20 && bytes[1] == 0x02; }
     private static boolean isTeredo(byte[] bytes) { return bytes[0] == 0x20 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0; }
     private static boolean isReservedV6(byte[] bytes) {
-        return (bytes[0] == 0x00 && bytes[1] == 0x64) // discard-only
-                || (bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x00 && bytes[3] == 0x00 && bytes[4] == 0x00 && bytes[5] == 0x00 && bytes[6] == 0x00 && bytes[7] == 0x00 && bytes[8] == 0x00 && bytes[9] == 0x00 && bytes[10] == 0x00 && bytes[11] == 0x00 && bytes[12] == 0x00 && bytes[13] == 0x00 && bytes[14] == 0x00 && bytes[15] == 0x00)
-                || (bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x00 && bytes[3] == 0x00 && bytes[4] == 0x00 && bytes[5] == 0x00 && bytes[6] == 0x00 && bytes[7] == 0x00 && bytes[8] == 0x00 && bytes[9] == 0x00 && bytes[10] == 0x00 && bytes[11] == 0x00 && bytes[12] == 0x00 && bytes[13] == 0x00 && bytes[14] == 0x00 && bytes[15] == 0x01)
-                || (bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x00 && bytes[3] == 0x00 && bytes[4] == 0x00 && bytes[5] == 0x00 && bytes[6] == 0x00 && bytes[7] == 0x00 && bytes[8] == 0x00 && bytes[9] == 0x00 && bytes[10] == (byte) 0xff && bytes[11] == (byte) 0xff)
-                || (bytes[0] == 0x00 && bytes[1] == 0x64 && bytes[2] == (byte) 0xff && bytes[3] == (byte) 0x9b)
-                || (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x00
+        return (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x00
                 && (bytes[3] == 0x02 || (bytes[3] & 0xf0) == 0x10 || (bytes[3] & 0xf0) == 0x20))
                 || (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == (byte) 0xb8);
     }
