@@ -4,6 +4,7 @@ import { AgentCard, type AgentAction } from "./agent-card";
 
 type Props = {
   agents: AdminAgent[];
+  currentUserId: number;
   busy: boolean;
   /** 도는 요청과 그 대상 에이전트다. 그 카드의 그 단추에만 회전 표시를 둔다. */
   pending: { code: string; action: AgentAction } | null;
@@ -24,6 +25,7 @@ export function AgentList(props: Props) {
         <AgentCard
           key={agent.code}
           agent={agent}
+          currentUserId={props.currentUserId}
           busy={props.busy}
           pendingAction={props.pending?.code === agent.code ? props.pending.action : null}
           onVisibilityChange={props.onVisibilityChange}

@@ -28,8 +28,7 @@ export function MainNav({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate(
   }, []);
 
   const links = isAdmin
-    ? [...LINKS, { href: "/admin/agents", label: "에이전트 관리" },
-      { href: "/admin/people", label: "사람 관리" }]
+    ? [...LINKS, { href: "/admin/people", label: "사람 관리" }]
     : LINKS;
   return (
     <nav aria-label="주요 화면" className="flex flex-col gap-1">

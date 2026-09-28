@@ -16,6 +16,7 @@ export type AgentAction = "private" | "group" | "enabled" | "address" | "sync" |
 
 type Props = {
   agent: AdminAgent;
+  currentUserId: number;
   /** 어느 에이전트든 요청이 돌고 있다. 그동안 모든 단추를 잠근다. */
   busy: boolean;
   /** 이 에이전트에 대해 도는 요청이다. 없으면 null 이다. */
@@ -30,6 +31,7 @@ type Props = {
 
 export function AgentCard({
   agent,
+  currentUserId,
   busy,
   pendingAction,
   onVisibilityChange,
@@ -56,7 +58,10 @@ export function AgentCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}</Badge>
-          <Badge variant={agent.enabled ? "outline" : "default"}>{agent.enabled ? "사용 중" : "사용 중지"}</Badge>
+          {agent.visibility === PRIVATE_VISIBILITY && agent.ownerUserId !== currentUserId ? (
+            <Badge variant="outline">다른 사람 것</Badge>
+          ) : null}
+          <Badge variant={agent.enabled ? "outline" : "default"}>{agent.enabled ? "사용 중" : "꺼짐"}</Badge>
         </div>
       </div>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">

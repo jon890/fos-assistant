@@ -20,7 +20,7 @@ function sidebarStatus(page: Page) {
 
 test("화면을 옮기면 뼈대가 먼저 보이고 이전 화면의 제목은 사라진다", async ({ page, hermes }) => {
   await page.goto("/agents");
-  await expect(page.getByRole("heading", { name: "에이전트" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "에이전트", exact: true })).toBeVisible();
 
   await hermes.holdNextSoul();
   try {
@@ -153,5 +153,5 @@ test("사이드바 링크의 이름이 그대로 맞는다", async ({ page }, te
   // 회전 표시는 aria-hidden 이라 링크 이름에 들어가지 않는다. 지금 검사들이 쓰는 이름이 그대로 맞아야 한다.
   await expect(mainNavLink(page, "사용량")).toBeVisible();
   await expect(mainNavLink(page, "에이전트")).toBeVisible();
-  await expect(mainNavLink(page, "에이전트 관리")).toBeVisible();
+  await expect(mainNavLink(page, "에이전트 관리")).toHaveCount(0);
 });

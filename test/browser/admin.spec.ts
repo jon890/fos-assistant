@@ -1,4 +1,4 @@
-import { expect, hermesBaseUrl, test, MODELS_AGENT_CODE } from "./fixtures.ts";
+import { expect, hermesBaseUrl, setSession, test, MODELS_AGENT_CODE } from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 에이전트가 여럿이라 검사가 보는 카드 하나로 좁힌다. */
@@ -9,12 +9,84 @@ function browserCard(page: Page) {
     .filter({ hasText: "브라우저 비서" });
 }
 
+test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", async ({ page }) => {
+  const registered = {
+    id: 99,
+    code: "registered-agent",
+    name: "새 에이전트",
+    hermesProfile: "registered-profile",
+    apiBaseUrl: "http://example.test/p/registered-profile",
+    provider: "openai-codex",
+    model: "example-model",
+    modelSyncedAt: null,
+    costMode: "SUBSCRIPTION",
+    credentialScope: "SHARED_HOUSEHOLD",
+    visibility: "PRIVATE",
+    ownerUserId: 1,
+    enabled: true,
+    flow: null,
+    models: [{ rank: 1, provider: "openai-codex", model: "example-model" }],
+  };
+  await page.route(/\/api\/admin\/agents(?:\?.*)?$/, async (route) => {
+    if (route.request().method() === "POST") return route.fulfill({ status: 201, json: registered });
+    if (route.request().method() === "GET") return route.fulfill({ json: [registered] });
+    await route.continue();
+  });
+
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "에이전트 등록" })).toBeVisible();
+  const form = page.getByRole("heading", { name: "에이전트 등록" }).locator("xpath=ancestor::form");
+  await form.getByLabel("코드").fill(registered.code);
+  await form.getByLabel("이름").fill(registered.name);
+  await form.getByLabel("Hermes profile").fill(registered.hermesProfile);
+  await form.getByLabel("Hermes API 주소").fill(registered.apiBaseUrl);
+  await form.getByLabel("provider").fill(registered.provider);
+  await form.getByRole("button", { name: "등록" }).click();
+
+  await expect(page.getByRole("heading", { name: registered.name })).toBeVisible();
+});
+
+test("관리자 목록은 다른 사람의 비공개 에이전트와 꺼진 에이전트를 표시한다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  await setSession(context, { email: "browser@example.com", name: "브라우저 테스트" });
+
+  const changed = await page.request.patch("/api/admin/agents/browser", {
+    data: { enabled: false, visibility: "PRIVATE", ownerEmail: "member@example.com" },
+  });
+  expect(changed.ok()).toBeTruthy();
+  try {
+    await page.goto("/agents");
+    const card = browserCard(page);
+    await expect(card.getByText("다른 사람 것", { exact: true })).toBeVisible();
+    await expect(card.getByText("꺼짐", { exact: true })).toBeVisible();
+  } finally {
+    const reset = await page.request.patch("/api/admin/agents/browser", {
+      data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
+    });
+    expect(reset.ok()).toBeTruthy();
+  }
+});
+
+test("MEMBER는 관리 목록과 옛 관리 주소를 쓰지 못한다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "에이전트 등록" })).toHaveCount(0);
+  await expect(page.getByText("다른 사람 것", { exact: true })).toHaveCount(0);
+  await expect(page.locator('a[href="/agents/browser"]')).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
+
+  await page.goto("/admin/agents");
+  await expect(page).toHaveURL(/\/agents$/);
+});
+
 test("그룹 공개로 바꾸기 전에 확인하고 취소와 확인을 반영한다", async ({ page }) => {
   const reset = await page.request.patch("/api/admin/agents/browser", {
     data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
   });
   expect(reset.ok()).toBeTruthy();
-  await page.goto("/admin/agents");
+  await page.goto("/agents");
   const card = browserCard(page);
 
   await expect(card.getByText("나만", { exact: true })).toBeVisible();
@@ -37,7 +109,7 @@ async function openVisibilityConfirm(page: Page) {
     data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },
   });
   expect(reset.ok()).toBeTruthy();
-  await page.goto("/admin/agents");
+  await page.goto("/agents");
   await browserCard(page).getByRole("button", { name: "그룹 공개로 변경" }).click();
   const dialog = page.getByRole("alertdialog", { name: "브라우저 비서 에이전트를 그룹에 공개할까요?" });
   await expect(dialog).toBeVisible();
@@ -106,7 +178,7 @@ test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ pa
   await page.request.put(`/api/admin/agents/${MODELS_AGENT_CODE}/models`, {
     data: { models: [{ provider: "openai-codex", model: "example-model" }] },
   });
-  await page.goto("/admin/agents");
+  await page.goto("/agents");
   const card = page
     .getByRole("region", { name: "등록된 에이전트" })
     .locator("article")
@@ -131,7 +203,7 @@ test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ pa
 });
 
 test("막힌 provider 가 없으면 그 줄을 그리지 않고 목록이 가로로 넘치지 않는다", async ({ page }, testInfo) => {
-  await page.goto("/admin/agents");
+  await page.goto("/agents");
 
   await expect(page.getByTestId("blocked-providers")).toHaveCount(0);
   const width = testInfo.project.name === "mobile" ? 390 : 1280;
@@ -144,7 +216,7 @@ test("Hermes 주소를 고쳐 저장하면 화면에 새 값이 보인다", asyn
   // 같은 가짜 Hermes 를 가리키면서 글자는 다른 주소다. 확인이 지나가면서 값이 바뀌는 것을 본다.
   const moved = `${original.replace("127.0.0.1", "localhost")}/`;
 
-  await page.goto("/admin/agents");
+  await page.goto("/agents");
   const address = browserCard(page).getByLabel("브라우저 비서 Hermes API 주소");
   await expect(address).toHaveValue(original);
 
@@ -161,7 +233,7 @@ test("Hermes 주소를 고쳐 저장하면 화면에 새 값이 보인다", asyn
 test("닿지 않는 주소를 저장하려 하면 실패 이유가 그 자리에 보인다", async ({ page }) => {
   const original = `${await hermesBaseUrl()}/p/browser`;
 
-  await page.goto("/admin/agents");
+  await page.goto("/agents");
   const card = browserCard(page);
   await card.getByLabel("브라우저 비서 Hermes API 주소").fill("http://127.0.0.1:1/p/browser");
   await card.getByRole("button", { name: "주소 저장" }).click();
@@ -169,6 +241,6 @@ test("닿지 않는 주소를 저장하려 하면 실패 이유가 그 자리에
   await expect(card.getByRole("alert")).toContainText("could not reach");
 
   // 저장되지 않았으므로 다시 열면 지금 값이 그대로다.
-  await page.goto("/admin/agents");
+  await page.goto("/agents");
   await expect(browserCard(page).getByLabel("브라우저 비서 Hermes API 주소")).toHaveValue(original);
 });
