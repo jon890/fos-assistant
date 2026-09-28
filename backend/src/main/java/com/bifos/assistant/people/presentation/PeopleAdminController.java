@@ -44,7 +44,7 @@ public class PeopleAdminController {
      * 허용 목록 전체를 준다.
      *
      * <p>들어온 적이 있는지는 {@code app_user} 의 메일 주소를 한 번에 읽어 맞춘다. 사람마다 따로 묻지
-     * 않는 것은 가족 수만큼 질의가 늘어나기 때문이다.
+     * 않는 것은 사용자 수만큼 질의가 늘어나기 때문이다.
      */
     @GetMapping
     public List<PersonView> list() {
