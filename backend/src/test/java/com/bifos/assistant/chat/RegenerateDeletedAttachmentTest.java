@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
@@ -56,6 +57,7 @@ class RegenerateDeletedAttachmentTest {
     @Autowired AgentModelSelector modelSelector;
     @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ChatMessageRepository messages;
+    @Autowired ConversationRepository conversations;
     @Autowired ChatAttachmentRepository attachments;
     @Autowired AgentExecutionRepository executions;
     @Autowired HermesRunsClient hermes;
@@ -96,7 +98,7 @@ class RegenerateDeletedAttachmentTest {
         assertThat(stub().received()).hasSize(2);
         // 지운 사진의 단락은 빠지고 결과물 폴더 단락만 사용자가 쓴 글 앞에 붙는다.
         assertThat(stub().received().get(1).input())
-                .isEqualTo(artifactService.agentPreamble(first.conversationId()) + "사진을 설명해 줘");
+                .isEqualTo(artifactService.agentPreamble(conversations.findById(first.conversationId()).orElseThrow()) + "사진을 설명해 줘");
     }
 
     private CurrentUser member() {

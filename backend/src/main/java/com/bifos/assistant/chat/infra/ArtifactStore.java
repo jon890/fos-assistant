@@ -1,25 +1,41 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.application.ArtifactProperties;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
+import java.nio.file.SecureDirectoryStream;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -35,6 +51,7 @@ public class ArtifactStore {
     private static final Logger log = LoggerFactory.getLogger(ArtifactStore.class);
 
     private static final String HTML = "html";
+    private static final AtomicBoolean UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED = new AtomicBoolean();
 
     /**
      * 내주는 확장자와 그 형식. 이 밖의 파일은 폴더에 있어도 내주지 않는다.
@@ -52,10 +69,25 @@ public class ArtifactStore {
 
     private final Path root;
     private final String agentRoot;
+    private final boolean forceAtomicMoveFallback;
+    private final AtomicMover atomicMover;
 
+    @Autowired
     public ArtifactStore(ArtifactProperties properties) {
+        this(properties, false, ArtifactStore::atomicMove);
+    }
+
+    /** Linux에서도 링크 재검사와 원자 교체 대체 경로를 검사할 때 쓴다. */
+    ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback) {
+        this(properties, forceAtomicMoveFallback, ArtifactStore::atomicMove);
+    }
+
+    /** 파일 시스템의 원자 교체 실패를 결정적으로 검사할 때 쓴다. */
+    ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback, AtomicMover atomicMover) {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
         this.agentRoot = stripTrailingSlash(properties.agentRoot());
+        this.forceAtomicMoveFallback = forceAtomicMoveFallback;
+        this.atomicMover = atomicMover;
     }
 
     /**
@@ -164,6 +196,71 @@ public class ArtifactStore {
     }
 
     /**
+     * 결과물을 쓸 최종 경로를 판정하고 필요한 부모 폴더를 만든다.
+     *
+     * <p>기존 읽기 경로와 달리 아직 없는 최종 파일도 받는다. 대화 폴더와 이미 있던 부모는 링크를 따라가지
+     * 않고 확인하고, 새 부모는 하나씩 만든 직후 실제 경로를 다시 확인한다.
+     */
+    public Path resolveForWrite(Long conversationId, String relativePath) {
+        try {
+            List<String> parts = writableParts(relativePath);
+            Path folder = checkedConversationFolder(conversationId);
+            Path current = folder;
+            for (int index = 0; index < parts.size() - 1; index++) {
+                current = checkedOrCreatedDirectory(current, parts.get(index), folder);
+            }
+            Path target = current.resolve(parts.getLast());
+            requireOrdinaryTarget(target);
+            return target;
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (IOException | RuntimeException ex) {
+            throw storeFailure(ex);
+        }
+    }
+
+    /** 파일 시스템을 열지 않고 결과물 쓰기 경로의 형식과 확장자만 검사한다. */
+    public static void requireWritablePath(String relativePath) {
+        writableParts(relativePath);
+    }
+
+    /**
+     * 검증한 대화 폴더 안에서 임시 파일을 완성한 뒤 원자적으로 바꾼다.
+     *
+     * <p>원자 교체를 지원하지 않는 파일 시스템에서는 기존 파일을 직접 덮지 않는다. 실패한 저장이 기존
+     * 결과물을 망가뜨리지 않게 하기 위해서다.
+     */
+    public long write(Long conversationId, String relativePath, byte[] content) {
+        if (content == null) {
+            throw validation("artifact content is required");
+        }
+        Path target = resolveForWrite(conversationId, relativePath);
+        Path parent = target.getParent();
+        try {
+            Path folder = checkedConversationFolder(conversationId);
+            verifyParent(parent, folder);
+            requireOrdinaryTarget(target);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(parent)) {
+                if (!forceAtomicMoveFallback && stream instanceof SecureDirectoryStream<Path> secure) {
+                    writeWithSecureDirectory(secure, target.getFileName(), content);
+                } else {
+                    if (!forceAtomicMoveFallback) {
+                        warnUnsupportedSecureDirectoryOnce();
+                    } else {
+                        log.warn("using forced checked atomic artifact replacement for verification");
+                    }
+                    writeWithAtomicMove(parent, target, folder, content, atomicMover);
+                }
+            }
+            return content.length;
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (IOException | RuntimeException ex) {
+            throw storeFailure(ex);
+        }
+    }
+
+    /**
      * 뿌리 아래를 걸어 마지막으로 바뀐 때가 {@code cutoff} 보다 앞선 파일을 지운다.
      *
      * <p>대화 번호 이름의 폴더 안에 있는 파일만 지운다. 한 파일이 실패해도 나머지를 계속한다. 하나 때문에 그날
@@ -256,6 +353,187 @@ public class ArtifactStore {
 
     private Path folderOf(Long conversationId) {
         return root.resolve(String.valueOf(conversationId));
+    }
+
+    private Path checkedConversationFolder(Long conversationId) throws IOException {
+        if (conversationId == null) {
+            throw validation("conversation id is required");
+        }
+        Path folder = folderOf(conversationId);
+        // 대화 준비에서는 생성 실패를 기록하고 계속하지만, 명시적인 쓰기는 실패를 호출자에게 돌린다.
+        Files.createDirectories(folder);
+        if (!Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(folder)) {
+            throw storeFailure(new IOException("artifact conversation folder is not a directory"));
+        }
+        Path realRoot = root.toRealPath();
+        Path realFolder = folder.toRealPath();
+        if (!realFolder.equals(realRoot.resolve(String.valueOf(conversationId)))) {
+            throw storeFailure(new IOException("artifact conversation folder escapes the root"));
+        }
+        return realFolder;
+    }
+
+    private static List<String> writableParts(String relativePath) {
+        if (relativePath == null || relativePath.isBlank() || relativePath.length() > 500
+                || relativePath.indexOf('\\') >= 0 || relativePath.indexOf('\0') >= 0
+                || relativePath.matches("^[A-Za-z]:.*")) {
+            throw validation("artifact path is invalid");
+        }
+        Path parsed;
+        try {
+            parsed = Path.of(relativePath);
+        } catch (RuntimeException ex) {
+            throw validation("artifact path is invalid");
+        }
+        if (parsed.isAbsolute() || contentTypeOf(relativePath).isEmpty()) {
+            throw validation("artifact path is invalid");
+        }
+        String[] rawParts = relativePath.split("/", -1);
+        List<String> parts = new ArrayList<>(rawParts.length);
+        for (String part : rawParts) {
+            if (part.isEmpty() || part.equals(".") || part.equals("..")) {
+                throw validation("artifact path is invalid");
+            }
+            parts.add(part);
+        }
+        return parts;
+    }
+
+    private static Path checkedOrCreatedDirectory(Path parent, String name, Path folder) throws IOException {
+        Path child = parent.resolve(name);
+        if (Files.exists(child, LinkOption.NOFOLLOW_LINKS)) {
+            if (!Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(child)) {
+                throw storeFailure(new IOException("artifact parent is not a directory"));
+            }
+        } else {
+            Files.createDirectory(child);
+        }
+        Path realChild = child.toRealPath();
+        if (!realChild.startsWith(folder)) {
+            throw storeFailure(new IOException("artifact parent escapes the conversation folder"));
+        }
+        return realChild;
+    }
+
+    private static void verifyParent(Path parent, Path folder) throws IOException {
+        if (!Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(parent)) {
+            throw storeFailure(new IOException("artifact parent is not a directory"));
+        }
+        Path realParent = parent.toRealPath();
+        if (!realParent.startsWith(folder)) {
+            throw storeFailure(new IOException("artifact parent escapes the conversation folder"));
+        }
+    }
+
+    private static void requireOrdinaryTarget(Path target) {
+        if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        if (Files.isSymbolicLink(target) || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
+            throw storeFailure(new IOException("artifact target is not a regular file"));
+        }
+    }
+
+    private static void writeWithSecureDirectory(
+            SecureDirectoryStream<Path> directory, Path targetName, byte[] content) throws IOException {
+        Path temporaryName = Path.of(".artifact-" + UUID.randomUUID() + ".tmp");
+        boolean temporaryCreated = false;
+        try {
+            Set<OpenOption> options = Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE,
+                    LinkOption.NOFOLLOW_LINKS);
+            try (SeekableByteChannel channel = directory.newByteChannel(temporaryName, options)) {
+                temporaryCreated = true;
+                writeFully(channel, content);
+            }
+            requireOrdinaryTargetInDirectory(directory, targetName);
+            directory.move(temporaryName, directory, targetName);
+            temporaryCreated = false;
+        } finally {
+            if (temporaryCreated) {
+                deleteSecurely(directory, temporaryName);
+            }
+        }
+    }
+
+    private static void writeWithAtomicMove(
+            Path parent, Path target, Path folder, byte[] content, AtomicMover atomicMover) throws IOException {
+        Path temporary = null;
+        try {
+            temporary = Files.createTempFile(parent, ".artifact-", ".tmp");
+            try (SeekableByteChannel channel = Files.newByteChannel(temporary,
+                    EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
+                writeFully(channel, content);
+            }
+            verifyParent(parent, folder);
+            requireOrdinaryTarget(target);
+            atomicMover.move(temporary, target);
+            temporary = null;
+        } catch (AtomicMoveNotSupportedException ex) {
+            throw ex;
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException ignored) {
+                    // 저장 실패의 원인을 임시 파일 정리 실패로 바꾸지 않는다.
+                }
+            }
+        }
+    }
+
+    private static void requireOrdinaryTargetInDirectory(SecureDirectoryStream<Path> directory, Path target)
+            throws IOException {
+        BasicFileAttributeView view = directory.getFileAttributeView(target, BasicFileAttributeView.class,
+                LinkOption.NOFOLLOW_LINKS);
+        if (view == null) {
+            throw new IOException("could not inspect artifact target");
+        }
+        try {
+            BasicFileAttributes attributes = view.readAttributes();
+            if (attributes.isSymbolicLink() || !attributes.isRegularFile()) {
+                throw storeFailure(new IOException("artifact target is not a regular file"));
+            }
+        } catch (NoSuchFileException ignored) {
+            // 대상이 없으면 새 파일로 바꿀 수 있다.
+        }
+    }
+
+    private static void writeFully(SeekableByteChannel channel, byte[] content) throws IOException {
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        while (buffer.hasRemaining()) {
+            channel.write(buffer);
+        }
+    }
+
+    private static void deleteSecurely(SecureDirectoryStream<Path> directory, Path temporary) {
+        try {
+            directory.deleteFile(temporary);
+        } catch (IOException ignored) {
+            // 저장 실패의 원인을 임시 파일 정리 실패로 바꾸지 않는다.
+        }
+    }
+
+    private static void atomicMove(Path source, Path target) throws IOException {
+        Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static void warnUnsupportedSecureDirectoryOnce() {
+        if (UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED.compareAndSet(false, true)) {
+            log.warn("SecureDirectoryStream is unavailable; using checked atomic artifact replacement");
+        }
+    }
+
+    @FunctionalInterface
+    interface AtomicMover {
+        void move(Path source, Path target) throws IOException;
+    }
+
+    private static ApiException validation(String message) {
+        return new ApiException(ErrorCode.VALIDATION_FAILED, message);
+    }
+
+    private static ApiException storeFailure(Exception cause) {
+        return new ApiException(ErrorCode.INTERNAL_ERROR, "could not store artifact", cause);
     }
 
     private static String relativeOf(Path folder, Path file) {
