@@ -11,6 +11,7 @@
 ## 컨텍스트
 
 **근거 문서**: [연동 계약의 SSRF 방어](../../docs/hermes/tools-and-skills.md#주소-방식과-ssrf-방어), [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md), [쓰기 모듈 배치](../../docs/code-architecture.md#mcp-로-쓰는-자리).
+근거 문서 경로는 `docs/hermes/tools-and-skills.md`, `docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md`, `docs/code-architecture.md` 다.
 
 본문 저장과 쓰기 경로 판정이 구현되고 검사를 통과한 뒤 수행한다.
 그 기반은 `chat/application/ArtifactWriteService`, `chat/infra/ArtifactStore` 다.
@@ -90,7 +91,8 @@ Control Plane 의 토큰, 쿠키와 다른 인증 정보를 보내지 않으며 
 | 연결, TLS, 읽기 오류와 제한 시간 초과 | 스트림과 socket 을 닫고 저장하지 않음 |
 | 느린 본문과 느린 DNS | 읽기 제한과 별도로 호출 전체 30초 제한을 적용 |
 
-DNS 와 전송 대기용 실행기는 크기를 제한하고 호출마다 끝나지 않는 thread 를 만들지 않는다.
+DNS 와 전송 대기용 실행기는 크기를 제한해 호출마다 새 thread 를 만들지 않는다.
+`InetAddress` 의 진행 중인 DNS 조회는 취소를 보장하지 않으므로, 전체 30초가 지나면 호출자는 실패를 받고 남은 조회는 크기가 제한된 공유 실행기에만 머물게 한다.
 전체 제한 시간이 지나면 전송을 취소하고 socket 을 닫는다.
 오류와 로그에는 URL query, 응답 본문, 인증 정보와 내부 경로를 쓰지 않는다.
 

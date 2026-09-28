@@ -159,7 +159,7 @@ Control Plane 은 그 사용자가 볼 수 있고 승인됐으며 항상 주입�
 ## 결과물 쓰기 도구
 
 `artifact_write` 는 일반 파일 도구가 없는 profile 에 결과물 저장만 연다.
-모든 profile 이 이미 허용한 `fos-assistant-memory` 서버에 추가하므로 Hermes 서버 등록과 허용 목록을 바꾸지 않는다.
+`fos-assistant-memory` 서버가 등록된 profile 에서만 보인다. 기존 서버에 도구를 추가하므로 Hermes 서버 등록과 허용 목록을 바꾸지 않는다.
 구현 전까지 현재 서버는 `memory_read` 만 제공한다.
 결정은 [ADR-028](../adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
 

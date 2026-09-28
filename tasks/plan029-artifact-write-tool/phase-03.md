@@ -4,13 +4,14 @@
 
 ## 목표
 
-모든 에이전트에 `artifact_write` 를 열고, 도구로 쓴 HTML 이 turn 의 답에 붙는 흐름을 검증한다.
+`fos-assistant-memory` MCP 서버가 등록된 profile 에 `artifact_write` 를 열고, 도구로 쓴 HTML 이 turn 의 답에 붙는 흐름을 검증한다.
 
 **범위 외**: Hermes core 와 profile 설정 변경, 에이전트별 도구 설정 화면, 배포와 운영 명령.
 
 ## 컨텍스트
 
 **근거 문서**: [MCP 계약](../../docs/hermes/tools-and-skills.md#결과물-쓰기-도구), [쓰기 흐름](../../docs/flow.md#결과물을-mcp-로-쓸-때), [실행 입력 안내](../../docs/code-architecture.md#에이전트에게-알리는-법-1), [ADR-028](../../docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md).
+근거 문서 경로는 `docs/hermes/tools-and-skills.md`, `docs/flow.md`, `docs/code-architecture.md`, `docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md` 다.
 
 본문과 URL 저장 서비스가 구현되고 검사를 통과한 뒤 연결한다.
 현재 코드는 아래와 같다. MCP 서버 이름과 프로토콜, 인증 경계는 바꾸지 않는다.
@@ -165,6 +166,7 @@ Node 는 22.18 이상을 쓴다.
 | 관측 | 충족 조건 |
 | --- | --- |
 | `file` 과 `terminal` 을 쓰지 않는 대역 | 실제 MCP HTTP 호출로 `test/index.html` 을 만들고 그 turn 의 답에 path 가 붙음 |
+| MCP 서버 등록 범위 | `fos-assistant-memory` 가 등록된 profile 에서만 도구가 보임 |
 | 실행 입력의 `publicId` | MCP 의 `conversation_id` 와 일치하고 내부 번호를 넘기지 않음 |
 | 같은 경로 재작성 | 최신 본문을 읽고 실패하면 이전 파일 보존 |
 | 이미지 URL | 허용한 공개 IP 와 MIME 만 저장하며 SSRF 거절과 5MB 상한 검사 통과 |
@@ -193,6 +195,9 @@ URL 저장의 운영 확인은 `fos-home-infra` 에서 실제 호스트를 설�
 | `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ArtifactTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatRegenerateTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/RegenerateDeletedAttachmentTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/ResearchAndBuildFlowTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/artifact.ts` | 수정 |
