@@ -18,6 +18,8 @@ public interface HermesDashboardClient {
      *
      * <p>본뜰 profile 을 주지 않는다. 주면 본뜬 profile 의 {@code API_SERVER_KEY} 까지 복사되어 key
      * 하나로 두 profile 이 열린다.
+     *
+     * <p>번들 스킬도 심지 않는다. 그 profile 이 쓰는 스킬은 따로 붙인다.
      */
     void createProfile(String name);
 

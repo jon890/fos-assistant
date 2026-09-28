@@ -13,9 +13,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 대시보드를 부를 때 나가는 메서드와 경로와 본문과 토큰을 본다.
@@ -86,14 +88,16 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void profile_을_만들_때_이름만_싣고_본뜰_profile_을_주지_않는다() {
+    void profile_을_만들_때_본뜰_profile_을_주지_않고_번들_스킬을_심지_않는다() {
         client.createProfile("kid");
 
         assertThat(calls).singleElement().satisfies(call -> {
             assertThat(call.method()).isEqualTo("POST");
             assertThat(call.path()).isEqualTo("/api/profiles");
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
-            assertThat(call.body()).isEqualTo("{\"name\":\"kid\"}");
+            // 칸 순서는 정해져 있지 않으므로 문자열이 아니라 JSON 으로 읽어 비교한다.
+            assertThat(new ObjectMapper().readValue(call.body(), Map.class))
+                    .isEqualTo(Map.of("name", "kid", "no_skills", true));
         });
     }
 

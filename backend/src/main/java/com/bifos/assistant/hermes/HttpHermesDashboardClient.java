@@ -46,7 +46,8 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
                     .uri(baseUrl + "/api/profiles")
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("name", name))
+                    // 번들 스킬을 심지 않는다. 스킬 설명은 매 대화의 입력에 실리므로 쓰는 스킬만 따로 붙인다.
+                    .body(Map.of("name", name, "no_skills", true))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {
