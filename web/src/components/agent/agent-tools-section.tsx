@@ -101,7 +101,7 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
       }
       await reload();
     } catch {
-      setError(describeError("HERMES_UNAVAILABLE", "도구 설정을 저장하지 못했습니다."));
+      setError(describeError("HERMES_UNAVAILABLE", "도구 설정을 저장하지 못했어요."));
       await reload();
     } finally {
       setPendingToolName(null);
@@ -142,7 +142,7 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
                   {reason ? <p className="mt-1 text-xs text-muted-foreground">{reason}</p> : null}
                   {missing.includes(tool.name) ? (
                     <p className="mt-1 text-xs text-destructive">
-                      이 도구는 profile 설정에서 막혀 있어요. 관리자에게 알려 주세요.
+                      이 도구를 켜지 못했어요. 관리자에게 알려 주세요.
                     </p>
                   ) : null}
                 </div>
@@ -187,9 +187,9 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
         <AlertDialog open onOpenChange={(open) => { if (!open && pendingToolName === null) setConfirming(null); }}>
           <AlertDialogContent onEscapeKeyDown={(event) => { if (pendingToolName !== null) event.preventDefault(); }}>
             <AlertDialogHeader>
-              <AlertDialogTitle>{confirming.label} 도구를 켤까요?</AlertDialogTitle>
+              <AlertDialogTitle>{confirming.label} 도구 켜기</AlertDialogTitle>
               <AlertDialogDescription>
-                {confirmationDescription(confirming.name)} 다음 실행부터 이 에이전트가 쓸 수 있습니다.
+                {confirmationDescription(confirming.name)} 다음 실행부터 이 에이전트가 쓸 수 있어요.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -204,7 +204,7 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
                   void save(tools.map((tool) => tool.name === confirming.name ? { ...tool, enabled: true } : tool), confirming.name);
                 }}
               >
-                켠다
+                켜기
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

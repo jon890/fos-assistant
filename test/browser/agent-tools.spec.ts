@@ -59,10 +59,10 @@ test("관리자가 terminal 도구를 켤 때 확인 창을 거친다", async ({
   await expect(terminal.getByRole("button", { name: "꺼짐" })).toBeVisible();
   await terminal.getByRole("button", { name: "꺼짐" }).click();
 
-  const dialog = page.getByRole("alertdialog", { name: "Terminal 도구를 켤까요?" });
+  const dialog = page.getByRole("alertdialog", { name: "Terminal 도구 켜기" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("이 도구는 홈서버 파일과 셸에 닿을 수 있어요.")).toBeVisible();
-  await dialog.getByRole("button", { name: "켠다" }).click();
+  await dialog.getByRole("button", { name: "켜기" }).click();
   await expect(terminal.getByRole("button", { name: "켜짐" })).toBeVisible();
 
   await terminal.getByRole("button", { name: "켜짐" }).click();
@@ -83,8 +83,8 @@ test("관리자는 다른 주인의 비공개 에이전트 도구를 관리자 �
       candidate.url().endsWith(`/api/admin/agents/${AGENT_CODE}/tools`)
         && candidate.request().method() === "PUT",
     );
-    await page.getByRole("alertdialog", { name: "Terminal 도구를 켤까요?" })
-      .getByRole("button", { name: "켠다" })
+    await page.getByRole("alertdialog", { name: "Terminal 도구 켜기" })
+      .getByRole("button", { name: "켜기" })
       .click();
     expect((await response).ok()).toBeTruthy();
     await expect(terminal.getByRole("button", { name: "켜짐" })).toBeVisible();
@@ -163,7 +163,7 @@ test("저장 뒤 도구가 빠지면 다시 읽은 상태와 안내를 보인다
   const web = toolRow(page, "Web");
   await web.getByRole("button", { name: "꺼짐" }).click();
   await expect(web.getByRole("button", { name: "꺼짐" })).toBeVisible();
-  await expect(web.getByText("이 도구는 profile 설정에서 막혀 있어요. 관리자에게 알려 주세요.")).toBeVisible();
+  await expect(web.getByText("이 도구를 켜지 못했어요. 관리자에게 알려 주세요.")).toBeVisible();
   await expect(toolsSection(page).getByText("표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.")).toBeVisible();
 });
 

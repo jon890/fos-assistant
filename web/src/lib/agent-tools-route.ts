@@ -13,7 +13,7 @@ export async function agentToolsRoute(
   const { code } = await context.params;
   if (!AGENT_CODE_PATTERN.test(code)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않습니다." },
+      { code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않아요." },
       { status: 400 },
     );
   }
@@ -24,7 +24,7 @@ export async function agentToolsRoute(
       body = await request.json();
     } catch {
       return NextResponse.json(
-        { code: "VALIDATION_FAILED", message: "요청 본문이 올바르지 않습니다." },
+        { code: "VALIDATION_FAILED", message: "요청 내용이 올바르지 않아요." },
         { status: 400 },
       );
     }
