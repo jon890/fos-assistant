@@ -1204,6 +1204,9 @@ v0.21.0 의 `hermes_cli/web_routers/profiles.py` 와 `hermes_cli/web_models.py` 
 - 이름이 겹치지 않으면 실행 wrapper 를 만든다
 - 컨테이너 안에서는 그 profile 의 gateway 를 s6 서비스로 등록한다
 
+**Control Plane 은 `no_skills` 를 true 로 보낸다.**
+번들 스킬이 심기면 그 설명이 매 대화의 입력에 실린다. 그 profile 이 쓰는 스킬은 「스킬을 profile 에 붙이는 방법」 대로 따로 붙인다.
+
 **CLI 의 `--no-alias` 에 해당하는 본문 필드가 없다.**
 API 로 만들면 wrapper 가 함께 생긴다.
 `DELETE` 로 지우면 wrapper 와 s6 서비스가 함께 사라지는 것까지 확인했다.
