@@ -60,7 +60,7 @@ function confirmationDescription(name: string): string {
 export function AgentToolsSection({ code, initialTools, admin, visibility }: Props) {
   const [tools, setTools] = useState(initialTools.toolsets);
   const [unclassifiedEnabled, setUnclassifiedEnabled] = useState(initialTools.unclassifiedEnabled);
-  const [pending, setPending] = useState(false);
+  const [pendingToolName, setPendingToolName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [confirming, setConfirming] = useState<ToolsetView | null>(null);
@@ -78,8 +78,8 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
     }
   }
 
-  async function save(next: ToolsetView[]) {
-    setPending(true);
+  async function save(next: ToolsetView[], toolName: string) {
+    setPendingToolName(toolName);
     setError(null);
     setMissing([]);
     try {
@@ -104,7 +104,7 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
       setError(describeError("HERMES_UNAVAILABLE", "도구 설정을 저장하지 못했습니다."));
       await reload();
     } finally {
-      setPending(false);
+      setPendingToolName(null);
     }
   }
 
@@ -114,7 +114,7 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
       setConfirming(tool);
       return;
     }
-    void save(tools.map((current) => current.name === tool.name ? { ...current, enabled: !current.enabled } : current));
+    void save(tools.map((current) => current.name === tool.name ? { ...current, enabled: !current.enabled } : current), tool.name);
   }
 
   const ownerTools = tools.filter((tool) => tool.tier === "OWNER");
@@ -133,7 +133,7 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
         <ul className="mt-2 divide-y divide-border rounded-md border border-border">
           {entries.map((tool) => {
             const reason = disabledReason(tool);
-            const disabled = pending || reason !== undefined;
+            const disabled = pendingToolName !== null || reason !== undefined;
             return (
               <li key={tool.name} className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
@@ -150,7 +150,7 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
                   size="sm"
                   variant={tool.enabled ? "default" : "outline"}
                   disabled={disabled}
-                  loading={pending && tool.enabled}
+                  loading={pendingToolName === tool.name}
                   loadingText="저장 중"
                   aria-pressed={tool.enabled}
                   title={reason}
@@ -184,8 +184,8 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
       {list("주인 등급", ownerTools)}
       {list("관리자 등급", adminTools)}
       {confirming ? (
-        <AlertDialog open onOpenChange={(open) => { if (!open && !pending) setConfirming(null); }}>
-          <AlertDialogContent onEscapeKeyDown={(event) => { if (pending) event.preventDefault(); }}>
+        <AlertDialog open onOpenChange={(open) => { if (!open && pendingToolName === null) setConfirming(null); }}>
+          <AlertDialogContent onEscapeKeyDown={(event) => { if (pendingToolName !== null) event.preventDefault(); }}>
             <AlertDialogHeader>
               <AlertDialogTitle>{confirming.label} 도구를 켤까요?</AlertDialogTitle>
               <AlertDialogDescription>
@@ -194,14 +194,14 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel asChild>
-                <Button variant="outline" disabled={pending}>취소</Button>
+                <Button variant="outline" disabled={pendingToolName !== null}>취소</Button>
               </AlertDialogCancel>
               <Button
-                loading={pending}
+                loading={pendingToolName !== null}
                 loadingText="저장 중"
                 onClick={() => {
                   setConfirming(null);
-                  void save(tools.map((tool) => tool.name === confirming.name ? { ...tool, enabled: true } : tool));
+                  void save(tools.map((tool) => tool.name === confirming.name ? { ...tool, enabled: true } : tool), confirming.name);
                 }}
               >
                 켠다

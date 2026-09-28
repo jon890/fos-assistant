@@ -166,3 +166,27 @@ test("저장 뒤 도구가 빠지면 다시 읽은 상태와 안내를 보인다
   await expect(web.getByText("이 도구는 profile 설정에서 막혀 있어요. 관리자에게 알려 주세요.")).toBeVisible();
   await expect(toolsSection(page).getByText("표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.")).toBeVisible();
 });
+
+test("저장하는 동안 누른 도구에만 저장 중 표시를 한다", async ({ page }) => {
+  await makePrivate(page);
+  await disableConfigurableTools(page);
+  let release = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`**/api/agents/${AGENT_CODE}/tools`, async (route) => {
+    if (route.request().method() === "PUT") await held;
+    await route.continue();
+  });
+
+  await page.goto(`/agents/${AGENT_CODE}`);
+  const web = toolRow(page, "Web");
+  await web.getByRole("button", { name: "꺼짐" }).click();
+  try {
+    await expect(web.getByRole("button", { name: "저장 중" })).toBeVisible();
+    const vision = toolRow(page, "Vision").getByRole("button", { name: "꺼짐" });
+    await expect(vision).toBeVisible();
+    await expect(vision).toBeDisabled();
+  } finally {
+    release();
+  }
+  await expect(web.getByRole("button", { name: "켜짐" })).toBeVisible();
+});
