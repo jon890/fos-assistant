@@ -65,6 +65,17 @@ export type StartersView = {
   maxPrompts: number;
 };
 
+/** 에이전트 도구 선택 화면의 한 줄이다. 등급과 변경 가능 여부는 Control Plane 이 계산한다. */
+export type ToolsetView = {
+  name: string;
+  label: string;
+  description: string;
+  tier: "OWNER" | "ADMIN";
+  enabled: boolean;
+  editable: boolean;
+  requiresPrivate: boolean;
+};
+
 export const PRIVATE_VISIBILITY: AdminAgent["visibility"] = "PRIVATE";
 export const GROUP_VISIBILITY: AdminAgent["visibility"] = "GROUP";
 

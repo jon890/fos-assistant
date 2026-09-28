@@ -1,0 +1,120 @@
+import { expect, setAgentVisibility, setSession, test } from "./fixtures.ts";
+import { TEST_EMAIL } from "./settings.ts";
+import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+
+const AGENT_CODE = "browser";
+
+function toolsSection(page: Page) {
+  return page.getByRole("region", { name: "도구" });
+}
+
+function toolRow(page: Page, label: string) {
+  return toolsSection(page).locator("li").filter({ hasText: label });
+}
+
+async function makePrivate(page: Page, ownerEmail = TEST_EMAIL) {
+  const response = await page.request.patch(`/api/admin/agents/${AGENT_CODE}`, {
+    data: { enabled: true, visibility: "PRIVATE", ownerEmail },
+  });
+  if (!response.ok()) throw new Error(`에이전트를 비공개로 바꾸지 못했다: ${response.status()} ${await response.text()}`);
+}
+
+async function disableConfigurableTools(page: Page) {
+  const response = await page.request.put(`/api/admin/agents/${AGENT_CODE}/tools`, {
+    data: { enabled: [] },
+  });
+  expect(response.ok()).toBeTruthy();
+}
+
+test("주인이 web 도구를 켜면 다시 열어도 켜져 있고 관리자 도구는 누를 수 없다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+  await makePrivate(page, "member@example.com");
+  await disableConfigurableTools(page);
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  try {
+    await page.goto(`/agents/${AGENT_CODE}`);
+    const web = toolRow(page, "Web");
+    await expect(web.getByRole("button", { name: "꺼짐" })).toBeVisible();
+    await web.getByRole("button", { name: "꺼짐" }).click();
+    await expect(web.getByRole("button", { name: "켜짐" })).toBeVisible();
+
+    await page.reload();
+    await expect(toolRow(page, "Web").getByRole("button", { name: "켜짐" })).toBeVisible();
+    await expect(toolRow(page, "Terminal").getByRole("button", { name: "꺼짐" })).toBeDisabled();
+    await expect(toolRow(page, "Terminal").getByText("관리자만 켤 수 있어요")).toBeVisible();
+  } finally {
+    await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+    await makePrivate(page);
+    await disableConfigurableTools(page);
+  }
+});
+
+test("관리자가 terminal 도구를 켤 때 확인 창을 거친다", async ({ page }) => {
+  await makePrivate(page);
+  await disableConfigurableTools(page);
+  await page.goto(`/agents/${AGENT_CODE}`);
+  const terminal = toolRow(page, "Terminal");
+  await expect(terminal.getByRole("button", { name: "꺼짐" })).toBeVisible();
+  await terminal.getByRole("button", { name: "꺼짐" }).click();
+
+  const dialog = page.getByRole("alertdialog", { name: "Terminal 도구를 켤까요?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("이 도구는 홈서버 파일과 셸에 닿을 수 있어요.")).toBeVisible();
+  await dialog.getByRole("button", { name: "켠다" }).click();
+  await expect(terminal.getByRole("button", { name: "켜짐" })).toBeVisible();
+
+  await terminal.getByRole("button", { name: "켜짐" }).click();
+  await expect(terminal.getByRole("button", { name: "꺼짐" })).toBeVisible();
+});
+
+test("그룹 공개 에이전트에서는 셸과 파일 도구를 누를 수 없다", async ({ page }) => {
+  await makePrivate(page);
+  await disableConfigurableTools(page);
+  await setAgentVisibility(AGENT_CODE, "GROUP", null);
+  try {
+    await page.goto(`/agents/${AGENT_CODE}`);
+    for (const label of ["Terminal", "File", "Code execution", "Browser", "Computer use"]) {
+      const row = toolRow(page, label);
+      await expect(row.getByRole("button", { name: "꺼짐" })).toBeDisabled();
+      await expect(row.getByText("그룹 공개 에이전트에는 켤 수 없어요")).toBeVisible();
+    }
+  } finally {
+    await makePrivate(page);
+  }
+});
+
+test("저장 뒤 도구가 빠지면 다시 읽은 상태와 안내를 보인다", async ({ page }) => {
+  await makePrivate(page);
+  await disableConfigurableTools(page);
+  const refreshed = [
+    { name: "web", label: "Web", description: "웹을 검색한다", tier: "OWNER", enabled: false, editable: true, requiresPrivate: false },
+    { name: "terminal", label: "Terminal", description: "명령을 실행한다", tier: "ADMIN", enabled: false, editable: true, requiresPrivate: true },
+  ];
+  let failed = false;
+  await page.route(`**/api/agents/${AGENT_CODE}/tools`, async (route) => {
+    if (route.request().method() === "PUT") {
+      failed = true;
+      return route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "AGENT_TOOLS_NOT_APPLIED",
+          message: "Hermes did not apply the requested toolsets",
+          missingToolsets: ["web"],
+        }),
+      });
+    }
+    if (route.request().method() === "GET" && failed) {
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(refreshed) });
+    }
+    return route.continue();
+  });
+
+  await page.goto(`/agents/${AGENT_CODE}`);
+  const web = toolRow(page, "Web");
+  await web.getByRole("button", { name: "꺼짐" }).click();
+  await expect(web.getByRole("button", { name: "꺼짐" })).toBeVisible();
+  await expect(web.getByText("이 도구는 profile 설정에서 막혀 있어요. 관리자에게 알려 주세요.")).toBeVisible();
+});

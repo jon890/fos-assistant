@@ -286,6 +286,26 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
   }
 }
 
+/** 그룹 공개 검사가 쓰는 profile 에 셸·파일 도구가 남지 않도록 API 실행 도구를 초기화한다. */
+async function seedBrowserToolsets(hermesBaseUrl: string): Promise<void> {
+  for (const profile of Object.keys(PROFILE_KEYS)) {
+    const response = await fetch(`${hermesBaseUrl}/api/config`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${FAKE_DASHBOARD_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        profile,
+        config: { platform_toolsets: { api_server: ["fos-assistant-memory"] } },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`브라우저 테스트 도구 설정을 준비하지 못했다: ${profile} ${response.status}`);
+    }
+  }
+}
+
 function startControlPlane(
   keyDir: string,
   dashboardBaseUrl: string,
@@ -352,6 +372,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
   try {
     hermes = await startFakeHermes(PROFILE_KEYS);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
+    await seedBrowserToolsets(hermes.baseUrl);
     app = startControlPlane(
       await writeProfileKeys(work),
       hermes.baseUrl,
