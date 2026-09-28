@@ -69,6 +69,50 @@ test("관리자가 terminal 도구를 켤 때 확인 창을 거친다", async ({
   await expect(terminal.getByRole("button", { name: "꺼짐" })).toBeVisible();
 });
 
+test("관리자는 다른 주인의 비공개 에이전트 도구를 관리자 경로로 고친다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+  await makePrivate(page, "member@example.com");
+  await disableConfigurableTools(page);
+  try {
+    await page.goto(`/agents/${AGENT_CODE}`);
+    const terminal = toolRow(page, "Terminal");
+    await terminal.getByRole("button", { name: "꺼짐" }).click();
+    const response = page.waitForResponse((candidate) =>
+      candidate.url().endsWith(`/api/admin/agents/${AGENT_CODE}/tools`)
+        && candidate.request().method() === "PUT",
+    );
+    await page.getByRole("alertdialog", { name: "Terminal 도구를 켤까요?" })
+      .getByRole("button", { name: "켠다" })
+      .click();
+    expect((await response).ok()).toBeTruthy();
+    await expect(terminal.getByRole("button", { name: "켜짐" })).toBeVisible();
+  } finally {
+    await makePrivate(page);
+    await disableConfigurableTools(page);
+  }
+});
+
+test("그룹 공개 에이전트를 읽는 사용자는 성격만 보고 도구 절은 보지 못한다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+  await makePrivate(page);
+  await disableConfigurableTools(page);
+  await setAgentVisibility(AGENT_CODE, "GROUP", null);
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  try {
+    await page.goto(`/agents/${AGENT_CODE}`);
+    await expect(page.getByRole("textbox", { name: "브라우저 비서 성격" })).toBeVisible();
+    await expect(toolsSection(page)).toHaveCount(0);
+  } finally {
+    await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
+    await makePrivate(page);
+    await disableConfigurableTools(page);
+  }
+});
+
 test("그룹 공개 에이전트에서는 셸과 파일 도구를 누를 수 없다", async ({ page }) => {
   await makePrivate(page);
   await disableConfigurableTools(page);
@@ -88,10 +132,13 @@ test("그룹 공개 에이전트에서는 셸과 파일 도구를 누를 수 없
 test("저장 뒤 도구가 빠지면 다시 읽은 상태와 안내를 보인다", async ({ page }) => {
   await makePrivate(page);
   await disableConfigurableTools(page);
-  const refreshed = [
-    { name: "web", label: "Web", description: "웹을 검색한다", tier: "OWNER", enabled: false, editable: true, requiresPrivate: false },
-    { name: "terminal", label: "Terminal", description: "명령을 실행한다", tier: "ADMIN", enabled: false, editable: true, requiresPrivate: true },
-  ];
+  const refreshed = {
+    toolsets: [
+      { name: "web", label: "Web", description: "웹을 검색한다", tier: "OWNER", enabled: false, editable: true, requiresPrivate: false },
+      { name: "terminal", label: "Terminal", description: "명령을 실행한다", tier: "ADMIN", enabled: false, editable: true, requiresPrivate: true },
+    ],
+    unclassifiedEnabled: ["profile-only-tool"],
+  };
   let failed = false;
   await page.route(`**/api/agents/${AGENT_CODE}/tools`, async (route) => {
     if (route.request().method() === "PUT") {
@@ -117,4 +164,5 @@ test("저장 뒤 도구가 빠지면 다시 읽은 상태와 안내를 보인다
   await web.getByRole("button", { name: "꺼짐" }).click();
   await expect(web.getByRole("button", { name: "꺼짐" })).toBeVisible();
   await expect(web.getByText("이 도구는 profile 설정에서 막혀 있어요. 관리자에게 알려 주세요.")).toBeVisible();
+  await expect(toolsSection(page).getByText("표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.")).toBeVisible();
 });

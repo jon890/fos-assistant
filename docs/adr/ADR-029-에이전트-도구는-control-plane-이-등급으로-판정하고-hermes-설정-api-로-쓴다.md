@@ -25,7 +25,10 @@ v0.21.3 에서 plugin 이 본문을 먼저 읽고 같은 요청을 처리기에 
 | 항상 끔 | `memory` | 아무도. 기억은 Control Plane 이 갖는다([ADR-003](ADR-003-memory-권한은-주입으로-강제한다.md)) |
 | 항상 켬 | 기억 MCP `fos-assistant-memory` | 아무도 끄지 못한다 |
 
-등급 표에 없는 toolset(예: v0.21.3 에 들어온 `connections`, `kanban`)은 화면에 보이지 않고 늘 꺼 둔다. 허용 목록을 늘 명시해 쓰므로 Hermes 의 기본 계산으로 열리지 않는다.
+등급 표에 없는 toolset(예: v0.21.3 에 들어온 `connections`, `kanban`)은 화면의 선택 목록에 보이지 않는다.
+도구를 쓸 때 plugin 이 허용 목록을 검사해 모르는 이름을 거절한다.
+Hermes 를 올릴 때는 `fos-home-infra` 의 기능 검사가 모든 profile 의 켜진 목록을 허용 목록과 대조한다.
+Hermes 가 쓰기 없이 toolset 을 자동으로 켤 수도 있어, 도구 조회 응답은 켜진 미분류 이름을 따로 알리고 화면은 관리자에게 알리라고 안내한다.
 허락은 켜는 시점에 한 번이다. 쓸 때마다 묻지 않는다. 관리자 등급을 켤 때는 확인 창을 거친다.
 
 **셸과 파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다.**
@@ -46,5 +49,5 @@ profile 분리는 이 도구의 파일 접근을 격리하지 않아, 그룹에 
 - 감당할 것:
   - 공유 토큰이 새면 다른 profile 의 도구 목록을 바꿀 수 있다. 모델, 승인 방식, MCP 서버는 plugin 의 키 검사 때문에 바꾸지 못한다. 이 토큰은 이미 profile 을 만들고 `.env` 를 쓸 수 있다([ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md))
   - plugin 의 검사와 Control Plane 의 등급 판정이 함께 있어야 경계가 선다. 어느 한쪽을 바꾸면 다른 쪽도 본다
-  - Hermes 가 새 toolset 을 더하면 등급 표에 넣기 전까지 쓰지 못한다
+  - Hermes 가 새 toolset 을 더하면 설정을 쓰지 않아도 그 toolset 이 켜질 수 있다. 쓰기 검사와 기동 기능 검사, 화면 경고로 찾으며 실행마다 검사하지 않는다
   - profile 의 공통 비활성화 목록이 막은 toolset 은 API 실행에서도 켤 수 없다. 쓰고 다시 읽어 켜지지 않은 이름을 오류 응답에 담고 관리자에게 알리도록 안내한다

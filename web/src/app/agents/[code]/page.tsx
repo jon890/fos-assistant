@@ -6,7 +6,7 @@ import { StarterEditor } from "@/components/agent/starter-editor";
 import { AgentAdminSection } from "@/components/agent/agent-admin-section";
 import { AgentToolsSection } from "@/components/agent/agent-tools-section";
 import { callControlPlane } from "@/lib/control-plane";
-import type { AdminAgent, AgentView, PersonaView, StartersView, ToolsetView } from "@/lib/agent";
+import type { AdminAgent, AgentToolsView, AgentView, PersonaView, StartersView } from "@/lib/agent";
 import { readMe } from "@/lib/me";
 
 export default async function AgentPersonaPage({
@@ -29,8 +29,8 @@ export default async function AgentPersonaPage({
       ? callControlPlane<AdminAgent[]>("/api/v1/admin/agents")
       : Promise.resolve(null),
     useAdminTools
-      ? callControlPlane<ToolsetView[]>(`/api/v1/admin/agents/${code}/tools`)
-      : callControlPlane<ToolsetView[]>(`/api/v1/agents/${code}/tools`),
+      ? callControlPlane<AgentToolsView>(`/api/v1/admin/agents/${code}/tools`)
+      : callControlPlane<AgentToolsView>(`/api/v1/agents/${code}/tools`),
   ]);
   const adminAgent = adminAgentsResult?.ok
     ? adminAgentsResult.data.find((agent) => agent.code === code)
@@ -49,7 +49,7 @@ export default async function AgentPersonaPage({
       admin={useAdminTools}
       visibility={adminAgent?.visibility ?? (agentsResult.ok ? agentsResult.data.find((agent) => agent.code === code)?.visibility : undefined)}
     />
-  ) : (
+  ) : toolsResult.code === "FORBIDDEN" ? null : (
     <section aria-label="도구" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
       <h2 className="font-semibold">도구</h2>
       <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">

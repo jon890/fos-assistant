@@ -37,12 +37,12 @@ plugin 은 다른 키, query 와 본문의 profile 불일치, `memory` 포함, `
 
 ## 의도 메모
 
-- 등급 표는 `AgentToolPolicy` 한 곳에 둔다. 표는 ADR-029 「도구 등급」 과 같다. 표에 없는 toolset 은 목록에 보이지 않고 늘 꺼 둔다
+- 등급 표는 `AgentToolPolicy` 한 곳에 둔다. 표는 ADR-029 「도구 등급」 과 같다. 표에 없는 toolset 은 선택 목록에 보이지 않고, 켜져 있으면 `unclassifiedEnabled` 에 알린다
 - 도구 선택을 데이터베이스에 저장하지 않는다. 읽을 때와 쓸 때 Hermes 에서 읽는다(ADR-029)
 - `PUT` 본문의 `enabled` 는 켤 toolset 전체다. 요청자가 바꿀 수 없는 등급의 toolset 은 지금 켜짐과 같아야 한다. 다르면 `FORBIDDEN`
 - 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)은 `GROUP` 에이전트에 켤 수 없다. `GROUP` 생성과 수정에는 최종 listener 주소의 현재 목록을 읽어 검사한다. 새 오류 코드 `AGENT_TOOLS_REQUIRE_PRIVATE` 를 둔다(409)
 - 그룹 독자는 도구를 쓸 수 없다. 주인 또는 `ADMIN` 인지 도구를 읽기 전에 확인한다
-- 도구 `PUT` 과 에이전트 `PATCH` 는 같은 에이전트 행에 쓰기 잠금을 잡고 검사한다. 대기 시간이 지나면 `AGENT_BUSY`(409)로 알린다. 생성은 트랜잭션에서 검사와 저장을 마친 뒤에만 다른 요청에 보인다
+- 도구 `PUT` 과 에이전트 `PATCH` 는 같은 에이전트 행에 쓰기 잠금을 잡고 검사한다. 이미 잠겨 있으면 `AGENT_BUSY`(409)로 곧바로 알린다. 생성은 트랜잭션에서 검사와 저장을 마친 뒤에만 다른 요청에 보인다
 - `agent.disabled_toolsets` 는 모든 platform 에 적용되므로 요청에 넣지 않는다. profile 의 기존 공통 비활성화 목록은 그대로 둔다
 - 쓴 뒤 다시 읽은 목록이 보낸 것과 다르면 새 오류 코드 `AGENT_TOOLS_NOT_APPLIED` 로 알린다(502). 요청했지만 켜지지 않은 이름은 응답의 `missingToolsets` 목록에 담는다. 되돌리려 하지 않는다. 화면은 다시 `GET` 으로 읽고, 켜지지 않은 도구에는 profile 설정이 막고 있다는 안내를 보인다
 - 대시보드나 listener 를 부르지 못하면 `HERMES_UNAVAILABLE`
@@ -68,7 +68,7 @@ plugin 은 다른 키, query 와 본문의 profile 불일치, `memory` 포함, `
 ### 3. `AgentToolService` 와 경로를 만든다
 
 `backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java` 와 `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentToolController.java`:
-- `GET`, `PUT /api/v1/agents/{code}/tools`: `requireReadable` 로 찾는다. 쓰기는 주인 등급은 주인과 `ADMIN`, 관리자 등급은 `ADMIN`
+- `GET`, `PUT /api/v1/agents/{code}/tools`: `requireReadable` 로 찾고 주인 또는 `ADMIN` 인지 도구 조회 전에 확인한다. 쓰기는 주인 등급은 주인과 `ADMIN`, 관리자 등급은 `ADMIN`. 응답에는 `toolsets` 와 `unclassifiedEnabled` 를 담는다
 - `GET`, `PUT /api/v1/admin/agents/{code}/tools`: `ADMIN` 만. 읽기 권한 검사 없이 에이전트를 찾는다
 - 응답 한 줄: `name`, `label`, `description`, `tier`, `enabled`, `editable`, `requiresPrivate`
 - `ErrorCode` 에 `AGENT_TOOLS_REQUIRE_PRIVATE`, `AGENT_TOOLS_NOT_APPLIED` 를 더한다

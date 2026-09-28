@@ -11,7 +11,6 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,32 +32,32 @@ public class AgentToolController {
     private final CurrentUserProvider currentUser;
 
     @GetMapping("/agents/{code}/tools")
-    public List<ToolsetView> read(@PathVariable String code) {
+    public AgentDtos.ToolsetsView read(@PathVariable String code) {
         CurrentUser user = currentUser.require();
-        return views(tools.read(user, agents.requireReadable(user, code)));
+        return view(tools.read(user, agents.requireReadable(user, code)));
     }
 
     @PutMapping("/agents/{code}/tools")
     @Transactional
-    public List<ToolsetView> write(
+    public AgentDtos.ToolsetsView write(
             @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
         CurrentUser user = currentUser.require();
         Agent agent = agents.requireReadableForUpdate(user, code);
-        return views(tools.write(user, agent, request.enabled()));
+        return view(tools.write(user, agent, request.enabled()));
     }
 
     @GetMapping("/admin/agents/{code}/tools")
-    public List<ToolsetView> readAdmin(@PathVariable String code) {
+    public AgentDtos.ToolsetsView readAdmin(@PathVariable String code) {
         CurrentUser user = currentUser.requireAdmin();
-        return views(tools.read(user, requireAgent(code)));
+        return view(tools.read(user, requireAgent(code)));
     }
 
     @PutMapping("/admin/agents/{code}/tools")
     @Transactional
-    public List<ToolsetView> writeAdmin(
+    public AgentDtos.ToolsetsView writeAdmin(
             @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
         CurrentUser user = currentUser.requireAdmin();
-        return views(tools.write(user, requireAgentForUpdate(code), request.enabled()));
+        return view(tools.write(user, requireAgentForUpdate(code), request.enabled()));
     }
 
     private Agent requireAgent(String code) {
@@ -71,7 +70,8 @@ public class AgentToolController {
                 .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
     }
 
-    private static List<ToolsetView> views(List<AgentToolService.ToolView> source) {
-        return source.stream().map(ToolsetView::from).toList();
+    private static AgentDtos.ToolsetsView view(AgentToolService.ToolsetsView source) {
+        return new AgentDtos.ToolsetsView(
+                source.toolsets().stream().map(ToolsetView::from).toList(), source.unclassifiedEnabled());
     }
 }

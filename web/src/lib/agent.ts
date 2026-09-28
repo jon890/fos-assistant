@@ -76,6 +76,12 @@ export type ToolsetView = {
   requiresPrivate: boolean;
 };
 
+/** profile 에서 읽은 도구와 등급 표에 없는 켜진 도구다. */
+export type AgentToolsView = {
+  toolsets: ToolsetView[];
+  unclassifiedEnabled: string[];
+};
+
 export const PRIVATE_VISIBILITY: AdminAgent["visibility"] = "PRIVATE";
 export const GROUP_VISIBILITY: AdminAgent["visibility"] = "GROUP";
 

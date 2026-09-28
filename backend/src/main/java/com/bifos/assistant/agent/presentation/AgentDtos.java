@@ -160,6 +160,8 @@ public final class AgentDtos {
         }
     }
 
+    public record ToolsetsView(List<ToolsetView> toolsets, List<String> unclassifiedEnabled) {}
+
     /**
      * @param providerRead Hermes 가 provider 도 함께 줬는가. 거짓이면 provider 는 그대로 두었다
      */

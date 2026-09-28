@@ -5,6 +5,7 @@ import { FAKE_DASHBOARD_TOKEN } from "../fake-hermes.ts";
 export const AGENT_TOOLS_PROFILE = "kid-tools-profile";
 
 type ToolsetView = { name: string; enabled: boolean; editable: boolean; requiresPrivate: boolean };
+type ToolsetsView = { toolsets: ToolsetView[]; unclassifiedEnabled: string[] };
 
 export const agentToolsScenario: Scenario = {
   name: "에이전트 도구",
@@ -52,7 +53,7 @@ export const agentToolsScenario: Scenario = {
       await call(context, "/agents/kid-tools/tools", { token: context.tokens.kid }),
       200,
       "도구 목록 조회",
-    ).json<ToolsetView[]>();
+    ).json<ToolsetsView>().toolsets;
     expect(initial.some((tool) => tool.name === "web" && tool.editable), "web이 주인에게 편집 가능하지 않다");
     expect(initial.some((tool) => tool.name === "terminal" && !tool.editable && tool.requiresPrivate), "terminal 등급이 다르다");
     context.hermes.dropNextAppliedToolset("web");
@@ -73,7 +74,7 @@ export const agentToolsScenario: Scenario = {
       }),
       200,
       "web 켜기",
-    ).json<ToolsetView[]>();
+    ).json<ToolsetsView>().toolsets;
     expect(enabled.some((tool) => tool.name === "web" && tool.enabled), "web이 켜진 목록으로 오지 않는다");
 
     step("주인이 terminal을 켜려 하면 거절한다");

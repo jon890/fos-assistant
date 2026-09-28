@@ -19,15 +19,15 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
      * 에이전트 한 줄을 쓰기 잠금으로 읽는다.
      *
      * <p>그 에이전트에 딸린 줄을 지우고 다시 넣는 쓰기를 한 번에 하나씩 돌리려고 쓴다. 트랜잭션이 끝날 때까지
-     * 같은 에이전트를 잠그려는 다른 요청은 기다린다.
+     * 같은 에이전트가 이미 잠겨 있으면 다른 요청은 즉시 실패한다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "0"))
     @Query("select a from Agent a where a.id = :id")
     Optional<Agent> findByIdForUpdate(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "0"))
     @Query("select a from Agent a where a.code = :code")
     Optional<Agent> findByCodeForUpdate(@Param("code") String code);
 

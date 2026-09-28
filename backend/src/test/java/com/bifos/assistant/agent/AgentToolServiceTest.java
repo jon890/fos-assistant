@@ -75,4 +75,33 @@ class AgentToolServiceTest {
 
         verifyNoInteractions(isolatedToolsets);
     }
+
+    @Test
+    void 그룹_에이전트를_읽을_수_있는_다른_사용자도_도구_목록을_읽지_못한다() {
+        HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
+        AgentToolService isolatedService = new AgentToolService(isolatedToolsets);
+        Agent groupAgent = Agent.of("group-read", "그룹 도구", "group-read-profile",
+                "http://listener.test/p/group-read-profile", "provider", "model",
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null);
+        CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
+
+        assertThatThrownBy(() -> isolatedService.read(reader, groupAgent))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.FORBIDDEN);
+
+        verifyNoInteractions(isolatedToolsets);
+    }
+
+    @Test
+    void policy에_없는_켜진_toolset은_별도_목록으로_돌린다() {
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenReturn(List.of("web", "connections", "memory", "fos-assistant-memory"));
+
+        AgentToolService.ToolsetsView result = service.read(owner, agent);
+
+        org.assertj.core.api.Assertions.assertThat(result.toolsets()).extracting(AgentToolService.ToolView::name)
+                .containsExactly("web");
+        org.assertj.core.api.Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
+    }
 }

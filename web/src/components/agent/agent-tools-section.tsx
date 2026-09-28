@@ -13,13 +13,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/components/error-message";
-import { GROUP_VISIBILITY, type AdminAgent, type ToolsetView } from "@/lib/agent";
+import { GROUP_VISIBILITY, type AdminAgent, type AgentToolsView, type ToolsetView } from "@/lib/agent";
 
 type ErrorPayload = { code: string; message: string; missingToolsets?: string[] };
 
 type Props = {
   code: string;
-  initialTools: ToolsetView[];
+  initialTools: AgentToolsView;
   admin: boolean;
   visibility: AdminAgent["visibility"] | undefined;
 };
@@ -58,18 +58,20 @@ function confirmationDescription(name: string): string {
 
 /** 에이전트가 다음 실행부터 쓸 도구를 등급별로 보이고 저장한다. */
 export function AgentToolsSection({ code, initialTools, admin, visibility }: Props) {
-  const [tools, setTools] = useState(initialTools);
+  const [tools, setTools] = useState(initialTools.toolsets);
+  const [unclassifiedEnabled, setUnclassifiedEnabled] = useState(initialTools.unclassifiedEnabled);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [confirming, setConfirming] = useState<ToolsetView | null>(null);
 
-  async function reload(): Promise<ToolsetView[] | null> {
+  async function reload(): Promise<AgentToolsView | null> {
     try {
       const response = await fetch(toolsPath(code, admin), { cache: "no-store" });
       if (!response.ok) return null;
-      const fresh = (await response.json()) as ToolsetView[];
-      setTools(fresh);
+      const fresh = (await response.json()) as AgentToolsView;
+      setTools(fresh.toolsets);
+      setUnclassifiedEnabled(fresh.unclassifiedEnabled);
       return fresh;
     } catch {
       return null;
@@ -87,7 +89,9 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
         body: JSON.stringify({ enabled: next.filter((tool) => tool.enabled).map((tool) => tool.name) }),
       });
       if (response.ok) {
-        setTools((await response.json()) as ToolsetView[]);
+        const saved = (await response.json()) as AgentToolsView;
+        setTools(saved.toolsets);
+        setUnclassifiedEnabled(saved.unclassifiedEnabled);
         return;
       }
       const failure = (await response.json()) as ErrorPayload;
@@ -172,6 +176,11 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
         <Badge variant="outline">{admin ? "관리자" : "주인"}</Badge>
       </div>
       {error ? <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">{error}</p> : null}
+      {unclassifiedEnabled.length > 0 ? (
+        <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
+          표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.
+        </p>
+      ) : null}
       {list("주인 등급", ownerTools)}
       {list("관리자 등급", adminTools)}
       {confirming ? (
