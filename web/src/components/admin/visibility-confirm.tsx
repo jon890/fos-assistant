@@ -28,8 +28,8 @@ export function VisibilityConfirm({ agent, busy, onCancel, onConfirm }: Props) {
         <AlertDialogHeader>
           <AlertDialogTitle>{agent.name} 에이전트를 그룹에 공개할까요?</AlertDialogTitle>
           <AlertDialogDescription>
-            모든 사용자가 이 에이전트를 골라 대화할 수 있게 된다. 연결된 도구와 자료를 함께 쓸 수 있는지
-            확인한 뒤 공개한다.
+            그룹의 모든 사용자가 이 에이전트로 대화할 수 있어요. 연결된 도구와 자료를 함께 써도 되는지
+            확인한 뒤 공개해 주세요.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

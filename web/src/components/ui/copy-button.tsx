@@ -17,7 +17,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
       await navigator.clipboard.writeText(text);
       setNotice("복사됨");
     } catch {
-      setNotice("복사하지 못했다");
+      setNotice("복사하지 못했어요");
     }
   }
 

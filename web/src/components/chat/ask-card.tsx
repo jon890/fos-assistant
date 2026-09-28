@@ -92,7 +92,7 @@ function QuestionField({ question, enabled, chosen, customText, onToggle, onCust
       <legend className="mb-1 text-sm">
         {question.header ? <span className="mr-2 text-xs font-medium text-muted-foreground">{question.header}</span> : null}
         <span className="font-medium">{question.text}</span>
-        {question.multiple ? <span className="ml-2 text-xs text-muted-foreground">여럿 고를 수 있다</span> : null}
+        {question.multiple ? <span className="ml-2 text-xs text-muted-foreground">여러 개를 고를 수 있어요</span> : null}
       </legend>
       {question.options.map((option) => (
         <label key={option.label} data-testid="ask-option"

@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { callControlPlane } from "@/lib/control-plane";
-import { AgentAdminPanel } from "@/app/admin/agents/agent-admin-panel";
+import { AgentAdminPanel } from "@/components/agent/agent-admin-panel";
 import type { AdminAgent, AgentView } from "@/lib/agent";
 import { readMe } from "@/lib/me";
 
@@ -27,8 +27,8 @@ export default async function AgentsPage() {
       <h1 className="mb-6 text-xl font-semibold">에이전트</h1>
       {result.data.length === 0 ? (
         <EmptyState
-          title="쓸 수 있는 에이전트가 없습니다"
-          description="관리자가 에이전트를 연결하면 여기에 나타납니다"
+          title="사용할 수 있는 에이전트가 없어요"
+          description="관리자가 에이전트를 연결하면 여기에 표시돼요"
         />
       ) : (
         <ul aria-label="쓸 수 있는 에이전트" className="grid gap-3">

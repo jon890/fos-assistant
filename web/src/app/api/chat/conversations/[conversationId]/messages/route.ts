@@ -10,7 +10,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
   if (!isConversationId(conversationId)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." },
+      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않아요." },
       { status: 400 },
     );
   }

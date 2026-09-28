@@ -67,14 +67,14 @@ async function buildThumbnail(file: File): Promise<string> {
   const context = canvas.getContext("2d");
   if (!context) {
     bitmap.close();
-    throw new Error("캔버스를 만들지 못했다.");
+    throw new Error("캔버스를 만들지 못했어요.");
   }
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (result) => (result ? resolve(result) : reject(new Error("미리보기를 만들지 못했다."))),
+      (result) => (result ? resolve(result) : reject(new Error("미리보기를 만들지 못했어요."))),
       "image/png",
     );
   });
@@ -212,7 +212,7 @@ export function Composer({
         });
         const payload = (await response.json()) as { conversationId?: string; code?: string; message?: string };
         if (!response.ok || !payload.conversationId) {
-          setPickNotice("대화를 시작하지 못했다. 잠시 뒤 다시 시도해 주세요.");
+          setPickNotice("대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
           return null;
         }
         // 요청 도중 대화를 바꿨으면 부모는 이미 다른 대화를 보고 있다. 그 선택을 덮지 않는다.
@@ -220,7 +220,7 @@ export function Composer({
         onConversationCreated(payload.conversationId);
         return payload.conversationId;
       } catch {
-        setPickNotice("대화를 시작하지 못했다. 잠시 뒤 다시 시도해 주세요.");
+        setPickNotice("대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
         return null;
       } finally {
         creatingConversationRef.current = null;
@@ -283,7 +283,7 @@ export function Composer({
         finalizeRemovalIfRequested(key, targetConversationId, null);
         updateItem(key, {
           status: "error",
-          errorMessage: describeError(payload.code ?? "INTERNAL_ERROR", payload.message ?? "올리지 못했습니다."),
+          errorMessage: describeError(payload.code ?? "INTERNAL_ERROR", payload.message ?? "사진을 올리지 못했어요."),
         });
         return;
       }
@@ -291,7 +291,7 @@ export function Composer({
       updateItem(key, { status: "done", attachmentId: payload.id });
     } catch {
       finalizeRemovalIfRequested(key, targetConversationId, null);
-      updateItem(key, { status: "error", errorMessage: "올리지 못했습니다. 다시 시도해 주세요." });
+      updateItem(key, { status: "error", errorMessage: "사진을 올리지 못했어요. 다시 시도해 주세요." });
     }
   }
 
@@ -312,13 +312,13 @@ export function Composer({
 
     const notices: string[] = [];
     if (rejectedFormatCount > 0) {
-      notices.push(`이미지 파일만 올릴 수 있다. ${rejectedFormatCount}장은 올리지 않았다.`);
+      notices.push(`이미지 파일만 올릴 수 있어요. ${rejectedFormatCount}장은 올리지 못했어요.`);
     }
     if (overflowCount > 0) {
-      notices.push(`한 번에 ${MAX_ATTACHMENTS}장까지 올릴 수 있다. ${overflowCount}장은 올리지 않았다.`);
+      notices.push(`한 번에 ${MAX_ATTACHMENTS}장까지 올릴 수 있어요. ${overflowCount}장은 올리지 못했어요.`);
     }
     if (oversize.length > 0) {
-      notices.push(`한 장은 10MB 까지 올릴 수 있다. ${oversize.length}장은 올리지 않았다.`);
+      notices.push(`사진 한 장은 10MB까지 올릴 수 있어요. ${oversize.length}장은 올리지 못했어요.`);
     }
     setPickNotice(notices.length > 0 ? notices.join(" ") : null);
 
@@ -504,7 +504,7 @@ export function Composer({
             void trySend();
           }}
           disabled={disabled}
-          placeholder={mention ? "@ 로 에이전트를 부른다" : "무엇을 도와줄까요"}
+          placeholder={mention ? "@로 에이전트를 불러요" : "무엇을 도와드릴까요?"}
           className={cn("max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
             "bg-transparent text-base leading-6 outline-none disabled:opacity-50")}
         />

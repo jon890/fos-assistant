@@ -32,7 +32,7 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
           <TableHead className="text-right">문맥</TableHead>
           <TableHead className="text-right">소요</TableHead>
           <TableHead className="text-right">API 환산 비용</TableHead>
-          <TableHead className="text-right">실제 청구액</TableHead>
+          <TableHead className="text-right">예상 추가 사용 요금</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

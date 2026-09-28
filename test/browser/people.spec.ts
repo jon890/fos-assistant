@@ -35,19 +35,19 @@ test("관리자가 사람을 더하면 목록에 한 줄이 늘어난다", async
   const person = newcomer("aunt", "이모", testInfo.project.name);
   await page.goto("/admin/people");
 
-  const list = page.getByRole("table", { name: "더해진 사람" });
+  const list = page.getByRole("table", { name: "등록된 사용자" });
   await expect(list.getByText(person.email)).toHaveCount(0);
 
   await page.getByLabel("이메일").fill(person.email);
   await page.getByLabel("이름", { exact: true }).fill(person.displayName);
-  await page.getByLabel("Hermes profile").fill(person.hermesProfile);
-  await page.getByRole("button", { name: "더하기" }).click();
+  await page.getByLabel("profile").fill(person.hermesProfile);
+  await page.getByRole("button", { name: "추가" }).click();
 
   const row = list.getByRole("row").filter({ hasText: person.email });
   await expect(row).toHaveCount(1);
   await expect(row.getByText(person.hermesProfile, { exact: true })).toBeVisible();
   // 아직 한 번도 들어오지 않았으므로 그 사람의 사용자와 에이전트는 없다.
-  await expect(row.getByText("아직 없음", { exact: true })).toBeVisible();
+  await expect(row.getByText("로그인한 적 없음", { exact: true })).toBeVisible();
   await expect(row.getByText("켜짐", { exact: true })).toBeVisible();
 });
 
@@ -59,10 +59,10 @@ test("이미 쓰는 profile 이름으로 더하면 무엇이 겹쳤는지 알린
 
   await page.getByLabel("이메일").fill(`uncle-twin-${testInfo.project.name}@example.com`);
   await page.getByLabel("이름", { exact: true }).fill("삼촌의 쌍둥이");
-  await page.getByLabel("Hermes profile").fill(owner.hermesProfile);
-  await page.getByRole("button", { name: "더하기" }).click();
+  await page.getByLabel("profile").fill(owner.hermesProfile);
+  await page.getByRole("button", { name: "추가" }).click();
 
-  await expect(page.getByTestId("people-error")).toContainText("profile 이름은 이미 쓰고 있다");
+  await expect(page.getByTestId("people-error")).toContainText("profile 이름을 이미 쓰고 있어요");
 });
 
 test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInfo) => {
@@ -71,7 +71,7 @@ test("사용 중지하고 다시 허용할 수 있다", async ({ page }, testInf
   await addPerson(page, person);
   await page.goto("/admin/people");
   const row = page
-    .getByRole("table", { name: "더해진 사람" })
+    .getByRole("table", { name: "등록된 사용자" })
     .getByRole("row")
     .filter({ hasText: person.email });
 
@@ -88,9 +88,9 @@ test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않�
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
 
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "사람 관리" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "사용자 관리" })).toHaveCount(0);
 
   await page.goto("/admin/people");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("table", { name: "더해진 사람" })).toHaveCount(0);
+  await expect(page.getByRole("table", { name: "등록된 사용자" })).toHaveCount(0);
 });

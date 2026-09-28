@@ -7,7 +7,7 @@ async function idOf(context: { params: Promise<{ id: string }> }): Promise<numbe
 }
 
 function invalid() {
-  return NextResponse.json({ code: "VALIDATION_FAILED", message: "Memory 번호가 올바르지 않습니다." }, { status: 400 });
+  return NextResponse.json({ code: "VALIDATION_FAILED", message: "기억 번호가 올바르지 않아요." }, { status: 400 });
 }
 
 function response(result: Awaited<ReturnType<typeof callControlPlane>>) {

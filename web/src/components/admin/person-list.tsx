@@ -15,11 +15,11 @@ type Props = {
 
 export function PersonList({ people, busy, pendingId, onEnabledChange }: Props) {
   if (people.length === 0) {
-    return <EmptyState title="아직 아무도 없습니다" description="위 양식에서 첫 사람을 더한다." />;
+    return <EmptyState title="아직 등록된 사용자가 없어요" description="위 양식에서 첫 사용자를 추가해 주세요." />;
   }
   return (
     <div className="rounded-md border border-border">
-      <Table aria-label="더해진 사람">
+      <Table aria-label="등록된 사용자">
         <TableHeader className="bg-muted">
           <TableRow className="hover:bg-transparent">
             <TableHead scope="col" className="px-3">이름</TableHead>
@@ -36,7 +36,7 @@ export function PersonList({ people, busy, pendingId, onEnabledChange }: Props) 
               <TableHead scope="row" className="px-3 text-foreground">{person.displayName}</TableHead>
               <TableCell className="px-3">{person.email}</TableCell>
               <TableCell className="px-3">{person.hermesProfile}</TableCell>
-              <TableCell className="px-3">{person.joined ? "들어온 적 있음" : "아직 없음"}</TableCell>
+              <TableCell className="px-3">{person.joined ? "로그인한 적 있음" : "로그인한 적 없음"}</TableCell>
               <TableCell className="px-3">
                 <Badge variant={person.enabled ? "outline" : "default"}>{person.enabled ? "켜짐" : "꺼짐"}</Badge>
               </TableCell>

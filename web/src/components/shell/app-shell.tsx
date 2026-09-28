@@ -16,6 +16,12 @@ import { useMediaQuery } from "@/components/ui/use-media-query";
 const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(null);
 /** 레이아웃이 한 번 읽은 사용자 이름이다. 화면마다 다시 읽지 않고 여기서 꺼낸다. 읽지 못했으면 null 이다 */
 const DisplayNameContext = createContext<string | null>(null);
+/** 레이아웃이 확인한 관리자 역할을 로딩 화면에서도 다시 조회하지 않고 쓴다. */
+const AdminContext = createContext(false);
+
+export function useShellIsAdmin(): boolean {
+  return useContext(AdminContext);
+}
 
 export function useShellDisplayName(): string | null {
   return useContext(DisplayNameContext);
@@ -157,13 +163,15 @@ export function AppShell({ isAdmin, displayName, children }: {
   const signedIn = pathname !== "/signin";
   return (
     <TooltipProvider>
-      <DisplayNameContext.Provider value={displayName || null}>
-        <ConversationsProvider enabled={signedIn}>
-          <ShellBody isAdmin={isAdmin} displayName={displayName} signedIn={signedIn}>
-            {children}
-          </ShellBody>
-        </ConversationsProvider>
-      </DisplayNameContext.Provider>
+      <AdminContext.Provider value={isAdmin}>
+        <DisplayNameContext.Provider value={displayName || null}>
+          <ConversationsProvider enabled={signedIn}>
+            <ShellBody isAdmin={isAdmin} displayName={displayName} signedIn={signedIn}>
+              {children}
+            </ShellBody>
+          </ConversationsProvider>
+        </DisplayNameContext.Provider>
+      </AdminContext.Provider>
     </TooltipProvider>
   );
 }

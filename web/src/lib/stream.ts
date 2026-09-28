@@ -2,7 +2,7 @@ export async function readEventStream<T>(
   response: Response,
   onEvent: (event: T) => void | Promise<void>,
 ): Promise<void> {
-  if (!response.body) throw new Error("응답 스트림이 없습니다.");
+  if (!response.body) throw new Error("응답 연결이 없어요.");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

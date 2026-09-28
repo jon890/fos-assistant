@@ -102,7 +102,7 @@ export function applyChatEvent(state: ActivityState, event: ChatEvent): Activity
       ? { ...item, state: event.stepState === "failed" ? "failed" : "done" } : item) };
   }
   if (event.type === "switched") return { ...state, items: append(items, {
-    kind: "switched", name: `여기부터 ${event.text ?? ""} 로 돈다`, detail: null,
+    kind: "switched", name: `여기부터 ${event.text ?? ""}로 실행해요`, detail: null,
     model: null, inputTokens: null, outputTokens: null, durationMs: null,
     state: "done", pairKey: null,
   }) };

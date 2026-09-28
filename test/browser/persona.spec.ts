@@ -23,10 +23,10 @@ test("성격을 저장한다", async ({ page }) => {
 
   const dialog = page.getByRole("alertdialog", { name: "성격 비서의 성격을 저장할까요?" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "저장한다" }).click();
+  await dialog.getByRole("button", { name: "저장" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("저장되었습니다.", { exact: true })).toBeVisible();
+  await expect(page.getByText("저장했어요.", { exact: true })).toBeVisible();
 });
 
 test("확인에서 취소한다", async ({ page }) => {
@@ -88,7 +88,7 @@ test("저장 요청이 도는 동안 저장 단추가 지금 하는 일을 보�
   await page.getByRole("textbox", { name: "성격 비서 성격" }).fill("기다리는 동안을 보이는 성격이다");
   await page.getByRole("button", { name: "저장", exact: true }).click();
   const dialog = page.getByRole("alertdialog", { name: "성격 비서의 성격을 저장할까요?" });
-  await dialog.getByRole("button", { name: "저장한다" }).click();
+  await dialog.getByRole("button", { name: "저장" }).click();
   await expect.poll(() => saveSeen).toBe(true);
 
   // 누른 뒤에는 확인 창이 닫히고 편집 화면의 단추 이름이 「저장 중」 으로 바뀐다.
@@ -98,7 +98,7 @@ test("저장 요청이 도는 동안 저장 단추가 지금 하는 일을 보�
   await expect(busy).toBeDisabled();
 
   release();
-  await expect(page.getByText("저장되었습니다.", { exact: true })).toBeVisible();
+  await expect(page.getByText("저장했어요.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "저장", exact: true })).not.toHaveAttribute("aria-busy", "true");
 });
 
@@ -130,5 +130,5 @@ test("고칠 수 없는 에이전트를 연다", async ({ context, page }) => {
 
 test("본문이 비어 있는 에이전트를 연다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_EMPTY_AGENT_CODE}`);
-  await expect(page.getByText("아직 성격을 쓰지 않았습니다.")).toBeVisible();
+  await expect(page.getByText("아직 성격을 쓰지 않았어요.")).toBeVisible();
 });

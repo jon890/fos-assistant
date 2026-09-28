@@ -11,7 +11,7 @@ export async function POST(_request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
   if (!isConversationId(conversationId)) {
     return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않습니다." },
+      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않아요." },
       { status: 400 },
     );
   }
@@ -31,7 +31,7 @@ export async function POST(_request: Request, context: RouteContext) {
   if (!upstream.ok || !upstream.body) {
     const payload = await upstream.json().catch(() => ({
       code: "INTERNAL_ERROR",
-      message: "스트림을 열지 못했습니다.",
+      message: "응답 연결을 열지 못했어요.",
     }));
     return NextResponse.json(payload, { status: upstream.status });
   }

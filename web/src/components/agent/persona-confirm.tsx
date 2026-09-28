@@ -24,7 +24,7 @@ export function PersonaConfirm({ agentName, busy, onCancel, onConfirm }: Props) 
         <AlertDialogHeader>
           <AlertDialogTitle>{agentName}의 성격을 저장할까요?</AlertDialogTitle>
           <AlertDialogDescription>
-            저장하면 앞의 본문이 사라지고 되돌릴 수 없습니다. 이 성격으로 앞으로의 대화가 답합니다.
+            저장하면 기존 본문을 되돌릴 수 없어요. 이후 시작하는 대화에는 새 성격이 적용돼요.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -33,7 +33,7 @@ export function PersonaConfirm({ agentName, busy, onCancel, onConfirm }: Props) 
             <Button variant="outline" disabled={busy}>취소</Button>
           </AlertDialogCancel>
           {/* AlertDialogAction 은 누르는 즉시 창을 닫고 loading 을 받지 못해 일반 Button 으로 둔다. */}
-          <Button loading={busy} loadingText="저장 중" onClick={onConfirm}>저장한다</Button>
+          <Button loading={busy} loadingText="저장 중" onClick={onConfirm}>저장</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

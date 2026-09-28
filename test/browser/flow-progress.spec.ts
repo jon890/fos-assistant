@@ -90,7 +90,7 @@ test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인
   await expect(block.locator('[data-kind="tool"][data-state="failed"]')).toHaveCount(1);
   const child = block.locator('[data-kind="subagent"][data-state="result-missing"]');
   await expect(child).toContainText("결과를 받지 못함");
-  await expect(child).toContainText("결과 - · 입력 - · 출력 -");
+  await expect(child).toContainText("결과를 받지 못함 · 입력 - · 출력 -");
   await page.reload();
   await expect(page.locator('[data-testid="activity-block"][data-mode="live"]')).toHaveCount(0);
 });
