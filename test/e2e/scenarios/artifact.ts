@@ -51,6 +51,8 @@ export const artifactScenario: Scenario = {
 
     const input = context.hermes.lastSubmittedInput() ?? "";
     expect(input.startsWith("[결과물 폴더]\n"), `Hermes 입력이 결과물 폴더 단락으로 시작하지 않는다: ${input}`);
+    expect(input.includes("artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다."),
+      "파일 도구만 있는 에이전트에게 직접 저장할 폴더를 안내하지 않는다");
 
     const messages = expectStatus(
       await call(context, `/chat/conversations/${conversationId}/messages`, { token: context.tokens.dad }),
@@ -128,6 +130,8 @@ export const artifactScenario: Scenario = {
       );
       const mcpDone = mcpEvents.find((event) => event.type === "done");
       expect(mcpDone?.conversationId !== undefined, `MCP 결과물 done 사건이 없다: ${JSON.stringify(mcpEvents)}`);
+      expect((context.hermes.lastSubmittedInput() ?? "").includes("artifact_write 도구가 있으면 그것으로 저장한다."),
+        "MCP 도구가 있는 에이전트에게 저장 방법을 안내하지 않는다");
       const mcpConversationId = mcpDone!.conversationId!;
       const mcpMessages = expectStatus(
         await call(context, `/chat/conversations/${mcpConversationId}/messages`, { token: context.tokens.dad }),

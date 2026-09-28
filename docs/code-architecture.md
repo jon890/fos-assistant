@@ -248,7 +248,7 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 - 뿌리 설정은 사진 첨부와 같은 모양으로 둘이다. `assistant.artifact.root` 는 Control Plane 이 보는 경로, `assistant.artifact.agent-root` 는 같은 디렉터리를 Hermes 컨테이너에서 보는 경로다.
   둘 다 기본값이 없어 비면 기동이 실패한다. 붙이는 일은 `fos-home-infra` 가 소유한다
 - 대화 하나가 폴더 하나다. 이름은 대화 번호다. 폴더는 Control Plane 이 turn 을 시작할 때 만든다
-- 파일 도구가 있는 profile 은 Hermes 가 직접 쓸 수 있다. 파일 도구가 없는 profile 은 `artifact_write` 로 Control Plane 에 쓰기를 요청한다.
+- `artifact_write` 도구가 있는 profile 은 MCP 로 Control Plane 에 쓰기를 요청한다. 그 도구가 없고 파일 도구가 있는 profile 은 Hermes 가 대화 폴더에 직접 쓴다.
   Control Plane 은 대화 주인을 확인하고 저장하며, 읽기와 보관 기간 정리도 맡는다
 - 보관 기간은 30일이다. 대화 폴더 단위로 센다. 폴더에서 가장 늦게 바뀐 파일이 30일을 넘기면 그 폴더의 파일을 함께 지운다.
   파일마다 세면 다음 turn 이 HTML 만 고쳤을 때 그 HTML 이 부르는 옛 사진이 먼저 지워진다
@@ -264,8 +264,9 @@ Hermes 에 보내는 `input` 에만 사진이 놓인 자리와 파일 이름을 
 [결과물 폴더]
 {agent-root}/{대화 번호}
 대화 식별자: {publicId}
-결과물은 artifact_write 로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.
-HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.
+artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.
+artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.
+artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.
 HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 ```
 

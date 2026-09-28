@@ -39,12 +39,12 @@ public class ArtifactSourceFetcher {
 
     public static final int MAX_BYTES = 5 * 1024 * 1024;
     private static final int MAX_HEADERS = 16 * 1024;
-    private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(
-            0, 4, 30, TimeUnit.SECONDS, new SynchronousQueue<>(), daemonFactory(), new ThreadPoolExecutor.AbortPolicy());
-
     private final ArtifactSourceProperties properties;
     private final DnsResolver dnsResolver;
     private final Transport transport;
+    private final ThreadPoolExecutor executor = new ThreadPoolExecutor(
+            0, 4, 30, TimeUnit.SECONDS, new SynchronousQueue<>(), daemonFactory(),
+            new ThreadPoolExecutor.AbortPolicy());
 
     @Autowired
     public ArtifactSourceFetcher(ArtifactSourceProperties properties) {
@@ -62,7 +62,7 @@ public class ArtifactSourceFetcher {
         Cancellation cancellation = new Cancellation();
         Future<byte[]> future;
         try {
-            future = EXECUTOR.submit(() -> fetchResolved(valid, expectedContentType, cancellation));
+            future = executor.submit(() -> fetchResolved(valid, expectedContentType, cancellation));
         } catch (RuntimeException ex) {
             throw failed("artifact source download is busy", ex);
         }

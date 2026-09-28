@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.ArtifactSourceProperties;
 import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
+import com.bifos.assistant.shared.error.ApiException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -231,22 +232,24 @@ class ArtifactSourceFetcherTest {
     void DNS_네_개가_멈추면_다음_호출은_대기열에_넣지_않고_즉시_거절한다() throws Exception {
         CountDownLatch started = new CountDownLatch(4);
         CountDownLatch release = new CountDownLatch(1);
-        ArtifactSourceFetcher blocked = new ArtifactSourceFetcher(new ArtifactSourceProperties(List.of("images.example.com"), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(2)),
+        ArtifactSourceFetcher blocked = new ArtifactSourceFetcher(new ArtifactSourceProperties(List.of("images.example.com"), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(10)),
                 host -> { started.countDown(); release.await(); return new InetAddress[] {InetAddress.getByName("8.8.8.8")}; },
                 (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200, Map.of("content-type", "image/png", "content-length", "0"), new ByteArrayInputStream(new byte[0])));
         List<Thread> callers = java.util.stream.IntStream.range(0, 4)
                 .mapToObj(index -> Thread.startVirtualThread(() -> blocked.fetch(URI.create("https://images.example.com/a.png"), "image/png")))
                 .toList();
         try {
-            assertThat(started.await(1, TimeUnit.SECONDS)).isTrue();
-            long startedAt = System.nanoTime();
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
             assertThatThrownBy(() -> blocked.fetch(URI.create("https://images.example.com/a.png"), "image/png"))
-                    .isInstanceOf(RuntimeException.class);
-            assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofMillis(500));
+                    .isInstanceOfSatisfying(ApiException.class,
+                            ex -> assertThat(ex.getMessage()).isEqualTo("artifact source download is busy"));
         } finally {
             release.countDown();
         }
-        for (Thread caller : callers) caller.join(1000);
+        for (Thread caller : callers) {
+            caller.join(5000);
+            assertThat(caller.isAlive()).isFalse();
+        }
     }
 
     private static ArtifactSourceFetcher.Response parsed(String response) throws IOException {

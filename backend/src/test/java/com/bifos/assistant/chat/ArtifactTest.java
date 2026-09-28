@@ -89,8 +89,9 @@ class ArtifactTest {
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
     private static final String AGENT_ARTIFACT_ROOT = "/agent-side/artifacts";
     private static final String PREAMBLE_GUIDE =
-            "결과물은 artifact_write 로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
-                    + "HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
+            "artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
+                    + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
+                    + "artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
                     + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.";
     private static final String CSP = "sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; "
             + "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; "
@@ -161,6 +162,9 @@ class ArtifactTest {
 
         chat.stream(dad, conversation.id(), "초안 만들어 줘", null, event -> {});
 
+        assertThat(stub().received()).singleElement().extracting(HermesRunCommand::input)
+                .as("파일 도구를 쓰는 에이전트도 결과물 폴더에 직접 쓸 수 있어야 한다")
+                .asString().contains("artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.");
         assertThat(answerArtifacts(conversation))
                 .containsExactly(List.of("a/index.html", String.valueOf(htmlBytes()), "false"));
     }

@@ -109,6 +109,28 @@ class McpArtifactWriteToolTest {
     }
 
     @Test
+    void 인자_오류는_고정한_이유를_돌리고_경로와_URL_query를_숨긴다() throws Exception {
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        String conversationId = conversation.publicId().toString();
+
+        JsonNode extension = body(call(dadToken, conversationId, "draft.svg", "x"));
+        JsonNode path = body(call(dadToken, conversationId, "../private.html", "x"));
+        JsonNode large = body(call(dadToken, conversationId, "large.html", "a".repeat(5 * 1024 * 1024 + 1)));
+        HttpResponse<String> invalidUrl = raw(dadToken,
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversationId + "\",\"path\":\"image.png\",\"source_url\":\"https://images.example.com/image.png?private=value%\"}}}");
+        JsonNode url = body(invalidUrl);
+
+        assertThat(extension.path("error").path("code").asInt()).isEqualTo(-32602);
+        assertThat(extension.path("error").path("data").asString()).isEqualTo("허용하지 않은 확장자입니다.");
+        assertThat(path.path("error").path("data").asString()).isEqualTo("경로 형식이 올바르지 않습니다.");
+        assertThat(large.path("error").path("data").asString()).isEqualTo("파일 크기가 5MB를 초과했습니다.");
+        assertThat(url.path("error").path("data").asString()).isEqualTo("주소 형식이 올바르지 않습니다.");
+        assertThat(path.toString()).doesNotContain("private.html");
+        assertThat(url.toString()).doesNotContain("private=value", "image.png");
+    }
+
+    @Test
     void 축약_UUID와_모르는_도구는_JSON_RPC_오류다() throws Exception {
         assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"1-1-1-1-1\",\"path\":\"a.html\",\"content\":\"x\"}}}")).path("error").path("code").asInt()).isEqualTo(-32602);
         assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown\",\"arguments\":{}}}")).path("error").path("code").asInt()).isEqualTo(-32601);

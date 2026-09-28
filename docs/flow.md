@@ -821,6 +821,9 @@ stateDiagram-v2
 ## 결과물을 MCP 로 쓸 때
 
 일반 파일 도구가 없는 에이전트도 결과물을 저장한다.
+실행 입력은 두 저장 방법을 함께 안내한다.
+`artifact_write` 도구가 있으면 MCP 로 쓰고, 그 도구가 없고 파일 도구가 있으면 대화 폴더에 직접 쓴다.
+아래 그림은 MCP 로 쓰는 경우다.
 도구 계약은 [`tools-and-skills.md`](hermes/tools-and-skills.md#결과물-쓰기-도구),
 권한 결정은 [ADR-028](adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
 
@@ -868,7 +871,7 @@ CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로
 에이전트가 turn 안에 HTML 파일을 만들면 그 답 아래에 파일이 보이고, 누르면 옆 패널에 그 페이지가 뜬다.
 근거는 [ADR-027](adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) 에 있다.
 
-아래 저장 요청은 `artifact_write` 의 흐름이다. Hermes 가 파일을 직접 쓰는 경우에도 저장 뒤의 조회 흐름은 같다.
+아래 흐름은 두 저장 방법을 모두 보인다. 저장 뒤의 조회 흐름은 같다.
 
 ```mermaid
 sequenceDiagram
@@ -880,8 +883,12 @@ sequenceDiagram
 
     C->>D: turn 을 시작할 때 대화 폴더를 만든다
     C->>H: 실행 입력 맨 앞에 결과물 폴더 단락
-    H->>C: artifact_write 로 HTML 과 사진 저장을 요청한다
-    C->>D: 토큰 사용자와 대화 주인을 확인하고 저장한다
+    alt artifact_write 도구가 있다
+        H->>C: artifact_write 로 HTML 과 사진 저장을 요청한다
+        C->>D: 토큰 사용자와 대화 주인을 확인하고 저장한다
+    else artifact_write 도구가 없고 파일 도구가 있다
+        H->>D: 결과물 폴더에 HTML 과 사진을 직접 쓴다
+    end
     H-->>C: turn 이 끝난다
     C->>D: 이번 turn 이 시작한 뒤 바뀐 .html 을 찾는다
     C->>C: 답 메시지에 chat_artifact 행으로 묶는다

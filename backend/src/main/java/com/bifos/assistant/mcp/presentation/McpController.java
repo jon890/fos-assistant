@@ -26,6 +26,7 @@ import tools.jackson.databind.JsonNode;
 @RequiredArgsConstructor
 public class McpController {
     private static final Pattern UUID_TEXT = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+    private static final String INVALID_ARGUMENTS = "인자 형식이 올바르지 않습니다.";
     private final McpToolService tools;
     private final CurrentUserProvider currentUser;
     private final BuildProperties buildProperties;
@@ -49,7 +50,7 @@ public class McpController {
         JsonNode name = params.get("name");
         JsonNode arguments = params.get("arguments");
         if (name == null || !name.isTextual() || arguments == null || !arguments.isObject()) {
-            return error(id, -32602, "Invalid params");
+            return invalidParams(id, INVALID_ARGUMENTS);
         }
         return switch (name.asString()) {
             case "memory_read" -> readMemory(id, arguments);
@@ -61,7 +62,7 @@ public class McpController {
     private Map<String, Object> readMemory(JsonNode id, JsonNode arguments) {
         JsonNode memoryId = arguments.get("id");
         if (memoryId == null || !memoryId.isIntegralNumber() || !memoryId.canConvertToLong()) {
-            return error(id, -32602, "Invalid params");
+            return invalidParams(id, INVALID_ARGUMENTS);
         }
         return response(id, tools.readMemory(currentUser.require(), new MemoryReadArguments(memoryId.longValue()).id()));
     }
@@ -69,21 +70,21 @@ public class McpController {
     private Map<String, Object> writeArtifact(JsonNode id, JsonNode arguments) {
         if (!onlyArtifactFields(arguments) || !text(arguments, "conversation_id") || !text(arguments, "path")
                 || !exactlyOneText(arguments, "content", "source_url")) {
-            return error(id, -32602, "Invalid params");
+            return invalidParams(id, INVALID_ARGUMENTS);
         }
         String conversationId = arguments.get("conversation_id").asString();
-        if (!UUID_TEXT.matcher(conversationId).matches()) return error(id, -32602, "Invalid params");
+        if (!UUID_TEXT.matcher(conversationId).matches()) return invalidParams(id, INVALID_ARGUMENTS);
         UUID parsed;
         try {
             parsed = UUID.fromString(conversationId);
         } catch (IllegalArgumentException ex) {
-            return error(id, -32602, "Invalid params");
+            return invalidParams(id, INVALID_ARGUMENTS);
         }
         ArtifactWriteArguments value = ArtifactWriteArguments.from(arguments);
         try {
             return response(id, tools.writeArtifact(currentUser.require(), new ArtifactWriteRequest(parsed, value.path(), value.content(), value.sourceUrl())));
         } catch (ApiException ex) {
-            return error(id, -32602, "Invalid params");
+            return invalidParams(id, artifactValidationReason(ex));
         }
     }
 
@@ -102,6 +103,25 @@ public class McpController {
         boolean hasSecond = arguments.has(second);
         return hasFirst != hasSecond && text(arguments, hasFirst ? first : second)
                 && (!hasSecond || !arguments.get(second).asString().isBlank());
+    }
+
+    /** 내부 예외 문구를 그대로 내보내지 않고, 정해 둔 오류 이유만 반환한다. */
+    private static String artifactValidationReason(ApiException exception) {
+        String message = exception.getMessage();
+        if (message == null) return INVALID_ARGUMENTS;
+        return switch (message) {
+            case "inline artifact content must be HTML or CSS", "URL artifact path must be an image" -> "허용하지 않은 확장자입니다.";
+            case "artifact path is invalid", "artifact path is required" -> "경로 형식이 올바르지 않습니다.";
+            case "artifact content must not exceed 5 MiB" -> "파일 크기가 5MB를 초과했습니다.";
+            case "artifact source URL is invalid" -> "주소 형식이 올바르지 않습니다.";
+            default -> INVALID_ARGUMENTS;
+        };
+    }
+
+    private static Map<String, Object> invalidParams(JsonNode id, String reason) {
+        Map<String, Object> body = base(id);
+        body.put("error", Map.of("code", -32602, "message", "Invalid params", "data", reason));
+        return body;
     }
 
     private static Map<String, Object> response(JsonNode id, Map<String, Object> result) { Map<String, Object> body = base(id); body.put("result", result); return body; }
