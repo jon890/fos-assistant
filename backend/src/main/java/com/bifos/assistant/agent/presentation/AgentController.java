@@ -2,7 +2,6 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.StarterService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.agent.presentation.AgentDtos.ChangeVisibilityRequest;
@@ -11,7 +10,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -30,27 +28,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AgentController {
     private final AgentService agents;
-    private final StarterService starters;
     private final CurrentUserProvider currentUser;
     private final AgentLifecycleService lifecycle;
 
-    /** 요청자가 쓸 수 있는 에이전트를 소개와 추천 질문까지 담아 한 번에 준다. */
+    /** 요청자가 쓸 수 있는 에이전트를 준다. 추천 질문은 에이전트마다 따로 읽는다. */
     @GetMapping
     public List<AgentView> readable() {
         CurrentUser user = currentUser.require();
-        List<Agent> list = agents.readableBy(user);
-        Map<Long, List<String>> prompts = starters.promptsOf(list);
-        return list.stream()
-                .map(agent -> view(user, agent, prompts.getOrDefault(agent.id(), List.of())))
-                .toList();
+        return agents.readableBy(user).stream().map(agent -> view(user, agent)).toList();
     }
 
-    /** 요청자의 에이전트를 profile 까지 만든다. 새 에이전트에는 추천 질문이 없다. */
+    /** 요청자의 에이전트를 profile 까지 만든다. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AgentView create(@RequestBody CreateOwnAgentRequest request) {
         CurrentUser user = currentUser.require();
-        return view(user, lifecycle.create(user, request.name(), request.visibility()), List.of());
+        return view(user, lifecycle.create(user, request.name(), request.visibility()));
     }
 
     /** 주인이나 {@code ADMIN} 이 공개 범위를 바꾼다. 주인은 그대로 남는다. */
@@ -58,8 +51,7 @@ public class AgentController {
     public AgentView changeVisibility(
             @PathVariable String code, @Valid @RequestBody ChangeVisibilityRequest request) {
         CurrentUser user = currentUser.require();
-        Agent agent = lifecycle.changeVisibility(user, code, request.visibility());
-        return view(user, agent, starters.promptsOf(List.of(agent)).getOrDefault(agent.id(), List.of()));
+        return view(user, lifecycle.changeVisibility(user, code, request.visibility()));
     }
 
     /** 주인이나 {@code ADMIN} 이 지운다. 대화는 읽기만 되게 남는다. */
@@ -69,10 +61,9 @@ public class AgentController {
         lifecycle.delete(currentUser.require(), code);
     }
 
-    private AgentView view(CurrentUser user, Agent agent, List<String> starterPrompts) {
+    private AgentView view(CurrentUser user, Agent agent) {
         return AgentView.from(
                 agent,
-                starterPrompts,
                 agents.isEditableBy(user, agent),
                 Objects.equals(agent.ownerUserId(), user.id()));
     }

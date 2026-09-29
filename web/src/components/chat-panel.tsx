@@ -7,6 +7,7 @@ import { cn } from "cn";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
 import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
+import { useStarterSuggestions } from "./chat/use-starter-suggestions";
 import { MessageList } from "./chat/message-list";
 import { applyChatEvent, emptyActivity, failActivity, fromTree, type ActivityState } from "./chat/activity/activity-state";
 import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
@@ -953,6 +954,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   useShellTitle(selectedAgent ?? null);
   const startScreen = freshStart && turns.length === 0 && !sending;
   const currentAgent = agents.find((agent) => agent.code === agentCode);
+  const starters = useStarterSuggestions(startScreen && currentAgent ? currentAgent.code : null);
 
   if (notFound) {
     return (
@@ -1061,7 +1063,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           />
           {startScreen ? (
             <StarterPrompts
-              prompts={currentAgent?.starterPrompts ?? []}
+              prompts={starters.prompts}
+              pending={starters.pending}
               disabled={sending || composerBlocking}
               onPrompt={(text) => { void send([], text); }}
             />

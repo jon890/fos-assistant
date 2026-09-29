@@ -1,7 +1,6 @@
 package com.bifos.assistant.agent;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -17,7 +16,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.StarterService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -30,7 +28,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.user.domain.UserRole;
-import java.util.HashMap;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,20 +49,17 @@ class AgentControllerLifecycleTest {
             new CurrentUser(9L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
 
     private final AgentRepository agents = mock(AgentRepository.class);
-    private final StarterService starters = mock(StarterService.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
 
     private final MockMvc mvc = MockMvcBuilders
-            .standaloneSetup(new AgentController(new AgentService(agents), starters, currentUser, lifecycle))
+            .standaloneSetup(new AgentController(new AgentService(agents), currentUser, lifecycle))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
     @BeforeEach
     void 준비한다() {
         when(currentUser.require()).thenReturn(KID);
-        // 대역의 에이전트는 저장되지 않아 번호가 비어 있다. 빈 번호로 찾아도 되는 표를 돌려준다.
-        when(starters.promptsOf(anyList())).thenAnswer(call -> new HashMap<Long, List<String>>());
     }
 
     @Test
@@ -79,7 +73,7 @@ class AgentControllerLifecycleTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("a0123456789"))
                 .andExpect(jsonPath("$.visibility").value("PRIVATE"))
-                .andExpect(jsonPath("$.starterPrompts").isEmpty())
+                .andExpect(jsonPath("$.starterPrompts").doesNotExist())
                 .andExpect(jsonPath("$.editable").value(true))
                 .andExpect(jsonPath("$.ownedByMe").value(true));
     }

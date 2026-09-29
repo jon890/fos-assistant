@@ -10,6 +10,7 @@ import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.StarterSuggestionService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
@@ -82,6 +83,7 @@ public class ChatService {
     private final AgentExecutionRepository executionRepository;
     private final ContextAssembler contextAssembler;
     private final MemoryProposer memoryProposer;
+    private final StarterSuggestionService starterSuggestions;
     private final FlowRegistry flows;
     private final AttachmentService attachments;
     private final ArtifactStore artifactStore;
@@ -430,6 +432,7 @@ public class ChatService {
         ChatMessage message = messages.save(
                 answerMessage(pending, answer, execution.id()));
         memoryProposer.proposeFrom(pending.user(), pending.conversation(), pending.agent(), execution, answer);
+        starterSuggestions.refreshIfStale(pending.user(), pending.agent());
         return new ChatTurn(pending.conversation().id(), pending.conversation().publicId(), execution.id(),
                 answer, message.id(), false);
     }

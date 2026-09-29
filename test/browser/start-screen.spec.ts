@@ -1,4 +1,5 @@
-import { CONVERSATION_URL, expect, setStarters, test } from "./fixtures.ts";
+import { FAKE_STARTER_PROMPTS } from "../e2e/fake-hermes.ts";
+import { CONVERSATION_URL, expect, FLOW_AGENT_CODE, test } from "./fixtures.ts";
 import type { Locator, Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 실제로 디코딩되는 1x1 PNG 다. 저장소에 이미지를 넣지 않으려고 바이트로 만들어 쓴다. */
@@ -7,18 +8,17 @@ const PNG_1X1 = Buffer.from(
   "base64",
 );
 
-const TAGLINE = "브라우저 검사용 비서다";
-const PROMPT = "첫 추천 질문이다";
+/** 가짜 Hermes 는 모든 profile 에 같은 네 추천을 답한다. 그 가운데 첫 번째다. */
+const PROMPT = FAKE_STARTER_PROMPTS[0];
+const STARTERS_PATTERN = "**/api/agents/*/starters";
 
 /** `/api/agents` 한 줄의 모양이다. 화면이 읽는 칸을 모두 갖춘다. */
-function agentRow(code: string, name: string, tagline: string | null, starterPrompts: string[]) {
+function agentRow(code: string, name: string) {
   return {
     code,
     name,
     visibility: "PRIVATE",
     acceptsAttachments: true,
-    tagline,
-    starterPrompts,
   };
 }
 
@@ -41,23 +41,13 @@ async function expectImageLoaded(locator: Locator): Promise<void> {
     .toBeGreaterThan(0);
 }
 
-test.beforeEach(async () => {
-  await setStarters("browser", TAGLINE, [PROMPT]);
-});
-
-test.afterAll(async () => {
-  // 다른 검사가 에이전트 카드의 이름으로 고른다. 소개가 남으면 카드의 이름이 길어지므로 비운다.
-  await setStarters("browser", null, []);
-});
-
 test("새 대화 화면에 인사와 첫 에이전트 카드와 추천 질문이 보인다", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1, name: /님, 무엇을 도와드릴까요\?$/ })).toBeVisible();
   const picker = page.getByRole("radiogroup", { name: "에이전트" });
   await expect(picker.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
-  await expect(picker.getByRole("radio", { name: "브라우저 비서" })).toContainText(TAGLINE);
-  await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(composer(page)).toHaveAttribute("placeholder", "@로 에이전트를 불러요");
   await expectNoHorizontalScroll(page);
 });
@@ -66,7 +56,7 @@ test("추천 질문을 누르면 그 글로 바로 보내고 입력창의 글은
   await page.goto("/");
   await composer(page).fill("쓰던 글");
 
-  await page.getByRole("button", { name: PROMPT, exact: true }).click();
+  await page.getByRole("button", { name: PROMPT, exact: true }).click({ timeout: 15_000 });
 
   await expect(page.getByTestId("user-message").last()).toContainText(PROMPT);
   await expect(page).toHaveURL(CONVERSATION_URL);
@@ -78,14 +68,20 @@ test("추천 질문을 누르면 그 글로 바로 보내고 입력창의 글은
 });
 
 test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문으로 바뀐다", async ({ page }) => {
+  // 가짜 Hermes 가 모든 profile 에 같은 추천을 답하므로 에이전트마다 다른 추천은 응답을 정해 준다.
+  await page.route(STARTERS_PATTERN, async (route) => {
+    const own = route.request().url().includes(`/agents/${FLOW_AGENT_CODE}/`) ? "흐름 추천이다" : "브라우저 추천이다";
+    await route.fulfill({ json: { prompts: [own], status: "READY" } });
+  });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toBeVisible();
 
   await page.getByRole("radio", { name: "흐름 비서" }).click();
 
   await expect(page.getByRole("radio", { name: "흐름 비서" })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByRole("button", { name: PROMPT, exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "흐름 추천이다", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toHaveCount(0);
 });
 
 test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르고 보내지 않는다", async ({ page }) => {
@@ -158,15 +154,17 @@ test("쓸 수 있는 에이전트가 없으면 알리고 입력창을 잠근다"
   await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
 });
 
-test("에이전트가 하나면 카드 없이 그 이름과 소개를 보인다", async ({ page }) => {
+test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보인다", async ({ page }) => {
   await page.route("**/api/agents", async (route) => {
-    await route.fulfill({ json: [agentRow("browser", "하나뿐인 비서", "혼자 일하는 비서다", ["하나뿐인 질문이다"])] });
+    await route.fulfill({ json: [agentRow("browser", "하나뿐인 비서")] });
+  });
+  await page.route(STARTERS_PATTERN, async (route) => {
+    await route.fulfill({ json: { prompts: ["하나뿐인 질문이다"], status: "READY" } });
   });
   await page.goto("/");
 
   const main = page.getByRole("main");
   await expect(main.getByText("하나뿐인 비서", { exact: true })).toBeVisible();
-  await expect(main.getByText("혼자 일하는 비서다")).toBeVisible();
   await expect(page.getByRole("button", { name: "하나뿐인 질문이다", exact: true })).toBeVisible();
   await expect(page.getByRole("radiogroup")).toHaveCount(0);
   await expectNoHorizontalScroll(page);
@@ -223,7 +221,7 @@ test("새 대화 화면에서 사진과 글을 보내면 입력창이 아래로 
 
 test("사진을 올려 두고 추천 질문으로 새 대화 화면을 벗어나도 사진이 입력창에 남는다", async ({ page }, testInfo) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible({ timeout: 15_000 });
 
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "kept.png", mimeType: "image/png", buffer: PNG_1X1 },
@@ -269,7 +267,7 @@ test("사진 때문에 빈 대화를 만드는 동안에는 추천 질문을 누
   });
   await page.goto("/");
   const promptButton = page.getByRole("button", { name: PROMPT, exact: true });
-  await expect(promptButton).toBeEnabled();
+  await expect(promptButton).toBeEnabled({ timeout: 15_000 });
 
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "slow.png", mimeType: "image/png", buffer: PNG_1X1 },

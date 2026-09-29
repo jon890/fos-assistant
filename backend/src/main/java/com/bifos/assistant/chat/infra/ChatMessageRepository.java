@@ -1,10 +1,15 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.domain.MessageRole;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
     List<ChatMessage> findByConversationIdOrderByIdAsc(Long conversationId);
+
+    /** 대화에서 그 역할이 처음 남긴 메시지를 읽는다. */
+    Optional<ChatMessage> findFirstByConversationIdAndRoleOrderByIdAsc(Long conversationId, MessageRole role);
 }

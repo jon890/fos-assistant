@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { describeAdminError, describeError } from "@/components/error-message";
 import { AgentDetailBody } from "@/components/agent/agent-detail-body";
 import { callControlPlane } from "@/lib/control-plane";
-import type { AdminAgent, AgentToolsView, AgentView, PersonaView, StartersView } from "@/lib/agent";
+import type { AdminAgent, AgentToolsView, AgentView, PersonaView } from "@/lib/agent";
 import { readMe } from "@/lib/me";
 
 export default async function AgentPersonaPage({
@@ -19,9 +19,8 @@ export default async function AgentPersonaPage({
   const agentsResult = await callControlPlane<AgentView[]>("/api/v1/agents");
   // 관리자는 자기 에이전트에도 일반 경로를 쓴다. 목록에 없는 다른 사람의 비공개 에이전트만 관리 경로로 읽는다.
   const useAdminTools = me?.role === "ADMIN" && !(agentsResult.ok && agentsResult.data.some((agent) => agent.code === code));
-  const [personaResult, startersResult, adminAgentsResult, toolsResult] = await Promise.all([
+  const [personaResult, adminAgentsResult, toolsResult] = await Promise.all([
     callControlPlane<PersonaView>(`/api/v1/agents/${code}/persona`),
-    callControlPlane<StartersView>(`/api/v1/agents/${code}/starters`),
     me?.role === "ADMIN"
       ? callControlPlane<AdminAgent[]>("/api/v1/admin/agents")
       : Promise.resolve(null),
@@ -51,7 +50,7 @@ export default async function AgentPersonaPage({
   if (!personaResult.ok) {
     if (personaResult.code === "AGENT_NOT_FOUND" && adminAgent) {
       return (
-        <AgentDetailBody code={code} name={name} initialPersona={null} initialStarters={null} tools={tools}
+        <AgentDetailBody code={code} name={name} initialPersona={null} tools={tools}
           initialVisibility={visibility} adminAgent={adminAgent} canManageAccess={canManageAccess} adminError={null} />
       );
     }
@@ -75,9 +74,6 @@ export default async function AgentPersonaPage({
       code={code}
       name={name}
       initialPersona={personaResult.data}
-      initialStarters={startersResult.ok
-        ? { ok: true, data: startersResult.data }
-        : { ok: false, message: describeError(startersResult.code, startersResult.message) }}
       tools={tools}
       initialVisibility={visibility}
       adminAgent={adminAgent}
