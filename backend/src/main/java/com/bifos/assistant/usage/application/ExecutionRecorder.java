@@ -60,7 +60,7 @@ public class ExecutionRecorder {
             Long parentExecutionId,
             Long rootExecutionId,
             ExecutionContextSnapshot context) {
-        return start(user, conversation, agent, parentExecutionId, rootExecutionId, context, null, null);
+        return start(user, conversation, agent, parentExecutionId, rootExecutionId, context, null, null, null);
     }
 
     /**
@@ -73,6 +73,8 @@ public class ExecutionRecorder {
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      * @param retryOfExecutionId 지금은 늘 null 이다. provider 가 막히면 다른 모델로 넘기던 때 채우던 칸이고,
      *     넘김이 없어진 뒤로는 채우지 않는다. 그 전에 남은 실행 기록을 읽으려고 칸과 인자를 남겨 둔다
+     * @param hermesSessionId 이 실행 줄에 적을 Hermes session. 제출하기 전에 적힌다. 대화 turn 은 그 대화의
+     *     뿌리 session 이라 Hermes 에 보내는 값과 다를 수 있다(ADR-031). 없으면 null 이다
      */
     public AgentExecution start(
             CurrentUser user,
@@ -82,9 +84,11 @@ public class ExecutionRecorder {
             Long rootExecutionId,
             ExecutionContextSnapshot context,
             ModelChoice requested,
-            Long retryOfExecutionId) {
+            Long retryOfExecutionId,
+            String hermesSessionId) {
         return executions.save(
                 base(user, conversation, agent)
+                        .hermesSessionId(hermesSessionId)
                         .parentExecutionId(parentExecutionId)
                         .rootExecutionId(rootExecutionId)
                         .retryOfExecutionId(retryOfExecutionId)

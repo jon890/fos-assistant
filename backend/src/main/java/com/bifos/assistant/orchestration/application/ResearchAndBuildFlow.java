@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatTurn;
+import com.bifos.assistant.chat.application.ConversationSessions;
 import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -78,6 +79,7 @@ public class ResearchAndBuildFlow implements Flow {
 
     private final ChatMessageRepository messages;
     private final ConversationRepository conversations;
+    private final ConversationSessions sessions;
     private final AgentRunner runner;
     private final ChildExecutionRunner children;
     private final ExecutionRecorder executions;
@@ -108,8 +110,11 @@ public class ResearchAndBuildFlow implements Flow {
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));
         AtomicReference<Long> rootExecutionId = new AtomicReference<>();
+        // Chief 는 대화의 turn 이다. 보낼 session 을 먼저 정하고, 실행 줄에는 대화의 뿌리 session 을 적는다.
+        String sessionId = sessions.ensure(conversation);
         AgentRunner.Run chief = runner.run(
-                user, conversation, agent, chiefPrompt(input), null, null, conversation.hermesSessionId(),
+                user, conversation, agent, chiefPrompt(input), null, null,
+                sessionId, conversation.executionSessionId(),
                 execution -> {
                     rootExecutionId.set(execution.id());
                     onRootStarted.accept(execution);

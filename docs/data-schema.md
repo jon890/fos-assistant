@@ -85,7 +85,8 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `public_id` | BINARY(16) UNIQUE | 화면 주소와 API 에 쓰는 UUID. 만들 때 정하고 바뀌지 않는다 |
 | `user_id` | BIGINT | 이 대화의 주인. 다른 사용자는 읽지 못한다 |
 | `agent_id` | BIGINT | 대화를 만들 때 정한다. 뒤에 바뀌지 않는다 |
-| `hermes_session_id` | VARCHAR(128) NULL | 그 대화의 Hermes session. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정해 적는다. 그 전의 대화는 첫 실행이 돌려준 값이다. 특정 profile 안의 값이다 |
+| `hermes_session_id` | VARCHAR(128) NULL | 다음 turn 에 보낼 Hermes session. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정해 적는다. 그 전의 대화는 첫 실행이 돌려준 값이다. 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다. 특정 profile 안의 값이다 |
+| `hermes_root_session_id` | VARCHAR(128) NULL | 그 대화의 뿌리 session. 새 대화는 첫 turn 을 보내기 전에 `hermes_session_id` 와 같은 `fos-<uuid>` 를 적고, 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 뿌리 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다 |
 | `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
 | `model_provider` | VARCHAR(64) NULL | 이 대화에서 고른 provider. `model` 과 함께 채우거나 함께 비운다 |
 | `model` | VARCHAR(128) NULL | 이 대화에서 고른 모델. 비면 그 profile 의 기본 모델로 돈다 |
@@ -153,7 +154,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `root_execution_id` | BIGINT NULL | 이 실행이 속한 나무의 뿌리. 뿌리 자신은 비어 있다 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
-| `hermes_session_id` | VARCHAR(128) NULL | 이 실행을 보낸 Hermes session. 대화 turn 은 그 대화의 session, 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. MCP `agent_*` 호출의 서명한 뿌리 session 으로 부모 실행을 찾을 때 쓴다. 이 칸이 생기기 전의 실행과 Memory 제안은 비어 있다 |
+| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. MCP `agent_*` 호출의 서명한 뿌리 session 으로 부모 실행을 찾을 때 쓴다. 이 칸이 생기기 전의 실행과 Memory 제안, 흐름의 하위 실행은 비어 있다 |
 | `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. 뿌리 session 과 `tool_call_id` 를 이은 글의 SHA-256 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 가 돌려준다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |

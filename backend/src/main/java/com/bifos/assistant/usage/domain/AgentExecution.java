@@ -62,6 +62,24 @@ public class AgentExecution {
     @Column(name = "hermes_run_id", length = 128)
     private String hermesRunId;
 
+    /**
+     * 이 실행이 속한 Hermes session. 제출하기 전에 적는다.
+     *
+     * <p>대화 turn 은 그 대화의 뿌리 session 을 적는다. 압축 교체로 Hermes 에 보낸 session 이 바뀌어도
+     * MCP {@code agent_*} 호출이 들고 오는 서명한 뿌리 session 으로 이 실행을 찾게 하기 위해서다
+     * (ADR-031). 뿌리가 없는 옛 대화는 보낸 session 을 적는다. Memory 제안과 흐름의 하위 실행은 비어 있다.
+     */
+    @Column(name = "hermes_session_id", length = 128)
+    private String hermesSessionId;
+
+    /** 다른 에이전트에게 맡겨 만든 실행만 채운다. 같은 호출이 다시 와도 실행을 하나만 만든다. */
+    @Column(name = "delegation_key", unique = true, length = 64)
+    private String delegationKey;
+
+    /** 다른 에이전트에게 맡겨 만든 실행이 끝났을 때의 답. 대화 turn 의 답은 {@code chat_message} 가 갖는다. */
+    @Column(name = "output_text", columnDefinition = "MEDIUMTEXT")
+    private String outputText;
+
     @Column(name = "provider", length = 64)
     private String provider;
 
@@ -157,6 +175,8 @@ public class AgentExecution {
         this.retryOfExecutionId = builder.retryOfExecutionId;
         this.profileName = builder.profileName;
         this.hermesRunId = builder.hermesRunId;
+        this.hermesSessionId = builder.hermesSessionId;
+        this.delegationKey = builder.delegationKey;
         this.provider = builder.provider;
         this.model = builder.model;
         this.reasoningEffort = builder.reasoningEffort;
@@ -210,6 +230,18 @@ public class AgentExecution {
 
     public String hermesRunId() {
         return hermesRunId;
+    }
+
+    public String hermesSessionId() {
+        return hermesSessionId;
+    }
+
+    public String delegationKey() {
+        return delegationKey;
+    }
+
+    public String outputText() {
+        return outputText;
     }
 
     public String provider() {
@@ -291,6 +323,11 @@ public class AgentExecution {
         this.hermesRunId = hermesRunId;
     }
 
+    /** 끝난 답을 적는다. 다른 에이전트에게 맡겨 만든 실행만 쓴다. */
+    public void recordOutput(String outputText) {
+        this.outputText = outputText;
+    }
+
     /** 끝난 시각과 토큰과 금액을 채우고 SUCCEEDED 로 옮긴다. */
     public void markSucceeded(
             String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
@@ -370,6 +407,8 @@ public class AgentExecution {
         private Long retryOfExecutionId;
         private String profileName;
         private String hermesRunId;
+        private String hermesSessionId;
+        private String delegationKey;
         private String provider;
         private String model;
         private String reasoningEffort;
@@ -429,6 +468,16 @@ public class AgentExecution {
 
         public Builder hermesRunId(String hermesRunId) {
             this.hermesRunId = hermesRunId;
+            return this;
+        }
+
+        public Builder hermesSessionId(String hermesSessionId) {
+            this.hermesSessionId = hermesSessionId;
+            return this;
+        }
+
+        public Builder delegationKey(String delegationKey) {
+            this.delegationKey = delegationKey;
             return this;
         }
 

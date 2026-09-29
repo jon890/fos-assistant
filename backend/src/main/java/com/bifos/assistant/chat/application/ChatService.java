@@ -69,6 +69,7 @@ public class ChatService {
     private static final int TITLE_LIMIT = 60;
 
     private final ConversationRepository conversations;
+    private final ConversationSessions sessions;
     private final ConversationAccess access;
     private final ChatMessageRepository messages;
     private final AgentService agents;
@@ -328,6 +329,9 @@ public class ChatService {
      * 대화가 고른 값으로 명령과 실행 줄을 만든다. 사용자 메시지는 이미 저장돼 있다.
      *
      * <p>고르지 않은 provider, 모델, effort 는 null 그대로 실어 profile 의 기본값으로 돌게 둔다.
+     *
+     * <p>보낼 session 을 명령보다 먼저 정한다. 실행 줄에는 그 대화의 뿌리 session 을 적는다. 압축 교체 뒤에는
+     * 보내는 session 과 적는 session 이 다르다(ADR-031).
      */
     private PendingTurn begin(
             CurrentUser user,
@@ -339,17 +343,18 @@ public class ChatService {
             TurnIntent intent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
+        String sessionId = sessions.ensure(conversation);
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
                 text,
                 TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
-                conversation.hermesSessionId(),
+                sessionId,
                 choice.provider(),
                 choice.model(),
                 choice.reasoningEffort());
         AgentExecution execution = executions.start(
-                user, conversation, agent, null, null, snapshot, choice, null);
+                user, conversation, agent, null, null, snapshot, choice, null, conversation.executionSessionId());
         return new PendingTurn(
                 user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder(), intent);
     }

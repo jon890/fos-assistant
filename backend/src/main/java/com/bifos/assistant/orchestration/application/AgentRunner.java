@@ -130,7 +130,11 @@ public class AgentRunner {
                 null);
     }
 
-    /** 실행 문맥 뒤에 turn 에만 적용하는 지시를 덧붙인다. 실행 기록의 문맥 값은 덧붙이기 전 값이다. */
+    /**
+     * 실행 문맥 뒤에 turn 에만 적용하는 지시를 덧붙인다. 실행 기록의 문맥 값은 덧붙이기 전 값이다.
+     *
+     * <p>실행 줄에는 보낸 session 을 그대로 적는다. 흐름의 하위 실행이 이 경로로 온다.
+     */
     public Run run(
             CurrentUser user,
             Conversation conversation,
@@ -143,12 +147,51 @@ public class AgentRunner {
             BiConsumer<AgentExecution, String> onSubmitted,
             BooleanSupplier cancelled,
             String instructionAddition) {
+        return run(
+                user,
+                conversation,
+                agent,
+                task,
+                parentExecutionId,
+                rootExecutionId,
+                sessionId,
+                sessionId,
+                onStarted,
+                onSubmitted,
+                cancelled,
+                instructionAddition);
+    }
+
+    /**
+     * 실행 줄에 적을 session 을 Hermes 에 보낼 session 과 따로 받는다.
+     *
+     * <p>대화의 첫 단계는 압축 교체 뒤에 보내는 session 이 바뀌어도 실행 줄에는 그 대화의 뿌리 session 을
+     * 적어야 하기 때문이다(ADR-031).
+     *
+     * @param sessionId Hermes 에 보낼 session. 새로 시작하면 null
+     * @param recordedSessionId 실행 줄에 제출하기 전에 적을 session. 대화의 첫 단계는 그 대화의 뿌리 session,
+     *     하위 실행은 {@code sessionId} 그대로다. 비면 비운다
+     */
+    public Run run(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            String task,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            String sessionId,
+            String recordedSessionId,
+            Consumer<AgentExecution> onStarted,
+            BiConsumer<AgentExecution, String> onSubmitted,
+            BooleanSupplier cancelled,
+            String instructionAddition) {
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
         ModelChoice choice = conversation.modelChoice();
         AgentExecution execution = executions.start(
-                user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, choice, null);
+                user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, choice, null,
+                recordedSessionId);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);

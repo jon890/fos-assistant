@@ -53,7 +53,7 @@ public class MemoryProposer {
             ModelChoice choice = conversation.modelChoice();
             proposalExecution = executions.start(user, conversation, agent,
                     parentExecution.id(), parentExecution.id(),
-                    ExecutionContextSnapshot.ofChars(0L), choice, null);
+                    ExecutionContextSnapshot.ofChars(0L), choice, null, null);
             HermesRunCommand command = new HermesRunCommand(agent.hermesProfile(), agent.apiBaseUrl(),
                     prompt(answer), null, null, choice.provider(), choice.model(), choice.reasoningEffort());
             String runId = hermes.submit(command);
