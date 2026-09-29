@@ -415,7 +415,7 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 `memory_read` 와 `artifact_write` 가 이 길을 쓰고, 앞으로의 `agent_*` 도 같은 길을 쓴다.
 
 등록 경로는 MCP 도구가 아니다. `tools/list` 에 나오지 않고 `McpController` 를 지나지 않는다.
-`ControlPlaneJwtFilter` 는 이 경로를 `/mcp` 처럼 건너뛴다. 사용자 JWT 로 부르면 인증 주체가 `McpPrincipal` 이 아니어서 거절한다.
+`ControlPlaneJwtFilter` 는 이 경로를 `/mcp` 처럼 건너뛴다. 사용자 JWT 로 부르면 `AgentTokenAuthenticationFilter` 가 토큰으로 인증하지 못해 401 이다. 컨트롤러의 `McpPrincipal` 확인은 그 뒤의 방어 검사다.
 
 ### 토큰 관리 경로
 

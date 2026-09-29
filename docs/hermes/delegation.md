@@ -431,7 +431,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 중첩 자식: `child_session_id` | `하위-세션-2` |
 | 중첩 자식의 기대 `sig` | `5479a21f26ddeb337754d4fd86dd3a0e36e0ef1f6ff2cc879c0fd07da5d84485` |
 
-서버는 서명을 확인한 뒤 부모를 푼다.
+서버는 서명을 확인한 뒤 같은 `child_session_id` 의 줄을 먼저 본다. 있고 뿌리와 부모가 요청과 같으면 부모를 풀지 않고 성공으로 답한다. 첫 응답을 잃고 다시 보내는 사이 부모 run 이 끝날 수 있어서다. 그 밖에는 부모를 푼다.
 
 1. `(토큰의 profile, parent_session_id)` 등록이 있으면 그 origin 을 잇는다. 하위 에이전트의 하위 에이전트다
 2. 없으면 `(토큰의 profile, parent_root_session_id)` 로 도는 실행 하나가 origin 이다. 최상위 session 이 만든 자식이고, 압축 교체된 최상위 session 이 만든 자식도 뿌리가 같아 여기 온다
@@ -440,9 +440,9 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 응답 | 뜻 |
 | --- | --- |
 | `201` `{"result": "created"}` | 새로 등록했다 |
-| `200` `{"result": "exists"}` | 같은 origin 으로 이미 등록돼 있다. 다시 보낸 것으로 본다 |
+| `200` `{"result": "exists"}` | 같은 부모와 뿌리로, 또는 같은 origin 으로 이미 등록돼 있다. 다시 보낸 것으로 본다. 앞의 경우 부모를 다시 풀지 않는다 |
 | `401` | 토큰이 없거나 모르는 토큰이거나 폐기됐다. profile 이 빈 옛 토큰이고 `assistant.mcp.legacy-user-tokens` 가 거짓이어도 같다. 사용자 JWT 로 불러도 같다. 본문이 없다 |
-| `403` `{"code": "SESSION_BINDING_REJECTED"}` | profile 이 빈 옛 토큰(설정이 참일 때), JSON 이 아니거나 모양이 틀린 본문, 서명, 부모를 풀지 못함, session 값이 128자를 넘음, `child_session_id` 가 뿌리나 실행 줄이나 대화의 session 과 같음. 이유는 서버 로그에만 남는다 |
+| `403` `{"code": "SESSION_BINDING_REJECTED"}` | profile 이 빈 옛 토큰(설정이 참일 때), JSON 이 아니거나 모양이 틀린 본문, 서명, 부모를 풀지 못함, session 값이 128자를 넘음, `child_session_id` 가 부모나 뿌리나 실행 줄이나 대화의 session 과 같음. 이유는 서버 로그에만 남는다 |
 | `409` `{"code": "SESSION_BINDING_CONFLICT"}` | 그 `child_session_id` 가 다른 origin 으로 이미 등록돼 있다. 덮어쓰지 않는다 |
 
 플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 등록이 없는 하위 에이전트의 호출은 서버가 거절하므로 안전한 쪽으로 실패한다.
@@ -457,7 +457,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 1 | 플러그인이 `subagent_start` 를 받았는지 본다 | hook 이 불리고 `parent_session_id`, `child_session_id` 가 채워져 있다 |
 | 2 | `delegate_task` 를 부르는 최상위 run 을 돌린다 | 부모 run 이 먼저 끝나고 자식은 계속 돈다 |
 | 3 | 등록 응답 시각과 자식의 첫 도구 호출 시각을 로그로 남긴다 | 등록 응답이 먼저다 |
-| 4 | 부모 run 이 끝난 뒤 자식이 `memory_read` 를 부른다 | 부모 실행의 사용자의 본문이 온다 |
+| 4 | 부모 run 이 끝난 뒤 자식이 `memory_read` 를 부른다 | origin 실행의 사용자의 본문이 온다 |
 | 5 | `compression.in_place: false` 로 교체된 최상위 session 에서 자식을 만든다 | 등록 본문의 `parent_root_session_id` 가 원래 뿌리다 |
 | 6 | 플러그인의 등록을 끈 채 자식이 `memory_read` 를 부른다 | 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
 
