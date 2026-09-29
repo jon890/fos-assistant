@@ -24,6 +24,10 @@ export type AgentView = {
   tagline: string | null;
   /** 새 대화 화면에 보일 추천 질문. 보이는 차례대로다 */
   starterPrompts: string[];
+  /** 요청자가 이 에이전트를 관리할 수 있다. 주인이거나 `ADMIN` 이다 */
+  editable: boolean;
+  /** 요청자가 이 에이전트의 주인이다 */
+  ownedByMe: boolean;
 };
 
 /** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { describeError } from "@/components/error-message";
+import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
 import { AgentToolsSection } from "./agent-tools-section";
 import { PersonaEditor } from "./persona-editor";
@@ -28,7 +29,8 @@ type Props = {
   tools: Loaded<{ initialTools: AgentToolsView; admin: boolean }> | null;
   initialVisibility: AdminAgent["visibility"] | undefined;
   adminAgent?: AdminAgent;
-  ownerEmail?: string;
+  /** 요청자가 이 에이전트의 공개 범위를 바꾸고 지울 수 있으면 참이다. 「공개와 삭제」 절을 그릴지 정한다. */
+  canManageAccess: boolean;
   adminError: string | null;
 };
 
@@ -48,7 +50,7 @@ async function read<T>(path: string): Promise<Loaded<T>> {
 /**
  * 에이전트 상세 화면에서 공개 범위에 따라 달라지는 절을 한곳에서 그린다.
  *
- * <p>관리 절이 공개 범위를 바꾸면 그 응답으로 이웃 절을 곧바로 바꾼다. 다른 사람의 비공개 에이전트를 그룹에
+ * <p>「공개와 삭제」 절이 공개 범위를 바꾸면 그 응답으로 이웃 절을 곧바로 바꾼다. 다른 사람의 비공개 에이전트를 그룹에
  * 공개하면 성격과 추천 질문을 여기서 다시 읽는다. 전에는 `router.refresh()` 로 서버가 다시 그리게 했는데,
  * 빌드한 서버에서 refresh 에 대한 서버 응답이 맞게 나와도 화면에 반영되지 않은 채 옛 안내가 남는 일이
  * 있었다(Next 16.0.10). refresh 에 기대지 않고 이 화면이 가진 상태로 바꾼다.
@@ -61,7 +63,7 @@ export function AgentDetailBody({
   tools,
   initialVisibility,
   adminAgent,
-  ownerEmail,
+  canManageAccess,
   adminError,
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
@@ -126,8 +128,9 @@ export function AgentDetailBody({
           <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">{tools.message}</p>
         </section>
       )}
-      {adminAgent && ownerEmail ? (
-        <AgentAdminSection initialAgent={adminAgent} ownerEmail={ownerEmail}
+      {adminAgent && visibility ? <AgentAdminSection initialAgent={adminAgent} visibility={visibility} /> : null}
+      {canManageAccess && visibility ? (
+        <AgentAccessSection code={code} name={name} visibility={visibility}
           onVisibilityChange={(next) => void changeVisibility(next)} />
       ) : null}
     </>
