@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;
@@ -66,6 +67,7 @@ class HermesBusyTest {
         server.createContext("/", exchange -> {
             calls.incrementAndGet();
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, payload.length);
             exchange.getResponseBody().write(payload);
             exchange.close();
@@ -110,6 +112,18 @@ class HermesBusyTest {
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.HERMES_BUSY);
+    }
+
+    @Test
+    void 중간에_끊긴_실행은_기다리지_않고_끝난_것으로_돌려준다() {
+        // v0.21.5 의 종료 상태다. 기다리면 실행 시간 한도(여기서는 2초)까지 조회만 되풀이한다.
+        respondWith(200, "{\"run_id\":\"run-1\",\"status\":\"interrupted\",\"session_id\":\"sess-1\"}");
+
+        HermesRunResult result = client.awaitCompletion(command(), "run-1");
+
+        assertThat(result.status()).isEqualTo("interrupted");
+        assertThat(result.succeeded()).isFalse();
+        assertThat(calls.get()).isEqualTo(1);
     }
 
     private HermesRunCommand command() {
