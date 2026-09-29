@@ -8,6 +8,8 @@ import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.ArtifactView;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
@@ -39,6 +41,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -123,6 +126,14 @@ public class ChatController {
         return viewOf(chat.rename(user, access.requireOwnId(user, conversationId), request.title()));
     }
 
+    /** 대화에서 쓸 모델과 effort 를 바꾸고 바뀐 대화 한 줄을 돌려준다. */
+    @PutMapping("/conversations/{conversationId}/model")
+    public ConversationView chooseModel(@PathVariable UUID conversationId,
+            @RequestBody ChooseModelRequest request) {
+        CurrentUser user = currentUser.require();
+        return viewOf(chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice()));
+    }
+
     @DeleteMapping("/conversations/{conversationId}")
     public ResponseEntity<Void> delete(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
@@ -142,8 +153,10 @@ public class ChatController {
 
     private ConversationView viewOf(Conversation conversation) {
         Agent agent = agents.requireById(conversation.agentId());
+        ModelChoice choice = conversation.modelChoice();
         return new ConversationView(conversation.publicId(), conversation.title(), agent.code(),
-                agent.name(), conversation.updatedAt());
+                agent.name(), conversation.updatedAt(), choice.provider(), choice.model(),
+                choice.reasoningEffort());
     }
 
     /**

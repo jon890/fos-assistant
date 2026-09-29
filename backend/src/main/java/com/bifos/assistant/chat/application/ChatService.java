@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -811,6 +812,22 @@ public class ChatService {
         return access.requireOwn(user, conversationId);
     }
 
+    /**
+     * 대화에서 쓸 모델과 effort 를 바꾼다. 그 뒤의 실행이 이 값을 쓴다.
+     *
+     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 대화 목록의 순서는 주고받은 시각으로 정하므로
+     * {@code updatedAt} 을 건드리지 않는다.
+     */
+    @Transactional
+    public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {
+        access.requireOwn(user, conversationId);
+        if (conversations.chooseModelIfActive(conversationId, user.id(),
+                choice.provider(), choice.model(), choice.reasoningEffort()) == 0) {
+            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
+        }
+        return access.requireOwn(user, conversationId);
+    }
+
     @Transactional
     public void delete(CurrentUser user, Long conversationId) {
         access.requireOwn(user, conversationId);
@@ -822,16 +839,12 @@ public class ChatService {
     /**
      * 메시지 없이 제목이 빈 대화를 만든다.
      *
-     * <p>사진을 올리는 경로에 대화 번호가 필요해, 새 대화의 첫 메시지에 사진을 붙이려면 대화가 먼저 있어야
-     * 한다. 이 경로는 그 용도로만 쓰므로 사진을 받지 않는 에이전트에는 대화를 남기지 않는다. 제목은 첫
-     * 메시지가 정한다.
+     * <p>사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려면 대화가 먼저 있어야 한다. 모델은 흐름이 붙은
+     * 에이전트에서도 고르므로 에이전트를 쓸 수 있는지만 본다. 사진을 받지 않는 에이전트는 보낼 때 거절한다.
+     * 제목은 첫 메시지가 정한다.
      */
     public Conversation startEmpty(CurrentUser user, String agentCode) {
         Agent agent = requireStartableAgent(user, agentCode);
-        if (!agent.acceptsAttachments()) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
-        }
         return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
     }
 

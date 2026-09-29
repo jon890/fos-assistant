@@ -51,6 +51,18 @@ public class Conversation {
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
+    /** 이 대화에서 고른 provider. {@code model} 과 함께 채우거나 함께 비운다. */
+    @Column(name = "model_provider", length = 64)
+    private String modelProvider;
+
+    /** 이 대화에서 고른 모델. 비면 그 profile 의 기본 모델로 돈다. */
+    @Column(name = "model", length = 128)
+    private String model;
+
+    /** 이 대화에서 고른 reasoning effort. 비면 그 profile 의 기본값이다. */
+    @Column(name = "reasoning_effort", length = 16)
+    private String reasoningEffort;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -92,6 +104,11 @@ public class Conversation {
 
     public String title() {
         return title;
+    }
+
+    /** 이 대화에서 고른 모델과 effort 다. 고르지 않았으면 셋 다 null 이다. */
+    public ModelChoice modelChoice() {
+        return new ModelChoice(modelProvider, model, reasoningEffort);
     }
 
     public Instant updatedAt() {
