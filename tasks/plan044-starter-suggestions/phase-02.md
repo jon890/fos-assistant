@@ -27,6 +27,8 @@
 - 다시 읽기는 `GENERATING` 일 때만, 2초 간격으로 최대 3번이다. 그래도 `GENERATING` 이면 자리를 비워 둔다. 무한히 읽지 않는다
 - 에이전트를 바꾸면 이전 에이전트의 다시 읽기를 멈춘다. 늦게 온 응답이 다른 에이전트의 추천을 그리지 않게 요청 순번으로 거른다(`conversations-provider` 가 쓰는 순번 방식과 같다)
 - 추천은 화면이 에이전트를 고를 때 읽는다. 목록 응답에 기대지 않는다
+- **브라우저 검사는 backend 하나를 모든 spec 과 두 project 가 함께 쓴다.** 앞선 spec 이 `/` 를 열면 그 사용자와 에이전트의 추천이 이미 캐시에 있다. 그래서 「비었다가 채워진다」 와 다시 읽기 횟수, 순번 거르기는 `page.route("**/api/agents/*/starters")` 로 응답을 정해 검사한다. 가짜 Hermes 를 거치는 실제 경로는 칩이 네 추천으로 보이는지만 본다
+- 추천을 만드는 실행도 실행 줄과 사용량에 남는다. 사용량 화면 검사가 실행 수를 세면 그 영향을 확인한다
 
 ## 작업 항목
 
@@ -49,14 +51,26 @@
 ### 4. 이 phase 를 검증하는 브라우저 검사
 
 - `test/browser/fixtures.ts`: `setStarters` 를 지운다
-- `test/browser/starters.spec.ts`: 편집기 검사를 지우고 새 대화 화면 검사로 바꾼다. 에이전트를 고르면 추천 자리가 잠깐 비었다가 가짜 Hermes 의 네 추천이 칩으로 보이고, 칩을 누르면 그 글로 보낸다. 에이전트 상세에 「추천 질문」 편집 절이 없다
-- `test/browser/start-screen.spec.ts`: `setStarters` 를 쓰던 소개 검사를 지우고, 에이전트가 하나일 때 이름과 추천만 보이는지로 바꾼다
+- `test/browser/starters.spec.ts`: 편집기 검사를 지우고 새 대화 화면 검사로 바꾼다
+  - 가로채지 않고 열면 가짜 Hermes 의 네 추천이 칩으로 보이고, 칩을 누르면 그 글로 보낸다
+  - `page.route` 로 첫 응답 `GENERATING`, 다음 응답 `READY` 를 주면 추천 자리가 비었다가 칩이 보인다
+  - 세 번 모두 `GENERATING` 이면 자리가 빈 채로 남고, 첫 요청 뒤 다시 읽기가 세 번을 넘지 않는다(네 번째 다시 읽기 요청이 없다)
+  - 에이전트 A 의 응답을 늦춰 둔 채 에이전트 B 로 바꾸면, 늦게 온 A 의 추천을 그리지 않고 B 의 추천만 보인다
+  - 에이전트 상세에 「추천 질문」 편집 절이 없다
+- `test/browser/start-screen.spec.ts`: `beforeEach` 의 `setStarters` 를 지운다. `setStarters` 에 기대던 `PROMPT` 는 가짜 Hermes 가 답하는 넷 가운데 하나로 바꾼다. 소개 검사는 에이전트가 하나일 때 이름과 추천만 보이는지로 바꾼다. 「다른 에이전트 카드를 누르면 그 추천으로 바뀐다」 검사는 가짜 Hermes 가 모든 profile 에 같은 넷을 답하므로 `page.route("**/api/agents/*/starters")` 로 에이전트마다 다른 추천을 주도록 다시 쓴다
+
+### 5. docs
+
+- `docs/flow.md` 「새 대화 화면」 표의 「추천을 만드는 중이다」 줄: 「그 자리를 비워 두고 2초 간격으로 세 번까지 다시 읽는다. 그래도 만드는 중이면 비워 둔다」
+- `docs/code-architecture.md` 「추천 질문」 절 표의 `GET` 줄: 「`GENERATING` 이면 화면이 2초 간격으로 세 번까지 다시 읽는다」
+- `docs/code-architecture.md` 화면 표의 `/agents/{code}` 줄 「성격, 소개와 추천 질문, 도구」 에서 「소개와 추천 질문」 을 뺀다
+- `docs/code-architecture.md` 「아직 만들지 않은 것」 의 「모델이 만드는 추천 질문」 줄을 뺀다
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-cd web && pnpm typecheck && pnpm build
+cd web && pnpm typecheck && pnpm build   # web/AGENTS.md 의 자리표시자 환경 변수를 주고 빌드한다
 cd web && pnpm test:browser
 grep -rn "tagline\|starterPrompts\|StarterEditor\|setStarters" web/src test/browser  # 결과 없음
 ```
@@ -78,6 +92,7 @@ grep -rn "tagline\|starterPrompts\|StarterEditor\|setStarters" web/src test/brow
 | `test/browser/fixtures.ts` | 수정 |
 | `test/browser/starters.spec.ts` | 수정 |
 | `test/browser/start-screen.spec.ts` | 수정 |
-| `tasks/plan044-starter-suggestions/index.json` | 수정 |
+| `docs/flow.md` | 수정 |
+| `docs/code-architecture.md` | 수정 |
 
-마지막 phase 다. 검증이 통과하면 `index.json` 의 `status` 를 `completed` 로 바꿔 이 커밋에 담는다. 그 뒤 PR 의 마지막 커밋으로 `tasks/plan044-starter-suggestions/` 를 지우고, `docs/code-architecture.md` 「아직 만들지 않은 것」 의 추천 질문 줄을 뺀다.
+마지막 phase 다. 검증이 통과한 뒤 PR 의 마지막 커밋으로 `tasks/plan044-starter-suggestions/` 를 지운다.
