@@ -363,6 +363,27 @@ class StarterSuggestionServiceTest {
         assertThat(stub().received()).hasSize(2);
     }
 
+    /** 꺼 둔 에이전트는 새 실행을 막는다. 볼 수는 있으므로 오류 대신 추천이 없다고 답한다. */
+    @Test
+    void 꺼진_에이전트의_추천은_NONE_이고_만들지_않는다() {
+        answerWith(json(FOUR));
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+        assertThat(stub().received()).hasSize(1);
+
+        family.changeAccess(false, AgentVisibility.GROUP, DAD.id());
+        family = agents.save(family);
+        clock.advance(Duration.ofHours(25));
+
+        assertThat(service.read(DAD, "starter-family"))
+                .isEqualTo(new StarterSuggestions(List.of(), StarterStatus.NONE));
+        assertThat(service.read(KID, "starter-family"))
+                .isEqualTo(new StarterSuggestions(List.of(), StarterStatus.NONE));
+        service.refreshIfStale(DAD, family);
+        executor.awaitAll();
+        assertThat(stub().received()).as("꺼진 뒤의 제출 수").hasSize(1);
+    }
+
     @Test
     void 볼_수_없는_에이전트의_추천은_AGENT_NOT_FOUND_이고_만들지_않는다() {
         agents.save(Agent.of("starter-private", "개인", "starter-private", "http://runtime.test",

@@ -124,11 +124,14 @@ public class StarterSuggestionService {
     /**
      * 요청자가 그 에이전트에서 받을 추천을 돌려준다. 추천이 없으면 만들기를 시작하고 곧바로 돌아온다.
      *
+     * <p>꺼 둔 에이전트는 새 실행을 막으므로 만들기를 시작하지 않고 추천이 없다고 답한다. 새 대화 화면이 읽는
+     * 경로라 오류로 돌려주지 않는다.
+     *
      * @throws ApiException 볼 수 없거나 없는 에이전트면 {@link ErrorCode#AGENT_NOT_FOUND}
      */
     public StarterSuggestions read(CurrentUser user, String code) {
         Agent agent = agents.requireReadable(user, code);
-        if (!properties.enabled()) {
+        if (!properties.enabled() || !agent.enabled()) {
             return none();
         }
         Key key = new Key(user.id(), agent.id());
@@ -152,12 +155,12 @@ public class StarterSuggestionService {
     /**
      * 대화를 마쳤을 때 부른다. 추천이 있고 {@code refreshAfter} 보다 오래됐을 때만 다시 만든다.
      *
-     * <p>추천이 없으면 아무것도 하지 않는다. 처음 만드는 것은 화면이 읽을 때다. turn 을 마치는 흐름을
-     * 실패시키지 않도록 예외를 밖으로 내지 않는다.
+     * <p>추천이 없거나 에이전트가 꺼져 있으면 아무것도 하지 않는다. 처음 만드는 것은 화면이 읽을 때다.
+     * turn 을 마치는 흐름을 실패시키지 않도록 예외를 밖으로 내지 않는다.
      */
     public void refreshIfStale(CurrentUser user, Agent agent) {
         try {
-            if (!properties.enabled()) {
+            if (!properties.enabled() || !agent.enabled()) {
                 return;
             }
             Key key = new Key(user.id(), agent.id());
