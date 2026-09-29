@@ -92,6 +92,8 @@ grep -rn "tagline\|starterPrompts\|StarterEditor\|setStarters" web/src test/brow
 | `test/browser/fixtures.ts` | 수정 |
 | `test/browser/starters.spec.ts` | 수정 |
 | `test/browser/start-screen.spec.ts` | 수정 |
+| `test/browser/identity.spec.ts` | 수정 |
+| `test/e2e/fake-hermes.ts` | 수정 |
 | `docs/flow.md` | 수정 |
 | `docs/code-architecture.md` | 수정 |
 
