@@ -1,6 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
-import com.bifos.assistant.orchestration.application.DelegationParentResolver;
+import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -18,9 +18,9 @@ import tools.jackson.databind.JsonNode;
 /**
  * MCP 도구 호출의 요청자를 정한다(ADR-032).
  *
- * <p>profile 이 묶인 토큰은 서명 확인, 부모 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 토큰이 어느
- * 사용자로 발급됐었는지는 보지 않는다. profile 이 빈 옛 토큰은 인증을 통과한 경우(설정이 참일 때)에만 여기 오고,
- * {@code _fos_ctx} 를 보지 않고 그 토큰의 사용자를 쓴다.
+ * <p>profile 이 묶인 토큰은 서명 확인, origin 실행 찾기(ADR-037), 그 실행의 사용자 읽기를 차례로 한다.
+ * 토큰이 어느 사용자로 발급됐었는지는 보지 않는다. profile 이 빈 옛 토큰은 인증을 통과한 경우(설정이 참일
+ * 때)에만 여기 오고, {@code _fos_ctx} 를 보지 않고 그 토큰의 사용자를 쓴다.
  *
  * <p>어느 단계에서 실패하든 밖에는 같은 {@link ErrorCode#MCP_CALL_CONTEXT_INVALID} 하나만 보인다. 서명이 틀린
  * 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게
@@ -32,7 +32,7 @@ public class McpCallerResolver {
 
     private static final Logger log = LoggerFactory.getLogger(McpCallerResolver.class);
 
-    private final DelegationParentResolver parents;
+    private final SessionOwnerResolver owners;
     private final AppUserRepository users;
 
     /**
@@ -50,9 +50,9 @@ public class McpCallerResolver {
             return new McpCaller(current(user), null, null);
         }
         McpCallContext context = McpCallContext.verify(toolName, fosCtx, principal.tokenHash());
-        AgentExecution origin = parents.resolve(principal.profileName(), context.rootSessionId());
+        AgentExecution origin = owners.resolve(principal.profileName(), context.rootSessionId(), context.sessionId());
         AppUser user = findUser(origin.userId())
-                .orElseThrow(() -> reject(toolName, "부모 실행의 사용자가 없다"));
+                .orElseThrow(() -> reject(toolName, "origin 실행의 사용자가 없다"));
         return new McpCaller(current(user), origin, context);
     }
 

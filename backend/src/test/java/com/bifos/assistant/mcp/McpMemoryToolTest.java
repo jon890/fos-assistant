@@ -7,13 +7,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.infra.AgentTokenAuthenticationFilter;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
@@ -66,12 +70,15 @@ class McpMemoryToolTest {
     @Autowired WebApplicationContext context;
     @Autowired AgentExecutionRepository executions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired SubagentSessionRegistrar registrar;
+    @Autowired McpToolService toolService;
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
     private AppUser kid;
     private String dadToken;
     private String dadRoot;
+    private AgentExecution dadRun;
     private static final String PROFILE = "mcp-memory-tool";
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
 
@@ -82,7 +89,7 @@ class McpMemoryToolTest {
         kid = users.save(AppUser.of("kid@example.com", "아이", 1L, UserRole.MEMBER));
         dadToken = tokens.issue(PROFILE, "dad").rawToken();
         dadRoot = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
+        dadRun = McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
     }
 
     @Test void initialize_목록과_알림은_계약한_응답을_낸다() throws Exception {
@@ -137,6 +144,23 @@ class McpMemoryToolTest {
                 .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
         assertThat(rejected.toString()).doesNotContain("아빠 본문");
         assertThat(missing).isEqualTo(rejected);
+    }
+
+    @Test void 등록한_하위_에이전트는_부모_실행이_끝난_뒤에도_그_사용자로_읽고_등록이_없으면_거절한다() throws Exception {
+        Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
+        String registered = "하위-" + UUID.randomUUID();
+        registrar.register(PROFILE, dadRoot, dadRoot, registered);
+        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
+        String unregistered = "하위-" + UUID.randomUUID();
+
+        JsonNode read = body(subagentRead(registered, indexed.id()));
+        JsonNode rejected = body(subagentRead(unregistered, indexed.id()));
+
+        assertThat(read.path("result").path("isError").asBoolean()).as("등록한 하위 에이전트의 읽기: %s", read).isFalse();
+        assertThat(read.path("result").path("content").get(0).path("text").asString()).isEqualTo("아빠 본문");
+        JsonNode invalidContext = json.valueToTree(toolService.invalidContext());
+        assertThat(rejected.path("result")).as("등록이 없는 하위 session 의 결과").isEqualTo(invalidContext);
+        assertThat(rejected.toString()).doesNotContain("아빠 본문");
     }
 
     @Test void 인증한_요청에_토큰_원문이_아닌_해시를_속성으로_싣는다() throws Exception {
@@ -224,6 +248,11 @@ class McpMemoryToolTest {
                 .statusCode()).isEqualTo(401);
     }
 
+    /** 아빠의 뿌리 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code memory_read} 를 보낸다. */
+    private HttpResponse<String> subagentRead(String sessionId, Long id) throws Exception {
+        String fosCtx = McpCallSigner.context(dadToken, "memory_read", dadRoot, sessionId, "call_" + UUID.randomUUID()).toString();
+        return send(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + id + ",\"_fos_ctx\":" + fosCtx + "}}}", false);
+    }
     private HttpResponse<String> call(String token, Long id, Long ignoredUserId) throws Exception { return mcp(token, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + id + (ignoredUserId == null ? "" : ",\"user_id\":" + ignoredUserId) + "}}}"); }
     /** 도구 호출이면 아빠의 도는 실행 뿌리로 서명한 {@code _fos_ctx} 를 붙여 보낸다. */
     private HttpResponse<String> mcp(String token, String request) throws Exception { return mcp(token, request, false); }
