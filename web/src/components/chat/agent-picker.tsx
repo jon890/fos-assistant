@@ -54,9 +54,6 @@ export function AgentPicker({ agents, selectedCode, onSelect, disabled = false }
             }`}
           >
             <span className="w-full truncate text-sm font-medium leading-5">{agent.name}</span>
-            {agent.tagline ? (
-              <span className="line-clamp-2 w-full text-xs leading-4 text-muted-foreground">{agent.tagline}</span>
-            ) : null}
           </button>
         );
       })}

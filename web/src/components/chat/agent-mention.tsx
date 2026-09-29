@@ -66,7 +66,6 @@ export function AgentMention({ id, agents, query, activeIndex, onPick }: Props) 
             className="cursor-pointer rounded-xl px-3 py-2 hover:bg-muted aria-selected:bg-muted"
           >
             <span className="block truncate text-sm font-medium">{agent.name}</span>
-            {agent.tagline ? <span className="block truncate text-xs text-muted-foreground">{agent.tagline}</span> : null}
           </li>
         ))
       )}

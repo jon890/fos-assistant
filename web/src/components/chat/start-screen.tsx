@@ -43,10 +43,7 @@ export function StartScreenHeader({ displayName, agents, loading, selectedCode, 
           사용할 수 있는 에이전트가 없어요. 관리자에게 등록을 요청해 주세요.
         </p>
       ) : only ? (
-        <div className="text-center">
-          <p className="text-sm font-medium">{only.name}</p>
-          {only.tagline ? <p className="mt-1 text-sm text-muted-foreground">{only.tagline}</p> : null}
-        </div>
+        <p className="text-center text-sm font-medium">{only.name}</p>
       ) : (
         <AgentPicker agents={agents} selectedCode={selectedCode} onSelect={onSelect} disabled={locked} />
       )}

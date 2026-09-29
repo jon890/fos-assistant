@@ -179,7 +179,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/agents/{code}/starters` | `{ "prompts": [...], "status": "READY" \| "GENERATING" \| "NONE" }`. `GENERATING` 이면 화면이 몇 초 뒤 한 번 더 읽는다 |
+| `GET /api/v1/agents/{code}/starters` | `{ "prompts": [...], "status": "READY" \| "GENERATING" \| "NONE" }`. `GENERATING` 이면 화면이 2초 간격으로 세 번까지 다시 읽는다 |
 
 한 줄 소개와 사람이 적던 추천 질문, 그것을 쓰던 `PUT` 경로와 에이전트 목록 응답의 `tagline`, `starterPrompts` 는 없앴다.
 
@@ -805,7 +805,7 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/memory` | 개인과 그룹 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
 | `/agents` | 에이전트 목록. `ADMIN` 에게는 모든 에이전트와 새 에이전트 등록이 보인다 |
-| `/agents/{code}` | 에이전트 하나의 설정. 성격, 소개와 추천 질문, 도구, `ADMIN` 에게만 관리 절 |
+| `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, `ADMIN` 에게만 관리 절 |
 | `/admin/agents` | 옛 주소. `/agents` 로 넘긴다 |
 
 ### 에이전트 화면
@@ -1080,7 +1080,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 - 사용자가 에이전트를 만들고 공개하고 지우는 것([「에이전트 만들기와 지우기」](#에이전트-만들기와-지우기)). 지금은 `ADMIN` 이 운영에서 만든 profile 을 등록하고, 가족용으로 공개하면 주인을 비운다
 - 스킬 올리기와 관리, 스킬 커맨드, 호출 이력([「스킬」](#스킬)), 사용량 화면의 탭
-- 모델이 만드는 추천 질문([「추천 질문」](#추천-질문)). 지금은 사람이 적은 `agent_starter_prompt` 와 `agent.tagline` 을 보인다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

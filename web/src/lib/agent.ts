@@ -20,10 +20,6 @@ export type AgentView = {
   visibility: "PRIVATE" | "GROUP";
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 흐름이 붙은 에이전트는 거짓이다 */
   acceptsAttachments: boolean;
-  /** 새 대화 화면에 보일 한 줄 소개. 비어 있으면 null 이다 */
-  tagline: string | null;
-  /** 새 대화 화면에 보일 추천 질문. 보이는 차례대로다 */
-  starterPrompts: string[];
 };
 
 /** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */
@@ -37,12 +33,12 @@ export type PersonaView = {
 /** 에이전트 코드 형식이다. 백엔드의 `AgentDtos` 와 `HermesProfileName` 이 두는 64자 상한을 같이 둔다. */
 export const AGENT_CODE_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
-/** 에이전트의 한 줄 소개와 추천 질문이다. */
+/**
+ * 새 대화 화면에 보일 추천 질문이다. `GENERATING` 은 Control Plane 이 만드는 중이라 `prompts` 가 비어 있다.
+ */
 export type StartersView = {
-  tagline: string | null;
-  starterPrompts: string[];
-  editable: boolean;
-  maxPrompts: number;
+  prompts: string[];
+  status: "READY" | "GENERATING" | "NONE";
 };
 
 /** 에이전트 도구 선택 화면의 한 줄이다. 등급과 변경 가능 여부는 Control Plane 이 계산한다. */

@@ -929,21 +929,28 @@ export function startFakeHermes(
           model?: string;
           model_options?: { reasoning?: { effort?: string } };
         };
-        lastSubmittedInstructions = submitted.instructions;
-        // 되돌려 받는 쪽은 원문을 본다. 결과물 폴더 단락이 붙었는지 검사가 이것으로 안다.
-        lastSubmittedInput = submitted.input;
         const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
+        // 추천을 만드는 실행은 Control Plane 이 새 대화 화면을 열 때마다 끼어든다. 대화 실행을 관찰하려는 검사가
+        // 그 실행에 흔들리지 않도록 「마지막 제출」 기록을 덮어쓰지 않고 `holdNextRun` 도 가져가지 않는다.
+        const starterRun = input.startsWith(STARTER_MARK);
+        if (!starterRun) {
+          lastSubmittedInstructions = submitted.instructions;
+          // 되돌려 받는 쪽은 원문을 본다. 결과물 폴더 단락이 붙었는지 검사가 이것으로 안다.
+          lastSubmittedInput = submitted.input;
+        }
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId, submitted.session_id);
         const memoryReadPrefix = `${MEMORY_READ_PROBE} `;
         const memoryReadOutput = input.startsWith(memoryReadPrefix)
           ? await readMemoryViaMcp(Number(input.slice(memoryReadPrefix.length)), submitted.session_id)
           : undefined;
-        lastSubmittedRuntime = {
-          provider: submitted.provider,
-          model: submitted.model,
-          reasoningEffort: submitted.model_options?.reasoning?.effort,
-        };
+        if (!starterRun) {
+          lastSubmittedRuntime = {
+            provider: submitted.provider,
+            model: submitted.model,
+            reasoningEffort: submitted.model_options?.reasoning?.effort,
+          };
+        }
         const runId = `run_${shortId()}`;
         const sessionId = submitted.session_id ?? `sess_${shortId()}`;
 
@@ -982,8 +989,8 @@ export function startFakeHermes(
         }
         const echoed = withoutAskGuide(submitted.instructions ?? "");
         const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
-        const held = holdNextRun;
-        holdNextRun = false;
+        const held = holdNextRun && !starterRun;
+        if (held) holdNextRun = false;
         runs.set(runId, {
           run_id: runId,
           status: held ? "running" : "completed",
