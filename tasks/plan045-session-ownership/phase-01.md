@@ -1,6 +1,6 @@
 # Phase 01. 토큰 묶기가 옛 사용자를 비우고 `McpCaller` 가 origin 실행을 들고 다닌다
 
-**Execution profile**: fast
+**Execution profile**: standard
 
 ## 목표
 
@@ -36,7 +36,7 @@
 - `@param originExecution`: 이 호출의 session 을 낳은 FOS 실행. 끝난 실행일 수 있다. 옛 토큰이면 null
 - `executionId()` 는 `originExecution` 의 번호를 돌려준다
 
-`McpCallerResolver` 의 지역 변수 `parent` 는 그대로 두어도 된다. 생성자 인자 순서가 같아 호출부는 바뀌지 않는다.
+`McpCallerResolver.resolve` 의 지역 변수 `parent` 를 `origin` 으로 바꾼다. 생성자 인자 순서는 같아 `McpToolServiceTest` 의 호출부는 바뀌지 않는다.
 `ResearchAndBuildFlowTest` 의 `caller.parent()` 세 곳을 `caller.originExecution()` 으로 바꾼다.
 
 ### 3. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/mcp/AgentTokenServiceTest.java`
@@ -62,5 +62,4 @@ grep -rn '\.parent()' backend/src | grep -i 'caller'   # 결과가 없어야 한
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpCaller.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpCallerResolver.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/mcp/AgentTokenServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/mcp/application/McpToolServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/ResearchAndBuildFlowTest.java` | 수정 |

@@ -1,82 +1,118 @@
-# Phase 04. 가짜 Hermes 로 부모가 끝난 뒤의 하위 에이전트 호출을 확인한다
+# Phase 04. 하위 에이전트 session 등록 경로
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
-`test/e2e` 에 시나리오 `native-delegation-mcp` 를 더한다. 실제 대화 turn 안에서 가짜 Hermes 가 플러그인처럼 하위 에이전트 session 을 등록하고, 부모 run 이 끝난 뒤 그 session 으로 `memory_read` 를 불러 origin 사용자의 Memory 에만 닿는지 본다. 두 사용자의 하위 에이전트를 함께 확인한다.
+profile 플러그인이 `subagent_start` hook 에서 부를 내부 경로 `POST /internal/hermes/session-bindings/subagent` 를 연다.
+MCP 토큰으로 인증하고, 본문 서명을 확인한 뒤 앞 phase 가 만든 `SubagentSessionRegistrar` 를 부른다.
 
-**범위 외**: 실제 Hermes 와 실제 플러그인 확인. 그 절차는 `docs/hermes/delegation.md` 의 「하위 에이전트를 실제로 확인하는 절차」 에 있고 `fos-home-infra` 가 돌린다.
+**범위 외**: 플러그인 쪽 hook(비공개 저장소 `fos-home-infra`), 가짜 Hermes 검사(phase 05). 이 경로를 MCP 도구로 내지 않는다.
 
 ## 컨텍스트
 
-- 시나리오는 `test/e2e/scenarios/` 에 하나씩 두고 `test/e2e/run.ts` 의 `SCENARIOS` 배열이 차례로 돌린다. profile 별 API key 와 스킬 목록은 `run.ts` 의 `profileKeys` 자리(`[MCP_PRINCIPAL_PROFILE]: PROFILE_KEY` 가 있는 곳)와 그 아래 스킬 목록, 그리고 profile 목록을 도는 `for (const profileName of [...])` 에 함께 더한다
-- 본보기는 `test/e2e/scenarios/mcp-principal.ts` 다. GROUP 에이전트를 새 profile 로 등록하고, 그 profile 에 묶은 토큰을 발급해 `context.hermes.setMemoryReadMcp(endpoint, token)` 로 가짜 Hermes 에 주고, 두 사용자가 `/chat/messages` 로 검사 글을 보낸다. 정리는 `finally` 에서 한다
-- 가짜 Hermes `test/e2e/fake-hermes.ts` 는 run 을 받을 때 입력이 `MEMORY_READ_PROBE` 로 시작하면 `readMemoryViaMcp(memoryId, submitted.session_id)` 로 `_fos_ctx` 를 서명해 `/mcp` 를 부른다. 서명은 `test/e2e/mcp-context.ts` 의 `signedCallContext(token, toolName, rootSessionId, sessionId, toolCallId)` 다
-- 등록 계약(경로, 본문, 서명, 응답)은 `docs/hermes/delegation.md` 의 「하위 에이전트 session 등록 계약」 이 정한다. 경로는 `/internal/hermes/session-bindings/subagent`, 서명할 글은 `v1-subagent`, 뿌리, 부모, 자식 session 을 `\n` 로 이은 것이다
-- 대화 turn 의 뿌리 session 은 Control Plane 이 보낸 `session_id` 다(새 대화의 첫 turn 이면 `fos-<uuid>`)
+- 계약(경로, 인증, 본문 칸, 서명, 응답과 오류 코드, 고정 서명 값)은 `docs/hermes/delegation.md` 의 「하위 에이전트 session 등록 계약」 이 정한다. 이 phase 는 그 표를 그대로 구현한다
+- 인증 필터 `backend/src/main/java/com/bifos/assistant/mcp/infra/AgentTokenAuthenticationFilter.java` 는 `shouldNotFilter` 에서 `request.getServletPath()` 가 `/mcp` 가 아니면 건너뛴다. `Origin` 헤더가 있으면 403, `Bearer` 가 없으면 401, 인증하면 `McpPrincipal` 을 인증 주체로 두고 `TOKEN_HASH_ATTRIBUTE` 요청 속성을 넣는다
+- 사용자 JWT 필터 `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` 는 `UNFILTERED_PATHS = Set.of("/mcp", "/api/v1/signin/allowed")` 를 `request.getRequestURI()` 로 건너뛴다. 새 경로를 여기 더하지 않으면 JWT 필터가 Bearer 를 사용자 토큰으로 읽는다
+- `backend/src/main/java/com/bifos/assistant/shared/config/SecurityConfig.java` 는 `anyRequest().authenticated()` 이고 토큰 필터를 JWT 필터 앞에 둔다
+- 서명 확인의 본보기는 `backend/src/main/java/com/bifos/assistant/mcp/application/McpCallContext.java` 의 `verify` 다. `v` 는 JSON 정수 1 만, `sig` 는 `^[0-9a-f]{64}$` 만, 비교는 `MessageDigest.isEqual`, key 는 토큰 해시 문자열의 UTF-8 바이트다
+- 컨트롤러의 요청과 응답 모양은 그 패키지의 `*Dtos.java` 하나에 모은다(`backend/AGENTS.md` 「데이터 클래스는 컨트롤러 안에 두지 않는다」). `mcp/presentation` 에는 `McpDtos.java` 가 있다
+- 오류 응답은 `ApiException` 을 던지면 `GlobalExceptionHandler.handleApi` 가 `{code, message}` 와 `ErrorCode` 의 상태로 바꾼다
+- `SubagentSessionRegistrar.register(profileName, parentRootSessionId, parentSessionId, childSessionId)` 와 `SubagentRegistrationResult { CREATED, EXISTS }`, `ErrorCode.SESSION_BINDING_REJECTED`(403), `SESSION_BINDING_CONFLICT`(409) 는 phase 02 가, `SessionOwnerResolver` 로 바꾼 MCP 판정은 phase 03 이 만들었다
 
-**근거 문서**: `docs/hermes/delegation.md` 의 「하위 에이전트는 부모 run 보다 오래 산다」, 「하위 에이전트 session 등록 계약」 절, `docs/flow.md` 의 「하위 에이전트 session 을 등록할 때」 절, `docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md`
+**근거 문서**: `docs/hermes/delegation.md` 의 「하위 에이전트 session 등록 계약」 절, `docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md`, `docs/code-architecture.md` 의 「MCP 요청자」 절, `docs/flow.md` 의 「하위 에이전트 session 을 등록할 때」 절
 
 ## 의도 메모
 
-- 가짜 Hermes 는 실제 Hermes 처럼 **부모 run 안에서, 응답하기 전에** 등록을 끝낸다. 실제 hook 이 동기이기 때문이다. 등록 응답이 2xx 가 아니면 run 을 실패로 두지 않고 기록만 한다(실제 Hermes 도 hook 예외를 삼킨다). 시나리오는 그 기록으로 실패를 알아낸다
-- 하위 에이전트의 호출은 **부모 run 이 끝나고 `/chat/messages` 가 응답한 뒤** 시나리오가 부른다. 그래야 「부모가 끝난 뒤」 를 확인한다
-- 등록 서명은 `mcp-context.ts` 에 새 함수로 두고 운영 코드를 부르지 않는다
-- 자식 session 은 `native-<uuid>` 처럼 Control Plane 이 정하지 않은 값으로 둔다
+- 본문은 `@RequestBody(required = false) String` 으로 받아 컨트롤러가 `JsonMapper` 로 읽는다. `@RequestBody JsonNode` 로 받으면 JSON 이 아닌 본문이 `GlobalExceptionHandler` 에서 500 으로 끝나 계약의 403 과 다르다. 빈 본문과 JSON 이 아닌 본문도 `SESSION_BINDING_REJECTED` 다. Jackson 의 record 바인딩은 `v: "1"` 이나 `1.0` 을 정수로 바꿔 받을 수 있어 쓰지 않는다. 이유는 로그에만 남긴다
+- `child_subagent_id`, `parent_subagent_id` 는 문자열이나 `null` 이면 받고 저장하지 않는다. 다른 타입이면 거절한다. 모르는 키는 무시한다(플러그인이 먼저 칸을 더해도 깨지지 않게)
+- 인증 주체가 `McpPrincipal` 이 아니면(사용자 JWT) `SESSION_BINDING_REJECTED` 로 거절한다. profile 이 빈 옛 토큰도 거절한다. 옛 토큰에는 profile 이 없어 등록을 profile 로 묶을 수 없다
+- 토큰, `sig`, 본문 원문을 로그에 남기지 않는다
+- 서명할 글의 첫 줄이 `v1-subagent` 다. `_fos_ctx` 의 첫 줄 `v1` 다음은 도구 이름이라, 도구 이름이 `v1-subagent` 인 도구가 없는 한 두 서명이 섞이지 않는다
 
 ## 작업 항목
 
-### 1. `test/e2e/mcp-context.ts` 에 등록 본문을 만드는 함수
+### 1. `backend/src/main/java/com/bifos/assistant/mcp/application/SubagentRegistration.java`
 
-`signedSubagentRegistration(token, parentRootSessionId, parentSessionId, childSessionId)` 가 `{ v: 1, parent_session_id, parent_root_session_id, child_session_id, child_subagent_id: null, parent_subagent_id: null, sig }` 를 돌려준다. key 는 `signedCallContext` 와 같고 서명할 글만 다르다. 파일 머리 주석에 두 계약의 자리를 함께 적는다.
+`record SubagentRegistration(String parentRootSessionId, String parentSessionId, String childSessionId)`.
 
-### 2. `test/e2e/fake-hermes.ts`
+`static SubagentRegistration verify(JsonNode body, String tokenHash)`:
 
-- `export const SUBAGENT_MEMORY_PROBE = "MCP 하위 에이전트 검사";` 를 더한다
-- run 입력이 `SUBAGENT_MEMORY_PROBE` 로 시작하면: 자식 session `native-<uuid>` 를 만들고, `memoryReadMcp` 의 토큰으로 `POST <memoryReadMcp.endpoint 에서 /mcp 를 뗀 주소>/internal/hermes/session-bindings/subagent` 에 부모 = 뿌리 = 제출받은 `session_id` 로 등록한다. 응답 상태를 자식 session 과 함께 기록한다. run 의 답은 `하위 에이전트 session: <자식 session>` 한 줄이다
-- 공개 메서드를 더한다
-  - `subagentRegistrations(): readonly { childSessionId: string; rootSessionId: string; status: number }[]`
-  - `readMemoryAsSubagent(childSessionId: string, memoryId: number): Promise<string>`: 기록에서 그 자식의 뿌리를 찾아 `signedCallContext(token, "memory_read", root, childSessionId, call_<uuid>)` 로 서명해 `/mcp` 를 부르고 도구 결과의 text 를 돌려준다
-  - `readMemoryAsUnregisteredSubagent(rootSessionId: string, memoryId: number): Promise<string>`: 등록하지 않은 `native-<uuid>` 로 같은 호출을 한다
-- `FakeHermes` 타입에 세 메서드를 적는다
+- `tokenHash` 가 비었거나 `body` 가 객체가 아니면 거절
+- `v` 가 정수 1 이 아니면 거절. `McpCallContext` 의 `isVersionOne` 과 `hmac` 을 package-private 으로 열어 함께 쓴다. 같은 규칙을 두 번 쓰지 않는다
+- `parent_session_id`, `parent_root_session_id`, `child_session_id`, `sig` 가 비지 않은 문자열이 아니면 거절. `sig` 가 소문자 16진수 64자가 아니면 거절
+- `child_subagent_id`, `parent_subagent_id` 가 있으면 문자열이나 `null` 이어야 한다
+- 서명할 글 `String.join("\n", "v1-subagent", parentRootSessionId, parentSessionId, childSessionId)` 의 HMAC-SHA256 을 `MessageDigest.isEqual` 로 견준다
 
-### 3. `test/e2e/scenarios/native-delegation-mcp.ts`
+거절은 `ApiException(ErrorCode.SESSION_BINDING_REJECTED, "session binding is rejected")` 하나이고 이유는 `log.warn` 으로만 남긴다.
 
-`export const NATIVE_DELEGATION_PROFILE = "native-delegation-group";` 와 `nativeDelegationScenario`(`name: "부모가 끝난 뒤의 하위 에이전트 MCP"`)를 둔다. `mcp-principal.ts` 처럼 GROUP 에이전트와 묶인 토큰을 준비하고 `finally` 에서 정리한다.
+### 2. `backend/src/main/java/com/bifos/assistant/mcp/presentation/SubagentSessionController.java` 와 응답 모양
 
-1. 아빠와 아이가 각자 제목만 싣는 USER Memory 를 만든다
-2. 두 사용자가 나란히 `SUBAGENT_MEMORY_PROBE` 를 보낸다. 두 응답이 모두 온 뒤(부모 run 과 turn 이 끝난 뒤) 등록 기록이 둘이고 상태가 모두 `201` 이다. 두 자식의 뿌리가 서로 다르다
-3. 두 turn 의 실행이 `/usage/executions` 에서 끝난 상태다(부모가 끝났다)
-4. 아빠 turn 의 자식이 아빠 Memory 를 읽으면 본문이 오고, 아이 Memory 를 읽으면 「Memory 항목을 읽을 수 없습니다.」 다. 아이 turn 의 자식도 거꾸로 같다
-5. 아빠의 같은 대화에서 다음 turn 을 하나 더 보낸다. 그 뒤에도 아빠 자식은 아빠 Memory 를 읽는다
-6. 등록하지 않은 자식 session 으로 아빠의 뿌리에 서명한 호출은 「호출 맥락을 확인할 수 없습니다」 로 시작하는 결과다(fail-closed)
+`@RestController`. `@PostMapping("/internal/hermes/session-bindings/subagent")`.
 
-### 4. `test/e2e/run.ts`
+- 인자: `@AuthenticationPrincipal Object principal`, `@RequestBody(required = false) String body`. 본문을 `JsonMapper` 로 읽다 실패하면 `SESSION_BINDING_REJECTED`
+- 주체가 `McpPrincipal` 이 아니거나 `bound()` 가 거짓이면 `SESSION_BINDING_REJECTED`
+- 읽은 `JsonNode` 로 `SubagentRegistration.verify(node, principal.tokenHash())` 뒤 `registrar.register(principal.profileName(), …)`
+- `CREATED` 면 `201` 과 `{"result": "created"}`, `EXISTS` 면 `200` 과 `{"result": "exists"}`
 
-`NATIVE_DELEGATION_PROFILE` 을 `mcp-principal` 과 같은 자리(profile key, 스킬 목록, profile 목록)에 더하고, `SCENARIOS` 에서 `mcpPrincipalScenario` 다음에 `nativeDelegationScenario` 를 둔다.
+응답 record 는 `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpDtos.java` 에 `SubagentRegistrationResponse(String result)` 로 더한다.
+
+### 3. 필터 두 곳에 경로를 더한다
+
+- `AgentTokenAuthenticationFilter.shouldNotFilter`: `/mcp` 와 `/internal/hermes/session-bindings/subagent` 둘 다 거른다. 경로 상수를 한 곳에 둔다(예: `AGENT_TOKEN_PATHS`)
+- `ControlPlaneJwtFilter.UNFILTERED_PATHS` 에 같은 경로를 더하고 Javadoc 의 「`/mcp` 는 장기 토큰을 쓰는 다른 인증 경계다」 에 등록 경로를 함께 적는다
+
+### 4. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/mcp/application/SubagentRegistrationTest.java`
+
+운영 코드를 부르지 않고 고정 값으로 확인한다. key 는 문서의 값 `41ed73a34f34174ba0b6ded1b16cf4a085b6da45df0f711ccbeaf2a2bbc2a2ac` 를 상수로 쓴다. `AgentTokenService.hash("test-mcp-token-0001")` 가 같은 값인지도 한 번 단언한다.
+
+- 정상: `docs/hermes/delegation.md` 「하위 에이전트 session 등록 계약」 의 최상위 자식 값과 기대 `sig` `ba540b481d830453accd812c8610be8d9467a532d5ff3db891514dcfe3d0726b`, 중첩 자식 값과 `5479a21f26ddeb337754d4fd86dd3a0e36e0ef1f6ff2cc879c0fd07da5d84485` 가 통과하고 세 session 값을 돌려준다
+- 실패: `sig` 대문자, 한 글자 바꾼 `sig`, `v: "1"`, `v: 1.0`, 칸 하나 없음, `child_subagent_id` 가 숫자, 같은 값을 `_fos_ctx` 규칙(`v1`, 도구 이름 …)으로 서명한 `sig` 는 모두 `SESSION_BINDING_REJECTED`
+
+### 5. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionEndpointTest.java`
+
+`McpMemoryToolTest` 처럼 `RANDOM_PORT` 와 `HttpClient` 로 실제 필터를 지난다. 서명은 검사 안에서 따로 계산한다(운영 코드로 서명하지 않는다). `McpCallSigner` 에 등록 서명 도우미 `subagentBody(rawToken, parentRoot, parent, child)` 를 더해 쓴다.
+
+| 경우 | 기대 |
+| --- | --- |
+| 도는 실행 아래 최상위 자식 등록 | `201`, `{"result":"created"}`, 줄 하나 |
+| 같은 본문 다시 | `200`, `{"result":"exists"}`, 줄 하나(9번) |
+| 같은 자식을 다른 뿌리의 도는 실행 아래로 | `409`, `code` 가 `SESSION_BINDING_CONFLICT`, origin 그대로(10번) |
+| 서명 틀림, 모양 틀림, JSON 이 아닌 본문, 빈 본문 | `403`, `SESSION_BINDING_REJECTED` |
+| profile A 토큰으로 profile B 실행의 뿌리 아래 등록(8번) | `403`, `SESSION_BINDING_REJECTED`. 줄이 없다 |
+| profile 이 빈 옛 토큰(`McpCallSigner.insertLegacyToken`). 기본 설정(`legacy-user-tokens` 거짓) | `401`. 인증에서 거절된다 |
+| 토큰 없음, 모르는 토큰, 폐기한 토큰 | `401` |
+| 사용자 JWT 로 부른다 | `401`. MCP 토큰 필터가 먼저 받아 인증에 실패한다. 줄이 없다 |
+| `Origin` 헤더가 있다 | `403` |
+| 등록한 뒤 부모 실행을 `SUCCEEDED` 로 바꾸고 그 자식 session 으로 서명한 `memory_read` 를 `/mcp` 로 부른다 | 부모 사용자의 본문(1번의 HTTP 판) |
+| `tools/list` 결과 | 등록 경로나 그 이름이 도구로 나오지 않는다 |
+
+### 6. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionLegacyTokenTest.java`
+
+`McpLegacyTokenTest` 처럼 `@SpringBootTest(webEnvironment = RANDOM_PORT, properties = "assistant.mcp.legacy-user-tokens=true")` 로 띄운다.
+
+- 실패: 옛 토큰으로 서명까지 맞춘 등록을 보내면 `403`, `SESSION_BINDING_REJECTED`. 줄이 없다. 옛 토큰에는 profile 이 없어 등록을 profile 로 묶을 수 없다
+- 정상: 같은 설정에서 profile 에 묶인 토큰의 등록은 `201` 이다
 
 ## 검증
 
-AGENTS.md 「확인」 절의 명령을 적힌 순서대로 돌린다. `test/e2e` 는 앞선 `gradlew test` 가 남긴 데이터에 걸릴 수 있어 건너뛰지 않는다.
-
 ```bash
+cd backend && ./gradlew test --tests 'com.bifos.assistant.mcp.application.SubagentRegistrationTest' --tests 'com.bifos.assistant.mcp.SubagentSessionEndpointTest' --tests 'com.bifos.assistant.mcp.SubagentSessionLegacyTokenTest' --tests 'com.bifos.assistant.mcp.McpMemoryToolTest'
 cd backend && ./gradlew test
-cd web && pnpm install --frozen-lockfile && pnpm typecheck && pnpm build
-cd web && pnpm test:browser
-node test/e2e/run.ts
-node --test 'test/unit/**/*.test.ts'
-scripts/check-public-safe.sh
+grep -n 'log\.' backend/src/main/java/com/bifos/assistant/mcp/presentation/SubagentSessionController.java backend/src/main/java/com/bifos/assistant/mcp/application/SubagentRegistration.java | grep -i 'sig\|tokenHash\|body'   # 결과가 없어야 한다. 로그 호출과 변수가 다른 줄에 있으면 잡지 못하므로 리뷰에서 한 번 더 본다
 ```
-
-`node test/e2e/run.ts` 출력에 「부모가 끝난 뒤의 하위 에이전트 MCP」 시나리오 이름과 통과가 보여야 한다.
-브라우저 검사는 한 번에 하나만 돌린다. 돌리기 전에 `ps -ax | grep -E "playwright test|standalone/server.js"` 로 다른 검사가 없는지 본다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `test/e2e/mcp-context.ts` | 수정 |
-| `test/e2e/fake-hermes.ts` | 수정 |
-| `test/e2e/scenarios/native-delegation-mcp.ts` | 신규 |
-| `test/e2e/run.ts` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/mcp/application/SubagentRegistration.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/mcp/application/McpCallContext.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/mcp/presentation/SubagentSessionController.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpDtos.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/mcp/infra/AgentTokenAuthenticationFilter.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpCallSigner.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/application/SubagentRegistrationTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionEndpointTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionLegacyTokenTest.java` | 신규 |
