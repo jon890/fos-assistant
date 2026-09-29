@@ -15,16 +15,19 @@ import org.springframework.stereotype.Service;
 public class AgentService {
     private final AgentRepository agents;
 
+    /** 요청자가 고를 수 있는 에이전트 목록이다. 꺼진 것과 지운 것은 빠진다. */
     public List<Agent> readableBy(CurrentUser user) {
         return agents.findByEnabledTrueOrderByCodeAsc().stream()
+                .filter(agent -> !agent.isDeleted())
                 .filter(agent -> agent.isReadableBy(user.id()))
                 .toList();
     }
 
+    /** 요청자가 읽을 수 있는 에이전트다. 지운 에이전트는 없는 에이전트와 같게 {@code AGENT_NOT_FOUND} 다. */
     public Agent requireReadable(CurrentUser user, String code) {
         Agent agent = agents.findByCode(code)
                 .orElseThrow(() -> notFound());
-        if (!agent.isReadableBy(user.id())) {
+        if (agent.isDeleted() || !agent.isReadableBy(user.id())) {
             throw notFound();
         }
         return agent;
@@ -42,24 +45,35 @@ public class AgentService {
         return agent;
     }
 
-    /** 쓰기 전에 행 잠금을 잡고, 잠금을 잡은 뒤의 접근 범위를 다시 확인한다. */
+    /**
+     * 쓰기 전에 행 잠금을 잡고, 잠금을 잡은 뒤의 접근 범위를 다시 확인한다.
+     *
+     * <p>지웠는지도 잠금을 잡은 뒤에 본다. 잠금 전에 보면 그 사이 지워진 에이전트에 쓸 수 있다.
+     */
     public Agent requireReadableForUpdate(CurrentUser user, String code) {
         Agent locked = agents.findByCodeForUpdate(code).orElseThrow(() -> notFound());
-        if (!locked.isReadableBy(user.id())) throw notFound();
+        if (locked.isDeleted() || !locked.isReadableBy(user.id())) throw notFound();
         return locked;
     }
 
     /**
      * 요청자가 이 에이전트의 성격과 소개, 추천 질문을 고칠 수 있는가.
      *
-     * <p>주인과 {@code ADMIN} 만 고친다. 그룹이 함께 쓰는 에이전트는 여럿이 함께 읽는 글이라 주인이 없고
-     * {@code ADMIN} 만 통과한다. 고칠 수 있는지 판정하는 곳은 모두 이 메서드를 부른다. 판정을 복사하면
-     * 한쪽만 바뀌어 성격은 못 고치는데 추천 질문은 고치는 에이전트가 생긴다.
+     * <p>주인과 {@code ADMIN} 만 고친다. 주인은 공개 범위와 무관하게 남아, 그룹에 공개한 에이전트도 만든
+     * 사람이 계속 고친다(ADR-033). 이 결정 전에 그룹 공개로 만든 에이전트는 주인이 비어 있어 {@code ADMIN}
+     * 만 통과한다. 고칠 수 있는지 판정하는 곳은 모두 이 메서드를 부른다. 판정을 복사하면 한쪽만 바뀌어
+     * 성격은 못 고치는데 추천 질문은 고치는 에이전트가 생긴다.
      */
     public boolean isEditableBy(CurrentUser user, Agent agent) {
         return user.isAdmin() || Objects.equals(agent.ownerUserId(), user.id());
     }
 
+    /**
+     * 번호로 에이전트를 읽는다. 지운 에이전트도 돌려준다.
+     *
+     * <p>지운 에이전트의 대화 이력과 사용량이 이 메서드로 이름을 읽는다. 새 turn 을 막는 판정은 부르는 쪽이
+     * {@link Agent#isDeleted()} 로 한다.
+     */
     public Agent requireById(Long id) {
         return agents.findById(id).orElseThrow(() -> notFound());
     }

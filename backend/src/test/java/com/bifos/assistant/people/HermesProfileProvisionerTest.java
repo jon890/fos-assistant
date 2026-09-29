@@ -2,10 +2,23 @@ package com.bifos.assistant.people;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.hermes.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesDashboardClient;
+import com.bifos.assistant.hermes.StubHermesDashboardClient.EnvWrite;
+import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.mcp.application.IssuedToken;
+import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.people.application.ProfileKeyFactory;
 import com.bifos.assistant.shared.error.ApiException;
@@ -14,7 +27,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,7 +39,17 @@ class HermesProfileProvisionerTest {
 
     private static final String PROFILE = "kid";
 
+    /** 발급한 토큰 원문으로 돌려줄 정해진 값이다. {@code .env} 에 이 값이 그대로 들어가야 한다. */
+    private static final String RAW_TOKEN = "issued-raw-token";
+
     private final StubHermesDashboardClient dashboard = new StubHermesDashboardClient();
+    private final AgentTokenService tokens = mock(AgentTokenService.class);
+
+    @BeforeEach
+    void 토큰_발급을_정해_둔다() {
+        when(tokens.issue(anyString(), anyString()))
+                .thenReturn(new IssuedToken(mock(AgentToken.class), RAW_TOKEN));
+    }
 
     private HermesProfileKeyStore keyStoreAt(Path dir) {
         return new HermesProfileKeyStore(
@@ -39,7 +65,7 @@ class HermesProfileProvisionerTest {
     }
 
     private HermesProfileProvisioner provisionerAt(Path dir) {
-        return new HermesProfileProvisioner(dashboard, keyStoreAt(dir), new ProfileKeyFactory());
+        return new HermesProfileProvisioner(dashboard, keyStoreAt(dir), new ProfileKeyFactory(), tokens);
     }
 
     @Test
@@ -53,13 +79,33 @@ class HermesProfileProvisionerTest {
     }
 
     @Test
-    void env_에_넣는_것은_모델_이름과_key_둘뿐이다(@TempDir Path dir) {
+    void env_에_넣는_것은_MCP_토큰과_모델_이름과_key_셋뿐이다(@TempDir Path dir) {
         provisionerAt(dir).provision(PROFILE);
 
         Map<String, String> env = dashboard.env(PROFILE);
-        assertThat(env).hasSize(2);
-        assertThat(env).containsKeys("API_SERVER_MODEL_NAME", "API_SERVER_KEY");
+        assertThat(env.keySet())
+                .containsExactlyInAnyOrder(
+                        "MCP_FOS_ASSISTANT_API_KEY", "API_SERVER_MODEL_NAME", "API_SERVER_KEY");
         assertThat(env.get("API_SERVER_MODEL_NAME")).isEqualTo(PROFILE);
+    }
+
+    /**
+     * profile 이 만들어지면 MCP 등록이 이미 붙어 있다. 토큰 없는 연결 실패가 쌓이면 Hermes 가 다시 붙는
+     * 간격을 늘리므로 토큰을 가장 먼저 넣는다.
+     */
+    @Test
+    void profile_에_묶인_MCP_토큰을_발급해_가장_먼저_env_에_넣는다(@TempDir Path dir) {
+        provisionerAt(dir).provision(PROFILE);
+
+        verify(tokens).issue(eq(PROFILE), anyString());
+        assertThat(dashboard.envWrites())
+                .extracting(EnvWrite::profile, EnvWrite::key)
+                .containsExactly(
+                        tuple(PROFILE, "MCP_FOS_ASSISTANT_API_KEY"),
+                        tuple(PROFILE, "API_SERVER_MODEL_NAME"),
+                        tuple(PROFILE, "API_SERVER_KEY"));
+        assertThat(dashboard.env(PROFILE).get("MCP_FOS_ASSISTANT_API_KEY")).isEqualTo(RAW_TOKEN);
+        verify(tokens, never()).revokeAllFor(anyString());
     }
 
     /**
@@ -89,7 +135,7 @@ class HermesProfileProvisionerTest {
     }
 
     @Test
-    void env_를_쓰다_실패하면_profile_을_거두고_key_파일을_남기지_않는다(@TempDir Path dir) {
+    void env_를_쓰다_실패하면_토큰을_폐기하고_profile_을_거두고_key_파일을_남기지_않는다(@TempDir Path dir) {
         dashboard.failOnPutEnv(
                 () -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
 
@@ -97,8 +143,52 @@ class HermesProfileProvisionerTest {
                 .isInstanceOf(ApiException.class)
                 .extracting(thrown -> ((ApiException) thrown).code())
                 .isEqualTo(ErrorCode.HERMES_PROVISION_FAILED);
+        verify(tokens).revokeAllFor(PROFILE);
         assertThat(dashboard.deletedProfiles()).containsExactly(PROFILE);
         assertThat(dir.resolve(PROFILE)).doesNotExist();
+    }
+
+    /** 토큰을 폐기하지 못했으면 다 거둔 것이 아니다. 원래 오류를 그대로 올리고 profile 은 그래도 거둔다. */
+    @Test
+    void 토큰을_폐기하지_못하면_원래_오류가_올라오고_profile_은_거둔다(@TempDir Path dir) {
+        ApiException original = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down");
+        dashboard.failOnPutEnv(() -> original);
+        doThrow(new IllegalStateException("database is down")).when(tokens).revokeAllFor(PROFILE);
+
+        assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE)).isSameAs(original);
+        assertThat(dashboard.deletedProfiles()).containsExactly(PROFILE);
+        assertThat(dir.resolve(PROFILE)).doesNotExist();
+    }
+
+    @Test
+    void 거두면_토큰을_profile_보다_먼저_폐기하고_key_파일을_지운다(@TempDir Path dir) {
+        HermesProfileProvisioner provisioner = provisionerAt(dir);
+        provisioner.provision(PROFILE);
+        // 토큰 폐기가 불린 시점에 profile 이 아직 지워지지 않았는지를 그 자리에서 기록한다.
+        List<String> deletedWhenRevoked = new ArrayList<>();
+        doAnswer(call -> {
+            deletedWhenRevoked.addAll(dashboard.deletedProfiles());
+            return null;
+        }).when(tokens).revokeAllFor(PROFILE);
+
+        provisioner.deprovision(PROFILE);
+
+        verify(tokens).revokeAllFor(PROFILE);
+        assertThat(deletedWhenRevoked).as("토큰을 폐기할 때 이미 지워진 profile").isEmpty();
+        assertThat(dashboard.deletedProfiles()).containsExactly(PROFILE);
+        assertThat(dir.resolve(PROFILE)).doesNotExist();
+    }
+
+    /** 부르는 쪽이 에이전트를 지우지 않도록 profile 을 지우지 못한 오류를 그대로 올린다. */
+    @Test
+    void 거두다_profile_을_지우지_못하면_그_오류가_올라온다(@TempDir Path dir) {
+        HermesProfileProvisioner provisioner = provisionerAt(dir);
+        provisioner.provision(PROFILE);
+        ApiException failure = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down");
+        dashboard.failOnDelete(() -> failure);
+
+        assertThatThrownBy(() -> provisioner.deprovision(PROFILE)).isSameAs(failure);
+        verify(tokens).revokeAllFor(PROFILE);
     }
 
     /**

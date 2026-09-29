@@ -70,6 +70,23 @@ public class Agent {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * 참이면 Control Plane 이 이 에이전트의 profile 을 만들었다.
+     *
+     * <p>지울 때 Hermes profile 까지 거두는 것은 이 값이 참일 때뿐이다. 관리자가 운영에서 만든 profile 과
+     * 사용자의 기본 profile 을 가리키는 에이전트는 거짓이다(ADR-033).
+     */
+    @Column(name = "profile_managed", nullable = false)
+    private boolean profileManaged;
+
+    /**
+     * 지운 시각. 비어 있으면 지우지 않았다.
+     *
+     * <p>행은 지우지 않는다. 대화, 실행, 사용량이 {@code agent_id} 로 이 에이전트의 이름을 읽기 때문이다.
+     */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     private Agent(String code, String name, String hermesProfile, String apiBaseUrl,
             CostMode costMode, CredentialScope credentialScope, AgentVisibility visibility,
             Long ownerUserId) {
@@ -108,6 +125,27 @@ public class Agent {
     public boolean enabled() { return enabled; }
     public String flow() { return flow; }
     public String tagline() { return tagline; }
+    public boolean profileManaged() { return profileManaged; }
+    public Instant deletedAt() { return deletedAt; }
+
+    /** Control Plane 이 이 에이전트의 profile 을 만들었다고 적는다. 지울 때 그 profile 까지 거둔다. */
+    public void markManagedProfile() {
+        this.profileManaged = true;
+    }
+
+    /**
+     * 지운 에이전트로 적고 끈다.
+     *
+     * <p>꺼 두는 것은 {@code enabled} 만 보는 곳에서도 새 대화가 시작되지 않게 하기 위해서다.
+     */
+    public void markDeleted(Instant now) {
+        this.deletedAt = now;
+        this.enabled = false;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
 
     /** 흐름 이름을 붙이거나 뗀다. 빈 문자열은 비운 것과 같게 본다. */
     public void assignFlow(String flow) {
