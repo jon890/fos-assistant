@@ -52,7 +52,11 @@ public enum ErrorCode {
      * 보내지 않는다. 붐비는데 다시 보내면 더 붐빈다.
      */
     HERMES_BUSY(HttpStatus.TOO_MANY_REQUESTS),
-    /** 그 provider 의 계정이 전부 막혀 다음 모델로 넘어갔다. 실행 줄에 남는 이름이기도 하다. */
+    /**
+     * 고른 provider 의 계정이 전부 막혀 그 실행이 실패했다. 다른 모델로 넘기지 않는다.
+     *
+     * <p>실행 줄에 남는 이름이기도 하다.
+     */
     PROVIDER_BLOCKED(HttpStatus.BAD_GATEWAY),
     /** 자식 실행이 다시 자식을 부르려 했다. 깊이를 1로 제한한다. */
     ORCHESTRATION_DEPTH_EXCEEDED(HttpStatus.CONFLICT),

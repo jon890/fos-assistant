@@ -63,7 +63,7 @@
 
 - 지운다: `agent/AgentModelOptionMigrationTest.java`, `agent/AgentModelOptionTest.java`, `agent/AgentModelSyncTest.java`
 - 신규 `agent/AgentModelDropMigrationTest.java`: H2 MySQL 모드로 모든 migration 을 돈 뒤 `INFORMATION_SCHEMA` 에 `agent_model_option`, `provider_state` 표와 `agent` 의 `provider`, `model`, `model_synced_at` 칸이 없음을 단언한다. `agent` 의 `code`, `hermes_profile` 칸은 남아 있음도 단언한다. 기존 `GroupRenameMigrationTest` 의 준비 방식을 따른다
-- `user/FirstSignInTest.java`: 모델을 읽은 시각과 1순위 목록을 보던 단언을 지운다. Hermes 가 모델을 주지 않거나 provider 를 비워 주면 에이전트를 만들지 않는다던 두 검사를 「에이전트가 만들어진다」 로 뒤집는다. `Agent::provider, Agent::model` 추출을 뺀다. 모델을 읽는 대역을 두지 않고 `HermesModelClient` 를 부르지 않음을 `verifyNoInteractions` 로 단언한다
+- `user/FirstSignInTest.java`: 모델을 읽은 시각과 1순위 목록을 보던 단언을 지운다. Hermes 가 모델을 주지 않거나 provider 를 비워 주면 에이전트를 만들지 않는다던 두 검사를 「Hermes 에 묻지 않고 에이전트가 만들어진다」 는 한 검사로 합친다. 모델을 읽지 않으므로 두 경우가 같은 조건이 된다. `Agent::provider, Agent::model` 추출을 뺀다. 모델을 읽는 대역을 두지 않고 `HermesModelClient` 를 부르지 않음을 `verifyNoInteractions` 로 단언한다
 - 등록 정상 경로 검사(`agent/AgentApiBaseUrlUpdateTest.java` 에 더한다): provider 없이 `PRIVATE` 에이전트를 등록하면 200 이고 저장된다. 이때 `HermesModelClient` 를 부르지 않는다. 주소가 닿지 않으면(`requireReachable` 이 `VALIDATION_FAILED` 를 던지면) 등록이 거절되고 저장되지 않는다
 - `agent/AgentApiBaseUrlUpdateTest.java` 와 에이전트를 만드는 테스트들: `Agent.of` 의 새 인자와 등록 요청에서 provider 를 빼도 등록된다
 - `testsupport/UsageTestSupportController.java`: 의도 메모대로 `SeededExecution.provider` 를 더하고 빈 값을 상수로 채운다

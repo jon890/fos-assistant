@@ -20,6 +20,7 @@ test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", 
     name: "새 에이전트",
     hermesProfile: "registered-profile",
     apiBaseUrl: "http://example.test/p/registered-profile",
+    model: "example-model",
     costMode: "SUBSCRIPTION",
     credentialScope: "SHARED_HOUSEHOLD",
     visibility: "PRIVATE",
@@ -46,6 +47,7 @@ test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", 
 
   const card = page.getByRole("region", { name: "등록된 에이전트" }).locator("article");
   await expect(card.getByRole("heading", { name: registered.name })).toBeVisible();
+  await expect(card.getByText(registered.model, { exact: true })).toHaveCount(0);
   await expect(card.getByText(registered.code, { exact: true })).toHaveCount(0);
   await expect(card.getByText(registered.hermesProfile, { exact: true })).toHaveCount(0);
 });

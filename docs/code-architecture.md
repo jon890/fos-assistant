@@ -624,6 +624,11 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다.
 관리 절이 쓰는 `/api/v1/admin/agents` 경로들도 그대로다.
 
+**에이전트 등록과 Hermes 주소 수정은 저장하기 전에 그 주소가 닿는지 본다.**
+그 에이전트의 profile key 로 `/v1/capabilities` 를 불러 200 이 아니면 `VALIDATION_FAILED` 로 거절하고 저장하지 않는다.
+틀린 주소나 profile 로 저장하면 그 에이전트의 모든 대화가 실패하고, 화면에는 Hermes 에 닿지 못했다는 것만 보인다.
+`AgentEndpointProbe` 가 이 확인을 한다.
+
 ### 사용량 화면의 절
 
 `/usage` 는 절 넷으로 이뤄진다. 위에서부터 이 순서다.
