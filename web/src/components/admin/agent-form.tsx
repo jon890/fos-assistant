@@ -23,13 +23,12 @@ export function AgentForm({ ownerEmail, busy, creating, onCreate }: Props) {
         <div className="grid gap-1.5"><Label htmlFor={`${id}-name`}>이름</Label><Input id={`${id}-name`} name="name" required /></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-profile`}>profile</Label><Input id={`${id}-profile`} name="hermesProfile" required /></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-address`}>에이전트 연결 주소</Label><Input id={`${id}-address`} name="apiBaseUrl" required /></div>
-        <div className="grid gap-1.5"><Label htmlFor={`${id}-provider`}>모델 제공사</Label><Input id={`${id}-provider`} name="provider" required /></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-owner`}>개인 소유자 이메일</Label><Input id={`${id}-owner`} name="ownerEmail" defaultValue={ownerEmail} /></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-cost`}>비용 방식</Label><NativeSelect id={`${id}-cost`} name="costMode" defaultValue="SUBSCRIPTION"><option value="SUBSCRIPTION">구독</option><option value="API">API</option></NativeSelect></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-credential`}>AI 계정 사용 범위</Label><NativeSelect id={`${id}-credential`} name="credentialScope" defaultValue="SHARED_HOUSEHOLD"><option value="SHARED_HOUSEHOLD">그룹 공유</option><option value="DEDICATED">전용</option></NativeSelect></div>
         <div className="grid gap-1.5"><Label htmlFor={`${id}-visibility`}>공개 범위</Label><NativeSelect id={`${id}-visibility`} name="visibility" defaultValue="PRIVATE"><option value="PRIVATE">나만</option><option value="GROUP">그룹 공개</option></NativeSelect></div>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">모델 목록은 등록할 때 불러와요.</p>
+      <p className="mt-3 text-xs text-muted-foreground">등록하기 전에 연결 주소에 닿는지 확인해요.</p>
       <Button type="submit" disabled={busy} loading={creating} loadingText="등록 중" className="mt-4">등록</Button>
     </form>
   );

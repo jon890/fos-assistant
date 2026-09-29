@@ -4,7 +4,6 @@ export type AdminAgent = {
   name: string;
   hermesProfile: string;
   apiBaseUrl: string;
-  provider: string;
   costMode: string;
   credentialScope: string;
   visibility: "PRIVATE" | "GROUP";
@@ -18,7 +17,6 @@ export type AdminAgent = {
 export type AgentView = {
   code: string;
   name: string;
-  model: string;
   visibility: "PRIVATE" | "GROUP";
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 흐름이 붙은 에이전트는 거짓이다 */
   acceptsAttachments: boolean;

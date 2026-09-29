@@ -63,8 +63,6 @@ class UsageControllerTest {
                 "목록 아빠",
                 "dad",
                 "http://127.0.0.1:1/p/dad",
-                "openai-codex",
-                "example-model",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,

@@ -120,8 +120,6 @@ class PersonRegistrarTest {
                 "삼촌 비서",
                 PROFILE,
                 "https://hermes-listener.example.com/p/" + PROFILE,
-                "openai-codex",
-                "example-model",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,

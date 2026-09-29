@@ -70,7 +70,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `tagline` | VARCHAR(200) NULL | 새 대화 화면에 보일 한 줄 소개 |
 
 **에이전트는 모델을 갖지 않는다.** 실행은 대화가 고른 값이나 profile 의 기본값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다.
-예전의 `provider`, `model`, `model_synced_at` 칸과 에이전트별 모델 목록 표 `agent_model_option`, 막힌 provider 를 기억하던 표 `provider_state` 는 아직 남아 있다. 실행은 더 이상 읽지 않고, 첫 로그인과 관리자 화면만 쓴다. 뒤따르는 변경이 그 화면과 함께 지운다.
+예전의 `provider`, `model`, `model_synced_at` 칸과 에이전트별 모델 목록 표 `agent_model_option`, 막힌 provider 를 기억하던 표 `provider_state` 는 V27 이 지웠다.
 모델과 effort 는 대화가 고르고, 고르지 않으면 그 profile 의 기본값으로 돈다.
 근거는 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
 공개 범위가 접근 권한을 정하는 이유는

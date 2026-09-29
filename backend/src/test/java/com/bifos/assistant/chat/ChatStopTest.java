@@ -5,15 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.infra.ProviderStateRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
@@ -71,9 +67,6 @@ class ChatStopTest {
     @Autowired ConversationAccess access;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
-    @Autowired ProviderStateRepository providerStates;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
     @Autowired ExecutionEventRepository executionEvents;
@@ -89,11 +82,9 @@ class ChatStopTest {
 
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        Agent agent = agents.save(Agent.of(
-                profileName, profileName, profileName, "http://agent-runtime.test/p/" + profileName,
-                "anthropic", "example-model-large", CostMode.SUBSCRIPTION,
+        agents.save(Agent.of(
+                profileName, profileName, profileName, "http://agent-runtime.test/p/" + profileName, CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
-        modelSelector.seedFirst(agent, new ModelOption("anthropic", "example-model-large"));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -122,8 +113,6 @@ class ChatStopTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
-        modelOptions.deleteAll();
-        providerStates.deleteAll();
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();

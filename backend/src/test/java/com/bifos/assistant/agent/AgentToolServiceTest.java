@@ -29,8 +29,7 @@ class AgentToolServiceTest {
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final AgentToolService service = new AgentToolService(toolsets);
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
-    private final Agent agent = Agent.of("tools", "도구", "tools-profile", "http://listener.test/p/tools-profile",
-            "provider", "model", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+    private final Agent agent = Agent.of("tools", "도구", "tools-profile", "http://listener.test/p/tools-profile", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
 
     @BeforeEach
     void 준비한다() {
@@ -66,7 +65,7 @@ class AgentToolServiceTest {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(isolatedToolsets);
         Agent groupAgent = Agent.of("group-tools", "그룹 도구", "group-tools-profile",
-                "http://listener.test/p/group-tools-profile", "provider", "model",
+                "http://listener.test/p/group-tools-profile",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null);
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
@@ -83,7 +82,7 @@ class AgentToolServiceTest {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(isolatedToolsets);
         Agent groupAgent = Agent.of("group-read", "그룹 도구", "group-read-profile",
-                "http://listener.test/p/group-read-profile", "provider", "model",
+                "http://listener.test/p/group-read-profile",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null);
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 

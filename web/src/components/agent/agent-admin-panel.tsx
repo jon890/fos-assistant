@@ -41,7 +41,7 @@ export function AgentAdminPanel({ initialAgents, ownerEmail, currentUserId }: Pr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: form.get("code"), name: form.get("name"), hermesProfile: form.get("hermesProfile"),
-          apiBaseUrl: form.get("apiBaseUrl"), provider: form.get("provider"), costMode: form.get("costMode"),
+          apiBaseUrl: form.get("apiBaseUrl"), costMode: form.get("costMode"),
           credentialScope: form.get("credentialScope"), visibility,
           ownerEmail: visibility === PRIVATE_VISIBILITY ? form.get("ownerEmail") : null,
         }),

@@ -3,13 +3,10 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -55,8 +52,6 @@ class EmptyConversationTest {
     @Autowired ChatService chat;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
@@ -69,7 +64,6 @@ class EmptyConversationTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
-        modelOptions.deleteAll();
         agents.deleteAll();
         users.deleteAll();
     }
@@ -146,13 +140,10 @@ class EmptyConversationTest {
                 code,
                 code,
                 "http://agent-runtime.test/p/" + code,
-                "anthropic",
-                "example-model-large",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 owner.id()));
-        modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         return saved;
     }
 

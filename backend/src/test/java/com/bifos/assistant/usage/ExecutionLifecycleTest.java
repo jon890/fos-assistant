@@ -39,6 +39,9 @@ class ExecutionLifecycleTest {
 
     private static final Long USER_ID = 4_102L;
 
+    /** 요청에 실어 보낸 provider 와 모델이다. 에이전트는 모델을 갖지 않아 검사가 정한다. */
+    private static final String REQUESTED_PROVIDER = "anthropic";
+    private static final String REQUESTED_MODEL = "example-model-large";
 
     /** 실행 줄 어디에도 남으면 안 되는 개인 기록을 흉내낸 문자열이다. */
     private static final String SECRET_MEMORY = "아빠는 매주 목요일에 병원에 간다";
@@ -74,7 +77,7 @@ class ExecutionLifecycleTest {
         AgentExecution execution = recorder.start(user(), conversation, agent(), null, null, 0L);
         Long id = execution.id();
 
-        AgentExecution completed = recorder.complete(execution, agent(), result(), requested(agent()));
+        AgentExecution completed = recorder.complete(execution, agent(), result(), requested());
 
         assertThat(completed.id()).isEqualTo(id);
         assertThat(executions.count()).isOne();
@@ -193,13 +196,13 @@ class ExecutionLifecycleTest {
     }
 
     private static Agent agent() {
-        return Agent.of("dad", "Dad", "dad", "http://127.0.0.1:1/p/dad", "anthropic", "example-model-large",
+        return Agent.of("dad", "Dad", "dad", "http://127.0.0.1:1/p/dad",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, USER_ID);
     }
 
     /** 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다. */
-    private static ModelChoice requested(Agent agent) {
-        return new ModelChoice(agent.provider(), agent.model(), null);
+    private static ModelChoice requested() {
+        return new ModelChoice(REQUESTED_PROVIDER, REQUESTED_MODEL, null);
     }
 
     private static HermesRunResult result() {

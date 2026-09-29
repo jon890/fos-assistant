@@ -41,6 +41,11 @@ class UsageCostRecordingTest {
 
     private static final Long USER_ID = 4_101L;
 
+    /** 요청에 실어 보낸 provider 와 모델이다. 에이전트는 모델을 갖지 않아 검사가 정한다. */
+    private static final String PROVIDER = "openai-codex";
+    private static final String PRICED_MODEL = "example-model";
+    private static final String UNPRICED_MODEL = "gpt-가격표에-없는-모델";
+    private static final String UNPRICED_AGENT_CODE = "dad-unpriced";
 
     @Autowired ExecutionRecorder recorder;
 
@@ -154,10 +159,12 @@ class UsageCostRecordingTest {
     /**
      * 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다.
      *
-     * <p>이 검사는 세션 조회를 하지 않으므로 그 에이전트의 1순위를 그대로 요청 값으로 둔다.
+     * <p>이 검사는 세션 조회를 하지 않으므로 이 값이 그대로 기록된다. 가격표에 없는 모델을 쓰는 에이전트만
+     * 가격표에 없는 모델을 보낸다.
      */
     private static ModelChoice requested(Agent agent) {
-        return new ModelChoice(agent.provider(), agent.model(), null);
+        String model = UNPRICED_AGENT_CODE.equals(agent.code()) ? UNPRICED_MODEL : PRICED_MODEL;
+        return new ModelChoice(PROVIDER, model, null);
     }
 
     private AgentExecution complete(HermesRunResult result) {
@@ -180,8 +187,6 @@ class UsageCostRecordingTest {
                 "Dad",
                 "dad",
                 "http://127.0.0.1:1/p/dad",
-                "openai-codex",
-                "example-model",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
@@ -194,8 +199,6 @@ class UsageCostRecordingTest {
                 "Dad API",
                 "dad",
                 "http://127.0.0.1:1/p/dad",
-                "openai-codex",
-                "example-model",
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
@@ -205,12 +208,10 @@ class UsageCostRecordingTest {
     /** 가격표에 없는 모델을 쓰는 API 경로 바인딩이다. 두 금액이 모두 비어 있게 된다. */
     private static Agent unpricedApiAgent() {
         return Agent.of(
-                "dad-unpriced",
+                UNPRICED_AGENT_CODE,
                 "Dad Unpriced",
                 "dad",
                 "http://127.0.0.1:1/p/dad",
-                "openai-codex",
-                "gpt-가격표에-없는-모델",
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,

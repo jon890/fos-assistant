@@ -2,7 +2,6 @@
 const MESSAGES: Record<string, string> = {
   AGENT_NOT_FOUND: "에이전트가 없거나 이 계정에서 사용할 수 없어요.",
   AGENT_DISABLED: "이 에이전트는 지금 사용할 수 없어요.",
-  AGENT_MODEL_UNKNOWN: "모델 목록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   HERMES_BINDING_MISSING: "사용할 수 있는 AI 계정이 없어요. 관리자에게 문의해 주세요.",
   HERMES_BINDING_DISABLED: "연결된 AI 계정이 사용 중지 상태예요.",
   HERMES_PROFILE_KEY_MISSING: "이 에이전트를 사용할 수 없어요. 관리자에게 문의해 주세요.",
@@ -35,7 +34,6 @@ export function describeError(code: string, fallback: string): string {
 
 /** 관리 화면에는 연결과 profile 문제의 원인을 구분해 보여준다. */
 const ADMIN_MESSAGES: Record<string, string> = {
-  AGENT_MODEL_UNKNOWN: "Hermes에서 모델을 읽지 못했어요. profile API 상태를 확인해 주세요.",
   HERMES_BINDING_MISSING: "이 계정에 연결된 Hermes profile이 없어요. 연결 설정을 확인해 주세요.",
   HERMES_PROFILE_KEY_MISSING: "연결된 profile의 API key가 서버에 준비되지 않았어요.",
   HERMES_PROFILE_EXISTS: "같은 이름의 Hermes profile이 이미 있어요. 다른 profile 이름을 입력해 주세요.",

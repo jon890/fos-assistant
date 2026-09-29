@@ -1,25 +1,19 @@
 package com.bifos.assistant.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentModelOption;
 import com.bifos.assistant.agent.domain.AgentVisibility;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.hermes.dto.HermesModelOptions;
 import com.bifos.assistant.people.application.PeopleProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserProvisioningService;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,8 +24,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 /**
  * 허용 목록에 있는 사람이 처음 들어올 때 무엇이 함께 생기는지 본다.
  *
- * <p>에이전트를 만들려고 시도하는 것은 {@code app_user} 를 새로 저장하는 그 순간뿐이다. 이 경로는
- * 매 요청 도는 자리라, 「없으면 다시 만든다」로 하면 모든 요청이 Hermes 호출 하나를 끌고 다닌다.
+ * <p>에이전트를 만들려고 시도하는 것은 {@code app_user} 를 새로 저장하는 그 순간뿐이다. 에이전트는 모델을
+ * 갖지 않으므로 그때 Hermes 에 모델을 묻지 않는다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -45,22 +39,18 @@ class FirstSignInTest {
     @Autowired AppUserRepository users;
     @Autowired AllowedPersonRepository people;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired HermesProperties hermesProperties;
     @Autowired PeopleProperties peopleProperties;
 
-    /** 실제 Hermes 를 부르지 않는다. 무엇을 돌려줄지와 읽지 못하는 경우를 여기서 정한다. */
+    /** 답을 정해 두지 않는다. 첫 로그인이 이 대역을 한 번도 부르지 않는지 본다. */
     @MockitoBean HermesModelClient hermesModels;
 
     @BeforeEach
     void 준비한다() {
-        modelOptions.deleteAll();
         agents.deleteAll();
         users.deleteAll();
         people.deleteAll();
         people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
-        when(hermesModels.readOptions(anyString(), anyString()))
-                .thenReturn(new HermesModelOptions("example-model", "openai-codex"));
     }
 
     private String expectedApiBaseUrl() {
@@ -74,34 +64,8 @@ class FirstSignInTest {
         assertThat(created.email()).isEqualTo(EMAIL);
         assertThat(agents.findByCode(PROFILE))
                 .get()
-                .extracting(Agent::name, Agent::hermesProfile, Agent::apiBaseUrl, Agent::provider, Agent::model)
-                .containsExactly(NAME, PROFILE, expectedApiBaseUrl(), "openai-codex", "example-model");
-    }
-
-    /**
-     * 모델을 읽은 시각도 함께 남는다.
-     *
-     * <p>방금 Hermes 에서 읽은 값으로 모델을 채워 놓고 읽은 시각만 비워 두면, 관리 화면이 그 에이전트를
-     * 한 번도 읽지 않은 것으로 보인다.
-     */
-    @Test
-    void 만들어진_에이전트는_모델을_읽은_시각을_갖는다() {
-        provisioning.resolve(EMAIL, NAME);
-
-        assertThat(agents.findByCode(PROFILE)).get().extracting(Agent::modelSyncedAt).isNotNull();
-    }
-
-    /** 목록이 비어 있으면 그 사람의 첫 대화가 쓸 모델을 찾지 못해 실패한다. */
-    @Test
-    void 만들어진_에이전트는_1순위_모델을_하나_갖는다() {
-        provisioning.resolve(EMAIL, NAME);
-
-        Agent agent = agents.findByCode(PROFILE).orElseThrow();
-        List<AgentModelOption> options = modelOptions.findByAgentIdOrderByRankAsc(agent.id());
-        assertThat(options)
-                .singleElement()
-                .extracting(AgentModelOption::rank, AgentModelOption::provider, AgentModelOption::model)
-                .containsExactly(1, "openai-codex", "example-model");
+                .extracting(Agent::name, Agent::hermesProfile, Agent::apiBaseUrl)
+                .containsExactly(NAME, PROFILE, expectedApiBaseUrl());
     }
 
     @Test
@@ -143,27 +107,21 @@ class FirstSignInTest {
         assertThat(agents.count()).isZero();
     }
 
-    /** 여기서 거절하면 Hermes 가 답하지 않는 동안 그 사람이 아무것도 하지 못한다. */
+    /**
+     * Hermes 가 모델을 주지 않아도 에이전트가 만들어진다.
+     *
+     * <p>대역이 아무 답도 정해 두지 않았으므로 불렀다면 모델도 provider 도 받지 못한다. 대화가 모델을 고르지
+     * 않으면 그 profile 의 기본값으로 돌기 때문에(ADR-030) 첫 로그인은 모델을 묻지 않는다.
+     */
     @Test
-    void 모델을_읽지_못하면_사용자만_만들고_로그인은_막지_않는다() {
-        when(hermesModels.readOptions(any(), any())).thenReturn(null);
-
+    void Hermes_에_모델을_묻지_않고_에이전트를_만든다() {
         AppUser created = provisioning.resolve(EMAIL, NAME);
 
         assertThat(created.id()).isNotNull();
-        assertThat(agents.count()).isZero();
-    }
-
-    /** 틀린 provider 로 만들어진 에이전트는 실행할 때마다 실패하고 그 원인이 화면에 드러나지 않는다. */
-    @Test
-    void provider_를_비워서_주면_기본값으로_메우지_않고_에이전트를_만들지_않는다() {
-        when(hermesModels.readOptions(any(), any()))
-                .thenReturn(new HermesModelOptions("example-model", null));
-
-        AppUser created = provisioning.resolve(EMAIL, NAME);
-
-        assertThat(created.id()).isNotNull();
-        assertThat(agents.count()).isZero();
+        assertThat(agents.findByCode(PROFILE))
+                .as("Hermes 가 모델과 provider 를 주지 않아도 에이전트가 만들어져야 한다")
+                .isPresent();
+        verifyNoInteractions(hermesModels);
     }
 
     @Test

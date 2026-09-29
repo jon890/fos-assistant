@@ -20,7 +20,7 @@ type PersonView = {
   joined: boolean;
 };
 
-type AgentView = { code: string; model: string; visibility: string };
+type AgentView = { code: string; visibility: string };
 
 export const peopleScenario: Scenario = {
   name: "사람을 더하고 첫 로그인에 에이전트가 생긴다",

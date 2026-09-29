@@ -9,15 +9,12 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.StarterService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
@@ -102,8 +99,6 @@ class ChatAttachmentTurnTest {
     @Autowired StarterService starterService;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired ChatAttachmentRepository attachmentRows;
@@ -125,7 +120,6 @@ class ChatAttachmentTurnTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
-        modelOptions.deleteAll();
         agents.deleteAll();
         users.deleteAll();
         deleteTree(Path.of(properties.root()).toAbsolutePath());
@@ -408,13 +402,10 @@ class ChatAttachmentTurnTest {
                 code,
                 code,
                 "http://agent-runtime.test/p/" + code,
-                "anthropic",
-                "example-model-large",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 owner.id()));
-        modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         return saved;
     }
 

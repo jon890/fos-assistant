@@ -15,7 +15,6 @@ function agentRow(code: string, name: string, tagline: string | null, starterPro
   return {
     code,
     name,
-    model: "example-model",
     visibility: "PRIVATE",
     acceptsAttachments: true,
     tagline,

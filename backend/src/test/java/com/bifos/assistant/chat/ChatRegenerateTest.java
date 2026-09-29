@@ -3,13 +3,10 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
@@ -65,8 +62,6 @@ class ChatRegenerateTest {
     @Autowired ArtifactService artifactService;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ChatMessageRepository messages;
     @Autowired ChatAttachmentRepository attachmentRows;
     @Autowired ConversationRepository conversations;
@@ -87,7 +82,6 @@ class ChatRegenerateTest {
         executions.deleteAll();
         attachmentRows.deleteAll();
         messages.deleteAll();
-        modelOptions.deleteAll();
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
@@ -373,11 +367,9 @@ class ChatRegenerateTest {
 
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        Agent agent = agents.save(Agent.of(
-                profileName, profileName, profileName, "http://agent-runtime.test/p/" + profileName,
-                "anthropic", "example-model-large", CostMode.SUBSCRIPTION,
+        agents.save(Agent.of(
+                profileName, profileName, profileName, "http://agent-runtime.test/p/" + profileName, CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
-        modelSelector.seedFirst(agent, new ModelOption("anthropic", "example-model-large"));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

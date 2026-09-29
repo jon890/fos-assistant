@@ -265,7 +265,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
         name: agent.name,
         hermesProfile: agent.profile,
         apiBaseUrl: `${hermesBaseUrl}/p/${agent.profile}`,
-        provider: "openai-codex",
         costMode: "SUBSCRIPTION",
         credentialScope: "SHARED_HOUSEHOLD",
         visibility: agent.visibility,
@@ -338,8 +337,6 @@ function startControlPlane(
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
       ASSISTANT_TESTSUPPORT_ENABLED: "true",
-      // 막힌 provider 를 오래 기억하면 다음 검사가 1순위를 건너뛴다. 검사에서만 짧게 둔다.
-      ASSISTANT_MODEL_PROVIDER_COOLDOWN: "PT1S",
     },
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],

@@ -5,9 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -114,8 +111,6 @@ class ResearchAndBuildFlowTest {
     @Autowired UsageController usage;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
@@ -159,15 +154,12 @@ class ResearchAndBuildFlowTest {
                 agentCode,
                 agentCode,
                 "http://agent-runtime.test/p/" + agentCode,
-                "anthropic",
-                "example-model-large",
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
                 user.id());
         agent.assignFlow(flow);
-        Agent saved = agents.save(agent);
-        modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
+        agents.save(agent);
         return new CurrentUser(
                 user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }

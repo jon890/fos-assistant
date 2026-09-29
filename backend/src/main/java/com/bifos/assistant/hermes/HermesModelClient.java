@@ -1,7 +1,6 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
-import com.bifos.assistant.hermes.dto.HermesModelOptions;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.ArrayList;
@@ -29,37 +28,6 @@ public class HermesModelClient {
         factory.setReadTimeout(properties.readTimeout());
         this.restClient = RestClient.builder().requestFactory(factory).build();
         this.keyStore = keyStore;
-    }
-
-    /** 그 profile 의 기본 모델만 읽는다. 읽지 못하면 null 이다. */
-    public String readModel(String apiBaseUrl, String profileName) {
-        HermesModelOptions options = readOptions(apiBaseUrl, profileName);
-        return options == null ? null : options.model();
-    }
-
-    /**
-     * 그 profile 의 기본 provider 와 모델을 읽는다. 읽지 못하면 null 이다.
-     *
-     * <p>{@code provider} 를 주지 않는 Hermes 판이 있어 그 칸은 비어 있을 수 있다. 비면 부르는 쪽이
-     * provider 를 건드리지 않는다.
-     */
-    public HermesModelOptions readOptions(String apiBaseUrl, String profileName) {
-        try {
-            String apiKey = keyStore.resolve(profileName);
-            JsonNode response = restClient.get()
-                    .uri(stripTrailingSlash(apiBaseUrl) + "/api/model/options")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .retrieve()
-                    .body(JsonNode.class);
-            String model = text(response, "model");
-            if (model == null) {
-                return null;
-            }
-            return new HermesModelOptions(model, text(response, "provider"));
-        } catch (RuntimeException ex) {
-            log.warn("Hermes 의 모델 설정을 읽지 못했다 profile={}", profileName, ex);
-            return null;
-        }
     }
 
     /**

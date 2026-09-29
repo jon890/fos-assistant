@@ -2,13 +2,10 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
@@ -54,8 +51,6 @@ class RegenerateDeletedAttachmentTest {
     @Autowired ArtifactService artifactService;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ChatMessageRepository messages;
     @Autowired ConversationRepository conversations;
     @Autowired ChatAttachmentRepository attachments;
@@ -68,7 +63,6 @@ class RegenerateDeletedAttachmentTest {
         attachments.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
-        modelOptions.deleteAll();
         agents.deleteAll();
         users.deleteAll();
     }
@@ -103,10 +97,8 @@ class RegenerateDeletedAttachmentTest {
 
     private CurrentUser member() {
         AppUser user = users.save(AppUser.of("deleted-photo@example.com", "dad", 1L, UserRole.MEMBER));
-        Agent agent = agents.save(Agent.of("dad", "dad", "dad", "http://agent-runtime.test/p/dad",
-                "anthropic", "example-model-large", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
+        agents.save(Agent.of("dad", "dad", "dad", "http://agent-runtime.test/p/dad", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE, user.id()));
-        modelSelector.seedFirst(agent, new ModelOption("anthropic", "example-model-large"));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
