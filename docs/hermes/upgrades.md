@@ -70,6 +70,7 @@ config migration 처리기와 `SessionDB` 의 schema 초기화다.
 
 소비자는 v0.21.5 의 `interrupted` 도 종료 상태로 처리해야 한다.
 run 입력 토큰에 cache read·write 를 다시 더하면 중복 합산이 된다.
+우리 backend 는 `cache_read_tokens` 를 캐시 입력으로 읽고, 입력 단가는 `input_tokens` 에서 그것을 뺀 나머지에만 매긴다. v0.21.3 의 run usage 에는 캐시 칸이 없어 그 전 실행의 캐시 입력은 비어 있다.
 session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 근거는 [v0.21.3 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server_runs.py) 와
 [v0.21.5 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의

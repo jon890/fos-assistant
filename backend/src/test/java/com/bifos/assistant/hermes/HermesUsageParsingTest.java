@@ -16,6 +16,22 @@ class HermesUsageParsingTest {
     }
 
     @Test
+    void Hermes_v0_21_5_의_run_usage_에서_캐시_읽기를_읽는다() throws Exception {
+        // 실제 v0.21.5 run 응답의 키 모양이다(2026-09-29 운영에서 확인). input 은 캐시 읽기와 쓰기를 포함한다.
+        TokenUsage usage =
+                parse(
+                        """
+                        {"input_tokens": 1200, "output_tokens": 40, "total_tokens": 1240,
+                         "cache_read_tokens": 1024, "cache_write_tokens": 0}
+                        """);
+
+        assertThat(usage.inputTokens()).isEqualTo(1200);
+        assertThat(usage.outputTokens()).isEqualTo(40);
+        assertThat(usage.totalTokens()).isEqualTo(1240);
+        assertThat(usage.cachedInputTokens()).isEqualTo(1024);
+    }
+
+    @Test
     void reads_the_openai_shape() throws Exception {
         TokenUsage usage =
                 parse(
