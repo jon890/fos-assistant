@@ -7,7 +7,7 @@
 옛 MCP 토큰을 profile 에 묶을 때 `agent_token.user_id` 를 비운다. 옛 판의 서버로 되돌려도 묶인 토큰이 옛 사용자로 돌지 않고 인증에서 거절되게 하기 위해서다.
 `McpCaller` 의 두 번째 칸 이름을 `parent` 에서 `originExecution` 으로 바꾼다. 다음 phase 부터 그 실행은 끝난 실행일 수 있어 「도는 부모」 라는 이름이 틀린다.
 
-**범위 외**: 등록 표와 판정 순서(phase 02), 등록 경로(phase 03), 가짜 Hermes 검사(phase 04). 옛 토큰 경로 자체를 지우는 일(`legacy-user-tokens` 설정, `agent_token.user_id` 칸, `McpPrincipal.legacyUserId`)은 이 plan 밖이다.
+**범위 외**: 등록 표(phase 02), 판정 교체(phase 03), 등록 경로(phase 04), 가짜 Hermes 검사(phase 05). 옛 토큰 경로 자체를 지우는 일(`legacy-user-tokens` 설정, `agent_token.user_id` 칸, `McpPrincipal.legacyUserId`)은 이 plan 밖이다.
 
 ## 컨텍스트
 

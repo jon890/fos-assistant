@@ -27,7 +27,7 @@ MCP 토큰으로 인증하고, 본문 서명을 확인한 뒤 앞 phase 가 만�
 - 본문은 `@RequestBody(required = false) String` 으로 받아 컨트롤러가 `JsonMapper` 로 읽는다. `@RequestBody JsonNode` 로 받으면 JSON 이 아닌 본문이 `GlobalExceptionHandler` 에서 500 으로 끝나 계약의 403 과 다르다. 빈 본문과 JSON 이 아닌 본문도 `SESSION_BINDING_REJECTED` 다. Jackson 의 record 바인딩은 `v: "1"` 이나 `1.0` 을 정수로 바꿔 받을 수 있어 쓰지 않는다. 이유는 로그에만 남긴다
 - `child_subagent_id`, `parent_subagent_id` 는 문자열이나 `null` 이면 받고 저장하지 않는다. 다른 타입이면 거절한다. 모르는 키는 무시한다(플러그인이 먼저 칸을 더해도 깨지지 않게)
 - 인증 주체가 `McpPrincipal` 이 아니면(사용자 JWT) `SESSION_BINDING_REJECTED` 로 거절한다. profile 이 빈 옛 토큰도 거절한다. 옛 토큰에는 profile 이 없어 등록을 profile 로 묶을 수 없다
-- 토큰, `sig`, 본문 원문을 로그에 남기지 않는다
+- 토큰, `sig`, 본문 원문을 로그에 남기지 않는다. 거절 이유는 `reject(reason)` 도우미의 인자로 넘기고 `log.` 줄에는 `reason={}` 자리만 둔다
 - 서명할 글의 첫 줄이 `v1-subagent` 다. `_fos_ctx` 의 첫 줄 `v1` 다음은 도구 이름이라, 도구 이름이 `v1-subagent` 인 도구가 없는 한 두 서명이 섞이지 않는다
 
 ## 작업 항목

@@ -54,7 +54,7 @@
 
 ### 4. `test/e2e/run.ts`
 
-`NATIVE_DELEGATION_PROFILE` 을 `mcp-principal` 과 같은 자리(profile key, 스킬 목록, profile 목록)에 더하고, `SCENARIOS` 에서 `mcpPrincipalScenario` 다음에 `nativeDelegationScenario` 를 둔다.
+`NATIVE_DELEGATION_PROFILE` 을 `mcp-principal` 과 같은 자리(profile key, API server toolset, profile 목록)에 더하고, `SCENARIOS` 에서 `mcpPrincipalScenario` 다음에 `nativeDelegationScenario` 를 둔다.
 
 ## 검증
 

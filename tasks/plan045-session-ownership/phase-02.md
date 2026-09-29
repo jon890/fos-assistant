@@ -32,6 +32,7 @@
 - 등록 실패는 `SESSION_BINDING_REJECTED` 하나로 묶는다. 다른 origin 으로 이미 등록된 경우만 `SESSION_BINDING_CONFLICT` 다. 이유는 로그에만 남기고 session 값은 적지 않는다
 - **메서드 전체에 `@Transactional` 을 두지 않는다.** 유일 제약 위반이 그 트랜잭션을 롤백 전용으로 만들어 다시 읽지 못한다. `TransactionTemplate` 트랜잭션 하나에서 `saveAndFlush` 하고, `DataIntegrityViolationException` 이면 그 트랜잭션 밖에서 다시 읽어 같은 규칙(같은 origin 이면 `EXISTS`, 다르면 충돌)으로 판정한다
 - 등록은 요청마다 저장소를 읽고 쓴다. JVM 메모리에 두지 않는다
+- 동시 등록 검사가 흔들리면 예외 종류를 먼저 본다. H2 가 잠금 대기 시간을 넘기면 `PessimisticLockingFailureException` 계열이 나와 재시도 경로를 타지 않는다
 
 ## Blocked 조건
 
