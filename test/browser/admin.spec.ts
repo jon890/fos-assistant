@@ -1,4 +1,4 @@
-import { expect, hermesBaseUrl, setSession, test, MODELS_AGENT_CODE, PERSONA_AGENT_CODE } from "./fixtures.ts";
+import { expect, hermesBaseUrl, setSession, test, PERSONA_AGENT_CODE } from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 에이전트가 여럿이라 검사가 보는 카드 하나로 좁힌다. */
@@ -22,14 +22,12 @@ test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", 
     apiBaseUrl: "http://example.test/p/registered-profile",
     provider: "openai-codex",
     model: "example-model",
-    modelSyncedAt: null,
     costMode: "SUBSCRIPTION",
     credentialScope: "SHARED_HOUSEHOLD",
     visibility: "PRIVATE",
     ownerUserId: 1,
     enabled: true,
     flow: null,
-    models: [{ rank: 1, provider: "openai-codex", model: "example-model" }],
   };
   await page.route(/\/api\/admin\/agents(?:\?.*)?$/, async (route) => {
     if (route.request().method() === "POST") return route.fulfill({ status: 201, json: registered });
@@ -49,7 +47,7 @@ test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", 
 
   const card = page.getByRole("region", { name: "등록된 에이전트" }).locator("article");
   await expect(card.getByRole("heading", { name: registered.name })).toBeVisible();
-  await expect(card.getByText(registered.model, { exact: true })).toBeVisible();
+  await expect(card.getByText(registered.model, { exact: true })).toHaveCount(0);
   await expect(card.getByText(registered.code, { exact: true })).toHaveCount(0);
   await expect(card.getByText(registered.hermesProfile, { exact: true })).toHaveCount(0);
 });
@@ -189,34 +187,9 @@ test("공개 요청이 도는 동안 Esc 로 닫히지 않고 끝나면 창이 �
   await expect(adminSection(page).getByText("그룹 공개", { exact: true })).toBeVisible();
 });
 
-test("모델 목록을 고쳐 저장하면 그 순서로 남는다", async ({ page }) => {
-  await page.request.put(`/api/admin/agents/${MODELS_AGENT_CODE}/models`, {
-    data: { models: [{ provider: "openai-codex", model: "example-model" }] },
-  });
-  await page.goto(`/agents/${MODELS_AGENT_CODE}`);
-  const list = adminSection(page).getByTestId("agent-model-list");
-
-  await expect(list.getByRole("button", { name: "지우기" })).toBeDisabled();
-
-  await list.getByRole("button", { name: "모델 추가" }).click();
-  await list.getByLabel("2순위 모델 제공사").fill("nvidia");
-  await list.getByLabel("2순위 모델", { exact: true }).fill("example-model-b");
-  await list.getByRole("button", { name: "모델 목록 저장" }).click();
-  await expect(list.getByLabel("2순위 모델 제공사")).toHaveValue("nvidia");
-
-  await list.getByRole("button", { name: "아래로" }).first().click();
-  await list.getByRole("button", { name: "모델 목록 저장" }).click();
-  await expect(list.getByLabel("1순위 모델 제공사")).toHaveValue("nvidia");
-
-  await page.reload();
-  await expect(list.getByLabel("1순위 모델 제공사")).toHaveValue("nvidia");
-  await expect(list.getByLabel("2순위 모델 제공사")).toHaveValue("openai-codex");
-});
-
-test("막힌 provider 가 없으면 그 줄을 그리지 않고 목록이 가로로 넘치지 않는다", async ({ page }, testInfo) => {
+test("에이전트 목록이 가로로 넘치지 않는다", async ({ page }, testInfo) => {
   await page.goto("/agents");
 
-  await expect(page.getByTestId("blocked-providers")).toHaveCount(0);
   const width = testInfo.project.name === "mobile" ? 390 : 1280;
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 });
@@ -256,7 +229,7 @@ test("닿지 않는 주소를 저장하려 하면 실패 이유가 그 자리에
   await expect(adminSection(page).getByLabel("브라우저 비서 에이전트 연결 주소")).toHaveValue(original);
 });
 
-test("상세 관리 절에서 사용 여부를 바꾸고 모델을 다시 읽는다", async ({ page }) => {
+test("상세 관리 절에서 사용 여부를 바꾼다", async ({ page }) => {
   try {
     await page.goto("/agents/browser");
     const section = adminSection(page);
@@ -266,13 +239,8 @@ test("상세 관리 절에서 사용 여부를 바꾸고 모델을 다시 읽는
     await section.getByRole("button", { name: "다시 사용" }).click();
     await expect(section.getByText("사용 중", { exact: true })).toBeVisible();
 
-    const sync = page.waitForResponse((response) =>
-      response.url().endsWith("/api/admin/agents/browser/sync-model")
-        && response.request().method() === "POST",
-    );
-    await section.getByRole("button", { name: "모델 목록 다시 읽기" }).click();
-    expect((await sync).ok()).toBeTruthy();
-    await expect(section.getByRole("button", { name: "모델 목록 다시 읽기" })).toBeEnabled();
+    await expect(section.getByRole("button", { name: "모델 목록 다시 읽기" })).toHaveCount(0);
+    await expect(section.getByTestId("agent-model-list")).toHaveCount(0);
   } finally {
     const restored = await page.request.patch("/api/admin/agents/browser", {
       data: { enabled: true, visibility: "PRIVATE", ownerEmail: "browser@example.com" },

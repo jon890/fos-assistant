@@ -13,7 +13,6 @@ export function AgentCard({ agent, currentUserId }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">{agent.name}</h2>
-          <p className="text-sm text-muted-foreground">{agent.model}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}</Badge>
