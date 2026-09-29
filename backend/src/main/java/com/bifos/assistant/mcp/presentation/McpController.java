@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.presentation;
 
+import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
@@ -40,7 +41,7 @@ public class McpController {
         JsonNode id = request.get("id"); String method = request.path("method").asString();
         if ("notifications/initialized".equals(method)) return ResponseEntity.status(HttpStatus.ACCEPTED).build();
         return ResponseEntity.ok(switch (method) {
-            case "initialize" -> response(id, Map.of("protocolVersion", "2025-03-26", "capabilities", Map.of("tools", Map.of("listChanged", false)), "serverInfo", Map.of("name", "fos-assistant-memory", "version", buildProperties.getVersion())));
+            case "initialize" -> response(id, Map.of("protocolVersion", "2025-03-26", "capabilities", Map.of("tools", Map.of("listChanged", false)), "serverInfo", Map.of("name", AgentToolPolicy.CONTROL_PLANE_MCP, "version", buildProperties.getVersion())));
             case "tools/list" -> response(id, Map.of("tools", tools.tools()));
             case "tools/call" -> call(id, request.path("params"));
             default -> error(id, -32601, "Method not found");

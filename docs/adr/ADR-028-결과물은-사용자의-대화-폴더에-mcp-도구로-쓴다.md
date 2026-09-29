@@ -4,6 +4,7 @@
 - **결정**: 기존 `fos-assistant-memory` MCP 서버에 `artifact_write` 를 더해 이 서버가 등록된 profile 의 에이전트가 결과물을 쓰게 한다.
   MCP 토큰이 정한 사용자가 주인인 대화만 받고, Control Plane 이 그 대화의 결과물 폴더에 대신 쓴다.
   Hermes 의 `file`, `terminal` toolset 을 닫은 profile 은 그대로 둔다.
+- **더해진 부분**: 서버 이름을 2026-09-29 에 `fos-assistant` 로 바꿨다. Hermes 가 도구 이름 앞에 서버 이름을 붙여 결과물 쓰기가 `mcp_fos_assistant_memory_artifact_write` 로 보였기 때문이다. 한 서버에 도구를 모으는 결정은 그대로다. 바꾸는 순서는 [`hermes/tools-and-skills.md`](../hermes/tools-and-skills.md#control-plane-mcp) 에 있다.
 
 ### 맥락
 

@@ -23,7 +23,7 @@ v0.21.3 에서 plugin 이 본문을 먼저 읽고 같은 요청을 처리기에 
 | 주인 | `web`, `vision`, `todo`, `clarify`, `skills`, `tts`, `delegation` | 그 에이전트의 주인과 `ADMIN` |
 | 관리자 | `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `cronjob`, `image_gen`, `video_gen`, `homeassistant`, `spotify`, `discord`, `session_search` | `ADMIN` 만 |
 | 항상 끔 | `memory` | 아무도. 기억은 Control Plane 이 갖는다([ADR-003](ADR-003-memory-권한은-주입으로-강제한다.md)) |
-| 항상 켬 | 기억 MCP `fos-assistant-memory` | 아무도 끄지 못한다 |
+| 항상 켬 | Control Plane MCP `fos-assistant` | 아무도 끄지 못한다 |
 
 등급 표에 없는 toolset(예: v0.21.3 에 들어온 `connections`, `kanban`)은 화면의 선택 목록에 보이지 않는다.
 도구를 쓸 때 plugin 이 허용 목록을 검사해 모르는 이름을 거절한다.

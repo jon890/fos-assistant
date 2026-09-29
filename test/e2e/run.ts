@@ -210,8 +210,8 @@ async function main(): Promise<void> {
       [FLOW_BINDING.profileName]: PROFILE_KEY,
       [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
     }, undefined, {
-      [DAD_BINDING.profileName]: ["fos-assistant-memory"],
-      [AGENT_TOOLS_PROFILE]: ["fos-assistant-memory"],
+      [DAD_BINDING.profileName]: ["fos-assistant"],
+      [AGENT_TOOLS_PROFILE]: ["fos-assistant"],
     });
     console.log(`   ${hermes.baseUrl}`);
 

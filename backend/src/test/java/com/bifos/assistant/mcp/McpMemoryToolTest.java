@@ -61,7 +61,7 @@ class McpMemoryToolTest {
         assertThat(initialized.path("id").asInt()).isEqualTo(17);
         assertThat(initialized.path("result").path("protocolVersion").asString()).isEqualTo("2025-03-26");
         assertThat(initialized.path("result").path("capabilities").path("tools").path("listChanged").asBoolean()).isFalse();
-        assertThat(initialized.path("result").path("serverInfo").path("name").asString()).isEqualTo("fos-assistant-memory");
+        assertThat(initialized.path("result").path("serverInfo").path("name").asString()).isEqualTo("fos-assistant");
         assertThat(initialized.path("result").path("serverInfo").path("version").asString())
                 .isEqualTo(buildProperties.getVersion());
         JsonNode listed = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/list\"}"));

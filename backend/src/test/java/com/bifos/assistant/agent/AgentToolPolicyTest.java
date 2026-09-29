@@ -26,7 +26,7 @@ class AgentToolPolicyTest {
         List<String> result = AgentToolPolicy.requestedForWrite(
                 OWNER, agent(AgentVisibility.PRIVATE), List.of("web"), List.of());
 
-        assertThat(result).containsExactly("web", AgentToolPolicy.MEMORY_MCP);
+        assertThat(result).containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
     @Test
@@ -51,7 +51,7 @@ class AgentToolPolicyTest {
     void 관리자는_관리자_등급을_켤_수_있다() {
         assertThat(AgentToolPolicy.requestedForWrite(
                 ADMIN, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of()))
-                .containsExactly("terminal", AgentToolPolicy.MEMORY_MCP);
+                .containsExactly("terminal", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
     @Test
@@ -91,7 +91,7 @@ class AgentToolPolicyTest {
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
         assertThat(AgentToolPolicy.requestedForWrite(
                 ADMIN, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
-                .containsExactly("session_search", AgentToolPolicy.MEMORY_MCP);
+                .containsExactly("session_search", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
     @Test
@@ -109,7 +109,7 @@ class AgentToolPolicyTest {
                 .isEqualTo(ErrorCode.FORBIDDEN);
         assertThat(AgentToolPolicy.requestedForWrite(
                 ADMIN, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search")))
-                .containsExactly("web", AgentToolPolicy.MEMORY_MCP);
+                .containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
     private static Agent agent(AgentVisibility visibility) {
