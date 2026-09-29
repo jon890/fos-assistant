@@ -1,0 +1,12 @@
+{
+  "name": "plan043-skill-commands",
+  "description": "대화창 맨 앞의 /스킬 이름을 Control Plane 이 해석해 Hermes 에 skill_view 로 읽고 따르라는 입력으로 넘기고 호출 이력을 남긴다(ADR-035)",
+  "status": "pending",
+  "created_at": "2026-09-29",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}

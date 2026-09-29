@@ -386,7 +386,7 @@ sequenceDiagram
         H->>H: skill_view 로 본문을 읽고 따른다
         H-->>C: 답
     else 없다
-        C-->>U: 400 SKILL_NOT_FOUND
+        C-->>U: 400 SKILL_COMMAND_UNKNOWN
     end
 ```
 
