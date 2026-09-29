@@ -118,6 +118,7 @@ ALTER TABLE agent_token MODIFY COLUMN user_id BIGINT NULL;
 | 6 | `private-a` 토큰으로 `shared-family` 실행의 뿌리를 서명 / `shared-family` 토큰으로 `private-a` 실행의 뿌리를 서명 | 둘 다 호출 맥락 오류 결과 |
 | 7 | A 의 뿌리로 B 의 Memory 번호 / B 의 뿌리로 A 의 Memory 번호 | 없는 항목과 같은 `Memory 항목을 읽을 수 없습니다.` |
 | 8 | A 의 뿌리로 B 의 대화에 `artifact_write` | `isError: true`, `결과물을 저장할 수 없습니다.` A 의 다른 대화에는 성공한다 |
+| 13 | Control Plane 이 시작하지 않은 run: 실행 줄이 없는 뿌리(`cron-session-1`)로 올바르게 서명한 호출 | 호출 맥락 오류 결과. 본문이 없다 |
 | 11 | 옛 대화: 실행 줄의 `hermesSessionId` 가 뿌리 칸이 빈 대화의 `legacy-session` | 그 값으로 서명한 호출이 그 실행의 사용자로 돈다 |
 | 12 | 폐기한 토큰, 모르는 토큰, 헤더 없음 | HTTP 401 |
 
@@ -126,7 +127,7 @@ ALTER TABLE agent_token MODIFY COLUMN user_id BIGINT NULL;
 - 묶인 토큰에서 `_fos_ctx` 없음, `sig` 가 틀림, `v` 가 문자열, 모델이 흉내 낸 서명(다른 토큰의 해시로 서명), 끝난 실행의 뿌리, 같은 뿌리로 도는 실행 둘 → 모두 같은 호출 맥락 오류 결과. 응답 본문이 서로 같다
 - 모델이 인자에 `user_id`, `profile` 을 더해도 결과가 바뀌지 않는다(`memory_read` 는 모르는 키를 무시하고, `artifact_write` 는 인자 오류)
 - 설정이 거짓일 때 profile 이 빈 옛 토큰은 401
-- `backend/src/test/java/com/bifos/assistant/mcp/McpLegacyTokenTest.java` 신규: `@SpringBootTest(properties = "assistant.mcp.legacy-user-tokens=true")`. 옛 토큰은 `_fos_ctx` 없이 그 토큰의 사용자로 읽는다. 같은 설정에서도 묶인 토큰은 `_fos_ctx` 가 없으면 거절된다
+- `backend/src/test/java/com/bifos/assistant/mcp/McpLegacyTokenTest.java` 신규: `@SpringBootTest(properties = "assistant.mcp.legacy-user-tokens=true")`. 옛 토큰은 `_fos_ctx` 없이, 그리고 실행 줄이 없는 뿌리로 서명한 `_fos_ctx` 를 붙여도 그 토큰의 사용자로 읽는다(Control Plane 이 시작하지 않은 run 의 전환 동안 동작). 같은 설정에서도 묶인 토큰은 `_fos_ctx` 가 없으면 거절된다
 
 기존 테스트를 새 모델에 맞춘다.
 

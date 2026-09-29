@@ -97,7 +97,7 @@ sequenceDiagram
 | profile 이 빈 옛 토큰이고 `assistant.mcp.legacy-user-tokens` 가 거짓이다 | HTTP 401 |
 | profile 이 빈 옛 토큰이고 그 설정이 참이다 | 옛 토큰의 `user_id` 로 전처럼 돈다. `_fos_ctx` 는 보지 않고 경고 로그를 남긴다 |
 | profile 이 묶인 토큰인데 `_fos_ctx` 가 없거나 모양이 틀렸거나 서명이 맞지 않는다 | 거절한다 |
-| 서명은 맞지만 그 뿌리 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, 이 결정 전 대화의 압축 교체가 여기 온다 |
+| 서명은 맞지만 그 뿌리 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, 이 결정 전 대화의 압축 교체, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
 | 그 뿌리 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 
