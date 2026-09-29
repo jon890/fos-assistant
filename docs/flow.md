@@ -302,11 +302,12 @@ sequenceDiagram
     U->>C: POST /api/v1/agents {name, visibility}
     C->>C: 주인 행을 잠그고 상한을 본다
     C->>C: code 와 profile 이름을 만든다
-    C->>D: profile 을 만든다 (no_skills)
-    C->>D: 안전한 기본 도구를 쓰고 확인한다
+    C->>D: POST /api/profiles (no_skills)
+    D->>D: 틀로 안전한 도구, MCP 등록, 서명 plugin, 관리 표식
+    C->>D: 도구 목록을 읽어 확인한다
     C->>C: 그 profile 에 묶인 MCP 토큰을 발급한다
-    C->>D: MCP 등록, profile 플러그인 켜기
-    C->>C: key 를 쓰고 에이전트 행을 저장한다 (profile_managed)
+    C->>D: PUT /api/env (MCP 토큰, API_SERVER_MODEL_NAME, API_SERVER_KEY)
+    C->>C: key 파일을 쓰고 에이전트 행을 저장한다 (profile_managed)
     C-->>U: 201 과 에이전트
     U->>U: 상세로 간다
 ```
@@ -318,6 +319,7 @@ sequenceDiagram
 | 이미 상한만큼 만들었다 | 409 `AGENT_LIMIT_REACHED`. 대화상자에 「에이전트는 5개까지 만들 수 있어요」 |
 | 같은 사용자가 두 번 누른다 | 주인 행 잠금으로 차례로 센다. 상한을 넘는 쪽이 거절된다 |
 | 중간에 Hermes 가 실패한다 | 만든 것을 역순으로 거두고 `HERMES_PROVISION_FAILED`. 거두기까지 실패하면 원래 오류를 올리고 로그를 남긴다 |
+| 만든 직후 첫 대화에서 MCP 도구가 아직 없다 | 새 profile 의 MCP 연결은 1~2분 안에 붙는다. 그동안 Memory 읽기와 결과물 쓰기가 없는 채로 답한다 |
 | 이름이 비었거나 너무 길다 | `VALIDATION_FAILED` |
 | 가족용으로 공개한다 | 주인이 승인 없이 한다. 셸·파일 도구가 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE` |
 | 지운다 | 확인 창을 거친다. 에이전트는 목록에서 빠지고 대화는 읽기만 된다. Control Plane 이 만든 profile 만 profile 까지 지운다 |

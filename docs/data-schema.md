@@ -157,7 +157,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `user_id` | BIGINT | 누가 물었는가 |
-| `conversation_id` | BIGINT | |
+| `conversation_id` | BIGINT NULL | 비어 있으면 대화 밖에서 돈 실행이다. 지금은 추천 질문을 만드는 실행뿐이다 |
 | `agent_id` | BIGINT | 어느 에이전트의 실행이었는가 |
 | `parent_execution_id` | BIGINT NULL | 이 실행을 부른 실행. 사용자가 부른 것이면 비어 있다 |
 | `root_execution_id` | BIGINT NULL | 이 실행이 속한 나무의 뿌리. 뿌리 자신은 비어 있다 |

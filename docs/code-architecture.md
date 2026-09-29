@@ -225,19 +225,21 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | `DELETE /api/v1/agents/{code}` | 지운다. 204 | `FORBIDDEN` |
 
 **만들기는 한 요청 안에서 끝낸다.** 차례는 아래와 같고, 중간에 실패하면 만든 것을 역순으로 거둔다(`people.application.HermesProfileProvisioner` 와 같은 규칙).
+대시보드 plugin 의 계약은 [`hermes/profiles.md`](hermes/profiles.md) 의 「Control Plane 이 부르는 대시보드 plugin 경로」 가 갖는다.
 
 1. 주인의 `app_user` 행을 잠그고 그 사용자의 지우지 않은 에이전트 수가 `assistant.agents.max-per-user`(기본 5)보다 적은지 본다. `ADMIN` 은 세지 않는다
 2. `code` 와 profile 이름을 만든다. 둘 다 사용자가 넣은 이름과 무관한 무작위 값이다
-3. 대시보드로 profile 을 `no_skills` 로 만든다
-4. 안전한 기본 toolset 을 적용하고 확인한다. 틀 없이 만든 profile 은 도구가 넓게 열리므로 key 를 주기 전에 한다([`hermes/profiles.md`](hermes/profiles.md))
-5. 그 profile 에 묶인 MCP 토큰을 발급하고 MCP 서버를 등록하고 profile 플러그인을 켠다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
-6. profile key 를 쓰고 에이전트 행을 `profile_managed = true` 로 저장한다
+3. `POST /api/profiles` 로 profile 을 `no_skills` 로 만든다. plugin 이 이 안에서 안전한 기본 도구, Control Plane MCP 등록, 서명 plugin, 관리 표식을 붙인다. Control Plane 은 도구 목록을 읽어 확인만 한다
+4. 그 profile 에 묶인 MCP 토큰을 발급해 `PUT /api/env` 로 `MCP_FOS_ASSISTANT_API_KEY` 에 넣는다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
+5. `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 를 넣고 key 파일을 쓴다
+6. 에이전트 행을 `profile_managed = true` 로 저장한다
 
+거둘 때는 토큰을 폐기하고 key 파일을 지우고 `DELETE /api/profiles/<이름>` 을 부른다.
+새 profile 은 재시작 없이 공유 listener 에서 답한다. MCP 도구는 첫 연결까지 1~2분 걸릴 수 있다.
 새 profile 은 가족 공용 credential 로 돈다([ADR-002](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)).
-5 는 운영 쪽 대시보드 플러그인이 그 경로를 열어야 한다. 그 경로의 운영 값은 `fos-home-infra` 가 갖는다.
 
 **지우기는 에이전트 행을 지우지 않는다.** `deleted_at` 을 적고 끈다.
-`profile_managed` 가 참이면 profile 과 올린 스킬 디렉터리를 지우고 MCP 토큰을 폐기한다. 거짓이면 profile 을 남긴다.
+`profile_managed` 가 참이면 MCP 토큰을 먼저 폐기하고, `DELETE /api/profiles/<이름>` 과 key 파일, 올린 스킬 디렉터리를 지운다. 거짓이면 profile 을 남긴다.
 지운 에이전트의 대화는 읽기만 된다. 새 turn 과 다시 생성은 `AGENT_NOT_FOUND` 다.
 
 | 무엇 | 어디 |
@@ -990,7 +992,7 @@ web/src/
 | 누가 | 무엇을 |
 | --- | --- |
 | 관리자 | 관리 화면에서 이메일과 이름과 profile 이름을 적는다 |
-| Control Plane | 허용 목록에 넣고, Hermes profile 을 만들고, key 를 넣는다 |
+| Control Plane | 허용 목록에 넣고, Hermes profile 을 만들고, key 와 그 profile 에 묶인 MCP 토큰을 넣는다. 만들기 경로가 에이전트 만들기와 같아 MCP 등록과 서명 plugin 도 함께 붙는다 |
 | 그 사람 | 로그인한다. 그때 `app_user` 와 에이전트가 생긴다 |
 
 Google 동의 화면의 테스트 사용자에 주소를 더하는 것만 사람이 따로 한다.

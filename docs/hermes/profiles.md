@@ -250,3 +250,28 @@ Control Plane 이 읽는 key 파일은 Hermes 밖의 파일이고 Hermes 의 API
 켜진 상태에서 등록된 auth provider 가 하나도 없으면 대시보드가 기동을 거부한다.
 token provider 하나만 있어도 이 조건을 채운다.
 측정용 대시보드를 loopback 에 붙이고 `dashboard.public_url` 만 넣어 인증을 켠 채로 확인했다.
+
+## Control Plane 이 부르는 대시보드 plugin 경로
+
+Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 `fos-home-infra` 에 있고, 서비스 토큰으로 오는 요청을 아래 계약으로만 받는다.
+2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
+인증은 모두 `Authorization: Bearer <대시보드 서비스 토큰>` 이고 없거나 틀리면 401 이다. 「그 profile」 은 있고 `default` 가 아닌 이름이다.
+
+| 메서드와 경로 | 요청 | 성공 | 실패 |
+| --- | --- | --- | --- |
+| `POST /api/profiles` | `{name, no_skills: true}`. 다른 키는 거절 | 200. 이때 안전한 도구 목록, Control Plane MCP 등록(토큰 값 없음), 서명 plugin 켜짐, **관리 표식**이 모두 있다 | 400 이름 규칙, 이미 있는 이름(Hermes 는 409 가 아니라 400), 허용하지 않는 키. 500 틀 적용 실패(만든 것은 지웠다) |
+| `PUT /api/env` | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 셋뿐 | 200 | 400 다른 key, `default`, 형식. 404 없는 profile |
+| `PUT /api/config` (도구) | `{profile, config: {platform_toolsets: {api_server: [...]}}}` | 200 | [ADR-029](../adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로 |
+| `PUT /api/config` (스킬 게시) | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}}`. 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 404 없는 profile |
+| `GET /api/skills?profile=<p>` | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
+| `PUT /api/skills/toggle` | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
+| `DELETE /api/profiles/<p>` | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
+
+**틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.
+토큰 값은 틀에 없고 Control Plane 이 `PUT /api/env` 로 넣는다. 토큰을 넣기 전의 MCP 연결 실패가 쌓이면 다시 붙는 간격이 길어지므로 만든 직후에 넣는다.
+
+**관리 표식이 있는 profile 만 지운다.** Control Plane 이 이 경로로 만든 profile 에만 표식이 있다. 운영자가 손으로 만든 profile 은 이 경로로 지워지지 않는다.
+
+**서명 plugin 은 `skill_manage` 를 막는다.** 모델이 같은 이름의 로컬 스킬을 만들면 올린 스킬보다 먼저 선택되어, 읽기 전용 마운트만으로는 올린 스킬이 가려지는 것을 막지 못하기 때문이다.
+
+**`skills.external_dirs` 에 없는 디렉터리를 넣으면 Hermes 는 오류 없이 건너뛴다.** 올린 스킬이 조용히 모두 사라지므로 plugin 이 게시 전에 디렉터리가 있는지 본다.
