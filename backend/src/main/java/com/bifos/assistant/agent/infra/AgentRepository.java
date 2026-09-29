@@ -38,4 +38,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
      * profile 을 쓰면 격리가 깨진다.
      */
     boolean existsByHermesProfile(String hermesProfile);
+
+    /** 그 사용자가 주인인 지우지 않은 에이전트 수다. 사용자당 상한을 이 수로 센다. */
+    long countByOwnerUserIdAndDeletedAtIsNull(Long ownerUserId);
 }

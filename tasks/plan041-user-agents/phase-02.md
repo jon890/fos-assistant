@@ -116,6 +116,7 @@ node test/e2e/run.ts
 | `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentControllerLifecycleTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/agent-lifecycle.ts` | 신규 |
 | `test/e2e/run.ts` | 수정 |

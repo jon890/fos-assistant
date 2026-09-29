@@ -1,14 +1,13 @@
 package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
+import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
 import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
-import com.bifos.assistant.hermes.HermesToolsetClient;
-import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -33,7 +32,7 @@ public class AgentAdminController {
     private final AgentRepository agents;
     private final AppUserRepository users;
     private final CurrentUserProvider currentUser;
-    private final HermesToolsetClient hermesToolsets;
+    private final AgentLifecycleService lifecycle;
     private final AgentEndpointProbe endpointProbe;
     private final FlowRegistry flows;
 
@@ -47,7 +46,9 @@ public class AgentAdminController {
         Long ownerId = ownerId(request.visibility(), request.ownerEmail());
         // 잘못된 주소나 profile 로 등록하면 그 에이전트의 모든 대화가 실패한다. 저장하기 전에 닿는지 본다.
         endpointProbe.requireReachable(request.apiBaseUrl(), request.hermesProfile());
-        requireGroupSafe(request.visibility(), request.apiBaseUrl(), request.hermesProfile());
+        if (request.visibility() == AgentVisibility.GROUP) {
+            lifecycle.requireGroupSafe(request.apiBaseUrl(), request.hermesProfile());
+        }
         Agent agent = Agent.of(request.code(), request.name(),
                 request.hermesProfile(), request.apiBaseUrl(),
                 request.costMode(), request.credentialScope(), request.visibility(), ownerId);
@@ -93,7 +94,7 @@ public class AgentAdminController {
         }
         String apiBaseUrl = effectiveApiBaseUrl(agent, request.apiBaseUrl());
         if (request.enabled() && request.visibility() == AgentVisibility.GROUP) {
-            requireGroupSafe(request.visibility(), apiBaseUrl, agent.hermesProfile());
+            lifecycle.requireGroupSafe(apiBaseUrl, agent.hermesProfile());
         }
         agent.changeAccess(request.enabled(), request.visibility(), ownerId);
         if (!apiBaseUrl.equals(agent.apiBaseUrl())) agent.changeApiBaseUrl(apiBaseUrl);
@@ -112,15 +113,6 @@ public class AgentAdminController {
         if (next.equals(agent.apiBaseUrl())) return agent.apiBaseUrl();
         endpointProbe.requireReachable(next, agent.hermesProfile());
         return next;
-    }
-
-    private void requireGroupSafe(AgentVisibility visibility, String apiBaseUrl, String profileName) {
-        if (visibility != AgentVisibility.GROUP) return;
-        if (AgentToolPolicy.hasPrivateOnlyToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
-            throw new ApiException(
-                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE,
-                    "shell and file toolsets require a private agent");
-        }
     }
 
     private static String stripTrailingSlash(String value) {
