@@ -30,6 +30,8 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -172,6 +174,49 @@ class ConversationModelChoiceTest {
                 new ChooseModelRequest("openrouter", "example-model-small", "extreme")));
 
         assertThat(conversations.findById(created.id()).orElseThrow().modelChoice()).isEqualTo(saved);
+    }
+
+    @Test
+    void 공백을_뗀_provider_나_모델이_열보다_길면_거절하고_저장된_값이_그대로다() {
+        CurrentUser dad = member("choice-dad");
+        Conversation created = chat.startEmpty(dad, "choice-dad");
+        ModelChoice saved = new ModelChoice("openrouter", "example-model-small", "medium");
+        chat.chooseModel(dad, created.id(), saved);
+        ChatController controller = chatController(dad);
+        String longestProvider = "p".repeat(64);
+        String longestModel = "m".repeat(128);
+
+        rejected(() -> controller.chooseModel(created.publicId(),
+                new ChooseModelRequest(longestProvider + "p", "example-model-small", null)));
+        rejected(() -> controller.chooseModel(created.publicId(),
+                new ChooseModelRequest("openrouter", longestModel + "m", null)));
+        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice()).isEqualTo(saved);
+
+        ConversationView longest = controller.chooseModel(created.publicId(),
+                new ChooseModelRequest("  " + longestProvider + " ", "\t" + longestModel + "\n", null));
+
+        assertThat(List.of(longest.provider(), longest.model())).containsExactly(longestProvider, longestModel);
+        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice())
+                .isEqualTo(new ModelChoice(longestProvider, longestModel, null));
+    }
+
+    @Test
+    void 저장된_값이_검증에_맞지_않아도_목록과_보내기가_그_값을_그대로_싣는다() {
+        CurrentUser dad = member("choice-dad");
+        Conversation created = chat.startEmpty(dad, "choice-dad");
+        conversations.chooseModelIfActive(created.id(), dad.id(), "openrouter", "example-model-small", "extreme");
+        ChatController controller = chatController(dad);
+        ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of(
+                "run-1", "sess-1", "completed", "네", "example-model-small", "openrouter", TokenUsage.empty()));
+
+        assertThat(controller.conversations()).singleElement().satisfies(it ->
+                assertThat(List.of(it.provider(), it.model(), it.reasoningEffort()))
+                        .containsExactly("openrouter", "example-model-small", "extreme"));
+        chat.send(dad, created.id(), "안녕", null);
+
+        assertThat(((StubHermesRunsClient) hermes).received()).singleElement().satisfies(command ->
+                assertThat(List.of(command.provider(), command.model(), command.reasoningEffort()))
+                        .containsExactly("openrouter", "example-model-small", "extreme"));
     }
 
     @Test

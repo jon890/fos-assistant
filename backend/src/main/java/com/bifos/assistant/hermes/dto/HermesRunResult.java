@@ -42,7 +42,7 @@ public record HermesRunResult(
         return "completed".equalsIgnoreCase(status);
     }
 
-    /** 이 provider 의 계정이 전부 막혀 실패했는가. 그때만 다음 순위로 넘어간다. */
+    /** 이 provider 의 계정이 전부 막혀 실패했는가. 그 실행은 {@code PROVIDER_BLOCKED} 로 남는다. */
     public boolean providerBlocked() {
         return !succeeded() && error != null && error.startsWith(PROVIDER_AUTH_FAILED_PREFIX);
     }

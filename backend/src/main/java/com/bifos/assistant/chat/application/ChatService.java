@@ -755,6 +755,8 @@ public class ChatService {
      *
      * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 대화 목록의 순서는 주고받은 시각으로 정하므로
      * {@code updatedAt} 을 건드리지 않는다.
+     *
+     * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택
      */
     @Transactional
     public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {

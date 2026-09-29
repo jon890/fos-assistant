@@ -135,8 +135,9 @@ public final class ChatDtos {
     /** 대화에서 쓸 모델과 effort 다. 모두 비워 보내면 그 profile 의 기본값으로 돌아간다. */
     public record ChooseModelRequest(String provider, String model, String reasoningEffort) {
 
+        /** 요청 값을 검증해 선택으로 바꾼다. 맞지 않으면 {@code VALIDATION_FAILED} 다. */
         public ModelChoice toChoice() {
-            return new ModelChoice(provider, model, reasoningEffort);
+            return ModelChoice.of(provider, model, reasoningEffort);
         }
     }
 

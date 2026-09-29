@@ -420,12 +420,12 @@ web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않�
 | 칸 | 뜻 |
 | --- | --- |
 | `defaultProvider`, `defaultModel` | 그 profile 의 기본값. Hermes 가 주지 않으면 null |
-| `providers[]` | `{ "provider", "name", "models": [...] }`. Hermes 가 `authenticated` 를 거짓으로 준 provider 는 뺀다 |
-| `reasoningCapable` | 모델 이름을 열쇠로 한 참거짓 표. Hermes 의 `capabilities.<모델>.reasoning` 이다. 값이 없는 모델은 참으로 본다. 화면은 거짓인 모델에서 effort 를 고르지 못하게 한다 |
+| `providers[]` | `{ "provider", "name", "models": [...], "reasoningCapable": {...} }`. Hermes 가 `authenticated` 를 참으로 준 provider 만 남긴다. 기본 provider 가 맨 앞에 오고, 모델은 Hermes 가 준 차례 그대로다 |
+| `providers[].reasoningCapable` | 모델 이름을 열쇠로 한 참거짓 표. Hermes 의 `capabilities.<모델>.reasoning` 이다. 값이 없는 모델은 참으로 본다. 화면은 거짓인 모델에서 effort 를 고르지 못하게 한다 |
 | `reasoningEfforts` | `["low", "medium", "high", "xhigh", "max"]`. 고정이다 |
 
 `hermes/HermesModelClient` 가 `GET {profile}/api/model/options` 를 부르고, `chat/application/ModelOptionsService` 가 profile 마다 10분 들고 있는다.
-Hermes 가 답하지 못하면 `HERMES_UNAVAILABLE` 이다. 들고 있던 목록은 버리지 않는다.
+10분이 지나 다시 읽다 Hermes 가 답하지 못하면 들고 있던 옛 목록을 돌려준다. 그 profile 의 목록을 한 번도 읽지 못했으면 `HERMES_UNAVAILABLE` 이다.
 목록을 저장하지 않는 까닭과 기본값을 Hermes 에 두는 까닭은
 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
 
@@ -487,7 +487,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `tool` | 도구가 시작되거나 끝났다 | `toolName`, `detail`, `phase`, `durationMs`, `failed` |
 | `subagent` | 하위 에이전트가 시작되거나 끝났다 | `subagentId`, `goal`, `model`, `phase`, `inputTokens`, `outputTokens`, `durationMs`, `failed` |
 | `step` | 흐름의 단계가 시작되거나 끝났다 | `stepName`, `stepState` |
-| `reset` | 지금까지 흘린 조각을 지우라 | |
+| `reset` | 지금까지 흘린 조각을 지우라. provider 를 넘기던 때만 보냈고 지금은 보내지 않는다. 화면은 아직 받는 쪽을 갖고 있다 | |
 | `done` | 끝나서 저장했다 | `conversationId`, `messageId`, `executionId` |
 | `stopped` | 중지로 끝나서 저장했다 | `conversationId`, `messageId`, `executionId`. 남긴 답이 없으면 `messageId` 가 null |
 | `error` | 실패했다 | `code`, `message` |
@@ -497,13 +497,13 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 **`started` 는 흐름으로 도는 turn 에서도 뿌리 실행의 번호를 싣는다.**
 중지는 뿌리 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다.
-화면은 마지막으로 받은 `started` 의 번호를 쓴다. 넘어가기 전 실행은 이미 `FAILED` 다.
+화면은 마지막으로 받은 `started` 의 번호를 쓴다.
 
 ### 중지
 
 `chat/application` 의 `TurnCancellation` 이 도는 turn 마다 중지 표시를 하나 갖는다. 뿌리 실행 번호가 열쇠다.
 `ChatService` 가 turn 을 시작할 때 등록하고 끝날 때 지운다.
-provider 를 넘어가 새 실행 줄로 다시 시도하면 열쇠를 새 번호로 옮긴다.
+실행 줄을 만들면 열쇠를 그 실행 번호로 옮긴다.
 중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
 같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성이 `CONVERSATION_BUSY` 를 판정하는 자리다.
 같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.

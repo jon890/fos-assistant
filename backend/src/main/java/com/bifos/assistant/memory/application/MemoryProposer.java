@@ -7,9 +7,14 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
+import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionEvent;
+import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +34,8 @@ public class MemoryProposer {
     private final MemoryService memories;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
+    private final ExecutionEventRecorder eventRecorder;
+    private final ExecutionEventRepository executionEvents;
     private final ObjectMapper objectMapper;
 
     /**
@@ -52,6 +59,12 @@ public class MemoryProposer {
             String runId = hermes.submit(command);
             executions.attachRunId(proposalExecution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
+            if (result.providerBlocked()) {
+                // 고른 모델의 provider 가 막힌 것은 대화 실행과 같은 코드로 남긴다. 다른 모델로 넘기지 않는다.
+                AgentExecution failed = executions.fail(proposalExecution, ErrorCode.PROVIDER_BLOCKED.name());
+                appendFailed(failed, ErrorCode.PROVIDER_BLOCKED.name());
+                return;
+            }
             if (!result.succeeded()) {
                 executions.fail(proposalExecution, statusOf(result));
                 return;
@@ -64,6 +77,20 @@ public class MemoryProposer {
                 executions.fail(proposalExecution, errorCode(ex));
             }
             log.warn("Memory 제안을 만들지 못했습니다. parentExecutionId={}", parentExecution.id(), ex);
+        }
+    }
+
+    /**
+     * 실패 사건을 남긴다. 제안 실행은 다른 사건을 적지 않으므로 첫 번째다.
+     *
+     * <p>저장이 실패해도 원래 대화에는 전하지 않는다. 사건은 관측용이다.
+     */
+    private void appendFailed(AgentExecution execution, String code) {
+        try {
+            ExecutionEvent event = eventRecorder.record(execution, ExecutionEventType.RUN_FAILED, code, 1);
+            executionEvents.save(event);
+        } catch (RuntimeException ex) {
+            log.warn("제안 실행의 사건을 남기지 못했다 executionId={}", execution.id(), ex);
         }
     }
 

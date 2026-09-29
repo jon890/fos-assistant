@@ -212,6 +212,19 @@ class ModelOptionsServiceTest {
     }
 
     @Test
+    void reasoning_표에_모든_모델이_있고_Hermes_가_밝히지_않은_모델은_참이다() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenReturn(catalog("openai-codex", new Provider("openai-codex", "OpenAI Codex",
+                        List.of("example-model", "example-model-mini", "example-model-new"),
+                        Map.of("example-model", true, "example-model-mini", false))));
+
+        Map<String, Boolean> reasoning = service.optionsFor(dad, "dad").providers().get(0).reasoning();
+
+        assertThat(reasoning).isEqualTo(Map.of(
+                "example-model", true, "example-model-mini", false, "example-model-new", true));
+    }
+
+    @Test
     void reasoningEfforts_는_대화가_고를_수_있는_effort_와_같다() {
         when(hermes.readCatalog(anyString(), anyString())).thenReturn(catalog("openai-codex"));
 

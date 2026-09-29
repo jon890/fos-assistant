@@ -390,9 +390,15 @@ sequenceDiagram
         C-->>W: 들고 있던 목록
     else 없거나 오래됐다
         C->>H: GET {profile}/api/model/options
-        H-->>C: 기본 provider 와 모델, provider 별 모델
-        C->>C: 부를 수 있는 provider 만 남겨 짧게 들고 있는다
-        C-->>W: 기본값, provider 별 모델, effort 선택지
+        alt Hermes 가 답한다
+            H-->>C: 기본 provider 와 모델, provider 별 모델
+            C->>C: 부를 수 있는 provider 만 남겨 짧게 들고 있는다
+            C-->>W: 기본값, provider 별 모델, effort 선택지
+        else 답하지 못하고 옛 목록이 있다
+            C-->>W: 들고 있던 옛 목록
+        else 답하지 못하고 한 번도 읽지 못했다
+            C-->>W: HERMES_UNAVAILABLE
+        end
     end
     W-->>B: 「기본 (기본 모델)」 과 모델, effort 를 고르는 창
     B->>B: 고른다
@@ -420,13 +426,15 @@ sequenceDiagram
 
 | 무엇 | 어떻게 되나 |
 | --- | --- |
-| Hermes 가 목록을 주지 못한다 | 목록 창에 불러오지 못했다고 보인다. 대화는 기본값으로 계속 보낼 수 있다 |
+| Hermes 가 목록을 주지 못하고 들고 있던 목록이 있다 | 들고 있던 옛 목록을 보인다 |
+| Hermes 가 목록을 주지 못하고 그 profile 의 목록을 한 번도 읽지 못했다 | `HERMES_UNAVAILABLE` 이다. 목록 창에 불러오지 못했다고 보인다. 대화는 기본값으로 계속 보낼 수 있다 |
 | 목록에 `authenticated` 가 거짓인 provider 가 있다 | 뺀다. 부를 수 없는 provider 다 |
 | 고른 모델이 나중에 목록에서 빠졌다 | 대화에 적힌 값을 그대로 보낸다. 모델을 찾지 못하면 Hermes 가 그 실행을 실패로 끝내고, 사용자가 다른 모델을 고른다 |
 | provider 와 모델 중 하나만 온다 | 거절한다. 둘은 함께 채우거나 함께 비운다 |
+| provider 가 64자, 모델이 128자를 넘는다 | 거절한다. 대화 표의 칸 길이다 |
 | effort 가 선택지에 없는 값이다 | 거절한다 |
 | 모델이 받지 않는 effort 를 골랐다 | 그대로 보낸다. Hermes 가 그 provider 의 값으로 맞춘다 |
-| 도는 turn 이 있는데 바꾼다 | 받는다. 도는 실행은 이미 보낸 값으로 끝나고, 바꾼 값은 다음 보내기부터 쓴다 |
+| 도는 turn 이 있는데 바꾼다 | 받는다. 도는 turn 은 시작할 때의 값으로 끝난다. 그 turn 의 Memory 제안과 흐름의 남은 하위 실행도 같다. 바꾼 값은 다음 보내기부터 쓴다 |
 | 남의 대화다 | 없는 대화와 같은 응답이다 |
 | 고른 모델의 provider 가 막혔다 | 그 실행은 `PROVIDER_BLOCKED` 로 실패한다. Control Plane 은 다른 모델로 넘기지 않는다 |
 | 다시 생성, Memory 제안, 흐름의 하위 실행 | 그 대화에 적힌 값을 쓴다 |

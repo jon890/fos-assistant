@@ -71,7 +71,8 @@ public class ExecutionRecorder {
      * effort 만 적는다.
      *
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
-     * @param retryOfExecutionId 이 실행이 대신하는 직전 실행. 없으면 null
+     * @param retryOfExecutionId 지금은 늘 null 이다. provider 가 막히면 다른 모델로 넘기던 때 채우던 칸이고,
+     *     넘김이 없어진 뒤로는 채우지 않는다. 그 전에 남은 실행 기록을 읽으려고 칸과 인자를 남겨 둔다
      */
     public AgentExecution start(
             CurrentUser user,

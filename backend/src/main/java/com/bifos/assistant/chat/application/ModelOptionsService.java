@@ -12,6 +12,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -87,7 +89,8 @@ public class ModelOptionsService {
     }
 
     private static ModelOptions optionsOf(HermesModelCatalog catalog) {
-        List<HermesModelCatalog.Provider> providers = new ArrayList<>(catalog.providers());
+        List<HermesModelCatalog.Provider> providers = new ArrayList<>(
+                catalog.providers().stream().map(ModelOptionsService::withEveryModelReasoning).toList());
         // 기본 provider 를 맨 앞에 둔다. 나머지는 Hermes 가 준 차례를 지킨다.
         providers.sort((left, right) -> Boolean.compare(
                 !Objects.equals(left.slug(), catalog.defaultProvider()),
@@ -97,5 +100,20 @@ public class ModelOptionsService {
                 catalog.defaultModel(),
                 List.copyOf(providers),
                 ModelChoice.REASONING_EFFORTS);
+    }
+
+    /**
+     * reasoning 지원 표에 그 provider 의 모델을 모두 넣는다.
+     *
+     * <p>Hermes 가 밝히지 않은 모델은 참으로 본다. 모르는 모델에서 effort 를 막으면 고를 수 있는 것을 못
+     * 고르게 된다. 화면이 표에 없는 모델을 따로 판단하지 않도록 여기서 채운다.
+     */
+    private static HermesModelCatalog.Provider withEveryModelReasoning(HermesModelCatalog.Provider provider) {
+        Map<String, Boolean> reasoning = new LinkedHashMap<>();
+        for (String model : provider.models()) {
+            reasoning.put(model, provider.reasoning().getOrDefault(model, true));
+        }
+        return new HermesModelCatalog.Provider(
+                provider.slug(), provider.name(), provider.models(), Collections.unmodifiableMap(reasoning));
     }
 }
