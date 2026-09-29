@@ -27,9 +27,9 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `shared/auth` | 토큰 검사와 현재 사용자 |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `user` | 사용자과 첫 로그인 처리 |
-| `agent` | 에이전트 등록, 공개 범위, Hermes profile 연결, 모델 동기화, 페르소나 |
+| `agent` | 에이전트 등록, 공개 범위, Hermes profile 연결, 페르소나, 도구 |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
-| `chat` | 대화, 메시지, 한 번의 실행 흐름 |
+| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택 |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회 |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인 |
 | `context` | 실행에 넣을 `instructions` 조립 |
@@ -50,9 +50,9 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다.
    요청자가 볼 수 있는 Memory 만 고른다.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
-   조립한 글자 수를 `context_chars` 에 적는다.
+   조립한 글자 수를 `context_chars` 에, 대화에서 고른 effort 를 `reasoning_effort` 에 적는다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
-6. `HttpHermesRunsClient` 가 실행을 제출한다. 받은 `run_id` 를 그 자리에서 실행 줄에 적는다.
+6. `HttpHermesRunsClient` 가 실행을 제출한다. 대화에서 고른 모델과 effort 가 있으면 싣고, 없으면 빼서 profile 의 기본값으로 돌게 한다. 받은 `run_id` 를 그 자리에서 실행 줄에 적는다.
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
 8. 실행이 끝나면 `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다.
 9. `ExecutionRecorder` 가 4번에서 만든 줄을 `SUCCEEDED` 로 갱신한다.
@@ -397,6 +397,8 @@ web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않�
 | --- | --- |
 | `GET /api/v1/chat/conversations` | 내 대화 목록. 지운 대화는 빠진다 |
 | `PATCH /api/v1/chat/conversations/{id}` | 이름을 바꾼다. 본문 `{ "title": "..." }`. 바뀐 대화 한 줄을 돌려준다 |
+| `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. 바뀐 대화 한 줄을 돌려준다 |
+| `GET /api/v1/chat/model-options?agentCode=` | 그 에이전트의 profile 로 고를 수 있는 모델. 요청자가 쓸 수 있는 에이전트만 받는다 |
 | `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204 |
 | `GET /api/v1/chat/conversations/{id}/messages` | 메시지 목록. 이전 판도 모두 온다 |
 | `POST /api/v1/chat/messages` | 한 번에 받는다 |
@@ -407,6 +409,27 @@ web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않�
 | `GET /api/v1/chat/conversations/by-number/{number}` | 옛 주소 `/c/{번호}` 를 넘겨 주려고 번호로 대화를 찾는다. `{ "id": "<공개 식별자>" }` |
 
 지운 대화와 남의 대화는 모든 경로에서 `CONVERSATION_NOT_FOUND` 다. 둘을 가리지 않는다.
+
+### 대화의 모델 선택
+
+대화 한 줄(`ConversationView`)은 `provider`, `model`, `reasoningEffort` 를 싣는다. 고르지 않았으면 셋 다 null 이다.
+
+`GET /api/v1/chat/model-options` 의 응답이다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `defaultProvider`, `defaultModel` | 그 profile 의 기본값. Hermes 가 주지 않으면 null |
+| `providers[]` | `{ "provider", "name", "models": [...] }`. Hermes 가 `authenticated` 를 거짓으로 준 provider 는 뺀다 |
+| `reasoningCapable` | 모델 이름을 열쇠로 한 참거짓 표. Hermes 의 `capabilities.<모델>.reasoning` 이다. 값이 없는 모델은 참으로 본다. 화면은 거짓인 모델에서 effort 를 고르지 못하게 한다 |
+| `reasoningEfforts` | `["low", "medium", "high", "xhigh", "max"]`. 고정이다 |
+
+`hermes/HermesModelClient` 가 `GET {profile}/api/model/options` 를 부르고, `chat/application/ModelOptionsService` 가 profile 마다 10분 들고 있는다.
+Hermes 가 답하지 못하면 `HERMES_UNAVAILABLE` 이다. 들고 있던 목록은 버리지 않는다.
+목록을 저장하지 않는 까닭과 기본값을 Hermes 에 두는 까닭은
+[ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
+
+실행을 보낼 때 `chat/domain/ModelChoice` 가 대화에 적힌 세 값을 싣는다. 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
+effort 가 비어 있으면 `model_options` 를 뺀다. 보내기, 다시 생성, Memory 제안, 흐름의 하위 실행이 모두 같은 값을 쓴다.
 
 **대화 경로의 `{id}` 는 대화의 공개 식별자(UUID)다.** 대화 표의 번호가 아니다.
 응답에서 대화를 가리키는 칸도 모두 공개 식별자다. 대화 목록의 `id`, 보내기 응답과 사건의 `conversationId`,
@@ -438,7 +461,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `artifacts` | 그 답의 turn 이 만든 결과물 파일. 위 「결과물 파일」 절이 모양을 갖는다 |
 
 `activity` 는 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 모두 센다.
-provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 실행 줄을 갖는다. 요약은 답을 만든 실행만 세고 막힌 시도의 사건은 넣지 않는다. 화면이 reset 때 그 줄을 비우는 것과 같다.
+예전에 provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 실행 줄을 갖는다. 요약은 답을 만든 실행만 세고 막힌 시도의 사건은 넣지 않는다. 지금은 Control Plane 이 provider 를 넘기지 않아 새 turn 에는 이런 줄이 생기지 않는다.
 
 | 칸 | 세는 것 |
 | --- | --- |
@@ -458,12 +481,11 @@ provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 
 
 | `type` | 언제 | 싣는 칸 |
 | --- | --- | --- |
-| `started` | 실행 줄을 만든 직후. provider 를 넘어가 새 줄로 다시 시도하면 다시 보낸다 | `conversationId`, `executionId` |
+| `started` | 실행 줄을 만든 직후 | `conversationId`, `executionId` |
 | `delta` | 답 조각 | `text` |
 | `tool` | 도구가 시작되거나 끝났다 | `toolName`, `detail`, `phase`, `durationMs`, `failed` |
 | `subagent` | 하위 에이전트가 시작되거나 끝났다 | `subagentId`, `goal`, `model`, `phase`, `inputTokens`, `outputTokens`, `durationMs`, `failed` |
 | `step` | 흐름의 단계가 시작되거나 끝났다 | `stepName`, `stepState` |
-| `switched` | provider 가 막혀 다음 모델로 넘어갔다 | `text` |
 | `reset` | 지금까지 흘린 조각을 지우라 | |
 | `done` | 끝나서 저장했다 | `conversationId`, `messageId`, `executionId` |
 | `stopped` | 중지로 끝나서 저장했다 | `conversationId`, `messageId`, `executionId`. 남긴 답이 없으면 `messageId` 가 null |
@@ -591,10 +613,10 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | 자리 | 누구에게 | 무엇 |
 | --- | --- | --- |
 | 목록 | 모두 | 내가 쓸 수 있는 에이전트. 누르면 상세로 간다 |
-| 목록 | `ADMIN` | 위에 더해 다른 사람의 비공개 에이전트와 꺼 둔 에이전트도 보인다. 「다른 사람 것」, 「꺼짐」 표시를 붙인다. 목록 위에 막힌 provider 알림과 새 에이전트 등록이 있다 |
+| 목록 | `ADMIN` | 위에 더해 다른 사람의 비공개 에이전트와 꺼 둔 에이전트도 보인다. 「다른 사람 것」, 「꺼짐」 표시를 붙인다. 목록 위에 새 에이전트 등록이 있다 |
 | 상세의 성격, 소개와 추천 질문 | 그 에이전트를 쓸 수 있는 사람. 고치는 것은 주인과 `ADMIN` | 읽기와 쓰기 권한은 [「페르소나」](#페르소나) 의 「누가 고칠 수 있나」 와 같다 |
 | 상세의 도구 | 그 에이전트의 주인과 `ADMIN` | 도구의 켜짐을 보고, 주인은 주인 등급을, `ADMIN` 은 모든 등급을 바꾼다. 다른 사람의 비공개 에이전트는 관리자 경로로 읽고 쓴다 |
-| 상세의 관리 절 | `ADMIN` | 사용 여부, 공개 범위(그룹 공개는 확인 창을 거친다), Hermes 주소, 모델 다시 읽기와 모델 목록 |
+| 상세의 관리 절 | `ADMIN` | 사용 여부, 공개 범위(그룹 공개는 확인 창을 거친다), Hermes 주소. 모델은 에이전트가 아니라 대화가 고른다 |
 
 **`ADMIN` 이라도 다른 사람의 비공개 에이전트는 성격과 추천 질문을 읽지 못한다.**
 그 상세에는 관리 절만 보이고, 성격 자리에는 주인만 볼 수 있다는 안내를 둔다.
@@ -610,7 +632,7 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 | 제목 없는 합계 칸 | 실제로 나간 돈과 API 로 돌렸다면의 두 금액, 실행 수,<br>가격을 찾지 못한 실행 수 (있을 때만) | 합계를 불러오지 못했을 때 |
 | 어디에 썼나 | 에이전트, 모델, 날짜, 지문 네 축 중 고른 하나의 합계 | 첫 조회가 실패했을 때.<br>그 자리에 실패 문구만 그린다 |
 | 무엇이 달라졌나 | 지문별 실행당 평균 비용 | 견줄 지문이 둘 미만일 때 |
-| 실행 기록 | 실행 한 줄씩. 토큰과 문맥 글자 수와 두 금액 | 없다. 기록이 없으면 빈 상태를 그린다 |
+| 실행 기록 | 실행 한 줄씩. 모델과 요청한 effort, 토큰과 문맥 글자 수와 두 금액 | 없다. 기록이 없으면 빈 상태를 그린다 |
 
 위 표는 절 하나씩의 조건이다.
 **실행 목록 조회가 실패하면 페이지 전체가 실패 문구 한 줄이 되고 네 절이 함께 사라진다.**
@@ -789,8 +811,7 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 [`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
 profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓴다.
 
-`provider` 와 `model` 은 설정에 두지 않는다. Hermes 에서 읽는다.
-읽지 못하면 에이전트를 만들지 않는다.
+에이전트는 모델을 갖지 않는다. 첫 로그인에 에이전트를 만들 때 Hermes 에서 모델을 읽지 않는다.
 
 ### key 를 두 곳에 같이 쓴다
 

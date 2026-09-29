@@ -57,6 +57,17 @@ profile 의 `config.yaml` 이 정한 것은 기본값일 뿐이다.
 provider 해석이 실패하면 이전 provider 가 남고 모델만 요청 값으로 바뀌는 중간 상태가 된다.
 그 상태에서 오는 404 는 provider 가 아니라 모델을 찾지 못한 것이다.
 
+**둘 다 보내지 않으면 그 profile 의 기본값으로 돈다.** 기본값은 `config.yaml` 의 `model.provider` 와 `model.default` 다.
+Control Plane 은 사용자가 대화에서 모델을 고르지 않았으면 두 칸을 모두 빼고 보낸다.
+
+**reasoning effort 는 `model_options` 로 그 실행에만 준다.**
+본문의 `model_options: {"reasoning": {"effort": "<값>"}}` 을 받는다. 옛 형식 `model_options.reasoning_effort` 도 받는다.
+받는 값은 `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` 다. 모르는 값은 오류 없이 버리고 기본값으로 돈다.
+모델이 받지 않는 값은 그 provider 의 값으로 맞춘다.
+`model_options` 를 보내지 않으면 그 모델에 정해 둔 설정값을 쓴다.
+근거는 [v0.21.3 `gateway/platforms/api_server.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의 `_request_reasoning_config`, `_request_agent_overrides` 와
+[v0.21.3 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server_runs.py) 가 그것을 넘기는 자리다. v0.21.5 에서도 같다.
+
 ### 조회 응답의 `model` 은 실제로 돈 모델이 아니다
 
 아래는 v0.21.0 과 v0.21.3 의 계약이다.

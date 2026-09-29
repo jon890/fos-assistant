@@ -116,8 +116,7 @@ sequenceDiagram
 | 같은 요청이 두 번 온다 | 뒤의 것이 이메일 유니크 제약에 걸려 거절된다 |
 | 허용 목록에 없는 사람이 로그인 | 지금과 같다. 토큰을 만들지 않는다 |
 | 허용 목록에는 있는데 profile 이 없어졌다 | 실행할 때 key 를 찾지 못해 실패한다. 관리자가 다시 더한다 |
-| 첫 로그인에 Hermes 가 모델을 주지 않는다 | **사용자만 만들고 에이전트는 만들지 않는다.** 로그인은 막지 않는다 |
-| 첫 로그인에 Hermes 가 provider 를 비워서 준다 | 같다. 틀린 값으로 메우면 실행할 때마다 실패한다 |
+| 첫 로그인에 Hermes 가 응답하지 않는다 | 에이전트는 Hermes 를 부르지 않고 만든다. 모델을 읽지 않으므로 이 경우에도 만들어진다. 실행할 때 Hermes 에 닿지 못하면 그때 실패한다 |
 
 에이전트 없이 들어온 사람은 관리자가 기존 에이전트 등록 화면에서 만든다.
 그 사람의 `app_user` 가 이미 있어 주인을 지정할 수 있다.
@@ -371,6 +370,69 @@ Control Plane 이 직접 적는 것이다.
 **사건 저장이 실패해도 대화는 성공으로 끝난다.**
 사건은 관측용이고 그것 때문에 답이 사라지면 안 된다.
 기동할 때 남은 실행을 정리하는 경로로 끝난 실행에는 `RUN_FAILED` 가 남지 않는다.
+
+## 모델을 고를 때
+
+에이전트는 모델을 갖지 않는다. 사용자가 대화에서 모델과 reasoning effort 를 고른다.
+고르지 않으면 그 대화 에이전트의 profile 에 정해 둔 기본값으로 돈다.
+근거는 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant W as Next.js 서버 라우트
+    participant C as Control Plane
+    participant H as Hermes
+
+    B->>W: 입력창 옆 모델 단추를 누른다
+    W->>C: GET /api/v1/chat/model-options?agentCode=
+    alt 짧게 들고 있는 목록이 있다
+        C-->>W: 들고 있던 목록
+    else 없거나 오래됐다
+        C->>H: GET {profile}/api/model/options
+        H-->>C: 기본 provider 와 모델, provider 별 모델
+        C->>C: 부를 수 있는 provider 만 남겨 짧게 들고 있는다
+        C-->>W: 기본값, provider 별 모델, effort 선택지
+    end
+    W-->>B: 「기본 (기본 모델)」 과 모델, effort 를 고르는 창
+    B->>B: 고른다
+    opt 아직 대화가 없다
+        B->>W: 빈 대화를 만든다(사진을 먼저 올릴 때와 같은 길)
+    end
+    B->>W: 고른 값
+    W->>C: PUT /api/v1/chat/conversations/{id}/model
+    C->>C: 대화의 model_provider, model, reasoning_effort 를 바꾼다
+    C-->>W: 바뀐 대화
+    B->>W: 메시지
+    W->>C: 보내기
+    alt 대화에 고른 모델이 있다
+        C->>H: POST {profile}/v1/runs 에 provider, model 을 싣는다
+    else 기본값이다
+        C->>H: POST {profile}/v1/runs 에 provider, model 을 빼고 보낸다
+    end
+    opt 대화에 고른 effort 가 있다
+        C->>H: 같은 요청에 model_options.reasoning.effort 를 싣는다
+    end
+    C->>C: 실행 줄에 요청한 effort 를 적고, 끝나면 실제로 돈 provider 와 모델을 적는다
+```
+
+### 갈리는 지점
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| Hermes 가 목록을 주지 못한다 | 목록 창에 불러오지 못했다고 보인다. 대화는 기본값으로 계속 보낼 수 있다 |
+| 목록에 `authenticated` 가 거짓인 provider 가 있다 | 뺀다. 부를 수 없는 provider 다 |
+| 고른 모델이 나중에 목록에서 빠졌다 | 대화에 적힌 값을 그대로 보낸다. 모델을 찾지 못하면 Hermes 가 그 실행을 실패로 끝내고, 사용자가 다른 모델을 고른다 |
+| provider 와 모델 중 하나만 온다 | 거절한다. 둘은 함께 채우거나 함께 비운다 |
+| effort 가 선택지에 없는 값이다 | 거절한다 |
+| 모델이 받지 않는 effort 를 골랐다 | 그대로 보낸다. Hermes 가 그 provider 의 값으로 맞춘다 |
+| 도는 turn 이 있는데 바꾼다 | 받는다. 도는 실행은 이미 보낸 값으로 끝나고, 바꾼 값은 다음 보내기부터 쓴다 |
+| 남의 대화다 | 없는 대화와 같은 응답이다 |
+| 고른 모델의 provider 가 막혔다 | 그 실행은 `PROVIDER_BLOCKED` 로 실패한다. Control Plane 은 다른 모델로 넘기지 않는다 |
+| 다시 생성, Memory 제안, 흐름의 하위 실행 | 그 대화에 적힌 값을 쓴다 |
+
+모델 목록은 저장하지 않는다. Hermes 가 답한 것을 Control Plane 메모리에 10분 들고 있는다.
+profile 마다 따로 들고 있고, Control Plane 이 다시 뜨면 비어서 시작한다.
 
 ## 에이전트가 물을 때
 
@@ -796,7 +858,7 @@ ChatGPT 가 생각하는 과정을 접어 두는 것과 같은 자리다.
 | 도구 | 도구 이름, `detail`, 끝났으면 걸린 시간. 실패면 실패 표시 |
 | 하위 에이전트 | 목표, 모델, 끝났으면 토큰과 걸린 시간 |
 | 흐름의 단계 | 단계 이름. 알려진 이름은 한국어로, 모르는 이름은 받은 그대로 |
-| provider 전환 | 「여기부터 {provider} {모델} 로 돈다」 |
+| provider 전환 | 「여기부터 {provider} {모델} 로 돈다」. 예전 실행에만 있다. 지금은 Control Plane 이 provider 를 넘기지 않는다 |
 
 | 하위 에이전트 상태 | 뜻 |
 | --- | --- |
@@ -1004,7 +1066,7 @@ sequenceDiagram
 | 상황 | 화면 |
 | --- | --- |
 | `started` 가 오기 전에 누른다 | 단추가 눌리지 않는다. 실행 번호가 아직 없다 |
-| 그 번호로 도는 turn 이 없다 | `EXECUTION_NOT_RUNNING`. 이미 끝났거나 provider 를 넘어가기 전의 번호다. 알리지 않고 곧 올 끝 사건을 기다린다 |
+| 그 번호로 도는 turn 이 없다 | `EXECUTION_NOT_RUNNING`. 이미 끝난 번호다. 알리지 않고 곧 올 끝 사건을 기다린다 |
 | 남의 실행 번호다 | `EXECUTION_NOT_FOUND`. 없는 것과 같은 오류다 |
 | Hermes 에 중지를 보내지 못했다 | 중지 단추를 다시 누를 수 있게 되돌리고 오류를 알린다 |
 | 멈춘 자리까지 나온 답이 없다 | 답 메시지를 만들지 않는다. 사용자 메시지 아래에 「답을 받지 못했다」 와 「다시 시도」 |
@@ -1055,7 +1117,6 @@ sequenceDiagram
 | --- | --- |
 | 도는 turn 이 없다 | 여느 때처럼 연다. 조회를 되풀이하지 않는다 |
 | 실행 번호가 아직 없다 | 기다리는 표시만 보인다. 중지 단추는 눌리지 않는다. 다음 조회에서 번호를 받는다 |
-| provider 를 넘어가 실행 번호가 바뀌었다 | 새 번호로 작업 과정을 다시 그린다. 중지도 새 번호로 보낸다 |
 | 다른 창에서 중지를 누른다 | 보낸 창과 같은 중지 경로다. 끝나면 두 창 모두 이력에서 「중지됨」 을 본다 |
 | 끝났다 | 조회를 멈추고 이력을 다시 읽는다 |
 | 조회가 실패한다 | 다음 주기에 다시 묻는다. 세 번 이어 실패하면 기다리는 표시를 거두고 이력을 다시 읽는다 |
@@ -1193,6 +1254,7 @@ flowchart TD
 | `HERMES_RUN_TIMEOUT` | 제한 시간 안에 끝나지 않았다 | 다시 보내도록 안내한다 |
 | `HERMES_BUSY` | Hermes 가 동시 실행 한도에 닿아 429 로 거절했다 | 붐빈다고 알리고 잠시 뒤에 다시 보내도록 안내한다 |
 | `HERMES_UNAVAILABLE` | Hermes 에 닿지 못했다 | 연결 실패로 안내한다 |
+| `PROVIDER_BLOCKED` | 고른 모델의 provider 계정이 모두 막혔다. Hermes 가 계정을 돌려 쓰고도 실패한 것이다 | 다른 모델을 골라 다시 보내도록 안내한다. 쓴 문장은 입력창에 되돌린다 |
 | `EXECUTION_NOT_RUNNING` | 중지하려는 실행이 이미 끝났다 | 알리지 않고 곧 올 끝 사건을 기다린다 |
 | `MESSAGE_NOT_LATEST` | 다시 생성하려는 답이 마지막이 아니다 | 이력을 다시 읽는다 |
 | `CONVERSATION_BUSY` | 그 대화에서 도는 turn 이 있다. 보내기와 다시 생성이 받는다 | 끝난 뒤에 다시 보내게 한다. 쓴 문장은 입력창에 되돌린다 |

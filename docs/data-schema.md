@@ -62,9 +62,6 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `name` | VARCHAR(100) | 화면에 보일 이름 |
 | `hermes_profile` | VARCHAR(64) | 유일하다. 호스트의 key 파일 이름과 같다 |
 | `api_base_url` | VARCHAR(255) | 그 profile 의 API server 주소. `/v1` 앞까지 |
-| `provider` | VARCHAR(64) | 실행이 올라타는 credential 의 이름 |
-| `model` | VARCHAR(128) | Hermes 에서 마지막으로 읽은 모델 이름 |
-| `model_synced_at` | DATETIME(6) NULL | Hermes 에서 모델을 읽은 시각 |
 | `cost_mode` | VARCHAR(20) | `SUBSCRIPTION` 또는 `API` |
 | `credential_scope` | VARCHAR(20) | `SHARED_HOUSEHOLD` 또는 `DEDICATED` |
 | `visibility` | VARCHAR(20) | `PRIVATE` 또는 `GROUP`. 기본값이 없다 |
@@ -72,8 +69,9 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `enabled` | BOOLEAN | 거짓이면 새 실행을 막는다 |
 | `tagline` | VARCHAR(200) NULL | 새 대화 화면에 보일 한 줄 소개 |
 
-`model` 은 등록할 때와 관리자가 동기화를 요청할 때 Hermes 에서 읽는다.
-읽지 못하면 마지막 값을 유지해 기존 실행과 비용 기록을 계속 해석할 수 있게 한다.
+**에이전트는 모델을 갖지 않는다.** 예전의 `provider`, `model`, `model_synced_at` 칸과 에이전트별 모델 목록 표 `agent_model_option` 은 지웠다.
+모델과 effort 는 대화가 고르고, 고르지 않으면 그 profile 의 기본값으로 돈다.
+근거는 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
 공개 범위가 접근 권한을 정하는 이유는
 [ADR-007](adr/ADR-007-에이전트가-모델과-도구를-함께-정한다.md)에 있다.
 
@@ -88,6 +86,9 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `agent_id` | BIGINT | 대화를 만들 때 정한다. 뒤에 바뀌지 않는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 첫 실행이 돌려준 session. 특정 profile 안의 값이다 |
 | `title` | VARCHAR(200) | 첫 메시지의 앞부분. 사진을 먼저 올리려고 만든 대화는 첫 메시지 전까지 비어 있다 |
+| `model_provider` | VARCHAR(64) NULL | 이 대화에서 고른 provider. `model` 과 함께 채우거나 함께 비운다 |
+| `model` | VARCHAR(128) NULL | 이 대화에서 고른 모델. 비면 그 profile 의 기본 모델로 돈다 |
+| `reasoning_effort` | VARCHAR(16) NULL | 이 대화에서 고른 effort. `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 비면 그 profile 의 기본값이다 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 
@@ -99,6 +100,9 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 근거는 [ADR-025](adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)에 있다.
 
 `title` 은 사용자가 고칠 수 있다. 앞뒤 공백을 떼고 1자에서 200자까지 받는다.
+
+`model_provider`, `model`, `reasoning_effort` 는 대화의 주인이 언제든 바꾼다. 바꾼 값은 그 뒤의 보내기, 다시 생성, Memory 제안, 흐름의 하위 실행에 쓰인다.
+새 대화는 셋 다 비어 있다. 고를 수 있는 모델 목록은 저장하지 않는다.
 
 작업 영역(workspace)은 제거됐다.
 근거는 [ADR-010](adr/ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md)에 있다.
@@ -148,7 +152,8 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `root_execution_id` | BIGINT NULL | 이 실행이 속한 나무의 뿌리. 뿌리 자신은 비어 있다 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
-| `provider`, `model` | VARCHAR | 실행이 돌려준 것이 profile 이름이면 에이전트의 값을 쓴다 |
+| `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
+| `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
