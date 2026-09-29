@@ -228,6 +228,13 @@ async function makeArtifactRoot(work: string): Promise<string> {
   return artifactRoot;
 }
 
+/** 스킬 버전 디렉터리의 뿌리다. 결과물 폴더와 같이 두 뿌리에 같은 경로를 준다. */
+async function makeSkillRoot(work: string): Promise<string> {
+  const skillRoot = join(work, "skills");
+  await mkdir(skillRoot, { recursive: true });
+  return skillRoot;
+}
+
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
@@ -313,6 +320,7 @@ function startControlPlane(
   logPath: string,
   attachmentRoot: string,
   artifactRoot: string,
+  skillRoot: string,
 ): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
@@ -332,6 +340,9 @@ function startControlPlane(
       // 결과물 폴더는 두 뿌리에 같은 경로를 준다. 대역이 같은 기계에서 입력에 적힌 폴더에 파일을 쓴다.
       ASSISTANT_ARTIFACT_ROOT: artifactRoot,
       ASSISTANT_ARTIFACT_AGENT_ROOT: artifactRoot,
+      // 스킬 디렉터리도 두 뿌리에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
+      ASSISTANT_SKILL_ROOT: skillRoot,
+      ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
@@ -369,7 +380,8 @@ export default async function setupServices(): Promise<() => Promise<void>> {
   let app: ChildProcess | undefined;
 
   try {
-    hermes = await startFakeHermes(PROFILE_KEYS);
+    const skillRoot = await makeSkillRoot(work);
+    hermes = await startFakeHermes(PROFILE_KEYS, undefined, {}, skillRoot);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
     await seedBrowserToolsets(hermes.baseUrl);
     app = startControlPlane(
@@ -378,6 +390,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
       logPath,
       join(work, "attachments"),
       await makeArtifactRoot(work),
+      skillRoot,
     );
     await waitForHealth(logPath);
     await seedAgents(hermes.baseUrl);

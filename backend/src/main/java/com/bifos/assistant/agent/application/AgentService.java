@@ -57,6 +57,19 @@ public class AgentService {
     }
 
     /**
+     * 이미 읽은 에이전트의 행을 기다리는 쓰기 잠금으로 다시 읽는다.
+     *
+     * <p>{@link #requireReadableForUpdate} 와 달리 다른 요청이 잠금을 쥐고 있으면 풀릴 때까지 기다린다.
+     * 스킬 저장처럼 차례로 돌아야 하는 쓰기가 쓴다. 잠금은 트랜잭션이 끝날 때 풀린다. 지웠는지와 접근
+     * 범위는 잠금을 잡은 뒤에 다시 본다.
+     */
+    public Agent lockForUpdate(CurrentUser user, Agent agent) {
+        Agent locked = agents.findByIdForUpdate(agent.id()).orElseThrow(() -> notFound());
+        if (locked.isDeleted() || !locked.isReadableBy(user.id())) throw notFound();
+        return locked;
+    }
+
+    /**
      * 요청자가 이 에이전트의 성격과 소개, 추천 질문을 고칠 수 있는가.
      *
      * <p>주인과 {@code ADMIN} 만 고친다. 주인은 공개 범위와 무관하게 남아, 그룹에 공개한 에이전트도 만든

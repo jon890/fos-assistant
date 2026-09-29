@@ -34,6 +34,7 @@ import { agentsScenario } from "./scenarios/agents.ts";
 import { agentAddressScenario } from "./scenarios/agent-address.ts";
 import { personaScenario } from "./scenarios/persona.ts";
 import { startersScenario } from "./scenarios/starters.ts";
+import { skillsScenario } from "./scenarios/skills.ts";
 import { memoryScenario } from "./scenarios/memory.ts";
 import { chatScenario } from "./scenarios/chat.ts";
 import { conversationHistoryScenario } from "./scenarios/conversation-history.ts";
@@ -86,6 +87,7 @@ const SCENARIOS: readonly Scenario[] = [
   agentAddressScenario,
   personaScenario,
   startersScenario,
+  skillsScenario,
   memoryScenario,
   chatScenario,
   usageCostScenario,
@@ -134,6 +136,17 @@ async function makeArtifactRoot(work: string): Promise<string> {
   return artifactRoot;
 }
 
+/**
+ * 스킬 버전 디렉터리의 뿌리를 실행마다 만든다.
+ *
+ * <p>Control Plane 이 쓰는 경로와 Hermes 가 보는 경로가 같은 기계의 같은 디렉터리다. 대역이 게시된 경로에서 `SKILL.md` 를 읽는다.
+ */
+async function makeSkillRoot(work: string): Promise<string> {
+  const skillRoot = join(work, "skills");
+  await mkdir(skillRoot, { recursive: true });
+  return skillRoot;
+}
+
 /** profile 이름을 파일 이름으로 쓰는 mode 600 key 디렉터리를 만든다. 운영과 같은 모양이다. */
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
@@ -152,6 +165,7 @@ function startControlPlane(
   logPath: string,
   attachmentRoot: string,
   artifactRoot: string,
+  skillRoot: string,
 ): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
@@ -171,6 +185,9 @@ function startControlPlane(
       // 결과물 폴더는 두 뿌리에 같은 경로를 준다. 대역이 같은 기계에서 입력에 적힌 폴더에 파일을 쓴다.
       ASSISTANT_ARTIFACT_ROOT: artifactRoot,
       ASSISTANT_ARTIFACT_AGENT_ROOT: artifactRoot,
+      // 스킬 디렉터리도 두 뿌리에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
+      ASSISTANT_SKILL_ROOT: skillRoot,
+      ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
       HERMES_DASHBOARD_TOKEN: FAKE_DASHBOARD_TOKEN,
       // 띄운 대역이 실행마다 빈 포트를 받아 쓰므로 고정값으로 적을 수 없다. 실제 주소를 넘긴다.
@@ -210,6 +227,7 @@ async function main(): Promise<void> {
   let app: ChildProcess | undefined;
 
   try {
+    const skillRoot = await makeSkillRoot(work);
     console.log("== fake Hermes 기동");
     hermes = await startFakeHermes({
       [DAD_BINDING.profileName]: PROFILE_KEY,
@@ -223,7 +241,7 @@ async function main(): Promise<void> {
       // 기본 toolset 에는 shell 과 file 이 있어 GROUP 에이전트로 등록되지 않는다. MCP 서버만 켠 profile 로 둔다.
       [MCP_PRINCIPAL_PROFILE]: ["fos-assistant"],
       [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
-    });
+    }, skillRoot);
     console.log(`   ${hermes.baseUrl}`);
 
     console.log("== Control Plane 기동");
@@ -233,6 +251,7 @@ async function main(): Promise<void> {
       logPath,
       join(work, "attachments"),
       await makeArtifactRoot(work),
+      skillRoot,
     );
     await waitForHealth(`http://127.0.0.1:${APP_PORT}/actuator/health`, logPath);
     console.log(`   http://127.0.0.1:${APP_PORT}`);

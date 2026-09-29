@@ -7,7 +7,7 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { signedCallContext, signedSubagentRegistration } from "./mcp-context.ts";
 
@@ -35,6 +35,19 @@ const SOUL_PATH = /^\/api\/profiles\/([^/]+)\/soul$/;
 const ENV_PATH = "/api/env";
 const TOOLSET_CATALOG_PATH = "/api/tools/toolsets";
 const CONFIG_PATH = "/api/config";
+/** 대시보드의 스킬 목록과 전역 켜고 끄기 경로다. */
+const SKILLS_PATH = "/api/skills";
+const SKILL_TOGGLE_PATH = "/api/skills/toggle";
+/**
+ * `skills.external_dirs` 에 올 수 있는 경로의 꼬리다. `<스킬 루트>/<profile>/<버전>` 이고 버전은 plugin 이
+ * 받는 형식이다. 둘째 묶음의 profile 이 본문의 profile 과 같아야 한다.
+ */
+const SKILL_VERSION_DIR = /\/([a-z0-9][a-z0-9-]{0,63})\/(v[0-9]{13}-[a-z0-9]{4})$/;
+/**
+ * Hermes 가 스스로 가진 스킬이다. 올린 스킬과 이름이 같으면 올린 것이 가려지므로 Control Plane 이 같은
+ * 이름을 거절해야 한다. 목록의 `HERMES` 출처도 이것으로 본다.
+ */
+const BUILTIN_SKILLS = [{ name: "hermes-help", description: "Hermes 사용법을 안내한다" }] as const;
 const ENABLED_TOOLSETS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/toolsets$/;
 const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)$/;
 const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
@@ -331,6 +344,30 @@ function specialOutputFor(input: string): string | null {
   return null;
 }
 
+/**
+ * 게시된 디렉터리에서 스킬 이름과 설명을 읽는다.
+ *
+ * <p>실제 Hermes 처럼 `SKILL.md` 앞머리의 `name` 과 `description` 을 쓴다. 없는 디렉터리는 오류 없이
+ * 건너뛴다. 게시 전에 디렉터리가 있는지 보는 것은 설정 쓰기 쪽이다.
+ */
+function readPublishedSkills(dirs: readonly string[]): { name: string; description: string }[] {
+  const found: { name: string; description: string }[] = [];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillMd = join(dir, entry.name, "SKILL.md");
+      if (!existsSync(skillMd)) continue;
+      const frontmatter = readFileSync(skillMd, "utf-8").match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? "";
+      found.push({
+        name: frontmatter.match(/^name:\s*(.+)$/m)?.[1]?.trim() ?? entry.name,
+        description: frontmatter.match(/^description:\s*(.+)$/m)?.[1]?.trim() ?? "",
+      });
+    }
+  }
+  return found;
+}
+
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -386,6 +423,8 @@ export type FakeHermes = {
   profileEnv(name: string): Record<string, string>;
   /** 그 profile 의 `SOUL.md` 본문을 대역이 실제로 받은 그대로 돌려준다. 쓴 적이 없으면 `undefined` 다. */
   soulOf(name: string): string | undefined;
+  /** 그 profile 에 마지막으로 게시된 `skills.external_dirs` 다. 게시한 적이 없으면 비어 있다. */
+  skillDirsOf(name: string): string[];
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -415,11 +454,14 @@ export type FakeHermes = {
  * @param profileKeys profile 이름과 그 profile 의 API server key
  * @param label 이 대역을 다른 대역과 구분하는 이름. 실행의 답에 그대로 실린다. 주소를 옮기는 검사가
  *     답이 어느 대역에서 왔는지 보는 데 쓴다
+ * @param skillRoot Control Plane 이 스킬 버전 디렉터리를 쓰는 뿌리. 주면 그 아래 경로만 게시로 받는다.
+ *     Hermes 쪽 뿌리와 같은 경로여야 대역이 게시된 `SKILL.md` 를 읽을 수 있다
  */
 export function startFakeHermes(
   profileKeys: Record<string, string>,
   label?: string,
   initialApiServerToolsets: Record<string, string[]> = {},
+  skillRoot?: string,
 ): Promise<FakeHermes> {
   const who = label === undefined ? "fake hermes" : `fake hermes ${label}`;
   /**
@@ -444,6 +486,10 @@ export function startFakeHermes(
    * 로 존재를 판정하면 기존 에이전트가 404 를 받아 `HERMES_UNAVAILABLE` 이 된다.
    */
   const souls = new Map<string, string>();
+  /** profile 이름과 그 profile 에 게시된 `skills.external_dirs` 다. */
+  const externalDirs = new Map<string, string[]>();
+  /** profile 이름과 전역으로 끈 스킬 이름들이다. */
+  const disabledSkills = new Map<string, Set<string>>();
   const blockedProviders = new Set<string>();
   let busy = false;
   let submitCount = 0;
@@ -594,7 +640,7 @@ export function startFakeHermes(
     const soulMatch = SOUL_PATH.exec(path);
     const profileMatch = PROFILE_PATH.exec(path);
     const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || path === TOOLSET_CATALOG_PATH
-      || path === CONFIG_PATH || profileMatch !== null;
+      || path === CONFIG_PATH || path === SKILLS_PATH || path === SKILL_TOGGLE_PATH || profileMatch !== null;
     if (!isDashboardPath) return false;
 
     if (!dashboardAuthorized(request)) {
@@ -607,25 +653,113 @@ export function startFakeHermes(
       return true;
     }
 
+    if (request.method === "GET" && path === SKILLS_PATH) {
+      if (queryProfile === null) {
+        send(response, 400, { error: "profile query is required" });
+        return true;
+      }
+      if (!keys[queryProfile]) {
+        send(response, 404, { error: "no such profile" });
+        return true;
+      }
+      const disabled = disabledSkills.get(queryProfile) ?? new Set<string>();
+      // 실제 응답의 모양이다. `enabled` 는 전역 `skills.disabled` 만 반영한다.
+      send(response, 200, [
+        ...BUILTIN_SKILLS.map((skill) => ({ ...skill, category: "builtin", provenance: "bundled" })),
+        ...readPublishedSkills(externalDirs.get(queryProfile) ?? []).map((skill) => ({
+          ...skill, category: "agent", provenance: "agent",
+        })),
+      ].map((skill) => ({ ...skill, enabled: !disabled.has(skill.name), usage: 0 })));
+      return true;
+    }
+
+    if (request.method === "PUT" && path === SKILL_TOGGLE_PATH) {
+      const body = JSON.parse((await readBody(request)) || "{}") as {
+        profile?: string;
+        name?: string;
+        enabled?: unknown;
+      };
+      if (body.profile === undefined || body.name === undefined || typeof body.enabled !== "boolean") {
+        send(response, 400, { error: "profile, name and enabled are required" });
+        return true;
+      }
+      if (!keys[body.profile]) {
+        send(response, 404, { error: "no such profile" });
+        return true;
+      }
+      const disabled = disabledSkills.get(body.profile) ?? new Set<string>();
+      if (body.enabled) disabled.delete(body.name);
+      else disabled.add(body.name);
+      disabledSkills.set(body.profile, disabled);
+      send(response, 200, { ok: true, name: body.name, enabled: body.enabled });
+      return true;
+    }
+
     if (request.method === "PUT" && path === CONFIG_PATH) {
       const body = JSON.parse((await readBody(request)) || "{}") as {
         profile?: string;
         config?: {
           platform_toolsets?: { api_server?: unknown };
+          skills?: { external_dirs?: unknown };
         };
       };
-      const toolsets = body.config?.platform_toolsets?.api_server;
-      const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP]);
+      const configKeys = Object.keys(body.config ?? {});
+      // 도구와 스킬 게시만 받는다. 둘을 한 본문에 함께 둘 수 있고, 그 밖의 키는 거절한다.
       const exactKeys = Object.keys(body).length === 2 && Object.keys(body).every((key) => key === "profile" || key === "config")
-        && Object.keys(body.config ?? {}).length === 1
-        && Object.keys(body.config ?? {}).every((key) => key === "platform_toolsets")
-        && Object.keys(body.config?.platform_toolsets ?? {}).length === 1;
+        && configKeys.length >= 1
+        && configKeys.every((key) => key === "platform_toolsets" || key === "skills");
       if (body.profile === undefined || queryProfile !== null && queryProfile !== body.profile
-          || !keys[body.profile] || !Array.isArray(toolsets)
-          || !toolsets.includes(CONTROL_PLANE_MCP) || !toolsets.every((name) => typeof name === "string" && validNames.has(name))
-          || !exactKeys) {
-        send(response, 400, { error: "invalid toolset configuration" });
+          || !keys[body.profile] || !exactKeys) {
+        send(response, 400, { error: "invalid configuration" });
         return true;
+      }
+      const profile = body.profile;
+      let nextToolsets: string[] | undefined;
+      if (configKeys.includes("platform_toolsets")) {
+        const toolsets = body.config?.platform_toolsets?.api_server;
+        const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP]);
+        if (Object.keys(body.config?.platform_toolsets ?? {}).length !== 1 || !Array.isArray(toolsets)
+            || !toolsets.includes(CONTROL_PLANE_MCP)
+            || !toolsets.every((name) => typeof name === "string" && validNames.has(name))) {
+          send(response, 400, { error: "invalid toolset configuration" });
+          return true;
+        }
+        nextToolsets = toolsets as string[];
+      }
+      let nextDirs: string[] | undefined;
+      if (configKeys.includes("skills")) {
+        const dirs = body.config?.skills?.external_dirs;
+        // 게시 거절 규칙은 docs/hermes/profiles.md 의 표를 따른다. 경로 형식, 다른 profile 의 prefix, 둘 이상,
+        // 심볼릭 링크, 없는 디렉터리, skills 도구가 꺼진 채 게시가 모두 400 이다.
+        if (Object.keys(body.config?.skills ?? {}).length !== 1 || !Array.isArray(dirs) || dirs.length > 1
+            || !dirs.every((dir) => typeof dir === "string")) {
+          send(response, 400, { error: "invalid skills configuration" });
+          return true;
+        }
+        for (const dir of dirs as string[]) {
+          const match = SKILL_VERSION_DIR.exec(dir);
+          if (match === null || match[1] !== profile || (skillRoot !== undefined && !dir.startsWith(`${skillRoot}/`))) {
+            send(response, 400, { error: "external_dirs path is not this profile's skill directory" });
+            return true;
+          }
+          let stat;
+          try {
+            stat = lstatSync(dir);
+          } catch {
+            send(response, 400, { error: "external_dirs path does not exist" });
+            return true;
+          }
+          if (stat.isSymbolicLink() || !stat.isDirectory()) {
+            send(response, 400, { error: "external_dirs path is not a plain directory" });
+            return true;
+          }
+        }
+        const effectiveToolsets = nextToolsets ?? apiServerToolsets.get(profile) ?? DEFAULT_API_SERVER_TOOLSETS;
+        if (dirs.length > 0 && !effectiveToolsets.includes("skills")) {
+          send(response, 400, { error: "the skills toolset is off for this profile" });
+          return true;
+        }
+        nextDirs = dirs as string[];
       }
       if (holdNextConfig) {
         holdNextConfig = false;
@@ -633,8 +767,11 @@ export function startFakeHermes(
         await new Promise<void>((done) => { releaseConfig = done; });
         releaseConfig = undefined;
       }
-      apiServerToolsets.set(body.profile, toolsets.filter((name) => name !== droppedToolset));
-      droppedToolset = undefined;
+      if (nextToolsets !== undefined) {
+        apiServerToolsets.set(profile, nextToolsets.filter((name) => name !== droppedToolset));
+        droppedToolset = undefined;
+      }
+      if (nextDirs !== undefined) externalDirs.set(profile, nextDirs);
       send(response, 200, { ok: true });
       return true;
     }
@@ -1096,6 +1233,7 @@ export function startFakeHermes(
         profiles: () => [...profiles.keys()],
         profileEnv: (name: string) => ({ ...(profiles.get(name) ?? {}) }),
         soulOf: (name: string) => souls.get(name),
+        skillDirsOf: (name: string) => [...(externalDirs.get(name) ?? [])],
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {

@@ -269,9 +269,9 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 ```
 
 - 저장할 때마다 그 profile 의 올린 스킬 전체를 새 버전 디렉터리에 쓰고, 그 profile 의 `skills.external_dirs` 를 `ASSISTANT_SKILL_AGENT_ROOT` 아래 새 버전 경로로 바꾼다. 쓰는 도중에는 옛 버전이 쓰인다
-- 설정 쓰기가 실패하면 새 디렉터리를 지우고 옛 버전을 둔다. 옛 버전은 최근 3개만 남긴다
-- 게시에 성공하면 그 버전 디렉터리에 표식 파일 `.published` 를 쓴다. 지금 버전은 표식이 있는 가장 새 디렉터리다. 표식 없는 디렉터리는 게시 도중에 멈춘 것이라 다음 저장이 지운다
-- 같은 에이전트의 저장은 에이전트 행 잠금으로 한 번에 하나씩 돈다
+- 설정 쓰기가 4xx 로 거절되면 새 디렉터리를 지운다. timeout 과 5xx 는 Hermes 가 이미 반영했을 수 있어 표식 없이 남기고, 다음 게시가 성공한 뒤 그보다 오래된 표식 없는 디렉터리를 지운다. 실패한 저장의 변경은 어느 쪽이든 반영되지 않으므로 다시 저장한다. 표식 있는 옛 버전은 최근 3개만 남긴다
+- 게시에 성공하면 그 버전 디렉터리에 표식 파일 `.published` 를 쓴다. 지금 버전은 표식이 있는 가장 새 디렉터리다
+- 같은 에이전트의 저장은 기다리는 에이전트 행 잠금으로 한 번에 하나씩 돈다. 잠금부터 표식 쓰기까지 한 트랜잭션이라 그동안 같은 에이전트의 도구와 공개 범위 변경은 `AGENT_BUSY` 다
 - 스킬을 저장하면 그 에이전트의 `skills` toolset 을 함께 켠다. 올린 스킬이 있는 동안은 `skills` 를 끄지 못한다
 
 | 제한 | 값 |
@@ -283,8 +283,8 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 경로 | 하는 일 |
 | --- | --- |
 | `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다 |
-| `GET /api/v1/agents/{code}/skills/{name}` | 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }` |
-| `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content" }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다 |
+| `GET /api/v1/agents/{code}/skills/{name}` | 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이고 `size` 는 UTF-8 바이트다 |
+| `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content"? }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다. `content` 를 생략한 파일은 지금 버전의 같은 경로 내용을 그대로 둔다 |
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
 | `PUT /api/v1/agents/{code}/skills/{name}/enabled` | `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
 

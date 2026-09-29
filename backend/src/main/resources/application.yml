@@ -80,6 +80,14 @@ assistant:
       connect-timeout: 5s
       read-timeout: 10s
       total-timeout: 30s
+  skill:
+    # 에이전트에 올린 스킬을 profile 별 버전 디렉터리로 두는 공유 디렉터리. Control Plane 이 쓰고 Hermes 는
+    # 읽기 전용으로 본다. 기본값을 두지 않아 없으면 기동에 실패한다
+    root: ${ASSISTANT_SKILL_ROOT}
+    # 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. skills.external_dirs 에 이 경로를 적는다. 기본값이 없다
+    agent-root: ${ASSISTANT_SKILL_AGENT_ROOT}
+    # 게시에 성공한 버전 가운데 남겨 두는 수. 되돌릴 때 쓴다
+    keep-versions: 3
   mcp:
     # profile 이 묶이지 않은 옛 MCP 토큰을 그 토큰의 사용자로 돌릴지. 토큰마다 profile 을 묶는 동안에만 참으로 두는
     # 전환용 설정이다. 거짓이면 그런 토큰은 401 이다(ADR-032)

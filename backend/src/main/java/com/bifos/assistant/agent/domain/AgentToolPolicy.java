@@ -11,6 +11,8 @@ import java.util.Set;
 public final class AgentToolPolicy {
 
     public static final String MEMORY = "memory";
+    /** 올린 스킬을 모델이 읽는 toolset 이다. 올린 스킬이 있는 동안은 끄지 못한다(ADR-034). */
+    public static final String SKILLS = "skills";
     /** Control Plane 이 여는 MCP 서버의 Hermes 등록 이름이며, 도구 저장 때 허용 목록에 늘 남긴다. */
     public static final String CONTROL_PLANE_MCP = "fos-assistant";
 
