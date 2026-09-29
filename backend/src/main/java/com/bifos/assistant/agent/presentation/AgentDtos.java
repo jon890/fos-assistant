@@ -73,20 +73,41 @@ public final class AgentDtos {
      *
      * @param acceptsAttachments 이 에이전트의 대화에 사진을 붙일 수 있다. 화면이 이때만 사진 단추를
      *     둔다. 흐름 이름은 내보내지 않는다
+     * @param editable 요청자가 이 에이전트를 관리할 수 있다. 주인과 {@code ADMIN} 이다. 화면이 공개와 삭제를
+     *     보일지 이 값으로 정한다
+     * @param ownedByMe 요청자가 이 에이전트의 주인이다
      */
     public record AgentView(
             String code,
             String name,
             String visibility,
-            boolean acceptsAttachments) {
-        static AgentView from(Agent agent) {
+            boolean acceptsAttachments,
+            boolean editable,
+            boolean ownedByMe) {
+        static AgentView from(Agent agent, boolean editable, boolean ownedByMe) {
             return new AgentView(
                     agent.code(),
                     agent.name(),
                     agent.visibility().name(),
-                    agent.acceptsAttachments());
+                    agent.acceptsAttachments(),
+                    editable,
+                    ownedByMe);
         }
     }
+
+    /**
+     * 사용자가 자기 에이전트를 만드는 요청이다.
+     *
+     * <p>이름의 길이는 앞뒤 공백을 뗀 뒤에 세야 하므로 요청 본문 검증을 걸지 않고 {@code
+     * AgentLifecycleService} 가 판정한다.
+     *
+     * @param name 보이는 이름. 한글이어도 되고 다른 에이전트와 겹쳐도 된다
+     * @param visibility 비어 있으면 {@code PRIVATE}
+     */
+    public record CreateOwnAgentRequest(String name, AgentVisibility visibility) {}
+
+    /** 에이전트의 공개 범위를 바꾸는 요청이다. */
+    public record ChangeVisibilityRequest(@NotNull AgentVisibility visibility) {}
 
     public record CreateAgentRequest(
             @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{0,63}") String code,

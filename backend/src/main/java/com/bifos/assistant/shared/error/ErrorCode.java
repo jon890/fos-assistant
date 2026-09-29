@@ -20,6 +20,8 @@ public enum ErrorCode {
     AGENT_BUSY(HttpStatus.CONFLICT),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
+    /** 요청자가 만들 수 있는 에이전트 수를 이미 채웠다. 지운 에이전트는 세지 않는다. */
+    AGENT_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */
     AGENT_TOOLS_NOT_APPLIED(HttpStatus.BAD_GATEWAY),
     /** 호출자에게 연결한 Hermes profile이 없다. 다른 사용자의 profile을 빌리지 않는다. */
@@ -88,12 +90,21 @@ public enum ErrorCode {
     /** 그 결과물이 있었지만 보관 기간이 지나 파일을 지웠다. 행에 지운 시각이 적힌 경로에만 쓴다. */
     ARTIFACT_GONE(HttpStatus.GONE),
     /**
-     * MCP 호출의 {@code _fos_ctx} 를 믿을 수 없거나, 그것이 가리키는 도는 부모 실행을 하나로 정하지 못했다.
+     * MCP 호출의 {@code _fos_ctx} 를 믿을 수 없거나, 그것이 가리키는 origin 실행을 하나로 정하지 못했다.
      *
-     * <p>서명 없음, 서명 틀림, 부모 없음, 부모 둘 이상을 가르지 않는다. 가르면 모델이 어느 값을 흉내 내야
+     * <p>서명 없음, 서명 틀림, origin 없음, origin 둘 이상을 가르지 않는다. 가르면 모델이 어느 값을 흉내 내야
      * 통과하는지 훑어 알아낼 수 있다. 이유는 서버 로그에만 남긴다. 근거는 ADR-031 이다.
      */
     MCP_CALL_CONTEXT_INVALID(HttpStatus.FORBIDDEN),
+    /**
+     * 하위 에이전트 session 을 등록할 수 없다.
+     *
+     * <p>서명, 부모, session 값 중 무엇이 틀렸는지 밖에 알리지 않는다. 가르면 남의 session 이 도는지 훑어 알아낼
+     * 수 있다. 이유는 서버 로그에만 남긴다. 근거는 ADR-037 이다.
+     */
+    SESSION_BINDING_REJECTED(HttpStatus.FORBIDDEN),
+    /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */
+    SESSION_BINDING_CONFLICT(HttpStatus.CONFLICT),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),

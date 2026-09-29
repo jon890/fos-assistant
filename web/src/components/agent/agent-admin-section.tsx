@@ -1,25 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { VisibilityConfirm } from "@/components/admin/visibility-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { describeAdminError } from "@/components/error-message";
-import {
-  GROUP_VISIBILITY,
-  PRIVATE_VISIBILITY,
-  type AdminAgent,
-} from "@/lib/agent";
+import type { AdminAgent } from "@/lib/agent";
 
-type AgentAction = "private" | "group" | "enabled" | "address";
+type AgentAction = "enabled" | "address";
 
 type Props = {
   initialAgent: AdminAgent;
-  ownerEmail: string;
-  /** 공개 범위를 바꾼 요청이 성공하면 바뀐 값으로 부른다. 그 범위에 따라 달라지는 이웃 절이 받는다. */
-  onVisibilityChange?(visibility: AdminAgent["visibility"]): void;
+  /**
+   * 지금 공개 범위다. 「공개와 삭제」 절이 바꾸므로 이 절이 처음 받은 값을 쓰지 않고,
+   * 저장할 때마다 이 값을 그대로 보내 그 절의 변경을 되돌리지 않는다.
+   */
+  visibility: AdminAgent["visibility"];
 };
 
 async function payload<T>(response: Response): Promise<T> {
@@ -27,44 +24,36 @@ async function payload<T>(response: Response): Promise<T> {
 }
 
 /** 관리자가 에이전트 하나의 실행과 연결 설정을 고친다. */
-export function AgentAdminSection({ initialAgent, ownerEmail, onVisibilityChange }: Props) {
+export function AgentAdminSection({ initialAgent, visibility }: Props) {
   const [agent, setAgent] = useState(initialAgent);
   const [pending, setPending] = useState<AgentAction | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmingGroupVisibility, setConfirmingGroupVisibility] = useState(false);
   const busy = pending !== null;
 
   async function update(
-    changes: Partial<Pick<AdminAgent, "enabled" | "visibility" | "apiBaseUrl">>,
+    changes: Partial<Pick<AdminAgent, "enabled" | "apiBaseUrl">>,
     action: AgentAction,
-  ): Promise<boolean> {
+  ): Promise<void> {
     setPending(action);
     setError(null);
     try {
-      const visibility = changes.visibility ?? agent.visibility;
       const response = await fetch(`/api/admin/agents/${agent.code}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: changes.enabled ?? agent.enabled,
           visibility,
-          // 비공개 상태를 유지하는 수정은 기존 주인을 그대로 둔다. 그룹 공개에서 비공개로 바꿀 때만
-          // 요청자를 새 주인으로 정한다.
-          ownerEmail: visibility === PRIVATE_VISIBILITY && agent.visibility === GROUP_VISIBILITY
-            ? ownerEmail
-            : null,
+          // 공개 범위와 주인은 바꾸지 않는다. 주인을 비워 보내 기존 주인을 그대로 둔다.
+          ownerEmail: null,
           apiBaseUrl: changes.apiBaseUrl,
         }),
       });
       if (!response.ok) {
         const result = await payload<{ code: string; message: string }>(response);
         setError(describeAdminError(result.code, result.message));
-        return false;
+        return;
       }
-      const updated = await payload<AdminAgent>(response);
-      setAgent(updated);
-      if (changes.visibility !== undefined) onVisibilityChange?.(updated.visibility);
-      return true;
+      setAgent(await payload<AdminAgent>(response));
     } finally {
       setPending(null);
     }
@@ -76,12 +65,6 @@ export function AgentAdminSection({ initialAgent, ownerEmail, onVisibilityChange
     await update({ apiBaseUrl: String(form.get("apiBaseUrl") ?? "") }, "address");
   }
 
-  async function confirmGroupVisibility() {
-    if (await update({ visibility: GROUP_VISIBILITY }, "group")) {
-      setConfirmingGroupVisibility(false);
-    }
-  }
-
   return (
     <section aria-label="관리" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -90,7 +73,6 @@ export function AgentAdminSection({ initialAgent, ownerEmail, onVisibilityChange
           <p className="mt-1 text-sm text-muted-foreground">사용 여부와 연결 설정을 고칠 수 있어요.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}</Badge>
           <Badge variant={agent.enabled ? "outline" : "default"}>{agent.enabled ? "사용 중" : "꺼짐"}</Badge>
         </div>
       </div>
@@ -110,14 +92,10 @@ export function AgentAdminSection({ initialAgent, ownerEmail, onVisibilityChange
         <Button type="submit" size="sm" variant="outline" disabled={busy} loading={pending === "address"} loadingText="확인하는 중" className="mt-2">주소 저장</Button>
       </form>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" disabled={busy} loading={pending === "private"} loadingText="바꾸는 중" onClick={() => agent.visibility === PRIVATE_VISIBILITY ? setConfirmingGroupVisibility(true) : void update({ visibility: PRIVATE_VISIBILITY }, "private")}>
-          {agent.visibility === PRIVATE_VISIBILITY ? "그룹 공개로 변경" : "나만으로 변경"}
-        </Button>
         <Button size="sm" variant="ghost" disabled={busy} loading={pending === "enabled"} loadingText={agent.enabled ? "중지하는 중" : "켜는 중"} onClick={() => void update({ enabled: !agent.enabled }, "enabled")}>
           {agent.enabled ? "사용 중지" : "다시 사용"}
         </Button>
       </div>
-      {confirmingGroupVisibility ? <VisibilityConfirm agent={agent} busy={pending === "group"} onCancel={() => setConfirmingGroupVisibility(false)} onConfirm={() => void confirmGroupVisibility()} /> : null}
     </section>
   );
 }

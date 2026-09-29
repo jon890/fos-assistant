@@ -18,7 +18,8 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * MCP 검사가 profile 플러그인처럼 {@code _fos_ctx} 를 서명하고, 부모가 될 실행 줄을 준비하는 도우미다.
+ * MCP 검사가 profile 플러그인처럼 {@code _fos_ctx} 와 하위 에이전트 등록 본문을 서명하고, 부모가 될 실행 줄을 준비하는
+ * 도우미다.
  *
  * <p>서명은 운영 코드를 부르지 않고 {@code docs/hermes/delegation.md} 의 「{@code _fos_ctx} 계약」 대로 따로
  * 계산한다. key 는 토큰 원문을 SHA-256 한 소문자 16진수 문자열의 UTF-8 바이트이고, 서명할 글은
@@ -53,6 +54,24 @@ public final class McpCallSigner {
     }
 
     /**
+     * 플러그인이 {@code subagent_start} hook 에서 보내는 하위 에이전트 session 등록 본문이다.
+     *
+     * <p>{@code docs/hermes/delegation.md} 의 「하위 에이전트 session 등록 계약」 대로 서명할 글은
+     * {@code v1-subagent\n<parent_root>\n<parent>\n<child>} 다. 서명하지 않는 두 칸은 hook 이 받은 모양대로 채운다.
+     */
+    static ObjectNode subagentBody(String rawToken, String parentRootSessionId, String parentSessionId, String childSessionId) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("v", 1);
+        body.put("parent_session_id", parentSessionId);
+        body.put("parent_root_session_id", parentRootSessionId);
+        body.put("child_session_id", childSessionId);
+        body.put("child_subagent_id", "sa-" + UUID.randomUUID());
+        body.putNull("parent_subagent_id");
+        body.put("sig", sign(rawToken, String.join("\n", "v1-subagent", parentRootSessionId, parentSessionId, childSessionId)));
+        return body;
+    }
+
+    /**
      * 요청 본문이 {@code tools/call} 이고 인자에 {@code _fos_ctx} 가 없으면 서명한 값을 붙인다.
      *
      * <p>인자 검사를 보는 검사가 요청자 판정에서 먼저 막히지 않게 쓴다. 그 밖의 요청은 그대로 돌려준다.
@@ -68,12 +87,12 @@ public final class McpCallSigner {
     }
 
     /** 그 profile 로 뿌리 session 에서 도는 실행 줄을 만든다. */
-    static AgentExecution running(AgentExecutionRepository executions, Long userId, Long conversationId,
+    public static AgentExecution running(AgentExecutionRepository executions, Long userId, Long conversationId,
             String profileName, String rootSessionId) {
         return save(executions, userId, conversationId, profileName, rootSessionId, ExecutionStatus.RUNNING);
     }
 
-    static AgentExecution save(AgentExecutionRepository executions, Long userId, Long conversationId,
+    public static AgentExecution save(AgentExecutionRepository executions, Long userId, Long conversationId,
             String profileName, String rootSessionId, ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
                 .userId(userId)
@@ -87,14 +106,15 @@ public final class McpCallSigner {
     }
 
     /**
-     * 그 검사가 쓰는 profile 의 실행 줄을 지운다.
+     * 그 검사가 쓰는 profile 의 하위 에이전트 session 등록 줄과 실행 줄을 지운다.
      *
      * <p>검사 클래스들이 H2 하나를 함께 쓰고, 사용자를 지워도 실행 줄은 남는다. 부모는 사용자로 거르지 않으므로
-     * 남은 {@code RUNNING} 줄이 「둘 이상」 으로 걸린다. 검사 때문에 운영 레포지토리에 메서드를 더하지 않으려고
-     * SQL 로 지운다.
+     * 남은 {@code RUNNING} 줄이 「둘 이상」 으로 걸린다. 등록 줄은 지운 실행을 origin 으로 가리키므로 먼저 지운다.
+     * 검사 때문에 운영 레포지토리에 메서드를 더하지 않으려고 SQL 로 지운다.
      */
-    static void clearRuns(JdbcTemplate jdbc, List<String> profileNames) {
+    public static void clearRuns(JdbcTemplate jdbc, List<String> profileNames) {
         for (String profileName : profileNames) {
+            jdbc.update("DELETE FROM hermes_session_binding WHERE profile_name = ?", profileName);
             jdbc.update("DELETE FROM agent_execution WHERE profile_name = ?", profileName);
         }
     }

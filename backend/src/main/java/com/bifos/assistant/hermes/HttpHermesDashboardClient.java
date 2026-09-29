@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
@@ -87,6 +88,9 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
                     .header("Authorization", "Bearer " + token)
                     .retrieve()
                     .toBodilessEntity();
+        } catch (HttpClientErrorException.NotFound ex) {
+            // 대시보드 plugin 은 없는 profile 에 404 를 준다. 이미 지운 것이므로 할 일이 끝났다.
+            log.info("지우려던 Hermes profile 이 이미 없다 profile={}", name);
         } catch (RestClientException ex) {
             log.warn("Hermes profile 을 지우지 못했다 profile={}", name, ex);
             throw HermesCallFailure.of(ex, "could not remove the Hermes profile");

@@ -43,13 +43,15 @@ export default async function AgentPersonaPage({
     : toolsResult.code === "FORBIDDEN" ? null : { ok: false as const, message: describeError(toolsResult.code, toolsResult.message) };
   const visibility = adminAgent?.visibility
     ?? (agentsResult.ok ? agentsResult.data.find((agent) => agent.code === code)?.visibility : undefined);
-  const ownerEmail = session.user.email;
+  // 목록의 editable 은 주인과 ADMIN 에게 참이다. ADMIN 이 관리자 목록으로만 찾은 다른 사람의 비공개 에이전트도 관리한다.
+  const listed = agentsResult.ok ? agentsResult.data.find((agent) => agent.code === code) : undefined;
+  const canManageAccess = listed?.editable === true || adminAgent !== undefined;
 
   if (!personaResult.ok) {
     if (personaResult.code === "AGENT_NOT_FOUND" && adminAgent) {
       return (
         <AgentDetailBody code={code} name={name} initialPersona={null} tools={tools}
-          initialVisibility={visibility} adminAgent={adminAgent} ownerEmail={ownerEmail} adminError={null} />
+          initialVisibility={visibility} adminAgent={adminAgent} canManageAccess={canManageAccess} adminError={null} />
       );
     }
     return (
@@ -75,7 +77,7 @@ export default async function AgentPersonaPage({
       tools={tools}
       initialVisibility={visibility}
       adminAgent={adminAgent}
-      ownerEmail={ownerEmail}
+      canManageAccess={canManageAccess}
       adminError={adminError}
     />
   );

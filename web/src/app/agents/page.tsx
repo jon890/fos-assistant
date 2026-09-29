@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { callControlPlane } from "@/lib/control-plane";
 import { AgentAdminPanel } from "@/components/agent/agent-admin-panel";
+import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
 import type { AdminAgent, AgentView } from "@/lib/agent";
 import { readMe } from "@/lib/me";
 
@@ -24,11 +25,14 @@ export default async function AgentsPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <h1 className="mb-6 text-xl font-semibold">에이전트</h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">에이전트</h1>
+        <CreateAgentDialog />
+      </div>
       {result.data.length === 0 ? (
         <EmptyState
-          title="사용할 수 있는 에이전트가 없어요"
-          description="관리자가 에이전트를 연결하면 여기에 표시돼요"
+          title="아직 에이전트가 없어요"
+          description="새 에이전트를 만들어 보세요"
         />
       ) : (
         <ul aria-label="쓸 수 있는 에이전트" className="grid gap-3">

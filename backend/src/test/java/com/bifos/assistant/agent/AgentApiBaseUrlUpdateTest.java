@@ -12,6 +12,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
+import com.bifos.assistant.agent.application.AgentLifecycleService;
+import com.bifos.assistant.agent.application.AgentProperties;
+import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -21,8 +24,12 @@ import com.bifos.assistant.agent.presentation.AgentAdminController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
 import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
+import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
+import com.bifos.assistant.people.application.HermesProfileProvisioner;
+import com.bifos.assistant.people.application.PeopleProperties;
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -44,8 +51,14 @@ class AgentApiBaseUrlUpdateTest {
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
     private final FlowRegistry flows = mock(FlowRegistry.class);
 
+    /** 그룹 공개 검사는 실제 서비스가 한다. 도구 목록을 읽는 대역만 이 테스트가 정한다. */
+    private final AgentLifecycleService lifecycle = new AgentLifecycleService(
+            agents, mock(AgentService.class), users, mock(AllowedPersonRepository.class),
+            mock(HermesProfileProvisioner.class), hermesToolsets, mock(HermesProperties.class),
+            mock(PeopleProperties.class), mock(AgentProperties.class));
+
     private final AgentAdminController controller = new AgentAdminController(
-            agents, users, currentUser, hermesToolsets, endpointProbe, flows);
+            agents, users, currentUser, lifecycle, endpointProbe, flows);
 
     private Agent agent;
 

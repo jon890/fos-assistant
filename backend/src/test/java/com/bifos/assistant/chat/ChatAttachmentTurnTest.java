@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -95,6 +96,7 @@ class ChatAttachmentTurnTest {
     @Autowired ArtifactService artifactService;
     @Autowired ConversationAccess access;
     @Autowired AgentService agentService;
+    @Autowired AgentLifecycleService agentLifecycle;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
     @Autowired ConversationRepository conversations;
@@ -340,7 +342,7 @@ class ChatAttachmentTurnTest {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(dad);
 
-        List<AgentView> listed = new AgentController(agentService, provider).readable();
+        List<AgentView> listed = new AgentController(agentService, provider, agentLifecycle).readable();
 
         assertThat(listed)
                 .extracting(AgentView::code, AgentView::acceptsAttachments)

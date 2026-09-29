@@ -43,6 +43,14 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     /** 그 Hermes session 으로 그 상태인 실행이 profile 과 무관하게 하나라도 있는지. 거절 이유를 로그에서 나누려고 쓴다. */
     boolean existsByHermesSessionIdAndStatus(String hermesSessionId, ExecutionStatus status);
 
+    /**
+     * 그 profile 의 실행 줄이 그 Hermes session 을 상태와 무관하게 쓰는지.
+     *
+     * <p>하위 에이전트 session 을 등록할 때 최상위 session 을 거르려고 쓴다(ADR-037). 최상위 session 에 등록이
+     * 생기면 뒤 turn 의 호출이 앞 turn 에 묶인다.
+     */
+    boolean existsByProfileNameAndHermesSessionId(String profileName, String hermesSessionId);
+
     /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);
 

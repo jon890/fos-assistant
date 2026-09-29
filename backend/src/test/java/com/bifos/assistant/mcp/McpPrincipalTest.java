@@ -11,7 +11,9 @@ import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
+import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -41,8 +43,8 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * MCP 토큰은 profile 만 증명하고 요청자는 서명한 뿌리 session 으로 찾은 부모 실행의 사용자라는 것을 실제
- * {@code /mcp} 경계에서 고정한다(ADR-032).
+ * MCP 토큰은 profile 만 증명하고 요청자는 서명한 session 으로 찾은 origin 실행의 사용자라는 것을 실제
+ * {@code /mcp} 경계에서 고정한다(ADR-032, ADR-037).
  *
  * <p>같은 GROUP profile 을 사용자 A 와 B 가 함께 써도 호출마다 자기 실행의 사용자로 돈다.
  */
@@ -63,6 +65,7 @@ class McpPrincipalTest {
     @Autowired AgentExecutionRepository executions;
     @Autowired ArtifactStore store;
     @Autowired JdbcTemplate jdbc;
+    @Autowired SubagentSessionRegistrar registrar;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -113,6 +116,25 @@ class McpPrincipalTest {
 
         assertBody(readMemory(sharedToken, rootA, memoryA.id()), "가의 본문");
         assertBody(readMemory(sharedToken, rootB, memoryB.id()), "나의 본문");
+    }
+
+    @Test
+    void 공유_profile_의_하위_에이전트는_부모가_모두_끝난_뒤에도_등록한_origin_의_사용자로_돈다() throws Exception {
+        String rootA = McpCallSigner.newRoot();
+        String rootB = McpCallSigner.newRoot();
+        AgentExecution runA = McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
+        AgentExecution runB = McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
+        String sa = newSubagent();
+        String sb = newSubagent();
+        registrar.register(SHARED, rootA, rootA, sa);
+        registrar.register(SHARED, rootB, rootB, sb);
+        finish(runA);
+        finish(runB);
+
+        assertBody(readMemory(sharedToken, rootA, sa, memoryA.id()), "가의 본문");
+        assertHidden(readMemory(sharedToken, rootA, sa, memoryB.id()));
+        assertBody(readMemory(sharedToken, rootB, sb, memoryB.id()), "나의 본문");
+        assertHidden(readMemory(sharedToken, rootB, sb, memoryA.id()));
     }
 
     @Test
@@ -252,6 +274,10 @@ class McpPrincipalTest {
         McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, doubledRoot);
         String privateRoot = McpCallSigner.newRoot();
         McpCallSigner.running(executions, userA.id(), conversationA.id(), PRIVATE_A, privateRoot);
+        String registered = newSubagent();
+        registrar.register(SHARED, rootA, rootA, registered);
+        String rootB = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
 
         ObjectNode wrongSig = McpCallSigner.context(sharedToken, "memory_read", rootA);
         String sig = wrongSig.path("sig").asString();
@@ -273,6 +299,8 @@ class McpPrincipalTest {
         rejections.put("도는 실행 둘", readMemory(sharedToken, doubledRoot, memoryA.id()).body());
         rejections.put("다른 profile", readMemory(sharedToken, privateRoot, memoryA.id()).body());
         rejections.put("시작하지 않은 run", readMemory(sharedToken, "cron-session-1", memoryA.id()).body());
+        rejections.put("등록 없는 하위 session", readMemory(sharedToken, rootA, newSubagent(), memoryA.id()).body());
+        rejections.put("등록과 다른 뿌리", readMemory(sharedToken, rootB, registered, memoryA.id()).body());
 
         String first = rejections.values().iterator().next();
         JsonNode parsed = json.readTree(first);
@@ -316,6 +344,20 @@ class McpPrincipalTest {
 
     private HttpResponse<String> readMemory(String token, String root, Long memoryId) throws Exception {
         return send(token, readMemoryRequest(token, root, memoryId));
+    }
+
+    /** 뿌리 {@code root} 아래 하위 에이전트 session {@code session} 에서 부른 것처럼 서명해 읽는다. */
+    private HttpResponse<String> readMemory(String token, String root, String session, Long memoryId) throws Exception {
+        return send(token, memoryReadRequest(memoryId,
+                McpCallSigner.context(token, "memory_read", root, session, "call_" + UUID.randomUUID())));
+    }
+
+    private static String newSubagent() {
+        return "하위-" + UUID.randomUUID();
+    }
+
+    private void finish(AgentExecution execution) {
+        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), execution.id());
     }
 
     private String readMemoryRequest(String token, String root, Long memoryId) {

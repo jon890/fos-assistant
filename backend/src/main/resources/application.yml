@@ -38,6 +38,9 @@ management:
         include: health
 
 assistant:
+  agents:
+    # 사용자 한 사람이 만들 수 있는 에이전트 수. 지운 것은 세지 않고 ADMIN 은 세지 않는다
+    max-per-user: 5
   chat:
     stop-stream-grace: 10s
     # 사건이 없는 동안 SSE 주석 줄을 보내는 간격. 앞단 프록시가 약 100초 동안 바이트가 없으면 연결을 끊는다

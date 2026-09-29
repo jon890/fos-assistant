@@ -107,7 +107,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
   다른 사용자의 개인 항목은 고르는 단계에서 빠진다.
 - `always_inject` 가 참이면 본문을 싣고, 거짓이면 제목과 번호만 색인에 싣는다.
 - 색인의 본문은 `memory_read` MCP 도구로 읽는다.
-  요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 부모 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
+  요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
   Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다.
 - 조립한 글자 수를 실행의 `context_chars` 에 남긴다.
   주입할 양이 실제로 문제가 되는 시점을 숫자로 판단하기 위해서다.
@@ -144,8 +144,8 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | 읽기 | 그 에이전트를 쓸 수 있는 사람. 목록에 보이는 것과 같은 기준이다 |
 | 쓰기 | 그 에이전트의 주인, 그리고 `ADMIN` |
 
-**주인은 공개해도 주인이다.** 가족용으로 공개한 에이전트도 만든 사람이 계속 고친다.
-주인이 비어 있는 에이전트(이 규칙 전에 운영에서 등록한 가족용 에이전트)는 `ADMIN` 만 고친다.
+**주인은 공개해도 주인이다.** 그룹에 공개한 에이전트도 만든 사람이 계속 고친다.
+주인이 비어 있는 에이전트(이 규칙 전에 운영에서 등록한 그룹 공개 에이전트)는 `ADMIN` 만 고친다.
 근거는 [ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
 
 판정은 `AgentService.isEditableBy` 하나다. 성격, 도구, 스킬, 공개 범위, 지우기가 모두 이것을 부른다.
@@ -205,7 +205,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - profile 의 공통 비활성화 목록이 막아 켜지지 않은 toolset 은 `AGENT_TOOLS_NOT_APPLIED` 응답의 `missingToolsets` 로 알린다. 화면은 `GET` 으로 현재 목록을 다시 읽는다
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
 - Hermes 가 쓰기 없이 미분류 toolset 을 켤 수 있다. 도구 응답의 `unclassifiedEnabled` 는 listener 에서 켜진 미분류 이름이고, 화면은 관리자에게 알리라는 경고를 보인다
-- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 읽지 못하면 변경하지 않는다
+- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 꺼진 에이전트의 공개 범위 변경은 검사하지 않고 켤 때 검사한다. 읽지 못하면 변경하지 않는다
 - 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다
 
 | 경로 | 누가 | 무엇 |
@@ -221,20 +221,27 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | 경로 | 하는 일 | 거절 |
 | --- | --- | --- |
 | `POST /api/v1/agents` | `{ "name", "visibility"? }` 로 만든다. 공개 범위 기본값은 `PRIVATE`. 201 과 에이전트를 돌려준다 | `VALIDATION_FAILED`, 상한이면 409 `AGENT_LIMIT_REACHED`, profile 을 만들지 못하면 `HERMES_PROVISION_FAILED` |
-| `PATCH /api/v1/agents/{code}/visibility` | `{ "visibility" }`. 주인과 `ADMIN` 이 승인 없이 바꾼다 | `FORBIDDEN`, 셸·파일 toolset 이 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE` |
-| `DELETE /api/v1/agents/{code}` | 지운다. 204 | `FORBIDDEN` |
+| `PATCH /api/v1/agents/{code}/visibility` | `{ "visibility" }`. 주인과 `ADMIN` 이 승인 없이 바꾼다 | `FORBIDDEN`, 읽을 수 없거나 지웠으면 `AGENT_NOT_FOUND`, 다른 요청이 그 에이전트를 고치는 중이면 `AGENT_BUSY`, `visibility` 가 비었으면 `VALIDATION_FAILED`, 켜진 에이전트를 그룹 공개로 바꿀 때 셸·파일 toolset 이 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 꺼진 에이전트는 켤 때 관리자 수정이 검사한다 |
+| `DELETE /api/v1/agents/{code}` | 지운다. 204 | `FORBIDDEN`, 읽을 수 없거나 지웠으면 `AGENT_NOT_FOUND`, 고치는 중이면 `AGENT_BUSY`, profile 을 거두지 못하면 그 Hermes 오류 |
+
+공개 범위를 바꿔도 주인은 그대로다.
+주인이 비어 있는 옛 그룹 공개 에이전트를 `ADMIN` 이 `PRIVATE` 로 바꾸면 그 `ADMIN` 이 주인이 된다.
 
 **만들기는 한 요청 안에서 끝낸다.** 차례는 아래와 같고, 중간에 실패하면 만든 것을 역순으로 거둔다(`people.application.HermesProfileProvisioner` 와 같은 규칙).
 대시보드 plugin 의 계약은 [`hermes/profiles.md`](hermes/profiles.md) 의 「Control Plane 이 부르는 대시보드 plugin 경로」 가 갖는다.
 
 1. 주인의 `app_user` 행을 잠그고 그 사용자의 지우지 않은 에이전트 수가 `assistant.agents.max-per-user`(기본 5)보다 적은지 본다. `ADMIN` 은 세지 않는다
 2. `code` 와 profile 이름을 만든다. 둘 다 사용자가 넣은 이름과 무관한 무작위 값이다
-3. `POST /api/profiles` 로 profile 을 `no_skills` 로 만든다. plugin 이 이 안에서 안전한 기본 도구, Control Plane MCP 등록, 서명 plugin, 관리 표식을 붙인다. Control Plane 은 도구 목록을 읽어 확인만 한다
+3. `POST /api/profiles` 로 profile 을 `no_skills` 로 만든다. plugin 이 이 안에서 안전한 기본 도구, Control Plane MCP 등록, 서명 plugin, 관리 표식을 붙인다
 4. 그 profile 에 묶인 MCP 토큰을 발급해 `PUT /api/env` 로 `MCP_FOS_ASSISTANT_API_KEY` 에 넣는다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
 5. `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 를 넣고 key 파일을 쓴다
-6. 에이전트 행을 `profile_managed = true` 로 저장한다
+6. 그 key 로 도구 목록을 읽는다. 셸·파일 등급이 켜져 있으면 plugin 틀이 적용되지 않은 것으로 보고 거두고 `HERMES_PROVISION_FAILED`. 도구 목록에는 MCP 서버 이름이 없어 MCP 등록은 3 이 성공한 것으로 믿는다
+7. 에이전트 행을 `profile_managed = true` 로 저장한다
 
-거둘 때는 토큰을 폐기하고 key 파일을 지우고 `DELETE /api/profiles/<이름>` 을 부른다.
+거둘 때는 토큰을 먼저 폐기한다. 토큰 발급과 폐기는 잠금을 쥔 트랜잭션과 떼어 곧바로 커밋한다.
+profile 을 만드는 도중의 실패는 key 파일, profile 순으로 모두 시도해 거둔다.
+만든 뒤의 실패와 지우기는 profile, key 파일 순으로 거두고, 하나라도 실패하면 거기서 멈춘다.
+profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 올린다.
 새 profile 은 재시작 없이 공유 listener 에서 답한다. MCP 도구는 첫 연결까지 1~2분 걸릴 수 있다.
 새 profile 은 가족 공용 credential 로 돈다([ADR-002](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)).
 
@@ -436,7 +443,7 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 
 `McpController` 의 `tools/call` 은 도구별로 인자를 검사한다.
 `memory_read` 의 정수 `id` 입력과 오류 계약은 유지한다.
-요청자는 아래 「MCP 요청자」 의 `McpCallerResolver` 가 부모 실행에서 정한 `CurrentUser` 다. 토큰이 사용자를 정하지 않는다.
+요청자는 아래 「MCP 요청자」 의 `McpCallerResolver` 가 origin 실행에서 정한 `CurrentUser` 다. 토큰이 사용자를 정하지 않는다.
 인자와 응답, SSRF 조건은 [`tools-and-skills.md`](hermes/tools-and-skills.md#결과물-쓰기-도구) 가 정한다.
 같은 사용자의 다른 대화에 쓸 때 답에 묶이는 시점과 실패 분기는
 [`flow.md`](flow.md#결과물을-mcp-로-쓸-때) 에 있다.
@@ -497,25 +504,34 @@ web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않�
 
 ## MCP 요청자
 
-Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 도구의 요청자는 서명한 `_fos_ctx` 로 찾은 부모 실행의 사용자다.
-결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), 흐름과 갈리는 지점은 [`flow.md`](flow.md#mcp-호출의-요청자를-정할-때) 에 있다.
+Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 도구의 요청자는 서명한 `_fos_ctx` 로 찾은 **origin 실행**의 사용자다.
+origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행이고, 최상위 session 이면 그 뿌리 session 으로 도는 실행이다.
+결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md), 흐름과 갈리는 지점은 [`flow.md`](flow.md#mcp-호출의-요청자를-정할-때) 에 있다.
 
 ### 어느 클래스가 무엇을 하나
 
 | 자리 | 하는 일 |
 | --- | --- |
-| `mcp.infra.AgentTokenAuthenticationFilter` | `/mcp` 요청의 토큰을 인증해 `McpPrincipal` 을 인증 주체로 둔다. `CurrentUser` 를 두지 않는다. 서명 검증에 쓸 토큰 해시를 요청 속성으로도 넘긴다 |
+| `mcp.infra.AgentTokenAuthenticationFilter` | `/mcp` 와 `/internal/hermes/session-bindings/subagent` 요청의 토큰을 인증해 `McpPrincipal` 을 인증 주체로 둔다. `CurrentUser` 를 두지 않는다. 서명 검증에 쓸 토큰 해시를 요청 속성으로도 넘긴다 |
 | `mcp.application.AgentTokenService` | 발급, profile 묶기, 목록, 폐기, 인증. profile 이 빈 옛 토큰은 `McpProperties.legacyUserTokens` 가 참일 때만 인증한다 |
 | `mcp.application.McpPrincipal` | 인증 결과. 토큰 번호, profile, 옛 토큰의 사용자 번호, 토큰 해시. profile 이 비었으면 옛 토큰이다 |
 | `mcp.application.McpProperties` | `assistant.mcp` 설정. `legacy-user-tokens`(기본 거짓) |
-| `mcp.application.McpCallerResolver` | 묶인 토큰이면 `_fos_ctx` 서명 확인, 부모 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 옛 토큰이면 그 토큰의 사용자를 쓴다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
-| `mcp.application.McpCaller` | 판정 결과. 요청자 `CurrentUser`, 부모 실행, 확인한 `McpCallContext`. 옛 토큰이면 뒤의 둘이 비었다 |
+| `mcp.application.McpCallerResolver` | 묶인 토큰이면 `_fos_ctx` 서명 확인, origin 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 옛 토큰이면 그 토큰의 사용자를 쓴다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
+| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. origin 실행은 끝난 실행일 수 있다. 옛 토큰이면 뒤의 둘이 비었다 |
 | `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
-| `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
+| `mcp.application.SubagentRegistration` | 등록 본문을 읽고 서명을 확인한다. 서명할 글의 첫 줄이 `v1-subagent` 다 |
+| `mcp.presentation.SubagentSessionController` | `POST /internal/hermes/session-bindings/subagent`. 인증 주체가 묶인 `McpPrincipal` 인지 보고 등록을 부른다 |
+| `orchestration.application.SessionOwnerResolver` | profile, 서명한 뿌리 session, 그 호출의 session 으로 origin 실행을 정한다. 등록을 먼저 보고, 없으면 session 이 뿌리와 같을 때만 `DelegationParentResolver` 를 부른다 |
+| `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 최상위 session 의 판정과 최상위 자식의 등록이 쓴다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
+| `orchestration.application.SubagentSessionRegistrar` | 등록 하나를 적는다. 부모를 풀고, 같은 origin 의 재등록은 그대로 두고, 다른 origin 은 거절한다 |
+| `orchestration.domain.HermesSessionBinding`, `orchestration.infra.HermesSessionBindingRepository` | 하위 에이전트 session 등록 줄과 그 저장소 |
 
 `McpController` 는 `params.name` 이 문자열이고 `params.arguments` 가 객체인지 본 뒤 `McpCallerResolver` 를 부른다. 도구별 인자 검사는 그 뒤에 하고, 그 `McpCaller` 로 `McpToolService` 를 부른다.
 판정이 실패하면 `McpToolService.invalidContext()` 의 같은 도구 결과를 돌려준다.
 `memory_read` 와 `artifact_write` 가 이 길을 쓰고, 앞으로의 `agent_*` 도 같은 길을 쓴다.
+
+등록 경로는 MCP 도구가 아니다. `tools/list` 에 나오지 않고 `McpController` 를 지나지 않는다.
+`ControlPlaneJwtFilter` 는 이 경로를 `/mcp` 처럼 건너뛴다. 사용자 JWT 로 부르면 `AgentTokenAuthenticationFilter` 가 토큰으로 인증하지 못해 401 이다. 컨트롤러의 `McpPrincipal` 확인은 그 뒤의 방어 검사다.
 
 ### 토큰 관리 경로
 
@@ -524,7 +540,7 @@ Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 �
 | 경로 | 하는 일 |
 | --- | --- |
 | `POST /api/v1/admin/agent-tokens` | 본문 `{ "profileName", "label" }`. profile 에 묶인 새 토큰을 발급하고 원문을 한 번만 돌려준다. 사용자로 발급하는 길은 없다 |
-| `PUT /api/v1/admin/agent-tokens/{id}/profile` | 본문 `{ "profileName" }`. profile 이 빈 옛 토큰을 그 profile 에 묶는다. 이미 묶였거나 폐기된 토큰은 `VALIDATION_FAILED` |
+| `PUT /api/v1/admin/agent-tokens/{id}/profile` | 본문 `{ "profileName" }`. profile 이 빈 옛 토큰을 그 profile 에 묶고 `user_id` 를 비운다. 이미 묶였거나 폐기된 토큰은 `VALIDATION_FAILED` |
 | `GET /api/v1/admin/agent-tokens` | 목록. 한 줄에 `id`, `profileName`, `userEmail`(옛 토큰만), `label`, 발급과 마지막 사용과 폐기 시각 |
 | `DELETE /api/v1/admin/agent-tokens/{id}` | 폐기한다. 행은 남는다 |
 
@@ -545,7 +561,8 @@ Memory 제안은 session 을 적지 않는다.
 
 ## 다른 에이전트에게 맡기기
 
-**아직 구현하지 않았다.** 이 절은 위임 도구를 열 때의 설계다. 지금 있는 것은 「MCP 요청자」 의 판정과 `DelegationKey`, 실행 줄의 session 칸이다. 구현하면 이 절이 현재 동작이 된다.
+**아직 구현하지 않았다.** 이 절은 위임 도구를 열 때의 설계다. 지금 있는 것은 「MCP 요청자」 의 판정과 하위 에이전트 session 등록, `DelegationKey`, 실행 줄의 session 칸이다. 구현하면 이 절이 현재 동작이 된다.
+하위 에이전트가 `agent_delegate` 를 부르면 새 FOS 자식의 `parent_execution_id` 는 그 하위 에이전트의 origin 실행이다. 하위 에이전트 몫의 실행 줄은 만들지 않는다.
 
 Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부른다. Control Plane 은 무엇을 할지 정하지 않고 경계만 검사한다.
 결정은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) , [ADR-031](adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md), [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), 흐름은 [`flow.md`](flow.md#다른-에이전트에게-맡길-때) 에 있다.
@@ -556,7 +573,7 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | --- | --- |
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 「MCP 요청자」 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
-| `orchestration.application.AgentDelegationService` | 부모 찾기(`DelegationParentResolver` 를 쓴다), 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
+| `orchestration.application.AgentDelegationService` | 부모는 `McpCaller.originExecution()` 이다. 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
 | `usage.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. `agent_execution.delegation_key` 칸의 값이라 `usage` 에 둔다. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
 | `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
 | `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다 |
@@ -804,8 +821,8 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/usage` | 사용량 |
 | `/memory` | 개인과 그룹 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
-| `/agents` | 에이전트 목록. `ADMIN` 에게는 모든 에이전트와 새 에이전트 등록이 보인다 |
-| `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, `ADMIN` 에게만 관리 절 |
+| `/agents` | 에이전트 목록과 「새 에이전트」. `ADMIN` 에게는 다른 사람의 비공개와 꺼진 에이전트, 운영 profile 등록이 더 보인다 |
+| `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 주인과 `ADMIN` 에게 공개와 삭제, `ADMIN` 에게만 관리 절 |
 | `/admin/agents` | 옛 주소. `/agents` 로 넘긴다 |
 
 ### 에이전트 화면
@@ -821,11 +838,11 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | 상세의 도구 | 그 에이전트의 주인과 `ADMIN` | 도구의 켜짐을 보고, 주인은 주인 등급을, `ADMIN` 은 모든 등급을 바꾼다. 다른 사람의 비공개 에이전트는 관리자 경로로 읽고 쓴다 |
 | 상세의 스킬 | 그 에이전트를 쓸 수 있는 사람. 고치는 것은 주인과 `ADMIN` | 스킬마다 이름, 설명, 「올린 스킬」 이나 「Hermes 기본」 표시, 켜짐. 관리하는 사람에게는 켜고 끄기, 호출 수와 마지막 호출, 올린 스킬의 편집과 삭제, 「스킬 추가」. 아니면 `/이름` 으로 부를 수 있다는 안내 |
 | 스킬 편집 `/agents/{code}/skills/{name}` | 주인과 `ADMIN` | `SKILL.md` 본문과 미리보기, 참고 파일 목록과 올리기. 별도 페이지다 |
-| 상세의 공개와 삭제 | 주인과 `ADMIN` | 개인용과 가족용을 바꾸는 스위치, 확인 창을 거치는 삭제 |
+| 상세의 공개와 삭제 | 주인과 `ADMIN` | 나만과 그룹 공개를 바꾸는 단추, 확인 창을 거치는 삭제 |
 | 상세의 관리 절 | `ADMIN` | 사용 여부, Hermes 주소. 모델은 에이전트가 아니라 대화가 고른다 |
 
 **`ADMIN` 이라도 다른 사람의 비공개 에이전트는 성격을 읽지 못한다.**
-그 상세에는 관리 절만 보이고, 성격 자리에는 주인만 볼 수 있다는 안내를 둔다.
+그 상세에는 공개와 삭제 절과 관리 절이 보이고, 성격 자리에는 주인만 볼 수 있다는 안내를 둔다.
 backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다.
 관리 절이 쓰는 `/api/v1/admin/agents` 경로들도 그대로다.
 
@@ -1078,7 +1095,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
   지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)만 있다
 - `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸을 지우는 것. 운영의 모든 토큰이 profile 에 묶인 뒤 지운다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」)
 
-- 사용자가 에이전트를 만들고 공개하고 지우는 것([「에이전트 만들기와 지우기」](#에이전트-만들기와-지우기)). 지금은 `ADMIN` 이 운영에서 만든 profile 을 등록하고, 가족용으로 공개하면 주인을 비운다
 - 스킬 올리기와 관리, 스킬 커맨드, 호출 이력([「스킬」](#스킬)), 사용량 화면의 탭
 
 SSE 중계와 스트리밍은 끝났다.

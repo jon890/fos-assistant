@@ -302,6 +302,10 @@ public class ChatService {
         }
         Conversation conversation = resolveConversation(user, conversationId, text, agentCode);
         Agent agent = agents.requireById(conversation.agentId());
+        // 지운 에이전트의 대화는 읽기만 된다. 꺼진 것보다 먼저 봐야 없는 에이전트로 알린다.
+        if (agent.isDeleted()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
@@ -507,6 +511,9 @@ public class ChatService {
 
     private Routed routeExisting(CurrentUser user, Conversation conversation, List<ChatAttachment> attached) {
         Agent agent = agents.requireById(conversation.agentId());
+        if (agent.isDeleted()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
