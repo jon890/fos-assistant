@@ -116,3 +116,4 @@ grep -n 'log\.' backend/src/main/java/com/bifos/assistant/mcp/presentation/Subag
 | `backend/src/test/java/com/bifos/assistant/mcp/application/SubagentRegistrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionEndpointTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionLegacyTokenTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilterTest.java` | 수정 |
