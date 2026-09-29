@@ -10,6 +10,7 @@ import {
   contextOmittedLabel,
   executionStatusLabel,
   isRunning,
+  reasoningEffortLabel,
   retryOfLabel,
   type UsageExecution,
 } from "./execution-list";
@@ -51,6 +52,10 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         </div>
         <p className="mt-3 truncate text-sm text-muted-foreground">
           {execution.provider ?? "-"} / {execution.model ?? "-"}
+        </p>
+        {/* 표처럼 모델 옆에 붙이지 않고 다음 줄에 따로 둔다. 까닭은 `reasoningEffortLabel` 에 있고, 붙이면 긴 모델 이름과 함께 잘린다. */}
+        <p className="text-xs text-muted-foreground">
+          effort <span data-testid="execution-effort">{reasoningEffortLabel(execution)}</span>
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
           <span title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}>

@@ -88,6 +88,8 @@ export type FakeHermesControl = {
   /** 동시 실행 한도에 닿아 실행 제출을 429 로 거절하게 한다. */
   busy(): Promise<void>;
   clearBusy(): Promise<void>;
+  /** 마지막 실행 요청이 실어 온 provider, 모델, effort 다. 싣지 않은 칸은 빠진다. */
+  lastSubmittedRuntime(): Promise<{ provider?: string; model?: string; reasoningEffort?: string }>;
 };
 
 async function fakeHermesControl(): Promise<FakeHermesControl> {
@@ -106,6 +108,11 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
     clearBlockedProviders: () => call("/__test/clear-blocked-providers", "POST"),
     busy: () => call("/__test/busy", "POST"),
     clearBusy: () => call("/__test/clear-busy", "POST"),
+    lastSubmittedRuntime: async () => {
+      const response = await fetch(`${baseUrl}/__test/last-submitted-runtime`);
+      if (!response.ok) throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
+      return (await response.json()) as { provider?: string; model?: string; reasoningEffort?: string };
+    },
   };
 }
 

@@ -47,6 +47,8 @@ const TEST_BUSY_PATH = "/__test/busy";
 const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
 const TEST_HOLD_NEXT_CONFIG_PATH = "/__test/hold-next-config";
 const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
+/** 마지막 실행 요청이 실어 온 provider, 모델, effort 를 돌려준다. 브라우저 검사는 대역을 다른 프로세스에서 띄워 이 길로 묻는다. */
+const TEST_LAST_SUBMITTED_RUNTIME_PATH = "/__test/last-submitted-runtime";
 
 /**
  * 대시보드가 기계에게 여는 토큰이다.
@@ -682,6 +684,10 @@ export function startFakeHermes(
         const run = runs.get(releasedRunId);
         if (run !== undefined) run.status = "completed";
         return send(response, 204, null);
+      }
+
+      if (request.method === "GET" && path === TEST_LAST_SUBMITTED_RUNTIME_PATH) {
+        return send(response, 200, lastSubmittedRuntime);
       }
 
       if (request.method === "POST" && path === TEST_HOLD_NEXT_SOUL_PATH) {

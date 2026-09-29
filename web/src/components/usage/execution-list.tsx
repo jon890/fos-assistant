@@ -9,6 +9,8 @@ export type UsageExecution = {
   agentName: string;
   provider: string | null;
   model: string | null;
+  /** 요청에 실은 reasoning effort. 고르지 않았거나 이 칸이 생기기 전 실행이면 null */
+  reasoningEffort: string | null;
   costMode: string;
   status: string;
   errorCode: string | null;
@@ -42,6 +44,16 @@ export function contextCharsLabel(execution: UsageExecution): string {
 export function contextOmittedLabel(execution: UsageExecution): string {
   const omitted = execution.contextOmittedItems;
   return omitted === null || omitted <= 0 ? "" : `기억 ${omitted.toLocaleString("ko-KR")}개가 길어서 답에 포함되지 않았어요`;
+}
+
+/**
+ * 요청한 effort 를 적는다. 비어 있으면 「기본」 이다.
+ *
+ * <p>비어 있다는 것은 요청에 싣지 않았다는 뜻이고 실제로 어떤 값이 돌았는지는 모른다.
+ * 그래서 모델 이름 옆에 붙여 쓰지 않고 따로 보인다.
+ */
+export function reasoningEffortLabel(execution: UsageExecution): string {
+  return execution.reasoningEffort ?? "기본";
 }
 
 export function isRunning(execution: UsageExecution): boolean {

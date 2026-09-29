@@ -8,6 +8,8 @@ import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
 import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
+import { ModelPicker, type ModelChoice, type ModelChoiceSaveResult } from "./model-picker";
+import type { Conversation } from "../shell/conversations-provider";
 
 type Props = {
   value: string;
@@ -36,6 +38,15 @@ type Props = {
    * 입력창을 거치지 않고 보내는 추천 질문도 이 동안은 막아야 대화가 둘 생기지 않는다.
    */
   onBlockingChange?(blocking: boolean): void;
+  /** 이 대화에 적힌 모델 선택이다. 대화가 아직 없으면 null */
+  modelChoice: ModelChoice | null;
+  /**
+   * 대화는 있는데 그 대화에 적힌 모델 선택을 아직 모른다. 대화 목록이 오기 전이 그렇다.
+   * 이때 고르게 하면 모르는 값을 「기본」 으로 보고 저장해 적힌 모델을 지운다. 그래서 단추를 막는다.
+   */
+  modelChoiceUnknown: boolean;
+  /** 모델 선택을 저장한 뒤 서버가 돌려준 대화 한 줄을 알린다 */
+  onModelChoiceSaved(conversation: Conversation): void;
 };
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -95,6 +106,9 @@ export function Composer({
   onStop,
   mention,
   onBlockingChange,
+  modelChoice,
+  modelChoiceUnknown,
+  onModelChoiceSaved,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +119,8 @@ export function Composer({
   const [creatingConversation, setCreatingConversation] = useState(false);
   /** 빈 대화를 만드는 요청이 진행 중이면 그 Promise 를 담아 다시 쓴다. 연달아 고르면 두 번 도는 것을 막는다 */
   const creatingConversationRef = useRef<Promise<string | null> | null>(null);
+  /** 모델 선택을 저장하는 중이다. 그동안 보내면 바꾸기 전의 모델로 돌 수 있어 보내기를 막는다 */
+  const [savingModel, setSavingModel] = useState(false);
   /** 올리는 중에 지운 첨부의 key 다. 올리기 응답을 받으면 그때 서버 DELETE 를 부른다 */
   const pendingRemovalRef = useRef<Set<string>>(new Set());
   /**
@@ -187,7 +203,7 @@ export function Composer({
 
   const uploading = items.some((item) => item.status === "uploading");
   const hasBlockingAttachment = items.some((item) => item.status !== "done");
-  const blocking = creatingConversation || hasBlockingAttachment;
+  const blocking = creatingConversation || hasBlockingAttachment || savingModel;
   const sendDisabled = disabled || value.trim().length === 0 || blocking;
 
   useEffect(() => {
@@ -329,6 +345,33 @@ export function Composer({
 
     for (const file of toUpload) {
       void uploadOne(file, targetConversationId);
+    }
+  }
+
+  /**
+   * 고른 모델을 대화에 저장한다. 대화가 아직 없으면 사진을 먼저 올릴 때처럼 빈 대화를 만든다.
+   *
+   * <p>대화를 만든 것은 `ensureConversationId` 가 이미 알렸으므로 여기서 다시 알리지 않는다.
+   */
+  async function saveModelChoice(choice: ModelChoice): Promise<ModelChoiceSaveResult> {
+    setSavingModel(true);
+    try {
+      const targetConversationId = await ensureConversationId();
+      // 빈 대화를 만들지 못했으면 `ensureConversationId` 가 이미 알렸다.
+      if (targetConversationId === null || !mountedRef.current) return "reported";
+      const response = await fetch(`/api/chat/conversations/${targetConversationId}/model`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(choice),
+      });
+      if (!response.ok) return "failed";
+      // 기다리는 동안 대화를 바꿨어도 알린다. 받은 줄은 그 대화의 것이라 목록의 그 줄만 바뀐다.
+      onModelChoiceSaved((await response.json()) as Conversation);
+      return "saved";
+    } catch {
+      return "failed";
+    } finally {
+      if (mountedRef.current) setSavingModel(false);
     }
   }
 
@@ -560,6 +603,15 @@ export function Composer({
             )}
           </TooltipButton>
         )}
+      </div>
+      {/* 알약 안에 두면 좁은 폭에서 입력칸이 줄어든다. 그래서 알약 아래 줄에 둔다. */}
+      <div className="mt-1 flex min-w-0 px-2">
+        <ModelPicker
+          agentCode={agentCode}
+          choice={modelChoice}
+          onChange={saveModelChoice}
+          disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
+        />
       </div>
     </form>
   );

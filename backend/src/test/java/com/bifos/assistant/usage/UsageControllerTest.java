@@ -92,6 +92,25 @@ class UsageControllerTest {
                 .isEqualTo(false);
     }
 
+    @Test
+    void 요청한_effort_를_싣고_고르지_않은_실행은_null_이다() {
+        AgentExecution chosen = execution(null, null, "high");
+        AgentExecution byDefault = execution(null, null);
+
+        List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
+
+        assertThat(page)
+                .filteredOn(view -> view.id().equals(chosen.id()))
+                .singleElement()
+                .extracting(UsageDtos.ExecutionView::reasoningEffort)
+                .isEqualTo("high");
+        assertThat(page)
+                .filteredOn(view -> view.id().equals(byDefault.id()))
+                .singleElement()
+                .extracting(UsageDtos.ExecutionView::reasoningEffort)
+                .isNull();
+    }
+
     /**
      * 목록 조회가 내는 질의 수다.
      *
@@ -129,6 +148,10 @@ class UsageControllerTest {
     }
 
     private AgentExecution execution(Long parentId, Long rootId) {
+        return execution(parentId, rootId, null);
+    }
+
+    private AgentExecution execution(Long parentId, Long rootId, String reasoningEffort) {
         return executions.save(AgentExecution.builder()
                 .userId(USER_ID)
                 .conversationId(7L)
@@ -136,6 +159,7 @@ class UsageControllerTest {
                 .parentExecutionId(parentId)
                 .rootExecutionId(rootId)
                 .profileName("dad")
+                .reasoningEffort(reasoningEffort)
                 .costMode(CostMode.SUBSCRIPTION)
                 .status(ExecutionStatus.SUCCEEDED)
                 .startedAt(Instant.now())

@@ -12,6 +12,7 @@ import {
   contextOmittedLabel,
   executionStatusLabel,
   isRunning,
+  reasoningEffortLabel,
   retryOfLabel,
   type UsageExecution,
 } from "./execution-list";
@@ -65,6 +66,9 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
               <TableCell className="max-w-40 py-3">
                 <span className="block truncate">{execution.model ?? "-"}</span>
                 <span className="block truncate text-xs text-muted-foreground">{execution.provider ?? "-"}</span>
+                <span className="block truncate text-xs text-muted-foreground" data-testid="execution-effort">
+                  {reasoningEffortLabel(execution)}
+                </span>
               </TableCell>
               <TableCell className="max-w-40 py-3 whitespace-normal">
                 <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
