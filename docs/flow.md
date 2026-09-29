@@ -32,9 +32,9 @@ flowchart LR
 | --- | --- | --- | --- |
 | ① | 웹 → Control Plane | 짧은 수명 JWT | 이 사람이 로그인했다 |
 | ② | Control Plane → Hermes | `API_SERVER_KEY` | 이 profile 을 쓸 자격이 있다 |
-| ③ | Hermes → Control Plane | `agent_token` | 이 요청이 누구의 것이다 |
+| ③ | Hermes → Control Plane | `agent_token` | 이 요청이 어느 profile 에서 왔다 |
 
-**①과 ③이 둘 다 사용자를 정하지만 성질이 다르다.**
+**①은 사용자를 정하고 ③은 profile 만 정한다.** 둘은 성질도 다르다.
 
 | 축 | ① 웹 토큰 | ③ agent_token |
 | --- | --- | --- |
@@ -46,10 +46,73 @@ flowchart LR
 ②는 사용자를 정하지 않는다. profile 을 정할 뿐이다.
 어느 사용자의 실행인지는 Control Plane 이 이미 알고 있고, 그것을 Hermes 에게 알리지 않는다.
 
-③이 필요한 이유가 여기 있다.
 Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주인을 모른다.
 **요청 본문에 사용자를 적게 하면 모델이 그것을 바꿀 수 있다.**
-그래서 토큰만이 사용자를 정한다.
+③도 사용자를 정하지 못한다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰고, MCP 연결과 그 토큰은 profile 에 하나다.
+
+그래서 사용자는 Control Plane 이 이미 기록한 실행에서 꺼낸다.
+profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 지금 도는 부모 실행 하나를 찾고, 그 실행의 `user_id` 가 요청자다.
+아래 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
+
+## MCP 호출의 요청자를 정할 때
+
+`memory_read`, `artifact_write` 와 앞으로의 `agent_*` 가 모두 이 길을 지난다.
+
+```mermaid
+sequenceDiagram
+    participant H as Hermes (공유 profile)
+    participant P as profile 플러그인
+    participant F as 토큰 인증
+    participant R as 요청자 판정
+    participant E as agent_execution
+
+    H->>P: 도구 호출 (session_id, tool_call_id)
+    P->>P: parent_session_id 사슬로 뿌리 session 을 찾고 그 profile 의 토큰으로 서명
+    P->>F: POST /mcp, Bearer 토큰, 인자에 _fos_ctx
+    F->>F: 토큰 해시로 한 줄을 찾는다. 폐기됐으면 401
+    F->>R: McpPrincipal(토큰 번호, profile, 토큰 해시)
+    R->>R: _fos_ctx 의 서명을 토큰 해시로 확인
+    R->>E: profile, 뿌리 session, RUNNING 이 맞는 줄을 둘까지 읽는다
+    E-->>R: 정확히 하나
+    R->>R: 그 줄의 user_id 로 사용자를 읽는다
+    R-->>H: 그 사용자의 권한으로 도구를 돌린 결과
+```
+
+같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
+대화마다 뿌리 session 이 다르고, 호출마다 자기 뿌리 session 에 서명이 붙기 때문이다.
+
+```text
+공유 profile
+  실행 #100  user=A  뿌리 session=fos-A → 서명한 뿌리 fos-A 의 호출은 A 로 돈다
+  실행 #101  user=B  뿌리 session=fos-B → 서명한 뿌리 fos-B 의 호출은 B 로 돈다
+```
+
+토큰이 어느 사용자로 발급됐었는지는 결과를 바꾸지 않는다.
+
+### 갈리는 지점
+
+| 경우 | 결과 |
+| --- | --- |
+| 토큰이 없거나, 모르는 토큰이거나, 폐기됐다 | HTTP 401 |
+| profile 이 빈 옛 토큰이고 `assistant.mcp.legacy-user-tokens` 가 거짓이다 | HTTP 401 |
+| profile 이 빈 옛 토큰이고 그 설정이 참이다 | 옛 토큰의 `user_id` 로 전처럼 돈다. `_fos_ctx` 는 보지 않고 경고 로그를 남긴다 |
+| profile 이 묶인 토큰인데 `_fos_ctx` 가 없거나 모양이 틀렸거나 서명이 맞지 않는다 | 거절한다 |
+| 서명은 맞지만 그 뿌리 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, 이 결정 전 대화의 압축 교체가 여기 온다 |
+| 그 뿌리 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
+| 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
+
+거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 「호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.」 다.
+서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
+이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다.
+
+**실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.**
+
+| 실행 | 적는 session |
+| --- | --- |
+| 대화 turn, 흐름의 Chief | 그 대화의 뿌리 session. 뿌리 칸이 빈 옛 대화는 Hermes 에 보내는 session |
+| 흐름의 하위 실행 | 제출하기 전에 새로 정한 `fos-<uuid>`. 부모의 session 을 잇지 않는다 |
+| 앞으로의 위임 자식 | 위와 같다 |
+| Memory 제안 | 적지 않는다. 이 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다 |
 
 ## 사람을 더할 때
 
@@ -524,8 +587,8 @@ sequenceDiagram
     H->>M: 그 instructions 와 도구 목록을 준다
     M-->>H: 12번 본문이 필요하다
     H->>C: POST /mcp  memory_read(id=12)
-    Note over H,C: Authorization 에 그 profile 의 agent_token
-    C->>C: 토큰으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
+    Note over H,C: Authorization 에 그 profile 의 agent_token, 인자에 서명한 _fos_ctx
+    C->>C: 부모 실행으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
     C-->>H: 본문 또는 읽을 수 없다는 응답
     H->>M: 도구 결과를 준다
     M-->>H: 그 본문으로 답한다
@@ -533,7 +596,7 @@ sequenceDiagram
 ```
 
 **요청 본문에는 항목 번호만 있고 사용자가 없다.**
-토큰만이 사용자를 정한다.
+사용자는 「MCP 호출의 요청자를 정할 때」 의 길로 부모 실행에서 정한다.
 모델이 만든 JSON 에 사용자를 넣게 하면 모델이 남의 Memory 를 읽을 수 있다.
 
 볼 수 없는 항목과 없는 항목은 **같은 응답**으로 답한다.
@@ -951,9 +1014,11 @@ flowchart TD
     A[실행 입력에 publicId 와 도구 안내] --> B[Hermes 가 artifact_write 호출]
     B --> T{MCP 토큰 인증}
     T -->|실패| U[HTTP 401]
-    T -->|성공| P{도구별 인자 검사}
+    T -->|성공| K{부모 실행으로 요청자 판정}
+    K -->|실패| N[isError true, 호출 맥락 오류]
+    K -->|성공| P{도구별 인자 검사}
     P -->|실패| I[JSON-RPC -32602]
-    P -->|성공| C{UUID 로 토큰 사용자의 활성 대화 조회}
+    P -->|성공| C{UUID 로 요청자의 활성 대화 조회}
     C -->|없는 대화, 지운 대화, 남의 대화| R[isError true]
     C -->|주인이다| M{본문 방식}
     M -->|content| X{HTML 또는 CSS 확장자 검사}
@@ -1008,8 +1073,8 @@ sequenceDiagram
     C->>P: agent_list 또는 agent_delegate(agent_code, task)
     P->>P: 뿌리 session 을 찾고 MCP 토큰으로 서명한다
     P->>M: tools/call + _fos_ctx
-    M->>M: 토큰으로 사용자를 정한다
-    M->>D: 서명 확인, 뿌리 session 의 도는 실행을 부모로
+    M->>M: 토큰으로 profile 을 정한다
+    M->>D: 서명 확인, profile 과 뿌리 session 의 도는 실행을 부모로, 그 실행의 사용자가 요청자
     D->>D: 깊이와 동시 한도, 에이전트 접근, 같은 호출인지 본다
     D->>D: 실행 줄을 만들고 새 session fos-<uuid> 를 적는다
     D->>H: POST /v1/runs (원래 사용자로 다시 조립한 Memory)
@@ -1030,12 +1095,13 @@ sequenceDiagram
 | --- | --- |
 | `_fos_ctx` 가 없거나 서명이 틀리다 | 거절한다. 플러그인이 빠진 profile 이거나 모델이 흉내 낸 것이다 |
 | 뿌리 session 을 가진 도는 실행이 없거나 둘 이상이다 | 거절한다. 부모를 추측하지 않는다 |
-| 그 실행의 사용자가 토큰의 사용자와 다르다 | 거절한다 |
+| 그 실행의 profile 이 토큰의 profile 과 다르다 | 거절한다. 사용자는 토큰이 아니라 그 실행이 정한다 |
 | 없는 에이전트, 쓸 수 없는 에이전트 | 같은 응답으로 거절한다. 있는지 없는지 알리지 않는다 |
 | 꺼진 에이전트 | 쓸 수 없다고 거절한다 |
 | 깊이가 한도(기본 2)를 넘는다 | 거절한다. Hermes 는 재귀를 막지 않는다 |
 | 한 뿌리 아래 도는 위임 자식이 한도(기본 4)에 닿았다 | 거절한다. Chief 가 앞의 것을 기다리거나 멈춘 뒤 다시 부른다 |
-| 같은 `tool_call_id` 가 다시 온다(Hermes 재시도) | 새로 만들지 않고 처음 만든 실행을 돌려준다 |
+| 같은 호출이 다시 온다(Hermes 재시도). profile, 뿌리 session, 그 호출의 session, `tool_call_id` 가 모두 같다 | 새로 만들지 않고 처음 만든 실행을 돌려준다 |
+| 다른 session 에서 같은 `tool_call_id` 가 온다 | 다른 호출이다. 따로 만든다 |
 | 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 실패 코드를 돌려준다 |
 | 제출이 한도 시간 안에 끝나지 않는다 | 실행 번호를 돌려주고, 뒤따르는 결과는 그 줄에 적는다 |
 | `agent_status` 로 남의 실행이나 그 나무 밖의 실행을 묻는다 | 없는 실행과 같은 응답이다 |
@@ -1066,7 +1132,7 @@ sequenceDiagram
     C->>H: 실행 입력 맨 앞에 결과물 폴더 단락
     alt artifact_write 도구가 있다
         H->>C: artifact_write 로 HTML 과 사진 저장을 요청한다
-        C->>D: 토큰 사용자와 대화 주인을 확인하고 저장한다
+        C->>D: 부모 실행의 사용자와 대화 주인을 확인하고 저장한다
     else artifact_write 도구가 없고 파일 도구가 있다
         H->>D: 결과물 폴더에 HTML 과 사진을 직접 쓴다
     end

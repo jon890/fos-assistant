@@ -280,7 +280,7 @@ MCP 규약 헤더뿐이었다. `params._meta` 는 빈 객체였다.
 
 **플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. 배치 방법은 비공개 저장소 `fos-home-infra` 가 갖는다.
 
-**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 `agent_*` 호출을 거절한다.
+**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 profile 에 묶인 토큰으로 온 호출 가운데 서명이 없거나 틀린 것을 거절한다. `memory_read`, `artifact_write`, `agent_*` 가 모두 그렇다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 
 #### `_fos_ctx` 계약
 
@@ -319,7 +319,10 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 | 기대 `sig` | `b28a128dbb642aba7a8b4c35dcb237e2feb5a452305ec275909c32a00ae1b25b` |
 | 같은 칸에 도구 이름만 `agent_status` 일 때 | `62109c6c99e7ed4638e4343f1e5b6b22a3f55dd974560916149986866c253236` |
 
-`memory_read` 와 `artifact_write` 는 `_fos_ctx` 를 받으면 버리고 읽지 않는다. 서명을 요구하는 것은 `agent_*` 도구다.
+서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인하고, 토큰이 증명한 profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾아 그 실행의 사용자로 돈다.
+도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
+profile 이 빈 옛 토큰은 설정이 허용할 때만 `_fos_ctx` 를 보지 않고 전처럼 돈다.
+플러그인은 서명할 수 없을 때 `agent_*` 만 막고 `memory_read`, `artifact_write` 는 서명 없이 보낸다. 그런 호출은 묶인 토큰에서 거절된다.
 
 #### 호출은 profile 마다 하나씩 나간다
 
@@ -330,8 +333,33 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 #### 재시도와 `tool_call_id`
 
 Hermes 는 401 이면 다시 연결해 같은 인자로 한 번 더 보낸다. session 이 만료되면 읽기 전용 도구만 다시 보내고 쓰기 도구는 `outcome_uncertain` 으로 끝낸다.
-hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **뿌리 session 과 `tool_call_id` 의 짝**을 같은 위임을 두 번 만들지 않는 키로 쓴다.
+hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **profile, 뿌리 session, 그 호출의 session, `tool_call_id`** 로 같은 위임을 두 번 만들지 않는 키를 계산한다.
+`tool_call_id` 가 뿌리 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
 JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는다.
+
+#### 공유 profile 에서 두 사용자의 호출을 실제로 확인하는 절차
+
+가짜 Hermes 검사는 플러그인을 흉내 내므로, 실제 Hermes 와 실제 플러그인에서 한 번 더 확인한다.
+환경과 실행 방법은 `fos-home-infra` 가 갖는다. 여기에는 무엇을 보고 무엇이 나와야 하는지만 적는다.
+
+준비할 것이다.
+
+- Hermes v0.21.5 와 그 profile 에 켠 플러그인. 그 profile 을 가리키는 GROUP 에이전트 하나
+- 그 profile 에 묶인 토큰. 사용자 A 와 B 가 각자 볼 수 있는 USER Memory 하나씩. 둘 다 제목만 싣는 색인 항목이다
+- 플러그인의 `pre_tool_call` 이 받은 `session_id`, 사슬로 찾은 `root_session_id`, `tool_call_id` 를 로그에 남기게 한 상태. 서명과 토큰은 남기지 않는다
+
+확인할 것이다.
+
+| 순서 | 할 것 | 기대하는 것 |
+| --- | --- | --- |
+| 1 | A 와 B 가 각자 새 대화에서 같은 에이전트로 자기 Memory 본문을 묻는다. 두 run 이 겹쳐 돌게 한다 | 두 run 의 `root_session_id` 가 서로 다르고, 각자 그 대화의 `conversation.hermes_root_session_id` 와 같다 |
+| 2 | 같은 두 run 의 `pre_tool_call` 로그를 본다 | 한 run 의 모든 호출에서 `root_session_id` 가 같다. 다른 run 의 값이 섞이지 않는다 |
+| 3 | 두 답을 본다 | A 의 답에는 A 의 본문만, B 의 답에는 B 의 본문만 있다 |
+| 4 | Control Plane 로그의 `memory read` 줄을 본다 | 호출마다 `userId` 가 그 run 의 실행 줄 `user_id` 와 같고 `executionId` 가 그 run 의 실행 줄이다 |
+| 5 | A 가 `delegate_task` 를 쓰게 해 하위 에이전트가 `memory_read` 를 부르게 한다 | 하위 에이전트 호출의 `session_id` 는 부모와 다르고 `root_session_id` 는 A 의 대화 뿌리와 같다. 결과는 A 의 본문이다 |
+| 6 | 플러그인을 끈 profile 에서 같은 질문을 한다 | `memory_read` 가 「호출 맥락을 확인할 수 없습니다」 로 끝나고 본문은 오지 않는다 |
+
+1 과 2 가 어긋나면 서버 쪽 판정이 옳아도 사용자가 섞인다. 그때는 배포를 되돌리지 말고 그 profile 의 토큰 묶기를 미루고 원인을 조사한다.
 
 ### 제한 시간은 우리가 정하지만 상한은 있다
 

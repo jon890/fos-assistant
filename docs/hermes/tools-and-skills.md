@@ -275,11 +275,14 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 | Hermes 가 보이는 도구 이름 | `mcp__fos_assistant__<도구>`. 예: `mcp__fos_assistant__artifact_write`, `mcp__fos_assistant__memory_read` (v0.21.5, 2026-09-29 운영에서 확인) |
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
-| 인증 | profile마다 다른 Bearer 토큰 |
+| 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
 | 도구 | `memory_read`, `artifact_write`. `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 은 아직 없고 위임 도구 계획서가 연다. 그 전에는 `-32601` 을 돌려준다 |
-| 부모 실행 | `agent_*` 는 profile 플러그인이 덮어쓴 `_fos_ctx` 의 서명한 뿌리 session 으로 찾는다. 서명이 없거나 틀리면 거절한다. 계약은 [`delegation.md`](delegation.md#부모-실행을-잇는-방법) 에 있다 |
+| 요청자 | `memory_read`, `artifact_write`, `agent_*` 모두 profile 플러그인이 덮어쓴 `_fos_ctx` 의 서명한 뿌리 session 으로 도는 부모 실행을 찾고, 그 실행의 사용자로 돈다. 서명이 없거나 틀리거나 profile 이 다르면 거절한다. 계약은 [`delegation.md`](delegation.md#부모-실행을-잇는-방법) 에 있다 |
 
-토큰이 요청자를 정한다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
+토큰은 요청자를 정하지 않는다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰기 때문이다.
+요청자는 서명한 `_fos_ctx` 로 찾은 부모 실행의 사용자다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
+요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
+profile 이 빈 옛 토큰은 `assistant.mcp.legacy-user-tokens` 가 참일 때만 그 토큰의 사용자로 돈다.
 `memory_read` 는 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
@@ -337,12 +340,12 @@ base64 인자와 정의하지 않은 인자는 거절한다.
 공통 상한은 **5MB(5 × 1024 × 1024 바이트)** 이고 본문은 문자 수 대신 UTF-8 바이트 수로 센다.
 경로는 기존 `chat_artifact.path` 에 맞춰 500자까지 받는다.
 
-토큰의 사용자로 `ConversationAccess.requireOwn(CurrentUser, UUID)` 를 호출한다.
+부모 실행의 사용자로 `ConversationAccess.requireOwn(CurrentUser, UUID)` 를 호출한다.
 확인 전에는 폴더 생성과 URL 조회를 하지 않는다.
 없는 대화, 지운 대화, 다른 사용자의 대화는 같은 `isError: true` 결과로 숨긴다.
 같은 사용자의 다른 대화는 허용한다.
 도구 입력에 사용자 번호나 profile 을 넣어 요청자를 바꿀 수 없다.
-실행 연결값을 받지 않는 이유는 [도구 호출에는 실행을 가리키는 값이 없다](delegation.md#도구-호출에는-실행을-가리키는-값이-없다) 절이 갖는다.
+실행을 가리키는 값은 모델이 주는 인자가 아니라 플러그인이 서명한 `_fos_ctx` 로만 온다. 그 까닭은 [도구 호출에는 실행을 가리키는 값이 없다](delegation.md#도구-호출에는-실행을-가리키는-값이-없다) 절이 갖는다.
 
 성공은 기존 MCP 결과의 `content[0].text` 에 JSON 문자열을 담아 반환한다.
 그 JSON 은 `{"path":"test/index.html","byteSize":123}` 모양이며 `isError` 는 `false` 다.
