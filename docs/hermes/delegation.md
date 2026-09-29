@@ -249,6 +249,70 @@ MCP 규약 헤더뿐이었다. `params._meta` 는 빈 객체였다.
 **도구가 아는 것은 어느 profile 이 불렀는지까지다.** 어느 실행에서 왔는지는 오지 않는다.
 그러므로 이 경로로 만든 실행을 부모 `agent_execution` 에 잇는 값은 우리가 만들어야 한다.
 
+### 부모 실행을 잇는 방법
+
+2026-09-29 에 v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md) 에 있다.
+
+**MCP 호출에 run 맥락을 실을 수 있는 공개 경로는 profile 플러그인의 `pre_tool_call` hook 하나다.**
+
+| 경로 | 쓸 수 있나 | 근거 |
+| --- | --- | --- |
+| `tools/call` 의 `_meta`, HTTP 헤더 | 없다 | 도구 호출은 `tools/mcp_tool_handlers.py` 의 `call_tool(tool_name, arguments=args)` 한 곳이고 `meta` 를 넘기지 않는다. 헤더는 연결할 때 한 번 정해진다(`tools/mcp_tool_transport.py`) |
+| `Mcp-Session-Id` | 없다 | 연결 하나의 값이다. 연결은 profile 당 하나를 모든 run 과 하위 에이전트가 함께 쓴다(`tools/mcp_tool_scope.py` 의 `_server_key`) |
+| 설정의 `${VAR}` | 없다 | 설정을 읽을 때 한 번만 푼다(`tools/mcp_tool_config.py` 의 `_interpolate_env_vars`) |
+| `/v1/runs` 본문 | 없다 | `provider`, `model`, `model_options` 만 agent 에 가고 LLM 요청에만 쓰인다 |
+| `pre_tool_call` hook | 된다 | hook 은 `tool_name`, `args`, `task_id`, `session_id`, `tool_call_id` 를 받고 `{"action": "modify", "args": {...}}` 로 인자를 덮어쓴다(`hermes_cli/plugins.py`, `agent/tool_executor.py`) |
+
+실측한 것이다.
+
+| 확인 | 결과 |
+| --- | --- |
+| hook 이 넣은 키가 MCP `arguments` 에 도착한다 | 도착한다. Hermes 는 hook 이 더한 키를 도구 입력 규격으로 검증하지 않는다 |
+| 모델이 같은 키를 넣었을 때 | hook 의 값이 이긴다 |
+| hook 에서 그 profile 의 비밀값 읽기 | `get_secret` 으로 scope 오류 없이 읽힌다 |
+| 같은 profile 에서 run 둘을 동시에 | 호출마다 자기 run 의 session 이 붙고 섞이지 않는다 |
+| `/v1/runs` 에 Hermes 가 모르는 `session_id` 를 준 첫 run | 그 id 로 session 이 생긴다. 같은 id 로 보낸 다음 run 이 이어진다 |
+| `delegate_task` 하위 에이전트의 호출 | session id 가 부모와 다르다. 하위 session 은 `parent_session_id` 로 부모를 가리킨다 |
+| 압축 | 기본값 `compression.in_place: true` 에서는 session 이 바뀌지 않는다. `false` 이면 run 도중 새 session 으로 바뀐다 |
+| `parent_session_id` 사슬을 따라 처음 session 찾기 | 1ms 미만. 하위 에이전트와 압축 교체 모두 처음 session 에 닿는다 |
+
+그래서 hook 이 서명하는 값은 그 호출의 session 이 아니라 **사슬의 처음 session(뿌리 session)** 이다.
+
+**플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. 배치 방법은 비공개 저장소 `fos-home-infra` 가 갖는다.
+
+**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 `agent_*` 호출을 거절한다.
+
+#### `_fos_ctx` 계약
+
+hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴다.
+
+| 키 | 값 |
+| --- | --- |
+| `v` | `1` |
+| `session_id` | 그 호출의 session |
+| `root_session_id` | `parent_session_id` 사슬의 처음 session |
+| `tool_call_id` | 그 도구 호출의 id. Hermes 의 재시도에도 같다 |
+| `sig` | 아래 서명의 소문자 16진수 |
+
+서명은 HMAC-SHA256 이다.
+
+- key 는 **그 profile 의 MCP 토큰을 SHA-256 한 값의 소문자 16진수 문자열**이다. 서버는 토큰의 원문 대신 이 해시를 저장하므로 같은 key 를 갖는다
+- 서명할 글은 `v1`, 도구 이름(서버 쪽 이름. 예: `agent_delegate`), `root_session_id`, `session_id`, `tool_call_id` 를 이 순서로 줄바꿈(`\n`) 하나로 이은 것이다
+
+`memory_read` 와 `artifact_write` 는 `_fos_ctx` 를 받으면 버리고 읽지 않는다. 서명을 요구하는 것은 `agent_*` 도구다.
+
+#### 호출은 profile 마다 하나씩 나간다
+
+같은 profile 의 MCP 연결 하나가 `_rpc_lock` 으로 호출을 직렬로 보낸다(`tools/mcp_tool.py`).
+한 run 의 도구 호출이 오래 걸리면 같은 profile 의 다른 run 이 기다린다.
+그래서 `agent_delegate` 는 제출까지만 기다리고, `agent_status` 는 저장된 값만 읽는다.
+
+#### 재시도와 `tool_call_id`
+
+Hermes 는 401 이면 다시 연결해 같은 인자로 한 번 더 보낸다. session 이 만료되면 읽기 전용 도구만 다시 보내고 쓰기 도구는 `outcome_uncertain` 으로 끝낸다.
+hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **뿌리 session 과 `tool_call_id` 의 짝**을 같은 위임을 두 번 만들지 않는 키로 쓴다.
+JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는다.
+
 ### 제한 시간은 우리가 정하지만 상한은 있다
 
 | 항목 | 값 |

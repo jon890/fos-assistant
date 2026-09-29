@@ -386,6 +386,42 @@ web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않�
 
 **경로를 만드는 규칙이 `ArtifactStore` 한 곳에 있다.** 대화 폴더 밖인지 판정하는 것도 거기서 한다.
 
+## 다른 에이전트에게 맡기기
+
+Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부른다. Control Plane 은 무엇을 할지 정하지 않고 경계만 검사한다.
+결정은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 과 [ADR-031](adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md), 흐름은 [`flow.md`](flow.md#다른-에이전트에게-맡길-때) 에 있다.
+
+### 어느 클래스가 무엇을 하나
+
+| 자리 | 하는 일 |
+| --- | --- |
+| `mcp.infra.AgentTokenAuthenticationFilter` | 토큰으로 사용자를 정하고, 서명 검증에 쓸 토큰 해시를 요청 속성으로 넘긴다 |
+| `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. `memory_read`, `artifact_write` 에서는 `_fos_ctx` 를 버린다 |
+| `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
+| `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
+| `orchestration.application.AgentDelegationService` | 부모 찾기, 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
+| `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
+| `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정한다 |
+| `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |
+
+**MCP 쪽은 Hermes 를 부르지 않는다.** 실행을 시작하고 멈추는 것은 `orchestration` 이 기존 `AgentRunner` 와 `HermesRunsClient` 로 한다.
+
+### 기다리지 않는 위임
+
+`agent_delegate` 는 제출까지만 기다리고 실행 번호를 돌려준다.
+실행은 가상 스레드 하나에서 `AgentRunner.run` 으로 끝까지 돌고, 끝나면 답을 그 실행 줄의 `output_text` 에 적는다.
+동시에 도는 위임은 뿌리당 한도와 전체 한도로 묶는다. 트랜잭션 안에서 Hermes 를 부르지 않는다.
+
+### 깊이와 동시 한도
+
+깊이는 부모의 `parent_execution_id` 를 따라 올라가 센다. 사용자가 부른 실행이 0 이다.
+`ChildExecutionRunner` 가 깊이 1 로 막던 규칙은 이 설정값으로 바뀐다.
+뿌리당 동시 자식은 같은 `root_execution_id` 아래 `delegation_key` 가 있는 도는 실행의 수로 센다. Memory 제안처럼 위임이 아닌 자식은 세지 않는다.
+
+### `ResearchAndBuildFlow`
+
+넓히지 않는다. 지우는 조건은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md#researchandbuildflow-의-자리) 에 있다.
+
 ## 대화
 
 `chat` 패키지가 대화와 메시지를 갖는다.
@@ -853,12 +889,11 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 ## 아직 만들지 않은 것
 
-- Hermes 하위 에이전트가 자식 실행 줄을 남기는 경로.
-  지금 자식 실행을 만드는 자리는 Memory 제안 하나뿐이고,
-  그것도 `assistant.memory.propose.enabled` 를 켠 곳에서만 돈다.
-  기본값은 꺼짐이다.
-  `parent_execution_id` 와 `root_execution_id` 는 있고 나무 조회와 화면도 자식을 담을 수 있다
-- 여러 에이전트를 잇는 실행 구조
+- Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
+  그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
+  우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다
+- `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
+- 사용자 전체의 동시 위임 한도. 지금은 뿌리당 한도와 서버 전체 한도만 있다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

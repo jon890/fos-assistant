@@ -32,3 +32,4 @@
 | [ADR-028](ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) | 결과물은 사용자의 대화 폴더에 MCP 도구로 쓴다 | Accepted |
 | [ADR-029](ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) | 에이전트 도구는 Control Plane 이 등급으로 판정하고 Hermes 설정 API 로 쓴다 | Accepted. ADR-007 에 더한다 |
 | [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) | 모델과 effort 는 대화가 고르고 기본값은 Hermes profile 이 갖는다 | Accepted. ADR-007 의 모델 부분을 대체한다 |
+| [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md) | MCP 호출의 부모 실행은 profile 플러그인이 서명한 뿌리 session 으로 잇는다 | Accepted. ADR-017 의 부모 잇기를 정한다 |
