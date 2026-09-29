@@ -1,8 +1,8 @@
 package com.bifos.assistant.usage.application;
 
-import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.ModelOption;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
@@ -64,13 +64,14 @@ public class ExecutionRecorder {
     }
 
     /**
-     * 요청에 실을 모델과 다시 시도한 직전 실행까지 적으며 RUNNING 으로 만들어 돌려준다.
+     * 대화가 고른 모델과 effort 까지 적으며 RUNNING 으로 만들어 돌려준다.
      *
      * <p>{@code requested} 를 시작할 때 적어 두면 실패로 끝난 실행도 어느 provider 로 시도한 것인지
-     * 남는다. 성공하면 실제로 돈 값으로 덮인다.
+     * 남는다. 끝나면 세션에서 읽은 실제 값으로 덮인다. 기본값으로 보냈으면 provider 와 모델을 비워 두고
+     * effort 만 적는다.
      *
-     * @param requested 이 실행에 실을 provider 와 모델. 고르지 못했으면 null
-     * @param retryOfExecutionId 막혀서 넘어오며 대신하는 직전 실행. 첫 시도면 null
+     * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
+     * @param retryOfExecutionId 이 실행이 대신하는 직전 실행. 없으면 null
      */
     public AgentExecution start(
             CurrentUser user,
@@ -79,7 +80,7 @@ public class ExecutionRecorder {
             Long parentExecutionId,
             Long rootExecutionId,
             ExecutionContextSnapshot context,
-            ModelOption requested,
+            ModelChoice requested,
             Long retryOfExecutionId) {
         return executions.save(
                 base(user, conversation, agent)
@@ -88,6 +89,7 @@ public class ExecutionRecorder {
                         .retryOfExecutionId(retryOfExecutionId)
                         .provider(requested == null ? null : requested.provider())
                         .model(requested == null ? null : requested.model())
+                        .reasoningEffort(requested == null ? null : requested.reasoningEffort())
                         .contextChars(context.contextChars())
                         .contextOmittedItems(context.contextOmittedItems())
                         .runtimeFingerprint(context.runtimeFingerprint())
@@ -106,14 +108,14 @@ public class ExecutionRecorder {
      * 끝난 실행을 SUCCEEDED 로 갱신한다.
      *
      * <p>기록할 모델은 {@code GET /api/sessions/{session_id}} 가 정한다. 실행 조회의 {@code model} 은
-     * 우리가 보낸 값을 되돌려 줄 뿐이라, 넘김이 일어난 실행에서는 실제와 어긋난다. 세션 조회가 실패해도
-     * 실행은 성공으로 남기고 요청에 보낸 값을 적는다. 모델 이름을 모르는 것이 답을 버릴 이유가 되지
-     * 않는다.
+     * 우리가 보낸 값을 되돌려 줄 뿐이고, 기본값으로 보낸 실행에서는 profile 이름만 돌려준다. 세션 조회가
+     * 실패해도 실행은 성공으로 남기고 대화가 고른 값을 적는다. 기본값으로 보냈으면 provider 와 모델은
+     * 비고 금액도 비어 있다. 모델 이름을 모르는 것이 답을 버릴 이유가 되지 않는다.
      *
-     * @param requested 이 실행에 실어 보낸 provider 와 모델
+     * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution complete(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelOption requested) {
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
         SessionRuntime actual = readActualRuntime(agent, result);
         String provider = firstNonBlank(
@@ -146,7 +148,7 @@ public class ExecutionRecorder {
 
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelOption requested) {
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
         if (result == null) {
             return cancel(execution);
         }
@@ -170,7 +172,7 @@ public class ExecutionRecorder {
                 hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), result.sessionId());
         if (actual == null) {
             log.info(
-                    "실제로 돈 모델을 읽지 못해 요청에 보낸 값을 적는다 profile={} sessionId={}",
+                    "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}",
                     agent.hermesProfile(),
                     result.sessionId());
         }

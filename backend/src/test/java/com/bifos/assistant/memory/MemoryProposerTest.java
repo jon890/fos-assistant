@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
@@ -129,11 +128,8 @@ class MemoryProposerTest {
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
-        AgentModelSelector selector = mock(AgentModelSelector.class);
-        when(selector.availableFor(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(java.util.List.of(new ModelOption("provider", "model")));
         MemoryProposer isolated = new MemoryProposer(new MemoryProposalProperties(true),
-                mock(MemoryService.class), mock(HermesRunsClient.class), selector, failingRecorder,
+                mock(MemoryService.class), mock(HermesRunsClient.class), failingRecorder,
                 new ObjectMapper());
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
 

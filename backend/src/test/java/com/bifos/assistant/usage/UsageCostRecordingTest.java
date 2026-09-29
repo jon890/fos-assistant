@@ -3,9 +3,9 @@ package com.bifos.assistant.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
@@ -156,8 +156,8 @@ class UsageCostRecordingTest {
      *
      * <p>이 검사는 세션 조회를 하지 않으므로 그 에이전트의 1순위를 그대로 요청 값으로 둔다.
      */
-    private static ModelOption requested(Agent agent) {
-        return new ModelOption(agent.provider(), agent.model());
+    private static ModelChoice requested(Agent agent) {
+        return new ModelChoice(agent.provider(), agent.model(), null);
     }
 
     private AgentExecution complete(HermesRunResult result) {

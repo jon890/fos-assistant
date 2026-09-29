@@ -29,6 +29,7 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.MemoryScope;
@@ -175,6 +176,7 @@ class ChatServiceTest {
                                 "example-model-large",
                                 "anthropic",
                                 new TokenUsage(120L, 80L, 40L, 160L)));
+        stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
         stub().beforeAwait(() ->
                 assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
                         .singleElement()
@@ -284,7 +286,7 @@ class ChatServiceTest {
     }
 
     @Test
-    void records_the_bound_model_when_the_run_only_echoes_the_profile_name() {
+    void 기본값으로_보냈고_세션이_답하지_못하면_provider와_모델이_비어_있다() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
@@ -294,8 +296,9 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
-        assertThat(execution.model()).isEqualTo("example-model-large");
-        assertThat(execution.provider()).isEqualTo("anthropic");
+        assertThat(execution.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(execution.model()).as("model").isNull();
+        assertThat(execution.provider()).as("provider").isNull();
     }
 
     @Test
@@ -492,34 +495,27 @@ class ChatServiceTest {
     }
 
     @Test
-    void provider를_넘어간_turn의_작업_과정은_답을_만든_시도만_센다() {
+    void 막히면_넘기지_않고_PROVIDER_BLOCKED_로_실패한다() {
         CurrentUser dad = member("dad@example.com", "dad");
-        Agent agent = agents.findByCode("dad").orElseThrow();
-        modelSelector.replace(agent, List.of(
-                new ModelOption("anthropic", "example-model-large"),
-                new ModelOption("nvidia", "example-model-small")));
         stub().willReturnInOrder(
                 new HermesRunResult("run-blocked", "sess-1", "failed", null, null, null,
                         HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
                 HermesRunResult.of("run-answer", "sess-1", "completed", "답", null, null, TokenUsage.empty()));
-        doAnswer(invocation -> {
-            String runId = invocation.getArgument(2);
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            int toolCount = "run-blocked".equals(runId) ? 2 : 1;
-            for (int index = 0; index < toolCount; index++) {
-                onEvent.accept(new RunEvent("tool.started", null, "search", null, null, null));
-                onEvent.accept(new RunEvent("tool.completed", null, "search", null, 1L, false));
-            }
-            return null;
-        }).when(eventStream).open(any(), any(), any(), any(), any());
 
         List<ChatEvent> relayed = new ArrayList<>();
-        chat.stream(dad, null, "찾아 줘", "dad", relayed::add);
+        assertThatThrownBy(() -> chat.stream(dad, null, "찾아 줘", "dad", relayed::add))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
-        ChatEvent done = relayed.getLast();
-        assertThat(done.type()).isEqualTo("done");
-        assertThat(chat.activitySummaries(chat.history(dad, access.requireOwnId(dad, done.conversationId()))).get(done.executionId())
-                .toolCount()).isEqualTo(1);
+        assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
+        assertThat(relayed).extracting(ChatEvent::type).doesNotContain("switched", "reset");
+        assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
+                .singleElement()
+                .satisfies(execution -> {
+                    assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
+                    assertThat(execution.errorCode()).isEqualTo("PROVIDER_BLOCKED");
+                });
     }
 
     @Test

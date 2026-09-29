@@ -1,15 +1,12 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -31,14 +28,14 @@ public class MemoryProposer {
     private final MemoryProposalProperties properties;
     private final MemoryService memories;
     private final HermesRunsClient hermes;
-    private final AgentModelSelector modelSelector;
     private final ExecutionRecorder executions;
     private final ObjectMapper objectMapper;
 
     /**
      * 제안을 만들지 못하면 아무것도 만들지 않는다. 원래 대화 실행은 실패시키지 않는다.
      *
-     * <p>제안 실행은 원래 실행의 agent와 대화를 이어 받아 같은 실행 기록 계통에 남긴다.
+     * <p>제안 실행은 원래 실행의 agent와 대화를 이어 받아 같은 실행 기록 계통에 남긴다. 모델과 effort 도
+     * 그 대화가 고른 값을 쓴다.
      */
     public void proposeFrom(CurrentUser user, Conversation conversation, Agent agent,
             AgentExecution parentExecution, String answer) {
@@ -46,16 +43,12 @@ public class MemoryProposer {
 
         AgentExecution proposalExecution = null;
         try {
-            // 제안 실행도 그 에이전트가 정한 1순위를 쓴다. 쓸 수 있는 것이 없으면 만들지 않는다.
-            ModelOption option = modelSelector.availableFor(agent).stream()
-                    .findFirst()
-                    .orElseThrow(() -> new ApiException(
-                            ErrorCode.NO_MODEL_AVAILABLE, "this agent has no model it can use right now"));
+            ModelChoice choice = conversation.modelChoice();
             proposalExecution = executions.start(user, conversation, agent,
                     parentExecution.id(), parentExecution.id(),
-                    ExecutionContextSnapshot.ofChars(0L), option, null);
+                    ExecutionContextSnapshot.ofChars(0L), choice, null);
             HermesRunCommand command = new HermesRunCommand(agent.hermesProfile(), agent.apiBaseUrl(),
-                    prompt(answer), null, null, option.provider(), option.model(), null);
+                    prompt(answer), null, null, choice.provider(), choice.model(), choice.reasoningEffort());
             String runId = hermes.submit(command);
             executions.attachRunId(proposalExecution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
@@ -63,7 +56,7 @@ public class MemoryProposer {
                 executions.fail(proposalExecution, statusOf(result));
                 return;
             }
-            AgentExecution completed = executions.complete(proposalExecution, agent, result, option);
+            AgentExecution completed = executions.complete(proposalExecution, agent, result, choice);
             proposalOf(result.output()).ifPresent(proposal ->
                     memories.proposeUser(user, proposal.title(), proposal.content(), completed.id()));
         } catch (Exception ex) {

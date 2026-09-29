@@ -182,36 +182,30 @@ test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨�
   expect(await scroll.evaluate((element) => element.scrollTop)).toBe(position);
 });
 
-test("막혀서 넘어가면 그 답 위에 넘어간 곳을 한 줄로 알린다", async ({ page, hermes }, testInfo) => {
+test("막힌 모델을 고른 대화는 넘기지 않고 실패한다", async ({ page, hermes }, testInfo) => {
   const blockedProvider = `blocked-${testInfo.project.name}`;
-  await page.request.put(`/api/admin/agents/${SWITCH_AGENT_CODE}/models`, {
-    data: {
-      models: [
-        { provider: blockedProvider, model: "blocked-model" },
-        { provider: "openai-codex", model: "example-model" },
-      ],
-    },
+  const created = await page.request.post("/api/chat/conversations", {
+    data: { agentCode: SWITCH_AGENT_CODE },
   });
+  expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
+  const { conversationId } = (await created.json()) as { conversationId: string };
+  const chosen = await page.request.put(`/api/chat/conversations/${conversationId}/model`, {
+    data: { provider: blockedProvider, model: "blocked-model", reasoningEffort: null },
+  });
+  expect(chosen.ok(), `모델을 고르지 못했다: ${chosen.status()}`).toBeTruthy();
+
   await hermes.blockProvider(blockedProvider);
   try {
     const response = await page.request.post("/api/chat", {
-      data: { text: "넘김 화면 검사", agentCode: SWITCH_AGENT_CODE },
+      data: { conversationId, text: "막힘 화면 검사" },
     });
-    expect(response.ok()).toBeTruthy();
+    expect(response.ok()).toBeFalsy();
+    expect(((await response.json()) as { code: string }).code).toBe("PROVIDER_BLOCKED");
   } finally {
     await hermes.clearBlockedProviders();
   }
 
-  await page.goto("/");
-  // 같은 초에 만들어진 대화가 여럿이라 목록의 첫 줄이 이 대화라고 볼 수 없다. 이름으로 고른다.
-  const opener = page.getByRole("button", { name: "사이드바 열기" });
-  if (await opener.isVisible()) await opener.click();
-  await page
-    .getByRole("complementary", { name: "사이드바" })
-    .getByRole("link", { name: /넘김 화면 검사/ })
-    // 다른 폭에서 같은 이름의 대화를 이미 만들었다. 목록은 최근 순서라 첫 줄이 이번 것이다.
-    .first()
-    .click();
-  const notice = page.getByTestId("provider-switched").last();
-  await expect(notice).toHaveText(/여기부터 openai-codex\/example-model로 실행해요/);
+  await page.goto(`/chat/${conversationId}`);
+  await expect(page.getByTestId("user-message").last()).toContainText("막힘 화면 검사");
+  await expect(page.getByTestId("provider-switched")).toHaveCount(0);
 });

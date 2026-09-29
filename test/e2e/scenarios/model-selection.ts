@@ -1,56 +1,51 @@
 /**
- * 실행마다 모델을 정해 보내고, 실제로 돈 모델을 적고, 막히면 다음으로 넘기는 것을 본다.
+ * 실행이 대화가 고른 모델과 effort 로 Hermes 를 부르고, 실제로 돈 모델을 적고, 막혀도 넘기지 않는 것을 본다.
  *
  * <p>이 시나리오는 사용량 합계를 검사하는 시나리오보다 뒤에 돈다. 여기서 실행을 더 만들기 때문이다.
  */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
-import { DAD_BINDING } from "./binding.ts";
 
-type ModelOptionView = { rank: number; provider: string; model: string };
 type ExecutionView = {
   id: number;
   provider: string | null;
   model: string | null;
   status: string;
   errorCode: string | null;
-  retryOfExecutionId: number | null;
 };
 type Turn = { conversationId: string; executionId: number; assistantText: string };
 
-/** 막힘을 검사할 때 2순위로 쓸 것이다. */
-const SECOND = { provider: "nvidia", model: "example-provider/example-model-b" } as const;
+/** 가짜 Hermes 의 세션이 모델을 받지 않았을 때 답하는 기본값이다. */
+const PROFILE_DEFAULT = { provider: "openai-codex", model: "example-model" } as const;
+
+/** 대화에서 고를 모델이다. 기본값과 달라야 고른 값이 실렸는지 알 수 있다. */
+const CHOSEN = { provider: "nvidia", model: "example-provider/example-model-b", reasoningEffort: "high" } as const;
 
 export const modelSelectionScenario: Scenario = {
-  name: "모델 선택과 넘김",
+  name: "대화의 모델 선택",
 
   async run(context) {
-    step("에이전트를 등록하면 1순위가 함께 만들어진다");
-    const seeded = expectStatus(
-      await call(context, "/admin/agents/dad/models", { token: context.tokens.dad }),
-      200,
-      "모델 목록 조회",
-    ).json<ModelOptionView[]>();
-    expect(
-      seeded.length === 1 && seeded[0]!.rank === 1
-        && seeded[0]!.provider === DAD_BINDING.provider
-        && seeded[0]!.model === DAD_BINDING.model,
-      `1순위가 만들어지지 않았다: ${JSON.stringify(seeded)}`,
-    );
-
-    step("요청에 provider 와 모델을 둘 다 싣는다");
-    expectStatus(
+    step("고르지 않은 대화는 provider 와 모델을 빼고 보낸다");
+    const plain = expectStatus(
       await call(context, "/chat/messages", {
         method: "POST",
         token: context.tokens.dad,
-        body: { text: "모델을 싣는지 검사", agentCode: "dad" },
+        body: { text: "기본값 검사", agentCode: "dad" },
       }),
       200,
-      "모델을 실은 대화",
-    );
-    const sent = context.hermes.lastSubmittedRuntime();
+      "기본값 대화",
+    ).json<Turn>();
+    const sentPlain = context.hermes.lastSubmittedRuntime();
     expect(
-      sent.provider === DAD_BINDING.provider && sent.model === DAD_BINDING.model,
-      `요청에 provider 와 모델이 함께 실리지 않았다: ${JSON.stringify(sent)}`,
+      sentPlain.provider === undefined && sentPlain.model === undefined
+        && sentPlain.reasoningEffort === undefined,
+      `기본값 대화의 요청에 모델이 실렸다: ${JSON.stringify(sentPlain)}`,
+    );
+
+    step("기본값 대화의 실행은 세션이 답한 profile 기본값을 적는다");
+    const plainExecution = (await executionsOf(context)).find((execution) => execution.id === plain.executionId);
+    expect(
+      plainExecution?.provider === PROFILE_DEFAULT.provider && plainExecution?.model === PROFILE_DEFAULT.model,
+      `세션의 기본값을 적지 않았다: ${JSON.stringify(plainExecution)}`,
     );
 
     step("실제로 돈 모델은 세션 조회의 값이다");
@@ -63,101 +58,93 @@ export const modelSelectionScenario: Scenario = {
       200,
       "세션 모델 검사",
     ).json<Turn>();
-    const afterProbe = await executionsOf(context);
-    const probed = afterProbe.find((execution) => execution.id === probe.executionId);
+    const probed = (await executionsOf(context)).find((execution) => execution.id === probe.executionId);
     expect(
       probed?.model === "example-provider/example-model-c" && probed?.provider === "nvidia",
       `실제로 돈 모델을 적지 않았다: ${JSON.stringify(probed)}`,
     );
 
-    step("빈 목록은 거절한다");
-    const refused = await call(context, "/admin/agents/dad/models", {
-      method: "PUT",
-      token: context.tokens.dad,
-      body: { models: [] },
-    });
-    expect(refused.status === 400, `빈 목록이 거절되지 않았다: ${refused.status}`);
-
-    step("목록 전체를 바꾸면 그 순서로 남는다");
-    const replaced = expectStatus(
-      await call(context, "/admin/agents/dad/models", {
-        method: "PUT",
+    step("대화에서 모델과 effort 를 고르면 그 값을 싣는다");
+    const conversationId = await emptyConversation(context);
+    await chooseModel(context, conversationId, CHOSEN);
+    const chosen = expectStatus(
+      await call(context, "/chat/messages", {
+        method: "POST",
         token: context.tokens.dad,
-        body: {
-          models: [
-            { provider: DAD_BINDING.provider, model: DAD_BINDING.model },
-            { provider: SECOND.provider, model: SECOND.model },
-          ],
-        },
+        body: { conversationId, text: "고른 모델 검사" },
       }),
       200,
-      "모델 목록 저장",
-    ).json<ModelOptionView[]>();
+      "고른 모델 대화",
+    ).json<Turn>();
+    const sentChosen = context.hermes.lastSubmittedRuntime();
     expect(
-      replaced.length === 2 && replaced[1]!.rank === 2 && replaced[1]!.provider === SECOND.provider,
-      `순서대로 남지 않았다: ${JSON.stringify(replaced)}`,
+      sentChosen.provider === CHOSEN.provider && sentChosen.model === CHOSEN.model
+        && sentChosen.reasoningEffort === CHOSEN.reasoningEffort,
+      `고른 provider, 모델, effort 가 실리지 않았다: ${JSON.stringify(sentChosen)}`,
+    );
+    const chosenExecution = (await executionsOf(context)).find((execution) => execution.id === chosen.executionId);
+    expect(
+      chosenExecution?.model === CHOSEN.model,
+      `실행 목록의 모델이 고른 값이 아니다: ${JSON.stringify(chosenExecution)}`,
     );
 
-    step("1순위가 막히면 그 턴 안에서 2순위로 넘어가 답이 온다");
-    context.hermes.blockProvider(DAD_BINDING.provider);
+    step("고른 모델의 provider 가 막히면 넘기지 않고 PROVIDER_BLOCKED 로 실패한다");
+    context.hermes.blockProvider(CHOSEN.provider);
     try {
-      const switched = expectStatus(
-        await call(context, "/chat/messages", {
-          method: "POST",
-          token: context.tokens.dad,
-          body: { text: "넘김 검사", agentCode: "dad" },
-        }),
-        200,
-        "넘어간 대화",
-      ).json<Turn>();
+      const blocked = await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { conversationId, text: "막힘 검사" },
+      });
+      const body = blocked.json<{ code?: string }>();
       expect(
-        switched.assistantText.includes("넘김 검사"),
-        `넘어간 뒤의 답이 오지 않았다: ${switched.assistantText}`,
+        blocked.status === 502 && body.code === "PROVIDER_BLOCKED",
+        `막혔는데 PROVIDER_BLOCKED 로 실패하지 않았다: ${blocked.status} ${JSON.stringify(body)}`,
       );
-      const after = context.hermes.lastSubmittedRuntime();
+      const sentBlocked = context.hermes.lastSubmittedRuntime();
       expect(
-        after.provider === SECOND.provider && after.model === SECOND.model,
-        `2순위로 다시 보내지 않았다: ${JSON.stringify(after)}`,
+        sentBlocked.provider === CHOSEN.provider,
+        `막힌 뒤 다른 provider 로 넘겼다: ${JSON.stringify(sentBlocked)}`,
       );
-
-      step("그 대화의 실행이 둘 남고 하나는 실패, 하나는 성공이다");
-      const executions = await executionsOf(context);
-      const succeeded = executions.find((execution) => execution.id === switched.executionId);
-      expect(succeeded?.status === "SUCCEEDED", `성공한 실행이 없다: ${JSON.stringify(succeeded)}`);
-      const failed = executions.find(
-        (execution) => execution.id === succeeded?.retryOfExecutionId,
-      );
+      const latest = (await executionsOf(context))[0];
       expect(
-        failed?.status === "FAILED" && failed?.errorCode === "PROVIDER_BLOCKED",
-        `막혀서 실패한 실행이 남지 않았다: ${JSON.stringify(failed)}`,
-      );
-
-      step("막힌 provider 가 관리 화면에 보인다");
-      const blocked = expectStatus(
-        await call(context, "/admin/providers/blocked", { token: context.tokens.dad }),
-        200,
-        "막힌 provider 조회",
-      ).json<{ provider: string; remainingSeconds: number }[]>();
-      expect(
-        blocked.some((row) => row.provider === DAD_BINDING.provider && row.remainingSeconds > 0),
-        `막힌 provider 가 보이지 않는다: ${JSON.stringify(blocked)}`,
+        latest?.status === "FAILED" && latest?.errorCode === "PROVIDER_BLOCKED"
+          && latest?.provider === CHOSEN.provider,
+        `막혀서 실패한 실행이 남지 않았다: ${JSON.stringify(latest)}`,
       );
     } finally {
       context.hermes.clearBlockedProviders();
     }
-
-    step("목록을 1순위 하나로 되돌린다");
-    expectStatus(
-      await call(context, "/admin/agents/dad/models", {
-        method: "PUT",
-        token: context.tokens.dad,
-        body: { models: [{ provider: DAD_BINDING.provider, model: DAD_BINDING.model }] },
-      }),
-      200,
-      "모델 목록 복원",
-    );
   },
 };
+
+async function emptyConversation(context: Parameters<Scenario["run"]>[0]): Promise<string> {
+  return expectStatus(
+    await call(context, "/chat/conversations", {
+      method: "POST",
+      token: context.tokens.dad,
+      body: { agentCode: "dad" },
+    }),
+    200,
+    "빈 대화 만들기",
+  ).json<{ conversationId: string }>().conversationId;
+}
+
+async function chooseModel(
+  context: Parameters<Scenario["run"]>[0],
+  conversationId: string,
+  choice: { provider: string; model: string; reasoningEffort: string },
+): Promise<void> {
+  expectStatus(
+    await call(context, `/chat/conversations/${conversationId}/model`, {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: choice,
+    }),
+    200,
+    "모델 고르기",
+  );
+}
 
 async function executionsOf(context: Parameters<Scenario["run"]>[0]): Promise<ExecutionView[]> {
   return expectStatus(

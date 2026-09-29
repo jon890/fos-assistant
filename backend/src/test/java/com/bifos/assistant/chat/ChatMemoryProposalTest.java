@@ -13,6 +13,7 @@ import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -81,6 +82,27 @@ class ChatMemoryProposalTest {
         runWithProposal();
         chat.stream(user, null, "질문", "proposal", event -> { });
         assertProposalExecution();
+    }
+
+    @Test
+    void 모델을_고른_대화의_제안_실행도_그_선택으로_Hermes를_부른다() {
+        runWithProposal();
+        Long conversationId = chat.startEmpty(user, "proposal").id();
+        chat.chooseModel(user, conversationId, new ModelChoice("nvidia", "example-model-small", "low"));
+
+        chat.send(user, conversationId, "질문", null);
+
+        StubHermesRunsClient stub = (StubHermesRunsClient) hermes;
+        assertThat(stub.received()).as("대화 실행과 제안 실행").hasSize(2);
+        assertThat(stub.received().getLast()).satisfies(proposal -> {
+            assertThat(proposal.provider()).isEqualTo("nvidia");
+            assertThat(proposal.model()).isEqualTo("example-model-small");
+            assertThat(proposal.reasoningEffort()).isEqualTo("low");
+        });
+        assertThat(executions.findAll())
+                .filteredOn(execution -> execution.parentExecutionId() != null)
+                .singleElement()
+                .satisfies(child -> assertThat(child.reasoningEffort()).isEqualTo("low"));
     }
 
     private void runWithProposal() {
