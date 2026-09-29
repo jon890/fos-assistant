@@ -110,7 +110,7 @@ const OBSERVE_MAX_FAILURES = 3;
 
 export function ChatPanel({ initialConversationId }: { initialConversationId: string | null }) {
   const pathname = usePathname();
-  const { conversations, refresh, newConversationVersion } = useConversations();
+  const { conversations, refresh, replace, newConversationVersion } = useConversations();
   const displayName = useShellDisplayName();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(initialConversationId);
@@ -947,7 +947,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     }
   }
 
-  const selectedAgent = conversations.find((item) => item.id === conversationId)?.agentName
+  const currentConversation = conversations.find((item) => item.id === conversationId);
+  const selectedAgent = currentConversation?.agentName
     ?? agents.find((agent) => agent.code === agentCode)?.name;
   useShellTitle(selectedAgent ?? null);
   const startScreen = freshStart && turns.length === 0 && !sending;
@@ -1049,6 +1050,13 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             mention={startScreen && !agentLocked && agents.length > 0
               ? { agents, onPick: setAgentCode } : undefined}
             onBlockingChange={setComposerBlocking}
+            modelChoice={currentConversation ? {
+              provider: currentConversation.provider,
+              model: currentConversation.model,
+              reasoningEffort: currentConversation.reasoningEffort,
+            } : null}
+            // 저장 응답으로 그 줄만 바꾼다. 목록을 다시 읽으면 먼저 나간 읽기가 늦게 와 저장한 줄을 저장 전의 줄로 되돌릴 수 있다.
+            onModelChoiceSaved={replace}
           />
           {startScreen ? (
             <StarterPrompts
