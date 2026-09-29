@@ -202,6 +202,7 @@ grep -rn "userEmail:" test/e2e/scenarios/memory.ts test/e2e/scenarios/artifact.t
 | `backend/src/main/java/com/bifos/assistant/usage/infra/AgentExecutionRepository.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpPrincipalTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpLegacyTokenTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpCallSigner.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/AgentTokenProfileMigrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpArtifactWriteToolTest.java` | 수정 |
