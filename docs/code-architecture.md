@@ -404,7 +404,7 @@ Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 �
 | `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
 | `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
 
-`McpController` 는 도구 이름과 인자 모양을 본 뒤 `McpCallerResolver` 를 부르고, 그 `McpCaller.user()` 로 `McpToolService` 를 부른다.
+`McpController` 는 `params.name` 이 문자열이고 `params.arguments` 가 객체인지 본 뒤 `McpCallerResolver` 를 부른다. 도구별 인자 검사는 그 뒤에 하고, 그 `McpCaller` 로 `McpToolService` 를 부른다.
 판정이 실패하면 `McpToolService.invalidContext()` 의 같은 도구 결과를 돌려준다.
 `memory_read` 와 `artifact_write` 가 이 길을 쓰고, 앞으로의 `agent_*` 도 같은 길을 쓴다.
 
@@ -446,7 +446,7 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 「MCP 요청자」 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
 | `orchestration.application.AgentDelegationService` | 부모 찾기(`DelegationParentResolver` 를 쓴다), 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
-| `orchestration.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키를 계산한다. 정의는 ADR-032 의 「`delegation_key`」 |
+| `orchestration.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
 | `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
 | `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다 |
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |

@@ -38,12 +38,13 @@
 
 ### 2. `test/e2e/scenarios/mcp-principal.ts` 신규와 `test/e2e/run.ts` 등록
 
-1. 관리자가 GROUP 에이전트 하나를 공유 profile 로 등록한다(켜진 상태)
+0. 시나리오 파일이 `export const MCP_PRINCIPAL_PROFILE = "mcp-shared-group"` 을 둔다. `test/e2e/run.ts` 의 `writeProfileKeys` 목록과 `startFakeHermes` 의 key 표에 이 상수를 더한다. `agent.hermes_profile` 은 유일해서 새 GROUP 에이전트에 새 profile 이 필요하고, key 가 없으면 실행 제출이 실패한다
+1. 관리자가 GROUP 에이전트 하나를 `MCP_PRINCIPAL_PROFILE` 로 등록한다(켜진 상태, `visibility: "GROUP"`, `ownerEmail: null`)
 2. 그 profile 에 묶은 토큰을 발급하고 `setMemoryReadMcp` 에 준다
 3. 아빠와 아이가 각자 제목만 싣는 USER Memory 를 하나씩 만든다
 4. 아빠와 아이가 **나란히** 그 에이전트로 새 대화를 보낸다. 입력은 각자 자기 Memory 번호의 검사 글이다. 두 답에 각자 자기 본문만 있다
 5. 아빠가 아이의 번호로, 아이가 아빠의 번호로 보낸다. 답이 `Memory 항목을 읽을 수 없습니다.` 이고 상대 본문이 없다
-6. 두 대화의 실행 줄(`GET /api/v1/usage/executions` 의 줄이나 실행 나무)이 각자의 사용자 것이다
+6. 아빠와 아이가 각자 `GET /api/v1/usage/executions` 를 부르면 자기 turn 의 실행 줄만 보인다. 상대 turn 의 실행 번호가 목록에 없다
 7. 정리: 토큰 폐기, Memory 삭제, 에이전트 끄기
 
 ### 3. `tasks/plan039-agent-tools/` 의 전제와 정의
@@ -58,6 +59,8 @@
   - `delegation_key` 는 `DelegationKey.of(부모 실행의 profileName, rootSessionId, sessionId, toolCallId)`(ADR-032 「`delegation_key`」)
   - 부모는 `McpCallerResolver` 가 찾은 `McpCaller.parent()`. `DelegationParentResolver` 를 다시 부르지 않는다
   - `AgentRunner.run` 시그니처를 `RunSession` 을 받는 하나로 고치고, 자식 session 은 `RunSession.fresh()` 를 쓴다
+  - 작업 항목 2 의 「오버로드를 더하거나, 두 값을 담는 작은 값 객체를 받는 오버로드 하나를 더한다. 기존 호출은 바꾸지 않는다」 를 「단일 `AgentRunner.run` 에 `DelegationKey delegationKey` 인자를 더하고 기존 호출은 null 을 넘긴다. `ExecutionRecorder.start` 도 `DelegationKey` 를 받아 처음 만들 때 적는다」 로 바꾼다
+  - 작업 항목 3 의 `delegate(..., String sessionId, String delegationKey, ...)` 를 `delegate(..., RunSession session, DelegationKey delegationKey, ...)` 로 바꾼다
   - 「남의 토큰으로 서명한 호출」 을 「다른 profile 의 토큰으로 서명한 호출」 로, 「같은 `tool_call_id` 두 번」 옆에 「다른 session 의 같은 `tool_call_id` 는 실행 둘」 을 더한다
 - `phase-03.md`
   - `agent_stop` 의 권한을 요청자(부모 실행의 사용자) 기준으로
@@ -79,7 +82,7 @@ node test/e2e/run.ts
 ```bash
 # cwd: 저장소 root
 python3 /Users/nhn/personal/fos-skills/planning/scripts/verify_task.py plan039-agent-tools
-grep -n "토큰의 사용자\|SHA-256(\`root_session_id\`" tasks/plan039-agent-tools/*.md
+grep -n "토큰의 사용자\|SHA-256(\`root_session_id\`\|오버로드를 더하거나\|String sessionId, String delegationKey" tasks/plan039-agent-tools/*.md
 ```
 
 `verify_task.py` 가 종료 코드 0 이고 grep 이 아무것도 찾지 않는다.
