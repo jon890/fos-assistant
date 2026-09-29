@@ -297,7 +297,7 @@ async function seedBrowserToolsets(hermesBaseUrl: string): Promise<void> {
       },
       body: JSON.stringify({
         profile,
-        config: { platform_toolsets: { api_server: ["fos-assistant-memory"] } },
+        config: { platform_toolsets: { api_server: ["fos-assistant"] } },
       }),
     });
     if (!response.ok) {
