@@ -50,6 +50,7 @@ import { chatAttachmentScenario } from "./scenarios/chat-attachment.ts";
 import { artifactScenario } from "./scenarios/artifact.ts";
 import { AGENT_TOOLS_PROFILE, agentToolsScenario } from "./scenarios/agent-tools.ts";
 import { MCP_PRINCIPAL_PROFILE, mcpPrincipalScenario } from "./scenarios/mcp-principal.ts";
+import { NATIVE_DELEGATION_PROFILE, nativeDelegationScenario } from "./scenarios/native-delegation-mcp.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -97,6 +98,7 @@ const SCENARIOS: readonly Scenario[] = [
   chatAttachmentScenario,
   artifactScenario,
   mcpPrincipalScenario,
+  nativeDelegationScenario,
   agentToolsScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
   busyScenario,
@@ -134,7 +136,7 @@ async function makeArtifactRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, NATIVE_DELEGATION_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -212,11 +214,13 @@ async function main(): Promise<void> {
       [FLOW_BINDING.profileName]: PROFILE_KEY,
       [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
       [MCP_PRINCIPAL_PROFILE]: PROFILE_KEY,
+      [NATIVE_DELEGATION_PROFILE]: PROFILE_KEY,
     }, undefined, {
       [DAD_BINDING.profileName]: ["fos-assistant"],
       [AGENT_TOOLS_PROFILE]: ["fos-assistant"],
       // 기본 toolset 에는 shell 과 file 이 있어 GROUP 에이전트로 등록되지 않는다. MCP 서버만 켠 profile 로 둔다.
       [MCP_PRINCIPAL_PROFILE]: ["fos-assistant"],
+      [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
     });
     console.log(`   ${hermes.baseUrl}`);
 
