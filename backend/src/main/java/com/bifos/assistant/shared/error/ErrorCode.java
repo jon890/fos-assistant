@@ -94,6 +94,15 @@ public enum ErrorCode {
      * 통과하는지 훑어 알아낼 수 있다. 이유는 서버 로그에만 남긴다. 근거는 ADR-031 이다.
      */
     MCP_CALL_CONTEXT_INVALID(HttpStatus.FORBIDDEN),
+    /**
+     * 하위 에이전트 session 을 등록할 수 없다.
+     *
+     * <p>서명, 부모, session 값 중 무엇이 틀렸는지 밖에 알리지 않는다. 가르면 남의 session 이 도는지 훑어 알아낼
+     * 수 있다. 이유는 서버 로그에만 남긴다. 근거는 ADR-037 이다.
+     */
+    SESSION_BINDING_REJECTED(HttpStatus.FORBIDDEN),
+    /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */
+    SESSION_BINDING_CONFLICT(HttpStatus.CONFLICT),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),

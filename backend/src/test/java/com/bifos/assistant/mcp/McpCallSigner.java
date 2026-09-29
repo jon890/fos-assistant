@@ -68,12 +68,12 @@ public final class McpCallSigner {
     }
 
     /** 그 profile 로 뿌리 session 에서 도는 실행 줄을 만든다. */
-    static AgentExecution running(AgentExecutionRepository executions, Long userId, Long conversationId,
+    public static AgentExecution running(AgentExecutionRepository executions, Long userId, Long conversationId,
             String profileName, String rootSessionId) {
         return save(executions, userId, conversationId, profileName, rootSessionId, ExecutionStatus.RUNNING);
     }
 
-    static AgentExecution save(AgentExecutionRepository executions, Long userId, Long conversationId,
+    public static AgentExecution save(AgentExecutionRepository executions, Long userId, Long conversationId,
             String profileName, String rootSessionId, ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
                 .userId(userId)
@@ -87,14 +87,15 @@ public final class McpCallSigner {
     }
 
     /**
-     * 그 검사가 쓰는 profile 의 실행 줄을 지운다.
+     * 그 검사가 쓰는 profile 의 하위 에이전트 session 등록 줄과 실행 줄을 지운다.
      *
      * <p>검사 클래스들이 H2 하나를 함께 쓰고, 사용자를 지워도 실행 줄은 남는다. 부모는 사용자로 거르지 않으므로
-     * 남은 {@code RUNNING} 줄이 「둘 이상」 으로 걸린다. 검사 때문에 운영 레포지토리에 메서드를 더하지 않으려고
-     * SQL 로 지운다.
+     * 남은 {@code RUNNING} 줄이 「둘 이상」 으로 걸린다. 등록 줄은 지운 실행을 origin 으로 가리키므로 먼저 지운다.
+     * 검사 때문에 운영 레포지토리에 메서드를 더하지 않으려고 SQL 로 지운다.
      */
-    static void clearRuns(JdbcTemplate jdbc, List<String> profileNames) {
+    public static void clearRuns(JdbcTemplate jdbc, List<String> profileNames) {
         for (String profileName : profileNames) {
+            jdbc.update("DELETE FROM hermes_session_binding WHERE profile_name = ?", profileName);
             jdbc.update("DELETE FROM agent_execution WHERE profile_name = ?", profileName);
         }
     }
