@@ -20,6 +20,7 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
     private final Map<String, Map<String, String>> env = new LinkedHashMap<>();
     private final Map<String, String> souls = new LinkedHashMap<>();
     private final List<SoulWrite> soulWrites = new ArrayList<>();
+    private final List<EnvWrite> envWrites = new ArrayList<>();
 
     private Supplier<RuntimeException> createFailure;
     private Supplier<RuntimeException> putEnvFailure;
@@ -29,6 +30,9 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
 
     /** {@code putSoul} 이 어느 profile 에 무엇을 넘겼는지다. */
     public record SoulWrite(String profile, String content) {}
+
+    /** {@code putEnv} 가 어느 profile 의 어느 key 를 썼는지다. 값은 {@link #env(String)} 로 본다. */
+    public record EnvWrite(String profile, String key) {}
 
     @Override
     public void createProfile(String name) {
@@ -44,6 +48,7 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
         if (putEnvFailure != null) {
             throw putEnvFailure.get();
         }
+        envWrites.add(new EnvWrite(profile, key));
         env.computeIfAbsent(profile, ignored -> new LinkedHashMap<>()).put(key, value);
     }
 
@@ -119,6 +124,11 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
 
     public List<String> deletedProfiles() {
         return List.copyOf(deletedProfiles);
+    }
+
+    /** {@code putEnv} 가 성공한 호출을 불린 순서대로 담는다. 실패한 호출은 담지 않는다. */
+    public List<EnvWrite> envWrites() {
+        return List.copyOf(envWrites);
     }
 
     /** 그 profile 의 {@code .env} 에 들어간 것이다. 아직 만든 적이 없으면 비어 있다. */

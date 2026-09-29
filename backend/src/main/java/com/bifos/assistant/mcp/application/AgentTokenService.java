@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -40,8 +41,13 @@ public class AgentTokenService {
     private final AppUserRepository users;
     private final McpProperties properties;
 
-    /** profile 에 묶인 새 토큰을 발급한다. 그 profile 에 에이전트가 있는지는 보지 않는다. */
-    @Transactional
+    /**
+     * profile 에 묶인 새 토큰을 발급한다. 그 profile 에 에이전트가 있는지는 보지 않는다.
+     *
+     * <p>부르는 쪽 트랜잭션과 떼어 곧바로 커밋한다. profile 을 만드는 쪽은 행 잠금을 쥔 트랜잭션 안에서
+     * 부르는데, 발급이 그 트랜잭션에 묶이면 커밋 전 몇 초 동안 Hermes 가 새 토큰으로 붙어도 인증이 실패한다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IssuedToken issue(String profileName, String label) {
         requireProfileName(profileName);
         byte[] bytes = new byte[32]; RANDOM.nextBytes(bytes);
@@ -77,6 +83,17 @@ public class AgentTokenService {
 
     @Transactional
     public void revoke(Long id) { tokens.findById(id).orElseThrow(() -> new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such token")).revoke(); }
+
+    /**
+     * 그 profile 에 묶인 폐기 안 된 토큰을 모두 폐기한다. 없으면 아무것도 하지 않는다.
+     *
+     * <p>부르는 쪽 트랜잭션과 떼어 곧바로 커밋한다. profile 을 거두다 바깥 트랜잭션이 되돌려져도 폐기는
+     * 남아야, 거두지 못한 profile 에 남은 연결이 Memory 와 결과물에 닿지 못한다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void revokeAllFor(String profileName) {
+        tokens.findByProfileNameAndRevokedAtIsNull(profileName).forEach(AgentToken::revoke);
+    }
 
     /**
      * 토큰 원문을 인증한다.

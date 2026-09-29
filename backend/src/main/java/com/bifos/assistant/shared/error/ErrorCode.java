@@ -20,6 +20,8 @@ public enum ErrorCode {
     AGENT_BUSY(HttpStatus.CONFLICT),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
+    /** 요청자가 만들 수 있는 에이전트 수를 이미 채웠다. 지운 에이전트는 세지 않는다. */
+    AGENT_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */
     AGENT_TOOLS_NOT_APPLIED(HttpStatus.BAD_GATEWAY),
     /** 호출자에게 연결한 Hermes profile이 없다. 다른 사용자의 profile을 빌리지 않는다. */

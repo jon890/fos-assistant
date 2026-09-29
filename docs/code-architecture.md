@@ -27,7 +27,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `shared/auth` | 토큰 검사와 현재 사용자 |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `user` | 사용자과 첫 로그인 처리 |
-| `agent` | 에이전트 등록, 공개 범위, Hermes profile 연결, 페르소나, 도구 |
+| `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 추천 질문 생성 |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택 |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회 |
@@ -35,6 +35,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `context` | 실행에 넣을 `instructions` 조립 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
+| `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
 `shared/error` 의 `GlobalExceptionHandler` 가 `MethodArgumentTypeMismatchException` 을 받는다.
@@ -143,8 +144,11 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | 읽기 | 그 에이전트를 쓸 수 있는 사람. 목록에 보이는 것과 같은 기준이다 |
 | 쓰기 | 그 에이전트의 주인, 그리고 `ADMIN` |
 
-자기만 보는 에이전트는 주인이 자기 성격을 쓴다.
-그룹에 공개한 에이전트는 `ADMIN` 만 고친다. 여럿이 함께 쓰는 글이기 때문이다.
+**주인은 공개해도 주인이다.** 그룹에 공개한 에이전트도 만든 사람이 계속 고친다.
+주인이 비어 있는 에이전트(이 규칙 전에 운영에서 등록한 그룹 공개 에이전트)는 `ADMIN` 만 고친다.
+근거는 [ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
+
+판정은 `AgentService.isEditableBy` 하나다. 성격, 도구, 스킬, 공개 범위, 지우기가 모두 이것을 부른다.
 
 **볼 수 없는 에이전트는 없는 에이전트와 같은 응답을 준다.**
 `code` 를 훑어 남의 에이전트가 있는지 알아낼 수 없게 한다.
@@ -162,20 +166,22 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 본문 대신 해시를 주고받는다. 상한이 8000자라 본문을 되보내면 그만큼이 요청에 실린다.
 
-### 소개와 추천 질문
+### 추천 질문
 
-새 대화 화면에 보이는 한 줄 소개와 추천 질문 넷까지다.
-성격과 달리 **데이터베이스에 둔다.** Hermes 가 쓰지 않는 값이고 화면만 읽는다.
-저장 모델은 [`data-schema.md`](data-schema.md) 의 「agent_starter_prompt」 절이 갖는다.
+새 대화 화면에 보이는 추천 질문 넷까지다. 사람이 적지 않고 모델이 만든다.
+근거는 [ADR-036](adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에 있다.
+
+- **`(사용자, 에이전트)` 마다 다르다.** 그 사용자의 최근 대화 첫 질문들을 모델이 요약한다. 이력이 없으면 그 에이전트의 성격과 켜진 도구와 스킬 이름으로 할 수 있는 일을 만든다
+- **backend 메모리에만 둔다.** 재시작하면 비고 다시 만든다
+- **만드는 때는 둘이다.** 추천이 없을 때 새 대화 화면이 읽으면 만들기를 시작한다. 있으면 그 사용자가 그 에이전트와 대화를 마쳤을 때 만든 지 `assistant.starters.refresh-after`(기본 24시간)보다 오래됐으면 다시 만든다
+- 같은 키의 만들기는 하나만 돈다. 실패하면 이전 추천을 그대로 둔다
+- 만들기는 그 에이전트의 profile 로 Hermes 실행 하나를 돌리고 실행 줄에 남긴다. turn 을 마치는 흐름을 기다리게 하지 않고 따로 돈다
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/agents` | 목록의 한 줄마다 `tagline` 과 `starterPrompts` 를 함께 준다 |
-| `GET /api/v1/agents/{code}/starters` | 소개와 추천 질문과 고칠 수 있는지 |
-| `PUT /api/v1/agents/{code}/starters` | 둘을 한꺼번에 쓴다. 본문 `{ "tagline": "...", "starterPrompts": ["..."] }` |
+| `GET /api/v1/agents/{code}/starters` | `{ "prompts": [...], "status": "READY" \| "GENERATING" \| "NONE" }`. `GENERATING` 이면 화면이 몇 초 뒤 한 번 더 읽는다 |
 
-읽고 쓸 수 있는 사람은 위 「누가 고칠 수 있나」 표와 같다.
-소개는 앞뒤 공백을 떼고 비면 null 로 둔다. 추천 질문은 빈 줄을 버리고 넷을 넘으면 거절한다.
+한 줄 소개와 사람이 적던 추천 질문, 그것을 쓰던 `PUT` 경로와 에이전트 목록 응답의 `tagline`, `starterPrompts` 는 없앴다.
 
 ### 어느 클래스가 무엇을 하나
 
@@ -199,7 +205,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - profile 의 공통 비활성화 목록이 막아 켜지지 않은 toolset 은 `AGENT_TOOLS_NOT_APPLIED` 응답의 `missingToolsets` 로 알린다. 화면은 `GET` 으로 현재 목록을 다시 읽는다
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다
 - Hermes 가 쓰기 없이 미분류 toolset 을 켤 수 있다. 도구 응답의 `unclassifiedEnabled` 는 listener 에서 켜진 미분류 이름이고, 화면은 관리자에게 알리라는 경고를 보인다
-- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 읽지 못하면 변경하지 않는다
+- 셸·파일 계열(`terminal`, `file`, `code_execution`, `browser`, `computer_use`)이 켜진 에이전트는 `PRIVATE` 만 된다. `GROUP` 생성과 수정, 도구 변경 모두에서 최종 listener 주소의 현재 목록을 본다. 꺼진 에이전트의 공개 범위 변경은 검사하지 않고 켤 때 검사한다. 읽지 못하면 변경하지 않는다
 - 도구 변경과 에이전트 접근 범위 변경은 같은 에이전트 행의 쓰기 잠금을 잡고 검사한다. 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다
 
 | 경로 | 누가 | 무엇 |
@@ -207,6 +213,116 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | `GET /api/v1/agents/{code}/tools` | 그 에이전트의 주인 또는 `ADMIN` | 응답 `{ "toolsets": [...], "unclassifiedEnabled": [...] }`. `toolsets` 는 등급 표에 있는 이름, 설명, 등급, 켜짐과 요청자의 변경 가능 여부다 |
 | `PUT /api/v1/agents/{code}/tools` | 주인은 주인 등급, `ADMIN` 은 전부 | 본문 `{ "enabled": ["web", "vision"] }`. 켤 toolset 전체다. 바꿀 수 없는 등급은 지금 값과 같아야 한다. 응답은 `GET` 과 같은 모양이다 |
 | `GET`, `PUT /api/v1/admin/agents/{code}/tools` | `ADMIN` | 위와 같은 모양. 다른 사람의 비공개 에이전트는 이 경로로만 다룬다 |
+
+## 에이전트 만들기와 지우기
+
+모든 사용자가 화면에서 자기 에이전트를 만든다. 근거는 [ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
+
+| 경로 | 하는 일 | 거절 |
+| --- | --- | --- |
+| `POST /api/v1/agents` | `{ "name", "visibility"? }` 로 만든다. 공개 범위 기본값은 `PRIVATE`. 201 과 에이전트를 돌려준다 | `VALIDATION_FAILED`, 상한이면 409 `AGENT_LIMIT_REACHED`, profile 을 만들지 못하면 `HERMES_PROVISION_FAILED` |
+| `PATCH /api/v1/agents/{code}/visibility` | `{ "visibility" }`. 주인과 `ADMIN` 이 승인 없이 바꾼다 | `FORBIDDEN`, 읽을 수 없거나 지웠으면 `AGENT_NOT_FOUND`, 다른 요청이 그 에이전트를 고치는 중이면 `AGENT_BUSY`, `visibility` 가 비었으면 `VALIDATION_FAILED`, 켜진 에이전트를 그룹 공개로 바꿀 때 셸·파일 toolset 이 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 꺼진 에이전트는 켤 때 관리자 수정이 검사한다 |
+| `DELETE /api/v1/agents/{code}` | 지운다. 204 | `FORBIDDEN`, 읽을 수 없거나 지웠으면 `AGENT_NOT_FOUND`, 고치는 중이면 `AGENT_BUSY`, profile 을 거두지 못하면 그 Hermes 오류 |
+
+공개 범위를 바꿔도 주인은 그대로다.
+주인이 비어 있는 옛 그룹 공개 에이전트를 `ADMIN` 이 `PRIVATE` 로 바꾸면 그 `ADMIN` 이 주인이 된다.
+
+**만들기는 한 요청 안에서 끝낸다.** 차례는 아래와 같고, 중간에 실패하면 만든 것을 역순으로 거둔다(`people.application.HermesProfileProvisioner` 와 같은 규칙).
+대시보드 plugin 의 계약은 [`hermes/profiles.md`](hermes/profiles.md) 의 「Control Plane 이 부르는 대시보드 plugin 경로」 가 갖는다.
+
+1. 주인의 `app_user` 행을 잠그고 그 사용자의 지우지 않은 에이전트 수가 `assistant.agents.max-per-user`(기본 5)보다 적은지 본다. `ADMIN` 은 세지 않는다
+2. `code` 와 profile 이름을 만든다. 둘 다 사용자가 넣은 이름과 무관한 무작위 값이다
+3. `POST /api/profiles` 로 profile 을 `no_skills` 로 만든다. plugin 이 이 안에서 안전한 기본 도구, Control Plane MCP 등록, 서명 plugin, 관리 표식을 붙인다
+4. 그 profile 에 묶인 MCP 토큰을 발급해 `PUT /api/env` 로 `MCP_FOS_ASSISTANT_API_KEY` 에 넣는다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
+5. `API_SERVER_MODEL_NAME` 과 `API_SERVER_KEY` 를 넣고 key 파일을 쓴다
+6. 그 key 로 도구 목록을 읽는다. 셸·파일 등급이 켜져 있으면 plugin 틀이 적용되지 않은 것으로 보고 거두고 `HERMES_PROVISION_FAILED`. 도구 목록에는 MCP 서버 이름이 없어 MCP 등록은 3 이 성공한 것으로 믿는다
+7. 에이전트 행을 `profile_managed = true` 로 저장한다
+
+거둘 때는 토큰을 먼저 폐기한다. 토큰 발급과 폐기는 잠금을 쥔 트랜잭션과 떼어 곧바로 커밋한다.
+profile 을 만드는 도중의 실패는 key 파일, profile 순으로 모두 시도해 거둔다.
+만든 뒤의 실패와 지우기는 profile, key 파일 순으로 거두고, 하나라도 실패하면 거기서 멈춘다.
+profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 올린다.
+새 profile 은 재시작 없이 공유 listener 에서 답한다. MCP 도구는 첫 연결까지 1~2분 걸릴 수 있다.
+새 profile 은 가족 공용 credential 로 돈다([ADR-002](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)).
+
+**지우기는 에이전트 행을 지우지 않는다.** `deleted_at` 을 적고 끈다.
+`profile_managed` 가 참이면 MCP 토큰을 먼저 폐기하고, `DELETE /api/profiles/<이름>` 과 key 파일, 올린 스킬 디렉터리를 지운다. 거짓이면 profile 을 남긴다.
+지운 에이전트의 대화는 읽기만 된다. 새 turn 과 다시 생성은 `AGENT_NOT_FOUND` 다.
+
+| 무엇 | 어디 |
+| --- | --- |
+| 만들기, 공개 범위, 지우기의 순서 | `agent/application/AgentLifecycleService` |
+| profile 을 만들고 거두기 | `people/application/HermesProfileProvisioner` 를 넓혀 쓴다 |
+| 대시보드 호출 | `hermes` |
+
+## 스킬
+
+에이전트를 관리하는 사람이 화면에서 스킬을 올리고 고치고 지운다. 승인 절차는 없다.
+근거는 [ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 에 있다.
+
+**본문은 데이터베이스에 두지 않는다.** Control Plane 이 공유 디렉터리에 쓰고 Hermes 는 읽기만 한다.
+
+```
+<ASSISTANT_SKILL_ROOT>/<profile>/<버전>/<스킬>/SKILL.md
+                                          references/…
+                                          templates/…
+```
+
+- 저장할 때마다 그 profile 의 올린 스킬 전체를 새 버전 디렉터리에 쓰고, 그 profile 의 `skills.external_dirs` 를 `ASSISTANT_SKILL_AGENT_ROOT` 아래 새 버전 경로로 바꾼다. 쓰는 도중에는 옛 버전이 쓰인다
+- 설정 쓰기가 실패하면 새 디렉터리를 지우고 옛 버전을 둔다. 옛 버전은 최근 3개만 남긴다
+- 게시에 성공하면 그 버전 디렉터리에 표식 파일 `.published` 를 쓴다. 지금 버전은 표식이 있는 가장 새 디렉터리다. 표식 없는 디렉터리는 게시 도중에 멈춘 것이라 다음 저장이 지운다
+- 같은 에이전트의 저장은 에이전트 행 잠금으로 한 번에 하나씩 돈다
+- 스킬을 저장하면 그 에이전트의 `skills` toolset 을 함께 켠다. 올린 스킬이 있는 동안은 `skills` 를 끄지 못한다
+
+| 제한 | 값 |
+| --- | --- |
+| 이름 | 소문자, 숫자, `-`. 64자까지. `new` 는 새 스킬 화면 경로라 쓸 수 없다. Hermes 기본 스킬과 같으면 `SKILL_NAME_TAKEN` |
+| 파일 | `SKILL.md` 와 `references/`, `templates/` 아래 텍스트 파일. 파일 20개까지 |
+| 크기 | 파일마다 10만 자, 합계 1 MiB |
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다 |
+| `GET /api/v1/agents/{code}/skills/{name}` | 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }` |
+| `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content" }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다 |
+| `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
+| `PUT /api/v1/agents/{code}/skills/{name}/enabled` | `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
+
+목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/tools-and-skills.md`](hermes/tools-and-skills.md) 의 「스킬 커맨드와 API server」).
+출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 지금 버전 디렉터리에 있는 이름이 `UPLOADED`, 나머지가 `HERMES` 다
+쓰기와 지우기는 관리하는 사람만, 읽기는 그 에이전트를 쓸 수 있는 사람이 한다.
+
+### 스킬 커맨드
+
+입력창 맨 앞의 `/<이름>` 을 Control Plane 이 해석한다. 근거는 [ADR-035](adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 에 있다.
+
+- 메시지 내용이 `^/[a-z0-9][a-z0-9-]*` 다음에 공백이나 끝이 오는 모양일 때만 커맨드다. 새 요청 칸은 없다
+- 이름이 그 에이전트의 켜진 스킬 목록에 있으면 Hermes 에 보낼 입력만 「사용자가 이 스킬을 호출했다. `skill_view` 로 읽고 그 절차대로 다음을 하라」로 바꾼다. 저장하는 메시지는 사용자가 친 글 그대로다
+- 없으면 Hermes 에 보내지 않고 400 `SKILL_COMMAND_UNKNOWN` 다
+- 목록은 에이전트마다 짧게 캐시한다
+- 흐름이 붙은 에이전트에서는 커맨드를 해석하지 않고 글 그대로 보낸다. 입력창도 `/` 목록을 띄우지 않는다
+
+### 호출 이력
+
+`execution_skill_use` 한 표에 둔다([`data-schema.md`](data-schema.md)).
+
+| 출처 | 적는 곳 |
+| --- | --- |
+| `COMMAND` | 커맨드로 turn 을 시작할 때 `chat` 이 적는다 |
+| `MODEL` | 실행 사건에서 `skill_view` 도구 호출을 받을 때 스킬 이름이 실려 있으면 `usage` 가 적는다 |
+
+| 경로 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/usage/skills` | 요청자 자신의 호출만. `[{ "agentCode", "agentName", "skillName", "count", "lastInvokedAt", "lastConversationId" }]` |
+
+관리하는 사람은 스킬 목록의 `usage` 로 합계만 보고, 누가 어느 대화에서 불렀는지는 보지 않는다.
+
+| 무엇 | 어디 |
+| --- | --- |
+| 권한 판정과 저장 순서 | `skill/application/SkillService` |
+| 버전 디렉터리 쓰기와 지우기 | `skill/infra/SkillStore` |
+| `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
+| 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |
 
 ## 사진 첨부
 
@@ -705,8 +821,8 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/usage` | 사용량 |
 | `/memory` | 개인과 그룹 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
-| `/agents` | 에이전트 목록. `ADMIN` 에게는 모든 에이전트와 새 에이전트 등록이 보인다 |
-| `/agents/{code}` | 에이전트 하나의 설정. 성격, 소개와 추천 질문, 도구, `ADMIN` 에게만 관리 절 |
+| `/agents` | 에이전트 목록과 「새 에이전트」. `ADMIN` 에게는 다른 사람의 비공개와 꺼진 에이전트, 운영 profile 등록이 더 보인다 |
+| `/agents/{code}` | 에이전트 하나의 설정. 성격, 소개와 추천 질문, 도구, 주인과 `ADMIN` 에게 공개와 삭제, `ADMIN` 에게만 관리 절 |
 | `/admin/agents` | 옛 주소. `/agents` 로 넘긴다 |
 
 ### 에이전트 화면
@@ -716,14 +832,17 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 
 | 자리 | 누구에게 | 무엇 |
 | --- | --- | --- |
-| 목록 | 모두 | 내가 쓸 수 있는 에이전트. 누르면 상세로 간다 |
-| 목록 | `ADMIN` | 위에 더해 다른 사람의 비공개 에이전트와 꺼 둔 에이전트도 보인다. 「다른 사람 것」, 「꺼짐」 표시를 붙인다. 목록 위에 새 에이전트 등록이 있다 |
-| 상세의 성격, 소개와 추천 질문 | 그 에이전트를 쓸 수 있는 사람. 고치는 것은 주인과 `ADMIN` | 읽기와 쓰기 권한은 [「페르소나」](#페르소나) 의 「누가 고칠 수 있나」 와 같다 |
+| 목록 | 모두 | 내가 쓸 수 있는 에이전트. 누르면 상세로 간다. 목록 위에 「새 에이전트」 가 있다. 이름과 공개 범위만 받는다 |
+| 목록 | `ADMIN` | 위에 더해 다른 사람의 비공개 에이전트와 꺼 둔 에이전트도 보인다. 「다른 사람 것」, 「꺼짐」 표시를 붙인다. 운영에서 만든 profile 을 등록하는 경로도 있다 |
+| 상세의 성격 | 그 에이전트를 쓸 수 있는 사람. 고치는 것은 주인과 `ADMIN` | 읽기와 쓰기 권한은 [「페르소나」](#페르소나) 의 「누가 고칠 수 있나」 와 같다 |
 | 상세의 도구 | 그 에이전트의 주인과 `ADMIN` | 도구의 켜짐을 보고, 주인은 주인 등급을, `ADMIN` 은 모든 등급을 바꾼다. 다른 사람의 비공개 에이전트는 관리자 경로로 읽고 쓴다 |
-| 상세의 관리 절 | `ADMIN` | 사용 여부, 공개 범위(그룹 공개는 확인 창을 거친다), Hermes 주소. 모델은 에이전트가 아니라 대화가 고른다 |
+| 상세의 스킬 | 그 에이전트를 쓸 수 있는 사람. 고치는 것은 주인과 `ADMIN` | 스킬마다 이름, 설명, 「올린 스킬」 이나 「Hermes 기본」 표시, 켜짐. 관리하는 사람에게는 켜고 끄기, 호출 수와 마지막 호출, 올린 스킬의 편집과 삭제, 「스킬 추가」. 아니면 `/이름` 으로 부를 수 있다는 안내 |
+| 스킬 편집 `/agents/{code}/skills/{name}` | 주인과 `ADMIN` | `SKILL.md` 본문과 미리보기, 참고 파일 목록과 올리기. 별도 페이지다 |
+| 상세의 공개와 삭제 | 주인과 `ADMIN` | 나만과 그룹 공개를 바꾸는 단추, 확인 창을 거치는 삭제 |
+| 상세의 관리 절 | `ADMIN` | 사용 여부, Hermes 주소. 모델은 에이전트가 아니라 대화가 고른다 |
 
-**`ADMIN` 이라도 다른 사람의 비공개 에이전트는 성격과 추천 질문을 읽지 못한다.**
-그 상세에는 관리 절만 보이고, 성격 자리에는 주인만 볼 수 있다는 안내를 둔다.
+**`ADMIN` 이라도 다른 사람의 비공개 에이전트는 성격을 읽지 못한다.**
+그 상세에는 공개와 삭제 절과 관리 절이 보이고, 성격 자리에는 주인만 볼 수 있다는 안내를 둔다.
 backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다.
 관리 절이 쓰는 `/api/v1/admin/agents` 경로들도 그대로다.
 
@@ -733,9 +852,20 @@ backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다
 틀린 주소나 profile 로 저장하면 그 에이전트의 모든 대화가 실패하고, 화면에는 Hermes 에 닿지 못했다는 것만 보인다.
 `AgentEndpointProbe` 가 이 확인을 한다.
 
-### 사용량 화면의 절
+### 사용량 화면의 탭
 
-`/usage` 는 절 넷으로 이뤄진다. 위에서부터 이 순서다.
+`/usage` 는 탭 넷으로 나눈다. 고른 탭은 주소 `?tab=` 에 남아 새로 고쳐도 같은 탭이 열린다.
+
+| 탭 | 담는 것 |
+| --- | --- |
+| 요약(`summary`, 기본) | 아래 표의 합계 칸과 「어디에 썼나」 |
+| 실행 기록(`executions`) | 아래 표의 「실행 기록」. 줄마다 그 실행에서 쓴 스킬 이름을 작게 붙인다 |
+| 스킬(`skills`) | 내가 부른 스킬. 스킬마다 횟수와 마지막 호출, 누르면 그 대화로 간다. `GET /api/v1/usage/skills` 를 읽는다 |
+| 입력 지문(`fingerprints`) | 아래 표의 「무엇이 달라졌나」 |
+
+#### 탭 안의 절
+
+각 절은 위 탭 안에 그대로 옮긴다.
 
 | 절 | 무엇을 보이나 | 그리지 않는 때 |
 | --- | --- | --- |
@@ -881,7 +1011,7 @@ web/src/
 | 누가 | 무엇을 |
 | --- | --- |
 | 관리자 | 관리 화면에서 이메일과 이름과 profile 이름을 적는다 |
-| Control Plane | 허용 목록에 넣고, Hermes profile 을 만들고, key 를 넣는다 |
+| Control Plane | 허용 목록에 넣고, Hermes profile 을 만들고, key 와 그 profile 에 묶인 MCP 토큰을 넣는다. 만들기 경로가 에이전트 만들기와 같아 MCP 등록과 서명 plugin 도 함께 붙는다 |
 | 그 사람 | 로그인한다. 그때 `app_user` 와 에이전트가 생긴다 |
 
 Google 동의 화면의 테스트 사용자에 주소를 더하는 것만 사람이 따로 한다.
@@ -964,6 +1094,9 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - MCP `agent_*` 도구(`agent_list`, `agent_delegate`, `agent_status`, `agent_stop`)와 그것을 처리하는 `AgentDelegationService`, `DelegationProperties`.
   지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)만 있다
 - `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸을 지우는 것. 운영의 모든 토큰이 profile 에 묶인 뒤 지운다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」)
+
+- 스킬 올리기와 관리, 스킬 커맨드, 호출 이력([「스킬」](#스킬)), 사용량 화면의 탭
+- 모델이 만드는 추천 질문([「추천 질문」](#추천-질문)). 지금은 사람이 적은 `agent_starter_prompt` 와 `agent.tagline` 을 보인다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

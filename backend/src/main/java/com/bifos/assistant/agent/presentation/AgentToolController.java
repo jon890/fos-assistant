@@ -60,14 +60,28 @@ public class AgentToolController {
         return view(tools.write(user, requireAgentForUpdate(code), request.enabled()));
     }
 
+    /** 관리자가 읽을 에이전트다. 지운 에이전트는 없는 에이전트와 같다. */
     private Agent requireAgent(String code) {
-        return agentRepository.findByCode(code)
+        Agent agent = agentRepository.findByCode(code)
                 .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+        if (agent.isDeleted()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
+        return agent;
     }
 
+    /**
+     * 관리자가 고칠 에이전트를 잠그고 읽는다. 지운 에이전트는 없는 에이전트와 같다.
+     *
+     * <p>지운 에이전트의 profile 은 이미 거둬졌을 수 있어 도구를 바꿀 곳이 없다.
+     */
     private Agent requireAgentForUpdate(String code) {
-        return agentRepository.findByCodeForUpdate(code)
+        Agent agent = agentRepository.findByCodeForUpdate(code)
                 .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+        if (agent.isDeleted()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
+        return agent;
     }
 
     private static AgentDtos.ToolsetsView view(AgentToolService.ToolsetsView source) {

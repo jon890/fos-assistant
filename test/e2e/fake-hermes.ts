@@ -94,6 +94,12 @@ const DEFAULT_API_SERVER_TOOLSETS = [
   "browser", "code_execution", "cronjob", "delegation", "file", "image_gen", "memory",
   "session_search", "skills", "terminal", "todo", "vision", "web", CONTROL_PLANE_MCP,
 ];
+/**
+ * 대시보드 plugin 이 `POST /api/profiles` 안에서 새 profile 에 붙이는 안전한 도구 목록이다.
+ *
+ * <p>셸과 파일 등급이 없다. 미리 심어 둔 profile 은 이 경로를 거치지 않으므로 그대로 기본 목록으로 답한다.
+ */
+const PLUGIN_TEMPLATE_TOOLSETS = ["web", "skills", "todo", "vision", CONTROL_PLANE_MCP];
 
 /**
  * 동시 실행 한도를 넘겼을 때 실제 Hermes 가 내는 본문이다.
@@ -668,6 +674,7 @@ export function startFakeHermes(
         return true;
       }
       profiles.set(name, {});
+      apiServerToolsets.set(name, [...PLUGIN_TEMPLATE_TOOLSETS]);
       send(response, 200, { name });
       return true;
     }

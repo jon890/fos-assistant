@@ -29,8 +29,11 @@ public interface HermesDashboardClient {
     /**
      * profile 을 지운다.
      *
-     * <p>만들다 실패해 되돌릴 때만 부른다. 대시보드에서 이 경로는 그 이름마다 따로 열어야 해서, 여는
-     * 일은 Hermes 쪽 plugin 이 맡는다.
+     * <p>만들다 실패해 되돌릴 때와 Control Plane 이 만든 profile 을 거둘 때 부른다. 대시보드에서 이 경로는
+     * 그 이름마다 따로 열어야 해서, 여는 일은 Hermes 쪽 plugin 이 맡는다.
+     *
+     * <p>없는 profile 은 이미 지운 것으로 보고 정상 반환한다. 지우다 실패한 뒤 다시 지울 때 끝까지 가게
+     * 하기 위해서다.
      */
     void deleteProfile(String name);
 

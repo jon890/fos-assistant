@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AgentForm } from "@/components/admin/agent-form";
 import { AgentList } from "@/components/admin/agent-list";
+import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
 import { describeAdminError } from "@/components/error-message";
 import {
   PRIVATE_VISIBILITY,
@@ -60,7 +61,10 @@ export function AgentAdminPanel({ initialAgents, ownerEmail, currentUserId }: Pr
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <h1 className="mb-2 text-xl font-semibold">에이전트</h1>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">에이전트</h1>
+        <CreateAgentDialog />
+      </div>
       <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
         공개 범위는 보안 설정이에요. 그룹에 공개하면 그룹의 모든 사용자가 이 에이전트로 대화할 수 있어요.
         연결된 도구와 자료를 함께 써도 되는지 확인해 주세요.

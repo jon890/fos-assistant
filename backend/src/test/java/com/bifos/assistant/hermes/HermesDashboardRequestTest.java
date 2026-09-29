@@ -127,6 +127,29 @@ class HermesDashboardRequestTest {
         });
     }
 
+    /** 지우다 실패한 뒤 다시 지울 때 끝까지 가려면, 없는 profile 은 이미 지운 것으로 봐야 한다. */
+    @Test
+    void 지울_profile_이_없다는_404_는_정상으로_끝난다() {
+        respondWith(404, "{\"error\":\"no such profile\"}");
+
+        client.deleteProfile("kid");
+
+        assertThat(calls).singleElement().satisfies(call -> {
+            assertThat(call.method()).isEqualTo("DELETE");
+            assertThat(call.path()).isEqualTo("/api/profiles/kid");
+        });
+    }
+
+    @Test
+    void profile_을_지우다_500_을_받으면_닿지_못한_것으로_남는다() {
+        respondWith(500, "{\"error\":\"boom\"}");
+
+        assertThatThrownBy(() -> client.deleteProfile("kid"))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+    }
+
     @Test
     void SOUL_을_읽을_때_그_이름이_경로에_붙는다() {
         respondWith(200, "{\"content\":\"너는 아빠다\",\"exists\":true}");
