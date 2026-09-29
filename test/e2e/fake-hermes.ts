@@ -268,7 +268,16 @@ function writeArtifactDraft(folder: string): void {
 /** 묻는 카드를 그리는지 보는 검사가 보내는 글이다. 이 글에는 답 끝에 `<ask>` 를 둔 답을 준다. */
 export const ASK_CARD_PROBE = "묻는 카드 검사";
 
+/** Control Plane 이 추천 질문을 만들 때 입력 첫 줄에 두는 표지다. */
+const STARTER_MARK = "[추천 질문 만들기]";
+
+/** 추천 질문을 만드는 입력에 주는 답이다. 실제 모델처럼 JSON 문자열 배열 하나만 답한다. */
+export const FAKE_STARTER_PROMPTS = ["이번 주 일정 정리해 줘", "장보기 목록 만들어 줘", "오늘 날씨 알려 줘", "가계부 요약해 줘"];
+
 function specialOutputFor(input: string): string | null {
+  if (input.startsWith(STARTER_MARK)) {
+    return JSON.stringify(FAKE_STARTER_PROMPTS);
+  }
   if (input === ASK_CARD_PROBE) {
     return [
       "사진을 다 봤어. 두 가지만 알려 줘.",

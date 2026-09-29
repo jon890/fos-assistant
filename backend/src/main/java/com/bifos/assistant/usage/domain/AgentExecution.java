@@ -35,7 +35,8 @@ public class AgentExecution {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "conversation_id", nullable = false)
+    /** 이 실행이 속한 대화. 추천 질문을 만드는 실행처럼 대화 없이 돈 실행은 비어 있다. */
+    @Column(name = "conversation_id")
     private Long conversationId;
 
     @Column(name = "agent_id")
