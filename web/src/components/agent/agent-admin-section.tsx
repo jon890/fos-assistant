@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { AgentModelList } from "@/components/admin/agent-model-list";
 import { VisibilityConfirm } from "@/components/admin/visibility-confirm";
 import { Badge } from "@/components/ui/badge";
@@ -17,15 +16,19 @@ import {
 
 type AgentAction = "private" | "group" | "enabled" | "address" | "sync" | "models";
 
-type Props = { initialAgent: AdminAgent; ownerEmail: string };
+type Props = {
+  initialAgent: AdminAgent;
+  ownerEmail: string;
+  /** 공개 범위를 바꾼 요청이 성공하면 바뀐 값으로 부른다. 그 범위에 따라 달라지는 이웃 절이 받는다. */
+  onVisibilityChange?(visibility: AdminAgent["visibility"]): void;
+};
 
 async function payload<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
 /** 관리자가 에이전트 하나의 실행과 연결 설정을 고친다. */
-export function AgentAdminSection({ initialAgent, ownerEmail }: Props) {
-  const router = useRouter();
+export function AgentAdminSection({ initialAgent, ownerEmail, onVisibilityChange }: Props) {
   const [agent, setAgent] = useState(initialAgent);
   const [pending, setPending] = useState<AgentAction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +62,9 @@ export function AgentAdminSection({ initialAgent, ownerEmail }: Props) {
         setError(describeAdminError(result.code, result.message));
         return false;
       }
-      setAgent(await payload<AdminAgent>(response));
-      if (changes.visibility !== undefined) router.refresh();
+      const updated = await payload<AdminAgent>(response);
+      setAgent(updated);
+      if (changes.visibility !== undefined) onVisibilityChange?.(updated.visibility);
       return true;
     } finally {
       setPending(null);
