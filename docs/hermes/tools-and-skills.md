@@ -272,7 +272,7 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 | 항목 | 계약 |
 | --- | --- |
 | 서버 이름 | `fos-assistant` |
-| Hermes 가 보이는 도구 이름 | `mcp_fos_assistant_<도구>`. 예: `mcp_fos_assistant_artifact_write` |
+| Hermes 가 보이는 도구 이름 | `mcp__fos_assistant__<도구>`. 예: `mcp__fos_assistant__artifact_write`, `mcp__fos_assistant__memory_read` (v0.21.5, 2026-09-29 운영에서 확인) |
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰 |
@@ -282,7 +282,7 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 `memory_read` 는 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
-결과물 쓰기가 같은 서버에 들어오면서 `mcp_fos_assistant_memory_artifact_write` 처럼 Memory 와 무관한 도구에 Memory 가 붙어 2026-09-29 에 `fos-assistant` 로 바꿨다.
+결과물 쓰기가 같은 서버에 들어오면서 `mcp__fos_assistant_memory__artifact_write` 처럼 Memory 와 무관한 도구에 Memory 가 붙어 2026-09-29 에 `fos-assistant` 로 바꿨다.
 앞으로 Control Plane 이 여는 도구도 이 서버에 더한다.
 
 **서버 이름을 바꿀 때는 등록 이름과 허용 목록을 한 번에 바꾼다.**
