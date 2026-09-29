@@ -4,7 +4,7 @@
 | --- | --- |
 | [Runs API](runs-api.md) | 실행 요청, 조회 응답과 사건의 모양 |
 | [동시 실행](concurrency.md) | profile 접두와 실행 한도, thread pool |
-| [도구와 스킬](tools-and-skills.md) | 도구 설정, Memory MCP 와 스킬 연결 |
+| [도구와 스킬](tools-and-skills.md) | 도구 설정, Control Plane MCP(`fos-assistant`) 와 스킬 연결 |
 | [profile 생성](profiles.md) | profile 관리 API 와 생성 계약 |
 | [위임](delegation.md) | 내장 delegation 과 Control Plane 도구 위임 |
 | [kanban](kanban.md) | 다중 에이전트 kanban 과 HTTP 호출 |

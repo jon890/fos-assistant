@@ -221,7 +221,7 @@ sequenceDiagram
 | 도구 변경과 공개 범위 변경이 동시에 들어온다 | 에이전트 행을 잠그고 차례로 검사한다. 이미 잠겨 있으면 `AGENT_BUSY` 로 곧바로 알린다 |
 | 등급 표에 없는 이름이 온다 | 거절한다 |
 | Hermes 가 쓰기 없이 미분류 도구를 켰다 | 도구 조회가 그 이름을 따로 알리고 화면은 관리자에게 알리라고 경고한다. Hermes 를 올릴 때 `fos-home-infra` 가 모든 profile 의 켜진 목록을 검사한다 |
-| `memory` 를 켜거나 기억 MCP 를 빼려 한다 | Control Plane 과 plugin 이 모두 거절한다 |
+| `memory` 를 켜거나 Control Plane MCP(`fos-assistant`) 를 빼려 한다 | Control Plane 과 plugin 이 모두 거절한다 |
 | 요청한 도구가 빠지거나 분류된 도구가 예상과 다르다 | `AGENT_TOOLS_NOT_APPLIED` 로 켜지지 않은 이름을 알린다. 화면은 도구 목록을 다시 읽고, profile 설정에서 막힌 도구는 관리자에게 알리라고 안내한다. 미분류 도구만 더 켜진 것은 성공 응답의 `unclassifiedEnabled` 로 따로 알린다 |
 | 대시보드나 listener 가 멈춰 있다 | 도구 절만 열리지 않는다. 대화는 그대로 돈다 |
 

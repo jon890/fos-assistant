@@ -165,7 +165,7 @@ Control Plane이 주인을 검사해 정확한 profile만 보낼 수는 있지�
 `GET /api/config`는 환경 변수 참조를 펼친 설정을 돌려줄 수 있으므로 도구 화면의 조회 경로로 열지 않는다.
 
 도구 선택값을 저장할 때는 제품이 허용한 이름만 받아 목록 전체를 계산하고, `memory`를 항상 제거해야 한다.
-기억 MCP 서버 이름은 API 허용 목록에 계속 남겨야 한다.
+Control Plane MCP(`fos-assistant`)의 서버 이름은 API 허용 목록에 계속 남겨야 한다.
 등록된 MCP 서버 이름이 하나도 없는 목록은 모든 활성 MCP 서버를 통과시킬 수 있으므로, 알 수 없는 이름만 남은 목록을 허용해서는 안 된다.
 `_get_platform_tools`로 저장 뒤 실제 목록을 계산해 허용 목록과 대조한다.
 새 plugin toolset은 저장 목록에 없어도 자동으로 켜질 수 있고, `agent.disabled_toolsets`는 마지막에 적용되므로 둘 다 확인해야 한다.
@@ -235,7 +235,7 @@ profile 로컬 스킬이 같은 이름이면 외부 스킬보다 먼저 선택�
 실행 중인 요청은 이미 만든 프롬프트를 계속 쓸 수 있다.
 `skill_view`는 파일을 직접 읽지만 색인 갱신을 대신하지 않는다.
 
-### profile 생성과 Memory MCP
+### profile 생성과 Control Plane MCP
 
 `POST /api/profiles`가 받는 이름은 정규화 뒤 `[a-z0-9][a-z0-9_-]{0,63}`에 맞아야 하며 예약 이름은 거절한다.
 생성 함수에는 profile 개수 상한이 없다. 서비스 자체의 자원 한도는 별도로 정해야 한다.
@@ -247,7 +247,7 @@ v0.21.3 공유 gateway는 profile 추가를 감지해 adapter를 추가하며, �
 
 생성 HTTP 본문에는 `mcp_servers`도 있으나, 생성 처리기는 profile을 게시하고 gateway에 알린 다음 MCP 설정을 best effort로 쓴다.
 MCP 설정 쓰기 실패가 profile 생성 실패로 바뀌지 않는다.
-따라서 이 인자만으로 새 profile의 Memory MCP 연결을 원자적으로 보장할 수 없다.
+따라서 이 인자만으로 새 profile의 Control Plane MCP 연결을 원자적으로 보장할 수 없다.
 기존 profile의 `POST /api/mcp/servers`도 설정 저장이지 gateway 연결 완료가 아니다.
 공유 gateway에는 profile 대화의 `/reload-mcp`가 있으며 재시작 없이 MCP를 다시 발견하지만, 기본적으로 확인 절차를 거치고 이 기능을 직접 호출하는 전용 HTTP 경로는 찾지 못했다.
 새 profile의 자동 발견 또는 이 명령을 쓸 수 없는 경우에는 공유 gateway 재시작이 확실한 적용 경로다.
@@ -279,6 +279,7 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 | 도구 | `memory_read`, `artifact_write` |
 
 토큰이 요청자를 정한다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
+`memory_read` 는 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
 결과물 쓰기가 같은 서버에 들어오면서 `mcp_fos_assistant_memory_artifact_write` 처럼 Memory 와 무관한 도구에 Memory 가 붙어 2026-09-29 에 `fos-assistant` 로 바꿨다.
@@ -287,7 +288,6 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 **서버 이름을 바꿀 때는 등록 이름과 허용 목록을 한 번에 바꾼다.**
 `platform_toolsets.api_server` 의 MCP 이름은 허용 목록이다. 목록에 등록되지 않은 이름만 남으면 Hermes 는 허용 목록이 없는 것으로 보고 전역 MCP 서버를 모두 켠다. 근거는 [v0.21.5 `hermes_cli/tools_config.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/tools_config.py) 의 `_get_platform_tools` 다.
 그래서 대시보드 plugin 이 옛 이름과 새 이름을 함께 받는 동안 등록과 목록을 바꾸고, backend 가 새 이름을 쓰게 한 뒤 옛 이름을 막는다.
-Control Plane 은 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 실제 MCP 서버 등록과 토큰 전달은 비공개 저장소 `fos-home-infra`가 맡는다.
 
 ### API server 에서 MCP 도구를 여는 범위
