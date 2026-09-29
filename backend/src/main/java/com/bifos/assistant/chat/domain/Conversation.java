@@ -120,16 +120,6 @@ public class Conversation {
         return hermesRootSessionId;
     }
 
-    /**
-     * 이 대화의 실행 줄에 적을 session 이다.
-     *
-     * <p>뿌리가 있으면 뿌리다. Hermes 에 보내는 session 은 압축 교체로 바뀌어도 서명한 뿌리 session 은
-     * 그대로이기 때문이다. 뿌리가 없는 옛 대화는 보내는 session 을 적는다.
-     */
-    public String executionSessionId() {
-        return hermesRootSessionId != null ? hermesRootSessionId : hermesSessionId;
-    }
-
     public String title() {
         return title;
     }

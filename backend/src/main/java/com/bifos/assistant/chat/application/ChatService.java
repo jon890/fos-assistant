@@ -16,6 +16,7 @@ import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryProposer;
 import com.bifos.assistant.orchestration.application.Flow;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
+import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
@@ -343,18 +344,19 @@ public class ChatService {
             TurnIntent intent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
-        String sessionId = sessions.ensure(conversation);
+        RunSession session = sessions.ensure(conversation);
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),
                 text,
                 TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
-                sessionId,
+                session.runtimeSessionId(),
                 choice.provider(),
                 choice.model(),
                 choice.reasoningEffort());
         AgentExecution execution = executions.start(
-                user, conversation, agent, null, null, snapshot, choice, null, conversation.executionSessionId());
+                user, conversation, agent, null, null, snapshot, choice, null,
+                session.correlationSessionId());
         return new PendingTurn(
                 user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder(), intent);
     }

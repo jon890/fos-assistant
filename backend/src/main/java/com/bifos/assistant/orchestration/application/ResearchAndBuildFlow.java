@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.domain.ChildResult;
+import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -110,11 +111,11 @@ public class ResearchAndBuildFlow implements Flow {
 
         onEvent.accept(ChatEvent.step(CHIEF, STARTED));
         AtomicReference<Long> rootExecutionId = new AtomicReference<>();
-        // Chief 는 대화의 turn 이다. 보낼 session 을 먼저 정하고, 실행 줄에는 대화의 뿌리 session 을 적는다.
-        String sessionId = sessions.ensure(conversation);
+        // Chief 는 대화의 turn 이다. 보낼 session 과 실행 줄에 적을 뿌리 session 을 RunSession 으로 함께 넘긴다.
+        RunSession session = sessions.ensure(conversation);
         AgentRunner.Run chief = runner.run(
                 user, conversation, agent, chiefPrompt(input), null, null,
-                sessionId, conversation.executionSessionId(),
+                session,
                 execution -> {
                     rootExecutionId.set(execution.id());
                     onRootStarted.accept(execution);

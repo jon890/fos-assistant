@@ -2,9 +2,9 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,13 +16,11 @@ import org.springframework.stereotype.Service;
  * 전에 실행 줄에 뿌리 session 을 적을 수 있고, MCP {@code agent_*} 호출이 들고 오는 서명한 뿌리 session 으로
  * 도는 실행을 찾을 수 있다. 근거는 ADR-031 에 있다.
  *
- * <p>Memory 제안과 흐름의 하위 실행은 여기를 거치지 않는다. 그 실행은 {@code agent_*} 의 부모가 되지 않는다.
+ * <p>흐름의 하위 실행은 {@code RunSession.fresh()} 로 자기 session 을 정하고, Memory 제안은 session 을 적지 않는다.
  */
 @Service
 @RequiredArgsConstructor
 public class ConversationSessions {
-
-    private static final String PREFIX = "fos-";
 
     private final ConversationRepository conversations;
 
@@ -33,20 +31,23 @@ public class ConversationSessions {
      * 같은 새 대화에 두 turn 이 함께 와서 다른 쪽이 먼저 정했으면 저장된 값을 다시 읽어 그것을 쓴다.
      * 대화의 {@code updatedAt} 은 바꾸지 않는다.
      */
-    public String ensure(Conversation conversation) {
-        String current = conversation.hermesSessionId();
-        if (current != null) {
-            return current;
+    public RunSession ensure(Conversation conversation) {
+        if (conversation.hermesSessionId() != null) {
+            return sessionOf(conversation);
         }
-        String created = PREFIX + UUID.randomUUID();
+        String created = RunSession.newSessionId();
         if (conversations.assignSessionIfAbsent(conversation.id(), created) == 1) {
             conversation.assignNewSession(created);
-            return created;
+            return sessionOf(conversation);
         }
         Conversation stored = conversations.findById(conversation.id())
                 .orElseThrow(() -> new ApiException(
                         ErrorCode.CONVERSATION_NOT_FOUND, "conversation not found"));
         conversation.adoptSessions(stored.hermesSessionId(), stored.hermesRootSessionId());
-        return stored.hermesSessionId();
+        return sessionOf(conversation);
+    }
+
+    private static RunSession sessionOf(Conversation conversation) {
+        return RunSession.ofConversation(conversation.hermesSessionId(), conversation.hermesRootSessionId());
     }
 }

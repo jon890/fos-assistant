@@ -150,9 +150,11 @@ class ChildExecutionRunnerTest {
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.input()).isEqualTo("이것을 조사해라");
             assertThat(command.profileName()).isEqualTo("child-dad");
-            // 자식은 부모의 session 을 잇지 않는다. 중간 산출물이 대화 session 에 쌓이면 안 된다.
-            assertThat(command.sessionId()).isNull();
+            // 자식은 부모의 session 을 잇지 않고 새 fos-<uuid> 를 보낸다. 중간 산출물이 대화 session 에 쌓이면 안 된다.
+            assertThat(command.sessionId()).startsWith("fos-");
         });
+        String sentSession = stub().received().get(0).sessionId();
+        assertThat(child.hermesSessionId()).as("자식 실행 줄의 session").isEqualTo(sentSession);
     }
 
     /**
