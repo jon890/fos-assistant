@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,13 +27,18 @@ public class AgentTokenAuthenticationFilter extends OncePerRequestFilter {
      * <p>{@code _fos_ctx} 서명의 key 가 이 값이다(ADR-031). 토큰 원문은 요청 어디에도 두지 않는다.
      */
     public static final String TOKEN_HASH_ATTRIBUTE = AgentTokenAuthenticationFilter.class.getName() + ".TOKEN_HASH";
+    /**
+     * profile 토큰으로 인증하는 경로다. {@code /mcp} 와 하위 에이전트 session 등록 경로(ADR-037)가 같은 토큰을 쓴다.
+     * 사용자 JWT 필터 {@code ControlPlaneJwtFilter} 는 같은 경로를 건너뛴다. 경로를 더하면 두 곳을 함께 고친다.
+     */
+    private static final Set<String> AGENT_TOKEN_PATHS = Set.of("/mcp", "/internal/hermes/session-bindings/subagent");
     private static final String BEARER = "Bearer ";
     private static final String MCP_AUTHORITY = "ROLE_MCP";
     private final AgentTokenService tokens;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !"/mcp".equals(request.getServletPath());
+        return !AGENT_TOKEN_PATHS.contains(request.getServletPath());
     }
 
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {

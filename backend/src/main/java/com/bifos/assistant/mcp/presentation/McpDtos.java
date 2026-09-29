@@ -2,7 +2,7 @@ package com.bifos.assistant.mcp.presentation;
 
 import tools.jackson.databind.JsonNode;
 
-/** MCP 도구가 받는 JSON 인자 모양을 한곳에 둔다. */
+/** MCP 도구가 받는 JSON 인자 모양과 하위 에이전트 session 등록의 응답 모양을 한곳에 둔다. */
 public final class McpDtos {
     private McpDtos() {
     }
@@ -28,5 +28,9 @@ public final class McpDtos {
             JsonNode value = arguments.get(name);
             return value == null ? null : value.asString();
         }
+    }
+
+    /** 하위 에이전트 session 등록의 응답이다. {@code created} 나 {@code exists} 다. */
+    public record SubagentRegistrationResponse(String result) {
     }
 }
