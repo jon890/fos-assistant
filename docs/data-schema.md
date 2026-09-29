@@ -65,9 +65,10 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `cost_mode` | VARCHAR(20) | `SUBSCRIPTION` 또는 `API` |
 | `credential_scope` | VARCHAR(20) | `SHARED_HOUSEHOLD` 또는 `DEDICATED` |
 | `visibility` | VARCHAR(20) | `PRIVATE` 또는 `GROUP`. 기본값이 없다 |
-| `owner_user_id` | BIGINT NULL | `PRIVATE` 일 때 필요하다 |
+| `owner_user_id` | BIGINT NULL | 주인. 사용자가 만든 에이전트는 만든 사람이다. `PRIVATE` 일 때 필요하고, `GROUP` 으로 공개해도 지우지 않는다 |
 | `enabled` | BOOLEAN | 거짓이면 새 실행을 막는다 |
-| `tagline` | VARCHAR(200) NULL | 새 대화 화면에 보일 한 줄 소개 |
+| `profile_managed` | BOOLEAN | 참이면 Control Plane 이 이 에이전트의 profile 을 만들었다. 에이전트를 지울 때 profile 까지 지우는 것은 이 값이 참일 때뿐이다. 기본 거짓 |
+| `deleted_at` | DATETIME(6) NULL | 지운 시각. 적히면 목록과 새 대화에서 빠지고 그 에이전트의 대화는 읽기만 된다 |
 
 **에이전트는 모델을 갖지 않는다.** 실행은 대화가 고른 값이나 profile 의 기본값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다.
 예전의 `provider`, `model`, `model_synced_at` 칸과 에이전트별 모델 목록 표 `agent_model_option`, 막힌 provider 를 기억하던 표 `provider_state` 는 V27 이 지웠다.
@@ -75,6 +76,14 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 근거는 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
 공개 범위가 접근 권한을 정하는 이유는
 [ADR-007](adr/ADR-007-에이전트가-모델과-도구를-함께-정한다.md)에 있다.
+
+**주인과 공개 범위는 따로다.** 가족용으로 공개해도 만든 사람이 계속 관리한다.
+이 결정 전에 운영에서 등록한 `GROUP` 에이전트는 주인이 비어 있어 `ADMIN` 만 관리한다.
+근거는 [ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
+
+한 줄 소개 칸 `tagline` 과 추천 질문 표 `agent_starter_prompt` 는 없앴다.
+추천 질문은 데이터베이스에 두지 않고 backend 메모리에만 둔다.
+근거는 [ADR-036](adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에 있다.
 
 ## conversation
 
@@ -341,22 +350,26 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 우리가 모르는 사건은 저장하지 않고 버린다. 버렸다는 사실만 로그로 남긴다.
 근거는 [ADR-013](adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md)에 있다.
 
-## agent_starter_prompt
+## execution_skill_use
 
-새 대화 화면에서 그 에이전트를 골랐을 때 보이는 추천 질문 한 줄이다.
+실행 하나에서 스킬 하나가 쓰인 것이 한 행이다. 스킬 호출 이력의 원천이다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
-| `agent_id` | BIGINT | 어느 에이전트의 것인가 |
-| `position` | INT | 보이는 차례. 0부터 센다 |
-| `text` | VARCHAR(300) | 누르면 그대로 보내는 글 |
+| `id` | BIGINT | |
+| `execution_id` | BIGINT | 어느 실행에서 썼나 |
+| `skill_name` | VARCHAR(64) | 스킬 이름 |
+| `source` | VARCHAR(20) | `COMMAND` 는 사용자가 `/이름` 으로 불렀다. `MODEL` 은 모델이 스스로 `skill_view` 로 읽었다 |
+| `occurred_at` | DATETIME(6) | |
 
-`agent_id` 와 `position` 을 함께 유일하게 둔다. 한 에이전트에 넷까지다.
-고칠 때는 그 에이전트의 줄을 모두 지우고 새로 넣는다. 차례를 바꾸는 것이 곧 전체를 다시 쓰는 것이다.
+`(execution_id, skill_name, source)` 에 유일 제약이 있다. 한 실행에서 모델이 같은 스킬을 여러 번 읽어도 한 행이다.
+사용자, 에이전트, 대화는 `agent_execution` 과 이어 얻는다. 같은 값을 여기 다시 적지 않는다.
 
-에이전트의 한 줄 소개는 `agent.tagline` 이 갖는다. `VARCHAR(200) NULL` 이다.
-소개와 추천 질문을 고칠 수 있는 사람은 성격을 고칠 수 있는 사람과 같다.
-그 규칙은 [`code-architecture.md`](code-architecture.md) 의 「누가 고칠 수 있나」 절이 갖는다.
+**스킬을 지워도 행은 남는다.** 이름으로 남아 지난 호출을 읽을 수 있다.
+`MODEL` 행은 실행 사건에 스킬 이름이 실려 올 때만 생긴다.
+
+스킬 본문과 참고 파일은 이 데이터베이스에 없다. Hermes 가 읽는 공유 디렉터리에만 있다.
+누가 이 이력을 어디까지 보는지와 근거는 [ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 에 있다.
 
 ## chat_artifact
 
@@ -381,13 +394,15 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 ## 지울 때
 
-에이전트나 영역을 지우지 않는다.
+에이전트 행은 지우지 않는다. 사용자가 에이전트를 지우면 `deleted_at` 을 적고 `enabled` 를 내린다.
+`profile_managed` 가 참이면 그 Hermes profile 과 올린 스킬 디렉터리를 지우고 그 profile 의 MCP 토큰을 폐기한다.
+거짓이면 운영에서 만든 profile 이라 profile 은 남긴다.
+대화와 실행 기록과 스킬 호출 이력은 남는다.
 
 대화도 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
 메시지와 실행 기록과 Hermes session 은 그대로 둔다.
 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
-`enabled` 를 내려 쓰지 않게 한다.
-실행 기록이 그것을 가리키고 있고, 기록은 남아야 한다.
+실행 기록이 에이전트와 대화를 가리키고 있고, 기록은 남아야 한다.
 
 사용자를 지우는 흐름은 아직 없다.
 
