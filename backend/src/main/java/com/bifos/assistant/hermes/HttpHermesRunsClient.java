@@ -202,7 +202,12 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         if (usage == null || usage.isMissingNode() || usage.isNull()) {
             return TokenUsage.empty();
         }
-        Long cached = number(usage, "cached_tokens");
+        // Hermes v0.21.5 의 run usage 는 캐시 읽기를 `cache_read_tokens` 로 주고, `input_tokens` 는 그것을 포함한다.
+        // v0.21.3 은 캐시 칸이 아예 없어 비어 있었다.
+        Long cached = number(usage, "cache_read_tokens");
+        if (cached == null) {
+            cached = number(usage, "cached_tokens");
+        }
         if (cached == null) {
             cached = number(usage.path("prompt_tokens_details"), "cached_tokens");
         }
