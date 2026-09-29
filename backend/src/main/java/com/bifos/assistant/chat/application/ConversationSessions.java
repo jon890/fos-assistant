@@ -1,0 +1,52 @@
+package com.bifos.assistant.chat.application;
+
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+/**
+ * 대화 turn 에 보낼 Hermes session 을 정한다.
+ *
+ * <p>새 대화는 첫 turn 을 보내기 전에 Control Plane 이 {@code fos-<uuid>} 를 만들어 보낼 session 과 뿌리
+ * session 에 함께 적는다. Hermes 는 모르는 session id 를 받으면 그 id 로 session 을 만든다. 그래서 제출하기
+ * 전에 실행 줄에 뿌리 session 을 적을 수 있고, MCP {@code agent_*} 호출이 들고 오는 서명한 뿌리 session 으로
+ * 도는 실행을 찾을 수 있다. 근거는 ADR-031 에 있다.
+ *
+ * <p>Memory 제안과 흐름의 하위 실행은 여기를 거치지 않는다. 그 실행은 {@code agent_*} 의 부모가 되지 않는다.
+ */
+@Service
+@RequiredArgsConstructor
+public class ConversationSessions {
+
+    private static final String PREFIX = "fos-";
+
+    private final ConversationRepository conversations;
+
+    /**
+     * 이 turn 에 보낼 session 을 돌려준다. 대화에 없으면 새로 정해 저장한다.
+     *
+     * <p>이미 있으면 그대로 쓴다. 뿌리 칸이 빈 옛 대화도 Hermes 가 정한 값을 그대로 쓰고 뿌리를 채우지 않는다.
+     * 같은 새 대화에 두 turn 이 함께 와서 다른 쪽이 먼저 정했으면 저장된 값을 다시 읽어 그것을 쓴다.
+     * 대화의 {@code updatedAt} 은 바꾸지 않는다.
+     */
+    public String ensure(Conversation conversation) {
+        String current = conversation.hermesSessionId();
+        if (current != null) {
+            return current;
+        }
+        String created = PREFIX + UUID.randomUUID();
+        if (conversations.assignSessionIfAbsent(conversation.id(), created) == 1) {
+            conversation.assignNewSession(created);
+            return created;
+        }
+        Conversation stored = conversations.findById(conversation.id())
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.CONVERSATION_NOT_FOUND, "conversation not found"));
+        conversation.adoptSessions(stored.hermesSessionId(), stored.hermesRootSessionId());
+        return stored.hermesSessionId();
+    }
+}

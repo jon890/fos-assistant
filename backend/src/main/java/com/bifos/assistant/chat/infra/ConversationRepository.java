@@ -24,6 +24,20 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     @Query("update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")
     int touchSession(@Param("id") Long id, @Param("sessionId") String sessionId, @Param("now") Instant now);
 
+    /**
+     * session 이 비어 있을 때만 보낼 session 과 뿌리 session 을 같은 값으로 채운다. 채웠으면 1 이다.
+     *
+     * <p>turn 을 시작할 때 쓰므로 {@code updatedAt} 을 바꾸지 않는다. 바꾸면 실패한 turn 도 대화를 목록 맨
+     * 위로 올린다. 같은 새 대화에 두 turn 이 함께 와도 조건 때문에 한쪽만 채운다.
+     */
+    @Modifying
+    @Transactional
+    @Query("""
+            update Conversation c set c.hermesSessionId = :sessionId, c.hermesRootSessionId = :sessionId
+             where c.id = :id and c.hermesSessionId is null
+            """)
+    int assignSessionIfAbsent(@Param("id") Long id, @Param("sessionId") String sessionId);
+
     @Modifying
     @Transactional
     @Query("update Conversation c set c.title = :title where c.id = :id and c.title = ''")

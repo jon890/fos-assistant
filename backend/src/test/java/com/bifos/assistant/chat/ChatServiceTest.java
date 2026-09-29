@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -43,8 +44,10 @@ import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -188,7 +191,8 @@ class ChatServiceTest {
                     .isEqualTo(artifactService.agentPreamble(conversations.findById(turn.conversationId()).orElseThrow()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
             assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
-            assertThat(command.sessionId()).isNull();
+            // 새 대화도 Control Plane 이 정한 session 으로 첫 turn 을 보낸다.
+            assertThat(command.sessionId()).startsWith("fos-");
         });
         assertThat(turn.assistantText()).isEqualTo("저녁은 김치찌개가 좋겠어요.");
 
@@ -258,6 +262,11 @@ class ChatServiceTest {
                         });
     }
 
+    /**
+     * 압축 교체로 Hermes 가 보낸 것과 다른 session 을 돌려준 경우다.
+     *
+     * <p>다음 turn 은 돌려받은 session 을 보내지만, 대화의 뿌리와 실행 줄에는 처음 정한 session 이 남는다.
+     */
     @Test
     void continues_the_same_hermes_session_on_the_next_turn() {
         CurrentUser dad = member("dad@example.com", "dad");
@@ -271,9 +280,77 @@ class ChatServiceTest {
                 .willReturn(
                         HermesRunResult.of(
                                 "run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
-        chat.send(dad, first.conversationId(), "하나 더", "mom");
+        ChatTurn second = chat.send(dad, first.conversationId(), "하나 더", "mom");
 
+        String root = stub().received().get(0).sessionId();
+        assertThat(root).startsWith("fos-");
         assertThat(stub().received().get(1).sessionId()).isEqualTo("sess-1");
+        var conversation = conversations.findById(first.conversationId()).orElseThrow();
+        assertThat(conversation.hermesSessionId()).as("다음에 보낼 session").isEqualTo("sess-1");
+        assertThat(conversation.hermesRootSessionId()).as("뿌리 session").isEqualTo(root);
+        assertThat(executions.findById(second.executionId()).orElseThrow().hermesSessionId())
+                .as("둘째 실행 줄의 session").isEqualTo(root);
+    }
+
+    /** Hermes 가 받은 session 을 그대로 돌려주게 한다. 실제 Hermes 가 모르는 id 를 받았을 때와 같다. */
+    private void hermesEchoesSession() {
+        stub().willAnswer(command -> HermesRunResult.of(
+                "run-" + stub().received().size(), command.sessionId(), "completed", "네", "m", "p",
+                TokenUsage.empty()));
+    }
+
+    @Test
+    void 새_대화의_첫_turn은_정한_session을_보내고_대화의_두_칸과_실행_줄에_제출_전에_적는다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        AtomicReference<String> recordedAtSubmit = new AtomicReference<>();
+        stub().willAnswer(command -> {
+            // 제출하는 순간 이미 실행 줄에 session 이 적혀 있어야 한다.
+            recordedAtSubmit.set(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10))
+                    .getFirst().hermesSessionId());
+            return HermesRunResult.of(
+                    "run-1", command.sessionId(), "completed", "네", "m", "p", TokenUsage.empty());
+        });
+
+        ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+
+        String sent = stub().received().getFirst().sessionId();
+        assertThat(sent).startsWith("fos-");
+        assertThat(recordedAtSubmit.get()).as("제출할 때 실행 줄의 session").isEqualTo(sent);
+        var conversation = conversations.findById(turn.conversationId()).orElseThrow();
+        assertThat(conversation.hermesSessionId()).isEqualTo(sent);
+        assertThat(conversation.hermesRootSessionId()).isEqualTo(sent);
+        assertThat(executions.findById(turn.executionId()).orElseThrow().hermesSessionId()).isEqualTo(sent);
+    }
+
+    @Test
+    void 둘째_turn은_같은_session을_보내고_새로_만들지_않는다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        hermesEchoesSession();
+
+        ChatTurn first = chat.send(dad, null, "안녕", "dad");
+        ChatTurn second = chat.send(dad, first.conversationId(), "하나 더", "dad");
+
+        String sent = stub().received().get(0).sessionId();
+        assertThat(stub().received().get(1).sessionId()).isEqualTo(sent);
+        assertThat(conversations.findById(first.conversationId()).orElseThrow().hermesRootSessionId())
+                .isEqualTo(sent);
+        assertThat(executions.findById(second.executionId()).orElseThrow().hermesSessionId()).isEqualTo(sent);
+    }
+
+    @Test
+    void 뿌리가_없는_옛_대화는_Hermes가_정한_session을_보내고_실행_줄에도_그_값을_적는다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Long agentId = agents.findByCode("dad").orElseThrow().id();
+        Conversation legacy = conversations.save(Conversation.startedBy(dad.id(), "옛 대화", agentId));
+        conversations.touchSession(legacy.id(), "hermes-made-session", Instant.now());
+        hermesEchoesSession();
+
+        ChatTurn turn = chat.send(dad, legacy.id(), "이어서", "dad");
+
+        assertThat(stub().received().getFirst().sessionId()).isEqualTo("hermes-made-session");
+        assertThat(executions.findById(turn.executionId()).orElseThrow().hermesSessionId())
+                .isEqualTo("hermes-made-session");
+        assertThat(conversations.findById(legacy.id()).orElseThrow().hermesRootSessionId()).isNull();
     }
 
     @Test

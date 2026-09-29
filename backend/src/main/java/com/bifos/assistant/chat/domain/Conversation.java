@@ -44,9 +44,23 @@ public class Conversation {
     @Column(name = "agent_id")
     private Long agentId;
 
-    /** 첫 실행이 session을 보고할 때까지 비어 있는 Hermes session이다. */
+    /**
+     * 다음 turn 에 보낼 Hermes session 이다.
+     *
+     * <p>새 대화는 첫 turn 을 보내기 전에 Control Plane 이 정한다. 압축 교체로 Hermes 가 다른 session 을
+     * 돌려주면 그 값으로 바뀐다.
+     */
     @Column(name = "hermes_session_id", length = 128)
     private String hermesSessionId;
+
+    /**
+     * 이 대화의 첫 Hermes session. 한 번 정하면 바뀌지 않는다.
+     *
+     * <p>MCP {@code agent_*} 호출이 들고 오는 서명한 뿌리 session 이 이 값이다(ADR-031). 이 칸이 생기기
+     * 전에 Hermes 가 session 을 정한 대화는 비어 있다.
+     */
+    @Column(name = "hermes_root_session_id", length = 128)
+    private String hermesRootSessionId;
 
     @Column(name = "title", nullable = false, length = 200)
     private String title;
@@ -102,6 +116,20 @@ public class Conversation {
         return hermesSessionId;
     }
 
+    public String hermesRootSessionId() {
+        return hermesRootSessionId;
+    }
+
+    /**
+     * 이 대화의 실행 줄에 적을 session 이다.
+     *
+     * <p>뿌리가 있으면 뿌리다. Hermes 에 보내는 session 은 압축 교체로 바뀌어도 서명한 뿌리 session 은
+     * 그대로이기 때문이다. 뿌리가 없는 옛 대화는 보내는 session 을 적는다.
+     */
+    public String executionSessionId() {
+        return hermesRootSessionId != null ? hermesRootSessionId : hermesSessionId;
+    }
+
     public String title() {
         return title;
     }
@@ -136,6 +164,23 @@ public class Conversation {
         if (this.title == null || this.title.isBlank()) {
             this.title = title;
         }
+    }
+
+    /**
+     * Control Plane 이 정한 새 session 을 보낼 session 과 뿌리 session 에 함께 적는다.
+     *
+     * <p>{@code updatedAt} 은 바꾸지 않는다. turn 을 시작할 때 부르므로, 바꾸면 실패한 turn 도 대화를
+     * 목록 맨 위로 올린다.
+     */
+    public void assignNewSession(String sessionId) {
+        this.hermesSessionId = sessionId;
+        this.hermesRootSessionId = sessionId;
+    }
+
+    /** 저장소에 이미 적힌 두 session 을 이 객체에 옮긴다. 다른 turn 이 먼저 정했을 때 쓴다. */
+    public void adoptSessions(String sessionId, String rootSessionId) {
+        this.hermesSessionId = sessionId;
+        this.hermesRootSessionId = rootSessionId;
     }
 
     public void rememberSession(String sessionId) {

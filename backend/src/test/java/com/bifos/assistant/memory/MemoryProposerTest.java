@@ -145,7 +145,8 @@ class MemoryProposerTest {
                 .start(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
         MemoryProposer isolated = new MemoryProposer(new MemoryProposalProperties(true),
                 mock(MemoryService.class), mock(HermesRunsClient.class), failingRecorder,
                 mock(ExecutionEventRecorder.class), mock(ExecutionEventRepository.class), new ObjectMapper());

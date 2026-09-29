@@ -31,6 +31,15 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
 
     List<AgentExecution> findByStatus(ExecutionStatus status);
 
+    /**
+     * 그 Hermes session 을 가진 그 사용자의 실행을 상태로 골라 둘까지만 읽는다.
+     *
+     * <p>다른 에이전트에게 맡기는 도구가 부모를 찾을 때 쓴다. 부모는 정확히 하나여야 하므로 둘이 보이면
+     * 더 읽지 않아도 실패가 정해진다. {@code (hermes_session_id, status)} 색인을 탄다.
+     */
+    List<AgentExecution> findTop2ByHermesSessionIdAndStatusAndUserId(
+            String hermesSessionId, ExecutionStatus status, Long userId);
+
     /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);
 

@@ -256,6 +256,27 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
+    void Chief_실행_줄에는_대화의_뿌리_session이_적히고_하위_실행_줄은_비어_있다() {
+        CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
+        hermesAnswersEachStep(SPLIT_JSON);
+
+        ChatTurn turn = chat.send(dad, null, "전기차를 사는 게 나을까?", MY_AGENT);
+
+        Conversation conversation = conversations.findById(turn.conversationId()).orElseThrow();
+        String root = conversation.hermesRootSessionId();
+        assertThat(root).startsWith("fos-");
+        assertThat(stub().received())
+                .filteredOn(command -> command.input().contains(CHIEF_MARK))
+                .singleElement()
+                .satisfies(command -> assertThat(command.sessionId()).isEqualTo(root));
+        AgentExecution chief = executions.findById(turn.executionId()).orElseThrow();
+        assertThat(chief.hermesSessionId()).as("Chief 실행 줄의 session").isEqualTo(root);
+        assertThat(executionsOf(dad).stream().filter(it -> !Objects.equals(it.id(), chief.id())))
+                .hasSize(3)
+                .allSatisfy(child -> assertThat(child.hermesSessionId()).as("하위 실행 줄의 session").isNull());
+    }
+
+    @Test
     void 경계_자식_실행의_userId가_전부_부모와_같다() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);

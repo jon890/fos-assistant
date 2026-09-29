@@ -87,6 +87,13 @@ public enum ErrorCode {
     ARTIFACT_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 그 결과물이 있었지만 보관 기간이 지나 파일을 지웠다. 행에 지운 시각이 적힌 경로에만 쓴다. */
     ARTIFACT_GONE(HttpStatus.GONE),
+    /**
+     * MCP 호출의 {@code _fos_ctx} 를 믿을 수 없거나, 그것이 가리키는 도는 부모 실행을 하나로 정하지 못했다.
+     *
+     * <p>서명 없음, 서명 틀림, 부모 없음, 부모 둘 이상을 가르지 않는다. 가르면 모델이 어느 값을 흉내 내야
+     * 통과하는지 훑어 알아낼 수 있다. 이유는 서버 로그에만 남긴다. 근거는 ADR-031 이다.
+     */
+    MCP_CALL_CONTEXT_INVALID(HttpStatus.FORBIDDEN),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),

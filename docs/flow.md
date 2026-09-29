@@ -987,6 +987,62 @@ CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로
 그 다른 대화의 turn 시작 뒤 바뀐 HTML 일 때만 그 대화의 답에 붙는다.
 같은 경로에 동시에 쓰면 마지막으로 성공한 파일 교체가 남는다.
 
+## 다른 에이전트에게 맡길 때
+
+Hermes 가 어느 에이전트를 부를지 정하고, Control Plane 은 경계만 검사한다.
+결정은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 과
+[ADR-031](adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md) 에 있다.
+
+```mermaid
+sequenceDiagram
+    participant C as Chief (Hermes)
+    participant P as profile 플러그인
+    participant M as Control Plane MCP
+    participant D as 위임 서비스
+    participant H as 다른 profile (Hermes)
+
+    C->>P: agent_list 또는 agent_delegate(agent_code, task)
+    P->>P: 뿌리 session 을 찾고 MCP 토큰으로 서명한다
+    P->>M: tools/call + _fos_ctx
+    M->>M: 토큰으로 사용자를 정한다
+    M->>D: 서명 확인, 뿌리 session 의 도는 실행을 부모로
+    D->>D: 깊이와 동시 한도, 에이전트 접근, 같은 호출인지 본다
+    D->>D: 실행 줄을 만들고 새 session fos-<uuid> 를 적는다
+    D->>H: POST /v1/runs (원래 사용자로 다시 조립한 Memory)
+    H-->>D: run_id
+    D-->>M: 실행 번호, RUNNING
+    M-->>C: 도구 결과
+    Note over D,H: 끝날 때까지 Control Plane 이 따로 기다리고 결과를 실행 줄에 적는다
+    C->>M: agent_status(execution_id)
+    M-->>C: RUNNING 또는 SUCCEEDED 와 답
+    C->>M: agent_stop(execution_id)
+    M->>H: POST /v1/runs/{run_id}/stop
+    M-->>C: CANCELLED
+```
+
+### 갈리는 지점
+
+| 경우 | 결과 |
+| --- | --- |
+| `_fos_ctx` 가 없거나 서명이 틀리다 | 거절한다. 플러그인이 빠진 profile 이거나 모델이 흉내 낸 것이다 |
+| 뿌리 session 을 가진 도는 실행이 없거나 둘 이상이다 | 거절한다. 부모를 추측하지 않는다 |
+| 그 실행의 사용자가 토큰의 사용자와 다르다 | 거절한다 |
+| 없는 에이전트, 쓸 수 없는 에이전트 | 같은 응답으로 거절한다. 있는지 없는지 알리지 않는다 |
+| 꺼진 에이전트 | 쓸 수 없다고 거절한다 |
+| 깊이가 한도(기본 2)를 넘는다 | 거절한다. Hermes 는 재귀를 막지 않는다 |
+| 한 뿌리 아래 도는 위임 자식이 한도(기본 4)에 닿았다 | 거절한다. Chief 가 앞의 것을 기다리거나 멈춘 뒤 다시 부른다 |
+| 같은 `tool_call_id` 가 다시 온다(Hermes 재시도) | 새로 만들지 않고 처음 만든 실행을 돌려준다 |
+| 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 실패 코드를 돌려준다 |
+| 제출이 한도 시간 안에 끝나지 않는다 | 실행 번호를 돌려주고, 뒤따르는 결과는 그 줄에 적는다 |
+| `agent_status` 로 남의 실행이나 그 나무 밖의 실행을 묻는다 | 없는 실행과 같은 응답이다 |
+| `agent_stop` 이 끝난 실행에 온다 | 멈추지 않고 끝난 상태를 그대로 돌려준다 |
+| 멈추기와 끝나기가 겹친다 | 먼저 적힌 쪽이 남는다. 끝난 뒤 온 중지는 끝난 상태를 돌려준다 |
+| 자식이 다시 `agent_delegate` 를 부른다 | 그 자식이 부모가 된다. 깊이 한도 안에서만 된다 |
+| 사용자가 그 turn 을 중지한다 | turn 이 도는 동안 추적하던 위임 자식도 함께 멈춘다. turn 이 끝난 뒤의 자식은 `agent_stop` 으로만 멈춘다 |
+| 서버가 다시 뜬다 | 도는 위임 실행은 기동 정리가 `FAILED`(`ORPHANED`) 로 적는다 |
+
+**자식의 답은 대화 이력에 넣지 않는다.** Chief 가 `agent_status` 로 받아 자기 답에 합친다. 자식 실행은 자기 줄에 사용량과 비용이 따로 남고 작업 과정과 실행 나무에 보인다.
+
 ## 결과물 파일을 볼 때
 
 에이전트가 turn 안에 HTML 파일을 만들면 그 답 아래에 파일이 보이고, 누르면 옆 패널에 그 페이지가 뜬다.
