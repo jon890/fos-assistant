@@ -11,7 +11,7 @@ Hermes 가 부를 수 있는 에이전트를 알고(`agent_list`), 맡긴 실행
 
 ## 컨텍스트
 
-- plan038 이 끝나 있어야 한다. `McpCallContext`(서명 검증), `DelegationParentResolver`(도는 부모 찾기), `agent_execution` 의 `hermes_session_id`, `delegation_key`, `output_text` 칸이 있다. 없으면 `PHASE_BLOCKED: plan038 이 main 에 없다` 로 멈춘다
+- 부모 실행을 잇는 바탕이 main 에 있어야 한다. `McpCallContext`(서명 검증), `DelegationParentResolver`(도는 부모 찾기), `McpController.withoutCallContext`(`_fos_ctx` 떼기), `AgentTokenAuthenticationFilter.TOKEN_HASH_ATTRIBUTE`, `agent_execution` 의 `hermes_session_id`, `delegation_key`, `output_text` 칸이다. 하나라도 없으면 `PHASE_BLOCKED: 부모 실행을 잇는 바탕(McpCallContext 등)이 main 에 없다` 로 멈춘다
 - MCP 도구 규격은 `McpToolService.tools()` 가 돌려주는 목록이고, 결과는 `McpToolService` 의 `result(text, isError)` 모양(`content` 에 text 하나, `isError`)이다. `McpController.call` 이 도구 이름으로 나눈다
 - 에이전트 목록은 `AgentService.readableBy(CurrentUser)`(켜져 있고 요청자가 읽을 수 있는 것)로 얻는다. 에이전트의 소개는 `Agent.tagline()`
 - 실행 나무의 뿌리는 `rootExecutionId` 가 있으면 그것, 없으면 자기 번호다(`ChildExecutionRunner.rootOf` 와 같은 규칙)
@@ -37,11 +37,11 @@ Hermes 가 부를 수 있는 에이전트를 알고(`agent_list`), 맡긴 실행
 
 - `McpToolService.tools()` 에 `agent_list`(인자 없음), `agent_status`(`execution_id` 정수) 규격과 한국어 설명을 더한다. 설명에는 `agent_delegate` 로 받은 번호를 넣는다는 것만 적는다
 - `McpToolService` 에 두 도구의 결과를 만드는 메서드를 더한다. 실패는 정해 둔 한국어 문구와 짧은 코드(예: `NOT_FOUND`, `INVALID_CONTEXT`)만 싣는다
-- `McpController.call` 에 두 이름을 더한다. plan038 phase 02 에서 떼어 둔 `_fos_ctx` 를 `McpCallContext` 로 검증해 넘긴다(검증에 쓸 토큰 해시는 요청 속성). 인자 모양 검사는 컨트롤러가, 판정은 서비스가 한다
+- `McpController.call` 에 두 이름을 더한다. `McpController.withoutCallContext` 가 떼어 내는 `_fos_ctx` 를 `McpCallContext` 로 검증해 넘긴다(검증에 쓸 토큰 해시는 요청 속성). 인자 모양 검사는 컨트롤러가, 판정은 서비스가 한다
 
 ### 3. 테스트 `backend/src/test/java/com/bifos/assistant/mcp/McpAgentToolsTest.java`
 
-`McpMemoryToolTest` 의 방식(토큰 발급, `/mcp` 호출)을 따른다. 서명 도우미는 plan038 의 `McpCallContextTest` 것과 같은 계약으로 만든다.
+`McpMemoryToolTest` 의 방식(토큰 발급, `/mcp` 호출)을 따른다. 서명 도우미는 `McpCallContextTest` 와 `docs/hermes/delegation.md` 「`_fos_ctx` 계약」 의 test vector 와 같은 계약으로 만든다.
 
 - `agent_list`: 요청자가 쓸 수 있는 켜진 에이전트만 오고, 남의 비공개 에이전트와 꺼진 에이전트는 오지 않는다. profile 이름이 응답 글 어디에도 없다
 - `agent_status`: 같은 뿌리의 위임 실행은 상태와 답을 받는다. 남의 실행, 다른 뿌리의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호는 모두 같은 응답이다
