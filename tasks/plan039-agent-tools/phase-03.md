@@ -1,0 +1,101 @@
+# Phase 03. `agent_stop` 과 turn 중지를 잇고 e2e 로 전체를 확인한다
+
+**Execution profile**: deep
+
+## 목표
+
+맡긴 실행을 그 실행만 멈추는 `agent_stop` 을 열고, 사용자가 turn 을 중지하면 그 turn 이 도는 동안 맡긴 자식도 함께 멈추게 한다.
+가짜 Hermes e2e 로 위임, 상태, 중지, 실행 나무를 한 번에 확인하고 PR 을 연다.
+
+**범위 외**: 그 실행 아래의 실행까지 멈추는 것(`docs/code-architecture.md` 「아직 만들지 않은 것」). 사용자 전체 동시 한도. 큰 화면 변경.
+
+## 컨텍스트
+
+- Hermes 중지는 `HermesRunsClient.stop(apiBaseUrl, profileName, runId)` 이고, 이미 끝난 run 은 404 를 로그만 남기고 넘긴다(`HttpHermesRunsClient.stop`)
+- `AgentRunner.run` 은 `cancelled` 가 참이면 `executions.cancel(...)` 로 `CANCELLED` 를 적는다. 끝나기를 기다리던 중 중지된 run 은 Hermes 가 `cancelled` 로 끝낸다
+- turn 중지는 `TurnCancellation` 이 갖는다. `trackRun(executionId, apiBaseUrl, profileName, runId)` 로 turn 에 run 을 붙이면 사용자가 중지할 때 `stopRun` 으로 함께 멈춘다. turn 의 핸들은 뿌리 실행 번호로 찾는다(`find(executionId)`)
+- phase 02 의 위임은 가상 스레드에서 `AgentRunner.run` 을 돌리고 `cancelled` 를 받는다
+- e2e 는 `test/e2e/scenarios/` 에 시나리오 하나씩 두고 `run.ts` 가 차례로 돌린다. 토큰 발급과 MCP 호출은 `test/e2e/scenarios/artifact.ts` 가 본보기다(`/admin/agent-tokens` 로 발급). 가짜 Hermes 는 `holdNextRun()`, `releaseHeldRun()`, `stoppedRuns()` 로 run 을 붙잡고 중지를 기록한다
+- 실행 나무는 `GET /api/v1/usage/executions/{id}/tree`(`UsageController`, `ExecutionTreeService.of`)
+
+**근거 문서**: `docs/flow.md` 의 「다른 에이전트에게 맡길 때」 절, `docs/adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md` 의 「도구 넷과 한도」 와 「`ResearchAndBuildFlow` 의 자리」 절, `docs/hermes/delegation.md` 의 「취소가 아래로 내려가지 않는다」 절
+
+## 의도 메모
+
+- `agent_stop` 의 권한은 `agent_status` 와 같다(같은 뿌리의 위임 실행, 토큰의 사용자). 아니면 없는 실행과 같은 응답
+- 이미 끝난 실행이면 멈추지 않고 그 상태를 돌려준다(오류가 아니다)
+- 도는 실행이면 위임 서비스가 들고 있는 그 실행의 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. `CANCELLED` 가 적히기를 짧게(예: 5초) 기다려 적혔으면 `CANCELLED`, 아니면 `RUNNING` 과 `stop_requested: true` 를 돌려준다. 멈추기와 끝나기가 겹치면 먼저 적힌 상태가 남는다
+- 서버가 다시 떠 중지 표시가 없는 도는 실행은 기동 정리가 `ORPHANED` 로 끝낸다. `agent_stop` 이 그 경우에도 Hermes 에 중지를 보내는지는 run 번호가 있으면 보낸다
+- turn 중지 연결: 위임 자식의 run 번호가 붙을 때(`onSubmitted`) 그 뿌리 실행의 turn 핸들이 있으면 `TurnCancellation.trackRun(뿌리 실행 번호, ...)` 으로 붙인다. turn 이 끝난 뒤에는 핸들이 없으므로 붙이지 않는다
+- `ResearchAndBuildFlow` 는 기능을 더하지 않는다. 클래스 Javadoc 에 「새 흐름을 더하지 않는다. 지우는 조건은 ADR-017 「`ResearchAndBuildFlow` 의 자리」」 한 단락을 더한다
+- 화면: 실행 나무와 작업 과정이 위임 자식을 이미 그리는지 e2e 의 나무 조회로 확인한다. 그리지 못하면 최소한만 고친다
+
+## 작업 항목
+
+### 1. `AgentDelegationService.stop` 과 중지 표시
+
+위임 실행마다 중지 표시(`AtomicBoolean`)와 run 참조를 들고, 끝나면 지운다. `stop(CurrentUser, McpCallContext, Long executionId)`.
+
+### 2. turn 중지 연결
+
+위 의도 메모대로 `onSubmitted` 에서 뿌리의 turn 핸들에 run 을 붙인다.
+
+### 3. MCP 규격과 경로
+
+`McpToolService.tools()` 에 `agent_stop`(`execution_id` 정수) 규격과 설명, `McpController.call` 에 경로.
+
+### 4. backend 테스트
+
+- 도는 위임 실행을 `agent_stop` 하면 Hermes 에 중지가 가고(`StubHermesRunsClient` 의 중지 기록) 실행이 `CANCELLED` 로 남는다
+- 끝난 실행에 `agent_stop` 은 끝난 상태를 그대로 준다
+- 남의 실행, 다른 뿌리의 실행은 없는 실행과 같은 응답
+- 사용자가 turn 을 중지하면 그 turn 이 도는 동안 맡긴 자식도 멈춘다
+
+### 5. e2e `test/e2e/scenarios/delegation.ts`
+
+가짜 Hermes 를 쓴다. 테스트가 profile 플러그인 역할을 하며 `_fos_ctx` 를 계약대로 서명해 `/mcp` 를 직접 부른다.
+
+1. 토큰을 발급하고, 대화 turn 하나를 붙잡아 도는 뿌리 실행과 그 `fos-` session 을 만든다
+2. `agent_list` 가 쓸 수 있는 에이전트만 준다
+3. `agent_delegate` 가 바로 번호와 `RUNNING` 을 준다. 자식 run 을 붙잡아 두고 `agent_status` 가 `RUNNING` 이다
+4. 자식을 끝내면 `agent_status` 가 `SUCCEEDED` 와 답을 준다
+5. 다시 위임하고 `agent_stop` 하면 가짜 Hermes 의 `stoppedRuns()` 에 그 run 이 있고 상태가 `CANCELLED` 다
+6. 서명을 바꾼 호출, 다른 사용자의 토큰, 없는 에이전트, 같은 `tool_call_id` 두 번(실행 하나)
+7. `GET /api/v1/usage/executions/{뿌리}/tree` 에 자식 둘이 뿌리 아래로 보이고 각자 토큰과 모델이 따로 적혀 있다
+
+`run.ts` 에 시나리오를 더한다.
+
+### 6. `ResearchAndBuildFlow` 의 Javadoc 과 PR
+
+- Javadoc 한 단락을 더한다
+- PR 본문과 보고서는 아래 여덟 절 형식으로 쓴다: 1. 기존 구조 분석(위임이 왜 불완전했는지) 2. 구현한 구조(최종 호출 흐름 ASCII 그림) 3. 주요 변경 파일(왜 바꿨는지) 4. 보안 경계(user, agent, memory, profile, credential, execution 권한을 각각 어떻게 지켰는지) 5. 실패 처리(Hermes 불가, 실패한 run, 중지 경합, 동시 위임 등) 6. 테스트(실제로 돌린 것과 결과) 7. 남은 제한(이번 범위 밖으로 둔 것) 8. Runtime 추상화 전에 풀어야 할 문제
+- 운영에서 동작하려면 profile 플러그인이 있어야 한다는 것을 PR 본문 앞에 적는다(배치는 `fos-home-infra`)
+
+## 검증
+
+AGENTS.md 「확인」 절을 적힌 순서대로 돌린다.
+
+```bash
+cd backend && ./gradlew test
+cd web && pnpm typecheck && pnpm build
+cd web && pnpm test:browser
+node test/e2e/run.ts
+node --test 'test/unit/**/*.test.ts'
+scripts/check-public-safe.sh
+```
+
+완료 처리: 검증이 모두 통과하면 `tasks/plan039-agent-tools/index.json` 의 `status` 를 `completed` 로 바꿔 이 phase 커밋에 담는다. 그 뒤 PR 의 마지막 커밋으로 `tasks/plan039-agent-tools/` 를 지운다(`docs(docs): 구현이 끝난 에이전트 위임 도구 계획서를 지운다`). 오래 남을 결정은 이미 ADR-017, ADR-031 과 `docs/` 에 있다. 구현하며 계약이 바뀌었으면 그 문서를 함께 고친다.
+
+## 변경 파일
+
+| 파일 | 변경 |
+|---|---|
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpController.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/ResearchAndBuildFlow.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpAgentToolsTest.java` | 수정 |
+| `test/e2e/scenarios/delegation.ts` | 신규 |
+| `test/e2e/run.ts` | 수정 |
+| `tasks/plan039-agent-tools/index.json` | 수정 |
