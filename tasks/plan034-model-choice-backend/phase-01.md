@@ -7,7 +7,7 @@
 `/v1/runs` 요청이 provider 와 모델을 함께 싣거나 함께 뺄 수 있고, reasoning effort 를 `model_options` 로 싣는다.
 뒤 phase 가 대화의 선택을 실행에 실을 때 이 요청 모양을 쓴다.
 
-**범위 외**: 대화에 선택을 저장하는 것과 부르는 쪽(`ChatService`, `AgentRunner`, `MemoryProposer`)의 동작 변경은 phase 02 다. 이 phase 는 부르는 쪽에 기존 값을 그대로 넘기고 effort 는 `null` 로 둔다.
+**범위 외**: 대화에 선택을 저장하는 것은 phase 02, 부르는 쪽(`ChatService`, `AgentRunner`, `MemoryProposer`)의 동작 변경은 phase 03 이다. 이 phase 는 부르는 쪽에 기존 값을 그대로 넘기고 effort 는 `null` 로 둔다.
 
 ## 컨텍스트
 
@@ -39,7 +39,7 @@
 
 ### 3. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/hermes/HermesRunRequestTest.java`
 
-같은 파일의 대역 서버로 본문을 읽어 확인한다.
+이 파일에는 지금 HTTP 대역 서버가 없다. `backend/src/test/java/com/bifos/assistant/hermes/HermesBusyTest.java` 의 `HttpServer` 와 `respondWith` 를 본보기로, 받은 `POST /v1/runs` 요청 본문을 저장하는 `HttpServer` 를 이 파일에 새로 둔다. 저장한 본문을 JSON 으로 읽어 확인한다.
 - provider 와 모델이 모두 비면 본문에 `provider`, `model`, `model_options` 키가 없다
 - provider 와 모델과 effort 를 주면 셋이 모두 실린다. `model_options.reasoning.effort` 가 준 값이다
 - provider 만 주면 Hermes 를 부르지 않고 `VALIDATION_FAILED` 다
@@ -47,7 +47,7 @@
 ### 4. 가짜 Hermes `test/e2e/fake-hermes.ts`
 
 `POST /v1/runs` 가 받은 `model_options` 를 `lastSubmittedRuntime` 에 함께 적는다(`reasoningEffort` 칸). 타입 `lastSubmittedRuntime(): { provider?: string; model?: string; reasoningEffort?: string }` 로 넓힌다.
-provider 와 모델을 모두 빼고 온 실행은 지금처럼 성공한다. 세션의 실제 모델은 그 profile 의 기본 모델(`MODEL_OPTIONS_PATH` 응답의 `model`, 지금 `example-model`)로 적는다.
+provider 와 모델을 모두 빼고 온 실행은 지금처럼 성공한다. 세션 조회가 답하는 실제 provider 와 모델은 그 profile 의 기본값(`MODEL_OPTIONS_PATH` 응답의 `provider` 와 `model`, 지금 `openai-codex` 와 `example-model`)으로 적는다. 지금은 세션 provider 를 `submitted.provider ?? null` 로 적어, 둘 다 빼고 온 실행의 provider 가 null 이 된다. 그러면 뒤 phase 에서 기본값 대화의 가격을 찾지 못해 `test/e2e/scenarios/usage-cost.ts` 의 provider 와 금액 단언이 깨진다. 기본값 두 값은 상수 하나로 두고 `MODEL_OPTIONS_PATH` 응답과 세션 응답이 함께 쓴다. `SESSION_MODEL_PROBE` 입력의 특별한 답은 그대로 둔다.
 
 ## 검증
 

@@ -1,33 +1,30 @@
-# Phase 02. 대화가 고른 모델과 effort 를 저장하고 실행에 싣는다
+# Phase 02. 대화가 모델과 effort 를 저장하고 돌려준다
 
 **Execution profile**: deep
 
 ## 목표
 
-대화마다 모델과 reasoning effort 를 저장하고, 보내기, 다시 생성, Memory 제안, 흐름의 하위 실행이 그 값으로 Hermes 를 부른다.
-고르지 않은 대화는 모델을 빼고 보내 profile 기본값으로 돈다. provider 가 막혀도 다른 모델로 넘기지 않는다.
+대화마다 모델과 reasoning effort 를 저장하는 칸과 그 값을 바꾸는 경로 `PUT /api/v1/chat/conversations/{conversationId}/model` 을 둔다.
+대화 한 줄의 응답이 고른 값을 싣는다. 흐름 에이전트도 첫 메시지 전에 빈 대화를 만들어 모델을 고를 수 있다.
 
-**범위 외**: 고를 수 있는 모델 목록 경로는 phase 03 이다. 에이전트 모델 목록 표와 `AgentModelSelector`, `ProviderBlocklist` 를 지우는 것은 plan035 다. 이 phase 는 그것들을 부르지 않게만 한다. 모델을 고르는 화면은 plan036 이다. 이 phase 의 web 변경은 브라우저 검사가 선택을 넣을 수 있는 서버 라우트와 막힘 문구뿐이다.
+**범위 외**: 실행이 이 값을 쓰는 것과 넘김을 없애는 것은 phase 03 이다. 이 phase 는 turn 의 동작을 바꾸지 않는다. `ChatService` 의 turn, `AgentRunner`, `MemoryProposer`, `ExecutionRecorder` 의 인자는 그대로다. 모델 목록 경로는 phase 04, 모델을 고르는 화면은 plan036 이다.
 
 ## 컨텍스트
 
-**근거 문서**: `docs/flow.md` 「모델을 고를 때」 의 「갈리는 지점」 과 「실행이 실패할 때」, `docs/data-schema.md` 「conversation」 과 「agent_execution」, `docs/code-architecture.md` 「대화」 의 「경로」 와 「대화의 모델 선택」, `docs/adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md`
+**근거 문서**: `docs/flow.md` 「모델을 고를 때」 의 「갈리는 지점」, `docs/data-schema.md` 「conversation」 과 「agent_execution」, `docs/code-architecture.md` 「대화」 의 「경로」 와 「대화의 모델 선택」, `docs/adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md`
 
-- 지금 `ChatService` 의 turn 은 `modelSelector.availableFor(agent)` 의 목록을 차례로 돌며, provider 가 막히면(`HermesRunResult.providerBlocked()`) `blocklist.block` 뒤 다음 순위로 새 실행 줄을 만든다(`PROVIDER_SWITCHED` 사건, `ChatEvent.switched`, `ChatEvent.reset`). 이 루프를 없앤다
-- `orchestration/application/AgentRunner.java` 는 `modelSelector.availableFor(agent)` 의 첫 줄을 쓰고, 없으면 `NO_MODEL_AVAILABLE` 로 실패시킨다
-- `memory/application/MemoryProposer.java` 의 `proposeFrom(user, conversation, agent, parentExecution, answer)` 도 첫 줄을 쓴다
-- `usage/application/ExecutionRecorder.java` 의 `start`, `complete`, `cancel(execution, agent, result, requested)` 가 `agent/domain/ModelOption requested` 를 받는다. 실제로 돈 값은 `readActualRuntime` 이 세션에서 읽고, 없으면 요청한 값을 적는다
-- 대화 이름 바꾸기는 `ConversationRepository.renameIfActive` 로 칸만 고친다. **turn 이 끝날 때 대화를 통째로 저장하지 않는다**(`docs/code-architecture.md` 「대화」). 모델 선택도 같은 방식의 갱신 질의로 쓴다
+- 대화 이름 바꾸기는 `ChatService.rename` 이 `ConversationRepository.renameIfActive` 로 칸만 고친다. **turn 이 끝날 때 대화를 통째로 저장하지 않는다**(`docs/code-architecture.md` 「대화」). 모델 선택도 같은 방식의 갱신 질의로 쓴다
 - 마지막 migration 은 `V25__group_rename.sql` 이다. 새 파일은 `V26` 이다. 이미 적용된 migration 은 고치지 않는다(`backend/AGENTS.md`)
-- `ErrorCode.PROVIDER_BLOCKED`(502)는 이미 있다
+- `ChatService.startEmpty(user, agentCode)` 는 `!agent.acceptsAttachments()` 인 에이전트(흐름이 있는 에이전트)를 `VALIDATION_FAILED` 로 거절한다. `docs/flow.md` 「모델을 고를 때」 는 대화가 없으면 이 길로 빈 대화를 만든 뒤 모델을 고른다고 적었다. 사진은 보내기 경로(`ChatService` 의 `withAttachments && !agent.acceptsAttachments()` 검사)가 따로 막는다
+- 사진 올리기(`AttachmentService.upload`)는 에이전트를 보지 않는다. 흐름 에이전트의 빈 대화에 사진을 올리면 올라가고, 보내기에서 거절된다. 보내지 않은 첨부는 보관 기간이 지나면 지워지는 기존 규칙을 따른다
+- 엔티티를 바꾸면 migration 도 함께 바꾼다. 테스트는 엔티티로 스키마를 만들고 운영은 Flyway 스키마를 검증하므로 어긋나도 테스트는 통과한다(`backend/AGENTS.md` 「엔티티와 마이그레이션은 따로 논다」)
 
 ## 의도 메모
 
-- `ExecutionEventType.PROVIDER_SWITCHED` 는 지우지 않는다. 예전 실행의 사건 행이 그 이름으로 저장돼 있다. 새로 쓰지만 않는다
-- `ChatEvent.switched` 와 `reset` 은 화면이 아직 받는다. 이 phase 는 보내지 않게만 하고, 받는 쪽 정리는 plan036 의 몫이다
-- 흐름의 하위 실행도 대화의 선택을 쓴다. 자식 에이전트가 달라도 사용자가 이 대화에서 고른 모델이 그 대화의 모든 실행에 적용된다는 규칙을 하나로 둔다
-- `NO_MODEL_AVAILABLE` 은 더 생기지 않는다. 코드 값은 plan035 가 지운다
 - 선택을 바꿔도 `updated_at` 은 건드리지 않는다. 대화 목록의 순서는 주고받은 시각으로 정한다
+- 고른 모델이 Hermes 목록에 있는지는 확인하지 않는다. 나중에 목록에서 빠져도 대화에 적힌 값을 그대로 보낸다(`docs/flow.md` 「갈리는 지점」)
+- `agent_execution.reasoning_effort` 칸과 엔티티 필드는 이 phase 에서 migration 과 함께 만든다. 값을 적는 것은 phase 03 이다
+- 배포 뒤 확인할 것: 기동 로그에서 `Schema validation` 이 실패하지 않는다. 확인 방법은 `fos-home-infra` 가 갖는다
 
 ## 작업 항목
 
@@ -40,77 +37,64 @@
 ### 2. `backend/src/main/java/com/bifos/assistant/chat/domain/ModelChoice.java`
 
 record `ModelChoice(String provider, String model, String reasoningEffort)`.
-- 앞뒤 공백을 떼고 빈 문자열은 null 로 둔다
-- provider 와 모델은 함께 채우거나 함께 비운다. 하나만 오면 `ApiException(VALIDATION_FAILED)`
-- effort 는 null 이거나 `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 아니면 `VALIDATION_FAILED`
+- 생성할 때 앞뒤 공백을 떼고 빈 문자열은 null 로 둔다
+- provider 와 모델은 함께 채우거나 함께 비운다. 하나만 오면 `ApiException(ErrorCode.VALIDATION_FAILED)`
+- effort 는 null 이거나 `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 아니면 `VALIDATION_FAILED`. 이 목록은 `public static final List<String> REASONING_EFFORTS` 로 두고 phase 04 가 꺼내 쓴다
 - `static ModelChoice defaults()` 는 셋 다 null, `boolean usesDefaultModel()` 은 모델이 비었는가
 
 ### 3. `Conversation` 과 `ConversationRepository`
 
-`chat/domain/Conversation.java` 에 세 칸과 `ModelChoice modelChoice()` 를 더한다.
-`chat/infra/ConversationRepository.java` 에 `chooseModelIfActive(id, userId, provider, model, reasoningEffort)` 갱신 질의를 `renameIfActive` 와 같은 모양으로 더한다(`updatedAt` 은 건드리지 않는다).
+`backend/src/main/java/com/bifos/assistant/chat/domain/Conversation.java` 에 필드 셋을 더한다. 열 이름과 길이는 `docs/data-schema.md` 「conversation」 을 따른다.
+- `@Column(name = "model_provider", length = 64) private String modelProvider;`
+- `@Column(name = "model", length = 128) private String model;`
+- `@Column(name = "reasoning_effort", length = 16) private String reasoningEffort;`
+- `public ModelChoice modelChoice()` 는 세 값으로 `ModelChoice` 를 만들어 돌려준다
 
-### 4. `ChatService` 의 선택 변경과 turn
+`backend/src/main/java/com/bifos/assistant/chat/infra/ConversationRepository.java` 에 `int chooseModelIfActive(Long id, Long userId, String provider, String model, String reasoningEffort)` 갱신 질의를 `renameIfActive` 와 같은 모양(`@Modifying(flushAutomatically = true, clearAutomatically = true)`, `@Transactional`, `deletedAt is null` 조건)으로 더한다. `updatedAt` 은 건드리지 않는다.
 
-- `public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice)` 를 `rename` 과 같은 순서로 둔다
-- turn 은 `routed.conversation().modelChoice()` 하나로 실행 줄을 만들고 제출한다. `modelSelector` 와 `blocklist` 필드와 루프, `noModelAvailable` 을 없앤다
-- 결과가 `providerBlocked()` 이면 실행을 `PROVIDER_BLOCKED` 로 실패시키고 `RUN_FAILED` 를 남긴 뒤 `ApiException(ErrorCode.PROVIDER_BLOCKED, ...)` 을 던진다. 다음 모델로 넘기지 않는다
-- `begin` 은 `HermesRunCommand` 에 선택의 provider, 모델, effort 를 싣는다. 비어 있으면 null 그대로다
-- 다시 생성도 같은 turn 경로를 타므로 같은 선택을 쓴다. 다르게 도는 곳이 있으면 맞춘다
+### 4. `AgentExecution` 의 effort 칸
 
-### 5. `AgentRunner`, `MemoryProposer`
+`backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` 에 `@Column(name = "reasoning_effort", length = 16) private String reasoningEffort` 와 builder 의 `reasoningEffort(String)`, 읽기 메서드 `reasoningEffort()` 를 더한다. 이 phase 에서는 아무도 값을 넣지 않는다.
 
-둘 다 `conversation.modelChoice()` 를 쓴다. `modelSelector` 필드와 `NO_MODEL_AVAILABLE` 분기를 없앤다.
+### 5. `ChatService` 의 선택 변경과 빈 대화
 
-### 6. `ExecutionRecorder` 와 `AgentExecution`
+- `public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice)` 를 `rename` 과 같은 순서로 둔다. 주인 확인, `chooseModelIfActive`, 0 줄이면 `CONVERSATION_NOT_FOUND`, 다시 읽어 돌려준다
+- `startEmpty` 의 `acceptsAttachments` 조건을 뺀다. 에이전트를 쓸 수 있는지(`requireStartableAgent`)만 본다. Javadoc 을 「사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려면 대화가 먼저 있어야 한다」 로 고친다
 
-- `ModelOption requested` 인자를 `ModelChoice requested` 로 바꾼다. `start` 는 `provider`, `model` 에 선택의 값을(비면 null), 새 칸 `reasoningEffort` 에 effort 를 적는다
-- `usage/domain/AgentExecution.java` 에 `@Column(name = "reasoning_effort", length = 16) String reasoningEffort` 와 builder, 읽기 메서드를 더한다
-- 끝난 실행의 provider 와 모델은 지금처럼 세션에서 읽은 실제 값을 먼저 쓴다
+### 6. 경로 `PUT /api/v1/chat/conversations/{conversationId}/model`
 
-### 7. 경로 `PUT /api/v1/chat/conversations/{conversationId}/model`
+- `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` 에 `ChooseModelRequest(String provider, String model, String reasoningEffort)` 와 `ModelChoice toChoice()`
+- `ConversationView` 에 `provider`, `model`, `reasoningEffort` 칸을 더한다. 고르지 않았으면 셋 다 null 이다. 목록과 이름 바꾸기 응답도 같은 모양이 된다
+- `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java` 에 경로를 더하고 이름 바꾸기 경로처럼 `access.requireOwnId` 로 주인을 확인한다. 바뀐 대화 한 줄(`ConversationView`)을 돌려준다
 
-- `chat/presentation/ChatDtos.java` 에 `ChooseModelRequest(String provider, String model, String reasoningEffort)` 와 `toChoice()`
-- `ConversationView` 에 `provider`, `model`, `reasoningEffort` 칸을 더한다. 목록과 이름 바꾸기 응답도 같은 모양이 된다
-- `chat/presentation/ChatController.java` 에 경로를 더하고 `access.requireOwnId` 로 주인을 확인한다. 바뀐 대화 한 줄을 돌려준다
+### 7. web 서버 라우트
 
-### 8. 이 phase 를 검증하는 backend 테스트
+`web/src/app/api/chat/conversations/[conversationId]/model/route.ts`: `PUT` 을 Control Plane `PUT /api/v1/chat/conversations/{id}/model` 로 넘긴다. 같은 폴더의 `web/src/app/api/chat/conversations/[conversationId]/route.ts` 의 `PATCH` 가 본보기다(대화 주소 검사와 오류 응답). 이 phase 에서는 화면이 부르지 않는다. phase 03 의 브라우저 검사와 plan036 의 화면이 쓴다.
 
-`backend/src/test/java/com/bifos/assistant/chat/ModelSelectionTest.java` 를 새 동작으로 다시 쓴다. 넘김을 검사하던 경우는 지운다.
-- 고르지 않은 대화의 실행 요청에 provider, 모델, effort 가 모두 없다. 실행 줄의 `reasoningEffort` 가 null 이다
-- 모델과 effort 를 고른 뒤 보내면 요청에 셋이 실리고 실행 줄의 `reasoningEffort` 가 고른 값이다. 세션이 다른 모델을 답하면 그 값을 적는다
-- provider 가 막히면 `PROVIDER_BLOCKED` 로 실패하고 Hermes 를 한 번만 부른다. `PROVIDER_SWITCHED` 사건이 남지 않는다
-- `chooseModel` 에 provider 만 주거나 모르는 effort 를 주면 `VALIDATION_FAILED`, 남의 대화면 `CONVERSATION_NOT_FOUND`
-- 다시 생성과 Memory 제안이 대화의 선택을 쓴다(`ChatRegenerateTest`, `ChatMemoryProposalTest` 에 경우 하나씩)
+### 8. docs 두 줄
 
-두 순위로 넘김을 검사하던 `ChatServiceTest` 와 `ChatRunningTurnTest` 의 경우는 「막히면 넘기지 않고 실패한다」 로 바꾼다.
-`ChildExecutionRunnerTest`, `ResearchAndBuildFlowTest`, `MemoryProposerTest` 에서 `AgentModelSelector` 를 흉내 내던 곳은 대화의 선택으로 바꾼다.
+`docs/flow.md` 「모델을 고를 때」 의 시퀀스 그림에서 `B->>W: 빈 대화를 만든다(사진을 먼저 올릴 때와 같은 길)` 를 흐름 에이전트도 같은 길이라는 것이 드러나게 고친다. 예: `빈 대화를 만든다(사진을 먼저 올릴 때와 같은 길, 흐름 에이전트도 같다)`. 같은 문서 「사진을 올려 보낼 때」 의 「갈리는 지점」 표에서 `흐름이 붙은 에이전트 | 대화를 만들 때와 보낼 때 거절한다. …` 줄을 `보낼 때 거절한다. 빈 대화는 만들 수 있다(모델을 먼저 고를 때). 흐름의 입력에는 사진 자리를 덧붙이지 않는다. 화면은 사진 단추를 두지 않는다` 로 고친다. 이 두 줄 밖의 docs 는 고치지 않는다.
+
+### 9. 이 phase 를 검증하는 backend 테스트
+
+`backend/src/test/java/com/bifos/assistant/chat/ConversationModelChoiceTest.java` 를 새로 둔다. 같은 폴더 `ConversationManageTest` 의 준비 방식을 따른다.
+- `chooseModel` 로 provider, 모델, effort 를 고르면 대화를 다시 읽었을 때 `modelChoice()` 가 그 값이다. `updatedAt` 이 바뀌지 않는다
+- 모두 비워 보내면 기본값(셋 다 null)으로 돌아간다
+- provider 만 주거나 모르는 effort(`"extreme"`)를 주면 `VALIDATION_FAILED` 이고 저장된 값이 그대로다
+- 앞뒤 공백을 준 값은 떼고 저장한다
+- 남의 대화와 지운 대화는 `CONVERSATION_NOT_FOUND`
+- 흐름이 있는 에이전트로 `startEmpty` 하면 빈 대화가 생긴다. 그 대화에 사진을 붙여 보내면 지금처럼 거절된다
+
+`ChatDtos` 의 `ConversationView` 가 바뀌어 깨지는 테스트가 있으면 새 칸을 넣어 맞춘다. `backend/src/test/java/com/bifos/assistant/chat/EmptyConversationTest.java` 의 `흐름이_붙은_에이전트에는_빈_대화를_만들지_않는다` 는 「흐름이 붙은 에이전트도 빈 대화를 만든다」 로 바꾼다. 빈 대화가 하나 생기고 제목이 비어 있음을 단언한다.
 H2 로 모든 migration 을 도는 `*MigrationTest` 가 V26 을 함께 통과해야 한다.
-
-### 9. web 의 얇은 변경과 브라우저 검사
-
-넘김을 없애면 넘김 알림을 검사하던 브라우저 검사가 깨진다. 같은 phase 에서 고친다.
-- `web/src/app/api/chat/conversations/[conversationId]/model/route.ts`: `PUT` 을 Control Plane `PUT /api/v1/chat/conversations/{id}/model` 로 넘긴다. 같은 폴더의 `route.ts` 의 `PATCH` 가 본보기다(대화 주소 검사와 오류 응답)
-- `web/src/components/error-message.ts`: `PROVIDER_BLOCKED` 안내 「이 모델은 지금 쓸 수 없어요. 다른 모델을 골라 다시 보내 주세요.」 를 더한다
-- `web/src/components/usage/execution-list.tsx`: `PROVIDER_BLOCKED` 의 표시를 「다음 모델로 다시 시도함」 에서 「모델을 쓸 수 없음」 으로 바꾼다
-- `test/browser/chat.spec.ts` 의 「막혀서 넘어가면 그 답 위에 넘어간 곳을 한 줄로 알린다」 를 「막힌 모델을 고른 대화는 넘기지 않고 실패한다」 로 바꾼다. 빈 대화를 만들고 새 라우트로 막힌 provider 를 고른 뒤 보내면 응답이 실패이고 `PROVIDER_BLOCKED` 다. `provider-switched` 알림이 없다
-- `test/browser/usage.spec.ts` 의 「막혀서 넘어간 실패와 보통 실패를 다르게 보인다」 를 같은 준비로 바꾸고, 실행 기록에 「모델을 쓸 수 없음」 이 보이는지 본다
-
-### 10. e2e `test/e2e/scenarios/model-selection.ts`
-
-관리자 모델 목록과 넘김을 검사하던 단계를 지우고 새 동작으로 다시 쓴다.
-- 새 대화의 실행은 가짜 Hermes 의 `lastSubmittedRuntime()` 에 provider 와 모델이 없다
-- `PUT /chat/conversations/{id}/model` 뒤 보내면 고른 provider, 모델, effort 가 실린다. 실행 목록의 `model` 이 고른 값이다
-- 막힌 provider 를 고르면 `PROVIDER_BLOCKED` 로 실패한다(가짜 Hermes 의 `blockProvider`)
 
 ## 검증
 
-`AGENTS.md` 「확인」 절의 여섯 명령을 적힌 순서대로 모두 돌린다. 새 워크트리라 `web` 에서 `pnpm install --frozen-lockfile` 이 먼저 필요하다. 첫 줄은 이 phase 의 테스트만 먼저 돌리는 것이다.
+`AGENTS.md` 「확인」 절의 여섯 명령을 적힌 순서대로 모두 돌린다. 첫 줄은 이 phase 의 테스트만 먼저 돌리는 것이다.
 
 ```bash
 # cwd: 저장소 root
-cd backend && ./gradlew test --tests '*ModelSelectionTest' --tests '*ChatRegenerateTest' --tests '*ChatMemoryProposalTest' --tests '*MigrationTest'
-cd web && pnpm test:browser chat.spec.ts usage.spec.ts
+cd backend && ./gradlew test --tests '*ConversationModelChoiceTest' --tests '*EmptyConversationTest' --tests '*MigrationTest'
 cd backend && ./gradlew test
 cd web && pnpm typecheck
 cd web && AUTH_SECRET=build-time-placeholder ASSISTANT_JWT_SECRET=build-time-placeholder CONTROL_PLANE_BASE_URL=http://build-time-placeholder AUTH_GOOGLE_ID=build-time-placeholder AUTH_GOOGLE_SECRET=build-time-placeholder pnpm build
@@ -121,7 +105,6 @@ scripts/check-public-safe.sh
 ```
 
 - 모두 통과한다
-- `grep -rn "modelSelector\|blocklist\." backend/src/main/java/com/bifos/assistant/chat backend/src/main/java/com/bifos/assistant/orchestration backend/src/main/java/com/bifos/assistant/memory` 가 아무것도 내지 않는다
 
 ## 변경 파일
 
@@ -134,23 +117,8 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentRunner.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/memory/application/MemoryProposer.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ModelSelectionTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ChatRegenerateTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ChatMemoryProposalTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ChatRunningTurnTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/orchestration/ChildExecutionRunnerTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/orchestration/ResearchAndBuildFlowTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/memory/MemoryProposerTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/**/*Test.java` | 수정 |
-| `test/e2e/scenarios/model-selection.ts` | 수정 |
-| `test/e2e/fake-hermes.ts` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationModelChoiceTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/EmptyConversationTest.java` | 수정 |
 | `web/src/app/api/chat/conversations/[[]conversationId]/model/route.ts` | 신규 |
-| `web/src/components/error-message.ts` | 수정 |
-| `web/src/components/usage/execution-list.tsx` | 수정 |
-| `test/browser/chat.spec.ts` | 수정 |
-| `test/browser/usage.spec.ts` | 수정 |
+| `docs/flow.md` | 수정 |
