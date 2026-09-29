@@ -33,7 +33,7 @@
 
 - `web/src/components/usage/usage-tabs.tsx` 신규
 - `web/src/components/usage/skill-usage-list.tsx` 신규
-- `web/src/app/usage/page.tsx`: `searchParams.tab` 으로 탭을 정하고 기존 절을 탭 안에 옮긴다
+- `web/src/app/usage/page.tsx`: `searchParams.tab` 으로 탭을 정하고 기존 절을 탭 안에 옮긴다. 바깥 틀(`mx-auto w-full max-w-5xl`)은 이 파일에 남긴다. `test/unit/loading-routes.test.ts` 가 이 틀과 `loading.tsx` 의 폭이 같은지 본다
 - `web/src/app/usage/loading.tsx`: 뼈대 맨 위에 탭 줄 자리를 더한다
 - `web/src/lib/skill.ts`: `SkillUsageRow` 를 더한다
 
@@ -58,6 +58,7 @@
 cd web && pnpm typecheck
 cd web && AUTH_SECRET=build-time-placeholder ASSISTANT_JWT_SECRET=build-time-placeholder CONTROL_PLANE_BASE_URL=http://build-time-placeholder AUTH_GOOGLE_ID=build-time-placeholder AUTH_GOOGLE_SECRET=build-time-placeholder pnpm build
 cd web && pnpm test:browser
+node --test 'test/unit/**/*.test.ts'
 grep -rn 'style={{' web/src/
 ```
 

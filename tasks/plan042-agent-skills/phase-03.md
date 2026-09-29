@@ -32,7 +32,7 @@
 - 기존 스킬을 고칠 때 손대지 않은 참고 파일은 `content` 없이 `{path}` 만 보낸다. 새로 올린 파일만 `content` 를 담는다. 뺀 파일은 목록에서 빠진다
 - 텍스트가 아닌 파일은 화면에서 거절한다. 판정: `File.type` 이 `text/` 로 시작하거나 비어 있고 확장자가 `.md`, `.txt`, `.json`, `.yaml`, `.yml`, `.csv` 중 하나이며, 읽은 글에 `\u0000` 이 없다. 경로는 `references/<파일 이름>` 으로 두고 올린 쪽에서 `templates/` 로 바꿀 수 있다
 - 저장하는 동안 단추를 막는다. 저장이 끝나면 에이전트 상세로 돌아간다
-- 실패 문구는 backend 오류 코드별로 보인다: `VALIDATION_FAILED` 는 받은 메시지, `SKILL_NAME_TAKEN` 은 「같은 이름의 기본 스킬이 있어요」, `AGENT_BUSY` 는 기존 문구, `HERMES_UNAVAILABLE` 은 「저장하지 못했어요. 바뀐 내용이 반영되지 않았을 수 있으니 다시 저장해 주세요」
+- 실패 문구는 backend 오류 코드별로 보인다: `VALIDATION_FAILED` 는 받은 메시지, `SKILL_NAME_TAKEN` 은 「같은 이름의 기본 스킬이 있어요」, `AGENT_BUSY` 는 기존 문구, `HERMES_UNAVAILABLE` 은 「저장하지 못했어요. 바뀐 내용이 반영되지 않았을 수 있으니 다시 저장해 주세요」. 이 문구는 `error-message.ts` 의 전역 문구를 바꾸지 않고 편집기에서 `describeFailure(response, overrides)` 의 overrides 로 덮는다
 
 ## 작업 항목
 
@@ -52,7 +52,7 @@
 ### 3. 편집 페이지
 
 - `web/src/app/agents/[code]/skills/[name]/page.tsx` 신규(서버에서 상세를 읽는다), `web/src/app/agents/[code]/skills/[name]/loading.tsx` 신규
-- `web/src/app/agents/[code]/skills/new/page.tsx` 신규
+- `web/src/app/agents/[code]/skills/new/page.tsx` 신규. 서버에서 읽지 않는다(`callControlPlane` 을 부르지 않는다). 이름 확인용 목록은 편집기가 브라우저에서 서버 라우트로 읽는다. `test/unit/loading-routes.test.ts` 가 서버에서 읽는 페이지마다 `loading.tsx` 를 요구한다
 - 둘이 `web/src/components/agent/skill-editor.tsx` 신규를 쓴다(이름 입력은 새 스킬일 때만, `SKILL.md` 본문 편집과 미리보기, 참고 파일 목록과 올리기와 빼기, 저장)
 
 ### 4. 이 phase 를 검증하는 브라우저 검사
@@ -70,6 +70,7 @@
 cd web && pnpm typecheck
 cd web && AUTH_SECRET=build-time-placeholder ASSISTANT_JWT_SECRET=build-time-placeholder CONTROL_PLANE_BASE_URL=http://build-time-placeholder AUTH_GOOGLE_ID=build-time-placeholder AUTH_GOOGLE_SECRET=build-time-placeholder pnpm build
 cd web && pnpm test:browser
+node --test 'test/unit/**/*.test.ts'
 grep -rn 'style={{' web/src/
 ```
 

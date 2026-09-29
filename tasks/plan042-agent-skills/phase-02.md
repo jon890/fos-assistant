@@ -13,7 +13,7 @@
 
 **근거 문서**: `docs/data-schema.md` 의 「execution_skill_use」 절, `docs/code-architecture.md` 의 「스킬」 절의 「호출 이력」, `docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md` 의 「호출 이력을 누가 보나」, `docs/hermes/tools-and-skills.md` 의 「모델이 스킬을 읽은 것을 아는 법」
 
-- Hermes 사건을 우리 사건으로 옮기는 곳은 `usage/application/ExecutionEventRecorder.record(AgentExecution, RunEvent, int)` 하나다. `ChatService`, `orchestration/application/AgentRunner`, `ResearchAndBuildFlow`, `memory/application/MemoryProposer` 가 모두 이것을 부른다. docs 는 `MODEL` 이력을 `usage` 가 적는다고 정한다. 그래서 기록은 이 메서드에서 부른다. 네 경로의 실행이 모두 기록된다
+- Hermes 사건을 우리 사건으로 옮기는 곳은 `usage/application/ExecutionEventRecorder.record(AgentExecution, RunEvent, int)` 하나이고, 이것을 부르는 곳은 대화 turn 의 `ChatService.append(PendingTurn, RunEvent)` 뿐이다. `AgentRunner`, `ResearchAndBuildFlow`, `MemoryProposer` 는 `RunEvent` 를 받지 않는 다른 오버로드를 부른다. docs 는 `MODEL` 이력을 `usage` 가 적는다고 정하므로 기록은 이 메서드에서 부른다. **그래서 기록되는 것은 대화 turn 의 실행이다.** 위임과 흐름의 하위 실행은 Hermes 사건을 옮기지 않아 기록되지 않는다
 - `RunEvent` 의 도구 이름은 `toolName()`, 미리보기는 `detail()` 이다(`hermes/HermesRunEventStream` 이 `preview`, `detail`, `result` 순으로 읽어 채운다)
 - `skill_view` 의 미리보기는 스킬 이름이거나 `이름 → 파일 경로` 다
 - `ExecutionEventRecorderTest` 는 `new ExecutionEventRecorder()` 로 만든다. 생성자가 바뀌면 함께 고친다
@@ -37,7 +37,7 @@
 
 ### 2. 저장과 기록
 
-- `skill/domain/ExecutionSkillUse.java`, `skill/domain/SkillUseSource.java`(`COMMAND`, `MODEL`), `skill/infra/ExecutionSkillUseRepository.java`
+- `skill/domain/ExecutionSkillUse.java`(유일 제약을 엔티티에도 `@Table(uniqueConstraints = @UniqueConstraint(...))` 로 선언한다. 테스트 스키마는 엔티티로 만들어진다. 선례 `agent/domain/AgentStarterPrompt`), `skill/domain/SkillUseSource.java`(`COMMAND`, `MODEL`), `skill/infra/ExecutionSkillUseRepository.java`
 - `skill/application/SkillUseRecorder.java`: `void recordModel(Long executionId, String preview)`, `void recordCommand(Long executionId, String skillName)`. 이름은 미리보기에서 ` → ` 앞까지 자르고 양끝 공백을 뺀 뒤 규칙을 본다
 - `ExecutionEventRecorder.record(AgentExecution, RunEvent, int)`: 옮긴 사건이 `TOOL_STARTED` 이고 도구 이름이 `skill_view` 면 `SkillUseRecorder.recordModel(execution.id(), event.detail())`. 클래스 설명의 「저장하지 않는다」 문단에 이 예외를 적는다
 
@@ -50,7 +50,11 @@
 - `SkillService.list`: 편집자에게만 스킬마다 `usage` 를 채운다. 호출 이력이 없는 스킬은 `count` 0, `lastInvokedAt` null
 - `usage/presentation/UsageController`: `GET /api/v1/usage/skills` 가 `docs/code-architecture.md` 「호출 이력」 의 모양을 돌려준다. `ExecutionView` 에 `skillNames`(그 실행에서 쓴 스킬 이름 목록, 없으면 빈 목록)를 더한다
 
-### 4. 이 phase 를 검증하는 테스트
+### 4. 문서
+
+- `docs/code-architecture.md` 「호출 이력」: `MODEL` 줄에 대화 turn 의 실행만 기록되고 위임과 흐름의 하위 실행은 사건을 옮기지 않아 기록되지 않는다고 적는다
+
+### 5. 이 phase 를 검증하는 테스트
 
 - `backend/src/test/java/com/bifos/assistant/skill/SkillUseRecorderTest.java` 신규: `이름`, `이름 → references/a.md` 는 기록되고 규칙에 맞지 않는 미리보기(빈 값, 대문자, 65자)는 버린다. 같은 실행에서 두 번 읽어도 한 행이다. 저장소가 예외를 던져도 `recordModel` 은 던지지 않는다
 - `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java` 신규: 가족용 에이전트를 두 사용자가 쓸 때 편집자 합계는 둘을 합치고, 각 사용자의 `/usage/skills` 는 자기 호출만 보인다. 편집자가 아닌 사용자의 스킬 목록에는 `usage` 가 없다. 지운 대화의 `lastConversationId` 는 null 이다
@@ -82,6 +86,7 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionEventRecorder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageController.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageDtos.java` | 수정 |
+| `docs/code-architecture.md` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillUseRecorderTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionEventRecorderTest.java` | 수정 |

@@ -35,6 +35,7 @@
 - 게시와 `skills` 켜기는 한 `PUT /api/config` 다. 올린 스킬이 하나도 없게 되면 `external_dirs` 를 빈 목록으로 게시한다
 - 파일은 hermes 가 읽을 수 있게 파일 644, 디렉터리 755 로 쓴다
 - 같은 에이전트의 저장은 기다리는 행 잠금으로 한 번에 하나씩 돈다. 뒤의 저장은 앞의 저장이 게시한 버전을 읽어 그 위에 쓴다
+- 잠금은 트랜잭션이 끝날 때 풀린다. 그래서 `save` 와 `delete` 는 `@Transactional` 이고 잠금부터 `markPublished` 와 `prune` 까지 한 트랜잭션이다. 그동안 DB 커넥션을 Hermes 호출 시간(connect 5초, read 30초, `HermesProperties`) 만큼 쥔다. 같은 에이전트의 도구와 공개 범위 변경은 그동안 `AGENT_BUSY` 로 거절된다
 - 앞머리 `name` 은 디렉터리 이름과 같아야 한다. 다르면 `VALIDATION_FAILED`
 - **배포 전제**: 운영에 두 환경 변수와 공유 디렉터리 마운트(Control Plane 쓰기, Hermes 읽기 전용), `skills.external_dirs` 를 받는 plugin 이 먼저 있어야 한다. 이 저장소에는 적지 않고 PR 본문에 선행 조건으로 적는다
 
@@ -43,7 +44,7 @@
 ### 1. 설정
 
 - `skill/application/SkillProperties.java`(`@ConfigurationProperties("assistant.skill")`): `root`(`${ASSISTANT_SKILL_ROOT}`), `agentRoot`(`${ASSISTANT_SKILL_AGENT_ROOT}`), `keepVersions`(기본 3). 두 경로는 기본값이 없어 비면 기동이 실패한다(결과물과 같다). `application.yml` 과 `README.md` 환경 변수 표에 더한다
-- `backend/src/test/resources/application-test.yml` 에 `assistant.skill.root: build/test-skills`, `agent-root: build/test-skills` 를 더한다
+- `backend/src/test/resources/application-test.yml` 에 `assistant.skill.root: build/test-skills`, `agent-root: build/test-skills` 를 더한다. 동시 저장 테스트를 위해 datasource URL 에 `;LOCK_TIMEOUT=10000` 을 더한다
 - `test/e2e/run.ts` 와 `test/browser/fixtures.ts` 가 Control Plane 을 띄울 때 `ASSISTANT_SKILL_ROOT` 와 `ASSISTANT_SKILL_AGENT_ROOT` 에 **같은** 임시 디렉터리를 준다. 결과물 경로를 만드는 방식을 따른다. 가짜 대시보드가 게시된 경로에서 `SKILL.md` 를 읽으려면 두 뿌리가 같아야 한다. e2e 는 그 디렉터리를 가짜 대시보드에도 알린다
 
 ### 2. 입력 규칙
@@ -89,7 +90,7 @@
 - `SkillList list(CurrentUser user, String code)`: `requireReadable`. Hermes 목록에 지금 버전 이름을 대조해 `source` 를 붙인다. `editable` 은 `isEditableBy`, `skillsToolsetEnabled` 는 `toolsets.readEnabled` 에 `skills` 가 있는가
 - `SkillDetail read(CurrentUser user, String code, String name)`: `requireReadable`, 편집자만(아니면 `FORBIDDEN`). 올린 스킬만. 없으면 `SKILL_NOT_FOUND`. `body` 는 **`SKILL.md` 원문 전체(앞머리 포함)**, `description` 은 앞머리 값, `files` 의 `size` 는 UTF-8 바이트
 - `SkillDetail save(CurrentUser user, String code, String name, String skillMd, List<SkillFileInput> files)`(`SkillFileInput(String path, String content)`):
-  1. `requireReadable` 로 읽고 편집자가 아니면 `FORBIDDEN`. 그 에이전트를 `AgentService` 에 새로 더한 기다리는 잠금 메서드(`AgentRepository.findByIdForUpdate` 를 부른다)로 잠근다
+  1. 이 메서드와 `delete` 는 `@Transactional` 이다. `requireReadable` 로 읽고 편집자가 아니면 `FORBIDDEN`. 그 에이전트를 `AgentService` 에 새로 더한 기다리는 잠금 메서드(`AgentRepository.findByIdForUpdate` 를 부른다)로 잠근다
   2. 「입력 규칙」 을 본다
   3. Hermes 목록에 같은 이름이 있고 지금 버전에 없으면 `SKILL_NAME_TAKEN`
   4. 지금 버전을 읽어 이 스킬을 바꿔 넣는다. `content` 가 null 인 파일은 **지금 버전의 같은 스킬의 같은 경로 내용을 그대로 쓴다.** 그 파일이 없으면 `VALIDATION_FAILED`. 합계 검사는 채운 뒤의 내용으로 한다. `writeVersion`
@@ -110,6 +111,7 @@
 
 ### 7. 이 phase 를 검증하는 테스트
 
+- 스킬 디렉터리를 쓰는 테스트는 앞선 실행이 남긴 버전 디렉터리에 기대지 않는다. 직접 만드는 `SkillStore` 는 `@TempDir` 로 루트를 받고(`ArtifactWriteServiceTest` 선례), 설정 경로를 쓰는 Spring 테스트는 `@BeforeEach` 에서 그 profile 디렉터리를 지운다
 - `backend/src/test/java/com/bifos/assistant/skill/SkillStoreTest.java` 신규: 쓰기가 새 버전을 만들고 표식 전에는 지금 버전이 옛 것이다. `prune` 이 표식 있는 3개만 남기고 게시한 버전보다 오래된 표식 없는 것을 지운다. `../`, 절대 경로, 루트 밖 경로, 심볼릭 링크를 거절한다. 파일 권한이 644 와 755 다
 - `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java` 신규(가짜 `HermesSkillClient` 와 도구 클라이언트):
   - 저장하면 한 번의 `publish` 에 새 경로와 `skills` 가 든 도구 목록(`CONTROL_PLANE_MCP` 포함)이 함께 간다. `skills` 가 이미 켜졌으면 도구 목록은 null 이다
@@ -118,7 +120,7 @@
   - 편집자가 아니면 `FORBIDDEN`. 앞머리 이름이 다르면, 경로가 `scripts/` 면, 파일이 21개면, 합계가 1 MiB 를 넘으면 `VALIDATION_FAILED`. Hermes 기본 스킬 이름이면 `SKILL_NAME_TAKEN`
   - `content` 를 생략한 파일은 지금 내용이 그대로 새 버전에 있다
   - 지우면 그 스킬이 빠진 버전이 게시되고, 마지막 스킬을 지우면 빈 목록이 게시된다
-  - 같은 에이전트에 두 저장이 동시에 와도 둘 다 반영된 버전이 남는다(첫 게시를 가짜 클라이언트가 붙잡는 동안 둘째가 잠금을 기다린다)
+  - 같은 에이전트에 두 저장이 동시에 와도 둘 다 반영된 버전이 남는다. 테스트 클래스는 `@Transactional` 이 아니고 두 저장을 다른 스레드(각자 트랜잭션)에서 돌린다. 가짜 클라이언트가 첫 게시를 붙잡는 동안 둘째가 잠금을 기다린다. H2 의 기본 lock timeout 이 2초라서 `application-test.yml` 의 datasource URL 에 `;LOCK_TIMEOUT=10000` 을 더한다
 - `backend/src/test/java/com/bifos/assistant/skill/SkillControllerTest.java` 신규: 경로별 상태 코드와 응답 모양
 - `backend/src/test/java/com/bifos/assistant/hermes/HermesSkillRequestTest.java` 신규: `publish` 본문이 `{profile, config:{skills:{external_dirs}}}` 이고 도구 목록이 주어지면 `platform_toolsets.api_server` 가 함께 있다. `list` 가 query `profile` 을 보내고 배열 응답을 읽는다. 4xx 와 5xx 가 다른 예외가 된다
 - `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java` 에 올린 스킬이 있을 때 `skills` 끄기 거절을 더한다
@@ -134,6 +136,7 @@ cd backend && ./gradlew test --tests 'com.bifos.assistant.skill.*'
 cd backend && ./gradlew test
 node test/e2e/run.ts
 cd web && pnpm test:browser
+scripts/check-public-safe.sh
 ```
 
 ## 변경 파일
