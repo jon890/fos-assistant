@@ -94,6 +94,10 @@
 - `docs/flow.md` 「어긋나는 지점」 표의 「첫 로그인에 Hermes 가 모델을 주지 않는다」, 「첫 로그인에 Hermes 가 provider 를 비워서 준다」 두 줄: 첫 로그인은 모델을 읽지 않고 에이전트를 만든다는 한 줄로 바꾼다. 바로 아래 「에이전트 없이 들어온 사람은 …」 단락이 다른 실패로 여전히 맞는지 코드로 확인하고, 모델 때문에 생기던 경우만 가리켰으면 함께 고친다
 - `docs/code-architecture.md` 의 「에이전트는 실행에 쓸 모델을 갖지 않는다. 다만 첫 로그인에 …」 단락: 첫 로그인도 모델을 읽지 않는다는 최종 동작으로 고친다
 - `backend/AGENTS.md` 의 `AgentModelOptionMigrationTest` 예시를 `GroupRenameMigrationTest` 로 바꾼다
+- `docs/adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md` 「첫 로그인에 에이전트가 안 생길 수 있다」 절 끝에 ADR-030 뒤로 그 경우가 없어졌다는 한 줄을 더한다. 본문은 고치지 않는다
+- `docs/adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md` 「대체된 부분」 에 ADR-018 의 그 절을 대체한다는 한 줄을 더한다
+- `docs/adr/INDEX.md` 의 ADR-018 상태에 첫 로그인의 모델 읽기가 ADR-030 으로 없어졌다고 적는다
+- `docs/code-architecture.md` 「에이전트 화면」 에 등록과 주소 수정이 저장 전에 주소가 닿는지 보는 단락을 더한다. key 가 없을 때와 주소가 답하지 않을 때의 오류 코드를 나눠 적는다
 
 ## 검증
 
@@ -161,5 +165,8 @@ scripts/check-public-safe.sh
 | `docs/data-schema.md` | 수정 |
 | `docs/flow.md` | 수정 |
 | `docs/code-architecture.md` | 수정 |
+| `docs/adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md` | 수정 |
+| `docs/adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md` | 수정 |
+| `docs/adr/INDEX.md` | 수정 |
 | `backend/AGENTS.md` | 수정 |
 | `tasks/plan035-remove-agent-models/index.json` | 수정 |
