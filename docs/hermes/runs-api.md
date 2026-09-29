@@ -79,6 +79,14 @@ Hermes 안에서 다른 모델로 넘어가도 이 값은 바뀌지 않는다.
 실제로 돈 모델은 `GET /api/sessions/{session_id}` 의 `model` 이 담는다.
 fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 
+**v0.21.5 에서 달라진 두 가지**(2026-09-29 운영에서 확인):
+
+- `GET /api/sessions/{session_id}` 는 행을 `{"object": "session", "session": {...}}` 로 감싸고, `model` 은 `session` 안에 있다. provider 칸은 응답에 없다. Hermes 저장소에는 `billing_provider` 로 남는다
+- `GET /v1/runs/{run_id}` 는 끝난 실행에 `runtime: {"provider", "model", "route_source"}` 를 싣는다. fallback 으로 넘어간 경우도 실제로 돈 값이다. 근거는 [v0.21.5 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_served_runtime` 과 `api_server.py` 의 `_sanitize_runtime_metadata` 다
+
+그래서 Control Plane 은 실행 기록의 provider 와 모델을 세션 조회, 실행의 `runtime`, 대화가 고른 값 순서로 먼저 있는 것에서 읽는다. provider 는 보통 `runtime` 에서 온다.
+처음에는 세션 응답을 감싸지 않은 모양으로 읽어, 모델을 보내지 않은 실행의 provider, 모델, 금액이 비었다.
+
 `POST /api/sessions/{id}/chat` 은 응답에 `runtime` 을 담아 요청한 것과 실제로 돈 것을
 한 응답에서 대조할 수 있다. 그 블록은 `/v1/runs` 에는 없다.
 
