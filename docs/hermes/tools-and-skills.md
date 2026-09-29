@@ -552,6 +552,11 @@ Control Plane 이 「`skill_view` 로 읽고 따르라」는 입력으로 바꿔
 
 모델이 도구를 부르지 않는 일이 실제로 보이면, profile 플러그인의 `pre_llm_call` 이 돌려주는 `{"context": ...}` 로 `build_skill_invocation_message` 결과를 붙이는 방법이 있다. `pre_llm_call` 은 API server 실행에서도 불린다(`agent/turn_context.py`).
 
+### 모델이 스킬을 읽은 것을 아는 법
+
+`skill_view` 도구 호출의 `tool.started` 사건 `preview` 는 스킬 이름이다. 참고 파일을 읽으면 `이름 → 파일 경로` 모양이다(`agent/display.py` 의 `_preview_skill_view`).
+미리보기는 길이 상한에서 잘릴 수 있다. 이름 규칙에 맞지 않으면 버린다.
+
 ### 스킬 목록을 얻는 곳
 
 | 경로 | 결과 |

@@ -263,7 +263,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 - 저장할 때마다 그 profile 의 올린 스킬 전체를 새 버전 디렉터리에 쓰고, 그 profile 의 `skills.external_dirs` 를 `ASSISTANT_SKILL_AGENT_ROOT` 아래 새 버전 경로로 바꾼다. 쓰는 도중에는 옛 버전이 쓰인다
 - 설정 쓰기가 실패하면 새 디렉터리를 지우고 옛 버전을 둔다. 옛 버전은 최근 3개만 남긴다
-- 지금 게시된 버전은 Hermes 설정을 읽어 안다
+- 게시에 성공하면 그 버전 디렉터리에 표식 파일 `.published` 를 쓴다. 지금 버전은 표식이 있는 가장 새 디렉터리다. 표식 없는 디렉터리는 게시 도중에 멈춘 것이라 다음 저장이 지운다
 - 같은 에이전트의 저장은 에이전트 행 잠금으로 한 번에 하나씩 돈다
 - 스킬을 저장하면 그 에이전트의 `skills` toolset 을 함께 켠다. 올린 스킬이 있는 동안은 `skills` 를 끄지 못한다
 
@@ -281,7 +281,8 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
 | `PUT /api/v1/agents/{code}/skills/{name}/enabled` | `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
 
-목록은 대시보드 `GET /api/skills?profile=` 에서 읽고 `skills.platform_disabled.api_server` 에 있는 스킬을 Control Plane 이 뺀다([`hermes/tools-and-skills.md`](hermes/tools-and-skills.md) 의 「스킬 커맨드와 API server」).
+목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/tools-and-skills.md`](hermes/tools-and-skills.md) 의 「스킬 커맨드와 API server」).
+출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 지금 버전 디렉터리에 있는 이름이 `UPLOADED`, 나머지가 `HERMES` 다
 쓰기와 지우기는 관리하는 사람만, 읽기는 그 에이전트를 쓸 수 있는 사람이 한다.
 
 ### 스킬 커맨드
