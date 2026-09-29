@@ -79,6 +79,8 @@ test("끝난 답의 패널에서 실행 나무를 보고 단추와 Esc 로 닫�
   if (testInfo.project.name === "desktop") {
     await expect(page.getByRole("textbox", { name: "메시지" })).toBeVisible();
   } else {
+    // 좁은 폭의 패널은 옆에서 밀려 들어온다. 움직이는 동안 측정하면 폭이 390 보다 조금 작게 나오므로 멈춘 뒤에 측정한다.
+    await panel.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
     const bounds = await panel.boundingBox();
     expect(bounds?.width).toBeGreaterThanOrEqual(390);
   }
