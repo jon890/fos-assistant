@@ -299,6 +299,26 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 - key 는 **그 profile 의 MCP 토큰을 SHA-256 한 값의 소문자 16진수 문자열**이다. 서버는 토큰의 원문 대신 이 해시를 저장하므로 같은 key 를 갖는다
 - 서명할 글은 `v1`, 도구 이름(서버 쪽 이름. 예: `agent_delegate`), `root_session_id`, `session_id`, `tool_call_id` 를 이 순서로 줄바꿈(`\n`) 하나로 이은 것이다
 
+인코딩은 아래와 같다. 플러그인도 같은 규칙으로 서명한다.
+
+- HMAC key 는 64자 소문자 16진수 문자열의 **UTF-8 바이트**다. 16진수를 풀어 낸 32바이트가 아니다. 서명할 글도 UTF-8 이다
+- `v` 는 JSON 숫자 `1` 이다. 문자열 `"1"` 은 거절한다
+- `sig` 는 소문자 16진수 64자만 받는다. 대문자가 섞이면 거절한다
+- 서명할 글에 도구 인자는 넣지 않는다
+
+서명을 맞춰 보는 값이다. Python `hmac` 으로 계산했고 구현과 무관한 기대값이다. 토큰은 가짜 값이다.
+
+| 항목 | 값 |
+| --- | --- |
+| 토큰 원문 | `test-mcp-token-0001` |
+| key(토큰의 SHA-256 소문자 16진수) | `41ed73a34f34174ba0b6ded1b16cf4a085b6da45df0f711ccbeaf2a2bbc2a2ac` |
+| 도구 이름 | `agent_delegate` |
+| `root_session_id` | `fos-00000000-0000-4000-8000-000000000001` |
+| `session_id` | `하위-세션-1` |
+| `tool_call_id` | `call_0001` |
+| 기대 `sig` | `b28a128dbb642aba7a8b4c35dcb237e2feb5a452305ec275909c32a00ae1b25b` |
+| 같은 칸에 도구 이름만 `agent_status` 일 때 | `62109c6c99e7ed4638e4343f1e5b6b22a3f55dd974560916149986866c253236` |
+
 `memory_read` 와 `artifact_write` 는 `_fos_ctx` 를 받으면 버리고 읽지 않는다. 서명을 요구하는 것은 `agent_*` 도구다.
 
 #### 호출은 profile 마다 하나씩 나간다

@@ -69,6 +69,23 @@ class McpArtifactWriteToolTest {
     }
 
     @Test
+    void _fos_ctx_가_붙어도_버리고_지금과_같이_쓰고_검사한다() throws Exception {
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        String fosCtx = "{\"v\":1,\"session_id\":\"s\",\"root_session_id\":\"r\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+        String prefix = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"_fos_ctx\":" + fosCtx;
+
+        JsonNode written = body(raw(dadToken, prefix + ",\"path\":\"ctx/index.html\",\"content\":\"<p>x</p>\"}}}"));
+        JsonNode unknownKey = body(raw(dadToken, prefix + ",\"path\":\"ctx/other.html\",\"content\":\"x\",\"base64\":\"x\"}}}"));
+
+        assertThat(written.path("result").path("isError").asBoolean()).isFalse();
+        assertThat(json.readTree(written.path("result").path("content").get(0).path("text").asString()).path("path").asString())
+                .isEqualTo("ctx/index.html");
+        assertThat(store.resolveInside(conversation.id(), "ctx/index.html")).isPresent();
+        assertThat(unknownKey.path("error").path("code").asInt()).isEqualTo(-32602);
+        assertThat(store.resolveInside(conversation.id(), "ctx/other.html")).isEmpty();
+    }
+
+    @Test
     void 빈_본문과_제어문자가_있는_경로도_유효한_JSON_결과로_돌려준다() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
 

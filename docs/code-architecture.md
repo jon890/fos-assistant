@@ -399,7 +399,8 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. `memory_read`, `artifact_write` 에서는 `_fos_ctx` 를 버린다 |
 | `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
-| `orchestration.application.AgentDelegationService` | 부모 찾기, 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
+| `orchestration.application.AgentDelegationService` | 부모 찾기(`DelegationParentResolver` 를 쓴다), 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
+| `orchestration.application.DelegationParentResolver` | 서명한 뿌리 session 과 토큰의 사용자로 도는 부모 실행 하나를 찾는다. 없거나 둘 이상이면 같은 실패 |
 | `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
 | `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정한다 |
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |

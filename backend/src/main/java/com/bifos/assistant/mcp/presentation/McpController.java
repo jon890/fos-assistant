@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
+import com.bifos.assistant.mcp.application.McpCallContext;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @RestController
 @RequiredArgsConstructor
@@ -53,11 +55,25 @@ public class McpController {
         if (name == null || !name.isTextual() || arguments == null || !arguments.isObject()) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
+        JsonNode toolArguments = withoutCallContext(arguments);
         return switch (name.asString()) {
-            case "memory_read" -> readMemory(id, arguments);
-            case "artifact_write" -> writeArtifact(id, arguments);
+            case "memory_read" -> readMemory(id, toolArguments);
+            case "artifact_write" -> writeArtifact(id, toolArguments);
             default -> error(id, -32601, "Method not found");
         };
+    }
+
+    /**
+     * profile 플러그인이 모든 도구 인자에 덮어쓴 {@code _fos_ctx} 를 뗀 복사본을 만든다.
+     *
+     * <p>도구 규격은 그 키를 모르므로 떼지 않으면 {@code artifact_write} 가 모르는 키로 거절한다. Hermes 는
+     * hook 이 더한 키를 도구 규격으로 검증하지 않는다. 받은 노드는 바꾸지 않는다.
+     */
+    private static JsonNode withoutCallContext(JsonNode arguments) {
+        if (!arguments.has(McpCallContext.FIELD)) return arguments;
+        ObjectNode copy = ((ObjectNode) arguments).deepCopy();
+        copy.remove(McpCallContext.FIELD);
+        return copy;
     }
 
     private Map<String, Object> readMemory(JsonNode id, JsonNode arguments) {

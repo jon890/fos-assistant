@@ -1,8 +1,13 @@
 package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.mcp.infra.AgentTokenAuthenticationFilter;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
@@ -27,7 +32,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -42,6 +51,7 @@ class McpMemoryToolTest {
     @Autowired MemoryRepository memoryRepository;
     @Autowired MemoryService memories;
     @Autowired BuildProperties buildProperties;
+    @Autowired WebApplicationContext context;
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
@@ -82,6 +92,29 @@ class McpMemoryToolTest {
         JsonNode unauthorized = body(call(dadToken, hidden.id(), null));
         JsonNode missing = body(call(dadToken, 999999L, null));
         assertThat(unauthorized.path("result")).isEqualTo(missing.path("result"));
+    }
+
+    @Test void _fos_ctx_가_붙어도_버리고_그대로_읽는다() throws Exception {
+        Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
+        String fosCtx = "{\"v\":1,\"session_id\":\"s\",\"root_session_id\":\"r\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+
+        JsonNode read = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}"));
+        JsonNode wrongId = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":\"wrong\",\"_fos_ctx\":" + fosCtx + "}}}"));
+
+        assertThat(read.path("result").path("isError").asBoolean()).isFalse();
+        assertThat(read.path("result").path("content").get(0).path("text").asString()).isEqualTo("아빠 본문");
+        assertThat(wrongId.path("error").path("code").asInt()).isEqualTo(-32602);
+    }
+
+    @Test void 인증한_요청에_토큰_원문이_아닌_해시를_속성으로_싣는다() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+        mvc.perform(post("/mcp").servletPath("/mcp")
+                        .header("Authorization", "Bearer " + dadToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))
+                .andExpect(status().isOk())
+                .andExpect(request().attribute(AgentTokenAuthenticationFilter.TOKEN_HASH_ATTRIBUTE, AgentTokenService.hash(dadToken)));
     }
 
     @Test void 제안과_항상_주입하는_항목은_본문을_돌려주지_않는다() throws Exception {

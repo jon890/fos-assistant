@@ -1,10 +1,10 @@
 {
   "name": "plan038-delegation-context",
   "description": "MCP 호출의 부모 실행을 잇는 바탕을 만든다 — 실행 줄에 대화의 뿌리 Hermes session 을 적고, 플러그인이 서명한 _fos_ctx 를 검증해 도는 부모 실행을 찾는다(ADR-031)",
-  "status": "pending",
+  "status": "completed",
   "created_at": "2026-09-29",
   "total_phases": 2,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
     { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
     { "number": 2, "file": "phase-02.md", "execution_profile": "deep" }
