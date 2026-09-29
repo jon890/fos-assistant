@@ -1,6 +1,6 @@
 # Phase 02. 사용량 화면의 실행 기록에 요청한 effort 를 보인다
 
-**Execution profile**: fast
+**Execution profile**: standard
 
 ## 목표
 
@@ -12,9 +12,10 @@
 
 **근거 문서**: `docs/code-architecture.md` 「사용량 화면의 절」, `docs/data-schema.md` 「agent_execution」
 
-- 실행 한 줄은 `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageDtos.java` 의 `ExecutionView` 다. `provider`, `model` 이 있고 effort 는 없다. `AgentExecution.reasoningEffort()` 는 plan034 가 더했다
+- 실행 한 줄은 `backend/src/main/java/com/bifos/assistant/usage/presentation/UsageDtos.java` 의 `ExecutionView` 다. `provider`, `model` 이 있고 effort 는 없다. `AgentExecution.reasoningEffort()` 는 이미 있다
 - 화면은 `web/src/components/usage/execution-list.tsx` 의 타입과 `execution-table.tsx`(넓은 폭), `execution-card.tsx`(좁은 폭)가 그린다
-- 기존 검사 `test/browser/usage.spec.ts` 가 실행 기록을 가짜 응답과 실제 실행 둘로 본다
+- `UsageDtos.ExecutionView.from` 은 package-private 이다. 실행 목록 응답은 `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` 가 `controller.myExecutions(...)` 로 받아 본다
+- `/usage` 는 서버 컴포넌트가 `callControlPlane` 으로 실행 목록을 직접 읽으므로 `page.route` 로 가짜 응답을 줄 수 없다. `test/browser/usage.spec.ts` 의 「막힌 모델로 실패한 실행」 검사처럼 실제 실행을 만들어 본다
 
 ## 의도 메모
 
@@ -33,8 +34,11 @@
 
 ### 3. 이 phase 를 검증하는 테스트
 
-- `backend/src/test/java/com/bifos/assistant/usage/UsageCostRecordingTest.java`: effort 를 고른 대화의 실행 목록 응답에 `reasoningEffort` 가 실린다. 고르지 않은 실행은 null 이다
-- `test/browser/usage.spec.ts`: 실행 기록 가짜 응답에 `reasoningEffort: "high"` 인 줄과 null 인 줄을 두고, 두 폭에서 `high` 와 「기본」 이 보인다
+- `UsageControllerTest.java`: builder 에 `.reasoningEffort("high")` 를 준 실행과 주지 않은 실행을 두고, `myExecutions` 응답에서 각각 `"high"` 와 null 이 나온다
+- `test/browser/usage.spec.ts`: 실제 실행 두 개를 만든다
+  - 하나는 `POST /api/chat/conversations` 로 빈 대화를 만들고 `PUT /api/chat/conversations/{id}/model` 로 `{ provider: null, model: null, reasoningEffort: "high" }` 를 저장한 뒤 고유한 글로 보낸다
+  - 다른 하나는 기본값으로 고유한 글로 보낸다
+  - 다른 검사가 남긴 실행이 목록에 섞여 있으므로 이 검사의 두 실행 줄(데스크톱은 `tr`, 모바일은 카드)을 특정한 뒤 그 줄 안에서 `high` 와 「기본」 을 본다. `/api/chat` 응답의 `executionId` 로 `a[href="/executions/{executionId}"]` 를 찾고 `ancestor::tr` 이나 `ancestor::article` 로 그 줄을 잡는다
 
 ## 검증
 
@@ -42,7 +46,7 @@
 
 ```bash
 # cwd: 저장소 root
-cd backend && ./gradlew test --tests '*UsageCostRecordingTest'
+cd backend && ./gradlew test --tests '*UsageControllerTest'
 cd web && pnpm test:browser usage.spec.ts
 cd backend && ./gradlew test
 cd web && pnpm typecheck
@@ -64,6 +68,6 @@ scripts/check-public-safe.sh
 | `web/src/components/usage/execution-list.tsx` | 수정 |
 | `web/src/components/usage/execution-table.tsx` | 수정 |
 | `web/src/components/usage/execution-card.tsx` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/usage/UsageCostRecordingTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` | 수정 |
 | `test/browser/usage.spec.ts` | 수정 |
 | `tasks/plan036-model-choice-web/index.json` | 수정 |
