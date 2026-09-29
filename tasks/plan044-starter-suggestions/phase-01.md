@@ -41,7 +41,7 @@
 
 ### 1. 마이그레이션 `backend/src/main/resources/db/migration/V{다음}__starter_suggestions.sql`
 
-`db/migration` 의 가장 큰 번호 다음 번호로 만든다(계획 순서대로면 V32). 여러 칸을 한 문장으로 바꾸는 문법이 MySQL 과 H2 MySQL 모드에서 달라 문장마다 따로 쓴다(`V28__execution_session_and_delegation.sql` 의 주석과 같다).
+번호는 V33 이다. 여러 계획을 나란히 구현해 번호를 미리 나눴다. 여러 칸을 한 문장으로 바꾸는 문법이 MySQL 과 H2 MySQL 모드에서 달라 문장마다 따로 쓴다(`V28__execution_session_and_delegation.sql` 의 주석과 같다).
 
 - `ALTER TABLE agent_execution MODIFY COLUMN conversation_id BIGINT NULL;`
 - `DROP TABLE agent_starter_prompt;`
@@ -108,7 +108,7 @@ grep -rn "tagline\|AgentStarterPrompt\|StarterService\b\|starterPrompts" backend
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V32__starter_suggestions.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V33__starter_suggestions.sql` | 신규 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |

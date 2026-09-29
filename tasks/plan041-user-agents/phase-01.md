@@ -24,6 +24,7 @@ profile 을 만드는 `HermesProfileProvisioner` 가 그 profile 에 묶인 MCP 
 
 ## 의도 메모
 
+- **이 계획의 PR 은 하위 에이전트 session 소유 등록(ADR-037)이 main 에 머지된 뒤에 머지한다.** 새 에이전트는 처음부터 profile 에 묶인 토큰을 받아, 그 등록 없이는 백그라운드 하위 에이전트의 Memory 읽기와 결과물 쓰기가 거절된다. 구현과 PR 은 먼저 해도 된다
 - 토큰은 **profile 을 만든 직후** 넣는다. 토큰 없는 MCP 연결 실패가 쌓이면 Hermes 가 다시 붙는 간격을 늘린다(`docs/hermes/profiles.md`)
 - 거두는 순서는 토큰 폐기, key 파일, profile 이다. 토큰을 먼저 폐기해 남은 연결의 호출을 막는다
 - 기존 가족용 에이전트의 주인은 비어 있는 채로 둔다. 데이터를 옮기지 않는다
@@ -31,14 +32,13 @@ profile 을 만드는 `HermesProfileProvisioner` 가 그 profile 에 묶인 MCP 
 
 ## Blocked 조건
 
-- `docs/adr/` 에 Hermes 하위 에이전트 session 의 주인을 영속 등록으로 복원하는 ADR(ADR-037)과 그 구현이 main 에 없으면 → `PHASE_BLOCKED: 하위 에이전트 session 소유 등록이 먼저 머지되어야 한다`. 새 에이전트는 처음부터 profile 에 묶인 토큰을 받아, 그 등록 없이는 백그라운드 하위 에이전트의 Memory 읽기와 결과물 쓰기가 거절된다
 - 운영 대시보드 plugin 이 위 계약을 아직 받지 않는 것은 이 phase 를 막지 않는다. 가짜 대시보드로 검증한다
 
 ## 작업 항목
 
-### 1. 마이그레이션 `backend/src/main/resources/db/migration/V30__agent_managed_profile.sql`
+### 1. 마이그레이션 `backend/src/main/resources/db/migration/V31__agent_managed_profile.sql`
 
-`db/migration` 의 가장 큰 번호 다음 번호로 만든다(계획 순서대로면 V30). 칸마다 문장을 따로 쓴다.
+번호는 V31 이다. 여러 계획을 나란히 구현해 번호를 미리 나눴다(V30 은 하위 에이전트 session 소유 등록이 쓴다). 칸마다 문장을 따로 쓴다.
 
 - `ALTER TABLE agent ADD COLUMN profile_managed BOOLEAN NOT NULL DEFAULT FALSE;`
 - `ALTER TABLE agent ADD COLUMN deleted_at DATETIME(6) NULL;`
@@ -75,7 +75,7 @@ node test/e2e/run.ts
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V30__agent_managed_profile.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V31__agent_managed_profile.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/domain/Agent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentAdminController.java` | 수정 |

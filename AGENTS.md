@@ -170,6 +170,7 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.1
 ## 머지는 PR 로 한다
 
 브랜치를 push 하고 PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
+**계획서만으로 PR 을 열지 않는다.** 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 PR 의 merge ref 에서 CI 의 `backend`, `web`, `e2e`, `unit`, `public-safe` 가 모두 통과했는지 확인한다. 브라우저 검사는 로컬에서 직접 돌린 결과로 본다.
 브랜치 보호의 필수 검사는 CI 가 여러 번 안정되게 돈 뒤 따로 정한다.
 PR 을 열면 `.github/workflows/claude-code-review.yml` 이 Claude 코드 리뷰를 돌린다.

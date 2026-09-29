@@ -28,9 +28,9 @@
 
 ## 작업 항목
 
-### 1. 마이그레이션 `backend/src/main/resources/db/migration/V31__execution_skill_use.sql`
+### 1. 마이그레이션 `backend/src/main/resources/db/migration/V32__execution_skill_use.sql`
 
-`db/migration` 의 가장 큰 번호 다음 번호로 만든다(계획 순서대로면 V31). `docs/data-schema.md` 「execution_skill_use」 표 그대로. `(execution_id, skill_name, source)` 유일 제약과 `skill_name` 조회용 인덱스.
+번호는 V32 다. 여러 계획을 나란히 구현해 번호를 미리 나눴다. `docs/data-schema.md` 「execution_skill_use」 표 그대로. `(execution_id, skill_name, source)` 유일 제약과 `skill_name` 조회용 인덱스.
 
 ### 2. 저장과 기록
 
@@ -64,7 +64,7 @@ node test/e2e/run.ts
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V31__execution_skill_use.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V32__execution_skill_use.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/domain/ExecutionSkillUse.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/domain/SkillUseSource.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/infra/ExecutionSkillUseRepository.java` | 신규 |
