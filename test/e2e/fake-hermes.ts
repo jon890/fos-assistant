@@ -233,6 +233,11 @@ export const ARTIFACT_PROBE = "결과물 파일 검사";
 /** 실제 MCP 호출로 HTML과 CSS를 저장하는지 보는 입력이다. */
 export const ARTIFACT_WRITE_PROBE = "MCP 결과물 파일 검사";
 
+/**
+ * 이 글 뒤에 공백과 Memory 번호를 붙여 보내면 그 run 안에서 `memory_read` 를 부르고, 도구 결과의 text 를 답으로 돌려준다.
+ */
+export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
+
 /** HTML 이 부르는 사진이다. 1픽셀짜리 PNG 다. */
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -381,6 +386,7 @@ export type FakeHermes = {
   dropNextAppliedToolset(name: string): void;
   close(): Promise<void>;
   setArtifactWriteMcp(endpoint: string, token: string): void;
+  setMemoryReadMcp(endpoint: string, token: string): void;
 };
 
 /**
@@ -440,6 +446,29 @@ export function startFakeHermes(
   let releaseConfig: (() => void) | undefined;
   let droppedToolset: string | undefined;
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
+  let memoryReadMcp: { endpoint: string; token: string } | undefined;
+
+  /**
+   * profile 플러그인처럼 서명한 `_fos_ctx` 를 붙여 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다.
+   *
+   * <p>제출받은 run 의 session 이 곧 뿌리 session 이다. run 마다 자기 session 으로 서명하므로, 나란히 도는 두 run 이
+   * 서로의 session 을 쓰면 요청자가 뒤섞여 검사가 실패한다.
+   */
+  const readMemoryViaMcp = async (memoryId: number, sessionId: string | undefined): Promise<string> => {
+    if (memoryReadMcp === undefined) throw new Error("memory_read MCP runtime is not configured");
+    if (sessionId === undefined) throw new Error("memory_read MCP needs the submitted session_id to sign _fos_ctx");
+    const _fos_ctx = signedCallContext(memoryReadMcp.token, "memory_read", sessionId, sessionId, `call_${randomUUID()}`);
+    const response = await fetch(memoryReadMcp.endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${memoryReadMcp.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: memoryId, _fos_ctx } } }),
+    });
+    if (!response.ok) throw new Error(`memory_read MCP HTTP ${response.status}`);
+    const body = await response.json() as { result?: { content?: { text?: string }[] } };
+    const text = body.result?.content?.[0]?.text;
+    if (text === undefined) throw new Error("memory_read MCP response has no text");
+    return text;
+  };
 
   /**
    * profile 플러그인처럼 도구 인자에 서명한 `_fos_ctx` 를 붙여 `artifact_write` 를 부른다.
@@ -897,6 +926,10 @@ export function startFakeHermes(
         const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId, submitted.session_id);
+        const memoryReadPrefix = `${MEMORY_READ_PROBE} `;
+        const memoryReadOutput = input.startsWith(memoryReadPrefix)
+          ? await readMemoryViaMcp(Number(input.slice(memoryReadPrefix.length)), submitted.session_id)
+          : undefined;
         lastSubmittedRuntime = {
           provider: submitted.provider,
           model: submitted.model,
@@ -948,7 +981,7 @@ export function startFakeHermes(
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
-          output: specialOutputFor(input)
+          output: memoryReadOutput ?? specialOutputFor(input)
             ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
           input,
           provider: submitted.provider ?? null,
@@ -1038,6 +1071,9 @@ export function startFakeHermes(
         dropNextAppliedToolset: (name) => { droppedToolset = name; },
         setArtifactWriteMcp: (endpoint: string, token: string) => {
           artifactWriteMcp = { endpoint, token };
+        },
+        setMemoryReadMcp: (endpoint: string, token: string) => {
+          memoryReadMcp = { endpoint, token };
         },
         close: () =>
           new Promise<void>((done) => {
