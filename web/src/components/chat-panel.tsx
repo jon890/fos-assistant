@@ -954,7 +954,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   useShellTitle(selectedAgent ?? null);
   const startScreen = freshStart && turns.length === 0 && !sending;
   const currentAgent = agents.find((agent) => agent.code === agentCode);
-  const suggestions = useStarterSuggestions(startScreen && currentAgent ? currentAgent.code : null);
+  const starters = useStarterSuggestions(startScreen && currentAgent ? currentAgent.code : null);
 
   if (notFound) {
     return (
@@ -1063,7 +1063,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           />
           {startScreen ? (
             <StarterPrompts
-              prompts={suggestions}
+              prompts={starters.prompts}
+              pending={starters.pending}
               disabled={sending || composerBlocking}
               onPrompt={(text) => { void send([], text); }}
             />

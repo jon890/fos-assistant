@@ -53,16 +53,31 @@ export function StartScreenHeader({ displayName, agents, loading, selectedCode, 
 
 type PromptsProps = {
   prompts: string[];
+  /** 추천을 읽는 중이다. 칩 자리에 뼈대를 그린다 */
+  pending: boolean;
   disabled: boolean;
   onPrompt(text: string): void;
 };
 
-/** 입력창 아래에 그리는 고른 에이전트의 추천 질문이다. 누르면 입력창을 거치지 않고 바로 보낸다 */
-export function StarterPrompts({ prompts, disabled, onPrompt }: PromptsProps) {
-  // 추천 질문이 없어도 자리는 둔다. 위의 인사와 함께 입력창을 세로 가운데로 모으는 여백이 이 요소에 붙는다.
+/**
+ * 입력창 아래에 그리는 고른 에이전트의 추천 질문이다. 누르면 입력창을 거치지 않고 바로 보낸다.
+ *
+ * <p>추천은 에이전트를 고를 때마다 따로 읽어 늦게 도착한다. 이 요소가 위의 인사와 함께 입력창을 세로 가운데로
+ * 모으는 여백을 갖고 있어서, 높이가 칩에 따라 변하면 칩이 나타날 때마다 입력창이 위로 밀린다. 그래서 읽는 중이든
+ * 비었든 채워졌든 같은 최소 높이를 잡는다. 칩 네 개가 줄바꿈되는 정도가 폭마다 달라 좁은 폭은 세 줄, 넓은 폭은 두 줄을 잡는다.
+ */
+export function StarterPrompts({ prompts, pending, disabled, onPrompt }: PromptsProps) {
   return (
-    <div className="mx-auto mb-auto w-full max-w-3xl pt-3">
-      {prompts.length > 0 ? (
+    <div className="mx-auto mb-auto min-h-32 w-full max-w-3xl pt-3 sm:min-h-24">
+      {pending ? (
+        // 뼈대는 낭독기에서 숨겨져 있다. 읽는 중이라는 것은 status 안의 글로 알린다.
+        <div role="status" className="flex flex-wrap justify-center gap-2">
+          <span className="sr-only">추천 질문을 읽는 중</span>
+          <Skeleton className="h-8 w-40 rounded-full" />
+          <Skeleton className="h-8 w-32 rounded-full" />
+          <Skeleton className="h-8 w-36 rounded-full" />
+        </div>
+      ) : prompts.length > 0 ? (
         <ul aria-label="추천 질문" className="flex flex-wrap justify-center gap-2">
           {prompts.map((prompt, index) => (
             <li key={index} className="max-w-full">
