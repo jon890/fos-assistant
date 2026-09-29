@@ -131,6 +131,8 @@ type Run = {
   input: string;
   interruptEvents: boolean;
   usage: typeof FAKE_USAGE;
+  /** v0.21.5 실행 조회의 실제로 돈 provider 와 모델이다. 끝난 실행에만 있다. */
+  runtime?: { provider: string; model: string; route_source: string };
 };
 
 /**
@@ -743,7 +745,8 @@ export function startFakeHermes(
           }
           const session = sessions.get(sessionId!);
           if (!session) return send(response, 404, { error: "no such session" });
-          return send(response, 200, { session_id: sessionId, ...session });
+          // 실제 v0.21.5 는 세션 행을 session 안에 감싸고 provider 칸을 주지 않는다(저장소의 billing_provider).
+          return send(response, 200, { object: "session", session: { id: sessionId, model: session.model } });
         }
 
         const capabilitiesMatch = CAPABILITIES_PATH.exec(path);
@@ -937,13 +940,16 @@ export function startFakeHermes(
           interruptEvents: input === "스트림 중단 검사",
           usage: FAKE_USAGE,
         });
-        // 실제로 돈 모델은 세션 행에만 남는다.
+        // 실제로 돈 모델은 세션 행과 v0.21.5 실행 조회의 runtime 에 남는다.
         // provider 와 모델을 빼고 온 실행은 profile 의 기본값으로 돈다.
-        sessions.set(sessionId, {
+        const served = {
           model: actualModelFor(input, submitted.model ?? DEFAULT_RUNTIME.model),
           provider:
             input === SESSION_MODEL_PROBE ? "nvidia" : submitted.provider ?? DEFAULT_RUNTIME.provider,
-        });
+        };
+        sessions.set(sessionId, served);
+        const stored = runs.get(runId);
+        if (stored) stored.runtime = { provider: served.provider, model: served.model, route_source: "global" };
         if (held) {
           heldRunId = runId;
           heldRunWaiter?.();
