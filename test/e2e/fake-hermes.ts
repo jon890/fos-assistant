@@ -105,11 +105,13 @@ const RATE_LIMITED = {
  *
  * <p>입력 120 중 80 이 캐시이고 출력이 40 이다. 사용량 시나리오가 이 값으로 환산 금액을 계산한다.
  */
+// 실제 v0.21.5 run 응답의 usage 모양이다. input_tokens 는 캐시 읽기와 쓰기를 포함한다.
 export const FAKE_USAGE = {
-  prompt_tokens: 120,
-  completion_tokens: 40,
+  input_tokens: 120,
+  output_tokens: 40,
   total_tokens: 160,
-  prompt_tokens_details: { cached_tokens: 80 },
+  cache_read_tokens: 80,
+  cache_write_tokens: 0,
 } as const;
 
 type Run = {
