@@ -194,7 +194,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 
 - 등급 표는 코드 한 곳(`agent/domain/AgentToolPolicy`)이 갖는다. 표와 이유는 ADR-029 의 「도구 등급」 이다
 - 설정을 쓸 때 대시보드 plugin 은 허용 목록 밖의 이름을 거절한다. Hermes 를 올릴 때 `fos-home-infra` 의 기능 검사는 모든 profile 의 켜진 목록을 허용 목록과 대조한다. 실행마다 검사하지 않는다
-- 쓸 때는 `platform_toolsets.api_server` 만 켤 toolset 과 `fos-assistant-memory` 로 통째로 쓴다. `agent.disabled_toolsets` 는 모든 platform 에 적용되므로 보내지 않고 기존 값을 둔다
+- 쓸 때는 `platform_toolsets.api_server` 만 켤 toolset 과 Control Plane MCP `fos-assistant` 로 통째로 쓴다. `agent.disabled_toolsets` 는 모든 platform 에 적용되므로 보내지 않고 기존 값을 둔다
 - 쓴 뒤 공유 listener 의 `GET /p/{profile}/v1/toolsets` 로 내장 도구를 다시 읽는다. 이 경로에는 MCP 서버 이름이 없으므로 기억 MCP 는 비교하지 않는다. 요청한 내장 도구가 빠지거나 분류된 도구가 예상과 다르면 적용 실패다. 추가로 켜진 미분류 도구는 적용 실패로 세지 않고 `unclassifiedEnabled` 로 알린다
 - profile 의 공통 비활성화 목록이 막아 켜지지 않은 toolset 은 `AGENT_TOOLS_NOT_APPLIED` 응답의 `missingToolsets` 로 알린다. 화면은 `GET` 으로 현재 목록을 다시 읽는다
 - 이름과 설명은 대시보드 `GET /api/tools/toolsets` 에서 읽는다. 그 응답의 `enabled` 는 CLI 기준이라 쓰지 않는다

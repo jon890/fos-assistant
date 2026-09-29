@@ -180,7 +180,7 @@ v0.21.3의 API server는 별도 `GET /v1/toolsets`를 제공하며 같은 설명
 **두 경로의 응답 모양이 다르다.** 대시보드 경로는 항목 배열을 그대로 돌려주고, `GET /v1/toolsets`는 `{"object": "list", "platform": "api_server", "data": [...]}`로 감싼다.
 가짜 Hermes 가 배열로 돌려주도록 쓰여 있어 테스트가 모두 통과한 채 운영에서 목록 조회가 502 로 실패한 적이 있다.
 이 목록에는 MCP 서버 이름이 없다. v0.21.3의 실제 응답 29개 항목에도 기억 MCP 이름이 없었고, 이 경로의 구현도 내장 도구 목록을 반환한다.
-따라서 `fos-assistant-memory`는 설정에 넣되, 저장 뒤 이 경로로 다시 읽은 결과와 비교하지 않는다.
+따라서 Control Plane MCP 서버 `fos-assistant`는 설정에 넣되, 저장 뒤 이 경로로 다시 읽은 결과와 비교하지 않는다.
 근거는 [대시보드 도구 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/tools.py), [API server 도구 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py)다.
 
 v0.21.0과 비교하면 v0.21.3의 설정 가능한 목록에 `connections`와 `kanban`이 들어왔다.
@@ -265,19 +265,28 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 본문 재읽기, profile 우선순위, 도구 목록 29개, 스킬 생성·수정·비활성화와 색인 경로 변경을 확인했다.
 공유 gateway의 MCP 자동 발견과 새 profile의 실제 대화 실행은 이 조사에서 구동하지 않았으므로 코드 판정으로 구분했다.
 
-## Memory MCP
+## Control Plane MCP
 
-제목만 `instructions` 에 실린 Memory 본문은 Control Plane 의 MCP 서버에서 읽는다.
+제목만 `instructions` 에 실린 Memory 본문과 결과물 쓰기를 Control Plane 의 MCP 서버 하나가 맡는다.
 
 | 항목 | 계약 |
 | --- | --- |
-| 서버 이름 | `fos-assistant-memory` |
+| 서버 이름 | `fos-assistant` |
+| Hermes 가 보이는 도구 이름 | `mcp_fos_assistant_<도구>`. 예: `mcp_fos_assistant_artifact_write` |
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰 |
 | 도구 | `memory_read`, `artifact_write` |
 
 토큰이 요청자를 정한다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
+
+**Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
+결과물 쓰기가 같은 서버에 들어오면서 `mcp_fos_assistant_memory_artifact_write` 처럼 Memory 와 무관한 도구에 Memory 가 붙어 2026-09-29 에 `fos-assistant` 로 바꿨다.
+앞으로 Control Plane 이 여는 도구도 이 서버에 더한다.
+
+**서버 이름을 바꿀 때는 등록 이름과 허용 목록을 한 번에 바꾼다.**
+`platform_toolsets.api_server` 의 MCP 이름은 허용 목록이다. 목록에 등록되지 않은 이름만 남으면 Hermes 는 허용 목록이 없는 것으로 보고 전역 MCP 서버를 모두 켠다. 근거는 [v0.21.5 `hermes_cli/tools_config.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/tools_config.py) 의 `_get_platform_tools` 다.
+그래서 대시보드 plugin 이 옛 이름과 새 이름을 함께 받는 동안 등록과 목록을 바꾸고, backend 가 새 이름을 쓰게 한 뒤 옛 이름을 막는다.
 Control Plane 은 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 실제 MCP 서버 등록과 토큰 전달은 비공개 저장소 `fos-home-infra`가 맡는다.
 
@@ -307,7 +316,7 @@ Control Plane 이 두 방식을 고르는 기준은
 ## 결과물 쓰기 도구
 
 `artifact_write` 는 일반 파일 도구가 없는 profile 에 결과물 저장만 연다.
-`fos-assistant-memory` 서버가 등록된 profile 에서만 보인다. 기존 서버에 도구를 추가하므로 Hermes 서버 등록과 허용 목록을 바꾸지 않는다.
+`fos-assistant` 서버가 등록된 profile 에서만 보인다. 기존 서버에 도구를 추가하므로 Hermes 서버 등록과 허용 목록을 바꾸지 않는다.
 실행 입력은 이 도구가 있으면 MCP 로 저장하고, 도구가 없고 파일 도구가 있으면 대화 폴더에 직접 쓰도록 안내한다.
 결정은 [ADR-028](../adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
 
