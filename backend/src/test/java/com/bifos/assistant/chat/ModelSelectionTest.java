@@ -203,6 +203,21 @@ class ModelSelectionTest {
     }
 
     @Test
+    void 세션이_provider_를_주지_않아도_실행의_runtime_으로_provider_와_모델을_적는다() {
+        // v0.21.5 의 세션 조회는 model 만 주고 provider 를 주지 않는다. 실행 조회의 runtime 이 실제로 돈 값을 준다.
+        stub().willReturn(new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, null, PRICED_USAGE,
+                new SessionRuntime("example-model-large", "anthropic")));
+        stub().willReportSessionRuntime(new SessionRuntime("example-model-large", null));
+
+        ChatTurn turn = chat.send(user, null, "안녕", AGENT_CODE);
+
+        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
+        assertThat(execution.provider()).isEqualTo("anthropic");
+        assertThat(execution.model()).isEqualTo("example-model-large");
+        assertThat(execution.estimatedCostMicros()).as("provider 와 모델을 알면 금액을 적는다").isNotNull();
+    }
+
+    @Test
     void 기본값으로_보냈어도_세션이_답하면_그_모델로_금액을_적는다() {
         stub().willReturn(succeeded("run-1", "sess-1"));
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
