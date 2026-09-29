@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -18,17 +19,23 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 실제 HTTP 경계에서 결과물 쓰기 도구의 인자와 소유권을 확인한다. */
+/**
+ * 실제 HTTP 경계에서 결과물 쓰기 도구의 인자와 소유권을 확인한다.
+ *
+ * <p>토큰은 이 검사의 profile 에 묶이고, 도구 호출은 그 profile 로 도는 아빠의 실행 뿌리로 서명한다(ADR-032).
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class McpArtifactWriteToolTest {
@@ -39,19 +46,27 @@ class McpArtifactWriteToolTest {
     @Autowired ConversationRepository conversations;
     @Autowired ArtifactStore store;
     @Autowired ChatArtifactRepository artifacts;
+    @Autowired AgentExecutionRepository executions;
+    @Autowired JdbcTemplate jdbc;
+
+    private static final String PROFILE = "mcp-artifact-write";
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
     private String dadToken;
+    private String dadRoot;
 
     @BeforeEach
     void 준비한다() {
+        McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         tokenRows.deleteAll();
         conversations.deleteAll();
         users.deleteAll();
         dad = users.save(AppUser.of("mcp-artifact-dad@example.com", "아빠", 1L, UserRole.ADMIN));
-        dadToken = tokens.issue(dad.email(), "dad").rawToken();
+        dadToken = tokens.issue(PROFILE, "dad").rawToken();
+        dadRoot = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
     }
 
     @Test
@@ -69,9 +84,9 @@ class McpArtifactWriteToolTest {
     }
 
     @Test
-    void _fos_ctx_가_붙어도_버리고_지금과_같이_쓰고_검사한다() throws Exception {
+    void 서명이_맞는_fos_ctx_를_떼고_지금과_같이_쓰고_검사한다() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        String fosCtx = "{\"v\":1,\"session_id\":\"s\",\"root_session_id\":\"r\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+        String fosCtx = McpCallSigner.context(dadToken, "artifact_write", dadRoot).toString();
         String prefix = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"_fos_ctx\":" + fosCtx;
 
         JsonNode written = body(raw(dadToken, prefix + ",\"path\":\"ctx/index.html\",\"content\":\"<p>x</p>\"}}}"));
@@ -83,6 +98,21 @@ class McpArtifactWriteToolTest {
         assertThat(store.resolveInside(conversation.id(), "ctx/index.html")).isPresent();
         assertThat(unknownKey.path("error").path("code").asInt()).isEqualTo(-32602);
         assertThat(store.resolveInside(conversation.id(), "ctx/other.html")).isEmpty();
+    }
+
+    @Test
+    void 틀린_fos_ctx_는_쓰지_않고_거절한다() throws Exception {
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        String zeroSig = "{\"v\":1,\"session_id\":\"" + dadRoot + "\",\"root_session_id\":\"" + dadRoot + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+        // 결과물 폴더는 디스크에 남아 다른 검사의 대화 번호와 겹칠 수 있으므로 경로를 새로 만든다.
+        String path = "rejected-" + UUID.randomUUID() + ".html";
+
+        JsonNode rejected = body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"_fos_ctx\":" + zeroSig + ",\"path\":\"" + path + "\",\"content\":\"<p>x</p>\"}}}"));
+
+        assertThat(rejected.path("result").path("isError").asBoolean()).isTrue();
+        assertThat(rejected.path("result").path("content").get(0).path("text").asString())
+                .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+        assertThat(store.resolveInside(conversation.id(), path)).isEmpty();
     }
 
     @Test
@@ -232,10 +262,12 @@ class McpArtifactWriteToolTest {
         return raw(token, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversationId + "\",\"path\":\"" + path + "\",\"content\":\"" + content + "\"}}}");
     }
 
+    /** 도구 호출의 인자에 {@code _fos_ctx} 가 없으면 아빠의 도는 실행 뿌리로 서명해 붙인다. */
     private HttpResponse<String> raw(String token, String request) throws Exception {
+        String signed = McpCallSigner.withContext(request, token, dadRoot);
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
                 .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(request)).build(), HttpResponse.BodyHandlers.ofString());
+                .POST(HttpRequest.BodyPublishers.ofString(signed)).build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private JsonNode body(HttpResponse<String> response) throws Exception {

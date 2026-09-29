@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.orchestration.domain.ChildResult;
+import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -41,8 +42,8 @@ public class ChildExecutionRunner {
     /**
      * 자식 실행 하나를 끝까지 돌린다.
      *
-     * <p>자식은 부모의 Hermes session 을 잇지 않는다. 중간 산출물이 대화 session 에 쌓이면 다음 turn
-     * 이 그것을 함께 읽는다.
+     * <p>자식은 부모의 Hermes session 을 잇지 않고 새 {@code fos-<uuid>} 를 정해 보내고 실행 줄에 적는다.
+     * 중간 산출물이 대화 session 에 쌓이면 다음 turn 이 그것을 함께 읽는다.
      *
      * @param user 부모 실행의 주인. 자식도 같은 사용자의 것이다
      * @param conversation 부모 실행이 속한 대화
@@ -90,7 +91,7 @@ public class ChildExecutionRunner {
                         task,
                         parent.id(),
                         rootOf(parent),
-                        null,
+                        RunSession.fresh(),
                         execution -> {},
                         onSubmitted,
                         cancelled,

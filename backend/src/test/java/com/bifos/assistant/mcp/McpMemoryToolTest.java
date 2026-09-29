@@ -14,6 +14,7 @@ import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -26,6 +27,12 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +40,7 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -40,7 +48,11 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 실제 HTTP 경계에서 MCP 인증과 JSON-RPC 계약을 확인한다. */
+/**
+ * 실제 HTTP 경계에서 MCP 인증과 JSON-RPC 계약을 확인한다.
+ *
+ * <p>토큰은 이 검사의 profile 에 묶이고, 도구 호출은 그 profile 로 도는 아빠의 실행 뿌리로 서명한다(ADR-032).
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class McpMemoryToolTest {
@@ -52,18 +64,25 @@ class McpMemoryToolTest {
     @Autowired MemoryService memories;
     @Autowired BuildProperties buildProperties;
     @Autowired WebApplicationContext context;
+    @Autowired AgentExecutionRepository executions;
+    @Autowired JdbcTemplate jdbc;
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
     private AppUser kid;
     private String dadToken;
+    private String dadRoot;
+    private static final String PROFILE = "mcp-memory-tool";
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
 
     @BeforeEach void 준비한다() {
+        McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         memoryRepository.deleteAll(); tokenRepository.deleteAll(); users.deleteAll();
         dad = users.save(AppUser.of("dad@example.com", "아빠", 1L, UserRole.ADMIN));
         kid = users.save(AppUser.of("kid@example.com", "아이", 1L, UserRole.MEMBER));
-        dadToken = tokens.issue(dad.email(), "dad").rawToken();
+        dadToken = tokens.issue(PROFILE, "dad").rawToken();
+        dadRoot = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
     }
 
     @Test void initialize_목록과_알림은_계약한_응답을_낸다() throws Exception {
@@ -83,7 +102,7 @@ class McpMemoryToolTest {
         assertThat(notification.statusCode()).isEqualTo(202); assertThat(notification.body()).isEmpty();
     }
 
-    @Test void 토큰의_사용자만_정하고_권한_오류는_동일하게_숨긴다() throws Exception {
+    @Test void 부모_실행의_사용자만_정하고_권한_오류는_동일하게_숨긴다() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
         JsonNode own = body(call(dadToken, indexed.id(), 999L));
@@ -94,16 +113,30 @@ class McpMemoryToolTest {
         assertThat(unauthorized.path("result")).isEqualTo(missing.path("result"));
     }
 
-    @Test void _fos_ctx_가_붙어도_버리고_그대로_읽는다() throws Exception {
+    @Test void 서명이_맞는_fos_ctx_를_떼고_읽는다() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
-        String fosCtx = "{\"v\":1,\"session_id\":\"s\",\"root_session_id\":\"r\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+        String fosCtx = McpCallSigner.context(dadToken, "memory_read", dadRoot).toString();
 
-        JsonNode read = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}"));
-        JsonNode wrongId = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":\"wrong\",\"_fos_ctx\":" + fosCtx + "}}}"));
+        JsonNode read = body(send(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}", false));
+        JsonNode wrongId = body(send(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":\"wrong\",\"_fos_ctx\":" + fosCtx + "}}}", false));
 
         assertThat(read.path("result").path("isError").asBoolean()).isFalse();
         assertThat(read.path("result").path("content").get(0).path("text").asString()).isEqualTo("아빠 본문");
         assertThat(wrongId.path("error").path("code").asInt()).isEqualTo(-32602);
+    }
+
+    @Test void 틀린_fos_ctx_는_거절한다() throws Exception {
+        Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
+        String zeroSig = "{\"v\":1,\"session_id\":\"" + dadRoot + "\",\"root_session_id\":\"" + dadRoot + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+
+        JsonNode rejected = body(send(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + indexed.id() + ",\"_fos_ctx\":" + zeroSig + "}}}", false));
+        JsonNode missing = body(send(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + indexed.id() + "}}}", false));
+
+        assertThat(rejected.path("result").path("isError").asBoolean()).isTrue();
+        assertThat(rejected.path("result").path("content").get(0).path("text").asString())
+                .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+        assertThat(rejected.toString()).doesNotContain("아빠 본문");
+        assertThat(missing).isEqualTo(rejected);
     }
 
     @Test void 인증한_요청에_토큰_원문이_아닌_해시를_속성으로_싣는다() throws Exception {
@@ -126,7 +159,7 @@ class McpMemoryToolTest {
 
     @Test void 인증_Origin_JSON_RPC_오류를_HTTP에서_검사한다() throws Exception {
         assertThat(mcp(null, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}").statusCode()).isEqualTo(401);
-        String revoked = tokens.issue(dad.email(), "revoked").rawToken();
+        String revoked = tokens.issue(PROFILE, "revoked").rawToken();
         tokens.revoke(tokenRepository.findByTokenHash(AgentTokenService.hash(revoked)).orElseThrow().id());
         assertThat(mcp(revoked, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}").statusCode()).isEqualTo(401);
         assertThat(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}", true).statusCode()).isEqualTo(403);
@@ -139,7 +172,8 @@ class McpMemoryToolTest {
     @Test void 관리자만_토큰을_발급하고_목록을_보고_폐기한다() throws Exception {
         String adminJwt = jwt(dad);
         String memberJwt = jwt(kid);
-        String issueBody = "{\"userEmail\":\"kid@example.com\",\"label\":\"profile\"}";
+        String issueBody = "{\"profileName\":\"kid-profile\",\"label\":\"profile\"}";
+        long legacyId = McpCallSigner.insertLegacyToken(jdbc, kid.id(), "legacy-" + UUID.randomUUID(), "legacy");
 
         assertThat(api("POST", "/api/v1/admin/agent-tokens", memberJwt, issueBody).statusCode())
                 .isEqualTo(403);
@@ -151,13 +185,36 @@ class McpMemoryToolTest {
         String rawToken = issuedBody.path("token").asString();
         long tokenId = issuedBody.path("id").asLong();
         assertThat(rawToken).isNotBlank();
+        assertThat(issuedBody.path("profileName").asString()).isEqualTo("kid-profile");
+        assertThat(issuedBody.has("userEmail")).as("발급 응답에 사용자 칸이 없다: %s", issuedBody).isFalse();
 
         HttpResponse<String> listed = api(
                 "GET", "/api/v1/admin/agent-tokens", adminJwt, null);
         assertThat(listed.statusCode()).isEqualTo(200);
         JsonNode listBody = json.readTree(listed.body());
-        assertThat(listBody).hasSize(2);
+        assertThat(listBody).hasSize(3);
         assertThat(listed.body()).doesNotContain(rawToken, "\"token\"");
+        Map<Long, JsonNode> rows = rowsById(listBody);
+        long dadTokenId = tokenRepository.findByTokenHash(AgentTokenService.hash(dadToken)).orElseThrow().id();
+        assertThat(rows.get(dadTokenId).path("profileName").asString()).isEqualTo(PROFILE);
+        assertThat(rows.get(dadTokenId).path("userEmail").isNull()).as("묶인 토큰의 메일: %s", rows.get(dadTokenId)).isTrue();
+        assertThat(rows.get(tokenId).path("profileName").asString()).isEqualTo("kid-profile");
+        assertThat(rows.get(tokenId).path("userEmail").isNull()).as("새 토큰의 메일: %s", rows.get(tokenId)).isTrue();
+        assertThat(rows.get(legacyId).path("profileName").isNull()).as("옛 토큰의 profile: %s", rows.get(legacyId)).isTrue();
+        assertThat(rows.get(legacyId).path("userEmail").asString()).isEqualTo("kid@example.com");
+
+        String bindBody = "{\"profileName\":\"kid-profile\"}";
+        assertThat(api("PUT", "/api/v1/admin/agent-tokens/" + legacyId + "/profile", memberJwt, bindBody)
+                .statusCode()).isEqualTo(403);
+        assertThat(tokenRepository.findById(legacyId).orElseThrow().profileName()).isNull();
+        HttpResponse<String> bound = api("PUT", "/api/v1/admin/agent-tokens/" + legacyId + "/profile", adminJwt, bindBody);
+        assertThat(bound.statusCode()).as("묶기 응답: %s", bound.body()).isEqualTo(200);
+        assertThat(json.readTree(bound.body()).path("profileName").asString()).isEqualTo("kid-profile");
+        assertThat(tokenRepository.findById(legacyId).orElseThrow().profileName()).isEqualTo("kid-profile");
+        assertThat(api("PUT", "/api/v1/admin/agent-tokens/" + legacyId + "/profile", adminJwt, "{\"profileName\":\"other\"}")
+                .statusCode()).as("이미 묶인 토큰").isEqualTo(400);
+        assertThat(api("POST", "/api/v1/admin/agent-tokens", adminJwt, "{\"userEmail\":\"kid@example.com\",\"label\":\"old\"}")
+                .statusCode()).as("사용자로 발급하는 길은 없다").isEqualTo(400);
 
         assertThat(api("DELETE", "/api/v1/admin/agent-tokens/" + tokenId, memberJwt, null)
                 .statusCode()).isEqualTo(403);
@@ -168,8 +225,13 @@ class McpMemoryToolTest {
     }
 
     private HttpResponse<String> call(String token, Long id, Long ignoredUserId) throws Exception { return mcp(token, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":" + id + (ignoredUserId == null ? "" : ",\"user_id\":" + ignoredUserId) + "}}}"); }
+    /** 도구 호출이면 아빠의 도는 실행 뿌리로 서명한 {@code _fos_ctx} 를 붙여 보낸다. */
     private HttpResponse<String> mcp(String token, String request) throws Exception { return mcp(token, request, false); }
     private HttpResponse<String> mcp(String token, String request, boolean origin) throws Exception {
+        return send(token, token == null ? request : McpCallSigner.withContext(request, token, dadRoot), origin);
+    }
+    /** 본문을 그대로 보낸다. */
+    private HttpResponse<String> send(String token, String request, boolean origin) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp")).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(request));
         if (token != null) builder.header("Authorization", "Bearer " + token);
         if (origin) builder.header("Origin", "http://browser.example");
@@ -195,6 +257,10 @@ class McpMemoryToolTest {
                 .expiration(Date.from(now.plusSeconds(600)))
                 .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
                 .compact();
+    }
+    private static Map<Long, JsonNode> rowsById(JsonNode list) {
+        return StreamSupport.stream(list.spliterator(), false)
+                .collect(Collectors.toMap(row -> row.path("id").asLong(), Function.identity()));
     }
     private JsonNode body(HttpResponse<String> response) { assertThat(response.statusCode()).isEqualTo(200); return json.readTree(response.body()); }
     private static CurrentUser current(AppUser user) { return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()); }

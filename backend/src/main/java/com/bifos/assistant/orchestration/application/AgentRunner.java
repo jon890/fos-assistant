@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.orchestration.domain.ChildResult;
+import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -61,13 +62,21 @@ public class AgentRunner {
     /**
      * 실행 하나를 끝까지 돌린다.
      *
+     * <p>실행 문맥 뒤에 turn 에만 적용하는 지시를 덧붙인다. 실행 기록의 문맥 값은 덧붙이기 전 값이다.
+     *
      * @param user 이 실행의 주인. 부르는 쪽이 부모에게서 그대로 가져온다
      * @param conversation 이 실행이 속한 대화
      * @param agent 실행할 에이전트. 요청자가 쓸 수 있는 것만 여기 들어온다
      * @param task 이 실행에만 주는 지시
      * @param parentExecutionId 이 실행을 부른 실행. 뿌리이면 null
      * @param rootExecutionId 이 실행이 속한 나무의 뿌리. 뿌리 자신이면 null
-     * @param sessionId 이어 갈 Hermes session. 새로 시작하면 null
+     * @param session Hermes 에 보낼 session 과 실행 줄에 제출하기 전에 적을 session. 대화의 첫 단계는 압축 교체 뒤에
+     *     보내는 session 이 바뀌어도 그 대화의 뿌리 session 을 적어야 하고(ADR-031), 하위 실행은 새
+     *     {@code fos-<uuid>} 를 보내고 적는다
+     * @param onStarted 실행 줄이 생긴 직후 호출한다
+     * @param onSubmitted 실행 줄과 Hermes run 번호가 모두 생긴 직후 호출한다
+     * @param cancelled 참이면 실행을 멈춘다
+     * @param instructionAddition 실행 문맥 뒤에 붙일 지시. 없으면 null
      */
     public Run run(
             CurrentUser user,
@@ -76,111 +85,7 @@ public class AgentRunner {
             String task,
             Long parentExecutionId,
             Long rootExecutionId,
-            String sessionId) {
-        return run(user, conversation, agent, task, parentExecutionId, rootExecutionId,
-                sessionId, execution -> {}, (execution, runId) -> {}, () -> false);
-    }
-
-    public Run run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String task,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            String sessionId,
-            Consumer<AgentExecution> onStarted) {
-        return run(
-                user,
-                conversation,
-                agent,
-                task,
-                parentExecutionId,
-                rootExecutionId,
-                sessionId,
-                onStarted,
-                (execution, runId) -> {},
-                () -> false,
-                null);
-    }
-
-    /** 실행 줄과 Hermes run 번호가 모두 생긴 직후 호출한다. */
-    public Run run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String task,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            String sessionId,
-            Consumer<AgentExecution> onStarted,
-            BiConsumer<AgentExecution, String> onSubmitted,
-            BooleanSupplier cancelled) {
-        return run(
-                user,
-                conversation,
-                agent,
-                task,
-                parentExecutionId,
-                rootExecutionId,
-                sessionId,
-                onStarted,
-                onSubmitted,
-                cancelled,
-                null);
-    }
-
-    /**
-     * 실행 문맥 뒤에 turn 에만 적용하는 지시를 덧붙인다. 실행 기록의 문맥 값은 덧붙이기 전 값이다.
-     *
-     * <p>실행 줄에는 보낸 session 을 그대로 적는다. 흐름의 하위 실행이 이 경로로 온다.
-     */
-    public Run run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String task,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            String sessionId,
-            Consumer<AgentExecution> onStarted,
-            BiConsumer<AgentExecution, String> onSubmitted,
-            BooleanSupplier cancelled,
-            String instructionAddition) {
-        return run(
-                user,
-                conversation,
-                agent,
-                task,
-                parentExecutionId,
-                rootExecutionId,
-                sessionId,
-                sessionId,
-                onStarted,
-                onSubmitted,
-                cancelled,
-                instructionAddition);
-    }
-
-    /**
-     * 실행 줄에 적을 session 을 Hermes 에 보낼 session 과 따로 받는다.
-     *
-     * <p>대화의 첫 단계는 압축 교체 뒤에 보내는 session 이 바뀌어도 실행 줄에는 그 대화의 뿌리 session 을
-     * 적어야 하기 때문이다(ADR-031).
-     *
-     * @param sessionId Hermes 에 보낼 session. 새로 시작하면 null
-     * @param recordedSessionId 실행 줄에 제출하기 전에 적을 session. 대화의 첫 단계는 그 대화의 뿌리 session,
-     *     하위 실행은 {@code sessionId} 그대로다. 비면 비운다
-     */
-    public Run run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String task,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            String sessionId,
-            String recordedSessionId,
+            RunSession session,
             Consumer<AgentExecution> onStarted,
             BiConsumer<AgentExecution, String> onSubmitted,
             BooleanSupplier cancelled,
@@ -191,7 +96,7 @@ public class AgentRunner {
         ModelChoice choice = conversation.modelChoice();
         AgentExecution execution = executions.start(
                 user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, choice, null,
-                recordedSessionId);
+                session.correlationSessionId());
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
@@ -203,7 +108,7 @@ public class AgentRunner {
                 agent.apiBaseUrl(),
                 task,
                 appendInstruction(context.instructions(), instructionAddition),
-                sessionId,
+                session.runtimeSessionId(),
                 choice.provider(),
                 choice.model(),
                 choice.reasoningEffort());

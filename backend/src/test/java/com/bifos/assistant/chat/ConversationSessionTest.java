@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.chat.application.ConversationSessions;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -38,9 +39,11 @@ class ConversationSessionTest {
     void 새_대화는_fos_session을_정해_보낼_session과_뿌리_session에_함께_적는다() {
         Conversation conversation = newConversation();
 
-        String sessionId = sessions.ensure(conversation);
+        RunSession session = sessions.ensure(conversation);
 
+        String sessionId = session.runtimeSessionId();
         assertThat(sessionId).startsWith("fos-");
+        assertThat(session.correlationSessionId()).isEqualTo(sessionId);
         assertThat(conversation.hermesSessionId()).isEqualTo(sessionId);
         assertThat(conversation.hermesRootSessionId()).isEqualTo(sessionId);
         Conversation stored = reload(conversation);
@@ -55,15 +58,17 @@ class ConversationSessionTest {
         Conversation winner = reload(created);
         Conversation loser = reload(created);
 
-        String first = sessions.ensure(winner);
-        String second = sessions.ensure(loser);
+        RunSession first = sessions.ensure(winner);
+        RunSession second = sessions.ensure(loser);
 
+        assertThat(first.runtimeSessionId()).startsWith("fos-");
+        assertThat(first.correlationSessionId()).isEqualTo(first.runtimeSessionId());
         assertThat(second).as("진 쪽이 돌려준 session").isEqualTo(first);
-        assertThat(loser.hermesSessionId()).isEqualTo(first);
-        assertThat(loser.hermesRootSessionId()).isEqualTo(first);
+        assertThat(loser.hermesSessionId()).isEqualTo(first.runtimeSessionId());
+        assertThat(loser.hermesRootSessionId()).isEqualTo(first.correlationSessionId());
         Conversation stored = reload(created);
-        assertThat(stored.hermesSessionId()).isEqualTo(first);
-        assertThat(stored.hermesRootSessionId()).isEqualTo(first);
+        assertThat(stored.hermesSessionId()).isEqualTo(first.runtimeSessionId());
+        assertThat(stored.hermesRootSessionId()).isEqualTo(first.correlationSessionId());
     }
 
     @Test
@@ -82,10 +87,10 @@ class ConversationSessionTest {
         conversations.touchSession(conversation.id(), "legacy-session", Instant.now());
         Conversation legacy = reload(conversation);
 
-        String sessionId = sessions.ensure(legacy);
+        RunSession session = sessions.ensure(legacy);
 
-        assertThat(sessionId).isEqualTo("legacy-session");
-        assertThat(legacy.executionSessionId()).isEqualTo("legacy-session");
+        assertThat(session.runtimeSessionId()).isEqualTo("legacy-session");
+        assertThat(session.correlationSessionId()).isEqualTo("legacy-session");
         assertThat(reload(conversation).hermesRootSessionId()).isNull();
     }
 }

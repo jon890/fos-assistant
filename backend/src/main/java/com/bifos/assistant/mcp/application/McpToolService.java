@@ -23,6 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class McpToolService {
     private static final Logger log = LoggerFactory.getLogger(McpToolService.class);
     private static final JsonMapper json = JsonMapper.builder().build();
+    private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
     private static final Set<String> SAFE_ARTIFACT_FAILURE_MESSAGES = Set.of(
             "this conversation does not exist",
             "could not store artifact",
@@ -63,9 +64,22 @@ public class McpToolService {
                                         Map.of("required", List.of("source_url"), "not", Map.of("required", List.of("content")))))));
     }
 
-    public Map<String, Object> readMemory(CurrentUser user, Long id) {
-        try { Memory memory = memories.bodyFor(user, id); log.info("memory read userId={} memoryId={}", user.id(), id); return result(memory.content(), false); }
-        catch (ApiException ex) {
+    /**
+     * 요청자를 정하지 못한 호출의 도구 결과다.
+     *
+     * <p>서명 오류, profile 불일치, 부모 없음, 부모 둘 이상, 사용자 없음을 모두 이 결과 하나로 답한다(ADR-032).
+     */
+    public Map<String, Object> invalidContext() {
+        return result(INVALID_CONTEXT, true);
+    }
+
+    public Map<String, Object> readMemory(McpCaller caller, Long id) {
+        CurrentUser user = caller.user();
+        try {
+            Memory memory = memories.bodyFor(user, id);
+            log.info("memory read userId={} memoryId={} executionId={}", user.id(), id, caller.executionId());
+            return result(memory.content(), false);
+        } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_NOT_FOUND) {
                 return result("Memory 항목을 읽을 수 없습니다.", true);
             }
@@ -73,7 +87,8 @@ public class McpToolService {
         }
     }
 
-    public Map<String, Object> writeArtifact(CurrentUser user, ArtifactWriteRequest request) {
+    public Map<String, Object> writeArtifact(McpCaller caller, ArtifactWriteRequest request) {
+        CurrentUser user = caller.user();
         try {
             ArtifactWriteResult written = artifacts.write(user, request);
             return result(toJson(written), false);
@@ -81,12 +96,12 @@ public class McpToolService {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
                 throw ex;
             }
-            log.warn("artifact write failed userId={} exceptionClass={} errorCode={} reason={}",
-                    user.id(), ex.getClass().getSimpleName(), ex.code(), safeArtifactFailureMessage(ex));
+            log.warn("artifact write failed userId={} executionId={} exceptionClass={} errorCode={} reason={}",
+                    user.id(), caller.executionId(), ex.getClass().getSimpleName(), ex.code(), safeArtifactFailureMessage(ex));
             return result("결과물을 저장할 수 없습니다.", true);
         } catch (RuntimeException ex) {
-            log.warn("artifact write failed userId={} exceptionClass={} errorCode={} reason={}",
-                    user.id(), ex.getClass().getSimpleName(), ErrorCode.INTERNAL_ERROR, "unexpected artifact write failure");
+            log.warn("artifact write failed userId={} executionId={} exceptionClass={} errorCode={} reason={}",
+                    user.id(), caller.executionId(), ex.getClass().getSimpleName(), ErrorCode.INTERNAL_ERROR, "unexpected artifact write failure");
             return result("결과물을 저장할 수 없습니다.", true);
         }
     }

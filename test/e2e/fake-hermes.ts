@@ -9,6 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { signedCallContext } from "./mcp-context.ts";
 
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
@@ -232,6 +233,11 @@ export const ARTIFACT_PROBE = "결과물 파일 검사";
 /** 실제 MCP 호출로 HTML과 CSS를 저장하는지 보는 입력이다. */
 export const ARTIFACT_WRITE_PROBE = "MCP 결과물 파일 검사";
 
+/**
+ * 이 글 뒤에 공백과 Memory 번호를 붙여 보내면 그 run 안에서 `memory_read` 를 부르고, 도구 결과의 text 를 답으로 돌려준다.
+ */
+export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
+
 /** HTML 이 부르는 사진이다. 1픽셀짜리 PNG 다. */
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -380,6 +386,7 @@ export type FakeHermes = {
   dropNextAppliedToolset(name: string): void;
   close(): Promise<void>;
   setArtifactWriteMcp(endpoint: string, token: string): void;
+  setMemoryReadMcp(endpoint: string, token: string): void;
 };
 
 /**
@@ -439,9 +446,39 @@ export function startFakeHermes(
   let releaseConfig: (() => void) | undefined;
   let droppedToolset: string | undefined;
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
+  let memoryReadMcp: { endpoint: string; token: string } | undefined;
 
-  const writeArtifactViaMcp = async (conversationId: string): Promise<void> => {
+  /**
+   * profile 플러그인처럼 서명한 `_fos_ctx` 를 붙여 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다.
+   *
+   * <p>제출받은 run 의 session 이 곧 뿌리 session 이다. run 마다 자기 session 으로 서명하므로, 나란히 도는 두 run 이
+   * 서로의 session 을 쓰면 요청자가 뒤섞여 검사가 실패한다.
+   */
+  const readMemoryViaMcp = async (memoryId: number, sessionId: string | undefined): Promise<string> => {
+    if (memoryReadMcp === undefined) throw new Error("memory_read MCP runtime is not configured");
+    if (sessionId === undefined) throw new Error("memory_read MCP needs the submitted session_id to sign _fos_ctx");
+    const _fos_ctx = signedCallContext(memoryReadMcp.token, "memory_read", sessionId, sessionId, `call_${randomUUID()}`);
+    const response = await fetch(memoryReadMcp.endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${memoryReadMcp.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: memoryId, _fos_ctx } } }),
+    });
+    if (!response.ok) throw new Error(`memory_read MCP HTTP ${response.status}`);
+    const body = await response.json() as { result?: { content?: { text?: string }[] } };
+    const text = body.result?.content?.[0]?.text;
+    if (text === undefined) throw new Error("memory_read MCP response has no text");
+    return text;
+  };
+
+  /**
+   * profile 플러그인처럼 도구 인자에 서명한 `_fos_ctx` 를 붙여 `artifact_write` 를 부른다.
+   *
+   * <p>제출받은 run 의 session 이 곧 뿌리 session 이다. 하위 에이전트가 아니므로 session 과 뿌리가 같다.
+   */
+  const writeArtifactViaMcp = async (conversationId: string, sessionId: string | undefined): Promise<void> => {
     if (artifactWriteMcp === undefined) throw new Error("artifact_write MCP runtime is not configured");
+    if (sessionId === undefined) throw new Error("artifact_write MCP needs the submitted session_id to sign _fos_ctx");
+    const token = artifactWriteMcp.token;
     const request = async (body: unknown): Promise<unknown> => {
       const response = await fetch(artifactWriteMcp.endpoint, {
         method: "POST",
@@ -461,7 +498,8 @@ export function startFakeHermes(
     const listed = await request({ jsonrpc: "2.0", id: 2, method: "tools/list" }) as { result?: { tools?: { name?: string }[] } };
     if (!listed.result?.tools?.some((tool) => tool.name === "artifact_write")) throw new Error("artifact_write MCP tool was not discovered");
     for (const [path, content] of [["test/index.html", "<!doctype html><title>MCP 초안</title><h1>MCP 결과물</h1>"], ["test/style.css", "h1 { color: navy; }"]] as const) {
-      const result = await request({ jsonrpc: "2.0", id: path, method: "tools/call", params: { name: "artifact_write", arguments: { conversation_id: conversationId, path, content } } }) as { result?: { content?: { text?: string }[]; isError?: boolean } };
+      const _fos_ctx = signedCallContext(token, "artifact_write", sessionId, sessionId, `call_${randomUUID()}`);
+      const result = await request({ jsonrpc: "2.0", id: path, method: "tools/call", params: { name: "artifact_write", arguments: { conversation_id: conversationId, path, content, _fos_ctx } } }) as { result?: { content?: { text?: string }[]; isError?: boolean } };
       if (result.result?.isError === true || result.result?.content?.[0]?.text === undefined) throw new Error("artifact_write MCP call failed");
       const written = JSON.parse(result.result.content[0].text) as { path?: string; byteSize?: number };
       if (written.path !== path || typeof written.byteSize !== "number") throw new Error("artifact_write MCP response is invalid");
@@ -887,7 +925,11 @@ export function startFakeHermes(
         lastSubmittedInput = submitted.input;
         const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
-        if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId);
+        if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId, submitted.session_id);
+        const memoryReadPrefix = `${MEMORY_READ_PROBE} `;
+        const memoryReadOutput = input.startsWith(memoryReadPrefix)
+          ? await readMemoryViaMcp(Number(input.slice(memoryReadPrefix.length)), submitted.session_id)
+          : undefined;
         lastSubmittedRuntime = {
           provider: submitted.provider,
           model: submitted.model,
@@ -939,7 +981,7 @@ export function startFakeHermes(
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
-          output: specialOutputFor(input)
+          output: memoryReadOutput ?? specialOutputFor(input)
             ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
           input,
           provider: submitted.provider ?? null,
@@ -1029,6 +1071,9 @@ export function startFakeHermes(
         dropNextAppliedToolset: (name) => { droppedToolset = name; },
         setArtifactWriteMcp: (endpoint: string, token: string) => {
           artifactWriteMcp = { endpoint, token };
+        },
+        setMemoryReadMcp: (endpoint: string, token: string) => {
+          memoryReadMcp = { endpoint, token };
         },
         close: () =>
           new Promise<void>((done) => {

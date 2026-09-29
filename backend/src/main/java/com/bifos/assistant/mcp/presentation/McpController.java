@@ -3,11 +3,14 @@ package com.bifos.assistant.mcp.presentation;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.mcp.application.McpCallContext;
+import com.bifos.assistant.mcp.application.McpCaller;
+import com.bifos.assistant.mcp.application.McpCallerResolver;
+import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
 import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +21,7 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -30,12 +34,26 @@ import tools.jackson.databind.node.ObjectNode;
 public class McpController {
     private static final Pattern UUID_TEXT = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final String INVALID_ARGUMENTS = "인자 형식이 올바르지 않습니다.";
+    private static final String MEMORY_READ = "memory_read";
+    private static final String ARTIFACT_WRITE = "artifact_write";
     private final McpToolService tools;
-    private final CurrentUserProvider currentUser;
+    private final McpCallerResolver callers;
     private final BuildProperties buildProperties;
+    /** 받아들이는 도구 이름과 그 처리. 이름 검사와 분기가 이 한 곳에서 정해진다. */
+    private final Map<String, ToolHandler> handlers = Map.of(
+            MEMORY_READ, this::readMemory,
+            ARTIFACT_WRITE, this::writeArtifact);
+
+    /** 요청자가 정해진 뒤 {@code _fos_ctx} 를 뗀 인자로 도구 하나를 처리한다. */
+    @FunctionalInterface
+    private interface ToolHandler {
+        Map<String, Object> handle(McpCaller caller, JsonNode id, JsonNode arguments);
+    }
+
     @PostMapping("/mcp")
     public ResponseEntity<?> handle(
             @RequestHeader(value = HttpHeaders.ORIGIN, required = false) String origin,
+            @AuthenticationPrincipal McpPrincipal principal,
             @RequestBody JsonNode request) {
         if (origin != null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -45,22 +63,39 @@ public class McpController {
         return ResponseEntity.ok(switch (method) {
             case "initialize" -> response(id, Map.of("protocolVersion", "2025-03-26", "capabilities", Map.of("tools", Map.of("listChanged", false)), "serverInfo", Map.of("name", AgentToolPolicy.CONTROL_PLANE_MCP, "version", buildProperties.getVersion())));
             case "tools/list" -> response(id, Map.of("tools", tools.tools()));
-            case "tools/call" -> call(id, request.path("params"));
+            case "tools/call" -> call(principal, id, request.path("params"));
             default -> error(id, -32601, "Method not found");
         });
     }
-    private Map<String, Object> call(JsonNode id, JsonNode params) {
+    /**
+     * 도구 호출을 네 단계로 판정한다. 모든 도구가 같은 순서를 지난다.
+     *
+     * <ol>
+     *   <li>{@code params.name} 이 문자열이고 {@code params.arguments} 가 객체인지 본다. 아니면 {@code -32602}
+     *   <li>이름으로 처리를 고른다. 모르는 도구면 {@code -32601}
+     *   <li>원래 인자의 {@code _fos_ctx} 로 요청자를 정한다(ADR-032). 정하지 못하면 {@link McpToolService#invalidContext()}
+     *   <li>{@code _fos_ctx} 를 뗀 인자로 도구별 검사를 하고 그 요청자로 도구를 돌린다
+     * </ol>
+     */
+    private Map<String, Object> call(McpPrincipal principal, JsonNode id, JsonNode params) {
         JsonNode name = params.get("name");
         JsonNode arguments = params.get("arguments");
         if (name == null || !name.isTextual() || arguments == null || !arguments.isObject()) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
-        JsonNode toolArguments = withoutCallContext(arguments);
-        return switch (name.asString()) {
-            case "memory_read" -> readMemory(id, toolArguments);
-            case "artifact_write" -> writeArtifact(id, toolArguments);
-            default -> error(id, -32601, "Method not found");
-        };
+        String toolName = name.asString();
+        ToolHandler handler = handlers.get(toolName);
+        if (handler == null) {
+            return error(id, -32601, "Method not found");
+        }
+        McpCaller caller;
+        try {
+            caller = callers.resolve(principal, toolName, arguments.get(McpCallContext.FIELD));
+        } catch (ApiException ex) {
+            if (ex.code() != ErrorCode.MCP_CALL_CONTEXT_INVALID) throw ex;
+            return response(id, tools.invalidContext());
+        }
+        return handler.handle(caller, id, withoutCallContext(arguments));
     }
 
     /**
@@ -76,15 +111,15 @@ public class McpController {
         return copy;
     }
 
-    private Map<String, Object> readMemory(JsonNode id, JsonNode arguments) {
+    private Map<String, Object> readMemory(McpCaller caller, JsonNode id, JsonNode arguments) {
         JsonNode memoryId = arguments.get("id");
         if (memoryId == null || !memoryId.isIntegralNumber() || !memoryId.canConvertToLong()) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
-        return response(id, tools.readMemory(currentUser.require(), new MemoryReadArguments(memoryId.longValue()).id()));
+        return response(id, tools.readMemory(caller, new MemoryReadArguments(memoryId.longValue()).id()));
     }
 
-    private Map<String, Object> writeArtifact(JsonNode id, JsonNode arguments) {
+    private Map<String, Object> writeArtifact(McpCaller caller, JsonNode id, JsonNode arguments) {
         if (!onlyArtifactFields(arguments) || !text(arguments, "conversation_id") || !text(arguments, "path")
                 || !exactlyOneText(arguments, "content", "source_url")) {
             return invalidParams(id, INVALID_ARGUMENTS);
@@ -99,7 +134,7 @@ public class McpController {
         }
         ArtifactWriteArguments value = ArtifactWriteArguments.from(arguments);
         try {
-            return response(id, tools.writeArtifact(currentUser.require(), new ArtifactWriteRequest(parsed, value.path(), value.content(), value.sourceUrl())));
+            return response(id, tools.writeArtifact(caller, new ArtifactWriteRequest(parsed, value.path(), value.content(), value.sourceUrl())));
         } catch (ApiException ex) {
             return invalidParams(id, artifactValidationReason(ex));
         }

@@ -1,7 +1,7 @@
 package com.bifos.assistant.mcp.infra;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
-import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.shared.error.ApiException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,6 +27,7 @@ public class AgentTokenAuthenticationFilter extends OncePerRequestFilter {
      */
     public static final String TOKEN_HASH_ATTRIBUTE = AgentTokenAuthenticationFilter.class.getName() + ".TOKEN_HASH";
     private static final String BEARER = "Bearer ";
+    private static final String MCP_AUTHORITY = "ROLE_MCP";
     private final AgentTokenService tokens;
 
     @Override
@@ -40,9 +41,10 @@ public class AgentTokenAuthenticationFilter extends OncePerRequestFilter {
         if (header == null || !header.startsWith(BEARER) || header.substring(BEARER.length()).trim().isEmpty()) { response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); return; }
         try {
             String raw = header.substring(BEARER.length()).trim();
-            CurrentUser user = tokens.authenticate(raw);
-            request.setAttribute(TOKEN_HASH_ATTRIBUTE, AgentTokenService.hash(raw));
-            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of(new SimpleGrantedAuthority("ROLE_" + user.role().name()))));
+            McpPrincipal principal = tokens.authenticate(raw);
+            request.setAttribute(TOKEN_HASH_ATTRIBUTE, principal.tokenHash());
+            // 토큰은 사용자가 아니라 profile 을 증명한다(ADR-032). 사용자의 역할을 권한으로 싣지 않는다.
+            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority(MCP_AUTHORITY))));
             chain.doFilter(request, response);
         } catch (ApiException ex) { SecurityContextHolder.clearContext(); response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); }
     }

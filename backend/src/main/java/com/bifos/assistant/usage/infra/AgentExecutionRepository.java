@@ -32,13 +32,16 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     List<AgentExecution> findByStatus(ExecutionStatus status);
 
     /**
-     * 그 Hermes session 을 가진 그 사용자의 실행을 상태로 골라 둘까지만 읽는다.
+     * 그 Hermes session 을 가진 그 profile 의 실행을 상태로 골라 둘까지만 읽는다.
      *
-     * <p>다른 에이전트에게 맡기는 도구가 부모를 찾을 때 쓴다. 부모는 정확히 하나여야 하므로 둘이 보이면
-     * 더 읽지 않아도 실패가 정해진다. {@code (hermes_session_id, status)} 색인을 탄다.
+     * <p>MCP 호출의 부모 실행을 찾을 때 쓴다(ADR-032). 사용자로 먼저 거르지 않는다. 부모는 정확히 하나여야
+     * 하므로 둘이 보이면 더 읽지 않아도 실패가 정해진다. {@code (hermes_session_id, status)} 색인을 탄다.
      */
-    List<AgentExecution> findTop2ByHermesSessionIdAndStatusAndUserId(
-            String hermesSessionId, ExecutionStatus status, Long userId);
+    List<AgentExecution> findTop2ByHermesSessionIdAndStatusAndProfileName(
+            String hermesSessionId, ExecutionStatus status, String profileName);
+
+    /** 그 Hermes session 으로 그 상태인 실행이 profile 과 무관하게 하나라도 있는지. 거절 이유를 로그에서 나누려고 쓴다. */
+    boolean existsByHermesSessionIdAndStatus(String hermesSessionId, ExecutionStatus status);
 
     /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);

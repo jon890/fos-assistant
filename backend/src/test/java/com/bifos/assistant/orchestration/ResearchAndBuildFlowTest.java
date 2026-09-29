@@ -23,6 +23,11 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.mcp.McpCallSigner;
+import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.mcp.application.McpCaller;
+import com.bifos.assistant.mcp.application.McpCallerResolver;
+import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -46,8 +51,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,7 +124,12 @@ class ResearchAndBuildFlowTest {
     @Autowired ExecutionEventRepository executionEvents;
     @Autowired MemoryRepository memoryRepository;
     @Autowired HermesRunsClient hermes;
+    @Autowired AgentTokenService agentTokens;
+    @Autowired McpCallerResolver callerResolver;
     @MockitoSpyBean TurnCancellation turns;
+
+    /** 단계가 돌려준 Hermes run 번호별로 그 단계가 받은 session 을 모은다. 실행 줄을 run 번호로 짝짓는 데 쓴다. */
+    private final Map<String, String> sentSessionByRunId = new ConcurrentHashMap<>();
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -132,6 +144,7 @@ class ResearchAndBuildFlowTest {
     @BeforeEach
     void reset() {
         stub().reset();
+        sentSessionByRunId.clear();
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -173,18 +186,23 @@ class ResearchAndBuildFlowTest {
     /** 단계마다 다른 답을 돌려준다. 나란히 도는 둘의 순서가 정해지지 않아 지시로 가려낸다. */
     private void hermesAnswersEachStep(String chiefOutput) {
         stub().willAnswer(command -> {
-            String input = command.input();
-            if (input.contains(CHIEF_MARK)) {
-                return completed("run-chief", chiefOutput);
-            }
-            if (input.contains("조사해")) {
-                return completed("run-researcher", "조사한 것");
-            }
-            if (input.contains("만든다")) {
-                return completed("run-engineer", "만든 것");
-            }
-            return completed("run-synthesizer", "합친 답");
+            HermesRunResult result = answerFor(command.input(), chiefOutput);
+            sentSessionByRunId.put(result.runId(), command.sessionId());
+            return result;
         });
+    }
+
+    private static HermesRunResult answerFor(String input, String chiefOutput) {
+        if (input.contains(CHIEF_MARK)) {
+            return completed("run-chief", chiefOutput);
+        }
+        if (input.contains("조사해")) {
+            return completed("run-researcher", "조사한 것");
+        }
+        if (input.contains("만든다")) {
+            return completed("run-engineer", "만든 것");
+        }
+        return completed("run-synthesizer", "합친 답");
     }
 
     private List<AgentExecution> executionsOf(CurrentUser user) {
@@ -256,7 +274,7 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void Chief_실행_줄에는_대화의_뿌리_session이_적히고_하위_실행_줄은_비어_있다() {
+    void Chief_실행_줄에는_대화의_뿌리_session이_적히고_하위_실행_줄에는_각자_보낸_새_session이_적힌다() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
 
@@ -271,9 +289,62 @@ class ResearchAndBuildFlowTest {
                 .satisfies(command -> assertThat(command.sessionId()).isEqualTo(root));
         AgentExecution chief = executions.findById(turn.executionId()).orElseThrow();
         assertThat(chief.hermesSessionId()).as("Chief 실행 줄의 session").isEqualTo(root);
-        assertThat(executionsOf(dad).stream().filter(it -> !Objects.equals(it.id(), chief.id())))
-                .hasSize(3)
-                .allSatisfy(child -> assertThat(child.hermesSessionId()).as("하위 실행 줄의 session").isNull());
+        List<AgentExecution> children =
+                executionsOf(dad).stream().filter(it -> !Objects.equals(it.id(), chief.id())).toList();
+        assertThat(children).hasSize(3).allSatisfy(child -> {
+            assertThat(child.hermesSessionId()).as("하위 실행 줄의 session").startsWith("fos-").isNotEqualTo(root);
+            // 나란히 도는 단계의 순서에 기대지 않고 Hermes run 번호로 그 실행이 보낸 session 을 찾는다.
+            assertThat(sentSessionByRunId.get(child.hermesRunId()))
+                    .as("하위 실행 %s 이 Hermes 에 보낸 session", child.hermesRunId())
+                    .isEqualTo(child.hermesSessionId());
+        });
+        assertThat(children.stream().map(AgentExecution::hermesSessionId).distinct())
+                .as("하위 실행 줄의 session 은 서로 다르다")
+                .hasSize(3);
+    }
+
+    /**
+     * 하위 실행 안의 MCP 호출은 그 하위 실행의 session 으로 서명한다. 그 session 으로 찾은 부모가 도는 하위 실행 줄이고
+     * 요청자가 흐름을 시작한 사용자여야 한다.
+     *
+     * <p>하위 실행이 부모의 session 을 보내면 부모 자리에 Chief 가 잡히고, session 이 비면 요청자를 정하지 못한다.
+     */
+    @Test
+    void 하위_실행_안의_MCP_호출은_그_하위_실행_줄을_부모로_삼고_흐름을_시작한_사용자로_돈다() {
+        CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
+        String rawToken = agentTokens.issue(MY_AGENT, "flow-mcp").rawToken();
+        McpPrincipal principal = agentTokens.authenticate(rawToken);
+        Map<String, Object> resolvedByRunId = new ConcurrentHashMap<>();
+        stub().willAnswer(command -> {
+            HermesRunResult result = answerFor(command.input(), SPLIT_JSON);
+            if (!command.input().contains(CHIEF_MARK)) {
+                // 실행 줄이 RUNNING 인 동안 profile 플러그인이 서명하듯 그 명령의 session 을 뿌리와 session 으로 삼는다.
+                String session = command.sessionId();
+                try {
+                    resolvedByRunId.put(result.runId(), callerResolver.resolve(principal, "memory_read",
+                            McpCallSigner.context(rawToken, "memory_read", session)));
+                } catch (RuntimeException ex) {
+                    resolvedByRunId.put(result.runId(), ex);
+                }
+            }
+            return result;
+        });
+
+        ChatTurn turn = chat.send(dad, null, "전기차를 사는 게 나을까?", MY_AGENT);
+
+        AgentExecution chief = executions.findById(turn.executionId()).orElseThrow();
+        List<AgentExecution> children =
+                executionsOf(dad).stream().filter(it -> !Objects.equals(it.id(), chief.id())).toList();
+        assertThat(children).hasSize(3).allSatisfy(child -> {
+            Object resolved = resolvedByRunId.get(child.hermesRunId());
+            assertThat(resolved).as("하위 실행 %s 안의 MCP 호출이 정한 요청자", child.hermesRunId())
+                    .isInstanceOf(McpCaller.class);
+            McpCaller caller = (McpCaller) resolved;
+            assertThat(caller.user().id()).as("하위 실행 %s 의 요청자", child.hermesRunId()).isEqualTo(dad.id());
+            assertThat(caller.parent().id()).as("하위 실행 %s 의 MCP 부모", child.hermesRunId()).isEqualTo(child.id());
+            assertThat(caller.parent().parentExecutionId()).as("MCP 부모의 부모").isEqualTo(chief.id());
+            assertThat(caller.parent().status()).as("부모를 찾을 때의 상태").isEqualTo(ExecutionStatus.RUNNING);
+        });
     }
 
     @Test
