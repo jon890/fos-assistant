@@ -108,23 +108,18 @@ public class ExecutionRecorder {
     /**
      * 끝난 실행을 SUCCEEDED 로 갱신한다.
      *
-     * <p>기록할 provider 와 모델은 세션 조회({@code GET /api/sessions/{session_id}}), 실행 결과의 {@code runtime},
-     * 대화가 고른 값 순서로 먼저 있는 것을 쓴다. v0.21.5 의 세션 조회는 provider 를 주지 않아 provider 는 보통
-     * {@code runtime} 에서 온다. {@code runtime} 이 없는 판의 실행 조회 값은 요청을 되돌려 줄 뿐이다. 모두 읽지
-     * 못해도 실행은 성공으로 남긴다. 모델 이름을 모르는 것이 답을 버릴 이유가 되지 않는다.
+     * <p>기록할 provider 와 모델은 {@link #served} 가 고른다. v0.21.5 의 실행 {@code runtime} 이 짝을 주면 그것을,
+     * 아니면 세션 조회와 대화가 고른 값으로 채운다. 모두 읽지 못해도 실행은 성공으로 남긴다. 모델 이름을 모르는
+     * 것이 답을 버릴 이유가 되지 않는다.
      *
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution complete(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime actual = readActualRuntime(agent, result);
-        String provider = firstNonBlank(
-                actual == null ? null : actual.provider(),
-                firstNonBlank(result.runtime() == null ? null : result.runtime().provider(), requested == null ? null : requested.provider()));
-        String model = firstNonBlank(
-                actual == null ? null : actual.model(),
-                firstNonBlank(result.runtime() == null ? null : result.runtime().model(), requested == null ? null : requested.model()));
+        SessionRuntime served = served(agent, result, requested);
+        String provider = served.provider();
+        String model = served.model();
         execution.attachRunId(result.runId());
         execution.markSucceeded(
                 provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
@@ -154,11 +149,9 @@ public class ExecutionRecorder {
             return cancel(execution);
         }
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime actual = readActualRuntime(agent, result);
-        String provider = firstNonBlank(actual == null ? null : actual.provider(),
-                firstNonBlank(result.runtime() == null ? null : result.runtime().provider(), requested == null ? null : requested.provider()));
-        String model = firstNonBlank(actual == null ? null : actual.model(),
-                firstNonBlank(result.runtime() == null ? null : result.runtime().model(), requested == null ? null : requested.model()));
+        SessionRuntime served = served(agent, result, requested);
+        String provider = served.provider();
+        String model = served.model();
         execution.attachRunId(result.runId());
         execution.markCancelled(provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
         return executions.save(execution);
@@ -168,6 +161,29 @@ public class ExecutionRecorder {
     public AgentExecution cancel(AgentExecution execution) {
         execution.markCancelled(Instant.now());
         return executions.save(execution);
+    }
+
+    /**
+     * 기록할 provider 와 모델의 짝을 고른다.
+     *
+     * <p>v0.21.5 실행 조회의 {@code runtime} 에 둘 다 있으면 그 짝을 통째로 쓴다. 출처가 다른 두 값을 한 짝으로
+     * 적으면 금액도 틀린 짝으로 계산된다. 없으면 세션 조회, {@code runtime}, 대화가 고른 값 순서로 칸마다 채운다.
+     */
+    private SessionRuntime served(Agent agent, HermesRunResult result, ModelChoice requested) {
+        SessionRuntime runtime = result.runtime();
+        if (runtime != null && !isBlank(runtime.provider()) && !isBlank(runtime.model())) {
+            return runtime;
+        }
+        SessionRuntime actual = readActualRuntime(agent, result);
+        String provider = firstNonBlank(actual == null ? null : actual.provider(),
+                firstNonBlank(runtime == null ? null : runtime.provider(), requested == null ? null : requested.provider()));
+        String model = firstNonBlank(actual == null ? null : actual.model(),
+                firstNonBlank(runtime == null ? null : runtime.model(), requested == null ? null : requested.model()));
+        return new SessionRuntime(model, provider);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private SessionRuntime readActualRuntime(Agent agent, HermesRunResult result) {
