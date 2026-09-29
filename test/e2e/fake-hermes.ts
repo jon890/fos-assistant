@@ -9,7 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { signedCallContext } from "./mcp-context.ts";
+import { signedCallContext, signedSubagentRegistration } from "./mcp-context.ts";
 
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
@@ -244,6 +244,14 @@ export const ARTIFACT_WRITE_PROBE = "MCP 결과물 파일 검사";
  */
 export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
 
+/**
+ * 이 글로 시작하는 입력을 받으면 그 run 안에서 하위 에이전트 session 을 등록하고, 답으로 자식 session 을 돌려준다.
+ *
+ * <p>실제 플러그인의 `subagent_start` hook 처럼 부모 run 이 끝나기 전에 등록을 마친다. 자식의 도구 호출은 시나리오가
+ * 부모가 끝난 뒤 `readMemoryAsSubagent` 로 부른다.
+ */
+export const SUBAGENT_MEMORY_PROBE = "MCP 하위 에이전트 검사";
+
 /** HTML 이 부르는 사진이다. 1픽셀짜리 PNG 다. */
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -393,6 +401,12 @@ export type FakeHermes = {
   close(): Promise<void>;
   setArtifactWriteMcp(endpoint: string, token: string): void;
   setMemoryReadMcp(endpoint: string, token: string): void;
+  /** 하위 에이전트 검사 입력으로 등록한 자식 session 과 그 응답 상태다. 등록이 거절돼도 run 은 실패하지 않고 여기에만 남는다. */
+  subagentRegistrations(): readonly { childSessionId: string; rootSessionId: string; status: number }[];
+  /** 등록한 자식 session 이 부모의 뿌리로 서명해 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다. */
+  readMemoryAsSubagent(childSessionId: string, memoryId: number): Promise<string>;
+  /** 등록하지 않은 자식 session 으로 그 뿌리에 서명해 `memory_read` 를 부른다. */
+  readMemoryAsUnregisteredSubagent(rootSessionId: string, memoryId: number): Promise<string>;
 };
 
 /**
@@ -453,17 +467,24 @@ export function startFakeHermes(
   let droppedToolset: string | undefined;
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
   let memoryReadMcp: { endpoint: string; token: string } | undefined;
+  const subagentRegistrations: { childSessionId: string; rootSessionId: string; status: number }[] = [];
 
   /**
    * profile 플러그인처럼 서명한 `_fos_ctx` 를 붙여 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다.
    *
    * <p>제출받은 run 의 session 이 곧 뿌리 session 이다. run 마다 자기 session 으로 서명하므로, 나란히 도는 두 run 이
-   * 서로의 session 을 쓰면 요청자가 뒤섞여 검사가 실패한다.
+   * 서로의 session 을 쓰면 요청자가 뒤섞여 검사가 실패한다. 하위 에이전트는 뿌리와 자기 session 을 따로 준다.
    */
-  const readMemoryViaMcp = async (memoryId: number, sessionId: string | undefined): Promise<string> => {
+  const readMemoryViaMcp = async (
+    memoryId: number,
+    sessionId: string | undefined,
+    rootSessionId: string | undefined = sessionId,
+  ): Promise<string> => {
     if (memoryReadMcp === undefined) throw new Error("memory_read MCP runtime is not configured");
-    if (sessionId === undefined) throw new Error("memory_read MCP needs the submitted session_id to sign _fos_ctx");
-    const _fos_ctx = signedCallContext(memoryReadMcp.token, "memory_read", sessionId, sessionId, `call_${randomUUID()}`);
+    if (sessionId === undefined || rootSessionId === undefined) {
+      throw new Error("memory_read MCP needs the submitted session_id to sign _fos_ctx");
+    }
+    const _fos_ctx = signedCallContext(memoryReadMcp.token, "memory_read", rootSessionId, sessionId, `call_${randomUUID()}`);
     const response = await fetch(memoryReadMcp.endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${memoryReadMcp.token}`, "Content-Type": "application/json" },
@@ -474,6 +495,26 @@ export function startFakeHermes(
     const text = body.result?.content?.[0]?.text;
     if (text === undefined) throw new Error("memory_read MCP response has no text");
     return text;
+  };
+
+  /**
+   * profile 플러그인의 `subagent_start` hook 처럼 자식 session 을 부모의 뿌리 아래 등록한다.
+   *
+   * <p>실제 hook 은 예외를 삼키므로 응답이 2xx 가 아니어도 던지지 않고 상태만 남긴다. 시나리오가 그 기록으로 실패를 안다.
+   * 등록 경로는 `/mcp` 와 같은 서버에 있어 MCP 주소에서 `/mcp` 를 떼어 만든다.
+   */
+  const registerSubagent = async (rootSessionId: string | undefined): Promise<string> => {
+    if (memoryReadMcp === undefined) throw new Error("subagent registration needs the MCP token");
+    if (rootSessionId === undefined) throw new Error("subagent registration needs the submitted session_id");
+    const childSessionId = `native-${randomUUID()}`;
+    const origin = memoryReadMcp.endpoint.replace(/\/mcp$/, "");
+    const response = await fetch(`${origin}/internal/hermes/session-bindings/subagent`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${memoryReadMcp.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(signedSubagentRegistration(memoryReadMcp.token, rootSessionId, rootSessionId, childSessionId)),
+    });
+    subagentRegistrations.push({ childSessionId, rootSessionId, status: response.status });
+    return childSessionId;
   };
 
   /**
@@ -933,6 +974,9 @@ export function startFakeHermes(
         const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId, submitted.session_id);
+        const registeredChild = input.startsWith(SUBAGENT_MEMORY_PROBE)
+          ? await registerSubagent(submitted.session_id)
+          : undefined;
         const memoryReadPrefix = `${MEMORY_READ_PROBE} `;
         const memoryReadOutput = input.startsWith(memoryReadPrefix)
           ? await readMemoryViaMcp(Number(input.slice(memoryReadPrefix.length)), submitted.session_id)
@@ -988,7 +1032,9 @@ export function startFakeHermes(
           session_id: sessionId,
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
-          output: memoryReadOutput ?? specialOutputFor(input)
+          output: memoryReadOutput
+            ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
+            ?? specialOutputFor(input)
             ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
           input,
           provider: submitted.provider ?? null,
@@ -1082,6 +1128,14 @@ export function startFakeHermes(
         setMemoryReadMcp: (endpoint: string, token: string) => {
           memoryReadMcp = { endpoint, token };
         },
+        subagentRegistrations: () => [...subagentRegistrations],
+        readMemoryAsSubagent: (childSessionId, memoryId) => {
+          const registered = subagentRegistrations.find((entry) => entry.childSessionId === childSessionId);
+          if (registered === undefined) return Promise.reject(new Error(`등록한 적 없는 자식 session 이다: ${childSessionId}`));
+          return readMemoryViaMcp(memoryId, childSessionId, registered.rootSessionId);
+        },
+        readMemoryAsUnregisteredSubagent: (rootSessionId, memoryId) =>
+          readMemoryViaMcp(memoryId, `native-${randomUUID()}`, rootSessionId),
         close: () =>
           new Promise<void>((done) => {
             holdNextRun = false;

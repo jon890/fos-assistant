@@ -7,7 +7,7 @@ import com.bifos.assistant.user.domain.UserProvisioningService;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-/** MCP 요청은 웹 계층 JWT 필터가 해석하지 않는다는 경계를 확인한다. */
+/** MCP 요청과 하위 에이전트 session 등록 요청은 웹 계층 JWT 필터가 해석하지 않는다는 경계를 확인한다. */
 class ControlPlaneJwtFilterTest {
 
     @Test
@@ -16,6 +16,16 @@ class ControlPlaneJwtFilterTest {
                 new AuthProperties("test-secret-test-secret-test-secret-test-secret"),
                 mock(UserProvisioningService.class));
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/mcp");
+
+        assertThat(filter.shouldNotFilter(request)).isTrue();
+    }
+
+    @Test
+    void 하위_에이전트_session_등록_요청은_Control_Plane_JWT_필터를_건너뛴다() {
+        ControlPlaneJwtFilter filter = new ControlPlaneJwtFilter(
+                new AuthProperties("test-secret-test-secret-test-secret-test-secret"),
+                mock(UserProvisioningService.class));
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/hermes/session-bindings/subagent");
 
         assertThat(filter.shouldNotFilter(request)).isTrue();
     }

@@ -19,6 +19,9 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     List<Conversation> findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(Long userId);
 
+    /** 어느 대화가 그 값을 보낼 session 이나 뿌리 session 으로 쓰는지. 지운 대화도 센다. */
+    boolean existsByHermesSessionIdOrHermesRootSessionId(String hermesSessionId, String hermesRootSessionId);
+
     @Modifying
     @Transactional
     @Query("update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")
