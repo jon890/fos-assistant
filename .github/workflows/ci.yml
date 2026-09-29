@@ -96,6 +96,7 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      # 웹 서버를 띄우기 전에 빌드하고 그 결과를 띄운다(test/browser/web-server.ts). 따로 빌드하지 않는다.
       - run: pnpm test:browser --project=${{ matrix.project }}
       - name: 실패하거나 취소된 브라우저 검사 결과
         if: failure() || cancelled()

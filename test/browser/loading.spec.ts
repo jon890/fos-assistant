@@ -1,11 +1,15 @@
 import { expect, PERSONA_AGENT_CODE, setSession, test } from "./fixtures.ts";
 import type { Page, Request, Route } from "../../web/node_modules/@playwright/test/index.js";
 
+/** RSC 요청이면 참이다. 화면을 옮기는 요청과 미리 읽기가 모두 해당하고 정적 자원과 API 호출은 걸러진다. */
+function isRscRequest(request: Request): boolean {
+  return request.headers()["rsc"] === "1" || new URL(request.url()).searchParams.has("_rsc");
+}
+
 /** RSC 로 화면을 옮기는 요청만 참이다. 정적 자원과 API 호출, 미리 읽기는 걸러진다. */
 function isRscNavigationRequest(request: Request): boolean {
-  const headers = request.headers();
-  if (headers["next-router-prefetch"]) return false;
-  return headers["rsc"] === "1" || new URL(request.url()).searchParams.has("_rsc");
+  if (request.headers()["next-router-prefetch"]) return false;
+  return isRscRequest(request);
 }
 
 /** 사이드바의 주요 화면 링크다. 제목에 같은 낱말이 든 대화 줄과 겹치지 않게 그 목록 안에서 정확한 이름으로 찾는다. */
@@ -91,20 +95,18 @@ test("뼈대의 폭이 내용이 온 뒤 바깥 틀의 폭과 같다", async ({ 
 });
 
 test("사이드바에서 다른 화면으로 옮기는 동안 누른 줄과 사이드바 안내에 표시가 붙는다", async ({ page }, testInfo) => {
-  await page.goto("/agents");
-  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
-
   let releaseRequest: () => void = () => {};
   const heldUntilReleased = new Promise<void>((resolve) => { releaseRequest = resolve; });
   const isUsagePath = (url: URL) => url.pathname === "/usage";
+  // 미리 읽기까지 붙잡아 목적지를 아직 받지 못한 상태로 누른다. 빌드한 서버는 화면에 보이는 링크를 미리
+  // 읽는데, 그 결과에 loading 화면이 들어 있으면 누르자마자 그 화면으로 옮겨 이동하는 중 표시가 켜지지
+  // 않는다. 표시는 목적지를 아직 받지 못했을 때를 위한 것이다. 링크가 보이기 전에 붙잡도록 먼저 건다.
   await page.route(isUsagePath, async (route: Route) => {
-    if (!isRscNavigationRequest(route.request())) {
-      await route.continue();
-      return;
-    }
-    await heldUntilReleased;
+    if (isRscRequest(route.request())) await heldUntilReleased;
     await route.continue();
   });
+  await page.goto("/agents");
+  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
 
   const status = sidebarStatus(page);
   try {

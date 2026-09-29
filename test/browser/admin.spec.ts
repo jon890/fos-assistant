@@ -315,7 +315,10 @@ test("다른 사람의 비공개 에이전트도 관리하고 수정 뒤 주인�
     expect(((await afterPrivateChanges.json()) as { code: string; ownerUserId: number }[]).find((agent) => agent.code === "browser")?.ownerUserId).toBe(ownerUserId);
     await section.getByRole("button", { name: "그룹 공개로 변경" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "그룹 공개" }).click();
+    // 공개 범위에 따라 달라지는 절이 새로 고치지 않아도 바뀐다. 성격을 읽을 수 있게 되고 비공개 전용 도구는 막힌다.
     await expect(page.getByRole("textbox", { name: "브라우저 비서 성격" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "도구" }).locator("li").filter({ hasText: "Terminal" })
+      .getByText("그룹 공개 에이전트에는 켤 수 없어요")).toBeVisible();
     expect(ownerEmails).toEqual([null, null, null, null]);
   } finally {
     await setSession(context, { email: "browser@example.com", name: "브라우저 테스트" });

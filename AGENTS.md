@@ -153,6 +153,12 @@ fork PR 처럼 secret 을 받지 못하는 실행은 형태 패턴만 검사하�
 `test/e2e` 는 앞선 실행이 남긴 데이터에 걸려,
 `gradlew test` 를 건너뛰면 `this agent code is already used` 로 실패할 수 있다.
 
+**브라우저 검사는 운영과 같은 빌드 결과를 띄워 검사한다.**
+`pnpm test:browser` 가 웹 서버를 띄우기 전에 빌드하므로, 따로 빌드하지 않아도 옛 화면을 검사하지 않는다.
+개발 서버는 링크를 미리 읽지 않아 운영과 다르게 움직이고, 개발 서버에서만 통과하던 검사가 실제로 있었다.
+화면을 고치며 같은 검사를 되풀이할 때만 `BROWSER_WEB_SERVER=dev` 로 개발 서버를 띄운다.
+머지 전 확인은 기본값으로 돌린다. 자세한 것은 [`web/AGENTS.md`](web/AGENTS.md) 에 있다.
+
 디렉터리마다 걸리는 함정은 [`backend/AGENTS.md`](backend/AGENTS.md) 와
 [`web/AGENTS.md`](web/AGENTS.md) 가 갖는다.
 `gradlew` 의 위치와 `pnpm build` 가 요구하는 환경 변수가 거기 있다.

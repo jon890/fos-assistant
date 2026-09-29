@@ -117,6 +117,8 @@ test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({ pa
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 입력 Esc 검사");
   await hermes.waitForHeldRun();
+  // 대역이 실행을 받은 뒤에도 화면은 `started` 사건을 받아야 실행 번호를 안다. 그전의 Esc 는 멈출 실행이 없다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
   await page.getByRole("textbox", { name: "메시지" }).focus();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
@@ -126,7 +128,9 @@ test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답�
   await hermes.holdNextRun();
   await beginHeldTurn(page, "중지 풀이 Esc 검사");
   await hermes.waitForHeldRun();
-  await page.getByTestId("composer-shell").getByRole("button", { name: "중지" }).hover();
+  const stop = page.getByTestId("composer-shell").getByRole("button", { name: "중지" });
+  await expect(stop).toBeEnabled();
+  await stop.hover();
   await expect(page.getByRole("tooltip")).toHaveText("중지");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tooltip")).toHaveCount(0);

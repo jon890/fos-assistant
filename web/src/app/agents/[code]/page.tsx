@@ -1,10 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { describeAdminError, describeError } from "@/components/error-message";
-import { PersonaEditor } from "@/components/agent/persona-editor";
-import { StarterEditor } from "@/components/agent/starter-editor";
-import { AgentAdminSection } from "@/components/agent/agent-admin-section";
-import { AgentToolsSection } from "@/components/agent/agent-tools-section";
+import { AgentDetailBody } from "@/components/agent/agent-detail-body";
 import { callControlPlane } from "@/lib/control-plane";
 import type { AdminAgent, AgentToolsView, AgentView, PersonaView, StartersView } from "@/lib/agent";
 import { readMe } from "@/lib/me";
@@ -42,35 +39,18 @@ export default async function AgentPersonaPage({
     ? (agentsResult.data.find((agent) => agent.code === code)?.name ?? code)
     : code);
 
-  const toolsSection = toolsResult.ok ? (
-    <AgentToolsSection
-      code={code}
-      initialTools={toolsResult.data}
-      admin={useAdminTools}
-      visibility={adminAgent?.visibility ?? (agentsResult.ok ? agentsResult.data.find((agent) => agent.code === code)?.visibility : undefined)}
-    />
-  ) : toolsResult.code === "FORBIDDEN" ? null : (
-    <section aria-label="도구" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
-      <h2 className="font-semibold">도구</h2>
-      <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">
-        {describeError(toolsResult.code, toolsResult.message)}
-      </p>
-    </section>
-  );
+  const tools = toolsResult.ok
+    ? { ok: true as const, data: { initialTools: toolsResult.data, admin: useAdminTools } }
+    : toolsResult.code === "FORBIDDEN" ? null : { ok: false as const, message: describeError(toolsResult.code, toolsResult.message) };
+  const visibility = adminAgent?.visibility
+    ?? (agentsResult.ok ? agentsResult.data.find((agent) => agent.code === code)?.visibility : undefined);
+  const ownerEmail = session.user.email;
 
   if (!personaResult.ok) {
-    if (personaResult.code === "AGENT_NOT_FOUND" && adminAgent && session.user.email) {
+    if (personaResult.code === "AGENT_NOT_FOUND" && adminAgent) {
       return (
-        <>
-          <div className="mx-auto w-full max-w-2xl">
-            <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-            <p className="rounded-md border border-border bg-muted p-3 text-sm">
-              이 에이전트의 성격은 주인만 볼 수 있어요.
-            </p>
-          </div>
-          {toolsSection}
-          <AgentAdminSection initialAgent={adminAgent} ownerEmail={session.user.email} />
-        </>
+        <AgentDetailBody code={code} name={name} initialPersona={null} initialStarters={null} tools={tools}
+          initialVisibility={visibility} adminAgent={adminAgent} ownerEmail={ownerEmail} adminError={null} />
       );
     }
     return (
@@ -89,26 +69,18 @@ export default async function AgentPersonaPage({
   }
 
   return (
-    <>
-      {adminError ? (
-        <div className="mx-auto mb-8 w-full max-w-2xl">
-          <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm">
-            관리 정보를 불러오지 못했어요. {adminError}
-          </p>
-        </div>
-      ) : null}
-      <PersonaEditor code={code} name={name} initialPersona={personaResult.data} />
-      {startersResult.ok ? (
-        <StarterEditor code={code} name={name} initialStarters={startersResult.data} />
-      ) : (
-        <div className="mx-auto mt-8 w-full max-w-2xl">
-          <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm">
-            {describeError(startersResult.code, startersResult.message)}
-          </p>
-        </div>
-      )}
-      {toolsSection}
-      {adminAgent && session.user.email ? <AgentAdminSection initialAgent={adminAgent} ownerEmail={session.user.email} /> : null}
-    </>
+    <AgentDetailBody
+      code={code}
+      name={name}
+      initialPersona={personaResult.data}
+      initialStarters={startersResult.ok
+        ? { ok: true, data: startersResult.data }
+        : { ok: false, message: describeError(startersResult.code, startersResult.message) }}
+      tools={tools}
+      initialVisibility={visibility}
+      adminAgent={adminAgent}
+      ownerEmail={ownerEmail}
+      adminError={adminError}
+    />
   );
 }

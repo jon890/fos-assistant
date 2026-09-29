@@ -35,11 +35,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm dev --hostname 127.0.0.1 --port ${WEB_PORT}`,
+    // 기본은 빌드한 서버다. `BROWSER_WEB_SERVER=dev` 면 개발 서버를 띄운다. 까닭은 web-server.ts 에 있다.
+    command: `node ../test/browser/web-server.ts ${WEB_PORT}`,
     cwd: join(import.meta.dirname, "../../web"),
     url: WEB_BASE_URL,
     reuseExistingServer: false,
-    timeout: 120_000,
+    // 빌드한 서버는 이 시간 안에 빌드까지 마친다.
+    timeout: 180_000,
     env: {
       AUTH_SECRET,
       AUTH_GOOGLE_ID: "browser-google-id",
