@@ -369,7 +369,7 @@ class ChatAttachmentTurnTest {
     private ChatController chatController(CurrentUser user) {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
-        return new ChatController(chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)));
+        return new ChatController(chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {

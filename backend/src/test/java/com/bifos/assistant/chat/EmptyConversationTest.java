@@ -37,7 +37,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 사진을 먼저 올리려고 메시지 없이 만드는 대화와, 그 대화의 제목을 첫 메시지가 정하는 것을 확인한다. */
+/** 사진을 먼저 올리거나 모델을 먼저 고르려고 메시지 없이 만드는 대화와, 그 대화의 제목을 첫 메시지가 정하는 것을 확인한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(EmptyConversationTest.StubRuntime.class)
@@ -119,16 +119,20 @@ class EmptyConversationTest {
     }
 
     @Test
-    void 흐름이_붙은_에이전트에는_빈_대화를_만들지_않는다() {
+    void 흐름이_붙은_에이전트도_빈_대화를_만든다() {
         CurrentUser dad = member("dad@example.com");
         Agent flowAgent = agentOf(dad, "flowed");
         flowAgent.assignFlow("research-and-build");
         agents.save(flowAgent);
 
-        assertThatThrownBy(() -> chat.startEmpty(dad, "flowed"))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
-        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id())).isEmpty();
+        chat.startEmpty(dad, "flowed");
+
+        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id()))
+                .singleElement()
+                .satisfies(it -> {
+                    assertThat(it.agentId()).isEqualTo(flowAgent.id());
+                    assertThat(it.title()).isEmpty();
+                });
     }
 
     private CurrentUser member(String email) {

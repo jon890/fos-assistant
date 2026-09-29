@@ -3,11 +3,11 @@ package com.bifos.assistant.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -198,8 +198,8 @@ class ExecutionLifecycleTest {
     }
 
     /** 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다. */
-    private static ModelOption requested(Agent agent) {
-        return new ModelOption(agent.provider(), agent.model());
+    private static ModelChoice requested(Agent agent) {
+        return new ModelChoice(agent.provider(), agent.model(), null);
     }
 
     private static HermesRunResult result() {

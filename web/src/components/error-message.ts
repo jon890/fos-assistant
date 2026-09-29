@@ -15,6 +15,7 @@ const MESSAGES: Record<string, string> = {
   HERMES_UNAVAILABLE: "연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.",
   HERMES_BUSY: "지금 요청이 많아요. 잠시 뒤 다시 보내 주세요.",
   HERMES_RUN_FAILED: "실행을 마치지 못했어요. 사용량 화면에서 기록을 확인해 주세요.",
+  PROVIDER_BLOCKED: "이 모델은 지금 쓸 수 없어요. 다른 모델을 골라 다시 보내 주세요.",
   EXECUTION_NOT_RUNNING: "이미 끝난 답이에요.",
   STREAM_INTERRUPTED: "응답 연결이 끊겼어요. 실행은 계속될 수 있으니 잠시 뒤 대화 이력을 다시 확인해 주세요.",
   CONVERSATION_NOT_FOUND: "대화를 찾지 못했어요. 대화 목록으로 돌아가 다시 골라 주세요.",

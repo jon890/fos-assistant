@@ -202,30 +202,30 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void provider를_넘어가_다시_시도하는_중에는_새_실행_번호를_답한다() {
+    void 막히면_넘기지_않고_실패하고_turn이_끝난다() {
         CurrentUser dad = member("dad");
-        Agent agent = agents.findByCode("dad").orElseThrow();
-        modelSelector.replace(agent, List.of(
-                new ModelOption("anthropic", "example-model-large"),
-                new ModelOption("nvidia", "example-model-small")));
         stub().willReturnInOrder(
                 new HermesRunResult("run-blocked", "session", "failed", "", null, null,
                         HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
                 completed("run-next", "답"));
-        AtomicReference<RunningTurn> whileRetrying = new AtomicReference<>();
-        stub().beforeAwait(() -> {
-            if (stub().received().size() != 2) return;
-            whileRetrying.set(chat.running(dad, latestExecution(dad).conversationId()));
-        });
+        AtomicReference<RunningTurn> whileRunning = new AtomicReference<>();
+        stub().beforeAwait(() -> whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
 
         List<ChatEvent> relayed = new ArrayList<>();
-        chat.stream(dad, null, "다음 provider 로 넘어가 줘", "dad", relayed::add);
+        assertThatThrownBy(() -> chat.stream(dad, null, "막힌 모델로 보내 줘", "dad", relayed::add))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         List<Long> started = relayed.stream()
                 .filter(event -> event.type().equals("started")).map(ChatEvent::executionId).toList();
-        assertThat(started).hasSize(2);
-        assertThat(whileRetrying.get().running()).isTrue();
-        assertThat(whileRetrying.get().executionId()).isEqualTo(started.get(1)).isNotEqualTo(started.getFirst());
+        assertThat(started).as("started 사건의 실행 번호").hasSize(1);
+        assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
+        assertThat(whileRunning.get().executionId()).isEqualTo(started.getFirst());
+        AgentExecution failed = latestExecution(dad);
+        assertThat(failed.id()).isEqualTo(started.getFirst());
+        assertThat(failed.errorCode()).isEqualTo("PROVIDER_BLOCKED");
+        assertThat(chat.running(dad, failed.conversationId()).running()).isFalse();
     }
 
     @Test

@@ -63,7 +63,7 @@ export function actualCostLabel(execution: UsageExecution): string {
 export function executionStatusLabel(execution: UsageExecution): string {
   if (isRunning(execution)) return "실행 중";
   if (execution.errorCode === "ORPHANED") return "중간에 중단됨";
-  if (execution.errorCode === "PROVIDER_BLOCKED") return "다음 모델로 다시 시도함";
+  if (execution.errorCode === "PROVIDER_BLOCKED") return "모델을 쓸 수 없음";
   if (execution.errorCode === "NO_MODEL_AVAILABLE") return "사용할 수 있는 모델 없음";
   // 공유 gateway 의 동시 실행 한도에 닿아 거절당한 것이다. Hermes 가 내려간 것과 원인이 다르다.
   if (execution.errorCode === "HERMES_BUSY") return "요청이 많아 거절됨";

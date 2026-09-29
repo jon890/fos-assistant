@@ -5,14 +5,12 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.ProviderBlocklist;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryProposer;
@@ -59,9 +57,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>라우팅은 여기에서만 정한다. 대화의 에이전트가 profile을 고르고, 대화가 시작된 뒤 요청 본문은
  * 그 profile을 바꾸지 못한다.
  *
- * <p>쓸 모델도 여기에서 고른다. 에이전트의 모델 목록을 순위대로 시도하고, 그 provider 의 계정이 전부
- * 막히면 그 턴 안에서 다음 순위로 다시 보낸다. 한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가
- * 이미 하므로 여기서 하지 않는다.
+ * <p>쓸 모델과 effort 는 대화가 고른 값이다. 고르지 않았으면 모델을 빼고 보내 profile 의 기본값으로
+ * 돈다. 그 provider 의 계정이 전부 막혀도 다른 모델로 넘기지 않고 {@code PROVIDER_BLOCKED} 로 실패한다.
+ * 한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 이미 하므로 여기서 하지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -74,8 +72,6 @@ public class ChatService {
     private final ConversationAccess access;
     private final ChatMessageRepository messages;
     private final AgentService agents;
-    private final AgentModelSelector modelSelector;
-    private final ProviderBlocklist blocklist;
     private final HermesRunsClient hermes;
     private final HermesRunEventStream eventStream;
     private final ExecutionRecorder executions;
@@ -141,14 +137,10 @@ public class ChatService {
     }
 
     /**
-     * 쓸 수 있는 모델을 순위대로 시도해 turn 하나를 끝낸다.
+     * 대화가 고른 모델로 turn 하나를 끝낸다.
      *
-     * <p>막혀서 실패한 실행도 지우지 않고 {@code FAILED} 로 남긴다. 다음 시도는 새 실행이고
-     * {@code retryOfExecutionId} 로 직전 실행을 가리킨다. 그래야 무엇이 얼마나 막혔는지 나중에 볼 수
-     * 있다.
-     *
-     * <p>넘김은 그 provider 의 계정이 전부 막혔을 때만 한다. 모델 이름이 틀렸거나 입력이 잘못된 것은
-     * 다음 provider 에서도 똑같이 실패하므로 넘기면 같은 실패를 목록 수만큼 되풀이한다.
+     * <p>provider 의 계정이 전부 막히면 그 실행을 {@code PROVIDER_BLOCKED} 로 실패시키고 끝낸다. 다른
+     * 모델로 넘기지 않는다. 어느 모델을 쓸지는 사용자가 대화에서 고르기 때문이다.
      *
      * <p>사용자 메시지를 저장하고 첨부를 묶는 것은 한 트랜잭션이다. 그 사이에 다른 요청이 같은 첨부를
      * 먼저 묶으면 메시지 저장도 되돌린다. 빈 제목을 채우는 것도 같은 트랜잭션이라 함께 되돌린다.
@@ -164,7 +156,6 @@ public class ChatService {
             boolean streaming,
             TurnCancellation.TurnHandle existingHandle) {
         Conversation conversation = routed.conversation();
-        Agent agent = routed.agent();
         List<Long> attachmentIds =
                 routed.attached().stream().map(ChatAttachment::id).toList();
         TurnCancellation.TurnHandle handle = existingHandle == null
@@ -172,36 +163,24 @@ public class ChatService {
         boolean closesHandle = existingHandle == null;
         try {
             saveQuestion(user, conversation, text, attachmentIds, intent);
-        // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
-        Instant startedAt = Instant.now();
-        artifactStore.ensureFolder(conversation.id());
-        String input = artifacts.agentPreamble(conversation)
-                + attachments.agentInput(conversation.id(), routed.attached(), text);
-        AssembledContext context = contextAssembler.assemble(user);
-        ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
-                context.chars(), null, context.instructionsHash(), context.omittedItems());
+            // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
+            Instant startedAt = Instant.now();
+            artifactStore.ensureFolder(conversation.id());
+            String input = artifacts.agentPreamble(conversation)
+                    + attachments.agentInput(conversation.id(), routed.attached(), text);
+            AssembledContext context = contextAssembler.assemble(user);
+            ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
+                    context.chars(), null, context.instructionsHash(), context.omittedItems());
 
-        List<ModelOption> options = modelSelector.availableFor(agent);
-        if (options.isEmpty()) {
-            throw noModelAvailable(user, routed, snapshot, handle, onEvent, streaming);
-        }
-
-        Long previousExecutionId = null;
-        for (int index = 0; index < options.size(); index++) {
-            ModelOption option = options.get(index);
-            boolean last = index == options.size() - 1;
-            PendingTurn pending = begin(user, routed, input, context, snapshot, option, previousExecutionId, intent);
+            ModelChoice choice = conversation.modelChoice();
+            PendingTurn pending = begin(user, routed, input, context, snapshot, choice, intent);
             turns.rekey(handle, pending.execution().id());
             if (streaming) {
                 onEvent.accept(ChatEvent.started(conversation.publicId(), pending.execution().id()));
             }
-            if (previousExecutionId != null) {
-                append(pending, ExecutionEventType.PROVIDER_SWITCHED, option.label());
-                onEvent.accept(ChatEvent.switched(option.label()));
-            }
 
             if (turns.isStopConfirmed(handle) || turns.shouldStopBeforeSubmit(pending.execution().id())) {
-                return recorded(cancel(pending, null, option), startedAt);
+                return recorded(cancel(pending, null, choice), startedAt);
             }
             String runId = submit(pending);
             HermesRunResult result;
@@ -215,70 +194,27 @@ public class ChatService {
             }
 
             if (turns.isStopConfirmed(handle) || "cancelled".equalsIgnoreCase(result.status())) {
-                return recorded(cancel(pending, result, option), startedAt);
+                return recorded(cancel(pending, result, choice), startedAt);
             }
             if (result.succeeded()) {
-                blocklist.release(option.provider());
-                ChatTurn completed = finish(pending, result, option);
+                ChatTurn completed = finish(pending, result, choice);
                 turns.markFinished(handle);
                 return recorded(completed, startedAt);
             }
-            if (!result.providerBlocked()) {
-                executions.fail(pending.execution(), hermesStatus(result));
-                append(pending, ExecutionEventType.RUN_FAILED, hermesStatus(result));
-                throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
-            }
-
-            blocklist.block(option.provider(), "provider authentication failed");
-            executions.fail(pending.execution(), ErrorCode.PROVIDER_BLOCKED.name());
-            append(pending, ExecutionEventType.RUN_FAILED, ErrorCode.PROVIDER_BLOCKED.name());
-            if (streaming) {
-                onEvent.accept(ChatEvent.reset());
-            }
-            if (last) {
+            if (result.providerBlocked()) {
+                executions.fail(pending.execution(), ErrorCode.PROVIDER_BLOCKED.name());
+                append(pending, ExecutionEventType.RUN_FAILED, ErrorCode.PROVIDER_BLOCKED.name());
                 throw new ApiException(
-                        ErrorCode.NO_MODEL_AVAILABLE, "every model this agent can use is blocked");
+                        ErrorCode.PROVIDER_BLOCKED, "every account of the chosen provider is blocked");
             }
-            log.info("provider 가 막혀 다음 모델로 넘어간다 agent={} blocked={}", agent.code(), option.provider());
-            previousExecutionId = pending.execution().id();
-        }
-        throw new ApiException(ErrorCode.NO_MODEL_AVAILABLE, "every model this agent can use is blocked");
+            executions.fail(pending.execution(), hermesStatus(result));
+            append(pending, ExecutionEventType.RUN_FAILED, hermesStatus(result));
+            throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
         } finally {
             if (closesHandle) {
                 turns.close(handle);
             }
         }
-    }
-
-    /**
-     * 쓸 수 있는 모델이 하나도 없다는 것을 실행 한 줄로 남기고 세운다.
-     *
-     * <p>Hermes 를 부르지 않는다. 실행 줄을 남기는 것은 실패해도 기록은 남긴다는 규칙 때문이고, 그것이
-     * 없으면 사용량 화면에서 이 turn 이 통째로 사라진다.
-     */
-    private ApiException noModelAvailable(
-            CurrentUser user, Routed routed, ExecutionContextSnapshot snapshot,
-            TurnCancellation.TurnHandle handle,
-            Consumer<ChatEvent> onEvent, boolean streaming) {
-        AgentExecution execution = executions.start(
-                user, routed.conversation(), routed.agent(), null, null, snapshot, null, null);
-        turns.rekey(handle, execution.id());
-        if (streaming) {
-            onEvent.accept(ChatEvent.started(routed.conversation().publicId(), execution.id()));
-        }
-        PendingTurn pending = new PendingTurn(
-                user,
-                routed.conversation(),
-                routed.agent(),
-                null,
-                execution,
-                new SequenceCounter(),
-                new StringBuilder(),
-                new TurnIntent.Fresh());
-        executions.fail(execution, ErrorCode.NO_MODEL_AVAILABLE.name());
-        append(pending, ExecutionEventType.RUN_FAILED, ErrorCode.NO_MODEL_AVAILABLE.name());
-        return new ApiException(
-                ErrorCode.NO_MODEL_AVAILABLE, "this agent has no model it can use right now");
     }
 
     /**
@@ -388,15 +324,18 @@ public class ChatService {
         }
     }
 
-    /** 시도 하나를 위한 명령과 실행 줄을 만든다. 사용자 메시지는 이미 저장돼 있다. */
+    /**
+     * 대화가 고른 값으로 명령과 실행 줄을 만든다. 사용자 메시지는 이미 저장돼 있다.
+     *
+     * <p>고르지 않은 provider, 모델, effort 는 null 그대로 실어 profile 의 기본값으로 돌게 둔다.
+     */
     private PendingTurn begin(
             CurrentUser user,
             Routed routed,
             String text,
             AssembledContext context,
             ExecutionContextSnapshot snapshot,
-            ModelOption option,
-            Long retryOfExecutionId,
+            ModelChoice choice,
             TurnIntent intent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
@@ -406,10 +345,11 @@ public class ChatService {
                 text,
                 TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
                 conversation.hermesSessionId(),
-                option.provider(),
-                option.model());
+                choice.provider(),
+                choice.model(),
+                choice.reasoningEffort());
         AgentExecution execution = executions.start(
-                user, conversation, agent, null, null, snapshot, option, retryOfExecutionId);
+                user, conversation, agent, null, null, snapshot, choice, null);
         return new PendingTurn(
                 user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder(), intent);
     }
@@ -467,7 +407,7 @@ public class ChatService {
         }
     }
 
-    private ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelOption requested) {
+    private ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
         pending.conversation().rememberSession(result.sessionId());
         conversations.touchSession(pending.conversation().id(),
                 result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(), Instant.now());
@@ -483,8 +423,8 @@ public class ChatService {
                 answer, message.id(), false);
     }
 
-    private ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelOption option) {
-        AgentExecution execution = executions.cancel(pending.execution(), pending.agent(), result, option);
+    private ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
+        AgentExecution execution = executions.cancel(pending.execution(), pending.agent(), result, requested);
         String answer;
         synchronized (pending) {
             append(pending, ExecutionEventType.RUN_CANCELLED, null);
@@ -810,6 +750,24 @@ public class ChatService {
         return access.requireOwn(user, conversationId);
     }
 
+    /**
+     * 대화에서 쓸 모델과 effort 를 바꾼다. 그 뒤의 실행이 이 값을 쓴다.
+     *
+     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 대화 목록의 순서는 주고받은 시각으로 정하므로
+     * {@code updatedAt} 을 건드리지 않는다.
+     *
+     * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택
+     */
+    @Transactional
+    public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {
+        access.requireOwn(user, conversationId);
+        if (conversations.chooseModelIfActive(conversationId, user.id(),
+                choice.provider(), choice.model(), choice.reasoningEffort()) == 0) {
+            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
+        }
+        return access.requireOwn(user, conversationId);
+    }
+
     @Transactional
     public void delete(CurrentUser user, Long conversationId) {
         access.requireOwn(user, conversationId);
@@ -821,39 +779,23 @@ public class ChatService {
     /**
      * 메시지 없이 제목이 빈 대화를 만든다.
      *
-     * <p>사진을 올리는 경로에 대화 번호가 필요해, 새 대화의 첫 메시지에 사진을 붙이려면 대화가 먼저 있어야
-     * 한다. 이 경로는 그 용도로만 쓰므로 사진을 받지 않는 에이전트에는 대화를 남기지 않는다. 제목은 첫
-     * 메시지가 정한다.
+     * <p>사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려면 대화가 먼저 있어야 한다. 모델은 흐름이 붙은
+     * 에이전트에서도 고르므로 에이전트를 쓸 수 있는지만 본다. 사진을 받지 않는 에이전트는 보낼 때 거절한다.
+     * 제목은 첫 메시지가 정한다.
      */
     public Conversation startEmpty(CurrentUser user, String agentCode) {
-        Agent agent = requireStartableAgent(user, agentCode);
-        if (!agent.acceptsAttachments()) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
-        }
+        Agent agent = agents.requireStartable(user, agentCode);
         return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
     }
 
     private Conversation resolveConversation(
             CurrentUser user, Long conversationId, String firstText, String agentCode) {
         if (conversationId == null) {
-            Agent agent = requireStartableAgent(user, agentCode);
+            Agent agent = agents.requireStartable(user, agentCode);
             return conversations.save(
                     Conversation.startedBy(user.id(), titleFrom(firstText), agent.id()));
         }
         return access.requireOwn(user, conversationId);
-    }
-
-    /** 새 대화를 시작할 에이전트를 고른다. 요청자가 읽을 수 있고 켜져 있어야 한다. */
-    private Agent requireStartableAgent(CurrentUser user, String agentCode) {
-        if (agentCode == null || agentCode.isBlank()) {
-            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
-        }
-        Agent agent = agents.requireReadable(user, agentCode);
-        if (!agent.enabled()) {
-            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
-        }
-        return agent;
     }
 
     private static String titleFrom(String text) {

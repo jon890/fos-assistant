@@ -1,9 +1,8 @@
 package com.bifos.assistant.orchestration.application;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.ModelOption;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -20,7 +19,6 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
-import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -35,6 +33,9 @@ import org.springframework.stereotype.Service;
  * <p>흐름의 첫 단계와 그 아래 단계가 같은 경로를 쓰게 하려고 여기 모았다. 부모와 뿌리를 정하는 것은
  * 부르는 쪽이고, 이 클래스는 받은 번호를 그대로 적는다. 요청자를 확인하고 에이전트를 고르는 것도
  * 부르는 쪽이 한다. 경계를 지키는 규칙은 {@link ChildExecutionRunner} 가 갖는다.
+ *
+ * <p>모델과 effort 는 대화가 고른 값을 쓴다. 자식 에이전트가 달라도 같은 대화의 실행은 모두 같은 선택을
+ * 따른다. 고르지 않았으면 모델을 빼고 보내 그 에이전트 profile 의 기본값으로 돈다.
  *
  * <p>Memory 는 실행마다 {@link ContextAssembler} 로 다시 조립한다. 부모에게 넣은 문자열을 복사하면
  * 그 사이에 바뀐 권한이 반영되지 않는다.
@@ -52,7 +53,6 @@ public class AgentRunner {
     private static final String UNKNOWN_ERROR = "ORCHESTRATION_STEP_FAILED";
 
     private final ContextAssembler contextAssembler;
-    private final AgentModelSelector modelSelector;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
@@ -146,20 +146,9 @@ public class AgentRunner {
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
-        // 자식은 자기 에이전트의 1순위를 쓴다. 부모의 것을 물려받지 않는다.
-        List<ModelOption> available = modelSelector.availableFor(agent);
-        if (available.isEmpty()) {
-            AgentExecution empty = executions.start(
-                    user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, null, null);
-            onStarted.accept(empty);
-            AgentExecution failed = executions.fail(empty, ErrorCode.NO_MODEL_AVAILABLE.name());
-            append(failed, ExecutionEventType.RUN_FAILED, ErrorCode.NO_MODEL_AVAILABLE.name(), 1);
-            return new Run(
-                    failed, ChildResult.failed(failed.id(), ErrorCode.NO_MODEL_AVAILABLE.name()), null);
-        }
-        ModelOption option = available.getFirst();
+        ModelChoice choice = conversation.modelChoice();
         AgentExecution execution = executions.start(
-                user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, option, null);
+                user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, choice, null);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
@@ -172,8 +161,9 @@ public class AgentRunner {
                 task,
                 appendInstruction(context.instructions(), instructionAddition),
                 sessionId,
-                option.provider(),
-                option.model());
+                choice.provider(),
+                choice.model(),
+                choice.reasoningEffort());
 
         String runId;
         try {
@@ -198,7 +188,7 @@ public class AgentRunner {
         }
 
         if (cancelled.getAsBoolean() || "cancelled".equalsIgnoreCase(result.status())) {
-            AgentExecution cancelledExecution = executions.cancel(execution, agent, result, option);
+            AgentExecution cancelledExecution = executions.cancel(execution, agent, result, choice);
             append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
             return new Run(
                     cancelledExecution,
@@ -207,13 +197,16 @@ public class AgentRunner {
         }
 
         if (!result.succeeded()) {
-            String status = result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
-            AgentExecution failed = executions.fail(execution, status);
-            append(failed, ExecutionEventType.RUN_FAILED, status, 2);
-            return new Run(failed, ChildResult.failed(failed.id(), status), null);
+            // 고른 모델의 provider 가 막힌 것은 보통 실패와 다른 코드로 남긴다. 다른 모델로 넘기지 않는다.
+            String code = result.providerBlocked()
+                    ? ErrorCode.PROVIDER_BLOCKED.name()
+                    : result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+            AgentExecution failed = executions.fail(execution, code);
+            append(failed, ExecutionEventType.RUN_FAILED, code, 2);
+            return new Run(failed, ChildResult.failed(failed.id(), code), null);
         }
 
-        AgentExecution completed = executions.complete(execution, agent, result, option);
+        AgentExecution completed = executions.complete(execution, agent, result, choice);
         append(completed, ExecutionEventType.RUN_COMPLETED, null, 2);
         return new Run(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
     }

@@ -111,22 +111,25 @@ test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, pag
   await expect(page.getByText("아직 실행 기록이 없어요", { exact: true })).toBeVisible();
 });
 
-test("막혀서 넘어간 실패와 보통 실패를 다르게 보인다", async ({ page, hermes }, testInfo) => {
+test("막힌 모델로 실패한 실행은 모델을 쓸 수 없다고 보인다", async ({ page, hermes }, testInfo) => {
   const blockedProvider = `usage-blocked-${testInfo.project.name}`;
-  await page.request.put(`/api/admin/agents/${SWITCH_AGENT_CODE}/models`, {
-    data: {
-      models: [
-        { provider: blockedProvider, model: "blocked-model" },
-        { provider: "openai-codex", model: "example-model" },
-      ],
-    },
+  const created = await page.request.post("/api/chat/conversations", {
+    data: { agentCode: SWITCH_AGENT_CODE },
   });
+  expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
+  const { conversationId } = (await created.json()) as { conversationId: string };
+  const chosen = await page.request.put(`/api/chat/conversations/${conversationId}/model`, {
+    data: { provider: blockedProvider, model: "blocked-model", reasoningEffort: null },
+  });
+  expect(chosen.ok(), `모델을 고르지 못했다: ${chosen.status()}`).toBeTruthy();
+
   await hermes.blockProvider(blockedProvider);
   try {
     const response = await page.request.post("/api/chat", {
-      data: { text: "사용량 넘김 검사", agentCode: SWITCH_AGENT_CODE },
+      data: { conversationId, text: "사용량 막힘 검사" },
     });
-    expect(response.ok()).toBeTruthy();
+    expect(response.ok()).toBeFalsy();
+    expect(((await response.json()) as { code: string }).code).toBe("PROVIDER_BLOCKED");
   } finally {
     await hermes.clearBlockedProviders();
   }
@@ -135,8 +138,7 @@ test("막혀서 넘어간 실패와 보통 실패를 다르게 보인다", async
   const records = page.getByTestId(
     testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
   );
-  await expect(records.getByText("다음 모델로 다시 시도함").first()).toBeVisible();
-  await expect(records.getByTestId("execution-retry-of").first()).toBeVisible();
+  await expect(records.getByText("모델을 쓸 수 없음").first()).toBeVisible();
 });
 
 /**

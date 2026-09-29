@@ -20,6 +20,7 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -185,6 +186,24 @@ class ChatRegenerateTest {
         chat.regenerate(dad, conversationId, event -> {});
 
         assertThat(stub().received().getLast().sessionId()).isEqualTo("shared-session");
+    }
+
+    @Test
+    void 모델을_고른_대화에서_다시_생성하면_요청에_그_선택이_실린다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturnInOrder(result("first", "첫 답"), result("second", "새 답"));
+        Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
+        chat.chooseModel(dad, conversationId, new ModelChoice("nvidia", "example-model-small", "high"));
+
+        chat.regenerate(dad, conversationId, event -> {});
+
+        assertThat(stub().received()).hasSize(2);
+        assertThat(stub().received().getFirst().model()).as("고르기 전 보내기의 모델").isNull();
+        assertThat(stub().received().getLast()).satisfies(command -> {
+            assertThat(command.provider()).isEqualTo("nvidia");
+            assertThat(command.model()).isEqualTo("example-model-small");
+            assertThat(command.reasoningEffort()).isEqualTo("high");
+        });
     }
 
     @Test

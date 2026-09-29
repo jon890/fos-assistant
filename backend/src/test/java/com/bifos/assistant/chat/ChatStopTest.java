@@ -428,41 +428,6 @@ class ChatStopTest {
     }
 
     @Test
-    void provider_전환_뒤에는_새_실행만_중지_대상이고_이전_실행은_끝난_것으로_응답한다() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        Agent agent = agents.findByCode("dad").orElseThrow();
-        modelSelector.replace(agent, List.of(
-                new ModelOption("anthropic", "example-model-large"),
-                new ModelOption("nvidia", "example-model-small")));
-        stub().willReturnInOrder(
-                new HermesRunResult("run-blocked", "session", "failed", "", null, null,
-                        HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
-                HermesRunResult.of("run-next", "session", "cancelled", "답", "model", "provider", TokenUsage.empty()));
-
-        List<ChatEvent> relayed = new ArrayList<>();
-        stub().beforeAwait(() -> {
-            if (stub().received().size() != 2) return;
-            List<ChatEvent> startedEvents = relayed.stream()
-                    .filter(event -> event.type().equals("started")).toList();
-            assertThat(startedEvents).hasSize(2);
-            assertThatThrownBy(() -> chat.stop(dad, startedEvents.getFirst().executionId()))
-                    .isInstanceOf(ApiException.class)
-                    .extracting(ex -> ((ApiException) ex).code())
-                    .isEqualTo(ErrorCode.EXECUTION_NOT_RUNNING);
-            chat.stop(dad, startedEvents.get(1).executionId());
-        });
-        chat.stream(dad, null, "다음 provider 로 넘어가 줘", "dad", relayed::add);
-
-        List<ChatEvent> started = relayed.stream().filter(event -> event.type().equals("started")).toList();
-        assertThat(relayed).extracting(ChatEvent::type)
-                .containsSequence("started", "reset", "started", "switched", "stopped");
-        assertThat(started).hasSize(2);
-        assertThat(started.getFirst().executionId()).isNotEqualTo(started.get(1).executionId());
-        assertThat(relayed.getLast().executionId()).isEqualTo(started.get(1).executionId());
-        assertThat(stub().stopped()).containsExactly("run-next");
-    }
-
-    @Test
     void 제출_전에_중지를_요청해도_등록된_run을_곧바로_멈춘다() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(

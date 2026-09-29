@@ -68,6 +68,10 @@ public class AgentExecution {
     @Column(name = "model", length = 128)
     private String model;
 
+    /** 이 실행에 요청한 reasoning effort. 기본값으로 보냈으면 비어 있다. */
+    @Column(name = "reasoning_effort", length = 16)
+    private String reasoningEffort;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
     private CostMode costMode;
@@ -155,6 +159,7 @@ public class AgentExecution {
         this.hermesRunId = builder.hermesRunId;
         this.provider = builder.provider;
         this.model = builder.model;
+        this.reasoningEffort = builder.reasoningEffort;
         this.costMode = builder.costMode;
         this.status = builder.status;
         this.errorCode = builder.errorCode;
@@ -213,6 +218,10 @@ public class AgentExecution {
 
     public String model() {
         return model;
+    }
+
+    public String reasoningEffort() {
+        return reasoningEffort;
     }
 
     public CostMode costMode() {
@@ -363,6 +372,7 @@ public class AgentExecution {
         private String hermesRunId;
         private String provider;
         private String model;
+        private String reasoningEffort;
         private CostMode costMode;
         private ExecutionStatus status;
         private String errorCode;
@@ -429,6 +439,11 @@ public class AgentExecution {
 
         public Builder model(String model) {
             this.model = model;
+            return this;
+        }
+
+        public Builder reasoningEffort(String reasoningEffort) {
+            this.reasoningEffort = reasoningEffort;
             return this;
         }
 

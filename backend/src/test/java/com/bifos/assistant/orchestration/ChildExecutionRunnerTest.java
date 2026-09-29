@@ -164,31 +164,54 @@ class ChildExecutionRunnerTest {
     }
 
     /**
-     * 자식은 자기 에이전트가 정한 1순위를 쓴다. 부모의 것을 물려받지 않는다.
+     * 자식 에이전트가 달라도 그 대화에서 고른 모델과 effort 로 돈다.
      *
-     * <p>자식이 다른 에이전트면 그 에이전트가 정한 모델이 맞다.
+     * <p>사용자가 이 대화에서 고른 모델이 그 대화의 모든 실행에 적용된다는 규칙을 하나로 둔다.
      */
     @Test
-    void 자식_실행이_자기_에이전트의_1순위를_쓴다() {
+    void 모델을_고른_대화의_자식_실행은_그_선택으로_Hermes를_부른다() {
         CurrentUser dad = member("child-dad@example.com", "child-dad");
-        CurrentUser mom = member("child-mom@example.com", "child-mom");
-        Agent childAgent = agents.findByCode("child-mom").orElseThrow();
-        modelSelector.replace(childAgent, java.util.List.of(new ModelOption("nvidia", "nemotron")));
-        agents.save(childAgent);
+        member("child-mom@example.com", "child-mom");
         Agent shared = agents.findByCode("child-mom").orElseThrow();
         shared.changeAccess(true, com.bifos.assistant.agent.domain.AgentVisibility.GROUP, null);
         agents.save(shared);
-        Conversation conversation = conversationOf(dad, "child-dad");
+        Conversation started = conversationOf(dad, "child-dad");
+        conversations.chooseModelIfActive(started.id(), dad.id(), "nvidia", "nemotron", "high");
+        Conversation conversation = conversations.findById(started.id()).orElseThrow();
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "조사 결과"));
 
-        children.run(dad, conversation, parent, "child-mom", "이것을 조사해라");
+        ChildResult result = children.run(dad, conversation, parent, "child-mom", "이것을 조사해라");
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.profileName()).isEqualTo("child-mom");
             assertThat(command.provider()).isEqualTo("nvidia");
             assertThat(command.model()).isEqualTo("nemotron");
+            assertThat(command.reasoningEffort()).isEqualTo("high");
         });
-        assertThat(mom.id()).isNotNull();
+        assertThat(executions.findById(result.executionId()).orElseThrow().reasoningEffort())
+                .isEqualTo("high");
+    }
+
+    @Test
+    void 모델을_고른_대화에서_자식_실행이_막히면_PROVIDER_BLOCKED로_남는다() {
+        CurrentUser dad = member("child-dad@example.com", "child-dad");
+        Conversation started = conversationOf(dad, "child-dad");
+        conversations.chooseModelIfActive(started.id(), dad.id(), "nvidia", "nemotron", null);
+        Conversation conversation = conversations.findById(started.id()).orElseThrow();
+        AgentExecution parent = parentOf(dad, conversation, "child-dad");
+        stub().willReturn(new HermesRunResult("run-blocked", "sess-child", "failed", null, null, null,
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()));
+
+        ChildResult result = children.run(dad, conversation, parent, "child-dad", "이것을 조사해라");
+
+        assertThat(result.succeeded()).isFalse();
+        assertThat(result.errorCode()).isEqualTo("PROVIDER_BLOCKED");
+        assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
+        AgentExecution child = executions.findById(result.executionId()).orElseThrow();
+        assertThat(child.status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(child.errorCode()).isEqualTo("PROVIDER_BLOCKED");
+        assertThat(child.provider()).isEqualTo("nvidia");
     }
 
     @Test

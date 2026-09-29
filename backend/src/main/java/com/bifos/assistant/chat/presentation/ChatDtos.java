@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.RunningTurn;
 import jakarta.validation.constraints.NotBlank;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class ChatDtos {
@@ -32,7 +34,7 @@ public final class ChatDtos {
         }
     }
 
-    /** 사진을 먼저 올리려고 메시지 없이 대화를 만든다. */
+    /** 사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려고 메시지 없이 대화를 만든다. */
     public record StartConversationRequest(String agentCode) {
     }
 
@@ -111,9 +113,16 @@ public final class ChatDtos {
         }
     }
 
-    /** @param id 대화의 공개 식별자 */
+    /**
+     * 대화 한 줄이다. 목록, 이름 바꾸기, 모델 선택이 같은 모양으로 돌려준다.
+     *
+     * @param id 대화의 공개 식별자
+     * @param provider 이 대화에서 고른 provider. 고르지 않았으면 null
+     * @param model 이 대화에서 고른 모델. 고르지 않았으면 null 이고 그 profile 의 기본 모델로 돈다
+     * @param reasoningEffort 이 대화에서 고른 effort. 고르지 않았으면 null
+     */
     public record ConversationView(UUID id, String title, String agentCode, String agentName,
-            Instant updatedAt) {
+            Instant updatedAt, String provider, String model, String reasoningEffort) {
     }
 
     /** 옛 대화 번호로 찾은 대화의 공개 식별자다. 옛 링크를 새 주소로 넘길 때만 쓴다. */
@@ -121,5 +130,29 @@ public final class ChatDtos {
     }
 
     public record RenameConversationRequest(@NotNull String title) {
+    }
+
+    /** 대화에서 쓸 모델과 effort 다. 모두 비워 보내면 그 profile 의 기본값으로 돌아간다. */
+    public record ChooseModelRequest(String provider, String model, String reasoningEffort) {
+
+        /** 요청 값을 검증해 선택으로 바꾼다. 맞지 않으면 {@code VALIDATION_FAILED} 다. */
+        public ModelChoice toChoice() {
+            return ModelChoice.of(provider, model, reasoningEffort);
+        }
+    }
+
+    /** 그 에이전트의 profile 로 고를 수 있는 모델이다. */
+    public record ModelOptionsView(String defaultProvider, String defaultModel, List<ProviderView> providers,
+            List<String> reasoningEfforts) {
+    }
+
+    /**
+     * @param provider Hermes 가 부르는 provider 이름
+     * @param name 화면에 보일 이름
+     * @param models 그 provider 의 모델 이름
+     * @param reasoningCapable 모델 이름을 열쇠로 한 reasoning 지원 여부. Hermes 가 밝히지 않은 모델은 참으로 본다
+     */
+    public record ProviderView(String provider, String name, List<String> models,
+            Map<String, Boolean> reasoningCapable) {
     }
 }

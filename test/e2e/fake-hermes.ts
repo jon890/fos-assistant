@@ -15,6 +15,11 @@ const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
 const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/events$/;
 const RUN_STOP_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/stop$/;
 const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
+/**
+ * profile 의 기본 provider 와 모델이다. 모델 선택지 응답과, provider 와 모델을 빼고 온 실행의 세션 조회가
+ * 함께 쓴다.
+ */
+const DEFAULT_RUNTIME = { provider: "openai-codex", model: "example-model" };
 const SESSION_PATH = /^\/p\/([a-z0-9-]+)\/api\/sessions\/([A-Za-z0-9_-]+)$/;
 /** Control Plane 이 주소를 저장하기 전에 닿는지 확인할 때 부른다. */
 const CAPABILITIES_PATH = /^\/p\/([a-z0-9-]+)\/v1\/capabilities$/;
@@ -340,8 +345,10 @@ export type FakeHermes = {
   lastSubmittedInstructions(): string | undefined;
   /** 마지막 실행 요청의 `input`. Control Plane 이 사용자가 쓴 글 앞에 덧붙인 것까지 담는다 */
   lastSubmittedInput(): string | undefined;
-  /** 마지막 실행 요청이 실어 온 provider 와 모델 */
-  lastSubmittedRuntime(): { provider?: string; model?: string };
+  /** 모델 목록 조회를 받은 횟수다. 들고 있는 동안 다시 묻지 않는 것을 이 수로 본다. */
+  modelOptionsCalls(): number;
+  /** 마지막 실행 요청이 실어 온 provider, 모델, reasoning effort */
+  lastSubmittedRuntime(): { provider?: string; model?: string; reasoningEffort?: string };
   blockProvider(provider: string): void;
   clearBlockedProviders(): void;
   /** 실행 제출을 429 로 거절하게 한다. 공유 gateway 가 한도에 닿은 상태를 흉내 낸다. */
@@ -409,7 +416,8 @@ export function startFakeHermes(
   const blockedProviders = new Set<string>();
   let busy = false;
   let submitCount = 0;
-  let lastSubmittedRuntime: { provider?: string; model?: string } = {};
+  let modelOptionsCalls = 0;
+  let lastSubmittedRuntime: { provider?: string; model?: string; reasoningEffort?: string } = {};
   let holdNextRun = false;
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
@@ -707,7 +715,24 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          return send(response, 200, { model: "example-model", provider: "openai-codex", providers: [] });
+          modelOptionsCalls += 1;
+          // 실제 응답의 모양이다. 설정하지 않은 provider 도 빈 행으로 함께 온다.
+          return send(response, 200, {
+            ...DEFAULT_RUNTIME,
+            providers: [
+              {
+                slug: DEFAULT_RUNTIME.provider,
+                name: "OpenAI Codex",
+                authenticated: true,
+                models: [DEFAULT_RUNTIME.model, "example-model-mini"],
+                capabilities: {
+                  [DEFAULT_RUNTIME.model]: { reasoning: true },
+                  "example-model-mini": { reasoning: false },
+                },
+              },
+              { slug: "unconfigured", name: "Unconfigured", authenticated: false, models: [] },
+            ],
+          });
         }
 
         const sessionMatch = SESSION_PATH.exec(path);
@@ -846,6 +871,7 @@ export function startFakeHermes(
           session_id?: string;
           provider?: string;
           model?: string;
+          model_options?: { reasoning?: { effort?: string } };
         };
         lastSubmittedInstructions = submitted.instructions;
         // 되돌려 받는 쪽은 원문을 본다. 결과물 폴더 단락이 붙었는지 검사가 이것으로 안다.
@@ -853,7 +879,11 @@ export function startFakeHermes(
         const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId);
-        lastSubmittedRuntime = { provider: submitted.provider, model: submitted.model };
+        lastSubmittedRuntime = {
+          provider: submitted.provider,
+          model: submitted.model,
+          reasoningEffort: submitted.model_options?.reasoning?.effort,
+        };
         const runId = `run_${shortId()}`;
         const sessionId = submitted.session_id ?? `sess_${shortId()}`;
 
@@ -908,10 +938,11 @@ export function startFakeHermes(
           usage: FAKE_USAGE,
         });
         // 실제로 돈 모델은 세션 행에만 남는다.
+        // provider 와 모델을 빼고 온 실행은 profile 의 기본값으로 돈다.
         sessions.set(sessionId, {
-          model: actualModelFor(input, submitted.model ?? profile!),
+          model: actualModelFor(input, submitted.model ?? DEFAULT_RUNTIME.model),
           provider:
-            input === SESSION_MODEL_PROBE ? "nvidia" : submitted.provider ?? null,
+            input === SESSION_MODEL_PROBE ? "nvidia" : submitted.provider ?? DEFAULT_RUNTIME.provider,
         });
         if (held) {
           heldRunId = runId;
@@ -944,6 +975,7 @@ export function startFakeHermes(
         baseUrl: `http://127.0.0.1:${address.port}`,
         lastSubmittedInstructions: () => lastSubmittedInstructions,
         lastSubmittedInput: () => lastSubmittedInput,
+        modelOptionsCalls: () => modelOptionsCalls,
         lastSubmittedRuntime: () => lastSubmittedRuntime,
         blockProvider: (provider: string) => blockedProviders.add(provider),
         clearBlockedProviders: () => blockedProviders.clear(),

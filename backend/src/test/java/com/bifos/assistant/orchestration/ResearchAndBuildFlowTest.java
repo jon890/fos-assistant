@@ -24,6 +24,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
@@ -400,6 +401,8 @@ class ResearchAndBuildFlowTest {
     void 사용량_목록에_뿌리_하나만_나오고_월_비용_합계는_넷을_모두_더한다() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
+        // 기본값으로 보낸 실행은 세션이 답한 모델로 가격을 찾는다.
+        stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
         ChatTurn turn = chat.send(dad, null, "전기차를 사는 게 나을까?", MY_AGENT);
         SecurityContextHolder.getContext()
                 .setAuthentication(new UsernamePasswordAuthenticationToken(dad, null));
@@ -574,6 +577,8 @@ class ResearchAndBuildFlowTest {
             }
             return completed("run-synthesizer", "합친 답");
         });
+        // 기본값으로 보낸 실행은 세션이 답한 모델로 가격을 찾는다.
+        stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
         stub().beforeAwait(() -> {
             if (awaitCalls.incrementAndGet() == 1) return;
             childrenAwaiting.countDown();

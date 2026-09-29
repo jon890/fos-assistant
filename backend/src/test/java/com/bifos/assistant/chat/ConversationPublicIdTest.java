@@ -119,7 +119,7 @@ class ConversationPublicIdTest {
         users.deleteAll();
         mvc = MockMvcBuilders
                 .standaloneSetup(new ChatController(chat, currentUser, users, agentService, access,
-                        new ChatEventStreams(Duration.ofSeconds(20))))
+                        new ChatEventStreams(Duration.ofSeconds(20)), null))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

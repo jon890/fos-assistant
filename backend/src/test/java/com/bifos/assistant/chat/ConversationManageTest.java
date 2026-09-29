@@ -166,37 +166,16 @@ class ConversationManageTest {
     }
 
     @Test
-    void provider를_넘어가면_새_실행_번호를_다시_보낸다() {
+    void provider가_막혀_실패해도_실패한_실행의_번호를_보낸다() {
         CurrentUser dad = member("manage-dad");
-        Agent agent = agents.findByCode("manage-dad").orElseThrow();
-        modelSelector.replace(agent, List.of(
-                new ModelOption("anthropic", "example-model-large"),
-                new ModelOption("nvidia", "example-model-small")));
-        stub().willReturnInOrder(
-                new HermesRunResult("run-blocked", null, "failed", null,
-                        "example-model-large", "anthropic",
-                        HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
-                HermesRunResult.of("run-good", "session-two", "completed", "답",
-                        "example-model-small", "nvidia", TokenUsage.empty()));
-
-        List<ChatEvent> events = new ArrayList<>();
-        chat.stream(dad, null, "첫 질문", "manage-dad", events::add);
-
-        List<ChatEvent> started = events.stream().filter(it -> "started".equals(it.type())).toList();
-        assertThat(started).hasSize(2);
-        assertThat(started.getFirst().executionId()).isNotEqualTo(started.getLast().executionId());
-        assertThat(started.getLast().executionId()).isEqualTo(events.getLast().executionId());
-    }
-
-    @Test
-    void 모델이_없어도_실패한_실행의_번호를_보낸다() {
-        CurrentUser dad = member("manage-dad");
-        modelOptions.deleteAll();
+        stub().willReturn(new HermesRunResult("run-blocked", null, "failed", null,
+                "example-model-large", "anthropic",
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()));
         List<ChatEvent> events = new ArrayList<>();
 
         assertThatThrownBy(() -> chat.stream(dad, null, "첫 질문", "manage-dad", events::add))
                 .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code()).isEqualTo(ErrorCode.NO_MODEL_AVAILABLE);
+                .extracting(ex -> ((ApiException) ex).code()).isEqualTo(ErrorCode.PROVIDER_BLOCKED);
         assertThat(events).singleElement().satisfies(started -> {
             assertThat(started.type()).isEqualTo("started");
             assertThat(executions.findById(started.executionId()).orElseThrow().status())

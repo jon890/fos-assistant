@@ -112,15 +112,16 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     }
 
     /**
-     * {@code provider} 와 {@code model} 이 모두 채워졌는지 본다.
+     * {@code provider} 와 {@code model} 이 함께 채워졌거나 함께 비었는지 본다.
      *
-     * <p>Hermes 가 {@code provider} 만 받으면 config 의 모델 문자열을 그대로 써서 엉뚱한 모델로
-     * 시도하고 알아보기 어려운 오류를 낸다. 그래서 요청을 보내기 전에 세운다.
+     * <p>둘 다 비면 Hermes 가 profile 의 기본값으로 돈다. 하나만 채우면 Hermes 가 config 의 모델
+     * 문자열을 그대로 써서 엉뚱한 모델로 시도하고 알아보기 어려운 오류를 낸다. 그래서 요청을 보내기
+     * 전에 세운다.
      */
     private static void requireProviderAndModel(HermesRunCommand command) {
-        if (isBlank(command.provider()) || isBlank(command.model())) {
+        if (isBlank(command.provider()) != isBlank(command.model())) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a run needs both a provider and a model");
+                    ErrorCode.VALIDATION_FAILED, "a run needs both a provider and a model, or neither");
         }
     }
 
@@ -131,8 +132,13 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private JsonNode submitRequest(HermesRunCommand command, String apiKey) {
         Map<String, Object> body = new HashMap<>();
         body.put("input", command.input());
-        body.put("provider", command.provider());
-        body.put("model", command.model());
+        if (!isBlank(command.provider()) && !isBlank(command.model())) {
+            body.put("provider", command.provider());
+            body.put("model", command.model());
+        }
+        if (!isBlank(command.reasoningEffort())) {
+            body.put("model_options", Map.of("reasoning", Map.of("effort", command.reasoningEffort())));
+        }
         if (command.sessionId() != null) {
             body.put("session_id", command.sessionId());
         }
