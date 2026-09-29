@@ -4,7 +4,7 @@
  * <p>MCP 토큰은 profile 만 증명한다. 두 사용자의 호출이 같은 토큰으로 오므로, 요청자는 서명한 `_fos_ctx` 의 뿌리
  * session 으로 찾은 도는 실행의 사용자여야 한다(ADR-032). 가짜 Hermes 가 run 마다 그 run 의 session 으로 서명해 부른다.
  */
-import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
 import { MEMORY_READ_PROBE } from "../fake-hermes.ts";
 
 export const MCP_PRINCIPAL_PROFILE = "mcp-shared-group";
@@ -61,20 +61,23 @@ export const mcpPrincipalScenario: Scenario = {
       "GROUP 에이전트 등록",
     );
 
-    step("그 profile 에 묶은 토큰을 발급해 가짜 Hermes 에 준다");
-    const issued = expectStatus(
-      await call(context, "/admin/agent-tokens", {
-        method: "POST",
-        token: context.tokens.dad,
-        body: { profileName: MCP_PRINCIPAL_PROFILE, label: "mcp-principal-e2e" },
-      }),
-      200,
-      "공유 profile MCP 토큰 발급",
-    ).json<{ id: number; token: string }>();
-    context.hermes.setMemoryReadMcp(context.api.replace(/\/api\/v1$/, "") + "/mcp", issued.token);
-
+    // 에이전트를 등록한 뒤로는 어디서 실패해도 정리한다. 정리가 실패해도 원래 실패를 가리지 않는다.
+    let issued: { id: number; token: string } | undefined;
     const memoryIds: { token: string; id: number }[] = [];
+    let failed = false;
     try {
+      step("그 profile 에 묶은 토큰을 발급해 가짜 Hermes 에 준다");
+      issued = expectStatus(
+        await call(context, "/admin/agent-tokens", {
+          method: "POST",
+          token: context.tokens.dad,
+          body: { profileName: MCP_PRINCIPAL_PROFILE, label: "mcp-principal-e2e" },
+        }),
+        200,
+        "공유 profile MCP 토큰 발급",
+      ).json<{ id: number; token: string }>();
+      context.hermes.setMemoryReadMcp(context.api.replace(/\/api\/v1$/, "") + "/mcp", issued.token);
+
       step("아빠와 아이가 각자 제목만 싣는 개인 Memory 를 만든다");
       const dadMemory = expectStatus(
         await call(context, "/memories", {
@@ -126,20 +129,34 @@ export const mcpPrincipalScenario: Scenario = {
       expect(kidTurns.every((id) => kidListed.includes(id)), `아이의 실행이 목록에 없다: ${kidListed.join()}`);
       expect(kidTurns.every((id) => !dadListed.includes(id)), "아빠의 사용량 목록에 아이 turn 의 실행이 보인다");
       expect(dadTurns.every((id) => !kidListed.includes(id)), "아이의 사용량 목록에 아빠 turn 의 실행이 보인다");
+    } catch (error) {
+      failed = true;
+      throw error;
     } finally {
+      const cleanupErrors: unknown[] = [];
+      const cleanup = async (action: () => Promise<unknown>) => {
+        try {
+          await action();
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
+      };
       for (const memory of memoryIds) {
-        expectStatus(
+        await cleanup(async () => expectStatus(
           await call(context, `/memories/${memory.id}`, { method: "DELETE", token: memory.token }),
           200,
           "공유 profile 검사 Memory 정리",
-        );
+        ));
       }
-      expectStatus(
-        await call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad }),
-        200,
-        "공유 profile MCP 토큰 폐기",
-      );
-      expectStatus(
+      const tokenId = issued?.id;
+      if (tokenId !== undefined) {
+        await cleanup(async () => expectStatus(
+          await call(context, `/admin/agent-tokens/${tokenId}`, { method: "DELETE", token: context.tokens.dad }),
+          200,
+          "공유 profile MCP 토큰 폐기",
+        ));
+      }
+      await cleanup(async () => expectStatus(
         await call(context, `/admin/agents/${AGENT_CODE}`, {
           method: "PATCH",
           token: context.tokens.dad,
@@ -147,7 +164,11 @@ export const mcpPrincipalScenario: Scenario = {
         }),
         200,
         "공유 profile 에이전트 끄기",
-      );
+      ));
+      // finally 에서 던지면 원래 실패가 사라지므로, 원래 실패가 없을 때만 정리 실패를 알린다.
+      if (!failed && cleanupErrors.length > 0) {
+        fail(cleanupErrors.map((error) => (error instanceof Error ? error.message : String(error))).join("; "));
+      }
     }
   },
 };

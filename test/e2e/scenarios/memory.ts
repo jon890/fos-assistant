@@ -15,7 +15,7 @@ type MemoryView = {
   omittedFromContext: boolean;
 };
 
-type AgentToken = { token: string };
+type AgentToken = { id: number; token: string };
 
 /** 요청자를 정하지 못한 MCP 호출이 받는 도구 결과 문구다. 이유를 가리지 않고 같다. */
 const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
@@ -259,26 +259,32 @@ export const memoryScenario: Scenario = {
         200,
         `${who} profile MCP 토큰 발급`,
       ).json<AgentToken>();
-      const idleRoot = `fos-${randomUUID()}`;
-      const attempts = [
-        ["서명 없음", undefined],
-        ["도는 실행이 없는 뿌리", signedCallContext(issued.token, "memory_read", idleRoot, idleRoot, `call_${randomUUID()}`)],
-      ] as const;
-      for (const [attempt, _fos_ctx] of attempts) {
-        for (const memory of [dadOnly, kidOwn]) {
-          const response = await fetch(context.api.replace("/api/v1", "/mcp"), {
-            method: "POST",
-            headers: { Authorization: `Bearer ${issued.token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: memory.id, user_id: 1, _fos_ctx } } }),
-          });
-          const text = await response.text();
-          expect(response.status === 200, `${who} profile 토큰의 MCP 요청이 처리되지 않았다(${attempt}): ${response.status}`);
-          const body = JSON.parse(text) as { result?: { isError?: boolean; content?: { text?: string }[] } };
-          expect(body.result?.isError === true && body.result.content?.[0]?.text === INVALID_CALL_CONTEXT,
-            `${who} profile 토큰이 호출 맥락 오류로 거절되지 않았다(${attempt}): ${text}`);
-          expect(!text.includes(dadOnly.content) && !text.includes(kidOwn.content),
-            `${who} profile 토큰만으로 Memory 본문이 나왔다(${attempt})`);
+      try {
+        const idleRoot = `fos-${randomUUID()}`;
+        const attempts = [
+          ["서명 없음", undefined],
+          ["도는 실행이 없는 뿌리", signedCallContext(issued.token, "memory_read", idleRoot, idleRoot, `call_${randomUUID()}`)],
+        ] as const;
+        for (const [attempt, _fos_ctx] of attempts) {
+          for (const memory of [dadOnly, kidOwn]) {
+            const response = await fetch(context.api.replace("/api/v1", "/mcp"), {
+              method: "POST",
+              headers: { Authorization: `Bearer ${issued.token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: memory.id, user_id: 1, _fos_ctx } } }),
+            });
+            const text = await response.text();
+            expect(response.status === 200, `${who} profile 토큰의 MCP 요청이 처리되지 않았다(${attempt}): ${response.status}`);
+            const body = JSON.parse(text) as { result?: { isError?: boolean; content?: { text?: string }[] } };
+            expect(body.result?.isError === true && body.result.content?.[0]?.text === INVALID_CALL_CONTEXT,
+              `${who} profile 토큰이 호출 맥락 오류로 거절되지 않았다(${attempt}): ${text}`);
+            expect(!text.includes(dadOnly.content) && !text.includes(kidOwn.content),
+              `${who} profile 토큰만으로 Memory 본문이 나왔다(${attempt})`);
+          }
         }
+      } finally {
+        expectStatus(await call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad }),
+          200,
+          `${who} profile MCP 토큰 폐기`);
       }
     }
     expectStatus(

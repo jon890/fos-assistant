@@ -33,7 +33,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회 |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인 |
 | `context` | 실행에 넣을 `instructions` 조립 |
-| `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사와 장기 토큰 인증 |
+| `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
 
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
@@ -436,6 +436,8 @@ Memory 제안은 session 을 적지 않는다.
 
 ## 다른 에이전트에게 맡기기
 
+**아직 구현하지 않았다.** 이 절은 위임 도구를 열 때의 설계다. 지금 있는 것은 「MCP 요청자」 의 판정과 `DelegationKey`, 실행 줄의 session 칸이다. 구현하면 이 절이 현재 동작이 된다.
+
 Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부른다. Control Plane 은 무엇을 할지 정하지 않고 경계만 검사한다.
 결정은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) , [ADR-031](adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md), [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), 흐름은 [`flow.md`](flow.md#다른-에이전트에게-맡길-때) 에 있다.
 
@@ -446,7 +448,7 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 「MCP 요청자」 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
 | `orchestration.application.AgentDelegationService` | 부모 찾기(`DelegationParentResolver` 를 쓴다), 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
-| `orchestration.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
+| `usage.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. `agent_execution.delegation_key` 칸의 값이라 `usage` 에 둔다. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
 | `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
 | `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다 |
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |

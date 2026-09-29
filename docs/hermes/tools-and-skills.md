@@ -276,7 +276,7 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
-| 도구 | `memory_read`, `artifact_write`. `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 은 아직 없고 위임 도구 계획서가 연다. 그 전에는 `-32601` 을 돌려준다 |
+| 도구 | `memory_read`, `artifact_write`. `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 은 아직 없다. 그 전에는 `-32601` 을 돌려준다 |
 | 요청자 | `memory_read`, `artifact_write`, `agent_*` 모두 profile 플러그인이 덮어쓴 `_fos_ctx` 의 서명한 뿌리 session 으로 도는 부모 실행을 찾고, 그 실행의 사용자로 돈다. 서명이 없거나 틀리거나 profile 이 다르면 거절한다. 계약은 [`delegation.md`](delegation.md#부모-실행을-잇는-방법) 에 있다 |
 
 토큰은 요청자를 정하지 않는다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰기 때문이다.

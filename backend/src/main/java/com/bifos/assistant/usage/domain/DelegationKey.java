@@ -1,4 +1,4 @@
-package com.bifos.assistant.orchestration.domain;
+package com.bifos.assistant.usage.domain;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -13,6 +13,10 @@ import java.util.regex.Pattern;
  *
  * <p>문자열이 아니라 record 로 둔 것은 위임 도구가 {@code AgentRunner.run} 에 넘길 때 다른 문자열 인자와
  * 자리를 바꿔도 컴파일되지 않게 하기 위해서다.
+ *
+ * <p>{@code usage} 에 두는 것은 실행 줄의 칸 값이라 {@code ExecutionRecorder.start} 가 이 타입을 직접 받게 하려는
+ * 것이다. 그러면 문자열 session 과 문자열 키가 나란히 오지 않고, {@code usage} 가 {@code orchestration} 을 import
+ * 하지도 않는다.
  *
  * @param value 소문자 16진수 64자
  */

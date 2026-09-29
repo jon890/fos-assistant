@@ -137,7 +137,7 @@ profile 플러그인의 hook 이 뿌리 session 과 `tool_call_id` 를 도구 �
 | `agent_status` | `execution_id` | `RUNNING`, `SUCCEEDED` 와 답, `FAILED` 와 오류 코드, `CANCELLED` |
 | `agent_stop` | `execution_id` | 그 실행의 상태. 이미 끝났으면 끝난 상태를 그대로 준다 |
 
-- profile, 사용자, 부모와 뿌리 번호를 인자로 받지 않는다. 요청자는 MCP 토큰이, 부모는 서명한 뿌리 session 이 정한다
+- profile, 사용자, 부모와 뿌리 번호를 인자로 받지 않는다. 요청자는 서명한 뿌리 session 으로 찾은 부모 실행의 사용자이고, 부모도 그 실행이다([ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))
 - 깊이는 실행 나무의 `parent_execution_id` 로 센다. 사용자가 부른 실행이 0 이고 기본 한도는 2 다
 - 한 뿌리 실행 아래에서 동시에 도는 위임 자식은 기본 4 개다. 둘 다 설정값이다
 - 남의 실행과 없는 실행, 그 나무 밖의 실행은 같은 응답을 받는다

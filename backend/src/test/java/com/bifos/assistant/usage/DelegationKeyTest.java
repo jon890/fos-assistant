@@ -1,9 +1,9 @@
-package com.bifos.assistant.orchestration;
+package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.orchestration.domain.DelegationKey;
+import com.bifos.assistant.usage.domain.DelegationKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;

@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
  * 계산한다. key 는 토큰 원문을 SHA-256 한 소문자 16진수 문자열의 UTF-8 바이트이고, 서명할 글은
  * {@code v1\n<tool>\n<root>\n<session>\n<tool_call_id>} 다. 운영 코드로 서명하면 구현과 함께 틀려도 통과한다.
  */
-final class McpCallSigner {
+public final class McpCallSigner {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Instant STARTED = Instant.parse("2026-09-29T00:00:00Z");
@@ -38,7 +38,7 @@ final class McpCallSigner {
     }
 
     /** 뿌리 session 과 같은 session 에서 부른 호출의 {@code _fos_ctx} 다. {@code tool_call_id} 는 호출마다 새 값이다. */
-    static ObjectNode context(String rawToken, String toolName, String rootSessionId) {
+    public static ObjectNode context(String rawToken, String toolName, String rootSessionId) {
         return context(rawToken, toolName, rootSessionId, rootSessionId, "call_" + UUID.randomUUID());
     }
 

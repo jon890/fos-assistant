@@ -43,7 +43,7 @@ Chief 가 `agent_delegate(agent_code, task)` 를 부르면 경계를 검사하�
 
 ### 2. `ExecutionRecorder.start` 와 `AgentRunner.run`
 
-실행 줄을 만들 때 `hermesSessionId` 와 `delegationKey` 를 함께 적을 수 있게 한다. 단일 `AgentRunner.run` 에 `DelegationKey delegationKey` 인자를 더하고 기존 호출은 null 을 넘긴다. `ExecutionRecorder.start` 는 `String delegationKey`(`DelegationKey.value()`)를 받아 처음 만들 때 적는다. `usage` 가 `orchestration` 을 import 하는 순환을 만들지 않기 위해서다.
+실행 줄을 만들 때 `hermesSessionId` 와 `delegationKey` 를 함께 적을 수 있게 한다. 단일 `AgentRunner.run` 에 `DelegationKey delegationKey` 인자를 더하고 기존 호출은 null 을 넘긴다. `ExecutionRecorder.start` 는 `usage.domain.DelegationKey` 를 받아 처음 만들 때 적는다. 문자열 session 과 나란히 문자열을 받지 않기 위해서다.
 
 ### 3. `ChildExecutionRunner` 에 위임용 메서드
 
