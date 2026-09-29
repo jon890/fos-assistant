@@ -18,7 +18,7 @@ MCP `agent_*` 호출이 들고 오는 뿌리 session 으로 도는 실행을 찾
   - `ChatService.begin`: 보내기, 사진 첨부 turn, 다시 생성이 모두 `runTurn` 을 거쳐 여기로 온다. `HermesRunCommand` 에 `conversation.hermesSessionId()` 를 넣는다
   - `ResearchAndBuildFlow.run` 의 Chief 실행: 흐름이 붙은 에이전트는 세 경우 모두 `runFlow` 를 거쳐 여기로 온다. `runner.run(..., conversation.hermesSessionId(), ...)`
   - 그 밖의 제출은 `MemoryProposer` 와 흐름의 하위 실행(`ChildExecutionRunner` → `AgentRunner.run`)뿐이다
-- 실행 줄은 `ExecutionRecorder.start(user, conversation, agent, parentExecutionId, rootExecutionId, context, requested, retryOfExecutionId)` 가 만든다. 이 8인자 메서드를 부르는 곳은 `ChatService.begin` 과 `AgentRunner.run` 둘뿐이다. `AgentRunner.run` 은 받은 `sessionId` 를 `HermesRunCommand` 에만 쓰고 실행 줄에 적지 않는다
+- 실행 줄은 `ExecutionRecorder.start(user, conversation, agent, parentExecutionId, rootExecutionId, context, requested, retryOfExecutionId)` 가 만든다. 이 8인자 메서드를 부르는 곳은 `ChatService.begin`, `AgentRunner.run`, `MemoryProposer.proposeFrom` 셋이다. `AgentRunner.run` 은 받은 `sessionId` 를 `HermesRunCommand` 에만 쓰고 실행 줄에 적지 않는다
 - 테스트 DB 는 `application-test.yml` 의 `ddl-auto: create-drop` 으로 엔티티에서 만들어지고 Flyway 는 꺼져 있다. 유일 제약은 엔티티에도 적어야 테스트 DB 에 생긴다(선례 `Memory.java` 의 `@Column(name = "proposal_dedup_key", unique = true, length = 64)`)
 - `ChatServiceTest` 의 스텁 `StubHermesRunsClient` 는 테스트가 정한 session 을 돌려준다. 지금 `ChatServiceTest.java:191` 은 첫 turn 의 `command.sessionId()` 가 null 이라고 단언하고, `:276` 은 둘째 turn 이 스텁이 돌려준 `sess-1` 을 보낸다고 단언한다
 - migration 은 V27 이 마지막이다
@@ -143,9 +143,11 @@ e2e 의 가짜 Hermes 는 본문의 `session_id` 를 그대로 session 으로 �
 | `backend/src/main/java/com/bifos/assistant/chat/application/ConversationSessions.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentRunner.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/memory/application/MemoryProposer.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/ResearchAndBuildFlow.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ConversationSessionTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/memory/MemoryProposerTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/ResearchAndBuildFlowTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionDelegationColumnsMigrationTest.java` | 신규 |
 | `docs/data-schema.md` | 수정 |
