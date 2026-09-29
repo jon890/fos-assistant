@@ -10,6 +10,7 @@ import {
   contextOmittedLabel,
   executionStatusLabel,
   isRunning,
+  reasoningEffortLabel,
   retryOfLabel,
   type UsageExecution,
 } from "./execution-list";
@@ -50,7 +51,8 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
           </span>
         </div>
         <p className="mt-3 truncate text-sm text-muted-foreground">
-          {execution.provider ?? "-"} / {execution.model ?? "-"}
+          {execution.provider ?? "-"} / {execution.model ?? "-"} ·{" "}
+          <span data-testid="execution-effort">{reasoningEffortLabel(execution)}</span>
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
           <span title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}>

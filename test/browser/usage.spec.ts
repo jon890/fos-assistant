@@ -163,3 +163,42 @@ test("붐벼서 거절된 실행은 다른 실패와 다르게 보인다", async
   );
   await expect(records.getByText("요청이 많아 거절됨", { exact: true }).first()).toBeVisible();
 });
+
+/**
+ * 요청한 effort 가 실행 한 줄에 보이고, 고르지 않은 실행은 「기본」 으로 보이는지 본다.
+ *
+ * <p>다른 검사가 남긴 실행이 목록에 섞여 있으므로 응답의 실행 번호로 이 검사의 줄을 특정한다.
+ */
+test("실행 기록에 요청한 effort 가 보이고 고르지 않으면 기본으로 보인다", async ({ page }, testInfo) => {
+  const created = await page.request.post("/api/chat/conversations", {
+    data: { agentCode: SWITCH_AGENT_CODE },
+  });
+  expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
+  const { conversationId } = (await created.json()) as { conversationId: string };
+  const chosen = await page.request.put(`/api/chat/conversations/${conversationId}/model`, {
+    data: { provider: null, model: null, reasoningEffort: "high" },
+  });
+  expect(chosen.ok(), `effort 를 고르지 못했다: ${chosen.status()}`).toBeTruthy();
+
+  const withEffort = await page.request.post("/api/chat", {
+    data: { conversationId, text: `effort 표시 검사 ${testInfo.project.name}` },
+  });
+  expect(withEffort.ok(), `effort 를 고른 대화의 보내기가 실패했다: ${withEffort.status()}`).toBeTruthy();
+  const withEffortId = ((await withEffort.json()) as { executionId: number }).executionId;
+
+  const byDefault = await page.request.post("/api/chat", {
+    data: { text: `기본 effort 표시 검사 ${testInfo.project.name}`, agentCode: "browser" },
+  });
+  expect(byDefault.ok(), `기본값 보내기가 실패했다: ${byDefault.status()}`).toBeTruthy();
+  const byDefaultId = ((await byDefault.json()) as { executionId: number }).executionId;
+
+  await page.goto("/usage");
+  const rowOf = (executionId: number) => {
+    const link = page.locator(`a[href="/executions/${executionId}"]`);
+    return testInfo.project.name === "mobile"
+      ? link.locator("xpath=ancestor::article")
+      : link.locator("xpath=ancestor::tr");
+  };
+  await expect(rowOf(withEffortId).getByTestId("execution-effort")).toHaveText("high");
+  await expect(rowOf(byDefaultId).getByTestId("execution-effort")).toHaveText("기본");
+});
