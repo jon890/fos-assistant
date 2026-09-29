@@ -485,6 +485,7 @@ UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. 「backend 패키�
 지금은 요청 시작에 읽은 `Conversation` 을 끝에서 `save` 한다. 그 사이에 사용자가 이름을 바꾸거나 지우면
 옛 값으로 덮여 지운 대화가 되살아난다.
 turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 둘만 고치는 질의로 쓴다.
+새 대화의 첫 turn 은 시작할 때 `hermes_session_id` 와 `hermes_root_session_id` 를 비어 있을 때만 채우는 질의로 쓴다. 이 질의는 `updated_at` 을 바꾸지 않는다. 바꾸면 실패한 turn 도 대화를 목록 맨 위로 올린다.
 남의 실행과 없는 실행은 `EXECUTION_NOT_FOUND` 다.
 
 ### 메시지 한 줄
@@ -895,6 +896,8 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다
 - `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
 - 사용자 전체의 동시 위임 한도. 지금은 뿌리당 한도와 서버 전체 한도만 있다
+- MCP `agent_*` 도구(`agent_list`, `agent_delegate`, `agent_status`, `agent_stop`)와 그것을 처리하는 `AgentDelegationService`, `DelegationProperties`.
+  지금은 부모를 잇는 바탕(`McpCallContext`, `DelegationParentResolver`, 실행 줄의 session 칸)만 있다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

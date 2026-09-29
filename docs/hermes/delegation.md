@@ -411,6 +411,7 @@ v0.21.5 의 중단·미완료 응답 차이는 [「Runs 응답과 사건의 버�
 **API server 의 session 은 그 대화 첫 실행의 `run_id` 와 같다.** 뒤의 turn 은 같은 값을 이어 쓴다.
 중지한 turn 뒤에도 그 값이 그대로여서, 다음 turn 이 중지 전의 맥락을 기억했다.
 첫 turn 을 중지한 대화는 그 중지한 실행의 `run_id` 가 곧 session 이다.
+이 세 문장은 Hermes 가 session 을 정하는 대화의 측정이다. 이제 새 대화는 Control Plane 이 첫 turn 전에 정한 `fos-<uuid>` 가 session 이고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md)).
 
 중지한 실행은 그 session 으로 실제로 돈 모델을 읽지 못했다. Control Plane 은 그때 요청에 보낸 모델을 적는다.
 
