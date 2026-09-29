@@ -28,7 +28,11 @@ import org.springframework.web.client.RestClientException;
 public class HttpHermesRunsClient implements HermesRunsClient {
 
     private static final Logger log = LoggerFactory.getLogger(HttpHermesRunsClient.class);
-    private static final Set<String> TERMINAL = Set.of("completed", "failed", "cancelled", "error");
+    /**
+     * 더 기다리지 않는 상태다. {@code interrupted} 는 v0.21.5 에서 생겼다. gateway 가 멈추거나 실행이 중간에
+     * 끊기면 그 상태로 끝나는데, 여기 없으면 실행 시간 한도까지 조회만 되풀이한다.
+     */
+    private static final Set<String> TERMINAL = Set.of("completed", "failed", "cancelled", "error", "interrupted");
 
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
