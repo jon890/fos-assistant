@@ -46,6 +46,7 @@ backend 의 경로를 지우는 phase 02 가 화면을 깨지 않도록 먼저 �
 - 「관리자 에이전트 목록에서 등록한 에이전트가 보인다」 의 `card.getByText(registered.model …)` 가 보인다는 단언을, 카드에 그 모델 글자가 없다(`toHaveCount(0)`)는 단언으로 바꾼다. 모의 값 `registered.model` 은 이 단언을 위해 남긴다. 등록 양식의 「모델 제공사」 칸 입력은 phase 02 까지 둔다
 - 같은 파일의 모의 응답에 `models`, `model`, `modelSyncedAt` 이 있으면 뺀다. 카드에 모델 글자가 없다는 단언에 쓰는 `registered.model` 은 남긴다
 - `test/browser/fixtures.ts` 의 `MODELS_AGENT_CODE`, 그 에이전트 준비, `PROFILE_KEYS` 의 `browsermodels` 줄을 함께 지운다
+- `test/browser/identity.spec.ts` 가 primary 단추 색을 「모델 목록 저장」 단추로 검사한다. 그 단추가 없어지므로 같은 화면의 기본 단추 「소개와 추천 질문 저장」 으로 바꾼다
 
 ## 검증
 
@@ -80,3 +81,4 @@ scripts/check-public-safe.sh
 | `web/src/lib/agent.ts` | 수정 |
 | `test/browser/admin.spec.ts` | 수정 |
 | `test/browser/fixtures.ts` | 수정 |
+| `test/browser/identity.spec.ts` | 수정 |
