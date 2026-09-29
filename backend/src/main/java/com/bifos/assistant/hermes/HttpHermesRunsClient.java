@@ -99,8 +99,13 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                     .retrieve()
                     .body(JsonNode.class);
-            String model = text(session, "model");
-            String provider = text(session, "provider");
+            // v0.21.5 는 `{"object": ..., "session": {...}}` 로 감싸고 provider 를 `billing_provider` 로 둔다.
+            JsonNode row = session != null && session.has("session") ? session.get("session") : session;
+            String model = text(row, "model");
+            String provider = text(row, "provider");
+            if (provider == null) {
+                provider = text(row, "billing_provider");
+            }
             if (model == null && provider == null) {
                 return null;
             }
@@ -188,7 +193,16 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
+    /**
+     * 끝난 실행을 결과로 옮긴다.
+     *
+     * <p>v0.21.5 는 실제로 돈 provider 와 모델을 {@code runtime} 에 싣는다. fallback 으로 넘어간 경우도 그 값이다.
+     * 그 값을 {@code runtime} 칸에 따로 둔다. 실행 조회의 {@code model}, {@code provider} 는 요청을 되돌려 줄 뿐이다.
+     */
     private HermesRunResult toResult(String runId, String status, JsonNode run) {
+        JsonNode runtime = run.path("runtime");
+        String servedModel = text(runtime, "model");
+        String servedProvider = text(runtime, "provider");
         return new HermesRunResult(
                 runId,
                 text(run, "session_id"),
@@ -197,7 +211,8 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                 text(run, "model"),
                 text(run, "provider"),
                 text(run, "error"),
-                readUsage(run.path("usage")));
+                readUsage(run.path("usage")),
+                servedModel == null && servedProvider == null ? null : new SessionRuntime(servedModel, servedProvider));
     }
 
     /**
