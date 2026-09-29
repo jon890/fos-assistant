@@ -22,7 +22,7 @@
 
 ## 의도 메모
 
-- `agent_stop` 의 권한은 `agent_status` 와 같다(같은 뿌리의 위임 실행, 토큰의 사용자). 아니면 없는 실행과 같은 응답
+- `agent_stop` 의 권한은 `agent_status` 와 같다(같은 뿌리의 위임 실행, 요청자인 부모 실행의 사용자). 아니면 없는 실행과 같은 응답
 - 이미 끝난 실행이면 멈추지 않고 그 상태를 돌려준다(오류가 아니다)
 - 도는 실행이면 위임 서비스가 들고 있는 그 실행의 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. `CANCELLED` 가 적히기를 짧게(예: 5초) 기다려 적혔으면 `CANCELLED`, 아니면 `RUNNING` 과 `stop_requested: true` 를 돌려준다. 멈추기와 끝나기가 겹치면 먼저 적힌 상태가 남는다
 - 서버가 다시 떠 중지 표시가 없는 도는 실행은 기동 정리가 `ORPHANED` 로 끝낸다. `agent_stop` 이 그 경우에도 Hermes 에 중지를 보내는지는 run 번호가 있으면 보낸다
@@ -34,7 +34,7 @@
 
 ### 1. `AgentDelegationService.stop` 과 중지 표시
 
-위임 실행마다 중지 표시(`AtomicBoolean`)와 run 참조를 들고, 끝나면 지운다. `stop(CurrentUser, McpCallContext, Long executionId)`.
+위임 실행마다 중지 표시(`AtomicBoolean`)와 run 참조를 들고, 끝나면 지운다. `stop(McpCaller, Long executionId)`.
 
 ### 2. turn 중지 연결
 
@@ -53,14 +53,14 @@
 
 ### 5. e2e `test/e2e/scenarios/delegation.ts`
 
-가짜 Hermes 를 쓴다. 테스트가 profile 플러그인 역할을 하며 `_fos_ctx` 를 계약대로 서명해 `/mcp` 를 직접 부른다.
+가짜 Hermes 를 쓴다. 테스트가 profile 플러그인 역할을 하며 `test/e2e/mcp-context.ts` 의 `signedCallContext` 로 `_fos_ctx` 를 계약대로 서명해 `/mcp` 를 직접 부른다.
 
-1. 토큰을 발급하고, 대화 turn 하나를 붙잡아 도는 뿌리 실행과 그 `fos-` session 을 만든다
+1. `{ profileName, label }` 로 토큰을 발급하고, 대화 turn 하나를 붙잡아 도는 뿌리 실행과 그 `fos-` session 을 만든다
 2. `agent_list` 가 쓸 수 있는 에이전트만 준다
 3. `agent_delegate` 가 바로 번호와 `RUNNING` 을 준다. 자식 run 을 붙잡아 두고 `agent_status` 가 `RUNNING` 이다
 4. 자식을 끝내면 `agent_status` 가 `SUCCEEDED` 와 답을 준다
 5. 다시 위임하고 `agent_stop` 하면 가짜 Hermes 의 `stoppedRuns()` 에 그 run 이 있고 상태가 `CANCELLED` 다
-6. 서명을 바꾼 호출, 다른 사용자의 토큰, 없는 에이전트, 같은 `tool_call_id` 두 번(실행 하나)
+6. 서명을 바꾼 호출, 다른 profile 의 토큰, 없는 에이전트, 같은 `tool_call_id` 두 번(실행 하나)
 7. `GET /api/v1/usage/executions/{뿌리}/tree` 에 자식 둘이 뿌리 아래로 보이고 각자 토큰과 모델이 따로 적혀 있다
 
 `run.ts` 에 시나리오를 더한다.
@@ -72,7 +72,7 @@
 - 운영에서 동작하려면 profile 플러그인이 있어야 한다는 것을 PR 본문 앞에 적는다(배치는 `fos-home-infra`)
 - `docs/code-architecture.md` 「아직 만들지 않은 것」 에서 「MCP `agent_*` 도구(...)와 그것을 처리하는 `AgentDelegationService`, `DelegationProperties`」 줄을 뺀다. 부모를 잇는 바탕만 먼저 머지되어 그 줄이 남아 있다
 - `docs/hermes/tools-and-skills.md` 「Control Plane MCP」 표의 도구 행에서 `agent_*` 가 아직 없다는 문장을 빼고 여섯 도구를 모두 적는다
-- `docs/flow.md` 「다른 에이전트에게 맡길 때」 의 「갈리는 지점」 에서 서명 거절과 부모 없음 행에 오류 코드 `MCP_CALL_CONTEXT_INVALID` 와 그것이 나가는 JSON-RPC 오류 모양을 적는다
+- `docs/flow.md` 「다른 에이전트에게 맡길 때」 의 「갈리는 지점」 의 서명 거절과 부모 없음 행이 「MCP 호출의 요청자를 정할 때」 의 같은 도구 결과(`McpToolService.invalidContext()`, `isError: true`)를 가리키게 맞춘다
 
 ## 검증
 
