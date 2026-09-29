@@ -341,9 +341,9 @@ class ResearchAndBuildFlowTest {
                     .isInstanceOf(McpCaller.class);
             McpCaller caller = (McpCaller) resolved;
             assertThat(caller.user().id()).as("하위 실행 %s 의 요청자", child.hermesRunId()).isEqualTo(dad.id());
-            assertThat(caller.parent().id()).as("하위 실행 %s 의 MCP 부모", child.hermesRunId()).isEqualTo(child.id());
-            assertThat(caller.parent().parentExecutionId()).as("MCP 부모의 부모").isEqualTo(chief.id());
-            assertThat(caller.parent().status()).as("부모를 찾을 때의 상태").isEqualTo(ExecutionStatus.RUNNING);
+            assertThat(caller.originExecution().id()).as("하위 실행 %s 의 MCP 부모", child.hermesRunId()).isEqualTo(child.id());
+            assertThat(caller.originExecution().parentExecutionId()).as("MCP 부모의 부모").isEqualTo(chief.id());
+            assertThat(caller.originExecution().status()).as("부모를 찾을 때의 상태").isEqualTo(ExecutionStatus.RUNNING);
         });
     }
 

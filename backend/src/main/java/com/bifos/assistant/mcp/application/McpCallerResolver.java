@@ -50,10 +50,10 @@ public class McpCallerResolver {
             return new McpCaller(current(user), null, null);
         }
         McpCallContext context = McpCallContext.verify(toolName, fosCtx, principal.tokenHash());
-        AgentExecution parent = parents.resolve(principal.profileName(), context.rootSessionId());
-        AppUser user = findUser(parent.userId())
+        AgentExecution origin = parents.resolve(principal.profileName(), context.rootSessionId());
+        AppUser user = findUser(origin.userId())
                 .orElseThrow(() -> reject(toolName, "부모 실행의 사용자가 없다"));
-        return new McpCaller(current(user), parent, context);
+        return new McpCaller(current(user), origin, context);
     }
 
     private Optional<AppUser> findUser(Long userId) {

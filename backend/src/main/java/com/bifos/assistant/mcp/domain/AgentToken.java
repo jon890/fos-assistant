@@ -44,11 +44,14 @@ public class AgentToken {
      * profile 이 빈 옛 토큰을 그 profile 에 묶는다. 묶은 순간부터 그 토큰에는 옛 경로가 없다.
      *
      * <p>한 번 묶은 profile 은 바꾸지 않는다. 다른 profile 에 쓰려면 새로 발급한다.
+     *
+     * <p>{@code user_id} 도 함께 비운다. 옛 판의 서버로 되돌려도 묶인 토큰이 옛 사용자로 돌지 않고 인증에서 거절된다.
      */
     public void bindProfile(String profileName) {
         if (revokedAt != null) throw new ApiException(ErrorCode.VALIDATION_FAILED, "revoked token cannot be bound");
         if (this.profileName != null) throw new ApiException(ErrorCode.VALIDATION_FAILED, "token is already bound to a profile");
         this.profileName = profileName;
+        this.userId = null;
     }
 
     public void markUsed() { lastUsedAt = Instant.now(); }

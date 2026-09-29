@@ -86,12 +86,19 @@ class AgentTokenServiceTest {
         String raw = "legacy-" + UUID.randomUUID();
         long id = McpCallSigner.insertLegacyToken(jdbc, admin.id(), raw, "legacy");
 
+        assertThat(jdbc.queryForObject("SELECT user_id FROM agent_token WHERE id = ?", Long.class, id))
+                .as("묶기 전 옛 토큰의 사용자").isEqualTo(admin.id());
+
         AgentToken bound = tokens.bindProfile(id, "shared-group");
 
         assertThat(bound.profileName()).isEqualTo("shared-group");
         assertThat(tokenRepository.findById(id).orElseThrow().profileName()).isEqualTo("shared-group");
         assertThat(tokens.authenticate(raw).legacyUserId()).as("묶인 토큰은 사용자를 싣지 않는다").isNull();
+        assertThat(jdbc.queryForObject("SELECT user_id FROM agent_token WHERE id = ?", Long.class, id))
+                .as("묶은 뒤 user_id").isNull();
         assertValidationFailed(() -> tokens.bindProfile(id, "other-profile"), "두 번째 묶기");
+        assertThat(jdbc.queryForObject("SELECT user_id FROM agent_token WHERE id = ?", Long.class, id))
+                .as("두 번째 묶기가 거절된 뒤 user_id").isNull();
         assertThat(tokenRepository.findById(id).orElseThrow().profileName()).isEqualTo("shared-group");
     }
 
