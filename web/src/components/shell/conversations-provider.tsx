@@ -52,24 +52,36 @@ export function ConversationsProvider({ enabled, children }: {
    * 응답보다 늦게 오면 `replace` 로 바꾼 줄이 저장 전의 줄로 되돌아간다. 그래서 응답이 왔을 때 순번이 그새 올랐으면 버린다.
    */
   const latestRequest = useRef(0);
+  /** 마지막으로 나간 목록 읽기의 순번이다. 응답을 `replace` 때문에 버렸는지 구분한다 */
+  const latestLoad = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
-    const request = ++latestRequest.current;
-    try {
-      const response = await fetch("/api/chat/conversations", { cache: "no-store" });
-      if (!response.ok) throw await failure(response);
-      const loaded = (await response.json()) as Conversation[];
-      if (request !== latestRequest.current) return;
-      setConversations(loaded);
-      setError(null);
-    } catch (reason) {
-      if (request !== latestRequest.current) return;
-      setError(reason instanceof Error ? reason.message : "대화 목록을 읽지 못했어요.");
-    } finally {
-      // 버린 응답이어도 첫 읽기의 뼈대는 거둔다. 순번을 올린 `replace` 는 뼈대를 거두지 않는다.
-      setLoading(false);
+
+    /** 목록을 한 번 읽는다. `replace` 때문에 응답을 버렸으면 참을 돌려준다 */
+    async function load(): Promise<boolean> {
+      const request = ++latestRequest.current;
+      latestLoad.current = request;
+      try {
+        const response = await fetch("/api/chat/conversations", { cache: "no-store" });
+        if (!response.ok) throw await failure(response);
+        const loaded = (await response.json()) as Conversation[];
+        if (request !== latestRequest.current) return request === latestLoad.current;
+        setConversations(loaded);
+        setError(null);
+      } catch (reason) {
+        if (request !== latestRequest.current) return request === latestLoad.current;
+        setError(reason instanceof Error ? reason.message : "대화 목록을 읽지 못했어요.");
+      } finally {
+        // 버린 응답이어도 첫 읽기의 뼈대는 거둔다. 순번을 올린 `replace` 는 뼈대를 거두지 않는다.
+        setLoading(false);
+      }
+      return false;
     }
+
+    // `replace` 는 한 줄만 바꾸므로, 버린 응답에 담긴 다른 줄의 제목과 순서는 옛 값으로 남는다. 그래서 한 번 더 읽는다.
+    // 뒤에 나간 목록 읽기 때문에 버렸으면 그 읽기가 목록을 채우므로 다시 읽지 않는다. 다시 읽기도 한 번뿐이라 되풀이되지 않는다.
+    if (await load()) await load();
   }, [enabled]);
 
   useEffect(() => {

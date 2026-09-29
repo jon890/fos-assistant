@@ -40,7 +40,7 @@ type OptionsState =
   | { status: "loaded"; options: ModelOptions }
   | { status: "failed" };
 
-/** Control Plane 이 받는 effort 다. 목록을 읽지 못해도 effort 는 고를 수 있어야 해서 화면이 따로 갖는다 */
+/** Control Plane 이 받는 effort 다. 목록을 읽지 못했을 때만 쓴다. 그때도 effort 는 고를 수 있어야 해서 화면이 따로 갖는다 */
 const REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
 /** 모델 고르기의 「기본」 자리 값이다 */
@@ -84,11 +84,19 @@ function sameChoice(left: ModelChoice | null, right: ModelChoice): boolean {
     && (left?.reasoningEffort ?? null) === right.reasoningEffort;
 }
 
+/**
+ * 저장한 결과다. 실패하면 단추가 이전 값으로 돌아간다.
+ *
+ * <p>`reported` 는 실패했지만 부르는 쪽이 이미 알렸다는 뜻이다. 빈 대화를 만들지 못하면 입력창이 알리므로
+ * 이 부품은 안내를 더 띄우지 않는다. 두 안내가 겹치면 무엇이 실패했는지 읽기 어렵다.
+ */
+export type ModelChoiceSaveResult = "saved" | "failed" | "reported";
+
 type Props = {
   agentCode: string;
   choice: ModelChoice | null;
-  /** 고른 값을 저장한다. 저장이 끝났는지를 돌려준다. 실패하면 단추가 이전 값으로 돌아간다 */
-  onChange(choice: ModelChoice): Promise<boolean>;
+  /** 고른 값을 저장한다 */
+  onChange(choice: ModelChoice): Promise<ModelChoiceSaveResult>;
   disabled: boolean;
 };
 
@@ -129,6 +137,8 @@ export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
       loadVersion.current += 1;
       return;
     }
+    // 다시 고르러 왔으니 지난 저장 실패 안내는 거둔다.
+    setFailed(false);
     setDraftModel(shown?.provider && shown.model ? modelKey(shown.provider, shown.model) : DEFAULT_KEY);
     setDraftEffort(shown?.reasoningEffort ?? "");
     void loadOptions();
@@ -143,6 +153,10 @@ export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
   const keptKey = shown?.provider && shown.model && !knownKeys.has(modelKey(shown.provider, shown.model))
     ? modelKey(shown.provider, shown.model) : null;
   const defaultLabel = options?.defaultModel ? `기본 (${options.defaultModel})` : "기본";
+  const listedEfforts = options?.reasoningEfforts ?? REASONING_EFFORTS;
+  // 대화에 적힌 effort 가 목록에 없으면 그 값도 둔다. 선택지에 없으면 창은 「기본」 을 보이는데 적용하면 옛 값이 나간다.
+  const efforts = shown?.reasoningEffort && !listedEfforts.includes(shown.reasoningEffort)
+    ? [...listedEfforts, shown.reasoningEffort] : listedEfforts;
 
   async function apply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -158,9 +172,9 @@ export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
     if (sameChoice(choice, next)) return;
     setSaving(next);
     setFailed(false);
-    const saved = await onChange(next);
+    const result = await onChange(next);
     setSaving(null);
-    if (!saved) setFailed(true);
+    if (result === "failed") setFailed(true);
   }
 
   return (
@@ -222,7 +236,7 @@ export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
                 onChange={(event) => setDraftEffort(event.target.value)}
               >
                 <option value="">기본</option>
-                {REASONING_EFFORTS.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+                {efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
               </NativeSelect>
               {effortEnabled ? null : (
                 <p className="text-xs text-muted-foreground">이 모델은 effort 를 고를 수 없어요.</p>

@@ -8,7 +8,7 @@ import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
 import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
-import { ModelPicker, type ModelChoice } from "./model-picker";
+import { ModelPicker, type ModelChoice, type ModelChoiceSaveResult } from "./model-picker";
 import type { Conversation } from "../shell/conversations-provider";
 
 type Props = {
@@ -40,6 +40,11 @@ type Props = {
   onBlockingChange?(blocking: boolean): void;
   /** 이 대화에 적힌 모델 선택이다. 대화가 아직 없으면 null */
   modelChoice: ModelChoice | null;
+  /**
+   * 대화는 있는데 그 대화에 적힌 모델 선택을 아직 모른다. 대화 목록이 오기 전이 그렇다.
+   * 이때 고르게 하면 모르는 값을 「기본」 으로 보고 저장해 적힌 모델을 지운다. 그래서 단추를 막는다.
+   */
+  modelChoiceUnknown: boolean;
   /** 모델 선택을 저장한 뒤 서버가 돌려준 대화 한 줄을 알린다 */
   onModelChoiceSaved(conversation: Conversation): void;
 };
@@ -102,6 +107,7 @@ export function Composer({
   mention,
   onBlockingChange,
   modelChoice,
+  modelChoiceUnknown,
   onModelChoiceSaved,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -347,22 +353,23 @@ export function Composer({
    *
    * <p>대화를 만든 것은 `ensureConversationId` 가 이미 알렸으므로 여기서 다시 알리지 않는다.
    */
-  async function saveModelChoice(choice: ModelChoice): Promise<boolean> {
+  async function saveModelChoice(choice: ModelChoice): Promise<ModelChoiceSaveResult> {
     setSavingModel(true);
     try {
       const targetConversationId = await ensureConversationId();
-      if (targetConversationId === null || !mountedRef.current) return false;
+      // 빈 대화를 만들지 못했으면 `ensureConversationId` 가 이미 알렸다.
+      if (targetConversationId === null || !mountedRef.current) return "reported";
       const response = await fetch(`/api/chat/conversations/${targetConversationId}/model`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(choice),
       });
-      if (!response.ok) return false;
+      if (!response.ok) return "failed";
       // 기다리는 동안 대화를 바꿨어도 알린다. 받은 줄은 그 대화의 것이라 목록의 그 줄만 바뀐다.
       onModelChoiceSaved((await response.json()) as Conversation);
-      return true;
+      return "saved";
     } catch {
-      return false;
+      return "failed";
     } finally {
       if (mountedRef.current) setSavingModel(false);
     }
@@ -603,7 +610,7 @@ export function Composer({
           agentCode={agentCode}
           choice={modelChoice}
           onChange={saveModelChoice}
-          disabled={disabled || agentCode.length === 0}
+          disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
         />
       </div>
     </form>

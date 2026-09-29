@@ -1055,6 +1055,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
               model: currentConversation.model,
               reasoningEffort: currentConversation.reasoningEffort,
             } : null}
+            modelChoiceUnknown={conversationId !== null && currentConversation === undefined}
             // 저장 응답으로 그 줄만 바꾼다. 목록을 다시 읽으면 먼저 나간 읽기가 늦게 와 저장한 줄을 저장 전의 줄로 되돌릴 수 있다.
             onModelChoiceSaved={replace}
           />
