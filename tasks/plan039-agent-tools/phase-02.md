@@ -23,7 +23,7 @@ Chief 가 `agent_delegate(agent_code, task)` 를 부르면 경계를 검사하�
 ## 의도 메모
 
 - 인자는 `agent_code`, `task` 둘뿐이다. `_fos_ctx` 외의 다른 키(profile, user, parent, root, api 주소, key)가 오면 인자 오류다. 모델이 준 값으로 profile 이나 사용자를 정하지 않는다
-- 부모는 `McpCallerResolver` 가 찾은 `McpCaller.parent()` 다(토큰의 profile, 서명한 뿌리 session, `RUNNING` 이 맞는 도는 실행). `DelegationParentResolver` 를 다시 부르지 않는다. 자식의 뿌리는 부모의 뿌리(없으면 부모 번호)다. 사용자는 `McpCaller.user()` 다
+- 부모는 `McpCallerResolver` 가 찾은 `McpCaller.originExecution()` 이다(ADR-037). 하위 에이전트가 부르면 그 session 을 등록한 origin 실행이고 끝난 실행일 수 있다. 최상위 session 이면 토큰의 profile, 서명한 뿌리 session, `RUNNING` 이 맞는 도는 실행이다. `SessionOwnerResolver` 나 `DelegationParentResolver` 를 다시 부르지 않는다. 하위 에이전트 몫의 실행 줄을 만들지 않는다. 자식의 뿌리는 부모의 뿌리(없으면 부모 번호)다. 사용자는 `McpCaller.user()` 다
 - 깊이: 부모에서 `parent_execution_id` 를 따라 올라가 센다(사용자가 부른 실행 0). 새 자식의 깊이가 `assistant.delegation.max-depth`(기본 2)를 넘으면 거절. 따라가는 횟수를 한도로 묶어 순환 데이터에서 멈춘다
 - 같은 호출: `delegation_key` 는 `DelegationKey.of(부모 실행의 profileName, rootSessionId, sessionId, toolCallId)` 다(ADR-032 「`delegation_key`」). `rootSessionId`, `sessionId`, `toolCallId` 는 `McpCaller.context()` 에서 읽는다. 이미 있으면 새로 만들지 않고 그 실행을 돌려준다. 동시에 두 요청이 와서 유일 제약에 걸리면 먼저 저장된 줄을 다시 읽어 돌려준다
 - 동시 한도: 같은 뿌리 아래 `delegation_key` 가 있는 `RUNNING` 줄 수가 `assistant.delegation.max-concurrent-children`(기본 4) 이상이면 거절. 세기와 시작 사이 경합은 서비스 안에서 뿌리별로 잠가 막는다(서버 하나 전제, 여러 대가 되면 DB 잠금으로 옮긴다고 주석에 적는다). 서버 전체 한도 `assistant.delegation.max-active`(기본 16)는 세마포어로 둔다
@@ -51,7 +51,7 @@ Chief 가 `agent_delegate(agent_code, task)` 를 부르면 경계를 검사하�
 
 ### 4. `AgentDelegationService.delegate`
 
-위 의도 메모의 순서로: 부모 확인(`McpCaller.parent()`), 깊이, 에이전트 확인, 같은 호출 확인, 동시 한도, 실행 시작, 제출 대기, 결과 돌려주기. 끝난 뒤 `output_text` 기록. 부모의 대화는 `ConversationRepository` 로 읽는다(부모의 `conversationId`).
+위 의도 메모의 순서로: 부모 확인(`McpCaller.originExecution()`), 깊이, 에이전트 확인, 같은 호출 확인, 동시 한도, 실행 시작, 제출 대기, 결과 돌려주기. 끝난 뒤 `output_text` 기록. 부모의 대화는 `ConversationRepository` 로 읽는다(부모의 `conversationId`).
 
 ### 5. MCP 규격과 경로
 
@@ -62,6 +62,7 @@ Chief 가 `agent_delegate(agent_code, task)` 를 부르면 경계를 검사하�
 `McpAgentToolsTest` 에 더하거나 `AgentDelegationServiceTest` 를 새로 둔다. `StubHermesRunsClient` 로 Hermes 를 대신한다.
 
 - 정상: 번호와 `RUNNING` 이 바로 오고, 스텁이 끝내면 `agent_status` 가 `SUCCEEDED` 와 답을 준다. 자식 줄의 `parent_execution_id`, `root_execution_id`, `user_id`, `hermes_session_id`(`fos-` 로 시작, 부모와 다름), `delegation_key` 가 맞다. `chat_message` 가 늘지 않는다
+- 하위 에이전트: 부모 실행 아래 하위 에이전트 session 을 `SubagentSessionRegistrar` 로 등록하고 부모를 `SUCCEEDED` 로 바꾼 뒤, 그 session 으로 서명한 `agent_delegate` 가 만든 자식의 `parent_execution_id` 가 그 부모 실행이다. 하위 에이전트 몫의 실행 줄은 생기지 않는다
 - Memory: 자식 실행의 `instructions` 가 원래 사용자로 다시 조립한 값이다(부모 문자열을 넘기지 않는다). 스텁의 `received()` 로 본다
 - profile: 자식 요청의 profile 과 주소가 에이전트 바인딩의 값이다. 인자에 profile 이나 사용자를 넣으면 인자 오류다
 - 없는 에이전트, 남의 비공개 에이전트는 같은 응답, 꺼진 에이전트는 `AGENT_DISABLED`
