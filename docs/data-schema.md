@@ -154,7 +154,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `root_execution_id` | BIGINT NULL | 이 실행이 속한 나무의 뿌리. 뿌리 자신은 비어 있다 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
-| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. MCP 호출의 서명한 뿌리 session 과 `profile_name` 으로 부모 실행을 찾고 그 실행의 `user_id` 를 요청자로 쓸 때 쓴다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 이 칸이 생기기 전의 실행과 Memory 제안은 비어 있다 |
+| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 뿌리 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안은 비어 있다 |
 | `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 뿌리 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. 정의는 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 가 돌려준다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
@@ -184,7 +184,7 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 
 `CANCELLED` 는 중지한 turn 과 `agent_stop` 으로 멈춘 위임 실행에 쓴다.
 
-`hermes_session_id` 와 `status` 에 함께 색인을 둔다. 사용자가 걸린 MCP 호출마다 서명한 뿌리 session 으로 도는 실행을 찾기 때문이다.
+`hermes_session_id` 와 `status` 에 함께 색인을 둔다. 최상위 session 의 MCP 호출과 최상위 자식의 등록마다 서명한 뿌리 session 으로 도는 실행을 찾기 때문이다.
 그 session 을 가진 도는 실행이 둘 이상이면 어느 쪽도 부모로 쓰지 않고 거절한다. 대화 하나에는 도는 turn 이 하나뿐이라 보통 생기지 않는다.
 
 금액을 0 으로 채우지 않는다.
@@ -273,13 +273,13 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 토큰 원문은 발급 응답에서 한 번만 내고 데이터베이스에는 SHA-256 해시만 저장한다.
 
 **토큰은 어느 profile 이 부르는지만 증명한다. 사용자를 정하지 않는다.**
-요청자는 서명한 `_fos_ctx` 로 찾은 부모 실행의 `user_id` 다.
+요청자는 서명한 `_fos_ctx` 로 찾은 origin 실행의 `user_id` 다.
 근거는 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `profile_name` | VARCHAR(64) NULL | 이 토큰을 쓰는 Hermes profile. 새로 발급하는 토큰은 늘 채운다. 비어 있으면 옛 토큰이다 |
-| `user_id` | BIGINT NULL | 옛 토큰을 발급한 대상 사용자. 권한 판정에 쓰지 않는다. `assistant.mcp.legacy-user-tokens` 가 참일 때 `profile_name` 이 빈 토큰만 이 값으로 돈다. 새 토큰은 비워 둔다 |
+| `user_id` | BIGINT NULL | 옛 토큰을 발급한 대상 사용자. 권한 판정에 쓰지 않는다. `assistant.mcp.legacy-user-tokens` 가 참일 때 `profile_name` 이 빈 토큰만 이 값으로 돈다. 새 토큰은 비워 두고, 옛 토큰을 profile 에 묶을 때 비운다. 옛 판의 서버로 되돌려도 묶인 토큰이 옛 사용자로 돌지 않고 인증에서 거절되게 하기 위해서다 |
 | `token_hash` | VARCHAR(64) | 토큰 원문의 SHA-256 해시. 원문은 저장하지 않는다 |
 | `label` | VARCHAR(100) | 관리자가 토큰 용도를 구분하는 이름 |
 | `created_at` | DATETIME(6) | 발급 시각 |
@@ -291,6 +291,38 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 **profile 을 채우는 값은 마이그레이션에 넣지 않는다.** 어느 토큰이 어느 profile 의 것인지는 운영 값이다.
 V29 는 칸만 더하고, 운영 토큰은 관리 API `PUT /api/v1/admin/agent-tokens/{id}/profile` 로 채운다.
+
+## hermes_session_binding
+
+Hermes `delegate_task` 가 만든 하위 에이전트 session 이 어느 FOS 실행에서 시작됐는지 적는다.
+profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+
+**한 번 적은 줄은 바꾸지 않는다.** 같은 대화의 다음 turn 이 시작돼도 그 하위 에이전트는 처음 origin 실행에 속한다.
+대화 session 은 여러 turn 이 이어 쓰므로 여기 적지 않는다. 최상위 session 은 `agent_execution.hermes_session_id` 로 찾는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | |
+| `profile_name` | VARCHAR(64) | 등록한 토큰이 증명한 profile |
+| `session_id` | VARCHAR(128) | 하위 에이전트 session. Hermes 가 정한 값이다 |
+| `user_id` | BIGINT | origin 실행의 `user_id`. MCP 호출의 요청자다 |
+| `origin_execution_id` | BIGINT | 이 session 을 낳은 FOS 실행. 끝난 실행이어도 된다 |
+| `root_session_id` | VARCHAR(128) | 서명한 `parent_root_session_id`. MCP 호출의 서명한 뿌리와 다르면 거절한다 |
+| `parent_session_id` | VARCHAR(128) | 이 session 을 만든 session. 최상위 session 이거나 다른 하위 에이전트 session 이다 |
+| `created_at` | DATETIME(6) | 등록 시각 |
+
+| 제약 | 까닭 |
+| --- | --- |
+| `UNIQUE (profile_name, session_id)` | session id 가 profile 사이에서 유일하다고 보장하지 않는다. 한 profile 안에서 한 session 은 한 origin 에만 속한다 |
+
+외래 키는 두지 않는다. `agent_execution` 도 사용자와 대화에 외래 키를 두지 않고, 실행 줄과 사용자는 지우지 않는다. 등록은 서버가 방금 읽은 실행에서 origin 과 사용자를 옮겨 적으므로 없는 실행을 가리키지 않는다.
+
+같은 `(profile_name, session_id)` 가 같은 부모와 뿌리로, 또는 같은 origin 으로 다시 오면 새 줄을 만들지 않고 성공으로 답한다.
+다른 origin 이면 거절하고 덮어쓰지 않는다. 동시에 두 요청이 와서 유일 제약에 걸리면 먼저 저장된 줄을 다시 읽어 같은 규칙으로 판정한다.
+
+하위 에이전트의 하위 에이전트는 부모 등록의 `origin_execution_id` 와 `user_id` 를 그대로 잇는다. 하위 에이전트 몫의 `agent_execution` 줄은 만들지 않는다. 하위 에이전트는 지금처럼 `execution_event` 의 `SUBAGENT_STARTED`, `SUBAGENT_COMPLETED` 로 보인다.
+
+Control Plane 이 다시 뜨면 도는 실행은 `ORPHANED` 로 끝나지만 등록 줄은 그대로다. 이미 등록한 하위 에이전트는 계속 요청자를 찾는다. 다시 뜬 뒤 그 부모 run 이 새로 만든 최상위 자식은 도는 부모가 없어 등록되지 않는다.
 
 ## execution_event
 
@@ -396,6 +428,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 첨부도 행을 지우지 않는다. 파일만 지우고 `deleted_at` 을 적는다.
 결과물(`chat_artifact`)도 같다.
+하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 
 허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다.

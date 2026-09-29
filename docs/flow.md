@@ -51,8 +51,8 @@ Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주�
 ③도 사용자를 정하지 못한다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰고, MCP 연결과 그 토큰은 profile 에 하나다.
 
 그래서 사용자는 Control Plane 이 이미 기록한 실행에서 꺼낸다.
-profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 지금 도는 부모 실행 하나를 찾고, 그 실행의 `user_id` 가 요청자다.
-아래 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
+profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 origin 실행 하나를 찾고, 그 실행의 `user_id` 가 요청자다. 하위 에이전트 session 은 만들 때 등록한 실행이, 최상위 session 은 지금 도는 실행이 origin 이다.
+아래 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 ## MCP 호출의 요청자를 정할 때
 
@@ -64,6 +64,7 @@ sequenceDiagram
     participant P as profile 플러그인
     participant F as 토큰 인증
     participant R as 요청자 판정
+    participant B as hermes_session_binding
     participant E as agent_execution
 
     H->>P: 도구 호출 (session_id, tool_call_id)
@@ -72,9 +73,16 @@ sequenceDiagram
     F->>F: 토큰 해시로 한 줄을 찾는다. 폐기됐으면 401
     F->>R: McpPrincipal(토큰 번호, profile, 토큰 해시)
     R->>R: _fos_ctx 의 서명을 토큰 해시로 확인
-    R->>E: profile, 뿌리 session, RUNNING 이 맞는 줄을 둘까지 읽는다
-    E-->>R: 정확히 하나
-    R->>R: 그 줄의 user_id 로 사용자를 읽는다
+    R->>B: (profile, session_id) 등록을 찾는다
+    alt 등록이 있다
+        B-->>R: origin 실행. 끝난 실행이어도 된다
+    else 등록이 없고 session_id 가 뿌리와 같다
+        R->>E: profile, 뿌리 session, RUNNING 이 맞는 줄을 둘까지 읽는다
+        E-->>R: 정확히 하나
+    else 등록이 없고 session_id 가 뿌리와 다르다
+        R-->>H: 거절
+    end
+    R->>R: 그 실행의 user_id 로 사용자를 읽는다
     R-->>H: 그 사용자의 권한으로 도구를 돌린 결과
 ```
 
@@ -97,13 +105,16 @@ sequenceDiagram
 | profile 이 빈 옛 토큰이고 `assistant.mcp.legacy-user-tokens` 가 거짓이다 | HTTP 401 |
 | profile 이 빈 옛 토큰이고 그 설정이 참이다 | 옛 토큰의 `user_id` 로 전처럼 돈다. `_fos_ctx` 는 보지 않고 경고 로그를 남긴다 |
 | profile 이 묶인 토큰인데 `_fos_ctx` 가 없거나 모양이 틀렸거나 서명이 맞지 않는다 | 거절한다 |
-| 서명은 맞지만 그 뿌리 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, 이 결정 전 대화의 압축 교체, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
+| 서명이 맞고 그 호출의 session 에 하위 에이전트 등록이 있다 | 등록의 origin 실행의 사용자로 돈다. origin 실행이 끝났어도, 같은 대화의 다음 turn 이 돌고 있어도 같다 |
+| 등록의 뿌리 session 이 서명한 뿌리와 다르다 | 거절한다 |
+| 등록이 없고 그 호출의 session 이 뿌리와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| 등록이 없고 session 이 뿌리와 같지만 그 뿌리 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
 | 그 뿌리 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 
 거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 「호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.」 다.
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
-이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다.
+이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를 남긴다.
 
 **실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.**
 
@@ -113,6 +124,59 @@ sequenceDiagram
 | 흐름의 하위 실행 | 제출하기 전에 새로 정한 `fos-<uuid>`. 부모의 session 을 잇지 않는다 |
 | 앞으로의 위임 자식 | 위와 같다 |
 | Memory 제안 | 적지 않는다. 이 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다 |
+
+### 하위 에이전트 session 을 등록할 때
+
+Hermes 의 하위 에이전트는 부모 run 보다 오래 살 수 있다. 그래서 만들어지는 순간 주인을 적는다.
+계약은 [`hermes/delegation.md`](hermes/delegation.md#하위-에이전트-session-등록-계약), 결정은 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+
+```mermaid
+sequenceDiagram
+    participant H as Hermes 부모 스레드
+    participant P as profile 플러그인
+    participant C as 등록 경로
+    participant B as hermes_session_binding
+    participant E as agent_execution
+
+    H->>H: delegate_task 가 자식 S1 을 만든다
+    H->>P: subagent_start(parent_session_id, child_session_id)
+    P->>C: POST /internal/hermes/session-bindings/subagent, Bearer 토큰, 서명한 본문
+    C->>C: 토큰 인증과 서명 확인
+    C->>B: (profile, parent_session_id) 등록을 찾는다
+    alt 부모도 하위 에이전트다
+        B-->>C: 부모의 origin 실행
+    else 부모가 최상위 session 이다
+        C->>E: profile, parent_root_session_id, RUNNING 인 줄 하나
+        E-->>C: origin 실행
+    end
+    C->>B: (profile, S1) → origin, 사용자, 뿌리, 부모 session
+    C-->>P: 201 또는 200
+    P-->>H: hook 이 돌아온다
+    H->>H: 자식 S1 이 돌기 시작한다
+```
+
+부모 run 이 먼저 끝나도 S1 의 등록은 남는다.
+
+```text
+FOS 실행 #100 user=A profile=chief session=R    ← 끝났다
+ └ S1 등록: (chief, S1) → #100, A
+     └ S2 등록: (chief, S2) → #100, A          ← S1 이 만든 자식도 #100 을 잇는다
+FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 에 남는다
+```
+
+다른 에이전트에게 맡긴 FOS 실행 안에서 만든 하위 에이전트는 그 FOS 실행을 origin 으로 갖는다. 그 FOS 실행이 제 session 으로 돌기 때문이다.
+
+| 경우 | 결과 |
+| --- | --- |
+| 같은 `(profile, child_session_id)` 가 같은 부모와 뿌리로 다시 온다 | `200` 으로 답한다. 부모를 다시 풀지 않아, 그사이 부모 run 이 끝났어도 같다. 줄은 하나다 |
+| 같은 `(profile, child_session_id)` 가 다른 origin 으로 온다 | `409` 로 거절하고 덮어쓰지 않는다 |
+| 부모 session 에 등록이 없고 뿌리로 도는 실행도 없다 | `403` 으로 거절한다 |
+| 서명이 틀리거나 토큰의 profile 이 부모의 profile 과 다르다 | `403` 으로 거절한다. 다른 profile 의 등록과 실행은 보이지 않는다 |
+| `child_session_id` 가 뿌리 session 이거나, 그 profile 의 실행 줄이 쓰는 session 이거나, 대화가 적어 둔 session 이다 | `403` 으로 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 이 앞 turn 에 묶인다. 압축 교체된 최상위 session 은 대화에만 남아 있어 대화도 본다 |
+| session 값이 128자를 넘는다 | `403` 으로 거절한다. 저장 칸의 길이다 |
+| 플러그인이 등록하지 못했다 | Hermes 는 hook 예외를 삼키고 자식을 돌린다. 그 자식의 호출은 위 판정에서 거절된다 |
+| Control Plane 이 다시 떴다 | 등록은 데이터베이스에 있어 그대로 쓴다 |
+| 부모 turn 이 끝난 뒤 하위 에이전트가 결과물을 썼다 | 파일은 대화 폴더에 남지만 어느 답에도 묶이지 않는다. 답에 묶는 것은 turn 이 끝날 때 폴더를 훑는 방식이다 |
 
 ## 사람을 더할 때
 
@@ -588,7 +652,7 @@ sequenceDiagram
     M-->>H: 12번 본문이 필요하다
     H->>C: POST /mcp  memory_read(id=12)
     Note over H,C: Authorization 에 그 profile 의 agent_token, 인자에 서명한 _fos_ctx
-    C->>C: 부모 실행으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
+    C->>C: origin 실행으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
     C-->>H: 본문 또는 읽을 수 없다는 응답
     H->>M: 도구 결과를 준다
     M-->>H: 그 본문으로 답한다
@@ -596,7 +660,7 @@ sequenceDiagram
 ```
 
 **요청 본문에는 항목 번호만 있고 사용자가 없다.**
-사용자는 「MCP 호출의 요청자를 정할 때」 의 길로 부모 실행에서 정한다.
+사용자는 「MCP 호출의 요청자를 정할 때」 의 길로 origin 실행에서 정한다.
 모델이 만든 JSON 에 사용자를 넣게 하면 모델이 남의 Memory 를 읽을 수 있다.
 
 볼 수 없는 항목과 없는 항목은 **같은 응답**으로 답한다.
@@ -1014,7 +1078,7 @@ flowchart TD
     A[실행 입력에 publicId 와 도구 안내] --> B[Hermes 가 artifact_write 호출]
     B --> T{MCP 토큰 인증}
     T -->|실패| U[HTTP 401]
-    T -->|성공| K{부모 실행으로 요청자 판정}
+    T -->|성공| K{origin 실행으로 요청자 판정}
     K -->|실패| N[isError true, 호출 맥락 오류]
     K -->|성공| P{도구별 인자 검사}
     P -->|실패| I[JSON-RPC -32602]
@@ -1076,7 +1140,7 @@ sequenceDiagram
     P->>P: 뿌리 session 을 찾고 MCP 토큰으로 서명한다
     P->>M: tools/call + _fos_ctx
     M->>M: 토큰으로 profile 을 정한다
-    M->>D: 서명 확인, profile 과 뿌리 session 의 도는 실행을 부모로, 그 실행의 사용자가 요청자
+    M->>D: 서명 확인, 「MCP 호출의 요청자를 정할 때」 의 origin 실행을 부모로, 그 실행의 사용자가 요청자
     D->>D: 깊이와 동시 한도, 에이전트 접근, 같은 호출인지 본다
     D->>D: 실행 줄을 만들고 새 session fos-<uuid> 를 적는다
     D->>H: POST /v1/runs (원래 사용자로 다시 조립한 Memory)
@@ -1096,7 +1160,7 @@ sequenceDiagram
 | 경우 | 결과 |
 | --- | --- |
 | `_fos_ctx` 가 없거나 서명이 틀리다 | 거절한다. 플러그인이 빠진 profile 이거나 모델이 흉내 낸 것이다 |
-| 뿌리 session 을 가진 도는 실행이 없거나 둘 이상이다 | 거절한다. 부모를 추측하지 않는다 |
+| origin 실행을 정하지 못했다 | 거절한다. 부모를 추측하지 않는다. 하위 에이전트는 origin 실행이 끝났어도 그 실행 아래 붙는다 |
 | 그 실행의 profile 이 토큰의 profile 과 다르다 | 거절한다. 사용자는 토큰이 아니라 그 실행이 정한다 |
 | 없는 에이전트, 쓸 수 없는 에이전트 | 같은 응답으로 거절한다. 있는지 없는지 알리지 않는다 |
 | 꺼진 에이전트 | 쓸 수 없다고 거절한다 |
@@ -1134,7 +1198,7 @@ sequenceDiagram
     C->>H: 실행 입력 맨 앞에 결과물 폴더 단락
     alt artifact_write 도구가 있다
         H->>C: artifact_write 로 HTML 과 사진 저장을 요청한다
-        C->>D: 부모 실행의 사용자와 대화 주인을 확인하고 저장한다
+        C->>D: origin 실행의 사용자와 대화 주인을 확인하고 저장한다
     else artifact_write 도구가 없고 파일 도구가 있다
         H->>D: 결과물 폴더에 HTML 과 사진을 직접 쓴다
     end

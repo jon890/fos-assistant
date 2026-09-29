@@ -5,6 +5,7 @@
   사용자가 걸린 도구(`memory_read`, `artifact_write`, 앞으로의 `agent_*`)는 profile 플러그인이 서명한 `_fos_ctx` 로 **도는 부모 실행 하나**를 찾고, 그 실행의 `user_id` 를 요청자로 쓴다.
   부모 실행은 토큰이 증명한 profile 과 서명한 뿌리 session 과 `RUNNING` 이 모두 맞는 줄이어야 한다. profile 이 다르면 거절한다.
   위임을 두 번 만들지 않는 `delegation_key` 는 뿌리 session 에 그 호출의 session 을 더해 계산한다.
+- **대체된 부분**: [ADR-037](ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 이 하위 에이전트 session 의 요청자를 바꿨다. 하위 에이전트 session 은 도는 부모 실행이 아니라 만들 때 등록한 origin 실행의 사용자로 돈다. origin 실행이 끝났어도 된다. 등록이 없는 하위 에이전트 session 은 거절한다. 최상위 session 은 이 결정 그대로 도는 실행 하나를 찾는다.
 - **맥락**:
   - 전에는 토큰 한 줄이 `user_id` 를 갖고 그 사용자로 모든 MCP 도구를 돌렸다. 개인 profile 은 그 사용자 한 사람만 쓰므로 맞았다.
   - GROUP 에이전트는 여러 사용자가 같은 profile 을 쓴다([ADR-002](ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md)). MCP 연결은 profile 당 하나이고 헤더는 연결할 때 한 번 정해진다([ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md)). 그 profile 설정에 사용자 A 의 토큰이 들어 있으면 B 의 대화에서 부른 `memory_read` 가 A 의 권한으로 돌았다.
@@ -59,7 +60,7 @@
 
 1. 백엔드를 배포하고 운영 설정에서 `legacy-user-tokens` 를 참으로 둔다
 2. profile 마다 플러그인이 Control Plane MCP 의 모든 도구에 `_fos_ctx` 를 붙이는지 확인한다
-3. 관리 API 로 그 profile 의 토큰에 profile 을 묶는다. 그 순간부터 그 profile 은 `_fos_ctx` 가 필수다
+3. 관리 API 로 그 profile 의 토큰에 profile 을 묶는다. 그 순간부터 그 profile 은 `_fos_ctx` 가 필수다. 묶을 때 `user_id` 를 비운다. `user_id` 를 읽는 옛 판의 서버로 되돌려도 묶인 토큰은 인증에서 거절된다
 4. 모든 토큰이 묶이면 설정을 거짓으로 돌린다
 5. 다음 변경에서 설정과 `agent_token.user_id` 칸을 지운다
 

@@ -8,6 +8,9 @@ import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
+import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
+import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
@@ -48,6 +51,7 @@ class McpArtifactWriteToolTest {
     @Autowired ChatArtifactRepository artifacts;
     @Autowired AgentExecutionRepository executions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired SubagentSessionRegistrar registrar;
 
     private static final String PROFILE = "mcp-artifact-write";
 
@@ -56,6 +60,7 @@ class McpArtifactWriteToolTest {
     private AppUser dad;
     private String dadToken;
     private String dadRoot;
+    private AgentExecution dadRun;
 
     @BeforeEach
     void 준비한다() {
@@ -66,7 +71,7 @@ class McpArtifactWriteToolTest {
         dad = users.save(AppUser.of("mcp-artifact-dad@example.com", "아빠", 1L, UserRole.ADMIN));
         dadToken = tokens.issue(PROFILE, "dad").rawToken();
         dadRoot = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
+        dadRun = McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
     }
 
     @Test
@@ -113,6 +118,28 @@ class McpArtifactWriteToolTest {
         assertThat(rejected.path("result").path("content").get(0).path("text").asString())
                 .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
         assertThat(store.resolveInside(conversation.id(), path)).isEmpty();
+    }
+
+    @Test
+    void 등록한_하위_에이전트는_부모_실행이_끝난_뒤에도_그_사용자의_대화에만_쓴다() throws Exception {
+        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        AppUser kid = users.save(AppUser.of("mcp-artifact-subagent-kid@example.com", "아이", 1L, UserRole.MEMBER));
+        Conversation kids = conversations.save(Conversation.startedBy(kid.id(), "", null));
+        String subagent = "하위-" + UUID.randomUUID();
+        registrar.register(PROFILE, dadRoot, dadRoot, subagent);
+        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
+        // 결과물 폴더는 디스크에 남아 다른 검사의 대화 번호와 겹칠 수 있으므로 경로를 새로 만든다.
+        String ownPath = "subagent-" + UUID.randomUUID() + ".html";
+        String kidsPath = "subagent-" + UUID.randomUUID() + ".html";
+
+        JsonNode written = body(subagentWrite(subagent, own, ownPath));
+        JsonNode refused = body(subagentWrite(subagent, kids, kidsPath));
+
+        assertThat(written.path("result").path("isError").asBoolean()).as("아빠의 대화에 쓴 결과: %s", written).isFalse();
+        assertThat(store.resolveInside(own.id(), ownPath)).isPresent();
+        assertThat(refused.path("result").path("isError").asBoolean()).as("아이의 대화에 쓴 결과: %s", refused).isTrue();
+        assertThat(refused.path("result").path("content").get(0).path("text").asString()).isEqualTo("결과물을 저장할 수 없습니다.");
+        assertThat(store.resolveInside(kids.id(), kidsPath)).isEmpty();
     }
 
     @Test
@@ -260,6 +287,12 @@ class McpArtifactWriteToolTest {
 
     private HttpResponse<String> call(String token, String conversationId, String path, String content) throws Exception {
         return raw(token, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversationId + "\",\"path\":\"" + path + "\",\"content\":\"" + content + "\"}}}");
+    }
+
+    /** 아빠의 뿌리 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code artifact_write} 를 보낸다. */
+    private HttpResponse<String> subagentWrite(String sessionId, Conversation conversation, String path) throws Exception {
+        String fosCtx = McpCallSigner.context(dadToken, "artifact_write", dadRoot, sessionId, "call_" + UUID.randomUUID()).toString();
+        return raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"_fos_ctx\":" + fosCtx + ",\"path\":\"" + path + "\",\"content\":\"<p>x</p>\"}}}");
     }
 
     /** 도구 호출의 인자에 {@code _fos_ctx} 가 없으면 아빠의 도는 실행 뿌리로 서명해 붙인다. */

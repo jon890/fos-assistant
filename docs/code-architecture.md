@@ -106,7 +106,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
   다른 사용자의 개인 항목은 고르는 단계에서 빠진다.
 - `always_inject` 가 참이면 본문을 싣고, 거짓이면 제목과 번호만 색인에 싣는다.
 - 색인의 본문은 `memory_read` MCP 도구로 읽는다.
-  요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 부모 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
+  요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
   Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다.
 - 조립한 글자 수를 실행의 `context_chars` 에 남긴다.
   주입할 양이 실제로 문제가 되는 시점을 숫자로 판단하기 위해서다.
@@ -327,7 +327,7 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 
 `McpController` 의 `tools/call` 은 도구별로 인자를 검사한다.
 `memory_read` 의 정수 `id` 입력과 오류 계약은 유지한다.
-요청자는 아래 「MCP 요청자」 의 `McpCallerResolver` 가 부모 실행에서 정한 `CurrentUser` 다. 토큰이 사용자를 정하지 않는다.
+요청자는 아래 「MCP 요청자」 의 `McpCallerResolver` 가 origin 실행에서 정한 `CurrentUser` 다. 토큰이 사용자를 정하지 않는다.
 인자와 응답, SSRF 조건은 [`tools-and-skills.md`](hermes/tools-and-skills.md#결과물-쓰기-도구) 가 정한다.
 같은 사용자의 다른 대화에 쓸 때 답에 묶이는 시점과 실패 분기는
 [`flow.md`](flow.md#결과물을-mcp-로-쓸-때) 에 있다.
@@ -388,25 +388,34 @@ web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않�
 
 ## MCP 요청자
 
-Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 도구의 요청자는 서명한 `_fos_ctx` 로 찾은 부모 실행의 사용자다.
-결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), 흐름과 갈리는 지점은 [`flow.md`](flow.md#mcp-호출의-요청자를-정할-때) 에 있다.
+Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 도구의 요청자는 서명한 `_fos_ctx` 로 찾은 **origin 실행**의 사용자다.
+origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행이고, 최상위 session 이면 그 뿌리 session 으로 도는 실행이다.
+결정은 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md), 흐름과 갈리는 지점은 [`flow.md`](flow.md#mcp-호출의-요청자를-정할-때) 에 있다.
 
 ### 어느 클래스가 무엇을 하나
 
 | 자리 | 하는 일 |
 | --- | --- |
-| `mcp.infra.AgentTokenAuthenticationFilter` | `/mcp` 요청의 토큰을 인증해 `McpPrincipal` 을 인증 주체로 둔다. `CurrentUser` 를 두지 않는다. 서명 검증에 쓸 토큰 해시를 요청 속성으로도 넘긴다 |
+| `mcp.infra.AgentTokenAuthenticationFilter` | `/mcp` 와 `/internal/hermes/session-bindings/subagent` 요청의 토큰을 인증해 `McpPrincipal` 을 인증 주체로 둔다. `CurrentUser` 를 두지 않는다. 서명 검증에 쓸 토큰 해시를 요청 속성으로도 넘긴다 |
 | `mcp.application.AgentTokenService` | 발급, profile 묶기, 목록, 폐기, 인증. profile 이 빈 옛 토큰은 `McpProperties.legacyUserTokens` 가 참일 때만 인증한다 |
 | `mcp.application.McpPrincipal` | 인증 결과. 토큰 번호, profile, 옛 토큰의 사용자 번호, 토큰 해시. profile 이 비었으면 옛 토큰이다 |
 | `mcp.application.McpProperties` | `assistant.mcp` 설정. `legacy-user-tokens`(기본 거짓) |
-| `mcp.application.McpCallerResolver` | 묶인 토큰이면 `_fos_ctx` 서명 확인, 부모 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 옛 토큰이면 그 토큰의 사용자를 쓴다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
-| `mcp.application.McpCaller` | 판정 결과. 요청자 `CurrentUser`, 부모 실행, 확인한 `McpCallContext`. 옛 토큰이면 뒤의 둘이 비었다 |
+| `mcp.application.McpCallerResolver` | 묶인 토큰이면 `_fos_ctx` 서명 확인, origin 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 옛 토큰이면 그 토큰의 사용자를 쓴다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
+| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. origin 실행은 끝난 실행일 수 있다. 옛 토큰이면 뒤의 둘이 비었다 |
 | `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
-| `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
+| `mcp.application.SubagentRegistration` | 등록 본문을 읽고 서명을 확인한다. 서명할 글의 첫 줄이 `v1-subagent` 다 |
+| `mcp.presentation.SubagentSessionController` | `POST /internal/hermes/session-bindings/subagent`. 인증 주체가 묶인 `McpPrincipal` 인지 보고 등록을 부른다 |
+| `orchestration.application.SessionOwnerResolver` | profile, 서명한 뿌리 session, 그 호출의 session 으로 origin 실행을 정한다. 등록을 먼저 보고, 없으면 session 이 뿌리와 같을 때만 `DelegationParentResolver` 를 부른다 |
+| `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 최상위 session 의 판정과 최상위 자식의 등록이 쓴다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
+| `orchestration.application.SubagentSessionRegistrar` | 등록 하나를 적는다. 부모를 풀고, 같은 origin 의 재등록은 그대로 두고, 다른 origin 은 거절한다 |
+| `orchestration.domain.HermesSessionBinding`, `orchestration.infra.HermesSessionBindingRepository` | 하위 에이전트 session 등록 줄과 그 저장소 |
 
 `McpController` 는 `params.name` 이 문자열이고 `params.arguments` 가 객체인지 본 뒤 `McpCallerResolver` 를 부른다. 도구별 인자 검사는 그 뒤에 하고, 그 `McpCaller` 로 `McpToolService` 를 부른다.
 판정이 실패하면 `McpToolService.invalidContext()` 의 같은 도구 결과를 돌려준다.
 `memory_read` 와 `artifact_write` 가 이 길을 쓰고, 앞으로의 `agent_*` 도 같은 길을 쓴다.
+
+등록 경로는 MCP 도구가 아니다. `tools/list` 에 나오지 않고 `McpController` 를 지나지 않는다.
+`ControlPlaneJwtFilter` 는 이 경로를 `/mcp` 처럼 건너뛴다. 사용자 JWT 로 부르면 `AgentTokenAuthenticationFilter` 가 토큰으로 인증하지 못해 401 이다. 컨트롤러의 `McpPrincipal` 확인은 그 뒤의 방어 검사다.
 
 ### 토큰 관리 경로
 
@@ -415,7 +424,7 @@ Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 �
 | 경로 | 하는 일 |
 | --- | --- |
 | `POST /api/v1/admin/agent-tokens` | 본문 `{ "profileName", "label" }`. profile 에 묶인 새 토큰을 발급하고 원문을 한 번만 돌려준다. 사용자로 발급하는 길은 없다 |
-| `PUT /api/v1/admin/agent-tokens/{id}/profile` | 본문 `{ "profileName" }`. profile 이 빈 옛 토큰을 그 profile 에 묶는다. 이미 묶였거나 폐기된 토큰은 `VALIDATION_FAILED` |
+| `PUT /api/v1/admin/agent-tokens/{id}/profile` | 본문 `{ "profileName" }`. profile 이 빈 옛 토큰을 그 profile 에 묶고 `user_id` 를 비운다. 이미 묶였거나 폐기된 토큰은 `VALIDATION_FAILED` |
 | `GET /api/v1/admin/agent-tokens` | 목록. 한 줄에 `id`, `profileName`, `userEmail`(옛 토큰만), `label`, 발급과 마지막 사용과 폐기 시각 |
 | `DELETE /api/v1/admin/agent-tokens/{id}` | 폐기한다. 행은 남는다 |
 
@@ -436,7 +445,8 @@ Memory 제안은 session 을 적지 않는다.
 
 ## 다른 에이전트에게 맡기기
 
-**아직 구현하지 않았다.** 이 절은 위임 도구를 열 때의 설계다. 지금 있는 것은 「MCP 요청자」 의 판정과 `DelegationKey`, 실행 줄의 session 칸이다. 구현하면 이 절이 현재 동작이 된다.
+**아직 구현하지 않았다.** 이 절은 위임 도구를 열 때의 설계다. 지금 있는 것은 「MCP 요청자」 의 판정과 하위 에이전트 session 등록, `DelegationKey`, 실행 줄의 session 칸이다. 구현하면 이 절이 현재 동작이 된다.
+하위 에이전트가 `agent_delegate` 를 부르면 새 FOS 자식의 `parent_execution_id` 는 그 하위 에이전트의 origin 실행이다. 하위 에이전트 몫의 실행 줄은 만들지 않는다.
 
 Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부른다. Control Plane 은 무엇을 할지 정하지 않고 경계만 검사한다.
 결정은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) , [ADR-031](adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md), [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), 흐름은 [`flow.md`](flow.md#다른-에이전트에게-맡길-때) 에 있다.
@@ -447,7 +457,7 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | --- | --- |
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 「MCP 요청자」 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
-| `orchestration.application.AgentDelegationService` | 부모 찾기(`DelegationParentResolver` 를 쓴다), 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
+| `orchestration.application.AgentDelegationService` | 부모는 `McpCaller.originExecution()` 이다. 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 상태, 중지 |
 | `usage.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. `agent_execution.delegation_key` 칸의 값이라 `usage` 에 둔다. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
 | `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
 | `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다 |

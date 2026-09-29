@@ -5,7 +5,7 @@
   플러그인은 `pre_tool_call` hook 에서 그 호출의 `session_id`, 그 session 이 속한 **뿌리 session**(`root_session_id`), `tool_call_id` 를 넣고, 그 profile 의 MCP 토큰으로 서명한다.
   서버는 서명을 확인한 뒤 뿌리 session 을 가진 **도는 중인 실행**을 부모로 쓴다. 서명이 없거나 틀리면 거절한다.
   Control Plane 은 새 대화의 첫 turn 과 위임한 자식 실행의 Hermes session id 를 `fos-<uuid>` 로 직접 정해, 제출하기 전에 실행 줄에 적는다.
-- **대체된 부분**: [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 이 세 곳을 바꿨다. 서명을 요구하는 도구가 `agent_*` 에서 `memory_read`, `artifact_write` 까지 넓어졌다. 부모 실행은 토큰의 사용자가 아니라 토큰이 증명한 profile 로 거른다. 같은 위임을 막는 키는 뿌리 session 과 `tool_call_id` 의 짝이 아니라 profile, 뿌리 session, 그 호출의 session, `tool_call_id` 로 계산한다. 서명할 글과 key 는 그대로다.
+- **대체된 부분**: [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 이 세 곳을 바꿨다. 서명을 요구하는 도구가 `agent_*` 에서 `memory_read`, `artifact_write` 까지 넓어졌다. 부모 실행은 토큰의 사용자가 아니라 토큰이 증명한 profile 로 거른다. 같은 위임을 막는 키는 뿌리 session 과 `tool_call_id` 의 짝이 아니라 profile, 뿌리 session, 그 호출의 session, `tool_call_id` 로 계산한다. 서명할 글과 key 는 그대로다. [ADR-037](ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 은 하위 에이전트 session 의 부모를 도는 실행이 아니라 만들 때 등록한 origin 실행으로 바꿨다.
 - **맥락**:
   - [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 은 `agent_delegate` 를 열기로 했지만, MCP 호출에 어느 실행이 불렀는지가 없어 그 방법을 구현 계획으로 미뤘다.
   - Hermes 는 MCP `tools/call` 에 run 이나 session 맥락을 싣지 않는다. 헤더는 연결할 때 한 번 정해지고, 연결은 profile 당 하나를 모든 run 이 함께 쓴다. `/v1/runs` 본문의 어느 칸도 MCP 호출까지 가지 않는다.
