@@ -59,7 +59,7 @@
   - `delegation_key` 는 `DelegationKey.of(부모 실행의 profileName, rootSessionId, sessionId, toolCallId)`(ADR-032 「`delegation_key`」)
   - 부모는 `McpCallerResolver` 가 찾은 `McpCaller.parent()`. `DelegationParentResolver` 를 다시 부르지 않는다
   - `AgentRunner.run` 시그니처를 `RunSession` 을 받는 하나로 고치고, 자식 session 은 `RunSession.fresh()` 를 쓴다
-  - 작업 항목 2 의 「오버로드를 더하거나, 두 값을 담는 작은 값 객체를 받는 오버로드 하나를 더한다. 기존 호출은 바꾸지 않는다」 를 「단일 `AgentRunner.run` 에 `DelegationKey delegationKey` 인자를 더하고 기존 호출은 null 을 넘긴다. `ExecutionRecorder.start` 도 `DelegationKey` 를 받아 처음 만들 때 적는다」 로 바꾼다
+  - 작업 항목 2 의 「오버로드를 더하거나, 두 값을 담는 작은 값 객체를 받는 오버로드 하나를 더한다. 기존 호출은 바꾸지 않는다」 를 「단일 `AgentRunner.run` 에 `DelegationKey delegationKey` 인자를 더하고 기존 호출은 null 을 넘긴다. `ExecutionRecorder.start` 는 `String delegationKey`(`DelegationKey.value()`)를 받아 처음 만들 때 적는다. `usage` 가 `orchestration` 을 import 하는 순환을 만들지 않기 위해서다」 로 바꾼다
   - 작업 항목 3 의 `delegate(..., String sessionId, String delegationKey, ...)` 를 `delegate(..., RunSession session, DelegationKey delegationKey, ...)` 로 바꾼다
   - 「남의 토큰으로 서명한 호출」 을 「다른 profile 의 토큰으로 서명한 호출」 로, 「같은 `tool_call_id` 두 번」 옆에 「다른 session 의 같은 `tool_call_id` 는 실행 둘」 을 더한다
 - `phase-03.md`

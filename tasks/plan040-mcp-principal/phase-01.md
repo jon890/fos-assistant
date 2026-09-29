@@ -85,6 +85,7 @@ public record DelegationKey(String value) {
 }
 ```
 
+- compact 생성자에서 `value` 가 소문자 16진수 64자가 아니면 `IllegalArgumentException`. `new DelegationKey("아무 값")` 이 검사 없이 만들어지지 않게 한다
 - `value` 는 `"v1"`, `profileName`, `rootSessionId`, `sessionId`, `toolCallId` 를 이 순서로 `"\n"` 하나로 이은 UTF-8 의 SHA-256 소문자 16진수 64자
 - 지금은 이것을 부르는 코드가 없다. 위임 도구가 쓴다고 Javadoc 에 적는다
 

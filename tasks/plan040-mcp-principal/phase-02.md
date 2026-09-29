@@ -110,10 +110,10 @@ ALTER TABLE agent_token MODIFY COLUMN user_id BIGINT NULL;
 
 - 실행 줄은 `orchestration/DelegationParentResolverTest.save` 를 본보기로 `AgentExecution.builder()` 에 `userId`, `conversationId`, `profileName`, `hermesSessionId`, `costMode`, `status(RUNNING)`, `startedAt` 을 넣어 만든다
 - 뿌리 session 은 테스트마다 `"fos-" + UUID.randomUUID()` 로 새로 만든다. 상수를 쓰지 않는다
-- 테스트 클래스들은 H2 하나를 함께 쓰고 사용자만 지우면 실행 줄이 남는다. `@BeforeEach` 에서 그 테스트가 쓰는 profile(`shared-group`, `private-a`)의 실행 줄을 먼저 지운다. 부모를 사용자로 거르지 않으므로 남은 `RUNNING` 줄이 「둘 이상」 으로 걸린다
+- 테스트 클래스들은 H2 하나를 함께 쓰고 사용자만 지우면 실행 줄이 남는다. `@BeforeEach` 에서 그 테스트가 쓰는 profile(`shared-group`, `private-a`)의 실행 줄을 `JdbcTemplate` 으로 먼저 지운다. 검사 때문에 운영 레포지토리에 메서드를 더하지 않는다. 부모를 사용자로 거르지 않으므로 남은 `RUNNING` 줄이 「둘 이상」 으로 걸린다
 - `McpMemoryToolTest` 와 `McpArtifactWriteToolTest` 도 자기 profile 이름을 따로 쓰고 같은 방식으로 준비한다
 
-요구 문서 번호를 그대로 쓴다. 9 와 10(위임 키)은 phase 01 의 `DelegationKeyTest` 가 맡는다. 13 은 더한 것이다.
+번호 9 와 10(위임 키)은 phase 01 의 `DelegationKeyTest` 가 맡는다.
 
 | 번호 | 시나리오 | 기대 |
 | --- | --- | --- |
@@ -140,7 +140,7 @@ ALTER TABLE agent_token MODIFY COLUMN user_id BIGINT NULL;
 
 - `McpMemoryToolTest`: 토큰을 profile 로 발급하고 호출마다 도는 실행과 서명을 붙인다. `_fos_ctx_가_붙어도_버리고_그대로_읽는다` 는 「서명이 맞는 `_fos_ctx` 를 떼고 읽는다」 와 「틀린 `_fos_ctx` 는 거절한다」 로 바꾼다. `인증한_요청에_토큰_원문이_아닌_해시를_속성으로_싣는다` 는 유지한다
 - `McpArtifactWriteToolTest`: 같은 방식
-- `mcp/application/McpToolServiceTest`: 새 `readMemory` 인자에 맞춘다
+- `mcp/application/McpToolServiceTest`: 새 `readMemory`, `writeArtifact` 인자(`McpCaller`)에 맞춘다
 - `McpMemoryToolTest.관리자만_토큰을_발급하고_목록을_보고_폐기한다`: 발급 본문을 `{ profileName, label }` 로 바꾸고 셋을 더한다. `MEMBER` 의 `PUT /api/v1/admin/agent-tokens/{id}/profile` 은 거절되고 `ADMIN` 의 것은 성공한다. 목록에 옛 토큰(`JdbcTemplate` 로 넣은 것)과 새 토큰이 섞여 있을 때 한 줄마다 `profileName` 이 맞고 `userEmail` 은 옛 토큰만 채워진다
 - `AgentTokenServiceTest`: `issue(profileName, label)`. profile 이름 규칙 위반은 `VALIDATION_FAILED`. `bindProfile` 은 빈 토큰만 묶고 두 번째는 거절. 폐기 토큰은 묶지 못한다
 - `orchestration/DelegationParentResolverTest`: `resolve(profileName, root)`. 다른 profile 의 도는 실행은 부모가 되지 못한다. 같은 profile 에서 사용자가 다른 실행 둘이 뿌리만 다르면 각자 찾는다
