@@ -174,12 +174,12 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - **`(사용자, 에이전트)` 마다 다르다.** 그 사용자의 최근 대화 첫 질문들을 모델이 요약한다. 이력이 없으면 그 에이전트의 성격과 켜진 도구와 스킬 이름으로 할 수 있는 일을 만든다
 - **backend 메모리에만 둔다.** 재시작하면 비고 다시 만든다
 - **만드는 때는 둘이다.** 추천이 없을 때 새 대화 화면이 읽으면 만들기를 시작한다. 있으면 그 사용자가 그 에이전트와 대화를 마쳤을 때 만든 지 `assistant.starters.refresh-after`(기본 24시간)보다 오래됐으면 다시 만든다
-- 같은 키의 만들기는 하나만 돈다. 실패하면 이전 추천을 그대로 둔다
+- 같은 키의 만들기는 하나만 돈다. 실패하면 이전 추천을 그대로 둔다. 실패하면 `assistant.starters.retry-after-failure`(기본 10분) 동안 그 키를 다시 만들지 않는다
 - 만들기는 그 에이전트의 profile 로 Hermes 실행 하나를 돌리고 실행 줄에 남긴다. turn 을 마치는 흐름을 기다리게 하지 않고 따로 돈다
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/agents/{code}/starters` | `{ "prompts": [...], "status": "READY" \| "GENERATING" \| "NONE" }`. `GENERATING` 이면 화면이 몇 초 뒤 한 번 더 읽는다 |
+| `GET /api/v1/agents/{code}/starters` | `{ "prompts": [...], "status": "READY" \| "GENERATING" \| "NONE" }`. `GENERATING` 이면 화면이 2초 간격으로 세 번까지 다시 읽는다 |
 
 한 줄 소개와 사람이 적던 추천 질문, 그것을 쓰던 `PUT` 경로와 에이전트 목록 응답의 `tagline`, `starterPrompts` 는 없앴다.
 
@@ -822,7 +822,7 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/memory` | 개인과 그룹 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
 | `/agents` | 에이전트 목록과 「새 에이전트」. `ADMIN` 에게는 다른 사람의 비공개와 꺼진 에이전트, 운영 profile 등록이 더 보인다 |
-| `/agents/{code}` | 에이전트 하나의 설정. 성격, 소개와 추천 질문, 도구, 주인과 `ADMIN` 에게 공개와 삭제, `ADMIN` 에게만 관리 절 |
+| `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 주인과 `ADMIN` 에게 공개와 삭제, `ADMIN` 에게만 관리 절 |
 | `/admin/agents` | 옛 주소. `/agents` 로 넘긴다 |
 
 ### 에이전트 화면
@@ -1096,7 +1096,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸을 지우는 것. 운영의 모든 토큰이 profile 에 묶인 뒤 지운다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」)
 
 - 스킬 올리기와 관리, 스킬 커맨드, 호출 이력([「스킬」](#스킬)), 사용량 화면의 탭
-- 모델이 만드는 추천 질문([「추천 질문」](#추천-질문)). 지금은 사람이 적은 `agent_starter_prompt` 와 `agent.tagline` 을 보인다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

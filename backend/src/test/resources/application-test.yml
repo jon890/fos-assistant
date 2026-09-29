@@ -15,6 +15,10 @@ spring:
 assistant:
   context:
     max-chars: 8000
+  starters:
+    # 추천 실행이 대역 Hermes 의 받은 명령과 응답 큐를 함께 써 다른 검사의 단언을 흔든다.
+    # 추천을 보는 검사만 켠다
+    enabled: false
   auth:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
   attachment:

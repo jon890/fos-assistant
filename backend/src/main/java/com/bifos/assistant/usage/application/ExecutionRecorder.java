@@ -103,6 +103,16 @@ public class ExecutionRecorder {
                         .build());
     }
 
+    /**
+     * 속한 대화 없이 도는 실행을 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 뿌리, session, 모델 선택을 모두
+     * 비우고 문맥 글자 수는 0 으로 적는다.
+     */
+    public AgentExecution startDetached(CurrentUser user, Agent agent) {
+        return start(user, null, agent, null, null, ExecutionContextSnapshot.ofChars(0L), null, null, null);
+    }
+
     /** 제출 직후 run 번호를 붙인다. */
     public void attachRunId(AgentExecution execution, String hermesRunId) {
         execution.attachRunId(hermesRunId);
@@ -205,7 +215,7 @@ public class ExecutionRecorder {
     private AgentExecution.Builder base(CurrentUser user, Conversation conversation, Agent agent) {
         return AgentExecution.builder()
                 .userId(user.id())
-                .conversationId(conversation.id())
+                .conversationId(conversation == null ? null : conversation.id())
                 .agentId(agent.id())
                 .profileName(agent.hermesProfile())
                 .costMode(agent.costMode())

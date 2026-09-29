@@ -1,70 +1,130 @@
-import {
-  expect,
-  setAgentVisibility,
-  setSession,
-  test,
-  PERSONA_AGENT_CODE,
-  PERSONA_GROUP_AGENT_CODE,
-} from "./fixtures.ts";
-import { TEST_EMAIL } from "./settings.ts";
+import { FAKE_STARTER_PROMPTS } from "../e2e/fake-hermes.ts";
+import { CONVERSATION_URL, expect, FLOW_AGENT_CODE, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
 
-test("소개와 추천 질문을 저장하고 새로고침해도 남는다", async ({ page }) => {
-  await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
+const STARTERS_PATTERN = "**/api/agents/*/starters";
 
-  await page.getByRole("textbox", { name: "성격 비서 소개" }).fill("차분하게 답하는 비서입니다");
-  await page.getByRole("textbox", { name: "추천 질문 1" }).fill("오늘 날씨 알려줘");
-  await page.getByRole("textbox", { name: "추천 질문 2" }).fill("이번 주 할 일 정리해줘");
-  await page.getByRole("textbox", { name: "추천 질문 3" }).fill("메모 남겨줘");
-  await page.getByRole("textbox", { name: "추천 질문 4" }).fill("사진 정리해줘");
-  await page.getByRole("button", { name: "소개와 추천 질문 저장" }).click();
+/** 추천 질문 응답 한 건의 모양이다 */
+function startersBody(status: "READY" | "GENERATING" | "NONE", prompts: string[]) {
+  return { prompts, status };
+}
 
-  await expect(page.getByText("소개와 추천 질문을 저장했어요.")).toBeVisible();
+test("가로채지 않고 열면 가짜 Hermes 가 만든 네 추천이 칩으로 보이고 누르면 그 글로 보낸다", async ({ page }) => {
+  await page.goto("/");
 
-  await page.reload();
-  await expect(page.getByRole("textbox", { name: "성격 비서 소개" })).toHaveValue(
-    "차분하게 답하는 비서입니다",
-  );
-  await expect(page.getByRole("textbox", { name: "추천 질문 1" })).toHaveValue("오늘 날씨 알려줘");
-  await expect(page.getByRole("textbox", { name: "추천 질문 2" })).toHaveValue(
-    "이번 주 할 일 정리해줘",
-  );
-  await expect(page.getByRole("textbox", { name: "추천 질문 3" })).toHaveValue("메모 남겨줘");
-  await expect(page.getByRole("textbox", { name: "추천 질문 4" })).toHaveValue("사진 정리해줘");
-});
-
-test("가운데 칸을 비우고 저장하면 앞으로 당겨져 채워진다", async ({ page }) => {
-  await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
-
-  // 앞 검사가 남긴 값 위에서도 통과하도록 소개와 추천 질문 넷을 모두 명시적으로 채우거나 비운다.
-  await page.getByRole("textbox", { name: "성격 비서 소개" }).fill("차분하게 답하는 비서입니다");
-  await page.getByRole("textbox", { name: "추천 질문 1" }).fill("오늘 일정 알려줘");
-  await page.getByRole("textbox", { name: "추천 질문 2" }).fill("");
-  await page.getByRole("textbox", { name: "추천 질문 3" }).fill("맛집 추천해줘");
-  await page.getByRole("textbox", { name: "추천 질문 4" }).fill("사진 정리해줘");
-  await page.getByRole("button", { name: "소개와 추천 질문 저장" }).click();
-
-  await expect(page.getByText("소개와 추천 질문을 저장했어요.")).toBeVisible();
-  // 가운데 칸(추천 질문 2)이 빈 채로 저장되면 뒤의 값이 앞으로 당겨진다.
-  await expect(page.getByRole("textbox", { name: "추천 질문 1" })).toHaveValue("오늘 일정 알려줘");
-  await expect(page.getByRole("textbox", { name: "추천 질문 2" })).toHaveValue("맛집 추천해줘");
-  await expect(page.getByRole("textbox", { name: "추천 질문 3" })).toHaveValue("사진 정리해줘");
-  await expect(page.getByRole("textbox", { name: "추천 질문 4" })).toHaveValue("");
-});
-
-test("그룹에 공개된 에이전트는 소개와 추천 질문이 읽기 전용이다", async ({ context, page }) => {
-  // 이 검사 동안만 그룹 공개로 두고 끝나면 되돌린다. identity.spec.ts 가 그룹 공개 에이전트가
-  // 정확히 하나라고 가정하고 있어, 여기서 하나를 더 남겨 두면 그 검사가 어긋난다.
-  await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "GROUP", null);
-  try {
-    await setSession(context, { email: "member@example.com", name: "그룹 사용자" });
-    await page.goto(`/agents/${PERSONA_GROUP_AGENT_CODE}`);
-
-    const tagline = page.getByRole("textbox", { name: "그룹 성격 비서 소개" });
-    await expect(tagline).toBeVisible();
-    await expect(tagline).toHaveAttribute("readonly", "");
-    await expect(page.getByRole("textbox", { name: "추천 질문 1" })).toHaveAttribute("readonly", "");
-    await expect(page.getByRole("button", { name: "소개와 추천 질문 저장" })).toHaveCount(0);
-  } finally {
-    await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "PRIVATE", TEST_EMAIL);
+  // 추천을 처음 만드는 경우라도 다시 읽기가 끝나면 채워진다.
+  for (const prompt of FAKE_STARTER_PROMPTS) {
+    await expect(page.getByRole("button", { name: prompt, exact: true })).toBeVisible({ timeout: 15_000 });
   }
+
+  await page.getByRole("button", { name: FAKE_STARTER_PROMPTS[0], exact: true }).click();
+
+  await expect(page.getByTestId("user-message").last()).toContainText(FAKE_STARTER_PROMPTS[0]);
+  await expect(page).toHaveURL(CONVERSATION_URL);
+  await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
+});
+
+test("만드는 중이면 자리를 비워 두었다가 다시 읽어 칩을 채운다", async ({ page }) => {
+  let requests = 0;
+  await page.route(STARTERS_PATTERN, async (route) => {
+    requests += 1;
+    await route.fulfill({
+      json: requests === 1 ? startersBody("GENERATING", []) : startersBody("READY", ["채워진 추천이다"]),
+    });
+  });
+  await page.goto("/");
+
+  await expect.poll(() => requests).toBeGreaterThanOrEqual(1);
+  await expect(page.getByRole("list", { name: "추천 질문" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "채워진 추천이다", exact: true })).toBeVisible({ timeout: 10_000 });
+  expect(requests, "채워질 때까지 나간 읽기").toBe(2);
+});
+
+test("추천이 나타나거나 사라져도 입력창이 움직이지 않는다", async ({ page }) => {
+  let browserRequests = 0;
+  await page.route(STARTERS_PATTERN, async (route) => {
+    if (route.request().url().includes(`/agents/${FLOW_AGENT_CODE}/`)) {
+      await route.fulfill({ json: startersBody("NONE", []) });
+      return;
+    }
+    browserRequests += 1;
+    await route.fulfill({
+      json: browserRequests === 1 ? startersBody("GENERATING", []) : startersBody("READY", FAKE_STARTER_PROMPTS),
+    });
+  });
+  const composerTop = async () => {
+    const box = await page.getByRole("textbox", { name: "메시지" }).boundingBox();
+    expect(box, "입력창의 위치").not.toBeNull();
+    return box!.y;
+  };
+  await page.goto("/");
+  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+
+  // 읽는 중일 때의 자리 표시가 보이는 동안의 위치를 기준으로 삼는다.
+  await expect(page.getByRole("status").filter({ hasText: "추천 질문을 읽는 중" })).toBeVisible();
+  const loadingTop = await composerTop();
+
+  await expect(page.getByRole("button", { name: FAKE_STARTER_PROMPTS[0], exact: true })).toBeVisible({ timeout: 10_000 });
+  expect(await composerTop(), "칩이 나타난 뒤 입력창 위치").toBeCloseTo(loadingTop, 0);
+
+  // 추천이 없는 에이전트로 바꿔 칩이 사라져도 같은 자리다.
+  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await expect(page.getByRole("list", { name: "추천 질문" })).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "추천 질문을 읽는 중" })).toHaveCount(0);
+  expect(await composerTop(), "칩이 사라진 뒤 입력창 위치").toBeCloseTo(loadingTop, 0);
+});
+
+test("세 번 다시 읽어도 만드는 중이면 자리를 비워 두고 더 읽지 않는다", async ({ page }) => {
+  let requests = 0;
+  await page.route(STARTERS_PATTERN, async (route) => {
+    requests += 1;
+    await route.fulfill({ json: startersBody("GENERATING", []) });
+  });
+  await page.goto("/");
+
+  // 첫 읽기 하나와 2초 간격의 다시 읽기 셋이다.
+  await expect.poll(() => requests, { timeout: 15_000 }).toBe(4);
+  // 다음 다시 읽기가 있었다면 2초 안에 나갔을 것이다.
+  await page.waitForTimeout(3_000);
+  expect(requests, "다시 읽기를 마친 뒤 나간 읽기").toBe(4);
+  await expect(page.getByRole("list", { name: "추천 질문" })).toHaveCount(0);
+});
+
+test("에이전트를 바꾸면 늦게 온 이전 에이전트의 추천은 그리지 않는다", async ({ page }) => {
+  let releaseFirst!: () => void;
+  const firstReleased = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let firstFulfilled!: () => void;
+  const firstDone = new Promise<void>((resolve) => {
+    firstFulfilled = resolve;
+  });
+  await page.route(STARTERS_PATTERN, async (route) => {
+    if (route.request().url().includes(`/agents/${FLOW_AGENT_CODE}/`)) {
+      await route.fulfill({ json: startersBody("READY", ["흐름 추천이다"]) });
+      return;
+    }
+    await firstReleased;
+    await route.fulfill({ json: startersBody("READY", ["늦게 온 추천이다"]) });
+    firstFulfilled();
+  });
+  await page.goto("/");
+  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+
+  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await expect(page.getByRole("button", { name: "흐름 추천이다", exact: true })).toBeVisible();
+
+  releaseFirst();
+  await firstDone;
+  // 응답이 화면에 닿을 시간을 준 뒤에도 이전 에이전트의 추천이 없어야 한다.
+  await page.waitForTimeout(500);
+  await expect(page.getByRole("button", { name: "늦게 온 추천이다", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "흐름 추천이다", exact: true })).toBeVisible();
+});
+
+test("에이전트 상세에는 추천 질문 편집 절이 없다", async ({ page }) => {
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
+
+  await expect(page.getByRole("textbox", { name: "성격 비서 성격" })).toBeVisible();
+  await expect(page.getByText("추천 질문")).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "성격 비서 소개" })).toHaveCount(0);
 });

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +19,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     Optional<Conversation> findByPublicIdAndUserIdAndDeletedAtIsNull(UUID publicId, Long userId);
 
     List<Conversation> findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(Long userId);
+
+    /** 그 사용자가 그 에이전트와 나눈 지우지 않은 대화를 최근 것부터 읽는다. 개수는 {@code pageable} 이 정한다. */
+    List<Conversation> findByUserIdAndAgentIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
+            Long userId, Long agentId, Pageable pageable);
 
     /** 어느 대화가 그 값을 보낼 session 이나 뿌리 session 으로 쓰는지. 지운 대화도 센다. */
     boolean existsByHermesSessionIdOrHermesRootSessionId(String hermesSessionId, String hermesRootSessionId);
