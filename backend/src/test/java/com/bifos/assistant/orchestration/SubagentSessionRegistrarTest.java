@@ -3,6 +3,8 @@ package com.bifos.assistant.orchestration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.orchestration.application.SubagentRegistrationResult;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
@@ -49,6 +51,7 @@ class SubagentSessionRegistrarTest {
     @Autowired HermesSessionBindingRepository bindings;
     @Autowired AgentExecutionRepository executions;
     @Autowired AppUserRepository users;
+    @Autowired ConversationRepository conversations;
     @Autowired JdbcTemplate jdbc;
 
     private AppUser dad;
@@ -56,11 +59,14 @@ class SubagentSessionRegistrarTest {
     private String root;
     private AgentExecution dadRun;
 
-    /** 같은 H2 를 다른 검사 클래스와 함께 쓰므로 이 검사의 사용자와 이 검사가 쓰는 profile 의 줄만 지운다. */
+    /** 같은 H2 를 다른 검사 클래스와 함께 쓰므로 이 검사의 사용자와 그 대화, 이 검사가 쓰는 profile 의 줄만 지운다. */
     @BeforeEach
     void 준비한다() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE_A, PROFILE_B));
-        MY_EMAILS.forEach(email -> users.findByEmail(email).ifPresent(users::delete));
+        MY_EMAILS.forEach(email -> users.findByEmail(email).ifPresent(user -> {
+            jdbc.update("DELETE FROM conversation WHERE user_id = ?", user.id());
+            users.delete(user);
+        }));
         dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER));
         kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER));
         root = newRoot();
@@ -179,6 +185,36 @@ class SubagentSessionRegistrarTest {
         assertThat(row.originExecutionId()).as("origin 은 %d 그대로", dadRun.id()).isEqualTo(dadRun.id())
                 .isNotEqualTo(otherRun.id());
         assertThat(row.userId()).isEqualTo(dad.id());
+    }
+
+    @Test
+    void 최상위_부모_실행이_끝난_뒤_같은_네_값의_재전송은_그대로_두고_다른_부모로_오면_거절한다() {
+        String s1 = newChild();
+        registrar.register(PROFILE_A, root, root, s1);
+        setStatus(dadRun, ExecutionStatus.SUCCEEDED);
+
+        assertThat(registrar.register(PROFILE_A, root, root, s1)).isEqualTo(SubagentRegistrationResult.EXISTS);
+        assertRejected(PROFILE_A, root, newRoot(), s1);
+
+        HermesSessionBinding row = binding(PROFILE_A, s1);
+        assertThat(row.originExecutionId()).as("origin 실행").isEqualTo(dadRun.id());
+        assertThat(row.parentSessionId()).as("부모는 처음 값 그대로").isEqualTo(root);
+        assertThat(rowCount(PROFILE_A, s1)).isEqualTo(1);
+    }
+
+    @Test
+    void 대화가_보낼_session_이나_뿌리_session_으로_쓰는_값은_하위_에이전트로_등록하지_못한다() {
+        String compacted = newRoot();
+        String conversationRoot = newRoot();
+        Conversation conversation = Conversation.startedBy(dad.id(), "압축된 대화", null);
+        conversation.adoptSessions(compacted, conversationRoot);
+        conversations.save(conversation);
+
+        assertRejected(PROFILE_A, root, root, compacted);
+        assertRejected(PROFILE_A, root, root, conversationRoot);
+
+        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, compacted)).isEmpty();
+        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, conversationRoot)).isEmpty();
     }
 
     @Test

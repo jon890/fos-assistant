@@ -43,8 +43,8 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * MCP 토큰은 profile 만 증명하고 요청자는 서명한 뿌리 session 으로 찾은 부모 실행의 사용자라는 것을 실제
- * {@code /mcp} 경계에서 고정한다(ADR-032).
+ * MCP 토큰은 profile 만 증명하고 요청자는 서명한 session 으로 찾은 origin 실행의 사용자라는 것을 실제
+ * {@code /mcp} 경계에서 고정한다(ADR-032, ADR-037).
  *
  * <p>같은 GROUP profile 을 사용자 A 와 B 가 함께 써도 호출마다 자기 실행의 사용자로 돈다.
  */

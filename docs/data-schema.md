@@ -273,7 +273,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 토큰 원문은 발급 응답에서 한 번만 내고 데이터베이스에는 SHA-256 해시만 저장한다.
 
 **토큰은 어느 profile 이 부르는지만 증명한다. 사용자를 정하지 않는다.**
-요청자는 서명한 `_fos_ctx` 로 찾은 부모 실행의 `user_id` 다.
+요청자는 서명한 `_fos_ctx` 로 찾은 origin 실행의 `user_id` 다.
 근거는 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
@@ -317,7 +317,7 @@ profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [AD
 
 외래 키는 두지 않는다. `agent_execution` 도 사용자와 대화에 외래 키를 두지 않고, 실행 줄과 사용자는 지우지 않는다. 등록은 서버가 방금 읽은 실행에서 origin 과 사용자를 옮겨 적으므로 없는 실행을 가리키지 않는다.
 
-같은 `(profile_name, session_id)` 가 같은 origin 으로 다시 오면 새 줄을 만들지 않고 성공으로 답한다.
+같은 `(profile_name, session_id)` 가 같은 부모와 뿌리로, 또는 같은 origin 으로 다시 오면 새 줄을 만들지 않고 성공으로 답한다.
 다른 origin 이면 거절하고 덮어쓰지 않는다. 동시에 두 요청이 와서 유일 제약에 걸리면 먼저 저장된 줄을 다시 읽어 같은 규칙으로 판정한다.
 
 하위 에이전트의 하위 에이전트는 부모 등록의 `origin_execution_id` 와 `user_id` 를 그대로 잇는다. 하위 에이전트 몫의 `agent_execution` 줄은 만들지 않는다. 하위 에이전트는 지금처럼 `execution_event` 의 `SUBAGENT_STARTED`, `SUBAGENT_COMPLETED` 로 보인다.

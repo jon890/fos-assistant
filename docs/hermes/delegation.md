@@ -328,7 +328,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 결정은 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
 profile 이 빈 옛 토큰은 설정이 허용할 때만 `_fos_ctx` 를 보지 않고 전처럼 돈다.
-플러그인은 서명할 수 없으면 `memory_read`, `artifact_write`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 서버도 서명이 없는 호출을 묶인 토큰에서 거절한다. 두 쪽이 같은 조건으로 막는다.
+플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 비공개 저장소 `fos-home-infra` 가 갖고, 이 저장소는 그 동작을 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 묶인 토큰에서 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
 
 #### 호출은 profile 마다 하나씩 나간다
 
@@ -441,8 +441,8 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | --- | --- |
 | `201` `{"result": "created"}` | 새로 등록했다 |
 | `200` `{"result": "exists"}` | 같은 origin 으로 이미 등록돼 있다. 다시 보낸 것으로 본다 |
-| `401` | 토큰이 없거나 모르는 토큰이거나 폐기됐다. 본문이 없다 |
-| `403` `{"code": "SESSION_BINDING_REJECTED"}` | profile 이 빈 옛 토큰, 본문 모양, 서명, 부모를 풀지 못함, `child_session_id` 가 뿌리나 실행 줄의 session 과 같음. 이유는 서버 로그에만 남는다 |
+| `401` | 토큰이 없거나 모르는 토큰이거나 폐기됐다. profile 이 빈 옛 토큰이고 `assistant.mcp.legacy-user-tokens` 가 거짓이어도 같다. 사용자 JWT 로 불러도 같다. 본문이 없다 |
+| `403` `{"code": "SESSION_BINDING_REJECTED"}` | profile 이 빈 옛 토큰(설정이 참일 때), JSON 이 아니거나 모양이 틀린 본문, 서명, 부모를 풀지 못함, session 값이 128자를 넘음, `child_session_id` 가 뿌리나 실행 줄이나 대화의 session 과 같음. 이유는 서버 로그에만 남는다 |
 | `409` `{"code": "SESSION_BINDING_CONFLICT"}` | 그 `child_session_id` 가 다른 origin 으로 이미 등록돼 있다. 덮어쓰지 않는다 |
 
 플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 등록이 없는 하위 에이전트의 호출은 서버가 거절하므로 안전한 쪽으로 실패한다.

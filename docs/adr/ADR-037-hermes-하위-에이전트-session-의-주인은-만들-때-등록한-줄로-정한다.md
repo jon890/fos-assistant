@@ -54,8 +54,8 @@ _fos_ctx 서명 확인
  └ 둘 다 없으면                                       → 거절
 ```
 
-같은 `(profile, child_session_id)` 가 같은 origin 으로 다시 오면 성공으로 답한다. 다른 origin 이면 거절하고 덮어쓰지 않는다.
-`child_session_id` 가 뿌리 session 과 같거나 그 profile 의 실행 줄이 쓰는 session 이면 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 의 호출이 앞 turn 에 묶이기 때문이다.
+같은 `(profile, child_session_id)` 가 같은 부모와 뿌리로 다시 오면 부모를 다시 풀지 않고 성공으로 답한다. 첫 응답을 잃고 다시 보내는 사이 부모 run 이 끝날 수 있어서다. 부모나 뿌리가 다르면 부모를 풀어, 같은 origin 이면 성공이고 다른 origin 이면 거절하고 덮어쓰지 않는다.
+`child_session_id` 가 뿌리 session 과 같거나, 그 profile 의 실행 줄이 쓰는 session 이거나, 대화가 적어 둔 session 이면 거절한다. 압축 교체된 최상위 session 은 대화에만 남는다. 최상위 session 에 등록이 생기면 뒤 turn 의 호출이 앞 turn 에 묶이기 때문이다.
 
 ### 이 결정 뒤에 할 일
 

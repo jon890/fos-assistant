@@ -114,7 +114,7 @@ sequenceDiagram
 
 거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 「호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.」 다.
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
-이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다.
+이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를 남긴다.
 
 **실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.**
 
@@ -168,11 +168,12 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 
 | 경우 | 결과 |
 | --- | --- |
-| 같은 `(profile, child_session_id)` 가 같은 origin 으로 다시 온다 | `200` 으로 답한다. 줄은 하나다 |
+| 같은 `(profile, child_session_id)` 가 같은 부모와 뿌리로 다시 온다 | `200` 으로 답한다. 부모를 다시 풀지 않아, 그사이 부모 run 이 끝났어도 같다. 줄은 하나다 |
 | 같은 `(profile, child_session_id)` 가 다른 origin 으로 온다 | `409` 로 거절하고 덮어쓰지 않는다 |
 | 부모 session 에 등록이 없고 뿌리로 도는 실행도 없다 | `403` 으로 거절한다 |
 | 서명이 틀리거나 토큰의 profile 이 부모의 profile 과 다르다 | `403` 으로 거절한다. 다른 profile 의 등록과 실행은 보이지 않는다 |
-| `child_session_id` 가 뿌리 session 이거나 그 profile 의 실행 줄이 쓰는 session 이다 | `403` 으로 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 이 앞 turn 에 묶인다 |
+| `child_session_id` 가 뿌리 session 이거나, 그 profile 의 실행 줄이 쓰는 session 이거나, 대화가 적어 둔 session 이다 | `403` 으로 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 이 앞 turn 에 묶인다. 압축 교체된 최상위 session 은 대화에만 남아 있어 대화도 본다 |
+| session 값이 128자를 넘는다 | `403` 으로 거절한다. 저장 칸의 길이다 |
 | 플러그인이 등록하지 못했다 | Hermes 는 hook 예외를 삼키고 자식을 돌린다. 그 자식의 호출은 위 판정에서 거절된다 |
 | Control Plane 이 다시 떴다 | 등록은 데이터베이스에 있어 그대로 쓴다 |
 | 부모 turn 이 끝난 뒤 하위 에이전트가 결과물을 썼다 | 파일은 대화 폴더에 남지만 어느 답에도 묶이지 않는다. 답에 묶는 것은 turn 이 끝날 때 폴더를 훑는 방식이다 |
@@ -651,7 +652,7 @@ sequenceDiagram
     M-->>H: 12번 본문이 필요하다
     H->>C: POST /mcp  memory_read(id=12)
     Note over H,C: Authorization 에 그 profile 의 agent_token, 인자에 서명한 _fos_ctx
-    C->>C: 부모 실행으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
+    C->>C: origin 실행으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
     C-->>H: 본문 또는 읽을 수 없다는 응답
     H->>M: 도구 결과를 준다
     M-->>H: 그 본문으로 답한다
@@ -659,7 +660,7 @@ sequenceDiagram
 ```
 
 **요청 본문에는 항목 번호만 있고 사용자가 없다.**
-사용자는 「MCP 호출의 요청자를 정할 때」 의 길로 부모 실행에서 정한다.
+사용자는 「MCP 호출의 요청자를 정할 때」 의 길로 origin 실행에서 정한다.
 모델이 만든 JSON 에 사용자를 넣게 하면 모델이 남의 Memory 를 읽을 수 있다.
 
 볼 수 없는 항목과 없는 항목은 **같은 응답**으로 답한다.
@@ -1077,7 +1078,7 @@ flowchart TD
     A[실행 입력에 publicId 와 도구 안내] --> B[Hermes 가 artifact_write 호출]
     B --> T{MCP 토큰 인증}
     T -->|실패| U[HTTP 401]
-    T -->|성공| K{부모 실행으로 요청자 판정}
+    T -->|성공| K{origin 실행으로 요청자 판정}
     K -->|실패| N[isError true, 호출 맥락 오류]
     K -->|성공| P{도구별 인자 검사}
     P -->|실패| I[JSON-RPC -32602]

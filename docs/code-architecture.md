@@ -327,7 +327,7 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 
 `McpController` 의 `tools/call` 은 도구별로 인자를 검사한다.
 `memory_read` 의 정수 `id` 입력과 오류 계약은 유지한다.
-요청자는 아래 「MCP 요청자」 의 `McpCallerResolver` 가 부모 실행에서 정한 `CurrentUser` 다. 토큰이 사용자를 정하지 않는다.
+요청자는 아래 「MCP 요청자」 의 `McpCallerResolver` 가 origin 실행에서 정한 `CurrentUser` 다. 토큰이 사용자를 정하지 않는다.
 인자와 응답, SSRF 조건은 [`tools-and-skills.md`](hermes/tools-and-skills.md#결과물-쓰기-도구) 가 정한다.
 같은 사용자의 다른 대화에 쓸 때 답에 묶이는 시점과 실패 분기는
 [`flow.md`](flow.md#결과물을-mcp-로-쓸-때) 에 있다.

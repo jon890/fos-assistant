@@ -150,8 +150,10 @@ class McpMemoryToolTest {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String registered = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, registered);
-        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
         String unregistered = "하위-" + UUID.randomUUID();
+        // 뿌리의 실행이 도는 중이어도 등록이 없는 하위 session 은 그 실행으로 되돌아가지 않는다.
+        JsonNode rejectedWhileRunning = body(subagentRead(unregistered, indexed.id()));
+        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
 
         JsonNode read = body(subagentRead(registered, indexed.id()));
         JsonNode rejected = body(subagentRead(unregistered, indexed.id()));
@@ -159,6 +161,9 @@ class McpMemoryToolTest {
         assertThat(read.path("result").path("isError").asBoolean()).as("등록한 하위 에이전트의 읽기: %s", read).isFalse();
         assertThat(read.path("result").path("content").get(0).path("text").asString()).isEqualTo("아빠 본문");
         JsonNode invalidContext = json.valueToTree(toolService.invalidContext());
+        assertThat(rejectedWhileRunning.path("result")).as("부모 실행이 도는 중 등록이 없는 하위 session 의 결과")
+                .isEqualTo(invalidContext);
+        assertThat(rejectedWhileRunning.toString()).doesNotContain("아빠 본문");
         assertThat(rejected.path("result")).as("등록이 없는 하위 session 의 결과").isEqualTo(invalidContext);
         assertThat(rejected.toString()).doesNotContain("아빠 본문");
     }
