@@ -31,6 +31,7 @@ profile 을 만드는 `HermesProfileProvisioner` 가 그 profile 에 묶인 MCP 
 
 ## Blocked 조건
 
+- `docs/adr/` 에 Hermes 하위 에이전트 session 의 주인을 영속 등록으로 복원하는 ADR(ADR-037)과 그 구현이 main 에 없으면 → `PHASE_BLOCKED: 하위 에이전트 session 소유 등록이 먼저 머지되어야 한다`. 새 에이전트는 처음부터 profile 에 묶인 토큰을 받아, 그 등록 없이는 백그라운드 하위 에이전트의 Memory 읽기와 결과물 쓰기가 거절된다
 - 운영 대시보드 plugin 이 위 계약을 아직 받지 않는 것은 이 phase 를 막지 않는다. 가짜 대시보드로 검증한다
 
 ## 작업 항목
