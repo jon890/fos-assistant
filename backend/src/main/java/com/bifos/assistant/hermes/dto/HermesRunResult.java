@@ -16,7 +16,26 @@ public record HermesRunResult(
         String model,
         String provider,
         String error,
-        TokenUsage usage) {
+        TokenUsage usage,
+        SessionRuntime runtime) {
+
+    /**
+     * {@code runtime} 없이 만든다. v0.21.5 의 {@code runtime} 을 읽지 않는 자리와 테스트가 쓴다.
+     *
+     * <p>{@code runtime} 은 v0.21.5 실행 조회가 싣는 실제로 돈 provider 와 모델이다. {@code model}, {@code provider}
+     * 와 달리 요청을 되돌려 준 값이 아니다. 없으면 null 이다.
+     */
+    public HermesRunResult(
+            String runId,
+            String sessionId,
+            String status,
+            String output,
+            String model,
+            String provider,
+            String error,
+            TokenUsage usage) {
+        this(runId, sessionId, status, output, model, provider, error, usage, null);
+    }
 
     /**
      * 그 provider 의 계정이 전부 막혔을 때 Hermes 가 붙이는 고정 접두사다.
