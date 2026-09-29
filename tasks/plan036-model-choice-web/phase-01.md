@@ -1,0 +1,84 @@
+# Phase 01. 입력창 옆 단추로 대화의 모델과 effort 를 고른다
+
+**Execution profile**: standard
+
+## 목표
+
+대화 화면의 입력창 옆에 지금 모델과 effort 를 보이는 단추를 두고, 누르면 고르는 창을 연다.
+고른 값은 그 대화에 저장되어 다음 보내기부터 쓰인다.
+
+**범위 외**: backend 경로는 plan034 가 만들었다. 사용량 화면의 effort 는 phase 02 다.
+
+## 컨텍스트
+
+**근거 문서**: `docs/flow.md` 「모델을 고를 때」 와 「갈리는 지점」, `docs/code-architecture.md` 「대화의 모델 선택」
+
+- **plan034 가 main 에 들어간 뒤에 시작한다.** `GET /api/v1/chat/model-options?agentCode=`, `PUT /api/v1/chat/conversations/{id}/model`, `ConversationView` 의 `provider`, `model`, `reasoningEffort` 칸, web 서버 라우트 `web/src/app/api/chat/conversations/[conversationId]/model/route.ts` 가 그때 생긴다. 시작 전에 `git merge origin/main` 을 하고 지금 모양을 읽는다
+- 입력창은 `web/src/components/chat/composer.tsx` 이고 `web/src/components/chat-panel.tsx` 가 `<Composer key={composerGeneration} ...>` 로 그린다. 대화가 아직 없을 때 사진을 먼저 올리면 `ensureConversationId()` 가 빈 대화를 만든다. 모델을 먼저 고를 때도 이 함수를 쓴다
+- 대화 목록 타입은 `web/src/components/shell/conversations-provider.tsx` 의 `Conversation` 이다
+- 브라우저는 Control Plane 토큰을 갖지 않는다. 새 서버 라우트는 `web/src/lib/control-plane.ts` 의 `callControlPlane` 을 쓴다(`web/AGENTS.md`)
+- 부품은 `web/src/components/ui/` 의 `dropdown-menu.tsx`, `dialog.tsx`, `sheet.tsx`, `native-select.tsx` 가 있다. 화면 문구는 해요체다(`web/AGENTS.md` 「화면 문구」)
+
+## 의도 메모
+
+- 단추는 `기본 (gpt-6-luna)` 처럼 기본값일 때 기본 모델 이름을, 고른 뒤에는 `gpt-6-sol · high` 처럼 모델과 effort 를 보인다. 좁은 폭에서도 입력창을 밀어내지 않게 한 줄로 줄인다
+- 창은 provider 별로 모델을 나열하고 맨 위에 「기본」 을 둔다. effort 는 「기본, low, medium, high, xhigh, max」 에서 고른다. 고른 모델의 `reasoningCapable` 이 거짓이면 effort 를 「기본」 으로 두고 고르지 못하게 한다
+- 목록은 창을 열 때 한 번 읽는다. 실패하면 창 안에 「모델 목록을 불러오지 못했어요. 기본 모델로는 계속 보낼 수 있어요.」 를 보이고 「기본」 만 고를 수 있게 한다
+- 답이 도는 중에도 바꿀 수 있다. 바꾼 값은 다음 보내기부터다
+- 저장이 실패하면 단추는 이전 값으로 돌아가고 오류 안내를 보인다
+
+## 작업 항목
+
+### 1. 서버 라우트 `web/src/app/api/chat/model-options/route.ts`
+
+`GET` 이 `agentCode` 쿼리를 받아 `/api/v1/chat/model-options?agentCode=` 로 넘긴다. `agentCode` 가 없으면 400 `VALIDATION_FAILED`.
+
+### 2. 고르는 부품 `web/src/components/chat/model-picker.tsx`
+
+- 속성: `agentCode`, `choice: { provider, model, reasoningEffort } | null`, `onChange(choice): Promise<boolean>`, `disabled`
+- 위 의도 메모의 단추와 창과 실패 표시를 그린다. `data-testid="model-picker"` 를 단추에 붙인다
+
+### 3. composer 와 chat-panel
+
+- `Composer` 가 `modelChoice` 와 `onModelChoiceSaved(conversation)` 를 받아 입력창 옆에 `ModelPicker` 를 그린다
+- 고르면 `ensureConversationId()` 로 대화를 확보한 뒤 `PUT /api/chat/conversations/{id}/model` 을 부른다. 새로 만든 대화면 `onConversationCreated` 도 부른다
+- `chat-panel.tsx` 는 지금 대화 한 줄의 세 칸을 `modelChoice` 로 넘기고, 저장된 뒤 대화 목록을 다시 읽는다
+- `conversations-provider.tsx` 의 `Conversation` 에 `provider`, `model`, `reasoningEffort` 를 더한다(모두 `string | null`)
+
+### 4. 이 phase 를 검증하는 브라우저 검사 `test/browser/model-choice.spec.ts`
+
+`test/browser/fixtures.ts` 의 가짜 Hermes 를 쓴다(plan034 가 모델 목록을 실제 모양으로 바꿨다).
+- 새 대화에서 단추가 「기본 (example-model)」 을 보인다. 모델과 `high` 를 고르고 보내면 가짜 Hermes 의 마지막 실행 요청에 그 모델과 effort 가 실린다. 다시 열어도 단추가 고른 값을 보인다
+- `reasoningCapable` 이 거짓인 모델을 고르면 effort 를 고를 수 없다
+- 가짜 Hermes 가 모델 목록에 실패하면 창에 실패 안내가 보이고, 기본값으로 보내기는 된다(실패를 켜는 테스트 경로가 없으면 `test/e2e/fake-hermes.ts` 에 `__test/model-options-fail` 을 더한다)
+- 좁은 폭에서 단추가 입력창을 밀어내지 않는다(가로 넘침 없음)
+
+## 검증
+
+`AGENTS.md` 「확인」 절의 여섯 명령을 적힌 순서대로 모두 돌린다. 새 워크트리라 `web` 에서 `pnpm install --frozen-lockfile` 이 먼저 필요하다. 첫 줄은 이 phase 의 검사만 먼저 돌리는 것이다.
+
+```bash
+# cwd: 저장소 root
+cd web && pnpm test:browser model-choice.spec.ts
+cd backend && ./gradlew test
+cd web && pnpm typecheck
+cd web && AUTH_SECRET=build-time-placeholder ASSISTANT_JWT_SECRET=build-time-placeholder CONTROL_PLANE_BASE_URL=http://build-time-placeholder AUTH_GOOGLE_ID=build-time-placeholder AUTH_GOOGLE_SECRET=build-time-placeholder pnpm build
+cd web && pnpm test:browser
+node test/e2e/run.ts
+node --test 'test/unit/**/*.test.ts'
+scripts/check-public-safe.sh
+```
+
+- 모두 통과한다
+
+## 변경 파일
+
+| 파일 | 변경 |
+| --- | --- |
+| `web/src/app/api/chat/model-options/route.ts` | 신규 |
+| `web/src/components/chat/model-picker.tsx` | 신규 |
+| `web/src/components/chat/composer.tsx` | 수정 |
+| `web/src/components/chat-panel.tsx` | 수정 |
+| `web/src/components/shell/conversations-provider.tsx` | 수정 |
+| `test/browser/model-choice.spec.ts` | 신규 |
+| `test/e2e/fake-hermes.ts` | 수정 |
