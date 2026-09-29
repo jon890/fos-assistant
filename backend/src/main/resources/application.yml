@@ -42,6 +42,8 @@ assistant:
     stop-stream-grace: 10s
     # 사건이 없는 동안 SSE 주석 줄을 보내는 간격. 앞단 프록시가 약 100초 동안 바이트가 없으면 연결을 끊는다
     stream-heartbeat: ${ASSISTANT_CHAT_STREAM_HEARTBEAT:20s}
+    # 고를 수 있는 모델 목록을 profile 마다 메모리에 들고 있는 시간. 지나면 Hermes 에 다시 묻는다
+    model-options-ttl: 10m
   context:
     max-chars: 8000
     index-budget-ratio: 4

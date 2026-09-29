@@ -10,6 +10,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class ChatDtos {
@@ -137,5 +138,20 @@ public final class ChatDtos {
         public ModelChoice toChoice() {
             return new ModelChoice(provider, model, reasoningEffort);
         }
+    }
+
+    /** 그 에이전트의 profile 로 고를 수 있는 모델이다. */
+    public record ModelOptionsView(String defaultProvider, String defaultModel, List<ProviderView> providers,
+            List<String> reasoningEfforts) {
+    }
+
+    /**
+     * @param provider Hermes 가 부르는 provider 이름
+     * @param name 화면에 보일 이름
+     * @param models 그 provider 의 모델 이름
+     * @param reasoningCapable 모델 이름을 열쇠로 한 reasoning 지원 여부. Hermes 가 밝히지 않은 모델은 참으로 본다
+     */
+    public record ProviderView(String provider, String name, List<String> models,
+            Map<String, Boolean> reasoningCapable) {
     }
 }

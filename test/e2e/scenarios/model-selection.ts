@@ -20,10 +20,49 @@ const PROFILE_DEFAULT = { provider: "openai-codex", model: "example-model" } as 
 /** 대화에서 고를 모델이다. 기본값과 달라야 고른 값이 실렸는지 알 수 있다. */
 const CHOSEN = { provider: "nvidia", model: "example-provider/example-model-b", reasoningEffort: "high" } as const;
 
+type ModelOptionsView = {
+  defaultProvider: string | null;
+  defaultModel: string | null;
+  providers: { provider: string; name: string; models: string[]; reasoningCapable: Record<string, boolean> }[];
+  reasoningEfforts: string[];
+};
+
 export const modelSelectionScenario: Scenario = {
   name: "대화의 모델 선택",
 
   async run(context) {
+    step("고를 수 있는 모델 목록은 기본값과 인증된 provider 만 주고, 다시 불러도 Hermes 를 한 번만 부른다");
+    const callsBefore = context.hermes.modelOptionsCalls();
+    const options = expectStatus(
+      await call(context, "/chat/model-options?agentCode=dad", { token: context.tokens.dad }),
+      200,
+      "모델 목록",
+    ).json<ModelOptionsView>();
+    expect(
+      options.defaultProvider === PROFILE_DEFAULT.provider && options.defaultModel === PROFILE_DEFAULT.model,
+      `기본값이 profile 의 기본값이 아니다: ${JSON.stringify(options)}`,
+    );
+    expect(
+      options.providers.length === 1 && options.providers[0]?.provider === PROFILE_DEFAULT.provider
+        && options.providers[0]?.models.includes(PROFILE_DEFAULT.model) === true
+        && options.providers[0]?.reasoningCapable["example-model-mini"] === false,
+      `인증된 provider 하나만 와야 한다: ${JSON.stringify(options.providers)}`,
+    );
+    expect(
+      options.reasoningEfforts.join(",") === "low,medium,high,xhigh,max",
+      `effort 선택지가 다르다: ${JSON.stringify(options.reasoningEfforts)}`,
+    );
+    expectStatus(
+      await call(context, "/chat/model-options?agentCode=dad", { token: context.tokens.dad }),
+      200,
+      "모델 목록 다시 조회",
+    );
+    const callsAfter = context.hermes.modelOptionsCalls();
+    expect(
+      callsAfter - callsBefore === 1,
+      `모델 목록을 두 번 불렀는데 Hermes 는 ${callsAfter - callsBefore}번 불렸다`,
+    );
+
     step("고르지 않은 대화는 provider 와 모델을 빼고 보낸다");
     const plain = expectStatus(
       await call(context, "/chat/messages", {

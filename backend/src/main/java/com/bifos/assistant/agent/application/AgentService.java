@@ -30,6 +30,18 @@ public class AgentService {
         return agent;
     }
 
+    /** 대화를 시작하거나 그 에이전트의 모델을 고를 수 있는 에이전트다. 요청자가 읽을 수 있고 켜져 있어야 한다. */
+    public Agent requireStartable(CurrentUser user, String code) {
+        if (code == null || code.isBlank()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
+        }
+        Agent agent = requireReadable(user, code);
+        if (!agent.enabled()) {
+            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
+        }
+        return agent;
+    }
+
     /** 쓰기 전에 행 잠금을 잡고, 잠금을 잡은 뒤의 접근 범위를 다시 확인한다. */
     public Agent requireReadableForUpdate(CurrentUser user, String code) {
         Agent locked = agents.findByCodeForUpdate(code).orElseThrow(() -> notFound());

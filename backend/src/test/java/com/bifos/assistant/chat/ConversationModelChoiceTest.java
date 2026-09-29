@@ -235,7 +235,7 @@ class ConversationModelChoiceTest {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
         return new ChatController(chat, provider, users, agentService, access,
-                new ChatEventStreams(Duration.ofSeconds(20)));
+                new ChatEventStreams(Duration.ofSeconds(20)), null);
     }
 
     private static void rejected(Runnable action) {

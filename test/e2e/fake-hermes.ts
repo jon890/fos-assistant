@@ -345,6 +345,8 @@ export type FakeHermes = {
   lastSubmittedInstructions(): string | undefined;
   /** 마지막 실행 요청의 `input`. Control Plane 이 사용자가 쓴 글 앞에 덧붙인 것까지 담는다 */
   lastSubmittedInput(): string | undefined;
+  /** 모델 목록 조회를 받은 횟수다. 들고 있는 동안 다시 묻지 않는 것을 이 수로 본다. */
+  modelOptionsCalls(): number;
   /** 마지막 실행 요청이 실어 온 provider, 모델, reasoning effort */
   lastSubmittedRuntime(): { provider?: string; model?: string; reasoningEffort?: string };
   blockProvider(provider: string): void;
@@ -414,6 +416,7 @@ export function startFakeHermes(
   const blockedProviders = new Set<string>();
   let busy = false;
   let submitCount = 0;
+  let modelOptionsCalls = 0;
   let lastSubmittedRuntime: { provider?: string; model?: string; reasoningEffort?: string } = {};
   let holdNextRun = false;
   let heldRunId: string | undefined;
@@ -712,7 +715,24 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
-          return send(response, 200, { ...DEFAULT_RUNTIME, providers: [] });
+          modelOptionsCalls += 1;
+          // 실제 응답의 모양이다. 설정하지 않은 provider 도 빈 행으로 함께 온다.
+          return send(response, 200, {
+            ...DEFAULT_RUNTIME,
+            providers: [
+              {
+                slug: DEFAULT_RUNTIME.provider,
+                name: "OpenAI Codex",
+                authenticated: true,
+                models: [DEFAULT_RUNTIME.model, "example-model-mini"],
+                capabilities: {
+                  [DEFAULT_RUNTIME.model]: { reasoning: true },
+                  "example-model-mini": { reasoning: false },
+                },
+              },
+              { slug: "unconfigured", name: "Unconfigured", authenticated: false, models: [] },
+            ],
+          });
         }
 
         const sessionMatch = SESSION_PATH.exec(path);
@@ -955,6 +975,7 @@ export function startFakeHermes(
         baseUrl: `http://127.0.0.1:${address.port}`,
         lastSubmittedInstructions: () => lastSubmittedInstructions,
         lastSubmittedInput: () => lastSubmittedInput,
+        modelOptionsCalls: () => modelOptionsCalls,
         lastSubmittedRuntime: () => lastSubmittedRuntime,
         blockProvider: (provider: string) => blockedProviders.add(provider),
         clearBlockedProviders: () => blockedProviders.clear(),

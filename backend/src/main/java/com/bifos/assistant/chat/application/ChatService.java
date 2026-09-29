@@ -782,30 +782,18 @@ public class ChatService {
      * 제목은 첫 메시지가 정한다.
      */
     public Conversation startEmpty(CurrentUser user, String agentCode) {
-        Agent agent = requireStartableAgent(user, agentCode);
+        Agent agent = agents.requireStartable(user, agentCode);
         return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
     }
 
     private Conversation resolveConversation(
             CurrentUser user, Long conversationId, String firstText, String agentCode) {
         if (conversationId == null) {
-            Agent agent = requireStartableAgent(user, agentCode);
+            Agent agent = agents.requireStartable(user, agentCode);
             return conversations.save(
                     Conversation.startedBy(user.id(), titleFrom(firstText), agent.id()));
         }
         return access.requireOwn(user, conversationId);
-    }
-
-    /** 새 대화를 시작할 에이전트를 고른다. 요청자가 읽을 수 있고 켜져 있어야 한다. */
-    private Agent requireStartableAgent(CurrentUser user, String agentCode) {
-        if (agentCode == null || agentCode.isBlank()) {
-            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "an agent is required");
-        }
-        Agent agent = agents.requireReadable(user, agentCode);
-        if (!agent.enabled()) {
-            throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
-        }
-        return agent;
     }
 
     private static String titleFrom(String text) {

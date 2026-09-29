@@ -4,6 +4,8 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ModelOptions;
+import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -15,6 +17,8 @@ import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
+import com.bifos.assistant.chat.presentation.ChatDtos.ModelOptionsView;
+import com.bifos.assistant.chat.presentation.ChatDtos.ProviderView;
 import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.RunningTurnView;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
@@ -43,6 +47,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -59,6 +64,7 @@ public class ChatController {
     private final AgentService agents;
     private final ConversationAccess access;
     private final ChatEventStreams streams;
+    private final ModelOptionsService modelOptions;
 
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
@@ -132,6 +138,25 @@ public class ChatController {
             @RequestBody ChooseModelRequest request) {
         CurrentUser user = currentUser.require();
         return viewOf(chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice()));
+    }
+
+    /**
+     * 그 에이전트의 profile 로 고를 수 있는 모델과 기본값을 돌려준다.
+     *
+     * <p>{@code agentCode} 를 필수 인자로 두지 않는다. 빠지면 필수 인자 예외가 받는 곳 없이 500 이 되므로,
+     * 서비스의 에이전트 확인이 {@code AGENT_NOT_FOUND} 로 거절하게 둔다.
+     */
+    @GetMapping("/model-options")
+    public ModelOptionsView modelOptions(@RequestParam(required = false) String agentCode) {
+        ModelOptions options = modelOptions.optionsFor(currentUser.require(), agentCode);
+        return new ModelOptionsView(
+                options.defaultProvider(),
+                options.defaultModel(),
+                options.providers().stream()
+                        .map(provider -> new ProviderView(
+                                provider.slug(), provider.name(), provider.models(), provider.reasoning()))
+                        .toList(),
+                options.reasoningEfforts());
     }
 
     @DeleteMapping("/conversations/{conversationId}")
