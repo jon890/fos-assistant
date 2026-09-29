@@ -324,7 +324,7 @@ sequenceDiagram
 | 중간에 Hermes 가 실패한다 | 만든 것을 역순으로 거두고 `HERMES_PROVISION_FAILED`. 거두기까지 실패하면 원래 오류를 올리고 로그를 남긴다 |
 | 만든 직후 첫 대화에서 MCP 도구가 아직 없다 | 새 profile 의 MCP 연결은 1~2분 안에 붙는다. 그동안 Memory 읽기와 결과물 쓰기가 없는 채로 답한다 |
 | 이름이 비었거나 너무 길다 | `VALIDATION_FAILED` |
-| 그룹에 공개한다 | 주인이 승인 없이 한다. 셸·파일 도구가 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE` |
+| 그룹에 공개한다 | 주인이 승인 없이 한다. 켜진 에이전트에 셸·파일 도구가 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE`. 꺼진 에이전트는 켤 때 관리자 수정이 검사한다 |
 | 지운다 | 확인 창을 거친다. 에이전트는 목록에서 빠지고 대화는 읽기만 된다. Control Plane 이 만든 profile 만 profile 까지 지운다 |
 | 지운 에이전트의 대화에 보낸다 | `AGENT_NOT_FOUND` |
 

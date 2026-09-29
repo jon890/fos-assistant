@@ -35,6 +35,13 @@ const ACCESS_FAILURES: Record<string, string> = {
   VALIDATION_FAILED: "공개 범위를 바꾸지 못했어요. 다시 시도해 주세요.",
 };
 
+/** 지우기의 문구다. profile 을 거두다 실패한 코드가 사람 추가 화면의 공용 문구로 보이지 않게 따로 둔다. */
+const DELETE_FAILURES: Record<string, string> = {
+  FORBIDDEN: ACCESS_FAILURES.FORBIDDEN!,
+  VALIDATION_FAILED: "에이전트를 지우지 못했어요. 다시 시도해 주세요.",
+  HERMES_PROVISION_FAILED: "에이전트를 지우지 못했어요. 다시 시도해 주세요.",
+};
+
 /** 지우기 확인 창이다. `VisibilityConfirm` 과 같이 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. */
 function DeleteConfirm({ name, busy, error, onCancel, onConfirm }: {
   name: string;
@@ -108,7 +115,7 @@ export function AgentAccessSection({ code, name, visibility, onVisibilityChange 
     try {
       const response = await fetch(`/api/agents/${code}`, { method: "DELETE" });
       if (!response.ok) {
-        setError(await describeFailure(response, ACCESS_FAILURES));
+        setError(await describeFailure(response, DELETE_FAILURES));
         setPending(null);
         return;
       }
