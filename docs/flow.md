@@ -136,6 +136,8 @@ sequenceDiagram
     C->>C: 허용 목록에 행을 만든다
     C->>D: POST /api/profiles
     D-->>C: 만들어졌다
+    C->>C: 그 profile 에 묶인 MCP 토큰을 발급한다
+    C->>D: PUT /api/env (MCP_FOS_ASSISTANT_API_KEY)
     C->>C: key 를 만든다
     C->>D: PUT /api/env (API_SERVER_MODEL_NAME 과 API_SERVER_KEY)
     D-->>C: 들어갔다
@@ -173,7 +175,7 @@ sequenceDiagram
 | --- | --- |
 | 이미 있는 이메일 | 거절한다. 허용 목록의 이메일은 하나뿐이다 |
 | 이미 있는 profile 이름 | 거절한다. 우리 표에서도 Hermes 에서도 본다 |
-| profile 은 만들었는데 key 주입이 실패 | **만든 profile 을 지운다.** 아무것도 남기지 않는다 |
+| profile 은 만들었는데 토큰이나 key 주입이 실패 | **발급한 토큰을 폐기하고 만든 profile 을 지운다.** 아무것도 남기지 않는다 |
 | key 파일 쓰기가 실패 | 같다. profile 을 지우고 허용 목록 행도 되돌린다 |
 | Hermes 가 응답하지 않는다 | 허용 목록 행을 만들기 전이므로 아무것도 남지 않는다 |
 | 같은 요청이 두 번 온다 | 뒤의 것이 이메일 유니크 제약에 걸려 거절된다 |
@@ -304,10 +306,11 @@ sequenceDiagram
     C->>C: code 와 profile 이름을 만든다
     C->>D: POST /api/profiles (no_skills)
     D->>D: 틀로 안전한 도구, MCP 등록, 서명 plugin, 관리 표식
-    C->>D: 도구 목록을 읽어 확인한다
     C->>C: 그 profile 에 묶인 MCP 토큰을 발급한다
     C->>D: PUT /api/env (MCP 토큰, API_SERVER_MODEL_NAME, API_SERVER_KEY)
-    C->>C: key 파일을 쓰고 에이전트 행을 저장한다 (profile_managed)
+    C->>C: key 파일을 쓴다
+    C->>D: 그 key 로 도구 목록을 읽어 셸·파일 등급이 없는지 확인한다
+    C->>C: 에이전트 행을 저장한다 (profile_managed)
     C-->>U: 201 과 에이전트
     U->>U: 상세로 간다
 ```
@@ -321,7 +324,7 @@ sequenceDiagram
 | 중간에 Hermes 가 실패한다 | 만든 것을 역순으로 거두고 `HERMES_PROVISION_FAILED`. 거두기까지 실패하면 원래 오류를 올리고 로그를 남긴다 |
 | 만든 직후 첫 대화에서 MCP 도구가 아직 없다 | 새 profile 의 MCP 연결은 1~2분 안에 붙는다. 그동안 Memory 읽기와 결과물 쓰기가 없는 채로 답한다 |
 | 이름이 비었거나 너무 길다 | `VALIDATION_FAILED` |
-| 가족용으로 공개한다 | 주인이 승인 없이 한다. 셸·파일 도구가 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE` |
+| 그룹에 공개한다 | 주인이 승인 없이 한다. 셸·파일 도구가 켜져 있으면 `AGENT_TOOLS_REQUIRE_PRIVATE` |
 | 지운다 | 확인 창을 거친다. 에이전트는 목록에서 빠지고 대화는 읽기만 된다. Control Plane 이 만든 profile 만 profile 까지 지운다 |
 | 지운 에이전트의 대화에 보낸다 | `AGENT_NOT_FOUND` |
 

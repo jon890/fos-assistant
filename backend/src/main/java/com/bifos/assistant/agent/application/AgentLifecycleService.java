@@ -73,6 +73,16 @@ public class AgentLifecycleService {
      * 셸이나 파일 등급이 켜져 있으면 틀이 적용되지 않은 것으로 보고 거둔다. 그래서 그룹 공개로 만들어도
      * 따로 검사하지 않는다. MCP 등록은 이 목록으로 볼 수 없어 profile 만들기가 성공한 것으로 믿는다.
      *
+     * <p>두 가지를 알고 받아들인다.
+     *
+     * <ul>
+     *   <li>만들기 한 건이 DB 커넥션을 둘 쓴다. 잠금을 쥔 이 트랜잭션과, profile 을 만들며 토큰을 발급하거나
+     *       폐기하는 {@code REQUIRES_NEW} 트랜잭션이다. 서로 다른 사용자의 동시 만들기가 커넥션 풀 크기 이상이면
+     *       모두 둘째 커넥션을 기다리며 막힐 수 있다. 가족 규모에서는 그만큼 동시에 만들 일이 없다.
+     *   <li>{@code saveAndFlush} 가 성공한 뒤 커밋 단계에서 실패하면 행은 되돌려지고 profile 은 남는다.
+     *       커밋 실패는 드물어 여기서 거두지 않는다. 남은 profile 은 운영에서 지운다.
+     * </ul>
+     *
      * @param visibility 비어 있으면 {@code PRIVATE}
      */
     @Transactional
@@ -115,10 +125,14 @@ public class AgentLifecycleService {
     }
 
     /**
-     * 공개 범위를 바꾼다. 주인은 그대로 둔다(ADR-033).
+     * 공개 범위를 바꾼다. 주인이 있으면 그대로 둔다(ADR-033).
      *
-     * <p>그룹으로 바꿀 때만 도구를 검사한다. 주인이 없는 에이전트는 자기만 보는 것으로 바꾸지 못한다. 바꾸면
-     * 아무도 읽지 못하는 에이전트가 된다.
+     * <p>주인이 비어 있는 에이전트를 자기만 보는 것으로 바꾸면 요청자를 주인으로 정한다. 주인 없이 바꾸면
+     * 아무도 읽지 못하는 에이전트가 된다. 주인이 없는 에이전트는 {@code ADMIN} 만 여기까지 오므로 그
+     * {@code ADMIN} 이 주인이 된다. 관리자 경로가 주인 메일로 관리자 자신을 받던 것과 같은 결과다. 그룹으로
+     * 두는 요청은 주인을 비운 채 둔다.
+     *
+     * <p>켜진 에이전트를 그룹으로 바꿀 때만 도구를 검사한다. 관리자 경로의 수정과 같은 기준이다.
      */
     @Transactional
     public Agent changeVisibility(CurrentUser user, String code, AgentVisibility visibility) {
@@ -126,13 +140,14 @@ public class AgentLifecycleService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a visibility is required");
         }
         Agent agent = requireManageable(user, code);
-        if (visibility == AgentVisibility.PRIVATE && agent.ownerUserId() == null) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a private agent needs an owner");
-        }
-        if (visibility == AgentVisibility.GROUP) {
+        Long ownerId = visibility == AgentVisibility.PRIVATE && agent.ownerUserId() == null
+                ? user.id()
+                : agent.ownerUserId();
+        // 꺼진 에이전트는 여기서 검사하지 않는다. 켤 때 관리자 경로의 수정이 같은 검사를 한다.
+        if (agent.enabled() && visibility == AgentVisibility.GROUP) {
             requireGroupSafe(agent.apiBaseUrl(), agent.hermesProfile());
         }
-        agent.changeAccess(agent.enabled(), visibility, agent.ownerUserId());
+        agent.changeAccess(agent.enabled(), visibility, ownerId);
         return agents.save(agent);
     }
 

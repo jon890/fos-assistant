@@ -2,6 +2,7 @@ package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentService;
@@ -11,13 +12,15 @@ import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentAdminController;
+import com.bifos.assistant.agent.presentation.AgentToolController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
 import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
+import com.bifos.assistant.agent.presentation.AgentDtos.UpdateToolsetsRequest;
 import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -28,6 +31,8 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +52,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 지운 에이전트가 읽기 목록, 대화 시작, 이어 보내기, 쓰기 경로에서 없는 에이전트로 보이는지와, 그룹에
  * 공개해도 주인이 남는지를 실제 저장소로 본다(ADR-033).
+ *
+ * <p>표를 비우지 않는다. 번호와 메일을 무작위로 만들어 이 클래스가 만든 행만 읽고 단언한다. 같은 스프링
+ * 문맥을 쓰는 다른 테스트의 행을 지우지 않고, 그 행에 단언이 흔들리지도 않는다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -66,10 +74,10 @@ class AgentLifecycleFlagsTest {
 
     @Autowired AgentService agentService;
     @Autowired AgentAdminController admin;
+    @Autowired AgentToolController agentTools;
     @Autowired ChatService chat;
     @Autowired AgentRepository agents;
     @Autowired AppUserRepository users;
-    @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired HermesRunsClient hermes;
     @Autowired PlatformTransactionManager transactionManager;
@@ -87,13 +95,9 @@ class AgentLifecycleFlagsTest {
     @BeforeEach
     void reset() {
         ((StubHermesRunsClient) hermes).reset();
-        messages.deleteAll();
-        conversations.deleteAll();
-        agents.deleteAll();
-        users.deleteAll();
-        owner = user("owner@example.com", UserRole.MEMBER);
-        otherMember = user("other@example.com", UserRole.MEMBER);
-        administrator = user("admin@example.com", UserRole.ADMIN);
+        owner = user(UserRole.MEMBER);
+        otherMember = user(UserRole.MEMBER);
+        administrator = user(UserRole.ADMIN);
     }
 
     @AfterEach
@@ -103,16 +107,17 @@ class AgentLifecycleFlagsTest {
 
     @Test
     void 지운_에이전트는_목록과_시작과_쓰기에서_없는_에이전트이고_번호로는_읽힌다() {
-        Agent agent = agents.save(privateAgentOf("helper", owner));
+        String helper = randomCode("helper");
+        Agent agent = agents.save(privateAgentOf(helper, owner));
         agent.markDeleted(DELETED_AT);
         agents.save(agent);
 
         assertThat(agentService.readableBy(owner))
                 .extracting(Agent::code)
-                .doesNotContain("helper");
-        assertNotFound(() -> agentService.requireStartable(owner, "helper"));
+                .doesNotContain(helper);
+        assertNotFound(() -> agentService.requireStartable(owner, helper));
         assertNotFound(() -> new TransactionTemplate(transactionManager)
-                .execute(status -> agentService.requireReadableForUpdate(owner, "helper")));
+                .execute(status -> agentService.requireReadableForUpdate(owner, helper)));
 
         Agent byId = agentService.requireById(agent.id());
         assertThat(byId.isDeleted()).isTrue();
@@ -122,9 +127,10 @@ class AgentLifecycleFlagsTest {
 
     @Test
     void 지운_에이전트의_기존_대화에_보내면_없는_에이전트이고_Hermes_를_부르지_않는다() {
-        agents.save(privateAgentOf("helper", owner));
-        Conversation conversation = chat.startEmpty(owner, "helper");
-        Agent agent = agents.findByCode("helper").orElseThrow();
+        String helper = randomCode("helper");
+        agents.save(privateAgentOf(helper, owner));
+        Conversation conversation = chat.startEmpty(owner, helper);
+        Agent agent = agents.findByCode(helper).orElseThrow();
         agent.markDeleted(DELETED_AT);
         agents.save(agent);
 
@@ -132,31 +138,62 @@ class AgentLifecycleFlagsTest {
         assertThat(((StubHermesRunsClient) hermes).received()).isEmpty();
     }
 
+    /** 다시 만들기는 새 질문 없이 기존 대화의 에이전트로 곧바로 간다. 그 길도 지운 에이전트를 막는다. */
+    @Test
+    void 지운_에이전트의_답을_다시_만들면_없는_에이전트이고_Hermes_를_부르지_않는다() {
+        String helper = randomCode("helper");
+        agents.save(privateAgentOf(helper, owner));
+        Conversation conversation = chat.startEmpty(owner, helper);
+        messages.save(ChatMessage.fromUser(conversation.id(), owner.id(), "오늘 숙제가 뭐였지?"));
+        Agent agent = agents.findByCode(helper).orElseThrow();
+        agent.markDeleted(DELETED_AT);
+        agents.save(agent);
+
+        assertNotFound(() -> chat.regenerate(owner, conversation.id(), event -> {}));
+        assertThat(((StubHermesRunsClient) hermes).received()).isEmpty();
+    }
+
     @Test
     void 관리자도_지운_에이전트를_켜지_못하고_관리_목록에서_보지_못한다() {
-        Agent deleted = agents.save(privateAgentOf("helper", owner));
+        String helper = randomCode("helper");
+        String kept = randomCode("kept");
+        Agent deleted = agents.save(privateAgentOf(helper, owner));
         deleted.markDeleted(DELETED_AT);
         agents.save(deleted);
-        agents.save(privateAgentOf("kept", owner));
+        agents.save(privateAgentOf(kept, owner));
         signIn(administrator);
 
         assertNotFound(() -> admin.update(
-                "helper", new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null)));
-        assertThat(agents.findByCode("helper").orElseThrow().enabled()).isFalse();
-        assertThat(admin.list()).extracting(AdminAgentView::code).containsExactly("kept");
+                helper, new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null)));
+        assertThat(agents.findByCode(helper).orElseThrow().enabled()).isFalse();
+        assertThat(admin.list()).extracting(AdminAgentView::code).contains(kept).doesNotContain(helper);
+    }
+
+    @Test
+    void 관리자도_지운_에이전트의_도구를_읽거나_바꾸지_못한다() {
+        String helper = randomCode("helper");
+        Agent deleted = agents.save(privateAgentOf(helper, owner));
+        deleted.markDeleted(DELETED_AT);
+        agents.save(deleted);
+        signIn(administrator);
+
+        assertNotFound(() -> agentTools.readAdmin(helper));
+        assertNotFound(() -> agentTools.writeAdmin(helper, new UpdateToolsetsRequest(List.of("web"))));
+        verifyNoInteractions(hermesToolsets);
     }
 
     @Test
     void 그룹으로_공개해도_주인이_남고_주인만_고친다() {
-        agents.save(privateAgentOf("helper", owner));
+        String helper = randomCode("helper");
+        agents.save(privateAgentOf(helper, owner));
         signIn(administrator);
 
         AdminAgentView view = admin.update(
-                "helper", new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null));
+                helper, new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null));
 
         assertThat(view.visibility()).isEqualTo("GROUP");
         assertThat(view.ownerUserId()).isEqualTo(owner.id());
-        Agent saved = agents.findByCode("helper").orElseThrow();
+        Agent saved = agents.findByCode(helper).orElseThrow();
         assertThat(saved.ownerUserId()).isEqualTo(owner.id());
         assertThat(agentService.isEditableBy(owner, saved)).isTrue();
         assertThat(agentService.isEditableBy(otherMember, saved)).isFalse();
@@ -167,16 +204,18 @@ class AgentLifecycleFlagsTest {
     void 관리자가_그룹_에이전트를_만들_때_준_사용자가_주인이_되고_없는_사용자는_거절한다() {
         signIn(administrator);
 
-        AdminAgentView owned = admin.create(groupRequest("family", owner.email()));
-        AdminAgentView ownerless = admin.create(groupRequest("shared", null));
+        String ghost = randomCode("ghost");
+
+        AdminAgentView owned = admin.create(groupRequest(randomCode("family"), owner.email()));
+        AdminAgentView ownerless = admin.create(groupRequest(randomCode("shared"), null));
 
         assertThat(owned.ownerUserId()).isEqualTo(owner.id());
         assertThat(ownerless.ownerUserId()).isNull();
-        assertThatThrownBy(() -> admin.create(groupRequest("ghost", "ghost@example.com")))
+        assertThatThrownBy(() -> admin.create(groupRequest(ghost, randomEmail())))
                 .isInstanceOf(ApiException.class)
                 .extracting(thrown -> ((ApiException) thrown).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
-        assertThat(agents.findByCode("ghost")).isEmpty();
+        assertThat(agents.findByCode(ghost)).isEmpty();
     }
 
     private static CreateAgentRequest groupRequest(String code, String ownerEmail) {
@@ -192,9 +231,19 @@ class AgentLifecycleFlagsTest {
                 .isEqualTo(ErrorCode.AGENT_NOT_FOUND);
     }
 
-    private CurrentUser user(String email, UserRole role) {
+    private CurrentUser user(UserRole role) {
+        String email = randomEmail();
         AppUser saved = users.save(AppUser.of(email, email, 1L, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
+    }
+
+    /** 에이전트 번호 규칙에 맞는 소문자와 숫자, {@code -} 로 만든다. */
+    private static String randomCode(String prefix) {
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 13);
+    }
+
+    private static String randomEmail() {
+        return "flags-" + UUID.randomUUID() + "@example.com";
     }
 
     private static Agent privateAgentOf(String code, CurrentUser owner) {

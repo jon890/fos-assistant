@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -259,6 +260,38 @@ class AgentLifecycleServiceTest {
 
         assertThat(agents.findByCode(created.code()).orElseThrow().visibility())
                 .isEqualTo(AgentVisibility.PRIVATE);
+    }
+
+    @Test
+    void 꺼진_에이전트는_Hermes_를_부르지_않고_그룹으로_바꾼다() {
+        CurrentUser kid = member();
+        Agent created = create(kid, "숙제 도우미", null);
+        Agent stored = agents.findByCode(created.code()).orElseThrow();
+        stored.changeAccess(false, AgentVisibility.PRIVATE, kid.id());
+        agents.save(stored);
+        clearInvocations(toolsets);
+
+        Agent changed = lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP);
+
+        assertThat(changed.visibility()).isEqualTo(AgentVisibility.GROUP);
+        assertThat(changed.enabled()).as("공개 범위만 바꾸고 켜지 않는다").isFalse();
+        verify(toolsets, never()).readEnabled(anyString(), anyString());
+    }
+
+    @Test
+    void 주인_없는_그룹_에이전트를_ADMIN_이_자기만_보게_바꾸면_그_ADMIN_이_주인이다() {
+        CurrentUser administrator = admin();
+        String code = "ownerless-" + UUID.randomUUID().toString().substring(0, 13);
+        agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null));
+
+        Agent changed = lifecycle.changeVisibility(administrator, code, AgentVisibility.PRIVATE);
+
+        assertThat(changed.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        Agent stored = agents.findByCode(code).orElseThrow();
+        assertThat(stored.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        assertThat(stored.ownerUserId()).as("주인이 비어 있던 에이전트의 새 주인").isEqualTo(administrator.id());
+        assertThat(stored.isReadableBy(administrator.id())).isTrue();
     }
 
     @Test

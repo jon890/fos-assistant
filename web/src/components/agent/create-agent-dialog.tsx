@@ -14,10 +14,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { describeError } from "@/components/error-message";
+import { describeError, describeFailure } from "@/components/error-message";
 import { GROUP_VISIBILITY, PRIVATE_VISIBILITY, type AdminAgent, type AgentView } from "@/lib/agent";
 
-type ErrorPayload = { code: string; message: string };
+/** 대화상자에서만 뜻이 정해지는 오류 코드의 문구다. 나머지는 공용 문구를 쓴다. */
+const CREATE_FAILURES: Record<string, string> = {
+  AGENT_LIMIT_REACHED: "에이전트는 5개까지 만들 수 있어요",
+  HERMES_PROVISION_FAILED: "에이전트를 만들지 못했어요. 다시 시도해 주세요.",
+  VALIDATION_FAILED: "이름은 1자 이상 100자 이하로 적어 주세요.",
+};
 
 /** `backend` 의 이름 칸 길이(`agent.name`)와 같다. */
 const MAX_NAME_CHARS = 100;
@@ -57,10 +62,7 @@ export function CreateAgentDialog() {
         body: JSON.stringify({ name: name.trim(), visibility }),
       });
       if (!response.ok) {
-        const payload = (await response.json()) as ErrorPayload;
-        setError(payload.code === "AGENT_LIMIT_REACHED"
-          ? "에이전트는 5개까지 만들 수 있어요"
-          : describeError(payload.code, payload.message));
+        setError(await describeFailure(response, CREATE_FAILURES));
         setCreating(false);
         return;
       }

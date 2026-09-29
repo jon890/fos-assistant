@@ -60,8 +60,9 @@ test.afterEach(async ({ context, page }, testInfo) => {
 });
 
 test("이름만 넣어 에이전트를 만들면 상세로 가고 그 에이전트와 대화가 끝난다", async ({ page }) => {
+  // 다른 검사가 남긴 그룹 공개 에이전트가 목록에 있을 수 있어 빈 상태 문구는 보지 않는다.
   await page.goto("/agents");
-  await expect(page.getByText("아직 에이전트가 없어요", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "새 에이전트", exact: true })).toBeVisible();
 
   // 만드는 동안 단추가 막히고 진행 중 문구가 보인다.
   let release: () => void = () => {};
@@ -114,6 +115,83 @@ test("상한만큼 만든 뒤 다시 만들면 대화상자 안에 상한 문구
   await expect(page).toHaveURL(/\/agents$/);
   await expect(dialog.getByRole("button", { name: "만들기" })).toBeEnabled();
   expect(await listedCodes(page)).toHaveLength(AGENT_LIMIT);
+});
+
+/** 에이전트를 만드는 요청을 이 응답으로 바꾼다. */
+async function failCreate(page: Page, status: number, contentType: string, body: string) {
+  await page.route("**/api/agents", (route) => route.request().method() === "POST"
+    ? route.fulfill({ status, contentType, body })
+    : route.continue());
+}
+
+async function submitCreate(page: Page) {
+  await page.goto("/agents");
+  await page.getByRole("button", { name: "새 에이전트", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "새 에이전트" });
+  await dialog.getByLabel("이름").fill(NAME);
+  await dialog.getByRole("button", { name: "만들기" }).click();
+  return dialog;
+}
+
+test("만들기가 profile 생성에 실패하면 사용자 추가가 아니라 에이전트 문구가 보인다", async ({ page }) => {
+  await failCreate(page, 502, "application/json", JSON.stringify({ code: "HERMES_PROVISION_FAILED", message: "provision failed" }));
+
+  const dialog = await submitCreate(page);
+
+  await expect(dialog.getByRole("alert")).toHaveText("에이전트를 만들지 못했어요. 다시 시도해 주세요.");
+  await expect(dialog.getByRole("button", { name: "만들기" })).toBeEnabled();
+});
+
+test("만들기가 입력 검증에 실패하면 backend 원문 대신 이름 길이 안내가 보인다", async ({ page }) => {
+  await failCreate(page, 400, "application/json", JSON.stringify({ code: "VALIDATION_FAILED", message: "name must be between 1 and 100" }));
+
+  const dialog = await submitCreate(page);
+
+  await expect(dialog.getByRole("alert")).toHaveText("이름은 1자 이상 100자 이하로 적어 주세요.");
+});
+
+test("만들기의 오류 응답이 JSON 이 아니면 연결 문구가 아니라 처리 실패 문구가 보인다", async ({ page }) => {
+  await failCreate(page, 502, "text/html", "<html>Bad Gateway</html>");
+
+  const dialog = await submitCreate(page);
+
+  await expect(dialog.getByRole("alert")).toHaveText("요청을 처리하지 못했어요.");
+});
+
+test("지우기에 권한이 없으면 backend 원문 대신 관리 권한 안내가 보인다", async ({ page }) => {
+  const code = await createAgent(page);
+  await page.route(`**/api/agents/${code}`, (route) => route.request().method() === "DELETE"
+    ? route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "FORBIDDEN", message: "forbidden" }),
+    })
+    : route.continue());
+
+  await page.goto(`/agents/${code}`);
+  await accessSection(page).getByRole("button", { name: "에이전트 지우기" }).click();
+  const dialog = page.getByRole("alertdialog", { name: `${NAME} 에이전트를 지울까요?` });
+  await dialog.getByRole("button", { name: "지우기" }).click();
+
+  await expect(dialog.getByRole("alert")).toHaveText("이 에이전트를 관리할 수 없어요.");
+});
+
+test("공개 범위 변경이 입력 검증에 실패하면 backend 원문 대신 다시 시도 안내가 보인다", async ({ page }) => {
+  const code = await createAgent(page);
+  await page.route(`**/api/agents/${code}/visibility`, (route) => route.request().method() === "PATCH"
+    ? route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "VALIDATION_FAILED", message: "visibility must be PRIVATE or GROUP" }),
+    })
+    : route.continue());
+
+  await page.goto(`/agents/${code}`);
+  await accessSection(page).getByRole("button", { name: "그룹 공개로 변경" }).click();
+  const dialog = page.getByRole("alertdialog", { name: `${NAME} 에이전트를 그룹에 공개할까요?` });
+  await dialog.getByRole("button", { name: "그룹 공개" }).click();
+
+  await expect(dialog.getByRole("alert")).toHaveText("공개 범위를 바꾸지 못했어요. 다시 시도해 주세요.");
 });
 
 test("그룹 공개로 바꾸면 확인 창을 거쳐 다른 사용자의 목록에 보이고 만든 사람은 성격을 고칠 수 있다", async ({ context, page }, testInfo) => {

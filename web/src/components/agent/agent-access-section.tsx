@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { describeError } from "@/components/error-message";
+import { describeError, describeFailure } from "@/components/error-message";
 import { GROUP_VISIBILITY, PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
 
 type Visibility = AdminAgent["visibility"];
@@ -29,16 +29,11 @@ type Props = {
 
 type Action = "group" | "private" | "delete";
 
-type ErrorPayload = { code: string; message: string };
-
-async function failureOf(response: Response): Promise<string> {
-  try {
-    const payload = (await response.json()) as ErrorPayload;
-    return describeError(payload.code, payload.message);
-  } catch {
-    return describeError("INTERNAL_ERROR", "요청을 처리하지 못했어요.");
-  }
-}
+/** 이 절에서만 뜻이 정해지는 오류 코드의 문구다. 나머지는 공용 문구를 쓴다. */
+const ACCESS_FAILURES: Record<string, string> = {
+  FORBIDDEN: "이 에이전트를 관리할 수 없어요.",
+  VALIDATION_FAILED: "공개 범위를 바꾸지 못했어요. 다시 시도해 주세요.",
+};
 
 /** 지우기 확인 창이다. `VisibilityConfirm` 과 같이 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. */
 function DeleteConfirm({ name, busy, error, onCancel, onConfirm }: {
@@ -89,7 +84,7 @@ export function AgentAccessSection({ code, name, visibility, onVisibilityChange 
         body: JSON.stringify({ visibility: next }),
       });
       if (!response.ok) {
-        setError(await failureOf(response));
+        setError(await describeFailure(response, ACCESS_FAILURES));
         return false;
       }
       const updated = (await response.json()) as { visibility: Visibility };
@@ -113,7 +108,7 @@ export function AgentAccessSection({ code, name, visibility, onVisibilityChange 
     try {
       const response = await fetch(`/api/agents/${code}`, { method: "DELETE" });
       if (!response.ok) {
-        setError(await failureOf(response));
+        setError(await describeFailure(response, ACCESS_FAILURES));
         setPending(null);
         return;
       }

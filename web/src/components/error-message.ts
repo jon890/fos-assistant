@@ -32,6 +32,22 @@ export function describeError(code: string, fallback: string): string {
   return MESSAGES[code] ?? fallback;
 }
 
+/**
+ * 실패한 응답의 본문을 읽어 사용자에게 보일 문구로 바꾼다.
+ *
+ * <p>`overrides` 는 그 화면에서만 뜻이 정해지는 코드의 문구다. 여기 없는 코드는 공용 문구를 쓰고, 공용 문구도 없으면
+ * 본문의 message 를 그대로 보인다. 본문이 JSON 이 아니거나 code 가 없으면 서버 내부 오류로 본다.
+ */
+export async function describeFailure(response: Response, overrides: Record<string, string> = {}): Promise<string> {
+  try {
+    const payload = (await response.json()) as { code?: string; message?: string };
+    if (typeof payload.code !== "string") throw new Error("code 가 없는 오류 응답");
+    return overrides[payload.code] ?? describeError(payload.code, payload.message ?? "요청을 처리하지 못했어요.");
+  } catch {
+    return describeError("INTERNAL_ERROR", "요청을 처리하지 못했어요.");
+  }
+}
+
 /** 관리 화면에는 연결과 profile 문제의 원인을 구분해 보여준다. */
 const ADMIN_MESSAGES: Record<string, string> = {
   HERMES_BINDING_MISSING: "이 계정에 연결된 Hermes profile이 없어요. 연결 설정을 확인해 주세요.",
