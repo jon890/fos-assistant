@@ -27,6 +27,7 @@ import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,15 @@ class UsageBreakdownTest {
 
     private static final String MONTH = "2026-09";
 
+    /** 실행을 심을 때 쓰는 provider 와 모델이다. 에이전트는 모델을 갖지 않아 실행마다 이 값을 적는다. */
+    private static final String PROVIDER = "openai-codex";
+    private static final String CAREER_CODE = "breakdown-career";
+    private static final String CHORE_CODE = "breakdown-chore";
+    private static final String CAREER_MODEL = "example-model";
+    private static final String CHORE_MODEL = "example-model-b";
+    private static final Map<String, String> MODEL_BY_AGENT =
+            Map.of(CAREER_CODE, CAREER_MODEL, CHORE_CODE, CHORE_MODEL);
+
     @Autowired AgentExecutionRepository executions;
     @Autowired AgentRepository agents;
     @Autowired AgentService agentService;
@@ -62,8 +72,8 @@ class UsageBreakdownTest {
     @BeforeEach
     void 준비한다() {
         executions.deleteAll();
-        career = agent("breakdown-career", "진로 비서", "example-model");
-        chore = agent("breakdown-chore", "집안일 비서", "example-model-b");
+        career = agent(CAREER_CODE, "진로 비서");
+        chore = agent(CHORE_CODE, "집안일 비서");
         controller = new UsageController(executions, currentUser, agentService, trees, conversations);
         when(currentUser.require())
                 .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
@@ -77,7 +87,7 @@ class UsageBreakdownTest {
 
         List<BreakdownRow> rows = controller.breakdown("agent", MONTH).rows();
 
-        assertThat(rows).extracting(BreakdownRow::key).containsExactly("breakdown-career", "breakdown-chore");
+        assertThat(rows).extracting(BreakdownRow::key).containsExactly(CAREER_CODE, CHORE_CODE);
         assertThat(rows.getFirst()).satisfies(row -> {
             assertThat(row.label()).isEqualTo("진로 비서");
             assertThat(row.executions()).isEqualTo(2L);
@@ -97,8 +107,8 @@ class UsageBreakdownTest {
 
         List<BreakdownRow> rows = controller.breakdown("model", MONTH).rows();
 
-        assertThat(rows).extracting(BreakdownRow::label).containsExactly("example-model", "example-model-b");
-        assertThat(rows).extracting(BreakdownRow::detail).containsOnly("openai-codex");
+        assertThat(rows).extracting(BreakdownRow::label).containsExactly(CAREER_MODEL, CHORE_MODEL);
+        assertThat(rows).extracting(BreakdownRow::detail).containsOnly(PROVIDER);
     }
 
     @Test
@@ -246,22 +256,20 @@ class UsageBreakdownTest {
                 .conversationId(CONVERSATION_ID)
                 .agentId(agent.id())
                 .profileName(agent.hermesProfile())
-                .provider(agent.provider())
-                .model(agent.model())
+                .provider(PROVIDER)
+                .model(MODEL_BY_AGENT.get(agent.code()))
                 .costMode(agent.costMode())
                 .status(ExecutionStatus.SUCCEEDED)
                 .startedAt(startedAt);
     }
 
-    private Agent agent(String code, String name, String model) {
+    private Agent agent(String code, String name) {
         return agents.findByCode(code)
                 .orElseGet(() -> agents.save(Agent.of(
                         code,
                         name,
                         code,
                         "http://127.0.0.1:1/p/" + code,
-                        "openai-codex",
-                        model,
                         CostMode.SUBSCRIPTION,
                         CredentialScope.SHARED_HOUSEHOLD,
                         AgentVisibility.PRIVATE,

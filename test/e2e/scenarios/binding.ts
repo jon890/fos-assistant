@@ -1,7 +1,7 @@
 /** 실행할 profile 은 요청자가 고른 에이전트에서만 나온다는 것을 본다. */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 
-/** 이 바인딩의 provider 와 모델이 사용량 시나리오의 환산 금액을 정한다. */
+/** 사용량 시나리오가 기대하는 provider 와 모델이다. 에이전트는 모델을 갖지 않아 가짜 Hermes 의 기본 런타임 값과 같게 둔다. */
 export const DAD_BINDING = {
   // 에이전트 code(`dad`) 와 일부러 다르게 둔다. 둘이 같으면 대시보드에 code 를 넘겨도 검사가 통과한다.
   profileName: "dad-profile",
@@ -38,7 +38,6 @@ export const bindingScenario: Scenario = {
           name: "Dad",
           hermesProfile: DAD_BINDING.profileName,
           apiBaseUrl: `${context.hermesBaseUrl}/p/${DAD_BINDING.profileName}`,
-          provider: DAD_BINDING.provider,
           costMode: "SUBSCRIPTION",
           credentialScope: "SHARED_HOUSEHOLD",
           visibility: "PRIVATE",
@@ -59,8 +58,6 @@ export const bindingScenario: Scenario = {
           name: "Kid",
           hermesProfile: "kid",
           apiBaseUrl: "http://127.0.0.1:1/p/kid",
-          provider: "x",
-          model: "y",
           costMode: "API",
           credentialScope: "DEDICATED",
           visibility: "PRIVATE",

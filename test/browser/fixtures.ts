@@ -27,9 +27,6 @@ const HERMES_CONTROL_PATH = join(tmpdir(), `fos-assistant-browser-hermes-${RUN_I
 /** 흐름이 붙은 에이전트의 코드다. 흐름 검사가 이 코드로 대화를 시작한다. */
 export const FLOW_AGENT_CODE = "browserflow";
 
-/** 모델 목록을 고치는 검사 전용이다. 다른 검사가 쓰는 에이전트를 건드리지 않는다. */
-export const MODELS_AGENT_CODE = "browsermodels";
-
 /** 막힌 모델을 고른 대화를 검사하는 전용이다. 여기서만 막힌 provider 를 만든다. */
 export const SWITCH_AGENT_CODE = "browserswitch";
 
@@ -71,7 +68,6 @@ export function conversationIdOf(url: string): string {
 const PROFILE_KEYS: Record<string, string> = {
   browser: "browser-profile-key",
   browserflow: "browser-flow-profile-key",
-  browsermodels: "browser-models-profile-key",
   browserswitch: "browser-switch-profile-key",
   browserpersona: "browser-persona-profile-key",
   browserpersonagroup: "browser-persona-group-profile-key",
@@ -247,8 +243,7 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
     { code: "browser", name: "브라우저 비서", profile: "browser", flow: null, visibility: "PRIVATE" as const },
     // 흐름 검사 전용이다. 하나만 두면 흐름이 붙지 않은 대화를 함께 검사할 수 없다.
     { code: FLOW_AGENT_CODE, name: "흐름 비서", profile: "browserflow", flow: "research-and-build", visibility: "PRIVATE" as const },
-    // 모델 목록을 고치는 검사와 막힘 검사 전용이다. 다른 검사가 쓰는 에이전트와 섞이지 않게 나눈다.
-    { code: MODELS_AGENT_CODE, name: "모델 목록 비서", profile: "browsermodels", flow: null, visibility: "PRIVATE" as const },
+    // 막힘 검사 전용이다. 다른 검사가 쓰는 에이전트와 섞이지 않게 나눈다.
     { code: SWITCH_AGENT_CODE, name: "막힘 비서", profile: "browserswitch", flow: null, visibility: "PRIVATE" as const },
     // 성격을 읽고 쓰는 검사 전용이다. 주인이 TEST_EMAIL 이라 admin 세션이 언제나 고칠 수 있다.
     { code: PERSONA_AGENT_CODE, name: "성격 비서", profile: "browserpersona", flow: null, visibility: "PRIVATE" as const },
@@ -270,7 +265,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
         name: agent.name,
         hermesProfile: agent.profile,
         apiBaseUrl: `${hermesBaseUrl}/p/${agent.profile}`,
-        provider: "openai-codex",
         costMode: "SUBSCRIPTION",
         credentialScope: "SHARED_HOUSEHOLD",
         visibility: agent.visibility,
@@ -343,8 +337,6 @@ function startControlPlane(
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate",
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.h2.Driver",
       ASSISTANT_TESTSUPPORT_ENABLED: "true",
-      // 막힌 provider 를 오래 기억하면 다음 검사가 1순위를 건너뛴다. 검사에서만 짧게 둔다.
-      ASSISTANT_MODEL_PROVIDER_COOLDOWN: "PT1S",
     },
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],

@@ -5,13 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -64,18 +61,15 @@ class MemoryProposerTest {
     @Autowired ExecutionEventRepository executionEvents;
     @Autowired MemoryRepository memories;
     @Autowired HermesRunsClient hermes;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     private Agent agent;
     private Conversation conversation;
 
     @BeforeEach
     void 준비한다() {
         memories.deleteAll(); executionEvents.deleteAll(); executions.deleteAll(); conversations.deleteAll();
-        modelOptions.deleteAll(); agents.deleteAll();
+        agents.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
-        agent = agents.save(Agent.of("test", "검사", "test", "http://runtime.test", "provider", "model", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, USER.id()));
-        modelSelector.seedFirst(agent, new ModelOption("provider", "model"));
+        agent = agents.save(Agent.of("test", "검사", "test", "http://runtime.test", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, USER.id()));
         conversation = conversations.save(Conversation.startedBy(USER.id(), "대화", agent.id()));
     }
 

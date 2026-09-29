@@ -60,7 +60,7 @@ class AgentStarterControllerTest {
     @BeforeEach
     void 준비한다() {
         Agent dad = Agent.of("dad", "dad", "dad-profile",
-                "http://127.0.0.1:1/p/dad-profile", "openai-codex", "example-model",
+                "http://127.0.0.1:1/p/dad-profile",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
                 OWNER.id());
         when(agents.findByCode("dad")).thenReturn(Optional.of(dad));

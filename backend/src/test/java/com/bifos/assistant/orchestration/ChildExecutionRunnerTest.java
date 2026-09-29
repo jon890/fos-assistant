@@ -3,9 +3,6 @@ package com.bifos.assistant.orchestration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -66,8 +63,6 @@ class ChildExecutionRunnerTest {
     @Autowired ExecutionRecorder recorder;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
@@ -106,18 +101,15 @@ class ChildExecutionRunnerTest {
     private CurrentUser member(String email, String agentCode) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         if (agentCode != null) {
-            Agent saved = agents.save(Agent.of(
+            agents.save(Agent.of(
                     agentCode,
                     agentCode,
                     agentCode,
                     "http://agent-runtime.test/p/" + agentCode,
-                    "anthropic",
-                    "example-model-large",
                     CostMode.SUBSCRIPTION,
                     CredentialScope.SHARED_HOUSEHOLD,
                     AgentVisibility.PRIVATE,
                     user.id()));
-            modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         }
         return new CurrentUser(
                 user.id(), user.email(), user.displayName(), user.groupId(), user.role());

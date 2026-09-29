@@ -21,7 +21,6 @@ export const agentToolsScenario: Scenario = {
           name: "Kid tools",
           hermesProfile: AGENT_TOOLS_PROFILE,
           apiBaseUrl: `${context.hermesBaseUrl}/p/${AGENT_TOOLS_PROFILE}`,
-          provider: "openai-codex",
           costMode: "SUBSCRIPTION",
           credentialScope: "SHARED_HOUSEHOLD",
           visibility: "PRIVATE",

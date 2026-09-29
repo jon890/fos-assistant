@@ -3,13 +3,10 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactCleaner;
 import com.bifos.assistant.chat.application.ArtifactProperties;
@@ -118,8 +115,6 @@ class ArtifactTest {
     @Autowired ChatArtifactRepository artifactRows;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ChatMessageRepository messages;
     @Autowired ConversationRepository conversations;
     @Autowired AgentExecutionRepository executions;
@@ -142,7 +137,6 @@ class ArtifactTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
-        modelOptions.deleteAll();
         agents.deleteAll();
         users.deleteAll();
         // 이 서버는 따로 뜬 메모리 데이터베이스를 써서 대화 번호가 겹칠 수 있다. 앞선 실행이 남긴 폴더를 비운다.
@@ -575,8 +569,6 @@ class ArtifactTest {
                 code,
                 code,
                 "http://agent-runtime.test/p/" + code,
-                "anthropic",
-                "example-model-large",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
@@ -584,8 +576,7 @@ class ArtifactTest {
         if (flow != null) {
             agent.assignFlow(flow);
         }
-        Agent saved = agents.save(agent);
-        modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
+        agents.save(agent);
     }
 
     private static void deleteTree(Path path) throws IOException {

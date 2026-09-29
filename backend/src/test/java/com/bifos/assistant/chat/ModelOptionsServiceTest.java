@@ -69,8 +69,7 @@ class ModelOptionsServiceTest {
     }
 
     private void agentOf(String code, String profile, boolean enabled) {
-        Agent agent = Agent.of(code, code, profile, "http://agent-runtime.test/p/" + profile,
-                "openai-codex", "example-model", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
+        Agent agent = Agent.of(code, code, profile, "http://agent-runtime.test/p/" + profile, CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE, dad.id());
         agent.changeAccess(enabled, AgentVisibility.PRIVATE, dad.id());
         when(agentRepository.findByCode(code)).thenReturn(Optional.of(agent));

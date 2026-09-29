@@ -36,15 +36,6 @@ public class Agent {
     @Column(name = "api_base_url", nullable = false, length = 255)
     private String apiBaseUrl;
 
-    @Column(nullable = false, length = 64)
-    private String provider;
-
-    @Column(nullable = false, length = 128)
-    private String model;
-
-    @Column(name = "model_synced_at")
-    private Instant modelSyncedAt;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
     private CostMode costMode;
@@ -79,15 +70,13 @@ public class Agent {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    private Agent(String code, String name, String hermesProfile, String apiBaseUrl, String provider,
-            String model, CostMode costMode, CredentialScope credentialScope,
-            AgentVisibility visibility, Long ownerUserId) {
+    private Agent(String code, String name, String hermesProfile, String apiBaseUrl,
+            CostMode costMode, CredentialScope credentialScope, AgentVisibility visibility,
+            Long ownerUserId) {
         this.code = code;
         this.name = name;
         this.hermesProfile = hermesProfile;
         this.apiBaseUrl = stripTrailingSlash(apiBaseUrl);
-        this.provider = provider;
-        this.model = model;
         this.costMode = costMode;
         this.credentialScope = credentialScope;
         this.visibility = visibility;
@@ -97,10 +86,10 @@ public class Agent {
     }
 
     public static Agent of(String code, String name, String hermesProfile, String apiBaseUrl,
-            String provider, String model, CostMode costMode, CredentialScope credentialScope,
-            AgentVisibility visibility, Long ownerUserId) {
-        return new Agent(code, name, hermesProfile, apiBaseUrl, provider, model, costMode,
-                credentialScope, visibility, ownerUserId);
+            CostMode costMode, CredentialScope credentialScope, AgentVisibility visibility,
+            Long ownerUserId) {
+        return new Agent(code, name, hermesProfile, apiBaseUrl, costMode, credentialScope,
+                visibility, ownerUserId);
     }
 
     private static String stripTrailingSlash(String url) {
@@ -112,9 +101,6 @@ public class Agent {
     public String name() { return name; }
     public String hermesProfile() { return hermesProfile; }
     public String apiBaseUrl() { return apiBaseUrl; }
-    public String provider() { return provider; }
-    public String model() { return model; }
-    public Instant modelSyncedAt() { return modelSyncedAt; }
     public CostMode costMode() { return costMode; }
     public CredentialScope credentialScope() { return credentialScope; }
     public AgentVisibility visibility() { return visibility; }
@@ -161,12 +147,5 @@ public class Agent {
      */
     public void changeApiBaseUrl(String apiBaseUrl) {
         this.apiBaseUrl = stripTrailingSlash(apiBaseUrl.strip());
-    }
-
-    public boolean syncModel(String model) {
-        boolean changed = !Objects.equals(this.model, model);
-        this.model = model;
-        this.modelSyncedAt = Instant.now();
-        return changed;
     }
 }

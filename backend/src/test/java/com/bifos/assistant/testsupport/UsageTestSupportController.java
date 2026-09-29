@@ -31,6 +31,15 @@ public class UsageTestSupportController {
     /** 한 번에 지우는 줄 수의 상한이다. 검사가 쌓는 양보다 넘친다. */
     private static final int CLEARED_AT_ONCE = 1_000;
 
+    /**
+     * 심을 실행에 provider 와 모델이 비었을 때 채우는 값이다.
+     *
+     * <p>에이전트는 모델을 갖지 않는다. 가짜 Hermes 의 기본 런타임과 같은 값이라 대화를 돌려 만든 실행과
+     * 같은 줄로 묶인다.
+     */
+    private static final String DEFAULT_PROVIDER = "openai-codex";
+    private static final String DEFAULT_MODEL = "example-model";
+
     private final AgentExecutionRepository executions;
     private final AgentRepository agents;
     private final CurrentUserProvider currentUser;
@@ -52,8 +61,8 @@ public class UsageTestSupportController {
                     .conversationId(1L)
                     .agentId(agent.id())
                     .profileName(agent.hermesProfile())
-                    .provider(agent.provider())
-                    .model(seed.model() == null ? agent.model() : seed.model())
+                    .provider(seed.provider() == null ? DEFAULT_PROVIDER : seed.provider())
+                    .model(seed.model() == null ? DEFAULT_MODEL : seed.model())
                     .costMode(agent.costMode())
                     .status(ExecutionStatus.SUCCEEDED)
                     .timing(seed.startedAt(), seed.startedAt().plusMillis(1_200L))
@@ -81,12 +90,14 @@ public class UsageTestSupportController {
     /**
      * 심을 실행 하나의 값이다.
      *
-     * @param model 비우면 에이전트가 가진 모델을 쓴다
+     * @param provider 비우면 {@link #DEFAULT_PROVIDER} 를 쓴다
+     * @param model 비우면 {@link #DEFAULT_MODEL} 을 쓴다
      * @param runtimeFingerprint 비우면 지문 없이 심는다
      * @param actualCostMicros 비우면 구독 경로처럼 실제 청구액이 없는 실행이 된다
      */
     public record SeededExecution(
             String agentCode,
+            String provider,
             String model,
             String runtimeFingerprint,
             Instant startedAt,

@@ -35,9 +35,8 @@ export default async function AgentsPage() {
           {result.data.map((agent) => (
             <li key={agent.code}>
               <Link href={`/agents/${agent.code}`} className="block rounded-xl">
-                <Card className="flex-row items-center justify-between px-4 hover:bg-accent">
+                <Card className="flex-row items-center px-4 hover:bg-accent">
                   <span className="text-base font-medium">{agent.name}</span>
-                  <span className="text-muted-foreground">{agent.model}</span>
                 </Card>
               </Link>
             </li>

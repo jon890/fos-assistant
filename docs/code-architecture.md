@@ -624,6 +624,12 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 backend 의 읽기 기준(`AgentService.requireReadable`)은 바꾸지 않는다.
 관리 절이 쓰는 `/api/v1/admin/agents` 경로들도 그대로다.
 
+**에이전트 등록과 Hermes 주소 수정은 저장하기 전에 그 주소가 닿는지 본다.**
+그 에이전트의 profile key 로 `/v1/capabilities` 를 부른다.
+그 profile 의 key 가 없으면 `HERMES_PROFILE_KEY_MISSING`, 주소가 200 으로 답하지 않으면 `VALIDATION_FAILED` 로 거절하고 저장하지 않는다.
+틀린 주소나 profile 로 저장하면 그 에이전트의 모든 대화가 실패하고, 화면에는 Hermes 에 닿지 못했다는 것만 보인다.
+`AgentEndpointProbe` 가 이 확인을 한다.
+
 ### 사용량 화면의 절
 
 `/usage` 는 절 넷으로 이뤄진다. 위에서부터 이 순서다.
@@ -812,7 +818,8 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 [`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
 profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓴다.
 
-에이전트는 실행에 쓸 모델을 갖지 않는다. 다만 첫 로그인에 에이전트를 만들 때는 아직 Hermes 에서 모델을 읽어 옛 칸을 채우고, 읽지 못하면 에이전트를 만들지 않는다. 옛 칸을 지우는 변경이 이 읽기도 없앤다.
+에이전트는 실행에 쓸 모델을 갖지 않는다.
+첫 로그인에 에이전트를 만들 때도 Hermes 에서 모델을 읽지 않는다.
 
 ### key 를 두 곳에 같이 쓴다
 

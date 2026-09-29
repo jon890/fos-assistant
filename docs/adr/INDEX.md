@@ -19,7 +19,7 @@
 | [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) | Memory 는 층을 나눠 싣는다 | Accepted. ADR-003 의 조회 방식을 보완 |
 | [ADR-016](ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) | 다중 에이전트 조율은 Control Plane이 맡는다 | Superseded ([ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md)) |
 | [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) | 무엇을 할지는 Hermes 가 정하고 Control Plane 은 경계만 갖는다 | Accepted |
-| [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) | 사람을 더하는 것을 Control Plane 이 끝낸다 | Accepted |
+| [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) | 사람을 더하는 것을 Control Plane 이 끝낸다 | Accepted. 첫 로그인의 모델 읽기는 ADR-030 으로 없어졌다 |
 | [ADR-019](ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) | 페르소나는 Hermes 가 갖고 Control Plane 은 화면만 준다 | Accepted |
 | [ADR-020](ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) | 사진은 공유 디렉터리에 두고 에이전트가 파일로 읽는다 | Accepted |
 | [ADR-021](ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) | 중지한 답은 멈춘 자리까지 남긴다 | Accepted. ADR-008 에 예외를 둔다 |

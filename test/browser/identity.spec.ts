@@ -37,7 +37,7 @@ test("Pretendard와 테마별 브랜드 색을 자체 글꼴 단추에 적용한
   expect(contrast(themeColors.light.primaryForeground, themeColors.light.primary)).toBeGreaterThanOrEqual(4.5);
   expect(contrast(themeColors.dark.primaryForeground, themeColors.dark.primary)).toBeGreaterThanOrEqual(4.5);
 
-  const primaryButton = page.getByRole("button", { name: "모델 목록 저장" });
+  const primaryButton = page.getByRole("button", { name: "소개와 추천 질문 저장" });
   const primaryColors = await primaryButton.evaluate((button) => {
     const buttonStyles = getComputedStyle(button);
     const rootStyles = getComputedStyle(document.documentElement);

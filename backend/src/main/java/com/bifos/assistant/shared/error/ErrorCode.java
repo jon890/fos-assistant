@@ -18,7 +18,6 @@ public enum ErrorCode {
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),
-    AGENT_MODEL_UNKNOWN(HttpStatus.BAD_GATEWAY),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
     /** Hermes가 저장 뒤 읽은 toolset 목록을 요청한 목록과 다르게 돌려줬다. */
@@ -53,10 +52,12 @@ public enum ErrorCode {
      * 보내지 않는다. 붐비는데 다시 보내면 더 붐빈다.
      */
     HERMES_BUSY(HttpStatus.TOO_MANY_REQUESTS),
-    /** 그 provider 의 계정이 전부 막혀 다음 모델로 넘어갔다. 실행 줄에 남는 이름이기도 하다. */
+    /**
+     * 고른 provider 의 계정이 전부 막혀 그 실행이 실패했다. 다른 모델로 넘기지 않는다.
+     *
+     * <p>실행 줄에 남는 이름이기도 하다.
+     */
     PROVIDER_BLOCKED(HttpStatus.BAD_GATEWAY),
-    /** 이 에이전트가 지금 쓸 수 있는 모델이 하나도 없다. 목록이 비었거나 전부 막혔다. */
-    NO_MODEL_AVAILABLE(HttpStatus.CONFLICT),
     /** 자식 실행이 다시 자식을 부르려 했다. 깊이를 1로 제한한다. */
     ORCHESTRATION_DEPTH_EXCEEDED(HttpStatus.CONFLICT),
     /** 흐름의 한 단계가 정한 출력 계약을 지키지 않았다. 원문을 그대로 다음 단계로 넘기지 않는다. */

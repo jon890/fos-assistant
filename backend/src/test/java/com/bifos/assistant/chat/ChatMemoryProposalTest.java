@@ -4,9 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -51,8 +48,6 @@ class ChatMemoryProposalTest {
     @Autowired ChatService chat;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired MemoryRepository memories;
     @Autowired AgentExecutionRepository executions;
     @Autowired HermesRunsClient hermes;
@@ -61,12 +56,11 @@ class ChatMemoryProposalTest {
 
     @BeforeEach
     void 준비한다() {
-        memories.deleteAll(); executions.deleteAll(); modelOptions.deleteAll(); agents.deleteAll(); users.deleteAll();
+        memories.deleteAll(); executions.deleteAll(); agents.deleteAll(); users.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
         AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
-        Agent savedAgent = agents.save(Agent.of("proposal", "제안", "proposal", "http://runtime.test", "provider", "model", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, user.id()));
-        modelSelector.seedFirst(savedAgent, new ModelOption("provider", "model"));
+        agents.save(Agent.of("proposal", "제안", "proposal", "http://runtime.test", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, user.id()));
         doNothing().when(events).open(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
     }
 

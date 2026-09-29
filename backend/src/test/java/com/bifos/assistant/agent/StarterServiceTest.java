@@ -242,8 +242,7 @@ class StarterServiceTest {
     }
 
     private static Agent agent(String code, AgentVisibility visibility, Long ownerUserId) {
-        return Agent.of(code, code, code, "http://agent-runtime.test/p/" + code, "openai-codex",
-                "example-model", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility,
+        return Agent.of(code, code, code, "http://agent-runtime.test/p/" + code, CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility,
                 ownerUserId);
     }
 }

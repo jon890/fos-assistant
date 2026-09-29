@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { AgentModelList } from "@/components/admin/agent-model-list";
 import { VisibilityConfirm } from "@/components/admin/visibility-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ import {
   type AdminAgent,
 } from "@/lib/agent";
 
-type AgentAction = "private" | "group" | "enabled" | "address" | "sync" | "models";
+type AgentAction = "private" | "group" | "enabled" | "address";
 
 type Props = {
   initialAgent: AdminAgent;
@@ -77,46 +76,6 @@ export function AgentAdminSection({ initialAgent, ownerEmail, onVisibilityChange
     await update({ apiBaseUrl: String(form.get("apiBaseUrl") ?? "") }, "address");
   }
 
-  async function syncModel() {
-    setPending("sync");
-    setError(null);
-    try {
-      const response = await fetch(`/api/admin/agents/${agent.code}/sync-model`, { method: "POST" });
-      if (!response.ok) {
-        const result = await payload<{ code: string; message: string }>(response);
-        setError(describeAdminError(result.code, result.message));
-      } else {
-        const result = await payload<{ model: string; modelSyncedAt: string }>(response);
-        setAgent((current) => ({ ...current, model: result.model, modelSyncedAt: result.modelSyncedAt }));
-      }
-    } finally {
-      setPending(null);
-    }
-  }
-
-  async function saveModels(models: { provider: string; model: string }[]) {
-    setPending("models");
-    setError(null);
-    try {
-      const response = await fetch(`/api/admin/agents/${agent.code}/models`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ models }),
-      });
-      if (response.ok) {
-        setAgent((current) => ({
-          ...current,
-          models: models.map((model, index) => ({ ...model, rank: index + 1 })),
-        }));
-      } else {
-        const result = await payload<{ code: string; message: string }>(response);
-        setError(describeAdminError(result.code, result.message));
-      }
-    } finally {
-      setPending(null);
-    }
-  }
-
   async function confirmGroupVisibility() {
     if (await update({ visibility: GROUP_VISIBILITY }, "group")) {
       setConfirmingGroupVisibility(false);
@@ -157,11 +116,7 @@ export function AgentAdminSection({ initialAgent, ownerEmail, onVisibilityChange
         <Button size="sm" variant="ghost" disabled={busy} loading={pending === "enabled"} loadingText={agent.enabled ? "중지하는 중" : "켜는 중"} onClick={() => void update({ enabled: !agent.enabled }, "enabled")}>
           {agent.enabled ? "사용 중지" : "다시 사용"}
         </Button>
-        <Button size="sm" variant="outline" disabled={busy} loading={pending === "sync"} loadingText="읽는 중" onClick={() => void syncModel()}>
-          모델 목록 다시 읽기
-        </Button>
       </div>
-      <AgentModelList agentCode={agent.code} models={agent.models} busy={busy} saving={pending === "models"} onSave={(models) => void saveModels(models)} />
       {confirmingGroupVisibility ? <VisibilityConfirm agent={agent} busy={pending === "group"} onCancel={() => setConfirmingGroupVisibility(false)} onConfirm={() => void confirmGroupVisibility()} /> : null}
     </section>
   );

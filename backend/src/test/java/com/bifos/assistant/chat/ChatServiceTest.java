@@ -16,9 +16,6 @@ import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
-import com.bifos.assistant.agent.application.AgentModelSelector;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
@@ -92,8 +89,6 @@ class ChatServiceTest {
     @Autowired MemoryService memories;
     @Autowired MemoryRepository memoryRepository;
     @Autowired HermesRunsClient hermes;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
 
     /** 실행 사건을 검사하려면 스트림을 우리가 열어 주어야 한다. */
     @MockitoBean HermesRunEventStream eventStream;
@@ -137,7 +132,6 @@ class ChatServiceTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
-        modelOptions.deleteAll();
         agents.deleteAll();
         memoryRepository.deleteAll();
         users.deleteAll();
@@ -146,19 +140,16 @@ class ChatServiceTest {
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         if (profileName != null) {
-            Agent saved = agents.save(
+            agents.save(
                     Agent.of(
                             profileName,
                             profileName,
                             profileName,
                             "http://agent-runtime.test/p/" + profileName,
-                            "anthropic",
-                            "example-model-large",
                             CostMode.SUBSCRIPTION,
                             CredentialScope.SHARED_HOUSEHOLD,
                             AgentVisibility.PRIVATE,
                             user.id()));
-            modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }

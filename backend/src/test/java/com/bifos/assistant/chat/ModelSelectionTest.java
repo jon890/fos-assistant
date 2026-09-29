@@ -7,7 +7,6 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
@@ -98,7 +97,6 @@ class ModelSelectionTest {
     @Autowired ChatService chat;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelOptionRepository modelOptions;
     @Autowired ChatMessageRepository messages;
     @Autowired ConversationRepository conversations;
     @Autowired AgentExecutionRepository executions;
@@ -120,7 +118,6 @@ class ModelSelectionTest {
         executions.deleteAll();
         messages.deleteAll();
         conversations.deleteAll();
-        modelOptions.deleteAll();
         agents.findByCode(AGENT_CODE).ifPresent(agents::delete);
         users.findByEmail("selection@example.com").ifPresent(users::delete);
 
@@ -131,8 +128,6 @@ class ModelSelectionTest {
                 "고름",
                 AGENT_CODE,
                 "http://agent-runtime.test/p/" + AGENT_CODE,
-                "openai-codex",
-                "example-model",
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,

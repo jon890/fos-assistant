@@ -3,15 +3,11 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.infra.ProviderStateRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
@@ -63,9 +59,6 @@ class ConversationManageTest {
     @Autowired AgentExecutionRepository executions;
     @Autowired ExecutionEventRepository executionEvents;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
-    @Autowired ProviderStateRepository providerStates;
     @Autowired MemoryRepository memories;
     @Autowired AppUserRepository users;
     @Autowired HermesRunsClient hermes;
@@ -81,8 +74,6 @@ class ConversationManageTest {
         executions.deleteAll();
         messages.deleteAll();
         conversations.deleteAll();
-        providerStates.deleteAll();
-        modelOptions.deleteAll();
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
@@ -90,11 +81,10 @@ class ConversationManageTest {
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        Agent agent = agents.save(Agent.of(name, name, name,
-                "http://agent-runtime.test/p/" + name, "anthropic", "example-model-large",
+        agents.save(Agent.of(name, name, name,
+                "http://agent-runtime.test/p/" + name,
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE, user.id()));
-        modelSelector.seedFirst(agent, new ModelOption("anthropic", "example-model-large"));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

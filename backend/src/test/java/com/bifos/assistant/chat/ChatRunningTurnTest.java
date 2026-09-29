@@ -3,15 +3,11 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.application.AgentModelSelector;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.domain.ModelOption;
-import com.bifos.assistant.agent.infra.AgentModelOptionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.infra.ProviderStateRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
@@ -67,9 +63,6 @@ class ChatRunningTurnTest {
     @Autowired TurnCancellation turns;
     @Autowired AppUserRepository users;
     @Autowired AgentRepository agents;
-    @Autowired AgentModelSelector modelSelector;
-    @Autowired AgentModelOptionRepository modelOptions;
-    @Autowired ProviderStateRepository providerStates;
     @Autowired ConversationRepository conversations;
     @Autowired ChatMessageRepository messages;
     @Autowired AgentExecutionRepository executions;
@@ -88,8 +81,6 @@ class ChatRunningTurnTest {
         executions.deleteAll();
         messages.deleteAll();
         conversations.deleteAll();
-        modelOptions.deleteAll();
-        providerStates.deleteAll();
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
@@ -102,12 +93,10 @@ class ChatRunningTurnTest {
     private CurrentUser member(String name, String flow) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
         Agent agent = Agent.of(
-                name, name, name, "http://agent-runtime.test/p/" + name,
-                "anthropic", "example-model-large", CostMode.SUBSCRIPTION,
+                name, name, name, "http://agent-runtime.test/p/" + name, CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id());
         if (flow != null) agent.assignFlow(flow);
-        Agent saved = agents.save(agent);
-        modelSelector.seedFirst(saved, new ModelOption("anthropic", "example-model-large"));
+        agents.save(agent);
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

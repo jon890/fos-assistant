@@ -113,7 +113,6 @@ class AgentToolPolicyTest {
     }
 
     private static Agent agent(AgentVisibility visibility) {
-        return Agent.of("tool-agent", "도구", "tool-profile", "http://example.test/p/tool-profile",
-                "provider", "model", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, 1L);
+        return Agent.of("tool-agent", "도구", "tool-profile", "http://example.test/p/tool-profile", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, 1L);
     }
 }
