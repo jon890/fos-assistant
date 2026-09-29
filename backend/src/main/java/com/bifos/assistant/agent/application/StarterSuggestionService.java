@@ -220,7 +220,13 @@ public class StarterSuggestionService {
             }
             cache.put(key, new Entry(prompts.get(), clock.instant()));
             lastFailures.remove(key);
-            executions.complete(execution, agent, result, null);
+            // 추천은 이미 만들어 캐시에 넣었다. 실행 줄을 끝내다 실패한 것을 만들기 실패로 번지게 하면 사용자는
+            // 추천을 보는데 실행이 실패로 남고 재시도 시간 동안 다시 만들지 못한다. 그래서 로그만 남긴다.
+            try {
+                executions.complete(execution, agent, result, null);
+            } catch (RuntimeException ex) {
+                log.warn("추천은 만들었지만 실행 줄을 끝내지 못했다 executionId={}", execution.id(), ex);
+            }
         } catch (Exception ex) {
             if (execution != null) {
                 failQuietly(execution, errorCode(ex));

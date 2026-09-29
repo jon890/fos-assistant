@@ -2,6 +2,9 @@ package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.StarterProperties;
@@ -192,6 +195,56 @@ class StarterSuggestionServiceTest {
         assertThat(service.read(DAD, "starter-family").status()).isEqualTo(StarterStatus.GENERATING);
         executor.awaitAll();
         assertThat(stub().received()).as("재시도 시간이 지난 뒤의 제출 수").hasSize(2);
+    }
+
+    @Test
+    void 대화를_마쳐_다시_만들다_실패하면_재시도_시간_안에는_다시_만들지_않고_이전_추천이_남는다() {
+        answerWith(json(FOUR));
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        answerWith("추천을 만들 수 없습니다");
+        clock.advance(Duration.ofHours(25));
+        service.refreshIfStale(DAD, family);
+        executor.awaitAll();
+        assertThat(stub().received()).as("오래된 추천을 다시 만든 제출 수").hasSize(2);
+
+        clock.advance(Duration.ofMinutes(9));
+        service.refreshIfStale(DAD, family);
+        executor.awaitAll();
+        assertThat(stub().received()).as("재시도 시간 안의 제출 수").hasSize(2);
+        assertThat(service.read(DAD, "starter-family"))
+                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+
+        clock.advance(Duration.ofMinutes(2));
+        service.refreshIfStale(DAD, family);
+        executor.awaitAll();
+        assertThat(stub().received()).as("재시도 시간이 지난 뒤의 제출 수").hasSize(3);
+        assertThat(service.read(DAD, "starter-family"))
+                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+    }
+
+    /** 추천을 만든 뒤 실행 줄을 끝내다 실패해도 만들기 실패로 보지 않는다. 재시도 시간에 막히지 않는다. */
+    @Test
+    void 실행_줄을_끝내다_실패해도_추천은_READY_이고_실행_줄은_실패로_바뀌지_않는다() {
+        ExecutionRecorder failingRecorder = spy(executions);
+        doThrow(new IllegalStateException("저장 실패")).when(failingRecorder).complete(any(), any(), any(), any());
+        service = new StarterSuggestionService(properties, agentService, conversations, messages, hermes,
+                failingRecorder, objectMapper, clock, executor);
+        answerWith(json(FOUR));
+
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        assertThat(service.read(DAD, "starter-family"))
+                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+        assertThat(executionRows.findAll()).singleElement().satisfies(row ->
+                assertThat(row.status()).isNotEqualTo(ExecutionStatus.FAILED));
+
+        clock.advance(Duration.ofHours(25));
+        service.refreshIfStale(DAD, family);
+        executor.awaitAll();
+        assertThat(stub().received()).as("실패 기록이 없어 오래된 추천을 다시 만든 제출 수").hasSize(2);
     }
 
     @Test

@@ -149,7 +149,8 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 ## agent_execution
 
 에이전트가 한 번 답한 기록이다.
-대화 하나에 여러 줄이 달리고, 한 줄이 곧 메시지 하나다.
+대부분 대화에 속해 대화 하나에 여러 줄이 달리고, 한 줄이 곧 메시지 하나다.
+추천 질문을 만드는 실행은 대화 없이 한 줄만 생긴다.
 
 **이 줄은 실행이 끝난 뒤가 아니라 시작할 때 만들어진다.**
 근거는 [ADR-011](adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md)에 있다.
@@ -163,7 +164,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `root_execution_id` | BIGINT NULL | 이 실행이 속한 나무의 뿌리. 뿌리 자신은 비어 있다 |
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
-| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. MCP 호출의 서명한 뿌리 session 과 `profile_name` 으로 부모 실행을 찾고 그 실행의 `user_id` 를 요청자로 쓸 때 쓴다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 이 칸이 생기기 전의 실행과 Memory 제안은 비어 있다 |
+| `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. MCP 호출의 서명한 뿌리 session 과 `profile_name` 으로 부모 실행을 찾고 그 실행의 `user_id` 를 요청자로 쓸 때 쓴다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
 | `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 뿌리 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. 정의는 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 가 돌려준다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
