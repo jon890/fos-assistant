@@ -7,6 +7,7 @@
 import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { ARTIFACT_PROBE, ARTIFACT_WRITE_PROBE } from "../fake-hermes.ts";
+import { DAD_BINDING } from "./binding.ts";
 
 type ChatEvent = { type: string; conversationId?: string; messageId?: number };
 type Message = {
@@ -107,7 +108,7 @@ export const artifactScenario: Scenario = {
       await call(context, "/admin/agent-tokens", {
         method: "POST",
         token: context.tokens.dad,
-        body: { userEmail: "dad@example.com", label: "artifact-e2e" },
+        body: { profileName: DAD_BINDING.profileName, label: "artifact-e2e" },
       }),
       200,
       "결과물 MCP 토큰 발급",

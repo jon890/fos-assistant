@@ -1,5 +1,9 @@
 /** Memory 의 공개 범위와 관리 권한을 검사한다. */
+import { randomUUID } from "node:crypto";
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
+import { signedCallContext } from "../mcp-context.ts";
+import { AGENT_TOOLS_PROFILE } from "./agent-tools.ts";
+import { DAD_BINDING } from "./binding.ts";
 
 type MemoryView = {
   id: number;
@@ -12,6 +16,9 @@ type MemoryView = {
 };
 
 type AgentToken = { token: string };
+
+/** 요청자를 정하지 못한 MCP 호출이 받는 도구 결과 문구다. 이유를 가리지 않고 같다. */
+const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
 
 /** 사용량 시나리오보다 먼저 Memory 권한과 주입 확인을 위해 실행하는 대화 수다. */
 export const MEMORY_CONTEXT_TURNS = 2;
@@ -221,7 +228,7 @@ export const memoryScenario: Scenario = {
       );
     }
 
-    step("MCP 토큰은 발급된 사용자만 정하고 다른 사람의 본문은 읽지 못한다");
+    step("profile 토큰만으로는 누구의 본문도 읽지 못한다");
     const dadOnly = expectStatus(
       await call(context, "/memories", {
         method: "POST",
@@ -231,24 +238,6 @@ export const memoryScenario: Scenario = {
       200,
       "MCP 대상 Memory 생성",
     ).json<MemoryView>();
-    const kidToken = expectStatus(
-      await call(context, "/admin/agent-tokens", {
-        method: "POST",
-        token: context.tokens.dad,
-        body: { userEmail: "kid@example.com", label: "e2e-kid" },
-      }),
-      200,
-      "아이 MCP 토큰 발급",
-    ).json<AgentToken>();
-    const dadToken = expectStatus(
-      await call(context, "/admin/agent-tokens", {
-        method: "POST",
-        token: context.tokens.dad,
-        body: { userEmail: "dad@example.com", label: "e2e-dad" },
-      }),
-      200,
-      "아빠 MCP 토큰 발급",
-    ).json<AgentToken>();
     const kidOwn = expectStatus(
       await call(context, "/memories", {
         method: "POST",
@@ -258,36 +247,40 @@ export const memoryScenario: Scenario = {
       200,
       "MCP 본인 Memory 생성",
     ).json<MemoryView>();
-    const kidReadsDad = await fetch(context.api.replace("/api/v1", "/mcp"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${kidToken.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: dadOnly.id, user_id: 1 } } }),
-    });
-    const kidReadsDadBody = await kidReadsDad.text();
-    expect(kidReadsDad.status === 200, "아이 MCP 요청이 처리되지 않았다");
-    expect(!kidReadsDadBody.includes(dadOnly.content), "아이 토큰에 아빠 Memory 본문이 있다");
-    const kidReadsOwn = await fetch(context.api.replace("/api/v1", "/mcp"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${kidToken.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "memory_read", arguments: { id: kidOwn.id } } }),
-    });
-    const kidReadsOwnBody = await kidReadsOwn.text();
-    expect(kidReadsOwn.status === 200 && kidReadsOwnBody.includes(kidOwn.content), "아이 토큰의 본문이 오지 않는다");
-    const dadReadsKid = await fetch(context.api.replace("/api/v1", "/mcp"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${dadToken.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "memory_read", arguments: { id: kidOwn.id, user_id: 2 } } }),
-    });
-    const dadReadsKidBody = await dadReadsKid.text();
-    expect(dadReadsKid.status === 200, "아빠 MCP 요청이 처리되지 않았다");
-    expect(!dadReadsKidBody.includes(kidOwn.content), "아빠 토큰에 아이 Memory 본문이 있다");
-    const dadReadsOwn = await fetch(context.api.replace("/api/v1", "/mcp"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${dadToken.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "memory_read", arguments: { id: dadOnly.id } } }),
-    });
-    const dadReadsOwnBody = await dadReadsOwn.text();
-    expect(dadReadsOwn.status === 200 && dadReadsOwnBody.includes(dadOnly.content), "아빠 토큰의 본문이 오지 않는다");
+    // 토큰은 profile 만 증명한다. 요청자는 서명한 뿌리 session 으로 찾은 도는 실행의 사용자라,
+    // 서명이 없거나 도는 실행이 없는 뿌리로 서명한 호출은 누구의 권한으로도 돌지 않는다.
+    for (const [who, profileName] of [["아이", AGENT_TOOLS_PROFILE], ["아빠", DAD_BINDING.profileName]] as const) {
+      const issued = expectStatus(
+        await call(context, "/admin/agent-tokens", {
+          method: "POST",
+          token: context.tokens.dad,
+          body: { profileName, label: `e2e-${profileName}` },
+        }),
+        200,
+        `${who} profile MCP 토큰 발급`,
+      ).json<AgentToken>();
+      const idleRoot = `fos-${randomUUID()}`;
+      const attempts = [
+        ["서명 없음", undefined],
+        ["도는 실행이 없는 뿌리", signedCallContext(issued.token, "memory_read", idleRoot, idleRoot, `call_${randomUUID()}`)],
+      ] as const;
+      for (const [attempt, _fos_ctx] of attempts) {
+        for (const memory of [dadOnly, kidOwn]) {
+          const response = await fetch(context.api.replace("/api/v1", "/mcp"), {
+            method: "POST",
+            headers: { Authorization: `Bearer ${issued.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_read", arguments: { id: memory.id, user_id: 1, _fos_ctx } } }),
+          });
+          const text = await response.text();
+          expect(response.status === 200, `${who} profile 토큰의 MCP 요청이 처리되지 않았다(${attempt}): ${response.status}`);
+          const body = JSON.parse(text) as { result?: { isError?: boolean; content?: { text?: string }[] } };
+          expect(body.result?.isError === true && body.result.content?.[0]?.text === INVALID_CALL_CONTEXT,
+            `${who} profile 토큰이 호출 맥락 오류로 거절되지 않았다(${attempt}): ${text}`);
+          expect(!text.includes(dadOnly.content) && !text.includes(kidOwn.content),
+            `${who} profile 토큰만으로 Memory 본문이 나왔다(${attempt})`);
+        }
+      }
+    }
     expectStatus(
       await call(context, `/memories/${dadOnly.id}`, { method: "DELETE", token: context.tokens.dad }),
       200,

@@ -9,6 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { signedCallContext } from "./mcp-context.ts";
 
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
@@ -440,8 +441,15 @@ export function startFakeHermes(
   let droppedToolset: string | undefined;
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
 
-  const writeArtifactViaMcp = async (conversationId: string): Promise<void> => {
+  /**
+   * profile 플러그인처럼 도구 인자에 서명한 `_fos_ctx` 를 붙여 `artifact_write` 를 부른다.
+   *
+   * <p>제출받은 run 의 session 이 곧 뿌리 session 이다. 하위 에이전트가 아니므로 session 과 뿌리가 같다.
+   */
+  const writeArtifactViaMcp = async (conversationId: string, sessionId: string | undefined): Promise<void> => {
     if (artifactWriteMcp === undefined) throw new Error("artifact_write MCP runtime is not configured");
+    if (sessionId === undefined) throw new Error("artifact_write MCP needs the submitted session_id to sign _fos_ctx");
+    const token = artifactWriteMcp.token;
     const request = async (body: unknown): Promise<unknown> => {
       const response = await fetch(artifactWriteMcp.endpoint, {
         method: "POST",
@@ -461,7 +469,8 @@ export function startFakeHermes(
     const listed = await request({ jsonrpc: "2.0", id: 2, method: "tools/list" }) as { result?: { tools?: { name?: string }[] } };
     if (!listed.result?.tools?.some((tool) => tool.name === "artifact_write")) throw new Error("artifact_write MCP tool was not discovered");
     for (const [path, content] of [["test/index.html", "<!doctype html><title>MCP 초안</title><h1>MCP 결과물</h1>"], ["test/style.css", "h1 { color: navy; }"]] as const) {
-      const result = await request({ jsonrpc: "2.0", id: path, method: "tools/call", params: { name: "artifact_write", arguments: { conversation_id: conversationId, path, content } } }) as { result?: { content?: { text?: string }[]; isError?: boolean } };
+      const _fos_ctx = signedCallContext(token, "artifact_write", sessionId, sessionId, `call_${randomUUID()}`);
+      const result = await request({ jsonrpc: "2.0", id: path, method: "tools/call", params: { name: "artifact_write", arguments: { conversation_id: conversationId, path, content, _fos_ctx } } }) as { result?: { content?: { text?: string }[]; isError?: boolean } };
       if (result.result?.isError === true || result.result?.content?.[0]?.text === undefined) throw new Error("artifact_write MCP call failed");
       const written = JSON.parse(result.result.content[0].text) as { path?: string; byteSize?: number };
       if (written.path !== path || typeof written.byteSize !== "number") throw new Error("artifact_write MCP response is invalid");
@@ -887,7 +896,7 @@ export function startFakeHermes(
         lastSubmittedInput = submitted.input;
         const { folder: artifactFolder, conversationId: artifactConversationId, rest: input } = splitArtifactPreamble(submitted.input ?? "");
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
-        if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId);
+        if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId, submitted.session_id);
         lastSubmittedRuntime = {
           provider: submitted.provider,
           model: submitted.model,
