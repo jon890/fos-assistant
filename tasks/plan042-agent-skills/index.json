@@ -3,11 +3,28 @@
   "description": "에이전트를 관리하는 사람이 스킬을 올리고 고치고 지운다. Control Plane 이 버전 디렉터리에 쓰고 Hermes 는 읽기만 한다. 호출 이력과 사용량 탭(ADR-034)",
   "status": "pending",
   "created_at": "2026-09-29",
-  "total_phases": 3,
+  "total_phases": 4,
   "current_phase": 1,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard"
+    }
   ]
 }
