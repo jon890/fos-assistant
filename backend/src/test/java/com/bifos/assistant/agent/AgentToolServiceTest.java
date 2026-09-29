@@ -115,7 +115,7 @@ class AgentToolServiceTest {
         AgentToolService.ToolsetsView result = service.write(owner, agent, List.of("web"));
 
         assertThat(result.unclassifiedEnabled()).containsExactly("connections");
-        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant-memory"));
+        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "fos-assistant"));
     }
 
     @Test

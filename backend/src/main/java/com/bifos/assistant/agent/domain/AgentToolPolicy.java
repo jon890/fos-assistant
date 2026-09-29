@@ -11,7 +11,8 @@ import java.util.Set;
 public final class AgentToolPolicy {
 
     public static final String MEMORY = "memory";
-    public static final String MEMORY_MCP = "fos-assistant-memory";
+    /** Control Plane 이 여는 MCP 서버의 Hermes 등록 이름이며, 도구 저장 때 허용 목록에 늘 남긴다. */
+    public static final String CONTROL_PLANE_MCP = "fos-assistant";
 
     private static final Set<String> OWNER_TOOLSETS = Set.of(
             "web", "vision", "todo", "clarify", "skills", "tts", "delegation");
@@ -64,7 +65,7 @@ public final class AgentToolPolicy {
         }
         LinkedHashSet<String> requestedSet = new LinkedHashSet<>();
         for (String name : requested) {
-            if (name == null || name.isBlank() || MEMORY.equals(name) || MEMORY_MCP.equals(name) || !isKnown(name)) {
+            if (name == null || name.isBlank() || MEMORY.equals(name) || CONTROL_PLANE_MCP.equals(name) || !isKnown(name)) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "the requested toolset is not allowed");
             }
             if (!requestedSet.add(name)) {
@@ -92,7 +93,7 @@ public final class AgentToolPolicy {
                     ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE,
                     "shell and file toolsets require a private agent");
         }
-        result.add(MEMORY_MCP);
+        result.add(CONTROL_PLANE_MCP);
         return List.copyOf(result);
     }
 

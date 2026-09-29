@@ -80,11 +80,11 @@ const TOOLSET_CATALOG = [
   { name: "spotify", label: "Spotify", description: "음악을 제어한다" },
   { name: "discord", label: "Discord", description: "Discord를 제어한다" },
 ] as const;
-const MEMORY_MCP = "fos-assistant-memory";
+const CONTROL_PLANE_MCP = "fos-assistant";
 /** 허용 목록이 없는 API server의 v0.21.3 기본 toolset이다. */
 const DEFAULT_API_SERVER_TOOLSETS = [
   "browser", "code_execution", "cronjob", "delegation", "file", "image_gen", "memory",
-  "session_search", "skills", "terminal", "todo", "vision", "web", MEMORY_MCP,
+  "session_search", "skills", "terminal", "todo", "vision", "web", CONTROL_PLANE_MCP,
 ];
 
 /**
@@ -518,14 +518,14 @@ export function startFakeHermes(
         };
       };
       const toolsets = body.config?.platform_toolsets?.api_server;
-      const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), MEMORY_MCP]);
+      const validNames = new Set([...TOOLSET_CATALOG.map((entry) => entry.name), CONTROL_PLANE_MCP]);
       const exactKeys = Object.keys(body).length === 2 && Object.keys(body).every((key) => key === "profile" || key === "config")
         && Object.keys(body.config ?? {}).length === 1
         && Object.keys(body.config ?? {}).every((key) => key === "platform_toolsets")
         && Object.keys(body.config?.platform_toolsets ?? {}).length === 1;
       if (body.profile === undefined || queryProfile !== null && queryProfile !== body.profile
           || !keys[body.profile] || !Array.isArray(toolsets)
-          || !toolsets.includes(MEMORY_MCP) || !toolsets.every((name) => typeof name === "string" && validNames.has(name))
+          || !toolsets.includes(CONTROL_PLANE_MCP) || !toolsets.every((name) => typeof name === "string" && validNames.has(name))
           || !exactKeys) {
         send(response, 400, { error: "invalid toolset configuration" });
         return true;

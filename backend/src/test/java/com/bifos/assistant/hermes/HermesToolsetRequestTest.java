@@ -89,7 +89,7 @@ class HermesToolsetRequestTest {
 
     @Test
     void API_server_목록만_설정으로_쓴다() throws Exception {
-        client.writeApiServer("kid", List.of("web", "fos-assistant-memory"));
+        client.writeApiServer("kid", List.of("web", "fos-assistant"));
 
         assertThat(calls).singleElement().satisfies(call -> {
             assertThat(call.method()).isEqualTo("PUT");
@@ -98,7 +98,7 @@ class HermesToolsetRequestTest {
             assertThat(new ObjectMapper().readValue(call.body(), Map.class)).isEqualTo(Map.of(
                     "profile", "kid",
                     "config", Map.of(
-                            "platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant-memory")))));
+                            "platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant")))));
         });
     }
 

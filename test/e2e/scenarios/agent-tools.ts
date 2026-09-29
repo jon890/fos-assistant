@@ -42,7 +42,7 @@ export const agentToolsScenario: Scenario = {
       body: JSON.stringify({
         profile: AGENT_TOOLS_PROFILE,
         config: {
-          platform_toolsets: { api_server: ["web", "fos-assistant-memory"] },
+          platform_toolsets: { api_server: ["web", "fos-assistant"] },
         },
       }),
     });
@@ -54,7 +54,7 @@ export const agentToolsScenario: Scenario = {
     });
     expect(builtinToolsets.status === 200, "API 실행 도구 목록을 읽지 못했다");
     const builtinNames = (await builtinToolsets.json() as { data: { name: string }[] }).data.map((entry) => entry.name);
-    expect(!builtinNames.includes("fos-assistant-memory"), "MCP 서버가 내장 도구 목록에 들어 있다");
+    expect(!builtinNames.includes("fos-assistant"), "MCP 서버가 내장 도구 목록에 들어 있다");
 
     step("주인은 자기 등급의 web만 켤 수 있다");
     const initial = expectStatus(

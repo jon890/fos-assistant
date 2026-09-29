@@ -45,7 +45,7 @@ public class AgentToolService {
         toolsets.writeApiServer(agent.hermesProfile(), desired);
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desiredBuiltin = desired.stream()
-                .filter(name -> !AgentToolPolicy.MEMORY_MCP.equals(name))
+                .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
                 .toList();
         List<String> controlledApplied = applied.stream()
                 .filter(name -> AgentToolPolicy.isKnown(name) || AgentToolPolicy.MEMORY.equals(name))
@@ -79,7 +79,7 @@ public class AgentToolService {
         List<String> unclassified = enabled.stream()
                 .filter(name -> !AgentToolPolicy.isKnown(name))
                 .filter(name -> !AgentToolPolicy.MEMORY.equals(name))
-                .filter(name -> !AgentToolPolicy.MEMORY_MCP.equals(name))
+                .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
                 .toList();
         return new ToolsetsView(views(user, agent, catalog, enabled), unclassified);
     }
