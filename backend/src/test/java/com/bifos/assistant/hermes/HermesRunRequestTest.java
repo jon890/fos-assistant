@@ -4,19 +4,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
-/** 요청에 provider 와 모델을 둘 다 실어야 한다는 것과 막힘 판정 문자열을 본다. */
+/**
+ * 요청이 provider 와 모델을 함께 싣거나 함께 빼는 것, effort 를 {@code model_options} 로 싣는 것,
+ * 막힘 판정 문자열을 본다.
+ */
 class HermesRunRequestTest {
 
     private final HermesProfileKeyStore keyStore = mock(HermesProfileKeyStore.class);
+    private final AtomicReference<String> receivedBody = new AtomicReference<>();
     private final HttpHermesRunsClient client = new HttpHermesRunsClient(
             keyStore,
             new HermesProperties(
@@ -29,9 +43,78 @@ class HermesRunRequestTest {
                     Duration.ofSeconds(1),
                     Duration.ofSeconds(1)));
 
+    private HttpServer server;
+    private String baseUrl;
+
+    @BeforeEach
+    void start() throws IOException {
+        when(keyStore.resolve("dad")).thenReturn("dad-key");
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/p/dad";
+        // 받은 POST /v1/runs 본문을 저장하고 실행 번호를 돌려준다.
+        server.createContext("/p/dad/v1/runs", exchange -> {
+            receivedBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] payload = "{\"run_id\":\"run-1\",\"status\":\"queued\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, payload.length);
+            exchange.getResponseBody().write(payload);
+            exchange.close();
+        });
+        server.start();
+    }
+
+    @AfterEach
+    void stop() {
+        server.stop(0);
+    }
+
+    @Test
+    void provider_와_모델이_모두_비면_세_키를_싣지_않는다() {
+        String runId = client.submit(command(null, null, null));
+
+        JsonNode body = submittedBody();
+        assertThat(runId).isEqualTo("run-1");
+        assertThat(body.has("provider")).isFalse();
+        assertThat(body.has("model")).isFalse();
+        assertThat(body.has("model_options")).isFalse();
+        assertThat(body.path("input").asString()).isEqualTo("안녕");
+    }
+
+    @Test
+    void provider_와_모델과_effort_를_주면_셋이_모두_실린다() {
+        client.submit(command("openai-codex", "example-model", "high"));
+
+        JsonNode body = submittedBody();
+        assertThat(body.path("provider").asString()).isEqualTo("openai-codex");
+        assertThat(body.path("model").asString()).isEqualTo("example-model");
+        assertThat(body.path("model_options").path("reasoning").path("effort").asString()).isEqualTo("high");
+        assertThat(body.path("model_options").has("reasoning_effort")).isFalse();
+    }
+
+    @Test
+    void effort_가_비어_있으면_model_options_를_싣지_않는다() {
+        client.submit(command("openai-codex", "example-model", " "));
+
+        assertThat(submittedBody().has("model_options")).isFalse();
+    }
+
+    @Test
+    void provider_만_주면_Hermes_를_부르지_않고_실패한다() {
+        assertThatThrownBy(() -> client.submit(command("openai-codex", null, null)))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        verifyNoInteractions(keyStore);
+        assertThat(receivedBody.get()).isNull();
+    }
+
+    private JsonNode submittedBody() {
+        return JsonMapper.builder().build().readTree(receivedBody.get());
+    }
+
     @Test
     void provider_가_비면_Hermes_를_부르지_않고_실패한다() {
-        assertThatThrownBy(() -> client.submit(command(null, "example-model")))
+        assertThatThrownBy(() -> client.submit(command(null, "example-model", null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
@@ -40,7 +123,7 @@ class HermesRunRequestTest {
 
     @Test
     void 모델이_비면_Hermes_를_부르지_않고_실패한다() {
-        assertThatThrownBy(() -> client.submit(command("openai-codex", " ")))
+        assertThatThrownBy(() -> client.submit(command("openai-codex", " ", null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
@@ -77,8 +160,8 @@ class HermesRunRequestTest {
                 "run-1", "sess-1", "failed", null, "example-model", "openai-codex", error, TokenUsage.empty());
     }
 
-    private static HermesRunCommand command(String provider, String model) {
+    private HermesRunCommand command(String provider, String model, String reasoningEffort) {
         return new HermesRunCommand(
-                "dad", "http://runtime.test/p/dad", "안녕", null, null, provider, model);
+                "dad", baseUrl, "안녕", null, null, provider, model, reasoningEffort);
     }
 }

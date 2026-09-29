@@ -407,7 +407,8 @@ public class ChatService {
                 TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
                 conversation.hermesSessionId(),
                 option.provider(),
-                option.model());
+                option.model(),
+                null);
         AgentExecution execution = executions.start(
                 user, conversation, agent, null, null, snapshot, option, retryOfExecutionId);
         return new PendingTurn(

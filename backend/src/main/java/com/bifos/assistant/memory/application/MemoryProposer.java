@@ -55,7 +55,7 @@ public class MemoryProposer {
                     parentExecution.id(), parentExecution.id(),
                     ExecutionContextSnapshot.ofChars(0L), option, null);
             HermesRunCommand command = new HermesRunCommand(agent.hermesProfile(), agent.apiBaseUrl(),
-                    prompt(answer), null, null, option.provider(), option.model());
+                    prompt(answer), null, null, option.provider(), option.model(), null);
             String runId = hermes.submit(command);
             executions.attachRunId(proposalExecution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);

@@ -3,8 +3,9 @@ package com.bifos.assistant.hermes.dto;
 /**
  * 실행 하나를 Hermes 에 보내는 데 필요한 것이다.
  *
- * <p>{@code provider} 와 {@code model} 은 둘 다 채워야 한다. 하나만 보내면 Hermes 가 config 의 모델
- * 문자열을 새 provider 에 그대로 넘겨 {@code No LLM provider configured} 로 끝난다.
+ * <p>{@code provider} 와 {@code model} 은 둘을 함께 채우거나 함께 비운다. 비우면 profile 의 기본값으로
+ * 돈다. 하나만 보내면 Hermes 가 config 의 모델 문자열을 새 provider 에 그대로 넘겨
+ * {@code No LLM provider configured} 로 끝난다.
  *
  * @param profileName 이 turn 을 도는 Hermes profile. credential 과 우리가 제시할 API key 도 이것이
  *     정한다
@@ -15,6 +16,8 @@ package com.bifos.assistant.hermes.dto;
  * @param sessionId 이어 갈 Hermes session. 새로 시작하면 null
  * @param provider 이 실행에 쓸 provider
  * @param model 이 실행에 쓸 모델
+ * @param reasoningEffort 이 실행에 실을 reasoning effort. 받은 값을 그대로 싣고, 비우면 Hermes 가 그
+ *     모델의 설정값을 쓴다
  */
 public record HermesRunCommand(
         String profileName,
@@ -23,5 +26,6 @@ public record HermesRunCommand(
         String instructions,
         String sessionId,
         String provider,
-        String model) {
+        String model,
+        String reasoningEffort) {
 }

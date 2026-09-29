@@ -173,7 +173,8 @@ public class AgentRunner {
                 appendInstruction(context.instructions(), instructionAddition),
                 sessionId,
                 option.provider(),
-                option.model());
+                option.model(),
+                null);
 
         String runId;
         try {
