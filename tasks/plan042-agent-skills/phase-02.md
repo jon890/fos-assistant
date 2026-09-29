@@ -31,9 +31,9 @@
 
 ## 작업 항목
 
-### 1. 마이그레이션 `backend/src/main/resources/db/migration/V32__execution_skill_use.sql`
+### 1. 마이그레이션 `backend/src/main/resources/db/migration/V34__execution_skill_use.sql`
 
-번호는 V32 다. 여러 계획을 나란히 구현해 번호를 미리 나눴다. `docs/data-schema.md` 「execution_skill_use」 표 그대로. `(execution_id, skill_name, source)` 유일 제약과 `skill_name` 조회용 인덱스. MySQL 과 H2 에 함께 있는 문법만 쓴다(`backend/AGENTS.md`).
+번호는 V34 다. 운영 데이터베이스가 이미 V33 이고 Flyway 의 out-of-order 를 쓰지 않으므로 그보다 큰 번호를 쓴다. `docs/data-schema.md` 「execution_skill_use」 표 그대로. `(execution_id, skill_name, source)` 유일 제약과 `skill_name` 조회용 인덱스. MySQL 과 H2 에 함께 있는 문법만 쓴다(`backend/AGENTS.md`).
 
 ### 2. 저장과 기록
 
@@ -75,7 +75,7 @@ node test/e2e/run.ts
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V32__execution_skill_use.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V34__execution_skill_use.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/domain/ExecutionSkillUse.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/domain/SkillUseSource.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/infra/ExecutionSkillUseRepository.java` | 신규 |
