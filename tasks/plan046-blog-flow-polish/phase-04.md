@@ -36,6 +36,7 @@
 - MCP 도구 `mcp__{서버}__{도구}` 는 마지막 `__` 뒤의 이름으로 표를 찾는다. 화면 문구일 뿐이라 Control Plane 의 공개 판정과 다르게 해도 된다
 - 문장은 그리는 때 정한다. 같은 항목이 도는 중에서 끝남으로 바뀌면 문장도 바뀌어야 해서 `name` 에 문장을 굳혀 넣지 않는다
 - 원래 도구 이름은 `data-tool` 속성으로 남긴다. 검사가 그것으로 줄을 찾는다. 이름은 감출 값이 아니고 감출 것은 `detail` 이다(ADR-038)
+- `data-tool` 은 두 화면이 같은 규칙을 쓴다. 도구 줄에는 늘 붙이고, 이름이 없으면 값은 `도구` 다. 작업 과정 항목은 이미 `name` 에 그 값을 갖고 있고, 실행 나무 줄은 `row.toolName ?? "도구"` 로 맞춘다
 - 따라가기는 도는 중인 블록만 한다. 끝난 답을 펼치면 맨 위부터 보인다
 - 맨 아래에서 `16px` 안이면 맨 아래를 보고 있는 것으로 본다. 스크롤할 때마다 이 값을 다시 정한다
 - 높이 상한은 목록에만 준다. 읽기 실패 문구와 「작업 과정 자세히 보기」 단추는 스크롤 상자 밖에 둔다
@@ -60,13 +61,21 @@
   - `useRef` 로 상자와 「맨 아래를 보고 있다」 값을 둔다. 처음 값은 참이다
   - `onScroll` 에서 `scrollHeight - scrollTop - clientHeight <= 16` 으로 그 값을 다시 정한다
   - `props.mode === "live"` 이고 `props.state.endedAt === null` 이고 그 값이 참이면, 항목 수가 바뀌거나 펼쳐질 때 `useLayoutEffect` 에서 `scrollTop = scrollHeight` 로 내린다
-- `execution-event-row.tsx` 의 도구 줄을 `{toolLabel(row.toolName, false)} · 걸린 시간 · detail` 로, 끝나지 않은 줄을 `{toolLabel(row.toolName, false)} · 끝나지 않음` 으로 바꾸고 `li` 에 `data-tool` 을 붙인다. 원래 이름이 없으면 속성을 붙이지 않는다
+- `execution-event-row.tsx` 의 도구 줄을 `{toolLabel(row.toolName, false)} · 걸린 시간 · detail` 로, 끝나지 않은 줄을 `{toolLabel(row.toolName, false)} · 끝나지 않음` 으로 바꾸고 `li` 에 `data-tool={row.toolName ?? "도구"}` 를 붙인다
 
 ### 3. 대역 Hermes 의 긴 작업 과정
 
 - `test/e2e/fake-hermes.ts` 에 `export const LONG_ACTIVITY_PROBE = "긴 작업 과정 검사"` 를 더한다
-- 이 입력의 스트림은 `terminal` 도구 사건 30쌍을 보낸 뒤 검사가 풀어 줄 때까지 기다렸다가 10쌍을 더 보내고 끝낸다. 기다리는 동안 turn 은 도는 중이어야 한다
-- 풀어 주는 방법은 기존 `holdNextRun` 과 `releaseHeldRun` 의 구현을 먼저 읽고 같은 방식으로 더한다. 새 제어 경로를 만들면 `test/browser/fixtures.ts` 의 `FakeHermesControl` 에도 더한다
+- 지금 사건 스트림은 held 여부와 상관없이 사건을 한 번에 모두 보낸다. `releaseHeldRun` 은 실행 상태만 `completed` 로 바꾼다. 스트림을 중간에 멈추는 장치가 없으므로 새로 만든다
+- 이 입력의 스트림은 이 순서로 보낸다
+  1. `message.delta` 하나(`긴 작업 과정`)
+  2. `terminal` 도구 사건 30쌍. `preview` 는 `단계 {n}` 이다. `terminal` 글자를 담지 않는다
+  3. `terminal` 의 `tool.started` 하나(`preview` 는 `단계 31`). 이 항목이 도는 중이라 블록 제목에 도는 줄의 말이 보인다
+  4. 스트림 풀림 신호를 기다린다
+  5. 3의 짝 `tool.completed` 와 `terminal` 10쌍(`단계 32` 부터), 그리고 `run.completed`
+  - `fake-tool`, `fake-reader`, 하위 에이전트 사건은 보내지 않는다
+- 스트림 풀림 신호는 실행 상태를 푸는 것과 따로 둔다. `TEST_RELEASE_LONG_ACTIVITY_PATH = "/__test/release-long-activity"` 경로를 새로 두고, `FakeHermes` 와 `test/browser/fixtures.ts` 의 `FakeHermesControl` 에 `releaseLongActivity()` 를 더한다. 기존 hold 경로의 등록 방식을 본뜬다
+- 검사는 `hermes.holdNextRun()` 으로 실행을 잡아 두고 이 입력을 보낸다. 그래야 스트림이 끝나도 turn 이 도는 중으로 남는다
 - 다른 입력의 사건은 바꾸지 않는다
 
 ### 4. 이 phase 를 검증하는 테스트
@@ -78,13 +87,15 @@
   - `fake-tool` 과 `null` 은 「도구를 쓰는 중」 과 「도구 사용」
 - `test/unit/activity-state.test.ts` 에 `activityLabel` 이 같은 도구 항목에서 `running` 일 때와 `done` 일 때 다른 문장을 내는 것을 더한다
 - `test/browser/activity-scroll.spec.ts` 신규. 두 폭 모두에서 돈다
-  - `LONG_ACTIVITY_PROBE` 를 보내고 30쌍이 온 뒤 블록을 펼친다
+  - `hermes.holdNextRun()` 뒤에 `LONG_ACTIVITY_PROBE` 를 보내고, 항목 31개가 온 뒤 live 블록(`data-mode="live"`)을 펼친다
   - 도는 중 제목에 「작업을 실행하는 중」 이 보이고 `terminal` 글자는 보이지 않는다
   - `activity-scroll` 의 `clientHeight` 가 257 이하이고 `scrollHeight` 가 `clientHeight` 보다 크며, 맨 아래에서 16 이내다
   - `activity-block` 의 높이가 360 이하다. 채팅 영역이 목록 길이만큼 늘지 않았다는 뜻이다
-  - 목록을 맨 위로 올린 뒤 대역을 풀어 10쌍을 더 받는다. 항목 수가 늘어도 `scrollTop` 이 0 이다
+  - 목록을 맨 위로 올린 뒤 `hermes.releaseLongActivity()` 로 스트림을 푼다. live 블록의 항목이 41개가 된 것을 확인한 뒤에도 `scrollTop` 이 0 이다. 이 확인은 `hermes.releaseHeldRun()` 을 부르기 전에 한다. 먼저 부르면 turn 이 끝나 live 블록이 저장된 블록으로 바뀐다
+  - 확인이 끝나면 `hermes.releaseHeldRun()` 을 부른다. 검사가 실패해도 `finally` 에서 두 신호를 모두 푼다
   - 문서의 가로 스크롤이 생기지 않는다(`scrollWidth - clientWidth <= 0`)
   - 끝난 뒤 새로 고쳐 저장된 블록을 펼치면 `scrollTop` 이 0 이다
+- `test/browser/execution-tree.spec.ts` 의 `deepTreeFixture` 는 긴 도구 이름으로 가로 넘침을 검사한다. 이제 이름이 「도구 사용」 으로 보이므로 그 긴 글자를 `detail` 쪽으로 옮겨 가로 넘침 검사가 계속 긴 글자를 다루게 한다
 - `test/browser/execution-tree.spec.ts` 의 `fake-tool`, `fake-reader` 글자 찾기를 `[data-tool="fake-tool"]`, `[data-tool="fake-reader"]` 로 바꾸고, 그 줄에 「도구 사용」 이 보이는지 확인한다
 - 도구 원래 이름을 글자로 찾는 다른 브라우저 검사가 있으면 같은 방식으로 바꾼다. `grep -rn "fake-tool\|fake-reader\|도구: " test/browser` 로 찾는다
 

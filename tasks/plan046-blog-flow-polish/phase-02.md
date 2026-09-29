@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/code-architecture.md` 의 「에이전트에게 알리는 법」 절과 「경로」 절, `docs/flow.md` 의 「결과물 파일을 볼 때」 절
+**근거 문서**: `docs/code-architecture.md` 의 「결과물 파일」 아래 「에이전트에게 알리는 법」 절과 「경로」 절(같은 이름의 절이 「사진 첨부」 아래에도 있다), `docs/flow.md` 의 「결과물 파일을 볼 때」 절
 
 지금 모양이다. 구현 전에 각 파일을 연다.
 
@@ -29,6 +29,7 @@
 
 - **304 로 답할 때는 파일을 열지 않는다.** 스트림을 연 뒤 304 로 끝내면 아무도 닫지 않는다. 그래서 판정과 여는 것을 둘로 나눈다
 - Spring 의 `ResponseEntity` 자동 304 처리에 기대지 않는다. 그 처리는 본문을 쓰지 않을 뿐 이미 연 `InputStreamResource` 를 닫지 않는다
+- 다만 `HttpEntityMethodProcessor` 는 200 으로 돌려준 `ResponseEntity` 에 `ETag` 나 `Last-Modified` 가 있으면 조건부 요청을 다시 판정한다. 우리 `notModified` 가 거짓이라 한 요청을 Spring 이 304 로 바꾸면 연 스트림이 닫히지 않는다. **그래서 `notModified` 는 Spring 의 판정과 같아야 한다.** If-None-Match 우선, `W/` 를 뗀 약한 비교, `If-Modified-Since` 의 초 단위 내림이다. `notModified` 의 Javadoc 에 이 조건을 적는다
 - `ServletWebRequest.checkNotModified` 도 쓰지 않는다. 응답 객체에 머리글을 직접 쓰고, 뒤에 돌려주는 `ResponseEntity` 의 머리글과 겹친다
 - `ETag` 는 약한 검증자 `W/"{바이트 수 16진수}-{수정 시각 밀리초 16진수}"` 다. 바이트 수와 수정 시각으로 만든 값이라 본문이 같다고 보장하지 않는다
 - 주인 확인과 경로 판정이 먼저다. 남의 대화에 맞는 `ETag` 를 보내도 `CONVERSATION_NOT_FOUND` 다
@@ -73,7 +74,7 @@
 - 받은 `Last-Modified` 를 `If-Modified-Since` 로 다시 보내면 304 다
 - 그 뒤 `writeAt` 으로 같은 경로에 다른 본문과 더 늦은 수정 시각을 쓰고 옛 `ETag` 로 보내면 200 과 새 본문이다
 - `If-None-Match: "다른값"` 에 `If-Modified-Since` 를 미래로 함께 보내면 200 이다. `If-None-Match` 가 이긴다
-- 다른 사용자로 로그인해 맞는 `ETag` 를 보내도 404 `CONVERSATION_NOT_FOUND` 다
+- 다른 사용자가 맞는 `ETag` 를 보내도 404 `CONVERSATION_NOT_FOUND` 다. 지금 `get(...)` 은 늘 `jwt(dad)` 로 보내므로, 보내는 사용자와 요청 머리글을 함께 받는 `file` 변형을 만든다. 다른 사용자는 이 테스트 클래스가 이미 쓰는 사용자 생성 방식을 따른다
 - 기존 `Hermes_로_간_입력은_결과물_폴더_단락으로_시작하고_사용자가_쓴_글로_끝난다` 가 새 줄로 통과한다
 
 ## 검증

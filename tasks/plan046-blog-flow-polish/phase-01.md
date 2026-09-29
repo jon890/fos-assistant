@@ -1,6 +1,6 @@
 # Phase 01. backend 가 도구 명령 원문을 관리자에게만 보낸다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -22,7 +22,7 @@
 - `backend/src/main/java/com/bifos/assistant/usage/domain/ExecutionEventType.java`: `isTool()` 은 `TOOL_STARTED`, `TOOL_COMPLETED` 에서 참이다
 - `backend/src/main/java/com/bifos/assistant/chat/application/ChatEvent.java`: 19칸 record. `tool(toolName, detail, phase, durationMs, failed)` 가 `type` 을 `"tool"` 로 만든다
 - `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java`: `stream(...)` 과 `regenerate(...)` 가 `streams.open(event -> chat.stream(..., event))` 와 `streams.open(event -> chat.regenerate(user, id, event))` 로 소비자를 넘긴다. 람다 인자 `event` 는 실제로는 `Consumer<ChatEvent>` 다
-- 테스트 본보기: `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` 의 `hermesStreams(RunEvent...)` 가 Hermes 사건을 흘리고, `backend/src/test/java/com/bifos/assistant/chat/ConversationPublicIdTest.java` 의 `streamed(RequestBuilder)` 와 `signedIn(CurrentUser)` 가 MockMvc 로 SSE 를 끝까지 읽는다. `backend/src/test/java/com/bifos/assistant/usage/ExecutionTreeServiceTest.java` 는 `UserRole.ADMIN` 인 주인으로 나무를 읽는다
+- 테스트 본보기: `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` 의 `hermesStreams(RunEvent...)` 가 Hermes 사건을 흘리고, `backend/src/test/java/com/bifos/assistant/chat/ConversationPublicIdTest.java` 의 `streamed(RequestBuilder)` 와 `signedIn(CurrentUser)` 가 MockMvc 로 SSE 를 끝까지 읽는다. `backend/src/test/java/com/bifos/assistant/usage/ExecutionTreeServiceTest.java` 는 `owner()` 가 `UserRole.ADMIN` 인 주인이고, 사건을 만드는 도우미 `event(...)` 는 `detail` 을 받지 않는다. 이 phase 의 검사를 쓰려면 그 도우미를 넓힌다
 
 ## 의도 메모
 

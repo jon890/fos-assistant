@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/code-architecture.md` 의 「경로」 절, `docs/flow.md` 의 「결과물 파일을 볼 때」 절
+**근거 문서**: `docs/code-architecture.md` 의 「결과물 파일」 아래 「경로」 절(같은 이름의 절이 「사진 첨부」 아래에도 있다), `docs/flow.md` 의 「결과물 파일을 볼 때」 절
 
 지금 모양이다. 구현 전에 각 파일을 연다.
 
@@ -69,7 +69,7 @@
 - `test/browser/artifact.spec.ts`
   - 첫 검사의 결과물 줄과 패널 제목 기대값을 `초안` 으로 바꾼다
   - 같은 검사의 직접 받기(`page.request.get(src!)`) 뒤에 둘을 더한다.
-    응답에 `etag` 가 있고, 그 값을 `If-None-Match` 로 다시 받으면 상태가 304, 본문이 비고, `cache-control` 이 `private, no-cache` 다
+    응답에 `etag` 와 `last-modified` 가 있고, `etag` 값을 `If-None-Match` 로 다시 받으면 상태가 304, 본문이 비고, `cache-control` 이 `private, no-cache` 다. `last-modified` 값을 `If-Modified-Since` 로만 보내도 304 다
   - 옮기는 목록 밖 머리글 검사(`x-frame-options` 가 없다)는 그대로 둔다
 
 ## 검증
