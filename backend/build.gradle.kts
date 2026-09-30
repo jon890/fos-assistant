@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    id("checkstyle")
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.management)
 }
@@ -77,6 +78,24 @@ tasks.register<Test>("archTest") {
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform {
         includeTags("architecture")
+    }
+}
+
+/**
+ * 코드 규칙은 config/checkstyle 의 설정 파일 셋이 갖는다.
+ * error 는 태스크를 실패시키고 warning 은 보고서에만 남긴다.
+ * 규칙과 기준 갱신 방법은 backend/AGENTS.md 의 「코드 규칙」 절에 있다.
+ */
+checkstyle {
+    toolVersion = libs.versions.checkstyle.get()
+    isIgnoreFailures = false
+    maxWarnings = Int.MAX_VALUE
+}
+
+tasks.withType<Checkstyle>().configureEach {
+    reports {
+        xml.required = true
+        html.required = false
     }
 }
 

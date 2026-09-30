@@ -111,6 +111,111 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 「`application` 과 `domain` 은 타입 하나에 파일 하나다」 와 「서비스가 돌려주는 결과 타입도 그 서비스 안에 두지 않는다」 는 규칙으로 옮기지 않았다.
 예외인 「그 타입 밖에서 쓰이지 않는 값」 을 기계로 판정할 수 없기 때문이다. 리뷰에서 본다.
 
+## 코드 규칙
+
+코드 모양 규칙은 Checkstyle 14.3.0 이 검사한다. Gradle 내장 `checkstyle` 플러그인을 쓴다.
+`./gradlew test` 에는 걸리지 않으므로 따로 돌린다.
+
+```bash
+# cwd: backend/
+./gradlew checkstyleMain checkstyleTest
+```
+
+error 는 태스크를 실패시키고, warning 은 실패시키지 않고 보고서에만 남긴다.
+보고서는 `build/reports/checkstyle/main.xml`, `test.xml` 이다.
+규칙을 도구 설정으로 두는 근거는 [ADR-040](../docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 에 있다.
+
+### 설정 파일
+
+`config/checkstyle/` 에 셋이 있다. Gradle 이 이 디렉터리를 `config_loc` 으로 넘긴다.
+
+| 파일 | 역할 |
+| --- | --- |
+| `checkstyle.xml` | 규칙 |
+| `suppressions.xml` | 설계상 예외. 앞으로도 허용하는 것이다 |
+| `baseline.xml` | 기존 위반. 줄여 가는 목록이다 |
+
+설계상 예외와 기존 위반은 다른 파일에 둔다. 앞의 것은 남고 뒤의 것은 없어져야 하기 때문이다.
+
+### 넣은 규칙
+
+| 규칙 | 심각도 | 까닭 |
+| --- | --- | --- |
+| `UnusedImports`, `AvoidStarImport`, `RedundantImport`, `IllegalImport` | error | 읽는 사람이 실제 의존을 import 줄에서 바로 본다 |
+| 전체 이름 참조 금지 (`fullyQualifiedName`) | error | 코드 안에 `java.util.concurrent.TimeoutException` 같은 이름을 쓰지 않고 import 한다. `import` 와 `package` 줄, 문자열 안의 글, 주석은 뺀다 |
+| `EmptyCatchBlock` (예외 변수 이름이 `ignored` 나 `expected` 면 허용) | error | 예외를 삼키는 자리를 이름으로 드러낸다 |
+| `EmptyStatement`, `EqualsHashCode`, `StringLiteralEquality`, `FallThrough`, `MissingOverride` | error | 결함으로 이어지는 모양이다 |
+| `SimplifyBooleanExpression`, `SimplifyBooleanReturn`, `ModifierOrder`, `UpperEll`, `ArrayTypeStyle` | error | 같은 뜻을 한 모양으로 쓴다 |
+| `PackageName`, `TypeName`, `MethodName`, `MemberName`, `ParameterName`, `LocalVariableName`, `LocalFinalVariableName`, `StaticVariableName`, `LambdaParameterName`, `RecordComponentName`, `ClassTypeParameterName`, `MethodTypeParameterName` | error | 기본 패턴 그대로 쓴다 |
+| `ConstantName` (`log` 와 대문자 상수 이름) | error | 로거 이름 `log` 는 Lombok `@Slf4j` 가 만드는 이름이다 |
+| `EmptyLineSeparator` (메서드와 생성자) | error | 메서드와 생성자 사이에 빈 줄이 한 줄 이상 있어야 읽는 단위가 보인다. 인터페이스의 추상 메서드 선언 사이도 잡는다. 자동으로 고치지 않는 목록에 든다 |
+| `OneStatementPerLine` | error | 한 줄에 한 문장 |
+| `LeftCurly` (`eol`), `RightCurly` 둘 | error | `void a() { return; }` 처럼 본문을 한 줄에 몰아 쓰지 않는다. `RightCurly` 는 `rightCurlyAlone` (메서드, 생성자, 클래스, `for`, `while`, 초기화 블록) 과 `rightCurlySame` (`try`, `catch`, `finally`, `if`, `else`, `do`) 로 나눈다. 제어문에 `alone` 을 걸면 `} else {` 가 위반이 되어 포매터와 어긋나기 때문이다. `LeftCurly` 는 람다를 대상에서 뺀다. 시험 대역의 `-> { throw ...; }` 한 줄이 흔하다 |
+| `NeedBraces` | error | 제어문은 한 문장이어도 중괄호를 쓴다 |
+| 직접 만든 로거 금지 (`lombokLogger`) | error | 로거는 Lombok `@Slf4j` 로 둔다. 바이트코드로는 구별되지 않아 소스에서 본다. `Logger x = LoggerFactory.getLogger(...)` 형태의 선언을 잡고, 시험이 로그를 붙잡으려고 `(Logger) LoggerFactory.getLogger(...)` 로 꺼내는 것은 잡지 않는다 |
+| 직접 쓴 private 빈 생성자 금지 (`privateEmptyConstructor`) | error | 인스턴스를 만들지 않는 클래스는 `@NoArgsConstructor(access = AccessLevel.PRIVATE)` 로 쓴다 |
+| 엔티티의 손 접근자 금지 (`entityHandwrittenAccessor`) | error | `@Entity` 가 있는 파일에서 필드를 그대로 돌려주는 인자 없는 `public` 메서드를 잡는다. 엔티티 접근자는 Lombok `@Getter` 와 `@Accessors(fluent = true)` 로 `code()` 모양을 만든다. 값을 꺼내는 메서드가 두 벌이 되지 않게 하고 record 와 같은 호출 모양을 지킨다. 파일마다 한 번만 보고한다 |
+| `FileLength` (500줄) | warning | 쪼갤 후보 목록이다. 빈 줄과 주석을 포함한 전체 줄 수다 |
+| `MethodLength` (60줄, 빈 줄과 한 줄 주석은 세지 않는다) | warning | 쪼갤 후보 목록이다 |
+| 생성자 주입은 `@RequiredArgsConstructor` (`requiredArgsConstructor`) | warning | `@Service`, `@Component`, `@Repository`, `@RestController`, `@Controller`, `@Configuration` 이 붙고 `@RequiredArgsConstructor` 가 없는 파일에서 인자가 있는 생성자를 잡는다. 테스트 전용 생성자, 설정값 가공처럼 까닭이 있는 경우가 섞여 있어 목록으로만 보인다. 자동으로 고치지 않는다 |
+
+`FileLength`, `MethodLength`, `requiredArgsConstructor` 는 테스트 코드에 걸지 않는다.
+테스트는 시나리오가 길고 생성자 주입 규칙과 관계가 없다.
+
+**정규식 규칙은 `id` 를 붙여 기준과 억제를 `id` 로 건다.**
+`checks` 로 걸면 같은 종류의 정규식 규칙이 모두 억제된다.
+
+### 뺀 규칙
+
+| 규칙 | 까닭 |
+| --- | --- |
+| `LineLength`, `Indentation`, `WhitespaceAround`, `CustomImportOrder` | 포매터가 정한다. 둘이 같은 것을 다르게 판정하면 고칠 수 없는 위반이 생긴다 |
+| `JavadocMethod`, `JavadocType`, `MissingJavadocMethod` 같은 Javadoc 규칙 | 주석은 한국어로 필요한 곳에만 쓴다(아래 「주석」 절). 모든 메서드에 요구하면 뜻 없는 주석이 늘어난다 |
+| `MagicNumber` | 테스트와 설정 기본값에서 대부분 오탐이다 |
+| `FinalParameters`, `HiddenField` | 생성자 주입과 record 가 이름을 같게 쓰는 것이 이 저장소의 모양이다 |
+| `DesignForExtension` | Spring 빈과 싸운다 |
+
+### 전체 이름을 꼭 써야 할 때
+
+같은 단순 이름의 두 타입을 한 파일에서 써서 import 로 나눌 수 없을 때만 전체 이름을 쓴다.
+그 줄 끝에 `// 전체 이름 허용: <까닭>` 주석을 달면 그 줄만 통과한다.
+
+```java
+java.util.Date legacy = new java.util.Date(); // 전체 이름 허용: 같은 파일이 java.sql.Date 를 import 한다
+```
+
+JPQL 문자열 안의 전체 이름은 규칙 대상이 아니지만, 텍스트 블록은 줄 단위로 읽으면 문자열인지 알 수 없다.
+`AgentExecutionRepository` 와 `ExecutionSkillUseRepository` 는 생성자 식이 전체 이름을 요구해 `suppressions.xml` 에 예외로 두었다.
+Flyway 가 요구하는 `V<번호>__<이름>` 클래스의 `TypeName` 도 같은 파일에 예외로 둔다.
+
+### 기준 파일
+
+지금 있는 위반은 `config/checkstyle/baseline.xml` 에 `(파일, 규칙)` 한 쌍마다 한 줄로 두고 새 위반만 실패시킨다.
+**기준에 든 위반은 허용이 아니라 줄여 갈 목록이다.** 기준마다 연 GitHub 이슈가 있다.
+
+| 언제 | 어떻게 |
+| --- | --- |
+| 기준에 든 위반을 고쳤다 | `baseline.xml` 에서 그 줄을 지운다. Checkstyle 은 쓰지 않는 기준 줄을 알리지 않으므로 고친 사람이 직접 지운다. 같은 커밋에 넣는다 |
+| 새 위반이 생겼다 | 기준에 더하지 않고 고친다 |
+| 꼭 받아들여야 한다 | 까닭을 커밋 메시지와 PR 본문에 적고 그 줄을 더한다 |
+| 규칙을 새로 더했다 | 기준을 비운 뒤 `build.gradle.kts` 의 `isIgnoreFailures` 를 잠시 `true` 로 두고 `./gradlew checkstyleMain checkstyleTest` 를 돌린다. 보고서에서 severity 가 error 인 위반의 `(파일, 규칙)` 을 뽑아 줄을 만들고 `isIgnoreFailures` 를 `false` 로 되돌린다. 뽑는 스크립트는 저장소에 두지 않는다 |
+
+줄의 모양이다. 경로 구분자는 `[\\/]` 로 쓰고, 파일 경로 순으로 둔다.
+
+```xml
+<suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]...[\\/]AgentService\.java$"/>
+<suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]...[\\/]ChatService\.java$"/>
+```
+
+- 내장 규칙은 `checks` 로 걸고 끝을 `(Check)?$` 로 고정한다. 고정하지 않으면 `ParameterName` 이 `LambdaParameterName` 까지 억제한다
+- 정규식 규칙과 `id` 를 붙인 규칙(`RightCurly` 둘)은 `id` 로 건다. `checks` 로 걸면 같은 종류의 규칙이 모두 억제된다. `RightCurly` 를 `checks` 로 걸면 `rightCurlyAlone` 과 `rightCurlySame` 이 함께 꺼진다
+- warning 규칙은 기준에 넣지 않는다
+
+**기준은 `(파일, 규칙)` 단위라 한계가 있다.**
+줄 번호로 두면 파일을 고칠 때마다 기준이 어긋나기 때문이다.
+그 대신 기준에 든 파일에 같은 규칙의 위반이 새로 생겨도 잡지 못한다.
+그 파일을 고칠 때는 그 규칙의 위반을 모두 고치고 기준 줄을 지우는 것을 원칙으로 한다.
+
 ## 엔티티와 마이그레이션은 따로 논다
 
 테스트는 엔티티로 스키마를 만들고 운영은 Flyway 가 만든 스키마를 검증한다.

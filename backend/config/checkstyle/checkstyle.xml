@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  백엔드 코드 규칙이다. Gradle 의 checkstyleMain, checkstyleTest 가 읽는다.
+  넣은 규칙과 뺀 규칙의 까닭, 기준 파일 갱신 방법은 backend/AGENTS.md 의 「코드 규칙」 절에 있다.
+
+  파일 셋
+  - checkstyle.xml  이 파일. 규칙을 둔다
+  - suppressions.xml  설계상 예외. 앞으로도 허용하는 것이다
+  - baseline.xml  기존 위반. (파일, 규칙) 단위로 줄여 가는 목록이다
+
+  severity 가 warning 인 규칙은 빌드를 실패시키지 않고 보고서에만 남긴다.
+-->
+<module name="Checker">
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="error"/>
+  <property name="fileExtensions" value="java"/>
+
+  <!-- 설계상 예외 -->
+  <module name="SuppressionFilter">
+    <property name="file" value="${config_loc}/suppressions.xml"/>
+    <property name="optional" value="false"/>
+  </module>
+  <!-- 기존 위반 -->
+  <module name="SuppressionFilter">
+    <property name="file" value="${config_loc}/baseline.xml"/>
+    <property name="optional" value="false"/>
+  </module>
+
+  <!-- 쪼갤 후보 목록이다. 빈 줄과 주석을 포함한 전체 줄 수를 센다 -->
+  <module name="FileLength">
+    <property name="max" value="500"/>
+    <property name="severity" value="warning"/>
+  </module>
+
+  <!-- 인스턴스를 만들지 않는 클래스는 @NoArgsConstructor(access = AccessLevel.PRIVATE) 로 쓴다 -->
+  <module name="RegexpMultiline">
+    <property name="id" value="privateEmptyConstructor"/>
+    <property name="format" value="private\s+[A-Z]\w*\s*\(\s*\)\s*\{\s*\}"/>
+    <property name="message" value="[privateEmptyConstructor] 빈 private 생성자를 직접 쓰지 말고 @NoArgsConstructor(access = AccessLevel.PRIVATE) 로 쓴다"/>
+  </module>
+
+  <!-- 엔티티 접근자는 @Getter 와 @Accessors(fluent = true) 로 만든다. 파일마다 한 번만 잡는다 -->
+  <module name="RegexpMultiline">
+    <property name="id" value="entityHandwrittenAccessor"/>
+    <property name="format" value="\A(?=[\s\S]*@Entity\b)(?=[\s\S]*public\s+[\w&lt;&gt;\[\], ?.]+\s+\w+\s*\(\s*\)\s*\{\s*return\s+(?:this\s*\.\s*)?\w+\s*;\s*\})[\s\S]"/>
+    <property name="message" value="[entityHandwrittenAccessor] 엔티티의 접근자를 손으로 쓰지 말고 @Getter 와 @Accessors(fluent = true) 로 만든다"/>
+  </module>
+
+  <!-- 생성자 주입은 @RequiredArgsConstructor 가 기본이다. 까닭이 있는 예외가 섞여 있어 목록으로만 보인다 -->
+  <module name="RegexpMultiline">
+    <property name="id" value="requiredArgsConstructor"/>
+    <property name="severity" value="warning"/>
+    <property name="format" value="(?m)\A(?![\s\S]*@RequiredArgsConstructor)(?=[\s\S]*^@(?:Service|Component|Repository|RestController|Controller|Configuration)\b)(?=[\s\S]*?\b(?:class|enum)\s+(\w+)\b[\s\S]*?^[ \t]*(?:public\s+|protected\s+|private\s+)?\1\s*\(\s*[^)\s])[\s\S]"/>
+    <property name="message" value="[requiredArgsConstructor] 인자가 있는 생성자를 직접 쓰지 말고 @RequiredArgsConstructor 를 쓴다"/>
+  </module>
+
+  <module name="TreeWalker">
+    <!-- 같은 단순 이름의 두 타입을 한 파일에서 써야 할 때만 그 줄에 주석으로 전체 이름을 허용한다 -->
+    <module name="SuppressWithNearbyCommentFilter">
+      <property name="commentFormat" value="전체 이름 허용:"/>
+      <property name="idFormat" value="fullyQualifiedName"/>
+      <property name="influenceFormat" value="0"/>
+    </module>
+
+    <!-- import -->
+    <module name="UnusedImports"/>
+    <module name="AvoidStarImport"/>
+    <module name="RedundantImport"/>
+    <module name="IllegalImport"/>
+
+    <!-- 코드 안에서는 전체 이름을 쓰지 않고 import 한다. import, package 줄과 문자열 안의 글은 뺀다 -->
+    <module name="RegexpSinglelineJava">
+      <property name="id" value="fullyQualifiedName"/>
+      <property name="format" value="^(?!\s*(?:import|package)\s)(?:[^&quot;\\]|\\.|&quot;(?:[^&quot;\\]|\\.)*&quot;)*?(?&lt;![\w.])(?:java|javax|jakarta|org|com|io|tools|lombok)\.(?:[a-z_][a-z0-9_]*\.)+[A-Z]"/>
+      <property name="ignoreComments" value="true"/>
+      <property name="message" value="[fullyQualifiedName] 전체 이름을 쓰지 말고 import 한다. 같은 이름의 두 타입 때문에 어려우면 그 줄에 '// 전체 이름 허용: 까닭' 을 단다"/>
+    </module>
+
+    <!-- 로거는 Lombok @Slf4j 로 둔다. 바이트코드로는 구별되지 않아 소스에서 본다 -->
+    <module name="RegexpSinglelineJava">
+      <property name="id" value="lombokLogger"/>
+      <property name="format" value="^\s*(?:(?:private|protected|public|static|final)\s+)*(?:org\.slf4j\.)?Logger\s+\w+\s*=\s*(?:org\.slf4j\.)?LoggerFactory\s*\.\s*getLogger"/>
+      <property name="ignoreComments" value="true"/>
+      <property name="message" value="[lombokLogger] 로거를 직접 만들지 말고 @Slf4j 를 쓴다"/>
+    </module>
+
+    <!-- 예외를 삼키는 자리를 이름으로 드러낸다 -->
+    <module name="EmptyCatchBlock">
+      <property name="exceptionVariableName" value="^(ignored|expected)$"/>
+    </module>
+
+    <!-- 결함으로 이어지는 모양 -->
+    <module name="EmptyStatement"/>
+    <module name="EqualsHashCode"/>
+    <module name="StringLiteralEquality"/>
+    <module name="FallThrough"/>
+    <module name="MissingOverride"/>
+
+    <!-- 같은 뜻을 한 모양으로 쓴다 -->
+    <module name="SimplifyBooleanExpression"/>
+    <module name="SimplifyBooleanReturn"/>
+    <module name="ModifierOrder"/>
+    <module name="UpperEll"/>
+    <module name="ArrayTypeStyle"/>
+
+    <!-- 이름. 기본 패턴 그대로 쓴다 -->
+    <module name="PackageName"/>
+    <module name="TypeName"/>
+    <module name="MethodName"/>
+    <module name="MemberName"/>
+    <module name="ParameterName"/>
+    <module name="LocalVariableName"/>
+    <module name="LocalFinalVariableName"/>
+    <module name="StaticVariableName"/>
+    <module name="LambdaParameterName"/>
+    <module name="RecordComponentName"/>
+    <module name="ClassTypeParameterName"/>
+    <module name="MethodTypeParameterName"/>
+    <!-- 로거 이름 log 는 Lombok @Slf4j 가 만드는 이름이다 -->
+    <module name="ConstantName">
+      <property name="format" value="^(log|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$"/>
+    </module>
+
+    <!-- 서식 -->
+    <module name="EmptyLineSeparator">
+      <property name="tokens" value="METHOD_DEF, CTOR_DEF"/>
+      <property name="allowMultipleEmptyLines" value="true"/>
+    </module>
+    <module name="OneStatementPerLine"/>
+    <!-- 한 줄 람다 본문 '-> { throw ...; }' 은 시험 대역에서 흔한 모양이라 LAMBDA 는 대상에서 뺀다 -->
+    <module name="LeftCurly">
+      <property name="option" value="eol"/>
+      <property name="tokens" value="ANNOTATION_DEF, CLASS_DEF, CTOR_DEF, ENUM_CONSTANT_DEF, ENUM_DEF, INTERFACE_DEF, LITERAL_CASE, LITERAL_CATCH, LITERAL_DEFAULT, LITERAL_DO, LITERAL_ELSE, LITERAL_FINALLY, LITERAL_FOR, LITERAL_IF, LITERAL_SWITCH, LITERAL_SYNCHRONIZED, LITERAL_TRY, LITERAL_WHILE, METHOD_DEF, OBJBLOCK, STATIC_INIT, RECORD_DEF, COMPACT_CTOR_DEF"/>
+    </module>
+    <!-- 본문을 한 줄에 몰아 쓰지 않는 자리. 제어문에 alone 을 걸면 '} else {' 가 위반이 되어 포매터와 어긋난다 -->
+    <module name="RightCurly">
+      <property name="id" value="rightCurlyAlone"/>
+      <property name="option" value="alone"/>
+      <property name="tokens" value="METHOD_DEF, CTOR_DEF, CLASS_DEF, LITERAL_FOR, LITERAL_WHILE, STATIC_INIT, INSTANCE_INIT"/>
+    </module>
+    <module name="RightCurly">
+      <property name="id" value="rightCurlySame"/>
+      <property name="option" value="same"/>
+      <property name="tokens" value="LITERAL_TRY, LITERAL_CATCH, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE, LITERAL_DO"/>
+    </module>
+    <module name="NeedBraces"/>
+
+    <!-- 쪼갤 후보 목록이다. 빈 줄과 한 줄 주석은 세지 않는다 -->
+    <module name="MethodLength">
+      <property name="max" value="60"/>
+      <property name="countEmpty" value="false"/>
+      <property name="severity" value="warning"/>
+    </module>
+  </module>
+</module>
