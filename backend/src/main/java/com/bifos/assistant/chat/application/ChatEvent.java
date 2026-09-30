@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.application.ToolDetailPolicy;
 import java.util.UUID;
 
 /**
@@ -55,6 +57,20 @@ public record ChatEvent(
     public static ChatEvent tool(String toolName, String detail, String phase, Long durationMs, Boolean failed) {
         return new ChatEvent("tool", null, toolName, detail, null, null, null, null, null, null, null,
                 phase, durationMs, failed, null, null, null, null, null);
+    }
+
+    /**
+     * 이 사건을 보는 사람에게 맞춰 돌려준다.
+     *
+     * <p>{@code tool} 사건의 {@code detail} 은 {@link ToolDetailPolicy} 가 허락할 때만 싣는다. 허락하지
+     * 않으면 {@code detail} 만 비운 새 사건을, 그 밖에는 이 사건을 그대로 돌려준다. 근거는 ADR-038 에 있다.
+     */
+    public ChatEvent forViewer(CurrentUser viewer) {
+        if (!"tool".equals(type) || ToolDetailPolicy.visibleTo(viewer, toolName)) {
+            return this;
+        }
+        return new ChatEvent(type, text, toolName, null, conversationId, messageId, executionId, code, message,
+                stepName, stepState, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens);
     }
 
     public static ChatEvent subagent(String subagentId, String goal, String model, String phase,

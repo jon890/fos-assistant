@@ -75,7 +75,7 @@ public class ExecutionTreeService {
         Branch rootBranch = branch(root, byParent, used, cut, 1);
         warnAboutUnreachable(root, descendants, used, cut);
 
-        ExecutionNode rootNode = node(rootBranch, eventsOf(used));
+        ExecutionNode rootNode = node(rootBranch, eventsOf(used), user);
         return new ExecutionTree(rootNode, ascent.truncated() || isTruncatedSomewhere(rootBranch));
     }
 
@@ -195,7 +195,9 @@ public class ExecutionTreeService {
                                 ExecutionEvent::executionId, LinkedHashMap::new, Collectors.toList()));
     }
 
-    private ExecutionNode node(Branch branch, Map<Long, List<ExecutionEvent>> byExecution) {
+    /** 나무를 응답으로 옮긴다. 도구 사건의 {@code detail} 은 보는 사람에 맞춰 싣는다. */
+    private ExecutionNode node(
+            Branch branch, Map<Long, List<ExecutionEvent>> byExecution, CurrentUser viewer) {
         AgentExecution execution = branch.execution();
         Agent agent = execution.agentId() == null ? null : agents.requireById(execution.agentId());
         return new ExecutionNode(
@@ -211,9 +213,9 @@ public class ExecutionTreeService {
                 execution.latencyMs(),
                 execution.startedAt(),
                 byExecution.getOrDefault(execution.id(), List.of()).stream()
-                        .map(ExecutionEventView::from)
+                        .map(event -> ExecutionEventView.from(event, viewer))
                         .toList(),
-                branch.children().stream().map(child -> node(child, byExecution)).toList());
+                branch.children().stream().map(child -> node(child, byExecution, viewer)).toList());
     }
 
     private static boolean isTruncatedSomewhere(Branch branch) {

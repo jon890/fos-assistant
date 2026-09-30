@@ -89,13 +89,14 @@ public class ChatController {
     public SseEmitter stream(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
         // 스트림 안에서 바꿔야 없는 대화가 지금처럼 SSE error 사건으로 알려진다.
-        return streams.open(event -> chat.stream(
+        // 도구의 명령 원문은 보내기 직전에 보는 사람에 맞춰 뺀다. 근거는 ADR-038 에 있다.
+        return streams.open(send -> chat.stream(
                 user,
                 numberOf(user, request.conversationId()),
                 request.text(),
                 request.agentCode(),
                 request.attachmentIds(),
-                event));
+                event -> send.accept(event.forViewer(user))));
     }
 
     @PostMapping(path = "/conversations/{conversationId}/regenerate/stream",
@@ -104,7 +105,7 @@ public class ChatController {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
         Long id = access.requireOwnId(user, conversationId);
-        return streams.open(event -> chat.regenerate(user, id, event));
+        return streams.open(send -> chat.regenerate(user, id, event -> send.accept(event.forViewer(user))));
     }
 
     /** 본문의 공개 식별자를 서비스가 받는 대화 번호로 바꾼다. 비어 있으면 새 대화다. */
