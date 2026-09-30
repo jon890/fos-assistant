@@ -103,8 +103,10 @@ test("지문이 하나뿐이면 무엇이 달라졌나 절을 그리지 않는�
     },
   ]);
   await page.goto("/usage");
-
   await expect(page.getByTestId("breakdown-axis")).toBeVisible();
+
+  await page.goto("/usage?tab=fingerprints");
+  await expect(page.getByRole("navigation", { name: "사용량 탭" })).toBeVisible();
   await expect(page.getByTestId("fingerprint-section")).toHaveCount(0);
 });
 
@@ -131,7 +133,7 @@ test("지문이 둘이면 구간마다 실행당 평균을 보인다", async ({ 
       actualCostMicros: null,
     },
   ]);
-  await page.goto("/usage");
+  await page.goto("/usage?tab=fingerprints");
 
   const section = page.getByTestId("fingerprint-section");
   await expect(section.getByText("설정 구분값 a3f2bbbb…", { exact: true })).toBeVisible();

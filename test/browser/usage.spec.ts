@@ -1,3 +1,4 @@
+import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
 import { expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
@@ -19,7 +20,7 @@ test("화면 폭에 맞춰 실행 기록을 카드나 표로 보인다", async (
     data: { text: "사용량 화면 검사", agentCode: "browser" },
   });
   expect(response.ok()).toBeTruthy();
-  await page.goto("/usage");
+  await page.goto("/usage?tab=executions");
 
   const cards = page.getByTestId("execution-cards");
   const table = page.getByTestId("execution-table");
@@ -46,6 +47,7 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
 
   await expect(page.getByText("API 가격으로 계산한 금액", { exact: true })).toBeVisible();
   await expect(page.getByText("가격을 찾지 못한 실행", { exact: true })).toBeVisible();
+  await page.goto("/usage?tab=executions");
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("가격 없음").first()).toBeVisible();
   await expect(records.getByText("0.0000 USD").first()).toBeVisible();
@@ -59,7 +61,7 @@ test("돌고 있는 실행은 시간과 금액 없이 보이고 완료 뒤에 �
   try {
     await hermes.waitForHeldRun();
 
-    await page.goto("/usage");
+    await page.goto("/usage?tab=executions");
     const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
     const running = records.getByText("실행 중", { exact: true });
     await expect(running).toBeVisible();
@@ -84,7 +86,7 @@ test("고아 실행은 중간에 끊겼다고 보인다", async ({ page }, testI
     { headers: { Authorization: `Bearer ${await controlPlaneToken()}` } },
   );
   expect(orphan.ok()).toBeTruthy();
-  await page.goto("/usage");
+  await page.goto("/usage?tab=executions");
 
   const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
   await expect(records.getByText("중간에 중단됨", { exact: true }).first()).toBeVisible();
@@ -107,7 +109,7 @@ test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, pag
   const provision = await page.request.get("/api/agents");
   expect(provision.ok()).toBeTruthy();
 
-  await page.goto("/usage");
+  await page.goto("/usage?tab=executions");
   await expect(page.getByText("아직 실행 기록이 없어요", { exact: true })).toBeVisible();
 });
 
@@ -134,7 +136,7 @@ test("막힌 모델로 실패한 실행은 모델을 쓸 수 없다고 보인다
     await hermes.clearBlockedProviders();
   }
 
-  await page.goto("/usage");
+  await page.goto("/usage?tab=executions");
   const records = page.getByTestId(
     testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
   );
@@ -157,7 +159,7 @@ test("붐벼서 거절된 실행은 다른 실패와 다르게 보인다", async
     await hermes.clearBusy();
   }
 
-  await page.goto("/usage");
+  await page.goto("/usage?tab=executions");
   const records = page.getByTestId(
     testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
   );
@@ -192,7 +194,7 @@ test("실행 기록에 요청한 effort 가 보이고 고르지 않으면 기본
   expect(byDefault.ok(), `기본값 보내기가 실패했다: ${byDefault.status()}`).toBeTruthy();
   const byDefaultId = ((await byDefault.json()) as { executionId: number }).executionId;
 
-  await page.goto("/usage");
+  await page.goto("/usage?tab=executions");
   const rowOf = (executionId: number) => {
     const link = page.locator(`a[href="/executions/${executionId}"]`);
     return testInfo.project.name === "mobile"
@@ -201,4 +203,88 @@ test("실행 기록에 요청한 effort 가 보이고 고르지 않으면 기본
   };
   await expect(rowOf(withEffortId).getByTestId("execution-effort")).toHaveText("high");
   await expect(rowOf(byDefaultId).getByTestId("execution-effort")).toHaveText("기본");
+});
+
+const TAB_LABELS = ["요약", "실행 기록", "스킬", "입력 지문"];
+
+function usageTabs(page: Page) {
+  return page.getByRole("navigation", { name: "사용량 탭" });
+}
+
+test("탭 넷이 보이고 주소의 tab 값이 고른 탭이 된다", async ({ page }) => {
+  await page.goto("/usage");
+  for (const label of TAB_LABELS) {
+    await expect(usageTabs(page).getByRole("link", { name: label, exact: true })).toBeVisible();
+  }
+  await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
+
+  await page.goto("/usage?tab=skills");
+  await expect(usageTabs(page).getByRole("link", { name: "스킬", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).not.toHaveAttribute("aria-current", "page");
+
+  // 모르는 값은 요약으로 본다.
+  await page.goto("/usage?tab=nothing");
+  await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
+
+  await usageTabs(page).getByRole("link", { name: "실행 기록", exact: true }).click();
+  await expect(page).toHaveURL(/\/usage\?tab=executions$/);
+  await expect(usageTabs(page).getByRole("link", { name: "실행 기록", exact: true })).toHaveAttribute("aria-current", "page");
+});
+
+test("모델이 스킬을 읽은 대화는 스킬 탭에 보이고 누르면 그 대화로 가며 실행 기록 줄에 스킬 이름이 붙는다", async ({ page }, testInfo) => {
+  const skillRow = () => page.getByTestId("skill-usage-list").locator("li").filter({ hasText: "브라우저 비서" });
+  const countBefore = async (): Promise<number> => {
+    const response = await page.request.get(`${CONTROL_PLANE_BASE_URL}/api/v1/usage/skills`, {
+      headers: { Authorization: `Bearer ${await controlPlaneToken()}` },
+    });
+    expect(response.ok()).toBeTruthy();
+    const rows = (await response.json()) as { agentCode: string; skillName: string; count: number }[];
+    return rows.find((row) => row.agentCode === "browser" && row.skillName === "shopping")?.count ?? 0;
+  };
+
+  // 두 폭의 검사가 같은 에이전트를 쓰므로 앞 검사가 남긴 횟수를 기준으로 한 번 늘었는지 본다.
+  const before = await countBefore();
+  // 스킬 읽기 사건은 스트리밍 경로로만 흘러 들어온다. 응답을 다 받으면 실행이 끝난 것이다.
+  const sent = await page.request.post("/api/chat/stream", {
+    data: { text: "스킬 읽기 검사", agentCode: "browser" },
+  });
+  expect(sent.ok(), `스킬을 읽는 대화가 실패했다: ${sent.status()}`).toBeTruthy();
+  await sent.text();
+  const latest = await page.request.get(`${CONTROL_PLANE_BASE_URL}/api/v1/usage/executions?limit=1`, {
+    headers: { Authorization: `Bearer ${await controlPlaneToken()}` },
+  });
+  expect(latest.ok()).toBeTruthy();
+  const [{ id: executionId, conversationId }] = (await latest.json()) as { id: number; conversationId: string }[];
+
+  await page.goto("/usage?tab=skills");
+  const row = skillRow().filter({ hasText: "shopping" });
+  await expect(row.getByText(`${before + 1}회`, { exact: true })).toBeVisible();
+  await row.getByRole("link").click();
+  await expect(page).toHaveURL(new RegExp(`/chat/${conversationId}$`));
+
+  await page.goto("/usage?tab=executions");
+  const link = page.locator(`a[href="/executions/${executionId}"]`);
+  const executionRow = testInfo.project.name === "mobile"
+    ? link.locator("xpath=ancestor::article")
+    : link.locator("xpath=ancestor::tr");
+  await expect(executionRow.getByTestId("execution-skills")).toHaveText("스킬 shopping");
+});
+
+test("스킬을 부른 적이 없으면 스킬 탭이 빈 상태를 보인다", async ({ context, page }) => {
+  const token = await encode({
+    salt: SESSION_COOKIE,
+    secret: AUTH_SECRET,
+    token: { sub: "empty@example.com", email: "empty@example.com", name: "빈 사용자" },
+  });
+  await context.addCookies([{
+    name: SESSION_COOKIE,
+    value: token,
+    url: WEB_BASE_URL,
+    httpOnly: true,
+    sameSite: "Lax",
+  }]);
+  expect((await page.request.get("/api/agents")).ok()).toBeTruthy();
+
+  await page.goto("/usage?tab=skills");
+  await expect(page.getByText("아직 부른 스킬이 없어요.", { exact: true })).toBeVisible();
 });

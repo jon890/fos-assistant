@@ -28,6 +28,8 @@ export type UsageExecution = {
   hasChildren: boolean;
   /** 막혀서 넘어오며 이 실행이 대신한 직전 실행. 첫 시도면 null */
   retryOfExecutionId: number | null;
+  /** 이 실행에서 쓴 스킬 이름. 없으면 빈 목록 */
+  skillNames: string[];
 };
 
 /** 같은 질문인데 문맥이 커진 실행을 눈으로 찾을 수 있게 글자 수를 적는다. */

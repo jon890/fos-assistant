@@ -102,12 +102,14 @@ function ListBody() {
 }
 
 /**
- * `/usage` 다. `MonthlySummary` 의 합계 칸 셋과 그 아래 안내 한 줄, 표 줄 다섯이다.
+ * `/usage` 다. `UsageTabs` 의 탭 줄, `MonthlySummary` 의 합계 칸 셋과 그 아래 안내 한 줄, 표 줄 다섯이다.
+ * 탭 줄은 링크 한 줄(`py-2` 와 글자 한 줄, 아래 테두리 2px)이라 38px 이다.
  * 합계 칸 하나는 `Stat` 의 `Card`(위아래 `py-4`, 이름표·값·설명 세 줄)라 104px 다. `Card` 의 테두리는 `ring` 이라 높이에 들지 않는다.
  */
 function TableBody() {
   return (
     <>
+      <Skeleton className="mb-6 h-[2.375rem] w-full" />
       <div className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
         <Skeleton className="h-26 w-full" />
         <Skeleton className="h-26 w-full" />

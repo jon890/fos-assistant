@@ -38,3 +38,17 @@ export type SkillDetailView = {
   body: string;
   files: SkillFileView[];
 };
+
+/**
+ * 내가 부른 스킬의 호출 이력 한 줄이다. 에이전트와 스킬 이름마다 하나다.
+ *
+ * <p>`lastConversationId` 는 마지막 호출이 속한 대화의 공개 식별자이고, 그 대화를 지웠으면 null 이다.
+ */
+export type SkillUsageRow = {
+  agentCode: string;
+  agentName: string;
+  skillName: string;
+  count: number;
+  lastInvokedAt: string;
+  lastConversationId: string | null;
+};

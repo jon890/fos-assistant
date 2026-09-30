@@ -69,6 +69,11 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         <p className="mt-2 text-xs text-muted-foreground" data-testid="execution-actual-cost">
           예상 추가 사용 요금 {actualCostLabel(execution)}
         </p>
+        {execution.skillNames.length > 0 ? (
+          <p className="mt-1 text-xs text-muted-foreground" data-testid="execution-skills">
+            스킬 {execution.skillNames.join(", ")}
+          </p>
+        ) : null}
         {retryOf ? (
           <p className="mt-1 text-xs text-muted-foreground" data-testid="execution-retry-of">
             {retryOf}
