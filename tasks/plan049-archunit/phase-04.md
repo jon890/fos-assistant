@@ -46,9 +46,9 @@
 | `SimplifyBooleanExpression`, `SimplifyBooleanReturn`, `ModifierOrder`, `UpperEll`, `ArrayTypeStyle` | error | 같은 뜻을 한 모양으로 쓴다 |
 | `PackageName`, `TypeName`, `MethodName`, `MemberName`, `ParameterName`, `LocalVariableName`, `LocalFinalVariableName`, `StaticVariableName`, `LambdaParameterName`, `RecordComponentName`, `ClassTypeParameterName`, `MethodTypeParameterName` | error | 기본 패턴 그대로 쓴다 |
 | `ConstantName` (패턴 `^(log\|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$`) | error | 로거 이름 `log` 는 Lombok `@Slf4j` 가 만드는 이름이다 |
-| `EmptyLineSeparator` (`tokens` 는 `METHOD_DEF`, `CTOR_DEF`, `allowMultipleEmptyLines=true`) | error | 메서드와 생성자 사이에 빈 줄이 한 줄 이상 있어야 읽는 단위가 보인다 |
+| `EmptyLineSeparator` (`tokens` 는 `METHOD_DEF`, `CTOR_DEF`, `allowMultipleEmptyLines=true`) | error | 메서드와 생성자 사이에 빈 줄이 한 줄 이상 있어야 읽는 단위가 보인다. 인터페이스의 추상 메서드 선언 사이도 잡는다(지금 4파일 약 13곳). 이것은 OpenRewrite `BlankLines` 가 고치지 않을 수 있어 자동으로 고치지 않는 목록에 든다 |
 | `OneStatementPerLine` | error | 한 줄에 한 문장 |
-| `LeftCurly`(`eol`), `RightCurly`(`alone`, 메서드와 생성자와 제어문) | error | `void a() { return; }` 처럼 본문을 한 줄에 몰아 쓰지 않는다. executor 가 옵션을 정하고 record 와 빈 본문, 람다가 잘못 걸리지 않는지 본다 |
+| `LeftCurly`(`eol`), `RightCurly` 둘. `alone` 은 `METHOD_DEF`, `CTOR_DEF`, `CLASS_DEF`, `LITERAL_FOR`, `LITERAL_WHILE`, `STATIC_INIT`, `INSTANCE_INIT`. `same` 은 `LITERAL_TRY`, `LITERAL_CATCH`, `LITERAL_FINALLY`, `LITERAL_IF`, `LITERAL_ELSE`, `LITERAL_DO` | error | `void a() { return; }` 처럼 본문을 한 줄에 몰아 쓰지 않는다. 제어문에 `alone` 을 걸면 `} else {` 와 `} catch (...) {` 가 위반이 되어 포매터와 어긋난다. executor 가 record 와 빈 본문, 람다가 잘못 걸리지 않는지 본다 |
 | `NeedBraces` | error | 제어문은 한 문장이어도 중괄호를 쓴다 |
 | 직접 만든 로거 금지. `RegexpSinglelineJava`, `id="lombokLogger"`, 형식 `LoggerFactory\s*\.\s*getLogger`, `ignoreComments=true` | error | 로거는 Lombok `@Slf4j` 로 둔다. 바이트코드로는 구별되지 않아 소스에서 본다 |
 | 직접 쓴 private 빈 생성자 금지. `RegexpMultiline`, `id="privateEmptyConstructor"`, 형식 예 `private\s+[A-Z]\w*\s*\(\s*\)\s*\{\s*\}` | error | 인스턴스를 만들지 않는 클래스는 `@NoArgsConstructor(access = AccessLevel.PRIVATE)` 로 쓴다 |

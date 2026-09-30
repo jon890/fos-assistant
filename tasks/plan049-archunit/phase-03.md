@@ -20,7 +20,7 @@
   - `MessageDigest.getInstance` 를 `shared.util.Sha256` 밖에서 부르는 곳 4곳
   - `@ConfigurationProperties` 클래스 가운데 `@Validated` 가 붙은 것은 0곳이다
   - `presentation` 이 `infra` 를 바로 쓰는 컨트롤러 5개
-  - 서비스 안에 공개된 중첩 타입 7개: `AgentToolService.ToolView`, `AgentToolService.ToolsetsView`, `AgentRunner.Run`, `DelegationResult.Failure`, `ArtifactStore.FoundFile`, `ArtifactStore.Removed`, `ArtifactSourceFetcher.Response`
+  - 서비스와 `infra` 안에 공개된 중첩 타입: `AgentToolService.ToolView`, `AgentToolService.ToolsetsView`, `AgentRunner.Run`, `ArtifactStore.FoundFile`, `ArtifactStore.Removed`, `ArtifactSourceFetcher.Response`, `ArtifactSourceFetcher.DnsResolver`, `ArtifactSourceFetcher.Transport` 등. 코디네이터 집계의 `DelegationResult.Failure` 는 바깥 클래스가 서비스도 `infra` 도 아니라 이 규칙에 걸리지 않는다. 정확한 수는 기준을 만들 때 센다
 - 엔티티의 `@Enumerated` 필드 타입은 지금 여러 패키지에 흩어져 있다. `..domain.type..` 패키지는 아직 없다
 
 **근거 문서**: `docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 「구조 규칙」, `docs/code-architecture.md` 「backend 패키지」
@@ -28,10 +28,11 @@
 ## 의도 메모
 
 - **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`
+- phase 02 가 커밋된 뒤에 시작한다. 같은 파일(`ArchitectureRules.java`, `ArchitectureRulesTest.java`, `stored.rules`)을 고친다
 - 합친 main 코드가 새 ArchUnit 간선 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다. 새 위반을 다시 얼릴 때는 그 규칙 하나만 대상으로 삼는다
 - 규칙마다 까닭을 `backend/AGENTS.md` 에 적는다. 까닭은 아래 표의 「까닭」 칸이다
 - 모든 새 규칙은 `MAIN` 에만 건다. 테스트는 시각을 고정하려고 `Instant.now()` 를 쓰는 등 사정이 다르다
-- **`LAYER_DIRECTION` 을 고친 뒤에는 그 규칙 하나만 다시 얼린다.** `as(...)` 설명은 바꾸지 않는다. 설명이 기준 파일의 열쇠라, 바꾸면 기준이 옮겨지지 않고 옛 파일이 남는다. `--tests '*ArchitectureRulesTest.<그 메서드>'` 로 골라 `-Parchunit.freeze.refreeze=true -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 다시 얼린다. 그 규칙의 기준 파일(`stored.rules` 에서 설명으로 찾는다)이 수정된다
+- **`LAYER_DIRECTION` 은 설명을 바꿔 새로 얼린다.** 지금 설명 「층은 presentation 에서 application, infra, domain 쪽으로만 흐른다」 는 고친 규칙과 맞지 않는다. 설명을 「층은 presentation 에서 application 을 거쳐 infra 와 domain 으로 흐른다」 처럼 바꾼다. 설명이 기준 파일의 열쇠라 옛 기준은 옮겨지지 않는다. `backend/config/archunit/store/stored.rules` 에서 옛 설명 줄을 지우고 그 줄이 가리키던 `1cceeea4-f3c2-4415-b0dc-2b2f8d185226` 파일을 지운 뒤, `-Parchunit.freeze.store.default.allowStoreUpdate=true` 로 새로 얼린다. 다른 규칙의 기준은 건드리지 않는다
 - 로거 규칙은 여기 두지 않는다. Lombok `@Slf4j` 가 만든 로거도 바이트코드에서는 `LoggerFactory.getLogger` 호출이라 손으로 쓴 것과 구별되지 않는다
 
 ## 작업 항목
@@ -56,7 +57,7 @@
 
 - `whereLayer("infra").mayOnlyBeAccessedByLayers("application")` 으로 바꾼다. 나머지 층 설정은 그대로다
 - 까닭: 컨트롤러가 저장소를 바로 쓰면 권한 확인과 트랜잭션 경계를 서비스가 갖지 못한다
-- 의도 메모대로 이 규칙 하나만 다시 얼린다. 기준 줄이 컨트롤러 5개 몫만큼 늘어난다
+- 의도 메모대로 설명을 바꿔 새로 얼린다. 기준 줄이 컨트롤러 5개 몫만큼 늘어난다
 - `backend/AGENTS.md` 「패키지 배치」 와 `docs/code-architecture.md` 「backend 패키지」 의 층 문장을 「`presentation` 은 `application` 을 거쳐 `infra` 에 닿는다」 는 뜻이 드러나게 고친다
 
 ### 3. `ArchitectureRulesTest.java` 에 테스트를 더한다
@@ -109,6 +110,6 @@ scripts/check-public-safe.sh
 | `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRulesTest.java` | 수정 |
 | `backend/config/archunit/store/stored.rules` | 수정 |
 | `backend/config/archunit/store/*` | 신규 |
-| `backend/config/archunit/store/1cceeea4-f3c2-4415-b0dc-2b2f8d185226` | 수정 |
+| `backend/config/archunit/store/1cceeea4-f3c2-4415-b0dc-2b2f8d185226` | 삭제 |
 | `backend/AGENTS.md` | 수정 |
 | `docs/code-architecture.md` | 수정 |

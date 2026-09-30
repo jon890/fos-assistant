@@ -30,7 +30,8 @@ Prettier 를 두고 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 �
 - ADR-040 은 처음에 Prettier 를 넣지 않는다고 적었다. 코디네이터 결정으로 넣으므로 ADR-040 의 그 대안 기각 항목을 고친다(작업 항목 5)
 - Prettier 설정은 기본값을 쓴다. 널리 쓰는 기본 모양이 좋은 포맷이고, 설정을 늘리면 읽는 사람이 규칙을 다시 배워야 한다. `components/ui` 도 포함한다
 - Prettier 는 eslint 와 겹치는 규칙이 없다. `eslint-config-next` 는 서식 규칙을 켜지 않는다. `eslint-config-prettier` 는 더하지 않는다. executor 가 실제로 겹치는 규칙이 없는지 확인한다
-- 바뀐 파일만 고르는 방법은 Spotless 와 같다. `git diff --name-only $(git merge-base HEAD origin/main)` 과 추적하지 않는 새 파일 가운데 `web/` 아래 Prettier 가 다루는 확장자다. 이 목록을 뽑는 일은 `web/scripts/changed-files.mjs` 하나에 두고 `format:check` 와 `format:changed` 스크립트가 함께 쓴다. 셸과 Node 에 같은 규칙이 두 벌 생기지 않게 한다
+- 바뀐 파일만 고르는 방법은 Spotless 와 같다. `git diff --name-only $(git merge-base HEAD origin/main)` 과 추적하지 않는 새 파일 가운데 `web/` 아래 Prettier 가 다루는 확장자다. 이 목록을 뽑는 일은 `web/scripts/changed-files.mjs` 하나에 두고(Node 내장 모듈만 쓴다. CI `unit` job 은 의존을 설치하지 않는다) `format:check` 와 `format:changed` 스크립트가 함께 쓴다. 셸과 Node 에 같은 규칙이 두 벌 생기지 않게 한다
+- `eslint.config.mjs` 는 `web/` 에 있으므로 `files` 와 `ignores` glob 은 `src/...` 로 적는다
 - 경고 규칙(`max-lines`, `max-lines-per-function`)은 실패시키지 않는다. bulk suppressions 는 error 만 다룬다
 
 넣는 규칙과 까닭이다.
@@ -38,11 +39,11 @@ Prettier 를 두고 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 �
 | 규칙 | 설정 | 심각도 | 까닭 |
 | --- | --- | --- | --- |
 | `eslint-config-next/core-web-vitals`, `eslint-config-next/typescript` | 그대로 | 설정대로 | Next.js 와 React 의 결함 모양 |
-| (1) API 라우트의 응답과 본문 | `web/src/app/api/**` 에 `no-restricted-syntax` 로 `NextResponse.json` 의 첫 인자가 `code` 속성을 가진 객체인 호출, `request.json()` 호출(`req.json()` 처럼 이름이 달라도 `Request` 의 `.json()` 이면 좋지만 정확히 판정할 수 없으면 이름 `request`, `req` 만)을 막는다 | error | 오류 응답 모양과 요청 본문 검사를 한곳의 도우미로 모은다. 도우미는 뒤 계획에서 만든다 |
-| (2) 화면 코드의 전역 `fetch` | `web/src/components/**`, `web/src/app/**/*.tsx` 에 `no-restricted-globals` 로 `fetch` 를 막는다. `web/src/lib/stream.ts` 와 업로드처럼 예외가 필요한 파일은 설정의 `ignores` 목록에 까닭 주석과 함께 둔다 | error | 화면은 `lib/` 의 호출 함수를 거친다 |
+| (1) API 라우트의 응답과 본문 | `src/app/api/**` 에 `no-restricted-syntax` 로 `NextResponse.json` 의 첫 인자가 `code` 속성을 가진 객체인 호출, `request.json()` 호출(`req.json()` 처럼 이름이 달라도 `Request` 의 `.json()` 이면 좋지만 정확히 판정할 수 없으면 이름 `request`, `req` 만)을 막는다 | error | 오류 응답 모양과 요청 본문 검사를 한곳의 도우미로 모은다. 도우미는 뒤 계획에서 만든다 |
+| (2) 화면 코드의 전역 `fetch` | `src/components/**`, `src/app/**/*.tsx` 에 `no-restricted-globals` 로 `fetch` 를 막는다. `src/lib/stream.ts` 와 업로드처럼 예외가 필요한 파일은 설정의 `ignores` 목록에 까닭 주석과 함께 둔다 | error | 화면은 `lib/` 의 호출 함수를 거친다 |
 | (3) 파일과 함수 길이 | `max-lines` 400, `max-lines-per-function` 150. 빈 줄과 주석은 세지 않는다(`skipBlankLines`, `skipComments`) | warning | 쪼갤 후보 목록이다 |
 | (4) 상위 경로 import 금지 | `no-restricted-imports` 의 `patterns` 로 `../*` 를 막고 `@/` 를 쓰게 한다. 컨텍스트의 `node --test` 가 읽는 파일과 그 파일이 import 하는 파일은 `ignores` 에 둔다. 그 목록은 executor 가 `test/unit/*.test.ts` 의 import 를 따라가 구한다 | error | 파일을 옮겨도 import 가 깨지지 않는다 |
-| (5) Prettier | 3.9.9, 기본 설정. `.prettierignore` 에 `.next`, `out`, `build`, `next-env.d.ts`, `pnpm-lock.yaml` | 바뀐 파일만 검사 | 화면 코드의 서식을 한 모양으로 둔다 |
+| (5) Prettier | 3.9.9, 기본 설정. `.prettierignore` 에 `.next`, `out`, `build`, `next-env.d.ts`, `pnpm-lock.yaml`, `eslint-suppressions.json`. 마지막 것은 ESLint 가 끝 줄바꿈 없이 쓰고 Prettier 는 붙여, 두 도구가 번갈아 고친다 | 바뀐 파일만 검사 | 화면 코드의 서식을 한 모양으로 둔다 |
 
 ## 작업 항목
 

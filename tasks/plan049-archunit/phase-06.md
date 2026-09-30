@@ -1,6 +1,6 @@
 # Phase 06. OpenRewrite 로 바뀐 파일의 규칙 위반을 자동으로 고친다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
@@ -12,13 +12,13 @@ Spotless 처럼 `origin/main` 과의 공통 조상 뒤에 바뀐 파일에만 �
 
 ## 컨텍스트
 
-- OpenRewrite Gradle 플러그인 `org.openrewrite.rewrite` 7.41.0 과 `org.openrewrite.recipe:rewrite-recipe-bom` 3.38.0 을 쓴다. 2026-09-30 에 Maven Central 과 Gradle 플러그인 포털에서 확인한 최신이다
+- OpenRewrite Gradle 플러그인 `org.openrewrite.rewrite` 7.41.0 과 `org.openrewrite.recipe:rewrite-recipe-bom` 3.37.0 을 쓴다. 3.38.0 은 Maven Central 에 없는 판(`rewrite-bom` 8.91.0 등)을 가리켜 받지 못한다. 3.37.0 이 가리키는 판(`rewrite-bom` 8.89.0, `rewrite-migrate-java` 3.42.0, `rewrite-static-analysis` 2.41.0)은 모두 받을 수 있고 아래 네 레시피 클래스가 있다(critic 이 2026-09-30 에 확인했다)
 - 켜는 레시피 넷이다. 모두 받은 jar 에 클래스가 있는 것을 확인했다
   - `org.openrewrite.java.ShortenFullyQualifiedTypeReferences` (`rewrite-java`). phase 04 의 `fullyQualifiedName`
   - `org.openrewrite.staticanalysis.NeedBraces` (`rewrite-static-analysis`). phase 04 의 `NeedBraces`
   - `org.openrewrite.java.format.BlankLines` (`rewrite-java`). phase 04 의 `EmptyLineSeparator`
   - `org.openrewrite.java.migrate.lombok.log.UseSlf4j` (`rewrite-migrate-java`). phase 04 의 `lombokLogger`
-- 레시피가 없어 자동으로 고치지 않는 규칙: private 빈 생성자(`privateEmptyConstructor`), 엔티티 손 접근자, 생성자 주입. 목록으로만 보인다
+- 레시피가 없어 자동으로 고치지 않는 규칙: private 빈 생성자(`privateEmptyConstructor`), 엔티티 손 접근자, 생성자 주입, 인터페이스 추상 메서드 사이의 빈 줄(`BlankLines` 기본 모양이 0줄이다). 목록으로만 보인다
 - 한 줄로 몰아 쓴 본문은 phase 05 의 palantir 포매터가 여러 줄로 나눈다. phase 05 가 그것을 확인했다
 - Spotless 는 `ratchetFrom("origin/main")` 으로 `HEAD` 와 `origin/main` 의 공통 조상 뒤에 바뀐 파일만 다룬다. OpenRewrite 플러그인에는 그런 설정이 없다
 - 순서는 OpenRewrite 다음 Spotless 다. OpenRewrite 가 바꾼 모양을 포매터가 정리한다
@@ -29,22 +29,22 @@ Spotless 처럼 `origin/main` 과의 공통 조상 뒤에 바뀐 파일에만 �
 
 - **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`
 - 합친 main 코드가 새 ArchUnit 간선 위반, 새 Checkstyle 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다. 새 위반을 다시 얼릴 때는 그 규칙 하나만 대상으로 삼는다
-- **범위 밖 파일은 실행 전 내용으로 되돌린다.** 범위는 `git diff --name-only $(git merge-base HEAD origin/main)` 의 Java 파일과 추적하지 않는 새 Java 파일이다. `rewriteRun` 이 저장소 전체를 바꾸게 두고, 실행 전에 저장소 밖에 떠 둔 범위 밖 파일의 내용으로 되돌리는 방식을 권한다. executor 가 더 단순하고 같은 결과를 내는 방법을 찾으면 그것을 쓰고 까닭을 회신에 적는다
-- **범위 밖 파일에 사람이 고치던 변경이 있으면 건드리지 않는다.** 되돌리는 것은 실행 전 내용이다. `git checkout` 으로 `HEAD` 내용을 덮지 않는다
+- **범위 밖 파일은 실행 전 내용 그대로 둔다.** 범위는 `git diff --name-only $(git merge-base HEAD origin/main)` 의 Java 파일과 추적하지 않는 새 Java 파일이다. 이 명령은 작업 트리와 비교하므로 사람이 고치는 중인 파일은 모두 범위 안이다. 범위 밖 파일은 공통 조상과 내용이 같은 파일이다. `rewriteRun` 이 저장소 전체를 바꾸게 두고, 범위 밖 파일을 실행 전에 저장소 밖에 떠 둔 내용으로 되돌리는 방식을 권한다. `git checkout` 으로 `HEAD` 를 덮지 않는다. executor 가 더 단순하고 같은 결과를 내는 방법을 찾으면 그것을 쓰고 까닭을 회신에 적는다
+- **범위 안 파일은 실행 전 내용에 레시피 결과만 더한다.** 사람이 커밋하지 않은 편집이 사라지면 안 된다. 실행 전 범위 안 파일의 내용을 저장소 밖에 떠 두고, 실패하면 그 내용으로 되돌린다
 - 이 범위 제한은 Gradle 태스크 하나(`rewriteChanged`)에 담는다. `scripts/quality.sh fix` 는 그 태스크를 부르기만 한다. 셸과 Gradle 에 같은 규칙이 두 벌 생기지 않게 한다. Gradle 태스크로 담기 어렵다면 `scripts/rewrite-changed.sh` 로 두고 까닭을 회신에 적는다
 - `rewriteDryRun` 은 검사에 쓰지 않는다. 검사는 Checkstyle 이 한다. OpenRewrite 는 고치는 데만 쓴다
 - 다른 레시피는 켜지 않는다
 
 ## Blocked 조건
 
-- OpenRewrite 플러그인 7.41.0 이 Gradle 9.5.0 과 JDK 21 에서 `rewriteRun` 을 끝내지 못한다 → `PHASE_BLOCKED: OpenRewrite 가 이 빌드에서 돌지 않는다` 와 전체 오류를 남기고 멈춘다
+- 플러그인이나 레시피 의존을 받지 못한다, 또는 OpenRewrite 플러그인 7.41.0 이 Gradle 9.5.0 과 JDK 21 에서 `rewriteRun` 을 끝내지 못한다 → `PHASE_BLOCKED: OpenRewrite 가 이 빌드에서 돌지 않는다` 와 전체 오류를 남기고 멈춘다
 - `./gradlew test` 가 플러그인을 더한 것만으로 실패하거나 눈에 띄게 느려진다(2배 이상) → 같은 형식으로 멈춘다
 
 ## 작업 항목
 
 ### 1. `backend/gradle/libs.versions.toml`, `backend/build.gradle.kts`
 
-- `[versions]` 에 `openrewrite-plugin = "7.41.0"`, `openrewrite-recipe-bom = "3.38.0"`
+- `[versions]` 에 `openrewrite-plugin = "7.41.0"`, `openrewrite-recipe-bom = "3.37.0"
 - `[plugins]` 에 `openrewrite = { id = "org.openrewrite.rewrite", version.ref = "openrewrite-plugin" }`
 - `[libraries]` 에 `openrewrite-recipe-bom`, `openrewrite-static-analysis`(`org.openrewrite.recipe:rewrite-static-analysis`), `openrewrite-migrate-java`(`org.openrewrite.recipe:rewrite-migrate-java`)
 - `plugins` 에 `alias(libs.plugins.openrewrite)`
@@ -56,9 +56,10 @@ Spotless 처럼 `origin/main` 과의 공통 조상 뒤에 바뀐 파일에만 �
 
 출력은 저장소 밖에 저장한다. 확인에 쓴 파일은 끝에 되돌리고 `git status --short` 에 이 phase 의 변경만 남았는지 본다.
 
-- 범위 안 파일(이 브랜치가 이미 바꾼 테스트 파일 하나)에 전체 이름 참조, 중괄호 없는 `if`, 빈 줄 없는 두 메서드를 넣는다. 범위 밖 파일(이 브랜치가 바꾸지 않은 main 파일 하나)에도 같은 것을 넣는다
-- `./gradlew rewriteChanged` 뒤에 범위 안 파일은 셋이 고쳐지고, 범위 밖 파일은 넣은 그대로다
-- 범위 밖 파일에 넣은 것이 실행 전 내용으로 남았는지 본다. `HEAD` 내용으로 돌아가면 틀린 것이다
+- 범위 안 파일(이 브랜치가 이미 바꾼 테스트 파일 하나)에 전체 이름 참조, 중괄호 없는 `if`, 빈 줄 없는 두 메서드를 넣는다
+- 범위 밖 파일은 손대지 않은 main 파일 가운데 이미 전체 이름 참조나 중괄호 없는 `if` 가 있는 것을 고른다(Checkstyle 기준에 든 파일). 실행 전 해시를 적어 둔다
+- `./gradlew rewriteChanged` 뒤에 범위 안 파일은 셋이 고쳐지고, 범위 밖 파일의 해시는 실행 전과 같다
+- 범위 안 파일에 레시피와 무관한 편집(주석 한 줄)을 커밋하지 않은 채 두고 돌린다. 그 편집이 남는지 본다
 - 이어서 `./gradlew spotlessApply` 와 `./gradlew checkstyleTest` 를 돌려 범위 안 파일이 Checkstyle error 0건인지 본다
 - 로거 레시피는 `LoggerFactory.getLogger` 로 만든 로거가 있는 범위 안 파일을 하나 만들어 `@Slf4j` 로 바뀌는지 본다. 확인에 쓴 파일은 끝에 지운다
 

@@ -39,7 +39,7 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 
 ### 2. `scripts/quality-warnings.mjs` (신규)
 
-- Checkstyle XML 보고서(`backend/build/reports/checkstyle/main.xml`)에서 severity 가 `warning` 인 항목과, `web/` 에서 `eslint --format json` 으로 받은 결과의 경고 항목을 읽어 규칙별로 `파일:줄 메시지` 를 낸다. 경로는 저장소 root 기준으로 줄인다
+- 기본 입력은 Checkstyle XML 보고서 `backend/build/reports/checkstyle/main.xml` 과 eslint JSON `web/build/eslint-report.json` 이다. 앞의 것에서 severity 가 `warning` 인 항목을, 뒤의 것에서 경고(`severity` 1) 항목을 읽어 규칙별로 `파일:줄 메시지` 를 낸다. 경로는 저장소 root 기준으로 줄인다
 - 입력이 없으면 그 도구는 「보고서 없음」 으로 한 줄 낸다. 이 스크립트는 늘 0 으로 끝난다
 - Node 내장 모듈만 쓴다
 
@@ -50,7 +50,7 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 - `web/node_modules` 가 없으면 `cd web && pnpm install --frozen-lockfile` 을 먼저 하라고 알리고 1 로 끝난다
 - `check`
   1. `(cd backend && ./gradlew qualityCheck)`
-  2. `(cd web && pnpm lint && pnpm format:check)`
+  2. `(cd web && pnpm lint --format json --output-file build/eslint-report.json)` 한 번으로 검사하고 경고 입력도 만든다. 사람이 읽을 요약은 이 JSON 에서 `quality-warnings.mjs` 가 낸다. 이어서 `(cd web && pnpm format:check)`. `web/build/` 가 `.gitignore` 에 없으면 더한다
   3. 둘 다 돌린 뒤 결과를 한 줄씩 요약한다
   4. `node scripts/quality-warnings.mjs` 로 경고 목록을 낸다
   5. 1, 2 가운데 하나라도 실패했으면 1 로 끝난다
@@ -69,7 +69,7 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 
 - `spawnSync("bash", [scripts/quality.sh])` 가 인자 없이 2 로 끝나고 표준 오류에 `check` 와 `fix` 가 든 사용법이 나온다. 모르는 인자(`lint`)도 같다
 - 두 스크립트 파일에 실행 권한이 있거나(`quality.sh`) Node 로 부를 수 있다(`quality-warnings.mjs`)
-- `quality-warnings.mjs` 에 저장소 밖 임시 디렉터리의 Checkstyle XML(경고 하나, error 하나)과 eslint JSON(경고 하나)을 넘겨 경고 둘만 나오고 error 는 나오지 않는다. 입력 경로를 인자나 환경 변수로 바꿀 수 있게 만든다
+- `quality-warnings.mjs` 에 저장소 밖 임시 디렉터리의 Checkstyle XML(경고 하나, error 하나)과 eslint JSON(경고 하나, error 하나)을 넘겨 경고 둘만 나오고 error 는 나오지 않는다. check 가 error 목록을 따로 보이지 않아도 되는 것은 `pnpm lint` 의 종료 코드와 Gradle 출력이 error 를 알리기 때문이다. 입력 경로를 인자나 환경 변수로 바꿀 수 있게 만든다
 - Gradle 과 pnpm 을 부르는 경로는 작업 항목 7 이 실제 명령으로 확인한다. 그 경로는 느리고 설치된 도구에 걸려 단위 테스트에 두지 않는다
 
 ### 5. `.github/workflows/ci.yml` 에 `quality` job
@@ -124,6 +124,7 @@ scripts/quality.sh check
 | `scripts/quality-warnings.mjs` | 신규 |
 | `test/unit/quality-script.test.ts` | 신규 |
 | `.github/workflows/ci.yml` | 수정 |
+| `.gitignore` | 수정 |
 | `AGENTS.md` | 수정 |
 | `backend/AGENTS.md` | 수정 |
 | `web/AGENTS.md` | 수정 |
