@@ -7,7 +7,7 @@
 맡긴 실행을 그 실행만 멈추는 `agent_stop` 을 열고, 사용자가 turn 을 중지하면 그 turn 이 도는 동안 맡긴 자식도 함께 멈추게 한다.
 가짜 Hermes e2e 로 위임, 상태, 중지, 실행 나무를 한 번에 확인하고 PR 을 연다.
 
-**범위 외**: 그 실행 아래의 실행까지 멈추는 것(`docs/code-architecture.md` 「아직 만들지 않은 것」). 사용자 전체 동시 한도. 큰 화면 변경.
+**범위 외**: 그 실행 아래의 실행까지 멈추는 것(`docs/code-architecture.md` 「아직 만들지 않은 것」). 사용자 전체 동시 한도. 큰 화면 변경. Hermes `delegate_task` 가 만든 native 하위 에이전트를 실제로 멈추는 구현(아래 「native 하위 에이전트의 중지 정책」 의 조사가 끝난 뒤 따로 계획한다).
 
 ## 컨텍스트
 
@@ -27,8 +27,20 @@
 - 도는 실행이면 위임 서비스가 들고 있는 그 실행의 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. `CANCELLED` 가 적히기를 짧게(예: 5초) 기다려 적혔으면 `CANCELLED`, 아니면 `RUNNING` 과 `stop_requested: true` 를 돌려준다. 멈추기와 끝나기가 겹치면 먼저 적힌 상태가 남는다
 - 서버가 다시 떠 중지 표시가 없는 도는 실행은 기동 정리가 `ORPHANED` 로 끝낸다. `agent_stop` 이 그 경우에도 Hermes 에 중지를 보내는지는 run 번호가 있으면 보낸다
 - turn 중지 연결: 위임 자식의 run 번호가 붙을 때(`onSubmitted`) 그 뿌리 실행의 turn 핸들이 있으면 `TurnCancellation.trackRun(뿌리 실행 번호, ...)` 으로 붙인다. turn 이 끝난 뒤에는 핸들이 없으므로 붙이지 않는다
+- 사용자가 뿌리 turn 을 중지하면 자식을 두 갈래로 본다
+  - FOS `agent_delegate` 로 시작한 자식: 위 「turn 중지 연결」 대로 멈춘다
+  - Hermes native `delegate_task` 자식: 가능하면 멈추거나 권한을 거둔다. 권한은 이미 거둔다. origin 실행이 `CANCELLED` 면 그 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, 이 계획의 `agent_*`)이 모두 거절된다(ADR-037, `SessionOwnerResolver`). 이 phase 의 `agent_*` 도 같은 판정을 지나므로 따로 막지 않는다
+- 그 판정은 origin 실행과 그 뿌리 실행(`root_execution_id`)만 본다. `agent_stop` 으로 위임 자식 하나만 멈추면 그 아래의 실행에서 만든 native 하위 에이전트는 origin 도 뿌리도 `CANCELLED` 가 아니라 막히지 않는다. 이 phase 에서 `agent_stop` 을 구현할 때 origin 에서 뿌리까지의 사슬을 볼지 다시 정하고 ADR-037 을 고친다
 - `ResearchAndBuildFlow` 는 기능을 더하지 않는다. 클래스 Javadoc 에 「새 흐름을 더하지 않는다. 지우는 조건은 ADR-017 「`ResearchAndBuildFlow` 의 자리」」 한 단락을 더한다
 - 화면: 실행 나무와 작업 과정이 위임 자식을 이미 그리는지 e2e 의 나무 조회로 확인한다. 그리지 못하면 최소한만 고친다
+
+### native 하위 에이전트의 중지 정책
+
+native 자식을 실제로 멈추는 것은 이 phase 에서 구현하지 않는다. 아래 둘을 조사한 뒤 따로 계획한다.
+조사는 phase 로 만들지 않고 orchestration 으로 워커에 맡기며, 결론은 `docs/hermes/delegation.md` 「취소가 아래로 내려가지 않는다」 절에 남긴다.
+
+- `subagent_stop` hook: 언제 불리고 무엇을 받는가. 자식을 멈추는 수단인가, 끝났다는 알림인가
+- Hermes 비동기 위임 제어: background 로 떨어져 나간 `delegate_task` 자식을 부모 session 이나 자식 session 으로 멈추는 API 가 있는가. 부모 run 의 중지(`POST /v1/runs/{run_id}/stop`)가 자식에 닿는가
 
 ## 작업 항목
 
