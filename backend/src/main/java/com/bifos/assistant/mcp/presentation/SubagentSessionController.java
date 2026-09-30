@@ -40,8 +40,6 @@ public class SubagentSessionController {
     public ResponseEntity<SubagentRegistrationResponse> register(
             @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
         if (!(principal instanceof McpPrincipal mcp)) throw reject("MCP 토큰으로 인증한 요청이 아니다");
-        // 옛 토큰에는 profile 이 없어 등록을 profile 로 묶을 수 없다.
-        if (!mcp.bound()) throw reject("profile 이 빈 옛 토큰이다");
         SubagentRegistration registration = SubagentRegistration.verify(read(body), mcp.tokenHash());
         SubagentRegistrationResult result = registrar.register(mcp.profileName(),
                 registration.parentRootSessionId(), registration.parentSessionId(), registration.childSessionId());

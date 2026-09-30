@@ -99,18 +99,6 @@ class McpToolServiceTest {
     }
 
     @Test
-    void 옛_토큰의_호출은_실행_번호를_null_로_남긴다() {
-        Memory memory = mock(Memory.class);
-        when(memory.content()).thenReturn("본문");
-        when(memories.bodyFor(user, 5L)).thenReturn(memory);
-
-        tools.readMemory(new McpCaller(user, null, null), 5L);
-
-        assertThat(logs.list).singleElement().extracting(ILoggingEvent::getFormattedMessage)
-                .isEqualTo("memory read userId=7 memoryId=5 executionId=null");
-    }
-
-    @Test
     void 호출_맥락_오류는_이유를_가리지_않는_한_가지_결과다() {
         assertThat(tools.invalidContext()).isEqualTo(Map.of(
                 "content", List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.")),

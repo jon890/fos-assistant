@@ -16,6 +16,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>다른 검사들은 엔티티로 스키마를 만들어 이 마이그레이션을 지나지 않는다. 마이그레이션은 H2 의 MySQL 모드와
  * MySQL 에서 함께 돌아야 한다.
+ *
+ * <p>V34 까지만 올린다. 이 검사는 V29 뒤의 {@code user_id} 를 읽고 폐기 안 된 profile 없는 줄을 넣으므로, 최신까지
+ * 올리면 V35 가 그 줄 때문에 실패한다.
  */
 class AgentTokenProfileMigrationTest {
 
@@ -30,7 +33,7 @@ class AgentTokenProfileMigrationTest {
                     + "VALUES (7, 'old-hash', 'old', CURRENT_TIMESTAMP(6))");
         }
 
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").target("34").load().migrate();
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {

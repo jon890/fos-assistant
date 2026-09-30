@@ -42,24 +42,16 @@ public class McpController {
     private final McpCallerResolver callers;
     private final BuildProperties buildProperties;
     /** 받아들이는 도구 이름과 그 처리. 이름 검사와 분기가 이 한 곳에서 정해진다. */
-    private final Map<String, Tool> handlers = Map.of(
-            MEMORY_READ, new Tool(false, this::readMemory),
-            ARTIFACT_WRITE, new Tool(false, this::writeArtifact),
-            AGENT_LIST, new Tool(true, this::listAgents),
-            AGENT_STATUS, new Tool(true, this::agentStatus));
+    private final Map<String, ToolHandler> handlers = Map.of(
+            MEMORY_READ, this::readMemory,
+            ARTIFACT_WRITE, this::writeArtifact,
+            AGENT_LIST, this::listAgents,
+            AGENT_STATUS, this::agentStatus);
 
     /** 요청자가 정해진 뒤 {@code _fos_ctx} 를 뗀 인자로 도구 하나를 처리한다. */
     @FunctionalInterface
     private interface ToolHandler {
         Map<String, Object> handle(McpCaller caller, JsonNode id, JsonNode arguments);
-    }
-
-    /**
-     * 도구 하나의 처리와 요청자 조건이다.
-     *
-     * @param requiresOrigin origin 실행이 있는 요청자만 받는지. 참이면 옛 토큰의 호출을 거절한다
-     */
-    private record Tool(boolean requiresOrigin, ToolHandler handler) {
     }
 
     @PostMapping("/mcp")
@@ -85,8 +77,7 @@ public class McpController {
      * <ol>
      *   <li>{@code params.name} 이 문자열이고 {@code params.arguments} 가 객체인지 본다. 아니면 {@code -32602}
      *   <li>이름으로 처리를 고른다. 모르는 도구면 {@code -32601}
-     *   <li>원래 인자의 {@code _fos_ctx} 로 요청자를 정한다(ADR-032). 정하지 못하면 {@link McpToolService#invalidContext()}.
-     *       {@code agent_*} 는 origin 실행이 없는 옛 토큰의 호출도 여기서 같은 결과로 거절한다
+     *   <li>원래 인자의 {@code _fos_ctx} 로 요청자를 정한다(ADR-032). 정하지 못하면 {@link McpToolService#invalidContext()}
      *   <li>{@code _fos_ctx} 를 뗀 인자로 도구별 검사를 하고 그 요청자로 도구를 돌린다
      * </ol>
      */
@@ -97,21 +88,19 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         String toolName = name.asString();
-        Tool tool = handlers.get(toolName);
-        if (tool == null) {
+        ToolHandler handler = handlers.get(toolName);
+        if (handler == null) {
             return error(id, -32601, "Method not found");
         }
         JsonNode fosCtx = arguments.get(McpCallContext.FIELD);
         McpCaller caller;
         try {
-            caller = tool.requiresOrigin()
-                    ? callers.resolveWithOrigin(principal, toolName, fosCtx)
-                    : callers.resolve(principal, toolName, fosCtx);
+            caller = callers.resolve(principal, toolName, fosCtx);
         } catch (ApiException ex) {
             if (ex.code() != ErrorCode.MCP_CALL_CONTEXT_INVALID) throw ex;
             return response(id, tools.invalidContext());
         }
-        return tool.handler().handle(caller, id, withoutCallContext(arguments));
+        return handler.handle(caller, id, withoutCallContext(arguments));
     }
 
     /**

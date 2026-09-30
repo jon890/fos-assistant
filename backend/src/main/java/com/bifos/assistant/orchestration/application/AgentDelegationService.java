@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Hermes 가 MCP {@code agent_*} 도구로 다른 에이전트를 부를 때의 경계를 판정한다(ADR-017).
  *
  * <p>요청자와 기준 실행은 {@link McpCaller} 가 정한 값만 쓴다. 토큰, profile, 최근 실행, 대화로 추측하지 않는다.
- * 요청자를 정하지 못한 호출과 origin 실행이 없는 옛 토큰의 호출은 여기 오지 않는다.
+ * {@link McpCaller} 는 요청자와 origin 실행을 늘 갖는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,7 +28,7 @@ public class AgentDelegationService {
     /** 요청자가 쓸 수 있고 켜진 에이전트다. 같은 profile 을 여럿이 써도 요청자마다 다르다. */
     @Transactional(readOnly = true)
     public List<Agent> list(McpCaller caller) {
-        return agents.readableBy(requireOrigin(caller).user());
+        return agents.readableBy(caller.user());
     }
 
     /**
@@ -40,19 +40,10 @@ public class AgentDelegationService {
      */
     @Transactional(readOnly = true)
     public Optional<AgentExecution> status(McpCaller caller, Long executionId) {
-        McpCaller checked = requireOrigin(caller);
-        Long callerRoot = checked.originExecution().treeRootId();
+        Long callerRoot = caller.originExecution().treeRootId();
         return executions.findById(executionId)
-                .filter(execution -> Objects.equals(execution.userId(), checked.user().id()))
+                .filter(execution -> Objects.equals(execution.userId(), caller.user().id()))
                 .filter(execution -> execution.delegationKey() != null)
                 .filter(execution -> Objects.equals(execution.treeRootId(), callerRoot));
-    }
-
-    /** 컨트롤러가 origin 실행이 없는 호출을 먼저 거절한다. 여기서 비어 있으면 그 경로가 빠진 것이다. */
-    private static McpCaller requireOrigin(McpCaller caller) {
-        if (caller.user() == null || caller.originExecution() == null || caller.context() == null) {
-            throw new IllegalStateException("agent tools require a caller with an origin execution");
-        }
-        return caller;
     }
 }

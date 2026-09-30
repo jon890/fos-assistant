@@ -97,10 +97,6 @@ assistant:
     agent-root: ${ASSISTANT_SKILL_AGENT_ROOT}
     # 게시에 성공한 버전 가운데 남겨 두는 수. 되돌릴 때 쓴다
     keep-versions: 3
-  mcp:
-    # profile 이 묶이지 않은 옛 MCP 토큰을 그 토큰의 사용자로 돌릴지. 토큰마다 profile 을 묶는 동안에만 참으로 두는
-    # 전환용 설정이다. 거짓이면 그런 토큰은 401 이다(ADR-032)
-    legacy-user-tokens: ${ASSISTANT_MCP_LEGACY_USER_TOKENS:false}
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

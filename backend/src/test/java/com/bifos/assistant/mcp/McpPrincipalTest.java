@@ -167,18 +167,6 @@ class McpPrincipalTest {
     }
 
     @Test
-    void 옛_사용자로_발급한_토큰이라도_묶인_뒤에는_토큰의_사용자를_보지_않는다() throws Exception {
-        String legacyRaw = "legacy-" + UUID.randomUUID();
-        long legacyId = McpCallSigner.insertLegacyToken(jdbc, userA.id(), legacyRaw, "legacy");
-        tokens.bindProfile(legacyId, SHARED);
-        String rootB = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
-
-        assertBody(readMemory(legacyRaw, rootB, memoryB.id()), "나의 본문");
-        assertHidden(readMemory(legacyRaw, rootB, memoryA.id()));
-    }
-
-    @Test
     void 다른_profile_의_실행_뿌리로_서명하면_호출_맥락_오류다() throws Exception {
         String sharedRoot = McpCallSigner.newRoot();
         String privateRoot = McpCallSigner.newRoot();
@@ -243,16 +231,6 @@ class McpPrincipalTest {
         assertThat(readMemory(revoked, root, memoryA.id()).statusCode()).isEqualTo(401);
         assertThat(readMemory("unknown-" + UUID.randomUUID(), root, memoryA.id()).statusCode()).isEqualTo(401);
         assertThat(send(null, readMemoryRequest(sharedToken, root, memoryA.id())).statusCode()).isEqualTo(401);
-    }
-
-    @Test
-    void 설정이_거짓이면_profile_이_빈_옛_토큰은_401_이다() throws Exception {
-        String legacyRaw = "legacy-" + UUID.randomUUID();
-        McpCallSigner.insertLegacyToken(jdbc, userA.id(), legacyRaw, "legacy");
-
-        assertThat(send(legacyRaw, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}").statusCode()).isEqualTo(401);
-        assertThat(send(legacyRaw, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                + memoryA.id() + "}}}").statusCode()).isEqualTo(401);
     }
 
     @Test

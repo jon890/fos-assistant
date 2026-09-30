@@ -220,7 +220,6 @@ class McpMemoryToolTest {
         String adminJwt = jwt(dad);
         String memberJwt = jwt(kid);
         String issueBody = "{\"profileName\":\"kid-profile\",\"label\":\"profile\"}";
-        long legacyId = McpCallSigner.insertLegacyToken(jdbc, kid.id(), "legacy-" + UUID.randomUUID(), "legacy");
 
         assertThat(api("POST", "/api/v1/admin/agent-tokens", memberJwt, issueBody).statusCode())
                 .isEqualTo(403);
@@ -239,27 +238,15 @@ class McpMemoryToolTest {
                 "GET", "/api/v1/admin/agent-tokens", adminJwt, null);
         assertThat(listed.statusCode()).isEqualTo(200);
         JsonNode listBody = json.readTree(listed.body());
-        assertThat(listBody).hasSize(3);
+        assertThat(listBody).hasSize(2);
         assertThat(listed.body()).doesNotContain(rawToken, "\"token\"");
         Map<Long, JsonNode> rows = rowsById(listBody);
         long dadTokenId = tokenRepository.findByTokenHash(AgentTokenService.hash(dadToken)).orElseThrow().id();
         assertThat(rows.get(dadTokenId).path("profileName").asString()).isEqualTo(PROFILE);
-        assertThat(rows.get(dadTokenId).path("userEmail").isNull()).as("묶인 토큰의 메일: %s", rows.get(dadTokenId)).isTrue();
         assertThat(rows.get(tokenId).path("profileName").asString()).isEqualTo("kid-profile");
-        assertThat(rows.get(tokenId).path("userEmail").isNull()).as("새 토큰의 메일: %s", rows.get(tokenId)).isTrue();
-        assertThat(rows.get(legacyId).path("profileName").isNull()).as("옛 토큰의 profile: %s", rows.get(legacyId)).isTrue();
-        assertThat(rows.get(legacyId).path("userEmail").asString()).isEqualTo("kid@example.com");
-
-        String bindBody = "{\"profileName\":\"kid-profile\"}";
-        assertThat(api("PUT", "/api/v1/admin/agent-tokens/" + legacyId + "/profile", memberJwt, bindBody)
-                .statusCode()).isEqualTo(403);
-        assertThat(tokenRepository.findById(legacyId).orElseThrow().profileName()).isNull();
-        HttpResponse<String> bound = api("PUT", "/api/v1/admin/agent-tokens/" + legacyId + "/profile", adminJwt, bindBody);
-        assertThat(bound.statusCode()).as("묶기 응답: %s", bound.body()).isEqualTo(200);
-        assertThat(json.readTree(bound.body()).path("profileName").asString()).isEqualTo("kid-profile");
-        assertThat(tokenRepository.findById(legacyId).orElseThrow().profileName()).isEqualTo("kid-profile");
-        assertThat(api("PUT", "/api/v1/admin/agent-tokens/" + legacyId + "/profile", adminJwt, "{\"profileName\":\"other\"}")
-                .statusCode()).as("이미 묶인 토큰").isEqualTo(400);
+        for (JsonNode row : listBody) {
+            assertThat(row.has("userEmail")).as("목록 줄에 사용자 칸이 없다: %s", row).isFalse();
+        }
         assertThat(api("POST", "/api/v1/admin/agent-tokens", adminJwt, "{\"userEmail\":\"kid@example.com\",\"label\":\"old\"}")
                 .statusCode()).as("사용자로 발급하는 길은 없다").isEqualTo(400);
 
