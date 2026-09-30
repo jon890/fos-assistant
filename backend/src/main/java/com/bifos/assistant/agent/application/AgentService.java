@@ -5,8 +5,14 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -85,10 +91,34 @@ public class AgentService {
      * 번호로 에이전트를 읽는다. 지운 에이전트도 돌려준다.
      *
      * <p>지운 에이전트의 대화 이력과 사용량이 이 메서드로 이름을 읽는다. 새 turn 을 막는 판정은 부르는 쪽이
-     * {@link Agent#isDeleted()} 로 한다.
+     * {@link Agent#isDeleted()} 로 한다. 행이 없거나 {@code id} 가 null 이면 {@code AGENT_NOT_FOUND} 다.
      */
     public Agent requireById(Long id) {
-        return agents.findById(id).orElseThrow(() -> notFound());
+        return findById(id).orElseThrow(() -> notFound());
+    }
+
+    /**
+     * 번호로 에이전트를 읽는다. 행이 없거나 {@code id} 가 null 이면 빈 값이다. 지운 에이전트도 돌려준다.
+     *
+     * <p>행이 없어도 오류로 끝내지 않고 그 칸만 비워 그릴 곳(목록, 실행 나무)이 쓴다.
+     */
+    public Optional<Agent> findById(Long id) {
+        return id == null ? Optional.empty() : agents.findById(id);
+    }
+
+    /**
+     * 번호들의 에이전트를 한 번에 읽어 번호별로 돌려준다. 행이 없는 번호는 맵에 없다.
+     *
+     * <p>목록이 줄마다 읽지 않게 하는 곳이다. null 은 빼고, 남은 번호가 없으면 질의하지 않는다. 부르는 쪽이
+     * 에이전트 번호가 null 인 줄에도 {@code get} 을 부르므로, 수정할 수 없는 {@code Map.of()} 는 null 키로
+     * 조회하면 예외를 던져 쓰지 않는다.
+     */
+    public Map<Long, Agent> byIds(Collection<Long> ids) {
+        List<Long> present = ids.stream().filter(Objects::nonNull).distinct().toList();
+        if (present.isEmpty()) {
+            return new HashMap<>();
+        }
+        return agents.findAllById(present).stream().collect(Collectors.toMap(Agent::id, Function.identity()));
     }
 
     private static ApiException notFound() {

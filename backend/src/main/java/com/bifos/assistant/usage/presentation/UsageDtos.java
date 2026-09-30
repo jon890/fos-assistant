@@ -205,6 +205,8 @@ public final class UsageDtos {
          *
          * <p>{@code hasChildren} 을 거짓으로 채워 주는 짧은 형태를 두지 않는다. 그것을 부르면 자식이
          * 있는 실행이 목록에 표시 없이 보이고, 컴파일은 통과한다. 부르는 쪽이 자식을 셀지 정하게 한다.
+         *
+         * <p>{@code agent} 는 행이 없으면 null 이다. 그 줄은 에이전트 코드와 이름만 비운다.
          */
         static ExecutionView from(
                 AgentExecution execution, Agent agent, UUID conversationPublicId, boolean hasChildren,
@@ -212,8 +214,8 @@ public final class UsageDtos {
             return new ExecutionView(
                     execution.id(),
                     conversationPublicId,
-                    agent.code(),
-                    agent.name(),
+                    agent == null ? null : agent.code(),
+                    agent == null ? null : agent.name(),
                     execution.provider(),
                     execution.model(),
                     execution.reasoningEffort(),

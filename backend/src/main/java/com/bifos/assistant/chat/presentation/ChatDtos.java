@@ -117,6 +117,8 @@ public final class ChatDtos {
      * 대화 한 줄이다. 목록, 이름 바꾸기, 모델 선택이 같은 모양으로 돌려준다.
      *
      * @param id 대화의 공개 식별자
+     * @param agentCode 대화의 에이전트 코드. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
+     * @param agentName 대화의 에이전트 이름. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
      * @param provider 이 대화에서 고른 provider. 고르지 않았으면 null
      * @param model 이 대화에서 고른 모델. 고르지 않았으면 null 이고 그 profile 의 기본 모델로 돈다
      * @param reasoningEffort 이 대화에서 고른 effort. 고르지 않았으면 null

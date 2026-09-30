@@ -145,6 +145,40 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
+    void 자식_실행의_에이전트_행이_없어도_나무가_나오고_그_노드의_에이전트_칸이_비어_있다() {
+        AgentExecution root = execution(OWNER_ID, null, null);
+        Agent gone = agents.save(Agent.of(
+                "tree-gone",
+                "지운 아빠",
+                "gone",
+                "http://127.0.0.1:1/p/gone",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                OWNER_ID));
+        AgentExecution child = executions.save(AgentExecution.builder()
+                .userId(OWNER_ID)
+                .agentId(gone.id())
+                .parentExecutionId(root.id())
+                .rootExecutionId(root.id())
+                .profileName("gone")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(Instant.now())
+                .build());
+        agents.deleteById(gone.id());
+
+        ExecutionTree tree = trees.of(owner(), root.id());
+
+        assertThat(tree.root().agentCode()).isEqualTo("tree-dad");
+        assertThat(tree.root().children()).singleElement().satisfies(node -> {
+            assertThat(node.executionId()).isEqualTo(child.id());
+            assertThat(node.agentCode()).isNull();
+            assertThat(node.agentName()).isNull();
+        });
+    }
+
+    @Test
     void 자식의_번호로_물어도_뿌리부터_나온다() {
         AgentExecution root = execution(OWNER_ID, null, null);
         AgentExecution child = execution(OWNER_ID, root.id(), root.id());
