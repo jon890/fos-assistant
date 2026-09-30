@@ -48,7 +48,7 @@
 
 - `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 에 상수를 더한다. `methods().that().areAnnotatedWith(org.junit.jupiter.api.Test.class).or().areAnnotatedWith(org.junit.jupiter.params.ParameterizedTest.class).should().beAnnotatedWith(org.junit.jupiter.api.DisplayName.class)`. `as(...)` 설명은 한국어로 쓴다
 - `ArchitectureRulesTest.java` 에 테스트 클래스만 읽는 `static final JavaClasses TESTS = new ClassFileImporter().withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS).importPackages("com.bifos.assistant");` 를 두고, 이 규칙을 `FreezingArchRule.freeze(...).check(TESTS)` 로 검사하는 `@Test` 를 더한다. 이 테스트에도 `@DisplayName` 을 단다
-- 새 규칙의 기준 파일을 만든다. `stored.rules` 가 이미 있으므로 `allowStoreUpdate` 만 켠다. **새 규칙의 기준 파일이 비어 있지 않으면 멈춘다.** 옮기지 못한 테스트가 기준으로 얼려진 것이다. 그 테스트를 옮기고 그 규칙의 기준 파일을 지운 뒤 다시 만든다
+- 새 규칙의 기준 파일을 만든다. `stored.rules` 가 이미 있으므로 `allowStoreUpdate` 만 켠다. **새 규칙의 기준 파일이 비어 있지 않으면 멈춘다.** 옮기지 못한 테스트가 기준으로 얼려진 것이다. 그 테스트를 옮긴 뒤 `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 를 다시 돌려, 옮긴 만큼 기준에서 빠져 파일이 비는지 확인한다. 기준 파일은 지우지 않는다. `stored.rules` 에 규칙과 파일의 짝이 남아 있어 파일만 지우면 `StoreReadException` 이 난다
 
 ```bash
 # cwd: backend/
