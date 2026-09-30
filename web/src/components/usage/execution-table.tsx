@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
+import { agentLabel, formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import {
   actualCostLabel,
   contextCharsLabel,
@@ -51,17 +51,19 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 <Link
                   href={`/executions/${execution.id}`}
                   className="font-medium hover:underline"
-                  aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)${
+                  aria-label={`${agentLabel(execution.agentName)} 실행 상세 보기 (${execution.id}번)${
                     execution.hasChildren ? ", 하위 실행 있음" : ""
                   }`}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  {execution.agentName}
+                  {agentLabel(execution.agentName)}
                 </Link>
                 {execution.hasChildren ? (
                   <ChevronRight aria-hidden="true" className="ml-1 inline-block size-4 text-muted-foreground" />
                 ) : null}
-                <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
+                {execution.agentCode === null ? null : (
+                  <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
+                )}
                 {execution.skillNames.length > 0 ? (
                   <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-skills">
                     스킬 {execution.skillNames.join(", ")}

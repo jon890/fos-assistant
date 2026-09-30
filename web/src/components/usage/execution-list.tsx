@@ -5,8 +5,8 @@ import { ExecutionTable } from "./execution-table";
 
 export type UsageExecution = {
   id: number;
-  agentCode: string;
-  agentName: string;
+  agentCode: string | null;
+  agentName: string | null;
   provider: string | null;
   model: string | null;
   /** 요청에 실은 reasoning effort. 고르지 않았거나 이 칸이 생기기 전 실행이면 null */

@@ -5,6 +5,11 @@ export function subagentLabel(name: string | null | undefined, goal: string | nu
   return codePoints.length > 80 ? `${codePoints.slice(0, 79).join("")}…` : label;
 }
 
+/** 에이전트 행이 없어 이름을 알 수 없는 대화와 실행은 지운 에이전트로 그린다. */
+export function agentLabel(name: string | null): string {
+  return name ?? "지운 에이전트";
+}
+
 /** 토큰 수를 자릿수 구분이 있는 문자열로 바꾼다. */
 export function formatTokens(tokens: number | null): string {
   return tokens === null ? "-" : tokens.toLocaleString("ko-KR");

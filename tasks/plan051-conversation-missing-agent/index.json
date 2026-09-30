@@ -1,7 +1,7 @@
 {
   "name": "plan051-conversation-missing-agent",
   "description": "대화와 실행이 가리키는 에이전트 행이 없어도 목록이 통째로 실패하지 않게 한다 — 지운 에이전트의 대화처럼 남기고 읽기만 된다",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-09-30",
   "total_phases": 2,
   "current_phase": 2,
