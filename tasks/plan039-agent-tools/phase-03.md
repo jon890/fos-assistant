@@ -82,7 +82,7 @@ native 자식을 실제로 멈추는 것은 이 phase 에서 구현하지 않는
 - Javadoc 한 단락을 더한다
 - PR 본문과 보고서는 아래 여덟 절 형식으로 쓴다: 1. 기존 구조 분석(위임이 왜 불완전했는지) 2. 구현한 구조(최종 호출 흐름 ASCII 그림) 3. 주요 변경 파일(왜 바꿨는지) 4. 보안 경계(user, agent, memory, profile, credential, execution 권한을 각각 어떻게 지켰는지) 5. 실패 처리(Hermes 불가, 실패한 run, 중지 경합, 동시 위임 등) 6. 테스트(실제로 돌린 것과 결과) 7. 남은 제한(이번 범위 밖으로 둔 것) 8. Runtime 추상화 전에 풀어야 할 문제
 - 운영에서 동작하려면 profile 플러그인이 있어야 한다는 것을 PR 본문 앞에 적는다(배치는 `fos-home-infra`)
-- `docs/code-architecture.md` 「아직 만들지 않은 것」 에서 「MCP `agent_*` 도구(...)와 그것을 처리하는 `AgentDelegationService`, `DelegationProperties`」 줄을 뺀다. 부모를 잇는 바탕만 먼저 머지되어 그 줄이 남아 있다
+- `docs/code-architecture.md` 「아직 만들지 않은 것」 에서 「MCP `agent_delegate` 와 `agent_stop`, 그것을 처리하는 `AgentDelegationService` 의 위임 시작과 중지, `DelegationProperties`」 줄을 뺀다. 읽기 도구 `agent_list`, `agent_status` 는 먼저 열려 그 줄에 없다
 - `docs/hermes/tools-and-skills.md` 「Control Plane MCP」 표의 도구 행에서 `agent_*` 가 아직 없다는 문장을 빼고 여섯 도구를 모두 적는다
 - `docs/flow.md` 「다른 에이전트에게 맡길 때」 의 「갈리는 지점」 의 서명 거절과 부모 없음 행이 「MCP 호출의 요청자를 정할 때」 의 같은 도구 결과(`McpToolService.invalidContext()`, `isError: true`)를 가리키게 맞춘다
 

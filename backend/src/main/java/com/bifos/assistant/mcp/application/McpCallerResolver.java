@@ -56,6 +56,23 @@ public class McpCallerResolver {
         return new McpCaller(current(user), origin, context);
     }
 
+    /**
+     * origin 실행이 있어야 하는 도구의 요청자를 정한다. {@code agent_*} 도구가 쓴다.
+     *
+     * <p>옛 토큰의 호출에는 origin 실행과 확인한 {@code _fos_ctx} 가 없어, 설정이 옛 토큰을 허용해도 거절한다.
+     * {@code _fos_ctx} 를 붙여 와도 옛 토큰은 그 값을 보지 않으므로 같다. 밖에는 다른 거절과 같은 결과만 보인다.
+     *
+     * @throws ApiException {@link ErrorCode#MCP_CALL_CONTEXT_INVALID}. 요청자나 origin 실행을 정하지 못했을 때
+     */
+    @Transactional(readOnly = true)
+    public McpCaller resolveWithOrigin(McpPrincipal principal, String toolName, JsonNode fosCtx) {
+        McpCaller caller = resolve(principal, toolName, fosCtx);
+        if (caller.originExecution() == null || caller.context() == null) {
+            throw reject(toolName, "옛 토큰의 호출에는 origin 실행이 없다");
+        }
+        return caller;
+    }
+
     private Optional<AppUser> findUser(Long userId) {
         return userId == null ? Optional.empty() : users.findById(userId);
     }

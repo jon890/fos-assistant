@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,8 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Control Plane 이 시작하지 않은 run 은 도는 부모 실행이 없다. 전환 동안에는 그런 run 에서 온 옛 토큰의
  * 호출도 전처럼 돌아야 한다. 같은 설정에서도 profile 이 묶인 토큰에는 옛 경로가 없다.
+ *
+ * <p>{@code agent_*} 도구는 origin 실행이 있어야 부모와 실행 나무를 정할 수 있어, 설정이 참이어도 옛 토큰을 받지 않는다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "assistant.mcp.legacy-user-tokens=true")
@@ -96,12 +99,34 @@ class McpLegacyTokenTest {
                 .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
     }
 
+    @Test
+    void 옛_토큰의_agent_도구_호출은_fos_ctx_가_있어도_호출_맥락_오류다() throws Exception {
+        ObjectNode statusArguments = json.createObjectNode();
+        statusArguments.put("execution_id", 1);
+
+        List<String> requests = List.of(
+                toolCall("agent_list", json.createObjectNode()),
+                toolCall("agent_list", json.createObjectNode().set("_fos_ctx", McpCallSigner.context(legacyToken, "agent_list", "cron-session-1"))),
+                toolCall("agent_status", statusArguments.deepCopy()),
+                toolCall("agent_status", statusArguments.deepCopy().set("_fos_ctx", McpCallSigner.context(legacyToken, "agent_status", "cron-session-1"))));
+        for (String request : requests) {
+            JsonNode result = body(send(legacyToken, request)).path("result");
+            assertThat(result.path("isError").asBoolean()).as("옛 토큰의 결과: %s", result).isTrue();
+            assertThat(result.path("content").get(0).path("text").asString())
+                    .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+        }
+    }
+
     private String memoryRead(ObjectNode fosCtx) {
         ObjectNode arguments = json.createObjectNode();
         arguments.put("id", memory.id());
         if (fosCtx != null) arguments.set("_fos_ctx", fosCtx);
+        return toolCall("memory_read", arguments);
+    }
+
+    private String toolCall(String name, JsonNode arguments) {
         ObjectNode params = json.createObjectNode();
-        params.put("name", "memory_read");
+        params.put("name", name);
         params.set("arguments", arguments);
         ObjectNode request = json.createObjectNode();
         request.put("jsonrpc", "2.0");

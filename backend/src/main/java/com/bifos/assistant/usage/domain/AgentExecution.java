@@ -224,6 +224,14 @@ public class AgentExecution {
 
     public Long rootExecutionId() { return rootExecutionId; }
 
+    /**
+     * 이 실행이 속한 실행 나무의 뿌리 번호다.
+     *
+     * <p>뿌리 자신은 {@code rootExecutionId} 가 비어 있으므로 자기 번호를 쓴다. 자식을 열 때와 위임 실행을 물을 때
+     * 같은 규칙으로 나무를 정한다.
+     */
+    public Long treeRootId() { return rootExecutionId == null ? id : rootExecutionId; }
+
     public Long retryOfExecutionId() { return retryOfExecutionId; }
 
     public String profileName() {

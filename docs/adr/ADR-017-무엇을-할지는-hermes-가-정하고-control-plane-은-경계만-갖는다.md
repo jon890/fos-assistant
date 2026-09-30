@@ -132,9 +132,9 @@ profile 플러그인의 hook 이 뿌리 session 과 `tool_call_id` 를 도구 �
 
 | 도구 | 받는 것 | 돌려주는 것 |
 | --- | --- | --- |
-| `agent_list` | 없음 | 요청자가 쓸 수 있고 켜진 에이전트의 `code`, 이름, 소개 |
+| `agent_list` | 없음 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 이름. 한 줄 소개 칸은 [ADR-036](ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에서 없앴다 |
 | `agent_delegate` | `agent_code`, `task` | 새 실행 번호와 `RUNNING`. 제출까지만 기다린다 |
-| `agent_status` | `execution_id` | `RUNNING`, `SUCCEEDED` 와 답, `FAILED` 와 오류 코드, `CANCELLED` |
+| `agent_status` | `execution_id` | `RUNNING`, `SUCCEEDED` 와 답, `FAILED` 와 오류 코드, `CANCELLED` 와 멈춘 자리까지의 답(있을 때만) |
 | `agent_stop` | `execution_id` | 그 실행의 상태. 이미 끝났으면 끝난 상태를 그대로 준다 |
 
 - profile, 사용자, 부모와 뿌리 번호를 인자로 받지 않는다. 요청자는 서명한 뿌리 session 으로 찾은 부모 실행의 사용자이고, 부모도 그 실행이다([ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md))

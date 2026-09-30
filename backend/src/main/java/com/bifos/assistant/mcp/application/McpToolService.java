@@ -1,13 +1,17 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +45,10 @@ public class McpToolService {
             "artifact source is too large",
             "artifact source URL is invalid",
             "artifact source host is not allowed");
+    private static final String EXECUTION_NOT_FOUND = "실행을 찾을 수 없습니다.";
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
+    private final AgentDelegationService delegations;
 
     public List<Map<String, Object>> tools() {
         return List.of(
@@ -61,7 +67,17 @@ public class McpToolService {
                                 "required", List.of("conversation_id", "path"),
                                 "oneOf", List.of(
                                         Map.of("required", List.of("content"), "not", Map.of("required", List.of("source_url"))),
-                                        Map.of("required", List.of("source_url"), "not", Map.of("required", List.of("content")))))));
+                                        Map.of("required", List.of("source_url"), "not", Map.of("required", List.of("content")))))),
+                Map.of("name", "agent_list",
+                        "description", "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code 와 이름을 읽는다.",
+                        "inputSchema", Map.of("type", "object", "additionalProperties", false, "properties", Map.of())),
+                Map.of("name", "agent_status",
+                        "description", "다른 에이전트에게 맡긴 실행의 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다.",
+                        "inputSchema", Map.of(
+                                "type", "object",
+                                "additionalProperties", false,
+                                "properties", Map.of("execution_id", Map.of("type", "integer")),
+                                "required", List.of("execution_id"))));
     }
 
     /**
@@ -104,6 +120,52 @@ public class McpToolService {
                     user.id(), caller.executionId(), ex.getClass().getSimpleName(), ErrorCode.INTERNAL_ERROR, "unexpected artifact write failure");
             return result("결과물을 저장할 수 없습니다.", true);
         }
+    }
+
+    /** 요청자가 쓸 수 있는 에이전트를 {@code code} 와 {@code name} 만 담은 JSON 배열로 돌려준다. profile, 주소, 모델, 공개 범위는 싣지 않는다. */
+    public Map<String, Object> listAgents(McpCaller caller) {
+        List<Map<String, Object>> listed = delegations.list(caller).stream().map(McpToolService::agentSummary).toList();
+        return result(json.writeValueAsString(listed), false);
+    }
+
+    /**
+     * 맡긴 실행 하나의 상태를 JSON 글로 돌려준다.
+     *
+     * <p>{@code SUCCEEDED} 는 답을, {@code FAILED} 는 오류 코드를, {@code CANCELLED} 는 답이 있으면 답을 싣는다.
+     * run 번호, profile, 토큰 수, 금액, 예외 문구는 싣지 않는다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
+     */
+    public Map<String, Object> agentStatus(McpCaller caller, Long executionId) {
+        return delegations.status(caller, executionId)
+                .map(execution -> result(json.writeValueAsString(statusOf(execution)), false))
+                .orElseGet(() -> result(json.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
+    }
+
+    private static Map<String, Object> agentSummary(Agent agent) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("code", agent.code());
+        summary.put("name", agent.name());
+        return summary;
+    }
+
+    private static Map<String, Object> statusOf(AgentExecution execution) {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("execution_id", execution.id());
+        status.put("status", execution.status().name());
+        ExecutionStatus value = execution.status();
+        if ((value == ExecutionStatus.SUCCEEDED || value == ExecutionStatus.CANCELLED) && execution.outputText() != null) {
+            status.put("output", execution.outputText());
+        }
+        if (value == ExecutionStatus.FAILED && execution.errorCode() != null) {
+            status.put("error_code", execution.errorCode());
+        }
+        return status;
+    }
+
+    private static Map<String, Object> failure(String code, String message) {
+        Map<String, Object> failure = new LinkedHashMap<>();
+        failure.put("code", code);
+        failure.put("message", message);
+        return failure;
     }
 
     private static String safeArtifactFailureMessage(ApiException exception) {
