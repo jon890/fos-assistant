@@ -53,6 +53,17 @@ assistant:
   memory:
     propose:
       enabled: false
+  delegation:
+    # 새 자식이 가질 수 있는 가장 깊은 깊이. 사용자가 부른 실행이 0 이다
+    max-depth: 2
+    # 한 뿌리 실행 아래에서 동시에 도는 위임 자식 수
+    max-concurrent-children: 4
+    # 서버 전체에서 동시에 도는 위임 수
+    max-active: 16
+    # agent_delegate 가 Hermes 제출을 기다리는 시간. 넘으면 실행 번호만 돌려주고 결과는 그 실행 줄에 적는다
+    submit-timeout: 30s
+    # 실행 줄에 적는 위임 답의 길이 상한. 넘으면 자르고 잘렸다는 한 줄을 붙인다
+    output-max-chars: 100000
   starters:
     # 새 대화 화면의 추천 질문을 모델로 만든다. 결과는 메모리에만 둔다(ADR-036)
     enabled: true

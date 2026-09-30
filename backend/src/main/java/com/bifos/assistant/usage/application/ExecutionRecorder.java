@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
@@ -86,9 +87,35 @@ public class ExecutionRecorder {
             ModelChoice requested,
             Long retryOfExecutionId,
             String hermesSessionId) {
+        return start(
+                user, conversation, agent, parentExecutionId, rootExecutionId, context, requested, retryOfExecutionId,
+                hermesSessionId, null);
+    }
+
+    /**
+     * 다른 에이전트에게 맡긴 실행을 {@code delegation_key} 와 함께 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>키를 처음 만들 때 함께 적어야 유일 제약이 같은 호출의 두 번째 줄을 막는다. 뒤에 붙이면 두 요청이 모두
+     * 줄을 만든 뒤에야 걸린다. 같은 키의 줄이 이미 있으면 저장이 {@code DataIntegrityViolationException} 으로
+     * 실패하고, 부르는 쪽이 그 키로 먼저 저장된 줄을 다시 읽는다.
+     *
+     * @param delegationKey 위임이 아니면 null 이다
+     */
+    public AgentExecution start(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            ExecutionContextSnapshot context,
+            ModelChoice requested,
+            Long retryOfExecutionId,
+            String hermesSessionId,
+            DelegationKey delegationKey) {
         return executions.save(
                 base(user, conversation, agent)
                         .hermesSessionId(hermesSessionId)
+                        .delegationKey(delegationKey == null ? null : delegationKey.value())
                         .parentExecutionId(parentExecutionId)
                         .rootExecutionId(rootExecutionId)
                         .retryOfExecutionId(retryOfExecutionId)
@@ -130,6 +157,19 @@ public class ExecutionRecorder {
      */
     public AgentExecution complete(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        return complete(execution, agent, result, requested, null);
+    }
+
+    /**
+     * 끝난 실행을 SUCCEEDED 로 갱신하며 답을 같은 저장에서 적는다.
+     *
+     * <p>다른 에이전트에게 맡긴 실행이 쓴다. 답을 따로 저장하면 그 사이 {@code agent_status} 가 답 없는 SUCCEEDED 를
+     * 읽는다. 길이를 자르는 것은 부르는 쪽이 한다.
+     *
+     * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
+     */
+    public AgentExecution complete(
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
         TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
         SessionRuntime served = served(agent, result, requested);
         String provider = served.provider();
@@ -137,6 +177,9 @@ public class ExecutionRecorder {
         execution.attachRunId(result.runId());
         execution.markSucceeded(
                 provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+        if (outputText != null) {
+            execution.recordOutput(outputText);
+        }
         return executions.save(execution);
     }
 
@@ -159,6 +202,19 @@ public class ExecutionRecorder {
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        return cancel(execution, agent, result, requested, null);
+    }
+
+    /**
+     * Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남기고, 멈춘 자리까지의 답을 같은 저장에서 적는다.
+     *
+     * <p>다른 에이전트에게 맡긴 실행이 쓴다. 답을 따로 저장하면 그 사이 {@code agent_status} 가 답 없는 CANCELLED 를
+     * 읽는다. 길이를 자르는 것은 부르는 쪽이 한다.
+     *
+     * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
+     */
+    public AgentExecution cancel(
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
         if (result == null) {
             return cancel(execution);
         }
@@ -168,6 +224,9 @@ public class ExecutionRecorder {
         String model = served.model();
         execution.attachRunId(result.runId());
         execution.markCancelled(provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+        if (outputText != null) {
+            execution.recordOutput(outputText);
+        }
         return executions.save(execution);
     }
 

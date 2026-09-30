@@ -165,8 +165,8 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `profile_name` | VARCHAR(64) | |
 | `hermes_run_id` | VARCHAR(128) NULL | 실행을 제출한 직후에 적는다 |
 | `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 뿌리 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
-| `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 뿌리 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 는 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
-| `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 가 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
+| `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 뿌리 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
+| `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 와 `agent_stop` 이 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 끝난 상태와 같은 저장에서 적는다. `assistant.delegation.output-max-chars`(기본 100,000자)를 넘으면 자르고 잘렸다는 한 줄을 붙인다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
