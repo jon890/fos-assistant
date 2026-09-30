@@ -273,6 +273,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 - 게시에 성공하면 그 버전 디렉터리에 표식 파일 `.published` 를 쓴다. 지금 버전은 표식이 있는 가장 새 디렉터리다
 - 같은 에이전트의 저장은 기다리는 에이전트 행 잠금으로 한 번에 하나씩 돈다. 잠금부터 표식 쓰기까지 한 트랜잭션이라 그동안 같은 에이전트의 도구와 공개 범위 변경은 `AGENT_BUSY` 다
 - 스킬을 저장하면 그 에이전트의 `skills` toolset 을 함께 켠다. 올린 스킬이 있는 동안은 `skills` 를 끄지 못한다
+- 마지막 남은 스킬을 지우면 새 버전을 쓰지 않고 빈 `external_dirs` 를 게시한 뒤 그 profile 의 버전 디렉터리를 모두 지운다. `skills` toolset 은 그대로 둔다
 
 | 제한 | 값 |
 | --- | --- |
@@ -283,14 +284,15 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 경로 | 하는 일 |
 | --- | --- |
 | `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다 |
-| `GET /api/v1/agents/{code}/skills/{name}` | 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이고 `size` 는 UTF-8 바이트다 |
+| `GET /api/v1/agents/{code}/skills/{name}` | 관리하는 사람만. 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이고 `size` 는 UTF-8 바이트다 |
 | `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content"? }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다. `content` 를 생략한 파일은 지금 버전의 같은 경로 내용을 그대로 둔다 |
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
-| `PUT /api/v1/agents/{code}/skills/{name}/enabled` | `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
+| `PUT /api/v1/agents/{code}/skills/{name}/enabled` | 관리하는 사람만. `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
 
 목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/tools-and-skills.md`](hermes/tools-and-skills.md) 의 「스킬 커맨드와 API server」).
-출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 지금 버전 디렉터리에 있는 이름이 `UPLOADED`, 나머지가 `HERMES` 다
-쓰기와 지우기는 관리하는 사람만, 읽기는 그 에이전트를 쓸 수 있는 사람이 한다.
+출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 지금 버전 디렉터리에 있는 이름이 `UPLOADED`, 나머지가 `HERMES` 다.
+지금 버전에 있는데 대시보드 목록에 없는 스킬도 올린 것으로 넣고 켜진 것으로 보인다. 게시 직후 색인 전이거나 Hermes 가 건너뛴 스킬도 화면에서 지울 수 있어야 하기 때문이다.
+목록은 그 에이전트를 쓸 수 있는 사람이 본다. 올린 스킬의 원문 읽기, 쓰기, 지우기, 켜고 끄기는 관리하는 사람만 하고, 아니면 `FORBIDDEN` 이다.
 
 ### 스킬 커맨드
 
@@ -823,7 +825,9 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 | `/memory` | 개인과 그룹 공용 Memory |
 | `/executions/{id}` | 실행 하나의 도구와 하위 에이전트 나무 |
 | `/agents` | 에이전트 목록과 「새 에이전트」. `ADMIN` 에게는 다른 사람의 비공개와 꺼진 에이전트, 운영 profile 등록이 더 보인다 |
-| `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 주인과 `ADMIN` 에게 공개와 삭제, `ADMIN` 에게만 관리 절 |
+| `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 스킬, 주인과 `ADMIN` 에게 공개와 삭제, `ADMIN` 에게만 관리 절 |
+| `/agents/{code}/skills/new` | 새 스킬. 주인과 `ADMIN` |
+| `/agents/{code}/skills/{name}` | 올린 스킬 편집. 주인과 `ADMIN` |
 | `/admin/agents` | 옛 주소. `/agents` 로 넘긴다 |
 
 ### 에이전트 화면
@@ -1096,7 +1100,8 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
   지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)만 있다
 - `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸을 지우는 것. 운영의 모든 토큰이 profile 에 묶인 뒤 지운다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」)
 
-- 스킬 커맨드([「스킬 커맨드」](#스킬-커맨드))
+- 스킬 커맨드([「스킬 커맨드」](#스킬-커맨드)): `chat/application/SkillCommand`, `SKILL_COMMAND_UNKNOWN`, `COMMAND` 이력 적기, 입력창의 `/` 목록.
+  지금은 `SkillUseRecorder.recordCommand` 와 `SkillUseSource.COMMAND` 만 있다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

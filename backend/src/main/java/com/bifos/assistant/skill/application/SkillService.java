@@ -40,6 +40,9 @@ public class SkillService {
 
     private static final Logger log = LoggerFactory.getLogger(SkillService.class);
 
+    // 아래 세 한도는 화면(web/src/components/agent/skill-editor.tsx)이 같은 값으로 저장 전에 검사한다.
+    // 바꾸면 두 곳을 함께 고친다.
+
     /** 참고 파일 수의 상한. {@code SKILL.md} 는 세지 않는다. */
     public static final int MAX_FILES = 20;
 

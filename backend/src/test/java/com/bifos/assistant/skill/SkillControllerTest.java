@@ -85,7 +85,7 @@ class SkillControllerTest {
     }
 
     @Test
-    void 저장은_본문을_생략한_파일을_빈_본문으로_넘기고_원문과_파일_크기를_돌려준다() throws Exception {
+    void 저장은_본문을_생략한_파일을_null_본문으로_넘기고_원문과_파일_크기를_돌려준다() throws Exception {
         when(skills.save(eq(OWNER), eq("dad"), eq("weekly-plan"), anyString(), any()))
                 .thenReturn(new SkillDetail("weekly-plan", "이번 주 계획", "---\nname: weekly-plan\n---\n",
                         List.of(new SkillFileInfo("references/guide.md", 9L))));

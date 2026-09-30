@@ -37,6 +37,7 @@ import com.bifos.assistant.skill.application.SkillSource;
 import com.bifos.assistant.skill.application.SkillUsageSummary;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -211,19 +212,17 @@ class SkillServiceTest {
     }
 
     @Test
-    void 정확히_20개_파일과_정확히_1_MiB_는_받는다() {
+    void 정확히_20개_파일과_정확히_1_MiB_는_받고_1_바이트가_넘으면_거절한다() {
         String skillMd = skillMd("weekly-plan");
-        long remaining = SkillService.MAX_TOTAL_BYTES - skillMd.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-        List<SkillFileInput> files = new ArrayList<>();
-        for (int i = 1; i <= 19; i++) {
-            files.add(new SkillFileInput("references/f" + i + ".md", "x"));
-            remaining -= 1;
-        }
-        files.add(new SkillFileInput("templates/last.md", "y".repeat((int) Math.min(remaining, 100_000))));
+        long fileBytes = SkillService.MAX_TOTAL_BYTES - skillMd.getBytes(StandardCharsets.UTF_8).length;
 
-        SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", skillMd, files);
+        SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", skillMd, asciiFilesTotaling(fileBytes, 20));
 
         assertThat(saved.files()).hasSize(20);
+        assertThat(saved.files().stream().mapToLong(SkillFileInfo::size).sum() + skillMd.getBytes(StandardCharsets.UTF_8).length)
+                .isEqualTo(SkillService.MAX_TOTAL_BYTES);
+        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd, asciiFilesTotaling(fileBytes + 1, 20)),
+                ErrorCode.VALIDATION_FAILED);
     }
 
     @Test
@@ -339,6 +338,21 @@ class SkillServiceTest {
 
         assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping", "weekly-plan");
         verify(skillClient, org.mockito.Mockito.times(2)).publish(eq(OWNED_PROFILE), anyList(), any());
+    }
+
+    /** 파일마다 10만 자 이하인 ASCII 본문으로 합계 바이트를 정확히 맞춘 참고 파일 목록을 만든다. */
+    private static List<SkillFileInput> asciiFilesTotaling(long totalBytes, int fileCount) {
+        List<SkillFileInput> files = new ArrayList<>();
+        long remaining = totalBytes;
+        for (int i = 1; i <= fileCount; i++) {
+            int size = (int) Math.min(remaining, SkillService.MAX_CHARS_PER_FILE);
+            files.add(new SkillFileInput("references/f" + i + ".md", "x".repeat(size)));
+            remaining -= size;
+        }
+        if (remaining != 0) {
+            throw new IllegalArgumentException("파일 " + fileCount + "개에 담을 수 없는 크기: " + totalBytes);
+        }
+        return files;
     }
 
     private static String skillMd(String name) {

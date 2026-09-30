@@ -37,7 +37,16 @@ const TEXT_EXTENSIONS = [".md", ".txt", ".json", ".yaml", ".yml", ".csv"];
 /** 브라우저가 이 확장자에 붙이는 형식이다. `.json` 과 `.yaml` 은 `text/` 로 시작하지 않는 형식을 받을 수 있다. */
 const TEXT_LIKE_TYPES = ["application/json", "application/yaml", "application/x-yaml"];
 
-const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(\r?\n|$)/;
+/** 맨 위 `---` 줄과 그다음 `---` 줄 사이가 앞머리다. 첫 번째 묶음이 앞머리 안쪽이다. */
+const FRONTMATTER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(\r?\n|$)/;
+
+/**
+ * 백엔드의 저장 한도와 같다. 글자 수는 UTF-16 코드 단위로 센다.
+ * backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
+ */
+const MAX_FILES = 20;
+const MAX_CHARS_PER_FILE = 100_000;
+const MAX_TOTAL_BYTES = 1_048_576;
 
 const NEW_SKILL_TEMPLATE = "---\nname: \ndescription: \n---\n\n";
 
@@ -45,12 +54,33 @@ const NEW_SKILL_TEMPLATE = "---\nname: \ndescription: \n---\n\n";
 const SAVE_FAILURES: Record<string, string> = {
   FORBIDDEN: "이 에이전트의 스킬을 관리할 수 없어요.",
   HERMES_UNAVAILABLE: "저장하지 못했어요. 바뀐 내용이 반영되지 않았을 수 있으니 다시 저장해 주세요.",
+  // 백엔드 메시지는 영어라서 화면에 그대로 보이지 않게 한다. 화면이 먼저 거르지 못한 경우에만 여기까지 온다.
+  VALIDATION_FAILED: "스킬 내용이 저장 규칙에 맞지 않아요. 앞머리와 파일을 확인해 주세요.",
 };
 
 function isTextFile(file: File, text: string): boolean {
   const lowerName = file.name.toLowerCase();
   const typeAllowed = file.type === "" || file.type.startsWith("text/") || TEXT_LIKE_TYPES.includes(file.type);
   return typeAllowed && TEXT_EXTENSIONS.some((extension) => lowerName.endsWith(extension)) && !text.includes("\u0000");
+}
+
+/**
+ * 앞머리 안쪽에서 줄 맨 앞의 `key:` 줄을 찾아 인라인 값을 읽는다. 그 줄이 없으면 null 이다.
+ * `multiline` 은 값이 `|`, `>` 이거나 다음 줄이 들여쓰기로 이어진다는 뜻이다.
+ * 플로 매핑(`{name: x}`)이나 따옴표 친 키(`"name": x`)처럼 서버 YAML 파서만 읽는 형태는 찾지 못하고 null 이다.
+ * 화면은 명백한 오류만 거르고, 나머지는 서버가 다시 검사한다.
+ */
+function frontmatterField(block: string, key: string): { value: string; multiline: boolean } | null {
+  const lines = block.split(/\r?\n/);
+  const pattern = new RegExp(`^${key}:(?:[ \\t](.*))?$`);
+  const index = lines.findIndex((line) => pattern.test(line));
+  if (index < 0) return null;
+  const inline = (pattern.exec(lines[index]!)![1] ?? "").trim();
+  const blockMarker = /^[>|]/.test(inline);
+  const quoted = /^(["'])(.*)\1$/.exec(inline);
+  const value = blockMarker ? "" : (quoted ? quoted[2]! : inline.replace(/(^|\s)#.*$/, "")).trim();
+  const next = lines.slice(index + 1).find((line) => line.trim() !== "");
+  return { value, multiline: blockMarker || (next !== undefined && /^\s/.test(next)) };
 }
 
 function formatSize(bytes: number): string {
@@ -127,6 +157,27 @@ export function SkillEditor({ code, initial }: Props) {
     }
     const paths = files.map((entry) => `${entry.directory}/${entry.fileName}`);
     if (new Set(paths).size !== paths.length) return "같은 경로의 참고 파일이 둘 이상 있어요.";
+    const frontmatter = FRONTMATTER.exec(body);
+    if (frontmatter === null) return "SKILL.md 맨 위에 --- 로 감싼 앞머리가 필요해요.";
+    const name = frontmatterField(frontmatter[1]!, "name");
+    if (name !== null && !name.multiline && name.value !== "" && name.value !== skillName) {
+      return "앞머리의 name 이 스킬 이름과 같아야 해요.";
+    }
+    const description = frontmatterField(frontmatter[1]!, "description");
+    if (description !== null && !description.multiline && description.value === "") {
+      return "앞머리에 description 을 적어 주세요.";
+    }
+    if (files.length > MAX_FILES) return `참고 파일은 ${MAX_FILES}개까지 둘 수 있어요.`;
+    if (body.length > MAX_CHARS_PER_FILE) return `SKILL.md 는 ${MAX_CHARS_PER_FILE.toLocaleString("ko-KR")}자까지 쓸 수 있어요.`;
+    const longFile = files.find((entry) => entry.content !== undefined && entry.content.length > MAX_CHARS_PER_FILE);
+    if (longFile) {
+      return `${longFile.fileName} 파일이 ${MAX_CHARS_PER_FILE.toLocaleString("ko-KR")}자를 넘어요. 파일 하나는 ${MAX_CHARS_PER_FILE.toLocaleString("ko-KR")}자까지예요.`;
+    }
+    // 새로 올리지 않은 파일은 서버가 알려 준 크기를 쓴다.
+    const totalBytes = new TextEncoder().encode(body).length + files.reduce((sum, entry) => sum + entry.size, 0);
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      return `SKILL.md 와 참고 파일을 합쳐 1MB 까지 저장할 수 있어요. 지금은 ${formatSize(totalBytes)}예요.`;
+    }
     if (isNew) {
       // 저장 요청은 같은 이름이 있으면 덮어쓴다. 새 스킬이 남의 스킬을 지우지 않게 먼저 목록을 읽는다.
       let response: Response;

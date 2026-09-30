@@ -82,20 +82,120 @@ test("주인이 스킬을 쓰고 참고 파일을 올려 저장하고, 고쳐도
   }
 });
 
-test("앞머리 이름이 스킬 이름과 다르면 저장하지 않고 오류를 보인다", async ({ page }) => {
+test("앞머리 이름이 스킬 이름과 다르면 저장 요청을 보내지 않고 한국어 오류를 보인다", async ({ page }) => {
+  const puts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT") puts.push(request.url());
+  });
   try {
     await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
     await page.getByLabel("스킬 이름").fill("name-mismatch");
     await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("another-name", "이름이 달라요"));
     await page.getByRole("button", { name: "저장", exact: true }).click();
 
-    await expect(page.getByRole("alert").filter({ hasText: "frontmatter name must equal the skill name" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "앞머리의 name 이 스킬 이름과 같아야 해요." })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/skills/new$`));
+    expect(puts).toEqual([]);
     const missing = await page.request.get(`/api/agents/${PERSONA_AGENT_CODE}/skills/name-mismatch`);
     expect(missing.status()).toBe(404);
   } finally {
     await removeSkill(page, PERSONA_AGENT_CODE, "name-mismatch");
   }
+});
+
+test("앞머리가 없거나 description 이 비어 있으면 저장 요청을 보내지 않고 한국어 오류를 보인다", async ({ page }) => {
+  const puts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT") puts.push(request.url());
+  });
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+  await page.getByLabel("스킬 이름").fill("no-frontmatter");
+  const editor = page.getByRole("textbox", { name: "SKILL.md 본문" });
+
+  await editor.fill("# 앞머리가 없어요\n");
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "SKILL.md 맨 위에 --- 로 감싼 앞머리가 필요해요." })).toBeVisible();
+
+  await editor.fill("---\nname: no-frontmatter\ndescription: \n---\n# 설명이 비었어요\n");
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "앞머리에 description 을 적어 주세요." })).toBeVisible();
+  expect(puts).toEqual([]);
+});
+
+test("플로 매핑 앞머리는 화면이 막지 않고 서버가 읽어 저장된다", async ({ page }) => {
+  const name = "flow-mapping";
+  try {
+    await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+    await page.getByLabel("스킬 이름").fill(name);
+    await page.getByRole("textbox", { name: "SKILL.md 본문" })
+      .fill(`---\n{name: ${name}, description: 플로 매핑으로 적어요}\n---\n# 본문\n`);
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/agents/${PERSONA_AGENT_CODE}$`));
+    const saved = await page.request.get(`/api/agents/${PERSONA_AGENT_CODE}/skills/${name}`);
+    expect(saved.status()).toBe(200);
+    expect(((await saved.json()) as { description: string }).description).toBe("플로 매핑으로 적어요");
+  } finally {
+    await removeSkill(page, PERSONA_AGENT_CODE, name);
+  }
+});
+
+test("참고 파일이 20개를 넘거나 10만 자를 넘거나 합계가 1MB 를 넘으면 저장 요청을 보내지 않는다", async ({ page }) => {
+  const puts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT") puts.push(request.url());
+  });
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+  await page.getByLabel("스킬 이름").fill("over-limit");
+  await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("over-limit", "한도를 넘어요"));
+  const upload = page.getByLabel("참고 파일 올리기");
+  const save = page.getByRole("button", { name: "저장", exact: true });
+
+  await upload.setInputFiles(
+    Array.from({ length: 21 }, (_, i) => ({ name: `f${i + 1}.md`, mimeType: "text/markdown", buffer: Buffer.from("x") })),
+  );
+  await save.click();
+  await expect(page.getByRole("alert").filter({ hasText: "참고 파일은 20개까지 둘 수 있어요." })).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel("스킬 이름").fill("over-limit");
+  await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("over-limit", "한도를 넘어요"));
+  await upload.setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from("x".repeat(100_001)) });
+  await save.click();
+  await expect(page.getByRole("alert").filter({ hasText: "long.md 파일이 100,000자를 넘어요." })).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel("스킬 이름").fill("over-limit");
+  await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("over-limit", "한도를 넘어요"));
+  await upload.setInputFiles(
+    Array.from({ length: 11 }, (_, i) => ({
+      name: `big${i + 1}.md`,
+      mimeType: "text/markdown",
+      buffer: Buffer.from("x".repeat(100_000)),
+    })),
+  );
+  await save.click();
+  await expect(page.getByRole("alert").filter({ hasText: "합쳐 1MB 까지 저장할 수 있어요." })).toBeVisible();
+  expect(puts).toEqual([]);
+});
+
+test("서버가 저장 규칙 위반으로 거절하면 영어 원문 대신 한국어 문구를 보인다", async ({ page }) => {
+  await page.route(`**/api/agents/${PERSONA_AGENT_CODE}/skills/server-rejects`, async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    await route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "VALIDATION_FAILED", message: "SKILL.md frontmatter is not valid YAML" }),
+    });
+  });
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+  await page.getByLabel("스킬 이름").fill("server-rejects");
+  await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("server-rejects", "서버가 거절해요"));
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+
+  const alert = page.getByRole("alert").filter({ hasText: "스킬 내용이 저장 규칙에 맞지 않아요. 앞머리와 파일을 확인해 주세요." });
+  await expect(alert).toBeVisible();
+  await expect(page.getByText("frontmatter")).toHaveCount(0);
 });
 
 test("새 스킬 화면에서 이미 올린 이름을 쓰면 덮어쓰지 않고 오류를 보인다", async ({ page }) => {

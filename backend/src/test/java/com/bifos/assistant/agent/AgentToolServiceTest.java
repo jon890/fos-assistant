@@ -129,6 +129,7 @@ class AgentToolServiceTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_NOT_APPLIED);
     }
+
     @Test
     void 올린_스킬이_있으면_skills_를_끄는_저장을_거절하고_Hermes_를_부르지_않는다() {
         when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
