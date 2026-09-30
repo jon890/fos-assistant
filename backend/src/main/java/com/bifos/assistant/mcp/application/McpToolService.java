@@ -124,7 +124,7 @@ public class McpToolService {
 
     /** 요청자가 쓸 수 있는 에이전트를 {@code code} 와 {@code name} 만 담은 JSON 배열로 돌려준다. profile, 주소, 모델, 공개 범위는 싣지 않는다. */
     public Map<String, Object> listAgents(McpCaller caller) {
-        List<Map<String, Object>> listed = delegations.list(caller).stream().map(McpToolService::agentSummary).toList();
+        List<Map<String, Object>> listed = delegations.list(caller.user()).stream().map(McpToolService::agentSummary).toList();
         return result(json.writeValueAsString(listed), false);
     }
 
@@ -135,7 +135,7 @@ public class McpToolService {
      * run 번호, profile, 토큰 수, 금액, 예외 문구는 싣지 않는다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
      */
     public Map<String, Object> agentStatus(McpCaller caller, Long executionId) {
-        return delegations.status(caller, executionId)
+        return delegations.status(caller.user(), caller.originExecution(), executionId)
                 .map(execution -> result(json.writeValueAsString(statusOf(execution)), false))
                 .orElseGet(() -> result(json.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
     }
