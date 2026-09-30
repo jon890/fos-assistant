@@ -12,7 +12,7 @@ Spotless 처럼 `origin/main` 과의 공통 조상 뒤에 바뀐 파일에만 �
 
 ## 컨텍스트
 
-- OpenRewrite Gradle 플러그인 `org.openrewrite.rewrite` 7.41.0 과 `org.openrewrite.recipe:rewrite-recipe-bom` 3.37.0 을 쓴다. 3.38.0 은 Maven Central 에 없는 판(`rewrite-bom` 8.91.0 등)을 가리켜 받지 못한다. 3.37.0 이 가리키는 판(`rewrite-bom` 8.89.0, `rewrite-migrate-java` 3.42.0, `rewrite-static-analysis` 2.41.0)은 모두 받을 수 있고 아래 네 레시피 클래스가 있다(critic 이 2026-09-30 에 확인했다)
+- OpenRewrite Gradle 플러그인 `org.openrewrite.rewrite` 7.39.0 과 `org.openrewrite.recipe:rewrite-recipe-bom` 3.37.0 을 쓴다. 3.38.0 과 플러그인 7.40.0, 7.41.0 은 Maven Central 에 없는 판(`rewrite-bom` 8.91.0)을 가리켜 받지 못한다. 플러그인 7.39.0 은 BOM 3.37.0 과 같은 `rewrite-bom` 8.89.0 을 가리킨다. 3.37.0 이 가리키는 판(`rewrite-bom` 8.89.0, `rewrite-migrate-java` 3.42.0, `rewrite-static-analysis` 2.41.0)은 모두 받을 수 있고 아래 네 레시피 클래스가 있다(critic 이 2026-09-30 에 확인했다)
 - 켜는 레시피 넷이다. 모두 받은 jar 에 클래스가 있는 것을 확인했다
   - `org.openrewrite.java.ShortenFullyQualifiedTypeReferences` (`rewrite-java`). phase 04 의 `fullyQualifiedName`
   - `org.openrewrite.staticanalysis.NeedBraces` (`rewrite-static-analysis`). phase 04 의 `NeedBraces`
@@ -37,14 +37,14 @@ Spotless 처럼 `origin/main` 과의 공통 조상 뒤에 바뀐 파일에만 �
 
 ## Blocked 조건
 
-- 플러그인이나 레시피 의존을 받지 못한다, 또는 OpenRewrite 플러그인 7.41.0 이 Gradle 9.5.0 과 JDK 21 에서 `rewriteRun` 을 끝내지 못한다 → `PHASE_BLOCKED: OpenRewrite 가 이 빌드에서 돌지 않는다` 와 전체 오류를 남기고 멈춘다
+- 플러그인이나 레시피 의존을 받지 못한다, 또는 OpenRewrite 플러그인 7.39.0 이 Gradle 9.5.0 과 JDK 21 에서 `rewriteRun` 을 끝내지 못한다 → `PHASE_BLOCKED: OpenRewrite 가 이 빌드에서 돌지 않는다` 와 전체 오류를 남기고 멈춘다
 - `./gradlew test` 가 플러그인을 더한 것만으로 실패하거나 눈에 띄게 느려진다(2배 이상) → 같은 형식으로 멈춘다
 
 ## 작업 항목
 
 ### 1. `backend/gradle/libs.versions.toml`, `backend/build.gradle.kts`
 
-- `[versions]` 에 `openrewrite-plugin = "7.41.0"`, `openrewrite-recipe-bom = "3.37.0"`
+- `[versions]` 에 `openrewrite-plugin = "7.39.0"`, `openrewrite-recipe-bom = "3.37.0"`
 - `[plugins]` 에 `openrewrite = { id = "org.openrewrite.rewrite", version.ref = "openrewrite-plugin" }`
 - `[libraries]` 에 `openrewrite-recipe-bom`, `openrewrite-static-analysis`(`org.openrewrite.recipe:rewrite-static-analysis`), `openrewrite-migrate-java`(`org.openrewrite.recipe:rewrite-migrate-java`)
 - `plugins` 에 `alias(libs.plugins.openrewrite)`
