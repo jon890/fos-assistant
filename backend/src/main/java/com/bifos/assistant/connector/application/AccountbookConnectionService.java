@@ -2,7 +2,6 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.connector.domain.AccountbookConnection;
 import com.bifos.assistant.connector.domain.ConnectionStatus;
 import com.bifos.assistant.connector.infra.AccountbookConnectionRepository;
@@ -50,7 +49,7 @@ public class AccountbookConnectionService {
         AppUser owner = users.findByIdForUpdate(user.id()).orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
         verifier.verify(token, family);
         AccountbookConnection connection = connections.findById(user.id()).orElseGet(() -> {
-            Agent agent = lifecycle.create(user, "가계부", AgentVisibility.PRIVATE); agent.markConnectorManaged();
+            Agent agent = lifecycle.createConnectorAgent(user, "가계부");
             return connections.save(AccountbookConnection.pending(owner.id(), agent));
         });
         connection.beginRegister();
