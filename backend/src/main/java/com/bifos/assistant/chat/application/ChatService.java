@@ -44,6 +44,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
@@ -614,8 +615,14 @@ public class ChatService {
         }
         for (AgentExecution child : executionRepository.findByRootExecutionId(executionId)) {
             if (child.status() != ExecutionStatus.RUNNING || child.hermesRunId() == null) continue;
-            Agent childAgent = agents.requireById(child.agentId());
-            turns.trackRun(executionId, childAgent.apiBaseUrl(), child.profileName(), child.hermesRunId());
+            Optional<Agent> childAgent = agents.findById(child.agentId());
+            if (childAgent.isEmpty()) {
+                // 뿌리 turn 의 중지는 이미 켰다. 에이전트 행이 없는 자식 하나 때문에 오류로 끝내지 않는다.
+                log.warn("에이전트 행이 없어 자식 run 을 함께 멈추지 못했다 executionId={} agentId={}",
+                        child.id(), child.agentId());
+                continue;
+            }
+            turns.trackRun(executionId, childAgent.get().apiBaseUrl(), child.profileName(), child.hermesRunId());
         }
         boolean firstStopSent = hadRuns || turns.awaitFirstStop(handle);
         if (!firstStopSent && turns.isFinished(handle)) {

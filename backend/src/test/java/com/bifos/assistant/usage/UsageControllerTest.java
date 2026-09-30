@@ -36,8 +36,7 @@ import org.springframework.test.context.ActiveProfiles;
  * 사용량 목록이 자식 여부를 어떻게 붙이는지 본다.
  *
  * <p>질의 수를 세려고 통계를 켠 별도의 문맥으로 띄운다. 세는 것은 <b>목록 길이가 늘어도 자식 확인이 한
- * 번인가</b> 하나다. 목록 조회 전체의 질의 수가 아니다. 에이전트를 실행마다 읽는 것은 이 변경이 만든
- * 것이 아니다.
+ * 번인가</b> 하나다. 목록 조회 전체의 질의 수가 아니다.
  */
 @SpringBootTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @ActiveProfiles("test")
@@ -113,13 +112,55 @@ class UsageControllerTest {
                 .isNull();
     }
 
+    @Test
+    void 에이전트_행이_없어도_두_줄이_나오고_없는_쪽의_에이전트_칸만_빈다() {
+        Agent gone = agents.save(Agent.of(
+                "list-gone",
+                "지운 아빠",
+                "gone",
+                "http://127.0.0.1:1/p/gone",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID));
+        AgentExecution kept = execution(null, null);
+        AgentExecution orphaned = executions.save(AgentExecution.builder()
+                .userId(USER_ID)
+                .conversationId(7L)
+                .agentId(gone.id())
+                .profileName("gone")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(Instant.now())
+                .build());
+        agents.deleteById(gone.id());
+
+        List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
+
+        assertThat(page).hasSize(2);
+        assertThat(page)
+                .filteredOn(view -> view.id().equals(orphaned.id()))
+                .singleElement()
+                .satisfies(view -> {
+                    assertThat(view.agentCode()).isNull();
+                    assertThat(view.agentName()).isNull();
+                });
+        assertThat(page)
+                .filteredOn(view -> view.id().equals(kept.id()))
+                .singleElement()
+                .satisfies(view -> {
+                    assertThat(view.agentCode()).isEqualTo("list-dad");
+                    assertThat(view.agentName()).isEqualTo("목록 아빠");
+                });
+    }
+
     /**
      * 목록 조회가 내는 질의 수다.
      *
-     * <p>목록을 읽는 것 하나와 자식을 확인하는 것 하나, 대화 번호를 공개 식별자로 바꾸는 것 하나, 실행에서 쓴 스킬 이름을 읽는 것 하나다.
-     * 실행마다 읽는 에이전트는 {@code findById} 라 엔티티 적재로 세어지고 이 지표에 들어오지 않는다.
+     * <p>목록을 읽는 것 하나와 자식을 확인하는 것 하나, 대화 번호를 공개 식별자로 바꾸는 것 하나, 실행에서 쓴 스킬 이름을 읽는 것 하나,
+     * 에이전트를 한 번에 읽는 것 하나다.
      */
-    private static final long QUERIES_PER_LIST = 4;
+    private static final long QUERIES_PER_LIST = 5;
 
     @Test
     void 목록이_길어져도_자식을_확인하는_질의는_늘지_않는다() {

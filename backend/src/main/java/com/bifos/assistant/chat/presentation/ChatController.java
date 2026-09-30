@@ -121,8 +121,11 @@ public class ChatController {
 
     @GetMapping("/conversations")
     public List<ConversationView> conversations() {
-        return chat.conversationsOf(currentUser.require()).stream()
-                .map(this::viewOf)
+        List<Conversation> page = chat.conversationsOf(currentUser.require());
+        // 목록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
+        Map<Long, Agent> byId = agents.byIds(page.stream().map(Conversation::agentId).toList());
+        return page.stream()
+                .map(conversation -> viewOf(conversation, byId.get(conversation.agentId())))
                 .toList();
     }
 
@@ -130,7 +133,8 @@ public class ChatController {
     public ConversationView rename(@PathVariable UUID conversationId,
             @Valid @RequestBody RenameConversationRequest request) {
         CurrentUser user = currentUser.require();
-        return viewOf(chat.rename(user, access.requireOwnId(user, conversationId), request.title()));
+        Conversation renamed = chat.rename(user, access.requireOwnId(user, conversationId), request.title());
+        return viewOf(renamed, agents.findById(renamed.agentId()).orElse(null));
     }
 
     /** 대화에서 쓸 모델과 effort 를 바꾸고 바뀐 대화 한 줄을 돌려준다. */
@@ -138,7 +142,8 @@ public class ChatController {
     public ConversationView chooseModel(@PathVariable UUID conversationId,
             @RequestBody ChooseModelRequest request) {
         CurrentUser user = currentUser.require();
-        return viewOf(chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice()));
+        Conversation chosen = chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice());
+        return viewOf(chosen, agents.findById(chosen.agentId()).orElse(null));
     }
 
     /**
@@ -177,11 +182,12 @@ public class ChatController {
         return new ConversationRefView(access.requireOwn(currentUser.require(), number).publicId());
     }
 
-    private ConversationView viewOf(Conversation conversation) {
-        Agent agent = agents.requireById(conversation.agentId());
+    /** 에이전트 행이 없으면({@code agent} 가 null) 에이전트 코드와 이름만 비운 줄을 돌려준다. */
+    private ConversationView viewOf(Conversation conversation, Agent agent) {
         ModelChoice choice = conversation.modelChoice();
-        return new ConversationView(conversation.publicId(), conversation.title(), agent.code(),
-                agent.name(), conversation.updatedAt(), choice.provider(), choice.model(),
+        return new ConversationView(conversation.publicId(), conversation.title(),
+                agent == null ? null : agent.code(), agent == null ? null : agent.name(),
+                conversation.updatedAt(), choice.provider(), choice.model(),
                 choice.reasoningEffort());
     }
 
