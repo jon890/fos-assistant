@@ -51,10 +51,14 @@ return origin;
 
 클래스 Javadoc 의 「origin 실행이 이미 끝났어도 그대로 쓴다」 문장을 「origin 실행이 끝났어도 쓰되, 사용자가 중지해 `CANCELLED` 로 끝났으면 거절한다」 로 바꾸고 까닭 한 문장을 붙인다.
 
+뿌리도 본다. `origin.rootExecutionId()` 가 있고 origin 자신이 아니면 그 실행을 읽어 `CANCELLED` 면 같은 이유 표시로 거절한다. 뿌리 자신은 `root_execution_id` 가 비어 있다. 흐름의 자식 실행은 제 session 으로 돌아 native 하위 에이전트의 origin 이 되고, 흐름을 멈출 때 이미 끝난 자식은 `CANCELLED` 가 되지 않기 때문이다. 뿌리와 origin 사이의 중간 실행은 보지 않는다.
+
 ### 2. `SessionOwnerResolverTest`
 
 - `등록한_하위_에이전트는_origin_실행이_취소되면_거절한다`: 부모 `RUNNING` 에서 `register(root, root)` 로 자식 등록, 그때 `owners.resolve` 가 `dadRun` 을 준다. `setStatus(dadRun, CANCELLED)` 뒤 `assertRejected(PROFILE, root, s1)`
 - `하위_에이전트의_하위_에이전트도_origin_실행이_취소되면_거절한다`: `s1`, `s2`(부모 `s1`) 등록 뒤 취소, `s2` 거절
+- `흐름을_중지하면_이미_끝난_자식_실행에서_만든_하위_에이전트도_거절한다`: 뿌리 `dadRun` 아래 자식 실행(`root_execution_id` 를 SQL 로 채운다)의 session 에서 등록, 자식 `SUCCEEDED`, 뿌리 `CANCELLED` 뒤 거절
+- `뿌리가_끝났어도_취소가_아니면_자식_실행의_하위_에이전트는_그대로_정한다`: 같은 모양에서 뿌리가 `FAILED` 면 자식 실행으로 정한다
 - `origin_실행이_실패로_끝나도_등록한_하위_에이전트는_그대로_정한다`: `setStatus(dadRun, FAILED)` 뒤 `assertOrigin(owners.resolve(PROFILE, root, s1), dadRun, dad)`. 지금 동작을 고정한다
 - 기존 `// 1`, `// 3`, `// 5`, `// 6`, `// 7` 검사는 그대로 통과해야 한다
 

@@ -65,8 +65,9 @@ async function openStream(
       throw error;
     },
   );
-  // started 를 기다리는 동안 스트림이 먼저 실패해도 처리되지 않은 거절로 남지 않게 한다.
+  // 단계가 먼저 실패해 어느 한쪽을 기다리지 않게 돼도 처리되지 않은 거절로 남아 프로세스가 끝나지 않게 한다.
   completed.catch(() => undefined);
+  executionId.catch(() => undefined);
   return { executionId, completed };
 }
 
@@ -222,7 +223,7 @@ export const nativeDelegationScenario: Scenario = {
         "하위 에이전트 검사 turn 중지",
       ).json<{ status: string }>();
       expect(stopped.status === "stopping", `중지 응답이 다르다: ${stopped.status}`);
-      await within(held.completed, 15_000, "중지 뒤 스트림이 끝나지 않았다");
+      await within(held.completed, 5_000, "중지 뒤 스트림이 끝나지 않았다");
       const afterStop = expectStatus(
         await call(context, "/usage/executions?limit=50", { token: context.tokens.dad }),
         200,

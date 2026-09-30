@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - **결정**: Hermes `delegate_task` 가 만든 하위 에이전트 session 은 **만들어지는 순간 Control Plane 에 등록한다.** 등록 한 줄은 `(profile, session)` 을 그 session 을 낳은 FOS 실행(**origin 실행**)과 그 사용자에 묶고, 한 번 적으면 바꾸지 않는다.
-  MCP 호출의 요청자는 서명을 확인한 뒤 `(토큰의 profile, 그 호출의 session)` 으로 등록을 먼저 찾는다. 있으면 그 origin 실행의 사용자다. **origin 실행이 끝났어도 쓴다. 다만 사용자가 중지해 `CANCELLED` 로 끝난 origin 실행이면 거절한다.**
+  MCP 호출의 요청자는 서명을 확인한 뒤 `(토큰의 profile, 그 호출의 session)` 으로 등록을 먼저 찾는다. 있으면 그 origin 실행의 사용자다. **origin 실행이 끝났어도 쓴다. 다만 origin 실행이나 그 실행 나무의 뿌리 실행이 `CANCELLED` 면 거절한다.**
   등록이 없으면 그 호출의 session 이 뿌리 session 과 같을 때만 [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 규칙(profile, 뿌리 session, `RUNNING`)으로 최상위 실행을 찾는다. session 이 뿌리와 다르고 등록이 없으면 거절한다.
   등록은 profile 플러그인이 `subagent_start` hook 에서 내부 경로 `POST /internal/hermes/session-bindings/subagent` 로 보낸다. 모델 도구가 아니다.
 - **맥락**:
@@ -22,6 +22,8 @@
   - **MCP 도구로 등록한다.** 모델 도구 목록에 드러나고 모델이 부를 수 있다.
   - **등록 없는 session 도 뿌리의 도는 실행으로 판정한다.** 압축 교체된 최상위 session 은 계속 동작하지만, 등록이 빠진 자식이 다음 turn 에 붙는다. 위의 추측과 같다.
   - **origin 실행이 `RUNNING` 일 때만 허용한다.** 부모 turn 이 정상으로 끝난 뒤에 도는 자식이 모두 막힌다. 이 결정이 풀려던 문제로 돌아간다.
+  - **origin 실행 자신만 본다.** 흐름의 자식 실행은 제 session 으로 돌아 그 안에서 만든 하위 에이전트의 origin 이 된다. 사용자가 흐름을 멈출 때 이미 `SUCCEEDED` 로 끝난 자식은 `CANCELLED` 가 되지 않아, 그 하위 에이전트가 계속 사용자의 권한을 쓴다. 앞으로의 위임 자식도 같은 모양이다.
+  - **origin 에서 뿌리까지의 사슬을 모두 본다.** 지금은 뿌리만 중지되고 중간 실행만 따로 중지되는 길이 없다. 자식 하나만 멈추는 위임 도구가 생길 때 다시 본다.
   - **`FAILED` 로 끝난 origin 도 거절한다.** `FAILED` 에는 Control Plane 이 다시 떠 도는 실행을 `ORPHANED` 로 끝낸 경우가 들어 있다. 사용자가 멈추려 한 것이 아니다. 실패의 세부 정책은 이 결정에서 넓히지 않는다.
   - **취소한 origin 의 자식은 등록부터 거절한다.** 이미 등록된 자식의 호출이 그대로 통과한다. 호출마다 판정해야 등록 시각과 무관하게 막힌다.
 - **결과**:
@@ -37,6 +39,8 @@
     - 등록 줄은 지우지 않는다. 실행 기록과 같이 남는다
     - **취소한 origin 에서 막는 것은 Control Plane MCP 도구뿐이다.** 자식의 Hermes 자체 도구(웹 검색, 터미널 등)는 막지 못하고 자식 run 도 계속 돈다. 자식을 실제로 멈추는 것은 이 결정 밖이다
     - 판정을 통과한 호출이 중지와 겹치면 그 호출 하나는 끝까지 돈다. `CANCELLED` 가 적힌 뒤에 온 호출부터 거절된다
+    - **origin 과 뿌리만 본다.** 뿌리와 origin 사이의 중간 실행만 따로 `CANCELLED` 가 되면 막지 못한다. 위임한 자식 하나만 멈추는 도구(`agent_stop`)를 구현할 때 이 사슬 판정을 다시 본다
+    - 사용자가 멈추지 않았어도 Hermes 가 run 을 `cancelled` 로 끝내면 실행이 `CANCELLED` 로 적혀 같이 거절된다
     - 취소한 origin 의 자식도 등록은 받는다. 그 자식의 호출이 판정에서 거절된다
     - 플러그인이 `subagent_start` hook 을 보내야 한다. 배치와 확인은 `fos-home-infra` 가 갖는다
 - **적용 범위**: ADR-032 의 「도는 부모 실행 하나를 찾는다」 는 최상위 session 에만 남고, 하위 에이전트 session 은 이 결정을 따른다. ADR-031 의 `_fos_ctx` 서명할 글과 key 는 그대로다. 등록 경로의 계약과 오류 코드는 [`hermes/delegation.md`](../hermes/delegation.md#하위-에이전트-session-등록-계약) 에, 저장 모델은 [`data-schema.md`](../data-schema.md#hermes_session_binding) 에 있다.
@@ -45,7 +49,7 @@
 
 ```text
 _fos_ctx 서명 확인
- └ (토큰의 profile, session_id) 등록이 있다   → origin 실행이 CANCELLED 면 거절
+ └ (토큰의 profile, session_id) 등록이 있다   → origin 실행이나 그 뿌리 실행이 CANCELLED 면 거절
                                                그 밖에는 origin 실행의 사용자. RUNNING, SUCCEEDED, FAILED 모두
  └ 없고 session_id == root_session_id         → (profile, 뿌리 session, RUNNING) 실행 하나의 사용자
  └ 없고 session_id != root_session_id         → 거절

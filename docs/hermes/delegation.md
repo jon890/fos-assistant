@@ -321,7 +321,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 
 서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 차례로 본다.
 
-1. 토큰이 증명한 profile 과 그 호출의 `session_id` 로 하위 에이전트 등록을 찾는다. 있으면 그 origin 실행의 사용자로 돈다. origin 실행이 끝났어도 된다. 사용자가 중지해 `CANCELLED` 로 끝났으면 거절한다
+1. 토큰이 증명한 profile 과 그 호출의 `session_id` 로 하위 에이전트 등록을 찾는다. 있으면 그 origin 실행의 사용자로 돈다. origin 실행이 끝났어도 된다. origin 실행이나 그 실행 나무의 뿌리 실행이 `CANCELLED` 면 거절한다
 2. 등록이 없고 `session_id` 가 `root_session_id` 와 같으면, 그 profile 과 뿌리 session 으로 도는 실행 하나를 찾아 그 실행의 사용자로 돈다
 3. 등록이 없고 `session_id` 가 뿌리와 다르면 거절한다
 
@@ -550,7 +550,7 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 
 | 무엇 | 지금 |
 | --- | --- |
-| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, 앞으로의 `agent_*`) | origin 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
+| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, 앞으로의 `agent_*`) | origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
 | 자식의 Hermes 자체 도구(웹 검색, 터미널 등) | 막지 못한다 |
 | 자식 run 자체 | 멈추지 못한다. `subagent_stop` hook 과 Hermes 의 비동기 위임 제어가 자식을 멈출 수 있는지 조사한 뒤 turn 중지에 잇는다 |
 

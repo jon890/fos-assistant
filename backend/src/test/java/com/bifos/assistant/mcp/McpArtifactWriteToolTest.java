@@ -147,11 +147,15 @@ class McpArtifactWriteToolTest {
         Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null));
         String subagent = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, subagent);
+        String beforePath = "subagent-" + UUID.randomUUID() + ".html";
+        JsonNode beforeCancel = body(subagentWrite(subagent, own, beforePath));
         jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.CANCELLED.name(), dadRun.id());
         String path = "subagent-" + UUID.randomUUID() + ".html";
 
         JsonNode refused = body(subagentWrite(subagent, own, path));
 
+        assertThat(beforeCancel.path("result").path("isError").asBoolean()).as("부모가 도는 동안 쓴 결과: %s", beforeCancel).isFalse();
+        assertThat(store.resolveInside(own.id(), beforePath)).isPresent();
         assertThat(refused.path("result").path("isError").asBoolean()).as("부모를 중지한 뒤 쓴 결과: %s", refused).isTrue();
         assertThat(refused.path("result").path("content").get(0).path("text").asString())
                 .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");

@@ -76,7 +76,7 @@ sequenceDiagram
     R->>B: (profile, session_id) 등록을 찾는다
     alt 등록이 있다
         B-->>R: origin 실행
-        R->>R: CANCELLED 면 거절. 다른 상태는 끝났어도 된다
+        R->>R: origin 이나 그 뿌리 실행이 CANCELLED 면 거절. 다른 상태는 끝났어도 된다
     else 등록이 없고 session_id 가 뿌리와 같다
         R->>E: profile, 뿌리 session, RUNNING 이 맞는 줄을 둘까지 읽는다
         E-->>R: 정확히 하나
@@ -107,7 +107,7 @@ sequenceDiagram
 | profile 이 빈 옛 토큰이고 그 설정이 참이다 | 옛 토큰의 `user_id` 로 전처럼 돈다. `_fos_ctx` 는 보지 않고 경고 로그를 남긴다 |
 | profile 이 묶인 토큰인데 `_fos_ctx` 가 없거나 모양이 틀렸거나 서명이 맞지 않는다 | 거절한다 |
 | 서명이 맞고 그 호출의 session 에 하위 에이전트 등록이 있다 | 등록의 origin 실행의 사용자로 돈다. origin 실행이 `SUCCEEDED` 나 `FAILED` 로 끝났어도, 같은 대화의 다음 turn 이 돌고 있어도 같다 |
-| 등록이 있는데 사용자가 중지해 origin 실행이 `CANCELLED` 로 끝났다 | 거절한다. 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| 등록이 있는데 origin 실행이나 그 실행 나무의 뿌리 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. 흐름을 멈출 때 이미 끝난 자식 실행에서 만든 하위 에이전트도 뿌리가 중지돼 거절된다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
 | 등록의 뿌리 session 이 서명한 뿌리와 다르다 | 거절한다 |
 | 등록이 없고 그 호출의 session 이 뿌리와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
 | 등록이 없고 session 이 뿌리와 같지만 그 뿌리 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
@@ -116,7 +116,7 @@ sequenceDiagram
 
 거절은 모두 **같은 도구 결과** 하나로 보인다. `isError: true` 와 「호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.」 다.
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
-이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를, 등록의 origin 실행이 취소됐으면 `ORIGIN_CANCELLED` 를 남긴다.
+이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를, 등록의 origin 실행이나 그 뿌리가 중지됐으면 `ORIGIN_CANCELLED` 를 남긴다.
 
 **실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.**
 
@@ -177,7 +177,7 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | `child_session_id` 가 뿌리 session 이거나, 그 profile 의 실행 줄이 쓰는 session 이거나, 대화가 적어 둔 session 이다 | `403` 으로 거절한다. 최상위 session 에 등록이 생기면 뒤 turn 이 앞 turn 에 묶인다. 압축 교체된 최상위 session 은 대화에만 남아 있어 대화도 본다 |
 | session 값이 128자를 넘는다 | `403` 으로 거절한다. 저장 칸의 길이다 |
 | 플러그인이 등록하지 못했다 | Hermes 는 hook 예외를 삼키고 자식을 돌린다. 그 자식의 호출은 위 판정에서 거절된다 |
-| 부모 등록의 origin 실행이 이미 `CANCELLED` 다 | 등록은 받는다. 그 자식의 MCP 호출이 위 판정에서 거절된다 |
+| 부모 등록의 origin 실행이나 그 뿌리가 이미 `CANCELLED` 다 | 등록은 받는다. 그 자식의 MCP 호출이 위 판정에서 거절된다 |
 | Control Plane 이 다시 떴다 | 등록은 데이터베이스에 있어 그대로 쓴다 |
 | 부모 turn 이 끝난 뒤 하위 에이전트가 결과물을 썼다 | 파일은 대화 폴더에 남지만 어느 답에도 묶이지 않는다. 답에 묶는 것은 turn 이 끝날 때 폴더를 훑는 방식이다 |
 
@@ -1319,7 +1319,7 @@ sequenceDiagram
 | 경우 | 결과 |
 | --- | --- |
 | `_fos_ctx` 가 없거나 서명이 틀리다 | 거절한다. 플러그인이 빠진 profile 이거나 모델이 흉내 낸 것이다 |
-| origin 실행을 정하지 못했다 | 거절한다. 부모를 추측하지 않는다. 하위 에이전트는 origin 실행이 끝났어도 그 실행 아래 붙고, 사용자가 중지해 `CANCELLED` 로 끝났으면 거절된다 |
+| origin 실행을 정하지 못했다 | 거절한다. 부모를 추측하지 않는다. 하위 에이전트는 origin 실행이 끝났어도 그 실행 아래 붙고, origin 이나 그 뿌리가 `CANCELLED` 면 거절된다 |
 | 그 실행의 profile 이 토큰의 profile 과 다르다 | 거절한다. 사용자는 토큰이 아니라 그 실행이 정한다 |
 | 없는 에이전트, 쓸 수 없는 에이전트 | 같은 응답으로 거절한다. 있는지 없는지 알리지 않는다 |
 | 꺼진 에이전트 | 쓸 수 없다고 거절한다 |

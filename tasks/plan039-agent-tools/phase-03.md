@@ -30,6 +30,7 @@
 - 사용자가 뿌리 turn 을 중지하면 자식을 두 갈래로 본다
   - FOS `agent_delegate` 로 시작한 자식: 위 「turn 중지 연결」 대로 멈춘다
   - Hermes native `delegate_task` 자식: 가능하면 멈추거나 권한을 거둔다. 권한은 이미 거둔다. origin 실행이 `CANCELLED` 면 그 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, 이 계획의 `agent_*`)이 모두 거절된다(ADR-037, `SessionOwnerResolver`). 이 phase 의 `agent_*` 도 같은 판정을 지나므로 따로 막지 않는다
+- 그 판정은 origin 실행과 그 뿌리 실행(`root_execution_id`)만 본다. `agent_stop` 으로 위임 자식 하나만 멈추면 그 아래의 실행에서 만든 native 하위 에이전트는 origin 도 뿌리도 `CANCELLED` 가 아니라 막히지 않는다. 이 phase 에서 `agent_stop` 을 구현할 때 origin 에서 뿌리까지의 사슬을 볼지 다시 정하고 ADR-037 을 고친다
 - `ResearchAndBuildFlow` 는 기능을 더하지 않는다. 클래스 Javadoc 에 「새 흐름을 더하지 않는다. 지우는 조건은 ADR-017 「`ResearchAndBuildFlow` 의 자리」」 한 단락을 더한다
 - 화면: 실행 나무와 작업 과정이 위임 자식을 이미 그리는지 e2e 의 나무 조회로 확인한다. 그리지 못하면 최소한만 고친다
 
