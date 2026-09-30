@@ -53,7 +53,7 @@
   - `testImplementation(libs.archunit)`
   - 모든 `Test` 태스크(`tasks.withType<Test>().configureEach`)에 아래 둘을 둔다
     - Gradle 속성 셋을 같은 이름의 JVM 시스템 속성으로 넘긴다. 속성이 없으면 넘기지 않는다. 이름은 `archunit.freeze.refreeze`, `archunit.freeze.store.default.allowStoreCreation`, `archunit.freeze.store.default.allowStoreUpdate` 다. ArchUnit 은 `archunit.` 으로 시작하는 시스템 속성으로 `archunit.properties` 값을 바꿔 쓴다. `systemProperty` 로 넘긴 값은 태스크 입력이 된다
-    - `inputs.dir("config/archunit/store")` 에 `optional()` 과 `withPathSensitivity(PathSensitivity.RELATIVE)` 를 붙인다. 기준 파일만 바뀌어도(`git pull` 등) 테스트가 옛 결과로 건너뛰지 않는다
+    - `inputs.files(fileTree("config/archunit/store")).withPropertyName("archunitStore").withPathSensitivity(PathSensitivity.RELATIVE)`. 기준 파일만 바뀌어도(`git pull` 등) 테스트가 옛 결과로 건너뛰지 않는다. `inputs.dir(...)` 는 `optional()` 을 붙여도 디렉터리가 없으면 태스크 검증이 실패해 기준을 처음 만들 수 없다(Gradle 9.5.0 에서 확인했다)
   - `archTest` 태스크를 등록한다. `Test` 타입, `group = "verification"`, `testClassesDirs = sourceSets.test.get().output.classesDirs`, `classpath = sourceSets.test.get().runtimeClasspath`, `useJUnitPlatform { includeTags("architecture") }`. `./gradlew test` 는 태그를 거르지 않으므로 규칙 테스트를 그대로 포함한다
 - `backend/src/test/resources/archunit.properties` (신규)
 
@@ -141,7 +141,7 @@ git add config/archunit
   - 기준 파일 위치 `backend/config/archunit/store/`
   - **기준에 든 위반은 허용이 아니라 줄여 갈 목록이다.** 기준마다 GitHub 이슈가 있다. 이슈 번호는 PR 을 열기 전에 team-lead 가 채우므로, 이 phase 에서는 「기준마다 연 이슈」 라고만 적고 번호 칸을 비워 두지 않는다
   - 갱신 방법. 명령은 모두 `backend/` 에서 돈다
-    - **위반을 고쳤을 때.** 평소 테스트가 `StoreUpdateFailedException` 으로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다. `scripts/quality.sh fix` 도 이것을 한다. 기준에 든 클래스의 이름만 바꿔도 같은 실패가 나고, 그때는 아래 「다시 얼릴 때」 를 따른다
+    - **위반을 고쳤을 때.** 평소 테스트가 `StoreUpdateFailedException` 으로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다. 기준에 든 클래스의 이름만 바꿔도 같은 실패가 나고, 그때는 아래 「다시 얼릴 때」 를 따른다
     - **규칙을 새로 더했을 때.** `-Parchunit.freeze.store.default.allowStoreUpdate=true` 로 그 규칙의 기준 파일을 만든다. `allowStoreCreation` 은 `stored.rules` 가 없을 때만 쓴다
     - **새 위반을 받아들여야 할 때와 다시 얼릴 때.** `./gradlew archTest --rerun --tests '*ArchitectureRulesTest.<메서드>' -Parchunit.freeze.refreeze=true -Parchunit.freeze.store.default.allowStoreUpdate=true`. 규칙 하나만 대상으로 삼는다. 까닭을 커밋 메시지와 PR 본문에 적는다
   - 코드로 옮기지 않은 문장과 까닭

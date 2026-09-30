@@ -23,6 +23,7 @@ Java 포맷을 Spotless 설정으로 정하고, `origin/main` 에서 바뀐 파�
 ## 의도 메모
 
 - **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. ratchet 은 합친 코드와 `origin/main` 의 공통 조상을 비교한다
+- 합친 main 코드가 새 ArchUnit 간선 위반, 새 Checkstyle 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다. 새 위반을 다시 얼릴 때는 그 규칙 하나만 대상으로 삼는다
 - `ratchetFrom` 은 사용자가 고른 방식이다. 저장소 전체를 한 번에 포맷하지 않는다
 - 포매터가 import 순서와 쓰지 않는 import 도 정리한다. `removeUnusedImports()` 를 따로 걸지 않는다(palantir 가 한다). 실제로 그런지 작업 항목 3 에서 본다
 - Javadoc 본문 포맷은 켜지 않는다(`formatJavadoc(false)`, 기본값). 한국어 Javadoc 의 줄바꿈을 바꾸지 않는다

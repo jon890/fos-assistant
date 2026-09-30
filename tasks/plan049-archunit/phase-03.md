@@ -26,6 +26,7 @@
 ## 의도 메모
 
 - **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. 기준은 합친 코드로 만든다
+- 합친 main 코드가 새 ArchUnit 간선 위반, 새 Checkstyle 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다. 새 위반을 다시 얼릴 때는 그 규칙 하나만 대상으로 삼는다
 넣는 규칙과 까닭이다.
 
 | 규칙 | 까닭 |

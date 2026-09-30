@@ -88,6 +88,7 @@ Gradle 과 pnpm 을 부르는 경로는 작업 항목 7 이 실제 명령으로 
 ### 6. 문서
 
 - `AGENTS.md` 「확인」 의 명령 목록 끝에 `scripts/quality.sh check` 를 더한다. 「위 여섯 검사」 를 새 개수로 고치고, 「머지는 PR 로 한다」 의 CI job 목록에 `quality` 를 더한다. `quality.sh fix` 가 무엇을 고치는지 한 줄 적고 자세한 것은 `backend/AGENTS.md` 와 `web/AGENTS.md` 를 가리킨다
+- `backend/AGENTS.md` 「구조 규칙」 의 「위반을 고쳤을 때」 에 `scripts/quality.sh fix` 도 기준을 줄인다고 더한다
 - `backend/AGENTS.md`: 「구조 규칙」, 「코드 규칙」, 「포맷」 절 앞에 한 절을 두어 `./gradlew qualityCheck` 가 셋을 묶는다는 것과 `scripts/quality.sh` 를 가리킨다. 기준에 든 위반은 줄여 갈 목록이고 기준마다 GitHub 이슈가 있다는 것을 적는다
 - `web/AGENTS.md` 에 「lint」 절: 도구와 버전, 규칙 묶음(`core-web-vitals`, `typescript`), 기준 파일, 갱신 방법(고치면 `pnpm exec eslint --prune-suppressions`, 새 위반은 고친다, 꼭 받아들여야 하면 `--suppress-rule <규칙>` 과 까닭), `fix` 가 하는 일, Prettier 를 쓰지 않는다는 것, 기준에 든 위반은 줄여 갈 목록이고 GitHub 이슈가 있다는 것
 
