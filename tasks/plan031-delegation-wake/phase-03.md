@@ -36,7 +36,12 @@ phase 02 가 만든 것을 쓴다.
 ## 의도 메모
 
 - 대화 단위 SSE 는 자동 turn 만 싣는다. 사용자가 보낸 turn 까지 실으면 보낸 창이 같은 답을 두 번 그린다.
-- 대화를 열 때 이미 돌던 turn 은 기존 보는 중 상태가 맡는다. SSE 는 그동안 그 실행 번호의 `started`, `delta`, `tool`, `done`, `stopped`, `error` 를 버린다. `system` 은 항상 받는다. 보는 중 상태가 끝나면 지금처럼 메시지를 다시 읽는다.
+- 대화를 열 때 이미 돌던 turn 은 기존 보는 중 상태가 맡는다. `delta`, `tool`, `error` 등 조각 사건에는 실행 번호가 없고(`ChatEvent` 의 팩토리가 `executionId` 를 null 로 둔다), turn 도중에 열면 `started` 는 이미 지나갔다. 그래서 사건의 순서로 고른다.
+  - 보는 중 상태가 켜진 동안 `started` 를 받기 전에 오는 조각 사건(`delta`, `tool`, `subagent`, `step`, `switched`, `reset`, `error`)은 버린다
+  - `started` 의 번호가 보는 중인 번호와 같으면 그 turn 의 `done` 이나 `stopped` 까지 버린다
+  - 다른 번호의 `started` 부터는 받는다
+  - `system` 은 항상 받는다
+  - 보는 중 상태가 끝나면 지금처럼 메시지를 다시 읽는다
 - 알림 줄은 turn 의 시작점이다. `foldVersions` 는 `SYSTEM` 을 `USER` 처럼 turn 을 여는 줄로 다루되, 판 사슬을 만들지 않는다.
 
 ## 작업 항목
@@ -69,8 +74,8 @@ phase 02 가 만든 것을 쓴다.
 
 - 대화 번호가 있는 동안 `/api/chat/conversations/{id}/events` 를 `fetch` 로 열고 `readEventStream` 으로 읽는다. 대화가 바뀌거나 화면이 닫히면 `AbortController` 로 끊는다. 서버가 끊으면 5초 뒤 다시 연다.
 - `system`: 알림 줄을 목록 끝에 더한다.
-- `started`, `delta`, `tool`, `done`, `stopped`, `error`: 지금 보낸 turn 을 그리는 코드와 같은 방식으로 새 답을 그린다. 그 처리를 함수로 꺼내 두 곳이 함께 쓴다. `done` 뒤에는 지금처럼 메시지를 다시 읽어 저장된 번호로 맞춘다.
-- 보는 중 상태(`beginObserving`)가 켜져 있으면 의도 메모대로 그 실행 번호의 사건을 버린다.
+- `started`, `delta`, `tool`, `subagent`, `step`, `switched`, `reset`, `done`, `stopped`, `error`: 지금 보낸 turn 을 그리는 코드와 같은 방식으로 새 답을 그린다. 그 처리를 함수로 꺼내 두 곳이 함께 쓴다. `done` 뒤에는 지금처럼 메시지를 다시 읽어 저장된 번호로 맞춘다.
+- 보는 중 상태(`beginObserving`)가 켜져 있으면 의도 메모의 순서 규칙으로 사건을 버린다.
 
 ### 6. 테스트
 
@@ -83,6 +88,7 @@ phase 02 가 만든 것을 쓴다.
   - 대화를 연 채로 대화 단위 SSE 에 `system` 과 답 사건이 오면 알림 줄과 답이 보인다
   - 저장된 메시지에 `SYSTEM` 이 있으면 알림 줄로 보이고, 그 뒤 답에는 다시 생성 버튼이 없다
   - 모바일과 데스크톱 두 폭에서 알림 줄이 가로로 넘치지 않는다
+  - `page.route` 로 events 응답을 한 번에 채워 주면 연결이 닫혀 5초 뒤 다시 연결한다. 두 번째 요청부터는 사건 없이 붙잡아 두어 같은 사건을 두 번 받지 않게 한다
 
 ## 검증
 

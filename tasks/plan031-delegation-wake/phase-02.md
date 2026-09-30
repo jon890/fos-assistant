@@ -80,7 +80,7 @@ phase 01 이 만든 것을 쓴다.
 
 ### 6. `chat/application/ChatEvent.java` — `system`
 
-- `type` 이 `system` 인 사건과 팩토리 `ChatEvent.system(String conversationPublicId, Long messageId, String content)` 를 더한다. `forViewer` 가 이 사건을 그대로 통과시키는지 확인한다.
+- `type` 이 `system` 인 사건과 팩토리 `ChatEvent.system(UUID conversationId, Long messageId, String content)` 를 더한다. `forViewer` 가 이 사건을 그대로 통과시키는지 확인한다.
 
 ### 7. `chat/application/ChatService.java` — 자동 turn 과 다시 생성
 
@@ -128,7 +128,7 @@ phase 01 이 만든 것을 쓴다.
 - `@EventListener(ApplicationReadyEvent.class) @Order(10)`: `findConversationsWithUndeliveredResults()` 의 대화마다 `tryWake` 를 부른다.
 - `tryWake(Long conversationId)`
   1. `findUndeliveredResults(conversationId)` 가 비었으면 끝.
-  2. 대화를 읽는다. 지워졌으면 끝. 에이전트가 지워졌거나 꺼졌으면 끝. 에이전트에 흐름이 있으면 끝(`FlowRegistry.find(agent.flow()) != null`). 결과는 그대로 남는다.
+  2. 대화를 읽는다. 지워졌으면 끝. 에이전트는 `findById` 로 읽어 행이 없거나 지워졌거나 꺼졌으면 끝(`requireById` 는 행이 없으면 예외를 던진다). 대화 주인의 `AppUser` 가 없으면 경고 로그를 남기고 끝. 에이전트에 흐름이 있으면 끝(`FlowRegistry.find(agent.flow()) != null`). 결과는 그대로 남는다.
   3. `auto_turn_count >= maxAutoTurns` 이면 끝. 단, 대화의 마지막 메시지가 한도 알림이 아닐 때만 `SYSTEM` 줄 「자동으로 이어 가는 횟수를 넘었어요. 이어서 하려면 메시지를 보내 주세요」 를 저장하고 `hub.publish(system 사건)` 를 한다.
   4. `turns.open(ownerId, conversationId)` 를 시도한다. `CONVERSATION_BUSY` 면 끝.
   5. 잡았으면 새 가상 스레드에서 `chatService.runDelegationResults(owner, conversationId, handle, event -> hub.publish(conversationId, event))` 를 돈다. 예외가 나면 `ChatEvent.error(...)` 를 publish 하고 로그를 남긴다. `finally` 에서 `turns.close(handle)` 한다. `close` 가 리스너를 다시 부르므로 쌓인 결과가 있으면 이어서 연다.
@@ -146,6 +146,7 @@ phase 01 이 만든 것을 쓴다.
   - 기동 훑기: 결과를 저장해 둔 뒤 `ApplicationReadyEvent` 수신 메서드를 직접 부르면 자동 turn 이 열린다
   - 자동 turn 의 답에 `regenerate` 를 보내면 거절된다
   - hub 에 구독자를 걸면 `system`, `started`, `done` 을 받는다
+- 자동 turn 은 테스트 스레드 밖의 가상 스레드에서 돈다. 각 검사는 끝나기 전에 자동 turn 이 끝날 때까지(`turns.markOf(대화번호).running()` 이 거짓이 될 때까지, 제한 시간을 두고) 기다린다. 그러지 않으면 다음 검사의 대역 Hermes 기록과 메시지 수가 흔들린다.
 - 기존 테스트는 test profile 에서 깨우기가 꺼져 있으므로 바꾸지 않는다. `./gradlew test` 전체가 통과해야 한다.
 
 ## 검증
