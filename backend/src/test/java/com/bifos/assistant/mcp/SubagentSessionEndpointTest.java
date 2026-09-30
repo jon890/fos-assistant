@@ -154,18 +154,6 @@ class SubagentSessionEndpointTest {
     }
 
     @Test
-    void 기본_설정에서_profile_이_빈_옛_토큰은_인증에서_401_이다() throws Exception {
-        String legacy = "legacy-" + UUID.randomUUID();
-        McpCallSigner.insertLegacyToken(jdbc, dad.id(), legacy, "legacy");
-        String child = newChild();
-
-        HttpResponse<String> response = register(legacy, McpCallSigner.subagentBody(legacy, rootA, rootA, child).toString());
-
-        assertThat(response.statusCode()).isEqualTo(401);
-        assertThat(rows(PROFILE_A, child)).isZero();
-    }
-
-    @Test
     void 토큰이_없거나_모르거나_폐기됐으면_401_이고_본문이_없다() throws Exception {
         String revoked = tokens.issue(PROFILE_A, "revoked").rawToken();
         tokens.revoke(tokenRepository.findByTokenHash(AgentTokenService.hash(revoked)).orElseThrow().id());

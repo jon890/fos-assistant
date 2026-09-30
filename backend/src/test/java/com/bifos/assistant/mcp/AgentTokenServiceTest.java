@@ -9,9 +9,6 @@ import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
-import com.bifos.assistant.user.infra.AppUserRepository;
 import java.lang.reflect.Field;
 import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -22,17 +19,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 장기 토큰 원문이 저장되지 않고, profile 로만 발급되며, 옛 토큰만 한 번 묶이는지 확인한다. */
+/** 장기 토큰 원문이 저장되지 않고, profile 로만 발급되는지 확인한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class AgentTokenServiceTest {
     @Autowired AgentTokenService tokens;
     @Autowired AgentTokenRepository tokenRepository;
-    @Autowired AppUserRepository users;
     @Autowired JdbcTemplate jdbc;
-    private AppUser admin;
 
-    @BeforeEach void 준비한다() { tokenRepository.deleteAll(); users.deleteAll(); admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN)); }
+    @BeforeEach void 준비한다() { tokenRepository.deleteAll(); }
 
     @Test void 발급한_원문은_응답에만_있고_저장된_행에는_없다() throws IllegalAccessException {
         var issued = tokens.issue("hermes-profile", "hermes");
@@ -53,7 +48,6 @@ class AgentTokenServiceTest {
         AgentToken saved = tokenRepository.findById(issued.token().id()).orElseThrow();
         assertThat(issued.profileName()).isEqualTo("hermes-profile");
         assertThat(saved.profileName()).isEqualTo("hermes-profile");
-        assertThat(saved.legacyUserId()).isNull();
     }
 
     @Test void profile_이름_규칙을_어기면_발급하지_않는다() {
@@ -77,53 +71,13 @@ class AgentTokenServiceTest {
         McpPrincipal principal = tokens.authenticate(issued.rawToken());
         assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt()).isNotNull();
         assertThat(principal.profileName()).isEqualTo("hermes-profile");
-        assertThat(principal.legacyUserId()).isNull();
         assertThat(principal.tokenHash()).isEqualTo(AgentTokenService.hash(issued.rawToken()));
         assertThat(principal.toString()).doesNotContain(principal.tokenHash());
     }
 
-    @Test void 옛_토큰은_한_번만_묶이고_묶인_뒤에는_사용자를_읽지_않는다() {
-        String raw = "legacy-" + UUID.randomUUID();
-        long id = McpCallSigner.insertLegacyToken(jdbc, admin.id(), raw, "legacy");
-
-        assertThat(jdbc.queryForObject("SELECT user_id FROM agent_token WHERE id = ?", Long.class, id))
-                .as("묶기 전 옛 토큰의 사용자").isEqualTo(admin.id());
-
-        AgentToken bound = tokens.bindProfile(id, "shared-group");
-
-        assertThat(bound.profileName()).isEqualTo("shared-group");
-        assertThat(tokenRepository.findById(id).orElseThrow().profileName()).isEqualTo("shared-group");
-        assertThat(tokens.authenticate(raw).legacyUserId()).as("묶인 토큰은 사용자를 싣지 않는다").isNull();
-        assertThat(jdbc.queryForObject("SELECT user_id FROM agent_token WHERE id = ?", Long.class, id))
-                .as("묶은 뒤 user_id").isNull();
-        assertValidationFailed(() -> tokens.bindProfile(id, "other-profile"), "두 번째 묶기");
-        assertThat(jdbc.queryForObject("SELECT user_id FROM agent_token WHERE id = ?", Long.class, id))
-                .as("두 번째 묶기가 거절된 뒤 user_id").isNull();
-        assertThat(tokenRepository.findById(id).orElseThrow().profileName()).isEqualTo("shared-group");
-    }
-
-    @Test void 새로_발급한_토큰도_다른_profile_로_다시_묶지_못한다() {
-        var issued = tokens.issue("hermes-profile", "hermes");
-        assertValidationFailed(() -> tokens.bindProfile(issued.token().id(), "other-profile"), "발급한 토큰 묶기");
-    }
-
-    @Test void 폐기한_옛_토큰은_묶지_못한다() {
-        long id = McpCallSigner.insertLegacyToken(jdbc, admin.id(), "legacy-" + UUID.randomUUID(), "legacy");
-        tokens.revoke(id);
-        assertValidationFailed(() -> tokens.bindProfile(id, "shared-group"), "폐기한 토큰 묶기");
-        assertThat(tokenRepository.findById(id).orElseThrow().profileName()).isNull();
-    }
-
-    @Test void 묶을_profile_이름도_규칙을_따르고_없는_토큰은_폐기와_같은_오류다() {
-        long id = McpCallSigner.insertLegacyToken(jdbc, admin.id(), "legacy-" + UUID.randomUUID(), "legacy");
-        assertValidationFailed(() -> tokens.bindProfile(id, "Bad_Name"), "Bad_Name");
-        assertThatThrownBy(() -> tokens.bindProfile(-1L, "shared-group"))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
-    }
-
-    @Test void 설정이_거짓이면_profile_이_빈_옛_토큰은_인증하지_않는다() {
-        String raw = "legacy-" + UUID.randomUUID();
-        long id = McpCallSigner.insertLegacyToken(jdbc, admin.id(), raw, "legacy");
+    @Test void profile_이_빈_토큰은_인증하지_않고_사용_시각을_남기지_않는다() {
+        String raw = "unbound-" + UUID.randomUUID();
+        long id = McpCallSigner.insertUnboundToken(jdbc, raw, "unbound");
         assertThatThrownBy(() -> tokens.authenticate(raw))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.UNAUTHENTICATED));
         assertThat(tokenRepository.findById(id).orElseThrow().lastUsedAt()).isNull();

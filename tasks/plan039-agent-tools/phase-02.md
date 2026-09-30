@@ -11,7 +11,7 @@ Chief 가 `agent_delegate(agent_code, task)` 를 부르면 경계를 검사하�
 
 ## 컨텍스트
 
-- **옛 토큰 경로가 지워져 있어야 한다.** 운영의 모든 토큰이 profile 에 묶이고, `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸과 `McpPrincipal.legacyUserId` 가 지워진 뒤에 시작한다(ADR-037 「이 결정 뒤에 할 일」). phase 01 은 옛 경로를 남긴 채 `agent_list`, `agent_status` 만 `McpCallerResolver.resolveWithOrigin` 으로 옛 토큰을 거절하게 열었다. 옛 경로를 지우는 일은 이 phase 전의 별도 작업이다. `McpPrincipal` 에 `legacyUserId` 가 남아 있으면 `PHASE_BLOCKED: 옛 토큰 경로가 아직 남아 있다` 로 멈춘다
+- **옛 토큰 경로는 지워졌다. 이 선행 조건은 충족됐다.** 운영의 모든 토큰이 profile 에 묶였고, `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸(V35)과 `McpPrincipal.legacyUserId` 가 지워졌다(ADR-037 「이 결정 뒤에 할 일」). 요청자는 `McpCallerResolver.resolve(principal, 도구 이름, 원래 인자의 _fos_ctx)` 하나로 정하고, 그 결과 `McpCaller` 는 `user`, `originExecution`, `context` 를 늘 갖는다(생성자가 빈 값을 거절한다). 구현 전에 `McpPrincipal` 에 `legacyUserId` 가 남아 있으면 이 전제가 깨진 것이므로 `PHASE_BLOCKED: 옛 토큰 경로가 아직 남아 있다` 로 멈춘다
 - 실행을 끝까지 돌리는 코드는 이미 있다. `AgentRunner.run(user, conversation, agent, task, parentExecutionId, rootExecutionId, RunSession session, onStarted, onSubmitted, cancelled, instructionAddition)` 이 Memory 를 원래 사용자로 다시 조립하고(`ContextAssembler.assemble(user)`), 대화의 모델 선택을 쓰고, 실행 줄을 만들고, 제출하고, 끝날 때까지 기다리고, 성공, 실패, 중지를 기록한다. `onStarted` 는 실행 줄이 생긴 직후, `onSubmitted` 는 run 번호가 붙은 직후 불린다. `RunSession` 은 Hermes 에 보낼 session 과 실행 줄에 적을 session 을 하나로 묶은 값이고, 흐름의 하위 실행은 `RunSession.fresh()` 를 넘긴다
 - 자식을 여는 자리는 `ChildExecutionRunner` 다. 지금은 `requireNotAChild` 로 깊이 1 을 막고 `agents.requireReadable` 로 에이전트를 확인한다. 이 규칙은 `ResearchAndBuildFlow` 가 쓴다. 흐름은 넓히지 않는다
 - `AgentService.requireStartable(user, code)` 는 켜지지 않은 에이전트를 `AGENT_DISABLED` 로, 없거나 읽을 수 없는 것을 `AGENT_NOT_FOUND` 로 거절한다

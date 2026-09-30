@@ -120,14 +120,14 @@ public final class McpCallSigner {
     }
 
     /**
-     * profile 이 빈 옛 토큰 한 줄을 넣고 그 번호를 돌려준다.
+     * profile 이 빈 토큰 한 줄을 넣고 그 번호를 돌려준다.
      *
-     * <p>운영 코드에는 옛 방식으로 발급하는 길이 없으므로 SQL 로 재현한다.
+     * <p>V35 전에 남았을 수 있는 profile 없는 줄을 재현한다. 운영 코드에는 이런 줄을 만드는 길이 없다.
      */
-    static long insertLegacyToken(JdbcTemplate jdbc, Long userId, String rawToken, String label) {
+    static long insertUnboundToken(JdbcTemplate jdbc, String rawToken, String label) {
         String tokenHash = sha256(rawToken);
-        jdbc.update("INSERT INTO agent_token (user_id, token_hash, label, created_at) VALUES (?, ?, ?, ?)",
-                userId, tokenHash, label, Timestamp.from(Instant.now()));
+        jdbc.update("INSERT INTO agent_token (token_hash, label, created_at) VALUES (?, ?, ?)",
+                tokenHash, label, Timestamp.from(Instant.now()));
         return jdbc.queryForObject("SELECT id FROM agent_token WHERE token_hash = ?", Long.class, tokenHash);
     }
 
