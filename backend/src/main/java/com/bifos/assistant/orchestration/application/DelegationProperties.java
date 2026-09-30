@@ -15,4 +15,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "assistant.delegation")
 public record DelegationProperties(
         int maxDepth, int maxConcurrentChildren, int maxActive, Duration submitTimeout, int outputMaxChars) {
+
+    /** 값이 비었거나 0 이하이면 기동을 멈춘다. 0 이면 모든 위임이 거절되거나 답이 통째로 잘리는데 기동은 성공해 알아채지 못한다. */
+    public DelegationProperties {
+        requirePositive("max-depth", maxDepth);
+        requirePositive("max-concurrent-children", maxConcurrentChildren);
+        requirePositive("max-active", maxActive);
+        requirePositive("output-max-chars", outputMaxChars);
+        if (submitTimeout == null || submitTimeout.isZero() || submitTimeout.isNegative()) {
+            throw new IllegalStateException("assistant.delegation.submit-timeout must be positive: " + submitTimeout);
+        }
+    }
+
+    private static void requirePositive(String name, int value) {
+        if (value < 1) {
+            throw new IllegalStateException("assistant.delegation." + name + " must be at least 1: " + value);
+        }
+    }
 }

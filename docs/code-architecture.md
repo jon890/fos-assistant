@@ -35,6 +35,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `context` | 실행에 넣을 `instructions` 조립 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
+| `orchestration` | 흐름과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 
 **`mcp` 는 `orchestration` 을 부르고, `orchestration` 은 `mcp` 를 import 하지 않는다.**
@@ -613,9 +614,9 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | --- | --- |
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 「MCP 요청자」 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
-| `orchestration.application.AgentDelegationService` | `McpToolService` 가 `McpCaller` 에서 풀어 넘긴 요청자와 origin 실행을 받는다. `list`(요청자의 `AgentService.readableBy`), `status`, `delegate`, `stop` 이 있다. `status` 는 요청자의 실행이고 `delegation_key` 가 있고 origin 실행과 대화가 같은 실행만 돌려주고, 아니면 빈 값이다. origin 실행에 대화가 없으면 뿌리가 origin 실행의 뿌리와 같은지 견준다. 판정은 private 메서드 `canQuery` 한 곳에 있다. `delegate` 는 대화, 깊이, 에이전트, 같은 호출, 뿌리당 동시 한도, 전체 한도 순서로 보고 가상 스레드에서 실행을 시작한 뒤 제출까지만 기다린다. 결과는 `DelegationResult` 다. `stop` 은 `status` 와 같은 `canQuery` 로 권한을 보고, 도는 실행이면 이 프로세스가 들고 있는 그 실행의 중지 표시를 켜고 run 번호가 있으면 Hermes 에 중지를 보낸 뒤 `CANCELLED` 가 적히기를 5초까지 기다린다. 끝난 실행은 멈추지 않고 그대로 돌려준다. 상태는 실행을 돌리는 가상 스레드만 적는다. 위임 자식의 run 번호가 붙으면 뿌리 turn 에 붙여(`TurnCancellation.trackRun`) 사용자가 turn 을 멈출 때 함께 멈추게 한다 |
+| `orchestration.application.AgentDelegationService` | `McpToolService` 가 `McpCaller` 에서 풀어 넘긴 요청자와 origin 실행을 받는다. `list`(요청자의 `AgentService.readableBy`), `status`, `delegate`, `stop` 이 있다. `status` 는 요청자의 실행이고 `delegation_key` 가 있고 origin 실행과 대화가 같은 실행만 돌려주고, 아니면 빈 값이다. origin 실행에 대화가 없으면 뿌리가 origin 실행의 뿌리와 같은지 견준다. 판정은 private 메서드 `canQuery` 한 곳에 있다. `delegate` 는 대화, 깊이, 에이전트, 같은 호출, 뿌리당 동시 한도, 전체 한도 순서로 보고 가상 스레드에서 실행을 시작한 뒤 제출까지만 기다린다. 뿌리별 잠금도 제출 대기 시간 안에서만 기다린다. 결과는 `DelegationResult` 다. `stop` 은 `status` 와 같은 `canQuery` 로 권한을 보고, 도는 실행이면 이 프로세스가 들고 있는 그 실행의 중지 표시를 켜고 run 번호가 있으면 Hermes 에 중지를 보낸 뒤 `CANCELLED` 가 적히기를 5초까지 기다린다. 결과는 실행 줄과 실제로 중지를 요청했는지를 담은 `DelegationStop` 이다. 끝난 실행은 멈추지 않고 그대로 돌려준다. 상태는 실행을 돌리는 가상 스레드만 적는다. 위임 자식의 run 번호가 붙으면 뿌리 turn 에 붙여(`TurnCancellation.trackRun`) 사용자가 turn 을 멈출 때 함께 멈추게 한다. turn 의 중지는 흐름과 같이 확정된 뒤에만 자식에 적용한다. 요청 스레드와 실행 스레드가 주고받는 상태는 `Handoff`(포기와 줄 생성 중 먼저 온 쪽), 도는 실행의 중지 표시와 run 번호는 `RunningDelegation` 이 갖는다 |
 | `usage.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. `agent_execution.delegation_key` 칸의 값이라 `usage` 에 둔다. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
-| `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간, 실행 줄에 적는 답의 길이 상한(`outputMaxChars`) |
+| `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간, 실행 줄에 적는 답의 길이 상한(`outputMaxChars`). 값이 1 미만이거나 `submitTimeout` 이 비었거나 0 이하면 기동에서 멈춘다 |
 | `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다. 뿌리 번호는 `AgentExecution.treeRootId()` 로 정한다. `agent_status` 는 대화로 견주고, origin 실행에 대화가 없을 때만 같은 메서드로 나무를 견준다 |
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |
 
@@ -632,6 +633,9 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 깊이는 부모의 `parent_execution_id` 를 따라 올라가 센다. 사용자가 부른 실행이 0 이다.
 흐름은 깊이 1 그대로이고 위임만 이 설정값을 쓴다.
 뿌리당 동시 자식은 같은 `root_execution_id` 아래 `delegation_key` 가 있는 도는 실행의 수로 센다. Memory 제안처럼 위임이 아닌 자식은 세지 않는다.
+
+**서버 한 대를 전제로 한다.** 같은 호출 확인부터 실행 줄 저장까지는 뿌리별 JVM 잠금으로 묶고, 전체 한도는 프로세스 안의 세마포어로 센다.
+서버를 여러 대로 늘리면 둘을 데이터베이스 잠금으로 옮긴다.
 
 ### `ResearchAndBuildFlow`
 

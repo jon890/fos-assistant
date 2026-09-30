@@ -146,13 +146,17 @@ public class AgentRunner {
                 choice.model(),
                 choice.reasoningEffort());
 
-        String runId;
+        String runId = null;
         try {
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             onSubmitted.accept(execution, runId);
             append(execution, ExecutionEventType.RUN_STARTED, null, 1);
         } catch (RuntimeException ex) {
+            if (runId != null) {
+                // 제출은 됐다. 실행 줄을 FAILED 로 적은 뒤에도 Hermes 에서 돌지 않게 멈춘다.
+                stopSubmitted(agent, execution, runId);
+            }
             return fail(execution, ex, 1);
         }
 
@@ -212,6 +216,15 @@ public class AgentRunner {
         append(failed, ExecutionEventType.RUN_FAILED, code, sequence);
         log.warn("흐름의 한 단계가 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
         return new Run(failed, ChildResult.failed(failed.id(), code), null);
+    }
+
+    /** 제출한 뒤 실패로 끝내는 run 에 중지를 한 번 보낸다. 보내지 못해도 실패로 끝내는 것은 그대로라 로그만 남긴다. */
+    private void stopSubmitted(Agent agent, AgentExecution execution, String runId) {
+        try {
+            hermes.stop(agent.apiBaseUrl(), agent.hermesProfile(), runId);
+        } catch (RuntimeException ex) {
+            log.warn("실패로 끝내는 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", execution.id(), runId, ex);
+        }
     }
 
     /**

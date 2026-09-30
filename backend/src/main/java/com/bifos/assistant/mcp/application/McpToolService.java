@@ -93,7 +93,7 @@ public class McpToolService {
                                 "properties", Map.of("execution_id", Map.of("type", "integer")),
                                 "required", List.of("execution_id"))),
                 Map.of("name", "agent_stop",
-                        "description", "다른 에이전트에게 맡긴 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 그 실행이 다시 맡긴 실행은 멈추지 않는다. 이미 끝난 실행은 끝난 상태를 그대로 돌려준다. 아직 RUNNING 이면 stop_requested 가 true 이고, 결과는 agent_status 로 다시 읽는다.",
+                        "description", "다른 에이전트에게 맡긴 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 그 실행이 다시 맡긴 실행은 멈추지 않는다. 이미 끝난 실행은 끝난 상태를 그대로 돌려준다. 중지를 요청했는데 아직 RUNNING 이면 stop_requested 가 true 이고, 결과는 agent_status 로 다시 읽는다. stop_requested 가 없는 RUNNING 은 멈추지 못한 것이다.",
                         "inputSchema", Map.of(
                                 "type", "object",
                                 "additionalProperties", false,
@@ -164,14 +164,16 @@ public class McpToolService {
     /**
      * 맡긴 실행 하나를 멈추고 그 뒤의 상태를 {@link #agentStatus} 와 같은 모양의 JSON 글로 돌려준다.
      *
-     * <p>짧게 기다려도 아직 {@code RUNNING} 이면 {@code stop_requested: true} 를 더한다. 이미 끝난 실행은 멈추지 않고 끝난
-     * 상태를 준다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
+     * <p>짧게 기다려도 아직 {@code RUNNING} 이고 이번 호출이 실제로 중지 표시를 켰거나 Hermes 에 중지를 보냈으면
+     * {@code stop_requested: true} 를 더한다. run 번호가 없어 아무것도 보내지 못한 끊긴 실행은 {@code RUNNING} 만 준다.
+     * 이미 끝난 실행은 멈추지 않고 끝난 상태를 준다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
      */
     public Map<String, Object> agentStop(McpCaller caller, Long executionId) {
         return delegations.stop(caller.user(), caller.originExecution(), executionId)
-                .map(execution -> {
+                .map(stop -> {
+                    AgentExecution execution = stop.execution();
                     Map<String, Object> status = statusOf(execution);
-                    if (execution.status() == ExecutionStatus.RUNNING) {
+                    if (execution.status() == ExecutionStatus.RUNNING && stop.stopRequested()) {
                         status.put("stop_requested", true);
                     }
                     return result(json.writeValueAsString(status), false);

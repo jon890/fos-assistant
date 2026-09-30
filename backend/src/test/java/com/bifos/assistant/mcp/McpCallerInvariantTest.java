@@ -53,7 +53,7 @@ class McpCallerInvariantTest {
     }
 
     @Test
-    void profile_이_빈_토큰은_목록과_네_도구_모두_401_이고_사용_시각을_남기지_않는다() throws Exception {
+    void profile_이_빈_토큰은_목록과_모든_도구가_401_이고_사용_시각을_남기지_않는다() throws Exception {
         Map<String, String> requests = new LinkedHashMap<>();
         requests.put("tools/list", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}");
         toolArguments().forEach((name, arguments) -> {
@@ -90,7 +90,7 @@ class McpCallerInvariantTest {
     }
 
     @Test
-    void profile_에_묶인_토큰도_fos_ctx_가_없으면_네_도구_모두_호출_맥락_오류다() throws Exception {
+    void profile_에_묶인_토큰도_fos_ctx_가_없으면_모든_도구가_호출_맥락_오류다() throws Exception {
         String bound = tokens.issue(PROFILE, "bound").rawToken();
 
         for (Map.Entry<String, ObjectNode> tool : toolArguments().entrySet()) {
@@ -108,6 +108,7 @@ class McpCallerInvariantTest {
         arguments.put("memory_read", json.createObjectNode().put("id", 1));
         arguments.put("artifact_write", json.createObjectNode());
         arguments.put("agent_list", json.createObjectNode());
+        arguments.put("agent_delegate", json.createObjectNode().put("agent_code", "worker").put("task", "일"));
         arguments.put("agent_status", json.createObjectNode().put("execution_id", 1));
         arguments.put("agent_stop", json.createObjectNode().put("execution_id", 1));
         return arguments;

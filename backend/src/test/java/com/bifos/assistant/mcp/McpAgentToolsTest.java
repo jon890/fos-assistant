@@ -692,6 +692,17 @@ class McpAgentToolsTest {
     }
 
     @Test
+    void 이_프로세스가_돌리지_않는_RUNNING_실행에_run_번호가_없으면_아무것도_보내지_않고_stop_requested_를_주지_않는다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution orphan = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+
+        assertStatus(agentStop(sharedToken, root, orphan.id()),
+                "{\"execution_id\":" + orphan.id() + ",\"status\":\"RUNNING\"}");
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
     void 남의_실행과_다른_대화의_실행과_위임이_아닌_실행의_agent_stop_은_없는_번호와_같은_응답이다() throws Exception {
         AgentExecution firstTurn = McpCallSigner.save(executions, userA.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
                 ExecutionStatus.SUCCEEDED);

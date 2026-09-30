@@ -19,10 +19,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,27 +125,27 @@ public class AgentDelegationService {
      * 기다리고, 그 안에 적히지 않으면 RUNNING 인 줄을 그대로 돌려준다. 부르는 쪽은 그것을 중지를 요청한 상태로 읽는다.
      *
      * <p>이 프로세스에 중지 표시가 없는 도는 실행은 서버가 다시 떠 끊긴 실행이다. 기동 정리가 그 줄을 끝내므로 상태를
-     * 기다리지 않고, run 번호가 있으면 Hermes 에 중지만 보낸다.
+     * 기다리지 않고, run 번호가 있으면 Hermes 에 중지만 보낸다. run 번호가 없거나 보내지 못하면 아무것도 멈추지 않았으므로
+     * {@link DelegationStop#stopRequested()} 가 거짓이다.
      */
-    public Optional<AgentExecution> stop(CurrentUser user, AgentExecution origin, Long executionId) {
+    public Optional<DelegationStop> stop(CurrentUser user, AgentExecution origin, Long executionId) {
         Optional<AgentExecution> found = status(user, origin, executionId);
         if (found.isEmpty() || found.get().status() != ExecutionStatus.RUNNING) {
-            return found;
+            return found.map(execution -> new DelegationStop(execution, false));
         }
         AgentExecution execution = found.get();
         RunningDelegation delegation = running.get(executionId);
         if (delegation == null) {
-            if (execution.hermesRunId() != null) {
-                stopDetached(execution);
-            }
-            return executions.findById(executionId);
+            boolean sent = execution.hermesRunId() != null && stopDetached(execution);
+            return executions.findById(executionId).map(reread -> new DelegationStop(reread, sent));
         }
         String runId = delegation.requestStop();
         if (runId != null) {
             sendStop(delegation, runId);
         }
         delegation.awaitEnded(STOP_WAIT);
-        return executions.findById(executionId);
+        // 중지 표시는 켜졌다. Hermes 에 보내지 못했어도 실행이 끝날 때 CANCELLED 로 적힌다.
+        return executions.findById(executionId).map(reread -> new DelegationStop(reread, true));
     }
 
     /**
@@ -157,7 +155,8 @@ public class AgentDelegationService {
      * <p>판정은 이 순서로 한다. 부모의 대화, 깊이, 에이전트, 같은 호출, 뿌리당 동시 한도, 전체 한도, 실행 시작, 제출 대기다.
      * 앞의 셋은 잠그지 않고 기다리지 않는다. 같은 호출 확인부터 실행 줄 저장까지는 뿌리별로 잠가, 세기와 시작 사이에
      * 다른 위임이 끼어들지 못하게 한다. 제출 대기는 잠금 밖에서 한다. 잠금이 제출 대기까지 덮으면 같은 뿌리의 위임이
-     * 모두 한 줄로 늘어선다.
+     * 모두 한 줄로 늘어선다. 잠금도 {@link DelegationProperties#submitTimeout()} 안에서만 기다리고, 그 안에 잡지 못하거나
+     * 잡은 뒤 남은 시간이 없으면 실행을 시작하지 않고 거절한다.
      *
      * <p>실행은 가상 스레드 하나에서 끝까지 돌고, 답은 그 실행 줄의 {@code output_text} 에 SUCCEEDED 와 함께 적힌다.
      * 제출 대기가 {@link DelegationProperties#submitTimeout()} 을 넘어도 실행 줄이 생겼으면 번호를 돌려준다. 줄도 생기지
@@ -197,7 +196,11 @@ public class AgentDelegationService {
         long deadline = System.nanoTime() + properties.submitTimeout().toNanos();
         Handoff handoff;
         ReentrantLock lock = lockOf(rootId);
-        lock.lock();
+        // 잠금도 제출 대기 시간 안에서만 기다린다. 못 잡으면 스레드도 줄도 만들지 않아, 같은 키로 다시 불러도 새로 시작한다.
+        // 한도에 닿은 것이 아니라 제한 시간이 지난 것이라 BUSY 가 아니라 SUBMIT_FAILED 다.
+        if (!tryLock(lock, deadline)) {
+            return rejected(Failure.SUBMIT_FAILED, origin, "제한 시간 안에 뿌리 잠금을 잡지 못했다");
+        }
         try {
             Optional<AgentExecution> existing = executions.findByDelegationKey(delegationKey.value());
             if (existing.isPresent()) {
@@ -206,6 +209,10 @@ public class AgentDelegationService {
             if (executions.countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(rootId, ExecutionStatus.RUNNING)
                     >= properties.maxConcurrentChildren()) {
                 return rejected(Failure.TOO_MANY_CHILDREN, origin, "뿌리당 동시 위임 한도에 닿았다");
+            }
+            // 남은 시간이 없으면 실행 스레드를 띄우지 않는다. 띄우면 곧바로 포기하게 되고 CANCELLED 줄만 남는다.
+            if (deadline - System.nanoTime() <= 0) {
+                return rejected(Failure.SUBMIT_FAILED, origin, "실행을 시작하기 전에 제한 시간이 지났다");
             }
             if (!activeDelegations.tryAcquire()) {
                 return rejected(Failure.BUSY, origin, "서버 전체 동시 위임 한도에 닿았다");
@@ -253,7 +260,7 @@ public class AgentDelegationService {
      * <p>어떻게 끝나든 전체 한도 자리를 돌려주고 요청 스레드를 깨운다. 실행 줄 저장이 예외를 던진 경로도 같다.
      *
      * <p>실행은 셋 가운데 하나가 참이면 멈춘다. 요청 스레드가 제출 대기를 포기했다, {@code agent_stop} 이 중지 표시를
-     * 켰다, 사용자가 뿌리 turn 을 멈췄다. run 번호가 붙으면 뿌리 turn 에 그 run 을 붙여, 사용자가 turn 을 멈출 때 이
+     * 켰다, 사용자가 뿌리 turn 을 멈췄다({@link #rootTurnStopped}). run 번호가 붙으면 뿌리 turn 에 그 run 을 붙여, 사용자가 turn 을 멈출 때 이
      * 실행도 함께 멈추게 한다. turn 이 이미 끝났으면 붙일 곳이 없어 붙지 않는다.
      */
     private void run(
@@ -277,7 +284,7 @@ public class AgentDelegationService {
                     delegationKey,
                     execution -> {
                         // 번호를 돌려받은 쪽이 곧바로 멈출 수 있게, 요청 스레드를 깨우기 전에 중지 표시를 등록한다.
-                        delegation.executionId = execution.id();
+                        delegation.bindExecution(execution.id());
                         running.put(execution.id(), delegation);
                         handoff.onRowCreated(execution);
                     },
@@ -288,7 +295,7 @@ public class AgentDelegationService {
                         }
                         turns.trackRun(rootId, agent.apiBaseUrl(), agent.hermesProfile(), runId);
                     },
-                    () -> handoff.abandoned() || delegation.stopRequested() || turns.isCancelled(rootId));
+                    () -> handoff.abandoned() || delegation.stopRequested() || rootTurnStopped(rootId));
         } catch (DataIntegrityViolationException ex) {
             failure = ex;
             log.info("같은 위임 키의 실행 줄이 먼저 저장됐다 originExecutionId={}", origin.id());
@@ -296,7 +303,7 @@ public class AgentDelegationService {
             failure = ex;
             log.warn("위임 실행이 예외로 끝났다 originExecutionId={}", origin.id(), ex);
         } finally {
-            Long executionId = delegation.executionId;
+            Long executionId = delegation.executionId();
             if (executionId != null) {
                 running.remove(executionId, delegation);
             }
@@ -314,19 +321,21 @@ public class AgentDelegationService {
     /** 중지를 보낸다. 보내지 못해도 중지 표시는 켜진 채라, 실행이 끝날 때 CANCELLED 로 적힌다. */
     private void sendStop(RunningDelegation delegation, String runId) {
         try {
-            hermes.stop(delegation.apiBaseUrl, delegation.profileName, runId);
+            hermes.stop(delegation.apiBaseUrl(), delegation.profileName(), runId);
         } catch (RuntimeException ex) {
-            log.warn("위임 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", delegation.executionId, runId, ex);
+            log.warn("위임 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", delegation.executionId(), runId, ex);
         }
     }
 
-    /** 이 프로세스에 중지 표시가 없는 실행의 run 에 중지만 보낸다. */
-    private void stopDetached(AgentExecution execution) {
+    /** 이 프로세스에 중지 표시가 없는 실행의 run 에 중지만 보낸다. 보냈으면 참이다. */
+    private boolean stopDetached(AgentExecution execution) {
         try {
             Agent agent = agents.requireById(execution.agentId());
             hermes.stop(agent.apiBaseUrl(), execution.profileName(), execution.hermesRunId());
+            return true;
         } catch (RuntimeException ex) {
             log.warn("끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={}", execution.id(), ex);
+            return false;
         }
     }
 
@@ -373,6 +382,27 @@ public class AgentDelegationService {
         return rootLocks[Math.floorMod(rootId.hashCode(), ROOT_LOCK_STRIPES)];
     }
 
+    /** 마감 시각까지 잠금을 기다린다. 끊기면 잡지 못한 것과 같게 보고 끊긴 표시는 되살린다. */
+    private static boolean tryLock(ReentrantLock lock, long deadline) {
+        try {
+            return lock.tryLock(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
+     * 사용자가 뿌리 turn 을 멈췄는지 본다. 흐름의 하위 실행과 같은 판정이다.
+     *
+     * <p>중지 버튼을 누른 것만으로는 멈춘 것으로 보지 않는다. Hermes 가 중지를 받아들여 확정된 뒤에만 참이다. 중지를 보내지
+     * 못하면 turn 은 원래대로 돌아가는데, 그 사이에 이 실행이 끝나면 멀쩡한 답을 CANCELLED 로 적게 된다. 뿌리 turn 에 붙은
+     * run 이 하나도 없어 Hermes 에 보낼 곳이 없는 중지는 확정을 기다리지 않고 참이다.
+     */
+    private boolean rootTurnStopped(Long rootId) {
+        return turns.isStopConfirmed(rootId) || turns.shouldStopBeforeSubmit(rootId);
+    }
+
     /** 이유는 로그에만 남긴다. 밖으로는 실패 코드만 나간다. */
     private static DelegationResult rejected(Failure failure, AgentExecution origin, String reason) {
         log.warn("위임을 시작하지 않았다 originExecutionId={} failure={} reason={}", origin.id(), failure, reason);
@@ -394,155 +424,5 @@ public class AgentDelegationService {
             return Objects.equals(execution.conversationId(), origin.conversationId());
         }
         return Objects.equals(execution.treeRootId(), origin.treeRootId());
-    }
-
-    /**
-     * 도는 위임 실행 하나의 중지 표시와 run 참조다.
-     *
-     * <p>「중지 표시를 켠다」 와 「run 번호를 붙인다」 는 같은 잠금 안에서 한다. 따로 하면 중지가 run 번호를 못 본 직후
-     * 번호가 붙고, 붙이는 쪽도 중지 표시를 못 봐 누구도 Hermes 에 중지를 보내지 않는다. 한 잠금 안에서 하면 둘 가운데
-     * 늦은 쪽이 앞의 것을 보고 한 번만 보낸다.
-     */
-    private static final class RunningDelegation {
-
-        private final String apiBaseUrl;
-        private final String profileName;
-        /** 실행 줄이 생기면 적힌다. */
-        private volatile Long executionId;
-        private String runId;
-        private boolean stopRequested;
-        /** 실행이 상태를 적고 끝나면 열린다. */
-        private final CountDownLatch ended = new CountDownLatch(1);
-
-        RunningDelegation(String apiBaseUrl, String profileName) {
-            this.apiBaseUrl = apiBaseUrl;
-            this.profileName = profileName;
-        }
-
-        /** 중지 표시를 켠다. 이미 붙은 run 번호가 있으면 그것을 돌려주고, 부르는 쪽이 Hermes 에 중지를 보낸다. */
-        synchronized String requestStop() {
-            stopRequested = true;
-            return runId;
-        }
-
-        /** run 번호를 붙인다. 중지 표시가 먼저 켜졌으면 참이고, 부르는 쪽이 Hermes 에 중지를 보낸다. */
-        synchronized boolean attachRun(String submittedRunId) {
-            runId = submittedRunId;
-            return stopRequested;
-        }
-
-        synchronized boolean stopRequested() {
-            return stopRequested;
-        }
-
-        synchronized String runId() {
-            return runId;
-        }
-
-        void markEnded() {
-            ended.countDown();
-        }
-
-        /** 실행이 끝나기를 기다린다. 끊기면 기다리기를 그만두고 끊긴 표시는 되살린다. */
-        void awaitEnded(Duration limit) {
-            try {
-                ended.await(limit.toMillis(), TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
-    /**
-     * 요청 스레드와 실행 스레드가 주고받는 상태다.
-     *
-     * <p>「실행 줄이 생겼다」 와 「요청 스레드가 포기했다」 는 {@link #stage} 하나에서 compareAndSet 으로 정한다. 둘을
-     * 따로 두면 요청 스레드가 줄이 없다고 본 직후 줄이 생겨 취소 확인을 지나 제출될 수 있다. 그러면 도구는 실패를 줬는데
-     * 실행은 Hermes 에서 끝까지 돈다.
-     */
-    private static final class Handoff {
-
-        private enum Stage {
-            /** 실행 줄을 아직 만들지 않았다 */
-            WAITING,
-            /** 실행 줄이 생겼다 */
-            ROW_CREATED,
-            /** 실행 줄을 만들기 전에 끝났다 */
-            NO_ROW,
-            /** 요청 스레드가 기다리다 포기했다. 뒤늦게 줄이 생기면 제출하지 않고 CANCELLED 로 끝난다 */
-            ABANDONED
-        }
-
-        private final AtomicReference<Stage> stage = new AtomicReference<>(Stage.WAITING);
-        /** 실행 줄이 생겼거나 줄 없이 끝났을 때 열린다. */
-        private final CountDownLatch rowDecided = new CountDownLatch(1);
-        /** 제출했거나 실행이 끝났을 때 열린다. */
-        private final CountDownLatch settled = new CountDownLatch(1);
-        private volatile AgentExecution execution;
-        private volatile boolean submitted;
-        private volatile RuntimeException failure;
-
-        /** 실행 스레드가 실행 줄을 만든 직후 부른다. 요청 스레드가 먼저 포기했으면 상태는 그대로 ABANDONED 다. */
-        void onRowCreated(AgentExecution created) {
-            execution = created;
-            stage.compareAndSet(Stage.WAITING, Stage.ROW_CREATED);
-            rowDecided.countDown();
-        }
-
-        void markSubmitted() {
-            submitted = true;
-            settled.countDown();
-        }
-
-        /** 실행 스레드가 끝날 때 부른다. 줄을 만들기 전에 끝났으면 그 예외를 남긴다. */
-        void markEnded(RuntimeException cause) {
-            failure = cause;
-            stage.compareAndSet(Stage.WAITING, Stage.NO_ROW);
-            rowDecided.countDown();
-            settled.countDown();
-        }
-
-        /** 요청 스레드가 포기한다. 실행 줄이 이미 생겼으면 거짓이고 그 줄을 돌려줘야 한다. */
-        boolean abandon() {
-            return stage.compareAndSet(Stage.WAITING, Stage.ABANDONED);
-        }
-
-        boolean abandoned() {
-            return stage.get() == Stage.ABANDONED;
-        }
-
-        boolean rowCreated() {
-            return stage.get() == Stage.ROW_CREATED;
-        }
-
-        boolean submitted() {
-            return submitted;
-        }
-
-        AgentExecution execution() {
-            return execution;
-        }
-
-        RuntimeException failure() {
-            return failure;
-        }
-
-        boolean awaitRowDecided(long deadline) {
-            return await(rowDecided, deadline);
-        }
-
-        boolean awaitSettled(long deadline) {
-            return await(settled, deadline);
-        }
-
-        /** 끊기면 제한 시간이 지난 것과 같게 본다. 끊긴 표시는 되살린다. */
-        private static boolean await(CountDownLatch latch, long deadline) {
-            try {
-                return latch.await(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
     }
 }
