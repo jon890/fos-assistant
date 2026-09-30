@@ -1,137 +1,110 @@
-# Phase 05. web 에 eslint 를 두고 `scripts/quality.sh` 로 한 번에 검사하고 고친다
+# Phase 05. Spotless 와 palantir-java-format 으로 바뀐 파일만 포맷한다
 
 **Execution profile**: standard
 
 ## 목표
 
-web 에 eslint 를 실제로 설치해 `pnpm lint` 가 돌게 한다. 기존 위반은 기준 파일에 둔다.
-backend 의 품질 검사를 Gradle 태스크 `qualityCheck` 하나로 묶는다.
-`scripts/quality.sh check` 와 `scripts/quality.sh fix` 를 진입점으로 두고, CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
+Java 포맷을 Spotless 설정으로 정하고, `origin/main` 에서 바뀐 파일만 검사하고 고친다.
+이 브랜치가 앞 phase 에서 바꾼 Java 파일을 이 phase 에서 포맷해, 포맷 변경이 한 커밋에 모이게 한다.
 
-**범위 외**: Prettier, 새 lint 규칙 작성, 기존 위반 수정.
+**범위 외**: 저장소 전체 포맷, OpenRewrite 자동 수정(phase 06), web 포맷(phase 07), `qualityCheck` 와 `scripts/quality.sh`, CI(phase 08).
 
 ## 컨텍스트
 
-- `web/package.json` 에 `"lint": "eslint"` 스크립트만 있고 eslint 패키지와 설정 파일이 없다. 지금 `pnpm lint` 는 명령을 찾지 못해 실패한다
-- next 는 `16.0.10` 이다. `eslint-config-next@16.0.10` 은 `eslint >=9` 를 요구하고 `typescript-eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `@next/eslint-plugin-next` 등을 가져온다
-- eslint 는 9.39.x 줄을 쓴다. 10 은 위 플러그인들이 아직 전제하지 않는다. ESLint 9.24 부터 기존 위반을 `eslint-suppressions.json` 에 두는 bulk suppressions 가 있다(`--suppress-all`, `--suppress-rule`, `--prune-suppressions`)
-- Node 는 `22.18.0`, pnpm 은 `10.22.0` 이다(`web/package.json`, `.github/workflows/ci.yml`)
-- backend 태스크는 앞 phase 가 만들었다. `archTest`(phase 01), `checkstyleMain`, `checkstyleTest`(phase 03), `spotlessCheck`, `spotlessApply`(phase 04). ArchUnit 기준을 줄이는 속성은 `-Parchunit.freeze.store.default.allowStoreUpdate=true` 다(`backend/AGENTS.md` 「구조 규칙」)
-- CI 는 `.github/workflows/ci.yml` 이다. 모든 job 이 `actions/checkout` 을 `persist-credentials: false` 로 쓰고 깊이를 정하지 않는다(기본 1). ratchet 에는 `origin/main` 이력이 필요하다
-- AGENTS.md 「확인」 절에 명령 여섯 줄이 있고, 그 아래 문장이 「위 여섯 검사」 와 CI job 이름 `backend`, `web`, `e2e`, `unit`, `public-safe` 를 적는다
+- 포매터는 palantir-java-format 2.100.0 이다. 선택 까닭은 ADR-040 「대안 기각」 에 있다. 들여쓰기 4칸, 한 줄 120자다
+- 2026-09-30 에 같은 코드로 측정했다. 저장소 전체에 적용하면 palantir 는 337개 중 258개 파일, google 기본 모양은 337개, AOSP 모양은 307개 파일이 바뀐다
+- Spotless Gradle 플러그인 8.10.3. `ratchetFrom("origin/main")` 이면 `origin/main` 과 내용이 다른 파일만 검사한다
+- 이 phase 를 돌리는 작업 공간은 git linked worktree 일 수 있다. Spotless 의 ratchet 은 JGit 으로 저장소를 연다
+- 앞 phase 들이 바꾼 Java 파일은 `git diff --name-only origin/main -- 'backend/src/**/*.java'` 로 본다. phase 02 가 테스트 파일 약 110개를 바꿨으므로 그 파일들도 이번에 포맷된다
+- phase 04 의 Checkstyle 은 줄 길이와 들여쓰기를 판정하지 않는다. 포맷 뒤에도 error 0건으로 통과해야 한다. palantir 가 한 줄 본문을 여러 줄로 나누는지 확인해 phase 04 의 `LeftCurly`, `RightCurly`, `OneStatementPerLine` 과 어긋나지 않는지 본다. 어긋나면(포맷한 결과가 Checkstyle 에 걸리면) 멈추고 보고한다
 
 **근거 문서**: `docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
 ## 의도 메모
 
-- **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. 합친 뒤 들어온 한국어 테스트 이름과 새 위반이 있으면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그런 변경이 있으면 회신에 파일 목록을 적는다
-- 코디네이터가 2026-09-30 에 eslint 설치와 bulk suppressions 방식을 정했다. 넣은 규칙 묶음, 기준에 든 위반 수, 기준 갱신 방법을 `web/AGENTS.md` 와 PR 본문에 적는다
-- `check` 는 파일을 바꾸지 않는다. 종료 코드로 알린다. backend 와 web 을 모두 돌린 뒤 하나라도 실패했으면 0 이 아닌 값으로 끝난다
-- `fix` 는 사람이 판단하지 않아도 되는 것만 고친다. Spotless 포맷, `eslint --fix`, 고친 위반을 기준에서 빼기(ArchUnit 기준 줄이기, `eslint --prune-suppressions`)다. 새 위반을 기준에 더하지 않는다. 고친 뒤 `check` 를 돌려 남은 위반을 「사람이 판단할 위반」 으로 보인다
-- Checkstyle 기준은 스스로 줄지 않는다. `fix` 는 Checkstyle 기준을 고치지 않는다
+- **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. ratchet 은 합친 코드와 `origin/main` 의 공통 조상을 비교한다
+- 합친 main 코드가 새 ArchUnit 간선 위반, 새 Checkstyle 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다. 새 위반을 다시 얼릴 때는 그 규칙 하나만 대상으로 삼는다
+- `ratchetFrom` 은 사용자가 고른 방식이다. 저장소 전체를 한 번에 포맷하지 않는다
+- 포매터가 import 순서와 쓰지 않는 import 도 정리한다. `removeUnusedImports()` 를 따로 걸지 않는다(palantir 가 한다). 실제로 그런지 작업 항목 3 에서 본다
+- Javadoc 본문 포맷은 켜지 않는다(`formatJavadoc(false)`, 기본값). 한국어 Javadoc 의 줄바꿈을 바꾸지 않는다
+- Spotless 8.10.3 이 쓰는 spotless-lib-extra 의 `GitRatchet` 은 `RevFilter.MERGE_BASE` 로 **`HEAD` 와 `origin/main` 의 공통 조상**과 작업 트리를 비교하고, `commondir` 로 linked worktree 를 연다(critic 이 소스로 확인했다). 그래서 로컬 `origin/main` 이 앞서 나가도 이 브랜치가 고치지 않은 파일은 잡히지 않는다. 다만 `git fetch` 를 오래 하지 않아 공통 조상이 옛 커밋이면 그 뒤 main 에 들어온 파일은 비교 대상이 아니다
+
+## Blocked 조건
+
+- linked worktree 에서 `./gradlew spotlessCheck` 가 저장소를 열지 못한다 → `PHASE_BLOCKED: Spotless ratchet 이 linked worktree 에서 git 저장소를 열지 못한다` 와 전체 오류를 남기고 멈춘다
 
 ## 작업 항목
 
-### 1. web 의 eslint
+### 1. `backend/gradle/libs.versions.toml`, `backend/build.gradle.kts`
 
-- `web/package.json` 의 `devDependencies` 에 `eslint` 를 `9.39.5`, `eslint-config-next` 를 `16.0.10` 으로 정확한 버전(`^` 없이) 더한다. `pnpm install` 로 `web/pnpm-lock.yaml` 을 갱신한다
-- `web/eslint.config.mjs` (신규): `eslint/config` 의 `defineConfig`, `globalIgnores` 로 `eslint-config-next/core-web-vitals` 와 `eslint-config-next/typescript` 를 펼치고, `.next/**`, `out/**`, `build/**`, `next-env.d.ts` 를 무시한다. 머리에 한국어 주석으로 규칙 이유와 기준 갱신 방법이 `web/AGENTS.md` 에 있다고 적는다
-- 기존 위반을 기준에 둔다
+- `[versions]` 에 `spotless = "8.10.3"`, `palantir-java-format = "2.100.0"`
+- `[plugins]` 에 `spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }`
+- `plugins` 에 `alias(libs.plugins.spotless)`
+- 설정
 
-  ```bash
-  # cwd: web/
-  pnpm exec eslint --suppress-all
-  pnpm lint   # 0 으로 끝난다
+  ```kotlin
+  spotless {
+      ratchetFrom("origin/main")
+      java {
+          target("src/main/java/**/*.java", "src/test/java/**/*.java")
+          palantirJavaFormat(libs.versions.palantir.java.format.get())
+          trimTrailingWhitespace()
+          endWithNewline()
+      }
+  }
   ```
 
-  `web/eslint-suppressions.json` 을 커밋한다. 규칙별 위반 수를 센다. 위반이 0건이라 파일이 생기지 않으면 그 사실을 보고하고 변경 파일 표에서 뺀다
-- `pnpm typecheck` 와 `pnpm build` 가 그대로 통과하는지 본다. `pnpm build` 에 필요한 환경 변수는 `web/AGENTS.md` 에 있다
+  위에 한국어 주석으로 ratchet 이 무엇을 뜻하는지와 ADR-040 을 적는다
 
-### 2. `backend/build.gradle.kts` 의 `qualityCheck`
+### 2. 이 브랜치가 바꾼 파일을 포맷한다
 
-- `tasks.register("qualityCheck")`: `group = "verification"`, 설명은 한국어. `dependsOn("archTest", "checkstyleMain", "checkstyleTest", "spotlessCheck")`
+```bash
+# cwd: backend/
+./gradlew spotlessApply
+```
 
-### 3. `scripts/quality.sh` (신규, 실행 권한)
+- 바뀐 파일이 `git diff --name-only origin/main` 의 Java 파일 안에만 있는지 본다. 밖의 파일이 바뀌면 ratchet 이 동작하지 않은 것이다. 되돌리고 원인을 찾는다
+- 포맷만 바뀌었는지 본다. `./gradlew test` 의 `tests` 합계가 phase 04 끝과 같다
 
-- `#!/usr/bin/env bash`, `set -euo pipefail`. 저장소 root 는 스크립트 위치에서 구한다
-- 인자 `check` 또는 `fix`. 그 밖이면 사용법을 내고 2 로 끝난다
-- `web/node_modules` 가 없으면 `cd web && pnpm install --frozen-lockfile` 을 먼저 하라고 알리고 1 로 끝난다
-- `check`
-  1. `(cd backend && ./gradlew qualityCheck)`
-  2. `(cd web && pnpm lint)`
-  3. 둘 다 돌린 뒤 결과를 한 줄씩 요약하고, 하나라도 실패했으면 1 로 끝난다
-- `fix`
-  1. `(cd backend && ./gradlew spotlessApply archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true)`
-  2. `(cd web && pnpm exec eslint --fix --prune-suppressions)`. ESLint 9.39.5 는 쓰지 않는 기준 항목이 남으면 2 를 돌려주므로 두 명령을 `&&` 로 잇지 않고 한 번에 준다
-  3. 1, 2 단계의 종료 코드는 받아 두기만 하고 멈추지 않는다(`set -e` 아래에서 `|| status=$?` 처럼 받는다). 고칠 수 없는 새 위반이 있어도 3 단계까지 가야 한다
-  4. `check` 를 돌린다. 실패하면 「사람이 판단할 위반」 이라고 알리고 그 종료 코드로 끝난다
-- 주석과 출력 문구는 한국어로 쓴다
-
-### 4. `test/unit/quality-script.test.ts` (신규)
-
-`node:test` 와 `node:assert/strict` 로 `scripts/quality.sh` 의 인자 처리를 검사한다. `test/unit/design-tokens.test.ts` 처럼 저장소 root 의 파일을 읽는 테스트의 경로 구하는 방식을 따른다. `node:child_process` 의 `spawnSync("bash", [스크립트 경로, ...인자])` 로 부른다.
-
-- 인자가 없으면 2 로 끝나고 표준 오류에 `check` 와 `fix` 가 든 사용법이 나온다
-- 모르는 인자(`lint`)도 같다
-- 스크립트 파일에 실행 권한이 있다(`fs.statSync(...).mode & 0o111`)
-
-Gradle 과 pnpm 을 부르는 경로는 작업 항목 7 이 실제 명령으로 확인한다. 그 경로는 느리고 설치된 도구에 걸려 단위 테스트에 두지 않는다.
-
-### 5. `.github/workflows/ci.yml` 에 `quality` job
-
-- 이름 `quality`, `runs-on: ubuntu-latest`, `timeout-minutes: 15`
-- `actions/checkout` 은 다른 job 과 같은 고정 SHA 에 `persist-credentials: false`, `fetch-depth: 0`. 그 위에 한국어 주석으로 ratchet 이 `origin/main` 이력을 쓴다고 적는다
-- `setup-java`(temurin 21), `setup-gradle`, `pnpm/action-setup`(10.22.0, `package_json_file: web/package.json`), `setup-node`(22.18.0, pnpm 캐시)를 다른 job 과 같은 SHA 로 쓴다
-- `cd web && pnpm install --frozen-lockfile` 뒤에 `scripts/quality.sh check`
-- `actions/checkout` 이 `fetch-depth: 0` 이면 원격 브랜치를 모두 받아 `origin/main` 이 생긴다. merge ref 에서 실제로 도는지는 PR 을 연 뒤 team-lead 가 확인한다. 회신의 「미검증」 에 적는다
-
-### 6. 문서
-
-- `AGENTS.md` 「확인」 의 명령 목록 끝에 `scripts/quality.sh check` 를 더한다. 「위 여섯 검사」 를 새 개수로 고치고, 「머지는 PR 로 한다」 의 CI job 목록에 `quality` 를 더한다. `quality.sh fix` 가 무엇을 고치는지 한 줄 적고 자세한 것은 `backend/AGENTS.md` 와 `web/AGENTS.md` 를 가리킨다
-- `backend/AGENTS.md` 「구조 규칙」 의 「위반을 고쳤을 때」 에 `scripts/quality.sh fix` 도 기준을 줄인다고 더한다
-- `backend/AGENTS.md`: 「구조 규칙」, 「코드 규칙」, 「포맷」 절 앞에 한 절을 두어 `./gradlew qualityCheck` 가 셋을 묶는다는 것과 `scripts/quality.sh` 를 가리킨다. 기준에 든 위반은 줄여 갈 목록이고 기준마다 GitHub 이슈가 있다는 것을 적는다
-- `web/AGENTS.md` 에 「lint」 절: 도구와 버전, 규칙 묶음(`core-web-vitals`, `typescript`), 기준 파일, 갱신 방법(고치면 `pnpm exec eslint --prune-suppressions`, 새 위반은 고친다, 꼭 받아들여야 하면 `--suppress-rule <규칙>` 과 까닭), `fix` 가 하는 일, Prettier 를 쓰지 않는다는 것, 기준에 든 위반은 줄여 갈 목록이고 GitHub 이슈가 있다는 것
-
-### 7. 동작을 확인한다
+### 3. 동작을 확인한다
 
 출력은 저장소 밖에 저장한다. 되돌린 뒤 `git status --short` 가 이 phase 의 변경만 남았는지 본다.
 
-- `scripts/quality.sh check` 를 돌리기 전과 뒤의 `git status --porcelain` 이 같다. 종료 코드 0
-- web 의 `.tsx` 파일 하나에 `eslint --fix` 로 고칠 수 있는 위반(예: `prefer-const` 에 걸리는 `let`)과 고칠 수 없는 위반을 하나씩 넣는다. backend 의 이 브랜치가 바꾼 Java 파일 하나의 들여쓰기를 흐트러뜨린다
-  - `check` 가 1 로 끝나고 세 위반을 모두 보인다
-  - `fix` 가 고칠 수 있는 둘을 고치고, 고칠 수 없는 하나만 「사람이 판단할 위반」 으로 보인다
-  - `fix` 뒤 `web/eslint-suppressions.json` 이 늘지 않았다(항목 수를 비교한다)
-- 넣은 것을 되돌리고 `check` 가 다시 0 으로 끝난다
-- 기준에 든 eslint 위반 하나를 고쳤을 때 `pnpm lint` 가 쓰지 않는 기준을 알리는지, `fix` 가 그 줄을 빼는지 본다. 확인 뒤 되돌린다
+- 이 브랜치에서 이미 바뀐 Java 파일 하나의 들여쓰기를 일부러 흐트러뜨린다. `./gradlew spotlessCheck` 가 실패하고 `./gradlew spotlessApply` 가 되돌리는지 본다
+- 이 브랜치가 바꾸지 않은 Java 파일 하나에 쓰지 않는 import 한 줄과 흐트러진 들여쓰기를 넣는다. `spotlessCheck` 가 그 파일을 잡고 `spotlessApply` 가 **그 파일 전체**를 포맷하는지 본다. 그 뒤 `git checkout -- <그 파일>` 로 되돌린다
+- 바꾸지 않은 파일은 120자를 넘는 줄이 있어도 `spotlessCheck` 가 잡지 않는지 본다
+
+### 4. `backend/AGENTS.md` 에 「포맷」 절을 더한다
+
+- 도구, 포매터, 버전, 들여쓰기 4칸과 120자
+- `ratchetFrom("origin/main")` 이라 바뀐 파일만 검사하고, 파일을 처음 고치면 그 파일 전체가 포맷된다는 것
+- **기능 변경과 포맷을 다른 커밋으로 나눈다.** 먼저 기능을 고치고 커밋한 뒤 `./gradlew spotlessApply` 결과를 따로 커밋한다
+- 비교 기준은 `HEAD` 와 `origin/main` 의 공통 조상이다. `git fetch origin` 뒤에 돌린다
+- 한글 한 글자를 한 칸으로 센다는 것
+- 명령 `./gradlew spotlessCheck`, `./gradlew spotlessApply`
 
 ## 검증
 
-AGENTS.md 「확인」 절을 적힌 순서대로 모두 돌린다. 새 브랜치라면 `cd web && pnpm install --frozen-lockfile` 을 먼저 한다.
-`pnpm build` 의 환경 변수는 `web/AGENTS.md` 의 자리표시자 값을 쓴다.
-브라우저 검사는 한 번에 하나만 돈다. 돌리기 전에 다른 브라우저 검사가 끝났는지 확인한다.
+```bash
+# cwd: backend/
+./gradlew spotlessCheck
+./gradlew checkstyleMain checkstyleTest
+./gradlew test
+```
+
+- 셋 모두 통과한다
+- 작업 항목 3 의 출력이 저장소 밖 파일에 있다
 
 ```bash
-cd backend && ./gradlew test
-cd web && pnpm typecheck && pnpm build
-cd web && pnpm test:browser
-node test/e2e/run.ts
-node --test 'test/unit/**/*.test.ts'
+# cwd: 저장소 root
 scripts/check-public-safe.sh
-scripts/quality.sh check
 ```
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `web/package.json` | 수정 |
-| `web/pnpm-lock.yaml` | 수정 |
-| `web/eslint.config.mjs` | 신규 |
-| `web/eslint-suppressions.json` | 신규 |
+| `backend/gradle/libs.versions.toml` | 수정 |
 | `backend/build.gradle.kts` | 수정 |
-| `scripts/quality.sh` | 신규 |
-| `test/unit/quality-script.test.ts` | 신규 |
-| `.github/workflows/ci.yml` | 수정 |
-| `AGENTS.md` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
 | `backend/AGENTS.md` | 수정 |
-| `web/AGENTS.md` | 수정 |

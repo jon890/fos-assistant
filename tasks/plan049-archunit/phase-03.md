@@ -1,110 +1,100 @@
-# Phase 03. Checkstyle 로 작은 코드 규칙 묶음을 건다
+# Phase 03. ArchUnit 규칙을 더하고 층 규칙에서 `presentation` 이 `infra` 를 쓰는 것을 막는다
 
 **Execution profile**: standard
 
 ## 목표
 
-쓰지 않는 import, `*` import, 빈 catch, 이름 규칙 같은 작은 규칙을 Checkstyle 설정으로 둔다.
-지금 있는 위반은 기준 파일에 두고 새 위반만 실패시킨다.
+코디네이터가 2026-09-30 에 더한 구조 규칙 가운데 바이트코드로 판정할 수 있는 것을 `ArchitectureRules` 에 더한다.
+`LAYER_DIRECTION` 을 고쳐 `presentation` 이 `infra` 를 바로 쓰지 못하게 한다.
+지금 있는 위반은 모두 기준에 얼린다. 코드는 고치지 않는다.
 
-**범위 외**: 줄 길이, 들여쓰기, 공백, import 순서처럼 포매터가 정하는 것(phase 04). `qualityCheck` 태스크(phase 05).
+**범위 외**: 소스를 봐야 판정할 수 있는 규칙(로거, 엔티티 접근자, private 빈 생성자, 전체 이름, 생성자 주입)은 Checkstyle 이 맡는다(phase 04). 위반을 옮기고 고치는 일은 뒤의 패키지 분리 계획이 한다.
 
 ## 컨텍스트
 
-- Gradle 내장 `checkstyle` 플러그인을 쓴다. 태스크는 `checkstyleMain`, `checkstyleTest` 다. 이 둘은 `./gradlew test` 에 걸리지 않는다
-- JDK 21 에서 Checkstyle 14.3.0 으로 아래 후보를 돌려 2026-09-30 에 측정한 기존 위반이다. 테스트 이름은 phase 02 에서 영문으로 옮겼으므로 테스트의 `MethodName` 위반은 0건이어야 한다
-  - `UnusedImports`: main 3건(`hermes/HttpHermesToolsetClient.java`, `memory/presentation/MemoryController.java`, `usage/presentation/UsageDtos.java`), test 4건
-  - `ConstantName`: main 44건. 43건이 `private static final Logger log` 이고 1건이 `mcp/application/McpToolService.java` 의 `json`
-  - `EmptyCatchBlock`: main 2건, 모두 `chat/infra/ArtifactSourceFetcher.java`
-  - `TypeName`: main 2건. Flyway 가 요구하는 `db/migration/V23__ConversationPublicId.java`, `V35__DropAgentTokenUserId.java`
-  - `OneStatementPerLine`: main 58건, test 23건. `try { ... } catch (...) { ... }` 를 한 줄에 쓴 것들이다
-  - 그 밖의 후보는 0건
-- 설정 파일 위치는 Gradle 기본값 `backend/config/checkstyle/` 이다. Gradle 이 `config_loc` 속성으로 그 디렉터리를 넘긴다
+- phase 01 이 `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java`, `ArchitectureRulesTest.java`, `TopLevelPackageCycles.java` 와 기준 디렉터리 `backend/config/archunit/store/` 를 만들었다. phase 02 가 `TEST_METHODS_HAVE_DISPLAY_NAME` 과 테스트 클래스만 읽는 `TESTS` 를 더했다. 기준 갱신 방법은 `backend/AGENTS.md` 「구조 규칙」 절에 있다
+- 지금 `LAYER_DIRECTION` 은 `whereLayer("infra").mayOnlyBeAccessedByLayers("presentation", "application")` 이다
+- 코디네이터가 main 에서 집계한 지금 위반
+  - `@Transactional` 이 `application` 밖에 있다: 컨트롤러 4곳(`AgentAdminController`, `AgentToolController` 등), 저장소 6곳
+  - `Instant.now()` 직접 호출 39곳
+  - `MessageDigest.getInstance` 를 `shared.util.Sha256` 밖에서 부르는 곳 4곳
+  - `@ConfigurationProperties` 클래스 가운데 `@Validated` 가 붙은 것은 0곳이다
+  - `presentation` 이 `infra` 를 바로 쓰는 컨트롤러 5개
+  - 서비스 안에 공개된 중첩 타입 7개: `AgentToolService.ToolView`, `AgentToolService.ToolsetsView`, `AgentRunner.Run`, `DelegationResult.Failure`, `ArtifactStore.FoundFile`, `ArtifactStore.Removed`, `ArtifactSourceFetcher.Response`
+- 엔티티의 `@Enumerated` 필드 타입은 지금 여러 패키지에 흩어져 있다. `..domain.type..` 패키지는 아직 없다
 
-**근거 문서**: `docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 의 「주석」 절(한국어 Javadoc)
+**근거 문서**: `docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 「구조 규칙」, `docs/code-architecture.md` 「backend 패키지」
 
 ## 의도 메모
 
-- **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. 기준은 합친 코드로 만든다
-- 합친 main 코드가 새 ArchUnit 간선 위반, 새 Checkstyle 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다. 새 위반을 다시 얼릴 때는 그 규칙 하나만 대상으로 삼는다
-넣는 규칙과 까닭이다.
-
-| 규칙 | 까닭 |
-| --- | --- |
-| `UnusedImports`, `AvoidStarImport`, `RedundantImport`, `IllegalImport` | 읽는 사람이 실제 의존을 import 줄에서 바로 본다 |
-| `EmptyCatchBlock` (`exceptionVariableName` 이 `^(ignored\|expected)$` 이면 허용) | 예외를 삼키는 자리를 이름으로 드러내게 한다. 이 저장소는 이미 `ignored` 를 쓴다 |
-| `EmptyStatement`, `EqualsHashCode`, `StringLiteralEquality`, `FallThrough`, `MissingOverride` | 결함으로 이어지는 모양이다 |
-| `SimplifyBooleanExpression`, `SimplifyBooleanReturn`, `ModifierOrder`, `UpperEll`, `ArrayTypeStyle` | 같은 뜻을 한 모양으로 쓴다 |
-| `PackageName`, `TypeName`, `MethodName`, `MemberName`, `ParameterName`, `LocalVariableName`, `LocalFinalVariableName`, `StaticVariableName`, `LambdaParameterName`, `RecordComponentName`, `ClassTypeParameterName`, `MethodTypeParameterName` | 기본 패턴 그대로 쓴다 |
-| `ConstantName` (패턴 `^(log\|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$`) | 로거 이름 `log` 는 저장소의 관례라 허용한다 |
-
-빼는 규칙과 까닭이다.
-
-| 규칙 | 까닭 |
-| --- | --- |
-| `LineLength`, `Indentation`, `WhitespaceAround`, `CustomImportOrder`, `OneStatementPerLine` 같은 배치 규칙 | 포매터가 정한다. 둘이 같은 것을 다르게 판정하면 고칠 수 없는 위반이 생긴다 |
-| `JavadocMethod`, `JavadocType`, `MissingJavadocMethod` 같은 Javadoc 규칙 | 주석은 한국어로 필요한 곳에만 쓴다(「주석」 절). 모든 메서드에 요구하면 뜻 없는 주석이 늘어난다 |
-| `MagicNumber` | 테스트와 설정 기본값에서 대부분 오탐이다 |
-| `FinalParameters`, `HiddenField` | 생성자 주입과 record 가 이름을 같게 쓰는 것이 이 저장소의 모양이다 |
-| `DesignForExtension` | Spring 빈과 싸운다 |
-
-- 설계상 예외와 기존 위반을 **다른 파일**에 둔다. 설계상 예외는 앞으로도 허용하는 것이고, 기존 위반은 고쳐서 줄일 목록이다
-- 기준에 든 위반은 줄여 갈 목록이다. 기준마다 GitHub 이슈가 있다(team-lead 가 PR 전에 연다)
-- 기존 위반 기준은 `(파일, 규칙)` 단위다. 줄 번호로 두면 파일을 고칠 때마다 기준이 어긋난다. 그 파일의 같은 규칙 위반은 새로 생겨도 잡지 못한다. 그 한계를 `backend/AGENTS.md` 에 적는다
+- **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`
+- 합친 main 코드가 새 ArchUnit 간선 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다. 새 위반을 다시 얼릴 때는 그 규칙 하나만 대상으로 삼는다
+- 규칙마다 까닭을 `backend/AGENTS.md` 에 적는다. 까닭은 아래 표의 「까닭」 칸이다
+- 모든 새 규칙은 `MAIN` 에만 건다. 테스트는 시각을 고정하려고 `Instant.now()` 를 쓰는 등 사정이 다르다
+- **`LAYER_DIRECTION` 을 고친 뒤에는 그 규칙 하나만 다시 얼린다.** `as(...)` 설명은 바꾸지 않는다. 설명이 기준 파일의 열쇠라, 바꾸면 기준이 옮겨지지 않고 옛 파일이 남는다. `--tests '*ArchitectureRulesTest.<그 메서드>'` 로 골라 `-Parchunit.freeze.refreeze=true -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 다시 얼린다. 그 규칙의 기준 파일(`stored.rules` 에서 설명으로 찾는다)이 수정된다
+- 로거 규칙은 여기 두지 않는다. Lombok `@Slf4j` 가 만든 로거도 바이트코드에서는 `LoggerFactory.getLogger` 호출이라 손으로 쓴 것과 구별되지 않는다
 
 ## 작업 항목
 
-### 1. `backend/gradle/libs.versions.toml`, `backend/build.gradle.kts`
+### 1. `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 에 규칙을 더한다
 
-- `[versions]` 에 `checkstyle = "14.3.0"`
-- `plugins` 에 `checkstyle`
-- `checkstyle { toolVersion = libs.versions.checkstyle.get(); maxWarnings = 0; isIgnoreFailures = false }`
-- `tasks.withType<Checkstyle>().configureEach { reports { xml.required = true; html.required = false } }`
+각 상수에 한국어 Javadoc 과 한국어 `as(...)` 설명을 단다. `that()` 대상이 없을 수 있는 규칙에는 `allowEmptyShould(true)` 를 붙인다.
 
-### 2. `backend/config/checkstyle/checkstyle.xml` (신규)
+| 상수 | 규칙 | 까닭 |
+| --- | --- | --- |
+| `TRANSACTIONAL_ONLY_IN_APPLICATION` | `..application..` 밖의 클래스와 그 메서드에 `org.springframework.transaction.annotation.Transactional`, `jakarta.transaction.Transactional` 이 없다. 클래스 규칙과 메서드 규칙을 `CompositeArchRule.of(...).and(...)` 로 묶어 상수 하나로 둔다 | 트랜잭션 경계는 유스케이스를 아는 층이 정한다. 컨트롤러와 저장소에 두면 경계가 둘로 갈린다 |
+| `NO_DIRECT_INSTANT_NOW` | `noClasses().should().callMethod(Instant.class, "now")` | 시각을 주입받아야 테스트가 시각을 고정한다. 뒤 계획에서 `Clock` 빈을 둔다 |
+| `MESSAGE_DIGEST_ONLY_IN_SHA256` | `com.bifos.assistant.shared.util.Sha256` 이 아닌 클래스가 `MessageDigest.getInstance(String)` 을 부르지 않는다 | 해시 구현을 한 곳에 둔다 |
+| `CONFIGURATION_PROPERTIES_ARE_VALIDATED` | `@ConfigurationProperties` 가 붙은 클래스는 `org.springframework.validation.annotation.Validated` 도 붙는다 | 잘못된 설정은 기동에서 멈춘다 |
+| `SERVICES_DO_NOT_EXPOSE_NESTED_TYPES` | 중첩 클래스 가운데 익명과 지역 클래스를 뺀 것의 바깥 클래스가 `@Service`, `@Component`, `@Repository` 이거나 `..infra..` 에 있으면, 그 중첩 타입은 `private` 이다 | 서비스가 돌려주는 모델을 서비스 파일 밖으로 뺀다(`backend/AGENTS.md` 「데이터 클래스는 컨트롤러 안에 두지 않는다」 와 같은 까닭). 캐시 키 같은 구현 세부는 `private` 으로 둔다 |
+| `ENUMERATED_FIELDS_USE_DOMAIN_TYPE` | `@Entity` 클래스에 선언된 `@Enumerated` 필드의 타입이 `..domain.type..` 에 있다 | 저장되는 값은 바꾸면 마이그레이션을 판단해야 한다. 한곳에 모아 보이게 한다 |
+| `DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE` | `..domain.type..` 의 클래스가 `..application..`, `..infra..`, `..presentation..` 에 의존하지 않는다 | 저장되는 enum 은 가장 아래 층이다 |
 
-- `Checker` 에 `charset` `UTF-8`, `severity` `error`
-- 의도 메모의 「넣는 규칙」 을 `TreeWalker` 아래에 둔다
-- `SuppressionFilter` 둘: `${config_loc}/suppressions.xml`(설계상 예외), `${config_loc}/baseline.xml`(기존 위반). 두 파일 모두 `optional` 을 `false` 로 둔다
-- 파일 머리에 한국어 XML 주석으로 이 파일이 무엇이고 규칙 이유는 `backend/AGENTS.md` 에 있다고 적는다
+`ENUMERATED_FIELDS_USE_DOMAIN_TYPE` 은 `fields().that().areAnnotatedWith(Enumerated.class).and().areDeclaredInClassesThat().areAnnotatedWith(Entity.class).should().haveRawType(JavaClass.Predicates.resideInAPackage("..domain.type.."))` 모양이다. 저장되지 않는 서비스 결과와 화면용 enum 은 `<기능>.application.model` 에 두고, `ErrorCode` 는 `shared.error` 에 그대로 둔다. 이 둘은 규칙으로 검사하지 않고 `backend/AGENTS.md` 에 적는다.
 
-### 3. `backend/config/checkstyle/suppressions.xml` (신규)
+### 2. `LAYER_DIRECTION` 을 고친다
 
-- `db/migration/V\d+__\w+\.java` 에 `TypeName` 을 끈다(`checks="(^|\.)TypeName(Check)?$"`). Flyway 가 이 이름을 요구한다
+- `whereLayer("infra").mayOnlyBeAccessedByLayers("application")` 으로 바꾼다. 나머지 층 설정은 그대로다
+- 까닭: 컨트롤러가 저장소를 바로 쓰면 권한 확인과 트랜잭션 경계를 서비스가 갖지 못한다
+- 의도 메모대로 이 규칙 하나만 다시 얼린다. 기준 줄이 컨트롤러 5개 몫만큼 늘어난다
+- `backend/AGENTS.md` 「패키지 배치」 와 `docs/code-architecture.md` 「backend 패키지」 의 층 문장을 「`presentation` 은 `application` 을 거쳐 `infra` 에 닿는다」 는 뜻이 드러나게 고친다
 
-### 4. `backend/config/checkstyle/baseline.xml` (신규)
+### 3. `ArchitectureRulesTest.java` 에 테스트를 더한다
 
-- `baseline.xml` 을 빈 `<suppressions/>` 로 두고 `isIgnoreFailures = true` 로 잠시 돌린다. XML 보고서(`backend/build/reports/checkstyle/main.xml`, `test.xml`)에서 `(파일, 규칙)` 을 뽑는다. 뽑은 뒤 `isIgnoreFailures` 를 `false` 로 되돌린다
-- 한 줄에 하나씩 `<suppress checks="(^|\.)<규칙 이름>(Check)?$" files="<src 아래 상대 경로를 정규식으로>"/>`. Checkstyle 은 `checks` 를 검사 이름에 정규식 find 로 맞추므로 끝을 고정하지 않으면 `ParameterName` 이 `LambdaParameterName` 까지 억제한다. 경로 구분자는 `[\\/]` 로 쓴다. 파일 경로 순으로 정렬한다
-- 보고서를 뽑고 기준을 만드는 스크립트는 저장소 밖에 둔다. 갱신 방법은 문서에 명령으로 적는다(작업 항목 5)
-- 기준에 든 `(파일, 규칙)` 수와 위반 수를 센다. 보고와 PR 본문에 쓴다
+규칙마다 `@Test` 와 한국어 `@DisplayName` 하나. 본문은 `FreezingArchRule.freeze(ArchitectureRules.<상수>).check(MAIN);`
 
-### 5. `backend/AGENTS.md` 에 「코드 규칙」 절을 더한다
+### 4. 기준을 만든다
 
-- 도구와 버전, 설정 파일 셋의 역할
-- 의도 메모의 두 표(넣은 규칙, 뺀 규칙)를 그대로 옮긴다
-- 기준 갱신 방법. 위반을 고치면 `baseline.xml` 에서 그 줄을 지운다(Checkstyle 은 쓰지 않는 기준 줄을 알리지 않는다). 새 위반은 기준에 더하지 않고 고친다. 꼭 받아들여야 하면 까닭을 커밋 메시지와 PR 본문에 적고 그 줄을 더한다
-- `(파일, 규칙)` 기준의 한계
-- 실행 명령 `./gradlew checkstyleMain checkstyleTest`
+```bash
+# cwd: backend/
+./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
+git add config/archunit
+```
 
-### 6. 규칙이 실제로 실패하는지 본다
+- 규칙별 기준 수를 센다. 코디네이터 집계와 크게 다르면 규칙을 다시 읽는다
+- 속성 없이 `./gradlew archTest --rerun` 을 두 번 돌려 `git diff --exit-code config/archunit` 가 0 인지 본다
 
-기록만 남기고 되돌린다. 출력은 저장소 밖에 저장한다.
+### 5. 규칙이 실제로 실패하는지 본다
 
-- 기준에 없는 main 파일 하나에 `import java.util.*;` 를 더해 `./gradlew checkstyleMain` 이 `AvoidStarImport` 로 실패하는지 본다
-- 기준에 없는 test 파일 하나의 테스트 메서드 이름을 `한국어_이름` 으로 바꿔 `./gradlew checkstyleTest` 가 `MethodName` 으로 실패하는지 본다
-- 둘을 되돌리고 `git status --short` 에 남지 않았는지 확인한다
+출력은 저장소 밖에 저장한다. 되돌릴 때는 `git checkout -- <그 파일>` 만 쓴다.
+
+- 기준에 없는 서비스 클래스 하나에 `Instant.now()` 호출을 넣어 `NO_DIRECT_INSTANT_NOW` 가 실패하는지 본다
+- 기준에 없는 `@Service` 클래스에 `public record Probe() {}` 를 넣어 `SERVICES_DO_NOT_EXPOSE_NESTED_TYPES` 가 실패하고, `private record` 로 바꾸면 통과하는지 본다
+- 기준에 없는 컨트롤러가 `infra` 의 저장소를 필드로 받게 해 `LAYER_DIRECTION` 이 실패하는지 본다
+
+### 6. `backend/AGENTS.md` 「구조 규칙」 절
+
+- 규칙 표에 새 상수와 까닭을 더한다
+- enum 위치 규칙(저장되는 enum 은 `<기능>.domain.type`, 저장되지 않는 것은 `<기능>.application.model`, `ErrorCode` 는 `shared.error`)을 적는다
 
 ## 검증
 
 ```bash
 # cwd: backend/
-./gradlew checkstyleMain checkstyleTest
+./gradlew archTest --rerun
 ./gradlew test
+git diff --exit-code config/archunit   # 기준 파일을 git add 한 뒤 테스트가 고치지 않았다
 ```
-
-- 두 Checkstyle 태스크가 위반 0건으로 통과한다
-- 작업 항목 6 의 두 실패 출력이 저장소 밖 파일에 있다
 
 ```bash
 # cwd: 저장소 root
@@ -115,9 +105,10 @@ scripts/check-public-safe.sh
 
 | 파일 | 변경 |
 |---|---|
-| `backend/gradle/libs.versions.toml` | 수정 |
-| `backend/build.gradle.kts` | 수정 |
-| `backend/config/checkstyle/checkstyle.xml` | 신규 |
-| `backend/config/checkstyle/suppressions.xml` | 신규 |
-| `backend/config/checkstyle/baseline.xml` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRulesTest.java` | 수정 |
+| `backend/config/archunit/store/stored.rules` | 수정 |
+| `backend/config/archunit/store/*` | 신규 |
+| `backend/config/archunit/store/1cceeea4-f3c2-4415-b0dc-2b2f8d185226` | 수정 |
 | `backend/AGENTS.md` | 수정 |
+| `docs/code-architecture.md` | 수정 |
