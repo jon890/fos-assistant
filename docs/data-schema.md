@@ -105,6 +105,13 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
 
+**`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
+에이전트를 지우는 것은 `deleted_at` 을 적는 것이라 정상 경로에서는 행이 사라지지 않는다.
+그래도 행이 없는 대화가 운영에서 나왔고, 그 대화를 읽는 경로는 행이 없어도 실패하지 않게 고쳤다
+([`code-architecture.md`](code-architecture.md) 의 「에이전트 만들기와 지우기」 절).
+FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, 그 정리는 대화 이력을 지우거나 가짜 에이전트 행을 만드는 일이 된다.
+행이 사라진 원인을 찾은 뒤 다시 판단한다.
+
 **`id` 는 Control Plane 밖으로 나가지 않는다.** 화면과 API 는 대화를 `public_id` 로만 가리킨다.
 다른 표는 지금처럼 `id` 로 대화를 참조한다.
 새 대화는 UUID v7 을 받고, 마이그레이션 전에 있던 대화는 임의 값(v4)을 받았다.

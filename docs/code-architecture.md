@@ -249,6 +249,21 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 `profile_managed` 가 참이면 MCP 토큰을 먼저 폐기하고, `DELETE /api/profiles/<이름>` 과 key 파일, 올린 스킬 디렉터리를 지운다. 거짓이면 profile 을 남긴다.
 지운 에이전트의 대화는 읽기만 된다. 새 turn 과 다시 생성은 `AGENT_NOT_FOUND` 다.
 
+**대화나 실행이 가리키는 에이전트 행이 아예 없어도 지운 에이전트와 같게 다룬다.**
+`conversation.agent_id` 와 `agent_execution.agent_id` 에 FK 가 없어 행이 사라진 대화와 실행이 남을 수 있다.
+운영에서 그런 대화 하나 때문에 대화 목록 전체가 `AGENT_NOT_FOUND` 로 실패한 적이 있다.
+
+| 경로의 모양 | 에이전트 행이 없을 때 |
+| --- | --- |
+| 여러 줄을 내는 목록 (대화 목록, 내 실행 기록, 실행 나무) | 그 줄을 빼지 않고 `agentCode`, `agentName` 을 null 로 낸다. 나머지 줄은 그대로 나온다 |
+| 한 대화를 바꾸고 그 줄을 돌려주는 경로 (이름 바꾸기, 모델 고르기) | 바꾸고, 돌려주는 줄의 `agentCode`, `agentName` 이 null 이다 |
+| 한 대화에 보내거나 다시 생성한다 | `AGENT_NOT_FOUND`. 지운 에이전트의 대화에 보낼 때와 같다 |
+| 사용자가 turn 을 중지하며 도는 자식 run 을 함께 멈춘다 | 에이전트를 찾지 못한 자식은 로그를 남기고 건너뛴다. 뿌리 turn 의 중지는 계속한다 |
+
+화면은 null 이름을 「지운 에이전트」 로 그린다.
+목록 경로는 에이전트를 줄마다 읽지 않고 한 번에 읽는다(`AgentService.byIds`).
+내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음을 이미 빼고 있어 그대로 둔다.
+
 | 무엇 | 어디 |
 | --- | --- |
 | 만들기, 공개 범위, 지우기의 순서 | `agent/application/AgentLifecycleService` |
