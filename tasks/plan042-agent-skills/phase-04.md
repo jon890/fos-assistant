@@ -34,7 +34,7 @@
 - `web/src/components/usage/usage-tabs.tsx` 신규
 - `web/src/components/usage/skill-usage-list.tsx` 신규
 - `web/src/app/usage/page.tsx`: `searchParams.tab` 으로 탭을 정하고 기존 절을 탭 안에 옮긴다. 바깥 틀(`mx-auto w-full max-w-5xl`)은 이 파일에 남긴다. `test/unit/loading-routes.test.ts` 가 이 틀과 `loading.tsx` 의 폭이 같은지 본다
-- `web/src/app/usage/loading.tsx`: 뼈대 맨 위에 탭 줄 자리를 더한다
+- `web/src/components/ui/page-skeleton.tsx`: `/usage` 만 쓰는 `table` 모양 뼈대 맨 위에 탭 줄 자리를 더한다. `web/src/app/usage/loading.tsx` 는 `PageSkeleton` 을 부르는 한 줄이라 그대로 둔다
 - `web/src/lib/skill.ts`: `SkillUsageRow` 를 더한다
 
 ### 2. 실행 줄의 스킬 이름
@@ -69,7 +69,7 @@ grep -rn 'style={{' web/src/
 | `web/src/components/usage/usage-tabs.tsx` | 신규 |
 | `web/src/components/usage/skill-usage-list.tsx` | 신규 |
 | `web/src/app/usage/page.tsx` | 수정 |
-| `web/src/app/usage/loading.tsx` | 수정 |
+| `web/src/components/ui/page-skeleton.tsx` | 수정 |
 | `web/src/lib/skill.ts` | 수정 |
 | `web/src/components/usage/execution-list.tsx` | 수정 |
 | `web/src/components/usage/execution-card.tsx` | 수정 |
