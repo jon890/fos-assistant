@@ -81,9 +81,11 @@ public class ArtifactController {
     /**
      * 요청의 조건이 지금 파일과 맞아 본문 없이 답해도 되는지 판정한다.
      *
-     * <p><b>Spring 의 {@code HttpEntityMethodProcessor} 판정과 같아야 한다.</b> 200 으로 돌려준
-     * {@code ResponseEntity} 에 {@code ETag} 나 {@code Last-Modified} 가 있으면 Spring 이 조건부 요청을 다시
-     * 판정해 304 로 바꾼다. 여기서 거짓이라 한 요청을 Spring 이 304 로 바꾸면 이미 연 스트림이 닫히지 않는다.
+     * <p><b>Spring 의 {@code HttpEntityMethodProcessor} 가 304 로 바꾸는 요청을 여기서 거짓이라 하면 안 된다.</b>
+     * 200 으로 돌려준 {@code ResponseEntity} 에 {@code ETag} 나 {@code Last-Modified} 가 있으면 Spring 이 조건부
+     * 요청을 다시 판정해 304 로 바꾼다. 그러면 이미 연 스트림이 닫히지 않는다. 반대로 여기서만 참인 요청은 파일을 열지
+     * 않고 304 로 끝나므로 안전하다. GET 의 {@code If-None-Match: *} 가 그 경우다. Spring 은 별표를 쓰기 요청에서만
+     * 맞는 것으로 본다. 두 판정을 견주는 검사는 {@code ArtifactControllerNotModifiedTest} 에 있다.
      *
      * <ul>
      *   <li>{@code If-None-Match} 가 있으면 그것만 본다. {@code *} 이거나 값 하나가 {@code W/} 를 뗀 채 같으면 참이다.

@@ -1,16 +1,16 @@
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
-import { ARTIFACT_PROBE } from "../e2e/fake-hermes.ts";
+import { ARTIFACT_PROBE, ARTIFACT_SAME_NAME_PROBE } from "../e2e/fake-hermes.ts";
 import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 새 대화에서 결과물을 만드는 글을 보내고, 답 아래 결과물 줄이 뜰 때까지 기다린다. */
-async function sendProbe(page: Page) {
+async function sendProbe(page: Page, text: string = ARTIFACT_PROBE, count = 1) {
   await page.goto("/");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
-  await page.getByRole("textbox", { name: "메시지" }).fill(ARTIFACT_PROBE);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page).toHaveURL(CONVERSATION_URL);
   const rows = page.getByTestId("assistant-message").last().getByTestId("message-artifact");
-  await expect(rows).toHaveCount(1, { timeout: 30_000 });
+  await expect(rows).toHaveCount(count, { timeout: 30_000 });
   return rows;
 }
 
@@ -118,4 +118,19 @@ test("결과물 패널을 연 채 다른 대화로 옮기면 패널이 닫힌다
   await expect(page.getByTestId("artifact-panel")).toHaveCount(0);
   expect(await page.evaluate(() => (window as Window & { __sameDocument?: boolean }).__sameDocument),
     "대화를 옮길 때 화면을 새로 읽었다").toBe(true);
+});
+
+test("폴더 이름이 같은 결과물은 답 아래 줄과 패널 머리가 같은 이름을 보인다", async ({ page }) => {
+  const rows = await sendProbe(page, ARTIFACT_SAME_NAME_PROBE, 2);
+  // 줄 순서는 Control Plane 이 정하므로 이름만 본다.
+  await expect(rows.filter({ hasText: "가/초안" })).toHaveCount(1);
+  await expect(rows.filter({ hasText: "나/초안" })).toHaveCount(1);
+
+  for (const name of ["가/초안", "나/초안"]) {
+    await rows.filter({ hasText: name }).getByRole("button").click();
+    const panel = page.getByTestId("artifact-panel");
+    await expect(panel.getByRole("heading")).toHaveText(name);
+    await panel.getByRole("button", { name: "결과물 닫기" }).click();
+    await expect(panel).toHaveCount(0);
+  }
 });

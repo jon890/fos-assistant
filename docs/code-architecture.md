@@ -741,6 +741,11 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `error` | 실패했다 | `code`, `message` |
 
 `phase` 는 `started` 와 `completed` 둘이다.
+`subagent` 의 칸은 Hermes 가 실어 보낼 때만 찬다. `goal` 이 비어 오면 Hermes 의 `preview` 를 그 자리에 싣는다.
+
+**`started` 는 흐름으로 도는 turn 에서도 뿌리 실행의 번호를 싣는다.**
+중지는 뿌리 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다.
+화면은 마지막으로 받은 `started` 의 번호를 쓴다.
 
 #### 도구 `detail` 을 싣는 대상
 
@@ -762,11 +767,6 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 도구 사건이 아닌 사건의 `detail` 은 모두에게 싣는다. 하위 에이전트의 목표, 실패 코드, 넘어간 모델 이름이다.
 판정은 도구 이름 전체로 한다. `mcp__{서버}__web_search` 처럼 다른 MCP 서버가 같은 이름을 붙인 도구는 공개하지 않는다.
-`subagent` 의 칸은 Hermes 가 실어 보낼 때만 찬다. `goal` 이 비어 오면 Hermes 의 `preview` 를 그 자리에 싣는다.
-
-**`started` 는 흐름으로 도는 turn 에서도 뿌리 실행의 번호를 싣는다.**
-중지는 뿌리 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다.
-화면은 마지막으로 받은 `started` 의 번호를 쓴다.
 
 ### 중지
 

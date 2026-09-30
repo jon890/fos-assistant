@@ -9,9 +9,8 @@ async function send(page: Page, text: string) {
   await page.getByRole("button", { name: "보내기" }).click();
 }
 
-test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 위로 올려 읽으면 따라가지 않는다", async ({ page, hermes }) => {
+test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 맨 아래에 있으면 따라가고 위로 올려 읽으면 따라가지 않는다", async ({ page, hermes }) => {
   await hermes.holdNextRun();
-  let streamReleased = false;
   let runReleased = false;
   try {
     await send(page, LONG_ACTIVITY_PROBE);
@@ -42,14 +41,18 @@ test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 위로 올
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
       .toBeLessThanOrEqual(0);
 
+    // 맨 아래를 보고 있으면 새 줄이 와도 맨 아래를 따라간다.
+    await hermes.releaseLongActivity();
+    await expect(items).toHaveCount(42);
+    await expect.poll(async () => (await measure()).fromBottom).toBeLessThanOrEqual(16);
+
     // 사용자가 위로 올려 읽는 중이면 새 줄이 와도 따라가지 않는다.
     await scroll.evaluate((element) => new Promise<void>((done) => {
       element.scrollTop = 0;
       requestAnimationFrame(() => requestAnimationFrame(() => done()));
     }));
     await hermes.releaseLongActivity();
-    streamReleased = true;
-    await expect(items).toHaveCount(41);
+    await expect(items).toHaveCount(52);
     expect((await measure()).scrollTop).toBe(0);
 
     await hermes.releaseHeldRun();
@@ -60,12 +63,13 @@ test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 위로 올
     const reloaded = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
     await expect(reloaded).toBeVisible();
     await reloaded.getByTestId("activity-toggle").click();
-    await expect(reloaded.getByTestId("activity-item")).toHaveCount(41);
+    await expect(reloaded.getByTestId("activity-item")).toHaveCount(52);
     const savedScroll = reloaded.getByTestId("activity-scroll");
     expect(await savedScroll.evaluate((element) => element.scrollTop)).toBe(0);
     expect(await savedScroll.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
   } finally {
-    if (!streamReleased) await hermes.releaseLongActivity();
+    await hermes.releaseLongActivity();
+    await hermes.releaseLongActivity();
     if (!runReleased) await hermes.releaseHeldRun();
   }
 });

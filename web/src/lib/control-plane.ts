@@ -123,15 +123,17 @@ export async function forwardControlPlane(
     method: string;
     body?: ReadableStream<Uint8Array> | null;
     contentType?: string | null;
-    /** 그대로 옮길 요청 머리글이다. `Authorization` 과 `Content-Type` 은 이 함수가 정한 값이 이긴다. */
+    /** 그대로 옮길 요청 머리글이다. `Authorization` 과 `Content-Type` 은 이름의 대소문자와 관계없이 이 함수가 정한 값이 이긴다. */
     headers?: Record<string, string>;
   },
 ): Promise<ControlPlaneResponse> {
   const authorized = await authorize();
   if (!authorized.ok) return authorized;
 
-  const headers: Record<string, string> = { ...init.headers, Authorization: `Bearer ${authorized.token}` };
-  if (init.contentType) headers["Content-Type"] = init.contentType;
+  // `Headers` 는 이름을 대소문자 없이 다루므로 `set` 이 `authorization` 처럼 다르게 쓴 옮길 머리글도 덮는다.
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${authorized.token}`);
+  if (init.contentType) headers.set("Content-Type", init.contentType);
 
   // 본문이 스트림이면 Node 의 fetch 에 duplex 를 함께 줘야 한다. 없으면 요청이 거절된다. 표준
   // RequestInit 타입에는 아직 이 칸이 없어 따로 넓혀 쓴다.

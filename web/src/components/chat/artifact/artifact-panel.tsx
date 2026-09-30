@@ -16,7 +16,8 @@ import { artifactName } from "@/lib/artifact-name";
  */
 const FRAME_SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
 
-type Props = { conversationId: string; path: string; onClose(): void };
+/** `name` 은 답 아래 줄이 보인 이름이다. 없을 때만 경로 하나로 이름을 정한다. */
+type Props = { conversationId: string; path: string; name?: string; onClose(): void };
 
 /** 대화 결과물 폴더 안의 파일을 웹 서버 라우트로 받는 주소다. 조각마다 따로 싼다. */
 function artifactUrl(conversationId: string, path: string): string {
@@ -29,12 +30,12 @@ function artifactUrl(conversationId: string, path: string): string {
  * <p>띄우기 전에 파일을 한 번 더 받아 확인하지 않는다. 두 번 받게 되고, 연 사이 지워졌으면 iframe 안에 서버의 오류
  * 응답이 그대로 보인다. 초점이 iframe 안에 있으면 Esc 가 이 창까지 오지 않아 닫기 단추로 닫는다.
  */
-export function ArtifactPanel({ conversationId, path, onClose }: Props) {
+export function ArtifactPanel({ conversationId, path, name: givenName, onClose }: Props) {
   // lg 이상은 대화 옆에 붙어 대화를 계속 쓸 수 있다. 그보다 좁으면 전체 폭 Sheet 로 대화를 덮는다.
   // 첫 그림에서 폭을 모르면(null) 옆에 붙는 모양으로 그린다.
   const wide = useMediaQuery("(min-width: 1024px)");
   const closeRef = useRef<HTMLButtonElement>(null);
-  const name = artifactName(path);
+  const name = givenName ?? artifactName(path);
   const src = artifactUrl(conversationId, path);
 
   const header = (title: React.ReactNode) => (

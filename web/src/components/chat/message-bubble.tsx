@@ -96,7 +96,7 @@ function ArtifactList({
   onOpen,
 }: {
   artifacts: MessageArtifact[];
-  onOpen?(path: string): void;
+  onOpen?(path: string, name: string): void;
 }) {
   if (artifacts.length === 0) return null;
   const names = artifactNames(artifacts.map((artifact) => artifact.path));
@@ -117,7 +117,7 @@ function ArtifactList({
                 {content}
               </span>
             ) : (
-              <button type="button" onClick={() => onOpen(artifact.path)}
+              <button type="button" onClick={() => onOpen(artifact.path, name)}
                 className="flex min-w-0 items-center gap-2 rounded-sm underline-offset-4 hover:underline">
                 {content}
               </button>
@@ -161,7 +161,7 @@ export function MessageBubble({
   /** 이 답 바로 다음의 사용자 메시지다. 카드 답을 복원할 때 쓴다 */
   nextUserMessage?: string;
   /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
-  onOpenArtifact?(messageId: Turn["id"], path: string): void;
+  onOpenArtifact?(messageId: Turn["id"], path: string, name: string): void;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
@@ -245,7 +245,7 @@ export function MessageBubble({
           canRegenerate={canRegenerate} onRegenerate={onRegenerate} /> : null}
         <AttachmentGallery conversationId={conversationId} attachments={attachments} />
         <ArtifactList artifacts={turn.artifacts ?? []}
-          onOpen={onOpenArtifact ? (path) => onOpenArtifact(turn.id, path) : undefined} />
+          onOpen={onOpenArtifact ? (path, name) => onOpenArtifact(turn.id, path, name) : undefined} />
       </div>
     </li>
   );

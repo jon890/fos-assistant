@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -146,6 +147,27 @@ class ToolDetailStreamTest {
         List<JsonNode> events = sent(dad);
 
         assertThat(toolEvent(events, "terminal").path("detail").asString()).isEqualTo(COMMAND);
+        assertThat(toolEvent(events, "web_search").path("detail").asString()).isEqualTo(QUERY);
+        assertThat(storedDetails(events)).containsExactly(COMMAND, QUERY);
+    }
+
+    @Test
+    void MEMBER_역할이_답을_다시_만들어도_terminal_의_명령_원문을_싣지_않고_검색어는_싣는다() throws Exception {
+        CurrentUser kid = signedIn("regenerate-kid", UserRole.MEMBER);
+        ((StubHermesRunsClient) hermes).willReturnInOrder(
+                HermesRunResult.of("run-first", "session-one", "completed", "첫 답",
+                        "example-model-large", "anthropic", TokenUsage.empty()),
+                HermesRunResult.of("run-again", "session-one", "completed", "새 답",
+                        "example-model-large", "anthropic", TokenUsage.empty()));
+        Long number = chat.send(kid, null, "도구를 써 줘", kid.displayName()).conversationId();
+        UUID conversationId = conversations.findById(number).orElseThrow().publicId();
+
+        List<JsonNode> events = streamed(post("/api/v1/chat/conversations/{conversationId}/regenerate/stream",
+                conversationId));
+
+        assertThat(toolEvent(events, "terminal").hasNonNull("detail"))
+                .as("MEMBER 역할이 다시 만든 답의 terminal 사건에 detail 이 실렸다: %s", toolEvent(events, "terminal"))
+                .isFalse();
         assertThat(toolEvent(events, "web_search").path("detail").asString()).isEqualTo(QUERY);
         assertThat(storedDetails(events)).containsExactly(COMMAND, QUERY);
     }
