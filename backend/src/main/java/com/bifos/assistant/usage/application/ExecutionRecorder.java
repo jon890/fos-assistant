@@ -202,6 +202,19 @@ public class ExecutionRecorder {
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        return cancel(execution, agent, result, requested, null);
+    }
+
+    /**
+     * Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남기고, 멈춘 자리까지의 답을 같은 저장에서 적는다.
+     *
+     * <p>다른 에이전트에게 맡긴 실행이 쓴다. 답을 따로 저장하면 그 사이 {@code agent_status} 가 답 없는 CANCELLED 를
+     * 읽는다. 길이를 자르는 것은 부르는 쪽이 한다.
+     *
+     * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
+     */
+    public AgentExecution cancel(
+            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
         if (result == null) {
             return cancel(execution);
         }
@@ -211,6 +224,9 @@ public class ExecutionRecorder {
         String model = served.model();
         execution.attachRunId(result.runId());
         execution.markCancelled(provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+        if (outputText != null) {
+            execution.recordOutput(outputText);
+        }
         return executions.save(execution);
     }
 

@@ -43,6 +43,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +72,9 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>{@code agent_delegate} 는 대역 Hermes 로 자식을 끝까지 돌린다. 위임은 가상 스레드에서 돌므로 각 검사는 자기가 띄운
  * 실행이 끝날 때까지 기다린 뒤 끝난다. 제출 대기와 전체 한도와 답 자르기는 설정값을 바꾼 {@code AgentDelegationServiceTest}
  * 가 본다.
+ *
+ * <p>{@code agent_stop} 은 {@code agent_status} 와 같은 판정을 지나고, 멈춘 위임 실행이 origin 인 Hermes 하위 에이전트의
+ * 호출은 거절된다(ADR-037). turn 중지와 이어지는 것은 {@code AgentDelegationServiceTest} 가 본다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -626,6 +631,169 @@ class McpAgentToolsTest {
 
         assertThat(executions.findByRootExecutionId(parent.id())).isEmpty();
         assertThat(stub().received()).isEmpty();
+    }
+
+    @Test
+    void 도구_목록에_agent_stop_의_규격이_있다() throws Exception {
+        JsonNode listed = body(send(sharedToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")).path("result").path("tools");
+        JsonNode stop = null;
+        for (JsonNode tool : listed) {
+            if ("agent_stop".equals(tool.path("name").asString())) stop = tool;
+        }
+
+        assertThat(stop).as("도구 목록: %s", listed).isNotNull();
+        JsonNode schema = stop.path("inputSchema");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("properties").path("execution_id").path("type").asString()).isEqualTo("integer");
+        assertThat(schema.path("required").get(0).asString()).isEqualTo("execution_id");
+        assertThat(stop.path("description").asString()).contains("agent_delegate", "agent_status");
+    }
+
+    @Test
+    void agent_stop_은_도는_위임_실행을_멈추고_CANCELLED_를_준다() throws Exception {
+        stub().willAnswer(command -> answered(command, "멈춘 자리까지"));
+        holdUntilStopped();
+        String root = McpCallSigner.newRoot();
+        turn(userA, root);
+        long executionId = started(delegate(sharedToken, root, GROUP_CODE, "멈출 일")).path("execution_id").asLong();
+        String runId = executions.findById(executionId).orElseThrow().hermesRunId();
+
+        assertStatus(agentStop(sharedToken, root, executionId),
+                "{\"execution_id\":" + executionId + ",\"status\":\"CANCELLED\",\"output\":\"멈춘 자리까지\"}");
+        assertThat(stub().stopped()).containsExactly(runId);
+        assertThat(awaitFinished(executionId).status()).isEqualTo(ExecutionStatus.CANCELLED);
+        assertStatus(agentStatus(sharedToken, root, executionId),
+                "{\"execution_id\":" + executionId + ",\"status\":\"CANCELLED\",\"output\":\"멈춘 자리까지\"}");
+    }
+
+    @Test
+    void 끝난_실행의_agent_stop_은_agent_status_와_같은_결과이고_Hermes_에_보내지_않는다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution succeeded = delegated(userA.id(), parent, ExecutionStatus.SUCCEEDED, "끝난 답", null);
+        AgentExecution failed = delegated(userA.id(), parent, ExecutionStatus.FAILED, null, "HERMES_RUN_FAILED");
+
+        assertThat(resultText(agentStop(sharedToken, root, succeeded.id()))).isEqualTo(resultText(agentStatus(sharedToken, root, succeeded.id())));
+        assertThat(resultText(agentStop(sharedToken, root, failed.id()))).isEqualTo(resultText(agentStatus(sharedToken, root, failed.id())));
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
+    void 이_프로세스가_돌리지_않는_RUNNING_실행은_run_번호로_중지만_보내고_stop_requested_를_준다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution orphan = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+        Long agentId = agents.findByCode(GROUP_CODE).orElseThrow().id();
+        jdbc.update("UPDATE agent_execution SET hermes_run_id = ?, agent_id = ? WHERE id = ?", "run-orphan-1", agentId, orphan.id());
+
+        assertStatus(agentStop(sharedToken, root, orphan.id()),
+                "{\"execution_id\":" + orphan.id() + ",\"status\":\"RUNNING\",\"stop_requested\":true}");
+        assertThat(stub().stopped()).containsExactly("run-orphan-1");
+    }
+
+    @Test
+    void 남의_실행과_다른_대화의_실행과_위임이_아닌_실행의_agent_stop_은_없는_번호와_같은_응답이다() throws Exception {
+        AgentExecution firstTurn = McpCallSigner.save(executions, userA.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        String root = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userA.id(), CONVERSATION, SHARED, root);
+        AgentExecution otherConversationTurn = McpCallSigner.save(executions, userA.id(), OTHER_CONVERSATION, SHARED,
+                McpCallSigner.newRoot(), ExecutionStatus.SUCCEEDED);
+        AgentExecution otherConversation = delegated(userA.id(), otherConversationTurn, ExecutionStatus.RUNNING, null, null);
+        AgentExecution proposal = child(userA.id(), firstTurn, ExecutionStatus.RUNNING);
+        AgentExecution otherUserTurn = McpCallSigner.save(executions, userB.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        AgentExecution otherUsers = delegated(userB.id(), otherUserTurn, ExecutionStatus.RUNNING, null, null);
+        for (AgentExecution target : List.of(otherConversation, proposal, otherUsers)) {
+            jdbc.update("UPDATE agent_execution SET hermes_run_id = ? WHERE id = ?", "run-hidden-" + target.id(), target.id());
+        }
+
+        JsonNode missing = body(agentStop(sharedToken, root, 999_999_999L)).path("result");
+        Map<String, JsonNode> hidden = new LinkedHashMap<>();
+        hidden.put("같은 사용자의 다른 대화의 위임 실행", body(agentStop(sharedToken, root, otherConversation.id())).path("result"));
+        hidden.put("같은 대화의 위임이 아닌 자식", body(agentStop(sharedToken, root, proposal.id())).path("result"));
+        hidden.put("같은 대화의 앞 turn", body(agentStop(sharedToken, root, firstTurn.id())).path("result"));
+        hidden.put("같은 대화 번호의 남의 위임 실행", body(agentStop(sharedToken, root, otherUsers.id())).path("result"));
+
+        JsonNode failure = json.readTree(missing.path("content").get(0).path("text").asString());
+        assertThat(missing.path("isError").asBoolean()).isTrue();
+        assertThat(failure.path("code").asString()).isEqualTo("NOT_FOUND");
+        hidden.forEach((reason, result) -> assertThat(result).as(reason).isEqualTo(missing));
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
+    void agent_stop_의_인자가_정수_번호_하나가_아니면_인자_오류이고_서명이_틀리면_호출_맥락_오류다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution running = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+
+        List<ObjectNode> invalid = new ArrayList<>();
+        invalid.add(json.createObjectNode());
+        invalid.add(json.createObjectNode().put("execution_id", "12"));
+        invalid.add(json.createObjectNode().put("execution_id", 1.5));
+        invalid.add(json.createObjectNode().put("execution_id", running.id()).put("user_id", userB.id()));
+        for (ObjectNode arguments : invalid) {
+            arguments.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_stop", root));
+            JsonNode response = body(send(sharedToken, toolCall("agent_stop", arguments)));
+            assertThat(response.path("error").path("code").asInt()).as("인자 %s: %s", arguments, response).isEqualTo(-32602);
+        }
+        ObjectNode wrongTool = json.createObjectNode().put("execution_id", running.id());
+        wrongTool.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_status", root));
+        assertInvalidContext(send(sharedToken, toolCall("agent_stop", wrongTool)));
+        assertInvalidContext(agentStop(privateAToken, root, running.id()));
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
+    void 멈춘_위임_실행이_origin_인_하위_에이전트의_호출은_호출_맥락_오류다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        holdUntilStopped();
+        String groupToken = tokens.issue(profileOf(GROUP_CODE), "group").rawToken();
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+        long executionId = started(delegate(sharedToken, root, GROUP_CODE, "하위 에이전트를 띄울 일")).path("execution_id").asLong();
+        String childSession = executions.findById(executionId).orElseThrow().hermesSessionId();
+        String subagent = "하위-" + UUID.randomUUID();
+        registrar.register(profileOf(GROUP_CODE), childSession, childSession, subagent);
+        HttpResponse<String> before = send(groupToken, toolCall("agent_list", withContext(json.createObjectNode(),
+                McpCallSigner.context(groupToken, "agent_list", childSession, subagent, "call_" + UUID.randomUUID()))));
+        assertThat(codes(json.readTree(resultText(before)))).as("멈추기 전에는 origin 사용자의 목록을 받는다").contains(OWN_A_CODE);
+
+        assertThat(json.readTree(resultText(agentStop(sharedToken, root, executionId))).path("status").asString()).isEqualTo("CANCELLED");
+        awaitFinished(executionId);
+
+        assertInvalidContext(send(groupToken, toolCall("agent_list", withContext(json.createObjectNode(),
+                McpCallSigner.context(groupToken, "agent_list", childSession, subagent, "call_" + UUID.randomUUID())))));
+        assertThat(executions.findById(parent.id()).orElseThrow().status()).as("멈춘 것은 위임 실행 하나다").isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    /**
+     * 완료를 기다리는 자리에서 중지가 올 때까지 멈춰 둔다. 실제 Hermes 에서 도는 run 과 같다.
+     *
+     * <p>중지가 오지 않아도 10초 뒤에는 이어져 실행 스레드가 검사보다 오래 살지 않는다.
+     */
+    private void holdUntilStopped() {
+        CountDownLatch stopReceived = new CountDownLatch(1);
+        stub().onStop(runId -> stopReceived.countDown());
+        stub().beforeAwait(() -> {
+            try {
+                stopReceived.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        });
+    }
+
+    private static HermesRunResult answered(HermesRunCommand command, String output) {
+        return HermesRunResult.of("run-" + UUID.randomUUID(), command.sessionId(), "completed", output,
+                "example-model", "example-provider", new TokenUsage(3L, 0L, 2L, 5L));
+    }
+
+    private HttpResponse<String> agentStop(String token, String root, Long executionId) throws Exception {
+        ObjectNode arguments = json.createObjectNode();
+        arguments.put("execution_id", executionId);
+        return send(token, toolCall("agent_stop", withContext(arguments, McpCallSigner.context(token, "agent_stop", root))));
     }
 
     @TestConfiguration

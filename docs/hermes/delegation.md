@@ -566,7 +566,7 @@ gateway 의 `/stop` 과 같은 함수이고, 부모 session 이 정확히 같은
 
 | 무엇 | 지금 |
 | --- | --- |
-| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_status`, 앞으로의 `agent_delegate`, `agent_stop`) | origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
+| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`) | origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
 | 자식의 Hermes 자체 도구(웹 검색, 터미널 등) | 막지 못한다 |
 | 자식 run 자체 | 멈추지 못한다. 동기 위임 자식만 부모 run 의 중지와 함께 멈춘다. background 자식을 멈추는 길은 위 「native 하위 에이전트를 멈추는 길」 에 있고 구현하지 않았다 |
 

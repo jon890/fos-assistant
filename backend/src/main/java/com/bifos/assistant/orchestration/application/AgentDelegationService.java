@@ -2,8 +2,10 @@ package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -12,9 +14,11 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -45,11 +49,24 @@ public class AgentDelegationService {
      */
     private static final int ROOT_LOCK_STRIPES = 64;
 
+    /** {@code agent_stop} 이 CANCELLED 가 적히기를 기다리는 시간이다. 넘으면 RUNNING 을 돌려준다. */
+    private static final Duration STOP_WAIT = Duration.ofSeconds(5);
+
     private final AgentService agents;
     private final AgentExecutionRepository executions;
     private final ChildExecutionRunner children;
     private final ConversationRepository conversations;
     private final DelegationProperties properties;
+    private final TurnCancellation turns;
+    private final HermesRunsClient hermes;
+
+    /**
+     * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
+     *
+     * <p>실행 줄이 생긴 직후 넣고 그 실행이 끝나 상태를 적은 뒤 뺀다. 서버가 다시 뜨면 비고, 그때 남은 RUNNING 줄은
+     * 기동 정리가 끝낸다.
+     */
+    private final ConcurrentHashMap<Long, RunningDelegation> running = new ConcurrentHashMap<>();
 
     /**
      * 같은 호출 확인과 동시 한도 세기부터 실행 줄 저장까지를 뿌리별로 묶는다.
@@ -66,12 +83,16 @@ public class AgentDelegationService {
             AgentExecutionRepository executions,
             ChildExecutionRunner children,
             ConversationRepository conversations,
-            DelegationProperties properties) {
+            DelegationProperties properties,
+            TurnCancellation turns,
+            HermesRunsClient hermes) {
         this.agents = agents;
         this.executions = executions;
         this.children = children;
         this.conversations = conversations;
         this.properties = properties;
+        this.turns = turns;
+        this.hermes = hermes;
         this.activeDelegations = new Semaphore(properties.maxActive());
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
             rootLocks[i] = new ReentrantLock();
@@ -93,6 +114,40 @@ public class AgentDelegationService {
     @Transactional(readOnly = true)
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId) {
         return executions.findById(executionId).filter(execution -> canQuery(user, origin, execution));
+    }
+
+    /**
+     * 요청자가 물을 수 있는 위임 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. 그 실행이 다시 맡긴 실행은 멈추지 않는다.
+     *
+     * <p>권한은 {@link #status} 와 같이 {@link #canQuery} 가 정한다. 아니면 없는 실행과 같게 빈 값이다. 이미 끝난 실행은
+     * 멈추지 않고 끝난 상태를 그대로 돌려준다.
+     *
+     * <p>도는 실행이면 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. 상태는 그 실행을 돌리는 가상 스레드만
+     * 적는다. 그래서 멈추기와 끝나기가 겹치면 먼저 적힌 상태가 남는다. CANCELLED 가 적히기를 {@link #STOP_WAIT} 까지
+     * 기다리고, 그 안에 적히지 않으면 RUNNING 인 줄을 그대로 돌려준다. 부르는 쪽은 그것을 중지를 요청한 상태로 읽는다.
+     *
+     * <p>이 프로세스에 중지 표시가 없는 도는 실행은 서버가 다시 떠 끊긴 실행이다. 기동 정리가 그 줄을 끝내므로 상태를
+     * 기다리지 않고, run 번호가 있으면 Hermes 에 중지만 보낸다.
+     */
+    public Optional<AgentExecution> stop(CurrentUser user, AgentExecution origin, Long executionId) {
+        Optional<AgentExecution> found = status(user, origin, executionId);
+        if (found.isEmpty() || found.get().status() != ExecutionStatus.RUNNING) {
+            return found;
+        }
+        AgentExecution execution = found.get();
+        RunningDelegation delegation = running.get(executionId);
+        if (delegation == null) {
+            if (execution.hermesRunId() != null) {
+                stopDetached(execution);
+            }
+            return executions.findById(executionId);
+        }
+        String runId = delegation.requestStop();
+        if (runId != null) {
+            sendStop(delegation, runId);
+        }
+        delegation.awaitEnded(STOP_WAIT);
+        return executions.findById(executionId);
     }
 
     /**
@@ -196,6 +251,10 @@ public class AgentDelegationService {
      * 가상 스레드에서 실행 하나를 끝까지 돌린다.
      *
      * <p>어떻게 끝나든 전체 한도 자리를 돌려주고 요청 스레드를 깨운다. 실행 줄 저장이 예외를 던진 경로도 같다.
+     *
+     * <p>실행은 셋 가운데 하나가 참이면 멈춘다. 요청 스레드가 제출 대기를 포기했다, {@code agent_stop} 이 중지 표시를
+     * 켰다, 사용자가 뿌리 turn 을 멈췄다. run 번호가 붙으면 뿌리 turn 에 그 run 을 붙여, 사용자가 turn 을 멈출 때 이
+     * 실행도 함께 멈추게 한다. turn 이 이미 끝났으면 붙일 곳이 없어 붙지 않는다.
      */
     private void run(
             CurrentUser user,
@@ -205,6 +264,8 @@ public class AgentDelegationService {
             String task,
             DelegationKey delegationKey,
             Handoff handoff) {
+        Long rootId = origin.treeRootId();
+        RunningDelegation delegation = new RunningDelegation(agent.apiBaseUrl(), agent.hermesProfile());
         RuntimeException failure = null;
         try {
             children.delegate(
@@ -214,9 +275,20 @@ public class AgentDelegationService {
                     agent,
                     task,
                     delegationKey,
-                    handoff::onRowCreated,
-                    (execution, runId) -> handoff.markSubmitted(),
-                    handoff::abandoned);
+                    execution -> {
+                        // 번호를 돌려받은 쪽이 곧바로 멈출 수 있게, 요청 스레드를 깨우기 전에 중지 표시를 등록한다.
+                        delegation.executionId = execution.id();
+                        running.put(execution.id(), delegation);
+                        handoff.onRowCreated(execution);
+                    },
+                    (execution, runId) -> {
+                        handoff.markSubmitted();
+                        if (delegation.attachRun(runId)) {
+                            sendStop(delegation, runId);
+                        }
+                        turns.trackRun(rootId, agent.apiBaseUrl(), agent.hermesProfile(), runId);
+                    },
+                    () -> handoff.abandoned() || delegation.stopRequested() || turns.isCancelled(rootId));
         } catch (DataIntegrityViolationException ex) {
             failure = ex;
             log.info("같은 위임 키의 실행 줄이 먼저 저장됐다 originExecutionId={}", origin.id());
@@ -224,8 +296,37 @@ public class AgentDelegationService {
             failure = ex;
             log.warn("위임 실행이 예외로 끝났다 originExecutionId={}", origin.id(), ex);
         } finally {
+            Long executionId = delegation.executionId;
+            if (executionId != null) {
+                running.remove(executionId, delegation);
+            }
+            String runId = delegation.runId();
+            if (runId != null) {
+                // 끝난 run 을 turn 중지가 다시 멈추지 않게 뗀다.
+                turns.untrackRun(rootId, runId);
+            }
+            delegation.markEnded();
             activeDelegations.release();
             handoff.markEnded(failure);
+        }
+    }
+
+    /** 중지를 보낸다. 보내지 못해도 중지 표시는 켜진 채라, 실행이 끝날 때 CANCELLED 로 적힌다. */
+    private void sendStop(RunningDelegation delegation, String runId) {
+        try {
+            hermes.stop(delegation.apiBaseUrl, delegation.profileName, runId);
+        } catch (RuntimeException ex) {
+            log.warn("위임 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", delegation.executionId, runId, ex);
+        }
+    }
+
+    /** 이 프로세스에 중지 표시가 없는 실행의 run 에 중지만 보낸다. */
+    private void stopDetached(AgentExecution execution) {
+        try {
+            Agent agent = agents.requireById(execution.agentId());
+            hermes.stop(agent.apiBaseUrl(), execution.profileName(), execution.hermesRunId());
+        } catch (RuntimeException ex) {
+            log.warn("끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={}", execution.id(), ex);
         }
     }
 
@@ -293,6 +394,63 @@ public class AgentDelegationService {
             return Objects.equals(execution.conversationId(), origin.conversationId());
         }
         return Objects.equals(execution.treeRootId(), origin.treeRootId());
+    }
+
+    /**
+     * 도는 위임 실행 하나의 중지 표시와 run 참조다.
+     *
+     * <p>「중지 표시를 켠다」 와 「run 번호를 붙인다」 는 같은 잠금 안에서 한다. 따로 하면 중지가 run 번호를 못 본 직후
+     * 번호가 붙고, 붙이는 쪽도 중지 표시를 못 봐 누구도 Hermes 에 중지를 보내지 않는다. 한 잠금 안에서 하면 둘 가운데
+     * 늦은 쪽이 앞의 것을 보고 한 번만 보낸다.
+     */
+    private static final class RunningDelegation {
+
+        private final String apiBaseUrl;
+        private final String profileName;
+        /** 실행 줄이 생기면 적힌다. */
+        private volatile Long executionId;
+        private String runId;
+        private boolean stopRequested;
+        /** 실행이 상태를 적고 끝나면 열린다. */
+        private final CountDownLatch ended = new CountDownLatch(1);
+
+        RunningDelegation(String apiBaseUrl, String profileName) {
+            this.apiBaseUrl = apiBaseUrl;
+            this.profileName = profileName;
+        }
+
+        /** 중지 표시를 켠다. 이미 붙은 run 번호가 있으면 그것을 돌려주고, 부르는 쪽이 Hermes 에 중지를 보낸다. */
+        synchronized String requestStop() {
+            stopRequested = true;
+            return runId;
+        }
+
+        /** run 번호를 붙인다. 중지 표시가 먼저 켜졌으면 참이고, 부르는 쪽이 Hermes 에 중지를 보낸다. */
+        synchronized boolean attachRun(String submittedRunId) {
+            runId = submittedRunId;
+            return stopRequested;
+        }
+
+        synchronized boolean stopRequested() {
+            return stopRequested;
+        }
+
+        synchronized String runId() {
+            return runId;
+        }
+
+        void markEnded() {
+            ended.countDown();
+        }
+
+        /** 실행이 끝나기를 기다린다. 끊기면 기다리기를 그만두고 끊긴 표시는 되살린다. */
+        void awaitEnded(Duration limit) {
+            try {
+                ended.await(limit.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     /**
