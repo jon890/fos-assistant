@@ -6,6 +6,7 @@ import { assistantAvatar, attachmentPlaceholder, revealedTime } from "./variants
 import { AnswerBody } from "./answer-body";
 import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
+import { artifactNames } from "@/lib/artifact-name";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
@@ -29,20 +30,6 @@ export type MessageArtifact = {
   /** 보관 기간이 지나 파일이 지워졌다 */
   deleted: boolean;
 };
-
-/**
- * 결과물 줄에 보일 이름이다. 경로의 마지막 조각이고, 같은 이름이 둘 이상이면 앞 폴더를 붙인다.
- */
-function artifactNames(paths: string[]): Map<string, string> {
-  const last = (path: string) => path.split("/").at(-1) ?? path;
-  const counts = new Map<string, number>();
-  for (const path of paths) counts.set(last(path), (counts.get(last(path)) ?? 0) + 1);
-  return new Map(paths.map((path) => {
-    const segments = path.split("/");
-    const name = last(path);
-    return [path, (counts.get(name) ?? 0) > 1 && segments.length > 1 ? segments.slice(-2).join("/") : name];
-  }));
-}
 
 export type Turn = {
   id: number | string;

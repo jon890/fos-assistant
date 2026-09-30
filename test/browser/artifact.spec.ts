@@ -30,11 +30,11 @@ async function createConversation(page: Page, text: string): Promise<string> {
 
 test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진과 함께 뜬다", async ({ page }) => {
   const rows = await sendProbe(page);
-  await expect(rows.first()).toHaveText("index.html");
+  await expect(rows.first()).toHaveText("초안");
 
   await rows.first().getByRole("button").click();
   const panel = page.getByTestId("artifact-panel");
-  await expect(panel.getByRole("heading", { name: "index.html" })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "초안" })).toBeVisible();
   const frame = page.getByTestId("artifact-frame");
   await expect(frame).toBeVisible();
   const sandbox = await frame.getAttribute("sandbox");
@@ -62,6 +62,18 @@ test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진
   expect(headers["x-content-type-options"]).toBe("nosniff");
   // 옮기는 목록 밖의 머리글이 붙으면 같은 출처 iframe 이 막힌다.
   expect(headers["x-frame-options"]).toBeUndefined();
+
+  // 조건부 요청이 Control Plane 까지 가서 304 로 돌아와야 한다. 본문은 비고 캐시 지시는 그대로 붙는다.
+  const etag = headers["etag"];
+  const lastModified = headers["last-modified"];
+  expect(etag, "ETag 가 옮겨지지 않았다").toBeTruthy();
+  expect(lastModified, "Last-Modified 가 옮겨지지 않았다").toBeTruthy();
+  const byEtag = await page.request.get(src!, { headers: { "If-None-Match": etag } });
+  expect(byEtag.status()).toBe(304);
+  expect((await byEtag.body()).length).toBe(0);
+  expect(byEtag.headers()["cache-control"]).toBe("private, no-cache");
+  const byDate = await page.request.get(src!, { headers: { "If-Modified-Since": lastModified } });
+  expect(byDate.status()).toBe(304);
 
   await panel.getByRole("button", { name: "결과물 닫기" }).click();
   await expect(panel).toHaveCount(0);

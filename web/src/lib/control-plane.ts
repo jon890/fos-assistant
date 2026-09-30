@@ -119,12 +119,18 @@ export async function requestControlPlane(
  */
 export async function forwardControlPlane(
   path: string,
-  init: { method: string; body?: ReadableStream<Uint8Array> | null; contentType?: string | null },
+  init: {
+    method: string;
+    body?: ReadableStream<Uint8Array> | null;
+    contentType?: string | null;
+    /** 그대로 옮길 요청 머리글이다. `Authorization` 과 `Content-Type` 은 이 함수가 정한 값이 이긴다. */
+    headers?: Record<string, string>;
+  },
 ): Promise<ControlPlaneResponse> {
   const authorized = await authorize();
   if (!authorized.ok) return authorized;
 
-  const headers: Record<string, string> = { Authorization: `Bearer ${authorized.token}` };
+  const headers: Record<string, string> = { ...init.headers, Authorization: `Bearer ${authorized.token}` };
   if (init.contentType) headers["Content-Type"] = init.contentType;
 
   // 본문이 스트림이면 Node 의 fetch 에 duplex 를 함께 줘야 한다. 없으면 요청이 거절된다. 표준

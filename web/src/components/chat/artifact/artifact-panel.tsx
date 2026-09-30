@@ -6,6 +6,7 @@ import { cn } from "cn";
 import { focusWithoutTooltip, TooltipButton } from "@/components/ui/tooltip-button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/components/ui/use-media-query";
+import { artifactName } from "@/lib/artifact-name";
 
 /**
  * iframe 에 주는 권한이다. 스크립트 실행 권한은 주지 않는다(ADR-027).
@@ -33,7 +34,7 @@ export function ArtifactPanel({ conversationId, path, onClose }: Props) {
   // 첫 그림에서 폭을 모르면(null) 옆에 붙는 모양으로 그린다.
   const wide = useMediaQuery("(min-width: 1024px)");
   const closeRef = useRef<HTMLButtonElement>(null);
-  const name = path.split("/").at(-1) ?? path;
+  const name = artifactName(path);
   const src = artifactUrl(conversationId, path);
 
   const header = (title: React.ReactNode) => (
