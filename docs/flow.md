@@ -1340,7 +1340,9 @@ sequenceDiagram
 | 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 실패 코드를 돌려준다 |
 | 제출이 한도 시간 안에 끝나지 않는다 | 실행 번호를 돌려주고, 뒤따르는 결과는 그 줄에 적는다 |
 | `agent_list` 를 부른다 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 `name` 만 JSON 배열로 준다. 같은 profile 을 여럿이 써도 요청자마다 다르다 |
-| `agent_status` 로 남의 실행, 그 나무 밖의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호를 묻는다 | 모두 `{"code":"NOT_FOUND","message":"실행을 찾을 수 없습니다."}` 하나로 답한다. 기준 나무는 부르는 쪽 origin 실행의 뿌리다. origin 실행이 끝났어도 같다 |
+| `agent_status` 로 남의 실행, 다른 대화의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호를 묻는다 | 모두 `{"code":"NOT_FOUND","message":"실행을 찾을 수 없습니다."}` 하나로 답한다. 기준은 부르는 쪽 origin 실행의 대화다. 같은 사용자의 다른 대화여도 찾지 못한다. origin 실행이 끝났어도 같다 |
+| `agent_status` 로 같은 대화의 앞 turn 에서 맡긴 실행을 묻는다 | 답한다. turn 마다 뿌리 실행이 달라도 대화가 같으면 된다. 기다리지 않는 위임의 결과를 뒤 turn 에서 가져오는 길이다 |
+| `agent_status` 를 부른 origin 실행에 대화가 없다 | 같은 실행 나무(같은 뿌리)의 위임 실행만 답한다 |
 | `agent_status` 가 물을 수 있는 실행이다 | `execution_id` 와 `status` 를 준다. `SUCCEEDED` 는 `output`, `FAILED` 는 `error_code`, `CANCELLED` 는 답이 있으면 `output` 을 더한다. run 번호, profile, 토큰 수, 금액은 싣지 않는다 |
 | `agent_stop` 이 끝난 실행에 온다 | 멈추지 않고 끝난 상태를 그대로 돌려준다 |
 | 멈추기와 끝나기가 겹친다 | 먼저 적힌 쪽이 남는다. 끝난 뒤 온 중지는 끝난 상태를 돌려준다 |

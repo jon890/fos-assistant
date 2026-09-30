@@ -283,7 +283,7 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 요청자는 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
 profile 이 빈 토큰은 인증에서 거절한다.
-`agent_list` 는 인자가 없고 `[{"code":"...","name":"..."}]` 를 글로 준다. `agent_status` 는 `execution_id` 정수 하나를 받고 `{"execution_id":123,"status":"SUCCEEDED","output":"..."}` 처럼 준다. 물을 수 없는 실행은 모두 `NOT_FOUND` 하나다. 갈리는 지점은 [`flow.md`](../flow.md#다른-에이전트에게-맡길-때) 에 있다.
+`agent_list` 는 인자가 없고 `[{"code":"...","name":"..."}]` 를 글로 준다. `agent_status` 는 `execution_id` 정수 하나를 받고 `{"execution_id":123,"status":"SUCCEEDED","output":"..."}` 처럼 준다. 물을 수 있는 실행은 요청자의 위임 실행 중 부르는 쪽 origin 실행과 같은 대화의 것이다. origin 실행에 대화가 없으면 같은 실행 나무의 것이다. 물을 수 없는 실행은 모두 `NOT_FOUND` 하나다. 갈리는 지점은 [`flow.md`](../flow.md#다른-에이전트에게-맡길-때) 에 있다.
 `memory_read` 는 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
