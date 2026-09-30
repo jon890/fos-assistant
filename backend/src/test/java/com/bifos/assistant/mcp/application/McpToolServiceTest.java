@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -31,7 +32,7 @@ class McpToolServiceTest {
             UUID.randomUUID(), "image.png", null, "https://images.example.com/a.png?private=value");
     private final ArtifactWriteService artifacts = mock(ArtifactWriteService.class);
     private final MemoryService memories = mock(MemoryService.class);
-    private final McpToolService tools = new McpToolService(memories, artifacts);
+    private final McpToolService tools = new McpToolService(memories, artifacts, mock(AgentDelegationService.class));
     private final AgentExecution parent = mock(AgentExecution.class);
     private McpCaller caller;
     private ListAppender<ILoggingEvent> logs;

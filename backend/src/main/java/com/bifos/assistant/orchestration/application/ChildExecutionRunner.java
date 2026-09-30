@@ -90,7 +90,7 @@ public class ChildExecutionRunner {
                         agent,
                         task,
                         parent.id(),
-                        rootOf(parent),
+                        parent.treeRootId(),
                         RunSession.fresh(),
                         execution -> {},
                         onSubmitted,
@@ -110,15 +110,5 @@ public class ChildExecutionRunner {
             throw new ApiException(
                     ErrorCode.ORCHESTRATION_DEPTH_EXCEEDED, "a child cannot spawn another child");
         }
-    }
-
-    /**
-     * 자식이 속할 나무의 뿌리를 정한다.
-     *
-     * <p>부모의 {@code rootExecutionId} 가 있으면 그것을 쓰고, 없으면 부모의 번호를 쓴다. 부모가
-     * 뿌리이면 자기 {@code rootExecutionId} 는 비어 있기 때문이다.
-     */
-    private static Long rootOf(AgentExecution parent) {
-        return parent.rootExecutionId() == null ? parent.id() : parent.rootExecutionId();
     }
 }
