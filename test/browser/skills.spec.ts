@@ -122,6 +122,94 @@ test("앞머리가 없거나 description 이 비어 있으면 저장 요청을 �
   expect(puts).toEqual([]);
 });
 
+test("새 스킬의 description 이 60자를 넘으면 저장 요청을 보내지 않고, 60자면 저장한다", async ({ page }) => {
+  const name = "sixty-chars";
+  const puts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT") puts.push(request.url());
+  });
+  try {
+    await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+    await page.getByLabel("스킬 이름").fill(name);
+    const editor = page.getByRole("textbox", { name: "SKILL.md 본문" });
+    const save = page.getByRole("button", { name: "저장", exact: true });
+
+    await editor.fill(skillMd(name, "가".repeat(61)));
+    await save.click();
+    await expect(page.getByRole("alert").filter({
+      hasText: "새 스킬의 description 은 60자까지 쓸 수 있어요. 지금은 61자예요. 자세한 설명은 본문에 적어 주세요.",
+    })).toBeVisible();
+    expect(puts).toEqual([]);
+
+    await editor.fill(skillMd(name, "가".repeat(60)));
+    await save.click();
+    await expect(page).toHaveURL(new RegExp(`/agents/${PERSONA_AGENT_CODE}$`));
+    expect(puts).toHaveLength(1);
+  } finally {
+    await removeSkill(page, PERSONA_AGENT_CODE, name);
+  }
+});
+
+test("앞머리만 있고 본문이 없으면 저장 요청을 보내지 않고 한국어 오류를 보인다", async ({ page }) => {
+  const puts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT") puts.push(request.url());
+  });
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+  await page.getByLabel("스킬 이름").fill("no-body");
+  await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill("---\nname: no-body\ndescription: 본문이 없어요\n---\n\n  \n");
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+
+  await expect(page.getByRole("alert").filter({ hasText: "SKILL.md 앞머리 아래에 스킬 본문을 적어 주세요." })).toBeVisible();
+  expect(puts).toEqual([]);
+});
+
+test("description 이 1,024자를 넘으면 저장 요청을 보내지 않고 한국어 오류를 보인다", async ({ page }) => {
+  const puts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT") puts.push(request.url());
+  });
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+  await page.getByLabel("스킬 이름").fill("long-description");
+  await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("long-description", "가".repeat(1025)));
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+
+  await expect(page.getByRole("alert").filter({ hasText: "description 은 1,024자까지 쓸 수 있어요." })).toBeVisible();
+  expect(puts).toEqual([]);
+});
+
+test("올린 스킬이 한도만큼 있으면 새 스킬을 저장 요청 없이 막고 한도를 알린다", async ({ page }) => {
+  const puts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PUT") puts.push(request.url());
+  });
+  await page.route(`**/api/agents/${PERSONA_AGENT_CODE}/skills`, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        skills: Array.from({ length: 30 }, (_, i) => ({
+          name: `filled-${i + 1}`,
+          description: "한도를 채워요",
+          source: "UPLOADED",
+          enabled: true,
+        })),
+        editable: true,
+        skillsToolsetEnabled: true,
+        uploadLimit: 30,
+      }),
+    });
+  });
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}/skills/new`);
+  await page.getByLabel("스킬 이름").fill("one-too-many");
+  await page.getByRole("textbox", { name: "SKILL.md 본문" }).fill(skillMd("one-too-many", "서른한 번째예요"));
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+
+  await expect(page.getByRole("alert").filter({ hasText: "스킬은 에이전트마다 최대 30개까지 만들 수 있어요." })).toBeVisible();
+  expect(puts).toEqual([]);
+});
+
 test("플로 매핑 앞머리는 화면이 막지 않고 서버가 읽어 저장된다", async ({ page }) => {
   const name = "flow-mapping";
   try {

@@ -34,7 +34,7 @@ class SkillStoreTest {
             """;
 
     private static SkillStore storeAt(Path root) {
-        return new SkillStore(new SkillProperties(root.toString(), AGENT_ROOT + "/", 3));
+        return new SkillStore(new SkillProperties(root.toString(), AGENT_ROOT + "/", 3, null));
     }
 
     private static Map<String, SkillBundle> skills(String... names) {

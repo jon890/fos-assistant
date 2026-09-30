@@ -30,6 +30,8 @@ export type SkillListView = {
   editable: boolean;
   /** 그 에이전트의 API 실행에 `skills` toolset 이 켜져 있다. */
   skillsToolsetEnabled: boolean;
+  /** 올릴 수 있는 스킬 수의 한도. 새 스킬을 만들 때만 본다. */
+  uploadLimit: number;
 };
 
 /** 참고 파일의 경로와 UTF-8 바이트 크기다. */
@@ -59,3 +61,37 @@ export type SkillUsageRow = {
   lastInvokedAt: string;
   lastConversationId: string | null;
 };
+
+/**
+ * 새 스킬의 description 이 넘을 수 없는 글자 수다. Hermes 가 새 스킬을 만들 때 거는 한도다.
+ * backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
+ */
+export const MAX_NEW_DESCRIPTION_CHARS = 60;
+
+/**
+ * description 이 넘을 수 없는 글자 수다. Hermes 가 저장할 때마다 거는 한도다.
+ * backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
+ */
+export const MAX_DESCRIPTION_CHARS = 1024;
+
+/**
+ * 새 스킬의 60자 한도에 견주는 description 글자 수다. 앞뒤 공백을 뺀 뒤 양 끝의 `'` 와 `"` 를 몇 개든 빼고,
+ * 이모지가 둘로 세어지지 않게 code point 로 센다. 백엔드 `SkillFrontmatter.indexedDescriptionLength` 와 함께 고친다.
+ */
+export function indexedDescriptionLength(value: string): number {
+  return Array.from(value.trim().replace(/^['"]+/, "").replace(/['"]+$/, "")).length;
+}
+
+/**
+ * 화면이 description 글자 수를 세도 되는 값인지 본다. 여러 줄이면 서버가 값을 이어 붙이고, 백슬래시나 `''` 는
+ * YAML 이 따옴표 안에서 한 글자로 줄이며, 여는 따옴표가 남았으면 뒤에 주석이 붙어 따옴표를 못 벗긴 것이다.
+ * 이런 값을 화면이 세면 서버보다 많이 세어 저장할 수 있는 값을 막으므로, 세지 않고 서버에 맡긴다.
+ */
+export function isCountableDescription(value: string, multiline: boolean): boolean {
+  return !multiline && !/[\\]|''|^['"]/.test(value);
+}
+
+/** 앞머리 뒤의 글이 공백뿐이 아니면 참이다. 백엔드는 본문이 빈 스킬을 거절한다. */
+export function hasBodyAfterFrontmatter(rest: string): boolean {
+  return rest.trim() !== "";
+}
