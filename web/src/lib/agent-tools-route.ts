@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
 import { requestControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 
 type RouteContext = { params: Promise<{ code: string }> };
 
@@ -20,14 +21,9 @@ export async function agentToolsRoute(
 
   let body: unknown;
   if (request.method === "PUT") {
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        { code: "VALIDATION_FAILED", message: "요청 내용이 올바르지 않아요." },
-        { status: 400 },
-      );
-    }
+    const parsed = await readJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    body = parsed.body;
   }
 
   const path = `/api/v1/${admin ? "admin/" : ""}agents/${code}/tools`;

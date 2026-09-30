@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 
 export async function GET() {
   const result = await callControlPlane<unknown[]>("/api/v1/chat/conversations");
@@ -11,7 +12,9 @@ export async function GET() {
 
 /** 제목이 빈 대화를 만든다. 사진을 먼저 올리려면 대화 번호가 먼저 있어야 한다. */
 export async function POST(request: Request) {
-  const body = (await request.json()) as { agentCode?: string };
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body as { agentCode?: string };
 
   const result = await callControlPlane<{ conversationId: string }>("/api/v1/chat/conversations", {
     method: "POST",

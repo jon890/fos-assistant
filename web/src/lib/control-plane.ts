@@ -1,5 +1,6 @@
 import { SignJWT } from "jose";
 import { auth } from "@/auth";
+import { readControlPlaneResult, type ControlPlaneResult } from "@/lib/control-plane-result";
 
 /** Control Plane 토큰은 한 요청 동안만 산다. 브라우저는 이 토큰을 보지 않는다. */
 const TOKEN_LIFETIME = "2m";
@@ -65,10 +66,6 @@ export async function isSignInAllowed(email: string): Promise<boolean> {
     return false;
   }
 }
-
-export type ControlPlaneResult<T> =
-  | { ok: true; status: number; data: T }
-  | { ok: false; status: number; code: string; message: string };
 
 export type ControlPlaneResponse =
   | { ok: true; response: Response }
@@ -166,16 +163,5 @@ export async function callControlPlane<T>(
   const opened = await requestControlPlane(path, init);
   if (!opened.ok) return opened;
   const response = opened.response;
-
-  const text = await response.text();
-  const payload = text.length > 0 ? JSON.parse(text) : null;
-  if (!response.ok) {
-    return {
-      ok: false,
-      status: response.status,
-      code: payload?.code ?? "INTERNAL_ERROR",
-      message: payload?.message ?? "요청을 처리하지 못했어요.",
-    };
-  }
-  return { ok: true, status: response.status, data: payload as T };
+  return readControlPlaneResult<T>(response.status, await response.text());
 }
