@@ -18,6 +18,7 @@ import { useConversations } from "./shell/conversations-provider";
 import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
 import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
+import { agentLabel } from "@/lib/format";
 import type { ChatEvent } from "@/lib/chat-event";
 import { foldVersions } from "@/lib/message-versions";
 import type { AgentView } from "@/lib/agent";
@@ -382,7 +383,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
 
   useEffect(() => {
     const selected = conversations.find((item) => item.id === conversationId);
-    if (selected) setAgentCode(selected.agentCode);
+    if (selected) setAgentCode(selected.agentCode ?? "");
   }, [conversations, conversationId]);
 
   useEffect(() => {
@@ -973,11 +974,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   }
 
   const currentConversation = conversations.find((item) => item.id === conversationId);
-  const selectedAgent = currentConversation?.agentName
-    ?? agents.find((agent) => agent.code === agentCode)?.name;
+  // 에이전트 행이 없는 대화는 agentCode 가 null 이다. 대화 목록이 먼저 읽혀 빈 코드가 첫 에이전트로 채워져도
+  // 그 에이전트의 모델과 사진 단추와 스킬이 이 대화에 보이지 않게, 상태가 아니라 이 값으로 막는다.
+  const agentMissing = currentConversation !== undefined && currentConversation.agentCode === null;
+  const selectedAgent = currentConversation
+    ? agentLabel(currentConversation.agentName)
+    : agents.find((agent) => agent.code === agentCode)?.name;
   useShellTitle(selectedAgent ?? null);
   const startScreen = freshStart && turns.length === 0 && !sending;
-  const currentAgent = agents.find((agent) => agent.code === agentCode);
+  const currentAgent = agentMissing ? undefined : agents.find((agent) => agent.code === agentCode);
   const starters = useStarterSuggestions(startScreen && currentAgent ? currentAgent.code : null);
   // 흐름이 붙은 에이전트는 사진을 받지 않고 커맨드도 해석하지 않는다. 사진 단추를 숨기는 기준과 같게 이 값으로 가린다.
   const commandAgentCode = currentAgent?.acceptsAttachments ? currentAgent.code : null;
@@ -1023,8 +1028,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             )}>
               <div className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
                 <span className="shrink-0">에이전트</span>
-                <span className="truncate" title={currentAgent?.name}>
-                  {currentAgent?.name ?? "등록된 에이전트가 없어요"}
+                <span className="truncate" title={agentMissing ? agentLabel(null) : currentAgent?.name}>
+                  {agentMissing ? agentLabel(null) : currentAgent?.name ?? "등록된 에이전트가 없어요"}
                 </span>
               </div>
             </div>
@@ -1082,7 +1087,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             onSend={(attachmentIds) => send(attachmentIds)}
             disabled={conversationId === null && agents.length === 0}
             conversationId={conversationId}
-            agentCode={agentCode}
+            agentCode={agentMissing ? "" : agentCode}
             acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
             onConversationCreated={(id) => {
               if (conversationIdRef.current === null) {

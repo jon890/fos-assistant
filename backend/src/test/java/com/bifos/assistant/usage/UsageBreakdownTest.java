@@ -137,6 +137,25 @@ class UsageBreakdownTest {
     }
 
     @Test
+    void 에이전트_행이_없는_실행도_agent_축에_번호로_묶이고_다른_줄은_그대로다() {
+        save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
+        save(chore, MID_SEPTEMBER.plusSeconds(60), 60_000L, 500L, null);
+        String missingKey = String.valueOf(chore.id());
+        agents.deleteById(chore.id());
+
+        List<BreakdownRow> rows = controller.breakdown("agent", MONTH).rows();
+
+        assertThat(rows).extracting(BreakdownRow::key).containsExactly(CAREER_CODE, missingKey);
+        assertThat(rows.getFirst().label()).isEqualTo("진로 비서");
+        assertThat(rows.get(1)).satisfies(row -> {
+            assertThat(row.label()).as("이름이 없으면 에이전트 번호를 이름 자리에 쓴다").isEqualTo(missingKey);
+            assertThat(row.detail()).isNull();
+            assertThat(row.executions()).isOne();
+            assertThat(row.estimatedCostMicros()).isEqualTo(60_000L);
+        });
+    }
+
+    @Test
     void 도는_중인_실행은_어느_축에도_세어지지_않는다() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         executions.save(builder(USER_ID, career, MID_SEPTEMBER.plusSeconds(60))

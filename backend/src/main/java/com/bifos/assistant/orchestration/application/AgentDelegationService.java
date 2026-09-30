@@ -327,11 +327,20 @@ public class AgentDelegationService {
         }
     }
 
-    /** 이 프로세스에 중지 표시가 없는 실행의 run 에 중지만 보낸다. 보냈으면 참이다. */
+    /**
+     * 이 프로세스에 중지 표시가 없는 실행의 run 에 중지만 보낸다. 보냈으면 참이다.
+     *
+     * <p>에이전트 행이 없으면 보낼 주소가 없다. 로그만 남기고 보내지 못한 것으로 답한다.
+     */
     private boolean stopDetached(AgentExecution execution) {
+        Optional<Agent> found = agents.findById(execution.agentId());
+        if (found.isEmpty()) {
+            log.warn("에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
+                    execution.id(), execution.agentId());
+            return false;
+        }
         try {
-            Agent agent = agents.requireById(execution.agentId());
-            hermes.stop(agent.apiBaseUrl(), execution.profileName(), execution.hermesRunId());
+            hermes.stop(found.get().apiBaseUrl(), execution.profileName(), execution.hermesRunId());
             return true;
         } catch (RuntimeException ex) {
             log.warn("끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={}", execution.id(), ex);

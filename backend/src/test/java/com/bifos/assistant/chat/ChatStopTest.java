@@ -37,6 +37,7 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -253,6 +254,35 @@ class ChatStopTest {
         assertThat(relayed).extracting(ChatEvent::type).contains("delta", "done").doesNotContain("stopped");
         assertThat(executions.findById(relayed.getLast().executionId()).orElseThrow().status())
                 .isEqualTo(ExecutionStatus.SUCCEEDED);
+    }
+
+    @Test
+    void 에이전트_행이_없는_자식_실행은_건너뛰고_뿌리_실행을_취소로_끝낸다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of(
+                "run-root", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
+        stub().beforeAwait(() -> {
+            AgentExecution root = latestExecution(dad);
+            // 에이전트 번호가 가리키는 행이 없는 자식이다. 같은 뿌리를 가리키며 아직 돈다.
+            executions.save(AgentExecution.builder()
+                    .userId(dad.id())
+                    .agentId(-1L)
+                    .parentExecutionId(root.id())
+                    .rootExecutionId(root.id())
+                    .profileName("gone")
+                    .hermesRunId("run-child")
+                    .costMode(CostMode.SUBSCRIPTION)
+                    .status(ExecutionStatus.RUNNING)
+                    .startedAt(Instant.now())
+                    .build());
+            chat.stop(dad, root.id());
+        });
+
+        ChatTurn turn = chat.send(dad, null, "자식이 있는 채로 멈춰 줘", "dad");
+
+        assertThat(executions.findById(turn.executionId()).orElseThrow().status())
+                .isEqualTo(ExecutionStatus.CANCELLED);
+        assertThat(stub().stopped()).containsExactly("run-root");
     }
 
     @Test

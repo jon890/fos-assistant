@@ -199,7 +199,7 @@ public class ExecutionTreeService {
     private ExecutionNode node(
             Branch branch, Map<Long, List<ExecutionEvent>> byExecution, CurrentUser viewer) {
         AgentExecution execution = branch.execution();
-        Agent agent = execution.agentId() == null ? null : agents.requireById(execution.agentId());
+        Agent agent = agents.findById(execution.agentId()).orElse(null);
         return new ExecutionNode(
                 branch.truncated(),
                 execution.id(),
