@@ -237,10 +237,13 @@ function withoutAskGuide(instructions: string): string {
 /** Control Plane 이 모든 실행 입력 맨 앞에 붙이는 결과물 폴더 단락의 첫 줄이다. `ArtifactService` 와 같아야 한다. */
 const ARTIFACT_HEADER = "[결과물 폴더]";
 
+/** 결과물 폴더 단락 바로 뒤에 붙는 스킬 관리 단락의 첫 줄이다. `SkillAgentNotice` 와 같아야 한다. */
+const SKILL_NOTICE_HEADER = "[스킬 관리]";
+
 /**
- * 입력 맨 앞의 결과물 폴더 단락을 떼고, 단락의 둘째 줄인 폴더를 함께 돌려준다.
+ * 입력 맨 앞의 결과물 폴더 단락과 그 뒤의 스킬 관리 단락을 떼고, 결과물 폴더 단락의 둘째 줄인 폴더를 함께 돌려준다.
  *
- * <p>단락은 빈 줄 하나로 끝난다. 맨 앞에 단락이 없으면 아무것도 떼지 않는다. Chief 는 요청 본문 안에서 이 단락을
+ * <p>단락은 각각 빈 줄 하나로 끝난다. 맨 앞에 결과물 폴더 단락이 없으면 아무것도 떼지 않는다. Chief 는 요청 본문 안에서 이 단락을
  * 받아 맨 앞이 아니므로 그대로 둔다. 떼지 않으면 입력을 글자 그대로 견주는 분기와 입력을 되돌려 주는 답이 모두
  * 어긋난다.
  */
@@ -250,7 +253,12 @@ function splitArtifactPreamble(input: string): { folder?: string; conversationId
   if (end < 0) return { rest: input };
   const lines = input.slice(0, end).split("\n");
   const identifier = lines.find((line) => line.startsWith("대화 식별자: "));
-  return { folder: lines[1], conversationId: identifier?.slice("대화 식별자: ".length), rest: input.slice(end + 2) };
+  let rest = input.slice(end + 2);
+  if (rest.startsWith(`${SKILL_NOTICE_HEADER}\n`)) {
+    const noticeEnd = rest.indexOf("\n\n");
+    if (noticeEnd >= 0) rest = rest.slice(noticeEnd + 2);
+  }
+  return { folder: lines[1], conversationId: identifier?.slice("대화 식별자: ".length), rest };
 }
 
 /** 이 글을 보내면 결과물 폴더에 HTML 과 그것이 부르는 사진을 쓰고 답한다. */
@@ -464,6 +472,8 @@ export type FakeHermes = {
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
+  /** 지금 붙잡아 둔 실행의 번호와 session 이다. 붙잡은 것이 없으면 `undefined` 다. 플러그인처럼 `_fos_ctx` 를 서명할 때 쓴다. */
+  heldRun(): { runId: string; sessionId: string } | undefined;
   /**
    * `LONG_ACTIVITY_PROBE` 스트림이 시작만 한 도구 줄을 남기고 기다리는 멈춤 지점 하나를 푼다. 실행 상태는 바꾸지 않는다.
    * 멈춤 지점이 둘이므로 끝까지 흘리려면 두 번 부른다. 기다리는 스트림이 없으면 아무것도 하지 않는다.
@@ -1353,6 +1363,10 @@ export function startFakeHermes(
           if (releasedRunId === undefined) return;
           const run = runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
+        },
+        heldRun: () => {
+          const run = heldRunId === undefined ? undefined : runs.get(heldRunId);
+          return run === undefined ? undefined : { runId: run.run_id, sessionId: run.session_id };
         },
         releaseLongActivity,
         holdNextSoul: () => {

@@ -47,6 +47,9 @@ import tools.jackson.databind.ObjectMapper;
  * 시작하면 이 저장소가 workflow engine 이 된다. 앞으로 에이전트 조합은 Hermes 가 정하고 Control
  * Plane 은 경계만 갖는다. 근거는 ADR-017 에 있다.
  *
+ * <p><b>이 흐름에 기능을 더하지 않는다.</b> 다른 에이전트에게 맡기는 일은 MCP {@code agent_*} 도구가 맡는다. 이 흐름을
+ * 지우는 조건은 ADR-017 「{@code ResearchAndBuildFlow} 의 자리」 가 정한다.
+ *
  * <p>단계가 넷이다.
  *
  * <pre>

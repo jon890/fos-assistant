@@ -1,6 +1,7 @@
 package com.bifos.assistant.usage.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -74,11 +75,13 @@ public class UsageController {
         // 한 페이지의 실행 번호로 한 번에 읽는다. 줄마다 질의하지 않는다.
         Map<Long, List<String>> skillNames =
                 skillUsage.skillNamesByExecution(page.stream().map(AgentExecution::id).toList());
+        // 에이전트도 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
+        Map<Long, Agent> agentsById = agents.byIds(page.stream().map(AgentExecution::agentId).toList());
         return page.stream()
                 .map(execution ->
                         ExecutionView.from(
                                 execution,
-                                agents.requireById(execution.agentId()),
+                                agentsById.get(execution.agentId()),
                                 execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
                                 withChildren.contains(execution.id()),
                                 skillNames.getOrDefault(execution.id(), List.of())))

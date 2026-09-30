@@ -91,7 +91,7 @@ class SkillCommandCatalogTest {
     @Test
     void skills_toolset_이_꺼져_있으면_켜진_스킬이_있어도_빈_집합이다() {
         when(skills.commandList(agent)).thenReturn(new SkillList(
-                List.of(new SkillListItem("shopping", "", SkillSource.UPLOADED, true, null)), false, false));
+                List.of(new SkillListItem("shopping", "", SkillSource.UPLOADED, true, null)), false, false, 30));
 
         assertThat(catalog.enabledNames(agent)).isEmpty();
     }
@@ -100,7 +100,7 @@ class SkillCommandCatalogTest {
         List<SkillListItem> items = Arrays.stream(enabledNames)
                 .map(name -> new SkillListItem(name, "", SkillSource.UPLOADED, true, null))
                 .toList();
-        return new SkillList(items, false, true);
+        return new SkillList(items, false, true, 30);
     }
 
     /** 테스트가 시각을 앞으로 옮긴다. */

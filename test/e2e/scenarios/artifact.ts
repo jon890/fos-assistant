@@ -54,6 +54,7 @@ export const artifactScenario: Scenario = {
     expect(input.startsWith("[결과물 폴더]\n"), `Hermes 입력이 결과물 폴더 단락으로 시작하지 않는다: ${input}`);
     expect(input.includes("artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다."),
       "파일 도구만 있는 에이전트에게 직접 저장할 폴더를 안내하지 않는다");
+    expect(input.includes("[스킬 관리]\n"), `Hermes 입력에 스킬 관리 단락이 없다: ${input}`);
 
     const messages = expectStatus(
       await call(context, `/chat/conversations/${conversationId}/messages`, { token: context.tokens.dad }),

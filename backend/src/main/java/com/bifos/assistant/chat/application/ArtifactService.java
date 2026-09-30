@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.infra.ArtifactStore.FoundFile;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.application.SkillAgentNotice;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -41,7 +42,7 @@ public class ArtifactService {
     private final ChatArtifactRepository artifacts;
 
     /**
-     * 실행 입력 맨 앞에 붙일 결과물 폴더 단락이다. 끝에 빈 줄 하나를 둔다.
+     * 실행 입력 맨 앞에 붙일 단락들이다. 결과물 폴더 단락 뒤에 스킬 관리 단락을 둔다. 끝에 빈 줄 하나를 둔다.
      *
      * <p>매 turn 붙인다. 에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다. 사진 단락이 있으면 그 앞에 둔다.
      * 저장하는 메시지 본문에는 쓰지 않는다.
@@ -58,7 +59,8 @@ public class ArtifactService {
                 + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
                 // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
                 + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
-                + "\n";
+                + "\n"
+                + SkillAgentNotice.PARAGRAPH;
     }
 
     /**

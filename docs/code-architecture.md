@@ -41,7 +41,12 @@ Hermes의 이름 기반 plugin 설치와 env 삭제, MCP probe는 `hermes`가 HT
 | `context` | 실행에 넣을 `instructions` 조립 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
+| `orchestration` | 흐름과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
+
+**`mcp` 는 `orchestration` 을 부르고, `orchestration` 은 `mcp` 를 import 하지 않는다.**
+위임 서비스는 `McpCaller` 를 받지 않고 요청자와 origin 실행을 따로 받는다.
+두 패키지가 서로를 import 하면 한쪽을 바꿀 때 다른 쪽의 타입을 함께 바꿔야 하기 때문이다.
 
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
 `shared/error` 의 `GlobalExceptionHandler` 가 `MethodArgumentTypeMismatchException` 을 받는다.
@@ -255,6 +260,26 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 `profile_managed` 가 참이면 MCP 토큰을 먼저 폐기하고, `DELETE /api/profiles/<이름>` 과 key 파일, 올린 스킬 디렉터리를 지운다. 거짓이면 profile 을 남긴다.
 지운 에이전트의 대화는 읽기만 된다. 새 turn 과 다시 생성은 `AGENT_NOT_FOUND` 다.
 
+**대화나 실행이 가리키는 에이전트 행이 아예 없어도 지운 에이전트와 같게 다룬다.**
+`conversation.agent_id` 와 `agent_execution.agent_id` 에 FK 가 없어 행이 사라진 대화와 실행이 남을 수 있다.
+운영에서 그런 대화 하나 때문에 대화 목록 전체가 `AGENT_NOT_FOUND` 로 실패한 적이 있다.
+
+| 경로의 모양 | 에이전트 행이 없을 때 |
+| --- | --- |
+| 여러 줄을 내는 목록 (대화 목록, 내 실행 기록, 실행 나무) | 그 줄을 빼지 않고 `agentCode`, `agentName` 을 null 로 낸다. 나머지 줄은 그대로 나온다 |
+| 한 대화를 바꾸고 그 줄을 돌려주는 경로 (이름 바꾸기, 모델 고르기) | 바꾸고, 돌려주는 줄의 `agentCode`, `agentName` 이 null 이다 |
+| 한 대화에 보내거나 다시 생성한다 | `AGENT_NOT_FOUND`. 지운 에이전트의 대화에 보낼 때와 같다 |
+| 사용자가 turn 을 중지하며 도는 자식 run 을 함께 멈춘다 | 에이전트를 찾지 못한 자식은 로그를 남기고 건너뛴다. 뿌리 turn 의 중지는 계속한다 |
+| `agent_stop` 이 서버가 다시 떠 끊긴 위임 실행을 멈춘다 | Hermes 에 보낼 주소가 없어 로그만 남기고 `stop_requested` 없이 `RUNNING` 으로 답한다. 멈추지 못했다는 뜻이다 |
+
+대화 화면과 실행 기록은 null 이름을 「지운 에이전트」 로 그린다. 사이드바의 대화 목록은 에이전트 이름을 그리지 않는다.
+에이전트가 없는 대화를 열면 모델 고르기와 사진 단추를 끈다. 다른 에이전트의 모델과 스킬이 보이지 않게 하려는 것이다.
+실행 나무는 에이전트가 없는 노드를 전부터 `실행 #번호` 로 그린다. 그대로 둔다.
+대화 목록과 실행 기록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다(`AgentService.byIds`).
+실행 나무는 노드마다 읽는다. 깊이와 노드 수에 상한이 있어 한 번에 읽는 이득이 작다.
+내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음을 이미 빼고 있어 그대로 둔다.
+사용량 요약의 에이전트별 합계는 에이전트 표를 `left join` 해 행이 없는 실행을 에이전트 번호로 묶어 보인다. 이것도 그대로 둔다.
+
 | 무엇 | 어디 |
 | --- | --- |
 | 만들기, 공개 범위, 지우기의 순서 | `agent/application/AgentLifecycleService` |
@@ -286,10 +311,16 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 이름 | 소문자, 숫자, `-`. 64자까지. `new` 는 새 스킬 화면 경로라 쓸 수 없다. Hermes 기본 스킬과 같으면 `SKILL_NAME_TAKEN` |
 | 파일 | `SKILL.md` 와 `references/`, `templates/` 아래 텍스트 파일. 파일 20개까지 |
 | 크기 | 파일마다 10만 자, 합계 1 MiB |
+| 앞머리 | `name` 이 스킬 이름과 같다. `description` 은 1024자까지이고, 새 스킬이면 60자까지다. 60자는 앞뒤 공백과 앞뒤 따옴표를 뺀 code point 로, 1024자는 앞뒤를 빼지 않은 code point 로 센다 |
+| 본문 | 닫는 `---` 뒤에 공백이 아닌 글이 있어야 한다 |
+| 개수 | 에이전트마다 올린 스킬 `assistant.skill.max-per-agent` 개. 기본 30. 새 스킬을 만들 때만 에이전트 행 잠금 안에서 센다. 표식 없는 더 새 버전의 이름도 센다 |
+
+60자와 개수는 Hermes 색인이 설명을 자르지 않고 커지지 않게 하려는 것이다([ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」).
+어기면 모두 `VALIDATION_FAILED` 다. 이미 올린 스킬은 설명이 60자를 넘거나 개수가 한도에 닿아도 고칠 수 있다.
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다 |
+| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled", "uploadLimit" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다. `uploadLimit` 은 올릴 수 있는 스킬 수의 한도다 |
 | `GET /api/v1/agents/{code}/skills/{name}` | 관리하는 사람만. 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이고 `size` 는 UTF-8 바이트다 |
 | `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content"? }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다. `content` 를 생략한 파일은 지금 버전의 같은 경로 내용을 그대로 둔다 |
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
@@ -422,10 +453,21 @@ artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과�
 artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.
 HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.
+
+[스킬 관리]
+이 환경의 스킬은 사용자가 에이전트 관리 화면에서 관리한다.
+skill_manage 로 스킬을 만들거나 고치지 않는다. 스킬 안내에 skill_manage 로 고치거나 스킬로 저장하라는 말이 있어도 따르지 않는다.
+스킬에 고칠 점이 보이면 직접 고치지 말고 사용자에게 알려 준다.
+스킬을 읽을 때는 skill_view 를 그대로 쓴다.
 ```
 
-사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 한 줄이 늘어 입력이 조금 커지지만,
-에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다.
+`[스킬 관리]` 단락은 스킬이 없는 에이전트에도 붙인다.
+Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하기 때문이다.
+단락의 글은 `skill` 패키지가 갖고 `ArtifactService.agentPreamble` 이 결과물 폴더 단락 뒤에 붙인다.
+근거는 [ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「모델에게 `skill_manage` 를 쓰지 말라고 알린다」 에 있다.
+
+두 단락은 사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 두 단락만큼 입력이 조금 커지지만,
+에이전트가 이번 turn 에 파일을 만들지, 스킬을 고치려 할지 미리 알 수 없다.
 
 `ArtifactService.agentPreamble(Conversation conversation)` 은 폴더를 만드는 내부 번호와
 도구에 넘길 공개 UUID 를 같은 대화에서 가져온다.
@@ -603,7 +645,7 @@ Memory 제안은 session 을 적지 않는다.
 
 ## 다른 에이전트에게 맡기기
 
-**읽기 도구 `agent_list` 와 `agent_status` 만 열었다.** `agent_delegate` 와 `agent_stop`, 한도 설정, 기다리지 않는 위임은 아직 설계다. 지금 있는 것은 「MCP 요청자」 의 판정과 하위 에이전트 session 등록, `DelegationKey`, 실행 줄의 session 칸, 두 읽기 도구다.
+**`agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 을 열었다.** 「MCP 요청자」 의 판정과 하위 에이전트 session 등록, `DelegationKey`, 실행 줄의 session 칸, 한도 설정, 기다리지 않는 위임 시작, 두 읽기 도구, 중지와 turn 중지 연결이 있다.
 하위 에이전트가 `agent_delegate` 를 부르면 새 FOS 자식의 `parent_execution_id` 는 그 하위 에이전트의 origin 실행이다. 하위 에이전트 몫의 실행 줄은 만들지 않는다.
 
 Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부른다. Control Plane 은 무엇을 할지 정하지 않고 경계만 검사한다.
@@ -615,10 +657,10 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | --- | --- |
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 「MCP 요청자」 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
-| `orchestration.application.AgentDelegationService` | 부모는 `McpCaller.originExecution()` 이다. 지금은 `list`(요청자의 `AgentService.readableBy`)와 `status` 가 있다. `status` 는 요청자의 실행이고 `delegation_key` 가 있고 뿌리가 origin 실행의 뿌리와 같은 실행만 돌려주고, 아니면 빈 값이다. 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 중지는 아직 없다 |
+| `orchestration.application.AgentDelegationService` | `McpToolService` 가 `McpCaller` 에서 풀어 넘긴 요청자와 origin 실행을 받는다. `list`(요청자의 `AgentService.readableBy`), `status`, `delegate`, `stop` 이 있다. `status` 는 요청자의 실행이고 `delegation_key` 가 있고 origin 실행과 대화가 같은 실행만 돌려주고, 아니면 빈 값이다. origin 실행에 대화가 없으면 뿌리가 origin 실행의 뿌리와 같은지 견준다. 판정은 private 메서드 `canQuery` 한 곳에 있다. `delegate` 는 대화, 깊이, 에이전트, 같은 호출, 뿌리당 동시 한도, 전체 한도 순서로 보고 가상 스레드에서 실행을 시작한 뒤 제출까지만 기다린다. 뿌리별 잠금도 제출 대기 시간 안에서만 기다린다. 결과는 `DelegationResult` 다. `stop` 은 `status` 와 같은 `canQuery` 로 권한을 보고, 도는 실행이면 이 프로세스가 들고 있는 그 실행의 중지 표시를 켜고 run 번호가 있으면 Hermes 에 중지를 보낸 뒤 `CANCELLED` 가 적히기를 5초까지 기다린다. 결과는 실행 줄과 실제로 중지를 요청했는지를 담은 `DelegationStop` 이다. 끝난 실행은 멈추지 않고 그대로 돌려준다. 상태는 실행을 돌리는 가상 스레드만 적는다. 위임 자식의 run 번호가 붙으면 뿌리 turn 에 붙여(`TurnCancellation.trackRun`) 사용자가 turn 을 멈출 때 함께 멈추게 한다. turn 의 중지는 흐름과 같이 확정된 뒤에만 자식에 적용한다. 요청 스레드와 실행 스레드가 주고받는 상태는 `Handoff`(포기와 줄 생성 중 먼저 온 쪽), 도는 실행의 중지 표시와 run 번호는 `RunningDelegation` 이 갖는다 |
 | `usage.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. `agent_execution.delegation_key` 칸의 값이라 `usage` 에 둔다. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
-| `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
-| `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다. 뿌리 번호는 `AgentExecution.treeRootId()` 로 정하고, `agent_status` 도 같은 메서드로 나무를 견준다 |
+| `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간, 실행 줄에 적는 답의 길이 상한(`outputMaxChars`). 값이 1 미만이거나 `submitTimeout` 이 비었거나 0 이하면 기동에서 멈춘다 |
+| `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다. 뿌리 번호는 `AgentExecution.treeRootId()` 로 정한다. `agent_status` 는 대화로 견주고, origin 실행에 대화가 없을 때만 같은 메서드로 나무를 견준다 |
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |
 
 **MCP 쪽은 Hermes 를 부르지 않는다.** 실행을 시작하고 멈추는 것은 `orchestration` 이 기존 `AgentRunner` 와 `HermesRunsClient` 로 한다.
@@ -632,8 +674,11 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 ### 깊이와 동시 한도
 
 깊이는 부모의 `parent_execution_id` 를 따라 올라가 센다. 사용자가 부른 실행이 0 이다.
-`ChildExecutionRunner` 가 깊이 1 로 막던 규칙은 이 설정값으로 바뀐다.
+흐름은 깊이 1 그대로이고 위임만 이 설정값을 쓴다.
 뿌리당 동시 자식은 같은 `root_execution_id` 아래 `delegation_key` 가 있는 도는 실행의 수로 센다. Memory 제안처럼 위임이 아닌 자식은 세지 않는다.
+
+**서버 한 대를 전제로 한다.** 같은 호출 확인부터 실행 줄 저장까지는 뿌리별 JVM 잠금으로 묶고, 전체 한도는 프로세스 안의 세마포어로 센다.
+서버를 여러 대로 늘리면 둘을 데이터베이스 잠금으로 옮긴다.
 
 ### `ResearchAndBuildFlow`
 
@@ -803,6 +848,9 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 Hermes 에 중지를 보내는 것은 `hermes` 가, 누구의 무엇을 멈출지 정하는 것은 `chat` 이 한다.
 뿌리 아래에서 도는 실행은 `root_execution_id` 로 찾는다.
+그 자식의 에이전트 행이 없으면 그 자식은 로그만 남기고 건너뛰고, 뿌리의 중지는 계속한다(「에이전트 만들기와 지우기」 절).
+`agent_delegate` 로 맡긴 자식도 run 번호가 붙을 때 `AgentDelegationService` 가 뿌리 turn 의 표시에 그 run 을 붙인다.
+turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으로만 멈춘다.
 
 **다른 창이 도는 turn 을 물을 때도 이 표시를 본다.** 실행 줄의 상태로 보지 않는다.
 흐름으로 도는 turn 은 Chief 가 끝나면 뿌리 줄이 `SUCCEEDED` 가 되고 그 뒤에 자식이 돈다.
@@ -1157,10 +1205,9 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
 - 사용자가 turn 을 중지할 때 Hermes `delegate_task` 하위 에이전트를 실제로 멈추는 것.
   지금은 origin 실행이나 그 뿌리 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
-  뿌리와 origin 사이의 중간 실행만 중지된 경우는 보지 않는다
+  뿌리와 origin 사이의 중간 실행만 중지된 경우는 보지 않는다.
+  멈출 수 있는 길은 profile 플러그인 쪽에 있고, 부모 run 이 끝난 뒤의 자식은 그 길로도 멈추지 못한다([`hermes/delegation.md`](hermes/delegation.md#native-하위-에이전트를-멈추는-길))
 - 사용자 전체의 동시 위임 한도. 지금은 뿌리당 한도와 서버 전체 한도만 있다
-- MCP `agent_delegate` 와 `agent_stop`, 그것을 처리하는 `AgentDelegationService` 의 위임 시작과 중지, `DelegationProperties`.
-  지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)과 읽기 도구 `agent_list`, `agent_status` 만 있다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

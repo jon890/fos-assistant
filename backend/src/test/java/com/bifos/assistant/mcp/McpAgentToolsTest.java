@@ -7,12 +7,28 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
+import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.DelegationKey;
+import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -20,17 +36,24 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
@@ -38,13 +61,24 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * {@code agent_list} 와 {@code agent_status} 가 origin 실행의 사용자와 그 실행 나무 안에서만 답하는 것을 실제
+ * {@code agent_list} 와 {@code agent_status} 가 origin 실행의 사용자와 그 대화 안에서만 답하는 것을 실제
  * {@code /mcp} 경계에서 고정한다(ADR-017, ADR-032, ADR-037).
  *
  * <p>같은 GROUP profile 을 사용자 A 와 B 가 함께 써도 각자의 목록과 각자의 위임 실행만 받는다.
+ * {@code conversationId} 없이 만든 origin 은 대화가 없을 때의 대체 규칙인 실행 나무로 판정된다.
+ * 대화 규칙은 origin 과 위임 실행에 대화 번호를 준 검사가 고정한다. {@code conversation_id} 에는 외래 키가 없어
+ * 대화 줄을 만들지 않고 번호만 준다.
+ *
+ * <p>{@code agent_delegate} 는 대역 Hermes 로 자식을 끝까지 돌린다. 위임은 가상 스레드에서 돌므로 각 검사는 자기가 띄운
+ * 실행이 끝날 때까지 기다린 뒤 끝난다. 제출 대기와 전체 한도와 답 자르기는 설정값을 바꾼 {@code AgentDelegationServiceTest}
+ * 가 본다.
+ *
+ * <p>{@code agent_stop} 은 {@code agent_status} 와 같은 판정을 지나고, 멈춘 위임 실행이 origin 인 Hermes 하위 에이전트의
+ * 호출은 거절된다(ADR-037). turn 중지와 이어지는 것은 {@code AgentDelegationServiceTest} 가 본다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(McpAgentToolsTest.StubRuntime.class)
 class McpAgentToolsTest {
     private static final String SHARED = "tools-shared";
     private static final String PRIVATE_A = "tools-private-a";
@@ -55,7 +89,12 @@ class McpAgentToolsTest {
     private static final String OWN_B_CODE = "tools-own-b";
     private static final String OFF_CODE = "tools-off";
     private static final List<String> CODES = List.of(GROUP_CODE, OWN_A_CODE, OWN_B_CODE, OFF_CODE);
+    /** 검사가 실행 줄을 남기는 profile 이다. 위임 자식은 에이전트의 profile 로 돈다. */
+    private static final List<String> PROFILES = List.of(SHARED, PRIVATE_A, TARGET,
+            profileOf(GROUP_CODE), profileOf(OWN_A_CODE), profileOf(OWN_B_CODE), profileOf(OFF_CODE));
     private static final Instant STARTED = Instant.parse("2026-09-30T00:00:00Z");
+    private static final Long CONVERSATION = 930_001L;
+    private static final Long OTHER_CONVERSATION = 930_002L;
 
     @LocalServerPort int port;
     @Autowired AgentTokenService tokens;
@@ -65,6 +104,11 @@ class McpAgentToolsTest {
     @Autowired AgentExecutionRepository executions;
     @Autowired JdbcTemplate jdbc;
     @Autowired SubagentSessionRegistrar registrar;
+    @Autowired HermesRunsClient hermes;
+    @Autowired ConversationRepository conversations;
+    @Autowired ChatMessageRepository messages;
+    @Autowired MemoryService memories;
+    @Autowired ExecutionEventRepository executionEvents;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -75,7 +119,8 @@ class McpAgentToolsTest {
 
     @BeforeEach
     void 준비한다() {
-        McpCallSigner.clearRuns(jdbc, List.of(SHARED, PRIVATE_A, TARGET));
+        stub().reset();
+        McpCallSigner.clearRuns(jdbc, PROFILES);
         CODES.forEach(code -> agents.findByCode(code).ifPresent(agents::delete));
         tokenRepository.deleteAll();
         users.deleteAll();
@@ -160,7 +205,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    void agent_status_는_같은_나무의_위임_실행을_상태별로_답한다() throws Exception {
+    void 대화_없는_origin_의_agent_status_는_같은_나무의_위임_실행을_상태별로_답한다() throws Exception {
         String root = McpCallSigner.newRoot();
         AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
         AgentExecution running = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
@@ -197,7 +242,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    void 남의_실행과_다른_나무와_위임이_아닌_실행과_없는_번호는_모두_같은_응답이다() throws Exception {
+    void 대화_없는_origin_에서_남의_실행과_다른_나무와_위임이_아닌_실행과_없는_번호는_모두_같은_응답이다() throws Exception {
         String rootA = McpCallSigner.newRoot();
         AgentExecution parentA = McpCallSigner.running(executions, userA.id(), null, SHARED, rootA);
         String rootB = McpCallSigner.newRoot();
@@ -224,6 +269,46 @@ class McpAgentToolsTest {
         hidden.forEach((reason, result) -> assertThat(result).as(reason).isEqualTo(missing));
         assertStatus(agentStatus(sharedToken, rootB, otherUsersOwn.id()),
                 "{\"execution_id\":" + otherUsersOwn.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"나의 답\"}");
+    }
+
+    @Test
+    void 같은_대화의_앞_turn_에서_맡긴_실행을_다음_turn_에서_묻는다() throws Exception {
+        AgentExecution firstTurn = McpCallSigner.save(executions, userA.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        AgentExecution earlier = delegated(userA.id(), firstTurn, ExecutionStatus.SUCCEEDED, "앞 turn 에서 맡긴 답", null);
+        String root = McpCallSigner.newRoot();
+        AgentExecution nextTurn = McpCallSigner.running(executions, userA.id(), CONVERSATION, SHARED, root);
+
+        assertThat(nextTurn.treeRootId()).as("다음 turn 은 뿌리가 다르다").isNotEqualTo(earlier.treeRootId());
+        assertStatus(agentStatus(sharedToken, root, earlier.id()),
+                "{\"execution_id\":" + earlier.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"앞 turn 에서 맡긴 답\"}");
+    }
+
+    @Test
+    void 대화가_있는_origin_에서_다른_대화와_위임이_아닌_실행과_남의_실행은_없는_번호와_같은_응답이다() throws Exception {
+        AgentExecution firstTurn = McpCallSigner.save(executions, userA.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        String root = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userA.id(), CONVERSATION, SHARED, root);
+        AgentExecution otherConversationTurn = McpCallSigner.save(executions, userA.id(), OTHER_CONVERSATION, SHARED,
+                McpCallSigner.newRoot(), ExecutionStatus.SUCCEEDED);
+        AgentExecution otherConversation = delegated(userA.id(), otherConversationTurn, ExecutionStatus.SUCCEEDED, "다른 대화의 답", null);
+        AgentExecution proposal = child(userA.id(), firstTurn, ExecutionStatus.SUCCEEDED);
+        // 대화 번호는 같고 사용자만 다르다.
+        AgentExecution otherUserTurn = McpCallSigner.save(executions, userB.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        AgentExecution otherUsers = delegated(userB.id(), otherUserTurn, ExecutionStatus.SUCCEEDED, "나의 답", null);
+
+        JsonNode missing = body(agentStatus(sharedToken, root, 999_999_999L)).path("result");
+        Map<String, JsonNode> hidden = new LinkedHashMap<>();
+        hidden.put("같은 사용자의 다른 대화의 위임 실행", body(agentStatus(sharedToken, root, otherConversation.id())).path("result"));
+        hidden.put("같은 대화의 위임이 아닌 자식", body(agentStatus(sharedToken, root, proposal.id())).path("result"));
+        hidden.put("같은 대화의 앞 turn", body(agentStatus(sharedToken, root, firstTurn.id())).path("result"));
+        hidden.put("같은 대화 번호의 남의 위임 실행", body(agentStatus(sharedToken, root, otherUsers.id())).path("result"));
+
+        JsonNode failure = json.readTree(missing.path("content").get(0).path("text").asString());
+        assertThat(failure.path("code").asString()).isEqualTo("NOT_FOUND");
+        hidden.forEach((reason, result) -> assertThat(result).as(reason).isEqualTo(missing));
     }
 
     @Test
@@ -308,6 +393,512 @@ class McpAgentToolsTest {
         }
     }
 
+    @Test
+    void 도구_목록에_agent_delegate_의_규격이_있다() throws Exception {
+        JsonNode listed = body(send(sharedToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")).path("result").path("tools");
+        JsonNode delegate = null;
+        for (JsonNode tool : listed) {
+            if ("agent_delegate".equals(tool.path("name").asString())) delegate = tool;
+        }
+
+        assertThat(delegate).as("도구 목록: %s", listed).isNotNull();
+        JsonNode schema = delegate.path("inputSchema");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("properties").path("agent_code").path("type").asString()).isEqualTo("string");
+        assertThat(schema.path("properties").path("task").path("type").asString()).isEqualTo("string");
+        List<String> required = new ArrayList<>();
+        schema.path("required").forEach(item -> required.add(item.asString()));
+        assertThat(required).containsExactlyInAnyOrder("agent_code", "task");
+        assertThat(delegate.path("description").asString()).contains("agent_status", "agent_list");
+    }
+
+    @Test
+    void agent_delegate_는_번호와_RUNNING_을_바로_주고_끝난_답은_agent_status_로_읽는다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+        String toolCallId = "call_" + UUID.randomUUID();
+        long messagesBefore = messages.count();
+
+        JsonNode started = started(delegateCall(sharedToken, root, root, toolCallId, delegateArguments(GROUP_CODE, "자료를 찾아 줘")));
+
+        assertThat(started.propertyNames()).containsExactly("execution_id", "status");
+        assertThat(started.path("status").asString()).isEqualTo("RUNNING");
+        AgentExecution child = awaitFinished(started.path("execution_id").asLong());
+        assertThat(child.parentExecutionId()).isEqualTo(parent.id());
+        assertThat(child.rootExecutionId()).isEqualTo(parent.id());
+        assertThat(child.userId()).isEqualTo(userA.id());
+        assertThat(child.conversationId()).isEqualTo(parent.conversationId());
+        assertThat(child.profileName()).isEqualTo(profileOf(GROUP_CODE));
+        assertThat(child.hermesSessionId()).startsWith("fos-").isNotEqualTo(parent.hermesSessionId());
+        assertThat(child.delegationKey()).isEqualTo(DelegationKey.of(SHARED, root, root, toolCallId).value());
+        assertThat(messages.count()).as("자식의 답은 대화 이력에 들어가지 않는다").isEqualTo(messagesBefore);
+        assertStatus(agentStatus(sharedToken, root, child.id()),
+                "{\"execution_id\":" + child.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"맡은 일의 답: 자료를 찾아 줘\"}");
+
+        // 같은 대화의 다음 turn 은 뿌리가 다르지만 앞 turn 에서 맡긴 실행을 묻는다.
+        setStatus(parent, ExecutionStatus.SUCCEEDED);
+        String nextRoot = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userA.id(), parent.conversationId(), SHARED, nextRoot);
+        assertStatus(agentStatus(sharedToken, nextRoot, child.id()),
+                "{\"execution_id\":" + child.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"맡은 일의 답: 자료를 찾아 줘\"}");
+    }
+
+    @Test
+    void agent_delegate_의_자식은_에이전트의_profile_로_가고_원래_사용자로_다시_조립한_Memory_를_받는다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        CurrentUser a = current(userA);
+        memories.create(a, MemoryScope.USER, "가의 취향", "가는 국물을 맵지 않게 먹는다", true);
+        memories.create(current(userB), MemoryScope.USER, "나의 취향", "나는 고수를 먹지 않는다", true);
+        String root = McpCallSigner.newRoot();
+        turn(userA, root);
+
+        JsonNode started = started(delegate(sharedToken, root, OWN_A_CODE, "저녁 메뉴를 골라 줘"));
+        awaitFinished(started.path("execution_id").asLong());
+
+        assertThat(stub().received()).hasSize(1);
+        HermesRunCommand command = stub().received().getFirst();
+        assertThat(command.profileName()).isEqualTo(profileOf(OWN_A_CODE));
+        assertThat(command.apiBaseUrl()).isEqualTo("http://agent-runtime.test/p/" + OWN_A_CODE);
+        assertThat(command.input()).isEqualTo("저녁 메뉴를 골라 줘");
+        assertThat(command.instructions()).contains("가는 국물을 맵지 않게 먹는다").doesNotContain("나는 고수를 먹지 않는다");
+    }
+
+    @Test
+    void 하위_에이전트가_부른_agent_delegate_의_부모는_끝난_origin_실행이고_하위_에이전트_몫의_줄은_없다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+        String subagent = "하위-" + UUID.randomUUID();
+        registrar.register(SHARED, root, root, subagent);
+        setStatus(parent, ExecutionStatus.SUCCEEDED);
+
+        JsonNode started = started(delegateCall(sharedToken, root, subagent, "call_" + UUID.randomUUID(),
+                delegateArguments(GROUP_CODE, "하위 에이전트가 맡긴다")));
+        AgentExecution child = awaitFinished(started.path("execution_id").asLong());
+
+        assertThat(child.parentExecutionId()).isEqualTo(parent.id());
+        assertThat(child.rootExecutionId()).isEqualTo(parent.id());
+        assertThat(executions.findByRootExecutionId(parent.id())).extracting(AgentExecution::id).containsExactly(child.id());
+        assertThat(executions.existsByProfileNameAndHermesSessionId(SHARED, subagent)).isFalse();
+    }
+
+    @Test
+    void agent_delegate_에_profile_이나_사용자를_넣거나_task_가_비었거나_길면_인자_오류다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        turn(userA, root);
+
+        Map<String, ObjectNode> invalid = new LinkedHashMap<>();
+        invalid.put("profile 을 넣었다", delegateArguments(GROUP_CODE, "일").put("profile", profileOf(OWN_B_CODE)));
+        invalid.put("사용자를 넣었다", delegateArguments(GROUP_CODE, "일").put("user_id", userB.id()));
+        invalid.put("부모를 넣었다", delegateArguments(GROUP_CODE, "일").put("parent_execution_id", 1));
+        invalid.put("task 가 없다", json.createObjectNode().put("agent_code", GROUP_CODE));
+        invalid.put("task 가 비었다", delegateArguments(GROUP_CODE, ""));
+        invalid.put("task 가 공백뿐이다", delegateArguments(GROUP_CODE, "  \n "));
+        invalid.put("task 가 8,000자를 넘는다", delegateArguments(GROUP_CODE, "가".repeat(8_001)));
+        invalid.put("agent_code 가 문자열이 아니다", json.createObjectNode().put("agent_code", 3).put("task", "일"));
+        for (Map.Entry<String, ObjectNode> entry : invalid.entrySet()) {
+            JsonNode response = body(delegateCall(sharedToken, root, root, "call_" + UUID.randomUUID(), entry.getValue()));
+            assertThat(response.path("error").path("code").asInt()).as("%s: %s", entry.getKey(), response).isEqualTo(-32602);
+        }
+        assertThat(stub().received()).isEmpty();
+    }
+
+    @Test
+    void task_가_8000자이면_맡긴다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        String root = McpCallSigner.newRoot();
+        turn(userA, root);
+
+        JsonNode started = started(delegate(sharedToken, root, GROUP_CODE, "가".repeat(8_000)));
+
+        assertThat(started.path("status").asString()).as("응답: %s", started).isEqualTo("RUNNING");
+        awaitFinished(started.path("execution_id").asLong());
+    }
+
+    @Test
+    void 없는_에이전트와_남의_비공개_에이전트는_같은_응답이고_꺼진_에이전트는_AGENT_DISABLED_다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+
+        HttpResponse<String> missing = delegate(sharedToken, root, "tools-missing", "일");
+        HttpResponse<String> othersPrivate = delegate(sharedToken, root, OWN_B_CODE, "일");
+        HttpResponse<String> disabled = delegate(sharedToken, root, OFF_CODE, "일");
+
+        assertFailure(missing, "AGENT_UNAVAILABLE");
+        assertThat(body(othersPrivate)).isEqualTo(body(missing));
+        assertFailure(disabled, "AGENT_DISABLED");
+        assertThat(executions.findByRootExecutionId(parent.id())).isEmpty();
+        assertThat(stub().received()).isEmpty();
+    }
+
+    @Test
+    void 깊이_2_인_부모에서는_DEPTH_EXCEEDED_이고_깊이_1_에서는_맡긴다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        AgentExecution top = turn(userA, McpCallSigner.newRoot());
+        AgentExecution depthOne = delegated(userA.id(), top, ExecutionStatus.SUCCEEDED, "답", null);
+        String deepRoot = McpCallSigner.newRoot();
+        running(depthOne, deepRoot);
+        String shallowRoot = McpCallSigner.newRoot();
+        AgentExecution shallow = running(top, shallowRoot);
+
+        assertFailure(delegate(sharedToken, deepRoot, GROUP_CODE, "더 맡긴다"), "DEPTH_EXCEEDED");
+        JsonNode started = started(delegate(sharedToken, shallowRoot, GROUP_CODE, "맡긴다"));
+
+        AgentExecution child = awaitFinished(started.path("execution_id").asLong());
+        assertThat(child.parentExecutionId()).isEqualTo(shallow.id());
+        assertThat(child.rootExecutionId()).isEqualTo(top.id());
+        assertThat(stub().received()).hasSize(1);
+    }
+
+    @Test
+    void 같은_뿌리에서_위임_넷이_돌면_다섯째는_TOO_MANY_CHILDREN_이고_위임이_아닌_자식은_세지_않는다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+        for (int i = 0; i < 3; i++) {
+            delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+        }
+        delegated(userA.id(), parent, ExecutionStatus.SUCCEEDED, "끝난 위임", null);
+        child(userA.id(), parent, ExecutionStatus.RUNNING);
+
+        JsonNode fourth = started(delegate(sharedToken, root, GROUP_CODE, "넷째"));
+        assertThat(fourth.path("status").asString()).as("넷째: %s", fourth).isEqualTo("RUNNING");
+        awaitFinished(fourth.path("execution_id").asLong());
+        delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+
+        assertFailure(delegate(sharedToken, root, GROUP_CODE, "다섯째"), "TOO_MANY_CHILDREN");
+        assertThat(stub().received()).hasSize(1);
+    }
+
+    @Test
+    void 같은_tool_call_id_로_두_번_부르면_실행이_하나이고_다른_session_의_같은_id_는_따로_만든다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+        String subagent = "하위-" + UUID.randomUUID();
+        registrar.register(SHARED, root, root, subagent);
+        String toolCallId = "call_" + UUID.randomUUID();
+
+        JsonNode first = started(delegateCall(sharedToken, root, root, toolCallId, delegateArguments(GROUP_CODE, "한 번")));
+        awaitFinished(first.path("execution_id").asLong());
+        JsonNode again = started(delegateCall(sharedToken, root, root, toolCallId, delegateArguments(GROUP_CODE, "한 번")));
+        JsonNode otherSession = started(delegateCall(sharedToken, root, subagent, toolCallId, delegateArguments(GROUP_CODE, "한 번")));
+        awaitFinished(otherSession.path("execution_id").asLong());
+
+        assertThat(again.path("execution_id").asLong()).isEqualTo(first.path("execution_id").asLong());
+        assertThat(otherSession.path("execution_id").asLong()).isNotEqualTo(first.path("execution_id").asLong());
+        assertThat(executions.findByRootExecutionId(parent.id())).hasSize(2);
+        assertThat(stub().received()).hasSize(2);
+    }
+
+    @Test
+    void 제출이_실패하면_실행_줄이_FAILED_로_남고_SUBMIT_FAILED_다() throws Exception {
+        stub().willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+        String toolCallId = "call_" + UUID.randomUUID();
+
+        HttpResponse<String> response = delegateCall(sharedToken, root, root, toolCallId, delegateArguments(GROUP_CODE, "일"));
+
+        assertFailure(response, "SUBMIT_FAILED");
+        assertThat(response.body()).doesNotContain("down", "HERMES_UNAVAILABLE");
+        AgentExecution child = executions.findByDelegationKey(DelegationKey.of(SHARED, root, root, toolCallId).value()).orElseThrow();
+        assertThat(awaitFinished(child.id()).status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(child.parentExecutionId()).isEqualTo(parent.id());
+    }
+
+    @Test
+    void 부모_실행에_대화가_없으면_실행_줄을_만들지_않고_SUBMIT_FAILED_다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+
+        assertFailure(delegate(sharedToken, root, GROUP_CODE, "일"), "SUBMIT_FAILED");
+
+        assertThat(executions.findByRootExecutionId(parent.id())).isEmpty();
+        assertThat(stub().received()).isEmpty();
+    }
+
+    @Test
+    void 서명_없는_agent_delegate_와_다른_profile_의_토큰으로_서명한_호출은_거절한다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+
+        assertInvalidContext(send(sharedToken, toolCall("agent_delegate", delegateArguments(GROUP_CODE, "일"))));
+        assertInvalidContext(send(sharedToken, toolCall("agent_delegate",
+                withContext(delegateArguments(GROUP_CODE, "일"), McpCallSigner.context(privateAToken, "agent_delegate", root)))));
+        assertInvalidContext(delegate(privateAToken, root, GROUP_CODE, "일"));
+
+        assertThat(executions.findByRootExecutionId(parent.id())).isEmpty();
+        assertThat(stub().received()).isEmpty();
+    }
+
+    @Test
+    void 도구_목록에_agent_stop_의_규격이_있다() throws Exception {
+        JsonNode listed = body(send(sharedToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")).path("result").path("tools");
+        JsonNode stop = null;
+        for (JsonNode tool : listed) {
+            if ("agent_stop".equals(tool.path("name").asString())) stop = tool;
+        }
+
+        assertThat(stop).as("도구 목록: %s", listed).isNotNull();
+        JsonNode schema = stop.path("inputSchema");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("properties").path("execution_id").path("type").asString()).isEqualTo("integer");
+        assertThat(schema.path("required").get(0).asString()).isEqualTo("execution_id");
+        assertThat(stop.path("description").asString()).contains("agent_delegate", "agent_status");
+    }
+
+    @Test
+    void agent_stop_은_도는_위임_실행을_멈추고_CANCELLED_를_준다() throws Exception {
+        stub().willAnswer(command -> answered(command, "멈춘 자리까지"));
+        holdUntilStopped();
+        String root = McpCallSigner.newRoot();
+        turn(userA, root);
+        long executionId = started(delegate(sharedToken, root, GROUP_CODE, "멈출 일")).path("execution_id").asLong();
+        String runId = executions.findById(executionId).orElseThrow().hermesRunId();
+
+        assertStatus(agentStop(sharedToken, root, executionId),
+                "{\"execution_id\":" + executionId + ",\"status\":\"CANCELLED\",\"output\":\"멈춘 자리까지\"}");
+        assertThat(stub().stopped()).containsExactly(runId);
+        assertThat(awaitFinished(executionId).status()).isEqualTo(ExecutionStatus.CANCELLED);
+        assertStatus(agentStatus(sharedToken, root, executionId),
+                "{\"execution_id\":" + executionId + ",\"status\":\"CANCELLED\",\"output\":\"멈춘 자리까지\"}");
+    }
+
+    @Test
+    void 끝난_실행의_agent_stop_은_agent_status_와_같은_결과이고_Hermes_에_보내지_않는다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution succeeded = delegated(userA.id(), parent, ExecutionStatus.SUCCEEDED, "끝난 답", null);
+        AgentExecution failed = delegated(userA.id(), parent, ExecutionStatus.FAILED, null, "HERMES_RUN_FAILED");
+
+        assertThat(resultText(agentStop(sharedToken, root, succeeded.id()))).isEqualTo(resultText(agentStatus(sharedToken, root, succeeded.id())));
+        assertThat(resultText(agentStop(sharedToken, root, failed.id()))).isEqualTo(resultText(agentStatus(sharedToken, root, failed.id())));
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
+    void 이_프로세스가_돌리지_않는_RUNNING_실행은_run_번호로_중지만_보내고_stop_requested_를_준다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution orphan = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+        Long agentId = agents.findByCode(GROUP_CODE).orElseThrow().id();
+        jdbc.update("UPDATE agent_execution SET hermes_run_id = ?, agent_id = ? WHERE id = ?", "run-orphan-1", agentId, orphan.id());
+
+        assertStatus(agentStop(sharedToken, root, orphan.id()),
+                "{\"execution_id\":" + orphan.id() + ",\"status\":\"RUNNING\",\"stop_requested\":true}");
+        assertThat(stub().stopped()).containsExactly("run-orphan-1");
+    }
+
+    @Test
+    void 이_프로세스가_돌리지_않는_RUNNING_실행에_run_번호가_없으면_아무것도_보내지_않고_stop_requested_를_주지_않는다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution orphan = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+
+        assertStatus(agentStop(sharedToken, root, orphan.id()),
+                "{\"execution_id\":" + orphan.id() + ",\"status\":\"RUNNING\"}");
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
+    void 남의_실행과_다른_대화의_실행과_위임이_아닌_실행의_agent_stop_은_없는_번호와_같은_응답이다() throws Exception {
+        AgentExecution firstTurn = McpCallSigner.save(executions, userA.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        String root = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userA.id(), CONVERSATION, SHARED, root);
+        AgentExecution otherConversationTurn = McpCallSigner.save(executions, userA.id(), OTHER_CONVERSATION, SHARED,
+                McpCallSigner.newRoot(), ExecutionStatus.SUCCEEDED);
+        AgentExecution otherConversation = delegated(userA.id(), otherConversationTurn, ExecutionStatus.RUNNING, null, null);
+        AgentExecution proposal = child(userA.id(), firstTurn, ExecutionStatus.RUNNING);
+        AgentExecution otherUserTurn = McpCallSigner.save(executions, userB.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        AgentExecution otherUsers = delegated(userB.id(), otherUserTurn, ExecutionStatus.RUNNING, null, null);
+        for (AgentExecution target : List.of(otherConversation, proposal, otherUsers)) {
+            jdbc.update("UPDATE agent_execution SET hermes_run_id = ? WHERE id = ?", "run-hidden-" + target.id(), target.id());
+        }
+
+        JsonNode missing = body(agentStop(sharedToken, root, 999_999_999L)).path("result");
+        Map<String, JsonNode> hidden = new LinkedHashMap<>();
+        hidden.put("같은 사용자의 다른 대화의 위임 실행", body(agentStop(sharedToken, root, otherConversation.id())).path("result"));
+        hidden.put("같은 대화의 위임이 아닌 자식", body(agentStop(sharedToken, root, proposal.id())).path("result"));
+        hidden.put("같은 대화의 앞 turn", body(agentStop(sharedToken, root, firstTurn.id())).path("result"));
+        hidden.put("같은 대화 번호의 남의 위임 실행", body(agentStop(sharedToken, root, otherUsers.id())).path("result"));
+
+        JsonNode failure = json.readTree(missing.path("content").get(0).path("text").asString());
+        assertThat(missing.path("isError").asBoolean()).isTrue();
+        assertThat(failure.path("code").asString()).isEqualTo("NOT_FOUND");
+        hidden.forEach((reason, result) -> assertThat(result).as(reason).isEqualTo(missing));
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
+    void agent_stop_의_인자가_정수_번호_하나가_아니면_인자_오류이고_서명이_틀리면_호출_맥락_오류다() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution running = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+
+        List<ObjectNode> invalid = new ArrayList<>();
+        invalid.add(json.createObjectNode());
+        invalid.add(json.createObjectNode().put("execution_id", "12"));
+        invalid.add(json.createObjectNode().put("execution_id", 1.5));
+        invalid.add(json.createObjectNode().put("execution_id", running.id()).put("user_id", userB.id()));
+        for (ObjectNode arguments : invalid) {
+            arguments.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_stop", root));
+            JsonNode response = body(send(sharedToken, toolCall("agent_stop", arguments)));
+            assertThat(response.path("error").path("code").asInt()).as("인자 %s: %s", arguments, response).isEqualTo(-32602);
+        }
+        ObjectNode wrongTool = json.createObjectNode().put("execution_id", running.id());
+        wrongTool.set("_fos_ctx", McpCallSigner.context(sharedToken, "agent_status", root));
+        assertInvalidContext(send(sharedToken, toolCall("agent_stop", wrongTool)));
+        assertInvalidContext(agentStop(privateAToken, root, running.id()));
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
+    void 멈춘_위임_실행이_origin_인_하위_에이전트의_호출은_호출_맥락_오류다() throws Exception {
+        stub().willAnswer(McpAgentToolsTest::completed);
+        holdUntilStopped();
+        String groupToken = tokens.issue(profileOf(GROUP_CODE), "group").rawToken();
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = turn(userA, root);
+        long executionId = started(delegate(sharedToken, root, GROUP_CODE, "하위 에이전트를 띄울 일")).path("execution_id").asLong();
+        String childSession = executions.findById(executionId).orElseThrow().hermesSessionId();
+        String subagent = "하위-" + UUID.randomUUID();
+        registrar.register(profileOf(GROUP_CODE), childSession, childSession, subagent);
+        HttpResponse<String> before = send(groupToken, toolCall("agent_list", withContext(json.createObjectNode(),
+                McpCallSigner.context(groupToken, "agent_list", childSession, subagent, "call_" + UUID.randomUUID()))));
+        assertThat(codes(json.readTree(resultText(before)))).as("멈추기 전에는 origin 사용자의 목록을 받는다").contains(OWN_A_CODE);
+
+        assertThat(json.readTree(resultText(agentStop(sharedToken, root, executionId))).path("status").asString()).isEqualTo("CANCELLED");
+        awaitFinished(executionId);
+
+        assertInvalidContext(send(groupToken, toolCall("agent_list", withContext(json.createObjectNode(),
+                McpCallSigner.context(groupToken, "agent_list", childSession, subagent, "call_" + UUID.randomUUID())))));
+        assertThat(executions.findById(parent.id()).orElseThrow().status()).as("멈춘 것은 위임 실행 하나다").isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    /**
+     * 완료를 기다리는 자리에서 중지가 올 때까지 멈춰 둔다. 실제 Hermes 에서 도는 run 과 같다.
+     *
+     * <p>중지가 오지 않아도 10초 뒤에는 이어져 실행 스레드가 검사보다 오래 살지 않는다.
+     */
+    private void holdUntilStopped() {
+        CountDownLatch stopReceived = new CountDownLatch(1);
+        stub().onStop(runId -> stopReceived.countDown());
+        stub().beforeAwait(() -> {
+            try {
+                stopReceived.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        });
+    }
+
+    private static HermesRunResult answered(HermesRunCommand command, String output) {
+        return HermesRunResult.of("run-" + UUID.randomUUID(), command.sessionId(), "completed", output,
+                "example-model", "example-provider", new TokenUsage(3L, 0L, 2L, 5L));
+    }
+
+    private HttpResponse<String> agentStop(String token, String root, Long executionId) throws Exception {
+        ObjectNode arguments = json.createObjectNode();
+        arguments.put("execution_id", executionId);
+        return send(token, toolCall("agent_stop", withContext(arguments, McpCallSigner.context(token, "agent_stop", root))));
+    }
+
+    @TestConfiguration
+    static class StubRuntime {
+        @Bean
+        @Primary
+        StubHermesRunsClient stubHermesRunsClient() {
+            return new StubHermesRunsClient();
+        }
+    }
+
+    private StubHermesRunsClient stub() {
+        return (StubHermesRunsClient) hermes;
+    }
+
+    /** 받은 지시를 답에 담아 끝낸다. run 번호가 명령마다 달라 나란히 돌아도 섞이지 않는다. */
+    private static HermesRunResult completed(HermesRunCommand command) {
+        return HermesRunResult.of("run-" + UUID.randomUUID(), command.sessionId(), "completed", "맡은 일의 답: " + command.input(),
+                "example-model", "example-provider", new TokenUsage(3L, 0L, 2L, 5L));
+    }
+
+    private static CurrentUser current(AppUser user) {
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+    }
+
+    /** 대화 줄 하나와 그 대화에서 뿌리 session {@code root} 로 도는 turn 실행을 만든다. */
+    private AgentExecution turn(AppUser user, String root) {
+        Long agentId = agents.findByCode(GROUP_CODE).orElseThrow().id();
+        Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "맡기기", agentId));
+        return McpCallSigner.running(executions, user.id(), conversation.id(), SHARED, root);
+    }
+
+    /** {@code parent} 아래에서 뿌리 session {@code session} 으로 도는 실행이다. 깊이를 만들 때 쓴다. */
+    private AgentExecution running(AgentExecution parent, String session) {
+        return executions.save(AgentExecution.builder()
+                .userId(parent.userId())
+                .conversationId(parent.conversationId())
+                .parentExecutionId(parent.id())
+                .rootExecutionId(parent.treeRootId())
+                .profileName(SHARED)
+                .hermesSessionId(session)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(STARTED)
+                .build());
+    }
+
+    private ObjectNode delegateArguments(String agentCode, String task) {
+        return json.createObjectNode().put("agent_code", agentCode).put("task", task);
+    }
+
+    /** 뿌리 session 에서 새 {@code tool_call_id} 로 부른다. */
+    private HttpResponse<String> delegate(String token, String root, String agentCode, String task) throws Exception {
+        return delegateCall(token, root, root, "call_" + UUID.randomUUID(), delegateArguments(agentCode, task));
+    }
+
+    private HttpResponse<String> delegateCall(String token, String root, String session, String toolCallId, ObjectNode arguments)
+            throws Exception {
+        return send(token, toolCall("agent_delegate",
+                withContext(arguments, McpCallSigner.context(token, "agent_delegate", root, session, toolCallId))));
+    }
+
+    /** 성공한 도구 결과의 글을 JSON 으로 읽는다. */
+    private JsonNode started(HttpResponse<String> response) {
+        return json.readTree(resultText(response));
+    }
+
+    private void assertFailure(HttpResponse<String> response, String code) {
+        JsonNode result = body(response).path("result");
+        assertThat(result.path("isError").asBoolean()).as("실패 결과: %s", result).isTrue();
+        JsonNode failure = json.readTree(result.path("content").get(0).path("text").asString());
+        assertThat(failure.propertyNames()).containsExactly("code", "message");
+        assertThat(failure.path("code").asString()).as("실패 결과: %s", failure).isEqualTo(code);
+    }
+
+    /**
+     * 위임 실행이 끝나고 끝난 사건까지 적힐 때까지 기다린다.
+     *
+     * <p>위임은 가상 스레드에서 돈다. 다음 검사의 {@code @BeforeEach} 가 사용자와 실행 줄을 지우기 전에 끝나야 한다.
+     */
+    private AgentExecution awaitFinished(Long executionId) throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        while (true) {
+            AgentExecution execution = executions.findById(executionId).orElseThrow();
+            boolean ended = executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId)).stream()
+                    .anyMatch(event -> event.eventType() != ExecutionEventType.RUN_STARTED);
+            if (execution.status() != ExecutionStatus.RUNNING && ended) return execution;
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("실행 " + executionId + " 이 10초 안에 끝나지 않았다. 상태: " + execution.status());
+            }
+            Thread.sleep(10);
+        }
+    }
+
     private static Agent agent(String code, String name, AgentVisibility visibility, Long ownerUserId) {
         return Agent.of(code, name, profileOf(code), "http://agent-runtime.test/p/" + code,
                 CostMode.API, CredentialScope.DEDICATED, visibility, ownerUserId);
@@ -317,10 +908,11 @@ class McpAgentToolsTest {
         return "profile-of-" + code;
     }
 
-    /** {@code agent_delegate} 로 만든 것처럼 {@code delegation_key} 가 있는 자식 실행을 만든다. */
+    /** {@code agent_delegate} 로 만든 것처럼 {@code delegation_key} 가 있는 자식 실행을 만든다. 대화는 부모의 것을 잇는다. */
     private AgentExecution delegated(Long userId, AgentExecution parent, ExecutionStatus status, String output, String errorCode) {
         AgentExecution execution = executions.save(AgentExecution.builder()
                 .userId(userId)
+                .conversationId(parent.conversationId())
                 .parentExecutionId(parent.id())
                 .rootExecutionId(parent.treeRootId())
                 .profileName(TARGET)
@@ -337,10 +929,11 @@ class McpAgentToolsTest {
         return execution;
     }
 
-    /** Memory 제안처럼 위임이 아닌 자식 실행이다. */
+    /** Memory 제안처럼 위임이 아닌 자식 실행이다. 대화는 부모의 것을 잇는다. */
     private AgentExecution child(Long userId, AgentExecution parent, ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
                 .userId(userId)
+                .conversationId(parent.conversationId())
                 .parentExecutionId(parent.id())
                 .rootExecutionId(parent.treeRootId())
                 .profileName(TARGET)

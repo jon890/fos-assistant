@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
+import { agentLabel, formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
 import {
   actualCostLabel,
   contextCharsLabel,
@@ -28,19 +28,21 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
           href={`/executions/${execution.id}`}
           // Card 가 overflow-hidden 이라 바깥으로 그린 초점 테두리가 잘린다. 브라우저의 초점 테두리를 안쪽으로 들인다.
           className="absolute inset-0 rounded-xl -outline-offset-2"
-          aria-label={`${execution.agentName} 실행 상세 보기 (${execution.id}번)${
+          aria-label={`${agentLabel(execution.agentName)} 실행 상세 보기 (${execution.id}번)${
             execution.hasChildren ? ", 하위 실행 있음" : ""
           }`}
         />
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold">
-              {execution.agentName}
+              {agentLabel(execution.agentName)}
               {execution.hasChildren ? (
                 <ChevronRight aria-hidden="true" className="pointer-events-none ml-1 inline-block size-4 text-muted-foreground" />
               ) : null}
             </h2>
-            <p className="truncate text-xs text-muted-foreground">{execution.agentCode}</p>
+            {execution.agentCode === null ? null : (
+              <p className="truncate text-xs text-muted-foreground">{execution.agentCode}</p>
+            )}
           </div>
           <span
             className="shrink-0 text-sm font-semibold"

@@ -34,6 +34,12 @@ token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/v
 관련 코드 경로도 남아 있다.
 함수 이름과 인자 유지가 plugin 의 실제 HTTP 동작 검증을 대신하지 않는다.
 
+**올린 스킬과 이름이 겹치는 스킬이 새로 생기지 않았는지 본다.**
+Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profile 로컬 스킬이 외부 디렉터리의 올린 스킬보다 먼저 선택되어,
+화면에 보이는 스킬과 실제로 도는 스킬이 달라진다.
+업그레이드와 배포 확인은 profile 마다 올린 스킬 이름과 Hermes 가 더 앞서 고르는 스킬 이름이 겹치지 않는지 보고, 겹치면 배포를 멈춘다.
+그 검사의 절차는 `fos-home-infra` 가 갖는다. 까닭은 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「Hermes 를 올릴 때 이름 충돌을 본다」 에 있다.
+
 근거는 [v0.21.3 tools_config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/tools_config.py),
 [config.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/config.py),
 [profiles.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/profiles.py),

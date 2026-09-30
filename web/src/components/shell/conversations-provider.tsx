@@ -6,8 +6,8 @@ import { describeError } from "@/components/error-message";
 export type Conversation = {
   id: string;
   title: string;
-  agentCode: string;
-  agentName: string;
+  agentCode: string | null;
+  agentName: string | null;
   updatedAt: string;
   /** 대화에서 고른 모델 제공사다. 고르지 않았으면 null 이고 profile 의 기본값으로 돈다 */
   provider: string | null;

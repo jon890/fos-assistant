@@ -532,15 +532,43 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 취소를 아래로 전파하는 것도 Control Plane 의 몫이다.
 
 모델이 부른 `delegate_task` 자식도 같다. 위 「하위 에이전트는 부모 run 보다 오래 산다」 대로 background 자식은 부모 run 에서 떨어져 나가 따로 돈다.
-부모 run 을 멈춰도 그 자식은 계속 돌 수 있다고 본다. 중지한 뒤 자식이 실제로 계속 도는지는 실행으로 확인하지 않았다.
+중지한 뒤 자식이 실제로 계속 도는지는 실행으로 확인하지 않았다. 아래는 소스로 확인한 것이다.
+
+#### native 하위 에이전트를 멈추는 길
+
+2026-09-30 에 v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다.
+
+| 확인한 것 | 근거 |
+| --- | --- |
+| `POST /v1/runs/{run_id}/stop` 은 부모 agent 에 hard interrupt 를 걸고, 그 interrupt 는 부모에 붙은 자식에게만 내려간다. 동기 위임 자식(오케스트레이터 자식이 부른 깊이 1 이상의 위임)은 붙어 있어 함께 멈춘다 | [`agent/interrupt_control.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/interrupt_control.py) 의 `interrupt`, [`tools/delegate_tool_child_run.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/delegate_tool_child_run.py) 의 `_attach_child` |
+| background 자식은 dispatch 직전에 부모에서 떼어지고 부모의 interrupt 를 따르지 않게 돈다. 그래서 부모 run 의 중지가 닿지 않는다 | [`tools/delegate_tool_dispatch.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/delegate_tool_dispatch.py) 의 `_dispatch_background`(`_detach_child`, `honor_parent_interrupt=False`) |
+| API server 에 background 자식을 멈추는 HTTP 경로가 없다. run 경로는 `events`, `approval`, `steer`, `stop` 뿐이다. 대시보드에도 없다 | [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_http_routes` |
+| `subagent_stop` hook 은 자식이 끝난 뒤 오는 알림이다. 반환값은 버려져 자식을 멈추는 수단이 아니다 | [`tools/delegate_tool_results.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/delegate_tool_results.py) 의 `_fire_subagent_stop_hooks` |
+| `pre_tool_call` hook 이 `{"action": "block"}` 을 돌려주면 도구 호출 한 번을 거절한다. 자식 실행을 끝내지는 않는다 | [`hermes_cli/plugins.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins.py) 의 `_get_pre_tool_call_directive_details` |
+| background 자식을 멈추는 함수는 `tools.async_delegation.interrupt_for_session(parent_session_id=...)` 이다. 대화형 gateway 의 `/stop` 이 이것을 부르고, API server 는 부르지 않는다. 공개 plugin API 가 아니다 | [`tools/async_delegation.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/async_delegation.py) |
+| turn 이 끝나면 `on_session_end` hook 이 `session_id`, `interrupted`, `turn_exit_reason` 을 받는다. `/v1/runs/{run_id}/stop` 으로 멈춘 turn 은 `interrupted_by_user` 다 | [`agent/turn_finalizer.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/turn_finalizer.py), [`agent/turn_iteration_prep.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/turn_iteration_prep.py) |
+
+**그래서 core 를 고치지 않고 멈출 수 있는 길은 하나이고 조건이 붙는다.**
+profile 플러그인이 `on_session_end` 에서 `interrupted` 이고 `turn_exit_reason` 이 `interrupted_by_user` 일 때 `interrupt_for_session(parent_session_id=session_id)` 를 부르는 것이다.
+gateway 의 `/stop` 과 같은 함수이고, 부모 session 이 정확히 같은 자식만 멈춘다. Control Plane 이 대화마다 고유한 session 을 보내므로 다른 사용자의 자식을 멈추는 길은 없다.
+
+이 길의 한계다.
+
+- **부모 run 이 이미 끝났으면 멈추지 못한다.** 중지가 아무것도 하지 않고 hook 도 다시 오지 않는다. background 자식은 대개 이 경우다
+- 공개 API 가 아닌 내부 함수에 기댄다. Hermes 버전을 올릴 때마다 함수 이름과 인자를 다시 확인해야 한다
+- 압축으로 turn 중간에 session 이 바뀌면 값이 맞지 않아 자식을 놓친다. 엉뚱한 자식을 멈추지는 않는다
+- 한 프로세스가 여러 profile 을 multiplex 하면 기록이 공유된다. 격리는 session 이 고유한 것에만 기댄다
+
+**이 저장소는 이 길을 구현하지 않는다.** 플러그인은 비공개 저장소 `fos-home-infra` 가 갖고, 거기의 후속 작업 후보다.
+그 전까지 Control Plane 이 막는 것은 아래 표와 같다. 멈춘 turn 의 자식이 사용자의 권한을 쓰는 길은 이미 막혀 있다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 
 그래서 Control Plane 은 지금 이만큼 막는다.
 
 | 무엇 | 지금 |
 | --- | --- |
-| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_status`, 앞으로의 `agent_delegate`, `agent_stop`) | origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
+| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`) | origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
 | 자식의 Hermes 자체 도구(웹 검색, 터미널 등) | 막지 못한다 |
-| 자식 run 자체 | 멈추지 못한다. `subagent_stop` hook 과 Hermes 의 비동기 위임 제어가 자식을 멈출 수 있는지 조사한 뒤 turn 중지에 잇는다 |
+| 자식 run 자체 | 멈추지 못한다. 동기 위임 자식만 부모 run 의 중지와 함께 멈춘다. background 자식을 멈추는 길은 위 「native 하위 에이전트를 멈추는 길」 에 있고 구현하지 않았다 |
 
 ### 취소한 실행의 조회 응답
 

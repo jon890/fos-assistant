@@ -208,6 +208,19 @@ v0.21.0과 비교하면 v0.21.3의 설정 가능한 목록에 `connections`와 `
 생성에는 YAML frontmatter의 `name`, `description`, 비어 있지 않은 본문이 필요하다.
 스킬 이름과 범주 이름은 최대 64자이며 소문자, 숫자, 점, 밑줄, 붙임표를 쓴다.
 새 스킬의 설명은 색인 예산에 맞춰 60자 이하여야 하고 `SKILL.md`는 최대 100,000자다.
+
+v0.21.5 의 `tools/skill_manager_tool.py` 의 `_validate_frontmatter(content, new_skill)` 를 읽고 확인한 검사다.
+
+| 검사 | 언제 | 세는 법 |
+| --- | --- | --- |
+| 설명 60자(`SKILL_PROMPT_DESC_LIMIT`) | 새 스킬(`create`)만. 고칠 때는 보지 않는다 | `len(desc.strip().strip("'\""))`. 앞뒤 공백과 앞뒤 따옴표를 뺀 Python 문자 수, 곧 code point 수 |
+| 설명 1024자(`MAX_DESCRIPTION_LENGTH`) | 늘 | 앞뒤를 빼지 않은 문자 수 |
+| 앞머리 뒤 본문 | 늘 | 닫는 `---` 줄 뒤가 공백뿐이면 「SKILL.md must have content after the frontmatter」 로 거절한다 |
+
+이름 64자(`MAX_NAME_LENGTH`)와 설명 1024자는 `tools/skills_tool_plugin.py` 에도 같은 값으로 있다.
+색인은 `agent/skill_utils.py` 의 `extract_skill_description` 이 같은 방법으로 앞뒤를 뺀 설명을 60자에서 잘라 57자에 `...` 을 붙인다.
+Control Plane 이 저장 규칙을 이 검사에 맞추는 까닭은 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」 에 있다.
+근거는 [v0.21.5 skill_manager_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/skill_manager_tool.py), [skill_utils.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/skill_utils.py), [skills_tool_plugin.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/skills_tool_plugin.py) 다.
 이 두 HTTP 경로에는 `references/`, `templates/`, `assets/`, `scripts/` 파일 인자가 없다.
 `skill_manage(write_file)`는 해당 네 하위 디렉터리의 텍스트 파일을 다루며 파일당 1 MiB와 100,000자 제한이 있지만, 대시보드 HTTP 경로로 노출되지 않았다.
 근거는 [스킬 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/skills.py), [스킬 쓰기와 검증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/skill_manager_tool.py)이다.
@@ -276,14 +289,14 @@ FastAPI의 실제 설정, 도구, 스킬 처리기를 사용했으며 실험 파
 | 경로 | `/mcp` |
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
-| 도구 | `memory_read`, `artifact_write`, `agent_list`, `agent_status`. `agent_delegate`, `agent_stop` 은 아직 없다. 그 전에는 `-32601` 을 돌려준다 |
+| 도구 | `memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` |
 | 요청자 | `memory_read`, `artifact_write`, `agent_*` 모두 profile 플러그인이 덮어쓴 `_fos_ctx` 로 origin 실행을 찾고, 그 실행의 사용자로 돈다. 하위 에이전트 session 은 만들 때 등록한 실행이고 끝난 실행이어도 되지만, 그 실행이나 뿌리 실행이 `CANCELLED` 면 거절한다. 최상위 session 은 서명한 뿌리 session 으로 도는 실행이다. 서명이 없거나 틀리거나, profile 이 다르거나, 등록 없는 하위 에이전트 session 이면 거절한다. 계약은 [`delegation.md`](delegation.md#부모-실행을-잇는-방법) 와 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다 |
 
 토큰은 요청자를 정하지 않는다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰기 때문이다.
 요청자는 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
 profile 이 빈 토큰은 인증에서 거절한다.
-`agent_list` 는 인자가 없고 `[{"code":"...","name":"..."}]` 를 글로 준다. `agent_status` 는 `execution_id` 정수 하나를 받고 `{"execution_id":123,"status":"SUCCEEDED","output":"..."}` 처럼 준다. 물을 수 없는 실행은 모두 `NOT_FOUND` 하나다. 갈리는 지점은 [`flow.md`](../flow.md#다른-에이전트에게-맡길-때) 에 있다.
+`agent_list` 는 인자가 없고 `[{"code":"...","name":"..."}]` 를 글로 준다. `agent_delegate` 는 `agent_code`, `task` 문자열 둘만 받고 제출까지만 기다린 뒤 `{"execution_id":123,"status":"RUNNING"}` 을 준다. 거절하면 `{"code":"...","message":"..."}` 를 준다. 코드는 `AGENT_UNAVAILABLE`(없거나 쓸 수 없음), `AGENT_DISABLED`, `DEPTH_EXCEEDED`, `TOO_MANY_CHILDREN`, `BUSY`, `SUBMIT_FAILED` 여섯이다. `agent_status` 는 `execution_id` 정수 하나를 받고 `{"execution_id":123,"status":"SUCCEEDED","output":"..."}` 처럼 준다. 물을 수 있는 실행은 요청자의 위임 실행 중 부르는 쪽 origin 실행과 같은 대화의 것이다. origin 실행에 대화가 없으면 같은 실행 나무의 것이다. 물을 수 없는 실행은 모두 `NOT_FOUND` 하나다. `agent_stop` 은 `execution_id` 정수 하나를 받고 `agent_status` 와 같은 모양을 준다. 5초 안에 `CANCELLED` 가 적히지 않으면 `"status":"RUNNING","stop_requested":true` 다. 이 서버가 돌리지 않는 실행에 run 번호가 없거나 중지를 보내지 못하면 `stop_requested` 없이 `RUNNING` 만 준다. 멈출 수 있는 범위는 `agent_status` 와 같다. 갈리는 지점은 [`flow.md`](../flow.md#다른-에이전트에게-맡길-때) 에 있다.
 `memory_read` 는 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
@@ -449,6 +462,30 @@ FAL 응답의 첫 이미지 URL 을 `success`, `image` 결과로 돌려준다.
 근거는 [v0.21.0 system_prompt.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/system_prompt.py),
 [skill_utils.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/skill_utils.py),
 [skill_manager_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/skill_manager_tool.py) 다.
+
+### `skill_manage` 만 빼는 설정
+
+v0.21.5 소스로 확인했다. **`skill_view` 를 두고 `skill_manage` 만 도구 목록에서 빼는 공식 설정은 없다.**
+
+| 방법 | 결과 |
+| --- | --- |
+| `agent.disabled_toolsets` | toolset 이름만 받는다. `skill_manage` 하나만 든 toolset 은 없고, 도구 이름을 넣으면 모르는 이름으로 무시한다. `skills` 나 옛 이름 `skills_tools` 를 넣으면 `skill_view` 와 색인까지 빠진다 |
+| `platform_toolsets.api_server` | 같은 toolset 이름 목록이라 같은 결과다 |
+| plugin 의 `registry.deregister` | 자기가 등록하지 않은 도구는 `plugins.entries.<plugin>.allow_tool_override: true` 가 있어야 해제된다. profile 범위 plugin 은 전역 도구를 해제하지 못하고, 전역 plugin 이 해제하면 같은 프로세스의 모든 profile 에 걸린다 |
+| 한 번 묻고 끝나는 실행의 도구 숨김 | `agent/oneshot_footprint.py` 는 `hermes chat -q` 같은 한 번 실행에서만 `skill_manage` 를 숨긴다. API server 실행은 해당하지 않는다 |
+
+도구를 빼도 안내문은 남는다.
+`agent/prompt_builder.py` 의 색인 안내문은 `skill_manage` 가 있든 없든
+「If a skill has issues, fix it with skill_manage(action='patch').」 와
+「After difficult/iterative tasks, offer to save as a skill.」 를 싣는다.
+`skill_manage` 가 있을 때만 붙는 것은 `SKILLS_GUIDANCE` 와 memory 안내의 `skill_manage` 문장이다.
+
+그래서 Control Plane 은 실행 입력 앞 단락으로 모델에게 쓰지 말라고 알리고, 서명 plugin 이 호출을 막는다.
+근거는 [toolsets.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/toolsets.py),
+[model_tools.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py) 의 `_apply_toolset_selection`,
+[tools/registry.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/registry.py) 의 `deregister`,
+[agent/system_prompt.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/system_prompt.py) 의 `_tool_guidance_block`,
+[agent/prompt_builder.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/prompt_builder.py) 다.
 
 ### 스킬 수를 줄인 실측
 

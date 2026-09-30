@@ -28,6 +28,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.skill.application.SkillAgentNotice;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -192,10 +193,39 @@ class ArtifactTest {
                         + "대화 식별자: " + conversation.publicId() + "\n"
                         + PREAMBLE_GUIDE + "\n"
                         + "\n"
+                        + SkillAgentNotice.PARAGRAPH
                         + "안녕");
         assertThat(Files.isDirectory(root.resolve(String.valueOf(conversation.id()))))
                 .as("turn 을 시작할 때 대화 폴더를 만든다")
                 .isTrue();
+    }
+
+    @Test
+    void Hermes_로_간_입력에_스킬_관리_단락이_들어_있다() {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+
+        chat.send(dad, conversation.id(), "안녕", null);
+
+        assertThat(stub().received()).singleElement().extracting(HermesRunCommand::input).asString()
+                .contains("[스킬 관리]\n")
+                .contains("skill_manage 로 스킬을 만들거나 고치지 않는다.");
+    }
+
+    @Test
+    void 흐름_turn_의_하위_실행으로_간_입력에도_스킬_관리_단락이_들어_있다() {
+        CurrentUser mom = member("artifact-mom@example.com");
+        agentOf(mom, "flow-mom", ResearchAndBuildFlow.NAME);
+        stub().willAnswer(command -> command.input().contains(CHIEF_MARK)
+                ? completed("run-chief", "{\"research\":\"보조금을 조사해\",\"build\":\"표를 만든다\"}")
+                : completed("run-child", "단계 답"));
+
+        chat.send(mom, null, "보조금 비교해 줘", "flow-mom");
+
+        assertThat(stub().received()).extracting(HermesRunCommand::input)
+                .isNotEmpty()
+                .allSatisfy(input -> assertThat(input)
+                        .contains("[스킬 관리]\n")
+                        .contains("skill_manage 로 스킬을 만들거나 고치지 않는다."));
     }
 
     @Test

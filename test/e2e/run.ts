@@ -53,6 +53,7 @@ import { AGENT_TOOLS_PROFILE, agentToolsScenario } from "./scenarios/agent-tools
 import { MCP_PRINCIPAL_PROFILE, mcpPrincipalScenario } from "./scenarios/mcp-principal.ts";
 import { agentLifecycleScenario } from "./scenarios/agent-lifecycle.ts";
 import { NATIVE_DELEGATION_PROFILE, nativeDelegationScenario } from "./scenarios/native-delegation-mcp.ts";
+import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -103,6 +104,8 @@ const SCENARIOS: readonly Scenario[] = [
   mcpPrincipalScenario,
   nativeDelegationScenario,
   agentToolsScenario,
+  // 아이의 개인 에이전트와 꺼진 에이전트가 목록에서 빠지는 것을 보므로 그 둘을 만드는 시나리오 뒤에 둔다.
+  delegationScenario,
   agentLifecycleScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
   busyScenario,
@@ -151,7 +154,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, NATIVE_DELEGATION_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -235,12 +238,14 @@ async function main(): Promise<void> {
       [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
       [MCP_PRINCIPAL_PROFILE]: PROFILE_KEY,
       [NATIVE_DELEGATION_PROFILE]: PROFILE_KEY,
+      [DELEGATION_PROFILE]: PROFILE_KEY,
     }, undefined, {
       [DAD_BINDING.profileName]: ["fos-assistant"],
       [AGENT_TOOLS_PROFILE]: ["fos-assistant"],
       // 기본 toolset 에는 shell 과 file 이 있어 GROUP 에이전트로 등록되지 않는다. MCP 서버만 켠 profile 로 둔다.
       [MCP_PRINCIPAL_PROFILE]: ["fos-assistant"],
       [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
+      [DELEGATION_PROFILE]: ["fos-assistant"],
     }, skillRoot);
     console.log(`   ${hermes.baseUrl}`);
 
