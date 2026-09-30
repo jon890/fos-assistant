@@ -12,8 +12,12 @@
 | `POST /api/v1/connections/accountbook` | `token`, 선택 `familyUuid` | 등록 또는 토큰 교체 |
 | `POST /api/v1/connections/accountbook/check` | 없음 | 설치 상태와 MCP probe 재확인 |
 | `DELETE /api/v1/connections/accountbook` | 없음 | 토큰 제거와 에이전트 비활성화 |
+| `GET /api/v1/admin/connections/accountbook` | 없음 | 같은 그룹의 연결 목록, ADMIN 전용 |
+| `POST /api/v1/admin/connections/accountbook/{userId}/confirm` | 없음 | 운영 반영 완료 확인, ADMIN 전용 |
 
-상태 응답은 `status`, `tokenPrefix`, `familyUuid`, `lastCheckedAt`, `agentCode`, `restartRequired`를 갖는다.
+상태 응답은 `status`, `tokenPrefix`, `familyUuid`, `checkedAt`, `agentCode`, `restartRequired`를 갖는다.
+관리자 목록은 `userId`, `displayName`, `status`, `agentCode`, `restartRequired`만 반환한다.
+다른 사용자의 토큰 앞부분과 가족 UUID는 목록에 넣지 않는다.
 등록 전에는 `DISCONNECTED`이며 선택 값은 null이다.
 `PENDING`은 토큰을 등록했으나 실행 준비가 끝나지 않은 상태다.
 `READY`는 설치가 켜져 있고 재시작이 필요 없으며 MCP probe에서 가계부 도구를 확인한 상태다.
@@ -48,6 +52,10 @@ env 전달 근거는 [MCP profile 비밀값 계약](hermes/mcp-profile-credentia
 
 같은 사용자의 등록, 확인과 해제는 사용자 행 잠금으로 순서대로 처리한다.
 토큰 교체와 해제 전에 에이전트를 끄고 상태를 `PENDING`으로 둔다.
+`desired_enabled`는 이번 등록의 env와 설치 단계가 모두 성공해 활성화 후보가 되었는지를 뜻한다.
+등록과 교체를 시작할 때 false로 바꾸고 모든 외부 반영이 성공한 뒤에만 true로 둔다.
+해제 시작 때도 false로 둔다.
+false인 연결은 확인이나 관리자 반영 완료로 READY가 되지 않는다.
 외부 API가 실패해도 이전 토큰으로 실행할 수 있는 활성 상태로 되돌리지 않는다.
 등록 실패 뒤에는 다시 등록하거나 해제할 수 있어야 한다.
 새 profile 생성 실패는 기존 생성기의 정리 절차를 따른다.
@@ -67,10 +75,22 @@ DB 커밋 자체가 실패하면 이미 반영한 env나 plugin 변경은 되돌
 이미 설치된 연결의 토큰 교체, 환경 항목 삭제와 해제는 재시작 필요 상태를 반환한다.
 해제 뒤에도 `restartRequired`를 표시해 기존 프로세스 정리가 필요하다는 것을 알린다.
 
+`GET /api/connectors?profile=`은 `profile`과 `connectors` 배열을 반환한다.
+알려진 plugin 항목은 `plugin`, `enabled`, `configured`를 갖고 미설치이면 두 판정은 모두 false다.
+GET에는 재시작 판정이 없으므로 연결 확인만으로 저장된 `restartRequired`를 지우지 않는다.
+저장된 대기 값과 각 env·설치 변경 응답의 `restart_required`를 논리 OR로 저장한다.
+도중 호출이 실패해도 앞선 응답의 true를 보존한다.
+관리자는 실제 gateway 반영을 마친 뒤 연결 화면에서 반영 완료를 확인한다.
+대기 연결은 설치의 enabled와 configured, MCP probe, 내장 도구 미노출을 다시 검사해 READY로 바꾼다.
+해제 연결은 설치의 disabled를 확인하고 DISCONNECTED를 유지한 채 재시작 대기를 지운다.
+일반 연결 확인도 활성화 후보가 아닌 연결의 disabled를 확인해 DISCONNECTED로 바꿀 수 있지만 재시작 대기는 보존한다.
+이 확인도 대상 사용자 행을 잠그며 ADMIN과 같은 그룹인지 검사한다.
+
 ## 저장과 비밀값
 
 `accountbook_connection`은 사용자와 에이전트 바인딩, 상태, 토큰 앞 8자,
 선택 가족 UUID, 마지막 확인 시각과 재시작 필요 여부만 저장한다.
+활성화 후보 여부도 저장해 실패한 등록이나 해제가 기존 토큰의 실행을 다시 허용하지 못하게 한다.
 토큰 원문과 해시는 저장하지 않는다.
 브라우저는 제출한 직후 토큰 입력을 비우고 다시 표시하지 않는다.
 요청 record의 문자열 표현, 외부 API 오류, 로그와 응답에 원문을 남기지 않는다.

@@ -33,6 +33,9 @@ Spring Boot 4의 Jackson은 `tools.jackson`이다.
 - 알려진 accountbook 서버의 probe `tools`가 비어 있지 않고 각 name이 비어 있지 않은 문자열인지 확인한다. 개별 도구 이름은 코드에 고정하지 않는 것으로 코디네이터가 승인했다.
 - `HermesToolsetClient.readEnabled`는 MCP를 열거하지 않으므로 결과가 빈 목록이어야 내장 도구가 모두 닫힌 것으로 본다. `fos-assistant` 서버 보존은 신뢰된 설치기 계약이며 운영에서 실제 호출한다.
 - 해제는 토큰 삭제와 plugin disabled 저장을 마치고 DISCONNECTED가 된다. 실패는 PENDING과 비활성화를 남기며 다시 해제할 수 있다.
+- 확인만으로 저장된 재시작 대기를 지우지 않는다. ADMIN 반영 완료는 같은 그룹의 대상 사용자를 잠그고 설치·probe·내장 도구를 재검사한다. 해제 연결은 disabled만 검사하고 DISCONNECTED를 유지한다.
+- desired_enabled는 env/install 전 단계 성공 후 활성화 후보가 되었는지를 뜻한다. 등록·교체 시작은 false+disabled+PENDING, 외부 반영 모두 성공 뒤 true다. 해제 시작도 false이고 false 상태는 check/confirm에서 READY가 되지 않는다.
+- 저장된 restartRequired와 모든 외부 응답 restart_required를 논리 OR로 누적하며 중간 실패에서도 보존한다. 일반 check는 disabled를 확인한 뒤 DISCONNECTED로 바꿀 수 있으나 대기 값은 유지한다.
 
 ## 작업 항목
 
@@ -59,7 +62,7 @@ HTTP 제한 시간을 주고 redirect를 따르지 않으며 실제 주소는 �
 `PUT /api/connectors`의 본문은 profile, plugin= fos-accountbook, enabled이고
 응답은 profile, plugin, enabled, restart_required다.
 `GET /api/connectors?profile=`로 상태를 다시 읽고
-GET 응답 포트는 PUT과 같은 필드로 둔다. 인프라의 최종 응답 모양은 HTTP 어댑터에서만 맞춘다. 이 선행 계약 미확정 상태에서 구현 진행을 코디네이터가 승인했다.
+GET은 profile과 connectors 배열이며 각 항목은 plugin, enabled, configured다. 미설치는 false/false이고 restart_required는 없다.
 `POST /api/mcp/servers/accountbook/test?profile=`의 ok와 tools 배열을 검사한다.
 `DELETE /api/env`로 ACCOUNTBOOK_API_TOKEN을 실제 제거하며 404는 이미 제거된 것으로 본다.
 가족 미선택으로 교체하거나 해제할 때 ACCOUNTBOOK_FAMILY_UUID도 DELETE하고 404는 성공으로 본다.
@@ -67,6 +70,8 @@ GET 응답 포트는 PUT과 같은 필드로 둔다. 인프라의 최종 응답 
 기존 `HermesDashboardClient.putEnv`의 예외 로그가 응답 본문을 노출할 수 있으므로
 새 토큰 쓰기는 새 클라이언트에서 외부 exception/cause 없이 고정 오류로 처리한다.
 토큰 교체 시 restart_required를 존중한다.
+env PUT/DELETE 응답의 restart_required도 모아 저장한다.
+ADMIN 목록과 반영 완료 경로는 docs의 확정 계약을 따른다. 목록에는 다른 사용자 토큰 앞부분을 넣지 않는다.
 
 ### 4. backend 테스트
 
@@ -78,6 +83,9 @@ GET 응답 포트는 PUT과 같은 필드로 둔다. 인프라의 최종 응답 
 `HttpAccountbookTokenVerifierTest`는 family 권한, redirect 거절, 인증 오류와 timeout을 확인한다.
 `AccountbookConnectionControllerTest`는 인증과 요청 profile 주입 차단, prefix만 반환을 확인한다.
 `AccountbookConnectionMigrationTest`는 전체 Flyway migration 실행과 필드/FK를 확인한다.
+ADMIN 목록/confirm의 MEMBER 거절과 다른 그룹 차단, 목록/confirm에서 prefix·family 부재를 확인한다.
+check의 저장된 restart 대기 보존, pending 반영 완료의 READY 전이, 해제 완료의 DISCONNECTED 유지,
+해제 실패와 토큰 교체 중간 실패가 confirm으로 READY가 되지 않는 것을 테스트한다.
 
 ## 검증
 
@@ -98,19 +106,22 @@ cd backend && ./gradlew test
 | `backend/src/main/java/com/bifos/assistant/connector/application/AccountbookProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/AccountbookTokenVerifier.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectionSnapshot.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/AdminConnectionSnapshot.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorOperationFailure.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/AccountbookConnectionService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectionDtos.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/AccountbookConnectionController.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/presentation/AccountbookConnectionAdminController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HermesConnectorClient.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/agent/domain/Agent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentAdminController.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
-| `backend/src/main/resources/db/migration/V35__accountbook_connection.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V36__accountbook_connection.sql` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/AccountbookConnectionServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/AccountbookConnectionControllerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/AccountbookConnectionMigrationTest.java` | 신규 |

@@ -78,7 +78,7 @@ public class AgentService {
      * 성격은 못 고치는데 추천 질문은 고치는 에이전트가 생긴다.
      */
     public boolean isEditableBy(CurrentUser user, Agent agent) {
-        return user.isAdmin() || Objects.equals(agent.ownerUserId(), user.id());
+        return !agent.connectorManaged() && (user.isAdmin() || Objects.equals(agent.ownerUserId(), user.id()));
     }
 
     /**

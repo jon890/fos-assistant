@@ -75,6 +75,9 @@ public class Agent {
     @Column(name = "profile_managed", nullable = false)
     private boolean profileManaged;
 
+    @Column(name = "connector_managed", nullable = false)
+    private boolean connectorManaged;
+
     /**
      * 지운 시각. 비어 있으면 지우지 않았다.
      *
@@ -121,11 +124,17 @@ public class Agent {
     public boolean enabled() { return enabled; }
     public String flow() { return flow; }
     public boolean profileManaged() { return profileManaged; }
+    public boolean connectorManaged() { return connectorManaged; }
     public Instant deletedAt() { return deletedAt; }
 
     /** Control Plane 이 이 에이전트의 profile 을 만들었다고 적는다. 지울 때 그 profile 까지 거둔다. */
     public void markManagedProfile() {
         this.profileManaged = true;
+    }
+
+    /** connector 가 만든 에이전트는 일반 설정 화면에서 바꾸지 않는다. */
+    public void markConnectorManaged() {
+        this.connectorManaged = true;
     }
 
     /**
@@ -154,7 +163,7 @@ public class Agent {
      * 흐름이 붙은 에이전트는 받지 않는다. 받을지 판정하는 곳은 모두 이 메서드를 부른다.
      */
     public boolean acceptsAttachments() {
-        return flow == null || flow.isBlank();
+        return !connectorManaged && (flow == null || flow.isBlank());
     }
 
     public boolean isReadableBy(Long userId) {
