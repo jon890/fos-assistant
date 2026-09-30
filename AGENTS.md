@@ -125,6 +125,20 @@ scripts/check-public-safe.sh
 
 ## 확인
 
+아래 여섯 검사를 한 번에 돌린다.
+
+```bash
+# cwd: 저장소 root
+scripts/check-local.sh
+```
+
+처음 받은 checkout 에서도 그대로 돈다.
+웹 의존성과 Playwright 의 chromium 을 먼저 설치하고, `pnpm build` 에 자리표시자 환경 변수를 준다.
+둘을 빠뜨려 코드와 관계없이 `playwright: command not found` 와 `Failed to collect page data` 로 실패한 적이 있다.
+처음 실패한 단계에서 멈추고 그 로그의 끝을 보인다.
+
+스크립트가 차례로 돌리는 명령은 아래와 같다.
+
 ```bash
 cd backend && ./gradlew test
 cd web && pnpm typecheck && pnpm build
