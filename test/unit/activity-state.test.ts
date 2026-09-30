@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyChatEvent, emptyActivity, failActivity, fromTree } from "../../web/src/components/chat/activity/activity-state.ts";
+import { activityLabel, applyChatEvent, emptyActivity, failActivity, fromTree } from "../../web/src/components/chat/activity/activity-state.ts";
 import type {
   ExecutionEventView,
   ExecutionTreeNode,
@@ -122,4 +122,21 @@ test("도는 나무로 읽어도 끝난 자식 노드는 끝난 상태로 보인
   };
   const items = fromTree(tree, { running: true }).filter((item) => item.kind === "subagent");
   assert.deepEqual(states(items), ["subagent:에이전트 2:done", "subagent:에이전트 3:failed"]);
+});
+
+test("activityLabel 은 같은 도구 항목이 도는 중일 때와 끝났을 때 다른 문장을 낸다", () => {
+  const started = applyChatEvent(emptyActivity(0), { type: "tool", toolName: "terminal", phase: "started" });
+  const running = started.items[0]!;
+  const done = applyChatEvent(started, { type: "tool", toolName: "terminal", phase: "completed" }).items[0]!;
+
+  assert.equal(running.name, "terminal");
+  assert.equal(done.name, "terminal");
+  assert.equal(activityLabel(running), "작업을 실행하는 중");
+  assert.equal(activityLabel(done), "작업 실행");
+});
+
+test("activityLabel 은 도구가 아닌 항목의 이름을 그대로 낸다", () => {
+  const state = applyChatEvent(emptyActivity(0), { type: "switched", text: "다른 모델" });
+
+  assert.equal(activityLabel(state.items[0]!), state.items[0]!.name);
 });

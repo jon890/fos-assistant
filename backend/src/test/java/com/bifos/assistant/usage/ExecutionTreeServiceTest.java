@@ -234,6 +234,45 @@ class ExecutionTreeServiceTest {
                 .contains(String.valueOf(orphan.id()));
     }
 
+    @Test
+    void MEMBER_역할에게는_공개한_도구와_도구가_아닌_사건의_detail_만_실린다() {
+        AgentExecution execution = executionWithToolAndSubagent();
+
+        ExecutionTree tree = trees.of(ownerAs(UserRole.MEMBER), execution.id());
+
+        assertThat(tree.root().events())
+                .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
+                .as("terminal 의 명령 원문은 비우고 검색어와 하위 에이전트 목표는 싣는다")
+                .containsExactly(
+                        tuple("TOOL_STARTED", null),
+                        tuple("TOOL_STARTED", "제주 날씨"),
+                        tuple("SUBAGENT_STARTED", "숙소를 찾는다"));
+        // 응답에서만 빼고 저장한 값은 그대로 둔다.
+        assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(execution.id())))
+                .extracting(ExecutionEvent::detail)
+                .containsExactly("python3 run.py", "제주 날씨", "숙소를 찾는다");
+    }
+
+    @Test
+    void ADMIN_역할에게는_도구의_명령_원문이_그대로_실린다() {
+        AgentExecution execution = executionWithToolAndSubagent();
+
+        ExecutionTree tree = trees.of(ownerAs(UserRole.ADMIN), execution.id());
+
+        assertThat(tree.root().events())
+                .extracting(ExecutionEventView::detail)
+                .containsExactly("python3 run.py", "제주 날씨", "숙소를 찾는다");
+    }
+
+    /** 공개하지 않는 도구, 공개하는 도구, 하위 에이전트 사건을 하나씩 가진 실행이다. */
+    private AgentExecution executionWithToolAndSubagent() {
+        AgentExecution execution = execution(OWNER_ID, null, null);
+        event(execution, 1, ExecutionEventType.TOOL_STARTED, "terminal", "python3 run.py");
+        event(execution, 2, ExecutionEventType.TOOL_STARTED, "web_search", "제주 날씨");
+        event(execution, 3, ExecutionEventType.SUBAGENT_STARTED, null, "숙소를 찾는다");
+        return execution;
+    }
+
     private static List<Long> flatten(ExecutionNode node) {
         List<Long> ids = new ArrayList<>();
         ids.add(node.executionId());
@@ -242,7 +281,11 @@ class ExecutionTreeServiceTest {
     }
 
     private static CurrentUser owner() {
-        return new CurrentUser(OWNER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
+        return ownerAs(UserRole.ADMIN);
+    }
+
+    private static CurrentUser ownerAs(UserRole role) {
+        return new CurrentUser(OWNER_ID, "dad@example.com", "dad", 1L, role);
     }
 
     private AgentExecution execution(Long userId, Long parentId, Long rootId) {
@@ -260,11 +303,17 @@ class ExecutionTreeServiceTest {
     }
 
     private void event(AgentExecution execution, int sequence, ExecutionEventType type, String toolName) {
+        event(execution, sequence, type, toolName, null);
+    }
+
+    private void event(
+            AgentExecution execution, int sequence, ExecutionEventType type, String toolName, String detail) {
         events.save(ExecutionEvent.builder()
                 .executionId(execution.id())
                 .sequence(sequence)
                 .eventType(type)
                 .toolName(toolName)
+                .detail(detail)
                 .occurredAt(Instant.now())
                 .build());
     }

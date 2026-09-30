@@ -50,6 +50,9 @@ import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -90,7 +93,8 @@ class ArtifactTest {
                     + "artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
                     + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
                     + "artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
-                    + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.";
+                    + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
+                    + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.";
     private static final String CSP = "sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; "
             + "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; "
             + "form-action 'none'";
@@ -432,6 +436,89 @@ class ArtifactTest {
     }
 
     @Test
+    void 파일_응답에는_약한_ETag_와_Last_Modified_가_붙는다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
+
+        HttpResponse<String> response = file(conversation, "a/index.html");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(header(response, "ETag")).startsWith("W/\"");
+        assertThat(header(response, "Last-Modified")).isNotEmpty();
+    }
+
+    @Test
+    void 받은_ETag_로_다시_물으면_본문_없이_304_이고_보호_머리글이_그대로다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
+        String etag = header(file(conversation, "a/index.html"), "ETag");
+
+        HttpResponse<String> response = file(conversation, "a/index.html", dad, "If-None-Match", etag);
+
+        assertThat(response.statusCode()).isEqualTo(304);
+        assertThat(response.body()).isEmpty();
+        assertThat(header(response, "ETag")).isEqualTo(etag);
+        assertThat(header(response, "Cache-Control")).isEqualTo("private, no-cache");
+        assertThat(header(response, "Content-Security-Policy")).isEqualTo(CSP);
+        assertThat(header(response, "X-Content-Type-Options")).isEqualTo("nosniff");
+    }
+
+    @Test
+    void 받은_Last_Modified_로_다시_물으면_304_다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
+        String modified = header(file(conversation, "a/index.html"), "Last-Modified");
+
+        HttpResponse<String> response = file(conversation, "a/index.html", dad, "If-Modified-Since", modified);
+
+        assertThat(response.statusCode()).isEqualTo(304);
+        assertThat(response.body()).isEmpty();
+    }
+
+    @Test
+    void 파일이_바뀐_뒤_옛_ETag_로_물으면_200_과_새_본문이다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        Instant first = Instant.now().minus(Duration.ofMinutes(5));
+        writeAt(conversation.id(), "a/index.html", HTML, first);
+        String oldEtag = header(file(conversation, "a/index.html"), "ETag");
+        writeAt(conversation.id(), "a/index.html", "<p>고친 본문</p>", first.plus(Duration.ofMinutes(1)));
+
+        HttpResponse<String> response = file(conversation, "a/index.html", dad, "If-None-Match", oldEtag);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo("<p>고친 본문</p>");
+        assertThat(header(response, "ETag")).isNotEqualTo(oldEtag);
+    }
+
+    @Test
+    void If_None_Match_가_있으면_If_Modified_Since_는_보지_않는다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        writeAt(conversation.id(), "a/index.html", HTML, Instant.now().minus(Duration.ofMinutes(5)));
+        String future = DateTimeFormatter.RFC_1123_DATE_TIME
+                .format(ZonedDateTime.now(ZoneOffset.UTC).plusDays(1));
+
+        HttpResponse<String> response = file(conversation, "a/index.html", dad,
+                "If-None-Match", "\"other\"", "If-Modified-Since", future);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo(HTML);
+    }
+
+    @Test
+    void 다른_사용자가_맞는_ETag_를_보내도_CONVERSATION_NOT_FOUND_다() throws Exception {
+        Conversation conversation = chat.startEmpty(dad, "dad");
+        writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
+        String etag = header(file(conversation, "a/index.html"), "ETag");
+        CurrentUser kid = member("artifact-kid@example.com");
+        agentOf(kid, "kid", null);
+
+        HttpResponse<String> response = file(conversation, "a/index.html", kid, "If-None-Match", etag);
+
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(code(response)).isEqualTo("CONVERSATION_NOT_FOUND");
+    }
+
+    @Test
     void 보관_기간이_지나_지운_HTML_은_행에_지운_시각이_남고_410_이다() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
@@ -507,11 +594,25 @@ class ArtifactTest {
     }
 
     private HttpResponse<String> file(Conversation conversation, String relativePath) throws Exception {
+        return file(conversation, relativePath, dad);
+    }
+
+    /** 보내는 사용자와 요청 머리글(이름, 값 순서의 쌍)을 정해 파일을 받는다. */
+    private HttpResponse<String> file(
+            Conversation conversation, String relativePath, CurrentUser sender, String... headers)
+            throws Exception {
         String encoded = StreamSupport.stream(Path.of(relativePath).spliterator(), false)
                 .map(segment -> URLEncoder.encode(segment.toString(), StandardCharsets.UTF_8))
                 .reduce((left, right) -> left + "/" + right)
                 .orElseThrow();
-        return get("/api/v1/chat/conversations/" + conversation.publicId() + "/files/" + encoded);
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                        + "/api/v1/chat/conversations/" + conversation.publicId() + "/files/" + encoded))
+                .header("Authorization", "Bearer " + jwt(sender))
+                .GET();
+        for (int i = 0; i < headers.length; i += 2) {
+            request.header(headers[i], headers[i + 1]);
+        }
+        return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(String path) throws Exception {
