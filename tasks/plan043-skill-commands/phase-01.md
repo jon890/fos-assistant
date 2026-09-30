@@ -121,6 +121,7 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/application/SkillCommandTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/skill/SkillCommandCatalogTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillUsageQueryTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java` | 수정 |
 | `docs/data-schema.md` | 수정 |
