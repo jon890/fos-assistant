@@ -551,14 +551,13 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 | 자리 | 하는 일 |
 | --- | --- |
 | `mcp.infra.AgentTokenAuthenticationFilter` | `/mcp` 와 `/internal/hermes/session-bindings/subagent` 요청의 토큰을 인증해 `McpPrincipal` 을 인증 주체로 둔다. `CurrentUser` 를 두지 않는다. 서명 검증에 쓸 토큰 해시를 요청 속성으로도 넘긴다 |
-| `mcp.application.AgentTokenService` | 발급, profile 묶기, 목록, 폐기, 인증. profile 이 빈 옛 토큰은 `McpProperties.legacyUserTokens` 가 참일 때만 인증한다 |
-| `mcp.application.McpPrincipal` | 인증 결과. 토큰 번호, profile, 옛 토큰의 사용자 번호, 토큰 해시. profile 이 비었으면 옛 토큰이다 |
-| `mcp.application.McpProperties` | `assistant.mcp` 설정. `legacy-user-tokens`(기본 거짓) |
-| `mcp.application.McpCallerResolver` | 묶인 토큰이면 `_fos_ctx` 서명 확인, origin 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 옛 토큰이면 그 토큰의 사용자를 쓴다. `resolveWithOrigin` 은 같은 판정에 더해 origin 실행이 없는 옛 토큰의 호출을 거절한다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
-| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. origin 실행은 끝난 실행일 수 있지만 그 실행이나 뿌리 실행이 `CANCELLED` 인 것은 아니다. 옛 토큰이면 뒤의 둘이 비었고, 그런 판정은 `agent_*` 에 가지 않는다 |
+| `mcp.application.AgentTokenService` | 발급, 목록, 폐기, 인증. 인증은 있고, 폐기되지 않았고, profile 이 묶인 토큰만 통과시킨다. 사용자는 토큰에서 읽지 않는다 |
+| `mcp.application.McpPrincipal` | 인증 결과. 토큰 번호, profile, 토큰 해시. profile 은 늘 있다 |
+| `mcp.application.McpCallerResolver` | `_fos_ctx` 서명 확인, origin 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 모든 MCP 도구가 이 한 메서드 `resolve` 를 지난다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
+| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. 셋은 늘 있고 생성자가 빈 값을 거절한다. origin 실행은 끝난 실행일 수 있지만 그 실행이나 뿌리 실행이 `CANCELLED` 인 것은 아니다 |
 | `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
 | `mcp.application.SubagentRegistration` | 등록 본문을 읽고 서명을 확인한다. 서명할 글의 첫 줄이 `v1-subagent` 다 |
-| `mcp.presentation.SubagentSessionController` | `POST /internal/hermes/session-bindings/subagent`. 인증 주체가 묶인 `McpPrincipal` 인지 보고 등록을 부른다 |
+| `mcp.presentation.SubagentSessionController` | `POST /internal/hermes/session-bindings/subagent`. 인증 주체가 `McpPrincipal` 인지 보고 등록을 부른다 |
 | `orchestration.application.SessionOwnerResolver` | profile, 서명한 뿌리 session, 그 호출의 session 으로 origin 실행을 정한다. 등록을 먼저 보고, 없으면 session 이 뿌리와 같을 때만 `DelegationParentResolver` 를 부른다. 등록의 origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다 |
 | `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 최상위 session 의 판정과 최상위 자식의 등록이 쓴다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
 | `orchestration.application.SubagentSessionRegistrar` | 등록 하나를 적는다. 부모를 풀고, 같은 origin 의 재등록은 그대로 두고, 다른 origin 은 거절한다 |
@@ -567,7 +566,6 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 `McpController` 는 `params.name` 이 문자열이고 `params.arguments` 가 객체인지 본 뒤 `McpCallerResolver` 를 부른다. 도구별 인자 검사는 그 뒤에 하고, 그 `McpCaller` 로 `McpToolService` 를 부른다.
 판정이 실패하면 `McpToolService.invalidContext()` 의 같은 도구 결과를 돌려준다.
 `memory_read`, `artifact_write`, `agent_list`, `agent_status` 가 이 길을 쓴다.
-`agent_*` 는 `resolveWithOrigin` 으로 요청자를 정해, 옛 토큰의 호출을 다른 거절과 같은 결과로 돌려준다.
 
 등록 경로는 MCP 도구가 아니다. `tools/list` 에 나오지 않고 `McpController` 를 지나지 않는다.
 `ControlPlaneJwtFilter` 는 이 경로를 `/mcp` 처럼 건너뛴다. 사용자 JWT 로 부르면 `AgentTokenAuthenticationFilter` 가 토큰으로 인증하지 못해 401 이다. 컨트롤러의 `McpPrincipal` 확인은 그 뒤의 방어 검사다.
@@ -579,8 +577,7 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 | 경로 | 하는 일 |
 | --- | --- |
 | `POST /api/v1/admin/agent-tokens` | 본문 `{ "profileName", "label" }`. profile 에 묶인 새 토큰을 발급하고 원문을 한 번만 돌려준다. 사용자로 발급하는 길은 없다 |
-| `PUT /api/v1/admin/agent-tokens/{id}/profile` | 본문 `{ "profileName" }`. profile 이 빈 옛 토큰을 그 profile 에 묶고 `user_id` 를 비운다. 이미 묶였거나 폐기된 토큰은 `VALIDATION_FAILED` |
-| `GET /api/v1/admin/agent-tokens` | 목록. 한 줄에 `id`, `profileName`, `userEmail`(옛 토큰만), `label`, 발급과 마지막 사용과 폐기 시각 |
+| `GET /api/v1/admin/agent-tokens` | 목록. 한 줄에 `id`, `profileName`, `label`, 발급과 마지막 사용과 폐기 시각 |
 | `DELETE /api/v1/admin/agent-tokens/{id}` | 폐기한다. 행은 남는다 |
 
 profile 이름은 `HermesProfileName` 의 규칙을 따른다. 그 profile 에 에이전트가 있는지는 보지 않는다. profile 을 먼저 만들고 에이전트를 나중에 붙이는 순서가 있어서다.
@@ -1158,7 +1155,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - 사용자 전체의 동시 위임 한도. 지금은 뿌리당 한도와 서버 전체 한도만 있다
 - MCP `agent_delegate` 와 `agent_stop`, 그것을 처리하는 `AgentDelegationService` 의 위임 시작과 중지, `DelegationProperties`.
   지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)과 읽기 도구 `agent_list`, `agent_status` 만 있다
-- `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸을 지우는 것. 운영의 모든 토큰이 profile 에 묶인 뒤, `agent_delegate` 를 열기 전에 지운다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」)
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

@@ -31,7 +31,7 @@
     - profile 플러그인이 빠진 profile 에서는 `memory_read` 와 `artifact_write` 가 거절된다. 플러그인 배치가 이 두 도구의 전제가 된다
     - Control Plane 이 session 을 모르는 실행에서 온 호출은 거절된다. 대화 turn 과 흐름의 하위 실행은 제출하기 전에 session 을 적는다. Memory 제안 실행은 적지 않으므로 그 안에서는 이 도구들을 쓸 수 없다
     - 이 결정 전에 Hermes 가 session 을 정한 대화에서 압축 교체가 일어났으면 뿌리가 우리 기록과 달라 거절된다
-    - **Control Plane 이 시작하지 않은 실행의 호출은 거절된다.** Hermes cron, 다른 채팅 플랫폼 gateway 처럼 우리가 실행 줄을 만들지 않은 run 에는 도는 부모 실행이 없다. 누가 요청했는지 알 수 없으므로 거절이 의도한 동작이다. 옛 토큰으로 설정이 참인 동안에는 전처럼 그 토큰의 사용자로 돈다
+    - **Control Plane 이 시작하지 않은 실행의 호출은 거절된다.** Hermes cron, 다른 채팅 플랫폼 gateway 처럼 우리가 실행 줄을 만들지 않은 run 에는 도는 부모 실행이 없다. 누가 요청했는지 알 수 없으므로 거절이 의도한 동작이다. 옮겨 가는 동안에는 옛 토큰이 설정에 따라 그 토큰의 사용자로 돌았고, 옛 경로를 지운 뒤로는 예외가 없다
     - 토큰 하나를 여러 profile 설정에 함께 두던 운영은 profile 마다 토큰을 따로 발급해야 한다
 - **적용 범위**: 부모 실행을 찾는 방법과 `_fos_ctx` 의 서명은 [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-뿌리-session-으로-잇는다.md) 을 그대로 따른다. 서명할 글과 key 는 바꾸지 않는다.
 
@@ -65,3 +65,13 @@
 5. 다음 변경에서 설정과 `agent_token.user_id` 칸을 지운다
 
 되돌릴 때는 설정을 참으로 돌린다. 이미 묶인 토큰은 풀지 않는다. 새 토큰은 옛 방식으로 발급할 수 없다.
+
+**2026-09-30 에 5단계까지 끝났다.** 운영의 토큰이 모두 profile 에 묶였고 옛 토큰 경고 로그가 0 건인 것을 확인한 뒤 옛 경로를 지웠다.
+
+- 인증은 토큰이 있고, 폐기되지 않았고, `profile_name` 이 있을 때만 통과한다. profile 이 빈 토큰은 설정과 무관하게 `401` 이다
+- `assistant.mcp.legacy-user-tokens` 설정과 `McpProperties`, `McpPrincipal.legacyUserId`, 요청자 판정의 옛 경로를 지웠다. `McpCaller` 는 요청자와 origin 실행과 확인한 `_fos_ctx` 를 늘 갖는다
+- 묶을 옛 토큰이 남지 않아 관리 API `PUT /api/v1/admin/agent-tokens/{id}/profile` 과 목록의 `userEmail` 도 지웠다
+- V35 가 `agent_token.user_id` 칸을 지운다. 칸을 지우기 전에 `profile_name` 이 빈 폐기 안 된 줄을 세어 한 줄이라도 있으면 아무것도 바꾸지 않고 실패한다. 그 토큰이 누구의 것이었는지 모르는 채로 인증만 막히는 일을 배포 단계에서 드러내기 위해서다
+- 배포 뒤 `ASSISTANT_MCP_LEGACY_USER_TOKENS` 를 infra 에서 지운다
+
+이제 되돌릴 길은 없다. `user_id` 칸이 사라져 옛 판의 서버는 기동할 때 스키마 검증에서 실패한다. 되돌리려면 백업에서 복원한다.

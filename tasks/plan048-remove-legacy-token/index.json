@@ -1,0 +1,11 @@
+{
+  "name": "plan048-remove-legacy-token",
+  "description": "profile 이 빈 옛 MCP 토큰 경로와 agent_token.user_id 를 지운다 — 토큰은 profile 만 증명하고 McpCaller 는 요청자, origin 실행, _fos_ctx 를 늘 갖게 한다(ADR-032, ADR-037)",
+  "status": "pending",
+  "created_at": "2026-09-30",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" }
+  ]
+}

@@ -288,8 +288,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
-| `profile_name` | VARCHAR(64) NULL | 이 토큰을 쓰는 Hermes profile. 새로 발급하는 토큰은 늘 채운다. 비어 있으면 옛 토큰이다 |
-| `user_id` | BIGINT NULL | 옛 토큰을 발급한 대상 사용자. 권한 판정에 쓰지 않는다. `assistant.mcp.legacy-user-tokens` 가 참일 때 `profile_name` 이 빈 토큰만 이 값으로 돈다. 새 토큰은 비워 두고, 옛 토큰을 profile 에 묶을 때 비운다. 옛 판의 서버로 되돌려도 묶인 토큰이 옛 사용자로 돌지 않고 인증에서 거절되게 하기 위해서다 |
+| `profile_name` | VARCHAR(64) NULL | 이 토큰을 쓰는 Hermes profile. 폐기되지 않은 토큰은 늘 채워져 있다. 비어 있는 줄은 profile 을 묶기 전에 폐기된 옛 토큰뿐이고, 인증에서 거절한다 |
 | `token_hash` | VARCHAR(64) | 토큰 원문의 SHA-256 해시. 원문은 저장하지 않는다 |
 | `label` | VARCHAR(100) | 관리자가 토큰 용도를 구분하는 이름 |
 | `created_at` | DATETIME(6) | 발급 시각 |
@@ -299,8 +298,11 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 한 profile 에 토큰이 여럿일 수 있다. 바꿔 끼우는 동안 옛 토큰과 새 토큰이 함께 쓰인다. 그래서 `profile_name` 에 유일 제약을 두지 않는다.
 토큰 하나는 profile 하나에만 묶인다. 한 번 묶은 profile 은 바꾸지 않는다. 다른 profile 에 쓰려면 새로 발급한다.
 
-**profile 을 채우는 값은 마이그레이션에 넣지 않는다.** 어느 토큰이 어느 profile 의 것인지는 운영 값이다.
-V29 는 칸만 더하고, 운영 토큰은 관리 API `PUT /api/v1/admin/agent-tokens/{id}/profile` 로 채운다.
+**토큰에는 사용자 칸이 없다.** 전에는 사용자 기준으로 발급한 옛 토큰이 `user_id` 를 가졌다.
+V29 가 `profile_name` 을 더했고, 운영의 옛 토큰을 모두 profile 에 묶은 뒤 V35 가 `user_id` 칸을 지웠다.
+V35 는 칸을 지우기 전에 `profile_name` 이 빈 폐기 안 된 줄을 센다. 한 줄이라도 있으면 아무것도 바꾸지 않고 실패한다.
+그 토큰이 누구의 것이었는지 모르는 채로 인증만 막히는 일을 배포 전에 드러내기 위해서다.
+폐기된 옛 토큰은 이력으로 남기므로 `profile_name` 은 NULL 을 그대로 받는다.
 
 ## hermes_session_binding
 

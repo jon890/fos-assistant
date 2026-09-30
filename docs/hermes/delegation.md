@@ -280,7 +280,7 @@ MCP 규약 헤더뿐이었다. `params._meta` 는 빈 객체였다.
 
 **플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. 배치 방법은 비공개 저장소 `fos-home-infra` 가 갖는다.
 
-**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 profile 에 묶인 토큰으로 온 호출 가운데 서명이 없거나 틀린 것을 거절한다. `memory_read`, `artifact_write`, `agent_*` 가 모두 그렇다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
+**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `agent_*` 가 모두 그렇다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 
 #### `_fos_ctx` 계약
 
@@ -327,8 +327,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 
 결정은 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
-profile 이 빈 옛 토큰은 설정이 허용할 때만 `_fos_ctx` 를 보지 않고 전처럼 돈다. `agent_*` 는 설정과 무관하게 옛 토큰을 거절한다.
-플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 비공개 저장소 `fos-home-infra` 가 갖고, 이 저장소는 그 동작을 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 묶인 토큰에서 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
+플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 비공개 저장소 `fos-home-infra` 가 갖고, 이 저장소는 그 동작을 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
 
 #### 호출은 profile 마다 하나씩 나간다
 
@@ -400,7 +399,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 항목 | 값 |
 | --- | --- |
 | 경로 | `POST /internal/hermes/session-bindings/subagent` |
-| 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>`. `/mcp` 와 같은 토큰이다. profile 이 빈 옛 토큰은 거절한다 |
+| 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>`. `/mcp` 와 같은 토큰이다. profile 이 빈 토큰은 인증에서 거절한다 |
 | 본문 | JSON 객체. 아래 칸 |
 | 제한 시간 | 플러그인이 짧게 둔다(예: 3초). 한 번만 다시 보낸다 |
 
@@ -441,33 +440,21 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | --- | --- |
 | `201` `{"result": "created"}` | 새로 등록했다 |
 | `200` `{"result": "exists"}` | 같은 부모와 뿌리로, 또는 같은 origin 으로 이미 등록돼 있다. 다시 보낸 것으로 본다. 앞의 경우 부모를 다시 풀지 않는다 |
-| `401` | 토큰이 없거나 모르는 토큰이거나 폐기됐다. profile 이 빈 옛 토큰이고 `assistant.mcp.legacy-user-tokens` 가 거짓이어도 같다. 사용자 JWT 로 불러도 같다. 본문이 없다 |
-| `403` `{"code": "SESSION_BINDING_REJECTED"}` | profile 이 빈 옛 토큰(설정이 참일 때), JSON 이 아니거나 모양이 틀린 본문, 서명, 부모를 풀지 못함, session 값이 128자를 넘음, `child_session_id` 가 부모나 뿌리나 실행 줄이나 대화의 session 과 같음. 이유는 서버 로그에만 남는다 |
+| `401` | 토큰이 없거나 모르는 토큰이거나 폐기됐거나 profile 이 빈 토큰이다. 사용자 JWT 로 불러도 같다. 본문이 없다 |
+| `403` `{"code": "SESSION_BINDING_REJECTED"}` | JSON 이 아니거나 모양이 틀린 본문, 서명, 부모를 풀지 못함, session 값이 128자를 넘음, `child_session_id` 가 부모나 뿌리나 실행 줄이나 대화의 session 과 같음. 이유는 서버 로그에만 남는다 |
 | `409` `{"code": "SESSION_BINDING_CONFLICT"}` | 그 `child_session_id` 가 다른 origin 으로 이미 등록돼 있다. 덮어쓰지 않는다 |
 
 플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 등록이 없는 하위 에이전트의 호출은 서버가 거절하므로 안전한 쪽으로 실패한다.
 플러그인과 서버 모두 토큰, `sig`, 본문을 로그에 남기지 않는다.
 
-#### profile 에 묶인 토큰에서만 동작한다
+#### 모든 토큰이 profile 에 묶여 있다
 
-등록과 origin 판정, 아래 「취소가 아래로 내려가지 않는다」 의 취소 차단은 **profile 에 묶인 MCP 토큰**에서만 동작한다.
-`agent_token.profile_name` 이 있고 `agent_token.user_id` 가 빈 토큰이다.
+등록과 origin 판정, 아래 「취소가 아래로 내려가지 않는다」 의 취소 차단은 토큰이 profile 을 증명하는 것을 전제로 한다.
+`agent_token` 에는 사용자 칸이 없고, 폐기되지 않은 토큰은 늘 `profile_name` 을 갖는다. profile 이 빈 토큰은 `/mcp` 와 등록 경로 모두 인증에서 `401` 이다.
 
-profile 이 빈 옛 토큰은 이렇게 된다.
-
-- 등록 경로가 거절한다. 설정이 거짓이면 `401`, 참이면 `403` 이다
-- `/mcp` 호출은 `_fos_ctx` 를 보지 않고 토큰의 사용자로 돈다. origin 실행을 찾지 않으므로 부모 turn 을 중지해도 하위 에이전트의 호출이 막히지 않는다
-- `agent_*` 도구는 origin 실행이 없어 거절한다. `_fos_ctx` 를 붙여 와도 같다
-
-그래서 하위 에이전트를 쓰는 profile 은 운영에서 모두 묶인 토큰이어야 한다. 어느 profile 의 토큰이 묶였는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
-
-옛 토큰 경로는 이 순서로 지운다. 앞 단계가 끝나야 다음 단계로 간다.
-
-1. 모든 토큰을 profile 에 묶는다. `PUT /api/v1/admin/agent-tokens/{id}/profile` 이 묶으면서 `user_id` 를 비운다
-2. `assistant.mcp.legacy-user-tokens` 를 거짓으로 돌린다
-3. 옛 경로가 쓰이지 않는지 본다. 옛 토큰이 쓰이거나 거절될 때 남는 서버 경고 로그(`profile 이 묶이지 않은 옛 MCP 토큰`)가 0 건이어야 한다
-4. `agent_token.user_id` 칸을 지운다
-5. `McpPrincipal.legacyUserId` 와 설정을 지운다
+전에는 사용자 기준으로 발급한 옛 토큰이 설정이 허용할 때 `_fos_ctx` 를 보지 않고 그 토큰의 사용자로 돌았다.
+그 profile 에서는 origin 실행을 찾지 않아, 부모 turn 을 중지해도 하위 에이전트의 호출이 막히지 않았다.
+운영의 모든 토큰을 profile 에 묶은 뒤 그 경로를 지웠다. 순서와 근거는 [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」 에 있다.
 
 #### 하위 에이전트를 실제로 확인하는 절차
 

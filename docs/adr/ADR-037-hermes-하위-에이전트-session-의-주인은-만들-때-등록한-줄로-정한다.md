@@ -72,12 +72,12 @@ _fos_ctx 서명 확인
 
 ### 이 결정 뒤에 할 일
 
-옛 토큰으로 온 호출에는 origin 실행이 없어 `agent_*` 가 부모와 실행 나무를 정할 수 없다.
-그래서 `agent_*` 도구는 옛 토큰의 호출을 거절한다. 설정 `assistant.mcp.legacy-user-tokens` 가 참이어도, `_fos_ctx` 를 붙여 와도 다른 거절과 같은 「호출 맥락을 확인할 수 없습니다」 결과다(2026-09-30).
-운영에 profile 에 묶이지 않은 토큰이 아직 쓰이고 있어 `agent_list` 와 `agent_status` 는 옛 경로를 지우기 전에 이 규칙으로 열었다.
+옛 토큰으로 온 호출에는 origin 실행이 없어 `agent_*` 가 부모와 실행 나무를 정할 수 없었다.
+그래서 `agent_list` 와 `agent_status` 는 옛 토큰의 호출을 다른 거절과 같은 결과로 거절하는 규칙으로 먼저 열었다(2026-09-30).
 
-`agent_delegate` 를 열기 전에 옛 토큰 경로를 지운다. 운영의 모든 토큰을 profile 에 묶고, `assistant.mcp.legacy-user-tokens` 를 거짓으로 돌리고, 옛 경로가 쓰이지 않는 것을 확인한 뒤 `agent_token.user_id` 칸과 설정과 `McpPrincipal.legacyUserId` 를 지운다.
+`agent_delegate` 를 열기 전에 옛 토큰 경로를 지웠다(2026-09-30).
+운영의 모든 토큰을 profile 에 묶고 옛 경로가 쓰이지 않는 것을 확인한 뒤, `agent_token.user_id` 칸과 `assistant.mcp.legacy-user-tokens` 설정과 `McpPrincipal.legacyUserId` 를 지웠다.
+이제 사용자가 걸린 모든 MCP 호출의 `McpCaller` 는 요청자, origin 실행, 서명을 확인한 `_fos_ctx` 를 늘 갖는다.
 
-**이 결정은 profile 에 묶인 토큰에서만 동작한다.** `agent_token.profile_name` 이 있고 `user_id` 가 빈 토큰이다.
-옛 토큰은 등록이 거절되고 `/mcp` 호출이 토큰의 사용자로 돌아 origin 실행을 보지 않는다. 그 profile 에서는 사용자가 중지해도 하위 에이전트의 호출이 막히지 않는다.
-하위 에이전트를 쓰는 profile 은 운영에서 모두 묶인 토큰이어야 한다. 확인 방법은 `fos-home-infra` 가 갖는다. 정리 순서는 [`hermes/delegation.md`](../hermes/delegation.md#profile-에-묶인-토큰에서만-동작한다) 에 있다.
+**이 결정은 profile 에 묶인 토큰을 전제로 한다.** 지금은 폐기되지 않은 토큰이 모두 그렇다.
+정리한 내용은 [`hermes/delegation.md`](../hermes/delegation.md#모든-토큰이-profile-에-묶여-있다) 에 있다.
