@@ -118,7 +118,45 @@ public class SkillStore {
         if (version.isEmpty()) {
             return new LinkedHashMap<>();
         }
-        Path versionDir = versionDir(profile, version.get());
+        return new LinkedHashMap<>(readVersion(profile, version.get()));
+    }
+
+    /**
+     * 지금 버전보다 새로 쓰였지만 표식이 없는 버전들의 스킬이다. 같은 이름이면 더 새 버전의 것을 쓴다.
+     *
+     * <p>게시가 timeout 이나 5xx 로 끝난 버전이다. Hermes 가 이미 반영해 그 버전을 가리키고 있을 수 있어서,
+     * 거기 든 이름은 우리가 올린 스킬로 다뤄야 한다. 그러지 않으면 Hermes 목록에 뜬 그 이름을 Hermes 자체
+     * 스킬로 읽어 다시 저장하지도 지우지도 못한다. 지금 버전보다 오래된 표식 없는 버전은 Hermes 가 이미 새
+     * 게시로 넘어간 것이라 보지 않는다.
+     */
+    public Map<String, SkillBundle> readPending(String profile) {
+        Path profileDir = profileDir(profile);
+        if (!Files.isDirectory(profileDir, LinkOption.NOFOLLOW_LINKS)) {
+            return new LinkedHashMap<>();
+        }
+        String current = currentVersion(profile).orElse("");
+        List<String> pending = versionNames(profileDir).stream()
+                .filter(version -> version.compareTo(current) > 0)
+                .filter(version -> !isPublished(profileDir.resolve(version)))
+                .sorted()
+                .toList();
+        Map<String, SkillBundle> bundles = new TreeMap<>();
+        for (String version : pending) {
+            bundles.putAll(readVersion(profile, version));
+        }
+        return new LinkedHashMap<>(bundles);
+    }
+
+    /**
+     * Hermes 가 가리킬 수 있는 버전에 스킬이 하나라도 있는가. 지금 버전과 표식 없는 더 새 버전을 본다.
+     * 도구 저장이 {@code skills} 를 끄지 못하게 할 때 본다.
+     */
+    public boolean hasUploadedSkills(String profile) {
+        return !readCurrent(profile).isEmpty() || !readPending(profile).isEmpty();
+    }
+
+    private Map<String, SkillBundle> readVersion(String profile, String version) {
+        Path versionDir = versionDir(profile, version);
         Map<String, SkillBundle> bundles = new TreeMap<>();
         try {
             for (String name : skillNames(versionDir)) {
@@ -127,20 +165,7 @@ public class SkillStore {
         } catch (IOException ex) {
             throw storeFailure(ex);
         }
-        return new LinkedHashMap<>(bundles);
-    }
-
-    /** 지금 버전에 스킬이 하나라도 있는가. 도구 저장이 {@code skills} 를 끄지 못하게 할 때 본다. */
-    public boolean hasUploadedSkills(String profile) {
-        Optional<String> version = currentVersion(profile);
-        if (version.isEmpty()) {
-            return false;
-        }
-        try {
-            return !skillNames(versionDir(profile, version.get())).isEmpty();
-        } catch (IOException ex) {
-            throw storeFailure(ex);
-        }
+        return bundles;
     }
 
     /**

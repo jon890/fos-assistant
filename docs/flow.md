@@ -430,6 +430,7 @@ sequenceDiagram
 | --- | --- |
 | 관리하는 사람이 아니다 | `FORBIDDEN`. 화면에는 편집 단추가 없다 |
 | Hermes 기본 스킬과 이름이 같다 | `SKILL_NAME_TAKEN` |
+| timeout 뒤 같은 이름으로 다시 저장한다 | 표식 없는 버전에 있는 이름은 올린 스킬로 보고 받는다. Hermes 목록에 먼저 떠 있어도 `SKILL_NAME_TAKEN` 이 아니다 |
 | 파일 경로가 `references/`, `templates/` 밖이거나 상한을 넘는다 | `VALIDATION_FAILED` |
 | 두 사람이 같은 에이전트에 함께 저장한다 | 에이전트 행 잠금으로 차례로 돈다. 뒤에 저장한 것이 남는다 |
 | 올린 스킬이 있는데 `skills` 도구를 끄려 한다 | 거절한다. 스킬을 먼저 지운다 |

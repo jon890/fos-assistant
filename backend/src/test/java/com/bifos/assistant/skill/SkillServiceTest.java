@@ -173,6 +173,62 @@ class SkillServiceTest {
     }
 
     @Test
+    void timeout_뒤_Hermes_에_뜬_새_스킬은_올린_스킬로_보이고_같은_이름으로_다시_저장된다() {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "read timed out"))
+                .when(skillClient).publish(anyString(), anyList(), any());
+        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"),
+                List.of(new SkillFileInput("references/list.md", "장보기 목록"))), ErrorCode.HERMES_UNAVAILABLE);
+        // Hermes 는 응답만 잃고 그 버전을 반영해 목록에 새 이름을 보인다.
+        when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(
+                new HermesSkill("hermes-help", "Hermes 기본", true),
+                new HermesSkill("shopping", "shopping 을 한다", true),
+                new HermesSkill("weekly-plan", "이번 주 계획을 세운다", true)));
+
+        assertThat(skills.list(OWNER, OWNED).skills()).as("Hermes 목록의 새 이름은 올린 스킬이다").contains(
+                new SkillListItem("shopping", "shopping 을 한다", SkillSource.UPLOADED, true,
+                        new SkillUsageSummary(0, null)));
+        assertThat(skills.read(OWNER, OWNED, "shopping").files())
+                .as("편집 화면이 표식 없는 버전의 원문을 연다")
+                .containsExactly(new SkillFileInfo("references/list.md", 16L));
+
+        doAnswer(call -> null).when(skillClient).publish(anyString(), anyList(), any());
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"),
+                List.of(new SkillFileInput("references/list.md", null)));
+
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping", "weekly-plan");
+        assertThat(store.readCurrent(OWNED_PROFILE).get("shopping").files())
+                .as("본문을 생략한 파일은 표식 없는 버전의 내용을 쓴다")
+                .containsExactly(new SkillFile("references/list.md", "장보기 목록"));
+        assertThat(store.readPending(OWNED_PROFILE)).isEmpty();
+    }
+
+    @Test
+    void timeout_뒤_Hermes_에만_뜬_스킬을_지우면_지금_버전을_다시_게시하고_지금_버전이_없으면_빈_목록을_게시한다() {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "read timed out"))
+                .when(skillClient).publish(anyString(), anyList(), any());
+        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
+                ErrorCode.HERMES_UNAVAILABLE);
+        assertCode(() -> skills.save(OWNER, GROUP, "cooking", skillMd("cooking"), List.of()),
+                ErrorCode.HERMES_UNAVAILABLE);
+        doAnswer(call -> null).when(skillClient).publish(anyString(), anyList(), any());
+
+        skills.delete(OWNER, OWNED, "shopping");
+
+        String republished = store.currentVersion(OWNED_PROFILE).orElseThrow();
+        verify(skillClient).publish(eq(OWNED_PROFILE), eq(List.of(store.agentPath(OWNED_PROFILE, republished))), any());
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("weekly-plan");
+        assertThat(store.readPending(OWNED_PROFILE)).as("Hermes 가 벗어난 표식 없는 버전은 지운다").isEmpty();
+        assertCode(() -> skills.delete(OWNER, OWNED, "shopping"), ErrorCode.SKILL_NOT_FOUND);
+
+        skills.delete(OWNER, GROUP, "cooking");
+
+        verify(skillClient).publish(GROUP_PROFILE, List.of(), null);
+        assertThat(SKILL_ROOT.resolve(GROUP_PROFILE)).doesNotExist();
+    }
+
+    @Test
     void 편집자가_아니면_FORBIDDEN_이고_아무것도_쓰지_않는다() {
         assertCode(() -> skills.save(MEMBER, GROUP, "weekly-plan", skillMd("weekly-plan"), List.of()),
                 ErrorCode.FORBIDDEN);

@@ -60,9 +60,10 @@ public class SkillService {
     /**
      * 그 에이전트의 스킬 목록이다. 읽을 수 있는 사람이면 누구나 본다.
      *
-     * <p>Hermes 목록에 지금 버전의 이름을 대조해 출처를 붙인다. 지금 버전에 있는데 Hermes 목록에 없는
-     * 스킬도 올린 것으로 넣는다. 게시 직후 색인 전이거나 Hermes 가 건너뛴 스킬을 화면에서 지울 수 있어야
-     * 하기 때문이다.
+     * <p>Hermes 목록에 올린 스킬 이름을 대조해 출처를 붙인다. 올린 스킬 이름은 지금 버전과, 게시가 timeout
+     * 으로 끝나 표식 없이 남은 더 새 버전의 이름이다. Hermes 가 그 버전을 이미 반영했을 수 있기 때문이다.
+     * 지금 버전에 있는데 Hermes 목록에 없는 스킬도 올린 것으로 넣는다. 게시 직후 색인 전이거나 Hermes 가
+     * 건너뛴 스킬을 화면에서 지울 수 있어야 하기 때문이다.
      *
      * <p>호출 합계는 편집자에게만 채운다. 그 에이전트의 실행 전체에서 센 것이라 누가 불렀는지는 담지 않는다.
      * 호출이 없는 스킬은 0 이다.
@@ -72,10 +73,11 @@ public class SkillService {
         boolean editable = agents.isEditableBy(user, agent);
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> uploaded = store.readCurrent(profile);
+        Set<String> uploadedNames = uploadedNames(uploaded, store.readPending(profile));
         Map<String, SkillUsageSummary> usages = editable ? usage.byAgent(agent.id()) : Map.of();
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
-            SkillSource source = uploaded.containsKey(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
+            SkillSource source = uploadedNames.contains(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
             items.put(skill.name(), new SkillListItem(
                     skill.name(), skill.description(), source, skill.enabled(),
                     usageOf(editable, usages, skill.name())));
@@ -96,10 +98,15 @@ public class SkillService {
         return usages.getOrDefault(name, new SkillUsageSummary(0, null));
     }
 
-    /** 올린 스킬 하나의 원문이다. 편집자만 본다. 없으면 {@link ErrorCode#SKILL_NOT_FOUND} 다. */
+    /**
+     * 올린 스킬 하나의 원문이다. 편집자만 본다. 없으면 {@link ErrorCode#SKILL_NOT_FOUND} 다.
+     *
+     * <p>지금 버전에 없으면 표식 없이 남은 더 새 버전의 것을 준다. timeout 뒤 Hermes 목록에만 뜬 스킬을
+     * 편집 화면에서 열어 다시 저장할 수 있어야 하기 때문이다.
+     */
     public SkillDetail read(CurrentUser user, String code, String name) {
         Agent agent = requireEditable(user, code);
-        SkillBundle bundle = store.readCurrent(agent.hermesProfile()).get(name);
+        SkillBundle bundle = uploadedBundle(agent.hermesProfile(), store.readCurrent(agent.hermesProfile()), name);
         if (bundle == null) {
             throw notFound();
         }
@@ -111,7 +118,8 @@ public class SkillService {
      *
      * <p>게시가 4xx 로 거절되면 새 디렉터리를 지우고 원래 오류를 올린다. timeout 과 5xx 는 Hermes 가 이미
      * 반영했을 수 있어 디렉터리를 표식 없이 두고 원래 오류를 올린다. 어느 쪽이든 지금 버전은 그대로라
-     * 이 저장의 변경은 반영되지 않는다.
+     * 이 저장의 변경은 반영되지 않는다. 그 뒤 같은 이름으로 다시 저장하면 표식 없는 버전의 이름을 올린
+     * 스킬로 보고 받는다. Hermes 목록에 그 이름이 먼저 떠 있어도 {@link ErrorCode#SKILL_NAME_TAKEN} 이 아니다.
      *
      * @param files 참고 파일. {@code content} 가 {@code null} 인 파일은 지금 버전의 같은 경로 내용을 쓴다
      */
@@ -124,10 +132,11 @@ public class SkillService {
         requireSkillMd(name, skillMd);
         List<SkillFileInput> inputs = requireFiles(files);
         Map<String, SkillBundle> current = store.readCurrent(profile);
-        if (!current.containsKey(name) && publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
+        SkillBundle uploaded = uploadedBundle(profile, current, name);
+        if (uploaded == null && publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
             throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
         }
-        SkillBundle bundle = bundleOf(name, skillMd, inputs, current.get(name));
+        SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
         Map<String, SkillBundle> next = new LinkedHashMap<>(current);
         next.put(name, bundle);
         publishVersion(user, agent, next);
@@ -139,13 +148,16 @@ public class SkillService {
      *
      * <p>남는 스킬이 없으면 새 버전을 쓰지 않고 빈 {@code external_dirs} 를 게시한 뒤 그 profile 의 버전
      * 디렉터리를 모두 지운다. 게시가 성공한 뒤라 Hermes 가 가리키는 디렉터리가 없다.
+     *
+     * <p>표식 없는 더 새 버전에만 있는 스킬도 지운다. 지금 버전을 다시 게시하면 Hermes 가 그 버전에서
+     * 벗어난다.
      */
     @Transactional
     public void delete(CurrentUser user, String code, String name) {
         Agent agent = requireEditableLocked(user, code);
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> current = store.readCurrent(profile);
-        if (!current.containsKey(name)) {
+        if (uploadedBundle(profile, current, name) == null) {
             throw notFound();
         }
         Map<String, SkillBundle> remaining = new LinkedHashMap<>(current);
@@ -165,6 +177,18 @@ public class SkillService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name is required");
         }
         publisher.toggle(agent.hermesProfile(), name, enabled);
+    }
+
+    /** 지금 버전의 그 스킬, 없으면 표식 없이 남은 더 새 버전의 그 스킬이다. 둘 다 없으면 {@code null} 이다. */
+    private SkillBundle uploadedBundle(String profile, Map<String, SkillBundle> current, String name) {
+        SkillBundle bundle = current.get(name);
+        return bundle != null ? bundle : store.readPending(profile).get(name);
+    }
+
+    private static Set<String> uploadedNames(Map<String, SkillBundle> current, Map<String, SkillBundle> pending) {
+        Set<String> names = new HashSet<>(current.keySet());
+        names.addAll(pending.keySet());
+        return names;
     }
 
     /** 새 버전을 쓰고 게시하고 표식을 쓰고 옛 버전을 정리한다. 저장과 지우기가 같은 순서를 쓴다. */

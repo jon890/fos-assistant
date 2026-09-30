@@ -75,6 +75,39 @@ class SkillStoreTest {
     }
 
     @Test
+    void 표식_없는_버전은_지금_버전보다_새_것만_올린_스킬로_읽고_같은_이름이면_더_새_것을_쓴다(@TempDir Path root) {
+        SkillStore store = storeAt(root);
+        String older = store.writeVersion(PROFILE, skills("stale"));
+        String current = store.writeVersion(PROFILE, skills("weekly-plan"));
+        store.markPublished(PROFILE, current);
+        assertThat(store.readPending(PROFILE)).as("표식 없는 새 버전이 없으면 비어 있다").isEmpty();
+
+        store.writeVersion(PROFILE, skills("weekly-plan", "shopping"));
+        Map<String, SkillBundle> newer = new java.util.LinkedHashMap<>(skills("shopping"));
+        newer.put("shopping", new SkillBundle("shopping", WEEKLY_MD.replace("weekly-plan", "shopping") + "고침",
+                List.of()));
+        store.writeVersion(PROFILE, newer);
+
+        Map<String, SkillBundle> pending = store.readPending(PROFILE);
+        assertThat(pending).as("지금 버전보다 오래된 %s 의 stale 은 보지 않는다", older)
+                .containsOnlyKeys("shopping", "weekly-plan");
+        assertThat(pending.get("shopping").skillMd()).as("같은 이름이면 더 새 버전의 것").endsWith("고침");
+        assertThat(store.readCurrent(PROFILE)).containsOnlyKeys("weekly-plan");
+    }
+
+    @Test
+    void 지금_버전이_없어도_표식_없는_버전에_스킬이_있으면_올린_스킬이_있다고_본다(@TempDir Path root) {
+        SkillStore store = storeAt(root);
+        assertThat(store.hasUploadedSkills(PROFILE)).isFalse();
+
+        store.writeVersion(PROFILE, skills("shopping"));
+
+        assertThat(store.currentVersion(PROFILE)).isEmpty();
+        assertThat(store.readPending(PROFILE)).containsOnlyKeys("shopping");
+        assertThat(store.hasUploadedSkills(PROFILE)).isTrue();
+    }
+
+    @Test
     void prune_은_표식_있는_최근_3개만_남기고_게시한_버전보다_오래된_표식_없는_것을_지운다(@TempDir Path root) {
         SkillStore store = storeAt(root);
         String v1 = published(store);
