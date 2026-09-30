@@ -269,6 +269,21 @@ class AccountbookConnectionServiceTest {
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
     }
 
+    @Test
+    void 관리자_확인도_설치가_configured가_아니면_목록을_쓰지_않고_PENDING으로_둔다() {
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        String profile = profileOf(service.register(member, TOKEN, null));
+        when(connector.readConnector(anyString())).thenReturn(new HermesConnectorClient.ConnectorState("p", true, false, false));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"));
+
+        assertThatThrownBy(() -> service.confirmApplied(admin, member.id()))
+                .isInstanceOf(ConnectorOperationFailure.class);
+
+        verify(toolsets, never()).writeApiServer(profile, List.of("fos-assistant", "accountbook"));
+        assertThat(connections.findById(member.id()).orElseThrow().getStatus()).isEqualTo(ConnectionStatus.PENDING);
+    }
+
     private String profileOf(ConnectionSnapshot snapshot) {
         return agents.findByCode(snapshot.agentCode()).orElseThrow().hermesProfile();
     }
