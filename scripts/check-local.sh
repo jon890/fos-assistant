@@ -25,6 +25,8 @@ step() {
   printf '%-16s' "${name}"
   if "$@" >"${log}" 2>&1; then
     echo "통과 ($((SECONDS - started))초)"
+    # 통과해도 검사 범위가 줄었다는 알림은 보인다. check-public-safe.sh 는 값 목록이 없으면 형태만 검사하고 통과한다.
+    grep -A3 '^알림:' "${log}" || true
   else
     echo "실패 ($((SECONDS - started))초)"
     echo "--- ${log} 의 끝 ---" >&2
