@@ -21,6 +21,7 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 ## backend 패키지
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application`, `domain`, `infra` 로만 흐른다.
+검사: `ArchitectureRules.LAYER_DIRECTION`
 
 | 패키지 | 책임 |
 | --- | --- |
@@ -38,9 +39,12 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 | `orchestration` | 흐름과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 
+검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
+
 **`mcp` 는 `orchestration` 을 부르고, `orchestration` 은 `mcp` 를 import 하지 않는다.**
 위임 서비스는 `McpCaller` 를 받지 않고 요청자와 origin 실행을 따로 받는다.
 두 패키지가 서로를 import 하면 한쪽을 바꿀 때 다른 쪽의 타입을 함께 바꿔야 하기 때문이다.
+검사: `ArchitectureRules.ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP`, `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
 `shared/error` 의 `GlobalExceptionHandler` 가 `MethodArgumentTypeMismatchException` 을 받는다.
@@ -641,6 +645,7 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |
 
 **MCP 쪽은 Hermes 를 부르지 않는다.** 실행을 시작하고 멈추는 것은 `orchestration` 이 기존 `AgentRunner` 와 `HermesRunsClient` 로 한다.
+검사: `ArchitectureRules.MCP_DOES_NOT_CALL_HERMES`
 
 ### 기다리지 않는 위임
 
@@ -813,6 +818,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.
 
 `ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다.
+검사: `ArchitectureRules.ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE`
 
 | 규칙 | 까닭 |
 | --- | --- |
@@ -1125,6 +1131,7 @@ Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
 **`people` 이 순서를 안다.** 허용 목록에 넣고 profile 을 만들고 key 를 넣는 차례와,
 중간에 실패했을 때 되돌리는 역순이 그 패키지 하나에 있다.
 `hermes` 는 부르는 방법만 알고 순서를 모른다.
+검사: `ArchitectureRules.HERMES_DOES_NOT_DEPEND_ON_PEOPLE`
 
 ### 첫 에이전트의 과금 설정은 `people` 이 갖는다
 

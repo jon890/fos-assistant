@@ -6,6 +6,7 @@ h2 = "2.4.240"
 jjwt = "0.13.0"
 springdoc-openapi = "3.0.3"
 lombok = "1.18.46"
+archunit = "1.5.1"
 
 [libraries]
 spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
@@ -30,6 +31,7 @@ lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 
 spring-security-test = { module = "org.springframework.security:spring-security-test" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
 
 
 [bundles]
