@@ -300,10 +300,13 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 
 입력창 맨 앞의 `/<이름>` 을 Control Plane 이 해석한다. 근거는 [ADR-035](adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 에 있다.
 
-- 메시지 내용이 `^/[a-z0-9][a-z0-9-]*` 다음에 공백이나 끝이 오는 모양일 때만 커맨드다. 새 요청 칸은 없다
+- 메시지 내용이 `^/[a-z0-9][a-z0-9-]{0,63}` 다음에 공백이나 끝이 오는 모양일 때만 커맨드다. 새 요청 칸은 없다
+- 이름에 `.` 이나 `_` 가 든 Hermes 기본 스킬은 커맨드로 부르지 못한다. 입력창의 `/` 목록에도 뜨지 않는다. 호출 이력은 Hermes 이름 규칙을 따르므로 모델이 스스로 읽으면 `MODEL` 로 남는다
 - 이름이 그 에이전트의 켜진 스킬 목록에 있으면 Hermes 에 보낼 입력만 「사용자가 이 스킬을 호출했다. `skill_view` 로 읽고 그 절차대로 다음을 하라」로 바꾼다. 저장하는 메시지는 사용자가 친 글 그대로다
 - 없으면 Hermes 에 보내지 않고 400 `SKILL_COMMAND_UNKNOWN` 다
-- 목록은 에이전트마다 짧게 캐시한다
+- 켜진 스킬 목록은 에이전트마다 30초 캐시한다. 스킬 저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 `SkillsChanged` 로 그 에이전트의 캐시를 비운다. `skills` toolset 변경은 캐시를 비우지 않아 30초 뒤에 반영된다
+- `skills` toolset 이 꺼진 에이전트는 켜진 스킬이 없는 것으로 보고 커맨드를 `SKILL_COMMAND_UNKNOWN` 으로 거절한다([ADR-035](adr/ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) 의 「감당할 것」)
+- 이름은 대화를 만들기 전에 확인한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다. 목록을 읽다 Hermes 가 실패하면 그 오류로 거절하고 캐시에 두지 않는다
 - 흐름이 붙은 에이전트에서는 커맨드를 해석하지 않고 글 그대로 보낸다. 입력창도 `/` 목록을 띄우지 않는다
 
 ### 호출 이력
@@ -328,6 +331,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 버전 디렉터리 쓰기와 지우기 | `skill/infra/SkillStore` |
 | `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
 | 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |
+| 커맨드로 부를 수 있는 이름과 그 캐시 | `skill/application/SkillCommandCatalog`, 비우기는 `SkillsChanged` |
 
 ## 사진 첨부
 
@@ -1154,9 +1158,6 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - MCP `agent_*` 도구(`agent_list`, `agent_delegate`, `agent_status`, `agent_stop`)와 그것을 처리하는 `AgentDelegationService`, `DelegationProperties`.
   지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)만 있다
 - `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸을 지우는 것. 운영의 모든 토큰이 profile 에 묶인 뒤 지운다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」)
-
-- 스킬 커맨드([「스킬 커맨드」](#스킬-커맨드)): `chat/application/SkillCommand`, `SKILL_COMMAND_UNKNOWN`, `COMMAND` 이력 적기, 입력창의 `/` 목록.
-  지금은 `SkillUseRecorder.recordCommand` 와 `SkillUseSource.COMMAND` 만 있다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

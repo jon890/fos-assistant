@@ -27,6 +27,7 @@ const MESSAGES: Record<string, string> = {
   AGENT_BUSY: "다른 설정 변경이 끝날 때까지 기다린 뒤 다시 시도해 주세요.",
   SKILL_NAME_TAKEN: "같은 이름의 기본 스킬이 있어요.",
   SKILL_NOT_FOUND: "스킬을 찾지 못했어요. 이미 지워졌는지 목록에서 확인해 주세요.",
+  SKILL_COMMAND_UNKNOWN: "이 스킬을 이 에이전트에서 쓸 수 없어요. 스킬이 꺼졌거나 지워졌는지 확인해 주세요.",
   ATTACHMENT_GONE: "보관 기간이 지나 볼 수 없어요.",
 };
 

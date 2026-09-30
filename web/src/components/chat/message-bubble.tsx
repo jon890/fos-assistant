@@ -12,6 +12,7 @@ import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
 import type { VersionSlot } from "@/lib/message-versions";
 import { VersionSwitcher } from "./version-switcher";
+import { parseSkillCommand } from "./skill-command";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -147,6 +148,7 @@ export function MessageBubble({
   onAnswer,
   nextUserMessage,
   onOpenArtifact,
+  skillCommandChip = false,
 }: {
   turn: Turn;
   conversationId: string | null;
@@ -162,12 +164,15 @@ export function MessageBubble({
   nextUserMessage?: string;
   /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
   onOpenArtifact?(messageId: Turn["id"], path: string, name: string): void;
+  /** 사용자 메시지가 스킬 커맨드로 시작하면 그 이름을 칩으로 앞에 그린다 */
+  skillCommandChip?: boolean;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
   const attachments = turn.attachments ?? [];
 
   if (user) {
+    const command = skillCommandChip ? parseSkillCommand(turn.content) : null;
     return (
       <li
         className="group flex min-w-0 justify-end focus-visible:outline-none"
@@ -178,7 +183,17 @@ export function MessageBubble({
           className={cn("relative max-w-[70%] rounded-3xl bg-primary-soft px-4 py-2.5",
             "group-focus-visible:outline-2 group-focus-visible:outline-primary")}
         >
-          <p className="whitespace-pre-wrap break-words text-sm leading-6">{turn.content}</p>
+          <p className="whitespace-pre-wrap break-words text-sm leading-6">
+            {command ? (
+              <>
+                <span data-testid="skill-chip"
+                  className="mr-1.5 inline-block rounded-full border border-border bg-background px-2 text-xs font-medium leading-5">
+                  /{command.name}
+                </span>
+                {command.rest}
+              </>
+            ) : turn.content}
+          </p>
           {userVersion && onVersionChange ? (
             <div className="mt-2 flex gap-2">
               <VersionSwitcher slot={userVersion} onChange={(index) => onVersionChange(userVersion.slotId, index)} />

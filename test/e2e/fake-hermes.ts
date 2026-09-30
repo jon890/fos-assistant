@@ -38,6 +38,8 @@ const CONFIG_PATH = "/api/config";
 /** 대시보드의 스킬 목록과 전역 켜고 끄기 경로다. */
 const SKILLS_PATH = "/api/skills";
 const SKILL_TOGGLE_PATH = "/api/skills/toggle";
+/** Control Plane 이 스킬 커맨드를 바꿔 보낸 입력에 든 `skill_view` 호출이다. 이름 규칙은 올린 스킬과 같다. */
+const SKILL_VIEW_CALL = /skill_view\(name="([a-z0-9][a-z0-9-]{0,63})"\)/;
 /**
  * `skills.external_dirs` 에 올 수 있는 경로의 꼬리다. `<스킬 루트>/<profile>/<버전>` 이고 버전은 plugin 이
  * 받는 형식이다. 둘째 묶음의 profile 이 본문의 profile 과 같아야 한다.
@@ -1131,6 +1133,12 @@ export function startFakeHermes(
           // 모델이 스킬을 읽은 사건이다. 실제 Hermes 는 `skill_view` 의 `preview` 에 스킬 이름을 싣는다.
           if (run.input === "스킬 읽기 검사") {
             event(response, { event: "tool.started", tool: "skill_view", preview: "shopping" });
+            event(response, { event: "tool.completed", tool: "skill_view", duration: 0.05, error: false });
+          }
+          // 스킬 커맨드로 바꾼 입력이다. 실제 Hermes 의 모델도 이 입력을 받으면 그 이름으로 `skill_view` 를 부른다.
+          const commandedSkill = SKILL_VIEW_CALL.exec(run.input)?.[1];
+          if (commandedSkill !== undefined) {
+            event(response, { event: "tool.started", tool: "skill_view", preview: commandedSkill });
             event(response, { event: "tool.completed", tool: "skill_view", duration: 0.05, error: false });
           }
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.

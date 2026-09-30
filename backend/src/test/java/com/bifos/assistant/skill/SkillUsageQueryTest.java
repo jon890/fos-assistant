@@ -208,4 +208,29 @@ class SkillUsageQueryTest {
         assertThat(page).filteredOn(view -> view.id().equals(none.id())).singleElement()
                 .extracting(UsageDtos.ExecutionView::skillNames).isEqualTo(List.of());
     }
+
+    @Test
+    void 한_실행에_같은_이름의_COMMAND_와_MODEL_이_함께_있으면_1회이고_다른_실행이_더해지면_2회다() {
+        AgentExecution commanded = execution(dad, dadFirst);
+        use(commanded, "weekly-plan", SkillUseSource.COMMAND, T1);
+        use(commanded, "weekly-plan", SkillUseSource.MODEL, T1);
+
+        assertThat(query.byAgent(agent.id()).get("weekly-plan")).as("에이전트 합계")
+                .isEqualTo(new SkillUsageSummary(1, T1));
+        assertThat(query.byUser(dad.id())).filteredOn(usage -> usage.skillName().equals("weekly-plan"))
+                .singleElement()
+                .satisfies(usage -> assertThat(usage.count()).as("사용자 합계").isEqualTo(1));
+
+        AgentExecution again = execution(dad, dadSecond);
+        use(again, "weekly-plan", SkillUseSource.MODEL, T2);
+
+        assertThat(query.byAgent(agent.id()).get("weekly-plan")).as("다른 실행을 더한 에이전트 합계")
+                .isEqualTo(new SkillUsageSummary(2, T2));
+        assertThat(query.byUser(dad.id())).filteredOn(usage -> usage.skillName().equals("weekly-plan"))
+                .singleElement()
+                .satisfies(usage -> {
+                    assertThat(usage.count()).as("다른 실행을 더한 사용자 합계").isEqualTo(2);
+                    assertThat(usage.lastConversationId()).isEqualTo(dadSecond.publicId());
+                });
+    }
 }

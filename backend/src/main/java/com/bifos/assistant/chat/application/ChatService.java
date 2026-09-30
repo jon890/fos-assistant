@@ -26,6 +26,8 @@ import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.application.SkillCommandCatalog;
+import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -90,6 +92,8 @@ public class ChatService {
     private final ArtifactService artifacts;
     private final TurnCancellation turns;
     private final TransactionTemplate transactions;
+    private final SkillCommandCatalog skillCommands;
+    private final SkillUseRecorder skillUses;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
@@ -150,6 +154,9 @@ public class ChatService {
      * 먼저 묶으면 메시지 저장도 되돌린다. 빈 제목을 채우는 것도 같은 트랜잭션이라 함께 되돌린다.
      * Hermes 호출은 그 트랜잭션 밖이다. 저장하는 본문은 사용자가 쓴
      * 그대로이고, 사진 자리는 Hermes 입력에만 붙인다.
+     *
+     * <p>스킬 커맨드이면 Hermes 입력의 글 자리만 {@link SkillCommand#hermesInput()} 으로 바꾸고, 실행 줄을
+     * 만든 뒤 그 실행에 {@code COMMAND} 이력을 남긴다. 저장하는 메시지는 그대로 사용자가 친 글이다.
      */
     private ChatTurn runTurn(
             CurrentUser user,
@@ -170,14 +177,19 @@ public class ChatService {
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = Instant.now();
             artifactStore.ensureFolder(conversation.id());
+            SkillCommand command = routed.command();
+            String asked = command == null ? text : command.hermesInput();
             String input = artifacts.agentPreamble(conversation)
-                    + attachments.agentInput(conversation.id(), routed.attached(), text);
+                    + attachments.agentInput(conversation.id(), routed.attached(), asked);
             AssembledContext context = contextAssembler.assemble(user);
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(), null, context.instructionsHash(), context.omittedItems());
 
             ModelChoice choice = conversation.modelChoice();
             PendingTurn pending = begin(user, routed, input, context, snapshot, choice, intent);
+            if (command != null) {
+                skillUses.recordCommand(pending.execution().id(), command.name());
+            }
             turns.rekey(handle, pending.execution().id());
             if (streaming) {
                 onEvent.accept(ChatEvent.started(conversation.publicId(), pending.execution().id()));
@@ -288,6 +300,10 @@ public class ChatService {
      *
      * <p>첨부 판정을 메시지를 저장하기 전에 모두 끝낸다. 첨부는 대화에 올리므로 첨부가 있으면 대화
      * 번호도 있어야 하고, 그것을 대화를 만들기 전에 본다. 거절은 모두 {@code VALIDATION_FAILED} 다.
+     *
+     * <p>에이전트를 새 대화를 저장하기 전에 정한다. 새 대화는 {@code agentCode} 의 에이전트, 이어 쓰는 대화는
+     * 그 대화의 에이전트다. 스킬 커맨드의 이름이 그 에이전트의 켜진 스킬이 아니면 대화를 만들기 전에
+     * {@code SKILL_COMMAND_UNKNOWN} 으로 거절한다. 거절한 커맨드는 대화도 메시지도 실행도 남기지 않는다.
      */
     private Routed route(
             CurrentUser user,
@@ -300,8 +316,10 @@ public class ChatService {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED, "attachments need an existing conversation");
         }
-        Conversation conversation = resolveConversation(user, conversationId, text, agentCode);
-        Agent agent = agents.requireById(conversation.agentId());
+        Conversation existing = conversationId == null ? null : access.requireOwn(user, conversationId);
+        Agent agent = existing == null
+                ? agents.requireStartable(user, agentCode)
+                : agents.requireById(existing.agentId());
         // 지운 에이전트의 대화는 읽기만 된다. 꺼진 것보다 먼저 봐야 없는 에이전트로 알린다.
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -314,8 +332,35 @@ public class ChatService {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
         }
+        Flow flow = flows.find(agent.flow());
+        SkillCommand command = commandOf(agent, flow, text);
+        Conversation conversation = existing != null
+                ? existing
+                : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
-        return new Routed(conversation, agent, flows.find(agent.flow()), attached);
+        return new Routed(conversation, agent, flow, attached, command);
+    }
+
+    /**
+     * 메시지가 스킬 커맨드이면 그 이름이 에이전트의 켜진 스킬인지 확인해 낸다. 근거는 ADR-035 에 있다.
+     *
+     * <p>커맨드 모양이 아니거나 흐름이 붙은 에이전트이면 {@code null} 이다. 흐름에는 글을 그대로 보낸다.
+     * 켜진 스킬 목록을 읽다 Hermes 가 실패하면 그 예외가 그대로 올라간다. 이름을 확인하지 못한 커맨드를
+     * 보내지 않는다. 그 에이전트를 쓸 수 있는지는 부르기 전에 이미 판정했으므로 목록을 읽을 때 다시 보지 않는다.
+     */
+    private SkillCommand commandOf(Agent agent, Flow flow, String text) {
+        if (flow != null) {
+            return null;
+        }
+        SkillCommand command = SkillCommand.parse(text).orElse(null);
+        if (command == null) {
+            return null;
+        }
+        if (!skillCommands.enabledNames(agent).contains(command.name())) {
+            throw new ApiException(
+                    ErrorCode.SKILL_COMMAND_UNKNOWN, "this agent has no enabled skill with that name");
+        }
+        return command;
     }
 
     /**
@@ -474,7 +519,7 @@ public class ChatService {
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
                     .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
                     .toList();
-            Routed routed = routeExisting(user, conversation, attached);
+            Routed routed = routeExisting(user, conversation, attached, question.content());
             TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
             if (routed.flow() != null) {
                 runFlow(user, routed, question.content(), intent, onEvent, true, handle);
@@ -509,7 +554,9 @@ public class ChatService {
         return null;
     }
 
-    private Routed routeExisting(CurrentUser user, Conversation conversation, List<ChatAttachment> attached) {
+    /** 다시 생성할 대화의 에이전트를 정한다. 저장된 질문이 스킬 커맨드이면 보낼 때와 같게 판별한다. */
+    private Routed routeExisting(
+            CurrentUser user, Conversation conversation, List<ChatAttachment> attached, String question) {
         Agent agent = agents.requireById(conversation.agentId());
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -517,7 +564,8 @@ public class ChatService {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        return new Routed(conversation, agent, flows.find(agent.flow()), attached);
+        Flow flow = flows.find(agent.flow());
+        return new Routed(conversation, agent, flow, attached, commandOf(agent, flow, question));
     }
 
     private void saveQuestion(
@@ -805,16 +853,6 @@ public class ChatService {
         return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
     }
 
-    private Conversation resolveConversation(
-            CurrentUser user, Long conversationId, String firstText, String agentCode) {
-        if (conversationId == null) {
-            Agent agent = agents.requireStartable(user, agentCode);
-            return conversations.save(
-                    Conversation.startedBy(user.id(), titleFrom(firstText), agent.id()));
-        }
-        return access.requireOwn(user, conversationId);
-    }
-
     private static String titleFrom(String text) {
         String single = text.strip().replaceAll("\\s+", " ");
         return single.length() <= TITLE_LIMIT ? single : single.substring(0, TITLE_LIMIT);
@@ -905,7 +943,9 @@ public class ChatService {
     /**
      * 이 turn 이 어느 대화와 에이전트의 것인지, 그리고 어느 흐름으로 갈지. 흐름이 없으면 null 이다.
      * {@code attached} 는 판정을 통과해 이 메시지에 묶을 첨부이고 없으면 빈 목록이다.
+     * {@code command} 는 이름을 확인한 스킬 커맨드이고 커맨드가 아니면 null 이다.
      */
-    private record Routed(Conversation conversation, Agent agent, Flow flow, List<ChatAttachment> attached) {
+    private record Routed(
+            Conversation conversation, Agent agent, Flow flow, List<ChatAttachment> attached, SkillCommand command) {
     }
 }

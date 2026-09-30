@@ -21,12 +21,15 @@ public interface ExecutionSkillUseRepository extends JpaRepository<ExecutionSkil
     /**
      * 그 에이전트의 실행 전체에서 스킬 이름별로 묶는다. 출처는 가리지 않는다.
      *
+     * <p>호출 횟수는 실행 수다. 커맨드로 부른 실행에서 모델도 그 스킬을 읽으면 {@code COMMAND} 와
+     * {@code MODEL} 두 줄이 생기지만 한 번으로 센다.
+     *
      * <p>줄을 다 읽어 와서 세지 않는다. 에이전트 하나의 사용은 그 에이전트를 쓴 모든 사람의 모든 turn 에
      * 걸쳐 쌓인다.
      */
     @Query("""
             select new com.bifos.assistant.skill.domain.SkillUseCount(
-                u.skillName, count(u), max(u.occurredAt))
+                u.skillName, count(distinct u.executionId), max(u.occurredAt))
             from ExecutionSkillUse u
                 join AgentExecution e on e.id = u.executionId
             where e.agentId = :agentId
@@ -34,10 +37,10 @@ public interface ExecutionSkillUseRepository extends JpaRepository<ExecutionSkil
             """)
     List<SkillUseCount> countByAgent(@Param("agentId") Long agentId);
 
-    /** 그 사용자의 실행에서 쓰인 것을 에이전트와 대화 번호를 붙여 읽는다. */
+    /** 그 사용자의 실행에서 쓰인 것을 실행과 에이전트와 대화 번호를 붙여 읽는다. */
     @Query("""
             select new com.bifos.assistant.skill.domain.SkillUseOccurrence(
-                e.agentId, e.conversationId, u.skillName, u.occurredAt)
+                u.executionId, e.agentId, e.conversationId, u.skillName, u.occurredAt)
             from ExecutionSkillUse u
                 join AgentExecution e on e.id = u.executionId
             where e.userId = :userId

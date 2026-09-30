@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,7 +40,7 @@ public class SkillUsageQuery {
     private final AgentRepository agents;
     private final ConversationRepository conversations;
 
-    /** 그 에이전트의 실행 전체에서 센 스킬 이름별 합계다. 누가 불렀는지는 담지 않는다. */
+    /** 그 에이전트의 실행 전체에서 센 스킬 이름별 합계다. 횟수는 실행 수다. 누가 불렀는지는 담지 않는다. */
     public Map<String, SkillUsageSummary> byAgent(Long agentId) {
         Map<String, SkillUsageSummary> summaries = new HashMap<>();
         for (SkillUseCount count : uses.countByAgent(agentId)) {
@@ -49,7 +50,8 @@ public class SkillUsageQuery {
     }
 
     /**
-     * 그 사용자의 실행에서 부른 것을 에이전트와 스킬 이름으로 묶는다. 마지막 호출이 최근인 것부터다.
+     * 그 사용자의 실행에서 부른 것을 에이전트와 스킬 이름으로 묶는다. 횟수는 실행 수다. 마지막 호출이 최근인
+     * 것부터다.
      *
      * <p>마지막 호출이 속한 대화의 공개 식별자를 함께 준다. 그 대화를 지웠으면 비운다. 지운 대화는 화면에서
      * 열 수 없어 가리켜도 갈 곳이 없다.
@@ -119,14 +121,21 @@ public class SkillUsageQuery {
     private record GroupKey(Long agentId, String skillName) {
     }
 
-    /** 에이전트와 스킬 이름이 같은 사용을 모은다. 마지막 호출의 대화만 기억한다. */
+    /**
+     * 에이전트와 스킬 이름이 같은 사용을 모은다. 마지막 호출의 대화만 기억한다.
+     *
+     * <p>호출 횟수는 실행 수다. 같은 실행의 {@code COMMAND} 와 {@code MODEL} 줄은 한 번만 센다.
+     */
     private static final class Group {
+        private final Set<Long> countedExecutions = new HashSet<>();
         private long count;
         private Instant lastInvokedAt;
         private Long lastConversationId;
 
         void add(SkillUseOccurrence occurrence) {
-            count++;
+            if (countedExecutions.add(occurrence.executionId())) {
+                count++;
+            }
             if (lastInvokedAt == null || occurrence.occurredAt().isAfter(lastInvokedAt)) {
                 lastInvokedAt = occurrence.occurredAt();
                 lastConversationId = occurrence.conversationId();

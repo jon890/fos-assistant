@@ -6,6 +6,7 @@ import Link from "next/link";
 import { cn } from "cn";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
+import { commandSkillNames, parseSkillCommand } from "./chat/skill-command";
 import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
 import { useStarterSuggestions } from "./chat/use-starter-suggestions";
 import { MessageList } from "./chat/message-list";
@@ -20,6 +21,7 @@ import { readEventStream } from "@/lib/stream";
 import type { ChatEvent } from "@/lib/chat-event";
 import { foldVersions } from "@/lib/message-versions";
 import type { AgentView } from "@/lib/agent";
+import type { SkillListView } from "@/lib/skill";
 import type { ExecutionTreeResponse } from "./execution/execution-tree";
 
 type ErrorPayload = { code: string; message: string };
@@ -138,6 +140,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
+  /** 보낸 스킬 커맨드의 이름이 이 에이전트에 없었다. 입력창 아래에 알리고 다음 보내기를 시작하면 지운다 */
+  const [unknownSkill, setUnknownSkill] = useState<string | null>(null);
+  /** `/` 목록에 띄울 스킬 이름과 그 목록을 읽은 에이전트다. 에이전트를 바꾸면 그 에이전트의 목록을 다시 읽는다 */
+  const [skillCommands, setSkillCommands] = useState<{ agentCode: string; names: string[] } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [agents, setAgents] = useState<AgentView[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
@@ -185,6 +191,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
+    setUnknownSkill(null);
     setTurns([]);
     setSending(false);
     setObserving(null);
@@ -448,6 +455,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setFlowIsSlow(false);
     setError(null);
     setTurnError(null);
+    setUnknownSkill(null);
     setNotFound(false);
     setDraft("");
     setSending(false);
@@ -659,6 +667,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setSending(true);
     setError(null);
     setTurnError(null);
+    setUnknownSkill(null);
     // 글을 인자로 받았으면 입력창의 글과 무관하게 보낸다. 추천 질문이 그렇다.
     if (replacementText === undefined) setDraft("");
     setActivity(emptyActivity(Date.now()));
@@ -728,6 +737,19 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       return kind === "observing" || kind === "answered" || stream.started || questionKept;
     };
 
+    /**
+     * `started` 전에 거절된 보내기를 알린다. 없는 스킬 커맨드는 입력창 위 오류 대신 입력창 아래에 이름으로 알린다.
+     * 스트림 사건, 스트림의 HTTP 오류, 스트림 없이 보낸 응답 셋이 모두 이 길로 온다.
+     */
+    const reportRejected = (code: string, message: string) => {
+      const command = code === "SKILL_COMMAND_UNKNOWN" ? parseSkillCommand(text) : null;
+      if (command === null) {
+        setError(describeError(code, message));
+      } else if (selectionVersion.current === version) {
+        setUnknownSkill(command.name);
+      }
+    };
+
     const requestBody = {
       conversationId,
       text,
@@ -746,7 +768,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       >(response);
       if (!response.ok) {
         restoreFailedMessage();
-        setError(describeError(payload.code, payload.message));
+        reportRejected(payload.code, payload.message);
         return false;
       }
       if (selectionVersion.current !== version) return true;
@@ -786,7 +808,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         }
         const payload = await readPayload<ErrorPayload>(response);
         restoreFailedMessage();
-        setError(describeError(payload.code, payload.message));
+        reportRejected(payload.code, payload.message);
         return false;
       }
 
@@ -822,13 +844,14 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             ]);
           },
           onError: async (event) => {
-            const message = describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했어요.");
+            const code = event.code ?? "INTERNAL_ERROR";
+            const fallback = event.message ?? "요청을 처리하지 못했어요.";
             if (stream.started && conversationIdRef.current !== null) {
               const refreshed = await refreshAfterStartedFailure();
-              setTurnError(startedFailureMessage(message, refreshed));
+              setTurnError(startedFailureMessage(describeError(code, fallback), refreshed));
             } else {
               restoreFailedMessage();
-              setError(message);
+              reportRejected(code, fallback);
             }
           },
         });
@@ -862,6 +885,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setSending(true);
     setError(null);
     setTurnError(null);
+    setUnknownSkill(null);
     setActivity(emptyActivity(Date.now()));
     setLiveExpanded(false);
     liveExpandedRef.current = false;
@@ -955,6 +979,26 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   const startScreen = freshStart && turns.length === 0 && !sending;
   const currentAgent = agents.find((agent) => agent.code === agentCode);
   const starters = useStarterSuggestions(startScreen && currentAgent ? currentAgent.code : null);
+  // 흐름이 붙은 에이전트는 사진을 받지 않고 커맨드도 해석하지 않는다. 사진 단추를 숨기는 기준과 같게 이 값으로 가린다.
+  const commandAgentCode = currentAgent?.acceptsAttachments ? currentAgent.code : null;
+  const skillNames = commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode
+    ? skillCommands.names : undefined;
+
+  useEffect(() => {
+    if (commandAgentCode === null) return;
+    let active = true;
+    fetch(`/api/agents/${commandAgentCode}/skills`)
+      .then((response) => (response.ok ? (response.json() as Promise<SkillListView>) : null))
+      .then((list) => {
+        if (active && list) setSkillCommands({ agentCode: commandAgentCode, names: commandSkillNames(list) });
+      })
+      .catch(() => {
+        // 읽지 못하면 `/` 목록을 띄우지 않는다. 보내면 Control Plane 이 이름을 판별한다.
+      });
+    return () => {
+      active = false;
+    };
+  }, [commandAgentCode]);
 
   if (notFound) {
     return (
@@ -1003,6 +1047,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             if (activity) setPanelTarget({ kind: "activity", target: { mode: "live", state: activity } });
           }}
           onOpenArtifact={(messageId, path, name) => setPanelTarget({ kind: "artifact", messageId, path, name })}
+          // 에이전트 목록을 읽기 전이거나 목록에 없는 에이전트의 대화는 흐름인지 모르므로 칩을 붙이지 않는다.
+          skillCommandChips={currentAgent?.acceptsAttachments === true}
           selectedVersions={selectedVersions}
           onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
           onRegenerate={() => { void regenerate(); }}
@@ -1051,6 +1097,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             onStop={() => { void stop(); }}
             mention={startScreen && !agentLocked && agents.length > 0
               ? { agents, onPick: setAgentCode } : undefined}
+            skillNames={skillNames}
             onBlockingChange={setComposerBlocking}
             modelChoice={currentConversation ? {
               provider: currentConversation.provider,
@@ -1061,6 +1108,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             // 저장 응답으로 그 줄만 바꾼다. 목록을 다시 읽으면 먼저 나간 읽기가 늦게 와 저장한 줄을 저장 전의 줄로 되돌릴 수 있다.
             onModelChoiceSaved={replace}
           />
+          {unknownSkill ? (
+            <p data-testid="skill-command-notice" role="alert"
+              className="mx-auto mt-2 w-full max-w-3xl rounded-md bg-muted px-3 py-2 text-sm">
+              /{unknownSkill} 스킬이 이 에이전트에 없어요
+            </p>
+          ) : null}
           {startScreen ? (
             <StarterPrompts
               prompts={starters.prompts}

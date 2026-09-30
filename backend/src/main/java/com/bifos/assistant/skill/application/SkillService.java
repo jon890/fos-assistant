@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>같은 에이전트의 저장은 기다리는 행 잠금으로 한 번에 하나씩 돈다. 잠금은 트랜잭션이 끝날 때 풀리므로
  * {@link #save} 와 {@link #delete} 는 잠금부터 표식 쓰기와 옛 버전 정리까지 한 트랜잭션이다. 그동안
  * 같은 에이전트의 도구와 공개 범위 변경은 {@code AGENT_BUSY} 로 거절된다.
+ *
+ * <p>저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 {@link SkillsChanged} 를 낸다. 커맨드가 부를 수 있는 이름의
+ * 캐시({@link SkillCommandCatalog})가 그것을 받아 비운다. catalog 를 직접 받지 않는 것은 catalog 가 이
+ * 서비스를 받기 때문이다.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,16 +59,17 @@ public class SkillService {
     public static final long MAX_TOTAL_BYTES = 1_048_576L;
 
     /**
-     * Hermes 가 가진 스킬까지 포함한 이름 형식이다. 켜고 끄기가 쓴다. Hermes 는 소문자, 숫자, 점, 밑줄,
+     * Hermes 가 가진 스킬까지 포함한 이름 형식이다. 켜고 끄기와 호출 이력({@link SkillUseRecorder})이 쓴다. Hermes 는 소문자, 숫자, 점, 밑줄,
      * 붙임표로 64자까지 받는다. 첫 글자를 영문 소문자나 숫자로 묶어 {@code .} 과 {@code ..} 같은 이름을
      * 막는다. 화면(web/src/lib/skill.ts)의 같은 규칙과 함께 고친다.
      */
-    private static final Pattern HERMES_SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
+    static final Pattern HERMES_SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
 
     private final AgentService agents;
     private final SkillStore store;
     private final SkillPublisher publisher;
     private final SkillUsageQuery usage;
+    private final ApplicationEventPublisher events;
 
     /**
      * 그 에이전트의 스킬 목록이다. 읽을 수 있는 사람이면 누구나 본다.
@@ -79,10 +85,27 @@ public class SkillService {
     public SkillList list(CurrentUser user, String code) {
         Agent agent = agents.requireReadable(user, code);
         boolean editable = agents.isEditableBy(user, agent);
+        Map<String, SkillUsageSummary> usages = editable ? usage.byAgent(agent.id()) : Map.of();
+        return assemble(agent, editable, usages);
+    }
+
+    /**
+     * 스킬 커맨드가 이름을 확인할 목록이다. {@link #list} 와 같은 규칙으로 조립하되 권한을 보지 않고 호출 합계를
+     * 읽지 않는다.
+     *
+     * <p>누가 그 에이전트를 쓸 수 있는지는 부르는 쪽이 이미 판정했다. 대화 turn 은 새 대화면 시작할 수 있는
+     * 에이전트인지, 이어 쓰는 대화면 그 대화의 주인인지를 본 뒤에 부른다. 물어본 사람이 없으므로 {@code editable}
+     * 은 {@code false} 이고 항목의 {@code usage} 는 {@code null} 이다.
+     */
+    public SkillList commandList(Agent agent) {
+        return assemble(agent, false, Map.of());
+    }
+
+    /** Hermes 목록과 올린 스킬 이름을 합친다. {@link #list} 와 {@link #commandList} 가 같은 조립을 쓴다. */
+    private SkillList assemble(Agent agent, boolean editable, Map<String, SkillUsageSummary> usages) {
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> uploaded = store.readCurrent(profile);
         Set<String> uploadedNames = uploadedNames(uploaded, store.readPending(profile));
-        Map<String, SkillUsageSummary> usages = editable ? usage.byAgent(agent.id()) : Map.of();
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
             SkillSource source = uploadedNames.contains(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
@@ -148,6 +171,7 @@ public class SkillService {
         Map<String, SkillBundle> next = new LinkedHashMap<>(current);
         next.put(name, bundle);
         publishVersion(user, agent, next);
+        events.publishEvent(new SkillsChanged(agent.id()));
         return detailOf(bundle);
     }
 
@@ -173,9 +197,10 @@ public class SkillService {
         if (remaining.isEmpty()) {
             publisher.publish(user, agent, List.of());
             store.deleteAll(profile);
-            return;
+        } else {
+            publishVersion(user, agent, remaining);
         }
-        publishVersion(user, agent, remaining);
+        events.publishEvent(new SkillsChanged(agent.id()));
     }
 
     /**
@@ -188,6 +213,7 @@ public class SkillService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name must follow the Hermes skill name rule");
         }
         publisher.toggle(agent.hermesProfile(), name, enabled);
+        events.publishEvent(new SkillsChanged(agent.id()));
     }
 
     /** 지금 버전의 그 스킬, 없으면 표식 없이 남은 더 새 버전의 그 스킬이다. 둘 다 없으면 {@code null} 이다. */

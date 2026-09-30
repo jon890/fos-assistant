@@ -8,6 +8,8 @@ import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
 import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
+import { SkillCommandMenu } from "./skill-command-menu";
+import { filterSkillNames, findSkillQuery, skillOptionId, withSkillCommand } from "./skill-command";
 import { ModelPicker, type ModelChoice, type ModelChoiceSaveResult } from "./model-picker";
 import type { Conversation } from "../shell/conversations-provider";
 
@@ -33,6 +35,11 @@ type Props = {
    * 대화의 에이전트는 첫 메시지가 정하고 그 뒤로 바뀌지 않는다.
    */
   mention?: { agents: AgentView[]; onPick(code: string): void };
+  /**
+   * 입력칸 맨 앞에 `/` 를 치면 이 스킬 이름 목록을 띄운다. 비었으면 스킬이 없다고 알린다.
+   * 흐름이 붙은 에이전트이거나 목록을 아직 읽지 못했으면 주지 않고, 그때는 목록을 띄우지 않는다.
+   */
+  skillNames?: string[];
   /**
    * 보내기를 막는 일이 도는지 알린다. 빈 대화를 만드는 요청이나 끝나지 않은 첨부가 그렇다.
    * 입력창을 거치지 않고 보내는 추천 질문도 이 동안은 막아야 대화가 둘 생기지 않는다.
@@ -105,6 +112,7 @@ export function Composer({
   canStop,
   onStop,
   mention,
+  skillNames,
   onBlockingChange,
   modelChoice,
   modelChoiceUnknown,
@@ -138,6 +146,10 @@ export function Composer({
   /** `Esc` 로 닫은 `@` 의 자리다. 같은 `@` 뒤에 글을 더 쳐도 다시 띄우지 않는다 */
   const [dismissedMentionStart, setDismissedMentionStart] = useState<number | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const skillListId = useId();
+  /** `Esc` 로 `/` 목록을 닫았다. 첫 낱말을 다 치거나 `/` 를 지울 때까지 다시 띄우지 않는다 */
+  const [skillDismissed, setSkillDismissed] = useState(false);
+  const [skillIndex, setSkillIndex] = useState(0);
   /** 고른 뒤 `@` 부터 커서까지를 뺀 글이 그려지면 커서를 이 자리에 둔다 */
   const pendingCaretRef = useRef<number | null>(null);
 
@@ -184,13 +196,28 @@ export function Composer({
   const openMention = found !== null && found.start !== dismissedMentionStart ? found : null;
   const mentionMatches = mention && openMention ? filterAgents(mention.agents, openMention.query) : [];
   const activeMentionIndex = Math.min(mentionIndex, Math.max(0, mentionMatches.length - 1));
+  const skillQuery = skillNames && !skillDismissed ? findSkillQuery(value, caret) : null;
+  const skillMatches = skillNames && skillQuery !== null ? filterSkillNames(skillNames, skillQuery) : [];
+  // 맞는 이름이 없으면 띄우지 않는다. `/usr/bin` 처럼 커맨드가 아닌 글을 칠 때 목록이 가리지 않게 한다.
+  // 스킬이 없는 에이전트는 `/` 만 친 동안에만 스킬이 없다고 알린다.
+  const skillMenuOpen = skillNames !== undefined && skillQuery !== null
+    && (skillNames.length === 0 ? skillQuery === "" : skillMatches.length > 0);
+  const activeSkillIndex = Math.min(skillIndex, Math.max(0, skillMatches.length - 1));
 
   function changeValue(nextValue: string, nextCaret: number) {
     const next = mention ? findMention(nextValue, nextCaret) : null;
     if (next === null || next.start !== dismissedMentionStart) setDismissedMentionStart(null);
+    if (findSkillQuery(nextValue, nextCaret) === null) setSkillDismissed(false);
     setCaret(nextCaret);
     setMentionIndex(0);
+    setSkillIndex(0);
     onChange(nextValue);
+  }
+
+  function pickSkill(name: string) {
+    const next = withSkillCommand(value, name);
+    pendingCaretRef.current = next.caret;
+    changeValue(next.value, next.caret);
   }
 
   function pickMention(code: string) {
@@ -490,14 +517,24 @@ export function Composer({
             onPick={pickMention}
           />
         ) : null}
+        {skillNames && skillMenuOpen && skillQuery !== null ? (
+          <SkillCommandMenu
+            id={skillListId}
+            names={skillNames}
+            query={skillQuery}
+            activeIndex={activeSkillIndex}
+            onPick={pickSkill}
+          />
+        ) : null}
         <textarea
           ref={textareaRef}
           rows={1}
           value={value}
           aria-label="메시지"
-          aria-controls={openMention ? mentionListId : undefined}
+          aria-controls={openMention ? mentionListId : skillMenuOpen ? skillListId : undefined}
           aria-activedescendant={openMention && mentionMatches.length > 0
-            ? mentionOptionId(mentionListId, activeMentionIndex) : undefined}
+            ? mentionOptionId(mentionListId, activeMentionIndex)
+            : skillMenuOpen && skillMatches.length > 0 ? skillOptionId(skillListId, activeSkillIndex) : undefined}
           onChange={(event) => changeValue(event.target.value, event.target.selectionStart)}
           onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
           onCompositionStart={() => {
@@ -508,6 +545,27 @@ export function Composer({
           }}
           onKeyDown={(event) => {
             const imeComposing = composing.current || event.nativeEvent.isComposing;
+            if (skillMenuOpen && event.key === "Escape") {
+              // `@` 목록과 같다. 목록만 닫고 대화 화면의 중지나 패널 닫기로 넘기지 않는다.
+              event.preventDefault();
+              event.stopPropagation();
+              setSkillDismissed(true);
+              return;
+            }
+            if (skillMenuOpen && !imeComposing && skillMatches.length > 0) {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const step = event.key === "ArrowDown" ? 1 : -1;
+                setSkillIndex((activeSkillIndex + step + skillMatches.length) % skillMatches.length);
+                return;
+              }
+              if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+                // 고를 이름이 있을 때만 Enter 가 고르기다. 스킬이 없다는 문구만 떠 있으면 평소처럼 보낸다.
+                event.preventDefault();
+                pickSkill(skillMatches[activeSkillIndex]!);
+                return;
+              }
+            }
             if (openMention && event.key === "Escape") {
               // 대화 화면의 Esc 처리기가 이 사건을 건너뛰게 한다. 목록만 닫고 중지나 패널 닫기로 넘기지 않는다.
               // 한글 조합 중에도 같다. 조합 중이라고 넘기면 목록이 떠 있는데 패널이 닫힌다.

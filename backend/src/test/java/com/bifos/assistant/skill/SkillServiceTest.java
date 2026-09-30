@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.application.SkillBundle;
+import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.application.SkillDetail;
 import com.bifos.assistant.skill.application.SkillFile;
 import com.bifos.assistant.skill.application.SkillFileInfo;
@@ -36,6 +37,7 @@ import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.application.SkillSource;
 import com.bifos.assistant.skill.application.SkillUsageSummary;
+import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
 import java.nio.charset.StandardCharsets;
@@ -58,6 +60,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -70,6 +76,7 @@ import org.springframework.web.client.HttpClientErrorException;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@RecordApplicationEvents
 class SkillServiceTest {
 
     private static final String OWNED = "skill-owned";
@@ -92,6 +99,12 @@ class SkillServiceTest {
 
     @MockitoBean HermesSkillClient skillClient;
     @MockitoBean HermesToolsetClient toolsets;
+
+    /** 스킬 커맨드의 캐시를 비우는 {@link SkillsChanged} 를 서비스가 냈는지 본다. */
+    @Autowired ApplicationEvents applicationEvents;
+
+    @Autowired SkillCommandCatalog commandCatalog;
+    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void 준비한다() {
@@ -227,6 +240,73 @@ class SkillServiceTest {
 
         verify(skillClient).publish(GROUP_PROFILE, List.of(), null);
         assertThat(SKILL_ROOT.resolve(GROUP_PROFILE)).doesNotExist();
+    }
+
+    @Test
+    void 저장과_켜고_끄기와_지우기가_Hermes_에_반영되면_그_에이전트의_SkillsChanged_를_낸다() {
+        Long agentId = agents.findByCode(OWNED).orElseThrow().id();
+
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+        skills.toggle(OWNER, OWNED, "weekly-plan", false);
+        skills.delete(OWNER, OWNED, "weekly-plan");
+        skills.delete(OWNER, OWNED, "shopping");
+
+        assertThat(applicationEvents.stream(SkillsChanged.class))
+                .as("저장 둘, 켜고 끄기 하나, 지우기 둘(마지막 스킬 포함)")
+                .containsExactly(
+                        new SkillsChanged(agentId), new SkillsChanged(agentId), new SkillsChanged(agentId),
+                        new SkillsChanged(agentId), new SkillsChanged(agentId));
+    }
+
+    /**
+     * 사건을 받는 쪽은 트랜잭션이 끝난 뒤에 받는다. 저장과 지우기를 바깥 트랜잭션에 넣어 끝나기 전에는 캐시가
+     * 그대로인 것을 본다. 커밋하면 비워지고, 되돌려도 비워진다. 되돌린 지우기도 Hermes 게시와 디렉터리 삭제는
+     * 이미 끝났기 때문이다. 트랜잭션 없는 켜고 끄기는 바로 비운다.
+     */
+    @Test
+    void 커맨드_이름_캐시는_저장과_지우기의_트랜잭션이_커밋이든_되돌림이든_끝난_뒤에_비워지고_켜고_끄기는_바로_비워진다() {
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
+        Agent agent = agents.findByCode(OWNED).orElseThrow();
+        TransactionTemplate outer = new TransactionTemplate(transactionManager);
+        assertThat(commandCatalog.enabledNames(agent)).as("처음 읽은 것").containsExactly("hermes-help");
+
+        outer.executeWithoutResult(status -> {
+            skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+            assertThat(commandCatalog.enabledNames(agent)).as("저장의 커밋 전").containsExactly("hermes-help");
+        });
+        assertThat(commandCatalog.enabledNames(agent)).as("저장이 커밋된 뒤")
+                .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
+
+        outer.executeWithoutResult(status -> {
+            skills.delete(OWNER, OWNED, "weekly-plan");
+            assertThat(commandCatalog.enabledNames(agent)).as("지우기의 트랜잭션이 끝나기 전")
+                    .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
+            status.setRollbackOnly();
+        });
+        // 캐시가 비워져 다시 읽었으면 지운 스킬은 없고 Hermes 목록이 준 이름만 남는다.
+        assertThat(commandCatalog.enabledNames(agent)).as("지우기를 되돌린 뒤").containsExactly("hermes-help");
+
+        when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(new HermesSkill("hermes-help", "Hermes 기본", false)));
+        skills.toggle(OWNER, OWNED, "hermes-help", false);
+        assertThat(commandCatalog.enabledNames(agent)).as("끈 뒤").isEmpty();
+    }
+
+    @Test
+    void Hermes_가_거절해_저장과_켜고_끄기와_지우기가_실패하면_SkillsChanged_를_내지_않는다() {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        applicationEvents.clear();
+        HermesRequestRejected rejected = new HermesRequestRejected(ErrorCode.HERMES_UNAVAILABLE, "rejected",
+                new HttpClientErrorException(HttpStatus.BAD_REQUEST));
+        doThrow(rejected).when(skillClient).publish(anyString(), anyList(), any());
+        doThrow(rejected).when(skillClient).toggle(anyString(), anyString(), anyBoolean());
+
+        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
+                ErrorCode.HERMES_UNAVAILABLE);
+        assertCode(() -> skills.toggle(OWNER, OWNED, "weekly-plan", false), ErrorCode.HERMES_UNAVAILABLE);
+        assertCode(() -> skills.delete(OWNER, OWNED, "weekly-plan"), ErrorCode.HERMES_UNAVAILABLE);
+
+        assertThat(applicationEvents.stream(SkillsChanged.class)).isEmpty();
     }
 
     @Test

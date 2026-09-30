@@ -396,6 +396,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `occurred_at` | DATETIME(6) | |
 
 `(execution_id, skill_name, source)` 에 유일 제약이 있다. 한 실행에서 모델이 같은 스킬을 여러 번 읽어도 한 행이다.
+호출 횟수는 실행 수로 센다. 같은 실행에 `COMMAND` 와 `MODEL` 이 함께 있어도 1회다.
 사용자, 에이전트, 대화는 `agent_execution` 과 이어 얻는다. 같은 값을 여기 다시 적지 않는다.
 
 **스킬을 지워도 행은 남는다.** 이름으로 남아 지난 호출을 읽을 수 있다.
