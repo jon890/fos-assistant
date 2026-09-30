@@ -56,7 +56,7 @@ profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 origin 
 
 ## MCP 호출의 요청자를 정할 때
 
-`memory_read`, `artifact_write` 와 앞으로의 `agent_*` 가 모두 이 길을 지난다.
+`memory_read`, `artifact_write`, `agent_list`, `agent_status` 가 이 길을 지나고, 앞으로의 `agent_delegate`, `agent_stop` 도 지난다.
 
 ```mermaid
 sequenceDiagram

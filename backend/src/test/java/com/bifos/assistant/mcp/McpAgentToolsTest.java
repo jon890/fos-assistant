@@ -185,11 +185,15 @@ class McpAgentToolsTest {
         AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
         AgentExecution succeeded = delegated(userA.id(), parent, ExecutionStatus.SUCCEEDED, "답", null);
         jdbc.update("UPDATE agent_execution SET hermes_run_id = ?, input_tokens = ?, output_tokens = ?, estimated_cost_micros = ? WHERE id = ?",
-                "run-secret-1", 1234L, 5678L, 9012L, succeeded.id());
+                "run-secret-1", 987_654_321L, 876_543_219L, 765_432_198L, succeeded.id());
 
         String text = resultText(agentStatus(sharedToken, root, succeeded.id()));
 
-        assertThat(text).doesNotContain("run-secret-1", TARGET, SHARED, "1234", "5678", "9012", "delegation_key", "session");
+        JsonNode status = json.readTree(text);
+        assertThat(status.propertyNames()).containsExactly("execution_id", "status", "output");
+        assertThat(status.path("execution_id").asLong()).isEqualTo(succeeded.id());
+        assertThat(status.path("output").asString()).isEqualTo("답");
+        assertThat(text).doesNotContain("run-secret-1", TARGET, SHARED, "987654321", "876543219", "765432198");
     }
 
     @Test
