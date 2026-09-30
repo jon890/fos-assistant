@@ -613,10 +613,10 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | --- | --- |
 | `mcp.presentation.McpController` | 도구 이름과 인자 모양만 본다. 요청자는 「MCP 요청자」 의 `McpCallerResolver` 가 정한다 |
 | `mcp.application.McpToolService` | 도구 결과를 MCP 모양으로 만든다. 예외 문구를 그대로 내보내지 않는다 |
-| `orchestration.application.AgentDelegationService` | `McpToolService` 가 `McpCaller` 에서 풀어 넘긴 요청자와 origin 실행을 받는다. 지금은 `list`(요청자의 `AgentService.readableBy`)와 `status` 가 있다. `status` 는 요청자의 실행이고 `delegation_key` 가 있고 뿌리가 origin 실행의 뿌리와 같은 실행만 돌려주고, 아니면 빈 값이다. 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 중지는 아직 없다 |
+| `orchestration.application.AgentDelegationService` | `McpToolService` 가 `McpCaller` 에서 풀어 넘긴 요청자와 origin 실행을 받는다. 지금은 `list`(요청자의 `AgentService.readableBy`)와 `status` 가 있다. `status` 는 요청자의 실행이고 `delegation_key` 가 있고 origin 실행과 대화가 같은 실행만 돌려주고, 아니면 빈 값이다. origin 실행에 대화가 없으면 뿌리가 origin 실행의 뿌리와 같은지 견준다. 판정은 private 메서드 `canQuery` 한 곳에 있다. 깊이와 동시 한도, 같은 호출 확인, 위임 시작, 중지는 아직 없다 |
 | `usage.domain.DelegationKey` | 같은 위임을 두 번 만들지 않는 키. `agent_execution.delegation_key` 칸의 값이라 `usage` 에 둔다. 문자열이 아니라 record 라 다른 문자열 인자와 자리를 바꿔 넘기지 못한다. 정의는 ADR-032 의 「`delegation_key`」 |
 | `orchestration.application.DelegationProperties` | `assistant.delegation` 설정. 깊이, 뿌리당 동시 자식, 전체 동시 위임, 제출 대기 시간 |
-| `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다. 뿌리 번호는 `AgentExecution.treeRootId()` 로 정하고, `agent_status` 도 같은 메서드로 나무를 견준다 |
+| `orchestration.application.ChildExecutionRunner` | 자식 실행을 여는 유일한 자리. 에이전트 확인과 부모, 뿌리 번호를 정하고 `RunSession.fresh()` 로 새 session 을 정한다. 뿌리 번호는 `AgentExecution.treeRootId()` 로 정한다. `agent_status` 는 대화로 견주고, origin 실행에 대화가 없을 때만 같은 메서드로 나무를 견준다 |
 | `orchestration.application.AgentRunner` | Memory 다시 조립, 모델 선택, 실행 줄, 제출, 완료 기록. 흐름과 위임이 함께 쓴다 |
 
 **MCP 쪽은 Hermes 를 부르지 않는다.** 실행을 시작하고 멈추는 것은 `orchestration` 이 기존 `AgentRunner` 와 `HermesRunsClient` 로 한다.

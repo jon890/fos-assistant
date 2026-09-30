@@ -38,10 +38,13 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * {@code agent_list} 와 {@code agent_status} 가 origin 실행의 사용자와 그 실행 나무 안에서만 답하는 것을 실제
+ * {@code agent_list} 와 {@code agent_status} 가 origin 실행의 사용자와 그 대화 안에서만 답하는 것을 실제
  * {@code /mcp} 경계에서 고정한다(ADR-017, ADR-032, ADR-037).
  *
  * <p>같은 GROUP profile 을 사용자 A 와 B 가 함께 써도 각자의 목록과 각자의 위임 실행만 받는다.
+ * {@code conversationId} 없이 만든 origin 은 대화가 없을 때의 대체 규칙인 실행 나무로 판정된다.
+ * 대화 규칙은 origin 과 위임 실행에 대화 번호를 준 검사가 고정한다. {@code conversation_id} 에는 외래 키가 없어
+ * 대화 줄을 만들지 않고 번호만 준다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -56,6 +59,8 @@ class McpAgentToolsTest {
     private static final String OFF_CODE = "tools-off";
     private static final List<String> CODES = List.of(GROUP_CODE, OWN_A_CODE, OWN_B_CODE, OFF_CODE);
     private static final Instant STARTED = Instant.parse("2026-09-30T00:00:00Z");
+    private static final Long CONVERSATION = 930_001L;
+    private static final Long OTHER_CONVERSATION = 930_002L;
 
     @LocalServerPort int port;
     @Autowired AgentTokenService tokens;
@@ -160,7 +165,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    void agent_status_는_같은_나무의_위임_실행을_상태별로_답한다() throws Exception {
+    void 대화_없는_origin_의_agent_status_는_같은_나무의_위임_실행을_상태별로_답한다() throws Exception {
         String root = McpCallSigner.newRoot();
         AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
         AgentExecution running = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
@@ -197,7 +202,7 @@ class McpAgentToolsTest {
     }
 
     @Test
-    void 남의_실행과_다른_나무와_위임이_아닌_실행과_없는_번호는_모두_같은_응답이다() throws Exception {
+    void 대화_없는_origin_에서_남의_실행과_다른_나무와_위임이_아닌_실행과_없는_번호는_모두_같은_응답이다() throws Exception {
         String rootA = McpCallSigner.newRoot();
         AgentExecution parentA = McpCallSigner.running(executions, userA.id(), null, SHARED, rootA);
         String rootB = McpCallSigner.newRoot();
@@ -224,6 +229,46 @@ class McpAgentToolsTest {
         hidden.forEach((reason, result) -> assertThat(result).as(reason).isEqualTo(missing));
         assertStatus(agentStatus(sharedToken, rootB, otherUsersOwn.id()),
                 "{\"execution_id\":" + otherUsersOwn.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"나의 답\"}");
+    }
+
+    @Test
+    void 같은_대화의_앞_turn_에서_맡긴_실행을_다음_turn_에서_묻는다() throws Exception {
+        AgentExecution firstTurn = McpCallSigner.save(executions, userA.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        AgentExecution earlier = delegated(userA.id(), firstTurn, ExecutionStatus.SUCCEEDED, "앞 turn 에서 맡긴 답", null);
+        String root = McpCallSigner.newRoot();
+        AgentExecution nextTurn = McpCallSigner.running(executions, userA.id(), CONVERSATION, SHARED, root);
+
+        assertThat(nextTurn.treeRootId()).as("다음 turn 은 뿌리가 다르다").isNotEqualTo(earlier.treeRootId());
+        assertStatus(agentStatus(sharedToken, root, earlier.id()),
+                "{\"execution_id\":" + earlier.id() + ",\"status\":\"SUCCEEDED\",\"output\":\"앞 turn 에서 맡긴 답\"}");
+    }
+
+    @Test
+    void 대화가_있는_origin_에서_다른_대화와_위임이_아닌_실행과_남의_실행은_없는_번호와_같은_응답이다() throws Exception {
+        AgentExecution firstTurn = McpCallSigner.save(executions, userA.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        String root = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userA.id(), CONVERSATION, SHARED, root);
+        AgentExecution otherConversationTurn = McpCallSigner.save(executions, userA.id(), OTHER_CONVERSATION, SHARED,
+                McpCallSigner.newRoot(), ExecutionStatus.SUCCEEDED);
+        AgentExecution otherConversation = delegated(userA.id(), otherConversationTurn, ExecutionStatus.SUCCEEDED, "다른 대화의 답", null);
+        AgentExecution proposal = child(userA.id(), firstTurn, ExecutionStatus.SUCCEEDED);
+        // 대화 번호는 같고 사용자만 다르다.
+        AgentExecution otherUserTurn = McpCallSigner.save(executions, userB.id(), CONVERSATION, SHARED, McpCallSigner.newRoot(),
+                ExecutionStatus.SUCCEEDED);
+        AgentExecution otherUsers = delegated(userB.id(), otherUserTurn, ExecutionStatus.SUCCEEDED, "나의 답", null);
+
+        JsonNode missing = body(agentStatus(sharedToken, root, 999_999_999L)).path("result");
+        Map<String, JsonNode> hidden = new LinkedHashMap<>();
+        hidden.put("같은 사용자의 다른 대화의 위임 실행", body(agentStatus(sharedToken, root, otherConversation.id())).path("result"));
+        hidden.put("같은 대화의 위임이 아닌 자식", body(agentStatus(sharedToken, root, proposal.id())).path("result"));
+        hidden.put("같은 대화의 앞 turn", body(agentStatus(sharedToken, root, firstTurn.id())).path("result"));
+        hidden.put("같은 대화 번호의 남의 위임 실행", body(agentStatus(sharedToken, root, otherUsers.id())).path("result"));
+
+        JsonNode failure = json.readTree(missing.path("content").get(0).path("text").asString());
+        assertThat(failure.path("code").asString()).isEqualTo("NOT_FOUND");
+        hidden.forEach((reason, result) -> assertThat(result).as(reason).isEqualTo(missing));
     }
 
     @Test
@@ -317,10 +362,11 @@ class McpAgentToolsTest {
         return "profile-of-" + code;
     }
 
-    /** {@code agent_delegate} 로 만든 것처럼 {@code delegation_key} 가 있는 자식 실행을 만든다. */
+    /** {@code agent_delegate} 로 만든 것처럼 {@code delegation_key} 가 있는 자식 실행을 만든다. 대화는 부모의 것을 잇는다. */
     private AgentExecution delegated(Long userId, AgentExecution parent, ExecutionStatus status, String output, String errorCode) {
         AgentExecution execution = executions.save(AgentExecution.builder()
                 .userId(userId)
+                .conversationId(parent.conversationId())
                 .parentExecutionId(parent.id())
                 .rootExecutionId(parent.treeRootId())
                 .profileName(TARGET)
@@ -337,10 +383,11 @@ class McpAgentToolsTest {
         return execution;
     }
 
-    /** Memory 제안처럼 위임이 아닌 자식 실행이다. */
+    /** Memory 제안처럼 위임이 아닌 자식 실행이다. 대화는 부모의 것을 잇는다. */
     private AgentExecution child(Long userId, AgentExecution parent, ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
                 .userId(userId)
+                .conversationId(parent.conversationId())
                 .parentExecutionId(parent.id())
                 .rootExecutionId(parent.treeRootId())
                 .profileName(TARGET)
