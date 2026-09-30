@@ -3,8 +3,10 @@
  *
  * <p>가짜 Hermes 가 플러그인처럼 부모 run 안에서 자식 session 을 등록한다. 자식의 호출은 `/chat/messages` 가 응답한 뒤
  * 시나리오가 부른다. 자식 session 은 Control Plane 이 정한 값이 아니므로 등록이 없으면 요청자를 찾지 못한다(ADR-037).
+ * 사용자가 turn 을 중지해 origin 실행이 `CANCELLED` 로 끝나면 그 자식의 호출도 거절된다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { SUBAGENT_MEMORY_PROBE } from "../fake-hermes.ts";
 
 export const NATIVE_DELEGATION_PROFILE = "native-delegation-group";
@@ -17,6 +19,56 @@ const CHILD_ANSWER = /^하위 에이전트 session: (native-[0-9a-f-]+)$/;
 type MemoryView = { id: number };
 type Turn = { conversationId: string; executionId: number; assistantText: string };
 type ExecutionView = { id: number; status: string };
+type ChatEvent = { type: string; executionId?: number };
+
+function within<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), milliseconds);
+    }),
+  ]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
+/** 스트림으로 turn 하나를 열고 `started` 사건의 실행 번호와 스트림이 끝나는 약속을 돌려준다. */
+async function openStream(
+  context: Context,
+  token: string,
+  text: string,
+): Promise<{ executionId: Promise<number>; completed: Promise<ChatEvent[]> }> {
+  const response = await fetch(`${context.api}/chat/messages/stream`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ text, agentCode: AGENT_CODE }),
+  });
+  expect(response.status === 200, `중지할 스트림을 열지 못했다: ${response.status}`);
+  const received: ChatEvent[] = [];
+  let resolveStarted: (executionId: number) => void;
+  let rejectStarted: (error: Error) => void;
+  const executionId = new Promise<number>((resolve, reject) => {
+    resolveStarted = resolve;
+    rejectStarted = reject;
+  });
+  const completed = readEventStream<ChatEvent>(response, (event) => {
+    received.push(event);
+    if (event.type === "started" && event.executionId !== undefined) resolveStarted!(event.executionId);
+  }).then(
+    () => {
+      rejectStarted!(new Error("started 사건 없이 스트림이 끝났다"));
+      return received;
+    },
+    (error: unknown) => {
+      rejectStarted!(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    },
+  );
+  // started 를 기다리는 동안 스트림이 먼저 실패해도 처리되지 않은 거절로 남지 않게 한다.
+  completed.catch(() => undefined);
+  return { executionId, completed };
+}
 
 async function send(context: Context, token: string, body: Record<string, string>, what: string): Promise<Turn> {
   return expectStatus(
@@ -148,6 +200,49 @@ export const nativeDelegationScenario: Scenario = {
       expect(
         unregistered.startsWith(INVALID_CONTEXT) && !unregistered.includes("아빠 위임 검사 본문"),
         `등록하지 않은 자식의 호출이 거절되지 않았다: ${unregistered}`,
+      );
+
+      step("아빠가 turn 을 중지하면 그 turn 에서 등록한 자식의 호출이 거절된다");
+      const registeredBefore = context.hermes.subagentRegistrations().length;
+      context.hermes.holdNextRun();
+      const held = await openStream(context, context.tokens.dad, SUBAGENT_MEMORY_PROBE);
+      await within(context.hermes.waitForHeldRun(), 5_000, "가짜 Hermes 가 중지할 실행을 받지 않았다");
+      const heldExecutionId = await within(held.executionId, 5_000, "중지할 turn 의 started 사건을 받지 못했다");
+      const heldRegistrations = context.hermes.subagentRegistrations().slice(registeredBefore);
+      expect(heldRegistrations.length === 1, `중지할 turn 에서 등록한 자식이 하나가 아니다: ${heldRegistrations.length}`);
+      const cancelledChild = heldRegistrations[0]!;
+      expect(cancelledChild.status === 201, `중지할 turn 의 자식 등록 상태가 201 이 아니다: ${cancelledChild.status}`);
+
+      const beforeStop = await context.hermes.readMemoryAsSubagent(cancelledChild.childSessionId, dadMemory.id);
+      expect(beforeStop.includes("아빠 위임 검사 본문"), `중지 전에 자식이 본문을 읽지 못했다: ${beforeStop}`);
+
+      const stopped = expectStatus(
+        await call(context, `/chat/executions/${heldExecutionId}/stop`, { method: "POST", token: context.tokens.dad }),
+        202,
+        "하위 에이전트 검사 turn 중지",
+      ).json<{ status: string }>();
+      expect(stopped.status === "stopping", `중지 응답이 다르다: ${stopped.status}`);
+      await within(held.completed, 15_000, "중지 뒤 스트림이 끝나지 않았다");
+      const afterStop = expectStatus(
+        await call(context, "/usage/executions?limit=50", { token: context.tokens.dad }),
+        200,
+        "중지한 turn 사용량 조회",
+      ).json<ExecutionView[]>();
+      const cancelledExecution = afterStop.find((entry) => entry.id === heldExecutionId);
+      expect(
+        cancelledExecution?.status === "CANCELLED",
+        `중지한 turn 의 실행이 CANCELLED 가 아니다: ${cancelledExecution?.status}`,
+      );
+
+      const afterCancel = await context.hermes.readMemoryAsSubagent(cancelledChild.childSessionId, dadMemory.id);
+      expect(
+        afterCancel.startsWith(INVALID_CONTEXT) && !afterCancel.includes("아빠 위임 검사 본문"),
+        `중지한 turn 의 자식 호출이 거절되지 않았다: ${afterCancel}`,
+      );
+      const succeededChild = await context.hermes.readMemoryAsSubagent(dadChild, dadMemory.id);
+      expect(
+        succeededChild.includes("아빠 위임 검사 본문"),
+        `정상으로 끝난 turn 의 자식이 본문을 읽지 못했다: ${succeededChild}`,
       );
     } catch (error) {
       failed = true;
