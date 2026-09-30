@@ -4,6 +4,7 @@ import { useState } from "react";
 import { describeError } from "@/components/error-message";
 import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
+import { AgentSkillsSection } from "./agent-skills-section";
 import { AgentToolsSection } from "./agent-tools-section";
 import { PersonaEditor } from "./persona-editor";
 import {
@@ -12,6 +13,7 @@ import {
   type AgentToolsView,
   type PersonaView,
 } from "@/lib/agent";
+import type { SkillListView } from "@/lib/skill";
 
 /** 서버가 읽어 온 값이거나, 읽지 못했을 때 화면에 보일 안내다. */
 export type Loaded<T> = { ok: true; data: T } | { ok: false; message: string };
@@ -23,6 +25,8 @@ type Props = {
   initialPersona: PersonaView | null;
   /** 도구 절을 그리지 않으면 null 이다. */
   tools: Loaded<{ initialTools: AgentToolsView; admin: boolean }> | null;
+  /** 스킬 절을 그리지 않으면 null 이다. 관리자가 다른 사람의 비공개 에이전트를 열 때다. */
+  skills: Loaded<SkillListView> | null;
   initialVisibility: AdminAgent["visibility"] | undefined;
   adminAgent?: AdminAgent;
   /** 요청자가 이 에이전트의 공개 범위를 바꾸고 지울 수 있으면 참이다. 「공개와 삭제」 절을 그릴지 정한다. */
@@ -56,6 +60,7 @@ export function AgentDetailBody({
   name,
   initialPersona,
   tools,
+  skills,
   initialVisibility,
   adminAgent,
   canManageAccess,
@@ -108,6 +113,14 @@ export function AgentDetailBody({
         <section aria-label="도구" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
           <h2 className="font-semibold">도구</h2>
           <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">{tools.message}</p>
+        </section>
+      )}
+      {skills === null ? null : skills.ok ? (
+        <AgentSkillsSection code={code} initialSkills={skills.data} />
+      ) : (
+        <section aria-label="스킬" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
+          <h2 className="font-semibold">스킬</h2>
+          <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">{skills.message}</p>
         </section>
       )}
       {adminAgent && visibility ? <AgentAdminSection initialAgent={adminAgent} visibility={visibility} /> : null}

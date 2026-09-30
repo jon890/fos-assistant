@@ -16,6 +16,7 @@ const SRC_ROOT = join(APP_ROOT, "..");
 const ROUTE_FRAMES: Record<string, string> = {
   agents: "app/agents/page.tsx",
   "agents/[code]": "components/agent/persona-editor.tsx",
+  "agents/[code]/skills/[name]": "components/agent/skill-editor.tsx",
   memory: "components/memory/memory-list.tsx",
   usage: "app/usage/page.tsx",
   "executions/[id]": "app/executions/[id]/page.tsx",

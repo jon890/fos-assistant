@@ -27,12 +27,16 @@ import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.application.SkillBundle;
+import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
@@ -48,6 +52,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 사용자가 에이전트를 만들고, 공개 범위를 바꾸고, 지우는 순서를 본다.
@@ -79,6 +84,9 @@ class AgentLifecycleServiceTest {
 
     @MockitoBean HermesDashboardClient dashboard;
     @MockitoBean HermesToolsetClient toolsets;
+
+    /** 실제 디렉터리에 쓰되, 지우기가 실패하는 경우만 흉내 낼 수 있게 감싼다. */
+    @MockitoSpyBean SkillStore skillStore;
 
     /** 이 테스트가 실제 key 디렉터리에 남긴 파일을 지우려고 적어 둔다. */
     private final List<String> createdProfiles = new ArrayList<>();
@@ -348,6 +356,37 @@ class AgentLifecycleServiceTest {
         assertThat(stored.isDeleted()).isTrue();
         assertThat(stored.enabled()).isFalse();
         assertCode(() -> agentService.requireStartable(kid, created.code()), ErrorCode.AGENT_NOT_FOUND);
+    }
+
+    @Test
+    void 만든_profile_의_에이전트를_지우면_deprovision_뒤에_스킬_디렉터리가_없다() {
+        CurrentUser kid = member();
+        Agent created = create(kid, "숙제 도우미", null);
+        String profile = created.hermesProfile();
+        skillStore.markPublished(profile, skillStore.writeVersion(profile, Map.of("weekly-plan",
+                new SkillBundle("weekly-plan", "---\nname: weekly-plan\ndescription: 계획\n---\n", List.of()))));
+        assertThat(skillStore.currentVersion(profile)).isPresent();
+
+        lifecycle.delete(kid, created.code());
+
+        verify(dashboard).deleteProfile(profile);
+        verify(skillStore).deleteAll(profile);
+        assertThat(skillStore.currentVersion(profile)).isEmpty();
+        assertThat(Path.of("build/test-skills", profile)).doesNotExist();
+        assertThat(agents.findByCode(created.code()).orElseThrow().isDeleted()).isTrue();
+    }
+
+    @Test
+    void 스킬_디렉터리를_지우지_못해도_에이전트_삭제는_성공한다() {
+        CurrentUser kid = member();
+        Agent created = create(kid, "숙제 도우미", null);
+        doThrow(new ApiException(ErrorCode.INTERNAL_ERROR, "could not access the skill store"))
+                .when(skillStore).deleteAll(created.hermesProfile());
+
+        lifecycle.delete(kid, created.code());
+
+        verify(dashboard).deleteProfile(created.hermesProfile());
+        assertThat(agents.findByCode(created.code()).orElseThrow().isDeleted()).isTrue();
     }
 
     @Test

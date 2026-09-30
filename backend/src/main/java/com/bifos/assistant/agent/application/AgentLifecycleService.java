@@ -13,6 +13,7 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -61,6 +62,7 @@ public class AgentLifecycleService {
     private final HermesProperties hermesProperties;
     private final PeopleProperties peopleProperties;
     private final AgentProperties properties;
+    private final SkillStore skillStore;
 
     /**
      * 요청자의 에이전트를 만든다. 주인은 요청자다. {@code ADMIN} 이 만들어도 자기 것이 된다.
@@ -157,15 +159,28 @@ public class AgentLifecycleService {
      * <p>Control Plane 이 만든 profile 이면 profile 을 먼저 거둔다. 거두다 실패하면 지우지 않고 그 오류를
      * 올린다. 지운 것으로 적은 뒤에는 다시 거둘 길이 없기 때문이다. 운영에서 만든 profile 과 사용자의 기본
      * profile 은 남긴다.
+     *
+     * <p>profile 을 거둔 뒤 그 profile 의 스킬 디렉터리를 지운다. 이것이 실패해도 삭제는 성공으로 둔다.
+     * profile 은 이미 지워져 되돌릴 수 없고, 남은 디렉터리는 아무것도 가리키지 않는다.
      */
     @Transactional
     public void delete(CurrentUser user, String code) {
         Agent agent = requireManageable(user, code);
         if (agent.profileManaged()) {
             provisioner.deprovision(agent.hermesProfile());
+            removeSkillDirectory(agent.hermesProfile());
         }
         agent.markDeleted(Instant.now());
         agents.save(agent);
+    }
+
+    private void removeSkillDirectory(String profileName) {
+        try {
+            skillStore.deleteAll(profileName);
+        } catch (RuntimeException failure) {
+            log.warn("지운 에이전트의 스킬 디렉터리를 지우지 못했다. 쓰이지 않을 디렉터리가 남는다 profile={}",
+                    profileName, failure);
+        }
     }
 
     /**

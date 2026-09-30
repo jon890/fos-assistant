@@ -1,6 +1,7 @@
 package com.bifos.assistant.usage.presentation;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.skill.application.UserSkillUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
@@ -139,11 +140,36 @@ public final class UsageDtos {
     }
 
     /**
+     * 로그인한 사용자 자신이 부른 스킬의 합계 한 줄이다.
+     *
+     * @param lastConversationId 마지막 호출이 속한 대화의 공개 식별자. 그 대화를 지웠으면 null
+     */
+    public record MySkillUsageView(
+            String agentCode,
+            String agentName,
+            String skillName,
+            long count,
+            Instant lastInvokedAt,
+            UUID lastConversationId) {
+
+        static MySkillUsageView from(UserSkillUsage usage) {
+            return new MySkillUsageView(
+                    usage.agentCode(),
+                    usage.agentName(),
+                    usage.skillName(),
+                    usage.count(),
+                    usage.lastInvokedAt(),
+                    usage.lastConversationId());
+        }
+    }
+
+    /**
      * 사용량 목록의 한 줄.
      *
      * @param conversationId 이 실행이 속한 대화의 공개 식별자. 대화 없이 돈 실행이면 null
      * @param hasChildren 이 실행이 부른 실행이 있는가. 화면이 나무로 들어갈 곳을 고를 때 쓴다
      * @param retryOfExecutionId 막혀서 넘어오며 이 실행이 대신한 직전 실행. 첫 시도면 null
+     * @param skillNames 이 실행에서 쓴 스킬 이름. 없으면 빈 목록
      */
     public record ExecutionView(
             Long id,
@@ -171,16 +197,18 @@ public final class UsageDtos {
             String pricingVersion,
             Instant startedAt,
             boolean hasChildren,
-            Long retryOfExecutionId) {
+            Long retryOfExecutionId,
+            List<String> skillNames) {
 
         /**
-         * 자식 여부를 받아서만 만든다.
+         * 자식 여부와 스킬 이름을 받아서만 만든다.
          *
          * <p>{@code hasChildren} 을 거짓으로 채워 주는 짧은 형태를 두지 않는다. 그것을 부르면 자식이
          * 있는 실행이 목록에 표시 없이 보이고, 컴파일은 통과한다. 부르는 쪽이 자식을 셀지 정하게 한다.
          */
         static ExecutionView from(
-                AgentExecution execution, Agent agent, UUID conversationPublicId, boolean hasChildren) {
+                AgentExecution execution, Agent agent, UUID conversationPublicId, boolean hasChildren,
+                List<String> skillNames) {
             return new ExecutionView(
                     execution.id(),
                     conversationPublicId,
@@ -207,7 +235,8 @@ public final class UsageDtos {
                     execution.pricingVersion(),
                     execution.startedAt(),
                     hasChildren,
-                    execution.retryOfExecutionId());
+                    execution.retryOfExecutionId(),
+                    skillNames);
         }
     }
 }

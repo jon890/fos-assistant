@@ -35,6 +35,8 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.domain.SkillUseSource;
+import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -99,6 +101,8 @@ class ChatServiceTest {
     /** 저장이 실패해도 대화가 이어지는지 보려면 저장소가 던지게 만들 수 있어야 한다. */
     @MockitoSpyBean ExecutionEventRepository executionEvents;
 
+    @Autowired ExecutionSkillUseRepository skillUses;
+
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
     }
@@ -132,6 +136,7 @@ class ChatServiceTest {
     @BeforeEach
     void reset() {
         stub().reset();
+        skillUses.deleteAll();
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -428,6 +433,42 @@ class ChatServiceTest {
                     assertThat(execution.hermesRunId()).isEqualTo("run-1");
                     assertThat(execution.errorCode()).isEqualTo("FAILED");
                 });
+    }
+
+    /**
+     * 모델이 {@code skill_view} 로 스킬을 읽으면 그 실행에 {@code MODEL} 호출 이력이 남는다. 같은 스킬을 참고
+     * 파일까지 두 번 읽어도 한 줄이다. 도구 사건 자체는 다른 도구와 같이 남는다.
+     */
+    @Test
+    void 스트림에서_skill_view_도구_사건이_오면_그_실행에_MODEL_이력이_하나_생긴다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(
+                HermesRunResult.of("run-1", "sess-1", "completed", "장을 봤어요", "dad", null, TokenUsage.empty()));
+        hermesStreams(
+                new RunEvent("tool.started", null, "skill_view", "shopping", null, null),
+                new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
+                new RunEvent("tool.started", null, "skill_view", "shopping → references/list.md", null, null),
+                new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
+                new RunEvent("run.completed", null, null, null, null, null));
+
+        List<ChatEvent> relayed = new ArrayList<>();
+        chat.stream(dad, null, "장보기 스킬을 써 줘", "dad", relayed::add);
+
+        Long executionId = relayed.getLast().executionId();
+        assertThat(skillUses.findByExecutionIdInOrderByExecutionIdAscSkillNameAsc(List.of(executionId)))
+                .singleElement()
+                .satisfies(use -> {
+                    assertThat(use.skillName()).isEqualTo("shopping");
+                    assertThat(use.source()).isEqualTo(SkillUseSource.MODEL);
+                });
+        assertThat(typesOf(eventsOf(executionId)))
+                .containsExactly(
+                        ExecutionEventType.RUN_STARTED,
+                        ExecutionEventType.TOOL_STARTED,
+                        ExecutionEventType.TOOL_COMPLETED,
+                        ExecutionEventType.TOOL_STARTED,
+                        ExecutionEventType.TOOL_COMPLETED,
+                        ExecutionEventType.RUN_COMPLETED);
     }
 
     @Test

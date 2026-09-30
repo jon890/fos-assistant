@@ -105,6 +105,15 @@ public enum ErrorCode {
     SESSION_BINDING_REJECTED(HttpStatus.FORBIDDEN),
     /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */
     SESSION_BINDING_CONFLICT(HttpStatus.CONFLICT),
+    /** 그 에이전트의 지금 버전 디렉터리에 그 이름의 올린 스킬이 없다. */
+    SKILL_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /**
+     * Hermes 가 이미 같은 이름의 스킬을 갖고 있다.
+     *
+     * <p>profile 로컬 스킬이 외부 스킬보다 먼저 선택되므로 같은 이름으로 올리면 올린 것이 가려진다.
+     * 근거는 ADR-034 다.
+     */
+    SKILL_NAME_TAKEN(HttpStatus.CONFLICT),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),

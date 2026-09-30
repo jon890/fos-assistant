@@ -2,9 +2,13 @@ package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -21,7 +25,10 @@ import org.junit.jupiter.api.Test;
  */
 class ExecutionEventRecorderTest {
 
-    private final ExecutionEventRecorder recorder = new ExecutionEventRecorder();
+    /** 스킬 호출 이력은 따로 적는 자리가 맡는다. 여기서는 그 자리에 무엇을 넘기는지만 본다. */
+    private final SkillUseRecorder skillUses = mock(SkillUseRecorder.class);
+
+    private final ExecutionEventRecorder recorder = new ExecutionEventRecorder(skillUses);
 
     private static final AgentExecution EXECUTION = AgentExecution.builder()
             .userId(1L)
@@ -51,6 +58,23 @@ class ExecutionEventRecorderTest {
         assertThat(event.sequence()).isEqualTo(1);
         assertThat(event.hermesSessionId()).isNull();
         assertThat(event.failed()).isNull();
+    }
+
+    /**
+     * 모델이 스킬을 읽은 것은 {@code skill_view} 도구의 시작 사건에만 실려 온다. 끝 사건과 다른 도구는 스킬
+     * 사용이 아니다. 사건 자체는 다른 도구와 같이 옮겨 적는다.
+     */
+    @Test
+    void skill_view_도구의_시작_사건에서만_스킬_사용을_적는다() {
+        ExecutionEvent started = record(hermes("tool.started", "skill_view", "shopping → references/list.md"));
+        record(hermes("tool.completed", "skill_view", "shopping"));
+        record(hermes("tool.started", "web_search", "shopping"));
+        record(hermes("subagent.start", "skill_view", "shopping"));
+
+        verify(skillUses).recordModel(EXECUTION.id(), "shopping → references/list.md");
+        verifyNoMoreInteractions(skillUses);
+        assertThat(started.eventType()).isEqualTo(ExecutionEventType.TOOL_STARTED);
+        assertThat(started.toolName()).isEqualTo("skill_view");
     }
 
     @Test

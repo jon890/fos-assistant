@@ -18,6 +18,7 @@ import com.bifos.assistant.hermes.HermesToolsetClient.ToolsetCatalogEntry;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +28,8 @@ import org.junit.jupiter.api.Test;
 class AgentToolServiceTest {
 
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
-    private final AgentToolService service = new AgentToolService(toolsets);
+    private final SkillStore skillStore = mock(SkillStore.class);
+    private final AgentToolService service = new AgentToolService(toolsets, skillStore);
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of("tools", "도구", "tools-profile", "http://listener.test/p/tools-profile", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
 
@@ -63,7 +65,7 @@ class AgentToolServiceTest {
     @Test
     void 그룹_에이전트를_읽을_수_있는_다른_사용자도_주인_등급을_바꾸지_못한다() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
-        AgentToolService isolatedService = new AgentToolService(isolatedToolsets);
+        AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
         Agent groupAgent = Agent.of("group-tools", "그룹 도구", "group-tools-profile",
                 "http://listener.test/p/group-tools-profile",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null);
@@ -80,7 +82,7 @@ class AgentToolServiceTest {
     @Test
     void 그룹_에이전트를_읽을_수_있는_다른_사용자도_도구_목록을_읽지_못한다() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
-        AgentToolService isolatedService = new AgentToolService(isolatedToolsets);
+        AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
         Agent groupAgent = Agent.of("group-read", "그룹 도구", "group-read-profile",
                 "http://listener.test/p/group-read-profile",
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null);
@@ -126,5 +128,31 @@ class AgentToolServiceTest {
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_NOT_APPLIED);
+    }
+
+    @Test
+    void 올린_스킬이_있으면_skills_를_끄는_저장을_거절하고_Hermes_를_부르지_않는다() {
+        when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+
+        verify(toolsets, org.mockito.Mockito.never()).writeApiServer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void 올린_스킬이_있어도_skills_를_둔_저장은_그대로_쓴다() {
+        when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
+        when(toolsets.readCatalog()).thenReturn(List.of(
+                new ToolsetCatalogEntry("web", "Web", "검색"), new ToolsetCatalogEntry("skills", "Skills", "스킬")));
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenReturn(List.of("skills"), List.of("web", "skills"));
+
+        AgentToolService.ToolsetsView result = service.write(owner, agent, List.of("web", "skills"));
+
+        assertThat(result.toolsets()).extracting(AgentToolService.ToolView::name).containsExactly("web", "skills");
+        verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"));
     }
 }

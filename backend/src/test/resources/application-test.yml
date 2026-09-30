@@ -1,6 +1,7 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:assistant;MODE=MySQL;DB_CLOSE_DELAY=-1
+    # 기본 lock timeout 2초로는 같은 에이전트에 스킬 저장을 동시에 거는 검사에서 둘째가 잠금을 기다리다 끊긴다
+    url: jdbc:h2:mem:assistant;MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000
     username: sa
     password: ""
     driver-class-name: org.h2.Driver
@@ -30,6 +31,10 @@ assistant:
     root: build/test-artifacts
     # 검사는 이 경로를 열지 않고 Hermes 로 간 입력에 적힌 글자만 본다
     agent-root: /agent-side/artifacts
+  skill:
+    root: build/test-skills
+    # 검사가 게시된 경로에 적힌 글자를 실제 디렉터리와 견주므로 두 뿌리를 같게 둔다
+    agent-root: build/test-skills
 hermes:
   profile-key-dir: build/test-hermes-keys
   # 실재하지 않는 주소다. 이 값으로 대시보드를 부르는 테스트가 없고, 부르면 닿지 못해 실패한다

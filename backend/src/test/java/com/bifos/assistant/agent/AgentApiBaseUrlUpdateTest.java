@@ -33,6 +33,7 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.Optional;
@@ -55,7 +56,7 @@ class AgentApiBaseUrlUpdateTest {
     private final AgentLifecycleService lifecycle = new AgentLifecycleService(
             agents, mock(AgentService.class), users, mock(AllowedPersonRepository.class),
             mock(HermesProfileProvisioner.class), hermesToolsets, mock(HermesProperties.class),
-            mock(PeopleProperties.class), mock(AgentProperties.class));
+            mock(PeopleProperties.class), mock(AgentProperties.class), mock(SkillStore.class));
 
     private final AgentAdminController controller = new AgentAdminController(
             agents, users, currentUser, lifecycle, endpointProbe, flows);

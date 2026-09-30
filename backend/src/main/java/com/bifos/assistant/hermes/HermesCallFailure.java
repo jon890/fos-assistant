@@ -24,6 +24,19 @@ final class HermesCallFailure {
         return new ApiException(codeOf(cause), message, cause);
     }
 
+    /**
+     * 4xx 는 {@link HermesRequestRejected} 로, 나머지는 {@link #of} 와 같게 옮긴다.
+     *
+     * <p>거절과 닿지 못함을 부르는 쪽이 갈라야 할 때 쓴다. 오류 코드는 어느 쪽이든 같다.
+     */
+    static ApiException ofDistinguishingRejection(RestClientException cause, String message) {
+        if (cause instanceof RestClientResponseException response
+                && response.getStatusCode().is4xxClientError()) {
+            return new HermesRequestRejected(codeOf(cause), message, response);
+        }
+        return of(cause, message);
+    }
+
     private static ErrorCode codeOf(RestClientException cause) {
         if (cause instanceof RestClientResponseException response
                 && response.getStatusCode().value() == HttpStatus.TOO_MANY_REQUESTS.value()) {

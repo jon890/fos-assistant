@@ -62,6 +62,11 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                   <ChevronRight aria-hidden="true" className="ml-1 inline-block size-4 text-muted-foreground" />
                 ) : null}
                 <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
+                {execution.skillNames.length > 0 ? (
+                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-skills">
+                    스킬 {execution.skillNames.join(", ")}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell className="max-w-40 py-3">
                 <span className="block truncate">{execution.model ?? "-"}</span>
