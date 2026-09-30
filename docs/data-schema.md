@@ -316,7 +316,7 @@ profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [AD
 | `profile_name` | VARCHAR(64) | 등록한 토큰이 증명한 profile |
 | `session_id` | VARCHAR(128) | 하위 에이전트 session. Hermes 가 정한 값이다 |
 | `user_id` | BIGINT | origin 실행의 `user_id`. MCP 호출의 요청자다 |
-| `origin_execution_id` | BIGINT | 이 session 을 낳은 FOS 실행. 끝난 실행이어도 된다 |
+| `origin_execution_id` | BIGINT | 이 session 을 낳은 FOS 실행. 끝난 실행이어도 된다. 이 실행이 `CANCELLED` 면 MCP 호출을 거절한다 |
 | `root_session_id` | VARCHAR(128) | 서명한 `parent_root_session_id`. MCP 호출의 서명한 뿌리와 다르면 거절한다 |
 | `parent_session_id` | VARCHAR(128) | 이 session 을 만든 session. 최상위 session 이거나 다른 하위 에이전트 session 이다 |
 | `created_at` | DATETIME(6) | 등록 시각 |
