@@ -59,6 +59,10 @@
 각 줄의 근거는 [`adr/INDEX.md`](adr/INDEX.md) 에 있다.
 실제로 그렇게 도는지는 [`AGENTS.md`](../AGENTS.md) 의 「확인」 절이 적은 검사가 판정한다.
 
+가계부 개인 연동 토큰을 등록하면 자신의 가계부 전용 에이전트를 쓴다.
+연결 전과 해제 후에는 그 에이전트로 실행하지 못해야 한다.
+화면과 상태 계약은 [가계부 연결](connectors.md)이 갖는다.
+
 ## 범위 밖
 
 - **Hermes core 를 고치지 않는다.** profile 과 API server 와 plugin hook 만 쓴다.

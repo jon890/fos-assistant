@@ -32,6 +32,8 @@ type Props = {
   /** 요청자가 이 에이전트의 공개 범위를 바꾸고 지울 수 있으면 참이다. 「공개와 삭제」 절을 그릴지 정한다. */
   canManageAccess: boolean;
   adminError: string | null;
+  /** 연결 화면이 설정을 소유하는 에이전트면 일반 편집 절을 숨긴다. */
+  connectorManaged?: boolean;
 };
 
 type ErrorPayload = { code: string; message: string };
@@ -65,6 +67,7 @@ export function AgentDetailBody({
   adminAgent,
   canManageAccess,
   adminError,
+  connectorManaged = false,
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
   const [persona, setPersona] = useState<Loaded<PersonaView> | null>(
@@ -96,7 +99,12 @@ export function AgentDetailBody({
               </p>
             </div>
           ) : null}
-          {persona.ok ? (
+          {connectorManaged ? (
+            <div className="mx-auto w-full max-w-2xl">
+              <h1 className="mb-4 text-xl font-semibold">{name}</h1>
+              <p className="rounded-md border border-border bg-muted p-3 text-sm">가계부 연결 화면에서 이 에이전트의 연결 상태를 관리해요.</p>
+            </div>
+          ) : persona.ok ? (
             <PersonaEditor code={code} name={name} initialPersona={persona.data} />
           ) : (
             <div className="mx-auto w-full max-w-2xl">
@@ -106,7 +114,7 @@ export function AgentDetailBody({
           )}
         </>
       )}
-      {tools === null ? null : tools.ok ? (
+      {connectorManaged || tools === null ? null : tools.ok ? (
         <AgentToolsSection code={code} initialTools={tools.data.initialTools} admin={tools.data.admin}
           visibility={visibility} />
       ) : (
@@ -115,7 +123,7 @@ export function AgentDetailBody({
           <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">{tools.message}</p>
         </section>
       )}
-      {skills === null ? null : skills.ok ? (
+      {connectorManaged || skills === null ? null : skills.ok ? (
         <AgentSkillsSection code={code} initialSkills={skills.data} />
       ) : (
         <section aria-label="스킬" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
