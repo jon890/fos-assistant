@@ -309,7 +309,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 출처 | 적는 곳 |
 | --- | --- |
 | `COMMAND` | 커맨드로 turn 을 시작할 때 `chat` 이 적는다 |
-| `MODEL` | 실행 사건에서 `skill_view` 도구 호출을 받을 때 스킬 이름이 실려 있으면 `usage` 가 적는다 |
+| `MODEL` | 실행 사건에서 `skill_view` 도구 호출을 받을 때 스킬 이름이 실려 있으면 `usage` 가 적는다. 대화 turn 의 실행만 기록된다. 위임과 흐름의 하위 실행은 Hermes 사건을 옮기지 않아 기록되지 않는다 |
 
 | 경로 | 하는 일 |
 | --- | --- |
@@ -320,6 +320,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 무엇 | 어디 |
 | --- | --- |
 | 권한 판정과 저장 순서 | `skill/application/SkillService` |
+| 호출 이력 적기와 읽기 | `skill/application/SkillUseRecorder`, `skill/application/SkillUsageQuery` |
 | 버전 디렉터리 쓰기와 지우기 | `skill/infra/SkillStore` |
 | `external_dirs` 게시와 대시보드 스킬 목록 | `skill/infra/SkillPublisher`, 호출은 `hermes` |
 | 커맨드 판별과 입력 바꾸기 | `chat/application/SkillCommand` |

@@ -1052,6 +1052,11 @@ export function startFakeHermes(
             error: run.input === "병렬 하위 에이전트 검사" });
           event(response, { event: "tool.started", tool: "fake-reader", preview: "started" });
           event(response, { event: "tool.completed", tool: "fake-reader", duration: 0.25, error: false });
+          // 모델이 스킬을 읽은 사건이다. 실제 Hermes 는 `skill_view` 의 `preview` 에 스킬 이름을 싣는다.
+          if (run.input === "스킬 읽기 검사") {
+            event(response, { event: "tool.started", tool: "skill_view", preview: "shopping" });
+            event(response, { event: "tool.completed", tool: "skill_view", duration: 0.05, error: false });
+          }
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
           // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
           if (run.input === "병렬 하위 에이전트 검사") {

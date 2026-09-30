@@ -1,12 +1,14 @@
 package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,12 +24,20 @@ import org.springframework.stereotype.Service;
  * 스트리밍 경로에만 같은 사건이 두 줄 남는다.
  *
  * <p>이 클래스는 저장하지 않고 엔티티를 만들기만 한다. 저장을 부르는 쪽이 하면 저장 실패를 감싸는
- * 자리가 한 곳으로 모인다.
+ * 자리가 한 곳으로 모인다. 예외가 하나 있다. {@code skill_view} 도구 호출의 시작 사건은 스킬 호출 이력이기도
+ * 해서 {@link SkillUseRecorder} 에 넘겨 그 자리에서 적는다. 그 저장은 스스로 실패를 감싸므로 여기로 던지지
+ * 않는다.
  */
 @Service
+@RequiredArgsConstructor
 public class ExecutionEventRecorder {
 
     private static final Logger log = LoggerFactory.getLogger(ExecutionEventRecorder.class);
+
+    /** 모델이 스킬을 읽는 Hermes 도구의 이름이다. */
+    private static final String SKILL_VIEW_TOOL = "skill_view";
+
+    private final SkillUseRecorder skillUses;
 
     /**
      * Hermes 이름에서 우리 이름으로 가는 표다.
@@ -57,6 +67,9 @@ public class ExecutionEventRecorder {
         if (type == null) {
             log.debug("옮겨 적을 이름이 없어 Hermes 사건을 버린다 event={}", hermesName);
             return null;
+        }
+        if (type == ExecutionEventType.TOOL_STARTED && SKILL_VIEW_TOOL.equals(event.toolName())) {
+            skillUses.recordModel(execution.id(), event.detail());
         }
         return ExecutionEvent.builder()
                 .executionId(execution.id())

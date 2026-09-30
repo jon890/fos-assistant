@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.application.SkillUsageQuery;
 import com.bifos.assistant.usage.application.ExecutionTree;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -14,6 +15,7 @@ import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownView;
 import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
 import com.bifos.assistant.usage.presentation.UsageDtos.MonthlyCostView;
+import com.bifos.assistant.usage.presentation.UsageDtos.MySkillUsageView;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
 import java.time.YearMonth;
@@ -54,6 +56,7 @@ public class UsageController {
     private final AgentService agents;
     private final ExecutionTreeService executionTrees;
     private final ConversationRepository conversations;
+    private final SkillUsageQuery skillUsage;
 
     /**
      * 로그인한 사용자 자신의 실행만 준다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
@@ -68,14 +71,29 @@ public class UsageController {
                 currentUser.require().id(), PageRequest.of(0, size));
         Set<Long> withChildren = idsHavingChildren(page);
         Map<Long, UUID> publicIds = conversationPublicIds(page);
+        // 한 페이지의 실행 번호로 한 번에 읽는다. 줄마다 질의하지 않는다.
+        Map<Long, List<String>> skillNames =
+                skillUsage.skillNamesByExecution(page.stream().map(AgentExecution::id).toList());
         return page.stream()
                 .map(execution ->
                         ExecutionView.from(
                                 execution,
                                 agents.requireById(execution.agentId()),
                                 execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
-                                withChildren.contains(execution.id())))
+                                withChildren.contains(execution.id()),
+                                skillNames.getOrDefault(execution.id(), List.of())))
                 .toList();
+    }
+
+    /**
+     * 로그인한 사용자 자신이 부른 스킬의 합계다. 에이전트와 스킬 이름으로 묶는다.
+     *
+     * <p>자기 실행만 센다. 관리하는 사람이 보는 에이전트 전체의 합계는 스킬 목록의 {@code usage} 가 맡고,
+     * 거기에는 누가 어느 대화에서 불렀는지가 없다(ADR-034).
+     */
+    @GetMapping("/skills")
+    public List<MySkillUsageView> mySkillUsage() {
+        return skillUsage.byUser(currentUser.require().id()).stream().map(MySkillUsageView::from).toList();
     }
 
     /**

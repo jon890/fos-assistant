@@ -52,6 +52,7 @@ public class SkillService {
     private final AgentService agents;
     private final SkillStore store;
     private final SkillPublisher publisher;
+    private final SkillUsageQuery usage;
 
     /**
      * 그 에이전트의 스킬 목록이다. 읽을 수 있는 사람이면 누구나 본다.
@@ -59,25 +60,37 @@ public class SkillService {
      * <p>Hermes 목록에 지금 버전의 이름을 대조해 출처를 붙인다. 지금 버전에 있는데 Hermes 목록에 없는
      * 스킬도 올린 것으로 넣는다. 게시 직후 색인 전이거나 Hermes 가 건너뛴 스킬을 화면에서 지울 수 있어야
      * 하기 때문이다.
+     *
+     * <p>호출 합계는 편집자에게만 채운다. 그 에이전트의 실행 전체에서 센 것이라 누가 불렀는지는 담지 않는다.
+     * 호출이 없는 스킬은 0 이다.
      */
     public SkillList list(CurrentUser user, String code) {
         Agent agent = agents.requireReadable(user, code);
+        boolean editable = agents.isEditableBy(user, agent);
         String profile = agent.hermesProfile();
         Map<String, SkillBundle> uploaded = store.readCurrent(profile);
+        Map<String, SkillUsageSummary> usages = editable ? usage.byAgent(agent.id()) : Map.of();
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
             SkillSource source = uploaded.containsKey(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
             items.put(skill.name(), new SkillListItem(
-                    skill.name(), skill.description(), source, skill.enabled(), null));
+                    skill.name(), skill.description(), source, skill.enabled(),
+                    usageOf(editable, usages, skill.name())));
         }
         for (SkillBundle bundle : uploaded.values()) {
             items.putIfAbsent(bundle.name(), new SkillListItem(
-                    bundle.name(), descriptionOf(bundle.skillMd()), SkillSource.UPLOADED, true, null));
+                    bundle.name(), descriptionOf(bundle.skillMd()), SkillSource.UPLOADED, true,
+                    usageOf(editable, usages, bundle.name())));
         }
-        return new SkillList(
-                List.copyOf(items.values()),
-                agents.isEditableBy(user, agent),
-                publisher.skillsToolsetEnabled(agent));
+        return new SkillList(List.copyOf(items.values()), editable, publisher.skillsToolsetEnabled(agent));
+    }
+
+    private static SkillUsageSummary usageOf(
+            boolean editable, Map<String, SkillUsageSummary> usages, String name) {
+        if (!editable) {
+            return null;
+        }
+        return usages.getOrDefault(name, new SkillUsageSummary(0, null));
     }
 
     /** 올린 스킬 하나의 원문이다. 편집자만 본다. 없으면 {@link ErrorCode#SKILL_NOT_FOUND} 다. */

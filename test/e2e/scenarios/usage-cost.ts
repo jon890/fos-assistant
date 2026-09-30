@@ -4,6 +4,7 @@ import { DAD_BINDING } from "./binding.ts";
 import { ADDRESS_TURNS } from "./agent-address.ts";
 import { CHAT_TURNS } from "./chat.ts";
 import { MEMORY_CONTEXT_TURNS } from "./memory.ts";
+import { SKILL_READ_TURNS } from "./skills.ts";
 import { STARTER_RUNS } from "./starters.ts";
 
 /**
@@ -18,7 +19,7 @@ import { STARTER_RUNS } from "./starters.ts";
 const MICROS_PER_RUN = 1440;
 const HELD_RUN_TIMEOUT_MS = 5_000;
 /** 추천 질문을 만든 실행도 같은 바인딩으로 돌아 같은 금액이 남는다. */
-const COMPLETED_TURNS = CHAT_TURNS + MEMORY_CONTEXT_TURNS + ADDRESS_TURNS + STARTER_RUNS;
+const COMPLETED_TURNS = CHAT_TURNS + MEMORY_CONTEXT_TURNS + ADDRESS_TURNS + STARTER_RUNS + SKILL_READ_TURNS;
 
 type ExecutionView = {
   id: number;

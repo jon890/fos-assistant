@@ -5,13 +5,23 @@
  * <p>`dad` 에이전트를 쓴다. 그 profile 은 `skills` 도구가 꺼진 채 시작하므로 첫 저장이 도구까지 함께 켜는
  * 길을 지난다. 끝나면 스킬을 모두 지워 뒤의 시나리오에 남기지 않는다.
  */
-import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, step, type Context, type Response, type Scenario } from "../harness.ts";
+import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { DAD_BINDING } from "./binding.ts";
 
-type SkillItem = { name: string; description: string; source: "UPLOADED" | "HERMES"; enabled: boolean; usage?: unknown };
+/** 모델이 스킬을 읽는 대화를 한 번 보낸다. 사용량 시나리오가 그 횟수로 합계를 검사한다. */
+export const SKILL_READ_TURNS = 1;
+
+type SkillUsage = { count: number; lastInvokedAt: string | null };
+type SkillItem = { name: string; description: string; source: "UPLOADED" | "HERMES"; enabled: boolean; usage?: SkillUsage };
 type SkillList = { skills: SkillItem[]; editable: boolean; skillsToolsetEnabled: boolean };
 type SkillDetail = { name: string; description: string; body: string; files: { path: string; size: number }[] };
 type ErrorBody = { code: string };
+type ChatEvent = { type: string; conversationId?: string; executionId?: number };
+type MySkillUsage = {
+  agentCode: string; agentName: string; skillName: string; count: number; lastInvokedAt: string; lastConversationId: string | null;
+};
+type ExecutionRow = { id: number; skillNames: string[] };
 
 const NAME = "weekly-plan";
 const DESCRIPTION = "이번 주 계획을 세운다";
@@ -145,8 +155,62 @@ export const skillsScenario: Scenario = {
       "없는 스킬 지우기",
     );
     expect(missing.json<ErrorBody>().code === "SKILL_NOT_FOUND", `기대한 오류 코드가 아니다: ${missing.body}`);
+
+    step("모델이 skill_view 로 스킬을 읽으면 자기 호출 이력과 실행 줄의 스킬 이름에 보인다");
+    const streamed = expectStatus(
+      await call(context, "/chat/messages/stream", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: "스킬 읽기 검사", agentCode: "dad" },
+      }),
+      200,
+      "스킬을 읽는 대화",
+    );
+    const done = (await events(streamed)).at(-1);
+    expect(done?.type === "done" && done.executionId !== undefined, `마지막 사건이 done 이 아니다: ${JSON.stringify(done)}`);
+    const mine = expectStatus(
+      await call(context, "/usage/skills", { token: context.tokens.dad }),
+      200,
+      "자기 스킬 호출 이력",
+    ).json<MySkillUsage[]>();
+    const shopping = mine.find((usage) => usage.skillName === "shopping");
+    expect(
+      shopping?.agentCode === "dad" && shopping.count === SKILL_READ_TURNS && shopping.lastConversationId === done!.conversationId,
+      `읽은 스킬이 자기 호출 이력에 없거나 다르다: ${JSON.stringify(mine)}`,
+    );
+    const rows = expectStatus(
+      await call(context, "/usage/executions?limit=10", { token: context.tokens.dad }),
+      200,
+      "실행 목록",
+    ).json<ExecutionRow[]>();
+    const row = rows.find((execution) => execution.id === done!.executionId);
+    expect(row?.skillNames.includes("shopping") === true, `실행 줄의 skillNames 에 읽은 스킬이 없다: ${JSON.stringify(row)}`);
+    const withUsage = await listOf(context, context.tokens.dad);
+    expect(
+      withUsage.skills.every((skill) => skill.usage !== undefined),
+      `주인의 목록에 usage 가 없는 스킬이 있다: ${JSON.stringify(withUsage.skills)}`,
+    );
+    expect(
+      !mine.some((usage) => usage.agentCode !== "dad"),
+      `다른 에이전트의 호출이 섞였다: ${JSON.stringify(mine)}`,
+    );
+    const kidUsage = expectStatus(
+      await call(context, "/usage/skills", { token: context.tokens.kid }),
+      200,
+      "다른 사용자의 스킬 호출 이력",
+    ).json<MySkillUsage[]>();
+    expect(!kidUsage.some((usage) => usage.skillName === "shopping"), "다른 사용자의 이력에 아빠의 호출이 보인다");
   },
 };
+
+async function events(response: Response): Promise<ChatEvent[]> {
+  const received: ChatEvent[] = [];
+  await readEventStream<ChatEvent>(
+    new globalThis.Response(response.body, { headers: { "Content-Type": "text/event-stream" } }),
+    (event) => received.push(event),
+  );
+  return received;
+}
 
 async function listOf(context: Context, token: string): Promise<SkillList> {
   return expectStatus(await call(context, "/agents/dad/skills", { token }), 200, "스킬 목록").json<SkillList>();

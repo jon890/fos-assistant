@@ -34,6 +34,7 @@ import com.bifos.assistant.skill.application.SkillList;
 import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.application.SkillSource;
+import com.bifos.assistant.skill.application.SkillUsageSummary;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
 import java.nio.file.Files;
@@ -260,9 +261,11 @@ class SkillServiceTest {
         SkillList list = skills.list(OWNER, OWNED);
         assertThat(list.editable()).isTrue();
         assertThat(list.skillsToolsetEnabled()).as("대역의 켜진 목록에 skills 가 없다").isFalse();
+        // 편집자에게는 호출이 없는 스킬에도 합계가 0 으로 붙는다.
+        SkillUsageSummary noUse = new SkillUsageSummary(0, null);
         assertThat(list.skills()).containsExactly(
-                new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, null),
-                new SkillListItem("weekly-plan", "이번 주 계획을 세운다", SkillSource.UPLOADED, false, null));
+                new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, noUse),
+                new SkillListItem("weekly-plan", "이번 주 계획을 세운다", SkillSource.UPLOADED, false, noUse));
 
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
         when(skillClient.list(GROUP_PROFILE)).thenReturn(List.of());
