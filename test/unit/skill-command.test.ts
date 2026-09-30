@@ -46,6 +46,6 @@ test("커맨드로 부를 이름은 켜진 스킬 가운데 점과 밑줄이 없
     { name: "off-skill", description: "", source: "UPLOADED" as const, enabled: false },
     { name: "note_taking.v2", description: "", source: "HERMES" as const, enabled: true },
   ];
-  assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: true }), ["weekly-plan"]);
-  assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: false }), []);
+  assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: true, uploadLimit: 30 }), ["weekly-plan"]);
+  assert.deepEqual(commandSkillNames({ skills, editable: true, skillsToolsetEnabled: false, uploadLimit: 30 }), []);
 });

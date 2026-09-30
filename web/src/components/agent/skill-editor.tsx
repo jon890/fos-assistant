@@ -10,7 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { SKILL_NAME_PATTERN, type SkillDetailView, type SkillListView } from "@/lib/skill";
+import {
+  hasBodyAfterFrontmatter,
+  indexedDescriptionLength,
+  MAX_DESCRIPTION_CHARS,
+  MAX_NEW_DESCRIPTION_CHARS,
+  SKILL_NAME_PATTERN,
+  type SkillDetailView,
+  type SkillListView,
+} from "@/lib/skill";
 
 type Props = {
   code: string;
@@ -81,6 +89,15 @@ function frontmatterField(block: string, key: string): { value: string; multilin
   const value = blockMarker ? "" : (quoted ? quoted[2]! : inline.replace(/(^|\s)#.*$/, "")).trim();
   const next = lines.slice(index + 1).find((line) => line.trim() !== "");
   return { value, multiline: blockMarker || (next !== undefined && /^\s/.test(next)) };
+}
+
+/**
+ * 화면이 description 글자 수를 세도 되는 값인지 본다. 여러 줄이면 서버가 값을 이어 붙이고, 백슬래시나 `''` 는
+ * YAML 이 따옴표 안에서 한 글자로 줄이며, 여는 따옴표가 남았으면 뒤에 주석이 붙어 따옴표를 못 벗긴 것이다.
+ * 이런 값을 화면이 세면 서버보다 많이 세어 저장할 수 있는 값을 막으므로, 세지 않고 서버에 맡긴다.
+ */
+function isCountable(description: { value: string; multiline: boolean }): boolean {
+  return !description.multiline && !/[\\]|''|^['"]/.test(description.value);
 }
 
 function formatSize(bytes: number): string {
@@ -167,6 +184,18 @@ export function SkillEditor({ code, initial }: Props) {
     if (description !== null && !description.multiline && description.value === "") {
       return "앞머리에 description 을 적어 주세요.";
     }
+    if (!hasBodyAfterFrontmatter(body.slice(frontmatter[0].length))) {
+      return "SKILL.md 앞머리 아래에 스킬 본문을 적어 주세요.";
+    }
+    if (description !== null && isCountable(description)) {
+      if (Array.from(description.value).length > MAX_DESCRIPTION_CHARS) {
+        return `description 은 ${MAX_DESCRIPTION_CHARS.toLocaleString("ko-KR")}자까지 쓸 수 있어요.`;
+      }
+      const indexed = indexedDescriptionLength(description.value);
+      if (isNew && indexed > MAX_NEW_DESCRIPTION_CHARS) {
+        return `새 스킬의 description 은 ${MAX_NEW_DESCRIPTION_CHARS}자까지 쓸 수 있어요. 지금은 ${indexed}자예요. 자세한 설명은 본문에 적어 주세요.`;
+      }
+    }
     if (files.length > MAX_FILES) return `참고 파일은 ${MAX_FILES}개까지 둘 수 있어요.`;
     if (body.length > MAX_CHARS_PER_FILE) return `SKILL.md 는 ${MAX_CHARS_PER_FILE.toLocaleString("ko-KR")}자까지 쓸 수 있어요.`;
     const longFile = files.find((entry) => entry.content !== undefined && entry.content.length > MAX_CHARS_PER_FILE);
@@ -190,6 +219,13 @@ export function SkillEditor({ code, initial }: Props) {
       const list = (await response.json()) as SkillListView;
       if (list.skills.some((skill) => skill.source === "UPLOADED" && skill.name === skillName)) {
         return "이미 같은 이름의 스킬이 있어요.";
+      }
+      // 옛 응답에는 한도가 없다. 서버가 최종으로 거절하므로 숫자가 아니면 개수는 보지 않는다.
+      if (
+        typeof list.uploadLimit === "number"
+        && list.skills.filter((skill) => skill.source === "UPLOADED").length >= list.uploadLimit
+      ) {
+        return `스킬은 에이전트마다 최대 ${list.uploadLimit}개까지 만들 수 있어요.`;
       }
     }
     return null;

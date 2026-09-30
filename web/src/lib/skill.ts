@@ -30,6 +30,8 @@ export type SkillListView = {
   editable: boolean;
   /** 그 에이전트의 API 실행에 `skills` toolset 이 켜져 있다. */
   skillsToolsetEnabled: boolean;
+  /** 올릴 수 있는 스킬 수의 한도. 새 스킬을 만들 때만 본다. */
+  uploadLimit: number;
 };
 
 /** 참고 파일의 경로와 UTF-8 바이트 크기다. */
@@ -59,3 +61,28 @@ export type SkillUsageRow = {
   lastInvokedAt: string;
   lastConversationId: string | null;
 };
+
+/**
+ * 새 스킬의 description 이 넘을 수 없는 글자 수다. Hermes 가 새 스킬을 만들 때 거는 한도다.
+ * backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
+ */
+export const MAX_NEW_DESCRIPTION_CHARS = 60;
+
+/**
+ * description 이 넘을 수 없는 글자 수다. Hermes 가 저장할 때마다 거는 한도다.
+ * backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
+ */
+export const MAX_DESCRIPTION_CHARS = 1024;
+
+/**
+ * 새 스킬의 60자 한도에 견주는 description 글자 수다. 앞뒤 공백을 뺀 뒤 양 끝의 `'` 와 `"` 를 몇 개든 빼고,
+ * 이모지가 둘로 세어지지 않게 code point 로 센다. 백엔드 `SkillFrontmatter.indexedDescriptionLength` 와 함께 고친다.
+ */
+export function indexedDescriptionLength(value: string): number {
+  return Array.from(value.trim().replace(/^['"]+/, "").replace(/['"]+$/, "")).length;
+}
+
+/** 앞머리 뒤의 글이 공백뿐이 아니면 참이다. 백엔드는 본문이 빈 스킬을 거절한다. */
+export function hasBodyAfterFrontmatter(rest: string): boolean {
+  return rest.trim() !== "";
+}
