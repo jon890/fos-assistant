@@ -114,6 +114,13 @@ public enum ErrorCode {
      * 근거는 ADR-034 다.
      */
     SKILL_NAME_TAKEN(HttpStatus.CONFLICT),
+    /**
+     * 메시지가 {@code /이름} 으로 시작했는데 그 이름이 그 에이전트의 켜진 스킬이 아니다.
+     *
+     * <p>Hermes 에 보내지 않고 대화, 메시지, 실행도 만들지 않는다. {@code skills} toolset 이 꺼진 에이전트는
+     * 켜진 스킬이 없는 것으로 본다. 근거는 ADR-035 다.
+     */
+    SKILL_COMMAND_UNKNOWN(HttpStatus.BAD_REQUEST),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),

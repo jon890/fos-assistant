@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>같은 에이전트의 저장은 기다리는 행 잠금으로 한 번에 하나씩 돈다. 잠금은 트랜잭션이 끝날 때 풀리므로
  * {@link #save} 와 {@link #delete} 는 잠금부터 표식 쓰기와 옛 버전 정리까지 한 트랜잭션이다. 그동안
  * 같은 에이전트의 도구와 공개 범위 변경은 {@code AGENT_BUSY} 로 거절된다.
+ *
+ * <p>저장, 지우기, 켜고 끄기가 Hermes 에 반영되면 {@link SkillsChanged} 를 낸다. 커맨드가 부를 수 있는 이름의
+ * 캐시({@link SkillCommandCatalog})가 그것을 받아 비운다. catalog 를 직접 받지 않는 것은 catalog 가 이
+ * 서비스를 받기 때문이다.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,6 +69,7 @@ public class SkillService {
     private final SkillStore store;
     private final SkillPublisher publisher;
     private final SkillUsageQuery usage;
+    private final ApplicationEventPublisher events;
 
     /**
      * 그 에이전트의 스킬 목록이다. 읽을 수 있는 사람이면 누구나 본다.
@@ -148,6 +154,7 @@ public class SkillService {
         Map<String, SkillBundle> next = new LinkedHashMap<>(current);
         next.put(name, bundle);
         publishVersion(user, agent, next);
+        events.publishEvent(new SkillsChanged(agent.id()));
         return detailOf(bundle);
     }
 
@@ -173,9 +180,10 @@ public class SkillService {
         if (remaining.isEmpty()) {
             publisher.publish(user, agent, List.of());
             store.deleteAll(profile);
-            return;
+        } else {
+            publishVersion(user, agent, remaining);
         }
-        publishVersion(user, agent, remaining);
+        events.publishEvent(new SkillsChanged(agent.id()));
     }
 
     /**
@@ -188,6 +196,7 @@ public class SkillService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name must follow the Hermes skill name rule");
         }
         publisher.toggle(agent.hermesProfile(), name, enabled);
+        events.publishEvent(new SkillsChanged(agent.id()));
     }
 
     /** 지금 버전의 그 스킬, 없으면 표식 없이 남은 더 새 버전의 그 스킬이다. 둘 다 없으면 {@code null} 이다. */

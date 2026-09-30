@@ -12,12 +12,15 @@ import { DAD_BINDING } from "./binding.ts";
 /** 모델이 스킬을 읽는 대화를 한 번 보낸다. 사용량 시나리오가 그 횟수로 합계를 검사한다. */
 export const SKILL_READ_TURNS = 1;
 
+/** 스킬 커맨드로 끝난 대화 turn 수다. 없는 이름으로 거절한 커맨드는 실행을 만들지 않아 세지 않는다. */
+export const SKILL_COMMAND_TURNS = 1;
+
 type SkillUsage = { count: number; lastInvokedAt: string | null };
 type SkillItem = { name: string; description: string; source: "UPLOADED" | "HERMES"; enabled: boolean; usage?: SkillUsage };
 type SkillList = { skills: SkillItem[]; editable: boolean; skillsToolsetEnabled: boolean };
 type SkillDetail = { name: string; description: string; body: string; files: { path: string; size: number }[] };
 type ErrorBody = { code: string };
-type ChatEvent = { type: string; conversationId?: string; executionId?: number };
+type ChatEvent = { type: string; conversationId?: string; executionId?: number; code?: string };
 type MySkillUsage = {
   agentCode: string; agentName: string; skillName: string; count: number; lastInvokedAt: string; lastConversationId: string | null;
 };
@@ -131,6 +134,63 @@ export const skillsScenario: Scenario = {
     const republished = context.hermes.skillDirsOf(DAD_BINDING.profileName);
     expect(republished.length === 1 && republished[0] !== published[0], "다시 저장했는데 새 버전이 게시되지 않았다");
 
+    step("켜진 스킬을 커맨드로 부르면 skill_view 로 읽으라는 입력이 가고 호출은 실행 수로 한 번이다");
+    const commanded = expectStatus(
+      await call(context, "/chat/messages/stream", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: `/${NAME} 이번 주`, agentCode: "dad" },
+      }),
+      200,
+      "스킬 커맨드",
+    );
+    const commandDone = (await events(commanded)).at(-1);
+    expect(commandDone?.type === "done" && commandDone.executionId !== undefined, `커맨드의 마지막 사건이 done 이 아니다: ${JSON.stringify(commandDone)}`);
+    const commandInput = context.hermes.lastSubmittedInput() ?? "";
+    expect(
+      commandInput.includes(`skill_view(name="${NAME}")`) && commandInput.includes("이번 주"),
+      `Hermes 에 간 입력이 스킬을 읽게 하지 않는다: ${commandInput}`,
+    );
+    const commandUsage = expectStatus(
+      await call(context, "/usage/skills", { token: context.tokens.dad }),
+      200,
+      "커맨드 뒤 자기 스킬 호출 이력",
+    ).json<MySkillUsage[]>();
+    const weekly = commandUsage.find((usage) => usage.skillName === NAME);
+    expect(
+      weekly?.count === SKILL_COMMAND_TURNS && weekly.lastConversationId === commandDone!.conversationId,
+      `COMMAND 와 MODEL 줄이 함께 있는 실행이 한 번으로 세어지지 않는다: ${JSON.stringify(commandUsage)}`,
+    );
+
+    step("켜진 스킬이 아닌 커맨드는 Hermes 에 보내지 않고 거절하며 대화를 만들지 않는다");
+    const conversationsBefore = await conversationCount(context);
+    const rejected = expectStatus(
+      await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: "/nope 해 줘", agentCode: "dad" },
+      }),
+      400,
+      "없는 스킬 커맨드",
+    );
+    expect(rejected.json<ErrorBody>().code === "SKILL_COMMAND_UNKNOWN", `기대한 오류 코드가 아니다: ${rejected.body}`);
+    const rejectedStream = await events(expectStatus(
+      await call(context, "/chat/messages/stream", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: "/nope 해 줘", agentCode: "dad" },
+      }),
+      200,
+      "없는 스킬 커맨드 스트림",
+    ));
+    expect(
+      rejectedStream[0]?.type === "error" && rejectedStream[0].code === "SKILL_COMMAND_UNKNOWN"
+        && !rejectedStream.some((event) => event.type === "started"),
+      `스트림이 SKILL_COMMAND_UNKNOWN 오류로 시작하지 않는다: ${JSON.stringify(rejectedStream)}`,
+    );
+    const conversationsAfter = await conversationCount(context);
+    expect(conversationsAfter === conversationsBefore, `거절한 커맨드가 대화를 만들었다: ${conversationsBefore} → ${conversationsAfter}`);
+
     step("끄면 목록에 꺼진 것으로 보인다");
     expectStatus(
       await call(context, `/agents/dad/skills/${NAME}/enabled`, { method: "PUT", token: context.tokens.dad, body: { enabled: false } }),
@@ -210,6 +270,14 @@ async function events(response: Response): Promise<ChatEvent[]> {
     (event) => received.push(event),
   );
   return received;
+}
+
+async function conversationCount(context: Context): Promise<number> {
+  return expectStatus(
+    await call(context, "/chat/conversations", { token: context.tokens.dad }),
+    200,
+    "대화 목록",
+  ).json<unknown[]>().length;
 }
 
 async function listOf(context: Context, token: string): Promise<SkillList> {

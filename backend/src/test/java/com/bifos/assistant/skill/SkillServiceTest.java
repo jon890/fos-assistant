@@ -36,6 +36,7 @@ import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.application.SkillSource;
 import com.bifos.assistant.skill.application.SkillUsageSummary;
+import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
 import java.nio.charset.StandardCharsets;
@@ -58,6 +59,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -70,6 +73,7 @@ import org.springframework.web.client.HttpClientErrorException;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@RecordApplicationEvents
 class SkillServiceTest {
 
     private static final String OWNED = "skill-owned";
@@ -92,6 +96,9 @@ class SkillServiceTest {
 
     @MockitoBean HermesSkillClient skillClient;
     @MockitoBean HermesToolsetClient toolsets;
+
+    /** 스킬 커맨드의 캐시를 비우는 {@link SkillsChanged} 를 서비스가 냈는지 본다. */
+    @Autowired ApplicationEvents applicationEvents;
 
     @BeforeEach
     void 준비한다() {
@@ -227,6 +234,40 @@ class SkillServiceTest {
 
         verify(skillClient).publish(GROUP_PROFILE, List.of(), null);
         assertThat(SKILL_ROOT.resolve(GROUP_PROFILE)).doesNotExist();
+    }
+
+    @Test
+    void 저장과_켜고_끄기와_지우기가_Hermes_에_반영되면_그_에이전트의_SkillsChanged_를_낸다() {
+        Long agentId = agents.findByCode(OWNED).orElseThrow().id();
+
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+        skills.toggle(OWNER, OWNED, "weekly-plan", false);
+        skills.delete(OWNER, OWNED, "weekly-plan");
+        skills.delete(OWNER, OWNED, "shopping");
+
+        assertThat(applicationEvents.stream(SkillsChanged.class))
+                .as("저장 둘, 켜고 끄기 하나, 지우기 둘(마지막 스킬 포함)")
+                .containsExactly(
+                        new SkillsChanged(agentId), new SkillsChanged(agentId), new SkillsChanged(agentId),
+                        new SkillsChanged(agentId), new SkillsChanged(agentId));
+    }
+
+    @Test
+    void Hermes_가_거절해_저장과_켜고_끄기와_지우기가_실패하면_SkillsChanged_를_내지_않는다() {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        applicationEvents.clear();
+        HermesRequestRejected rejected = new HermesRequestRejected(ErrorCode.HERMES_UNAVAILABLE, "rejected",
+                new HttpClientErrorException(HttpStatus.BAD_REQUEST));
+        doThrow(rejected).when(skillClient).publish(anyString(), anyList(), any());
+        doThrow(rejected).when(skillClient).toggle(anyString(), anyString(), anyBoolean());
+
+        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
+                ErrorCode.HERMES_UNAVAILABLE);
+        assertCode(() -> skills.toggle(OWNER, OWNED, "weekly-plan", false), ErrorCode.HERMES_UNAVAILABLE);
+        assertCode(() -> skills.delete(OWNER, OWNED, "weekly-plan"), ErrorCode.HERMES_UNAVAILABLE);
+
+        assertThat(applicationEvents.stream(SkillsChanged.class)).isEmpty();
     }
 
     @Test

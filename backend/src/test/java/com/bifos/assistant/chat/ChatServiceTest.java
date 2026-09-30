@@ -3,8 +3,12 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
@@ -12,6 +16,7 @@ import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.SkillCommand;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -32,9 +37,16 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.application.SkillList;
+import com.bifos.assistant.skill.application.SkillListItem;
+import com.bifos.assistant.skill.application.SkillService;
+import com.bifos.assistant.skill.application.SkillSource;
+import com.bifos.assistant.skill.application.SkillsChanged;
+import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -48,9 +60,11 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +72,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
@@ -102,6 +117,11 @@ class ChatServiceTest {
     @MockitoSpyBean ExecutionEventRepository executionEvents;
 
     @Autowired ExecutionSkillUseRepository skillUses;
+
+    /** 스킬 커맨드가 확인하는 켜진 스킬 목록을 테스트가 정한다. Hermes 대시보드를 부르지 않는다. */
+    @MockitoBean SkillService skillService;
+
+    @Autowired ApplicationEventPublisher applicationEvents;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -666,5 +686,173 @@ class ChatServiceTest {
                     assertThat(event.detail()).isEqualTo("HERMES_UNAVAILABLE");
                     assertThat(event.sequence()).isEqualTo(1);
                 });
+    }
+
+    /** 그 에이전트의 스킬 목록을 이렇게 답하게 한다. 이름 뒤에 {@code :off} 를 붙이면 꺼진 스킬이다. */
+    private void skillsOf(String agentCode, boolean skillsToolsetEnabled, String... names) {
+        List<SkillListItem> items = Arrays.stream(names)
+                .map(name -> name.endsWith(":off")
+                        ? new SkillListItem(name.substring(0, name.length() - 4), "", SkillSource.UPLOADED, false, null)
+                        : new SkillListItem(name, "", SkillSource.UPLOADED, true, null))
+                .toList();
+        when(skillService.list(any(), eq(agentCode))).thenReturn(new SkillList(items, true, skillsToolsetEnabled));
+    }
+
+    private List<ExecutionSkillUse> skillUsesOf(Long executionId) {
+        return skillUses.findByExecutionIdInOrderByExecutionIdAscSkillNameAsc(List.of(executionId));
+    }
+
+    private static void assertCode(ThrowingCallable call, ErrorCode expected) {
+        assertThatThrownBy(call)
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(expected);
+    }
+
+    private static HermesRunResult answered(String runId, String output) {
+        return HermesRunResult.of(runId, "sess-1", "completed", output, "dad", null, TokenUsage.empty());
+    }
+
+    @Test
+    void 켜진_스킬의_커맨드는_Hermes_입력만_바꾸고_메시지는_원문으로_저장하며_COMMAND_이력을_남긴다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        skillsOf("dad", true, "shopping", "cooking:off");
+        stub().willReturn(answered("run-1", "장보기 목록이에요"));
+
+        ChatTurn turn = chat.send(dad, null, "/shopping 이번 주", "dad");
+
+        Conversation conversation = conversations.findById(turn.conversationId()).orElseThrow();
+        assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.input())
+                    .isEqualTo(artifactService.agentPreamble(conversation)
+                            + new SkillCommand("shopping", "이번 주").hermesInput())
+                    .contains("skill_view(name=\"shopping\")", "이번 주")
+                    .doesNotContain("/shopping");
+        });
+        assertThat(conversation.title()).as("대화 제목").isEqualTo("/shopping 이번 주");
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .first()
+                .satisfies(message -> {
+                    assertThat(message.role()).isEqualTo(MessageRole.USER);
+                    assertThat(message.content()).isEqualTo("/shopping 이번 주");
+                });
+        assertThat(skillUsesOf(turn.executionId()))
+                .singleElement()
+                .satisfies(use -> {
+                    assertThat(use.skillName()).isEqualTo("shopping");
+                    assertThat(use.source()).isEqualTo(SkillUseSource.COMMAND);
+                });
+    }
+
+    @Test
+    void 켜진_스킬이_아닌_커맨드는_SKILL_COMMAND_UNKNOWN_이고_대화도_메시지도_실행도_만들지_않는다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        skillsOf("dad", true, "shopping", "cooking:off");
+        stub().willReturn(answered("run-1", "네"));
+
+        assertCode(() -> chat.send(dad, null, "/nope 해 줘", "dad"), ErrorCode.SKILL_COMMAND_UNKNOWN);
+        assertCode(() -> chat.send(dad, null, "/cooking", "dad"), ErrorCode.SKILL_COMMAND_UNKNOWN);
+        List<ChatEvent> relayed = new ArrayList<>();
+        assertCode(() -> chat.stream(dad, null, "/nope 해 줘", "dad", relayed::add), ErrorCode.SKILL_COMMAND_UNKNOWN);
+
+        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id())).as("대화").isEmpty();
+        assertThat(messages.count()).as("메시지 수").isZero();
+        assertThat(executions.count()).as("실행 수").isZero();
+        assertThat(stub().received()).as("Hermes 에 보낸 것").isEmpty();
+        assertThat(relayed).as("스트림 사건").isEmpty();
+    }
+
+    @Test
+    void 이어_쓰는_대화에서도_없는_이름이면_거절하고_메시지를_더하지_않는다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        skillsOf("dad", true, "shopping");
+        stub().willReturn(answered("run-1", "네"));
+        ChatTurn first = chat.send(dad, null, "안녕", "dad");
+
+        assertCode(() -> chat.send(dad, first.conversationId(), "/nope", null), ErrorCode.SKILL_COMMAND_UNKNOWN);
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(first.conversationId())).as("메시지").hasSize(2);
+        assertThat(executions.count()).as("실행 수").isOne();
+    }
+
+    @Test
+    void skills_toolset_이_꺼진_에이전트는_켜진_스킬이어도_SKILL_COMMAND_UNKNOWN_이다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        skillsOf("dad", false, "shopping");
+        stub().willReturn(answered("run-1", "네"));
+
+        assertCode(() -> chat.send(dad, null, "/shopping 이번 주", "dad"), ErrorCode.SKILL_COMMAND_UNKNOWN);
+
+        assertThat(stub().received()).isEmpty();
+        assertThat(executions.count()).isZero();
+    }
+
+    @Test
+    void 흐름이_붙은_에이전트는_커맨드를_해석하지_않고_글_그대로_보낸다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        agent.assignFlow(ResearchAndBuildFlow.NAME);
+        agents.save(agent);
+        stub().willAnswer(command -> {
+            if (command.input().contains("조사할 것과 만들 것을 나눈다")) {
+                return answered("chief", "{\"research\":\"자료\",\"build\":\"구현\"}");
+            }
+            return answered("step", "단계 답");
+        });
+
+        ChatTurn turn = chat.send(dad, null, "/shopping 이번 주", "dad");
+
+        assertThat(stub().received()).as("Hermes 에 보낸 것").isNotEmpty()
+                .allSatisfy(command -> assertThat(command.input()).doesNotContain("skill_view"));
+        assertThat(stub().received())
+                .anySatisfy(command -> assertThat(command.input()).contains("/shopping 이번 주"));
+        assertThat(skillUses.count()).as("스킬 이력").isZero();
+        assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
+                .first()
+                .satisfies(message -> assertThat(message.content()).isEqualTo("/shopping 이번 주"));
+    }
+
+    @Test
+    void 다시_생성도_바꾼_입력을_보내고_그_실행에_COMMAND_이력을_남긴다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        skillsOf("dad", true, "shopping");
+        stub().willReturnInOrder(answered("first", "첫 답"), answered("second", "새 답"));
+        ChatTurn first = chat.send(dad, null, "/shopping 이번 주", "dad");
+
+        List<ChatEvent> relayed = new ArrayList<>();
+        chat.regenerate(dad, first.conversationId(), relayed::add);
+
+        String expected = artifactService.agentPreamble(conversations.findById(first.conversationId()).orElseThrow())
+                + new SkillCommand("shopping", "이번 주").hermesInput();
+        assertThat(stub().received()).extracting(command -> command.input()).containsExactly(expected, expected);
+        Long regenerated = relayed.getLast().executionId();
+        assertThat(regenerated).isNotEqualTo(first.executionId());
+        assertThat(skillUsesOf(regenerated))
+                .singleElement()
+                .satisfies(use -> {
+                    assertThat(use.skillName()).isEqualTo("shopping");
+                    assertThat(use.source()).isEqualTo(SkillUseSource.COMMAND);
+                });
+    }
+
+    @Test
+    void 켜진_스킬_목록은_에이전트마다_캐시하고_SkillsChanged_를_받으면_다시_읽는다() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Long agentId = agents.findByCode("dad").orElseThrow().id();
+        skillsOf("dad", true, "shopping");
+        stub().willReturn(answered("run-1", "네"));
+        ChatTurn first = chat.send(dad, null, "/shopping 하나", "dad");
+        chat.send(dad, first.conversationId(), "/shopping 둘", null);
+        verify(skillService, times(1)).list(any(), eq("dad"));
+
+        // 목록이 바뀌어도 사건 전에는 들고 있던 목록으로 판별한다.
+        skillsOf("dad", true, "shopping:off");
+        chat.send(dad, first.conversationId(), "/shopping 셋", null);
+
+        applicationEvents.publishEvent(new SkillsChanged(agentId));
+
+        assertCode(() -> chat.send(dad, first.conversationId(), "/shopping 넷", null),
+                ErrorCode.SKILL_COMMAND_UNKNOWN);
+        assertThat(stub().received()).as("Hermes 에 보낸 것").hasSize(3);
     }
 }
