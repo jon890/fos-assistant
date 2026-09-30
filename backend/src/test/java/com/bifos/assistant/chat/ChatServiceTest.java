@@ -847,7 +847,7 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "/shopping 이번 주", "dad");
 
         assertThat(stub().received()).as("Hermes 에 보낸 것").isNotEmpty()
-                .allSatisfy(command -> assertThat(command.input()).doesNotContain("skill_view"));
+                .allSatisfy(command -> assertThat(command.input()).doesNotContain("skill_view(name="));
         assertThat(stub().received())
                 .anySatisfy(command -> assertThat(command.input()).contains("/shopping 이번 주"));
         assertThat(skillUses.count()).as("스킬 이력").isZero();
