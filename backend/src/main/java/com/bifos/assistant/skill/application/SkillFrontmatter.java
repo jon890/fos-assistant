@@ -14,10 +14,15 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * <p>앞머리는 파일 맨 앞의 {@code ---} 줄과 그다음 {@code ---} 줄 사이의 YAML 이다. Hermes 가 스킬 목록에
  * 쓰는 이름과 설명이 여기서 나오므로, 올릴 때 같은 자리를 같은 규칙으로 읽어 둘이 어긋나지 않게 한다.
  *
- * @param name 앞머리의 {@code name}
- * @param description 앞머리의 {@code description}
+ * <p>본문이 없어도 읽기는 성공한다. 본문 검사는 저장할 때 {@link SkillService} 가 한다. 설명만 읽는 자리가
+ * 본문 없는 옛 스킬도 읽을 수 있어야 하기 때문이다.
+ *
+ * @param name 앞머리의 {@code name}. 앞뒤 공백을 뺀 값이다
+ * @param description 앞머리의 {@code description}. 앞뒤 공백을 뺀 값이고 화면에 보이는 값이다
+ * @param rawDescription 앞머리의 {@code description} 을 문자열로 바꾼 원래 값. 앞뒤를 빼지 않는다
+ * @param hasBody 닫는 {@code ---} 줄 뒤에 공백이 아닌 글이 있는가
  */
-public record SkillFrontmatter(String name, String description) {
+public record SkillFrontmatter(String name, String description, String rawDescription, boolean hasBody) {
 
     private static final String FENCE = "---";
 
@@ -55,14 +60,50 @@ public record SkillFrontmatter(String name, String description) {
             throw invalid("SKILL.md frontmatter must be a YAML mapping");
         }
         String name = textOf(values.get("name"));
-        String description = textOf(values.get("description"));
+        Object descriptionValue = values.get("description");
+        String description = textOf(descriptionValue);
         if (name.isEmpty()) {
             throw invalid("SKILL.md frontmatter needs a name");
         }
         if (description.isEmpty()) {
             throw invalid("SKILL.md frontmatter needs a description");
         }
-        return new SkillFrontmatter(name, description);
+        String body = String.join("\n", Arrays.copyOfRange(lines, end + 1, lines.length));
+        return new SkillFrontmatter(name, description, String.valueOf(descriptionValue), !body.isBlank());
+    }
+
+    /**
+     * Hermes 가 새 스킬을 만들 때 60자 한도에 견주는 설명 글자 수다.
+     *
+     * <p>Hermes v0.21.5 {@code tools/skill_manager_tool.py} 의 {@code len(desc.strip().strip("'\""))} 와 같다.
+     * 앞뒤 공백을 뺀 뒤 양 끝의 {@code '} 와 {@code "} 를 몇 개든 빼고, Python 처럼 code point 로 센다.
+     * {@code String.length()} 로 세면 이모지 하나가 둘로 세어져 Hermes 보다 엄격해진다.
+     */
+    public int indexedDescriptionLength() {
+        String text = rawDescription.strip();
+        int start = 0;
+        int end = text.length();
+        while (start < end && isQuote(text.charAt(start))) {
+            start++;
+        }
+        while (end > start && isQuote(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.codePointCount(start, end);
+    }
+
+    /**
+     * Hermes 가 저장할 때마다 1024자 한도에 견주는 설명 글자 수다.
+     *
+     * <p>Hermes v0.21.5 {@code tools/skill_manager_tool.py} 의 {@code len(str(parsed["description"]))} 와 같다.
+     * 앞뒤를 빼지 않고 code point 로 센다.
+     */
+    public int rawDescriptionLength() {
+        return rawDescription.codePointCount(0, rawDescription.length());
+    }
+
+    private static boolean isQuote(char value) {
+        return value == '\'' || value == '"';
     }
 
     private static String textOf(Object value) {

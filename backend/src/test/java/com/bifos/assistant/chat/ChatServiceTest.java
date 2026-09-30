@@ -739,7 +739,7 @@ class ChatServiceTest {
                         : new SkillListItem(name, "", SkillSource.UPLOADED, true, null))
                 .toList();
         when(skillService.commandList(argThat(agent -> agent != null && agentCode.equals(agent.code()))))
-                .thenReturn(new SkillList(items, false, skillsToolsetEnabled));
+                .thenReturn(new SkillList(items, false, skillsToolsetEnabled, 30));
     }
 
     private List<ExecutionSkillUse> skillUsesOf(Long executionId) {

@@ -46,8 +46,8 @@ public class SkillService {
 
     private static final Logger log = LoggerFactory.getLogger(SkillService.class);
 
-    // 아래 세 한도는 화면(web/src/components/agent/skill-editor.tsx)이 같은 값으로 저장 전에 검사한다.
-    // 바꾸면 두 곳을 함께 고친다.
+    // 아래 파일 세 한도는 화면(web/src/components/agent/skill-editor.tsx)이, 설명 두 한도는 web/src/lib/skill.ts 가
+    // 같은 값으로 저장 전에 검사한다. 바꾸면 함께 고친다.
 
     /** 참고 파일 수의 상한. {@code SKILL.md} 는 세지 않는다. */
     public static final int MAX_FILES = 20;
@@ -57,6 +57,15 @@ public class SkillService {
 
     /** 스킬 하나의 UTF-8 바이트 합계 상한. 1 MiB 다. */
     public static final long MAX_TOTAL_BYTES = 1_048_576L;
+
+    /**
+     * 새 스킬 설명의 글자 수 상한. 이미 올린 스킬을 고칠 때는 보지 않는다. Hermes v0.21.5 의
+     * {@code SKILL_PROMPT_DESC_LIMIT} 와 같다. Hermes 를 올리며 바뀌면 함께 고친다.
+     */
+    public static final int MAX_NEW_DESCRIPTION_CHARS = 60;
+
+    /** 설명의 글자 수 상한. 저장할 때마다 본다. Hermes v0.21.5 가 스킬을 쓸 때마다 보는 상한과 같다. */
+    public static final int MAX_DESCRIPTION_CHARS = 1024;
 
     /**
      * Hermes 가 가진 스킬까지 포함한 이름 형식이다. 켜고 끄기와 호출 이력({@link SkillUseRecorder})이 쓴다. Hermes 는 소문자, 숫자, 점, 밑줄,
@@ -70,6 +79,7 @@ public class SkillService {
     private final SkillPublisher publisher;
     private final SkillUsageQuery usage;
     private final ApplicationEventPublisher events;
+    private final SkillProperties properties;
 
     /**
      * 그 에이전트의 스킬 목록이다. 읽을 수 있는 사람이면 누구나 본다.
@@ -118,7 +128,8 @@ public class SkillService {
                     bundle.name(), descriptionOf(bundle.skillMd()), SkillSource.UPLOADED, true,
                     usageOf(editable, usages, bundle.name())));
         }
-        return new SkillList(List.copyOf(items.values()), editable, publisher.skillsToolsetEnabled(agent));
+        return new SkillList(
+                List.copyOf(items.values()), editable, publisher.skillsToolsetEnabled(agent), properties.maxPerAgent());
     }
 
     private static SkillUsageSummary usageOf(
@@ -152,6 +163,11 @@ public class SkillService {
      * 이 저장의 변경은 반영되지 않는다. 그 뒤 같은 이름으로 다시 저장하면 표식 없는 버전의 이름을 올린
      * 스킬로 보고 받는다. Hermes 목록에 그 이름이 먼저 떠 있어도 {@link ErrorCode#SKILL_NAME_TAKEN} 이 아니다.
      *
+     * <p>새 스킬일 때만 두 가지를 더 본다. 설명이 {@link #MAX_NEW_DESCRIPTION_CHARS} 자를 넘지 않는지와, 올린
+     * 스킬 수가 {@code assistant.skill.max-per-agent} 에 닿지 않았는지다. Hermes 색인이 설명을 자르지 않고
+     * 커지지 않게 하려는 것이다(ADR-034). 이미 올린 스킬은 Hermes 처럼 두 검사 없이 고칠 수 있다. 개수는 에이전트
+     * 행 잠금을 잡은 뒤 읽은 버전으로 세야 동시에 온 두 생성이 함께 통과하지 않는다.
+     *
      * @param files 참고 파일. {@code content} 가 {@code null} 인 파일은 지금 버전의 같은 경로 내용을 쓴다
      */
     @Transactional
@@ -160,12 +176,23 @@ public class SkillService {
         Agent agent = requireEditableLocked(user, code);
         String profile = agent.hermesProfile();
         SkillStore.requireSkillName(name);
-        requireSkillMd(name, skillMd);
+        SkillFrontmatter frontmatter = requireSkillMd(name, skillMd);
         List<SkillFileInput> inputs = requireFiles(files);
         Map<String, SkillBundle> current = store.readCurrent(profile);
         SkillBundle uploaded = uploadedBundle(profile, current, name);
-        if (uploaded == null && publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
+        boolean creating = uploaded == null;
+        if (creating && publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
             throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
+        }
+        int max = properties.maxPerAgent();
+        if (creating && uploadedNames(current, store.readPending(profile)).size() >= max) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "an agent can have at most " + max + " uploaded skills");
+        }
+        if (creating && frontmatter.indexedDescriptionLength() > MAX_NEW_DESCRIPTION_CHARS) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "a new skill description can be at most " + MAX_NEW_DESCRIPTION_CHARS + " characters");
         }
         SkillBundle bundle = bundleOf(name, skillMd, inputs, uploaded);
         Map<String, SkillBundle> next = new LinkedHashMap<>(current);
@@ -268,7 +295,7 @@ public class SkillService {
         return locked;
     }
 
-    private static void requireSkillMd(String name, String skillMd) {
+    private static SkillFrontmatter requireSkillMd(String name, String skillMd) {
         if (skillMd == null || skillMd.isBlank()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md is required");
         }
@@ -281,6 +308,15 @@ public class SkillService {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED, "SKILL.md frontmatter name must equal the skill name");
         }
+        if (frontmatter.rawDescriptionLength() > MAX_DESCRIPTION_CHARS) {
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "SKILL.md description can be at most " + MAX_DESCRIPTION_CHARS + " characters");
+        }
+        if (!frontmatter.hasBody()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md must have content after the frontmatter");
+        }
+        return frontmatter;
     }
 
     /** 경로 규칙과 수와 중복을 본다. 본문이 온 파일은 글자 수도 본다. */

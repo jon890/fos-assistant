@@ -17,7 +17,7 @@ export const SKILL_COMMAND_TURNS = 1;
 
 type SkillUsage = { count: number; lastInvokedAt: string | null };
 type SkillItem = { name: string; description: string; source: "UPLOADED" | "HERMES"; enabled: boolean; usage?: SkillUsage };
-type SkillList = { skills: SkillItem[]; editable: boolean; skillsToolsetEnabled: boolean };
+type SkillList = { skills: SkillItem[]; editable: boolean; skillsToolsetEnabled: boolean; uploadLimit: number };
 type SkillDetail = { name: string; description: string; body: string; files: { path: string; size: number }[] };
 type ErrorBody = { code: string };
 type ChatEvent = { type: string; conversationId?: string; executionId?: number; code?: string; toolName?: string };
@@ -63,6 +63,7 @@ export const skillsScenario: Scenario = {
     expect(uploaded?.description === DESCRIPTION, `목록의 설명이 다르다: ${uploaded?.description}`);
     expect(list.skills.some((skill) => skill.name === "hermes-help" && skill.source === "HERMES"), "Hermes 기본 스킬이 HERMES 로 보이지 않는다");
     expect(list.editable && list.skillsToolsetEnabled, `편집 여부와 도구 상태가 다르다: ${JSON.stringify(list)}`);
+    expect(list.uploadLimit === 30, `올릴 수 있는 스킬 수 한도가 기본값 30 이 아니다: ${list.uploadLimit}`);
 
     step("올린 스킬이 있는 동안은 skills 도구를 끄지 못한다");
     const toolsOff = expectStatus(
@@ -83,6 +84,28 @@ export const skillsScenario: Scenario = {
       "같은 이름 저장",
     );
     expect(taken.json<ErrorBody>().code === "SKILL_NAME_TAKEN", `기대한 오류 코드가 아니다: ${taken.body}`);
+
+    step("새 스킬의 설명이 60자를 넘거나 앞머리 뒤에 본문이 없으면 거절한다");
+    const longDescription = expectStatus(
+      await call(context, "/agents/dad/skills/long-description", {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: { skillMd: `---\nname: long-description\ndescription: ${"가".repeat(61)}\n---\n# 본문\n` },
+      }),
+      400,
+      "61자 설명으로 새 스킬 저장",
+    );
+    expect(longDescription.json<ErrorBody>().code === "VALIDATION_FAILED", `기대한 오류 코드가 아니다: ${longDescription.body}`);
+    const noBody = expectStatus(
+      await call(context, "/agents/dad/skills/no-body", {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: { skillMd: `---\nname: no-body\ndescription: ${DESCRIPTION}\n---\n` },
+      }),
+      400,
+      "앞머리만 있는 새 스킬 저장",
+    );
+    expect(noBody.json<ErrorBody>().code === "VALIDATION_FAILED", `기대한 오류 코드가 아니다: ${noBody.body}`);
 
     step("볼 수 없는 사용자에게는 없는 에이전트와 같고, 볼 수만 있는 사용자는 쓰지 못한다");
     const hidden = expectStatus(

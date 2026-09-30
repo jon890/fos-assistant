@@ -56,11 +56,11 @@ class SkillControllerTest {
     }
 
     @Test
-    void 목록은_출처와_편집_여부와_도구_상태를_주고_사용량이_없으면_칸을_뺀다() throws Exception {
+    void 목록은_출처와_편집_여부와_도구_상태와_올릴_수_있는_한도를_주고_사용량이_없으면_칸을_뺀다() throws Exception {
         when(skills.list(OWNER, "dad")).thenReturn(new SkillList(List.of(
                 new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, null),
                 new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
-                true, true));
+                true, true, 30));
 
         mvc.perform(get("/api/v1/agents/dad/skills"))
                 .andExpect(status().isOk())
@@ -71,7 +71,8 @@ class SkillControllerTest {
                 .andExpect(jsonPath("$.skills[1].source").value("UPLOADED"))
                 .andExpect(jsonPath("$.skills[1].enabled").value(false))
                 .andExpect(jsonPath("$.editable").value(true))
-                .andExpect(jsonPath("$.skillsToolsetEnabled").value(true));
+                .andExpect(jsonPath("$.skillsToolsetEnabled").value(true))
+                .andExpect(jsonPath("$.uploadLimit").value(30));
     }
 
     @Test

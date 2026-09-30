@@ -28,13 +28,16 @@ public final class SkillDtos {
      *
      * @param editable 지금 요청자가 스킬을 올리고 지울 수 있는가
      * @param skillsToolsetEnabled 그 에이전트의 API 실행에 {@code skills} toolset 이 켜져 있는가
+     * @param uploadLimit 그 에이전트에 올릴 수 있는 스킬 수의 한도
      */
-    public record SkillListView(List<SkillItemView> skills, boolean editable, boolean skillsToolsetEnabled) {
+    public record SkillListView(
+            List<SkillItemView> skills, boolean editable, boolean skillsToolsetEnabled, int uploadLimit) {
         static SkillListView from(SkillList list) {
             return new SkillListView(
                     list.skills().stream().map(SkillItemView::from).toList(),
                     list.editable(),
-                    list.skillsToolsetEnabled());
+                    list.skillsToolsetEnabled(),
+                    list.uploadLimit());
         }
     }
 
