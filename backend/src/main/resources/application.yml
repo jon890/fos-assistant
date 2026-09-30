@@ -108,6 +108,8 @@ assistant:
     agent-root: ${ASSISTANT_SKILL_AGENT_ROOT}
     # 게시에 성공한 버전 가운데 남겨 두는 수. 되돌릴 때 쓴다
     keep-versions: 3
+    # 에이전트 하나에 올릴 수 있는 스킬 수. 새 스킬을 만들 때만 본다
+    max-per-agent: ${ASSISTANT_SKILL_MAX_PER_AGENT:30}
   pricing:
     # models.dev 카탈로그를 복사해 둔 경로. 없으면 실행 비용을 비워 두고 기동은 계속한다
     catalog-path: ${ASSISTANT_PRICING_CATALOG:}

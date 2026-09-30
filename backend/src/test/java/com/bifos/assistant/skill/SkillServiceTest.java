@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -44,9 +45,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -396,6 +399,7 @@ class SkillServiceTest {
 
         SkillList list = skills.list(OWNER, OWNED);
         assertThat(list.editable()).isTrue();
+        assertThat(list.uploadLimit()).as("설정하지 않은 기본 한도").isEqualTo(30);
         assertThat(list.skillsToolsetEnabled()).as("대역의 켜진 목록에 skills 가 없다").isFalse();
         // 편집자에게는 호출이 없는 스킬에도 합계가 0 으로 붙는다.
         SkillUsageSummary noUse = new SkillUsageSummary(0, null);
@@ -483,6 +487,154 @@ class SkillServiceTest {
         verify(skillClient, org.mockito.Mockito.times(2)).publish(eq(OWNED_PROFILE), anyList(), any());
     }
 
+    @Test
+    void 새_스킬의_설명은_60자까지_저장되고_61자는_VALIDATION_FAILED_이며_게시하지_않는다() {
+        assertCode(() -> skills.save(OWNER, OWNED, "too-long", skillMd("too-long", "가".repeat(61)), List.of()),
+                ErrorCode.VALIDATION_FAILED);
+
+        verify(skillClient, never()).publish(anyString(), anyList(), any());
+        assertThat(store.currentVersion(OWNED_PROFILE)).isEmpty();
+
+        skills.save(OWNER, OWNED, "just-fits", skillMd("just-fits", "가".repeat(60)), List.of());
+
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("just-fits");
+    }
+
+    @Test
+    void 이미_올린_스킬은_61자_설명으로_고쳐도_저장된다() {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "가".repeat(60)), List.of());
+
+        SkillDetail saved = skills.save(
+                OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "나".repeat(61)), List.of());
+
+        assertThat(saved.description()).isEqualTo("나".repeat(61));
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd()).contains("나".repeat(61));
+    }
+
+    @Test
+    void 설명_1024자는_고칠_때_받고_1025자는_이미_올린_스킬을_고칠_때도_VALIDATION_FAILED_다() {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "가".repeat(1024)), List.of());
+        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "가".repeat(1025)),
+                List.of()), ErrorCode.VALIDATION_FAILED);
+
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd())
+                .as("거절된 저장은 반영되지 않는다")
+                .isEqualTo(skillMd("weekly-plan", "가".repeat(1024)));
+    }
+
+    @Test
+    void 앞머리만_있는_원문은_새_스킬이든_이미_올린_스킬을_고치는_것이든_VALIDATION_FAILED_다() {
+        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", frontmatterOnly("weekly-plan"), List.of()),
+                ErrorCode.VALIDATION_FAILED);
+        verify(skillClient, never()).publish(anyString(), anyList(), any());
+
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", frontmatterOnly("weekly-plan") + "  \n\n",
+                List.of()), ErrorCode.VALIDATION_FAILED);
+
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd()).isEqualTo(skillMd("weekly-plan"));
+    }
+
+    @Test
+    void 올린_스킬이_29개면_30번째_새_스킬은_저장되고_30개면_31번째_새_스킬은_VALIDATION_FAILED_이며_게시하지_않는다() {
+        publishUploaded(29);
+
+        skills.save(OWNER, OWNED, "skill-30", skillMd("skill-30"), List.of());
+        assertThat(store.readCurrent(OWNED_PROFILE)).hasSize(30);
+        clearInvocations(skillClient);
+
+        assertCode(() -> skills.save(OWNER, OWNED, "skill-31", skillMd("skill-31"), List.of()),
+                ErrorCode.VALIDATION_FAILED);
+
+        verify(skillClient, never()).publish(anyString(), anyList(), any());
+        assertThat(store.readCurrent(OWNED_PROFILE)).hasSize(30).doesNotContainKey("skill-31");
+    }
+
+    @Test
+    void 올린_스킬이_30개여도_이미_올린_스킬은_고칠_수_있고_하나를_지우면_새_스킬을_받는다() {
+        publishUploaded(30);
+
+        skills.save(OWNER, OWNED, "skill-01", skillMd("skill-01") + "\n고침", List.of());
+        assertThat(store.readCurrent(OWNED_PROFILE).get("skill-01").skillMd()).endsWith("고침");
+
+        skills.delete(OWNER, OWNED, "skill-01");
+        skills.save(OWNER, OWNED, "replacement", skillMd("replacement"), List.of());
+
+        assertThat(store.readCurrent(OWNED_PROFILE)).hasSize(30).containsKey("replacement");
+    }
+
+    @Test
+    void 표식_없이_남은_더_새_버전의_이름도_올린_스킬_수에_센다() {
+        publishUploaded(29);
+        doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "read timed out"))
+                .when(skillClient).publish(anyString(), anyList(), any());
+        assertCode(() -> skills.save(OWNER, OWNED, "skill-30", skillMd("skill-30"), List.of()),
+                ErrorCode.HERMES_UNAVAILABLE);
+        doAnswer(call -> null).when(skillClient).publish(anyString(), anyList(), any());
+
+        assertThat(store.readCurrent(OWNED_PROFILE)).as("지금 버전은 29개다").hasSize(29);
+        assertCode(() -> skills.save(OWNER, OWNED, "skill-31", skillMd("skill-31"), List.of()),
+                ErrorCode.VALIDATION_FAILED);
+        skills.save(OWNER, OWNED, "skill-30", skillMd("skill-30"), List.of());
+
+        assertThat(store.readCurrent(OWNED_PROFILE)).as("표식 없는 버전의 이름은 고칠 수 있다").hasSize(30);
+    }
+
+    /**
+     * 올린 스킬이 29개일 때 서로 다른 새 스킬 둘이 동시에 와도 하나만 저장된다.
+     *
+     * <p>대역이 첫 게시를 붙잡는 동안 둘째가 잠금을 기다린다. 개수를 잠금 밖에서 세면 둘 다 29개를 보고
+     * 통과해 31개가 된다.
+     */
+    @Test
+    void 올린_스킬이_29개일_때_새_스킬_둘이_동시에_와도_하나만_저장된다() throws Exception {
+        publishUploaded(29);
+        CountDownLatch firstPublishStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstPublish = new CountDownLatch(1);
+        doAnswer(call -> {
+            if (firstPublishStarted.getCount() > 0) {
+                firstPublishStarted.countDown();
+                assertThat(releaseFirstPublish.await(10, TimeUnit.SECONDS)).as("첫 게시를 풀어 주기까지").isTrue();
+            }
+            return null;
+        }).when(skillClient).publish(anyString(), anyList(), any());
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<SkillDetail> first = pool.submit(
+                    () -> skills.save(OWNER, OWNED, "first-new", skillMd("first-new"), List.of()));
+            assertThat(firstPublishStarted.await(10, TimeUnit.SECONDS)).as("첫 저장이 게시에 닿기까지").isTrue();
+            Future<SkillDetail> second = pool.submit(
+                    () -> skills.save(OWNER, OWNED, "second-new", skillMd("second-new"), List.of()));
+            Thread.sleep(300);
+            assertThat(second.isDone()).as("둘째 저장은 첫째가 끝날 때까지 잠금을 기다린다").isFalse();
+
+            releaseFirstPublish.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> second.get(10, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class)
+                    .cause()
+                    .isInstanceOf(ApiException.class)
+                    .extracting(ex -> ((ApiException) ex).code())
+                    .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(store.readCurrent(OWNED_PROFILE)).hasSize(30).containsKey("first-new").doesNotContainKey("second-new");
+    }
+
+    /** {@code skill-01} 부터 이름을 붙인 올린 스킬 {@code count} 개를 서비스를 거치지 않고 게시된 버전으로 둔다. */
+    private void publishUploaded(int count) {
+        Map<String, SkillBundle> bundles = new LinkedHashMap<>();
+        for (int i = 1; i <= count; i++) {
+            String name = String.format("skill-%02d", i);
+            bundles.put(name, new SkillBundle(name, skillMd(name), List.of()));
+        }
+        store.markPublished(OWNED_PROFILE, store.writeVersion(OWNED_PROFILE, bundles));
+    }
+
     /** 파일마다 10만 자 이하인 ASCII 본문으로 합계 바이트를 정확히 맞춘 참고 파일 목록을 만든다. */
     private static List<SkillFileInput> asciiFilesTotaling(long totalBytes, int fileCount) {
         List<SkillFileInput> files = new ArrayList<>();
@@ -499,7 +651,16 @@ class SkillServiceTest {
     }
 
     private static String skillMd(String name) {
-        return "---\nname: " + name + "\ndescription: 이번 주 계획을 세운다\n---\n# " + name + "\n";
+        return skillMd(name, "이번 주 계획을 세운다");
+    }
+
+    private static String skillMd(String name, String description) {
+        return "---\nname: " + name + "\ndescription: " + description + "\n---\n# " + name + "\n";
+    }
+
+    /** 앞머리 뒤에 본문이 없는 원문이다. */
+    private static String frontmatterOnly(String name) {
+        return "---\nname: " + name + "\ndescription: 이번 주 계획을 세운다\n---\n";
     }
 
     private static Agent agent(String code, String profile, AgentVisibility visibility, Long ownerId) {

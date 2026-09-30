@@ -208,6 +208,19 @@ v0.21.0과 비교하면 v0.21.3의 설정 가능한 목록에 `connections`와 `
 생성에는 YAML frontmatter의 `name`, `description`, 비어 있지 않은 본문이 필요하다.
 스킬 이름과 범주 이름은 최대 64자이며 소문자, 숫자, 점, 밑줄, 붙임표를 쓴다.
 새 스킬의 설명은 색인 예산에 맞춰 60자 이하여야 하고 `SKILL.md`는 최대 100,000자다.
+
+v0.21.5 의 `tools/skill_manager_tool.py` 의 `_validate_frontmatter(content, new_skill)` 를 읽고 확인한 검사다.
+
+| 검사 | 언제 | 세는 법 |
+| --- | --- | --- |
+| 설명 60자(`SKILL_PROMPT_DESC_LIMIT`) | 새 스킬(`create`)만. 고칠 때는 보지 않는다 | `len(desc.strip().strip("'\""))`. 앞뒤 공백과 앞뒤 따옴표를 뺀 Python 문자 수, 곧 code point 수 |
+| 설명 1024자(`MAX_DESCRIPTION_LENGTH`) | 늘 | 앞뒤를 빼지 않은 문자 수 |
+| 앞머리 뒤 본문 | 늘 | 닫는 `---` 줄 뒤가 공백뿐이면 「SKILL.md must have content after the frontmatter」 로 거절한다 |
+
+이름 64자(`MAX_NAME_LENGTH`)와 설명 1024자는 `tools/skills_tool_plugin.py` 에도 같은 값으로 있다.
+색인은 `agent/skill_utils.py` 의 `extract_skill_description` 이 같은 방법으로 앞뒤를 뺀 설명을 60자에서 잘라 57자에 `...` 을 붙인다.
+Control Plane 이 저장 규칙을 이 검사에 맞추는 까닭은 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」 에 있다.
+근거는 [v0.21.5 skill_manager_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/skill_manager_tool.py), [skill_utils.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/skill_utils.py), [skills_tool_plugin.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/skills_tool_plugin.py) 다.
 이 두 HTTP 경로에는 `references/`, `templates/`, `assets/`, `scripts/` 파일 인자가 없다.
 `skill_manage(write_file)`는 해당 네 하위 디렉터리의 텍스트 파일을 다루며 파일당 1 MiB와 100,000자 제한이 있지만, 대시보드 HTTP 경로로 노출되지 않았다.
 근거는 [스킬 HTTP 경로](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/skills.py), [스킬 쓰기와 검증](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/skill_manager_tool.py)이다.
@@ -449,6 +462,30 @@ FAL 응답의 첫 이미지 URL 을 `success`, `image` 결과로 돌려준다.
 근거는 [v0.21.0 system_prompt.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/system_prompt.py),
 [skill_utils.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/agent/skill_utils.py),
 [skill_manager_tool.py](https://github.com/NousResearch/hermes-agent/blob/v2026.8.31/tools/skill_manager_tool.py) 다.
+
+### `skill_manage` 만 빼는 설정
+
+v0.21.5 소스로 확인했다. **`skill_view` 를 두고 `skill_manage` 만 도구 목록에서 빼는 공식 설정은 없다.**
+
+| 방법 | 결과 |
+| --- | --- |
+| `agent.disabled_toolsets` | toolset 이름만 받는다. `skill_manage` 하나만 든 toolset 은 없고, 도구 이름을 넣으면 모르는 이름으로 무시한다. `skills` 나 옛 이름 `skills_tools` 를 넣으면 `skill_view` 와 색인까지 빠진다 |
+| `platform_toolsets.api_server` | 같은 toolset 이름 목록이라 같은 결과다 |
+| plugin 의 `registry.deregister` | 자기가 등록하지 않은 도구는 `plugins.entries.<plugin>.allow_tool_override: true` 가 있어야 해제된다. profile 범위 plugin 은 전역 도구를 해제하지 못하고, 전역 plugin 이 해제하면 같은 프로세스의 모든 profile 에 걸린다 |
+| 한 번 묻고 끝나는 실행의 도구 숨김 | `agent/oneshot_footprint.py` 는 `hermes chat -q` 같은 한 번 실행에서만 `skill_manage` 를 숨긴다. API server 실행은 해당하지 않는다 |
+
+도구를 빼도 안내문은 남는다.
+`agent/prompt_builder.py` 의 색인 안내문은 `skill_manage` 가 있든 없든
+「If a skill has issues, fix it with skill_manage(action='patch').」 와
+「After difficult/iterative tasks, offer to save as a skill.」 를 싣는다.
+`skill_manage` 가 있을 때만 붙는 것은 `SKILLS_GUIDANCE` 와 memory 안내의 `skill_manage` 문장이다.
+
+그래서 Control Plane 은 실행 입력 앞 단락으로 모델에게 쓰지 말라고 알리고, 서명 plugin 이 호출을 막는다.
+근거는 [toolsets.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/toolsets.py),
+[model_tools.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py) 의 `_apply_toolset_selection`,
+[tools/registry.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/registry.py) 의 `deregister`,
+[agent/system_prompt.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/system_prompt.py) 의 `_tool_guidance_block`,
+[agent/prompt_builder.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/prompt_builder.py) 다.
 
 ### 스킬 수를 줄인 실측
 
