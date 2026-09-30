@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { requestControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 import { isConversationId } from "@/lib/conversation-id";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body as {
     conversationId?: string;
     text?: string;
     agentCode?: string;

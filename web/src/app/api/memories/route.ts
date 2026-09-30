@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 
 function response(result: Awaited<ReturnType<typeof callControlPlane>>) {
   if (!result.ok) return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
@@ -11,5 +12,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  return response(await callControlPlane("/api/v1/memories", { method: "POST", body: await request.json() }));
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  return response(await callControlPlane("/api/v1/memories", { method: "POST", body: parsed.body }));
 }
