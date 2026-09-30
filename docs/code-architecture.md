@@ -1159,8 +1159,5 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
   지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)만 있다
 - `assistant.mcp.legacy-user-tokens` 설정과 `agent_token.user_id` 칸을 지우는 것. 운영의 모든 토큰이 profile 에 묶인 뒤 지운다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 「옛 토큰에서 옮겨 가는 길」)
 
-- 스킬 커맨드([「스킬 커맨드」](#스킬-커맨드)): `chat/application/SkillCommand`, `SKILL_COMMAND_UNKNOWN`, `COMMAND` 이력 적기, 입력창의 `/` 목록.
-  지금은 `SkillUseRecorder.recordCommand` 와 `SkillUseSource.COMMAND` 만 있다
-
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.
