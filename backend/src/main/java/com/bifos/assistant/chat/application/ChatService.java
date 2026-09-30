@@ -333,7 +333,7 @@ public class ChatService {
                     ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
         }
         Flow flow = flows.find(agent.flow());
-        SkillCommand command = commandOf(user, agent, flow, text);
+        SkillCommand command = commandOf(agent, flow, text);
         Conversation conversation = existing != null
                 ? existing
                 : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id()));
@@ -346,9 +346,9 @@ public class ChatService {
      *
      * <p>커맨드 모양이 아니거나 흐름이 붙은 에이전트이면 {@code null} 이다. 흐름에는 글을 그대로 보낸다.
      * 켜진 스킬 목록을 읽다 Hermes 가 실패하면 그 예외가 그대로 올라간다. 이름을 확인하지 못한 커맨드를
-     * 보내지 않는다.
+     * 보내지 않는다. 그 에이전트를 쓸 수 있는지는 부르기 전에 이미 판정했으므로 목록을 읽을 때 다시 보지 않는다.
      */
-    private SkillCommand commandOf(CurrentUser user, Agent agent, Flow flow, String text) {
+    private SkillCommand commandOf(Agent agent, Flow flow, String text) {
         if (flow != null) {
             return null;
         }
@@ -356,7 +356,7 @@ public class ChatService {
         if (command == null) {
             return null;
         }
-        if (!skillCommands.enabledNames(user, agent).contains(command.name())) {
+        if (!skillCommands.enabledNames(agent).contains(command.name())) {
             throw new ApiException(
                     ErrorCode.SKILL_COMMAND_UNKNOWN, "this agent has no enabled skill with that name");
         }
@@ -565,7 +565,7 @@ public class ChatService {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         Flow flow = flows.find(agent.flow());
-        return new Routed(conversation, agent, flow, attached, commandOf(user, agent, flow, question));
+        return new Routed(conversation, agent, flow, attached, commandOf(agent, flow, question));
     }
 
     private void saveQuestion(

@@ -181,7 +181,17 @@ test("스트림이 HTTP 오류로 거절해도 없는 이름을 같은 문구로
 test("스킬 목록이 빈 에이전트에서 / 를 치면 스킬이 없다고 알린다", async ({ page }) => {
   await routeSkills(page, { skills: [], skillsToolsetEnabled: true });
   await page.goto("/");
-  await composer(page).fill("/");
+  const input = composer(page);
+  await input.fill("/");
+  await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
+  // 글자를 더 치면 커맨드가 아닌 글일 수 있어 알림을 닫는다.
+  await input.press("u");
+  await input.press("s");
+  await input.press("r");
+  await expect(input).toHaveValue("/usr");
+  await expect(skillList(page)).toHaveCount(0);
+  // 다시 `/` 만 남기면 알림이 돌아온다.
+  await input.fill("/");
   await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
 });
 

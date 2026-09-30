@@ -12,7 +12,7 @@ import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
 import type { VersionSlot } from "@/lib/message-versions";
 import { VersionSwitcher } from "./version-switcher";
-import { parseSkillCommand } from "./skill-command-menu";
+import { parseSkillCommand } from "./skill-command";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {

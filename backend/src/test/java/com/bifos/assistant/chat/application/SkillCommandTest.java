@@ -39,6 +39,15 @@ class SkillCommandTest {
         assertThat(SkillCommand.parse(null)).isEmpty();
     }
 
+    /** 이름 뒤 공백은 Java 정규식의 {@code \s} 인 공백, 탭, 줄바꿈, 세로 탭, 폼 피드, 캐리지 리턴만 받는다. */
+    @Test
+    void 이름_뒤가_전각_공백이나_NBSP_면_커맨드가_아니고_탭이나_줄바꿈이면_커맨드다() {
+        assertThat(SkillCommand.parse("/shopping　이번 주")).as("전각 공백").isEmpty();
+        assertThat(SkillCommand.parse("/shopping 이번 주")).as("NBSP").isEmpty();
+        assertThat(SkillCommand.parse("/shopping\t이번 주")).as("탭").map(SkillCommand::rest).contains("이번 주");
+        assertThat(SkillCommand.parse("/shopping\n이번 주")).as("줄바꿈").map(SkillCommand::rest).contains("이번 주");
+    }
+
     @Test
     void 이름은_64자까지이고_65자면_커맨드가_아니다() {
         String longest = "a".repeat(64);

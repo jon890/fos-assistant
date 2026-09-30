@@ -6,7 +6,7 @@ import Link from "next/link";
 import { cn } from "cn";
 import { describeError } from "./error-message";
 import { Composer } from "./chat/composer";
-import { commandSkillNames, parseSkillCommand } from "./chat/skill-command-menu";
+import { commandSkillNames, parseSkillCommand } from "./chat/skill-command";
 import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
 import { useStarterSuggestions } from "./chat/use-starter-suggestions";
 import { MessageList } from "./chat/message-list";
@@ -1047,7 +1047,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             if (activity) setPanelTarget({ kind: "activity", target: { mode: "live", state: activity } });
           }}
           onOpenArtifact={(messageId, path, name) => setPanelTarget({ kind: "artifact", messageId, path, name })}
-          skillCommandChips={currentAgent?.acceptsAttachments !== false}
+          // 에이전트 목록을 읽기 전이거나 목록에 없는 에이전트의 대화는 흐름인지 모르므로 칩을 붙이지 않는다.
+          skillCommandChips={currentAgent?.acceptsAttachments === true}
           selectedVersions={selectedVersions}
           onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
           onRegenerate={() => { void regenerate(); }}

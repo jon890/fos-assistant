@@ -20,7 +20,7 @@ type SkillItem = { name: string; description: string; source: "UPLOADED" | "HERM
 type SkillList = { skills: SkillItem[]; editable: boolean; skillsToolsetEnabled: boolean };
 type SkillDetail = { name: string; description: string; body: string; files: { path: string; size: number }[] };
 type ErrorBody = { code: string };
-type ChatEvent = { type: string; conversationId?: string; executionId?: number; code?: string };
+type ChatEvent = { type: string; conversationId?: string; executionId?: number; code?: string; toolName?: string };
 type MySkillUsage = {
   agentCode: string; agentName: string; skillName: string; count: number; lastInvokedAt: string; lastConversationId: string | null;
 };
@@ -144,12 +144,18 @@ export const skillsScenario: Scenario = {
       200,
       "스킬 커맨드",
     );
-    const commandDone = (await events(commanded)).at(-1);
+    const commandEvents = await events(commanded);
+    const commandDone = commandEvents.at(-1);
     expect(commandDone?.type === "done" && commandDone.executionId !== undefined, `커맨드의 마지막 사건이 done 이 아니다: ${JSON.stringify(commandDone)}`);
     const commandInput = context.hermes.lastSubmittedInput() ?? "";
     expect(
       commandInput.includes(`skill_view(name="${NAME}")`) && commandInput.includes("이번 주"),
       `Hermes 에 간 입력이 스킬을 읽게 하지 않는다: ${commandInput}`,
+    );
+    // 모델이 읽은 사건이 왔다는 것은 같은 실행에 MODEL 줄도 적혔다는 뜻이다. COMMAND 줄은 Control Plane 이 적는다.
+    expect(
+      commandEvents.some((event) => event.type === "tool" && event.toolName === "skill_view"),
+      `모델이 스킬을 읽은 도구 사건이 없다: ${JSON.stringify(commandEvents)}`,
     );
     const commandUsage = expectStatus(
       await call(context, "/usage/skills", { token: context.tokens.dad }),
@@ -158,8 +164,18 @@ export const skillsScenario: Scenario = {
     ).json<MySkillUsage[]>();
     const weekly = commandUsage.find((usage) => usage.skillName === NAME);
     expect(
-      weekly?.count === SKILL_COMMAND_TURNS && weekly.lastConversationId === commandDone!.conversationId,
+      weekly?.count === 1 && weekly.lastConversationId === commandDone!.conversationId,
       `COMMAND 와 MODEL 줄이 함께 있는 실행이 한 번으로 세어지지 않는다: ${JSON.stringify(commandUsage)}`,
+    );
+    // 실행 줄의 skillNames 는 출처를 가리지 않고 이름을 한 번만 싣는다. 출처별 줄은 API 로 보이지 않는다.
+    const commandRow = expectStatus(
+      await call(context, "/usage/executions?limit=10", { token: context.tokens.dad }),
+      200,
+      "커맨드 뒤 실행 목록",
+    ).json<ExecutionRow[]>().find((execution) => execution.id === commandDone!.executionId);
+    expect(
+      commandRow !== undefined && commandRow.skillNames.filter((name) => name === NAME).length === 1,
+      `커맨드 실행 줄의 skillNames 에 스킬 이름이 한 번 있지 않다: ${JSON.stringify(commandRow)}`,
     );
 
     step("켜진 스킬이 아닌 커맨드는 Hermes 에 보내지 않고 거절하며 대화를 만들지 않는다");

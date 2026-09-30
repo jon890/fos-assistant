@@ -3,7 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
@@ -41,6 +41,7 @@ import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.application.SkillList;
 import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
@@ -58,7 +59,11 @@ import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -87,12 +92,49 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 @Import(ChatServiceTest.StubRuntime.class)
 class ChatServiceTest {
 
+    /** 켜진 스킬 캐시가 실제 시계에 기대지 않게 한다. 테스트마다 앞으로 옮겨 앞 테스트가 채운 캐시를 모두 지나게 한다. */
+    static final TestClock SKILL_CLOCK = new TestClock(Instant.parse("2026-09-30T00:00:00Z"));
+
     @TestConfiguration
     static class StubRuntime {
         @Bean
         @Primary
         StubHermesRunsClient stubHermesRunsClient() {
             return new StubHermesRunsClient();
+        }
+
+        @Bean
+        @Primary
+        SkillCommandCatalog testSkillCommandCatalog(SkillService skills) {
+            return new SkillCommandCatalog(skills, SKILL_CLOCK);
+        }
+    }
+
+    /** 테스트가 정한 시각만 주는 시계다. */
+    static final class TestClock extends Clock {
+        private volatile Instant now;
+
+        TestClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
         }
     }
 
@@ -155,6 +197,7 @@ class ChatServiceTest {
 
     @BeforeEach
     void reset() {
+        SKILL_CLOCK.advance(Duration.ofHours(1));
         stub().reset();
         skillUses.deleteAll();
         executionEvents.deleteAll();
@@ -695,7 +738,8 @@ class ChatServiceTest {
                         ? new SkillListItem(name.substring(0, name.length() - 4), "", SkillSource.UPLOADED, false, null)
                         : new SkillListItem(name, "", SkillSource.UPLOADED, true, null))
                 .toList();
-        when(skillService.list(any(), eq(agentCode))).thenReturn(new SkillList(items, true, skillsToolsetEnabled));
+        when(skillService.commandList(argThat(agent -> agent != null && agentCode.equals(agent.code()))))
+                .thenReturn(new SkillList(items, false, skillsToolsetEnabled));
     }
 
     private List<ExecutionSkillUse> skillUsesOf(Long executionId) {
@@ -843,10 +887,11 @@ class ChatServiceTest {
         stub().willReturn(answered("run-1", "네"));
         ChatTurn first = chat.send(dad, null, "/shopping 하나", "dad");
         chat.send(dad, first.conversationId(), "/shopping 둘", null);
-        verify(skillService, times(1)).list(any(), eq("dad"));
+        verify(skillService, times(1)).commandList(argThat(agent -> "dad".equals(agent.code())));
 
-        // 목록이 바뀌어도 사건 전에는 들고 있던 목록으로 판별한다.
+        // 목록이 바뀌어도 사건 전에는 들고 있던 목록으로 판별한다. 캐시 시간 안이다.
         skillsOf("dad", true, "shopping:off");
+        SKILL_CLOCK.advance(Duration.ofSeconds(29));
         chat.send(dad, first.conversationId(), "/shopping 셋", null);
 
         applicationEvents.publishEvent(new SkillsChanged(agentId));

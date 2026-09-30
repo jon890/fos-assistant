@@ -31,6 +31,7 @@
 - 흐름 에이전트(`acceptsAttachments === false`)에서는 `/` 목록을 띄우지 않는다
 - 스킬 목록이 비었거나(거른 뒤 0개) `skillsToolsetEnabled === false` 이면 `/` 목록 자리에 「이 에이전트에는 스킬이 없어요」 를 보인다
 - 없는 이름 문구는 「`/foo` 스킬이 이 에이전트에 없어요」 다. `foo` 는 보낸 글의 이름이다. 입력창 아래에 보이고 입력한 글은 지우지 않는다. 다음 보내기를 시작하면 지운다. 위 세 경로 모두 같은 문구다
+- 다시 생성이 `SKILL_COMMAND_UNKNOWN` 을 받으면(그 사이 스킬이 꺼졌거나 지워졌다) 입력창 아래 알림이 아니라 지금의 turn 오류로 보인다. `web/src/components/error-message.ts` 의 `MESSAGES` 에 그 코드의 해요체 문구를 둬 영어 원문이 보이지 않게 한다
 - 말풍선 표시는 사용자 말풍선 내용이 `^/[a-z0-9][a-z0-9-]*(\s|$)` 로 시작하면 이름을 작은 칩으로 앞에 보이고 나머지 글을 그린다. 흐름 에이전트의 대화는 커맨드를 해석하지 않으므로 칩을 붙이지 않는다
 - `docs/flow.md` 「스킬 커맨드로 보낼 때」 의 갈리는 지점 표에서 「이 에이전트에는 스킬이 없습니다」 를 「이 에이전트에는 스킬이 없어요」 로 고친다. `web/AGENTS.md` 의 화면 문구 해요체 규칙을 따르기 위해서다. 같은 표의 다른 화면 문구도 해요체인지 본다
 
@@ -73,11 +74,13 @@ cd web && pnpm test:browser
 | 파일 | 변경 |
 |---|---|
 | `web/src/components/chat/skill-command-menu.tsx` | 신규 |
+| `web/src/components/chat/skill-command.ts` | 신규 |
 | `web/src/components/chat/composer.tsx` | 수정 |
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
 | `web/src/components/chat/message-list.tsx` | 수정 |
 | `web/src/components/error-message.ts` | 수정 |
 | `test/unit/error-message.test.ts` | 수정 |
+| `test/unit/skill-command.test.ts` | 신규 |
 | `docs/flow.md` | 수정 |
 | `test/browser/skill-command.spec.ts` | 신규 |

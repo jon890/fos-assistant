@@ -8,7 +8,8 @@ import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
 import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
-import { filterSkillNames, findSkillQuery, SkillCommandMenu, skillOptionId, withSkillCommand } from "./skill-command-menu";
+import { SkillCommandMenu } from "./skill-command-menu";
+import { filterSkillNames, findSkillQuery, skillOptionId, withSkillCommand } from "./skill-command";
 import { ModelPicker, type ModelChoice, type ModelChoiceSaveResult } from "./model-picker";
 import type { Conversation } from "../shell/conversations-provider";
 
@@ -197,9 +198,10 @@ export function Composer({
   const activeMentionIndex = Math.min(mentionIndex, Math.max(0, mentionMatches.length - 1));
   const skillQuery = skillNames && !skillDismissed ? findSkillQuery(value, caret) : null;
   const skillMatches = skillNames && skillQuery !== null ? filterSkillNames(skillNames, skillQuery) : [];
-  // 스킬이 있는데 맞는 이름이 없으면 띄우지 않는다. `/usr/bin` 처럼 커맨드가 아닌 글을 칠 때 목록이 가리지 않게 한다.
+  // 맞는 이름이 없으면 띄우지 않는다. `/usr/bin` 처럼 커맨드가 아닌 글을 칠 때 목록이 가리지 않게 한다.
+  // 스킬이 없는 에이전트는 `/` 만 친 동안에만 스킬이 없다고 알린다.
   const skillMenuOpen = skillNames !== undefined && skillQuery !== null
-    && (skillNames.length === 0 || skillMatches.length > 0);
+    && (skillNames.length === 0 ? skillQuery === "" : skillMatches.length > 0);
   const activeSkillIndex = Math.min(skillIndex, Math.max(0, skillMatches.length - 1));
 
   function changeValue(nextValue: string, nextCaret: number) {

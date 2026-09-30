@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.application.SkillBundle;
+import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.application.SkillDetail;
 import com.bifos.assistant.skill.application.SkillFile;
 import com.bifos.assistant.skill.application.SkillFileInfo;
@@ -61,6 +62,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -99,6 +102,9 @@ class SkillServiceTest {
 
     /** 스킬 커맨드의 캐시를 비우는 {@link SkillsChanged} 를 서비스가 냈는지 본다. */
     @Autowired ApplicationEvents applicationEvents;
+
+    @Autowired SkillCommandCatalog commandCatalog;
+    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void 준비한다() {
@@ -251,6 +257,37 @@ class SkillServiceTest {
                 .containsExactly(
                         new SkillsChanged(agentId), new SkillsChanged(agentId), new SkillsChanged(agentId),
                         new SkillsChanged(agentId), new SkillsChanged(agentId));
+    }
+
+    /**
+     * 사건을 받는 쪽은 커밋 뒤에 받는다. 저장을 바깥 트랜잭션에 넣어 커밋 전에는 캐시가 그대로이고, 커밋하면
+     * 비워지며, 되돌리면 비워지지 않는 것을 본다. 트랜잭션 없는 켜고 끄기는 바로 비운다.
+     */
+    @Test
+    void 커맨드_이름_캐시는_저장과_지우기가_커밋된_뒤에_비워지고_켜고_끄기는_바로_비워진다() {
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
+        Agent agent = agents.findByCode(OWNED).orElseThrow();
+        TransactionTemplate outer = new TransactionTemplate(transactionManager);
+        assertThat(commandCatalog.enabledNames(agent)).as("처음 읽은 것").containsExactly("hermes-help");
+
+        outer.executeWithoutResult(status -> {
+            skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+            assertThat(commandCatalog.enabledNames(agent)).as("커밋 전").containsExactly("hermes-help");
+        });
+        assertThat(commandCatalog.enabledNames(agent)).as("저장이 커밋된 뒤")
+                .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
+
+        outer.executeWithoutResult(status -> {
+            skills.delete(OWNER, OWNED, "weekly-plan");
+            status.setRollbackOnly();
+        });
+        assertThat(commandCatalog.enabledNames(agent)).as("지우기를 되돌린 뒤")
+                .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
+
+        when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(new HermesSkill("hermes-help", "Hermes 기본", false)));
+        skills.toggle(OWNER, OWNED, "hermes-help", false);
+        // 되돌린 지우기가 이미 지운 디렉터리는 되살아나지 않으므로 끈 이름이 빠졌는지만 본다.
+        assertThat(commandCatalog.enabledNames(agent)).as("끈 뒤").doesNotContain("hermes-help");
     }
 
     @Test
