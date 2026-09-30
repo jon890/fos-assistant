@@ -33,6 +33,7 @@ POST는 token과 familyUuid만 새 객체로 만든다. 다른 profile 입력은
 오류 코드는 phase 01이 정한 `ACCOUNTBOOK_TOKEN_REJECTED`, `ACCOUNTBOOK_FAMILY_FORBIDDEN`,
 `ACCOUNTBOOK_UNAVAILABLE`, `CONNECTOR_OPERATION_FAILED`와 기존 `UNAUTHENTICATED`, `VALIDATION_FAILED`다.
 `check/route.ts`는 POST를 전달한다.
+ADMIN 목록과 반영 완료 서버 라우트를 추가한다. 요청 userId는 양의 정수만 받으며 권한과 그룹은 backend가 검사한다.
 
 ### 2. 화면
 
@@ -41,6 +42,8 @@ POST는 token과 familyUuid만 새 객체로 만든다. 다른 profile 입력은
 네트워크 실패에도 token 입력은 비운다. busy 동안 중복 제출을 막는다.
 READY이면 agentCode 링크를 보인다.
 해제한 `DISCONNECTED` 상태에서도 restartRequired가 참이면 관리자 반영 대기와 가계부 토큰 폐기를 안내한다.
+같은 페이지에 ADMIN 전용 대기 목록과 반영 완료 버튼을 둔다. 목록에는 다른 사용자 토큰을 표시하지 않는다.
+connectorManaged 에이전트는 일반 관리 화면의 편집 버튼을 숨긴다.
 
 ### 3. 브라우저 테스트
 
@@ -48,6 +51,7 @@ READY이면 agentCode 링크를 보인다.
 실패 뒤 token 입력 제거, 모바일 가로 넘침 없음을 확인한다.
 해제 응답의 DISCONNECTED와 restartRequired=true를 함께 표시하고 가계부 토큰 폐기 안내가 남는지 확인한다.
 mock 응답에 raw token을 넣지 않는다.
+관리자 목록과 반영 완료, 다른 사용자 토큰 미표시도 확인한다.
 
 ## 검증
 
@@ -66,7 +70,12 @@ cd web && pnpm test:browser accountbook-connection.spec.ts
 | `web/src/lib/connection-route.ts` | 신규 |
 | `web/src/app/api/connections/accountbook/route.ts` | 신규 |
 | `web/src/app/api/connections/accountbook/check/route.ts` | 신규 |
+| `web/src/app/api/admin/connections/accountbook/route.ts` | 신규 |
+| `web/src/app/api/admin/connections/accountbook/[userId]/confirm/route.ts` | 신규 |
 | `web/src/app/connections/accountbook/page.tsx` | 신규 |
 | `web/src/components/connector/accountbook-connection-panel.tsx` | 신규 |
+| `web/src/components/connector/accountbook-admin-panel.tsx` | 신규 |
+| `web/src/lib/agent.ts` | 수정 |
+| `web/src/app/agents/[code]/page.tsx` | 수정 |
 | `web/src/components/shell/main-nav.tsx` | 수정 |
 | `test/browser/accountbook-connection.spec.ts` | 신규 |

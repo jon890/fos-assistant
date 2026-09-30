@@ -11,6 +11,8 @@ export type AdminAgent = {
   enabled: boolean;
   /** 이 에이전트를 묶어 둔 다중 에이전트 흐름의 이름. 없으면 null 이다 */
   flow: string | null;
+  /** 연결 화면이 소유하므로 일반 에이전트 편집 화면에서 바꾸지 않는다. */
+  connectorManaged: boolean;
 };
 
 /** 사용자가 쓸 수 있는 에이전트 한 줄이다. 관리 화면의 `AdminAgent` 보다 정보가 적다. */
