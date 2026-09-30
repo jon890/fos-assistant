@@ -555,11 +555,11 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 | `mcp.application.McpPrincipal` | 인증 결과. 토큰 번호, profile, 옛 토큰의 사용자 번호, 토큰 해시. profile 이 비었으면 옛 토큰이다 |
 | `mcp.application.McpProperties` | `assistant.mcp` 설정. `legacy-user-tokens`(기본 거짓) |
 | `mcp.application.McpCallerResolver` | 묶인 토큰이면 `_fos_ctx` 서명 확인, origin 실행 찾기, 그 실행의 사용자 읽기를 차례로 한다. 옛 토큰이면 그 토큰의 사용자를 쓴다. 실패는 모두 `MCP_CALL_CONTEXT_INVALID` 다 |
-| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. origin 실행은 끝난 실행일 수 있다. 옛 토큰이면 뒤의 둘이 비었다 |
+| `mcp.application.McpCaller` | 판정 결과. 요청자 `user`, origin 실행 `originExecution`, 확인한 `context`. origin 실행은 끝난 실행일 수 있지만 그 실행이나 뿌리 실행이 `CANCELLED` 인 것은 아니다. 옛 토큰이면 뒤의 둘이 비었다 |
 | `mcp.application.McpCallContext` | `_fos_ctx` 를 읽고 서명을 확인한다. 모델이 준 다른 인자는 보지 않는다 |
 | `mcp.application.SubagentRegistration` | 등록 본문을 읽고 서명을 확인한다. 서명할 글의 첫 줄이 `v1-subagent` 다 |
 | `mcp.presentation.SubagentSessionController` | `POST /internal/hermes/session-bindings/subagent`. 인증 주체가 묶인 `McpPrincipal` 인지 보고 등록을 부른다 |
-| `orchestration.application.SessionOwnerResolver` | profile, 서명한 뿌리 session, 그 호출의 session 으로 origin 실행을 정한다. 등록을 먼저 보고, 없으면 session 이 뿌리와 같을 때만 `DelegationParentResolver` 를 부른다 |
+| `orchestration.application.SessionOwnerResolver` | profile, 서명한 뿌리 session, 그 호출의 session 으로 origin 실행을 정한다. 등록을 먼저 보고, 없으면 session 이 뿌리와 같을 때만 `DelegationParentResolver` 를 부른다. 등록의 origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다 |
 | `orchestration.application.DelegationParentResolver` | profile 과 서명한 뿌리 session 으로 도는 실행 하나를 찾는다. 최상위 session 의 판정과 최상위 자식의 등록이 쓴다. 사용자로 먼저 거르지 않는다. 없거나 둘 이상이거나 profile 이 다르면 같은 실패 |
 | `orchestration.application.SubagentSessionRegistrar` | 등록 하나를 적는다. 부모를 풀고, 같은 origin 의 재등록은 그대로 두고, 다른 origin 은 거절한다 |
 | `orchestration.domain.HermesSessionBinding`, `orchestration.infra.HermesSessionBindingRepository` | 하위 에이전트 session 등록 줄과 그 저장소 |
@@ -1151,6 +1151,9 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다
 - `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
+- 사용자가 turn 을 중지할 때 Hermes `delegate_task` 하위 에이전트를 실제로 멈추는 것.
+  지금은 origin 실행이나 그 뿌리 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
+  뿌리와 origin 사이의 중간 실행만 중지된 경우는 보지 않는다
 - 사용자 전체의 동시 위임 한도. 지금은 뿌리당 한도와 서버 전체 한도만 있다
 - MCP `agent_*` 도구(`agent_list`, `agent_delegate`, `agent_status`, `agent_stop`)와 그것을 처리하는 `AgentDelegationService`, `DelegationProperties`.
   지금은 바탕(「MCP 요청자」 의 판정, `DelegationKey`, 실행 줄의 session 칸)만 있다

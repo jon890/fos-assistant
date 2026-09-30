@@ -120,6 +120,63 @@ class SessionOwnerResolverTest {
         assertThat(origin.errorCode()).as("origin 실행의 오류 코드").isEqualTo("ORPHANED");
     }
 
+    @Test
+    void 등록한_하위_에이전트는_origin_실행이_취소되면_거절한다() {
+        String s1 = register(root, root);
+        assertOrigin(owners.resolve(PROFILE, root, s1), dadRun, dad);
+
+        setStatus(dadRun, ExecutionStatus.CANCELLED);
+
+        assertRejected(PROFILE, root, s1);
+    }
+
+    @Test
+    void 하위_에이전트의_하위_에이전트도_origin_실행이_취소되면_거절한다() {
+        String s1 = register(root, root);
+        String s2 = register(root, s1);
+        setStatus(dadRun, ExecutionStatus.CANCELLED);
+
+        assertRejected(PROFILE, root, s1);
+        assertRejected(PROFILE, root, s2);
+    }
+
+    @Test
+    void 흐름을_중지하면_이미_끝난_자식_실행에서_만든_하위_에이전트도_거절한다() {
+        // 흐름의 자식 실행은 제 session 으로 돌아 그 안의 하위 에이전트는 자식 실행을 origin 으로 갖는다.
+        String childRoot = newRoot();
+        AgentExecution researched = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, childRoot);
+        jdbc.update("UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
+                dadRun.id(), dadRun.id(), researched.id());
+        String s1 = register(childRoot, childRoot);
+        setStatus(researched, ExecutionStatus.SUCCEEDED);
+        assertOrigin(owners.resolve(PROFILE, childRoot, s1), researched, dad);
+
+        setStatus(dadRun, ExecutionStatus.CANCELLED);
+
+        assertRejected(PROFILE, childRoot, s1);
+    }
+
+    @Test
+    void 뿌리가_끝났어도_취소가_아니면_자식_실행의_하위_에이전트는_그대로_정한다() {
+        String childRoot = newRoot();
+        AgentExecution researched = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, childRoot);
+        jdbc.update("UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
+                dadRun.id(), dadRun.id(), researched.id());
+        String s1 = register(childRoot, childRoot);
+        setStatus(researched, ExecutionStatus.SUCCEEDED);
+        setStatus(dadRun, ExecutionStatus.FAILED);
+
+        assertOrigin(owners.resolve(PROFILE, childRoot, s1), researched, dad);
+    }
+
+    @Test
+    void origin_실행이_실패로_끝나도_등록한_하위_에이전트는_그대로_정한다() {
+        String s1 = register(root, root);
+        setStatus(dadRun, ExecutionStatus.FAILED);
+
+        assertOrigin(owners.resolve(PROFILE, root, s1), dadRun, dad);
+    }
+
     @Test // 8
     void 다른_profile_의_등록으로는_정하지_못한다() {
         String s1 = register(root, root);

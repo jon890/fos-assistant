@@ -321,7 +321,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 
 서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 차례로 본다.
 
-1. 토큰이 증명한 profile 과 그 호출의 `session_id` 로 하위 에이전트 등록을 찾는다. 있으면 그 origin 실행의 사용자로 돈다. origin 실행이 끝났어도 된다
+1. 토큰이 증명한 profile 과 그 호출의 `session_id` 로 하위 에이전트 등록을 찾는다. 있으면 그 origin 실행의 사용자로 돈다. origin 실행이 끝났어도 된다. origin 실행이나 그 실행 나무의 뿌리 실행이 `CANCELLED` 면 거절한다
 2. 등록이 없고 `session_id` 가 `root_session_id` 와 같으면, 그 profile 과 뿌리 session 으로 도는 실행 하나를 찾아 그 실행의 사용자로 돈다
 3. 등록이 없고 `session_id` 가 뿌리와 다르면 거절한다
 
@@ -448,6 +448,26 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 등록이 없는 하위 에이전트의 호출은 서버가 거절하므로 안전한 쪽으로 실패한다.
 플러그인과 서버 모두 토큰, `sig`, 본문을 로그에 남기지 않는다.
 
+#### profile 에 묶인 토큰에서만 동작한다
+
+등록과 origin 판정, 아래 「취소가 아래로 내려가지 않는다」 의 취소 차단은 **profile 에 묶인 MCP 토큰**에서만 동작한다.
+`agent_token.profile_name` 이 있고 `agent_token.user_id` 가 빈 토큰이다.
+
+profile 이 빈 옛 토큰은 이렇게 된다.
+
+- 등록 경로가 거절한다. 설정이 거짓이면 `401`, 참이면 `403` 이다
+- `/mcp` 호출은 `_fos_ctx` 를 보지 않고 토큰의 사용자로 돈다. origin 실행을 찾지 않으므로 부모 turn 을 중지해도 하위 에이전트의 호출이 막히지 않는다
+
+그래서 하위 에이전트를 쓰는 profile 은 운영에서 모두 묶인 토큰이어야 한다. 어느 profile 의 토큰이 묶였는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
+
+옛 토큰 경로는 이 순서로 지운다. 앞 단계가 끝나야 다음 단계로 간다.
+
+1. 모든 토큰을 profile 에 묶는다. `PUT /api/v1/admin/agent-tokens/{id}/profile` 이 묶으면서 `user_id` 를 비운다
+2. `assistant.mcp.legacy-user-tokens` 를 거짓으로 돌린다
+3. 옛 경로가 쓰이지 않는지 본다. 옛 토큰이 쓰이거나 거절될 때 남는 서버 경고 로그(`profile 이 묶이지 않은 옛 MCP 토큰`)가 0 건이어야 한다
+4. `agent_token.user_id` 칸을 지운다
+5. `McpPrincipal.legacyUserId` 와 설정을 지운다
+
 #### 하위 에이전트를 실제로 확인하는 절차
 
 환경과 실행 방법은 `fos-home-infra` 가 갖는다. 일회용 Hermes v0.21.5 에서 본다.
@@ -460,6 +480,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | 4 | 부모 run 이 끝난 뒤 자식이 `memory_read` 를 부른다 | origin 실행의 사용자의 본문이 온다 |
 | 5 | `compression.in_place: false` 로 교체된 최상위 session 에서 자식을 만든다 | 등록 본문의 `parent_root_session_id` 가 원래 뿌리다 |
 | 6 | 플러그인의 등록을 끈 채 자식이 `memory_read` 를 부른다 | 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
+| 7 | 자식이 도는 동안 사용자가 부모 turn 을 중지하고, 그 뒤 자식이 `memory_read` 를 부른다 | origin 실행이 `CANCELLED` 이고 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
 
 Hermes 를 올릴 때도 이 표를 다시 돌린다. `subagent_start` 가 사라지거나 인자 이름이 바뀌면 하위 에이전트의 MCP 호출이 모두 거절된다.
 
@@ -521,6 +542,17 @@ Hermes 는 그 도구가 자기를 다시 부른다는 것을 알지 못한다.
 뿌리 실행을 취소한 뒤에도 그 도구가 만든 아래 실행이 완료로 끝나고
 다시 그 아래를 시작하는 것을 실측했다.
 취소를 아래로 전파하는 것도 Control Plane 의 몫이다.
+
+모델이 부른 `delegate_task` 자식도 같다. 위 「하위 에이전트는 부모 run 보다 오래 산다」 대로 background 자식은 부모 run 에서 떨어져 나가 따로 돈다.
+부모 run 을 멈춰도 그 자식은 계속 돌 수 있다고 본다. 중지한 뒤 자식이 실제로 계속 도는지는 실행으로 확인하지 않았다.
+
+그래서 Control Plane 은 지금 이만큼 막는다.
+
+| 무엇 | 지금 |
+| --- | --- |
+| 자식의 Control Plane MCP 호출(`memory_read`, `artifact_write`, 앞으로의 `agent_*`) | origin 실행이나 그 뿌리 실행이 `CANCELLED` 면 거절한다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)). 다른 거절과 같은 도구 결과다 |
+| 자식의 Hermes 자체 도구(웹 검색, 터미널 등) | 막지 못한다 |
+| 자식 run 자체 | 멈추지 못한다. `subagent_stop` hook 과 Hermes 의 비동기 위임 제어가 자식을 멈출 수 있는지 조사한 뒤 turn 중지에 잇는다 |
 
 ### 취소한 실행의 조회 응답
 
