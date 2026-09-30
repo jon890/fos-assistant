@@ -59,11 +59,11 @@ public class SkillService {
     public static final long MAX_TOTAL_BYTES = 1_048_576L;
 
     /**
-     * Hermes 가 가진 스킬까지 포함한 이름 형식이다. 켜고 끄기가 쓴다. Hermes 는 소문자, 숫자, 점, 밑줄,
+     * Hermes 가 가진 스킬까지 포함한 이름 형식이다. 켜고 끄기와 호출 이력({@link SkillUseRecorder})이 쓴다. Hermes 는 소문자, 숫자, 점, 밑줄,
      * 붙임표로 64자까지 받는다. 첫 글자를 영문 소문자나 숫자로 묶어 {@code .} 과 {@code ..} 같은 이름을
      * 막는다. 화면(web/src/lib/skill.ts)의 같은 규칙과 함께 고친다.
      */
-    private static final Pattern HERMES_SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
+    static final Pattern HERMES_SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
 
     private final AgentService agents;
     private final SkillStore store;

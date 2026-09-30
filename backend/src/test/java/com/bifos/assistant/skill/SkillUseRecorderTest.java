@@ -66,6 +66,32 @@ class SkillUseRecorderTest {
     }
 
     @Test
+    void Hermes_기본_스킬처럼_점과_밑줄이_든_이름도_MODEL_로_적는다() {
+        recorder.recordModel(EXECUTION_ID, "note_taking.v2");
+
+        assertThat(recorded()).singleElement().satisfies(use -> {
+            assertThat(use.skillName()).isEqualTo("note_taking.v2");
+            assertThat(use.source()).isEqualTo(SkillUseSource.MODEL);
+        });
+    }
+
+    @Test
+    void 점과_밑줄이_든_이름에_참고_파일_경로가_붙어도_화살표_앞의_이름만_적는다() {
+        recorder.recordModel(EXECUTION_ID, "note_taking.v2 → references/a.md");
+
+        assertThat(recorded()).extracting(ExecutionSkillUse::skillName).containsExactly("note_taking.v2");
+    }
+
+    @Test
+    void 점이나_밑줄로_시작하거나_대문자가_든_이름은_버린다() {
+        recorder.recordModel(EXECUTION_ID, ".hidden");
+        recorder.recordModel(EXECUTION_ID, "_x");
+        recorder.recordModel(EXECUTION_ID, "Note");
+
+        assertThat(recorded()).isEmpty();
+    }
+
+    @Test
     void 규칙에_맞지_않는_미리보기는_버린다() {
         recorder.recordModel(EXECUTION_ID, null);
         recorder.recordModel(EXECUTION_ID, "");

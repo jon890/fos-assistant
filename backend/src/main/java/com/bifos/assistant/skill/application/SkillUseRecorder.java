@@ -4,7 +4,6 @@ import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import java.time.Instant;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,9 +27,6 @@ public class SkillUseRecorder {
 
     private static final Logger log = LoggerFactory.getLogger(SkillUseRecorder.class);
 
-    /** 스킬 이름 규칙이다. Hermes 가 받는 디렉터리 이름과 같다. */
-    static final Pattern SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
-
     /** {@code skill_view} 미리보기에서 이름과 참고 파일 경로를 나누는 글자다. */
     private static final String PREVIEW_PATH_SEPARATOR = "→";
 
@@ -47,7 +43,7 @@ public class SkillUseRecorder {
      * 모델이 {@code skill_view} 로 읽은 것을 적는다.
      *
      * @param preview 도구 사건의 미리보기. 스킬 이름이거나 {@code 이름 → 파일 경로} 다. 길이 상한에서 잘렸을
-     *     수 있어, 이름 규칙에 맞지 않으면 버린다
+     *     수 있어, Hermes 스킬 이름 규칙에 맞지 않으면 버린다
      */
     public void recordModel(Long executionId, String preview) {
         record(executionId, nameOf(preview), SkillUseSource.MODEL);
@@ -58,14 +54,14 @@ public class SkillUseRecorder {
         record(executionId, nameOf(skillName), SkillUseSource.COMMAND);
     }
 
-    /** 미리보기에서 이름만 꺼낸다. 규칙에 맞지 않으면 {@code null} 이다. */
+    /** 미리보기에서 이름만 꺼낸다. Hermes 스킬 이름 규칙({@code .} 과 {@code _} 포함)에 맞지 않으면 {@code null} 이다. */
     static String nameOf(String preview) {
         if (preview == null) {
             return null;
         }
         int separator = preview.indexOf(PREVIEW_PATH_SEPARATOR);
         String name = (separator < 0 ? preview : preview.substring(0, separator)).strip();
-        return SKILL_NAME.matcher(name).matches() ? name : null;
+        return SkillService.HERMES_SKILL_NAME.matcher(name).matches() ? name : null;
     }
 
     private void record(Long executionId, String skillName, SkillUseSource source) {
