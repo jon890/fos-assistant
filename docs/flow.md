@@ -1,5 +1,28 @@
 # 흐름
 
+## 가계부 연결
+
+```mermaid
+flowchart TD
+    A[토큰과 선택 가족 제출] --> B[로그인 사용자 확인과 토큰 검증]
+    B -->|인증 실패 또는 가족 권한 없음| X[고정 오류]
+    B --> C[사용자 행 잠금과 전용 에이전트 바인딩]
+    C --> D[에이전트 비활성화와 PENDING 저장]
+    D --> E[profile env와 이름 기반 plugin 설치]
+    E -->|실패 또는 재시작 필요| P[PENDING 유지]
+    E --> F[설치 조회와 MCP probe]
+    F -->|도구 확인 성공과 재시작 불필요| R[READY와 에이전트 활성화]
+    F -->|실패| P
+    P -->|연결 확인| F
+    R -->|해제| U[비활성화 후 토큰 삭제와 plugin 해제]
+    U -->|실패| P
+    U --> Z[DISCONNECTED]
+```
+
+동일 사용자의 요청은 잠금으로 순서대로 처리한다.
+실패한 외부 호출이 에이전트 비활성화를 되돌리지 않아야 한다.
+API와 저장 계약은 [가계부 연결](connectors.md)이 갖는다.
+
 화면 전환과 호출 순서를 담는다.
 모듈 배치는 [`code-architecture.md`](code-architecture.md), 저장 모델은 [`data-schema.md`](data-schema.md)가 가진다.
 

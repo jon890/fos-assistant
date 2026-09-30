@@ -1,5 +1,20 @@
 # 저장 모델
 
+## accountbook_connection
+
+사용자마다 가계부 연결 하나를 둔다.
+`user_id BIGINT`가 기본키이며 `app_user`를 참조한다.
+`agent_id BIGINT`는 필수이며 유니크하고 `agent`를 참조한다.
+`status VARCHAR(20)`은 `DISCONNECTED`, `PENDING`, `READY` 중 하나다.
+`token_prefix VARCHAR(8)`, `family_uuid VARCHAR(36)`, `last_checked_at TIMESTAMP`는 비어도 된다.
+`restart_required BOOLEAN`은 필수다.
+연결 해제 때 행은 남기고 prefix와 가족을 비운다.
+토큰 원문과 해시는 저장하지 않는다.
+
+`agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE`는 전용 연결 에이전트를 표시한다.
+이 값이 참인 에이전트는 일반 설정 편집과 공개, 삭제 경로를 막는다.
+상태 변화는 [가계부 연결](connectors.md)이 갖는다.
+
 MySQL 8.4 에 둔다.
 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
 
