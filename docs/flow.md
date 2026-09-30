@@ -104,7 +104,7 @@ sequenceDiagram
 | --- | --- |
 | 토큰이 없거나, 모르는 토큰이거나, 폐기됐다 | HTTP 401 |
 | profile 이 빈 옛 토큰이고 `assistant.mcp.legacy-user-tokens` 가 거짓이다 | HTTP 401 |
-| profile 이 빈 옛 토큰이고 그 설정이 참이다 | 옛 토큰의 `user_id` 로 전처럼 돈다. `_fos_ctx` 는 보지 않고 경고 로그를 남긴다 |
+| profile 이 빈 옛 토큰이고 그 설정이 참이다 | 옛 토큰의 `user_id` 로 전처럼 돈다. `_fos_ctx` 는 보지 않고 경고 로그를 남긴다. 다만 `agent_*` 도구는 origin 실행이 없어 거절한다 |
 | profile 이 묶인 토큰인데 `_fos_ctx` 가 없거나 모양이 틀렸거나 서명이 맞지 않는다 | 거절한다 |
 | 서명이 맞고 그 호출의 session 에 하위 에이전트 등록이 있다 | 등록의 origin 실행의 사용자로 돈다. origin 실행이 `SUCCEEDED` 나 `FAILED` 로 끝났어도, 같은 대화의 다음 turn 이 돌고 있어도 같다 |
 | 등록이 있는데 origin 실행이나 그 실행 나무의 뿌리 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. 흐름을 멈출 때 이미 끝난 자식 실행에서 만든 하위 에이전트도 뿌리가 중지돼 거절된다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
@@ -1292,7 +1292,7 @@ CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로
 
 ## 다른 에이전트에게 맡길 때
 
-**아직 구현하지 않았다.** 이 절은 `agent_*` 도구를 열 때의 흐름이다. 지금 `/mcp` 는 이 도구들에 `-32601` 을 돌려준다. 요청자를 정하는 앞부분은 「MCP 호출의 요청자를 정할 때」 로 이미 돈다.
+**`agent_list` 와 `agent_status` 만 열었다.** `agent_delegate` 와 `agent_stop` 은 아직 없어 `/mcp` 가 `-32601` 을 돌려준다. 아래 그림에서 그 둘의 부분은 열 때의 흐름이다. 요청자를 정하는 앞부분은 「MCP 호출의 요청자를 정할 때」 로 돈다.
 
 Hermes 가 어느 에이전트를 부를지 정하고, Control Plane 은 경계만 검사한다.
 결정은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 과
@@ -1340,7 +1340,10 @@ sequenceDiagram
 | 다른 session 에서 같은 `tool_call_id` 가 온다 | 다른 호출이다. 따로 만든다 |
 | 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 실패 코드를 돌려준다 |
 | 제출이 한도 시간 안에 끝나지 않는다 | 실행 번호를 돌려주고, 뒤따르는 결과는 그 줄에 적는다 |
-| `agent_status` 로 남의 실행이나 그 나무 밖의 실행을 묻는다 | 없는 실행과 같은 응답이다 |
+| 옛 토큰으로 `agent_*` 를 부른다 | 설정이 참이어도, `_fos_ctx` 를 붙여도 거절한다. origin 실행이 없어 요청자와 실행 나무를 정할 수 없다 |
+| `agent_list` 를 부른다 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 `name` 만 JSON 배열로 준다. 같은 profile 을 여럿이 써도 요청자마다 다르다 |
+| `agent_status` 로 남의 실행, 그 나무 밖의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호를 묻는다 | 모두 `{"code":"NOT_FOUND","message":"실행을 찾을 수 없습니다."}` 하나로 답한다. 기준 나무는 부르는 쪽 origin 실행의 뿌리다. origin 실행이 끝났어도 같다 |
+| `agent_status` 가 물을 수 있는 실행이다 | `execution_id` 와 `status` 를 준다. `SUCCEEDED` 는 `output`, `FAILED` 는 `error_code`, `CANCELLED` 는 답이 있으면 `output` 을 더한다. run 번호, profile, 토큰 수, 금액은 싣지 않는다 |
 | `agent_stop` 이 끝난 실행에 온다 | 멈추지 않고 끝난 상태를 그대로 돌려준다 |
 | 멈추기와 끝나기가 겹친다 | 먼저 적힌 쪽이 남는다. 끝난 뒤 온 중지는 끝난 상태를 돌려준다 |
 | 자식이 다시 `agent_delegate` 를 부른다 | 그 자식이 부모가 된다. 깊이 한도 안에서만 된다 |
