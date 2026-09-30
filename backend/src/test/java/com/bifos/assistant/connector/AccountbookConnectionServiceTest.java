@@ -106,11 +106,16 @@ class AccountbookConnectionServiceTest {
         CurrentUser first = user(UserRole.MEMBER, 1L);
         CurrentUser second = user(UserRole.MEMBER, 1L);
 
-        ConnectionSnapshot firstResult = service.register(first, TOKEN, null);
-        ConnectionSnapshot secondResult = service.register(second, "fab_" + "b".repeat(43), null);
+        UUID sameFamily = UUID.randomUUID();
+        ConnectionSnapshot firstResult = service.register(first, TOKEN, sameFamily.toString());
+        ConnectionSnapshot secondResult = service.register(second, "fab_" + "b".repeat(43), sameFamily.toString());
 
         assertThat(service.read(first).agentCode()).isEqualTo(firstResult.agentCode());
         assertThat(service.read(first).agentCode()).isNotEqualTo(secondResult.agentCode());
+        assertThat(firstResult.familyUuid()).isEqualTo(secondResult.familyUuid()).isEqualTo(sameFamily);
+        assertThat(firstResult.tokenPrefix()).isNotEqualTo(secondResult.tokenPrefix());
+        org.mockito.Mockito.verify(verifier).verify(TOKEN, sameFamily);
+        org.mockito.Mockito.verify(verifier).verify("fab_" + "b".repeat(43), sameFamily);
     }
 
     @Test

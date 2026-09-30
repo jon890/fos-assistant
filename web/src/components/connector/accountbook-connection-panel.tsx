@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { AccountbookConnection } from "@/lib/connection";
+import type { AccountbookConnection, AccountbookFamily } from "@/lib/connection";
 
 const ERROR_MESSAGES: Record<string, string> = {
   ACCOUNTBOOK_TOKEN_REJECTED: "가계부 토큰을 확인하지 못했어요. 토큰을 다시 확인해 주세요.",
@@ -41,7 +41,8 @@ export function AccountbookConnectionPanel({ initialConnection }: { initialConne
   const [connection, setConnection] = useState(initialConnection);
   const [token, setToken] = useState("");
   const [familyUuid, setFamilyUuid] = useState(initialConnection?.familyUuid ?? "");
-  const [pending, setPending] = useState<"save" | "check" | "disconnect" | null>(null);
+  const [families, setFamilies] = useState<AccountbookFamily[] | null>(null);
+  const [pending, setPending] = useState<"save" | "check" | "disconnect" | "families" | null>(null);
   const [error, setError] = useState<string | null>(initialConnection ? null : "연결 상태를 읽지 못했어요. 다시 확인해 주세요.");
   const busy = pending !== null;
   useEffect(() => {
@@ -52,11 +53,28 @@ export function AccountbookConnectionPanel({ initialConnection }: { initialConne
     return () => window.removeEventListener("accountbook-connection-updated", refresh);
   }, []);
 
+  async function loadFamilies() {
+    if (busy || !token.trim()) return;
+    setPending("families"); setError(null);
+    const result = await request<AccountbookFamily[]>("/api/connections/accountbook/families", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+    });
+    setPending(null);
+    if ("error" in result) { setToken(""); setFamilies(null); setFamilyUuid(""); return setError(result.error); }
+    setFamilies(result.data);
+    setFamilyUuid(result.data.length === 1 ? result.data[0].uuid : "");
+    if (result.data.length === 0) setError("이 토큰으로 고를 수 있는 가족이 없어요. 가계부에서 가족을 확인해 주세요.");
+  }
+
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
+    if (!families?.some((family) => family.uuid === familyUuid)) {
+      setError("가족 목록을 불러온 뒤 함께 쓸 가족을 골라 주세요."); return;
+    }
     const submittedToken = token;
     setToken("");
+    setFamilies(null);
     if (submittedToken.trim().length === 0) {
       setError("가계부 토큰을 입력해 주세요.");
       return;
@@ -71,6 +89,7 @@ export function AccountbookConnectionPanel({ initialConnection }: { initialConne
     if ("error" in result) return setError(result.error);
     setConnection(result.data);
     setFamilyUuid(result.data.familyUuid ?? "");
+    setFamilies(null);
   }
 
   async function check() {
@@ -95,7 +114,7 @@ export function AccountbookConnectionPanel({ initialConnection }: { initialConne
   return <Card>
     <CardHeader>
       <CardTitle>가계부 연결</CardTitle>
-      <CardDescription>내 가계부 조회를 위한 토큰을 연결해요.</CardDescription>
+      <CardDescription>가족과 함께 쓰려면 각자 가계부에서 연동 토큰을 발급해 연결하고 같은 가족을 고르세요.</CardDescription>
     </CardHeader>
     <CardContent className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">
@@ -112,11 +131,20 @@ export function AccountbookConnectionPanel({ initialConnection }: { initialConne
       <form onSubmit={save} className="space-y-3">
         <div className="space-y-2"><Label htmlFor="accountbook-token">가계부 토큰</Label>
           <Input id="accountbook-token" name="token" type="password" autoComplete="off" value={token} disabled={busy}
-            onChange={(event) => setToken(event.target.value)} /></div>
-        <div className="space-y-2"><Label htmlFor="accountbook-family">가족 식별자 (선택)</Label>
-          <Input id="accountbook-family" name="familyUuid" value={familyUuid} disabled={busy}
-            onChange={(event) => setFamilyUuid(event.target.value)} /></div>
-        <Button type="submit" disabled={busy} loading={pending === "save"} loadingText="연결하는 중…">{status === "READY" ? "토큰 바꾸기" : "연결하기"}</Button>
+            onChange={(event) => { setToken(event.target.value); setFamilies(null); setFamilyUuid(""); }} /></div>
+        <Button type="button" variant="outline" disabled={busy || !token.trim()} onClick={() => void loadFamilies()}
+          loading={pending === "families"} loadingText="가족을 불러오는 중…">가족 불러오기</Button>
+        {families && families.length > 0 ? <div className="space-y-2"><Label htmlFor="accountbook-family">연결할 가족</Label>
+          <select id="accountbook-family" name="familyUuid" value={familyUuid} disabled={busy}
+            className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm"
+            onChange={(event) => setFamilyUuid(event.target.value)}>
+            <option value="" disabled>가족 선택</option>
+            {families.map((family) => <option key={family.uuid} value={family.uuid}>{family.name}</option>)}
+          </select>
+          {families.length === 1 ? <p className="text-sm text-muted-foreground">가족이 하나라 자동으로 골랐어요.</p> : null}
+        </div> : null}
+        {connection?.familyUuid ? <p className="break-all text-sm text-muted-foreground">현재 연결한 가족: {connection.familyUuid}</p> : null}
+        <Button type="submit" disabled={busy || !token.trim() || !families?.length || !familyUuid} loading={pending === "save"} loadingText="연결하는 중…">{status === "READY" ? "토큰 바꾸기" : "연결하기"}</Button>
       </form>
       {status === "PENDING" ? <Button disabled={busy} variant="outline" onClick={() => void check()} loading={pending === "check"} loadingText="확인하는 중…">연결 다시 확인</Button> : null}
       {status && status !== "DISCONNECTED" ? <Button disabled={busy} variant="destructive" onClick={() => void disconnect()} loading={pending === "disconnect"} loadingText="해제하는 중…">연결 해제</Button> : null}

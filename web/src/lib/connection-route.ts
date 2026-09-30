@@ -46,11 +46,23 @@ export async function connectorCall<T>(path: string, init: { method?: string; bo
     const result = await callControlPlane<unknown>(path, init);
     if (!result.ok) return result;
     const admin = path.startsWith("/api/v1/admin/");
-    const data = Array.isArray(result.data) && admin ? result.data.map((item) => safeConnection(item, true)) : safeConnection(result.data, admin);
+    const data = path.endsWith("/families") ? safeFamilies(result.data)
+      : Array.isArray(result.data) && admin ? result.data.map((item) => safeConnection(item, true)) : safeConnection(result.data, admin);
     return { ...result, data: data as T };
   } catch {
     return { ok: false as const, status: 502, code: "CONNECTOR_OPERATION_FAILED", message: "" };
   }
+}
+
+function safeFamilies(value: unknown) {
+  if (!Array.isArray(value)) throw new Error();
+  return value.map((entry: unknown) => {
+    if (!entry || typeof entry !== "object") throw new Error();
+    const item = entry as Record<string, unknown>;
+    if (typeof item.uuid !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.uuid)
+      || typeof item.name !== "string" || !item.name.trim()) throw new Error();
+    return { uuid: item.uuid, name: item.name };
+  });
 }
 
 /** 응답 계약의 칸만 복사해 비밀값이 추가된 원격 응답도 브라우저로 옮기지 않는다. */

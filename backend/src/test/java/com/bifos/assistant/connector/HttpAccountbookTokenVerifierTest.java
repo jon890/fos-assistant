@@ -33,7 +33,7 @@ class HttpAccountbookTokenVerifierTest {
 
     @Test void readsTheRealSuccessEnvelopeAndAuthorizesSelectedFamily() {
         server.expect(requestTo(BASE + "/families")).andExpect(header("Authorization", "Bearer test-secret"))
-                .andRespond(withSuccess("{\"success\":true,\"data\":[{\"uuid\":\"" + FAMILY + "\"}]}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"success\":true,\"data\":[{\"uuid\":\"" + FAMILY + "\",\"name\":\"함께 쓰는 가계부\"}]}", MediaType.APPLICATION_JSON));
         verifier.verify("test-secret", FAMILY);
         server.verify();
     }

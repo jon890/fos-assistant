@@ -33,6 +33,11 @@ public class AccountbookConnectionService {
     private final HermesToolsetClient toolsets;
     private final AccountbookProperties properties;
 
+    public List<AccountbookTokenVerifier.FamilyOption> availableFamilies(CurrentUser user, String token) {
+        requireToken(token);
+        return verifier.readFamilies(token);
+    }
+
     @Transactional(readOnly = true)
     public ConnectionSnapshot read(CurrentUser user) {
         return connections.findById(user.id()).map(this::snapshot)

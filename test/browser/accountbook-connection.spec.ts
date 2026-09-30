@@ -1,4 +1,8 @@
 import { expect, test } from "./fixtures.ts";
+const familyUuid = "e5b60d52-bc21-4781-b230-df0ee8e11a65";
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/connections/accountbook/families", (route) => route.fulfill({ json: [{ uuid: familyUuid, name: "함께 쓰는 가족" }] }));
+});
 
 const pending = {
   status: "PENDING", tokenPrefix: "ab12cd34", familyUuid: null, checkedAt: null,
@@ -17,6 +21,8 @@ test("토큰을 등록하고 확인한 뒤 해제 상태와 반영 안내를 본
   await page.route("**/api/connections/accountbook/check", (route) => route.fulfill({ json: ready }));
   await page.goto("/connections/accountbook");
   await page.getByLabel("가계부 토큰").fill("browser-secret-token");
+  await page.getByRole("button", { name: "가족 불러오기" }).click();
+  await expect(page.getByLabel("연결할 가족")).toHaveValue(familyUuid);
   await page.getByRole("button", { name: "연결하기" }).click();
   await expect(page.getByText("상태:").locator("strong")).toHaveText("준비 중");
   await expect(page.getByRole("button", { name: "연결 다시 확인" })).toBeVisible();
@@ -41,12 +47,35 @@ test("등록 요청을 기다리는 동안 토큰 입력을 비우고 오류 원
   await page.goto("/connections/accountbook");
   const token = page.getByLabel("가계부 토큰");
   await token.fill("browser-secret-token");
+  await page.getByRole("button", { name: "가족 불러오기" }).click();
   await page.getByRole("button", { name: "연결하기" }).click();
   await expect(token).toHaveValue("");
-  expect(submitted).toEqual({ token: "browser-secret-token" });
+  expect(submitted).toEqual({ token: "browser-secret-token", familyUuid });
   release();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText("가계부 토큰을 확인하지 못했어요. 토큰을 다시 확인해 주세요.");
   await expect(page.getByText("raw upstream secret")).toHaveCount(0);
+});
+
+test("가족이 여럿이면 고른 가족을 자기 토큰과 함께 등록한다", async ({ page }) => {
+  const anotherUuid = "c0b31ae5-072d-4a54-a945-0345d3632ec4";
+  await page.route("**/api/connections/accountbook/families", (route) => route.fulfill({ json: [
+    { uuid: anotherUuid, name: "다른 가족" }, { uuid: familyUuid, name: "함께 쓰는 가족" },
+  ] }));
+  let submitted: unknown;
+  await page.route("**/api/connections/accountbook", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    submitted = route.request().postDataJSON();
+    await route.fulfill({ json: { ...pending, familyUuid } });
+  });
+  await page.goto("/connections/accountbook");
+  await expect(page.getByText(/각자 가계부에서 연동 토큰/)).toBeVisible();
+  await page.getByLabel("가계부 토큰").fill("second-user-secret-token");
+  await page.getByRole("button", { name: "가족 불러오기" }).click();
+  await expect(page.getByRole("button", { name: "연결하기" })).toBeDisabled();
+  await page.getByLabel("연결할 가족").selectOption(familyUuid);
+  await page.getByRole("button", { name: "연결하기" }).click();
+  await expect(page.getByLabel("가계부 토큰")).toHaveValue("");
+  expect(submitted).toEqual({ token: "second-user-secret-token", familyUuid });
 });
 
 test("관리자는 반영 대기 연결을 완료로 확인한다", async ({ page }) => {

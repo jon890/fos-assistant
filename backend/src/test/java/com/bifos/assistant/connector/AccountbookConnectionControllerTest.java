@@ -87,6 +87,20 @@ class AccountbookConnectionControllerTest {
     }
 
     @Test
+    void 가족_목록은_로그인_사용자의_토큰으로_읽고_토큰은_응답하지_않는다() throws Exception {
+        String token = "fab_" + "a".repeat(43);
+        java.util.UUID uuid = java.util.UUID.randomUUID();
+        when(service.availableFamilies(MEMBER, token)).thenReturn(List.of(
+                new com.bifos.assistant.connector.application.AccountbookTokenVerifier.FamilyOption(uuid, "공유 가족")));
+        var result = mvc.perform(post("/api/v1/connections/accountbook/families")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].uuid").value(uuid.toString()))
+                .andExpect(jsonPath("$[0].name").value("공유 가족")).andReturn();
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(token);
+        verify(service).availableFamilies(MEMBER, token);
+    }
+
+    @Test
     void 확인은_요청_본문_없이_로그인_사용자로_수행한다() throws Exception {
         when(service.check(MEMBER)).thenReturn(snapshot(ConnectionStatus.PENDING, "fab_abcd"));
 

@@ -9,6 +9,7 @@
 | 경로 | 요청 | 결과 |
 | --- | --- | --- |
 | `GET /api/v1/connections/accountbook` | 없음 | 자신의 연결 상태 |
+| `POST /api/v1/connections/accountbook/families` | `token` | 토큰 주인의 가족 목록 `uuid`, `name` |
 | `POST /api/v1/connections/accountbook` | `token`, 선택 `familyUuid` | 등록 또는 토큰 교체 |
 | `POST /api/v1/connections/accountbook/check` | 없음 | 설치 상태와 MCP probe 재확인 |
 | `DELETE /api/v1/connections/accountbook` | 없음 | 토큰 제거와 에이전트 비활성화 |
@@ -25,6 +26,11 @@ probe는 공유 gateway의 실제 실행 확인을 대신하지 않는다.
 운영에서 실제 도구를 호출하는 확인은 `fos-home-infra`가 맡는다.
 
 등록 요청은 profile, 사용자 번호, plugin 경로, MCP 정의를 받지 않는다.
+화면은 토큰으로 가족 목록을 불러오며 가족이 하나면 자동으로 고른다.
+여럿이면 사용자가 선택한 가족 UUID를 등록 요청에 함께 보낸다.
+가족과 함께 쓰는 사용자들은 각자 발급한 토큰으로 같은 가족을 선택한다.
+가족 조회는 연결이나 토큰을 저장하지 않으며 조회한 토큰은 응답하지 않는다.
+토큰을 바꾸면 조회한 가족 목록을 비우고 다시 확인한다.
 서버가 로그인 사용자와 저장된 에이전트 바인딩으로 profile을 정한다.
 `ACCOUNTBOOK_API_BASE_URL`은 Control Plane 환경 변수로 받으며 HTTPS 공인 경로여야 한다.
 등록 전에 그 주소의 `/families`를 한 번 불러 토큰과 선택 가족의 권한을 확인한다.
@@ -92,6 +98,7 @@ GET에는 재시작 판정이 없으므로 연결 확인만으로 저장된 `res
 선택 가족 UUID, 마지막 확인 시각과 재시작 필요 여부만 저장한다.
 활성화 후보 여부도 저장해 실패한 등록이나 해제가 기존 토큰의 실행을 다시 허용하지 못하게 한다.
 토큰 원문과 해시는 저장하지 않는다.
-브라우저는 제출한 직후 토큰 입력을 비우고 다시 표시하지 않는다.
+브라우저는 연결 등록을 제출한 직후 토큰 입력을 비우고 다시 표시하지 않는다.
+가족을 고르는 동안은 작성 중인 토큰 입력을 사용하며 가족 조회가 실패해도 입력을 비운다.
 요청 record의 문자열 표현, 외부 API 오류, 로그와 응답에 원문을 남기지 않는다.
 인프라의 대시보드 권한과 운영 확인은 `fos-home-infra`가 소유한다.

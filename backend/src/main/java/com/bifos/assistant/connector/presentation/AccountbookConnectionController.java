@@ -29,6 +29,10 @@ public class AccountbookConnectionController {
         CurrentUser user = currentUser.require(); return ConnectionView.from(connections.register(user, request.token(), request.familyUuid()));
     }
     @PostMapping("/check") public ConnectionView check() { return ConnectionView.from(connections.check(currentUser.require())); }
+    @PostMapping("/families") public java.util.List<com.bifos.assistant.connector.application.AccountbookTokenVerifier.FamilyOption> families(
+            @Valid @RequestBody RegisterRequest request) {
+        return connections.availableFamilies(currentUser.require(), request.token());
+    }
     @DeleteMapping public ConnectionView disconnect() { return ConnectionView.from(connections.disconnect(currentUser.require())); }
     /** 역직렬화 오류에도 토큰이 포함된 예외 본문을 로그에 남기지 않는다. */
     @ExceptionHandler(HttpMessageNotReadableException.class)

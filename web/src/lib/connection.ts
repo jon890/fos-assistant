@@ -1,4 +1,5 @@
 export type ConnectionStatus = "DISCONNECTED" | "PENDING" | "READY";
+export type AccountbookFamily = { uuid: string; name: string };
 
 /** 가계부 연결 화면이 보여 주는 현재 사용자의 상태다. 토큰 원문은 이 형식에 없다. */
 export type AccountbookConnection = {
