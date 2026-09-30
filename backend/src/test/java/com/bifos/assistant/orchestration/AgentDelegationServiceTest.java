@@ -277,6 +277,30 @@ class AgentDelegationServiceTest {
     }
 
     @Test
+    void 끊긴_위임_실행의_에이전트_행이_없으면_Hermes_에_보내지_않고_중지를_요청하지_않은_상태로_답한다() {
+        // 서버가 다시 떠 이 프로세스에 중지 표시가 없는 도는 위임 실행이다. 가리키는 에이전트 행은 없다.
+        AgentExecution detached = executions.save(AgentExecution.builder()
+                .userId(user.id())
+                .conversationId(conversation.id())
+                .agentId(999_999_999L)
+                .parentExecutionId(origin.id())
+                .rootExecutionId(origin.id())
+                .profileName(WORKER)
+                .hermesRunId("run-detached")
+                .delegationKey("detached-" + UUID.randomUUID())
+                .costMode(CostMode.API)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.parse("2026-09-30T00:00:00Z"))
+                .build());
+
+        DelegationStop stopped = delegations.stop(user, origin, detached.id()).orElseThrow();
+
+        assertThat(stopped.stopRequested()).as("보낼 주소가 없어 멈추지 못했다").isFalse();
+        assertThat(stopped.execution().status()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(stub().stopped()).isEmpty();
+    }
+
+    @Test
     void 같은_대화의_다음_turn_에서_앞_turn_이_맡긴_실행을_멈춘다() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         holdUntilStopped();
