@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.connector.domain.AccountbookConnection;
 import com.bifos.assistant.connector.domain.ConnectionStatus;
 import com.bifos.assistant.connector.infra.AccountbookConnectionRepository;
@@ -24,6 +25,8 @@ public class AccountbookConnectionService {
     private static final String TOKEN_KEY = "ACCOUNTBOOK_API_TOKEN";
     private static final String FAMILY_KEY = "ACCOUNTBOOK_FAMILY_UUID";
     private static final String BASE_URL_KEY = "ACCOUNTBOOK_API_BASE_URL";
+    /** 인프라 plugin 이 설치하는 가계부 MCP 서버의 이름이다. 설치된 profile 에서만 허용 목록에 둘 수 있다. */
+    private static final String CONNECTOR_SERVER = "accountbook";
     private final AccountbookConnectionRepository connections;
     private final AppUserRepository users;
     private final AgentLifecycleService lifecycle;
@@ -59,6 +62,8 @@ public class AccountbookConnectionService {
         final boolean baseUrlRestart;
         final boolean installRestart;
         try {
+            // 설정 틀이 넣은 delegation 을 뺀다. 설치가 이 목록에 accountbook 을 더한다.
+            toolsets.writeApiServer(connection.getAgent().hermesProfile(), List.of(AgentToolPolicy.CONTROL_PLANE_MCP));
             tokenRestart = connector.putEnv(connection.getAgent().hermesProfile(), TOKEN_KEY, token); connection.markRestartRequired(tokenRestart);
             familyRestart = family == null
                     ? connector.deleteEnv(connection.getAgent().hermesProfile(), FAMILY_KEY)
@@ -110,8 +115,7 @@ public class AccountbookConnectionService {
         final boolean usable;
         try {
             HermesConnectorClient.ProbeResult probe = connector.probeAccountbook(connection.getAgent().hermesProfile());
-            usable = probe.ok() && !probe.tools().isEmpty()
-                    && toolsets.readEnabled(connection.getAgent().apiBaseUrl(), connection.getAgent().hermesProfile()).isEmpty();
+            usable = probe.ok() && !probe.tools().isEmpty() && narrowedEnabled(connection.getAgent()).isEmpty();
         } catch (RuntimeException ex) { connection.pending(); throw new ConnectorOperationFailure(); }
         if (usable) connection.ready(); else connection.pending();
         return snapshot(connections.save(connection));
@@ -130,9 +134,9 @@ public class AccountbookConnectionService {
                 if (state.enabled()) throw new IllegalStateException();
                 disconnected = true;
             } else {
+                if (!state.enabled() || !state.configured()) throw new IllegalStateException();
                 HermesConnectorClient.ProbeResult probe = connector.probeAccountbook(connection.getAgent().hermesProfile());
-                if (!state.enabled() || !state.configured() || !probe.ok() || probe.tools().isEmpty()
-                        || !toolsets.readEnabled(connection.getAgent().apiBaseUrl(), connection.getAgent().hermesProfile()).isEmpty()) throw new IllegalStateException();
+                if (!probe.ok() || probe.tools().isEmpty() || !narrowedEnabled(connection.getAgent()).isEmpty()) throw new IllegalStateException();
                 disconnected = false;
             }
         } catch (RuntimeException ex) { connection.pending(); throw new ConnectorOperationFailure(); }
@@ -148,6 +152,17 @@ public class AccountbookConnectionService {
             AppUser user = users.findById(connection.getUserId()).orElseThrow();
             return new AdminConnectionSnapshot(user.id(), user.displayName(), connection.getStatus(), connection.getAgent().code(), connection.isRestartRequired());
         }).toList();
+    }
+    /**
+     * 켜진 내장 도구를 읽고, 남아 있으면 허용 목록을 Control Plane MCP 와 가계부 MCP 로 줄인 뒤 다시 읽는다.
+     *
+     * <p>설치가 enabled 이고 configured 인 뒤에만 부른다. 그 전에는 accountbook 이 그 profile 에서 모르는 이름이다.
+     */
+    private List<String> narrowedEnabled(Agent agent) {
+        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
+        if (enabled.isEmpty()) return enabled;
+        toolsets.writeApiServer(agent.hermesProfile(), List.of(AgentToolPolicy.CONTROL_PLANE_MCP, CONNECTOR_SERVER));
+        return toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
     }
     private ConnectionSnapshot snapshot(AccountbookConnection value) { return new ConnectionSnapshot(value.getStatus(), value.getTokenPrefix(), value.getFamilyUuid(), value.isRestartRequired(), value.getCheckedAt(), value.getAgent().code()); }
     private static void requireToken(String value) { if (value == null || !value.matches("fab_[A-Za-z0-9_-]{43}")) throw new ApiException(ErrorCode.ACCOUNTBOOK_TOKEN_REJECTED, "accountbook token has an invalid format"); }

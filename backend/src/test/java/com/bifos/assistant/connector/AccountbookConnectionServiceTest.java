@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -26,6 +29,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.List;
+import org.mockito.InOrder;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -211,6 +215,62 @@ class AccountbookConnectionServiceTest {
 
         assertThatThrownBy(() -> service.confirmApplied(anotherGroupAdmin, member.id()))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+    }
+
+    @Test
+    void 등록은_설치_전에_API_도구_목록을_Control_Plane_MCP_하나로_줄인다() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        ConnectionSnapshot registered = service.register(user, TOKEN, null);
+
+        String profile = profileOf(registered);
+        InOrder order = inOrder(toolsets, connector);
+        order.verify(toolsets).writeApiServer(profile, List.of("fos-assistant"));
+        order.verify(connector).putConnector(profile, true);
+    }
+
+    @Test
+    void 확인에서_내장_도구가_켜져_있으면_목록을_줄이고_READY가_된다() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, TOKEN, null));
+        when(connector.readConnector(anyString())).thenReturn(new HermesConnectorClient.ConnectorState("p", true, true, false));
+        when(connector.probeAccountbook(anyString())).thenReturn(new HermesConnectorClient.ProbeResult(true, List.of("accountbook_search")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"), List.of());
+
+        ConnectionSnapshot checked = service.check(user);
+
+        verify(toolsets).writeApiServer(profile, List.of("fos-assistant", "accountbook"));
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
+    }
+
+    @Test
+    void 목록을_줄인_뒤에도_내장_도구가_남으면_PENDING이다() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, TOKEN, null);
+        when(connector.readConnector(anyString())).thenReturn(new HermesConnectorClient.ConnectorState("p", true, true, false));
+        when(connector.probeAccountbook(anyString())).thenReturn(new HermesConnectorClient.ProbeResult(true, List.of("accountbook_search")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"));
+
+        ConnectionSnapshot checked = service.check(user);
+
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+    }
+
+    @Test
+    void 설치가_configured가_아니면_확인에서_목록을_쓰지_않는다() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, TOKEN, null));
+        when(connector.readConnector(anyString())).thenReturn(new HermesConnectorClient.ConnectorState("p", true, false, false));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"));
+
+        ConnectionSnapshot checked = service.check(user);
+
+        verify(toolsets, never()).writeApiServer(profile, List.of("fos-assistant", "accountbook"));
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+    }
+
+    private String profileOf(ConnectionSnapshot snapshot) {
+        return agents.findByCode(snapshot.agentCode()).orElseThrow().hermesProfile();
     }
 
     private CurrentUser user(UserRole role, long groupId) {
