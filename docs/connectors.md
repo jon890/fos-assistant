@@ -64,6 +64,9 @@ Control Plane은 `PUT /api/connectors`에 `profile`, `plugin: fos-accountbook`, 
 | 연결 확인과 관리자 반영 완료에서 켜진 내장 도구가 보일 때 | `["fos-assistant", "accountbook"]` |
 
 목록은 `PUT /api/config`의 `platform_toolsets.api_server`로 쓴다.
+다시 등록할 때도 `["fos-assistant"]`로 줄인다.
+설치 요청은 이미 설치된 profile이라도 목록에 `accountbook`이 없으면 다시 더한다.
+`GET /api/connectors`의 `configured`는 목록에 `accountbook`이 없으면 false라서, 빠진 채로는 READY가 되지 않는다.
 확인 경로는 설치의 enabled와 configured가 참일 때만 쓰고, 쓴 뒤 다시 읽어 내장 도구가 비었는지 판정한다.
 이미 연결된 사용자도 토큰을 다시 넣지 않고 연결 확인만으로 READY가 된다.
 
