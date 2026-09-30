@@ -44,7 +44,7 @@ Spotless 처럼 `origin/main` 과의 공통 조상 뒤에 바뀐 파일에만 �
 
 ### 1. `backend/gradle/libs.versions.toml`, `backend/build.gradle.kts`
 
-- `[versions]` 에 `openrewrite-plugin = "7.41.0"`, `openrewrite-recipe-bom = "3.37.0"
+- `[versions]` 에 `openrewrite-plugin = "7.41.0"`, `openrewrite-recipe-bom = "3.37.0"`
 - `[plugins]` 에 `openrewrite = { id = "org.openrewrite.rewrite", version.ref = "openrewrite-plugin" }`
 - `[libraries]` 에 `openrewrite-recipe-bom`, `openrewrite-static-analysis`(`org.openrewrite.recipe:rewrite-static-analysis`), `openrewrite-migrate-java`(`org.openrewrite.recipe:rewrite-migrate-java`)
 - `plugins` 에 `alias(libs.plugins.openrewrite)`

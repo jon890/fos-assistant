@@ -29,7 +29,7 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 - `check` 는 끝에 「경고 목록(실패 아님)」 을 따로 보인다. 넘은 파일과 메서드, 줄 수다. 뒤의 패키지 분리 계획이 쪼갤 후보로 쓴다
 - `fix` 는 사람이 판단하지 않아도 되는 것만 고친다. 순서는 OpenRewrite(`rewriteChanged`), Spotless(`spotlessApply`), ArchUnit 기준 줄이기, `eslint --fix --prune-suppressions`, Prettier(`format:changed`)다. 새 위반을 기준에 더하지 않는다. 앞 단계가 실패해도 다음 단계로 가고, 끝에 `check` 를 돌려 남은 위반을 「사람이 판단할 위반」 으로 보인다
 - Checkstyle 기준은 스스로 줄지 않는다. `fix` 는 Checkstyle 기준을 고치지 않는다
-- 경고 목록을 뽑는 일은 `scripts/quality-warnings.mjs` 하나에 둔다. 셸에 XML 과 JSON 을 푸는 heredoc 을 두지 않는다
+- 경고 목록과 eslint 의 실패한 위반을 뽑는 일은 `scripts/quality-report.mjs` 하나에 둔다. 셸에 XML 과 JSON 을 푸는 heredoc 을 두지 않는다
 
 ## 작업 항목
 
@@ -37,9 +37,10 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 
 - `tasks.register("qualityCheck")`: `group = "verification"`, 설명은 한국어. `dependsOn("archTest", "checkstyleMain", "checkstyleTest", "spotlessCheck")`
 
-### 2. `scripts/quality-warnings.mjs` (신규)
+### 2. `scripts/quality-report.mjs` (신규)
 
 - 기본 입력은 Checkstyle XML 보고서 `backend/build/reports/checkstyle/main.xml` 과 eslint JSON `web/build/eslint-report.json` 이다. 앞의 것에서 severity 가 `warning` 인 항목을, 뒤의 것에서 경고(`severity` 1) 항목을 읽어 규칙별로 `파일:줄 메시지` 를 낸다. 경로는 저장소 root 기준으로 줄인다
+- eslint JSON 의 error(`severity` 2) 항목은 「실패한 위반」 절로 따로 낸다. `--output-file` 을 주면 ESLint 가 표준 출력에 아무것도 내지 않으므로, 이 절이 없으면 어느 파일의 어느 규칙이 실패했는지 보이지 않는다. Checkstyle error 는 Gradle 출력이 보이므로 이 절에 넣지 않는다
 - 입력이 없으면 그 도구는 「보고서 없음」 으로 한 줄 낸다. 이 스크립트는 늘 0 으로 끝난다
 - Node 내장 모듈만 쓴다
 
@@ -50,9 +51,9 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 - `web/node_modules` 가 없으면 `cd web && pnpm install --frozen-lockfile` 을 먼저 하라고 알리고 1 로 끝난다
 - `check`
   1. `(cd backend && ./gradlew qualityCheck)`
-  2. `(cd web && pnpm lint --format json --output-file build/eslint-report.json)` 한 번으로 검사하고 경고 입력도 만든다. 사람이 읽을 요약은 이 JSON 에서 `quality-warnings.mjs` 가 낸다. 이어서 `(cd web && pnpm format:check)`. `web/build/` 가 `.gitignore` 에 없으면 더한다
+  2. `(cd web && pnpm lint --format json --output-file build/eslint-report.json)` 한 번으로 검사하고 경고 입력도 만든다. 사람이 읽을 목록은 이 JSON 에서 `quality-report.mjs` 가 낸다. 이어서 `(cd web && pnpm format:check)`. `web/build/` 가 `.gitignore` 에 없으면 더한다
   3. 둘 다 돌린 뒤 결과를 한 줄씩 요약한다
-  4. `node scripts/quality-warnings.mjs` 로 경고 목록을 낸다
+  4. `node scripts/quality-report.mjs` 로 eslint 의 실패한 위반과 경고 목록을 낸다
   5. 1, 2 가운데 하나라도 실패했으면 1 로 끝난다
 - `fix`
   1. `(cd backend && ./gradlew rewriteChanged)`
@@ -68,8 +69,8 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 `node:test` 와 `node:assert/strict` 로 인자 처리와 경고 목록을 검사한다. `test/unit/design-tokens.test.ts` 처럼 `import.meta.dirname` 으로 경로를 구한다.
 
 - `spawnSync("bash", [scripts/quality.sh])` 가 인자 없이 2 로 끝나고 표준 오류에 `check` 와 `fix` 가 든 사용법이 나온다. 모르는 인자(`lint`)도 같다
-- 두 스크립트 파일에 실행 권한이 있거나(`quality.sh`) Node 로 부를 수 있다(`quality-warnings.mjs`)
-- `quality-warnings.mjs` 에 저장소 밖 임시 디렉터리의 Checkstyle XML(경고 하나, error 하나)과 eslint JSON(경고 하나, error 하나)을 넘겨 경고 둘만 나오고 error 는 나오지 않는다. check 가 error 목록을 따로 보이지 않아도 되는 것은 `pnpm lint` 의 종료 코드와 Gradle 출력이 error 를 알리기 때문이다. 입력 경로를 인자나 환경 변수로 바꿀 수 있게 만든다
+- 두 스크립트 파일에 실행 권한이 있거나(`quality.sh`) Node 로 부를 수 있다(`quality-report.mjs`)
+- `quality-report.mjs` 에 저장소 밖 임시 디렉터리의 Checkstyle XML(경고 하나, error 하나)과 eslint JSON(경고 하나, error 하나)을 넘긴다. 경고 목록에는 경고 둘만 나오고 error 는 섞이지 않는다. eslint error 는 「실패한 위반」 절에 나온다 입력 경로를 인자나 환경 변수로 바꿀 수 있게 만든다
 - Gradle 과 pnpm 을 부르는 경로는 작업 항목 7 이 실제 명령으로 확인한다. 그 경로는 느리고 설치된 도구에 걸려 단위 테스트에 두지 않는다
 
 ### 5. `.github/workflows/ci.yml` 에 `quality` job
@@ -121,7 +122,7 @@ scripts/quality.sh check
 |---|---|
 | `backend/build.gradle.kts` | 수정 |
 | `scripts/quality.sh` | 신규 |
-| `scripts/quality-warnings.mjs` | 신규 |
+| `scripts/quality-report.mjs` | 신규 |
 | `test/unit/quality-script.test.ts` | 신규 |
 | `.github/workflows/ci.yml` | 수정 |
 | `.gitignore` | 수정 |
