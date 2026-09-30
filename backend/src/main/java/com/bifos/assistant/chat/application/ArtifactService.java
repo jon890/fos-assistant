@@ -56,6 +56,8 @@ public class ArtifactService {
                 + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
                 + "artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
                 + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
+                // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
+                + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
                 + "\n";
     }
 
@@ -107,28 +109,43 @@ public class ArtifactService {
     }
 
     /**
-     * 대화 폴더 안의 파일 하나를 연다.
+     * 대화 폴더 안의 파일 하나를 열지 않고 판정한다.
      *
      * <p>행을 찾지 않는다. HTML 이 부르는 사진은 행이 없다. 폴더 안에 있고 확장자가 허용되면 준다. 행은 없는 파일이
      * 보관 기간이 지나 지워진 것인지 가릴 때만 본다. 대화 주인 확인은 컨트롤러가 대화 번호를 얻을 때 이미 했다.
      *
      * <p>형식은 링크를 따라간 실제 파일의 확장자로 정한다. 요청한 이름으로 정하면 {@code a.html} 이름의 링크가
      * 사진을 가리킬 때 사진을 HTML 로 내준다.
+     *
+     * <p>파일을 열지 않고 크기와 수정 시각만 읽는다. 조건부 요청이 304 로 끝나면 열 것이 없다.
      */
-    public ArtifactContent open(Long conversationId, String relativePath) {
+    public ArtifactFile find(Long conversationId, String relativePath) {
         Path file = store.resolveInside(conversationId, relativePath)
                 .orElseThrow(() -> missing(conversationId, relativePath));
         String contentType = ArtifactStore.contentTypeOf(file.getFileName().toString())
                 .orElseThrow(() -> missing(conversationId, relativePath));
         try {
             long size = Files.size(file);
-            InputStream body = Files.newInputStream(file);
-            return new ArtifactContent(contentType, size, body);
+            Instant lastModified = Files.getLastModifiedTime(file).toInstant();
+            return new ArtifactFile(conversationId, relativePath, file, contentType, size, lastModified);
         } catch (NoSuchFileException ex) {
-            // 판정과 여는 사이에 정리 작업이 지운 경우다.
+            // 판정과 읽는 사이에 정리 작업이 지운 경우다.
             throw missing(conversationId, relativePath);
         } catch (IOException ex) {
-            throw new UncheckedIOException("could not open an artifact of conversation " + conversationId, ex);
+            throw new UncheckedIOException("could not read an artifact of conversation " + conversationId, ex);
+        }
+    }
+
+    /** {@link #find} 가 판정한 파일의 본문을 연다. 받은 쪽이 스트림을 닫는다. */
+    public InputStream open(ArtifactFile file) {
+        try {
+            return Files.newInputStream(file.path());
+        } catch (NoSuchFileException ex) {
+            // 판정과 여는 사이에 정리 작업이 지운 경우다.
+            throw missing(file.conversationId(), file.relativePath());
+        } catch (IOException ex) {
+            throw new UncheckedIOException(
+                    "could not open an artifact of conversation " + file.conversationId(), ex);
         }
     }
 
