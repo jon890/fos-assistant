@@ -91,3 +91,4 @@ grep -rn 'style={{' web/src/
 | `web/src/app/agents/[[]code]/skills/new/page.tsx` | 신규 |
 | `web/src/components/agent/skill-editor.tsx` | 신규 |
 | `test/browser/skills.spec.ts` | 신규 |
+| `test/unit/loading-routes.test.ts` | 수정 |
