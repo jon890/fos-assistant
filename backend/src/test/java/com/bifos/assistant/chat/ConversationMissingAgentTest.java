@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -128,7 +129,7 @@ class ConversationMissingAgentTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.title").value("새 이름"))
-                .andExpect(jsonPath("$.agentCode").doesNotExist());
+                .andExpect(jsonPath("$.agentCode").value(nullValue()));
     }
 
     @Test
@@ -163,8 +164,8 @@ class ConversationMissingAgentTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(id.toString()))
-                .andExpect(jsonPath("$[0].agentCode").doesNotExist())
-                .andExpect(jsonPath("$[0].agentName").doesNotExist());
+                .andExpect(jsonPath("$[0].agentCode").value(nullValue()))
+                .andExpect(jsonPath("$[0].agentName").value(nullValue()));
         mvc.perform(post("/api/v1/chat/messages")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(sendBody(id)))
