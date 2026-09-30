@@ -30,7 +30,8 @@ public class V35__DropAgentTokenUserId extends BaseJavaMigration {
         }
         if (unbound > 0) {
             throw new IllegalStateException("profile 이 묶이지 않은 폐기 안 된 MCP 토큰이 " + unbound
-                    + " 개 있어 agent_token.user_id 를 지우지 않는다. 묶거나 폐기한 뒤 다시 배포한다");
+                    + " 개 있어 agent_token.user_id 를 지우지 않는다. 그 토큰을 폐기하거나 이전 판에서 profile 을 묶고,"
+                    + " 실패한 V35 기록을 정리한 뒤 다시 배포한다");
         }
         try (Statement statement = connection.createStatement()) {
             statement.execute("ALTER TABLE agent_token DROP COLUMN user_id");

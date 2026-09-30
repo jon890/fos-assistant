@@ -70,7 +70,7 @@ sequenceDiagram
     H->>P: 도구 호출 (session_id, tool_call_id)
     P->>P: parent_session_id 사슬로 뿌리 session 을 찾고 그 profile 의 토큰으로 서명
     P->>F: POST /mcp, Bearer 토큰, 인자에 _fos_ctx
-    F->>F: 토큰 해시로 한 줄을 찾는다. 폐기됐으면 401
+    F->>F: 토큰 해시로 한 줄을 찾는다. 폐기됐거나 profile 이 비었으면 401
     F->>R: McpPrincipal(토큰 번호, profile, 토큰 해시)
     R->>R: _fos_ctx 의 서명을 토큰 해시로 확인
     R->>B: (profile, session_id) 등록을 찾는다
