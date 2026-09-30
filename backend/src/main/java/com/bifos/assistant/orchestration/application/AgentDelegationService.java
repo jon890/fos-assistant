@@ -15,6 +15,7 @@ import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -248,6 +249,8 @@ public class AgentDelegationService {
         AgentExecution execution = handoff.execution();
         boolean settled = handoff.awaitSettled(deadline);
         if (settled && !handoff.submitted()) {
+            // 부모는 번호 없이 실패만 받는다. 적지 않으면 번호를 모르는 결과가 부모 대화에 다시 전해진다.
+            executions.markResultDelivered(execution.id(), Instant.now());
             return rejected(Failure.SUBMIT_FAILED, origin, "제출하기 전에 실행이 끝났다 executionId=" + execution.id());
         }
         // 제한 시간이 지나도 줄이 있으면 번호를 돌려준다. 뒤따르는 결과는 그 줄에 적힌다.

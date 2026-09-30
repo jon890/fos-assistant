@@ -72,6 +72,11 @@ public class ChatMessage {
         return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, null);
     }
 
+    /** Control Plane 이 적는 메시지다. 보낸 사용자도, 만든 실행도, 대신한 메시지도 없다. */
+    public static ChatMessage fromSystem(Long conversationId, String content) {
+        return new ChatMessage(conversationId, MessageRole.SYSTEM, content, null, null, null);
+    }
+
     public static ChatMessage regeneratedAnswer(
             Long conversationId, String content, Long executionId, Long replacesMessageId) {
         return new ChatMessage(
