@@ -3,6 +3,7 @@ plugins {
     id("checkstyle")
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.management)
+    alias(libs.plugins.spotless)
 }
 
 group = "com.bifos"
@@ -96,6 +97,22 @@ tasks.withType<Checkstyle>().configureEach {
     reports {
         xml.required = true
         html.required = false
+    }
+}
+
+/**
+ * Java 포맷은 Spotless 와 palantir-java-format 이 정한다.
+ * ratchetFrom 은 HEAD 와 origin/main 의 공통 조상에서 바뀐 파일만 검사하고 고친다.
+ * 저장소 전체를 한 번에 바꾸지 않고, 파일을 처음 고칠 때 그 파일 전체가 포맷된다.
+ * 선택 까닭은 ADR-040 에 있고, 사용법은 backend/AGENTS.md 의 「포맷」 절에 있다.
+ */
+spotless {
+    ratchetFrom("origin/main")
+    java {
+        target("src/main/java/**/*.java", "src/test/java/**/*.java")
+        palantirJavaFormat(libs.versions.palantir.java.format.get())
+        trimTrailingWhitespace()
+        endWithNewline()
     }
 }
 
