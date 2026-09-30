@@ -52,6 +52,24 @@ Control Plane은 `PUT /api/connectors`에 `profile`, `plugin: fos-accountbook`, 
 허용 도구는 `accountbook`과 Control Plane MCP `fos-assistant`이며 셸, 파일, `skills` 도구는 닫는다.
 신뢰된 가계부 스킬 본문은 persona에 넣는다.
 
+**허용 목록은 Control Plane이 줄인다.**
+새 profile의 설정 틀은 `platform_toolsets.api_server`에 `delegation`과 `fos-assistant`를 넣는다.
+인프라 plugin의 설치는 그 목록에 `accountbook`을 더할 뿐 내장 도구를 빼지 않는다.
+그대로 두면 `delegation`이 켜진 채 남아, 내장 도구 미노출을 요구하는 확인이 READY로 넘어가지 못한다.
+실제로 그렇게 모든 연결이 `PENDING`에 머물렀다.
+
+| 시점 | 쓰는 목록 |
+| --- | --- |
+| 등록할 때, 설치 요청 전 | `["fos-assistant"]`. 설치가 `accountbook`을 더한다 |
+| 연결 확인과 관리자 반영 완료에서 켜진 내장 도구가 보일 때 | `["fos-assistant", "accountbook"]` |
+
+목록은 `PUT /api/config`의 `platform_toolsets.api_server`로 쓴다.
+다시 등록할 때도 `["fos-assistant"]`로 줄인다.
+설치 요청은 이미 설치된 profile이라도 목록에 `accountbook`이 없으면 다시 더한다.
+`GET /api/connectors`의 `configured`는 목록에 `accountbook`이 없으면 false라서, 빠진 채로는 READY가 되지 않는다.
+확인 경로는 설치의 enabled와 configured가 참일 때만 쓰고, 쓴 뒤 다시 읽어 내장 도구가 비었는지 판정한다.
+이미 연결된 사용자도 토큰을 다시 넣지 않고 연결 확인만으로 READY가 된다.
+
 토큰은 `PUT /api/env`로 `ACCOUNTBOOK_API_TOKEN`에 쓴다.
 공통 주소와 선택 가족도 `ACCOUNTBOOK_API_BASE_URL`, `ACCOUNTBOOK_FAMILY_UUID`에 쓴다.
 `ACCOUNTBOOK_PRIVATE_DIR`는 인프라 plugin이 profile별로 정한다.
