@@ -7,7 +7,8 @@ Control Plane 이다. Spring Boot 4 와 MySQL 8.4 를 쓴다.
 
 ## 패키지 배치
 
-도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application`, `domain`, `infra` 로만 흐른다.
+도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
+`presentation` 은 `infra` 를 바로 쓰지 않는다. 컨트롤러가 저장소를 바로 쓰면 권한 확인과 트랜잭션 경계를 서비스가 갖지 못한다.
 검사: `ArchitectureRules.LAYER_DIRECTION`
 자세한 것은 [`docs/code-architecture.md`](../docs/code-architecture.md) 에 있다.
 
@@ -48,7 +49,7 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 | --- | --- |
 | `TOP_LEVEL_PACKAGES_FREE_OF_CYCLES` | 최상위 패키지 사이의 간선이 순환에 속하지 않는다 |
 | `SHARED_DOES_NOT_DEPEND_ON_DOMAINS` | `shared` 는 다른 최상위 패키지를 쓰지 않는다 |
-| `LAYER_DIRECTION` | 아래 층이 위 층을 쓰지 않는다. `presentation` 이 `infra` 를 바로 쓰는 것은 막지 않는다 |
+| `LAYER_DIRECTION` | 아래 층이 위 층을 쓰지 않는다. `presentation` 은 `infra` 를 바로 쓰지 않고 `application` 을 거친다. 컨트롤러가 저장소를 바로 쓰면 권한 확인과 트랜잭션 경계를 서비스가 갖지 못한다 |
 | `DOMAIN_DOES_NOT_DEPEND_ON_WEB` | `domain` 은 Spring Web, HTTP, Servlet 타입과 `presentation` 을 쓰지 않는다 |
 | `ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP` | `orchestration` 은 `mcp` 를 쓰지 않는다 |
 | `MCP_DOES_NOT_CALL_HERMES` | `mcp` 는 Hermes 를 부르는 타입을 쓰지 않는다. 이름이 `Client` 로 끝나는 타입과 `HermesRunEventStream`, `HermesProfileKeyStore` 가 대상이다. `HermesProfileName` 같은 이름 규칙 값은 쓴다 |
@@ -57,12 +58,30 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 | `NO_JACKSON_2_DATABIND` | Jackson 2 의 `core` 와 `databind` 를 쓰지 않는다. `com.fasterxml.jackson.annotation` 은 Jackson 3 도 쓰므로 허용한다 |
 | `CONTROLLERS_HAVE_NO_NESTED_RECORDS` | 컨트롤러 안에 record 를 두지 않는다 |
 | `TEST_METHODS_HAVE_DISPLAY_NAME` | `@Test` 와 `@ParameterizedTest` 메서드에는 `@DisplayName` 이 붙는다. 테스트 클래스만 읽는다 |
+| `TRANSACTIONAL_ONLY_IN_APPLICATION` | `application` 밖의 클래스와 메서드에는 Spring 과 Jakarta 의 `@Transactional` 을 붙이지 않는다. 트랜잭션 경계는 유스케이스를 아는 층이 정한다. 컨트롤러와 저장소에 두면 경계가 둘로 갈린다 |
+| `NO_DIRECT_INSTANT_NOW` | `Instant.now()` 를 직접 부르지 않는다. 시각을 주입받아야 테스트가 시각을 고정한다. `Clock` 을 받는 `Instant.now(Clock)` 은 허용한다 |
+| `MESSAGE_DIGEST_ONLY_IN_SHA256` | `MessageDigest.getInstance` 는 `shared.util.Sha256` 만 부른다. 해시 구현을 한 곳에 둔다 |
+| `CONFIGURATION_PROPERTIES_ARE_VALIDATED` | `@ConfigurationProperties` 클래스에는 `@Validated` 도 붙인다. 잘못된 설정은 기동에서 멈춘다 |
+| `SERVICES_DO_NOT_EXPOSE_NESTED_TYPES` | `@Service`, `@Component`, `@Repository` 클래스와 `infra` 안의 클래스에 든 중첩 타입은 `private` 이다. 서비스가 돌려주는 모델은 서비스 파일 밖으로 뺀다. 캐시 키 같은 구현 세부는 `private` 으로 둔다. 익명 클래스와 지역 클래스는 대상이 아니다 |
+| `ENUMERATED_FIELDS_USE_DOMAIN_TYPE` | `@Entity` 의 `@Enumerated` 필드 타입은 `<기능>.domain.type` 에 있다. 저장되는 값은 바꾸면 마이그레이션을 판단해야 하므로 한곳에 모아 보이게 한다 |
+| `DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE` | `domain.type` 의 클래스는 `application`, `infra`, `presentation` 을 쓰지 않는다. 저장되는 enum 은 가장 아래 층이다 |
 
 **순환 규칙은 패키지 간선 하나를 위반 하나로 센다.**
 `B` 에서 `A` 로 돌아올 수 있을 때 간선 `A -> B` 가 위반이다.
 이미 있는 간선 위에 클래스 의존을 더하는 것은 통과하고, 순환을 늘리는 새 간선만 실패한다.
 `shared` 는 모든 도메인이 쓰는 기반 패키지라 이 그래프에서 빼고, `SHARED_DOES_NOT_DEPEND_ON_DOMAINS` 가 따로 막는다.
 규칙은 컴파일한 클래스를 읽는다. 쓰지 않는 import 는 간선이 되지 않는다.
+
+### enum 은 저장 여부로 둘 곳을 정한다
+
+| 종류 | 위치 |
+| --- | --- |
+| 엔티티에 `@Enumerated` 로 저장되는 enum | `<기능>.domain.type` |
+| 저장되지 않는 서비스 결과와 화면용 enum | `<기능>.application.model` |
+| `ErrorCode` | `shared.error` 에 그대로 둔다 |
+
+앞의 둘 가운데 저장되는 쪽만 `ENUMERATED_FIELDS_USE_DOMAIN_TYPE` 이 검사한다.
+저장되지 않는 enum 과 `ErrorCode` 는 규칙으로 검사하지 않는다. 리뷰에서 본다.
 
 ### 기준 파일
 

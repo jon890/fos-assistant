@@ -20,7 +20,8 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 
 ## backend 패키지
 
-도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application`, `domain`, `infra` 로만 흐른다.
+도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
+`presentation` 은 `infra` 를 바로 쓰지 않는다.
 검사: `ArchitectureRules.LAYER_DIRECTION`
 
 | 패키지 | 책임 |

@@ -36,7 +36,7 @@ class ArchitectureRulesTest {
     }
 
     @Test
-    @DisplayName("아래 층이 위 층을 새로 쓰지 않는다")
+    @DisplayName("아래 층이 위 층을 새로 쓰지 않고 presentation 이 infra 를 새로 바로 쓰지 않는다")
     void layerDirection() {
         FreezingArchRule.freeze(ArchitectureRules.LAYER_DIRECTION).check(MAIN);
     }
@@ -81,6 +81,48 @@ class ArchitectureRulesTest {
     @DisplayName("컨트롤러 안에 record 를 두지 않는다")
     void controllersHaveNoNestedRecords() {
         FreezingArchRule.freeze(ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("Transactional 이 application 밖에 새로 붙지 않는다")
+    void transactionalOnlyInApplication() {
+        FreezingArchRule.freeze(ArchitectureRules.TRANSACTIONAL_ONLY_IN_APPLICATION).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("Instant.now() 를 새로 직접 부르지 않는다")
+    void noDirectInstantNow() {
+        FreezingArchRule.freeze(ArchitectureRules.NO_DIRECT_INSTANT_NOW).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("MessageDigest.getInstance 를 Sha256 밖에서 새로 부르지 않는다")
+    void messageDigestOnlyInSha256() {
+        FreezingArchRule.freeze(ArchitectureRules.MESSAGE_DIGEST_ONLY_IN_SHA256).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("ConfigurationProperties 클래스에 Validated 가 붙는다")
+    void configurationPropertiesAreValidated() {
+        FreezingArchRule.freeze(ArchitectureRules.CONFIGURATION_PROPERTIES_ARE_VALIDATED).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("서비스와 infra 안에 공개된 중첩 타입이 새로 생기지 않는다")
+    void servicesDoNotExposeNestedTypes() {
+        FreezingArchRule.freeze(ArchitectureRules.SERVICES_DO_NOT_EXPOSE_NESTED_TYPES).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("엔티티의 Enumerated 필드 타입이 domain.type 에 있다")
+    void enumeratedFieldsUseDomainType() {
+        FreezingArchRule.freeze(ArchitectureRules.ENUMERATED_FIELDS_USE_DOMAIN_TYPE).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("domain.type 이 위 층을 쓰지 않는다")
+    void domainTypeDependsOnNothingAbove() {
+        FreezingArchRule.freeze(ArchitectureRules.DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE).check(MAIN);
     }
 
     @Test

@@ -1,13 +1,20 @@
 #
-#Wed Sep 30 18:06:51 KST 2026
+#Wed Sep 30 18:41:03 KST 2026
+ConfigurationProperties\ \uD074\uB798\uC2A4\uC5D0\uB294\ Validated\ \uAC00\ \uBD99\uB294\uB2E4=f875bef7-581f-41c7-8e85-cf4b3d36f833
+Enumerated\ \uD544\uB4DC\uC758\ \uD0C0\uC785\uC740\ domain.type\ \uC5D0\ \uC788\uB2E4=2c9d047b-fb3f-4e7d-b83b-975d0be92766
+Instant.now()\ \uB97C\ \uC9C1\uC811\ \uBD80\uB974\uC9C0\ \uC54A\uB294\uB2E4=d3d721a0-86e5-4069-8051-dd3e7adf2c55
 Jackson\ 2\ \uC758\ core\ \uC640\ databind\ \uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=5f79dd7c-de4a-4c30-921f-73f0c7a81711
+MessageDigest.getInstance\ \uB294\ Sha256\ \uB9CC\ \uBD80\uB978\uB2E4=d3f00600-4e52-412f-ab23-2abb80f9eefd
+Transactional\ \uC740\ application\ \uC548\uC5D0\uC11C\uB9CC\ \uC4F4\uB2E4=54473729-2b30-4508-9d02-64e810d6f34b
 domain\ \uC740\ \uC6F9\ \uACC4\uCE35\uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=fda5b75e-596a-4968-8f75-c511a5d04433
+domain.type\ \uC740\ \uC704\ \uCE35\uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=0dbe6f1e-065e-4044-81ad-31fc37fb29f9
 hermes\ \uB294\ people\ \uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=e9252619-cd88-4b87-83fe-85392fc2ce9b
 mcp\ \uB294\ Hermes\ \uB97C\ \uBD80\uB974\uB294\ \uD0C0\uC785\uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=81d71f1d-7368-44ae-ad20-13dcfc55e5b8
 orchestration\ \uC740\ ChatService\ \uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=5bfc697c-ee99-48d1-8747-5055debb7fb8
 orchestration\ \uC740\ mcp\ \uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=c84381bf-ad9a-4965-a421-9254c649c3f8
 shared\ \uB294\ \uB2E4\uB978\ \uCD5C\uC0C1\uC704\ \uD328\uD0A4\uC9C0\uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=25192a86-f325-4b77-b6d1-3c590c06ead7
+\uC11C\uBE44\uC2A4\uC640\ infra\ \uC548\uC758\ \uC911\uCCA9\ \uD0C0\uC785\uC740\ private\ \uC774\uB2E4=48448fa9-9176-4cf5-bcc0-f28f044ecc43
 \uCD5C\uC0C1\uC704\ \uD328\uD0A4\uC9C0\ \uC0AC\uC774\uC758\ \uAC04\uC120\uC740\ \uC21C\uD658\uC5D0\ \uC18D\uD558\uC9C0\ \uC54A\uB294\uB2E4=0fd01c41-aa58-43cb-81c5-236ae5119948
-\uCE35\uC740\ presentation\ \uC5D0\uC11C\ application,\ infra,\ domain\ \uCABD\uC73C\uB85C\uB9CC\ \uD750\uB978\uB2E4=1cceeea4-f3c2-4415-b0dc-2b2f8d185226
+\uCE35\uC740\ presentation\ \uC5D0\uC11C\ application\ \uC744\ \uAC70\uCCD0\ infra\ \uC640\ domain\ \uC73C\uB85C\ \uD750\uB978\uB2E4=2790ecd4-faaa-4952-b703-a028b68814d5
 \uCEE8\uD2B8\uB864\uB7EC\ \uC548\uC5D0\ record\ \uB97C\ \uB450\uC9C0\ \uC54A\uB294\uB2E4=4bb22b9f-8a84-44cd-9b69-d799283da519
 \uD14C\uC2A4\uD2B8\ \uBA54\uC11C\uB4DC\uC5D0\uB294\ DisplayName\ \uC774\ \uBD99\uB294\uB2E4=d50bd353-29e2-4077-b2af-aa9e2d722c23
