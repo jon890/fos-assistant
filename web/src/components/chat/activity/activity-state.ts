@@ -1,6 +1,7 @@
 import type { ChatEvent } from "@/lib/chat-event";
 import type { ExecutionTreeNode, ExecutionTreeResponse } from "@/components/execution/execution-tree";
 import { subagentLabel } from "../../../lib/format.ts";
+import { toolLabel } from "../../../lib/tool-label.ts";
 
 export type ActivityItemKind = "tool" | "subagent" | "step" | "switched";
 export type ActivityItemState = "running" | "done" | "failed" | "stopped" | "unfinished" | "result-missing";
@@ -26,6 +27,11 @@ export const STEP_LABELS: Record<string, string> = {
   engineer: "구현",
   synthesizer: "합치기",
 };
+
+/** 항목이 화면에 보이는 문장이다. 도구는 그리는 때 정해 도는 중과 끝남의 말이 다르다. */
+export function activityLabel(item: ActivityItem): string {
+  return item.kind === "tool" ? toolLabel(item.name, item.state === "running") : item.name;
+}
 
 export function emptyActivity(startedAt: number): ActivityState {
   return { items: [], startedAt, endedAt: null };

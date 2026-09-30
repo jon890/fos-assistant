@@ -41,6 +41,7 @@ const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
 const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
 const TEST_RELEASE_HELD_RUN_PATH = "/__test/release-held-run";
+const TEST_RELEASE_LONG_ACTIVITY_PATH = "/__test/release-long-activity";
 /** 다음 `GET /api/profiles/{이름}/soul` 응답을 붙잡아 화면의 뼈대 검사가 서버를 실제로 늦출 수 있게 한다. */
 const TEST_HOLD_NEXT_SOUL_PATH = "/__test/hold-next-soul";
 const TEST_RELEASE_HELD_SOUL_PATH = "/__test/release-held-soul";
@@ -252,6 +253,12 @@ export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
  */
 export const SUBAGENT_MEMORY_PROBE = "MCP 하위 에이전트 검사";
 
+/**
+ * 이 글을 보내면 `terminal` 도구 사건을 많이 보내고, 마지막 도구 줄 하나를 시작만 한 채 `releaseLongActivity` 를
+ * 기다린다. 풀리면 그 줄을 끝내고 열 쌍을 더 보낸 뒤 스트림을 닫는다. 펼친 작업 과정 목록의 높이와 스크롤을 보려는 입력이다.
+ */
+export const LONG_ACTIVITY_PROBE = "긴 작업 과정 검사";
+
 /** HTML 이 부르는 사진이다. 1픽셀짜리 PNG 다. */
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -398,6 +405,11 @@ export type FakeHermes = {
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
+  /**
+   * `LONG_ACTIVITY_PROBE` 스트림이 도는 도구 줄 하나를 남기고 기다리는 자리를 푼다. 실행 상태는 바꾸지 않는다.
+   * 기다리는 스트림이 없으면 아무것도 하지 않는다.
+   */
+  releaseLongActivity(): void;
   /** 다음 성격 읽기 응답을 붙잡는다. `releaseHeldSoul` 을 부를 때까지 요청이 끝나지 않는다. */
   holdNextSoul(): void;
   releaseHeldSoul(): void;
@@ -462,6 +474,8 @@ export function startFakeHermes(
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
+  /** `LONG_ACTIVITY_PROBE` 스트림이 기다리는 자리다. 풀면 나머지 사건을 보낸다. */
+  let longActivityGate: (() => void) | undefined;
   let holdNextSoul = false;
   /** 붙잡아 둔 성격 읽기 요청의 응답 객체와 보낼 본문이다. 풀릴 때 이것으로 응답을 끝낸다. */
   let heldSoul: { response: ServerResponse; payload: unknown } | undefined;
@@ -586,6 +600,13 @@ export function startFakeHermes(
     heldRunReady = undefined;
     heldRunWaiter = undefined;
     return runId;
+  };
+
+  /** 기다리는 긴 작업 과정 스트림을 풀고 대기 표시를 지운다. 기다리는 것이 없으면 아무것도 하지 않는다. */
+  const releaseLongActivity = () => {
+    const gate = longActivityGate;
+    longActivityGate = undefined;
+    gate?.();
   };
 
   /**
@@ -781,6 +802,11 @@ export function startFakeHermes(
         return send(response, 204, null);
       }
 
+      if (request.method === "POST" && path === TEST_RELEASE_LONG_ACTIVITY_PATH) {
+        releaseLongActivity();
+        return send(response, 204, null);
+      }
+
       if (request.method === "GET" && path === TEST_LAST_SUBMITTED_RUNTIME_PATH) {
         return send(response, 200, lastSubmittedRuntime);
       }
@@ -888,8 +914,30 @@ export function startFakeHermes(
           const streamedOutput = specialOutputFor(run.input);
           event(response, {
             event: "message.delta",
-            delta: streamedOutput === null ? "화면에서만 " : streamedOutput.slice(0, 80),
+            delta: run.input === LONG_ACTIVITY_PROBE ? "긴 작업 과정"
+              : streamedOutput === null ? "화면에서만 " : streamedOutput.slice(0, 80),
           });
+          // 도구 줄이 많은 작업 과정이다. 마지막 도구 줄 하나를 시작만 하고 기다려, 검사가 도는 중인 블록의
+          // 높이와 스크롤을 본다. 이 입력에는 다른 도구 사건과 하위 에이전트 사건을 보내지 않는다.
+          if (run.input === LONG_ACTIVITY_PROBE) {
+            for (let step = 1; step <= 30; step += 1) {
+              event(response, { event: "tool.started", tool: "terminal", preview: `단계 ${step}` });
+              event(response, { event: "tool.completed", tool: "terminal", duration: 0.1, error: false });
+            }
+            event(response, { event: "tool.started", tool: "terminal", preview: "단계 31" });
+            await new Promise<void>((resolve) => {
+              longActivityGate = resolve;
+              response.on("close", resolve);
+            });
+            event(response, { event: "tool.completed", tool: "terminal", duration: 0.1, error: false });
+            for (let step = 32; step <= 41; step += 1) {
+              event(response, { event: "tool.started", tool: "terminal", preview: `단계 ${step}` });
+              event(response, { event: "tool.completed", tool: "terminal", duration: 0.1, error: false });
+            }
+            event(response, { event: "run.completed" });
+            response.end();
+            return;
+          }
           // 중지 뒤에도 Hermes 사건 스트림이 닫히지 않는 경우를 재현한다. Control Plane 이 유예 시간 뒤
           // 이 연결을 직접 닫아야 한다.
           if (run.input === "중지 스트림 유지 검사") return;
@@ -1126,6 +1174,7 @@ export function startFakeHermes(
           const run = runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
         },
+        releaseLongActivity,
         holdNextSoul: () => {
           holdNextSoul = true;
         },
@@ -1156,6 +1205,7 @@ export function startFakeHermes(
           new Promise<void>((done) => {
             holdNextRun = false;
             releaseHeldRun();
+            releaseLongActivity();
             holdNextSoul = false;
             heldSoul = undefined;
             server.closeAllConnections();

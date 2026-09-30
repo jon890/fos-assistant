@@ -78,6 +78,8 @@ export type FakeHermesControl = {
   holdNextRun(): Promise<void>;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): Promise<void>;
+  /** 긴 작업 과정 입력의 스트림이 기다리는 자리를 푼다. 실행 상태는 그대로다. 기다리는 것이 없으면 아무것도 하지 않는다. */
+  releaseLongActivity(): Promise<void>;
   /** 다음 `GET /api/profiles/{이름}/soul` 응답을 붙잡는다. 성격 화면의 서버를 실제로 늦출 때 쓴다. */
   holdNextSoul(): Promise<void>;
   /** 붙잡은 성격 읽기 응답을 보낸다. 붙잡은 것이 없어도 대기 표시를 끄고 끝난다. */
@@ -102,6 +104,7 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
     holdNextRun: () => call("/__test/hold-next-run", "POST"),
     waitForHeldRun: () => call("/__test/wait-held-run", "GET"),
     releaseHeldRun: () => call("/__test/release-held-run", "POST"),
+    releaseLongActivity: () => call("/__test/release-long-activity", "POST"),
     holdNextSoul: () => call("/__test/hold-next-soul", "POST"),
     releaseHeldSoul: () => call("/__test/release-held-soul", "POST"),
     blockProvider: (provider: string) => call(`/__test/block-provider/${provider}`, "POST"),
