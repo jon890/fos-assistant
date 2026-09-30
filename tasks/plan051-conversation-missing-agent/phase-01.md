@@ -12,7 +12,7 @@
 ## 컨텍스트
 
 - `AgentService.requireById(Long)` 는 `agents.findById(id)` 로 읽고 없으면 `AGENT_NOT_FOUND` 를 던진다. 지운 에이전트(`deleted_at` 있음)도 돌려준다. `id` 가 null 이면 Spring Data 가 `IllegalArgumentException` 계열을 던져 500 이 된다
-- `requireById` 를 부르는 곳은 다섯이다
+- `requireById` 를 부르는 곳은 여섯이다
   - `chat/presentation/ChatController.viewOf`: 대화 목록(`GET /api/v1/chat/conversations`)이 대화마다 부른다. 이름 바꾸기와 모델 고르기도 이 메서드로 한 줄을 돌려준다
   - `chat/application/ChatService.route`: 이어 쓰는 대화에 보낼 때
   - `chat/application/ChatService.routeExisting`: 다시 생성할 때
@@ -22,6 +22,8 @@
 - `skill/application/SkillUsageQuery.byUser` 는 `findAllById` 로 한 번에 읽고 없는 에이전트의 묶음을 빼고 있다. 고치지 않는다
 - 응답 레코드: `ChatDtos.ConversationView(id, title, agentCode, agentName, ...)`, `UsageDtos.ExecutionView.from(execution, agent, ...)` 는 `agent.code()`, `agent.name()` 을 바로 읽는다
 - 테스트에서 에이전트 행을 없애려면 `AgentRepository.deleteById` 를 쓴다. `conversation.agent_id` 와 `agent_execution.agent_id` 에 FK 가 없어 지워진다
+- `agent_id` 가 null 인 대화는 `Conversation.startedBy(userId, title, null)` 로 만들 수 있다
+- `UsageControllerTest` 는 Hibernate 통계로 목록 한 번의 질의 수를 세고 `QUERIES_PER_LIST = 4` 를 기대한다. 줄마다 부르는 `findById` 는 엔티티 적재로 세어져 이 지표에 들어오지 않는다. `findAllById` 는 질의로 세어진다
 
 **근거 문서**: `docs/code-architecture.md` 의 「에이전트 만들기와 지우기」 절(에이전트 행이 없을 때의 표), `docs/flow.md` 의 에이전트 만들기 「갈리는 지점」 표, `docs/data-schema.md` 의 「conversation」 절
 
@@ -31,7 +33,7 @@
 - 목록 경로는 에이전트를 줄마다 읽지 않는다. `AgentService.byIds(Collection<Long>)` 가 null 을 빼고 `findAllById` 로 한 번에 읽어 `Map<Long, Agent>` 를 돌려준다. 빈 목록이면 질의하지 않는다
 - 한 번에 한 에이전트를 읽는 곳은 `AgentService.findById(Long)` 이 `Optional<Agent>` 를 돌려준다. `id` 가 null 이면 빈 값이다. `requireById` 는 이 메서드 위에서 `AGENT_NOT_FOUND` 를 던지게 바꿔 null 도 같은 오류가 되게 한다
 - `ChatService.stop` 은 에이전트를 찾지 못한 자식을 `log.warn` 으로 실행 번호와 에이전트 번호를 남기고 건너뛴다. 뿌리 turn 의 중지를 오류로 끝내면 이미 켠 중지 표시와 어긋난다
-- `ExecutionTreeService.node` 는 `findById` 로 바꿔 없으면 에이전트 칸을 null 로 둔다. 나무의 노드 수만큼 읽는 것은 지금과 같고, 이 phase 에서 한 번에 읽도록 바꾸지 않는다
+- `ExecutionTreeService.node` 는 `findById` 로 바꿔 없으면 에이전트 칸을 null 로 둔다. 나무의 노드 수만큼 읽는 것은 지금과 같고, 이 phase 에서 한 번에 읽도록 바꾸지 않는다. 나무는 깊이와 노드 수에 상한이 있어 한 번에 읽는 이득이 작다
 
 ## 작업 항목
 
@@ -66,9 +68,12 @@
   - 행이 없는 대화의 이름을 바꾸면 200 이고 돌려준 줄의 `agentCode` 가 null 이다
   - 행이 없는 대화에 `POST /api/v1/chat/messages` 로 보내면 404 `AGENT_NOT_FOUND` 다
   - 행이 없는 대화의 메시지 목록(`GET .../messages`)은 200 이다
-- `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java`: 실행 둘 중 하나의 에이전트 행을 없애도 `myExecutions` 가 두 줄을 내고, 없는 쪽의 `agentCode`, `agentName` 이 null 이다. 이 테스트 파일이 컨트롤러를 부르는 방식을 따른다
+  - `agent_id` 가 null 인 대화(`Conversation.startedBy(userId, title, null)` 로 저장)도 목록에 200 으로 오고 두 칸이 null 이다. 그 대화에 보내면 404 `AGENT_NOT_FOUND` 다. `requireById` 의 null 처리를 되돌리면 이 검사가 500 으로 실패해야 한다
+- `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java`
+  - 실행 둘 중 하나의 에이전트 행을 없애도 `myExecutions` 가 두 줄을 내고, 없는 쪽의 `agentCode`, `agentName` 이 null 이다. 이 테스트 파일이 컨트롤러를 부르는 방식을 따른다
+  - `byIds` 가 `findAllById` 질의 하나를 더하므로 `QUERIES_PER_LIST` 를 5 로 바꾼다. 상수의 Javadoc 에 에이전트를 한 번에 읽는 질의를 더하고 「실행마다 읽는 에이전트는 `findById` 라…」 문장을 뺀다. 클래스 Javadoc 의 「에이전트를 실행마다 읽는 것은 이 변경이 만든 것이 아니다」 도 뺀다. 실행 2개와 10개에서 같은 5 라는 기존 검사가 에이전트를 한 번에 읽는지까지 본다
 - `backend/src/test/java/com/bifos/assistant/usage/ExecutionTreeServiceTest.java`: 자식 실행의 에이전트 행을 없애도 나무가 나오고 그 노드의 에이전트 칸이 null 이다
-- `ChatService.stop` 의 건너뛰기는 새 테스트를 더하지 않는다. 자식이 있는 중지는 `ResearchAndBuildFlowTest` 가 이미 돌린다
+- `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java`: 뿌리 turn 이 도는 동안 같은 뿌리를 가리키는 `RUNNING` 자식 실행 줄(`hermesRunId` 있음, 에이전트 번호는 행이 없는 번호)을 저장하고 뿌리를 멈추면 예외 없이 끝나고 뿌리 실행이 `CANCELLED` 로 남는다. 자식 줄은 `AgentExecution` 의 생성 메서드와 `ResearchAndBuildFlowTest` 가 자식을 만드는 방식을 본다. 건너뛰기를 되돌리면 `AGENT_NOT_FOUND` 로 실패해야 한다
 
 ## 검증
 
@@ -92,4 +97,5 @@ cd backend && ./gradlew test
 | `backend/src/test/java/com/bifos/assistant/chat/ConversationMissingAgentTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionTreeServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java` | 수정 |
 | `tasks/plan051-conversation-missing-agent/index.json` | 수정 |
