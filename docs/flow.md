@@ -8,9 +8,11 @@ flowchart TD
     B -->|인증 실패 또는 가족 권한 없음| X[고정 오류]
     B --> C[사용자 행 잠금과 전용 에이전트 바인딩]
     C --> D[에이전트 비활성화와 PENDING 저장]
-    D --> E[profile env와 이름 기반 plugin 설치]
+    D --> T[API 도구 목록을 fos-assistant 하나로 줄임]
+    T -->|실패| P
+    T --> E[profile env와 이름 기반 plugin 설치]
     E -->|실패 또는 재시작 필요| P[PENDING 유지]
-    E --> F[설치 조회와 MCP probe]
+    E --> F[설치 조회, 켜진 내장 도구가 있으면 목록 다시 씀, MCP probe]
     F -->|도구 확인 성공과 재시작 불필요| R[READY와 에이전트 활성화]
     F -->|실패| P
     P -->|연결 확인| F
