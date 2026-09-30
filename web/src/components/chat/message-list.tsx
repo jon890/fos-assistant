@@ -31,6 +31,8 @@ type Props = {
   onAnswer?(text: string): void;
   /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
   onOpenArtifact(messageId: Turn["id"], path: string, name: string): void;
+  /** 사용자 메시지 맨 앞의 스킬 커맨드를 칩으로 그린다. 흐름이 붙은 에이전트의 대화는 커맨드를 해석하지 않아 거짓이다 */
+  skillCommandChips: boolean;
 };
 
 export function MessageList({
@@ -47,7 +49,7 @@ export function MessageList({
   onOpenSaved,
   onOpenLive,
   onRetry,
-  selectedVersions, onVersionChange, onRegenerate, onAnswer, onOpenArtifact,
+  selectedVersions, onVersionChange, onRegenerate, onAnswer, onOpenArtifact, skillCommandChips,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -149,7 +151,7 @@ export function MessageList({
                       onAnswer={isLast && turn.role === "ASSISTANT" && latestView && !sending ? onAnswer : undefined}
                       nextUserMessage={turn.role === "ASSISTANT" && nextTurn?.role === "USER"
                         ? nextTurn.content : undefined}
-                      onOpenArtifact={onOpenArtifact} />
+                      onOpenArtifact={onOpenArtifact} skillCommandChip={skillCommandChips} />
                     {isLast && hasNoAnswer ? (
                       <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground">
                         <span>답을 받지 못했어요</span>
