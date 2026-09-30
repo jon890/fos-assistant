@@ -20,6 +20,12 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 
 ## backend 패키지
 
+`connector`는 사용자별 가계부 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
+Hermes의 이름 기반 plugin 설치와 env 삭제, MCP probe는 `hermes`가 HTTP로 호출한다.
+외부 가계부 토큰 검증은 `connector/infra`가 공통 설정 주소로 호출한다.
+웹은 `components/connector`와 `app/connections/accountbook`, 대응 서버 라우트가 맡는다.
+계약은 [가계부 연결](connectors.md)에 있다.
+
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application`, `domain`, `infra` 로만 흐른다.
 
 | 패키지 | 책임 |

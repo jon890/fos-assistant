@@ -99,6 +99,9 @@ public class AgentToolService {
     }
 
     private static void requireOwnerOrAdmin(CurrentUser user, Agent agent) {
+        if (agent.connectorManaged()) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "connector-managed agent toolsets cannot be changed here");
+        }
         if (!user.isAdmin() && !Objects.equals(user.id(), agent.ownerUserId())) {
             throw new ApiException(ErrorCode.FORBIDDEN, "only the agent owner can read or change toolsets");
         }

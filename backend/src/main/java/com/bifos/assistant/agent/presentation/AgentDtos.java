@@ -155,11 +155,11 @@ public final class AgentDtos {
      */
     public record AdminAgentView(Long id, String code, String name, String hermesProfile,
             String apiBaseUrl, String costMode, String credentialScope, String visibility,
-            Long ownerUserId, boolean enabled, String flow) {
+            Long ownerUserId, boolean enabled, String flow, boolean connectorManaged) {
         static AdminAgentView from(Agent agent) {
             return new AdminAgentView(agent.id(), agent.code(), agent.name(), agent.hermesProfile(),
                     agent.apiBaseUrl(), agent.costMode().name(), agent.credentialScope().name(),
-                    agent.visibility().name(), agent.ownerUserId(), agent.enabled(), agent.flow());
+                    agent.visibility().name(), agent.ownerUserId(), agent.enabled(), agent.flow(), agent.connectorManaged());
         }
     }
 }
