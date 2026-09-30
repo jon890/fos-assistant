@@ -3,6 +3,7 @@ package com.bifos.assistant.skill;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -350,10 +351,16 @@ class SkillServiceTest {
     }
 
     @Test
-    void 켜고_끄기는_대시보드에_그대로_넘긴다() {
+    void 켜고_끄기는_Hermes_이름_규칙으로_보고_대시보드에_그대로_넘긴다() {
         skills.toggle(OWNER, OWNED, "hermes-help", false);
+        skills.toggle(OWNER, OWNED, "note_taking.v2", true);
 
         verify(skillClient).toggle(OWNED_PROFILE, "hermes-help", false);
+        verify(skillClient).toggle(OWNED_PROFILE, "note_taking.v2", true);
+        for (String bad : List.of("..", ".hidden", "Upper", "a/b", "a".repeat(65), "")) {
+            assertCode(() -> skills.toggle(OWNER, OWNED, bad, false), ErrorCode.VALIDATION_FAILED);
+        }
+        verify(skillClient, never()).toggle(eq(OWNED_PROFILE), eq(".."), anyBoolean());
     }
 
     /**

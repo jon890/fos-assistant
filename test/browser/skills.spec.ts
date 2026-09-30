@@ -298,6 +298,24 @@ test("관리하는 사람이 Hermes 기본 스킬을 끄고 켠다", async ({ pa
   }
 });
 
+test("점과 밑줄이 든 Hermes 스킬도 끄고 켠다", async ({ page }) => {
+  const name = "note_taking.v2";
+  await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
+  const row = skillRow(page, name);
+  await expect(row.getByText("Hermes 기본")).toBeVisible();
+  try {
+    await row.getByRole("button", { name: "켜짐" }).click();
+    await expect(row.getByRole("button", { name: "꺼짐" })).toBeVisible();
+    await page.reload();
+    await expect(skillRow(page, name).getByRole("button", { name: "꺼짐" })).toBeVisible();
+  } finally {
+    const restore = await page.request.put(`/api/agents/${PERSONA_AGENT_CODE}/skills/${name}/enabled`, {
+      data: { enabled: true },
+    });
+    expect(restore.ok()).toBeTruthy();
+  }
+});
+
 test("가족용 에이전트를 다른 사용자가 열면 목록과 부르는 방법만 있고 편집 단추가 없다", async ({ context, page }) => {
   const name = "shared-skill";
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });

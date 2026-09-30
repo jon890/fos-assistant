@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +52,13 @@ public class SkillService {
 
     /** 스킬 하나의 UTF-8 바이트 합계 상한. 1 MiB 다. */
     public static final long MAX_TOTAL_BYTES = 1_048_576L;
+
+    /**
+     * Hermes 가 가진 스킬까지 포함한 이름 형식이다. 켜고 끄기가 쓴다. Hermes 는 소문자, 숫자, 점, 밑줄,
+     * 붙임표로 64자까지 받는다. 첫 글자를 영문 소문자나 숫자로 묶어 {@code .} 과 {@code ..} 같은 이름을
+     * 막는다. 화면(web/src/lib/skill.ts)의 같은 규칙과 함께 고친다.
+     */
+    private static final Pattern HERMES_SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
 
     private final AgentService agents;
     private final SkillStore store;
@@ -170,11 +178,14 @@ public class SkillService {
         publishVersion(user, agent, remaining);
     }
 
-    /** 대시보드의 전역 켜고 끄기를 쓴다. 편집자만 한다. Hermes 가 가진 스킬도 켜고 끌 수 있다. */
+    /**
+     * 대시보드의 전역 켜고 끄기를 쓴다. 편집자만 한다. Hermes 가 가진 스킬도 켜고 끌 수 있어서 이름은 올린
+     * 스킬 규칙이 아니라 Hermes 이름 규칙으로 본다.
+     */
     public void toggle(CurrentUser user, String code, String name, boolean enabled) {
         Agent agent = requireEditable(user, code);
-        if (name == null || name.isBlank()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name is required");
+        if (name == null || !HERMES_SKILL_NAME.matcher(name).matches()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name must follow the Hermes skill name rule");
         }
         publisher.toggle(agent.hermesProfile(), name, enabled);
     }

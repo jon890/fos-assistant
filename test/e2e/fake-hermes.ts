@@ -47,7 +47,11 @@ const SKILL_VERSION_DIR = /\/([a-z0-9][a-z0-9-]{0,63})\/(v[0-9]{13}-[a-z0-9]{4})
  * Hermes 가 스스로 가진 스킬이다. 올린 스킬과 이름이 같으면 올린 것이 가려지므로 Control Plane 이 같은
  * 이름을 거절해야 한다. 목록의 `HERMES` 출처도 이것으로 본다.
  */
-const BUILTIN_SKILLS = [{ name: "hermes-help", description: "Hermes 사용법을 안내한다" }] as const;
+const BUILTIN_SKILLS = [
+  { name: "hermes-help", description: "Hermes 사용법을 안내한다" },
+  // Hermes 이름 규칙은 올린 스킬 규칙과 달리 점과 밑줄을 받는다. 켜고 끄기 검사가 이 이름을 쓴다.
+  { name: "note_taking.v2", description: "메모를 정리한다" },
+] as const;
 const ENABLED_TOOLSETS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/toolsets$/;
 const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)$/;
 const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";

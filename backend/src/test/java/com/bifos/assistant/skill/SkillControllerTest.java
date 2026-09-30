@@ -148,6 +148,15 @@ class SkillControllerTest {
                 .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
     }
 
+    @Test
+    void 켜고_끄기는_점과_밑줄이_든_Hermes_스킬_이름을_그대로_넘긴다() throws Exception {
+        mvc.perform(put("/api/v1/agents/dad/skills/note_taking.v2/enabled")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isNoContent());
+        verify(skills).toggle(OWNER, "dad", "note_taking.v2", true);
+    }
+
     private static RequestBuilder write(String name, String json) {
         return put("/api/v1/agents/{code}/skills/{name}", "dad", name)
                 .contentType(MediaType.APPLICATION_JSON)
