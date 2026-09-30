@@ -4,13 +4,16 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.shared.error.ApiException;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Consumer;
 
@@ -22,6 +25,9 @@ import java.util.function.Consumer;
  */
 public class StubHermesRunsClient implements HermesRunsClient {
 
+    /** 붙잡은 제출이 풀리지 않아도 이어지는 시간이다. */
+    private static final Duration SUBMIT_HOLD_LIMIT = Duration.ofSeconds(10);
+
     private final List<HermesRunCommand> received = new CopyOnWriteArrayList<>();
     private volatile HermesRunResult nextResult;
     private final Deque<HermesRunResult> queuedResults = new ArrayDeque<>();
@@ -31,6 +37,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private volatile Runnable beforeAwait = () -> {};
     private final List<String> stopped = new CopyOnWriteArrayList<>();
     private volatile Consumer<String> onStop = runId -> {};
+
+    /** 비어 있지 않으면 제출이 이것이 열릴 때까지 멈춘다. */
+    private volatile CountDownLatch submitGate;
 
     /** 세션 조회가 답할 값이다. 비어 있으면 읽지 못한 것으로 본다. */
     private volatile SessionRuntime sessionRuntime;
@@ -85,6 +94,25 @@ public class StubHermesRunsClient implements HermesRunsClient {
         this.beforeAwait = action;
     }
 
+    /**
+     * 이 뒤의 제출을 {@link #releaseSubmits()} 까지 붙잡는다. 제출을 기다리는 쪽의 제한 시간을 검사할 때 쓴다.
+     *
+     * <p>받은 명령은 붙잡기 전에 남긴다. 풀지 않아도 {@link #SUBMIT_HOLD_LIMIT} 가 지나면 제출이 이어져 스레드가 검사보다
+     * 오래 살지 않는다.
+     */
+    public void holdSubmits() {
+        submitGate = new CountDownLatch(1);
+    }
+
+    /** 붙잡은 제출을 모두 놓는다. */
+    public void releaseSubmits() {
+        CountDownLatch gate = submitGate;
+        submitGate = null;
+        if (gate != null) {
+            gate.countDown();
+        }
+    }
+
     public void onStop(Consumer<String> action) { this.onStop = action; }
     public List<String> stopped() { return stopped; }
 
@@ -102,11 +130,13 @@ public class StubHermesRunsClient implements HermesRunsClient {
         sessionLookups.clear();
         stopped.clear();
         onStop = runId -> {};
+        releaseSubmits();
     }
 
     @Override
     public String submit(HermesRunCommand command) {
         received.add(command);
+        awaitGate();
         if (nextFailure != null) {
             throw nextFailure;
         }
@@ -137,6 +167,18 @@ public class StubHermesRunsClient implements HermesRunsClient {
     public SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
         sessionLookups.add(sessionId);
         return sessionRuntime;
+    }
+
+    private void awaitGate() {
+        CountDownLatch gate = submitGate;
+        if (gate == null) {
+            return;
+        }
+        try {
+            gate.await(SUBMIT_HOLD_LIMIT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private HermesRunResult resultFor(HermesRunCommand command) {

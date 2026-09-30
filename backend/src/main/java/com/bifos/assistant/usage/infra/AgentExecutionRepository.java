@@ -11,6 +11,7 @@ import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -50,6 +51,16 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 생기면 뒤 turn 의 호출이 앞 turn 에 묶인다.
      */
     boolean existsByProfileNameAndHermesSessionId(String profileName, String hermesSessionId);
+
+    /** 그 {@code delegation_key} 로 만든 위임 실행이다. 같은 도구 호출이 다시 왔는지 볼 때 쓴다(ADR-032). */
+    Optional<AgentExecution> findByDelegationKey(String delegationKey);
+
+    /**
+     * 한 뿌리 아래에서 그 상태인 위임 실행의 수다. 위임 동시 한도를 셀 때 쓴다.
+     *
+     * <p>{@code delegation_key} 가 없는 자식(흐름의 하위 실행, Memory 제안)은 세지 않는다.
+     */
+    long countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(Long rootExecutionId, ExecutionStatus status);
 
     /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);

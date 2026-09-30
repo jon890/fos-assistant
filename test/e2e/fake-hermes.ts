@@ -464,6 +464,8 @@ export type FakeHermes = {
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
+  /** 지금 붙잡아 둔 실행의 번호와 session 이다. 붙잡은 것이 없으면 `undefined` 다. 플러그인처럼 `_fos_ctx` 를 서명할 때 쓴다. */
+  heldRun(): { runId: string; sessionId: string } | undefined;
   /**
    * `LONG_ACTIVITY_PROBE` 스트림이 시작만 한 도구 줄을 남기고 기다리는 멈춤 지점 하나를 푼다. 실행 상태는 바꾸지 않는다.
    * 멈춤 지점이 둘이므로 끝까지 흘리려면 두 번 부른다. 기다리는 스트림이 없으면 아무것도 하지 않는다.
@@ -1353,6 +1355,10 @@ export function startFakeHermes(
           if (releasedRunId === undefined) return;
           const run = runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
+        },
+        heldRun: () => {
+          const run = heldRunId === undefined ? undefined : runs.get(heldRunId);
+          return run === undefined ? undefined : { runId: run.run_id, sessionId: run.session_id };
         },
         releaseLongActivity,
         holdNextSoul: () => {

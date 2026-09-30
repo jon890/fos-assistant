@@ -56,7 +56,7 @@ profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 origin 
 
 ## MCP 호출의 요청자를 정할 때
 
-`memory_read`, `artifact_write`, `agent_list`, `agent_status` 가 이 길을 지나고, 앞으로의 `agent_delegate`, `agent_stop` 도 지난다.
+`memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 이 모두 이 길을 지난다.
 
 ```mermaid
 sequenceDiagram
@@ -123,7 +123,7 @@ sequenceDiagram
 | --- | --- |
 | 대화 turn, 흐름의 Chief | 그 대화의 뿌리 session. 뿌리 칸이 빈 옛 대화는 Hermes 에 보내는 session |
 | 흐름의 하위 실행 | 제출하기 전에 새로 정한 `fos-<uuid>`. 부모의 session 을 잇지 않는다 |
-| 앞으로의 위임 자식 | 위와 같다 |
+| `agent_delegate` 의 위임 자식 | 위와 같다 |
 | Memory 제안 | 적지 않는다. 이 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다 |
 
 ### 하위 에이전트 session 을 등록할 때
@@ -1292,7 +1292,7 @@ CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로
 
 ## 다른 에이전트에게 맡길 때
 
-**`agent_list` 와 `agent_status` 만 열었다.** `agent_delegate` 와 `agent_stop` 은 아직 없어 `/mcp` 가 `-32601` 을 돌려준다. 아래 그림에서 그 둘의 부분은 열 때의 흐름이다. 요청자를 정하는 앞부분은 「MCP 호출의 요청자를 정할 때」 로 돈다.
+**`agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 을 열었다.** 요청자를 정하는 앞부분은 「MCP 호출의 요청자를 정할 때」 로 돈다.
 
 Hermes 가 어느 에이전트를 부를지 정하고, Control Plane 은 경계만 검사한다.
 결정은 [ADR-017](adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 과
@@ -1321,32 +1321,45 @@ sequenceDiagram
     C->>M: agent_status(execution_id)
     M-->>C: RUNNING 또는 SUCCEEDED 와 답
     C->>M: agent_stop(execution_id)
-    M->>H: POST /v1/runs/{run_id}/stop
-    M-->>C: CANCELLED
+    M->>D: 같은 권한 판정, 중지 표시를 켠다
+    D->>H: POST /v1/runs/{run_id}/stop
+    D-->>M: CANCELLED 가 적히기를 짧게 기다린 뒤의 상태
+    M-->>C: CANCELLED, 또는 RUNNING 과 stop_requested
 ```
 
 ### 갈리는 지점
 
 | 경우 | 결과 |
 | --- | --- |
-| `_fos_ctx` 가 없거나 서명이 틀리다 | 거절한다. 플러그인이 빠진 profile 이거나 모델이 흉내 낸 것이다 |
-| origin 실행을 정하지 못했다 | 거절한다. 부모를 추측하지 않는다. 하위 에이전트는 origin 실행이 끝났어도 그 실행 아래 붙고, origin 이나 그 뿌리가 `CANCELLED` 면 거절된다 |
+| `_fos_ctx` 가 없거나 서명이 틀리다 | 「MCP 호출의 요청자를 정할 때」 의 거절과 같은 도구 결과(`McpToolService.invalidContext()`, `isError: true`)다. 플러그인이 빠진 profile 이거나 모델이 흉내 낸 것이다 |
+| origin 실행을 정하지 못했다 | 「MCP 호출의 요청자를 정할 때」 의 거절과 같은 도구 결과(`McpToolService.invalidContext()`, `isError: true`)다. 부모를 추측하지 않는다. 하위 에이전트는 origin 실행이 끝났어도 그 실행 아래 붙고, origin 이나 그 뿌리가 `CANCELLED` 면 거절된다 |
 | 그 실행의 profile 이 토큰의 profile 과 다르다 | 거절한다. 사용자는 토큰이 아니라 그 실행이 정한다 |
-| 없는 에이전트, 쓸 수 없는 에이전트 | 같은 응답으로 거절한다. 있는지 없는지 알리지 않는다 |
-| 꺼진 에이전트 | 쓸 수 없다고 거절한다 |
-| 깊이가 한도(기본 2)를 넘는다 | 거절한다. Hermes 는 재귀를 막지 않는다 |
-| 한 뿌리 아래 도는 위임 자식이 한도(기본 4)에 닿았다 | 거절한다. Chief 가 앞의 것을 기다리거나 멈춘 뒤 다시 부른다 |
+| 없는 에이전트, 쓸 수 없는 에이전트 | 같은 `AGENT_UNAVAILABLE` 로 거절한다. 있는지 없는지 알리지 않는다 |
+| 꺼진 에이전트 | `AGENT_DISABLED` 로 거절한다 |
+| 깊이가 한도(기본 2)를 넘는다 | `DEPTH_EXCEEDED` 로 거절한다. Hermes 는 재귀를 막지 않는다 |
+| 한 뿌리 아래 도는 위임 자식이 한도(기본 4)에 닿았다 | `TOO_MANY_CHILDREN` 으로 거절한다. Chief 가 앞의 것을 기다리거나 멈춘 뒤 다시 부른다 |
 | 같은 호출이 다시 온다(Hermes 재시도). profile, 뿌리 session, 그 호출의 session, `tool_call_id` 가 모두 같다 | 새로 만들지 않고 처음 만든 실행을 돌려준다 |
 | 다른 session 에서 같은 `tool_call_id` 가 온다 | 다른 호출이다. 따로 만든다 |
-| 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 실패 코드를 돌려준다 |
-| 제출이 한도 시간 안에 끝나지 않는다 | 실행 번호를 돌려주고, 뒤따르는 결과는 그 줄에 적는다 |
+| `task` 가 비었거나 공백뿐이거나 8,000자를 넘는다. `agent_code` 와 `task` 밖의 인자가 온다 | 인자 오류(`-32602`)다. profile 이나 사용자를 인자로 정하지 못한다 |
+| 부모 실행에 대화가 없다 | 실행 줄을 만들지 않고 `SUBMIT_FAILED` 로 거절한다. 운영에서는 생기지 않는 방어다 |
+| 서버 전체에서 도는 위임이 한도(기본 16)에 닿았다 | `BUSY` 로 거절한다. 기다리지 않는다 |
+| 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 `SUBMIT_FAILED` 를 돌려준다. 제출은 됐는데 그 뒤의 기록(run 번호, 시작 사건)이 실패하면 그 run 에 중지를 한 번 보내고 `FAILED` 로 적는다. 흐름의 하위 실행도 같다 |
+| 제출이 한도 시간(기본 30초, `assistant.delegation.submit-timeout`) 안에 끝나지 않는다 | 실행 줄이 생겼으면 번호와 `RUNNING` 을 돌려주고, 뒤따르는 결과는 그 줄에 적는다. 줄도 생기지 않았으면 `SUBMIT_FAILED` 이고, 뒤늦게 줄이 생겨도 제출하지 않고 `CANCELLED` 로 끝낸다. 뿌리별 잠금도 그 시간 안에서만 기다린다. 잡지 못하거나 잡은 뒤 남은 시간이 없으면 실행 줄을 만들지 않고 `SUBMIT_FAILED` 다. 줄이 없으므로 같은 호출을 다시 보내면 새로 시작한다 |
+| 위임 실행이 끝난다 | 답을 `SUCCEEDED` 와 같은 저장에서 그 줄의 `output_text` 에 적는다. 100,000자를 넘으면 자르고 잘렸다는 한 줄을 붙인다. `chat_message` 에는 넣지 않는다 |
 | `agent_list` 를 부른다 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 `name` 만 JSON 배열로 준다. 같은 profile 을 여럿이 써도 요청자마다 다르다 |
-| `agent_status` 로 남의 실행, 그 나무 밖의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호를 묻는다 | 모두 `{"code":"NOT_FOUND","message":"실행을 찾을 수 없습니다."}` 하나로 답한다. 기준 나무는 부르는 쪽 origin 실행의 뿌리다. origin 실행이 끝났어도 같다 |
+| `agent_status` 로 남의 실행, 다른 대화의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호를 묻는다 | 모두 `{"code":"NOT_FOUND","message":"실행을 찾을 수 없습니다."}` 하나로 답한다. 기준은 부르는 쪽 origin 실행의 대화다. 같은 사용자의 다른 대화여도 찾지 못한다. origin 실행이 끝났어도 같다 |
+| `agent_status` 로 같은 대화의 앞 turn 에서 맡긴 실행을 묻는다 | 답한다. turn 마다 뿌리 실행이 달라도 대화가 같으면 된다. 기다리지 않는 위임의 결과를 뒤 turn 에서 가져오는 길이다 |
+| `agent_status` 를 부른 origin 실행에 대화가 없다 | 같은 실행 나무(같은 뿌리)의 위임 실행만 답한다 |
 | `agent_status` 가 물을 수 있는 실행이다 | `execution_id` 와 `status` 를 준다. `SUCCEEDED` 는 `output`, `FAILED` 는 `error_code`, `CANCELLED` 는 답이 있으면 `output` 을 더한다. run 번호, profile, 토큰 수, 금액은 싣지 않는다 |
+| `agent_stop` 으로 물을 수 없는 실행을 멈추려 한다 | `agent_status` 와 같은 판정이다. 남의 실행, 다른 대화의 실행, 위임이 아닌 실행, 없는 번호는 모두 `NOT_FOUND` 하나로 답하고 멈추지 않는다 |
+| `agent_stop` 이 도는 실행에 온다 | 그 실행의 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. 번호가 붙기 전이면 붙는 자리에서 보낸다. `CANCELLED` 가 적히기를 5초까지 기다려 `CANCELLED` 를 주고, 그 안에 적히지 않으면 `RUNNING` 과 `stop_requested: true` 를 준다 |
+| 멈춘 실행이 그때까지 답을 받았다 | 그 답을 `CANCELLED` 와 같은 저장에서 `output_text` 에 적는다. 받은 답이 없으면 비운다 |
+| `agent_stop` 으로 멈춘 실행이 다시 맡긴 실행이 있다 | 그 실행은 멈추지 않는다. 멈춘 실행 자신이 origin 인 Hermes 하위 에이전트의 Control Plane MCP 호출은 거절된다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
+| `agent_stop` 이 이 서버가 돌리지 않는 `RUNNING` 위임 실행에 온다(서버가 다시 떠 끊긴 실행) | run 번호가 있으면 Hermes 에 중지만 보내고 기다리지 않는다. 중지를 보냈으면 `RUNNING` 과 `stop_requested: true` 를 준다. run 번호가 없거나 보내지 못하면 `RUNNING` 만 준다. 그 줄은 기동 정리가 끝낸다 |
 | `agent_stop` 이 끝난 실행에 온다 | 멈추지 않고 끝난 상태를 그대로 돌려준다 |
 | 멈추기와 끝나기가 겹친다 | 먼저 적힌 쪽이 남는다. 끝난 뒤 온 중지는 끝난 상태를 돌려준다 |
 | 자식이 다시 `agent_delegate` 를 부른다 | 그 자식이 부모가 된다. 깊이 한도 안에서만 된다 |
-| 사용자가 그 turn 을 중지한다 | turn 이 도는 동안 추적하던 위임 자식도 함께 멈춘다. turn 이 끝난 뒤의 자식은 `agent_stop` 으로만 멈춘다 |
+| 사용자가 그 turn 을 중지한다 | turn 이 도는 동안 맡긴 위임 자식은 run 번호가 붙을 때 그 turn 에 붙어 함께 멈춘다. 중지가 확정된 뒤 제출 전이면 제출하지 않고 `CANCELLED` 로 끝나고, 확정 전에 제출됐으면 run 번호가 붙는 자리에서 곧바로 멈춘다. turn 이 끝난 뒤에 맡긴 자식은 `agent_stop` 으로만 멈춘다. 자식은 Hermes 가 turn 의 중지를 받아 확정된 뒤에만 `CANCELLED` 로 적힌다. 중지를 보내지 못해 turn 이 되돌아가면 그 사이에 끝난 자식은 `SUCCEEDED` 로 남는다 |
 | 서버가 다시 뜬다 | 도는 위임 실행은 기동 정리가 `FAILED`(`ORPHANED`) 로 적는다 |
 
 **자식의 답은 대화 이력에 넣지 않는다.** Chief 가 `agent_status` 로 받아 자기 답에 합친다. 자식 실행은 자기 줄에 사용량과 비용이 따로 남고 작업 과정과 실행 나무에 보인다.
