@@ -671,6 +671,28 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 실행은 가상 스레드 하나에서 `AgentRunner.run` 으로 끝까지 돌고, 끝나면 답을 그 실행 줄의 `output_text` 에 적는다.
 동시에 도는 위임은 뿌리당 한도와 전체 한도로 묶는다. 트랜잭션 안에서 Hermes 를 부르지 않는다.
 
+### 위임 결과로 부모 대화를 깨우기
+
+결정은 [ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md), 흐름은 [flow.md](flow.md) 의 「위임 결과가 도착했을 때」 에 있다.
+
+| 자리 | 맡는 것 |
+| --- | --- |
+| `orchestration.application.AgentDelegationService` | 위임 실행이 끝나면 `run()` 의 `finally` 에서 `DelegationFinished(conversationId)` 사건을 낸다. `chat` 을 직접 부르지 않는다 |
+| `chat.application.DelegationWakeService` | 사건과 turn 종료를 받아 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 기동할 때 전하지 않은 결과가 있는 대화를 한 번 훑는다 |
+| `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
+| `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(깨우기 서비스)를 부른다 |
+| `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 자동 turn 의 사건을 모든 구독에 보낸다 |
+| `chat.presentation.ChatController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다 |
+| `mcp.application.McpToolService` | `agent_status` 와 `agent_stop` 이 끝난 상태를 돌려주면 `result_delivered_at` 을 적는다 |
+| 웹 `app/api/chat/conversations/[conversationId]/events/route.ts` | 대화 단위 SSE 를 그대로 넘긴다 |
+| 웹 `components/chat-panel.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다 |
+
+**`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.** 두 패키지는 이미 서로를 import 한다(`TurnCancellation`, `Flow`). 위임 서비스가 `ChatService` 를 부르면 그 얽힘이 turn 실행까지 번진다.
+
+깨울지는 대화별 JVM 잠금(`TurnCancellation.open`) 을 잡을 수 있는지로 정한다.
+잡지 못하면 그 turn 이 닫힐 때 다시 확인하므로 결과를 잃지 않는다.
+전한 결과는 `result_delivered_at` 으로, 연속 횟수는 `conversation.auto_turn_count` 로 DB 에 남긴다.
+
 ### 깊이와 동시 한도
 
 깊이는 부모의 `parent_execution_id` 를 따라 올라가 센다. 사용자가 부른 실행이 0 이다.
