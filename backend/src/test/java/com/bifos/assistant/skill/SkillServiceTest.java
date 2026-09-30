@@ -260,11 +260,12 @@ class SkillServiceTest {
     }
 
     /**
-     * 사건을 받는 쪽은 커밋 뒤에 받는다. 저장을 바깥 트랜잭션에 넣어 커밋 전에는 캐시가 그대로이고, 커밋하면
-     * 비워지며, 되돌리면 비워지지 않는 것을 본다. 트랜잭션 없는 켜고 끄기는 바로 비운다.
+     * 사건을 받는 쪽은 트랜잭션이 끝난 뒤에 받는다. 저장과 지우기를 바깥 트랜잭션에 넣어 끝나기 전에는 캐시가
+     * 그대로인 것을 본다. 커밋하면 비워지고, 되돌려도 비워진다. 되돌린 지우기도 Hermes 게시와 디렉터리 삭제는
+     * 이미 끝났기 때문이다. 트랜잭션 없는 켜고 끄기는 바로 비운다.
      */
     @Test
-    void 커맨드_이름_캐시는_저장과_지우기가_커밋된_뒤에_비워지고_켜고_끄기는_바로_비워진다() {
+    void 커맨드_이름_캐시는_저장과_지우기의_트랜잭션이_커밋이든_되돌림이든_끝난_뒤에_비워지고_켜고_끄기는_바로_비워진다() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
         Agent agent = agents.findByCode(OWNED).orElseThrow();
         TransactionTemplate outer = new TransactionTemplate(transactionManager);
@@ -272,22 +273,23 @@ class SkillServiceTest {
 
         outer.executeWithoutResult(status -> {
             skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
-            assertThat(commandCatalog.enabledNames(agent)).as("커밋 전").containsExactly("hermes-help");
+            assertThat(commandCatalog.enabledNames(agent)).as("저장의 커밋 전").containsExactly("hermes-help");
         });
         assertThat(commandCatalog.enabledNames(agent)).as("저장이 커밋된 뒤")
                 .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
 
         outer.executeWithoutResult(status -> {
             skills.delete(OWNER, OWNED, "weekly-plan");
+            assertThat(commandCatalog.enabledNames(agent)).as("지우기의 트랜잭션이 끝나기 전")
+                    .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
             status.setRollbackOnly();
         });
-        assertThat(commandCatalog.enabledNames(agent)).as("지우기를 되돌린 뒤")
-                .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
+        // 캐시가 비워져 다시 읽었으면 지운 스킬은 없고 Hermes 목록이 준 이름만 남는다.
+        assertThat(commandCatalog.enabledNames(agent)).as("지우기를 되돌린 뒤").containsExactly("hermes-help");
 
         when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(new HermesSkill("hermes-help", "Hermes 기본", false)));
         skills.toggle(OWNER, OWNED, "hermes-help", false);
-        // 되돌린 지우기가 이미 지운 디렉터리는 되살아나지 않으므로 끈 이름이 빠졌는지만 본다.
-        assertThat(commandCatalog.enabledNames(agent)).as("끈 뒤").doesNotContain("hermes-help");
+        assertThat(commandCatalog.enabledNames(agent)).as("끈 뒤").isEmpty();
     }
 
     @Test

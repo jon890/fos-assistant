@@ -1,3 +1,4 @@
+// node --test 가 이 파일을 직접 읽으므로 `@/` 별칭 대신 확장자를 붙인 상대 경로로 가져온다.
 import { SKILL_NAME_PATTERN, type SkillListView } from "../../lib/skill.ts";
 
 /**

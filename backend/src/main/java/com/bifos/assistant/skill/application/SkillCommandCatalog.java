@@ -78,10 +78,12 @@ public class SkillCommandCatalog {
     /**
      * 그 에이전트의 스킬이 바뀌었으니 다음 커맨드가 목록을 다시 읽게 한다.
      *
-     * <p>저장과 지우기는 트랜잭션 안에서 사건을 내므로 커밋된 뒤에 받는다. 커밋 전에 비우면 그 사이 다른 요청이
-     * 커밋 전의 목록을 다시 캐시에 넣을 수 있다. 트랜잭션 없이 내는 켜고 끄기는 바로 받는다.
+     * <p>저장과 지우기는 트랜잭션 안에서 사건을 내므로 트랜잭션이 끝난 뒤에 받는다. 끝나기 전에 비우면 그 사이 다른
+     * 요청이 끝나기 전의 목록을 다시 캐시에 넣을 수 있다. 커밋뿐 아니라 되돌려도 비운다. 사건을 낸 때에는 Hermes
+     * 게시와 버전 디렉터리 쓰기나 지우기가 이미 끝났고, 트랜잭션을 되돌려도 그것은 돌아오지 않는다. 비우지 않으면
+     * {@link #TTL} 동안 Hermes 에서 이미 지운 스킬을 커맨드로 받는다. 트랜잭션 없이 내는 켜고 끄기는 바로 받는다.
      */
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMPLETION, fallbackExecution = true)
     public void on(SkillsChanged event) {
         generations.merge(event.agentId(), 1L, Long::sum);
         cache.remove(event.agentId());
