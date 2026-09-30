@@ -7,10 +7,13 @@ import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
+import com.bifos.assistant.orchestration.application.DelegationResult;
+import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +49,8 @@ public class McpToolService {
             "artifact source URL is invalid",
             "artifact source host is not allowed");
     private static final String EXECUTION_NOT_FOUND = "실행을 찾을 수 없습니다.";
+    /** {@code agent_delegate} 의 {@code task} 길이 상한. 대화 메시지 상한과 같다. */
+    public static final int TASK_MAX_CHARS = 8000;
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
@@ -71,6 +76,15 @@ public class McpToolService {
                 Map.of("name", "agent_list",
                         "description", "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code 와 이름을 읽는다.",
                         "inputSchema", Map.of("type", "object", "additionalProperties", false, "properties", Map.of())),
+                Map.of("name", "agent_delegate",
+                        "description", "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 로 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 결과는 돌려받은 execution_id 로 agent_status 를 불러 읽는다.",
+                        "inputSchema", Map.of(
+                                "type", "object",
+                                "additionalProperties", false,
+                                "properties", Map.of(
+                                        "agent_code", Map.of("type", "string"),
+                                        "task", Map.of("type", "string", "minLength", 1, "maxLength", TASK_MAX_CHARS)),
+                                "required", List.of("agent_code", "task"))),
                 Map.of("name", "agent_status",
                         "description", "다른 에이전트에게 맡긴 실행의 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다.",
                         "inputSchema", Map.of(
@@ -138,6 +152,39 @@ public class McpToolService {
         return delegations.status(caller.user(), caller.originExecution(), executionId)
                 .map(execution -> result(json.writeValueAsString(statusOf(execution)), false))
                 .orElseGet(() -> result(json.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
+    }
+
+    /**
+     * 다른 에이전트의 실행을 시작하고 번호를 JSON 글로 돌려준다. 제출까지만 기다린다.
+     *
+     * <p>부모는 요청자를 정한 origin 실행이다. 같은 호출을 알아보는 키는 그 실행의 profile 과 서명한 {@code _fos_ctx} 의 세
+     * 값으로 만든다(ADR-032 「{@code delegation_key}」). 거절하면 정해 둔 코드와 한국어 한 줄만 싣는다.
+     */
+    public Map<String, Object> delegate(McpCaller caller, String agentCode, String task) {
+        AgentExecution origin = caller.originExecution();
+        McpCallContext context = caller.context();
+        DelegationKey key = DelegationKey.of(
+                origin.profileName(), context.rootSessionId(), context.sessionId(), context.toolCallId());
+        DelegationResult delegated = delegations.delegate(caller.user(), origin, key, agentCode, task);
+        if (!delegated.accepted()) {
+            Failure failure = delegated.failure();
+            return result(json.writeValueAsString(failure(failure.name(), delegationFailureMessage(failure))), true);
+        }
+        Map<String, Object> started = new LinkedHashMap<>();
+        started.put("execution_id", delegated.executionId());
+        started.put("status", delegated.status().name());
+        return result(json.writeValueAsString(started), false);
+    }
+
+    private static String delegationFailureMessage(Failure failure) {
+        return switch (failure) {
+            case AGENT_UNAVAILABLE -> "맡길 수 없는 에이전트입니다.";
+            case AGENT_DISABLED -> "꺼진 에이전트입니다.";
+            case DEPTH_EXCEEDED -> "더 깊이 맡길 수 없습니다.";
+            case TOO_MANY_CHILDREN -> "이미 맡긴 일이 많습니다. 앞의 일이 끝난 뒤 다시 맡겨 주세요.";
+            case BUSY -> "지금은 맡길 수 없습니다. 잠시 뒤 다시 시도해 주세요.";
+            case SUBMIT_FAILED -> "실행을 시작하지 못했습니다.";
+        };
     }
 
     private static Map<String, Object> agentSummary(Agent agent) {

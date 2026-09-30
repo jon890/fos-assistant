@@ -38,6 +38,7 @@ public class McpController {
     private static final String ARTIFACT_WRITE = "artifact_write";
     private static final String AGENT_LIST = "agent_list";
     private static final String AGENT_STATUS = "agent_status";
+    private static final String AGENT_DELEGATE = "agent_delegate";
     private final McpToolService tools;
     private final McpCallerResolver callers;
     private final BuildProperties buildProperties;
@@ -46,7 +47,8 @@ public class McpController {
             MEMORY_READ, this::readMemory,
             ARTIFACT_WRITE, this::writeArtifact,
             AGENT_LIST, this::listAgents,
-            AGENT_STATUS, this::agentStatus);
+            AGENT_STATUS, this::agentStatus,
+            AGENT_DELEGATE, this::agentDelegate);
 
     /** 요청자가 정해진 뒤 {@code _fos_ctx} 를 뗀 인자로 도구 하나를 처리한다. */
     @FunctionalInterface
@@ -136,6 +138,22 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         return response(id, tools.agentStatus(caller, executionId.longValue()));
+    }
+
+    /**
+     * 인자는 {@code agent_code} 와 {@code task} 둘뿐이다. 다른 키가 오면 인자 오류다.
+     *
+     * <p>profile, 사용자, 부모를 인자로 받지 않는다. 모델이 준 값으로 그것을 정하지 않는다(ADR-017).
+     */
+    private Map<String, Object> agentDelegate(McpCaller caller, JsonNode id, JsonNode arguments) {
+        if (arguments.size() != 2 || !text(arguments, "agent_code") || !text(arguments, "task")) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        String task = arguments.get("task").asString();
+        if (task.isBlank() || task.length() > McpToolService.TASK_MAX_CHARS) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        return response(id, tools.delegate(caller, arguments.get("agent_code").asString(), task));
     }
 
     private Map<String, Object> writeArtifact(McpCaller caller, JsonNode id, JsonNode arguments) {

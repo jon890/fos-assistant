@@ -17,6 +17,7 @@ import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
@@ -53,11 +54,15 @@ public class AgentRunner {
     /** 실행이 어떤 이유로 끝났는지 알 수 없을 때 실행 줄에 적는 값이다. */
     private static final String UNKNOWN_ERROR = "ORCHESTRATION_STEP_FAILED";
 
+    /** 위임 답을 잘랐을 때 끝에 붙이는 한 줄이다. 읽는 쪽은 모델이다. */
+    static final String TRUNCATED_NOTICE = "[답이 %d자를 넘어 뒷부분을 잘랐다]";
+
     private final ContextAssembler contextAssembler;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
+    private final DelegationProperties delegation;
 
     /**
      * 실행 하나를 끝까지 돌린다.
@@ -90,13 +95,40 @@ public class AgentRunner {
             BiConsumer<AgentExecution, String> onSubmitted,
             BooleanSupplier cancelled,
             String instructionAddition) {
+        return run(
+                user, conversation, agent, task, parentExecutionId, rootExecutionId, session, onStarted, onSubmitted,
+                cancelled, instructionAddition, null);
+    }
+
+    /**
+     * 실행 하나를 끝까지 돌리며 실행 줄에 {@code delegation_key} 를 처음부터 적는다.
+     *
+     * <p>키가 있으면 다른 에이전트에게 맡긴 실행이다. 성공하면 답을 {@link DelegationProperties#outputMaxChars()}
+     * 까지 잘라 SUCCEEDED 와 같은 저장에서 {@code output_text} 에 적는다. 부르는 쪽은 이 결과를 기다리지 않고
+     * {@code agent_status} 가 그 줄을 읽는다. 같은 키의 줄이 이미 있으면 실행 줄 저장이 예외로 올라온다.
+     *
+     * @param delegationKey 위임이 아니면 null 이다. 나머지 인자는 11개 인자 판과 같다
+     */
+    public Run run(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            String task,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            RunSession session,
+            Consumer<AgentExecution> onStarted,
+            BiConsumer<AgentExecution, String> onSubmitted,
+            BooleanSupplier cancelled,
+            String instructionAddition,
+            DelegationKey delegationKey) {
         AssembledContext context = contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
         ModelChoice choice = conversation.modelChoice();
         AgentExecution execution = executions.start(
                 user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, choice, null,
-                session.correlationSessionId());
+                session.correlationSessionId(), delegationKey);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
@@ -154,7 +186,9 @@ public class AgentRunner {
             return new Run(failed, ChildResult.failed(failed.id(), code), null);
         }
 
-        AgentExecution completed = executions.complete(execution, agent, result, choice);
+        AgentExecution completed = delegationKey == null
+                ? executions.complete(execution, agent, result, choice)
+                : executions.complete(execution, agent, result, choice, clip(result.output()));
         append(completed, ExecutionEventType.RUN_COMPLETED, null, 2);
         return new Run(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
     }
@@ -175,6 +209,23 @@ public class AgentRunner {
         append(failed, ExecutionEventType.RUN_FAILED, code, sequence);
         log.warn("흐름의 한 단계가 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
         return new Run(failed, ChildResult.failed(failed.id(), code), null);
+    }
+
+    /**
+     * 위임 답을 상한까지 자르고 잘렸다는 한 줄을 붙인다.
+     *
+     * <p>상한 자리에서 대리 쌍이 갈리면 그 앞에서 자른다. 반쪽 글자가 남으면 저장과 JSON 쓰기에서 깨진다.
+     */
+    private String clip(String output) {
+        if (output == null) {
+            return "";
+        }
+        int max = delegation.outputMaxChars();
+        if (output.length() <= max) {
+            return output;
+        }
+        int end = max > 0 && Character.isHighSurrogate(output.charAt(max - 1)) ? max - 1 : max;
+        return output.substring(0, end) + "\n\n" + String.format(TRUNCATED_NOTICE, max);
     }
 
     private static String appendInstruction(String instructions, String addition) {
