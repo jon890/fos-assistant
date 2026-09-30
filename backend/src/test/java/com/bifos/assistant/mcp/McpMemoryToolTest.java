@@ -168,6 +168,22 @@ class McpMemoryToolTest {
         assertThat(rejected.toString()).doesNotContain("아빠 본문");
     }
 
+    @Test void 등록한_하위_에이전트는_부모_실행이_취소되면_읽지_못한다() throws Exception {
+        Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
+        String child = "하위-" + UUID.randomUUID();
+        registrar.register(PROFILE, dadRoot, dadRoot, child);
+        JsonNode whileRunning = body(subagentRead(child, indexed.id()));
+        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.CANCELLED.name(), dadRun.id());
+
+        JsonNode afterCancel = body(subagentRead(child, indexed.id()));
+
+        assertThat(whileRunning.path("result").path("content").get(0).path("text").asString())
+                .as("부모가 도는 동안의 읽기: %s", whileRunning).isEqualTo("아빠 본문");
+        assertThat(afterCancel.path("result")).as("부모를 중지한 뒤의 결과")
+                .isEqualTo(json.valueToTree(toolService.invalidContext()));
+        assertThat(afterCancel.toString()).doesNotContain("아빠 본문");
+    }
+
     @Test void 인증한_요청에_토큰_원문이_아닌_해시를_속성으로_싣는다() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 

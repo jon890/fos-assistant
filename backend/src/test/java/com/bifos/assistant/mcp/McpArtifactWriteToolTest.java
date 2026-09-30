@@ -143,6 +143,22 @@ class McpArtifactWriteToolTest {
     }
 
     @Test
+    void 등록한_하위_에이전트는_부모_실행이_취소되면_쓰지_못한다() throws Exception {
+        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        String subagent = "하위-" + UUID.randomUUID();
+        registrar.register(PROFILE, dadRoot, dadRoot, subagent);
+        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.CANCELLED.name(), dadRun.id());
+        String path = "subagent-" + UUID.randomUUID() + ".html";
+
+        JsonNode refused = body(subagentWrite(subagent, own, path));
+
+        assertThat(refused.path("result").path("isError").asBoolean()).as("부모를 중지한 뒤 쓴 결과: %s", refused).isTrue();
+        assertThat(refused.path("result").path("content").get(0).path("text").asString())
+                .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+        assertThat(store.resolveInside(own.id(), path)).isEmpty();
+    }
+
+    @Test
     void 빈_본문과_제어문자가_있는_경로도_유효한_JSON_결과로_돌려준다() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
 

@@ -120,6 +120,34 @@ class SessionOwnerResolverTest {
         assertThat(origin.errorCode()).as("origin 실행의 오류 코드").isEqualTo("ORPHANED");
     }
 
+    @Test
+    void 등록한_하위_에이전트는_origin_실행이_취소되면_거절한다() {
+        String s1 = register(root, root);
+        assertOrigin(owners.resolve(PROFILE, root, s1), dadRun, dad);
+
+        setStatus(dadRun, ExecutionStatus.CANCELLED);
+
+        assertRejected(PROFILE, root, s1);
+    }
+
+    @Test
+    void 하위_에이전트의_하위_에이전트도_origin_실행이_취소되면_거절한다() {
+        String s1 = register(root, root);
+        String s2 = register(root, s1);
+        setStatus(dadRun, ExecutionStatus.CANCELLED);
+
+        assertRejected(PROFILE, root, s1);
+        assertRejected(PROFILE, root, s2);
+    }
+
+    @Test
+    void origin_실행이_실패로_끝나도_등록한_하위_에이전트는_그대로_정한다() {
+        String s1 = register(root, root);
+        setStatus(dadRun, ExecutionStatus.FAILED);
+
+        assertOrigin(owners.resolve(PROFILE, root, s1), dadRun, dad);
+    }
+
     @Test // 8
     void 다른_profile_의_등록으로는_정하지_못한다() {
         String s1 = register(root, root);
