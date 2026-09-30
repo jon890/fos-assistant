@@ -1,16 +1,16 @@
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
-import { ARTIFACT_PROBE } from "../e2e/fake-hermes.ts";
+import { ARTIFACT_PROBE, ARTIFACT_SAME_NAME_PROBE } from "../e2e/fake-hermes.ts";
 import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 새 대화에서 결과물을 만드는 글을 보내고, 답 아래 결과물 줄이 뜰 때까지 기다린다. */
-async function sendProbe(page: Page) {
+async function sendProbe(page: Page, text: string = ARTIFACT_PROBE, count = 1) {
   await page.goto("/");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
-  await page.getByRole("textbox", { name: "메시지" }).fill(ARTIFACT_PROBE);
+  await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page).toHaveURL(CONVERSATION_URL);
   const rows = page.getByTestId("assistant-message").last().getByTestId("message-artifact");
-  await expect(rows).toHaveCount(1, { timeout: 30_000 });
+  await expect(rows).toHaveCount(count, { timeout: 30_000 });
   return rows;
 }
 
@@ -30,11 +30,11 @@ async function createConversation(page: Page, text: string): Promise<string> {
 
 test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진과 함께 뜬다", async ({ page }) => {
   const rows = await sendProbe(page);
-  await expect(rows.first()).toHaveText("index.html");
+  await expect(rows.first()).toHaveText("초안");
 
   await rows.first().getByRole("button").click();
   const panel = page.getByTestId("artifact-panel");
-  await expect(panel.getByRole("heading", { name: "index.html" })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "초안" })).toBeVisible();
   const frame = page.getByTestId("artifact-frame");
   await expect(frame).toBeVisible();
   const sandbox = await frame.getAttribute("sandbox");
@@ -62,6 +62,18 @@ test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진
   expect(headers["x-content-type-options"]).toBe("nosniff");
   // 옮기는 목록 밖의 머리글이 붙으면 같은 출처 iframe 이 막힌다.
   expect(headers["x-frame-options"]).toBeUndefined();
+
+  // 조건부 요청이 Control Plane 까지 가서 304 로 돌아와야 한다. 본문은 비고 캐시 지시는 그대로 붙는다.
+  const etag = headers["etag"];
+  const lastModified = headers["last-modified"];
+  expect(etag, "ETag 가 옮겨지지 않았다").toBeTruthy();
+  expect(lastModified, "Last-Modified 가 옮겨지지 않았다").toBeTruthy();
+  const byEtag = await page.request.get(src!, { headers: { "If-None-Match": etag } });
+  expect(byEtag.status()).toBe(304);
+  expect((await byEtag.body()).length).toBe(0);
+  expect(byEtag.headers()["cache-control"]).toBe("private, no-cache");
+  const byDate = await page.request.get(src!, { headers: { "If-Modified-Since": lastModified } });
+  expect(byDate.status()).toBe(304);
 
   await panel.getByRole("button", { name: "결과물 닫기" }).click();
   await expect(panel).toHaveCount(0);
@@ -106,4 +118,19 @@ test("결과물 패널을 연 채 다른 대화로 옮기면 패널이 닫힌다
   await expect(page.getByTestId("artifact-panel")).toHaveCount(0);
   expect(await page.evaluate(() => (window as Window & { __sameDocument?: boolean }).__sameDocument),
     "대화를 옮길 때 화면을 새로 읽었다").toBe(true);
+});
+
+test("폴더 이름이 같은 결과물은 답 아래 줄과 패널 머리가 같은 이름을 보인다", async ({ page }) => {
+  const rows = await sendProbe(page, ARTIFACT_SAME_NAME_PROBE, 2);
+  // 줄 순서는 Control Plane 이 정하므로 이름만 본다.
+  await expect(rows.filter({ hasText: "가/초안" })).toHaveCount(1);
+  await expect(rows.filter({ hasText: "나/초안" })).toHaveCount(1);
+
+  for (const name of ["가/초안", "나/초안"]) {
+    await rows.filter({ hasText: name }).getByRole("button").click();
+    const panel = page.getByTestId("artifact-panel");
+    await expect(panel.getByRole("heading")).toHaveText(name);
+    await panel.getByRole("button", { name: "결과물 닫기" }).click();
+    await expect(panel).toHaveCount(0);
+  }
 });

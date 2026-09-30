@@ -409,6 +409,7 @@ artifact_write 도구가 있으면 그것으로 저장한다. conversation_id �
 artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.
 artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.
 HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
+이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.
 ```
 
 사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 한 줄이 늘어 입력이 조금 커지지만,
@@ -418,6 +419,17 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 도구에 넘길 공개 UUID 를 같은 대화에서 가져온다.
 `ChatService` 의 일반 실행과 흐름 실행, `ResearchAndBuildFlow` 의 하위 실행이 같은 단락을 받는다.
 사용자 메시지의 저장 본문에는 이 단락을 넣지 않는다.
+
+**답에 적힌 폴더 경로를 Control Plane 이 고치지 않는다.**
+단락이 경로를 답에 쓰지 말라고 이르고, 그래도 적힌 경로는 그대로 저장하고 보인다.
+turn 이 끝날 때 답 본문의 폴더 절대 경로를 결과물 열기 링크나 파일 이름으로 바꾸는 방안을 검토했고 하지 않았다.
+
+- 답은 흘러나오는 동안 이미 화면에 보인다. 끝난 뒤에 바꾸면 사용자가 본 글과 저장된 글이 달라진다.
+  저장은 실행 결과로 한다는 [ADR-008](adr/ADR-008-스트리밍은-보여주기용이고-저장은-실행-결과로-한다.md) 과도 어긋난다
+- 운영에서 답에 적힌 경로의 절반은 에이전트 작업 공간의 상대 경로였다. 결과물 폴더가 아니어서 바꿀 대상을 찾지 못한다
+- 에이전트의 스킬과 스크립트가 경로를 출력하지 않게 고치는 것이 먼저다. 그쪽은 에이전트 저장소가 맡는다
+
+단락을 바꾼 뒤에도 답에 폴더 경로가 계속 적히면 다시 검토한다.
 
 ### MCP 로 쓰는 자리
 
@@ -487,8 +499,25 @@ HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 | `X-Content-Type-Options` | `nosniff` |
 | `Content-Security-Policy` | `sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'` |
 | `Cache-Control` | `private, no-cache` |
+| `ETag` | `W/"{바이트 수 16진수}-{마지막 수정 시각 밀리초 16진수}"`. 약한 검증자다 |
+| `Last-Modified` | 파일의 마지막 수정 시각 |
 
 web 의 서버 라우트는 이 머리글을 그대로 옮긴다. 옮기지 않으면 주소를 직접 열었을 때 스크립트가 돈다.
+
+**다시 열 때는 304 로 끝낸다.** `no-cache` 는 저장하지 말라는 뜻이 아니라 쓰기 전에 매번 확인하라는 뜻이다.
+브라우저가 `If-None-Match` 나 `If-Modified-Since` 를 보내면 파일이 그대로일 때 본문 없이 304 로 답한다.
+에이전트가 같은 경로의 HTML 을 고치면 바이트 수나 수정 시각이 바뀌어 다음 열기에 새 본문을 받는다.
+
+- 주인 확인과 경로 판정을 먼저 한다. 남의 대화에 맞는 `ETag` 를 보내도 304 가 아니라 `CONVERSATION_NOT_FOUND` 다
+- `If-None-Match` 가 있으면 그것만 본다. `*` 이거나 목록의 값 하나가 `W/` 를 뗀 채 같으면 304 다
+- `If-None-Match` 가 없고 `If-Modified-Since` 가 있으면 초 단위로 견준다. 수정 시각이 그 시각보다 늦지 않으면 304 다
+- 304 에도 위 표의 머리글을 모두 붙인다. `Content-Type` 과 `Content-Length` 는 뺀다
+- 304 로 답할 때는 파일을 열지 않는다
+
+web 의 서버 라우트는 브라우저의 `If-None-Match` 와 `If-Modified-Since` 를 Control Plane 에 옮기고,
+응답의 `ETag` 와 `Last-Modified` 를 브라우저로 옮기고, 304 를 오류로 바꾸지 않고 본문 없이 그대로 돌려준다.
+
+2026-09-29 운영에서 원본 해상도 사진 12장, 약 28MB 가 든 결과물을 네 번 열 때마다 모두 200 으로 전체를 다시 받았다.
 
 ### 메시지 한 줄의 `artifacts`
 
@@ -706,7 +735,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | --- | --- | --- |
 | `started` | 실행 줄을 만든 직후 | `conversationId`, `executionId` |
 | `delta` | 답 조각 | `text` |
-| `tool` | 도구가 시작되거나 끝났다 | `toolName`, `detail`, `phase`, `durationMs`, `failed` |
+| `tool` | 도구가 시작되거나 끝났다 | `toolName`, `detail`, `phase`, `durationMs`, `failed`. `detail` 은 아래 「도구 `detail` 을 싣는 대상」 을 따른다 |
 | `subagent` | 하위 에이전트가 시작되거나 끝났다 | `subagentId`, `goal`, `model`, `phase`, `inputTokens`, `outputTokens`, `durationMs`, `failed` |
 | `step` | 흐름의 단계가 시작되거나 끝났다 | `stepName`, `stepState` |
 | `reset` | 지금까지 흘린 조각을 지우라. provider 를 넘기던 때만 보냈고 지금은 보내지 않는다. 화면은 아직 받는 쪽을 갖고 있다 | |
@@ -720,6 +749,27 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 **`started` 는 흐름으로 도는 turn 에서도 뿌리 실행의 번호를 싣는다.**
 중지는 뿌리 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다.
 화면은 마지막으로 받은 `started` 의 번호를 쓴다.
+
+#### 도구 `detail` 을 싣는 대상
+
+**도구의 명령 원문은 `ADMIN` 역할에게만 보낸다.** 근거는 [ADR-038](adr/ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md) 에 있다.
+저장은 그대로 하고 응답을 만들 때 뺀다.
+
+| 받는 사람 | 도구 | `detail` |
+| --- | --- | --- |
+| `ADMIN` 역할 | 모든 도구 | 저장된 값 |
+| `MEMBER` 역할 | `web_search`, `vision_analyze` | 저장된 값 |
+| `MEMBER` 역할 | 그 밖의 도구 | `null` |
+
+두 경로가 같은 판정을 쓴다. `usage/application` 의 `ToolDetailPolicy` 가 판정을 갖는다.
+
+| 경로 | 판정하는 자리 |
+| --- | --- |
+| 대화 스트림의 `tool` 사건 | `ChatController` 가 `ChatService` 에 넘기는 사건 소비자 |
+| `GET /api/v1/usage/executions/{id}/tree` 의 `TOOL_STARTED`, `TOOL_COMPLETED` 사건 | `ExecutionTreeService` 가 `ExecutionEventView` 를 만들 때 |
+
+도구 사건이 아닌 사건의 `detail` 은 모두에게 싣는다. 하위 에이전트의 목표, 실패 코드, 넘어간 모델 이름이다.
+판정은 도구 이름 전체로 한다. `mcp__{서버}__web_search` 처럼 다른 MCP 서버가 같은 이름을 붙인 도구는 공개하지 않는다.
 
 ### 중지
 

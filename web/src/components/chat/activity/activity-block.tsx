@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { formatElapsed } from "@/lib/format";
 import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
 import { ActivityTimeline } from "./activity-timeline";
-import { fromTree, type ActivityItem, type ActivityState } from "./activity-state";
+import { activityLabel, fromTree, type ActivityItem, type ActivityState } from "./activity-state";
+
+/** 맨 아래에서 이 값(px) 안이면 사용자가 맨 아래를 보고 있는 것으로 본다. */
+const BOTTOM_TOLERANCE_PX = 16;
 
 type Props =
   | { mode: "live"; state: ActivityState; slow: boolean; expanded: boolean;
@@ -20,6 +23,8 @@ export function ActivityBlock(props: Props) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadVersion, setLoadVersion] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
 
   useEffect(() => {
     if (props.mode !== "live" || props.state.endedAt !== null) return;
@@ -50,7 +55,7 @@ export function ActivityBlock(props: Props) {
     ? props.state.items.findLast((item) => item.state === "running") : null;
   const title = live
     ? props.state.endedAt === null
-      ? `작업 과정${latest ? ` · ${latest.name}` : ""} · ${formatElapsed(now - props.state.startedAt)}`
+      ? `작업 과정${latest ? ` · ${activityLabel(latest)}` : ""} · ${formatElapsed(now - props.state.startedAt)}`
       : ["작업 과정", `도구 ${props.state.items.filter((item) => item.kind === "tool").length}`,
         `하위 에이전트 ${props.state.items.filter((item) => item.kind === "subagent").length}`,
         formatElapsed(props.state.endedAt - props.state.startedAt)].join(" · ")
@@ -59,6 +64,16 @@ export function ActivityBlock(props: Props) {
       props.summary.durationMs === null ? null : formatElapsed(props.summary.durationMs)]
       .filter(Boolean).join(" · ");
   const items = live ? props.state.items : savedItems;
+  const following = props.mode === "live" && props.state.endedAt === null;
+
+  // 도는 중이고 사용자가 맨 아래를 보고 있을 때만 새 줄을 따라간다. 끝난 답은 맨 위부터 보인다.
+  useLayoutEffect(() => {
+    // 접으면 스크롤 상자가 사라진다. 다시 펼친 새 상자는 맨 위에서 시작하므로 맨 아래를 보는 것으로 되돌린다.
+    if (!expanded) atBottomRef.current = true;
+    const box = scrollRef.current;
+    if (!following || !expanded || !box || !atBottomRef.current) return;
+    box.scrollTop = box.scrollHeight;
+  }, [following, expanded, items?.length]);
 
   return (
     <div data-testid="activity-block" data-mode={props.mode}
@@ -78,7 +93,16 @@ export function ActivityBlock(props: Props) {
       ) : null}
       {expanded ? (
         <div className="min-w-0 border-t border-border px-3 py-2">
-          {items ? <ActivityTimeline items={items} /> : loadFailed ? (
+          {items ? (
+            <div ref={scrollRef} data-testid="activity-scroll"
+              className="max-h-64 overflow-y-auto overscroll-contain"
+              onScroll={(event) => {
+                const box = event.currentTarget;
+                atBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight <= BOTTOM_TOLERANCE_PX;
+              }}>
+              <ActivityTimeline items={items} />
+            </div>
+          ) : loadFailed ? (
             <p data-testid="activity-load-error" className="text-xs text-muted-foreground">
               작업 과정을 읽지 못했어요
               <button type="button" className="ml-2 underline" onClick={() => {

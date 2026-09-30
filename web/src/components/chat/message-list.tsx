@@ -30,7 +30,7 @@ type Props = {
   /** 마지막 답 끝의 질문에 답한다. 고른 답을 글로 만들어 다음 메시지로 보낸다 */
   onAnswer?(text: string): void;
   /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
-  onOpenArtifact(messageId: Turn["id"], path: string): void;
+  onOpenArtifact(messageId: Turn["id"], path: string, name: string): void;
 };
 
 export function MessageList({

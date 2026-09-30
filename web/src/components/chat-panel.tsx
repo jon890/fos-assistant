@@ -27,7 +27,7 @@ type ErrorPayload = { code: string; message: string };
 /** 옆 패널에 띄운 것이다. 작업 과정이거나, 답이 만든 결과물 파일 하나다 */
 type SidePanelTarget =
   | { kind: "activity"; target: ActivityPanelTarget }
-  | { kind: "artifact"; messageId: Turn["id"]; path: string };
+  | { kind: "artifact"; messageId: Turn["id"]; path: string; name: string };
 /** 대화에 지금 도는 turn 이다. 실행 번호가 아직 붙지 않았으면 `running` 이 참이어도 나머지가 null 이다. */
 type RunningTurn = { running: boolean; executionId: number | null; startedAt: string | null };
 /**
@@ -1002,7 +1002,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           onOpenLive={() => {
             if (activity) setPanelTarget({ kind: "activity", target: { mode: "live", state: activity } });
           }}
-          onOpenArtifact={(messageId, path) => setPanelTarget({ kind: "artifact", messageId, path })}
+          onOpenArtifact={(messageId, path, name) => setPanelTarget({ kind: "artifact", messageId, path, name })}
           selectedVersions={selectedVersions}
           onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
           onRegenerate={() => { void regenerate(); }}
@@ -1074,7 +1074,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       {panelTarget?.kind === "activity" ? <ActivityPanel target={panelTarget.target.mode === "live" && activity
         ? { mode: "live", state: activity } : panelTarget.target} onClose={() => setPanelTarget(null)} /> : null}
       {panelTarget?.kind === "artifact" && conversationId !== null ? <ArtifactPanel key={panelTarget.path}
-        conversationId={conversationId} path={panelTarget.path} onClose={() => setPanelTarget(null)} /> : null}
+        conversationId={conversationId} path={panelTarget.path} name={panelTarget.name} onClose={() => setPanelTarget(null)} /> : null}
     </section>
   );
 }
