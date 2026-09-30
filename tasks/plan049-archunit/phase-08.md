@@ -70,7 +70,7 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 
 - `spawnSync("bash", [scripts/quality.sh])` 가 인자 없이 2 로 끝나고 표준 오류에 `check` 와 `fix` 가 든 사용법이 나온다. 모르는 인자(`lint`)도 같다
 - 두 스크립트 파일에 실행 권한이 있거나(`quality.sh`) Node 로 부를 수 있다(`quality-report.mjs`)
-- `quality-report.mjs` 에 저장소 밖 임시 디렉터리의 Checkstyle XML(경고 하나, error 하나)과 eslint JSON(경고 하나, error 하나)을 넘긴다. 경고 목록에는 경고 둘만 나오고 error 는 섞이지 않는다. eslint error 는 「실패한 위반」 절에 나온다 입력 경로를 인자나 환경 변수로 바꿀 수 있게 만든다
+- `quality-report.mjs` 에 저장소 밖 임시 디렉터리의 Checkstyle XML(경고 하나, error 하나)과 eslint JSON(경고 하나, error 하나)을 넘긴다. 경고 목록에는 경고 둘만 나오고 error 는 섞이지 않는다. eslint error 는 「실패한 위반」 절에 나온다. 입력 경로를 인자나 환경 변수로 바꿀 수 있게 만든다
 - Gradle 과 pnpm 을 부르는 경로는 작업 항목 7 이 실제 명령으로 확인한다. 그 경로는 느리고 설치된 도구에 걸려 단위 테스트에 두지 않는다
 
 ### 5. `.github/workflows/ci.yml` 에 `quality` job
