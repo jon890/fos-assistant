@@ -93,3 +93,10 @@ node test/e2e/run.ts
 | `backend/src/test/java/com/bifos/assistant/chat/ChatServiceTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/skills.ts` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/domain/SkillUseCount.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/skill/domain/SkillUseOccurrence.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/skill/application/SkillListItem.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/usage/UsageBreakdownTest.java` | 수정 |
+| `test/e2e/scenarios/usage-cost.ts` | 수정 |
