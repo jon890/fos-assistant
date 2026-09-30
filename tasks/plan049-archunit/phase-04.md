@@ -22,10 +22,11 @@ Java 포맷을 Spotless 설정으로 정하고, `origin/main` 에서 바뀐 파�
 
 ## 의도 메모
 
+- **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. ratchet 은 합친 코드와 `origin/main` 의 공통 조상을 비교한다
 - `ratchetFrom` 은 사용자가 고른 방식이다. 저장소 전체를 한 번에 포맷하지 않는다
 - 포매터가 import 순서와 쓰지 않는 import 도 정리한다. `removeUnusedImports()` 를 따로 걸지 않는다(palantir 가 한다). 실제로 그런지 작업 항목 3 에서 본다
 - Javadoc 본문 포맷은 켜지 않는다(`formatJavadoc(false)`, 기본값). 한국어 Javadoc 의 줄바꿈을 바꾸지 않는다
-- `ratchetFrom` 의 기준이 `origin/main` 의 끝인지 두 브랜치의 공통 조상인지를 이 phase 에서 확인하고 문서에 적는다. 끝이라면, 로컬 `origin/main` 이 앞서 나갔을 때 이 브랜치가 고치지 않은 파일이 잡힐 수 있다. 그때 할 일(`origin/main` 을 합친다)을 적는다
+- Spotless 8.10.3 이 쓰는 spotless-lib-extra 의 `GitRatchet` 은 `RevFilter.MERGE_BASE` 로 **`HEAD` 와 `origin/main` 의 공통 조상**과 작업 트리를 비교하고, `commondir` 로 linked worktree 를 연다(critic 이 소스로 확인했다). 그래서 로컬 `origin/main` 이 앞서 나가도 이 브랜치가 고치지 않은 파일은 잡히지 않는다. 다만 `git fetch` 를 오래 하지 않아 공통 조상이 옛 커밋이면 그 뒤 main 에 들어온 파일은 비교 대상이 아니다
 
 ## Blocked 조건
 
@@ -71,14 +72,13 @@ Java 포맷을 Spotless 설정으로 정하고, `origin/main` 에서 바뀐 파�
 - 이 브랜치에서 이미 바뀐 Java 파일 하나의 들여쓰기를 일부러 흐트러뜨린다. `./gradlew spotlessCheck` 가 실패하고 `./gradlew spotlessApply` 가 되돌리는지 본다
 - 이 브랜치가 바꾸지 않은 Java 파일 하나에 쓰지 않는 import 한 줄과 흐트러진 들여쓰기를 넣는다. `spotlessCheck` 가 그 파일을 잡고 `spotlessApply` 가 **그 파일 전체**를 포맷하는지 본다. 그 뒤 `git checkout -- <그 파일>` 로 되돌린다
 - 바꾸지 않은 파일은 120자를 넘는 줄이 있어도 `spotlessCheck` 가 잡지 않는지 본다
-- `ratchetFrom` 의 기준이 끝인지 공통 조상인지 확인한다. 예: 저장소 밖 임시 clone 에서 `origin/main` 을 앞으로 옮긴 뒤 결과를 본다
 
 ### 4. `backend/AGENTS.md` 에 「포맷」 절을 더한다
 
 - 도구, 포매터, 버전, 들여쓰기 4칸과 120자
 - `ratchetFrom("origin/main")` 이라 바뀐 파일만 검사하고, 파일을 처음 고치면 그 파일 전체가 포맷된다는 것
 - **기능 변경과 포맷을 다른 커밋으로 나눈다.** 먼저 기능을 고치고 커밋한 뒤 `./gradlew spotlessApply` 결과를 따로 커밋한다
-- 로컬 `origin/main` 이 오래되면 결과가 달라진다. `git fetch origin` 뒤에 돌린다. 작업 항목 3 에서 확인한 기준(끝 또는 공통 조상)에 따라 할 일을 적는다
+- 비교 기준은 `HEAD` 와 `origin/main` 의 공통 조상이다. `git fetch origin` 뒤에 돌린다
 - 한글 한 글자를 한 칸으로 센다는 것
 - 명령 `./gradlew spotlessCheck`, `./gradlew spotlessApply`
 

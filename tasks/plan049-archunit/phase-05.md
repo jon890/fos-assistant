@@ -24,6 +24,7 @@ backend 의 품질 검사를 Gradle 태스크 `qualityCheck` 하나로 묶는다
 
 ## 의도 메모
 
+- **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. 합친 뒤 들어온 한국어 테스트 이름과 새 위반이 있으면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그런 변경이 있으면 회신에 파일 목록을 적는다
 - 코디네이터가 2026-09-30 에 eslint 설치와 bulk suppressions 방식을 정했다. 넣은 규칙 묶음, 기준에 든 위반 수, 기준 갱신 방법을 `web/AGENTS.md` 와 PR 본문에 적는다
 - `check` 는 파일을 바꾸지 않는다. 종료 코드로 알린다. backend 와 web 을 모두 돌린 뒤 하나라도 실패했으면 0 이 아닌 값으로 끝난다
 - `fix` 는 사람이 판단하지 않아도 되는 것만 고친다. Spotless 포맷, `eslint --fix`, 고친 위반을 기준에서 빼기(ArchUnit 기준 줄이기, `eslint --prune-suppressions`)다. 새 위반을 기준에 더하지 않는다. 고친 뒤 `check` 를 돌려 남은 위반을 「사람이 판단할 위반」 으로 보인다
@@ -60,9 +61,10 @@ backend 의 품질 검사를 Gradle 태스크 `qualityCheck` 하나로 묶는다
   2. `(cd web && pnpm lint)`
   3. 둘 다 돌린 뒤 결과를 한 줄씩 요약하고, 하나라도 실패했으면 1 로 끝난다
 - `fix`
-  1. `(cd backend && ./gradlew spotlessApply archTest -Parchunit.freeze.store.default.allowStoreUpdate=true)`
-  2. `(cd web && pnpm exec eslint --fix && pnpm exec eslint --prune-suppressions)`
-  3. `check` 를 돌린다. 실패하면 「사람이 판단할 위반」 이라고 알리고 그 종료 코드로 끝난다
+  1. `(cd backend && ./gradlew spotlessApply archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true)`
+  2. `(cd web && pnpm exec eslint --fix --prune-suppressions)`. ESLint 9.39.5 는 쓰지 않는 기준 항목이 남으면 2 를 돌려주므로 두 명령을 `&&` 로 잇지 않고 한 번에 준다
+  3. 1, 2 단계의 종료 코드는 받아 두기만 하고 멈추지 않는다(`set -e` 아래에서 `|| status=$?` 처럼 받는다). 고칠 수 없는 새 위반이 있어도 3 단계까지 가야 한다
+  4. `check` 를 돌린다. 실패하면 「사람이 판단할 위반」 이라고 알리고 그 종료 코드로 끝난다
 - 주석과 출력 문구는 한국어로 쓴다
 
 ### 4. `test/unit/quality-script.test.ts` (신규)
@@ -81,13 +83,13 @@ Gradle 과 pnpm 을 부르는 경로는 작업 항목 7 이 실제 명령으로 
 - `actions/checkout` 은 다른 job 과 같은 고정 SHA 에 `persist-credentials: false`, `fetch-depth: 0`. 그 위에 한국어 주석으로 ratchet 이 `origin/main` 이력을 쓴다고 적는다
 - `setup-java`(temurin 21), `setup-gradle`, `pnpm/action-setup`(10.22.0, `package_json_file: web/package.json`), `setup-node`(22.18.0, pnpm 캐시)를 다른 job 과 같은 SHA 로 쓴다
 - `cd web && pnpm install --frozen-lockfile` 뒤에 `scripts/quality.sh check`
-- PR 의 merge ref 에서 `origin/main` 이 있는지 확인한다. `actions/checkout` 이 `fetch-depth: 0` 이면 원격 브랜치를 모두 받는다
+- `actions/checkout` 이 `fetch-depth: 0` 이면 원격 브랜치를 모두 받아 `origin/main` 이 생긴다. merge ref 에서 실제로 도는지는 PR 을 연 뒤 team-lead 가 확인한다. 회신의 「미검증」 에 적는다
 
 ### 6. 문서
 
 - `AGENTS.md` 「확인」 의 명령 목록 끝에 `scripts/quality.sh check` 를 더한다. 「위 여섯 검사」 를 새 개수로 고치고, 「머지는 PR 로 한다」 의 CI job 목록에 `quality` 를 더한다. `quality.sh fix` 가 무엇을 고치는지 한 줄 적고 자세한 것은 `backend/AGENTS.md` 와 `web/AGENTS.md` 를 가리킨다
-- `backend/AGENTS.md`: 「구조 규칙」, 「코드 규칙」, 「포맷」 절 앞에 한 절을 두어 `./gradlew qualityCheck` 가 셋을 묶는다는 것과 `scripts/quality.sh` 를 가리킨다
-- `web/AGENTS.md` 에 「lint」 절: 도구와 버전, 규칙 묶음(`core-web-vitals`, `typescript`), 기준 파일, 갱신 방법(고치면 `pnpm exec eslint --prune-suppressions`, 새 위반은 고친다, 꼭 받아들여야 하면 `--suppress-rule <규칙>` 과 까닭), `fix` 가 하는 일, Prettier 를 쓰지 않는다는 것
+- `backend/AGENTS.md`: 「구조 규칙」, 「코드 규칙」, 「포맷」 절 앞에 한 절을 두어 `./gradlew qualityCheck` 가 셋을 묶는다는 것과 `scripts/quality.sh` 를 가리킨다. 기준에 든 위반은 줄여 갈 목록이고 기준마다 GitHub 이슈가 있다는 것을 적는다
+- `web/AGENTS.md` 에 「lint」 절: 도구와 버전, 규칙 묶음(`core-web-vitals`, `typescript`), 기준 파일, 갱신 방법(고치면 `pnpm exec eslint --prune-suppressions`, 새 위반은 고친다, 꼭 받아들여야 하면 `--suppress-rule <규칙>` 과 까닭), `fix` 가 하는 일, Prettier 를 쓰지 않는다는 것, 기준에 든 위반은 줄여 갈 목록이고 GitHub 이슈가 있다는 것
 
 ### 7. 동작을 확인한다
 

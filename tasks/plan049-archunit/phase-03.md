@@ -25,6 +25,7 @@
 
 ## 의도 메모
 
+- **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`. 기준은 합친 코드로 만든다
 넣는 규칙과 까닭이다.
 
 | 규칙 | 까닭 |
@@ -47,6 +48,7 @@
 | `DesignForExtension` | Spring 빈과 싸운다 |
 
 - 설계상 예외와 기존 위반을 **다른 파일**에 둔다. 설계상 예외는 앞으로도 허용하는 것이고, 기존 위반은 고쳐서 줄일 목록이다
+- 기준에 든 위반은 줄여 갈 목록이다. 기준마다 GitHub 이슈가 있다(team-lead 가 PR 전에 연다)
 - 기존 위반 기준은 `(파일, 규칙)` 단위다. 줄 번호로 두면 파일을 고칠 때마다 기준이 어긋난다. 그 파일의 같은 규칙 위반은 새로 생겨도 잡지 못한다. 그 한계를 `backend/AGENTS.md` 에 적는다
 
 ## 작업 항목
@@ -67,12 +69,12 @@
 
 ### 3. `backend/config/checkstyle/suppressions.xml` (신규)
 
-- `db/migration/V\d+__\w+\.java` 에 `TypeName` 을 끈다. Flyway 가 이 이름을 요구한다
+- `db/migration/V\d+__\w+\.java` 에 `TypeName` 을 끈다(`checks="(^|\.)TypeName(Check)?$"`). Flyway 가 이 이름을 요구한다
 
 ### 4. `backend/config/checkstyle/baseline.xml` (신규)
 
 - `baseline.xml` 을 빈 `<suppressions/>` 로 두고 `isIgnoreFailures = true` 로 잠시 돌린다. XML 보고서(`backend/build/reports/checkstyle/main.xml`, `test.xml`)에서 `(파일, 규칙)` 을 뽑는다. 뽑은 뒤 `isIgnoreFailures` 를 `false` 로 되돌린다
-- 한 줄에 하나씩 `<suppress checks="<규칙 이름>" files="<src 아래 상대 경로를 정규식으로>"/>`. 경로 구분자는 `[\\/]` 로 쓴다. 파일 경로 순으로 정렬한다
+- 한 줄에 하나씩 `<suppress checks="(^|\.)<규칙 이름>(Check)?$" files="<src 아래 상대 경로를 정규식으로>"/>`. Checkstyle 은 `checks` 를 검사 이름에 정규식 find 로 맞추므로 끝을 고정하지 않으면 `ParameterName` 이 `LambdaParameterName` 까지 억제한다. 경로 구분자는 `[\\/]` 로 쓴다. 파일 경로 순으로 정렬한다
 - 보고서를 뽑고 기준을 만드는 스크립트는 저장소 밖에 둔다. 갱신 방법은 문서에 명령으로 적는다(작업 항목 5)
 - 기준에 든 `(파일, 규칙)` 수와 위반 수를 센다. 보고와 PR 본문에 쓴다
 
