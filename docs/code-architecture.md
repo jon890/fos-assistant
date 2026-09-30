@@ -677,13 +677,14 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 
 | 자리 | 맡는 것 |
 | --- | --- |
-| `orchestration.application.AgentDelegationService` | 위임 실행이 끝나면 `run()` 의 `finally` 에서 `DelegationFinished(conversationId)` 사건을 낸다. `chat` 을 직접 부르지 않는다 |
-| `chat.application.DelegationWakeService` | 사건과 turn 종료를 받아 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 기동할 때 전하지 않은 결과가 있는 대화를 한 번 훑는다 |
+| `orchestration.application.AgentDelegationService` | 위임 실행이 끝나면 `run()` 의 `finally` 에서 `DelegationFinished(conversationId, executionId)` 사건을 낸다. `chat` 을 직접 부르지 않는다 |
+| `chat.application.DelegationWakeService` | 사건과 turn 종료를 받아 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 기동할 때 전하지 않은 결과가 있는 대화를 한 번 훑는다. `OrphanedExecutionSweeper` 보다 뒤에 돈다 |
+| `chat.application.DelegationWakeProperties` | `assistant.delegation-wake.enabled`, `max-auto-turns`. 테스트 profile 은 끈다. 같은 H2 와 대역 Hermes 를 쓰는 다른 검사에서 자동 turn 이 열리지 않게 하기 위해서다 |
 | `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
 | `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(깨우기 서비스)를 부른다 |
 | `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 자동 turn 의 사건을 모든 구독에 보낸다 |
-| `chat.presentation.ChatController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다 |
-| `mcp.application.McpToolService` | `agent_status` 와 `agent_stop` 이 끝난 상태를 돌려주면 `result_delivered_at` 을 적는다 |
+| `chat.presentation.ConversationEventController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다. 보내기 전에 `forViewer` 를 적용한다(ADR-038) |
+| `mcp.application.McpToolService` | `agent_status` 와 `agent_stop` 이 끝난 상태를 돌려주면 `result_delivered_at` 을 적는다. `agent_delegate` 가 줄을 만든 뒤 `SUBMIT_FAILED` 를 돌려줄 때도 위임 서비스가 적는다 |
 | 웹 `app/api/chat/conversations/[conversationId]/events/route.ts` | 대화 단위 SSE 를 그대로 넘긴다 |
 | 웹 `components/chat-panel.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다 |
 
@@ -692,6 +693,8 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 깨울지는 대화별 JVM 잠금(`TurnCancellation.open`) 을 잡을 수 있는지로 정한다.
 잡지 못하면 그 turn 이 닫힐 때 다시 확인하므로 결과를 잃지 않는다.
 전한 결과는 `result_delivered_at` 으로, 연속 횟수는 `conversation.auto_turn_count` 로 DB 에 남긴다.
+`SYSTEM` 줄 저장과 `result_delivered_at` 기록과 횟수 증가는 한 트랜잭션이다. 그 뒤 turn 이 실패해도 같은 결과로 다시 깨우지 않는다.
+잠금을 잡은 뒤 결과를 다시 읽고, 흐름 대화와 꺼진 에이전트는 잠금을 잡기 전에 거른다. 잡은 뒤 빈손으로 닫으면 닫기 리스너가 곧바로 다시 부른다.
 
 ### 깊이와 동시 한도
 

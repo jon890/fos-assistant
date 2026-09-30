@@ -1430,7 +1430,7 @@ sequenceDiagram
 | 부모가 그 turn 안에서 `agent_status` 나 `agent_stop` 으로 끝난 결과를 이미 받았다 | 전한 것으로 적혀 있어 깨우지 않는다 |
 | 자식이 `CANCELLED` 로 끝났다 | 깨우지 않는다. 사용자가 turn 을 멈췄거나 부모가 `agent_stop` 으로 멈춘 것이다 |
 | 자식이 맡긴 손자 실행이 끝났다 | 깨우지 않는다. 그 결과는 자식이 `agent_status` 로 읽는다 |
-| 자동 turn 이 사용자 질문 뒤로 10번(`assistant.delegation.wake-max-auto-turns`)에 닿았다 | 열지 않고 「자동으로 이어 가는 횟수를 넘었어요」 알림 줄만 남긴다. 결과는 전하지 않은 채 남아, 사용자가 다음 질문을 보내면 그 turn 이 끝난 뒤 전한다 |
+| 자동 turn 이 사용자 질문 뒤로 10번(`assistant.delegation-wake.max-auto-turns`)에 닿았다 | 열지 않고 「자동으로 이어 가는 횟수를 넘었어요」 알림 줄만 남긴다. 결과는 전하지 않은 채 남아, 사용자가 다음 질문을 보내면 그 turn 이 끝난 뒤 전한다 |
 | 사용자가 새 질문을 보낸다 | 보통 turn 으로 돈다. 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다. 자동 turn 이 도는 중이면 지금처럼 `CONVERSATION_BUSY` 다 |
 | 자동 turn 을 사용자가 중지한다 | 보통 turn 의 중지와 같다. 넣었던 결과는 전한 것으로 남는다 |
 | 대화가 지워졌거나 에이전트가 꺼졌거나 지워졌다 | 열지 않는다. 결과는 실행 줄에 그대로 남는다 |
