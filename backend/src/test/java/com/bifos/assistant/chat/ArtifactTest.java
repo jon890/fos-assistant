@@ -61,7 +61,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -135,7 +137,7 @@ class ArtifactTest {
     private Path root;
 
     @BeforeEach
-    void 준비한다() throws IOException {
+    void setUp() throws IOException {
         stub().reset();
         stub().willReturn(completed("run-1", "만들었어요"));
         artifactRows.deleteAll();
@@ -152,7 +154,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 스트림_turn_이_도는_사이_쓴_HTML_하나만_답에_묶이고_사진과_CSS_는_묶이지_않는다() throws Exception {
+    @DisplayName("스트림 turn 이 도는 사이 쓴 HTML 하나만 답에 묶이고 사진과 CSS 는 묶이지 않는다")
+    void bindsOnlyOneHtmlWrittenDuringStreamTurnNotImagesOrCss() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         stub().beforeAwait(() -> {
             writeDuringTurn(conversation.id(), "a/index.html", HTML);
@@ -170,7 +173,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 스트림이_아닌_보내기로_돈_turn_이_쓴_파일도_그_답에_묶인다() throws Exception {
+    @DisplayName("스트림이 아닌 보내기로 돈 turn 이 쓴 파일도 그 답에 묶인다")
+    void bindsFilesWrittenByNonStreamSendToItsReply() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
 
@@ -182,7 +186,8 @@ class ArtifactTest {
     }
 
     @Test
-    void Hermes_로_간_입력은_결과물_폴더_단락으로_시작하고_사용자가_쓴_글로_끝난다() {
+    @DisplayName("Hermes 로 간 입력은 결과물 폴더 단락으로 시작하고 사용자가 쓴 글로 끝난다")
+    void hermesInputStartsWithOutputFolderParagraphAndEndsWithUserText() {
         Conversation conversation = chat.startEmpty(dad, "dad");
 
         chat.send(dad, conversation.id(), "안녕", null);
@@ -201,7 +206,8 @@ class ArtifactTest {
     }
 
     @Test
-    void Hermes_로_간_입력에_스킬_관리_단락이_들어_있다() {
+    @DisplayName("Hermes 로 간 입력에 스킬 관리 단락이 들어 있다")
+    void hermesInputContainsSkillManagementParagraph() {
         Conversation conversation = chat.startEmpty(dad, "dad");
 
         chat.send(dad, conversation.id(), "안녕", null);
@@ -212,7 +218,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 흐름_turn_의_하위_실행으로_간_입력에도_스킬_관리_단락이_들어_있다() {
+    @DisplayName("흐름 turn 의 하위 실행으로 간 입력에도 스킬 관리 단락이 들어 있다")
+    void flowChildRunInputContainsSkillManagementParagraph() {
         CurrentUser mom = member("artifact-mom@example.com");
         agentOf(mom, "flow-mom", ResearchAndBuildFlow.NAME);
         stub().willAnswer(command -> command.input().contains(CHIEF_MARK)
@@ -229,7 +236,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 흐름_turn_의_하위_실행으로_간_입력은_모두_결과물_폴더_단락으로_시작한다() {
+    @DisplayName("흐름 turn 의 하위 실행으로 간 입력은 모두 결과물 폴더 단락으로 시작한다")
+    void flowChildRunInputsAllStartWithOutputFolderParagraph() {
         CurrentUser mom = member("artifact-mom@example.com");
         agentOf(mom, "flow-mom", ResearchAndBuildFlow.NAME);
         stub().willAnswer(command -> command.input().contains(CHIEF_MARK)
@@ -250,7 +258,8 @@ class ArtifactTest {
     }
 
     @Test
-    void turn_이_시작하기_전에_있던_HTML_은_묶이지_않는다() throws Exception {
+    @DisplayName("turn 이 시작하기 전에 있던 HTML 은 묶이지 않는다")
+    void doesNotBindHtmlThatExistedBeforeTurnStarted() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "old.html", HTML, Instant.now().minus(Duration.ofMinutes(5)));
         stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "new.html", HTML));
@@ -261,7 +270,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 같은_파일을_다음_turn_이_다시_고치면_두_답에_각각_한_행이_생긴다() throws Exception {
+    @DisplayName("같은 파일을 다음 turn 이 다시 고치면 두 답에 각각 한 행이 생긴다")
+    void editingSameFileInNextTurnCreatesOneRowPerReply() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
 
@@ -278,7 +288,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 답_메시지가_없는_turn_은_폴더에_HTML_이_있어도_묶지_않는다() throws Exception {
+    @DisplayName("답 메시지가 없는 turn 은 폴더에 HTML 이 있어도 묶지 않는다")
+    void doesNotBindHtmlForTurnWithoutReplyMessage() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
 
@@ -288,7 +299,8 @@ class ArtifactTest {
     }
 
     @Test
-    void HTML_은_200_이고_스크립트를_막는_머리글이_붙는다() throws Exception {
+    @DisplayName("HTML 은 200 이고 스크립트를 막는 머리글이 붙는다")
+    void servesHtmlWith200AndScriptBlockingHeaders() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
 
@@ -303,7 +315,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 한국어_폴더_이름의_파일도_준다() throws Exception {
+    @DisplayName("한국어 폴더 이름의 파일도 준다")
+    void servesFilesInKoreanFolderName() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "초안/index.html", HTML, Instant.now());
 
@@ -314,7 +327,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 행이_없는_사진도_폴더_안에_있으면_준다() throws Exception {
+    @DisplayName("행이 없는 사진도 폴더 안에 있으면 준다")
+    void servesImageWithoutRowIfInsideFolder() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/photo.png", "png", Instant.now());
 
@@ -326,7 +340,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 받지_않는_확장자는_파일이_있어도_ARTIFACT_NOT_FOUND_다() throws Exception {
+    @DisplayName("받지 않는 확장자는 파일이 있어도 ARTIFACT NOT FOUND 다")
+    void unacceptedExtensionIsArtifactNotFoundEvenIfFileExists() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/x.svg", "<svg><script>alert(1)</script></svg>", Instant.now());
 
@@ -337,7 +352,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 경로에_상위_폴더를_섞으면_폴더_밖_파일을_주지_않는다() throws Exception {
+    @DisplayName("경로에 상위 폴더를 섞으면 폴더 밖 파일을 주지 않는다")
+    void doesNotServeFilesOutsideFolderForPathWithParentSegments() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         store.ensureFolder(conversation.id());
         Path outside = root.resolve("other").resolve("a.html");
@@ -354,7 +370,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 상위_폴더를_가리키는_상대_경로를_직접_풀면_빈_값이다() throws Exception {
+    @DisplayName("상위 폴더를 가리키는 상대 경로를 직접 풀면 빈 값이다")
+    void resolvingRelativePathToParentDirectlyIsEmpty() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         store.ensureFolder(conversation.id());
         Path outside = root.resolve("other").resolve("a.html");
@@ -365,7 +382,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 폴더_밖을_가리키는_심볼릭_링크는_ARTIFACT_NOT_FOUND_다() throws Exception {
+    @DisplayName("폴더 밖을 가리키는 심볼릭 링크는 ARTIFACT NOT FOUND 다")
+    void symlinkPointingOutsideFolderIsArtifactNotFound() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         Path outside = root.resolve("other").resolve("secret.html");
         Files.createDirectories(outside.getParent());
@@ -382,7 +400,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 대화_폴더_자체가_다른_대화의_폴더를_가리키는_링크면_ARTIFACT_NOT_FOUND_다() throws Exception {
+    @DisplayName("대화 폴더 자체가 다른 대화의 폴더를 가리키는 링크면 ARTIFACT NOT FOUND 다")
+    void conversationFolderLinkingToOtherConversationIsArtifactNotFound() throws Exception {
         Conversation other = chat.startEmpty(dad, "dad");
         writeAt(other.id(), "a/index.html", "SECRET", Instant.now());
         Conversation conversation = chat.startEmpty(dad, "dad");
@@ -400,7 +419,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 허용된_이름의_링크가_폴더_안의_사진을_가리키면_실제_파일의_형식으로_준다() throws Exception {
+    @DisplayName("허용된 이름의 링크가 폴더 안의 사진을 가리키면 실제 파일의 형식으로 준다")
+    void linkWithAllowedNameToImageInFolderServesRealFileType() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/b.png", "png", Instant.now());
         Path folder = root.resolve(String.valueOf(conversation.id())).resolve("a");
@@ -413,7 +433,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 읽지_못하는_하위_폴더가_있어도_나머지_HTML_은_찾고_오래된_파일은_지운다() throws Exception {
+    @DisplayName("읽지 못하는 하위 폴더가 있어도 나머지 HTML 은 찾고 오래된 파일은 지운다")
+    void findsOtherHtmlAndDeletesOldFilesDespiteUnreadableSubfolder() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         Instant startedAt = Instant.now().minus(Duration.ofMinutes(1));
         writeAt(conversation.id(), "ok.html", HTML, Instant.now());
@@ -439,7 +460,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 폴더에_최근에_바뀐_파일이_있으면_그_폴더의_오래된_사진도_지우지_않는다() throws Exception {
+    @DisplayName("폴더에 최근에 바뀐 파일이 있으면 그 폴더의 오래된 사진도 지우지 않는다")
+    void keepsOldImagesInFolderWithRecentlyChangedFile() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/photo.png", "png", Instant.now().minus(Duration.ofDays(40)));
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
@@ -452,7 +474,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 남의_대화의_파일은_CONVERSATION_NOT_FOUND_다() throws Exception {
+    @DisplayName("남의 대화의 파일은 CONVERSATION NOT FOUND 다")
+    void otherUsersConversationFileIsConversationNotFound() throws Exception {
         CurrentUser kid = member("artifact-kid@example.com");
         agentOf(kid, "kid", null);
         Conversation theirs = chat.startEmpty(kid, "kid");
@@ -466,7 +489,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 파일_응답에는_약한_ETag_와_Last_Modified_가_붙는다() throws Exception {
+    @DisplayName("파일 응답에는 약한 ETag 와 Last Modified 가 붙는다")
+    void fileResponseCarriesWeakEtagAndLastModified() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
 
@@ -478,7 +502,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 받은_ETag_로_다시_물으면_본문_없이_304_이고_보호_머리글이_그대로다() throws Exception {
+    @DisplayName("받은 ETag 로 다시 물으면 본문 없이 304 이고 보호 머리글이 그대로다")
+    void revalidatingWithEtagReturns304WithoutBodyKeepingProtectiveHeaders() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
         String etag = header(file(conversation, "a/index.html"), "ETag");
@@ -494,7 +519,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 받은_Last_Modified_로_다시_물으면_304_다() throws Exception {
+    @DisplayName("받은 Last Modified 로 다시 물으면 304 다")
+    void revalidatingWithLastModifiedReturns304() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
         String modified = header(file(conversation, "a/index.html"), "Last-Modified");
@@ -506,7 +532,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 파일이_바뀐_뒤_옛_ETag_로_물으면_200_과_새_본문이다() throws Exception {
+    @DisplayName("파일이 바뀐 뒤 옛 ETag 로 물으면 200 과 새 본문이다")
+    void oldEtagAfterFileChangeReturns200WithNewBody() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         Instant first = Instant.now().minus(Duration.ofMinutes(5));
         writeAt(conversation.id(), "a/index.html", HTML, first);
@@ -521,7 +548,8 @@ class ArtifactTest {
     }
 
     @Test
-    void If_None_Match_가_있으면_If_Modified_Since_는_보지_않는다() throws Exception {
+    @DisplayName("If None Match 가 있으면 If Modified Since 는 보지 않는다")
+    void ignoresIfModifiedSinceWhenIfNoneMatchPresent() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now().minus(Duration.ofMinutes(5)));
         String future = DateTimeFormatter.RFC_1123_DATE_TIME
@@ -535,7 +563,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 다른_사용자가_맞는_ETag_를_보내도_CONVERSATION_NOT_FOUND_다() throws Exception {
+    @DisplayName("다른 사용자가 맞는 ETag 를 보내도 CONVERSATION NOT FOUND 다")
+    void otherUserWithMatchingEtagIsConversationNotFound() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
         String etag = header(file(conversation, "a/index.html"), "ETag");
@@ -549,7 +578,8 @@ class ArtifactTest {
     }
 
     @Test
-    void 보관_기간이_지나_지운_HTML_은_행에_지운_시각이_남고_410_이다() throws Exception {
+    @DisplayName("보관 기간이 지나 지운 HTML 은 행에 지운 시각이 남고 410 이다")
+    void expiredDeletedHtmlRecordsDeletionTimeAndReturns410() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
         chat.send(dad, conversation.id(), "만들어 줘", null);
@@ -708,6 +738,12 @@ class ArtifactTest {
             agent.assignFlow(flow);
         }
         agents.save(agent);
+    }
+
+    /** 링크를 만드는 테스트가 남긴 것이 저장 root 를 함께 쓰는 다른 테스트 클래스에 걸리지 않게 비운다. */
+    @AfterEach
+    void tearDown() throws IOException {
+        deleteTree(root);
     }
 
     private static void deleteTree(Path path) throws IOException {

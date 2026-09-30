@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -97,7 +98,7 @@ class ConversationPublicIdTest {
     private MockMvc mvc;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         ((StubHermesRunsClient) hermes).reset();
         ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("run-one", "session-one", "completed", "답",
                 "example-model-large", "anthropic", TokenUsage.empty()));
@@ -146,7 +147,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 새_대화는_v7_공개_식별자를_받고_목록이_같은_식별자를_낸다() throws Exception {
+    @DisplayName("새 대화는 v7 공개 식별자를 받고 목록이 같은 식별자를 낸다")
+    void newConversationGetsV7PublicIdAndListReturnsSameId() throws Exception {
         CurrentUser dad = member("public-dad");
         UUID id = started(dad);
 
@@ -157,7 +159,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 공개_식별자로_메시지를_읽고_이름을_바꾸고_지운다() throws Exception {
+    @DisplayName("공개 식별자로 메시지를 읽고 이름을 바꾸고 지운다")
+    void readsMessagesRenamesAndDeletesByPublicId() throws Exception {
         CurrentUser dad = member("public-dad");
         UUID id = started(dad);
 
@@ -181,7 +184,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 남의_대화의_공개_식별자는_없는_대화와_같다() throws Exception {
+    @DisplayName("남의 대화의 공개 식별자는 없는 대화와 같다")
+    void othersPublicIdIsSameAsMissingConversation() throws Exception {
         CurrentUser dad = member("public-dad");
         CurrentUser kid = member("public-kid");
         UUID id = started(dad);
@@ -197,7 +201,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 모양이_틀린_식별자는_입력_오류다() throws Exception {
+    @DisplayName("모양이 틀린 식별자는 입력 오류다")
+    void malformedIdIsInputError() throws Exception {
         signedIn(member("public-dad"));
 
         mvc.perform(get("/api/v1/chat/conversations/abc/messages"))
@@ -206,7 +211,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 공개_식별자로_도는_turn을_물으면_돌지_않는_대화는_running이_false이고_나머지는_null이다() throws Exception {
+    @DisplayName("공개 식별자로 도는 turn을 물으면 돌지 않는 대화는 running이 false이고 나머지는 null이다")
+    void runningQueryByPublicIdGivesFalseForIdleAndNullForRest() throws Exception {
         UUID id = started(member("public-dad"));
 
         mvc.perform(get("/api/v1/chat/conversations/{id}/running", id))
@@ -217,7 +223,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 도는_turn을_물을_때_모양이_틀린_식별자는_입력_오류다() throws Exception {
+    @DisplayName("도는 turn을 물을 때 모양이 틀린 식별자는 입력 오류다")
+    void runningQueryWithMalformedIdIsInputError() throws Exception {
         signedIn(member("public-dad"));
 
         mvc.perform(get("/api/v1/chat/conversations/abc/running"))
@@ -226,7 +233,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 옛_번호로는_주인에게만_공개_식별자를_알려_준다() throws Exception {
+    @DisplayName("옛 번호로는 주인에게만 공개 식별자를 알려 준다")
+    void oldNumberRevealsPublicIdOnlyToOwner() throws Exception {
         CurrentUser dad = member("public-dad");
         CurrentUser kid = member("public-kid");
         UUID id = started(dad);
@@ -248,7 +256,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 스트리밍_보내기의_started_와_done_이_같은_공개_식별자를_싣는다() throws Exception {
+    @DisplayName("스트리밍 보내기의 started 와 done 이 같은 공개 식별자를 싣는다")
+    void streamStartedAndDoneCarrySamePublicId() throws Exception {
         CurrentUser dad = member("public-dad");
         UUID id = started(dad);
 
@@ -265,7 +274,8 @@ class ConversationPublicIdTest {
     }
 
     @Test
-    void 스트리밍_보내기에서_남의_대화는_error_사건이다() throws Exception {
+    @DisplayName("스트리밍 보내기에서 남의 대화는 error 사건이다")
+    void streamSendToOthersConversationIsErrorEvent() throws Exception {
         UUID id = started(member("public-dad"));
         signedIn(member("public-kid"));
 

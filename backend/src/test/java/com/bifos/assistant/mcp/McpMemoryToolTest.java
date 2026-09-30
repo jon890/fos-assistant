@@ -38,6 +38,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.info.BuildProperties;
@@ -82,7 +83,7 @@ class McpMemoryToolTest {
     private static final String PROFILE = "mcp-memory-tool";
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
 
-    @BeforeEach void 준비한다() {
+    @BeforeEach void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         memoryRepository.deleteAll(); tokenRepository.deleteAll(); users.deleteAll();
         dad = users.save(AppUser.of("dad@example.com", "아빠", 1L, UserRole.ADMIN));
@@ -92,7 +93,9 @@ class McpMemoryToolTest {
         dadRun = McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
     }
 
-    @Test void initialize_목록과_알림은_계약한_응답을_낸다() throws Exception {
+    @Test
+    @DisplayName("initialize 목록과 알림은 계약한 응답을 낸다")
+    void initializeListAndNotificationGiveContractedResponses() throws Exception {
         JsonNode initialized = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":17,\"method\":\"initialize\"}"));
         assertThat(initialized.path("id").asInt()).isEqualTo(17);
         assertThat(initialized.path("result").path("protocolVersion").asString()).isEqualTo("2025-03-26");
@@ -113,7 +116,9 @@ class McpMemoryToolTest {
         assertThat(notification.statusCode()).isEqualTo(202); assertThat(notification.body()).isEmpty();
     }
 
-    @Test void 부모_실행의_사용자만_정하고_권한_오류는_동일하게_숨긴다() throws Exception {
+    @Test
+    @DisplayName("부모 실행의 사용자만 정하고 권한 오류는 동일하게 숨긴다")
+    void decidesOnlyParentRunUserAndHidesPermissionErrorsAlike() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
         JsonNode own = body(call(dadToken, indexed.id(), 999L));
@@ -124,7 +129,9 @@ class McpMemoryToolTest {
         assertThat(unauthorized.path("result")).isEqualTo(missing.path("result"));
     }
 
-    @Test void 서명이_맞는_fos_ctx_를_떼고_읽는다() throws Exception {
+    @Test
+    @DisplayName("서명이 맞는 fos ctx 를 떼고 읽는다")
+    void stripsValidlySignedFosCtxAndReads() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String fosCtx = McpCallSigner.context(dadToken, "memory_read", dadRoot).toString();
 
@@ -136,7 +143,9 @@ class McpMemoryToolTest {
         assertThat(wrongId.path("error").path("code").asInt()).isEqualTo(-32602);
     }
 
-    @Test void 틀린_fos_ctx_는_거절한다() throws Exception {
+    @Test
+    @DisplayName("틀린 fos ctx 는 거절한다")
+    void rejectsWrongFosCtx() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String zeroSig = "{\"v\":1,\"session_id\":\"" + dadRoot + "\",\"root_session_id\":\"" + dadRoot + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
 
@@ -150,7 +159,9 @@ class McpMemoryToolTest {
         assertThat(missing).isEqualTo(rejected);
     }
 
-    @Test void 등록한_하위_에이전트는_부모_실행이_끝난_뒤에도_그_사용자로_읽고_등록이_없으면_거절한다() throws Exception {
+    @Test
+    @DisplayName("등록한 하위 에이전트는 부모 실행이 끝난 뒤에도 그 사용자로 읽고 등록이 없으면 거절한다")
+    void registeredSubagentReadsAsItsUserAfterParentEndsAndUnregisteredIsRejected() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String registered = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, registered);
@@ -172,7 +183,9 @@ class McpMemoryToolTest {
         assertThat(rejected.toString()).doesNotContain("아빠 본문");
     }
 
-    @Test void 등록한_하위_에이전트는_부모_실행이_취소되면_읽지_못한다() throws Exception {
+    @Test
+    @DisplayName("등록한 하위 에이전트는 부모 실행이 취소되면 읽지 못한다")
+    void registeredSubagentCannotReadWhenParentRunIsCancelled() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String child = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, child);
@@ -188,7 +201,9 @@ class McpMemoryToolTest {
         assertThat(afterCancel.toString()).doesNotContain("아빠 본문");
     }
 
-    @Test void 인증한_요청에_토큰_원문이_아닌_해시를_속성으로_싣는다() throws Exception {
+    @Test
+    @DisplayName("인증한 요청에 토큰 원문이 아닌 해시를 속성으로 싣는다")
+    void authenticatedRequestCarriesHashNotRawTokenAsAttribute() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
         mvc.perform(post("/mcp").servletPath("/mcp")
@@ -199,14 +214,18 @@ class McpMemoryToolTest {
                 .andExpect(request().attribute(AgentTokenAuthenticationFilter.TOKEN_HASH_ATTRIBUTE, AgentTokenService.hash(dadToken)));
     }
 
-    @Test void 제안과_항상_주입하는_항목은_본문을_돌려주지_않는다() throws Exception {
+    @Test
+    @DisplayName("제안과 항상 주입하는 항목은 본문을 돌려주지 않는다")
+    void doesNotReturnBodyOfProposalsAndAlwaysInjectedItems() throws Exception {
         Memory proposed = memories.proposeUser(current(dad), "제안", "승인 전", 1L);
         Memory always = memories.create(current(dad), MemoryScope.USER, "항상", "이미 주입됨", true);
         assertThat(body(call(dadToken, proposed.id(), null)).path("result").path("isError").asBoolean()).isTrue();
         assertThat(body(call(dadToken, always.id(), null)).path("result").path("isError").asBoolean()).isTrue();
     }
 
-    @Test void 인증_Origin_JSON_RPC_오류를_HTTP에서_검사한다() throws Exception {
+    @Test
+    @DisplayName("인증 Origin JSON RPC 오류를 HTTP에서 검사한다")
+    void checksAuthOriginAndJsonRpcErrorsOverHttp() throws Exception {
         assertThat(mcp(null, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}").statusCode()).isEqualTo(401);
         String revoked = tokens.issue(PROFILE, "revoked").rawToken();
         tokens.revoke(tokenRepository.findByTokenHash(AgentTokenService.hash(revoked)).orElseThrow().id());
@@ -218,7 +237,9 @@ class McpMemoryToolTest {
         assertThat(body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":1.5}}}")).path("error").path("code").asInt()).isEqualTo(-32602);
     }
 
-    @Test void 관리자만_토큰을_발급하고_목록을_보고_폐기한다() throws Exception {
+    @Test
+    @DisplayName("관리자만 토큰을 발급하고 목록을 보고 폐기한다")
+    void onlyAdminIssuesListsAndRevokesTokens() throws Exception {
         String adminJwt = jwt(dad);
         String memberJwt = jwt(kid);
         String issueBody = "{\"profileName\":\"kid-profile\",\"label\":\"profile\"}";

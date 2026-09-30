@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -62,7 +63,7 @@ class AttachmentUploadLimitTest {
     private UUID conversationPublicId;
 
     @BeforeEach
-    void 준비한다() throws IOException {
+    void setUp() throws IOException {
         attachments.deleteAll();
         // 이 서버는 따로 뜬 메모리 데이터베이스를 써서 번호가 1부터 다시 시작한다. 앞선 실행이 남긴 파일과
         // 겹치지 않게 비운다.
@@ -75,7 +76,8 @@ class AttachmentUploadLimitTest {
     }
 
     @Test
-    void 기본_상한_1MB_를_넘는_2MB_사진이_올라간다() throws Exception {
+    @DisplayName("기본 상한 1MB 를 넘는 2MB 사진이 올라간다")
+    void uploads2MbPhotoOverDefault1MbLimit() throws Exception {
         HttpResponse<String> response = upload(2 * MB);
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
@@ -84,7 +86,8 @@ class AttachmentUploadLimitTest {
     }
 
     @Test
-    void 한_장_상한을_조금_넘으면_서비스가_입력_오류로_거절한다() throws Exception {
+    @DisplayName("한 장 상한을 조금 넘으면 서비스가 입력 오류로 거절한다")
+    void serviceRejectsAsInputErrorWhenSlightlyOverPerImageLimit() throws Exception {
         HttpResponse<String> response = upload(10 * MB + 100 * KB);
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
@@ -93,7 +96,8 @@ class AttachmentUploadLimitTest {
     }
 
     @Test
-    void 요청_상한을_넘어도_500_이_아니라_입력_오류다() throws Exception {
+    @DisplayName("요청 상한을 넘어도 500 이 아니라 입력 오류다")
+    void overRequestLimitIsInputErrorNot500() throws Exception {
         // 넘는 양을 수백 KB 로 둔다. 많이 넘기면 서버가 남은 본문을 읽지 않고 연결을 끊어 응답을 받지 못한다.
         HttpResponse<String> response = upload(12 * MB + 300 * KB);
 

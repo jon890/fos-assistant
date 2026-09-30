@@ -22,6 +22,7 @@ import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** Hermes 설정 저장 뒤의 재조회와 대시보드 실패 처리를 본다. */
@@ -34,14 +35,15 @@ class AgentToolServiceTest {
     private final Agent agent = Agent.of("tools", "도구", "tools-profile", "http://listener.test/p/tools-profile", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(toolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry("web", "Web", "검색")));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of(), List.of());
     }
 
     @Test
-    void 저장_뒤_다른_목록이_오면_적용되지_않은_오류를_돌린다() {
+    @DisplayName("저장 뒤 다른 목록이 오면 적용되지 않은 오류를 돌린다")
+    void returnsNotAppliedErrorWhenDifferentListComesBackAfterSave() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of(), List.of());
 
@@ -52,7 +54,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void 대시보드를_읽지_못하면_HERMES_UNAVAILABLE을_그대로_돌린다() {
+    @DisplayName("대시보드를 읽지 못하면 HERMES UNAVAILABLE을 그대로 돌린다")
+    void passesHermesUnavailableThroughWhenDashboardUnreadable() {
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not reach Hermes"))
                 .when(toolsets).readCatalog();
 
@@ -63,7 +66,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void 그룹_에이전트를_읽을_수_있는_다른_사용자도_주인_등급을_바꾸지_못한다() {
+    @DisplayName("그룹 에이전트를 읽을 수 있는 다른 사용자도 주인 등급을 바꾸지 못한다")
+    void otherUserReadingGroupAgentCannotChangeOwnerTier() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
         Agent groupAgent = Agent.of("group-tools", "그룹 도구", "group-tools-profile",
@@ -80,7 +84,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void 그룹_에이전트를_읽을_수_있는_다른_사용자도_도구_목록을_읽지_못한다() {
+    @DisplayName("그룹 에이전트를 읽을 수 있는 다른 사용자도 도구 목록을 읽지 못한다")
+    void otherUserReadingGroupAgentCannotReadToolList() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
         Agent groupAgent = Agent.of("group-read", "그룹 도구", "group-read-profile",
@@ -97,7 +102,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void policy에_없는_켜진_toolset은_별도_목록으로_돌린다() {
+    @DisplayName("policy에 없는 켜진 toolset은 별도 목록으로 돌린다")
+    void returnsEnabledToolsetsMissingFromPolicyAsSeparateList() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of("web", "connections", "memory"));
 
@@ -109,7 +115,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void 저장_뒤_자동으로_켜진_미분류_toolset은_성공_응답에_남긴다() {
+    @DisplayName("저장 뒤 자동으로 켜진 미분류 toolset은 성공 응답에 남긴다")
+    void keepsAutoEnabledUnclassifiedToolsetInSuccessResponse() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of(), List.of("web", "connections"));
 
@@ -120,7 +127,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void 저장_뒤_예상하지_않은_policy_known_toolset은_거절한다() {
+    @DisplayName("저장 뒤 예상하지 않은 policy known toolset은 거절한다")
+    void rejectsUnexpectedPolicyKnownToolsetAfterSave() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of(), List.of("web", "terminal"));
 
@@ -131,7 +139,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void 올린_스킬이_있으면_skills_를_끄는_저장을_거절하고_Hermes_를_부르지_않는다() {
+    @DisplayName("올린 스킬이 있으면 skills 를 끄는 저장을 거절하고 Hermes 를 부르지 않는다")
+    void rejectsDisablingSkillsWhenUploadedSkillsExistAndSkipsHermes() {
         when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
 
         assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
@@ -143,7 +152,8 @@ class AgentToolServiceTest {
     }
 
     @Test
-    void 올린_스킬이_있어도_skills_를_둔_저장은_그대로_쓴다() {
+    @DisplayName("올린 스킬이 있어도 skills 를 둔 저장은 그대로 쓴다")
+    void keepsSaveThatLeavesSkillsOnEvenWithUploadedSkills() {
         when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
         when(toolsets.readCatalog()).thenReturn(List.of(
                 new ToolsetCatalogEntry("web", "Web", "검색"), new ToolsetCatalogEntry("skills", "Skills", "스킬")));

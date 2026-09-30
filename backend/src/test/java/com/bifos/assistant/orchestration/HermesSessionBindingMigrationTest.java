@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,7 +26,8 @@ class HermesSessionBindingMigrationTest {
             + "VALUES ('%s', 'child-1', 7, 100, 'root-1', 'root-1', CURRENT_TIMESTAMP(6))";
 
     @Test
-    void V30_은_profile_마다_session_하나만_받는다() throws SQLException {
+    @DisplayName("V30 은 profile 마다 session 하나만 받는다")
+    void v30AcceptsOnlyOneSessionPerProfile() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").target("29").load().migrate();
         Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();

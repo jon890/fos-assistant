@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -116,7 +117,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 도는_turn이_없는_내_대화는_돌지_않는다고_답한다() {
+    @DisplayName("도는 turn이 없는 내 대화는 돌지 않는다고 답한다")
+    void ownConversationWithoutRunningTurnReportsNotRunning() {
         CurrentUser dad = member("dad");
         Conversation conversation = chat.startEmpty(dad, "dad");
 
@@ -124,7 +126,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 도는_turn이_있으면_뿌리_실행_번호와_시작_시각을_답하고_끝나면_돌지_않는다고_답한다() {
+    @DisplayName("도는 turn이 있으면 뿌리 실행 번호와 시작 시각을 답하고 끝나면 돌지 않는다고 답한다")
+    void runningTurnReportsRootRunIdAndStartTimeThenNotRunningAfterEnd() {
         CurrentUser dad = member("dad");
         stub().willReturn(completed("run-held", "답"));
         AtomicReference<RunningTurn> whileRunning = new AtomicReference<>();
@@ -145,7 +148,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 표시는_있는데_실행_번호가_붙기_전이면_돈다고만_답한다() {
+    @DisplayName("표시는 있는데 실행 번호가 붙기 전이면 돈다고만 답한다")
+    void reportsOnlyRunningWhenMarkExistsBeforeRunIdIsAttached() {
         CurrentUser dad = member("dad");
         Conversation conversation = chat.startEmpty(dad, "dad");
         TurnCancellation.TurnHandle handle = turns.open(dad.id(), conversation.id());
@@ -157,7 +161,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 흐름에서_Chief가_끝나_뿌리_줄이_SUCCEEDED여도_자식이_도는_동안은_뿌리_번호로_돈다고_답한다() {
+    @DisplayName("흐름에서 Chief가 끝나 뿌리 줄이 SUCCEEDED여도 자식이 도는 동안은 뿌리 번호로 돈다고 답한다")
+    void reportsRunningWithRootIdWhileChildRunsEvenIfRootRowSucceeded() {
         CurrentUser dad = member("flow-dad", ResearchAndBuildFlow.NAME);
         AtomicReference<RunningTurn> whileChildRuns = new AtomicReference<>();
         AtomicReference<ExecutionStatus> rootStatus = new AtomicReference<>();
@@ -191,7 +196,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 막히면_넘기지_않고_실패하고_turn이_끝난다() {
+    @DisplayName("막히면 넘기지 않고 실패하고 turn이 끝난다")
+    void blockedFailsWithoutFallbackAndEndsTurn() {
         CurrentUser dad = member("dad");
         stub().willReturnInOrder(
                 new HermesRunResult("run-blocked", "session", "failed", "", null, null,
@@ -218,7 +224,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 남의_대화는_도는_turn이_있어도_찾을_수_없다고_답한다() {
+    @DisplayName("남의 대화는 도는 turn이 있어도 찾을 수 없다고 답한다")
+    void othersConversationReportsNotFoundEvenWithRunningTurn() {
         CurrentUser dad = member("dad");
         CurrentUser mom = member("mom");
         stub().willReturn(completed("run-dad", "답"));
@@ -241,7 +248,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 지운_대화와_없는_대화는_찾을_수_없다고_답한다() {
+    @DisplayName("지운 대화와 없는 대화는 찾을 수 없다고 답한다")
+    void deletedAndMissingConversationsReportNotFound() {
         CurrentUser dad = member("dad");
         Conversation gone = chat.startEmpty(dad, "dad");
         chat.delete(dad, gone.id());

@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,7 +73,7 @@ class UsageBreakdownTest {
     private Agent chore;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         executions.deleteAll();
         career = agent(CAREER_CODE, "진로 비서");
         chore = agent(CHORE_CODE, "집안일 비서");
@@ -82,7 +83,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 에이전트_둘의_실행이_섞여_있으면_agent_축이_둘로_묶인다() {
+    @DisplayName("에이전트 둘의 실행이 섞여 있으면 agent 축이 둘로 묶인다")
+    void agentAxisGroupsIntoTwoWhenRunsOfTwoAgentsAreMixed() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         save(career, MID_SEPTEMBER.plusSeconds(60), 90_000L, 6_000L, null);
         save(chore, MID_SEPTEMBER.plusSeconds(120), 60_000L, 500L, null);
@@ -103,7 +105,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 모델_축은_provider_와_모델로_묶는다() {
+    @DisplayName("모델 축은 provider 와 모델로 묶는다")
+    void modelAxisGroupsByProviderAndModel() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         save(chore, MID_SEPTEMBER.plusSeconds(60), 60_000L, 500L, null);
 
@@ -114,7 +117,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 날짜_축은_하루씩_묶고_이른_날부터_준다() {
+    @DisplayName("날짜 축은 하루씩 묶고 이른 날부터 준다")
+    void dateAxisGroupsByDayAndReturnsEarlierDaysFirst() {
         save(career, Instant.parse("2026-09-15T03:00:00Z"), 10_000L, 100L, null);
         save(career, Instant.parse("2026-09-15T09:00:00Z"), 20_000L, 100L, null);
         save(career, Instant.parse("2026-09-16T03:00:00Z"), 30_000L, 100L, null);
@@ -127,7 +131,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 날짜_축도_가족이_사는_곳의_달력으로_하루를_끊는다() {
+    @DisplayName("날짜 축도 가족이 사는 곳의 달력으로 하루를 끊는다")
+    void dateAxisCutsDayByCalendarOfWhereFamilyLives() {
         // 한국 시각으로는 9월 16일 오전 8시다. 세계 표준시로 끊으면 9월 15일이 된다.
         save(career, Instant.parse("2026-09-15T23:00:00Z"), 10_000L, 100L, null);
 
@@ -137,7 +142,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 에이전트_행이_없는_실행도_agent_축에_번호로_묶이고_다른_줄은_그대로다() {
+    @DisplayName("에이전트 행이 없는 실행도 agent 축에 번호로 묶이고 다른 줄은 그대로다")
+    void runWithoutAgentRowGroupsByIdOnAgentAxisAndOtherRowsStay() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         save(chore, MID_SEPTEMBER.plusSeconds(60), 60_000L, 500L, null);
         String missingKey = String.valueOf(chore.id());
@@ -156,7 +162,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 도는_중인_실행은_어느_축에도_세어지지_않는다() {
+    @DisplayName("도는 중인 실행은 어느 축에도 세어지지 않는다")
+    void runningRunIsCountedOnNoAxis() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         executions.save(builder(USER_ID, career, MID_SEPTEMBER.plusSeconds(60))
                 .status(ExecutionStatus.RUNNING)
@@ -171,7 +178,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 모르는_축은_400_으로_거절하고_기본값으로_떨어지지_않는다() {
+    @DisplayName("모르는 축은 400 으로 거절하고 기본값으로 떨어지지 않는다")
+    void rejectsUnknownAxisWith400AndDoesNotFallBackToDefault() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
 
         assertThatThrownBy(() -> controller.breakdown("workspace", MONTH))
@@ -182,14 +190,16 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 달_형태가_아닌_값도_400_으로_거절한다() {
+    @DisplayName("달 형태가 아닌 값도 400 으로 거절한다")
+    void rejectsNonMonthFormatWith400Too() {
         assertThatThrownBy(() -> controller.breakdown("agent", "지난달"))
                 .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
     @Test
-    void 남의_실행은_내_합계에_들어가지_않는다() {
+    @DisplayName("남의 실행은 내 합계에 들어가지 않는다")
+    void othersRunsAreNotInMyTotals() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         executions.save(builder(OTHER_USER_ID, career, MID_SEPTEMBER.plusSeconds(60))
                 .cost(new ExecutionCost(99_000_000L, null, "USD", "models.dev@2026-09-17"))
@@ -205,7 +215,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 달_경계는_가족이_사는_곳의_달력으로_끊긴다() {
+    @DisplayName("달 경계는 가족이 사는 곳의 달력으로 끊긴다")
+    void monthBoundaryIsCutByCalendarOfWhereFamilyLives() {
         // 한국 시각으로 9월 30일 23시와 10월 1일 1시다.
         save(career, Instant.parse("2026-09-30T14:00:00Z"), 10_000L, 100L, null);
         save(career, Instant.parse("2026-09-30T16:00:00Z"), 20_000L, 100L, null);
@@ -219,7 +230,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 지문_축은_지문별로_묶고_실행당_평균을_낼_수_있게_준다() {
+    @DisplayName("지문 축은 지문별로 묶고 실행당 평균을 낼 수 있게 준다")
+    void fingerprintAxisGroupsByFingerprintAndGivesDataForPerRunAverage() {
         save(career, MID_SEPTEMBER, 50_000L, 500L, "a3f2");
         save(career, MID_SEPTEMBER.plusSeconds(60), 70_000L, 700L, "a3f2");
         save(career, MID_SEPTEMBER.minusSeconds(86_400), 30_000L, 300L, "8c11");
@@ -236,7 +248,8 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 지문이_비어_있는_실행은_지문_축에서_통째로_빠진다() {
+    @DisplayName("지문이 비어 있는 실행은 지문 축에서 통째로 빠진다")
+    void runWithEmptyFingerprintDropsWholeFromFingerprintAxis() {
         save(career, MID_SEPTEMBER, 50_000L, 500L, null);
         save(career, MID_SEPTEMBER.plusSeconds(60), 70_000L, 700L, "a3f2");
 
@@ -247,13 +260,15 @@ class UsageBreakdownTest {
     }
 
     @Test
-    void 기록이_없는_달은_빈_줄_목록을_준다() {
+    @DisplayName("기록이 없는 달은 빈 줄 목록을 준다")
+    void monthWithoutRecordsGivesEmptyRowList() {
         assertThat(controller.breakdown("agent", "2020-01").rows()).isEmpty();
         assertThat(controller.breakdown("fingerprint", "2020-01").rows()).isEmpty();
     }
 
     @Test
-    void 구독_경로만_있는_묶음은_실제_청구액을_0_으로_채우지_않는다() {
+    @DisplayName("구독 경로만 있는 묶음은 실제 청구액을 0 으로 채우지 않는다")
+    void groupWithOnlySubscriptionPathDoesNotFillActualBilledWithZero() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
 
         assertThat(controller.breakdown("agent", MONTH).rows())

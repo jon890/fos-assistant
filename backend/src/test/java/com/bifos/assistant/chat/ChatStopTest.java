@@ -50,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -120,7 +121,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 도는_turn을_멈추면_취소_상태와_Hermes_결과를_남긴다() {
+    @DisplayName("도는 turn을 멈추면 취소 상태와 Hermes 결과를 남긴다")
+    void stoppingRunningTurnLeavesCancelledStateAndHermesResult() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-stop", "session", "cancelled", "절반", "model", "provider", TokenUsage.empty()));
@@ -143,7 +145,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 중지한_결과의_output이_비면_스트림_조각을_답으로_남긴다() {
+    @DisplayName("중지한 결과의 output이 비면 스트림 조각을 답으로 남긴다")
+    void usesStreamChunksAsReplyWhenStoppedOutputIsEmpty() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-stop", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
@@ -158,7 +161,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 중지한_결과와_스트림_조각이_모두_비면_답_메시지를_만들지_않는다() {
+    @DisplayName("중지한 결과와 스트림 조각이 모두 비면 답 메시지를 만들지 않는다")
+    void createsNoReplyMessageWhenStoppedOutputAndChunksAreBothEmpty() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-stop", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
@@ -175,7 +179,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 다른_사용자의_도는_실행은_찾을_수_없다고_응답한다() {
+    @DisplayName("다른 사용자의 도는 실행은 찾을 수 없다고 응답한다")
+    void respondsNotFoundForOtherUsersRunningExecution() {
         CurrentUser dad = member("dad@example.com", "dad");
         CurrentUser mom = member("mom@example.com", "mom");
         stub().willReturn(HermesRunResult.of(
@@ -195,7 +200,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 끝난_실행을_멈추면_실행이_끝났다고_응답한다() {
+    @DisplayName("끝난 실행을 멈추면 실행이 끝났다고 응답한다")
+    void stoppingFinishedRunRespondsThatItEnded() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-done", "session", "completed", "완료", "model", "provider", TokenUsage.empty()));
@@ -208,7 +214,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 중지_전송이_실패하면_다음_요청이_같은_run에_다시_보낸다() {
+    @DisplayName("중지 전송이 실패하면 다음 요청이 같은 run에 다시 보낸다")
+    void nextRequestResendsToSameRunWhenStopSendFails() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-retry", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
@@ -233,7 +240,8 @@ class ChatStopTest {
     }
 
     @Test
-    void Hermes_중지_전송이_실패하면_실행과_스트림을_계속_받는다() {
+    @DisplayName("Hermes 중지 전송이 실패하면 실행과 스트림을 계속 받는다")
+    void keepsReceivingRunAndStreamWhenHermesStopSendFails() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-continue", "session", "completed", "계속한 답", "model", "provider", TokenUsage.empty()));
@@ -257,7 +265,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 에이전트_행이_없는_자식_실행은_건너뛰고_뿌리_실행을_취소로_끝낸다() {
+    @DisplayName("에이전트 행이 없는 자식 실행은 건너뛰고 뿌리 실행을 취소로 끝낸다")
+    void skipsChildRunWithoutAgentRowAndEndsRootRunAsCancelled() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-root", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
@@ -286,7 +295,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 중지_요청을_두_번_받아도_성공한_run에는_한_번만_보낸다() {
+    @DisplayName("중지 요청을 두 번 받아도 성공한 run에는 한 번만 보낸다")
+    void sendsToSucceededRunOnlyOnceEvenIfStopRequestedTwice() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-once", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
@@ -302,7 +312,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 제출_전에_중지_전송이_실패해도_다음_중지_요청이_같은_run에_다시_보낸다() throws Exception {
+    @DisplayName("제출 전에 중지 전송이 실패해도 다음 중지 요청이 같은 run에 다시 보낸다")
+    void nextStopResendsToSameRunEvenIfStopSendBeforeSubmitFails() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         AtomicReference<Future<?>> firstStop = new AtomicReference<>();
@@ -348,7 +359,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 제출이_보낸_중지가_실패해도_같은_중지_요청이_다시_보내_성공하면_성공으로_답한다() throws Exception {
+    @DisplayName("제출이 보낸 중지가 실패해도 같은 중지 요청이 다시 보내 성공하면 성공으로 답한다")
+    void answersSuccessWhenSameStopRequestResendsAfterSubmitSentStopFailed() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         AtomicReference<Future<?>> firstStop = new AtomicReference<>();
@@ -393,7 +405,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 제출_전에_run_없음을_본_중지_요청이_같은_run을_다시_멈추면_첫_중지가_실패했어도_성공으로_답한다() throws Exception {
+    @DisplayName("제출 전에 run 없음을 본 중지 요청이 같은 run을 다시 멈추면 첫 중지가 실패했어도 성공으로 답한다")
+    void answersSuccessWhenStopThatSawNoRunBeforeSubmitStopsSameRunAgain() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         AtomicReference<Future<?>> firstStop = new AtomicReference<>();
@@ -447,7 +460,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 제출_전에_중지를_요청해도_등록된_run을_곧바로_멈춘다() throws Exception {
+    @DisplayName("제출 전에 중지를 요청해도 등록된 run을 곧바로 멈춘다")
+    void stoppingBeforeSubmitStopsRegisteredRunImmediately() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-race", "session", "cancelled", "", "model", "provider", TokenUsage.empty()));
@@ -484,7 +498,8 @@ class ChatStopTest {
     }
 
     @Test
-    void Hermes_제출_전_중지는_run_없이_성공하고_취소로_끝난다() throws Exception {
+    @DisplayName("Hermes 제출 전 중지는 run 없이 성공하고 취소로 끝난다")
+    void stopBeforeHermesSubmitSucceedsWithoutRunAndEndsCancelled() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         AtomicReference<Future<?>> stop = new AtomicReference<>();
@@ -508,7 +523,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 완료를_저장한_뒤_닫기_전_중지는_실행이_끝났다고_응답한다() throws Exception {
+    @DisplayName("완료를 저장한 뒤 닫기 전 중지는 실행이 끝났다고 응답한다")
+    void stopAfterSavingCompletionBeforeCloseRespondsThatRunEnded() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-completed", "session", "completed", "완료", "model", "provider", TokenUsage.empty()));
@@ -533,7 +549,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 한_번에_받는_turn도_도는_동안_멈출_수_있다() {
+    @DisplayName("한 번에 받는 turn도 도는 동안 멈출 수 있다")
+    void nonStreamTurnCanAlsoBeStoppedWhileRunning() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-sync", "session", "cancelled", "중단", "model", "provider", TokenUsage.empty()));
@@ -546,7 +563,8 @@ class ChatStopTest {
     }
 
     @Test
-    void 같은_대화에서_도는_turn이_있으면_다음_turn을_거절한다() throws Exception {
+    @DisplayName("같은 대화에서 도는 turn이 있으면 다음 turn을 거절한다")
+    void rejectsNextTurnWhileTurnRunsInSameConversation() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-busy", "session", "completed", "완료", "model", "provider", TokenUsage.empty()));

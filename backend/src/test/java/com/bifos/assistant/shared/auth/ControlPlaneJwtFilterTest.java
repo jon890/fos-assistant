@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.user.domain.UserProvisioningService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
@@ -11,7 +12,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 class ControlPlaneJwtFilterTest {
 
     @Test
-    void mcp_요청은_Control_Plane_JWT_필터를_건너뛴다() {
+    @DisplayName("mcp 요청은 Control Plane JWT 필터를 건너뛴다")
+    void mcpRequestSkipsControlPlaneJwtFilter() {
         ControlPlaneJwtFilter filter = new ControlPlaneJwtFilter(
                 new AuthProperties("test-secret-test-secret-test-secret-test-secret"),
                 mock(UserProvisioningService.class));
@@ -21,7 +23,8 @@ class ControlPlaneJwtFilterTest {
     }
 
     @Test
-    void 하위_에이전트_session_등록_요청은_Control_Plane_JWT_필터를_건너뛴다() {
+    @DisplayName("하위 에이전트 session 등록 요청은 Control Plane JWT 필터를 건너뛴다")
+    void subagentSessionRegistrationRequestSkipsControlPlaneJwtFilter() {
         ControlPlaneJwtFilter filter = new ControlPlaneJwtFilter(
                 new AuthProperties("test-secret-test-secret-test-secret-test-secret"),
                 mock(UserProvisioningService.class));

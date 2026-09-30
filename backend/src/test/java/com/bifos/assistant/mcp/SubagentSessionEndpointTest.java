@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -73,7 +74,7 @@ class SubagentSessionEndpointTest {
     private AgentExecution dadRun;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE_A, PROFILE_B));
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
@@ -89,7 +90,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test
-    void 도는_실행_아래_최상위_자식을_등록하면_201_이다() throws Exception {
+    @DisplayName("도는 실행 아래 최상위 자식을 등록하면 201 이다")
+    void registeringTopLevelChildUnderRunningRunIs201() throws Exception {
         String child = newChild();
 
         HttpResponse<String> response = register(tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
@@ -100,7 +102,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test // 9
-    void 같은_본문을_다시_보내면_200_이고_줄은_하나다() throws Exception {
+    @DisplayName("같은 본문을 다시 보내면 200 이고 줄은 하나다")
+    void resendingSameBodyIs200AndKeepsOneRow() throws Exception {
         String child = newChild();
         String body = McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString();
         register(tokenA, body);
@@ -113,7 +116,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test // 10
-    void 같은_자식을_다른_뿌리의_도는_실행_아래로_보내면_409_이고_origin_은_그대로다() throws Exception {
+    @DisplayName("같은 자식을 다른 뿌리의 도는 실행 아래로 보내면 409 이고 origin 은 그대로다")
+    void sendingSameChildUnderOtherRootsRunningRunIs409AndOriginUnchanged() throws Exception {
         String child = newChild();
         register(tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
         String otherRoot = McpCallSigner.newRoot();
@@ -127,7 +131,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test
-    void 서명이나_모양이_틀리거나_JSON_이_아니거나_비어_있으면_403_이다() throws Exception {
+    @DisplayName("서명이나 모양이 틀리거나 JSON 이 아니거나 비어 있으면 403 이다")
+    void badSignatureShapeNonJsonOrEmptyIs403() throws Exception {
         String child = newChild();
         ObjectNode wrongSig = McpCallSigner.subagentBody(tokenA, rootA, rootA, child);
         wrongSig.put("sig", "0".repeat(64));
@@ -143,7 +148,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test // 8
-    void profile_A_토큰으로_profile_B_실행의_뿌리_아래_등록하면_403_이고_줄이_없다() throws Exception {
+    @DisplayName("profile A 토큰으로 profile B 실행의 뿌리 아래 등록하면 403 이고 줄이 없다")
+    void registeringUnderRootOfProfileBRunWithProfileATokenIs403AndNoRow() throws Exception {
         String child = newChild();
 
         HttpResponse<String> response = register(tokenA, McpCallSigner.subagentBody(tokenA, rootB, rootB, child).toString());
@@ -154,7 +160,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test
-    void 토큰이_없거나_모르거나_폐기됐으면_401_이고_본문이_없다() throws Exception {
+    @DisplayName("토큰이 없거나 모르거나 폐기됐으면 401 이고 본문이 없다")
+    void missingUnknownOrRevokedTokenIs401WithoutBody() throws Exception {
         String revoked = tokens.issue(PROFILE_A, "revoked").rawToken();
         tokens.revoke(tokenRepository.findByTokenHash(AgentTokenService.hash(revoked)).orElseThrow().id());
         String unknown = "unknown-" + UUID.randomUUID();
@@ -172,7 +179,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test
-    void 사용자_JWT_로_부르면_MCP_토큰_필터가_받아_401_이고_줄이_없다() throws Exception {
+    @DisplayName("사용자 JWT 로 부르면 MCP 토큰 필터가 받아 401 이고 줄이 없다")
+    void userJwtIs401ByMcpTokenFilterAndLeavesNoRow() throws Exception {
         String jwt = jwt(dad);
         String child = newChild();
 
@@ -183,7 +191,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test
-    void Origin_헤더가_있으면_403_이다() throws Exception {
+    @DisplayName("Origin 헤더가 있으면 403 이다")
+    void originHeaderIs403() throws Exception {
         String child = newChild();
 
         HttpResponse<String> response = send(PATH, tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString(), true);
@@ -193,7 +202,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test // 1
-    void 등록한_자식은_부모_실행이_끝난_뒤에도_memory_read_로_부모_사용자의_본문을_읽는다() throws Exception {
+    @DisplayName("등록한 자식은 부모 실행이 끝난 뒤에도 memory read 로 부모 사용자의 본문을 읽는다")
+    void registeredChildReadsParentUsersBodyByMemoryReadEvenAfterParentEnds() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String child = newChild();
         assertThat(register(tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString()).statusCode()).isEqualTo(201);
@@ -211,7 +221,8 @@ class SubagentSessionEndpointTest {
     }
 
     @Test
-    void 등록_경로는_도구_목록에_나오지_않는다() throws Exception {
+    @DisplayName("등록 경로는 도구 목록에 나오지 않는다")
+    void registrationPathIsNotInToolList() throws Exception {
         HttpResponse<String> response = send("/mcp", tokenA, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}", false);
 
         assertThat(response.statusCode()).isEqualTo(200);

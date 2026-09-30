@@ -25,6 +25,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -58,7 +59,7 @@ class RegenerateDeletedAttachmentTest {
     @Autowired HermesRunsClient hermes;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         stub().reset();
         attachments.deleteAll();
         executions.deleteAll();
@@ -68,8 +69,9 @@ class RegenerateDeletedAttachmentTest {
     }
 
     @Test
+    @DisplayName("지워진 사진은 다시 생성 Hermes 입력에서 뺀다")
     @Transactional
-    void 지워진_사진은_다시_생성_Hermes_입력에서_뺀다() {
+    void dropsRemovedImagesFromRegenerationHermesInput() {
         CurrentUser dad = member();
         stub().willReturnInOrder(
                 HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),

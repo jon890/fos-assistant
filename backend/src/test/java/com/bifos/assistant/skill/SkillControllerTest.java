@@ -30,6 +30,7 @@ import com.bifos.assistant.skill.presentation.SkillController;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
@@ -51,12 +52,13 @@ class SkillControllerTest {
             .build();
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(currentUser.require()).thenReturn(OWNER);
     }
 
     @Test
-    void 목록은_출처와_편집_여부와_도구_상태와_올릴_수_있는_한도를_주고_사용량이_없으면_칸을_뺀다() throws Exception {
+    @DisplayName("목록은 출처와 편집 여부와 도구 상태와 올릴 수 있는 한도를 주고 사용량이 없으면 칸을 뺀다")
+    void listGivesSourceEditabilityToolStatusAndUploadLimit() throws Exception {
         when(skills.list(OWNER, "dad")).thenReturn(new SkillList(List.of(
                 new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, null),
                 new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
@@ -76,7 +78,8 @@ class SkillControllerTest {
     }
 
     @Test
-    void 없는_스킬은_404_SKILL_NOT_FOUND_다() throws Exception {
+    @DisplayName("없는 스킬은 404 SKILL NOT FOUND 다")
+    void missingSkillIs404SkillNotFound() throws Exception {
         when(skills.read(OWNER, "dad", "missing"))
                 .thenThrow(new ApiException(ErrorCode.SKILL_NOT_FOUND, "no such uploaded skill"));
 
@@ -86,7 +89,8 @@ class SkillControllerTest {
     }
 
     @Test
-    void 저장은_본문을_생략한_파일을_null_본문으로_넘기고_원문과_파일_크기를_돌려준다() throws Exception {
+    @DisplayName("저장은 본문을 생략한 파일을 null 본문으로 넘기고 원문과 파일 크기를 돌려준다")
+    void saveSendsOmittedBodyAsNullAndReturnsOriginalAndFileSize() throws Exception {
         when(skills.save(eq(OWNER), eq("dad"), eq("weekly-plan"), anyString(), any()))
                 .thenReturn(new SkillDetail("weekly-plan", "이번 주 계획", "---\nname: weekly-plan\n---\n",
                         List.of(new SkillFileInfo("references/guide.md", 9L))));
@@ -109,7 +113,8 @@ class SkillControllerTest {
     }
 
     @Test
-    void 경로가_빈_파일과_본문이_없는_요청은_서비스에_닿기_전에_거절한다() throws Exception {
+    @DisplayName("경로가 빈 파일과 본문이 없는 요청은 서비스에 닿기 전에 거절한다")
+    void rejectsBlankPathFileAndBodylessRequestBeforeService() throws Exception {
         mvc.perform(write("weekly-plan", "{\"skillMd\":\"x\",\"files\":[{\"path\":\" \",\"content\":\"x\"}]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
@@ -121,7 +126,8 @@ class SkillControllerTest {
     }
 
     @Test
-    void Hermes_와_같은_이름은_409_SKILL_NAME_TAKEN_다() throws Exception {
+    @DisplayName("Hermes 와 같은 이름은 409 SKILL NAME TAKEN 다")
+    void nameSameAsHermesIs409SkillNameTaken() throws Exception {
         when(skills.save(eq(OWNER), eq("dad"), eq("hermes-help"), anyString(), any()))
                 .thenThrow(new ApiException(ErrorCode.SKILL_NAME_TAKEN, "taken"));
 
@@ -131,7 +137,8 @@ class SkillControllerTest {
     }
 
     @Test
-    void 지우기와_켜고_끄기는_본문_없이_204_다() throws Exception {
+    @DisplayName("지우기와 켜고 끄기는 본문 없이 204 다")
+    void deleteAndToggleReturn204WithoutBody() throws Exception {
         mvc.perform(delete("/api/v1/agents/dad/skills/weekly-plan"))
                 .andExpect(status().isNoContent());
         verify(skills).delete(OWNER, "dad", "weekly-plan");
@@ -150,7 +157,8 @@ class SkillControllerTest {
     }
 
     @Test
-    void 켜고_끄기는_점과_밑줄이_든_Hermes_스킬_이름을_그대로_넘긴다() throws Exception {
+    @DisplayName("켜고 끄기는 점과 밑줄이 든 Hermes 스킬 이름을 그대로 넘긴다")
+    void toggleSendsHermesSkillNameWithDotAndUnderscoreAsIs() throws Exception {
         mvc.perform(put("/api/v1/agents/dad/skills/note_taking.v2/enabled")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"enabled\":true}"))

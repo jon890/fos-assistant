@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -32,7 +33,8 @@ class RealHermesResponseShapeTest {
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     @Test
-    void reads_the_token_counts_a_real_run_reports() {
+    @DisplayName("reads the token counts a real run reports")
+    void readsTheTokenCountsARealRunReports() {
         TokenUsage usage = HttpHermesRunsClient.readUsage(mapper.readTree(RUN_STATUS).path("usage"));
 
         assertThat(usage.inputTokens()).isEqualTo(561);
@@ -42,7 +44,8 @@ class RealHermesResponseShapeTest {
     }
 
     @Test
-    void the_run_reports_the_profile_name_where_a_model_would_go() {
+    @DisplayName("the run reports the profile name where a model would go")
+    void theRunReportsTheProfileNameWhereAModelWouldGo() {
         assertThat(mapper.readTree(RUN_STATUS).get("model").asString()).isEqualTo("bifos");
         assertThat(mapper.readTree(RUN_STATUS).get("provider")).isNull();
     }

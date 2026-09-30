@@ -38,6 +38,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 관리 화면이 에이전트를 등록하고 Hermes 주소를 고치는 길을 검사한다. */
@@ -74,7 +75,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 주소를_바꿔_저장하면_그_값이_남는다() {
+    @DisplayName("주소를 바꿔 저장하면 그 값이 남는다")
+    void persistsUpdatedBaseUrl() {
         AdminAgentView view = controller.update("dad", request("http://127.0.0.1:2/p/dad"));
 
         assertThat(view.apiBaseUrl()).isEqualTo("http://127.0.0.1:2/p/dad");
@@ -83,7 +85,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 주소를_비워_보내면_지금_값이_그대로_남는다() {
+    @DisplayName("주소를 비워 보내면 지금 값이 그대로 남는다")
+    void keepsCurrentUrlWhenBlankSent() {
         controller.update("dad", request(null));
         controller.update("dad", request("   "));
 
@@ -92,14 +95,16 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 끝에_슬래시를_붙여_보내면_떼고_저장한다() {
+    @DisplayName("끝에 슬래시를 붙여 보내면 떼고 저장한다")
+    void stripsTrailingSlashBeforeSaving() {
         controller.update("dad", request("http://127.0.0.1:2/p/dad/"));
 
         assertThat(agent.apiBaseUrl()).isEqualTo("http://127.0.0.1:2/p/dad");
     }
 
     @Test
-    void 확인이_실패하면_저장하지_않고_값이_그대로다() {
+    @DisplayName("확인이 실패하면 저장하지 않고 값이 그대로다")
+    void keepsValueWhenProbeFails() {
         doThrow(new ApiException(ErrorCode.VALIDATION_FAILED, "the new address answered 404"))
                 .when(endpointProbe).requireReachable(anyString(), anyString());
 
@@ -112,14 +117,16 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 확인은_그_에이전트의_profile_로_나간다() {
+    @DisplayName("확인은 그 에이전트의 profile 로 나간다")
+    void sendsProbeWithAgentProfile() {
         controller.update("dad", request("http://127.0.0.1:2/p/dad"));
 
         verify(endpointProbe).requireReachable("http://127.0.0.1:2/p/dad", "dad");
     }
 
     @Test
-    void 그룹_공개_전에_도구를_읽지_못하면_접근_범위를_바꾸지_않는다() {
+    @DisplayName("그룹 공개 전에 도구를 읽지 못하면 접근 범위를 바꾸지 않는다")
+    void keepsAccessScopeWhenToolsUnreadableBeforeGroupPublish() {
         agent = Agent.of("dad", "Dad", "dad", CURRENT_URL,
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
@@ -137,7 +144,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 그룹_공개와_주소_변경을_함께_보내도_새_주소의_도구를_검사한다() {
+    @DisplayName("그룹 공개와 주소 변경을 함께 보내도 새 주소의 도구를 검사한다")
+    void checksToolsOfNewUrlWhenPublishingToGroupAndChangingUrl() {
         agent = Agent.of("dad", "Dad", "dad", CURRENT_URL,
                 CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
@@ -155,7 +163,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 그룹_에이전트를_새로_만들_때도_private_toolset을_거절한다() {
+    @DisplayName("그룹 에이전트를 새로 만들 때도 private toolset을 거절한다")
+    void rejectsPrivateToolsetWhenCreatingGroupAgent() {
         when(agents.findByCode("group")).thenReturn(Optional.empty());
         when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/group", "group-profile"))
                 .thenReturn(java.util.List.of("terminal"));
@@ -170,7 +179,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void provider_없이_자기만_보는_에이전트를_등록하면_주소만_확인하고_저장한다() {
+    @DisplayName("provider 없이 자기만 보는 에이전트를 등록하면 주소만 확인하고 저장한다")
+    void onlyProbesUrlForPrivateAgentWithoutProvider() {
         when(agents.findByCode("mom")).thenReturn(Optional.empty());
         AppUser owner = owner(7L);
         when(users.findByEmail("mom@example.com")).thenReturn(Optional.of(owner));
@@ -188,7 +198,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 등록할_주소가_닿지_않으면_거절하고_저장하지_않는다() {
+    @DisplayName("등록할 주소가 닿지 않으면 거절하고 저장하지 않는다")
+    void rejectsUnreachableUrlOnRegister() {
         when(agents.findByCode("mom")).thenReturn(Optional.empty());
         AppUser owner = owner(7L);
         when(users.findByEmail("mom@example.com")).thenReturn(Optional.of(owner));
@@ -203,7 +214,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 그룹_에이전트를_끄는_요청은_도구를_읽지_않는다() {
+    @DisplayName("그룹 에이전트를 끄는 요청은 도구를 읽지 않는다")
+    void skipsToolReadWhenDisablingGroupAgent() {
         AdminAgentView view = controller.update("dad", new UpdateAgentRequest(false, AgentVisibility.GROUP, null, null));
 
         assertThat(view.enabled()).isFalse();
@@ -211,7 +223,8 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     @Test
-    void 꺼진_그룹_에이전트를_켜기_전에는_private_toolset을_검사한다() {
+    @DisplayName("꺼진 그룹 에이전트를 켜기 전에는 private toolset을 검사한다")
+    void checksPrivateToolsetBeforeEnablingDisabledGroupAgent() {
         agent.changeAccess(false, AgentVisibility.GROUP, null);
         when(hermesToolsets.readEnabled(CURRENT_URL, "dad")).thenReturn(java.util.List.of("terminal"));
 

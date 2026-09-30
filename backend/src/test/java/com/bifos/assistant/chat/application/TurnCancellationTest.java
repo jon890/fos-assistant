@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class TurnCancellationTest {
@@ -22,7 +23,8 @@ class TurnCancellationTest {
     }
 
     @Test
-    void 중지_뒤에_붙은_스트림도_유예_시간이_지나면_닫는다() throws InterruptedException {
+    @DisplayName("중지 뒤에 붙은 스트림도 유예 시간이 지나면 닫는다")
+    void closesStreamAttachedAfterStopOnceGracePeriodPasses() throws InterruptedException {
         TurnCancellation.TurnHandle handle = turns.open(1L, 2L);
         CountDownLatch closed = new CountDownLatch(1);
         Closeable stream = closed::countDown;
@@ -36,7 +38,8 @@ class TurnCancellationTest {
     }
 
     @Test
-    void Hermes_중지가_확정되기_전에는_유예_시간으로_스트림을_닫지_않는다() throws InterruptedException {
+    @DisplayName("Hermes 중지가 확정되기 전에는 유예 시간으로 스트림을 닫지 않는다")
+    void doesNotCloseStreamByGracePeriodBeforeHermesStopIsConfirmed() throws InterruptedException {
         TurnCancellation delayed = new TurnCancellation(mock(HermesRunsClient.class), Duration.ofMillis(10));
         try {
             TurnCancellation.TurnHandle handle = delayed.open(1L, 2L);

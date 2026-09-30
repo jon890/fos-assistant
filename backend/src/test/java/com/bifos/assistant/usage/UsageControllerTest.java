@@ -27,6 +27,7 @@ import java.util.List;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,7 +58,7 @@ class UsageControllerTest {
     private Agent agent;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         executions.deleteAll();
         agent = agents.findByCode("list-dad").orElseGet(() -> agents.save(Agent.of(
                 "list-dad",
@@ -74,7 +75,8 @@ class UsageControllerTest {
     }
 
     @Test
-    void 자식을_가진_실행만_hasChildren_이_참이다() {
+    @DisplayName("자식을 가진 실행만 hasChildren 이 참이다")
+    void onlyRunsWithChildrenHaveHasChildrenTrue() {
         AgentExecution parent = execution(null, null);
         execution(parent.id(), parent.id());
         AgentExecution alone = execution(null, null);
@@ -94,7 +96,8 @@ class UsageControllerTest {
     }
 
     @Test
-    void 요청한_effort_를_싣고_고르지_않은_실행은_null_이다() {
+    @DisplayName("요청한 effort 를 싣고 고르지 않은 실행은 null 이다")
+    void carriesRequestedEffortAndUnchosenRunIsNull() {
         AgentExecution chosen = execution(null, null, "high");
         AgentExecution byDefault = execution(null, null);
 
@@ -113,7 +116,8 @@ class UsageControllerTest {
     }
 
     @Test
-    void 에이전트_행이_없어도_두_줄이_나오고_없는_쪽의_에이전트_칸만_빈다() {
+    @DisplayName("에이전트 행이 없어도 두 줄이 나오고 없는 쪽의 에이전트 칸만 빈다")
+    void twoRowsComeOutWithoutAgentRowAndOnlyMissingSideAgentColumnIsEmpty() {
         Agent gone = agents.save(Agent.of(
                 "list-gone",
                 "지운 아빠",
@@ -163,7 +167,8 @@ class UsageControllerTest {
     private static final long QUERIES_PER_LIST = 5;
 
     @Test
-    void 목록이_길어져도_자식을_확인하는_질의는_늘지_않는다() {
+    @DisplayName("목록이 길어져도 자식을 확인하는 질의는 늘지 않는다")
+    void childCheckQueriesDoNotGrowAsListGrows() {
         long few = queriesForList(2);
         long many = queriesForList(10);
 

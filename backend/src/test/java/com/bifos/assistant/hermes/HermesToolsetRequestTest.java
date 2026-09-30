@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -60,7 +61,8 @@ class HermesToolsetRequestTest {
     }
 
     @Test
-    void 대시보드_목록은_기계용_토큰으로_읽는다() {
+    @DisplayName("대시보드 목록은 기계용 토큰으로 읽는다")
+    void dashboardListIsReadWithMachineToken() {
         response = "[{\"name\":\"web\",\"label\":\"Web\",\"description\":\"Search\"}]";
 
         assertThat(client.readCatalog()).singleElement().satisfies(entry -> {
@@ -75,7 +77,8 @@ class HermesToolsetRequestTest {
     }
 
     @Test
-    void listener_목록은_profile_key로_켜진_이름만_읽는다() {
+    @DisplayName("listener 목록은 profile key로 켜진 이름만 읽는다")
+    void listenerListReadsOnlyEnabledNamesWithProfileKey() {
         response = "{\"object\":\"list\",\"platform\":\"api_server\",\"data\":["
                 + "{\"name\":\"web\",\"enabled\":true},{\"name\":\"terminal\",\"enabled\":false}]}";
 
@@ -88,7 +91,8 @@ class HermesToolsetRequestTest {
     }
 
     @Test
-    void API_server_목록만_설정으로_쓴다() throws Exception {
+    @DisplayName("API server 목록만 설정으로 쓴다")
+    void usesOnlyApiServerListAsSetting() throws Exception {
         client.writeApiServer("kid", List.of("web", "fos-assistant"));
 
         assertThat(calls).singleElement().satisfies(call -> {
@@ -103,7 +107,8 @@ class HermesToolsetRequestTest {
     }
 
     @Test
-    void listener_목록이_data_로_감싸지_않은_배열이면_받지_않는다() {
+    @DisplayName("listener 목록이 data 로 감싸지 않은 배열이면 받지 않는다")
+    void rejectsListenerListNotWrappedAsDataArray() {
         response = "[{\"name\":\"web\",\"enabled\":true}]";
 
         assertThatThrownBy(() -> client.readEnabled(baseUrl() + "/p/kid", "kid"))
@@ -113,7 +118,8 @@ class HermesToolsetRequestTest {
     }
 
     @Test
-    void listener가_빈_목록을_성공으로_돌려도_도구가_모두_꺼진_것으로_읽지_않는다() {
+    @DisplayName("listener가 빈 목록을 성공으로 돌려도 도구가 모두 꺼진 것으로 읽지 않는다")
+    void doesNotReadAsAllToolsOffWhenListenerReturnsEmptyListAsSuccess() {
         response = "{\"object\":\"list\",\"platform\":\"api_server\",\"data\":[]}";
 
         assertThatThrownBy(() -> client.readEnabled(baseUrl() + "/p/kid", "kid"))

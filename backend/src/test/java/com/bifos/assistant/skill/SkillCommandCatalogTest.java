@@ -23,6 +23,7 @@ import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,7 +38,7 @@ class SkillCommandCatalogTest {
     private final Agent agent = mock(Agent.class);
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(agent.id()).thenReturn(7L);
         when(agent.code()).thenReturn("dad");
     }
@@ -48,7 +49,8 @@ class SkillCommandCatalogTest {
     }
 
     @Test
-    void 삼십초_안에는_들고_있던_이름을_주고_삼십초가_지나면_다시_읽는다() {
+    @DisplayName("삼십초 안에는 들고 있던 이름을 주고 삼십초가 지나면 다시 읽는다")
+    void holdsNamesForThirtySecondsAndRereadsAfter() {
         listed("shopping");
         assertThat(catalog.enabledNames(agent)).containsExactly("shopping");
 
@@ -61,7 +63,8 @@ class SkillCommandCatalogTest {
     }
 
     @Test
-    void 목록을_읽다_Hermes_가_실패하면_그_예외를_올리고_다음에_다시_읽는다() {
+    @DisplayName("목록을 읽다 Hermes 가 실패하면 그 예외를 올리고 다음에 다시 읽는다")
+    void rethrowsAndRereadsNextTimeWhenHermesFailsWhileReadingList() {
         when(skills.commandList(agent)).thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
         assertThatThrownBy(() -> catalog.enabledNames(agent))
@@ -74,7 +77,8 @@ class SkillCommandCatalogTest {
     }
 
     @Test
-    void 목록을_읽는_동안_SkillsChanged_가_오면_읽은_목록을_캐시에_넣지_않는다() {
+    @DisplayName("목록을 읽는 동안 SkillsChanged 가 오면 읽은 목록을 캐시에 넣지 않는다")
+    void doesNotCacheListReadWhileSkillsChangedArrives() {
         // 첫 읽기가 끝나기 전에 스킬이 바뀌었다. 그 읽기는 바뀌기 전의 목록을 들고 돌아온다.
         when(skills.commandList(agent))
                 .thenAnswer(call -> {
@@ -89,7 +93,8 @@ class SkillCommandCatalogTest {
     }
 
     @Test
-    void skills_toolset_이_꺼져_있으면_켜진_스킬이_있어도_빈_집합이다() {
+    @DisplayName("skills toolset 이 꺼져 있으면 켜진 스킬이 있어도 빈 집합이다")
+    void returnsEmptySetWhenSkillsToolsetIsOffEvenWithEnabledSkills() {
         when(skills.commandList(agent)).thenReturn(new SkillList(
                 List.of(new SkillListItem("shopping", "", SkillSource.UPLOADED, true, null)), false, false, 30));
 

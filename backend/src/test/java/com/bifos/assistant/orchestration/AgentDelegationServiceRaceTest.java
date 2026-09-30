@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -58,7 +59,7 @@ class AgentDelegationServiceRaceTest {
     private AgentDelegationService delegations;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(origin.id()).thenReturn(ROOT_ID);
         when(origin.treeRootId()).thenReturn(ROOT_ID);
         when(origin.conversationId()).thenReturn(CONVERSATION_ID);
@@ -76,7 +77,8 @@ class AgentDelegationServiceRaceTest {
     }
 
     @Test
-    void 뿌리_잠금을_제한_시간_안에_잡지_못하면_실행을_시작하지_않고_SUBMIT_FAILED_다() throws Exception {
+    @DisplayName("뿌리 잠금을 제한 시간 안에 잡지 못하면 실행을 시작하지 않고 SUBMIT FAILED 다")
+    void doesNotStartRunAndSubmitFailedWhenRootLockNotAcquiredInTime() throws Exception {
         DelegationKey holding = key("call_holding");
         DelegationKey waiting = key("call_waiting");
         CountDownLatch holdingEntered = new CountDownLatch(1);
@@ -114,7 +116,8 @@ class AgentDelegationServiceRaceTest {
     }
 
     @Test
-    void 실행_줄_저장이_유일_제약에_걸리면_먼저_저장된_같은_키의_줄을_다시_읽어_그_번호를_준다() {
+    @DisplayName("실행 줄 저장이 유일 제약에 걸리면 먼저 저장된 같은 키의 줄을 다시 읽어 그 번호를 준다")
+    void rereadsRowOfSameKeySavedFirstAndReturnsItsIdOnUniqueConflict() {
         DelegationKey raced = key("call_raced");
         AgentExecution saved = mock(AgentExecution.class);
         when(saved.id()).thenReturn(55L);
@@ -133,7 +136,8 @@ class AgentDelegationServiceRaceTest {
     }
 
     @Test
-    void 다시_읽은_같은_키의_줄이_다른_사용자의_것이면_번호를_알리지_않는다() {
+    @DisplayName("다시 읽은 같은 키의 줄이 다른 사용자의 것이면 번호를 알리지 않는다")
+    void doesNotRevealIdWhenRereadRowOfSameKeyBelongsToOtherUser() {
         DelegationKey raced = key("call_other_user");
         AgentExecution saved = mock(AgentExecution.class);
         when(saved.id()).thenReturn(56L);

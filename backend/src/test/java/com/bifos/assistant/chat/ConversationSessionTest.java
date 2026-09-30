@@ -10,6 +10,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,7 +37,8 @@ class ConversationSessionTest {
     }
 
     @Test
-    void 새_대화는_fos_session을_정해_보낼_session과_뿌리_session에_함께_적는다() {
+    @DisplayName("새 대화는 fos session을 정해 보낼 session과 뿌리 session에 함께 적는다")
+    void newConversationFixesSessionAndRecordsItForSendAndRootSession() {
         Conversation conversation = newConversation();
 
         RunSession session = sessions.ensure(conversation);
@@ -52,7 +54,8 @@ class ConversationSessionTest {
     }
 
     @Test
-    void 두_turn이_함께_정하려_하면_하나만_저장되고_진_쪽은_저장된_값을_다시_읽어_쓴다() {
+    @DisplayName("두 turn이 함께 정하려 하면 하나만 저장되고 진 쪽은 저장된 값을 다시 읽어 쓴다")
+    void concurrentTurnsSaveOnlyOneAndLoserRereadsStoredValue() {
         Conversation created = newConversation();
         // 두 turn 이 각자 session 이 빈 대화를 읽어 둔 상태다.
         Conversation winner = reload(created);
@@ -72,7 +75,8 @@ class ConversationSessionTest {
     }
 
     @Test
-    void session을_정해도_대화의_updated_at은_바뀌지_않는다() {
+    @DisplayName("session을 정해도 대화의 updated at은 바뀌지 않는다")
+    void fixingSessionLeavesConversationUpdatedAtUnchanged() {
         Conversation conversation = newConversation();
         Instant before = reload(conversation).updatedAt();
 
@@ -82,7 +86,8 @@ class ConversationSessionTest {
     }
 
     @Test
-    void Hermes가_정한_session이_있는_옛_대화는_그대로_쓰고_뿌리를_채우지_않는다() {
+    @DisplayName("Hermes가 정한 session이 있는 옛 대화는 그대로 쓰고 뿌리를 채우지 않는다")
+    void keepsOldConversationWithHermesSessionAndDoesNotFillRoot() {
         Conversation conversation = newConversation();
         conversations.touchSession(conversation.id(), "legacy-session", Instant.now());
         Conversation legacy = reload(conversation);

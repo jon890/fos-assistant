@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -106,7 +107,8 @@ class HermesModelCatalogTest {
     }
 
     @Test
-    void 기본값과_인증된_provider_의_모델을_읽고_설정하지_않은_provider_는_뺀다() {
+    @DisplayName("기본값과 인증된 provider 의 모델을 읽고 설정하지 않은 provider 는 뺀다")
+    void readsDefaultAndAuthenticatedProviderModelsAndDropsUnconfigured() {
         HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
 
         assertThat(catalog.defaultProvider()).isEqualTo("openai-codex");
@@ -119,7 +121,8 @@ class HermesModelCatalogTest {
     }
 
     @Test
-    void capabilities_의_reasoning_을_모델_이름_표로_옮긴다() {
+    @DisplayName("capabilities 의 reasoning 을 모델 이름 표로 옮긴다")
+    void mapsCapabilitiesReasoningToModelNameTable() {
         HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
 
         assertThat(catalog.providers().get(0).reasoning())
@@ -127,7 +130,8 @@ class HermesModelCatalogTest {
     }
 
     @Test
-    void capabilities_에_없는_모델은_표에_넣지_않는다() {
+    @DisplayName("capabilities 에 없는 모델은 표에 넣지 않는다")
+    void leavesModelsMissingFromCapabilitiesOutOfTable() {
         respondWith(200, """
                 {"providers": [{"slug": "p", "authenticated": true, "models": ["a", "b"],
                  "capabilities": {"a": {"reasoning": true}, "b": {}}}]}
@@ -142,7 +146,8 @@ class HermesModelCatalogTest {
     }
 
     @Test
-    void profile_의_key_를_bearer_로_싣고_model_options_경로를_부른다() {
+    @DisplayName("profile 의 key 를 bearer 로 싣고 model options 경로를 부른다")
+    void callsModelOptionsPathWithProfileKeyAsBearer() {
         client.readCatalog(baseUrl(), "dad");
 
         assertThat(paths).containsExactly("/p/dad/api/model/options");
@@ -150,14 +155,16 @@ class HermesModelCatalogTest {
     }
 
     @Test
-    void 인증된_provider_가_하나도_없으면_빈_목록이다() {
+    @DisplayName("인증된 provider 가 하나도 없으면 빈 목록이다")
+    void returnsEmptyListWhenNoProviderIsAuthenticated() {
         respondWith(200, "{\"provider\": \"x\", \"model\": \"y\", \"providers\": []}");
 
         assertThat(client.readCatalog(baseUrl(), "dad").providers()).isEmpty();
     }
 
     @Test
-    void 서버_오류와_429_는_모두_HERMES_UNAVAILABLE_이다() {
+    @DisplayName("서버 오류와 429 는 모두 HERMES UNAVAILABLE 이다")
+    void serverErrorAnd429AreBothHermesUnavailable() {
         for (int failure : new int[] {500, 503, 429}) {
             respondWith(failure, "{}");
 
@@ -170,7 +177,8 @@ class HermesModelCatalogTest {
     }
 
     @Test
-    void key_가_없는_profile_은_그_예외를_그대로_올린다() {
+    @DisplayName("key 가 없는 profile 은 그 예외를 그대로 올린다")
+    void rethrowsAsIsForProfileWithoutKey() {
         assertThatThrownBy(() -> client.readCatalog(baseUrl(), "kid"))
                 .isInstanceOfSatisfying(
                         ApiException.class,

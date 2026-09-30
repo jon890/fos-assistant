@@ -19,6 +19,10 @@ class ArchitectureRulesTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.bifos.assistant");
 
+    static final JavaClasses TESTS = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
+            .importPackages("com.bifos.assistant");
+
     @Test
     @DisplayName("최상위 패키지 사이에 새 순환 간선이 생기지 않는다")
     void topLevelPackagesFreeOfCycles() {
@@ -77,5 +81,11 @@ class ArchitectureRulesTest {
     @DisplayName("컨트롤러 안에 record 를 두지 않는다")
     void controllersHaveNoNestedRecords() {
         FreezingArchRule.freeze(ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS).check(MAIN);
+    }
+
+    @Test
+    @DisplayName("테스트 메서드에 DisplayName 이 붙는다")
+    void testMethodsHaveDisplayName() {
+        FreezingArchRule.freeze(ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME).check(TESTS);
     }
 }

@@ -48,6 +48,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -103,7 +104,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 고른_모델과_effort_를_저장하고_목록_순서를_정하는_시각은_그대로다() {
+    @DisplayName("고른 모델과 effort 를 저장하고 목록 순서를 정하는 시각은 그대로다")
+    void storesChosenModelAndEffortAndKeepsListOrderTimeUnchanged() {
         CurrentUser dad = member("choice-dad");
         Long id = chat.startEmpty(dad, "choice-dad").id();
         Instant before = conversations.findById(id).orElseThrow().updatedAt();
@@ -117,7 +119,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 경로는_바뀐_대화_한_줄을_돌려주고_목록도_같은_값을_싣는다() {
+    @DisplayName("경로는 바뀐 대화 한 줄을 돌려주고 목록도 같은 값을 싣는다")
+    void pathReturnsChangedConversationRowAndListCarriesSameValues() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ChatController controller = chatController(dad);
@@ -133,7 +136,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 고르지_않은_대화와_모두_비워_보낸_대화는_기본값이다() {
+    @DisplayName("고르지 않은 대화와 모두 비워 보낸 대화는 기본값이다")
+    void unchosenAndAllBlankConversationsUseDefault() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ChatController controller = chatController(dad);
@@ -155,7 +159,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void provider_만_주거나_모르는_effort_를_주면_거절하고_저장된_값이_그대로다() {
+    @DisplayName("provider 만 주거나 모르는 effort 를 주면 거절하고 저장된 값이 그대로다")
+    void rejectsProviderOnlyOrUnknownEffortAndKeepsStoredValue() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ModelChoice saved = new ModelChoice("openrouter", "example-model-small", "medium");
@@ -171,7 +176,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 공백을_뗀_provider_나_모델이_열보다_길면_거절하고_저장된_값이_그대로다() {
+    @DisplayName("공백을 뗀 provider 나 모델이 열보다 길면 거절하고 저장된 값이 그대로다")
+    void rejectsTrimmedProviderOrModelLongerThanColumnAndKeepsStoredValue() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ModelChoice saved = new ModelChoice("openrouter", "example-model-small", "medium");
@@ -195,7 +201,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 저장된_값이_검증에_맞지_않아도_목록과_보내기가_그_값을_그대로_싣는다() {
+    @DisplayName("저장된 값이 검증에 맞지 않아도 목록과 보내기가 그 값을 그대로 싣는다")
+    void listAndSendCarryStoredValueEvenIfItFailsValidation() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         conversations.chooseModelIfActive(created.id(), dad.id(), "openrouter", "example-model-small", "extreme");
@@ -214,7 +221,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 앞뒤_공백을_떼고_저장한다() {
+    @DisplayName("앞뒤 공백을 떼고 저장한다")
+    void trimsSurroundingWhitespaceOnSave() {
         CurrentUser dad = member("choice-dad");
         Long id = chat.startEmpty(dad, "choice-dad").id();
 
@@ -225,7 +233,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 남의_대화와_지운_대화는_없는_대화와_같다() {
+    @DisplayName("남의 대화와 지운 대화는 없는 대화와 같다")
+    void othersAndDeletedConversationsAreSameAsMissing() {
         CurrentUser dad = member("choice-dad");
         CurrentUser kid = member("choice-kid");
         Long dadsId = chat.startEmpty(dad, "choice-dad").id();
@@ -241,7 +250,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 흐름이_붙은_에이전트의_빈_대화에_모델을_고르고_사진은_보낼_때_거절한다() {
+    @DisplayName("흐름이 붙은 에이전트의 빈 대화에 모델을 고르고 사진은 보낼 때 거절한다")
+    void choosesModelOnEmptyFlowAgentConversationAndRejectsImagesAtSend() {
         CurrentUser dad = member("choice-dad");
         Agent flowed = agents.findByCode("choice-dad").orElseThrow();
         flowed.assignFlow("research-and-build");

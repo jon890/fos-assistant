@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,7 +54,7 @@ class SessionOwnerResolverTest {
 
     /** 같은 H2 를 다른 검사 클래스와 함께 쓰므로 이 검사의 사용자와 이 검사가 쓰는 profile 의 줄만 지운다. */
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));
         MY_EMAILS.forEach(email -> users.findByEmail(email).ifPresent(users::delete));
         dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER));
@@ -63,7 +64,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 1
-    void 등록한_하위_에이전트는_origin_실행이_끝난_뒤에도_그_실행으로_정한다() {
+    @DisplayName("등록한 하위 에이전트는 origin 실행이 끝난 뒤에도 그 실행으로 정한다")
+    void registeredSubagentIsDecidedByOriginRunEvenAfterItEnds() {
         String s1 = register(root, root);
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
 
@@ -71,7 +73,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 3
-    void 하위_에이전트의_하위_에이전트도_끝난_origin_실행으로_정한다() {
+    @DisplayName("하위 에이전트의 하위 에이전트도 끝난 origin 실행으로 정한다")
+    void subagentOfSubagentIsDecidedByEndedOriginRunToo() {
         String s1 = register(root, root);
         String s2 = register(root, s1);
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
@@ -80,7 +83,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 5
-    void 같은_뿌리로_다음_turn_이_돌아도_등록한_session_은_처음_origin_에_남는다() {
+    @DisplayName("같은 뿌리로 다음 turn 이 돌아도 등록한 session 은 처음 origin 에 남는다")
+    void registeredSessionStaysWithFirstOriginEvenIfNextTurnRunsOnSameRoot() {
         String s1 = register(root, root);
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
         AgentExecution nextTurn = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, root);
@@ -90,7 +94,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 6
-    void 같은_profile_을_두_사용자가_써도_부모가_모두_끝난_뒤_각자의_origin_으로_정한다() {
+    @DisplayName("같은 profile 을 두 사용자가 써도 부모가 모두 끝난 뒤 각자의 origin 으로 정한다")
+    void twoUsersOnSameProfileAreDecidedByOwnOriginAfterParentsEnd() {
         String rootA = root;
         String rootB = newRoot();
         AgentExecution kidRun = McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE, rootB);
@@ -104,7 +109,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 7
-    void 앞_프로세스가_적은_등록_줄만으로_실패한_origin_실행을_정한다() {
+    @DisplayName("앞 프로세스가 적은 등록 줄만으로 실패한 origin 실행을 정한다")
+    void decidesFailedOriginRunFromRegistrationRowWrittenByPreviousProcess() {
         setStatus(dadRun, ExecutionStatus.FAILED);
         jdbc.update("UPDATE agent_execution SET error_code = ? WHERE id = ?", "ORPHANED", dadRun.id());
         String s1 = newChild();
@@ -121,7 +127,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 등록한_하위_에이전트는_origin_실행이_취소되면_거절한다() {
+    @DisplayName("등록한 하위 에이전트는 origin 실행이 취소되면 거절한다")
+    void rejectsRegisteredSubagentWhenOriginRunIsCancelled() {
         String s1 = register(root, root);
         assertOrigin(owners.resolve(PROFILE, root, s1), dadRun, dad);
 
@@ -131,7 +138,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 하위_에이전트의_하위_에이전트도_origin_실행이_취소되면_거절한다() {
+    @DisplayName("하위 에이전트의 하위 에이전트도 origin 실행이 취소되면 거절한다")
+    void rejectsSubagentOfSubagentWhenOriginRunIsCancelled() {
         String s1 = register(root, root);
         String s2 = register(root, s1);
         setStatus(dadRun, ExecutionStatus.CANCELLED);
@@ -141,7 +149,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 흐름을_중지하면_이미_끝난_자식_실행에서_만든_하위_에이전트도_거절한다() {
+    @DisplayName("흐름을 중지하면 이미 끝난 자식 실행에서 만든 하위 에이전트도 거절한다")
+    void stoppingFlowRejectsSubagentMadeInAlreadyEndedChildRun() {
         // 흐름의 자식 실행은 제 session 으로 돌아 그 안의 하위 에이전트는 자식 실행을 origin 으로 갖는다.
         String childRoot = newRoot();
         AgentExecution researched = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, childRoot);
@@ -157,7 +166,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 뿌리가_끝났어도_취소가_아니면_자식_실행의_하위_에이전트는_그대로_정한다() {
+    @DisplayName("뿌리가 끝났어도 취소가 아니면 자식 실행의 하위 에이전트는 그대로 정한다")
+    void decidesChildRunSubagentAsIsWhenRootEndedButNotCancelled() {
         String childRoot = newRoot();
         AgentExecution researched = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, childRoot);
         jdbc.update("UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
@@ -170,7 +180,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void origin_실행이_실패로_끝나도_등록한_하위_에이전트는_그대로_정한다() {
+    @DisplayName("origin 실행이 실패로 끝나도 등록한 하위 에이전트는 그대로 정한다")
+    void decidesRegisteredSubagentAsIsWhenOriginRunEndedInFailure() {
         String s1 = register(root, root);
         setStatus(dadRun, ExecutionStatus.FAILED);
 
@@ -178,21 +189,24 @@ class SessionOwnerResolverTest {
     }
 
     @Test // 8
-    void 다른_profile_의_등록으로는_정하지_못한다() {
+    @DisplayName("다른 profile 의 등록으로는 정하지 못한다")
+    void cannotDecideByRegistrationOfOtherProfile() {
         String s1 = register(root, root);
 
         assertRejected(OTHER_PROFILE, root, s1);
     }
 
     @Test // 11
-    void 등록이_없는_하위_session_은_뿌리에서_실행이_돌아도_거절한다() {
+    @DisplayName("등록이 없는 하위 session 은 뿌리에서 실행이 돌아도 거절한다")
+    void rejectsSubSessionWithoutRegistrationEvenIfRunRunsOnRoot() {
         String s9 = newChild();
 
         assertRejected(PROFILE, root, s9);
     }
 
     @Test
-    void 등록이_없고_session_이_뿌리와_같으면_도는_실행을_찾고_없으면_거절한다() {
+    @DisplayName("등록이 없고 session 이 뿌리와 같으면 도는 실행을 찾고 없으면 거절한다")
+    void findsRunningRunWhenNoRegistrationAndSessionEqualsRootElseRejects() {
         assertOrigin(owners.resolve(PROFILE, root, root), dadRun, dad);
 
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
@@ -201,7 +215,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 압축_교체된_최상위_session_의_호출은_거절하고_그_session_이_만든_하위_에이전트는_origin_으로_정한다() {
+    @DisplayName("압축 교체된 최상위 session 의 호출은 거절하고 그 session 이 만든 하위 에이전트는 origin 으로 정한다")
+    void rejectsCallOfCompactedTopSessionAndDecidesItsSubagentByOrigin() {
         String compacted = newRoot();
         String s1 = register(root, compacted);
 
@@ -210,7 +225,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 등록의_뿌리와_서명한_뿌리가_다르면_거절한다() {
+    @DisplayName("등록의 뿌리와 서명한 뿌리가 다르면 거절한다")
+    void rejectsWhenRegistrationRootDiffersFromSignedRoot() {
         String s1 = register(root, root);
         String otherRoot = newRoot();
         McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, otherRoot);
@@ -219,7 +235,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 등록의_origin_실행_줄이_없으면_거절한다() {
+    @DisplayName("등록의 origin 실행 줄이 없으면 거절한다")
+    void rejectsWhenRegistrationOriginRunRowIsMissing() {
         String s1 = register(root, root);
         jdbc.update("DELETE FROM agent_execution WHERE id = ?", dadRun.id());
 
@@ -227,7 +244,8 @@ class SessionOwnerResolverTest {
     }
 
     @Test
-    void 셋_가운데_하나라도_비었으면_거절한다() {
+    @DisplayName("셋 가운데 하나라도 비었으면 거절한다")
+    void rejectsWhenAnyOfThreeIsBlank() {
         String s1 = register(root, root);
 
         assertRejected(null, root, s1);

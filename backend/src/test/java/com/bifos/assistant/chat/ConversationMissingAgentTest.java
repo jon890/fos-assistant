@@ -35,6 +35,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -68,7 +69,7 @@ class ConversationMissingAgentTest {
     private CurrentUser dad;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -100,7 +101,8 @@ class ConversationMissingAgentTest {
     }
 
     @Test
-    void 에이전트_행이_없는_대화도_목록에_오고_그_줄의_에이전트_칸만_비어_있다() throws Exception {
+    @DisplayName("에이전트 행이 없는 대화도 목록에 오고 그 줄의 에이전트 칸만 비어 있다")
+    void conversationWithoutAgentRowStaysInListWithOnlyAgentColumnEmpty() throws Exception {
         Agent kept = agent("kept");
         Agent gone = agent("gone");
         UUID keptId = conversationOf(kept.id(), "남은 대화");
@@ -118,7 +120,8 @@ class ConversationMissingAgentTest {
     }
 
     @Test
-    void 에이전트_행이_없는_대화의_이름을_바꾸면_에이전트_칸이_빈_줄을_돌려준다() throws Exception {
+    @DisplayName("에이전트 행이 없는 대화의 이름을 바꾸면 에이전트 칸이 빈 줄을 돌려준다")
+    void renamingConversationWithoutAgentRowReturnsRowWithEmptyAgentColumn() throws Exception {
         Agent gone = agent("gone");
         UUID id = conversationOf(gone.id(), "옛 이름");
         agents.deleteById(gone.id());
@@ -133,7 +136,8 @@ class ConversationMissingAgentTest {
     }
 
     @Test
-    void 에이전트_행이_없는_대화에_보내면_없는_에이전트로_거절한다() throws Exception {
+    @DisplayName("에이전트 행이 없는 대화에 보내면 없는 에이전트로 거절한다")
+    void sendingToConversationWithoutAgentRowIsRejectedAsMissingAgent() throws Exception {
         Agent gone = agent("gone");
         UUID id = conversationOf(gone.id(), "행이 없는 대화");
         agents.deleteById(gone.id());
@@ -146,7 +150,8 @@ class ConversationMissingAgentTest {
     }
 
     @Test
-    void 에이전트_행이_없는_대화의_메시지_목록은_읽힌다() throws Exception {
+    @DisplayName("에이전트 행이 없는 대화의 메시지 목록은 읽힌다")
+    void messageListOfConversationWithoutAgentRowIsReadable() throws Exception {
         Agent gone = agent("gone");
         UUID id = conversationOf(gone.id(), "행이 없는 대화");
         agents.deleteById(gone.id());
@@ -157,7 +162,8 @@ class ConversationMissingAgentTest {
     }
 
     @Test
-    void 에이전트_번호가_없는_대화도_목록에_오고_보내면_없는_에이전트로_거절한다() throws Exception {
+    @DisplayName("에이전트 번호가 없는 대화도 목록에 오고 보내면 없는 에이전트로 거절한다")
+    void conversationWithoutAgentIdStaysInListAndSendIsMissingAgent() throws Exception {
         UUID id = conversationOf(null, "에이전트 없는 대화");
 
         mvc.perform(get("/api/v1/chat/conversations"))

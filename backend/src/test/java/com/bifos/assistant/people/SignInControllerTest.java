@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Date;
 import javax.crypto.SecretKey;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,14 +47,15 @@ class SignInControllerTest {
     private final JsonMapper json = JsonMapper.builder().build();
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         people.deleteAll();
         users.deleteAll();
         people.save(AllowedPerson.of("mom@example.com", "엄마", "mom"));
     }
 
     @Test
-    void 로그인_판정용_토큰은_허용된_사람을_돌려준다() throws Exception {
+    @DisplayName("로그인 판정용 토큰은 허용된 사람을 돌려준다")
+    void signInJudgeTokenReturnsAllowedPerson() throws Exception {
         HttpResponse<String> response = ask(signInToken(), "mom@example.com");
 
         assertThat(response.statusCode()).isEqualTo(200);
@@ -64,18 +66,21 @@ class SignInControllerTest {
     }
 
     @Test
-    void 토큰이_없으면_거절한다() throws Exception {
+    @DisplayName("토큰이 없으면 거절한다")
+    void rejectsWhenTokenIsMissing() throws Exception {
         assertThat(ask(null, "mom@example.com").statusCode()).isEqualTo(401);
     }
 
     @Test
-    void 대화용_토큰으로는_부를_수_없다() throws Exception {
+    @DisplayName("대화용 토큰으로는 부를 수 없다")
+    void cannotBeCalledWithConversationToken() throws Exception {
         assertThat(ask(conversationToken("mom@example.com"), "mom@example.com").statusCode())
                 .isEqualTo(401);
     }
 
     @Test
-    void 허용되지_않은_주소를_물어도_사용자가_생기지_않는다() throws Exception {
+    @DisplayName("허용되지 않은 주소를 물어도 사용자가 생기지 않는다")
+    void asksDisallowedAddressWithoutCreatingUser() throws Exception {
         long before = users.count();
 
         HttpResponse<String> response = ask(signInToken(), "stranger@example.com");
@@ -86,7 +91,8 @@ class SignInControllerTest {
     }
 
     @Test
-    void 빈_주소는_허용_목록에_없는_주소와_같은_답을_받는다() throws Exception {
+    @DisplayName("빈 주소는 허용 목록에 없는 주소와 같은 답을 받는다")
+    void blankAddressGetsSameAnswerAsAddressNotInAllowlist() throws Exception {
         HttpResponse<String> response = ask(signInToken(), "");
 
         assertThat(response.statusCode()).isEqualTo(200);
@@ -94,7 +100,8 @@ class SignInControllerTest {
     }
 
     @Test
-    void 토큰_검사가_본문_검사보다_먼저_돈다() throws Exception {
+    @DisplayName("토큰 검사가 본문 검사보다 먼저 돈다")
+    void tokenCheckRunsBeforeBodyCheck() throws Exception {
         assertThat(ask(null, "").statusCode()).isEqualTo(401);
     }
 

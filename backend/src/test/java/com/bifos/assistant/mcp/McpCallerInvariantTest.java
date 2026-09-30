@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,14 +47,15 @@ class McpCallerInvariantTest {
     private long unboundTokenId;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         tokenRepository.deleteAll();
         unboundToken = "unbound-" + UUID.randomUUID();
         unboundTokenId = McpCallSigner.insertUnboundToken(jdbc, unboundToken, "unbound");
     }
 
     @Test
-    void profile_이_빈_토큰은_목록과_모든_도구가_401_이고_사용_시각을_남기지_않는다() throws Exception {
+    @DisplayName("profile 이 빈 토큰은 목록과 모든 도구가 401 이고 사용 시각을 남기지 않는다")
+    void tokenWithBlankProfileGives401ForAllToolsWithoutUsageTime() throws Exception {
         Map<String, String> requests = new LinkedHashMap<>();
         requests.put("tools/list", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}");
         toolArguments().forEach((name, arguments) -> {
@@ -71,7 +73,8 @@ class McpCallerInvariantTest {
     }
 
     @Test
-    void profile_이_빈_토큰은_하위_에이전트_session_을_등록하지_못한다() throws Exception {
+    @DisplayName("profile 이 빈 토큰은 하위 에이전트 session 을 등록하지 못한다")
+    void tokenWithBlankProfileCannotRegisterSubagentSession() throws Exception {
         String root = McpCallSigner.newRoot();
         String child = "하위-" + UUID.randomUUID();
 
@@ -90,7 +93,8 @@ class McpCallerInvariantTest {
     }
 
     @Test
-    void profile_에_묶인_토큰도_fos_ctx_가_없으면_모든_도구가_호출_맥락_오류다() throws Exception {
+    @DisplayName("profile 에 묶인 토큰도 fos ctx 가 없으면 모든 도구가 호출 맥락 오류다")
+    void tokenBoundToProfileGivesCallContextErrorForAllToolsWithoutFosCtx() throws Exception {
         String bound = tokens.issue(PROFILE, "bound").rawToken();
 
         for (Map.Entry<String, ObjectNode> tool : toolArguments().entrySet()) {

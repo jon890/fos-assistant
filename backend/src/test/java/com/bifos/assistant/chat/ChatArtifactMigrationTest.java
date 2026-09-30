@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,7 +21,8 @@ import org.junit.jupiter.api.Test;
 class ChatArtifactMigrationTest {
 
     @Test
-    void V24_가_만든_표는_같은_답의_같은_경로를_두_번_받지_않고_다른_답에는_받는다() throws SQLException {
+    @DisplayName("V24 가 만든 표는 같은 답의 같은 경로를 두 번 받지 않고 다른 답에는 받는다")
+    void tableFromV24RejectsSamePathTwiceForSameReplyButAllowsOtherReply() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
                 .dataSource(url, "sa", "")

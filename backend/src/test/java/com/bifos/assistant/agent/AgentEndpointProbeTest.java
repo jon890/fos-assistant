@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -35,7 +36,8 @@ class AgentEndpointProbeTest {
     }
 
     @Test
-    void 확인이_200_이면_지나간다(@TempDir Path keyDir) throws IOException {
+    @DisplayName("확인이 200 이면 지나간다")
+    void passesWhenProbeReturns200(@TempDir Path keyDir) throws IOException {
         String baseUrl = startHermes(200);
 
         probe(keyDir, "dad", "dad-key").requireReachable(baseUrl + "/p/dad", "dad");
@@ -45,7 +47,8 @@ class AgentEndpointProbeTest {
     }
 
     @Test
-    void 확인은_그_에이전트의_profile_key_로_나간다(@TempDir Path keyDir) throws IOException {
+    @DisplayName("확인은 그 에이전트의 profile key 로 나간다")
+    void sendsProbeWithAgentProfileKey(@TempDir Path keyDir) throws IOException {
         String baseUrl = startHermes(200);
 
         probe(keyDir, "dad", "dad-key").requireReachable(baseUrl + "/p/dad", "dad");
@@ -55,7 +58,8 @@ class AgentEndpointProbeTest {
     }
 
     @Test
-    void 확인이_200_이_아니면_무엇이_왔는지_알린다(@TempDir Path keyDir) throws IOException {
+    @DisplayName("확인이 200 이 아니면 무엇이 왔는지 알린다")
+    void reportsReceivedStatusWhenNot200(@TempDir Path keyDir) throws IOException {
         String baseUrl = startHermes(401);
         AgentEndpointProbe probe = probe(keyDir, "dad", "dad-key");
 
@@ -67,7 +71,8 @@ class AgentEndpointProbeTest {
     }
 
     @Test
-    void 닿지_않는_주소는_무엇이_막혔는지_알린다(@TempDir Path keyDir) throws IOException {
+    @DisplayName("닿지 않는 주소는 무엇이 막혔는지 알린다")
+    void reportsWhatBlockedUnreachableUrl(@TempDir Path keyDir) throws IOException {
         // 아무도 듣지 않는 포트를 고르려고 띄운 뒤 바로 내린다.
         String baseUrl = startHermes(200);
         server.stop(0);
@@ -80,7 +85,8 @@ class AgentEndpointProbeTest {
     }
 
     @Test
-    void 끝의_슬래시를_떼고_묻는다(@TempDir Path keyDir) throws IOException {
+    @DisplayName("끝의 슬래시를 떼고 묻는다")
+    void stripsTrailingSlashBeforeProbing(@TempDir Path keyDir) throws IOException {
         String baseUrl = startHermes(200);
 
         probe(keyDir, "dad", "dad-key").requireReachable(baseUrl + "/p/dad/", "dad");

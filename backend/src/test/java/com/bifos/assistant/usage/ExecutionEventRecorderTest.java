@@ -15,6 +15,7 @@ import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import java.time.Instant;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -48,7 +49,8 @@ class ExecutionEventRecorderTest {
     }
 
     @Test
-    void 도구를_부르기_시작한_사건을_TOOL_STARTED로_옮기고_도구_이름을_채운다() {
+    @DisplayName("도구를 부르기 시작한 사건을 TOOL STARTED로 옮기고 도구 이름을 채운다")
+    void mapsToolStartEventToToolStartedAndFillsToolName() {
         ExecutionEvent event = record(hermes("tool.started", "web_search", "started"));
 
         assertThat(event.eventType()).isEqualTo(ExecutionEventType.TOOL_STARTED);
@@ -65,7 +67,8 @@ class ExecutionEventRecorderTest {
      * 사용이 아니다. 사건 자체는 다른 도구와 같이 옮겨 적는다.
      */
     @Test
-    void skill_view_도구의_시작_사건에서만_스킬_사용을_적는다() {
+    @DisplayName("skill view 도구의 시작 사건에서만 스킬 사용을 적는다")
+    void recordsSkillUseOnlyFromSkillViewToolStartEvent() {
         ExecutionEvent started = record(hermes("tool.started", "skill_view", "shopping → references/list.md"));
         record(hermes("tool.completed", "skill_view", "shopping"));
         record(hermes("tool.started", "web_search", "shopping"));
@@ -78,7 +81,8 @@ class ExecutionEventRecorderTest {
     }
 
     @Test
-    void 도구_호출이_끝난_사건에_걸린_시간을_채운다() {
+    @DisplayName("도구 호출이 끝난 사건에 걸린 시간을 채운다")
+    void fillsElapsedTimeOnToolCallEndEvent() {
         ExecutionEvent event =
                 record(new RunEvent("tool.completed", null, "web_search", "done", 1500L, false));
 
@@ -89,7 +93,8 @@ class ExecutionEventRecorderTest {
     }
 
     @Test
-    void 하위_에이전트_사건은_도구_사건과_어미가_다르다() {
+    @DisplayName("하위 에이전트 사건은 도구 사건과 어미가 다르다")
+    void subagentEventSuffixDiffersFromToolEvent() {
         ExecutionEvent started = record(hermes("subagent.start", null, "탐색을 시작한다"));
         ExecutionEvent completed = record(hermes("subagent.complete", null, "탐색을 마쳤다"));
 
@@ -100,7 +105,8 @@ class ExecutionEventRecorderTest {
     }
 
     @Test
-    void 하위_에이전트_이름이_오면_subagentName에_채운다() {
+    @DisplayName("하위 에이전트 이름이 오면 subagentName에 채운다")
+    void fillsSubagentNameWhenSubagentNameComes() {
         ExecutionEvent event = record(hermes("subagent.start", "researcher", null));
 
         assertThat(event.subagentName()).isEqualTo("researcher");
@@ -108,7 +114,8 @@ class ExecutionEventRecorderTest {
     }
 
     @Test
-    void 하위_에이전트의_목표와_session과_모델과_토큰만_옮긴다() {
+    @DisplayName("하위 에이전트의 목표와 session과 모델과 토큰만 옮긴다")
+    void carriesOnlySubagentGoalSessionModelAndTokens() {
         RunEvent completed = new RunEvent("subagent.complete", null, "researcher", "preview", 1500L,
                 false, "sa-1", "숙소 조사", "model-a", "child-1", 123L, 45L, "completed");
         ExecutionEvent event = record(completed);
@@ -132,14 +139,16 @@ class ExecutionEventRecorderTest {
      * 사건이 두 줄 남는다.
      */
     @Test
-    void 실행의_시작과_끝을_알리는_사건은_여기서_옮기지_않는다() {
+    @DisplayName("실행의 시작과 끝을 알리는 사건은 여기서 옮기지 않는다")
+    void doesNotMapRunStartAndEndEventsHere() {
         assertThat(record(hermes("run.completed", null, null))).isNull();
         assertThat(record(hermes("run.failed", null, null))).isNull();
         assertThat(record(hermes("run.cancelled", null, null))).isNull();
     }
 
     @Test
-    void 모르는_사건은_예외를_던지지_않고_버린다() {
+    @DisplayName("모르는 사건은 예외를 던지지 않고 버린다")
+    void dropsUnknownEventWithoutThrowing() {
         assertThatCode(() -> record(hermes("plugin.exploded", null, null))).doesNotThrowAnyException();
 
         assertThat(record(hermes("plugin.exploded", null, null))).isNull();
@@ -148,20 +157,23 @@ class ExecutionEventRecorderTest {
     }
 
     @Test
-    void 글자_조각과_추론_사건은_저장하지_않는다() {
+    @DisplayName("글자 조각과 추론 사건은 저장하지 않는다")
+    void doesNotStoreTextChunkAndReasoningEvents() {
         assertThat(record(new RunEvent("message.delta", "안녕", null, null, null, null))).isNull();
         assertThat(record(new RunEvent("reasoning.available", "생각", null, null, null, null))).isNull();
     }
 
     @Test
-    void 실패한_도구의_완료_사건은_실패로_저장한다() {
+    @DisplayName("실패한 도구의 완료 사건은 실패로 저장한다")
+    void storesCompletionEventOfFailedToolAsFailure() {
         ExecutionEvent event = record(new RunEvent("tool.completed", null, "search", "실패", 5L, true));
 
         assertThat(event.failed()).isTrue();
     }
 
     @Test
-    void detail이_500자를_넘으면_자른다() {
+    @DisplayName("detail이 500자를 넘으면 자른다")
+    void truncatesDetailOver500Chars() {
         String long501 = "가".repeat(ExecutionEvent.DETAIL_LIMIT + 1);
 
         ExecutionEvent event = record(hermes("tool.started", "web_search", long501));
@@ -171,14 +183,16 @@ class ExecutionEventRecorderTest {
     }
 
     @Test
-    void detail이_정확히_500자면_그대로_둔다() {
+    @DisplayName("detail이 정확히 500자면 그대로 둔다")
+    void keepsDetailOfExactly500Chars() {
         String long500 = "가".repeat(ExecutionEvent.DETAIL_LIMIT);
 
         assertThat(record(hermes("tool.started", "web_search", long500)).detail()).isEqualTo(long500);
     }
 
     @Test
-    void 우리가_직접_적는_사건은_Hermes_이름_없이_만든다() {
+    @DisplayName("우리가 직접 적는 사건은 Hermes 이름 없이 만든다")
+    void createsOwnEventsWithoutHermesName() {
         ExecutionEvent event =
                 recorder.record(EXECUTION, ExecutionEventType.RUN_FAILED, "HERMES_UNAVAILABLE", 3);
 

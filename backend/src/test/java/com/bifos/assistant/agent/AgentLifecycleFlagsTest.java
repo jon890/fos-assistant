@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -106,7 +107,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 지운_에이전트는_목록과_시작과_쓰기에서_없는_에이전트이고_번호로는_읽힌다() {
+    @DisplayName("지운 에이전트는 목록과 시작과 쓰기에서 없는 에이전트이고 번호로는 읽힌다")
+    void deletedAgentIsMissingInListStartAndWriteButReadableById() {
         String helper = randomCode("helper");
         Agent agent = agents.save(privateAgentOf(helper, owner));
         agent.markDeleted(DELETED_AT);
@@ -126,7 +128,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 지운_에이전트의_기존_대화에_보내면_없는_에이전트이고_Hermes_를_부르지_않는다() {
+    @DisplayName("지운 에이전트의 기존 대화에 보내면 없는 에이전트이고 Hermes 를 부르지 않는다")
+    void sendingToConversationOfDeletedAgentIsMissingAndSkipsHermes() {
         String helper = randomCode("helper");
         agents.save(privateAgentOf(helper, owner));
         Conversation conversation = chat.startEmpty(owner, helper);
@@ -140,7 +143,8 @@ class AgentLifecycleFlagsTest {
 
     /** 다시 만들기는 새 질문 없이 기존 대화의 에이전트로 곧바로 간다. 그 길도 지운 에이전트를 막는다. */
     @Test
-    void 지운_에이전트의_답을_다시_만들면_없는_에이전트이고_Hermes_를_부르지_않는다() {
+    @DisplayName("지운 에이전트의 답을 다시 만들면 없는 에이전트이고 Hermes 를 부르지 않는다")
+    void regeneratingReplyOfDeletedAgentIsMissingAndSkipsHermes() {
         String helper = randomCode("helper");
         agents.save(privateAgentOf(helper, owner));
         Conversation conversation = chat.startEmpty(owner, helper);
@@ -154,7 +158,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 관리자도_지운_에이전트를_켜지_못하고_관리_목록에서_보지_못한다() {
+    @DisplayName("관리자도 지운 에이전트를 켜지 못하고 관리 목록에서 보지 못한다")
+    void adminCannotEnableDeletedAgentNorSeeItInManageList() {
         String helper = randomCode("helper");
         String kept = randomCode("kept");
         Agent deleted = agents.save(privateAgentOf(helper, owner));
@@ -170,7 +175,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 관리자도_지운_에이전트의_도구를_읽거나_바꾸지_못한다() {
+    @DisplayName("관리자도 지운 에이전트의 도구를 읽거나 바꾸지 못한다")
+    void adminCannotReadOrChangeToolsOfDeletedAgent() {
         String helper = randomCode("helper");
         Agent deleted = agents.save(privateAgentOf(helper, owner));
         deleted.markDeleted(DELETED_AT);
@@ -183,7 +189,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 그룹으로_공개해도_주인이_남고_주인만_고친다() {
+    @DisplayName("그룹으로 공개해도 주인이 남고 주인만 고친다")
+    void keepsOwnerWhenPublishedToGroupAndOnlyOwnerEdits() {
         String helper = randomCode("helper");
         agents.save(privateAgentOf(helper, owner));
         signIn(administrator);
@@ -201,7 +208,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 관리자가_그룹_에이전트를_만들_때_준_사용자가_주인이_되고_없는_사용자는_거절한다() {
+    @DisplayName("관리자가 그룹 에이전트를 만들 때 준 사용자가 주인이 되고 없는 사용자는 거절한다")
+    void adminCreatedGroupAgentGetsGivenUserAsOwnerAndRejectsUnknownUser() {
         signIn(administrator);
 
         String ghost = randomCode("ghost");

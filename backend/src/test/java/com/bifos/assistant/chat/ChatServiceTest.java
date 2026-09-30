@@ -72,6 +72,7 @@ import java.util.function.Consumer;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -226,7 +227,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void routes_the_turn_to_the_caller_own_profile_and_records_what_it_used() {
+    @DisplayName("routes the turn to the caller own profile and records what it used")
+    void routesTheTurnToTheCallerOwnProfileAndRecordsWhatItUsed() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
@@ -292,7 +294,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 조립한_Memory를_Hermes에_보내고_실행_기록에도_길이를_남긴다() {
+    @DisplayName("조립한 Memory를 Hermes에 보내고 실행 기록에도 길이를 남긴다")
+    void sendsAssembledMemoryToHermesAndRecordsLengthInRunRecord() {
         CurrentUser dad = member("dad@example.com", "dad");
         memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
         stub().willReturn(
@@ -308,7 +311,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void message_history_includes_the_user_display_name_only_on_user_messages() {
+    @DisplayName("message history includes the user display name only on user messages")
+    void messageHistoryIncludesTheUserDisplayNameOnlyOnUserMessages() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
@@ -336,7 +340,8 @@ class ChatServiceTest {
      * <p>다음 turn 은 돌려받은 session 을 보내지만, 대화의 뿌리와 실행 줄에는 처음 정한 session 이 남는다.
      */
     @Test
-    void continues_the_same_hermes_session_on_the_next_turn() {
+    @DisplayName("continues the same hermes session on the next turn")
+    void continuesTheSameHermesSessionOnTheNextTurn() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
@@ -368,7 +373,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 새_대화의_첫_turn은_정한_session을_보내고_대화의_두_칸과_실행_줄에_제출_전에_적는다() {
+    @DisplayName("새 대화의 첫 turn은 정한 session을 보내고 대화의 두 칸과 실행 줄에 제출 전에 적는다")
+    void firstTurnSendsChosenSessionAndRecordsItBeforeSubmit() {
         CurrentUser dad = member("dad@example.com", "dad");
         AtomicReference<String> recordedAtSubmit = new AtomicReference<>();
         stub().willAnswer(command -> {
@@ -391,7 +397,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 둘째_turn은_같은_session을_보내고_새로_만들지_않는다() {
+    @DisplayName("둘째 turn은 같은 session을 보내고 새로 만들지 않는다")
+    void secondTurnSendsSameSessionWithoutCreatingNew() {
         CurrentUser dad = member("dad@example.com", "dad");
         hermesEchoesSession();
 
@@ -406,7 +413,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 뿌리가_없는_옛_대화는_Hermes가_정한_session을_보내고_실행_줄에도_그_값을_적는다() {
+    @DisplayName("뿌리가 없는 옛 대화는 Hermes가 정한 session을 보내고 실행 줄에도 그 값을 적는다")
+    void oldConversationWithoutRootSendsSessionChosenByHermesAndRecordsIt() {
         CurrentUser dad = member("dad@example.com", "dad");
         Long agentId = agents.findByCode("dad").orElseThrow().id();
         Conversation legacy = conversations.save(Conversation.startedBy(dad.id(), "옛 대화", agentId));
@@ -422,7 +430,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 기본값으로_보냈고_세션이_답하지_못하면_provider와_모델이_비어_있다() {
+    @DisplayName("기본값으로 보냈고 세션이 답하지 못하면 provider와 모델이 비어 있다")
+    void providerAndModelAreEmptyWhenSentWithDefaultAndSessionCannotAnswer() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub()
                 .willReturn(
@@ -438,7 +447,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void refuses_a_member_with_no_profile_bound_and_never_calls_the_runtime() {
+    @DisplayName("refuses a member with no profile bound and never calls the runtime")
+    void refusesAMemberWithNoProfileBoundAndNeverCallsTheRuntime() {
         CurrentUser kid = member("kid@example.com", null);
 
         assertThatThrownBy(() -> chat.send(kid, null, "숙제 도와줘", "missing"))
@@ -449,7 +459,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void refuses_to_read_another_member_conversation() {
+    @DisplayName("refuses to read another member conversation")
+    void refusesToReadAnotherMemberConversation() {
         CurrentUser dad = member("dad@example.com", "dad");
         CurrentUser mom = member("mom@example.com", "mom");
         stub()
@@ -465,7 +476,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void records_a_failed_run_so_the_usage_view_still_shows_it() {
+    @DisplayName("records a failed run so the usage view still shows it")
+    void recordsAFailedRunSoTheUsageViewStillShowsIt() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
@@ -479,7 +491,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void Hermes가_실패_결과를_돌려줘도_실행_줄_하나를_FAILED로_갱신한다() {
+    @DisplayName("Hermes가 실패 결과를 돌려줘도 실행 줄 하나를 FAILED로 갱신한다")
+    void updatesSingleRunRowToFailedWhenHermesReturnsFailure() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
@@ -503,7 +516,8 @@ class ChatServiceTest {
      * 파일까지 두 번 읽어도 한 줄이다. 도구 사건 자체는 다른 도구와 같이 남는다.
      */
     @Test
-    void 스트림에서_skill_view_도구_사건이_오면_그_실행에_MODEL_이력이_하나_생긴다() {
+    @DisplayName("스트림에서 skill view 도구 사건이 오면 그 실행에 MODEL 이력이 하나 생긴다")
+    void skillViewToolEventInStreamCreatesOneModelHistoryForRun() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "completed", "장을 봤어요", "dad", null, TokenUsage.empty()));
@@ -535,7 +549,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 스트리밍_한_번이_RUN_STARTED로_시작해_RUN_COMPLETED로_끝나는_사건을_남긴다() {
+    @DisplayName("스트리밍 한 번이 RUN STARTED로 시작해 RUN COMPLETED로 끝나는 사건을 남긴다")
+    void oneStreamLeavesEventsFromRunStartedToRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
@@ -576,7 +591,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 사건이_없는_자손은_작업_과정에_세지_않는다() {
+    @DisplayName("사건이 없는 자손은 작업 과정에 세지 않는다")
+    void descendantWithoutEventsDoesNotCountAsWorkProcess() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
@@ -594,7 +610,8 @@ class ChatServiceTest {
      * 적는 자리는 {@code ChatService} 하나여야 한다.
      */
     @Test
-    void 스트리밍_한_번이_RUN_COMPLETED를_한_줄만_남긴다() {
+    @DisplayName("스트리밍 한 번이 RUN COMPLETED를 한 줄만 남긴다")
+    void oneStreamLeavesExactlyOneRunCompletedRow() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
@@ -611,7 +628,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 글자_조각은_사건으로_저장하지_않는다() {
+    @DisplayName("글자 조각은 사건으로 저장하지 않는다")
+    void doesNotStoreTextChunksAsEvents() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
@@ -628,7 +646,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 사건_저장이_예외를_던져도_대화는_성공하고_중계도_이어진다() {
+    @DisplayName("사건 저장이 예외를 던져도 대화는 성공하고 중계도 이어진다")
+    void conversationSucceedsAndRelayContinuesEvenIfEventSaveThrows() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "completed", "저녁은 김치찌개", "dad", null, TokenUsage.empty()));
@@ -653,7 +672,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 한_번에_받는_경로는_RUN_STARTED와_RUN_COMPLETED_둘만_남긴다() {
+    @DisplayName("한 번에 받는 경로는 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
+    void nonStreamPathLeavesOnlyRunStartedAndRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
@@ -667,7 +687,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 막히면_넘기지_않고_PROVIDER_BLOCKED_로_실패한다() {
+    @DisplayName("막히면 넘기지 않고 PROVIDER BLOCKED 로 실패한다")
+    void blockedFailsAsProviderBlockedWithoutFallback() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(
                 new HermesRunResult("run-blocked", "sess-1", "failed", null, null, null,
@@ -691,7 +712,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void Hermes가_실패로_끝나면_RUN_FAILED가_남고_예외는_그대로_올라간다() {
+    @DisplayName("Hermes가 실패로 끝나면 RUN FAILED가 남고 예외는 그대로 올라간다")
+    void leavesRunFailedAndRethrowsWhenHermesEndsInFailure() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
                 HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
@@ -714,7 +736,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 제출이_실패하면_RUN_FAILED_하나만_남는다() {
+    @DisplayName("제출이 실패하면 RUN FAILED 하나만 남는다")
+    void leavesOnlyOneRunFailedWhenSubmitFails() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
@@ -758,7 +781,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 켜진_스킬의_커맨드는_Hermes_입력만_바꾸고_메시지는_원문으로_저장하며_COMMAND_이력을_남긴다() {
+    @DisplayName("켜진 스킬의 커맨드는 Hermes 입력만 바꾸고 메시지는 원문으로 저장하며 COMMAND 이력을 남긴다")
+    void enabledSkillCommandChangesOnlyHermesInputAndRecordsCommandHistory() {
         CurrentUser dad = member("dad@example.com", "dad");
         skillsOf("dad", true, "shopping", "cooking:off");
         stub().willReturn(answered("run-1", "장보기 목록이에요"));
@@ -789,7 +813,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 켜진_스킬이_아닌_커맨드는_SKILL_COMMAND_UNKNOWN_이고_대화도_메시지도_실행도_만들지_않는다() {
+    @DisplayName("켜진 스킬이 아닌 커맨드는 SKILL COMMAND UNKNOWN 이고 대화도 메시지도 실행도 만들지 않는다")
+    void commandOfDisabledSkillIsSkillCommandUnknownAndCreatesNothing() {
         CurrentUser dad = member("dad@example.com", "dad");
         skillsOf("dad", true, "shopping", "cooking:off");
         stub().willReturn(answered("run-1", "네"));
@@ -807,7 +832,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 이어_쓰는_대화에서도_없는_이름이면_거절하고_메시지를_더하지_않는다() {
+    @DisplayName("이어 쓰는 대화에서도 없는 이름이면 거절하고 메시지를 더하지 않는다")
+    void unknownNameInContinuedConversationIsRejectedWithoutAddingMessage() {
         CurrentUser dad = member("dad@example.com", "dad");
         skillsOf("dad", true, "shopping");
         stub().willReturn(answered("run-1", "네"));
@@ -820,7 +846,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void skills_toolset_이_꺼진_에이전트는_켜진_스킬이어도_SKILL_COMMAND_UNKNOWN_이다() {
+    @DisplayName("skills toolset 이 꺼진 에이전트는 켜진 스킬이어도 SKILL COMMAND UNKNOWN 이다")
+    void skillsToolsetOffGivesSkillCommandUnknownEvenForEnabledSkill() {
         CurrentUser dad = member("dad@example.com", "dad");
         skillsOf("dad", false, "shopping");
         stub().willReturn(answered("run-1", "네"));
@@ -832,7 +859,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 흐름이_붙은_에이전트는_커맨드를_해석하지_않고_글_그대로_보낸다() {
+    @DisplayName("흐름이 붙은 에이전트는 커맨드를 해석하지 않고 글 그대로 보낸다")
+    void flowAgentSendsTextAsIsWithoutInterpretingCommands() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
         agent.assignFlow(ResearchAndBuildFlow.NAME);
@@ -857,7 +885,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 다시_생성도_바꾼_입력을_보내고_그_실행에_COMMAND_이력을_남긴다() {
+    @DisplayName("다시 생성도 바꾼 입력을 보내고 그 실행에 COMMAND 이력을 남긴다")
+    void regenerationAlsoSendsChangedInputAndRecordsCommandHistory() {
         CurrentUser dad = member("dad@example.com", "dad");
         skillsOf("dad", true, "shopping");
         stub().willReturnInOrder(answered("first", "첫 답"), answered("second", "새 답"));
@@ -880,7 +909,8 @@ class ChatServiceTest {
     }
 
     @Test
-    void 켜진_스킬_목록은_에이전트마다_캐시하고_SkillsChanged_를_받으면_다시_읽는다() {
+    @DisplayName("켜진 스킬 목록은 에이전트마다 캐시하고 SkillsChanged 를 받으면 다시 읽는다")
+    void cachesEnabledSkillListPerAgentAndRereadsOnSkillsChanged() {
         CurrentUser dad = member("dad@example.com", "dad");
         Long agentId = agents.findByCode("dad").orElseThrow().id();
         skillsOf("dad", true, "shopping");

@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 중지 표시와 run 번호 붙이기가 어떤 순서로 겹쳐도 Hermes 에 중지를 보내는 쪽이 꼭 하나인 것을 고정한다. */
@@ -17,7 +18,8 @@ class RunningDelegationTest {
     private static final String RUN_ID = "run-1";
 
     @Test
-    void 중지가_먼저_오면_run_번호를_붙이는_쪽이_보낸다() {
+    @DisplayName("중지가 먼저 오면 run 번호를 붙이는 쪽이 보낸다")
+    void sideAttachingRunIdSendsWhenStopComesFirst() {
         RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");
 
         assertThat(delegation.requestStop()).as("아직 붙은 run 번호가 없다").isNull();
@@ -27,7 +29,8 @@ class RunningDelegationTest {
     }
 
     @Test
-    void run_번호가_먼저_붙으면_멈추는_쪽이_그_번호로_보낸다() {
+    @DisplayName("run 번호가 먼저 붙으면 멈추는 쪽이 그 번호로 보낸다")
+    void sideStoppingSendsByRunIdWhenIdIsAttachedFirst() {
         RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");
 
         assertThat(delegation.attachRun(RUN_ID)).as("중지 표시가 없어 붙이는 쪽은 보내지 않는다").isFalse();
@@ -35,7 +38,8 @@ class RunningDelegationTest {
     }
 
     @Test
-    void 실행_번호는_줄이_생긴_뒤에_적히고_끝나면_기다리던_쪽이_깨어난다() {
+    @DisplayName("실행 번호는 줄이 생긴 뒤에 적히고 끝나면 기다리던 쪽이 깨어난다")
+    void recordsRunIdAfterRowExistsAndWakesWaiterWhenDone() {
         RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");
         assertThat(delegation.executionId()).isNull();
 
@@ -49,7 +53,8 @@ class RunningDelegationTest {
     }
 
     @Test
-    void 중지와_run_번호_붙이기가_겹치면_보내는_쪽이_꼭_하나다() throws Exception {
+    @DisplayName("중지와 run 번호 붙이기가 겹치면 보내는 쪽이 꼭 하나다")
+    void exactlyOneSenderWhenStopAndRunIdAttachOverlap() throws Exception {
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
             for (int i = 0; i < RACES; i++) {
                 RunningDelegation delegation = new RunningDelegation("http://agent-runtime.test", "worker");

@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,7 +35,8 @@ class ArtifactWriteServiceTest {
     private static final CurrentUser USER = new CurrentUser(1L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
 
     @Test
-    void 본인_대화의_HTML_본문을_UTF_8_크기로_저장한다() {
+    @DisplayName("본인 대화의 HTML 본문을 UTF 8 크기로 저장한다")
+    void savesOwnHtmlBodyWithUtf8Size() {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         Conversation conversation = mock(Conversation.class);
@@ -50,7 +52,8 @@ class ArtifactWriteServiceTest {
     }
 
     @Test
-    void 빈_본문과_정확히_5MiB_본문은_받고_한글로_초과하면_저장하지_않는다() {
+    @DisplayName("빈 본문과 정확히 5MiB 본문은 받고 한글로 초과하면 저장하지 않는다")
+    void acceptsEmptyAndExactly5MiBBodyButRejectsKoreanOverflow() {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         Conversation conversation = mock(Conversation.class);
@@ -72,7 +75,8 @@ class ArtifactWriteServiceTest {
     }
 
     @Test
-    void 없는_대화는_저장소를_부르지_않는다() {
+    @DisplayName("없는 대화는 저장소를 부르지 않는다")
+    void doesNotCallStoreForMissingConversation() {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         UUID publicId = UUID.randomUUID();
@@ -88,7 +92,8 @@ class ArtifactWriteServiceTest {
     }
 
     @Test
-    void URL_방식과_HTML_CSS_밖의_본문은_저장하지_않는다() {
+    @DisplayName("URL 방식과 HTML CSS 밖의 본문은 저장하지 않는다")
+    void rejectsUrlMethodAndBodiesOutsideHtmlCss() {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         Conversation conversation = mock(Conversation.class);
@@ -107,7 +112,8 @@ class ArtifactWriteServiceTest {
     }
 
     @Test
-    void 본인_대화의_이미지_URL은_내려받은_바이트를_같은_저장소에_쓴다() throws Exception {
+    @DisplayName("본인 대화의 이미지 URL은 내려받은 바이트를 같은 저장소에 쓴다")
+    void writesDownloadedBytesOfOwnImageUrlToSameStore() throws Exception {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         Conversation conversation = mock(Conversation.class);
@@ -128,7 +134,8 @@ class ArtifactWriteServiceTest {
     }
 
     @Test
-    void URL_경로가_대화_폴더를_벗어나면_DNS_전에_거절한다() {
+    @DisplayName("URL 경로가 대화 폴더를 벗어나면 DNS 전에 거절한다")
+    void rejectsUrlPathEscapingConversationFolderBeforeDns() {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         Conversation conversation = mock(Conversation.class);
@@ -146,7 +153,8 @@ class ArtifactWriteServiceTest {
     }
 
     @Test
-    void 접근할_수_없는_대화의_URL은_DNS_조회와_파일_쓰기를_하지_않는다() {
+    @DisplayName("접근할 수 없는 대화의 URL은 DNS 조회와 파일 쓰기를 하지 않는다")
+    void skipsDnsAndFileWriteForUrlOfInaccessibleConversation() {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         AtomicInteger dnsCalls = new AtomicInteger();
@@ -170,7 +178,8 @@ class ArtifactWriteServiceTest {
     }
 
     @Test
-    void URL_다운로드가_실패하면_기존_파일을_보존한다(@TempDir Path root) throws Exception {
+    @DisplayName("URL 다운로드가 실패하면 기존 파일을 보존한다")
+    void keepsExistingFileWhenUrlDownloadFails(@TempDir Path root) throws Exception {
         ConversationAccess access = mock(ConversationAccess.class);
         Conversation conversation = mock(Conversation.class);
         UUID publicId = UUID.randomUUID();

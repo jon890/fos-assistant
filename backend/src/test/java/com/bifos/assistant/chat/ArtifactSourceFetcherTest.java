@@ -17,13 +17,15 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 주소 결과물은 외부 DNS나 네트워크 없이 대역으로 경계를 검사한다. */
 class ArtifactSourceFetcherTest {
 
     @Test
-    void 주소_공급자_설정은_안전한_기본값과_형식만_받는다() {
+    @DisplayName("주소 공급자 설정은 안전한 기본값과 형식만 받는다")
+    void acceptsOnlySafeDefaultsAndFormatsForAddressProviderConfig() {
         assertThat(new ArtifactSourceProperties(null, null, null, null).allowedHosts()).isEmpty();
         for (String invalid : List.of("*.example.com", "https://images.example.com", "127.0.0.1", "images.example.com:443", "Images.example.com")) {
             assertThatThrownBy(() -> new ArtifactSourceProperties(List.of(invalid), null, null, null)).isInstanceOf(IllegalStateException.class);
@@ -32,7 +34,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 빈_허용_목록과_userinfo는_DNS_전에_거절한다() throws Exception {
+    @DisplayName("빈 허용 목록과 userinfo는 DNS 전에 거절한다")
+    void rejectsEmptyAllowlistAndUserinfoBeforeDns() throws Exception {
         AtomicInteger dns = new AtomicInteger();
         ArtifactSourceFetcher empty = new ArtifactSourceFetcher(new ArtifactSourceProperties(List.of(), null, null, null),
                 host -> { dns.incrementAndGet(); return new InetAddress[] {InetAddress.getByName("8.8.8.8")}; },
@@ -45,7 +48,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 허용한_호스트의_공개_IP와_맞는_MIME_이미지만_받는다() throws Exception {
+    @DisplayName("허용한 호스트의 공개 IP와 맞는 MIME 이미지만 받는다")
+    void acceptsOnlyPublicIpOfAllowedHostWithMatchingImageMime() throws Exception {
         AtomicInteger connects = new AtomicInteger();
         ArtifactSourceFetcher fetcher = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                 (address, host, source, connect, read, cancellation) -> {
@@ -61,7 +65,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 공개_주소와_특수_용도_주소의_경계를_구분한다() throws Exception {
+    @DisplayName("공개 주소와 특수 용도 주소의 경계를 구분한다")
+    void distinguishesPublicFromSpecialPurposeAddressBoundaries() throws Exception {
         AtomicInteger connects = new AtomicInteger();
         for (String address : List.of("192.0.1.1", "192.0.0.9", "192.0.0.10", "192.31.196.1", "192.52.193.1")) {
             ArtifactSourceFetcher publicAddress = fetcher(host -> new InetAddress[] {InetAddress.getByName(address)},
@@ -81,7 +86,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 허용되지_않은_URL과_사설_주소는_DNS_또는_연결하지_않는다() throws Exception {
+    @DisplayName("허용되지 않은 URL과 사설 주소는 DNS 또는 연결하지 않는다")
+    void skipsDnsAndConnectForDisallowedUrlAndPrivateAddress() throws Exception {
         AtomicInteger dns = new AtomicInteger();
         AtomicInteger connects = new AtomicInteger();
         ArtifactSourceFetcher rejected = fetcher(host -> { dns.incrementAndGet(); return new InetAddress[] {InetAddress.getByName("8.8.8.8")}; },
@@ -100,7 +106,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 크기와_형식과_압축_응답을_저장_전에_거절한다() throws Exception {
+    @DisplayName("크기와 형식과 압축 응답을 저장 전에 거절한다")
+    void rejectsSizeFormatAndCompressedResponseBeforeSaving() throws Exception {
         ArtifactSourceFetcher tooLarge = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                 (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200, Map.of("content-type", "image/png"),
                         new ByteArrayInputStream(new byte[ArtifactSourceFetcher.MAX_BYTES + 1])));
@@ -116,7 +123,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 이미지_확장자별_MIME와_정확히_5MiB_본문만_받고_실패_응답은_닫는다() throws Exception {
+    @DisplayName("이미지 확장자별 MIME와 정확히 5MiB 본문만 받고 실패 응답은 닫는다")
+    void acceptsPerExtensionMimeAndExactly5MiBBodyAndClosesOnFailure() throws Exception {
         Map<String, String> types = Map.of("png", "image/png", "jpg", "image/jpeg", "jpeg", "image/jpeg", "gif", "image/gif", "webp", "image/webp");
         for (var entry : types.entrySet()) {
             ArtifactSourceFetcher fetcher = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
@@ -134,7 +142,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 잘못된_MIME와_초과_길이는_본문을_읽기_전에_거절한다() throws Exception {
+    @DisplayName("잘못된 MIME와 초과 길이는 본문을 읽기 전에 거절한다")
+    void rejectsWrongMimeAndOversizeLengthBeforeReadingBody() throws Exception {
         for (Map<String, String> headers : List.<Map<String, String>>of(
                 Map.of(), Map.of("content-type", "image/jpeg"), Map.of("content-type", "text/html"),
                 Map.of("content-type", "image/svg+xml"),
@@ -158,7 +167,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void HTTP_머리글은_실제_CRLF로_끝나야_하고_중복_길이는_거절한다() throws Exception {
+    @DisplayName("HTTP 머리글은 실제 CRLF로 끝나야 하고 중복 길이는 거절한다")
+    void requiresRealCrlfInHttpHeadersAndRejectsDuplicateLength() throws Exception {
         assertThat(new String(ArtifactSourceFetcher.SocketTransport.requestBytes("/a?x=1", "images.example.com")))
                 .isEqualTo("GET /a?x=1 HTTP/1.1\r\nHost: images.example.com\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n");
         try (Socket socket = new Socket(); ArtifactSourceFetcher.Response response = ArtifactSourceFetcher.SocketTransport.parse(socket,
@@ -183,7 +193,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void chunked와_고정_길이_응답을_프레이밍에_맞게_읽고_오류와_redirect는_거절한다() throws Exception {
+    @DisplayName("chunked와 고정 길이 응답을 프레이밍에 맞게 읽고 오류와 redirect는 거절한다")
+    void readsChunkedAndFixedLengthByFramingAndRejectsErrorAndRedirect() throws Exception {
         ArtifactSourceFetcher chunked = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                 (address, host, source, connect, read, cancellation) -> parsed("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nTransfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n0\r\n\r\n"));
         assertThat(chunked.fetch(URI.create("https://images.example.com/a.png"), "image/png")).containsExactly('a', 'b', 'c');
@@ -204,7 +215,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 혼합_A_AAAA와_느린_DNS는_전송하지_않는다() throws Exception {
+    @DisplayName("혼합 A AAAA와 느린 DNS는 전송하지 않는다")
+    void doesNotSendForMixedARecordsAndSlowDns() throws Exception {
         AtomicInteger connects = new AtomicInteger();
         for (String blocked : List.of("fd00::1", "fec0::1", "feff::1", "::ffff:127.0.0.1")) {
             ArtifactSourceFetcher mixed = fetcher(host -> new InetAddress[] {InetAddress.getByName("8.8.8.8"), InetAddress.getByName(blocked)},
@@ -219,7 +231,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void 전체_제한_시간이_지나면_진행_중인_전송을_닫는다() throws Exception {
+    @DisplayName("전체 제한 시간이 지나면 진행 중인 전송을 닫는다")
+    void closesInFlightTransferAfterTotalTimeout() throws Exception {
         CountDownLatch closed = new CountDownLatch(1);
         ArtifactSourceFetcher fetcher = new ArtifactSourceFetcher(new ArtifactSourceProperties(List.of("images.example.com"), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofMillis(20)),
                 host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
@@ -229,7 +242,8 @@ class ArtifactSourceFetcherTest {
     }
 
     @Test
-    void DNS_네_개가_멈추면_다음_호출은_대기열에_넣지_않고_즉시_거절한다() throws Exception {
+    @DisplayName("DNS 네 개가 멈추면 다음 호출은 대기열에 넣지 않고 즉시 거절한다")
+    void rejectsNextCallImmediatelyWhenFourDnsLookupsHang() throws Exception {
         CountDownLatch started = new CountDownLatch(4);
         CountDownLatch release = new CountDownLatch(1);
         ArtifactSourceFetcher blocked = new ArtifactSourceFetcher(new ArtifactSourceProperties(List.of("images.example.com"), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(10)),

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -34,19 +35,22 @@ class SubagentRegistrationTest {
     private static final String FOS_CTX_RULE_SIG = "17dbb5b8aa4f08da9f262d69ab6191f9978c8bf9439f7260047f7e8444448f7e";
 
     @Test
-    void 토큰_해시는_표에_적은_key_와_같다() {
+    @DisplayName("토큰 해시는 표에 적은 key 와 같다")
+    void tokenHashEqualsKeyInTable() {
         assertThat(AgentTokenService.hash(TOKEN)).isEqualTo(TOKEN_HASH);
     }
 
     @Test
-    void 최상위_자식의_test_vector_가_통과하고_세_session_을_돌려준다() {
+    @DisplayName("최상위 자식의 test vector 가 통과하고 세 session 을 돌려준다")
+    void passesTopLevelChildTestVectorAndReturnsThreeSessions() {
         SubagentRegistration registration = SubagentRegistration.verify(topChild(), TOKEN_HASH);
 
         assertThat(registration).isEqualTo(new SubagentRegistration(ROOT, ROOT, TOP_CHILD));
     }
 
     @Test
-    void 중첩_자식의_test_vector_가_통과하고_세_session_을_돌려준다() {
+    @DisplayName("중첩 자식의 test vector 가 통과하고 세 session 을 돌려준다")
+    void passesNestedChildTestVectorAndReturnsThreeSessions() {
         ObjectNode body = body(TOP_CHILD, NESTED_CHILD, NESTED_SIG);
         body.put("parent_subagent_id", "sa-1");
 
@@ -56,7 +60,8 @@ class SubagentRegistrationTest {
     }
 
     @Test
-    void 서명하지_않는_칸이_없거나_null_이고_모르는_키가_있어도_받는다() {
+    @DisplayName("서명하지 않는 칸이 없거나 null 이고 모르는 키가 있어도 받는다")
+    void acceptsMissingOrNullUnsignedFieldsAndUnknownKeys() {
         ObjectNode body = topChild();
         body.remove("child_subagent_id");
         body.remove("parent_subagent_id");
@@ -66,27 +71,32 @@ class SubagentRegistrationTest {
     }
 
     @Test
-    void sig_가_대문자면_거절한다() {
+    @DisplayName("sig 가 대문자면 거절한다")
+    void rejectsUppercaseSig() {
         assertRejected(body -> body.put("sig", TOP_SIG.toUpperCase()));
     }
 
     @Test
-    void sig_를_한_글자_바꾸면_거절한다() {
+    @DisplayName("sig 를 한 글자 바꾸면 거절한다")
+    void rejectsSigWithOneCharChanged() {
         assertRejected(body -> body.put("sig", (TOP_SIG.charAt(0) == '0' ? "1" : "0") + TOP_SIG.substring(1)));
     }
 
     @Test
-    void v_가_문자열이면_거절한다() {
+    @DisplayName("v 가 문자열이면 거절한다")
+    void rejectsStringV() {
         assertRejected(body -> body.put("v", "1"));
     }
 
     @Test
-    void v_가_소수면_거절한다() {
+    @DisplayName("v 가 소수면 거절한다")
+    void rejectsFractionalV() {
         assertRejected(body -> body.put("v", 1.0));
     }
 
     @Test
-    void 서명하는_칸이_하나_없으면_거절한다() {
+    @DisplayName("서명하는 칸이 하나 없으면 거절한다")
+    void rejectsWhenOneSignedFieldIsMissing() {
         assertRejected(body -> body.remove("parent_root_session_id"));
         assertRejected(body -> body.remove("parent_session_id"));
         assertRejected(body -> body.remove("child_session_id"));
@@ -94,22 +104,26 @@ class SubagentRegistrationTest {
     }
 
     @Test
-    void 서명하는_칸이_빈_문자열이면_거절한다() {
+    @DisplayName("서명하는 칸이 빈 문자열이면 거절한다")
+    void rejectsWhenSignedFieldIsEmptyString() {
         assertRejected(body -> body.put("child_session_id", ""));
     }
 
     @Test
-    void child_subagent_id_가_숫자면_거절한다() {
+    @DisplayName("child subagent id 가 숫자면 거절한다")
+    void rejectsNumericChildSubagentId() {
         assertRejected(body -> body.put("child_subagent_id", 7));
     }
 
     @Test
-    void 같은_값을_fos_ctx_규칙으로_서명한_sig_는_거절한다() {
+    @DisplayName("같은 값을 fos ctx 규칙으로 서명한 sig 는 거절한다")
+    void rejectsSigSignedWithFosCtxRulesOverSameValue() {
         assertRejected(body -> body.put("sig", FOS_CTX_RULE_SIG));
     }
 
     @Test
-    void 본문이_객체가_아니거나_토큰_해시가_없으면_거절한다() {
+    @DisplayName("본문이 객체가 아니거나 토큰 해시가 없으면 거절한다")
+    void rejectsNonObjectBodyOrMissingTokenHash() {
         assertThatThrownBy(() -> SubagentRegistration.verify(JSON.createArrayNode(), TOKEN_HASH))
                 .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
         assertThatThrownBy(() -> SubagentRegistration.verify(topChild(), ""))

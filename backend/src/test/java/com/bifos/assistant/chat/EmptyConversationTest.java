@@ -25,6 +25,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,7 +60,7 @@ class EmptyConversationTest {
     @Autowired HermesRunsClient hermes;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         ((StubHermesRunsClient) hermes).reset();
         executionEvents.deleteAll();
         executions.deleteAll();
@@ -69,7 +70,8 @@ class EmptyConversationTest {
     }
 
     @Test
-    void 쓸_수_있는_에이전트로_제목이_빈_대화를_만든다() {
+    @DisplayName("쓸 수 있는 에이전트로 제목이 빈 대화를 만든다")
+    void createsEmptyTitleConversationWithUsableAgent() {
         CurrentUser dad = member("dad@example.com");
         agentOf(dad, "dad");
 
@@ -82,7 +84,8 @@ class EmptyConversationTest {
     }
 
     @Test
-    void 첫_메시지가_제목을_정하고_둘째_메시지는_바꾸지_않는다() {
+    @DisplayName("첫 메시지가 제목을 정하고 둘째 메시지는 바꾸지 않는다")
+    void firstMessageSetsTitleAndSecondDoesNotChangeIt() {
         CurrentUser dad = member("dad@example.com");
         agentOf(dad, "dad");
         ((StubHermesRunsClient) hermes).willReturn(
@@ -97,7 +100,8 @@ class EmptyConversationTest {
     }
 
     @Test
-    void 읽을_수_없거나_꺼진_에이전트는_새_대화를_만들_때와_같은_오류다() {
+    @DisplayName("읽을 수 없거나 꺼진 에이전트는 새 대화를 만들 때와 같은 오류다")
+    void unreadableOrDisabledAgentGivesSameErrorAsCreatingNewConversation() {
         CurrentUser dad = member("dad@example.com");
         CurrentUser kid = member("kid@example.com");
         agentOf(kid, "kid");
@@ -113,7 +117,8 @@ class EmptyConversationTest {
     }
 
     @Test
-    void 흐름이_붙은_에이전트도_빈_대화를_만든다() {
+    @DisplayName("흐름이 붙은 에이전트도 빈 대화를 만든다")
+    void createsEmptyConversationForFlowAgentToo() {
         CurrentUser dad = member("dad@example.com");
         Agent flowAgent = agentOf(dad, "flowed");
         flowAgent.assignFlow("research-and-build");

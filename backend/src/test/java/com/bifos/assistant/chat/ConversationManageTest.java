@@ -30,6 +30,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -100,7 +101,8 @@ class ConversationManageTest {
     }
 
     @Test
-    void 이름을_바꾸고_공백과_길이를_검사한다() {
+    @DisplayName("이름을 바꾸고 공백과 길이를 검사한다")
+    void renamesAndValidatesBlankAndLength() {
         CurrentUser dad = member("manage-dad");
         successfulAnswer();
         Long id = chat.send(dad, null, "첫 질문", "manage-dad").conversationId();
@@ -117,7 +119,8 @@ class ConversationManageTest {
     }
 
     @Test
-    void 지운_대화는_읽거나_이어_보낼_수_없지만_실행은_남는다() {
+    @DisplayName("지운 대화는 읽거나 이어 보낼 수 없지만 실행은 남는다")
+    void deletedConversationCannotBeReadOrContinuedButRunsRemain() {
         CurrentUser dad = member("manage-dad");
         successfulAnswer();
         ChatTurn turn = chat.send(dad, null, "첫 질문", "manage-dad");
@@ -130,7 +133,8 @@ class ConversationManageTest {
     }
 
     @Test
-    void 남의_대화는_이름을_바꾸거나_지울_수_없다() {
+    @DisplayName("남의 대화는 이름을 바꾸거나 지울 수 없다")
+    void othersConversationCannotBeRenamedOrDeleted() {
         CurrentUser dad = member("manage-dad");
         CurrentUser kid = member("manage-kid");
         successfulAnswer();
@@ -142,7 +146,8 @@ class ConversationManageTest {
     }
 
     @Test
-    void 스트림은_실행을_만들자마자_번호를_보낸다() {
+    @DisplayName("스트림은 실행을 만들자마자 번호를 보낸다")
+    void streamSendsRunIdAsSoonAsRunIsCreated() {
         CurrentUser dad = member("manage-dad");
         successfulAnswer();
         List<ChatEvent> events = new ArrayList<>();
@@ -156,7 +161,8 @@ class ConversationManageTest {
     }
 
     @Test
-    void provider가_막혀_실패해도_실패한_실행의_번호를_보낸다() {
+    @DisplayName("provider가 막혀 실패해도 실패한 실행의 번호를 보낸다")
+    void sendsFailedRunIdEvenWhenProviderBlockedFailure() {
         CurrentUser dad = member("manage-dad");
         stub().willReturn(new HermesRunResult("run-blocked", null, "failed", null,
                 "example-model-large", "anthropic",
@@ -174,7 +180,8 @@ class ConversationManageTest {
     }
 
     @Test
-    void 실행_도중_지우거나_이름을_바꿔도_끝난_뒤에_남는다() {
+    @DisplayName("실행 도중 지우거나 이름을 바꿔도 끝난 뒤에 남는다")
+    void deleteOrRenameDuringRunSurvivesAfterRunEnds() {
         CurrentUser dad = member("manage-dad");
         successfulAnswer();
         Long deletedId = chat.send(dad, null, "첫 질문", "manage-dad").conversationId();

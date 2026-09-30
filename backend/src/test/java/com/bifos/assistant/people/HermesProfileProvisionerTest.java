@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,7 +47,7 @@ class HermesProfileProvisionerTest {
     private final AgentTokenService tokens = mock(AgentTokenService.class);
 
     @BeforeEach
-    void 토큰_발급을_정해_둔다() {
+    void setUp() {
         when(tokens.issue(anyString(), anyString()))
                 .thenReturn(new IssuedToken(mock(AgentToken.class), RAW_TOKEN));
     }
@@ -69,7 +70,8 @@ class HermesProfileProvisionerTest {
     }
 
     @Test
-    void profile_과_key_파일을_만들고_같은_key_를_env_에_넣는다(@TempDir Path dir) {
+    @DisplayName("profile 과 key 파일을 만들고 같은 key 를 env 에 넣는다")
+    void createsProfileAndKeyFileAndPutsSameKeyInEnv(@TempDir Path dir) {
         provisionerAt(dir).provision(PROFILE);
 
         assertThat(dashboard.createdProfiles()).containsExactly(PROFILE);
@@ -79,7 +81,8 @@ class HermesProfileProvisionerTest {
     }
 
     @Test
-    void env_에_넣는_것은_MCP_토큰과_모델_이름과_key_셋뿐이다(@TempDir Path dir) {
+    @DisplayName("env 에 넣는 것은 MCP 토큰과 모델 이름과 key 셋뿐이다")
+    void envHoldsOnlyMcpTokenModelNameAndKeySet(@TempDir Path dir) {
         provisionerAt(dir).provision(PROFILE);
 
         Map<String, String> env = dashboard.env(PROFILE);
@@ -94,7 +97,8 @@ class HermesProfileProvisionerTest {
      * 간격을 늘리므로 토큰을 가장 먼저 넣는다.
      */
     @Test
-    void profile_에_묶인_MCP_토큰을_발급해_가장_먼저_env_에_넣는다(@TempDir Path dir) {
+    @DisplayName("profile 에 묶인 MCP 토큰을 발급해 가장 먼저 env 에 넣는다")
+    void issuesProfileBoundMcpTokenAndPutsItFirstInEnv(@TempDir Path dir) {
         provisionerAt(dir).provision(PROFILE);
 
         verify(tokens).issue(eq(PROFILE), anyString());
@@ -114,7 +118,8 @@ class HermesProfileProvisionerTest {
      * <p>건너뛴 것은 기동 로그에만 남고, 그 사람이 처음 대화할 때에야 드러난다. 그래서 여기서 고정한다.
      */
     @Test
-    void listener_설정을_env_에_넣지_않는다(@TempDir Path dir) {
+    @DisplayName("listener 설정을 env 에 넣지 않는다")
+    void doesNotPutListenerSettingsInEnv(@TempDir Path dir) {
         provisionerAt(dir).provision(PROFILE);
 
         assertThat(dashboard.env(PROFILE))
@@ -122,7 +127,8 @@ class HermesProfileProvisionerTest {
     }
 
     @Test
-    void 이미_있는_이름이면_만들지_않고_그대로_알린다(@TempDir Path dir) {
+    @DisplayName("이미 있는 이름이면 만들지 않고 그대로 알린다")
+    void reportsExistingNameAsIsWithoutCreating(@TempDir Path dir) {
         dashboard.failOnCreate(
                 () -> new ApiException(ErrorCode.HERMES_PROFILE_EXISTS, "already taken"));
 
@@ -135,7 +141,8 @@ class HermesProfileProvisionerTest {
     }
 
     @Test
-    void env_를_쓰다_실패하면_토큰을_폐기하고_profile_을_거두고_key_파일을_남기지_않는다(@TempDir Path dir) {
+    @DisplayName("env 를 쓰다 실패하면 토큰을 폐기하고 profile 을 거두고 key 파일을 남기지 않는다")
+    void revokesTokenReclaimsProfileAndLeavesNoKeyFileWhenEnvWriteFails(@TempDir Path dir) {
         dashboard.failOnPutEnv(
                 () -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
 
@@ -150,7 +157,8 @@ class HermesProfileProvisionerTest {
 
     /** 토큰을 폐기하지 못했으면 다 거둔 것이 아니다. 원래 오류를 그대로 올리고 profile 은 그래도 거둔다. */
     @Test
-    void 토큰을_폐기하지_못하면_원래_오류가_올라오고_profile_은_거둔다(@TempDir Path dir) {
+    @DisplayName("토큰을 폐기하지 못하면 원래 오류가 올라오고 profile 은 거둔다")
+    void rethrowsOriginalErrorAndReclaimsProfileWhenTokenCannotBeRevoked(@TempDir Path dir) {
         ApiException original = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down");
         dashboard.failOnPutEnv(() -> original);
         doThrow(new IllegalStateException("database is down")).when(tokens).revokeAllFor(PROFILE);
@@ -161,7 +169,8 @@ class HermesProfileProvisionerTest {
     }
 
     @Test
-    void 거두면_토큰을_profile_보다_먼저_폐기하고_key_파일을_지운다(@TempDir Path dir) {
+    @DisplayName("거두면 토큰을 profile 보다 먼저 폐기하고 key 파일을 지운다")
+    void reclaimRevokesTokenBeforeProfileAndDeletesKeyFile(@TempDir Path dir) {
         HermesProfileProvisioner provisioner = provisionerAt(dir);
         provisioner.provision(PROFILE);
         // 토큰 폐기가 불린 시점에 profile 이 아직 지워지지 않았는지를 그 자리에서 기록한다.
@@ -181,7 +190,8 @@ class HermesProfileProvisionerTest {
 
     /** 부르는 쪽이 에이전트를 지우지 않도록 profile 을 지우지 못한 오류를 그대로 올린다. */
     @Test
-    void 거두다_profile_을_지우지_못하면_그_오류가_올라온다(@TempDir Path dir) {
+    @DisplayName("거두다 profile 을 지우지 못하면 그 오류가 올라온다")
+    void rethrowsErrorWhenProfileCannotBeDeletedDuringReclaim(@TempDir Path dir) {
         HermesProfileProvisioner provisioner = provisionerAt(dir);
         provisioner.provision(PROFILE);
         ApiException failure = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down");
@@ -198,7 +208,8 @@ class HermesProfileProvisionerTest {
      * 남겨 두면 다음에 같은 이름으로 만들 때 그 파일에 걸려 그 이름을 영영 쓸 수 없다.
      */
     @Test
-    void key_파일을_쓰다_실패하면_profile_과_그_파일을_함께_거둔다(@TempDir Path dir) throws IOException {
+    @DisplayName("key 파일을 쓰다 실패하면 profile 과 그 파일을 함께 거둔다")
+    void reclaimsProfileAndFileTogetherWhenKeyFileWriteFails(@TempDir Path dir) throws IOException {
         // 같은 이름의 key 파일이 이미 있으면 덮지 않고 실패한다. 남아 있던 파일을 흉내 낸 것이다.
         Files.writeString(dir.resolve(PROFILE), "앞서 실패해 남아 있던 key");
 
@@ -212,7 +223,8 @@ class HermesProfileProvisionerTest {
 
     /** 되돌리기가 하는 일이 이것이다. 막힌 이름을 풀어 같은 이름으로 다시 만들 수 있게 한다. */
     @Test
-    void 되돌린_뒤_같은_이름으로_다시_만들_수_있다(@TempDir Path dir) throws IOException {
+    @DisplayName("되돌린 뒤 같은 이름으로 다시 만들 수 있다")
+    void canCreateAgainWithSameNameAfterRollback(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve(PROFILE), "앞서 실패해 남아 있던 key");
         HermesProfileProvisioner provisioner = provisionerAt(dir);
         assertThatThrownBy(() -> provisioner.provision(PROFILE)).isInstanceOf(ApiException.class);
@@ -227,7 +239,8 @@ class HermesProfileProvisionerTest {
 
     /** 대시보드를 부르다 실패한 경우에도 같은 이름을 다시 쓸 수 있어야 한다. */
     @Test
-    void 대시보드가_실패해_되돌린_뒤에도_같은_이름으로_다시_만들_수_있다(@TempDir Path dir) {
+    @DisplayName("대시보드가 실패해 되돌린 뒤에도 같은 이름으로 다시 만들 수 있다")
+    void canCreateAgainWithSameNameAfterRollbackFromDashboardFailure(@TempDir Path dir) {
         dashboard.failOnPutEnv(
                 () -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
         HermesProfileProvisioner provisioner = provisionerAt(dir);
@@ -242,7 +255,8 @@ class HermesProfileProvisionerTest {
 
     /** 되돌리기 실패가 원래 원인을 가리면 무엇 때문에 만들지 못했는지 알 수 없게 된다. */
     @Test
-    void 되돌리기도_실패하면_원래_오류가_올라온다(@TempDir Path dir) {
+    @DisplayName("되돌리기도 실패하면 원래 오류가 올라온다")
+    void rethrowsOriginalErrorWhenRollbackAlsoFails(@TempDir Path dir) {
         ApiException original = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down");
         dashboard.failOnPutEnv(() -> original);
         dashboard.failOnDelete(
@@ -258,7 +272,8 @@ class HermesProfileProvisionerTest {
      * 늘어난다. 하나라도 거두지 못했으므로 원래 오류가 그대로 올라온다.
      */
     @Test
-    void key_파일을_거두지_못해도_profile_은_거둔다(@TempDir Path dir) {
+    @DisplayName("key 파일을 거두지 못해도 profile 은 거둔다")
+    void reclaimsProfileEvenIfKeyFileCannotBeReclaimed(@TempDir Path dir) {
         assertThatThrownBy(() -> provisionerAt(dir).provision("위로 올라가는 이름"))
                 .isInstanceOf(ApiException.class)
                 .extracting(thrown -> ((ApiException) thrown).code())

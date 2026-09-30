@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -61,7 +62,7 @@ class SubagentSessionRegistrarTest {
 
     /** 같은 H2 를 다른 검사 클래스와 함께 쓰므로 이 검사의 사용자와 그 대화, 이 검사가 쓰는 profile 의 줄만 지운다. */
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE_A, PROFILE_B));
         MY_EMAILS.forEach(email -> users.findByEmail(email).ifPresent(user -> {
             jdbc.update("DELETE FROM conversation WHERE user_id = ?", user.id());
@@ -74,7 +75,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 뿌리에서_도는_실행_아래_하위_에이전트는_그_실행을_origin_으로_등록한다() {
+    @DisplayName("뿌리에서 도는 실행 아래 하위 에이전트는 그 실행을 origin 으로 등록한다")
+    void registersRunUnderRootAsOriginOfSubagent() {
         String s1 = newChild();
 
         assertThat(registrar.register(PROFILE_A, root, root, s1)).isEqualTo(SubagentRegistrationResult.CREATED);
@@ -88,7 +90,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test // 3
-    void origin_실행이_끝난_뒤에도_하위_에이전트의_하위_에이전트는_그_origin_을_잇는다() {
+    @DisplayName("origin 실행이 끝난 뒤에도 하위 에이전트의 하위 에이전트는 그 origin 을 잇는다")
+    void subagentOfSubagentFollowsOriginEvenAfterOriginRunEnds() {
         String s1 = newChild();
         registrar.register(PROFILE_A, root, root, s1);
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
@@ -103,7 +106,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test // 4
-    void 다른_에이전트에게_맡긴_FOS_실행_안의_하위_에이전트는_그_FOS_실행을_origin_으로_갖는다() {
+    @DisplayName("다른 에이전트에게 맡긴 FOS 실행 안의 하위 에이전트는 그 FOS 실행을 origin 으로 갖는다")
+    void subagentInsideFosRunDelegatedToOtherAgentHasThatRunAsOrigin() {
         String delegatedRoot = newRoot();
         AgentExecution delegated = McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE_B, delegatedRoot);
         jdbc.update("UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
@@ -119,7 +123,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test // 8
-    void 다른_profile_의_부모_등록이나_도는_실행으로는_등록하지_못한다() {
+    @DisplayName("다른 profile 의 부모 등록이나 도는 실행으로는 등록하지 못한다")
+    void cannotRegisterByParentRegistrationOrRunningRunOfOtherProfile() {
         String s1 = newChild();
         registrar.register(PROFILE_A, root, root, s1);
         String underBinding = newChild();
@@ -133,7 +138,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test // 9
-    void 같은_네_값으로_두_번_오면_두_번째는_그대로_두고_줄은_하나다() {
+    @DisplayName("같은 네 값으로 두 번 오면 두 번째는 그대로 두고 줄은 하나다")
+    void secondArrivalWithSameFourValuesIsLeftAsIsAndOneRow() {
         String s1 = newChild();
 
         assertThat(registrar.register(PROFILE_A, root, root, s1)).isEqualTo(SubagentRegistrationResult.CREATED);
@@ -143,7 +149,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test // 9
-    void 같은_네_값이_동시에_와도_줄은_하나이고_나머지는_그대로_둔다() throws Exception {
+    @DisplayName("같은 네 값이 동시에 와도 줄은 하나이고 나머지는 그대로 둔다")
+    void concurrentSameFourValuesLeaveOneRowAndRestAsIs() throws Exception {
         String s1 = newChild();
         int threads = 8;
         CountDownLatch start = new CountDownLatch(1);
@@ -171,7 +178,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test // 10
-    void 이미_등록한_session_이_다른_origin_으로_오면_거절하고_덮어쓰지_않는다() {
+    @DisplayName("이미 등록한 session 이 다른 origin 으로 오면 거절하고 덮어쓰지 않는다")
+    void rejectsWithoutOverwritingWhenRegisteredSessionComesWithOtherOrigin() {
         String s1 = newChild();
         registrar.register(PROFILE_A, root, root, s1);
         String otherRoot = newRoot();
@@ -188,7 +196,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 최상위_부모_실행이_끝난_뒤_같은_네_값의_재전송은_그대로_두고_다른_부모로_오면_거절한다() {
+    @DisplayName("최상위 부모 실행이 끝난 뒤 같은 네 값의 재전송은 그대로 두고 다른 부모로 오면 거절한다")
+    void resendAfterTopParentRunEndsIsLeftAsIsAndOtherParentIsRejected() {
         String s1 = newChild();
         registrar.register(PROFILE_A, root, root, s1);
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
@@ -203,7 +212,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 대화가_보낼_session_이나_뿌리_session_으로_쓰는_값은_하위_에이전트로_등록하지_못한다() {
+    @DisplayName("대화가 보낼 session 이나 뿌리 session 으로 쓰는 값은 하위 에이전트로 등록하지 못한다")
+    void cannotRegisterValueUsedAsConversationSendOrRootSessionAsSubagent() {
         String compacted = newRoot();
         String conversationRoot = newRoot();
         Conversation conversation = Conversation.startedBy(dad.id(), "압축된 대화", null);
@@ -218,7 +228,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 압축_교체된_최상위_session_이_만든_하위_에이전트는_뿌리에서_도는_실행으로_풀린다() {
+    @DisplayName("압축 교체된 최상위 session 이 만든 하위 에이전트는 뿌리에서 도는 실행으로 풀린다")
+    void subagentOfCompactedTopSessionResolvesToRunRunningOnRoot() {
         String compacted = newRoot();
         String child = newChild();
 
@@ -230,7 +241,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 최상위_session_은_하위_에이전트로_등록하지_못한다() {
+    @DisplayName("최상위 session 은 하위 에이전트로 등록하지 못한다")
+    void cannotRegisterTopSessionAsSubagent() {
         AgentExecution earlierTurn =
                 McpCallSigner.save(executions, dad.id(), CONVERSATION_ID, PROFILE_A, newRoot(), ExecutionStatus.SUCCEEDED);
 
@@ -242,7 +254,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 부모_등록이_없고_뿌리에서_도는_실행도_없으면_거절한다() {
+    @DisplayName("부모 등록이 없고 뿌리에서 도는 실행도 없으면 거절한다")
+    void rejectsWhenNoParentRegistrationAndNoRunRunningOnRoot() {
         setStatus(dadRun, ExecutionStatus.SUCCEEDED);
         String child = newChild();
 
@@ -252,7 +265,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 부모_등록의_뿌리가_서명한_뿌리와_다르면_거절한다() {
+    @DisplayName("부모 등록의 뿌리가 서명한 뿌리와 다르면 거절한다")
+    void rejectsWhenParentRegistrationRootDiffersFromSignedRoot() {
         String s1 = newChild();
         registrar.register(PROFILE_A, root, root, s1);
         String otherRoot = newRoot();
@@ -265,7 +279,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 부모_등록의_origin_실행_줄이_없으면_거절한다() {
+    @DisplayName("부모 등록의 origin 실행 줄이 없으면 거절한다")
+    void rejectsWhenParentRegistrationOriginRunRowIsMissing() {
         String s1 = newChild();
         registrar.register(PROFILE_A, root, root, s1);
         jdbc.update("DELETE FROM agent_execution WHERE id = ?", dadRun.id());
@@ -277,7 +292,8 @@ class SubagentSessionRegistrarTest {
     }
 
     @Test
-    void 비었거나_칸_길이를_넘는_값은_거절하고_칸_길이까지는_받는다() {
+    @DisplayName("비었거나 칸 길이를 넘는 값은 거절하고 칸 길이까지는 받는다")
+    void rejectsBlankOrOverColumnLengthAndAcceptsUpToColumnLength() {
         String longest = "하".repeat(128);
         String tooLong = "하".repeat(129);
 

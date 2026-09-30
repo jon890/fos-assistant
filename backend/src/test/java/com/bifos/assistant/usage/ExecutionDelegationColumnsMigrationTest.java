@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -23,7 +24,8 @@ import org.junit.jupiter.api.Test;
 class ExecutionDelegationColumnsMigrationTest {
 
     @Test
-    void V28_이_만든_칸과_색인이_있고_위임_키는_한_번만_받되_빈_값은_여럿_받는다() throws SQLException {
+    @DisplayName("V28 이 만든 칸과 색인이 있고 위임 키는 한 번만 받되 빈 값은 여럿 받는다")
+    void v28HasColumnsAndIndexAndAcceptsDelegationKeyOnceButManyBlanks() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
                 .dataSource(url, "sa", "")

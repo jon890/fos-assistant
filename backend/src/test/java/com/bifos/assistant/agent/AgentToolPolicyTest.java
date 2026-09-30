@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 도구 등급과 비공개 제약을 한곳에서 판정하는지 본다. */
@@ -22,7 +23,8 @@ class AgentToolPolicyTest {
     private static final CurrentUser ADMIN = new CurrentUser(2L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
 
     @Test
-    void 주인은_주인_등급을_켜고_기억_MCP는_항상_남는다() {
+    @DisplayName("주인은 주인 등급을 켜고 기억 MCP는 항상 남는다")
+    void ownerEnablesOwnerTierAndMemoryMcpAlwaysStays() {
         List<String> result = AgentToolPolicy.requestedForWrite(
                 OWNER, agent(AgentVisibility.PRIVATE), List.of("web"), List.of());
 
@@ -30,7 +32,8 @@ class AgentToolPolicyTest {
     }
 
     @Test
-    void 주인은_관리자_등급을_새로_켤_수_없다() {
+    @DisplayName("주인은 관리자 등급을 새로 켤 수 없다")
+    void ownerCannotNewlyEnableAdminTier() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
                         OWNER, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of()))
                 .isInstanceOf(ApiException.class)
@@ -39,7 +42,8 @@ class AgentToolPolicyTest {
     }
 
     @Test
-    void 주인은_이미_켜진_관리자_등급도_끌_수_없다() {
+    @DisplayName("주인은 이미 켜진 관리자 등급도 끌 수 없다")
+    void ownerCannotDisableAlreadyEnabledAdminTier() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
                         OWNER, agent(AgentVisibility.PRIVATE), List.of(), List.of("terminal")))
                 .isInstanceOf(ApiException.class)
@@ -48,14 +52,16 @@ class AgentToolPolicyTest {
     }
 
     @Test
-    void 관리자는_관리자_등급을_켤_수_있다() {
+    @DisplayName("관리자는 관리자 등급을 켤 수 있다")
+    void adminCanEnableAdminTier() {
         assertThat(AgentToolPolicy.requestedForWrite(
                 ADMIN, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of()))
                 .containsExactly("terminal", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
     @Test
-    void memory와_모르는_이름은_거절한다() {
+    @DisplayName("memory와 모르는 이름은 거절한다")
+    void rejectsMemoryAndUnknownNames() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
                         ADMIN, agent(AgentVisibility.PRIVATE), List.of("memory"), List.of()))
                 .isInstanceOf(ApiException.class)
@@ -69,7 +75,8 @@ class AgentToolPolicyTest {
     }
 
     @Test
-    void 그룹_에이전트는_셸과_파일_계열을_켤_수_없다() {
+    @DisplayName("그룹 에이전트는 셸과 파일 계열을 켤 수 없다")
+    void groupAgentCannotEnableShellAndFileFamilies() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
                         ADMIN, agent(AgentVisibility.GROUP), List.of("terminal"), List.of()))
                 .isInstanceOf(ApiException.class)
@@ -78,7 +85,8 @@ class AgentToolPolicyTest {
     }
 
     @Test
-    void 지난_대화_검색은_관리자만_켜고_그룹_에이전트에는_둘_수_없다() {
+    @DisplayName("지난 대화 검색은 관리자만 켜고 그룹 에이전트에는 둘 수 없다")
+    void pastConversationSearchIsAdminOnlyAndNotAllowedForGroupAgent() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
                         OWNER, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
                 .isInstanceOf(ApiException.class)
@@ -95,7 +103,8 @@ class AgentToolPolicyTest {
     }
 
     @Test
-    void 지난_대화_검색이_이미_켜진_그룹_에이전트는_관리자가_끌_때까지_주인이_다른_도구를_바꾸지_못한다() {
+    @DisplayName("지난 대화 검색이 이미 켜진 그룹 에이전트는 관리자가 끌 때까지 주인이 다른 도구를 바꾸지 못한다")
+    void ownerCannotChangeOtherToolsUntilAdminDisablesPastSearch() {
         // 등급을 옮기기 전에 켜 둔 에이전트다. 주인은 그 도구를 끄지 못하고, 남긴 채 저장하면 그룹 제약에 걸린다.
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
                         OWNER, agent(AgentVisibility.GROUP), List.of("session_search", "web"), List.of("session_search")))

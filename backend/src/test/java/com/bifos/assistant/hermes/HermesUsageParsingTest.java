@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import org.junit.jupiter.api.DisplayName;
 import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +17,8 @@ class HermesUsageParsingTest {
     }
 
     @Test
-    void Hermes_v0_21_5_의_run_usage_에서_캐시_읽기를_읽는다() throws Exception {
+    @DisplayName("Hermes v0 21 5 의 run usage 에서 캐시 읽기를 읽는다")
+    void readsCacheReadFromRunUsageOfHermesV0215() throws Exception {
         // 실제 v0.21.5 run 응답의 키 모양이다(2026-09-29 운영에서 확인). input 은 캐시 읽기와 쓰기를 포함한다.
         TokenUsage usage =
                 parse(
@@ -32,7 +34,8 @@ class HermesUsageParsingTest {
     }
 
     @Test
-    void reads_the_openai_shape() throws Exception {
+    @DisplayName("reads the openai shape")
+    void readsTheOpenaiShape() throws Exception {
         TokenUsage usage =
                 parse(
                         """
@@ -47,7 +50,8 @@ class HermesUsageParsingTest {
     }
 
     @Test
-    void reads_the_anthropic_shape_and_derives_the_total() throws Exception {
+    @DisplayName("reads the anthropic shape and derives the total")
+    void readsTheAnthropicShapeAndDerivesTheTotal() throws Exception {
         TokenUsage usage =
                 parse("""
                         {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 3}
@@ -60,7 +64,8 @@ class HermesUsageParsingTest {
     }
 
     @Test
-    void survives_a_missing_usage_block() throws Exception {
+    @DisplayName("survives a missing usage block")
+    void survivesAMissingUsageBlock() throws Exception {
         TokenUsage usage = parse("{}");
 
         assertThat(usage.inputTokens()).isNull();

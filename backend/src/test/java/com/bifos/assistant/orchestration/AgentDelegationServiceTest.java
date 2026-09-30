@@ -45,6 +45,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -108,7 +109,7 @@ class AgentDelegationServiceTest {
 
     /** 이 검사의 profile 과 에이전트와 사용자만 지운다. 같은 H2 를 다른 검사 클래스와 함께 쓴다. */
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         stub().reset();
         for (String profile : List.of(CHIEF_PROFILE, WORKER)) {
             jdbc.update("DELETE FROM agent_execution WHERE profile_name = ?", profile);
@@ -126,7 +127,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 제출을_붙잡으면_제한_시간_뒤_번호와_RUNNING_이_오고_풀면_결과가_그_줄에_적힌다() throws Exception {
+    @DisplayName("제출을 붙잡으면 제한 시간 뒤 번호와 RUNNING 이 오고 풀면 결과가 그 줄에 적힌다")
+    void heldSubmitReturnsIdAndRunningAfterTimeoutThenRecordsResult() throws Exception {
         stub().willAnswer(command -> completed(command, "붙잡혔던 답"));
         stub().holdSubmits();
 
@@ -150,7 +152,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 답이_상한을_넘으면_잘리고_잘렸다는_한_줄이_붙는다() throws Exception {
+    @DisplayName("답이 상한을 넘으면 잘리고 잘렸다는 한 줄이 붙는다")
+    void truncatesAnswerOverLimitAndAppendsTruncationLine() throws Exception {
         stub().willAnswer(command -> completed(command, command.input().equals("길다") ? "가".repeat(21) : "나".repeat(20)));
 
         DelegationResult longer = delegate("길다");
@@ -164,7 +167,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 서버_전체_한도를_채우면_BUSY_이고_끝나면_자리가_돌아온다() throws Exception {
+    @DisplayName("서버 전체 한도를 채우면 BUSY 이고 끝나면 자리가 돌아온다")
+    void isBusyAtServerWideLimitAndSlotReturnsWhenFinished() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         stub().holdSubmits();
         List<Long> started = new ArrayList<>();
@@ -187,7 +191,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 같은_키로_동시에_두_번_부르면_잠금을_기다린_요청이_먼저_생긴_줄을_읽어_실행이_하나이고_같은_번호가_온다() throws Exception {
+    @DisplayName("같은 키로 동시에 두 번 부르면 잠금을 기다린 요청이 먼저 생긴 줄을 읽어 실행이 하나이고 같은 번호가 온다")
+    void concurrentCallsWithSameKeyReadEarlierRowAndReturnSameId() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         stub().holdSubmits();
         DelegationKey key = DelegationKey.of(CHIEF_PROFILE, root, root, "call_" + UUID.randomUUID());
@@ -210,7 +215,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 도는_위임_실행을_멈추면_Hermes_에_중지가_가고_멈춘_자리까지의_답과_함께_CANCELLED_로_남는다() throws Exception {
+    @DisplayName("도는 위임 실행을 멈추면 Hermes 에 중지가 가고 멈춘 자리까지의 답과 함께 CANCELLED 로 남는다")
+    void stoppingRunningDelegationSendsStopToHermesAndLeavesCancelled() throws Exception {
         stub().willAnswer(command -> completed(command, "멈춘 자리까지의 답"));
         holdUntilStopped();
         DelegationResult started = delegate("멈출 일");
@@ -229,7 +235,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 멈춘_실행이_받은_답이_없으면_답을_비워_둔다() throws Exception {
+    @DisplayName("멈춘 실행이 받은 답이 없으면 답을 비워 둔다")
+    void leavesAnswerEmptyWhenStoppedRunHasNoAnswer() throws Exception {
         stub().willAnswer(command -> completed(command, ""));
         holdUntilStopped();
         DelegationResult started = delegate("답이 없다");
@@ -240,7 +247,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void run_번호가_붙기_전에_온_중지는_번호가_붙는_자리에서_Hermes_에_보낸다() throws Exception {
+    @DisplayName("run 번호가 붙기 전에 온 중지는 번호가 붙는 자리에서 Hermes 에 보낸다")
+    void stopBeforeRunIdIsAttachedIsSentToHermesWhenIdGetsAttached() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         stub().holdSubmits();
         DelegationResult started = delegate("제출 전에 멈춘다");
@@ -263,7 +271,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 끝난_실행을_멈추면_Hermes_에_보내지_않고_끝난_상태를_그대로_준다() throws Exception {
+    @DisplayName("끝난 실행을 멈추면 Hermes 에 보내지 않고 끝난 상태를 그대로 준다")
+    void stoppingFinishedRunSendsNothingToHermesAndReturnsEndedState() throws Exception {
         stub().willAnswer(command -> completed(command, "끝난 답"));
         DelegationResult started = delegate("먼저 끝난다");
         awaitFinished(started.executionId());
@@ -277,7 +286,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 끊긴_위임_실행의_에이전트_행이_없으면_Hermes_에_보내지_않고_중지를_요청하지_않은_상태로_답한다() {
+    @DisplayName("끊긴 위임 실행의 에이전트 행이 없으면 Hermes 에 보내지 않고 중지를 요청하지 않은 상태로 답한다")
+    void answersNotStopRequestedWithoutSendingWhenCutRunHasNoAgentRow() {
         // 서버가 다시 떠 이 프로세스에 중지 표시가 없는 도는 위임 실행이다. 가리키는 에이전트 행은 없다.
         AgentExecution detached = executions.save(AgentExecution.builder()
                 .userId(user.id())
@@ -301,7 +311,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 같은_대화의_다음_turn_에서_앞_turn_이_맡긴_실행을_멈춘다() throws Exception {
+    @DisplayName("같은 대화의 다음 turn 에서 앞 turn 이 맡긴 실행을 멈춘다")
+    void stopsRunDelegatedByEarlierTurnInNextTurnOfSameConversation() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         holdUntilStopped();
         DelegationResult started = delegate("앞 turn 의 일");
@@ -316,7 +327,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 사용자가_뿌리_turn_을_멈추면_그_turn_이_도는_동안_맡긴_자식도_멈춘다() throws Exception {
+    @DisplayName("사용자가 뿌리 turn 을 멈추면 그 turn 이 도는 동안 맡긴 자식도 멈춘다")
+    void stoppingRootTurnAlsoStopsChildrenDelegatedWhileItRuns() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         // 대역 Hermes 는 중지를 받은 뒤에도 completed 를 준다. 뿌리 turn 의 중지가 확정된 뒤에 답하게 해, 확정된 중지를
         // 보고 CANCELLED 로 적는지 본다.
@@ -341,7 +353,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 뿌리_turn_의_중지를_Hermes_가_받지_않은_사이에_끝난_자식은_성공으로_남는다() throws Exception {
+    @DisplayName("뿌리 turn 의 중지를 Hermes 가 받지 않은 사이에 끝난 자식은 성공으로 남는다")
+    void childFinishedBeforeHermesAcceptedRootStopStaysSucceeded() throws Exception {
         stub().willAnswer(command -> completed(command, "멀쩡한 답"));
         CountDownLatch stopAttempted = new CountDownLatch(1);
         AtomicReference<Long> childId = new AtomicReference<>();
@@ -386,7 +399,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 끝난_turn_과_같은_사용자의_다른_대화_turn_에는_자식_run_을_붙이지_않는다() throws Exception {
+    @DisplayName("끝난 turn 과 같은 사용자의 다른 대화 turn 에는 자식 run 을 붙이지 않는다")
+    void doesNotAttachChildRunToEndedTurnOrOtherConversationTurnOfSameUser() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         CountDownLatch awaiting = holdUntilStopped();
         TurnCancellation.TurnHandle ended = turns.open(user.id(), conversation.id());
@@ -422,7 +436,8 @@ class AgentDelegationServiceTest {
     }
 
     @Test
-    void 남의_실행과_다른_대화의_실행은_멈추지_않고_없는_실행과_같다() throws Exception {
+    @DisplayName("남의 실행과 다른 대화의 실행은 멈추지 않고 없는 실행과 같다")
+    void doesNotStopOthersOrOtherConversationRunsAndTreatsAsMissing() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         holdUntilStopped();
         DelegationResult started = delegate("남이 멈추려는 일");

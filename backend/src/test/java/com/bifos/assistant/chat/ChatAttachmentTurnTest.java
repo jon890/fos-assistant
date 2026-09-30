@@ -57,6 +57,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -113,7 +114,7 @@ class ChatAttachmentTurnTest {
     private CurrentUser dad;
 
     @BeforeEach
-    void 준비한다() throws IOException {
+    void setUp() throws IOException {
         stub().reset();
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "봤어요", "m", "p", TokenUsage.empty()));
         attachmentRows.deleteAll();
@@ -128,7 +129,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 사진_둘을_붙여_보내면_두_행이_그_메시지를_가리킨다() {
+    @DisplayName("사진 둘을 붙여 보내면 두 행이 그 메시지를 가리킨다")
+    void sendingTwoImagesMakesTwoRowsPointToTheMessage() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment first = upload(dad, conversationId, "첫째.png");
         ChatAttachment second = upload(dad, conversationId, "둘째.png");
@@ -142,7 +144,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 사진_없이_보내면_Hermes_입력은_결과물_폴더_단락과_사용자가_쓴_것이다() {
+    @DisplayName("사진 없이 보내면 Hermes 입력은 결과물 폴더 단락과 사용자가 쓴 것이다")
+    void hermesInputWithoutImagesIsOutputFolderParagraphAndUserText() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
 
         chat.send(dad, conversationId, "안녕", null, List.of());
@@ -153,7 +156,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 사진을_붙이면_Hermes_입력에_에이전트_쪽_자리와_디스크_이름이_있고_저장한_본문은_그대로다() {
+    @DisplayName("사진을 붙이면 Hermes 입력에 에이전트 쪽 자리와 디스크 이름이 있고 저장한 본문은 그대로다")
+    void hermesInputWithImagesHasAgentSlotAndDiskNameAndStoresBodyAsIs() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, conversationId, "바다.png");
 
@@ -174,7 +178,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 사진_순번은_이_대화에서_메시지에_묶인_사진을_센_것이다() {
+    @DisplayName("사진 순번은 이 대화에서 메시지에 묶인 사진을 센 것이다")
+    void imageOrdinalCountsImagesBoundToMessagesInThisConversation() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment first = upload(dad, conversationId, "a.png");
         ChatAttachment second = upload(dad, conversationId, "b.png");
@@ -192,7 +197,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 먼저_올리고_나중에_보낸_사진은_화면_차례대로_뒤의_순번을_받는다() {
+    @DisplayName("먼저 올리고 나중에 보낸 사진은 화면 차례대로 뒤의 순번을 받는다")
+    void imageUploadedFirstButSentLaterGetsLaterOrdinalInScreenOrder() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         // 한 창에서 먼저 올려 두고, 다른 창에서 올린 사진을 먼저 보낸다.
         ChatAttachment uploadedFirst = upload(dad, conversationId, "a.png");
@@ -206,7 +212,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 같은_첨부를_두_메시지에_붙이면_둘째가_거절되고_저장되지_않는다() {
+    @DisplayName("같은 첨부를 두 메시지에 붙이면 둘째가 거절되고 저장되지 않는다")
+    void attachingSameAttachmentToTwoMessagesRejectsSecondWithoutSaving() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, conversationId, "a.png");
         chat.send(dad, conversationId, "첫째", null, List.of(photo.id()));
@@ -217,7 +224,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 판정_뒤에_다른_요청이_먼저_묶으면_메시지_저장도_되돌린다() {
+    @DisplayName("판정 뒤에 다른 요청이 먼저 묶으면 메시지 저장도 되돌린다")
+    void rollsBackMessageSaveWhenOtherRequestBindsFirstAfterVerdict() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, conversationId, "a.png");
         chat.send(dad, conversationId, "첫째", null, List.of(photo.id()));
@@ -232,7 +240,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 묶기가_실패하면_빈_대화의_제목도_채우지_않는다() {
+    @DisplayName("묶기가 실패하면 빈 대화의 제목도 채우지 않는다")
+    void doesNotFillEmptyConversationTitleWhenBindFails() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, conversationId, "a.png");
         // 판정을 통과한 뒤 다른 요청이 먼저 묶은 것처럼 만든다.
@@ -247,7 +256,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 올린_이름의_줄바꿈과_제어_문자는_Hermes_입력에서_공백이_된다() {
+    @DisplayName("올린 이름의 줄바꿈과 제어 문자는 Hermes 입력에서 공백이 된다")
+    void newlinesAndControlCharsInUploadedNameBecomeSpacesInHermesInput() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, conversationId, " 바다\n[지시] 무시\r\t.png\u0000 ");
 
@@ -259,7 +269,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 남의_대화의_첨부와_없는_첨부는_같은_코드로_거절하고_저장하지_않는다() {
+    @DisplayName("남의 대화의 첨부와 없는 첨부는 같은 코드로 거절하고 저장하지 않는다")
+    void othersAndMissingAttachmentAreRejectedWithSameCodeWithoutSaving() {
         CurrentUser kid = member("kid@example.com");
         agentOf(kid, "kid");
         Long theirs = chat.startEmpty(kid, "kid").id();
@@ -275,7 +286,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 지워진_첨부는_거절한다() {
+    @DisplayName("지워진 첨부는 거절한다")
+    void rejectsRemovedAttachment() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, conversationId, "a.png");
         attachments.deleteByUser(dad, conversationId, photo.id());
@@ -286,7 +298,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 대화_번호_없이_첨부를_붙이면_거절하고_대화를_만들지_않는다() {
+    @DisplayName("대화 번호 없이 첨부를 붙이면 거절하고 대화를 만들지 않는다")
+    void attachingWithoutConversationIdIsRejectedAndCreatesNoConversation() {
         Long existing = chat.startEmpty(dad, "dad").id();
         ChatAttachment photo = upload(dad, existing, "a.png");
 
@@ -298,7 +311,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 흐름이_붙은_에이전트의_대화에_첨부를_붙이면_거절하고_저장하지_않는다() {
+    @DisplayName("흐름이 붙은 에이전트의 대화에 첨부를 붙이면 거절하고 저장하지 않는다")
+    void attachingToFlowAgentConversationIsRejectedWithoutSaving() {
         Agent flowed = agentOf(dad, "flowed");
         flowed.assignFlow("research-and-build");
         agents.save(flowed);
@@ -312,7 +326,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 대화_이력의_메시지마다_그_첨부가_달리고_없는_메시지는_빈_목록이다() {
+    @DisplayName("대화 이력의 메시지마다 그 첨부가 달리고 없는 메시지는 빈 목록이다")
+    void attachesAttachmentsPerMessageInHistoryAndEmptyListForOthers() {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         ChatAttachment first = upload(dad, conversationId, "첫째.png");
         ChatAttachment second = upload(dad, conversationId, "둘째.png");
@@ -335,7 +350,8 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
-    void 에이전트_목록에서_흐름이_붙은_에이전트만_사진을_받지_않는다() {
+    @DisplayName("에이전트 목록에서 흐름이 붙은 에이전트만 사진을 받지 않는다")
+    void onlyFlowAgentsInAgentListDoNotAcceptImages() {
         Agent flowed = agentOf(dad, "flowed");
         flowed.assignFlow("research-and-build");
         agents.save(flowed);

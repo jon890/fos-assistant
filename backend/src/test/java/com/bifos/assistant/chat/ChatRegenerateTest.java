@@ -46,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -88,7 +89,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 마지막_답을_다시_만들면_이전_답을_가리키고_질문은_늘지_않는다() {
+    @DisplayName("마지막 답을 다시 만들면 이전 답을 가리키고 질문은 늘지 않는다")
+    void regeneratingLastReplyPointsToPreviousReplyAndAddsNoQuestion() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "새 답"));
 
@@ -110,7 +112,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 다시_생성이_실패하면_이전_답_뒤에_새_메시지를_남기지_않는다() {
+    @DisplayName("다시 생성이 실패하면 이전 답 뒤에 새 메시지를 남기지 않는다")
+    void leavesNoNewMessageAfterPreviousReplyWhenRegenerationFails() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -125,7 +128,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 답_없는_질문을_다시_시도하면_답은_새로_생기고_판을_가리키지_않는다() {
+    @DisplayName("답 없는 질문을 다시 시도하면 답은 새로 생기고 판을 가리키지 않는다")
+    void retryingUnansweredQuestionCreatesReplyWithoutPointingToVersion() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(new HermesRunResult("failed", "session", "failed", "", null, null, "failed", TokenUsage.empty()));
         Long conversationId;
@@ -145,7 +149,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 빈_대화는_다시_만들_답이_없다() {
+    @DisplayName("빈 대화는 다시 만들 답이 없다")
+    void emptyConversationHasNoReplyToRegenerate() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", agent.id()));
@@ -157,7 +162,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 다른_사용자의_대화는_없는_대화처럼_거절한다() {
+    @DisplayName("다른 사용자의 대화는 없는 대화처럼 거절한다")
+    void rejectsOtherUsersConversationAsMissing() {
         CurrentUser dad = member("dad@example.com", "dad");
         CurrentUser mom = member("mom@example.com", "mom");
         stub().willReturn(result("first", "첫 답"));
@@ -170,7 +176,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 다시_생성은_대화가_기억한_Hermes_session을_이어서_쓴다() {
+    @DisplayName("다시 생성은 대화가 기억한 Hermes session을 이어서 쓴다")
+    void regenerationContinuesHermesSessionRememberedByConversation() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(
                 HermesRunResult.of("first", "shared-session", "completed", "첫 답", "model", "provider", TokenUsage.empty()),
@@ -183,7 +190,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 모델을_고른_대화에서_다시_생성하면_요청에_그_선택이_실린다() {
+    @DisplayName("모델을 고른 대화에서 다시 생성하면 요청에 그 선택이 실린다")
+    void regeneratingInConversationWithChosenModelCarriesChoiceInRequest() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "새 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -201,7 +209,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 지운_대화에서는_다시_생성을_거절한다() {
+    @DisplayName("지운 대화에서는 다시 생성을 거절한다")
+    void rejectsRegenerationInDeletedConversation() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -214,7 +223,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 도는_재생성_중에는_둘째_재생성을_거절한다() throws Exception {
+    @DisplayName("도는 재생성 중에는 둘째 재생성을 거절한다")
+    void rejectsSecondRegenerationWhileOneIsRunning() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("regenerated", "새 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -251,7 +261,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 도는_turn이_있는_대화는_재생성을_거절하고_새_실행을_만들지_않는다() throws Exception {
+    @DisplayName("도는 turn이 있는 대화는 재생성을 거절하고 새 실행을 만들지 않는다")
+    void rejectsRegenerationWhileTurnRunsAndCreatesNoNewRun() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("running", "새 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -287,7 +298,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 다시_생성을_거듭하면_새_답이_직전_답을_가리킨다() {
+    @DisplayName("다시 생성을 거듭하면 새 답이 직전 답을 가리킨다")
+    void repeatedRegenerationPointsNewReplyToPreviousOne() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "둘째 답"), result("third", "셋째 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -302,7 +314,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 흐름_재생성은_모든_실행의_지시에_문구를_붙이고_답_판을_잇는다() {
+    @DisplayName("흐름 재생성은 모든 실행의 지시에 문구를 붙이고 답 판을 잇는다")
+    void flowRegenerationAppendsPhraseToAllRunsAndLinksReplyVersion() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -322,7 +335,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 흐름으로_바꾼_대화도_이전_질문의_사진_자리를_재생성_입력에_넣는다() {
+    @DisplayName("흐름으로 바꾼 대화도 이전 질문의 사진 자리를 재생성 입력에 넣는다")
+    void flowConversationRegenerationInputKeepsPreviousImageSlots() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "사진 질문", "dad").conversationId();

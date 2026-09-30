@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,7 +26,8 @@ import org.junit.jupiter.api.Test;
 class AgentTokenUserIdDropMigrationTest {
 
     @Test
-    void 폐기_안_된_토큰이_모두_profile_에_묶였으면_user_id_칸을_지우고_줄은_남긴다() throws SQLException {
+    @DisplayName("폐기 안 된 토큰이 모두 profile 에 묶였으면 user id 칸을 지우고 줄은 남긴다")
+    void dropsUserIdColumnKeepingRowsWhenAllTokensAreBoundToProfile() throws SQLException {
         String url = migratedTo34();
         execute(url, "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "
                 + "VALUES (NULL, 'shared-group', 'bound-hash', 'bound', CURRENT_TIMESTAMP(6))");
@@ -39,7 +41,8 @@ class AgentTokenUserIdDropMigrationTest {
     }
 
     @Test
-    void profile_이_비고_폐기_안_된_토큰이_있으면_실패하고_user_id_칸을_그대로_둔다() throws SQLException {
+    @DisplayName("profile 이 비고 폐기 안 된 토큰이 있으면 실패하고 user id 칸을 그대로 둔다")
+    void failsAndKeepsUserIdColumnWhenProfileBlankAndUnrevokedTokenExists() throws SQLException {
         String url = migratedTo34();
         execute(url, "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "
                 + "VALUES (7, NULL, 'unbound-hash', 'unbound', CURRENT_TIMESTAMP(6))");

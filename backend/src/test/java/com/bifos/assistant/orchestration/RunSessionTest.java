@@ -3,13 +3,15 @@ package com.bifos.assistant.orchestration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.orchestration.domain.RunSession;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 보낼 session 과 실행 줄에 적을 session 을 정하는 규칙을 고정한다. */
 class RunSessionTest {
 
     @Test
-    void 새_대화는_보낼_session과_적을_session이_같다() {
+    @DisplayName("새 대화는 보낼 session과 적을 session이 같다")
+    void newConversationSendSessionEqualsRecordedSession() {
         RunSession session = RunSession.ofConversation("fos-a", "fos-a");
 
         assertThat(session.runtimeSessionId()).isEqualTo("fos-a");
@@ -17,7 +19,8 @@ class RunSessionTest {
     }
 
     @Test
-    void 압축_교체_뒤에는_보낼_session만_바뀌고_적을_session은_뿌리를_가리킨다() {
+    @DisplayName("압축 교체 뒤에는 보낼 session만 바뀌고 적을 session은 뿌리를 가리킨다")
+    void afterCompactionOnlySendSessionChangesAndRecordedPointsToRoot() {
         RunSession session = RunSession.ofConversation("fos-b", "fos-a");
 
         assertThat(session.runtimeSessionId()).isEqualTo("fos-b");
@@ -25,7 +28,8 @@ class RunSessionTest {
     }
 
     @Test
-    void 뿌리가_빈_옛_대화는_두_값이_모두_보낸_session이다() {
+    @DisplayName("뿌리가 빈 옛 대화는 두 값이 모두 보낸 session이다")
+    void oldConversationWithBlankRootHasBothValuesAsSendSession() {
         RunSession session = RunSession.ofConversation("legacy-session", null);
 
         assertThat(session.runtimeSessionId()).isEqualTo("legacy-session");
@@ -33,7 +37,8 @@ class RunSessionTest {
     }
 
     @Test
-    void fresh는_fos_접두사의_같은_값_둘이고_부를_때마다_다르다() {
+    @DisplayName("fresh는 fos 접두사의 같은 값 둘이고 부를 때마다 다르다")
+    void freshMakesTwoEqualValuesWithFosPrefixAndDiffersEachCall() {
         RunSession first = RunSession.fresh();
         RunSession second = RunSession.fresh();
 

@@ -24,6 +24,7 @@ import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,7 +35,8 @@ class ArtifactSourceTlsTest {
     private static final String ORIGINAL_HOST = "images.artifact-test.invalid";
 
     @Test
-    void 전달한_IP로_연결하고_원래_호스트의_SNI와_Host와_SAN을_쓴다(@TempDir Path directory) throws Exception {
+    @DisplayName("전달한 IP로 연결하고 원래 호스트의 SNI와 Host와 SAN을 쓴다")
+    void connectsToGivenIpWithOriginalHostSniHostAndSan(@TempDir Path directory) throws Exception {
         TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
         try (TlsServer server = new TlsServer(material.serverContext())) {
             ArtifactSourceFetcher.SocketTransport transport = new ArtifactSourceFetcher.SocketTransport(
@@ -55,7 +57,8 @@ class ArtifactSourceTlsTest {
     }
 
     @Test
-    void 원래_호스트와_다른_SAN은_신뢰한_인증서여도_HTTPS_식별에서_거절한다(@TempDir Path directory)
+    @DisplayName("원래 호스트와 다른 SAN은 신뢰한 인증서여도 HTTPS 식별에서 거절한다")
+    void rejectsSanDifferentFromOriginalHostInHttpsIdentification(@TempDir Path directory)
             throws Exception {
         TlsMaterial material = tlsMaterial(directory, "other.artifact-test.invalid");
         try (TlsServer server = new TlsServer(material.serverContext())) {
@@ -72,7 +75,8 @@ class ArtifactSourceTlsTest {
     }
 
     @Test
-    void TLS_응답_머리글이_늦으면_읽기_제한으로_실패한다(@TempDir Path directory) throws Exception {
+    @DisplayName("TLS 응답 머리글이 늦으면 읽기 제한으로 실패한다")
+    void failsWithReadLimitWhenTlsResponseHeadersAreLate(@TempDir Path directory) throws Exception {
         TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
         try (TlsServer server = new TlsServer(material.serverContext(), Duration.ofMillis(1200), false)) {
             ArtifactSourceFetcher.SocketTransport transport = new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());
@@ -85,7 +89,8 @@ class ArtifactSourceTlsTest {
     }
 
     @Test
-    void TLS_본문이_조금씩_오면_각_읽기에_제한을_적용한다(@TempDir Path directory) throws Exception {
+    @DisplayName("TLS 본문이 조금씩 오면 각 읽기에 제한을 적용한다")
+    void appliesLimitToEachReadWhenTlsBodyArrivesInDribbles(@TempDir Path directory) throws Exception {
         TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
         try (TlsServer server = new TlsServer(material.serverContext(), Duration.ofMillis(1200), true)) {
             ArtifactSourceFetcher.SocketTransport transport = new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());

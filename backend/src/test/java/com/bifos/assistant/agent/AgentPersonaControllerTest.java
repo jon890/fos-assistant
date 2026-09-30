@@ -26,6 +26,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import java.util.Optional;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -59,7 +60,7 @@ class AgentPersonaControllerTest {
             .build();
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(agents.findByCode("dad")).thenReturn(Optional.of(
                 agent("dad", "dad-profile", AgentVisibility.PRIVATE, OWNER.id())));
         when(agents.findByCode("home")).thenReturn(Optional.of(
@@ -70,7 +71,8 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 자기만_보는_자기_에이전트를_주인이_읽으면_고칠_수_있다() throws Exception {
+    @DisplayName("자기만 보는 자기 에이전트를 주인이 읽으면 고칠 수 있다")
+    void ownerCanEditOwnPrivateAgent() throws Exception {
         mvc.perform(get("/api/v1/agents/dad/persona"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.body").value(SOUL))
@@ -80,7 +82,8 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 남의_자기만_보는_에이전트는_없는_것과_같은_응답을_준다() throws Exception {
+    @DisplayName("남의 자기만 보는 에이전트는 없는 것과 같은 응답을 준다")
+    void othersPrivateAgentRespondsAsMissing() throws Exception {
         when(currentUser.require()).thenReturn(OTHER);
 
         mvc.perform(get("/api/v1/agents/dad/persona"))
@@ -89,7 +92,8 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 그룹_공용_에이전트를_MEMBER_가_읽으면_고칠_수_없다() throws Exception {
+    @DisplayName("그룹 공용 에이전트를 MEMBER 가 읽으면 고칠 수 없다")
+    void memberCannotEditGroupSharedAgent() throws Exception {
         when(currentUser.require()).thenReturn(OTHER);
 
         mvc.perform(get("/api/v1/agents/home/persona"))
@@ -98,7 +102,8 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 그룹_공용_에이전트를_MEMBER_가_쓰면_거절하고_쓰지_않는다() throws Exception {
+    @DisplayName("그룹 공용 에이전트를 MEMBER 가 쓰면 거절하고 쓰지 않는다")
+    void memberWritingGroupSharedAgentIsRejectedWithoutWrite() throws Exception {
         when(currentUser.require()).thenReturn(OTHER);
 
         mvc.perform(write("home", "새 성격", Sha256.hex16(SOUL)))
@@ -109,7 +114,8 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 그룹_공용_에이전트를_ADMIN_은_쓸_수_있다() throws Exception {
+    @DisplayName("그룹 공용 에이전트를 ADMIN 은 쓸 수 있다")
+    void adminCanWriteGroupSharedAgent() throws Exception {
         when(currentUser.require()).thenReturn(ADMIN);
 
         mvc.perform(write("home", "새 성격", Sha256.hex16(SOUL)))
@@ -118,7 +124,8 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 상한을_넘는_본문은_거절한다() throws Exception {
+    @DisplayName("상한을 넘는 본문은 거절한다")
+    void rejectsBodyOverLimit() throws Exception {
         mvc.perform(write("dad", "가".repeat(8001), Sha256.hex16(SOUL)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
@@ -127,7 +134,8 @@ class AgentPersonaControllerTest {
     }
 
     @Test
-    void 대시보드에_닿지_못하면_그것으로_알린다() throws Exception {
+    @DisplayName("대시보드에 닿지 못하면 그것으로 알린다")
+    void reportsDashboardUnreachable() throws Exception {
         dashboard.failOnReadSoul(
                 () -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not reach Hermes"));
 

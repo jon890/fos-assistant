@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SecureDirectoryStream;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,7 +22,8 @@ import org.junit.jupiter.api.io.TempDir;
 class ArtifactStoreWriteTest {
 
     @Test
-    void HTML과_CSS를_대화_폴더에_쓰고_UTF_8_크기를_돌려준다(@TempDir Path root) throws IOException {
+    @DisplayName("HTML과 CSS를 대화 폴더에 쓰고 UTF 8 크기를 돌려준다")
+    void writesHtmlAndCssToConversationFolderAndReturnsUtf8Size(@TempDir Path root) throws IOException {
         ArtifactStore store = store(root, true);
 
         long htmlSize = store.write(10L, "test/index.html", "한글".getBytes(StandardCharsets.UTF_8));
@@ -34,7 +36,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void 같은_경로를_다시_쓰면_새_본문으로_교체한다(@TempDir Path root) throws IOException {
+    @DisplayName("같은 경로를 다시 쓰면 새 본문으로 교체한다")
+    void replacesWithNewBodyWhenSamePathIsWrittenAgain(@TempDir Path root) throws IOException {
         ArtifactStore store = store(root, true);
         store.write(10L, "index.html", "이전".getBytes(StandardCharsets.UTF_8));
 
@@ -45,7 +48,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void 강제한_ATOMIC_MOVE_대체_경로도_저장한다(@TempDir Path root) throws IOException {
+    @DisplayName("강제한 ATOMIC MOVE 대체 경로도 저장한다")
+    void storesOnFallbackPathWhenAtomicMoveIsForced(@TempDir Path root) throws IOException {
         ArtifactStore store = store(root, true);
 
         store.write(10L, "nested/index.html", "대체 경로".getBytes(StandardCharsets.UTF_8));
@@ -54,7 +58,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void 기본_경로도_저장한다(@TempDir Path root) throws IOException {
+    @DisplayName("기본 경로도 저장한다")
+    void storesOnDefaultPathToo(@TempDir Path root) throws IOException {
         ArtifactStore store = store(root, false);
 
         store.write(10L, "index.html", "본문".getBytes(StandardCharsets.UTF_8));
@@ -63,7 +68,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void Linux에서는_SecureDirectoryStream_경로를_쓴다(@TempDir Path root) throws IOException {
+    @DisplayName("Linux에서는 SecureDirectoryStream 경로를 쓴다")
+    void usesSecureDirectoryStreamPathOnLinux(@TempDir Path root) throws IOException {
         Assumptions.assumeTrue(System.getProperty("os.name").toLowerCase().contains("linux"));
         ArtifactStore store = store(root, false);
         Path target = store.resolveForWrite(10L, "index.html");
@@ -77,7 +83,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void 원자_교체가_실패하면_기존_파일을_보존하고_임시_파일을_지운다(@TempDir Path root) throws IOException {
+    @DisplayName("원자 교체가 실패하면 기존 파일을 보존하고 임시 파일을 지운다")
+    void keepsExistingFileAndDeletesTempWhenAtomicReplaceFails(@TempDir Path root) throws IOException {
         ArtifactStore initial = store(root, true);
         initial.write(10L, "index.html", "이전 본문".getBytes(StandardCharsets.UTF_8));
         ArtifactStore failing = new ArtifactStore(new ArtifactProperties(root.toString(), "/agent/artifacts", 30),
@@ -95,7 +102,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void 위험한_경로는_거절하고_폴더_밖을_바꾸지_않는다(@TempDir Path root) throws IOException {
+    @DisplayName("위험한 경로는 거절하고 폴더 밖을 바꾸지 않는다")
+    void rejectsDangerousPathWithoutChangingOutsideFolder(@TempDir Path root) throws IOException {
         ArtifactStore store = store(root, true);
         Path outside = root.resolve("outside.html");
         Files.writeString(outside, "보존");
@@ -110,7 +118,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void 대화_폴더와_부모_폴더와_대상_링크를_거절한다(@TempDir Path root) throws IOException {
+    @DisplayName("대화 폴더와 부모 폴더와 대상 링크를 거절한다")
+    void rejectsConversationFolderParentFolderAndTargetLink(@TempDir Path root) throws IOException {
         ArtifactStore store = store(root, true);
         Path outside = root.resolve("outside");
         Files.createDirectories(outside);
@@ -130,7 +139,8 @@ class ArtifactStoreWriteTest {
     }
 
     @Test
-    void 저장소_루트를_만들지_못하면_저장_실패를_돌린다(@TempDir Path root) throws IOException {
+    @DisplayName("저장소 루트를 만들지 못하면 저장 실패를 돌린다")
+    void failsSaveWhenStoreRootCannotBeCreated(@TempDir Path root) throws IOException {
         Path blockedRoot = root.resolve("blocked");
         Files.writeString(blockedRoot, "기존 파일");
         ArtifactStore store = store(blockedRoot, true);

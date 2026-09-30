@@ -4,6 +4,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPac
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleName;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
@@ -182,6 +183,21 @@ public final class ArchitectureRules {
             .should(notEnclosedByController())
             .allowEmptyShould(true)
             .as("컨트롤러 안에 record 를 두지 않는다");
+
+    /**
+     * {@code @Test} 와 {@code @ParameterizedTest} 메서드에는 {@code @DisplayName} 이 붙는다.
+     * 메서드 이름은 영문 camelCase 이고, 테스트 보고서에 보이는 한국어 문장은 {@code @DisplayName} 이 갖는다.
+     *
+     * <p>근거: {@code backend/AGENTS.md} 「테스트」 의 「테스트 이름」.
+     */
+    public static final ArchRule TEST_METHODS_HAVE_DISPLAY_NAME = methods()
+            .that()
+            .areAnnotatedWith(org.junit.jupiter.api.Test.class)
+            .or()
+            .areAnnotatedWith(org.junit.jupiter.params.ParameterizedTest.class)
+            .should()
+            .beAnnotatedWith(org.junit.jupiter.api.DisplayName.class)
+            .as("테스트 메서드에는 DisplayName 이 붙는다");
 
     private ArchitectureRules() {}
 

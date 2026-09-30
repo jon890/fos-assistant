@@ -19,6 +19,7 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -47,13 +48,14 @@ class PersonRegistrarTest {
     @MockitoBean HermesProfileProvisioner profiles;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         people.deleteAll();
         agents.deleteAll();
     }
 
     @Test
-    void 새_사람을_더하면_행이_생기고_profile_이_만들어진다() {
+    @DisplayName("새 사람을 더하면 행이 생기고 profile 이 만들어진다")
+    void addingNewPersonCreatesRowAndProfile() {
         AllowedPerson added = registrar.register(EMAIL, NAME, PROFILE);
 
         verify(profiles).provision(PROFILE);
@@ -65,7 +67,8 @@ class PersonRegistrarTest {
     }
 
     @Test
-    void 대문자가_섞인_주소도_소문자로_맞춰_넣는다() {
+    @DisplayName("대문자가 섞인 주소도 소문자로 맞춰 넣는다")
+    void lowercasesAddressesWithUppercase() {
         registrar.register("Aunt@Example.com", NAME, PROFILE);
 
         assertThat(people.existsByEmail(EMAIL)).isTrue();
@@ -73,7 +76,8 @@ class PersonRegistrarTest {
 
     /** 반만 더해진 사람이 남으면 같은 주소로 다시 더할 수 없고 그 사람은 대화하지도 못한다. */
     @Test
-    void profile_만들기가_실패하면_행이_남지_않는다() {
+    @DisplayName("profile 만들기가 실패하면 행이 남지 않는다")
+    void leavesNoRowWhenProfileCreationFails() {
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"))
                 .when(profiles)
                 .provision(PROFILE);
@@ -86,7 +90,8 @@ class PersonRegistrarTest {
     }
 
     @Test
-    void 이미_쓰는_이메일이면_거절하고_Hermes_를_부르지_않는다() {
+    @DisplayName("이미 쓰는 이메일이면 거절하고 Hermes 를 부르지 않는다")
+    void rejectsAlreadyUsedEmailWithoutCallingHermes() {
         people.save(AllowedPerson.of(EMAIL, NAME, "already-taken"));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
@@ -97,7 +102,8 @@ class PersonRegistrarTest {
     }
 
     @Test
-    void 허용_목록이_이미_쓰는_profile_이름이면_거절하고_Hermes_를_부르지_않는다() {
+    @DisplayName("허용 목록이 이미 쓰는 profile 이름이면 거절하고 Hermes 를 부르지 않는다")
+    void rejectsProfileNameUsedByAllowlistWithoutCallingHermes() {
         people.save(AllowedPerson.of("uncle@example.com", "삼촌", PROFILE));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
@@ -114,7 +120,8 @@ class PersonRegistrarTest {
      * 격리가 깨진다.
      */
     @Test
-    void 에이전트가_이미_쓰는_profile_이름이면_거절한다() {
+    @DisplayName("에이전트가 이미 쓰는 profile 이름이면 거절한다")
+    void rejectsProfileNameAlreadyUsedByAgent() {
         agents.save(Agent.of(
                 "uncle",
                 "삼촌 비서",

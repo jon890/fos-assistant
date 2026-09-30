@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -23,7 +24,8 @@ import org.junit.jupiter.api.Test;
 class ConversationPublicIdMigrationTest {
 
     @Test
-    void V23_이_이미_있는_대화마다_서로_다른_v4_식별자를_채운다() throws SQLException {
+    @DisplayName("V23 이 이미 있는 대화마다 서로 다른 v4 식별자를 채운다")
+    void v23FillsDistinctV4IdsForExistingConversations() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
 
         Flyway.configure()

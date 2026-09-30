@@ -25,6 +25,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -55,7 +56,7 @@ class ChatMemoryProposalTest {
     private CurrentUser user;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         memories.deleteAll(); executions.deleteAll(); agents.deleteAll(); users.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
         AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER));
@@ -65,21 +66,24 @@ class ChatMemoryProposalTest {
     }
 
     @Test
-    void 일반_응답_뒤에_제안을_저장하고_자식_실행을_연결한다() {
+    @DisplayName("일반 응답 뒤에 제안을 저장하고 자식 실행을 연결한다")
+    void savesProposalAfterPlainResponseAndLinksChildRun() {
         runWithProposal();
         chat.send(user, null, "질문", "proposal");
         assertProposalExecution();
     }
 
     @Test
-    void 스트리밍_응답_뒤에도_제안을_저장하고_자식_실행을_연결한다() {
+    @DisplayName("스트리밍 응답 뒤에도 제안을 저장하고 자식 실행을 연결한다")
+    void savesProposalAfterStreamingResponseAndLinksChildRun() {
         runWithProposal();
         chat.stream(user, null, "질문", "proposal", event -> { });
         assertProposalExecution();
     }
 
     @Test
-    void 모델을_고른_대화의_제안_실행도_그_선택으로_Hermes를_부른다() {
+    @DisplayName("모델을 고른 대화의 제안 실행도 그 선택으로 Hermes를 부른다")
+    void proposalRunOfConversationWithChosenModelCallsHermesWithThatChoice() {
         runWithProposal();
         Long conversationId = chat.startEmpty(user, "proposal").id();
         chat.chooseModel(user, conversationId, new ModelChoice("nvidia", "example-model-small", "low"));

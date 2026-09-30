@@ -57,6 +57,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -227,7 +228,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 흐름_한_번이_실행_넷을_남기고_Chief가_뿌리다() {
+    @DisplayName("흐름 한 번이 실행 넷을 남기고 Chief가 뿌리다")
+    void oneFlowLeavesFourRunsAndChiefIsRoot() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
 
@@ -274,7 +276,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void Chief_실행_줄에는_대화의_뿌리_session이_적히고_하위_실행_줄에는_각자_보낸_새_session이_적힌다() {
+    @DisplayName("Chief 실행 줄에는 대화의 뿌리 session이 적히고 하위 실행 줄에는 각자 보낸 새 session이 적힌다")
+    void chiefRowHasConversationRootSessionAndChildRowsHaveOwnNewSessions() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
 
@@ -310,7 +313,8 @@ class ResearchAndBuildFlowTest {
      * <p>하위 실행이 부모의 session 을 보내면 부모 자리에 Chief 가 잡히고, session 이 비면 요청자를 정하지 못한다.
      */
     @Test
-    void 하위_실행_안의_MCP_호출은_그_하위_실행_줄을_부모로_삼고_흐름을_시작한_사용자로_돈다() {
+    @DisplayName("하위 실행 안의 MCP 호출은 그 하위 실행 줄을 부모로 삼고 흐름을 시작한 사용자로 돈다")
+    void mcpCallInChildRunTakesChildRowAsParentAndRunsAsFlowStarter() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         String rawToken = agentTokens.issue(MY_AGENT, "flow-mcp").rawToken();
         McpPrincipal principal = agentTokens.authenticate(rawToken);
@@ -348,7 +352,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 경계_자식_실행의_userId가_전부_부모와_같다() {
+    @DisplayName("경계 자식 실행의 userId가 전부 부모와 같다")
+    void boundaryAllChildRunUserIdsEqualParents() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
 
@@ -359,7 +364,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 스트림이_네_단계의_사건을_순서대로_낸다() {
+    @DisplayName("스트림이 네 단계의 사건을 순서대로 낸다")
+    void streamEmitsEventsOfFourStagesInOrder() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
 
@@ -389,7 +395,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void Chief가_도는_동안_대화를_지워도_끝난_뒤에_지운_채다() {
+    @DisplayName("Chief가 도는 동안 대화를 지워도 끝난 뒤에 지운 채다")
+    void conversationDeletedWhileChiefRunsStaysDeletedAfterEnd() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         List<ChatEvent> relayed = new ArrayList<>();
         stub().willAnswer(command -> {
@@ -412,7 +419,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void Researcher가_실패하면_Engineer를_기다린_뒤_멈추고_Synthesizer는_돌지_않는다() {
+    @DisplayName("Researcher가 실패하면 Engineer를 기다린 뒤 멈추고 Synthesizer는 돌지 않는다")
+    void researcherFailureWaitsForEngineerThenStopsAndSkipsSynthesizer() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         stub().willAnswer(command -> {
             String input = command.input();
@@ -450,7 +458,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void Chief의_답을_파싱하지_못하면_자식을_하나도_만들지_않고_흐름이_실패한다() {
+    @DisplayName("Chief의 답을 파싱하지 못하면 자식을 하나도 만들지 않고 흐름이 실패한다")
+    void createsNoChildAndFailsFlowWhenChiefAnswerCannotBeParsed() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep("JSON 이 아닌 그냥 문장이다");
 
@@ -468,7 +477,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 나눌_것이_둘_다_비면_Chief의_답이_최종_답이_되고_실행이_하나만_남는다() {
+    @DisplayName("나눌 것이 둘 다 비면 Chief의 답이 최종 답이 되고 실행이 하나만 남는다")
+    void chiefAnswerBecomesFinalAndOneRunRemainsWhenBothPartsAreEmpty() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep("{\"research\":\"\",\"build\":\"\"}");
 
@@ -482,7 +492,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 사용량_목록에_뿌리_하나만_나오고_월_비용_합계는_넷을_모두_더한다() {
+    @DisplayName("사용량 목록에 뿌리 하나만 나오고 월 비용 합계는 넷을 모두 더한다")
+    void usageListShowsOnlyRootAndMonthlyCostSumsAllFour() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
         // 기본값으로 보낸 실행은 세션이 답한 모델로 가격을 찾는다.
@@ -511,7 +522,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 흐름이_없는_에이전트는_지금처럼_실행_하나만_남긴다() {
+    @DisplayName("흐름이 없는 에이전트는 지금처럼 실행 하나만 남긴다")
+    void agentWithoutFlowLeavesSingleRunAsBefore() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, null);
         stub().willReturn(completed("run-1", "그냥 답"));
 
@@ -524,7 +536,8 @@ class ResearchAndBuildFlowTest {
 
     /** 나란히 도는 두 단계가 실제로 함께 떠 있는지 본다. 줄서면 이 흐름의 값이 사라진다. */
     @Test
-    void Researcher와_Engineer가_실제로_함께_떠_있다() {
+    @DisplayName("Researcher와 Engineer가 실제로 함께 떠 있다")
+    void researcherAndEngineerActuallyRunTogether() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         java.util.concurrent.CountDownLatch bothSubmitted = new java.util.concurrent.CountDownLatch(2);
         stub().willAnswer(command -> {
@@ -546,7 +559,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void Chief가_도는_중에_멈추면_Chief를_멈추고_자식을_시작하지_않는다() {
+    @DisplayName("Chief가 도는 중에 멈추면 Chief를 멈추고 자식을 시작하지 않는다")
+    void stoppingWhileChiefRunsStopsChiefAndStartsNoChild() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         List<ChatEvent> relayed = new ArrayList<>();
         stub().willAnswer(command -> HermesRunResult.of(
@@ -579,7 +593,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void Chief가_끝난_뒤_자식_제출_전에_멈추면_자식을_만들지_않는다() throws Exception {
+    @DisplayName("Chief가 끝난 뒤 자식 제출 전에 멈추면 자식을 만들지 않는다")
+    void stoppingAfterChiefBeforeChildSubmitCreatesNoChild() throws Exception {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         hermesAnswersEachStep(SPLIT_JSON);
         List<ChatEvent> relayed = new ArrayList<>();
@@ -608,7 +623,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 자식_runId가_저장된_뒤_trackRun_전에_중지해도_그_자식을_멈춘다() {
+    @DisplayName("자식 runId가 저장된 뒤 trackRun 전에 중지해도 그 자식을 멈춘다")
+    void stopsChildEvenIfStoppedAfterRunIdSavedBeforeTrackRun() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         java.util.concurrent.atomic.AtomicBoolean intercepted = new java.util.concurrent.atomic.AtomicBoolean();
         stub().willAnswer(command -> {
@@ -632,7 +648,8 @@ class ResearchAndBuildFlowTest {
     }
 
     @Test
-    void 자식_둘이_도는_중에_멈추면_둘을_멈추고_합치기를_시작하지_않는다() {
+    @DisplayName("자식 둘이 도는 중에 멈추면 둘을 멈추고 합치기를 시작하지 않는다")
+    void stoppingWhileTwoChildrenRunStopsBothAndDoesNotStartMerge() {
         CurrentUser dad = member(MY_EMAIL, MY_AGENT, ResearchAndBuildFlow.NAME);
         List<ChatEvent> relayed = new ArrayList<>();
         java.util.concurrent.CountDownLatch childrenSubmitted = new java.util.concurrent.CountDownLatch(2);

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -35,40 +36,47 @@ class ArtifactControllerNotModifiedTest {
      * Spring 의 판정이 바뀌면 이 검사가 알린다.
      */
     @Test
-    void If_None_Match_가_별표면_참이고_Spring_은_거짓이다() {
+    @DisplayName("If None Match 가 별표면 참이고 Spring 은 거짓이다")
+    void starIfNoneMatchIsTrueAndSpringIsFalse() {
         assertThat(ours(ETAG, SECOND, "If-None-Match", "*")).isTrue();
         assertThat(spring(ETAG, SECOND, "If-None-Match", "*")).isFalse();
     }
 
     @Test
-    void 쉼표로_나열한_값_가운데_하나가_맞으면_참이다() {
+    @DisplayName("쉼표로 나열한 값 가운데 하나가 맞으면 참이다")
+    void trueWhenOneOfCommaSeparatedValuesMatches() {
         assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", " + ETAG + ", W/\"another\"")).isTrue();
     }
 
     @Test
-    void 요청에만_W_가_있어도_참이다() {
+    @DisplayName("요청에만 W 가 있어도 참이다")
+    void trueEvenIfOnlyRequestHasWeakPrefix() {
         assertThat(judged("\"1f-19a2b3c4d5e\"", SECOND, "If-None-Match", "W/\"1f-19a2b3c4d5e\"")).isTrue();
     }
 
     @Test
-    void 현재_값에만_W_가_있어도_참이다() {
+    @DisplayName("현재 값에만 W 가 있어도 참이다")
+    void trueEvenIfOnlyCurrentValueHasWeakPrefix() {
         assertThat(judged(ETAG, SECOND, "If-None-Match", "\"1f-19a2b3c4d5e\"")).isTrue();
     }
 
     @Test
-    void 어느_값도_맞지_않으면_거짓이다() {
+    @DisplayName("어느 값도 맞지 않으면 거짓이다")
+    void falseWhenNoValueMatches() {
         assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", W/\"another\"")).isFalse();
     }
 
     @Test
-    void If_None_Match_가_맞지_않으면_If_Modified_Since_가_맞아도_거짓이다() {
+    @DisplayName("If None Match 가 맞지 않으면 If Modified Since 가 맞아도 거짓이다")
+    void falseWhenIfNoneMatchMismatchesEvenIfIfModifiedSinceMatches() {
         assertThat(judged(ETAG, SECOND,
                 "If-None-Match", "\"other\"",
                 "If-Modified-Since", SECOND_AS_HEADER)).isFalse();
     }
 
     @Test
-    void If_None_Match_가_맞으면_If_Modified_Since_가_옛날이어도_참이다() {
+    @DisplayName("If None Match 가 맞으면 If Modified Since 가 옛날이어도 참이다")
+    void trueWhenIfNoneMatchMatchesEvenIfIfModifiedSinceIsOld() {
         String yearBefore = DateTimeFormatter.RFC_1123_DATE_TIME
                 .withZone(ZoneOffset.UTC).format(SECOND.minusSeconds(365L * 24 * 60 * 60));
 
@@ -78,17 +86,20 @@ class ArtifactControllerNotModifiedTest {
     }
 
     @Test
-    void 수정_시각이_If_Modified_Since_와_같은_초의_999ms_면_참이다() {
+    @DisplayName("수정 시각이 If Modified Since 와 같은 초의 999ms 면 참이다")
+    void trueWhenModifiedTimeIs999MsWithinSameSecondAsIfModifiedSince() {
         assertThat(judged(ETAG, SECOND.plusMillis(999), "If-Modified-Since", SECOND_AS_HEADER)).isTrue();
     }
 
     @Test
-    void 수정_시각이_If_Modified_Since_의_다음_초면_거짓이다() {
+    @DisplayName("수정 시각이 If Modified Since 의 다음 초면 거짓이다")
+    void falseWhenModifiedTimeIsSecondAfterIfModifiedSince() {
         assertThat(judged(ETAG, SECOND.plusSeconds(1), "If-Modified-Since", SECOND_AS_HEADER)).isFalse();
     }
 
     @Test
-    void 조건_머리글이_둘_다_없으면_거짓이다() {
+    @DisplayName("조건 머리글이 둘 다 없으면 거짓이다")
+    void falseWhenBothConditionalHeadersAreAbsent() {
         assertThat(judged(ETAG, SECOND)).isFalse();
     }
 

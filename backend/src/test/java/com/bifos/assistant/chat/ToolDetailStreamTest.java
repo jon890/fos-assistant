@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -105,7 +106,7 @@ class ToolDetailStreamTest {
     private MockMvc mvc;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         ((StubHermesRunsClient) hermes).reset();
         ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("run-one", "session-one", "completed", "답",
                 "example-model-large", "anthropic", TokenUsage.empty()));
@@ -128,7 +129,8 @@ class ToolDetailStreamTest {
     }
 
     @Test
-    void MEMBER_역할에게는_terminal_의_명령_원문을_싣지_않고_검색어는_싣는다() throws Exception {
+    @DisplayName("MEMBER 역할에게는 terminal 의 명령 원문을 싣지 않고 검색어는 싣는다")
+    void memberGetsSearchQueryButNotTerminalCommandText() throws Exception {
         CurrentUser kid = signedIn("stream-kid", UserRole.MEMBER);
 
         List<JsonNode> events = sent(kid);
@@ -141,7 +143,8 @@ class ToolDetailStreamTest {
     }
 
     @Test
-    void ADMIN_역할에게는_terminal_의_명령_원문을_싣는다() throws Exception {
+    @DisplayName("ADMIN 역할에게는 terminal 의 명령 원문을 싣는다")
+    void adminGetsTerminalCommandText() throws Exception {
         CurrentUser dad = signedIn("stream-dad", UserRole.ADMIN);
 
         List<JsonNode> events = sent(dad);
@@ -152,7 +155,8 @@ class ToolDetailStreamTest {
     }
 
     @Test
-    void MEMBER_역할이_답을_다시_만들어도_terminal_의_명령_원문을_싣지_않고_검색어는_싣는다() throws Exception {
+    @DisplayName("MEMBER 역할이 답을 다시 만들어도 terminal 의 명령 원문을 싣지 않고 검색어는 싣는다")
+    void memberRegeneratingReplyStillGetsNoTerminalCommandText() throws Exception {
         CurrentUser kid = signedIn("regenerate-kid", UserRole.MEMBER);
         ((StubHermesRunsClient) hermes).willReturnInOrder(
                 HermesRunResult.of("run-first", "session-one", "completed", "첫 답",

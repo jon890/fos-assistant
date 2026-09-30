@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -79,7 +80,8 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 구독형_바인딩의_실행도_API_가격으로_환산해_저장한다() {
+    @DisplayName("구독형 바인딩의 실행도 API 가격으로 환산해 저장한다")
+    void convertsSubscriptionBindingRunAtApiPriceAndStoresIt() {
         AgentExecution execution =
                 complete(run(1_000L, 800L, 500L));
 
@@ -90,7 +92,8 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 실패한_실행은_금액을_남기지_않는다() {
+    @DisplayName("실패한 실행은 금액을 남기지 않는다")
+    void leavesNoAmountForFailedRun() {
         AgentExecution execution =
                 fail();
 
@@ -99,7 +102,8 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 한_달_합계는_금액이_잡힌_실행만_더하고_나머지는_따로_센다() {
+    @DisplayName("한 달 합계는 금액이 잡힌 실행만 더하고 나머지는 따로 센다")
+    void monthlyTotalAddsOnlyRunsWithAmountAndCountsRestSeparately() {
         complete(run(1_000L, null, 500L));
         complete(run(1_000L, null, 500L));
         fail();
@@ -114,7 +118,8 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 기록이_없는_구간의_합계는_0_이다() {
+    @DisplayName("기록이 없는 구간의 합계는 0 이다")
+    void totalOfPeriodWithoutRecordsIsZero() {
         MonthlyCost cost =
                 executions.sumCostBetween(
                         USER_ID, Instant.parse("2020-01-01T00:00:00Z"), Instant.parse("2020-02-01T00:00:00Z"));
@@ -125,7 +130,8 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 구독_경로_실행_둘과_API_경로_실행_하나의_합계는_API_경로_하나의_금액과_같다() {
+    @DisplayName("구독 경로 실행 둘과 API 경로 실행 하나의 합계는 API 경로 하나의 금액과 같다")
+    void totalOfTwoSubscriptionRunsAndOneApiRunEqualsAmountOfApiRun() {
         complete(run(1_000L, null, 500L), subscriptionAgent());
         complete(run(1_000L, null, 500L), subscriptionAgent());
         AgentExecution apiExecution = complete(run(1_000L, null, 500L), apiAgent());
@@ -139,7 +145,8 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 가격표에_없는_모델로_돈_API_경로_실행은_구독_경로로_세지_않는다() {
+    @DisplayName("가격표에 없는 모델로 돈 API 경로 실행은 구독 경로로 세지 않는다")
+    void apiPathRunWithModelNotInPriceTableIsNotCountedAsSubscription() {
         AgentExecution unpriced = complete(run(1_000L, null, 500L), unpricedApiAgent());
 
         MonthlyCostDetail cost =

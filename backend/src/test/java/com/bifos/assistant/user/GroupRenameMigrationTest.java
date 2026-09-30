@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -28,7 +29,7 @@ class GroupRenameMigrationTest {
     private String url;
 
     @BeforeEach
-    void V24_시점의_데이터를_만든다() throws SQLException {
+    void setUpV24Data() throws SQLException {
         url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
 
         // V25 바로 앞까지 올린 뒤 그 시점의 사용자, 에이전트, Memory 를 넣는다.
@@ -77,7 +78,8 @@ class GroupRenameMigrationTest {
     }
 
     @Test
-    void V25_가_group_id_값을_보존하고_FAMILY_만_GROUP_으로_바꾼다() throws SQLException {
+    @DisplayName("V25 가 group id 값을 보존하고 FAMILY 만 GROUP 으로 바꾼다")
+    void v25KeepsGroupIdValuesAndChangesOnlyFamilyToGroup() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
             try (ResultSet rows = statement.executeQuery(
@@ -100,7 +102,8 @@ class GroupRenameMigrationTest {
     }
 
     @Test
-    void V25_뒤에는_색인도_group_이름으로_바뀌고_옛_이름은_남지_않는다() throws SQLException {
+    @DisplayName("V25 뒤에는 색인도 group 이름으로 바뀌고 옛 이름은 남지 않는다")
+    void afterV25IndexesAreRenamedToGroupAndNoOldNameRemains() throws SQLException {
         List<String> indexes = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement();
@@ -119,7 +122,8 @@ class GroupRenameMigrationTest {
     }
 
     @Test
-    void V25_뒤에는_family_id_컬럼을_읽을_수_없다() throws SQLException {
+    @DisplayName("V25 뒤에는 family id 컬럼을 읽을 수 없다")
+    void afterV25FamilyIdColumnCannotBeRead() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
             assertThatThrownBy(() -> statement.executeQuery("SELECT family_id FROM app_user"))

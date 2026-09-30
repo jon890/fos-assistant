@@ -56,6 +56,7 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 | `HERMES_DOES_NOT_DEPEND_ON_PEOPLE` | `hermes` 는 `people` 을 쓰지 않는다 |
 | `NO_JACKSON_2_DATABIND` | Jackson 2 의 `core` 와 `databind` 를 쓰지 않는다. `com.fasterxml.jackson.annotation` 은 Jackson 3 도 쓰므로 허용한다 |
 | `CONTROLLERS_HAVE_NO_NESTED_RECORDS` | 컨트롤러 안에 record 를 두지 않는다 |
+| `TEST_METHODS_HAVE_DISPLAY_NAME` | `@Test` 와 `@ParameterizedTest` 메서드에는 `@DisplayName` 이 붙는다. 테스트 클래스만 읽는다 |
 
 **순환 규칙은 패키지 간선 하나를 위반 하나로 센다.**
 `B` 에서 `A` 로 돌아올 수 있을 때 간선 `A -> B` 가 위반이다.
@@ -135,6 +136,19 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 `test/e2e` 는 저장소 루트에서 돌리고, 앞선 실행이 남긴 데이터에 걸린다.
 `gradlew test` 를 건너뛰고 `run.ts` 만 돌리면
 `this agent code is already used` 로 실패할 수 있다.
+
+### 테스트 이름
+
+**메서드 이름은 영문 camelCase 로 짓고, 한국어 문장은 `@DisplayName` 에 쓴다.**
+테스트 보고서에는 `@DisplayName` 의 문장이 보이고, 메서드 이름은 코드에서 무엇을 확인하는지 드러낸다.
+이름은 동사로 시작한다. 예: `assemblesGroupAndUserItemsInLayerOrder`.
+검사: `ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME`
+
+- `@Test` 와 `@ParameterizedTest` 메서드에 `@DisplayName` 을 단다.
+- `@BeforeEach` 같은 준비 메서드와 정리 메서드는 `setUp`, `tearDown` 관례 이름을 쓰고 `@DisplayName` 을 달지 않는다.
+  한 클래스에 여럿이면 하는 일을 이름에 담는다.
+- 보조 메서드는 영문 camelCase 로 짓고 `@DisplayName` 을 달지 않는다.
+- 테스트 클래스에는 `@DisplayName` 을 달지 않는다. 클래스 이름이 이미 영문이다.
 
 ## 주석
 

@@ -32,6 +32,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,7 +66,7 @@ class MemoryProposerTest {
     private Conversation conversation;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         memories.deleteAll(); executionEvents.deleteAll(); executions.deleteAll(); conversations.deleteAll();
         agents.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
@@ -74,7 +75,8 @@ class MemoryProposerTest {
     }
 
     @Test
-    void 제안을_만들면_부모와_뿌리_실행을_기록하고_PROPOSED로_저장한다() {
+    @DisplayName("제안을 만들면 부모와 뿌리 실행을 기록하고 PROPOSED로 저장한다")
+    void proposalRecordsParentAndRootRunAndSavesAsProposed() {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
         ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("proposal", "new", "completed", "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}", "model", "provider", TokenUsage.empty()));
 
@@ -94,7 +96,8 @@ class MemoryProposerTest {
     }
 
     @Test
-    void 제안_실행이_실패해도_예외를_던지지_않고_자식_실행은_실패로_남긴다() {
+    @DisplayName("제안 실행이 실패해도 예외를 던지지 않고 자식 실행은 실패로 남긴다")
+    void keepsChildRunFailedWithoutThrowingWhenProposalRunFails() {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
         ((StubHermesRunsClient) hermes).willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
@@ -109,7 +112,8 @@ class MemoryProposerTest {
     }
 
     @Test
-    void 제안_실행의_provider_가_막히면_PROVIDER_BLOCKED_로_남기고_예외를_던지지_않는다() {
+    @DisplayName("제안 실행의 provider 가 막히면 PROVIDER BLOCKED 로 남기고 예외를 던지지 않는다")
+    void leavesProviderBlockedWithoutThrowingWhenProposalProviderIsBlocked() {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
         ((StubHermesRunsClient) hermes).willReturn(new HermesRunResult("proposal", "new", "failed", null, "model",
                 "provider", HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked",
@@ -131,7 +135,8 @@ class MemoryProposerTest {
     }
 
     @Test
-    void NONE과_잘못된_JSON은_Memory를_만들지_않는다() {
+    @DisplayName("NONE과 잘못된 JSON은 Memory를 만들지 않는다")
+    void noneAndMalformedJsonCreateNoMemory() {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
         ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));
         proposer.proposeFrom(USER, conversation, agent, parent, "답");
@@ -139,7 +144,8 @@ class MemoryProposerTest {
     }
 
     @Test
-    void 자식_실행을_시작하지_못해도_원래_대화에_예외를_전하지_않는다() {
+    @DisplayName("자식 실행을 시작하지 못해도 원래 대화에 예외를 전하지 않는다")
+    void doesNotPropagateExceptionWhenChildRunCannotStart() {
         ExecutionRecorder failingRecorder = mock(ExecutionRecorder.class);
         doThrow(new IllegalStateException("database unavailable")).when(failingRecorder)
                 .start(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),

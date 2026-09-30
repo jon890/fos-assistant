@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -58,7 +59,8 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    void 게시는_profile_과_external_dirs_만_싣고_도구_목록이_있으면_함께_싣는다() throws Exception {
+    @DisplayName("게시는 profile 과 external dirs 만 싣고 도구 목록이 있으면 함께 싣는다")
+    void publishCarriesOnlyProfileAndExternalDirsPlusToolListIfPresent() throws Exception {
         client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null);
         client.publish("kid", List.of(), List.of("web", "skills", "fos-assistant"));
 
@@ -78,7 +80,8 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    void 목록은_query_profile_로_묻고_배열을_읽는다() {
+    @DisplayName("목록은 query profile 로 묻고 배열을 읽는다")
+    void listAsksByQueryProfileAndReadsArray() {
         response = "[{\"name\":\"weekly-plan\",\"description\":\"이번 주 계획\",\"category\":\"agent\","
                 + "\"enabled\":false,\"usage\":0,\"provenance\":\"agent\"},{\"name\":\"bare\"}]";
 
@@ -94,7 +97,8 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    void 빈_배열은_스킬이_없는_profile_이고_배열이_아니면_받지_않는다() {
+    @DisplayName("빈 배열은 스킬이 없는 profile 이고 배열이 아니면 받지 않는다")
+    void emptyArrayMeansProfileWithoutSkillsAndNonArrayIsRejected() {
         response = "[]";
         assertThat(client.list("kid")).isEmpty();
 
@@ -105,7 +109,8 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    void 켜고_끄기는_profile_과_이름과_값을_함께_싣는다() throws Exception {
+    @DisplayName("켜고 끄기는 profile 과 이름과 값을 함께 싣는다")
+    void toggleCarriesProfileNameAndValue() throws Exception {
         client.toggle("kid", "weekly-plan", false);
 
         assertThat(calls).singleElement().satisfies(call -> {
@@ -117,7 +122,8 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    void 게시가_4xx_면_거절_예외이고_5xx_면_닿지_못한_것과_같은_예외다() {
+    @DisplayName("게시가 4xx 면 거절 예외이고 5xx 면 닿지 못한 것과 같은 예외다")
+    void publishGives4xxRejectionExceptionAnd5xxSameAsUnreachable() {
         status = 400;
         response = "{\"error\":\"directory does not exist\"}";
         assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null))
@@ -135,7 +141,8 @@ class HermesSkillRequestTest {
     }
 
     @Test
-    void profile_이름이_규칙에_맞지_않으면_대시보드를_부르지_않는다() {
+    @DisplayName("profile 이름이 규칙에 맞지 않으면 대시보드를 부르지 않는다")
+    void doesNotCallDashboardForProfileNameBreakingRule() {
         assertThatThrownBy(() -> client.list("Kid/../x"))
                 .isInstanceOfSatisfying(ApiException.class,
                         ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
