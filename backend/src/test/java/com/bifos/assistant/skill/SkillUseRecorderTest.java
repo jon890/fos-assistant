@@ -31,12 +31,15 @@ class SkillUseRecorderTest {
 
     /** 실행 표와 외래 키로 묶이지 않아 실제 실행 줄 없이 번호만 쓴다. */
     private static final Long EXECUTION_ID = 9_101L;
+
     private static final Long OTHER_EXECUTION_ID = 9_102L;
 
-    @Autowired SkillUseRecorder recorder;
+    @Autowired
+    SkillUseRecorder recorder;
 
     /** 저장이 실패해도 던지지 않는지 보려면 저장소가 던지게 만들 수 있어야 한다. */
-    @MockitoSpyBean ExecutionSkillUseRepository uses;
+    @MockitoSpyBean
+    ExecutionSkillUseRepository uses;
 
     @BeforeEach
     void setUp() {
@@ -158,7 +161,8 @@ class SkillUseRecorderTest {
     @DisplayName("동시에 먼저 적혀 유일 제약에 걸려도 던지지 않는다")
     void doesNotThrowEvenIfUniqueConstraintHitByConcurrentEarlierWrite() {
         doThrow(new DataIntegrityViolationException("uk_execution_skill_use_execution_skill_source"))
-                .when(uses).save(any(ExecutionSkillUse.class));
+                .when(uses)
+                .save(any(ExecutionSkillUse.class));
 
         assertThatCode(() -> recorder.recordCommand(EXECUTION_ID, "shopping")).doesNotThrowAnyException();
     }

@@ -29,10 +29,14 @@ class AgentTokenUserIdDropMigrationTest {
     @DisplayName("폐기 안 된 토큰이 모두 profile 에 묶였으면 user id 칸을 지우고 줄은 남긴다")
     void dropsUserIdColumnKeepingRowsWhenAllTokensAreBoundToProfile() throws SQLException {
         String url = migratedTo34();
-        execute(url, "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "
-                + "VALUES (NULL, 'shared-group', 'bound-hash', 'bound', CURRENT_TIMESTAMP(6))");
-        execute(url, "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at, revoked_at) "
-                + "VALUES (7, NULL, 'revoked-hash', 'revoked', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
+        execute(
+                url,
+                "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "
+                        + "VALUES (NULL, 'shared-group', 'bound-hash', 'bound', CURRENT_TIMESTAMP(6))");
+        execute(
+                url,
+                "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at, revoked_at) "
+                        + "VALUES (7, NULL, 'revoked-hash', 'revoked', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
 
         migrateToLatest(url);
 
@@ -44,12 +48,15 @@ class AgentTokenUserIdDropMigrationTest {
     @DisplayName("profile 이 비고 폐기 안 된 토큰이 있으면 실패하고 user id 칸을 그대로 둔다")
     void failsAndKeepsUserIdColumnWhenProfileBlankAndUnrevokedTokenExists() throws SQLException {
         String url = migratedTo34();
-        execute(url, "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "
-                + "VALUES (7, NULL, 'unbound-hash', 'unbound', CURRENT_TIMESTAMP(6))");
+        execute(
+                url,
+                "INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "
+                        + "VALUES (7, NULL, 'unbound-hash', 'unbound', CURRENT_TIMESTAMP(6))");
 
         assertThatThrownBy(() -> migrateToLatest(url))
                 .isInstanceOf(FlywayException.class)
-                .satisfies(ex -> assertThat(messages(ex)).as("예외 사슬의 메시지")
+                .satisfies(ex -> assertThat(messages(ex))
+                        .as("예외 사슬의 메시지")
                         .anyMatch(message -> message.contains("profile 이 묶이지 않은 폐기 안 된 MCP 토큰이 1 개")));
         assertThat(userIdColumns(url)).as("agent_token.user_id 칸 수").isEqualTo(1);
         assertThat(tokenHashes(url)).containsExactly("unbound-hash");
@@ -57,12 +64,21 @@ class AgentTokenUserIdDropMigrationTest {
 
     private static String migratedTo34() {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").target("34").load().migrate();
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .target("34")
+                .load()
+                .migrate();
         return url;
     }
 
     private static void migrateToLatest(String url) {
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
     }
 
     private static void execute(String url, String sql) throws SQLException {

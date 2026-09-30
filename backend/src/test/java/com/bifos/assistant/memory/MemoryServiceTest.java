@@ -29,8 +29,11 @@ class MemoryServiceTest {
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
     private static final CurrentUser OTHER_GROUP = user(3L, 20L, UserRole.ADMIN);
 
-    @Autowired MemoryService memories;
-    @Autowired MemoryRepository repository;
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    MemoryRepository repository;
 
     @BeforeEach
     void setUp() {
@@ -64,8 +67,8 @@ class MemoryServiceTest {
     @DisplayName("scope가 없으면 거절하고 항상 주입은 기본으로 켜지지 않는다")
     void rejectsMissingScopeAndAlwaysInjectionIsNotOnByDefault() {
         assertThatThrownBy(() -> memories.create(ADMIN, null, "제목", "내용", false))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SCOPE_REQUIRED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SCOPE_REQUIRED));
 
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "제목", "내용", false);
         assertThat(memory.alwaysInject()).isFalse();
@@ -122,8 +125,7 @@ class MemoryServiceTest {
         String key = "a".repeat(64);
         repository.saveAndFlush(Memory.proposedUser(ADMIN.id(), "제안", "내용", 99L, key));
 
-        assertThatThrownBy(() -> repository.saveAndFlush(
-                Memory.proposedUser(ADMIN.id(), "제안", "내용", 100L, key)))
+        assertThatThrownBy(() -> repository.saveAndFlush(Memory.proposedUser(ADMIN.id(), "제안", "내용", 100L, key)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -132,13 +134,15 @@ class MemoryServiceTest {
     }
 
     private static void assertNotFound(ThrowingAction action) {
-        assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class,
-                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
     }
 
     private static void assertForbidden(ThrowingAction action) {
-        assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class,
-                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
     }
 
     @FunctionalInterface

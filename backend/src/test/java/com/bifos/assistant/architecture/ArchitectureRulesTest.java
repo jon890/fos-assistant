@@ -26,13 +26,15 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("최상위 패키지 사이에 새 순환 간선이 생기지 않는다")
     void topLevelPackagesFreeOfCycles() {
-        FreezingArchRule.freeze(ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES)
+                .check(MAIN);
     }
 
     @Test
     @DisplayName("shared 가 다른 최상위 패키지를 새로 쓰지 않는다")
     void sharedDoesNotDependOnDomains() {
-        FreezingArchRule.freeze(ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS)
+                .check(MAIN);
     }
 
     @Test
@@ -50,7 +52,8 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("orchestration 이 mcp 를 쓰지 않는다")
     void orchestrationDoesNotDependOnMcp() {
-        FreezingArchRule.freeze(ArchitectureRules.ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP)
+                .check(MAIN);
     }
 
     @Test
@@ -62,13 +65,15 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("orchestration 이 ChatService 를 쓰지 않는다")
     void orchestrationDoesNotCallChatService() {
-        FreezingArchRule.freeze(ArchitectureRules.ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE)
+                .check(MAIN);
     }
 
     @Test
     @DisplayName("hermes 가 people 을 쓰지 않는다")
     void hermesDoesNotDependOnPeople() {
-        FreezingArchRule.freeze(ArchitectureRules.HERMES_DOES_NOT_DEPEND_ON_PEOPLE).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.HERMES_DOES_NOT_DEPEND_ON_PEOPLE)
+                .check(MAIN);
     }
 
     @Test
@@ -80,13 +85,15 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("컨트롤러 안에 record 를 두지 않는다")
     void controllersHaveNoNestedRecords() {
-        FreezingArchRule.freeze(ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS)
+                .check(MAIN);
     }
 
     @Test
     @DisplayName("Transactional 이 application 밖에 새로 붙지 않는다")
     void transactionalOnlyInApplication() {
-        FreezingArchRule.freeze(ArchitectureRules.TRANSACTIONAL_ONLY_IN_APPLICATION).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.TRANSACTIONAL_ONLY_IN_APPLICATION)
+                .check(MAIN);
     }
 
     @Test
@@ -104,30 +111,35 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("ConfigurationProperties 클래스에 Validated 가 붙는다")
     void configurationPropertiesAreValidated() {
-        FreezingArchRule.freeze(ArchitectureRules.CONFIGURATION_PROPERTIES_ARE_VALIDATED).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.CONFIGURATION_PROPERTIES_ARE_VALIDATED)
+                .check(MAIN);
     }
 
     @Test
     @DisplayName("서비스와 infra 안에 공개된 중첩 타입이 새로 생기지 않는다")
     void servicesDoNotExposeNestedTypes() {
-        FreezingArchRule.freeze(ArchitectureRules.SERVICES_DO_NOT_EXPOSE_NESTED_TYPES).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.SERVICES_DO_NOT_EXPOSE_NESTED_TYPES)
+                .check(MAIN);
     }
 
     @Test
     @DisplayName("엔티티의 Enumerated 필드 타입이 domain.type 에 있다")
     void enumeratedFieldsUseDomainType() {
-        FreezingArchRule.freeze(ArchitectureRules.ENUMERATED_FIELDS_USE_DOMAIN_TYPE).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.ENUMERATED_FIELDS_USE_DOMAIN_TYPE)
+                .check(MAIN);
     }
 
     @Test
     @DisplayName("domain.type 이 위 층을 쓰지 않는다")
     void domainTypeDependsOnNothingAbove() {
-        FreezingArchRule.freeze(ArchitectureRules.DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE).check(MAIN);
+        FreezingArchRule.freeze(ArchitectureRules.DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE)
+                .check(MAIN);
     }
 
     @Test
     @DisplayName("테스트 메서드에 DisplayName 이 붙는다")
     void testMethodsHaveDisplayName() {
-        FreezingArchRule.freeze(ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME).check(TESTS);
+        FreezingArchRule.freeze(ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME)
+                .check(TESTS);
     }
 }

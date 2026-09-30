@@ -8,9 +8,9 @@ import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryScope;
-import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.presentation.MemoryController;
+import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.user.domain.UserRole;
@@ -26,12 +26,17 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class MemoryControllerTest {
 
-    private static final CurrentUser ADMIN =
-            new CurrentUser(1L, "admin@example.com", "admin", 1L, UserRole.ADMIN);
+    private static final CurrentUser ADMIN = new CurrentUser(1L, "admin@example.com", "admin", 1L, UserRole.ADMIN);
 
-    @Autowired MemoryService memories;
-    @Autowired MemoryRepository repository;
-    @Autowired ContextAssembler context;
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    MemoryRepository repository;
+
+    @Autowired
+    ContextAssembler context;
+
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private MemoryController controller;
 

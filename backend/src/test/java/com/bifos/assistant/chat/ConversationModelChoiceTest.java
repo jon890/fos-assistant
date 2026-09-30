@@ -76,19 +76,44 @@ class ConversationModelChoiceTest {
         }
     }
 
-    @Autowired ChatService chat;
-    @Autowired AttachmentService attachments;
-    @Autowired AttachmentProperties attachmentProperties;
-    @Autowired ConversationAccess access;
-    @Autowired AgentService agentService;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ChatAttachmentRepository attachmentRows;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AgentRepository agents;
-    @Autowired AppUserRepository users;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    AttachmentService attachments;
+
+    @Autowired
+    AttachmentProperties attachmentProperties;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ChatAttachmentRepository attachmentRows;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     @BeforeEach
     void reset() throws IOException {
@@ -113,8 +138,7 @@ class ConversationModelChoiceTest {
         chat.chooseModel(dad, id, new ModelChoice("openrouter", "example-model-small", "high"));
 
         Conversation stored = conversations.findById(id).orElseThrow();
-        assertThat(stored.modelChoice())
-                .isEqualTo(new ModelChoice("openrouter", "example-model-small", "high"));
+        assertThat(stored.modelChoice()).isEqualTo(new ModelChoice("openrouter", "example-model-small", "high"));
         assertThat(stored.updatedAt()).as("updatedAt after choosing a model").isEqualTo(before);
     }
 
@@ -125,8 +149,8 @@ class ConversationModelChoiceTest {
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ChatController controller = chatController(dad);
 
-        ConversationView chosen = controller.chooseModel(created.publicId(),
-                new ChooseModelRequest("openrouter", "example-model-small", "max"));
+        ConversationView chosen = controller.chooseModel(
+                created.publicId(), new ChooseModelRequest("openrouter", "example-model-small", "max"));
 
         assertThat(chosen.id()).isEqualTo(created.publicId());
         assertThat(chosen.agentCode()).isEqualTo("choice-dad");
@@ -168,11 +192,13 @@ class ConversationModelChoiceTest {
         ChatController controller = chatController(dad);
 
         rejected(() -> controller.chooseModel(created.publicId(), new ChooseModelRequest("openrouter", null, null)));
-        rejected(() -> controller.chooseModel(created.publicId(), new ChooseModelRequest(null, "example-model-small", null)));
-        rejected(() -> controller.chooseModel(created.publicId(),
-                new ChooseModelRequest("openrouter", "example-model-small", "extreme")));
+        rejected(() ->
+                controller.chooseModel(created.publicId(), new ChooseModelRequest(null, "example-model-small", null)));
+        rejected(() -> controller.chooseModel(
+                created.publicId(), new ChooseModelRequest("openrouter", "example-model-small", "extreme")));
 
-        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice()).isEqualTo(saved);
+        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice())
+                .isEqualTo(saved);
     }
 
     @Test
@@ -186,13 +212,15 @@ class ConversationModelChoiceTest {
         String longestProvider = "p".repeat(64);
         String longestModel = "m".repeat(128);
 
-        rejected(() -> controller.chooseModel(created.publicId(),
-                new ChooseModelRequest(longestProvider + "p", "example-model-small", null)));
-        rejected(() -> controller.chooseModel(created.publicId(),
-                new ChooseModelRequest("openrouter", longestModel + "m", null)));
-        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice()).isEqualTo(saved);
+        rejected(() -> controller.chooseModel(
+                created.publicId(), new ChooseModelRequest(longestProvider + "p", "example-model-small", null)));
+        rejected(() -> controller.chooseModel(
+                created.publicId(), new ChooseModelRequest("openrouter", longestModel + "m", null)));
+        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice())
+                .isEqualTo(saved);
 
-        ConversationView longest = controller.chooseModel(created.publicId(),
+        ConversationView longest = controller.chooseModel(
+                created.publicId(),
                 new ChooseModelRequest("  " + longestProvider + " ", "\t" + longestModel + "\n", null));
 
         assertThat(List.of(longest.provider(), longest.model())).containsExactly(longestProvider, longestModel);
@@ -207,17 +235,21 @@ class ConversationModelChoiceTest {
         Conversation created = chat.startEmpty(dad, "choice-dad");
         conversations.chooseModelIfActive(created.id(), dad.id(), "openrouter", "example-model-small", "extreme");
         ChatController controller = chatController(dad);
-        ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of(
-                "run-1", "sess-1", "completed", "네", "example-model-small", "openrouter", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes)
+                .willReturn(HermesRunResult.of(
+                        "run-1", "sess-1", "completed", "네", "example-model-small", "openrouter", TokenUsage.empty()));
 
-        assertThat(controller.conversations()).singleElement().satisfies(it ->
-                assertThat(List.of(it.provider(), it.model(), it.reasoningEffort()))
+        assertThat(controller.conversations())
+                .singleElement()
+                .satisfies(it -> assertThat(List.of(it.provider(), it.model(), it.reasoningEffort()))
                         .containsExactly("openrouter", "example-model-small", "extreme"));
         chat.send(dad, created.id(), "안녕", null);
 
-        assertThat(((StubHermesRunsClient) hermes).received()).singleElement().satisfies(command ->
-                assertThat(List.of(command.provider(), command.model(), command.reasoningEffort()))
-                        .containsExactly("openrouter", "example-model-small", "extreme"));
+        assertThat(((StubHermesRunsClient) hermes).received())
+                .singleElement()
+                .satisfies(
+                        command -> assertThat(List.of(command.provider(), command.model(), command.reasoningEffort()))
+                                .containsExactly("openrouter", "example-model-small", "extreme"));
     }
 
     @Test
@@ -246,7 +278,8 @@ class ConversationModelChoiceTest {
         notFound(() -> chat.chooseModel(kid, deletedId, choice));
 
         assertThat(conversations.findById(dadsId).orElseThrow().modelChoice()).isEqualTo(ModelChoice.defaults());
-        assertThat(conversations.findById(deletedId).orElseThrow().modelChoice()).isEqualTo(ModelChoice.defaults());
+        assertThat(conversations.findById(deletedId).orElseThrow().modelChoice())
+                .isEqualTo(ModelChoice.defaults());
     }
 
     @Test
@@ -259,43 +292,49 @@ class ConversationModelChoiceTest {
 
         Long id = chat.startEmpty(dad, "choice-dad").id();
         chat.chooseModel(dad, id, new ModelChoice("openrouter", "example-model-small", null));
-        ChatAttachment photo = attachments.upload(
-                dad, id, "a.png", "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
+        ChatAttachment photo =
+                attachments.upload(dad, id, "a.png", "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
 
         rejected(() -> chat.send(dad, id, "사진 봐", null, List.of(photo.id())));
 
         assertThat(conversations.findById(id).orElseThrow().modelChoice())
                 .isEqualTo(new ModelChoice("openrouter", "example-model-small", null));
         assertThat(messages.findByConversationIdOrderByIdAsc(id)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId()).isNull();
+        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
+                .isNull();
     }
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(name, name, name,
+        agents.save(Agent.of(
+                name,
+                name,
+                name,
                 "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, user.id()));
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private ChatController chatController(CurrentUser user) {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
-        return new ChatController(chat, provider, users, agentService, access,
-                new ChatEventStreams(Duration.ofSeconds(20)), null);
+        return new ChatController(
+                chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
     }
 
     private static void rejected(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
     private static void notFound(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
     }
 
     private static void deleteTree(Path path) throws IOException {

@@ -67,7 +67,8 @@ class SubagentRegistrationTest {
         body.remove("parent_subagent_id");
         body.put("added_later", 3);
 
-        assertThat(SubagentRegistration.verify(body, TOKEN_HASH).childSessionId()).isEqualTo(TOP_CHILD);
+        assertThat(SubagentRegistration.verify(body, TOKEN_HASH).childSessionId())
+                .isEqualTo(TOP_CHILD);
     }
 
     @Test
@@ -125,9 +126,11 @@ class SubagentRegistrationTest {
     @DisplayName("본문이 객체가 아니거나 토큰 해시가 없으면 거절한다")
     void rejectsNonObjectBodyOrMissingTokenHash() {
         assertThatThrownBy(() -> SubagentRegistration.verify(JSON.createArrayNode(), TOKEN_HASH))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
         assertThatThrownBy(() -> SubagentRegistration.verify(topChild(), ""))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
     }
 
     private static void assertRejected(Consumer<ObjectNode> change) {
@@ -135,7 +138,8 @@ class SubagentRegistrationTest {
         change.accept(body);
         assertThatThrownBy(() -> SubagentRegistration.verify(body, TOKEN_HASH))
                 .as("거절해야 하는 본문: %s", body)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
     }
 
     private static ObjectNode topChild() {

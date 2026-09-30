@@ -38,14 +38,24 @@ class SessionOwnerResolverTest {
 
     private static final String PROFILE = "session-owner";
     private static final String OTHER_PROFILE = "session-owner-other";
-    private static final List<String> MY_EMAILS = List.of("session-owner-dad@example.com", "session-owner-kid@example.com");
+    private static final List<String> MY_EMAILS =
+            List.of("session-owner-dad@example.com", "session-owner-kid@example.com");
     private static final Long CONVERSATION_ID = 1L;
 
-    @Autowired SessionOwnerResolver owners;
-    @Autowired SubagentSessionRegistrar registrar;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AppUserRepository users;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    SessionOwnerResolver owners;
+
+    @Autowired
+    SubagentSessionRegistrar registrar;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private AppUser dad;
     private AppUser kid;
@@ -114,10 +124,17 @@ class SessionOwnerResolverTest {
         setStatus(dadRun, ExecutionStatus.FAILED);
         jdbc.update("UPDATE agent_execution SET error_code = ? WHERE id = ?", "ORPHANED", dadRun.id());
         String s1 = newChild();
-        jdbc.update("INSERT INTO hermes_session_binding "
+        jdbc.update(
+                "INSERT INTO hermes_session_binding "
                         + "(profile_name, session_id, user_id, origin_execution_id, root_session_id, parent_session_id, created_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                PROFILE, s1, dad.id(), dadRun.id(), root, root, Timestamp.from(Instant.now()));
+                PROFILE,
+                s1,
+                dad.id(),
+                dadRun.id(),
+                root,
+                root,
+                Timestamp.from(Instant.now()));
 
         AgentExecution origin = owners.resolve(PROFILE, root, s1);
 
@@ -154,8 +171,11 @@ class SessionOwnerResolverTest {
         // 흐름의 자식 실행은 제 session 으로 돌아 그 안의 하위 에이전트는 자식 실행을 origin 으로 갖는다.
         String childRoot = newRoot();
         AgentExecution researched = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, childRoot);
-        jdbc.update("UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
-                dadRun.id(), dadRun.id(), researched.id());
+        jdbc.update(
+                "UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
+                dadRun.id(),
+                dadRun.id(),
+                researched.id());
         String s1 = register(childRoot, childRoot);
         setStatus(researched, ExecutionStatus.SUCCEEDED);
         assertOrigin(owners.resolve(PROFILE, childRoot, s1), researched, dad);
@@ -170,8 +190,11 @@ class SessionOwnerResolverTest {
     void decidesChildRunSubagentAsIsWhenRootEndedButNotCancelled() {
         String childRoot = newRoot();
         AgentExecution researched = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE, childRoot);
-        jdbc.update("UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
-                dadRun.id(), dadRun.id(), researched.id());
+        jdbc.update(
+                "UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
+                dadRun.id(),
+                dadRun.id(),
+                researched.id());
         String s1 = register(childRoot, childRoot);
         setStatus(researched, ExecutionStatus.SUCCEEDED);
         setStatus(dadRun, ExecutionStatus.FAILED);
@@ -275,8 +298,8 @@ class SessionOwnerResolverTest {
     private void assertRejected(String profileName, String rootSessionId, String sessionId) {
         assertThatThrownBy(() -> owners.resolve(profileName, rootSessionId, sessionId))
                 .as("profile=%s", profileName)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
 
     private static String newRoot() {

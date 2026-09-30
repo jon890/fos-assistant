@@ -95,8 +95,12 @@ class SkillCommandCatalogTest {
     @Test
     @DisplayName("skills toolset 이 꺼져 있으면 켜진 스킬이 있어도 빈 집합이다")
     void returnsEmptySetWhenSkillsToolsetIsOffEvenWithEnabledSkills() {
-        when(skills.commandList(agent)).thenReturn(new SkillList(
-                List.of(new SkillListItem("shopping", "", SkillSource.UPLOADED, true, null)), false, false, 30));
+        when(skills.commandList(agent))
+                .thenReturn(new SkillList(
+                        List.of(new SkillListItem("shopping", "", SkillSource.UPLOADED, true, null)),
+                        false,
+                        false,
+                        30));
 
         assertThat(catalog.enabledNames(agent)).isEmpty();
     }

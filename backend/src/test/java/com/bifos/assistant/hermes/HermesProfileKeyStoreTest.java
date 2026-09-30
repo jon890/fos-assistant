@@ -18,16 +18,15 @@ import org.junit.jupiter.api.io.TempDir;
 class HermesProfileKeyStoreTest {
 
     private HermesProfileKeyStore storeAt(Path dir) {
-        return new HermesProfileKeyStore(
-                new HermesProperties(
-                        dir.toString(),
-                        "https://hermes-dashboard.example.com",
-                        "test-dashboard-token",
-                        "https://hermes-listener.example.com",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1)));
+        return new HermesProfileKeyStore(new HermesProperties(
+                dir.toString(),
+                "https://hermes-dashboard.example.com",
+                "test-dashboard-token",
+                "https://hermes-listener.example.com",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)));
     }
 
     @Test
@@ -42,8 +41,7 @@ class HermesProfileKeyStoreTest {
 
     @Test
     @DisplayName("refuses a profile without a key instead of borrowing another one")
-    void refusesAProfileWithoutAKeyInsteadOfBorrowingAnotherOne(@TempDir Path dir)
-            throws IOException {
+    void refusesAProfileWithoutAKeyInsteadOfBorrowingAnotherOne(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("dad"), "dad-key");
 
         assertThatThrownBy(() -> storeAt(dir).resolve("kid"))
@@ -85,8 +83,7 @@ class HermesProfileKeyStoreTest {
 
         Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(dir.resolve("kid"));
         assertThat(permissions)
-                .containsExactlyInAnyOrder(
-                        PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+                .containsExactlyInAnyOrder(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
     }
 
     /** 덮으면 그 profile 로 돌던 대화가 다음 요청부터 401 을 받는데 그 원인이 드러나지 않는다. */

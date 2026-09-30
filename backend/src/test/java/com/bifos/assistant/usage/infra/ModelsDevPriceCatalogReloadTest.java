@@ -37,7 +37,9 @@ class ModelsDevPriceCatalogReloadTest {
         assertThat(catalog.find("openai", "new-model")).isEmpty();
 
         write(catalog("new-model"), SECOND);
-        assertThat(catalog.find("openai", "new-model")).as("간격 안에서는 디스크를 다시 보지 않는다").isEmpty();
+        assertThat(catalog.find("openai", "new-model"))
+                .as("간격 안에서는 디스크를 다시 보지 않는다")
+                .isEmpty();
 
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
         assertThat(catalog.find("openai", "new-model")).isPresent();
@@ -67,13 +69,17 @@ class ModelsDevPriceCatalogReloadTest {
         Files.createDirectory(file);
         Files.setLastModifiedTime(file, FileTime.from(SECOND));
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
-        assertThat(catalog.find("openai", "old-model")).as("읽지 못하는 동안에도 이전 가격을 쓴다").isPresent();
+        assertThat(catalog.find("openai", "old-model"))
+                .as("읽지 못하는 동안에도 이전 가격을 쓴다")
+                .isPresent();
 
         Files.delete(file);
         write(catalog("new-model"), SECOND);
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
 
-        assertThat(catalog.find("openai", "new-model")).as("수정 시각이 같아도 입출력 오류였으므로 다시 읽는다").isPresent();
+        assertThat(catalog.find("openai", "new-model"))
+                .as("수정 시각이 같아도 입출력 오류였으므로 다시 읽는다")
+                .isPresent();
     }
 
     @Test

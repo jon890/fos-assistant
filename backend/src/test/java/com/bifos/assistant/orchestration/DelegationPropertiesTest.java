@@ -26,15 +26,20 @@ class DelegationPropertiesTest {
     @DisplayName("정수 한도가 0 이면 어느 값인지 알리며 멈춘다")
     void stopsNamingWhichValueWhenIntegerLimitIsZero() {
         assertThatThrownBy(() -> new DelegationProperties(0, 4, 16, TIMEOUT, 100))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("max-depth");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("max-depth");
         assertThatThrownBy(() -> new DelegationProperties(2, 0, 16, TIMEOUT, 100))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("max-concurrent-children");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("max-concurrent-children");
         assertThatThrownBy(() -> new DelegationProperties(2, 4, 0, TIMEOUT, 100))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("max-active");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("max-active");
         assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, TIMEOUT, 0))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("output-max-chars");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("output-max-chars");
         assertThatThrownBy(() -> new DelegationProperties(2, 4, -1, TIMEOUT, 100))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("max-active");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("max-active");
     }
 
     @Test
@@ -43,7 +48,8 @@ class DelegationPropertiesTest {
         for (Duration invalid : new Duration[] {null, Duration.ZERO, Duration.ofMillis(-1)}) {
             assertThatThrownBy(() -> new DelegationProperties(2, 4, 16, invalid, 100))
                     .as("submit-timeout=%s", invalid)
-                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("submit-timeout");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("submit-timeout");
         }
     }
 }

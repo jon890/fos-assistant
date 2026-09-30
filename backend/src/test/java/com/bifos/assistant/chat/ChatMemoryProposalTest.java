@@ -42,27 +42,67 @@ class ChatMemoryProposalTest {
 
     @TestConfiguration
     static class StubRuntime {
-        @Bean @Primary StubHermesRunsClient runs() { return new StubHermesRunsClient(); }
-        @Bean @Primary HermesRunEventStream events() { return mock(HermesRunEventStream.class); }
+        @Bean
+        @Primary
+        StubHermesRunsClient runs() {
+            return new StubHermesRunsClient();
+        }
+
+        @Bean
+        @Primary
+        HermesRunEventStream events() {
+            return mock(HermesRunEventStream.class);
+        }
     }
 
-    @Autowired ChatService chat;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired MemoryRepository memories;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired HermesRunsClient hermes;
-    @Autowired HermesRunEventStream events;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    HermesRunsClient hermes;
+
+    @Autowired
+    HermesRunEventStream events;
+
     private CurrentUser user;
 
     @BeforeEach
     void setUp() {
-        memories.deleteAll(); executions.deleteAll(); agents.deleteAll(); users.deleteAll();
+        memories.deleteAll();
+        executions.deleteAll();
+        agents.deleteAll();
+        users.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
         AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
-        agents.save(Agent.of("proposal", "제안", "proposal", "http://runtime.test", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, user.id()));
-        doNothing().when(events).open(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+        agents.save(Agent.of(
+                "proposal",
+                "제안",
+                "proposal",
+                "http://runtime.test",
+                CostMode.API,
+                CredentialScope.DEDICATED,
+                AgentVisibility.PRIVATE,
+                user.id()));
+        doNothing()
+                .when(events)
+                .open(
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -77,7 +117,7 @@ class ChatMemoryProposalTest {
     @DisplayName("스트리밍 응답 뒤에도 제안을 저장하고 자식 실행을 연결한다")
     void savesProposalAfterStreamingResponseAndLinksChildRun() {
         runWithProposal();
-        chat.stream(user, null, "질문", "proposal", event -> { });
+        chat.stream(user, null, "질문", "proposal", event -> {});
         assertProposalExecution();
     }
 
@@ -104,17 +144,34 @@ class ChatMemoryProposalTest {
     }
 
     private void runWithProposal() {
-        ((StubHermesRunsClient) hermes).willReturnInOrder(
-                HermesRunResult.of("parent", "session", "completed", "원래 답", "model", "provider", TokenUsage.empty()),
-                HermesRunResult.of("proposal", "new", "completed", "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}", "model", "provider", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes)
+                .willReturnInOrder(
+                        HermesRunResult.of(
+                                "parent", "session", "completed", "원래 답", "model", "provider", TokenUsage.empty()),
+                        HermesRunResult.of(
+                                "proposal",
+                                "new",
+                                "completed",
+                                "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}",
+                                "model",
+                                "provider",
+                                TokenUsage.empty()));
     }
 
     private void assertProposalExecution() {
-        assertThat(memories.findAll()).singleElement().satisfies(memory -> assertThat(memory.status().name()).isEqualTo("PROPOSED"));
+        assertThat(memories.findAll())
+                .singleElement()
+                .satisfies(memory -> assertThat(memory.status().name()).isEqualTo("PROPOSED"));
         List<com.bifos.assistant.usage.domain.AgentExecution> all = executions.findAll();
         assertThat(all).hasSize(2);
-        var parent = all.stream().filter(execution -> execution.parentExecutionId() == null).findFirst().orElseThrow();
-        var child = all.stream().filter(execution -> execution.parentExecutionId() != null).findFirst().orElseThrow();
+        var parent = all.stream()
+                .filter(execution -> execution.parentExecutionId() == null)
+                .findFirst()
+                .orElseThrow();
+        var child = all.stream()
+                .filter(execution -> execution.parentExecutionId() != null)
+                .findFirst()
+                .orElseThrow();
         assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(child.parentExecutionId()).isEqualTo(parent.id());
         assertThat(child.rootExecutionId()).isEqualTo(parent.id());

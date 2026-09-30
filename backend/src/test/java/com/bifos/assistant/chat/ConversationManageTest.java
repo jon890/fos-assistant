@@ -54,15 +54,32 @@ class ConversationManageTest {
         }
     }
 
-    @Autowired ChatService chat;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AgentRepository agents;
-    @Autowired MemoryRepository memories;
-    @Autowired AppUserRepository users;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -82,20 +99,26 @@ class ConversationManageTest {
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(name, name, name,
+        agents.save(Agent.of(
+                name,
+                name,
+                name,
                 "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, user.id()));
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private void successfulAnswer() {
-        stub().willReturn(HermesRunResult.of("run-one", "session-one", "completed", "답",
-                "example-model-large", "anthropic", TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of(
+                "run-one", "session-one", "completed", "답", "example-model-large", "anthropic", TokenUsage.empty()));
     }
 
     private static void notFound(Runnable action) {
-        assertThatThrownBy(action::run).isInstanceOf(ApiException.class)
+        assertThatThrownBy(action::run)
+                .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
     }
@@ -108,14 +131,17 @@ class ConversationManageTest {
         Long id = chat.send(dad, null, "첫 질문", "manage-dad").conversationId();
 
         chat.rename(dad, id, "  새 이름  ");
-        assertThat(chat.conversationsOf(dad)).singleElement()
+        assertThat(chat.conversationsOf(dad))
+                .singleElement()
                 .satisfies(it -> assertThat(it.title()).isEqualTo("새 이름"));
         assertThatThrownBy(() -> chat.rename(dad, id, "   "))
                 .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code()).isEqualTo(ErrorCode.VALIDATION_FAILED);
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThatThrownBy(() -> chat.rename(dad, id, "가".repeat(201)))
                 .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code()).isEqualTo(ErrorCode.VALIDATION_FAILED);
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
 
     @Test
@@ -164,14 +190,21 @@ class ConversationManageTest {
     @DisplayName("provider가 막혀 실패해도 실패한 실행의 번호를 보낸다")
     void sendsFailedRunIdEvenWhenProviderBlockedFailure() {
         CurrentUser dad = member("manage-dad");
-        stub().willReturn(new HermesRunResult("run-blocked", null, "failed", null,
-                "example-model-large", "anthropic",
-                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()));
+        stub().willReturn(new HermesRunResult(
+                "run-blocked",
+                null,
+                "failed",
+                null,
+                "example-model-large",
+                "anthropic",
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+                TokenUsage.empty()));
         List<ChatEvent> events = new ArrayList<>();
 
         assertThatThrownBy(() -> chat.stream(dad, null, "첫 질문", "manage-dad", events::add))
                 .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code()).isEqualTo(ErrorCode.PROVIDER_BLOCKED);
+                .extracting(ex -> ((ApiException) ex).code())
+                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
         assertThat(events).singleElement().satisfies(started -> {
             assertThat(started.type()).isEqualTo("started");
             assertThat(executions.findById(started.executionId()).orElseThrow().status())
@@ -185,17 +218,24 @@ class ConversationManageTest {
         CurrentUser dad = member("manage-dad");
         successfulAnswer();
         Long deletedId = chat.send(dad, null, "첫 질문", "manage-dad").conversationId();
-        stub().willReturn(HermesRunResult.of("run-two", "session-two", "completed", "둘째 답",
-                "example-model-large", "anthropic", TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of(
+                "run-two", "session-two", "completed", "둘째 답", "example-model-large", "anthropic", TokenUsage.empty()));
         stub().beforeAwait(() -> chat.delete(dad, deletedId));
         chat.send(dad, deletedId, "이어 보내기", "manage-dad");
         assertThat(conversations.findById(deletedId).orElseThrow().deletedAt()).isNotNull();
         assertThat(conversations.findById(deletedId).orElseThrow().hermesSessionId())
                 .isEqualTo("session-two");
 
-        stub().willReturn(HermesRunResult.of("run-three", "session-three", "completed", "셋째 답",
-                "example-model-large", "anthropic", TokenUsage.empty()));
-        stub().beforeAwait(() -> chat.rename(dad, chat.conversationsOf(dad).getFirst().id(), "바뀐 이름"));
+        stub().willReturn(HermesRunResult.of(
+                "run-three",
+                "session-three",
+                "completed",
+                "셋째 답",
+                "example-model-large",
+                "anthropic",
+                TokenUsage.empty()));
+        stub().beforeAwait(() ->
+                chat.rename(dad, chat.conversationsOf(dad).getFirst().id(), "바뀐 이름"));
         Long renamedId = chat.send(dad, null, "다른 질문", "manage-dad").conversationId();
         assertThat(conversations.findById(renamedId).orElseThrow().title()).isEqualTo("바뀐 이름");
         assertThat(conversations.findById(renamedId).orElseThrow().hermesSessionId())

@@ -44,17 +44,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  */
 class AgentControllerLifecycleTest {
 
-    private static final CurrentUser KID =
-            new CurrentUser(7L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
-    private static final CurrentUser ADMIN =
-            new CurrentUser(9L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
+    private static final CurrentUser KID = new CurrentUser(7L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
+    private static final CurrentUser ADMIN = new CurrentUser(9L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
 
     private final AgentRepository agents = mock(AgentRepository.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
 
-    private final MockMvc mvc = MockMvcBuilders
-            .standaloneSetup(new AgentController(new AgentService(agents), currentUser, lifecycle))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
+                    new AgentController(new AgentService(agents), currentUser, lifecycle))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
@@ -66,8 +64,7 @@ class AgentControllerLifecycleTest {
     @Test
     @DisplayName("만들면 201 과 요청자가 주인인 에이전트를 준다")
     void returns201WithRequesterAsOwnerOnCreate() throws Exception {
-        when(lifecycle.create(KID, "숙제 도우미", null))
-                .thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
+        when(lifecycle.create(KID, "숙제 도우미", null)).thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
 
         mvc.perform(post("/api/v1/agents")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -164,7 +161,14 @@ class AgentControllerLifecycleTest {
     }
 
     private static Agent agent(String code, AgentVisibility visibility, Long ownerUserId) {
-        return Agent.of(code, "숙제 도우미", "ua-" + code, "http://agent-runtime.test/p/ua-" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, ownerUserId);
+        return Agent.of(
+                code,
+                "숙제 도우미",
+                "ua-" + code,
+                "http://agent-runtime.test/p/ua-" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                visibility,
+                ownerUserId);
     }
 }

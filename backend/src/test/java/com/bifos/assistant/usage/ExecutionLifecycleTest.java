@@ -42,17 +42,24 @@ class ExecutionLifecycleTest {
 
     /** 요청에 실어 보낸 provider 와 모델이다. 에이전트는 모델을 갖지 않아 검사가 정한다. */
     private static final String REQUESTED_PROVIDER = "anthropic";
+
     private static final String REQUESTED_MODEL = "example-model-large";
 
     /** 실행 줄 어디에도 남으면 안 되는 개인 기록을 흉내낸 문자열이다. */
     private static final String SECRET_MEMORY = "아빠는 매주 목요일에 병원에 간다";
 
-    @Autowired ExecutionRecorder recorder;
+    @Autowired
+    ExecutionRecorder recorder;
 
     /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
-    @MockitoBean HermesRunsClient hermes;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ConversationRepository conversations;
+    @MockitoBean
+    HermesRunsClient hermes;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ConversationRepository conversations;
 
     private Conversation conversation;
 
@@ -116,7 +123,12 @@ class ExecutionLifecycleTest {
     void sameInstructionsGiveSameHashAndBodyIsStoredNowhere() {
         AssembledContext context = contextOf(SECRET_MEMORY);
 
-        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null,
+        AgentExecution execution = recorder.start(
+                user(),
+                conversation,
+                agent(),
+                null,
+                null,
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
 
         AgentExecution saved = executions.findById(execution.id()).orElseThrow();
@@ -142,10 +154,16 @@ class ExecutionLifecycleTest {
         assertThat(AssembledContext.empty().instructionsHash()).isNull();
         assertThat(new AssembledContext("", 0).instructionsHash()).isNull();
 
-        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null,
+        AgentExecution execution = recorder.start(
+                user(),
+                conversation,
+                agent(),
+                null,
+                null,
                 new ExecutionContextSnapshot(0L, null, AssembledContext.empty().instructionsHash()));
 
-        assertThat(executions.findById(execution.id()).orElseThrow().instructionsHash()).isNull();
+        assertThat(executions.findById(execution.id()).orElseThrow().instructionsHash())
+                .isNull();
     }
 
     @Test
@@ -153,10 +171,16 @@ class ExecutionLifecycleTest {
     void configFingerprintIsEmptyBecauseNothingReadsIt() {
         AssembledContext context = contextOf(SECRET_MEMORY);
 
-        AgentExecution execution = recorder.start(user(), conversation, agent(), null, null,
+        AgentExecution execution = recorder.start(
+                user(),
+                conversation,
+                agent(),
+                null,
+                null,
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
 
-        assertThat(executions.findById(execution.id()).orElseThrow().runtimeFingerprint()).isNull();
+        assertThat(executions.findById(execution.id()).orElseThrow().runtimeFingerprint())
+                .isNull();
     }
 
     @Test
@@ -205,8 +229,15 @@ class ExecutionLifecycleTest {
     }
 
     private static Agent agent() {
-        return Agent.of("dad", "Dad", "dad", "http://127.0.0.1:1/p/dad",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, USER_ID);
+        return Agent.of(
+                "dad",
+                "Dad",
+                "dad",
+                "http://127.0.0.1:1/p/dad",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID);
     }
 
     /** 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다. */
@@ -215,7 +246,13 @@ class ExecutionLifecycleTest {
     }
 
     private static HermesRunResult result() {
-        return HermesRunResult.of("run-1", "session-1", "completed", "끝", "example-model-large", "anthropic",
+        return HermesRunResult.of(
+                "run-1",
+                "session-1",
+                "completed",
+                "끝",
+                "example-model-large",
+                "anthropic",
                 new TokenUsage(120L, 80L, 40L, 160L));
     }
 }

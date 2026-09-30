@@ -70,8 +70,15 @@ class ModelOptionsServiceTest {
     }
 
     private void agentOf(String code, String profile, boolean enabled) {
-        Agent agent = Agent.of(code, code, profile, "http://agent-runtime.test/p/" + profile, CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, dad.id());
+        Agent agent = Agent.of(
+                code,
+                code,
+                profile,
+                "http://agent-runtime.test/p/" + profile,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                dad.id());
         agent.changeAccess(enabled, AgentVisibility.PRIVATE, dad.id());
         when(agentRepository.findByCode(code)).thenReturn(Optional.of(agent));
     }
@@ -178,8 +185,7 @@ class ModelOptionsServiceTest {
             assertThatThrownBy(() -> service.optionsFor(dad, code))
                     .as("agentCode=%s", code)
                     .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         }
         verify(hermes, never()).readCatalog(anyString(), anyString());
     }
@@ -200,10 +206,7 @@ class ModelOptionsServiceTest {
     void putsDefaultProviderFirstAndKeepsHermesOrderForRest() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog(
-                        "openai-codex",
-                        provider("alpha", "a"),
-                        provider("openai-codex", "b"),
-                        provider("beta", "c")));
+                        "openai-codex", provider("alpha", "a"), provider("openai-codex", "b"), provider("beta", "c")));
 
         ModelOptions options = service.optionsFor(dad, "dad");
 
@@ -225,14 +228,19 @@ class ModelOptionsServiceTest {
     @DisplayName("reasoning 표에 모든 모델이 있고 Hermes 가 밝히지 않은 모델은 참이다")
     void reasoningTableHasAllModelsAndUnstatedModelsAreTrue() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", new Provider("openai-codex", "OpenAI Codex",
-                        List.of("example-model", "example-model-mini", "example-model-new"),
-                        Map.of("example-model", true, "example-model-mini", false))));
+                .thenReturn(catalog(
+                        "openai-codex",
+                        new Provider(
+                                "openai-codex",
+                                "OpenAI Codex",
+                                List.of("example-model", "example-model-mini", "example-model-new"),
+                                Map.of("example-model", true, "example-model-mini", false))));
 
-        Map<String, Boolean> reasoning = service.optionsFor(dad, "dad").providers().get(0).reasoning();
+        Map<String, Boolean> reasoning =
+                service.optionsFor(dad, "dad").providers().get(0).reasoning();
 
-        assertThat(reasoning).isEqualTo(Map.of(
-                "example-model", true, "example-model-mini", false, "example-model-new", true));
+        assertThat(reasoning)
+                .isEqualTo(Map.of("example-model", true, "example-model-mini", false, "example-model-new", true));
     }
 
     @Test

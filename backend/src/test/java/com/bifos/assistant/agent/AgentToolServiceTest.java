@@ -1,11 +1,11 @@
 package com.bifos.assistant.agent;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentToolService;
@@ -32,20 +32,26 @@ class AgentToolServiceTest {
     private final SkillStore skillStore = mock(SkillStore.class);
     private final AgentToolService service = new AgentToolService(toolsets, skillStore);
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
-    private final Agent agent = Agent.of("tools", "도구", "tools-profile", "http://listener.test/p/tools-profile", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+    private final Agent agent = Agent.of(
+            "tools",
+            "도구",
+            "tools-profile",
+            "http://listener.test/p/tools-profile",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            1L);
 
     @BeforeEach
     void setUp() {
         when(toolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry("web", "Web", "검색")));
-        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of(), List.of());
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of(), List.of());
     }
 
     @Test
     @DisplayName("저장 뒤 다른 목록이 오면 적용되지 않은 오류를 돌린다")
     void returnsNotAppliedErrorWhenDifferentListComesBackAfterSave() {
-        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of(), List.of());
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of(), List.of());
 
         assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
                 .isInstanceOf(ApiException.class)
@@ -57,7 +63,8 @@ class AgentToolServiceTest {
     @DisplayName("대시보드를 읽지 못하면 HERMES UNAVAILABLE을 그대로 돌린다")
     void passesHermesUnavailableThroughWhenDashboardUnreadable() {
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not reach Hermes"))
-                .when(toolsets).readCatalog();
+                .when(toolsets)
+                .readCatalog();
 
         assertThatThrownBy(() -> service.read(owner, agent))
                 .isInstanceOf(ApiException.class)
@@ -70,9 +77,15 @@ class AgentToolServiceTest {
     void otherUserReadingGroupAgentCannotChangeOwnerTier() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
-        Agent groupAgent = Agent.of("group-tools", "그룹 도구", "group-tools-profile",
+        Agent groupAgent = Agent.of(
+                "group-tools",
+                "그룹 도구",
+                "group-tools-profile",
                 "http://listener.test/p/group-tools-profile",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null);
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null);
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.write(reader, groupAgent, List.of()))
@@ -88,9 +101,15 @@ class AgentToolServiceTest {
     void otherUserReadingGroupAgentCannotReadToolList() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
-        Agent groupAgent = Agent.of("group-read", "그룹 도구", "group-read-profile",
+        Agent groupAgent = Agent.of(
+                "group-read",
+                "그룹 도구",
+                "group-read-profile",
                 "http://listener.test/p/group-read-profile",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null);
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null);
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.read(reader, groupAgent))
@@ -109,7 +128,8 @@ class AgentToolServiceTest {
 
         AgentToolService.ToolsetsView result = service.read(owner, agent);
 
-        org.assertj.core.api.Assertions.assertThat(result.toolsets()).extracting(AgentToolService.ToolView::name)
+        org.assertj.core.api.Assertions.assertThat(result.toolsets())
+                .extracting(AgentToolService.ToolView::name)
                 .containsExactly("web");
         org.assertj.core.api.Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
     }
@@ -148,21 +168,26 @@ class AgentToolServiceTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
-        verify(toolsets, org.mockito.Mockito.never()).writeApiServer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
+        verify(toolsets, org.mockito.Mockito.never())
+                .writeApiServer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
     }
 
     @Test
     @DisplayName("올린 스킬이 있어도 skills 를 둔 저장은 그대로 쓴다")
     void keepsSaveThatLeavesSkillsOnEvenWithUploadedSkills() {
         when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
-        when(toolsets.readCatalog()).thenReturn(List.of(
-                new ToolsetCatalogEntry("web", "Web", "검색"), new ToolsetCatalogEntry("skills", "Skills", "스킬")));
+        when(toolsets.readCatalog())
+                .thenReturn(List.of(
+                        new ToolsetCatalogEntry("web", "Web", "검색"),
+                        new ToolsetCatalogEntry("skills", "Skills", "스킬")));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
                 .thenReturn(List.of("skills"), List.of("web", "skills"));
 
         AgentToolService.ToolsetsView result = service.write(owner, agent, List.of("web", "skills"));
 
-        assertThat(result.toolsets()).extracting(AgentToolService.ToolView::name).containsExactly("web", "skills");
+        assertThat(result.toolsets())
+                .extracting(AgentToolService.ToolView::name)
+                .containsExactly("web", "skills");
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"));
     }
 }

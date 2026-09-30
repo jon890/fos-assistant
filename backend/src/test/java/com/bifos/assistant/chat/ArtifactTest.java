@@ -113,23 +113,51 @@ class ArtifactTest {
         }
     }
 
-    @LocalServerPort int port;
-    @Autowired ChatService chat;
-    @Autowired ArtifactService artifactService;
-    @Autowired ArtifactStore store;
-    @Autowired ArtifactCleaner cleaner;
-    @Autowired ArtifactProperties properties;
-    @Autowired ChatArtifactRepository artifactRows;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ConversationRepository conversations;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired HermesRunsClient hermes;
+    @LocalServerPort
+    int port;
+
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    ArtifactService artifactService;
+
+    @Autowired
+    ArtifactStore store;
+
+    @Autowired
+    ArtifactCleaner cleaner;
+
+    @Autowired
+    ArtifactProperties properties;
+
+    @Autowired
+    ChatArtifactRepository artifactRows;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     /** 스트림 경로의 사건 중계는 이 검사가 보는 것이 아니다. 열자마자 끝나게 둔다. */
-    @MockitoBean HermesRunEventStream eventStream;
+    @MockitoBean
+    HermesRunEventStream eventStream;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -165,9 +193,12 @@ class ArtifactTest {
 
         chat.stream(dad, conversation.id(), "초안 만들어 줘", null, event -> {});
 
-        assertThat(stub().received()).singleElement().extracting(HermesRunCommand::input)
+        assertThat(stub().received())
+                .singleElement()
+                .extracting(HermesRunCommand::input)
                 .as("파일 도구를 쓰는 에이전트도 결과물 폴더에 직접 쓸 수 있어야 한다")
-                .asString().contains("artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.");
+                .asString()
+                .contains("artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.");
         assertThat(answerArtifacts(conversation))
                 .containsExactly(List.of("a/index.html", String.valueOf(htmlBytes()), "false"));
     }
@@ -178,11 +209,14 @@ class ArtifactTest {
         Conversation conversation = chat.startEmpty(dad, "dad");
         stub().beforeAwait(() -> writeDuringTurn(conversation.id(), "a/index.html", HTML));
 
-        HttpResponse<String> sent = post("/api/v1/chat/messages",
+        HttpResponse<String> sent = post(
+                "/api/v1/chat/messages",
                 "{\"conversationId\":\"" + conversation.publicId() + "\",\"text\":\"초안 만들어 줘\"}");
 
         assertThat(sent.statusCode()).as(sent.body()).isEqualTo(200);
-        assertThat(answerArtifacts(conversation)).extracting(row -> row.getFirst()).containsExactly("a/index.html");
+        assertThat(answerArtifacts(conversation))
+                .extracting(row -> row.getFirst())
+                .containsExactly("a/index.html");
     }
 
     @Test
@@ -192,8 +226,10 @@ class ArtifactTest {
 
         chat.send(dad, conversation.id(), "안녕", null);
 
-        assertThat(stub().received()).singleElement().extracting(HermesRunCommand::input).isEqualTo(
-                "[결과물 폴더]\n"
+        assertThat(stub().received())
+                .singleElement()
+                .extracting(HermesRunCommand::input)
+                .isEqualTo("[결과물 폴더]\n"
                         + AGENT_ARTIFACT_ROOT + "/" + conversation.id() + "\n"
                         + "대화 식별자: " + conversation.publicId() + "\n"
                         + PREAMBLE_GUIDE + "\n"
@@ -212,7 +248,10 @@ class ArtifactTest {
 
         chat.send(dad, conversation.id(), "안녕", null);
 
-        assertThat(stub().received()).singleElement().extracting(HermesRunCommand::input).asString()
+        assertThat(stub().received())
+                .singleElement()
+                .extracting(HermesRunCommand::input)
+                .asString()
                 .contains("[스킬 관리]\n")
                 .contains("skill_manage 로 스킬을 만들거나 고치지 않는다.");
     }
@@ -228,11 +267,11 @@ class ArtifactTest {
 
         chat.send(mom, null, "보조금 비교해 줘", "flow-mom");
 
-        assertThat(stub().received()).extracting(HermesRunCommand::input)
+        assertThat(stub().received())
+                .extracting(HermesRunCommand::input)
                 .isNotEmpty()
-                .allSatisfy(input -> assertThat(input)
-                        .contains("[스킬 관리]\n")
-                        .contains("skill_manage 로 스킬을 만들거나 고치지 않는다."));
+                .allSatisfy(
+                        input -> assertThat(input).contains("[스킬 관리]\n").contains("skill_manage 로 스킬을 만들거나 고치지 않는다."));
     }
 
     @Test
@@ -249,11 +288,17 @@ class ArtifactTest {
         Long conversationId = executions.findAll().getFirst().conversationId();
         Conversation conversation = conversations.findById(conversationId).orElseThrow();
         String preamble = artifactService.agentPreamble(conversation);
-        List<String> inputs = stub().received().stream().map(HermesRunCommand::input).toList();
-        List<String> children = inputs.stream().filter(input -> !input.contains(CHIEF_MARK)).toList();
-        assertThat(children).as("Researcher, Engineer, Synthesizer").hasSize(3)
+        List<String> inputs =
+                stub().received().stream().map(HermesRunCommand::input).toList();
+        List<String> children =
+                inputs.stream().filter(input -> !input.contains(CHIEF_MARK)).toList();
+        assertThat(children)
+                .as("Researcher, Engineer, Synthesizer")
+                .hasSize(3)
                 .allSatisfy(input -> assertThat(input).startsWith(preamble));
-        assertThat(inputs).filteredOn(input -> input.contains(CHIEF_MARK)).singleElement()
+        assertThat(inputs)
+                .filteredOn(input -> input.contains(CHIEF_MARK))
+                .singleElement()
                 .satisfies(chief -> assertThat(chief).contains(preamble));
     }
 
@@ -266,7 +311,9 @@ class ArtifactTest {
 
         chat.send(dad, conversation.id(), "새로 만들어 줘", null);
 
-        assertThat(answerArtifacts(conversation)).extracting(row -> row.getFirst()).containsExactly("new.html");
+        assertThat(answerArtifacts(conversation))
+                .extracting(row -> row.getFirst())
+                .containsExactly("new.html");
     }
 
     @Test
@@ -282,9 +329,7 @@ class ArtifactTest {
         assertThat(answers).hasSize(2);
         assertThat(artifactRows.findByMessageIdInOrderByIdAsc(answers))
                 .extracting(ChatArtifact::messageId, ChatArtifact::path)
-                .containsExactly(
-                        tuple(answers.get(0), "a/index.html"),
-                        tuple(answers.get(1), "a/index.html"));
+                .containsExactly(tuple(answers.get(0), "a/index.html"), tuple(answers.get(1), "a/index.html"));
     }
 
     @Test
@@ -450,10 +495,13 @@ class ArtifactTest {
                     .extracting(ArtifactStore.FoundFile::path)
                     .contains("ok.html");
 
-            List<ArtifactStore.Removed> removed = store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
+            List<ArtifactStore.Removed> removed =
+                    store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
 
             assertThat(removed).extracting(ArtifactStore.Removed::path).containsExactly("old/old.html");
-            assertThat(Files.exists(root.resolve(String.valueOf(conversation.id())).resolve("ok.html"))).isTrue();
+            assertThat(Files.exists(
+                            root.resolve(String.valueOf(conversation.id())).resolve("ok.html")))
+                    .isTrue();
         } finally {
             Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
         }
@@ -466,10 +514,13 @@ class ArtifactTest {
         writeAt(conversation.id(), "a/photo.png", "png", Instant.now().minus(Duration.ofDays(40)));
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
 
-        List<ArtifactStore.Removed> removed = store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
+        List<ArtifactStore.Removed> removed =
+                store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
 
         assertThat(removed).isEmpty();
-        assertThat(Files.exists(root.resolve(String.valueOf(conversation.id())).resolve("a").resolve("photo.png")))
+        assertThat(Files.exists(root.resolve(String.valueOf(conversation.id()))
+                        .resolve("a")
+                        .resolve("photo.png")))
                 .isTrue();
     }
 
@@ -552,11 +603,11 @@ class ArtifactTest {
     void ignoresIfModifiedSinceWhenIfNoneMatchPresent() throws Exception {
         Conversation conversation = chat.startEmpty(dad, "dad");
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now().minus(Duration.ofMinutes(5)));
-        String future = DateTimeFormatter.RFC_1123_DATE_TIME
-                .format(ZonedDateTime.now(ZoneOffset.UTC).plusDays(1));
+        String future = DateTimeFormatter.RFC_1123_DATE_TIME.format(
+                ZonedDateTime.now(ZoneOffset.UTC).plusDays(1));
 
-        HttpResponse<String> response = file(conversation, "a/index.html", dad,
-                "If-None-Match", "\"other\"", "If-Modified-Since", future);
+        HttpResponse<String> response =
+                file(conversation, "a/index.html", dad, "If-None-Match", "\"other\"", "If-Modified-Since", future);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo(HTML);
@@ -590,7 +641,8 @@ class ArtifactTest {
 
         assertThat(removed).isEqualTo(1);
         assertThat(Files.exists(html)).isFalse();
-        assertThat(artifactRows.findAll()).singleElement()
+        assertThat(artifactRows.findAll())
+                .singleElement()
                 .satisfies(row -> assertThat(row.deletedAt()).isNotNull());
         HttpResponse<String> response = file(conversation, "a/index.html");
         assertThat(response.statusCode()).isEqualTo(410);
@@ -601,13 +653,14 @@ class ArtifactTest {
 
     /** 대화 이력의 답마다 붙은 결과물을 {@code [path, byteSize, deleted]} 로 모은다. */
     private List<List<String>> answerArtifacts(Conversation conversation) throws Exception {
-        HttpResponse<String> response =
-                get("/api/v1/chat/conversations/" + conversation.publicId() + "/messages");
+        HttpResponse<String> response = get("/api/v1/chat/conversations/" + conversation.publicId() + "/messages");
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
         List<List<String>> rows = new ArrayList<>();
         for (JsonNode message : json.readTree(response.body())) {
             if (!"ASSISTANT".equals(message.path("role").asString())) {
-                assertThat(message.path("artifacts").isEmpty()).as("사용자 메시지에는 결과물이 없다").isTrue();
+                assertThat(message.path("artifacts").isEmpty())
+                        .as("사용자 메시지에는 결과물이 없다")
+                        .isTrue();
                 continue;
             }
             for (JsonNode artifact : message.path("artifacts")) {
@@ -659,8 +712,7 @@ class ArtifactTest {
 
     /** 보내는 사용자와 요청 머리글(이름, 값 순서의 쌍)을 정해 파일을 받는다. */
     private HttpResponse<String> file(
-            Conversation conversation, String relativePath, CurrentUser sender, String... headers)
-            throws Exception {
+            Conversation conversation, String relativePath, CurrentUser sender, String... headers) throws Exception {
         String encoded = StreamSupport.stream(Path.of(relativePath).spliterator(), false)
                 .map(segment -> URLEncoder.encode(segment.toString(), StandardCharsets.UTF_8))
                 .reduce((left, right) -> left + "/" + right)

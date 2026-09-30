@@ -36,8 +36,7 @@ class ConversationPublicIdMigrationTest {
                 .migrate();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO conversation (user_id, title, created_at, updated_at) VALUES
                         (1, '첫 대화', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)),
                         (1, '둘째 대화', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))

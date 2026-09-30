@@ -24,9 +24,10 @@ class ArtifactControllerNotModifiedTest {
 
     /** 결과물 파일이 붙이는 것과 같은 모양의 약한 검증자다. */
     private static final String ETAG = "W/\"1f-19a2b3c4d5e\"";
+
     private static final Instant SECOND = Instant.parse("2026-09-01T10:00:00Z");
-    private static final String SECOND_AS_HEADER = DateTimeFormatter.RFC_1123_DATE_TIME
-            .withZone(ZoneOffset.UTC).format(SECOND);
+    private static final String SECOND_AS_HEADER =
+            DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC).format(SECOND);
 
     /**
      * 이 경우만 Spring 과 다르다. Spring 7 은 GET 의 {@code If-None-Match: *} 를 맞지 않은 것으로 보아 200 을 준다.
@@ -45,13 +46,15 @@ class ArtifactControllerNotModifiedTest {
     @Test
     @DisplayName("쉼표로 나열한 값 가운데 하나가 맞으면 참이다")
     void trueWhenOneOfCommaSeparatedValuesMatches() {
-        assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", " + ETAG + ", W/\"another\"")).isTrue();
+        assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", " + ETAG + ", W/\"another\""))
+                .isTrue();
     }
 
     @Test
     @DisplayName("요청에만 W 가 있어도 참이다")
     void trueEvenIfOnlyRequestHasWeakPrefix() {
-        assertThat(judged("\"1f-19a2b3c4d5e\"", SECOND, "If-None-Match", "W/\"1f-19a2b3c4d5e\"")).isTrue();
+        assertThat(judged("\"1f-19a2b3c4d5e\"", SECOND, "If-None-Match", "W/\"1f-19a2b3c4d5e\""))
+                .isTrue();
     }
 
     @Test
@@ -63,38 +66,40 @@ class ArtifactControllerNotModifiedTest {
     @Test
     @DisplayName("어느 값도 맞지 않으면 거짓이다")
     void falseWhenNoValueMatches() {
-        assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", W/\"another\"")).isFalse();
+        assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", W/\"another\""))
+                .isFalse();
     }
 
     @Test
     @DisplayName("If None Match 가 맞지 않으면 If Modified Since 가 맞아도 거짓이다")
     void falseWhenIfNoneMatchMismatchesEvenIfIfModifiedSinceMatches() {
-        assertThat(judged(ETAG, SECOND,
-                "If-None-Match", "\"other\"",
-                "If-Modified-Since", SECOND_AS_HEADER)).isFalse();
+        assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\"", "If-Modified-Since", SECOND_AS_HEADER))
+                .isFalse();
     }
 
     @Test
     @DisplayName("If None Match 가 맞으면 If Modified Since 가 옛날이어도 참이다")
     void trueWhenIfNoneMatchMatchesEvenIfIfModifiedSinceIsOld() {
         String yearBefore = DateTimeFormatter.RFC_1123_DATE_TIME
-                .withZone(ZoneOffset.UTC).format(SECOND.minusSeconds(365L * 24 * 60 * 60));
+                .withZone(ZoneOffset.UTC)
+                .format(SECOND.minusSeconds(365L * 24 * 60 * 60));
 
-        assertThat(judged(ETAG, SECOND,
-                "If-None-Match", ETAG,
-                "If-Modified-Since", yearBefore)).isTrue();
+        assertThat(judged(ETAG, SECOND, "If-None-Match", ETAG, "If-Modified-Since", yearBefore))
+                .isTrue();
     }
 
     @Test
     @DisplayName("수정 시각이 If Modified Since 와 같은 초의 999ms 면 참이다")
     void trueWhenModifiedTimeIs999MsWithinSameSecondAsIfModifiedSince() {
-        assertThat(judged(ETAG, SECOND.plusMillis(999), "If-Modified-Since", SECOND_AS_HEADER)).isTrue();
+        assertThat(judged(ETAG, SECOND.plusMillis(999), "If-Modified-Since", SECOND_AS_HEADER))
+                .isTrue();
     }
 
     @Test
     @DisplayName("수정 시각이 If Modified Since 의 다음 초면 거짓이다")
     void falseWhenModifiedTimeIsSecondAfterIfModifiedSince() {
-        assertThat(judged(ETAG, SECOND.plusSeconds(1), "If-Modified-Since", SECOND_AS_HEADER)).isFalse();
+        assertThat(judged(ETAG, SECOND.plusSeconds(1), "If-Modified-Since", SECOND_AS_HEADER))
+                .isFalse();
     }
 
     @Test
@@ -113,7 +118,8 @@ class ArtifactControllerNotModifiedTest {
         boolean spring = spring(etag, lastModified, headerPairs);
 
         assertThat(ours)
-                .as("머리글 %s, ETag %s, 수정 시각 %s 에서 우리 판정 %s 가 Spring 판정 %s 와 다르다",
+                .as(
+                        "머리글 %s, ETag %s, 수정 시각 %s 에서 우리 판정 %s 가 Spring 판정 %s 와 다르다",
                         String.join(" ", headerPairs), etag, lastModified, ours, spring)
                 .isEqualTo(spring);
         return ours;

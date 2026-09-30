@@ -20,8 +20,11 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class OrphanedExecutionSweeperTest {
 
-    @Autowired OrphanedExecutionSweeper sweeper;
-    @Autowired AgentExecutionRepository executions;
+    @Autowired
+    OrphanedExecutionSweeper sweeper;
+
+    @Autowired
+    AgentExecutionRepository executions;
 
     @BeforeEach
     void setUp() {
@@ -59,8 +62,7 @@ class OrphanedExecutionSweeperTest {
 
         sweeper.sweep();
 
-        assertThat(executions.findById(succeeded.id()).orElseThrow().status())
-                .isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(executions.findById(succeeded.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(executions.count()).isOne();
     }
 

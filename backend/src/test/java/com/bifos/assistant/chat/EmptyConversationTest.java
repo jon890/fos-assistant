@@ -50,14 +50,29 @@ class EmptyConversationTest {
         }
     }
 
-    @Autowired ChatService chat;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     @BeforeEach
     void setUp() {
@@ -88,8 +103,8 @@ class EmptyConversationTest {
     void firstMessageSetsTitleAndSecondDoesNotChangeIt() {
         CurrentUser dad = member("dad@example.com");
         agentOf(dad, "dad");
-        ((StubHermesRunsClient) hermes).willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes)
+                .willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
         Long conversationId = chat.startEmpty(dad, "dad").id();
 
         chat.send(dad, conversationId, "  이 사진   정리해 줘 ", null);
@@ -113,7 +128,8 @@ class EmptyConversationTest {
                 () -> chat.startEmpty(dad, "kid"), () -> chat.send(dad, null, "안녕", "kid"), ErrorCode.AGENT_NOT_FOUND);
         assertSameCode(
                 () -> chat.startEmpty(dad, "off"), () -> chat.send(dad, null, "안녕", "off"), ErrorCode.AGENT_DISABLED);
-        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id())).isEmpty();
+        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id()))
+                .isEmpty();
     }
 
     @Test
@@ -154,8 +170,10 @@ class EmptyConversationTest {
 
     private static void assertSameCode(Runnable empty, Runnable firstMessage, ErrorCode expected) {
         assertThatThrownBy(empty::run)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
         assertThatThrownBy(firstMessage::run)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
 }

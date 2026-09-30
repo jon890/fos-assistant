@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import org.junit.jupiter.api.DisplayName;
-import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Providers disagree on usage field names, so the reader has to accept every shape we have seen. */
 class HermesUsageParsingTest {
@@ -20,9 +20,7 @@ class HermesUsageParsingTest {
     @DisplayName("Hermes v0 21 5 의 run usage 에서 캐시 읽기를 읽는다")
     void readsCacheReadFromRunUsageOfHermesV0215() throws Exception {
         // 실제 v0.21.5 run 응답의 키 모양이다(2026-09-29 운영에서 확인). input 은 캐시 읽기와 쓰기를 포함한다.
-        TokenUsage usage =
-                parse(
-                        """
+        TokenUsage usage = parse("""
                         {"input_tokens": 1200, "output_tokens": 40, "total_tokens": 1240,
                          "cache_read_tokens": 1024, "cache_write_tokens": 0}
                         """);
@@ -36,9 +34,7 @@ class HermesUsageParsingTest {
     @Test
     @DisplayName("reads the openai shape")
     void readsTheOpenaiShape() throws Exception {
-        TokenUsage usage =
-                parse(
-                        """
+        TokenUsage usage = parse("""
                         {"prompt_tokens": 120, "completion_tokens": 40, "total_tokens": 160,
                          "prompt_tokens_details": {"cached_tokens": 80}}
                         """);
@@ -52,8 +48,7 @@ class HermesUsageParsingTest {
     @Test
     @DisplayName("reads the anthropic shape and derives the total")
     void readsTheAnthropicShapeAndDerivesTheTotal() throws Exception {
-        TokenUsage usage =
-                parse("""
+        TokenUsage usage = parse("""
                         {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 3}
                         """);
 

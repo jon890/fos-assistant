@@ -27,15 +27,15 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
-import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,7 +48,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,18 +64,38 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 @Import(ChatServiceTest.StubRuntime.class)
 class ChatStopTest {
 
-    @Autowired ChatService chat;
-    @Autowired ConversationAccess access;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired MemoryRepository memories;
-    @Autowired HermesRunsClient hermes;
-    @MockitoSpyBean TurnCancellation turns;
+    @Autowired
+    ChatService chat;
 
-    @MockitoBean HermesRunEventStream eventStream;
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    HermesRunsClient hermes;
+
+    @MockitoSpyBean
+    TurnCancellation turns;
+
+    @MockitoBean
+    HermesRunEventStream eventStream;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -85,28 +104,39 @@ class ChatStopTest {
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         agents.save(Agent.of(
-                profileName, profileName, profileName, "http://agent-runtime.test/p/" + profileName, CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
+                profileName,
+                profileName,
+                profileName,
+                "http://agent-runtime.test/p/" + profileName,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private void hermesStreams(RunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
-                onEvent.accept(event);
-            }
-            return null;
-        }).when(eventStream).open(any(), any(), any(), any(), any());
+                    Consumer<RunEvent> onEvent = invocation.getArgument(3);
+                    for (RunEvent event : events) {
+                        onEvent.accept(event);
+                    }
+                    return null;
+                })
+                .when(eventStream)
+                .open(any(), any(), any(), any(), any());
     }
 
     private AgentExecution latestExecution(CurrentUser user) {
-        return executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1)).getFirst();
+        return executions
+                .findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1))
+                .getFirst();
     }
 
     private List<ExecutionEventType> eventTypes(Long executionId) {
-        return executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId))
-                .stream().map(ExecutionEvent::eventType).toList();
+        return executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId)).stream()
+                .map(ExecutionEvent::eventType)
+                .toList();
     }
 
     @BeforeEach
@@ -136,7 +166,8 @@ class ChatStopTest {
         assertThat(stub().stopped()).containsExactly("run-stop");
         assertThat(executions.findById(stopped.executionId()).orElseThrow().status())
                 .isEqualTo(ExecutionStatus.CANCELLED);
-        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, stopped.conversationId()))).last()
+        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, stopped.conversationId())))
+                .last()
                 .satisfies(message -> {
                     assertThat(message.role()).isEqualTo(MessageRole.ASSISTANT);
                     assertThat(message.content()).isEqualTo("절반");
@@ -156,7 +187,9 @@ class ChatStopTest {
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "멈춰 줘", "dad", relayed::add);
 
-        assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, relayed.getLast().conversationId()))).last()
+        assertThat(messages.findByConversationIdOrderByIdAsc(
+                        access.requireOwnId(dad, relayed.getLast().conversationId())))
+                .last()
                 .satisfies(message -> assertThat(message.content()).isEqualTo("앞부분"));
     }
 
@@ -175,7 +208,8 @@ class ChatStopTest {
         assertThat(stopped.type()).isEqualTo("stopped");
         assertThat(stopped.messageId()).isNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(dad, stopped.conversationId())))
-                .singleElement().satisfies(message -> assertThat(message.role()).isEqualTo(MessageRole.USER));
+                .singleElement()
+                .satisfies(message -> assertThat(message.role()).isEqualTo(MessageRole.USER));
     }
 
     @Test
@@ -245,22 +279,32 @@ class ChatStopTest {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(HermesRunResult.of(
                 "run-continue", "session", "completed", "계속한 답", "model", "provider", TokenUsage.empty()));
-        stub().onStop(runId -> { throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "stop failed"); });
+        stub().onStop(runId -> {
+            throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "stop failed");
+        });
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            assertThatThrownBy(() -> chat.stop(dad, latestExecution(dad).id()))
-                    .isInstanceOf(ApiException.class)
-                    .extracting(ex -> ((ApiException) ex).code())
-                    .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
-            onEvent.accept(new RunEvent("message.delta", "조각", null, null, null, null));
-            return null;
-        }).when(eventStream).open(any(), any(), any(), any(), any());
+                    Consumer<RunEvent> onEvent = invocation.getArgument(3);
+                    assertThatThrownBy(() -> chat.stop(dad, latestExecution(dad).id()))
+                            .isInstanceOf(ApiException.class)
+                            .extracting(ex -> ((ApiException) ex).code())
+                            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+                    onEvent.accept(new RunEvent("message.delta", "조각", null, null, null, null));
+                    return null;
+                })
+                .when(eventStream)
+                .open(any(), any(), any(), any(), any());
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "계속해 줘", "dad", relayed::add);
 
-        assertThat(relayed).extracting(ChatEvent::type).contains("delta", "done").doesNotContain("stopped");
-        assertThat(executions.findById(relayed.getLast().executionId()).orElseThrow().status())
+        assertThat(relayed)
+                .extracting(ChatEvent::type)
+                .contains("delta", "done")
+                .doesNotContain("stopped");
+        assertThat(executions
+                        .findById(relayed.getLast().executionId())
+                        .orElseThrow()
+                        .status())
                 .isEqualTo(ExecutionStatus.SUCCEEDED);
     }
 
@@ -325,9 +369,11 @@ class ChatStopTest {
             }
         });
         doAnswer(invocation -> {
-            awaitingFirstStop.countDown();
-            return invocation.callRealMethod();
-        }).when(turns).awaitFirstStop(any());
+                    awaitingFirstStop.countDown();
+                    return invocation.callRealMethod();
+                })
+                .when(turns)
+                .awaitFirstStop(any());
         // 첫 중지 요청이 run 없이 첫 중지 결과를 기다리기 시작한 뒤에 제출을 끝낸다.
         // 제출이 먼저 run 을 등록하면 그 요청이 run 을 직접 다시 멈춰 성공할 수 있다.
         stub().willAnswer(command -> {
@@ -345,8 +391,8 @@ class ChatStopTest {
         stub().beforeAwait(() -> {
             assertThatThrownBy(() -> firstStop.get().get(1, TimeUnit.SECONDS))
                     .hasCauseInstanceOf(ApiException.class)
-                    .satisfies(ex -> assertThat(((ApiException) ex.getCause()).code())
-                            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+                    .satisfies(ex ->
+                            assertThat(((ApiException) ex.getCause()).code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
             chat.stop(dad, latestExecution(dad).id());
         });
         try {
@@ -373,10 +419,12 @@ class ChatStopTest {
         // 중지 요청이 취소 표시를 남긴 뒤 run 이 있는지 보는 것을, 제출이 run 을 등록하며 보낸 중지가 실패할 때까지 미룬다.
         // 그 요청이 같은 run 에 다시 보내 Hermes 가 받아들였으므로 중지는 성공이다.
         doAnswer(invocation -> {
-            long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
-            while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
-            return invocation.callRealMethod();
-        }).when(turns).hasRuns(any());
+                    long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+                    while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+                    return invocation.callRealMethod();
+                })
+                .when(turns)
+                .hasRuns(any());
         stub().willAnswer(command -> {
             Long executionId = latestExecution(dad).id();
             firstStop.set(executor.submit(() -> chat.stop(dad, executionId)));
@@ -420,15 +468,19 @@ class ChatStopTest {
         // 중지 요청이 run 이 없다고 본 뒤, 제출이 run 을 등록하며 보낸 첫 중지가 실패할 때까지 다시 보내기를 미룬다.
         // 그 뒤 요청이 같은 run 에 다시 보내 Hermes 가 받아들였으므로 중지는 성공이다.
         doAnswer(invocation -> {
-            Object result = invocation.callRealMethod();
-            sawNoRuns.countDown();
-            return result;
-        }).when(turns).hasRuns(any());
+                    Object result = invocation.callRealMethod();
+                    sawNoRuns.countDown();
+                    return result;
+                })
+                .when(turns)
+                .hasRuns(any());
         doAnswer(invocation -> {
-            long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
-            while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
-            return invocation.callRealMethod();
-        }).when(turns).pendingStops(any());
+                    long deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos();
+                    while (attempts.get() == 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+                    return invocation.callRealMethod();
+                })
+                .when(turns)
+                .pendingStops(any());
         stub().willAnswer(command -> {
             Long executionId = latestExecution(dad).id();
             firstStop.set(executor.submit(() -> chat.stop(dad, executionId)));
@@ -505,12 +557,14 @@ class ChatStopTest {
         AtomicReference<Future<?>> stop = new AtomicReference<>();
         try {
             doAnswer(invocation -> {
-                invocation.callRealMethod();
-                Long executionId = invocation.getArgument(1);
-                stop.set(executor.submit(() -> chat.stop(dad, executionId)));
-                assertThat(awaitCancelled(executionId)).isTrue();
-                return null;
-            }).when(turns).rekey(any(), any());
+                        invocation.callRealMethod();
+                        Long executionId = invocation.getArgument(1);
+                        stop.set(executor.submit(() -> chat.stop(dad, executionId)));
+                        assertThat(awaitCancelled(executionId)).isTrue();
+                        return null;
+                    })
+                    .when(turns)
+                    .rekey(any(), any());
 
             ChatTurn turn = chat.send(dad, null, "제출 전 중지", "dad");
 
@@ -532,10 +586,13 @@ class ChatStopTest {
         AtomicReference<Future<?>> stop = new AtomicReference<>();
         try {
             doAnswer(invocation -> {
-                invocation.callRealMethod();
-                stop.set(executor.submit(() -> chat.stop(dad, latestExecution(dad).id())));
-                return null;
-            }).when(turns).markFinished(any());
+                        invocation.callRealMethod();
+                        stop.set(executor.submit(
+                                () -> chat.stop(dad, latestExecution(dad).id())));
+                        return null;
+                    })
+                    .when(turns)
+                    .markFinished(any());
 
             chat.send(dad, null, "완료 경합", "dad");
 

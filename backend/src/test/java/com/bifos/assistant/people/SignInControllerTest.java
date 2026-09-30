@@ -36,12 +36,16 @@ import tools.jackson.databind.json.JsonMapper;
 class SignInControllerTest {
 
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
-    private static final SecretKey KEY =
-            Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+    private static final SecretKey KEY = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
 
-    @LocalServerPort int port;
-    @Autowired AllowedPersonRepository people;
-    @Autowired AppUserRepository users;
+    @LocalServerPort
+    int port;
+
+    @Autowired
+    AllowedPersonRepository people;
+
+    @Autowired
+    AppUserRepository users;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -106,10 +110,10 @@ class SignInControllerTest {
     }
 
     private HttpResponse<String> ask(String token, String email) throws Exception {
-        HttpRequest.Builder request =
-                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/v1/signin/allowed"))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString("{\"email\":\"" + email + "\"}"));
+        HttpRequest.Builder request = HttpRequest.newBuilder(
+                        URI.create("http://127.0.0.1:" + port + "/api/v1/signin/allowed"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"email\":\"" + email + "\"}"));
         if (token != null) {
             request.header("Authorization", "Bearer " + token);
         }

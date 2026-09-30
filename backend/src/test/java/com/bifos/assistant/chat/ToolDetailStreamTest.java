@@ -86,20 +86,42 @@ class ToolDetailStreamTest {
         }
     }
 
-    @Autowired ChatService chat;
-    @Autowired ConversationAccess access;
-    @Autowired AgentService agentService;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AgentRepository agents;
-    @Autowired MemoryRepository memories;
-    @Autowired AppUserRepository users;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     /** 도구 사건을 흘리려면 Hermes 의 사건 스트림을 우리가 열어 주어야 한다. */
-    @MockitoBean HermesRunEventStream eventStream;
+    @MockitoBean
+    HermesRunEventStream eventStream;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final JsonMapper json = JsonMapper.builder().build();
@@ -108,8 +130,15 @@ class ToolDetailStreamTest {
     @BeforeEach
     void setUp() {
         ((StubHermesRunsClient) hermes).reset();
-        ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("run-one", "session-one", "completed", "답",
-                "example-model-large", "anthropic", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes)
+                .willReturn(HermesRunResult.of(
+                        "run-one",
+                        "session-one",
+                        "completed",
+                        "답",
+                        "example-model-large",
+                        "anthropic",
+                        TokenUsage.empty()));
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -117,9 +146,14 @@ class ToolDetailStreamTest {
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
-        mvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(chat, currentUser, users, agentService, access,
-                        new ChatEventStreams(Duration.ofSeconds(20)), null))
+        mvc = MockMvcBuilders.standaloneSetup(new ChatController(
+                        chat,
+                        currentUser,
+                        users,
+                        agentService,
+                        access,
+                        new ChatEventStreams(Duration.ofSeconds(20)),
+                        null))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         hermesStreams(
@@ -158,16 +192,29 @@ class ToolDetailStreamTest {
     @DisplayName("MEMBER 역할이 답을 다시 만들어도 terminal 의 명령 원문을 싣지 않고 검색어는 싣는다")
     void memberRegeneratingReplyStillGetsNoTerminalCommandText() throws Exception {
         CurrentUser kid = signedIn("regenerate-kid", UserRole.MEMBER);
-        ((StubHermesRunsClient) hermes).willReturnInOrder(
-                HermesRunResult.of("run-first", "session-one", "completed", "첫 답",
-                        "example-model-large", "anthropic", TokenUsage.empty()),
-                HermesRunResult.of("run-again", "session-one", "completed", "새 답",
-                        "example-model-large", "anthropic", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes)
+                .willReturnInOrder(
+                        HermesRunResult.of(
+                                "run-first",
+                                "session-one",
+                                "completed",
+                                "첫 답",
+                                "example-model-large",
+                                "anthropic",
+                                TokenUsage.empty()),
+                        HermesRunResult.of(
+                                "run-again",
+                                "session-one",
+                                "completed",
+                                "새 답",
+                                "example-model-large",
+                                "anthropic",
+                                TokenUsage.empty()));
         Long number = chat.send(kid, null, "도구를 써 줘", kid.displayName()).conversationId();
         UUID conversationId = conversations.findById(number).orElseThrow().publicId();
 
-        List<JsonNode> events = streamed(post("/api/v1/chat/conversations/{conversationId}/regenerate/stream",
-                conversationId));
+        List<JsonNode> events =
+                streamed(post("/api/v1/chat/conversations/{conversationId}/regenerate/stream", conversationId));
 
         assertThat(toolEvent(events, "terminal").hasNonNull("detail"))
                 .as("MEMBER 역할이 다시 만든 답의 terminal 사건에 detail 이 실렸다: %s", toolEvent(events, "terminal"))
@@ -179,12 +226,12 @@ class ToolDetailStreamTest {
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
     private void hermesStreams(RunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
-                onEvent.accept(event);
-            }
-            return null;
-        })
+                    Consumer<RunEvent> onEvent = invocation.getArgument(3);
+                    for (RunEvent event : events) {
+                        onEvent.accept(event);
+                    }
+                    return null;
+                })
                 .when(eventStream)
                 .open(any(), any(), any(), any(), any());
     }
@@ -192,10 +239,15 @@ class ToolDetailStreamTest {
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */
     private CurrentUser signedIn(String name, UserRole role) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, role));
-        agents.save(Agent.of(name, name, name,
+        agents.save(Agent.of(
+                name,
+                name,
+                name,
                 "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, user.id()));
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), role);
         when(currentUser.require()).thenReturn(current);
         return current;
@@ -229,11 +281,12 @@ class ToolDetailStreamTest {
 
     /** SSE 응답을 끝까지 받아 {@code data:} 줄마다 사건 하나로 읽는다. */
     private List<JsonNode> streamed(RequestBuilder builder) throws Exception {
-        MvcResult result = mvc.perform(builder).andExpect(request().asyncStarted()).andReturn();
+        MvcResult result =
+                mvc.perform(builder).andExpect(request().asyncStarted()).andReturn();
         // 스트림은 가상 스레드에서 돈다. 끝날 때까지 기다린 뒤 응답을 읽는다.
         result.getAsyncResult(10_000);
-        String body = mvc.perform(asyncDispatch(result)).andReturn()
-                .getResponse().getContentAsString(StandardCharsets.UTF_8);
+        String body =
+                mvc.perform(asyncDispatch(result)).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         List<JsonNode> events = new ArrayList<>();
         for (String line : body.split("\n")) {
             if (line.startsWith("data:")) {

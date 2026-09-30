@@ -48,7 +48,8 @@ class McpCallContextTest {
     @Test
     @DisplayName("도구 이름이 서명에 들어가 다른 도구의 서명은 통과하지 못한다")
     void toolNameIsInSignatureSoOtherToolsSignatureFails() {
-        assertThat(McpCallContext.verify("agent_status", ctx(STATUS_SIG), TOKEN_HASH).toolCallId())
+        assertThat(McpCallContext.verify("agent_status", ctx(STATUS_SIG), TOKEN_HASH)
+                        .toolCallId())
                 .isEqualTo(TOOL_CALL_ID);
         assertRejected("agent_status", ctx(DELEGATE_SIG));
     }
@@ -112,7 +113,8 @@ class McpCallContextTest {
         String body = "{\"v\":%s,\"session_id\":\"" + SESSION_ID + "\",\"root_session_id\":\"" + ROOT_SESSION_ID
                 + "\",\"tool_call_id\":\"" + TOOL_CALL_ID + "\",\"sig\":\"" + DELEGATE_SIG + "\"}";
 
-        assertThat(McpCallContext.verify("agent_delegate", JSON.readTree(body.formatted("1")), TOKEN_HASH).rootSessionId())
+        assertThat(McpCallContext.verify("agent_delegate", JSON.readTree(body.formatted("1")), TOKEN_HASH)
+                        .rootSessionId())
                 .isEqualTo(ROOT_SESSION_ID);
         assertRejected("agent_delegate", JSON.readTree(body.formatted("1.0")));
         assertRejected("agent_delegate", JSON.readTree(body.formatted("1e0")));
@@ -135,7 +137,7 @@ class McpCallContextTest {
     private static void assertRejected(String toolName, JsonNode fosCtx, String tokenHash) {
         assertThatThrownBy(() -> McpCallContext.verify(toolName, fosCtx, tokenHash))
                 .as("tool=%s ctx=%s", toolName, fosCtx)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
 }

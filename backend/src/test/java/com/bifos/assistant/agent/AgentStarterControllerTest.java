@@ -31,14 +31,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  */
 class AgentStarterControllerTest {
 
-    private static final CurrentUser DAD =
-            new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
+    private static final CurrentUser DAD = new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
 
     private final StarterSuggestionService starters = mock(StarterSuggestionService.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
 
-    private final MockMvc mvc = MockMvcBuilders
-            .standaloneSetup(new AgentStarterController(starters, currentUser))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new AgentStarterController(starters, currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
@@ -50,8 +48,8 @@ class AgentStarterControllerTest {
     @Test
     @DisplayName("만들어 둔 추천은 prompts 와 READY 로 준다")
     void returnsPreparedSuggestionsWithPromptsAndReady() throws Exception {
-        when(starters.read(DAD, "dad")).thenReturn(
-                new StarterSuggestions(List.of("일정 정리해 줘", "장보기 목록 만들어 줘"), StarterStatus.READY));
+        when(starters.read(DAD, "dad"))
+                .thenReturn(new StarterSuggestions(List.of("일정 정리해 줘", "장보기 목록 만들어 줘"), StarterStatus.READY));
 
         mvc.perform(get("/api/v1/agents/dad/starters"))
                 .andExpect(status().isOk())

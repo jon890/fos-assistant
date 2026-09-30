@@ -37,16 +37,22 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class AttachmentServiceTest {
 
-    private static final CurrentUser OWNER =
-            new CurrentUser(9101L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER = new CurrentUser(9101L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private static final CurrentUser STRANGER =
             new CurrentUser(9102L, "stranger@example.com", "남", 1L, UserRole.MEMBER);
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
 
-    @Autowired AttachmentService service;
-    @Autowired AttachmentProperties properties;
-    @Autowired ChatAttachmentRepository attachments;
-    @Autowired ConversationRepository conversations;
+    @Autowired
+    AttachmentService service;
+
+    @Autowired
+    AttachmentProperties properties;
+
+    @Autowired
+    ChatAttachmentRepository attachments;
+
+    @Autowired
+    ConversationRepository conversations;
 
     private Path root;
     private Long mine;
@@ -57,8 +63,12 @@ class AttachmentServiceTest {
         attachments.deleteAll();
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
-        mine = conversations.save(Conversation.startedBy(OWNER.id(), "내 대화", null)).id();
-        theirs = conversations.save(Conversation.startedBy(STRANGER.id(), "남의 대화", null)).id();
+        mine = conversations
+                .save(Conversation.startedBy(OWNER.id(), "내 대화", null))
+                .id();
+        theirs = conversations
+                .save(Conversation.startedBy(STRANGER.id(), "남의 대화", null))
+                .id();
     }
 
     @Test
@@ -165,7 +175,8 @@ class AttachmentServiceTest {
         ChatAttachment saved = service.upload(
                 OWNER, mine, "\n\r\t\u0000", "image/png", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
 
-        assertThat(attachments.findById(saved.id()).orElseThrow().originalName()).isEqualTo("image");
+        assertThat(attachments.findById(saved.id()).orElseThrow().originalName())
+                .isEqualTo("image");
     }
 
     @Test
@@ -259,7 +270,8 @@ class AttachmentServiceTest {
 
     private static void assertCode(Runnable action, ErrorCode expected) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
 
     private static void deleteTree(Path path) throws IOException {

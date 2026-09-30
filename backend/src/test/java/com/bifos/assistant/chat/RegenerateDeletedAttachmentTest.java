@@ -44,19 +44,39 @@ class RegenerateDeletedAttachmentTest {
 
     @TestConfiguration
     static class StubRuntime {
-        @Bean @Primary StubHermesRunsClient stubHermesRunsClient() { return new StubHermesRunsClient(); }
+        @Bean
+        @Primary
+        StubHermesRunsClient stubHermesRunsClient() {
+            return new StubHermesRunsClient();
+        }
     }
 
-    @Autowired ChatService chat;
+    @Autowired
+    ChatService chat;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
-    @Autowired ArtifactService artifactService;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatAttachmentRepository attachments;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ArtifactService artifactService;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatAttachmentRepository attachments;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     @BeforeEach
     void setUp() {
@@ -74,14 +94,21 @@ class RegenerateDeletedAttachmentTest {
     void dropsRemovedImagesFromRegenerationHermesInput() {
         CurrentUser dad = member();
         stub().willReturnInOrder(
-                HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),
-                HermesRunResult.of("again", "session", "completed", "새 답", "m", "p", TokenUsage.empty()));
+                        HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),
+                        HermesRunResult.of("again", "session", "completed", "새 답", "m", "p", TokenUsage.empty()));
 
         var first = chat.send(dad, null, "사진을 설명해 줘", "dad");
         var question = messages.findByConversationIdOrderByIdAsc(first.conversationId()).stream()
-                .filter(message -> message.role() == MessageRole.USER).findFirst().orElseThrow();
+                .filter(message -> message.role() == MessageRole.USER)
+                .findFirst()
+                .orElseThrow();
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
-                first.conversationId(), dad.id(), "지운.png", "image/png", 1, Instant.now().plusSeconds(1)));
+                first.conversationId(),
+                dad.id(),
+                "지운.png",
+                "image/png",
+                1,
+                Instant.now().plusSeconds(1)));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachments.save(attachment);
         attachments.attachToMessage(question.id(), first.conversationId(), java.util.List.of(attachment.id()));
@@ -94,15 +121,25 @@ class RegenerateDeletedAttachmentTest {
         assertThat(stub().received()).hasSize(2);
         // 지운 사진의 단락은 빠지고 결과물 폴더 단락만 사용자가 쓴 글 앞에 붙는다.
         assertThat(stub().received().get(1).input())
-                .isEqualTo(artifactService.agentPreamble(conversations.findById(first.conversationId()).orElseThrow()) + "사진을 설명해 줘");
+                .isEqualTo(artifactService.agentPreamble(
+                                conversations.findById(first.conversationId()).orElseThrow()) + "사진을 설명해 줘");
     }
 
     private CurrentUser member() {
         AppUser user = users.save(AppUser.of("deleted-photo@example.com", "dad", 1L, UserRole.MEMBER));
-        agents.save(Agent.of("dad", "dad", "dad", "http://agent-runtime.test/p/dad", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, user.id()));
+        agents.save(Agent.of(
+                "dad",
+                "dad",
+                "dad",
+                "http://agent-runtime.test/p/dad",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
-    private StubHermesRunsClient stub() { return (StubHermesRunsClient) hermes; }
+    private StubHermesRunsClient stub() {
+        return (StubHermesRunsClient) hermes;
+    }
 }

@@ -83,8 +83,7 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("도구 호출이 끝난 사건에 걸린 시간을 채운다")
     void fillsElapsedTimeOnToolCallEndEvent() {
-        ExecutionEvent event =
-                record(new RunEvent("tool.completed", null, "web_search", "done", 1500L, false));
+        ExecutionEvent event = record(new RunEvent("tool.completed", null, "web_search", "done", 1500L, false));
 
         assertThat(event.eventType()).isEqualTo(ExecutionEventType.TOOL_COMPLETED);
         assertThat(event.toolName()).isEqualTo("web_search");
@@ -116,8 +115,20 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("하위 에이전트의 목표와 session과 모델과 토큰만 옮긴다")
     void carriesOnlySubagentGoalSessionModelAndTokens() {
-        RunEvent completed = new RunEvent("subagent.complete", null, "researcher", "preview", 1500L,
-                false, "sa-1", "숙소 조사", "model-a", "child-1", 123L, 45L, "completed");
+        RunEvent completed = new RunEvent(
+                "subagent.complete",
+                null,
+                "researcher",
+                "preview",
+                1500L,
+                false,
+                "sa-1",
+                "숙소 조사",
+                "model-a",
+                "child-1",
+                123L,
+                45L,
+                "completed");
         ExecutionEvent event = record(completed);
 
         assertThat(event.detail()).isEqualTo("숙소 조사");
@@ -127,8 +138,20 @@ class ExecutionEventRecorderTest {
         assertThat(event.outputTokens()).isEqualTo(45L);
         assertThat(event.failed()).isFalse();
         assertThat(record(hermes("subagent.start", null, "preview")).detail()).isEqualTo("preview");
-        ExecutionEvent tool = record(new RunEvent("tool.completed", null, "search", "preview", 1L, false,
-                "sa-1", "숙소 조사", "model-a", "child-1", 123L, 45L, "completed"));
+        ExecutionEvent tool = record(new RunEvent(
+                "tool.completed",
+                null,
+                "search",
+                "preview",
+                1L,
+                false,
+                "sa-1",
+                "숙소 조사",
+                "model-a",
+                "child-1",
+                123L,
+                45L,
+                "completed"));
         assertThat(tool.model()).isNull();
         assertThat(tool.inputTokens()).isNull();
         assertThat(tool.hermesSessionId()).isNull();
@@ -159,8 +182,10 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("글자 조각과 추론 사건은 저장하지 않는다")
     void doesNotStoreTextChunkAndReasoningEvents() {
-        assertThat(record(new RunEvent("message.delta", "안녕", null, null, null, null))).isNull();
-        assertThat(record(new RunEvent("reasoning.available", "생각", null, null, null, null))).isNull();
+        assertThat(record(new RunEvent("message.delta", "안녕", null, null, null, null)))
+                .isNull();
+        assertThat(record(new RunEvent("reasoning.available", "생각", null, null, null, null)))
+                .isNull();
     }
 
     @Test
@@ -187,14 +212,14 @@ class ExecutionEventRecorderTest {
     void keepsDetailOfExactly500Chars() {
         String long500 = "가".repeat(ExecutionEvent.DETAIL_LIMIT);
 
-        assertThat(record(hermes("tool.started", "web_search", long500)).detail()).isEqualTo(long500);
+        assertThat(record(hermes("tool.started", "web_search", long500)).detail())
+                .isEqualTo(long500);
     }
 
     @Test
     @DisplayName("우리가 직접 적는 사건은 Hermes 이름 없이 만든다")
     void createsOwnEventsWithoutHermesName() {
-        ExecutionEvent event =
-                recorder.record(EXECUTION, ExecutionEventType.RUN_FAILED, "HERMES_UNAVAILABLE", 3);
+        ExecutionEvent event = recorder.record(EXECUTION, ExecutionEventType.RUN_FAILED, "HERMES_UNAVAILABLE", 3);
 
         assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
         assertThat(event.detail()).isEqualTo("HERMES_UNAVAILABLE");

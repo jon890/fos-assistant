@@ -13,9 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SecureDirectoryStream;
 import java.util.List;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 
 /** 결과물 쓰기가 대화 폴더를 벗어나지 않고 기존 파일을 원자적으로 바꾸는지 확인한다. */
@@ -87,11 +87,14 @@ class ArtifactStoreWriteTest {
     void keepsExistingFileAndDeletesTempWhenAtomicReplaceFails(@TempDir Path root) throws IOException {
         ArtifactStore initial = store(root, true);
         initial.write(10L, "index.html", "이전 본문".getBytes(StandardCharsets.UTF_8));
-        ArtifactStore failing = new ArtifactStore(new ArtifactProperties(root.toString(), "/agent/artifacts", 30),
-                true, (source, target) -> { throw new IOException("forced replacement failure"); });
+        ArtifactStore failing = new ArtifactStore(
+                new ArtifactProperties(root.toString(), "/agent/artifacts", 30), true, (source, target) -> {
+                    throw new IOException("forced replacement failure");
+                });
 
         assertThatThrownBy(() -> failing.write(10L, "index.html", "새 본문".getBytes(StandardCharsets.UTF_8)))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
 
         Path folder = root.resolve("10");
         assertThat(Files.readString(folder.resolve("index.html"))).isEqualTo("이전 본문");
@@ -108,8 +111,8 @@ class ArtifactStoreWriteTest {
         Path outside = root.resolve("outside.html");
         Files.writeString(outside, "보존");
 
-        for (String path : List.of("", "/outside.html", "../outside.html", "a\\b.html", "a\0b.html", "a.svg",
-                "a".repeat(501) + ".html")) {
+        for (String path : List.of(
+                "", "/outside.html", "../outside.html", "a\\b.html", "a\0b.html", "a.svg", "a".repeat(501) + ".html")) {
             assertValidation(() -> store.write(10L, path, new byte[0]));
         }
 
@@ -150,17 +153,20 @@ class ArtifactStoreWriteTest {
     }
 
     private static ArtifactStore store(Path root, boolean forceAtomicMoveFallback) {
-        return new ArtifactStore(new ArtifactProperties(root.toString(), "/agent/artifacts", 30), forceAtomicMoveFallback);
+        return new ArtifactStore(
+                new ArtifactProperties(root.toString(), "/agent/artifacts", 30), forceAtomicMoveFallback);
     }
 
     private static void assertValidation(ThrowingRunnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
     private static void assertStoreFailure(ThrowingRunnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
     }
 
     @FunctionalInterface

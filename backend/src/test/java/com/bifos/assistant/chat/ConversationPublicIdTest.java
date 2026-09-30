@@ -81,17 +81,38 @@ class ConversationPublicIdTest {
         }
     }
 
-    @Autowired ChatService chat;
-    @Autowired ConversationAccess access;
-    @Autowired AgentService agentService;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AgentRepository agents;
-    @Autowired MemoryRepository memories;
-    @Autowired AppUserRepository users;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final JsonMapper json = JsonMapper.builder().build();
@@ -100,8 +121,15 @@ class ConversationPublicIdTest {
     @BeforeEach
     void setUp() {
         ((StubHermesRunsClient) hermes).reset();
-        ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of("run-one", "session-one", "completed", "답",
-                "example-model-large", "anthropic", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes)
+                .willReturn(HermesRunResult.of(
+                        "run-one",
+                        "session-one",
+                        "completed",
+                        "답",
+                        "example-model-large",
+                        "anthropic",
+                        TokenUsage.empty()));
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -109,19 +137,29 @@ class ConversationPublicIdTest {
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
-        mvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(chat, currentUser, users, agentService, access,
-                        new ChatEventStreams(Duration.ofSeconds(20)), null))
+        mvc = MockMvcBuilders.standaloneSetup(new ChatController(
+                        chat,
+                        currentUser,
+                        users,
+                        agentService,
+                        access,
+                        new ChatEventStreams(Duration.ofSeconds(20)),
+                        null))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(name, name, name,
+        agents.save(Agent.of(
+                name,
+                name,
+                name,
                 "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, user.id()));
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -136,14 +174,17 @@ class ConversationPublicIdTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"text\":\"첫 질문\",\"agentCode\":\"" + user.displayName() + "\"}"))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
         return UUID.fromString(json.readTree(body).path("conversationId").asString());
     }
 
     private Conversation stored(UUID publicId) {
         return conversations.findAll().stream()
                 .filter(conversation -> publicId.equals(conversation.publicId()))
-                .findFirst().orElseThrow();
+                .findFirst()
+                .orElseThrow();
     }
 
     @Test
@@ -174,8 +215,7 @@ class ConversationPublicIdTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.title").value("새 이름"));
-        mvc.perform(delete("/api/v1/chat/conversations/{id}", id))
-                .andExpect(status().isNoContent());
+        mvc.perform(delete("/api/v1/chat/conversations/{id}", id)).andExpect(status().isNoContent());
 
         assertThat(stored(id).deletedAt()).isNotNull();
         mvc.perform(get("/api/v1/chat/conversations/{id}/messages", id))
@@ -291,11 +331,12 @@ class ConversationPublicIdTest {
 
     /** SSE 응답을 끝까지 받아 {@code data:} 줄마다 사건 하나로 읽는다. */
     private List<JsonNode> streamed(RequestBuilder builder) throws Exception {
-        MvcResult result = mvc.perform(builder).andExpect(request().asyncStarted()).andReturn();
+        MvcResult result =
+                mvc.perform(builder).andExpect(request().asyncStarted()).andReturn();
         // 스트림은 가상 스레드에서 돈다. 끝날 때까지 기다린 뒤 응답을 읽는다.
         result.getAsyncResult(10_000);
-        String body = mvc.perform(asyncDispatch(result)).andReturn()
-                .getResponse().getContentAsString(StandardCharsets.UTF_8);
+        String body =
+                mvc.perform(asyncDispatch(result)).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         List<JsonNode> events = new ArrayList<>();
         for (String line : body.split("\n")) {
             if (line.startsWith("data:")) {

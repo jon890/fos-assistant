@@ -15,9 +15,9 @@ import com.bifos.assistant.usage.infra.PricingProperties;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
-import java.nio.file.attribute.FileTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -40,8 +40,9 @@ class CostEstimatorTest {
 
     @BeforeAll
     static void loadCatalog() throws URISyntaxException, IOException {
-        catalogFile =
-                Path.of(CostEstimatorTest.class.getResource("/pricing/models-dev-sample.json").toURI());
+        catalogFile = Path.of(CostEstimatorTest.class
+                .getResource("/pricing/models-dev-sample.json")
+                .toURI());
         // pricing_version 은 파일의 수정 시각에서 나온다. 검사에서 그 날짜를 못 박는다.
         Files.setLastModifiedTime(catalogFile, FileTime.from(Instant.parse("2026-09-17T04:00:00Z")));
         estimator = new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties(catalogFile.toString())));
@@ -182,8 +183,7 @@ class CostEstimatorTest {
         ExecutionCost apiCost =
                 estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.API);
         ExecutionCost subscriptionCost =
-                estimator.estimate(
-                        "openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
+                estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
 
         assertThat(apiCost).isEqualTo(ExecutionCost.unknown());
         assertThat(subscriptionCost).isEqualTo(ExecutionCost.unknown());

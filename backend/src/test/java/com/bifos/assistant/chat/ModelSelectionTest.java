@@ -74,9 +74,8 @@ class ModelSelectionTest {
     private static final String AGENT_CODE = "selection";
 
     /** 그 provider 의 계정이 전부 막혔을 때 Hermes 가 돌려주는 글이다. 실측한 문장이다. */
-    private static final String BLOCKED_ERROR =
-            HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX
-                    + " No Codex credentials stored. Run `hermes auth` to authenticate.";
+    private static final String BLOCKED_ERROR = HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX
+            + " No Codex credentials stored. Run `hermes auth` to authenticate.";
 
     /** 금액이 비는 것이 가격표가 없어서가 아니라는 것을 보이려고 표본 가격표를 가리킨다. */
     @DynamicPropertySource
@@ -86,7 +85,9 @@ class ModelSelectionTest {
 
     private static Path sampleCatalog() {
         try {
-            return Path.of(ModelSelectionTest.class.getResource("/pricing/models-dev-sample.json").toURI());
+            return Path.of(ModelSelectionTest.class
+                    .getResource("/pricing/models-dev-sample.json")
+                    .toURI());
         } catch (URISyntaxException ex) {
             throw new IllegalStateException(ex);
         }
@@ -95,16 +96,32 @@ class ModelSelectionTest {
     /** 가격표에 있는 모델로 돌았다면 금액이 나오는 사용량이다. */
     private static final TokenUsage PRICED_USAGE = new TokenUsage(1_000L, 0L, 500L, 1_500L);
 
-    @Autowired ChatService chat;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ConversationRepository conversations;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
 
-    @MockitoBean HermesRunEventStream eventStream;
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    HermesRunsClient hermes;
+
+    @MockitoBean
+    HermesRunEventStream eventStream;
 
     private CurrentUser user;
 
@@ -147,7 +164,8 @@ class ModelSelectionTest {
             assertThat(command.model()).as("model").isNull();
             assertThat(command.reasoningEffort()).as("reasoning effort").isNull();
         });
-        assertThat(executions.findById(turn.executionId()).orElseThrow().reasoningEffort()).isNull();
+        assertThat(executions.findById(turn.executionId()).orElseThrow().reasoningEffort())
+                .isNull();
     }
 
     @Test
@@ -175,8 +193,7 @@ class ModelSelectionTest {
     void recordsModelWhenSessionAnswersOtherThanChosen() {
         Long conversationId = conversationChoosing(new ModelChoice("anthropic", "example-model-large", "low"));
         stub().willReturn(succeeded("run-1", "sess-1"));
-        stub().willReportSessionRuntime(
-                new SessionRuntime("example-provider/example-model-c", "nvidia"));
+        stub().willReportSessionRuntime(new SessionRuntime("example-provider/example-model-c", "nvidia"));
 
         ChatTurn turn = chat.send(user, conversationId, "안녕", null);
 
@@ -206,7 +223,15 @@ class ModelSelectionTest {
     @DisplayName("세션이 provider 를 주지 않아도 실행의 runtime 으로 provider 와 모델을 적는다")
     void recordsProviderAndModelFromRuntimeEvenIfSessionGivesNoProvider() {
         // v0.21.5 의 세션 조회는 model 만 주고 provider 를 주지 않는다. 실행 조회의 runtime 이 실제로 돈 값을 준다.
-        stub().willReturn(new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, null, PRICED_USAGE,
+        stub().willReturn(new HermesRunResult(
+                "run-1",
+                "sess-1",
+                "completed",
+                "네",
+                "dad",
+                null,
+                null,
+                PRICED_USAGE,
                 new SessionRuntime("example-model-large", "anthropic")));
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", null));
 
@@ -215,7 +240,9 @@ class ModelSelectionTest {
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
         assertThat(execution.provider()).isEqualTo("anthropic");
         assertThat(execution.model()).isEqualTo("example-model-large");
-        assertThat(execution.estimatedCostMicros()).as("provider 와 모델을 알면 금액을 적는다").isNotNull();
+        assertThat(execution.estimatedCostMicros())
+                .as("provider 와 모델을 알면 금액을 적는다")
+                .isNotNull();
     }
 
     @Test
@@ -244,8 +271,7 @@ class ModelSelectionTest {
                 .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
-        List<AgentExecution> recorded =
-                executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10));
+        List<AgentExecution> recorded = executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10));
         assertThat(recorded).singleElement().satisfies(failed -> {
             assertThat(failed.status()).isEqualTo(ExecutionStatus.FAILED);
             assertThat(failed.errorCode()).isEqualTo("PROVIDER_BLOCKED");
@@ -253,7 +279,8 @@ class ModelSelectionTest {
         });
         List<ExecutionEvent> events = executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
                 List.of(recorded.getFirst().id()));
-        assertThat(events).extracting(ExecutionEvent::eventType)
+        assertThat(events)
+                .extracting(ExecutionEvent::eventType)
                 .doesNotContain(ExecutionEventType.PROVIDER_SWITCHED)
                 .contains(ExecutionEventType.RUN_FAILED);
     }
@@ -270,18 +297,21 @@ class ModelSelectionTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
-        assertThat(relayed).extracting(ChatEvent::type)
-                .contains("started")
-                .doesNotContain("switched", "reset");
+        assertThat(relayed).extracting(ChatEvent::type).contains("started").doesNotContain("switched", "reset");
     }
 
     @Test
     @DisplayName("다른 실패는 넘기지 않고 한 번만 실패한다")
     void otherFailuresFailOnceWithoutFallback() {
-        stub().willReturn(
-                new HermesRunResult(
-                        "run-1", "sess-1", "failed", null, "example-model", "openai-codex",
-                        "HTTP 404: 404 page not found", TokenUsage.empty()));
+        stub().willReturn(new HermesRunResult(
+                "run-1",
+                "sess-1",
+                "failed",
+                null,
+                "example-model",
+                "openai-codex",
+                "HTTP 404: 404 page not found",
+                TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(user, null, "안녕", AGENT_CODE))
                 .isInstanceOf(ApiException.class)

@@ -55,15 +55,23 @@ class McpToolServiceTest {
     @Test
     @DisplayName("정해 둔 API 오류 문구와 코드만 남긴다")
     void keepsOnlyFixedApiErrorTextAndCode() {
-        when(artifacts.write(any(), any())).thenThrow(new ApiException(ErrorCode.INTERNAL_ERROR,
-                "artifact source download timed out", new IllegalStateException("private=value")));
+        when(artifacts.write(any(), any()))
+                .thenThrow(new ApiException(
+                        ErrorCode.INTERNAL_ERROR,
+                        "artifact source download timed out",
+                        new IllegalStateException("private=value")));
 
         assertThat(tools.writeArtifact(caller, request).get("isError")).isEqualTo(true);
 
         assertThat(logs.list).hasSize(1);
         ILoggingEvent event = logs.list.getFirst();
-        assertThat(event.getFormattedMessage()).contains("userId=7", "executionId=42", "exceptionClass=ApiException",
-                "errorCode=INTERNAL_ERROR", "reason=artifact source download timed out")
+        assertThat(event.getFormattedMessage())
+                .contains(
+                        "userId=7",
+                        "executionId=42",
+                        "exceptionClass=ApiException",
+                        "errorCode=INTERNAL_ERROR",
+                        "reason=artifact source download timed out")
                 .doesNotContain("private=value", "image.png");
         assertThat(event.getThrowableProxy()).isNull();
     }
@@ -83,7 +91,9 @@ class McpToolServiceTest {
                 .contains("exceptionClass=ApiException", "errorCode=INTERNAL_ERROR", "reason=artifact write failed")
                 .doesNotContain("private=value");
         assertThat(logs.list.get(1).getFormattedMessage())
-                .contains("exceptionClass=IllegalStateException", "errorCode=INTERNAL_ERROR",
+                .contains(
+                        "exceptionClass=IllegalStateException",
+                        "errorCode=INTERNAL_ERROR",
                         "reason=unexpected artifact write failure")
                 .doesNotContain("private=value");
         assertThat(logs.list).allMatch(event -> event.getThrowableProxy() == null);
@@ -98,16 +108,21 @@ class McpToolServiceTest {
 
         assertThat(tools.readMemory(caller, 5L).get("isError")).isEqualTo(false);
 
-        assertThat(logs.list).singleElement().extracting(ILoggingEvent::getFormattedMessage)
+        assertThat(logs.list)
+                .singleElement()
+                .extracting(ILoggingEvent::getFormattedMessage)
                 .isEqualTo("memory read userId=7 memoryId=5 executionId=42");
     }
 
     @Test
     @DisplayName("호출 맥락 오류는 이유를 가리지 않는 한 가지 결과다")
     void callContextErrorIsOneResultRegardlessOfReason() {
-        assertThat(tools.invalidContext()).isEqualTo(Map.of(
-                "content", List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.")),
-                "isError", true));
+        assertThat(tools.invalidContext())
+                .isEqualTo(Map.of(
+                        "content",
+                        List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.")),
+                        "isError",
+                        true));
     }
 
     private static Logger logger() {

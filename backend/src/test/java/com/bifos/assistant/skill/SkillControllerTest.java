@@ -46,8 +46,7 @@ class SkillControllerTest {
     private final SkillService skills = mock(SkillService.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
 
-    private final MockMvc mvc = MockMvcBuilders
-            .standaloneSetup(new SkillController(skills, currentUser))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new SkillController(skills, currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
@@ -59,10 +58,14 @@ class SkillControllerTest {
     @Test
     @DisplayName("목록은 출처와 편집 여부와 도구 상태와 올릴 수 있는 한도를 주고 사용량이 없으면 칸을 뺀다")
     void listGivesSourceEditabilityToolStatusAndUploadLimit() throws Exception {
-        when(skills.list(OWNER, "dad")).thenReturn(new SkillList(List.of(
-                new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, null),
-                new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
-                true, true, 30));
+        when(skills.list(OWNER, "dad"))
+                .thenReturn(new SkillList(
+                        List.of(
+                                new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, null),
+                                new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
+                        true,
+                        true,
+                        30));
 
         mvc.perform(get("/api/v1/agents/dad/skills"))
                 .andExpect(status().isOk())
@@ -92,11 +95,17 @@ class SkillControllerTest {
     @DisplayName("저장은 본문을 생략한 파일을 null 본문으로 넘기고 원문과 파일 크기를 돌려준다")
     void saveSendsOmittedBodyAsNullAndReturnsOriginalAndFileSize() throws Exception {
         when(skills.save(eq(OWNER), eq("dad"), eq("weekly-plan"), anyString(), any()))
-                .thenReturn(new SkillDetail("weekly-plan", "이번 주 계획", "---\nname: weekly-plan\n---\n",
+                .thenReturn(new SkillDetail(
+                        "weekly-plan",
+                        "이번 주 계획",
+                        "---\nname: weekly-plan\n---\n",
                         List.of(new SkillFileInfo("references/guide.md", 9L))));
 
-        mvc.perform(write("weekly-plan", "{\"skillMd\":\"---\\nname: weekly-plan\\n---\\n\","
-                        + "\"files\":[{\"path\":\"references/guide.md\"},{\"path\":\"templates/t.md\",\"content\":\"x\"}]}"))
+        mvc.perform(
+                        write(
+                                "weekly-plan",
+                                "{\"skillMd\":\"---\\nname: weekly-plan\\n---\\n\","
+                                        + "\"files\":[{\"path\":\"references/guide.md\"},{\"path\":\"templates/t.md\",\"content\":\"x\"}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("weekly-plan"))
                 .andExpect(jsonPath("$.description").value("이번 주 계획"))
@@ -106,10 +115,11 @@ class SkillControllerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SkillFileInput>> files = ArgumentCaptor.forClass(List.class);
-        verify(skills).save(eq(OWNER), eq("dad"), eq("weekly-plan"), eq("---\nname: weekly-plan\n---\n"), files.capture());
-        assertThat(files.getValue()).containsExactly(
-                new SkillFileInput("references/guide.md", null),
-                new SkillFileInput("templates/t.md", "x"));
+        verify(skills)
+                .save(eq(OWNER), eq("dad"), eq("weekly-plan"), eq("---\nname: weekly-plan\n---\n"), files.capture());
+        assertThat(files.getValue())
+                .containsExactly(
+                        new SkillFileInput("references/guide.md", null), new SkillFileInput("templates/t.md", "x"));
     }
 
     @Test
@@ -139,8 +149,7 @@ class SkillControllerTest {
     @Test
     @DisplayName("지우기와 켜고 끄기는 본문 없이 204 다")
     void deleteAndToggleReturn204WithoutBody() throws Exception {
-        mvc.perform(delete("/api/v1/agents/dad/skills/weekly-plan"))
-                .andExpect(status().isNoContent());
+        mvc.perform(delete("/api/v1/agents/dad/skills/weekly-plan")).andExpect(status().isNoContent());
         verify(skills).delete(OWNER, "dad", "weekly-plan");
 
         mvc.perform(put("/api/v1/agents/dad/skills/weekly-plan/enabled")

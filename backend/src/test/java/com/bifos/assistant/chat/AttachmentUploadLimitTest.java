@@ -50,11 +50,20 @@ class AttachmentUploadLimitTest {
     private static final int MB = 1024 * 1024;
     private static final int KB = 1024;
 
-    @LocalServerPort int port;
-    @Autowired AppUserRepository users;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatAttachmentRepository attachments;
-    @Autowired AttachmentProperties properties;
+    @LocalServerPort
+    int port;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatAttachmentRepository attachments;
+
+    @Autowired
+    AttachmentProperties properties;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -68,8 +77,7 @@ class AttachmentUploadLimitTest {
         // 이 서버는 따로 뜬 메모리 데이터베이스를 써서 번호가 1부터 다시 시작한다. 앞선 실행이 남긴 파일과
         // 겹치지 않게 비운다.
         deleteTree(Path.of(properties.root()).toAbsolutePath());
-        user = users.findByEmail(EMAIL)
-                .orElseGet(() -> users.save(AppUser.of(EMAIL, "올리는 사람", 1L, UserRole.MEMBER)));
+        user = users.findByEmail(EMAIL).orElseGet(() -> users.save(AppUser.of(EMAIL, "올리는 사람", 1L, UserRole.MEMBER)));
         Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "사진 대화", null));
         conversationId = conversation.id();
         conversationPublicId = conversation.publicId();
@@ -116,8 +124,8 @@ class AttachmentUploadLimitTest {
         body.write(new byte[size]);
         body.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(
-                        "http://localhost:" + port + "/api/v1/chat/conversations/" + conversationPublicId + "/attachments"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                        + "/api/v1/chat/conversations/" + conversationPublicId + "/attachments"))
                 .header("Authorization", "Bearer " + jwt())
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))

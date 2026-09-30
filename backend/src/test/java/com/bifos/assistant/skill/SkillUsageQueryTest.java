@@ -65,18 +65,38 @@ class SkillUsageQueryTest {
     private static final Instant T2 = Instant.parse("2026-09-21T01:00:00Z");
     private static final Instant T3 = Instant.parse("2026-09-22T01:00:00Z");
 
-    @Autowired SkillUsageQuery query;
-    @Autowired SkillService skills;
-    @Autowired ExecutionSkillUseRepository uses;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ConversationRepository conversations;
-    @Autowired AgentRepository agents;
-    @Autowired AppUserRepository users;
-    @Autowired AgentService agentService;
-    @Autowired ExecutionTreeService trees;
+    @Autowired
+    SkillUsageQuery query;
 
-    @MockitoBean HermesSkillClient skillClient;
-    @MockitoBean HermesToolsetClient toolsets;
+    @Autowired
+    SkillService skills;
+
+    @Autowired
+    ExecutionSkillUseRepository uses;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ExecutionTreeService trees;
+
+    @MockitoBean
+    HermesSkillClient skillClient;
+
+    @MockitoBean
+    HermesToolsetClient toolsets;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
@@ -95,8 +115,15 @@ class SkillUsageQueryTest {
         agents.findByCode(AGENT_CODE).ifPresent(agents::delete);
         dad = user("usage-dad@example.com", "아빠");
         kid = user("usage-kid@example.com", "아이");
-        agent = agents.save(Agent.of(AGENT_CODE, "가족 비서", AGENT_PROFILE, "http://agent-runtime.test/p/family",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, dad.id()));
+        agent = agents.save(Agent.of(
+                AGENT_CODE,
+                "가족 비서",
+                AGENT_PROFILE,
+                "http://agent-runtime.test/p/family",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                dad.id()));
         dadFirst = conversations.save(Conversation.startedBy(dad.id(), "장보기 첫째", agent.id()));
         dadSecond = conversations.save(Conversation.startedBy(dad.id(), "장보기 둘째", agent.id()));
         kidOnly = conversations.save(Conversation.startedBy(kid.id(), "아이 장보기", agent.id()));
@@ -106,13 +133,14 @@ class SkillUsageQueryTest {
         use(execution(kid, kidOnly), "shopping", SkillUseSource.MODEL, T3);
         controller = new UsageController(executions, currentUser, agentService, trees, conversations, query);
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
-        when(skillClient.list(anyString())).thenReturn(List.of(
-                new HermesSkill("shopping", "장을 본다", true),
-                new HermesSkill("hermes-help", "Hermes 기본", true)));
+        when(skillClient.list(anyString()))
+                .thenReturn(List.of(
+                        new HermesSkill("shopping", "장을 본다", true), new HermesSkill("hermes-help", "Hermes 기본", true)));
     }
 
     private CurrentUser user(String email, String name) {
-        AppUser user = users.findByEmail(email).orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER)));
+        AppUser user =
+                users.findByEmail(email).orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER)));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -160,7 +188,9 @@ class SkillUsageQueryTest {
         SkillList list = skills.list(kid, AGENT_CODE);
 
         assertThat(list.editable()).isFalse();
-        assertThat(list.skills()).isNotEmpty().allSatisfy(item -> assertThat(item.usage()).isNull());
+        assertThat(list.skills())
+                .isNotEmpty()
+                .allSatisfy(item -> assertThat(item.usage()).isNull());
     }
 
     @Test
@@ -171,10 +201,12 @@ class SkillUsageQueryTest {
         when(currentUser.require()).thenReturn(kid);
         List<UsageDtos.MySkillUsageView> kidView = controller.mySkillUsage();
 
-        assertThat(dadView).containsExactly(new UsageDtos.MySkillUsageView(
-                AGENT_CODE, "가족 비서", "shopping", 2, T2, dadSecond.publicId()));
-        assertThat(kidView).containsExactly(new UsageDtos.MySkillUsageView(
-                AGENT_CODE, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
+        assertThat(dadView)
+                .containsExactly(
+                        new UsageDtos.MySkillUsageView(AGENT_CODE, "가족 비서", "shopping", 2, T2, dadSecond.publicId()));
+        assertThat(kidView)
+                .containsExactly(
+                        new UsageDtos.MySkillUsageView(AGENT_CODE, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
     }
 
     @Test
@@ -211,10 +243,16 @@ class SkillUsageQueryTest {
 
         List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
 
-        assertThat(page).filteredOn(view -> view.id().equals(both.id())).singleElement()
-                .extracting(UsageDtos.ExecutionView::skillNames).isEqualTo(List.of("cooking", "shopping"));
-        assertThat(page).filteredOn(view -> view.id().equals(none.id())).singleElement()
-                .extracting(UsageDtos.ExecutionView::skillNames).isEqualTo(List.of());
+        assertThat(page)
+                .filteredOn(view -> view.id().equals(both.id()))
+                .singleElement()
+                .extracting(UsageDtos.ExecutionView::skillNames)
+                .isEqualTo(List.of("cooking", "shopping"));
+        assertThat(page)
+                .filteredOn(view -> view.id().equals(none.id()))
+                .singleElement()
+                .extracting(UsageDtos.ExecutionView::skillNames)
+                .isEqualTo(List.of());
     }
 
     @Test
@@ -224,18 +262,20 @@ class SkillUsageQueryTest {
         use(commanded, "weekly-plan", SkillUseSource.COMMAND, T1);
         use(commanded, "weekly-plan", SkillUseSource.MODEL, T1);
 
-        assertThat(query.byAgent(agent.id()).get("weekly-plan")).as("에이전트 합계")
-                .isEqualTo(new SkillUsageSummary(1, T1));
-        assertThat(query.byUser(dad.id())).filteredOn(usage -> usage.skillName().equals("weekly-plan"))
+        assertThat(query.byAgent(agent.id()).get("weekly-plan")).as("에이전트 합계").isEqualTo(new SkillUsageSummary(1, T1));
+        assertThat(query.byUser(dad.id()))
+                .filteredOn(usage -> usage.skillName().equals("weekly-plan"))
                 .singleElement()
                 .satisfies(usage -> assertThat(usage.count()).as("사용자 합계").isEqualTo(1));
 
         AgentExecution again = execution(dad, dadSecond);
         use(again, "weekly-plan", SkillUseSource.MODEL, T2);
 
-        assertThat(query.byAgent(agent.id()).get("weekly-plan")).as("다른 실행을 더한 에이전트 합계")
+        assertThat(query.byAgent(agent.id()).get("weekly-plan"))
+                .as("다른 실행을 더한 에이전트 합계")
                 .isEqualTo(new SkillUsageSummary(2, T2));
-        assertThat(query.byUser(dad.id())).filteredOn(usage -> usage.skillName().equals("weekly-plan"))
+        assertThat(query.byUser(dad.id()))
+                .filteredOn(usage -> usage.skillName().equals("weekly-plan"))
                 .singleElement()
                 .satisfies(usage -> {
                     assertThat(usage.count()).as("다른 실행을 더한 사용자 합계").isEqualTo(2);

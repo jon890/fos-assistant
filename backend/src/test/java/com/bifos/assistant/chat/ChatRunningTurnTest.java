@@ -60,16 +60,35 @@ class ChatRunningTurnTest {
 
     private static final String SPLIT_JSON = "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}";
 
-    @Autowired ChatService chat;
-    @Autowired TurnCancellation turns;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired MemoryRepository memories;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    TurnCancellation turns;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -94,15 +113,23 @@ class ChatRunningTurnTest {
     private CurrentUser member(String name, String flow) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
         Agent agent = Agent.of(
-                name, name, name, "http://agent-runtime.test/p/" + name, CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id());
+                name,
+                name,
+                name,
+                "http://agent-runtime.test/p/" + name,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id());
         if (flow != null) agent.assignFlow(flow);
         agents.save(agent);
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private AgentExecution latestExecution(CurrentUser user) {
-        return executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1)).getFirst();
+        return executions
+                .findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1))
+                .getFirst();
     }
 
     private static HermesRunResult completed(String runId, String output) {
@@ -141,7 +168,8 @@ class ChatRunningTurnTest {
         ChatTurn turn = chat.send(dad, null, "질문", "dad");
 
         assertThat(whileRunning.get())
-                .isEqualTo(new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
+                .isEqualTo(
+                        new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
         assertThat(whileRunning.get().executionId()).isEqualTo(turn.executionId());
         assertThat(whileRunning.get().startedAt()).isNotNull();
         assertThat(chat.running(dad, turn.conversationId())).isEqualTo(new RunningTurn(false, null, null));
@@ -176,7 +204,10 @@ class ChatRunningTurnTest {
                     AgentExecution child = latestExecution(dad);
                     RunningTurn running = chat.running(dad, child.conversationId());
                     whileChildRuns.set(running);
-                    rootStatus.set(executions.findById(running.executionId()).orElseThrow().status());
+                    rootStatus.set(executions
+                            .findById(running.executionId())
+                            .orElseThrow()
+                            .status());
                 } catch (Throwable ex) {
                     failure.set(ex);
                 }
@@ -200,11 +231,19 @@ class ChatRunningTurnTest {
     void blockedFailsWithoutFallbackAndEndsTurn() {
         CurrentUser dad = member("dad");
         stub().willReturnInOrder(
-                new HermesRunResult("run-blocked", "session", "failed", "", null, null,
-                        HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
-                completed("run-next", "답"));
+                        new HermesRunResult(
+                                "run-blocked",
+                                "session",
+                                "failed",
+                                "",
+                                null,
+                                null,
+                                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+                                TokenUsage.empty()),
+                        completed("run-next", "답"));
         AtomicReference<RunningTurn> whileRunning = new AtomicReference<>();
-        stub().beforeAwait(() -> whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
+        stub().beforeAwait(() ->
+                whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
 
         List<ChatEvent> relayed = new ArrayList<>();
         assertThatThrownBy(() -> chat.stream(dad, null, "막힌 모델로 보내 줘", "dad", relayed::add))
@@ -213,7 +252,9 @@ class ChatRunningTurnTest {
                 .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         List<Long> started = relayed.stream()
-                .filter(event -> event.type().equals("started")).map(ChatEvent::executionId).toList();
+                .filter(event -> event.type().equals("started"))
+                .map(ChatEvent::executionId)
+                .toList();
         assertThat(started).as("started 사건의 실행 번호").hasSize(1);
         assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
         assertThat(whileRunning.get().executionId()).isEqualTo(started.getFirst());

@@ -30,8 +30,7 @@ class DelegationKeyTest {
     @Test
     @DisplayName("session만 다르면 다른 키다")
     void differsWhenOnlySessionDiffers() {
-        assertThat(key("dad", "fos-root", "fos-a", "call-1"))
-                .isNotEqualTo(key("dad", "fos-root", "fos-b", "call-1"));
+        assertThat(key("dad", "fos-root", "fos-a", "call-1")).isNotEqualTo(key("dad", "fos-root", "fos-b", "call-1"));
     }
 
     @Test
@@ -44,15 +43,13 @@ class DelegationKeyTest {
     @Test
     @DisplayName("profile만 다르면 다른 키다")
     void differsWhenOnlyProfileDiffers() {
-        assertThat(key("dad", "fos-root", "fos-a", "call-1"))
-                .isNotEqualTo(key("mom", "fos-root", "fos-a", "call-1"));
+        assertThat(key("dad", "fos-root", "fos-a", "call-1")).isNotEqualTo(key("mom", "fos-root", "fos-a", "call-1"));
     }
 
     @Test
     @DisplayName("toolCall만 다르면 다른 키다")
     void differsWhenOnlyToolCallDiffers() {
-        assertThat(key("dad", "fos-root", "fos-a", "call-1"))
-                .isNotEqualTo(key("dad", "fos-root", "fos-a", "call-2"));
+        assertThat(key("dad", "fos-root", "fos-a", "call-1")).isNotEqualTo(key("dad", "fos-root", "fos-a", "call-2"));
     }
 
     @Test
@@ -68,24 +65,17 @@ class DelegationKeyTest {
     @Test
     @DisplayName("null이나 빈 칸은 거절한다")
     void rejectsNullOrBlankFields() {
-        assertThatThrownBy(() -> key(null, "fos-root", "fos-a", "call-1"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> key("dad", "", "fos-a", "call-1"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> key("dad", "fos-root", "  ", "call-1"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> key("dad", "fos-root", "fos-a", null))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> key(null, "fos-root", "fos-a", "call-1")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> key("dad", "", "fos-a", "call-1")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> key("dad", "fos-root", "  ", "call-1")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> key("dad", "fos-root", "fos-a", null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("해시가 아닌 문자열로는 직접 만들지 못한다")
     void cannotBeCreatedDirectlyFromNonHashString() {
-        assertThatThrownBy(() -> new DelegationKey("아무 값"))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new DelegationKey(null))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new DelegationKey("A".repeat(64)))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DelegationKey("아무 값")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DelegationKey(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DelegationKey("A".repeat(64))).isInstanceOf(IllegalArgumentException.class);
     }
 }

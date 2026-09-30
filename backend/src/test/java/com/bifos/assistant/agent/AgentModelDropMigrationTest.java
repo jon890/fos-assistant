@@ -38,8 +38,7 @@ class AgentModelDropMigrationTest {
                 .migrate();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO agent (
                         code, name, hermes_profile, api_base_url, provider, model, model_synced_at,
                         cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at
@@ -49,13 +48,11 @@ class AgentModelDropMigrationTest {
                         CURRENT_TIMESTAMP(6)
                     )
                     """);
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO agent_model_option (agent_id, option_rank, provider, model, created_at)
                     SELECT id, 1, 'openai-codex', 'example-model', CURRENT_TIMESTAMP(6) FROM agent
                     """);
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO provider_state (provider, blocked_until, blocked_reason, updated_at)
                     VALUES ('openai-codex', CURRENT_TIMESTAMP(6), 'rate limit', CURRENT_TIMESTAMP(6))
                     """);
@@ -71,22 +68,18 @@ class AgentModelDropMigrationTest {
     @Test
     @DisplayName("V27 뒤에는 모델 목록과 막힌 provider 표가 없다")
     void v27DropsModelListAndBlockedProviderTable() throws SQLException {
-        List<String> tables = strings(
-                """
+        List<String> tables = strings("""
                 SELECT UPPER(TABLE_NAME) FROM INFORMATION_SCHEMA.TABLES
                 WHERE UPPER(TABLE_NAME) IN ('AGENT_MODEL_OPTION', 'PROVIDER_STATE', 'AGENT')
                 """);
 
-        assertThat(tables)
-                .as("V27 뒤에 남은 표")
-                .containsExactly("AGENT");
+        assertThat(tables).as("V27 뒤에 남은 표").containsExactly("AGENT");
     }
 
     @Test
     @DisplayName("V27 뒤에는 agent 의 모델 칸이 없고 다른 칸은 남는다")
     void v27DropsAgentModelColumnKeepingOthers() throws SQLException {
-        List<String> columns = strings(
-                """
+        List<String> columns = strings("""
                 SELECT UPPER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE UPPER(TABLE_NAME) = 'AGENT'
                 """);
@@ -100,9 +93,7 @@ class AgentModelDropMigrationTest {
     @Test
     @DisplayName("V27 은 이미 있던 에이전트 줄을 지우지 않는다")
     void v27KeepsExistingAgentRows() throws SQLException {
-        assertThat(strings("SELECT code FROM agent"))
-                .as("V27 뒤 남은 에이전트")
-                .containsExactly("dad");
+        assertThat(strings("SELECT code FROM agent")).as("V27 뒤 남은 에이전트").containsExactly("dad");
     }
 
     private List<String> strings(String sql) throws SQLException {

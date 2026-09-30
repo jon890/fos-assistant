@@ -23,9 +23,14 @@ class ContextAssemblerTest {
     private static final CurrentUser ADMIN = user(1L, 10L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
 
-    @Autowired ContextAssembler assembler;
-    @Autowired MemoryService memories;
-    @Autowired MemoryRepository repository;
+    @Autowired
+    ContextAssembler assembler;
+
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    MemoryRepository repository;
 
     @BeforeEach
     void setUp() {
@@ -71,7 +76,8 @@ class ContextAssemblerTest {
 
         AssembledContext result = assembler.assemble(ADMIN);
 
-        assertThat(result.instructions()).contains("# 지금 묻는 사람에 대해 아는 것", "개인 내용")
+        assertThat(result.instructions())
+                .contains("# 지금 묻는 사람에 대해 아는 것", "개인 내용")
                 .doesNotContain("# 우리 그룹이 함께 아는 것", "# 더 물어볼 수 있는 것");
     }
 
@@ -116,9 +122,7 @@ class ContextAssemblerTest {
 
         AssembledContext result = assembler.assemble(ADMIN);
 
-        assertThat(result.instructions())
-                .isNotNull()
-                .contains("# 더 물어볼 수 있는 것", "[" + indexed.id() + "] 색인 제목");
+        assertThat(result.instructions()).isNotNull().contains("# 더 물어볼 수 있는 것", "[" + indexed.id() + "] 색인 제목");
         assertThat(result.chars()).isLessThanOrEqualTo(8_000);
     }
 
@@ -130,8 +134,7 @@ class ContextAssemblerTest {
 
         AssembledContext result = assembler.assemble(ADMIN);
 
-        assertThat(result.instructions())
-                .contains(body.content(), "[" + indexed.id() + "] 색인 제목");
+        assertThat(result.instructions()).contains(body.content(), "[" + indexed.id() + "] 색인 제목");
         assertThat(result.omittedItems()).isZero();
     }
 

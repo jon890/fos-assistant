@@ -2,13 +2,13 @@ package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -31,9 +31,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 실행이 끝날 때 금액을 저장하고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
 @SpringBootTest
@@ -44,16 +44,23 @@ class UsageCostRecordingTest {
 
     /** 요청에 실어 보낸 provider 와 모델이다. 에이전트는 모델을 갖지 않아 검사가 정한다. */
     private static final String PROVIDER = "openai-codex";
+
     private static final String PRICED_MODEL = "example-model";
     private static final String UNPRICED_MODEL = "gpt-가격표에-없는-모델";
     private static final String UNPRICED_AGENT_CODE = "dad-unpriced";
 
-    @Autowired ExecutionRecorder recorder;
+    @Autowired
+    ExecutionRecorder recorder;
 
     /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
-    @MockitoBean HermesRunsClient hermes;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ConversationRepository conversations;
+    @MockitoBean
+    HermesRunsClient hermes;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ConversationRepository conversations;
 
     private Conversation conversation;
 
@@ -64,8 +71,9 @@ class UsageCostRecordingTest {
 
     private static Path sampleCatalog() {
         try {
-            Path file =
-                    Path.of(UsageCostRecordingTest.class.getResource("/pricing/models-dev-sample.json").toURI());
+            Path file = Path.of(UsageCostRecordingTest.class
+                    .getResource("/pricing/models-dev-sample.json")
+                    .toURI());
             Files.setLastModifiedTime(file, FileTime.from(Instant.parse("2026-09-17T04:00:00Z")));
             return file;
         } catch (URISyntaxException | IOException ex) {
@@ -82,8 +90,7 @@ class UsageCostRecordingTest {
     @Test
     @DisplayName("구독형 바인딩의 실행도 API 가격으로 환산해 저장한다")
     void convertsSubscriptionBindingRunAtApiPriceAndStoresIt() {
-        AgentExecution execution =
-                complete(run(1_000L, 800L, 500L));
+        AgentExecution execution = complete(run(1_000L, 800L, 500L));
 
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isEqualTo(16_400L);
@@ -94,8 +101,7 @@ class UsageCostRecordingTest {
     @Test
     @DisplayName("실패한 실행은 금액을 남기지 않는다")
     void leavesNoAmountForFailedRun() {
-        AgentExecution execution =
-                fail();
+        AgentExecution execution = fail();
 
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.pricingVersion()).isNull();
@@ -108,9 +114,8 @@ class UsageCostRecordingTest {
         complete(run(1_000L, null, 500L));
         fail();
 
-        MonthlyCost cost =
-                executions.sumCostBetween(
-                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        MonthlyCost cost = executions.sumCostBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
 
         assertThat(cost.totalMicros()).isEqualTo(40_000L);
         assertThat(cost.pricedExecutions()).isEqualTo(2L);
@@ -120,9 +125,8 @@ class UsageCostRecordingTest {
     @Test
     @DisplayName("기록이 없는 구간의 합계는 0 이다")
     void totalOfPeriodWithoutRecordsIsZero() {
-        MonthlyCost cost =
-                executions.sumCostBetween(
-                        USER_ID, Instant.parse("2020-01-01T00:00:00Z"), Instant.parse("2020-02-01T00:00:00Z"));
+        MonthlyCost cost = executions.sumCostBetween(
+                USER_ID, Instant.parse("2020-01-01T00:00:00Z"), Instant.parse("2020-02-01T00:00:00Z"));
 
         assertThat(cost.totalMicros()).isZero();
         assertThat(cost.pricedExecutions()).isZero();
@@ -136,9 +140,8 @@ class UsageCostRecordingTest {
         complete(run(1_000L, null, 500L), subscriptionAgent());
         AgentExecution apiExecution = complete(run(1_000L, null, 500L), apiAgent());
 
-        MonthlyCostDetail cost =
-                executions.sumCostDetailBetween(
-                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        MonthlyCostDetail cost = executions.sumCostDetailBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
 
         assertThat(cost.actualMicros()).isEqualTo(apiExecution.actualCostMicros());
         assertThat(cost.subscriptionExecutions()).isEqualTo(2L);
@@ -149,9 +152,8 @@ class UsageCostRecordingTest {
     void apiPathRunWithModelNotInPriceTableIsNotCountedAsSubscription() {
         AgentExecution unpriced = complete(run(1_000L, null, 500L), unpricedApiAgent());
 
-        MonthlyCostDetail cost =
-                executions.sumCostDetailBetween(
-                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        MonthlyCostDetail cost = executions.sumCostDetailBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
 
         assertThat(unpriced.estimatedCostMicros()).isNull();
         assertThat(unpriced.actualCostMicros()).isNull();

@@ -41,13 +41,11 @@ class GroupRenameMigrationTest {
                 .migrate();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO app_user (email, display_name, family_id, role, created_at)
                     VALUES ('dad@example.com', 'Dad', 1, 'ADMIN', CURRENT_TIMESTAMP(6))
                     """);
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO agent (
                         code, name, hermes_profile, api_base_url, provider, model, model_synced_at,
                         cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at
@@ -57,8 +55,7 @@ class GroupRenameMigrationTest {
                         ('dad', 'Dad', 'dad', 'http://runtime.test/p/dad', 'openai-codex', 'example-model',
                             NULL, 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 1, TRUE, CURRENT_TIMESTAMP(6))
                     """);
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO memory (
                         scope, owner_user_id, family_id, title, content, always_inject, status,
                         created_at, updated_at
@@ -82,8 +79,8 @@ class GroupRenameMigrationTest {
     void v25KeepsGroupIdValuesAndChangesOnlyFamilyToGroup() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
-            try (ResultSet rows = statement.executeQuery(
-                    "SELECT group_id FROM app_user WHERE email = 'dad@example.com'")) {
+            try (ResultSet rows =
+                    statement.executeQuery("SELECT group_id FROM app_user WHERE email = 'dad@example.com'")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getLong("group_id")).isEqualTo(1L);
             }
@@ -92,11 +89,10 @@ class GroupRenameMigrationTest {
                     .containsExactlyInAnyOrderEntriesOf(Map.of("home", "GROUP", "dad", "PRIVATE"));
 
             Map<String, String> memoryScopes = pairs(statement, "SELECT title, scope FROM memory");
-            assertThat(memoryScopes)
-                    .containsExactlyInAnyOrderEntriesOf(Map.of("그룹 제목", "GROUP", "개인 제목", "USER"));
+            assertThat(memoryScopes).containsExactlyInAnyOrderEntriesOf(Map.of("그룹 제목", "GROUP", "개인 제목", "USER"));
 
-            Map<String, String> memoryGroups = pairs(statement,
-                    "SELECT title, CAST(group_id AS VARCHAR(20)) FROM memory");
+            Map<String, String> memoryGroups =
+                    pairs(statement, "SELECT title, CAST(group_id AS VARCHAR(20)) FROM memory");
             assertThat(memoryGroups).containsEntry("그룹 제목", "1").containsEntry("개인 제목", null);
         }
     }
@@ -107,8 +103,7 @@ class GroupRenameMigrationTest {
         List<String> indexes = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery(
-                        """
+                ResultSet rows = statement.executeQuery("""
                         SELECT UPPER(INDEX_NAME) FROM INFORMATION_SCHEMA.INDEXES
                         WHERE UPPER(TABLE_NAME) IN ('APP_USER', 'MEMORY')
                         """)) {

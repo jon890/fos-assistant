@@ -43,13 +43,11 @@ class HermesDashboardRequestTest {
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
-            calls.add(
-                    new Call(
-                            exchange.getRequestMethod(),
-                            exchange.getRequestURI().getPath(),
-                            exchange.getRequestHeaders().getFirst("Authorization"),
-                            new String(
-                                    exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+            calls.add(new Call(
+                    exchange.getRequestMethod(),
+                    exchange.getRequestURI().getPath(),
+                    exchange.getRequestHeaders().getFirst("Authorization"),
+                    new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] payload = responseBody.getBytes(StandardCharsets.UTF_8);
             // 대시보드는 JSON 으로 답한다. 이 머리글이 없으면 응답을 읽는 호출만 변환기를 찾지 못한다.
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -76,16 +74,15 @@ class HermesDashboardRequestTest {
     }
 
     private HttpHermesDashboardClient clientFor(String baseUrl) {
-        return new HttpHermesDashboardClient(
-                new HermesProperties(
-                        "keys",
-                        baseUrl,
-                        TOKEN,
-                        "https://hermes-listener.example.com",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1)));
+        return new HttpHermesDashboardClient(new HermesProperties(
+                "keys",
+                baseUrl,
+                TOKEN,
+                "https://hermes-listener.example.com",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)));
     }
 
     @Test

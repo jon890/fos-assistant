@@ -21,9 +21,14 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class ConversationSessionTest {
 
-    @Autowired ConversationSessions sessions;
-    @Autowired ConversationRepository conversations;
-    @Autowired AppUserRepository users;
+    @Autowired
+    ConversationSessions sessions;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    AppUserRepository users;
 
     /** 다른 검사 클래스와 겹치지 않도록 매번 새 사용자로 대화를 만든다. */
     private Conversation newConversation() {

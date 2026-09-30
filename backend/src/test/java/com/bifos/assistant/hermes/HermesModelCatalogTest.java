@@ -171,8 +171,7 @@ class HermesModelCatalogTest {
             assertThatThrownBy(() -> client.readCatalog(baseUrl(), "dad"))
                     .as("응답 코드 %d", failure)
                     .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
         }
     }
 

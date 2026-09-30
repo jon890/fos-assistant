@@ -35,12 +35,23 @@ class AttachmentCleanerTest {
     private static final Instant EXPIRED = NOW.minus(Duration.ofDays(1));
     private static final Instant LIVE = NOW.plus(Duration.ofDays(1));
 
-    @Autowired AttachmentCleaner cleaner;
-    @Autowired AttachmentService service;
-    @Autowired AttachmentStore store;
-    @Autowired AttachmentProperties properties;
-    @Autowired ChatAttachmentRepository attachments;
-    @Autowired ConversationRepository conversations;
+    @Autowired
+    AttachmentCleaner cleaner;
+
+    @Autowired
+    AttachmentService service;
+
+    @Autowired
+    AttachmentStore store;
+
+    @Autowired
+    AttachmentProperties properties;
+
+    @Autowired
+    ChatAttachmentRepository attachments;
+
+    @Autowired
+    ConversationRepository conversations;
 
     private Path root;
     private Long conversationId;
@@ -50,7 +61,8 @@ class AttachmentCleanerTest {
         attachments.deleteAll();
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
-        conversationId = conversations.save(Conversation.startedBy(9201L, "정리 대화", null)).id();
+        conversationId =
+                conversations.save(Conversation.startedBy(9201L, "정리 대화", null)).id();
     }
 
     @Test
@@ -131,8 +143,8 @@ class AttachmentCleanerTest {
     }
 
     private ChatAttachment stored(Instant expiresAt) {
-        ChatAttachment attachment = attachments.save(
-                ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt));
+        ChatAttachment attachment =
+                attachments.save(ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
         store.save(conversationId, attachment.id(), "png", new ByteArrayInputStream(new byte[] {1, 2, 3}));

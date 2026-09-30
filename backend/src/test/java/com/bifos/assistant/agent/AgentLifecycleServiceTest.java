@@ -76,18 +76,33 @@ class AgentLifecycleServiceTest {
     /** {@code application-test.yml} 의 공유 listener 주소다. */
     private static final String LISTENER = "https://hermes-listener.example.com";
 
-    @Autowired AgentLifecycleService lifecycle;
-    @Autowired AgentService agentService;
-    @Autowired AgentRepository agents;
-    @Autowired AppUserRepository users;
-    @Autowired AgentTokenRepository tokens;
-    @Autowired HermesProfileKeyStore keyStore;
+    @Autowired
+    AgentLifecycleService lifecycle;
 
-    @MockitoBean HermesDashboardClient dashboard;
-    @MockitoBean HermesToolsetClient toolsets;
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentTokenRepository tokens;
+
+    @Autowired
+    HermesProfileKeyStore keyStore;
+
+    @MockitoBean
+    HermesDashboardClient dashboard;
+
+    @MockitoBean
+    HermesToolsetClient toolsets;
 
     /** 실제 디렉터리에 쓰되, 지우기가 실패하는 경우만 흉내 낼 수 있게 감싼다. */
-    @MockitoSpyBean SkillStore skillStore;
+    @MockitoSpyBean
+    SkillStore skillStore;
 
     /** 이 테스트가 실제 key 디렉터리에 남긴 파일을 지우려고 적어 둔다. */
     private final List<String> createdProfiles = new ArrayList<>();
@@ -232,9 +247,11 @@ class AgentLifecycleServiceTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_TERMINAL);
         List<String> made = new ArrayList<>();
         doAnswer(call -> {
-            made.add(call.getArgument(0));
-            return null;
-        }).when(dashboard).createProfile(anyString());
+                    made.add(call.getArgument(0));
+                    return null;
+                })
+                .when(dashboard)
+                .createProfile(anyString());
 
         assertCode(() -> lifecycle.create(kid, "셸이 켜진 틀", null), ErrorCode.HERMES_PROVISION_FAILED);
 
@@ -270,14 +287,14 @@ class AgentLifecycleServiceTest {
     void cannotChangeToGroupWhenShellToolEnabled() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
-        when(toolsets.readEnabled(created.apiBaseUrl(), created.hermesProfile())).thenReturn(WITH_TERMINAL);
+        when(toolsets.readEnabled(created.apiBaseUrl(), created.hermesProfile()))
+                .thenReturn(WITH_TERMINAL);
 
         assertCode(
                 () -> lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP),
                 ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
 
-        assertThat(agents.findByCode(created.code()).orElseThrow().visibility())
-                .isEqualTo(AgentVisibility.PRIVATE);
+        assertThat(agents.findByCode(created.code()).orElseThrow().visibility()).isEqualTo(AgentVisibility.PRIVATE);
     }
 
     @Test
@@ -302,8 +319,15 @@ class AgentLifecycleServiceTest {
     void adminSwitchingOwnerlessGroupAgentToPrivateBecomesOwner() {
         CurrentUser administrator = admin();
         String code = "ownerless-" + UUID.randomUUID().toString().substring(0, 13);
-        agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null));
+        agents.save(Agent.of(
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null));
 
         Agent changed = lifecycle.changeVisibility(administrator, code, AgentVisibility.PRIVATE);
 
@@ -332,8 +356,7 @@ class AgentLifecycleServiceTest {
         Agent secret = create(kid, "비밀 일기", null);
 
         assertCode(
-                () -> lifecycle.changeVisibility(other, shared.code(), AgentVisibility.PRIVATE),
-                ErrorCode.FORBIDDEN);
+                () -> lifecycle.changeVisibility(other, shared.code(), AgentVisibility.PRIVATE), ErrorCode.FORBIDDEN);
         assertCode(() -> lifecycle.delete(other, shared.code()), ErrorCode.FORBIDDEN);
         assertCode(
                 () -> lifecycle.changeVisibility(other, secret.code(), AgentVisibility.GROUP),
@@ -367,7 +390,8 @@ class AgentLifecycleServiceTest {
         lifecycle.delete(kid, created.code());
 
         verify(dashboard).deleteProfile(created.hermesProfile());
-        assertThat(tokens.findByProfileNameAndRevokedAtIsNull(created.hermesProfile())).isEmpty();
+        assertThat(tokens.findByProfileNameAndRevokedAtIsNull(created.hermesProfile()))
+                .isEmpty();
         Agent stored = agents.findByCode(created.code()).orElseThrow();
         assertThat(stored.isDeleted()).isTrue();
         assertThat(stored.enabled()).isFalse();
@@ -380,8 +404,14 @@ class AgentLifecycleServiceTest {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         String profile = created.hermesProfile();
-        skillStore.markPublished(profile, skillStore.writeVersion(profile, Map.of("weekly-plan",
-                new SkillBundle("weekly-plan", "---\nname: weekly-plan\ndescription: 계획\n---\n", List.of()))));
+        skillStore.markPublished(
+                profile,
+                skillStore.writeVersion(
+                        profile,
+                        Map.of(
+                                "weekly-plan",
+                                new SkillBundle(
+                                        "weekly-plan", "---\nname: weekly-plan\ndescription: 계획\n---\n", List.of()))));
         assertThat(skillStore.currentVersion(profile)).isPresent();
 
         lifecycle.delete(kid, created.code());
@@ -399,7 +429,8 @@ class AgentLifecycleServiceTest {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         doThrow(new ApiException(ErrorCode.INTERNAL_ERROR, "could not access the skill store"))
-                .when(skillStore).deleteAll(created.hermesProfile());
+                .when(skillStore)
+                .deleteAll(created.hermesProfile());
 
         lifecycle.delete(kid, created.code());
 
@@ -426,7 +457,8 @@ class AgentLifecycleServiceTest {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"))
-                .when(dashboard).deleteProfile(created.hermesProfile());
+                .when(dashboard)
+                .deleteProfile(created.hermesProfile());
 
         assertCode(() -> lifecycle.delete(kid, created.code()), ErrorCode.HERMES_UNAVAILABLE);
 
@@ -460,8 +492,14 @@ class AgentLifecycleServiceTest {
         List<Agent> seeded = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             String code = "seed-" + UUID.randomUUID().toString().substring(0, 13);
-            seeded.add(agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code,
-                    CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
+            seeded.add(agents.save(Agent.of(
+                    code,
+                    code,
+                    code,
+                    "http://agent-runtime.test/p/" + code,
+                    CostMode.SUBSCRIPTION,
+                    CredentialScope.SHARED_HOUSEHOLD,
+                    AgentVisibility.PRIVATE,
                     owner.id())));
         }
         return seeded;
@@ -482,7 +520,9 @@ class AgentLifecycleServiceTest {
     }
 
     private List<AgentToken> tokensOf(String profile) {
-        return tokens.findAll().stream().filter(token -> profile.equals(token.profileName())).toList();
+        return tokens.findAll().stream()
+                .filter(token -> profile.equals(token.profileName()))
+                .toList();
     }
 
     /** 성공이면 만든 에이전트, 거절이면 그 오류 코드다. 그 밖의 실패는 그대로 드러낸다. */

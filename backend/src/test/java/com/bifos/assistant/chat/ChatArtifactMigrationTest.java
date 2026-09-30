@@ -47,7 +47,7 @@ class ChatArtifactMigrationTest {
     }
 
     private static String insert(Long messageId) {
-        return "INSERT INTO chat_artifact (conversation_id, message_id, path, byte_size, created_at) "
-                + "VALUES (1, " + messageId + ", '초안/index.html', 42, CURRENT_TIMESTAMP(6))";
+        return "INSERT INTO chat_artifact (conversation_id, message_id, path, byte_size, created_at) " + "VALUES (1, "
+                + messageId + ", '초안/index.html', 42, CURRENT_TIMESTAMP(6))";
     }
 }

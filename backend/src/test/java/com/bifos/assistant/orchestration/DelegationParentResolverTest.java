@@ -35,10 +35,17 @@ class DelegationParentResolverTest {
     private static final String OTHER_PROFILE = "parent-resolver-other";
     private static final Instant STARTED = Instant.parse("2026-09-29T00:00:00Z");
 
-    @Autowired DelegationParentResolver resolver;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AppUserRepository users;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    DelegationParentResolver resolver;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private AppUser dad;
     private AppUser kid;
@@ -139,7 +146,7 @@ class DelegationParentResolverTest {
     private void assertRejected(String profileName, String rootSessionId) {
         assertThatThrownBy(() -> resolver.resolve(profileName, rootSessionId))
                 .as("profile=%s root=%s", profileName, rootSessionId)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
 }

@@ -10,9 +10,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
-import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
@@ -22,11 +27,6 @@ import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
-import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentVisibility;
-import com.bifos.assistant.agent.domain.CostMode;
-import com.bifos.assistant.agent.domain.CredentialScope;
-import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -50,15 +50,15 @@ import com.bifos.assistant.skill.application.SkillsChanged;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
-import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
-import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -76,7 +76,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -85,6 +84,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -139,32 +139,59 @@ class ChatServiceTest {
         }
     }
 
-    @Autowired ChatService chat;
+    @Autowired
+    ChatService chat;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
-    @Autowired ArtifactService artifactService;
-    @Autowired ChatController controller;
-    @Autowired ConversationAccess access;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired MemoryService memories;
-    @Autowired MemoryRepository memoryRepository;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ArtifactService artifactService;
+
+    @Autowired
+    ChatController controller;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    MemoryRepository memoryRepository;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     /** 실행 사건을 검사하려면 스트림을 우리가 열어 주어야 한다. */
-    @MockitoBean HermesRunEventStream eventStream;
+    @MockitoBean
+    HermesRunEventStream eventStream;
 
     /** 저장이 실패해도 대화가 이어지는지 보려면 저장소가 던지게 만들 수 있어야 한다. */
-    @MockitoSpyBean ExecutionEventRepository executionEvents;
+    @MockitoSpyBean
+    ExecutionEventRepository executionEvents;
 
-    @Autowired ExecutionSkillUseRepository skillUses;
+    @Autowired
+    ExecutionSkillUseRepository skillUses;
 
     /** 스킬 커맨드가 확인하는 켜진 스킬 목록을 테스트가 정한다. Hermes 대시보드를 부르지 않는다. */
-    @MockitoBean SkillService skillService;
+    @MockitoBean
+    SkillService skillService;
 
-    @Autowired ApplicationEventPublisher applicationEvents;
+    @Autowired
+    ApplicationEventPublisher applicationEvents;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -173,12 +200,12 @@ class ChatServiceTest {
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
     private void hermesStreams(RunEvent... events) {
         doAnswer(invocation -> {
-            Consumer<RunEvent> onEvent = invocation.getArgument(3);
-            for (RunEvent event : events) {
-                onEvent.accept(event);
-            }
-            return null;
-        })
+                    Consumer<RunEvent> onEvent = invocation.getArgument(3);
+                    for (RunEvent event : events) {
+                        onEvent.accept(event);
+                    }
+                    return null;
+                })
                 .when(eventStream)
                 .open(any(), any(), any(), any(), any());
     }
@@ -212,16 +239,15 @@ class ChatServiceTest {
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         if (profileName != null) {
-            agents.save(
-                    Agent.of(
-                            profileName,
-                            profileName,
-                            profileName,
-                            "http://agent-runtime.test/p/" + profileName,
-                            CostMode.SUBSCRIPTION,
-                            CredentialScope.SHARED_HOUSEHOLD,
-                            AgentVisibility.PRIVATE,
-                            user.id()));
+            agents.save(Agent.of(
+                    profileName,
+                    profileName,
+                    profileName,
+                    "http://agent-runtime.test/p/" + profileName,
+                    CostMode.SUBSCRIPTION,
+                    CredentialScope.SHARED_HOUSEHOLD,
+                    AgentVisibility.PRIVATE,
+                    user.id()));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -230,24 +256,21 @@ class ChatServiceTest {
     @DisplayName("routes the turn to the caller own profile and records what it used")
     void routesTheTurnToTheCallerOwnProfileAndRecordsWhatItUsed() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub()
-                .willReturn(
-                        HermesRunResult.of(
-                                "run-1",
-                                "sess-1",
-                                "completed",
-                                "저녁은 김치찌개가 좋겠어요.",
-                                "example-model-large",
-                                "anthropic",
-                                new TokenUsage(120L, 80L, 40L, 160L)));
+        stub().willReturn(HermesRunResult.of(
+                "run-1",
+                "sess-1",
+                "completed",
+                "저녁은 김치찌개가 좋겠어요.",
+                "example-model-large",
+                "anthropic",
+                new TokenUsage(120L, 80L, 40L, 160L)));
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
-        stub().beforeAwait(() ->
-                assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
-                        .singleElement()
-                        .satisfies(execution -> {
-                            assertThat(execution.status()).isEqualTo(ExecutionStatus.RUNNING);
-                            assertThat(execution.hermesRunId()).isEqualTo("run-1");
-                        }));
+        stub().beforeAwait(() -> assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
+                .singleElement()
+                .satisfies(execution -> {
+                    assertThat(execution.status()).isEqualTo(ExecutionStatus.RUNNING);
+                    assertThat(execution.hermesRunId()).isEqualTo("run-1");
+                }));
 
         ChatTurn turn = chat.send(dad, null, "오늘 저녁 뭐 먹을까?", "dad");
 
@@ -258,7 +281,10 @@ class ChatServiceTest {
             assertThat(command.apiBaseUrl()).isEqualTo("http://agent-runtime.test/p/dad");
             // 사용자가 쓴 글 앞에 결과물 폴더 단락이 매 turn 붙는다.
             assertThat(command.input())
-                    .isEqualTo(artifactService.agentPreamble(conversations.findById(turn.conversationId()).orElseThrow()) + "오늘 저녁 뭐 먹을까?");
+                    .isEqualTo(
+                            artifactService.agentPreamble(conversations
+                                            .findById(turn.conversationId())
+                                            .orElseThrow()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
             assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
             // 새 대화도 Control Plane 이 정한 session 으로 첫 turn 을 보낸다.
@@ -298,8 +324,7 @@ class ChatServiceTest {
     void sendsAssembledMemoryToHermesAndRecordsLengthInRunRecord() {
         CurrentUser dad = member("dad@example.com", "dad");
         memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
         ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
 
@@ -314,13 +339,9 @@ class ChatServiceTest {
     @DisplayName("message history includes the user display name only on user messages")
     void messageHistoryIncludesTheUserDisplayNameOnlyOnUserMessages() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub()
-                .willReturn(
-                        HermesRunResult.of(
-                                "run-1", "sess-1", "completed", "반가워요", "m", "p", TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "반가워요", "m", "p", TokenUsage.empty()));
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
-        SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken(dad, null));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(dad, null));
 
         assertThat(controller.messages(turn.conversationPublicId()))
                 .satisfiesExactly(
@@ -343,16 +364,10 @@ class ChatServiceTest {
     @DisplayName("continues the same hermes session on the next turn")
     void continuesTheSameHermesSessionOnTheNextTurn() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub()
-                .willReturn(
-                        HermesRunResult.of(
-                                "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
         ChatTurn first = chat.send(dad, null, "안녕", "dad");
 
-        stub()
-                .willReturn(
-                        HermesRunResult.of(
-                                "run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
         ChatTurn second = chat.send(dad, first.conversationId(), "하나 더", "mom");
 
         String root = stub().received().get(0).sessionId();
@@ -362,13 +377,19 @@ class ChatServiceTest {
         assertThat(conversation.hermesSessionId()).as("다음에 보낼 session").isEqualTo("sess-1");
         assertThat(conversation.hermesRootSessionId()).as("뿌리 session").isEqualTo(root);
         assertThat(executions.findById(second.executionId()).orElseThrow().hermesSessionId())
-                .as("둘째 실행 줄의 session").isEqualTo(root);
+                .as("둘째 실행 줄의 session")
+                .isEqualTo(root);
     }
 
     /** Hermes 가 받은 session 을 그대로 돌려주게 한다. 실제 Hermes 가 모르는 id 를 받았을 때와 같다. */
     private void hermesEchoesSession() {
         stub().willAnswer(command -> HermesRunResult.of(
-                "run-" + stub().received().size(), command.sessionId(), "completed", "네", "m", "p",
+                "run-" + stub().received().size(),
+                command.sessionId(),
+                "completed",
+                "네",
+                "m",
+                "p",
                 TokenUsage.empty()));
     }
 
@@ -379,10 +400,11 @@ class ChatServiceTest {
         AtomicReference<String> recordedAtSubmit = new AtomicReference<>();
         stub().willAnswer(command -> {
             // 제출하는 순간 이미 실행 줄에 session 이 적혀 있어야 한다.
-            recordedAtSubmit.set(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10))
-                    .getFirst().hermesSessionId());
-            return HermesRunResult.of(
-                    "run-1", command.sessionId(), "completed", "네", "m", "p", TokenUsage.empty());
+            recordedAtSubmit.set(executions
+                    .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10))
+                    .getFirst()
+                    .hermesSessionId());
+            return HermesRunResult.of("run-1", command.sessionId(), "completed", "네", "m", "p", TokenUsage.empty());
         });
 
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
@@ -393,7 +415,8 @@ class ChatServiceTest {
         var conversation = conversations.findById(turn.conversationId()).orElseThrow();
         assertThat(conversation.hermesSessionId()).isEqualTo(sent);
         assertThat(conversation.hermesRootSessionId()).isEqualTo(sent);
-        assertThat(executions.findById(turn.executionId()).orElseThrow().hermesSessionId()).isEqualTo(sent);
+        assertThat(executions.findById(turn.executionId()).orElseThrow().hermesSessionId())
+                .isEqualTo(sent);
     }
 
     @Test
@@ -409,7 +432,8 @@ class ChatServiceTest {
         assertThat(stub().received().get(1).sessionId()).isEqualTo(sent);
         assertThat(conversations.findById(first.conversationId()).orElseThrow().hermesRootSessionId())
                 .isEqualTo(sent);
-        assertThat(executions.findById(second.executionId()).orElseThrow().hermesSessionId()).isEqualTo(sent);
+        assertThat(executions.findById(second.executionId()).orElseThrow().hermesSessionId())
+                .isEqualTo(sent);
     }
 
     @Test
@@ -426,17 +450,15 @@ class ChatServiceTest {
         assertThat(stub().received().getFirst().sessionId()).isEqualTo("hermes-made-session");
         assertThat(executions.findById(turn.executionId()).orElseThrow().hermesSessionId())
                 .isEqualTo("hermes-made-session");
-        assertThat(conversations.findById(legacy.id()).orElseThrow().hermesRootSessionId()).isNull();
+        assertThat(conversations.findById(legacy.id()).orElseThrow().hermesRootSessionId())
+                .isNull();
     }
 
     @Test
     @DisplayName("기본값으로 보냈고 세션이 답하지 못하면 provider와 모델이 비어 있다")
     void providerAndModelAreEmptyWhenSentWithDefaultAndSessionCannotAnswer() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub()
-                .willReturn(
-                        HermesRunResult.of(
-                                "run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 
@@ -463,10 +485,7 @@ class ChatServiceTest {
     void refusesToReadAnotherMemberConversation() {
         CurrentUser dad = member("dad@example.com", "dad");
         CurrentUser mom = member("mom@example.com", "mom");
-        stub()
-                .willReturn(
-                        HermesRunResult.of(
-                                "run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
         ChatTurn dadTurn = chat.send(dad, null, "비밀 얘기", "dad");
 
         assertThatThrownBy(() -> chat.history(mom, dadTurn.conversationId()))
@@ -494,8 +513,7 @@ class ChatServiceTest {
     @DisplayName("Hermes가 실패 결과를 돌려줘도 실행 줄 하나를 FAILED로 갱신한다")
     void updatesSingleRunRowToFailedWhenHermesReturnsFailure() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(dad, null, "안녕", "dad"))
                 .isInstanceOf(ApiException.class)
@@ -520,7 +538,7 @@ class ChatServiceTest {
     void skillViewToolEventInStreamCreatesOneModelHistoryForRun() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "장을 봤어요", "dad", null, TokenUsage.empty()));
+                        HermesRunResult.of("run-1", "sess-1", "completed", "장을 봤어요", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("tool.started", null, "skill_view", "shopping", null, null),
                 new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
@@ -552,8 +570,7 @@ class ChatServiceTest {
     @DisplayName("스트리밍 한 번이 RUN STARTED로 시작해 RUN COMPLETED로 끝나는 사건을 남긴다")
     void oneStreamLeavesEventsFromRunStartedToRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("message.delta", "조각", null, null, null, null),
                 new RunEvent("tool.started", null, "web_search", "started", null, null),
@@ -581,10 +598,14 @@ class ChatServiceTest {
         assertThat(recorded.get(3).subagentName()).isEqualTo("researcher");
         assertThat(recorded.get(3).toolName()).isNull();
         assertThat(relayed.stream().filter(it -> "tool".equals(it.type())).toList())
-                .extracting(ChatEvent::phase).containsExactly("started", "completed");
+                .extracting(ChatEvent::phase)
+                .containsExactly("started", "completed");
         assertThat(relayed.stream().filter(it -> "subagent".equals(it.type())).toList())
-                .extracting(ChatEvent::phase).containsExactly("started", "completed");
-        var summary = chat.activitySummaries(chat.history(dad, access.requireOwnId(dad, relayed.getLast().conversationId()))).get(executionId);
+                .extracting(ChatEvent::phase)
+                .containsExactly("started", "completed");
+        var summary = chat.activitySummaries(chat.history(
+                        dad, access.requireOwnId(dad, relayed.getLast().conversationId())))
+                .get(executionId);
         assertThat(summary.toolCount()).isEqualTo(1);
         assertThat(summary.subagentCount()).isEqualTo(1);
         assertThat(summary.durationMs()).isNotNull();
@@ -598,11 +619,19 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
         AgentExecution root = executions.findById(turn.executionId()).orElseThrow();
         executions.save(AgentExecution.builder()
-                .userId(dad.id()).conversationId(turn.conversationId()).agentId(root.agentId())
-                .parentExecutionId(root.id()).rootExecutionId(root.id()).profileName(root.profileName())
-                .costMode(root.costMode()).status(ExecutionStatus.RUNNING).startedAt(root.startedAt()).build());
+                .userId(dad.id())
+                .conversationId(turn.conversationId())
+                .agentId(root.agentId())
+                .parentExecutionId(root.id())
+                .rootExecutionId(root.id())
+                .profileName(root.profileName())
+                .costMode(root.costMode())
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(root.startedAt())
+                .build());
 
-        assertThat(chat.activitySummaries(chat.history(dad, turn.conversationId()))).isEmpty();
+        assertThat(chat.activitySummaries(chat.history(dad, turn.conversationId())))
+                .isEmpty();
     }
 
     /**
@@ -613,8 +642,7 @@ class ChatServiceTest {
     @DisplayName("스트리밍 한 번이 RUN COMPLETED를 한 줄만 남긴다")
     void oneStreamLeavesExactlyOneRunCompletedRow() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("tool.started", null, "web_search", "started", null, null),
                 new RunEvent("run.completed", null, null, null, null, null));
@@ -631,8 +659,7 @@ class ChatServiceTest {
     @DisplayName("글자 조각은 사건으로 저장하지 않는다")
     void doesNotStoreTextChunksAsEvents() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("message.delta", "조각 하나", null, null, null, null),
                 new RunEvent("message.delta", "조각 둘", null, null, null, null));
@@ -649,8 +676,8 @@ class ChatServiceTest {
     @DisplayName("사건 저장이 예외를 던져도 대화는 성공하고 중계도 이어진다")
     void conversationSucceedsAndRelayContinuesEvenIfEventSaveThrows() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "저녁은 김치찌개", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of(
+                "run-1", "sess-1", "completed", "저녁은 김치찌개", "dad", null, TokenUsage.empty()));
         hermesStreams(
                 new RunEvent("message.delta", "저녁은 ", null, null, null, null),
                 new RunEvent("tool.started", null, "web_search", "started", null, null));
@@ -675,14 +702,12 @@ class ChatServiceTest {
     @DisplayName("한 번에 받는 경로는 RUN STARTED와 RUN COMPLETED 둘만 남긴다")
     void nonStreamPathLeavesOnlyRunStartedAndRunCompleted() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
         ChatTurn turn = chat.send(dad, null, "안녕", "dad");
 
         List<ExecutionEvent> recorded = eventsOf(turn.executionId());
-        assertThat(typesOf(recorded))
-                .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
+        assertThat(typesOf(recorded)).containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
         assertThat(recorded).extracting(ExecutionEvent::sequence).containsExactly(1, 2);
     }
 
@@ -691,9 +716,16 @@ class ChatServiceTest {
     void blockedFailsAsProviderBlockedWithoutFallback() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(
-                new HermesRunResult("run-blocked", "sess-1", "failed", null, null, null,
-                        HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
-                HermesRunResult.of("run-answer", "sess-1", "completed", "답", null, null, TokenUsage.empty()));
+                        new HermesRunResult(
+                                "run-blocked",
+                                "sess-1",
+                                "failed",
+                                null,
+                                null,
+                                null,
+                                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+                                TokenUsage.empty()),
+                        HermesRunResult.of("run-answer", "sess-1", "completed", "답", null, null, TokenUsage.empty()));
 
         List<ChatEvent> relayed = new ArrayList<>();
         assertThatThrownBy(() -> chat.stream(dad, null, "찾아 줘", "dad", relayed::add))
@@ -715,16 +747,17 @@ class ChatServiceTest {
     @DisplayName("Hermes가 실패로 끝나면 RUN FAILED가 남고 예외는 그대로 올라간다")
     void leavesRunFailedAndRethrowsWhenHermesEndsInFailure() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(
-                HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "failed", null, "dad", null, TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(dad, null, "안녕", "dad"))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.HERMES_RUN_FAILED);
 
-        Long executionId =
-                executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)).getFirst().id();
+        Long executionId = executions
+                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10))
+                .getFirst()
+                .id();
         assertThat(eventsOf(executionId))
                 .satisfiesExactly(
                         started -> assertThat(started.eventType()).isEqualTo(ExecutionEventType.RUN_STARTED),
@@ -743,15 +776,15 @@ class ChatServiceTest {
 
         assertThatThrownBy(() -> chat.send(dad, null, "안녕", "dad")).isInstanceOf(ApiException.class);
 
-        Long executionId =
-                executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)).getFirst().id();
-        assertThat(eventsOf(executionId))
-                .singleElement()
-                .satisfies(event -> {
-                    assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
-                    assertThat(event.detail()).isEqualTo("HERMES_UNAVAILABLE");
-                    assertThat(event.sequence()).isEqualTo(1);
-                });
+        Long executionId = executions
+                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10))
+                .getFirst()
+                .id();
+        assertThat(eventsOf(executionId)).singleElement().satisfies(event -> {
+            assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
+            assertThat(event.detail()).isEqualTo("HERMES_UNAVAILABLE");
+            assertThat(event.sequence()).isEqualTo(1);
+        });
     }
 
     /** 그 에이전트의 스킬 목록을 이렇게 답하게 한다. 이름 뒤에 {@code :off} 를 붙이면 꺼진 스킬이다. */
@@ -789,7 +822,8 @@ class ChatServiceTest {
 
         ChatTurn turn = chat.send(dad, null, "/shopping 이번 주", "dad");
 
-        Conversation conversation = conversations.findById(turn.conversationId()).orElseThrow();
+        Conversation conversation =
+                conversations.findById(turn.conversationId()).orElseThrow();
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.input())
                     .isEqualTo(artifactService.agentPreamble(conversation)
@@ -804,12 +838,10 @@ class ChatServiceTest {
                     assertThat(message.role()).isEqualTo(MessageRole.USER);
                     assertThat(message.content()).isEqualTo("/shopping 이번 주");
                 });
-        assertThat(skillUsesOf(turn.executionId()))
-                .singleElement()
-                .satisfies(use -> {
-                    assertThat(use.skillName()).isEqualTo("shopping");
-                    assertThat(use.source()).isEqualTo(SkillUseSource.COMMAND);
-                });
+        assertThat(skillUsesOf(turn.executionId())).singleElement().satisfies(use -> {
+            assertThat(use.skillName()).isEqualTo("shopping");
+            assertThat(use.source()).isEqualTo(SkillUseSource.COMMAND);
+        });
     }
 
     @Test
@@ -824,7 +856,9 @@ class ChatServiceTest {
         List<ChatEvent> relayed = new ArrayList<>();
         assertCode(() -> chat.stream(dad, null, "/nope 해 줘", "dad", relayed::add), ErrorCode.SKILL_COMMAND_UNKNOWN);
 
-        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id())).as("대화").isEmpty();
+        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id()))
+                .as("대화")
+                .isEmpty();
         assertThat(messages.count()).as("메시지 수").isZero();
         assertThat(executions.count()).as("실행 수").isZero();
         assertThat(stub().received()).as("Hermes 에 보낸 것").isEmpty();
@@ -841,7 +875,9 @@ class ChatServiceTest {
 
         assertCode(() -> chat.send(dad, first.conversationId(), "/nope", null), ErrorCode.SKILL_COMMAND_UNKNOWN);
 
-        assertThat(messages.findByConversationIdOrderByIdAsc(first.conversationId())).as("메시지").hasSize(2);
+        assertThat(messages.findByConversationIdOrderByIdAsc(first.conversationId()))
+                .as("메시지")
+                .hasSize(2);
         assertThat(executions.count()).as("실행 수").isOne();
     }
 
@@ -874,7 +910,9 @@ class ChatServiceTest {
 
         ChatTurn turn = chat.send(dad, null, "/shopping 이번 주", "dad");
 
-        assertThat(stub().received()).as("Hermes 에 보낸 것").isNotEmpty()
+        assertThat(stub().received())
+                .as("Hermes 에 보낸 것")
+                .isNotEmpty()
                 .allSatisfy(command -> assertThat(command.input()).doesNotContain("skill_view(name="));
         assertThat(stub().received())
                 .anySatisfy(command -> assertThat(command.input()).contains("/shopping 이번 주"));
@@ -895,17 +933,16 @@ class ChatServiceTest {
         List<ChatEvent> relayed = new ArrayList<>();
         chat.regenerate(dad, first.conversationId(), relayed::add);
 
-        String expected = artifactService.agentPreamble(conversations.findById(first.conversationId()).orElseThrow())
+        String expected = artifactService.agentPreamble(
+                        conversations.findById(first.conversationId()).orElseThrow())
                 + new SkillCommand("shopping", "이번 주").hermesInput();
         assertThat(stub().received()).extracting(command -> command.input()).containsExactly(expected, expected);
         Long regenerated = relayed.getLast().executionId();
         assertThat(regenerated).isNotEqualTo(first.executionId());
-        assertThat(skillUsesOf(regenerated))
-                .singleElement()
-                .satisfies(use -> {
-                    assertThat(use.skillName()).isEqualTo("shopping");
-                    assertThat(use.source()).isEqualTo(SkillUseSource.COMMAND);
-                });
+        assertThat(skillUsesOf(regenerated)).singleElement().satisfies(use -> {
+            assertThat(use.skillName()).isEqualTo("shopping");
+            assertThat(use.source()).isEqualTo(SkillUseSource.COMMAND);
+        });
     }
 
     @Test
@@ -926,8 +963,7 @@ class ChatServiceTest {
 
         applicationEvents.publishEvent(new SkillsChanged(agentId));
 
-        assertCode(() -> chat.send(dad, first.conversationId(), "/shopping 넷", null),
-                ErrorCode.SKILL_COMMAND_UNKNOWN);
+        assertCode(() -> chat.send(dad, first.conversationId(), "/shopping 넷", null), ErrorCode.SKILL_COMMAND_UNKNOWN);
         assertThat(stub().received()).as("Hermes 에 보낸 것").hasSize(3);
     }
 }

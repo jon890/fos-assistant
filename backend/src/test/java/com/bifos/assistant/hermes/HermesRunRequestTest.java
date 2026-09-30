@@ -90,7 +90,8 @@ class HermesRunRequestTest {
         JsonNode body = submittedBody();
         assertThat(body.path("provider").asString()).isEqualTo("openai-codex");
         assertThat(body.path("model").asString()).isEqualTo("example-model");
-        assertThat(body.path("model_options").path("reasoning").path("effort").asString()).isEqualTo("high");
+        assertThat(body.path("model_options").path("reasoning").path("effort").asString())
+                .isEqualTo("high");
         assertThat(body.path("model_options").has("reasoning_effort")).isFalse();
     }
 
@@ -150,7 +151,8 @@ class HermesRunRequestTest {
                         .providerBlocked())
                 .isTrue();
         assertThat(failed("HTTP 404: 404 page not found").providerBlocked()).isFalse();
-        assertThat(failed("HTTP 402: This request requires more credits").providerBlocked()).isFalse();
+        assertThat(failed("HTTP 402: This request requires more credits").providerBlocked())
+                .isFalse();
         assertThat(failed(null).providerBlocked()).isFalse();
     }
 
@@ -158,8 +160,14 @@ class HermesRunRequestTest {
     @DisplayName("성공한 실행은 넘김 대상이 아니다")
     void succeededRunIsNotFallbackTarget() {
         HermesRunResult completed = new HermesRunResult(
-                "run-1", "sess-1", "completed", "네", "example-model", "openai-codex",
-                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " 남아 있는 글", TokenUsage.empty());
+                "run-1",
+                "sess-1",
+                "completed",
+                "네",
+                "example-model",
+                "openai-codex",
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " 남아 있는 글",
+                TokenUsage.empty());
 
         assertThat(completed.providerBlocked()).isFalse();
     }
@@ -170,7 +178,6 @@ class HermesRunRequestTest {
     }
 
     private HermesRunCommand command(String provider, String model, String reasoningEffort) {
-        return new HermesRunCommand(
-                "dad", baseUrl, "안녕", null, null, provider, model, reasoningEffort);
+        return new HermesRunCommand("dad", baseUrl, "안녕", null, null, provider, model, reasoningEffort);
     }
 }

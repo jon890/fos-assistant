@@ -34,8 +34,7 @@ import org.junit.jupiter.api.Test;
 class PersonaServiceTest {
 
     private static final String SOUL = "너는 아빠의 비서다.\n";
-    private static final CurrentUser OWNER =
-            new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER = new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
 
     private final AgentRepository agents = mock(AgentRepository.class);
     private final StubHermesDashboardClient dashboard = new StubHermesDashboardClient();
@@ -153,13 +152,18 @@ class PersonaServiceTest {
 
         personas.write(OWNER, "dad", "새 성격", Sha256.hex16(SOUL));
 
-        assertThat(dashboard.soulWrites())
-                .extracting(SoulWrite::profile)
-                .containsExactly("dad-profile");
+        assertThat(dashboard.soulWrites()).extracting(SoulWrite::profile).containsExactly("dad-profile");
     }
 
     private static Agent agent(String code, String profile, Long ownerUserId) {
-        return Agent.of(code, "아빠", profile, "http://127.0.0.1:1/p/" + profile, CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, ownerUserId);
+        return Agent.of(
+                code,
+                "아빠",
+                profile,
+                "http://127.0.0.1:1/p/" + profile,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                ownerUserId);
     }
 }

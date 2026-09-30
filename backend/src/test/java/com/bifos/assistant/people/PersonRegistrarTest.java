@@ -40,12 +40,18 @@ class PersonRegistrarTest {
     private static final String NAME = "이모";
     private static final String PROFILE = "aunt";
 
-    @Autowired PersonRegistrar registrar;
-    @Autowired AllowedPersonRepository people;
-    @Autowired AgentRepository agents;
+    @Autowired
+    PersonRegistrar registrar;
+
+    @Autowired
+    AllowedPersonRepository people;
+
+    @Autowired
+    AgentRepository agents;
 
     /** 실제 Hermes 대시보드를 부르지 않는다. 언제 불렸는지와 실패했을 때를 여기서 정한다. */
-    @MockitoBean HermesProfileProvisioner profiles;
+    @MockitoBean
+    HermesProfileProvisioner profiles;
 
     @BeforeEach
     void setUp() {

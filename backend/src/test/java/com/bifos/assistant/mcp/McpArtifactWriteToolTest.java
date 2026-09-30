@@ -47,17 +47,38 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class McpArtifactWriteToolTest {
-    @LocalServerPort int port;
-    @Autowired AgentTokenService tokens;
-    @Autowired AgentTokenRepository tokenRows;
-    @Autowired AppUserRepository users;
-    @Autowired ConversationRepository conversations;
-    @Autowired ArtifactStore store;
-    @Autowired ArtifactProperties properties;
-    @Autowired ChatArtifactRepository artifacts;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired SubagentSessionRegistrar registrar;
+    @LocalServerPort
+    int port;
+
+    @Autowired
+    AgentTokenService tokens;
+
+    @Autowired
+    AgentTokenRepository tokenRows;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ArtifactStore store;
+
+    @Autowired
+    ArtifactProperties properties;
+
+    @Autowired
+    ChatArtifactRepository artifacts;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    SubagentSessionRegistrar registrar;
 
     private static final String PROFILE = "mcp-artifact-write";
 
@@ -90,7 +111,8 @@ class McpArtifactWriteToolTest {
         JsonNode result = body(call(dadToken, conversation.publicId().toString(), "test/index.html", "<h1>안녕</h1>"));
 
         assertThat(result.path("result").path("isError").asBoolean()).isFalse();
-        JsonNode output = json.readTree(result.path("result").path("content").get(0).path("text").asString());
+        JsonNode output = json.readTree(
+                result.path("result").path("content").get(0).path("text").asString());
         assertThat(output.path("path").asString()).isEqualTo("test/index.html");
         assertThat(output.path("byteSize").asLong()).isEqualTo("<h1>안녕</h1>".getBytes(StandardCharsets.UTF_8).length);
         assertThat(store.resolveInside(conversation.id(), "test/index.html")).isPresent();
@@ -101,14 +123,24 @@ class McpArtifactWriteToolTest {
     @DisplayName("서명이 맞는 fos ctx 를 떼고 지금과 같이 쓰고 검사한다")
     void stripsValidlySignedFosCtxAndWritesAndChecksAsBefore() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        String fosCtx = McpCallSigner.context(dadToken, "artifact_write", dadRoot).toString();
-        String prefix = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"_fos_ctx\":" + fosCtx;
+        String fosCtx =
+                McpCallSigner.context(dadToken, "artifact_write", dadRoot).toString();
+        String prefix =
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversation.publicId() + "\",\"_fos_ctx\":" + fosCtx;
 
         JsonNode written = body(raw(dadToken, prefix + ",\"path\":\"ctx/index.html\",\"content\":\"<p>x</p>\"}}}"));
-        JsonNode unknownKey = body(raw(dadToken, prefix + ",\"path\":\"ctx/other.html\",\"content\":\"x\",\"base64\":\"x\"}}}"));
+        JsonNode unknownKey =
+                body(raw(dadToken, prefix + ",\"path\":\"ctx/other.html\",\"content\":\"x\",\"base64\":\"x\"}}}"));
 
         assertThat(written.path("result").path("isError").asBoolean()).isFalse();
-        assertThat(json.readTree(written.path("result").path("content").get(0).path("text").asString()).path("path").asString())
+        assertThat(json.readTree(written.path("result")
+                                .path("content")
+                                .get(0)
+                                .path("text")
+                                .asString())
+                        .path("path")
+                        .asString())
                 .isEqualTo("ctx/index.html");
         assertThat(store.resolveInside(conversation.id(), "ctx/index.html")).isPresent();
         assertThat(unknownKey.path("error").path("code").asInt()).isEqualTo(-32602);
@@ -119,11 +151,16 @@ class McpArtifactWriteToolTest {
     @DisplayName("틀린 fos ctx 는 쓰지 않고 거절한다")
     void rejectsWrongFosCtxWithoutWriting() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        String zeroSig = "{\"v\":1,\"session_id\":\"" + dadRoot + "\",\"root_session_id\":\"" + dadRoot + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+        String zeroSig = "{\"v\":1,\"session_id\":\"" + dadRoot + "\",\"root_session_id\":\"" + dadRoot
+                + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
         // 결과물 폴더는 디스크에 남아 다른 검사의 대화 번호와 겹칠 수 있으므로 경로를 새로 만든다.
         String path = "rejected-" + UUID.randomUUID() + ".html";
 
-        JsonNode rejected = body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"_fos_ctx\":" + zeroSig + ",\"path\":\"" + path + "\",\"content\":\"<p>x</p>\"}}}"));
+        JsonNode rejected = body(raw(
+                dadToken,
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversation.publicId() + "\",\"_fos_ctx\":" + zeroSig + ",\"path\":\"" + path
+                        + "\",\"content\":\"<p>x</p>\"}}}"));
 
         assertThat(rejected.path("result").path("isError").asBoolean()).isTrue();
         assertThat(rejected.path("result").path("content").get(0).path("text").asString())
@@ -139,7 +176,8 @@ class McpArtifactWriteToolTest {
         Conversation kids = conversations.save(Conversation.startedBy(kid.id(), "", null));
         String subagent = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, subagent);
-        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
+        jdbc.update(
+                "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
         // 결과물 폴더는 디스크에 남아 다른 검사의 대화 번호와 겹칠 수 있으므로 경로를 새로 만든다.
         String ownPath = "subagent-" + UUID.randomUUID() + ".html";
         String kidsPath = "subagent-" + UUID.randomUUID() + ".html";
@@ -147,10 +185,15 @@ class McpArtifactWriteToolTest {
         JsonNode written = body(subagentWrite(subagent, own, ownPath));
         JsonNode refused = body(subagentWrite(subagent, kids, kidsPath));
 
-        assertThat(written.path("result").path("isError").asBoolean()).as("아빠의 대화에 쓴 결과: %s", written).isFalse();
+        assertThat(written.path("result").path("isError").asBoolean())
+                .as("아빠의 대화에 쓴 결과: %s", written)
+                .isFalse();
         assertThat(store.resolveInside(own.id(), ownPath)).isPresent();
-        assertThat(refused.path("result").path("isError").asBoolean()).as("아이의 대화에 쓴 결과: %s", refused).isTrue();
-        assertThat(refused.path("result").path("content").get(0).path("text").asString()).isEqualTo("결과물을 저장할 수 없습니다.");
+        assertThat(refused.path("result").path("isError").asBoolean())
+                .as("아이의 대화에 쓴 결과: %s", refused)
+                .isTrue();
+        assertThat(refused.path("result").path("content").get(0).path("text").asString())
+                .isEqualTo("결과물을 저장할 수 없습니다.");
         assertThat(store.resolveInside(kids.id(), kidsPath)).isEmpty();
     }
 
@@ -162,14 +205,19 @@ class McpArtifactWriteToolTest {
         registrar.register(PROFILE, dadRoot, dadRoot, subagent);
         String beforePath = "subagent-" + UUID.randomUUID() + ".html";
         JsonNode beforeCancel = body(subagentWrite(subagent, own, beforePath));
-        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.CANCELLED.name(), dadRun.id());
+        jdbc.update(
+                "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.CANCELLED.name(), dadRun.id());
         String path = "subagent-" + UUID.randomUUID() + ".html";
 
         JsonNode refused = body(subagentWrite(subagent, own, path));
 
-        assertThat(beforeCancel.path("result").path("isError").asBoolean()).as("부모가 도는 동안 쓴 결과: %s", beforeCancel).isFalse();
+        assertThat(beforeCancel.path("result").path("isError").asBoolean())
+                .as("부모가 도는 동안 쓴 결과: %s", beforeCancel)
+                .isFalse();
         assertThat(store.resolveInside(own.id(), beforePath)).isPresent();
-        assertThat(refused.path("result").path("isError").asBoolean()).as("부모를 중지한 뒤 쓴 결과: %s", refused).isTrue();
+        assertThat(refused.path("result").path("isError").asBoolean())
+                .as("부모를 중지한 뒤 쓴 결과: %s", refused)
+                .isTrue();
         assertThat(refused.path("result").path("content").get(0).path("text").asString())
                 .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
         assertThat(store.resolveInside(own.id(), path)).isEmpty();
@@ -181,11 +229,27 @@ class McpArtifactWriteToolTest {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
 
         JsonNode empty = body(call(dadToken, conversation.publicId().toString(), "empty.html", ""));
-        JsonNode escaped = body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"path\":\"test/\\tname.html\",\"content\":\"x\"}}}"));
+        JsonNode escaped = body(raw(
+                dadToken,
+                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversation.publicId() + "\",\"path\":\"test/\\tname.html\",\"content\":\"x\"}}}"));
 
         assertThat(empty.path("result").path("isError").asBoolean()).isFalse();
-        assertThat(json.readTree(empty.path("result").path("content").get(0).path("text").asString()).path("byteSize").asLong()).isZero();
-        assertThat(json.readTree(escaped.path("result").path("content").get(0).path("text").asString()).path("path").asString())
+        assertThat(json.readTree(empty.path("result")
+                                .path("content")
+                                .get(0)
+                                .path("text")
+                                .asString())
+                        .path("byteSize")
+                        .asLong())
+                .isZero();
+        assertThat(json.readTree(escaped.path("result")
+                                .path("content")
+                                .get(0)
+                                .path("text")
+                                .asString())
+                        .path("path")
+                        .asString())
                 .isEqualTo("test/\tname.html");
     }
 
@@ -196,13 +260,40 @@ class McpArtifactWriteToolTest {
         AppUser kid = users.save(AppUser.of("mcp-artifact-kid@example.com", "아이", 1L, UserRole.MEMBER));
         Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null));
 
-        assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + own.publicId() + "\",\"path\":\"a.html\",\"content\":null}}}"))
-                .path("error").path("code").asInt()).isEqualTo(-32602);
-        assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + own.publicId() + "\",\"path\":\"a.html\",\"content\":\"x\",\"source_url\":\"https://example.com/x.png\"}}}"))
-                .path("error").path("code").asInt()).isEqualTo(-32602);
-        assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + own.publicId() + "\",\"path\":\"a.html\",\"content\":\"x\",\"base64\":\"x\"}}}"))
-                .path("error").path("code").asInt()).isEqualTo(-32602);
-        assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + other.publicId() + "\",\"path\":\"a.html\",\"content\":\"x\"}}}")).path("result").path("isError").asBoolean()).isTrue();
+        assertThat(body(raw(
+                                dadToken,
+                                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                                        + own.publicId() + "\",\"path\":\"a.html\",\"content\":null}}}"))
+                        .path("error")
+                        .path("code")
+                        .asInt())
+                .isEqualTo(-32602);
+        assertThat(body(raw(
+                                dadToken,
+                                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                                        + own.publicId()
+                                        + "\",\"path\":\"a.html\",\"content\":\"x\",\"source_url\":\"https://example.com/x.png\"}}}"))
+                        .path("error")
+                        .path("code")
+                        .asInt())
+                .isEqualTo(-32602);
+        assertThat(body(raw(
+                                dadToken,
+                                "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                                        + own.publicId()
+                                        + "\",\"path\":\"a.html\",\"content\":\"x\",\"base64\":\"x\"}}}"))
+                        .path("error")
+                        .path("code")
+                        .asInt())
+                .isEqualTo(-32602);
+        assertThat(body(raw(
+                                dadToken,
+                                "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                                        + other.publicId() + "\",\"path\":\"a.html\",\"content\":\"x\"}}}"))
+                        .path("result")
+                        .path("isError")
+                        .asBoolean())
+                .isTrue();
         assertThat(store.resolveInside(other.id(), "a.html")).isEmpty();
     }
 
@@ -210,11 +301,22 @@ class McpArtifactWriteToolTest {
     @DisplayName("본문과 URL 방식의 누락 null 숫자 조합은 인자 오류다")
     void bodyAndUrlModeMissingNullAndNumberCombinationsAreArgumentErrors() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        String prefix = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"path\":\"a.html\"";
+        String prefix =
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversation.publicId() + "\",\"path\":\"a.html\"";
 
-        for (String suffix : java.util.List.of("}}}", ",\"content\":null}}}", ",\"content\":1}}}",
-                ",\"source_url\":null}}}", ",\"source_url\":\"\"}}}", ",\"source_url\":\"  \"}}}")) {
-            assertThat(body(raw(dadToken, prefix + suffix)).path("error").path("code").asInt()).isEqualTo(-32602);
+        for (String suffix : java.util.List.of(
+                "}}}",
+                ",\"content\":null}}}",
+                ",\"content\":1}}}",
+                ",\"source_url\":null}}}",
+                ",\"source_url\":\"\"}}}",
+                ",\"source_url\":\"  \"}}}")) {
+            assertThat(body(raw(dadToken, prefix + suffix))
+                            .path("error")
+                            .path("code")
+                            .asInt())
+                    .isEqualTo(-32602);
         }
     }
 
@@ -227,9 +329,11 @@ class McpArtifactWriteToolTest {
         JsonNode extension = body(call(dadToken, conversationId, "draft.svg", "x"));
         JsonNode path = body(call(dadToken, conversationId, "../private.html", "x"));
         JsonNode large = body(call(dadToken, conversationId, "large.html", "a".repeat(5 * 1024 * 1024 + 1)));
-        HttpResponse<String> invalidUrl = raw(dadToken,
+        HttpResponse<String> invalidUrl = raw(
+                dadToken,
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
-                        + conversationId + "\",\"path\":\"image.png\",\"source_url\":\"https://images.example.com/image.png?private=value%\"}}}");
+                        + conversationId
+                        + "\",\"path\":\"image.png\",\"source_url\":\"https://images.example.com/image.png?private=value%\"}}}");
         JsonNode url = body(invalidUrl);
 
         assertThat(extension.path("error").path("code").asInt()).isEqualTo(-32602);
@@ -244,9 +348,27 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("축약 UUID와 모르는 도구는 JSON RPC 오류다")
     void shortenedUuidAndUnknownToolAreJsonRpcErrors() throws Exception {
-        assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"1-1-1-1-1\",\"path\":\"a.html\",\"content\":\"x\"}}}")).path("error").path("code").asInt()).isEqualTo(-32602);
-        assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown\",\"arguments\":{}}}")).path("error").path("code").asInt()).isEqualTo(-32601);
-        assertThat(body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"1\",\"path\":\"a.html\",\"content\":\"x\"}}}")).path("error").path("code").asInt()).isEqualTo(-32602);
+        assertThat(body(raw(
+                                dadToken,
+                                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"1-1-1-1-1\",\"path\":\"a.html\",\"content\":\"x\"}}}"))
+                        .path("error")
+                        .path("code")
+                        .asInt())
+                .isEqualTo(-32602);
+        assertThat(body(raw(
+                                dadToken,
+                                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown\",\"arguments\":{}}}"))
+                        .path("error")
+                        .path("code")
+                        .asInt())
+                .isEqualTo(-32601);
+        assertThat(body(raw(
+                                dadToken,
+                                "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"1\",\"path\":\"a.html\",\"content\":\"x\"}}}"))
+                        .path("error")
+                        .path("code")
+                        .asInt())
+                .isEqualTo(-32602);
     }
 
     @Test
@@ -258,9 +380,12 @@ class McpArtifactWriteToolTest {
         AppUser kid = users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER));
         Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null));
 
-        JsonNode missing = body(call(dadToken, UUID.randomUUID().toString(), "a.html", "x")).path("result");
-        JsonNode gone = body(call(dadToken, deleted.publicId().toString(), "a.html", "x")).path("result");
-        JsonNode forbidden = body(call(dadToken, other.publicId().toString(), "a.html", "x")).path("result");
+        JsonNode missing = body(call(dadToken, UUID.randomUUID().toString(), "a.html", "x"))
+                .path("result");
+        JsonNode gone = body(call(dadToken, deleted.publicId().toString(), "a.html", "x"))
+                .path("result");
+        JsonNode forbidden =
+                body(call(dadToken, other.publicId().toString(), "a.html", "x")).path("result");
         JsonNode own = body(call(dadToken, active.publicId().toString(), "a.html", "x"));
 
         assertThat(missing).isEqualTo(gone).isEqualTo(forbidden);
@@ -277,10 +402,19 @@ class McpArtifactWriteToolTest {
         body(call(dadToken, conversation.publicId().toString(), "page.html", "새 본문"));
         store.write(conversation.id(), "image.png", "before".getBytes(StandardCharsets.UTF_8));
 
-        JsonNode failed = body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"path\":\"image.png\",\"source_url\":\"https://not-allowed.example/image.png?private=value\"}}}"));
+        JsonNode failed = body(
+                raw(
+                        dadToken,
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                                + conversation.publicId()
+                                + "\",\"path\":\"image.png\",\"source_url\":\"https://not-allowed.example/image.png?private=value\"}}}"));
 
-        assertThat(Files.readString(store.resolveInside(conversation.id(), "page.html").orElseThrow())).isEqualTo("새 본문");
-        assertThat(Files.readString(store.resolveInside(conversation.id(), "image.png").orElseThrow())).isEqualTo("before");
+        assertThat(Files.readString(
+                        store.resolveInside(conversation.id(), "page.html").orElseThrow()))
+                .isEqualTo("새 본문");
+        assertThat(Files.readString(
+                        store.resolveInside(conversation.id(), "image.png").orElseThrow()))
+                .isEqualTo("before");
         assertThat(failed.path("result").path("isError").asBoolean()).isTrue();
     }
 
@@ -297,7 +431,8 @@ class McpArtifactWriteToolTest {
 
             assertThat(response.path("error").isMissingNode()).isTrue();
             assertThat(response.path("result").path("isError").asBoolean()).isTrue();
-            assertThat(Files.readString(target.getParent().resolve("original.html"))).isEqualTo("보존");
+            assertThat(Files.readString(target.getParent().resolve("original.html")))
+                    .isEqualTo("보존");
         } finally {
             Files.deleteIfExists(target);
         }
@@ -310,8 +445,10 @@ class McpArtifactWriteToolTest {
         JsonNode artifact = tools.path("result").path("tools").get(1);
 
         assertThat(artifact.path("description").asString()).contains("5MB를 넘을 수 없다");
-        assertThat(artifact.path("description").asString()).contains("html", "css", "png", "jpg", "jpeg", "gif", "webp");
-        assertThat(artifact.path("inputSchema").path("additionalProperties").asBoolean()).isFalse();
+        assertThat(artifact.path("description").asString())
+                .contains("html", "css", "png", "jpg", "jpeg", "gif", "webp");
+        assertThat(artifact.path("inputSchema").path("additionalProperties").asBoolean())
+                .isFalse();
         assertThat(artifact.path("inputSchema").path("oneOf")).hasSize(2);
     }
 
@@ -321,29 +458,48 @@ class McpArtifactWriteToolTest {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
         String sourceUrl = "https://not-allowed.example/image.png?private=value";
 
-        JsonNode result = body(raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"path\":\"image.png\",\"source_url\":\"" + sourceUrl + "\"}}}"));
+        JsonNode result = body(raw(
+                dadToken,
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversation.publicId() + "\",\"path\":\"image.png\",\"source_url\":\"" + sourceUrl
+                        + "\"}}}"));
 
         assertThat(result.path("result").path("isError").asBoolean()).isTrue();
         assertThat(result.path("result").path("content").get(0).path("text").asString())
                 .doesNotContain("not-allowed", "private=value", "image.png");
     }
 
-    private HttpResponse<String> call(String token, String conversationId, String path, String content) throws Exception {
-        return raw(token, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversationId + "\",\"path\":\"" + path + "\",\"content\":\"" + content + "\"}}}");
+    private HttpResponse<String> call(String token, String conversationId, String path, String content)
+            throws Exception {
+        return raw(
+                token,
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversationId + "\",\"path\":\"" + path + "\",\"content\":\"" + content + "\"}}}");
     }
 
     /** 아빠의 뿌리 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code artifact_write} 를 보낸다. */
-    private HttpResponse<String> subagentWrite(String sessionId, Conversation conversation, String path) throws Exception {
-        String fosCtx = McpCallSigner.context(dadToken, "artifact_write", dadRoot, sessionId, "call_" + UUID.randomUUID()).toString();
-        return raw(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\"" + conversation.publicId() + "\",\"_fos_ctx\":" + fosCtx + ",\"path\":\"" + path + "\",\"content\":\"<p>x</p>\"}}}");
+    private HttpResponse<String> subagentWrite(String sessionId, Conversation conversation, String path)
+            throws Exception {
+        String fosCtx = McpCallSigner.context(
+                        dadToken, "artifact_write", dadRoot, sessionId, "call_" + UUID.randomUUID())
+                .toString();
+        return raw(
+                dadToken,
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
+                        + conversation.publicId() + "\",\"_fos_ctx\":" + fosCtx + ",\"path\":\"" + path
+                        + "\",\"content\":\"<p>x</p>\"}}}");
     }
 
     /** 도구 호출의 인자에 {@code _fos_ctx} 가 없으면 아빠의 도는 실행 뿌리로 서명해 붙인다. */
     private HttpResponse<String> raw(String token, String request) throws Exception {
         String signed = McpCallSigner.withContext(request, token, dadRoot);
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
-                .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(signed)).build(), HttpResponse.BodyHandlers.ofString());
+        return client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
+                        .header("Authorization", "Bearer " + token)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(signed))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
     }
 
     private JsonNode body(HttpResponse<String> response) throws Exception {

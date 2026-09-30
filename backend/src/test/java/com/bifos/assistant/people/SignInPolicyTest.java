@@ -17,8 +17,11 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class SignInPolicyTest {
 
-    @Autowired SignInPolicy policy;
-    @Autowired AllowedPersonRepository people;
+    @Autowired
+    SignInPolicy policy;
+
+    @Autowired
+    AllowedPersonRepository people;
 
     @BeforeEach
     void setUp() {
@@ -70,7 +73,8 @@ class SignInPolicyTest {
     void uppercaseAddressStillHitsDuplicateCheck() {
         people.save(AllowedPerson.of("MOM@Example.com", "엄마", "mom"));
 
-        assertThat(people.existsByEmail(AllowedPerson.normalizeEmail("mom@example.com"))).isTrue();
+        assertThat(people.existsByEmail(AllowedPerson.normalizeEmail("mom@example.com")))
+                .isTrue();
     }
 
     @Test

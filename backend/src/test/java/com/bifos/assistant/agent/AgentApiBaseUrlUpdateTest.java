@@ -55,20 +55,33 @@ class AgentApiBaseUrlUpdateTest {
 
     /** 그룹 공개 검사는 실제 서비스가 한다. 도구 목록을 읽는 대역만 이 테스트가 정한다. */
     private final AgentLifecycleService lifecycle = new AgentLifecycleService(
-            agents, mock(AgentService.class), users, mock(AllowedPersonRepository.class),
-            mock(HermesProfileProvisioner.class), hermesToolsets, mock(HermesProperties.class),
-            mock(PeopleProperties.class), mock(AgentProperties.class), mock(SkillStore.class));
+            agents,
+            mock(AgentService.class),
+            users,
+            mock(AllowedPersonRepository.class),
+            mock(HermesProfileProvisioner.class),
+            hermesToolsets,
+            mock(HermesProperties.class),
+            mock(PeopleProperties.class),
+            mock(AgentProperties.class),
+            mock(SkillStore.class));
 
-    private final AgentAdminController controller = new AgentAdminController(
-            agents, users, currentUser, lifecycle, endpointProbe, flows);
+    private final AgentAdminController controller =
+            new AgentAdminController(agents, users, currentUser, lifecycle, endpointProbe, flows);
 
     private Agent agent;
 
     @BeforeEach
     void seed() {
-        agent = Agent.of("dad", "Dad", "dad", CURRENT_URL,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP, null);
+        agent = Agent.of(
+                "dad",
+                "Dad",
+                "dad",
+                CURRENT_URL,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
@@ -106,7 +119,8 @@ class AgentApiBaseUrlUpdateTest {
     @DisplayName("확인이 실패하면 저장하지 않고 값이 그대로다")
     void keepsValueWhenProbeFails() {
         doThrow(new ApiException(ErrorCode.VALIDATION_FAILED, "the new address answered 404"))
-                .when(endpointProbe).requireReachable(anyString(), anyString());
+                .when(endpointProbe)
+                .requireReachable(anyString(), anyString());
 
         assertThatThrownBy(() -> controller.update("dad", request("http://127.0.0.1:2/p/dad")))
                 .isInstanceOf(ApiException.class)
@@ -127,12 +141,20 @@ class AgentApiBaseUrlUpdateTest {
     @Test
     @DisplayName("그룹 공개 전에 도구를 읽지 못하면 접근 범위를 바꾸지 않는다")
     void keepsAccessScopeWhenToolsUnreadableBeforeGroupPublish() {
-        agent = Agent.of("dad", "Dad", "dad", CURRENT_URL,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+        agent = Agent.of(
+                "dad",
+                "Dad",
+                "dad",
+                CURRENT_URL,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                1L);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "invalid toolset response"))
-                .when(hermesToolsets).readEnabled(CURRENT_URL, "dad");
+                .when(hermesToolsets)
+                .readEnabled(CURRENT_URL, "dad");
 
         assertThatThrownBy(() -> controller.update("dad", request(null)))
                 .isInstanceOf(ApiException.class)
@@ -146,8 +168,15 @@ class AgentApiBaseUrlUpdateTest {
     @Test
     @DisplayName("그룹 공개와 주소 변경을 함께 보내도 새 주소의 도구를 검사한다")
     void checksToolsOfNewUrlWhenPublishingToGroupAndChangingUrl() {
-        agent = Agent.of("dad", "Dad", "dad", CURRENT_URL,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+        agent = Agent.of(
+                "dad",
+                "Dad",
+                "dad",
+                CURRENT_URL,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                1L);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/dad", "dad")).thenReturn(java.util.List.of("terminal"));
@@ -170,8 +199,15 @@ class AgentApiBaseUrlUpdateTest {
                 .thenReturn(java.util.List.of("terminal"));
 
         assertThatThrownBy(() -> controller.create(new CreateAgentRequest(
-                        "group", "Group", "group-profile", "http://127.0.0.1:2/p/group",
-                        CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null, null)))
+                        "group",
+                        "Group",
+                        "group-profile",
+                        "http://127.0.0.1:2/p/group",
+                        CostMode.SUBSCRIPTION,
+                        CredentialScope.SHARED_HOUSEHOLD,
+                        AgentVisibility.GROUP,
+                        null,
+                        null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
@@ -188,7 +224,10 @@ class AgentApiBaseUrlUpdateTest {
         AdminAgentView view = controller.create(privateRequest("mom", "http://127.0.0.1:2/p/mom/"));
 
         assertThat(view)
-                .extracting(AdminAgentView::code, AdminAgentView::apiBaseUrl, AdminAgentView::visibility,
+                .extracting(
+                        AdminAgentView::code,
+                        AdminAgentView::apiBaseUrl,
+                        AdminAgentView::visibility,
                         AdminAgentView::ownerUserId)
                 .containsExactly("mom", "http://127.0.0.1:2/p/mom", "PRIVATE", 7L);
         verify(endpointProbe).requireReachable("http://127.0.0.1:2/p/mom/", "mom-profile");
@@ -204,7 +243,8 @@ class AgentApiBaseUrlUpdateTest {
         AppUser owner = owner(7L);
         when(users.findByEmail("mom@example.com")).thenReturn(Optional.of(owner));
         doThrow(new ApiException(ErrorCode.VALIDATION_FAILED, "the new address answered 404 for /v1/capabilities"))
-                .when(endpointProbe).requireReachable("http://127.0.0.1:2/p/mom", "mom-profile");
+                .when(endpointProbe)
+                .requireReachable("http://127.0.0.1:2/p/mom", "mom-profile");
 
         assertThatThrownBy(() -> controller.create(privateRequest("mom", "http://127.0.0.1:2/p/mom")))
                 .isInstanceOf(ApiException.class)
@@ -216,7 +256,8 @@ class AgentApiBaseUrlUpdateTest {
     @Test
     @DisplayName("그룹 에이전트를 끄는 요청은 도구를 읽지 않는다")
     void skipsToolReadWhenDisablingGroupAgent() {
-        AdminAgentView view = controller.update("dad", new UpdateAgentRequest(false, AgentVisibility.GROUP, null, null));
+        AdminAgentView view =
+                controller.update("dad", new UpdateAgentRequest(false, AgentVisibility.GROUP, null, null));
 
         assertThat(view.enabled()).isFalse();
         verifyNoInteractions(hermesToolsets);
@@ -238,9 +279,16 @@ class AgentApiBaseUrlUpdateTest {
     }
 
     private static CreateAgentRequest privateRequest(String code, String apiBaseUrl) {
-        return new CreateAgentRequest(code, "Mom", code + "-profile", apiBaseUrl,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
-                code + "@example.com", null);
+        return new CreateAgentRequest(
+                code,
+                "Mom",
+                code + "-profile",
+                apiBaseUrl,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                code + "@example.com",
+                null);
     }
 
     private static AppUser owner(Long id) {

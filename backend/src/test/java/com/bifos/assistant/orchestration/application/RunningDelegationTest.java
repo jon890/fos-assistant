@@ -49,7 +49,9 @@ class RunningDelegationTest {
         assertThat(delegation.executionId()).isEqualTo(7L);
         long before = System.nanoTime();
         delegation.awaitEnded(Duration.ofSeconds(5));
-        assertThat(Duration.ofNanos(System.nanoTime() - before)).as("이미 끝나 기다리지 않는다").isLessThan(Duration.ofSeconds(1));
+        assertThat(Duration.ofNanos(System.nanoTime() - before))
+                .as("이미 끝나 기다리지 않는다")
+                .isLessThan(Duration.ofSeconds(1));
     }
 
     @Test
@@ -70,7 +72,8 @@ class RunningDelegationTest {
                 boolean stopperSends = stopped.get(5, TimeUnit.SECONDS) != null;
                 boolean attacherSends = attached.get(5, TimeUnit.SECONDS);
 
-                assertThat(stopperSends).as("%d번째 경합: 멈추는 쪽과 붙이는 쪽 가운데 하나만 보낸다", i)
+                assertThat(stopperSends)
+                        .as("%d번째 경합: 멈추는 쪽과 붙이는 쪽 가운데 하나만 보낸다", i)
                         .isNotEqualTo(attacherSends);
             }
         }

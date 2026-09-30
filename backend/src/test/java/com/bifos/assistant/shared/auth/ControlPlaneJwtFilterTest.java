@@ -28,7 +28,8 @@ class ControlPlaneJwtFilterTest {
         ControlPlaneJwtFilter filter = new ControlPlaneJwtFilter(
                 new AuthProperties("test-secret-test-secret-test-secret-test-secret"),
                 mock(UserProvisioningService.class));
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/hermes/session-bindings/subagent");
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/internal/hermes/session-bindings/subagent");
 
         assertThat(filter.shouldNotFilter(request)).isTrue();
     }

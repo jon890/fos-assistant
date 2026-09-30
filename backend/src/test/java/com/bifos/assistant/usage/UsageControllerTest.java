@@ -45,13 +45,26 @@ class UsageControllerTest {
 
     private static final Long USER_ID = 4_401L;
 
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AgentRepository agents;
-    @Autowired AgentService agentService;
-    @Autowired ExecutionTreeService trees;
-    @Autowired ConversationRepository conversations;
-    @Autowired SkillUsageQuery skillUsage;
-    @Autowired EntityManagerFactory entityManagers;
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ExecutionTreeService trees;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    SkillUsageQuery skillUsage;
+
+    @Autowired
+    EntityManagerFactory entityManagers;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
@@ -60,18 +73,18 @@ class UsageControllerTest {
     @BeforeEach
     void setUp() {
         executions.deleteAll();
-        agent = agents.findByCode("list-dad").orElseGet(() -> agents.save(Agent.of(
-                "list-dad",
-                "목록 아빠",
-                "dad",
-                "http://127.0.0.1:1/p/dad",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                USER_ID)));
+        agent = agents.findByCode("list-dad")
+                .orElseGet(() -> agents.save(Agent.of(
+                        "list-dad",
+                        "목록 아빠",
+                        "dad",
+                        "http://127.0.0.1:1/p/dad",
+                        CostMode.SUBSCRIPTION,
+                        CredentialScope.SHARED_HOUSEHOLD,
+                        AgentVisibility.PRIVATE,
+                        USER_ID)));
         controller = new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage);
-        when(currentUser.require())
-                .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
+        when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
     }
 
     @Test
@@ -172,12 +185,8 @@ class UsageControllerTest {
         long few = queriesForList(2);
         long many = queriesForList(10);
 
-        assertThat(few)
-                .as("실행 2개일 때 %d 번 질의했다", few)
-                .isEqualTo(QUERIES_PER_LIST);
-        assertThat(many)
-                .as("실행 10개일 때 %d 번 질의했다. 2개일 때는 %d 번이었다", many, few)
-                .isEqualTo(QUERIES_PER_LIST);
+        assertThat(few).as("실행 2개일 때 %d 번 질의했다", few).isEqualTo(QUERIES_PER_LIST);
+        assertThat(many).as("실행 10개일 때 %d 번 질의했다. 2개일 때는 %d 번이었다", many, few).isEqualTo(QUERIES_PER_LIST);
     }
 
     /** 실행을 그만큼 넣고 목록을 한 번 부르면서 질의 수를 센다. */

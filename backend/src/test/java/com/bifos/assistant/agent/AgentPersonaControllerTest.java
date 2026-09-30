@@ -42,29 +42,25 @@ class AgentPersonaControllerTest {
 
     private static final String SOUL = "너는 아빠의 비서다.\n";
 
-    private static final CurrentUser OWNER =
-            new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
-    private static final CurrentUser OTHER =
-            new CurrentUser(8L, "mom@example.com", "엄마", 1L, UserRole.MEMBER);
-    private static final CurrentUser ADMIN =
-            new CurrentUser(9L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
+    private static final CurrentUser OWNER = new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
+    private static final CurrentUser OTHER = new CurrentUser(8L, "mom@example.com", "엄마", 1L, UserRole.MEMBER);
+    private static final CurrentUser ADMIN = new CurrentUser(9L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
 
     private final AgentRepository agents = mock(AgentRepository.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final StubHermesDashboardClient dashboard = new StubHermesDashboardClient();
 
-    private final MockMvc mvc = MockMvcBuilders
-            .standaloneSetup(new AgentPersonaController(
-                    new PersonaService(new AgentService(agents), dashboard), currentUser))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
+                    new AgentPersonaController(new PersonaService(new AgentService(agents), dashboard), currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
     @BeforeEach
     void setUp() {
-        when(agents.findByCode("dad")).thenReturn(Optional.of(
-                agent("dad", "dad-profile", AgentVisibility.PRIVATE, OWNER.id())));
-        when(agents.findByCode("home")).thenReturn(Optional.of(
-                agent("home", "home-profile", AgentVisibility.GROUP, null)));
+        when(agents.findByCode("dad"))
+                .thenReturn(Optional.of(agent("dad", "dad-profile", AgentVisibility.PRIVATE, OWNER.id())));
+        when(agents.findByCode("home"))
+                .thenReturn(Optional.of(agent("home", "home-profile", AgentVisibility.GROUP, null)));
         dashboard.seedSoul("dad-profile", SOUL);
         dashboard.seedSoul("home-profile", SOUL);
         when(currentUser.require()).thenReturn(OWNER);
@@ -136,8 +132,7 @@ class AgentPersonaControllerTest {
     @Test
     @DisplayName("대시보드에 닿지 못하면 그것으로 알린다")
     void reportsDashboardUnreachable() throws Exception {
-        dashboard.failOnReadSoul(
-                () -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not reach Hermes"));
+        dashboard.failOnReadSoul(() -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not reach Hermes"));
 
         mvc.perform(get("/api/v1/agents/dad/persona"))
                 .andExpect(status().isBadGateway())
@@ -155,9 +150,15 @@ class AgentPersonaControllerTest {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\"";
     }
 
-    private static Agent agent(
-            String code, String profile, AgentVisibility visibility, Long ownerUserId) {
-        return Agent.of(code, code, profile, "http://127.0.0.1:1/p/" + profile, CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility,
+    private static Agent agent(String code, String profile, AgentVisibility visibility, Long ownerUserId) {
+        return Agent.of(
+                code,
+                code,
+                profile,
+                "http://127.0.0.1:1/p/" + profile,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                visibility,
                 ownerUserId);
     }
 }

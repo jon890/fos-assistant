@@ -50,8 +50,14 @@ class SkillCommandTest {
     void fullWidthSpaceOrNbspAfterNameIsNotCommandButTabOrNewlineIs() {
         assertThat(SkillCommand.parse("/shopping　이번 주")).as("전각 공백").isEmpty();
         assertThat(SkillCommand.parse("/shopping 이번 주")).as("NBSP").isEmpty();
-        assertThat(SkillCommand.parse("/shopping\t이번 주")).as("탭").map(SkillCommand::rest).contains("이번 주");
-        assertThat(SkillCommand.parse("/shopping\n이번 주")).as("줄바꿈").map(SkillCommand::rest).contains("이번 주");
+        assertThat(SkillCommand.parse("/shopping\t이번 주"))
+                .as("탭")
+                .map(SkillCommand::rest)
+                .contains("이번 주");
+        assertThat(SkillCommand.parse("/shopping\n이번 주"))
+                .as("줄바꿈")
+                .map(SkillCommand::rest)
+                .contains("이번 주");
     }
 
     @Test
@@ -59,7 +65,9 @@ class SkillCommandTest {
     void acceptsNameUpTo64CharsAndRejects65() {
         String longest = "a".repeat(64);
 
-        assertThat(SkillCommand.parse("/" + longest + " 해 줘")).map(SkillCommand::name).contains(longest);
+        assertThat(SkillCommand.parse("/" + longest + " 해 줘"))
+                .map(SkillCommand::name)
+                .contains(longest);
         assertThat(SkillCommand.parse("/" + "a".repeat(65) + " 해 줘")).isEmpty();
     }
 }

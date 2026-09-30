@@ -39,7 +39,9 @@ class SkillFrontmatterTest {
 
         assertThat(spaced.indexedDescriptionLength()).as("앞뒤 공백과 따옴표를 뺀 「가나다」").isEqualTo(3);
         assertThat(nested.indexedDescriptionLength()).as("섞인 따옴표를 뺀 「가나다」").isEqualTo(3);
-        assertThat(innerSpace.indexedDescriptionLength()).as("따옴표 안쪽 공백은 남는 「 가나다 」").isEqualTo(5);
+        assertThat(innerSpace.indexedDescriptionLength())
+                .as("따옴표 안쪽 공백은 남는 「 가나다 」")
+                .isEqualTo(5);
     }
 
     @Test
@@ -81,8 +83,10 @@ class SkillFrontmatterTest {
     @Test
     @DisplayName("앞머리 뒤에 글이 있으면 본문이 있다")
     void hasBodyWhenTextFollowsFrontmatter() {
-        assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "# 본문")).hasBody()).isTrue();
-        assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "\n\n  본문은 빈 줄 뒤에 있다")).hasBody())
+        assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "# 본문")).hasBody())
+                .isTrue();
+        assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "\n\n  본문은 빈 줄 뒤에 있다"))
+                        .hasBody())
                 .as("빈 줄 뒤의 글도 본문이다")
                 .isTrue();
     }
@@ -90,8 +94,7 @@ class SkillFrontmatterTest {
     @Test
     @DisplayName("앞머리 뒤가 비었거나 공백과 빈 줄뿐이면 본문이 없고 읽기는 성공한다")
     void hasNoBodyWhenNothingOrBlankLinesFollowFrontmatterAndReadSucceeds() {
-        SkillFrontmatter closedAtEnd =
-                SkillFrontmatter.parse("---\nname: weekly-plan\ndescription: 계획\n---");
+        SkillFrontmatter closedAtEnd = SkillFrontmatter.parse("---\nname: weekly-plan\ndescription: 계획\n---");
         SkillFrontmatter emptyAfter = SkillFrontmatter.parse(skillMd("description: 계획", ""));
         SkillFrontmatter blankAfter = SkillFrontmatter.parse(skillMd("description: 계획", "  \n\t\n\r\n   "));
 

@@ -51,11 +51,20 @@ class ExecutionTreeServiceTest {
     /** 서비스가 올라가고 내려가는 길에 두는 상한이다. 값을 바꾸면 이 테스트가 함께 알려야 한다. */
     private static final int MAX_DEPTH = 8;
 
-    @Autowired ExecutionTreeService trees;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository events;
-    @Autowired AgentRepository agents;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    ExecutionTreeService trees;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository events;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private Agent agent;
 
@@ -69,15 +78,16 @@ class ExecutionTreeServiceTest {
         serviceLogger().addAppender(logs);
         events.deleteAll();
         executions.deleteAll();
-        agent = agents.findByCode("tree-dad").orElseGet(() -> agents.save(Agent.of(
-                "tree-dad",
-                "나무 아빠",
-                "dad",
-                "http://127.0.0.1:1/p/dad",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                OWNER_ID)));
+        agent = agents.findByCode("tree-dad")
+                .orElseGet(() -> agents.save(Agent.of(
+                        "tree-dad",
+                        "나무 아빠",
+                        "dad",
+                        "http://127.0.0.1:1/p/dad",
+                        CostMode.SUBSCRIPTION,
+                        CredentialScope.SHARED_HOUSEHOLD,
+                        AgentVisibility.PRIVATE,
+                        OWNER_ID)));
     }
 
     @AfterEach
@@ -115,10 +125,7 @@ class ExecutionTreeServiceTest {
         assertThat(tree.root().children()).isEmpty();
         assertThat(tree.root().events())
                 .extracting(ExecutionEventView::sequence, ExecutionEventView::eventType)
-                .containsExactly(
-                        tuple(1, "RUN_STARTED"),
-                        tuple(2, "TOOL_STARTED"),
-                        tuple(3, "RUN_COMPLETED"));
+                .containsExactly(tuple(1, "RUN_STARTED"), tuple(2, "TOOL_STARTED"), tuple(3, "RUN_COMPLETED"));
         assertThat(tree.root().events().get(1).toolName()).isEqualTo("fake-tool");
     }
 
@@ -238,7 +245,8 @@ class ExecutionTreeServiceTest {
         AgentExecution root = execution(OWNER_ID, null, null);
         List<Long> chain = new ArrayList<>(List.of(root.id()));
         for (int depth = 2; depth <= MAX_DEPTH + 1; depth++) {
-            chain.add(execution(OWNER_ID, chain.get(chain.size() - 1), root.id()).id());
+            chain.add(
+                    execution(OWNER_ID, chain.get(chain.size() - 1), root.id()).id());
         }
 
         ExecutionTree tree = trees.of(owner(), root.id());
@@ -269,14 +277,9 @@ class ExecutionTreeServiceTest {
 
         ExecutionTree tree = trees.of(owner(), root.id());
 
-        assertThat(flatten(tree.root()))
-                .containsExactly(root.id(), child.id())
-                .doesNotContain(orphan.id());
+        assertThat(flatten(tree.root())).containsExactly(root.id(), child.id()).doesNotContain(orphan.id());
         assertThat(tree.truncated()).isFalse();
-        assertThat(warnings())
-                .singleElement()
-                .asString()
-                .contains(String.valueOf(orphan.id()));
+        assertThat(warnings()).singleElement().asString().contains(String.valueOf(orphan.id()));
     }
 
     @Test
@@ -372,9 +375,6 @@ class ExecutionTreeServiceTest {
      * 없으므로 여기서만 데이터베이스를 직접 고친다.
      */
     private void pointParentTo(AgentExecution execution, AgentExecution parent) {
-        jdbc.update(
-                "update agent_execution set parent_execution_id = ? where id = ?",
-                parent.id(),
-                execution.id());
+        jdbc.update("update agent_execution set parent_execution_id = ? where id = ?", parent.id(), execution.id());
     }
 }

@@ -23,7 +23,6 @@ import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.presentation.UsageController;
-import com.bifos.assistant.usage.presentation.UsageDtos;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Instant;
@@ -53,6 +52,7 @@ class UsageBreakdownTest {
 
     /** 실행을 심을 때 쓰는 provider 와 모델이다. 에이전트는 모델을 갖지 않아 실행마다 이 값을 적는다. */
     private static final String PROVIDER = "openai-codex";
+
     private static final String CAREER_CODE = "breakdown-career";
     private static final String CHORE_CODE = "breakdown-chore";
     private static final String CAREER_MODEL = "example-model";
@@ -60,12 +60,23 @@ class UsageBreakdownTest {
     private static final Map<String, String> MODEL_BY_AGENT =
             Map.of(CAREER_CODE, CAREER_MODEL, CHORE_CODE, CHORE_MODEL);
 
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AgentRepository agents;
-    @Autowired AgentService agentService;
-    @Autowired ExecutionTreeService trees;
-    @Autowired ConversationRepository conversations;
-    @Autowired SkillUsageQuery skillUsage;
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ExecutionTreeService trees;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    SkillUsageQuery skillUsage;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
@@ -78,8 +89,7 @@ class UsageBreakdownTest {
         career = agent(CAREER_CODE, "진로 비서");
         chore = agent(CHORE_CODE, "집안일 비서");
         controller = new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage);
-        when(currentUser.require())
-                .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
+        when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
     }
 
     @Test
@@ -276,8 +286,8 @@ class UsageBreakdownTest {
                 .satisfies(row -> assertThat(row.actualCostMicros()).isNull());
     }
 
-    private AgentExecution save(Agent agent, Instant startedAt, Long estimatedMicros, Long contextChars,
-            String fingerprint) {
+    private AgentExecution save(
+            Agent agent, Instant startedAt, Long estimatedMicros, Long contextChars, String fingerprint) {
         return executions.save(builder(USER_ID, agent, startedAt)
                 .tokens(1_000L, null, 500L, 1_500L)
                 .cost(new ExecutionCost(estimatedMicros, null, "USD", "models.dev@2026-09-17"))

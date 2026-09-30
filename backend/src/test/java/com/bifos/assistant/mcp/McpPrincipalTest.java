@@ -6,11 +6,11 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
-import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -56,17 +56,38 @@ class McpPrincipalTest {
     private static final String PRIVATE_A = "private-a";
     private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
 
-    @LocalServerPort int port;
-    @Autowired AgentTokenService tokens;
-    @Autowired AgentTokenRepository tokenRepository;
-    @Autowired AppUserRepository users;
-    @Autowired MemoryRepository memoryRepository;
-    @Autowired MemoryService memories;
-    @Autowired ConversationRepository conversations;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ArtifactStore store;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired SubagentSessionRegistrar registrar;
+    @LocalServerPort
+    int port;
+
+    @Autowired
+    AgentTokenService tokens;
+
+    @Autowired
+    AgentTokenRepository tokenRepository;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    MemoryRepository memoryRepository;
+
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ArtifactStore store;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    SubagentSessionRegistrar registrar;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -105,7 +126,9 @@ class McpPrincipalTest {
 
         assertBody(readMemory(privateAToken, root, memoryA.id()), "가의 본문");
         JsonNode written = body(writeArtifact(privateAToken, root, conversationA, path));
-        assertThat(written.path("result").path("isError").asBoolean()).as("자기 대화에 쓴 결과: %s", written).isFalse();
+        assertThat(written.path("result").path("isError").asBoolean())
+                .as("자기 대화에 쓴 결과: %s", written)
+                .isFalse();
         assertThat(store.resolveInside(conversationA.id(), path)).isPresent();
     }
 
@@ -212,13 +235,17 @@ class McpPrincipalTest {
 
         String forbiddenPath = uniquePath("b");
         String otherPath = uniquePath("other");
-        JsonNode forbidden = body(writeArtifact(sharedToken, rootA, conversationB, forbiddenPath)).path("result");
-        JsonNode other = body(writeArtifact(sharedToken, rootA, otherOfA, otherPath)).path("result");
+        JsonNode forbidden = body(writeArtifact(sharedToken, rootA, conversationB, forbiddenPath))
+                .path("result");
+        JsonNode other =
+                body(writeArtifact(sharedToken, rootA, otherOfA, otherPath)).path("result");
 
         assertThat(forbidden.path("isError").asBoolean()).isTrue();
         assertThat(forbidden.path("content").get(0).path("text").asString()).isEqualTo("결과물을 저장할 수 없습니다.");
         assertThat(store.resolveInside(conversationB.id(), forbiddenPath)).isEmpty();
-        assertThat(other.path("isError").asBoolean()).as("같은 사용자의 다른 대화: %s", other).isFalse();
+        assertThat(other.path("isError").asBoolean())
+                .as("같은 사용자의 다른 대화: %s", other)
+                .isFalse();
         assertThat(store.resolveInside(otherOfA.id(), otherPath)).isPresent();
     }
 
@@ -234,13 +261,20 @@ class McpPrincipalTest {
     @DisplayName("폐기한 토큰과 모르는 토큰과 헤더 없음은 401 이다")
     void revokedUnknownAndMissingHeaderTokensGive401() throws Exception {
         String revoked = tokens.issue(SHARED, "revoked").rawToken();
-        tokens.revoke(tokenRepository.findByTokenHash(AgentTokenService.hash(revoked)).orElseThrow().id());
+        tokens.revoke(tokenRepository
+                .findByTokenHash(AgentTokenService.hash(revoked))
+                .orElseThrow()
+                .id());
         String root = McpCallSigner.newRoot();
         McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, root);
 
         assertThat(readMemory(revoked, root, memoryA.id()).statusCode()).isEqualTo(401);
-        assertThat(readMemory("unknown-" + UUID.randomUUID(), root, memoryA.id()).statusCode()).isEqualTo(401);
-        assertThat(send(null, readMemoryRequest(sharedToken, root, memoryA.id())).statusCode()).isEqualTo(401);
+        assertThat(readMemory("unknown-" + UUID.randomUUID(), root, memoryA.id())
+                        .statusCode())
+                .isEqualTo(401);
+        assertThat(send(null, readMemoryRequest(sharedToken, root, memoryA.id()))
+                        .statusCode())
+                .isEqualTo(401);
     }
 
     @Test
@@ -280,22 +314,43 @@ class McpPrincipalTest {
         ObjectNode otherTool = McpCallSigner.context(sharedToken, "artifact_write", rootA);
 
         Map<String, String> rejections = new LinkedHashMap<>();
-        rejections.put("_fos_ctx 없음", send(sharedToken, memoryReadRequest(memoryA.id(), null)).body());
-        rejections.put("sig 가 틀림", send(sharedToken, memoryReadRequest(memoryA.id(), wrongSig)).body());
-        rejections.put("v 가 문자열", send(sharedToken, memoryReadRequest(memoryA.id(), stringVersion)).body());
-        rejections.put("흉내 낸 서명", send(sharedToken, memoryReadRequest(memoryA.id(), forged)).body());
-        rejections.put("다른 도구의 서명", send(sharedToken, memoryReadRequest(memoryA.id(), otherTool)).body());
-        rejections.put("끝난 실행", readMemory(sharedToken, finishedRoot, memoryA.id()).body());
-        rejections.put("도는 실행 둘", readMemory(sharedToken, doubledRoot, memoryA.id()).body());
-        rejections.put("다른 profile", readMemory(sharedToken, privateRoot, memoryA.id()).body());
-        rejections.put("시작하지 않은 run", readMemory(sharedToken, "cron-session-1", memoryA.id()).body());
-        rejections.put("등록 없는 하위 session", readMemory(sharedToken, rootA, newSubagent(), memoryA.id()).body());
-        rejections.put("등록과 다른 뿌리", readMemory(sharedToken, rootB, registered, memoryA.id()).body());
+        rejections.put(
+                "_fos_ctx 없음",
+                send(sharedToken, memoryReadRequest(memoryA.id(), null)).body());
+        rejections.put(
+                "sig 가 틀림",
+                send(sharedToken, memoryReadRequest(memoryA.id(), wrongSig)).body());
+        rejections.put(
+                "v 가 문자열",
+                send(sharedToken, memoryReadRequest(memoryA.id(), stringVersion))
+                        .body());
+        rejections.put(
+                "흉내 낸 서명",
+                send(sharedToken, memoryReadRequest(memoryA.id(), forged)).body());
+        rejections.put(
+                "다른 도구의 서명",
+                send(sharedToken, memoryReadRequest(memoryA.id(), otherTool)).body());
+        rejections.put(
+                "끝난 실행", readMemory(sharedToken, finishedRoot, memoryA.id()).body());
+        rejections.put(
+                "도는 실행 둘", readMemory(sharedToken, doubledRoot, memoryA.id()).body());
+        rejections.put(
+                "다른 profile", readMemory(sharedToken, privateRoot, memoryA.id()).body());
+        rejections.put(
+                "시작하지 않은 run",
+                readMemory(sharedToken, "cron-session-1", memoryA.id()).body());
+        rejections.put(
+                "등록 없는 하위 session",
+                readMemory(sharedToken, rootA, newSubagent(), memoryA.id()).body());
+        rejections.put(
+                "등록과 다른 뿌리",
+                readMemory(sharedToken, rootB, registered, memoryA.id()).body());
 
         String first = rejections.values().iterator().next();
         JsonNode parsed = json.readTree(first);
         assertThat(parsed.path("result").path("isError").asBoolean()).isTrue();
-        assertThat(parsed.path("result").path("content").get(0).path("text").asString()).isEqualTo(INVALID_CONTEXT);
+        assertThat(parsed.path("result").path("content").get(0).path("text").asString())
+                .isEqualTo(INVALID_CONTEXT);
         rejections.forEach((reason, responseBody) ->
                 assertThat(responseBody).as("거절 이유 %s 의 응답 본문", reason).isEqualTo(first));
     }
@@ -324,7 +379,9 @@ class McpPrincipalTest {
         writeArguments.put("user_id", userB.id());
         writeArguments.set("_fos_ctx", McpCallSigner.context(sharedToken, "artifact_write", rootA));
         JsonNode written = body(send(sharedToken, toolCall("artifact_write", writeArguments)));
-        assertThat(written.path("error").path("code").asInt()).as("모르는 인자: %s", written).isEqualTo(-32602);
+        assertThat(written.path("error").path("code").asInt())
+                .as("모르는 인자: %s", written)
+                .isEqualTo(-32602);
         assertThat(store.resolveInside(conversationB.id(), path)).isEmpty();
     }
 
@@ -339,8 +396,11 @@ class McpPrincipalTest {
 
     /** 뿌리 {@code root} 아래 하위 에이전트 session {@code session} 에서 부른 것처럼 서명해 읽는다. */
     private HttpResponse<String> readMemory(String token, String root, String session, Long memoryId) throws Exception {
-        return send(token, memoryReadRequest(memoryId,
-                McpCallSigner.context(token, "memory_read", root, session, "call_" + UUID.randomUUID())));
+        return send(
+                token,
+                memoryReadRequest(
+                        memoryId,
+                        McpCallSigner.context(token, "memory_read", root, session, "call_" + UUID.randomUUID())));
     }
 
     private static String newSubagent() {
@@ -348,7 +408,8 @@ class McpPrincipalTest {
     }
 
     private void finish(AgentExecution execution) {
-        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), execution.id());
+        jdbc.update(
+                "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), execution.id());
     }
 
     private String readMemoryRequest(String token, String root, Long memoryId) {
@@ -362,7 +423,8 @@ class McpPrincipalTest {
         return toolCall("memory_read", arguments);
     }
 
-    private HttpResponse<String> writeArtifact(String token, String root, Conversation conversation, String path) throws Exception {
+    private HttpResponse<String> writeArtifact(String token, String root, Conversation conversation, String path)
+            throws Exception {
         ObjectNode arguments = json.createObjectNode();
         arguments.put("conversation_id", conversation.publicId().toString());
         arguments.put("path", path);

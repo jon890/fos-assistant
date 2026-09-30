@@ -7,15 +7,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.chat.application.ArtifactProperties;
+import com.bifos.assistant.chat.application.ArtifactSourceProperties;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
-import com.bifos.assistant.chat.application.ArtifactProperties;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
-import com.bifos.assistant.chat.application.ArtifactSourceProperties;
+import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -43,7 +43,8 @@ class ArtifactWriteServiceTest {
         UUID publicId = UUID.randomUUID();
         when(access.requireOwn(USER, publicId)).thenReturn(conversation);
         when(conversation.id()).thenReturn(42L);
-        when(store.write(42L, "test/index.html", "한글".getBytes(StandardCharsets.UTF_8))).thenReturn(6L);
+        when(store.write(42L, "test/index.html", "한글".getBytes(StandardCharsets.UTF_8)))
+                .thenReturn(6L);
 
         ArtifactWriteResult result = new ArtifactWriteService(access, store, fetcher())
                 .write(USER, new ArtifactWriteRequest(publicId, "test/index.html", "한글", null));
@@ -65,13 +66,19 @@ class ArtifactWriteServiceTest {
         when(store.write(42L, "b.css", exactLimit)).thenReturn((long) exactLimit.length);
         ArtifactWriteService service = new ArtifactWriteService(access, store, fetcher());
 
-        assertThat(service.write(USER, new ArtifactWriteRequest(publicId, "a.css", "", null)).byteSize()).isZero();
-        assertThat(service.write(USER, new ArtifactWriteRequest(publicId, "b.css",
-                new String(exactLimit, StandardCharsets.ISO_8859_1), null)).byteSize()).isEqualTo(exactLimit.length);
-        assertThatThrownBy(() -> service.write(USER, new ArtifactWriteRequest(publicId, "c.css",
-                "가".repeat((5 * 1024 * 1024 / 3) + 1), null)))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        assertThat(service.write(USER, new ArtifactWriteRequest(publicId, "a.css", "", null))
+                        .byteSize())
+                .isZero();
+        assertThat(service.write(
+                                USER,
+                                new ArtifactWriteRequest(
+                                        publicId, "b.css", new String(exactLimit, StandardCharsets.ISO_8859_1), null))
+                        .byteSize())
+                .isEqualTo(exactLimit.length);
+        assertThatThrownBy(() -> service.write(
+                        USER, new ArtifactWriteRequest(publicId, "c.css", "가".repeat((5 * 1024 * 1024 / 3) + 1), null)))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
     @Test
@@ -84,9 +91,11 @@ class ArtifactWriteServiceTest {
                 .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
 
         assertThatThrownBy(() -> new ArtifactWriteService(access, store, fetcher())
-                .write(USER, new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
+                        .write(
+                                USER,
+                                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
 
         verifyNoInteractions(store);
     }
@@ -101,8 +110,8 @@ class ArtifactWriteServiceTest {
         when(access.requireOwn(USER, publicId)).thenReturn(conversation);
         ArtifactWriteService service = new ArtifactWriteService(access, store, fetcher());
 
-        assertThatThrownBy(() -> service.write(USER,
-                new ArtifactWriteRequest(publicId, "a.html", "본문", "https://example.com/a.html")))
+        assertThatThrownBy(() -> service.write(
+                        USER, new ArtifactWriteRequest(publicId, "a.html", "본문", "https://example.com/a.html")))
                 .isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> service.write(USER, new ArtifactWriteRequest(publicId, "a.svg", "본문", null)))
                 .isInstanceOf(ApiException.class);
@@ -125,11 +134,15 @@ class ArtifactWriteServiceTest {
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
                 new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
                 host -> new java.net.InetAddress[] {java.net.InetAddress.getByName("8.8.8.8")},
-                (address, host, uri, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(200,
-                        java.util.Map.of("content-type", "image/png", "content-length", "3"), new java.io.ByteArrayInputStream(image)));
+                (address, host, uri, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                        200,
+                        java.util.Map.of("content-type", "image/png", "content-length", "3"),
+                        new java.io.ByteArrayInputStream(image)));
 
-        assertThat(new ArtifactWriteService(access, store, source).write(USER,
-                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
+        assertThat(new ArtifactWriteService(access, store, source)
+                        .write(
+                                USER,
+                                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
                 .isEqualTo(new ArtifactWriteResult("a.png", 3L));
     }
 
@@ -143,12 +156,20 @@ class ArtifactWriteServiceTest {
         when(access.requireOwn(USER, publicId)).thenReturn(conversation);
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
                 new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
-                host -> { throw new AssertionError("DNS must not run"); },
-                (address, host, uri, connect, read, cancellation) -> { throw new AssertionError("transport must not run"); });
+                host -> {
+                    throw new AssertionError("DNS must not run");
+                },
+                (address, host, uri, connect, read, cancellation) -> {
+                    throw new AssertionError("transport must not run");
+                });
 
-        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source).write(USER,
-                new ArtifactWriteRequest(publicId, "../a.png", null, "https://images.example.com/a.png")))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source)
+                        .write(
+                                USER,
+                                new ArtifactWriteRequest(
+                                        publicId, "../a.png", null, "https://images.example.com/a.png")))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         verifyNoInteractions(store);
     }
 
@@ -160,16 +181,23 @@ class ArtifactWriteServiceTest {
         AtomicInteger dnsCalls = new AtomicInteger();
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
                 new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
-                host -> { dnsCalls.incrementAndGet(); throw new AssertionError("DNS must not run"); },
-                (address, host, uri, connect, read, cancellation) -> { throw new AssertionError("transport must not run"); });
+                host -> {
+                    dnsCalls.incrementAndGet();
+                    throw new AssertionError("DNS must not run");
+                },
+                (address, host, uri, connect, read, cancellation) -> {
+                    throw new AssertionError("transport must not run");
+                });
         ArtifactWriteService service = new ArtifactWriteService(access, store, source);
 
         for (UUID publicId : java.util.List.of(UUID.randomUUID(), UUID.randomUUID())) {
             when(access.requireOwn(USER, publicId))
                     .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
-            assertThatThrownBy(() -> service.write(USER,
-                    new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
-                    .isInstanceOfSatisfying(ApiException.class,
+            assertThatThrownBy(() -> service.write(
+                            USER,
+                            new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
+                    .isInstanceOfSatisfying(
+                            ApiException.class,
                             ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
         }
 
@@ -190,10 +218,14 @@ class ArtifactWriteServiceTest {
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
                 new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
                 host -> new java.net.InetAddress[] {java.net.InetAddress.getByName("8.8.8.8")},
-                (address, host, uri, connect, read, cancellation) -> { throw new java.io.IOException("download failed"); });
+                (address, host, uri, connect, read, cancellation) -> {
+                    throw new java.io.IOException("download failed");
+                });
 
-        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source).write(USER,
-                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
+        assertThatThrownBy(() -> new ArtifactWriteService(access, store, source)
+                        .write(
+                                USER,
+                                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
                 .isInstanceOf(ApiException.class);
         assertThat(Files.readAllBytes(root.resolve("42/a.png"))).containsExactly(1, 2, 3);
         try (var files = Files.list(root.resolve("42"))) {
@@ -202,7 +234,11 @@ class ArtifactWriteServiceTest {
     }
 
     private static ArtifactSourceFetcher fetcher() {
-        return new ArtifactSourceFetcher(new ArtifactSourceProperties(java.util.List.of(), null, null, null), host -> new java.net.InetAddress[0],
-                (address, host, source, connectTimeout, readTimeout, cancellation) -> { throw new java.io.IOException("unused"); });
+        return new ArtifactSourceFetcher(
+                new ArtifactSourceProperties(java.util.List.of(), null, null, null),
+                host -> new java.net.InetAddress[0],
+                (address, host, source, connectTimeout, readTimeout, cancellation) -> {
+                    throw new java.io.IOException("unused");
+                });
     }
 }

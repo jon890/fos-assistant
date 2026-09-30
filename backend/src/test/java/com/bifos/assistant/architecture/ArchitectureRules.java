@@ -304,8 +304,7 @@ public final class ArchitectureRules {
      *
      * <p>근거: {@code backend/AGENTS.md} 「구조 규칙」.
      */
-    public static final ArchRule ENUMERATED_FIELDS_USE_DOMAIN_TYPE = fields()
-            .that()
+    public static final ArchRule ENUMERATED_FIELDS_USE_DOMAIN_TYPE = fields().that()
             .areAnnotatedWith(Enumerated.class)
             .and()
             .areDeclaredInClassesThat()
@@ -354,7 +353,8 @@ public final class ArchitectureRules {
                 while (enclosing.isPresent()) {
                     if (enclosing.get().getSimpleName().endsWith("Controller")) {
                         events.add(SimpleConditionEvent.violated(
-                                item, item.getName() + " 가 컨트롤러 " + enclosing.get().getName() + " 안에 있다"));
+                                item,
+                                item.getName() + " 가 컨트롤러 " + enclosing.get().getName() + " 안에 있다"));
                         return;
                     }
                     enclosing = enclosing.get().getEnclosingClass();

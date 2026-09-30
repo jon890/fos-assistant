@@ -26,12 +26,14 @@ class ToolDetailPolicyTest {
     @ParameterizedTest
     @DisplayName("MEMBER 역할은 공개한 도구가 아니면 보지 못한다")
     @NullSource
-    @ValueSource(strings = {
-            "terminal",
-            "read_file",
-            "mcp__fos_assistant__artifact_write",
-            // 다른 서버가 붙인 같은 이름은 공개한 도구가 아니다.
-            "mcp__other__web_search"})
+    @ValueSource(
+            strings = {
+                "terminal",
+                "read_file",
+                "mcp__fos_assistant__artifact_write",
+                // 다른 서버가 붙인 같은 이름은 공개한 도구가 아니다.
+                "mcp__other__web_search"
+            })
     void memberCannotSeeNonPublicTools(String toolName) {
         assertThat(ToolDetailPolicy.visibleTo(MEMBER, toolName))
                 .as("MEMBER 역할에게 %s 의 detail 을 실으면 안 된다", toolName)

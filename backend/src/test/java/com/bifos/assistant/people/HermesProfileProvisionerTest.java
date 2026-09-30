@@ -48,21 +48,19 @@ class HermesProfileProvisionerTest {
 
     @BeforeEach
     void setUp() {
-        when(tokens.issue(anyString(), anyString()))
-                .thenReturn(new IssuedToken(mock(AgentToken.class), RAW_TOKEN));
+        when(tokens.issue(anyString(), anyString())).thenReturn(new IssuedToken(mock(AgentToken.class), RAW_TOKEN));
     }
 
     private HermesProfileKeyStore keyStoreAt(Path dir) {
-        return new HermesProfileKeyStore(
-                new HermesProperties(
-                        dir.toString(),
-                        "https://hermes-dashboard.example.com",
-                        "test-dashboard-token",
-                        "https://hermes-listener.example.com",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1)));
+        return new HermesProfileKeyStore(new HermesProperties(
+                dir.toString(),
+                "https://hermes-dashboard.example.com",
+                "test-dashboard-token",
+                "https://hermes-listener.example.com",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)));
     }
 
     private HermesProfileProvisioner provisionerAt(Path dir) {
@@ -87,8 +85,7 @@ class HermesProfileProvisionerTest {
 
         Map<String, String> env = dashboard.env(PROFILE);
         assertThat(env.keySet())
-                .containsExactlyInAnyOrder(
-                        "MCP_FOS_ASSISTANT_API_KEY", "API_SERVER_MODEL_NAME", "API_SERVER_KEY");
+                .containsExactlyInAnyOrder("MCP_FOS_ASSISTANT_API_KEY", "API_SERVER_MODEL_NAME", "API_SERVER_KEY");
         assertThat(env.get("API_SERVER_MODEL_NAME")).isEqualTo(PROFILE);
     }
 
@@ -129,8 +126,7 @@ class HermesProfileProvisionerTest {
     @Test
     @DisplayName("이미 있는 이름이면 만들지 않고 그대로 알린다")
     void reportsExistingNameAsIsWithoutCreating(@TempDir Path dir) {
-        dashboard.failOnCreate(
-                () -> new ApiException(ErrorCode.HERMES_PROFILE_EXISTS, "already taken"));
+        dashboard.failOnCreate(() -> new ApiException(ErrorCode.HERMES_PROFILE_EXISTS, "already taken"));
 
         assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE))
                 .isInstanceOf(ApiException.class)
@@ -143,8 +139,7 @@ class HermesProfileProvisionerTest {
     @Test
     @DisplayName("env 를 쓰다 실패하면 토큰을 폐기하고 profile 을 거두고 key 파일을 남기지 않는다")
     void revokesTokenReclaimsProfileAndLeavesNoKeyFileWhenEnvWriteFails(@TempDir Path dir) {
-        dashboard.failOnPutEnv(
-                () -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
+        dashboard.failOnPutEnv(() -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
 
         assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE))
                 .isInstanceOf(ApiException.class)
@@ -176,9 +171,11 @@ class HermesProfileProvisionerTest {
         // 토큰 폐기가 불린 시점에 profile 이 아직 지워지지 않았는지를 그 자리에서 기록한다.
         List<String> deletedWhenRevoked = new ArrayList<>();
         doAnswer(call -> {
-            deletedWhenRevoked.addAll(dashboard.deletedProfiles());
-            return null;
-        }).when(tokens).revokeAllFor(PROFILE);
+                    deletedWhenRevoked.addAll(dashboard.deletedProfiles());
+                    return null;
+                })
+                .when(tokens)
+                .revokeAllFor(PROFILE);
 
         provisioner.deprovision(PROFILE);
 
@@ -241,8 +238,7 @@ class HermesProfileProvisionerTest {
     @Test
     @DisplayName("대시보드가 실패해 되돌린 뒤에도 같은 이름으로 다시 만들 수 있다")
     void canCreateAgainWithSameNameAfterRollbackFromDashboardFailure(@TempDir Path dir) {
-        dashboard.failOnPutEnv(
-                () -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
+        dashboard.failOnPutEnv(() -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
         HermesProfileProvisioner provisioner = provisionerAt(dir);
         assertThatThrownBy(() -> provisioner.provision(PROFILE)).isInstanceOf(ApiException.class);
 
@@ -259,8 +255,7 @@ class HermesProfileProvisionerTest {
     void rethrowsOriginalErrorWhenRollbackAlsoFails(@TempDir Path dir) {
         ApiException original = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down");
         dashboard.failOnPutEnv(() -> original);
-        dashboard.failOnDelete(
-                () -> new ApiException(ErrorCode.HERMES_BUSY, "could not remove the profile"));
+        dashboard.failOnDelete(() -> new ApiException(ErrorCode.HERMES_BUSY, "could not remove the profile"));
 
         assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE)).isSameAs(original);
     }

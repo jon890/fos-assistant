@@ -27,7 +27,12 @@ class AgentTokenProfileMigrationTest {
     @DisplayName("V29 는 옛 토큰을 바꾸지 않고 profile 만 있는 새 토큰을 받는다")
     void v29KeepsOldTokensAndIssuesNewTokensWithOnlyProfile() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").target("28").load().migrate();
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .target("28")
+                .load()
+                .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
@@ -35,7 +40,12 @@ class AgentTokenProfileMigrationTest {
                     + "VALUES (7, 'old-hash', 'old', CURRENT_TIMESTAMP(6))");
         }
 
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").target("34").load().migrate();
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .target("34")
+                .load()
+                .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
@@ -43,7 +53,9 @@ class AgentTokenProfileMigrationTest {
                     "SELECT user_id, profile_name FROM agent_token WHERE token_hash = 'old-hash'")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getLong("user_id")).isEqualTo(7L);
-                assertThat(rows.getString("profile_name")).as("옛 토큰의 profile 은 채우지 않는다").isNull();
+                assertThat(rows.getString("profile_name"))
+                        .as("옛 토큰의 profile 은 채우지 않는다")
+                        .isNull();
             }
 
             statement.executeUpdate("INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "

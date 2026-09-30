@@ -33,7 +33,8 @@ class MethodNotAllowedTest {
 
     private static final String POST_ONLY = "/api/v1/signin/allowed";
 
-    @LocalServerPort int port;
+    @LocalServerPort
+    int port;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -57,10 +58,12 @@ class MethodNotAllowedTest {
         HttpResponse<String> response = send("HEAD", POST_ONLY);
 
         assertThat(response.statusCode()).isEqualTo(405);
-        assertThat(response.headers().firstValue("Allow")).hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
+        assertThat(response.headers().firstValue("Allow"))
+                .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
         assertThat(logs.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.ERROR));
-        assertThat(logs.list).anyMatch(event -> event.getLevel() == Level.WARN
-                && event.getFormattedMessage().contains("HEAD"));
+        assertThat(logs.list)
+                .anyMatch(event -> event.getLevel() == Level.WARN
+                        && event.getFormattedMessage().contains("HEAD"));
     }
 
     @Test
@@ -69,7 +72,8 @@ class MethodNotAllowedTest {
         HttpResponse<String> response = send("GET", POST_ONLY);
 
         assertThat(response.statusCode()).isEqualTo(405);
-        assertThat(response.headers().firstValue("Allow")).hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
+        assertThat(response.headers().firstValue("Allow"))
+                .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
         JsonNode body = json.readTree(response.body());
         assertThat(body.path("code").asString()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.name());
         assertThat(body.path("message").asString()).contains("GET");

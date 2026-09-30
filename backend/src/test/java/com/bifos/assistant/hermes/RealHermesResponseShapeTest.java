@@ -16,8 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 class RealHermesResponseShapeTest {
 
-    private static final String RUN_STATUS =
-            """
+    private static final String RUN_STATUS = """
             {
               "object": "hermes.run",
               "run_id": "run_8b4418b4886843f08408f924621ec005",
@@ -35,7 +34,8 @@ class RealHermesResponseShapeTest {
     @Test
     @DisplayName("reads the token counts a real run reports")
     void readsTheTokenCountsARealRunReports() {
-        TokenUsage usage = HttpHermesRunsClient.readUsage(mapper.readTree(RUN_STATUS).path("usage"));
+        TokenUsage usage =
+                HttpHermesRunsClient.readUsage(mapper.readTree(RUN_STATUS).path("usage"));
 
         assertThat(usage.inputTokens()).isEqualTo(561);
         assertThat(usage.outputTokens()).isEqualTo(15);

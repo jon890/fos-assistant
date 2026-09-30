@@ -37,8 +37,7 @@ class ExecutionDelegationColumnsMigrationTest {
                 Statement statement = connection.createStatement()) {
             DatabaseMetaData meta = connection.getMetaData();
             assertThat(columns(meta, "CONVERSATION")).contains("HERMES_ROOT_SESSION_ID");
-            assertThat(columns(meta, "AGENT_EXECUTION"))
-                    .contains("HERMES_SESSION_ID", "DELEGATION_KEY", "OUTPUT_TEXT");
+            assertThat(columns(meta, "AGENT_EXECUTION")).contains("HERMES_SESSION_ID", "DELEGATION_KEY", "OUTPUT_TEXT");
             assertThat(indexes(meta, "AGENT_EXECUTION"))
                     .contains("UK_AGENT_EXECUTION_DELEGATION_KEY", "IDX_AGENT_EXECUTION_SESSION_STATUS");
 
@@ -50,8 +49,8 @@ class ExecutionDelegationColumnsMigrationTest {
             assertThatThrownBy(() -> statement.executeUpdate(insert("'key-1'", "'fos-b'")))
                     .isInstanceOf(SQLException.class)
                     .hasMessageContaining("UK_AGENT_EXECUTION_DELEGATION_KEY");
-            try (ResultSet rows = statement.executeQuery(
-                    "SELECT COUNT(*) FROM agent_execution WHERE hermes_session_id = 'fos-a'")) {
+            try (ResultSet rows =
+                    statement.executeQuery("SELECT COUNT(*) FROM agent_execution WHERE hermes_session_id = 'fos-a'")) {
                 rows.next();
                 assertThat(rows.getLong(1)).isEqualTo(2);
             }

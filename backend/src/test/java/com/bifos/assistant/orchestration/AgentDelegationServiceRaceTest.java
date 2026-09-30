@@ -71,9 +71,13 @@ class AgentDelegationServiceRaceTest {
         when(children.startableAgent(user, WORKER)).thenReturn(agent);
         // 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다.
         delegations = new AgentDelegationService(
-                mock(AgentService.class), executions, children, conversations,
+                mock(AgentService.class),
+                executions,
+                children,
+                conversations,
                 new DelegationProperties(2, 4, 1, SUBMIT_TIMEOUT, 100),
-                mock(TurnCancellation.class), mock(HermesRunsClient.class));
+                mock(TurnCancellation.class),
+                mock(HermesRunsClient.class));
     }
 
     @Test
@@ -93,8 +97,11 @@ class AgentDelegationServiceRaceTest {
         DelegationResult holdingResult;
         DelegationResult waitingResult;
         try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
-            Future<DelegationResult> first = pool.submit(() -> delegations.delegate(user, origin, holding, WORKER, "앞 요청"));
-            assertThat(holdingEntered.await(10, TimeUnit.SECONDS)).as("앞 요청이 잠금을 쥐었다").isTrue();
+            Future<DelegationResult> first =
+                    pool.submit(() -> delegations.delegate(user, origin, holding, WORKER, "앞 요청"));
+            assertThat(holdingEntered.await(10, TimeUnit.SECONDS))
+                    .as("앞 요청이 잠금을 쥐었다")
+                    .isTrue();
 
             waitingResult = delegations.delegate(user, origin, waiting, WORKER, "잠금을 기다리는 요청");
 
@@ -102,15 +109,18 @@ class AgentDelegationServiceRaceTest {
             holdingResult = first.get(10, TimeUnit.SECONDS);
         }
 
-        assertThat(waitingResult.failure()).as("잠금을 못 잡은 요청: %s", waitingResult)
+        assertThat(waitingResult.failure())
+                .as("잠금을 못 잡은 요청: %s", waitingResult)
                 .isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
-        assertThat(holdingResult.failure()).as("잠금 안에서 제한 시간이 지난 요청: %s", holdingResult)
+        assertThat(holdingResult.failure())
+                .as("잠금 안에서 제한 시간이 지난 요청: %s", holdingResult)
                 .isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
         verify(children, never()).delegate(any(), any(), any(), any(), any(), any(), any(), any(), any());
 
         startsWithRow(77L);
         DelegationResult retried = delegations.delegate(user, origin, waiting, WORKER, "같은 키로 다시 부른다");
-        assertThat(retried.executionId()).as("거절한 요청이 줄과 자리를 남기지 않아 같은 키로 새로 시작한다: %s", retried)
+        assertThat(retried.executionId())
+                .as("거절한 요청이 줄과 자리를 남기지 않아 같은 키로 새로 시작한다: %s", retried)
                 .isEqualTo(77L);
         assertThat(retried.status()).isEqualTo(ExecutionStatus.RUNNING);
     }
@@ -124,7 +134,9 @@ class AgentDelegationServiceRaceTest {
         when(saved.userId()).thenReturn(user.id());
         when(saved.status()).thenReturn(ExecutionStatus.RUNNING);
         // 잠금 안에서는 아직 없고, 저장이 걸린 뒤 다시 읽으면 다른 요청이 저장한 줄이 있다.
-        when(executions.findByDelegationKey(raced.value())).thenReturn(Optional.empty()).thenReturn(Optional.of(saved));
+        when(executions.findByDelegationKey(raced.value()))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(saved));
         when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenThrow(new DataIntegrityViolationException("같은 delegation_key"));
 
@@ -143,7 +155,9 @@ class AgentDelegationServiceRaceTest {
         when(saved.id()).thenReturn(56L);
         when(saved.userId()).thenReturn(user.id() + 1);
         when(saved.status()).thenReturn(ExecutionStatus.RUNNING);
-        when(executions.findByDelegationKey(raced.value())).thenReturn(Optional.empty()).thenReturn(Optional.of(saved));
+        when(executions.findByDelegationKey(raced.value()))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(saved));
         when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenThrow(new DataIntegrityViolationException("같은 delegation_key"));
 
@@ -157,13 +171,14 @@ class AgentDelegationServiceRaceTest {
     private void startsWithRow(Long executionId) {
         AgentExecution row = mock(AgentExecution.class);
         when(row.id()).thenReturn(executionId);
-        when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
-            Consumer<AgentExecution> onStarted = invocation.getArgument(6);
-            BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
-            onStarted.accept(row);
-            onSubmitted.accept(row, "run-" + executionId);
-            return ChildResult.succeeded(executionId, "답");
-        });
+        when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    Consumer<AgentExecution> onStarted = invocation.getArgument(6);
+                    BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
+                    onStarted.accept(row);
+                    onSubmitted.accept(row, "run-" + executionId);
+                    return ChildResult.succeeded(executionId, "답");
+                });
     }
 
     private static DelegationKey key(String toolCallId) {

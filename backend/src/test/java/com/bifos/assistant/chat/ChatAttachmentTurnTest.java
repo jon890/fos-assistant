@@ -18,9 +18,9 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
+import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
-import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -31,9 +31,9 @@ import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
-import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
+import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
@@ -92,24 +92,51 @@ class ChatAttachmentTurnTest {
         }
     }
 
-    @Autowired ChatService chat;
+    @Autowired
+    ChatService chat;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
-    @Autowired ArtifactService artifactService;
-    @Autowired ConversationAccess access;
-    @Autowired AgentService agentService;
-    @Autowired AgentLifecycleService agentLifecycle;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ChatAttachmentRepository attachmentRows;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AttachmentProperties properties;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ArtifactService artifactService;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    AgentLifecycleService agentLifecycle;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ChatAttachmentRepository attachmentRows;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AttachmentProperties properties;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     /** 묶는 사이에 다른 요청이 끼어든 것을 만들려면 판정을 통과시킬 수 있어야 한다. */
-    @MockitoSpyBean AttachmentService attachments;
+    @MockitoSpyBean
+    AttachmentService attachments;
 
     private CurrentUser dad;
 
@@ -151,8 +178,9 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "안녕", null, List.of());
         chat.send(dad, conversationId, "또 안녕", null);
 
-        assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(
-                artifactPreamble(conversationId) + "안녕", artifactPreamble(conversationId) + "또 안녕");
+        assertThat(stub().received())
+                .extracting(HermesRunCommand::input)
+                .containsExactly(artifactPreamble(conversationId) + "안녕", artifactPreamble(conversationId) + "또 안녕");
     }
 
     @Test
@@ -281,7 +309,8 @@ class ChatAttachmentTurnTest {
         assertRejected(() -> chat.send(dad, mine, "없는 것", null, List.of(theirPhoto.id() + 10_000)));
 
         assertThat(userContentsOf(mine)).isEmpty();
-        assertThat(attachmentRows.findById(theirPhoto.id()).orElseThrow().messageId()).isNull();
+        assertThat(attachmentRows.findById(theirPhoto.id()).orElseThrow().messageId())
+                .isNull();
         assertThat(stub().received()).isEmpty();
     }
 
@@ -316,13 +345,16 @@ class ChatAttachmentTurnTest {
         Agent flowed = agentOf(dad, "flowed");
         flowed.assignFlow("research-and-build");
         agents.save(flowed);
-        Long conversationId = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id())).id();
+        Long conversationId = conversations
+                .save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()))
+                .id();
         ChatAttachment photo = upload(dad, conversationId, "a.png");
 
         assertRejected(() -> chat.send(dad, conversationId, "사진 봐", null, List.of(photo.id())));
 
         assertThat(userContentsOf(conversationId)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId()).isNull();
+        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
+                .isNull();
     }
 
     @Test
@@ -335,18 +367,21 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "사진 없음", null);
         attachments.deleteByUser(dad, conversationId, second.id());
 
-        List<MessageView> history = chatController(dad).messages(conversations.findById(conversationId).orElseThrow().publicId());
+        List<MessageView> history = chatController(dad)
+                .messages(conversations.findById(conversationId).orElseThrow().publicId());
 
-        MessageView withPhotos = history.stream().filter(it -> "사진 둘".equals(it.content())).findFirst().orElseThrow();
+        MessageView withPhotos = history.stream()
+                .filter(it -> "사진 둘".equals(it.content()))
+                .findFirst()
+                .orElseThrow();
         assertThat(withPhotos.attachments())
                 .extracting(AttachmentView::id, AttachmentView::originalName, AttachmentView::visible)
-                .containsExactly(
-                        tuple(first.id(), "첫째.png", true),
-                        tuple(second.id(), "둘째.png", false));
+                .containsExactly(tuple(first.id(), "첫째.png", true), tuple(second.id(), "둘째.png", false));
         assertThat(history)
                 .filteredOn(it -> !"사진 둘".equals(it.content()))
                 .hasSize(3)
-                .allSatisfy(it -> assertThat(it.attachments()).as("message %s", it.id()).isEmpty());
+                .allSatisfy(it ->
+                        assertThat(it.attachments()).as("message %s", it.id()).isEmpty());
     }
 
     @Test
@@ -362,14 +397,13 @@ class ChatAttachmentTurnTest {
 
         assertThat(listed)
                 .extracting(AgentView::code, AgentView::acceptsAttachments)
-                .containsExactlyInAnyOrder(
-                        tuple("dad", true),
-                        tuple("flowed", false));
+                .containsExactlyInAnyOrder(tuple("dad", true), tuple("flowed", false));
     }
 
     /** 사진 단락보다 앞에 매 turn 붙는 결과물 폴더 단락이다. */
     private String artifactPreamble(Long conversationId) {
-        return artifactService.agentPreamble(conversations.findById(conversationId).orElseThrow());
+        return artifactService.agentPreamble(
+                conversations.findById(conversationId).orElseThrow());
     }
 
     private StubHermesRunsClient stub() {
@@ -379,12 +413,12 @@ class ChatAttachmentTurnTest {
     private ChatController chatController(CurrentUser user) {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
-        return new ChatController(chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
+        return new ChatController(
+                chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {
-        return attachments.upload(
-                user, conversationId, name, "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
+        return attachments.upload(user, conversationId, name, "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
     }
 
     private ChatMessage userMessageOf(Long conversationId) {
@@ -403,8 +437,8 @@ class ChatAttachmentTurnTest {
 
     private static void assertRejected(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
     private CurrentUser member(String email) {

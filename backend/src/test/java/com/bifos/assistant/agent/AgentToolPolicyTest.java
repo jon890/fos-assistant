@@ -25,8 +25,8 @@ class AgentToolPolicyTest {
     @Test
     @DisplayName("주인은 주인 등급을 켜고 기억 MCP는 항상 남는다")
     void ownerEnablesOwnerTierAndMemoryMcpAlwaysStays() {
-        List<String> result = AgentToolPolicy.requestedForWrite(
-                OWNER, agent(AgentVisibility.PRIVATE), List.of("web"), List.of());
+        List<String> result =
+                AgentToolPolicy.requestedForWrite(OWNER, agent(AgentVisibility.PRIVATE), List.of("web"), List.of());
 
         assertThat(result).containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
@@ -55,7 +55,7 @@ class AgentToolPolicyTest {
     @DisplayName("관리자는 관리자 등급을 켤 수 있다")
     void adminCanEnableAdminTier() {
         assertThat(AgentToolPolicy.requestedForWrite(
-                ADMIN, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of()))
+                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("terminal"), List.of()))
                 .containsExactly("terminal", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
@@ -98,7 +98,7 @@ class AgentToolPolicyTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
         assertThat(AgentToolPolicy.requestedForWrite(
-                ADMIN, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
+                        ADMIN, agent(AgentVisibility.PRIVATE), List.of("session_search"), List.of()))
                 .containsExactly("session_search", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
@@ -107,7 +107,10 @@ class AgentToolPolicyTest {
     void ownerCannotChangeOtherToolsUntilAdminDisablesPastSearch() {
         // 등급을 옮기기 전에 켜 둔 에이전트다. 주인은 그 도구를 끄지 못하고, 남긴 채 저장하면 그룹 제약에 걸린다.
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(
-                        OWNER, agent(AgentVisibility.GROUP), List.of("session_search", "web"), List.of("session_search")))
+                        OWNER,
+                        agent(AgentVisibility.GROUP),
+                        List.of("session_search", "web"),
+                        List.of("session_search")))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
@@ -117,11 +120,19 @@ class AgentToolPolicyTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.FORBIDDEN);
         assertThat(AgentToolPolicy.requestedForWrite(
-                ADMIN, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search")))
+                        ADMIN, agent(AgentVisibility.GROUP), List.of("web"), List.of("session_search")))
                 .containsExactly("web", AgentToolPolicy.CONTROL_PLANE_MCP);
     }
 
     private static Agent agent(AgentVisibility visibility) {
-        return Agent.of("tool-agent", "도구", "tool-profile", "http://example.test/p/tool-profile", CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, 1L);
+        return Agent.of(
+                "tool-agent",
+                "도구",
+                "tool-profile",
+                "http://example.test/p/tool-profile",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                visibility,
+                1L);
     }
 }

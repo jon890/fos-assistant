@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.sun.net.httpserver.HttpServer;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -37,7 +37,9 @@ class HermesToolsetRequestTest {
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
-            calls.add(new Call(exchange.getRequestMethod(), exchange.getRequestURI().getPath(),
+            calls.add(new Call(
+                    exchange.getRequestMethod(),
+                    exchange.getRequestURI().getPath(),
                     exchange.getRequestHeaders().getFirst("Authorization"),
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] body = response.getBytes(StandardCharsets.UTF_8);
@@ -48,8 +50,14 @@ class HermesToolsetRequestTest {
         });
         server.start();
         HermesProperties properties = new HermesProperties(
-                "keys", baseUrl(), DASHBOARD_TOKEN, "http://listener.test", Duration.ofMillis(10),
-                Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1));
+                "keys",
+                baseUrl(),
+                DASHBOARD_TOKEN,
+                "http://listener.test",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1));
         HermesProfileKeyStore keyStore = mock(HermesProfileKeyStore.class);
         when(keyStore.resolve("kid")).thenReturn(PROFILE_KEY);
         client = new HttpHermesToolsetClient(keyStore, properties);
@@ -99,10 +107,12 @@ class HermesToolsetRequestTest {
             assertThat(call.method()).isEqualTo("PUT");
             assertThat(call.path()).isEqualTo("/api/config");
             assertThat(call.authorization()).isEqualTo("Bearer " + DASHBOARD_TOKEN);
-            assertThat(new ObjectMapper().readValue(call.body(), Map.class)).isEqualTo(Map.of(
-                    "profile", "kid",
-                    "config", Map.of(
-                            "platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant")))));
+            assertThat(new ObjectMapper().readValue(call.body(), Map.class))
+                    .isEqualTo(Map.of(
+                            "profile",
+                            "kid",
+                            "config",
+                            Map.of("platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant")))));
         });
     }
 

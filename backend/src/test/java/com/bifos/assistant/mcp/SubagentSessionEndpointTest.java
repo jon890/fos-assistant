@@ -55,14 +55,29 @@ class SubagentSessionEndpointTest {
     private static final String PROFILE_B = "subagent-endpoint-b";
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
 
-    @LocalServerPort int port;
-    @Autowired AgentTokenService tokens;
-    @Autowired AgentTokenRepository tokenRepository;
-    @Autowired AppUserRepository users;
-    @Autowired MemoryRepository memoryRepository;
-    @Autowired MemoryService memories;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired JdbcTemplate jdbc;
+    @LocalServerPort
+    int port;
+
+    @Autowired
+    AgentTokenService tokens;
+
+    @Autowired
+    AgentTokenRepository tokenRepository;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    MemoryRepository memoryRepository;
+
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -94,7 +109,8 @@ class SubagentSessionEndpointTest {
     void registeringTopLevelChildUnderRunningRunIs201() throws Exception {
         String child = newChild();
 
-        HttpResponse<String> response = register(tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
+        HttpResponse<String> response = register(
+                tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(201);
         assertThat(json.readTree(response.body())).isEqualTo(json.readTree("{\"result\":\"created\"}"));
@@ -123,7 +139,9 @@ class SubagentSessionEndpointTest {
         String otherRoot = McpCallSigner.newRoot();
         McpCallSigner.running(executions, kid.id(), 3L, PROFILE_A, otherRoot);
 
-        HttpResponse<String> response = register(tokenA, McpCallSigner.subagentBody(tokenA, otherRoot, otherRoot, child).toString());
+        HttpResponse<String> response = register(
+                tokenA,
+                McpCallSigner.subagentBody(tokenA, otherRoot, otherRoot, child).toString());
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(409);
         assertThat(json.readTree(response.body()).path("code").asString()).isEqualTo("SESSION_BINDING_CONFLICT");
@@ -141,8 +159,12 @@ class SubagentSessionEndpointTest {
 
         for (String body : List.of(wrongSig.toString(), wrongShape.toString(), "not json", "[1]", "")) {
             HttpResponse<String> response = register(tokenA, body);
-            assertThat(response.statusCode()).as("본문 %s 의 응답: %s", body, response.body()).isEqualTo(403);
-            assertThat(json.readTree(response.body()).path("code").asString()).as("본문 %s", body).isEqualTo("SESSION_BINDING_REJECTED");
+            assertThat(response.statusCode())
+                    .as("본문 %s 의 응답: %s", body, response.body())
+                    .isEqualTo(403);
+            assertThat(json.readTree(response.body()).path("code").asString())
+                    .as("본문 %s", body)
+                    .isEqualTo("SESSION_BINDING_REJECTED");
         }
         assertThat(rows(PROFILE_A, child)).isZero();
     }
@@ -152,7 +174,8 @@ class SubagentSessionEndpointTest {
     void registeringUnderRootOfProfileBRunWithProfileATokenIs403AndNoRow() throws Exception {
         String child = newChild();
 
-        HttpResponse<String> response = register(tokenA, McpCallSigner.subagentBody(tokenA, rootB, rootB, child).toString());
+        HttpResponse<String> response = register(
+                tokenA, McpCallSigner.subagentBody(tokenA, rootB, rootB, child).toString());
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(403);
         assertThat(json.readTree(response.body()).path("code").asString()).isEqualTo("SESSION_BINDING_REJECTED");
@@ -163,13 +186,21 @@ class SubagentSessionEndpointTest {
     @DisplayName("토큰이 없거나 모르거나 폐기됐으면 401 이고 본문이 없다")
     void missingUnknownOrRevokedTokenIs401WithoutBody() throws Exception {
         String revoked = tokens.issue(PROFILE_A, "revoked").rawToken();
-        tokens.revoke(tokenRepository.findByTokenHash(AgentTokenService.hash(revoked)).orElseThrow().id());
+        tokens.revoke(tokenRepository
+                .findByTokenHash(AgentTokenService.hash(revoked))
+                .orElseThrow()
+                .id());
         String unknown = "unknown-" + UUID.randomUUID();
         String child = newChild();
 
-        HttpResponse<String> none = register(null, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
-        HttpResponse<String> notIssued = register(unknown, McpCallSigner.subagentBody(unknown, rootA, rootA, child).toString());
-        HttpResponse<String> gone = register(revoked, McpCallSigner.subagentBody(revoked, rootA, rootA, child).toString());
+        HttpResponse<String> none = register(
+                null, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
+        HttpResponse<String> notIssued = register(
+                unknown,
+                McpCallSigner.subagentBody(unknown, rootA, rootA, child).toString());
+        HttpResponse<String> gone = register(
+                revoked,
+                McpCallSigner.subagentBody(revoked, rootA, rootA, child).toString());
 
         for (HttpResponse<String> response : List.of(none, notIssued, gone)) {
             assertThat(response.statusCode()).isEqualTo(401);
@@ -184,7 +215,8 @@ class SubagentSessionEndpointTest {
         String jwt = jwt(dad);
         String child = newChild();
 
-        HttpResponse<String> response = register(jwt, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
+        HttpResponse<String> response = register(
+                jwt, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(rows(PROFILE_A, child)).isZero();
@@ -195,7 +227,11 @@ class SubagentSessionEndpointTest {
     void originHeaderIs403() throws Exception {
         String child = newChild();
 
-        HttpResponse<String> response = send(PATH, tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString(), true);
+        HttpResponse<String> response = send(
+                PATH,
+                tokenA,
+                McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString(),
+                true);
 
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(rows(PROFILE_A, child)).isZero();
@@ -206,13 +242,23 @@ class SubagentSessionEndpointTest {
     void registeredChildReadsParentUsersBodyByMemoryReadEvenAfterParentEnds() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String child = newChild();
-        assertThat(register(tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString()).statusCode()).isEqualTo(201);
-        jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
-        String fosCtx = McpCallSigner.context(tokenA, "memory_read", rootA, child, "call_" + UUID.randomUUID()).toString();
+        assertThat(register(
+                                tokenA,
+                                McpCallSigner.subagentBody(tokenA, rootA, rootA, child)
+                                        .toString())
+                        .statusCode())
+                .isEqualTo(201);
+        jdbc.update(
+                "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
+        String fosCtx = McpCallSigner.context(tokenA, "memory_read", rootA, child, "call_" + UUID.randomUUID())
+                .toString();
 
-        HttpResponse<String> response = send("/mcp", tokenA,
+        HttpResponse<String> response = send(
+                "/mcp",
+                tokenA,
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                        + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}", false);
+                        + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}",
+                false);
 
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode result = json.readTree(response.body()).path("result");
@@ -223,7 +269,8 @@ class SubagentSessionEndpointTest {
     @Test
     @DisplayName("등록 경로는 도구 목록에 나오지 않는다")
     void registrationPathIsNotInToolList() throws Exception {
-        HttpResponse<String> response = send("/mcp", tokenA, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}", false);
+        HttpResponse<String> response =
+                send("/mcp", tokenA, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}", false);
 
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode listed = json.readTree(response.body()).path("result").path("tools");
@@ -248,13 +295,19 @@ class SubagentSessionEndpointTest {
     }
 
     private int rows(String profileName, String sessionId) {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
-                Integer.class, profileName, sessionId);
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
+                Integer.class,
+                profileName,
+                sessionId);
     }
 
     private Long origin(String profileName, String sessionId) {
-        return jdbc.queryForObject("SELECT origin_execution_id FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
-                Long.class, profileName, sessionId);
+        return jdbc.queryForObject(
+                "SELECT origin_execution_id FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
+                Long.class,
+                profileName,
+                sessionId);
     }
 
     private static String newChild() {

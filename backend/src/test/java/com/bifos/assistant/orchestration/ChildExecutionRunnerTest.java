@@ -60,22 +60,43 @@ class ChildExecutionRunnerTest {
         }
     }
 
-    @Autowired ChildExecutionRunner children;
-    @Autowired ExecutionRecorder recorder;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired MemoryService memories;
-    @Autowired MemoryRepository memoryRepository;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChildExecutionRunner children;
+
+    @Autowired
+    ExecutionRecorder recorder;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    MemoryRepository memoryRepository;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     /** 이 검사가 쓰는 에이전트와 사용자다. 다른 검사 클래스와 겹치지 않는 이름으로 둔다. */
     private static final List<String> MY_AGENTS = List.of("child-dad", "child-mom");
-    private static final List<String> MY_EMAILS =
-            List.of("child-dad@example.com", "child-mom@example.com");
+
+    private static final List<String> MY_EMAILS = List.of("child-dad@example.com", "child-mom@example.com");
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -112,8 +133,7 @@ class ChildExecutionRunnerTest {
                     AgentVisibility.PRIVATE,
                     user.id()));
         }
-        return new CurrentUser(
-                user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private Conversation conversationOf(CurrentUser user, String agentCode) {
@@ -123,13 +143,17 @@ class ChildExecutionRunnerTest {
 
     /** 부모 실행 하나를 뿌리로 만든다. */
     private AgentExecution parentOf(CurrentUser user, Conversation conversation, String agentCode) {
-        return recorder.start(
-                user, conversation, agents.findByCode(agentCode).orElseThrow(), null, null, 0L);
+        return recorder.start(user, conversation, agents.findByCode(agentCode).orElseThrow(), null, null, 0L);
     }
 
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(
-                runId, "sess-child", "completed", output, "example-model-large", "anthropic",
+                runId,
+                "sess-child",
+                "completed",
+                output,
+                "example-model-large",
+                "anthropic",
                 new TokenUsage(30L, 10L, 5L, 35L));
     }
 
@@ -198,8 +222,15 @@ class ChildExecutionRunnerTest {
         conversations.chooseModelIfActive(started.id(), dad.id(), "nvidia", "nemotron", null);
         Conversation conversation = conversations.findById(started.id()).orElseThrow();
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
-        stub().willReturn(new HermesRunResult("run-blocked", "sess-child", "failed", null, null, null,
-                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()));
+        stub().willReturn(new HermesRunResult(
+                "run-blocked",
+                "sess-child",
+                "failed",
+                null,
+                null,
+                null,
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+                TokenUsage.empty()));
 
         ChildResult result = children.run(dad, conversation, parent, "child-dad", "이것을 조사해라");
 
@@ -295,8 +326,7 @@ class ChildExecutionRunnerTest {
         assertThat(child.status()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(child.errorCode()).isEqualTo("HERMES_UNAVAILABLE");
         assertThat(child.parentExecutionId()).isEqualTo(parent.id());
-        assertThat(executions.findById(parent.id()).orElseThrow().status())
-                .isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(executions.findById(parent.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.RUNNING);
     }
 
     @Test
@@ -310,11 +340,12 @@ class ChildExecutionRunnerTest {
         ChildResult result = children.run(dad, conversation, parent, "child-dad", "지시");
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
-        assertThat(executionEvents
-                        .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(result.executionId()))
-                        .stream()
-                        .map(event -> event.eventType())
-                        .toList())
+        assertThat(
+                        executionEvents
+                                .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(result.executionId()))
+                                .stream()
+                                .map(event -> event.eventType())
+                                .toList())
                 .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
     }
 }

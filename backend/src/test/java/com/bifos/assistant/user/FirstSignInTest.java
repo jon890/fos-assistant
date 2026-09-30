@@ -36,15 +36,27 @@ class FirstSignInTest {
     private static final String NAME = "이모";
     private static final String PROFILE = "aunt";
 
-    @Autowired UserProvisioningService provisioning;
-    @Autowired AppUserRepository users;
-    @Autowired AllowedPersonRepository people;
-    @Autowired AgentRepository agents;
-    @Autowired HermesProperties hermesProperties;
-    @Autowired PeopleProperties peopleProperties;
+    @Autowired
+    UserProvisioningService provisioning;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AllowedPersonRepository people;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    HermesProperties hermesProperties;
+
+    @Autowired
+    PeopleProperties peopleProperties;
 
     /** 답을 정해 두지 않는다. 첫 로그인이 이 대역을 한 번도 부르지 않는지 본다. */
-    @MockitoBean HermesModelClient hermesModels;
+    @MockitoBean
+    HermesModelClient hermesModels;
 
     @BeforeEach
     void setUp() {
@@ -89,8 +101,7 @@ class FirstSignInTest {
         assertThat(agents.findByCode(PROFILE))
                 .get()
                 .extracting(Agent::costMode, Agent::credentialScope)
-                .containsExactly(
-                        peopleProperties.defaultCostMode(), peopleProperties.defaultCredentialScope());
+                .containsExactly(peopleProperties.defaultCostMode(), peopleProperties.defaultCredentialScope());
     }
 
     @Test

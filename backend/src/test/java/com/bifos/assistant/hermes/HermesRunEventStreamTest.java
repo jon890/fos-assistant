@@ -23,8 +23,7 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("초 단위 실수로 오는 걸린 시간을 밀리초 정수로 옮긴다")
     void convertsFractionalSecondsElapsedToIntegerMillis() {
-        RunEvent event =
-                parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");
+        RunEvent event = parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");
 
         assertThat(event.type()).isEqualTo("tool.completed");
         assertThat(event.toolName()).isEqualTo("web_search");
@@ -34,7 +33,8 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("걸린 시간이 0이면 0밀리초가 된다")
     void zeroElapsedBecomesZeroMillis() {
-        assertThat(parse("{\"event\": \"tool.completed\", \"duration\": 0}").durationMs()).isZero();
+        assertThat(parse("{\"event\": \"tool.completed\", \"duration\": 0}").durationMs())
+                .isZero();
     }
 
     @Test
@@ -49,8 +49,10 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("도구가 실패로 끝났는지를 읽는다")
     void readsWhetherToolEndedInFailure() {
-        assertThat(parse("{\"event\": \"tool.completed\", \"error\": true}").failed()).isTrue();
-        assertThat(parse("{\"event\": \"tool.completed\", \"error\": false}").failed()).isFalse();
+        assertThat(parse("{\"event\": \"tool.completed\", \"error\": true}").failed())
+                .isTrue();
+        assertThat(parse("{\"event\": \"tool.completed\", \"error\": false}").failed())
+                .isFalse();
     }
 
     @Test
@@ -65,9 +67,8 @@ class HermesRunEventStreamTest {
     @Test
     @DisplayName("사건이 data 안에 실려 와도 같은 칸을 읽는다")
     void readsSameFieldWhenEventIsNestedInData() {
-        RunEvent event =
-                parse("{\"data\": {\"event\": \"tool.completed\", \"tool\": \"grep\", \"duration\": 2.5,"
-                        + " \"error\": true, \"preview\": \"찾지 못했다\"}}");
+        RunEvent event = parse("{\"data\": {\"event\": \"tool.completed\", \"tool\": \"grep\", \"duration\": 2.5,"
+                + " \"error\": true, \"preview\": \"찾지 못했다\"}}");
 
         assertThat(event.type()).isEqualTo("tool.completed");
         assertThat(event.toolName()).isEqualTo("grep");

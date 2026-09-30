@@ -30,7 +30,9 @@ class HandoffTest {
         assertThat(handoff.rowCreated()).isTrue();
         assertThat(handoff.abandoned()).isFalse();
         assertThat(handoff.execution()).isSameAs(row);
-        assertThat(handoff.awaitRowDecided(deadlineAfter(Duration.ZERO))).as("줄이 정해졌다").isTrue();
+        assertThat(handoff.awaitRowDecided(deadlineAfter(Duration.ZERO)))
+                .as("줄이 정해졌다")
+                .isTrue();
     }
 
     @Test
@@ -79,7 +81,8 @@ class HandoffTest {
     void stopsWaitingAtDeadlineWhenNothingIsDecided() {
         Handoff handoff = new Handoff();
 
-        assertThat(handoff.awaitRowDecided(deadlineAfter(Duration.ofMillis(20)))).isFalse();
+        assertThat(handoff.awaitRowDecided(deadlineAfter(Duration.ofMillis(20))))
+                .isFalse();
         assertThat(handoff.awaitSettled(deadlineAfter(Duration.ofMillis(20)))).isFalse();
     }
 
@@ -102,9 +105,10 @@ class HandoffTest {
                 boolean requestGaveUp = abandoned.get(5, TimeUnit.SECONDS);
                 created.get(5, TimeUnit.SECONDS);
 
-                assertThat(requestGaveUp).as("%d번째 경합: 포기가 이겼으면 줄은 돌려주지 않는다", i)
-                        .isNotEqualTo(handoff.rowCreated());
-                assertThat(handoff.abandoned()).as("%d번째 경합: 실행 스레드가 보는 포기 표시", i).isEqualTo(requestGaveUp);
+                assertThat(requestGaveUp).as("%d번째 경합: 포기가 이겼으면 줄은 돌려주지 않는다", i).isNotEqualTo(handoff.rowCreated());
+                assertThat(handoff.abandoned())
+                        .as("%d번째 경합: 실행 스레드가 보는 포기 표시", i)
+                        .isEqualTo(requestGaveUp);
             }
         }
     }

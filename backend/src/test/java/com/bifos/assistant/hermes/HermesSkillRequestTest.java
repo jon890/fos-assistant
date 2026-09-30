@@ -37,7 +37,9 @@ class HermesSkillRequestTest {
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
-            calls.add(new Call(exchange.getRequestMethod(), exchange.getRequestURI().getPath(),
+            calls.add(new Call(
+                    exchange.getRequestMethod(),
+                    exchange.getRequestURI().getPath(),
                     exchange.getRequestURI().getQuery(),
                     exchange.getRequestHeaders().getFirst("Authorization"),
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
@@ -49,8 +51,14 @@ class HermesSkillRequestTest {
         });
         server.start();
         client = new HttpHermesSkillClient(new HermesProperties(
-                "keys", "http://127.0.0.1:" + server.getAddress().getPort() + "/", TOKEN, "http://listener.test",
-                Duration.ofMillis(10), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1)));
+                "keys",
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/",
+                TOKEN,
+                "http://listener.test",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)));
     }
 
     @AfterEach
@@ -69,14 +77,20 @@ class HermesSkillRequestTest {
             assertThat(call.path()).isEqualTo("/api/config");
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
         });
-        assertThat(new ObjectMapper().readValue(calls.get(0).body(), Map.class)).isEqualTo(Map.of(
-                "profile", "kid",
-                "config", Map.of("skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2")))));
-        assertThat(new ObjectMapper().readValue(calls.get(1).body(), Map.class)).isEqualTo(Map.of(
-                "profile", "kid",
-                "config", Map.of(
-                        "skills", Map.of("external_dirs", List.of()),
-                        "platform_toolsets", Map.of("api_server", List.of("web", "skills", "fos-assistant")))));
+        assertThat(new ObjectMapper().readValue(calls.get(0).body(), Map.class))
+                .isEqualTo(Map.of(
+                        "profile",
+                        "kid",
+                        "config",
+                        Map.of("skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2")))));
+        assertThat(new ObjectMapper().readValue(calls.get(1).body(), Map.class))
+                .isEqualTo(Map.of(
+                        "profile",
+                        "kid",
+                        "config",
+                        Map.of(
+                                "skills", Map.of("external_dirs", List.of()),
+                                "platform_toolsets", Map.of("api_server", List.of("web", "skills", "fos-assistant")))));
     }
 
     @Test
@@ -85,9 +99,8 @@ class HermesSkillRequestTest {
         response = "[{\"name\":\"weekly-plan\",\"description\":\"이번 주 계획\",\"category\":\"agent\","
                 + "\"enabled\":false,\"usage\":0,\"provenance\":\"agent\"},{\"name\":\"bare\"}]";
 
-        assertThat(client.list("kid")).containsExactly(
-                new HermesSkill("weekly-plan", "이번 주 계획", false),
-                new HermesSkill("bare", "", true));
+        assertThat(client.list("kid"))
+                .containsExactly(new HermesSkill("weekly-plan", "이번 주 계획", false), new HermesSkill("bare", "", true));
         assertThat(calls).singleElement().satisfies(call -> {
             assertThat(call.method()).isEqualTo("GET");
             assertThat(call.path()).isEqualTo("/api/skills");
@@ -104,8 +117,8 @@ class HermesSkillRequestTest {
 
         response = "{\"skills\":[]}";
         assertThatThrownBy(() -> client.list("kid"))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
 
     @Test
@@ -144,8 +157,8 @@ class HermesSkillRequestTest {
     @DisplayName("profile 이름이 규칙에 맞지 않으면 대시보드를 부르지 않는다")
     void doesNotCallDashboardForProfileNameBreakingRule() {
         assertThatThrownBy(() -> client.list("Kid/../x"))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThat(calls).isEmpty();
     }
 }

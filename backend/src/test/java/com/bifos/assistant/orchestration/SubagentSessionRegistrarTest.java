@@ -48,12 +48,23 @@ class SubagentSessionRegistrarTest {
     private static final List<String> MY_EMAILS = List.of("registrar-dad@example.com", "registrar-kid@example.com");
     private static final Long CONVERSATION_ID = 1L;
 
-    @Autowired SubagentSessionRegistrar registrar;
-    @Autowired HermesSessionBindingRepository bindings;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AppUserRepository users;
-    @Autowired ConversationRepository conversations;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    SubagentSessionRegistrar registrar;
+
+    @Autowired
+    HermesSessionBindingRepository bindings;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private AppUser dad;
     private AppUser kid;
@@ -109,9 +120,13 @@ class SubagentSessionRegistrarTest {
     @DisplayName("다른 에이전트에게 맡긴 FOS 실행 안의 하위 에이전트는 그 FOS 실행을 origin 으로 갖는다")
     void subagentInsideFosRunDelegatedToOtherAgentHasThatRunAsOrigin() {
         String delegatedRoot = newRoot();
-        AgentExecution delegated = McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE_B, delegatedRoot);
-        jdbc.update("UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
-                dadRun.id(), dadRun.id(), delegated.id());
+        AgentExecution delegated =
+                McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE_B, delegatedRoot);
+        jdbc.update(
+                "UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
+                dadRun.id(),
+                dadRun.id(),
+                delegated.id());
         String s3 = newChild();
 
         assertThat(registrar.register(PROFILE_B, delegatedRoot, delegatedRoot, s3))
@@ -133,7 +148,8 @@ class SubagentSessionRegistrarTest {
         assertRejected(PROFILE_B, root, s1, underBinding);
         assertRejected(PROFILE_B, root, root, underRoot);
 
-        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_B, underBinding)).isEmpty();
+        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_B, underBinding))
+                .isEmpty();
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_B, underRoot)).isEmpty();
     }
 
@@ -168,7 +184,8 @@ class SubagentSessionRegistrarTest {
                 results.add(future.get(30, TimeUnit.SECONDS));
             }
 
-            assertThat(results).as("결과 %s", results)
+            assertThat(results)
+                    .as("결과 %s", results)
                     .containsOnlyOnce(SubagentRegistrationResult.CREATED)
                     .filteredOn(result -> result == SubagentRegistrationResult.EXISTS)
                     .hasSize(threads - 1);
@@ -186,11 +203,13 @@ class SubagentSessionRegistrarTest {
         AgentExecution otherRun = McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE_A, otherRoot);
 
         assertThatThrownBy(() -> registrar.register(PROFILE_A, otherRoot, otherRoot, s1))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_CONFLICT));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_CONFLICT));
 
         HermesSessionBinding row = binding(PROFILE_A, s1);
-        assertThat(row.originExecutionId()).as("origin 은 %d 그대로", dadRun.id()).isEqualTo(dadRun.id())
+        assertThat(row.originExecutionId())
+                .as("origin 은 %d 그대로", dadRun.id())
+                .isEqualTo(dadRun.id())
                 .isNotEqualTo(otherRun.id());
         assertThat(row.userId()).isEqualTo(dad.id());
     }
@@ -224,7 +243,8 @@ class SubagentSessionRegistrarTest {
         assertRejected(PROFILE_A, root, root, conversationRoot);
 
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, compacted)).isEmpty();
-        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, conversationRoot)).isEmpty();
+        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, conversationRoot))
+                .isEmpty();
     }
 
     @Test
@@ -243,14 +263,15 @@ class SubagentSessionRegistrarTest {
     @Test
     @DisplayName("최상위 session 은 하위 에이전트로 등록하지 못한다")
     void cannotRegisterTopSessionAsSubagent() {
-        AgentExecution earlierTurn =
-                McpCallSigner.save(executions, dad.id(), CONVERSATION_ID, PROFILE_A, newRoot(), ExecutionStatus.SUCCEEDED);
+        AgentExecution earlierTurn = McpCallSigner.save(
+                executions, dad.id(), CONVERSATION_ID, PROFILE_A, newRoot(), ExecutionStatus.SUCCEEDED);
 
         assertRejected(PROFILE_A, root, root, root);
         assertRejected(PROFILE_A, root, root, earlierTurn.hermesSessionId());
 
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, root)).isEmpty();
-        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, earlierTurn.hermesSessionId())).isEmpty();
+        assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, earlierTurn.hermesSessionId()))
+                .isEmpty();
     }
 
     @Test
@@ -315,7 +336,8 @@ class SubagentSessionRegistrarTest {
 
     private long rowCount(String profileName, String sessionId) {
         return bindings.findAll().stream()
-                .filter(row -> row.profileName().equals(profileName) && row.sessionId().equals(sessionId))
+                .filter(row ->
+                        row.profileName().equals(profileName) && row.sessionId().equals(sessionId))
                 .count();
     }
 
@@ -326,8 +348,8 @@ class SubagentSessionRegistrarTest {
     private void assertRejected(String profileName, String parentRoot, String parent, String child) {
         assertThatThrownBy(() -> registrar.register(profileName, parentRoot, parent, child))
                 .as("profile=%s", profileName)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
     }
 
     private static String newRoot() {

@@ -47,8 +47,15 @@ class AgentRunnerSubmitFailureTest {
     private final HermesRunsClient hermes = mock(HermesRunsClient.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
-    private final Agent agent = Agent.of("runner", "실행기", PROFILE, API_BASE_URL,
-            CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, 1L);
+    private final Agent agent = Agent.of(
+            "runner",
+            "실행기",
+            PROFILE,
+            API_BASE_URL,
+            CostMode.API,
+            CredentialScope.DEDICATED,
+            AgentVisibility.PRIVATE,
+            1L);
     private final AgentExecution started = mock(AgentExecution.class);
     private final AgentExecution failed = mock(AgentExecution.class);
     private AgentRunner runner;
@@ -59,10 +66,16 @@ class AgentRunnerSubmitFailureTest {
         when(started.id()).thenReturn(3L);
         when(failed.id()).thenReturn(3L);
         when(failed.status()).thenReturn(ExecutionStatus.FAILED);
-        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(started);
+        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(started);
         when(executions.fail(any(), anyString())).thenReturn(failed);
-        runner = new AgentRunner(contextAssembler, hermes, executions, mock(ExecutionEventRecorder.class),
-                mock(ExecutionEventRepository.class), new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100));
+        runner = new AgentRunner(
+                contextAssembler,
+                hermes,
+                executions,
+                mock(ExecutionEventRecorder.class),
+                mock(ExecutionEventRepository.class),
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100));
     }
 
     @Test
@@ -107,7 +120,17 @@ class AgentRunnerSubmitFailureTest {
     }
 
     private AgentRunner.Run run() {
-        return runner.run(user, Conversation.startedBy(user.id(), "대화", 2L), agent, "일", null, null,
-                RunSession.fresh(), execution -> {}, (execution, runId) -> {}, () -> false, null);
+        return runner.run(
+                user,
+                Conversation.startedBy(user.id(), "대화", 2L),
+                agent,
+                "일",
+                null,
+                null,
+                RunSession.fresh(),
+                execution -> {},
+                (execution, runId) -> {},
+                () -> false,
+                null);
     }
 }

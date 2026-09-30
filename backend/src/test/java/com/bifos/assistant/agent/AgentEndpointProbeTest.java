@@ -42,7 +42,8 @@ class AgentEndpointProbeTest {
 
         probe(keyDir, "dad", "dad-key").requireReachable(baseUrl + "/p/dad", "dad");
 
-        assertThat(calls).singleElement()
+        assertThat(calls)
+                .singleElement()
                 .satisfies(call -> assertThat(call.path()).isEqualTo("/p/dad/v1/capabilities"));
     }
 
@@ -53,7 +54,8 @@ class AgentEndpointProbeTest {
 
         probe(keyDir, "dad", "dad-key").requireReachable(baseUrl + "/p/dad", "dad");
 
-        assertThat(calls).singleElement()
+        assertThat(calls)
+                .singleElement()
                 .satisfies(call -> assertThat(call.authorization()).isEqualTo("Bearer dad-key"));
     }
 
@@ -91,16 +93,21 @@ class AgentEndpointProbeTest {
 
         probe(keyDir, "dad", "dad-key").requireReachable(baseUrl + "/p/dad/", "dad");
 
-        assertThat(calls).singleElement()
+        assertThat(calls)
+                .singleElement()
                 .satisfies(call -> assertThat(call.path()).isEqualTo("/p/dad/v1/capabilities"));
     }
 
     private AgentEndpointProbe probe(Path keyDir, String profile, String key) throws IOException {
         Files.writeString(keyDir.resolve(profile), key);
-        HermesProperties properties = new HermesProperties(keyDir.toString(),
-                "https://hermes-dashboard.example.com", "test-dashboard-token",
+        HermesProperties properties = new HermesProperties(
+                keyDir.toString(),
+                "https://hermes-dashboard.example.com",
+                "test-dashboard-token",
                 "https://hermes-listener.example.com",
-                Duration.ofMillis(10), Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
                 Duration.ofSeconds(2));
         return new AgentEndpointProbe(new HermesProfileKeyStore(properties), properties);
     }
@@ -109,7 +116,8 @@ class AgentEndpointProbeTest {
     private String startHermes(int status) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
-            calls.add(new Call(exchange.getRequestURI().getPath(),
+            calls.add(new Call(
+                    exchange.getRequestURI().getPath(),
                     exchange.getRequestHeaders().getFirst("Authorization")));
             byte[] body = "{}".getBytes();
             exchange.getResponseHeaders().add("Content-Type", "application/json");

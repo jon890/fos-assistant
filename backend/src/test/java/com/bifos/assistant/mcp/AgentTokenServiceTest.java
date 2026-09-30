@@ -24,11 +24,19 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("test")
 class AgentTokenServiceTest {
-    @Autowired AgentTokenService tokens;
-    @Autowired AgentTokenRepository tokenRepository;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    AgentTokenService tokens;
 
-    @BeforeEach void setUp() { tokenRepository.deleteAll(); }
+    @Autowired
+    AgentTokenRepository tokenRepository;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @BeforeEach
+    void setUp() {
+        tokenRepository.deleteAll();
+    }
 
     @Test
     @DisplayName("발급한 원문은 응답에만 있고 저장된 행에는 없다")
@@ -63,7 +71,9 @@ class AgentTokenServiceTest {
             assertValidationFailed(() -> tokens.issue(name, "hermes"), name);
         }
         assertValidationFailed(() -> tokens.issue(null, "hermes"), null);
-        assertThat(tokens.issue("a".repeat(64), "hermes").profileName()).as("64자까지는 받는다").hasSize(64);
+        assertThat(tokens.issue("a".repeat(64), "hermes").profileName())
+                .as("64자까지는 받는다")
+                .hasSize(64);
     }
 
     @Test
@@ -71,16 +81,22 @@ class AgentTokenServiceTest {
     void revokeKeepsRowAndFillsRevokedTime() {
         var issued = tokens.issue("hermes-profile", "hermes");
         tokens.revoke(issued.token().id());
-        assertThat(tokenRepository.findById(issued.token().id())).isPresent().get().extracting(AgentToken::revokedAt).isNotNull();
+        assertThat(tokenRepository.findById(issued.token().id()))
+                .isPresent()
+                .get()
+                .extracting(AgentToken::revokedAt)
+                .isNotNull();
     }
 
     @Test
     @DisplayName("인증하면 마지막 사용 시각을 갱신하고 profile 을 증명한다")
     void authenticationUpdatesLastUsedTimeAndProvesProfile() {
         var issued = tokens.issue("hermes-profile", "hermes");
-        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt()).isNull();
+        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt())
+                .isNull();
         McpPrincipal principal = tokens.authenticate(issued.rawToken());
-        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt()).isNotNull();
+        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt())
+                .isNotNull();
         assertThat(principal.profileName()).isEqualTo("hermes-profile");
         assertThat(principal.tokenHash()).isEqualTo(AgentTokenService.hash(issued.rawToken()));
         assertThat(principal.toString()).doesNotContain(principal.tokenHash());
@@ -92,13 +108,15 @@ class AgentTokenServiceTest {
         String raw = "unbound-" + UUID.randomUUID();
         long id = McpCallSigner.insertUnboundToken(jdbc, raw, "unbound");
         assertThatThrownBy(() -> tokens.authenticate(raw))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.UNAUTHENTICATED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.UNAUTHENTICATED));
         assertThat(tokenRepository.findById(id).orElseThrow().lastUsedAt()).isNull();
     }
 
     private static void assertValidationFailed(ThrowingCallable call, String input) {
         assertThatThrownBy(call)
                 .as("입력 %s", input)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 }

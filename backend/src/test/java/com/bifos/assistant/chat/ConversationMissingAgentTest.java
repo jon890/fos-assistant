@@ -53,16 +53,35 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 @ActiveProfiles("test")
 class ConversationMissingAgentTest {
 
-    @Autowired ChatService chat;
-    @Autowired ConversationAccess access;
-    @Autowired AgentService agentService;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AgentRepository agents;
-    @Autowired MemoryRepository memories;
-    @Autowired AppUserRepository users;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    AppUserRepository users;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private MockMvc mvc;
@@ -77,9 +96,14 @@ class ConversationMissingAgentTest {
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
-        mvc = MockMvcBuilders
-                .standaloneSetup(new ChatController(chat, currentUser, users, agentService, access,
-                        new ChatEventStreams(Duration.ofSeconds(20)), null))
+        mvc = MockMvcBuilders.standaloneSetup(new ChatController(
+                        chat,
+                        currentUser,
+                        users,
+                        agentService,
+                        access,
+                        new ChatEventStreams(Duration.ofSeconds(20)),
+                        null))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
@@ -88,12 +112,21 @@ class ConversationMissingAgentTest {
     }
 
     private Agent agent(String code) {
-        return agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, dad.id()));
+        return agents.save(Agent.of(
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                dad.id()));
     }
 
     private UUID conversationOf(Long agentId, String title) {
-        return conversations.save(Conversation.startedBy(dad.id(), title, agentId)).publicId();
+        return conversations
+                .save(Conversation.startedBy(dad.id(), title, agentId))
+                .publicId();
     }
 
     private String sendBody(UUID conversationId) {
@@ -115,8 +148,10 @@ class ConversationMissingAgentTest {
                 .andExpect(jsonPath("$[?(@.id == '" + keptId + "')].agentCode").value("kept"))
                 .andExpect(jsonPath("$[?(@.id == '" + keptId + "')].agentName").value("kept"))
                 .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].title").value("행이 없는 대화"))
-                .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].agentCode").value(org.hamcrest.Matchers.contains((Object) null)))
-                .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].agentName").value(org.hamcrest.Matchers.contains((Object) null)));
+                .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].agentCode")
+                        .value(org.hamcrest.Matchers.contains((Object) null)))
+                .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].agentName")
+                        .value(org.hamcrest.Matchers.contains((Object) null)));
     }
 
     @Test
