@@ -42,8 +42,10 @@ phase 01 뒤로 대화 목록과 실행 기록의 `agentCode`, `agentName` 이 n
 3. `UsageExecution` 타입의 두 칸을 `string | null` 로 바꾸고 카드와 표를 맞춘다
 4. `test/unit/agent-label.test.ts` 를 더한다. 이름이 있으면 그 이름, null 이면 「지운 에이전트」 다. 다른 파일처럼 `../../web/src/lib/format.ts` 를 불러온다
 5. `test/browser/missing-agent.spec.ts` 를 더한다. `page.route` 로 응답을 바꿔 끼운다
-   - `/api/chat/conversations` 목록에 `agentCode`, `agentName` 이 null 인 대화 한 줄을 넣고 그 대화(`/chat/<id>`)를 연다. 메시지 목록과 도는 turn 응답도 필요한 만큼 바꿔 끼운다. 머리줄에 「지운 에이전트」 가 보이고, 모델 고르기 단추가 꺼져 있고, 사진 단추가 없다
-   - `/api/usage/executions` 에 `agentCode`, `agentName` 이 null 인 줄을 넣고 실행 기록 탭을 연다. 「지운 에이전트」 가 보이고 「null」 이라는 글이 없다
+   - `/api/chat/conversations` 목록에 `agentCode`, `agentName` 이 null 인 대화 한 줄을 넣고 그 대화(`/chat/<id>`)를 연다. 메시지 목록과 도는 turn 응답도 필요한 만큼 바꿔 끼운다. 대화 화면이 읽는 이 셋은 모두 브라우저의 fetch 라 바꿔 끼울 수 있다
+   - 「지운 에이전트」 가 보이는 곳은 폭마다 다르다. desktop 은 대화 머리줄에, mobile 은 셸 윗줄의 제목에 보인다. 대화를 열면 머리줄은 mobile 에서 `hidden md:flex` 로 숨는다(`shell/app-shell.tsx` 의 `md:hidden` 윗줄이 대신 제목을 보인다). `testInfo.project.name` 으로 나눈다(`test/browser/usage.spec.ts` 본보기)
+   - 두 폭 모두 모델 고르기 단추(`data-testid="model-picker"`)가 꺼져 있고 사진 단추가 없다
+   - 실행 기록은 브라우저 검사에 넣지 않는다. 사용량 화면은 서버 컴포넌트(`web/src/app/usage/page.tsx`)가 실행 기록을 읽어 `page.route` 가 닿지 않고, 브라우저 검사 backend 에는 에이전트 행을 없앨 API 가 없다. 카드와 표의 제목은 `agentLabel` 을 쓰므로 4번의 단위 테스트가 그 글을 확인한다
    - 단추와 영역은 같은 화면을 다루는 기존 spec 의 찾는 방법을 따른다
 
 ## 검증
