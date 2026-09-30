@@ -3,11 +3,13 @@
   "description": "Control Plane MCP 에 agent_list, agent_status, agent_delegate, agent_stop 을 연다 — Hermes 가 다른 에이전트를 부르고 Control Plane 은 경계만 검사한다(ADR-017, ADR-031)",
   "status": "pending",
   "created_at": "2026-09-29",
-  "total_phases": 3,
+  "total_phases": 5,
   "current_phase": 2,
   "phases": [
     { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" }
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "deep" },
+    { "number": 5, "file": "phase-05.md", "execution_profile": "deep" }
   ]
 }
