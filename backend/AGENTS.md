@@ -216,6 +216,54 @@ Flyway 가 요구하는 `V<번호>__<이름>` 클래스의 `TypeName` 도 같은
 그 대신 기준에 든 파일에 같은 규칙의 위반이 새로 생겨도 잡지 못한다.
 그 파일을 고칠 때는 그 규칙의 위반을 모두 고치고 기준 줄을 지우는 것을 원칙으로 한다.
 
+### 자동으로 고치기
+
+위 규칙 가운데 기계적으로 고칠 수 있는 넷은 OpenRewrite 레시피가 고친다.
+검사는 Checkstyle 이 하고, OpenRewrite 는 고치는 데만 쓴다.
+
+```bash
+# cwd: backend/
+./gradlew rewriteChanged
+./gradlew spotlessApply
+```
+
+| Checkstyle 규칙 | 레시피 |
+| --- | --- |
+| 전체 이름 참조 금지 (`fullyQualifiedName`) | `org.openrewrite.java.ShortenFullyQualifiedTypeReferences` |
+| `NeedBraces` | `org.openrewrite.staticanalysis.NeedBraces` |
+| `EmptyLineSeparator` (메서드와 생성자) | `org.openrewrite.java.format.BlankLines` |
+| 직접 만든 로거 금지 (`lombokLogger`) | `org.openrewrite.java.migrate.lombok.log.UseSlf4j` |
+
+아래는 레시피가 없어 자동으로 고치지 않는다. Checkstyle 보고서를 보고 손으로 고친다.
+
+- 직접 쓴 private 빈 생성자 (`privateEmptyConstructor`)
+- 엔티티의 손 접근자 (`entityHandwrittenAccessor`)
+- 생성자 주입 (`requiredArgsConstructor`)
+- 인터페이스 추상 메서드 선언 사이의 빈 줄. `BlankLines` 의 기본 모양이 0줄이다
+
+**OpenRewrite 도 Spotless 처럼 바뀐 파일만 고친다.**
+범위는 `HEAD` 와 `origin/main` 의 공통 조상에서 작업 트리까지 바뀐 Java 파일과, git 이 추적하지 않는 새 Java 파일이다.
+작업 트리와 비교하므로 커밋하지 않은 편집이 있는 파일도 범위에 들고, 그 편집은 그대로 남는다.
+비교 기준이 공통 조상이므로 `git fetch origin` 뒤에 돌린다.
+
+플러그인에는 범위를 정하는 설정이 없어 `rewriteChanged` 가 범위를 맡는다.
+
+- `rewriteRun` 이 파일을 바꾸기 직전에 `backend/` 아래 파일을 저장소 밖 임시 디렉터리에 떠 둔다
+- `rewriteRun` 이 끝나면 범위 밖 파일을 떠 둔 내용으로 되돌린다
+- `rewriteRun` 이 실패하면 범위 안 파일까지 모두 되돌린다
+- 범위 안 파일이 없으면 레시피를 돌리지 않는다
+
+**`./gradlew rewriteRun` 을 직접 부르지 않는다.** 저장소 전체를 고친다.
+
+`spotlessApply` 를 뒤에 돌리는 까닭은 레시피가 바꾼 모양을 포매터가 정리하기 때문이다.
+`UseSlf4j` 가 남긴 쓰지 않는 `Logger` import 도 이때 지워진다.
+
+- `build.gradle.kts` 는 레시피 대상에서 뺐다. Java 레시피가 Kotlin 스크립트를 읽다가 멈춘다
+- 플러그인은 7.39.0 에 둔다. 7.40.0 과 7.41.0 은 Maven Central 에 없는 `rewrite-bom` 8.91.0 을 가리켜 받지 못한다
+- Gradle 기본 메모리(heap 512 MiB, Metaspace 384 MiB)에서는 오래 쓴 daemon 이 `rewriteRun` 도중 Metaspace 부족으로 멈춘 적이 있다.
+  그래서 `gradle.properties` 의 `org.gradle.jvmargs` 로 daemon 메모리를 늘렸다. 한 번 돌면 heap 을 600 MB 가까이, Metaspace 를 150 MB 가까이 쓴다
+- daemon 이 멈추면 되돌리는 단계도 돌지 못한다. 떠 둔 디렉터리는 `rewriteChanged:` 로 시작하는 로그 줄에 있다
+
 ## 포맷
 
 Java 포맷은 Spotless 8.10.3 의 palantir-java-format 2.100.0 이 정한다. 들여쓰기는 4칸이고 한 줄은 120자다.

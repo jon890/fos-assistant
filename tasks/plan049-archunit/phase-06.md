@@ -92,3 +92,5 @@ scripts/check-public-safe.sh
 | `backend/gradle/libs.versions.toml` | 수정 |
 | `backend/build.gradle.kts` | 수정 |
 | `backend/AGENTS.md` | 수정 |
+| `backend/gradle.properties` | 신규 |
+| `.gitignore` | 수정 |
