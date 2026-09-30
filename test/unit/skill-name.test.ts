@@ -4,6 +4,7 @@ import {
   hasBodyAfterFrontmatter,
   HERMES_SKILL_NAME_PATTERN,
   indexedDescriptionLength,
+  isCountableDescription,
   SKILL_NAME_PATTERN,
 } from "../../web/src/lib/skill.ts";
 
@@ -34,4 +35,20 @@ test("앞머리 뒤에 공백뿐이면 본문이 없다", () => {
   assert.ok(hasBodyAfterFrontmatter("\n# 본문\n"));
   assert.ok(!hasBodyAfterFrontmatter(""));
   assert.ok(!hasBodyAfterFrontmatter("\n  \n"));
+});
+
+test("한 줄의 보통 설명은 화면이 글자 수를 센다", () => {
+  assert.ok(isCountableDescription("주간 계획을 세운다", false));
+  assert.ok(isCountableDescription("요리 🍳 it's", false), "가운데 작은따옴표 하나는 센다");
+});
+
+test("여러 줄 설명은 서버가 이어 붙이므로 화면이 세지 않는다", () => {
+  assert.ok(!isCountableDescription("", true));
+  assert.ok(!isCountableDescription("주간 계획", true));
+});
+
+test("YAML 이 짧게 읽는 설명은 화면이 세지 않고 서버에 맡긴다", () => {
+  for (const value of ["줄\\n바꿈", "it''s", "'여는 따옴표만", "\"여는 따옴표만"]) {
+    assert.ok(!isCountableDescription(value, false), value);
+  }
 });

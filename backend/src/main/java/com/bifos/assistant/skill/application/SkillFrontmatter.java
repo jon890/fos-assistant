@@ -4,9 +4,14 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.regex.Pattern;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Representer;
+import org.yaml.snakeyaml.resolver.Resolver;
 
 /**
  * {@code SKILL.md} 앞머리에서 읽은 이름과 설명이다.
@@ -19,7 +24,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  *
  * @param name 앞머리의 {@code name}. 앞뒤 공백을 뺀 값이다
  * @param description 앞머리의 {@code description}. 앞뒤 공백을 뺀 값이고 화면에 보이는 값이다
- * @param rawDescription 앞머리의 {@code description} 을 문자열로 바꾼 원래 값. 앞뒤를 빼지 않는다
+ * @param rawDescription 앞머리의 {@code description} 을 문자열로 바꾼 원래 값. 앞뒤를 빼지 않는다.
+ *     날짜처럼 보이는 값은 적힌 글자 그대로다. {@link TextTimestampResolver} 를 본다
  * @param hasBody 닫는 {@code ---} 줄 뒤에 공백이 아닌 글이 있는가
  */
 public record SkillFrontmatter(String name, String description, String rawDescription, boolean hasBody) {
@@ -52,7 +58,14 @@ public record SkillFrontmatter(String name, String description, String rawDescri
         Object loaded;
         try {
             // 태그로 임의의 객체를 만들지 않는 생성기다. 사용자가 올린 글을 그대로 읽는 자리라서다.
-            loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(yaml);
+            LoaderOptions options = new LoaderOptions();
+            loaded = new Yaml(
+                            new SafeConstructor(options),
+                            new Representer(new DumperOptions()),
+                            new DumperOptions(),
+                            options,
+                            new TextTimestampResolver())
+                    .load(yaml);
         } catch (RuntimeException ex) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md frontmatter is not valid YAML", ex);
         }
@@ -112,5 +125,23 @@ public record SkillFrontmatter(String name, String description, String rawDescri
 
     private static ApiException invalid(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);
+    }
+
+    /**
+     * 날짜처럼 보이는 값을 {@link java.util.Date} 로 바꾸지 않고 적힌 글자 그대로 둔다.
+     *
+     * <p>{@code description: 2024-01-01} 을 {@code Date} 로 읽으면 {@code Date.toString()} 이 실행 환경의 시간대로
+     * 옮긴 「Mon Jan 01 09:00:00 KST 2024」 가 되어, Hermes 의 {@code str()} 인 「2024-01-01」 과 화면의 설명도 글자
+     * 수도 달라진다. 글자 그대로 두면 날짜와 {@code 2024-01-01 10:00:00} 같은 시각이 Hermes 와 같다. 시간대가 붙은
+     * 값({@code 2024-01-01T10:00:00Z})은 Hermes 가 다른 모양으로 옮겨 몇 글자 다를 수 있다.
+     */
+    private static final class TextTimestampResolver extends Resolver {
+
+        @Override
+        public void addImplicitResolver(Tag tag, Pattern regexp, String first, int limit) {
+            if (!Tag.TIMESTAMP.equals(tag)) {
+                super.addImplicitResolver(tag, regexp, first, limit);
+            }
+        }
     }
 }

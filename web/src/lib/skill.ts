@@ -82,6 +82,15 @@ export function indexedDescriptionLength(value: string): number {
   return Array.from(value.trim().replace(/^['"]+/, "").replace(/['"]+$/, "")).length;
 }
 
+/**
+ * 화면이 description 글자 수를 세도 되는 값인지 본다. 여러 줄이면 서버가 값을 이어 붙이고, 백슬래시나 `''` 는
+ * YAML 이 따옴표 안에서 한 글자로 줄이며, 여는 따옴표가 남았으면 뒤에 주석이 붙어 따옴표를 못 벗긴 것이다.
+ * 이런 값을 화면이 세면 서버보다 많이 세어 저장할 수 있는 값을 막으므로, 세지 않고 서버에 맡긴다.
+ */
+export function isCountableDescription(value: string, multiline: boolean): boolean {
+  return !multiline && !/[\\]|''|^['"]/.test(value);
+}
+
 /** 앞머리 뒤의 글이 공백뿐이 아니면 참이다. 백엔드는 본문이 빈 스킬을 거절한다. */
 export function hasBodyAfterFrontmatter(rest: string): boolean {
   return rest.trim() !== "";

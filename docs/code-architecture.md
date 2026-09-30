@@ -435,8 +435,8 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 단락의 글은 `skill` 패키지가 갖고 `ArtifactService.agentPreamble` 이 결과물 폴더 단락 뒤에 붙인다.
 근거는 [ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「모델에게 `skill_manage` 를 쓰지 말라고 알린다」 에 있다.
 
-사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 한 줄이 늘어 입력이 조금 커지지만,
-에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다.
+두 단락은 사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 두 단락만큼 입력이 조금 커지지만,
+에이전트가 이번 turn 에 파일을 만들지, 스킬을 고치려 할지 미리 알 수 없다.
 
 `ArtifactService.agentPreamble(Conversation conversation)` 은 폴더를 만드는 내부 번호와
 도구에 넘길 공개 UUID 를 같은 대화에서 가져온다.

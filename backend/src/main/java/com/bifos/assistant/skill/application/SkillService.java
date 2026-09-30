@@ -179,13 +179,14 @@ public class SkillService {
         SkillFrontmatter frontmatter = requireSkillMd(name, skillMd);
         List<SkillFileInput> inputs = requireFiles(files);
         Map<String, SkillBundle> current = store.readCurrent(profile);
-        SkillBundle uploaded = uploadedBundle(profile, current, name);
+        Map<String, SkillBundle> pending = store.readPending(profile);
+        SkillBundle uploaded = uploadedBundle(current, pending, name);
         boolean creating = uploaded == null;
         if (creating && publisher.list(profile).stream().anyMatch(s -> s.name().equals(name))) {
             throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "Hermes already has a skill with this name");
         }
         int max = properties.maxPerAgent();
-        if (creating && uploadedNames(current, store.readPending(profile)).size() >= max) {
+        if (creating && uploadedNames(current, pending).size() >= max) {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED, "an agent can have at most " + max + " uploaded skills");
         }
@@ -243,10 +244,20 @@ public class SkillService {
         events.publishEvent(new SkillsChanged(agent.id()));
     }
 
-    /** 지금 버전의 그 스킬, 없으면 표식 없이 남은 더 새 버전의 그 스킬이다. 둘 다 없으면 {@code null} 이다. */
+    /**
+     * 지금 버전의 그 스킬, 없으면 표식 없이 남은 더 새 버전의 그 스킬이다. 둘 다 없으면 {@code null} 이다.
+     * 더 새 버전은 지금 버전에 없을 때만 읽는다.
+     */
     private SkillBundle uploadedBundle(String profile, Map<String, SkillBundle> current, String name) {
         SkillBundle bundle = current.get(name);
         return bundle != null ? bundle : store.readPending(profile).get(name);
+    }
+
+    /** 이미 읽은 더 새 버전으로 찾는다. 같은 트랜잭션에서 그 버전을 다시 읽지 않으려는 저장이 쓴다. */
+    private static SkillBundle uploadedBundle(
+            Map<String, SkillBundle> current, Map<String, SkillBundle> pending, String name) {
+        SkillBundle bundle = current.get(name);
+        return bundle != null ? bundle : pending.get(name);
     }
 
     private static Set<String> uploadedNames(Map<String, SkillBundle> current, Map<String, SkillBundle> pending) {

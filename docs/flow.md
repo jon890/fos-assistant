@@ -1372,7 +1372,7 @@ sequenceDiagram
     participant H as Hermes
 
     C->>D: turn 을 시작할 때 대화 폴더를 만든다
-    C->>H: 실행 입력 맨 앞에 결과물 폴더 단락
+    C->>H: 실행 입력 맨 앞에 결과물 폴더 단락과 스킬 관리 단락
     alt artifact_write 도구가 있다
         H->>C: artifact_write 로 HTML 과 사진 저장을 요청한다
         C->>D: origin 실행의 사용자와 대화 주인을 확인하고 저장한다

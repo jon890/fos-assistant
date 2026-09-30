@@ -3,6 +3,7 @@ package com.bifos.assistant.skill;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.skill.application.SkillFrontmatter;
+import com.bifos.assistant.skill.application.SkillService;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -54,6 +55,21 @@ class SkillFrontmatterTest {
         assertThat(frontmatter.rawDescription()).isEqualTo("  '가나다'  ");
         assertThat(frontmatter.rawDescriptionLength()).isEqualTo(9);
         assertThat(frontmatter.description()).as("화면에 보이는 설명은 앞뒤 공백만 뺀다").isEqualTo("'가나다'");
+    }
+
+    @Test
+    void 날짜처럼_보이는_설명은_적힌_글자_그대로_세어_60자_한도에_걸리지_않는다() {
+        // Hermes 는 이 값을 날짜로 읽고 str() 로 「2024-01-01」 을 만든다. 시간대에 따라 바뀌는 글이 되면 안 된다.
+        SkillFrontmatter date = SkillFrontmatter.parse(skillMd("description: 2024-01-01", "# 본문"));
+        SkillFrontmatter dateTime = SkillFrontmatter.parse(skillMd("description: 2024-01-01 10:00:00", "# 본문"));
+
+        assertThat(date.description()).isEqualTo("2024-01-01");
+        assertThat(date.rawDescription()).isEqualTo("2024-01-01");
+        assertThat(date.indexedDescriptionLength())
+                .isEqualTo(10)
+                .isLessThanOrEqualTo(SkillService.MAX_NEW_DESCRIPTION_CHARS);
+        assertThat(dateTime.rawDescription()).isEqualTo("2024-01-01 10:00:00");
+        assertThat(dateTime.rawDescriptionLength()).isEqualTo(19);
     }
 
     @Test

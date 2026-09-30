@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   hasBodyAfterFrontmatter,
   indexedDescriptionLength,
+  isCountableDescription,
   MAX_DESCRIPTION_CHARS,
   MAX_NEW_DESCRIPTION_CHARS,
   SKILL_NAME_PATTERN,
@@ -89,15 +90,6 @@ function frontmatterField(block: string, key: string): { value: string; multilin
   const value = blockMarker ? "" : (quoted ? quoted[2]! : inline.replace(/(^|\s)#.*$/, "")).trim();
   const next = lines.slice(index + 1).find((line) => line.trim() !== "");
   return { value, multiline: blockMarker || (next !== undefined && /^\s/.test(next)) };
-}
-
-/**
- * 화면이 description 글자 수를 세도 되는 값인지 본다. 여러 줄이면 서버가 값을 이어 붙이고, 백슬래시나 `''` 는
- * YAML 이 따옴표 안에서 한 글자로 줄이며, 여는 따옴표가 남았으면 뒤에 주석이 붙어 따옴표를 못 벗긴 것이다.
- * 이런 값을 화면이 세면 서버보다 많이 세어 저장할 수 있는 값을 막으므로, 세지 않고 서버에 맡긴다.
- */
-function isCountable(description: { value: string; multiline: boolean }): boolean {
-  return !description.multiline && !/[\\]|''|^['"]/.test(description.value);
 }
 
 function formatSize(bytes: number): string {
@@ -187,7 +179,7 @@ export function SkillEditor({ code, initial }: Props) {
     if (!hasBodyAfterFrontmatter(body.slice(frontmatter[0].length))) {
       return "SKILL.md 앞머리 아래에 스킬 본문을 적어 주세요.";
     }
-    if (description !== null && isCountable(description)) {
+    if (description !== null && isCountableDescription(description.value, description.multiline)) {
       if (Array.from(description.value).length > MAX_DESCRIPTION_CHARS) {
         return `description 은 ${MAX_DESCRIPTION_CHARS.toLocaleString("ko-KR")}자까지 쓸 수 있어요.`;
       }
