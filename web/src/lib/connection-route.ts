@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { callControlPlane, type ControlPlaneResult } from "@/lib/control-plane";
+import { callControlPlane } from "@/lib/control-plane";
+import type { ControlPlaneResult } from "@/lib/control-plane-result";
 
 const MESSAGES: Record<string, string> = {
   ACCOUNTBOOK_TOKEN_REJECTED: "가계부 토큰을 확인하지 못했어요. 토큰을 다시 확인해 주세요.",
