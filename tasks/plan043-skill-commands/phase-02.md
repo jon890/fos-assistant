@@ -76,5 +76,8 @@ cd web && pnpm test:browser
 | `web/src/components/chat/composer.tsx` | 수정 |
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
+| `web/src/components/chat/message-list.tsx` | 수정 |
+| `web/src/components/error-message.ts` | 수정 |
+| `test/unit/error-message.test.ts` | 수정 |
 | `docs/flow.md` | 수정 |
 | `test/browser/skill-command.spec.ts` | 신규 |
