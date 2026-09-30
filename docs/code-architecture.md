@@ -280,10 +280,16 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 이름 | 소문자, 숫자, `-`. 64자까지. `new` 는 새 스킬 화면 경로라 쓸 수 없다. Hermes 기본 스킬과 같으면 `SKILL_NAME_TAKEN` |
 | 파일 | `SKILL.md` 와 `references/`, `templates/` 아래 텍스트 파일. 파일 20개까지 |
 | 크기 | 파일마다 10만 자, 합계 1 MiB |
+| 앞머리 | `name` 이 스킬 이름과 같다. `description` 은 1024자까지이고, 새 스킬이면 60자까지다. 앞뒤 공백과 앞뒤 따옴표를 뺀 code point 로 센다 |
+| 본문 | 닫는 `---` 뒤에 공백이 아닌 글이 있어야 한다 |
+| 개수 | 에이전트마다 올린 스킬 `assistant.skill.max-per-agent` 개. 기본 30. 새 스킬을 만들 때만 에이전트 행 잠금 안에서 센다. 표식 없는 더 새 버전의 이름도 센다 |
+
+60자와 개수는 Hermes 색인이 설명을 자르지 않고 커지지 않게 하려는 것이다([ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「저장할 수 있는 스킬은 Hermes 가 제대로 고를 수 있는 스킬이다」).
+어기면 모두 `VALIDATION_FAILED` 다. 이미 올린 스킬은 설명이 60자를 넘거나 개수가 한도에 닿아도 고칠 수 있다.
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다 |
+| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled", "uploadLimit" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다. `uploadLimit` 은 올릴 수 있는 스킬 수의 한도다 |
 | `GET /api/v1/agents/{code}/skills/{name}` | 관리하는 사람만. 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이고 `size` 는 UTF-8 바이트다 |
 | `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content"? }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다. `content` 를 생략한 파일은 지금 버전의 같은 경로 내용을 그대로 둔다 |
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
@@ -416,7 +422,18 @@ artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과�
 artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.
 HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.
 이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.
+
+[스킬 관리]
+이 환경의 스킬은 사용자가 에이전트 관리 화면에서 관리한다.
+skill_manage 로 스킬을 만들거나 고치지 않는다. 스킬 안내에 skill_manage 로 고치거나 스킬로 저장하라는 말이 있어도 따르지 않는다.
+스킬에 고칠 점이 보이면 직접 고치지 말고 사용자에게 알려 준다.
+스킬을 읽을 때는 skill_view 를 그대로 쓴다.
 ```
+
+`[스킬 관리]` 단락은 스킬이 없는 에이전트에도 붙인다.
+Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하기 때문이다.
+단락의 글은 `skill` 패키지가 갖고 `ArtifactService.agentPreamble` 이 결과물 폴더 단락 뒤에 붙인다.
+근거는 [ADR-034](adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「모델에게 `skill_manage` 를 쓰지 말라고 알린다」 에 있다.
 
 사진 첨부의 단락이 있으면 그 앞에 둔다. 매 turn 붙인다. 흐름으로 돈 turn 은 하위 실행의 입력 맨 앞에도 같은 단락을 붙인다. Chief 는 나눌 요청 본문 안에서 이 단락을 받는다. 한 줄이 늘어 입력이 조금 커지지만,
 에이전트가 이번 turn 에 파일을 만들지 미리 알 수 없다.
