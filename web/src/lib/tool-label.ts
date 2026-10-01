@@ -22,8 +22,12 @@ const UNKNOWN = { running: "도구를 쓰는 중", done: "도구 사용" };
 
 export function toolLabel(toolName: string | null, running: boolean): string {
   // MCP 도구는 `mcp__{서버}__{도구}` 로 온다. 마지막 `__` 뒤의 이름으로 표를 찾는다.
-  const name = toolName !== null && toolName.startsWith("mcp__")
-    ? toolName.slice(toolName.lastIndexOf("__") + 2) : toolName;
-  const label = (name !== null && Object.hasOwn(LABELS, name) ? LABELS[name] : undefined) ?? UNKNOWN;
+  const name =
+    toolName !== null && toolName.startsWith("mcp__")
+      ? toolName.slice(toolName.lastIndexOf("__") + 2)
+      : toolName;
+  const label =
+    (name !== null && Object.hasOwn(LABELS, name) ? LABELS[name] : undefined) ??
+    UNKNOWN;
   return running ? label.running : label.done;
 }

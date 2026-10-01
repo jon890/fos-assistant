@@ -1,8 +1,13 @@
 /** 이름이 없는 사건은 목표나 preview로 구분하고, 긴 본문은 코드 포인트 단위로 줄인다. */
-export function subagentLabel(name: string | null | undefined, goal: string | null | undefined): string {
+export function subagentLabel(
+  name: string | null | undefined,
+  goal: string | null | undefined,
+): string {
   const label = name?.trim() || goal?.trim() || "하위 에이전트";
   const codePoints = Array.from(label);
-  return codePoints.length > 80 ? `${codePoints.slice(0, 79).join("")}…` : label;
+  return codePoints.length > 80
+    ? `${codePoints.slice(0, 79).join("")}…`
+    : label;
 }
 
 /** 에이전트 행이 없어 이름을 알 수 없는 대화와 실행은 지운 에이전트로 그린다. */
@@ -41,7 +46,10 @@ export function formatAmount(micros: number, currency: string | null): string {
 }
 
 /** 값이 없는 금액과 무료인 금액을 구분한다. */
-export function formatCost(micros: number | null, currency: string | null): string {
+export function formatCost(
+  micros: number | null,
+  currency: string | null,
+): string {
   return micros === null ? "가격 없음" : formatAmount(micros, currency);
 }
 
@@ -52,9 +60,9 @@ export function formatWhen(value: string): string {
 
   const now = new Date();
   const isToday =
-    date.getFullYear() === now.getFullYear()
-    && date.getMonth() === now.getMonth()
-    && date.getDate() === now.getDate();
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
   return new Intl.DateTimeFormat("ko-KR", {
     ...(isToday ? {} : { month: "2-digit", day: "2-digit" }),
     hour: "2-digit",
