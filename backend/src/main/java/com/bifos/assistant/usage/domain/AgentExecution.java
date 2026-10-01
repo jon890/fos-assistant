@@ -1,7 +1,9 @@
 package com.bifos.assistant.usage.domain;
 
 import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -93,6 +95,14 @@ public class AgentExecution {
     private String reasoningEffort;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "reasoning_effort_source", length = 20)
+    private ReasoningEffortSource reasoningEffortSource;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_tier", length = 16)
+    private ModelTier modelTier;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
     private CostMode costMode;
 
@@ -168,6 +178,19 @@ public class AgentExecution {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    @Column(name = "request_received_at")
+    private Instant requestReceivedAt;
+
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    @Column(name = "first_delta_at")
+    private Instant firstDeltaAt;
+
+    /** profile 기본 모델 설정을 정상으로 읽어 이 실행의 기본 강도를 확인한 시각이다. */
+    @Column(name = "reasoning_defaults_checked_at")
+    private Instant reasoningDefaultsCheckedAt;
+
     /**
      * 이 실행의 끝난 결과를 부모 대화에 전한 시각이다. 전하지 않았으면 비어 있다.
      *
@@ -191,6 +214,8 @@ public class AgentExecution {
         this.provider = builder.provider;
         this.model = builder.model;
         this.reasoningEffort = builder.reasoningEffort;
+        this.reasoningEffortSource = builder.reasoningEffortSource;
+        this.modelTier = builder.modelTier;
         this.costMode = builder.costMode;
         this.status = builder.status;
         this.errorCode = builder.errorCode;
@@ -209,6 +234,9 @@ public class AgentExecution {
         this.pricingVersion = builder.pricingVersion;
         this.startedAt = builder.startedAt;
         this.finishedAt = builder.finishedAt;
+        this.requestReceivedAt = builder.requestReceivedAt;
+        this.submittedAt = builder.submittedAt;
+        this.firstDeltaAt = builder.firstDeltaAt;
     }
 
     public static Builder builder() {
@@ -227,11 +255,17 @@ public class AgentExecution {
         return conversationId;
     }
 
-    public Long agentId() { return agentId; }
+    public Long agentId() {
+        return agentId;
+    }
 
-    public Long parentExecutionId() { return parentExecutionId; }
+    public Long parentExecutionId() {
+        return parentExecutionId;
+    }
 
-    public Long rootExecutionId() { return rootExecutionId; }
+    public Long rootExecutionId() {
+        return rootExecutionId;
+    }
 
     /**
      * 이 실행이 속한 실행 나무의 뿌리 번호다.
@@ -239,9 +273,13 @@ public class AgentExecution {
      * <p>뿌리 자신은 {@code rootExecutionId} 가 비어 있으므로 자기 번호를 쓴다. 자식을 열 때와 위임 실행을 물을 때
      * 같은 규칙으로 나무를 정한다.
      */
-    public Long treeRootId() { return rootExecutionId == null ? id : rootExecutionId; }
+    public Long treeRootId() {
+        return rootExecutionId == null ? id : rootExecutionId;
+    }
 
-    public Long retryOfExecutionId() { return retryOfExecutionId; }
+    public Long retryOfExecutionId() {
+        return retryOfExecutionId;
+    }
 
     public String profileName() {
         return profileName;
@@ -273,6 +311,14 @@ public class AgentExecution {
 
     public String reasoningEffort() {
         return reasoningEffort;
+    }
+
+    public ReasoningEffortSource reasoningEffortSource() {
+        return reasoningEffortSource;
+    }
+
+    public ModelTier modelTier() {
+        return modelTier;
     }
 
     public CostMode costMode() {
@@ -307,19 +353,29 @@ public class AgentExecution {
         return latencyMs;
     }
 
-    public Long contextChars() { return contextChars; }
+    public Long contextChars() {
+        return contextChars;
+    }
 
-    public Integer contextOmittedItems() { return contextOmittedItems; }
+    public Integer contextOmittedItems() {
+        return contextOmittedItems;
+    }
 
-    public String runtimeFingerprint() { return runtimeFingerprint; }
+    public String runtimeFingerprint() {
+        return runtimeFingerprint;
+    }
 
-    public String instructionsHash() { return instructionsHash; }
+    public String instructionsHash() {
+        return instructionsHash;
+    }
 
     public Long estimatedCostMicros() {
         return estimatedCostMicros;
     }
 
-    public Long actualCostMicros() { return actualCostMicros; }
+    public Long actualCostMicros() {
+        return actualCostMicros;
+    }
 
     public String costCurrency() {
         return costCurrency;
@@ -337,6 +393,22 @@ public class AgentExecution {
         return finishedAt;
     }
 
+    public Instant requestReceivedAt() {
+        return requestReceivedAt;
+    }
+
+    public Instant submittedAt() {
+        return submittedAt;
+    }
+
+    public Instant firstDeltaAt() {
+        return firstDeltaAt;
+    }
+
+    public Instant reasoningDefaultsCheckedAt() {
+        return reasoningDefaultsCheckedAt;
+    }
+
     public Instant resultDeliveredAt() {
         return resultDeliveredAt;
     }
@@ -346,14 +418,54 @@ public class AgentExecution {
         this.hermesRunId = hermesRunId;
     }
 
+    /** Hermes 에 제출하기 직전 시각은 한 번만 적는다. */
+    public void markSubmitted(Instant at) {
+        if (submittedAt == null) {
+            submittedAt = at;
+        }
+    }
+
+    /** Flow 뿌리가 먼저 받은 원래 요청 시각을 보존하려고 더 이른 시각만 적는다. */
+    public void markRequestReceived(Instant at) {
+        if (at != null && (requestReceivedAt == null || at.isBefore(requestReceivedAt))) {
+            requestReceivedAt = at;
+        }
+    }
+
+    /** 첫 assistant delta를 받은 시각만 보존한다. 본문은 실행 기록에 두지 않는다. */
+    public boolean markFirstDelta(Instant at) {
+        if (firstDeltaAt == null) {
+            firstDeltaAt = at;
+            return true;
+        }
+        return false;
+    }
+
+    /** profile 설정에서 읽은 기본값으로 요청 effort의 출처를 보완한다. */
+    public void recordProfileReasoningDefault(String effort) {
+        if (reasoningEffortSource != ReasoningEffortSource.UNKNOWN || effort == null || effort.isBlank()) {
+            return;
+        }
+        reasoningEffortSource = ReasoningEffortSource.PROFILE_DEFAULT;
+        if (reasoningEffort == null) {
+            reasoningEffort = effort;
+        }
+    }
+
+    /** profile 기본 모델 설정의 정상 응답을 확인했음을 적어 빈 effort를 다시 조회하지 않는다. */
+    public void markReasoningDefaultsChecked(Instant at) {
+        if (reasoningDefaultsCheckedAt == null) {
+            reasoningDefaultsCheckedAt = at;
+        }
+    }
+
     /** 끝난 답을 적는다. 다른 에이전트에게 맡겨 만든 실행만 쓴다. */
     public void recordOutput(String outputText) {
         this.outputText = outputText;
     }
 
     /** 끝난 시각과 토큰과 금액을 채우고 SUCCEEDED 로 옮긴다. */
-    public void markSucceeded(
-            String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
+    public void markSucceeded(String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
         this.provider = provider;
         this.model = model;
         this.inputTokens = usage.inputTokens();
@@ -369,8 +481,7 @@ public class AgentExecution {
     }
 
     /** 끝난 시각과 토큰과 환산액과 실제 청구액을 채우고 SUCCEEDED 로 옮긴다. */
-    public void markSucceeded(
-            String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
+    public void markSucceeded(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
         this.provider = provider;
         this.model = model;
         this.inputTokens = usage.inputTokens();
@@ -395,8 +506,7 @@ public class AgentExecution {
     }
 
     /** 끝난 시각과 토큰과 금액을 채우고 CANCELLED 로 옮긴다. */
-    public void markCancelled(
-            String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
+    public void markCancelled(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
         this.provider = provider;
         this.model = model;
         this.inputTokens = usage.inputTokens();
@@ -435,6 +545,8 @@ public class AgentExecution {
         private String provider;
         private String model;
         private String reasoningEffort;
+        private ReasoningEffortSource reasoningEffortSource;
+        private ModelTier modelTier;
         private CostMode costMode;
         private ExecutionStatus status;
         private String errorCode;
@@ -453,6 +565,9 @@ public class AgentExecution {
         private String pricingVersion;
         private Instant startedAt;
         private Instant finishedAt;
+        private Instant requestReceivedAt;
+        private Instant submittedAt;
+        private Instant firstDeltaAt;
 
         public Builder userId(Long userId) {
             this.userId = userId;
@@ -516,6 +631,21 @@ public class AgentExecution {
 
         public Builder reasoningEffort(String reasoningEffort) {
             this.reasoningEffort = reasoningEffort;
+            return this;
+        }
+
+        public Builder reasoningEffortSource(ReasoningEffortSource reasoningEffortSource) {
+            this.reasoningEffortSource = reasoningEffortSource;
+            return this;
+        }
+
+        public Builder modelTier(ModelTier modelTier) {
+            this.modelTier = modelTier;
+            return this;
+        }
+
+        public Builder requestReceivedAt(Instant requestReceivedAt) {
+            this.requestReceivedAt = requestReceivedAt;
             return this;
         }
 

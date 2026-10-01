@@ -9,6 +9,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "app_user")
@@ -34,8 +36,12 @@ public class AppUser {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    protected AppUser() {
-    }
+    @Column(name = "model_default_tier", length = 16)
+    @Getter
+    @Accessors(fluent = true)
+    private String modelDefaultTier;
+
+    protected AppUser() {}
 
     private AppUser(String email, String displayName, Long groupId, UserRole role) {
         this.email = email;

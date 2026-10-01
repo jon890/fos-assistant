@@ -25,8 +25,12 @@ import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.SkillCommand;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
+import com.bifos.assistant.chat.domain.ModelTierDefinition;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.HermesRunEventStream;
@@ -91,6 +95,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -166,6 +171,12 @@ class ChatServiceTest {
 
     @Autowired
     ChatMessageRepository messages;
+
+    @Autowired
+    ModelTierDefinitionRepository tierDefinitions;
+
+    @Autowired
+    TransactionTemplate transactions;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -257,6 +268,7 @@ class ChatServiceTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
+        tierDefinitions.deleteAll();
         agents.deleteAll();
         memoryRepository.deleteAll();
         users.deleteAll();
@@ -276,6 +288,36 @@ class ChatServiceTest {
                     user.id()));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+    }
+
+    @Test
+    @DisplayName("깨진 단계 정의로 모델 해석이 실패해도 질문과 FAILED 실행을 남기고 Hermes에는 제출하지 않는다")
+    void recordsFailedExecutionWhenStoredTierDefinitionIsMalformed() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id()));
+        transactions.executeWithoutResult(status -> conversations.chooseModelTierIfActive(
+                conversation.id(), dad.id(), ModelSelectionMode.TIER, ModelTier.FAST));
+        tierDefinitions.save(ModelTierDefinition.of(dad.groupId(), ModelTier.FAST, null, "example-fast", "low"));
+
+        assertThatThrownBy(() -> chat.send(dad, conversation.id(), "질문", null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).singleElement();
+        assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
+                .singleElement()
+                .satisfies(execution -> {
+                    assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
+                    assertThat(execution.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+                    assertThat(eventsOf(execution.id())).singleElement().satisfies(event -> {
+                        assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
+                        assertThat(event.detail()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+                    });
+                });
+        assertThat(stub().received()).isEmpty();
+        assertThat(chat.running(dad, conversation.id()).running()).isFalse();
     }
 
     @Test

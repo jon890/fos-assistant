@@ -7,6 +7,8 @@ import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -143,7 +145,9 @@ public final class ChatDtos {
             Instant updatedAt,
             String provider,
             String model,
-            String reasoningEffort) {}
+            String reasoningEffort,
+            ModelSelectionMode modelSelectionMode,
+            ModelTier modelTier) {}
 
     /** 옛 대화 번호로 찾은 대화의 공개 식별자다. 옛 링크를 새 주소로 넘길 때만 쓴다. */
     public record ConversationRefView(UUID id) {}
@@ -158,6 +162,15 @@ public final class ChatDtos {
             return ModelChoice.of(provider, model, reasoningEffort);
         }
     }
+
+    public record ChooseModelTierRequest(@NotNull ModelSelectionMode mode, ModelTier tier) {}
+
+    public record UpdateDefaultModelTierRequest(ModelTier tier) {}
+
+    public record ModelTierDefinitionRequest(ModelTier tier, String provider, String model, String reasoningEffort) {}
+
+    public record UpdateGroupModelTiersRequest(
+            @NotNull List<@NotNull ModelTierDefinitionRequest> tiers, ModelTier defaultTier) {}
 
     /** 그 에이전트의 profile 로 고를 수 있는 모델이다. */
     public record ModelOptionsView(

@@ -281,6 +281,7 @@ Control Plane 은 `policy_hook` 이 참이 아니면 그 연결을 `READY` 로 �
 
 | 경로 | 요청 | 성공 |
 | --- | --- | --- |
+| `GET /api/profiles/{name}/model-defaults` | Control Plane 토큰. 서버가 바인딩에서 정한 profile | `provider`, `model`, `reasoningEffort`만. 설정 전체와 비밀값은 반환하지 않는다. [모델 기본값 계약](model-tiers.md#profile-기본-강도)을 따른다 |
 | `GET /api/connectors/catalog` | 없음 | `[{id, schema, title, description, fields[], verify, mcp_server, toolsets, attachments, tools}]`. 운영 목록에 있고 검증을 통과한 manifest 만. `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다. `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다. `tools` 는 `{<이름>: {risk, approval, title}}` 이고 `approval` 은 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다. `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다 |
 | `POST /api/connectors/{id}/call` | `{tool, values}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` |
 | `GET /api/connectors?profile=<p>` | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured}]}` |

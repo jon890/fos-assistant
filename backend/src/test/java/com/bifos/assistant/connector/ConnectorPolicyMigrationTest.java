@@ -33,7 +33,7 @@ class ConnectorPolicyMigrationTest {
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-policy-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrate("42");
+        migrate("44");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
             for (int id = READY; id <= PENDING_ON; id++) {

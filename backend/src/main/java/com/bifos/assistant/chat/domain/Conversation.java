@@ -1,9 +1,13 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -77,6 +81,14 @@ public class Conversation {
     @Column(name = "reasoning_effort", length = 16)
     private String reasoningEffort;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_selection_mode", length = 16)
+    private ModelSelectionMode modelSelectionMode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_tier", length = 16)
+    private ModelTier modelTier;
+
     /**
      * 사용자의 질문 없이 Control Plane 이 연 turn 의 수다. 사용자가 질문을 보내면 0 으로 돌아간다.
      *
@@ -118,7 +130,9 @@ public class Conversation {
         return userId;
     }
 
-    public Long agentId() { return agentId; }
+    public Long agentId() {
+        return agentId;
+    }
 
     public String hermesSessionId() {
         return hermesSessionId;
@@ -139,6 +153,14 @@ public class Conversation {
      */
     public ModelChoice modelChoice() {
         return ModelChoice.stored(modelProvider, model, reasoningEffort);
+    }
+
+    public ModelSelectionMode modelSelectionMode() {
+        return modelSelectionMode;
+    }
+
+    public ModelTier modelTier() {
+        return modelTier;
     }
 
     public int autoTurnCount() {

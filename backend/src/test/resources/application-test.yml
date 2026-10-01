@@ -13,6 +13,18 @@ spring:
     enabled: false
 
 assistant:
+  model-tiers:
+    fast:
+      model: example-fast
+      reasoning-effort: low
+    balanced:
+      model: example-balanced
+      reasoning-effort: medium
+    deep:
+      model: example-deep
+      reasoning-effort: high
+  usage:
+    reconcile-cron: "-"
   context:
     max-chars: 8000
   starters:

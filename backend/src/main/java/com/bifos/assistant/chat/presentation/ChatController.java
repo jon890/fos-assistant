@@ -1,19 +1,24 @@
 package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ActivitySummary;
+import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
+import com.bifos.assistant.chat.application.ModelTierOptions;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
-import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.ArtifactView;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
+import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelRequest;
+import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelTierRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
@@ -26,45 +31,65 @@ import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StopResponse;
+import com.bifos.assistant.chat.presentation.ChatDtos.UpdateDefaultModelTierRequest;
+import com.bifos.assistant.chat.presentation.ChatDtos.UpdateGroupModelTiersRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.user.infra.AppUserRepository;
-import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1/chat")
-@RequiredArgsConstructor
 public class ChatController {
 
     private final ChatService chat;
     private final CurrentUserProvider currentUser;
-    private final AppUserRepository users;
+    private final UserDisplayNameService userNames;
     private final AgentService agents;
     private final ConversationAccess access;
     private final ChatEventStreams streams;
     private final ModelOptionsService modelOptions;
+    private final ModelTierService modelTiers;
+
+    @Autowired
+    public ChatController(
+            ChatService chat,
+            CurrentUserProvider currentUser,
+            UserDisplayNameService userNames,
+            AgentService agents,
+            ConversationAccess access,
+            ChatEventStreams streams,
+            ModelOptionsService modelOptions,
+            ModelTierService modelTiers) {
+        this.chat = chat;
+        this.currentUser = currentUser;
+        this.userNames = userNames;
+        this.agents = agents;
+        this.access = access;
+        this.streams = streams;
+        this.modelOptions = modelOptions;
+        this.modelTiers = modelTiers;
+    }
 
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
@@ -99,7 +124,8 @@ public class ChatController {
                 event -> send.accept(event.forViewer(user))));
     }
 
-    @PostMapping(path = "/conversations/{conversationId}/regenerate/stream",
+    @PostMapping(
+            path = "/conversations/{conversationId}/regenerate/stream",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter regenerate(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
@@ -123,15 +149,16 @@ public class ChatController {
     public List<ConversationView> conversations() {
         List<Conversation> page = chat.conversationsOf(currentUser.require());
         // 목록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
-        Map<Long, Agent> byId = agents.byIds(page.stream().map(Conversation::agentId).toList());
+        Map<Long, Agent> byId =
+                agents.byIds(page.stream().map(Conversation::agentId).toList());
         return page.stream()
                 .map(conversation -> viewOf(conversation, byId.get(conversation.agentId())))
                 .toList();
     }
 
     @PatchMapping("/conversations/{conversationId}")
-    public ConversationView rename(@PathVariable UUID conversationId,
-            @Valid @RequestBody RenameConversationRequest request) {
+    public ConversationView rename(
+            @PathVariable UUID conversationId, @Valid @RequestBody RenameConversationRequest request) {
         CurrentUser user = currentUser.require();
         Conversation renamed = chat.rename(user, access.requireOwnId(user, conversationId), request.title());
         return viewOf(renamed, agents.findById(renamed.agentId()).orElse(null));
@@ -139,8 +166,7 @@ public class ChatController {
 
     /** 대화에서 쓸 모델과 effort 를 바꾸고 바뀐 대화 한 줄을 돌려준다. */
     @PutMapping("/conversations/{conversationId}/model")
-    public ConversationView chooseModel(@PathVariable UUID conversationId,
-            @RequestBody ChooseModelRequest request) {
+    public ConversationView chooseModel(@PathVariable UUID conversationId, @RequestBody ChooseModelRequest request) {
         CurrentUser user = currentUser.require();
         Conversation chosen = chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice());
         return viewOf(chosen, agents.findById(chosen.agentId()).orElse(null));
@@ -165,6 +191,40 @@ public class ChatController {
                 options.reasoningEfforts());
     }
 
+    @GetMapping("/model-tiers")
+    public ModelTierOptions modelTiers(@RequestParam String agentCode) {
+        CurrentUser user = currentUser.require();
+        return modelTiers.optionsFor(user, agents.requireStartable(user, agentCode));
+    }
+
+    @PutMapping("/model-tiers/default")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateModelTierDefault(@RequestBody UpdateDefaultModelTierRequest request) {
+        modelTiers.saveUserDefault(currentUser.require(), request.tier());
+    }
+
+    @PutMapping("/model-tiers/group")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateGroupModelTiers(@Valid @RequestBody UpdateGroupModelTiersRequest request) {
+        CurrentUser user = currentUser.require();
+        modelTiers.saveGroup(
+                user,
+                request.tiers().stream()
+                        .map(tier -> new ModelTierOptions.Tier(
+                                tier.tier(), null, tier.provider(), tier.model(), tier.reasoningEffort()))
+                        .toList(),
+                request.defaultTier());
+    }
+
+    @PutMapping("/conversations/{conversationId}/model-tier")
+    public ConversationView chooseModelTier(
+            @PathVariable UUID conversationId, @Valid @RequestBody ChooseModelTierRequest request) {
+        CurrentUser user = currentUser.require();
+        Conversation chosen =
+                chat.chooseModelTier(user, access.requireOwnId(user, conversationId), request.mode(), request.tier());
+        return viewOf(chosen, agents.findById(chosen.agentId()).orElse(null));
+    }
+
     @DeleteMapping("/conversations/{conversationId}")
     public ResponseEntity<Void> delete(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
@@ -179,16 +239,24 @@ public class ChatController {
      */
     @GetMapping("/conversations/by-number/{number}")
     public ConversationRefView byNumber(@PathVariable Long number) {
-        return new ConversationRefView(access.requireOwn(currentUser.require(), number).publicId());
+        return new ConversationRefView(
+                access.requireOwn(currentUser.require(), number).publicId());
     }
 
     /** 에이전트 행이 없으면({@code agent} 가 null) 에이전트 코드와 이름만 비운 줄을 돌려준다. */
     private ConversationView viewOf(Conversation conversation, Agent agent) {
         ModelChoice choice = conversation.modelChoice();
-        return new ConversationView(conversation.publicId(), conversation.title(),
-                agent == null ? null : agent.code(), agent == null ? null : agent.name(),
-                conversation.updatedAt(), choice.provider(), choice.model(),
-                choice.reasoningEffort());
+        return new ConversationView(
+                conversation.publicId(),
+                conversation.title(),
+                agent == null ? null : agent.code(),
+                agent == null ? null : agent.name(),
+                conversation.updatedAt(),
+                choice.provider(),
+                choice.model(),
+                choice.reasoningEffort(),
+                conversation.modelSelectionMode(),
+                conversation.modelTier());
     }
 
     /**
@@ -206,7 +274,7 @@ public class ChatController {
     public List<MessageView> messages(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         Long number = access.requireOwnId(user, conversationId);
-        String senderName = users.findById(user.id()).map(it -> it.displayName()).orElse(null);
+        String senderName = userNames.find(user.id());
         List<ChatMessage> history = chat.history(user, number);
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
@@ -215,28 +283,27 @@ public class ChatController {
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
         return history.stream()
-                .map(
-                        it ->
-                                new MessageView(
-                                        it.id(),
-                                        it.role().name(),
-                                        it.content(),
-                                        it.senderUserId() == null ? null : senderName,
-                                        it.executionId(),
-                                        // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
-                                        it.executionId() != null && withChildren.contains(it.executionId()),
-                                        it.executionId() == null ? null : switched.get(it.executionId()),
-                                        it.replacesMessageId(),
-                                        it.createdAt(),
-                                        attached.getOrDefault(it.id(), List.of()).stream()
-                                                .map(AttachmentView::from)
-                                                .toList(),
-                                        produced.getOrDefault(it.id(), List.of()).stream()
-                                                .map(ArtifactView::from)
-                                                .toList(),
-                                        it.executionId() == null ? null : activity.get(it.executionId()),
-                                        it.executionId() == null || statuses.get(it.executionId()) == null
-                                                ? null : statuses.get(it.executionId()).name()))
+                .map(it -> new MessageView(
+                        it.id(),
+                        it.role().name(),
+                        it.content(),
+                        it.senderUserId() == null ? null : senderName,
+                        it.executionId(),
+                        // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
+                        it.executionId() != null && withChildren.contains(it.executionId()),
+                        it.executionId() == null ? null : switched.get(it.executionId()),
+                        it.replacesMessageId(),
+                        it.createdAt(),
+                        attached.getOrDefault(it.id(), List.of()).stream()
+                                .map(AttachmentView::from)
+                                .toList(),
+                        produced.getOrDefault(it.id(), List.of()).stream()
+                                .map(ArtifactView::from)
+                                .toList(),
+                        it.executionId() == null ? null : activity.get(it.executionId()),
+                        it.executionId() == null || statuses.get(it.executionId()) == null
+                                ? null
+                                : statuses.get(it.executionId()).name()))
                 .toList();
     }
 }

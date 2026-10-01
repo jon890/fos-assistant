@@ -29,10 +29,13 @@ import {
 } from "./skill-command";
 import {
   ModelPicker,
+  ModelTierPicker,
   type ModelChoice,
   type ModelChoiceSaveResult,
+  type ModelTierSaveResult,
 } from "./model-picker";
 import type { Conversation } from "../shell/conversations-provider";
+import { saveConversationTier, type ModelTierCode } from "@/lib/model-tiers";
 
 type Props = {
   value: string;
@@ -75,6 +78,8 @@ type Props = {
    * 이때 고르게 하면 모르는 값을 「기본」 으로 보고 저장해 적힌 모델을 지운다. 그래서 단추를 막는다.
    */
   modelChoiceUnknown: boolean;
+  modelSelectionMode: "DEFAULT" | "TIER" | "CUSTOM" | null;
+  modelTier: ModelTierCode | null;
   /** 모델 선택을 저장한 뒤 서버가 돌려준 대화 한 줄을 알린다 */
   onModelChoiceSaved(conversation: Conversation): void;
 };
@@ -143,6 +148,8 @@ export function Composer({
   onBlockingChange,
   modelChoice,
   modelChoiceUnknown,
+  modelSelectionMode,
+  modelTier,
   onModelChoiceSaved,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -510,6 +517,31 @@ export function Composer({
     }
   }
 
+  /** 고른 단계를 대화에 저장한다. 기본값으로 돌아가기도 같은 경로에서 명시적으로 적는다. */
+  async function saveModelTier(
+    mode: "DEFAULT" | "TIER",
+    tier: ModelTierCode | null,
+  ): Promise<ModelTierSaveResult> {
+    setSavingModel(true);
+    try {
+      const targetConversationId = await ensureConversationId();
+      if (targetConversationId === null || !mountedRef.current)
+        return "reported";
+      const result = await saveConversationTier<Conversation>(
+        targetConversationId,
+        mode,
+        tier,
+      );
+      if (!result.ok) return "failed";
+      onModelChoiceSaved(result.data);
+      return "saved";
+    } catch {
+      return "failed";
+    } finally {
+      if (mountedRef.current) setSavingModel(false);
+    }
+  }
+
   function removeItem(key: string) {
     if (running) return;
     // 부수 효과는 updater 밖에서 한 번만 부른다. 개발 모드의 StrictMode 는 updater 를 두 번 돌린다.
@@ -816,12 +848,26 @@ export function Composer({
       </div>
       {/* 알약 안에 두면 좁은 폭에서 입력칸이 줄어든다. 그래서 알약 아래 줄에 둔다. */}
       <div className="mt-1 flex min-w-0 px-2">
-        <ModelPicker
-          agentCode={agentCode}
-          choice={modelChoice}
-          onChange={saveModelChoice}
-          disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
-        />
+        <div className="flex min-w-0 flex-col gap-1">
+          <ModelTierPicker
+            agentCode={agentCode}
+            mode={modelSelectionMode}
+            tier={modelTier}
+            onChange={saveModelTier}
+            disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
+            advancedPicker={
+              <ModelPicker
+                agentCode={agentCode}
+                choice={modelChoice}
+                onChange={saveModelChoice}
+                disabled={
+                  disabled || agentCode.length === 0 || modelChoiceUnknown
+                }
+                inSettings
+              />
+            }
+          />
+        </div>
       </div>
     </form>
   );

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,7 +14,11 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -31,7 +36,10 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +61,8 @@ class AgentRunnerConnectorContextTest {
     private final ContextAssembler contextAssembler = mock(ContextAssembler.class);
     private final HermesRunsClient hermes = mock(HermesRunsClient.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
+    private final ModelTierService modelTiers = mock(ModelTierService.class);
+    private static final Instant REQUEST_RECEIVED_AT = Instant.parse("2026-10-01T00:00:00Z");
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final AgentExecution started = mock(AgentExecution.class);
     private final AgentExecution completed = mock(AgentExecution.class);
@@ -64,7 +74,8 @@ class AgentRunnerConnectorContextTest {
         when(contextAssembler.withResponseInstructions(any())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
-        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
+        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(started);
         when(executions.complete(any(), any(), any(), any())).thenReturn(completed);
         when(executions.complete(any(), any(), any(), any(), any())).thenReturn(completed);
@@ -78,7 +89,42 @@ class AgentRunnerConnectorContextTest {
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100));
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100),
+                modelTiers,
+                Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC));
+    }
+
+    @Test
+    @DisplayName("Flow와 위임 실행은 해석한 단계 값을 보내고 요청·제출 시각을 기록한다")
+    void sendsResolvedTierAndRecordsRequestAndSubmission() {
+        ModelChoice choice = ModelChoice.of("openai-codex", "example-deep", "high");
+        when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(choice, ModelTier.DEEP));
+
+        run(agent(), null, null);
+
+        HermesRunCommand command = submitted();
+        assertThat(command.provider()).isEqualTo(choice.provider());
+        assertThat(command.model()).isEqualTo(choice.model());
+        assertThat(command.reasoningEffort()).isEqualTo(choice.reasoningEffort());
+        verify(executions)
+                .start(
+                        same(user),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        same(choice),
+                        any(),
+                        any(),
+                        any(),
+                        eq(ModelTier.DEEP),
+                        eq(REQUEST_RECEIVED_AT));
+        verify(executions).markSubmitted(started);
+        verify(executions, never()).markFirstDelta(any());
+        var submissionOrder = inOrder(executions, hermes);
+        submissionOrder.verify(executions).markSubmitted(started);
+        submissionOrder.verify(hermes).submit(any());
     }
 
     @Test
@@ -142,7 +188,8 @@ class AgentRunnerConnectorContextTest {
 
     private ExecutionContextSnapshot recordedSnapshot() {
         ArgumentCaptor<ExecutionContextSnapshot> snapshot = ArgumentCaptor.forClass(ExecutionContextSnapshot.class);
-        verify(executions).start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any());
+        verify(executions)
+                .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
         return snapshot.getValue();
     }
 
