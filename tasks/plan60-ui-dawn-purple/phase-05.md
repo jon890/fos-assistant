@@ -105,6 +105,8 @@ export function toolsetText(name: string, fallback: { label: string; description
 - `test/browser/usage.spec.ts` 에 `MEMBER` 검사를 더한다: 실행 기록에 `USD`, `example-model`, `effort`, `문맥` 이 없고 에이전트 이름과 상태 배지가 있다. 요약 탭에 「API 가격」 이 없다. `?tab=fingerprints` 로 가면 요약 탭이 열린다.
 - 같은 파일의 기존 관리자 검사는 그대로 통과해야 한다. 탭 이름을 「설정별 사용량」 으로 찾게 고친다(`usage-breakdown.spec.ts` 포함).
 - `test/browser/execution-tree.spec.ts` 에 더한다: 붐빔으로 실패한 실행의 상세를 `MEMBER` 로 열면 `HERMES_BUSY` 가 없고 「지금 요청이 많아요」 가 있다. 관리자는 둘 다 본다.
+- `test/browser/execution-tree.spec.ts` 에 원본 보기 검사를 더한다: 관리자가 `terminal` 도구를 쓴 실행의 상세를 열면 그 `detail` 글자가 줄에 보이지 않고, `activity-raw` 의 「원본 보기」 를 눌러야 보인다. `mobile` 폭에서 펼쳐도 `document.documentElement.scrollWidth` 가 `clientWidth` 를 넘지 않는다. `MEMBER` 로 자기 실행의 상세를 열면 `activity-raw` 가 0개다.
+- `test/browser/usage.spec.ts` 의 `MEMBER` 검사에 더한다: 대화에서 작업 과정 블록을 펼쳐도 `activity-raw` 가 0개다.
 - `test/browser/agent-tools.spec.ts`: 도구 이름을 영어 `label` 로 찾는 곳을 한국어 이름으로 고친다. 「주인 등급」, 「관리자 등급」 을 찾는 곳도 고친다.
 - `test/browser/skills.spec.ts`: 「Hermes 기본」 을 찾는 곳을 고친다.
 

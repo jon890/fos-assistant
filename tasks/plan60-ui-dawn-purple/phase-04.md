@@ -130,7 +130,8 @@ export function AssistantRow({ header, children, ...props }: React.ComponentProp
 ### 9. 검사
 
 - `test/unit/tool-label.test.ts`, `test/unit/subagent-label.test.ts`, `test/unit/activity-state.test.ts`: 새 문장에 맞춘다. `tool-label.test.ts` 에 더한다: `toolLabel("mcp__ledger__query", false)` 는 「연결된 서비스를 썼어요」, `toolLabel("mcp__fos__artifact_write", false)` 는 표의 문장, `isReadableDetail("web_search")` 는 참, `isReadableDetail("terminal")` 과 `isReadableDetail("mcp__ledger__query")` 는 거짓.
-- `test/browser/activity-panel.spec.ts` 에 더한다: 관리자가 `terminal` 도구를 쓴 답을 펼치면 `detail` 글자가 보이지 않고 `activity-raw` 의 「원본 보기」 를 눌러야 보인다. `MEMBER` 검사는 phase 05 가 한다. `activity-state.test.ts` 에 `activitySummaryLabel` 의 여섯 조건을 더한다.
+- `test/browser/activity-panel.spec.ts` 에 더한다: 관리자가 `terminal` 도구를 쓴 답을 펼치면 `detail` 글자가 보이지 않고 `activity-raw` 의 「원본 보기」 를 눌러야 보인다. `MEMBER` 검사는 phase 05 가 한다.
+- `test/browser/execution-tree.spec.ts` 의 「깊은 나무를 열어도 좁은 화면과 넓은 화면 모두 가로로 넘치지 않는다」 는 `fake-tool` 의 긴 `detail` 을 줄에 넣어 가로 넘침을 본다(29줄, 49~61줄). `fake-tool` 의 `detail` 은 이제 줄에 그려지지 않으므로 그 검사의 `toolName` 을 `web_search` 로 바꿔 긴 글이 계속 줄에 그려지게 한다. `activity-state.test.ts` 에 `activitySummaryLabel` 의 여섯 조건을 더한다.
 - 새 단위 테스트를 `test/unit/activity-state.test.ts` 에 더한다: `formatSeconds(999)` 는 `null`, `formatSeconds(2_100)` 은 「2초」.
 - 브라우저 검사에서 옛 문장을 찾는 곳을 고친다. 아래로 찾는다.
 
