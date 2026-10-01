@@ -5,9 +5,9 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * 자기 연결 하나의 상태다. 비밀 칸은 앞 8자만 담는다.
+ * 자기 연결 하나의 상태다. 비밀 칸은 앞부분만 담는다.
  *
- * @param secretPrefixes 비밀 칸의 앞 8자
+ * @param secretPrefixes 비밀 칸의 앞 4자. 값이 16자 미만인 칸은 없다
  * @param values 비밀이 아닌 칸의 값
  */
 public record ConnectionSnapshot(

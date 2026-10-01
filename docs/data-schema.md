@@ -21,7 +21,7 @@
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
-- V39 가 모든 행의 `secretPrefixes` 를 비웠다. 그 전에는 앞 8자를 저장했고 원래 길이를 남기지 않아, 짧은 비밀의 대부분이 저장된 행을 골라낼 수 없었다. `values` 는 그대로 둔다
+- V39 가 모든 행의 `secretPrefixes` 를 비웠다. 그 전에는 앞부분을 8자까지 저장했고 원래 길이를 남기지 않아, 짧은 비밀의 대부분이 저장된 행을 골라낼 수 없었다. `values` 는 그대로 둔다
 - 가계부 전용으로 먼저 만든 `accountbook_connection` 은 V38 이 이 표로 옮기고 지웠다. `connector_id` 는 `fos-accountbook`, `token_prefix` 는 `secretPrefixes.token`, `family_uuid` 는 `values.family` 가 됐다
 
 `agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE` 는 연결 전용 에이전트를 표시한다.
