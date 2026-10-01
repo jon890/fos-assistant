@@ -7,6 +7,7 @@
 | [도구와 스킬](tools-and-skills.md) | 도구 설정, Control Plane MCP(`fos-assistant`) 와 스킬 연결 |
 | [profile 생성](profiles.md) | profile 관리 API 와 생성 계약 |
 | [위임](delegation.md) | 내장 delegation 과 Control Plane 도구 위임 |
+| [도구 hook 과 승인](connector-policy.md) | `pre_tool_call` 로 MCP 도구를 막을 때의 계약, 등록 이름, 내장 승인 |
 | [kanban](kanban.md) | 다중 에이전트 kanban 과 HTTP 호출 |
 | [버전 변경과 실측](upgrades.md) | 버전별 계약 차이와 확인 결과 |
 

@@ -15,6 +15,7 @@
 | `restart_required` | `BOOLEAN NOT NULL` | 공유 gateway 재시작 뒤 반영 완료를 기다린다 |
 | `desired_enabled` | `BOOLEAN NOT NULL` | env 와 설치 반영이 모두 성공해 활성화 후보가 되었는가. 등록, 교체, 해제 시작과 반영 실패에서 false. true 여도 실행 확인 전에는 `PENDING` |
 | `checked_at` | `DATETIME(6)` | 마지막 확인 시각. 비어도 된다 |
+| `undeclared_tools` | `INT NOT NULL` 기본 0 | 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수. `schema: 1` 은 0 이다 |
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
 
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
@@ -36,6 +37,62 @@ MySQL 8.4 에 둔다.
 
 비밀값은 어느 표에도 넣지 않는다.
 AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 홈서버의 파일에 있다.
+
+## connector_action
+
+커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다. 근거는 [ADR-047](adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | `BIGINT` 기본키 | |
+| `public_id` | `BINARY(16) NOT NULL`, 유니크 | 화면과 모델에 보이는 승인 요청 번호. 대화의 공개 식별자와 같은 방식이다([ADR-025](adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)) |
+| `user_id` | `BIGINT NOT NULL` | 연결의 주인 |
+| `agent_id` | `BIGINT NOT NULL` | 연결용 에이전트 |
+| `connector_id` | `VARCHAR(64) NOT NULL` | |
+| `tool_name` | `VARCHAR(128)` | MCP 서버의 원래 도구 이름. 대응 파일에서 찾지 못한 호출은 비운다 |
+| `hermes_tool` | `VARCHAR(128) NOT NULL` | hook 이 받은 등록 이름 |
+| `risk` | `VARCHAR(16)` | 판정 당시의 위험도. 정책을 읽지 못했거나 선언이 없던 호출은 비운다 |
+| `approval_mode` | `VARCHAR(16)` | 판정 당시의 승인 방식. 위와 같을 때 비운다 |
+| `decision` | `VARCHAR(20) NOT NULL` | `ALLOWED`, `DENIED`, `NEEDS_APPROVAL` |
+| `deny_reason` | `VARCHAR(40)` | `DENIED` 일 때만. `POLICY_UNAVAILABLE`, `NOT_READY`, `UNDECLARED`, `RISK_NOT_OPEN`, `ARGS_TOO_LARGE` |
+| `passed` | `BOOLEAN NOT NULL` | hook 에 통과로 답했는가 |
+| `status` | `VARCHAR(20)` | 승인 줄만. `PENDING`, `EXECUTING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `REJECTED`, `EXPIRED` |
+| `origin_execution_id` | `BIGINT NOT NULL` | hook 의 session 으로 찾은 실행 |
+| `conversation_id` | `BIGINT` | 그 실행의 대화. 결과를 돌려줄 곳이다. 대화 없는 실행이면 비운다 |
+| `dedupe_key` | `VARCHAR(64) NOT NULL`, 유니크 | `v1-connector`, profile, 뿌리 session, session, `tool_call_id` 를 줄바꿈으로 이어 SHA-256 한 값. 같은 호출이 다시 와도 줄이 하나다 |
+| `args_json` | `MEDIUMTEXT` | 승인 줄만. hook 이 보낸 글자 그대로다. 16KB 까지 |
+| `args_sha256` | `VARCHAR(64) NOT NULL` | 인자 글의 SHA-256. 원문을 두지 않는 줄에서도 무엇을 불렀는지 맞춰 볼 수 있다 |
+| `expires_at` | `DATETIME(6)` | 승인 줄만. 만든 시각에서 24시간 뒤 |
+| `decided_at` | `DATETIME(6)` | 승인, 거절, 만료한 시각 |
+| `executed_at` | `DATETIME(6)` | 실행 결과를 적은 시각 |
+| `result_text` | `MEDIUMTEXT` | 실행 결과. 위임 답과 같은 상한으로 자른다 |
+| `error_code` | `VARCHAR(64)` | 공통 오류 어휘 넷과 `TIMEOUT` |
+| `result_delivered_at` | `DATETIME(6)` | 결과나 거절, 만료를 대화에 전한 시각. `agent_execution` 의 같은 이름 칸과 뜻이 같다 |
+| `created_at` | `DATETIME(6) NOT NULL` | |
+
+- 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다
+- 승인 엔진이 켜지기 전에는 `NEEDS_APPROVAL` 인 줄도 `passed` 가 참이고 `status` 와 `args_json` 이 빈다
+- `(conversation_id, status)` 와 `(user_id, created_at)` 에 색인을 둔다
+- 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다
+- 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+
+## connector_tool_grant
+
+사용자가 도구 하나에 준 상시 허락이다. 승인 엔진과 함께 들어온다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | `BIGINT` 기본키 | |
+| `user_id` | `BIGINT NOT NULL` | |
+| `connector_id` | `VARCHAR(64) NOT NULL` | |
+| `tool_name` | `VARCHAR(128) NOT NULL` | 원래 도구 이름 |
+| `expires_at` | `DATETIME(6) NOT NULL` | 무기한은 없다 |
+| `created_at` | `DATETIME(6) NOT NULL` | |
+| `revoked_at` | `DATETIME(6)` | 사용자가 거두었거나 연결을 해제한 시각 |
+
+- `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤인 줄만 유효하다
+- `approval: always` 인 도구에는 만들지 않는다. 판정할 때도 `always` 는 허락을 보지 않는다
+- 같은 도구에 허락을 다시 주면 새 줄을 만든다. 유니크 제약은 없다
 
 ## app_user
 
