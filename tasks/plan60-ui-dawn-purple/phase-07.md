@@ -103,4 +103,5 @@ cd web && pnpm test:browser
 | `web/src/app/globals.css` | 수정 |
 | `web/Dockerfile` | 수정 |
 | `test/browser/motion.spec.ts` | 수정 |
+| `test/browser/memory.spec.ts` | 수정 |
 | `docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md` | 수정 |

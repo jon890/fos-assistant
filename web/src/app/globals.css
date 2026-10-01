@@ -233,6 +233,24 @@ html {
   }
 }
 
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* 화면을 옮길 때 나가는 본문은 짧게 흐려지고 들어오는 본문은 오르며 나타난다. */
+::view-transition-old(.screen) {
+  animation: fade-out var(--duration-fast) linear both;
+}
+
+::view-transition-new(.screen) {
+  animation: screen-in var(--duration-base) var(--ease-out) both;
+}
+
 /* 내 말풍선은 꼬리가 있는 오른쪽 아래에서 커진다. */
 .animate-message-user {
   transform-origin: 100% 100%;
@@ -293,6 +311,17 @@ html {
   .animate-message-assistant,
   .animate-screen-in,
   .animate-fade-in {
+    animation-name: fade-in !important;
+  }
+
+  /* 화면 전환의 가상 요소는 위의 `*` 에 잡히지 않아 따로 적는다. */
+  ::view-transition-old(.screen),
+  ::view-transition-new(.screen) {
+    animation-duration: 100ms !important;
+    animation-timing-function: linear !important;
+  }
+
+  ::view-transition-new(.screen) {
     animation-name: fade-in !important;
   }
 

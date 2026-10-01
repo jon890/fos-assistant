@@ -17,6 +17,7 @@ import {
   ConversationsProvider,
   useConversations,
 } from "./conversations-provider";
+import { ScreenTransition } from "./screen-transition";
 import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
@@ -226,7 +227,7 @@ function ShellBody({
             </TooltipButton>
           </header>
           <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
-            {children}
+            <ScreenTransition>{children}</ScreenTransition>
           </main>
         </div>
       </div>

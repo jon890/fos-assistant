@@ -309,3 +309,46 @@ test("줄인 움직임에서 「새 메시지」 단추는 바로 내려간다",
   await expect.poll(() => scroll.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight))
     .toBeLessThanOrEqual(1);
 });
+
+/** 사이드바의 「사용량」 을 눌러 화면을 옮기고 그 화면의 제목이 보일 때까지 기다린다. */
+async function goToUsage(page: Page, testInfo: TestInfo) {
+  await openSidebar(page, testInfo);
+  await page.getByRole("link", { name: "사용량", exact: true }).click();
+  await expect(page).toHaveURL(/\/usage$/);
+  await expect(page.getByRole("heading", { name: "사용량", exact: true, level: 1 })).toBeVisible();
+}
+
+test("화면을 옮기면 본문만 바뀌고 화면 틀은 같은 DOM 노드로 남는다", async ({ page }, testInfo) => {
+  await page.goto("/");
+  // 좁은 폭의 서랍은 옮기면 닫히므로, 그 폭에서는 늘 남는 머리의 단추를 화면 틀로 본다.
+  const shell = testInfo.project.name === "mobile"
+    ? page.getByRole("button", { name: "사이드바 열기" })
+    : page.getByRole("complementary", { name: "사이드바" });
+  await expect(shell).toBeVisible();
+  await shell.evaluate((node) => node.setAttribute("data-probe", "shell"));
+
+  await goToUsage(page, testInfo);
+  await expect(shell, "옮긴 뒤에도 화면 틀이 다시 만들어지지 않는다").toHaveAttribute("data-probe", "shell");
+  expect(await page.locator('[data-probe="shell"]').count(), "표시를 붙인 화면 틀의 수").toBe(1);
+});
+
+test("첫 메시지를 보내 주소가 바뀌어도 대화가 다시 만들어지지 않는다", async ({ page }) => {
+  await page.goto("/");
+  const composer = page.getByRole("textbox", { name: "메시지" });
+  await expect(composer).toBeVisible();
+  await composer.evaluate((node) => node.setAttribute("data-probe", "composer"));
+
+  await send(page, "주소가 바뀌는 첫 메시지 검사");
+  await expect(page).toHaveURL(/\/chat\/[^/]+$/);
+  await expect(page.getByTestId("assistant-message")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "답 복사" })).toBeVisible({ timeout: 30_000 });
+  await expect(composer, "주소가 바뀐 뒤에도 입력창이 같은 DOM 노드다").toHaveAttribute("data-probe", "composer");
+});
+
+test("줄인 움직임에서 화면을 옮겨도 본문 제목이 보인다", async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await goToUsage(page, testInfo);
+  expect(await page.getByRole("heading", { name: "사용량", exact: true, level: 1 }).evaluate((node) => getComputedStyle(node).opacity), "옮긴 뒤 제목의 불투명도")
+    .toBe("1");
+});
