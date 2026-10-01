@@ -12,11 +12,16 @@ async function controlPlaneToken(): Promise<string> {
 }
 
 /** 방금 만든 실행 중 가장 최근 것의 번호를 읽는다. */
-async function lastExecutionId(page: import("../../web/node_modules/@playwright/test/index.js").Page): Promise<number> {
+async function lastExecutionId(
+  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+): Promise<number> {
   const token = await controlPlaneToken();
-  const response = await page.request.get(`${CONTROL_PLANE_BASE_URL}/api/v1/usage/executions?limit=1`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await page.request.get(
+    `${CONTROL_PLANE_BASE_URL}/api/v1/usage/executions?limit=1`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
   expect(response.ok()).toBeTruthy();
   const [execution] = (await response.json()) as { id: number }[];
   return execution.id;
@@ -83,7 +88,9 @@ function deepTreeFixture(depth: number) {
  * <p>자식은 Memory 제안 실행처럼 하위 에이전트와 무관하게 달릴 수 있다. 그런 자식이 있어도
  * `SUBAGENT_STARTED` 줄이 사라지면 안 된다는 것을 이 나무로 확인한다.
  */
-function treeWithChildAndSubagentFixture(usageStatus: "WAITING" | "RECORDED" | "UNCONFIRMED" | null = null) {
+function treeWithChildAndSubagentFixture(
+  usageStatus: "WAITING" | "RECORDED" | "UNCONFIRMED" | null = null,
+) {
   return {
     truncated: false,
     root: {
@@ -140,7 +147,9 @@ function treeWithChildAndSubagentFixture(usageStatus: "WAITING" | "RECORDED" | "
   };
 }
 
-test("자식 노드가 있어도 하위 에이전트 사건 줄이 사라지지 않는다", async ({ page }) => {
+test("자식 노드가 있어도 하위 에이전트 사건 줄이 사라지지 않는다", async ({
+  page,
+}) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: treeWithChildAndSubagentFixture() });
   });
@@ -149,10 +158,14 @@ test("자식 노드가 있어도 하위 에이전트 사건 줄이 사라지지 
   const tree = page.getByTestId("execution-tree");
   await expect(tree).toBeVisible();
   expect(await tree.locator("[data-testid=execution-node]").count()).toBe(2);
-  await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(1);
+  await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(
+    1,
+  );
 });
 
-test("하위 에이전트 사용량 확인 상태를 실패와 다르게 보인다", async ({ page }) => {
+test("하위 에이전트 사용량 확인 상태를 실패와 다르게 보인다", async ({
+  page,
+}) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: treeWithChildAndSubagentFixture("WAITING") });
   });
@@ -162,27 +175,41 @@ test("하위 에이전트 사용량 확인 상태를 실패와 다르게 보인�
 
   await page.unroute("**/api/usage/executions/*/tree");
   await page.route("**/api/usage/executions/*/tree", async (route) => {
-    await route.fulfill({ json: treeWithChildAndSubagentFixture("UNCONFIRMED") });
+    await route.fulfill({
+      json: treeWithChildAndSubagentFixture("UNCONFIRMED"),
+    });
   });
   await page.reload();
   await expect(page.getByText("사용량 미확인", { exact: true })).toBeVisible();
 });
 
-test("실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 기록된 시각만 보인다", async ({ page }) => {
+test("실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 기록된 시각만 보인다", async ({
+  page,
+}) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: deepTreeFixture(1) });
   });
   await page.goto("/executions/900");
 
-  await expect(page.getByText("openai-codex · example-model", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("openai-codex · example-model", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("균형", { exact: true })).toBeVisible();
   await expect(page.getByText("기본값 medium", { exact: true })).toBeVisible();
   await expect(page.getByTestId("execution-timing")).toContainText("요청 수신");
-  await expect(page.getByTestId("execution-node-runtime").first()).toContainText("균형");
+  await expect(
+    page.getByTestId("execution-node-runtime").first(),
+  ).toContainText("균형");
 });
 
-test("MEMBER는 실행 상세에서 단계와 걸린 시간만 본다", async ({ context, page }) => {
-  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+test("MEMBER는 실행 상세에서 단계와 걸린 시간만 본다", async ({
+  context,
+  page,
+}) => {
+  await setSession(context, {
+    email: "member@example.com",
+    name: "가족 사용자",
+  });
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: deepTreeFixture(1) });
   });
@@ -190,7 +217,9 @@ test("MEMBER는 실행 상세에서 단계와 걸린 시간만 본다", async ({
 
   await expect(page.getByText("균형", { exact: true })).toBeVisible();
   await expect(page.getByText("500ms", { exact: true })).toBeVisible();
-  await expect(page.getByText("openai-codex · example-model", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("openai-codex · example-model", { exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByText("기본값 medium", { exact: true })).toHaveCount(0);
   await expect(page.getByText("입력 토큰", { exact: true })).toHaveCount(0);
   await expect(page.getByText("환산 금액", { exact: true })).toHaveCount(0);
@@ -199,7 +228,9 @@ test("MEMBER는 실행 상세에서 단계와 걸린 시간만 본다", async ({
   await expect(page.getByTestId("execution-node-tokens")).toHaveCount(0);
 });
 
-test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보인다", async ({ page }) => {
+test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보인다", async ({
+  page,
+}) => {
   const response = await page.request.post("/api/chat/stream", {
     data: { text: "실행 나무 검사", agentCode: "browser" },
   });
@@ -211,14 +242,22 @@ test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보�
   await expect(tree).toBeVisible();
   await expect(tree.locator('[data-tool="fake-tool"]')).toHaveCount(1);
   await expect(tree.locator('[data-tool="fake-reader"]')).toHaveCount(1);
-  await expect(tree.locator('[data-tool="fake-tool"]')).toContainText("도구 사용");
-  await expect(tree.locator('[data-tool="fake-reader"]')).toContainText("도구 사용");
+  await expect(tree.locator('[data-tool="fake-tool"]')).toContainText(
+    "도구 사용",
+  );
+  await expect(tree.locator('[data-tool="fake-reader"]')).toContainText(
+    "도구 사용",
+  );
   await expect(tree.getByText("도구: ", { exact: false })).toHaveCount(0);
-  await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(1);
+  await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(
+    1,
+  );
   await expect(tree.getByText("끝나지 않음")).toHaveCount(0);
 });
 
-test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이고 요약은 그대로 보인다", async ({ page }) => {
+test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이고 요약은 그대로 보인다", async ({
+  page,
+}) => {
   const response = await page.request.post("/api/chat", {
     data: { text: "실행 나무 빈 사건 검사", agentCode: "browser" },
   });
@@ -226,11 +265,15 @@ test("사건이 없는 실행을 열면 기록된 작업이 없어요고 보이�
   const id = await lastExecutionId(page);
 
   await page.goto(`/executions/${id}`);
-  await expect(page.getByText("기록된 작업이 없어요", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("기록된 작업이 없어요", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("성공", { exact: true })).toBeVisible();
 });
 
-test("깊은 나무를 열어도 좁은 화면과 넓은 화면 모두 가로로 넘치지 않는다", async ({ page }) => {
+test("깊은 나무를 열어도 좁은 화면과 넓은 화면 모두 가로로 넘치지 않는다", async ({
+  page,
+}) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     await route.fulfill({ json: deepTreeFixture(5) });
   });
@@ -242,7 +285,9 @@ test("깊은 나무를 열어도 좁은 화면과 넓은 화면 모두 가로로
 
   const viewportWidth = page.viewportSize()?.width;
   expect(viewportWidth).toBeDefined();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewportWidth!);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(viewportWidth!);
 });
 
 /**
@@ -297,11 +342,18 @@ function singleNodeTreeFixture({
 
 test("나무가 위쪽에서 잘렸으면 뿌리 위에 안내가 보인다", async ({ page }) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
-    await route.fulfill({ json: singleNodeTreeFixture({ treeTruncated: true, nodeTruncated: false }) });
+    await route.fulfill({
+      json: singleNodeTreeFixture({
+        treeTruncated: true,
+        nodeTruncated: false,
+      }),
+    });
   });
   await page.goto("/executions/970");
 
-  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveText("위쪽 기록이 없어 이곳이 첫 실행이 아닐 수 있어요");
+  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveText(
+    "위쪽 기록이 없어 이곳이 첫 실행이 아닐 수 있어요",
+  );
   await expect(page.getByText("이전 실행은 표시되지 않아요")).toHaveCount(0);
 });
 
@@ -311,12 +363,18 @@ test("나무가 위쪽에서 잘렸으면 뿌리 위에 안내가 보인다", as
  * <p>위쪽 안내를 「언제나 그린다」 로 잘못 고치는 것을 막는 짝이다.
  * 바로 위의 검사가 이번 결함을 잡고, 이것은 그 고침이 지나치지 않았는지를 본다.
  */
-test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아 같은 말을 두 번 하지 않는다", async ({ page }) => {
+test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아 같은 말을 두 번 하지 않는다", async ({
+  page,
+}) => {
   await page.route("**/api/usage/executions/*/tree", async (route) => {
-    await route.fulfill({ json: singleNodeTreeFixture({ treeTruncated: true, nodeTruncated: true }) });
+    await route.fulfill({
+      json: singleNodeTreeFixture({ treeTruncated: true, nodeTruncated: true }),
+    });
   });
   await page.goto("/executions/970");
 
-  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveCount(0);
+  await expect(page.getByTestId("execution-tree-truncated-above")).toHaveCount(
+    0,
+  );
   await expect(page.getByText("이전 실행은 표시되지 않아요")).toHaveCount(1);
 });
