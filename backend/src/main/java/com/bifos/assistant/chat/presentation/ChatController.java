@@ -6,6 +6,8 @@ import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
+import com.bifos.assistant.chat.application.ModelTierOptions;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -18,6 +20,9 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ModelOptionsView;
+import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelTierRequest;
+import com.bifos.assistant.chat.presentation.ChatDtos.UpdateDefaultModelTierRequest;
+import com.bifos.assistant.chat.presentation.ChatDtos.UpdateGroupModelTiersRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.ProviderView;
 import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.RunningTurnView;
@@ -36,8 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,7 +60,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1/chat")
-@RequiredArgsConstructor
 public class ChatController {
 
     private final ChatService chat;
@@ -65,6 +69,39 @@ public class ChatController {
     private final ConversationAccess access;
     private final ChatEventStreams streams;
     private final ModelOptionsService modelOptions;
+    private final ModelTierService modelTiers;
+
+    /** 기존 단위 테스트의 controller 조립 경로를 보존한다. */
+    public ChatController(
+            ChatService chat,
+            CurrentUserProvider currentUser,
+            UserDisplayNameService userNames,
+            AgentService agents,
+            ConversationAccess access,
+            ChatEventStreams streams,
+            ModelOptionsService modelOptions) {
+        this(chat, currentUser, userNames, agents, access, streams, modelOptions, null);
+    }
+
+    @Autowired
+    public ChatController(
+            ChatService chat,
+            CurrentUserProvider currentUser,
+            UserDisplayNameService userNames,
+            AgentService agents,
+            ConversationAccess access,
+            ChatEventStreams streams,
+            ModelOptionsService modelOptions,
+            ModelTierService modelTiers) {
+        this.chat = chat;
+        this.currentUser = currentUser;
+        this.userNames = userNames;
+        this.agents = agents;
+        this.access = access;
+        this.streams = streams;
+        this.modelOptions = modelOptions;
+        this.modelTiers = modelTiers;
+    }
 
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
@@ -165,6 +202,35 @@ public class ChatController {
                 options.reasoningEfforts());
     }
 
+    @GetMapping("/model-tiers")
+    public ModelTierOptions modelTiers(@RequestParam String agentCode) {
+        CurrentUser user = currentUser.require();
+        return modelTiers.optionsFor(user, agents.requireStartable(user, agentCode));
+    }
+
+    @PutMapping("/model-tiers/default")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateModelTierDefault(@RequestBody UpdateDefaultModelTierRequest request) {
+        modelTiers.saveUserDefault(currentUser.require(), request.tier());
+    }
+
+    @PutMapping("/model-tiers/group")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateGroupModelTiers(@RequestBody UpdateGroupModelTiersRequest request) {
+        CurrentUser user = currentUser.require();
+        modelTiers.saveGroup(user, request.tiers().stream()
+                .map(tier -> new ModelTierOptions.Tier(tier.tier(), null, tier.provider(), tier.model(), tier.reasoningEffort()))
+                .toList(), request.defaultTier());
+    }
+
+    @PutMapping("/conversations/{conversationId}/model-tier")
+    public ConversationView chooseModelTier(@PathVariable UUID conversationId,
+            @RequestBody ChooseModelTierRequest request) {
+        CurrentUser user = currentUser.require();
+        Conversation chosen = chat.chooseModelTier(user, access.requireOwnId(user, conversationId), request.mode(), request.tier());
+        return viewOf(chosen, agents.findById(chosen.agentId()).orElse(null));
+    }
+
     @DeleteMapping("/conversations/{conversationId}")
     public ResponseEntity<Void> delete(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
@@ -188,7 +254,7 @@ public class ChatController {
         return new ConversationView(conversation.publicId(), conversation.title(),
                 agent == null ? null : agent.code(), agent == null ? null : agent.name(),
                 conversation.updatedAt(), choice.provider(), choice.model(),
-                choice.reasoningEffort());
+                choice.reasoningEffort(), conversation.modelSelectionMode(), conversation.modelTier());
     }
 
     /**

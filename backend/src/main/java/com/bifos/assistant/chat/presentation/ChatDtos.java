@@ -3,6 +3,8 @@ package com.bifos.assistant.chat.presentation;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.RunningTurn;
 import jakarta.validation.constraints.NotBlank;
@@ -124,7 +126,8 @@ public final class ChatDtos {
      * @param reasoningEffort 이 대화에서 고른 effort. 고르지 않았으면 null
      */
     public record ConversationView(UUID id, String title, String agentCode, String agentName,
-            Instant updatedAt, String provider, String model, String reasoningEffort) {
+            Instant updatedAt, String provider, String model, String reasoningEffort,
+            ModelSelectionMode modelSelectionMode, ModelTier modelTier) {
     }
 
     /** 옛 대화 번호로 찾은 대화의 공개 식별자다. 옛 링크를 새 주소로 넘길 때만 쓴다. */
@@ -141,6 +144,20 @@ public final class ChatDtos {
         public ModelChoice toChoice() {
             return ModelChoice.of(provider, model, reasoningEffort);
         }
+    }
+
+    public record ChooseModelTierRequest(@NotNull ModelSelectionMode mode, ModelTier tier) {
+    }
+
+    public record UpdateDefaultModelTierRequest(ModelTier tier) {
+    }
+
+    public record ModelTierDefinitionRequest(
+            ModelTier tier, String provider, String model, String reasoningEffort) {
+    }
+
+    public record UpdateGroupModelTiersRequest(
+            @NotNull List<@NotNull ModelTierDefinitionRequest> tiers, ModelTier defaultTier) {
     }
 
     /** 그 에이전트의 profile 로 고를 수 있는 모델이다. */

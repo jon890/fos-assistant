@@ -65,6 +65,11 @@ public class ModelOptionsService {
     /** 요청자가 쓸 수 있는 에이전트의 profile 로 고를 수 있는 모델을 돌려준다. */
     public ModelOptions optionsFor(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
+        return optionsForAgent(agent);
+    }
+
+    /** 이미 권한을 확인한 에이전트의 profile 모델 목록을 읽는다. */
+    public ModelOptions optionsForAgent(Agent agent) {
         return optionsOf(catalogFor(agent));
     }
 

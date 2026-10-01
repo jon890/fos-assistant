@@ -7,6 +7,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -16,6 +18,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 
 @Entity
 @Table(name = "conversation")
@@ -76,6 +80,14 @@ public class Conversation {
     /** 이 대화에서 고른 reasoning effort. 비면 그 profile 의 기본값이다. */
     @Column(name = "reasoning_effort", length = 16)
     private String reasoningEffort;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_selection_mode", length = 16)
+    private ModelSelectionMode modelSelectionMode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_tier", length = 16)
+    private ModelTier modelTier;
 
     /**
      * 사용자의 질문 없이 Control Plane 이 연 turn 의 수다. 사용자가 질문을 보내면 0 으로 돌아간다.
@@ -140,6 +152,10 @@ public class Conversation {
     public ModelChoice modelChoice() {
         return ModelChoice.stored(modelProvider, model, reasoningEffort);
     }
+
+    public ModelSelectionMode modelSelectionMode() { return modelSelectionMode; }
+
+    public ModelTier modelTier() { return modelTier; }
 
     public int autoTurnCount() {
         return autoTurnCount;

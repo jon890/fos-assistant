@@ -2,6 +2,8 @@ package com.bifos.assistant.usage.domain;
 
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.chat.domain.type.ModelTier;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -93,6 +95,14 @@ public class AgentExecution {
     private String reasoningEffort;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "reasoning_effort_source", length = 20)
+    private ReasoningEffortSource reasoningEffortSource;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "model_tier", length = 16)
+    private ModelTier modelTier;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
     private CostMode costMode;
 
@@ -168,6 +178,15 @@ public class AgentExecution {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    @Column(name = "request_received_at")
+    private Instant requestReceivedAt;
+
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    @Column(name = "first_delta_at")
+    private Instant firstDeltaAt;
+
     /**
      * 이 실행의 끝난 결과를 부모 대화에 전한 시각이다. 전하지 않았으면 비어 있다.
      *
@@ -191,6 +210,8 @@ public class AgentExecution {
         this.provider = builder.provider;
         this.model = builder.model;
         this.reasoningEffort = builder.reasoningEffort;
+        this.reasoningEffortSource = builder.reasoningEffortSource;
+        this.modelTier = builder.modelTier;
         this.costMode = builder.costMode;
         this.status = builder.status;
         this.errorCode = builder.errorCode;
@@ -209,6 +230,9 @@ public class AgentExecution {
         this.pricingVersion = builder.pricingVersion;
         this.startedAt = builder.startedAt;
         this.finishedAt = builder.finishedAt;
+        this.requestReceivedAt = builder.requestReceivedAt;
+        this.submittedAt = builder.submittedAt;
+        this.firstDeltaAt = builder.firstDeltaAt;
     }
 
     public static Builder builder() {
@@ -275,6 +299,10 @@ public class AgentExecution {
         return reasoningEffort;
     }
 
+    public ReasoningEffortSource reasoningEffortSource() { return reasoningEffortSource; }
+
+    public ModelTier modelTier() { return modelTier; }
+
     public CostMode costMode() {
         return costMode;
     }
@@ -337,6 +365,12 @@ public class AgentExecution {
         return finishedAt;
     }
 
+    public Instant requestReceivedAt() { return requestReceivedAt; }
+
+    public Instant submittedAt() { return submittedAt; }
+
+    public Instant firstDeltaAt() { return firstDeltaAt; }
+
     public Instant resultDeliveredAt() {
         return resultDeliveredAt;
     }
@@ -344,6 +378,33 @@ public class AgentExecution {
     /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */
     public void attachRunId(String hermesRunId) {
         this.hermesRunId = hermesRunId;
+    }
+
+    /** Hermes 에 제출하기 직전 시각은 한 번만 적는다. */
+    public void markSubmitted(Instant at) {
+        if (submittedAt == null) {
+            submittedAt = at;
+        }
+    }
+
+    /** 첫 assistant delta를 받은 시각만 보존한다. 본문은 실행 기록에 두지 않는다. */
+    public boolean markFirstDelta(Instant at) {
+        if (firstDeltaAt == null) {
+            firstDeltaAt = at;
+            return true;
+        }
+        return false;
+    }
+
+    /** profile 설정에서 읽은 기본값으로 요청 effort의 출처를 보완한다. */
+    public void recordProfileReasoningDefault(String effort) {
+        if (reasoningEffortSource != ReasoningEffortSource.UNKNOWN || effort == null || effort.isBlank()) {
+            return;
+        }
+        reasoningEffortSource = ReasoningEffortSource.PROFILE_DEFAULT;
+        if (reasoningEffort == null) {
+            reasoningEffort = effort;
+        }
     }
 
     /** 끝난 답을 적는다. 다른 에이전트에게 맡겨 만든 실행만 쓴다. */
@@ -435,6 +496,8 @@ public class AgentExecution {
         private String provider;
         private String model;
         private String reasoningEffort;
+        private ReasoningEffortSource reasoningEffortSource;
+        private ModelTier modelTier;
         private CostMode costMode;
         private ExecutionStatus status;
         private String errorCode;
@@ -453,6 +516,9 @@ public class AgentExecution {
         private String pricingVersion;
         private Instant startedAt;
         private Instant finishedAt;
+        private Instant requestReceivedAt;
+        private Instant submittedAt;
+        private Instant firstDeltaAt;
 
         public Builder userId(Long userId) {
             this.userId = userId;
@@ -516,6 +582,21 @@ public class AgentExecution {
 
         public Builder reasoningEffort(String reasoningEffort) {
             this.reasoningEffort = reasoningEffort;
+            return this;
+        }
+
+        public Builder reasoningEffortSource(ReasoningEffortSource reasoningEffortSource) {
+            this.reasoningEffortSource = reasoningEffortSource;
+            return this;
+        }
+
+        public Builder modelTier(ModelTier modelTier) {
+            this.modelTier = modelTier;
+            return this;
+        }
+
+        public Builder requestReceivedAt(Instant requestReceivedAt) {
+            this.requestReceivedAt = requestReceivedAt;
             return this;
         }
 

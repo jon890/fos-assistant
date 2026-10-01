@@ -1,6 +1,8 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -74,15 +76,32 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     /** 고른 모델과 effort 만 바꾼다. 대화 목록의 순서를 흔들지 않도록 {@code updatedAt} 은 건드리지 않는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
     @Query("""
             update Conversation c
-               set c.modelProvider = :provider, c.model = :model, c.reasoningEffort = :reasoningEffort
+               set c.modelProvider = :provider, c.model = :model, c.reasoningEffort = :reasoningEffort,
+                   c.modelSelectionMode = :customMode,
+                   c.modelTier = null
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
     int chooseModelIfActive(@Param("id") Long id, @Param("userId") Long userId,
             @Param("provider") String provider, @Param("model") String model,
-            @Param("reasoningEffort") String reasoningEffort);
+            @Param("reasoningEffort") String reasoningEffort,
+            @Param("customMode") ModelSelectionMode customMode);
+
+    /** 기존 호출은 직접 선택으로 보존한다. */
+    default int chooseModelIfActive(
+            Long id, Long userId, String provider, String model, String reasoningEffort) {
+        return chooseModelIfActive(id, userId, provider, model, reasoningEffort, ModelSelectionMode.CUSTOM);
+    }
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier,
+                c.modelProvider = null, c.model = null, c.reasoningEffort = null
+             where c.id = :id and c.userId = :userId and c.deletedAt is null
+            """)
+    int chooseModelTierIfActive(@Param("id") Long id, @Param("userId") Long userId,
+            @Param("mode") ModelSelectionMode mode, @Param("tier") ModelTier tier);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional

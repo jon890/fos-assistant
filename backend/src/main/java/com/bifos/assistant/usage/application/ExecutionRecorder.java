@@ -3,6 +3,7 @@ package com.bifos.assistant.usage.application;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
@@ -11,7 +12,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -29,6 +32,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ExecutionRecorder {
+    private final Clock clock;
 
     private static final Logger log = LoggerFactory.getLogger(ExecutionRecorder.class);
 
@@ -112,6 +116,15 @@ public class ExecutionRecorder {
             Long retryOfExecutionId,
             String hermesSessionId,
             DelegationKey delegationKey) {
+        return start(user, conversation, agent, parentExecutionId, rootExecutionId, context, requested,
+                retryOfExecutionId, hermesSessionId, delegationKey, null, null);
+    }
+
+    /** 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다. */
+    public AgentExecution start(
+            CurrentUser user, Conversation conversation, Agent agent, Long parentExecutionId, Long rootExecutionId,
+            ExecutionContextSnapshot context, ModelChoice requested, Long retryOfExecutionId, String hermesSessionId,
+            DelegationKey delegationKey, ModelTier modelTier, Instant requestReceivedAt) {
         return executions.save(
                 base(user, conversation, agent)
                         .hermesSessionId(hermesSessionId)
@@ -122,6 +135,10 @@ public class ExecutionRecorder {
                         .provider(requested == null ? null : requested.provider())
                         .model(requested == null ? null : requested.model())
                         .reasoningEffort(requested == null ? null : requested.reasoningEffort())
+                        .reasoningEffortSource(requested != null && requested.reasoningEffort() != null
+                                ? ReasoningEffortSource.REQUESTED : ReasoningEffortSource.UNKNOWN)
+                        .modelTier(modelTier)
+                        .requestReceivedAt(requestReceivedAt)
                         .contextChars(context.contextChars())
                         .contextOmittedItems(context.contextOmittedItems())
                         .runtimeFingerprint(context.runtimeFingerprint())
@@ -144,6 +161,19 @@ public class ExecutionRecorder {
     public void attachRunId(AgentExecution execution, String hermesRunId) {
         execution.attachRunId(hermesRunId);
         executions.save(execution);
+    }
+
+    /** Hermes 제출 직전 시각을 실행 줄에 남긴다. */
+    public void markSubmitted(AgentExecution execution) {
+        execution.markSubmitted(clock.instant());
+        executions.save(execution);
+    }
+
+    /** 최초 assistant delta 수신 시각만 남긴다. */
+    public void markFirstDelta(AgentExecution execution) {
+        if (execution.markFirstDelta(clock.instant())) {
+            executions.save(execution);
+        }
     }
 
     /**
