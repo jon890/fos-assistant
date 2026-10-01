@@ -375,12 +375,15 @@ public class ConnectorConnectionService {
         if (manifest.isEmpty()) {
             return false;
         }
+        // 도구 목록을 먼저 맞춘다. 설치 요청은 목록에 Control Plane MCP 가 없으면 거절되므로, 어긋난 목록을
+        // 여기서 다시 써야 뒤의 설치 요청이 지나간다.
+        boolean toolsetsApplied = declaredToolsetsApplied(agent, manifest.get());
         // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. plugin 의 스킬 본문이 바뀌었으면 지침을 다시 쓴다.
         // 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
         connector.putConnector(agent.hermesProfile(), connection.connectorId(), true);
         ProbeResult probe =
                 connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
-        return probe.ok() && !probe.tools().isEmpty() && declaredToolsetsApplied(agent, manifest.get());
+        return toolsetsApplied && probe.ok() && !probe.tools().isEmpty();
     }
 
     /**

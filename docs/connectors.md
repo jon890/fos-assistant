@@ -140,6 +140,7 @@ Control Plane 도 카탈로그를 읽을 때 `toolsets` 를 한 번 더 본다. 
 - `SKILL.md` 밖의 파일은 읽지 않는다. 스킬 디렉터리나 `SKILL.md` 가 심볼릭 링크이면 그 커넥터를 카탈로그에 내지 않는다. 링크가 plugin 밖의 파일을 가리키면 그 내용이 지침으로 들어가기 때문이다
 - 합친 본문은 8,000자까지다. Control Plane 의 성격 본문 상한과 같다. 넘으면 그 커넥터를 카탈로그에 내지 않는다
 - 스킬이 하나도 없으면 `SOUL.md` 를 바꾸지 않는다
+- 대시보드는 연결용 profile 과 다른 관리 profile 을 구분하지 못한다. Control Plane 이 연결용 에이전트의 profile 에만 설치를 보낸다
 - 관리 표식이 있는 profile 에, 그 커넥터의 소유 기록과 한 묶음으로만 쓴다. 쓰다가 실패하면 설정, 소유 기록과 함께 되돌린다. 다른 profile 의 `SOUL.md` 는 건드리지 않는다
 - 해제는 `SOUL.md` 를 지우지 않는다. 에이전트가 꺼지고, 다시 등록하면 다시 쓴다
 - 본문은 카탈로그 응답과 로그에 싣지 않는다
@@ -157,7 +158,7 @@ Control Plane 은 그 값을 `agent.connector_attachments` 에 옮겨 두고 `Ag
 이미 연결된 에이전트는 다시 등록, 연결 확인, 관리자 반영 완료 가운데 어느 것에서든 지금 manifest 의 `toolsets` 와 `attachments` 를 받는다.
 plugin 이 두 칸을 새로 선언했으면 사용자가 연결 화면에서 연결 확인을 한 번 누르면 된다.
 `platform_toolsets.api_server` 는 다음 실행부터 적용되므로 공유 gateway 를 재시작하지 않는다([`hermes/tools-and-skills.md`](hermes/tools-and-skills.md)).
-해제하거나 그 커넥터가 카탈로그에서 빠지면 사진을 받지 않는 것으로 되돌린다.
+해제하면 사진을 받지 않는 것으로 되돌린다. 그 커넥터가 카탈로그에서 빠지면 연결이 `PENDING` 이 되어 에이전트가 꺼지므로 사진도 받지 않는다.
 
 **배포한 뒤 확인할 것이다. 아직 확인하지 못했다.**
 
