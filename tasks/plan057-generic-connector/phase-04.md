@@ -27,15 +27,15 @@
 
 ### 1. `test/e2e/fake-hermes.ts` 에 커넥터 경로를 더한다
 
-`GET /api/connectors/catalog`(시험 커넥터 하나), `POST /api/connectors/{id}/call`(토큰 `demo_ok` 면 `{ok: true, result: {"scopes": [{"id": "a", "name": "A"}]}}`, `demo_bad` 면 `credential_rejected`), `GET PUT /api/connectors`, 커넥터 key 의 `PUT DELETE /api/env`, `POST /api/mcp/servers/demo/test`. 응답 모양은 `docs/connectors.md` 표와 같게 한다. 받은 요청을 기록해 시나리오가 순서를 단언할 수 있게 한다.
+`GET /api/connectors/catalog`(시험 커넥터 하나. `fields[].env`, `verify` 를 담는다), `POST /api/connectors/{id}/call`(토큰 `demo_ok_0123456789` 면 `{ok: true, result: {"scopes": [{"id": "a", "name": "A"}]}}`, `demo_bad_0123456789` 면 `credential_rejected`), `GET PUT /api/connectors`, 커넥터 key 의 `PUT DELETE /api/env`, `POST /api/mcp/servers/demo/test`. 응답 모양은 `docs/connectors.md` 표와 같게 한다. 받은 요청을 기록해 시나리오가 순서를 단언할 수 있게 한다.
 
 ### 2. `test/e2e/scenarios/connector.ts` (신규)
 
 `test/e2e/run.ts` 에 등록한다.
 - 카탈로그에 `demo-notes` 가 보인다
 - 선택지 조회 → `[{value: "a", label: "A"}]`
-- `demo_bad` 로 등록 → 400 `CONNECTOR_CREDENTIAL_REJECTED`, 연결 행 없음
-- `demo_ok` 로 등록 → `PENDING`, 대역이 받은 순서가 확인 → env → 도구 목록 → 설치
+- `demo_bad_0123456789` 로 등록 → 400 `CONNECTOR_CREDENTIAL_REJECTED`, 연결 행 없음
+- `demo_ok_0123456789` 로 등록 → `PENDING`, 대역이 받은 순서가 확인 → env → 도구 목록 → 설치
 - 연결 확인 → `READY`, 상태 응답의 `secretPrefixes.token` 이 앞 8자이고 원문이 응답 어디에도 없음
 - 해제 → `DISCONNECTED`
 - 다른 사용자는 이 연결을 읽지 못한다

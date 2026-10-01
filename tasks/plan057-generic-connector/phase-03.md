@@ -21,6 +21,7 @@
 | `web/src/app/api/admin/connections/accountbook/route.ts`, `[userId]/confirm/route.ts` | `web/src/app/api/admin/connections/route.ts`, `web/src/app/api/admin/connections/[id]/[userId]/confirm/route.ts` |
 | `web/src/lib/connection.ts`, `web/src/lib/connection-route.ts` | 범용 타입과 라우트 도우미로 고친다 |
 | `web/src/components/shell/main-nav.tsx` 의 「가계부 연결」 | 「연결」, `/connections` |
+| `web/src/components/agent/agent-detail-body.tsx` 의 「가계부 연결 화면에서 …」 문구 | 서비스 이름 없는 「연결 화면에서 …」 |
 | `test/browser/accountbook-connection.spec.ts` | `test/browser/connector-connection.spec.ts` |
 
 지금 라우트 도우미의 원칙은 그대로 둔다: 본문은 `readJsonBody` 로 읽고, Control Plane 응답은 계약 칸만 골라 넘기고, 오류 원문을 브라우저로 넘기지 않는다(`web/src/lib/connection-route.ts` 의 `connectorCall`, `safeConnection`).
@@ -29,6 +30,8 @@
 
 ## 의도 메모
 
+- **카탈로그와 연결 상태는 브라우저에서 읽는다.** 부품이 `/api/connectors`, `/api/connections/[id]`, `/api/admin/connections` 를 불러 그린다. 서버 컴포넌트가 Control Plane 을 직접 부르지 않는다. 브라우저 검사는 실제 Control Plane 과 Hermes 대역을 띄우는데 대역의 커넥터 경로는 phase 04 에서 생기고, 브라우저 가로채기는 서버 쪽 호출에 닿지 않기 때문이다. 모르는 id 의 404 화면도 그 응답(`CONNECTOR_NOT_FOUND`)으로 정한다
+- **새 부품은 `fetch` 를 직접 쓰지 않는다**(`web/AGENTS.md` 의 `no-restricted-globals`). 호출 함수는 `web/src/lib/` 에 두고 부품이 그것을 쓴다. 지우는 파일을 가리키는 `web/eslint-suppressions.json` 의 항목은 함께 뺀다. 남기면 `pnpm lint` 가 쓰지 않는 기준으로 실패한다. 새 항목은 더하지 않는다
 - 화면 문구에 서비스 이름을 쓰지 않는다. 제목과 설명과 칸 라벨은 manifest 에서 온다. 상태와 오류 문구는 공통 어휘로 정한다
 - 비밀 칸은 `type="password"` 로 받고, 제출한 직후와 선택지 조회가 실패했을 때 비운다. 저장된 상태에는 앞 8자만 보인다
 - 선택지 칸은 비밀 칸이 모두 채워진 뒤 「불러오기」 로 부른다. `autoSelectSingle` 이 참이고 하나뿐이면 고른다. 비밀 칸을 바꾸면 불러온 선택지를 비운다
@@ -63,6 +66,7 @@
 cd web && pnpm typecheck && cd ..
 # 다른 브라우저 검사가 돌고 있으면 끝난 뒤에 돌린다
 cd web && pnpm test:browser connector-connection && cd ..
+node --test 'test/unit/**/*.test.ts'
 ! git grep -niE "accountbook|ACCOUNTBOOK_|fab_|가계부" -- web/src ':!web/src/app/connections/accountbook/page.tsx'
 scripts/quality.sh check
 scripts/check-public-safe.sh
@@ -94,5 +98,7 @@ scripts/check-public-safe.sh
 | `web/src/lib/connection.ts` | 수정 |
 | `web/src/lib/connection-route.ts` | 수정 |
 | `web/src/components/shell/main-nav.tsx` | 수정 |
+| `web/src/components/agent/agent-detail-body.tsx` | 수정 |
+| `web/eslint-suppressions.json` | 수정 |
 | `test/browser/connector-connection.spec.ts` | 신규 |
 | `test/browser/accountbook-connection.spec.ts` | 삭제 |
