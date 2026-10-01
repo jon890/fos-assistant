@@ -14,7 +14,7 @@ flowchart TD
     V -->|실패| X
     V --> C[사용자 행 잠금과 전용 에이전트 바인딩]
     C --> D[에이전트 비활성화와 PENDING 저장]
-    D --> E[칸마다 env 쓰기, 설치가 API 도구 목록을 커넥터 MCP 서버만으로 씀]
+    D --> E[칸마다 env 쓰기, 설치가 API 도구 목록을 커넥터 MCP 서버만으로 쓰고 Control Plane MCP 등록을 지움]
     E -->|실패| P[PENDING 유지와 CONNECTOR_OPERATION_FAILED]
     E -->|재시작 필요| W[재시작 대기]
     E --> P2[PENDING, desired_enabled 참]

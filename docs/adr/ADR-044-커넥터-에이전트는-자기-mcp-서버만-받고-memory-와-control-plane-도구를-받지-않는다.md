@@ -3,9 +3,9 @@
 - **status**: `accepted`
 - **결정**: 커넥터 연결의 전용 에이전트([ADR-039](ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md))는 외부 서비스의 데이터를 읽는 worker 로 본다.
   이 에이전트의 실행에는 세 가지를 주지 않는다.
-  - Control Plane MCP(`fos-assistant`) 도구. profile 의 API 도구 목록은 그 profile 에 설치한 커넥터의 MCP 서버 이름만 갖는다. 목록은 대시보드 plugin 의 설치가 쓰고, 설치한 커넥터가 없으면 `no_mcp` 하나를 둔다.
+  - Control Plane MCP(`fos-assistant`) 도구. profile 의 API 도구 목록은 그 profile 에 설치한 커넥터의 MCP 서버 이름만 갖고, `mcp_servers` 의 Control Plane MCP 등록도 지운다. 그 profile 의 MCP 토큰과 `fos-ctx` plugin 은 그대로 둔다. 목록은 대시보드 plugin 의 설치가 쓰고, 설치한 커넥터가 없으면 `no_mcp` 하나를 둔다.
   - 호출자의 Memory 문맥. 사용자가 직접 연 대화와 위임받은 실행 모두에서 Control Plane 이 Memory 를 조립하지 않는다.
-  - Control Plane MCP 호출의 수락. origin 실행의 에이전트가 커넥터 에이전트이면 Control Plane 이 도구 호출을 거절한다. profile 설정이 옛 모양으로 남아 있어도 이 판정은 바로 걸린다.
+  - Control Plane MCP 호출의 수락. origin 실행의 에이전트가 커넥터 에이전트이면 Control Plane 이 도구 호출을 거절한다. 거절은 도구 호출의 요청자 판정에 두고 토큰 인증은 바꾸지 않는다. profile 설정이 옛 모양으로 남아 있어도 이 판정은 바로 걸린다.
 
   필요한 맥락은 부르는 쪽(Chief)이 위임 요청의 `task` 에 담는다.
   위임 결과는 지금처럼 Control Plane 이 실행 줄의 답을 부모 대화의 다음 turn 으로 전한다([ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 이 경로는 worker 의 MCP 호출을 쓰지 않는다.
@@ -25,3 +25,5 @@
     이미 설치한 profile 은 연결 확인이나 관리자의 반영 완료가 설치를 다시 써서 새 목록으로 바꾸고, 공유 gateway 를 재시작한 뒤에 반영된다([커넥터 연결](../connectors.md)).
     커넥터의 MCP 서버가 가진 쓰기 도구는 그대로 열려 있다. 그 도구의 승인은 이 결정의 범위가 아니다.
 - **다음**: 도구 호출마다 승인을 받는 action policy 와 OAuth 연결은 따로 설계한다. 그때 에이전트 종류를 `connectorManaged` 한 칸이 아니라 종류 값으로 나눌지 함께 정한다.
+  커넥터 에이전트 대화의 답이 Memory 제안으로 가는 경로는 이 결정이 다루지 않는다. 제안은 사람이 승인해야 남고([ADR-012](ADR-012-memory-는-사람이-승인한-것만-남는다.md)) 기본 설정에서 꺼져 있다. 켤 때 커넥터 에이전트의 대화를 제안 대상에서 뺄지 정한다.
+  동작 정책을 넣을 때 `fos-ctx` 의 hook 이 그 profile 의 MCP 토큰으로 Control Plane 에 정책을 묻는 경로를 더할 수 있다. 그래서 토큰을 회수하지 않는다.

@@ -107,8 +107,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - Control Plane 은 카탈로그의 `fields[].env` 로 `PUT /api/env` 의 key 를 정하고 `verify.tool` 로 확인 도구를 부른다. `env` 이름은 Control Plane 의 응답에 담지 않는다
 - 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `PUT /api/connectors` 의 `enabled: false` 를 받는다. 이때 대시보드가 그 기록의 서버 env 가 참조하던 key 를 profile `.env` 에서 지운다. `GET /api/connectors` 는 그 기록을 `configured: false` 로 낸다
 - 운영 목록에도 없고 소유 기록도 없는 plugin 의 `enabled: false` 는 끌 것이 없으므로 `changed: false` 로 성공한다. `enabled: true` 는 거절한다. `GET /api/connectors` 는 그런 plugin 을 목록에 넣지 않고, Control Plane 은 목록에 없는 것을 설치 안 됨(`enabled: false`, `configured: false`)으로 읽는다. 카탈로그에서 빠진 연결의 해제와 반영 완료가 끝까지 가게 하기 위해서다
-- 설치는 API 도구 목록(`platform_toolsets.api_server`)을 그 profile 에 설치한 커넥터의 MCP 서버 이름만으로 다시 쓴다. Control Plane MCP 와 내장 도구는 목록에서 빠진다. 마지막 커넥터를 끄면 목록은 `no_mcp` 하나다. 목록을 비우면 Hermes 가 등록된 MCP 서버를 모두 통과시키기 때문이다([ADR-044](adr/ADR-044-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md))
-- `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치한 커넥터의 서버 이름과 정확히 같을 때만 참이다. Control Plane MCP 가 목록에 남은 옛 모양은 `configured: false` 다
+- 설치는 API 도구 목록(`platform_toolsets.api_server`)을 그 profile 에 설치한 커넥터의 MCP 서버 이름만으로 다시 쓴다. Control Plane MCP 와 내장 도구는 목록에서 빠지고, `mcp_servers` 의 Control Plane MCP 등록도 지운다. 그 profile 의 MCP 토큰과 `fos-ctx` plugin 은 그대로 둔다. 마지막 커넥터를 끄면 목록은 `no_mcp` 하나다. 목록을 비우면 Hermes 가 등록된 MCP 서버를 모두 통과시키기 때문이다([ADR-044](adr/ADR-044-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md))
+- `GET /api/connectors` 의 `configured` 는 서버 정의가 소유 기록과 같고 API 도구 목록이 설치한 커넥터의 서버 이름과 정확히 같고 Control Plane MCP 등록이 없을 때만 참이다. Control Plane MCP 나 내장 도구가 목록에 남은 옛 모양은 `configured: false` 다
 - 설치와 제거는 쓰기 전에 `config.yaml` 과 소유 기록을 `connector-backups/` 에 떠 둔다. profile `.env` 는 떠 두지 않는다. 쓸 때마다 그 디렉터리에 남아 있는 `.env` 사본을 지운다
 - 운영자는 대시보드 프로세스의 환경 변수로 커넥터 목록을 준다. 자세한 모양은 [`code-architecture.md`](code-architecture.md) 의 「Hermes 쪽 코드」 절이 갖는다
 
@@ -129,7 +129,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 6. 모두 성공하면 `desired_enabled=true`, 칸 값과 비밀 앞부분 저장. 상태는 여전히 `PENDING` 이다
 
 연결 확인과 관리자 반영 완료는 설치의 enabled 와 configured, MCP probe 의 도구, 켜진 내장 도구 없음을 모두 보고 `READY` 로 바꾼다.
-설치가 켜져 있는데 `configured` 가 거짓이거나 켜진 내장 도구가 보이면 설치를 한 번 다시 써서(`PUT /api/connectors`, `enabled: true`) 목록을 맞춘다. 칸 값은 profile `.env` 에 그대로 있어 다시 입력받지 않는다.
+설치가 켜져 있는데 `configured` 가 거짓이면 설치를 한 번 다시 써서(`PUT /api/connectors`, `enabled: true`) 목록을 맞춘다. `configured` 가 참이면 다시 쓰지 않는다. 바뀌는 것 없이 재시작 대기만 서기 때문이다. 칸 값은 profile `.env` 에 그대로 있어 다시 입력받지 않는다.
 다시 쓴 응답이 `restart_required` 이면 재시작 대기로 남기고, 아니면 다시 읽어 판정한다. 이전 판이 설치한 연결은 이 경로로 새 목록이 된다.
 
 같은 사용자의 등록, 확인과 해제는 사용자 행 잠금으로 순서대로 처리한다.
@@ -148,7 +148,7 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 
 `connector_connection` 은 사용자, 커넥터, 에이전트 바인딩, 상태, 칸 값, 마지막 확인 시각, 재시작 필요 여부, 활성화 후보 여부를 저장한다([`data-schema.md`](data-schema.md)).
 비밀 칸의 원문과 해시는 저장하지 않는다. 값이 16자 이상일 때만 앞 4자를 `fields.secretPrefixes` 에 둔다.
-16자 미만인 값은 앞부분이 원문의 큰 부분이라 `secretPrefixes` 에 넣지 않는다. 화면은 앞부분이 없는 비밀 칸을 「입력됨」 으로만 보인다.
+16자 미만인 값은 앞부분이 원문의 큰 부분이라 `secretPrefixes` 에 넣지 않는다. 화면은 연결된 상태에서 앞부분이 없는 필수 비밀 칸을 「입력됨」 으로만 보인다. 앞부분이 없는 선택 비밀 칸은 입력 여부를 응답으로 알 수 없어 보이지 않는다.
 V39 이전에 저장한 앞부분은 원래 길이를 알 수 없어 마이그레이션이 모두 비웠다.
 브라우저는 등록을 제출한 직후 비밀 칸 입력을 비우고 다시 표시하지 않는다. 선택지를 고르는 동안은 작성 중인 입력을 쓰고, 조회가 실패해도 입력을 비운다.
 요청 record 의 문자열 표현, 외부 오류, 로그와 응답에 비밀 원문을 남기지 않는다.
@@ -160,9 +160,9 @@ V39 이전에 저장한 앞부분은 원래 길이를 알 수 없어 마이그�
 
 | 무엇 | 어떻게 |
 | --- | --- |
-| 도구 | profile 의 API 도구 목록에 자기 커넥터의 MCP 서버 이름만 둔다. 대시보드 plugin 의 설치가 쓴다 |
+| 도구 | profile 의 API 도구 목록에 자기 커넥터의 MCP 서버 이름만 두고 Control Plane MCP 의 서버 등록을 지운다. 대시보드 plugin 의 설치가 쓴다 |
 | Memory | 직접 연 대화와 위임받은 실행 모두에서 Memory 문맥을 조립하지 않는다. 실행 줄의 문맥 길이는 0 이고 지문은 비어 있다 |
-| Control Plane MCP 호출 | origin 실행의 에이전트가 커넥터 에이전트이면 요청자를 정하지 않고 거절한다. 응답은 서명이 틀린 호출과 같다 |
+| Control Plane MCP 호출 | origin 실행의 에이전트가 커넥터 에이전트이면 도구 호출의 요청자를 정하지 않고 거절한다. 응답은 서명이 틀린 호출과 같다. 그 profile 의 MCP 토큰은 유효한 채로 둔다 |
 | 위임 결과 | Control Plane 이 실행 줄의 답을 부모 대화의 다음 turn 으로 전한다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). worker 의 MCP 호출을 쓰지 않는다 |
 
 부르는 쪽 에이전트가 필요한 맥락을 `agent_delegate` 의 `task` 에 담는다. worker 는 결과물을 쓰지 못하고 다른 에이전트에게 맡기지 못한다.

@@ -1,128 +1,85 @@
-# Phase 04. 커넥터 호출을 사용자별로 제한한다
+# Phase 04. Control Plane 이 도구 목록을 쓰지 않고 설치에 맡기며, 옛 목록의 연결을 다시 설치한다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
-선택지 조회, 등록, 연결 확인을 사용자마다 동시 1개와 60초에 10회로 제한한다. 이 셋은 MCP 서버를 자식 프로세스로 띄우고, 연결이 없는 사용자도 임의 값으로 부를 수 있어 토큰이 유효한지 훑어 알아내는 데 쓰일 수 있다.
+커넥터 연결의 등록과 확인이 Control Plane MCP 를 도구 목록에 쓰지 않게 한다. 이전 판이 설치한 연결은 연결 확인이나 관리자의 반영 완료가 설치를 다시 써서 새 목록으로 바꾼다.
 
-**범위 외**: 일반 에이전트 실행의 한도와 대시보드 plugin 의 전역 동시 4개는 바꾸지 않는다. 해제, 읽기, 카탈로그, 관리자 경로는 제한하지 않는다.
+**범위 외**: 대시보드 plugin 의 목록 쓰기는 앞 phase 가 끝냈다. Memory 와 MCP 호출 거절도 앞 phase 가 끝냈다.
 
 ## 컨텍스트
 
-- 대상 메서드는 `ConnectorConnectionService` 의 `options`, `register`, `check` 다(`backend/src/main/java/com/bifos/assistant/connector/application/ConnectorConnectionService.java`)
-- 본보기는 `AgentDelegationService` 다. `Semaphore.tryAcquire` 로 기다리지 않고 거절하고 상태를 JVM 메모리에 둔다
-- 설정 클래스의 본보기는 `backend/src/main/java/com/bifos/assistant/orchestration/application/DelegationProperties.java` 다. `AssistantApplication` 의 `@ConfigurationPropertiesScan` 이 찾는다. 구조 규칙 `CONFIGURATION_PROPERTIES_ARE_VALIDATED` 가 `@Validated` 를 요구한다. 새 클래스에는 `org.springframework.validation.annotation.Validated` 를 붙인다. 기준 파일(`backend/config/archunit/store/`)에 새 위반을 더하지 않는다
-- 시각은 `Clock` 으로 받는다(`NO_DIRECT_INSTANT_NOW`). `ConnectorConnectionService` 는 이미 `Clock` 을 받는 생성자를 갖는다
-- 오류 코드는 `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` 에 있고 화면 문구는 `web/src/lib/connection.ts` 의 오류 문구 표에 있다
-- 테스트와 e2e 와 브라우저 검사는 같은 사용자로 짧은 시간에 여러 번 부른다. 기본값 10회에 걸리지 않게 그 실행들의 설정을 올려야 한다
+- 대상은 `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorConnectionService.java` 다. 고치기 전에 `apply`, `check`, `confirmApplied`, `usable`, `narrowedEnabled` 를 읽는다
+- 지금 `apply` 는 env 를 쓴 뒤 `toolsets.writeApiServer(profile, List.of(AgentToolPolicy.CONTROL_PLANE_MCP))` 를 부르고 설치한다. `narrowedEnabled` 는 켜진 내장 도구가 보이면 `writeApiServer(profile, List.of(CONTROL_PLANE_MCP, mcpServer))` 를 부른다
+- 대시보드 plugin 의 설치(`HermesConnectorClient.putConnector(profile, id, true)`)는 API 도구 목록을 커넥터 서버 이름만으로 다시 쓰고 `mcp_servers` 의 Control Plane MCP 등록을 지운다. 반환값은 `restart_required` 다. 이미 설치한 것을 다시 쓰면 바뀐 것이 없어도 `restart_required` 가 참이다
+- `readConnector` 의 `configured` 는 서버 정의가 소유 기록과 같고 목록이 설치한 커넥터의 서버 이름과 정확히 같고 Control Plane MCP 등록이 없을 때만 참이다. 내장 도구나 Control Plane MCP 가 목록에 남은 옛 모양은 `configured: false` 다
+- `PENDING` 인 연결의 에이전트는 꺼져 있다. `connection.pending(now())` 과 `connection.ready(now())` 가 에이전트 활성화를 함께 다룬다(`backend/src/main/java/com/bifos/assistant/connector/domain/ConnectorConnection.java`)
 
-**근거 문서**: `docs/connectors.md` 의 「사용자별 호출 제한」, `docs/flow.md` 의 「커넥터 연결」, `docs/code-architecture.md` 의 「backend 패키지」
+**근거 문서**: `docs/connectors.md` 의 「설치와 실패 처리」 와 「대시보드 plugin 계약」, `docs/flow.md` 의 「커넥터 연결」, `docs/adr/ADR-044-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md`
 
 ## 의도 메모
 
-- 기다리게 하지 않는다. 줄을 세우면 요청 스레드와 DB 연결을 쥔 채로 쌓인다
-- DB 나 외부 저장소에 두지 않는다. Control Plane 이 한 대이고, 재시작으로 횟수가 비워져도 잃는 것이 없다
-- 거절한 요청은 횟수에 넣지 않는다. 넣으면 계속 누르는 사용자가 스스로 풀리지 않는다
+- 이미 설치한 연결을 새 목록으로 바꾸려고 사용자에게 토큰을 다시 받지 않는다. 칸 값은 profile `.env` 에 그대로 있다
+- 다시 설치는 `configured` 가 거짓일 때만 한다. `configured` 가 참인데 다시 쓰면 바뀌는 것 없이 `restart_required` 만 서고 관리자 반영 완료가 끝나지 않는다
+- 켜진 내장 도구가 보이는 것은 `configured` 가 참인 뒤에는 목록이 아니라 다른 설정에서 온 것이다. 다시 쓰지 않고 `PENDING` 으로 둔다
 
 ## 작업 항목
 
-### 1. `ConnectorProperties` (신규)
+### 1. `apply` 가 도구 목록을 쓰지 않는다
 
-`backend/src/main/java/com/bifos/assistant/connector/application/ConnectorProperties.java`
+- `STEP_TOOLSET` 단계와 `toolsets.writeApiServer(...)` 호출을 지운다. env 뒤에 바로 설치한다. 상수 `STEP_TOOLSET` 도 지운다
 
-- `@ConfigurationProperties(prefix = "assistant.connector") public record ConnectorProperties(int maxConcurrentCalls, int callsPerMinute)`
-- 둘 다 1 이상이 아니면 `IllegalStateException` 으로 기동을 멈춘다. `DelegationProperties.requirePositive` 와 같은 문구 형식을 쓴다
-- `backend/src/main/resources/application.yml` 의 `assistant:` 아래에 더한다
+### 2. `usable` 과 `narrowedEnabled`
 
-```yaml
-  connector:
-    # 한 사용자가 동시에 돌릴 수 있는 선택지 조회, 등록, 연결 확인 수
-    max-concurrent-calls: 1
-    # 한 사용자가 60초 동안 돌릴 수 있는 그 호출 수. 상태는 JVM 메모리에 둔다
-    calls-per-minute: 10
-```
+- `narrowedEnabled` 를 지운다. `usable` 은 `probe.ok() && !probe.tools().isEmpty() && toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).isEmpty()` 로 판정한다
+- `HermesToolsetClient` 필드는 `readEnabled` 에 계속 쓴다. `AgentToolPolicy` import 가 쓰이지 않으면 지운다
 
-### 2. `ConnectorCallLimiter` (신규)
+### 3. `check` 와 `confirmApplied` 의 다시 설치
 
-`backend/src/main/java/com/bifos/assistant/connector/application/ConnectorCallLimiter.java`
+- 새 private 메서드 `reinstall(ConnectorConnection connection)`: `connector.putConnector(profile, connectorId, true)` 를 부르고 `connection.markRestartRequired(...)` 에 그 반환값을 넣는다
+- `check`: `connection.desiredEnabled()` 이고 `state.enabled()` 이고 `!state.configured()` 이고 `!connection.restartRequired()` 이고 카탈로그에 그 커넥터가 있으면(`findManifest` 가 비지 않으면) `reinstall` 을 부른다. 그 뒤 `connection.restartRequired()` 이면 `PENDING` 으로 저장하고 돌려준다. 아니면 `readConnector` 를 다시 읽어 지금의 판정을 잇는다. `reinstall` 이 예외를 내면 `warn(STEP_INSTALL, ...)` 과 `connection.pending(now())` 뒤 `ConnectorOperationFailure` 다. 카탈로그에 없으면 다시 쓰지 않고 지금처럼 `PENDING` 이다
+- `confirmApplied`: `connection.desiredEnabled()` 이고 `state.enabled() && !state.configured()` 이고 카탈로그에 있으면 `reinstall` 을 부른다. 반환값이 참이면 `connection.pending(now())` 뒤 `ConnectorOperationFailure` 를 던진다(관리자가 gateway 를 재시작한 뒤 다시 누른다. `noRollbackFor` 라 `restart_required` 는 저장된다). 거짓이면 `readConnector` 를 다시 읽어 지금의 판정을 잇는다. 이미 `restartRequired` 인 연결도 관리자가 재시작한 뒤 누른 것이므로 `configured` 가 거짓이면 다시 쓴다. 그 응답이 다시 `restart_required` 이면 한 번 더 재시작이 필요하다는 뜻이고 그대로 실패로 답한다
+- 메서드가 60줄을 넘으면 private 메서드로 나눈다(`MethodLength` 경고)
 
-- `@Component`. 생성자는 `ConnectorProperties` 와 `Clock` 을 받는다. `Clock` 빈이 없으면 `ConnectorConnectionService` 처럼 `Clock.systemUTC()` 를 쓰는 생성자와 `Clock` 을 받는 생성자를 따로 둔다
-- `public <T> T call(Long userId, Supplier<T> action)`: 받아들이면 `action` 을 돌리고 끝나면(예외여도) 동시 자리를 돌려준다. 받아들이지 못하면 `action` 을 부르지 않고 `new ApiException(ErrorCode.CONNECTOR_RATE_LIMITED, "too many connector calls")` 를 던진다
-- 상태는 `ConcurrentHashMap<Long, ...>` 에 사용자마다 둔다. 사용자 한 명의 상태는 지금 도는 수와 받아들인 호출의 시작 시각(`ArrayDeque<Instant>`)이다. 판정과 갱신은 그 사용자의 상태 객체를 잠그고 한다(`ConcurrentHashMap.compute` 안에서 하거나 상태 객체에 `synchronized`)
-- 받아들이는 조건: 60초보다 오래된 시각을 버린 뒤 지금 도는 수가 `maxConcurrentCalls` 미만이고 남은 시각 수가 `callsPerMinute` 미만이다
-- 도는 수가 0 이고 남은 시각이 없는 사용자의 상태는 맵에서 지운다. 맵이 끝없이 커지지 않게 한다
-- 중첩 타입은 `private` 이다(`SERVICES_DO_NOT_EXPOSE_NESTED_TYPES`)
+### 4. 이 phase 를 검증하는 `ConnectorConnectionServiceTest`
 
-### 3. `ErrorCode.CONNECTOR_RATE_LIMITED`
+`backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java`
 
-- `CONNECTOR_OPERATION_FAILED` 아래에 `CONNECTOR_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS)` 를 더하고 Javadoc 한 줄을 적는다. 같은 이름이 없는지 `git grep -n "RATE_LIMITED"` 로 확인한다
+- `writeApiServer` 를 기대하는 검사(156, 745, 785, 814 줄 부근)를 고친다. 등록 순서는 확인 도구, env, 설치다. `toolsets.writeApiServer` 는 어느 경로에서도 불리지 않는다(`verify(toolsets, never()).writeApiServer(any(), any())`). 켜진 내장 도구가 보이는 검사(741 줄 부근)는 `configured` 가 참이고 내장 도구가 남으면 다시 쓰지 않고 `PENDING` 임을 본다
+- 새 검사 `checkReinstallsWhenInstallIsNotConfigured`: `readConnector` 가 처음에 `enabled=true, configured=false`, 다시 읽을 때 `configured=true` 이고 `putConnector` 가 false 를 돌려주면 `READY` 다
+- 새 검사 `checkStaysPendingWhenReinstallNeedsRestart`: `putConnector` 가 true 를 돌려주면 `PENDING` 이고 `restartRequired` 가 참이며 probe 를 부르지 않는다
+- 새 검사 `checkDoesNotReinstallConfiguredConnection`: `configured=true` 이면 `putConnector` 가 불리지 않는다
+- 새 검사 `confirmAppliedReinstallsOldAllowlistAndWaitsForRestart`: 관리자 반영 완료가 `putConnector(profile, id, true)` 를 부르고 `ConnectorOperationFailure` 로 끝나며 저장된 행의 `restartRequired` 가 참이다. 재시작 뒤(대역이 `configured=true` 를 돌려줌) 다시 누르면 `READY` 다
 
-### 4. `ConnectorConnectionService` 가 제한을 지난다
+### 5. e2e 대역과 시나리오
 
-- 생성자 둘에 `ConnectorCallLimiter` 를 더한다
-- `options`, `register`, `check` 의 본문 전체를 `limiter.call(user.id(), () -> ...)` 로 감싼다. `register` 는 확인 도구 호출과 저장이 한 번의 호출이다. `check` 는 `@Transactional(noRollbackFor = ConnectorOperationFailure.class)` 이다. 제한에 걸린 `ApiException` 은 아무것도 쓰기 전에 나오므로 rollback 되어도 잃는 것이 없다. 감싸느라 `check` 가 자기 클래스의 다른 메서드를 부르게 만들지 않는다(`@Transactional` 이 프록시 밖 호출에서 걸리지 않는다). 메서드 안에서 람다로 감싼다
-- `disconnect`, `read`, `catalog`, `confirmApplied`, `listForAdmin` 은 감싸지 않는다
-
-### 5. 화면 문구
-
-- `web/src/lib/connection.ts` 의 오류 문구 표에 `CONNECTOR_RATE_LIMITED: "요청이 많아요. 잠시 뒤 다시 해 주세요."` 를 더한다
-- `web/src/lib/connection-route.ts` 가 모르는 오류 코드를 `CONNECTOR_OPERATION_FAILED` 로 바꾸는 자리를 읽고, `CONNECTOR_RATE_LIMITED` 와 HTTP 429 가 화면까지 그대로 가게 한다. 선택지 조회가 이 오류로 실패하면 지금의 조회 실패와 같이 입력을 비우고 문구를 보인다
-
-### 6. 테스트와 검사 실행의 설정
-
-- `backend/src/test/resources/application-test.yml` 의 `assistant:` 아래에 `connector.max-concurrent-calls: 1`, `connector.calls-per-minute: 1000` 을 둔다. 제한 자체는 아래 단위 검사가 본다
-- e2e 는 `test/e2e/run.ts`, 브라우저 검사는 `test/browser/fixtures.ts` 가 backend 를 띄우며 `ASSISTANT_JWT_SECRET` 같은 환경 변수를 준다. 두 곳의 같은 자리에 `ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000"` 을 더한다
-
-### 7. 이 phase 를 검증하는 테스트
-
-- 새 파일 `backend/src/test/java/com/bifos/assistant/connector/ConnectorCallLimiterTest.java`. 시각은 고정 `Clock` 을 바꿔 가며 준다
-  - `rejectsSecondConcurrentCallOfSameUser`: 첫 호출의 `action` 안에서 같은 사용자의 둘째 호출이 `CONNECTOR_RATE_LIMITED` 이고 둘째의 `action` 은 불리지 않는다. 다른 사용자는 받아들인다
-  - `releasesSlotWhenActionThrows`: `action` 이 예외를 내도 다음 호출을 받는다
-  - `rejectsEleventhCallWithinAMinute`: 한도 10 에서 열 번은 받고 열한 번째는 거절한다. 61초 뒤에는 다시 받는다
-  - `rejectedCallsAreNotCounted`: 거절된 호출이 횟수에 들지 않는다
-- 새 파일 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPropertiesTest.java`: 0 이하 값이 `IllegalStateException` 이다. `DelegationPropertiesTest` 를 본보기로 쓴다
-- `ConnectorConnectionServiceTest`: 생성자 인자를 맞추고, 한도 1회로 만든 limiter 에서 `options` 의 둘째 호출이 `CONNECTOR_RATE_LIMITED` 이고 `connector.call` 이 한 번만 불렸음을 본다. `disconnect` 는 한도를 넘어도 된다
-- `ConnectorConnectionControllerTest`: 제한에 걸린 `POST /api/v1/connections/{id}/options/{fieldKey}` 가 429 와 `CONNECTOR_RATE_LIMITED` 를 돌려준다
+- `test/e2e/fake-hermes.ts`: `PUT /api/connectors` 가 설치 때 그 profile 의 도구 목록을 `[DEMO_CONNECTOR 의 mcp_server]` 로, 제거 때 `["no_mcp"]` 로 기록한다. `GET /api/connectors` 의 `configured` 는 지금 조건에 더해 기록한 목록이 커넥터 서버 하나일 때만 참이다. 대역이 받은 호출을 기록하는 방식은 지금 것을 따른다
+- `test/e2e/scenarios/connector.ts`: 「통과한 토큰으로 등록하면 PENDING 이고 대역이 확인, env, 도구 목록, 설치 순으로 받는다」 단계를 확인, env, 설치 순으로 고치고, 등록 동안 `PUT /api/config` 가 오지 않았음을 본다. 연결 확인 뒤 대역의 목록이 커넥터 서버 하나임을 본다
+- `test/e2e/scenarios/delegation.ts` 는 고치지 않는다
 
 ## 검증
 
 ```bash
 # cwd: backend/
-./gradlew test --tests '*ConnectorCallLimiterTest' --tests '*ConnectorPropertiesTest' --tests '*ConnectorConnectionServiceTest' --tests '*ConnectorConnectionControllerTest'
-./gradlew archTest
+./gradlew test --tests '*ConnectorConnectionServiceTest' --tests '*ConnectorConnectionControllerTest'
 ./gradlew test
-```
-
-```bash
-# cwd: web/
-pnpm typecheck
 ```
 
 ```bash
 # cwd: 저장소 root
 node test/e2e/run.ts
-grep -n "CONNECTOR_RATE_LIMITED" web/src/lib/connection.ts backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java
+! grep -n "writeApiServer" backend/src/main/java/com/bifos/assistant/connector/application/ConnectorConnectionService.java
 scripts/check-public-safe.sh
 ```
 
-모두 종료 코드 0 이어야 한다.
+`node test/e2e/run.ts` 는 `./gradlew test` 뒤에 돌린다. 모두 종료 코드 0 이어야 한다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorProperties.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorCallLimiter.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorConnectionService.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
-| `backend/src/main/resources/application.yml` | 수정 |
-| `backend/src/test/resources/application-test.yml` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorCallLimiterTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPropertiesTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionControllerTest.java` | 수정 |
-| `web/src/lib/connection.ts` | 수정 |
-| `web/src/lib/connection-route.ts` | 수정 |
-| `test/e2e/run.ts` | 수정 |
-| `test/browser/fixtures.ts` | 수정 |
+| `test/e2e/fake-hermes.ts` | 수정 |
+| `test/e2e/scenarios/connector.ts` | 수정 |
