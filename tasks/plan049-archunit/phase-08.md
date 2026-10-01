@@ -127,3 +127,5 @@ scripts/check-local.sh
 | `AGENTS.md` | 수정 |
 | `backend/AGENTS.md` | 수정 |
 | `web/AGENTS.md` | 수정 |
+| `backend/config/checkstyle/checkstyle.xml` | 수정 |
+| `backend/config/checkstyle/baseline.xml` | 수정 |
