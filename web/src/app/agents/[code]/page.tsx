@@ -51,7 +51,7 @@ export default async function AgentPersonaPage({
     ?? (agentsResult.ok ? agentsResult.data.find((agent) => agent.code === code)?.visibility : undefined);
   // 목록의 editable 은 주인과 ADMIN 에게 참이다. ADMIN 이 관리자 목록으로만 찾은 다른 사람의 비공개 에이전트도 관리한다.
   const listed = agentsResult.ok ? agentsResult.data.find((agent) => agent.code === code) : undefined;
-  const connectorManaged = adminAgent?.connectorManaged === true;
+  const connectorManaged = listed?.connectorManaged === true || adminAgent?.connectorManaged === true;
   const canManageAccess = !connectorManaged && (listed?.editable === true || adminAgent !== undefined);
 
   if (!personaResult.ok) {

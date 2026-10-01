@@ -160,6 +160,22 @@ class AgentControllerLifecycleTest {
                 .andExpect(jsonPath("$[1].ownedByMe").value(false));
     }
 
+    @Test
+    @DisplayName("목록은 커넥터 에이전트만 connectorManaged 를 참으로 낸다")
+    void marksConnectorManagedAgentsInList() throws Exception {
+        Agent connector = agent("a-connector", AgentVisibility.PRIVATE, KID.id());
+        connector.markConnectorManaged();
+        Agent plain = agent("a-plain", AgentVisibility.PRIVATE, KID.id());
+        when(agents.findByEnabledTrueOrderByCodeAsc()).thenReturn(List.of(connector, plain));
+
+        mvc.perform(get("/api/v1/agents"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("a-connector"))
+                .andExpect(jsonPath("$[0].connectorManaged").value(true))
+                .andExpect(jsonPath("$[1].code").value("a-plain"))
+                .andExpect(jsonPath("$[1].connectorManaged").value(false));
+    }
+
     private static Agent agent(String code, AgentVisibility visibility, Long ownerUserId) {
         return Agent.of(
                 code,

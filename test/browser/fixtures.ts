@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
 import playwright, { type BrowserContext } from "../../web/node_modules/@playwright/test/index.js";
-import { FAKE_DASHBOARD_TOKEN, startFakeHermes, type FakeHermes } from "../e2e/fake-hermes.ts";
+import { DEMO_CONNECTOR, DEMO_TOKEN_OK, FAKE_DASHBOARD_TOKEN, startFakeHermes, type FakeHermes } from "../e2e/fake-hermes.ts";
 import {
   AUTH_SECRET,
   CONTROL_PLANE_BASE_URL,
@@ -152,6 +152,43 @@ export async function setAgentVisibility(
   if (!response.ok) {
     throw new Error(`에이전트 공개 범위를 바꾸지 못했다: ${code} ${response.status} ${await response.text()}`);
   }
+}
+
+async function connectorCall(email: string, method: "POST" | "DELETE", path: string, body?: unknown): Promise<Response> {
+  const token = await new SignJWT({ name: "브라우저 테스트" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(email)
+    .setIssuedAt()
+    .setExpirationTime("2m")
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  return fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/connections/${DEMO_CONNECTOR.id}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/**
+ * 그 사용자로 시험 커넥터를 등록하고 확인해 `READY` 로 만든다. 만들어진 커넥터 에이전트의 코드를 돌려준다.
+ *
+ * <p>커넥터 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
+ */
+export async function connectDemoConnector(email: string): Promise<string> {
+  const registered = await connectorCall(email, "POST", "", { values: { token: DEMO_TOKEN_OK } });
+  if (!registered.ok) throw new Error(`시험 커넥터를 등록하지 못했다: ${registered.status} ${await registered.text()}`);
+  const checked = await connectorCall(email, "POST", "/check");
+  if (!checked.ok) throw new Error(`시험 커넥터를 확인하지 못했다: ${checked.status} ${await checked.text()}`);
+  const view = (await checked.json()) as { status: string; agentCode: string | null };
+  if (view.status !== "READY" || !view.agentCode) {
+    throw new Error(`시험 커넥터가 READY 가 아니다: ${view.status}`);
+  }
+  return view.agentCode;
+}
+
+/** 그 사용자의 시험 커넥터 연결을 해제한다. */
+export async function disconnectDemoConnector(email: string): Promise<void> {
+  const response = await connectorCall(email, "DELETE", "");
+  if (!response.ok) throw new Error(`시험 커넥터를 해제하지 못했다: ${response.status} ${await response.text()}`);
 }
 
 export async function setSession(
