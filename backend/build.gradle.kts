@@ -57,6 +57,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
+    maxHeapSize = "1g"
 }
 
 /**
