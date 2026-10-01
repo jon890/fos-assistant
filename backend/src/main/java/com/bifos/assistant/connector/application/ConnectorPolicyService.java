@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.domain.HermesToolName;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
+import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
@@ -181,15 +182,29 @@ public class ConnectorPolicyService {
      *
      * <p>한 session 에서 같은 {@code tool_call_id} 가 되풀이되면 키가 같다. 줄의 판정을 그대로 주면 앞서 허용한
      * 읽기 도구의 답이 다른 도구나 다른 인자의 호출에 나간다. 새 줄은 만들지 않는다. 키가 유니크라 만들 수 없다.
+     *
+     * <p>허용한 줄은 연결이 지금도 {@code READY} 일 때만 다시 허용한다. 연결을 해제한 뒤에 같은 호출이 다시 와도
+     * 앞의 허용이 나가지 않게 한다. 막은 줄은 연결 상태와 상관없이 처음 답을 돌려준다.
      */
-    private static ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
+    private ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
         if (!recorded.hermesTool().equals(hermesTool)) {
             return blockedWithoutRecord("같은 키의 줄과 등록 이름이 다르다");
         }
         if (!recorded.argsSha256().equals(argsSha256)) {
             return blockedWithoutRecord("같은 키의 줄과 인자가 다르다");
         }
+        if (recorded.passed() && !stillReady(recorded.agentId())) {
+            log.warn("connector policy replay blocked: 허용한 줄의 연결이 지금은 READY 가 아니다");
+            return new ConnectorPolicyAnswer(false, NOT_READY_MESSAGE, null);
+        }
         return answer(recorded);
+    }
+
+    private boolean stillReady(Long agentId) {
+        return connections
+                .findByAgentId(agentId)
+                .map(connection -> connection.status() == ConnectionStatus.READY)
+                .orElse(false);
     }
 
     /** 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 서버 이름까지의 앞부분이 같은지로 본다. */

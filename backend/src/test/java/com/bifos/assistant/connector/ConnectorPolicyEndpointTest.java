@@ -415,6 +415,21 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
+    @DisplayName("허용한 요청을 연결이 READY 를 벗어난 뒤 다시 보내면 앞의 allow 를 돌려주지 않고 block 이며 줄이 하나다")
+    void resendingAllowedRequestAfterConnectionLeftReadyIsBlocked() throws Exception {
+        connect(true);
+        String body = body(token, "mcp__demo__list_scopes", "list_scopes", root, newCall(), ARGS);
+        HttpResponse<String> first = send(token, body);
+        jdbc.update("update connector_connection set status = 'PENDING' where user_id = ?", owner.id());
+
+        HttpResponse<String> second = send(token, body);
+
+        assertThat(json.readTree(first.body()).path("decision").asString()).isEqualTo("allow");
+        assertBlocked(second, "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.");
+        assertThat(rows()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("같은 tool_call_id 로 다른 등록 이름이나 다른 인자를 보내면 앞의 allow 를 돌려주지 않고 block 이며 줄이 하나다")
     void reusedToolCallIdWithAnotherToolOrArgsIsBlockedWithoutNewRow() throws Exception {
         connect(true);
