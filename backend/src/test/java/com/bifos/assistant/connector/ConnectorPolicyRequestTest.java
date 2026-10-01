@@ -15,8 +15,9 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * 판정 요청의 서명 계약을 고정한 값으로 확인한다. 계약은 {@code docs/connectors.md} 의 「도구 호출 판정」 이다.
  *
- * <p>{@code VECTOR_*} 는 운영 코드가 아니라 계약대로 따로 계산한 값이다. hook 쪽 검사가 같은 값을 쓴다. 두 구현이 같은
- * 벡터를 통과해야 서명이 서로 맞는다.
+ * <p>{@code VECTOR_*} 는 운영 코드가 아니라 계약대로 따로 계산한 값이다. hook 쪽 검사인
+ * {@code hermes/tests/test_fos_ctx.py} 의 {@code POLICY_VECTOR_*} 가 같은 값을 쓴다. 한쪽을 바꾸면 두 쪽을 함께
+ * 고친다. 두 구현이 같은 벡터를 통과해야 서명이 서로 맞는다.
  */
 class ConnectorPolicyRequestTest {
     /** 토큰 원문 {@code vector-token} 을 SHA-256 한 소문자 16진수다. 서명의 key 다. */

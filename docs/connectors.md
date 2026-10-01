@@ -152,7 +152,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 | hook 이 본 것 | 처리 |
 | --- | --- |
 | 대응 파일이 없다 | 연결용 profile 이 아니다. 이 절의 처리를 하지 않는다 |
-| 대응 파일을 읽지 못한다 | Control Plane MCP 밖의 `mcp__` 도구를 모두 막는다 |
+| 대응 파일을 읽지 못한다 | Control Plane MCP 밖의 `mcp__` 도구와 `execute_code` 를 모두 막는다 |
 | Control Plane MCP 의 도구 | 지금처럼 `_fos_ctx` 를 붙인다 |
 | `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 |
 | `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다 |
