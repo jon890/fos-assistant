@@ -180,6 +180,8 @@ void rejectPendingFor(ConnectorConnection connection, Instant now);
 - **승인할 때 정책을 다시 읽는다.** `approve` 의 트랜잭션 1 에서 `ConnectorCatalogCache.find` 로 manifest 를 읽어 `ToolPolicyDecision.decide(...)` 를 `granted: false` 로 다시 돌린다. 결과가 `DENIED` 이거나 카탈로그를 읽지 못하면 `reject` 하고 커밋한 뒤 `CONNECTOR_ACTION_NOT_PENDING` 이다. 테스트 두 줄을 더한다(도구가 선언에서 빠짐, 위험도가 `DESTRUCTIVE` 로 바뀜)
 - phase 04 가 컨트롤러와 요청 검증을 `connector` 에 뒀다. 끝단 테스트는 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java` 다
 
+- `ConnectorPolicyService` 의 클래스 Javadoc 에서 「줄을 남기지 않는」 까닭을 두 경우로 나눠 적는다. 실행이나 연결을 찾지 못한 호출은 줄에 적을 사용자와 에이전트를 알 수 없어서이고, 같은 키로 다른 도구나 인자를 보낸 호출은 키가 유니크라 새 줄을 만들 수 없어서다
+
 ## 검증
 
 ```bash

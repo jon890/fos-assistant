@@ -75,6 +75,8 @@
 - `call` 은 자식을 띄우기 전에 `_mcp_sdk_problem()` 으로 `mcp` SDK 가 지원 범위인지 본다. `execute` 도 같은 자리에서 보고, 범위 밖이면 `{"ok": false, "error": "unavailable"}` 로 답한다(실행되지 않았다)
 - `hermes/README.md` 의 대시보드 경로 표에 `POST /api/connectors/<id>/execute` 한 줄을, 커넥터 절에 「Control Plane 이 승인한 호출만 부른다. 대시보드는 승인 여부를 다시 확인하지 않는다」 를 더한다
 
+- **서버 이름 길이를 제한한다.** `_load_connector` 가 `_hermes_tool_name(mcp_server, "")` 의 길이가 40자를 넘는 커넥터를 카탈로그에서 뺀다. 접두사가 길면 등록 이름이 64자에서 잘려 Control Plane 의 접두사 검사(`ConnectorPolicyService.ownServerTool`)가 그 서버의 긴 도구를 선언 없는 도구로 읽는다. `hermes/tests/test_connector_manifest.py` 에 경계 테스트를 더하고 「변경 파일」 에 그 파일을 수정으로 더한다. `docs/connectors.md` 의 「도구 정책」 목록에 한 줄을 더한다
+
 ## 검증
 
 ```bash
@@ -94,3 +96,5 @@ scripts/check-public-safe.sh
 | `hermes/tests/fixtures/demo-connector/server.py` | 수정 |
 | `hermes/tests/test_connector_execute.py` | 신규 |
 | `hermes/README.md` | 수정 |
+| `hermes/tests/test_connector_manifest.py` | 수정 |
+| `docs/connectors.md` | 수정 |
