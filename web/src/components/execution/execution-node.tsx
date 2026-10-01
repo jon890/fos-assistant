@@ -1,5 +1,6 @@
 import { ExecutionEventRow, type MergedEventRow } from "./execution-event-row";
 import type { ExecutionEventView, ExecutionTreeNode } from "./execution-tree";
+import { formatDuration, formatTokens } from "@/lib/format";
 
 /**
  * 서버가 여덟에서 자르지만(`ExecutionTreeService.MAX_DEPTH`), 화면도 스스로 멈춘다.
@@ -24,7 +25,10 @@ const MAX_DEPTH = 8;
  */
 export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
   const rows: MergedEventRow[] = [];
-  const pendingByTool = new Map<string, Extract<MergedEventRow, { kind: "tool" }>[]>();
+  const pendingByTool = new Map<
+    string,
+    Extract<MergedEventRow, { kind: "tool" }>[]
+  >();
 
   for (const event of events) {
     switch (event.eventType) {
@@ -78,6 +82,7 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
           key: event.sequence,
           subagentName: event.subagentName,
           detail: event.detail,
+          usageStatus: event.subagentUsageStatus ?? null,
         });
         break;
       case "SUBAGENT_COMPLETED":
@@ -91,29 +96,99 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
 }
 
 /** 노드 하나다. 자기 자신을 자식으로 다시 그린다. */
-export function ExecutionNode({ node, depth }: { node: ExecutionTreeNode; depth: number }) {
+export function ExecutionNode({
+  node,
+  depth,
+  showRuntime,
+}: {
+  node: ExecutionTreeNode;
+  depth: number;
+  showRuntime: boolean;
+}) {
   const stoppedByScreen = depth >= MAX_DEPTH;
   const rows = mergeEvents(node.events);
   const label = node.agentName ?? node.agentCode ?? `실행 #${node.executionId}`;
-  const showsTruncated = node.truncated || (stoppedByScreen && node.children.length > 0);
+  const showsTruncated =
+    node.truncated || (stoppedByScreen && node.children.length > 0);
 
   return (
-    <li className={`min-w-0 ${depth === 0 ? "" : "ml-3"}`} data-testid="execution-node">
+    <li
+      className={`min-w-0 ${depth === 0 ? "" : "ml-3"}`}
+      data-testid="execution-node"
+    >
       <div className="min-w-0 border-l border-border pl-3">
         <p className="truncate text-sm font-medium">{label}</p>
+        {showRuntime ? (
+          <>
+            <p
+              className="truncate text-xs text-muted-foreground"
+              data-testid="execution-node-runtime"
+            >
+              {[node.provider, node.model].filter(Boolean).join(" · ") ||
+                "모델 정보 없음"}
+              {node.modelTier ? ` · ${tierLabel(node.modelTier)}` : ""}
+              {node.reasoningEffort
+                ? ` · ${effortLabel(node.reasoningEffort, node.reasoningEffortSource)}`
+                : ""}
+            </p>
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="execution-node-tokens"
+            >
+              입력 {formatTokens(node.inputTokens)} · 출력{" "}
+              {formatTokens(node.outputTokens)}
+              {node.cachedInputTokens === undefined ||
+              node.cachedInputTokens === null
+                ? ""
+                : ` · 캐시 ${formatTokens(node.cachedInputTokens)}`}
+              {node.latencyMs === null
+                ? ""
+                : ` · ${formatDuration(node.latencyMs)}`}
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {node.modelTier ? tierLabel(node.modelTier) : "단계 미확인"}
+            {node.latencyMs === null
+              ? ""
+              : ` · ${formatDuration(node.latencyMs)}`}
+          </p>
+        )}
         <ul className="min-w-0">
           {rows.map((row) => (
             <ExecutionEventRow key={row.key} row={row} />
           ))}
-          {!stoppedByScreen
-            && node.children.map((child) => (
-              <ExecutionNode key={child.executionId} node={child} depth={depth + 1} />
+          {!stoppedByScreen &&
+            node.children.map((child) => (
+              <ExecutionNode
+                key={child.executionId}
+                node={child}
+                depth={depth + 1}
+                showRuntime={showRuntime}
+              />
             ))}
           {showsTruncated ? (
-            <li className="truncate text-xs text-muted-foreground">이전 실행은 표시되지 않아요</li>
+            <li className="truncate text-xs text-muted-foreground">
+              이전 실행은 표시되지 않아요
+            </li>
           ) : null}
         </ul>
       </div>
     </li>
   );
+}
+
+function tierLabel(tier: NonNullable<ExecutionTreeNode["modelTier"]>): string {
+  if (tier === "FAST") return "빠르게";
+  if (tier === "BALANCED") return "균형";
+  return "깊게";
+}
+
+function effortLabel(
+  effort: string,
+  source: ExecutionTreeNode["reasoningEffortSource"],
+): string {
+  if (source === "PROFILE_DEFAULT") return `기본 강도 ${effort}`;
+  if (source === "UNKNOWN") return "강도 미확인";
+  return `선택한 강도 ${effort}`;
 }

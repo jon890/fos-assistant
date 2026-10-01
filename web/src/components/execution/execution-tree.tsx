@@ -25,6 +25,8 @@ export type ExecutionEventView = {
   inputTokens: number | null;
   outputTokens: number | null;
   occurredAt: string;
+  /** 비동기 하위 에이전트 사용량을 뒤늦게 읽는 상태다. 실행 성공 여부가 아니다. */
+  subagentUsageStatus?: "WAITING" | "RECORDED" | "UNCONFIRMED" | null;
 };
 
 /**
@@ -38,12 +40,22 @@ export type ExecutionTreeNode = {
   agentCode: string | null;
   agentName: string | null;
   status: string;
+  provider?: string | null;
   model: string | null;
   inputTokens: number | null;
+  cachedInputTokens?: number | null;
   outputTokens: number | null;
+  totalTokens?: number | null;
   estimatedCostMicros: number | null;
   latencyMs: number | null;
   startedAt: string;
+  reasoningEffort?: string | null;
+  reasoningEffortSource?: "REQUESTED" | "PROFILE_DEFAULT" | "UNKNOWN" | null;
+  modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
+  requestReceivedAt?: string | null;
+  submittedAt?: string | null;
+  firstDeltaAt?: string | null;
+  finishedAt?: string | null;
   events: ExecutionEventView[];
   children: ExecutionTreeNode[];
 };
@@ -70,7 +82,8 @@ export type ExecutionTreeResponse = {
 export function hasRenderableEvent(node: ExecutionTreeNode): boolean {
   if (node.children.length > 0) return true;
   return node.events.some(
-    (event) => event.eventType !== "RUN_STARTED" && event.eventType !== "RUN_COMPLETED",
+    (event) =>
+      event.eventType !== "RUN_STARTED" && event.eventType !== "RUN_COMPLETED",
   );
 }
 
@@ -79,13 +92,22 @@ function anyNodeTruncated(node: ExecutionTreeNode): boolean {
   return node.truncated || node.children.some(anyNodeTruncated);
 }
 
-export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
+export function ExecutionTree({
+  tree,
+  showRuntime = false,
+}: {
+  tree: ExecutionTreeResponse;
+  showRuntime?: boolean;
+}) {
   // 나무의 truncated 가 참인데 그 안 어느 노드도 truncated 가 아니면, 아래쪽이 아니라 뿌리로
   // 올라가는 길이 잘린 것이다. 그 경우에만 위쪽 안내를 그린다 — 노드가 이미 「여기부터 보이지
   // 않는다」 를 그렸으면 여기서 또 적어 두 번 말하지 않는다.
   const truncatedAbove = tree.truncated && !anyNodeTruncated(tree.root);
   const aboveNotice = truncatedAbove ? (
-    <p className="mb-2 text-xs text-muted-foreground" data-testid="execution-tree-truncated-above">
+    <p
+      className="mb-2 text-xs text-muted-foreground"
+      data-testid="execution-tree-truncated-above"
+    >
       위쪽 기록이 없어 이곳이 첫 실행이 아닐 수 있어요
     </p>
   ) : null;
@@ -102,7 +124,7 @@ export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
     <>
       {aboveNotice}
       <ul className="min-w-0" data-testid="execution-tree">
-        <ExecutionNode node={tree.root} depth={0} />
+        <ExecutionNode node={tree.root} depth={0} showRuntime={showRuntime} />
       </ul>
     </>
   );

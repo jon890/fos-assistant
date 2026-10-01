@@ -4,7 +4,6 @@ Method <com.bifos.assistant.agent.presentation.AgentToolController.write(java.la
 Method <com.bifos.assistant.agent.presentation.AgentToolController.writeAdmin(java.lang.String, com.bifos.assistant.agent.presentation.AgentDtos$UpdateToolsetsRequest)> is annotated with @Transactional in (AgentToolController.java:59)
 Method <com.bifos.assistant.chat.infra.ChatArtifactRepository.markDeleted(java.lang.Long, java.lang.String, java.time.Instant)> is annotated with @Transactional in (ChatArtifactRepository.java:0)
 Method <com.bifos.assistant.chat.infra.ConversationRepository.assignSessionIfAbsent(java.lang.Long, java.lang.String)> is annotated with @Transactional in (ConversationRepository.java:0)
-Method <com.bifos.assistant.chat.infra.ConversationRepository.chooseModelIfActive(java.lang.Long, java.lang.Long, java.lang.String, java.lang.String, java.lang.String)> is annotated with @Transactional in (ConversationRepository.java:0)
 Method <com.bifos.assistant.chat.infra.ConversationRepository.deleteIfActive(java.lang.Long, java.lang.Long, java.time.Instant)> is annotated with @Transactional in (ConversationRepository.java:0)
 Method <com.bifos.assistant.chat.infra.ConversationRepository.fillTitleIfBlank(java.lang.Long, java.lang.String)> is annotated with @Transactional in (ConversationRepository.java:0)
 Method <com.bifos.assistant.chat.infra.ConversationRepository.incrementAutoTurns(java.lang.Long)> is annotated with @Transactional in (ConversationRepository.java:0)

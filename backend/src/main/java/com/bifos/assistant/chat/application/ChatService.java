@@ -10,6 +10,8 @@ import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
@@ -40,6 +42,7 @@ import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -98,6 +101,8 @@ public class ChatService {
     private final TransactionTemplate transactions;
     private final SkillCommandCatalog skillCommands;
     private final SkillUseRecorder skillUses;
+    private final ModelTierService modelTiers;
+    private final Clock clock;
     private final ChatPendingMessageRepository pendingMessages;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
@@ -405,6 +410,7 @@ public class ChatService {
             Consumer<ChatEvent> onEvent,
             boolean streaming,
             TurnCancellation.TurnHandle existingHandle) {
+        Instant requestReceivedAt = routed.requestReceivedAt();
         Conversation conversation = routed.conversation();
         List<Long> attachmentIds =
                 routed.attached().stream().map(ChatAttachment::id).toList();
@@ -427,8 +433,28 @@ public class ChatService {
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(), null, context.instructionsHash(), context.omittedItems());
 
-            ModelChoice choice = conversation.modelChoice();
-            PendingTurn pending = begin(user, routed, input, context, snapshot, choice, intent);
+            ResolvedModelTier resolved;
+            try {
+                resolved = modelTiers.resolve(user, conversation, routed.agent());
+            } catch (RuntimeException ex) {
+                PendingTurn failed = begin(
+                        user,
+                        routed,
+                        input,
+                        context,
+                        snapshot,
+                        ModelChoice.defaults(),
+                        null,
+                        intent,
+                        requestReceivedAt);
+                String code = ex instanceof ApiException api ? api.code().name() : "MODEL_TIER_RESOLVE_FAILED";
+                executions.fail(failed.execution(), code);
+                append(failed, ExecutionEventType.RUN_FAILED, code);
+                throw ex;
+            }
+            ModelChoice choice = resolved.choice();
+            PendingTurn pending =
+                    begin(user, routed, input, context, snapshot, choice, resolved.tier(), intent, requestReceivedAt);
             if (command != null) {
                 skillUses.recordCommand(pending.execution().id(), command.name());
             }
@@ -519,6 +545,7 @@ public class ChatService {
                                 intent,
                                 execution -> {
                                     rootExecutionId.set(execution.id());
+                                    executions.markRequestReceived(execution, routed.requestReceivedAt());
                                     turns.rekey(handle, execution.id());
                                     if (streaming) {
                                         onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
@@ -578,6 +605,7 @@ public class ChatService {
      */
     private Routed route(
             CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
+        Instant requestReceivedAt = clock.instant();
         boolean withAttachments = attachmentIds != null && !attachmentIds.isEmpty();
         if (withAttachments && conversationId == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "attachments need an existing conversation");
@@ -602,7 +630,7 @@ public class ChatService {
                 ? existing
                 : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
-        return new Routed(conversation, agent, flow, attached, command);
+        return new Routed(conversation, agent, flow, attached, command, requestReceivedAt);
     }
 
     /**
@@ -655,7 +683,9 @@ public class ChatService {
             AssembledContext context,
             ExecutionContextSnapshot snapshot,
             ModelChoice choice,
-            TurnIntent intent) {
+            ModelTier modelTier,
+            TurnIntent intent,
+            Instant requestReceivedAt) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
         RunSession session = sessions.ensure(conversation);
@@ -669,13 +699,25 @@ public class ChatService {
                 choice.model(),
                 choice.reasoningEffort());
         AgentExecution execution = executions.start(
-                user, conversation, agent, null, null, snapshot, choice, null, session.correlationSessionId());
+                user,
+                conversation,
+                agent,
+                null,
+                null,
+                snapshot,
+                choice,
+                null,
+                session.correlationSessionId(),
+                null,
+                modelTier,
+                requestReceivedAt);
         return new PendingTurn(
                 user, conversation, agent, command, execution, new SequenceCounter(), new StringBuilder(), intent);
     }
 
     private String submit(PendingTurn pending) {
         try {
+            executions.markSubmitted(pending.execution());
             String runId = hermes.submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);
@@ -781,6 +823,7 @@ public class ChatService {
 
     /** 마지막 답을 새 실행으로 다시 만든다. */
     public void regenerate(CurrentUser user, Long conversationId, Consumer<ChatEvent> onEvent) {
+        Instant requestReceivedAt = clock.instant();
         Conversation conversation = access.requireOwn(user, conversationId);
         TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
@@ -797,7 +840,7 @@ public class ChatService {
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
                     .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
                     .toList();
-            Routed routed = routeExisting(user, conversation, attached, question.content());
+            Routed routed = routeExisting(user, conversation, attached, question.content(), requestReceivedAt);
             TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
             if (routed.flow() != null) {
                 runFlow(user, routed, question.content(), intent, onEvent, true, handle);
@@ -845,7 +888,11 @@ public class ChatService {
 
     /** 다시 생성할 대화의 에이전트를 정한다. 저장된 질문이 스킬 커맨드이면 보낼 때와 같게 판별한다. */
     private Routed routeExisting(
-            CurrentUser user, Conversation conversation, List<ChatAttachment> attached, String question) {
+            CurrentUser user,
+            Conversation conversation,
+            List<ChatAttachment> attached,
+            String question,
+            Instant requestReceivedAt) {
         Agent agent = agents.requireById(conversation.agentId());
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -854,7 +901,7 @@ public class ChatService {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         Flow flow = flows.find(agent.flow());
-        return new Routed(conversation, agent, flow, attached, commandOf(agent, flow, question));
+        return new Routed(conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt);
     }
 
     private void saveQuestion(
@@ -1164,8 +1211,35 @@ public class ChatService {
     public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {
         access.requireOwn(user, conversationId);
         if (conversations.chooseModelIfActive(
-                        conversationId, user.id(), choice.provider(), choice.model(), choice.reasoningEffort())
+                        conversationId,
+                        user.id(),
+                        choice.provider(),
+                        choice.model(),
+                        choice.reasoningEffort(),
+                        ModelSelectionMode.CUSTOM)
                 == 0) {
+            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
+        }
+        return access.requireOwn(user, conversationId);
+    }
+
+    /** 대화가 고른 단계를 저장한다. DEFAULT 는 profile 기본값만 쓰도록 사용자·그룹 기본값도 건너뛴다. */
+    @Transactional
+    public Conversation chooseModelTier(
+            CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
+        Conversation conversation = access.requireOwn(user, conversationId);
+        if (mode == null
+                || mode == ModelSelectionMode.CUSTOM
+                || (mode == ModelSelectionMode.TIER && tier == null)
+                || (mode == ModelSelectionMode.DEFAULT && tier != null)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid model tier selection");
+        }
+        if (mode == ModelSelectionMode.TIER) {
+            Agent agent = agents.requireStartable(
+                    user, agents.requireById(conversation.agentId()).code());
+            modelTiers.resolveTier(user, tier, agent);
+        }
+        if (conversations.chooseModelTierIfActive(conversationId, user.id(), mode, tier) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
         return access.requireOwn(user, conversationId);
@@ -1206,7 +1280,8 @@ public class ChatService {
     private void forward(PendingTurn pending, RunEvent event, Consumer<ChatEvent> onEvent) {
         append(pending, event);
         String type = event.type() == null ? "" : event.type().toLowerCase();
-        if (type.contains("delta") && event.text() != null) {
+        if ("message.delta".equals(type) && event.text() != null) {
+            executions.markFirstDelta(pending.execution());
             synchronized (pending) {
                 pending.streamed().append(event.text());
                 onEvent.accept(ChatEvent.delta(event.text()));
@@ -1299,5 +1374,10 @@ public class ChatService {
      * {@code command} 는 이름을 확인한 스킬 커맨드이고 커맨드가 아니면 null 이다.
      */
     private record Routed(
-            Conversation conversation, Agent agent, Flow flow, List<ChatAttachment> attached, SkillCommand command) {}
+            Conversation conversation,
+            Agent agent,
+            Flow flow,
+            List<ChatAttachment> attached,
+            SkillCommand command,
+            Instant requestReceivedAt) {}
 }

@@ -57,7 +57,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    // @SpringBootTest 가 서로 다른 context 를 수십 개 만들어 쥔다. 기본 heap 으로는 CI 에서 context 를 만들다 OutOfMemoryError 로 실패했다.
+    // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
 }
 

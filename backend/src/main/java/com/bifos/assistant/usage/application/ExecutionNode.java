@@ -17,12 +17,21 @@ public record ExecutionNode(
         String agentCode,
         String agentName,
         String status,
+        String provider,
         String model,
+        String reasoningEffort,
+        String reasoningEffortSource,
+        String modelTier,
         Long inputTokens,
+        Long cachedInputTokens,
         Long outputTokens,
+        Long totalTokens,
         Long estimatedCostMicros,
         Long latencyMs,
+        Instant requestReceivedAt,
+        Instant submittedAt,
+        Instant firstDeltaAt,
         Instant startedAt,
+        Instant finishedAt,
         List<ExecutionEventView> events,
-        List<ExecutionNode> children) {
-}
+        List<ExecutionNode> children) {}

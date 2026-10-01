@@ -170,6 +170,7 @@ PROBE_ROUTE_RE = re.compile(r"^/api/mcp/servers/([^/]+)/test$")
 CONNECTORS_PATH = "/api/connectors"
 CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
+MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
 
 PROFILES_PATH = "/api/profiles"
 PROFILE_PREFIX = "/api/profiles/"
@@ -1779,6 +1780,34 @@ class ProfileApiProvider(DashboardAuthProvider):
         return None
 
 
+def _model_defaults_response(name):
+    """profile 설정에서 공개 가능한 모델 기본값 세 칸만 돌려준다."""
+    if not isinstance(name, str) or not PROFILE_NAME_RE.fullmatch(name):
+        return _rejected("profile 이름이 올바르지 않다", 400)
+    try:
+        from hermes_cli.profiles import get_profile_dir, profile_exists
+        from starlette.responses import JSONResponse
+        import yaml
+
+        if not profile_exists(name):
+            return _rejected("없는 profile 이다", 404)
+        config = yaml.safe_load((get_profile_dir(name) / "config.yaml").read_text(encoding="utf-8")) or {}
+        model = config.get("model") or {}
+        agent = config.get("agent") or {}
+        if not isinstance(model, dict) or not isinstance(agent, dict):
+            return _rejected("profile 설정을 읽지 못했다", 503)
+
+        def public_text(value):
+            return value if isinstance(value, str) and value.strip() else None
+
+        return JSONResponse({"provider": public_text(model.get("provider")),
+                             "model": public_text(model.get("default")),
+                             "reasoningEffort": public_text(agent.get("reasoning_effort"))}, status_code=200)
+    except Exception:
+        logger.warning("dashboard-profile-api: 모델 기본값을 읽지 못했다")
+        return _rejected("profile 설정을 읽지 못했다", 503)
+
+
 def _install_gate() -> bool:
     """`token_auth_middleware` 를 감싼다. 감싸지 못하면 False 를 돌려준다."""
     try:
@@ -1872,6 +1901,13 @@ def _install_gate() -> bool:
         path = request.url.path
         method = request.method.upper()
 
+        defaults_match = MODEL_DEFAULTS_RE.match(path) if method == "GET" else None
+        if defaults_match is not None:
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            return await asyncio.to_thread(_model_defaults_response, defaults_match.group(1))
+
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
                 or (path == CATALOG_PATH and method == "GET") or call is not None):
@@ -1960,6 +1996,7 @@ def register(ctx) -> None:
         opened.setdefault(path, []).append(method)
     opened[CONNECTORS_PATH] = ["GET", "PUT"]
     opened[CATALOG_PATH] = ["GET"]
+    opened["/api/profiles/<이름>/model-defaults"] = ["GET"]
     logger.info(
         "dashboard-profile-api: %s 를 토큰으로 연다. 스킬 루트는 %s 다",
         ", ".join(

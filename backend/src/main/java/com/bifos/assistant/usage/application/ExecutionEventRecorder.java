@@ -77,7 +77,7 @@ public class ExecutionEventRecorder {
                 .sequence(sequence)
                 .eventType(type)
                 .toolName(type.isTool() ? event.toolName() : null)
-                .subagentName(type.isSubagent() ? event.toolName() : null)
+                .subagentName(type.isSubagent() ? subagentName(event) : null)
                 .hermesSessionId(type.isSubagent() ? event.childSessionId() : null)
                 .durationMs(event.durationMs())
                 .failed(
@@ -90,6 +90,20 @@ public class ExecutionEventRecorder {
                 .outputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.outputTokens() : null)
                 .occurredAt(Instant.now())
                 .build();
+    }
+
+    private static String subagentName(RunEvent event) {
+        String name = event.toolName();
+        if (name == null || name.isBlank()) {
+            name = event.subagentId();
+        }
+        if (name == null || name.isBlank()) {
+            name = event.goal();
+        }
+        if (name == null) {
+            return null;
+        }
+        return name.length() > 128 ? name.substring(0, 128) : name;
     }
 
     /**
