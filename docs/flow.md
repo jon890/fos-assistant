@@ -1411,6 +1411,7 @@ sequenceDiagram
 sequenceDiagram
     participant C as Chief (Hermes)
     participant D as 위임 서비스
+    participant N as 다음 turn 을 정하는 자리
     participant W as 깨우기 서비스
     participant S as 대화 서비스
     participant U as 열린 대화 창
@@ -1419,12 +1420,14 @@ sequenceDiagram
     D-->>C: 실행 번호
     C->>C: 남은 일을 계속하고 turn 을 마친다
     Note over D: 자식이 따로 돈다
-    D->>W: 자식이 SUCCEEDED 나 FAILED 로 끝났다
+    D->>N: 자식이 SUCCEEDED 나 FAILED 로 끝났다
+    N->>W: 보낼 대기 메시지가 없으면 넘긴다
     W->>W: 그 대화에 도는 turn 이 있으면 여기서 멈춘다
     W->>S: 전하지 않은 결과를 모아 자동 turn 을 연다
     S->>S: SYSTEM 알림 줄을 저장하고 결과를 Hermes 입력으로 넣는다
     S-->>U: 대화 단위 SSE 로 알림 줄과 답 조각
-    S->>W: turn 이 끝났다
+    S->>N: turn 이 끝났다
+    N->>W: 보낼 대기 메시지가 없으면 넘긴다
     W->>W: 그 사이 쌓인 결과가 있으면 다시 연다
 ```
 

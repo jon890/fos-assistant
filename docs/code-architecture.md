@@ -734,7 +734,7 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `chat.presentation.ConversationEventController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다. 보내기 전에 `forViewer` 를 적용한다(ADR-038) |
 | `mcp.application.McpToolService` | `agent_status` 와 `agent_stop` 이 끝난 상태를 돌려주면 `result_delivered_at` 을 적는다. `agent_delegate` 가 줄을 만든 뒤 `SUBMIT_FAILED` 를 돌려줄 때도 위임 서비스가 적는다 |
 | 웹 `app/api/chat/conversations/[conversationId]/events/route.ts` | 대화 단위 SSE 를 그대로 넘긴다 |
-| 웹 `components/chat-panel.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다 |
+| 웹 `components/chat-panel.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다. 대기 메시지 쪽 사건은 「응답 중 대기열」 이 갖는다 |
 
 **`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.** 두 패키지는 이미 서로를 import 한다(`TurnCancellation`, `Flow`). 위임 서비스가 `ChatService` 를 부르면 그 얽힘이 turn 실행까지 번진다.
 
@@ -926,6 +926,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | 웹 `app/api/chat/conversations/[conversationId]/pending/` | `route.ts`(GET, POST), `[pendingId]/route.ts`(DELETE), `send/route.ts`(POST). Control Plane 으로 그대로 넘긴다 |
 | 웹 `lib/pending-route.ts` | 위 서버 라우트 셋이 함께 쓰는 넘기기와 형식 오류 응답. Control Plane 의 상태와 본문을 다시 감싸지 않는다 |
 | 웹 `lib/pending-messages.ts` | 브라우저가 위 서버 라우트를 부르는 함수 |
+| 웹 `components/chat-panel.tsx` | 보낼 때 보통 보내기와 대기 경로 가운데 하나를 고른다. 답이 도는 중이거나 대기 줄이 멈춰 있으면 대기 경로다. 보통 보내기가 `CONVERSATION_BUSY` 로 거절되면 글만 보낸 경우에 대기 메시지로 다시 넣는다. `user` 사건은 사용자 줄로 그리고, `pending` 사건은 보류하지 않고 곧바로 대기 줄을 다시 읽는다 |
 | 웹 `components/chat/use-pending-queue.ts` | 대기 줄 상태. 대화를 열 때와 `pending` 사건을 받을 때 다시 읽는다 |
 | 웹 `components/chat/pending-queue.tsx` | 입력창 위의 대기 줄. 취소 단추와, 멈춰 있을 때의 「보내기」 |
 
@@ -1217,7 +1218,7 @@ web/src/
 | 대화 열 | 가운데 정렬한 좁은 열. 화면 폭을 다 쓰지 않는다 |
 | 내가 보낸 줄 | 오른쪽 정렬 말풍선. 폭은 열의 70% 까지 |
 | 비서가 답한 줄 | 열 전체 폭. 배경과 테두리가 없다 |
-| 입력창 | 둥근 알약 하나. 그 안 오른쪽에 원형 보내기 단추. 답을 만드는 동안 중지 단추로 바뀐다. 알약 아래 줄에 모델과 effort 를 고르는 단추 하나 |
+| 입력창 | 둥근 알약 하나. 그 안 오른쪽에 원형 보내기 단추. 답을 만드는 동안 보내기 옆에 중지 단추가 나온다. 알약 아래 줄에 모델과 effort 를 고르는 단추 하나 |
 | 작업 과정 | 답 위에 접힌 블록 하나. 펼치거나 오른쪽 패널로 연다 |
 | 메시지 동작 | 답 아래 한 줄. 복사, 다시 생성, 판 넘기기 |
 | 새 대화 | 입력창이 가운데. 위에 에이전트 카드, 아래에 추천 질문 |
