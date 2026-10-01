@@ -18,7 +18,9 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
   const [people, setPeople] = useState(initialPeople);
   const [error, setError] = useState<string | null>(null);
   /** 도는 요청이다. 누른 단추에만 회전 표시를 두려고 더하기인지 누구를 켜고 끄는지 기억한다. */
-  const [pending, setPending] = useState<{ action: "create" } | { action: "enabled"; id: Person["id"] } | null>(null);
+  const [pending, setPending] = useState<
+    { action: "create" } | { action: "enabled"; id: Person["id"] } | null
+  >(null);
   const busy = pending !== null;
 
   async function reload() {
@@ -78,11 +80,20 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
     <div className="mx-auto w-full max-w-4xl">
       <h1 className="mb-2 text-xl font-semibold">사용자 관리</h1>
       <p className="mb-6 max-w-2xl text-sm leading-6 text-muted-foreground">
-        여기서 사용자를 추가하면 기본 profile이 만들어져요. 에이전트는 그 사용자가 처음 로그인할 때 만들어져요.
+        여기서 사용자를 추가하면 기본 profile이 만들어져요. 에이전트는 그
+        사용자가 처음 로그인할 때 만들어져요.
       </p>
-      <PersonForm busy={busy} creating={pending?.action === "create"} onCreate={(event) => void create(event)} />
+      <PersonForm
+        busy={busy}
+        creating={pending?.action === "create"}
+        onCreate={(event) => void create(event)}
+      />
       {error ? (
-        <p role="alert" data-testid="people-error" className="mb-4 rounded-md bg-muted p-3 text-sm">
+        <p
+          role="alert"
+          data-testid="people-error"
+          className="mb-4 rounded-md bg-muted p-3 text-sm"
+        >
           {error}
         </p>
       ) : null}

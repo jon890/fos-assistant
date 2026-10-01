@@ -15,7 +15,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { describeError, describeFailure } from "@/components/error-message";
-import { GROUP_VISIBILITY, PRIVATE_VISIBILITY, type AdminAgent, type AgentView } from "@/lib/agent";
+import {
+  GROUP_VISIBILITY,
+  PRIVATE_VISIBILITY,
+  type AdminAgent,
+  type AgentView,
+} from "@/lib/agent";
 
 /** 대화상자에서만 뜻이 정해지는 오류 코드의 문구다. 나머지는 공용 문구를 쓴다. */
 const CREATE_FAILURES: Record<string, string> = {
@@ -38,7 +43,8 @@ export function CreateAgentDialog() {
   const id = useId();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [visibility, setVisibility] = useState<AdminAgent["visibility"]>(PRIVATE_VISIBILITY);
+  const [visibility, setVisibility] =
+    useState<AdminAgent["visibility"]>(PRIVATE_VISIBILITY);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +89,8 @@ export function CreateAgentDialog() {
             <DialogHeader>
               <DialogTitle>새 에이전트</DialogTitle>
               <DialogDescription>
-                이름을 정하면 에이전트를 만들어요. 성격과 도구는 만든 뒤에 고칠 수 있어요.
+                이름을 정하면 에이전트를 만들어요. 성격과 도구는 만든 뒤에 고칠
+                수 있어요.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-1.5">
@@ -103,16 +110,36 @@ export function CreateAgentDialog() {
                 id={`${id}-visibility`}
                 value={visibility}
                 disabled={creating}
-                onChange={(event) => setVisibility(event.target.value as AdminAgent["visibility"])}
+                onChange={(event) =>
+                  setVisibility(event.target.value as AdminAgent["visibility"])
+                }
               >
                 <option value={PRIVATE_VISIBILITY}>나만</option>
                 <option value={GROUP_VISIBILITY}>그룹 공개</option>
               </NativeSelect>
             </div>
-            {error ? <p role="alert" className="rounded-md bg-muted p-3 text-sm">{error}</p> : null}
+            {error ? (
+              <p role="alert" className="rounded-md bg-muted p-3 text-sm">
+                {error}
+              </p>
+            ) : null}
             <DialogFooter>
-              <Button type="button" variant="outline" disabled={creating} onClick={() => changeOpen(false)}>취소</Button>
-              <Button type="submit" loading={creating} loadingText="만드는 중…" disabled={name.trim() === ""}>만들기</Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={creating}
+                onClick={() => changeOpen(false)}
+              >
+                취소
+              </Button>
+              <Button
+                type="submit"
+                loading={creating}
+                loadingText="만드는 중…"
+                disabled={name.trim() === ""}
+              >
+                만들기
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

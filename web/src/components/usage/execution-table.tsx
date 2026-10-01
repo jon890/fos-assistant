@@ -4,8 +4,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { agentLabel, formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  agentLabel,
+  formatCost,
+  formatDuration,
+  formatTokens,
+  formatWhen,
+} from "@/lib/format";
 import {
   actualCostLabel,
   contextCharsLabel,
@@ -17,7 +30,11 @@ import {
   type UsageExecution,
 } from "./execution-list";
 
-export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
+export function ExecutionTable({
+  executions,
+}: {
+  executions: UsageExecution[];
+}) {
   const router = useRouter();
   return (
     <Table className="hidden text-left md:table" data-testid="execution-table">
@@ -39,14 +56,17 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
       <TableBody>
         {executions.map((execution) => {
           const running = isRunning(execution);
-          const failed = execution.status === "FAILED" || execution.errorCode !== null;
+          const failed =
+            execution.status === "FAILED" || execution.errorCode !== null;
           return (
             <TableRow
               key={execution.id}
               className="cursor-pointer align-top hover:bg-muted"
               onClick={() => router.push(`/executions/${execution.id}`)}
             >
-              <TableCell className="py-3">{formatWhen(execution.startedAt)}</TableCell>
+              <TableCell className="py-3">
+                {formatWhen(execution.startedAt)}
+              </TableCell>
               <TableCell className="py-3 whitespace-normal">
                 <Link
                   href={`/executions/${execution.id}`}
@@ -59,47 +79,77 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                   {agentLabel(execution.agentName)}
                 </Link>
                 {execution.hasChildren ? (
-                  <ChevronRight aria-hidden="true" className="ml-1 inline-block size-4 text-muted-foreground" />
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="ml-1 inline-block size-4 text-muted-foreground"
+                  />
                 ) : null}
                 {execution.agentCode === null ? null : (
-                  <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {execution.agentCode}
+                  </span>
                 )}
                 {execution.skillNames.length > 0 ? (
-                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-skills">
+                  <span
+                    className="mt-1 block text-xs text-muted-foreground"
+                    data-testid="execution-skills"
+                  >
                     스킬 {execution.skillNames.join(", ")}
                   </span>
                 ) : null}
               </TableCell>
               <TableCell className="max-w-40 py-3">
                 <span className="block truncate">{execution.model ?? "-"}</span>
-                <span className="block truncate text-xs text-muted-foreground">{execution.provider ?? "-"}</span>
-                <span className="block truncate text-xs text-muted-foreground" data-testid="execution-effort">
+                <span className="block truncate text-xs text-muted-foreground">
+                  {execution.provider ?? "-"}
+                </span>
+                <span
+                  className="block truncate text-xs text-muted-foreground"
+                  data-testid="execution-effort"
+                >
                   {reasoningEffortLabel(execution)}
                 </span>
               </TableCell>
               <TableCell className="max-w-40 py-3 whitespace-normal">
-                <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
+                <Badge variant={failed ? "default" : "outline"}>
+                  {executionStatusLabel(execution)}
+                </Badge>
                 {retryOfLabel(execution) ? (
-                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-retry-of">
+                  <span
+                    className="mt-1 block text-xs text-muted-foreground"
+                    data-testid="execution-retry-of"
+                  >
                     {retryOfLabel(execution)}
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.inputTokens)}</TableCell>
-              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</TableCell>
-              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.outputTokens)}</TableCell>
+              <TableCell className="py-3 text-right tabular-nums">
+                {formatTokens(execution.inputTokens)}
+              </TableCell>
+              <TableCell className="py-3 text-right tabular-nums">
+                {formatTokens(execution.cachedInputTokens)}
+              </TableCell>
+              <TableCell className="py-3 text-right tabular-nums">
+                {formatTokens(execution.outputTokens)}
+              </TableCell>
               <TableCell
                 className="py-3 text-right tabular-nums"
                 data-testid="execution-context-chars"
               >
                 <span className="block">{contextCharsLabel(execution)}</span>
                 {contextOmittedLabel(execution) ? (
-                  <span className="block text-xs text-destructive" data-testid="execution-context-omitted">
+                  <span
+                    className="block text-xs text-destructive"
+                    data-testid="execution-context-omitted"
+                  >
                     {contextOmittedLabel(execution)}
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell className="py-3 text-right" data-testid="execution-duration">
+              <TableCell
+                className="py-3 text-right"
+                data-testid="execution-duration"
+              >
                 {running ? "" : formatDuration(execution.latencyMs ?? 0)}
               </TableCell>
               <TableCell
@@ -107,9 +157,17 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                 data-testid="execution-cost"
                 title={execution.pricingVersion ?? undefined}
               >
-                {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
+                {running
+                  ? ""
+                  : formatCost(
+                      execution.estimatedCostMicros,
+                      execution.costCurrency,
+                    )}
               </TableCell>
-              <TableCell className="py-3 text-right" data-testid="execution-actual-cost">
+              <TableCell
+                className="py-3 text-right"
+                data-testid="execution-actual-cost"
+              >
                 {actualCostLabel(execution)}
               </TableCell>
             </TableRow>

@@ -3,7 +3,13 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { agentLabel, formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
+import {
+  agentLabel,
+  formatCost,
+  formatDuration,
+  formatTokens,
+  formatWhen,
+} from "@/lib/format";
 import {
   actualCostLabel,
   contextCharsLabel,
@@ -37,11 +43,16 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
             <h2 className="truncate text-base font-semibold">
               {agentLabel(execution.agentName)}
               {execution.hasChildren ? (
-                <ChevronRight aria-hidden="true" className="pointer-events-none ml-1 inline-block size-4 text-muted-foreground" />
+                <ChevronRight
+                  aria-hidden="true"
+                  className="pointer-events-none ml-1 inline-block size-4 text-muted-foreground"
+                />
               ) : null}
             </h2>
             {execution.agentCode === null ? null : (
-              <p className="truncate text-xs text-muted-foreground">{execution.agentCode}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {execution.agentCode}
+              </p>
             )}
           </div>
           <span
@@ -49,7 +60,12 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
             data-testid="execution-cost"
             title={execution.pricingVersion ?? undefined}
           >
-            {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
+            {running
+              ? ""
+              : formatCost(
+                  execution.estimatedCostMicros,
+                  execution.costCurrency,
+                )}
           </span>
         </div>
         <p className="mt-3 truncate text-sm text-muted-foreground">
@@ -57,32 +73,56 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
         </p>
         {/* 표처럼 모델 옆에 붙이지 않고 다음 줄에 따로 둔다. 까닭은 `reasoningEffortLabel` 에 있고, 붙이면 긴 모델 이름과 함께 잘린다. */}
         <p className="text-xs text-muted-foreground">
-          effort <span data-testid="execution-effort">{reasoningEffortLabel(execution)}</span>
+          effort{" "}
+          <span data-testid="execution-effort">
+            {reasoningEffortLabel(execution)}
+          </span>
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-          <span title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}>
-            {formatTokens(execution.inputTokens)} → {formatTokens(execution.outputTokens)}
+          <span
+            title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}
+          >
+            {formatTokens(execution.inputTokens)} →{" "}
+            {formatTokens(execution.outputTokens)}
           </span>
-          <span data-testid="execution-context-chars">문맥 {contextCharsLabel(execution)}</span>
-          <span data-testid="execution-duration">{running ? "" : formatDuration(execution.latencyMs ?? 0)}</span>
+          <span data-testid="execution-context-chars">
+            문맥 {contextCharsLabel(execution)}
+          </span>
+          <span data-testid="execution-duration">
+            {running ? "" : formatDuration(execution.latencyMs ?? 0)}
+          </span>
           <span>{formatWhen(execution.startedAt)}</span>
-          <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
+          <Badge variant={failed ? "default" : "outline"}>
+            {executionStatusLabel(execution)}
+          </Badge>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground" data-testid="execution-actual-cost">
+        <p
+          className="mt-2 text-xs text-muted-foreground"
+          data-testid="execution-actual-cost"
+        >
           예상 추가 사용 요금 {actualCostLabel(execution)}
         </p>
         {execution.skillNames.length > 0 ? (
-          <p className="mt-1 text-xs text-muted-foreground" data-testid="execution-skills">
+          <p
+            className="mt-1 text-xs text-muted-foreground"
+            data-testid="execution-skills"
+          >
             스킬 {execution.skillNames.join(", ")}
           </p>
         ) : null}
         {retryOf ? (
-          <p className="mt-1 text-xs text-muted-foreground" data-testid="execution-retry-of">
+          <p
+            className="mt-1 text-xs text-muted-foreground"
+            data-testid="execution-retry-of"
+          >
             {retryOf}
           </p>
         ) : null}
         {omitted ? (
-          <p className="mt-1 text-xs text-destructive" data-testid="execution-context-omitted">
+          <p
+            className="mt-1 text-xs text-destructive"
+            data-testid="execution-context-omitted"
+          >
             {omitted}
           </p>
         ) : null}

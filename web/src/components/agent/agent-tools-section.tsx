@@ -13,9 +13,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/components/error-message";
-import { GROUP_VISIBILITY, type AdminAgent, type AgentToolsView, type ToolsetView } from "@/lib/agent";
+import {
+  GROUP_VISIBILITY,
+  type AdminAgent,
+  type AgentToolsView,
+  type ToolsetView,
+} from "@/lib/agent";
 
-type ErrorPayload = { code: string; message: string; missingToolsets?: string[] };
+type ErrorPayload = {
+  code: string;
+  message: string;
+  missingToolsets?: string[];
+};
 
 type Props = {
   code: string;
@@ -25,7 +34,9 @@ type Props = {
 };
 
 function toolsPath(code: string, admin: boolean): string {
-  return admin ? `/api/admin/agents/${code}/tools` : `/api/agents/${code}/tools`;
+  return admin
+    ? `/api/admin/agents/${code}/tools`
+    : `/api/agents/${code}/tools`;
 }
 
 /** 관리자 도구를 켤 때 그 도구가 실제로 닿는 대상을 짧게 알린다. */
@@ -59,9 +70,16 @@ function confirmationDescription(name: string): string {
 }
 
 /** 에이전트가 다음 실행부터 쓸 도구를 등급별로 보이고 저장한다. */
-export function AgentToolsSection({ code, initialTools, admin, visibility }: Props) {
+export function AgentToolsSection({
+  code,
+  initialTools,
+  admin,
+  visibility,
+}: Props) {
   const [tools, setTools] = useState(initialTools.toolsets);
-  const [unclassifiedEnabled, setUnclassifiedEnabled] = useState(initialTools.unclassifiedEnabled);
+  const [unclassifiedEnabled, setUnclassifiedEnabled] = useState(
+    initialTools.unclassifiedEnabled,
+  );
   const [pendingToolName, setPendingToolName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
@@ -69,7 +87,9 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
 
   async function reload(): Promise<AgentToolsView | null> {
     try {
-      const response = await fetch(toolsPath(code, admin), { cache: "no-store" });
+      const response = await fetch(toolsPath(code, admin), {
+        cache: "no-store",
+      });
       if (!response.ok) return null;
       const fresh = (await response.json()) as AgentToolsView;
       setTools(fresh.toolsets);
@@ -88,7 +108,9 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
       const response = await fetch(toolsPath(code, admin), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: next.filter((tool) => tool.enabled).map((tool) => tool.name) }),
+        body: JSON.stringify({
+          enabled: next.filter((tool) => tool.enabled).map((tool) => tool.name),
+        }),
       });
       if (response.ok) {
         const saved = (await response.json()) as AgentToolsView;
@@ -103,7 +125,9 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
       }
       await reload();
     } catch {
-      setError(describeError("HERMES_UNAVAILABLE", "도구 설정을 저장하지 못했어요."));
+      setError(
+        describeError("HERMES_UNAVAILABLE", "도구 설정을 저장하지 못했어요."),
+      );
       await reload();
     } finally {
       setPendingToolName(null);
@@ -111,19 +135,31 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
   }
 
   function toggle(tool: ToolsetView) {
-    if (!tool.editable || (visibility === GROUP_VISIBILITY && tool.requiresPrivate)) return;
+    if (
+      !tool.editable ||
+      (visibility === GROUP_VISIBILITY && tool.requiresPrivate)
+    )
+      return;
     if (!tool.enabled && tool.tier === "ADMIN") {
       setConfirming(tool);
       return;
     }
-    void save(tools.map((current) => current.name === tool.name ? { ...current, enabled: !current.enabled } : current), tool.name);
+    void save(
+      tools.map((current) =>
+        current.name === tool.name
+          ? { ...current, enabled: !current.enabled }
+          : current,
+      ),
+      tool.name,
+    );
   }
 
   const ownerTools = tools.filter((tool) => tool.tier === "OWNER");
   const adminTools = tools.filter((tool) => tool.tier === "ADMIN");
 
   function disabledReason(tool: ToolsetView): string | undefined {
-    if (visibility === GROUP_VISIBILITY && tool.requiresPrivate) return "그룹 공개 에이전트에는 켤 수 없어요";
+    if (visibility === GROUP_VISIBILITY && tool.requiresPrivate)
+      return "그룹 공개 에이전트에는 켤 수 없어요";
     if (!tool.editable) return "관리자만 켤 수 있어요";
     return undefined;
   }
@@ -137,11 +173,20 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
             const reason = disabledReason(tool);
             const disabled = pendingToolName !== null || reason !== undefined;
             return (
-              <li key={tool.name} className="flex items-center justify-between gap-3 p-3">
+              <li
+                key={tool.name}
+                className="flex items-center justify-between gap-3 p-3"
+              >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{tool.label}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{tool.description}</p>
-                  {reason ? <p className="mt-1 text-xs text-muted-foreground">{reason}</p> : null}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {tool.description}
+                  </p>
+                  {reason ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {reason}
+                    </p>
+                  ) : null}
                   {missing.includes(tool.name) ? (
                     <p className="mt-1 text-xs text-destructive">
                       이 도구를 켜지 못했어요. 관리자에게 알려 주세요.
@@ -169,15 +214,24 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
   }
 
   return (
-    <section aria-label="도구" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
+    <section
+      aria-label="도구"
+      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">도구</h2>
-          <p className="mt-1 text-sm text-muted-foreground">저장하면 다음 실행부터 반영돼요.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            저장하면 다음 실행부터 반영돼요.
+          </p>
         </div>
         <Badge variant="outline">{admin ? "관리자" : "주인"}</Badge>
       </div>
-      {error ? <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
+          {error}
+        </p>
+      ) : null}
       {unclassifiedEnabled.length > 0 ? (
         <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
           표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.
@@ -186,24 +240,43 @@ export function AgentToolsSection({ code, initialTools, admin, visibility }: Pro
       {list("주인 등급", ownerTools)}
       {list("관리자 등급", adminTools)}
       {confirming ? (
-        <AlertDialog open onOpenChange={(open) => { if (!open && pendingToolName === null) setConfirming(null); }}>
-          <AlertDialogContent onEscapeKeyDown={(event) => { if (pendingToolName !== null) event.preventDefault(); }}>
+        <AlertDialog
+          open
+          onOpenChange={(open) => {
+            if (!open && pendingToolName === null) setConfirming(null);
+          }}
+        >
+          <AlertDialogContent
+            onEscapeKeyDown={(event) => {
+              if (pendingToolName !== null) event.preventDefault();
+            }}
+          >
             <AlertDialogHeader>
               <AlertDialogTitle>{confirming.label} 도구 켜기</AlertDialogTitle>
               <AlertDialogDescription>
-                {confirmationDescription(confirming.name)} 다음 실행부터 이 에이전트가 쓸 수 있어요.
+                {confirmationDescription(confirming.name)} 다음 실행부터 이
+                에이전트가 쓸 수 있어요.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel asChild>
-                <Button variant="outline" disabled={pendingToolName !== null}>취소</Button>
+                <Button variant="outline" disabled={pendingToolName !== null}>
+                  취소
+                </Button>
               </AlertDialogCancel>
               <Button
                 loading={pendingToolName !== null}
                 loadingText="저장 중"
                 onClick={() => {
                   setConfirming(null);
-                  void save(tools.map((tool) => tool.name === confirming.name ? { ...tool, enabled: true } : tool), confirming.name);
+                  void save(
+                    tools.map((tool) =>
+                      tool.name === confirming.name
+                        ? { ...tool, enabled: true }
+                        : tool,
+                    ),
+                    confirming.name,
+                  );
                 }}
               >
                 켜기

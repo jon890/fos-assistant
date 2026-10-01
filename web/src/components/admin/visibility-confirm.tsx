@@ -23,24 +23,50 @@ type Props = {
  * 부르는 쪽이 확인할 때만 그리므로 언제나 열린 채로 그린다. `Esc` 와 「취소」 는 모두 `onCancel` 로 간다.
  * 공개 요청이 도는 동안에는 닫히지 않고, 실패하면 부르는 쪽이 창을 남겨 둔다.
  */
-export function VisibilityConfirm({ name, busy, error, onCancel, onConfirm }: Props) {
+export function VisibilityConfirm({
+  name,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+}: Props) {
   return (
-    <AlertDialog open onOpenChange={(open) => { if (!open && !busy) onCancel(); }}>
-      <AlertDialogContent onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}>
+    <AlertDialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onCancel();
+      }}
+    >
+      <AlertDialogContent
+        onEscapeKeyDown={(event) => {
+          if (busy) event.preventDefault();
+        }}
+      >
         <AlertDialogHeader>
-          <AlertDialogTitle>{name} 에이전트를 그룹에 공개할까요?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {name} 에이전트를 그룹에 공개할까요?
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            그룹의 모든 사용자가 이 에이전트와 대화할 수 있어요. 각자의 대화와 기억은 서로 보이지 않아요.
+            그룹의 모든 사용자가 이 에이전트와 대화할 수 있어요. 각자의 대화와
+            기억은 서로 보이지 않아요.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error ? <p role="alert" className="rounded-md bg-muted p-3 text-sm">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="rounded-md bg-muted p-3 text-sm">
+            {error}
+          </p>
+        ) : null}
         <AlertDialogFooter>
           {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}
           <AlertDialogCancel asChild>
-            <Button variant="outline" disabled={busy}>취소</Button>
+            <Button variant="outline" disabled={busy}>
+              취소
+            </Button>
           </AlertDialogCancel>
           {/* AlertDialogAction 은 누르는 즉시 창을 닫아, 공개가 실패해도 창이 사라지므로 일반 Button 으로 둔다. */}
-          <Button loading={busy} loadingText="공개하는 중" onClick={onConfirm}>그룹 공개</Button>
+          <Button loading={busy} loadingText="공개하는 중" onClick={onConfirm}>
+            그룹 공개
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -23,12 +23,21 @@ type HeaderProps = {
 };
 
 /** 입력창 위에 그리는 인사와 에이전트 카드다 */
-export function StartScreenHeader({ displayName, agents, loading, selectedCode, onSelect, locked }: HeaderProps) {
+export function StartScreenHeader({
+  displayName,
+  agents,
+  loading,
+  selectedCode,
+  onSelect,
+  locked,
+}: HeaderProps) {
   const only = agents.length === 1 ? agents[0] : undefined;
   return (
     <div className="mx-auto mt-auto w-full max-w-3xl pb-2">
       <h1 className="mb-6 text-center text-2xl font-semibold">
-        {displayName ? `${displayName}님, 무엇을 도와드릴까요?` : "무엇을 도와드릴까요?"}
+        {displayName
+          ? `${displayName}님, 무엇을 도와드릴까요?`
+          : "무엇을 도와드릴까요?"}
       </h1>
       {loading ? (
         // 뼈대는 낭독기에서 숨겨져 있다. 읽는 중이라는 것은 status 안의 글로 알린다.
@@ -45,7 +54,12 @@ export function StartScreenHeader({ displayName, agents, loading, selectedCode, 
       ) : only ? (
         <p className="text-center text-sm font-medium">{only.name}</p>
       ) : (
-        <AgentPicker agents={agents} selectedCode={selectedCode} onSelect={onSelect} disabled={locked} />
+        <AgentPicker
+          agents={agents}
+          selectedCode={selectedCode}
+          onSelect={onSelect}
+          disabled={locked}
+        />
       )}
     </div>
   );
@@ -66,7 +80,12 @@ type PromptsProps = {
  * 모으는 여백을 갖고 있어서, 높이가 칩에 따라 변하면 칩이 나타날 때마다 입력창이 위로 밀린다. 그래서 읽는 중이든
  * 비었든 채워졌든 같은 최소 높이를 잡는다. 칩 네 개가 줄바꿈되는 정도가 폭마다 달라 좁은 폭은 세 줄, 넓은 폭은 두 줄을 잡는다.
  */
-export function StarterPrompts({ prompts, pending, disabled, onPrompt }: PromptsProps) {
+export function StarterPrompts({
+  prompts,
+  pending,
+  disabled,
+  onPrompt,
+}: PromptsProps) {
   return (
     <div className="mx-auto mb-auto min-h-32 w-full max-w-3xl pt-3 sm:min-h-24">
       {pending ? (
@@ -78,12 +97,21 @@ export function StarterPrompts({ prompts, pending, disabled, onPrompt }: Prompts
           <Skeleton className="h-8 w-36 rounded-full" />
         </div>
       ) : prompts.length > 0 ? (
-        <ul aria-label="추천 질문" className="flex flex-wrap justify-center gap-2">
+        <ul
+          aria-label="추천 질문"
+          className="flex flex-wrap justify-center gap-2"
+        >
           {prompts.map((prompt, index) => (
             <li key={index} className="max-w-full">
-              <Button variant="outline" disabled={disabled} onClick={() => onPrompt(prompt)}
-                className={cn("max-w-full justify-start whitespace-normal text-left",
-                  "rounded-full px-3 py-1.5 font-normal")}>
+              <Button
+                variant="outline"
+                disabled={disabled}
+                onClick={() => onPrompt(prompt)}
+                className={cn(
+                  "max-w-full justify-start whitespace-normal text-left",
+                  "rounded-full px-3 py-1.5 font-normal",
+                )}
+              >
                 {prompt}
               </Button>
             </li>
