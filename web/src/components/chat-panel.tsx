@@ -27,6 +27,7 @@ import { ArtifactPanel } from "./chat/artifact/artifact-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
 import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
+import { Notice } from "./ui/notice";
 import {
   useShellDisplayName,
   useShellIsAdmin,
@@ -1943,9 +1944,9 @@ export function ChatPanel({
             />
           ) : null}
           {error ? (
-            <p className="mb-2 rounded-md bg-muted px-3 py-2 text-sm">
+            <Notice variant="error" className="mb-2">
               {error}
-            </p>
+            </Notice>
           ) : null}
           {observing ? (
             <p
@@ -2016,13 +2017,14 @@ export function ChatPanel({
             onModelChoiceSaved={replace}
           />
           {unknownSkill ? (
-            <p
+            <Notice
+              variant="error"
               data-testid="skill-command-notice"
               role="alert"
-              className="mx-auto mt-2 w-full max-w-3xl rounded-md bg-muted px-3 py-2 text-sm"
+              className="mx-auto mt-2 w-full max-w-3xl"
             >
               /{unknownSkill} 스킬이 이 에이전트에 없어요
-            </p>
+            </Notice>
           ) : null}
           {startScreen ? (
             <StarterPrompts

@@ -1,3 +1,4 @@
+import { parseRgb } from "./color.ts";
 import { expect, setSession, test } from "./fixtures.ts";
 
 test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", async ({ context, page }, testInfo) => {
@@ -65,6 +66,5 @@ test("로그인 화면은 메뉴 없이 가운데 카드와 브랜드 단추만 
     primary: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
   }));
   expect(colors.background).not.toBe("rgba(0, 0, 0, 0)");
-  expect(colors.background).toBe("rgb(176, 90, 60)");
-  expect(colors.primary).toBe("#b05a3c");
+  expect(parseRgb(colors.background), `로그인 단추 바탕이 --primary(${colors.primary}) 이어야 한다`).toEqual(parseRgb(colors.primary));
 });

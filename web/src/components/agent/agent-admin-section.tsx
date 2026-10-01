@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Notice } from "@/components/ui/notice";
 import { describeAdminError } from "@/components/error-message";
 import type { AdminAgent } from "@/lib/agent";
 
@@ -49,7 +50,9 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
         }),
       });
       if (!response.ok) {
-        const result = await payload<{ code: string; message: string }>(response);
+        const result = await payload<{ code: string; message: string }>(
+          response,
+        );
         setError(describeAdminError(result.code, result.message));
         return;
       }
@@ -62,21 +65,35 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
   async function saveAddress(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    await update({ apiBaseUrl: String(form.get("apiBaseUrl") ?? "") }, "address");
+    await update(
+      { apiBaseUrl: String(form.get("apiBaseUrl") ?? "") },
+      "address",
+    );
   }
 
   return (
-    <section aria-label="관리" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
+    <section
+      aria-label="관리"
+      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">관리</h2>
-          <p className="mt-1 text-sm text-muted-foreground">사용 여부와 연결 설정을 고칠 수 있어요.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            사용 여부와 연결 설정을 고칠 수 있어요.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant={agent.enabled ? "outline" : "default"}>{agent.enabled ? "사용 중" : "꺼짐"}</Badge>
+          <Badge variant={agent.enabled ? "success" : "warning"}>
+            {agent.enabled ? "사용 중" : "꺼짐"}
+          </Badge>
         </div>
       </div>
-      {error ? <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">{error}</p> : null}
+      {error ? (
+        <Notice variant="error" role="alert" className="mt-4">
+          {error}
+        </Notice>
+      ) : null}
       <form onSubmit={(event) => void saveAddress(event)} className="mt-4">
         <div className="grid gap-1.5">
           <Label htmlFor="agent-api-base-url">에이전트 연결 주소</Label>
@@ -88,11 +105,30 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
             aria-label={`${agent.name} 에이전트 연결 주소`}
           />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">저장하기 전에 이 주소에 연결되는지 확인해 주세요.</p>
-        <Button type="submit" size="sm" variant="outline" disabled={busy} loading={pending === "address"} loadingText="확인하는 중" className="mt-2">주소 저장</Button>
+        <p className="mt-2 text-xs text-muted-foreground">
+          저장하기 전에 이 주소에 연결되는지 확인해 주세요.
+        </p>
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          loading={pending === "address"}
+          loadingText="확인하는 중"
+          className="mt-2"
+        >
+          주소 저장
+        </Button>
       </form>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" disabled={busy} loading={pending === "enabled"} loadingText={agent.enabled ? "중지하는 중" : "켜는 중"} onClick={() => void update({ enabled: !agent.enabled }, "enabled")}>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          loading={pending === "enabled"}
+          loadingText={agent.enabled ? "중지하는 중" : "켜는 중"}
+          onClick={() => void update({ enabled: !agent.enabled }, "enabled")}
+        >
           {agent.enabled ? "사용 중지" : "다시 사용"}
         </Button>
       </div>

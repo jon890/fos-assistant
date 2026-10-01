@@ -38,7 +38,11 @@ test("Pretendard와 테마별 브랜드 색을 자체 글꼴 단추에 적용한
   expect(contrast(themeColors.dark.primaryForeground, themeColors.dark.primary)).toBeGreaterThanOrEqual(4.5);
 
   const primaryButton = page.getByRole("button", { name: "저장", exact: true });
-  const primaryColors = await primaryButton.evaluate((button) => {
+  // 성격이 비어 있으면 저장 단추가 잠겨 muted 바탕이다. 글을 넣어 단추를 켠 뒤 강조 색을 본다.
+  // 저장하지 않으므로 이 에이전트의 성격은 바뀌지 않는다.
+  await page.getByRole("textbox", { name: /성격$/ }).fill("단추 색을 보려고 넣은 글");
+  await expect(primaryButton).toBeEnabled();
+  const readColors = () => primaryButton.evaluate((button) => {
     const buttonStyles = getComputedStyle(button);
     const rootStyles = getComputedStyle(document.documentElement);
     return {
@@ -46,8 +50,12 @@ test("Pretendard와 테마별 브랜드 색을 자체 글꼴 단추에 적용한
       primary: rootStyles.getPropertyValue("--primary").trim(),
     };
   });
-  expect(primaryColors.background).not.toBe("rgba(0, 0, 0, 0)");
-  expect(parseRgb(primaryColors.background)).toEqual(parseRgb(primaryColors.primary));
+  // 바탕색은 짧게 바뀌어 가므로 강조 색에 닿을 때까지 기다린다.
+  await expect.poll(async () => {
+    const colors = await readColors();
+    return parseRgb(colors.background);
+  }).toEqual(parseRgb((await readColors()).primary));
+  expect((await readColors()).background).not.toBe("rgba(0, 0, 0, 0)");
   await expect(page.getByRole("region", { name: "공개와 삭제" }).getByRole("button", { name: "그룹 공개로 변경" }))
     .toHaveAttribute("type", "button");
   expect(externalFontRequests).toEqual([]);

@@ -5,10 +5,11 @@ import {
   type ConnectorTool,
 } from "@/lib/connection";
 
+/** 실행 방식은 상태라 의미 색으로 그린다. 바로 실행은 success, 승인을 기다리는 것은 warning 이다. */
 function policyVariant(tool: ConnectorTool) {
   if (tool.risk === "DESTRUCTIVE" || tool.risk === "FINANCIAL")
     return "destructive";
-  return tool.approval === "NONE" ? "secondary" : "default";
+  return tool.approval === "NONE" ? "success" : "warning";
 }
 
 /** 커넥터가 선언한 도구마다 위험도와 실행 방식을 보인다. */

@@ -48,7 +48,7 @@ test("새 대화 화면에 인사와 첫 에이전트 카드와 추천 질문이
   const picker = page.getByRole("radiogroup", { name: "에이전트" });
   await expect(picker.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(composer(page)).toHaveAttribute("placeholder", "@로 에이전트를 불러요");
+  await expect(composer(page)).toHaveAttribute("placeholder", "무엇이든 물어보세요");
   await expectNoHorizontalScroll(page);
 });
 

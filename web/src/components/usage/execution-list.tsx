@@ -1,5 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatCost } from "@/lib/format";
+import { formatCost, formatDurationFor } from "@/lib/format";
 import { ExecutionCard } from "./execution-card";
 import { ExecutionTable } from "./execution-table";
 
@@ -34,7 +34,9 @@ export type UsageExecution = {
 
 /** 같은 질문인데 문맥이 커진 실행을 눈으로 찾을 수 있게 글자 수를 적는다. */
 export function contextCharsLabel(execution: UsageExecution): string {
-  return execution.contextChars === null ? "-" : `${execution.contextChars.toLocaleString("ko-KR")}자`;
+  return execution.contextChars === null
+    ? "-"
+    : `${execution.contextChars.toLocaleString("ko-KR")}자`;
 }
 
 /**
@@ -45,7 +47,9 @@ export function contextCharsLabel(execution: UsageExecution): string {
  */
 export function contextOmittedLabel(execution: UsageExecution): string {
   const omitted = execution.contextOmittedItems;
-  return omitted === null || omitted <= 0 ? "" : `기억 ${omitted.toLocaleString("ko-KR")}개가 길어서 답에 포함되지 않았어요`;
+  return omitted === null || omitted <= 0
+    ? ""
+    : `기억 ${omitted.toLocaleString("ko-KR")}개가 길어서 답에 포함되지 않았어요`;
 }
 
 /**
@@ -74,14 +78,34 @@ export function actualCostLabel(execution: UsageExecution): string {
   return formatCost(execution.actualCostMicros, execution.costCurrency);
 }
 
-export function executionStatusLabel(execution: UsageExecution): string {
+/** 걸린 시간 칸에 적을 문구다. 끝나지 않은 실행은 빈 칸이다. */
+export function durationLabel(
+  execution: UsageExecution,
+  isAdmin: boolean,
+): string {
+  return isRunning(execution)
+    ? ""
+    : formatDurationFor(execution.latencyMs ?? 0, isAdmin);
+}
+
+/**
+ * 상태 배지의 문구다.
+ *
+ * <p>문구가 정해지지 않은 오류 코드는 관리자에게만 원문으로 보인다. 그 밖의 사용자에게는 「실패」 다.
+ */
+export function executionStatusLabel(
+  execution: UsageExecution,
+  isAdmin: boolean,
+): string {
   if (isRunning(execution)) return "실행 중";
   if (execution.errorCode === "ORPHANED") return "중간에 중단됨";
   if (execution.errorCode === "PROVIDER_BLOCKED") return "모델을 쓸 수 없음";
-  if (execution.errorCode === "NO_MODEL_AVAILABLE") return "사용할 수 있는 모델 없음";
+  if (execution.errorCode === "NO_MODEL_AVAILABLE")
+    return "사용할 수 있는 모델 없음";
   // 공유 gateway 의 동시 실행 한도에 닿아 거절당한 것이다. Hermes 가 내려간 것과 원인이 다르다.
   if (execution.errorCode === "HERMES_BUSY") return "요청이 많아 거절됨";
-  if (execution.status === "FAILED" || execution.errorCode !== null) return execution.errorCode ?? "실패";
+  if (execution.status === "FAILED" || execution.errorCode !== null)
+    return isAdmin ? (execution.errorCode ?? "실패") : "실패";
   return "성공";
 }
 
@@ -96,16 +120,34 @@ export function retryOfLabel(execution: UsageExecution): string {
     : `${execution.retryOfExecutionId}번 실행에 이어서 시작함`;
 }
 
-export function ExecutionList({ executions }: { executions: UsageExecution[] }) {
+/** 실행 기록이다. 금액, 모델, 토큰 같은 내부 값은 `isAdmin` 일 때만 카드와 표가 그린다. */
+export function ExecutionList({
+  executions,
+  isAdmin,
+}: {
+  executions: UsageExecution[];
+  isAdmin: boolean;
+}) {
   if (executions.length === 0) {
-    return <EmptyState title="아직 실행 기록이 없어요" description="에이전트와 대화하면 사용량이 여기에 쌓여요." />;
+    return (
+      <EmptyState
+        title="아직 실행 기록이 없어요"
+        description="에이전트와 대화하면 사용량이 여기에 쌓여요."
+      />
+    );
   }
 
   return (
     <section aria-label="실행 기록">
-      <ExecutionTable executions={executions} />
+      <ExecutionTable executions={executions} isAdmin={isAdmin} />
       <div className="grid gap-3 md:hidden" data-testid="execution-cards">
-        {executions.map((execution) => <ExecutionCard key={execution.id} execution={execution} />)}
+        {executions.map((execution) => (
+          <ExecutionCard
+            key={execution.id}
+            execution={execution}
+            isAdmin={isAdmin}
+          />
+        ))}
       </div>
     </section>
   );

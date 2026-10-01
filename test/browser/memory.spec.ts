@@ -88,7 +88,8 @@ test("제안을 물리면 제안 절과 머리의 미처리 수가 사라진다"
 });
 
 test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인다", async ({ page }, testInfo) => {
-  const title = `${testInfo.project.name} 실패 검사`;
+  // 두 폭이 같은 제목을 만들고 지우지 않으면 같은 제목의 줄이 둘이 된다.
+  const title = `실패 검사 ${testInfo.project.name} ${Date.now()}`;
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("USER");
   await page.getByLabel("제목", { exact: true }).fill(title);

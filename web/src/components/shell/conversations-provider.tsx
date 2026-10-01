@@ -38,7 +38,10 @@ type ConversationsValue = {
   rename(id: string, title: string): Promise<void>;
   /** 서버가 돌려준 대화 한 줄로 목록의 그 줄을 바꾼다. 목록에 없으면 앞에 더한다 */
   replace(conversation: Conversation): void;
+  /** 서버에 지우기 요청만 보낸다. 목록의 줄은 그대로 두고, 실패하면 던진다 */
   remove(id: string): Promise<void>;
+  /** 목록에서 그 줄을 뺀다. 지우기 요청이 성공하고 나가는 움직임이 끝난 뒤에 부른다 */
+  drop(id: string): void;
 };
 
 const ConversationsContext = createContext<ConversationsValue | null>(null);
@@ -149,6 +152,9 @@ export function ConversationsProvider({
       method: "DELETE",
     });
     if (!response.ok) throw await failure(response);
+  }, []);
+
+  const drop = useCallback((id: string) => {
     setConversations((current) => current.filter((item) => item.id !== id));
   }, []);
 
@@ -163,6 +169,7 @@ export function ConversationsProvider({
       rename,
       replace,
       remove,
+      drop,
     }),
     [
       conversations,
@@ -174,6 +181,7 @@ export function ConversationsProvider({
       rename,
       replace,
       remove,
+      drop,
     ],
   );
 

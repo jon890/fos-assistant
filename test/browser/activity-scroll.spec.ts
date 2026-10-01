@@ -23,7 +23,7 @@ test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 맨 아래
     await expect(items).toHaveCount(31);
 
     const title = block.getByTestId("activity-toggle");
-    await expect(title).toContainText("작업을 실행하는 중");
+    await expect(title).toContainText("작업하고 있어요");
     await expect(title).not.toContainText("terminal");
 
     const scroll = block.getByTestId("activity-scroll");
@@ -44,6 +44,13 @@ test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 맨 아래
     // 맨 아래를 보고 있으면 새 줄이 와도 맨 아래를 따라간다.
     await hermes.releaseLongActivity();
     await expect(items).toHaveCount(42);
+    await expect.poll(async () => (await measure()).fromBottom).toBeLessThanOrEqual(16);
+
+    // 접어도 스크롤 상자는 남는다. 도는 중에 접었다가 다시 펼치면 맨 아래부터 따라간다.
+    await title.click();
+    await expect(scroll).toBeHidden();
+    await title.click();
+    await expect(scroll).toBeVisible();
     await expect.poll(async () => (await measure()).fromBottom).toBeLessThanOrEqual(16);
 
     // 사용자가 위로 올려 읽는 중이면 새 줄이 와도 따라가지 않는다.

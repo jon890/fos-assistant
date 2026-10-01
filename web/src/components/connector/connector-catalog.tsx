@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ConnectorAdminPanel } from "@/components/connector/connector-admin-panel";
 import { useShellIsAdmin } from "@/components/shell/app-shell";
 import { Badge } from "@/components/ui/badge";
+import { Notice } from "@/components/ui/notice";
 import {
   Card,
   CardContent,
@@ -35,12 +36,9 @@ export function ConnectorCatalog() {
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="mb-4 text-xl font-semibold">연결</h1>
       {error ? (
-        <p
-          role="alert"
-          className="rounded-md border border-border bg-muted p-3 text-sm"
-        >
+        <Notice variant="error" role="alert">
           연결 목록을 읽지 못했어요. {error}
-        </p>
+        </Notice>
       ) : connectors === null ? (
         <p className="text-sm text-muted-foreground">불러오는 중…</p>
       ) : connectors.length === 0 ? (
@@ -55,7 +53,7 @@ export function ConnectorCatalog() {
               <Link
                 href={`/connections/${connector.id}`}
                 data-testid="connector-card"
-                className="block rounded-xl focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <Card className="transition-colors hover:bg-accent">
                   <CardHeader>

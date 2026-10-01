@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activityLabel, applyChatEvent, emptyActivity, failActivity, fromTree } from "../../web/src/components/chat/activity/activity-state.ts";
+import {
+  activityLabel, activityOutcome, activitySummaryLabel, applyChatEvent, emptyActivity, failActivity, fromTree,
+} from "../../web/src/components/chat/activity/activity-state.ts";
+import { formatSeconds } from "../../web/src/lib/format.ts";
 import type {
   ExecutionEventView,
   ExecutionTreeNode,
@@ -93,10 +96,26 @@ test("스트림 종료와 오류는 자식의 결과 누락이고 사용자 중�
   assert.equal(applyChatEvent(state, { type: "stopped" }).items[0].state, "stopped");
 });
 
-test("이름이 있으면 이름을 쓰고 없으면 긴 목표나 preview를 줄인다", () => {
+test("이름이 id 로 채워져 와도 목표가 있으면 목표를 보인다", () => {
+  const event = subagentStarted();
+  event.subagentName = "sa-1";
+  assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "자료를 찾는다");
+});
+
+test("목표가 없으면 이름을 쓰고 둘 다 없으면 도우미다", () => {
   const event = subagentStarted();
   event.subagentName = "조사 담당";
+  event.detail = null;
   assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "조사 담당");
+  event.detail = "  ";
+  assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "조사 담당");
+  event.subagentName = null;
+  event.detail = null;
+  assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "도우미");
+});
+
+test("이름이 없으면 긴 목표나 preview를 줄인다", () => {
+  const event = subagentStarted();
   event.subagentName = null;
   event.detail = "긴 목표 ".repeat(40);
   const [item] = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) });
@@ -131,12 +150,48 @@ test("activityLabel 은 같은 도구 항목이 도는 중일 때와 끝났을 �
 
   assert.equal(running.name, "terminal");
   assert.equal(done.name, "terminal");
-  assert.equal(activityLabel(running), "작업을 실행하는 중");
-  assert.equal(activityLabel(done), "작업 실행");
+  assert.equal(activityLabel(running), "작업하고 있어요");
+  assert.equal(activityLabel(done), "작업을 했어요");
 });
 
 test("activityLabel 은 도구가 아닌 항목의 이름을 그대로 낸다", () => {
   const state = applyChatEvent(emptyActivity(0), { type: "switched", text: "다른 모델" });
 
   assert.equal(activityLabel(state.items[0]!), state.items[0]!.name);
+});
+
+test("끝난 블록의 접힌 한 줄은 중지와 오류를 먼저 보고 그 밖에는 도구와 도우미의 수로 고른다", () => {
+  const both = { toolCount: 2, subagentCount: 1 };
+  assert.equal(activitySummaryLabel(both, "stopped"), "하다가 멈췄어요");
+  assert.equal(activitySummaryLabel(both, "failed"), "끝까지 하지 못했어요");
+  assert.equal(activitySummaryLabel(both, "done"), "찾아보고 도우미와 함께 정리했어요");
+  assert.equal(activitySummaryLabel({ toolCount: 0, subagentCount: 1 }, "done"), "도우미와 함께 정리했어요");
+  assert.equal(activitySummaryLabel({ toolCount: 1, subagentCount: 0 }, "done"), "필요한 것을 확인하고 답했어요");
+  assert.equal(activitySummaryLabel({ toolCount: 0, subagentCount: 0 }, "done"), "차례로 정리했어요");
+});
+
+test("접힌 한 줄에는 도구와 도우미의 수가 글자로 들어가지 않는다", () => {
+  for (const outcome of ["done", "stopped", "failed"] as const) {
+    assert.doesNotMatch(activitySummaryLabel({ toolCount: 7, subagentCount: 3 }, outcome), /[0-9]/);
+  }
+});
+
+test("흘러온 사건으로 끝난 블록은 중지가 있으면 멈춤, 끝나지 않은 줄이 있으면 실패, 그 밖에는 끝남이다", () => {
+  const tool = applyChatEvent(emptyActivity(0), { type: "tool", toolName: "terminal", phase: "started" });
+  const child = applyChatEvent(emptyActivity(0), { type: "subagent", phase: "started", goal: "자료를 찾는다" });
+  const finished = applyChatEvent(tool, { type: "tool", toolName: "terminal", phase: "completed" });
+
+  assert.equal(activityOutcome(applyChatEvent(tool, { type: "stopped" }).items), "stopped");
+  assert.equal(activityOutcome(failActivity(tool, 1000).items), "failed");
+  assert.equal(activityOutcome(failActivity(child, 1000).items), "failed");
+  assert.equal(activityOutcome(applyChatEvent(finished, { type: "done" }).items), "done");
+  assert.equal(activityOutcome([]), "done");
+});
+
+test("formatSeconds 는 1초가 안 되면 null 이고 그 밖에는 초와 분으로 보인다", () => {
+  assert.equal(formatSeconds(0), null);
+  assert.equal(formatSeconds(999), null);
+  assert.equal(formatSeconds(1_000), "1초");
+  assert.equal(formatSeconds(2_100), "2초");
+  assert.equal(formatSeconds(72_000), "1분 12초");
 });

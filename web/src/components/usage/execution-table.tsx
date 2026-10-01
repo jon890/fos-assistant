@@ -4,12 +4,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { agentLabel, formatCost, formatDuration, formatTokens, formatWhen } from "@/lib/format";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
+import { executionStatusVariant } from "@/lib/execution-status";
 import {
   actualCostLabel,
   contextCharsLabel,
   contextOmittedLabel,
+  durationLabel,
   executionStatusLabel,
   isRunning,
   reasoningEffortLabel,
@@ -17,7 +26,13 @@ import {
   type UsageExecution,
 } from "./execution-list";
 
-export function ExecutionTable({ executions }: { executions: UsageExecution[] }) {
+export function ExecutionTable({
+  executions,
+  isAdmin,
+}: {
+  executions: UsageExecution[];
+  isAdmin: boolean;
+}) {
   const router = useRouter();
   return (
     <Table className="hidden text-left md:table" data-testid="execution-table">
@@ -25,28 +40,38 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
         <TableRow className="hover:bg-transparent">
           <TableHead>시각</TableHead>
           <TableHead>에이전트</TableHead>
-          <TableHead>모델</TableHead>
+          {isAdmin ? <TableHead>모델</TableHead> : null}
           <TableHead>상태</TableHead>
-          <TableHead className="text-right">입력</TableHead>
-          <TableHead className="text-right">캐시</TableHead>
-          <TableHead className="text-right">출력</TableHead>
-          <TableHead className="text-right">문맥</TableHead>
+          {isAdmin ? (
+            <>
+              <TableHead className="text-right">입력</TableHead>
+              <TableHead className="text-right">캐시</TableHead>
+              <TableHead className="text-right">출력</TableHead>
+              <TableHead className="text-right">문맥</TableHead>
+            </>
+          ) : null}
           <TableHead className="text-right">소요</TableHead>
-          <TableHead className="text-right">API 환산 비용</TableHead>
-          <TableHead className="text-right">예상 추가 사용 요금</TableHead>
+          {isAdmin ? (
+            <>
+              <TableHead className="text-right">API 환산 비용</TableHead>
+              <TableHead className="text-right">예상 추가 사용 요금</TableHead>
+            </>
+          ) : null}
         </TableRow>
       </TableHeader>
       <TableBody>
         {executions.map((execution) => {
           const running = isRunning(execution);
-          const failed = execution.status === "FAILED" || execution.errorCode !== null;
+          const omitted = contextOmittedLabel(execution);
           return (
             <TableRow
               key={execution.id}
               className="cursor-pointer align-top hover:bg-muted"
               onClick={() => router.push(`/executions/${execution.id}`)}
             >
-              <TableCell className="py-3">{formatWhen(execution.startedAt)}</TableCell>
+              <TableCell className="py-3">
+                {formatWhen(execution.startedAt)}
+              </TableCell>
               <TableCell className="py-3 whitespace-normal">
                 <Link
                   href={`/executions/${execution.id}`}
@@ -59,59 +84,111 @@ export function ExecutionTable({ executions }: { executions: UsageExecution[] })
                   {agentLabel(execution.agentName)}
                 </Link>
                 {execution.hasChildren ? (
-                  <ChevronRight aria-hidden="true" className="ml-1 inline-block size-4 text-muted-foreground" />
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="ml-1 inline-block size-4 text-muted-foreground"
+                  />
                 ) : null}
-                {execution.agentCode === null ? null : (
-                  <span className="block text-xs text-muted-foreground">{execution.agentCode}</span>
+                {!isAdmin || execution.agentCode === null ? null : (
+                  <span className="block text-xs text-muted-foreground">
+                    {execution.agentCode}
+                  </span>
                 )}
                 {execution.skillNames.length > 0 ? (
-                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-skills">
+                  <span
+                    className="mt-1 block text-xs text-muted-foreground"
+                    data-testid="execution-skills"
+                  >
                     스킬 {execution.skillNames.join(", ")}
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell className="max-w-40 py-3">
-                <span className="block truncate">{execution.model ?? "-"}</span>
-                <span className="block truncate text-xs text-muted-foreground">{execution.provider ?? "-"}</span>
-                <span className="block truncate text-xs text-muted-foreground" data-testid="execution-effort">
-                  {reasoningEffortLabel(execution)}
-                </span>
-              </TableCell>
+              {isAdmin ? (
+                <TableCell className="max-w-40 py-3">
+                  <span className="block truncate">
+                    {execution.model ?? "-"}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {execution.provider ?? "-"}
+                  </span>
+                  <span
+                    className="block truncate text-xs text-muted-foreground"
+                    data-testid="execution-effort"
+                  >
+                    {reasoningEffortLabel(execution)}
+                  </span>
+                </TableCell>
+              ) : null}
               <TableCell className="max-w-40 py-3 whitespace-normal">
-                <Badge variant={failed ? "default" : "outline"}>{executionStatusLabel(execution)}</Badge>
+                <Badge variant={executionStatusVariant(execution)}>
+                  {executionStatusLabel(execution, isAdmin)}
+                </Badge>
                 {retryOfLabel(execution) ? (
-                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="execution-retry-of">
+                  <span
+                    className="mt-1 block text-xs text-muted-foreground"
+                    data-testid="execution-retry-of"
+                  >
                     {retryOfLabel(execution)}
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.inputTokens)}</TableCell>
-              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.cachedInputTokens)}</TableCell>
-              <TableCell className="py-3 text-right tabular-nums">{formatTokens(execution.outputTokens)}</TableCell>
-              <TableCell
-                className="py-3 text-right tabular-nums"
-                data-testid="execution-context-chars"
-              >
-                <span className="block">{contextCharsLabel(execution)}</span>
-                {contextOmittedLabel(execution) ? (
-                  <span className="block text-xs text-destructive" data-testid="execution-context-omitted">
-                    {contextOmittedLabel(execution)}
-                  </span>
-                ) : null}
-              </TableCell>
-              <TableCell className="py-3 text-right" data-testid="execution-duration">
-                {running ? "" : formatDuration(execution.latencyMs ?? 0)}
-              </TableCell>
+              {isAdmin ? (
+                <>
+                  <TableCell className="py-3 text-right tabular-nums">
+                    {formatTokens(execution.inputTokens)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right tabular-nums">
+                    {formatTokens(execution.cachedInputTokens)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right tabular-nums">
+                    {formatTokens(execution.outputTokens)}
+                  </TableCell>
+                  <TableCell
+                    className="py-3 text-right tabular-nums"
+                    data-testid="execution-context-chars"
+                  >
+                    <span className="block">
+                      {contextCharsLabel(execution)}
+                    </span>
+                    {omitted ? (
+                      <span
+                        className="block text-xs text-destructive"
+                        data-testid="execution-context-omitted"
+                      >
+                        {omitted}
+                      </span>
+                    ) : null}
+                  </TableCell>
+                </>
+              ) : null}
               <TableCell
                 className="py-3 text-right"
-                data-testid="execution-cost"
-                title={execution.pricingVersion ?? undefined}
+                data-testid="execution-duration"
               >
-                {running ? "" : formatCost(execution.estimatedCostMicros, execution.costCurrency)}
+                {durationLabel(execution, isAdmin)}
               </TableCell>
-              <TableCell className="py-3 text-right" data-testid="execution-actual-cost">
-                {actualCostLabel(execution)}
-              </TableCell>
+              {isAdmin ? (
+                <>
+                  <TableCell
+                    className="py-3 text-right"
+                    data-testid="execution-cost"
+                    title={execution.pricingVersion ?? undefined}
+                  >
+                    {running
+                      ? ""
+                      : formatCost(
+                          execution.estimatedCostMicros,
+                          execution.costCurrency,
+                        )}
+                  </TableCell>
+                  <TableCell
+                    className="py-3 text-right"
+                    data-testid="execution-actual-cost"
+                  >
+                    {actualCostLabel(execution)}
+                  </TableCell>
+                </>
+              ) : null}
             </TableRow>
           );
         })}

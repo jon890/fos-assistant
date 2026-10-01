@@ -91,16 +91,14 @@ for (const cancelled of [false, true]) {
     );
     await expect(item).toContainText(goal);
     await expect(item).toContainText(cancelled ? "중지됨" : "결과를 받지 못함");
-    if (!cancelled) {
-      await expect(item).not.toContainText("child-model");
-      await expect(item).not.toContainText("입력");
-      await expect(item).not.toContainText("출력");
-    }
+    await expect(item).toContainText("도우미");
+    // 도우미의 모델과 토큰은 대화에 그리지 않는다.
+    await expect(item).not.toContainText("child-model");
+    await expect(item).not.toContainText("입력 ");
+    await expect(item).not.toContainText("출력 ");
     await block.getByTestId("activity-open-panel").click();
     const panel = page.getByTestId("activity-panel");
-    await expect(
-      panel.getByText(`하위 에이전트: ${goal}`, { exact: true }),
-    ).toBeVisible();
+    await expect(panel.getByText(`도우미: ${goal}`, { exact: true })).toBeVisible();
     await expect(panel).not.toContainText("이름 없음");
     await page.reload();
     const reloaded = page
@@ -377,4 +375,51 @@ test("넓은 폭에서 패널을 Esc 로 닫고 한 번 더 누르면 답이 멈
   ).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
+});
+
+test("관리자가 도구 줄을 펼쳐도 원본은 접혀 있고 원본 보기를 눌러야 보인다", async ({ page }) => {
+  const raw = '{"output":"terminal-raw-result"}';
+  const query = "제주 3월 날씨";
+  const event = (sequence: number, eventType: string, toolName: string, detail: string | null) => ({
+    sequence, eventType, toolName, subagentName: null, hermesSessionId: null, detail, model: null,
+    inputTokens: null, outputTokens: null, durationMs: eventType === "TOOL_COMPLETED" ? 2_100 : null,
+    failed: eventType === "TOOL_COMPLETED" ? false : null, occurredAt: "2026-09-28T00:00:01Z",
+  });
+  await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: {
+    truncated: false,
+    root: { truncated: false, executionId: 960, agentCode: "browser", agentName: "비서",
+      status: "SUCCEEDED", model: "example-model", inputTokens: 10, outputTokens: 20,
+      estimatedCostMicros: null, latencyMs: 500, startedAt: "2026-09-28T00:00:00Z", children: [],
+      events: [
+        event(1, "TOOL_STARTED", "terminal", "ls"),
+        event(2, "TOOL_COMPLETED", "terminal", raw),
+        event(3, "TOOL_STARTED", "web_search", query),
+        event(4, "TOOL_COMPLETED", "web_search", query),
+        event(5, "TOOL_STARTED", "mcp__ledger__query", "select"),
+        event(6, "TOOL_COMPLETED", "mcp__ledger__query", raw),
+      ],
+    },
+  } }));
+  await send(page, "원본 보기 검사");
+  const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+  await expect(block).toBeVisible({ timeout: 30_000 });
+  await block.getByTestId("activity-toggle").click();
+
+  const terminal = block.locator('[data-tool="terminal"]');
+  await expect(terminal).toContainText("작업을 했어요");
+  await expect(terminal).toContainText("2초");
+  await expect(terminal.getByText(raw)).toBeHidden();
+  // 검색어는 사람 말이라 줄에 바로 보인다.
+  await expect(block.locator('[data-tool="web_search"]').getByText(query)).toBeVisible();
+  await expect(block.locator('[data-tool="web_search"]').getByTestId("activity-raw")).toHaveCount(0);
+  // 표에 없는 MCP 도구는 이름 원문을 줄에 그리지 않는다.
+  const connected = block.locator('[data-tool="mcp__ledger__query"]');
+  await expect(connected).toContainText("연결된 서비스를 썼어요");
+  await expect(connected.getByText("mcp__ledger__query")).toBeHidden();
+
+  await terminal.getByTestId("activity-raw").getByText("원본 보기").click();
+  await expect(terminal.getByText(raw)).toBeVisible();
+  await expect(terminal.getByTestId("activity-raw")).toContainText("terminal");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(0);
 });

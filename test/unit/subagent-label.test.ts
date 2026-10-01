@@ -21,7 +21,7 @@ test("이름이 있으면 목표보다 우선하고 앞뒤 공백을 지운다",
 });
 
 test("이름과 목표가 모두 없으면 기본 문구를 쓴다", () => {
-  assert.equal(subagentLabel(null, null), "하위 에이전트");
-  assert.equal(subagentLabel(undefined, undefined), "하위 에이전트");
-  assert.equal(subagentLabel(" ", " "), "하위 에이전트");
+  assert.equal(subagentLabel(null, null), "도우미");
+  assert.equal(subagentLabel(undefined, undefined), "도우미");
+  assert.equal(subagentLabel(" ", " "), "도우미");
 });

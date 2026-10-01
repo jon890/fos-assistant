@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { describeError } from "@/components/error-message";
+import { Notice } from "@/components/ui/notice";
 import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
 import { AgentSkillsSection } from "./agent-skills-section";
@@ -89,28 +90,25 @@ export function AgentDetailBody({
       {persona === null ? (
         <div className="mx-auto w-full max-w-2xl">
           <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-          <p className="rounded-md border border-border bg-muted p-3 text-sm">
+          <Notice variant="info">
             이 에이전트의 성격은 주인만 볼 수 있어요.
-          </p>
+          </Notice>
         </div>
       ) : (
         <>
           {adminError ? (
             <div className="mx-auto mb-8 w-full max-w-2xl">
-              <p
-                role="alert"
-                className="rounded-md border border-border bg-muted p-3 text-sm"
-              >
+              <Notice variant="error" role="alert">
                 관리 정보를 불러오지 못했어요. {adminError}
-              </p>
+              </Notice>
             </div>
           ) : null}
           {connectorManaged ? (
             <div className="mx-auto w-full max-w-2xl">
               <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-              <p className="rounded-md border border-border bg-muted p-3 text-sm">
+              <Notice variant="info">
                 연결 화면에서 이 에이전트의 연결 상태를 관리해요.
-              </p>
+              </Notice>
             </div>
           ) : persona.ok ? (
             <PersonaEditor
@@ -121,12 +119,9 @@ export function AgentDetailBody({
           ) : (
             <div className="mx-auto w-full max-w-2xl">
               <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-              <p
-                role="alert"
-                className="rounded-md border border-border bg-muted p-3 text-sm"
-              >
+              <Notice variant="error" role="alert">
                 {persona.message}
-              </p>
+              </Notice>
             </div>
           )}
         </>
@@ -144,9 +139,9 @@ export function AgentDetailBody({
           className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
         >
           <h2 className="font-semibold">도구</h2>
-          <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">
+          <Notice variant="error" role="alert" className="mt-3">
             {tools.message}
-          </p>
+          </Notice>
         </section>
       )}
       {connectorManaged || skills === null ? null : skills.ok ? (
@@ -157,9 +152,9 @@ export function AgentDetailBody({
           className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
         >
           <h2 className="font-semibold">스킬</h2>
-          <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">
+          <Notice variant="error" role="alert" className="mt-3">
             {skills.message}
-          </p>
+          </Notice>
         </section>
       )}
       {adminAgent && visibility ? (
