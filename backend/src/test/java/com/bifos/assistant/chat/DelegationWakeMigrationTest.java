@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,6 +60,43 @@ class DelegationWakeMigrationTest {
                 assertThat(row.next()).isTrue();
                 assertThat(row.getInt(1)).isZero();
             }
+        }
+    }
+
+    @Test
+    void V37은_이미_끝난_위임_실행만_전한_것으로_채우고_도는_위임과_위임이_아닌_실행은_비워_둔다() throws SQLException {
+        String before = "jdbc:h2:mem:delegation-wake-backfill-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
+        Flyway.configure().dataSource(before, "sa", "").locations("classpath:db/migration").target("36").load().migrate();
+        try (Connection connection = DriverManager.getConnection(before, "sa", "");
+                Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO agent_execution
+                        (id, user_id, conversation_id, profile_name, cost_mode, status, delegation_key, started_at, finished_at)
+                    VALUES
+                        (901, 1, 1, 'worker', 'SUBSCRIPTION', 'SUCCEEDED', 'k-succeeded',
+                            TIMESTAMP '2026-01-01 00:00:00', TIMESTAMP '2026-01-01 00:01:00'),
+                        (902, 1, 1, 'worker', 'SUBSCRIPTION', 'FAILED', 'k-failed-no-finish',
+                            TIMESTAMP '2026-01-01 00:00:00', NULL),
+                        (903, 1, 1, 'worker', 'SUBSCRIPTION', 'RUNNING', 'k-running',
+                            TIMESTAMP '2026-01-01 00:00:00', NULL),
+                        (904, 1, 1, 'dad', 'SUBSCRIPTION', 'SUCCEEDED', NULL,
+                            TIMESTAMP '2026-01-01 00:00:00', TIMESTAMP '2026-01-01 00:01:00')
+                    """);
+
+            Flyway.configure().dataSource(before, "sa", "").locations("classpath:db/migration").load().migrate();
+
+            assertThat(deliveredAt(statement, 901)).as("끝난 위임은 끝난 시각으로 채운다")
+                    .isEqualTo(Timestamp.valueOf("2026-01-01 00:01:00"));
+            assertThat(deliveredAt(statement, 902)).as("끝난 시각이 없는 끝난 위임도 채운다").isNotNull();
+            assertThat(deliveredAt(statement, 903)).as("도는 위임은 기동 정리 뒤에 전하도록 비워 둔다").isNull();
+            assertThat(deliveredAt(statement, 904)).as("위임이 아닌 실행").isNull();
+        }
+    }
+
+    private static Timestamp deliveredAt(Statement statement, long id) throws SQLException {
+        try (ResultSet row = statement.executeQuery("SELECT result_delivered_at FROM agent_execution WHERE id = " + id)) {
+            assertThat(row.next()).as("실행 %d", id).isTrue();
+            return row.getTimestamp(1);
         }
     }
 

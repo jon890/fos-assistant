@@ -12,11 +12,16 @@ import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -40,6 +45,14 @@ public class DelegationWakeService {
     /** 자동 turn 한도에 닿았을 때 대화에 남기는 알림 줄이다. 같은 줄이 연달아 쌓이지 않게 글로 견준다. */
     static final String LIMIT_NOTICE = "자동으로 이어 가는 횟수를 넘었어요. 이어서 하려면 메시지를 보내 주세요";
 
+    /**
+     * 결과를 전하기 전에 실패한 자동 turn 뒤에 다시 열지 않고 기다리는 시간이다.
+     *
+     * <p>결과가 그대로 남으므로, 기다리지 않으면 그 turn 을 닫는 자리에서 같은 결과로 곧바로 다시 열어 같은 실패를 쉬지 않고
+     * 되풀이한다. 이 시간이 지난 뒤의 사건, turn 닫기, 기동 훑기가 다시 시도한다.
+     */
+    static final Duration FAILURE_BACKOFF = Duration.ofSeconds(30);
+
     private final DelegationWakeProperties properties;
     private final TurnCancellation turns;
     private final ChatService chat;
@@ -50,6 +63,8 @@ public class DelegationWakeService {
     private final AgentService agents;
     private final FlowRegistry flows;
     private final AppUserRepository users;
+    /** 결과를 전하기 전에 자동 turn 이 실패한 대화와 그 시각이다. */
+    private final Map<Long, Instant> lastFailures = new ConcurrentHashMap<>();
 
     public DelegationWakeService(
             DelegationWakeProperties properties,
@@ -116,6 +131,9 @@ public class DelegationWakeService {
         if (!properties.enabled() || executions.findUndeliveredResults(conversationId).isEmpty()) {
             return;
         }
+        if (inFailureBackoff(conversationId)) {
+            return;
+        }
         Optional<Conversation> found = conversations.findById(conversationId);
         if (found.isEmpty() || found.get().deletedAt() != null) {
             return;
@@ -158,19 +176,58 @@ public class DelegationWakeService {
         }
     }
 
-    /** 자동 turn 을 돌리고 잠금을 푼다. 푸는 자리에서 닫기 리스너가 그 사이 쌓인 결과를 이어서 연다. */
+    /**
+     * 자동 turn 을 돌리고 잠금을 푼다. 푸는 자리에서 닫기 리스너가 그 사이 쌓인 결과를 이어서 연다.
+     *
+     * <p>결과를 전했다고 적기 전에 실패하면 잠금을 풀기 전에 실패 시각을 적는다. 그래야 닫기 리스너가 같은 결과로 곧바로
+     * 다시 열지 않는다.
+     */
     private void runAutoTurn(CurrentUser owner, Long conversationId, TurnCancellation.TurnHandle handle) {
+        List<Long> pending = List.of();
         try {
+            pending = executions.findUndeliveredResults(conversationId).stream()
+                    .map(AgentExecution::id)
+                    .toList();
             chat.runDelegationResults(owner, conversationId, handle, event -> hub.publish(conversationId, event));
+            lastFailures.remove(conversationId);
         } catch (ApiException ex) {
             log.warn("자동 turn 이 실패했다 conversationId={} code={}", conversationId, ex.code(), ex);
+            rememberFailureIfUndelivered(conversationId, pending);
             hub.publish(conversationId, ChatEvent.error(ex.code().name(), ex.getMessage()));
         } catch (RuntimeException ex) {
             log.error("자동 turn 이 예외로 끝났다 conversationId={}", conversationId, ex);
+            rememberFailureIfUndelivered(conversationId, pending);
             hub.publish(conversationId, ChatEvent.error("INTERNAL_ERROR", "internal error"));
         } finally {
             turns.close(handle);
         }
+    }
+
+    /** 이 turn 이 전하려던 결과가 아직 남아 있으면 실패 시각을 적는다. 전한 뒤의 실패는 같은 결과로 다시 열지 않으므로 적지 않는다. */
+    private void rememberFailureIfUndelivered(Long conversationId, List<Long> pending) {
+        try {
+            boolean stillUndelivered = executions.findUndeliveredResults(conversationId).stream()
+                    .anyMatch(result -> pending.contains(result.id()));
+            if (stillUndelivered) {
+                lastFailures.put(conversationId, Instant.now());
+            }
+        } catch (RuntimeException ex) {
+            // 남았는지 모르면 남은 것으로 본다. 쉬지 않고 다시 여는 것보다 잠시 늦게 전하는 편이 낫다.
+            log.warn("자동 turn 이 전하려던 결과가 남았는지 읽지 못했다 conversationId={}", conversationId, ex);
+            lastFailures.put(conversationId, Instant.now());
+        }
+    }
+
+    private boolean inFailureBackoff(Long conversationId) {
+        Instant failedAt = lastFailures.get(conversationId);
+        if (failedAt == null) {
+            return false;
+        }
+        if (failedAt.plus(FAILURE_BACKOFF).isAfter(Instant.now())) {
+            return true;
+        }
+        lastFailures.remove(conversationId, failedAt);
+        return false;
     }
 
     /**

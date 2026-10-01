@@ -174,6 +174,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   /** 보는 중일 때만 채운다. `observing` 을 비우는 자리에서 함께 비운다. */
   const observedTurnFilter = useRef<ObservedTurnFilter | null>(null);
   const autoTurn = useRef<AutoTurn | null>(null);
+  /**
+   * 이 창이 보낸 turn(보내기, 다시 생성)이 도는 동안 그 turn 의 임시 식별자를 담는다.
+   *
+   * <p>그동안 대화 단위 SSE 로 온 일은 `conversationTasks` 에 순서대로 보류한다. 곧바로 그리면 자동 turn 의
+   * 작업 과정과 답 줄을 보낸 turn 의 끝 처리(작업 과정 비우기, 이력 다시 읽기, 입력창 풀기)가 지운다.
+   */
+  const sentTurnToken = useRef<string | null>(null);
+  const conversationTasks = useRef<(() => Promise<void>)[]>([]);
+  const drainingConversationTasks = useRef(false);
   const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -235,6 +244,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setObserving(null);
     observedTurnFilter.current = null;
     autoTurn.current = null;
+    sentTurnToken.current = null;
+    conversationTasks.current = [];
     setActivity(null);
     setLiveExpanded(false);
     liveExpandedRef.current = false;
@@ -281,7 +292,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         if (selectionVersion.current === version) {
           setTurns((previous) => {
             const loadedIds = new Set(messages.map((turn) => turn.id));
-            return [...messages, ...previous.filter((turn) => !loadedIds.has(turn.id))];
+            // 서버 번호가 있는 줄만 잇는다. 문자열 번호의 임시 줄은 저장된 줄과 겹쳐 보일 수 있어 버린다.
+            return [...messages, ...previous.filter((turn) => typeof turn.id === "number" && !loadedIds.has(turn.id))];
           });
         }
       } catch (reason) {
@@ -430,20 +442,27 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    * 대화가 열려 있는 동안 대화 단위 SSE 를 받는다. 위임 결과로 열린 자동 turn 이 여기로 온다.
    *
    * <p>서버가 끊거나 연결이 깨지면 잠시 뒤 다시 연다. 대화를 옮기거나 화면이 사라지면 연결을 끊는다. 4xx 는
-   * 다시 열어도 같으므로 다시 열지 않는다.
+   * 다시 열어도 같으므로 다시 열지 않는다. 다시 연 연결에서는 `resumeAfterReconnect` 로 끊긴 사이의 일을 맞춘다.
    */
   useEffect(() => {
     if (conversationId === null) return;
     const id = conversationId;
     const controller = new AbortController();
     let timer: number | undefined;
+    let attempts = 0;
     const connect = async () => {
       let reconnect = true;
+      const reconnected = attempts > 0;
+      attempts += 1;
       try {
         const response = await fetch(`/api/chat/conversations/${id}/events`,
           { cache: "no-store", signal: controller.signal });
         if (response.ok) {
-          await readEventStream<ChatEvent>(response, (event) => applyConversationEvent(id, event));
+          if (reconnected) {
+            await runConversationTask(() => resumeAfterReconnect(id));
+          }
+          await readEventStream<ChatEvent>(response,
+            (event) => runConversationTask(() => applyConversationEvent(id, event)));
         } else {
           reconnect = response.status >= 500;
         }
@@ -521,6 +540,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setObserving(null);
     observedTurnFilter.current = null;
     autoTurn.current = null;
+    sentTurnToken.current = null;
+    conversationTasks.current = [];
     setComposerGeneration((generation) => generation + 1);
     setConversationId(null);
     setFreshStart(true);
@@ -744,6 +765,86 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   }
 
   /**
+   * 대화 단위 SSE 로 온 일을 처리한다. 보낸 turn 이 돌거나 보류한 일을 처리하는 중이면 순서대로 보류한다.
+   */
+  async function runConversationTask(task: () => Promise<void>) {
+    if (sentTurnToken.current !== null || drainingConversationTasks.current) {
+      conversationTasks.current.push(task);
+      return;
+    }
+    await task();
+  }
+
+  /**
+   * 대화 단위 SSE 를 다시 연 뒤 끊긴 사이의 일을 맞춘다.
+   *
+   * <p>받던 자동 turn 이 없으면 이력을 한 번 다시 읽어 그사이 열리고 끝난 자동 turn 을 보인다. 받던 자동 turn 이
+   * 있으면 그 끝 사건을 놓쳤을 수 있어 도는 turn 을 묻는다. 돌고 있으면 보는 중 상태로 넘겨 폴링이 끝을 알리고,
+   * 돌지 않으면 그 turn 을 정리하고 이력을 다시 읽어 입력창을 푼다. 묻지 못하면 돌지 않는 것으로 본다.
+   */
+  async function resumeAfterReconnect(id: string) {
+    if (conversationIdRef.current !== id) return;
+    const version = selectionVersion.current;
+    const current = autoTurn.current;
+    if (current === null) {
+      await refreshMessages(id, version).catch(() => {});
+      return;
+    }
+    let running: RunningTurn | null = null;
+    try {
+      const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
+      if (response.ok) {
+        running = await readPayload<RunningTurn>(response);
+      } else if (response.status === 404) {
+        const payload = await readPayload<ErrorPayload>(response).catch(() => null);
+        if (payload?.code === "CONVERSATION_NOT_FOUND") {
+          if (selectionVersion.current === version) setNotFound(true);
+          return;
+        }
+      }
+    } catch {
+      // 아래에서 돌지 않는 것으로 본다.
+    }
+    if (selectionVersion.current !== version || autoTurn.current !== current) return;
+    autoTurn.current = null;
+    if (running?.running) {
+      beginObserving(id, version, running);
+      return;
+    }
+    settleFinishedActivity(currentExecutionId.current);
+    setActivity(null);
+    setFlowIsSlow(false);
+    currentExecutionId.current = null;
+    setExecutionId(null);
+    await Promise.all([refresh(), refreshMessages(id, version).catch(() => {})]);
+    if (selectionVersion.current === version) setSending(false);
+  }
+
+  /**
+   * 보낸 turn 의 끝 처리가 모두 끝났다. 그동안 보류한 대화 단위 SSE 의 일을 받은 순서대로 처리한다.
+   *
+   * <p>그사이 대화를 옮겼거나 다음 turn 을 보냈으면 식별자가 달라 아무것도 하지 않는다.
+   */
+  async function finishSentTurn(token: string) {
+    if (sentTurnToken.current !== token) return;
+    sentTurnToken.current = null;
+    if (drainingConversationTasks.current) return;
+    drainingConversationTasks.current = true;
+    try {
+      while (sentTurnToken.current === null && conversationTasks.current.length > 0) {
+        const task = conversationTasks.current.shift()!;
+        try {
+          await task();
+        } catch {
+          // 사건 하나를 그리지 못해도 뒤의 사건은 그린다. 자동 turn 이 끝나면 이력을 다시 읽어 맞춘다.
+        }
+      }
+    } finally {
+      drainingConversationTasks.current = false;
+    }
+  }
+
+  /**
    * 대화 단위 SSE 로 받은 사건을 그린다. 이 스트림에는 위임 결과로 열린 자동 turn 의 사건만 온다.
    *
    * <p>보는 중인 turn 의 사건은 폴링이 그리므로 버린다. `started` 를 받지 못한 채 온 끝 사건은 이력을 다시 읽어
@@ -789,8 +890,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const finish = async () => {
       if (autoTurn.current === current) autoTurn.current = null;
       if (conversationIdRef.current !== id) return;
-      setSending(false);
+      // 이력을 다 읽은 뒤에 입력창을 푼다. 먼저 풀면 그사이 보낸 질문의 임시 줄을 다시 읽은 이력이 덮는다.
       await Promise.all([refresh(), refreshMessages(id, selectionVersion.current).catch(() => {})]);
+      if (conversationIdRef.current === id) setSending(false);
     };
     await applyTurnEvent(event, current.state, {
       onDelta: (textDelta) => {
@@ -823,6 +925,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const savedBefore = savedIdsOf(turns);
     /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
     let handedOff = false;
+    sentTurnToken.current = pendingId;
     setSending(true);
     setError(null);
     setTurnError(null);
@@ -1027,6 +1130,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       return false;
     } finally {
       if (selectionVersion.current === version && !handedOff) setSending(false);
+      void finishSentTurn(pendingId);
     }
   }
 
@@ -1041,6 +1145,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     let handedOff = false;
     /** 끊긴 turn 을 판단하며 이력을 이미 다시 읽었다. 실패 처리에서 한 번 더 읽지 않는다. */
     let historyRead = false;
+    sentTurnToken.current = pendingId;
     setSending(true);
     setError(null);
     setTurnError(null);
@@ -1111,6 +1216,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         setSending(false);
         setFlowIsSlow(false);
       }
+      void finishSentTurn(pendingId);
     }
   }
 

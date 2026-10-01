@@ -3,6 +3,8 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -14,6 +16,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationEventHub;
 import com.bifos.assistant.chat.application.DelegationWakeService;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnMark;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
@@ -43,6 +46,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +56,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 맡긴 일의 결과가 끝나면 부모 대화의 turn 이 자동으로 열리는지 본다.
@@ -70,7 +75,8 @@ class DelegationWakeServiceTest {
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
     @MockitoBean HermesRunEventStream eventStream;
 
-    @Autowired ChatService chat;
+    /** 자동 turn 이 결과를 전하기 전에 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
+    @MockitoSpyBean ChatService chat;
     @Autowired DelegationWakeService wake;
     @Autowired ConversationEventHub hub;
     @Autowired TurnCancellation turns;
@@ -291,6 +297,53 @@ class DelegationWakeServiceTest {
         assertThat(system.conversationId()).isEqualTo(conversation.publicId());
         assertThat(system.messageId()).isEqualTo(
                 messages.findByConversationIdOrderByIdAsc(conversation.id()).getFirst().id());
+    }
+
+    @Test
+    void 사용자_turn_은_done_을_보낸_뒤에_잠금을_풀어_자동_turn_이_그_뒤에_열린다() {
+        AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
+        AtomicReference<ChatEvent> doneEvent = new AtomicReference<>();
+        AtomicReference<TurnMark> markAtDone = new AtomicReference<>();
+
+        chat.stream(dad, conversation.id(), "질문", null, event -> {
+            if ("done".equals(event.type())) {
+                doneEvent.set(event);
+                markAtDone.set(turns.markOf(conversation.id()));
+            }
+        });
+        awaitIdle(conversation.id());
+
+        assertThat(doneEvent.get()).as("사용자 turn 의 done").isNotNull();
+        assertThat(markAtDone.get())
+                .as("done 을 받은 때 잠금은 아직 사용자 turn 의 것이다")
+                .isEqualTo(new TurnMark(true, doneEvent.get().executionId()));
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("사용자 turn 이 닫힌 뒤 자동 turn 이 결과를 전했다").isNotNull();
+        assertThat(stub().received()).as("사용자 turn 과 자동 turn").hasSize(2);
+    }
+
+    @Test
+    void 자동_turn_이_결과를_전하기_전에_실패하면_30초_안에는_같은_결과로_다시_열지_않는다() {
+        doThrow(new IllegalStateException("결과를 전하기 전에 실패"))
+                .when(chat).runDelegationResults(any(), any(), any(), any());
+        AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
+        List<ChatEvent> received = new CopyOnWriteArrayList<>();
+        Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
+        try {
+            finished(done);
+            awaitIdle(conversation.id());
+            finished(done);
+            awaitIdle(conversation.id());
+        } finally {
+            unsubscribe.run();
+        }
+
+        assertThat(received).extracting(ChatEvent::type)
+                .as("닫을 때와 뒤이은 사건이 다시 열지 않아 실패 알림은 하나다")
+                .containsExactly("error");
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("결과는 전하지 않은 채 남는다").isNull();
+        assertThat(turns.markOf(conversation.id()).running()).isFalse();
     }
 
     private void finished(AgentExecution execution) {

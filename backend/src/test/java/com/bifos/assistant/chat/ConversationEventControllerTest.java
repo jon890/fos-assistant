@@ -110,6 +110,16 @@ class ConversationEventControllerTest {
     }
 
     @Test
+    void 구독_직후_사건_없이도_첫_줄을_받는다() throws Exception {
+        CurrentUser dad = signedIn("events-connected", UserRole.ADMIN);
+        MvcResult subscribed = subscribe(conversationOf(dad).publicId());
+
+        String body = subscribed.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(body).as("주석 줄 간격(20초)을 기다리지 않고 받은 응답").startsWith(":connected\n");
+        assertThat(received(subscribed)).isEmpty();
+    }
+
+    @Test
     void 다른_대화에_낸_사건은_받지_않는다() throws Exception {
         CurrentUser dad = signedIn("events-other-dad", UserRole.ADMIN);
         Conversation watched = conversationOf(dad);

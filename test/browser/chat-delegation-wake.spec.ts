@@ -165,3 +165,182 @@ test("대화 단위 SSE 가 닫히면 5초 뒤 다시 연결하고 같은 사건
   expect(waited, `다시 연결하기까지 ${waited}ms 걸렸다`).toBeGreaterThanOrEqual(EVENTS_RECONNECT_MS - 500);
   await expect(page.getByTestId("system-message")).toHaveCount(1);
 });
+
+test("보낸 turn 이 도는 중에 자동 turn 사건이 와도 보낸 답과 알림 줄과 자동 답이 모두 남고 자동 turn 이 끝날 때까지 보내기를 막는다", async ({ page }) => {
+  const conversationId = await createConversation(page, "보낸 turn 과 자동 turn 겹침 검사");
+  const question = `겹침 검사 질문 ${Date.now()}`;
+  let wakeSaved = false;
+  await routeMessagesWithWake(page, conversationId, NOTICE, () => wakeSaved);
+
+  let markUserSent!: () => void;
+  const userSent = new Promise<void>((resolve) => {
+    markUserSent = resolve;
+  });
+  let markEventsDelivered!: () => void;
+  const eventsDelivered = new Promise<void>((resolve) => {
+    markEventsDelivered = resolve;
+  });
+  let releaseAutoDone!: () => void;
+  const autoDoneReleased = new Promise<void>((resolve) => {
+    releaseAutoDone = resolve;
+  });
+  let eventRequests = 0;
+  await page.route(`**/api/chat/conversations/${conversationId}/events`, async (route: Route) => {
+    eventRequests += 1;
+    const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" };
+    if (eventRequests === 1) {
+      // 보낸 turn 의 스트림이 끝나기 전에 자동 turn 의 앞부분을 보낸다. 응답이 닫혀 화면이 다시 연결한다.
+      await userSent;
+      await route.fulfill({ status: 200, headers, body: eventStream([
+        { type: "system", conversationId, messageId: SYSTEM_MESSAGE_ID, text: NOTICE },
+        { type: "started", conversationId, executionId: AUTO_EXECUTION_ID },
+        { type: "delta", text: AUTO_ANSWER },
+      ]) });
+      markEventsDelivered();
+      return;
+    }
+    if (eventRequests === 2) {
+      // 다시 연결한 뒤 시험이 막힌 입력창을 본 다음에 자동 turn 을 끝낸다.
+      await autoDoneReleased;
+      wakeSaved = true;
+      await route.fulfill({ status: 200, headers, body: eventStream([
+        { type: "done", conversationId, messageId: AUTO_ANSWER_ID, executionId: AUTO_EXECUTION_ID },
+      ]) });
+      return;
+    }
+    await new Promise(() => {});
+  });
+  await page.route("**/api/chat/stream", async (route: Route) => {
+    markUserSent();
+    await eventsDelivered;
+    // 화면이 앞의 사건을 읽을 틈을 둔 뒤에 보낸 turn 의 스트림을 돌려준다.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const response = await route.fetch();
+    await route.fulfill({ response });
+  });
+
+  await page.goto(`/chat/${conversationId}`);
+  const answers = page.getByTestId("assistant-message");
+  await expect(answers).toHaveCount(1);
+  await page.getByRole("textbox", { name: "메시지" }).fill(question);
+  await page.getByTestId("composer-shell").getByRole("button", { name: "보내기" }).click();
+
+  // 보낸 turn 의 답이 저장된 이력으로 바뀐 뒤에도 알림 줄과 흘러온 자동 답이 남아 있다.
+  await expect(page.getByTestId("user-message").last()).toContainText(question);
+  await expect(answers.nth(1).locator("time")).toHaveCount(1);
+  await expect(page.getByTestId("system-message")).toHaveText(NOTICE);
+  await expect(answers).toHaveCount(3);
+  await expect(answers.last()).toContainText(AUTO_ANSWER);
+  const composer = page.getByTestId("composer-shell");
+  await expect(composer.getByRole("button", { name: "중지" })).toBeVisible();
+  await expect(composer.getByRole("button", { name: "보내기" })).toHaveCount(0);
+
+  // 다시 연결해 자동 turn 의 끝을 받을 때까지 기다린다.
+  await expect.poll(() => eventRequests, { timeout: EVENTS_RECONNECT_MS + 10_000 }).toBeGreaterThanOrEqual(2);
+  await expect(composer.getByRole("button", { name: "보내기" })).toHaveCount(0);
+  releaseAutoDone();
+
+  await expect(composer.getByRole("button", { name: "보내기" })).toBeVisible();
+  await expect(answers.last().locator("time")).toHaveCount(1);
+  await expect(answers).toHaveCount(3);
+  await expect(answers.last()).toContainText(AUTO_ANSWER);
+  await expect(page.getByTestId("system-message")).toHaveCount(1);
+});
+
+test("대화 단위 SSE 가 다시 연결되면 끊긴 사이 끝난 자동 turn 을 이력에서 읽어 보인다", async ({ page }) => {
+  const conversationId = await createConversation(page, "다시 연결 이력 검사");
+  // 처음 이력을 준 뒤 연결이 끊긴 사이에 자동 turn 이 열리고 끝난 것으로 둔다.
+  let wakeSaved = false;
+  let firstMessagesServed!: () => void;
+  const messagesServed = new Promise<void>((resolve) => {
+    firstMessagesServed = resolve;
+  });
+  await routeMessagesWithWake(page, conversationId, NOTICE, () => wakeSaved, () => firstMessagesServed());
+  // 화면은 다시 연 연결의 응답을 받은 뒤 이력을 읽는다. 그래서 두 번째 요청까지는 사건 없이 응답하고 그 뒤로는 붙잡아 둔다.
+  let eventRequests = 0;
+  await page.route(`**/api/chat/conversations/${conversationId}/events`, async (route: Route) => {
+    eventRequests += 1;
+    if (eventRequests > 2) {
+      await new Promise(() => {});
+      return;
+    }
+    if (eventRequests === 1) {
+      await messagesServed;
+      wakeSaved = true;
+    }
+    await route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
+      body: "",
+    });
+  });
+
+  await page.goto(`/chat/${conversationId}`);
+
+  await expect(page.getByTestId("assistant-message")).toHaveCount(1);
+  await expect(page.getByTestId("system-message")).toHaveCount(0);
+  await expect(page.getByTestId("system-message")).toHaveText(NOTICE, { timeout: EVENTS_RECONNECT_MS + 10_000 });
+  expect(eventRequests, "다시 연결하기 전에 이력을 다시 읽었다").toBeGreaterThanOrEqual(2);
+  const answers = page.getByTestId("assistant-message");
+  await expect(answers).toHaveCount(2);
+  await expect(answers.last()).toContainText(AUTO_ANSWER);
+});
+
+test("자동 turn 을 받던 중 대화 단위 SSE 가 끊겨 끝 사건을 놓쳐도 그 turn 이 돌지 않으면 저장된 답을 보이고 입력창을 푼다", async ({ page }) => {
+  const conversationId = await createConversation(page, "자동 turn 끝 놓침 검사");
+  let wakeSaved = false;
+  await routeMessagesWithWake(page, conversationId, NOTICE, () => wakeSaved);
+  // 처음 읽은 이력이 그려진 뒤에 사건을 보낸다. 이력을 합칠 때 번호 없는 임시 답 줄은 버려지기 때문이다.
+  let releaseEvents!: () => void;
+  const eventsReleased = new Promise<void>((resolve) => {
+    releaseEvents = resolve;
+  });
+  // 끊긴 사이 자동 turn 이 끝났다. 다시 연결해도 끝 사건은 오지 않고, 도는 turn 도 없다.
+  await page.route(`**/api/chat/conversations/${conversationId}/running`, (route: Route) =>
+    route.fulfill({ json: { running: false, executionId: null, startedAt: null } }));
+  let releaseReconnect!: () => void;
+  const reconnectReleased = new Promise<void>((resolve) => {
+    releaseReconnect = resolve;
+  });
+  let eventRequests = 0;
+  await page.route(`**/api/chat/conversations/${conversationId}/events`, async (route: Route) => {
+    eventRequests += 1;
+    const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" };
+    if (eventRequests === 1) {
+      await eventsReleased;
+      await route.fulfill({ status: 200, headers, body: eventStream([
+        { type: "system", conversationId, messageId: SYSTEM_MESSAGE_ID, text: NOTICE },
+        { type: "started", conversationId, executionId: AUTO_EXECUTION_ID },
+        { type: "delta", text: AUTO_ANSWER },
+      ]) });
+      return;
+    }
+    if (eventRequests === 2) {
+      // 시험이 막힌 입력창을 본 다음에 다시 연결을 받는다.
+      await reconnectReleased;
+      wakeSaved = true;
+      await route.fulfill({ status: 200, headers, body: "" });
+      return;
+    }
+    await new Promise(() => {});
+  });
+
+  await page.goto(`/chat/${conversationId}`);
+
+  const answers = page.getByTestId("assistant-message");
+  const composer = page.getByTestId("composer-shell");
+  await expect(answers.first().locator("time")).toHaveCount(1);
+  releaseEvents();
+  await expect(page.getByTestId("system-message")).toHaveText(NOTICE);
+  await expect(answers.last()).toContainText(AUTO_ANSWER);
+  await expect(composer.getByRole("button", { name: "중지" })).toBeVisible();
+  await expect(composer.getByRole("button", { name: "보내기" })).toHaveCount(0);
+  releaseReconnect();
+
+  await expect(composer.getByRole("button", { name: "보내기" })).toBeVisible({ timeout: EVENTS_RECONNECT_MS + 10_000 });
+  expect(eventRequests, "다시 연결하기 전에 입력창이 풀렸다").toBeGreaterThanOrEqual(2);
+  await expect(answers).toHaveCount(2);
+  await expect(answers.last().locator("time")).toHaveCount(1);
+  await expect(answers.last()).toContainText(AUTO_ANSWER);
+  await expect(page.getByTestId("system-message")).toHaveCount(1);
+});

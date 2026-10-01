@@ -323,7 +323,7 @@ public class AgentDelegationService {
             activeDelegations.release();
             handoff.markEnded(failure);
             if (executionId != null) {
-                publishFinished(conversation.id(), executionId);
+                publishFinished(conversation, executionId);
             }
         }
     }
@@ -331,11 +331,12 @@ public class AgentDelegationService {
     /**
      * 위임 실행이 끝났다고 알린다. 받는 쪽이 부모 대화에 전할지 정한다.
      *
-     * <p>받는 쪽의 예외가 이 실행의 정리를 막지 않게, 알리다 난 예외는 경고 로그만 남긴다.
+     * <p>받는 쪽의 예외가 이 실행의 정리를 막지 않게, 알리다 난 예외는 경고 로그만 남긴다. 대화 번호도 이 안에서 읽는다.
+     * 대화가 없어 난 예외가 실행 스레드의 정리 블록 밖으로 나가지 않게 하기 위해서다.
      */
-    private void publishFinished(Long conversationId, Long executionId) {
+    private void publishFinished(Conversation conversation, Long executionId) {
         try {
-            events.publishEvent(new DelegationFinished(conversationId, executionId));
+            events.publishEvent(new DelegationFinished(conversation.id(), executionId));
         } catch (RuntimeException ex) {
             log.warn("위임 실행이 끝났다고 알리지 못했다 executionId={}", executionId, ex);
         }

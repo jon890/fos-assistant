@@ -135,14 +135,21 @@ public class ChatService {
             List<Long> attachmentIds,
             Consumer<ChatEvent> onEvent) {
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
-        if (routed.flow() != null) {
-            runFlow(user, routed, text, new TurnIntent.Fresh(), onEvent, true, null);
-            return;
+        // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
+        // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
+        TurnCancellation.TurnHandle handle = turns.open(user.id(), routed.conversation().id());
+        try {
+            if (routed.flow() != null) {
+                runFlow(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
+                return;
+            }
+            ChatTurn turn = runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
+            onEvent.accept(turn.cancelled()
+                    ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                    : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+        } finally {
+            turns.close(handle);
         }
-        ChatTurn turn = runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, null);
-        onEvent.accept(turn.cancelled()
-                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
     }
 
     /**
@@ -171,6 +178,7 @@ public class ChatService {
         Routed routed = route(owner, conversationId, input, null, List.of());
         if (routed.flow() != null) {
             // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
+            // 깨우는 쪽이 거르는 것과 별개로 남긴다. 거르기와 잠금 사이에 에이전트의 흐름이 바뀌어도 흐름에 이 입력을 보내지 않는다.
             log.warn("흐름이 붙은 대화라 맡긴 일의 결과를 전하지 않는다 conversationId={}", conversationId);
             return;
         }

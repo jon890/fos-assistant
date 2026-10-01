@@ -695,6 +695,8 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 전한 결과는 `result_delivered_at` 으로, 연속 횟수는 `conversation.auto_turn_count` 로 DB 에 남긴다.
 `SYSTEM` 줄 저장과 `result_delivered_at` 기록과 횟수 증가는 한 트랜잭션이다. 그 뒤 turn 이 실패해도 같은 결과로 다시 깨우지 않는다.
 잠금을 잡은 뒤 결과를 다시 읽고, 흐름 대화와 꺼진 에이전트는 잠금을 잡기 전에 거른다. 잡은 뒤 빈손으로 닫으면 닫기 리스너가 곧바로 다시 부른다.
+전하기 전에 실패한 대화는 30초 동안 다시 열지 않는다. 실패 시각은 메모리에만 두며 서버가 다시 뜨면 사라진다.
+사용자 turn 은 `done` 이나 `stopped` 를 보낸 뒤 잠금을 닫는다. 그보다 먼저 닫으면 자동 turn 의 사건이 사용자 turn 의 끝보다 먼저 화면에 간다.
 
 ### 깊이와 동시 한도
 
@@ -729,6 +731,7 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |
 | `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
 | `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
+| `GET /api/v1/chat/conversations/{id}/events` | 대화 단위 SSE. 끝나지 않는다. 위임 결과로 열린 자동 turn 의 사건과 `system` 사건만 싣는다. 연결 직후 `: connected` 주석 줄을 보내 사건이 없어도 응답 헤더가 바로 나가고, 20초마다 `: ping` 을 보낸다 |
 | `GET /api/v1/chat/conversations/{id}/running` | 이 대화에 지금 도는 turn. `{ "running", "executionId", "startedAt" }`. 돌지 않으면 `running` 이 false 이고 나머지는 null |
 | `GET /api/v1/chat/conversations/by-number/{number}` | 옛 주소 `/c/{번호}` 를 넘겨 주려고 번호로 대화를 찾는다. `{ "id": "<공개 식별자>" }` |
 
