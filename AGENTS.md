@@ -165,8 +165,14 @@ scripts/quality.sh check
 GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 여덟 검사를 돌린다.
 PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사하고, main 에 push 하면 main 을 검사한다.
 각 검사는 독립된 job 으로 나란히 돈다. 브라우저를 뺀 검사는 로컬 직접 확인과 위 규칙을 그대로 유지한다.
-브라우저 검사는 `browser-mobile` 과 `browser-desktop` 으로 나눠 두 폭을 나란히 검사한다.
-**브라우저 검사는 PR 에서도 CI 가 돌리고, 그 결과가 머지 전 확인이다.** 한 번에 7~11분이 걸려 PR 의 대기 시간이 늘지만, 로컬에서 여러 작업의 전체 브라우저 검사를 차례로 돌리는 것보다 빠르고 이 머신의 부하에 흔들리지 않는다. main 에서 실패하면 바로 고친다.
+브라우저 검사는 폭마다 파일 단위 shard 4개로 나눠 총 8개 job 을 나란히 돌린다.
+각 job 은 별도 runner 에서 웹과 Control Plane, H2 메모리 DB 를 새로 띄우며 job 안에서는 직렬로 검사한다.
+필수 검사 `browser-mobile` 과 `browser-desktop` 은 해당 폭의 shard 4개가 모두 성공했는지 판정한다.
+실패, 취소, 누락된 shard 가 있으면 통과하지 않는다. 실패 trace 와 폭별 shard JSON 결과는 CI artifact 에 남는다.
+**브라우저 검사는 PR 에서도 CI 가 돌리고, 그 결과가 머지 전 확인이다.**
+main push 와 한국 시간 매일 04:23 에도 전체 검사를 돌린다. 변경이 없는 날에도 외부 의존성과 흔들리는 검사를 확인한다.
+main 과 매일 실행의 실패는 `브라우저 실패` 라벨 이슈에 파일과 폭별로 모으며, 같은 파일의 열린 이슈에는 재발 횟수와 실행 링크를 댓글로 남긴다.
+PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 한 번에 처리하고, 흔들리는 검사는 고치거나 까닭을 적어 닫는다.
 
 공개 정보 검사는 repository secret `PUBLIC_REPO_DENYLIST` 를 값 목록으로 쓴다.
 `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣어야 한다.

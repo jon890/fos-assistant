@@ -209,6 +209,17 @@ BROWSER_WEB_SERVER=dev pnpm test:browser
 `test/browser` 는 웹과 Chromium 을 띄워 화면을 검사한다.
 `mobile` 과 `desktop` 두 폭에서 돌고 각각 390px 와 1280px 다.
 
+PR 과 main 의 CI 는 폭마다 `--shard=1/4` 부터 `--shard=4/4` 까지 별도 runner 에서 나란히 돌린다.
+`fullyParallel: false` 와 `workers: 1` 은 유지하므로 파일을 나누되 파일 안의 검사와 서버 상태는 직렬로 처리한다.
+globalSetup 은 shard 마다 새 Control Plane 과 H2 메모리 DB, 실행별 임시 파일을 만든다.
+필수 검사 `browser-mobile` 과 `browser-desktop` 은 해당 폭의 shard 4개가 모두 성공해야 통과한다.
+JSON 결과와 실패 trace 는 폭과 shard 번호를 붙인 CI artifact 에서 읽는다.
+
+한국 시간 매일 04:23 에 main 전체를 다시 검사하며 변경이 없는 날도 건너뛰지 않는다.
+main push 와 매일 실행의 실패는 `브라우저 실패` 이슈에 파일과 폭별로 모은다.
+같은 파일의 열린 이슈에는 재발 횟수와 실행 링크를 남긴다. PR 실패는 이슈를 만들지 않고 그 PR 에서 고친다.
+모인 실패는 한 번에 고치고, 흔들리는 검사는 고치거나 까닭을 적어 이슈를 닫는다.
+
 **운영 코드에 시험용 문을 만들지 않는다.**
 로그인은 테스트가 NextAuth 세션 쿠키를 직접 만들어 넣는다.
 테스트일 때만 켜지는 우회를 두면 그 문이 운영에도 남는다.
