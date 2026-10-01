@@ -9,7 +9,7 @@
 import { call, expect, expectStatus, fail, step, type Scenario } from "../harness.ts";
 import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK } from "../fake-hermes.ts";
 import { DAD_BINDING } from "./binding.ts";
-import { callTool, contextFor, openStream, parsed, within, type Status } from "./delegation.ts";
+import { callTool, contextFor, openStream, parsed, within, type Status } from "../delegation-support.ts";
 
 type ConnectionView = { status: string; agentCode: string | null };
 type Tree = { root: { children: { executionId: number; status: string }[] } };

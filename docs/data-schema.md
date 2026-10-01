@@ -247,6 +247,34 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 `sender_user_id` 는 화면이 보낸 사람 이름을 보이기 위한 것이다.
 대화는 여전히 주인 한 사람의 것이고, 여러 사람이 같은 대화를 읽고 쓰는 것은 아직 만들지 않았다.
 
+## chat_pending_message
+
+turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. 보내지기 전까지만 있다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 쌓인 순서다. 합칠 때 이 순서로 잇는다 |
+| `conversation_id` | BIGINT | |
+| `user_id` | BIGINT | 이 글을 보낸 사용자. 합친 `USER` 행의 `sender_user_id` 가 된다 |
+| `content` | LONGTEXT | 글. 한 행은 8000자까지다 |
+| `held` | BOOLEAN NOT NULL DEFAULT FALSE | 멈춰 두었다. 앞 turn 을 중지했거나 보내려다 저장 전에 실패했다 |
+| `created_at` | DATETIME(6) | |
+
+색인은 `(conversation_id, id)` 다.
+
+**보낸 행은 지운다.** 대기 행을 지우는 것과 합친 글을 `chat_message` 의 `USER` 행으로 저장하는 것이 한 트랜잭션이다.
+보낸 글은 `chat_message` 에 남으므로 여기에 이력을 두지 않는다.
+취소한 행도 지운다.
+
+한 대화에 5행까지 둔다. 사이에 빈 줄 하나를 두고 이은 길이가 8000자를 넘지 못한다.
+상한은 표의 제약이 아니라 `PendingMessageService` 가 더할 때 본다.
+
+**한 행이라도 `held` 가 참이면 그 대화의 대기 행을 모두 보내지 않는다.**
+사용자가 「보내기」 를 누르면 그 대화의 `held` 를 모두 내린다.
+
+사진은 담지 않는다.
+근거는 [ADR-048](adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 에 있다.
+
 ## agent_execution
 
 에이전트가 한 번 답한 기록이다.
@@ -539,6 +567,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 대화도 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
 메시지와 실행 기록과 Hermes session 은 그대로 둔다.
+아직 보내지 않은 대기 메시지(`chat_pending_message`)는 함께 지운다. 지운 대화에는 보낼 곳이 없다.
 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 실행 기록이 에이전트와 대화를 가리키고 있고, 기록은 남아야 한다.
 

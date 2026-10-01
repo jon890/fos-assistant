@@ -116,7 +116,7 @@ test("대화를 연 채로 자동 turn 이 오면 알림 줄과 답이 보인다
   await expect(answer.locator("time")).toHaveCount(1);
   await expect(page.getByTestId("system-message")).toHaveCount(1);
   await expect(page.getByTestId("assistant-message")).toHaveCount(2);
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "보내기" })).toBeVisible();
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
 });
 
 test("저장된 알림 줄은 버튼 없는 한 줄로 보이고 그 뒤 답은 다시 만들 수 없으며 가로로 넘치지 않는다", async ({ page }) => {
@@ -166,7 +166,7 @@ test("대화 단위 SSE 가 닫히면 5초 뒤 다시 연결하고 같은 사건
   await expect(page.getByTestId("system-message")).toHaveCount(1);
 });
 
-test("보낸 turn 이 도는 중에 자동 turn 사건이 와도 보낸 답과 알림 줄과 자동 답이 모두 남고 자동 turn 이 끝날 때까지 보내기를 막는다", async ({ page }) => {
+test("보낸 turn 이 도는 중에 자동 turn 사건이 와도 보낸 답과 알림 줄과 자동 답이 모두 남고 자동 turn 이 끝날 때까지 중지를 보인다", async ({ page }) => {
   const conversationId = await createConversation(page, "보낸 turn 과 자동 turn 겹침 검사");
   const question = `겹침 검사 질문 ${Date.now()}`;
   let wakeSaved = false;
@@ -233,14 +233,13 @@ test("보낸 turn 이 도는 중에 자동 turn 사건이 와도 보낸 답과 �
   await expect(answers.last()).toContainText(AUTO_ANSWER);
   const composer = page.getByTestId("composer-shell");
   await expect(composer.getByRole("button", { name: "중지" })).toBeVisible();
-  await expect(composer.getByRole("button", { name: "보내기" })).toHaveCount(0);
 
   // 다시 연결해 자동 turn 의 끝을 받을 때까지 기다린다.
   await expect.poll(() => eventRequests, { timeout: EVENTS_RECONNECT_MS + 10_000 }).toBeGreaterThanOrEqual(2);
-  await expect(composer.getByRole("button", { name: "보내기" })).toHaveCount(0);
+  await expect(composer.getByRole("button", { name: "중지" })).toBeVisible();
   releaseAutoDone();
 
-  await expect(composer.getByRole("button", { name: "보내기" })).toBeVisible();
+  await expect(composer.getByRole("button", { name: "중지" })).toHaveCount(0);
   await expect(answers.last().locator("time")).toHaveCount(1);
   await expect(answers).toHaveCount(3);
   await expect(answers.last()).toContainText(AUTO_ANSWER);
@@ -334,10 +333,9 @@ test("자동 turn 을 받던 중 대화 단위 SSE 가 끊겨 끝 사건을 놓�
   await expect(page.getByTestId("system-message")).toHaveText(NOTICE);
   await expect(answers.last()).toContainText(AUTO_ANSWER);
   await expect(composer.getByRole("button", { name: "중지" })).toBeVisible();
-  await expect(composer.getByRole("button", { name: "보내기" })).toHaveCount(0);
   releaseReconnect();
 
-  await expect(composer.getByRole("button", { name: "보내기" })).toBeVisible({ timeout: EVENTS_RECONNECT_MS + 10_000 });
+  await expect(composer.getByRole("button", { name: "중지" })).toHaveCount(0, { timeout: EVENTS_RECONNECT_MS + 10_000 });
   expect(eventRequests, "다시 연결하기 전에 입력창이 풀렸다").toBeGreaterThanOrEqual(2);
   await expect(answers).toHaveCount(2);
   await expect(answers.last().locator("time")).toHaveCount(1);

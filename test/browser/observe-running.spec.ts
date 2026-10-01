@@ -46,8 +46,8 @@ function countRunningRequests(page: Page, conversationId: string): () => number 
 /** 붙잡은 run 을 풀고 보낸 창의 turn 이 끝날 때까지 기다린다. 다음 검사가 붙잡힌 run 에 걸리지 않게 한다. */
 async function releaseAndSettle(page: Page, hermes: FakeHermesControl) {
   await hermes.releaseHeldRun();
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "보내기" }))
-    .toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" }))
+    .toHaveCount(0, { timeout: 30_000 });
 }
 
 function composer(page: Page) {
@@ -129,12 +129,13 @@ test("다른 창에서 답하는 중이면 기다리는 표시와 중지를 보�
     await expect(other.getByLabel("비서의 답을 기다리고 있어요")
       .or(other.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(composer(other).getByRole("button", { name: "중지" })).toBeEnabled({ timeout: 10_000 });
-    await expect(composer(other).getByRole("button", { name: "보내기" })).toHaveCount(0);
+    // 보는 창의 입력창도 잠기지 않는다. 보내기는 중지 옆에 그대로 있다.
+    await expect(composer(other).getByRole("button", { name: "보내기" })).toBeVisible();
 
     await hermes.releaseHeldRun();
     await expect(other.getByTestId("assistant-message")).toHaveCount(1, { timeout: 30_000 });
     await expect(other.getByTestId("observing-notice")).toHaveCount(0);
-    await expect(composer(other).getByRole("button", { name: "보내기" })).toBeVisible();
+    await expect(composer(other).getByRole("button", { name: "중지" })).toHaveCount(0);
   } finally {
     await releaseAndSettle(page, hermes);
   }
@@ -168,7 +169,7 @@ test("도는 turn 조회가 이어 실패하면 오류 없이 기다리는 표�
     }));
     // 세 번 이어 실패해야 거두므로 주기 세 번보다 넉넉히 기다린다.
     await expect(other.getByTestId("observing-notice")).toHaveCount(0, { timeout: OBSERVE_INTERVAL_MS * 3 + 10_000 });
-    await expect(composer(other).getByRole("button", { name: "보내기" })).toBeVisible();
+    await expect(composer(other).getByRole("button", { name: "중지" })).toHaveCount(0);
     await expect(other.getByText("연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.")).toHaveCount(0);
     await expect(other.getByText(FAILED_RUNNING_MESSAGE)).toHaveCount(0);
     await expect(other.getByTestId("turn-error")).toHaveCount(0);
@@ -231,7 +232,7 @@ test("보는 중에 다른 대화로 옮기면 입력창이 풀리고 옮기기 
     await expect(other).toHaveURL(new RegExp(`/chat/${target}$`));
     await expect(other.getByTestId("assistant-message")).toHaveCount(1);
     await expect(other.getByTestId("observing-notice")).toHaveCount(0);
-    await expect(composer(other).getByRole("button", { name: "보내기" })).toBeVisible();
+    await expect(composer(other).getByRole("button", { name: "중지" })).toHaveCount(0);
 
     const afterMove = runningRequests();
     // 요청이 더 가지 않는 것을 보려면 기다릴 조건이 없다. 주기 한 번을 넘길 만큼 고정으로 기다린다.
@@ -283,7 +284,7 @@ test("보낸 창의 스트림이 끊겨도 turn 이 돌면 기다리는 표시�
     await expect(page.getByTestId("user-message")).toHaveCount(1);
     await expect(page.getByTestId("user-message").first()).toContainText(text);
     await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
-    await expect(composer(page).getByRole("button", { name: "보내기" })).toBeVisible();
+    await expect(composer(page).getByRole("button", { name: "중지" })).toHaveCount(0);
   } finally {
     await releaseAndSettle(page, hermes);
   }
@@ -315,7 +316,7 @@ test("스트림이 끊겼을 때 turn 이 이미 끝나 답이 저장됐으면 �
     await expect(page.getByTestId("observing-notice")).toHaveCount(0);
     await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
     await expect(page.getByTestId("turn-error")).toHaveCount(0);
-    await expect(composer(page).getByRole("button", { name: "보내기" })).toBeVisible();
+    await expect(composer(page).getByRole("button", { name: "중지" })).toHaveCount(0);
   } finally {
     await releaseAndSettle(page, hermes);
   }
@@ -335,7 +336,7 @@ test("스트림이 끊기고 turn 이 돌지 않는데 답도 없으면 끊김 �
     await expect(page.getByTestId("observing-notice")).toHaveCount(0);
     await expect(page.getByTestId("assistant-message")).toHaveCount(0);
     await expect(page.getByTestId("user-message")).toHaveCount(1);
-    await expect(composer(page).getByRole("button", { name: "보내기" })).toBeVisible();
+    await expect(composer(page).getByRole("button", { name: "중지" })).toHaveCount(0);
   } finally {
     await releaseAndSettle(page, hermes);
   }

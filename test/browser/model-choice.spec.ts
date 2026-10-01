@@ -61,6 +61,8 @@ async function sendAndWait(page: Page, text: string): Promise<void> {
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.getByTestId("user-message").last()).toContainText(text);
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
+  // 답이 끝난 뒤에 돌려준다. 답이 오는 동안 이어 보낸 글은 대기 메시지로 쌓인다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0, { timeout: 30_000 });
 }
 
 async function expectNoHorizontalScroll(page: Page): Promise<void> {

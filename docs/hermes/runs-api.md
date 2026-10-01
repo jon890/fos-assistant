@@ -10,14 +10,45 @@
 | `GET /v1/runs/{run_id}` | `status`, `session_id`, `model`, `output`, `usage` 를 준다 |
 | `GET /v1/runs/{run_id}/events` | SSE. `tool.started`, `tool.completed`, `subagent.start`, `subagent.complete` 와 종료 사건 |
 | `POST /v1/runs/{run_id}/stop` | 실행 중단 |
+| `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 우리는 아직 부르지 않는다 |
 
 MVP 는 제출과 조회만 쓴다.
 
-**도는 실행에 메시지를 끼워 넣는 경로는 없다.** 실행을 시작한 뒤 바꿀 수 있는 것은 중단뿐이다. 그래서 끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
+**실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단만 쓴다.
+끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
+응답 중에 사용자가 보낸 메시지도 그 turn 이 끝난 뒤 새 실행으로 보낸다([ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)).
 실행 Graph 는 SSE 를 그대로 받아 그리면 되고, 이를 위해 Hermes 를 고칠 일은 없다.
 
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
 Control Plane 이 Memory 를 주입하는 자리가 여기다.
+
+### 도는 실행에 지시를 더하는 `steer`
+
+**이 문서는 2026-10-01 까지 「도는 실행에 메시지를 끼워 넣는 경로는 없다」 고 적었다. 틀린 기술이었다.**
+v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 있다.
+[`delegation.md`](delegation.md) 와 [`upgrades.md`](upgrades.md) 는 이미 `steer` 경로와 `run.steered` 사건을 적고 있었다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 경로 | `POST /v1/runs/{run_id}/steer` |
+| 소유자 판정 | 조회, 중단과 같다([`concurrency.md`](concurrency.md)) |
+| 본문 | `input`, `message`, `text` 중 처음으로 찬 칸의 글을 읽는다 |
+| 받는 때 | 그 run 의 `status` 가 `running` 일 때만. 아니면 409 `run_not_accepting_steer` 다. 중단을 보낸 run 도 이 판정으로 거절한다 |
+| 빈 글 | 400 `invalid_steer_input` |
+| agent 가 받지 않았다 | 409 `steer_not_accepted` |
+| agent 가 예외를 던졌다 | 500 `steer_failed` |
+| 성공 | `{ "object": "hermes.run.steer", "run_id", "accepted": true }` 와 `run.steered` 사건 |
+| 넣지 못하고 끝났다 | 종료 사건과 조회 응답에 `pending_steer` 로 그 글이 실려 온다. 클라이언트가 다시 보내라는 뜻이다 |
+
+조사에서 소스로 읽은 것이 둘 더 있다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
+
+- 받은 글은 곧바로 들어가지 않는다. 다음 도구 묶음이 끝난 뒤 user 행으로 들어간다.
+- 중단(hard interrupt)으로 끝나면 넣지 못한 글은 버려진다.
+
+**Control Plane 은 아직 `steer` 를 부르지 않는다.**
+넣지 못한 글과 버려진 글을 받아 둘 자리가 먼저 있어야 해서 대기열을 먼저 만들었다(ADR-048).
+`steer` 를 쓰기 전에 운영 Hermes 에서 `steer` 와 `pending_steer` 의 왕복을 확인한다.
+가짜 Hermes 에는 이 경로가 없다.
 
 ### `/v1/runs` 는 이미지를 받지 않는다
 

@@ -9,7 +9,7 @@
  *
  * <p>Node 의 TypeScript 실행을 쓰므로 빌드 단계가 없다. Node 22.18 이상이 필요하다.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, rm, writeFile, chmod, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -57,6 +57,7 @@ import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.t
 import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
+import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -114,10 +115,14 @@ const SCENARIOS: readonly Scenario[] = [
   connectorScenario,
   connectorPolicyScenario,
   connectorDelegationScenario,
+  // 에이전트를 하나 만들고 끄므로 에이전트 수를 세는 시나리오 뒤에 둔다.
+  chatQueueScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
   busyScenario,
-  // 막힌 provider 를 만들어 두고 끝나므로 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
+  // 막힌 provider 를 만들어 두고 끝나므로 turn 을 돌리는 시나리오 가운데 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
   modelSelectionScenario,
+  // Control Plane 을 다시 띄우므로 맨 끝에 둔다. 막힌 provider 를 먼저 푼다.
+  chatQueueRestartScenario,
 ];
 
 async function waitForHealth(url: string, logPath: string): Promise<void> {
@@ -161,7 +166,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -176,13 +181,17 @@ function startControlPlane(
   attachmentRoot: string,
   artifactRoot: string,
   skillRoot: string,
+  databaseFile: string,
 ): ChildProcess {
-  const log = createWriteStream(logPath);
+  // 다시 띄울 때 앞 실행의 로그를 지우지 않고 이어 쓴다.
+  const log = createWriteStream(logPath, { flags: "a" });
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
     cwd: join(ROOT, "backend"),
     env: {
       ...process.env,
-      DB_URL: "jdbc:h2:mem:smoke;MODE=MySQL;DB_CLOSE_DELAY=-1",
+      // 파일이라 프로세스를 다시 띄워도 같은 데이터를 읽는다. WRITE_DELAY=0 은 커밋을 바로 디스크에 내려
+      // 강제 종료 직전의 커밋도 남게 한다. 운영 데이터베이스의 커밋과 같은 약속이다.
+      DB_URL: `jdbc:h2:file:${databaseFile};MODE=MySQL;WRITE_DELAY=0`,
       DB_USERNAME: "sa",
       DB_PASSWORD: "",
       SERVER_PORT: String(APP_PORT),
@@ -220,6 +229,59 @@ function startControlPlane(
   return app;
 }
 
+const STOP_TIMEOUT_MS = 30_000;
+
+/** `root` 와 그 자손의 pid 를 모은다. gradle 이 JVM 을 별도 프로세스 그룹으로 띄울 수 있어 그룹만으로는 다 못 잡는다. */
+function processTree(root: number): number[] {
+  const table = execFileSync("ps", ["-axo", "pid=,ppid="], { encoding: "utf-8" });
+  const children = new Map<number, number[]>();
+  for (const line of table.split("\n")) {
+    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    if (pid === undefined || ppid === undefined || Number.isNaN(pid) || Number.isNaN(ppid)) continue;
+    children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  }
+  const found: number[] = [];
+  const pending = [root];
+  while (pending.length > 0) {
+    const next = pending.pop()!;
+    found.push(next);
+    pending.push(...(children.get(next) ?? []));
+  }
+  return found;
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 프로세스 그룹과 그 자손 모두에 SIGKILL 을 보내고 전부 끝날 때까지 기다린다. */
+async function killControlPlane(app: ChildProcess): Promise<void> {
+  if (app.pid === undefined) return;
+  const victims = processTree(app.pid);
+  try {
+    process.kill(-app.pid, "SIGKILL");
+  } catch {
+    // 이미 내려갔다
+  }
+  for (const pid of victims) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // 이미 내려갔다
+    }
+  }
+  const deadline = Date.now() + STOP_TIMEOUT_MS;
+  while (victims.some(alive)) {
+    if (Date.now() > deadline) throw new ScenarioFailure("Control Plane 이 30초 안에 내려가지 않았다");
+    await new Promise((done) => setTimeout(done, 100));
+  }
+}
+
 /** 실패한 자리에서 Control Plane 로그를 보여준다. */
 async function printAppLog(logPath: string): Promise<void> {
   const log = await readFile(logPath, "utf-8").catch(() => "");
@@ -248,6 +310,7 @@ async function main(): Promise<void> {
       [MCP_PRINCIPAL_PROFILE]: PROFILE_KEY,
       [NATIVE_DELEGATION_PROFILE]: PROFILE_KEY,
       [DELEGATION_PROFILE]: PROFILE_KEY,
+      [CHAT_QUEUE_PROFILE]: PROFILE_KEY,
     }, undefined, {
       [DAD_BINDING.profileName]: ["fos-assistant"],
       [AGENT_TOOLS_PROFILE]: ["fos-assistant"],
@@ -255,19 +318,27 @@ async function main(): Promise<void> {
       [MCP_PRINCIPAL_PROFILE]: ["fos-assistant"],
       [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
       [DELEGATION_PROFILE]: ["fos-assistant"],
+      [CHAT_QUEUE_PROFILE]: ["fos-assistant"],
     }, skillRoot);
     console.log(`   ${hermes.baseUrl}`);
 
     console.log("== Control Plane 기동");
-    app = startControlPlane(
-      await writeProfileKeys(work),
-      hermes.baseUrl,
-      logPath,
-      join(work, "attachments"),
-      await makeArtifactRoot(work),
-      skillRoot,
-    );
-    await waitForHealth(`http://127.0.0.1:${APP_PORT}/actuator/health`, logPath);
+    const keyDir = await writeProfileKeys(work);
+    const artifactRoot = await makeArtifactRoot(work);
+    const hermesBaseUrl = hermes.baseUrl;
+    const healthUrl = `http://127.0.0.1:${APP_PORT}/actuator/health`;
+    const launch = (): ChildProcess =>
+      startControlPlane(
+        keyDir,
+        hermesBaseUrl,
+        logPath,
+        join(work, "attachments"),
+        artifactRoot,
+        skillRoot,
+        join(work, "smoke"),
+      );
+    app = launch();
+    await waitForHealth(healthUrl, logPath);
     console.log(`   http://127.0.0.1:${APP_PORT}`);
 
     const context: Context = {
@@ -281,6 +352,11 @@ async function main(): Promise<void> {
       hermesBaseUrl: hermes.baseUrl,
       hermesProfileKey: PROFILE_KEY,
       hermes,
+      restartControlPlane: async () => {
+        if (app !== undefined) await killControlPlane(app);
+        app = launch();
+        await waitForHealth(healthUrl, logPath);
+      },
     };
 
     for (const scenario of SCENARIOS) {
