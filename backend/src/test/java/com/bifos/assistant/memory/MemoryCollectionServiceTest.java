@@ -13,7 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 그룹의 collection 목록과 기본 collection 을 확인한다(ADR-051). */
+/** 그룹의 collection 목록과 기본 collection 을 확인한다(ADR-052). */
 @SpringBootTest
 @ActiveProfiles("test")
 class MemoryCollectionServiceTest {

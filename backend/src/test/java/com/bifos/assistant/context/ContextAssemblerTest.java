@@ -44,7 +44,7 @@ class ContextAssemblerTest {
     @Autowired
     AgentRepository agents;
 
-    /** core collection 을 받는 보통 에이전트의 번호다. 저장하면 core 가 딸려 온다(ADR-052). */
+    /** core collection 을 받는 보통 에이전트의 번호다. 저장하면 core 가 딸려 온다(ADR-053). */
     private Long agentId;
 
     @BeforeEach

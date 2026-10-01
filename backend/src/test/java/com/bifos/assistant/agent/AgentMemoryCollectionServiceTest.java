@@ -19,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 에이전트가 받는 Memory collection 과 새 에이전트의 기본 부여를 확인한다(ADR-052). */
+/** 에이전트가 받는 Memory collection 과 새 에이전트의 기본 부여를 확인한다(ADR-053). */
 @SpringBootTest
 @ActiveProfiles("test")
 class AgentMemoryCollectionServiceTest {

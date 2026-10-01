@@ -973,7 +973,7 @@ sequenceDiagram
 | origin 실행의 에이전트가 커넥터 에이전트다 | 요청자 판정에서 먼저 거절한다. 「호출 맥락을 확인할 수 없다」 는 응답이다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)) |
 | 위임받아 도는 에이전트가 읽는다 | 그 에이전트의 허용으로 판정한다. 부르는 쪽의 허용을 물려받지 않는다 |
 
-근거는 [ADR-052](adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+근거는 [ADR-053](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
 
 ### Memory 를 고치고 지울 때
 

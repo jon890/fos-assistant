@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 에이전트가 받는 Memory collection 하나다(ADR-052).
+ * 에이전트가 받는 Memory collection 하나다(ADR-053).
  *
  * <p>줄이 있는 collection 의 Memory 만 그 에이전트의 실행에 실린다. 줄이 하나도 없으면 아무것도 실리지 않는다.
  * 커넥터 에이전트는 줄이 있어도 받지 않는다(ADR-045).

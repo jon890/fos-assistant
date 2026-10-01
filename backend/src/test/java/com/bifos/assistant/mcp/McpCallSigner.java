@@ -148,7 +148,7 @@ public final class McpCallSigner {
     /**
      * 그 profile 의 에이전트로 뿌리 session 에서 도는 실행 줄을 만든다.
      *
-     * <p>{@code memory_read} 는 origin 실행의 에이전트가 받는 collection 만 읽는다(ADR-052). 에이전트가 없는 실행은
+     * <p>{@code memory_read} 는 origin 실행의 에이전트가 받는 collection 만 읽는다(ADR-053). 에이전트가 없는 실행은
      * 아무것도 읽지 못하므로, Memory 를 읽는 검사는 이 메서드로 실행을 만든다.
      */
     public static AgentExecution running(

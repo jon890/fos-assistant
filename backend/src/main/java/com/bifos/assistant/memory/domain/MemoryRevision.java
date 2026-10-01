@@ -23,7 +23,7 @@ import lombok.experimental.Accessors;
 import org.springframework.data.domain.Persistable;
 
 /**
- * 지금 값에서 물러난 판 하나다(ADR-051).
+ * 지금 값에서 물러난 판 하나다(ADR-052).
  *
  * <p>고치면 고치기 전의 값을, 지우면 마지막 값을 남긴다. 지운 뒤에는 {@code memory} 에 줄이 없으므로 누가 볼 수
  * 있는지를 정하는 범위와 주인을 이 줄이 함께 갖는다.

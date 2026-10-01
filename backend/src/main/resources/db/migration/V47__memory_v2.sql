@@ -1,4 +1,4 @@
--- Memory 를 collection, 종류, 꺼내는 방식, 민감도, 판, 출처로 넓힌다(ADR-051).
+-- Memory 를 collection, 종류, 꺼내는 방식, 민감도, 판, 출처로 넓힌다(ADR-052).
 -- 기존 행은 모두 core collection 의 MEMORY 이고 판은 1 이다.
 ALTER TABLE memory ADD COLUMN collection VARCHAR(64) NOT NULL DEFAULT 'core';
 ALTER TABLE memory ADD COLUMN entry_type VARCHAR(20) NOT NULL DEFAULT 'MEMORY';
@@ -64,7 +64,7 @@ CROSS JOIN (
     UNION ALL SELECT 'identity', '신원', 7
 ) d;
 
--- 에이전트가 받는 collection 이다(ADR-052). 줄이 없는 에이전트는 Memory 를 받지 않는다.
+-- 에이전트가 받는 collection 이다(ADR-053). 줄이 없는 에이전트는 Memory 를 받지 않는다.
 CREATE TABLE agent_memory_collection (
     agent_id BIGINT NOT NULL,
     collection VARCHAR(64) NOT NULL,

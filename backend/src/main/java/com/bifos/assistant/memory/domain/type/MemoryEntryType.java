@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.domain.type;
 
-/** Memory 한 줄의 종류다(ADR-051). */
+/** Memory 한 줄의 종류다(ADR-052). */
 public enum MemoryEntryType {
     /** 사실 하나. 지금까지의 Memory 가 모두 이것이다. */
     MEMORY,

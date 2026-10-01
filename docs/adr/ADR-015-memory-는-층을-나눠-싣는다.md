@@ -6,7 +6,7 @@
   에이전트가 요청할 때 준다.
   그 요청은 Control Plane 이 여는 MCP 도구로 받고, 권한은 Control Plane 이 강제한다.
   **항상 층만으로 기본 대화가 성립해야 한다.** 도구는 보조다.
-- **대체된 부분**: 「적용 범위」 의 `always_inject` 한 칸은 [ADR-051](ADR-051-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 이 `retrieval`(`ALWAYS`, `SEARCH`, `ARCHIVE`)로 넓혔다.
+- **대체된 부분**: 「적용 범위」 의 `always_inject` 한 칸은 [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 이 `retrieval`(`ALWAYS`, `SEARCH`, `ARCHIVE`)로 넓혔다.
   참은 `ALWAYS`, 거짓은 `SEARCH` 다. 층을 나눠 싣는 결정은 그대로다.
 
 ### 맥락

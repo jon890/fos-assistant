@@ -60,7 +60,7 @@ public class ContextAssembler {
      * 상한을 거의 채워 색인이 통째로 빠지고, 색인이 없으면 {@code memory_read} 로 읽을 번호도
      * 사라져 에이전트가 나머지 Memory 에 닿을 길이 없어진다.
      *
-     * <p>싣는 것은 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 항목뿐이다(ADR-052). 커넥터 에이전트와
+     * <p>싣는 것은 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 항목뿐이다(ADR-053). 커넥터 에이전트와
      * 찾지 못한 에이전트는 아무것도 받지 않는다.
      *
      * @param agentId 이 실행을 도는 에이전트의 번호

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V47 이 이미 있는 Memory 와 에이전트를 잃지 않고 넓힌 칸으로 옮기는지 본다(ADR-051, ADR-052).
+ * V47 이 이미 있는 Memory 와 에이전트를 잃지 않고 넓힌 칸으로 옮기는지 본다(ADR-052, ADR-053).
  *
  * <p>다른 검사들은 엔티티로 스키마를 만들어 이 옮김을 지나지 않는다. 기존 줄이 있는 데이터베이스에서 마이그레이션이
  * 멈추거나 값을 잘못 옮기면 배포한 뒤 주입 결과가 달라진다.

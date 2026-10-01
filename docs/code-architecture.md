@@ -232,8 +232,8 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | `memory.application.MemoryCollectionService` | 그룹의 collection 목록. 줄이 없는 그룹이면 기본 일곱 개를 넣는다 |
 | `agent.application.AgentMemoryCollectionService` | 에이전트가 받는 collection 읽기, 새 에이전트에 `core` 넣기 |
 
-근거는 [`adr/ADR-051-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md`](adr/ADR-051-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 와
-[`adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md`](adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+근거는 [`adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md`](adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 와
+[`adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md`](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
 
 ### 다음
 

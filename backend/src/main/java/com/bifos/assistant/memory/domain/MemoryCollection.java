@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 그룹이 쓰는 collection 하나다(ADR-051).
+ * 그룹이 쓰는 collection 하나다(ADR-052).
  *
  * <p>화면의 탭과 에이전트 접근 설정이 고를 목록이다. 누가 읽는지는 이 줄이 정하지 않는다. 그것은 범위와 에이전트의
  * 허용 목록이 정한다.

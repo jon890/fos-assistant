@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 그룹이 쓰는 collection 의 목록을 낸다(ADR-051). */
+/** 그룹이 쓰는 collection 의 목록을 낸다(ADR-052). */
 @Service
 @RequiredArgsConstructor
 public class MemoryCollectionService {

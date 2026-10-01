@@ -426,8 +426,8 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 | Memory 를 고치거나 지웠다 | `memory_revision` 에 그 판이 없다 | 맞출 수 없다. 그 사이의 이력은 비어 있다 |
 
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
-[ADR-051](adr/ADR-051-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md),
-[ADR-052](adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+[ADR-052](adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md),
+[ADR-053](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
 
 ## memory_revision
 
@@ -470,10 +470,11 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 
 그룹마다 `core`, `career`, `learning`, `health`, `finance`, `home`, `identity` 일곱 개로 시작한다.
 마이그레이션이 사용자가 있는 그룹에 넣고, 그 뒤에 생긴 그룹은 목록을 처음 읽을 때 넣는다.
+목록을 읽는 `MemoryCollectionService.collectionsOf` 와 판을 읽는 `MemoryService.revisionsOf` 는 아직 부르는 API 가 없다. 화면과 API 를 넓힐 때 연결한다.
 
 ## agent_memory_collection
 
-에이전트가 받는 collection 하나가 한 줄이다. 근거는 [ADR-052](adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+에이전트가 받는 collection 하나가 한 줄이다. 근거는 [ADR-053](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |

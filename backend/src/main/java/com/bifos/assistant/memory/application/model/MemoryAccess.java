@@ -4,7 +4,7 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import java.util.Set;
 
 /**
- * 한 실행이 받을 수 있는 collection 이다(ADR-052).
+ * 한 실행이 받을 수 있는 collection 이다(ADR-053).
  *
  * <p>범위 판정(USER 의 주인, GROUP 의 같은 그룹)과는 따로다. 이 값은 그 위에 collection 과 민감도를 더 거른다.
  *

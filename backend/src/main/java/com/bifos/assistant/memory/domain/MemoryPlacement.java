@@ -5,7 +5,7 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import java.util.regex.Pattern;
 
 /**
- * 항목을 어느 collection 에 어떤 방식과 민감도로 둘지다(ADR-051).
+ * 항목을 어느 collection 에 어떤 방식과 민감도로 둘지다(ADR-052).
  *
  * <p>민감 항목은 항상 싣지 못한다. 항상 층은 고른 항목의 본문이 곧 프롬프트다. 저장할 때 막아 두면 조립 판정이 한 번
  * 틀려도 민감 본문이 나가지 않는다.

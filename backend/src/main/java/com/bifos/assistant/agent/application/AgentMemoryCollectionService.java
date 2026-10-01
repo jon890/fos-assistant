@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 에이전트가 받는 Memory collection 을 읽고, 새 에이전트에 기본 collection 을 준다(ADR-052).
+ * 에이전트가 받는 Memory collection 을 읽고, 새 에이전트에 기본 collection 을 준다(ADR-053).
  *
  * <p>커넥터 에이전트와 찾지 못한 에이전트는 아무것도 받지 않는다. 커넥터 에이전트는 줄이 있어도 같다(ADR-045).
  */

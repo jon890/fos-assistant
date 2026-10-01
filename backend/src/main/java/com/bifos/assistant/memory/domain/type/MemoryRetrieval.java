@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.domain.type;
 
-/** 에이전트가 이 항목에 닿는 방식이다(ADR-051). */
+/** 에이전트가 이 항목에 닿는 방식이다(ADR-052). */
 public enum MemoryRetrieval {
     /** 본문을 매 실행에 싣는다. */
     ALWAYS,

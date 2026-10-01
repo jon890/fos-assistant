@@ -3,7 +3,7 @@ package com.bifos.assistant.agent.application;
 import java.util.Set;
 
 /**
- * 에이전트 하나가 받는 Memory collection 이다(ADR-052).
+ * 에이전트 하나가 받는 Memory collection 이다(ADR-053).
  *
  * @param collections 받는 collection 의 key
  * @param sensitiveCollections 그 가운데 민감 항목까지 받는 collection 의 key
