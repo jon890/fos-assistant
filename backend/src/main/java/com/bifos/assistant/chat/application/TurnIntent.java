@@ -13,7 +13,16 @@ public sealed interface TurnIntent {
             "맡긴 일의 결과가 도착했다. 결과를 사용자에게 정리해 전하고, 이어서 할 일이 있으면 진행한다. "
                     + "아직 끝나지 않은 맡긴 일은 기다리지 말고 답을 마친다.";
 
-    record Fresh() implements TurnIntent {}
+    /** @param pendingIds 이 turn 이 합쳐 보내는 대기 메시지들. 사용자가 바로 보낸 turn 은 비어 있다 */
+    record Fresh(List<Long> pendingIds) implements TurnIntent {
+        public Fresh {
+            pendingIds = List.copyOf(pendingIds);
+        }
+
+        public Fresh() {
+            this(List.of());
+        }
+    }
 
     record Regenerate(ChatMessage previousAnswer, ChatMessage question) implements TurnIntent {}
 

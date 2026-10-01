@@ -129,6 +129,23 @@ public record ChatEvent(
                 null, null, null, null, null, null, null, null);
     }
 
+    /**
+     * 대기 메시지를 합쳐 사용자 메시지로 저장했다. 요청한 연결이 없는 turn 이라 화면이 이 사건으로 그 글을 그린다.
+     *
+     * @param messageId 저장된 {@code USER} 메시지의 번호
+     * @param content 합친 글
+     */
+    public static ChatEvent user(UUID conversationId, Long messageId, String content) {
+        return new ChatEvent("user", content, null, null, conversationId, messageId, null, null, null, null, null,
+                null, null, null, null, null, null, null, null);
+    }
+
+    /** 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. */
+    public static ChatEvent pending(UUID conversationId) {
+        return new ChatEvent("pending", null, null, null, conversationId, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null);
+    }
+
     public static ChatEvent error(String code, String message) {
         return new ChatEvent("error", null, null, null, null, null, null, code, message, null, null,
                 null, null, null, null, null, null, null, null);

@@ -1,19 +1,35 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.application.DelegationFinished;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import jakarta.annotation.PostConstruct;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때 다음 turn 을 정한다.
  *
  * <p>다음 turn 을 정하는 자리는 이것 하나다(ADR-047). 리스너를 여럿 걸면 같은 순간에 turn 잠금을 다투고 순서가 등록
  * 순서에 달리기 때문이다. 잠금은 {@link TurnCancellation} 의 메모리 맵이라 서버 하나를 전제로 한다.
+ *
+ * <p>대기 메시지를 먼저 보고, 보낼 것이 없으면 끝난 위임 결과를 본다. 사용자의 말이 위임 결과보다 먼저 간다.
  */
 @Slf4j
 @Service
@@ -22,14 +38,33 @@ public class NextTurnDispatcher {
 
     private final TurnCancellation turns;
     private final DelegationWakeService wake;
+    private final ChatPendingMessageRepository pendingMessages;
+    private final ConversationRepository conversations;
+    private final AppUserRepository users;
+    private final ChatService chat;
+    private final ConversationEventHub hub;
+    private final TransactionTemplate transactions;
 
     @PostConstruct
     void listenToTurnClose() {
         turns.addCloseListener(this::onTurnClosed);
     }
 
+    /**
+     * 중지로 닫힌 turn 뒤에는 대기 줄이 멈췄다고 화면에 알린다.
+     *
+     * <p>멈춤 표시는 {@link ChatService} 가 잠금을 풀기 전에 이미 적었다. 여기서 적으면 잠금이 풀린 뒤라 그 사이 다른
+     * 스레드가 아직 멈추지 않은 행으로 turn 을 연다.
+     */
     void onTurnClosed(TurnClosed closed) {
-        tryNext(closed.conversationId());
+        Long conversationId = closed.conversationId();
+        if (closed.stopped() && !pendingMessages.findByConversationIdOrderByIdAsc(conversationId).isEmpty()) {
+            conversations
+                    .findById(conversationId)
+                    .ifPresent(conversation ->
+                            hub.publish(conversationId, ChatEvent.pending(conversation.publicId())));
+        }
+        tryNext(conversationId);
     }
 
     @EventListener
@@ -40,14 +75,17 @@ public class NextTurnDispatcher {
     }
 
     /**
-     * 기동 전에 끝났지만 전하지 못한 결과가 있는 대화를 차례로 이어 준다.
+     * 기동 전에 보내지 못한 대기 메시지나 전하지 못한 결과가 있는 대화를 차례로 이어 준다.
      *
-     * <p>기동 정리가 끊긴 위임 실행을 FAILED 로 적은 뒤에 돈다. 그래야 그 결과도 함께 전한다.
+     * <p>기동 정리가 끊긴 위임 실행을 FAILED 로 적은 뒤에 돈다. 그래야 그 결과도 함께 전한다. 멈춰 둔 대기 줄은
+     * 그대로 둔다.
      */
     @EventListener(ApplicationReadyEvent.class)
     @Order(10)
     public void dispatchAfterStartup() {
-        for (Long conversationId : wake.conversationsToWake()) {
+        Set<Long> conversationIds = new LinkedHashSet<>(pendingMessages.findConversationsReadyToSend());
+        conversationIds.addAll(wake.conversationsToWake());
+        for (Long conversationId : conversationIds) {
             try {
                 tryNext(conversationId);
             } catch (RuntimeException ex) {
@@ -58,6 +96,93 @@ public class NextTurnDispatcher {
     }
 
     public void tryNext(Long conversationId) {
+        if (tryPending(conversationId)) {
+            return;
+        }
         wake.tryWake(conversationId);
+    }
+
+    /**
+     * 보낼 대기 메시지가 있으면 turn 잠금을 잡고 새 가상 스레드에서 보낸다.
+     *
+     * @return 대기 메시지가 이 대화의 다음 turn 을 차지했다. 도는 turn 때문에 잠금을 잡지 못한 때도 참이다. 그
+     *     turn 이 닫힐 때 다시 온다
+     */
+    private boolean tryPending(Long conversationId) {
+        List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
+        if (rows.isEmpty() || rows.stream().anyMatch(ChatPendingMessage::held)) {
+            return false;
+        }
+        Optional<Conversation> found = conversations.findById(conversationId);
+        if (found.isEmpty() || found.get().deletedAt() != null) {
+            return false;
+        }
+        Conversation conversation = found.get();
+        Optional<AppUser> user = users.findById(conversation.userId());
+        if (user.isEmpty()) {
+            log.warn("대화 주인이 없어 대기 메시지를 보내지 않는다 conversationId={}", conversationId);
+            return false;
+        }
+        AppUser owner = user.get();
+        TurnCancellation.TurnHandle handle;
+        try {
+            handle = turns.open(owner.id(), conversationId);
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.CONVERSATION_BUSY) {
+                return true;
+            }
+            throw ex;
+        }
+        CurrentUser current =
+                new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
+        List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
+        try {
+            Thread.ofVirtual()
+                    .name("pending-turn-" + conversationId)
+                    .start(() -> runQueuedTurn(current, conversation, handle, ids));
+        } catch (RuntimeException | Error ex) {
+            log.warn("대기 메시지 turn 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
+            turns.close(handle);
+        }
+        return true;
+    }
+
+    /**
+     * 대기 메시지 turn 을 돌리고 잠금을 푼다.
+     *
+     * <p>사용자 메시지를 저장하기 전에 실패하면 대기 행이 그대로 남는다. 잠금을 풀기 전에 그 행을 멈춰 둔다. 그대로
+     * 닫으면 닫기 리스너가 같은 행으로 곧바로 다시 열어 같은 실패를 되풀이한다.
+     */
+    private void runQueuedTurn(
+            CurrentUser owner, Conversation conversation, TurnCancellation.TurnHandle handle, List<Long> ids) {
+        Long conversationId = conversation.id();
+        try {
+            chat.runPendingMessages(owner, conversationId, handle, event -> hub.publish(conversationId, event));
+        } catch (ApiException ex) {
+            log.warn("대기 메시지 turn 이 실패했다 conversationId={} code={}", conversationId, ex.code(), ex);
+            hub.publish(conversationId, ChatEvent.error(ex.code().name(), ex.getMessage()));
+            holdUnsent(conversation, ids);
+        } catch (RuntimeException ex) {
+            log.error("대기 메시지 turn 이 예외로 끝났다 conversationId={}", conversationId, ex);
+            hub.publish(conversationId, ChatEvent.error(ErrorCode.INTERNAL_ERROR.name(), "internal error"));
+            holdUnsent(conversation, ids);
+        } finally {
+            turns.close(handle);
+        }
+    }
+
+    /** 이 turn 이 보내려던 행이 하나라도 남아 있으면 그 대화의 대기 줄을 멈춰 둔다. 보낸 뒤의 실패는 남은 행이 없다. */
+    private void holdUnsent(Conversation conversation, List<Long> ids) {
+        try {
+            boolean unsent = pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
+                    .anyMatch(row -> ids.contains(row.id()));
+            if (!unsent) {
+                return;
+            }
+            transactions.executeWithoutResult(status -> pendingMessages.markHeld(conversation.id(), true));
+            hub.publish(conversation.id(), ChatEvent.pending(conversation.publicId()));
+        } catch (RuntimeException ex) {
+            log.warn("보내지 못한 대기 메시지를 멈춰 두지 못했다 conversationId={}", conversation.id(), ex);
+        }
     }
 }
