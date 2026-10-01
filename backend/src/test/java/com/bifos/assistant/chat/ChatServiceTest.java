@@ -27,6 +27,7 @@ import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -291,7 +292,7 @@ class ChatServiceTest {
                                             .findById(turn.conversationId())
                                             .orElseThrow()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
-            assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
+            assertThat(command.instructions()).contains("GFM", "| --- | --- |").endsWith(AskFormat.GUIDE);
             // 새 대화도 Control Plane 이 정한 session 으로 첫 turn 을 보낸다.
             assertThat(command.sessionId()).startsWith("fos-");
         });
@@ -310,7 +311,11 @@ class ChatServiceTest {
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.latencyMs()).isGreaterThanOrEqualTo(0);
-        assertThat(execution.contextChars()).isZero();
+        String sentInstructions = stub().received().getFirst().instructions();
+        String commonInstructions = sentInstructions.substring(0, sentInstructions.indexOf("\n\n" + AskFormat.GUIDE));
+        assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
+        assertThat(execution.instructionsHash())
+                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
                 .satisfiesExactly(
@@ -335,13 +340,13 @@ class ChatServiceTest {
 
         String instructions = stub().received().getFirst().instructions();
         assertThat(instructions).contains("국수는 맵지 않게 먹는다").endsWith("\n\n" + AskFormat.GUIDE);
-        // 실행 기록의 길이는 Memory 몫만 센다. 형식 안내는 Memory 상한과 무관하게 붙는다.
+        // 실행 기록은 공통 지침과 Memory를 세고, turn 전용 지침은 제외한다.
         assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
                 .isEqualTo((long) (instructions.length() - ("\n\n" + AskFormat.GUIDE).length()));
     }
 
     @Test
-    @DisplayName("커넥터 에이전트의 대화 turn 은 Memory 를 Hermes 에 보내지 않고 실행 기록의 길이도 0 이다")
+    @DisplayName("커넥터 대화는 Memory 없이 공통 표 지침을 보내고 길이와 해시를 기록한다")
     void sendsNoMemoryToHermesForConnectorAgentTurn() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent connector = agents.findAll().getFirst();
@@ -356,10 +361,13 @@ class ChatServiceTest {
         assertThat(instructions)
                 .as("커넥터 에이전트의 turn 이 Hermes 에 보낸 instructions")
                 .doesNotContain("국수는 맵지 않게 먹는다")
-                .isEqualTo(AskFormat.GUIDE);
-        assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
-                .as("실행 기록의 문맥 길이")
-                .isZero();
+                .contains("GFM", "구분 줄")
+                .endsWith("\n\n" + AskFormat.GUIDE);
+        String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + AskFormat.GUIDE));
+        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
+        assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
+        assertThat(execution.instructionsHash())
+                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
     }
 
     @Test
