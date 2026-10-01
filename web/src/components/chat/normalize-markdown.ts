@@ -90,7 +90,8 @@ export function normalizeMarkdown(source: string): string {
       continue;
     }
 
-    if (quoteDepth !== previousQuoteDepth) {
+    // 새 목록 항목은 앞 항목의 표와 이어지지 않는다.
+    if (listPrefix !== "" || quoteDepth !== previousQuoteDepth) {
       previousCells = null;
       tableColumns = null;
     }
