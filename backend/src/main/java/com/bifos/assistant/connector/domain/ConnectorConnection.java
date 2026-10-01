@@ -70,6 +70,10 @@ public class ConnectorConnection {
     @Column(name = "checked_at")
     private Instant checkedAt;
 
+    /** 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 가 선언하지 않은 수다. 그 도구의 호출은 거절된다. */
+    @Column(name = "undeclared_tools", nullable = false)
+    private int undeclaredTools;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -117,12 +121,17 @@ public class ConnectorConnection {
 
     public void beginRegister(Instant now) {
         this.desiredEnabled = false;
+        this.undeclaredTools = 0;
         pending(now);
     }
 
     /** 앞선 대기 값을 지우지 않고 논리 OR 로 누적한다. */
     public void markRestartRequired(boolean restartRequired) {
         this.restartRequired = this.restartRequired || restartRequired;
+    }
+
+    public void recordUndeclaredTools(int count) {
+        this.undeclaredTools = count;
     }
 
     public void beginDisconnect(Instant now) {
@@ -140,6 +149,7 @@ public class ConnectorConnection {
         this.status = ConnectionStatus.DISCONNECTED;
         this.desiredEnabled = false;
         this.fields = ConnectionFields.empty();
+        this.undeclaredTools = 0;
         this.restartRequired = this.restartRequired || restartRequired;
         this.checkedAt = now;
         this.updatedAt = now;

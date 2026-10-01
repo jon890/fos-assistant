@@ -1,6 +1,7 @@
 """dashboard-profile-api 가 `connector.json` 을 읽어 카탈로그로 내는 규칙을 검사한다(ADR-043)."""
 
 import asyncio
+import hashlib
 import importlib.util
 import json
 import logging
@@ -135,8 +136,8 @@ class ConnectorCatalogTest(ConnectorGateCase):
         body = self.catalog()
         self.assertEqual(len(body), 1)
         entry = body[0]
-        self.assertEqual(set(entry), {"id", "title", "description", "fields", "verify", "mcp_server",
-                                      "toolsets", "attachments"})
+        self.assertEqual(set(entry), {"id", "schema", "title", "description", "fields", "verify", "mcp_server",
+                                      "toolsets", "attachments", "tools"})
         # 두 칸이 없는 manifest 는 내장 도구를 열지 않고 사진을 받지 않는다.
         self.assertEqual(entry["toolsets"], [])
         self.assertIs(entry["attachments"], False)
@@ -211,6 +212,10 @@ class ConnectorCatalogTest(ConnectorGateCase):
              lambda value: value["mcpServers"].update(other=value["mcpServers"]["demo"])),
             ("server named after the Control Plane MCP", ".mcp.json",
              lambda value: value.update(mcpServers={"fos-assistant": value["mcpServers"]["demo"]})),
+            ("server whose registered prefix equals the Control Plane MCP", ".mcp.json",
+             lambda value: value.update(mcpServers={"fos_assistant": value["mcpServers"]["demo"]})),
+            ("server that differs from the Control Plane MCP only by case", ".mcp.json",
+             lambda value: value.update(mcpServers={"FOS-Assistant": value["mcpServers"]["demo"]})),
             ("plugin name differs from the list", ".claude-plugin/plugin.json",
              lambda value: value.update(name="other")),
             ("skills outside the plugin", ".claude-plugin/plugin.json", lambda value: value.update(skills="..")),
@@ -225,6 +230,25 @@ class ConnectorCatalogTest(ConnectorGateCase):
                 (self.connector_root / name).write_bytes(originals[name])
         # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
         self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_server_name_is_compared_with_the_control_plane_mcp_in_canonical_form(self):
+        """MCP 서버 이름은 등록 규칙으로 바꾸고 소문자로 맞춰 Control Plane MCP 와 견준다."""
+        original = (self.connector_root / ".mcp.json").read_bytes()
+        for name in ("fos-assistant", "fos_assistant", "FOS-Assistant", "Fos_Assistant", "fos.assistant"):
+            with self.subTest(name=name):
+                self.rewrite(".mcp.json", lambda value, name=name: value.update(
+                    mcpServers={name: value["mcpServers"]["demo"]}))
+                self.assertEqual(self.catalog(), [], "%s 가 카탈로그에 남았다" % name)
+                self.assertIsNone(self.plugin._connector_manifest(DEMO))
+                (self.connector_root / ".mcp.json").write_bytes(original)
+        # 이름이 다른 서버는 대문자가 섞여도 받는다. 위의 거절이 대문자 때문이 아님을 확인한다.
+        for name in ("demo", "Demo-Notes", "fos-assistant-notes"):
+            with self.subTest(name=name):
+                self.rewrite(".mcp.json", lambda value, name=name: value.update(
+                    mcpServers={name: value["mcpServers"]["demo"]}))
+                self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO], "%s 가 거절됐다" % name)
+                self.assertEqual(self.plugin._connector_manifest(DEMO)["mcp_server"], name)
+                (self.connector_root / ".mcp.json").write_bytes(original)
 
     def test_operator_secrets_are_rejected_as_unsupported(self):
         """`operator_secrets` 를 선언한 커넥터는 카탈로그에서 빠지고 까닭이 경고 로그에 남는다. 빈 목록은 통과한다."""
@@ -374,6 +398,162 @@ class ConnectorCatalogTest(ConnectorGateCase):
         # 운영자 env 는 참조가 아니라 운영 목록의 값이 서버 정의에 직접 들어간다.
         demo = self.plugin._connector_manifest(DEMO)
         self.assertEqual(demo["server"]["env"]["DEMO_BASE"], DEMO_BASE)
+
+
+class ConnectorToolPolicyTest(ConnectorGateCase):
+    """`schema: 2` 의 도구 정책을 검증해 카탈로그로 내는 규칙을 검사한다(ADR-049)."""
+
+    def declare(self, change=lambda tools: None, **extra):
+        """시험 커넥터를 `schema: 2` 로 바꾼다. 기준 선언에 `change` 를 입히고 `extra` 를 manifest 에 더한다."""
+        tools = {"list_scopes": {"risk": "READ"}, "env_view": {"risk": "READ"}, "write_note": {"risk": "WRITE"}}
+        change(tools)
+        self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools, **extra))
+
+    def test_schema_one_lists_only_the_read_only_call_tools(self):
+        """`schema: 1` 은 그대로 받고, 대시보드가 부르는 도구만 읽기 전용 정책으로 낸다."""
+        entry = self.catalog()[0]
+        self.assertEqual(entry["schema"], 1)
+        self.assertEqual(entry["tools"], {"list_scopes": {"risk": "READ", "approval": "none"}})
+
+    def test_schema_two_fills_the_default_approval(self):
+        """`approval` 을 적지 않은 도구는 그 위험도의 기본값으로 채워 낸다. 제목이 없으면 `title` 을 내지 않는다."""
+        self.declare()
+        entry = self.catalog()[0]
+        self.assertEqual(entry["schema"], 2)
+        self.assertEqual(entry["tools"], {
+            "list_scopes": {"risk": "READ", "approval": "none"},
+            "env_view": {"risk": "READ", "approval": "none"},
+            "write_note": {"risk": "WRITE", "approval": "required"},
+        })
+
+    def test_default_approval_of_every_risk(self):
+        """위험도 다섯의 기본 `approval` 은 계약의 표와 같다."""
+        expected = {"READ": "none", "SENSITIVE": "required", "WRITE": "required",
+                    "DESTRUCTIVE": "always", "FINANCIAL": "always"}
+        for risk, approval in expected.items():
+            with self.subTest(risk):
+                self.declare(lambda tools: tools.update(probe={"risk": risk}))
+                self.assertEqual(self.catalog()[0]["tools"]["probe"], {"risk": risk, "approval": approval})
+
+    def test_stricter_approval_and_title_reach_the_catalog(self):
+        """하한보다 엄격한 `approval` 과 사람 말 제목은 선언한 그대로 낸다."""
+        self.declare(lambda tools: tools.update(
+            write_note={"risk": "WRITE", "approval": "always", "title": "메모 쓰기"},
+            env_view={"risk": "READ", "approval": "required"}))
+        tools = self.catalog()[0]["tools"]
+        self.assertEqual(tools["write_note"], {"risk": "WRITE", "approval": "always", "title": "메모 쓰기"})
+        self.assertEqual(tools["env_view"], {"risk": "READ", "approval": "required"})
+
+    def test_title_length_boundary(self):
+        """제목은 80자까지 받는다. 81자와 빈 문자열은 받지 않는다."""
+        self.declare(lambda tools: tools["write_note"].update(title="가" * 80))
+        self.assertEqual(self.catalog()[0]["tools"]["write_note"]["title"], "가" * 80)
+        for label, title in (("81 chars", "가" * 81), ("empty", ""), ("not a string", 1), ("null", None)):
+            with self.subTest(label):
+                self.declare(lambda tools: tools["write_note"].update(title=title))
+                self.assertEqual(self.catalog(), [])
+
+    def test_destructive_tool_defaults_to_always(self):
+        """`DESTRUCTIVE` 는 받고 `approval` 이 `always` 다. `required` 로 내려 선언하면 빠진다."""
+        self.declare(lambda tools: tools.update(purge={"risk": "DESTRUCTIVE"}))
+        self.assertEqual(self.catalog()[0]["tools"]["purge"], {"risk": "DESTRUCTIVE", "approval": "always"})
+        self.declare(lambda tools: tools.update(purge={"risk": "DESTRUCTIVE", "approval": "required"}))
+        self.assertEqual(self.catalog(), [])
+
+    def test_explicit_deny_default_policy_is_accepted(self):
+        """`default_tool_policy` 는 `deny` 만 받는다."""
+        self.declare(default_tool_policy="deny")
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_invalid_tool_policy_leaves_the_connector_out(self):
+        """도구 정책이 하나라도 틀리면 고쳐 읽지 않고 그 커넥터를 카탈로그에서 뺀다."""
+        cases = (
+            ("write below the floor", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "approval": "none"}))),
+            ("sensitive below the floor", lambda: self.declare(
+                lambda tools: tools.update(env_view={"risk": "SENSITIVE", "approval": "none"}))),
+            ("financial below the floor", lambda: self.declare(
+                lambda tools: tools.update(pay={"risk": "FINANCIAL", "approval": "required"}))),
+            ("verify tool is not READ", lambda: self.declare(
+                lambda tools: tools.update(list_scopes={"risk": "WRITE"}))),
+            ("verify tool needs approval", lambda: self.declare(
+                lambda tools: tools.update(list_scopes={"risk": "READ", "approval": "required"}))),
+            ("verify tool is not declared", lambda: self.declare(lambda tools: tools.pop("list_scopes"))),
+            ("no tools", lambda: self.rewrite("connector.json", lambda value: value.update(schema=2))),
+            ("empty tools", lambda: self.rewrite("connector.json", lambda value: value.update(schema=2, tools={}))),
+            ("tools is a list", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(schema=2, tools=["list_scopes"]))),
+            ("default policy allow", lambda: self.declare(default_tool_policy="allow")),
+            ("default policy null", lambda: self.declare(default_tool_policy=None)),
+            ("unknown risk", lambda: self.declare(lambda tools: tools.update(write_note={"risk": "DANGEROUS"}))),
+            ("lowercase risk", lambda: self.declare(lambda tools: tools.update(write_note={"risk": "write"}))),
+            ("no risk", lambda: self.declare(lambda tools: tools.update(write_note={"approval": "always"}))),
+            ("risk is not a string", lambda: self.declare(lambda tools: tools.update(write_note={"risk": ["WRITE"]}))),
+            ("unknown approval", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "approval": "sometimes"}))),
+            ("approval null", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "approval": None}))),
+            ("unknown key", lambda: self.declare(
+                lambda tools: tools.update(write_note={"risk": "WRITE", "note": "x"}))),
+            ("tool value is not an object", lambda: self.declare(lambda tools: tools.update(write_note="WRITE"))),
+            ("tool name format", lambda: self.declare(lambda tools: tools.update({"write note": {"risk": "WRITE"}}))),
+            ("registered names collide", lambda: self.declare(
+                lambda tools: tools.update({"a.b": {"risk": "READ"}, "a-b": {"risk": "READ"}}))),
+            ("schema 3", lambda: (self.declare(), self.rewrite("connector.json", lambda value: value.update(schema=3)))),
+            ("schema 1 with tools", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(tools={"list_scopes": {"risk": "READ"}}))),
+            ("schema 1 with default policy", lambda: self.rewrite(
+                "connector.json", lambda value: value.update(default_tool_policy="deny"))),
+        )
+        original = (self.connector_root / "connector.json").read_bytes()
+        for label, apply in cases:
+            with self.subTest(label):
+                apply()
+                self.assertEqual(self.catalog(), [])
+                self.assertIsNone(self.plugin._connector_manifest(DEMO))
+                (self.connector_root / "connector.json").write_bytes(original)
+        # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_one_of_two_colliding_names_alone_is_accepted(self):
+        """등록 이름이 겹치는 두 도구 가운데 하나만 선언하면 받는다. 거절의 까닭이 겹침임을 확인한다."""
+        self.declare(lambda tools: tools.update({"a.b": {"risk": "READ"}}))
+        self.assertIn("a.b", self.catalog()[0]["tools"])
+
+    def test_call_still_accepts_only_the_dashboard_tools(self):
+        """도구 정책에 선언한 쓰기 도구는 대시보드의 `call` 로 부르지 못한다."""
+        self.declare()
+        manifest = self.plugin._connector_manifest(DEMO)
+        self.assertEqual(manifest["call_tools"], frozenset({"list_scopes"}))
+        status, body = self.request("/api/connectors/%s/call" % DEMO, "POST", {"tool": "write_note", "values": {}})
+        self.assertEqual(status, 400, body)
+
+
+class HermesToolNameTest(ConnectorGateCase):
+    """원래 도구 이름에서 Hermes 의 등록 이름을 계산하는 규칙을 검사한다."""
+
+    def test_non_word_characters_become_underscores(self):
+        self.assertEqual(self.plugin._hermes_tool_name("policy-probe", "write_item"), "mcp__policy_probe__write_item")
+        self.assertEqual(self.plugin._hermes_tool_name("demo", "a.b"), "mcp__demo__a_b")
+
+    def test_name_of_exactly_the_limit_is_kept(self):
+        """이은 이름이 64자이면 줄이지 않는다."""
+        tool = "t" * (64 - len("mcp__demo__"))
+        self.assertEqual(self.plugin._hermes_tool_name("demo", tool), "mcp__demo__" + tool)
+
+    def test_long_name_is_cut_with_a_hash(self):
+        """64자를 넘으면 앞 55자에 `_` 와 이름 전체의 SHA-256 앞 8자를 붙인다."""
+        server, tool = "long-server-name", "tool." + "x" * 60
+        full = "mcp__long_server_name__tool_" + "x" * 60
+        self.assertGreater(len(full), 64)
+        name = self.plugin._hermes_tool_name(server, tool)
+        self.assertEqual(len(name), 64)
+        self.assertEqual(name[:55], full[:55])
+        self.assertRegex(name[55:], r"^_[0-9a-f]{8}$")
+        self.assertEqual(name[56:], hashlib.sha256(full.encode("utf-8")).hexdigest()[:8])
+        self.assertEqual(self.plugin._hermes_tool_name(server, tool), name)
+        # 앞 55자가 같아도 뒤가 다르면 다른 이름이다.
+        self.assertNotEqual(self.plugin._hermes_tool_name(server, tool + "y"), name)
 
 
 if __name__ == "__main__":

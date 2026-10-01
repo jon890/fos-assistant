@@ -9,7 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { signedCallContext, signedSubagentRegistration } from "./mcp-context.ts";
+import { signedCallContext, signedPolicyRequest, signedSubagentRegistration } from "./mcp-context.ts";
 
 const RUN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs$/;
 const RUN_STATUS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)$/;
@@ -96,6 +96,7 @@ export const TOOL_DETAIL_SAMPLE = JSON.stringify({
  */
 export const DEMO_CONNECTOR = {
   id: "demo-notes",
+  schema: 2,
   title: "검사용 메모",
   description: "검사에서만 쓰는 커넥터입니다.",
   fields: [
@@ -112,7 +113,16 @@ export const DEMO_CONNECTOR = {
   mcp_server: "demo",
   // manifest 가 선언한 내장 toolset 이다. 설치가 도구 목록에서 서버 이름 다음에 둔다.
   toolsets: [] as string[],
+  attachments: false,
+  // 도구마다의 정책이다. 확인 도구이자 선택지 도구인 `list_scopes` 는 읽기 전용이고 승인이 없다.
+  tools: {
+    list_scopes: { risk: "READ", approval: "none" },
+    write_note: { risk: "WRITE", approval: "required", title: "메모 쓰기" },
+    purge_notes: { risk: "DESTRUCTIVE", approval: "always" },
+  },
 };
+/** MCP 서버가 실제로 내는 도구다. `hidden_tool` 은 manifest 가 선언하지 않은 도구다. */
+const DEMO_SERVER_TOOLS = ["list_scopes", "write_note", "purge_notes", "hidden_tool"];
 export const DEMO_TOKEN_OK = "demo_ok_0123456789";
 export const DEMO_TOKEN_BAD = "demo_bad_0123456789";
 
@@ -338,6 +348,13 @@ export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
 export const SUBAGENT_MEMORY_PROBE = "MCP 하위 에이전트 검사";
 
 /**
+ * 이 글로 시작하는 입력을 받으면 그 뒤의 줄마다 `<등록 이름> <JSON 인자>` 를 읽어, profile 플러그인의 hook 처럼
+ * 차례로 Control Plane 에 판정을 묻는다. 답은 줄마다 `<등록 이름>: allow` 나 `<등록 이름>: block <글>` 이다.
+ * `allow` 인 호출만 커넥터 서버에 닿은 것으로 치고 `connectorToolCalls` 에 남긴다.
+ */
+export const CONNECTOR_TOOL_PROBE = "커넥터 도구 검사";
+
+/**
  * 이 글을 보내면 `terminal` 도구 사건을 많이 보내고, 도구 줄 하나를 시작만 한 채 `releaseLongActivity` 를
  * 기다린다. 첫 번째로 풀리면 그 줄을 끝내고 열 쌍과 시작만 한 줄 하나를 더 보내 다시 기다린다. 두 번째로 풀리면 그 줄을
  * 끝내고 열 쌍을 더 보낸 뒤 스트림을 닫는다. 펼친 작업 과정 목록의 높이와 스크롤, 맨 아래를 따라가는 동작을 보려는 입력이다.
@@ -534,6 +551,15 @@ export type FakeHermes = {
    * 비밀 값은 적지 않는다.
    */
   connectorRequests(): readonly string[];
+  /**
+   * 그 profile 의 정책 hook 이 켜져 있다고 답할지 정한다. `false` 로 두면 설치를 다시 보내도 고쳐지지 않는
+   * 상태가 되고, `true` 로 풀 때까지 설치 목록이 `policy_hook: false` 로 답한다.
+   */
+  setPolicyHook(profile: string, active: boolean): void;
+  /** 커넥터 도구 호출의 판정을 물을 Control Plane 주소를 준다. 주지 않으면 `CONNECTOR_TOOL_PROBE` 의 호출은 모두 막힌다. */
+  setConnectorPolicy(endpoint: string): void;
+  /** 판정이 `allow` 여서 커넥터 서버에 닿은 것으로 친 도구 호출이다. 막힌 호출은 없다. */
+  connectorToolCalls(): readonly { profile: string; hermesTool: string; argsJson: string }[];
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -608,6 +634,10 @@ export function startFakeHermes(
   /** profile 이름과 그 profile 에 설치된 커넥터 id 들이다. */
   const installedConnectors = new Map<string, Set<string>>();
   const connectorRequests: string[] = [];
+  /** 설치가 정책 hook 을 지금 판으로 맞춘 profile 이다. 설치한 적이 없는 profile 의 hook 은 꺼져 있다. */
+  const policyHookInstalled = new Set<string>();
+  /** 설치해도 정책 hook 이 고쳐지지 않게 둔 profile 이다. */
+  const policyHookOff = new Set<string>();
   const connectorEnvNames = new Set(DEMO_CONNECTOR.fields.map((field) => field.env));
   /** profile 이름과 전역으로 끈 스킬 이름들이다. */
   const disabledSkills = new Map<string, Set<string>>();
@@ -637,6 +667,59 @@ export function startFakeHermes(
   let artifactWriteMcp: { endpoint: string; token: string } | undefined;
   let memoryReadMcp: { endpoint: string; token: string } | undefined;
   const subagentRegistrations: { childSessionId: string; rootSessionId: string; status: number }[] = [];
+  let connectorPolicyEndpoint: string | undefined;
+  const connectorToolCalls: { profile: string; hermesTool: string; argsJson: string }[] = [];
+
+  /**
+   * profile 플러그인의 `pre_tool_call` hook 처럼 커넥터 도구 호출마다 Control Plane 에 판정을 묻는다.
+   *
+   * <p>토큰은 그 profile 의 `.env` 에 든 MCP 토큰이고, 제출받은 run 의 session 이 곧 뿌리 session 이다.
+   * 실제 hook 과 같이 주소나 토큰이 없거나 답이 200 의 `allow` 가 아니면 막는다. `block` 에 글이 없어도 막는다.
+   * 인자는 입력의 글을 그대로 보낸다. 실제 hook 은 키를 정렬해 직렬화하지만 서버는 받은 글을 그대로 해시한다.
+   */
+  const callConnectorTools = async (
+    profile: string,
+    input: string,
+    sessionId: string | undefined,
+    runNumber: number,
+  ): Promise<string> => {
+    const token = profiles.get(profile)?.MCP_FOS_ASSISTANT_API_KEY;
+    const prefix = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
+    const lines = input.split("\n").slice(1).map((line) => line.trim()).filter((line) => line.length > 0);
+    const output: string[] = [];
+    for (const [index, line] of lines.entries()) {
+      const space = line.indexOf(" ");
+      const hermesTool = space < 0 ? line : line.slice(0, space);
+      const argsJson = space < 0 ? "{}" : line.slice(space + 1).trim();
+      const original = hermesTool.startsWith(prefix) ? hermesTool.slice(prefix.length) : "";
+      const tool = Object.hasOwn(DEMO_CONNECTOR.tools, original) ? original : null;
+      let blocked = "정책을 확인하지 못했다";
+      if (token !== undefined && connectorPolicyEndpoint !== undefined && sessionId !== undefined) {
+        const response = await fetch(connectorPolicyEndpoint, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify(signedPolicyRequest(
+            token, hermesTool, tool, sessionId, sessionId, `connector-call-${runNumber}-${index + 1}`, argsJson,
+          )),
+        });
+        if (response.status === 200) {
+          const answer = await response.json() as { decision?: unknown; message?: unknown };
+          if (answer.decision === "allow") {
+            connectorToolCalls.push({ profile, hermesTool, argsJson });
+            output.push(`${hermesTool}: allow`);
+            continue;
+          }
+          if (answer.decision === "block" && typeof answer.message === "string" && answer.message.trim() !== "") {
+            blocked = answer.message;
+          }
+        } else {
+          blocked = `정책을 확인하지 못했다 (HTTP ${response.status})`;
+        }
+      }
+      output.push(`${hermesTool}: block ${blocked}`);
+    }
+    return output.join("\n");
+  };
 
   /**
    * profile 플러그인처럼 서명한 `_fos_ctx` 를 붙여 `memory_read` 를 부르고 도구 결과의 text 를 돌려준다.
@@ -819,6 +902,7 @@ export function startFakeHermes(
         && toolsets.join() === [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets].join();
       send(response, 200, {
         profile: queryProfile,
+        policy_hook: policyHookInstalled.has(queryProfile) && !policyHookOff.has(queryProfile),
         connectors: [{ plugin: DEMO_CONNECTOR.id, enabled: installed.has(DEMO_CONNECTOR.id), configured }],
       });
       return true;
@@ -834,14 +918,24 @@ export function startFakeHermes(
       if (body.plugin !== DEMO_CONNECTOR.id) {
         // 모르는 plugin 은 켜지 못한다. 끄기는 끌 것이 없으므로 바뀐 것 없이 성공한다.
         if (body.enabled) send(response, 400, { error: "invalid connector request" });
-        else send(response, 200, { profile: body.profile, plugin: body.plugin, enabled: false, changed: false, restart_required: false });
+        else {
+          send(response, 200, {
+            profile: body.profile, plugin: body.plugin, enabled: false, changed: false, restart_required: false,
+            plugin_updated: false,
+          });
+        }
         return true;
       }
       connectorRequests.push(`install ${body.profile} ${body.enabled ? "on" : "off"}`);
       const installed = installedConnectors.get(body.profile) ?? new Set<string>();
       const changed = installed.has(body.plugin) !== body.enabled;
-      if (body.enabled) installed.add(body.plugin);
-      else installed.delete(body.plugin);
+      if (body.enabled) {
+        installed.add(body.plugin);
+        // 설치는 그 profile 의 정책 hook 을 지금 판으로 맞춘다.
+        policyHookInstalled.add(body.profile);
+      } else {
+        installed.delete(body.plugin);
+      }
       installedConnectors.set(body.profile, installed);
       // 설치는 그 profile 의 API 도구 목록을 커넥터의 MCP 서버 이름과 선언한 toolset 으로 다시 쓰고,
       // 해제는 MCP 가 없는 목록으로 쓴다.
@@ -851,6 +945,7 @@ export function startFakeHermes(
       );
       send(response, 200, {
         profile: body.profile, plugin: body.plugin, enabled: body.enabled, changed, restart_required: false,
+        plugin_updated: false,
       });
       return true;
     }
@@ -864,7 +959,7 @@ export function startFakeHermes(
         return true;
       }
       connectorRequests.push(`probe ${queryProfile}`);
-      send(response, 200, { ok: true, tools: [{ name: DEMO_CONNECTOR.verify.tool }] });
+      send(response, 200, { ok: true, tools: DEMO_SERVER_TOOLS.map((name) => ({ name })) });
       return true;
     }
 
@@ -1451,6 +1546,9 @@ export function startFakeHermes(
         const memoryReadOutput = input.startsWith(memoryReadPrefix)
           ? await readMemoryViaMcp(Number(input.slice(memoryReadPrefix.length)), submitted.session_id)
           : undefined;
+        const connectorOutput = input.startsWith(CONNECTOR_TOOL_PROBE)
+          ? await callConnectorTools(profile!, input, submitted.session_id, submitCount)
+          : undefined;
         if (!starterRun) {
           lastSubmittedRuntime = {
             provider: submitted.provider,
@@ -1505,6 +1603,7 @@ export function startFakeHermes(
                   // 실제 Hermes 와 같이 요청 본문의 값을 그대로 되돌려 준다. 실제로 돈 모델이 아니다.
           model: submitted.model ?? profile!,
           output: memoryReadOutput
+            ?? connectorOutput
             ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
             ?? specialOutputFor(input)
             ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
@@ -1574,6 +1673,14 @@ export function startFakeHermes(
           return toolsets === undefined ? undefined : [...toolsets];
         },
         connectorRequests: () => [...connectorRequests],
+        setPolicyHook: (profile: string, active: boolean) => {
+          if (active) policyHookOff.delete(profile);
+          else policyHookOff.add(profile);
+        },
+        setConnectorPolicy: (endpoint: string) => {
+          connectorPolicyEndpoint = endpoint;
+        },
+        connectorToolCalls: () => connectorToolCalls.map((entry) => ({ ...entry })),
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {

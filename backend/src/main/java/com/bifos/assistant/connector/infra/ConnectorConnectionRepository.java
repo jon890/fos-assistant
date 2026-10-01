@@ -17,4 +17,8 @@ public interface ConnectorConnectionRepository extends JpaRepository<ConnectorCo
     /** 관리자 목록이 에이전트 코드를 함께 보이므로 에이전트를 한 번에 읽는다. */
     @EntityGraph(attributePaths = "agent")
     List<ConnectorConnection> findByUserIdIn(List<Long> userIds);
+
+    /** 도구 호출 판정이 그 실행의 에이전트가 가진 연결을 찾는다. 에이전트의 profile 을 견주므로 에이전트를 한 번에 읽는다. */
+    @EntityGraph(attributePaths = "agent")
+    Optional<ConnectorConnection> findByAgentId(Long agentId);
 }

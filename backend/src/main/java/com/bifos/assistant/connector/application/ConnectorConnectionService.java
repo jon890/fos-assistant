@@ -2,7 +2,6 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
@@ -14,6 +13,7 @@ import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
+import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.CallResult;
@@ -117,13 +117,20 @@ public class ConnectorConnectionService {
                     manifest.title(),
                     manifest.description(),
                     manifest.fields().stream().map(ConnectorFieldSummary::from).toList(),
+                    ConnectorToolPolicies.summaries(manifest),
                     connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
                     true));
         }
         mine.values().stream()
                 .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
                 .map(connection -> new ConnectorSummary(
-                        connection.connectorId(), connection.agent().name(), "", List.of(), connection.status(), false))
+                        connection.connectorId(),
+                        connection.agent().name(),
+                        "",
+                        List.of(),
+                        List.of(),
+                        connection.status(),
+                        false))
                 .forEach(result::add);
         return List.copyOf(result);
     }
@@ -137,7 +144,7 @@ public class ConnectorConnectionService {
         }
         requireManifest(connectorId);
         return new ConnectionSnapshot(
-                connectorId, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), false, null, null);
+                connectorId, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), false, null, null, 0);
     }
 
     /** 작성 중인 값으로 선택지 도구를 부른다. 아무것도 저장하지 않으므로 사용자 행을 잠그지 않는다. */
@@ -209,7 +216,9 @@ public class ConnectorConnectionService {
             // 도구 목록은 쓰지 않는다. 설치가 API 도구 목록을 커넥터의 MCP 서버 이름과 manifest 가 선언한
             // 내장 toolset 으로 다시 쓴다.
             step = STEP_INSTALL;
-            connection.markRestartRequired(connector.putConnector(profile, manifest.id(), true));
+            // hook plugin 파일이 바뀌었으면 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있다. 재시작 대기로 둔다.
+            InstallResult installed = connector.putConnector(profile, manifest.id(), true);
+            connection.markRestartRequired(installed.restartRequired() || installed.pluginUpdated());
         } catch (RuntimeException ex) {
             warn(step, manifest.id(), ex);
             connection.pending(now());
@@ -240,7 +249,8 @@ public class ConnectorConnectionService {
                 connection.markRestartRequired(connector.deleteEnv(profile, field.env()));
             }
             step = STEP_INSTALL;
-            connection.markRestartRequired(connector.putConnector(profile, connectorId, false));
+            connection.markRestartRequired(
+                    connector.putConnector(profile, connectorId, false).restartRequired());
         } catch (RuntimeException ex) {
             warn(step, connectorId, ex);
             throw new ConnectorOperationFailure();
@@ -323,6 +333,12 @@ public class ConnectorConnectionService {
      * 새 목록을 받는 자리다. 그래서 Control Plane 은 목록을 쓰지 않고, 다시 보낸 뒤에 읽은 설치가 configured 이고
      * 켜진 내장 도구가 선언과 같은지만 본다. 선언 밖의 도구가 켜져 있어도, 선언한 도구가 꺼져 있어도 쓸 수 없다.
      *
+     * <p>다시 보내는 설치는 그 profile 의 hook plugin 도 지금 판으로 바꾼다. 파일이 바뀌었으면 떠 있는 gateway 가
+     * 옛 코드를 쥐고 있을 수 있으므로 재시작 대기로 두고 쓸 수 없는 것으로 본다. 정책 hook 이 켜져 있는지는 다시
+     * 보낸 뒤에 읽은 설치 상태로만 판정한다. 그 앞에 읽은 상태로 거르면 옛 판의 hook 을 가진 연결이 설치를 다시
+     * 받지 못한다(ADR-049). probe 가 낸 도구 가운데 manifest 가 선언하지 않은 수는 연결에 적기만 하고 쓸 수 있는지에
+     * 넣지 않는다. 그 도구의 호출만 거절된다.
+     *
      * <p>manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 선언한 toolset 이 실제로 켜졌을 때만 참으로 둔다.
      * 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다. 외부 호출이 실패하면 {@code PENDING} 을
      * 남기고 연결 실패로 끝낸다.
@@ -345,13 +361,18 @@ public class ConnectorConnectionService {
         try {
             // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은
             // 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
-            connector.putConnector(profile, connection.connectorId(), true);
+            if (connector.putConnector(profile, connection.connectorId(), true).pluginUpdated()) {
+                connection.markRestartRequired(true);
+                return false;
+            }
             step = STEP_INSTALL_STATE;
-            if (!connector.readConnector(profile, connection.connectorId()).configured()) {
+            ConnectorState state = connector.readConnector(profile, connection.connectorId());
+            if (!state.configured() || !state.policyHook()) {
                 return false;
             }
             step = STEP_PROBE;
             ProbeResult probe = connector.probe(profile, manifest.get().mcpServer());
+            connection.recordUndeclaredTools(ConnectorToolPolicies.undeclared(manifest.get(), probe.tools()));
             boolean usable = probe.ok()
                     && !probe.tools().isEmpty()
                     && Set.copyOf(manifest.get().toolsets())
@@ -393,10 +414,11 @@ public class ConnectorConnectionService {
     }
 
     /**
-     * 카탈로그를 읽는다. manifest 로 열 수 없는 내장 toolset 을 선언한 커넥터는 없는 것으로 본다.
+     * 카탈로그를 읽는다. manifest 로 열 수 없는 내장 toolset 을 선언한 커넥터와 도구 정책이 하한보다 느슨한
+     * 커넥터는 없는 것으로 본다.
      *
      * <p>대시보드가 같은 검사를 먼저 한다. 여기서 한 번 더 보는 것은 셸이나 파일 도구가 대시보드의 결함으로
-     * 넘어와도 연결용 에이전트에 켜지지 않게 하기 위해서다(ADR-044).
+     * 넘어와도 연결용 에이전트에 켜지지 않게 하고(ADR-044), 느슨한 정책으로 호출을 판정하지 않기 위해서다(ADR-049).
      */
     private List<ConnectorManifest> readCatalog() {
         final List<ConnectorManifest> manifests;
@@ -406,16 +428,7 @@ public class ConnectorConnectionService {
             log.warn("connector catalog read failed: {}", ex.getClass().getSimpleName());
             throw ConnectorErrors.unavailable();
         }
-        List<ConnectorManifest> allowed = new ArrayList<>();
-        for (ConnectorManifest manifest : manifests) {
-            if (AgentToolPolicy.allowedForConnector(manifest.toolsets())
-                    && (!manifest.attachments() || manifest.toolsets().contains(AgentToolPolicy.VISION))) {
-                allowed.add(manifest);
-            } else {
-                log.warn("connector {} declares toolsets a manifest cannot open", manifest.id());
-            }
-        }
-        return List.copyOf(allowed);
+        return manifests.stream().filter(ConnectorManifests::accepted).toList();
     }
 
     private Optional<ConnectorManifest> findManifest(String connectorId) {

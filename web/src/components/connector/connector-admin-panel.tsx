@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import {
   confirmAdminConnection,
+  connectionStatusLabel,
   readAdminConnections,
   type AdminConnection,
   type ConnectorSummary,
@@ -18,6 +20,13 @@ import {
 
 const key = (connection: AdminConnection) =>
   `${connection.connectorId}/${connection.userId}`;
+
+/** 준비 중, 재시작 대기, 그 밖(선언하지 않은 도구만 남은 연결)으로 나눠 상태 글을 낸다. */
+function statusText(connection: AdminConnection): string {
+  if (connection.status === "PENDING") return "준비 중";
+  if (connection.restartRequired) return "연결 해제";
+  return connectionStatusLabel(connection.status);
+}
 
 export function ConnectorAdminPanel({
   connectors,
@@ -29,7 +38,9 @@ export function ConnectorAdminPanel({
   const [error, setError] = useState<string | null>(null);
   const waiting = connections.filter(
     (connection) =>
-      connection.restartRequired || connection.status === "PENDING",
+      connection.restartRequired ||
+      connection.status === "PENDING" ||
+      connection.undeclaredTools > 0,
   );
   const titleOf = (id: string) =>
     connectors.find((connector) => connector.id === id)?.title ?? id;
@@ -95,23 +106,35 @@ export function ConnectorAdminPanel({
                     {titleOf(connection.connectorId)}
                   </p>
                   <p className="text-muted-foreground">
-                    {connection.status === "PENDING" ? "준비 중" : "연결 해제"}
+                    {statusText(connection)}
                   </p>
+                  {connection.undeclaredTools > 0 ? (
+                    <Badge
+                      variant="destructive"
+                      data-testid="admin-undeclared"
+                      className="mt-1"
+                    >
+                      선언하지 않은 도구 {connection.undeclaredTools}개
+                    </Badge>
+                  ) : null}
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Button
-                    disabled={pending !== null}
-                    variant="outline"
-                    onClick={() => void confirm(connection)}
-                    loading={pending === key(connection)}
-                    loadingText="확인 중…"
-                  >
-                    반영 완료 확인
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    공유 gateway 를 재시작한 뒤 눌러 주세요.
-                  </span>
-                </div>
+                {connection.restartRequired ||
+                connection.status === "PENDING" ? (
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      disabled={pending !== null}
+                      variant="outline"
+                      onClick={() => void confirm(connection)}
+                      loading={pending === key(connection)}
+                      loadingText="확인 중…"
+                    >
+                      반영 완료 확인
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      공유 gateway 를 재시작한 뒤 눌러 주세요.
+                    </span>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

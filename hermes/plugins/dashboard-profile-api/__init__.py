@@ -18,7 +18,7 @@ Hermes core 는 고치지 않는다.
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
 | `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다. 설치는 plugin 의 스킬 본문을 그 profile 의 SOUL.md 에 쓴다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
@@ -126,6 +126,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import hashlib
 import hmac
 import importlib.metadata
 import json
@@ -202,6 +203,11 @@ CONNECTOR_ROOTS_ENV = "FOS_ASSISTANT_CONNECTOR_ROOTS"
 # 커넥터 MCP 서버를 실행할 파일의 절대 경로다. 운영 목록 항목에 `command` 가 없을 때 쓴다.
 CONNECTOR_COMMAND_ENV = "FOS_ASSISTANT_CONNECTOR_COMMAND"
 CONNECTOR_STATE = ".fos-connectors.json"
+# 설치가 profile 에 쓰는 이름 대응 파일이다. 정책 hook 이 Hermes 등록 이름으로 원래 도구 이름을 찾는다(ADR-049).
+CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
+# 커넥터 도구 호출을 판정하는 hook 을 가진 profile plugin 과, 묶음의 판과 견주는 그 파일들이다.
+POLICY_PLUGIN = "fos-ctx"
+PROFILE_PLUGIN_FILES = ("plugin.yaml", "__init__.py")
 # `connector.json` 의 형식 규칙이다. `docs/connectors.md` 의 「connector.json」 표와 같다.
 CONNECTOR_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
@@ -212,6 +218,18 @@ ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "u
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
+# `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
+# 표는 `docs/connectors.md` 의 「도구 정책」 과 같다.
+TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
+# 느슨한 것에서 엄격한 것의 순서다. 하한 비교가 이 순서의 자리를 쓴다.
+TOOL_APPROVALS = ("none", "required", "always")
+# 위험도마다 (`approval` 이 없을 때의 기본값, 선언이 내려갈 수 없는 하한) 이다.
+TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "required"),
+                      "WRITE": ("required", "required"), "DESTRUCTIVE": ("always", "always"),
+                      "FINANCIAL": ("always", "always")}
+TOOL_TITLE_MAX_CHARS = 80
+# Hermes 가 MCP 도구의 등록 이름에 허용하는 길이다. 넘으면 앞부분에 해시를 붙여 줄인다.
+HERMES_TOOL_NAME_MAX_CHARS = 64
 # 설치가 연결용 profile 의 `SOUL.md` 에 쓰는 스킬 본문의 상한이다. Control Plane 의 성격 본문 상한과 같다.
 CONNECTOR_PERSONA_MAX_CHARS = 8000
 SOUL_FILE = "SOUL.md"
@@ -267,6 +285,17 @@ def _copy_profile_plugin(name: str, profile_dir: pathlib.Path) -> None:
         for file_name in files:
             os.chmod(os.path.join(current, file_name), 0o644)
     os.chmod(target.parent, 0o755)
+
+
+def _profile_plugin_files(name: str) -> dict[str, bytes] | None:
+    """설치 묶음에 든 profile plugin 의 파일 이름과 바이트다. 디렉터리나 파일 하나가 없으면 None 이다.
+
+    저장소에서 바로 읽은 plugin 에는 묶음 디렉터리가 없다. 그때는 견줄 판이 없다.
+    """
+    source = PROFILE_PLUGIN_DIR / name
+    if not source.is_dir() or any(not (source / file_name).is_file() for file_name in PROFILE_PLUGIN_FILES):
+        return None
+    return {file_name: (source / file_name).read_bytes() for file_name in PROFILE_PLUGIN_FILES}
 
 
 def _write_managed_marker(profile_dir: pathlib.Path) -> None:
@@ -584,6 +613,75 @@ def _connector_fields(declared) -> list:
     return declared
 
 
+def _canonical_server_name(server: str) -> str:
+    """MCP 서버 이름을 견줄 수 있게 맞춘다. Hermes 등록 규칙대로 글자를 `_` 로 바꾸고 소문자로 맞춘다.
+
+    등록 규칙만 쓰면 대소문자만 다른 이름이 다른 서버로 읽힌다. 이름을 대소문자 없이 다루는 자리가
+    하나라도 있으면 두 서버의 도구가 섞이므로 가장 넓게 같은 이름으로 본다.
+    """
+    return re.sub(r"[^A-Za-z0-9_]", "_", server).lower()
+
+
+def _hermes_tool_name(server: str, tool: str) -> str:
+    """Hermes 가 MCP 도구에 붙이는 등록 이름이다. `tools/mcp_tool_schema.py` 의 `mcp_prefixed_tool_name` 과 같은 규칙이다.
+
+    규칙은 `docs/hermes/connector-policy.md` 의 「MCP 도구의 등록 이름」 이 갖는다.
+    글자를 바꾸고 줄이므로 서로 다른 도구가 같은 등록 이름이 될 수 있다.
+    """
+    full = "mcp__%s__%s" % (re.sub(r"[^A-Za-z0-9_]", "_", server), re.sub(r"[^A-Za-z0-9_]", "_", tool))
+    if len(full) <= HERMES_TOOL_NAME_MAX_CHARS:
+        return full
+    return full[:HERMES_TOOL_NAME_MAX_CHARS - 9] + "_" + hashlib.sha256(full.encode("utf-8")).hexdigest()[:8]
+
+
+def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
+    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title"}}` 로 낸다. 틀리면 예외다.
+
+    하한보다 느슨한 선언은 고쳐서 받지 않고 거절한다. 조용히 엄격하게 읽으면 선언이 틀린 것을 만든 사람이 모른다.
+    `schema: 1` 은 도구 정책을 선언하지 않는다. 대시보드가 부르는 읽기 전용 도구만 정책으로 낸다.
+    """
+    call_tools = {verify_tool} | set(option_tools)
+    if declared["schema"] == 1:
+        if "tools" in declared or "default_tool_policy" in declared:
+            raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
+        return {name: {"risk": "READ", "approval": "none", "title": None} for name in sorted(call_tools)}
+    if declared["schema"] != 2:
+        raise ValueError("schema 는 1 이나 2 만 받는다")
+
+    tools = declared.get("tools")
+    if not isinstance(tools, dict) or not tools:
+        raise ValueError("schema 2 의 tools 는 비어 있지 않은 객체다")
+    if "default_tool_policy" in declared and declared["default_tool_policy"] != "deny":
+        raise ValueError("default_tool_policy 는 deny 만 받는다")
+    policies = {}
+    for name, declared_tool in tools.items():
+        if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
+            raise ValueError("tools 의 키는 도구 이름이다")
+        if not isinstance(declared_tool, dict) or set(declared_tool) - {"risk", "approval", "title"}:
+            raise ValueError("tools 의 값은 risk, approval, title 만 갖는 객체다")
+        risk = declared_tool.get("risk")
+        if not isinstance(risk, str) or risk not in TOOL_RISKS:
+            raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
+        default, floor = TOOL_RISK_DEFAULTS[risk]
+        approval = declared_tool.get("approval", default)
+        if not isinstance(approval, str) or approval not in TOOL_APPROVALS:
+            raise ValueError("approval 은 none, required, always 가운데 하나다")
+        if TOOL_APPROVALS.index(approval) < TOOL_APPROVALS.index(floor):
+            raise ValueError("approval 이 그 위험도의 하한보다 느슨하다")
+        title = declared_tool.get("title")
+        if "title" in declared_tool and (not isinstance(title, str) or not 1 <= len(title) <= TOOL_TITLE_MAX_CHARS):
+            raise ValueError("title 은 1자에서 %d자까지의 문자열이다" % TOOL_TITLE_MAX_CHARS)
+        policies[name] = {"risk": risk, "approval": approval, "title": title}
+    for name in call_tools:
+        # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
+        if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":
+            raise ValueError("확인 도구와 선택지 도구는 tools 에 READ 와 none 으로 선언한다")
+    # 판정은 등록 이름으로 도구를 찾는다. 두 도구의 등록 이름이 같으면 어느 정책인지 알 수 없다.
+    if len({_hermes_tool_name(mcp_server, name) for name in policies}) != len(policies):
+        raise ValueError("tools 의 두 도구가 같은 Hermes 등록 이름이 된다")
+    return policies
+
+
 def _connector_persona(skill_dirs: list) -> str | None:
     """스킬 디렉터리들의 `<스킬>/SKILL.md` 본문을 이름 순으로 이어 붙인다. 스킬이 없으면 None 이다.
 
@@ -631,8 +729,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("plugin.json 의 이름이 운영 목록과 다르다")
 
     declared = _read_connector_json(root, "connector.json")
-    if not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] != 1:
-        raise ValueError("schema 는 1 만 받는다")
+    if not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] not in (1, 2):
+        raise ValueError("schema 는 1 이나 2 만 받는다")
     if declared.get("id") != connector_id:
         raise ValueError("id 가 운영 목록의 이름과 다르다")
     if (not isinstance(declared.get("title"), str) or not declared["title"]
@@ -681,7 +779,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if not isinstance(mcp, dict) or len(mcp) != 1:
         raise ValueError("MCP 서버 하나만 허용한다")
     mcp_server, server = next(iter(mcp.items()))
-    if not SERVER_NAME_RE.match(mcp_server) or mcp_server == CONTROL_PLANE_MCP:
+    # 맞춘 이름으로 견준다. `fos_assistant` 나 `FOS-Assistant` 처럼 글자만 다른 이름도 Control Plane MCP 의 이름으로 읽힐 수 있어
+    # 그 커넥터의 도구가 Control Plane 도구와 같은 이름 공간에 놓인다.
+    if (not SERVER_NAME_RE.match(mcp_server)
+            or _canonical_server_name(mcp_server) == _canonical_server_name(CONTROL_PLANE_MCP)):
         raise ValueError("MCP 서버 이름이 올바르지 않다")
     if (not isinstance(server, dict) or set(server) - {"command", "args", "env"}
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):
@@ -727,9 +828,16 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     env = {name: "${%s}" % name for name in server["env"]}
     # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
     env.update({name: entry["env"][name] for name in operator_env})
-    tools = {verify["tool"]} | {field["options"]["tool"] for field in fields if "options" in field}
+    option_tools = {field["options"]["tool"] for field in fields if "options" in field}
+    tools = _connector_tools(declared, verify["tool"], option_tools, mcp_server)
+    definition = {"command": command, "args": args, "env": env, "enabled": True}
+    # 늘 승인이 필요한 도구는 모델에 등록하지 않는다. 도구 이름에는 glob 글자가 없어 그 이름만 빠진다.
+    excluded = sorted(name for name, policy in tools.items() if policy["approval"] == "always")
+    if excluded:
+        definition["tools"] = {"exclude": excluded}
     return {
         "id": connector_id,
+        "schema": declared["schema"],
         "title": declared["title"],
         "description": declared.get("description", ""),
         "fields": fields,
@@ -741,8 +849,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "toolsets": list(toolsets),
         "attachments": attachments,
         "persona": persona,
-        "tools": frozenset(tools),
-        "server": {"command": command, "args": args, "env": env, "enabled": True},
+        # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
+        "call_tools": frozenset({verify["tool"]} | option_tools),
+        "tools": tools,
+        "server": definition,
     }
 
 
@@ -779,7 +889,32 @@ def _connector_env_keys() -> tuple[frozenset, frozenset]:
 def _connector_server(manifest: dict) -> dict:
     """profile 설정에 쓸 서버 정의의 사본이다."""
     server = manifest["server"]
-    return {**server, "args": list(server["args"]), "env": dict(server["env"])}
+    copied = {**server, "args": list(server["args"]), "env": dict(server["env"])}
+    if "tools" in server:
+        copied["tools"] = {"exclude": list(server["tools"]["exclude"])}
+    return copied
+
+
+def _connector_tool_map(state: dict) -> dict:
+    """소유 기록의 커넥터로 만든 이름 대응이다. 형식은 `docs/connectors.md` 의 「이름 대응」 이 갖는다.
+
+    운영 목록에서 빠졌거나 manifest 를 읽을 수 없는 커넥터는 싣지 않는다. 대응이 없는 도구는 hook 이 막는다.
+    """
+    roots = _connector_roots()
+    servers = {}
+    for plugin in state:
+        manifest = _connector_manifest(plugin) if plugin in roots else None
+        if manifest is None:
+            continue
+        name = manifest["mcp_server"]
+        servers[name] = {"connector": plugin, "prefix": _hermes_tool_name(name, ""),
+                         "tools": {_hermes_tool_name(name, tool): tool for tool in manifest["tools"]}}
+    return {"v": 1, "servers": servers}
+
+
+def _tool_map_bytes(tool_map: dict) -> bytes:
+    """이름 대응 파일의 본문이다. hook 상태 판정이 바이트로 견주므로 직렬화를 하나로 고정한다."""
+    return (json.dumps(tool_map, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
 
 
 def _env_value(env_text: str, key: str) -> str:
@@ -806,6 +941,7 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     칸의 env 는 자기 이름의 참조이고, 선택 칸은 명시한 빈 값도 된다.
     운영자 env 는 옛 기록의 `${이름}` 참조와 지금 정의의 직접 값을 같다고 본다.
     옛 판이 남긴 기록을 그대로 인정해야 이미 설치한 연결이 끊기지 않는다(ADR-041).
+    `tools` 는 견주지 않는다. 옛 기록에는 그 키가 없고, 다시 보낸 설치가 지금 manifest 의 값으로 덮어쓴다.
     """
     expected = manifest["server"]
     if (server["command"] != expected["command"] or server["args"] != expected["args"]
@@ -836,7 +972,11 @@ def _connector_state(value) -> dict:
                 or not isinstance(entry.get("mcp_server", ""), str)):
             raise ValueError("connector 소유 기록의 필드가 올바르지 않다")
         server = entry["server"]
-        if (not isinstance(server, dict) or set(server) != {"command", "args", "env", "enabled"}
+        tools = server.get("tools") if isinstance(server, dict) else None
+        if (not isinstance(server, dict) or set(server) - {"tools"} != {"command", "args", "env", "enabled"}
+                or ("tools" in server and (
+                    not isinstance(tools, dict) or set(tools) != {"exclude"} or not isinstance(tools["exclude"], list)
+                    or any(not isinstance(item, str) for item in tools["exclude"])))
                 or not isinstance(server["command"], str) or server["enabled"] is not True
                 or not isinstance(server["args"], list) or any(not isinstance(arg, str) for arg in server["args"])
                 or not isinstance(server["env"], dict)
@@ -896,6 +1036,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
 
     설치와 제거는 API 도구 목록을 커넥터 서버 이름과 manifest 가 선언한 내장 toolset 으로 다시 쓰고,
     설치는 Control Plane MCP 등록도 지운다(ADR-045).
+    둘 다 이름 대응 파일을 바뀐 소유 기록으로 다시 쓰고, 설치는 정책 hook 을 가진 profile plugin 을 묶음의 판으로 맞춘다(ADR-049).
+    `plugin_updated` 는 그 plugin 파일이 바뀌었는지다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있어 따로 답한다.
     이 설치는 커넥터 전용 profile 을 전제한다. Control Plane 이 커넥터 에이전트의 profile 로만 부른다.
     일반 에이전트의 profile 에 설치하면 그 profile 의 Control Plane MCP 등록과 도구 목록이 사라지고 제거해도 돌아오지 않는다.
     """
@@ -906,13 +1048,19 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     state_path = profile_dir / CONNECTOR_STATE
     env_path = profile_dir / ".env"
     soul_path = profile_dir / SOUL_FILE
-    for path in (config_path, state_path, env_path, soul_path):
+    tool_map_path = profile_dir / CONNECTOR_TOOL_MAP
+    plugin_dir = profile_dir / "plugins" / POLICY_PLUGIN
+    # 묶음에 그 plugin 이 없으면 건드리지 않는다. 설치는 그대로 되고 hook 상태 조회가 거짓으로 답한다.
+    bundled = (_profile_plugin_files(POLICY_PLUGIN) if enabled else None) or {}
+    plugin_values = {plugin_dir / file_name: value for file_name, value in bundled.items()}
+    plugin_dirs = (plugin_dir.parent, plugin_dir) if plugin_values else ()
+    for path in (config_path, state_path, env_path, soul_path, tool_map_path, *plugin_dirs, *plugin_values):
         if path.is_symlink():
             raise ValueError("profile 설정에 심볼릭 링크가 있다")
     # 바뀐 것이 없어 일찍 돌아가는 요청에서도 옛 사본은 지운다.
     _remove_backup_env_copies(profile_dir)
     originals = {path: path.read_bytes() if path.exists() else None
-                 for path in (config_path, state_path, env_path, soul_path)}
+                 for path in (config_path, state_path, env_path, soul_path, tool_map_path, *plugin_values)}
     saved = yaml.safe_load(originals[config_path]) or {}
     state = _connector_state(json.loads(originals[state_path])) if originals[state_path] else {}
     servers = dict(saved.get("mcp_servers") or {})
@@ -925,7 +1073,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
         raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
     elif not owned:
         # 끌 것이 없다. 운영 목록에서 빠진 연결의 해제가 끝까지 가도록 성공으로 답한다.
-        return {"changed": False, "restart_required": False}
+        return {"changed": False, "restart_required": False, "plugin_updated": False}
     else:
         # 운영 목록에서 빠진 커넥터다. 옛 기록에는 서버 이름이 없어 기록과 같은 정의를 설정에서 찾는다.
         name = owned.get("mcp_server") or next(
@@ -973,24 +1121,44 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
                "platform_toolsets": {**(saved.get("platform_toolsets") or {}), "api_server": allowed}}
     values = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
               state_path: (json.dumps(state) + "\n").encode(), **values}
+    if enabled or owned:
+        # 설정만 바뀌고 대응이 옛것으로 남으면 hook 이 새 도구를 모두 막는다. 같은 묶음 안에서 쓴다.
+        values[tool_map_path] = _tool_map_bytes(_connector_tool_map(state))
+    # plugin 파일은 맨 뒤에 쓴다. 앞의 쓰기가 실패하면 plugin 은 손대지 않은 채 남는다.
+    values.update(plugin_values)
+    plugin_updated = any(originals[path] != value for path, value in plugin_values.items())
     if all(originals[path] == value for path, value in values.items()):
-        return {"changed": False, "restart_required": bool(owned)}
+        return {"changed": False, "restart_required": bool(owned), "plugin_updated": False}
     backup = profile_dir / "connector-backups" / str(time.time_ns())
     backup.mkdir(parents=True, mode=0o700)
     os.chmod(backup.parent, 0o700)
     for path, value in originals.items():
         # profile `.env` 에는 사용자의 비밀 원문이 있다. 백업에 넣으면 연결을 해제한 뒤에도 남는다.
-        if value is not None and path != env_path:
+        if value is None or path == env_path:
+            continue
+        if path not in plugin_values:
             _atomic_private_write(backup / path.name, value)
+        elif value != plugin_values[path]:
+            # 묶음의 판과 같은 plugin 파일은 뜨지 않는다. 다른 것만 plugin 이름을 붙여 남긴다.
+            _atomic_private_write(backup / ("%s.%s" % (POLICY_PLUGIN, path.name)), value)
     written = []
+    created_dirs = []
     try:
         if any((path.read_bytes() if path.exists() else None) != value for path, value in originals.items()):
             raise FileExistsError("저장 전 profile 설정이 밖에서 바뀌었다")
+        for directory in plugin_dirs:
+            if not directory.is_dir():
+                directory.mkdir()
+                created_dirs.append(directory)
+                os.chmod(directory, 0o755)
         for path, value in values.items():
             if (path.read_bytes() if path.exists() else None) != originals[path]:
                 raise FileExistsError("profile 설정이 밖에서 바뀌었다")
             _atomic_private_write(path, value)
             written.append(path)
+            if path in plugin_values:
+                # 임시 파일은 600 으로 생긴다. plugin 파일은 새 profile 에 복사할 때와 같은 644 로 둔다.
+                os.chmod(path, 0o644)
     except Exception:
         for path in reversed(written):
             # 이 요청이 쓴 값일 때만 복원한다. 바깥의 새 수정은 덮어쓰지 않는다.
@@ -1001,8 +1169,51 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
                 path.unlink(missing_ok=True)
             else:
                 _atomic_private_write(path, value)
+                if path in plugin_values:
+                    os.chmod(path, 0o644)
+        for directory in reversed(created_dirs):
+            # 이 요청이 만든 디렉터리만 지운다. 그 사이 밖에서 무엇이 생겼으면 비어 있지 않아 남는다.
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
         raise
-    return {"changed": True, "restart_required": bool(owned)}
+    return {"changed": True, "restart_required": bool(owned), "plugin_updated": plugin_updated}
+
+
+def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) -> bool:
+    """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치는지 본다. 읽다가 예외가 나면 거짓이다.
+
+    조건은 `docs/connectors.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
+    """
+    try:
+        plugins = config["plugins"]
+        disabled = plugins.get("disabled") or []
+        if (not isinstance(plugins["enabled"], list) or POLICY_PLUGIN not in plugins["enabled"]
+                or not isinstance(disabled, list) or POLICY_PLUGIN in disabled
+                or plugins["entries"][POLICY_PLUGIN]["allow_tool_override"] is not False):
+            return False
+        bundled = _profile_plugin_files(POLICY_PLUGIN)
+        if bundled is None:
+            return False
+        for file_name, value in bundled.items():
+            installed = profile_dir / "plugins" / POLICY_PLUGIN / file_name
+            if installed.is_symlink() or installed.read_bytes() != value:
+                return False
+        if (profile_dir / CONNECTOR_TOOL_MAP).read_bytes() != _tool_map_bytes(_connector_tool_map(state)):
+            return False
+        roots = _connector_roots()
+        servers = config.get("mcp_servers") or {}
+        for plugin in state:
+            manifest = _connector_manifest(plugin) if plugin in roots else None
+            # 늘 승인이 필요한 도구가 모델에 등록된 채이면 hook 이 켜져 있어도 설치가 덜 된 것이다.
+            if manifest is None:
+                continue
+            if servers[manifest["mcp_server"]].get("tools") != manifest["server"].get("tools"):
+                return False
+        return True
+    except Exception:
+        return False
 
 
 async def _connector_request(request):
@@ -1057,7 +1268,8 @@ async def _connector_request(request):
             # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False}
                               for plugin in state if plugin not in roots)
-            return JSONResponse({"profile": body["profile"], "connectors": connectors}, status_code=200)
+            return JSONResponse({"profile": body["profile"], "connectors": connectors,
+                                 "policy_hook": _policy_hook_active(profile_dir, config, state)}, status_code=200)
         result = await asyncio.to_thread(_connector_config, profile_dir, body["plugin"], body["enabled"])
         return JSONResponse({**body, **result}, status_code=200)
     except FileExistsError:
@@ -1072,9 +1284,13 @@ def _connector_catalog_response():
     from starlette.responses import JSONResponse
 
     return JSONResponse(
-        [{"id": manifest["id"], "title": manifest["title"], "description": manifest["description"],
+        [{"id": manifest["id"], "schema": manifest["schema"], "title": manifest["title"],
+          "description": manifest["description"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
-          "toolsets": manifest["toolsets"], "attachments": manifest["attachments"]}
+          "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
+          # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
+          "tools": {name: {key: value for key, value in policy.items() if value is not None}
+                    for name, policy in manifest["tools"].items()}}
          for manifest in _connector_catalog().values()],
         status_code=200,
     )
@@ -1172,7 +1388,7 @@ async def _connector_call_request(request, connector_id: str):
     if body is None or set(body) != {"tool", "values"} or not isinstance(body["values"], dict):
         return _rejected("tool 과 values 만 필요하다")
     tool = body["tool"]
-    if not isinstance(tool, str) or tool not in manifest["tools"]:
+    if not isinstance(tool, str) or tool not in manifest["call_tools"]:
         return _rejected("이 커넥터가 선택지나 확인에 쓰는 도구가 아니다")
     fields = {field["key"]: field for field in manifest["fields"]}
     env = {}
@@ -1662,7 +1878,8 @@ def _install_gate() -> bool:
                         continue
                     try:
                         # 비운 선택 칸의 명시적 빈 값도 갱신한다. 재시작만으로는 바뀌지 않는다.
-                        await asyncio.to_thread(_connector_config, get_profile_dir(body["profile"]), manifest["id"], True)
+                        await asyncio.to_thread(
+                            _connector_config, get_profile_dir(body["profile"]), manifest["id"], True)
                     except FileExistsError:
                         return _rejected("환경 변수는 저장했지만 connector 설정과 충돌한다", 409)
                     except (ValueError, OSError, KeyError, TypeError):

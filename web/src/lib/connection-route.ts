@@ -6,6 +6,9 @@ import {
   CONNECTOR_ID_PATTERN,
   FIELD_KEY_PATTERN,
   connectionErrorMessage,
+  type ConnectorTool,
+  type ToolApproval,
+  type ToolRisk,
 } from "@/lib/connection";
 import { readJsonBody } from "@/lib/json-body";
 
@@ -152,9 +155,44 @@ function safeSummary(value: unknown) {
     title: text(item.title),
     description: text(item.description ?? ""),
     fields: list(item.fields ?? []).map(safeField),
+    tools: safeTools(item.tools),
     myStatus: status(item.myStatus),
     available: bool(item.available),
   };
+}
+
+const TOOL_RISKS = ["READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL"];
+const TOOL_APPROVALS = ["NONE", "REQUIRED", "ALWAYS"];
+
+/** 도구 목록이 없거나 모양이 틀리면 빈 목록으로 두고, 값이 틀린 항목만 뺀다. */
+function safeTools(value: unknown): ConnectorTool[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): ConnectorTool[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const item = entry as Record<string, unknown>;
+    if (
+      typeof item.name !== "string" ||
+      typeof item.risk !== "string" ||
+      !TOOL_RISKS.includes(item.risk) ||
+      typeof item.approval !== "string" ||
+      !TOOL_APPROVALS.includes(item.approval)
+    )
+      return [];
+    return [
+      {
+        name: item.name,
+        title: typeof item.title === "string" ? item.title : null,
+        risk: item.risk as ToolRisk,
+        approval: item.approval as ToolApproval,
+      },
+    ];
+  });
+}
+
+function undeclaredCount(value: unknown): number {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+    ? (value as number)
+    : 0;
 }
 
 function safeField(value: unknown) {
@@ -194,6 +232,7 @@ function safeConnection(value: unknown) {
     checkedAt,
     agentCode: agentCode(item.agentCode),
     restartRequired: bool(item.restartRequired),
+    undeclaredTools: undeclaredCount(item.undeclaredTools),
   };
 }
 
@@ -208,5 +247,6 @@ function safeAdmin(value: unknown) {
     status: status(item.status),
     agentCode: agentCode(item.agentCode),
     restartRequired: bool(item.restartRequired),
+    undeclaredTools: undeclaredCount(item.undeclaredTools),
   };
 }

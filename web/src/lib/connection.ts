@@ -12,12 +12,25 @@ export type ConnectorField = {
   autoSelectSingle: boolean;
 };
 
+export type ToolRisk =
+  "READ" | "SENSITIVE" | "WRITE" | "DESTRUCTIVE" | "FINANCIAL";
+export type ToolApproval = "NONE" | "REQUIRED" | "ALWAYS";
+
+/** 커넥터가 선언한 도구 한 개다. `title` 이 없으면 `name` 으로 보인다. */
+export type ConnectorTool = {
+  name: string;
+  title: string | null;
+  risk: ToolRisk;
+  approval: ToolApproval;
+};
+
 /** 연결 목록의 카드 한 장이다. `available` 이 거짓이면 운영 목록에서 빠진 커넥터다. */
 export type ConnectorSummary = {
   id: string;
   title: string;
   description: string;
   fields: ConnectorField[];
+  tools: ConnectorTool[];
   myStatus: ConnectionStatus;
   available: boolean;
 };
@@ -33,6 +46,8 @@ export type ConnectorConnection = {
   checkedAt: string | null;
   agentCode: string | null;
   restartRequired: boolean;
+  /** 커넥터가 선언하지 않아 쓰지 않는 도구의 수다. */
+  undeclaredTools: number;
 };
 
 /** 관리자가 반영 완료를 확인할 수 있는 다른 사용자의 연결이다. */
@@ -43,6 +58,7 @@ export type AdminConnection = {
   status: ConnectionStatus;
   agentCode: string | null;
   restartRequired: boolean;
+  undeclaredTools: number;
 };
 
 export const CONNECTOR_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -152,4 +168,28 @@ export function connectionStatusLabel(
   return { DISCONNECTED: "연결 안 됨", PENDING: "준비 중", READY: "연결됨" }[
     status
   ];
+}
+
+const TOOL_RISK_LABELS: Record<ToolRisk, string> = {
+  READ: "조회",
+  SENSITIVE: "민감한 조회",
+  WRITE: "쓰기",
+  DESTRUCTIVE: "되돌리기 어려운 쓰기",
+  FINANCIAL: "결제",
+};
+
+export function toolRiskLabel(risk: ToolRisk): string {
+  return TOOL_RISK_LABELS[risk];
+}
+
+/**
+ * 도구를 호출할 때 일어나는 일을 사용자에게 보이는 말로 바꾼다. 막힌 위험도가 승인 방식보다 앞선다.
+ * 승인이 필요한 도구는 승인을 받는 길이 아직 없어 실행되지 않으므로 그렇게 적는다.
+ */
+export function toolPolicyLabel(tool: ConnectorTool): string {
+  if (tool.risk === "DESTRUCTIVE" || tool.risk === "FINANCIAL")
+    return "아직 쓸 수 없어요";
+  return tool.approval === "NONE"
+    ? "바로 실행해요"
+    : "승인 기능이 준비될 때까지 실행하지 않아요";
 }

@@ -29,11 +29,15 @@ import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
 import com.bifos.assistant.connector.application.model.ConnectorSummary;
+import com.bifos.assistant.connector.application.model.ConnectorToolSummary;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.domain.type.ToolApproval;
+import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
+import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
 import com.bifos.assistant.hermes.HermesDashboardClient;
 import com.bifos.assistant.hermes.HermesToolsetClient;
@@ -42,6 +46,7 @@ import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -101,7 +106,9 @@ class ConnectorConnectionServiceTest {
             "list_scopes",
             "demo",
             List.of(),
-            false);
+            false,
+            1,
+            List.of());
     /** 이미지 도구와 사진 받기를 선언한 커넥터다. 번호와 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
     private static final ConnectorManifest VISION_MANIFEST = new ConnectorManifest(
             DEMO,
@@ -111,7 +118,9 @@ class ConnectorConnectionServiceTest {
             "list_scopes",
             "demo",
             List.of("vision"),
-            true);
+            true,
+            1,
+            List.of());
     /** 형식이 없는 비밀 칸 하나만 가진 커넥터다. 비밀값의 길이 경계를 보는 데 쓴다. */
     private static final ConnectorManifest PIN_MANIFEST = new ConnectorManifest(
             PIN,
@@ -121,7 +130,14 @@ class ConnectorConnectionServiceTest {
             "check_pin",
             "pin",
             List.of(),
-            false);
+            false,
+            1,
+            List.of());
+    /** 도구마다 정책을 선언한 커넥터다. 번호와 칸과 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
+    private static final ConnectorManifest POLICY_MANIFEST = policyManifest(List.of(
+            new ConnectorTool("list_scopes", "READ", "none", null),
+            new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
+            new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null)));
 
     @Autowired
     ConnectorConnectionService service;
@@ -159,6 +175,8 @@ class ConnectorConnectionServiceTest {
     @BeforeEach
     void setUp() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
+        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new InstallResult(false, false));
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST, PIN_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(MAPPER.readTree(
@@ -390,7 +408,16 @@ class ConnectorConnectionServiceTest {
             when(connector.readCatalog())
                     .thenReturn(List.of(
                             new ConnectorManifest(
-                                    DEMO, "검사용 메모", "", DEMO_MANIFEST.fields(), "list_scopes", "demo", declared, false),
+                                    DEMO,
+                                    "검사용 메모",
+                                    "",
+                                    DEMO_MANIFEST.fields(),
+                                    "list_scopes",
+                                    "demo",
+                                    declared,
+                                    false,
+                                    1,
+                                    List.of()),
                             PIN_MANIFEST));
             CurrentUser user = user(UserRole.MEMBER, 1L);
 
@@ -405,7 +432,16 @@ class ConnectorConnectionServiceTest {
     void manifestAcceptingAttachmentsWithoutVisionIsLeftOut() {
         when(connector.readCatalog())
                 .thenReturn(List.of(new ConnectorManifest(
-                        DEMO, "검사용 메모", "", DEMO_MANIFEST.fields(), "list_scopes", "demo", List.of(), true)));
+                        DEMO,
+                        "검사용 메모",
+                        "",
+                        DEMO_MANIFEST.fields(),
+                        "list_scopes",
+                        "demo",
+                        List.of(),
+                        true,
+                        1,
+                        List.of())));
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
         assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
@@ -418,7 +454,7 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(user, DEMO, VALUES));
         installed(true, true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
@@ -522,7 +558,7 @@ class ConnectorConnectionServiceTest {
 
         assertThat(read)
                 .isEqualTo(new ConnectionSnapshot(
-                        DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), false, null, null));
+                        DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), false, null, null, 0));
     }
 
     @Test
@@ -688,9 +724,11 @@ class ConnectorConnectionServiceTest {
                                 "검사용 번호",
                                 "",
                                 service.catalog(other).get(0).fields(),
+                                List.of(),
                                 ConnectionStatus.DISCONNECTED,
                                 true),
-                        new ConnectorSummary(DEMO, "검사용 메모", "", List.of(), ConnectionStatus.PENDING, false));
+                        new ConnectorSummary(
+                                DEMO, "검사용 메모", "", List.of(), List.of(), ConnectionStatus.PENDING, false));
     }
 
     @Test
@@ -860,7 +898,7 @@ class ConnectorConnectionServiceTest {
         when(connector.readCatalog()).thenReturn(List.of());
         service.disconnect(member, DEMO);
         // 대시보드의 목록에 그 커넥터가 없을 때 클라이언트가 돌려주는 모양이다.
-        when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false));
+        when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false, true));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
@@ -880,8 +918,8 @@ class ConnectorConnectionServiceTest {
         verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
         when(connector.readCatalog()).thenReturn(List.of());
         // 대시보드는 모르는 plugin 의 해제를 바뀐 것 없는 성공으로 답한다.
-        when(connector.putConnector(profile, DEMO, false)).thenReturn(false);
-        when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false));
+        when(connector.putConnector(profile, DEMO, false)).thenReturn(new InstallResult(false, false));
+        when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false, true));
 
         ConnectionSnapshot disconnected = service.disconnect(member, DEMO);
 
@@ -921,8 +959,8 @@ class ConnectorConnectionServiceTest {
             values.put("k" + index, "v".repeat(500));
         }
         when(connector.readCatalog())
-                .thenReturn(List.of(
-                        new ConnectorManifest("demo-wide", "넓은 칸", "", fields, "check", "wide", List.of(), false)));
+                .thenReturn(List.of(new ConnectorManifest(
+                        "demo-wide", "넓은 칸", "", fields, "check", "wide", List.of(), false, 1, List.of())));
         // {"values":{"k1":"…",…},"secretPrefixes":{}} 에서 값 말고 드는 글자 수는 33 + 칸마다 7 + 쉼표 7 이다.
         int lastLength = 4000 - (33 + 8 * 7 + 7) - 7 * 500;
         values.put("k8", "v".repeat(lastLength + 1));
@@ -1042,7 +1080,8 @@ class ConnectorConnectionServiceTest {
                         member.displayName(),
                         ConnectionStatus.PENDING,
                         registered.agentCode(),
-                        false));
+                        false,
+                        0));
     }
 
     @Test
@@ -1084,7 +1123,9 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         String profile = profileOf(service.register(user, DEMO, VALUES));
         when(connector.readConnector(anyString(), eq(DEMO)))
-                .thenReturn(new ConnectorState("p", true, false, false), new ConnectorState("p", true, true, false));
+                .thenReturn(
+                        new ConnectorState("p", true, false, false, true),
+                        new ConnectorState("p", true, true, false, true));
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
@@ -1155,8 +1196,10 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(member, DEMO, VALUES));
         // 이전 판이 쓴 목록이라 configured 가 아니다. 다시 보낸 설치가 목록을 맞춘 뒤에는 configured 다.
         when(connector.readConnector(anyString(), eq(DEMO)))
-                .thenReturn(new ConnectorState("p", true, false, false), new ConnectorState("p", true, true, false));
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
+                .thenReturn(
+                        new ConnectorState("p", true, false, false, true),
+                        new ConnectorState("p", true, true, false, true));
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
@@ -1274,6 +1317,248 @@ class ConnectorConnectionServiceTest {
         assertThat(limited.options(second, DEMO, "scope", VALUES)).hasSize(2);
     }
 
+    @Test
+    @DisplayName("설치를 다시 보낸 뒤 읽은 상태의 정책 hook 이 꺼져 있으면 PENDING 이고 probe 를 부르지 않는다")
+    void staysPendingWithoutProbeWhenPolicyHookIsOffAfterReinstall() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        when(connector.readConnector(anyString(), eq(DEMO)))
+                .thenReturn(new ConnectorState("p", true, true, false, false));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agentEnabled(user)).isFalse();
+        // hook 을 판정하기 전에 설치를 다시 보냈다. 등록의 설치와 다시 보낸 설치다.
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, never()).probe(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("첫 조회에서 정책 hook 이 꺼져 있어도 설치를 다시 보낸 뒤 켜졌으면 READY다")
+    void becomesReadyWhenReinstallTurnsPolicyHookOn() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        when(connector.readConnector(anyString(), eq(DEMO)))
+                .thenReturn(
+                        new ConnectorState("p", true, true, false, false),
+                        new ConnectorState("p", true, true, false, true));
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+    }
+
+    @Test
+    @DisplayName("도구를 선언한 커넥터는 probe 가 낸 선언 밖 도구를 세고 그 도구가 있어도 READY다")
+    void countsUndeclaredToolsAndStillBecomesReady() {
+        when(connector.readCatalog()).thenReturn(List.of(POLICY_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo"))
+                .thenReturn(new ProbeResult(true, List.of("list_scopes", "write_note", "purge_notes")));
+
+        ConnectionSnapshot declaredOnly = service.check(user, DEMO);
+
+        assertThat(declaredOnly.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(declaredOnly.undeclaredTools()).isZero();
+
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes", "hidden_tool")));
+
+        ConnectionSnapshot withHidden = service.check(user, DEMO);
+
+        assertThat(withHidden.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(withHidden.undeclaredTools()).isEqualTo(1);
+        assertThat(stored(user).undeclaredTools()).isEqualTo(1);
+        assertThat(agentEnabled(user)).isTrue();
+    }
+
+    @Test
+    @DisplayName("도구를 선언하지 않는 판의 커넥터는 선언 밖 도구를 세지 않는다")
+    void doesNotCountUndeclaredToolsForManifestWithoutToolDeclarations() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes", "hidden_tool")));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(checked.undeclaredTools()).isZero();
+    }
+
+    @Test
+    @DisplayName("해제와 다시 등록은 세어 둔 선언 밖 도구 수를 0 으로 되돌린다")
+    void disconnectAndReregisterResetUndeclaredTools() {
+        when(connector.readCatalog()).thenReturn(List.of(POLICY_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes", "hidden_tool")));
+        assertThat(service.check(user, DEMO).undeclaredTools()).isEqualTo(1);
+
+        assertThat(service.register(user, DEMO, VALUES).undeclaredTools()).isZero();
+
+        assertThat(service.check(user, DEMO).undeclaredTools()).isEqualTo(1);
+        assertThat(service.disconnect(user, DEMO).undeclaredTools()).isZero();
+    }
+
+    @Test
+    @DisplayName("위험도의 하한보다 느슨하게 선언한 커넥터는 카탈로그에 나오지 않는 없는 커넥터다")
+    void manifestDeclaringApprovalBelowFloorIsLeftOut() {
+        when(connector.readCatalog())
+                .thenReturn(List.of(
+                        policyManifest(List.of(
+                                new ConnectorTool("list_scopes", "READ", "none", null),
+                                new ConnectorTool("write_note", "WRITE", "none", null))),
+                        PIN_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        assertThat(service.catalog(user)).extracting(ConnectorSummary::id).containsExactly(PIN);
+        assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("판이나 도구 선언을 읽을 수 없던 커넥터만 카탈로그에서 빠지고 다른 커넥터는 남는다")
+    void manifestWithUnreadableSchemaOrToolsIsLeftOutAlone() {
+        // 클라이언트는 판이 정수가 아니거나 도구 선언이 객체가 아닌 커넥터를 판 0 과 빈 도구로 읽는다.
+        ConnectorManifest unreadable = new ConnectorManifest(
+                DEMO,
+                DEMO_MANIFEST.title(),
+                DEMO_MANIFEST.description(),
+                DEMO_MANIFEST.fields(),
+                "list_scopes",
+                "demo",
+                List.of(),
+                false,
+                0,
+                List.of());
+        when(connector.readCatalog()).thenReturn(List.of(unreadable, PIN_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        assertThat(service.catalog(user)).extracting(ConnectorSummary::id).containsExactly(PIN);
+        assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("카탈로그는 선언한 도구의 이름과 제목과 위험도와 승인 방식을 선언한 순서로 준다")
+    void catalogListsDeclaredTools() {
+        when(connector.readCatalog()).thenReturn(List.of(POLICY_MANIFEST, PIN_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        List<ConnectorSummary> listed = service.catalog(user);
+
+        assertThat(listed.get(0).tools())
+                .containsExactly(
+                        new ConnectorToolSummary("list_scopes", null, ToolRisk.READ, ToolApproval.NONE),
+                        new ConnectorToolSummary("write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED),
+                        new ConnectorToolSummary("purge_notes", null, ToolRisk.DESTRUCTIVE, ToolApproval.ALWAYS));
+        // 도구를 선언하지 않는 판의 커넥터는 빈 목록이다.
+        assertThat(listed.get(1).tools()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("연결 확인의 설치가 hook plugin 을 바꿨으면 PENDING 과 재시작 대기이고 관리자 반영 완료 뒤 READY다")
+    void pluginUpdateLeavesRestartPendingUntilAdminConfirms() {
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        String profile = profileOf(service.register(member, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, true));
+
+        ConnectionSnapshot checked = service.check(member, DEMO);
+
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(checked.restartRequired()).isTrue();
+        assertThat(agentEnabled(member)).isFalse();
+        verify(connector, never()).probe(anyString(), anyString());
+
+        // 재시작한 뒤에는 파일이 이미 새 판이라 설치가 바꾼 것이 없다.
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
+
+        ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
+
+        assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(confirmed.restartRequired()).isFalse();
+        assertThat(agentEnabled(member)).isTrue();
+    }
+
+    @Test
+    @DisplayName("관리자 반영 완료의 설치가 hook plugin 을 바꿨으면 READY 가 되지 않고 재시작 대기로 남는다")
+    void adminConfirmStaysRestartPendingWhenItsInstallUpdatesPlugin() {
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        String profile = profileOf(service.register(member, DEMO, VALUES));
+        installed(true, true);
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, true));
+
+        assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
+                .isInstanceOf(ConnectorOperationFailure.class);
+
+        assertThat(stored(member).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(stored(member).restartRequired()).isTrue();
+    }
+
+    @Test
+    @DisplayName("등록의 설치가 hook plugin 을 바꿨으면 재시작 대기로 등록된다")
+    void registrationMarksRestartWhenInstallUpdatesPlugin() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        when(connector.putConnector(anyString(), eq(DEMO), eq(true))).thenReturn(new InstallResult(false, true));
+
+        assertThat(service.register(user, DEMO, VALUES).restartRequired()).isTrue();
+    }
+
+    @Test
+    @DisplayName("READY 에서 PENDING 으로 내려진 연결은 연결 확인 뒤 재시작 대기가 되고 관리자 반영 완료 뒤 READY 와 켜진 에이전트로 돌아온다")
+    void connectionLoweredFromReadyReturnsThroughCheckAndAdminConfirm() {
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        String profile = profileOf(service.register(member, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        assertThat(service.check(member, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+        // 정책 판정을 들이는 마이그레이션이 READY 이던 연결에 하는 일과 같다. 재시작 대기는 건드리지 않는다.
+        jdbc.update("UPDATE agent SET enabled = FALSE, connector_attachments = FALSE WHERE id IN"
+                + " (SELECT agent_id FROM connector_connection WHERE status = 'READY')");
+        jdbc.update("UPDATE connector_connection SET status = 'PENDING' WHERE status = 'READY'");
+        ConnectorConnection lowered = stored(member);
+        assertThat(lowered.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(lowered.desiredEnabled()).isTrue();
+        assertThat(lowered.restartRequired()).isFalse();
+        assertThat(agentEnabled(member)).isFalse();
+        // 옛 판의 hook 을 가진 profile 이라 다시 보낸 설치가 파일을 바꾼다.
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, true));
+
+        ConnectionSnapshot checked = service.check(member, DEMO);
+
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(checked.restartRequired()).isTrue();
+        assertThat(agentEnabled(member)).isFalse();
+
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
+
+        ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
+
+        assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(confirmed.restartRequired()).isFalse();
+        assertThat(agentEnabled(member)).isTrue();
+    }
+
+    private static ConnectorManifest policyManifest(List<ConnectorTool> tools) {
+        return new ConnectorManifest(
+                DEMO,
+                DEMO_MANIFEST.title(),
+                DEMO_MANIFEST.description(),
+                DEMO_MANIFEST.fields(),
+                "list_scopes",
+                "demo",
+                List.of(),
+                false,
+                2,
+                tools);
+    }
+
     /** 주어진 한도의 limiter 를 쓰는 서비스를 직접 만든다. 주입된 서비스는 검사 설정의 넉넉한 한도를 쓴다. */
     private ConnectorConnectionService serviceLimitedTo(int maxConcurrentCalls, int callsPerMinute) {
         return new ConnectorConnectionService(
@@ -1303,7 +1588,7 @@ class ConnectorConnectionServiceTest {
 
     private void installed(boolean enabled, boolean configured) {
         when(connector.readConnector(anyString(), eq(DEMO)))
-                .thenReturn(new ConnectorState("p", enabled, configured, false));
+                .thenReturn(new ConnectorState("p", enabled, configured, false, true));
     }
 
     private ConnectorConnection stored(CurrentUser user) {

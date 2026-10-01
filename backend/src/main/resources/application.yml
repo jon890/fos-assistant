@@ -83,6 +83,11 @@ assistant:
     max-concurrent-calls: 1
     # 한 사용자가 60초 동안 돌릴 수 있는 그 호출 수. 상태는 JVM 메모리에 둔다
     calls-per-minute: 10
+    policy:
+      # 도구 호출 판정이 쓰는 카탈로그를 메모리에 두는 시간. 지나면 다음 판정이 대시보드에서 다시 읽는다(ADR-049)
+      catalog-ttl: 60s
+      # 카탈로그 읽기 실패를 기억하는 시간. 그동안 판정은 대시보드를 다시 부르지 않고 바로 거절한다
+      catalog-failure-ttl: 5s
   delegation-wake:
     # 맡긴 일의 결과가 끝나면 부모 대화의 turn 을 자동으로 연다(ADR-040)
     enabled: true

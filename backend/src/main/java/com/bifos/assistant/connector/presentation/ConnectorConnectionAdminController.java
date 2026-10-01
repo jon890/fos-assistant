@@ -33,6 +33,12 @@ public class ConnectorConnectionAdminController {
     public AdminConnectionView confirm(@PathVariable String id, @PathVariable Long userId) {
         ConnectionSnapshot snapshot = connections.confirmApplied(currentUser.requireAdmin(), id, userId);
         return new AdminConnectionView(
-                id, userId, null, snapshot.status().name(), snapshot.agentCode(), snapshot.restartRequired());
+                id,
+                userId,
+                null,
+                snapshot.status().name(),
+                snapshot.agentCode(),
+                snapshot.restartRequired(),
+                snapshot.undeclaredTools());
     }
 }

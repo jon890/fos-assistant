@@ -6,7 +6,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | plugin | 하는 일 | 두는 곳 | 읽는 프로세스 |
 | --- | --- | --- | --- |
 | `dashboard-profile-api` | 대시보드의 profile 관리와 도구 목록 경로를 `Authorization: Bearer` 로 연다 | Hermes 기본 루트의 `plugins/` | 대시보드 |
-| `fos-ctx` | Control Plane MCP 호출 인자에 서명한 run 맥락 `_fos_ctx` 를 덮어쓰고, `skill_manage` 를 막고, 자식 session 을 등록한다 | Control Plane MCP 를 등록한 profile 마다 | gateway |
+| `fos-ctx` | Control Plane MCP 호출 인자에 서명한 run 맥락 `_fos_ctx` 를 덮어쓰고, `skill_manage` 를 막고, 자식 session 을 등록하고, 연결용 profile 의 커넥터 도구 호출을 Control Plane 에 묻는다 | Control Plane MCP 를 등록한 profile 마다 | gateway |
 
 ## 설치 묶음
 
@@ -81,6 +81,38 @@ Control Plane 은 부모 run 으로 자식의 요청자를 찾지 못하므로, 
 Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동기로 부른다. 그래서 등록이 자식의 첫 도구 호출보다 먼저 끝난다.
 일회용 컨테이너에서 부모 run 이 0.25초에 끝나고 등록이 0.12초에 도착했다.
 등록 로그는 `fos-ctx: 자식 session 을 등록했다 (시도 N)` 이고, 실패하면 상태 코드나 예외 종류만 남는다.
+
+### 연결용 profile 의 커넥터 도구 호출을 묻는다
+
+profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 을 연결용 profile 로 읽는다.
+그 profile 에서는 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
+경로, 본문, 서명, 응답은 [`../docs/connectors.md`](../docs/connectors.md) 의 「도구 호출 판정」 이 소유한다.
+대응 파일이 없는 profile 에서는 아래 처리를 하지 않는다.
+
+| hook 이 본 것 | 처리 |
+| --- | --- |
+| `skill_manage` | 위와 같이 막는다 |
+| 대응 파일을 읽지 못한다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 그 밖의 도구는 건드리지 않는다 |
+| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 |
+| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 |
+| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 |
+| `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 |
+| `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 |
+| `session_id` 나 `tool_call_id` 가 없거나 인자가 객체가 아니다 | 막는다. Control Plane 에 묻지 않는다 |
+| 대응 파일에 없는 도구 | `tool` 을 `null` 로 묻는다 |
+| 답이 200 의 `allow` | 통과한다 |
+| 답이 200 의 `block` 이고 글이 있다 | 그 글로 막는다 |
+| 주소나 토큰이 없다, 제한 시간 안에 답이 없다, 200 이 아니다, 답을 읽지 못한다, 예외가 났다 | 정해 둔 글로 막는다 |
+
+| 항목 | 값 |
+| --- | --- |
+| 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL`. 운영이 준다. 없으면 커넥터 도구를 모두 막는다 |
+| 인증 | 그 profile 의 MCP 토큰 |
+| 제한 시간 | 3초. 한 번만 부르고 다시 부르지 않는다. 기다리는 동안 run 의 스레드가 묶인다 |
+| 로그 | 상태 코드나 예외 종류만 남긴다. 토큰, 서명, 인자, 응답 본문은 남기지 않는다 |
+
+막을 때는 늘 글이 든 `block` 을 돌려준다. Hermes 는 글이 없는 `block` 을 통과로 읽는다.
+`hermes/tests/test_fos_ctx.py` 가 서버 쪽 검사와 같은 서명 확인 값으로 plugin 을 검사한다.
 
 Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버 이름의 `-` 가 `_` 로 바뀐다.
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
@@ -191,6 +223,9 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 운영 목록에서 빠진 커넥터를 제거하면 plugin 이 그 기록의 서버 env 가 `${이름}` 으로 참조하던 key 를 profile `.env` 에서 함께 지운다. Control Plane 이 그 이름을 더는 알 수 없기 때문이다.
 값이 바뀌어 503 이 된 profile 은 값을 되돌리면 다시 읽힌다.
 **운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
+
+설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
+`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 연결](../docs/connectors.md) 의 「hook 이 켜져 있는지」 가 갖는다.
 
 **한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록을 그대로 받는다**([ADR-041](../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)).
 

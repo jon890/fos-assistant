@@ -1,0 +1,65 @@
+{
+  "name": "plan59-connector-action-policy",
+  "description": "커넥터 도구 호출을 Control Plane 이 판정하고 승인한 쓰기만 실행한다 — 모델이 도구를 부를 수 있다는 것이 사용자 대신 바로 실행한다는 뜻이 아니게 한다",
+  "status": "in_progress",
+  "created_at": "2026-10-01",
+  "total_phases": 11,
+  "current_phase": 7,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 5,
+      "file": "phase-05.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 7,
+      "file": "phase-07.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 8,
+      "file": "phase-08.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 9,
+      "file": "phase-09.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 10,
+      "file": "phase-10.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 11,
+      "file": "phase-11.md",
+      "execution_profile": "standard"
+    }
+  ]
+}

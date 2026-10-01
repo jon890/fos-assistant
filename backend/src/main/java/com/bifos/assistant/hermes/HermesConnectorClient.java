@@ -12,7 +12,22 @@ import java.util.Map;
  * 응답 모양이 틀리거나 호출이 실패하면 원문 없는 {@link IllegalStateException} 을 던진다.
  */
 public interface HermesConnectorClient {
-    record ConnectorState(String profile, boolean enabled, boolean configured, boolean restartRequired) {}
+    /**
+     * 그 profile 의 설치 상태다.
+     *
+     * @param policyHook 그 profile 의 도구 호출이 정책 판정을 거치는가. 대시보드가 참이라고 답했을 때만 참이다
+     */
+    record ConnectorState(
+            String profile, boolean enabled, boolean configured, boolean restartRequired, boolean policyHook) {}
+
+    /**
+     * 설치 요청의 결과다.
+     *
+     * @param restartRequired 대시보드가 답한 재시작 필요. 설치된 연결에는 늘 참이다
+     * @param pluginUpdated 설치가 그 profile 의 hook plugin 파일을 바꿨는가. 떠 있는 gateway 가 옛 코드를 쥐고 있을
+     *     수 있다는 뜻이다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 거짓이다
+     */
+    record InstallResult(boolean restartRequired, boolean pluginUpdated) {}
 
     record ProbeResult(boolean ok, List<String> tools) {}
 
@@ -22,7 +37,7 @@ public interface HermesConnectorClient {
     /** 후보 값으로 선택지 도구나 확인 도구를 한 번 부른다. 대시보드는 값을 저장하지 않는다. */
     CallResult call(String connectorId, String tool, Map<String, String> values);
 
-    boolean putConnector(String profile, String connectorId, boolean enabled);
+    InstallResult putConnector(String profile, String connectorId, boolean enabled);
 
     /** 그 profile 의 설치 상태다. 대시보드의 목록에 그 커넥터가 없으면 설치되지 않은 것으로 돌려준다. */
     ConnectorState readConnector(String profile, String connectorId);

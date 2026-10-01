@@ -30,6 +30,7 @@ import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
@@ -340,6 +341,9 @@ public class ChatService {
     /**
      * 결과마다 에이전트 이름, 실행 번호, 상태를 적은 머리줄을 두고, 답이 있으면 그 아래에 잇는다. 실패는 오류 코드를
      * 머리줄에 더한다.
+     *
+     * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 {@code <external-data>} 로 감싸 지시가 아니라고 알린다.
+     * 에이전트 행이 없는 결과도 출처를 모르므로 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다(ADR-049).
      */
     private static String delegationInput(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
         StringBuilder input = new StringBuilder("맡긴 일의 결과가 도착했다.");
@@ -355,10 +359,19 @@ public class ChatService {
             }
             input.append(']');
             if (result.outputText() != null && !result.outputText().isBlank()) {
-                input.append('\n').append(result.outputText());
+                input.append('\n')
+                        .append(
+                                isExternalResult(result, resultAgents)
+                                        ? ExternalData.wrap(result.outputText())
+                                        : result.outputText());
             }
         }
         return input.toString();
+    }
+
+    private static boolean isExternalResult(AgentExecution execution, Map<Long, Agent> resultAgents) {
+        Agent agent = resultAgents.get(execution.agentId());
+        return agent == null || agent.connectorManaged();
     }
 
     private static String delegationNotice(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
