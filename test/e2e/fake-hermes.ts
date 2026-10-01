@@ -791,9 +791,15 @@ export function startFakeHermes(
 
     if (request.method === "PUT" && path === CONNECTORS_PATH) {
       const body = JSON.parse((await readBody(request)) || "{}") as { profile?: string; plugin?: string; enabled?: unknown };
-      if (body.profile === undefined || !profiles.has(body.profile) || body.plugin !== DEMO_CONNECTOR.id
+      if (body.profile === undefined || !profiles.has(body.profile) || typeof body.plugin !== "string"
           || typeof body.enabled !== "boolean") {
         send(response, 400, { error: "invalid connector request" });
+        return true;
+      }
+      if (body.plugin !== DEMO_CONNECTOR.id) {
+        // 모르는 plugin 은 켜지 못한다. 끄기는 끌 것이 없으므로 바뀐 것 없이 성공한다.
+        if (body.enabled) send(response, 400, { error: "invalid connector request" });
+        else send(response, 200, { profile: body.profile, plugin: body.plugin, enabled: false, changed: false, restart_required: false });
         return true;
       }
       connectorRequests.push(`install ${body.profile} ${body.enabled ? "on" : "off"}`);

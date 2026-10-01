@@ -59,8 +59,9 @@ async function fetchLoaded(id: string): Promise<Loaded> {
       ? { kind: "notFound" }
       : { kind: "failed", message: connection.message };
   }
-  const connector =
-    (catalog.ok && catalog.data.find((item) => item.id === id)) || null;
+  // 카탈로그를 읽지 못한 것을 목록에서 빠진 것으로 보이면 일시 장애에 해제만 남는다.
+  if (!catalog.ok) return { kind: "failed", message: catalog.message };
+  const connector = catalog.data.find((item) => item.id === id) ?? null;
   return { kind: "ready", connector, connection: connection.data };
 }
 

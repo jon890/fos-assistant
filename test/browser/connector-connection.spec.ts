@@ -89,9 +89,9 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
   await card.click();
 
   await expect(page).toHaveURL(new RegExp(`/connections/${DEMO_ID}$`));
-  await page.getByLabel("토큰").fill("demo_ok_0123456789");
+  await page.getByLabel("토큰", { exact: true }).fill("demo_ok_0123456789");
   await page.getByRole("button", { name: "불러오기" }).click();
-  await expect(page.getByLabel("범위")).toHaveValue(SCOPE_ID);
+  await expect(page.getByLabel("범위", { exact: true })).toHaveValue(SCOPE_ID);
   await expect(page.getByText("하나뿐이라 자동으로 골랐어요.")).toBeVisible();
   await page.getByRole("button", { name: "연결하기" }).click();
 
@@ -99,7 +99,7 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
   expect(submitted).toEqual({
     values: { token: "demo_ok_0123456789", scope: SCOPE_ID },
   });
-  await expect(page.getByLabel("토큰")).toHaveValue("");
+  await expect(page.getByLabel("토큰", { exact: true })).toHaveValue("");
   await page.getByRole("button", { name: "연결 다시 확인" }).click();
   await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
   await expect(
@@ -128,15 +128,15 @@ test("등록이 거절되면 비밀 칸을 비우고 정해 둔 문구만 보인
     });
   });
   await page.goto(`/connections/${DEMO_ID}`);
-  await page.getByLabel("토큰").fill("demo_ok_0123456789");
+  await page.getByLabel("토큰", { exact: true }).fill("demo_ok_0123456789");
   await page.getByRole("button", { name: "불러오기" }).click();
-  await expect(page.getByLabel("범위")).toHaveValue(SCOPE_ID);
+  await expect(page.getByLabel("범위", { exact: true })).toHaveValue(SCOPE_ID);
   await page.getByRole("button", { name: "연결하기" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     "입력한 값을 확인하지 못했어요.",
   );
   await expect(page.getByText("raw upstream secret")).toHaveCount(0);
-  await expect(page.getByLabel("토큰")).toHaveValue("");
+  await expect(page.getByLabel("토큰", { exact: true })).toHaveValue("");
 });
 
 test("선택지 조회가 실패하면 비밀 칸을 비운다", async ({ page }) => {
@@ -150,7 +150,7 @@ test("선택지 조회가 실패하면 비밀 칸을 비운다", async ({ page }
     }),
   );
   await page.goto(`/connections/${DEMO_ID}`);
-  const token = page.getByLabel("토큰");
+  const token = page.getByLabel("토큰", { exact: true });
   await token.fill("demo_ok_0123456789");
   await page.getByRole("button", { name: "불러오기" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
@@ -173,7 +173,7 @@ test("비밀 칸이 비어 있으면 선택지를 불러오지 못하고 입력 
   await page.goto(`/connections/${DEMO_ID}`);
   await expect(page.getByRole("button", { name: "불러오기" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "연결하기" })).toBeDisabled();
-  await page.getByLabel("토큰").fill("not-a-demo-token");
+  await page.getByLabel("토큰", { exact: true }).fill("not-a-demo-token");
   await page.getByRole("button", { name: "연결하기" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     "입력 형식을 확인해 주세요.",
@@ -232,7 +232,7 @@ test("카탈로그를 읽지 못하면 쓸 수 없다고 하지 않고 다시 �
   await expect(page.getByRole("button", { name: "연결 해제" })).toHaveCount(0);
   catalogOk = true;
   await page.getByRole("button", { name: "상태 다시 읽기" }).click();
-  await expect(page.getByLabel("토큰")).toBeVisible();
+  await expect(page.getByLabel("토큰", { exact: true })).toBeVisible();
 });
 
 test("운영 목록에서 빠진 연결은 쓸 수 없다고 알리고 해제만 한다", async ({
@@ -267,7 +267,7 @@ test("운영 목록에서 빠진 연결은 쓸 수 없다고 알리고 해제만
   await expect(page.getByRole("main").getByRole("status")).toContainText(
     "지금은 쓸 수 없어요",
   );
-  await expect(page.getByLabel("토큰")).toHaveCount(0);
+  await expect(page.getByLabel("토큰", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "연결 해제" }).click();
   await expect(page.getByTestId("connection-status")).toHaveText("연결 안 됨");
 });
