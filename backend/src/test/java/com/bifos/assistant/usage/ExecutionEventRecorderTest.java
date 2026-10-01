@@ -62,6 +62,12 @@ class ExecutionEventRecorderTest {
         assertThat(event.failed()).isNull();
     }
 
+    /** 사건 스트림이 가리기 전 미리보기에서 꺼낸 스킬 이름을 함께 실은 사건이다. */
+    private static RunEvent hermes(String name, String toolName, String detail, String skillName) {
+        return new RunEvent(
+                name, null, toolName, detail, null, null, null, null, null, null, null, null, null, skillName);
+    }
+
     /**
      * 모델이 스킬을 읽은 것은 {@code skill_view} 도구의 시작 사건에만 실려 온다. 끝 사건과 다른 도구는 스킬
      * 사용이 아니다. 사건 자체는 다른 도구와 같이 옮겨 적는다.
@@ -69,15 +75,28 @@ class ExecutionEventRecorderTest {
     @Test
     @DisplayName("skill view 도구의 시작 사건에서만 스킬 사용을 적는다")
     void recordsSkillUseOnlyFromSkillViewToolStartEvent() {
-        ExecutionEvent started = record(hermes("tool.started", "skill_view", "shopping → references/list.md"));
-        record(hermes("tool.completed", "skill_view", "shopping"));
-        record(hermes("tool.started", "web_search", "shopping"));
-        record(hermes("subagent.start", "skill_view", "shopping"));
+        ExecutionEvent started =
+                record(hermes("tool.started", "skill_view", "shopping → references/list.md", "shopping"));
+        record(hermes("tool.completed", "skill_view", "shopping", "shopping"));
+        record(hermes("tool.started", "web_search", "shopping", "shopping"));
+        record(hermes("subagent.start", "skill_view", "shopping", "shopping"));
 
-        verify(skillUses).recordModel(EXECUTION.id(), "shopping → references/list.md");
+        verify(skillUses).recordModel(EXECUTION.id(), "shopping");
         verifyNoMoreInteractions(skillUses);
         assertThat(started.eventType()).isEqualTo(ExecutionEventType.TOOL_STARTED);
         assertThat(started.toolName()).isEqualTo("skill_view");
+    }
+
+    /** 스킬 사용에는 가린 설명이 아니라 따로 실려 온 이름을 넘긴다. 저장하는 설명에는 그 이름을 싣지 않는다. */
+    @Test
+    @DisplayName("스킬 사용에는 가린 설명 대신 따로 실린 이름을 넘기고 저장하는 설명은 가린 값 그대로 둔다")
+    void passesSeparateSkillNameInsteadOfRedactedDetailAndKeepsStoredDetailRedacted() {
+        String longName = "weekly-grocery-shopping-list-builder-2026-v2";
+
+        ExecutionEvent started = record(hermes("tool.started", "skill_view", "[가림]", longName));
+
+        verify(skillUses).recordModel(EXECUTION.id(), longName);
+        assertThat(started.detail()).isEqualTo("[가림]");
     }
 
     @Test
@@ -128,7 +147,8 @@ class ExecutionEventRecorderTest {
                 "child-1",
                 123L,
                 45L,
-                "completed");
+                "completed",
+                null);
         ExecutionEvent event = record(completed);
 
         assertThat(event.detail()).isEqualTo("숙소 조사");
@@ -151,7 +171,8 @@ class ExecutionEventRecorderTest {
                 "child-1",
                 123L,
                 45L,
-                "completed"));
+                "completed",
+                null));
         assertThat(tool.model()).isNull();
         assertThat(tool.inputTokens()).isNull();
         assertThat(tool.hermesSessionId()).isNull();

@@ -1,5 +1,6 @@
 package com.bifos.assistant.skill.application;
 
+import com.bifos.assistant.hermes.HermesSkillName;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
@@ -27,9 +28,6 @@ public class SkillUseRecorder {
 
     private static final Logger log = LoggerFactory.getLogger(SkillUseRecorder.class);
 
-    /** {@code skill_view} 미리보기에서 이름과 참고 파일 경로를 나누는 글자다. */
-    private static final String PREVIEW_PATH_SEPARATOR = "→";
-
     private final ExecutionSkillUseRepository uses;
     private final TransactionTemplate newTransaction;
 
@@ -42,26 +40,16 @@ public class SkillUseRecorder {
     /**
      * 모델이 {@code skill_view} 로 읽은 것을 적는다.
      *
-     * @param preview 도구 사건의 미리보기. 스킬 이름이거나 {@code 이름 → 파일 경로} 다. 길이 상한에서 잘렸을
-     *     수 있어, Hermes 스킬 이름 규칙에 맞지 않으면 버린다
+     * @param preview 사건 스트림이 가리기 전 미리보기에서 꺼내 넘긴 스킬 이름. {@code 이름 → 파일 경로} 모양도
+     *     받는다. 넘겨받은 값을 믿지 않고 Hermes 스킬 이름 규칙으로 다시 보아, 맞지 않으면 버린다
      */
     public void recordModel(Long executionId, String preview) {
-        record(executionId, nameOf(preview), SkillUseSource.MODEL);
+        record(executionId, HermesSkillName.fromPreview(preview), SkillUseSource.MODEL);
     }
 
     /** 사용자가 {@code /이름} 으로 부른 것을 적는다. */
     public void recordCommand(Long executionId, String skillName) {
-        record(executionId, nameOf(skillName), SkillUseSource.COMMAND);
-    }
-
-    /** 미리보기에서 이름만 꺼낸다. Hermes 스킬 이름 규칙({@code .} 과 {@code _} 포함)에 맞지 않으면 {@code null} 이다. */
-    static String nameOf(String preview) {
-        if (preview == null) {
-            return null;
-        }
-        int separator = preview.indexOf(PREVIEW_PATH_SEPARATOR);
-        String name = (separator < 0 ? preview : preview.substring(0, separator)).strip();
-        return SkillService.HERMES_SKILL_NAME.matcher(name).matches() ? name : null;
+        record(executionId, HermesSkillName.fromPreview(skillName), SkillUseSource.COMMAND);
     }
 
     private void record(Long executionId, String skillName, SkillUseSource source) {

@@ -25,8 +25,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>이 클래스는 저장하지 않고 엔티티를 만들기만 한다. 저장을 부르는 쪽이 하면 저장 실패를 감싸는
  * 자리가 한 곳으로 모인다. 예외가 하나 있다. {@code skill_view} 도구 호출의 시작 사건은 스킬 호출 이력이기도
- * 해서 {@link SkillUseRecorder} 에 넘겨 그 자리에서 적는다. 그 저장은 스스로 실패를 감싸므로 여기로 던지지
- * 않는다.
+ * 해서 {@link SkillUseRecorder} 에 넘겨 그 자리에서 적는다. 넘기는 것은 가린 {@code detail} 이 아니라 사건
+ * 스트림이 가리기 전 미리보기에서 꺼내 검증한 {@code skillName} 이다. 근거는 ADR-047 에 있다. 그 저장은 스스로
+ * 실패를 감싸므로 여기로 던지지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -69,7 +70,7 @@ public class ExecutionEventRecorder {
             return null;
         }
         if (type == ExecutionEventType.TOOL_STARTED && SKILL_VIEW_TOOL.equals(event.toolName())) {
-            skillUses.recordModel(execution.id(), event.detail());
+            skillUses.recordModel(execution.id(), event.skillName());
         }
         return ExecutionEvent.builder()
                 .executionId(execution.id())

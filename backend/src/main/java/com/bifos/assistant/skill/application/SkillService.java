@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesRequestRejected;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
+import com.bifos.assistant.hermes.HermesSkillName;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -18,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,13 +66,6 @@ public class SkillService {
 
     /** 설명의 글자 수 상한. 저장할 때마다 본다. Hermes v0.21.5 가 스킬을 쓸 때마다 보는 상한과 같다. */
     public static final int MAX_DESCRIPTION_CHARS = 1024;
-
-    /**
-     * Hermes 가 가진 스킬까지 포함한 이름 형식이다. 켜고 끄기와 호출 이력({@link SkillUseRecorder})이 쓴다. Hermes 는 소문자, 숫자, 점, 밑줄,
-     * 붙임표로 64자까지 받는다. 첫 글자를 영문 소문자나 숫자로 묶어 {@code .} 과 {@code ..} 같은 이름을
-     * 막는다. 화면(web/src/lib/skill.ts)의 같은 규칙과 함께 고친다.
-     */
-    static final Pattern HERMES_SKILL_NAME = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
 
     private final AgentService agents;
     private final SkillStore store;
@@ -245,7 +238,7 @@ public class SkillService {
      */
     public void toggle(CurrentUser user, String code, String name, boolean enabled) {
         Agent agent = requireEditable(user, code);
-        if (name == null || !HERMES_SKILL_NAME.matcher(name).matches()) {
+        if (!HermesSkillName.isValid(name)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill name must follow the Hermes skill name rule");
         }
         publisher.toggle(agent.hermesProfile(), name, enabled);

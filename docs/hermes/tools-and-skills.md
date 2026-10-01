@@ -594,6 +594,7 @@ Control Plane 이 「`skill_view` 로 읽고 따르라」는 입력으로 바꿔
 
 `skill_view` 도구 호출의 `tool.started` 사건 `preview` 는 스킬 이름이다. 참고 파일을 읽으면 `이름 → 파일 경로` 모양이다(`agent/display.py` 의 `_preview_skill_view`).
 미리보기는 길이 상한에서 잘릴 수 있다. 이름 규칙에 맞지 않으면 버린다.
+Control Plane 은 도구 내용을 가리기 전에 이 미리보기에서 이름을 꺼낸다([Runs API 계약](runs-api.md#도구-내용-가리기)).
 
 ### 스킬 목록을 얻는 곳
 
