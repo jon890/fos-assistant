@@ -113,7 +113,9 @@ test("워크플로 게시 확인 단계는 누락과 커밋 변경, API 오류�
     .split("\n")
     .map((line) => line.replace(/^          /, ""))
     .join("\n")
-    .replace(/\$\{\{[^}]+\}\}/g, "fixture");
+    .replace(/\$\{\{[^}]+\}\}/g, "fixture")
+    // CI 는 기본 브랜치의 사본을 .review-tools 에 두고 쓴다. 여기서는 작업 트리의 같은 파일을 쓴다.
+    .replaceAll(".review-tools/", "");
   const run = (head, reviews, apiFailure = false) =>
     spawnSync(
       "bash",
