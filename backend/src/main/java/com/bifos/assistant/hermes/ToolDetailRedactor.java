@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** 도구 설명을 외부로 중계하거나 저장하기 전에 비밀값과 식별자를 제거한다. */
-final class ToolDetailRedactor {
+public final class ToolDetailRedactor {
     private static final String HIDDEN = "[가림]";
     private static final int INPUT_LIMIT = 65_536;
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
@@ -49,7 +49,8 @@ final class ToolDetailRedactor {
         return redact(detail, connectorManaged, new LinkedHashMap<>());
     }
 
-    static String redact(String detail, boolean connectorManaged, Map<String, String> identifiers) {
+    /** 번호표는 실행 하나 동안만 메모리에 두고 저장하거나 다른 실행과 공유하지 않는다. */
+    public static String redact(String detail, boolean connectorManaged, Map<String, String> identifiers) {
         if (detail == null) {
             return null;
         }
