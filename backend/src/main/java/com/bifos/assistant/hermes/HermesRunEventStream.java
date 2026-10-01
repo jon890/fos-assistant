@@ -8,6 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -35,14 +38,26 @@ public class HermesRunEventStream {
         this.objectMapper = objectMapper;
     }
 
-    public void open(
-            String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
+    public void open(String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
         open(apiBaseUrl, profileName, runId, onEvent, stream -> {});
     }
 
     public void open(
-            String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent,
+            String apiBaseUrl,
+            String profileName,
+            String runId,
+            Consumer<RunEvent> onEvent,
             Consumer<java.io.Closeable> onOpened) {
+        open(apiBaseUrl, profileName, runId, onEvent, onOpened, false);
+    }
+
+    public void open(
+            String apiBaseUrl,
+            String profileName,
+            String runId,
+            Consumer<RunEvent> onEvent,
+            Consumer<java.io.Closeable> onOpened,
+            boolean connectorManaged) {
         String apiKey = keyStore.resolve(profileName);
         try (InputStream body = restClient
                 .get()
@@ -55,7 +70,7 @@ public class HermesRunEventStream {
                 throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an empty event stream");
             }
             onOpened.accept(body);
-            readEvents(body, onEvent);
+            readEvents(body, onEvent, connectorManaged);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not read the Hermes event stream");
         } catch (IOException ex) {
@@ -63,14 +78,14 @@ public class HermesRunEventStream {
         }
     }
 
-    private void readEvents(InputStream body, Consumer<RunEvent> onEvent) throws IOException {
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(body, StandardCharsets.UTF_8))) {
+    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, boolean connectorManaged) throws IOException {
+        Map<String, String> identifiers = new LinkedHashMap<>();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
-                    emit(data, onEvent);
+                    emit(data, onEvent, connectorManaged, identifiers);
                     continue;
                 }
                 if (line.startsWith(":")) {
@@ -83,20 +98,22 @@ public class HermesRunEventStream {
                     data.append(line.substring(5).stripLeading());
                 }
             }
-            emit(data, onEvent);
+            emit(data, onEvent, connectorManaged, identifiers);
         }
     }
 
-    private void emit(StringBuilder data, Consumer<RunEvent> onEvent) throws IOException {
+    private void emit(
+            StringBuilder data, Consumer<RunEvent> onEvent, boolean connectorManaged, Map<String, String> identifiers)
+            throws IOException {
         if (data.isEmpty()) {
             return;
         }
         String raw = data.toString();
         data.setLength(0);
         try {
-            onEvent.accept(toRunEvent(objectMapper.readTree(raw)));
+            onEvent.accept(toRunEvent(objectMapper.readTree(raw), connectorManaged, identifiers));
         } catch (JacksonException ex) {
-            throw new IOException("Hermes sent an invalid event", ex);
+            throw new IOException("Hermes sent an invalid event");
         }
     }
 
@@ -107,12 +124,25 @@ public class HermesRunEventStream {
      * 것은 다른 형태로 보내는 구현이 섞일 때를 위한 것이다.
      */
     static RunEvent toRunEvent(JsonNode root) {
+        return toRunEvent(root, false);
+    }
+
+    static RunEvent toRunEvent(JsonNode root, boolean connectorManaged) {
+        return toRunEvent(root, connectorManaged, new LinkedHashMap<>());
+    }
+
+    private static RunEvent toRunEvent(JsonNode root, boolean connectorManaged, Map<String, String> identifiers) {
         JsonNode payload = root.path("data");
+        String type = firstText(root, payload, "event", "type");
+        String detail = firstDetail(root, payload);
+        if (type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.")) {
+            detail = ToolDetailRedactor.redact(detail, connectorManaged, identifiers);
+        }
         return new RunEvent(
-                firstText(root, payload, "event", "type"),
+                type,
                 firstText(root, payload, "delta", "text", "output"),
                 firstText(root, payload, "tool", "tool_name", "toolName", "name"),
-                firstText(root, payload, "preview", "detail", "result"),
+                detail,
                 durationMs(root, payload),
                 failed(root, payload),
                 firstText(root, payload, "subagent_id"),
@@ -122,6 +152,19 @@ public class HermesRunEventStream {
                 firstNumber(root, payload, "input_tokens"),
                 firstNumber(root, payload, "output_tokens"),
                 firstText(root, payload, "status"));
+    }
+
+    private static String firstDetail(JsonNode root, JsonNode payload) {
+        for (String name : new String[] {"preview", "detail", "result"}) {
+            JsonNode value = root.get(name);
+            if (value == null || value.isNull()) {
+                value = payload.get(name);
+            }
+            if (value != null && !value.isNull()) {
+                return value.isValueNode() ? value.asText() : value.toString();
+            }
+        }
+        return null;
     }
 
     /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 1000 을 곱해 밀리초 정수로 옮긴다. */
