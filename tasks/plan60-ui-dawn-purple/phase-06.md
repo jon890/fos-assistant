@@ -95,7 +95,10 @@ ADR-047 「움직임」 표의 움직임을 부품에 붙이고, 모든 움직�
 
   `durationMs` 기본값은 120 이다. `prefers-reduced-motion` 이면 기다리지 않고 바로 `remove` 를 부른다. 언마운트되면 타이머를 지운다.
 - `globals.css` 에 `[data-leaving="true"] { opacity: 0; transition: opacity var(--duration-fast) linear; }` 를 둔다.
-- 쓰는 곳: `web/src/components/shell/conversation-nav.tsx` 의 대화 지우기, `web/src/components/memory/memory-item.tsx` 의 기억 지우기. 서버 요청이 성공한 뒤 `exit(() => 목록 갱신)` 을 부른다.
+- 쓰는 곳은 둘이다.
+  - 기억 지우기: `web/src/components/memory/memory-item.tsx` 가 요청이 성공한 뒤 `onChanged()` 를 따로 부른다. 그 호출을 `exit(() => void onChanged())` 로 감싼다.
+  - 대화 지우기: `web/src/components/shell/conversations-provider.tsx` 의 `remove` 가 `DELETE` 요청과 `setConversations(filter)` 를 한 번에 한다. 둘을 나눈다. `remove(id)` 는 요청만 보내고 지금처럼 실패를 던지거나 돌려준다. 새 함수 `drop(id)` 가 목록에서 그 줄을 뺀다. context 값에 `drop` 을 더한다. `remove` 를 부르는 곳은 `web/src/components/shell/conversation-nav.tsx` 의 지우기 확인 하나다. 거기서 `await remove(id)` 가 성공한 뒤 `exit(() => drop(id))` 를 부른다. 지운 대화를 보고 있었을 때 새 대화로 옮기는 지금 동작은 `drop` 뒤에 그대로 일어나야 한다.
+  - 줄마다 `useExit` 을 따로 가져야 하므로, 대화 목록의 줄이 한 컴포넌트가 아니면 지우는 중인 id 하나를 상태로 두고 그 id 의 줄에 `data-leaving` 을 준다.
 - 추가: 대화 목록의 새 줄과 기억 목록의 새 줄에 `animate-message-assistant` 를 준다. 처음 그릴 때 있던 줄에는 주지 않는다. 목록을 처음 그릴 때의 id 집합을 `useRef` 에 두고, 그 집합에 없는 id 의 줄에만 준다. 대화 목록은 목록을 처음 읽어 온 뒤에 집합을 채운다.
 
 ### 6. 검사
@@ -138,6 +141,7 @@ cd web && pnpm test:browser
 | `web/src/components/ui/use-exit.ts` | 신규 |
 | `web/src/app/globals.css` | 수정 |
 | `web/src/components/shell/conversation-nav.tsx` | 수정 |
+| `web/src/components/shell/conversations-provider.tsx` | 수정 |
 | `web/src/components/memory/memory-item.tsx` | 수정 |
 | `web/src/components/memory/memory-list.tsx` | 수정 |
 | `web/src/components/chat/message-list.tsx` | 수정 |
