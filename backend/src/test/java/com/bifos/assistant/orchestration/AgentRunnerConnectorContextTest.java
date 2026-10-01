@@ -97,7 +97,7 @@ class AgentRunnerConnectorContextTest {
     @Test
     @DisplayName("Flow와 위임 실행은 해석한 단계 값을 보내고 요청·제출 시각을 기록한다")
     void sendsResolvedTierAndRecordsRequestAndSubmission() {
-        ModelChoice choice = ModelChoice.of("openai-codex", "gpt-6.1-sol", "high");
+        ModelChoice choice = ModelChoice.of("openai-codex", "example-deep", "high");
         when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(choice, ModelTier.DEEP));
 
         run(agent(), null, null);

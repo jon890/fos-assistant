@@ -71,12 +71,12 @@ class HermesRuntimeReadTest {
     void sessionQueryReadsModelInsideSession() {
         bodies.put(
                 "/p/dad/api/sessions/sess-1",
-                "{\"object\":\"session\",\"session\":{\"id\":\"sess-1\",\"model\":\"gpt-6-luna\"}}");
+                "{\"object\":\"session\",\"session\":{\"id\":\"sess-1\",\"model\":\"example-fast\"}}");
 
         SessionRuntime runtime = client.readSessionRuntime(baseUrl, "dad", "sess-1");
 
         assertThat(runtime).isNotNull();
-        assertThat(runtime.model()).isEqualTo("gpt-6-luna");
+        assertThat(runtime.model()).isEqualTo("example-fast");
         assertThat(runtime.provider()).isNull();
     }
 
@@ -87,14 +87,14 @@ class HermesRuntimeReadTest {
         bodies.put(
                 "/p/dad/v1/runs/run-1",
                 "{\"run_id\":\"run-1\",\"status\":\"completed\",\"session_id\":\"sess-1\",\"model\":\"dad\","
-                        + "\"runtime\":{\"provider\":\"openai-codex\",\"model\":\"gpt-6-luna\",\"route_source\":\"global\"}}");
+                        + "\"runtime\":{\"provider\":\"openai-codex\",\"model\":\"example-fast\",\"route_source\":\"global\"}}");
 
         HermesRunResult result = client.awaitCompletion(
                 new HermesRunCommand("dad", baseUrl, "안녕", null, null, null, null, null), "run-1");
 
         assertThat(result.runtime()).isNotNull();
         assertThat(result.runtime().provider()).isEqualTo("openai-codex");
-        assertThat(result.runtime().model()).isEqualTo("gpt-6-luna");
+        assertThat(result.runtime().model()).isEqualTo("example-fast");
         assertThat(result.model()).as("model 칸은 요청을 되돌려 준 값 그대로다").isEqualTo("dad");
     }
 
@@ -104,7 +104,7 @@ class HermesRuntimeReadTest {
         bodies.put(
                 "/p/dad/api/sessions/child-1",
                 "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
-                        + "\"parent_session_id\":\"parent-1\",\"model\":\"gpt-6-luna\","
+                        + "\"parent_session_id\":\"parent-1\",\"model\":\"example-fast\","
                         + "\"started_at\":10.25,\"ended_at\":12.75,\"input_tokens\":100,"
                         + "\"output_tokens\":40,\"cache_read_tokens\":20,\"cache_write_tokens\":5}}");
 

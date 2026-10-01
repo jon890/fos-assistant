@@ -183,6 +183,13 @@ function startControlPlane(
       DB_PASSWORD: "",
       SERVER_PORT: String(APP_PORT),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
+      // 단계 초기값은 제품 코드가 아닌 실행 설정에서 받는다. 대역 catalog의 중립 모델을 쓴다.
+      ASSISTANT_MODEL_TIERS_FAST_MODEL: "example-fast",
+      ASSISTANT_MODEL_TIERS_FAST_REASONING_EFFORT: "low",
+      ASSISTANT_MODEL_TIERS_BALANCED_MODEL: "example-balanced",
+      ASSISTANT_MODEL_TIERS_BALANCED_REASONING_EFFORT: "medium",
+      ASSISTANT_MODEL_TIERS_DEEP_MODEL: "example-deep",
+      ASSISTANT_MODEL_TIERS_DEEP_REASONING_EFFORT: "high",
       // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
       HERMES_PROFILE_KEY_DIR: keyDir,

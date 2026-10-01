@@ -1209,7 +1209,7 @@ export function startFakeHermes(
                 slug: DEFAULT_RUNTIME.provider,
                 name: "OpenAI Codex",
                 authenticated: true,
-                models: [DEFAULT_RUNTIME.model, "example-model-mini", "gpt-6-luna", "gpt-6.1-sol"],
+                models: [DEFAULT_RUNTIME.model, "example-model-mini", "example-fast", "example-balanced", "example-deep"],
                 capabilities: {
                   [DEFAULT_RUNTIME.model]: { reasoning: true },
                   "example-model-mini": { reasoning: false },
@@ -1232,7 +1232,7 @@ export function startFakeHermes(
             const ended = !child.delayed || child.reads > 1;
             return send(response, 200, { object: "session", session: {
               id: sessionId, source: "subagent", parent_session_id: child.parent,
-              model: "gpt-6-luna", started_at: 1000, ended_at: ended ? 1002.5 : null,
+              model: "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
               end_reason: ended ? "agent_close" : null,
               input_tokens: 100, cache_read_tokens: 50, cache_write_tokens: 10, output_tokens: 20,
             } });
@@ -1361,7 +1361,7 @@ export function startFakeHermes(
             childUsages.set(childSessionId, { profile: profile!, parent: run.session_id,
               reads: 0, delayed: run.input === "자식 늦은 완료 검사" });
             const child = { subagent_id: `sa-${run.run_id}`, goal: "부모 뒤에 끝나는 조사",
-              model: "gpt-6-luna", child_session_id: childSessionId };
+              model: "example-fast", child_session_id: childSessionId };
             event(response, { event: "subagent.start", ...child });
             event(response, { event: "run.completed" });
             // 부모 스트림을 먼저 닫는다. 늦은 자식 완료는 첫 session 조회 뒤에만 보이며,

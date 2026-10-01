@@ -103,26 +103,35 @@ export const modelSelectionScenario: Scenario = {
       `실제로 돈 모델을 적지 않았다: ${JSON.stringify(probed)}`,
     );
 
-    step("단계를 고르면 정의된 모델과 강도를 보내고 기본값 복귀는 요청 값을 비운다");
+    step("세 단계는 실행 설정과 profile catalog로 해석하고 기본값 복귀는 요청 값을 비운다");
     const tierConversationId = await emptyConversation(context);
-    expectStatus(await call(context, `/chat/conversations/${tierConversationId}/model-tier`, {
-      method: "PUT",
-      token: context.tokens.dad,
-      body: { mode: "TIER", tier: "DEEP" },
-    }), 200, "깊게 단계 선택");
-    const tierTurn = expectStatus(await call(context, "/chat/messages", {
-      method: "POST",
-      token: context.tokens.dad,
-      body: { conversationId: tierConversationId, text: "단계 선택 검사" },
-    }), 200, "단계 대화").json<Turn>();
-    const tierRuntime = context.hermes.lastSubmittedRuntime();
-    expect(tierRuntime.provider === PROFILE_DEFAULT.provider && tierRuntime.model === "gpt-6.1-sol"
-      && tierRuntime.reasoningEffort === "high", `단계 정의가 실리지 않았다: ${JSON.stringify(tierRuntime)}`);
-    const tierTree = expectStatus(await call(context, `/usage/executions/${tierTurn.executionId}/tree`, {
-      token: context.tokens.dad,
-    }), 200, "단계 실행 기록").json<{ root: { modelTier: string; model: string; reasoningEffortSource: string } }>();
-    expect(tierTree.root.modelTier === "DEEP" && tierTree.root.model === "gpt-6.1-sol"
-      && tierTree.root.reasoningEffortSource === "REQUESTED", "단계와 실제 요청 강도가 기록되지 않았다");
+    const tierCases = [
+      { tier: "FAST", model: "example-fast", effort: "low" },
+      { tier: "BALANCED", model: "example-balanced", effort: "medium" },
+      { tier: "DEEP", model: "example-deep", effort: "high" },
+    ];
+    for (const selected of tierCases) {
+      expectStatus(await call(context, `/chat/conversations/${tierConversationId}/model-tier`, {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: { mode: "TIER", tier: selected.tier },
+      }), 200, `${selected.tier} 단계 선택`);
+      const tierTurn = expectStatus(await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { conversationId: tierConversationId, text: "단계 선택 검사" },
+      }), 200, "단계 대화").json<Turn>();
+
+      const tierRuntime = context.hermes.lastSubmittedRuntime();
+      expect(tierRuntime.provider === PROFILE_DEFAULT.provider && tierRuntime.model === selected.model
+        && tierRuntime.reasoningEffort === selected.effort,
+        `설정된 단계가 실리지 않았다: ${JSON.stringify(tierRuntime)}`);
+      const tierTree = expectStatus(await call(context, `/usage/executions/${tierTurn.executionId}/tree`, {
+        token: context.tokens.dad,
+      }), 200, "단계 실행 기록").json<{ root: { modelTier: string; model: string; reasoningEffortSource: string } }>();
+      expect(tierTree.root.modelTier === selected.tier && tierTree.root.model === selected.model
+        && tierTree.root.reasoningEffortSource === "REQUESTED", "단계와 실제 요청 강도가 기록되지 않았다");
+    }
     expectStatus(await call(context, `/chat/conversations/${tierConversationId}/model-tier`, {
       method: "PUT",
       token: context.tokens.dad,

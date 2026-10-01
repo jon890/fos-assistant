@@ -51,7 +51,7 @@ class SubagentUsageReconcilerTest {
     void unfinishedChildIsNotFinal() throws ReflectiveOperationException {
         SubagentUsageJob job = job();
         SubagentSessionUsage running =
-                new SubagentSessionUsage("child", "subagent", "parent", "gpt-6-luna", 1.0, null, 10L, 2L, 1L, 1L);
+                new SubagentSessionUsage("child", "subagent", "parent", "example-fast", 1.0, null, 10L, 2L, 1L, 1L);
 
         assertThat(SubagentUsageReconciler.isFinalChild(job, running)).isFalse();
     }
@@ -60,8 +60,8 @@ class SubagentUsageReconcilerTest {
     @DisplayName("다른 부모에 속한 종료 session은 완료 사용량으로 기록하지 않는다")
     void rejectsChildOfAnotherParent() throws ReflectiveOperationException {
         SubagentUsageJob job = job();
-        SubagentSessionUsage wrongParent =
-                new SubagentSessionUsage("child", "subagent", "other-parent", "gpt-6-luna", 1.0, 2.0, 10L, 2L, 1L, 1L);
+        SubagentSessionUsage wrongParent = new SubagentSessionUsage(
+                "child", "subagent", "other-parent", "example-fast", 1.0, 2.0, 10L, 2L, 1L, 1L);
 
         assertThat(SubagentUsageReconciler.isFinalChild(job, wrongParent)).isFalse();
     }
@@ -71,7 +71,7 @@ class SubagentUsageReconcilerTest {
     void acceptsCompletedChildWithInclusiveUsage() throws ReflectiveOperationException {
         SubagentUsageJob job = job();
         SubagentSessionUsage completed =
-                new SubagentSessionUsage("child", "subagent", "parent", "gpt-6-luna", 1.25, 3.75, 10L, 4L, 2L, 3L);
+                new SubagentSessionUsage("child", "subagent", "parent", "example-fast", 1.25, 3.75, 10L, 4L, 2L, 3L);
 
         assertThat(SubagentUsageReconciler.isFinalChild(job, completed)).isTrue();
         assertThat(completed.inclusiveInputTokens()).isEqualTo(15L);
@@ -82,7 +82,7 @@ class SubagentUsageReconcilerTest {
     @DisplayName("토큰 합계가 long 범위를 넘으면 기록하지 않는다")
     void keepsOverflowingInclusiveInputUnknown() {
         SubagentSessionUsage completed = new SubagentSessionUsage(
-                "child", "subagent", "parent", "gpt-6-luna", 1.0, 2.0, Long.MAX_VALUE, 0L, 1L, 0L);
+                "child", "subagent", "parent", "example-fast", 1.0, 2.0, Long.MAX_VALUE, 0L, 1L, 0L);
 
         assertThat(completed.inclusiveInputTokens()).isNull();
     }
@@ -92,7 +92,7 @@ class SubagentUsageReconcilerTest {
     void supplementMarksCheckedWhenDefaultResponseHasNoEffort() throws ReflectiveOperationException {
         Fixtures fixtures = fixtures();
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
-        when(fixtures.defaults.read("dad")).thenReturn(new ProfileModelDefaults("openai-codex", "gpt-6-luna", null));
+        when(fixtures.defaults.read("dad")).thenReturn(new ProfileModelDefaults("openai-codex", "example-fast", null));
 
         fixtures.reconciler.supplementDefault(1L, "dad");
 
@@ -122,8 +122,8 @@ class SubagentUsageReconcilerTest {
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.defaults.read("dad"))
                 .thenReturn(
-                        new ProfileModelDefaults("openai-codex", "gpt-6-luna", null),
-                        new ProfileModelDefaults("openai-codex", "gpt-6-luna", "high"));
+                        new ProfileModelDefaults("openai-codex", "example-fast", null),
+                        new ProfileModelDefaults("openai-codex", "example-fast", "high"));
 
         fixtures.reconciler.supplementDefault(1L, "dad");
         fixtures.reconciler.supplementDefault(1L, "dad");
@@ -154,7 +154,7 @@ class SubagentUsageReconcilerTest {
         when(fixtures.defaults.read("dad")).thenAnswer(invocation -> {
             profileStarted.countDown();
             await(release);
-            return new ProfileModelDefaults("openai-codex", "gpt-6-luna", null);
+            return new ProfileModelDefaults("openai-codex", "example-fast", null);
         });
         when(fixtures.hermes.readSubagentUsage(any(), any(), any())).thenAnswer(invocation -> {
             childrenStarted.countDown();
@@ -268,7 +268,7 @@ class SubagentUsageReconcilerTest {
         when(fixtures.events.lastSequence(1L)).thenReturn(7);
         when(fixtures.hermes.readSubagentUsage(any(), any(), any()))
                 .thenReturn(new SubagentSessionUsage(
-                        "child", "subagent", "parent", "gpt-6-luna", 1.0, 2.5, 10L, 4L, 2L, 3L));
+                        "child", "subagent", "parent", "example-fast", 1.0, 2.5, 10L, 4L, 2L, 3L));
 
         fixtures.reconciler.poll(10L);
 
@@ -326,7 +326,7 @@ class SubagentUsageReconcilerTest {
                 .thenReturn(false);
         when(fixtures.hermes.readSubagentUsage(any(), any(), any()))
                 .thenReturn(new SubagentSessionUsage(
-                        "child", "subagent", "parent", "gpt-6-luna", 1.0, null, 10L, 4L, 2L, 3L));
+                        "child", "subagent", "parent", "example-fast", 1.0, null, 10L, 4L, 2L, 3L));
 
         fixtures.reconciler.poll(10L);
 
