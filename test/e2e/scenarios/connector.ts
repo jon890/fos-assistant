@@ -8,7 +8,10 @@ import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 import { DEMO_CONNECTOR, DEMO_TOKEN_BAD, DEMO_TOKEN_OK } from "../fake-hermes.ts";
 
 type FieldView = { key: string; hasOptions: boolean; secret: boolean; required: boolean };
-type ConnectorView = { id: string; title: string; fields: FieldView[]; myStatus: string; available: boolean };
+type ToolView = { name: string; title: string | null; risk: string; approval: string };
+type ConnectorView = {
+  id: string; title: string; fields: FieldView[]; tools: ToolView[]; myStatus: string; available: boolean;
+};
 type ConnectionView = {
   connectorId: string;
   status: string;
@@ -16,6 +19,7 @@ type ConnectionView = {
   values: Record<string, string>;
   agentCode: string | null;
   restartRequired: boolean;
+  undeclaredTools: number;
 };
 
 const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
@@ -33,9 +37,20 @@ export const connectorScenario: Scenario = {
     expect(demo!.fields.map((field) => field.key).join() === "token,scope", `칸 순서가 다르다\n${catalogResponse.body}`);
     expect(demo!.fields[0]!.secret && demo!.fields[0]!.required && demo!.fields[1]!.hasOptions,
       `칸의 성질이 선언과 다르다\n${catalogResponse.body}`);
-    for (const hidden of ["DEMO_TOKEN", "DEMO_SCOPE", "list_scopes", "verify"]) {
+    // 도구 이름은 이제 도구 정책으로 나온다. env 이름과 확인 도구 선언은 그대로 숨긴다.
+    for (const hidden of ["DEMO_TOKEN", "DEMO_SCOPE", "verify"]) {
       expect(!catalogResponse.body.includes(hidden), `목록 응답에 ${hidden} 가 새었다`);
     }
+    const writeNote = demo!.tools.find((tool) => tool.name === "write_note");
+    expect(
+      writeNote !== undefined && writeNote.risk === "WRITE" && writeNote.approval === "REQUIRED"
+        && writeNote.title === DEMO_CONNECTOR.tools.write_note.title,
+      `write_note 의 도구 정책이 선언과 다르다\n${catalogResponse.body}`,
+    );
+    expect(
+      demo!.tools.map((tool) => tool.name).join() === Object.keys(DEMO_CONNECTOR.tools).join(),
+      `도구 목록이 선언과 다르다\n${catalogResponse.body}`,
+    );
 
     step("선택지를 불러온다");
     const options = expectStatus(
@@ -104,6 +119,7 @@ export const connectorScenario: Scenario = {
     const checked = expectStatus(await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인");
     const ready = checked.json<ConnectionView>();
     expect(ready.status === "READY", `READY 가 아니다\n${checked.body}`);
+    expect(ready.undeclaredTools === 1, `선언하지 않은 도구 수가 1 이 아니다\n${checked.body}`);
     const checkRequests = context.hermes.connectorRequests().slice(requestsAtCheck);
     const reinstalledAt = checkRequests.indexOf(`install ${profile} on`);
     expect(
@@ -131,6 +147,21 @@ export const connectorScenario: Scenario = {
       (await call(context, "/admin/connections", { token: context.tokens.dad })).body,
     ];
     reads.forEach((body, index) => expect(!body.includes(DEMO_TOKEN_OK), `응답 ${index} 에 토큰 원문이 있다`));
+
+    step("정책 hook 이 꺼져 있으면 연결 확인이 PENDING 으로 내리고 다시 켜지면 READY 로 돌아온다");
+    const installLine = context.hermes.connectorRequests().find((line) => /^install \S+ on$/.test(line));
+    const hookProfile = installLine?.split(" ")[1];
+    expect(hookProfile === profile, `설치 요청의 profile 이 연결용 profile 과 다르다: ${installLine}`);
+    context.hermes.setPolicyHook(hookProfile!, false);
+    const hookOff = expectStatus(
+      await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "hook 이 꺼진 연결 확인",
+    );
+    expect(hookOff.json<ConnectionView>().status === "PENDING", `hook 이 꺼졌는데 PENDING 이 아니다\n${hookOff.body}`);
+    context.hermes.setPolicyHook(hookProfile!, true);
+    const hookOn = expectStatus(
+      await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "hook 이 켜진 연결 확인",
+    );
+    expect(hookOn.json<ConnectionView>().status === "READY", `hook 이 켜졌는데 READY 가 아니다\n${hookOn.body}`);
 
     step("다른 사용자는 이 연결을 읽지 못한다");
     const others = expectStatus(await call(context, CONNECTION, { token: context.tokens.kid }), 200, "다른 사용자의 상태").json<ConnectionView>();

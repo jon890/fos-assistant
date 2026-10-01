@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,7 +14,11 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -31,7 +36,10 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +61,8 @@ class AgentRunnerConnectorContextTest {
     private final ContextAssembler contextAssembler = mock(ContextAssembler.class);
     private final HermesRunsClient hermes = mock(HermesRunsClient.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
+    private final ModelTierService modelTiers = mock(ModelTierService.class);
+    private static final Instant REQUEST_RECEIVED_AT = Instant.parse("2026-10-01T00:00:00Z");
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final AgentExecution started = mock(AgentExecution.class);
     private final AgentExecution completed = mock(AgentExecution.class);
@@ -61,9 +71,11 @@ class AgentRunnerConnectorContextTest {
     @BeforeEach
     void setUp() {
         when(contextAssembler.assemble(user)).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
+        when(contextAssembler.withResponseInstructions(any())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
-        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
+        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(started);
         when(executions.complete(any(), any(), any(), any())).thenReturn(completed);
         when(executions.complete(any(), any(), any(), any(), any())).thenReturn(completed);
@@ -77,28 +89,68 @@ class AgentRunnerConnectorContextTest {
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100));
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100),
+                modelTiers,
+                Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC));
     }
 
     @Test
-    @DisplayName("커넥터 에이전트의 실행은 Memory 를 조립하지 않고 덧붙인 지시만 보낸다")
+    @DisplayName("Flow와 위임 실행은 해석한 단계 값을 보내고 요청·제출 시각을 기록한다")
+    void sendsResolvedTierAndRecordsRequestAndSubmission() {
+        ModelChoice choice = ModelChoice.of("openai-codex", "example-deep", "high");
+        when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(choice, ModelTier.DEEP));
+
+        run(agent(), null, null);
+
+        HermesRunCommand command = submitted();
+        assertThat(command.provider()).isEqualTo(choice.provider());
+        assertThat(command.model()).isEqualTo(choice.model());
+        assertThat(command.reasoningEffort()).isEqualTo(choice.reasoningEffort());
+        verify(executions)
+                .start(
+                        same(user),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        same(choice),
+                        any(),
+                        any(),
+                        any(),
+                        eq(ModelTier.DEEP),
+                        eq(REQUEST_RECEIVED_AT));
+        verify(executions).markSubmitted(started);
+        verify(executions, never()).markFirstDelta(any());
+        var submissionOrder = inOrder(executions, hermes);
+        submissionOrder.verify(executions).markSubmitted(started);
+        submissionOrder.verify(hermes).submit(any());
+    }
+
+    @Test
+    @DisplayName("커넥터 실행은 Memory 없이 공통 지침과 덧붙인 지시를 보낸다")
     void sendsOnlyInstructionAdditionForConnectorAgent() {
         run(connectorAgent(), ADDITION, null);
 
         verify(contextAssembler, never()).assemble(any());
-        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isEqualTo(ADDITION);
+        String instructions = submitted().instructions();
+        assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY).endsWith("\n\n" + ADDITION);
+        String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + ADDITION));
         ExecutionContextSnapshot snapshot = recordedSnapshot();
-        assertThat(snapshot.contextChars()).as("실행 줄에 적는 문맥 길이").isZero();
-        assertThat(snapshot.instructionsHash()).as("실행 줄에 적는 문맥 지문").isNull();
+        assertThat(snapshot.contextChars()).isEqualTo(commonInstructions.length());
+        assertThat(snapshot.instructionsHash())
+                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
     }
 
     @Test
-    @DisplayName("커넥터 에이전트의 실행에 덧붙일 지시가 없으면 instructions 를 비워 보낸다")
+    @DisplayName("커넥터 실행에 덧붙일 지시가 없어도 공통 표 지침은 보낸다")
     void sendsNoInstructionsForConnectorAgentWithoutAddition() {
         run(connectorAgent(), null, null);
 
         verify(contextAssembler, never()).assemble(any());
-        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isNull();
+        String instructions = submitted().instructions();
+        assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY);
+        assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length());
     }
 
     @Test
@@ -107,8 +159,9 @@ class AgentRunnerConnectorContextTest {
         run(agent(), ADDITION, null);
 
         verify(contextAssembler).assemble(user);
-        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isEqualTo(MEMORY + "\n\n" + ADDITION);
-        assertThat(recordedSnapshot().contextChars()).as("실행 줄에 적는 문맥 길이").isEqualTo((long) MEMORY.length());
+        String instructions = submitted().instructions();
+        assertThat(instructions).contains("GFM", MEMORY).endsWith("\n\n" + ADDITION);
+        assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
     }
 
     @Test
@@ -120,6 +173,7 @@ class AgentRunnerConnectorContextTest {
         AgentRunner.Run run = run(agent, null, key);
 
         verify(contextAssembler, never()).assemble(any());
+        assertThat(submitted().instructions()).contains("GFM", "구분 줄").doesNotContain(MEMORY);
         verify(executions).complete(same(started), same(agent), any(), any(), eq(ANSWER));
         assertThat(run.execution()).isSameAs(completed);
         assertThat(run.result().succeeded()).as("위임 실행의 성공 여부").isTrue();
@@ -134,7 +188,8 @@ class AgentRunnerConnectorContextTest {
 
     private ExecutionContextSnapshot recordedSnapshot() {
         ArgumentCaptor<ExecutionContextSnapshot> snapshot = ArgumentCaptor.forClass(ExecutionContextSnapshot.class);
-        verify(executions).start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any());
+        verify(executions)
+                .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
         return snapshot.getValue();
     }
 

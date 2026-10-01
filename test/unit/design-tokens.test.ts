@@ -7,7 +7,7 @@ const WEB_SRC = join(import.meta.dirname, "../../web/src");
 const GLOBALS_CSS = join(WEB_SRC, "app/globals.css");
 
 /**
- * ADR-023 과 ADR-047 의 표가 정한 색 토큰 이름이다.
+ * ADR-023 과 ADR-051 의 표가 정한 색 토큰 이름이다.
  *
  * Tailwind v4 는 쓰지 않는 유틸리티를 만들지 않아, 아직 아무 화면도 `bg-popover` 를 쓰지 않으면
  * `--color-popover` 가 빠져도 브라우저 검사가 알아채지 못한다. 그래서 소스를 직접 읽는다.

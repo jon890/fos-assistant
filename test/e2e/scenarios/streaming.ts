@@ -2,6 +2,7 @@
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { DAD_BINDING } from "./binding.ts";
+import { TOOL_DETAIL_SECRETS } from "../fake-hermes.ts";
 
 type ChatEvent = {
   type: "delta" | "tool" | "subagent" | "done" | "error";
@@ -27,11 +28,18 @@ type ExecutionEventView = {
   model: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  durationMs: number | null;
+  failed: boolean | null;
+  detail: string | null;
 };
 type ExecutionNode = {
   truncated: boolean;
   executionId: number;
   agentCode: string;
+  requestReceivedAt: string | null;
+  submittedAt: string | null;
+  firstDeltaAt: string | null;
+  finishedAt: string | null;
   events: ExecutionEventView[];
   children: ExecutionNode[];
 };
@@ -94,6 +102,11 @@ export const streamingScenario: Scenario = {
       "스트림 대화",
     );
     const received = await events(response);
+    for (const secret of TOOL_DETAIL_SECRETS) {
+      expect(!response.body.includes(secret), "SSE에 도구 비밀값이나 UUID 원문이 있다");
+    }
+    expect(response.body.includes("[가림]") && response.body.includes("[항목 1]"),
+      "SSE에 가린 도구 내용이 없다");
     expect(received.filter((item) => item.type === "delta").length === 2, "delta 두 개를 받지 못했다");
     // 가짜 Hermes 가 도구 쌍 둘과 하위 에이전트 쌍 하나를 보낸다.
     expect(received.filter((item) => item.type === "tool").length === 4, "도구 사건을 받지 못했다");
@@ -125,6 +138,38 @@ export const streamingScenario: Scenario = {
     const savedSubagent = richTree.root.events.find((item) => item.eventType === "SUBAGENT_COMPLETED");
     expect(savedSubagent?.model === "z-ai/glm-5.2", "하위 에이전트 모델이 저장되지 않았다");
     expect(savedSubagent?.inputTokens === 12300 && savedSubagent.outputTokens === 410, "하위 에이전트 토큰이 저장되지 않았다");
+    const timings = [richTree.root.requestReceivedAt, richTree.root.submittedAt,
+      richTree.root.firstDeltaAt, richTree.root.finishedAt];
+    expect(timings.every((value) => value !== null), "스트림 실행의 네 시각을 기록하지 못했다");
+    const timingValues = timings.map((value) => Date.parse(value!));
+    expect(timingValues.every((value, index) => Number.isFinite(value)
+      && (index === 0 || value >= timingValues[index - 1]!)), "실행 시각의 순서가 뒤집혔다");
+
+    for (const text of ["자식 늦은 완료 검사", "자식 완료 사건 없음 검사", "압축 뒤 자식 완료 검사"]) {
+      step(`${text}: 부모 종료 뒤 session 사용량을 보완한다`);
+      const receivedChild = await events(expectStatus(await call(context, "/chat/messages/stream", {
+        method: "POST", token: context.tokens.dad, body: { text, agentCode: "dad" },
+      }), 200, text));
+      const doneChild = receivedChild.at(-1)!;
+      let recordedChild: ExecutionEventView | undefined;
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        const childTree = expectStatus(await call(context, `/usage/executions/${doneChild.executionId}/tree`, {
+          token: context.tokens.dad,
+        }), 200, "비동기 자식 실행 나무").json<ExecutionTree>();
+        const completedChildren = childTree.root.events.filter((item) => item.eventType === "SUBAGENT_COMPLETED");
+        expect(completedChildren.length <= 1, "자식 완료가 중복으로 기록됐다");
+        recordedChild = completedChildren.at(0);
+        if (recordedChild !== undefined) break;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      expect(recordedChild?.inputTokens === 160 && recordedChild.outputTokens === 20,
+        "session의 일반 입력과 cache read/write를 합산하지 못했다");
+      expect(recordedChild?.durationMs === 2500, "자식 session의 종료 시각으로 시간을 계산하지 못했다");
+      expect(recordedChild?.failed === null, "agent_close만으로 자식의 성공을 추정했다");
+      expect(recordedChild?.subagentName?.startsWith("sa-") === true,
+        "이름이 없는 자식의 subagent_id를 표시 이름으로 보존하지 못했다");
+    }
 
     step("Hermes 이벤트 스트림이 중간에 끝나도 최종 답과 실행 기록을 남긴다");
     const interrupted = await events(expectStatus(
@@ -153,6 +198,13 @@ export const streamingScenario: Scenario = {
       200,
       "실행 나무 조회",
     ).json<ExecutionTree>();
+
+    const savedTool = tree.root.events.find((event) => event.toolName === "fake-tool");
+    expect(savedTool?.detail?.includes("[가림]") === true, "저장된 도구 내용에 가리기 표시가 없다");
+    expect(savedTool?.detail?.includes("12000") === true, "도구 내용의 일반 금액이 사라졌다");
+    for (const secret of TOOL_DETAIL_SECRETS) {
+      expect(!JSON.stringify(tree).includes(secret), "실행 나무 API에 도구 비밀값이나 UUID 원문이 있다");
+    }
 
     expect(tree.root.executionId === done!.executionId, "물어본 실행이 뿌리로 나오지 않았다");
     expect(tree.truncated === false, "자를 것이 없는데 나무가 잘렸다고 나왔다");

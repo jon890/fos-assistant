@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConnectorTools } from "@/components/connector/connector-tools";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -361,6 +362,20 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
               연결 다시 확인
             </Button>
           ) : null}
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold">할 수 있는 일</h2>
+            <ConnectorTools tools={connector?.tools ?? []} />
+            {connection.undeclaredTools > 0 ? (
+              <Notice
+                variant="info"
+                role="status"
+                data-testid="connection-undeclared"
+              >
+                이 서비스가 알려 주지 않은 도구 {connection.undeclaredTools}개는
+                쓰지 않아요.
+              </Notice>
+            ) : null}
+          </section>
           {status !== "DISCONNECTED" ? (
             <Button
               disabled={busy}

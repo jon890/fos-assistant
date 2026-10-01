@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -15,6 +16,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnClosed;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.hermes.HermesRunEventStream;
@@ -40,6 +42,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -124,7 +127,7 @@ class ChatStopTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any());
+                .open(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     private AgentExecution latestExecution(CurrentUser user) {
@@ -173,6 +176,45 @@ class ChatStopTest {
                     assertThat(message.content()).isEqualTo("절반");
                 });
         assertThat(eventTypes(stopped.executionId())).contains(ExecutionEventType.RUN_CANCELLED);
+    }
+
+    @Test
+    @DisplayName("중지로 끝난 turn 은 닫힐 때 stopped 가 참이다")
+    void stoppedTurnClosesWithStoppedTrue() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of(
+                "run-stop", "session", "cancelled", "절반", "model", "provider", TokenUsage.empty()));
+        stub().beforeAwait(() -> chat.stop(dad, latestExecution(dad).id()));
+        List<TurnClosed> closed = new CopyOnWriteArrayList<>();
+        turns.addCloseListener(closed::add);
+
+        ChatTurn turn = chat.send(dad, null, "멈춰 줘", "dad");
+
+        Long conversationId =
+                executions.findById(turn.executionId()).orElseThrow().conversationId();
+        assertThat(closed)
+                .filteredOn(it -> it.conversationId().equals(conversationId))
+                .singleElement()
+                .satisfies(it -> assertThat(it.stopped()).isTrue());
+    }
+
+    @Test
+    @DisplayName("중지하지 않고 끝난 turn 은 닫힐 때 stopped 가 거짓이다")
+    void finishedTurnClosesWithStoppedFalse() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of(
+                "run-done", "session", "completed", "완료", "model", "provider", TokenUsage.empty()));
+        List<TurnClosed> closed = new CopyOnWriteArrayList<>();
+        turns.addCloseListener(closed::add);
+
+        ChatTurn turn = chat.send(dad, null, "완료해 줘", "dad");
+
+        Long conversationId =
+                executions.findById(turn.executionId()).orElseThrow().conversationId();
+        assertThat(closed)
+                .filteredOn(it -> it.conversationId().equals(conversationId))
+                .singleElement()
+                .satisfies(it -> assertThat(it.stopped()).isFalse());
     }
 
     @Test
@@ -292,7 +334,7 @@ class ChatStopTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any());
+                .open(any(), any(), any(), any(), any(), anyBoolean());
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "계속해 줘", "dad", relayed::add);

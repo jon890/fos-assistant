@@ -10,106 +10,185 @@ async function sendWithTheFlowAgent(page: Page, text: string): Promise<void> {
   await page.getByRole("button", { name: "보내기" }).click();
 }
 
-test("흐름 중에는 도착한 단계만 보이고 끝난 답에 작업 과정이 남는다", async ({ page, hermes }) => {
+test("흐름 중에는 도착한 단계만 보이고 끝난 답에 작업 과정이 남는다", async ({
+  page,
+  hermes,
+}) => {
   await hermes.holdNextRun();
   let released = false;
   try {
     await sendWithTheFlowAgent(page, "전기차를 사는 게 나을까?");
     await hermes.waitForHeldRun();
 
-    const block = page.locator('[data-testid="activity-block"][data-mode="live"]');
+    const block = page.locator(
+      '[data-testid="activity-block"][data-mode="live"]',
+    );
     await expect(block).toBeVisible();
     await block.getByTestId("activity-toggle").click();
-    await expect(block.locator('[data-step="chief"]')).toHaveAttribute("data-state", "running");
+    await expect(block.locator('[data-step="chief"]')).toHaveAttribute(
+      "data-state",
+      "running",
+    );
     await expect(block.locator('[data-step="synthesizer"]')).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
-      .toBeLessThanOrEqual(0);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
 
     await hermes.releaseHeldRun();
     released = true;
-    await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
-    const saved = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+    await expect(page.getByTestId("assistant-message").last()).toBeVisible({
+      timeout: 30_000,
+    });
+    const saved = page
+      .locator('[data-testid="activity-block"][data-mode="saved"]')
+      .last();
     await expect(saved).toBeVisible();
-    await expect(saved.getByTestId("activity-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(saved.getByTestId("activity-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     await page.reload();
     await expect(saved).toBeVisible();
     await expect(saved).toContainText("작업 과정");
     await saved.getByTestId("activity-toggle").click();
     await expect(saved.locator('[data-kind="subagent"]')).toHaveCount(3);
     await saved.getByTestId("activity-open-panel").click();
-    await expect(page.getByTestId("activity-panel").getByTestId("flow-tree-link")).toBeVisible();
-    await page.getByTestId("activity-panel").getByTestId("flow-tree-link").click();
+    await expect(
+      page.getByTestId("activity-panel").getByTestId("flow-tree-link"),
+    ).toBeVisible();
+    await page
+      .getByTestId("activity-panel")
+      .getByTestId("flow-tree-link")
+      .click();
     await expect(page).toHaveURL(/\/executions\/\d+$/);
   } finally {
     if (!released) await hermes.releaseHeldRun();
   }
 });
 
-test("실패한 단계만 실패로 보이고 오지 않은 단계는 그리지 않는다", async ({ page }) => {
+test("실패한 단계만 실패로 보이고 오지 않은 단계는 그리지 않는다", async ({
+  page,
+}) => {
   await sendWithTheFlowAgent(page, "흐름 계약 위반 검사");
-  const block = page.locator('[data-testid="activity-block"][data-mode="live"]');
+  const block = page.locator(
+    '[data-testid="activity-block"][data-mode="live"]',
+  );
   await expect(block).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("turn-error")).toBeVisible({ timeout: 30_000 });
-  await expect(block.getByTestId("activity-toggle")).toHaveAttribute("aria-expanded", "false");
+  await expect(block.getByTestId("activity-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   const stoppedTitle = await block.getByTestId("activity-toggle").textContent();
   await page.waitForTimeout(1_200);
-  expect(await block.getByTestId("activity-toggle").textContent()).toBe(stoppedTitle);
+  expect(await block.getByTestId("activity-toggle").textContent()).toBe(
+    stoppedTitle,
+  );
   await block.getByTestId("activity-toggle").click();
-  await expect(block.locator('[data-step="chief"]')).toHaveAttribute("data-state", "failed", { timeout: 30_000 });
+  await expect(block.locator('[data-step="chief"]')).toHaveAttribute(
+    "data-state",
+    "failed",
+    { timeout: 30_000 },
+  );
   await expect(block.locator('[data-step="researcher"]')).toHaveCount(0);
   await expect(block.locator('[data-step="engineer"]')).toHaveCount(0);
   await expect(block.locator('[data-step="synthesizer"]')).toHaveCount(0);
 });
 
-test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인다", async ({ page }) => {
+test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인다", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill("첫 답");
   await page.getByRole("button", { name: "보내기" }).click();
-  await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last()).toBeVisible();
+  await expect(
+    page.locator('[data-testid="activity-block"][data-mode="saved"]').last(),
+  ).toBeVisible();
+  // 첫 답이 끝난 뒤에 보낸다. 답이 오는 동안 보내면 대기 메시지로 쌓여 아래에서 꾸민 스트림을 지나지 않는다.
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toHaveCount(0);
   const conversationId = conversationIdOf(page.url());
   const events = [
     { type: "started", conversationId, executionId: 1 },
     { type: "tool", phase: "started", toolName: "실패 도구" },
     { type: "tool", phase: "completed", toolName: "실패 도구", failed: true },
-    { type: "subagent", phase: "started", goal: "끝나지 않은 조사", subagentId: "pending" },
+    {
+      type: "subagent",
+      phase: "started",
+      goal: "끝나지 않은 조사",
+      subagentId: "pending",
+      model: "숨길 모델",
+    },
   ];
-  await page.route("**/api/chat/stream", (route) => route.fulfill({
-    status: 200,
-    contentType: "text/event-stream",
-    body: events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
-  }));
+  await page.route("**/api/chat/stream", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: events
+        .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+        .join(""),
+    }),
+  );
   await page.getByRole("textbox", { name: "메시지" }).fill("연결 중단 검사");
   await page.getByRole("button", { name: "보내기" }).click();
-  const block = page.locator('[data-testid="activity-block"][data-mode="live"]');
+  const block = page.locator(
+    '[data-testid="activity-block"][data-mode="live"]',
+  );
   await expect(page.getByTestId("turn-error")).toBeVisible();
-  await expect(block.getByTestId("activity-toggle")).toHaveAttribute("aria-expanded", "false");
+  await expect(block.getByTestId("activity-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   const stoppedTitle = await block.getByTestId("activity-toggle").textContent();
   await page.waitForTimeout(1_200);
-  expect(await block.getByTestId("activity-toggle").textContent()).toBe(stoppedTitle);
+  expect(await block.getByTestId("activity-toggle").textContent()).toBe(
+    stoppedTitle,
+  );
   await block.getByTestId("activity-toggle").click();
-  await expect(block.locator('[data-kind="tool"][data-state="failed"]')).toHaveCount(1);
-  const child = block.locator('[data-kind="subagent"][data-state="result-missing"]');
+  await expect(
+    block.locator('[data-kind="tool"][data-state="failed"]'),
+  ).toHaveCount(1);
+  const child = block.locator(
+    '[data-kind="subagent"][data-state="result-missing"]',
+  );
   await expect(child).toContainText("결과를 받지 못함");
+  await expect(child).not.toContainText("숨길 모델");
   await expect(child).not.toContainText("입력 ");
   await expect(child).not.toContainText("출력 ");
   await expect(block.getByTestId("activity-toggle")).toContainText("끝까지 하지 못했어요");
   await expect(block.locator('[data-kind="tool"][data-state="failed"]')).toContainText("실패");
   await page.reload();
-  await expect(page.locator('[data-testid="activity-block"][data-mode="live"]')).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid="activity-block"][data-mode="live"]'),
+  ).toHaveCount(0);
 });
 
 test("사건 없는 자식은 저장된 줄에서 빼고 머리는 수 없이 한 줄로 보인다", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
-  await page.getByRole("textbox", { name: "메시지" }).fill("사건 없는 자식 검사");
+  await page
+    .getByRole("textbox", { name: "메시지" })
+    .fill("사건 없는 자식 검사");
   await page.getByRole("button", { name: "보내기" }).click();
-  const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+  const block = page
+    .locator('[data-testid="activity-block"][data-mode="saved"]')
+    .last();
   await expect(block).toBeVisible({ timeout: 30_000 });
   await page.route("**/api/usage/executions/*/tree", async (route) => {
     const response = await route.fetch();
     const tree = await response.json();
-    tree.root.children.push({ ...tree.root, executionId: -1, events: [], children: [] });
+    tree.root.children.push({
+      ...tree.root,
+      executionId: -1,
+      events: [],
+      children: [],
+    });
     await route.fulfill({ response, json: tree });
   });
   await block.getByTestId("activity-toggle").click();
@@ -122,9 +201,13 @@ test("사건 없는 자식은 저장된 줄에서 빼고 머리는 수 없이 �
 test("병렬 도우미가 거꾸로 끝나도 저장된 줄의 시간이 맞고 모델과 토큰은 보이지 않는다", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
-  await page.getByRole("textbox", { name: "메시지" }).fill("병렬 하위 에이전트 검사");
+  await page
+    .getByRole("textbox", { name: "메시지" })
+    .fill("병렬 하위 에이전트 검사");
   await page.getByRole("button", { name: "보내기" }).click();
-  const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+  const block = page
+    .locator('[data-testid="activity-block"][data-mode="saved"]')
+    .last();
   await expect(block).toBeVisible({ timeout: 30_000 });
   await expect(block.getByTestId("activity-toggle")).toContainText("찾아보고 도우미와 함께 정리했어요");
   await block.getByTestId("activity-toggle").click();
@@ -140,26 +223,41 @@ test("병렬 도우미가 거꾸로 끝나도 저장된 줄의 시간이 맞고 
   await expect(agents.nth(1)).not.toContainText("입력 ");
   await expect(agents.nth(1)).not.toContainText("200");
   await expect(agents.nth(1)).toContainText("2초");
+  await expect(block).not.toContainText("model-first");
+  await expect(block).not.toContainText("model-second");
+  await expect(block).not.toContainText("입력");
+  await expect(block).not.toContainText("출력");
   await expect(block.locator('[data-kind="tool"][data-state="failed"]')).toHaveCount(1);
 });
 
-test("일반 대화에는 단계 없이 도구 줄이 남고 읽기 실패를 다시 시도할 수 있다", async ({ page }) => {
+test("일반 대화에는 단계 없이 도구 줄이 남고 읽기 실패를 다시 시도할 수 있다", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill("그냥 대화");
   await page.getByRole("button", { name: "보내기" }).click();
 
-  const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+  const block = page
+    .locator('[data-testid="activity-block"][data-mode="saved"]')
+    .last();
   await expect(block).toBeVisible({ timeout: 30_000 });
-  await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ status: 500, body: "{}" }));
+  await page.route("**/api/usage/executions/*/tree", (route) =>
+    route.fulfill({ status: 500, body: "{}" }),
+  );
   await block.getByTestId("activity-toggle").click();
   await expect(block.getByTestId("activity-load-error")).toBeVisible();
   await page.unroute("**/api/usage/executions/*/tree");
   await block.getByRole("button", { name: "다시 읽기" }).click();
   await expect(block.locator('[data-kind="tool"]')).toHaveCount(2);
   await expect(block.locator('[data-kind="step"]')).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
-    .toBeLessThanOrEqual(0);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
 });
 
 /**
@@ -203,7 +301,9 @@ for (const { durationMs, duration } of [
 
   await toggle.click();
   await expect(block.locator('[data-kind="tool"]')).toHaveCount(2);
+  // 저장된 줄은 목표를 보인다. 이름 칸에 온 Hermes 의 id 는 대화에 그리지 않는다.
   await expect(block.locator('[data-kind="subagent"]')).toHaveText(/^끝남도우미숙소 후보를 조사한다1초$/);
+  await expect(block.locator('[data-kind="subagent"]')).not.toContainText("sa-1");
   if (duration === null) await expect(block.getByTestId("activity-duration")).toHaveCount(0);
   else await expect(block.getByTestId("activity-duration")).toHaveText(duration);
   await expect(block.getByTestId("activity-open-panel")).toHaveText("자세히 보기");
@@ -326,6 +426,8 @@ test("기다림 점이 있던 자리에 답이 들어와 얼굴과 첫 줄이 �
 test("흐름 에이전트의 코드가 바뀌면 이 검사가 먼저 알린다", async ({ page }) => {
   const agents = await page.request.get("/api/agents");
   expect(agents.ok()).toBeTruthy();
-  const codes = ((await agents.json()) as { code: string }[]).map((agent) => agent.code);
+  const codes = ((await agents.json()) as { code: string }[]).map(
+    (agent) => agent.code,
+  );
   expect(codes).toContain(FLOW_AGENT_CODE);
 });

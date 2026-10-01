@@ -1,6 +1,11 @@
 import { ExecutionEventRow, type MergedEventRow } from "./execution-event-row";
 import type { ExecutionEventView, ExecutionTreeNode } from "./execution-tree";
-import { agentLabel } from "@/lib/format";
+import {
+  agentLabel,
+  formatDuration,
+  formatDurationFor,
+  formatTokens,
+} from "@/lib/format";
 
 /**
  * 서버가 여덟에서 자르지만(`ExecutionTreeService.MAX_DEPTH`), 화면도 스스로 멈춘다.
@@ -82,6 +87,7 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
           key: event.sequence,
           subagentName: event.subagentName,
           detail: event.detail,
+          usageStatus: event.subagentUsageStatus ?? null,
         });
         break;
       case "SUBAGENT_COMPLETED":
@@ -99,10 +105,12 @@ export function ExecutionNode({
   node,
   depth,
   isAdmin,
+  showRuntime,
 }: {
   node: ExecutionTreeNode;
   depth: number;
   isAdmin: boolean;
+  showRuntime: boolean;
 }) {
   const stoppedByScreen = depth >= MAX_DEPTH;
   const rows = mergeEvents(node.events);
@@ -120,6 +128,42 @@ export function ExecutionNode({
     >
       <div className="min-w-0 border-l border-border pl-3">
         <p className="truncate text-sm font-medium">{label}</p>
+        {showRuntime ? (
+          <>
+            <p
+              className="truncate text-xs text-muted-foreground"
+              data-testid="execution-node-runtime"
+            >
+              {[node.provider, node.model].filter(Boolean).join(" · ") ||
+                "모델 정보 없음"}
+              {node.modelTier ? ` · ${tierLabel(node.modelTier)}` : ""}
+              {node.reasoningEffort
+                ? ` · ${effortLabel(node.reasoningEffort, node.reasoningEffortSource)}`
+                : ""}
+            </p>
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="execution-node-tokens"
+            >
+              입력 {formatTokens(node.inputTokens)} · 출력{" "}
+              {formatTokens(node.outputTokens)}
+              {node.cachedInputTokens === undefined ||
+              node.cachedInputTokens === null
+                ? ""
+                : ` · 캐시 ${formatTokens(node.cachedInputTokens)}`}
+              {node.latencyMs === null
+                ? ""
+                : ` · ${formatDuration(node.latencyMs)}`}
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {node.modelTier ? tierLabel(node.modelTier) : "단계 미확인"}
+            {node.latencyMs === null
+              ? ""
+              : ` · ${formatDurationFor(node.latencyMs, false)}`}
+          </p>
+        )}
         <ul className="min-w-0">
           {rows.map((row) => (
             <ExecutionEventRow key={row.key} row={row} isAdmin={isAdmin} />
@@ -131,6 +175,7 @@ export function ExecutionNode({
                 node={child}
                 depth={depth + 1}
                 isAdmin={isAdmin}
+                showRuntime={showRuntime}
               />
             ))}
           {showsTruncated ? (
@@ -142,4 +187,19 @@ export function ExecutionNode({
       </div>
     </li>
   );
+}
+
+function tierLabel(tier: NonNullable<ExecutionTreeNode["modelTier"]>): string {
+  if (tier === "FAST") return "빠르게";
+  if (tier === "BALANCED") return "균형";
+  return "깊게";
+}
+
+function effortLabel(
+  effort: string,
+  source: ExecutionTreeNode["reasoningEffortSource"],
+): string {
+  if (source === "PROFILE_DEFAULT") return `기본 강도 ${effort}`;
+  if (source === "UNKNOWN") return "강도 미확인";
+  return `선택한 강도 ${effort}`;
 }

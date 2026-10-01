@@ -45,8 +45,8 @@ test("카드 대신 입력창으로 답해도 된다", async ({ page }) => {
   await composer.fill(ASK_CARD_PROBE);
   await page.getByRole("button", { name: "보내기", exact: true }).click();
   await expect(page.getByTestId("ask-card")).toBeVisible();
-  // 블록이 닫히면 답이 끝나기 전에도 카드가 보인다. 답이 끝나 보내기 단추가 돌아온 뒤에 입력한다.
-  await expect(page.getByRole("button", { name: "보내기", exact: true })).toBeVisible();
+  // 블록이 닫히면 답이 끝나기 전에도 카드가 보인다. 답이 끝나 중지 단추가 사라진 뒤에 입력한다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
 
   await composer.fill("잘 모르겠어");
   await page.getByRole("button", { name: "보내기", exact: true }).click();
@@ -61,7 +61,9 @@ test("보낸 답이 전송에 실패하면 카드를 다시 누를 수 있다", 
   await page.getByRole("textbox", { name: "메시지" }).fill(ASK_CARD_PROBE);
   await page.getByRole("button", { name: "보내기", exact: true }).click();
   const card = page.getByTestId("ask-card");
-  await expect(page.getByRole("button", { name: "보내기", exact: true })).toBeVisible();
+  await expect(card).toBeVisible();
+  // 답이 끝난 뒤에 누른다. 답이 오는 동안 누른 답은 대기 메시지로 쌓여 아래에서 실패시킬 요청을 지나지 않는다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
 
   await page.route("**/api/chat/stream", (route) => route.fulfill({
     status: 503, contentType: "application/json", body: JSON.stringify({ code: "HERMES_UNAVAILABLE", message: "down" }),

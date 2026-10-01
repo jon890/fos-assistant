@@ -6,6 +6,7 @@ import java.util.List;
 /**
  * 카탈로그의 커넥터 하나와 그것에 대한 내 연결 상태다.
  *
+ * @param tools 도구마다의 위험도와 승인 방식. 도구를 선언하지 않는 판의 커넥터와 카탈로그에서 빠진 커넥터는 빈 목록
  * @param myStatus 등록한 적이 없으면 {@code DISCONNECTED}
  * @param available 지금 카탈로그에 있는가. 거짓이면 읽기와 해제만 되고 {@code fields} 와 {@code description} 이 비어 있다
  */
@@ -14,5 +15,6 @@ public record ConnectorSummary(
         String title,
         String description,
         List<ConnectorFieldSummary> fields,
+        List<ConnectorToolSummary> tools,
         ConnectionStatus myStatus,
         boolean available) {}

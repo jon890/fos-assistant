@@ -115,3 +115,17 @@ subagent 를 쓴 실행과 쓰지 않은 실행의 토큰을 견줘 확인했고
 공유 listener 를 쓰더라도 profile 마다 접두가 다르고,
 나중에는 profile 마다 다른 노드를 가리킬 수 있어야 한다.
 그래서 Control Plane 은 API server 주소를 `hermes.base-url` 이 아니라 에이전트의 `api_base_url` 에 둔다.
+
+## 커넥터 정책이 기대는 계약
+
+Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지면 커넥터 도구의 판정이 비켜 갈 수 있다.
+계약의 내용은 [도구 hook 과 승인](connector-policy.md) 에 있다.
+
+| 계약 | 달라지면 |
+| --- | --- |
+| MCP 도구의 등록 이름 규칙(`mcp_prefixed_tool_name`) | 대시보드 plugin 의 `_hermes_tool_name` 을 같은 규칙으로 고친다. 다르면 hook 이 도구를 대응 파일에서 찾지 못해 모두 막는다 |
+| 글이 있는 `block` 이 MCP 요청을 막는다 | hook 으로 강제할 수 없다. wrapper 가 필요하다 |
+| 중계 도구 `tool_call` 이 hook 에 안쪽 등록 이름을 준다 | 중계 도구를 연결용 profile 에서 막는다 |
+| `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
+| `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
+

@@ -1,6 +1,7 @@
 package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
@@ -12,6 +13,7 @@ import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
@@ -53,55 +55,110 @@ public class McpToolService {
     private static final String EXECUTION_NOT_FOUND = "실행을 찾을 수 없습니다.";
     /** {@code agent_delegate} 의 {@code task} 길이 상한. 대화 메시지 상한과 같다. */
     public static final int TASK_MAX_CHARS = 8000;
+
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
     private final AgentExecutionRepository executions;
+    private final AgentRepository agents;
 
     public List<Map<String, Object>> tools() {
         return List.of(
-                Map.of("name", "memory_read", "description", "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 색인에 있다.",
-                        "inputSchema", Map.of("type", "object", "properties", Map.of("id", Map.of("type", "integer")), "required", List.of("id"))),
-                Map.of("name", "artifact_write",
-                        "description", "대화의 결과물에 쓸 파일을 저장한다. conversation_id에는 대화 UUID, path에는 폴더 안 상대 경로를 준다. content로 html 또는 css 본문을 쓰거나 source_url로 png, jpg, jpeg, gif, webp 이미지를 가져온다. 두 방식은 하나만 쓰며 파일 하나는 5MB를 넘을 수 없다. 같은 path는 새 내용으로 바뀐다.",
-                        "inputSchema", Map.of(
+                Map.of(
+                        "name",
+                        "memory_read",
+                        "description",
+                        "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 색인에 있다.",
+                        "inputSchema",
+                        Map.of(
+                                "type",
+                                "object",
+                                "properties",
+                                Map.of("id", Map.of("type", "integer")),
+                                "required",
+                                List.of("id"))),
+                Map.of(
+                        "name",
+                        "artifact_write",
+                        "description",
+                        "대화의 결과물에 쓸 파일을 저장한다. conversation_id에는 대화 UUID, path에는 폴더 안 상대 경로를 준다. content로 html 또는 css 본문을 쓰거나 source_url로 png, jpg, jpeg, gif, webp 이미지를 가져온다. 두 방식은 하나만 쓰며 파일 하나는 5MB를 넘을 수 없다. 같은 path는 새 내용으로 바뀐다.",
+                        "inputSchema",
+                        Map.of(
                                 "type", "object",
                                 "additionalProperties", false,
-                                "properties", Map.of(
-                                        "conversation_id", Map.of("type", "string"),
-                                        "path", Map.of("type", "string"),
-                                        "content", Map.of("type", "string"),
-                                        "source_url", Map.of("type", "string")),
+                                "properties",
+                                        Map.of(
+                                                "conversation_id", Map.of("type", "string"),
+                                                "path", Map.of("type", "string"),
+                                                "content", Map.of("type", "string"),
+                                                "source_url", Map.of("type", "string")),
                                 "required", List.of("conversation_id", "path"),
-                                "oneOf", List.of(
-                                        Map.of("required", List.of("content"), "not", Map.of("required", List.of("source_url"))),
-                                        Map.of("required", List.of("source_url"), "not", Map.of("required", List.of("content")))))),
-                Map.of("name", "agent_list",
-                        "description", "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code 와 이름을 읽는다.",
-                        "inputSchema", Map.of("type", "object", "additionalProperties", false, "properties", Map.of())),
-                Map.of("name", "agent_delegate",
-                        "description", "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 로 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "additionalProperties", false,
-                                "properties", Map.of(
+                                "oneOf",
+                                        List.of(
+                                                Map.of(
+                                                        "required",
+                                                        List.of("content"),
+                                                        "not",
+                                                        Map.of("required", List.of("source_url"))),
+                                                Map.of(
+                                                        "required",
+                                                        List.of("source_url"),
+                                                        "not",
+                                                        Map.of("required", List.of("content")))))),
+                Map.of(
+                        "name",
+                        "agent_list",
+                        "description",
+                        "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code 와 이름을 읽는다.",
+                        "inputSchema",
+                        Map.of("type", "object", "additionalProperties", false, "properties", Map.of())),
+                Map.of(
+                        "name",
+                        "agent_delegate",
+                        "description",
+                        "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 로 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
+                        "inputSchema",
+                        Map.of(
+                                "type",
+                                "object",
+                                "additionalProperties",
+                                false,
+                                "properties",
+                                Map.of(
                                         "agent_code", Map.of("type", "string"),
                                         "task", Map.of("type", "string", "minLength", 1, "maxLength", TASK_MAX_CHARS)),
-                                "required", List.of("agent_code", "task"))),
-                Map.of("name", "agent_status",
-                        "description", "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "additionalProperties", false,
-                                "properties", Map.of("execution_id", Map.of("type", "integer")),
-                                "required", List.of("execution_id"))),
-                Map.of("name", "agent_stop",
-                        "description", "다른 에이전트에게 맡긴 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 그 실행이 다시 맡긴 실행은 멈추지 않는다. 이미 끝난 실행은 끝난 상태를 그대로 돌려준다. 중지를 요청했는데 아직 RUNNING 이면 stop_requested 가 true 이고, 결과는 agent_status 로 다시 읽는다. stop_requested 가 없는 RUNNING 은 멈추지 못한 것이다.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "additionalProperties", false,
-                                "properties", Map.of("execution_id", Map.of("type", "integer")),
-                                "required", List.of("execution_id"))));
+                                "required",
+                                List.of("agent_code", "task"))),
+                Map.of(
+                        "name",
+                        "agent_status",
+                        "description",
+                        "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.",
+                        "inputSchema",
+                        Map.of(
+                                "type",
+                                "object",
+                                "additionalProperties",
+                                false,
+                                "properties",
+                                Map.of("execution_id", Map.of("type", "integer")),
+                                "required",
+                                List.of("execution_id"))),
+                Map.of(
+                        "name",
+                        "agent_stop",
+                        "description",
+                        "다른 에이전트에게 맡긴 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 그 실행이 다시 맡긴 실행은 멈추지 않는다. 이미 끝난 실행은 끝난 상태를 그대로 돌려준다. 중지를 요청했는데 아직 RUNNING 이면 stop_requested 가 true 이고, 결과는 agent_status 로 다시 읽는다. stop_requested 가 없는 RUNNING 은 멈추지 못한 것이다.",
+                        "inputSchema",
+                        Map.of(
+                                "type",
+                                "object",
+                                "additionalProperties",
+                                false,
+                                "properties",
+                                Map.of("execution_id", Map.of("type", "integer")),
+                                "required",
+                                List.of("execution_id"))));
     }
 
     /**
@@ -136,19 +193,31 @@ public class McpToolService {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
                 throw ex;
             }
-            log.warn("artifact write failed userId={} executionId={} exceptionClass={} errorCode={} reason={}",
-                    user.id(), caller.executionId(), ex.getClass().getSimpleName(), ex.code(), safeArtifactFailureMessage(ex));
+            log.warn(
+                    "artifact write failed userId={} executionId={} exceptionClass={} errorCode={} reason={}",
+                    user.id(),
+                    caller.executionId(),
+                    ex.getClass().getSimpleName(),
+                    ex.code(),
+                    safeArtifactFailureMessage(ex));
             return result("결과물을 저장할 수 없습니다.", true);
         } catch (RuntimeException ex) {
-            log.warn("artifact write failed userId={} executionId={} exceptionClass={} errorCode={} reason={}",
-                    user.id(), caller.executionId(), ex.getClass().getSimpleName(), ErrorCode.INTERNAL_ERROR, "unexpected artifact write failure");
+            log.warn(
+                    "artifact write failed userId={} executionId={} exceptionClass={} errorCode={} reason={}",
+                    user.id(),
+                    caller.executionId(),
+                    ex.getClass().getSimpleName(),
+                    ErrorCode.INTERNAL_ERROR,
+                    "unexpected artifact write failure");
             return result("결과물을 저장할 수 없습니다.", true);
         }
     }
 
     /** 요청자가 쓸 수 있는 에이전트를 {@code code} 와 {@code name} 만 담은 JSON 배열로 돌려준다. profile, 주소, 모델, 공개 범위는 싣지 않는다. */
     public Map<String, Object> listAgents(McpCaller caller) {
-        List<Map<String, Object>> listed = delegations.list(caller.user()).stream().map(McpToolService::agentSummary).toList();
+        List<Map<String, Object>> listed = delegations.list(caller.user()).stream()
+                .map(McpToolService::agentSummary)
+                .toList();
         return result(json.writeValueAsString(listed), false);
     }
 
@@ -159,9 +228,13 @@ public class McpToolService {
      * run 번호, profile, 토큰 수, 금액, 예외 문구는 싣지 않는다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
      *
      * <p>끝난 결과를 돌려주면 부모가 받은 것으로 적는다. 그 결과를 부모 대화에 다시 전하지 않기 위해서다.
+     *
+     * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 부모 대화에 전할 때와 같이 {@code <external-data>} 로
+     * 감싼다. 에이전트 행이 없는 실행도 출처를 모르므로 감싼다(ADR-049).
      */
     public Map<String, Object> agentStatus(McpCaller caller, Long executionId) {
-        return delegations.status(caller.user(), caller.originExecution(), executionId)
+        return delegations
+                .status(caller.user(), caller.originExecution(), executionId)
                 .map(execution -> {
                     markDeliveredIfFinished(execution);
                     return result(json.writeValueAsString(statusOf(execution)), false);
@@ -179,7 +252,8 @@ public class McpToolService {
      * <p>끝난 결과를 돌려주면 {@link #agentStatus} 처럼 부모가 받은 것으로 적는다.
      */
     public Map<String, Object> agentStop(McpCaller caller, Long executionId) {
-        return delegations.stop(caller.user(), caller.originExecution(), executionId)
+        return delegations
+                .stop(caller.user(), caller.originExecution(), executionId)
                 .map(stop -> {
                     AgentExecution execution = stop.execution();
                     markDeliveredIfFinished(execution);
@@ -239,18 +313,29 @@ public class McpToolService {
         return summary;
     }
 
-    private static Map<String, Object> statusOf(AgentExecution execution) {
+    private Map<String, Object> statusOf(AgentExecution execution) {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("execution_id", execution.id());
         status.put("status", execution.status().name());
         ExecutionStatus value = execution.status();
-        if ((value == ExecutionStatus.SUCCEEDED || value == ExecutionStatus.CANCELLED) && execution.outputText() != null) {
-            status.put("output", execution.outputText());
+        if ((value == ExecutionStatus.SUCCEEDED || value == ExecutionStatus.CANCELLED)
+                && execution.outputText() != null) {
+            status.put(
+                    "output",
+                    isExternalResult(execution) ? ExternalData.wrap(execution.outputText()) : execution.outputText());
         }
         if (value == ExecutionStatus.FAILED && execution.errorCode() != null) {
             status.put("error_code", execution.errorCode());
         }
         return status;
+    }
+
+    /** 연결용 에이전트의 실행이거나 에이전트를 찾지 못한 실행이다. */
+    private boolean isExternalResult(AgentExecution execution) {
+        if (execution.agentId() == null) {
+            return true;
+        }
+        return agents.findById(execution.agentId()).map(Agent::connectorManaged).orElse(true);
     }
 
     private static Map<String, Object> failure(String code, String message) {
@@ -268,5 +353,11 @@ public class McpToolService {
     private static String toJson(ArtifactWriteResult result) {
         return json.writeValueAsString(Map.of("path", result.path(), "byteSize", result.byteSize()));
     }
-    private static Map<String, Object> result(String text, boolean error) { Map<String, Object> result = new LinkedHashMap<>(); result.put("content", List.of(Map.of("type", "text", "text", text))); result.put("isError", error); return result; }
+
+    private static Map<String, Object> result(String text, boolean error) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("content", List.of(Map.of("type", "text", "text", text)));
+        result.put("isError", error);
+        return result;
+    }
 }

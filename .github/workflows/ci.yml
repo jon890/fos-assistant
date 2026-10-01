@@ -5,13 +5,16 @@ on:
     types: [opened, synchronize, reopened]
   push:
     branches: [main]
+  schedule:
+    # 한국 시간 매일 04:23. 변경이 없어도 외부 의존성과 흔들리는 검사를 확인한다.
+    - cron: '23 19 * * *'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -63,15 +66,15 @@ jobs:
         run: pnpm build
 
   browser:
-    name: browser-${{ matrix.project }}
-    # PR 에서는 머지 전에 로컬에서 돌린다(AGENTS.md 「확인」). CI 는 main 에 들어간 뒤에만 돌려 사후 확인한다.
-    if: github.event_name == 'push'
+    name: browser-${{ matrix.project }}-shard-${{ matrix.shard }}
+    # runner 마다 웹, Control Plane, H2 메모리 DB 를 새로 띄운다. job 안에서는 직렬로 돈다.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         project: [mobile, desktop]
+        shard: [1, 2, 3, 4]
     defaults:
       run:
         working-directory: web
@@ -95,18 +98,94 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: Chromium 캐시
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: chromium-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps chromium
       # 웹 서버를 띄우기 전에 빌드하고 그 결과를 띄운다(test/browser/web-server.ts). 따로 빌드하지 않는다.
-      - run: pnpm test:browser --project=${{ matrix.project }}
+      - name: 브라우저 shard 검사
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/browser-report-${{ matrix.project }}-${{ matrix.shard }}.json
+        run: pnpm test:browser --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4 --reporter=list,json
+      - name: 브라우저 JSON 결과
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-report-${{ matrix.project }}-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-report-${{ matrix.project }}-${{ matrix.shard }}.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: 실패하거나 취소된 브라우저 검사 결과
         if: failure() || cancelled()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: browser-results-${{ matrix.project }}
+          name: browser-results-${{ matrix.project }}-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           # Playwright 설정의 outputDir 은 os.tmpdir() 아래에 있다.
           path: /tmp/fos-assistant-playwright-results-*
           if-no-files-found: ignore
           retention-days: 7
+
+  browser-required:
+    name: browser-${{ matrix.project }}
+    needs: browser
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [mobile, desktop]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - name: 폭별 shard 결과 판정
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/browser-ci.mjs check ${{ matrix.project }} 4
+
+  browser-failures:
+    name: browser-failures
+    needs: browser
+    if: >-
+      always() && needs.browser.result != 'success' &&
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    concurrency:
+      group: browser-failure-issues
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: browser-report-*-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-reports
+          merge-multiple: true
+      - name: main 브라우저 실패 이슈 집계
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/browser-ci.mjs issues "$RUNNER_TEMP/browser-reports"
 
   e2e:
     name: e2e

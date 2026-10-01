@@ -4,7 +4,10 @@ import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
+import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.application.model.ConnectorSummary;
+import com.bifos.assistant.connector.application.model.ConnectorToolSummary;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -45,11 +48,23 @@ public final class ConnectionDtos {
         }
     }
 
+    /** 위험도와 승인 방식은 enum 이름 그대로 낸다. */
+    public record ConnectorToolView(String name, String title, String risk, String approval) {
+        static ConnectorToolView from(ConnectorToolSummary value) {
+            return new ConnectorToolView(
+                    value.name(),
+                    value.title(),
+                    value.risk().name(),
+                    value.approval().name());
+        }
+    }
+
     public record ConnectorView(
             String id,
             String title,
             String description,
             List<ConnectorFieldView> fields,
+            List<ConnectorToolView> tools,
             String myStatus,
             boolean available) {
         static ConnectorView from(ConnectorSummary value) {
@@ -58,6 +73,7 @@ public final class ConnectionDtos {
                     value.title(),
                     value.description(),
                     value.fields().stream().map(ConnectorFieldView::from).toList(),
+                    value.tools().stream().map(ConnectorToolView::from).toList(),
                     value.myStatus().name(),
                     value.available());
         }
@@ -76,7 +92,8 @@ public final class ConnectionDtos {
             Map<String, String> values,
             Instant checkedAt,
             String agentCode,
-            boolean restartRequired) {
+            boolean restartRequired,
+            int undeclaredTools) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
                     value.connectorId(),
@@ -85,7 +102,27 @@ public final class ConnectionDtos {
                     value.values(),
                     value.checkedAt(),
                     value.agentCode(),
-                    value.restartRequired());
+                    value.restartRequired(),
+                    value.undeclaredTools());
+        }
+    }
+
+    /**
+     * 도구 호출 판정의 응답이다. 칸은 {@code docs/connectors.md} 의 「도구 호출 판정」 과 같다.
+     *
+     * @param decision {@code allow} 나 {@code block}
+     * @param message {@code block} 일 때 모델에게 보일 글. {@code allow} 이면 빈 글이다
+     * @param actionId 승인 요청 번호. 승인 요청을 만들지 않았으면 null
+     */
+    public record ConnectorPolicyResponse(
+            String decision,
+            String message,
+            @JsonProperty("action_id") String actionId) {
+        static ConnectorPolicyResponse from(ConnectorPolicyAnswer value) {
+            return new ConnectorPolicyResponse(
+                    value.allowed() ? "allow" : "block",
+                    value.message(),
+                    value.actionId() == null ? null : value.actionId().toString());
         }
     }
 
@@ -96,7 +133,8 @@ public final class ConnectionDtos {
             String displayName,
             String status,
             String agentCode,
-            boolean restartRequired) {
+            boolean restartRequired,
+            int undeclaredTools) {
         static AdminConnectionView from(AdminConnectionSnapshot value) {
             return new AdminConnectionView(
                     value.connectorId(),
@@ -104,7 +142,8 @@ public final class ConnectionDtos {
                     value.displayName(),
                     value.status().name(),
                     value.agentCode(),
-                    value.restartRequired());
+                    value.restartRequired(),
+                    value.undeclaredTools());
         }
     }
 }

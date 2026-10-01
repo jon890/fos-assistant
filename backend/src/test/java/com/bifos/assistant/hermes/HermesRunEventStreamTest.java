@@ -21,6 +21,78 @@ class HermesRunEventStreamTest {
     }
 
     @Test
+    @DisplayName("도구 결과 객체와 문자열을 중계 전에 같은 규칙으로 가린다")
+    void redactsStructuredAndStringToolDetailsBeforeForwarding() {
+        RunEvent object = parse("""
+                {"event":"tool.completed","tool":"web_search","result":
+                  {"token":"small-secret","id":"12345678-1234-5678-9012-123456789abc","price":12000}}
+                """);
+        RunEvent text = parse("""
+                {"data":{"event":"tool.started","tool":"terminal","preview":"Bearer small-secret"}}
+                """);
+
+        assertThat(object.detail()).isEqualTo("{\"token\":\"[가림]\",\"id\":\"[항목 1]\",\"price\":12000}");
+        assertThat(text.detail()).isEqualTo("[가림]");
+    }
+
+    @Test
+    @DisplayName("연결용 도구의 결과는 가리되 이름과 성공 여부와 걸린 시간은 남긴다")
+    void hidesConnectorDetailAndPreservesToolMetadata() {
+        RunEvent event = HermesRunEventStream.toRunEvent(mapper.readTree("""
+                {"event":"tool.completed","tool":"lookup","detail":"tiny secret","duration":0.5,"error":false}
+                """), true);
+
+        assertThat(event.detail()).isEqualTo("[연결 도구 내용 가림]");
+        assertThat(event.toolName()).isEqualTo("lookup");
+        assertThat(event.durationMs()).isEqualTo(500L);
+        assertThat(event.failed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("32자를 넘는 스킬 이름은 설명에서 가리고 가리기 전에 꺼낸 이름을 따로 싣는다")
+    void hidesLongSkillNameInDetailAndCarriesNameTakenBeforeRedaction() {
+        String name = "weekly-grocery-shopping-list-builder-2026-v2";
+
+        RunEvent nameOnly = parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name + "\"}");
+        RunEvent withPath = parse("{\"data\":{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name
+                + " → references/list.md\"}}");
+
+        assertThat(nameOnly.detail()).isEqualTo("[가림]");
+        assertThat(nameOnly.skillName()).isEqualTo(name);
+        assertThat(withPath.detail()).contains("[가림]").doesNotContain(name);
+        assertThat(withPath.skillName()).isEqualTo(name);
+    }
+
+    @Test
+    @DisplayName("이름 규칙에 맞지 않는 skill view 미리보기에서는 이름을 싣지 않는다")
+    void carriesNoSkillNameWhenSkillViewPreviewBreaksNameRule() {
+        for (String preview : new String[] {"Shopping", "weekly shopping", "a".repeat(65), "", "../shopping"}) {
+            RunEvent event =
+                    parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + preview + "\"}");
+
+            assertThat(event.skillName()).as("미리보기 「%s」", preview).isNull();
+        }
+        assertThat(parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\"}").skillName())
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("skill view 가 아닌 도구와 도구 완료 사건과 연결용 실행에서는 스킬 이름을 싣지 않는다")
+    void carriesNoSkillNameForOtherToolCompletedEventAndConnectorRun() {
+        RunEvent otherTool = parse("{\"event\":\"tool.started\",\"tool\":\"web_search\",\"preview\":\"shopping\"}");
+        RunEvent completed = parse("{\"event\":\"tool.completed\",\"tool\":\"skill_view\",\"detail\":\"shopping\"}");
+        RunEvent subagent = parse("{\"event\":\"subagent.start\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}");
+        RunEvent connector = HermesRunEventStream.toRunEvent(
+                mapper.readTree("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}"), true);
+
+        assertThat(otherTool.skillName()).isNull();
+        assertThat(completed.skillName()).isNull();
+        assertThat(subagent.skillName()).isNull();
+        assertThat(connector.skillName()).isNull();
+        assertThat(connector.detail()).isEqualTo("[연결 도구 내용 가림]");
+    }
+
+    @Test
     @DisplayName("초 단위 실수로 오는 걸린 시간을 밀리초 정수로 옮긴다")
     void convertsFractionalSecondsElapsedToIntegerMillis() {
         RunEvent event = parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");

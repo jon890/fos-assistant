@@ -312,7 +312,11 @@ export function fromTree(
         case "SUBAGENT_COMPLETED":
           state = applyChatEvent(state, {
             type: "subagent",
-            goal: subagentLabel(event.subagentName, event.detail),
+            // 진행 중 줄과 같게 목표를 먼저 쓴다. 이름 칸에는 Hermes 의 id 가 올 수 있어 목표가 없을 때만 쓴다.
+            goal: subagentLabel(
+              event.detail?.trim() ? null : event.subagentName,
+              event.detail,
+            ),
             subagentId: event.hermesSessionId,
             model: event.model,
             inputTokens: event.inputTokens,

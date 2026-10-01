@@ -1,5 +1,28 @@
 # 저장 모델
 
+## 모델 단계와 재조회
+
+선택의 우선순위와 초기값은 [모델 단계와 실행 기록](model-tiers.md)이 정한다.
+비밀값은 아래 표에 저장하지 않는다.
+
+| 표 | 키 | 저장하는 값 |
+| --- | --- | --- |
+| `model_tier_definition` | `id` BIGINT, `(group_id, tier)` 유일 | 그룹 번호, 단계 코드 VARCHAR(16), provider VARCHAR(64) NULL, model VARCHAR(128) NULL, reasoning_effort VARCHAR(16) NULL |
+| `app_user` | 기존 `id` BIGINT | `model_default_tier` VARCHAR(16) NULL 추가 |
+| `model_tier_group_setting` | `group_id` BIGINT | `default_tier` VARCHAR(16) NULL |
+| `subagent_usage_job` | `id` BIGINT, `(execution_id, child_session_id)` 유일 | profile, API 주소, 부모 session, 자식 session, 상태, 시작/다음 조회/기한 시각, 조회 횟수 |
+
+`conversation`은 `model_selection_mode` VARCHAR(16) NULL과 `model_tier` VARCHAR(16) NULL을 더한다.
+선택 모드는 `DEFAULT`, `TIER`, `CUSTOM`이며 null은 사용자와 그룹 기본값을 따른다.
+`agent_execution`은 `model_tier` VARCHAR(16) NULL과 `reasoning_effort_source` VARCHAR(20) NULL을 더한다.
+`request_received_at`, `submitted_at`, `first_delta_at`은 DATETIME(6) NULL이며
+기존 `finished_at`과 함께 실행 구간을 표시한다. 끝난 실행의 재조회는 `finished_at` 색인을 쓴다.
+첫 assistant delta 본문은 이 칸들과 함께 저장하지 않는다.
+단계와 요청값은 실행 시작 시 복사하고 실제 제공사와 모델은 완료 시 갱신한다.
+이전 실행의 출처는 null로 두고 추정해 채우지 않는다.
+재조회 작업의 완료 사건은 기존 `(execution_id, sequence)` 유일 제약을 지키며 같은 자식 완료를 중복 저장하지 않는다.
+실행이나 사용자 삭제에 의한 cascade를 추가하지 않는다. 기존 실행 기록과 같은 보존 규칙을 따른다.
+
 ## connector_connection
 
 사용자마다 커넥터 하나에 연결 하나를 둔다. 근거는 [ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 이다.
@@ -15,9 +38,11 @@
 | `restart_required` | `BOOLEAN NOT NULL` | 공유 gateway 재시작 뒤 반영 완료를 기다린다 |
 | `desired_enabled` | `BOOLEAN NOT NULL` | env 와 설치 반영이 모두 성공해 활성화 후보가 되었는가. 등록, 교체, 해제 시작과 반영 실패에서 false. true 여도 실행 확인 전에는 `PENDING` |
 | `checked_at` | `DATETIME(6)` | 마지막 확인 시각. 비어도 된다 |
+| `undeclared_tools` | `INT NOT NULL` 기본 0 | 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수. `schema: 1` 은 0 이다 |
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
 
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
+- V45 는 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내리고 그 연결용 에이전트를 끄고 사진 받기도 내렸다. 그 profile 의 `fos-ctx` 가 옛 판이라 도구 호출이 판정 없이 나가기 때문이다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
@@ -37,6 +62,62 @@ MySQL 8.4 에 둔다.
 
 비밀값은 어느 표에도 넣지 않는다.
 AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 홈서버의 파일에 있다.
+
+## connector_action
+
+커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다. 근거는 [ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | `BIGINT` 기본키 | |
+| `public_id` | `BINARY(16) NOT NULL`, 유니크 | 화면과 모델에 보이는 승인 요청 번호. 대화의 공개 식별자와 같은 방식이다([ADR-025](adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)) |
+| `user_id` | `BIGINT NOT NULL` | 연결의 주인 |
+| `agent_id` | `BIGINT NOT NULL` | 연결용 에이전트 |
+| `connector_id` | `VARCHAR(64) NOT NULL` | |
+| `tool_name` | `VARCHAR(128)` | MCP 서버의 원래 도구 이름. 대응 파일에서 찾지 못했거나 등록 이름과 맞는 것을 확인하지 못한 호출은 비운다 |
+| `hermes_tool` | `VARCHAR(128) NOT NULL` | hook 이 받은 등록 이름 |
+| `risk` | `VARCHAR(16)` | 판정 당시의 위험도. 정책을 읽지 못했거나, 선언이 없었거나, 연결이 준비되지 않아 거절한 호출은 비운다 |
+| `approval_mode` | `VARCHAR(16)` | 판정 당시의 승인 방식. 위와 같을 때 비운다 |
+| `decision` | `VARCHAR(20) NOT NULL` | `ALLOWED`, `DENIED`, `NEEDS_APPROVAL` |
+| `deny_reason` | `VARCHAR(40)` | `DENIED` 일 때만. `POLICY_UNAVAILABLE`, `NOT_READY`, `UNDECLARED`, `RISK_NOT_OPEN`, `ARGS_TOO_LARGE` |
+| `passed` | `BOOLEAN NOT NULL` | hook 에 통과로 답했는가. `decision` 이 `ALLOWED` 일 때만 참이다 |
+| `status` | `VARCHAR(20)` | 승인 줄만. `PENDING`, `EXECUTING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `REJECTED`, `EXPIRED` |
+| `origin_execution_id` | `BIGINT NOT NULL` | hook 의 session 으로 찾은 실행 |
+| `conversation_id` | `BIGINT` | 그 실행의 대화. 결과를 돌려줄 곳이다. 대화 없는 실행이면 비운다 |
+| `dedupe_key` | `VARCHAR(64) NOT NULL`, 유니크 | `v1-connector`, profile, 뿌리 session, session, `tool_call_id` 를 줄바꿈으로 이어 SHA-256 한 값. 같은 호출이 다시 와도 줄이 하나다 |
+| `args_json` | `MEDIUMTEXT` | 승인 줄만. hook 이 보낸 글자 그대로다. 16KB 까지 |
+| `args_sha256` | `VARCHAR(64) NOT NULL` | 인자 글의 SHA-256. 원문을 두지 않는 줄에서도 무엇을 불렀는지 맞춰 볼 수 있다 |
+| `expires_at` | `DATETIME(6)` | 승인 줄만. 만든 시각에서 24시간 뒤 |
+| `decided_at` | `DATETIME(6)` | 승인, 거절, 만료한 시각 |
+| `executed_at` | `DATETIME(6)` | 실행 결과를 적은 시각 |
+| `result_text` | `MEDIUMTEXT` | 실행 결과. 위임 답과 같은 상한으로 자른다 |
+| `error_code` | `VARCHAR(64)` | 공통 오류 어휘 넷과 `TIMEOUT` |
+| `result_delivered_at` | `DATETIME(6)` | 결과나 거절, 만료를 대화에 전한 시각. `agent_execution` 의 같은 이름 칸과 뜻이 같다 |
+| `created_at` | `DATETIME(6) NOT NULL` | |
+
+- 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다
+- 승인 엔진이 켜지기 전에는 `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 와 `args_json` 이 빈다. 그 호출은 막혀 실행되지 않는다
+- `(conversation_id, status)` 와 `(user_id, created_at)` 에 색인을 둔다
+- 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다
+- 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+
+## connector_tool_grant
+
+사용자가 도구 하나에 준 상시 허락이다. 승인 엔진과 함께 들어온다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | `BIGINT` 기본키 | |
+| `user_id` | `BIGINT NOT NULL` | |
+| `connector_id` | `VARCHAR(64) NOT NULL` | |
+| `tool_name` | `VARCHAR(128) NOT NULL` | 원래 도구 이름 |
+| `expires_at` | `DATETIME(6) NOT NULL` | 무기한은 없다 |
+| `created_at` | `DATETIME(6) NOT NULL` | |
+| `revoked_at` | `DATETIME(6)` | 사용자가 거두었거나 연결을 해제한 시각 |
+
+- `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤인 줄만 유효하다
+- `approval: always` 인 도구에는 만들지 않는다. 판정할 때도 `always` 는 허락을 보지 않는다
+- 같은 도구에 허락을 다시 주면 새 줄을 만든다. 유니크 제약은 없다
 
 ## app_user
 
@@ -189,6 +270,34 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 `sender_user_id` 는 화면이 보낸 사람 이름을 보이기 위한 것이다.
 대화는 여전히 주인 한 사람의 것이고, 여러 사람이 같은 대화를 읽고 쓰는 것은 아직 만들지 않았다.
 
+## chat_pending_message
+
+turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. 보내지기 전까지만 있다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 쌓인 순서다. 합칠 때 이 순서로 잇는다 |
+| `conversation_id` | BIGINT | |
+| `user_id` | BIGINT | 이 글을 보낸 사용자. 합친 `USER` 행의 `sender_user_id` 가 된다 |
+| `content` | LONGTEXT | 글. 한 행은 8000자까지다 |
+| `held` | BOOLEAN NOT NULL DEFAULT FALSE | 멈춰 두었다. 앞 turn 을 중지했거나 보내려다 저장 전에 실패했다 |
+| `created_at` | DATETIME(6) | |
+
+색인은 `(conversation_id, id)` 다.
+
+**보낸 행은 지운다.** 대기 행을 지우는 것과 합친 글을 `chat_message` 의 `USER` 행으로 저장하는 것이 한 트랜잭션이다.
+보낸 글은 `chat_message` 에 남으므로 여기에 이력을 두지 않는다.
+취소한 행도 지운다.
+
+한 대화에 5행까지 둔다. 사이에 빈 줄 하나를 두고 이은 길이가 8000자를 넘지 못한다.
+상한은 표의 제약이 아니라 `PendingMessageService` 가 더할 때 본다.
+
+**한 행이라도 `held` 가 참이면 그 대화의 대기 행을 모두 보내지 않는다.**
+사용자가 「보내기」 를 누르면 그 대화의 `held` 를 모두 내린다.
+
+사진은 담지 않는다.
+근거는 [ADR-048](adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 에 있다.
+
 ## agent_execution
 
 에이전트가 한 번 답한 기록이다.
@@ -213,12 +322,13 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 | `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 `FAILED` 로 적은 뒤 전한다. 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
+| `reasoning_defaults_checked_at` | DATETIME(6) NULL | `reasoning_effort`가 비어 있고 profile 기본값을 정상 응답으로 읽어 확인한 시각. 응답에 effort가 없어도 적어 같은 실행을 다시 조회하지 않는다. 조회 실패면 비워 다시 시도한다 |
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
-| `context_chars` | BIGINT NULL | 이 실행의 `instructions` 에 넣은 Memory 문맥의 글자 수. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다 |
+| `context_chars` | BIGINT NULL | 이 실행의 공통 답변 지침과 Memory 문맥의 글자 수. Memory가 없어도 공통 지침은 센다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다 |
 | `runtime_fingerprint` | VARCHAR(64) NULL | 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문. 그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있고, 그동안 사용량 화면의 지문 축은 빈 목록을 돌려준다 |
-| `instructions_hash` | VARCHAR(64) NULL | 넣은 Memory 문맥의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory 를 담고 있어 저장하지 않는다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다. 넣은 Memory 가 없으면 비어 있다 |
+| `instructions_hash` | VARCHAR(64) NULL | 공통 답변 지침과 Memory 문맥의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory를 담을 수 있어 저장하지 않는다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 제외한다. Memory가 없어도 공통 지침의 지문을 기록한다 |
 | `latency_ms` | BIGINT NULL | 끝나지 않은 실행은 비어 있다 |
 | `estimated_cost_micros` | BIGINT NULL | 공개 API 가격으로 환산한 금액. 통화 단위의 100만분의 1 |
 | `actual_cost_micros` | BIGINT NULL | 실제로 청구되는 금액. 구독 경로는 비어 있다 |
@@ -395,22 +505,27 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `hermes_session_id` | VARCHAR(128) NULL | 하위 에이전트가 따로 session 을 가지면 적는다 |
 | `duration_ms` | BIGINT NULL | 끝난 사건에만 있다 |
 | `failed` | BOOLEAN NULL | 완료 사건의 실패 여부. Hermes 가 알려주지 않으면 비운다 |
-| `detail` | VARCHAR(500) NULL | 화면에 한 줄로 보일 만큼만. 하위 에이전트 사건이면 그 목표. 도구 사건의 값은 모두 저장하되 응답에는 ADR-038 이 정한 사람에게만 싣는다 |
+| `detail` | VARCHAR(500) NULL | 하위 에이전트 사건이면 그 목표. 도구 사건은 ADR-047에 따라 비밀값과 UUID를 가린 뒤 저장하고, 응답에는 ADR-038이 정한 사람에게만 싣는다. 연결용 에이전트의 도구 내용은 전체를 가린다 |
 | `model` | VARCHAR(128) NULL | 하위 에이전트가 돈 모델. 하위 에이전트 사건에만 있다 |
 | `input_tokens`, `output_tokens` | BIGINT NULL | 하위 에이전트가 쓴 토큰. `SUBAGENT_COMPLETED` 에만 있다 |
 | `occurred_at` | DATETIME(6) | |
 
 `execution_id` 와 `sequence` 를 함께 유일하게 둔다.
 
-**`subagent_name` 은 Hermes 가 이름을 보낼 때만 채운다.**
+**`subagent_name`은 이름, `subagent_id`, `goal` 순서로 채운다.**
 이름이 없는 사건의 `preview` 에서 이름처럼 보이는 글자를 뽑아 채우지 않는다.
 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 
-**`hermes_session_id` 와 `model` 과 토큰은 Hermes 가 실어 보낼 때만 채운다.**
+**`hermes_session_id`, `model`, 토큰은 SSE 또는 종료된 자식 session 조회에서 확인한 값이다.**
 [`hermes/delegation.md`](hermes/delegation.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
 `subagent.start` 와 `subagent.complete` 에 오는 칸을 적는다.
 `child_session_id` 를 `hermes_session_id` 에, `goal` 을 `detail` 에 옮긴다.
 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.
+
+부모가 끝난 뒤에도 완료 사건이 없으면 [모델 단계와 실행 기록](model-tiers.md)의 재조회로 보완한다.
+`completed_child_session_id` VARCHAR(128) NULL은 자식 완료 사건의 중복 저장을 막는다.
+`(execution_id, completed_child_session_id)`가 유일하며 다른 종류의 사건은 이 칸을 비운다.
+기존 중복 완료 사건은 최신 한 줄만 키를 채우고 나머지 이력은 보존한다.
 
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓴다.
 사용량 합계에 더하지 않는다. 합계는 여전히 `agent_execution` 한 줄씩의 값이다.
@@ -481,6 +596,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 대화도 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
 메시지와 실행 기록과 Hermes session 은 그대로 둔다.
+아직 보내지 않은 대기 메시지(`chat_pending_message`)는 함께 지운다. 지운 대화에는 보낼 곳이 없다.
 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 실행 기록이 에이전트와 대화를 가리키고 있고, 기록은 남아야 한다.
 

@@ -43,7 +43,7 @@ src/
 **강조 색(`primary`)은 주 단추, 지금 고른 것, 초점 테두리에만 쓴다.**
 링크와 숫자는 글자색으로, 상태는 의미 색(`success`, `warning`, `info`, `destructive`)으로 그린다.
 읽는 글이 강조 색을 가지면 무엇이 누를 수 있는 것인지 알 수 없게 된다.
-값과 쓰는 곳의 표는 [ADR-047](../docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
+값과 쓰는 곳의 표는 [ADR-051](../docs/adr/ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
 
 - 색을 `#` 값이나 `bg-white`, `bg-black` 으로 적지 않는다. 토큰이 없으면 `globals.css` 에 더한다
 - 모서리는 `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-full` 만 쓴다
@@ -218,6 +218,17 @@ BROWSER_WEB_SERVER=dev pnpm test:browser
 
 `test/browser` 는 웹과 Chromium 을 띄워 화면을 검사한다.
 `mobile` 과 `desktop` 두 폭에서 돌고 각각 390px 와 1280px 다.
+
+PR 과 main 의 CI 는 폭마다 `--shard=1/4` 부터 `--shard=4/4` 까지 별도 runner 에서 나란히 돌린다.
+`fullyParallel: false` 와 `workers: 1` 은 유지하므로 파일을 나누되 파일 안의 검사와 서버 상태는 직렬로 처리한다.
+globalSetup 은 shard 마다 새 Control Plane 과 H2 메모리 DB, 실행별 임시 파일을 만든다.
+필수 검사 `browser-mobile` 과 `browser-desktop` 은 해당 폭의 shard 4개가 모두 성공해야 통과한다.
+JSON 결과와 실패 trace 는 폭과 shard 번호를 붙인 CI artifact 에서 읽는다.
+
+한국 시간 매일 04:23 에 main 전체를 다시 검사하며 변경이 없는 날도 건너뛰지 않는다.
+main push 와 매일 실행의 실패는 `브라우저 실패` 이슈에 파일과 폭별로 모은다.
+같은 파일의 열린 이슈에는 재발 횟수와 실행 링크를 남긴다. PR 실패는 이슈를 만들지 않고 그 PR 에서 고친다.
+모인 실패는 한 번에 고치고, 흔들리는 검사는 고치거나 까닭을 적어 이슈를 닫는다.
 
 **운영 코드에 시험용 문을 만들지 않는다.**
 로그인은 테스트가 NextAuth 세션 쿠키를 직접 만들어 넣는다.

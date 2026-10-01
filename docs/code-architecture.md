@@ -1,5 +1,13 @@
 # 구조
 
+## 모델 단계와 실행 정보 보완
+
+`chat`이 그룹 단계 정의, 사용자와 그룹 기본값, 대화의 선택을 소유한다.
+실행을 시작할 때 선택을 해석하고 `usage`에 선택 스냅샷을 넘긴다.
+`usage`는 부모 종료 뒤 자식 session의 최종 사용량을 별도 작업으로 보완한다.
+`hermes`는 session 조회와 최소한의 profile 기본값 조회를 소유한다.
+선택과 실패 처리 계약은 [모델 단계와 실행 기록](model-tiers.md)이 정한다.
+
 ## 경계
 
 ```
@@ -27,7 +35,7 @@ Control Plane 이 기대는 Hermes 쪽 코드는 이 저장소가 갖는다.
 hermes/
   plugins/
     dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
-    fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙인다
+    fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 연결용 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
   profile-template/
     config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
   bundle.sh                  설치 묶음을 만든다
@@ -49,6 +57,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` |
 | 스킬 루트 | 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` |
+| 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL`. Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 연결용 profile 의 커넥터 도구를 모두 막는다 |
 
 **plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받는다.** 운영은 plugin 을 먼저 올리고 Control Plane 을 올린다.
 경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
@@ -68,6 +77,20 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 `test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 와 `hermes/plugins` 에 특정 서비스 이름이 들어오지 않았는지 본다.
 예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
 계약은 [커넥터 연결](connectors.md)에 있다.
+
+`connector` 는 커넥터 도구 호출의 판정과 그 기록도 소유한다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
+
+| 클래스 | 하는 일 |
+| --- | --- |
+| `connector.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
+| `connector.application.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
+| `connector.application.ConnectorPolicyService` | 실행과 연결과 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다 |
+| `connector.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
+| `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
+| `connector.domain.ConnectorAction` | 판정 한 줄. 승인 상태 전이는 승인 엔진이 들어올 때 더한다 |
+
+**다른 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 승인 엔진이 들어오면 `chat` 도 부른다. `agent` 가 `people` 을 거쳐 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다.
+검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
 `presentation` 은 `infra` 를 바로 쓰지 않는다.
@@ -108,7 +131,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 2. `ChatService` 가 요청한 에이전트를 사용자가 쓸 수 있는지 확인하고 `conversation` 에 기록한다.
    이어지는 대화는 요청의 `agentCode` 를 무시하고 처음 기록한 에이전트를 쓴다.
 3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다.
-   요청자가 볼 수 있는 Memory 만 고른다.
+   요청자가 볼 수 있는 Memory만 고르고, Memory 예산 밖에서 공통 표 지침을 추가한다.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
    조립한 글자 수를 `context_chars` 에, 대화에서 고른 effort 를 `reasoning_effort` 에 적는다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
@@ -168,8 +191,9 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 색인의 본문은 `memory_read` MCP 도구로 읽는다.
   요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
   Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다.
-- 조립한 글자 수를 실행의 `context_chars` 에 남긴다.
-  주입할 양이 실제로 문제가 되는 시점을 숫자로 판단하기 위해서다.
+- 공통 답변 지침과 Memory를 합친 글자 수를 실행의 `context_chars`에 남긴다.
+  `instructions_hash`도 이 문자열을 대상으로 하며, turn 전용 지시는 제외한다.
+  Memory가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다.
 - 항목 하나가 남은 자리에 들어가지 않으면 그 항목만 빼고 다음 항목을 계속 담는다.
   넘친 항목을 잘라서 싣지는 않는다. 잘린 사실은 틀린 사실이 될 수 있다.
 - 색인 층에 쓸 자리를 먼저 떼어 두고 항상 층을 담는다.
@@ -401,7 +425,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 출처 | 적는 곳 |
 | --- | --- |
 | `COMMAND` | 커맨드로 turn 을 시작할 때 `chat` 이 적는다 |
-| `MODEL` | 실행 사건에서 `skill_view` 도구 호출을 받을 때 스킬 이름이 실려 있으면 `usage` 가 적는다. 대화 turn 의 실행만 기록된다. 위임과 흐름의 하위 실행은 Hermes 사건을 옮기지 않아 기록되지 않는다 |
+| `MODEL` | 실행 사건에서 `skill_view` 도구 호출을 받을 때 스킬 이름이 실려 있으면 `usage` 가 적는다. 이름은 `hermes` 가 사건을 읽을 때 가리기 전 미리보기에서 꺼내 이름 규칙으로 검증해 사건의 `skillName` 칸에 싣는다. 가린 `detail` 에서는 읽지 않는다(ADR-047). 연결용 에이전트의 실행은 이름을 싣지 않아 기록되지 않는다. 대화 turn 의 실행만 기록된다. 위임과 흐름의 하위 실행은 Hermes 사건을 옮기지 않아 기록되지 않는다 |
 
 | 경로 | 하는 일 |
 | --- | --- |
@@ -727,15 +751,16 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | 자리 | 맡는 것 |
 | --- | --- |
 | `orchestration.application.AgentDelegationService` | 위임 실행이 끝나면 `run()` 의 `finally` 에서 `DelegationFinished(conversationId, executionId)` 사건을 낸다. `chat` 을 직접 부르지 않는다 |
-| `chat.application.DelegationWakeService` | 사건과 turn 종료를 받아 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 기동할 때 전하지 않은 결과가 있는 대화를 한 번 훑는다. `OrphanedExecutionSweeper` 보다 뒤에 돈다 |
+| `chat.application.NextTurnDispatcher` | 위임 종료 사건, turn 종료, 기동을 받아 다음 turn 을 정한다. 대기 메시지를 먼저 보고 보낼 것이 없으면 깨우기 서비스에 넘긴다. 아래 「응답 중 대기열」 이 갖는다 |
+| `chat.application.DelegationWakeService` | 그 대화를 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 사건과 turn 종료를 직접 듣지 않는다 |
 | `chat.application.DelegationWakeProperties` | `assistant.delegation-wake.enabled`, `max-auto-turns`. 테스트 profile 은 끈다. 같은 H2 와 대역 Hermes 를 쓰는 다른 검사에서 자동 turn 이 열리지 않게 하기 위해서다 |
 | `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
-| `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(깨우기 서비스)를 부른다 |
-| `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 자동 turn 의 사건을 모든 구독에 보낸다 |
+| `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(`NextTurnDispatcher`)를 `TurnClosed(conversationId, stopped)` 로 부른다 |
+| `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 요청한 연결이 없는 turn(자동 turn, 대기 메시지로 연 turn)의 사건을 모든 구독에 보낸다 |
 | `chat.presentation.ConversationEventController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다. 보내기 전에 `forViewer` 를 적용한다(ADR-038) |
 | `mcp.application.McpToolService` | `agent_status` 와 `agent_stop` 이 끝난 상태를 돌려주면 `result_delivered_at` 을 적는다. `agent_delegate` 가 줄을 만든 뒤 `SUBMIT_FAILED` 를 돌려줄 때도 위임 서비스가 적는다 |
 | 웹 `app/api/chat/conversations/[conversationId]/events/route.ts` | 대화 단위 SSE 를 그대로 넘긴다 |
-| 웹 `components/chat-panel.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다 |
+| 웹 `components/chat-panel.tsx` | 대화를 열면 그 SSE 를 구독한다. `system` 사건은 알림 줄로, 자동 turn 의 답 조각은 보통 답과 같이 그린다. 대기 메시지 쪽 사건은 「응답 중 대기열」 이 갖는다 |
 
 **`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.** 두 패키지는 이미 서로를 import 한다(`TurnCancellation`, `Flow`). 위임 서비스가 `ChatService` 를 부르면 그 얽힘이 turn 실행까지 번진다.
 
@@ -780,7 +805,11 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |
 | `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
 | `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
-| `GET /api/v1/chat/conversations/{id}/events` | 대화 단위 SSE. 끝나지 않는다. 위임 결과로 열린 자동 turn 의 사건과 `system` 사건만 싣는다. 연결 직후 `: connected` 주석 줄을 보내 사건이 없어도 응답 헤더가 바로 나가고, 20초마다 `: ping` 을 보낸다 |
+| `GET /api/v1/chat/conversations/{id}/events` | 대화 단위 SSE. 끝나지 않는다. 요청한 연결이 없는 turn(위임 결과로 열린 자동 turn, 대기 메시지로 연 turn)의 사건과 `system`, `user`, `pending` 사건을 싣는다. 연결 직후 `: connected` 주석 줄을 보내 사건이 없어도 응답 헤더가 바로 나가고, 20초마다 `: ping` 을 보낸다 |
+| `GET /api/v1/chat/conversations/{id}/pending` | 대기 줄. `{ "held", "items": [{ "id", "text", "createdAt" }] }`. 없으면 `held` 가 false 이고 `items` 가 빈 목록이다 |
+| `POST /api/v1/chat/conversations/{id}/pending` | 대기 메시지를 더한다. 본문 `{ "text": "..." }`. 201 과 대기 줄을 돌려준다. 도는 turn 이 없으면 곧바로 보낸다 |
+| `DELETE /api/v1/chat/conversations/{id}/pending/{pendingId}` | 대기 메시지 하나를 취소한다. 204. 이미 보내졌거나 없으면 `PENDING_MESSAGE_NOT_FOUND` |
+| `POST /api/v1/chat/conversations/{id}/pending/send` | 멈춰 둔 대기 줄을 풀어 보낸다. 본문이 없다. 202 와 대기 줄을 돌려준다 |
 | `GET /api/v1/chat/conversations/{id}/running` | 이 대화에 지금 도는 turn. `{ "running", "executionId", "startedAt" }`. 돌지 않으면 `running` 이 false 이고 나머지는 null |
 | `GET /api/v1/chat/conversations/by-number/{number}` | 옛 주소 `/c/{번호}` 를 넘겨 주려고 번호로 대화를 찾는다. `{ "id": "<공개 식별자>" }` |
 
@@ -874,6 +903,9 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `done` | 끝나서 저장했다 | `conversationId`, `messageId`, `executionId` |
 | `stopped` | 중지로 끝나서 저장했다 | `conversationId`, `messageId`, `executionId`. 남긴 답이 없으면 `messageId` 가 null |
 | `error` | 실패했다 | `code`, `message` |
+| `system` | 알림 줄을 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
+| `user` | 대기 메시지를 합쳐 사용자 메시지로 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
+| `pending` | 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. 대화 단위 SSE 로만 간다 | `conversationId` |
 
 `phase` 는 `started` 와 `completed` 둘이다.
 `subagent` 의 칸은 Hermes 가 실어 보낼 때만 찬다. `goal` 이 비어 오면 Hermes 의 `preview` 를 그 자리에 싣는다.
@@ -903,6 +935,62 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 도구 사건이 아닌 사건의 `detail` 은 모두에게 싣는다. 하위 에이전트의 목표, 실패 코드, 넘어간 모델 이름이다.
 판정은 도구 이름 전체로 한다. `mcp__{서버}__web_search` 처럼 다른 MCP 서버가 같은 이름을 붙인 도구는 공개하지 않는다.
 
+### 응답 중 대기열
+
+결정은 [ADR-048](adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md), 흐름은 [flow.md](flow.md) 의 「응답 중에 보낼 때」 에 있다.
+
+| 자리 | 맡는 것 |
+| --- | --- |
+| `chat.domain.ChatPendingMessage` | 대기 메시지 한 행. `chat_pending_message` 표다 |
+| `chat.infra.ChatPendingMessageRepository` | 대화별 대기 행 읽기, 세기, 지우기, 멈춤 표시 바꾸기. 트랜잭션은 부르는 서비스가 연다 |
+| `chat.application.PendingMessageService` | 대기 줄 읽기, 더하기, 취소, 멈춤 풀기. 상한을 보고 `pending` 사건을 낸다. 더하거나 푼 뒤 `NextTurnDispatcher` 를 부른다 |
+| `chat.application.PendingQueue` | 서비스가 돌려주는 대기 줄. `held` 와 대기 행 목록 |
+| `chat.application.NextTurnDispatcher` | 다음 turn 을 정하는 한 자리. turn 종료, 위임 종료 사건, 기동을 받는다 |
+| `chat.application.TurnClosed` | turn 이 닫혔다는 알림. 대화 번호와 중지로 끝났는지를 싣는다 |
+| `chat.application.ChatService` | `runPendingMessages` 가 대기 행을 합쳐 `TurnIntent.Fresh` 로 turn 을 돌린다. 대화를 지울 때 대기 행도 지운다 |
+| `chat.presentation.PendingMessageController` | 위 「경로」 의 `pending` 경로 넷 |
+| 웹 `app/api/chat/conversations/[conversationId]/pending/` | `route.ts`(GET, POST), `[pendingId]/route.ts`(DELETE), `send/route.ts`(POST). Control Plane 으로 그대로 넘긴다 |
+| 웹 `lib/pending-route.ts` | 위 서버 라우트 셋이 함께 쓰는 넘기기와 형식 오류 응답. Control Plane 의 상태와 본문을 다시 감싸지 않는다 |
+| 웹 `lib/pending-messages.ts` | 브라우저가 위 서버 라우트를 부르는 함수 |
+| 웹 `components/chat-panel.tsx` | 보낼 때 보통 보내기와 대기 경로 가운데 하나를 고른다. 답이 도는 중이거나 대기 줄이 멈춰 있으면 대기 경로다. 보통 보내기가 `CONVERSATION_BUSY` 로 거절되면 글만 보낸 경우에 대기 메시지로 다시 넣는다. `user` 사건은 사용자 줄로 그리고, `pending` 사건은 보류하지 않고 곧바로 대기 줄을 다시 읽는다 |
+| 웹 `components/chat/use-pending-queue.ts` | 대기 줄 상태. 대화를 열 때와 `pending` 사건을 받을 때 다시 읽는다 |
+| 웹 `components/chat/pending-queue.tsx` | 입력창 위의 대기 줄. 취소 단추와, 멈춰 있을 때의 「보내기」 |
+
+**다음 turn 을 정하는 자리는 `NextTurnDispatcher.tryNext` 하나다.**
+`TurnCancellation` 의 종료 리스너는 이것 하나만 건다.
+대기 메시지와 위임 결과가 리스너를 따로 걸면 같은 순간에 잠금을 다투고 순서가 등록 순서에 달린다.
+
+`tryNext` 는 아래 순서로 본다.
+
+1. 그 대화에 대기 행이 있고 멈춰 둔 행이 하나도 없으면 turn 잠금을 잡고 새 가상 스레드에서 `ChatService.runPendingMessages` 를 돌린다. 잠금을 잡지 못하면 도는 turn 이 닫힐 때 다시 온다.
+2. 보낼 대기 행이 없으면 `DelegationWakeService.tryWake` 로 넘긴다.
+
+turn 이 중지로 끝나면 `ChatService` 가 취소된 turn 을 돌려주는 자리에서 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 행을 모두 멈춰 둔다.
+**잠금을 풀기 전에 멈춘다.** 잠금을 푼 뒤 종료 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다.
+**사용자가 중지를 확정한 실행은 `RUNNING` 으로 남지 않는다.** 중지가 확정된 turn 이 예외로 끝나면 실행 줄이 아직 끝나지 않았을 때 취소로 적고(이미 `FAILED` 면 그대로 둔다), 그 뒤 잠금을 풀기 전에 대기 행을 멈춘다. 흐름 turn 도 같다.
+대기 줄 처리(멈춤, `pending` 알림)의 실패는 경고 로그로만 남고 취소 기록과 잠금 해제를 막지 않는다.
+취소 기록을 먼저 남기고 그 뒤에 멈춘다. 멈추다 실패하면 경고 로그만 남기고 그 turn 은 `stopped` 로 끝난다. 실행 줄이 `RUNNING` 으로 남지 않게 하기 위해서다.
+닫을 때 `TurnClosed.stopped` 가 참이면 `NextTurnDispatcher` 가 `pending` 사건을 낸다. 그 알림이 실패해도 `tryNext` 는 부른다.
+
+**멈춤은 행마다 `held` 로 DB 에 적는다.** 한 행이라도 멈춰 있으면 그 대화의 대기 줄 전체를 보내지 않는다.
+대기 줄이 멈춰 있을 때 더한 행은 멈춘 채로 들어간다.
+메모리에만 두면 서버가 다시 뜬 뒤 기동 확인이 사용자가 멈춘 글을 보내 버린다.
+
+대기 행을 지우는 것과 `USER` 행을 저장하는 것은 `ChatService.saveQuestion` 의 같은 트랜잭션이다.
+지운 행 수가 읽은 행 수와 다르면 되돌리고 대기 행을 다시 읽어 합친다. 읽은 뒤 취소된 행이 있었다는 뜻이다.
+그 트랜잭션 뒤에 `user` 사건과 `pending` 사건을 낸다.
+
+사용자 메시지를 저장하기 전에 실패하면 대기 행이 그대로 남는다.
+그대로 닫으면 종료 리스너가 같은 행으로 곧바로 다시 열어 같은 실패를 되풀이한다.
+그래서 `NextTurnDispatcher` 가 남은 행을 멈춰 두고 `error` 사건을 낸다.
+멈추는 것까지 실패하면 그 대화는 30초 동안 대기 메시지 turn 을 다시 열지 않는다. 실패 시각은 메모리에만 두며 서버가 다시 뜨면 사라진다. 그동안에도 위임 결과는 전한다.
+
+더할 때의 상한 확인과 저장은 대화별 잠금 안에서 한다. 잠금은 메모리에 있고, turn 잠금과 같이 서버 한 대를 전제로 한다.
+`POST .../pending` 은 저장한 뒤 언제나 `tryNext` 를 부른다.
+turn 이 도는지 먼저 보고 저장할지 정하면, 보는 순간과 저장하는 순간 사이에 turn 이 닫혔을 때 그 글을 보낼 계기가 없다.
+
+대기 메시지 경로는 `assistant.delegation-wake.enabled` 와 무관하게 켜져 있다. 그 설정은 위임 결과 쪽만 끈다.
+
 ### 중지
 
 `chat/application` 의 `TurnCancellation` 이 도는 turn 마다 중지 표시를 하나 갖는다. 뿌리 실행 번호가 열쇠다.
@@ -910,6 +998,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 실행 줄을 만들면 열쇠를 그 실행 번호로 옮긴다.
 중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
 같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성이 `CONVERSATION_BUSY` 를 판정하는 자리다.
+화면은 turn 이 도는 동안 보내기 대신 대기 메시지 경로를 쓴다. 아래 「응답 중 대기열」 이 갖는다.
 같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.
 
 `ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다.
@@ -1132,7 +1221,7 @@ web/src/
 토큰은 `globals.css` 한 곳에서만 선언한다. 밝기 모드도 거기서 갈린다.
 
 토큰 이름은 shadcn 의 이름 체계를 쓴다. 옛 이름과의 대응표와 근거는 [ADR-023](adr/ADR-023-화면-부품은-shadcn-ui-를-저장소에-복사해-쓴다.md) 이 갖는다.
-색 값, 모서리, 움직임 토큰의 값과 근거는 [ADR-047](adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
+색 값, 모서리, 움직임 토큰의 값과 근거는 [ADR-051](adr/ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
 
 검사 명령과 예외는 [`web/AGENTS.md`](../web/AGENTS.md) 가 갖는다.
 
@@ -1140,7 +1229,7 @@ web/src/
 
 가족이 쓰는 개인형 비서다. 대화가 중심이고 관리 도구처럼 보이지 않게 한다.
 팔레트는 「새벽 보라」 다. 강조 색은 보라(`primary`, 밝음 `#6D4AFF`)이고, 비서가 일하는 중이라는 신호만 라임 점(`signal`)이 맡는다.
-값과 근거는 [ADR-047](adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
+값과 근거는 [ADR-051](adr/ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
 
 | 토큰 | 쓰는 곳 |
 | --- | --- |
@@ -1176,7 +1265,7 @@ web/src/
 | 대화 열 | 가운데 정렬한 좁은 열. 화면 폭을 다 쓰지 않는다 |
 | 내가 보낸 줄 | 오른쪽 정렬 말풍선. 폭은 열의 70% 까지 |
 | 비서가 답한 줄 | 열 전체 폭. 배경과 테두리가 없다 |
-| 입력창 | 둥근 알약 하나. 그 안 오른쪽에 원형 보내기 단추. 답을 만드는 동안 중지 단추로 바뀐다. 알약 아래 줄에 모델과 effort 를 고르는 단추 하나 |
+| 입력창 | 둥근 알약 하나. 그 안 오른쪽에 원형 보내기 단추. 답을 만드는 동안 보내기 옆에 중지 단추가 나온다. 알약 아래 줄에 모델과 effort 를 고르는 단추 하나 |
 | 작업 과정 | 답 위에 접힌 블록 하나. 펼치거나 오른쪽 패널로 연다 |
 | 메시지 동작 | 답 아래 한 줄. 복사, 다시 생성, 판 넘기기 |
 | 새 대화 | 입력창이 가운데. 위에 에이전트 카드, 아래에 추천 질문 |
@@ -1304,6 +1393,7 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
   뿌리와 origin 사이의 중간 실행만 중지된 경우는 보지 않는다.
   멈출 수 있는 길은 profile 플러그인 쪽에 있고, 부모 run 이 끝난 뒤의 자식은 그 길로도 멈추지 못한다([`hermes/delegation.md`](hermes/delegation.md#native-하위-에이전트를-멈추는-길))
 - 사용자 전체의 동시 위임 한도. 지금은 뿌리당 한도와 서버 전체 한도만 있다
+- `connector_action` 줄의 보관 기한과 정리. 지금은 도구 호출마다 남긴 줄을 지우지 않는다
 
 SSE 중계와 스트리밍은 끝났다.
 `HermesRunEventStream` 이 받아 `ChatService.stream` 이 화면으로 중계한다.

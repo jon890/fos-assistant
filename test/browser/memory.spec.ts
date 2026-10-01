@@ -95,7 +95,7 @@ test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인�
   await page.getByLabel("제목", { exact: true }).fill(title);
   await page.getByLabel("내용").fill("원래 내용");
   await page.getByRole("button", { name: "저장" }).click();
-  const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
+  const item = page.getByRole("heading", { name: title, exact: true }).locator("xpath=ancestor::article");
   await page.route("**/api/memories/*", async (route) => route.fulfill({ status: 500 }));
   await item.getByRole("button", { name: "고치기" }).click();
   await item.getByRole("textbox").fill("바뀐 내용");

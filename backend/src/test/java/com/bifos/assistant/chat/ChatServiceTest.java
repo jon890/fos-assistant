@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -24,9 +25,14 @@ import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.SkillCommand;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
+import com.bifos.assistant.chat.domain.ModelTierDefinition;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -89,6 +95,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -166,6 +173,12 @@ class ChatServiceTest {
     ChatMessageRepository messages;
 
     @Autowired
+    ModelTierDefinitionRepository tierDefinitions;
+
+    @Autowired
+    TransactionTemplate transactions;
+
+    @Autowired
     AgentExecutionRepository executions;
 
     @Autowired
@@ -202,6 +215,25 @@ class ChatServiceTest {
         return (StubHermesRunsClient) hermes;
     }
 
+    /** 사건 스트림이 {@code skill_view} 시작 사건에 가리기 전 미리보기에서 꺼낸 이름을 실어 보낸 것처럼 만든다. */
+    private static RunEvent skillViewStarted(String detail, String skillName) {
+        return new RunEvent(
+                "tool.started",
+                null,
+                "skill_view",
+                detail,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                skillName);
+    }
+
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
     private void hermesStreams(RunEvent... events) {
         doAnswer(invocation -> {
@@ -212,7 +244,7 @@ class ChatServiceTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any());
+                .open(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     private List<ExecutionEvent> eventsOf(Long executionId) {
@@ -236,6 +268,7 @@ class ChatServiceTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
+        tierDefinitions.deleteAll();
         agents.deleteAll();
         memoryRepository.deleteAll();
         users.deleteAll();
@@ -255,6 +288,36 @@ class ChatServiceTest {
                     user.id()));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+    }
+
+    @Test
+    @DisplayName("깨진 단계 정의로 모델 해석이 실패해도 질문과 FAILED 실행을 남기고 Hermes에는 제출하지 않는다")
+    void recordsFailedExecutionWhenStoredTierDefinitionIsMalformed() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id()));
+        transactions.executeWithoutResult(status -> conversations.chooseModelTierIfActive(
+                conversation.id(), dad.id(), ModelSelectionMode.TIER, ModelTier.FAST));
+        tierDefinitions.save(ModelTierDefinition.of(dad.groupId(), ModelTier.FAST, null, "example-fast", "low"));
+
+        assertThatThrownBy(() -> chat.send(dad, conversation.id(), "질문", null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).singleElement();
+        assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
+                .singleElement()
+                .satisfies(execution -> {
+                    assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
+                    assertThat(execution.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+                    assertThat(eventsOf(execution.id())).singleElement().satisfies(event -> {
+                        assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
+                        assertThat(event.detail()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+                    });
+                });
+        assertThat(stub().received()).isEmpty();
+        assertThat(chat.running(dad, conversation.id()).running()).isFalse();
     }
 
     @Test
@@ -291,7 +354,7 @@ class ChatServiceTest {
                                             .findById(turn.conversationId())
                                             .orElseThrow()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
-            assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
+            assertThat(command.instructions()).contains("GFM", "| --- | --- |").endsWith(AskFormat.GUIDE);
             // 새 대화도 Control Plane 이 정한 session 으로 첫 turn 을 보낸다.
             assertThat(command.sessionId()).startsWith("fos-");
         });
@@ -310,7 +373,11 @@ class ChatServiceTest {
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.latencyMs()).isGreaterThanOrEqualTo(0);
-        assertThat(execution.contextChars()).isZero();
+        String sentInstructions = stub().received().getFirst().instructions();
+        String commonInstructions = sentInstructions.substring(0, sentInstructions.indexOf("\n\n" + AskFormat.GUIDE));
+        assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
+        assertThat(execution.instructionsHash())
+                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
                 .satisfiesExactly(
@@ -335,13 +402,13 @@ class ChatServiceTest {
 
         String instructions = stub().received().getFirst().instructions();
         assertThat(instructions).contains("국수는 맵지 않게 먹는다").endsWith("\n\n" + AskFormat.GUIDE);
-        // 실행 기록의 길이는 Memory 몫만 센다. 형식 안내는 Memory 상한과 무관하게 붙는다.
+        // 실행 기록은 공통 지침과 Memory를 세고, turn 전용 지침은 제외한다.
         assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
                 .isEqualTo((long) (instructions.length() - ("\n\n" + AskFormat.GUIDE).length()));
     }
 
     @Test
-    @DisplayName("커넥터 에이전트의 대화 turn 은 Memory 를 Hermes 에 보내지 않고 실행 기록의 길이도 0 이다")
+    @DisplayName("커넥터 대화는 Memory 없이 공통 표 지침을 보내고 길이와 해시를 기록한다")
     void sendsNoMemoryToHermesForConnectorAgentTurn() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent connector = agents.findAll().getFirst();
@@ -356,10 +423,13 @@ class ChatServiceTest {
         assertThat(instructions)
                 .as("커넥터 에이전트의 turn 이 Hermes 에 보낸 instructions")
                 .doesNotContain("국수는 맵지 않게 먹는다")
-                .isEqualTo(AskFormat.GUIDE);
-        assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
-                .as("실행 기록의 문맥 길이")
-                .isZero();
+                .contains("GFM", "구분 줄")
+                .endsWith("\n\n" + AskFormat.GUIDE);
+        String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + AskFormat.GUIDE));
+        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
+        assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
+        assertThat(execution.instructionsHash())
+                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
     }
 
     @Test
@@ -584,9 +654,9 @@ class ChatServiceTest {
         stub().willReturn(
                         HermesRunResult.of("run-1", "sess-1", "completed", "장을 봤어요", "dad", null, TokenUsage.empty()));
         hermesStreams(
-                new RunEvent("tool.started", null, "skill_view", "shopping", null, null),
+                skillViewStarted("shopping", "shopping"),
                 new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
-                new RunEvent("tool.started", null, "skill_view", "shopping → references/list.md", null, null),
+                skillViewStarted("shopping → references/list.md", "shopping"),
                 new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
                 new RunEvent("run.completed", null, null, null, null, null));
 

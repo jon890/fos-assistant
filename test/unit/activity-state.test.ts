@@ -96,10 +96,26 @@ test("스트림 종료와 오류는 자식의 결과 누락이고 사용자 중�
   assert.equal(applyChatEvent(state, { type: "stopped" }).items[0].state, "stopped");
 });
 
-test("이름이 있으면 이름을 쓰고 없으면 긴 목표나 preview를 줄인다", () => {
+test("이름이 id 로 채워져 와도 목표가 있으면 목표를 보인다", () => {
+  const event = subagentStarted();
+  event.subagentName = "sa-1";
+  assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "자료를 찾는다");
+});
+
+test("목표가 없으면 이름을 쓰고 둘 다 없으면 도우미다", () => {
   const event = subagentStarted();
   event.subagentName = "조사 담당";
+  event.detail = null;
   assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "조사 담당");
+  event.detail = "  ";
+  assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "조사 담당");
+  event.subagentName = null;
+  event.detail = null;
+  assert.equal(fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) })[0].name, "도우미");
+});
+
+test("이름이 없으면 긴 목표나 preview를 줄인다", () => {
+  const event = subagentStarted();
   event.subagentName = null;
   event.detail = "긴 목표 ".repeat(40);
   const [item] = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [event]) });

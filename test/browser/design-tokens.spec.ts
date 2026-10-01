@@ -2,7 +2,7 @@ import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright
 import { contrast, parseRgb } from "./color.ts";
 import { expect, test } from "./fixtures.ts";
 
-/** `globals.css` 가 두 밝기 모드에서 모두 값을 가져야 하는 색 토큰이다. 이름은 ADR-023 과 ADR-047 의 표를 따른다. */
+/** `globals.css` 가 두 밝기 모드에서 모두 값을 가져야 하는 색 토큰이다. 이름은 ADR-023 과 ADR-051 의 표를 따른다. */
 const TOKENS = [
   "--background",
   "--foreground",

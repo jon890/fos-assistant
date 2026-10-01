@@ -9,11 +9,13 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorTool;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,7 +92,9 @@ class HttpHermesConnectorClientTest {
                         "list_scopes",
                         "demo",
                         List.of(),
-                        false));
+                        false,
+                        1,
+                        List.of()));
         server.verify();
     }
 
@@ -119,6 +123,112 @@ class HttpHermesConnectorClientTest {
         for (int attempt = 0; attempt < 3; attempt++) {
             assertThatThrownBy(() -> client.readCatalog()).isInstanceOf(IllegalStateException.class);
         }
+        server.verify();
+    }
+
+    @DisplayName("카탈로그의 schema 와 tools 를 받은 글자 그대로 읽고, title 이 없으면 null 이다")
+    @Test
+    void readsSchemaAndToolPolicies() {
+        String tail = "\"mcp_server\":\"demo\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(
+                        CATALOG.replace(
+                                tail,
+                                tail + ",\"schema\":2,\"tools\":{"
+                                        + "\"list_scopes\":{\"risk\":\"READ\",\"approval\":\"none\"},"
+                                        + "\"write_note\":{\"risk\":\"WRITE\",\"approval\":\"required\","
+                                        + "\"title\":\"메모 쓰기\"},"
+                                        + "\"odd\":{\"risk\":\"UNKNOWN\"}}"),
+                        MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.schema()).isEqualTo(2);
+        assertThat(declared.tools())
+                .containsExactly(
+                        new ConnectorTool("list_scopes", "READ", "none", null),
+                        new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
+                        // 모르는 위험도와 빠진 승인 방식은 여기서 거르지 않는다. 받는 쪽이 그 커넥터만 뺀다.
+                        new ConnectorTool("odd", "UNKNOWN", null, null));
+        server.verify();
+    }
+
+    @DisplayName("schema 가 정수가 아니거나 tools 가 객체가 아닌 커넥터는 받는 쪽이 거르는 값으로 읽고 다른 커넥터는 그대로 읽는다")
+    @Test
+    void readsMalformedSchemaOrToolsAsUnjudgeableWithoutFailingCatalog() {
+        String url = BASE + "/api/connectors/catalog";
+        String tail = "\"mcp_server\":\"demo\"";
+        String other = ",{\"id\":\"other-notes\",\"title\":\"다른 메모\",\"fields\":[],"
+                + "\"verify\":{\"tool\":\"list_scopes\"},\"mcp_server\":\"other\",\"schema\":2,"
+                + "\"tools\":{\"list_scopes\":{\"risk\":\"READ\",\"approval\":\"none\"}}}]";
+        String declared = ",\"tools\":{\"list_scopes\":{\"risk\":\"READ\",\"approval\":\"none\"}}";
+        List<String> malformed = List.of(
+                // 판이 글자다. 도구 선언이 멀쩡해도 함께 버린다.
+                ",\"schema\":\"2\"" + declared,
+                // 도구 선언이 배열이다. 판이 없어 도구를 선언하지 않는 판으로 읽히면 안 된다.
+                ",\"tools\":[\"list_scopes\"]",
+                ",\"schema\":2,\"tools\":[\"list_scopes\"]");
+        for (String broken : malformed) {
+            String catalog = CATALOG.replace(tail, tail + broken).strip();
+            server.expect(requestTo(url))
+                    .andRespond(withSuccess(
+                            catalog.substring(0, catalog.length() - 1) + other, MediaType.APPLICATION_JSON));
+        }
+
+        for (String broken : malformed) {
+            List<ConnectorManifest> read = client.readCatalog();
+
+            assertThat(read)
+                    .as("틀린 선언 %s", broken)
+                    .extracting(ConnectorManifest::id)
+                    .containsExactly(DEMO, "other-notes");
+            assertThat(read.get(0).schema()).as("틀린 선언 %s 의 판", broken).isZero();
+            assertThat(read.get(0).tools()).as("틀린 선언 %s 의 도구", broken).isEmpty();
+            assertThat(read.get(1).schema()).isEqualTo(2);
+            assertThat(read.get(1).tools()).containsExactly(new ConnectorTool("list_scopes", "READ", "none", null));
+        }
+        server.verify();
+    }
+
+    @DisplayName("설치 목록의 policy_hook 은 JSON true 일 때만 참이다")
+    @Test
+    void readsPolicyHookOnlyWhenJsonTrue() {
+        String url = BASE + "/api/connectors?profile=user-demo";
+        String connectors = "\"connectors\":[{\"plugin\":\"demo-notes\",\"enabled\":true,\"configured\":true}]}";
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"policy_hook\":true," + connectors, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"policy_hook\":false," + connectors, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"policy_hook\":\"true\"," + connectors,
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"policy_hook\":true,\"connectors\":[]}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.readConnector(PROFILE, DEMO).policyHook()).isTrue();
+        assertThat(client.readConnector(PROFILE, DEMO).policyHook()).isFalse();
+        assertThat(client.readConnector(PROFILE, DEMO).policyHook()).isFalse();
+        // 설치되지 않은 것으로 읽는 응답도 최상위의 값을 그대로 담는다.
+        assertThat(client.readConnector(PROFILE, DEMO).policyHook()).isTrue();
+        server.verify();
+    }
+
+    @DisplayName("설치 응답의 plugin_updated 를 읽고, 없으면 거짓이다")
+    @Test
+    void readsPluginUpdatedFromInstallResponse() {
+        String body = "{\"profile\":\"user-demo\",\"plugin\":\"demo-notes\",\"enabled\":true,\"restart_required\":true";
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withSuccess(body + ",\"plugin_updated\":true}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andRespond(withSuccess(body + "}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, true));
+        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, false));
         server.verify();
     }
 
@@ -233,10 +343,12 @@ class HttpHermesConnectorClientTest {
                                 + "{\"plugin\":\"other\",\"enabled\":false,\"configured\":false},"
                                 + "{\"plugin\":\"demo-notes\",\"enabled\":true,\"configured\":true}]}",
                         MediaType.APPLICATION_JSON));
-        assertThat(client.putConnector(PROFILE, DEMO, true)).isTrue();
+        assertThat(client.putConnector(PROFILE, DEMO, true)).isEqualTo(new InstallResult(true, false));
         var state = client.readConnector(PROFILE, DEMO);
         assertThat(state.enabled()).isTrue();
         assertThat(state.configured()).isTrue();
+        // 옛 대시보드 plugin 은 policy_hook 을 내지 않는다. 없는 칸은 거짓이다.
+        assertThat(state.policyHook()).isFalse();
         server.verify();
     }
 

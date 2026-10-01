@@ -21,6 +21,9 @@ export type Conversation = {
   provider: string | null;
   model: string | null;
   reasoningEffort: string | null;
+  /** 선택하지 않은 새 대화는 null 이고, 서버가 새 선택 방식을 주면 그 값을 쓴다. */
+  modelSelectionMode?: "DEFAULT" | "TIER" | "CUSTOM" | null;
+  modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
 };
 
 type ErrorPayload = { code?: string; message?: string };

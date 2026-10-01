@@ -4,6 +4,8 @@ async function ask(page: import("../../web/node_modules/@playwright/test/index.j
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
+  // 답이 끝난 뒤에 돌려준다. 답이 오는 동안 이어 보낸 글은 대기 메시지로 쌓인다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0, { timeout: 30_000 });
 }
 
 test("다시 생성 아이콘 단추에 접근성 이름과 풀이가 있다", async ({ page }) => {

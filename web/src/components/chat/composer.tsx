@@ -29,10 +29,13 @@ import {
 } from "./skill-command";
 import {
   ModelPicker,
+  ModelTierPicker,
   type ModelChoice,
   type ModelChoiceSaveResult,
+  type ModelTierSaveResult,
 } from "./model-picker";
 import type { Conversation } from "../shell/conversations-provider";
+import { saveConversationTier, type ModelTierCode } from "@/lib/model-tiers";
 
 type Props = {
   value: string;
@@ -46,8 +49,10 @@ type Props = {
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 거짓이면 사진 단추를 그리지 않는다 */
   acceptsAttachments: boolean;
   onConversationCreated(id: string): void;
-  /** 답을 만드는 중이다. 참이면 보내기 자리에서 중지를 보인다. */
+  /** 답을 만드는 중이다. 참이면 보내기 옆에 중지를 함께 보인다. */
   running: boolean;
+  /** 답을 만드는 중에도 보내기를 받을 수 있다. 거짓이면 그동안 보내기와 Enter 를 막는다. */
+  canQueue: boolean;
   /** `started` 사건 뒤, 아직 중지를 누르지 않았을 때 참이다. */
   canStop: boolean;
   onStop(): void;
@@ -73,6 +78,8 @@ type Props = {
    * 이때 고르게 하면 모르는 값을 「기본」 으로 보고 저장해 적힌 모델을 지운다. 그래서 단추를 막는다.
    */
   modelChoiceUnknown: boolean;
+  modelSelectionMode: "DEFAULT" | "TIER" | "CUSTOM" | null;
+  modelTier: ModelTierCode | null;
   /** 모델 선택을 저장한 뒤 서버가 돌려준 대화 한 줄을 알린다 */
   onModelChoiceSaved(conversation: Conversation): void;
 };
@@ -133,6 +140,7 @@ export function Composer({
   acceptsAttachments,
   onConversationCreated,
   running,
+  canQueue,
   canStop,
   onStop,
   mention,
@@ -140,6 +148,8 @@ export function Composer({
   onBlockingChange,
   modelChoice,
   modelChoiceUnknown,
+  modelSelectionMode,
+  modelTier,
   onModelChoiceSaved,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -507,6 +517,31 @@ export function Composer({
     }
   }
 
+  /** 고른 단계를 대화에 저장한다. 기본값으로 돌아가기도 같은 경로에서 명시적으로 적는다. */
+  async function saveModelTier(
+    mode: "DEFAULT" | "TIER",
+    tier: ModelTierCode | null,
+  ): Promise<ModelTierSaveResult> {
+    setSavingModel(true);
+    try {
+      const targetConversationId = await ensureConversationId();
+      if (targetConversationId === null || !mountedRef.current)
+        return "reported";
+      const result = await saveConversationTier<Conversation>(
+        targetConversationId,
+        mode,
+        tier,
+      );
+      if (!result.ok) return "failed";
+      onModelChoiceSaved(result.data);
+      return "saved";
+    } catch {
+      return "failed";
+    } finally {
+      if (mountedRef.current) setSavingModel(false);
+    }
+  }
+
   function removeItem(key: string) {
     if (running) return;
     // 부수 효과는 updater 밖에서 한 번만 부른다. 개발 모드의 StrictMode 는 updater 를 두 번 돌린다.
@@ -740,7 +775,7 @@ export function Composer({
               event.shiftKey ||
               composing.current ||
               event.nativeEvent.isComposing ||
-              running
+              (running && !canQueue)
             ) {
               return;
             }
@@ -782,7 +817,7 @@ export function Composer({
           <TooltipButton
             label="중지"
             passEscape
-            variant="default"
+            variant="outline"
             disabled={!canStop}
             onClick={onStop}
             size="icon"
@@ -790,34 +825,47 @@ export function Composer({
           >
             <Square aria-hidden="true" className="size-4 fill-current" />
           </TooltipButton>
-        ) : (
-          <TooltipButton
-            label="보내기"
-            variant="default"
-            type="submit"
-            disabled={sendDisabled}
-            size="icon"
-            className="size-10 shrink-0 rounded-full"
-          >
-            {uploading ? (
-              <LoaderCircle
-                aria-hidden="true"
-                className="size-4 animate-spin motion-reduce:animate-none"
-              />
-            ) : (
-              <ArrowUp aria-hidden="true" className="size-5" />
-            )}
-          </TooltipButton>
-        )}
+        ) : null}
+        <TooltipButton
+          label="보내기"
+          variant="default"
+          type="submit"
+          disabled={sendDisabled || (running && !canQueue)}
+          size="icon"
+          className="size-10 shrink-0 rounded-full"
+        >
+          {uploading ? (
+            <LoaderCircle
+              aria-hidden="true"
+              className="size-4 animate-spin motion-reduce:animate-none"
+            />
+          ) : (
+            <ArrowUp aria-hidden="true" className="size-5" />
+          )}
+        </TooltipButton>
       </div>
       {/* 알약 안에 두면 좁은 폭에서 입력칸이 줄어든다. 그래서 알약 아래 줄에 둔다. */}
       <div className="mt-1 flex min-w-0 px-2">
-        <ModelPicker
-          agentCode={agentCode}
-          choice={modelChoice}
-          onChange={saveModelChoice}
-          disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
-        />
+        <div className="flex min-w-0 flex-col gap-1">
+          <ModelTierPicker
+            agentCode={agentCode}
+            mode={modelSelectionMode}
+            tier={modelTier}
+            onChange={saveModelTier}
+            disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
+            advancedPicker={
+              <ModelPicker
+                agentCode={agentCode}
+                choice={modelChoice}
+                onChange={saveModelChoice}
+                disabled={
+                  disabled || agentCode.length === 0 || modelChoiceUnknown
+                }
+                inSettings
+              />
+            }
+          />
+        </div>
       </div>
     </form>
   );

@@ -10,14 +10,45 @@
 | `GET /v1/runs/{run_id}` | `status`, `session_id`, `model`, `output`, `usage` 를 준다 |
 | `GET /v1/runs/{run_id}/events` | SSE. `tool.started`, `tool.completed`, `subagent.start`, `subagent.complete` 와 종료 사건 |
 | `POST /v1/runs/{run_id}/stop` | 실행 중단 |
+| `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 우리는 아직 부르지 않는다 |
 
 MVP 는 제출과 조회만 쓴다.
 
-**도는 실행에 메시지를 끼워 넣는 경로는 없다.** 실행을 시작한 뒤 바꿀 수 있는 것은 중단뿐이다. 그래서 끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
+**실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단만 쓴다.
+끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
+응답 중에 사용자가 보낸 메시지도 그 turn 이 끝난 뒤 새 실행으로 보낸다([ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)).
 실행 Graph 는 SSE 를 그대로 받아 그리면 되고, 이를 위해 Hermes 를 고칠 일은 없다.
 
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
 Control Plane 이 Memory 를 주입하는 자리가 여기다.
+
+### 도는 실행에 지시를 더하는 `steer`
+
+**이 문서는 2026-10-01 까지 「도는 실행에 메시지를 끼워 넣는 경로는 없다」 고 적었다. 틀린 기술이었다.**
+v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 있다.
+[`delegation.md`](delegation.md) 와 [`upgrades.md`](upgrades.md) 는 이미 `steer` 경로와 `run.steered` 사건을 적고 있었다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 경로 | `POST /v1/runs/{run_id}/steer` |
+| 소유자 판정 | 조회, 중단과 같다([`concurrency.md`](concurrency.md)) |
+| 본문 | `input`, `message`, `text` 중 처음으로 찬 칸의 글을 읽는다 |
+| 받는 때 | 그 run 의 `status` 가 `running` 일 때만. 아니면 409 `run_not_accepting_steer` 다. 중단을 보낸 run 도 이 판정으로 거절한다 |
+| 빈 글 | 400 `invalid_steer_input` |
+| agent 가 받지 않았다 | 409 `steer_not_accepted` |
+| agent 가 예외를 던졌다 | 500 `steer_failed` |
+| 성공 | `{ "object": "hermes.run.steer", "run_id", "accepted": true }` 와 `run.steered` 사건 |
+| 넣지 못하고 끝났다 | 종료 사건과 조회 응답에 `pending_steer` 로 그 글이 실려 온다. 클라이언트가 다시 보내라는 뜻이다 |
+
+조사에서 소스로 읽은 것이 둘 더 있다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
+
+- 받은 글은 곧바로 들어가지 않는다. 다음 도구 묶음이 끝난 뒤 user 행으로 들어간다.
+- 중단(hard interrupt)으로 끝나면 넣지 못한 글은 버려진다.
+
+**Control Plane 은 아직 `steer` 를 부르지 않는다.**
+넣지 못한 글과 버려진 글을 받아 둘 자리가 먼저 있어야 해서 대기열을 먼저 만들었다(ADR-048).
+`steer` 를 쓰기 전에 운영 Hermes 에서 `steer` 와 `pending_steer` 의 왕복을 확인한다.
+가짜 Hermes 에는 이 경로가 없다.
 
 ### `/v1/runs` 는 이미지를 받지 않는다
 
@@ -313,3 +344,42 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 
 **가짜 Hermes 를 이 형태로 맞춰 둔다.**
 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다. 실측으로 그렇게 한 번 놓쳤다.
+
+### 도구 내용 가리기
+
+`tool.` 사건의 `preview`, `detail`, `result` 중 처음 있는 값을 설명으로 읽는다.
+문자열과 JSON 객체, 배열을 모두 받는다.
+`HermesRunEventStream`은 이 값을 가린 뒤 `RunEvent.detail`에 넣는다.
+SSE와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도 이 실행 기록을 조회한다.
+관리자도 가리기 전 원문을 받지 않는다.
+근거는 [ADR-047](../adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md)에 있다.
+
+| 대상 | 처리 |
+| --- | --- |
+| JSON 비밀 키 | 중첩 객체와 배열에서도 값 전체를 `[가림]`으로 바꾼다. 키의 대소문자, `_`, `-` 차이는 무시한다 |
+| 비밀 키 이름 | `token`, `secret`, `password`, `passwd`, `api_key`, `apikey`, `authorization`, `cookie`, `credential`, `credentials`, `private_key`, `access_key`, `client_secret`과 `token`, `secret`, `password`, `privatekey`로 끝나는 키 |
+| 일반 문장의 비밀 할당 | `key=value`와 `key: value`에서 위 비밀 키의 값을 가린다. 따옴표 안의 공백도 값에 포함한다 |
+| 인증 헤더 | 일반 문장의 `Authorization`과 `Cookie`는 인증 방식과 세미콜론으로 나뉜 값도 포함해 줄 끝까지 가린다 |
+| 토큰 모양 | `Bearer` 인증값, `alg`를 가진 JSON 헤더와 base64url 세 구간으로 된 JWT, `sk-`, `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`, `xox`로 시작해 `-`로 끝나는 계열 접두의 값을 가린다 |
+| 긴 인코딩 모양 | 32자 이상의 hex와 base64/base64url 덩어리를 가린다 |
+| UUID | 표준 8-4-4-4-12 형태를 `[항목 N]`으로 바꾼다. 같은 실행 스트림 안에서 같은 UUID의 대소문자를 통일해 시작과 완료 사건에 같은 번호를 쓴다. 번호표는 스트림이 끝나면 버린다 |
+| 연결용 에이전트 | `connectorManaged`가 참이면 내용 전체를 `[연결 도구 내용 가림]`으로 바꾼다. 짧은 manifest 비밀값도 노출하지 않는다 |
+| 길이와 손상 | 가린 뒤 500자를 넘으면 끝에 `…`를 붙여 자른다. 입력이 65,536자를 넘으면 전체를 가린다. JSON으로 시작하지만 파싱할 수 없는 설명도 전체를 가린다 |
+
+원문을 저장하거나 파싱 오류의 원문과 예외를 로그에 남기지 않는다.
+가리기는 되돌릴 수 없고, 원문이 필요하면 Hermes에서 조사한다.
+도구 이름, 성공 여부, 걸린 시간은 유지한다.
+일반 도구의 금액, 날짜, 짧은 식별자와 일반 문장도 위 규칙에 걸리지 않으면 유지한다.
+답 본문과 하위 에이전트 목표는 이 계약의 대상이 아니다.
+
+`skill_view` 도구의 `tool.started` 사건은 가리기 전에 `preview` 에서 스킬 이름을 따로 꺼낸다.
+32자를 넘는 스킬 이름은 토큰 모양이라 도구 내용에서 가려지기 때문이다.
+꺼낸 이름은 Hermes 스킬 이름 규칙에 맞을 때만 스킬 사용 기록으로 넘기고, 도구 내용에는 싣지 않는다.
+이름이 `...` 로 끝나면 길이 상한에서 잘린 것으로 보고 넘기지 않는다([도구와 스킬](tools-and-skills.md)).
+연결용 에이전트의 실행에서는 꺼내지 않는다.
+
+V41은 이미 저장된 `TOOL_STARTED`, `TOOL_COMPLETED`의 `detail`에도 같은 규칙을 적용한다.
+UUID 번호표는 실행마다 새로 만들고 사건 순서대로 읽는다.
+연결용 에이전트는 실행의 에이전트 번호나 profile로 판별한다.
+다른 사건과 도구 이름, 성공 여부, 걸린 시간은 바꾸지 않는다.
+기존 원문을 복원할 수 없으므로 배포 전에 데이터베이스를 백업해야 한다.

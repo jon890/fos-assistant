@@ -25,8 +25,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>이 클래스는 저장하지 않고 엔티티를 만들기만 한다. 저장을 부르는 쪽이 하면 저장 실패를 감싸는
  * 자리가 한 곳으로 모인다. 예외가 하나 있다. {@code skill_view} 도구 호출의 시작 사건은 스킬 호출 이력이기도
- * 해서 {@link SkillUseRecorder} 에 넘겨 그 자리에서 적는다. 그 저장은 스스로 실패를 감싸므로 여기로 던지지
- * 않는다.
+ * 해서 {@link SkillUseRecorder} 에 넘겨 그 자리에서 적는다. 넘기는 것은 가린 {@code detail} 이 아니라 사건
+ * 스트림이 가리기 전 미리보기에서 꺼내 검증한 {@code skillName} 이다. 근거는 ADR-047 에 있다. 그 저장은 스스로
+ * 실패를 감싸므로 여기로 던지지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -69,18 +70,20 @@ public class ExecutionEventRecorder {
             return null;
         }
         if (type == ExecutionEventType.TOOL_STARTED && SKILL_VIEW_TOOL.equals(event.toolName())) {
-            skillUses.recordModel(execution.id(), event.detail());
+            skillUses.recordModel(execution.id(), event.skillName());
         }
         return ExecutionEvent.builder()
                 .executionId(execution.id())
                 .sequence(sequence)
                 .eventType(type)
                 .toolName(type.isTool() ? event.toolName() : null)
-                .subagentName(type.isSubagent() ? event.toolName() : null)
+                .subagentName(type.isSubagent() ? subagentName(event) : null)
                 .hermesSessionId(type.isSubagent() ? event.childSessionId() : null)
                 .durationMs(event.durationMs())
-                .failed(type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
-                        ? event.failed() : null)
+                .failed(
+                        type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
+                                ? event.failed()
+                                : null)
                 .detail(type.isSubagent() && event.goal() != null ? event.goal() : event.detail())
                 .model(type.isSubagent() ? event.model() : null)
                 .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
@@ -89,13 +92,26 @@ public class ExecutionEventRecorder {
                 .build();
     }
 
+    private static String subagentName(RunEvent event) {
+        String name = event.toolName();
+        if (name == null || name.isBlank()) {
+            name = event.subagentId();
+        }
+        if (name == null || name.isBlank()) {
+            name = event.goal();
+        }
+        if (name == null) {
+            return null;
+        }
+        return name.length() > 128 ? name.substring(0, 128) : name;
+    }
+
     /**
      * Hermes 사건을 기다리지 않고 우리가 직접 적는 사건이다.
      *
      * <p>실행의 시작과 끝은 스트림을 열지 않는 경로에서도 남아야 한다.
      */
-    public ExecutionEvent record(
-            AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
+    public ExecutionEvent record(AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
         return ExecutionEvent.builder()
                 .executionId(execution.id())
                 .sequence(sequence)

@@ -44,8 +44,7 @@ public class ModelOptionsService {
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
     /** 읽은 시각과 그때 읽은 목록이다. */
-    private record Cached(Instant readAt, HermesModelCatalog catalog) {
-    }
+    private record Cached(Instant readAt, HermesModelCatalog catalog) {}
 
     @Autowired
     public ModelOptionsService(
@@ -65,6 +64,11 @@ public class ModelOptionsService {
     /** 요청자가 쓸 수 있는 에이전트의 profile 로 고를 수 있는 모델을 돌려준다. */
     public ModelOptions optionsFor(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
+        return optionsForAgent(agent);
+    }
+
+    /** 이미 권한을 확인한 에이전트의 profile 모델 목록을 읽는다. */
+    public ModelOptions optionsForAgent(Agent agent) {
         return optionsOf(catalogFor(agent));
     }
 
@@ -89,8 +93,9 @@ public class ModelOptionsService {
     }
 
     private static ModelOptions optionsOf(HermesModelCatalog catalog) {
-        List<HermesModelCatalog.Provider> providers = new ArrayList<>(
-                catalog.providers().stream().map(ModelOptionsService::withEveryModelReasoning).toList());
+        List<HermesModelCatalog.Provider> providers = new ArrayList<>(catalog.providers().stream()
+                .map(ModelOptionsService::withEveryModelReasoning)
+                .toList());
         // 기본 provider 를 맨 앞에 둔다. 나머지는 Hermes 가 준 차례를 지킨다.
         providers.sort((left, right) -> Boolean.compare(
                 !Objects.equals(left.slug(), catalog.defaultProvider()),

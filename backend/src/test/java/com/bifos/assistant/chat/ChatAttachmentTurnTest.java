@@ -23,6 +23,7 @@ import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -45,6 +46,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -414,7 +416,14 @@ class ChatAttachmentTurnTest {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
         return new ChatController(
-                chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
+                chat,
+                provider,
+                new UserDisplayNameService(users),
+                agentService,
+                access,
+                new ChatEventStreams(Duration.ofSeconds(20)),
+                null,
+                mock(ModelTierService.class));
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {

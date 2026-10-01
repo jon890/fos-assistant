@@ -17,8 +17,7 @@ public final class Sha256 {
     /** 지문으로 남기는 해시 길이. SHA-256 앞부분만 쓴다. */
     private static final int HASH_BYTES = 16;
 
-    private Sha256() {
-    }
+    private Sha256() {}
 
     /**
      * SHA-256 의 앞 16바이트를 16진수 32글자로 적는다.
@@ -27,11 +26,23 @@ public final class Sha256 {
      * 지문이 있어야 처음 쓰는 요청이 「보지 않고 덮어쓰는 것」과 구분된다.
      */
     public static String hex16(String value) {
+        return HexFormat.of().formatHex(Arrays.copyOf(digest(value), HASH_BYTES));
+    }
+
+    /**
+     * SHA-256 전체를 소문자 16진수 64글자로 적는다.
+     *
+     * <p>서명할 글에 들어가는 해시와 같은 호출을 알아보는 키처럼, 다른 구현이 같은 값을 계산해 견주는 자리에 쓴다.
+     * null 은 빈 문자열과 같게 다룬다.
+     */
+    public static String hex(String value) {
+        return HexFormat.of().formatHex(digest(value));
+    }
+
+    private static byte[] digest(String value) {
         String source = value == null ? "" : value;
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(source.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(Arrays.copyOf(digest, HASH_BYTES));
+            return MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is unavailable", ex);
         }

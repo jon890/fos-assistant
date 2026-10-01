@@ -25,6 +25,8 @@ export type ExecutionEventView = {
   inputTokens: number | null;
   outputTokens: number | null;
   occurredAt: string;
+  /** 비동기 하위 에이전트 사용량을 뒤늦게 읽는 상태다. 실행 성공 여부가 아니다. */
+  subagentUsageStatus?: "WAITING" | "RECORDED" | "UNCONFIRMED" | null;
 };
 
 /**
@@ -38,12 +40,22 @@ export type ExecutionTreeNode = {
   agentCode: string | null;
   agentName: string | null;
   status: string;
+  provider?: string | null;
   model: string | null;
   inputTokens: number | null;
+  cachedInputTokens?: number | null;
   outputTokens: number | null;
+  totalTokens?: number | null;
   estimatedCostMicros: number | null;
   latencyMs: number | null;
   startedAt: string;
+  reasoningEffort?: string | null;
+  reasoningEffortSource?: "REQUESTED" | "PROFILE_DEFAULT" | "UNKNOWN" | null;
+  modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
+  requestReceivedAt?: string | null;
+  submittedAt?: string | null;
+  firstDeltaAt?: string | null;
+  finishedAt?: string | null;
   events: ExecutionEventView[];
   children: ExecutionTreeNode[];
 };
@@ -80,13 +92,20 @@ function anyNodeTruncated(node: ExecutionTreeNode): boolean {
   return node.truncated || node.children.some(anyNodeTruncated);
 }
 
-/** 나무를 그린다. `isAdmin` 이면 오류 코드와 도구 결과의 원본 같은 내부 값도 함께 그린다. */
+/**
+ * 나무를 그린다. `isAdmin` 이면 오류 코드와 도구 결과의 원본 같은 내부 값도 함께 그린다.
+ *
+ * <p>`showRuntime` 이면 노드마다 모델 제공사와 모델과 토큰을 그린다. 실행 상세가 관리자에게만 켠다.
+ * 대화 안 작업 과정은 켜지 않아 역할과 관계없이 단계 이름과 걸린 시간만 보인다.
+ */
 export function ExecutionTree({
   tree,
   isAdmin,
+  showRuntime = false,
 }: {
   tree: ExecutionTreeResponse;
   isAdmin: boolean;
+  showRuntime?: boolean;
 }) {
   // 나무의 truncated 가 참인데 그 안 어느 노드도 truncated 가 아니면, 아래쪽이 아니라 뿌리로
   // 올라가는 길이 잘린 것이다. 그 경우에만 위쪽 안내를 그린다 — 노드가 이미 「여기부터 보이지
@@ -113,7 +132,12 @@ export function ExecutionTree({
     <>
       {aboveNotice}
       <ul className="min-w-0" data-testid="execution-tree">
-        <ExecutionNode node={tree.root} depth={0} isAdmin={isAdmin} />
+        <ExecutionNode
+          node={tree.root}
+          depth={0}
+          isAdmin={isAdmin}
+          showRuntime={showRuntime}
+        />
       </ul>
     </>
   );

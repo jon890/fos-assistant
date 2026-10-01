@@ -13,6 +13,10 @@ public enum ErrorCode {
     EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),
     EXECUTION_NOT_RUNNING(HttpStatus.CONFLICT),
     CONVERSATION_BUSY(HttpStatus.CONFLICT),
+    /** 대기 메시지가 상한에 닿았다. 개수가 찼거나, 더하면 합친 글이 메시지 길이 상한을 넘는다. */
+    PENDING_QUEUE_FULL(HttpStatus.CONFLICT),
+    /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */
+    PENDING_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
     MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     AGENT_DISABLED(HttpStatus.CONFLICT),
@@ -103,6 +107,13 @@ public enum ErrorCode {
      * 수 있다. 이유는 서버 로그에만 남긴다. 근거는 ADR-037 이다.
      */
     SESSION_BINDING_REJECTED(HttpStatus.FORBIDDEN),
+    /**
+     * 커넥터 도구 호출의 판정 요청을 믿을 수 없다.
+     *
+     * <p>본문의 모양과 서명 중 무엇이 틀렸는지 밖에 알리지 않는다. 이유는 서버 로그에만 남긴다. hook 은 이 답을 받으면
+     * 그 호출을 막는다. 근거는 ADR-049 이다.
+     */
+    CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN),
     /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */
     SESSION_BINDING_CONFLICT(HttpStatus.CONFLICT),
     /** 그 에이전트의 지금 버전 디렉터리에 그 이름의 올린 스킬이 없다. */

@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
@@ -35,6 +37,7 @@ import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -149,11 +152,12 @@ class ToolDetailStreamTest {
         mvc = MockMvcBuilders.standaloneSetup(new ChatController(
                         chat,
                         currentUser,
-                        users,
+                        new UserDisplayNameService(users),
                         agentService,
                         access,
                         new ChatEventStreams(Duration.ofSeconds(20)),
-                        null))
+                        null,
+                        mock(ModelTierService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         hermesStreams(
@@ -233,7 +237,7 @@ class ToolDetailStreamTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any());
+                .open(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */

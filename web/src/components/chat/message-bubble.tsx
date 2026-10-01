@@ -188,6 +188,7 @@ export function AssistantRow({
 
 export function MessageBubble({
   turn,
+  isAdmin,
   conversationId,
   onOpenSaved,
   initialActivityExpanded,
@@ -205,6 +206,8 @@ export function MessageBubble({
   liveActivity,
 }: {
   turn: Turn;
+  /** 모델 제공사와 모델 전환 안내는 관리자만 본다. */
+  isAdmin: boolean;
   conversationId: string | null;
   onOpenSaved(executionId: number): void;
   initialActivityExpanded: boolean;
@@ -311,7 +314,7 @@ export function MessageBubble({
       className="focus-visible:outline-2 focus-visible:outline-ring"
       tabIndex={0}
       above={
-        turn.switchedTo ? (
+        isAdmin && turn.switchedTo ? (
           <p
             className="mb-1 text-xs text-muted-foreground"
             data-testid="provider-switched"
