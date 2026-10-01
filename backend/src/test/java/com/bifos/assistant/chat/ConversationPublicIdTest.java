@@ -20,6 +20,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -145,7 +146,8 @@ class ConversationPublicIdTest {
                         agentService,
                         access,
                         new ChatEventStreams(Duration.ofSeconds(20)),
-                        null))
+                        null,
+                        mock(ModelTierService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

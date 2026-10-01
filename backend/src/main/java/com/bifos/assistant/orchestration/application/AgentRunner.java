@@ -138,12 +138,31 @@ public class AgentRunner {
             String instructionAddition,
             DelegationKey delegationKey) {
         Instant requestReceivedAt = clock.instant();
-        ResolvedModelTier resolved = modelTiers.resolve(user, conversation, agent);
         AssembledContext context =
                 agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
         context = contextAssembler.withResponseInstructions(context);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
+        ResolvedModelTier resolved;
+        try {
+            resolved = modelTiers.resolve(user, conversation, agent);
+        } catch (RuntimeException ex) {
+            AgentExecution execution = executions.start(
+                    user,
+                    conversation,
+                    agent,
+                    parentExecutionId,
+                    rootExecutionId,
+                    snapshot,
+                    ModelChoice.defaults(),
+                    null,
+                    session.correlationSessionId(),
+                    delegationKey,
+                    null,
+                    requestReceivedAt);
+            onStarted.accept(execution);
+            return fail(execution, ex, 1);
+        }
         ModelChoice choice = resolved.choice();
         AgentExecution execution = executions.start(
                 user,

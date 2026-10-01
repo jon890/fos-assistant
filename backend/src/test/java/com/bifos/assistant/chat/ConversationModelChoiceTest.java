@@ -15,9 +15,11 @@ import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -239,7 +241,7 @@ class ConversationModelChoiceTest {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
-                created.id(), dad.id(), "openrouter", "example-model-small", "extreme"));
+                created.id(), dad.id(), "openrouter", "example-model-small", "extreme", ModelSelectionMode.CUSTOM));
         ChatController controller = chatController(dad);
         ((StubHermesRunsClient) hermes)
                 .willReturn(HermesRunResult.of(
@@ -334,7 +336,8 @@ class ConversationModelChoiceTest {
                 agentService,
                 access,
                 new ChatEventStreams(Duration.ofSeconds(20)),
-                null);
+                null,
+                mock(ModelTierService.class));
     }
 
     private static void rejected(Runnable action) {

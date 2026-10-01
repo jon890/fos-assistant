@@ -17,6 +17,8 @@ CREATE TABLE subagent_usage_job (
 
 CREATE INDEX ix_subagent_usage_due ON subagent_usage_job (status, next_attempt_at);
 
+CREATE INDEX idx_agent_execution_finished_at ON agent_execution (finished_at);
+
 ALTER TABLE agent_execution ADD COLUMN reasoning_defaults_checked_at DATETIME(6) NULL;
 
 ALTER TABLE execution_event ADD COLUMN completed_child_session_id VARCHAR(128) NULL;

@@ -71,18 +71,6 @@ public class ChatController {
     private final ModelOptionsService modelOptions;
     private final ModelTierService modelTiers;
 
-    /** 기존 단위 테스트의 controller 조립 경로를 보존한다. */
-    public ChatController(
-            ChatService chat,
-            CurrentUserProvider currentUser,
-            UserDisplayNameService userNames,
-            AgentService agents,
-            ConversationAccess access,
-            ChatEventStreams streams,
-            ModelOptionsService modelOptions) {
-        this(chat, currentUser, userNames, agents, access, streams, modelOptions, null);
-    }
-
     @Autowired
     public ChatController(
             ChatService chat,

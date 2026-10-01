@@ -420,7 +420,25 @@ public class ChatService {
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(), null, context.instructionsHash(), context.omittedItems());
 
-            ResolvedModelTier resolved = modelTiers.resolve(user, conversation, routed.agent());
+            ResolvedModelTier resolved;
+            try {
+                resolved = modelTiers.resolve(user, conversation, routed.agent());
+            } catch (RuntimeException ex) {
+                PendingTurn failed = begin(
+                        user,
+                        routed,
+                        input,
+                        context,
+                        snapshot,
+                        ModelChoice.defaults(),
+                        null,
+                        intent,
+                        requestReceivedAt);
+                String code = ex instanceof ApiException api ? api.code().name() : "MODEL_TIER_RESOLVE_FAILED";
+                executions.fail(failed.execution(), code);
+                append(failed, ExecutionEventType.RUN_FAILED, code);
+                throw ex;
+            }
             ModelChoice choice = resolved.choice();
             PendingTurn pending =
                     begin(user, routed, input, context, snapshot, choice, resolved.tier(), intent, requestReceivedAt);

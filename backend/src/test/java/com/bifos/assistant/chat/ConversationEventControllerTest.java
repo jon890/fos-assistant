@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationEventHub;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -171,7 +172,8 @@ class ConversationEventControllerTest {
                         null,
                         access,
                         new ChatEventStreams(Duration.ofSeconds(20)),
-                        null))
+                        null,
+                        mock(ModelTierService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build()
                 .perform(get("/api/v1/chat/conversations/{id}/running", dadsConversation))

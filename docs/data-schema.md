@@ -16,7 +16,7 @@
 선택 모드는 `DEFAULT`, `TIER`, `CUSTOM`이며 null은 사용자와 그룹 기본값을 따른다.
 `agent_execution`은 `model_tier` VARCHAR(16) NULL과 `reasoning_effort_source` VARCHAR(20) NULL을 더한다.
 `request_received_at`, `submitted_at`, `first_delta_at`은 DATETIME(6) NULL이며
-기존 `finished_at`과 함께 실행 구간을 표시한다.
+기존 `finished_at`과 함께 실행 구간을 표시한다. 끝난 실행의 재조회는 `finished_at` 색인을 쓴다.
 첫 assistant delta 본문은 이 칸들과 함께 저장하지 않는다.
 단계와 요청값은 실행 시작 시 복사하고 실제 제공사와 모델은 완료 시 갱신한다.
 이전 실행의 출처는 null로 두고 추정해 채우지 않는다.

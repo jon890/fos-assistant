@@ -57,13 +57,24 @@ class SubagentUsageReconcilerTest {
     }
 
     @Test
-    @DisplayName("다른 부모에 속한 종료 session은 완료 사용량으로 기록하지 않는다")
-    void rejectsChildOfAnotherParent() throws ReflectiveOperationException {
+    @DisplayName("압축으로 부모 session이 바뀌어도 같은 종료 자식 사용량을 기록한다")
+    void acceptsChildWithCompactedRuntimeParent() throws ReflectiveOperationException {
         SubagentUsageJob job = job();
-        SubagentSessionUsage wrongParent = new SubagentSessionUsage(
-                "child", "subagent", "other-parent", "example-fast", 1.0, 2.0, 10L, 2L, 1L, 1L);
+        SubagentSessionUsage childWithCompactedParent = new SubagentSessionUsage(
+                "child", "subagent", "compacted-runtime-parent", "example-fast", 1.0, 2.0, 10L, 2L, 1L, 1L);
 
-        assertThat(SubagentUsageReconciler.isFinalChild(job, wrongParent)).isFalse();
+        assertThat(SubagentUsageReconciler.isFinalChild(job, childWithCompactedParent))
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("같은 session 번호라도 subagent가 아닌 session은 사용량으로 기록하지 않는다")
+    void rejectsNonSubagentSession() throws ReflectiveOperationException {
+        SubagentUsageJob job = job();
+        SubagentSessionUsage rootSession =
+                new SubagentSessionUsage("child", "user", "parent", "example-fast", 1.0, 2.0, 10L, 2L, 1L, 1L);
+
+        assertThat(SubagentUsageReconciler.isFinalChild(job, rootSession)).isFalse();
     }
 
     @Test
@@ -113,6 +124,33 @@ class SubagentUsageReconcilerTest {
         assertThat(fixtures.parent.reasoningDefaultsCheckedAt()).isNull();
         verify(fixtures.executions, never()).lockById(anyLong());
         verify(fixtures.executions, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("최신 기본값을 읽지 못해도 같은 page의 다음 실행을 보완한다")
+    void supplementDefaultsContinuesAfterLatestReadFailure() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        AgentExecution next = AgentExecution.builder()
+                .userId(1L)
+                .agentId(2L)
+                .profileName("mom")
+                .costMode(CostMode.SUBSCRIPTION)
+                .reasoningEffortSource(ReasoningEffortSource.UNKNOWN)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(NOW.minusSeconds(2))
+                .build();
+        setField(next, "id", 2L);
+        when(fixtures.defaults.read("dad")).thenReturn(null);
+        when(fixtures.defaults.read("mom"))
+                .thenReturn(new ProfileModelDefaults("openai-codex", "example-fast", "medium"));
+        when(fixtures.executions.lockById(2L)).thenReturn(Optional.of(next));
+
+        fixtures.reconciler.supplementDefaults(List.of(fixtures.parent, next));
+
+        assertThat(next.reasoningEffort()).isEqualTo("medium");
+        assertThat(next.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.PROFILE_DEFAULT);
+        assertThat(next.reasoningDefaultsCheckedAt()).isEqualTo(NOW);
+        verify(fixtures.executions).save(next);
     }
 
     @Test

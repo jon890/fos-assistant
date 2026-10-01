@@ -95,11 +95,6 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             @Param("reasoningEffort") String reasoningEffort,
             @Param("customMode") ModelSelectionMode customMode);
 
-    /** 기존 호출은 직접 선택으로 보존한다. */
-    default int chooseModelIfActive(Long id, Long userId, String provider, String model, String reasoningEffort) {
-        return chooseModelIfActive(id, userId, provider, model, reasoningEffort, ModelSelectionMode.CUSTOM);
-    }
-
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier,

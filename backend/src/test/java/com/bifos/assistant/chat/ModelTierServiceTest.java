@@ -91,24 +91,6 @@ class ModelTierServiceTest {
     }
 
     @Test
-    @DisplayName("일부만 저장된 단계 정의는 초기값과 섞지 않고 거절한다")
-    void rejectsIncompleteStoredDefinitions() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
-        ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
-        when(definitions.findByGroupIdOrderByTier(10L))
-                .thenReturn(List.of(ModelTierDefinition.of(10L, ModelTier.FAST, null, "example-fast", "low")));
-
-        assertThatThrownBy(() -> service.requireDefined(user, ModelTier.FAST))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
-    }
-
-    @Test
     @DisplayName("관리자가 아니면 그룹 단계 정의를 바꾸지 못한다")
     void memberCannotSaveGroupModelTiers() {
         ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);

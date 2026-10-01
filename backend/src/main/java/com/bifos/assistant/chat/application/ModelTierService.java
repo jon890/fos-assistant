@@ -139,22 +139,6 @@ public class ModelTierService {
         return new ResolvedModelTier(choice, tier);
     }
 
-    @Transactional(readOnly = true)
-    public void requireDefined(CurrentUser user, ModelTier tier) {
-        if (tier == null
-                || definitionsFor(user.groupId()).stream().noneMatch(definition -> definition.tier() == tier)) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier");
-        }
-    }
-
-    /** 고급 직접 선택도 실행할 에이전트의 catalog 안에 있어야 한다. */
-    @Transactional(readOnly = true)
-    public void requireAvailable(Agent agent, ModelChoice choice) {
-        if (choice.provider() != null) {
-            requireAvailable(modelOptions.optionsForAgent(agent), choice);
-        }
-    }
-
     private static ModelTierOptions.Tier view(ModelTierDefinition definition, String defaultProvider) {
         if (isFallback(definition)) {
             return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);

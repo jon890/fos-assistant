@@ -81,8 +81,7 @@ public class SubagentUsageReconciler {
         List<AgentExecution> unknownDefaults =
                 executions.findUnknownReasoningDefaults(now.minus(Duration.ofHours(24)), PageRequest.of(0, 20));
         if (!unknownDefaults.isEmpty()) {
-            AgentExecution execution = unknownDefaults.getFirst();
-            launch("profile:" + execution.id(), () -> supplementDefault(execution.id(), execution.profileName()));
+            launch("profile:defaults", () -> supplementDefaults(unknownDefaults));
         }
         for (SubagentUsageJob job :
                 jobs.findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc("WAITING", now)) {
@@ -190,17 +189,24 @@ public class SubagentUsageReconciler {
         return usage != null
                 && "subagent".equals(usage.source())
                 && job.childSessionId().equals(usage.id())
-                && job.parentSessionId() != null
-                && job.parentSessionId().equals(usage.parentSessionId())
                 && usage.endedAt() != null;
     }
 
-    void supplementDefault(Long executionId, String profile) {
+    /** 읽을 수 없는 최신 profile이 다음 실행의 기본 강도 보완까지 막지 않게 page 안에서 차례로 읽는다. */
+    void supplementDefaults(List<AgentExecution> executions) {
+        for (AgentExecution execution : executions) {
+            if (supplementDefault(execution.id(), execution.profileName())) {
+                return;
+            }
+        }
+    }
+
+    boolean supplementDefault(Long executionId, String profile) {
         ProfileModelDefaults value = defaults.read(profile);
         if (value == null) {
-            return;
+            return false;
         }
-        transaction.executeWithoutResult(status -> {
+        return Boolean.TRUE.equals(transaction.execute(status -> {
             AgentExecution execution = executions.lockById(executionId).orElse(null);
             if (execution != null
                     && execution.reasoningEffort() == null
@@ -210,7 +216,9 @@ public class SubagentUsageReconciler {
                 }
                 execution.markReasoningDefaultsChecked(clock.instant());
                 executions.save(execution);
+                return true;
             }
-        });
+            return false;
+        }));
     }
 }

@@ -24,6 +24,8 @@ import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -126,6 +128,20 @@ class AgentRunnerSubmitFailureTest {
         verify(hermes, never()).stop(any(), any(), any());
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
         assertThat(run.result().succeeded()).isFalse();
+    }
+
+    @Test
+    @DisplayName("단계 모델이 catalog에 없으면 chief 실행을 FAILED로 남기고 Hermes에 제출하지 않는다")
+    void recordsFailedChiefWhenModelTierCannotBeResolved() {
+        when(modelTiers.resolve(any(), any(), any()))
+                .thenThrow(new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable"));
+
+        AgentRunner.Run run = run();
+
+        verify(executions).fail(started, ErrorCode.VALIDATION_FAILED.name());
+        verify(hermes, never()).submit(any());
+        assertThat(run.execution()).isSameAs(failed);
+        assertThat(run.result().errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
     }
 
     private AgentRunner.Run run() {
