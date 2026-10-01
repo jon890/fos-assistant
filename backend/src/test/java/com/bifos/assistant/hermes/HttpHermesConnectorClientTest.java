@@ -88,7 +88,37 @@ class HttpHermesConnectorClientTest {
                                         null,
                                         new ConnectorFieldOptions("list_scopes", "scopes", "id", "name", true))),
                         "list_scopes",
-                        "demo"));
+                        "demo",
+                        List.of(),
+                        false));
+        server.verify();
+    }
+
+    @DisplayName("카탈로그의 toolsets 와 attachments 를 읽고, 모양이 틀리면 거절한다")
+    @Test
+    void readsDeclaredToolsetsAndAttachments() {
+        String url = BASE + "/api/connectors/catalog";
+        String tail = "\"mcp_server\":\"demo\"";
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(tail, tail + ",\"toolsets\":[\"vision\"],\"attachments\":true"),
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(tail, tail + ",\"toolsets\":\"vision\""), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(CATALOG.replace(tail, tail + ",\"toolsets\":[7]"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        CATALOG.replace(tail, tail + ",\"attachments\":\"true\""), MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.toolsets()).containsExactly("vision");
+        assertThat(declared.attachments()).isTrue();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            assertThatThrownBy(() -> client.readCatalog()).isInstanceOf(IllegalStateException.class);
+        }
         server.verify();
     }
 

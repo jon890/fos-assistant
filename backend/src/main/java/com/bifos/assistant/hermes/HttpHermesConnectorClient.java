@@ -196,7 +196,27 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 description == null ? "" : description,
                 fields,
                 requiredText(item.get("verify"), "tool"),
-                requiredText(item, "mcp_server"));
+                requiredText(item, "mcp_server"),
+                toolsets(item.get("toolsets")),
+                optionalBoolean(item, "attachments", false));
+    }
+
+    /** 옛 대시보드 plugin 은 이 칸을 내지 않는다. 없으면 빈 목록이다. */
+    private static List<String> toolsets(JsonNode declared) {
+        if (declared == null || declared.isNull()) {
+            return List.of();
+        }
+        if (!declared.isArray()) {
+            throw new IllegalStateException();
+        }
+        List<String> names = new ArrayList<>();
+        for (JsonNode name : declared) {
+            if (!name.isString() || name.asString().isBlank()) {
+                throw new IllegalStateException();
+            }
+            names.add(name.asString());
+        }
+        return List.copyOf(names);
     }
 
     /** manifest 에서 생략할 수 있는 칸의 기본값은 {@code docs/connectors.md} 의 「connector.json」 과 같다. */

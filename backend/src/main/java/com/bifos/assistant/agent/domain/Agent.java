@@ -79,6 +79,15 @@ public class Agent {
     private boolean connectorManaged;
 
     /**
+     * 참이면 이 연결용 에이전트의 커넥터가 사진을 받는다고 선언했다.
+     *
+     * <p>선언은 대시보드가 내는 manifest 에 있고 이 엔티티는 Hermes 를 부르지 못한다. 그래서 연결 흐름이 등록,
+     * 연결 확인, 관리자 반영 완료 때 manifest 의 값을 여기 옮겨 둔다(ADR-044).
+     */
+    @Column(name = "connector_attachments", nullable = false)
+    private boolean connectorAttachments;
+
+    /**
      * 지운 시각. 비어 있으면 지우지 않았다.
      *
      * <p>행은 지우지 않는다. 대화, 실행, 사용량이 {@code agent_id} 로 이 에이전트의 이름을 읽기 때문이다.
@@ -137,6 +146,11 @@ public class Agent {
         this.connectorManaged = true;
     }
 
+    /** 커넥터 manifest 가 선언한 사진 받기 여부를 옮겨 적는다. 연결용 에이전트에만 뜻이 있다. */
+    public void acceptConnectorAttachments(boolean accepted) {
+        this.connectorAttachments = accepted;
+    }
+
     /**
      * 지운 에이전트로 적고 끈다.
      *
@@ -160,10 +174,11 @@ public class Agent {
      * 이 에이전트의 대화에 사진을 붙일 수 있다.
      *
      * <p>흐름은 Hermes 를 한 번 부르는 경로를 거치지 않아 사진이 놓인 자리를 입력에 덧붙일 수 없다. 그래서
-     * 흐름이 붙은 에이전트는 받지 않는다. 받을지 판정하는 곳은 모두 이 메서드를 부른다.
+     * 흐름이 붙은 에이전트는 받지 않는다. 연결용 에이전트는 그 커넥터가 사진을 받는다고 선언했을 때만 받는다.
+     * 받을지 판정하는 곳은 모두 이 메서드를 부른다.
      */
     public boolean acceptsAttachments() {
-        return !connectorManaged && (flow == null || flow.isBlank());
+        return (!connectorManaged || connectorAttachments) && (flow == null || flow.isBlank());
     }
 
     public boolean isReadableBy(Long userId) {
