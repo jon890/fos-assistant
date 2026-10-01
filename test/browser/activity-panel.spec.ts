@@ -237,6 +237,10 @@ test("다른 답에서 열면 같은 패널이 그 답의 나무로 바뀐다", 
   await expect(
     page.locator('[data-testid="activity-block"][data-mode="saved"]'),
   ).toHaveCount(1);
+  // 첫 답이 끝난 뒤에 보낸다. 답이 오는 동안 보내면 대기 메시지로 쌓인다.
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toHaveCount(0);
   await page.getByRole("textbox", { name: "메시지" }).fill("두 번째 패널 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const blocks = page.locator(

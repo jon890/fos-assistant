@@ -1,9 +1,11 @@
 package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.ActivitySummary;
+import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.RunningTurn;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.domain.type.ModelTier;
@@ -73,6 +75,25 @@ public final class ChatDtos {
     public record RunningTurnView(boolean running, Long executionId, Instant startedAt) {
         static RunningTurnView from(RunningTurn turn) {
             return new RunningTurnView(turn.running(), turn.executionId(), turn.startedAt());
+        }
+    }
+
+    /** 응답 중에 보내는 메시지다. 글만 받는다. */
+    public record PendingMessageRequest(
+            @NotBlank @Size(max = 8000) String text) {}
+
+    public record PendingMessageView(Long id, String text, Instant createdAt) {
+        static PendingMessageView from(ChatPendingMessage message) {
+            return new PendingMessageView(message.id(), message.content(), message.createdAt());
+        }
+    }
+
+    /** @param held 멈춰 두었다. 사용자가 「보내기」 를 누를 때까지 보내지 않는다 */
+    public record PendingQueueView(boolean held, List<PendingMessageView> items) {
+        static PendingQueueView from(PendingQueue queue) {
+            return new PendingQueueView(
+                    queue.held(),
+                    queue.items().stream().map(PendingMessageView::from).toList());
         }
     }
 
