@@ -14,7 +14,8 @@
 - 화면 틀은 `web/src/components/shell/app-shell.tsx` 다. `children` 을 감싼 본문 자리가 있다.
 - 대화 화면의 주소는 `/` (새 대화)와 `/chat/{id}` 다. `web/src/components/chat-panel.tsx` 는 첫 메시지를 보낼 때 `history.replaceState` 로 `/` 를 `/chat/{id}` 로 바꾸고, Next 가 그것을 `usePathname` 에 반영한다. 같은 `ChatPanel` 이 살아 있어야 흐르던 스트림과 메시지 상태가 남는다.
 - phase 01 이 줄인 움직임 블록을, phase 06 이 `animate-screen-in` 을 `web/src/app/globals.css` 에 두었다.
-- 브라우저 검사의 웹 서버는 `test/browser/web-server.ts` 가 빌드하고 띄운다. 빌드에 줄 환경 변수를 그 파일이 정한다.
+- 브라우저 검사의 웹 서버는 `test/browser/web-server.ts` 가 빌드하고 띄운다. 빌드에 `process.env` 를 이미 그대로 넘기므로, 검사를 돌릴 때 준 `NEXT_PUBLIC_VIEW_TRANSITION` 이 빌드에 닿는다.
+- 운영 이미지는 `web/Dockerfile` 이 빌드한다. 빌드 단계가 받는 값은 그 파일의 `ARG` 와 `ENV` 가 정한다.
 
 **근거 문서**: `docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md` 의 「움직임」 절과 「결과」 의 「감당할 것」, `docs/flow.md` 의 「기다리는 동안 보이는 것」 절
 
@@ -53,7 +54,7 @@ export function ScreenTransition({ children }: { children: React.ReactNode })
 - `usePathname()` 과 `screenKey` 로 key 를 정한다. 켬 여부는 `viewTransitionEnabled(process.env.NEXT_PUBLIC_VIEW_TRANSITION)` 이다.
 - key 가 `"chat"` 이면 어느 쪽이든 `children` 을 그대로 돌려준다. 감싸지 않고 움직임도 주지 않는다. 감싸개의 key 가 바뀌지 않으므로 `ChatPanel` 이 살아 있다.
 - 켰을 때: `<ViewTransition key={key} enter="screen" exit="screen" default="none">` 로 `children` 을 감싼다.
-- 껐을 때: `<div key={key} className="animate-screen-in ...">` 로 감싼다. 그 `div` 는 `app-shell.tsx` 의 본문 자리가 자식에게 기대하는 높이와 스크롤 클래스를 그대로 가져야 한다. `app-shell.tsx` 의 본문 감싸개를 읽고, 자식이 `h-full` 이나 `flex-1 min-h-0` 에 기대면 같은 클래스를 준다.
+- 껐을 때: `<div key={key} className="animate-screen-in">` 로 감싼다. 본문 자리는 `app-shell.tsx` 의 `<main>` 이고 그것이 스크롤과 여백(`min-h-0 flex-1 overflow-y-auto px-4 py-5`)을 갖는다. 대화가 아닌 화면은 그 안에서 흐르는 블록이라 감싸개에 높이 클래스를 주지 않는다.
 - `web/src/components/shell/app-shell.tsx` 의 본문 자리에서 `children` 을 `ScreenTransition` 으로 감싼다.
 
 ### 4. `web/src/app/globals.css`
@@ -62,9 +63,9 @@ export function ScreenTransition({ children }: { children: React.ReactNode })
 - 줄인 움직임 블록 안에서 둘 다 100ms 흐려짐만 한다.
 - `@keyframes` 는 `@theme` 블록 밖에 둔다.
 
-### 5. `test/browser/web-server.ts`
+### 5. `web/Dockerfile`
 
-빌드 명령의 환경에 `NEXT_PUBLIC_VIEW_TRANSITION` 을 `process.env` 에서 그대로 넘긴다. 값이 없으면 넘기지 않는다.
+빌드 단계(`pnpm build` 를 돌리는 단계)에 `ARG NEXT_PUBLIC_VIEW_TRANSITION` 과 `ENV NEXT_PUBLIC_VIEW_TRANSITION=${NEXT_PUBLIC_VIEW_TRANSITION}` 를 `pnpm build` 앞에 둔다. 값을 주지 않으면 빈 문자열이라 기본값을 따른다. 기본값을 적지 않는다.
 
 ### 6. 검사와 기본값 판정
 
@@ -75,7 +76,7 @@ export function ScreenTransition({ children }: { children: React.ReactNode })
   - 줄인 움직임에서 화면을 옮겨도 본문 제목이 보인다.
 - 켠 채로(환경 변수 없이) 전체 브라우저 검사를 돌린다. 모두 통과하면 기본값은 그대로 켬이다.
 - 실패하는 검사가 있으면 `NEXT_PUBLIC_VIEW_TRANSITION=off` 로 같은 검사를 다시 돌린다. 끈 쪽에서만 통과하면 `viewTransitionEnabled` 와 `next.config.ts` 의 판정을 `=== "on"` 으로 바꿔 기본값을 끔으로 두고, 단위 테스트의 기대값을 함께 고치고, 무엇이 실패했는지 회신에 적는다. 양쪽 모두 실패하면 화면 전환과 무관한 실패이므로 원인을 고친다.
-- 판정한 기본값을 `docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md` 의 「움직임」 표 아래에 한 줄로 적는다: 기본값과 끄는 방법(`NEXT_PUBLIC_VIEW_TRANSITION` 을 빌드 때 준다).
+- 판정한 기본값을 `docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md` 의 「움직임」 표 아래에 한 줄로 적는다: 기본값과 끄는 방법(이미지를 빌드할 때 `NEXT_PUBLIC_VIEW_TRANSITION` 을 build arg 로 준다).
 
 ## 검증
 
@@ -100,6 +101,6 @@ cd web && pnpm test:browser
 | `web/next.config.ts` | 수정 |
 | `web/src/components/shell/app-shell.tsx` | 수정 |
 | `web/src/app/globals.css` | 수정 |
-| `test/browser/web-server.ts` | 수정 |
+| `web/Dockerfile` | 수정 |
 | `test/browser/motion.spec.ts` | 수정 |
 | `docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md` | 수정 |

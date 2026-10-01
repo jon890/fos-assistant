@@ -96,7 +96,7 @@ ADR-047 「움직임」 표의 움직임을 부품에 붙이고, 모든 움직�
   `durationMs` 기본값은 120 이다. `prefers-reduced-motion` 이면 기다리지 않고 바로 `remove` 를 부른다. 언마운트되면 타이머를 지운다.
 - `globals.css` 에 `[data-leaving="true"] { opacity: 0; transition: opacity var(--duration-fast) linear; }` 를 둔다.
 - 쓰는 곳: `web/src/components/shell/conversation-nav.tsx` 의 대화 지우기, `web/src/components/memory/memory-item.tsx` 의 기억 지우기. 서버 요청이 성공한 뒤 `exit(() => 목록 갱신)` 을 부른다.
-- 추가: 대화 목록의 새 줄과 기억 목록의 새 줄에 `animate-message-assistant` 를 준다. 처음 그릴 때 있던 줄에는 주지 않는다(작업 항목 2 와 같은 방법).
+- 추가: 대화 목록의 새 줄과 기억 목록의 새 줄에 `animate-message-assistant` 를 준다. 처음 그릴 때 있던 줄에는 주지 않는다. 목록을 처음 그릴 때의 id 집합을 `useRef` 에 두고, 그 집합에 없는 id 의 줄에만 준다. 대화 목록은 목록을 처음 읽어 온 뒤에 집합을 채운다.
 
 ### 6. 검사
 
@@ -111,6 +111,8 @@ ADR-047 「움직임」 표의 움직임을 부품에 붙이고, 모든 움직�
 | 줄인 움직임에서 말풍선이 이동하지 않는다 | `emulateMedia({ reducedMotion: "reduce" })` 뒤 보낸 말풍선의 `animationDuration` 이 `0.1s` 이고 `animationName` 이 흐려짐만 하는 keyframes 의 이름이다 |
 | 줄인 움직임에서 대화상자가 크기 변화를 하지 않는다 | 대화 지우기 확인 창을 열고 `[data-slot="alert-dialog-content"]` 의 `getComputedStyle(...).getPropertyValue("--tw-enter-scale")` 이 `1` 이다. 줄이지 않았을 때는 `1` 이 아니다 |
 | 줄인 움직임에서 서랍이 밀려 들어오지 않는다 | `mobile` 에서 사이드바 서랍(`[data-slot="sheet-content"]`)의 `--tw-enter-translate-x` 계산값이 `0` 이나 `0px` 이다. 줄이지 않았을 때는 그렇지 않다 |
+| 대화를 지우면 줄이 나가는 움직임을 거쳐 사라진다 | 지우기를 확인한 뒤 그 줄이 `data-leaving="true"` 를 가졌다가 목록에서 없어진다. `MutationObserver` 를 `addInitScript` 로 걸어 그 속성이 한 번 붙었는지 기록한다 |
+| 지우기가 실패하면 줄이 남는다 | 지우기 요청(`DELETE /api/chat/conversations/*`)을 `page.route` 로 500 으로 돌려준다. 줄이 그대로 보이고 `data-leaving` 속성이 없다 |
 | 줄인 움직임에서 「새 메시지」 단추가 바로 내려간다 | `scrollTo` 를 `addInitScript` 로 감싸 받은 `behavior` 가 `auto` 다 |
 
 `test/unit/design-tokens.test.ts` 에 더한다: `web/src` 에 `duration-100`, `duration-150`, `duration-200`, `duration-300` 이 없다. `motion-reduce:` 는 `animate-none` 과 `hidden`, `flex` 에만 붙는다(`waiting-indicator.tsx` 의 대체 문장 포함).
@@ -138,7 +140,6 @@ cd web && pnpm test:browser
 | `web/src/components/shell/conversation-nav.tsx` | 수정 |
 | `web/src/components/memory/memory-item.tsx` | 수정 |
 | `web/src/components/memory/memory-list.tsx` | 수정 |
-| `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/chat/message-list.tsx` | 수정 |
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
 | `web/src/components/chat/activity/activity-block.tsx` | 수정 |

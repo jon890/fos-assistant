@@ -63,8 +63,8 @@ grep -rnE 'rounded-md (border border-border )?bg-muted (p|px)-' web/src
 
 | 순서 | 조건 | 변형 |
 | --- | --- | --- |
-| 1 | 옮기지 않는다: `web/src/components/chat/markdown.tsx` 의 `<pre>`, `web/src/components/chat-panel.tsx` 의 「새 대화」 `Link`, `<li>` 나 `<ul>` 인 목록 줄, 폼을 감싼 상자 | 없음 |
-| 2 | `web/src/components/agent/agent-tools-section.tsx` 의 「표에 없는 도구가 켜져 있어요」, `web/src/components/admin/visibility-confirm.tsx` 의 상자, `web/src/components/agent/agent-access-section.tsx` 의 공개 범위 경고 | `warning` |
+| 1 | 옮기지 않는다: `web/src/components/chat/markdown.tsx` 의 `<pre>`, `web/src/components/chat-panel.tsx` 의 「새 대화」 `Link`, `<li>` 나 `<ul>` 인 목록 줄, `web/src/components/memory/memory-proposal.tsx` 22줄의 `<article>` 카드, `web/src/components/connector/connector-connection-panel.tsx` 242줄 근처의 상태 배지를 담은 줄 | 없음 |
+| 2 | `web/src/components/agent/agent-tools-section.tsx` 의 「표에 없는 도구가 켜져 있어요」 | `warning` |
 | 3 | `role="alert"` 가 있거나, 그리는 값의 이름이 `error`, `...Error`, `failure`, `message`(실패 응답의 문구) 다 | `error` |
 | 4 | 그 밖 | `info` |
 
