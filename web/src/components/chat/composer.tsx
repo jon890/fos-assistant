@@ -1,16 +1,37 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { ArrowUp, ImagePlus, LoaderCircle, Square, X } from "lucide-react";
 import { TooltipButton } from "@/components/ui/tooltip-button";
 import { cn } from "cn";
 import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
 import { describeError } from "../error-message";
-import { AgentMention, filterAgents, findMention, mentionOptionId } from "./agent-mention";
+import {
+  AgentMention,
+  filterAgents,
+  findMention,
+  mentionOptionId,
+} from "./agent-mention";
 import { SkillCommandMenu } from "./skill-command-menu";
-import { filterSkillNames, findSkillQuery, skillOptionId, withSkillCommand } from "./skill-command";
-import { ModelPicker, type ModelChoice, type ModelChoiceSaveResult } from "./model-picker";
+import {
+  filterSkillNames,
+  findSkillQuery,
+  skillOptionId,
+  withSkillCommand,
+} from "./skill-command";
+import {
+  ModelPicker,
+  type ModelChoice,
+  type ModelChoiceSaveResult,
+} from "./model-picker";
 import type { Conversation } from "../shell/conversations-provider";
 
 type Props = {
@@ -94,7 +115,10 @@ async function buildThumbnail(file: File): Promise<string> {
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (result) => (result ? resolve(result) : reject(new Error("미리보기를 만들지 못했어요."))),
+      (result) =>
+        result
+          ? resolve(result)
+          : reject(new Error("미리보기를 만들지 못했어요.")),
       "image/png",
     );
   });
@@ -147,7 +171,9 @@ export function Composer({
   /** 입력칸의 커서 자리다. `@` 목록은 커서 앞의 글만 본다 */
   const [caret, setCaret] = useState(0);
   /** `Esc` 로 닫은 `@` 의 자리다. 같은 `@` 뒤에 글을 더 쳐도 다시 띄우지 않는다 */
-  const [dismissedMentionStart, setDismissedMentionStart] = useState<number | null>(null);
+  const [dismissedMentionStart, setDismissedMentionStart] = useState<
+    number | null
+  >(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const skillListId = useId();
   /** `Esc` 로 `/` 목록을 닫았다. 첫 낱말을 다 치거나 `/` 를 지울 때까지 다시 띄우지 않는다 */
@@ -170,7 +196,11 @@ export function Composer({
       const sending = new Set(sendingItemsRef.current.map((item) => item.key));
       for (const item of itemsRef.current) {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-        if (item.status === "done" && item.attachmentId !== null && !sending.has(item.key)) {
+        if (
+          item.status === "done" &&
+          item.attachmentId !== null &&
+          !sending.has(item.key)
+        ) {
           void deleteAttachment(item.conversationId, item.attachmentId);
         }
       }
@@ -196,20 +226,37 @@ export function Composer({
   }, [value]);
 
   const found = mention ? findMention(value, caret) : null;
-  const openMention = found !== null && found.start !== dismissedMentionStart ? found : null;
-  const mentionMatches = mention && openMention ? filterAgents(mention.agents, openMention.query) : [];
-  const activeMentionIndex = Math.min(mentionIndex, Math.max(0, mentionMatches.length - 1));
-  const skillQuery = skillNames && !skillDismissed ? findSkillQuery(value, caret) : null;
-  const skillMatches = skillNames && skillQuery !== null ? filterSkillNames(skillNames, skillQuery) : [];
+  const openMention =
+    found !== null && found.start !== dismissedMentionStart ? found : null;
+  const mentionMatches =
+    mention && openMention
+      ? filterAgents(mention.agents, openMention.query)
+      : [];
+  const activeMentionIndex = Math.min(
+    mentionIndex,
+    Math.max(0, mentionMatches.length - 1),
+  );
+  const skillQuery =
+    skillNames && !skillDismissed ? findSkillQuery(value, caret) : null;
+  const skillMatches =
+    skillNames && skillQuery !== null
+      ? filterSkillNames(skillNames, skillQuery)
+      : [];
   // 맞는 이름이 없으면 띄우지 않는다. `/usr/bin` 처럼 커맨드가 아닌 글을 칠 때 목록이 가리지 않게 한다.
   // 스킬이 없는 에이전트는 `/` 만 친 동안에만 스킬이 없다고 알린다.
-  const skillMenuOpen = skillNames !== undefined && skillQuery !== null
-    && (skillNames.length === 0 ? skillQuery === "" : skillMatches.length > 0);
-  const activeSkillIndex = Math.min(skillIndex, Math.max(0, skillMatches.length - 1));
+  const skillMenuOpen =
+    skillNames !== undefined &&
+    skillQuery !== null &&
+    (skillNames.length === 0 ? skillQuery === "" : skillMatches.length > 0);
+  const activeSkillIndex = Math.min(
+    skillIndex,
+    Math.max(0, skillMatches.length - 1),
+  );
 
   function changeValue(nextValue: string, nextCaret: number) {
     const next = mention ? findMention(nextValue, nextCaret) : null;
-    if (next === null || next.start !== dismissedMentionStart) setDismissedMentionStart(null);
+    if (next === null || next.start !== dismissedMentionStart)
+      setDismissedMentionStart(null);
     if (findSkillQuery(nextValue, nextCaret) === null) setSkillDismissed(false);
     setCaret(nextCaret);
     setMentionIndex(0);
@@ -228,7 +275,10 @@ export function Composer({
     const end = textareaRef.current?.selectionStart ?? caret;
     pendingCaretRef.current = openMention.start;
     mention.onPick(code);
-    changeValue(value.slice(0, openMention.start) + value.slice(end), openMention.start);
+    changeValue(
+      value.slice(0, openMention.start) + value.slice(end),
+      openMention.start,
+    );
   }
 
   const uploading = items.some((item) => item.status === "uploading");
@@ -241,7 +291,9 @@ export function Composer({
   }, [blocking, onBlockingChange]);
 
   function updateItem(key: string, patch: Partial<AttachmentItem>) {
-    setItems((previous) => previous.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+    setItems((previous) =>
+      previous.map((item) => (item.key === key ? { ...item, ...patch } : item)),
+    );
   }
 
   async function ensureConversationId(): Promise<string | null> {
@@ -256,9 +308,15 @@ export function Composer({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ agentCode }),
         });
-        const payload = (await response.json()) as { conversationId?: string; code?: string; message?: string };
+        const payload = (await response.json()) as {
+          conversationId?: string;
+          code?: string;
+          message?: string;
+        };
         if (!response.ok || !payload.conversationId) {
-          setPickNotice("대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+          setPickNotice(
+            "대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+          );
           return null;
         }
         // 요청 도중 대화를 바꿨으면 부모는 이미 다른 대화를 보고 있다. 그 선택을 덮지 않는다.
@@ -278,18 +336,29 @@ export function Composer({
   }
 
   /** 지우는 단추가 눌린 첨부다. 업로드 응답이 오면 DELETE 로 마무리한다 */
-  function finalizeRemovalIfRequested(key: string, targetConversationId: string, attachmentId: number | null) {
+  function finalizeRemovalIfRequested(
+    key: string,
+    targetConversationId: string,
+    attachmentId: number | null,
+  ) {
     if (!pendingRemovalRef.current.has(key)) return false;
     pendingRemovalRef.current.delete(key);
-    if (attachmentId !== null) void deleteAttachment(targetConversationId, attachmentId);
+    if (attachmentId !== null)
+      void deleteAttachment(targetConversationId, attachmentId);
     return true;
   }
 
-  async function deleteAttachment(targetConversationId: string, attachmentId: number) {
+  async function deleteAttachment(
+    targetConversationId: string,
+    attachmentId: number,
+  ) {
     try {
-      await fetch(`/api/chat/conversations/${targetConversationId}/attachments/${attachmentId}`, {
-        method: "DELETE",
-      });
+      await fetch(
+        `/api/chat/conversations/${targetConversationId}/attachments/${attachmentId}`,
+        {
+          method: "DELETE",
+        },
+      );
     } catch {
       // 지우기 요청이 실패해도 화면은 이미 그 미리보기를 치웠다. 사용자가 다시 시도할 자리가 없어 조용히 넘어간다.
     }
@@ -309,35 +378,57 @@ export function Composer({
     }
     setItems((previous) => [
       ...previous,
-      { key, previewUrl, status: "uploading", attachmentId: null, errorMessage: null, conversationId: targetConversationId },
+      {
+        key,
+        previewUrl,
+        status: "uploading",
+        attachmentId: null,
+        errorMessage: null,
+        conversationId: targetConversationId,
+      },
     ]);
 
     try {
       const form = new FormData();
       form.append("file", file, file.name);
-      const response = await fetch(`/api/chat/conversations/${targetConversationId}/attachments`, {
-        method: "POST",
-        body: form,
-      });
-      const payload = (await response.json()) as { id?: number; code?: string; message?: string };
+      const response = await fetch(
+        `/api/chat/conversations/${targetConversationId}/attachments`,
+        {
+          method: "POST",
+          body: form,
+        },
+      );
+      const payload = (await response.json()) as {
+        id?: number;
+        code?: string;
+        message?: string;
+      };
       if (!mountedRef.current) {
         // 올리는 동안 대화를 바꿨다. 이 첨부를 보낼 자리가 사라졌으므로 서버에서도 지운다.
-        if (response.ok && payload.id) void deleteAttachment(targetConversationId, payload.id);
+        if (response.ok && payload.id)
+          void deleteAttachment(targetConversationId, payload.id);
         return;
       }
       if (!response.ok || !payload.id) {
         finalizeRemovalIfRequested(key, targetConversationId, null);
         updateItem(key, {
           status: "error",
-          errorMessage: describeError(payload.code ?? "INTERNAL_ERROR", payload.message ?? "사진을 올리지 못했어요."),
+          errorMessage: describeError(
+            payload.code ?? "INTERNAL_ERROR",
+            payload.message ?? "사진을 올리지 못했어요.",
+          ),
         });
         return;
       }
-      if (finalizeRemovalIfRequested(key, targetConversationId, payload.id)) return;
+      if (finalizeRemovalIfRequested(key, targetConversationId, payload.id))
+        return;
       updateItem(key, { status: "done", attachmentId: payload.id });
     } catch {
       finalizeRemovalIfRequested(key, targetConversationId, null);
-      updateItem(key, { status: "error", errorMessage: "사진을 올리지 못했어요. 다시 시도해 주세요." });
+      updateItem(key, {
+        status: "error",
+        errorMessage: "사진을 올리지 못했어요. 다시 시도해 주세요.",
+      });
     }
   }
 
@@ -347,7 +438,9 @@ export function Composer({
     event.target.value = "";
     if (files.length === 0) return;
 
-    const rejectedFormatCount = files.filter((file) => !ACCEPTED_TYPES.includes(file.type)).length;
+    const rejectedFormatCount = files.filter(
+      (file) => !ACCEPTED_TYPES.includes(file.type),
+    ).length;
     const accepted = files.filter((file) => ACCEPTED_TYPES.includes(file.type));
     // 상한은 한 번에 고를 때만 센다. 이미 붙은 첨부를 빼고 남은 자리만큼만 올린다.
     const remainingSlots = Math.max(0, MAX_ATTACHMENTS - items.length);
@@ -358,13 +451,19 @@ export function Composer({
 
     const notices: string[] = [];
     if (rejectedFormatCount > 0) {
-      notices.push(`이미지 파일만 올릴 수 있어요. ${rejectedFormatCount}장은 올리지 못했어요.`);
+      notices.push(
+        `이미지 파일만 올릴 수 있어요. ${rejectedFormatCount}장은 올리지 못했어요.`,
+      );
     }
     if (overflowCount > 0) {
-      notices.push(`한 번에 ${MAX_ATTACHMENTS}장까지 올릴 수 있어요. ${overflowCount}장은 올리지 못했어요.`);
+      notices.push(
+        `한 번에 ${MAX_ATTACHMENTS}장까지 올릴 수 있어요. ${overflowCount}장은 올리지 못했어요.`,
+      );
     }
     if (oversize.length > 0) {
-      notices.push(`사진 한 장은 10MB까지 올릴 수 있어요. ${oversize.length}장은 올리지 못했어요.`);
+      notices.push(
+        `사진 한 장은 10MB까지 올릴 수 있어요. ${oversize.length}장은 올리지 못했어요.`,
+      );
     }
     setPickNotice(notices.length > 0 ? notices.join(" ") : null);
 
@@ -383,17 +482,23 @@ export function Composer({
    *
    * <p>대화를 만든 것은 `ensureConversationId` 가 이미 알렸으므로 여기서 다시 알리지 않는다.
    */
-  async function saveModelChoice(choice: ModelChoice): Promise<ModelChoiceSaveResult> {
+  async function saveModelChoice(
+    choice: ModelChoice,
+  ): Promise<ModelChoiceSaveResult> {
     setSavingModel(true);
     try {
       const targetConversationId = await ensureConversationId();
       // 빈 대화를 만들지 못했으면 `ensureConversationId` 가 이미 알렸다.
-      if (targetConversationId === null || !mountedRef.current) return "reported";
-      const response = await fetch(`/api/chat/conversations/${targetConversationId}/model`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(choice),
-      });
+      if (targetConversationId === null || !mountedRef.current)
+        return "reported";
+      const response = await fetch(
+        `/api/chat/conversations/${targetConversationId}/model`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(choice),
+        },
+      );
       if (!response.ok) return "failed";
       // 기다리는 동안 대화를 바꿨어도 알린다. 받은 줄은 그 대화의 것이라 목록의 그 줄만 바뀐다.
       onModelChoiceSaved((await response.json()) as Conversation);
@@ -423,7 +528,8 @@ export function Composer({
   async function trySend() {
     if (sendDisabled) return;
     const sendingItems = items.filter(
-      (item): item is AttachmentItem & { attachmentId: number } => item.status === "done" && item.attachmentId !== null,
+      (item): item is AttachmentItem & { attachmentId: number } =>
+        item.status === "done" && item.attachmentId !== null,
     );
     sendingItemsRef.current = sendingItems;
     let succeeded = false;
@@ -460,7 +566,10 @@ export function Composer({
       className="mx-auto w-full max-w-3xl pt-3"
     >
       {items.length > 0 ? (
-        <div data-testid="attachment-previews" className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
+        <div
+          data-testid="attachment-previews"
+          className="mb-2 flex items-center gap-2 overflow-x-auto pb-1"
+        >
           {items.map((item) => (
             <div key={item.key} className="relative shrink-0">
               {item.status === "error" ? (
@@ -471,7 +580,11 @@ export function Composer({
                 <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border bg-muted">
                   {item.previewUrl ? (
                     // eslint 설정이 없는 저장소라 next/image 대신 object URL 을 바로 그린다.
-                    <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={item.previewUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   ) : null}
                   {item.status === "uploading" ? (
                     <span
@@ -501,15 +614,20 @@ export function Composer({
       ) : null}
 
       {pickNotice ? (
-        <p data-testid="attachment-notice" className="mb-2 text-xs text-muted-foreground">
+        <p
+          data-testid="attachment-notice"
+          className="mb-2 text-xs text-muted-foreground"
+        >
           {pickNotice}
         </p>
       ) : null}
 
       <div
         data-testid="composer-shell"
-        className={cn("relative flex items-end gap-2 p-1.5 pl-4",
-          "rounded-3xl border border-border bg-background focus-within:border-primary")}
+        className={cn(
+          "relative flex items-end gap-2 p-1.5 pl-4",
+          "rounded-3xl border border-border bg-background focus-within:border-primary",
+        )}
       >
         {mention && openMention ? (
           <AgentMention
@@ -534,11 +652,23 @@ export function Composer({
           rows={1}
           value={value}
           aria-label="메시지"
-          aria-controls={openMention ? mentionListId : skillMenuOpen ? skillListId : undefined}
-          aria-activedescendant={openMention && mentionMatches.length > 0
-            ? mentionOptionId(mentionListId, activeMentionIndex)
-            : skillMenuOpen && skillMatches.length > 0 ? skillOptionId(skillListId, activeSkillIndex) : undefined}
-          onChange={(event) => changeValue(event.target.value, event.target.selectionStart)}
+          aria-controls={
+            openMention
+              ? mentionListId
+              : skillMenuOpen
+                ? skillListId
+                : undefined
+          }
+          aria-activedescendant={
+            openMention && mentionMatches.length > 0
+              ? mentionOptionId(mentionListId, activeMentionIndex)
+              : skillMenuOpen && skillMatches.length > 0
+                ? skillOptionId(skillListId, activeSkillIndex)
+                : undefined
+          }
+          onChange={(event) =>
+            changeValue(event.target.value, event.target.selectionStart)
+          }
           onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
           onCompositionStart={() => {
             composing.current = true;
@@ -547,7 +677,8 @@ export function Composer({
             composing.current = false;
           }}
           onKeyDown={(event) => {
-            const imeComposing = composing.current || event.nativeEvent.isComposing;
+            const imeComposing =
+              composing.current || event.nativeEvent.isComposing;
             if (skillMenuOpen && event.key === "Escape") {
               // `@` 목록과 같다. 목록만 닫고 대화 화면의 중지나 패널 닫기로 넘기지 않는다.
               event.preventDefault();
@@ -559,10 +690,16 @@ export function Composer({
               if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
                 const step = event.key === "ArrowDown" ? 1 : -1;
-                setSkillIndex((activeSkillIndex + step + skillMatches.length) % skillMatches.length);
+                setSkillIndex(
+                  (activeSkillIndex + step + skillMatches.length) %
+                    skillMatches.length,
+                );
                 return;
               }
-              if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+              if (
+                (event.key === "Enter" && !event.shiftKey) ||
+                event.key === "Tab"
+              ) {
                 // 고를 이름이 있을 때만 Enter 가 고르기다. 스킬이 없다는 문구만 떠 있으면 평소처럼 보낸다.
                 event.preventDefault();
                 pickSkill(skillMatches[activeSkillIndex]!);
@@ -582,11 +719,17 @@ export function Composer({
                 event.preventDefault();
                 if (mentionMatches.length > 0) {
                   const step = event.key === "ArrowDown" ? 1 : -1;
-                  setMentionIndex((activeMentionIndex + step + mentionMatches.length) % mentionMatches.length);
+                  setMentionIndex(
+                    (activeMentionIndex + step + mentionMatches.length) %
+                      mentionMatches.length,
+                  );
                 }
                 return;
               }
-              if ((event.key === "Enter" && !event.shiftKey) || (event.key === "Tab" && mentionMatches.length > 0)) {
+              if (
+                (event.key === "Enter" && !event.shiftKey) ||
+                (event.key === "Tab" && mentionMatches.length > 0)
+              ) {
                 // 목록이 떠 있는 동안의 Enter 는 고르기다. 맞는 것이 없어도 보내지 않는다.
                 // Shift+Enter 는 고르지 않고 평소처럼 줄을 바꾼다. 줄이 바뀌면 `@` 뒤에 공백이 생겨 목록이 닫힌다.
                 event.preventDefault();
@@ -596,11 +739,11 @@ export function Composer({
               }
             }
             if (
-              event.key !== "Enter"
-              || event.shiftKey
-              || composing.current
-              || event.nativeEvent.isComposing
-              || (running && !canQueue)
+              event.key !== "Enter" ||
+              event.shiftKey ||
+              composing.current ||
+              event.nativeEvent.isComposing ||
+              (running && !canQueue)
             ) {
               return;
             }
@@ -608,9 +751,13 @@ export function Composer({
             void trySend();
           }}
           disabled={disabled}
-          placeholder={mention ? "@로 에이전트를 불러요" : "무엇을 도와드릴까요?"}
-          className={cn("max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
-            "bg-transparent text-base leading-6 outline-none disabled:opacity-50")}
+          placeholder={
+            mention ? "@로 에이전트를 불러요" : "무엇을 도와드릴까요?"
+          }
+          className={cn(
+            "max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
+            "bg-transparent text-base leading-6 outline-none disabled:opacity-50",
+          )}
         />
         {acceptsAttachments ? (
           <>
@@ -658,7 +805,10 @@ export function Composer({
           className="size-10 shrink-0 rounded-full"
         >
           {uploading ? (
-            <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
+            <LoaderCircle
+              aria-hidden="true"
+              className="size-4 animate-spin motion-reduce:animate-none"
+            />
           ) : (
             <ArrowUp aria-hidden="true" className="size-5" />
           )}

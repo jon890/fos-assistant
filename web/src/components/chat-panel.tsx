@@ -12,8 +12,17 @@ import { useStarterSuggestions } from "./chat/use-starter-suggestions";
 import { PendingQueueView } from "@/components/chat/pending-queue";
 import { usePendingQueue } from "@/components/chat/use-pending-queue";
 import { MessageList } from "./chat/message-list";
-import { applyChatEvent, emptyActivity, failActivity, fromTree, type ActivityState } from "./chat/activity/activity-state";
-import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
+import {
+  applyChatEvent,
+  emptyActivity,
+  failActivity,
+  fromTree,
+  type ActivityState,
+} from "./chat/activity/activity-state";
+import {
+  ActivityPanel,
+  type ActivityPanelTarget,
+} from "./chat/activity/activity-panel";
 import { ArtifactPanel } from "./chat/artifact/artifact-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
@@ -35,13 +44,21 @@ type SidePanelTarget =
   | { kind: "activity"; target: ActivityPanelTarget }
   | { kind: "artifact"; messageId: Turn["id"]; path: string; name: string };
 /** 대화에 지금 도는 turn 이다. 실행 번호가 아직 붙지 않았으면 `running` 이 참이어도 나머지가 null 이다. */
-type RunningTurn = { running: boolean; executionId: number | null; startedAt: string | null };
+type RunningTurn = {
+  running: boolean;
+  executionId: number | null;
+  startedAt: string | null;
+};
 /**
  * 도는 turn 을 보고 있는 대화와, 보기 시작할 때의 선택 판이다.
  *
  * <p>`sentHere` 는 이 창이 보낸 turn 의 스트림이 끊겨 넘어온 것인지다. 안내 문구만 이 값으로 고른다.
  */
-type ObservedTurn = { conversationId: string; version: number; sentHere: boolean };
+type ObservedTurn = {
+  conversationId: string;
+  version: number;
+  sentHere: boolean;
+};
 /**
  * 끝 사건 없이 끊긴 스트림을 도는 turn 조회로 넘긴 결과다.
  *
@@ -59,7 +76,11 @@ type InterruptedHandlers = {
   /** 돌지 않고 답도 없다. 끊김 문구를 보이는 방식은 호출자가 정한다. */
   onMissing(history: Turn[] | null): Promise<void>;
 };
-type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
+type TurnStreamState = {
+  started: boolean;
+  done: boolean;
+  reportedError: boolean;
+};
 /**
  * 보는 중인 turn 의 사건을 대화 단위 SSE 에서 가려내는 상태다.
  *
@@ -67,7 +88,10 @@ type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean
  * `skipping` 은 보는 turn 의 `started` 를 받아 그 turn 이 끝날 때까지 버리는 중이며, `passed` 는 그 turn 을 지나
  * 뒤의 사건을 받는 것이다. `watchedId` 는 보기 시작할 때의 실행 번호이고, 번호가 붙기 전이면 null 이다.
  */
-type ObservedTurnFilter = { watchedId: number | null; phase: "waiting" | "skipping" | "passed" };
+type ObservedTurnFilter = {
+  watchedId: number | null;
+  phase: "waiting" | "skipping" | "passed";
+};
 /** 대화 단위 SSE 로 받아 그리고 있는 자동 turn 이다. `pendingId` 는 흘러오는 답 조각의 임시 식별자다. */
 type AutoTurn = { state: TurnStreamState; pendingId: string };
 type TurnStreamCallbacks = {
@@ -88,12 +112,16 @@ async function readPayload<T>(response: Response): Promise<T> {
  * 질문만 남는다(`ChatService` 의 `finish` 와 `cancel`). 그래서 마지막 질문 뒤의 답 행은 끝난 답이다. 다시
  * 생성은 이전 답이 이미 그 자리에 있으므로 보내기 전에 저장돼 있던 행은 뺀다.
  */
-function answerAfterLastQuestion(loaded: Turn[], savedBefore: ReadonlySet<Turn["id"]>): Turn | undefined {
+function answerAfterLastQuestion(
+  loaded: Turn[],
+  savedBefore: ReadonlySet<Turn["id"]>,
+): Turn | undefined {
   let answer: Turn | undefined;
   for (const turn of loaded) {
     if (turn.role === "USER") answer = undefined;
     // 알림 줄은 질문도 답도 아니다. 질문 뒤의 답을 찾을 때 건너뛴다.
-    else if (turn.role === "ASSISTANT" && !savedBefore.has(turn.id)) answer = turn;
+    else if (turn.role === "ASSISTANT" && !savedBefore.has(turn.id))
+      answer = turn;
   }
   return answer;
 }
@@ -102,14 +130,19 @@ function answerAfterLastQuestion(loaded: Turn[], savedBefore: ReadonlySet<Turn["
  * 마지막 질문이 보내기 전에 없던 새 행인지다. `started` 를 받기 전에 끊겨도 서버가 질문을 저장했을 수 있다.
  * 그때 보낸 글을 입력창에 되돌리면 저장된 질문과 함께 보이고, 다시 보내면 두 번 저장된다.
  */
-function lastQuestionIsNew(loaded: Turn[], savedBefore: ReadonlySet<Turn["id"]>): boolean {
+function lastQuestionIsNew(
+  loaded: Turn[],
+  savedBefore: ReadonlySet<Turn["id"]>,
+): boolean {
   const question = loaded.findLast((turn) => turn.role === "USER");
   return question !== undefined && !savedBefore.has(question.id);
 }
 
 /** 화면에 있는 저장된 메시지의 번호다. 끊긴 뒤 새로 저장된 답을 가려낼 때 쓴다. */
 function savedIdsOf(turns: Turn[]): Set<Turn["id"]> {
-  return new Set(turns.filter((turn) => typeof turn.id === "number").map((turn) => turn.id));
+  return new Set(
+    turns.filter((turn) => typeof turn.id === "number").map((turn) => turn.id),
+  );
 }
 
 /**
@@ -135,8 +168,12 @@ const EVENTS_RECONNECT_MS = 5_000;
  * <p>대기 경로의 `CONVERSATION_BUSY` 는 답을 만드는 중이라는 뜻이 아니다. 흐름이 붙은 에이전트라 대기 메시지를
  * 받지 않는다는 뜻이라 이 경로에서만 문구를 바꾼다. 요청이 닿지 못했으면 문구가 비어 오므로 `fallback` 을 쓴다.
  */
-function describePendingFailure(failure: Extract<PendingResult<unknown>, { ok: false }>, fallback: string): string {
-  if (failure.code === "CONVERSATION_BUSY") return "이 대화는 답이 끝난 뒤 보낼 수 있어요.";
+function describePendingFailure(
+  failure: Extract<PendingResult<unknown>, { ok: false }>,
+  fallback: string,
+): string {
+  if (failure.code === "CONVERSATION_BUSY")
+    return "이 대화는 답이 끝난 뒤 보낼 수 있어요.";
   return describeError(failure.code, failure.message || fallback);
 }
 
@@ -145,34 +182,52 @@ function describePendingFailure(failure: Extract<PendingResult<unknown>, { ok: f
  *
  * <p>`filter` 의 단계를 이 자리에서 옮긴다. `system` 은 turn 의 사건이 아니므로 언제나 받는다.
  */
-function belongsToObservedTurn(filter: ObservedTurnFilter | null, event: ChatEvent): boolean {
-  if (filter === null || filter.phase === "passed" || event.type === "system") return false;
+function belongsToObservedTurn(
+  filter: ObservedTurnFilter | null,
+  event: ChatEvent,
+): boolean {
+  if (filter === null || filter.phase === "passed" || event.type === "system")
+    return false;
   if (event.type === "started") {
     // 번호가 붙기 전에 보기 시작했으면 처음 받는 `started` 가 보는 turn 이다.
-    if (filter.phase === "waiting" && (filter.watchedId === null || event.executionId === filter.watchedId)) {
+    if (
+      filter.phase === "waiting" &&
+      (filter.watchedId === null || event.executionId === filter.watchedId)
+    ) {
       filter.phase = "skipping";
       return true;
     }
     filter.phase = "passed";
     return false;
   }
-  if (event.type === "done" || event.type === "stopped") filter.phase = "passed";
+  if (event.type === "done" || event.type === "stopped")
+    filter.phase = "passed";
   return true;
 }
 
-export function ChatPanel({ initialConversationId }: { initialConversationId: string | null }) {
+export function ChatPanel({
+  initialConversationId,
+}: {
+  initialConversationId: string | null;
+}) {
   const pathname = usePathname();
-  const { conversations, refresh, replace, newConversationVersion } = useConversations();
+  const { conversations, refresh, replace, newConversationVersion } =
+    useConversations();
   const displayName = useShellDisplayName();
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(initialConversationId);
+  const [conversationId, setConversationId] = useState<string | null>(
+    initialConversationId,
+  );
   const conversationIdRef = useRef<string | null>(initialConversationId);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [activity, setActivity] = useState<ActivityState | null>(null);
   const [liveExpanded, setLiveExpanded] = useState(false);
   const liveExpandedRef = useRef(false);
-  const [expandedOnDone, setExpandedOnDone] = useState<{ executionId: number; expanded: boolean } | null>(null);
+  const [expandedOnDone, setExpandedOnDone] = useState<{
+    executionId: number;
+    expanded: boolean;
+  } | null>(null);
   // 옆 패널은 한 번에 하나다. 작업 과정과 결과물을 한 상태에 담아 둘이 같이 열리지 않게 한다.
   const [panelTarget, setPanelTarget] = useState<SidePanelTarget | null>(null);
   const currentExecutionId = useRef<number | null>(null);
@@ -197,14 +252,19 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   const sentTurnToken = useRef<string | null>(null);
   const conversationTasks = useRef<(() => Promise<void>)[]>([]);
   const drainingConversationTasks = useRef(false);
-  const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
+  const [selectedVersions, setSelectedVersions] = useState<
+    Record<number, number>
+  >({});
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
   /** 보낸 스킬 커맨드의 이름이 이 에이전트에 없었다. 입력창 아래에 알리고 다음 보내기를 시작하면 지운다 */
   const [unknownSkill, setUnknownSkill] = useState<string | null>(null);
   /** `/` 목록에 띄울 스킬 이름과 그 목록을 읽은 에이전트다. 에이전트를 바꾸면 그 에이전트의 목록을 다시 읽는다 */
-  const [skillCommands, setSkillCommands] = useState<{ agentCode: string; names: string[] } | null>(null);
+  const [skillCommands, setSkillCommands] = useState<{
+    agentCode: string;
+    names: string[];
+  } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [agents, setAgents] = useState<AgentView[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
@@ -217,7 +277,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    * <p>사진을 먼저 올려 대화 번호가 생겨도 참으로 남는다. 주소로 연 대화는 메시지를 읽는 동안에도 거짓이다.
    */
   const [freshStart, setFreshStart] = useState(initialConversationId === null);
-  const [messagesLoading, setMessagesLoading] = useState(initialConversationId !== null);
+  const [messagesLoading, setMessagesLoading] = useState(
+    initialConversationId !== null,
+  );
   const selectionVersion = useRef(0);
   const previousPathname = useRef(pathname);
   const previousNewVersion = useRef(newConversationVersion);
@@ -287,12 +349,16 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         // 이력과 `running=false` 를 함께 받아, 새로 고칠 때까지 답이 보이지 않는다.
         let running: RunningTurn | null = null;
         try {
-          const runningResponse = await fetch(`/api/chat/conversations/${initialConversationId}/running`,
-            { cache: "no-store" });
+          const runningResponse = await fetch(
+            `/api/chat/conversations/${initialConversationId}/running`,
+            { cache: "no-store" },
+          );
           if (runningResponse.ok) {
             running = await readPayload<RunningTurn>(runningResponse);
           } else if (runningResponse.status === 404) {
-            const payload = await readPayload<ErrorPayload>(runningResponse).catch(() => null);
+            const payload = await readPayload<ErrorPayload>(
+              runningResponse,
+            ).catch(() => null);
             if (payload?.code === "CONVERSATION_NOT_FOUND") {
               if (selectionVersion.current === version) setNotFound(true);
               return;
@@ -302,8 +368,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           // 묻지 못하면 돌지 않는 것으로 보고 이력을 읽는다. 이력 읽기가 실패하면 그 오류가 뜬다.
         }
         if (selectionVersion.current !== version) return;
-        if (running?.running) beginObserving(initialConversationId, version, running);
-        const response = await fetch(`/api/chat/conversations/${initialConversationId}/messages`);
+        if (running?.running)
+          beginObserving(initialConversationId, version, running);
+        const response = await fetch(
+          `/api/chat/conversations/${initialConversationId}/messages`,
+        );
         if (!response.ok) {
           const payload = await readPayload<ErrorPayload>(response);
           if (payload.code === "CONVERSATION_NOT_FOUND") {
@@ -318,12 +387,22 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           setTurns((previous) => {
             const loadedIds = new Set(messages.map((turn) => turn.id));
             // 서버 번호가 있는 줄만 잇는다. 문자열 번호의 임시 줄은 저장된 줄과 겹쳐 보일 수 있어 버린다.
-            return [...messages, ...previous.filter((turn) => typeof turn.id === "number" && !loadedIds.has(turn.id))];
+            return [
+              ...messages,
+              ...previous.filter(
+                (turn) =>
+                  typeof turn.id === "number" && !loadedIds.has(turn.id),
+              ),
+            ];
           });
         }
       } catch (reason) {
         if (selectionVersion.current === version) {
-          setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했어요.");
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "대화 이력을 읽지 못했어요.",
+          );
         }
       } finally {
         if (selectionVersion.current === version) {
@@ -350,10 +429,14 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
 
     const loadTree = async (treeExecutionId: number) => {
       try {
-        const response = await fetch(`/api/usage/executions/${treeExecutionId}/tree`, { cache: "no-store" });
+        const response = await fetch(
+          `/api/usage/executions/${treeExecutionId}/tree`,
+          { cache: "no-store" },
+        );
         if (!response.ok) return;
         const tree = await readPayload<ExecutionTreeResponse>(response);
-        if (!current() || currentExecutionId.current !== treeExecutionId) return;
+        if (!current() || currentExecutionId.current !== treeExecutionId)
+          return;
         const items = fromTree(tree, { running: true });
         setActivity((previous) => previous && { ...previous, items });
       } catch {
@@ -368,11 +451,19 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         loaded = await refreshMessages(id, version);
       } catch (reason) {
         if (selectionVersion.current === version) {
-          setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했어요.");
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "대화 이력을 읽지 못했어요.",
+          );
         }
       }
       if (selectionVersion.current !== version) return;
-      releaseObserving(loaded ? answerAfterLastQuestion(loaded, new Set())?.executionId ?? null : null);
+      releaseObserving(
+        loaded
+          ? (answerAfterLastQuestion(loaded, new Set())?.executionId ?? null)
+          : null,
+      );
       void refresh();
     };
 
@@ -380,11 +471,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const pollOnce = async (): Promise<boolean> => {
       let running: RunningTurn | null = null;
       try {
-        const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
+        const response = await fetch(`/api/chat/conversations/${id}/running`, {
+          cache: "no-store",
+        });
         if (response.ok) {
           running = await readPayload<RunningTurn>(response);
         } else if (response.status === 404) {
-          const payload = await readPayload<ErrorPayload>(response).catch(() => null);
+          const payload = await readPayload<ErrorPayload>(response).catch(
+            () => null,
+          );
           if (payload?.code === "CONVERSATION_NOT_FOUND") {
             // 보는 동안 대화가 지워졌다. 되풀이해 물어도 돌아오지 않으므로 곧바로 멈추고 첫 조회와 같은 화면으로 간다.
             if (!current()) return false;
@@ -418,7 +513,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         // 처음 번호를 받았거나 provider 를 넘어가 번호가 바뀌었다. 중지도 새 번호로 보낸다.
         currentExecutionId.current = running.executionId;
         setExecutionId(running.executionId);
-        const startedAt = running.startedAt ? Date.parse(running.startedAt) : Date.now();
+        const startedAt = running.startedAt
+          ? Date.parse(running.startedAt)
+          : Date.now();
         setActivity((previous) => previous && { ...previous, startedAt });
       }
       await loadTree(running.executionId);
@@ -453,7 +550,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     document.addEventListener("visibilitychange", onVisibilityChange);
     void run(async () => {
       // 대화를 열 때 이미 도는 turn 을 물었다. 번호가 있으면 작업 과정만 곧바로 읽는다.
-      if (currentExecutionId.current !== null) await loadTree(currentExecutionId.current);
+      if (currentExecutionId.current !== null)
+        await loadTree(currentExecutionId.current);
       return current();
     });
     return () => {
@@ -480,8 +578,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       const reconnected = attempts > 0;
       attempts += 1;
       try {
-        const response = await fetch(`/api/chat/conversations/${id}/events`,
-          { cache: "no-store", signal: controller.signal });
+        const response = await fetch(`/api/chat/conversations/${id}/events`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (response.ok) {
           if (reconnected) {
             // 끊긴 사이의 `pending` 사건은 다시 오지 않는다. 놓치면 이미 보낸 글이 대기 줄에 남으므로 다시 읽는다.
@@ -523,7 +623,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   useEffect(() => {
     const previous = previousPathname.current;
     previousPathname.current = pathname;
-    if (previous !== "/" && pathname === "/" && conversationIdRef.current !== null) {
+    if (
+      previous !== "/" &&
+      pathname === "/" &&
+      conversationIdRef.current !== null
+    ) {
       startNewConversation();
     }
   }, [pathname]);
@@ -559,7 +663,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    *
    * <p>첫 단계 사건이 올 때 재기 시작한다. 그전에는 이 turn 이 흐름인지 알 수 없다.
    */
-  const flowActive = activity?.items.some((item) => item.kind === "step") ?? false;
+  const flowActive =
+    activity?.items.some((item) => item.kind === "step") ?? false;
 
   useEffect(() => {
     if (!flowActive || flowIsSlow) return;
@@ -606,14 +711,27 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    *
    * <p>스트림이 끊겨 넘어온 창은 이미 받은 작업 과정을 그대로 두고, 다음 나무 조회가 그것을 덮는다.
    */
-  function beginObserving(id: string, version: number, running: RunningTurn, sentHere = false) {
-    const startedAt = running.startedAt ? Date.parse(running.startedAt) : Date.now();
+  function beginObserving(
+    id: string,
+    version: number,
+    running: RunningTurn,
+    sentHere = false,
+  ) {
+    const startedAt = running.startedAt
+      ? Date.parse(running.startedAt)
+      : Date.now();
     setSending(true);
     setStopRequested(false);
     currentExecutionId.current = running.executionId;
     setExecutionId(running.executionId);
-    setActivity((previous) => ({ ...emptyActivity(startedAt), items: previous?.items ?? [] }));
-    observedTurnFilter.current = { watchedId: running.executionId, phase: "waiting" };
+    setActivity((previous) => ({
+      ...emptyActivity(startedAt),
+      items: previous?.items ?? [],
+    }));
+    observedTurnFilter.current = {
+      watchedId: running.executionId,
+      phase: "waiting",
+    };
     setObserving({ conversationId: id, version, sentHere });
   }
 
@@ -630,17 +748,24 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    * @param savedBefore 보내기 전에 화면에 있던 저장된 메시지의 번호다. 그 밖의 답이 마지막 질문 뒤에 있으면 답이 저장된 것이다.
    * @param streamedId 받던 답 조각의 임시 식별자다.
    */
-  async function handOffInterruptedStream(version: number, savedBefore: ReadonlySet<Turn["id"]>, streamedId: string)
-    : Promise<InterruptedOutcome> {
+  async function handOffInterruptedStream(
+    version: number,
+    savedBefore: ReadonlySet<Turn["id"]>,
+    streamedId: string,
+  ): Promise<InterruptedOutcome> {
     const id = conversationIdRef.current;
     if (id === null) return { kind: "missing", history: null };
     let running: RunningTurn | null = null;
     try {
-      const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
+      const response = await fetch(`/api/chat/conversations/${id}/running`, {
+        cache: "no-store",
+      });
       if (response.ok) {
         running = await readPayload<RunningTurn>(response);
       } else if (response.status === 404) {
-        const payload = await readPayload<ErrorPayload>(response).catch(() => null);
+        const payload = await readPayload<ErrorPayload>(response).catch(
+          () => null,
+        );
         if (payload?.code === "CONVERSATION_NOT_FOUND") {
           // 대화를 열 때와 보는 중과 같게 대화를 찾을 수 없어요는 화면으로 간다.
           if (selectionVersion.current === version) setNotFound(true);
@@ -668,7 +793,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     }
     if (selectionVersion.current !== version) return { kind: "gone" };
     const answer = answerAfterLastQuestion(loaded, savedBefore);
-    return answer ? { kind: "answered", executionId: answer.executionId ?? null } : { kind: "missing", history: loaded };
+    return answer
+      ? { kind: "answered", executionId: answer.executionId ?? null }
+      : { kind: "missing", history: loaded };
   }
 
   /**
@@ -681,7 +808,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     streamedId: string,
     handlers: InterruptedHandlers,
   ): Promise<InterruptedOutcome["kind"]> {
-    const outcome = await handOffInterruptedStream(version, savedBefore, streamedId);
+    const outcome = await handOffInterruptedStream(
+      version,
+      savedBefore,
+      streamedId,
+    );
     if (outcome.kind === "answered") {
       setActivity(null);
       setFlowIsSlow(false);
@@ -700,13 +831,20 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    */
   function settleFinishedActivity(finishedExecutionId: number | null) {
     if (finishedExecutionId !== null) {
-      setExpandedOnDone({ executionId: finishedExecutionId, expanded: liveExpandedRef.current });
+      setExpandedOnDone({
+        executionId: finishedExecutionId,
+        expanded: liveExpandedRef.current,
+      });
     }
     // 결과물 패널은 turn 이 끝나도 그대로 둔다.
     setPanelTarget((previous) => {
-      if (previous?.kind !== "activity" || previous.target.mode !== "live") return previous;
+      if (previous?.kind !== "activity" || previous.target.mode !== "live")
+        return previous;
       return finishedExecutionId !== null
-        ? { kind: "activity", target: { mode: "saved", executionId: finishedExecutionId } }
+        ? {
+            kind: "activity",
+            target: { mode: "saved", executionId: finishedExecutionId },
+          }
         : null;
     });
   }
@@ -740,8 +878,14 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   }
 
   function latestSlots() {
-    const saved = turns.filter((turn): turn is Turn & { id: number } => typeof turn.id === "number")
-      .map((turn) => ({ ...turn, replacesMessageId: turn.replacesMessageId ?? null }));
+    const saved = turns
+      .filter(
+        (turn): turn is Turn & { id: number } => typeof turn.id === "number",
+      )
+      .map((turn) => ({
+        ...turn,
+        replacesMessageId: turn.replacesMessageId ?? null,
+      }));
     return foldVersions(saved, {}).at(-1);
   }
 
@@ -768,7 +912,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   }
 
   /** turn 사건 하나를 실행 상태와 작업 과정에 반영한다. 보낸 turn 과 대화 단위 SSE 의 자동 turn 이 함께 쓴다. */
-  async function applyTurnEvent(event: ChatEvent, state: TurnStreamState, callbacks: TurnStreamCallbacks) {
+  async function applyTurnEvent(
+    event: ChatEvent,
+    state: TurnStreamState,
+    callbacks: TurnStreamCallbacks,
+  ) {
     if (event.type === "started") {
       state.started = true;
       currentExecutionId.current = event.executionId ?? null;
@@ -781,10 +929,14 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       setActivity((previous) => previous && applyChatEvent(previous, event));
     } else if (["tool", "subagent", "step", "switched"].includes(event.type)) {
       setActivity((previous) => previous && applyChatEvent(previous, event));
-    } else if ((event.type === "done" || event.type === "stopped") && event.conversationId) {
+    } else if (
+      (event.type === "done" || event.type === "stopped") &&
+      event.conversationId
+    ) {
       state.done = true;
       setActivity((previous) => previous && applyChatEvent(previous, event));
-      const finishedExecutionId = event.executionId ?? currentExecutionId.current;
+      const finishedExecutionId =
+        event.executionId ?? currentExecutionId.current;
       settleFinishedActivity(finishedExecutionId);
       await callbacks.onDone?.(event);
       setActivity(null);
@@ -827,11 +979,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     }
     let running: RunningTurn | null = null;
     try {
-      const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
+      const response = await fetch(`/api/chat/conversations/${id}/running`, {
+        cache: "no-store",
+      });
       if (response.ok) {
         running = await readPayload<RunningTurn>(response);
       } else if (response.status === 404) {
-        const payload = await readPayload<ErrorPayload>(response).catch(() => null);
+        const payload = await readPayload<ErrorPayload>(response).catch(
+          () => null,
+        );
         if (payload?.code === "CONVERSATION_NOT_FOUND") {
           if (selectionVersion.current === version) setNotFound(true);
           return;
@@ -840,7 +996,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     } catch {
       // 아래에서 돌지 않는 것으로 본다.
     }
-    if (selectionVersion.current !== version || autoTurn.current !== current) return;
+    if (selectionVersion.current !== version || autoTurn.current !== current)
+      return;
     autoTurn.current = null;
     if (running?.running) {
       beginObserving(id, version, running);
@@ -851,7 +1008,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setFlowIsSlow(false);
     currentExecutionId.current = null;
     setExecutionId(null);
-    await Promise.all([refresh(), refreshMessages(id, version).catch(() => {})]);
+    await Promise.all([
+      refresh(),
+      refreshMessages(id, version).catch(() => {}),
+    ]);
     if (selectionVersion.current === version) setSending(false);
   }
 
@@ -866,7 +1026,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     if (drainingConversationTasks.current) return;
     drainingConversationTasks.current = true;
     try {
-      while (sentTurnToken.current === null && conversationTasks.current.length > 0) {
+      while (
+        sentTurnToken.current === null &&
+        conversationTasks.current.length > 0
+      ) {
         const task = conversationTasks.current.shift()!;
         try {
           await task();
@@ -895,7 +1058,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         content: event.text ?? "",
         senderName: null,
       };
-      setTurns((previous) => previous.some((turn) => turn.id === line.id) ? previous : [...previous, line]);
+      setTurns((previous) =>
+        previous.some((turn) => turn.id === line.id)
+          ? previous
+          : [...previous, line],
+      );
       return;
     }
     if (event.type === "user") {
@@ -906,7 +1073,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         content: event.text ?? "",
         senderName: null,
       };
-      setTurns((previous) => previous.some((turn) => turn.id === line.id) ? previous : [...previous, line]);
+      setTurns((previous) =>
+        previous.some((turn) => turn.id === line.id)
+          ? previous
+          : [...previous, line],
+      );
       return;
     }
     if (belongsToObservedTurn(observedTurnFilter.current, event)) return;
@@ -933,7 +1104,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       } else if (event.type === "error" && hasPendingItems.current) {
         // 대기 메시지를 보내려다 사용자 메시지를 저장하기 전에 실패했다. turn 이 열리지 않아 답 자리가 없으므로
         // 입력창 위에 까닭을 알린다. 대기 줄은 멈춘 채 남고 이어 오는 `pending` 사건이 그것을 보인다.
-        setError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했어요."));
+        setError(
+          describeError(
+            event.code ?? "INTERNAL_ERROR",
+            event.message ?? "요청을 처리하지 못했어요.",
+          ),
+        );
       }
       return;
     }
@@ -942,33 +1118,66 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       if (autoTurn.current === current) autoTurn.current = null;
       if (conversationIdRef.current !== id) return;
       // 이력을 다 읽은 뒤에 입력창을 푼다. 먼저 풀면 그사이 보낸 질문의 임시 줄을 다시 읽은 이력이 덮는다.
-      await Promise.all([refresh(), refreshMessages(id, selectionVersion.current).catch(() => {})]);
+      await Promise.all([
+        refresh(),
+        refreshMessages(id, selectionVersion.current).catch(() => {}),
+      ]);
       if (conversationIdRef.current === id) setSending(false);
     };
     await applyTurnEvent(event, current.state, {
       onDelta: (textDelta) => {
         setTurns((previous) => {
           const pending = previous.find((turn) => turn.id === pendingId);
-          if (!pending) return [...previous, { id: pendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
-          return previous.map((turn) => turn.id === pendingId ? { ...turn, content: turn.content + textDelta } : turn);
+          if (!pending)
+            return [
+              ...previous,
+              {
+                id: pendingId,
+                role: "ASSISTANT",
+                content: textDelta,
+                senderName: null,
+              },
+            ];
+          return previous.map((turn) =>
+            turn.id === pendingId
+              ? { ...turn, content: turn.content + textDelta }
+              : turn,
+          );
         });
       },
       onReset: () => {
-        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+        setTurns((previous) =>
+          previous.filter((turn) => turn.id !== pendingId),
+        );
       },
       onDone: finish,
       onError: async (failed) => {
-        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-        setTurnError(describeError(failed.code ?? "INTERNAL_ERROR", failed.message ?? "요청을 처리하지 못했어요."));
+        setTurns((previous) =>
+          previous.filter((turn) => turn.id !== pendingId),
+        );
+        setTurnError(
+          describeError(
+            failed.code ?? "INTERNAL_ERROR",
+            failed.message ?? "요청을 처리하지 못했어요.",
+          ),
+        );
         await finish();
       },
     });
   }
 
   /** 전송이 실제로 끝났는지를 돌려준다. `Composer` 는 이 값을 보고 실패했을 때 미리보기를 남긴다 */
-  async function send(attachmentIds: number[], replacementText?: string): Promise<boolean> {
+  async function send(
+    attachmentIds: number[],
+    replacementText?: string,
+  ): Promise<boolean> {
     const text = (replacementText ?? draft).trim();
-    if (text.length === 0 || sending || (conversationId === null && agentCode.length === 0)) return false;
+    if (
+      text.length === 0 ||
+      sending ||
+      (conversationId === null && agentCode.length === 0)
+    )
+      return false;
 
     const version = selectionVersion.current;
     const pendingId = `pending-${Date.now()}`;
@@ -1007,7 +1216,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       if (selectionVersion.current !== version) return;
       if (replacementText === undefined) setDraft(text);
       setTurns((previous) =>
-        previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId),
+        previous.filter(
+          (turn) => turn.id !== pendingId && turn.id !== assistantPendingId,
+        ),
       );
     };
     const refreshAfterStartedFailure = async (): Promise<boolean> => {
@@ -1018,36 +1229,62 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       } catch {
         // `started` 뒤에는 서버에 질문이 남는다. 다만 새 이력을 못 받았을 때 임시 질문을 저장된 판처럼
         // 보이면 다음 다시 시도가 무엇을 대상으로 하는지 알 수 없으므로 화면에서 치운다.
-        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId));
+        setTurns((previous) =>
+          previous.filter(
+            (turn) => turn.id !== pendingId && turn.id !== assistantPendingId,
+          ),
+        );
         return false;
       }
     };
-    const stream: TurnStreamState = { started: false, done: false, reportedError: false };
-    const startedFailureMessage = (message: string, refreshed: boolean) => refreshed
-      ? message
-      : `${message} 대화 이력을 다시 읽지 못했어요. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
+    const stream: TurnStreamState = {
+      started: false,
+      done: false,
+      reportedError: false,
+    };
+    const startedFailureMessage = (message: string, refreshed: boolean) =>
+      refreshed
+        ? message
+        : `${message} 대화 이력을 다시 읽지 못했어요. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
 
     /** 끝 사건 없이 끊긴 스트림을 마무리한다. 돌고 있거나 답이 저장됐으면 오류로 끝내지 않는다. */
     const finishInterrupted = async (): Promise<boolean> => {
       // 질문이 이미 저장돼 글을 되돌리지 않았으면 전송이 끝난 것으로 알린다. 입력창이 첨부 미리보기를 남기지 않게 한다.
       let questionKept = false;
-      const kind = await settleInterruptedStream(version, savedBefore, assistantPendingId, {
-        onMissing: async (history) => {
-          finishFailedActivity();
-          const message = describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼어요.");
-          const questionSaved = stream.started || (history !== null && lastQuestionIsNew(history, savedBefore));
-          if (questionSaved && conversationIdRef.current !== null) {
-            questionKept = true;
-            const refreshed = history !== null || await refreshAfterStartedFailure();
-            if (selectionVersion.current === version) setTurnError(startedFailureMessage(message, refreshed));
-          } else {
-            restoreFailedMessage();
-            if (selectionVersion.current === version) setError(message);
-          }
+      const kind = await settleInterruptedStream(
+        version,
+        savedBefore,
+        assistantPendingId,
+        {
+          onMissing: async (history) => {
+            finishFailedActivity();
+            const message = describeError(
+              "STREAM_INTERRUPTED",
+              "응답 연결이 끊겼어요.",
+            );
+            const questionSaved =
+              stream.started ||
+              (history !== null && lastQuestionIsNew(history, savedBefore));
+            if (questionSaved && conversationIdRef.current !== null) {
+              questionKept = true;
+              const refreshed =
+                history !== null || (await refreshAfterStartedFailure());
+              if (selectionVersion.current === version)
+                setTurnError(startedFailureMessage(message, refreshed));
+            } else {
+              restoreFailedMessage();
+              if (selectionVersion.current === version) setError(message);
+            }
+          },
         },
-      });
+      );
       if (kind === "observing") handedOff = true;
-      return kind === "observing" || kind === "answered" || stream.started || questionKept;
+      return (
+        kind === "observing" ||
+        kind === "answered" ||
+        stream.started ||
+        questionKept
+      );
     };
 
     /**
@@ -1055,7 +1292,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
      * 스트림 사건, 스트림의 HTTP 오류, 스트림 없이 보낸 응답 셋이 모두 이 길로 온다.
      */
     const reportRejected = (code: string, message: string) => {
-      const command = code === "SKILL_COMMAND_UNKNOWN" ? parseSkillCommand(text) : null;
+      const command =
+        code === "SKILL_COMMAND_UNKNOWN" ? parseSkillCommand(text) : null;
       if (command === null) {
         setError(describeError(code, message));
       } else if (selectionVersion.current === version) {
@@ -1071,9 +1309,20 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
      * <p>`CONVERSATION_BUSY` 는 자동 turn 이 막 열린 순간에 보낸 경우다. 화면은 아직 그 turn 을 모른다. 글을
      * 입력창에 되돌리지 않고 대기 메시지로 넣는다. 사진을 실었으면 대기 메시지가 글만 받으므로 되돌린다.
      */
-    const rejectBeforeStart = async (code: string, message: string): Promise<boolean> => {
-      if (code === "CONVERSATION_BUSY" && attachmentIds.length === 0 && conversationIdRef.current !== null) {
-        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId));
+    const rejectBeforeStart = async (
+      code: string,
+      message: string,
+    ): Promise<boolean> => {
+      if (
+        code === "CONVERSATION_BUSY" &&
+        attachmentIds.length === 0 &&
+        conversationIdRef.current !== null
+      ) {
+        setTurns((previous) =>
+          previous.filter(
+            (turn) => turn.id !== pendingId && turn.id !== assistantPendingId,
+          ),
+        );
         if (await queueMessage(text, false)) {
           queuedInstead = true;
           return true;
@@ -1106,7 +1355,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       if (!response.ok) return rejectBeforeStart(payload.code, payload.message);
       if (selectionVersion.current !== version) return true;
       if (conversationIdRef.current === null) {
-        window.history.replaceState(null, "", `/chat/${payload.conversationId}`);
+        window.history.replaceState(
+          null,
+          "",
+          `/chat/${payload.conversationId}`,
+        );
       }
       conversationIdRef.current = payload.conversationId;
       setConversationId(payload.conversationId);
@@ -1119,7 +1372,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           senderName: null,
         },
       ]);
-      await Promise.all([refresh(), refreshMessages(payload.conversationId, version)]);
+      await Promise.all([
+        refresh(),
+        refreshMessages(payload.conversationId, version),
+      ]);
       return true;
     };
 
@@ -1147,24 +1403,43 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         await consumeTurnStream(response, version, stream, {
           onStarted: (event) => {
             if (!event.conversationId) return;
-            if (conversationIdRef.current === null) window.history.replaceState(null, "", `/chat/${event.conversationId}`);
+            if (conversationIdRef.current === null)
+              window.history.replaceState(
+                null,
+                "",
+                `/chat/${event.conversationId}`,
+              );
             conversationIdRef.current = event.conversationId;
             setConversationId(event.conversationId);
             void refresh();
           },
           onDelta: (textDelta) => {
             setTurns((previous) => {
-              const current = previous.find((turn) => turn.id === assistantPendingId);
-              if (!current) return [...previous,
-                { id: assistantPendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
+              const current = previous.find(
+                (turn) => turn.id === assistantPendingId,
+              );
+              if (!current)
+                return [
+                  ...previous,
+                  {
+                    id: assistantPendingId,
+                    role: "ASSISTANT",
+                    content: textDelta,
+                    senderName: null,
+                  },
+                ];
               return previous.map((turn) =>
-                turn.id === assistantPendingId ? { ...turn, content: turn.content + textDelta } : turn,
+                turn.id === assistantPendingId
+                  ? { ...turn, content: turn.content + textDelta }
+                  : turn,
               );
             });
           },
           onReset: () => {
             // 막혀서 넘어간 시도의 조각이다. 화면에 남으면 읽는 사람이 그것을 답으로 읽는다.
-            setTurns((previous) => previous.filter((turn) => turn.id !== assistantPendingId));
+            setTurns((previous) =>
+              previous.filter((turn) => turn.id !== assistantPendingId),
+            );
           },
           onDone: async (event) => {
             conversationIdRef.current = event.conversationId!;
@@ -1179,22 +1454,28 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             const fallback = event.message ?? "요청을 처리하지 못했어요.";
             if (stream.started && conversationIdRef.current !== null) {
               const refreshed = await refreshAfterStartedFailure();
-              setTurnError(startedFailureMessage(describeError(code, fallback), refreshed));
+              setTurnError(
+                startedFailureMessage(describeError(code, fallback), refreshed),
+              );
             } else {
               await rejectBeforeStart(code, fallback);
             }
           },
         });
       } catch {
-        if (!stream.done && !stream.reportedError) return await finishInterrupted();
+        if (!stream.done && !stream.reportedError)
+          return await finishInterrupted();
         return queuedInstead || stream.started || stream.done;
       }
-      if (!stream.done && !stream.reportedError) return await finishInterrupted();
+      if (!stream.done && !stream.reportedError)
+        return await finishInterrupted();
       return queuedInstead || stream.started || stream.done;
     } catch (reason) {
       finishFailedActivity();
       restoreFailedMessage();
-      setError(reason instanceof Error ? reason.message : "요청을 보내지 못했어요.");
+      setError(
+        reason instanceof Error ? reason.message : "요청을 보내지 못했어요.",
+      );
       return false;
     } finally {
       if (selectionVersion.current === version && !handedOff) setSending(false);
@@ -1210,9 +1491,17 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    *
    * @param fromDraft 입력창의 글을 보냈다. 더한 뒤 입력창을 비운다. 질문 카드의 답은 입력창과 무관하다.
    */
-  async function queueMessage(text: string, fromDraft: boolean): Promise<boolean> {
+  async function queueMessage(
+    text: string,
+    fromDraft: boolean,
+  ): Promise<boolean> {
     // 새 대화의 첫 turn 은 `started` 가 대화 식별자를 실어 올 때까지 대기 메시지를 받을 대화가 없다.
-    if (text.length === 0 || conversationIdRef.current === null || enqueueing.current) return false;
+    if (
+      text.length === 0 ||
+      conversationIdRef.current === null ||
+      enqueueing.current
+    )
+      return false;
     const version = selectionVersion.current;
     const wasHeld = pending.queue.held;
     enqueueing.current = true;
@@ -1221,15 +1510,26 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       const result = await pending.enqueue(text);
       if (selectionVersion.current !== version) return result.ok;
       if (!result.ok) {
-        setError(describePendingFailure(result, "메시지를 보내지 못했어요. 잠시 뒤 다시 보내 주세요."));
+        setError(
+          describePendingFailure(
+            result,
+            "메시지를 보내지 못했어요. 잠시 뒤 다시 보내 주세요.",
+          ),
+        );
         return false;
       }
       // 기다리는 동안 다음 글을 쓰기 시작했으면 그 글은 지우지 않는다.
-      if (fromDraft) setDraft((current) => current.trim() === text ? "" : current);
+      if (fromDraft)
+        setDraft((current) => (current.trim() === text ? "" : current));
       if (wasHeld) {
         const released = await pending.release();
         if (!released.ok && selectionVersion.current === version) {
-          setError(describePendingFailure(released, "대기 메시지를 보내지 못했어요. 「보내기」 를 다시 눌러 주세요."));
+          setError(
+            describePendingFailure(
+              released,
+              "대기 메시지를 보내지 못했어요. 「보내기」 를 다시 눌러 주세요.",
+            ),
+          );
         }
       }
       return true;
@@ -1243,14 +1543,24 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    *
    * <p>답이 오는 중이거나 대기 줄이 멈춰 있으면 대기 경로다. 대기 메시지는 글만 받으므로 사진을 실었으면 보내지 않는다.
    */
-  async function submit(attachmentIds: number[], replacementText?: string): Promise<boolean> {
-    if (!sending && !pending.queue.held) return send(attachmentIds, replacementText);
+  async function submit(
+    attachmentIds: number[],
+    replacementText?: string,
+  ): Promise<boolean> {
+    if (!sending && !pending.queue.held)
+      return send(attachmentIds, replacementText);
     if (attachmentIds.length > 0) {
       // 답이 오는 동안은 사진 첨부가 잠겨 있다. 여기 오는 것은 멈춰 둔 대기 줄이 있을 때 사진을 붙인 경우다.
-      if (!sending) setError("사진은 대기 중인 메시지를 보내거나 취소한 뒤에 보낼 수 있어요.");
+      if (!sending)
+        setError(
+          "사진은 대기 중인 메시지를 보내거나 취소한 뒤에 보낼 수 있어요.",
+        );
       return false;
     }
-    return queueMessage((replacementText ?? draft).trim(), replacementText === undefined);
+    return queueMessage(
+      (replacementText ?? draft).trim(),
+      replacementText === undefined,
+    );
   }
 
   /** 대기 메시지를 취소하고 그 글을 입력창에 되돌린다. 쓰던 글이 있으면 그 뒤에 줄을 바꿔 붙인다. */
@@ -1264,10 +1574,19 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         setError(null);
         // 화면이 그 줄을 모르면 되돌릴 글이 없다. 입력창에 빈 줄만 붙지 않게 그대로 둔다.
         if (result.data.length === 0) return;
-        setDraft((current) => current.trim().length === 0 ? result.data : `${current}\n${result.data}`);
+        setDraft((current) =>
+          current.trim().length === 0
+            ? result.data
+            : `${current}\n${result.data}`,
+        );
         return;
       }
-      setError(describePendingFailure(result, "대기 메시지를 취소하지 못했어요. 다시 시도해 주세요."));
+      setError(
+        describePendingFailure(
+          result,
+          "대기 메시지를 취소하지 못했어요. 다시 시도해 주세요.",
+        ),
+      );
       // 취소하는 사이에 이미 보내졌다. 그 글은 사용자 메시지로 저장됐으므로 되돌리지 않고 대기 줄만 맞춘다.
       if (result.code === "PENDING_MESSAGE_NOT_FOUND") await pending.reload();
     } finally {
@@ -1283,7 +1602,13 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       const result = await pending.release();
       if (selectionVersion.current !== version) return;
       if (result.ok) setError(null);
-      else setError(describePendingFailure(result, "대기 메시지를 보내지 못했어요. 「보내기」 를 다시 눌러 주세요."));
+      else
+        setError(
+          describePendingFailure(
+            result,
+            "대기 메시지를 보내지 못했어요. 「보내기」 를 다시 눌러 주세요.",
+          ),
+        );
     } finally {
       setPendingBusy(false);
     }
@@ -1314,11 +1639,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setStopRequested(false);
     setFlowIsSlow(false);
     try {
-      const response = await fetch(`/api/chat/conversations/${conversationId}/regenerate`, { method: "POST" });
+      const response = await fetch(
+        `/api/chat/conversations/${conversationId}/regenerate`,
+        { method: "POST" },
+      );
       if (!response.ok) {
         const payload = await readPayload<ErrorPayload>(response);
         setError(describeError(payload.code, payload.message));
-        if (payload.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
+        if (payload.code === "MESSAGE_NOT_LATEST")
+          await refreshMessages(conversationId, version);
         return;
       }
       try {
@@ -1326,21 +1655,49 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           onDelta: (textDelta) => {
             setTurns((previous) => {
               const current = previous.find((turn) => turn.id === pendingId);
-              return current ? previous.map((turn) => turn.id === pendingId ? { ...turn, content: turn.content + textDelta } : turn)
-                : [...previous, { id: pendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
+              return current
+                ? previous.map((turn) =>
+                    turn.id === pendingId
+                      ? { ...turn, content: turn.content + textDelta }
+                      : turn,
+                  )
+                : [
+                    ...previous,
+                    {
+                      id: pendingId,
+                      role: "ASSISTANT",
+                      content: textDelta,
+                      senderName: null,
+                    },
+                  ];
             });
           },
           onReset: () => {
-            setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+            setTurns((previous) =>
+              previous.filter((turn) => turn.id !== pendingId),
+            );
           },
           onError: async (event) => {
-            setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-            setTurnError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했어요."));
-            if (event.code === "MESSAGE_NOT_LATEST") await refreshMessages(conversationId, version);
+            setTurns((previous) =>
+              previous.filter((turn) => turn.id !== pendingId),
+            );
+            setTurnError(
+              describeError(
+                event.code ?? "INTERNAL_ERROR",
+                event.message ?? "요청을 처리하지 못했어요.",
+              ),
+            );
+            if (event.code === "MESSAGE_NOT_LATEST")
+              await refreshMessages(conversationId, version);
           },
           onDone: async (event) => {
-            setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-            await Promise.all([refresh(), refreshMessages(event.conversationId!, version)]);
+            setTurns((previous) =>
+              previous.filter((turn) => turn.id !== pendingId),
+            );
+            await Promise.all([
+              refresh(),
+              refreshMessages(event.conversationId!, version),
+            ]);
             clearSelectedSlot(regeneratedSlotId);
           },
         });
@@ -1349,22 +1706,38 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         if (stream.done || stream.reportedError) throw reason;
       }
       if (!stream.done && !stream.reportedError) {
-        const kind = await settleInterruptedStream(version, savedBefore, pendingId, {
-          onAnswered: () => clearSelectedSlot(regeneratedSlotId),
-          onMissing: async (history) => {
-            historyRead = history !== null;
+        const kind = await settleInterruptedStream(
+          version,
+          savedBefore,
+          pendingId,
+          {
+            onAnswered: () => clearSelectedSlot(regeneratedSlotId),
+            onMissing: async (history) => {
+              historyRead = history !== null;
+            },
           },
-        });
+        );
         if (kind === "observing") handedOff = true;
         if (kind !== "missing") return;
-        throw new Error(describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼어요."));
+        throw new Error(
+          describeError("STREAM_INTERRUPTED", "응답 연결이 끊겼어요."),
+        );
       }
     } catch (reason) {
       if (selectionVersion.current === version) {
-        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
-        setActivity((previous) => previous && failActivity(previous, Date.now()));
-        setTurnError(reason instanceof Error ? reason.message : "답을 다시 만들지 못했어요.");
-        if (!historyRead) await refreshMessages(conversationId, version).catch(() => {});
+        setTurns((previous) =>
+          previous.filter((turn) => turn.id !== pendingId),
+        );
+        setActivity(
+          (previous) => previous && failActivity(previous, Date.now()),
+        );
+        setTurnError(
+          reason instanceof Error
+            ? reason.message
+            : "답을 다시 만들지 못했어요.",
+        );
+        if (!historyRead)
+          await refreshMessages(conversationId, version).catch(() => {});
       }
     } finally {
       if (selectionVersion.current === version && !handedOff) {
@@ -1380,7 +1753,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     if (executionId === null || stopRequested) return;
     setStopRequested(true);
     try {
-      const response = await fetch(`/api/chat/executions/${executionId}/stop`, { method: "POST" });
+      const response = await fetch(`/api/chat/executions/${executionId}/stop`, {
+        method: "POST",
+      });
       if (response.status === 202) return;
       const payload = await readPayload<ErrorPayload>(response);
       if (payload.code === "EXECUTION_NOT_RUNNING") return;
@@ -1388,33 +1763,52 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       setError(describeError(payload.code, payload.message));
     } catch {
       setStopRequested(false);
-      setError(describeError("HERMES_UNAVAILABLE", "중지 요청을 보내지 못했어요."));
+      setError(
+        describeError("HERMES_UNAVAILABLE", "중지 요청을 보내지 못했어요."),
+      );
     }
   }
 
-  const currentConversation = conversations.find((item) => item.id === conversationId);
+  const currentConversation = conversations.find(
+    (item) => item.id === conversationId,
+  );
   // 에이전트 행이 없는 대화는 agentCode 가 null 이다. 대화 목록이 먼저 읽혀 빈 코드가 첫 에이전트로 채워져도
   // 그 에이전트의 모델과 사진 단추와 스킬이 이 대화에 보이지 않게, 상태가 아니라 이 값으로 막는다.
-  const agentMissing = currentConversation !== undefined && currentConversation.agentCode === null;
+  const agentMissing =
+    currentConversation !== undefined && currentConversation.agentCode === null;
   const selectedAgent = currentConversation
     ? agentLabel(currentConversation.agentName)
     : agents.find((agent) => agent.code === agentCode)?.name;
   useShellTitle(selectedAgent ?? null);
   const startScreen = freshStart && turns.length === 0 && !sending;
-  const currentAgent = agentMissing ? undefined : agents.find((agent) => agent.code === agentCode);
-  const starters = useStarterSuggestions(startScreen && currentAgent ? currentAgent.code : null);
+  const currentAgent = agentMissing
+    ? undefined
+    : agents.find((agent) => agent.code === agentCode);
+  const starters = useStarterSuggestions(
+    startScreen && currentAgent ? currentAgent.code : null,
+  );
   // 흐름이 붙은 에이전트는 사진을 받지 않고 커맨드도 해석하지 않는다. 사진 단추를 숨기는 기준과 같게 이 값으로 가린다.
-  const commandAgentCode = currentAgent?.acceptsAttachments ? currentAgent.code : null;
-  const skillNames = commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode
-    ? skillCommands.names : undefined;
+  const commandAgentCode = currentAgent?.acceptsAttachments
+    ? currentAgent.code
+    : null;
+  const skillNames =
+    commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode
+      ? skillCommands.names
+      : undefined;
 
   useEffect(() => {
     if (commandAgentCode === null) return;
     let active = true;
     fetch(`/api/agents/${commandAgentCode}/skills`)
-      .then((response) => (response.ok ? (response.json() as Promise<SkillListView>) : null))
+      .then((response) =>
+        response.ok ? (response.json() as Promise<SkillListView>) : null,
+      )
       .then((list) => {
-        if (active && list) setSkillCommands({ agentCode: commandAgentCode, names: commandSkillNames(list) });
+        if (active && list)
+          setSkillCommands({
+            agentCode: commandAgentCode,
+            names: commandSkillNames(list),
+          });
       })
       .catch(() => {
         // 읽지 못하면 `/` 목록을 띄우지 않는다. 보내면 Control Plane 이 이름을 판별한다.
@@ -1426,9 +1820,17 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
 
   if (notFound) {
     return (
-      <section data-testid="conversation-not-found" className="mx-auto max-w-3xl py-12 text-center">
+      <section
+        data-testid="conversation-not-found"
+        className="mx-auto max-w-3xl py-12 text-center"
+      >
         <h1 className="text-lg font-semibold">대화를 찾을 수 없어요</h1>
-        <Link href="/" className="mt-4 inline-block rounded-md bg-muted px-3 py-2 text-sm">새 대화</Link>
+        <Link
+          href="/"
+          className="mt-4 inline-block rounded-md bg-muted px-3 py-2 text-sm"
+        >
+          새 대화
+        </Link>
       </section>
     );
   }
@@ -1441,47 +1843,89 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {startScreen ? null : (
           <div className="flex min-w-0 items-center gap-3 border-b border-border pb-3">
-            <div className={cn(
-              "flex min-w-0 flex-1 items-center gap-3 overflow-hidden",
-              "text-xs text-muted-foreground",
-            )}>
-              <div className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}>
+            <div
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-3 overflow-hidden",
+                "text-xs text-muted-foreground",
+              )}
+            >
+              <div
+                className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}
+              >
                 <span className="shrink-0">에이전트</span>
-                <span className="truncate" title={agentMissing ? agentLabel(null) : currentAgent?.name}>
-                  {agentMissing ? agentLabel(null) : currentAgent?.name ?? "등록된 에이전트가 없어요"}
+                <span
+                  className="truncate"
+                  title={agentMissing ? agentLabel(null) : currentAgent?.name}
+                >
+                  {agentMissing
+                    ? agentLabel(null)
+                    : (currentAgent?.name ?? "등록된 에이전트가 없어요")}
                 </span>
               </div>
             </div>
           </div>
         )}
 
-        {startScreen ? null : <MessageList
-          turns={turns}
-          loading={messagesLoading}
-          sending={sending}
-          activity={activity}
-          conversationId={conversationId}
-          flowIsSlow={flowIsSlow}
-          liveExpanded={liveExpanded}
-          onLiveExpandedChange={(value) => { liveExpandedRef.current = value; setLiveExpanded(value); }}
-          expandedOnDone={expandedOnDone}
-          turnError={turnError}
-          onOpenSaved={(executionId) => setPanelTarget({ kind: "activity", target: { mode: "saved", executionId } })}
-          onOpenLive={() => {
-            if (activity) setPanelTarget({ kind: "activity", target: { mode: "live", state: activity } });
-          }}
-          onOpenArtifact={(messageId, path, name) => setPanelTarget({ kind: "artifact", messageId, path, name })}
-          // 에이전트 목록을 읽기 전이거나 목록에 없는 에이전트의 대화는 흐름인지 모르므로 칩을 붙이지 않는다.
-          skillCommandChips={currentAgent?.acceptsAttachments === true}
-          selectedVersions={selectedVersions}
-          onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
-          onRegenerate={() => { void regenerate(); }}
-          onRetry={() => { void regenerate(); }}
-          // 질문 카드는 답이 오는 중에도 보인다. 그때 고른 답은 입력창의 보내기와 같이 대기 메시지로 들어간다.
-          onAnswer={(text) => { void submit([], text); }}
-        />}
+        {startScreen ? null : (
+          <MessageList
+            turns={turns}
+            loading={messagesLoading}
+            sending={sending}
+            activity={activity}
+            conversationId={conversationId}
+            flowIsSlow={flowIsSlow}
+            liveExpanded={liveExpanded}
+            onLiveExpandedChange={(value) => {
+              liveExpandedRef.current = value;
+              setLiveExpanded(value);
+            }}
+            expandedOnDone={expandedOnDone}
+            turnError={turnError}
+            onOpenSaved={(executionId) =>
+              setPanelTarget({
+                kind: "activity",
+                target: { mode: "saved", executionId },
+              })
+            }
+            onOpenLive={() => {
+              if (activity)
+                setPanelTarget({
+                  kind: "activity",
+                  target: { mode: "live", state: activity },
+                });
+            }}
+            onOpenArtifact={(messageId, path, name) =>
+              setPanelTarget({ kind: "artifact", messageId, path, name })
+            }
+            // 에이전트 목록을 읽기 전이거나 목록에 없는 에이전트의 대화는 흐름인지 모르므로 칩을 붙이지 않는다.
+            skillCommandChips={currentAgent?.acceptsAttachments === true}
+            selectedVersions={selectedVersions}
+            onVersionChange={(slotId, index) =>
+              setSelectedVersions((previous) => ({
+                ...previous,
+                [slotId]: index,
+              }))
+            }
+            onRegenerate={() => {
+              void regenerate();
+            }}
+            onRetry={() => {
+              void regenerate();
+            }}
+            // 질문 카드는 답이 오는 중에도 보인다. 그때 고른 답은 입력창의 보내기와 같이 대기 메시지로 들어간다.
+            onAnswer={(text) => {
+              void submit([], text);
+            }}
+          />
+        )}
 
-        <div className={startScreen ? "flex min-h-0 flex-1 flex-col overflow-y-auto" : "shrink-0"}>
+        <div
+          className={
+            startScreen
+              ? "flex min-h-0 flex-1 flex-col overflow-y-auto"
+              : "shrink-0"
+          }
+        >
           {startScreen ? (
             <StartScreenHeader
               displayName={displayName}
@@ -1492,9 +1936,16 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
               locked={agentLocked}
             />
           ) : null}
-          {error ? <p className="mb-2 rounded-md bg-muted px-3 py-2 text-sm">{error}</p> : null}
+          {error ? (
+            <p className="mb-2 rounded-md bg-muted px-3 py-2 text-sm">
+              {error}
+            </p>
+          ) : null}
           {observing ? (
-            <p data-testid="observing-notice" className="mb-2 text-xs text-muted-foreground">
+            <p
+              data-testid="observing-notice"
+              className="mb-2 text-xs text-muted-foreground"
+            >
               {observing.sentHere
                 ? "응답 연결이 끊겨 답을 기다리고 있어요. 답이 완성되면 여기에 나타나요."
                 : "다른 창에서 답을 만들고 있어요. 완성되면 이 창에도 나타나요."}
@@ -1502,8 +1953,12 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           ) : null}
           <PendingQueueView
             queue={pending.queue}
-            onCancel={(pendingId) => { void cancelPendingMessage(pendingId); }}
-            onRelease={() => { void releasePendingMessages(); }}
+            onCancel={(pendingId) => {
+              void cancelPendingMessage(pendingId);
+            }}
+            onRelease={() => {
+              void releasePendingMessages();
+            }}
             busy={pendingBusy}
           />
           <Composer
@@ -1527,23 +1982,37 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
             // 새 대화의 첫 turn 은 `started` 가 대화 식별자를 실어 온 뒤부터 대기 메시지를 받는다.
             canQueue={conversationId !== null}
             canStop={executionId !== null && !stopRequested}
-            onStop={() => { void stop(); }}
-            mention={startScreen && !agentLocked && agents.length > 0
-              ? { agents, onPick: setAgentCode } : undefined}
+            onStop={() => {
+              void stop();
+            }}
+            mention={
+              startScreen && !agentLocked && agents.length > 0
+                ? { agents, onPick: setAgentCode }
+                : undefined
+            }
             skillNames={skillNames}
             onBlockingChange={setComposerBlocking}
-            modelChoice={currentConversation ? {
-              provider: currentConversation.provider,
-              model: currentConversation.model,
-              reasoningEffort: currentConversation.reasoningEffort,
-            } : null}
-            modelChoiceUnknown={conversationId !== null && currentConversation === undefined}
+            modelChoice={
+              currentConversation
+                ? {
+                    provider: currentConversation.provider,
+                    model: currentConversation.model,
+                    reasoningEffort: currentConversation.reasoningEffort,
+                  }
+                : null
+            }
+            modelChoiceUnknown={
+              conversationId !== null && currentConversation === undefined
+            }
             // 저장 응답으로 그 줄만 바꾼다. 목록을 다시 읽으면 먼저 나간 읽기가 늦게 와 저장한 줄을 저장 전의 줄로 되돌릴 수 있다.
             onModelChoiceSaved={replace}
           />
           {unknownSkill ? (
-            <p data-testid="skill-command-notice" role="alert"
-              className="mx-auto mt-2 w-full max-w-3xl rounded-md bg-muted px-3 py-2 text-sm">
+            <p
+              data-testid="skill-command-notice"
+              role="alert"
+              className="mx-auto mt-2 w-full max-w-3xl rounded-md bg-muted px-3 py-2 text-sm"
+            >
               /{unknownSkill} 스킬이 이 에이전트에 없어요
             </p>
           ) : null}
@@ -1552,15 +2021,32 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
               prompts={starters.prompts}
               pending={starters.pending}
               disabled={sending || composerBlocking}
-              onPrompt={(text) => { void send([], text); }}
+              onPrompt={(text) => {
+                void send([], text);
+              }}
             />
           ) : null}
         </div>
       </div>
-      {panelTarget?.kind === "activity" ? <ActivityPanel target={panelTarget.target.mode === "live" && activity
-        ? { mode: "live", state: activity } : panelTarget.target} onClose={() => setPanelTarget(null)} /> : null}
-      {panelTarget?.kind === "artifact" && conversationId !== null ? <ArtifactPanel key={panelTarget.path}
-        conversationId={conversationId} path={panelTarget.path} name={panelTarget.name} onClose={() => setPanelTarget(null)} /> : null}
+      {panelTarget?.kind === "activity" ? (
+        <ActivityPanel
+          target={
+            panelTarget.target.mode === "live" && activity
+              ? { mode: "live", state: activity }
+              : panelTarget.target
+          }
+          onClose={() => setPanelTarget(null)}
+        />
+      ) : null}
+      {panelTarget?.kind === "artifact" && conversationId !== null ? (
+        <ArtifactPanel
+          key={panelTarget.path}
+          conversationId={conversationId}
+          path={panelTarget.path}
+          name={panelTarget.name}
+          onClose={() => setPanelTarget(null)}
+        />
+      ) : null}
     </section>
   );
 }

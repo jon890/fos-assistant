@@ -8,8 +8,19 @@
  */
 export type ChatEvent = {
   type:
-    | "started" | "delta" | "tool" | "subagent" | "step" | "switched" | "reset" | "done" | "stopped" | "error"
-    | "system" | "user" | "pending";
+    | "started"
+    | "delta"
+    | "tool"
+    | "subagent"
+    | "step"
+    | "switched"
+    | "reset"
+    | "done"
+    | "stopped"
+    | "error"
+    | "system"
+    | "user"
+    | "pending";
   text?: string | null;
   toolName?: string | null;
   detail?: string | null;
