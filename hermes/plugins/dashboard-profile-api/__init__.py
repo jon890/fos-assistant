@@ -207,6 +207,9 @@ ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable"})
+# `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
+# 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
+CONNECTOR_TOOLSETS = frozenset({"vision"})
 # `.mcp.json` 의 인자가 plugin 디렉터리를 가리키는 자리다. 그 밖의 치환은 받지 않는다.
 PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
 # 커넥터 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
@@ -613,6 +616,13 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
             not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
             for code, word in errors.items()):
         raise ValueError("errors 의 값은 공통 어휘 넷 가운데 하나다")
+    toolsets = declared.get("toolsets", [])
+    if (not isinstance(toolsets, list) or any(not isinstance(name, str) for name in toolsets)
+            or len(set(toolsets)) != len(toolsets) or set(toolsets) - CONNECTOR_TOOLSETS):
+        raise ValueError("toolsets 는 허용한 내장 toolset 이름의 겹치지 않는 목록이다")
+    attachments = declared.get("attachments", False)
+    if not isinstance(attachments, bool) or (attachments and "vision" not in toolsets):
+        raise ValueError("attachments 는 boolean 이고 참이면 toolsets 에 vision 이 있어야 한다")
 
     mcp = _read_connector_json(root, ".mcp.json")
     if not isinstance(mcp, dict):
@@ -678,6 +688,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "operator_env": frozenset(operator_env),
         "optional_env": optional_env,
         "errors": errors,
+        "toolsets": list(toolsets),
+        "attachments": attachments,
         "tools": frozenset(tools),
         "server": {"command": command, "args": args, "env": env, "enabled": True},
     }
@@ -946,7 +958,8 @@ def _connector_catalog_response():
 
     return JSONResponse(
         [{"id": manifest["id"], "title": manifest["title"], "description": manifest["description"],
-          "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"]}
+          "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
+          "toolsets": manifest["toolsets"], "attachments": manifest["attachments"]}
          for manifest in _connector_catalog().values()],
         status_code=200,
     )

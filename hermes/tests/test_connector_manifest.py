@@ -135,7 +135,11 @@ class ConnectorCatalogTest(ConnectorGateCase):
         body = self.catalog()
         self.assertEqual(len(body), 1)
         entry = body[0]
-        self.assertEqual(set(entry), {"id", "title", "description", "fields", "verify", "mcp_server"})
+        self.assertEqual(set(entry), {"id", "title", "description", "fields", "verify", "mcp_server",
+                                      "toolsets", "attachments"})
+        # 두 칸이 없는 manifest 는 내장 도구를 열지 않고 사진을 받지 않는다.
+        self.assertEqual(entry["toolsets"], [])
+        self.assertIs(entry["attachments"], False)
         self.assertEqual(entry["id"], DEMO)
         self.assertEqual(entry["title"], "검사용 메모")
         self.assertEqual(entry["mcp_server"], "demo")
@@ -184,6 +188,16 @@ class ConnectorCatalogTest(ConnectorGateCase):
             ("verify.tool is not a string", "connector.json", lambda value: value.update(verify={"tool": 1})),
             ("errors value outside the vocabulary", "connector.json",
              lambda value: value["errors"].update(DEMO_FORBIDDEN="denied")),
+            ("toolsets opens the shell", "connector.json", lambda value: value.update(toolsets=["terminal"])),
+            ("toolsets mixes an allowed and a closed name", "connector.json",
+             lambda value: value.update(toolsets=["vision", "file"])),
+            ("toolsets has an unknown name", "connector.json", lambda value: value.update(toolsets=["sight"])),
+            ("toolsets repeats a name", "connector.json", lambda value: value.update(toolsets=["vision", "vision"])),
+            ("toolsets is not a list", "connector.json", lambda value: value.update(toolsets="vision")),
+            ("toolsets item is not a string", "connector.json", lambda value: value.update(toolsets=[["vision"]])),
+            ("attachments without vision", "connector.json", lambda value: value.update(attachments=True)),
+            ("attachments is not a boolean", "connector.json",
+             lambda value: value.update(toolsets=["vision"], attachments="true")),
             ("operator_env missing from .mcp.json", "connector.json", lambda value: value.update(operator_env=[])),
             ("operator_env repeats a field env", "connector.json",
              lambda value: value.update(operator_env=["DEMO_BASE", "DEMO_TOKEN"])),
@@ -211,6 +225,26 @@ class ConnectorCatalogTest(ConnectorGateCase):
                 (self.connector_root / name).write_bytes(originals[name])
         # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
         self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_declared_toolsets_and_attachments_reach_the_catalog(self):
+        """허용한 내장 toolset 과 사진 받기를 선언하면 카탈로그가 그대로 낸다."""
+        self.rewrite("connector.json", lambda value: value.update(toolsets=["vision"], attachments=True))
+        entry = self.catalog()[0]
+        self.assertEqual(entry["toolsets"], ["vision"])
+        self.assertIs(entry["attachments"], True)
+        # 이미지 도구만 열고 사진은 받지 않는 선언도 된다.
+        self.rewrite("connector.json", lambda value: value.update(attachments=False))
+        entry = self.catalog()[0]
+        self.assertEqual(entry["toolsets"], ["vision"])
+        self.assertIs(entry["attachments"], False)
+
+    def test_closed_toolsets_are_never_allowed(self):
+        """셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다."""
+        for name in ("terminal", "file", "memory", "skills", "delegation", "code_execution", "browser"):
+            with self.subTest(name):
+                self.assertNotIn(name, self.plugin.CONNECTOR_TOOLSETS)
+                self.rewrite("connector.json", lambda value: value.update(toolsets=[name]))
+                self.assertEqual(self.catalog(), [])
 
     def test_missing_or_unreadable_files_leave_the_connector_out(self):
         """`connector.json` 이 없거나, JSON 이 아니거나, 실행할 파일이 링크면 카탈로그에서 빠진다."""
