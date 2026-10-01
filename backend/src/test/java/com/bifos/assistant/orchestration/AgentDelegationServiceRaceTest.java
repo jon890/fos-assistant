@@ -72,7 +72,7 @@ class AgentDelegationServiceRaceTest {
         delegations = new AgentDelegationService(
                 mock(AgentService.class), executions, children, conversations,
                 new DelegationProperties(2, 4, 1, SUBMIT_TIMEOUT, 100),
-                mock(TurnCancellation.class), mock(HermesRunsClient.class));
+                mock(TurnCancellation.class), mock(HermesRunsClient.class), event -> {});
     }
 
     @Test

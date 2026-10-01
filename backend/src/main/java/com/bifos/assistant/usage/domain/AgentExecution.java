@@ -168,6 +168,15 @@ public class AgentExecution {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    /**
+     * 이 실행의 끝난 결과를 부모 대화에 전한 시각이다. 전하지 않았으면 비어 있다.
+     *
+     * <p>부모가 {@code agent_status} 나 {@code agent_stop} 으로 결과를 직접 받았을 때도 적는다. 한 실행의 결과는
+     * 한 번만 전하므로 {@code AgentExecutionRepository#markResultDelivered} 가 비어 있을 때만 채운다.
+     */
+    @Column(name = "result_delivered_at")
+    private Instant resultDeliveredAt;
+
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;
         this.conversationId = builder.conversationId;
@@ -326,6 +335,10 @@ public class AgentExecution {
 
     public Instant finishedAt() {
         return finishedAt;
+    }
+
+    public Instant resultDeliveredAt() {
+        return resultDeliveredAt;
     }
 
     /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */
