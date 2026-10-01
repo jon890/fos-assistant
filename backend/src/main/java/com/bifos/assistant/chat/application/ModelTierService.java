@@ -179,7 +179,7 @@ public class ModelTierService {
     }
 
     /**
-     * V41 뒤 새로 생긴 그룹은 초기 행을 아직 갖지 않는다. 조회에서 저장하지 않고 같은 초기 정의를 보인다.
+     * 단계 정의 테이블이 생긴 뒤 새로 생긴 그룹은 초기 행을 아직 갖지 않는다. 조회에서 저장하지 않고 같은 초기 정의를 보인다.
      * 일부 행만 있으면 관리자가 저장한 정의가 깨진 것이므로 임의의 기본값과 섞지 않는다.
      */
     private List<ModelTierDefinition> definitionsFor(Long groupId) {
