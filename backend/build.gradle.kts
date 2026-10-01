@@ -113,7 +113,7 @@ tasks.withType<Checkstyle>().configureEach {
  * Java 포맷은 Spotless 와 palantir-java-format 이 정한다.
  * ratchetFrom 은 HEAD 와 origin/main 의 공통 조상에서 바뀐 파일만 검사하고 고친다.
  * 저장소 전체를 한 번에 바꾸지 않고, 파일을 처음 고칠 때 그 파일 전체가 포맷된다.
- * 선택 까닭은 ADR-040 에 있고, 사용법은 backend/AGENTS.md 의 「포맷」 절에 있다.
+ * 선택 까닭은 ADR-041 에 있고, 사용법은 backend/AGENTS.md 의 「포맷」 절에 있다.
  */
 spotless {
     ratchetFrom("origin/main")

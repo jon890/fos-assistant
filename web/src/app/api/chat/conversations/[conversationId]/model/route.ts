@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 import { isConversationId } from "@/lib/conversation-id";
 
 type RouteContext = {
@@ -16,9 +17,11 @@ export async function PUT(request: Request, context: RouteContext) {
     );
   }
 
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
   const result = await callControlPlane<unknown>(
     `/api/v1/chat/conversations/${conversationId}/model`,
-    { method: "PUT", body: await request.json() },
+    { method: "PUT", body: parsed.body },
   );
   if (!result.ok) {
     return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });

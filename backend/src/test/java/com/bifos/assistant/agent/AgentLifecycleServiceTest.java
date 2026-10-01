@@ -166,7 +166,8 @@ class AgentLifecycleServiceTest {
         assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
 
         verifyNoInteractions(dashboard);
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id())).isEqualTo(5);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isEqualTo(5);
     }
 
     @Test
@@ -178,7 +179,8 @@ class AgentLifecycleServiceTest {
         Agent created = create(admin, "여섯째", null);
 
         assertThat(created.ownerUserId()).isEqualTo(admin.id());
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(admin.id())).isEqualTo(6);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(admin.id()))
+                .isEqualTo(6);
     }
 
     @Test
@@ -193,7 +195,24 @@ class AgentLifecycleServiceTest {
         Agent created = create(kid, "다시 다섯째", null);
 
         assertThat(created.ownerUserId()).isEqualTo(kid.id());
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id())).isEqualTo(5);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("커넥터 연결용 에이전트는 다섯이어도 만들고 상한에 세지 않는다")
+    void createsConnectorAgentsBeyondLimitWithoutCounting() {
+        CurrentUser kid = member();
+        seedAgents(kid, 5);
+
+        Agent connectorAgent = lifecycle.createConnectorAgent(kid, "가계부");
+        createdProfiles.add(connectorAgent.hermesProfile());
+
+        assertThat(connectorAgent.connectorManaged()).isTrue();
+        assertThat(connectorAgent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isEqualTo(5);
+        assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
     }
 
     /**
@@ -234,7 +253,7 @@ class AgentLifecycleServiceTest {
                     .as("%d번째 동시 만들기의 결과", round)
                     .filteredOn(outcome -> outcome == ErrorCode.AGENT_LIMIT_REACHED)
                     .hasSize(1);
-            assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id()))
+            assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
                     .as("%d번째 동시 만들기 뒤의 에이전트 수", round)
                     .isEqualTo(5);
         }
@@ -265,7 +284,8 @@ class AgentLifecycleServiceTest {
                 .isNotEmpty()
                 .allSatisfy(token -> assertThat(token.revokedAt()).isNotNull());
         assertThat(agents.existsByHermesProfile(profile)).isFalse();
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id())).isZero();
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isZero();
     }
 
     @Test

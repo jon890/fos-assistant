@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 
 async function idOf(context: { params: Promise<{ id: string }> }): Promise<number | null> {
   const { id } = await context.params;
@@ -17,7 +18,10 @@ function response(result: Awaited<ReturnType<typeof callControlPlane>>) {
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const id = await idOf(context);
-  return id === null ? invalid() : response(await callControlPlane(`/api/v1/memories/${id}`, { method: "PATCH", body: await request.json() }));
+  if (id === null) return invalid();
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  return response(await callControlPlane(`/api/v1/memories/${id}`, { method: "PATCH", body: parsed.body }));
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {

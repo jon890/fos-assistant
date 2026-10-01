@@ -19,7 +19,7 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 - CI 는 `.github/workflows/ci.yml` 이다. 모든 job 이 `actions/checkout` 을 `persist-credentials: false` 로 쓰고 깊이를 정하지 않는다(기본 1). ratchet 과 바뀐 파일 목록에는 `origin/main` 이력이 필요하다
 - AGENTS.md 「확인」 절에 명령 여섯 줄이 있고, 그 아래 문장이 「위 여섯 검사」 와 CI job 이름 `backend`, `web`, `e2e`, `unit`, `public-safe` 를 적는다
 
-**근거 문서**: `docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
+**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
 ## 의도 메모
 

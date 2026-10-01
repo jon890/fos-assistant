@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
 
 export async function GET(_request: Request, context: { params: Promise<{ code: string }> }) {
@@ -19,12 +20,9 @@ export async function PUT(request: Request, context: { params: Promise<{ code: s
   if (!AGENT_CODE_PATTERN.test(code)) {
     return NextResponse.json({ code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않아요." }, { status: 400 });
   }
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ code: "VALIDATION_FAILED", message: "요청 내용이 올바르지 않아요." }, { status: 400 });
-  }
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   const result = await callControlPlane(`/api/v1/agents/${code}/persona`, {
     method: "PUT",
     body,

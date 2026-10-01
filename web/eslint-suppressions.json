@@ -6,27 +6,32 @@
   },
   "src/app/api/admin/agents/[code]/route.ts": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "src/app/api/admin/agents/route.ts": {
     "no-restricted-syntax": {
-      "count": 2
+      "count": 1
+    }
+  },
+  "src/app/api/admin/connections/accountbook/[userId]/confirm/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "src/app/api/admin/people/[id]/route.ts": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "src/app/api/admin/people/route.ts": {
     "no-restricted-syntax": {
-      "count": 2
+      "count": 1
     }
   },
   "src/app/api/agents/[code]/persona/route.ts": {
     "no-restricted-syntax": {
-      "count": 6
+      "count": 4
     }
   },
   "src/app/api/agents/[code]/route.ts": {
@@ -36,12 +41,12 @@
   },
   "src/app/api/agents/[code]/skills/[name]/enabled/route.ts": {
     "no-restricted-syntax": {
-      "count": 5
+      "count": 3
     }
   },
   "src/app/api/agents/[code]/skills/[name]/route.ts": {
     "no-restricted-syntax": {
-      "count": 7
+      "count": 5
     }
   },
   "src/app/api/agents/[code]/skills/route.ts": {
@@ -56,12 +61,12 @@
   },
   "src/app/api/agents/[code]/visibility/route.ts": {
     "no-restricted-syntax": {
-      "count": 4
+      "count": 2
     }
   },
   "src/app/api/agents/route.ts": {
     "no-restricted-syntax": {
-      "count": 4
+      "count": 2
     }
   },
   "src/app/api/chat/conversations/[conversationId]/attachments/[attachmentId]/route.ts": {
@@ -72,6 +77,11 @@
   "src/app/api/chat/conversations/[conversationId]/attachments/route.ts": {
     "no-restricted-syntax": {
       "count": 4
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/events/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "src/app/api/chat/conversations/[conversationId]/files/[...path]/route.ts": {
@@ -86,7 +96,7 @@
   },
   "src/app/api/chat/conversations/[conversationId]/model/route.ts": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "src/app/api/chat/conversations/[conversationId]/regenerate/route.ts": {
@@ -96,7 +106,7 @@
   },
   "src/app/api/chat/conversations/[conversationId]/route.ts": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "src/app/api/chat/conversations/[conversationId]/running/route.ts": {
@@ -106,7 +116,7 @@
   },
   "src/app/api/chat/conversations/route.ts": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "src/app/api/chat/executions/[id]/stop/route.ts": {
@@ -121,12 +131,12 @@
   },
   "src/app/api/chat/route.ts": {
     "no-restricted-syntax": {
-      "count": 4
+      "count": 3
     }
   },
   "src/app/api/chat/stream/route.ts": {
     "no-restricted-syntax": {
-      "count": 4
+      "count": 3
     }
   },
   "src/app/api/me/route.ts": {
@@ -146,12 +156,12 @@
   },
   "src/app/api/memories/[id]/route.ts": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "src/app/api/memories/route.ts": {
     "no-restricted-syntax": {
-      "count": 2
+      "count": 1
     }
   },
   "src/app/api/usage/breakdown/route.ts": {
@@ -216,7 +226,7 @@
   },
   "src/components/chat-panel.tsx": {
     "no-restricted-globals": {
-      "count": 12
+      "count": 14
     },
     "react-hooks/set-state-in-effect": {
       "count": 2
@@ -261,6 +271,16 @@
     }
   },
   "src/components/chat/use-starter-suggestions.ts": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/connector/accountbook-admin-panel.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/connector/accountbook-connection-panel.tsx": {
     "no-restricted-globals": {
       "count": 1
     }

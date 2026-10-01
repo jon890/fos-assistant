@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { readJsonBody } from "@/lib/json-body";
 
 const ID = /^[1-9][0-9]*$/;
 
@@ -11,9 +12,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       { status: 400 },
     );
   }
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return parsed.response;
   const result = await callControlPlane(`/api/v1/admin/people/${id}`, {
     method: "PATCH",
-    body: await request.json(),
+    body: parsed.body,
   });
   if (!result.ok) {
     return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });

@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /** 기동 전에 끊긴 실행 기록을 실패로 마무리한다. */
@@ -22,8 +23,14 @@ public class OrphanedExecutionSweeper {
 
     private final AgentExecutionRepository executions;
 
-    /** Flyway가 끝난 뒤에 실행 중으로 남은 기록을 한 번 정리한다. */
+    /**
+     * Flyway가 끝난 뒤에 실행 중으로 남은 기록을 한 번 정리한다.
+     *
+     * <p>끊긴 위임 실행을 FAILED 로 적은 뒤에 부모 대화를 깨워야 그 결과도 함께 전한다. 그래서 깨우기의 기동
+     * 훑기보다 먼저 돈다.
+     */
     @EventListener(ApplicationReadyEvent.class)
+    @Order(0)
     public void sweep() {
         List<AgentExecution> running = executions.findByStatus(ExecutionStatus.RUNNING);
         if (running.isEmpty()) {

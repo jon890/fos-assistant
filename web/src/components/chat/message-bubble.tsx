@@ -34,7 +34,8 @@ export type MessageArtifact = {
 
 export type Turn = {
   id: number | string;
-  role: "USER" | "ASSISTANT";
+  /** `SYSTEM` 은 대화에 남는 알림 줄이다. 위임 결과가 도착했거나 자동 turn 한도에 닿았을 때 생긴다 */
+  role: "USER" | "ASSISTANT" | "SYSTEM";
   content: string;
   senderName: string | null;
   createdAt?: string;
@@ -170,6 +171,17 @@ export function MessageBubble({
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
   const attachments = turn.attachments ?? [];
+
+  if (turn.role === "SYSTEM") {
+    // 사람이 쓴 말도 비서의 답도 아니다. 복사, 다시 생성, 판 넘기기를 두지 않는다.
+    return (
+      <li data-testid="system-message" className="flex min-w-0 justify-center px-4">
+        <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-center text-xs text-muted-foreground">
+          {turn.content}
+        </p>
+      </li>
+    );
+  }
 
   if (user) {
     const command = skillCommandChip ? parseSkillCommand(turn.content) : null;

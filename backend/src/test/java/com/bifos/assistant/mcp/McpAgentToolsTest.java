@@ -36,6 +36,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -286,6 +287,73 @@ class McpAgentToolsTest {
     }
 
     @Test
+    @DisplayName("끝난 위임 실행을 agent status 로 읽으면 결과를 전했다고 적고 RUNNING 은 적지 않는다")
+    void agentStatusMarksFinishedDelegationsDeliveredButNotRunning() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution running = delegated(userA.id(), parent, ExecutionStatus.RUNNING, null, null);
+        Map<String, AgentExecution> finished = new LinkedHashMap<>();
+        finished.put("SUCCEEDED", delegated(userA.id(), parent, ExecutionStatus.SUCCEEDED, "조사한 결과다", null));
+        finished.put("FAILED", delegated(userA.id(), parent, ExecutionStatus.FAILED, null, "HERMES_RUN_FAILED"));
+        finished.put("CANCELLED", delegated(userA.id(), parent, ExecutionStatus.CANCELLED, null, null));
+
+        agentStatus(sharedToken, root, running.id());
+        for (AgentExecution execution : finished.values()) {
+            agentStatus(sharedToken, root, execution.id());
+        }
+
+        assertThat(deliveredAt(running.id())).as("RUNNING 은 결과가 없어 적지 않는다").isNull();
+        finished.forEach((status, execution) -> assertThat(deliveredAt(execution.id()))
+                .as(status + " 을 읽으면 전했다고 적는다")
+                .isNotNull());
+    }
+
+    @Test
+    @DisplayName("이미 전했다고 적힌 실행을 다시 읽어도 처음 적은 시각이 남는다")
+    void keepsFirstDeliveredAtWhenReadAgain() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution succeeded = delegated(userA.id(), parent, ExecutionStatus.SUCCEEDED, "조사한 결과다", null);
+        Instant first = Instant.parse("2026-09-30T01:00:00Z");
+        jdbc.update(
+                "UPDATE agent_execution SET result_delivered_at = ? WHERE id = ?",
+                Timestamp.from(first),
+                succeeded.id());
+
+        agentStatus(sharedToken, root, succeeded.id());
+        agentStop(sharedToken, root, succeeded.id());
+
+        assertThat(deliveredAt(succeeded.id())).isEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("끝난 위임 실행을 agent stop 으로 받아도 결과를 전했다고 적는다")
+    void agentStopMarksFinishedDelegationDelivered() throws Exception {
+        String root = McpCallSigner.newRoot();
+        AgentExecution parent = McpCallSigner.running(executions, userA.id(), null, SHARED, root);
+        AgentExecution succeeded = delegated(userA.id(), parent, ExecutionStatus.SUCCEEDED, "끝난 답", null);
+
+        agentStop(sharedToken, root, succeeded.id());
+
+        assertThat(deliveredAt(succeeded.id())).isNotNull();
+    }
+
+    @Test
+    @DisplayName("물을 수 없는 실행은 agent status 와 agent stop 이 끝났어도 적지 않는다")
+    void doesNotMarkInaccessibleExecutionDelivered() throws Exception {
+        String rootA = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userA.id(), null, SHARED, rootA);
+        String rootB = McpCallSigner.newRoot();
+        AgentExecution parentB = McpCallSigner.running(executions, userB.id(), null, SHARED, rootB);
+        AgentExecution otherUsers = delegated(userB.id(), parentB, ExecutionStatus.SUCCEEDED, "나의 답", null);
+
+        assertFailure(agentStatus(sharedToken, rootA, otherUsers.id()), "NOT_FOUND");
+        assertFailure(agentStop(sharedToken, rootA, otherUsers.id()), "NOT_FOUND");
+
+        assertThat(deliveredAt(otherUsers.id())).isNull();
+    }
+
+    @Test
     @DisplayName("agent status 응답에는 run 번호와 profile 과 토큰 수가 없다")
     void agentStatusResponseHasNoRunIdProfileOrTokenCount() throws Exception {
         String root = McpCallSigner.newRoot();
@@ -529,7 +597,10 @@ class McpAgentToolsTest {
         List<String> required = new ArrayList<>();
         schema.path("required").forEach(item -> required.add(item.asString()));
         assertThat(required).containsExactlyInAnyOrder("agent_code", "task");
-        assertThat(delegate.path("description").asString()).contains("agent_status", "agent_list");
+        // 결과는 다음 차례에 자동으로 전해지므로, 설명은 agent_status 로 기다리라고 하지 않는다.
+        assertThat(delegate.path("description").asString())
+                .contains("agent_list", "다음 차례에 자동으로 전달된다")
+                .doesNotContain("agent_status");
     }
 
     @Test
@@ -761,6 +832,7 @@ class McpAgentToolsTest {
                 .orElseThrow();
         assertThat(awaitFinished(child.id()).status()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(child.parentExecutionId()).isEqualTo(parent.id());
+        assertThat(deliveredAt(child.id())).as("부모가 번호 없이 실패를 받았으므로 전한 것으로 적는다").isNotNull();
     }
 
     @Test
@@ -1034,6 +1106,10 @@ class McpAgentToolsTest {
                 "example-model",
                 "example-provider",
                 new TokenUsage(3L, 0L, 2L, 5L));
+    }
+
+    private Instant deliveredAt(Long executionId) {
+        return executions.findById(executionId).orElseThrow().resultDeliveredAt();
     }
 
     private HttpResponse<String> agentStop(String token, String root, Long executionId) throws Exception {

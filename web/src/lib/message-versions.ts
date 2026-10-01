@@ -1,6 +1,6 @@
 export type VersionedMessage = {
   id: number;
-  role: "USER" | "ASSISTANT";
+  role: "USER" | "ASSISTANT" | "SYSTEM";
   replacesMessageId: number | null;
 };
 
@@ -8,26 +8,35 @@ export type VersionedMessage = {
 export type VersionSlot = { slotId: number; index: number; count: number };
 
 export type FoldedTurn<T extends VersionedMessage> = {
+  /** turn 을 여는 줄이다. `role` 이 `SYSTEM` 이면 질문이 아니라 알림 줄이다 */
   user: T;
   userVersion: VersionSlot;
   answers: { message: T; version: VersionSlot }[];
 };
 
-/** 대신된 판까지 포함한 메시지를 현재 화면에 보일 turn 으로 접는다. */
+/**
+ * 대신된 판까지 포함한 메시지를 현재 화면에 보일 turn 으로 접는다.
+ *
+ * <p>`USER` 와 `SYSTEM` 이 turn 을 연다. `SYSTEM` 은 고쳐 쓸 수 없는 알림 줄이라 판 사슬을 만들지 않고 줄마다
+ * turn 하나를 연다.
+ */
 export function foldVersions<T extends VersionedMessage>(
   messages: T[],
   selected: Record<number, number>,
 ): FoldedTurn<T>[] {
   const ordered = [...messages].sort((left, right) => left.id - right.id);
-  const users = ordered.filter((message) => message.role === "USER");
-  const userChains = chainsOf(users);
+  const openers = ordered.filter((message) => message.role === "USER" || message.role === "SYSTEM");
+  const openerChains = [
+    ...chainsOf(openers.filter((message) => message.role === "USER")),
+    ...openers.filter((message) => message.role === "SYSTEM").map((message) => [message]),
+  ].sort((left, right) => left[0].id - right[0].id);
 
-  return userChains.map((chain) => {
+  return openerChains.map((chain) => {
     const userIndex = chosenIndex(chain, selected[chain[0].id]);
     const user = chain[userIndex];
-    const nextUserId = users.find((message) => message.id > user.id)?.id ?? Infinity;
+    const nextOpenerId = openers.find((message) => message.id > user.id)?.id ?? Infinity;
     const answers = ordered.filter((message) =>
-      message.role === "ASSISTANT" && message.id > user.id && message.id < nextUserId);
+      message.role === "ASSISTANT" && message.id > user.id && message.id < nextOpenerId);
 
     return {
       user,

@@ -15,6 +15,8 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +56,7 @@ public class McpToolService {
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
+    private final AgentExecutionRepository executions;
 
     public List<Map<String, Object>> tools() {
         return List.of(
@@ -77,7 +80,7 @@ public class McpToolService {
                         "description", "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code 와 이름을 읽는다.",
                         "inputSchema", Map.of("type", "object", "additionalProperties", false, "properties", Map.of())),
                 Map.of("name", "agent_delegate",
-                        "description", "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 로 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 결과는 돌려받은 execution_id 로 agent_status 를 불러 읽는다.",
+                        "description", "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 로 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
                         "inputSchema", Map.of(
                                 "type", "object",
                                 "additionalProperties", false,
@@ -86,7 +89,7 @@ public class McpToolService {
                                         "task", Map.of("type", "string", "minLength", 1, "maxLength", TASK_MAX_CHARS)),
                                 "required", List.of("agent_code", "task"))),
                 Map.of("name", "agent_status",
-                        "description", "다른 에이전트에게 맡긴 실행의 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다.",
+                        "description", "다른 에이전트에게 맡긴 실행의 지금 상태와 결과를 읽는다. execution_id 에는 agent_delegate 로 받은 번호를 넣는다. 결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.",
                         "inputSchema", Map.of(
                                 "type", "object",
                                 "additionalProperties", false,
@@ -154,10 +157,15 @@ public class McpToolService {
      *
      * <p>{@code SUCCEEDED} 는 답을, {@code FAILED} 는 오류 코드를, {@code CANCELLED} 는 답이 있으면 답을 싣는다.
      * run 번호, profile, 토큰 수, 금액, 예외 문구는 싣지 않는다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
+     *
+     * <p>끝난 결과를 돌려주면 부모가 받은 것으로 적는다. 그 결과를 부모 대화에 다시 전하지 않기 위해서다.
      */
     public Map<String, Object> agentStatus(McpCaller caller, Long executionId) {
         return delegations.status(caller.user(), caller.originExecution(), executionId)
-                .map(execution -> result(json.writeValueAsString(statusOf(execution)), false))
+                .map(execution -> {
+                    markDeliveredIfFinished(execution);
+                    return result(json.writeValueAsString(statusOf(execution)), false);
+                })
                 .orElseGet(() -> result(json.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
     }
 
@@ -167,11 +175,14 @@ public class McpToolService {
      * <p>짧게 기다려도 아직 {@code RUNNING} 이고 이번 호출이 실제로 중지 표시를 켰거나 Hermes 에 중지를 보냈으면
      * {@code stop_requested: true} 를 더한다. run 번호가 없어 아무것도 보내지 못한 끊긴 실행은 {@code RUNNING} 만 준다.
      * 이미 끝난 실행은 멈추지 않고 끝난 상태를 준다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
+     *
+     * <p>끝난 결과를 돌려주면 {@link #agentStatus} 처럼 부모가 받은 것으로 적는다.
      */
     public Map<String, Object> agentStop(McpCaller caller, Long executionId) {
         return delegations.stop(caller.user(), caller.originExecution(), executionId)
                 .map(stop -> {
                     AgentExecution execution = stop.execution();
+                    markDeliveredIfFinished(execution);
                     Map<String, Object> status = statusOf(execution);
                     if (execution.status() == ExecutionStatus.RUNNING && stop.stopRequested()) {
                         status.put("stop_requested", true);
@@ -212,6 +223,13 @@ public class McpToolService {
             case BUSY -> "지금은 맡길 수 없습니다. 잠시 뒤 다시 시도해 주세요.";
             case SUBMIT_FAILED -> "실행을 시작하지 못했습니다.";
         };
+    }
+
+    /** 끝난 실행이면 결과를 전했다고 적는다. {@code RUNNING} 은 결과가 아직 없으므로 적지 않는다. */
+    private void markDeliveredIfFinished(AgentExecution execution) {
+        if (execution.status() != ExecutionStatus.RUNNING) {
+            executions.markResultDelivered(execution.id(), Instant.now());
+        }
     }
 
     private static Map<String, Object> agentSummary(Agent agent) {

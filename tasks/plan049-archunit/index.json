@@ -1,6 +1,6 @@
 {
   "name": "plan049-archunit",
-  "description": "코드 품질 규칙을 도구 설정으로 정의하고 강제한다 — ArchUnit, 테스트 이름의 @DisplayName, Checkstyle, Spotless, OpenRewrite, eslint 와 Prettier, 한 명령 진입점(ADR-040)",
+  "description": "코드 품질 규칙을 도구 설정으로 정의하고 강제한다 — ArchUnit, 테스트 이름의 @DisplayName, Checkstyle, Spotless, OpenRewrite, eslint 와 Prettier, 한 명령 진입점(ADR-041)",
   "status": "in_progress",
   "created_at": "2026-09-30",
   "total_phases": 8,

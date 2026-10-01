@@ -23,7 +23,7 @@ Spotless 처럼 `origin/main` 과의 공통 조상 뒤에 바뀐 파일에만 �
 - Spotless 는 `ratchetFrom("origin/main")` 으로 `HEAD` 와 `origin/main` 의 공통 조상 뒤에 바뀐 파일만 다룬다. OpenRewrite 플러그인에는 그런 설정이 없다
 - 순서는 OpenRewrite 다음 Spotless 다. OpenRewrite 가 바꾼 모양을 포매터가 정리한다
 
-**근거 문서**: `docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 「코드 규칙」
+**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 「코드 규칙」
 
 ## 의도 메모
 

@@ -57,6 +57,16 @@ type InterruptedHandlers = {
   onMissing(history: Turn[] | null): Promise<void>;
 };
 type TurnStreamState = { started: boolean; done: boolean; reportedError: boolean };
+/**
+ * 보는 중인 turn 의 사건을 대화 단위 SSE 에서 가려내는 상태다.
+ *
+ * <p>조각 사건에는 실행 번호가 없어 사건의 순서로 가린다. `waiting` 은 아직 `started` 를 받지 못한 것이고,
+ * `skipping` 은 보는 turn 의 `started` 를 받아 그 turn 이 끝날 때까지 버리는 중이며, `passed` 는 그 turn 을 지나
+ * 뒤의 사건을 받는 것이다. `watchedId` 는 보기 시작할 때의 실행 번호이고, 번호가 붙기 전이면 null 이다.
+ */
+type ObservedTurnFilter = { watchedId: number | null; phase: "waiting" | "skipping" | "passed" };
+/** 대화 단위 SSE 로 받아 그리고 있는 자동 turn 이다. `pendingId` 는 흘러오는 답 조각의 임시 식별자다. */
+type AutoTurn = { state: TurnStreamState; pendingId: string };
 type TurnStreamCallbacks = {
   onStarted?(event: ChatEvent): void | Promise<void>;
   onDelta?(text: string): void;
@@ -79,7 +89,8 @@ function answerAfterLastQuestion(loaded: Turn[], savedBefore: ReadonlySet<Turn["
   let answer: Turn | undefined;
   for (const turn of loaded) {
     if (turn.role === "USER") answer = undefined;
-    else if (!savedBefore.has(turn.id)) answer = turn;
+    // 알림 줄은 질문도 답도 아니다. 질문 뒤의 답을 찾을 때 건너뛴다.
+    else if (turn.role === "ASSISTANT" && !savedBefore.has(turn.id)) answer = turn;
   }
   return answer;
 }
@@ -112,6 +123,29 @@ const OBSERVE_INTERVAL_MS = 3_000;
 /** 도는 turn 조회가 이만큼 이어 실패하면 기다리는 표시를 거두고 이력을 다시 읽는다. */
 const OBSERVE_MAX_FAILURES = 3;
 
+/** 대화 단위 SSE 가 끊긴 뒤 다시 열기까지 기다리는 시간이다. */
+const EVENTS_RECONNECT_MS = 5_000;
+
+/**
+ * 보는 중인 turn 의 사건이면 참이다. 그 turn 은 폴링이 그리므로 대화 단위 SSE 로 받은 것은 버린다.
+ *
+ * <p>`filter` 의 단계를 이 자리에서 옮긴다. `system` 은 turn 의 사건이 아니므로 언제나 받는다.
+ */
+function belongsToObservedTurn(filter: ObservedTurnFilter | null, event: ChatEvent): boolean {
+  if (filter === null || filter.phase === "passed" || event.type === "system") return false;
+  if (event.type === "started") {
+    // 번호가 붙기 전에 보기 시작했으면 처음 받는 `started` 가 보는 turn 이다.
+    if (filter.phase === "waiting" && (filter.watchedId === null || event.executionId === filter.watchedId)) {
+      filter.phase = "skipping";
+      return true;
+    }
+    filter.phase = "passed";
+    return false;
+  }
+  if (event.type === "done" || event.type === "stopped") filter.phase = "passed";
+  return true;
+}
+
 export function ChatPanel({ initialConversationId }: { initialConversationId: string | null }) {
   const pathname = usePathname();
   const { conversations, refresh, replace, newConversationVersion } = useConversations();
@@ -137,6 +171,18 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    * turn 이 있거나, 보낸 창의 스트림이 끝 사건 없이 끊겼는데 turn 이 아직 돌 때만 채운다.
    */
   const [observing, setObserving] = useState<ObservedTurn | null>(null);
+  /** 보는 중일 때만 채운다. `observing` 을 비우는 자리에서 함께 비운다. */
+  const observedTurnFilter = useRef<ObservedTurnFilter | null>(null);
+  const autoTurn = useRef<AutoTurn | null>(null);
+  /**
+   * 이 창이 보낸 turn(보내기, 다시 생성)이 도는 동안 그 turn 의 임시 식별자를 담는다.
+   *
+   * <p>그동안 대화 단위 SSE 로 온 일은 `conversationTasks` 에 순서대로 보류한다. 곧바로 그리면 자동 turn 의
+   * 작업 과정과 답 줄을 보낸 turn 의 끝 처리(작업 과정 비우기, 이력 다시 읽기, 입력창 풀기)가 지운다.
+   */
+  const sentTurnToken = useRef<string | null>(null);
+  const conversationTasks = useRef<(() => Promise<void>)[]>([]);
+  const drainingConversationTasks = useRef(false);
   const [selectedVersions, setSelectedVersions] = useState<Record<number, number>>({});
   const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +242,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     setTurns([]);
     setSending(false);
     setObserving(null);
+    observedTurnFilter.current = null;
+    autoTurn.current = null;
+    sentTurnToken.current = null;
+    conversationTasks.current = [];
     setActivity(null);
     setLiveExpanded(false);
     liveExpandedRef.current = false;
@@ -238,7 +288,14 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           throw new Error(describeError(payload.code, payload.message));
         }
         const messages = await readPayload<Turn[]>(response);
-        if (selectionVersion.current === version) setTurns(messages);
+        // 이력을 읽는 동안 대화 단위 SSE 로 먼저 받은 줄이 있으면 덮지 않고 이어 둔다.
+        if (selectionVersion.current === version) {
+          setTurns((previous) => {
+            const loadedIds = new Set(messages.map((turn) => turn.id));
+            // 서버 번호가 있는 줄만 잇는다. 문자열 번호의 임시 줄은 저장된 줄과 겹쳐 보일 수 있어 버린다.
+            return [...messages, ...previous.filter((turn) => typeof turn.id === "number" && !loadedIds.has(turn.id))];
+          });
+        }
       } catch (reason) {
         if (selectionVersion.current === version) {
           setError(reason instanceof Error ? reason.message : "대화 이력을 읽지 못했어요.");
@@ -381,6 +438,48 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     };
   }, [observing]);
 
+  /**
+   * 대화가 열려 있는 동안 대화 단위 SSE 를 받는다. 위임 결과로 열린 자동 turn 이 여기로 온다.
+   *
+   * <p>서버가 끊거나 연결이 깨지면 잠시 뒤 다시 연다. 대화를 옮기거나 화면이 사라지면 연결을 끊는다. 4xx 는
+   * 다시 열어도 같으므로 다시 열지 않는다. 다시 연 연결에서는 `resumeAfterReconnect` 로 끊긴 사이의 일을 맞춘다.
+   */
+  useEffect(() => {
+    if (conversationId === null) return;
+    const id = conversationId;
+    const controller = new AbortController();
+    let timer: number | undefined;
+    let attempts = 0;
+    const connect = async () => {
+      let reconnect = true;
+      const reconnected = attempts > 0;
+      attempts += 1;
+      try {
+        const response = await fetch(`/api/chat/conversations/${id}/events`,
+          { cache: "no-store", signal: controller.signal });
+        if (response.ok) {
+          if (reconnected) {
+            await runConversationTask(() => resumeAfterReconnect(id));
+          }
+          await readEventStream<ChatEvent>(response,
+            (event) => runConversationTask(() => applyConversationEvent(id, event)));
+        } else {
+          reconnect = response.status >= 500;
+        }
+      } catch {
+        // 연결이 깨졌다. 끊은 것이 이 화면이 아니면 아래에서 다시 연다.
+      }
+      if (reconnect && !controller.signal.aborted) {
+        timer = window.setTimeout(() => void connect(), EVENTS_RECONNECT_MS);
+      }
+    };
+    void connect();
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [conversationId]);
+
   useEffect(() => {
     const selected = conversations.find((item) => item.id === conversationId);
     if (selected) setAgentCode(selected.agentCode ?? "");
@@ -439,6 +538,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     selectionVersion.current += 1;
     conversationIdRef.current = null;
     setObserving(null);
+    observedTurnFilter.current = null;
+    autoTurn.current = null;
+    sentTurnToken.current = null;
+    conversationTasks.current = [];
     setComposerGeneration((generation) => generation + 1);
     setConversationId(null);
     setFreshStart(true);
@@ -475,6 +578,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     currentExecutionId.current = running.executionId;
     setExecutionId(running.executionId);
     setActivity((previous) => ({ ...emptyActivity(startedAt), items: previous?.items ?? [] }));
+    observedTurnFilter.current = { watchedId: running.executionId, phase: "waiting" };
     setObserving({ conversationId: id, version, sentHere });
   }
 
@@ -581,6 +685,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     settleFinishedActivity(finishedExecutionId);
     setSending(false);
     setObserving(null);
+    observedTurnFilter.current = null;
     setActivity(null);
     currentExecutionId.current = null;
     setExecutionId(null);
@@ -623,34 +728,189 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   ) {
     await readEventStream<ChatEvent>(response, async (event) => {
       if (selectionVersion.current !== version) return;
-      if (event.type === "started") {
-        state.started = true;
-        currentExecutionId.current = event.executionId ?? null;
-        setExecutionId(event.executionId ?? null);
-        await callbacks.onStarted?.(event);
-      } else if (event.type === "delta" && event.text) {
-        callbacks.onDelta?.(event.text);
-      } else if (event.type === "reset") {
-        callbacks.onReset?.();
-        setActivity((previous) => previous && applyChatEvent(previous, event));
-      } else if (["tool", "subagent", "step", "switched"].includes(event.type)) {
-        setActivity((previous) => previous && applyChatEvent(previous, event));
-      } else if ((event.type === "done" || event.type === "stopped") && event.conversationId) {
-        state.done = true;
-        setActivity((previous) => previous && applyChatEvent(previous, event));
-        const finishedExecutionId = event.executionId ?? currentExecutionId.current;
-        settleFinishedActivity(finishedExecutionId);
-        await callbacks.onDone?.(event);
-        setActivity(null);
-        setFlowIsSlow(false);
-      } else if (event.type === "error") {
-        state.reportedError = true;
-        setActivity((previous) => previous && failActivity(previous, Date.now()));
-        setLiveExpanded(false);
-        liveExpandedRef.current = false;
-        setFlowIsSlow(false);
-        await callbacks.onError?.(event);
+      await applyTurnEvent(event, state, callbacks);
+    });
+  }
+
+  /** turn 사건 하나를 실행 상태와 작업 과정에 반영한다. 보낸 turn 과 대화 단위 SSE 의 자동 turn 이 함께 쓴다. */
+  async function applyTurnEvent(event: ChatEvent, state: TurnStreamState, callbacks: TurnStreamCallbacks) {
+    if (event.type === "started") {
+      state.started = true;
+      currentExecutionId.current = event.executionId ?? null;
+      setExecutionId(event.executionId ?? null);
+      await callbacks.onStarted?.(event);
+    } else if (event.type === "delta" && event.text) {
+      callbacks.onDelta?.(event.text);
+    } else if (event.type === "reset") {
+      callbacks.onReset?.();
+      setActivity((previous) => previous && applyChatEvent(previous, event));
+    } else if (["tool", "subagent", "step", "switched"].includes(event.type)) {
+      setActivity((previous) => previous && applyChatEvent(previous, event));
+    } else if ((event.type === "done" || event.type === "stopped") && event.conversationId) {
+      state.done = true;
+      setActivity((previous) => previous && applyChatEvent(previous, event));
+      const finishedExecutionId = event.executionId ?? currentExecutionId.current;
+      settleFinishedActivity(finishedExecutionId);
+      await callbacks.onDone?.(event);
+      setActivity(null);
+      setFlowIsSlow(false);
+    } else if (event.type === "error") {
+      state.reportedError = true;
+      setActivity((previous) => previous && failActivity(previous, Date.now()));
+      setLiveExpanded(false);
+      liveExpandedRef.current = false;
+      setFlowIsSlow(false);
+      await callbacks.onError?.(event);
+    }
+  }
+
+  /**
+   * 대화 단위 SSE 로 온 일을 처리한다. 보낸 turn 이 돌거나 보류한 일을 처리하는 중이면 순서대로 보류한다.
+   */
+  async function runConversationTask(task: () => Promise<void>) {
+    if (sentTurnToken.current !== null || drainingConversationTasks.current) {
+      conversationTasks.current.push(task);
+      return;
+    }
+    await task();
+  }
+
+  /**
+   * 대화 단위 SSE 를 다시 연 뒤 끊긴 사이의 일을 맞춘다.
+   *
+   * <p>받던 자동 turn 이 없으면 이력을 한 번 다시 읽어 그사이 열리고 끝난 자동 turn 을 보인다. 받던 자동 turn 이
+   * 있으면 그 끝 사건을 놓쳤을 수 있어 도는 turn 을 묻는다. 돌고 있으면 보는 중 상태로 넘겨 폴링이 끝을 알리고,
+   * 돌지 않으면 그 turn 을 정리하고 이력을 다시 읽어 입력창을 푼다. 묻지 못하면 돌지 않는 것으로 본다.
+   */
+  async function resumeAfterReconnect(id: string) {
+    if (conversationIdRef.current !== id) return;
+    const version = selectionVersion.current;
+    const current = autoTurn.current;
+    if (current === null) {
+      await refreshMessages(id, version).catch(() => {});
+      return;
+    }
+    let running: RunningTurn | null = null;
+    try {
+      const response = await fetch(`/api/chat/conversations/${id}/running`, { cache: "no-store" });
+      if (response.ok) {
+        running = await readPayload<RunningTurn>(response);
+      } else if (response.status === 404) {
+        const payload = await readPayload<ErrorPayload>(response).catch(() => null);
+        if (payload?.code === "CONVERSATION_NOT_FOUND") {
+          if (selectionVersion.current === version) setNotFound(true);
+          return;
+        }
       }
+    } catch {
+      // 아래에서 돌지 않는 것으로 본다.
+    }
+    if (selectionVersion.current !== version || autoTurn.current !== current) return;
+    autoTurn.current = null;
+    if (running?.running) {
+      beginObserving(id, version, running);
+      return;
+    }
+    settleFinishedActivity(currentExecutionId.current);
+    setActivity(null);
+    setFlowIsSlow(false);
+    currentExecutionId.current = null;
+    setExecutionId(null);
+    await Promise.all([refresh(), refreshMessages(id, version).catch(() => {})]);
+    if (selectionVersion.current === version) setSending(false);
+  }
+
+  /**
+   * 보낸 turn 의 끝 처리가 모두 끝났다. 그동안 보류한 대화 단위 SSE 의 일을 받은 순서대로 처리한다.
+   *
+   * <p>그사이 대화를 옮겼거나 다음 turn 을 보냈으면 식별자가 달라 아무것도 하지 않는다.
+   */
+  async function finishSentTurn(token: string) {
+    if (sentTurnToken.current !== token) return;
+    sentTurnToken.current = null;
+    if (drainingConversationTasks.current) return;
+    drainingConversationTasks.current = true;
+    try {
+      while (sentTurnToken.current === null && conversationTasks.current.length > 0) {
+        const task = conversationTasks.current.shift()!;
+        try {
+          await task();
+        } catch {
+          // 사건 하나를 그리지 못해도 뒤의 사건은 그린다. 자동 turn 이 끝나면 이력을 다시 읽어 맞춘다.
+        }
+      }
+    } finally {
+      drainingConversationTasks.current = false;
+    }
+  }
+
+  /**
+   * 대화 단위 SSE 로 받은 사건을 그린다. 이 스트림에는 위임 결과로 열린 자동 turn 의 사건만 온다.
+   *
+   * <p>보는 중인 turn 의 사건은 폴링이 그리므로 버린다. `started` 를 받지 못한 채 온 끝 사건은 이력을 다시 읽어
+   * 저장된 답을 보인다.
+   */
+  async function applyConversationEvent(id: string, event: ChatEvent) {
+    if (conversationIdRef.current !== id) return;
+    if (event.type === "system") {
+      const line: Turn = {
+        id: event.messageId ?? `system-${Date.now()}`,
+        role: "SYSTEM",
+        content: event.text ?? "",
+        senderName: null,
+      };
+      setTurns((previous) => previous.some((turn) => turn.id === line.id) ? previous : [...previous, line]);
+      return;
+    }
+    if (belongsToObservedTurn(observedTurnFilter.current, event)) return;
+
+    if (event.type === "started") {
+      autoTurn.current = {
+        state: { started: false, done: false, reportedError: false },
+        pendingId: `assistant-auto-${Date.now()}`,
+      };
+      setSending(true);
+      setTurnError(null);
+      setActivity(emptyActivity(Date.now()));
+      setLiveExpanded(false);
+      liveExpandedRef.current = false;
+      setExpandedOnDone(null);
+      setStopRequested(false);
+      setFlowIsSlow(false);
+    }
+    const current = autoTurn.current;
+    if (current === null) {
+      // 이 창이 연결되기 전에 시작한 turn 이다. 끝나면 저장된 답을 읽어 보인다.
+      if (event.type === "done" || event.type === "stopped") {
+        await refreshMessages(id, selectionVersion.current).catch(() => {});
+      }
+      return;
+    }
+    const { pendingId } = current;
+    const finish = async () => {
+      if (autoTurn.current === current) autoTurn.current = null;
+      if (conversationIdRef.current !== id) return;
+      // 이력을 다 읽은 뒤에 입력창을 푼다. 먼저 풀면 그사이 보낸 질문의 임시 줄을 다시 읽은 이력이 덮는다.
+      await Promise.all([refresh(), refreshMessages(id, selectionVersion.current).catch(() => {})]);
+      if (conversationIdRef.current === id) setSending(false);
+    };
+    await applyTurnEvent(event, current.state, {
+      onDelta: (textDelta) => {
+        setTurns((previous) => {
+          const pending = previous.find((turn) => turn.id === pendingId);
+          if (!pending) return [...previous, { id: pendingId, role: "ASSISTANT", content: textDelta, senderName: null }];
+          return previous.map((turn) => turn.id === pendingId ? { ...turn, content: turn.content + textDelta } : turn);
+        });
+      },
+      onReset: () => {
+        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+      },
+      onDone: finish,
+      onError: async (failed) => {
+        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId));
+        setTurnError(describeError(failed.code ?? "INTERNAL_ERROR", failed.message ?? "요청을 처리하지 못했어요."));
+        await finish();
+      },
     });
   }
 
@@ -665,6 +925,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     const savedBefore = savedIdsOf(turns);
     /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
     let handedOff = false;
+    sentTurnToken.current = pendingId;
     setSending(true);
     setError(null);
     setTurnError(null);
@@ -869,6 +1130,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       return false;
     } finally {
       if (selectionVersion.current === version && !handedOff) setSending(false);
+      void finishSentTurn(pendingId);
     }
   }
 
@@ -883,6 +1145,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     let handedOff = false;
     /** 끊긴 turn 을 판단하며 이력을 이미 다시 읽었다. 실패 처리에서 한 번 더 읽지 않는다. */
     let historyRead = false;
+    sentTurnToken.current = pendingId;
     setSending(true);
     setError(null);
     setTurnError(null);
@@ -953,6 +1216,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
         setSending(false);
         setFlowIsSlow(false);
       }
+      void finishSentTurn(pendingId);
     }
   }
 

@@ -23,7 +23,7 @@
   - 서비스와 `infra` 안에 공개된 중첩 타입: `AgentToolService.ToolView`, `AgentToolService.ToolsetsView`, `AgentRunner.Run`, `ArtifactStore.FoundFile`, `ArtifactStore.Removed`, `ArtifactSourceFetcher.Response`, `ArtifactSourceFetcher.DnsResolver`, `ArtifactSourceFetcher.Transport` 등. 코디네이터 집계의 `DelegationResult.Failure` 는 바깥 클래스가 서비스도 `infra` 도 아니라 이 규칙에 걸리지 않는다. 정확한 수는 기준을 만들 때 센다
 - 엔티티의 `@Enumerated` 필드 타입은 지금 여러 패키지에 흩어져 있다. `..domain.type..` 패키지는 아직 없다
 
-**근거 문서**: `docs/adr/ADR-040-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 「구조 규칙」, `docs/code-architecture.md` 「backend 패키지」
+**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 「구조 규칙」, `docs/code-architecture.md` 「backend 패키지」
 
 ## 의도 메모
 

@@ -1,5 +1,22 @@
 # 저장 모델
 
+## accountbook_connection
+
+사용자마다 가계부 연결 하나를 둔다.
+`user_id BIGINT`가 기본키이며 `app_user`를 참조한다.
+`agent_id BIGINT`는 필수이며 유니크하고 `agent`를 참조한다.
+`status VARCHAR(20)`은 `DISCONNECTED`, `PENDING`, `READY` 중 하나다.
+`token_prefix VARCHAR(8)`, `family_uuid CHAR(36)`, `checked_at DATETIME(6)`는 비어도 된다.
+`restart_required BOOLEAN`은 필수다.
+`desired_enabled BOOLEAN`은 env와 설치 반영이 모두 성공해 활성화 후보가 되었는지를 뜻한다.
+등록·교체·해제 시작과 반영 실패에서는 false이며, true여도 실행 확인 전에는 PENDING이다.
+연결 해제 때 행은 남기고 prefix와 가족을 비운다.
+토큰 원문과 해시는 저장하지 않는다.
+
+`agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE`는 전용 연결 에이전트를 표시한다.
+이 값이 참인 에이전트는 일반 설정 편집과 공개, 삭제 경로를 막는다.
+상태 변화는 [가계부 연결](connectors.md)이 갖는다.
+
 MySQL 8.4 에 둔다.
 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
 
@@ -102,6 +119,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `reasoning_effort` | VARCHAR(16) NULL | 이 대화에서 고른 effort. `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 비면 그 profile 의 기본값이다 |
 | `updated_at` | DATETIME(6) | 목록 정렬에 쓴다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
+| `auto_turn_count` | INT NOT NULL DEFAULT 0 | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns`(기본 10)에 닿으면 더 깨우지 않는다 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
 
@@ -132,10 +150,10 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `conversation_id` | BIGINT | |
-| `role` | VARCHAR(20) | `USER` 또는 `ASSISTANT` |
+| `role` | VARCHAR(20) | `USER`, `ASSISTANT`, `SYSTEM`. `SYSTEM` 은 위임 결과가 도착했다는 알림 줄이다 |
 | `content` | LONGTEXT | |
-| `sender_user_id` | BIGINT NULL | 이 줄을 쓴 사람. `ASSISTANT` 는 비어 있다 |
-| `execution_id` | BIGINT NULL | 이 답을 만든 실행. `USER` 는 비어 있다 |
+| `sender_user_id` | BIGINT NULL | 이 줄을 쓴 사람. `ASSISTANT` 와 `SYSTEM` 은 비어 있다 |
+| `execution_id` | BIGINT NULL | 이 답을 만든 실행. `USER` 와 `SYSTEM` 은 비어 있다 |
 | `replaces_message_id` | BIGINT NULL | 이 메시지가 새 판으로 대신하는 이전 메시지. 같은 대화, 같은 `role` 이다 |
 
 `content` 를 `LONGTEXT` 로 못 박는다.
@@ -149,6 +167,9 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 
 중지한 실행의 답도 한 줄로 남는다.
 근거는 [ADR-021](adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 에 있다.
+
+`SYSTEM` 줄은 Control Plane 이 부모 대화를 깨울 때 한 줄 남긴다. 본문은 어느 에이전트의 결과가 도착했는지 알리는 짧은 글이고, 자식의 답 전문은 넣지 않는다.
+다시 생성의 대상이 아니다. 근거는 [ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
 
 `sender_user_id` 는 화면이 보낸 사람 이름을 보이기 위한 것이다.
 대화는 여전히 주인 한 사람의 것이고, 여러 사람이 같은 대화를 읽고 쓰는 것은 아직 만들지 않았다.
@@ -174,6 +195,7 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 | `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 뿌리 session 이고, 뿌리가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 뿌리 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
 | `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 뿌리 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 와 `agent_stop` 이 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 끝난 상태와 같은 저장에서 적는다. `assistant.delegation.output-max-chars`(기본 100,000자)를 넘으면 자르고 잘렸다는 한 줄을 붙인다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
+| `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 `FAILED` 로 적은 뒤 전한다. 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |

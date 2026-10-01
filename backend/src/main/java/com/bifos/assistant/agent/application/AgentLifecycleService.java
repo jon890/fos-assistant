@@ -89,11 +89,25 @@ public class AgentLifecycleService {
      */
     @Transactional
     public Agent create(CurrentUser user, String name, AgentVisibility visibility) {
-        String agentName = requireName(name);
-        AgentVisibility effectiveVisibility = visibility == null ? AgentVisibility.PRIVATE : visibility;
         if (!user.isAdmin()) {
             requireBelowLimit(user);
         }
+        return provisionAgent(user, name, visibility, false);
+    }
+
+    /**
+     * 커넥터 연결용 비공개 에이전트를 만든다.
+     *
+     * <p>사용자가 지울 수 없는 에이전트라 사용자당 상한을 거치지 않고, 상한 계산에서도 빠진다.
+     */
+    @Transactional
+    public Agent createConnectorAgent(CurrentUser user, String name) {
+        return provisionAgent(user, name, AgentVisibility.PRIVATE, true);
+    }
+
+    private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility, boolean connectorManaged) {
+        String agentName = requireName(name);
+        AgentVisibility effectiveVisibility = visibility == null ? AgentVisibility.PRIVATE : visibility;
 
         String code = CODE_PREFIX + randomChars();
         String profileName = PROFILE_PREFIX + randomChars();
@@ -118,6 +132,9 @@ public class AgentLifecycleService {
                     peopleProperties.defaultCostMode(), CredentialScope.SHARED_HOUSEHOLD,
                     effectiveVisibility, user.id());
             agent.markManagedProfile();
+            if (connectorManaged) {
+                agent.markConnectorManaged();
+            }
             // 제약 위반이 커밋 때가 아니라 여기서 드러나야 profile 을 거둘 수 있다.
             return agents.saveAndFlush(agent);
         } catch (RuntimeException failure) {
@@ -210,7 +227,7 @@ public class AgentLifecycleService {
     private void requireBelowLimit(CurrentUser user) {
         users.findByIdForUpdate(user.id())
                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
-        if (agents.countByOwnerUserIdAndDeletedAtIsNull(user.id()) >= properties.maxPerUser()) {
+        if (agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(user.id()) >= properties.maxPerUser()) {
             throw new ApiException(
                     ErrorCode.AGENT_LIMIT_REACHED,
                     "an agent limit of " + properties.maxPerUser() + " was reached");

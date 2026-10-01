@@ -15,6 +15,7 @@ import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +59,7 @@ public class AgentDelegationService {
     private final DelegationProperties properties;
     private final TurnCancellation turns;
     private final HermesRunsClient hermes;
+    private final ApplicationEventPublisher events;
 
     /**
      * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
@@ -83,7 +86,8 @@ public class AgentDelegationService {
             ConversationRepository conversations,
             DelegationProperties properties,
             TurnCancellation turns,
-            HermesRunsClient hermes) {
+            HermesRunsClient hermes,
+            ApplicationEventPublisher events) {
         this.agents = agents;
         this.executions = executions;
         this.children = children;
@@ -91,6 +95,7 @@ public class AgentDelegationService {
         this.properties = properties;
         this.turns = turns;
         this.hermes = hermes;
+        this.events = events;
         this.activeDelegations = new Semaphore(properties.maxActive());
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
             rootLocks[i] = new ReentrantLock();
@@ -248,6 +253,8 @@ public class AgentDelegationService {
         AgentExecution execution = handoff.execution();
         boolean settled = handoff.awaitSettled(deadline);
         if (settled && !handoff.submitted()) {
+            // 부모는 번호 없이 실패만 받는다. 적지 않으면 번호를 모르는 결과가 부모 대화에 다시 전해진다.
+            executions.markResultDelivered(execution.id(), Instant.now());
             return rejected(Failure.SUBMIT_FAILED, origin, "제출하기 전에 실행이 끝났다 executionId=" + execution.id());
         }
         // 제한 시간이 지나도 줄이 있으면 번호를 돌려준다. 뒤따르는 결과는 그 줄에 적힌다.
@@ -315,6 +322,23 @@ public class AgentDelegationService {
             delegation.markEnded();
             activeDelegations.release();
             handoff.markEnded(failure);
+            if (executionId != null) {
+                publishFinished(conversation, executionId);
+            }
+        }
+    }
+
+    /**
+     * 위임 실행이 끝났다고 알린다. 받는 쪽이 부모 대화에 전할지 정한다.
+     *
+     * <p>받는 쪽의 예외가 이 실행의 정리를 막지 않게, 알리다 난 예외는 경고 로그만 남긴다. 대화 번호도 이 안에서 읽는다.
+     * 대화가 없어 난 예외가 실행 스레드의 정리 블록 밖으로 나가지 않게 하기 위해서다.
+     */
+    private void publishFinished(Conversation conversation, Long executionId) {
+        try {
+            events.publishEvent(new DelegationFinished(conversation.id(), executionId));
+        } catch (RuntimeException ex) {
+            log.warn("위임 실행이 끝났다고 알리지 못했다 executionId={}", executionId, ex);
         }
     }
 

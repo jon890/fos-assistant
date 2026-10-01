@@ -82,6 +82,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
@@ -192,6 +193,9 @@ class ChatServiceTest {
 
     @Autowired
     ApplicationEventPublisher applicationEvents;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -379,6 +383,23 @@ class ChatServiceTest {
         assertThat(executions.findById(second.executionId()).orElseThrow().hermesSessionId())
                 .as("둘째 실행 줄의 session")
                 .isEqualTo(root);
+    }
+
+    @Test
+    @DisplayName("사용자가 질문을 보내면 질문 없이 연 turn 의 수가 0 이 된다")
+    void resetsAutoTurnCountWhenUserSendsQuestion() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        ChatTurn first = chat.send(dad, null, "안녕", "dad");
+        jdbc.update("UPDATE conversation SET auto_turn_count = 3 WHERE id = ?", first.conversationId());
+        assertThat(conversations.findById(first.conversationId()).orElseThrow().autoTurnCount())
+                .isEqualTo(3);
+
+        stub().willReturn(HermesRunResult.of("run-2", "sess-1", "completed", "네", "m", "p", TokenUsage.empty()));
+        chat.send(dad, first.conversationId(), "하나 더", "dad");
+
+        assertThat(conversations.findById(first.conversationId()).orElseThrow().autoTurnCount())
+                .isZero();
     }
 
     /** Hermes 가 받은 session 을 그대로 돌려주게 한다. 실제 Hermes 가 모르는 id 를 받았을 때와 같다. */
