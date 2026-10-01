@@ -23,6 +23,12 @@ import com.bifos.assistant.user.domain.UserRole;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Memory 의 공개 범위, 승인 상태, 쓰기 권한을 확인한다. */
 @SpringBootTest
@@ -53,6 +60,9 @@ class MemoryServiceTest {
 
     @Autowired
     MemoryRevisionRepository revisionRepository;
+
+    @Autowired
+    TransactionTemplate transactions;
 
     @BeforeEach
     void setUp() {
@@ -191,6 +201,40 @@ class MemoryServiceTest {
         assertThat(history.getLast().id().revision()).isEqualTo(2);
         assertThat(history.getLast().status()).isEqualTo(MemoryStatus.ACCEPTED);
         assertThat(history.getLast().entryType()).isEqualTo(MemoryEntryType.MEMORY);
+    }
+
+    @Test
+    @DisplayName("수정이 커밋되는 사이에 들어온 승인은 그 수정의 본문과 판 번호를 되돌리지 않는다")
+    void acceptingWhileAnUpdateCommitsDoesNotRevertTheUpdate() throws Exception {
+        Memory proposed = memories.proposeUser(ADMIN, "제안", "처음 내용", 99L);
+        CountDownLatch locked = new CountDownLatch(1);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> accepting = pool.submit(() -> {
+                locked.await();
+                // 수정 트랜잭션이 줄을 잠근 동안 들어온다. 잠그지 않고 읽으면 처음 내용을 읽어 통째로 저장한다.
+                return memories.accept(ADMIN, proposed.id());
+            });
+            transactions.executeWithoutResult(status -> {
+                Memory held = repository.findByIdForUpdate(proposed.id()).orElseThrow();
+                revisionRepository.save(MemoryRevision.of(held, MemoryChangeType.UPDATED, ADMIN.id(), null, NOW));
+                held.revise("고친 내용", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL, null, NOW);
+                locked.countDown();
+                // 승인 쪽이 읽기에 닿을 틈을 준다. 잠금이 있으면 이 커밋 뒤에야 읽는다.
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500));
+            });
+            accepting.get(20, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        Memory current = repository.findById(proposed.id()).orElseThrow();
+        assertThat(current.status()).isEqualTo(MemoryStatus.ACCEPTED);
+        assertThat(current.content()).isEqualTo("고친 내용");
+        assertThat(current.revision()).isEqualTo(2);
+        assertThat(memories.revisionsOf(ADMIN, proposed.id()))
+                .singleElement()
+                .satisfies(revision -> assertThat(revision.content()).isEqualTo("처음 내용"));
     }
 
     @Test
