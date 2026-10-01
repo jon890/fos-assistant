@@ -36,20 +36,26 @@ public class HermesRunEventStream {
         this.objectMapper = objectMapper;
     }
 
-    public void open(
-            String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
+    public void open(String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
         open(apiBaseUrl, profileName, runId, onEvent, stream -> {});
     }
 
     public void open(
-            String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent,
+            String apiBaseUrl,
+            String profileName,
+            String runId,
+            Consumer<RunEvent> onEvent,
             Consumer<java.io.Closeable> onOpened) {
         open(apiBaseUrl, profileName, runId, onEvent, onOpened, false);
     }
 
     public void open(
-            String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent,
-            Consumer<java.io.Closeable> onOpened, boolean connectorManaged) {
+            String apiBaseUrl,
+            String profileName,
+            String runId,
+            Consumer<RunEvent> onEvent,
+            Consumer<java.io.Closeable> onOpened,
+            boolean connectorManaged) {
         String apiKey = keyStore.resolve(profileName);
         try (InputStream body = restClient
                 .get()
@@ -71,8 +77,7 @@ public class HermesRunEventStream {
     }
 
     private void readEvents(InputStream body, Consumer<RunEvent> onEvent, boolean connectorManaged) throws IOException {
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(body, StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {

@@ -20,20 +20,28 @@ final class ToolDetailRedactor {
     private static final int INPUT_LIMIT = 65_536;
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> SECRET_KEYS = Set.of(
-            "token", "secret", "password", "passwd", "apikey", "authorization", "cookie",
-            "credential", "credentials", "privatekey", "accesskey", "clientsecret");
-    private static final Pattern UUID = Pattern.compile(
-            "(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
-    private static final Pattern JWT = Pattern.compile(
-            "(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])");
-    private static final Pattern TOKEN = Pattern.compile(
-            "(?i)Bearer\\s+[^\\s\"'`,;<>}\\]]+"
-                    + "|(?i)(?:sk-|gh[pousr]_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]+"
-                    + "|(?<![A-Za-z0-9])[A-Fa-f0-9]{32,}(?![A-Za-z0-9])"
-                    + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_+/-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
-    private static final Pattern ASSIGNMENT = Pattern.compile(
-            "(?i)([\"']?[A-Za-z][A-Za-z0-9_-]*[\"']?\\s*[:=]\\s*)"
-                    + "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\s,;}&]+)");
+            "token",
+            "secret",
+            "password",
+            "passwd",
+            "apikey",
+            "authorization",
+            "cookie",
+            "credential",
+            "credentials",
+            "privatekey",
+            "accesskey",
+            "clientsecret");
+    private static final Pattern UUID =
+            Pattern.compile("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    private static final Pattern JWT =
+            Pattern.compile("(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])");
+    private static final Pattern TOKEN = Pattern.compile("(?i)Bearer\\s+[^\\s\"'`,;<>}\\]]+"
+            + "|(?i)(?:sk-|gh[pousr]_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]+"
+            + "|(?<![A-Za-z0-9])[A-Fa-f0-9]{32,}(?![A-Za-z0-9])"
+            + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_+/-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
+    private static final Pattern ASSIGNMENT = Pattern.compile("(?i)([\"']?[A-Za-z][A-Za-z0-9_-]*[\"']?\\s*[:=]\\s*)"
+            + "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\s,;}&]+)");
 
     static String redact(String detail, boolean connectorManaged) {
         if (detail == null) {

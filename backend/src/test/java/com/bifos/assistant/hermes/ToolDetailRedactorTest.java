@@ -46,15 +46,13 @@ class ToolDetailRedactorTest {
         String detail = "Bearer abc sk-example ghp_example xoxb-example github_pat_example "
                 + "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature";
 
-        assertThat(ToolDetailRedactor.redact(detail, false))
-                .isEqualTo("[가림] [가림] [가림] [가림] [가림] [가림]");
+        assertThat(ToolDetailRedactor.redact(detail, false)).isEqualTo("[가림] [가림] [가림] [가림] [가림] [가림]");
     }
 
     @Test
     @DisplayName("긴 hex와 base64 값은 가린다")
     void redactsLongHexAndBase64Values() {
-        String detail = "0123456789abcdef0123456789abcdef "
-                + "QWxhZGRpbjpvcGVuIHNlc2FtZVNlY3JldA==";
+        String detail = "0123456789abcdef0123456789abcdef " + "QWxhZGRpbjpvcGVuIHNlc2FtZVNlY3JldA==";
 
         assertThat(ToolDetailRedactor.redact(detail, false)).isEqualTo("[가림] [가림]");
     }
@@ -86,8 +84,10 @@ class ToolDetailRedactorTest {
     @Test
     @DisplayName("손상된 JSON의 비밀값은 원문 전체를 가려 보호한다")
     void hidesMalformedJson() {
-        assertThat(ToolDetailRedactor.redact("{\"password\":\"unfinished", false)).isEqualTo("[가림]");
-        assertThat(ToolDetailRedactor.redact("실행 token={\"a\":{\"b\":\"short\"}}", false)).isEqualTo("[가림]");
+        assertThat(ToolDetailRedactor.redact("{\"password\":\"unfinished", false))
+                .isEqualTo("[가림]");
+        assertThat(ToolDetailRedactor.redact("실행 token={\"a\":{\"b\":\"short\"}}", false))
+                .isEqualTo("[가림]");
     }
 
     @Test
@@ -96,7 +96,9 @@ class ToolDetailRedactorTest {
         String detail = "가".repeat(490) + " sk-" + "x".repeat(100);
 
         assertThat(ToolDetailRedactor.redact(detail, false)).isEqualTo("가".repeat(490) + " [가림]");
-        assertThat(ToolDetailRedactor.redact("가".repeat(600), false)).hasSize(500).endsWith("…");
+        assertThat(ToolDetailRedactor.redact("가".repeat(600), false))
+                .hasSize(500)
+                .endsWith("…");
         assertThat(ToolDetailRedactor.redact("가".repeat(65_537), false)).isEqualTo("[긴 도구 내용 가림]");
     }
 }
