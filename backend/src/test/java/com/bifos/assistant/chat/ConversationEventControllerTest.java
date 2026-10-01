@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -61,23 +62,42 @@ class ConversationEventControllerTest {
 
     private static final String COMMAND = "python3 run.py";
 
-    @Autowired ChatService chat;
-    @Autowired ConversationAccess access;
-    @Autowired ConversationEventHub hub;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AgentRepository agents;
-    @Autowired MemoryRepository memories;
-    @Autowired AppUserRepository users;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    ConversationEventHub hub;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    AppUserRepository users;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final JsonMapper json = JsonMapper.builder().build();
     private MockMvc mvc;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -85,15 +105,15 @@ class ConversationEventControllerTest {
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
-        mvc = MockMvcBuilders
-                .standaloneSetup(new ConversationEventController(currentUser, access, hub,
-                        new ChatEventStreams(Duration.ofSeconds(20))))
+        mvc = MockMvcBuilders.standaloneSetup(new ConversationEventController(
+                        currentUser, access, hub, new ChatEventStreams(Duration.ofSeconds(20))))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 
     @Test
-    void 주인이_구독하면_대화에_낸_system_사건을_받는다() throws Exception {
+    @DisplayName("주인이 구독하면 대화에 낸 system 사건을 받는다")
+    void ownerSubscriberReceivesSystemEventsOfConversation() throws Exception {
         CurrentUser dad = signedIn("events-dad", UserRole.ADMIN);
         Conversation conversation = conversationOf(dad);
         MvcResult subscribed = subscribe(conversation.publicId());
@@ -110,7 +130,8 @@ class ConversationEventControllerTest {
     }
 
     @Test
-    void 구독_직후_사건_없이도_첫_줄을_받는다() throws Exception {
+    @DisplayName("구독 직후 사건 없이도 첫 줄을 받는다")
+    void receivesFirstLineRightAfterSubscribing() throws Exception {
         CurrentUser dad = signedIn("events-connected", UserRole.ADMIN);
         MvcResult subscribed = subscribe(conversationOf(dad).publicId());
 
@@ -120,7 +141,8 @@ class ConversationEventControllerTest {
     }
 
     @Test
-    void 다른_대화에_낸_사건은_받지_않는다() throws Exception {
+    @DisplayName("다른 대화에 낸 사건은 받지 않는다")
+    void doesNotReceiveEventsOfOtherConversation() throws Exception {
         CurrentUser dad = signedIn("events-other-dad", UserRole.ADMIN);
         Conversation watched = conversationOf(dad);
         Conversation other = conversationOf(dad);
@@ -132,20 +154,22 @@ class ConversationEventControllerTest {
     }
 
     @Test
-    void 남의_대화는_도는_turn_조회와_같은_오류다() throws Exception {
+    @DisplayName("남의 대화는 도는 turn 조회와 같은 오류다")
+    void rejectsOthersConversationLikeRunningTurnLookup() throws Exception {
         CurrentUser dad = signedIn("events-owner", UserRole.ADMIN);
         UUID dadsConversation = conversationOf(dad).publicId();
         signedIn("events-stranger", UserRole.MEMBER);
 
-        MockHttpServletResponse events = mvc.perform(get("/api/v1/chat/conversations/{id}/events",
-                dadsConversation)).andReturn().getResponse();
-        MockHttpServletResponse running = MockMvcBuilders
-                .standaloneSetup(new ChatController(chat, currentUser, users,
-                        null, access, new ChatEventStreams(Duration.ofSeconds(20)), null))
+        MockHttpServletResponse events = mvc.perform(get("/api/v1/chat/conversations/{id}/events", dadsConversation))
+                .andReturn()
+                .getResponse();
+        MockHttpServletResponse running = MockMvcBuilders.standaloneSetup(new ChatController(
+                        chat, currentUser, users, null, access, new ChatEventStreams(Duration.ofSeconds(20)), null))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build()
                 .perform(get("/api/v1/chat/conversations/{id}/running", dadsConversation))
-                .andReturn().getResponse();
+                .andReturn()
+                .getResponse();
 
         assertThat(events.getStatus()).isEqualTo(404).isEqualTo(running.getStatus());
         assertThat(events.getContentAsString(StandardCharsets.UTF_8))
@@ -153,7 +177,8 @@ class ConversationEventControllerTest {
     }
 
     @Test
-    void MEMBER_역할에게는_tool_사건의_명령_원문을_싣지_않는다() throws Exception {
+    @DisplayName("MEMBER 역할에게는 tool 사건의 명령 원문을 싣지 않는다")
+    void omitsToolCommandTextForMemberRole() throws Exception {
         CurrentUser kid = signedIn("events-kid", UserRole.MEMBER);
         Conversation conversation = conversationOf(kid);
         MvcResult subscribed = subscribe(conversation.publicId());
@@ -162,11 +187,14 @@ class ConversationEventControllerTest {
 
         JsonNode tool = received(subscribed).getFirst();
         assertThat(tool.path("toolName").asString()).isEqualTo("terminal");
-        assertThat(tool.hasNonNull("detail")).as("MEMBER 역할의 terminal 사건에 detail 이 실렸다: %s", tool).isFalse();
+        assertThat(tool.hasNonNull("detail"))
+                .as("MEMBER 역할의 terminal 사건에 detail 이 실렸다: %s", tool)
+                .isFalse();
     }
 
     @Test
-    void ADMIN_역할에게는_tool_사건의_명령_원문을_싣는다() throws Exception {
+    @DisplayName("ADMIN 역할에게는 tool 사건의 명령 원문을 싣는다")
+    void includesToolCommandTextForAdminRole() throws Exception {
         CurrentUser dad = signedIn("events-admin", UserRole.ADMIN);
         Conversation conversation = conversationOf(dad);
         MvcResult subscribed = subscribe(conversation.publicId());
@@ -180,10 +208,15 @@ class ConversationEventControllerTest {
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */
     private CurrentUser signedIn(String name, UserRole role) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, role));
-        agents.save(Agent.of(name, name, name,
+        agents.save(Agent.of(
+                name,
+                name,
+                name,
                 "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, user.id()));
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), role);
         when(currentUser.require()).thenReturn(current);
         return current;

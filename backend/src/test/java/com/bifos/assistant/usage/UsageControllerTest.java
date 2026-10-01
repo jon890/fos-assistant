@@ -27,6 +27,7 @@ import java.util.List;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -44,37 +45,51 @@ class UsageControllerTest {
 
     private static final Long USER_ID = 4_401L;
 
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AgentRepository agents;
-    @Autowired AgentService agentService;
-    @Autowired ExecutionTreeService trees;
-    @Autowired ConversationRepository conversations;
-    @Autowired SkillUsageQuery skillUsage;
-    @Autowired EntityManagerFactory entityManagers;
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ExecutionTreeService trees;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    SkillUsageQuery skillUsage;
+
+    @Autowired
+    EntityManagerFactory entityManagers;
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
     private Agent agent;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         executions.deleteAll();
-        agent = agents.findByCode("list-dad").orElseGet(() -> agents.save(Agent.of(
-                "list-dad",
-                "목록 아빠",
-                "dad",
-                "http://127.0.0.1:1/p/dad",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                USER_ID)));
+        agent = agents.findByCode("list-dad")
+                .orElseGet(() -> agents.save(Agent.of(
+                        "list-dad",
+                        "목록 아빠",
+                        "dad",
+                        "http://127.0.0.1:1/p/dad",
+                        CostMode.SUBSCRIPTION,
+                        CredentialScope.SHARED_HOUSEHOLD,
+                        AgentVisibility.PRIVATE,
+                        USER_ID)));
         controller = new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage);
-        when(currentUser.require())
-                .thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
+        when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
     }
 
     @Test
-    void 자식을_가진_실행만_hasChildren_이_참이다() {
+    @DisplayName("자식을 가진 실행만 hasChildren 이 참이다")
+    void onlyRunsWithChildrenHaveHasChildrenTrue() {
         AgentExecution parent = execution(null, null);
         execution(parent.id(), parent.id());
         AgentExecution alone = execution(null, null);
@@ -94,7 +109,8 @@ class UsageControllerTest {
     }
 
     @Test
-    void 요청한_effort_를_싣고_고르지_않은_실행은_null_이다() {
+    @DisplayName("요청한 effort 를 싣고 고르지 않은 실행은 null 이다")
+    void carriesRequestedEffortAndUnchosenRunIsNull() {
         AgentExecution chosen = execution(null, null, "high");
         AgentExecution byDefault = execution(null, null);
 
@@ -113,7 +129,8 @@ class UsageControllerTest {
     }
 
     @Test
-    void 에이전트_행이_없어도_두_줄이_나오고_없는_쪽의_에이전트_칸만_빈다() {
+    @DisplayName("에이전트 행이 없어도 두 줄이 나오고 없는 쪽의 에이전트 칸만 빈다")
+    void twoRowsComeOutWithoutAgentRowAndOnlyMissingSideAgentColumnIsEmpty() {
         Agent gone = agents.save(Agent.of(
                 "list-gone",
                 "지운 아빠",
@@ -163,16 +180,13 @@ class UsageControllerTest {
     private static final long QUERIES_PER_LIST = 5;
 
     @Test
-    void 목록이_길어져도_자식을_확인하는_질의는_늘지_않는다() {
+    @DisplayName("목록이 길어져도 자식을 확인하는 질의는 늘지 않는다")
+    void childCheckQueriesDoNotGrowAsListGrows() {
         long few = queriesForList(2);
         long many = queriesForList(10);
 
-        assertThat(few)
-                .as("실행 2개일 때 %d 번 질의했다", few)
-                .isEqualTo(QUERIES_PER_LIST);
-        assertThat(many)
-                .as("실행 10개일 때 %d 번 질의했다. 2개일 때는 %d 번이었다", many, few)
-                .isEqualTo(QUERIES_PER_LIST);
+        assertThat(few).as("실행 2개일 때 %d 번 질의했다", few).isEqualTo(QUERIES_PER_LIST);
+        assertThat(many).as("실행 10개일 때 %d 번 질의했다. 2개일 때는 %d 번이었다", many, few).isEqualTo(QUERIES_PER_LIST);
     }
 
     /** 실행을 그만큼 넣고 목록을 한 번 부르면서 질의 수를 센다. */

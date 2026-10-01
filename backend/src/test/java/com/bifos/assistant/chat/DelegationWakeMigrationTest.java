@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,13 +26,18 @@ class DelegationWakeMigrationTest {
     private String url;
 
     @BeforeEach
-    void 전체_마이그레이션을_적용한다() {
+    void setUp() {
         url = "jdbc:h2:mem:delegation-wake-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
     }
 
     @Test
-    void V37은_대화에_기본값_0_인_auto_turn_count_를_더한다() throws SQLException {
+    @DisplayName("V37은 대화에 기본값 0 인 auto turn count 를 더한다")
+    void v37AddsAutoTurnCountDefaultingToZero() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             DatabaseMetaData meta = connection.getMetaData();
             try (ResultSet column = meta.getColumns(null, null, "CONVERSATION", "AUTO_TURN_COUNT")) {
@@ -43,10 +49,16 @@ class DelegationWakeMigrationTest {
     }
 
     @Test
-    void V37은_이미_있던_대화의_auto_turn_count_를_0_으로_채운다() throws SQLException {
+    @DisplayName("V37은 이미 있던 대화의 auto turn count 를 0 으로 채운다")
+    void v37FillsAutoTurnCountOfExistingConversationsWithZero() throws SQLException {
         String before = "jdbc:h2:mem:delegation-wake-before-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         // 공개 식별자 칸이 생기기 전 버전에서 대화를 넣으면 이후 마이그레이션이 그 칸을 채운다.
-        Flyway.configure().dataSource(before, "sa", "").locations("classpath:db/migration").target("22").load().migrate();
+        Flyway.configure()
+                .dataSource(before, "sa", "")
+                .locations("classpath:db/migration")
+                .target("22")
+                .load()
+                .migrate();
         try (Connection connection = DriverManager.getConnection(before, "sa", "");
                 Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
@@ -54,7 +66,11 @@ class DelegationWakeMigrationTest {
                     VALUES (900, 1, 'before', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                     """);
 
-            Flyway.configure().dataSource(before, "sa", "").locations("classpath:db/migration").load().migrate();
+            Flyway.configure()
+                    .dataSource(before, "sa", "")
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
 
             try (ResultSet row = statement.executeQuery("SELECT auto_turn_count FROM conversation WHERE id = 900")) {
                 assertThat(row.next()).isTrue();
@@ -64,9 +80,15 @@ class DelegationWakeMigrationTest {
     }
 
     @Test
-    void V37은_이미_끝난_위임_실행만_전한_것으로_채우고_도는_위임과_위임이_아닌_실행은_비워_둔다() throws SQLException {
+    @DisplayName("V37은 이미 끝난 위임 실행만 전한 것으로 채우고 도는 위임과 위임이 아닌 실행은 비워 둔다")
+    void v37MarksOnlyFinishedDelegationsAsDelivered() throws SQLException {
         String before = "jdbc:h2:mem:delegation-wake-backfill-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        Flyway.configure().dataSource(before, "sa", "").locations("classpath:db/migration").target("36").load().migrate();
+        Flyway.configure()
+                .dataSource(before, "sa", "")
+                .locations("classpath:db/migration")
+                .target("36")
+                .load()
+                .migrate();
         try (Connection connection = DriverManager.getConnection(before, "sa", "");
                 Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
@@ -83,29 +105,40 @@ class DelegationWakeMigrationTest {
                             TIMESTAMP '2026-01-01 00:00:00', TIMESTAMP '2026-01-01 00:01:00')
                     """);
 
-            Flyway.configure().dataSource(before, "sa", "").locations("classpath:db/migration").load().migrate();
+            Flyway.configure()
+                    .dataSource(before, "sa", "")
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
 
-            assertThat(deliveredAt(statement, 901)).as("끝난 위임은 끝난 시각으로 채운다")
+            assertThat(deliveredAt(statement, 901))
+                    .as("끝난 위임은 끝난 시각으로 채운다")
                     .isEqualTo(Timestamp.valueOf("2026-01-01 00:01:00"));
             assertThat(deliveredAt(statement, 902)).as("끝난 시각이 없는 끝난 위임도 채운다").isNotNull();
-            assertThat(deliveredAt(statement, 903)).as("도는 위임은 기동 정리 뒤에 전하도록 비워 둔다").isNull();
+            assertThat(deliveredAt(statement, 903))
+                    .as("도는 위임은 기동 정리 뒤에 전하도록 비워 둔다")
+                    .isNull();
             assertThat(deliveredAt(statement, 904)).as("위임이 아닌 실행").isNull();
         }
     }
 
     private static Timestamp deliveredAt(Statement statement, long id) throws SQLException {
-        try (ResultSet row = statement.executeQuery("SELECT result_delivered_at FROM agent_execution WHERE id = " + id)) {
+        try (ResultSet row =
+                statement.executeQuery("SELECT result_delivered_at FROM agent_execution WHERE id = " + id)) {
             assertThat(row.next()).as("실행 %d", id).isTrue();
             return row.getTimestamp(1);
         }
     }
 
     @Test
-    void V37은_실행에_비어_있어도_되는_result_delivered_at_과_대화별_전달_색인을_더한다() throws SQLException {
+    @DisplayName("V37은 실행에 비어 있어도 되는 result delivered at 과 대화별 전달 색인을 더한다")
+    void v37AddsNullableResultDeliveredAtAndConversationIndex() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             DatabaseMetaData meta = connection.getMetaData();
             try (ResultSet column = meta.getColumns(null, null, "AGENT_EXECUTION", "RESULT_DELIVERED_AT")) {
-                assertThat(column.next()).as("agent_execution.result_delivered_at 칸").isTrue();
+                assertThat(column.next())
+                        .as("agent_execution.result_delivered_at 칸")
+                        .isTrue();
                 assertThat(column.getString("IS_NULLABLE")).isEqualTo("YES");
             }
             assertThat(indexColumns(meta, "AGENT_EXECUTION", "IDX_AGENT_EXECUTION_CONVERSATION_DELIVERED"))

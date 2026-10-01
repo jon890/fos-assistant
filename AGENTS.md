@@ -126,7 +126,7 @@ scripts/check-public-safe.sh
 
 ## 확인
 
-아래 일곱 검사를 한 번에 돌린다.
+아래 여덟 검사를 한 번에 돌린다.
 
 ```bash
 # cwd: 저장소 root
@@ -138,6 +138,10 @@ scripts/check-local.sh
 둘을 빠뜨려 코드와 관계없이 `playwright: command not found` 와 `Failed to collect page data` 로 실패한 적이 있다.
 처음 실패한 단계에서 멈추고 그 로그의 끝을 보인다.
 
+`scripts/quality.sh check` 는 backend 의 구조 규칙과 코드 규칙과 포맷, web 의 lint 와 포맷을 파일을 바꾸지 않고 검사한다.
+`scripts/quality.sh fix` 는 기계가 고칠 수 있는 위반(OpenRewrite, Spotless, `eslint --fix`, Prettier, 고친 위반의 기준 줄)만 고친 뒤 `check` 를 돌려 사람이 판단할 위반을 보인다. 새 위반은 기준에 더하지 않는다.
+자세한 것은 [`backend/AGENTS.md`](backend/AGENTS.md) 와 [`web/AGENTS.md`](web/AGENTS.md) 에 있다.
+
 스크립트가 차례로 돌리는 명령은 아래와 같다.
 
 ```bash
@@ -148,6 +152,7 @@ node test/e2e/run.ts
 node --test 'test/unit/**/*.test.ts'
 python3 -m unittest discover -s hermes/tests
 scripts/check-public-safe.sh
+scripts/quality.sh check
 ```
 
 **위 검사가 모두 통과하면 머지한다. 머지마다 승인을 받지 않는다.**
@@ -155,7 +160,7 @@ scripts/check-public-safe.sh
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
-GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 일곱 검사를 돌린다.
+GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 여덟 검사를 돌린다.
 PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사하고, main 에 push 하면 main 을 검사한다.
 각 검사는 독립된 job 으로 나란히 돈다. 로컬 직접 확인과 위 규칙은 그대로 유지한다.
 브라우저 검사는 `browser-mobile` 과 `browser-desktop` 으로 나눠 두 폭을 나란히 검사한다.
@@ -187,7 +192,7 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.1
 
 브랜치를 push 하고 PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
 **계획서만으로 PR 을 열지 않는다.** 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
-PR 의 merge ref 에서 CI 의 `backend`, `web`, `e2e`, `unit`, `hermes`, `public-safe` 가 모두 통과했는지 확인한다. 브라우저 검사는 로컬에서 직접 돌린 결과로 본다.
+PR 의 merge ref 에서 CI 의 `backend`, `web`, `e2e`, `unit`, `hermes`, `public-safe`, `quality` 가 모두 통과했는지 확인한다. 브라우저 검사는 로컬에서 직접 돌린 결과로 본다.
 브랜치 보호의 필수 검사는 CI 가 여러 번 안정되게 돈 뒤 따로 정한다.
 PR 을 열면 `.github/workflows/claude-code-review.yml` 이 Claude 코드 리뷰를 돌린다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖고, 그 파일은 이 문서와 `docs/` 를 가리킨다.

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.user.domain.UserRole;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -22,27 +23,35 @@ class McpCallerTest {
     private final McpCallContext context = new McpCallContext("fos-root", "fos-root", "call_1");
 
     @Test
-    void 요청자와_origin_실행과_호출_맥락_중_하나라도_없으면_만들지_못한다() {
-        assertThatThrownBy(() -> new McpCaller(null, execution, context)).as("요청자 없음")
+    @DisplayName("요청자와 origin 실행과 호출 맥락 중 하나라도 없으면 만들지 못한다")
+    void cannotBeBuiltWhenAnyOfRequesterOriginRunOrCallContextIsMissing() {
+        assertThatThrownBy(() -> new McpCaller(null, execution, context))
+                .as("요청자 없음")
                 .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new McpCaller(user, null, context)).as("origin 실행 없음")
+        assertThatThrownBy(() -> new McpCaller(user, null, context))
+                .as("origin 실행 없음")
                 .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new McpCaller(user, execution, null)).as("호출 맥락 없음")
+        assertThatThrownBy(() -> new McpCaller(user, execution, null))
+                .as("호출 맥락 없음")
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    void 세_값이_있으면_실행_번호는_origin_실행의_번호다() {
+    @DisplayName("세 값이 있으면 실행 번호는 origin 실행의 번호다")
+    void runIdIsOriginRunIdWhenAllThreeValuesExist() {
         when(execution.id()).thenReturn(42L);
 
         assertThat(new McpCaller(user, execution, context).executionId()).isEqualTo(42L);
     }
 
     @Test
-    void 인증_주체는_profile_과_토큰_해시_없이_만들지_못하고_로그_글에_해시를_싣지_않는다() {
-        assertThatThrownBy(() -> new McpPrincipal(1L, null, "hash")).as("profile 없음")
+    @DisplayName("인증 주체는 profile 과 토큰 해시 없이 만들지 못하고 로그 글에 해시를 싣지 않는다")
+    void principalNeedsProfileAndTokenHashAndLogTextOmitsHash() {
+        assertThatThrownBy(() -> new McpPrincipal(1L, null, "hash"))
+                .as("profile 없음")
                 .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new McpPrincipal(1L, "p", null)).as("토큰 해시 없음")
+        assertThatThrownBy(() -> new McpPrincipal(1L, "p", null))
+                .as("토큰 해시 없음")
                 .isInstanceOf(NullPointerException.class);
 
         String tokenHash = "a".repeat(64);

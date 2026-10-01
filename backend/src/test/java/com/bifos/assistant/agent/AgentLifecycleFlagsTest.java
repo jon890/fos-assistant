@@ -12,11 +12,11 @@ import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentAdminController;
-import com.bifos.assistant.agent.presentation.AgentToolController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
 import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateToolsetsRequest;
+import com.bifos.assistant.agent.presentation.AgentToolController;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,21 +73,40 @@ class AgentLifecycleFlagsTest {
 
     private static final Instant DELETED_AT = Instant.parse("2026-09-29T00:00:00Z");
 
-    @Autowired AgentService agentService;
-    @Autowired AgentAdminController admin;
-    @Autowired AgentToolController agentTools;
-    @Autowired ChatService chat;
-    @Autowired AgentRepository agents;
-    @Autowired AppUserRepository users;
-    @Autowired ChatMessageRepository messages;
-    @Autowired HermesRunsClient hermes;
-    @Autowired PlatformTransactionManager transactionManager;
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    AgentAdminController admin;
+
+    @Autowired
+    AgentToolController agentTools;
+
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    HermesRunsClient hermes;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     /** 그룹으로 공개하는 요청이 도구 목록을 읽는다. 실제 Hermes 를 부르지 않도록 빈 목록을 돌려준다. */
-    @MockitoBean HermesToolsetClient hermesToolsets;
+    @MockitoBean
+    HermesToolsetClient hermesToolsets;
 
     /** 관리자가 등록할 때 주소가 닿는지 본다. 실제 Hermes 를 부르지 않도록 통과시킨다. */
-    @MockitoBean AgentEndpointProbe endpointProbe;
+    @MockitoBean
+    AgentEndpointProbe endpointProbe;
 
     private CurrentUser owner;
     private CurrentUser otherMember;
@@ -106,15 +126,14 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 지운_에이전트는_목록과_시작과_쓰기에서_없는_에이전트이고_번호로는_읽힌다() {
+    @DisplayName("지운 에이전트는 목록과 시작과 쓰기에서 없는 에이전트이고 번호로는 읽힌다")
+    void deletedAgentIsMissingInListStartAndWriteButReadableById() {
         String helper = randomCode("helper");
         Agent agent = agents.save(privateAgentOf(helper, owner));
         agent.markDeleted(DELETED_AT);
         agents.save(agent);
 
-        assertThat(agentService.readableBy(owner))
-                .extracting(Agent::code)
-                .doesNotContain(helper);
+        assertThat(agentService.readableBy(owner)).extracting(Agent::code).doesNotContain(helper);
         assertNotFound(() -> agentService.requireStartable(owner, helper));
         assertNotFound(() -> new TransactionTemplate(transactionManager)
                 .execute(status -> agentService.requireReadableForUpdate(owner, helper)));
@@ -126,7 +145,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 지운_에이전트의_기존_대화에_보내면_없는_에이전트이고_Hermes_를_부르지_않는다() {
+    @DisplayName("지운 에이전트의 기존 대화에 보내면 없는 에이전트이고 Hermes 를 부르지 않는다")
+    void sendingToConversationOfDeletedAgentIsMissingAndSkipsHermes() {
         String helper = randomCode("helper");
         agents.save(privateAgentOf(helper, owner));
         Conversation conversation = chat.startEmpty(owner, helper);
@@ -140,7 +160,8 @@ class AgentLifecycleFlagsTest {
 
     /** 다시 만들기는 새 질문 없이 기존 대화의 에이전트로 곧바로 간다. 그 길도 지운 에이전트를 막는다. */
     @Test
-    void 지운_에이전트의_답을_다시_만들면_없는_에이전트이고_Hermes_를_부르지_않는다() {
+    @DisplayName("지운 에이전트의 답을 다시 만들면 없는 에이전트이고 Hermes 를 부르지 않는다")
+    void regeneratingReplyOfDeletedAgentIsMissingAndSkipsHermes() {
         String helper = randomCode("helper");
         agents.save(privateAgentOf(helper, owner));
         Conversation conversation = chat.startEmpty(owner, helper);
@@ -154,7 +175,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 관리자도_지운_에이전트를_켜지_못하고_관리_목록에서_보지_못한다() {
+    @DisplayName("관리자도 지운 에이전트를 켜지 못하고 관리 목록에서 보지 못한다")
+    void adminCannotEnableDeletedAgentNorSeeItInManageList() {
         String helper = randomCode("helper");
         String kept = randomCode("kept");
         Agent deleted = agents.save(privateAgentOf(helper, owner));
@@ -163,14 +185,14 @@ class AgentLifecycleFlagsTest {
         agents.save(privateAgentOf(kept, owner));
         signIn(administrator);
 
-        assertNotFound(() -> admin.update(
-                helper, new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null)));
+        assertNotFound(() -> admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null)));
         assertThat(agents.findByCode(helper).orElseThrow().enabled()).isFalse();
         assertThat(admin.list()).extracting(AdminAgentView::code).contains(kept).doesNotContain(helper);
     }
 
     @Test
-    void 관리자도_지운_에이전트의_도구를_읽거나_바꾸지_못한다() {
+    @DisplayName("관리자도 지운 에이전트의 도구를 읽거나 바꾸지 못한다")
+    void adminCannotReadOrChangeToolsOfDeletedAgent() {
         String helper = randomCode("helper");
         Agent deleted = agents.save(privateAgentOf(helper, owner));
         deleted.markDeleted(DELETED_AT);
@@ -183,13 +205,13 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 그룹으로_공개해도_주인이_남고_주인만_고친다() {
+    @DisplayName("그룹으로 공개해도 주인이 남고 주인만 고친다")
+    void keepsOwnerWhenPublishedToGroupAndOnlyOwnerEdits() {
         String helper = randomCode("helper");
         agents.save(privateAgentOf(helper, owner));
         signIn(administrator);
 
-        AdminAgentView view = admin.update(
-                helper, new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null));
+        AdminAgentView view = admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null));
 
         assertThat(view.visibility()).isEqualTo("GROUP");
         assertThat(view.ownerUserId()).isEqualTo(owner.id());
@@ -201,7 +223,8 @@ class AgentLifecycleFlagsTest {
     }
 
     @Test
-    void 관리자가_그룹_에이전트를_만들_때_준_사용자가_주인이_되고_없는_사용자는_거절한다() {
+    @DisplayName("관리자가 그룹 에이전트를 만들 때 준 사용자가 주인이 되고 없는 사용자는 거절한다")
+    void adminCreatedGroupAgentGetsGivenUserAsOwnerAndRejectsUnknownUser() {
         signIn(administrator);
 
         String ghost = randomCode("ghost");
@@ -219,9 +242,16 @@ class AgentLifecycleFlagsTest {
     }
 
     private static CreateAgentRequest groupRequest(String code, String ownerEmail) {
-        return new CreateAgentRequest(code, code, code, "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP,
-                ownerEmail, null);
+        return new CreateAgentRequest(
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                ownerEmail,
+                null);
     }
 
     private void assertNotFound(Runnable call) {
@@ -247,12 +277,18 @@ class AgentLifecycleFlagsTest {
     }
 
     private static Agent privateAgentOf(String code, CurrentUser owner) {
-        return Agent.of(code, code, code, "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id());
+        return Agent.of(
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                owner.id());
     }
 
     private static void signIn(CurrentUser user) {
-        SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken(user, null));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user, null));
     }
 }

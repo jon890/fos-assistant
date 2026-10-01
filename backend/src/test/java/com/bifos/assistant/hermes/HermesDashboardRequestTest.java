@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -42,13 +43,11 @@ class HermesDashboardRequestTest {
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
-            calls.add(
-                    new Call(
-                            exchange.getRequestMethod(),
-                            exchange.getRequestURI().getPath(),
-                            exchange.getRequestHeaders().getFirst("Authorization"),
-                            new String(
-                                    exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+            calls.add(new Call(
+                    exchange.getRequestMethod(),
+                    exchange.getRequestURI().getPath(),
+                    exchange.getRequestHeaders().getFirst("Authorization"),
+                    new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] payload = responseBody.getBytes(StandardCharsets.UTF_8);
             // 대시보드는 JSON 으로 답한다. 이 머리글이 없으면 응답을 읽는 호출만 변환기를 찾지 못한다.
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -75,20 +74,20 @@ class HermesDashboardRequestTest {
     }
 
     private HttpHermesDashboardClient clientFor(String baseUrl) {
-        return new HttpHermesDashboardClient(
-                new HermesProperties(
-                        "keys",
-                        baseUrl,
-                        TOKEN,
-                        "https://hermes-listener.example.com",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1)));
+        return new HttpHermesDashboardClient(new HermesProperties(
+                "keys",
+                baseUrl,
+                TOKEN,
+                "https://hermes-listener.example.com",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)));
     }
 
     @Test
-    void profile_을_만들_때_본뜰_profile_을_주지_않고_번들_스킬을_심지_않는다() {
+    @DisplayName("profile 을 만들 때 본뜰 profile 을 주지 않고 번들 스킬을 심지 않는다")
+    void createsProfileWithoutCloneSourceAndBundledSkills() {
         client.createProfile("kid");
 
         assertThat(calls).singleElement().satisfies(call -> {
@@ -102,7 +101,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void 환경_값은_profile_과_이름과_값을_함께_싣는다() {
+    @DisplayName("환경 값은 profile 과 이름과 값을 함께 싣는다")
+    void envValueCarriesProfileNameAndValue() {
         client.putEnv("kid", "API_SERVER_MODEL_NAME", "kid");
 
         assertThat(calls).singleElement().satisfies(call -> {
@@ -117,7 +117,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void profile_을_지울_때_그_이름이_경로에_붙는다() {
+    @DisplayName("profile 을 지울 때 그 이름이 경로에 붙는다")
+    void appendsNameToPathWhenDeletingProfile() {
         client.deleteProfile("kid");
 
         assertThat(calls).singleElement().satisfies(call -> {
@@ -129,7 +130,8 @@ class HermesDashboardRequestTest {
 
     /** 지우다 실패한 뒤 다시 지울 때 끝까지 가려면, 없는 profile 은 이미 지운 것으로 봐야 한다. */
     @Test
-    void 지울_profile_이_없다는_404_는_정상으로_끝난다() {
+    @DisplayName("지울 profile 이 없다는 404 는 정상으로 끝난다")
+    void treatsNoSuchProfile404OnDeleteAsNormalEnd() {
         respondWith(404, "{\"error\":\"no such profile\"}");
 
         client.deleteProfile("kid");
@@ -141,7 +143,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void profile_을_지우다_500_을_받으면_닿지_못한_것으로_남는다() {
+    @DisplayName("profile 을 지우다 500 을 받으면 닿지 못한 것으로 남는다")
+    void remainsUnreachableWhenProfileDeleteGets500() {
         respondWith(500, "{\"error\":\"boom\"}");
 
         assertThatThrownBy(() -> client.deleteProfile("kid"))
@@ -151,7 +154,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void SOUL_을_읽을_때_그_이름이_경로에_붙는다() {
+    @DisplayName("SOUL 을 읽을 때 그 이름이 경로에 붙는다")
+    void appendsNameToPathWhenReadingSoul() {
         respondWith(200, "{\"content\":\"너는 아빠다\",\"exists\":true}");
 
         SoulDocument soul = client.readSoul("kid");
@@ -165,7 +169,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void SOUL_을_쓸_때_본문이_content_한_칸이다() {
+    @DisplayName("SOUL 을 쓸 때 본문이 content 한 칸이다")
+    void soulWriteBodyIsSingleContentField() {
         client.putSoul("kid", "너는 아빠다");
 
         assertThat(calls).singleElement().satisfies(call -> {
@@ -177,7 +182,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void 규칙에_맞지_않는_profile_이름은_대시보드를_부르지_않는다() {
+    @DisplayName("규칙에 맞지 않는 profile 이름은 대시보드를 부르지 않는다")
+    void doesNotCallDashboardForProfileNameBreakingRule() {
         assertThatThrownBy(() -> client.readSoul("../etc"))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
@@ -191,7 +197,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void 주소_끝에_빗금이_붙어_있어도_경로가_겹치지_않는다() {
+    @DisplayName("주소 끝에 빗금이 붙어 있어도 경로가 겹치지 않는다")
+    void pathsDoNotOverlapEvenIfUrlEndsWithSlash() {
         clientFor(baseUrl() + "/").createProfile("kid");
 
         assertThat(calls)
@@ -200,7 +207,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void 이미_쓰이는_이름이면_그것으로_알린다() {
+    @DisplayName("이미 쓰이는 이름이면 그것으로 알린다")
+    void reportsNameAlreadyInUse() {
         respondWith(409, "{\"error\":\"profile already exists\"}");
 
         assertThatThrownBy(() -> client.createProfile("kid"))
@@ -210,7 +218,8 @@ class HermesDashboardRequestTest {
     }
 
     @Test
-    void 다른_실패는_닿지_못한_것으로_남는다() {
+    @DisplayName("다른 실패는 닿지 못한 것으로 남는다")
+    void otherFailuresRemainAsUnreachable() {
         respondWith(500, "{\"error\":\"boom\"}");
 
         assertThatThrownBy(() -> client.createProfile("kid"))

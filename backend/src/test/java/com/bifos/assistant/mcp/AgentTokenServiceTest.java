@@ -13,6 +13,7 @@ import java.lang.reflect.Field;
 import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,13 +24,23 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("test")
 class AgentTokenServiceTest {
-    @Autowired AgentTokenService tokens;
-    @Autowired AgentTokenRepository tokenRepository;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    AgentTokenService tokens;
 
-    @BeforeEach void 준비한다() { tokenRepository.deleteAll(); }
+    @Autowired
+    AgentTokenRepository tokenRepository;
 
-    @Test void 발급한_원문은_응답에만_있고_저장된_행에는_없다() throws IllegalAccessException {
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @BeforeEach
+    void setUp() {
+        tokenRepository.deleteAll();
+    }
+
+    @Test
+    @DisplayName("발급한 원문은 응답에만 있고 저장된 행에는 없다")
+    void rawValueIsOnlyInResponseAndNotInStoredRow() throws IllegalAccessException {
         var issued = tokens.issue("hermes-profile", "hermes");
         AgentToken saved = tokenRepository.findById(issued.token().id()).orElseThrow();
         assertThat(issued.rawToken()).isNotBlank();
@@ -43,49 +54,69 @@ class AgentTokenServiceTest {
         }
     }
 
-    @Test void profile_로_발급한_토큰은_사용자를_갖지_않는다() {
+    @Test
+    @DisplayName("profile 로 발급한 토큰은 사용자를 갖지 않는다")
+    void tokenIssuedForProfileHasNoUser() {
         var issued = tokens.issue("hermes-profile", "hermes");
         AgentToken saved = tokenRepository.findById(issued.token().id()).orElseThrow();
         assertThat(issued.profileName()).isEqualTo("hermes-profile");
         assertThat(saved.profileName()).isEqualTo("hermes-profile");
     }
 
-    @Test void profile_이름_규칙을_어기면_발급하지_않는다() {
+    @Test
+    @DisplayName("profile 이름 규칙을 어기면 발급하지 않는다")
+    void doesNotIssueWhenProfileNameBreaksRule() {
         String tooLong = "a".repeat(65);
         for (String name : new String[] {"", "Upper", "-leading", "has space", "../escape", tooLong}) {
             assertValidationFailed(() -> tokens.issue(name, "hermes"), name);
         }
         assertValidationFailed(() -> tokens.issue(null, "hermes"), null);
-        assertThat(tokens.issue("a".repeat(64), "hermes").profileName()).as("64자까지는 받는다").hasSize(64);
+        assertThat(tokens.issue("a".repeat(64), "hermes").profileName())
+                .as("64자까지는 받는다")
+                .hasSize(64);
     }
 
-    @Test void 폐기해도_행은_남고_폐기_시각이_채워진다() {
+    @Test
+    @DisplayName("폐기해도 행은 남고 폐기 시각이 채워진다")
+    void revokeKeepsRowAndFillsRevokedTime() {
         var issued = tokens.issue("hermes-profile", "hermes");
         tokens.revoke(issued.token().id());
-        assertThat(tokenRepository.findById(issued.token().id())).isPresent().get().extracting(AgentToken::revokedAt).isNotNull();
+        assertThat(tokenRepository.findById(issued.token().id()))
+                .isPresent()
+                .get()
+                .extracting(AgentToken::revokedAt)
+                .isNotNull();
     }
 
-    @Test void 인증하면_마지막_사용_시각을_갱신하고_profile_을_증명한다() {
+    @Test
+    @DisplayName("인증하면 마지막 사용 시각을 갱신하고 profile 을 증명한다")
+    void authenticationUpdatesLastUsedTimeAndProvesProfile() {
         var issued = tokens.issue("hermes-profile", "hermes");
-        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt()).isNull();
+        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt())
+                .isNull();
         McpPrincipal principal = tokens.authenticate(issued.rawToken());
-        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt()).isNotNull();
+        assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt())
+                .isNotNull();
         assertThat(principal.profileName()).isEqualTo("hermes-profile");
         assertThat(principal.tokenHash()).isEqualTo(AgentTokenService.hash(issued.rawToken()));
         assertThat(principal.toString()).doesNotContain(principal.tokenHash());
     }
 
-    @Test void profile_이_빈_토큰은_인증하지_않고_사용_시각을_남기지_않는다() {
+    @Test
+    @DisplayName("profile 이 빈 토큰은 인증하지 않고 사용 시각을 남기지 않는다")
+    void doesNotAuthenticateBlankProfileTokenNorLeaveUsedTime() {
         String raw = "unbound-" + UUID.randomUUID();
         long id = McpCallSigner.insertUnboundToken(jdbc, raw, "unbound");
         assertThatThrownBy(() -> tokens.authenticate(raw))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.UNAUTHENTICATED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.UNAUTHENTICATED));
         assertThat(tokenRepository.findById(id).orElseThrow().lastUsedAt()).isNull();
     }
 
     private static void assertValidationFailed(ThrowingCallable call, String input) {
         assertThatThrownBy(call)
                 .as("입력 %s", input)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 }

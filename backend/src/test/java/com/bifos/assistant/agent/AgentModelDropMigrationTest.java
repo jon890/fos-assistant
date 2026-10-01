@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,7 +26,7 @@ class AgentModelDropMigrationTest {
     private String url;
 
     @BeforeEach
-    void V26_시점의_에이전트를_두고_끝까지_올린다() throws SQLException {
+    void migrateUpFromV26WithAgent() throws SQLException {
         url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
 
         // V27 바로 앞까지 올린 뒤 모델 칸이 채워진 에이전트와 그 모델 목록, 막힌 provider 를 넣는다.
@@ -37,8 +38,7 @@ class AgentModelDropMigrationTest {
                 .migrate();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO agent (
                         code, name, hermes_profile, api_base_url, provider, model, model_synced_at,
                         cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at
@@ -48,13 +48,11 @@ class AgentModelDropMigrationTest {
                         CURRENT_TIMESTAMP(6)
                     )
                     """);
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO agent_model_option (agent_id, option_rank, provider, model, created_at)
                     SELECT id, 1, 'openai-codex', 'example-model', CURRENT_TIMESTAMP(6) FROM agent
                     """);
-            statement.executeUpdate(
-                    """
+            statement.executeUpdate("""
                     INSERT INTO provider_state (provider, blocked_until, blocked_reason, updated_at)
                     VALUES ('openai-codex', CURRENT_TIMESTAMP(6), 'rate limit', CURRENT_TIMESTAMP(6))
                     """);
@@ -68,22 +66,20 @@ class AgentModelDropMigrationTest {
     }
 
     @Test
-    void V27_뒤에는_모델_목록과_막힌_provider_표가_없다() throws SQLException {
-        List<String> tables = strings(
-                """
+    @DisplayName("V27 뒤에는 모델 목록과 막힌 provider 표가 없다")
+    void v27DropsModelListAndBlockedProviderTable() throws SQLException {
+        List<String> tables = strings("""
                 SELECT UPPER(TABLE_NAME) FROM INFORMATION_SCHEMA.TABLES
                 WHERE UPPER(TABLE_NAME) IN ('AGENT_MODEL_OPTION', 'PROVIDER_STATE', 'AGENT')
                 """);
 
-        assertThat(tables)
-                .as("V27 뒤에 남은 표")
-                .containsExactly("AGENT");
+        assertThat(tables).as("V27 뒤에 남은 표").containsExactly("AGENT");
     }
 
     @Test
-    void V27_뒤에는_agent_의_모델_칸이_없고_다른_칸은_남는다() throws SQLException {
-        List<String> columns = strings(
-                """
+    @DisplayName("V27 뒤에는 agent 의 모델 칸이 없고 다른 칸은 남는다")
+    void v27DropsAgentModelColumnKeepingOthers() throws SQLException {
+        List<String> columns = strings("""
                 SELECT UPPER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE UPPER(TABLE_NAME) = 'AGENT'
                 """);
@@ -95,10 +91,9 @@ class AgentModelDropMigrationTest {
     }
 
     @Test
-    void V27_은_이미_있던_에이전트_줄을_지우지_않는다() throws SQLException {
-        assertThat(strings("SELECT code FROM agent"))
-                .as("V27 뒤 남은 에이전트")
-                .containsExactly("dad");
+    @DisplayName("V27 은 이미 있던 에이전트 줄을 지우지 않는다")
+    void v27KeepsExistingAgentRows() throws SQLException {
+        assertThat(strings("SELECT code FROM agent")).as("V27 뒤 남은 에이전트").containsExactly("dad");
     }
 
     private List<String> strings(String sql) throws SQLException {

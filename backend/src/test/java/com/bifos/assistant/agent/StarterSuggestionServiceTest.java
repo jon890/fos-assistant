@@ -44,6 +44,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -60,33 +61,55 @@ import tools.jackson.databind.ObjectMapper;
  * <p>서비스를 직접 만들어 시각과 실행기를 바꿔 끼운다. 시각을 옮겨 오래됨과 재시도 시간을 만들고, 실행기가 받은
  * 만들기가 끝나기를 기다린 뒤 결과를 읽는다. 다른 검사에서는 추천이 꺼져 있고 이 검사만 켠다.
  */
-@SpringBootTest(properties = {
-        "assistant.starters.enabled=true",
-        "assistant.starters.refresh-after=24h",
-        "assistant.starters.retry-after-failure=10m"
-})
+@SpringBootTest(
+        properties = {
+            "assistant.starters.enabled=true",
+            "assistant.starters.refresh-after=24h",
+            "assistant.starters.retry-after-failure=10m"
+        })
 @ActiveProfiles("test")
 @Import(StarterSuggestionServiceTest.StubRuntime.class)
 class StarterSuggestionServiceTest {
 
     @TestConfiguration
     static class StubRuntime {
-        @Bean @Primary StubHermesRunsClient stubHermesRunsClient() { return new StubHermesRunsClient(); }
+        @Bean
+        @Primary
+        StubHermesRunsClient stubHermesRunsClient() {
+            return new StubHermesRunsClient();
+        }
     }
 
     private static final CurrentUser DAD = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
     private static final CurrentUser KID = new CurrentUser(82L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
     private static final List<String> FOUR = List.of("일정 정리해 줘", "장보기 목록 만들어 줘", "날씨 알려 줘", "가계부 요약해 줘");
 
-    @Autowired StarterProperties properties;
-    @Autowired AgentService agentService;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executionRows;
-    @Autowired ExecutionRecorder executions;
-    @Autowired HermesRunsClient hermes;
-    @Autowired ObjectMapper objectMapper;
+    @Autowired
+    StarterProperties properties;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executionRows;
+
+    @Autowired
+    ExecutionRecorder executions;
+
+    @Autowired
+    HermesRunsClient hermes;
+
+    @Autowired
+    ObjectMapper objectMapper;
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
     private final TrackingExecutor executor = new TrackingExecutor();
@@ -94,20 +117,28 @@ class StarterSuggestionServiceTest {
     private Agent family;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         messages.deleteAll();
         conversations.deleteAll();
         executionRows.deleteAll();
         agents.deleteAll();
         stub().reset();
-        family = agents.save(Agent.of("starter-family", "가족", "starter-family", "http://runtime.test",
-                CostMode.API, CredentialScope.DEDICATED, AgentVisibility.GROUP, DAD.id()));
-        service = new StarterSuggestionService(properties, agentService, conversations, messages, hermes,
-                executions, objectMapper, clock, executor);
+        family = agents.save(Agent.of(
+                "starter-family",
+                "가족",
+                "starter-family",
+                "http://runtime.test",
+                CostMode.API,
+                CredentialScope.DEDICATED,
+                AgentVisibility.GROUP,
+                DAD.id()));
+        service = new StarterSuggestionService(
+                properties, agentService, conversations, messages, hermes, executions, objectMapper, clock, executor);
     }
 
     @Test
-    void 캐시가_비면_GENERATING_을_주고_만들기가_끝나면_READY_와_넷을_준다() {
+    @DisplayName("캐시가 비면 GENERATING 을 주고 만들기가 끝나면 READY 와 넷을 준다")
+    void returnsGeneratingOnEmptyCacheThenReadyWithFourAfterBuild() {
         answerWith(json(FOUR));
 
         StarterSuggestions first = service.read(DAD, "starter-family");
@@ -124,7 +155,8 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 추천_실행은_대화_없는_실행_줄로_남고_끝에_SUCCEEDED_다() {
+    @DisplayName("추천 실행은 대화 없는 실행 줄로 남고 끝에 SUCCEEDED 다")
+    void suggestionRunLeavesRunRowWithoutConversationEndingSucceeded() {
         answerWith(json(FOUR));
 
         service.read(DAD, "starter-family");
@@ -142,14 +174,22 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 이력이_있으면_그_사용자의_지우지_않은_대화마다_첫_질문을_입력에_싣는다() {
+    @DisplayName("이력이 있으면 그 사용자의 지우지 않은 대화마다 첫 질문을 입력에 싣는다")
+    void putsFirstQuestionOfEachLiveConversationIntoInput() {
         conversationOf(DAD, family, "이번 주 일정 알려 줘", "다음 질문은 싣지 않는다");
         conversationOf(DAD, family, "장보기 목록 정리해 줘");
         conversationOf(KID, family, "다른 사용자의 질문");
         Conversation deleted = conversationOf(DAD, family, "지운 대화의 질문");
         conversations.deleteIfActive(deleted.id(), DAD.id(), Instant.now());
-        Agent other = agents.save(Agent.of("starter-other", "다른", "starter-other", "http://runtime.test",
-                CostMode.API, CredentialScope.DEDICATED, AgentVisibility.GROUP, DAD.id()));
+        Agent other = agents.save(Agent.of(
+                "starter-other",
+                "다른",
+                "starter-other",
+                "http://runtime.test",
+                CostMode.API,
+                CredentialScope.DEDICATED,
+                AgentVisibility.GROUP,
+                DAD.id()));
         conversationOf(DAD, other, "다른 에이전트와 나눈 질문");
         answerWith(json(FOUR));
 
@@ -160,24 +200,23 @@ class StarterSuggestionServiceTest {
         assertThat(input.lines().findFirst()).contains(StarterSuggestionService.PROMPT_MARK);
         assertThat(input)
                 .contains("이번 주 일정 알려 줘", "장보기 목록 정리해 줘", "JSON 문자열 배열")
-                .doesNotContain("다른 사용자의 질문", "다음 질문은 싣지 않는다", "지운 대화의 질문",
-                        "다른 에이전트와 나눈 질문", "처음 해 볼 만한");
+                .doesNotContain("다른 사용자의 질문", "다음 질문은 싣지 않는다", "지운 대화의 질문", "다른 에이전트와 나눈 질문", "처음 해 볼 만한");
     }
 
     @Test
-    void 이력이_없으면_처음_해_볼_만한_요청을_묻는다() {
+    @DisplayName("이력이 없으면 처음 해 볼 만한 요청을 묻는다")
+    void asksForFirstRequestsToTryWhenNoHistory() {
         answerWith(json(FOUR));
 
         service.read(DAD, "starter-family");
         executor.awaitAll();
 
-        assertThat(onlyInput())
-                .startsWith(StarterSuggestionService.PROMPT_MARK)
-                .contains("처음 해 볼 만한", "JSON 문자열 배열");
+        assertThat(onlyInput()).startsWith(StarterSuggestionService.PROMPT_MARK).contains("처음 해 볼 만한", "JSON 문자열 배열");
     }
 
     @Test
-    void 답이_JSON_이_아니면_NONE_이고_재시도_시간_안에는_다시_만들지_않는다() {
+    @DisplayName("답이 JSON 이 아니면 NONE 이고 재시도 시간 안에는 다시 만들지 않는다")
+    void returnsNoneAndSkipsRebuildWithinRetryWindowWhenAnswerIsNotJson() {
         answerWith("추천을 만들 수 없습니다");
 
         service.read(DAD, "starter-family");
@@ -188,8 +227,9 @@ class StarterSuggestionServiceTest {
         clock.advance(Duration.ofMinutes(9));
         assertThat(service.read(DAD, "starter-family").status()).isEqualTo(StarterStatus.NONE);
         assertThat(stub().received()).as("재시도 시간 안의 제출 수").hasSize(1);
-        assertThat(executionRows.findAll()).singleElement().satisfies(row ->
-                assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED));
+        assertThat(executionRows.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED));
 
         clock.advance(Duration.ofMinutes(2));
         assertThat(service.read(DAD, "starter-family").status()).isEqualTo(StarterStatus.GENERATING);
@@ -198,7 +238,8 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 대화를_마쳐_다시_만들다_실패하면_재시도_시간_안에는_다시_만들지_않고_이전_추천이_남는다() {
+    @DisplayName("대화를 마쳐 다시 만들다 실패하면 재시도 시간 안에는 다시 만들지 않고 이전 추천이 남는다")
+    void keepsPreviousAndSkipsRebuildInRetryWindowAfterFailedRebuild() {
         answerWith(json(FOUR));
         service.read(DAD, "starter-family");
         executor.awaitAll();
@@ -213,33 +254,40 @@ class StarterSuggestionServiceTest {
         service.refreshIfStale(DAD, family);
         executor.awaitAll();
         assertThat(stub().received()).as("재시도 시간 안의 제출 수").hasSize(2);
-        assertThat(service.read(DAD, "starter-family"))
-                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+        assertThat(service.read(DAD, "starter-family")).isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
 
         clock.advance(Duration.ofMinutes(2));
         service.refreshIfStale(DAD, family);
         executor.awaitAll();
         assertThat(stub().received()).as("재시도 시간이 지난 뒤의 제출 수").hasSize(3);
-        assertThat(service.read(DAD, "starter-family"))
-                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+        assertThat(service.read(DAD, "starter-family")).isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
     }
 
     /** 추천을 만든 뒤 실행 줄을 끝내다 실패해도 만들기 실패로 보지 않는다. 재시도 시간에 막히지 않는다. */
     @Test
-    void 실행_줄을_끝내다_실패해도_추천은_READY_이고_실행_줄은_실패로_바뀌지_않는다() {
+    @DisplayName("실행 줄을 끝내다 실패해도 추천은 READY 이고 실행 줄은 실패로 바뀌지 않는다")
+    void keepsReadyAndRunRowNotFailedWhenFinishingRunRowFails() {
         ExecutionRecorder failingRecorder = spy(executions);
         doThrow(new IllegalStateException("저장 실패")).when(failingRecorder).complete(any(), any(), any(), any());
-        service = new StarterSuggestionService(properties, agentService, conversations, messages, hermes,
-                failingRecorder, objectMapper, clock, executor);
+        service = new StarterSuggestionService(
+                properties,
+                agentService,
+                conversations,
+                messages,
+                hermes,
+                failingRecorder,
+                objectMapper,
+                clock,
+                executor);
         answerWith(json(FOUR));
 
         service.read(DAD, "starter-family");
         executor.awaitAll();
 
-        assertThat(service.read(DAD, "starter-family"))
-                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
-        assertThat(executionRows.findAll()).singleElement().satisfies(row ->
-                assertThat(row.status()).isNotEqualTo(ExecutionStatus.FAILED));
+        assertThat(service.read(DAD, "starter-family")).isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+        assertThat(executionRows.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.status()).isNotEqualTo(ExecutionStatus.FAILED));
 
         clock.advance(Duration.ofHours(25));
         service.refreshIfStale(DAD, family);
@@ -248,7 +296,8 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 다시_만들다_실패하면_이전_추천이_남는다() {
+    @DisplayName("다시 만들다 실패하면 이전 추천이 남는다")
+    void keepsPreviousSuggestionsWhenRebuildFails() {
         answerWith(json(FOUR));
         service.read(DAD, "starter-family");
         executor.awaitAll();
@@ -259,12 +308,12 @@ class StarterSuggestionServiceTest {
         executor.awaitAll();
 
         assertThat(stub().received()).hasSize(2);
-        assertThat(service.read(DAD, "starter-family"))
-                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+        assertThat(service.read(DAD, "starter-family")).isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
     }
 
     @Test
-    void Hermes_가_실패해도_이전_추천이_남고_실행_줄은_실패로_남는다() {
+    @DisplayName("Hermes 가 실패해도 이전 추천이 남고 실행 줄은 실패로 남는다")
+    void keepsPreviousSuggestionsAndRecordsRunFailureWhenHermesFails() {
         answerWith(json(FOUR));
         service.read(DAD, "starter-family");
         executor.awaitAll();
@@ -274,27 +323,27 @@ class StarterSuggestionServiceTest {
         service.refreshIfStale(DAD, family);
         executor.awaitAll();
 
-        assertThat(service.read(DAD, "starter-family"))
-                .isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
+        assertThat(service.read(DAD, "starter-family")).isEqualTo(new StarterSuggestions(FOUR, StarterStatus.READY));
         assertThat(executionRows.findAll())
                 .extracting(row -> row.status())
                 .containsExactlyInAnyOrder(ExecutionStatus.SUCCEEDED, ExecutionStatus.FAILED);
     }
 
     @Test
-    void 코드_펜스를_떼고_120자를_넘는_줄은_버리고_앞의_넷만_쓴다() {
+    @DisplayName("코드 펜스를 떼고 120자를 넘는 줄은 버리고 앞의 넷만 쓴다")
+    void stripsCodeFenceDropsLinesOver120CharsAndUsesFirstFour() {
         String limit = "나".repeat(120);
         answerWith("```json\n" + json(List.of("첫째", "가".repeat(121), limit, "셋째", "넷째", "다섯째")) + "\n```");
 
         service.read(DAD, "starter-family");
         executor.awaitAll();
 
-        assertThat(service.read(DAD, "starter-family").prompts())
-                .containsExactly("첫째", limit, "셋째", "넷째");
+        assertThat(service.read(DAD, "starter-family").prompts()).containsExactly("첫째", limit, "셋째", "넷째");
     }
 
     @Test
-    void 빈_배열은_실패로_본다() {
+    @DisplayName("빈 배열은 실패로 본다")
+    void treatsEmptyArrayAsFailure() {
         answerWith("[]");
 
         service.read(DAD, "starter-family");
@@ -304,7 +353,8 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 같은_키를_만드는_동안_다시_읽어도_제출은_한_번이다() throws InterruptedException {
+    @DisplayName("같은 키를 만드는 동안 다시 읽어도 제출은 한 번이다")
+    void submitsOnceEvenIfReadAgainWhileBuildingSameKey() throws InterruptedException {
         answerWith(json(FOUR));
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -314,7 +364,9 @@ class StarterSuggestionServiceTest {
         });
         try {
             assertThat(service.read(DAD, "starter-family").status()).isEqualTo(StarterStatus.GENERATING);
-            assertThat(entered.await(5, TimeUnit.SECONDS)).as("첫 만들기가 Hermes 제출에 닿았다").isTrue();
+            assertThat(entered.await(5, TimeUnit.SECONDS))
+                    .as("첫 만들기가 Hermes 제출에 닿았다")
+                    .isTrue();
 
             StarterSuggestions whileGenerating = service.read(DAD, "starter-family");
 
@@ -329,7 +381,8 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 대화를_마쳤을_때는_추천이_있고_오래됐을_때만_다시_만든다() {
+    @DisplayName("대화를 마쳤을 때는 추천이 있고 오래됐을 때만 다시 만든다")
+    void rebuildsOnlyWhenStaleAfterConversationEnds() {
         answerWith(json(FOUR));
 
         service.refreshIfStale(DAD, family);
@@ -352,7 +405,8 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 사용자마다_추천을_따로_만든다() {
+    @DisplayName("사용자마다 추천을 따로 만든다")
+    void buildsSuggestionsPerUser() {
         answerWith(json(FOUR));
 
         service.read(DAD, "starter-family");
@@ -365,7 +419,8 @@ class StarterSuggestionServiceTest {
 
     /** 꺼 둔 에이전트는 새 실행을 막는다. 볼 수는 있으므로 오류 대신 추천이 없다고 답한다. */
     @Test
-    void 꺼진_에이전트의_추천은_NONE_이고_만들지_않는다() {
+    @DisplayName("꺼진 에이전트의 추천은 NONE 이고 만들지 않는다")
+    void returnsNoneAndDoesNotBuildForDisabledAgent() {
         answerWith(json(FOUR));
         service.read(DAD, "starter-family");
         executor.awaitAll();
@@ -385,14 +440,22 @@ class StarterSuggestionServiceTest {
     }
 
     @Test
-    void 볼_수_없는_에이전트의_추천은_AGENT_NOT_FOUND_이고_만들지_않는다() {
-        agents.save(Agent.of("starter-private", "개인", "starter-private", "http://runtime.test",
-                CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, DAD.id()));
+    @DisplayName("볼 수 없는 에이전트의 추천은 AGENT NOT FOUND 이고 만들지 않는다")
+    void returnsAgentNotFoundAndDoesNotBuildForInvisibleAgent() {
+        agents.save(Agent.of(
+                "starter-private",
+                "개인",
+                "starter-private",
+                "http://runtime.test",
+                CostMode.API,
+                CredentialScope.DEDICATED,
+                AgentVisibility.PRIVATE,
+                DAD.id()));
         answerWith(json(FOUR));
 
         assertThatThrownBy(() -> service.read(KID, "starter-private"))
-                .isInstanceOfSatisfying(ApiException.class, ex ->
-                        assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         executor.awaitAll();
         assertThat(stub().received()).isEmpty();
     }
@@ -440,11 +503,14 @@ class StarterSuggestionServiceTest {
 
         @Override
         public void execute(Runnable command) {
-            tasks.add(CompletableFuture.runAsync(command, runnable -> Thread.ofVirtual().start(runnable)));
+            tasks.add(CompletableFuture.runAsync(
+                    command, runnable -> Thread.ofVirtual().start(runnable)));
         }
 
         void awaitAll() {
-            CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new)).orTimeout(5, TimeUnit.SECONDS).join();
+            CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new))
+                    .orTimeout(5, TimeUnit.SECONDS)
+                    .join();
         }
     }
 

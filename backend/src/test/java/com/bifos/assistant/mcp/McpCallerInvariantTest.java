@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,10 +36,17 @@ class McpCallerInvariantTest {
     private static final String PROFILE = "caller-invariant";
     private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
 
-    @LocalServerPort int port;
-    @Autowired AgentTokenService tokens;
-    @Autowired AgentTokenRepository tokenRepository;
-    @Autowired JdbcTemplate jdbc;
+    @LocalServerPort
+    int port;
+
+    @Autowired
+    AgentTokenService tokens;
+
+    @Autowired
+    AgentTokenRepository tokenRepository;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -46,14 +54,15 @@ class McpCallerInvariantTest {
     private long unboundTokenId;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         tokenRepository.deleteAll();
         unboundToken = "unbound-" + UUID.randomUUID();
         unboundTokenId = McpCallSigner.insertUnboundToken(jdbc, unboundToken, "unbound");
     }
 
     @Test
-    void profile_이_빈_토큰은_목록과_모든_도구가_401_이고_사용_시각을_남기지_않는다() throws Exception {
+    @DisplayName("profile 이 빈 토큰은 목록과 모든 도구가 401 이고 사용 시각을 남기지 않는다")
+    void tokenWithBlankProfileGives401ForAllToolsWithoutUsageTime() throws Exception {
         Map<String, String> requests = new LinkedHashMap<>();
         requests.put("tools/list", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}");
         toolArguments().forEach((name, arguments) -> {
@@ -65,40 +74,59 @@ class McpCallerInvariantTest {
 
         for (Map.Entry<String, String> request : requests.entrySet()) {
             HttpResponse<String> response = send(unboundToken, request.getValue());
-            assertThat(response.statusCode()).as("%s 의 HTTP 상태, 본문: %s", request.getKey(), response.body()).isEqualTo(401);
+            assertThat(response.statusCode())
+                    .as("%s 의 HTTP 상태, 본문: %s", request.getKey(), response.body())
+                    .isEqualTo(401);
         }
-        assertThat(tokenRepository.findById(unboundTokenId).orElseThrow().lastUsedAt()).as("profile 이 빈 토큰의 사용 시각").isNull();
+        assertThat(tokenRepository.findById(unboundTokenId).orElseThrow().lastUsedAt())
+                .as("profile 이 빈 토큰의 사용 시각")
+                .isNull();
     }
 
     @Test
-    void profile_이_빈_토큰은_하위_에이전트_session_을_등록하지_못한다() throws Exception {
+    @DisplayName("profile 이 빈 토큰은 하위 에이전트 session 을 등록하지 못한다")
+    void tokenWithBlankProfileCannotRegisterSubagentSession() throws Exception {
         String root = McpCallSigner.newRoot();
         String child = "하위-" + UUID.randomUUID();
 
         HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/internal/hermes/session-bindings/subagent"))
+                HttpRequest.newBuilder(
+                                URI.create("http://localhost:" + port + "/internal/hermes/session-bindings/subagent"))
                         .header("Content-Type", "application/json")
                         .header("Authorization", "Bearer " + unboundToken)
-                        .POST(HttpRequest.BodyPublishers.ofString(McpCallSigner.subagentBody(unboundToken, root, root, child).toString()))
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                McpCallSigner.subagentBody(unboundToken, root, root, child)
+                                        .toString()))
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).as("등록 응답: %s", response.body()).isEqualTo(401);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM hermes_session_binding WHERE session_id = ?", Integer.class, child))
-                .as("등록 줄 수").isZero();
-        assertThat(tokenRepository.findById(unboundTokenId).orElseThrow().lastUsedAt()).as("profile 이 빈 토큰의 사용 시각").isNull();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM hermes_session_binding WHERE session_id = ?", Integer.class, child))
+                .as("등록 줄 수")
+                .isZero();
+        assertThat(tokenRepository.findById(unboundTokenId).orElseThrow().lastUsedAt())
+                .as("profile 이 빈 토큰의 사용 시각")
+                .isNull();
     }
 
     @Test
-    void profile_에_묶인_토큰도_fos_ctx_가_없으면_모든_도구가_호출_맥락_오류다() throws Exception {
+    @DisplayName("profile 에 묶인 토큰도 fos ctx 가 없으면 모든 도구가 호출 맥락 오류다")
+    void tokenBoundToProfileGivesCallContextErrorForAllToolsWithoutFosCtx() throws Exception {
         String bound = tokens.issue(PROFILE, "bound").rawToken();
 
         for (Map.Entry<String, ObjectNode> tool : toolArguments().entrySet()) {
             HttpResponse<String> response = send(bound, toolCall(tool.getKey(), tool.getValue()));
-            assertThat(response.statusCode()).as("%s 의 HTTP 상태, 본문: %s", tool.getKey(), response.body()).isEqualTo(200);
+            assertThat(response.statusCode())
+                    .as("%s 의 HTTP 상태, 본문: %s", tool.getKey(), response.body())
+                    .isEqualTo(200);
             JsonNode result = json.readTree(response.body()).path("result");
-            assertThat(result.path("isError").asBoolean()).as("%s 의 결과: %s", tool.getKey(), result).isTrue();
-            assertThat(result.path("content").get(0).path("text").asString()).as("%s 의 문구", tool.getKey()).isEqualTo(INVALID_CONTEXT);
+            assertThat(result.path("isError").asBoolean())
+                    .as("%s 의 결과: %s", tool.getKey(), result)
+                    .isTrue();
+            assertThat(result.path("content").get(0).path("text").asString())
+                    .as("%s 의 문구", tool.getKey())
+                    .isEqualTo(INVALID_CONTEXT);
         }
     }
 
@@ -108,7 +136,9 @@ class McpCallerInvariantTest {
         arguments.put("memory_read", json.createObjectNode().put("id", 1));
         arguments.put("artifact_write", json.createObjectNode());
         arguments.put("agent_list", json.createObjectNode());
-        arguments.put("agent_delegate", json.createObjectNode().put("agent_code", "worker").put("task", "일"));
+        arguments.put(
+                "agent_delegate",
+                json.createObjectNode().put("agent_code", "worker").put("task", "일"));
         arguments.put("agent_status", json.createObjectNode().put("execution_id", 1));
         arguments.put("agent_stop", json.createObjectNode().put("execution_id", 1));
         return arguments;
@@ -127,8 +157,12 @@ class McpCallerInvariantTest {
     }
 
     private HttpResponse<String> send(String token, String request) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
-                .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(request)).build(), HttpResponse.BodyHandlers.ofString());
+        return client.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
+                        .header("Authorization", "Bearer " + token)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(request))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
     }
 }

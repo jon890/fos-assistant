@@ -12,35 +12,44 @@ import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AccountbookConnectionMigrationTest {
     private String url;
 
     @BeforeEach
-    void 전체_마이그레이션을_적용한다() {
+    void setUp() {
         url = "jdbc:h2:mem:accountbook-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration").load().migrate();
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
     }
 
     @Test
-    void V36은_연결_상태만_저장하고_raw_token과_hash_칸을_만들지_않는다() throws SQLException {
+    @DisplayName("V36은 연결 상태만 저장하고 raw token과 hash 칸을 만들지 않는다")
+    void v36StoresOnlyStateWithoutRawTokenOrHashColumns() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             List<String> columns = columns(connection.getMetaData(), "ACCOUNTBOOK_CONNECTION");
 
-            assertThat(columns).contains("USER_ID", "AGENT_ID", "STATUS", "TOKEN_PREFIX", "FAMILY_UUID", "DESIRED_ENABLED");
+            assertThat(columns)
+                    .contains("USER_ID", "AGENT_ID", "STATUS", "TOKEN_PREFIX", "FAMILY_UUID", "DESIRED_ENABLED");
             assertThat(columns).noneMatch(column -> column.contains("TOKEN") && !column.equals("TOKEN_PREFIX"));
             assertThat(columns).noneMatch(column -> column.contains("HASH"));
         }
     }
 
     @Test
-    void V36은_사용자와_에이전트_FK와_에이전트_유니크_키를_만든다() throws SQLException {
+    @DisplayName("V36은 사용자와 에이전트 FK와 에이전트 유니크 키를 만든다")
+    void v36CreatesUserAndAgentForeignKeysAndAgentUniqueKey() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             DatabaseMetaData meta = connection.getMetaData();
 
             assertThat(importedColumns(meta, "ACCOUNTBOOK_CONNECTION")).contains("USER_ID", "AGENT_ID");
-            assertThat(hasUniqueIndexFor(meta, "ACCOUNTBOOK_CONNECTION", "AGENT_ID")).isTrue();
+            assertThat(hasUniqueIndexFor(meta, "ACCOUNTBOOK_CONNECTION", "AGENT_ID"))
+                    .isTrue();
         }
     }
 

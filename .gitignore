@@ -12,6 +12,7 @@ web/.next/
 web/out/
 web/next-env.d.ts
 web/tsconfig.tsbuildinfo
+web/build/
 
 # 비밀값
 .env
@@ -21,6 +22,7 @@ web/tsconfig.tsbuildinfo
 # 도구
 .DS_Store
 .omc/
+*.hprof
 
 # 워커가 쓰는 워크트리
 worktrees/

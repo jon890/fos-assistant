@@ -57,17 +57,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.HttpClientErrorException;
 
 /**
@@ -96,21 +97,33 @@ class SkillServiceTest {
     private static final List<String> WITHOUT_SKILLS = List.of("web", "fos-assistant");
     private static final List<String> WITH_SKILLS = List.of("web", "skills", "fos-assistant");
 
-    @Autowired SkillService skills;
-    @Autowired SkillStore store;
-    @Autowired AgentRepository agents;
+    @Autowired
+    SkillService skills;
 
-    @MockitoBean HermesSkillClient skillClient;
-    @MockitoBean HermesToolsetClient toolsets;
+    @Autowired
+    SkillStore store;
+
+    @Autowired
+    AgentRepository agents;
+
+    @MockitoBean
+    HermesSkillClient skillClient;
+
+    @MockitoBean
+    HermesToolsetClient toolsets;
 
     /** 스킬 커맨드의 캐시를 비우는 {@link SkillsChanged} 를 서비스가 냈는지 본다. */
-    @Autowired ApplicationEvents applicationEvents;
+    @Autowired
+    ApplicationEvents applicationEvents;
 
-    @Autowired SkillCommandCatalog commandCatalog;
-    @Autowired PlatformTransactionManager transactionManager;
+    @Autowired
+    SkillCommandCatalog commandCatalog;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         for (String profile : List.of(OWNED_PROFILE, GROUP_PROFILE)) {
             store.deleteAll(profile);
         }
@@ -124,8 +137,13 @@ class SkillServiceTest {
     }
 
     @Test
-    void 저장하면_한_번의_게시에_새_경로와_skills_가_든_도구_목록이_함께_간다() throws Exception {
-        SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"),
+    @DisplayName("저장하면 한 번의 게시에 새 경로와 skills 가 든 도구 목록이 함께 간다")
+    void saveSendsNewPathAndToolListWithSkillsInOnePublish() throws Exception {
+        SkillDetail saved = skills.save(
+                OWNER,
+                OWNED,
+                "weekly-plan",
+                skillMd("weekly-plan"),
                 List.of(new SkillFileInput("references/guide.md", "안내")));
 
         String version = store.currentVersion(OWNED_PROFILE).orElseThrow();
@@ -134,15 +152,20 @@ class SkillServiceTest {
         verify(skillClient).publish(eq(OWNED_PROFILE), dirs.capture(), apiServer.capture());
         assertThat(dirs.getValue()).containsExactly(store.agentPath(OWNED_PROFILE, version));
         assertThat(apiServer.getValue()).containsExactly("web", "skills", "fos-assistant");
-        assertThat(saved).isEqualTo(new SkillDetail("weekly-plan", "이번 주 계획을 세운다", skillMd("weekly-plan"),
-                List.of(new SkillFileInfo("references/guide.md", 6L))));
+        assertThat(saved)
+                .isEqualTo(new SkillDetail(
+                        "weekly-plan",
+                        "이번 주 계획을 세운다",
+                        skillMd("weekly-plan"),
+                        List.of(new SkillFileInfo("references/guide.md", 6L))));
         assertThat(Files.readAllLines(Path.of(dirs.getValue().get(0), "weekly-plan", "SKILL.md")))
                 .as("게시한 경로에 SKILL.md 가 있다")
                 .contains("name: weekly-plan");
     }
 
     @Test
-    void skills_가_이미_켜져_있으면_도구_목록은_null_이다() {
+    @DisplayName("skills 가 이미 켜져 있으면 도구 목록은 null 이다")
+    void toolListIsNullWhenSkillsAlreadyEnabled() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
 
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
@@ -152,14 +175,17 @@ class SkillServiceTest {
     }
 
     @Test
-    void 게시가_4xx_로_거절되면_새_디렉터리가_없고_지금_버전이_그대로다() {
+    @DisplayName("게시가 4xx 로 거절되면 새 디렉터리가 없고 지금 버전이 그대로다")
+    void leavesNoNewDirectoryAndKeepsCurrentVersionWhenPublishGets4xx() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         String before = store.currentVersion(OWNED_PROFILE).orElseThrow();
-        doThrow(new HermesRequestRejected(ErrorCode.HERMES_UNAVAILABLE, "rejected",
-                new HttpClientErrorException(HttpStatus.BAD_REQUEST)))
-                .when(skillClient).publish(anyString(), anyList(), any());
+        doThrow(new HermesRequestRejected(
+                        ErrorCode.HERMES_UNAVAILABLE, "rejected", new HttpClientErrorException(HttpStatus.BAD_REQUEST)))
+                .when(skillClient)
+                .publish(anyString(), anyList(), any());
 
-        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
                 ErrorCode.HERMES_UNAVAILABLE);
 
         assertThat(store.currentVersion(OWNED_PROFILE)).contains(before);
@@ -168,13 +194,16 @@ class SkillServiceTest {
     }
 
     @Test
-    void 게시가_timeout_이나_5xx_로_실패하면_표식_없이_남고_다음_성공이_그것을_지우며_실패한_변경은_없다() {
+    @DisplayName("게시가 timeout 이나 5xx 로 실패하면 표식 없이 남고 다음 성공이 그것을 지우며 실패한 변경은 없다")
+    void leavesUnmarkedOnTimeoutOr5xxAndNextSuccessClearsIt() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         String first = store.currentVersion(OWNED_PROFILE).orElseThrow();
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "read timed out"))
-                .when(skillClient).publish(anyString(), anyList(), any());
+                .when(skillClient)
+                .publish(anyString(), anyList(), any());
 
-        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
                 ErrorCode.HERMES_UNAVAILABLE);
 
         assertThat(store.currentVersion(OWNED_PROFILE)).as("지금 버전은 옛 것이다").contains(first);
@@ -185,33 +214,44 @@ class SkillServiceTest {
 
         String third = store.currentVersion(OWNED_PROFILE).orElseThrow();
         assertThat(versionDirs(OWNED_PROFILE)).as("표식 없는 디렉터리는 다음 성공이 지운다").containsExactlyInAnyOrder(first, third);
-        assertThat(store.readCurrent(OWNED_PROFILE)).as("실패한 저장의 변경은 반영되지 않는다")
+        assertThat(store.readCurrent(OWNED_PROFILE))
+                .as("실패한 저장의 변경은 반영되지 않는다")
                 .containsOnlyKeys("cooking", "weekly-plan");
     }
 
     @Test
-    void timeout_뒤_Hermes_에_뜬_새_스킬은_올린_스킬로_보이고_같은_이름으로_다시_저장된다() {
+    @DisplayName("timeout 뒤 Hermes 에 뜬 새 스킬은 올린 스킬로 보이고 같은 이름으로 다시 저장된다")
+    void skillAppearingInHermesAfterTimeoutLooksUploadedAndSavesAgainByName() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "read timed out"))
-                .when(skillClient).publish(anyString(), anyList(), any());
-        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"),
-                List.of(new SkillFileInput("references/list.md", "장보기 목록"))), ErrorCode.HERMES_UNAVAILABLE);
+                .when(skillClient)
+                .publish(anyString(), anyList(), any());
+        assertCode(
+                () -> skills.save(
+                        OWNER,
+                        OWNED,
+                        "shopping",
+                        skillMd("shopping"),
+                        List.of(new SkillFileInput("references/list.md", "장보기 목록"))),
+                ErrorCode.HERMES_UNAVAILABLE);
         // Hermes 는 응답만 잃고 그 버전을 반영해 목록에 새 이름을 보인다.
-        when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(
-                new HermesSkill("hermes-help", "Hermes 기본", true),
-                new HermesSkill("shopping", "shopping 을 한다", true),
-                new HermesSkill("weekly-plan", "이번 주 계획을 세운다", true)));
+        when(skillClient.list(OWNED_PROFILE))
+                .thenReturn(List.of(
+                        new HermesSkill("hermes-help", "Hermes 기본", true),
+                        new HermesSkill("shopping", "shopping 을 한다", true),
+                        new HermesSkill("weekly-plan", "이번 주 계획을 세운다", true)));
 
-        assertThat(skills.list(OWNER, OWNED).skills()).as("Hermes 목록의 새 이름은 올린 스킬이다").contains(
-                new SkillListItem("shopping", "shopping 을 한다", SkillSource.UPLOADED, true,
-                        new SkillUsageSummary(0, null)));
+        assertThat(skills.list(OWNER, OWNED).skills())
+                .as("Hermes 목록의 새 이름은 올린 스킬이다")
+                .contains(new SkillListItem(
+                        "shopping", "shopping 을 한다", SkillSource.UPLOADED, true, new SkillUsageSummary(0, null)));
         assertThat(skills.read(OWNER, OWNED, "shopping").files())
                 .as("편집 화면이 표식 없는 버전의 원문을 연다")
                 .containsExactly(new SkillFileInfo("references/list.md", 16L));
 
         doAnswer(call -> null).when(skillClient).publish(anyString(), anyList(), any());
-        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"),
-                List.of(new SkillFileInput("references/list.md", null)));
+        skills.save(
+                OWNER, OWNED, "shopping", skillMd("shopping"), List.of(new SkillFileInput("references/list.md", null)));
 
         assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping", "weekly-plan");
         assertThat(store.readCurrent(OWNED_PROFILE).get("shopping").files())
@@ -221,13 +261,17 @@ class SkillServiceTest {
     }
 
     @Test
-    void timeout_뒤_Hermes_에만_뜬_스킬을_지우면_지금_버전을_다시_게시하고_지금_버전이_없으면_빈_목록을_게시한다() {
+    @DisplayName("timeout 뒤 Hermes 에만 뜬 스킬을 지우면 지금 버전을 다시 게시하고 지금 버전이 없으면 빈 목록을 게시한다")
+    void deletingSkillOnlyInHermesAfterTimeoutRepublishesCurrentVersion() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "read timed out"))
-                .when(skillClient).publish(anyString(), anyList(), any());
-        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
+                .when(skillClient)
+                .publish(anyString(), anyList(), any());
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
                 ErrorCode.HERMES_UNAVAILABLE);
-        assertCode(() -> skills.save(OWNER, GROUP, "cooking", skillMd("cooking"), List.of()),
+        assertCode(
+                () -> skills.save(OWNER, GROUP, "cooking", skillMd("cooking"), List.of()),
                 ErrorCode.HERMES_UNAVAILABLE);
         doAnswer(call -> null).when(skillClient).publish(anyString(), anyList(), any());
 
@@ -236,7 +280,9 @@ class SkillServiceTest {
         String republished = store.currentVersion(OWNED_PROFILE).orElseThrow();
         verify(skillClient).publish(eq(OWNED_PROFILE), eq(List.of(store.agentPath(OWNED_PROFILE, republished))), any());
         assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("weekly-plan");
-        assertThat(store.readPending(OWNED_PROFILE)).as("Hermes 가 벗어난 표식 없는 버전은 지운다").isEmpty();
+        assertThat(store.readPending(OWNED_PROFILE))
+                .as("Hermes 가 벗어난 표식 없는 버전은 지운다")
+                .isEmpty();
         assertCode(() -> skills.delete(OWNER, OWNED, "shopping"), ErrorCode.SKILL_NOT_FOUND);
 
         skills.delete(OWNER, GROUP, "cooking");
@@ -246,7 +292,8 @@ class SkillServiceTest {
     }
 
     @Test
-    void 저장과_켜고_끄기와_지우기가_Hermes_에_반영되면_그_에이전트의_SkillsChanged_를_낸다() {
+    @DisplayName("저장과 켜고 끄기와 지우기가 Hermes 에 반영되면 그 에이전트의 SkillsChanged 를 낸다")
+    void emitsSkillsChangedOfAgentWhenSaveToggleAndDeleteReachHermes() {
         Long agentId = agents.findByCode(OWNED).orElseThrow().id();
 
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
@@ -258,8 +305,11 @@ class SkillServiceTest {
         assertThat(applicationEvents.stream(SkillsChanged.class))
                 .as("저장 둘, 켜고 끄기 하나, 지우기 둘(마지막 스킬 포함)")
                 .containsExactly(
-                        new SkillsChanged(agentId), new SkillsChanged(agentId), new SkillsChanged(agentId),
-                        new SkillsChanged(agentId), new SkillsChanged(agentId));
+                        new SkillsChanged(agentId),
+                        new SkillsChanged(agentId),
+                        new SkillsChanged(agentId),
+                        new SkillsChanged(agentId),
+                        new SkillsChanged(agentId));
     }
 
     /**
@@ -268,7 +318,8 @@ class SkillServiceTest {
      * 이미 끝났기 때문이다. 트랜잭션 없는 켜고 끄기는 바로 비운다.
      */
     @Test
-    void 커맨드_이름_캐시는_저장과_지우기의_트랜잭션이_커밋이든_되돌림이든_끝난_뒤에_비워지고_켜고_끄기는_바로_비워진다() {
+    @DisplayName("커맨드 이름 캐시는 저장과 지우기의 트랜잭션이 커밋이든 되돌림이든 끝난 뒤에 비워지고 켜고 끄기는 바로 비워진다")
+    void clearsCommandNameCacheAfterSaveAndDeleteTxEndsAndOnToggle() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
         Agent agent = agents.findByCode(OWNED).orElseThrow();
         TransactionTemplate outer = new TransactionTemplate(transactionManager);
@@ -278,12 +329,14 @@ class SkillServiceTest {
             skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
             assertThat(commandCatalog.enabledNames(agent)).as("저장의 커밋 전").containsExactly("hermes-help");
         });
-        assertThat(commandCatalog.enabledNames(agent)).as("저장이 커밋된 뒤")
+        assertThat(commandCatalog.enabledNames(agent))
+                .as("저장이 커밋된 뒤")
                 .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
 
         outer.executeWithoutResult(status -> {
             skills.delete(OWNER, OWNED, "weekly-plan");
-            assertThat(commandCatalog.enabledNames(agent)).as("지우기의 트랜잭션이 끝나기 전")
+            assertThat(commandCatalog.enabledNames(agent))
+                    .as("지우기의 트랜잭션이 끝나기 전")
                     .containsExactlyInAnyOrder("hermes-help", "weekly-plan");
             status.setRollbackOnly();
         });
@@ -296,15 +349,17 @@ class SkillServiceTest {
     }
 
     @Test
-    void Hermes_가_거절해_저장과_켜고_끄기와_지우기가_실패하면_SkillsChanged_를_내지_않는다() {
+    @DisplayName("Hermes 가 거절해 저장과 켜고 끄기와 지우기가 실패하면 SkillsChanged 를 내지 않는다")
+    void emitsNoSkillsChangedWhenHermesRejectsSaveToggleOrDelete() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         applicationEvents.clear();
-        HermesRequestRejected rejected = new HermesRequestRejected(ErrorCode.HERMES_UNAVAILABLE, "rejected",
-                new HttpClientErrorException(HttpStatus.BAD_REQUEST));
+        HermesRequestRejected rejected = new HermesRequestRejected(
+                ErrorCode.HERMES_UNAVAILABLE, "rejected", new HttpClientErrorException(HttpStatus.BAD_REQUEST));
         doThrow(rejected).when(skillClient).publish(anyString(), anyList(), any());
         doThrow(rejected).when(skillClient).toggle(anyString(), anyString(), anyBoolean());
 
-        assertCode(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()),
                 ErrorCode.HERMES_UNAVAILABLE);
         assertCode(() -> skills.toggle(OWNER, OWNED, "weekly-plan", false), ErrorCode.HERMES_UNAVAILABLE);
         assertCode(() -> skills.delete(OWNER, OWNED, "weekly-plan"), ErrorCode.HERMES_UNAVAILABLE);
@@ -313,13 +368,16 @@ class SkillServiceTest {
     }
 
     @Test
-    void 편집자가_아니면_FORBIDDEN_이고_아무것도_쓰지_않는다() {
-        assertCode(() -> skills.save(MEMBER, GROUP, "weekly-plan", skillMd("weekly-plan"), List.of()),
+    @DisplayName("편집자가 아니면 FORBIDDEN 이고 아무것도 쓰지 않는다")
+    void nonEditorIsForbiddenAndWritesNothing() {
+        assertCode(
+                () -> skills.save(MEMBER, GROUP, "weekly-plan", skillMd("weekly-plan"), List.of()),
                 ErrorCode.FORBIDDEN);
         assertCode(() -> skills.read(MEMBER, GROUP, "weekly-plan"), ErrorCode.FORBIDDEN);
         assertCode(() -> skills.delete(MEMBER, GROUP, "weekly-plan"), ErrorCode.FORBIDDEN);
         assertCode(() -> skills.toggle(MEMBER, GROUP, "hermes-help", false), ErrorCode.FORBIDDEN);
-        assertCode(() -> skills.save(MEMBER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of()),
+        assertCode(
+                () -> skills.save(MEMBER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of()),
                 ErrorCode.AGENT_NOT_FOUND);
 
         verify(skillClient, never()).publish(anyString(), anyList(), any());
@@ -327,24 +385,44 @@ class SkillServiceTest {
     }
 
     @Test
-    void 입력_규칙을_어기면_VALIDATION_FAILED_이고_Hermes_이름과_같으면_SKILL_NAME_TAKEN_이다() {
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("other-name"), List.of()),
+    @DisplayName("입력 규칙을 어기면 VALIDATION FAILED 이고 Hermes 이름과 같으면 SKILL NAME TAKEN 이다")
+    void breakingInputRulesIsValidationFailedAndHermesNameIsSkillNameTaken() {
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("other-name"), List.of()),
                 ErrorCode.VALIDATION_FAILED);
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"),
-                List.of(new SkillFileInput("scripts/run.sh", "echo"))), ErrorCode.VALIDATION_FAILED);
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"),
-                IntStream.rangeClosed(1, 21)
-                        .mapToObj(i -> new SkillFileInput("references/f" + i + ".md", "x"))
-                        .toList()), ErrorCode.VALIDATION_FAILED);
+        assertCode(
+                () -> skills.save(
+                        OWNER,
+                        OWNED,
+                        "weekly-plan",
+                        skillMd("weekly-plan"),
+                        List.of(new SkillFileInput("scripts/run.sh", "echo"))),
+                ErrorCode.VALIDATION_FAILED);
+        assertCode(
+                () -> skills.save(
+                        OWNER,
+                        OWNED,
+                        "weekly-plan",
+                        skillMd("weekly-plan"),
+                        IntStream.rangeClosed(1, 21)
+                                .mapToObj(i -> new SkillFileInput("references/f" + i + ".md", "x"))
+                                .toList()),
+                ErrorCode.VALIDATION_FAILED);
         String hundredThousand = "a".repeat(100_000);
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"),
-                IntStream.rangeClosed(1, 11)
-                        .mapToObj(i -> new SkillFileInput("references/f" + i + ".md", hundredThousand))
-                        .toList()), ErrorCode.VALIDATION_FAILED);
-        assertCode(() -> skills.save(OWNER, OWNED, "new", skillMd("new"), List.of()), ErrorCode.VALIDATION_FAILED);
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", "# 앞머리가 없다", List.of()),
+        assertCode(
+                () -> skills.save(
+                        OWNER,
+                        OWNED,
+                        "weekly-plan",
+                        skillMd("weekly-plan"),
+                        IntStream.rangeClosed(1, 11)
+                                .mapToObj(i -> new SkillFileInput("references/f" + i + ".md", hundredThousand))
+                                .toList()),
                 ErrorCode.VALIDATION_FAILED);
-        assertCode(() -> skills.save(OWNER, OWNED, "hermes-help", skillMd("hermes-help"), List.of()),
+        assertCode(() -> skills.save(OWNER, OWNED, "new", skillMd("new"), List.of()), ErrorCode.VALIDATION_FAILED);
+        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", "# 앞머리가 없다", List.of()), ErrorCode.VALIDATION_FAILED);
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "hermes-help", skillMd("hermes-help"), List.of()),
                 ErrorCode.SKILL_NAME_TAKEN);
 
         verify(skillClient, never()).publish(anyString(), anyList(), any());
@@ -352,44 +430,69 @@ class SkillServiceTest {
     }
 
     @Test
-    void 정확히_20개_파일과_정확히_1_MiB_는_받고_1_바이트가_넘으면_거절한다() {
+    @DisplayName("정확히 20개 파일과 정확히 1 MiB 는 받고 1 바이트가 넘으면 거절한다")
+    void accepts20FilesAndExactly1MiBAndRejectsOverByOneByte() {
         String skillMd = skillMd("weekly-plan");
         long fileBytes = SkillService.MAX_TOTAL_BYTES - skillMd.getBytes(StandardCharsets.UTF_8).length;
 
         SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", skillMd, asciiFilesTotaling(fileBytes, 20));
 
         assertThat(saved.files()).hasSize(20);
-        assertThat(saved.files().stream().mapToLong(SkillFileInfo::size).sum() + skillMd.getBytes(StandardCharsets.UTF_8).length)
+        assertThat(saved.files().stream().mapToLong(SkillFileInfo::size).sum()
+                        + skillMd.getBytes(StandardCharsets.UTF_8).length)
                 .isEqualTo(SkillService.MAX_TOTAL_BYTES);
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd, asciiFilesTotaling(fileBytes + 1, 20)),
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", skillMd, asciiFilesTotaling(fileBytes + 1, 20)),
                 ErrorCode.VALIDATION_FAILED);
     }
 
     @Test
-    void 본문을_생략한_파일은_지금_내용이_그대로_새_버전에_있고_없는_경로면_거절한다() {
-        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"),
+    @DisplayName("본문을 생략한 파일은 지금 내용이 그대로 새 버전에 있고 없는 경로면 거절한다")
+    void omittedBodyFileKeepsCurrentContentAndMissingPathIsRejected() {
+        skills.save(
+                OWNER,
+                OWNED,
+                "weekly-plan",
+                skillMd("weekly-plan"),
                 List.of(new SkillFileInput("references/guide.md", "처음 안내")));
 
-        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan") + "\n고침",
-                List.of(new SkillFileInput("references/guide.md", null),
+        skills.save(
+                OWNER,
+                OWNED,
+                "weekly-plan",
+                skillMd("weekly-plan") + "\n고침",
+                List.of(
+                        new SkillFileInput("references/guide.md", null),
                         new SkillFileInput("templates/note.md", "새 파일")));
 
         SkillBundle current = store.readCurrent(OWNED_PROFILE).get("weekly-plan");
         assertThat(current.skillMd()).endsWith("고침");
-        assertThat(current.files()).containsExactly(
-                new SkillFile("references/guide.md", "처음 안내"),
-                new SkillFile("templates/note.md", "새 파일"));
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"),
-                List.of(new SkillFileInput("references/missing.md", null))), ErrorCode.VALIDATION_FAILED);
+        assertThat(current.files())
+                .containsExactly(
+                        new SkillFile("references/guide.md", "처음 안내"), new SkillFile("templates/note.md", "새 파일"));
+        assertCode(
+                () -> skills.save(
+                        OWNER,
+                        OWNED,
+                        "weekly-plan",
+                        skillMd("weekly-plan"),
+                        List.of(new SkillFileInput("references/missing.md", null))),
+                ErrorCode.VALIDATION_FAILED);
     }
 
     @Test
-    void 읽기는_앞머리를_포함한_원문과_UTF_8_크기를_주고_목록은_출처를_붙인다() {
-        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"),
+    @DisplayName("읽기는 앞머리를 포함한 원문과 UTF 8 크기를 주고 목록은 출처를 붙인다")
+    void readGivesOriginalWithFrontmatterAndUtf8SizeAndListAddsSource() {
+        skills.save(
+                OWNER,
+                OWNED,
+                "weekly-plan",
+                skillMd("weekly-plan"),
                 List.of(new SkillFileInput("references/guide.md", "안내")));
-        when(skillClient.list(OWNED_PROFILE)).thenReturn(List.of(
-                new HermesSkill("hermes-help", "Hermes 기본", true),
-                new HermesSkill("weekly-plan", "이번 주 계획을 세운다", false)));
+        when(skillClient.list(OWNED_PROFILE))
+                .thenReturn(List.of(
+                        new HermesSkill("hermes-help", "Hermes 기본", true),
+                        new HermesSkill("weekly-plan", "이번 주 계획을 세운다", false)));
 
         SkillDetail detail = skills.read(OWNER, OWNED, "weekly-plan");
         assertThat(detail.body()).startsWith("---\nname: weekly-plan");
@@ -403,9 +506,10 @@ class SkillServiceTest {
         assertThat(list.skillsToolsetEnabled()).as("대역의 켜진 목록에 skills 가 없다").isFalse();
         // 편집자에게는 호출이 없는 스킬에도 합계가 0 으로 붙는다.
         SkillUsageSummary noUse = new SkillUsageSummary(0, null);
-        assertThat(list.skills()).containsExactly(
-                new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, noUse),
-                new SkillListItem("weekly-plan", "이번 주 계획을 세운다", SkillSource.UPLOADED, false, noUse));
+        assertThat(list.skills())
+                .containsExactly(
+                        new SkillListItem("hermes-help", "Hermes 기본", SkillSource.HERMES, true, noUse),
+                        new SkillListItem("weekly-plan", "이번 주 계획을 세운다", SkillSource.UPLOADED, false, noUse));
 
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_SKILLS);
         when(skillClient.list(GROUP_PROFILE)).thenReturn(List.of());
@@ -416,7 +520,8 @@ class SkillServiceTest {
     }
 
     @Test
-    void 지우면_그_스킬이_빠진_버전이_게시되고_마지막_스킬을_지우면_빈_목록이_게시된다() {
+    @DisplayName("지우면 그 스킬이 빠진 버전이 게시되고 마지막 스킬을 지우면 빈 목록이 게시된다")
+    void deleteRepublishesWithoutSkillAndLastDeleteRepublishesEmptyList() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
 
@@ -435,7 +540,8 @@ class SkillServiceTest {
     }
 
     @Test
-    void 켜고_끄기는_Hermes_이름_규칙으로_보고_대시보드에_그대로_넘긴다() {
+    @DisplayName("켜고 끄기는 Hermes 이름 규칙으로 보고 대시보드에 그대로 넘긴다")
+    void toggleChecksHermesNameRuleAndPassesAsIsToDashboard() {
         skills.toggle(OWNER, OWNED, "hermes-help", false);
         skills.toggle(OWNER, OWNED, "note_taking.v2", true);
 
@@ -454,23 +560,30 @@ class SkillServiceTest {
      * 뒤의 것이 앞의 것을 덮는다.
      */
     @Test
-    void 같은_에이전트에_두_저장이_동시에_와도_둘_다_반영된_버전이_남는다() throws Exception {
+    @DisplayName("같은 에이전트에 두 저장이 동시에 와도 둘 다 반영된 버전이 남는다")
+    void keepsVersionWithBothSavesWhenTwoSavesArriveTogetherForSameAgent() throws Exception {
         CountDownLatch firstPublishStarted = new CountDownLatch(1);
         CountDownLatch releaseFirstPublish = new CountDownLatch(1);
         doAnswer(call -> {
-            if (firstPublishStarted.getCount() > 0) {
-                firstPublishStarted.countDown();
-                assertThat(releaseFirstPublish.await(10, TimeUnit.SECONDS)).as("첫 게시를 풀어 주기까지").isTrue();
-            }
-            return null;
-        }).when(skillClient).publish(anyString(), anyList(), any());
+                    if (firstPublishStarted.getCount() > 0) {
+                        firstPublishStarted.countDown();
+                        assertThat(releaseFirstPublish.await(10, TimeUnit.SECONDS))
+                                .as("첫 게시를 풀어 주기까지")
+                                .isTrue();
+                    }
+                    return null;
+                })
+                .when(skillClient)
+                .publish(anyString(), anyList(), any());
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<SkillDetail> first = pool.submit(
-                    () -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of()));
-            assertThat(firstPublishStarted.await(10, TimeUnit.SECONDS)).as("첫 저장이 게시에 닿기까지").isTrue();
-            Future<SkillDetail> second = pool.submit(
-                    () -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()));
+            Future<SkillDetail> first =
+                    pool.submit(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of()));
+            assertThat(firstPublishStarted.await(10, TimeUnit.SECONDS))
+                    .as("첫 저장이 게시에 닿기까지")
+                    .isTrue();
+            Future<SkillDetail> second =
+                    pool.submit(() -> skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of()));
             // 둘째가 잠금에 걸려 있는 동안에는 게시가 한 번뿐이다.
             Thread.sleep(300);
             verify(skillClient, org.mockito.Mockito.times(1)).publish(anyString(), anyList(), any());
@@ -488,8 +601,10 @@ class SkillServiceTest {
     }
 
     @Test
-    void 새_스킬의_설명은_60자까지_저장되고_61자는_VALIDATION_FAILED_이며_게시하지_않는다() {
-        assertCode(() -> skills.save(OWNER, OWNED, "too-long", skillMd("too-long", "가".repeat(61)), List.of()),
+    @DisplayName("새 스킬의 설명은 60자까지 저장되고 61자는 VALIDATION FAILED 이며 게시하지 않는다")
+    void newSkillDescriptionSavesUpTo60CharsAnd61IsValidationFailed() {
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "too-long", skillMd("too-long", "가".repeat(61)), List.of()),
                 ErrorCode.VALIDATION_FAILED);
 
         verify(skillClient, never()).publish(anyString(), anyList(), any());
@@ -501,23 +616,26 @@ class SkillServiceTest {
     }
 
     @Test
-    void 이미_올린_스킬은_61자_설명으로_고쳐도_저장된다() {
+    @DisplayName("이미 올린 스킬은 61자 설명으로 고쳐도 저장된다")
+    void alreadyUploadedSkillSavesEditToDescriptionOf61Chars() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "가".repeat(60)), List.of());
 
-        SkillDetail saved = skills.save(
-                OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "나".repeat(61)), List.of());
+        SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "나".repeat(61)), List.of());
 
         assertThat(saved.description()).isEqualTo("나".repeat(61));
-        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd()).contains("나".repeat(61));
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd())
+                .contains("나".repeat(61));
     }
 
     @Test
-    void 설명_1024자는_고칠_때_받고_1025자는_이미_올린_스킬을_고칠_때도_VALIDATION_FAILED_다() {
+    @DisplayName("설명 1024자는 고칠 때 받고 1025자는 이미 올린 스킬을 고칠 때도 VALIDATION FAILED 다")
+    void description1024AcceptedOnEditAnd1025IsValidationFailed() {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
 
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "가".repeat(1024)), List.of());
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "가".repeat(1025)),
-                List.of()), ErrorCode.VALIDATION_FAILED);
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan", "가".repeat(1025)), List.of()),
+                ErrorCode.VALIDATION_FAILED);
 
         assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd())
                 .as("거절된 저장은 반영되지 않는다")
@@ -525,27 +643,33 @@ class SkillServiceTest {
     }
 
     @Test
-    void 앞머리만_있는_원문은_새_스킬이든_이미_올린_스킬을_고치는_것이든_VALIDATION_FAILED_다() {
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", frontmatterOnly("weekly-plan"), List.of()),
+    @DisplayName("앞머리만 있는 원문은 새 스킬이든 이미 올린 스킬을 고치는 것이든 VALIDATION FAILED 다")
+    void frontmatterOnlyOriginalIsValidationFailedForNewAndEditedSkills() {
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", frontmatterOnly("weekly-plan"), List.of()),
                 ErrorCode.VALIDATION_FAILED);
         verify(skillClient, never()).publish(anyString(), anyList(), any());
 
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
-        assertCode(() -> skills.save(OWNER, OWNED, "weekly-plan", frontmatterOnly("weekly-plan") + "  \n\n",
-                List.of()), ErrorCode.VALIDATION_FAILED);
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "weekly-plan", frontmatterOnly("weekly-plan") + "  \n\n", List.of()),
+                ErrorCode.VALIDATION_FAILED);
 
-        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd()).isEqualTo(skillMd("weekly-plan"));
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd())
+                .isEqualTo(skillMd("weekly-plan"));
     }
 
     @Test
-    void 올린_스킬이_29개면_30번째_새_스킬은_저장되고_30개면_31번째_새_스킬은_VALIDATION_FAILED_이며_게시하지_않는다() {
+    @DisplayName("올린 스킬이 29개면 30번째 새 스킬은 저장되고 30개면 31번째 새 스킬은 VALIDATION FAILED 이며 게시하지 않는다")
+    void thirtiethNewSkillSavesAt29UploadedAndThirtyFirstFailsAt30() {
         publishUploaded(29);
 
         skills.save(OWNER, OWNED, "skill-30", skillMd("skill-30"), List.of());
         assertThat(store.readCurrent(OWNED_PROFILE)).hasSize(30);
         clearInvocations(skillClient);
 
-        assertCode(() -> skills.save(OWNER, OWNED, "skill-31", skillMd("skill-31"), List.of()),
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "skill-31", skillMd("skill-31"), List.of()),
                 ErrorCode.VALIDATION_FAILED);
 
         verify(skillClient, never()).publish(anyString(), anyList(), any());
@@ -553,7 +677,8 @@ class SkillServiceTest {
     }
 
     @Test
-    void 올린_스킬이_30개여도_이미_올린_스킬은_고칠_수_있고_하나를_지우면_새_스킬을_받는다() {
+    @DisplayName("올린 스킬이 30개여도 이미 올린 스킬은 고칠 수 있고 하나를 지우면 새 스킬을 받는다")
+    void canEditUploadedSkillAt30AndDeletingOneAcceptsNewSkill() {
         publishUploaded(30);
 
         skills.save(OWNER, OWNED, "skill-01", skillMd("skill-01") + "\n고침", List.of());
@@ -566,16 +691,20 @@ class SkillServiceTest {
     }
 
     @Test
-    void 표식_없이_남은_더_새_버전의_이름도_올린_스킬_수에_센다() {
+    @DisplayName("표식 없이 남은 더 새 버전의 이름도 올린 스킬 수에 센다")
+    void countsNameOfNewerUnmarkedVersionInUploadedSkills() {
         publishUploaded(29);
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "read timed out"))
-                .when(skillClient).publish(anyString(), anyList(), any());
-        assertCode(() -> skills.save(OWNER, OWNED, "skill-30", skillMd("skill-30"), List.of()),
+                .when(skillClient)
+                .publish(anyString(), anyList(), any());
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "skill-30", skillMd("skill-30"), List.of()),
                 ErrorCode.HERMES_UNAVAILABLE);
         doAnswer(call -> null).when(skillClient).publish(anyString(), anyList(), any());
 
         assertThat(store.readCurrent(OWNED_PROFILE)).as("지금 버전은 29개다").hasSize(29);
-        assertCode(() -> skills.save(OWNER, OWNED, "skill-31", skillMd("skill-31"), List.of()),
+        assertCode(
+                () -> skills.save(OWNER, OWNED, "skill-31", skillMd("skill-31"), List.of()),
                 ErrorCode.VALIDATION_FAILED);
         skills.save(OWNER, OWNED, "skill-30", skillMd("skill-30"), List.of());
 
@@ -589,24 +718,31 @@ class SkillServiceTest {
      * 통과해 31개가 된다.
      */
     @Test
-    void 올린_스킬이_29개일_때_새_스킬_둘이_동시에_와도_하나만_저장된다() throws Exception {
+    @DisplayName("올린 스킬이 29개일 때 새 스킬 둘이 동시에 와도 하나만 저장된다")
+    void savesOnlyOneWhenTwoNewSkillsArriveTogetherAt29Uploaded() throws Exception {
         publishUploaded(29);
         CountDownLatch firstPublishStarted = new CountDownLatch(1);
         CountDownLatch releaseFirstPublish = new CountDownLatch(1);
         doAnswer(call -> {
-            if (firstPublishStarted.getCount() > 0) {
-                firstPublishStarted.countDown();
-                assertThat(releaseFirstPublish.await(10, TimeUnit.SECONDS)).as("첫 게시를 풀어 주기까지").isTrue();
-            }
-            return null;
-        }).when(skillClient).publish(anyString(), anyList(), any());
+                    if (firstPublishStarted.getCount() > 0) {
+                        firstPublishStarted.countDown();
+                        assertThat(releaseFirstPublish.await(10, TimeUnit.SECONDS))
+                                .as("첫 게시를 풀어 주기까지")
+                                .isTrue();
+                    }
+                    return null;
+                })
+                .when(skillClient)
+                .publish(anyString(), anyList(), any());
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<SkillDetail> first = pool.submit(
-                    () -> skills.save(OWNER, OWNED, "first-new", skillMd("first-new"), List.of()));
-            assertThat(firstPublishStarted.await(10, TimeUnit.SECONDS)).as("첫 저장이 게시에 닿기까지").isTrue();
-            Future<SkillDetail> second = pool.submit(
-                    () -> skills.save(OWNER, OWNED, "second-new", skillMd("second-new"), List.of()));
+            Future<SkillDetail> first =
+                    pool.submit(() -> skills.save(OWNER, OWNED, "first-new", skillMd("first-new"), List.of()));
+            assertThat(firstPublishStarted.await(10, TimeUnit.SECONDS))
+                    .as("첫 저장이 게시에 닿기까지")
+                    .isTrue();
+            Future<SkillDetail> second =
+                    pool.submit(() -> skills.save(OWNER, OWNED, "second-new", skillMd("second-new"), List.of()));
             Thread.sleep(300);
             assertThat(second.isDone()).as("둘째 저장은 첫째가 끝날 때까지 잠금을 기다린다").isFalse();
 
@@ -622,7 +758,10 @@ class SkillServiceTest {
             pool.shutdownNow();
         }
 
-        assertThat(store.readCurrent(OWNED_PROFILE)).hasSize(30).containsKey("first-new").doesNotContainKey("second-new");
+        assertThat(store.readCurrent(OWNED_PROFILE))
+                .hasSize(30)
+                .containsKey("first-new")
+                .doesNotContainKey("second-new");
     }
 
     /** {@code skill-01} 부터 이름을 붙인 올린 스킬 {@code count} 개를 서비스를 거치지 않고 게시된 버전으로 둔다. */
@@ -664,8 +803,15 @@ class SkillServiceTest {
     }
 
     private static Agent agent(String code, String profile, AgentVisibility visibility, Long ownerId) {
-        return Agent.of(code, code, profile, "http://agent-runtime.test/p/" + profile,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, ownerId);
+        return Agent.of(
+                code,
+                code,
+                profile,
+                "http://agent-runtime.test/p/" + profile,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                visibility,
+                ownerId);
     }
 
     private static List<String> versionDirs(String profile) {

@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,26 +35,39 @@ class AttachmentCleanerTest {
     private static final Instant EXPIRED = NOW.minus(Duration.ofDays(1));
     private static final Instant LIVE = NOW.plus(Duration.ofDays(1));
 
-    @Autowired AttachmentCleaner cleaner;
-    @Autowired AttachmentService service;
-    @Autowired AttachmentStore store;
-    @Autowired AttachmentProperties properties;
-    @Autowired ChatAttachmentRepository attachments;
-    @Autowired ConversationRepository conversations;
+    @Autowired
+    AttachmentCleaner cleaner;
+
+    @Autowired
+    AttachmentService service;
+
+    @Autowired
+    AttachmentStore store;
+
+    @Autowired
+    AttachmentProperties properties;
+
+    @Autowired
+    ChatAttachmentRepository attachments;
+
+    @Autowired
+    ConversationRepository conversations;
 
     private Path root;
     private Long conversationId;
 
     @BeforeEach
-    void 준비한다() throws IOException {
+    void setUp() throws IOException {
         attachments.deleteAll();
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
-        conversationId = conversations.save(Conversation.startedBy(9201L, "정리 대화", null)).id();
+        conversationId =
+                conversations.save(Conversation.startedBy(9201L, "정리 대화", null)).id();
     }
 
     @Test
-    void 기간이_지난_것만_파일을_지우고_행에_지운_시각을_적는다() {
+    @DisplayName("기간이 지난 것만 파일을 지우고 행에 지운 시각을 적는다")
+    void deletesFilesAndRecordsDeletionTimeOnlyForExpired() {
         ChatAttachment expired = stored(EXPIRED);
         ChatAttachment live = stored(LIVE);
 
@@ -67,7 +81,8 @@ class AttachmentCleanerTest {
     }
 
     @Test
-    void 이미_지운_것은_다시_지우지_않는다() {
+    @DisplayName("이미 지운 것은 다시 지우지 않는다")
+    void doesNotDeleteAlreadyDeletedAgain() {
         ChatAttachment gone = stored(EXPIRED);
         Instant firstDeletion = NOW.minus(Duration.ofHours(3));
         store.delete(gone);
@@ -81,7 +96,8 @@ class AttachmentCleanerTest {
     }
 
     @Test
-    void 메시지에_묶였든_아니든_기간이_지났으면_함께_지운다() {
+    @DisplayName("메시지에 묶였든 아니든 기간이 지났으면 함께 지운다")
+    void deletesExpiredWhetherBoundToMessageOrNot() {
         ChatAttachment bound = stored(EXPIRED);
         ChatAttachment unbound = stored(EXPIRED);
         service.attach(801L, conversationId, List.of(bound.id()));
@@ -96,7 +112,8 @@ class AttachmentCleanerTest {
     }
 
     @Test
-    void 지운_대화의_보내지_않은_첨부도_기간이_지나면_지운다() {
+    @DisplayName("지운 대화의 보내지 않은 첨부도 기간이 지나면 지운다")
+    void deletesExpiredUnsentAttachmentsOfDeletedConversation() {
         ChatAttachment unbound = stored(EXPIRED);
         conversations.deleteIfActive(conversationId, 9201L, NOW.minus(Duration.ofHours(2)));
 
@@ -108,7 +125,8 @@ class AttachmentCleanerTest {
     }
 
     @Test
-    void 한_건이_실패해도_나머지를_지운다() throws IOException {
+    @DisplayName("한 건이 실패해도 나머지를 지운다")
+    void deletesRestEvenIfOneFails() throws IOException {
         ChatAttachment broken = stored(EXPIRED);
         ChatAttachment fine = stored(EXPIRED);
         // 파일 자리를 비어 있지 않은 디렉터리로 바꿔 지우기가 실패하게 한다.
@@ -125,8 +143,8 @@ class AttachmentCleanerTest {
     }
 
     private ChatAttachment stored(Instant expiresAt) {
-        ChatAttachment attachment = attachments.save(
-                ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt));
+        ChatAttachment attachment =
+                attachments.save(ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
         store.save(conversationId, attachment.id(), "png", new ByteArrayInputStream(new byte[] {1, 2, 3}));

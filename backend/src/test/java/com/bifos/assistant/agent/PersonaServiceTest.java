@@ -22,6 +22,7 @@ import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,20 +34,20 @@ import org.junit.jupiter.api.Test;
 class PersonaServiceTest {
 
     private static final String SOUL = "너는 아빠의 비서다.\n";
-    private static final CurrentUser OWNER =
-            new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER = new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.MEMBER);
 
     private final AgentRepository agents = mock(AgentRepository.class);
     private final StubHermesDashboardClient dashboard = new StubHermesDashboardClient();
     private final PersonaService personas = new PersonaService(new AgentService(agents), dashboard);
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent("dad", "dad-profile", OWNER.id())));
     }
 
     @Test
-    void 지금_본문과_그_해시를_돌려준다() {
+    @DisplayName("지금 본문과 그 해시를 돌려준다")
+    void returnsCurrentBodyAndItsHash() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         PersonaSnapshot snapshot = personas.read(OWNER, "dad");
@@ -57,7 +58,8 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 파일이_없는_profile_은_본문이_빈_문자열이다() {
+    @DisplayName("파일이 없는 profile 은 본문이 빈 문자열이다")
+    void returnsEmptyBodyForProfileWithoutFile() {
         PersonaSnapshot snapshot = personas.read(OWNER, "dad");
 
         assertThat(snapshot.body()).isEmpty();
@@ -65,7 +67,8 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 맞는_해시로_쓰면_그_본문이_그_profile_로_넘어간다() {
+    @DisplayName("맞는 해시로 쓰면 그 본문이 그 profile 로 넘어간다")
+    void writesBodyToProfileWhenHashMatches() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         PersonaSnapshot written = personas.write(OWNER, "dad", "새 성격", Sha256.hex16(SOUL));
@@ -76,7 +79,8 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 한_글자_다른_해시로_쓰면_거절하고_쓰지_않는다() {
+    @DisplayName("한 글자 다른 해시로 쓰면 거절하고 쓰지 않는다")
+    void rejectsWriteWithOneCharDifferentHash() {
         dashboard.seedSoul("dad-profile", SOUL);
         String wrong = "0" + Sha256.hex16(SOUL).substring(1);
 
@@ -88,7 +92,8 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 지금_본문이_있는데_해시가_비어_있으면_거절한다() {
+    @DisplayName("지금 본문이 있는데 해시가 비어 있으면 거절한다")
+    void rejectsBlankHashWhenBodyExists() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         assertThatThrownBy(() -> personas.write(OWNER, "dad", "새 성격", ""))
@@ -99,14 +104,16 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 파일이_없는_profile_에는_해시_없이_처음_쓸_수_있다() {
+    @DisplayName("파일이 없는 profile 에는 해시 없이 처음 쓸 수 있다")
+    void allowsFirstWriteWithoutHashForProfileWithoutFile() {
         personas.write(OWNER, "dad", "새 성격", null);
 
         assertThat(dashboard.soulWrites()).containsExactly(new SoulWrite("dad-profile", "새 성격"));
     }
 
     @Test
-    void 공백만_있는_본문은_거절하고_쓰지_않는다() {
+    @DisplayName("공백만 있는 본문은 거절하고 쓰지 않는다")
+    void rejectsWhitespaceOnlyBodyWithoutWriting() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         assertThatThrownBy(() -> personas.write(OWNER, "dad", "   \n ", Sha256.hex16(SOUL)))
@@ -117,7 +124,8 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 앞뒤_공백은_떼고_쓴다() {
+    @DisplayName("앞뒤 공백은 떼고 쓴다")
+    void trimsSurroundingWhitespaceOnWrite() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         PersonaSnapshot written = personas.write(OWNER, "dad", "  새 성격 \n", Sha256.hex16(SOUL));
@@ -127,7 +135,8 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 줄바꿈으로_끝나는_본문을_읽어_그대로_되보내면_저장된다() {
+    @DisplayName("줄바꿈으로 끝나는 본문을 읽어 그대로 되보내면 저장된다")
+    void savesBodyEndingWithNewlineWhenReadAndSentBackUnchanged() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         PersonaSnapshot read = personas.read(OWNER, "dad");
@@ -137,18 +146,24 @@ class PersonaServiceTest {
     }
 
     @Test
-    void 대시보드에는_code_가_아니라_그_에이전트의_profile_이름이_넘어간다() {
+    @DisplayName("대시보드에는 code 가 아니라 그 에이전트의 profile 이름이 넘어간다")
+    void sendsAgentProfileNameToDashboardInsteadOfCode() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         personas.write(OWNER, "dad", "새 성격", Sha256.hex16(SOUL));
 
-        assertThat(dashboard.soulWrites())
-                .extracting(SoulWrite::profile)
-                .containsExactly("dad-profile");
+        assertThat(dashboard.soulWrites()).extracting(SoulWrite::profile).containsExactly("dad-profile");
     }
 
     private static Agent agent(String code, String profile, Long ownerUserId) {
-        return Agent.of(code, "아빠", profile, "http://127.0.0.1:1/p/" + profile, CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, ownerUserId);
+        return Agent.of(
+                code,
+                "아빠",
+                profile,
+                "http://127.0.0.1:1/p/" + profile,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                ownerUserId);
     }
 }

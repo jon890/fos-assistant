@@ -9,6 +9,7 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,16 +20,20 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class OrphanedExecutionSweeperTest {
 
-    @Autowired OrphanedExecutionSweeper sweeper;
-    @Autowired AgentExecutionRepository executions;
+    @Autowired
+    OrphanedExecutionSweeper sweeper;
+
+    @Autowired
+    AgentExecutionRepository executions;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         executions.deleteAll();
     }
 
     @Test
-    void 실행_중인_두_줄을_고아_실패로_정리한다() {
+    @DisplayName("실행 중인 두 줄을 고아 실패로 정리한다")
+    void cleansUpTwoRunningRowsAsOrphanFailures() {
         AgentExecution first = executions.save(running(1L));
         AgentExecution second = executions.save(running(2L));
 
@@ -39,7 +44,8 @@ class OrphanedExecutionSweeperTest {
     }
 
     @Test
-    void 성공한_줄은_건드리지_않는다() {
+    @DisplayName("성공한 줄은 건드리지 않는다")
+    void leavesSucceededRowsAlone() {
         AgentExecution succeeded = executions.save(succeeded(1L));
 
         sweeper.sweep();
@@ -50,13 +56,13 @@ class OrphanedExecutionSweeperTest {
     }
 
     @Test
-    void 실행_중인_줄이_없으면_아무것도_바꾸지_않는다() {
+    @DisplayName("실행 중인 줄이 없으면 아무것도 바꾸지 않는다")
+    void changesNothingWhenNoRunningRows() {
         AgentExecution succeeded = executions.save(succeeded(1L));
 
         sweeper.sweep();
 
-        assertThat(executions.findById(succeeded.id()).orElseThrow().status())
-                .isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(executions.findById(succeeded.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(executions.count()).isOne();
     }
 

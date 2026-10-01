@@ -1,0 +1,341 @@
+{
+  "src/app/admin/people/people-admin-panel.tsx": {
+    "no-restricted-globals": {
+      "count": 3
+    }
+  },
+  "src/app/api/admin/agents/[code]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/admin/agents/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/api/admin/connections/accountbook/[userId]/confirm/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/api/admin/people/[id]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/admin/people/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/api/agents/[code]/persona/route.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/app/api/agents/[code]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/agents/[code]/skills/[name]/enabled/route.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/api/agents/[code]/skills/[name]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "src/app/api/agents/[code]/skills/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/agents/[code]/starters/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/agents/[code]/visibility/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/agents/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/attachments/[attachmentId]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/attachments/route.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/events/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/files/[...path]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/messages/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/model/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/regenerate/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/[conversationId]/running/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/conversations/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/executions/[id]/stop/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/model-options/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/chat/route.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/api/chat/stream/route.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/api/me/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/api/memories/[id]/accept/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/memories/[id]/reject/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/memories/[id]/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/memories/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/api/usage/breakdown/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/api/usage/executions/[id]/tree/route.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/api/usage/route.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/agent/agent-access-section.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/agent/agent-admin-panel.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/agent/agent-admin-section.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/agent/agent-detail-body.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/agent/agent-skills-section.tsx": {
+    "no-restricted-globals": {
+      "count": 3
+    }
+  },
+  "src/components/agent/agent-tools-section.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/agent/create-agent-dialog.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/agent/persona-editor.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/agent/skill-editor.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/chat-panel.tsx": {
+    "no-restricted-globals": {
+      "count": 14
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/chat/activity/activity-block.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/chat/activity/activity-panel.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/chat/composer.tsx": {
+    "no-restricted-globals": {
+      "count": 4
+    },
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "src/components/chat/markdown.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/chat/message-bubble.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/components/chat/message-list.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/chat/model-picker.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/chat/use-starter-suggestions.ts": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/connector/accountbook-admin-panel.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/connector/accountbook-connection-panel.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/execution/execution-detail.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/memory/memory-form.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/memory/memory-item.tsx": {
+    "no-restricted-globals": {
+      "count": 2
+    }
+  },
+  "src/components/memory/memory-list.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/memory/memory-proposal.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/shell/app-shell.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "src/components/shell/conversations-provider.tsx": {
+    "no-restricted-globals": {
+      "count": 3
+    }
+  },
+  "src/components/shell/main-nav.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  },
+  "src/components/ui/theme-toggle.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/usage/breakdown-section.tsx": {
+    "no-restricted-globals": {
+      "count": 1
+    }
+  }
+}

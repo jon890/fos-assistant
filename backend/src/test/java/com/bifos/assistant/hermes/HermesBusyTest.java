@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -76,7 +77,8 @@ class HermesBusyTest {
     }
 
     @Test
-    void 실행_제출이_429_를_받으면_붐빈다고_적는다() {
+    @DisplayName("실행 제출이 429 를 받으면 붐빈다고 적는다")
+    void notesBusyWhenRunSubmitGets429() {
         respondWith(429, RATE_LIMITED);
 
         assertThatThrownBy(() -> client.submit(command()))
@@ -86,7 +88,8 @@ class HermesBusyTest {
     }
 
     @Test
-    void 붐빈다는_응답에_다시_보내지_않는다() {
+    @DisplayName("붐빈다는 응답에 다시 보내지 않는다")
+    void doesNotResendOnBusyResponse() {
         respondWith(429, RATE_LIMITED);
 
         assertThatThrownBy(() -> client.submit(command())).isInstanceOf(ApiException.class);
@@ -95,7 +98,8 @@ class HermesBusyTest {
     }
 
     @Test
-    void 다른_실패는_닿지_못한_것으로_남는다() {
+    @DisplayName("다른 실패는 닿지 못한 것으로 남는다")
+    void otherFailuresRemainAsUnreachable() {
         respondWith(500, "{\"error\":\"boom\"}");
 
         assertThatThrownBy(() -> client.submit(command()))
@@ -105,7 +109,8 @@ class HermesBusyTest {
     }
 
     @Test
-    void 상태_조회가_429_를_받아도_붐빈다고_적는다() {
+    @DisplayName("상태 조회가 429 를 받아도 붐빈다고 적는다")
+    void notesBusyWhenStatusQueryGets429() {
         respondWith(429, RATE_LIMITED);
 
         assertThatThrownBy(() -> client.awaitCompletion(command(), "run-1"))
@@ -115,7 +120,8 @@ class HermesBusyTest {
     }
 
     @Test
-    void 중간에_끊긴_실행은_기다리지_않고_끝난_것으로_돌려준다() {
+    @DisplayName("중간에 끊긴 실행은 기다리지 않고 끝난 것으로 돌려준다")
+    void returnsHalfwayCutRunAsEndedWithoutWaiting() {
         // v0.21.5 의 종료 상태다. 기다리면 실행 시간 한도(여기서는 2초)까지 조회만 되풀이한다.
         respondWith(200, "{\"run_id\":\"run-1\",\"status\":\"interrupted\",\"session_id\":\"sess-1\"}");
 
@@ -127,7 +133,6 @@ class HermesBusyTest {
     }
 
     private HermesRunCommand command() {
-        return new HermesRunCommand(
-                "dad", baseUrl, "안녕", null, null, "openai-codex", "example-model", null);
+        return new HermesRunCommand("dad", baseUrl, "안녕", null, null, "openai-codex", "example-model", null);
     }
 }

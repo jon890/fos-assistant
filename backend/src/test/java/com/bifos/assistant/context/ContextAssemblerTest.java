@@ -9,6 +9,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.UserRole;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,17 +23,23 @@ class ContextAssemblerTest {
     private static final CurrentUser ADMIN = user(1L, 10L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
 
-    @Autowired ContextAssembler assembler;
-    @Autowired MemoryService memories;
-    @Autowired MemoryRepository repository;
+    @Autowired
+    ContextAssembler assembler;
+
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    MemoryRepository repository;
 
     @BeforeEach
-    void 비운다() {
+    void setUp() {
         repository.deleteAll();
     }
 
     @Test
-    void 그룹과_개인_항목을_층_순서대로_본문까지_넣는다() {
+    @DisplayName("그룹과 개인 항목을 층 순서대로 본문까지 넣는다")
+    void assemblesGroupAndUserItemsInLayerOrderWithBodies() {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", true);
 
@@ -45,7 +52,8 @@ class ContextAssemblerTest {
     }
 
     @Test
-    void 다른_사용자의_개인_항목과_승인_전_항목은_조립하지_않는다() {
+    @DisplayName("다른 사용자의 개인 항목과 승인 전 항목은 조립하지 않는다")
+    void skipsOtherUsersPersonalItemsAndUnapprovedItems() {
         memories.create(ADMIN, MemoryScope.USER, "아빠 제목", "아빠만 아는 내용", true);
         memories.proposeUser(MEMBER, "제안 제목", "승인 전 내용", 1L);
 
@@ -56,22 +64,26 @@ class ContextAssemblerTest {
     }
 
     @Test
-    void 넣을_항목이_없으면_null과_0을_낸다() {
+    @DisplayName("넣을 항목이 없으면 null과 0을 낸다")
+    void returnsNullAndZeroWhenNothingToInsert() {
         assertThat(assembler.assemble(ADMIN)).isEqualTo(AssembledContext.empty());
     }
 
     @Test
-    void 한_층만_있으면_그_층의_제목만_넣는다() {
+    @DisplayName("한 층만 있으면 그 층의 제목만 넣는다")
+    void insertsOnlyTitlesOfLayerWhenOnlyOneLayerExists() {
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", true);
 
         AssembledContext result = assembler.assemble(ADMIN);
 
-        assertThat(result.instructions()).contains("# 지금 묻는 사람에 대해 아는 것", "개인 내용")
+        assertThat(result.instructions())
+                .contains("# 지금 묻는 사람에 대해 아는 것", "개인 내용")
                 .doesNotContain("# 우리 그룹이 함께 아는 것", "# 더 물어볼 수 있는 것");
     }
 
     @Test
-    void 상한을_넘는_항목은_일부도_넣지_않고_그_항목만_건너뛴다() {
+    @DisplayName("상한을 넘는 항목은 일부도 넣지 않고 그 항목만 건너뛴다")
+    void skipsOnlyItemOverLimitWithoutPartialInsert() {
         Memory first = memories.create(ADMIN, MemoryScope.GROUP, "첫째", "가".repeat(5_000), true);
         Memory second = memories.create(ADMIN, MemoryScope.GROUP, "둘째", "나".repeat(5_000), true);
         Memory third = memories.create(ADMIN, MemoryScope.GROUP, "셋째", "짧은 내용", true);
@@ -86,7 +98,8 @@ class ContextAssemblerTest {
     }
 
     @Test
-    void 첫_항목이_상한을_넘어도_색인과_나머지_항목을_싣는다() {
+    @DisplayName("첫 항목이 상한을 넘어도 색인과 나머지 항목을 싣는다")
+    void shipsIndexAndRestEvenIfFirstItemExceedsLimit() {
         Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
         Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
         Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인만 하는 제목", "색인 본문", false);
@@ -102,32 +115,32 @@ class ContextAssemblerTest {
     }
 
     @Test
-    void 항상_층이_상한을_거의_채워도_색인_층을_싣는다() {
+    @DisplayName("항상 층이 상한을 거의 채워도 색인 층을 싣는다")
+    void shipsIndexLayerEvenWhenAlwaysLayerNearlyFillsLimit() {
         memories.create(ADMIN, MemoryScope.GROUP, "거의 상한", "가".repeat(7_960), true);
         Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인 제목", "색인 본문", false);
 
         AssembledContext result = assembler.assemble(ADMIN);
 
-        assertThat(result.instructions())
-                .isNotNull()
-                .contains("# 더 물어볼 수 있는 것", "[" + indexed.id() + "] 색인 제목");
+        assertThat(result.instructions()).isNotNull().contains("# 더 물어볼 수 있는 것", "[" + indexed.id() + "] 색인 제목");
         assertThat(result.chars()).isLessThanOrEqualTo(8_000);
     }
 
     @Test
-    void 색인이_짧으면_떼어_둔_자리를_항상_층이_쓴다() {
+    @DisplayName("색인이 짧으면 떼어 둔 자리를 항상 층이 쓴다")
+    void alwaysLayerUsesReservedSpaceWhenIndexIsShort() {
         Memory body = memories.create(ADMIN, MemoryScope.GROUP, "본문", "가".repeat(7_000), true);
         Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인 제목", "색인 본문", false);
 
         AssembledContext result = assembler.assemble(ADMIN);
 
-        assertThat(result.instructions())
-                .contains(body.content(), "[" + indexed.id() + "] 색인 제목");
+        assertThat(result.instructions()).contains(body.content(), "[" + indexed.id() + "] 색인 제목");
         assertThat(result.omittedItems()).isZero();
     }
 
     @Test
-    void 모든_항목이_상한을_넘으면_비우고_빠진_수만_남긴다() {
+    @DisplayName("모든 항목이 상한을 넘으면 비우고 빠진 수만 남긴다")
+    void emptiesAndKeepsOnlyOmittedCountWhenAllItemsExceedLimit() {
         memories.create(ADMIN, MemoryScope.GROUP, "첫째", "가".repeat(9_000), true);
         memories.create(ADMIN, MemoryScope.USER, "둘째", "나".repeat(9_000), true);
 
@@ -139,7 +152,8 @@ class ContextAssemblerTest {
     }
 
     @Test
-    void 상한_안에_다_들어가면_빠진_항목이_없다() {
+    @DisplayName("상한 안에 다 들어가면 빠진 항목이 없다")
+    void hasNoOmittedItemsWhenEverythingFitsLimit() {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", false);
 
@@ -150,7 +164,8 @@ class ContextAssemblerTest {
     }
 
     @Test
-    void 항상_층_뒤에_색인_층을_id_오름차순으로_넣는다() {
+    @DisplayName("항상 층 뒤에 색인 층을 id 오름차순으로 넣는다")
+    void putsIndexLayerAfterAlwaysLayerInIdAscendingOrder() {
         Memory first = memories.create(ADMIN, MemoryScope.USER, "먼저 저장", "본문", false);
         Memory second = memories.create(ADMIN, MemoryScope.GROUP, "나중 저장", "본문", false);
 

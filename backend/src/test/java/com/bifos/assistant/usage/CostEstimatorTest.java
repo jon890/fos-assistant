@@ -15,13 +15,14 @@ import com.bifos.assistant.usage.infra.PricingProperties;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
-import java.nio.file.attribute.FileTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,15 +40,17 @@ class CostEstimatorTest {
 
     @BeforeAll
     static void loadCatalog() throws URISyntaxException, IOException {
-        catalogFile =
-                Path.of(CostEstimatorTest.class.getResource("/pricing/models-dev-sample.json").toURI());
+        catalogFile = Path.of(CostEstimatorTest.class
+                .getResource("/pricing/models-dev-sample.json")
+                .toURI());
         // pricing_version 은 파일의 수정 시각에서 나온다. 검사에서 그 날짜를 못 박는다.
         Files.setLastModifiedTime(catalogFile, FileTime.from(Instant.parse("2026-09-17T04:00:00Z")));
         estimator = new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties(catalogFile.toString())));
     }
 
     @Test
-    void 카탈로그에서_가격을_찾아_금액을_계산한다() {
+    @DisplayName("카탈로그에서 가격을 찾아 금액을 계산한다")
+    void calculatesAmountByFindingPriceInCatalog() {
         // 입력 1000 × 5 + 출력 500 × 30 = 20000 마이크로 달러
         EstimatedCost cost = estimator.estimate("openai", "example-model", usage(1000L, null, 500L));
 
@@ -57,7 +60,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 캐시된_입력은_캐시_단가로_세고_나머지만_입력_단가로_센다() {
+    @DisplayName("캐시된 입력은 캐시 단가로 세고 나머지만 입력 단가로 센다")
+    void countsCachedInputAtCacheRateAndOnlyRestAtInputRate() {
         // 입력 1000 중 800 이 캐시다. 200 × 5 + 800 × 0.5 + 500 × 30 = 16400
         EstimatedCost cost = estimator.estimate("openai", "example-model", usage(1000L, 800L, 500L));
 
@@ -65,7 +69,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 캐시_단가가_없는_모델은_캐시_토큰도_입력_단가로_센다() {
+    @DisplayName("캐시 단가가 없는 모델은 캐시 토큰도 입력 단가로 센다")
+    void countsCacheTokensAtInputRateForModelWithoutCacheRate() {
         // 할인한다는 근거가 없으므로 공짜로 떨어뜨리지 않는다. 1000 × 2 + 100 × 8 = 2800
         EstimatedCost cost = estimator.estimate("openai", "gpt-flat", usage(1000L, 400L, 100L));
 
@@ -73,7 +78,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 구간_경계를_넘으면_그_구간의_단가를_쓴다() {
+    @DisplayName("구간 경계를 넘으면 그 구간의 단가를 쓴다")
+    void usesTierRateOnceTierBoundaryIsExceeded() {
         // 경계는 272000 이다. 300000 × 10 + 1000 × 45 = 3045000
         EstimatedCost cost = estimator.estimate("openai", "example-model", usage(300_000L, null, 1_000L));
 
@@ -81,7 +87,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 구간_경계와_같으면_아직_기본_단가를_쓴다() {
+    @DisplayName("구간 경계와 같으면 아직 기본 단가를 쓴다")
+    void stillUsesBaseRateWhenEqualToTierBoundary() {
         // 272000 × 5 = 1360000. 경계를 넘을 때만 올라간다
         EstimatedCost cost = estimator.estimate("openai", "example-model", usage(272_000L, null, 0L));
 
@@ -89,7 +96,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 경계값을_적지_않은_옛_항목은_20만_토큰을_경계로_본다() {
+    @DisplayName("경계값을 적지 않은 옛 항목은 20만 토큰을 경계로 본다")
+    void oldEntryWithoutBoundaryTreatsTwoHundredThousandTokensAsBoundary() {
         // gpt-legacy-band 는 context_over_200k 만 적어 두었다. 250000 × 6 + 10 × 12 = 1500120
         EstimatedCost cost = estimator.estimate("openai", "gpt-legacy-band", usage(250_000L, null, 10L));
 
@@ -97,7 +105,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void provider_별칭이_동작한다() {
+    @DisplayName("provider 별칭이 동작한다")
+    void providerAliasWorks() {
         // 바인딩은 openai-codex 를 적지만 카탈로그는 그 모델을 openai 아래에 둔다
         EstimatedCost aliased = estimator.estimate(CODEX_PROVIDER, "example-model", usage(1000L, null, 500L));
 
@@ -106,14 +115,16 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 별칭에_없는_provider_는_그_이름_그대로_찾는다() {
+    @DisplayName("별칭에 없는 provider 는 그 이름 그대로 찾는다")
+    void providerNotInAliasIsLookedUpByItsOwnName() {
         EstimatedCost cost = estimator.estimate("anthropic", "example-model-large", usage(100L, null, 10L));
 
         assertThat(cost.micros()).isEqualTo(2_250L);
     }
 
     @Test
-    void 가격을_찾지_못하면_금액이_비어_있다() {
+    @DisplayName("가격을 찾지 못하면 금액이 비어 있다")
+    void amountIsEmptyWhenPriceIsNotFound() {
         EstimatedCost unknownModel = estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L));
         EstimatedCost unknownProvider = estimator.estimate("some-vendor", "example-model", usage(1000L, null, 500L));
         EstimatedCost noRates = estimator.estimate("openai", "gpt-free-tool", usage(1000L, null, 500L));
@@ -126,13 +137,15 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 토큰을_하나도_보고하지_않은_실행은_금액이_비어_있다() {
+    @DisplayName("토큰을 하나도 보고하지 않은 실행은 금액이 비어 있다")
+    void amountIsEmptyForRunThatReportedNoTokens() {
         assertThat(estimator.estimate("openai", "example-model", TokenUsage.empty()))
                 .isEqualTo(EstimatedCost.unknown());
     }
 
     @Test
-    void 카탈로그가_없으면_기동을_막지_않고_금액만_비워_둔다() {
+    @DisplayName("카탈로그가 없으면 기동을 막지 않고 금액만 비워 둔다")
+    void leavesOnlyAmountEmptyWithoutBlockingStartupWhenNoCatalog() {
         CostEstimator noCatalog =
                 new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties("/tmp/no-such-catalog.json")));
         CostEstimator notConfigured = new CostEstimator(new ModelsDevPriceCatalog(new PricingProperties("")));
@@ -144,7 +157,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void API_경로는_환산액과_실제_청구액이_같다() {
+    @DisplayName("API 경로는 환산액과 실제 청구액이 같다")
+    void apiPathConvertedAmountEqualsActualBilledAmount() {
         ExecutionCost cost = estimator.estimate("openai", "example-model", usage(1000L, null, 500L), CostMode.API);
 
         assertThat(cost.estimatedMicros()).isEqualTo(20_000L);
@@ -154,7 +168,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 구독_경로는_환산액은_있고_실제_청구액은_비어_있다() {
+    @DisplayName("구독 경로는 환산액은 있고 실제 청구액은 비어 있다")
+    void subscriptionPathHasConvertedAmountAndEmptyActualBilledAmount() {
         ExecutionCost cost =
                 estimator.estimate("openai", "example-model", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
 
@@ -163,12 +178,12 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 가격표에_없는_모델은_cost_mode_와_무관하게_둘_다_비어_있다() {
+    @DisplayName("가격표에 없는 모델은 cost mode 와 무관하게 둘 다 비어 있다")
+    void modelNotInPriceTableGivesBothEmptyRegardlessOfCostMode() {
         ExecutionCost apiCost =
                 estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.API);
         ExecutionCost subscriptionCost =
-                estimator.estimate(
-                        "openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
+                estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
 
         assertThat(apiCost).isEqualTo(ExecutionCost.unknown());
         assertThat(subscriptionCost).isEqualTo(ExecutionCost.unknown());
@@ -177,7 +192,8 @@ class CostEstimatorTest {
     }
 
     @Test
-    void 금액에는_그_가격을_찾은_가격표의_버전을_적는다() {
+    @DisplayName("금액에는 그 가격을 찾은 가격표의 버전을 적는다")
+    void amountRecordsVersionOfPriceTableThatFoundThePrice() {
         // 조회한 뒤 가격표가 다시 읽혀 버전이 바뀐 상황이다. 금액에는 가격을 찾은 쪽의 버전이 붙어야 한다.
         ModelPrice price = new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), null, List.of());
         PriceCatalog reloadedBetween = new PriceCatalog() {

@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,13 +30,16 @@ class ModelsDevPriceCatalogReloadTest {
     private final AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-09-28T00:00:00Z"));
 
     @Test
-    void 파일이_바뀌면_확인_간격이_지난_뒤_새_가격과_버전을_쓴다() throws IOException {
+    @DisplayName("파일이 바뀌면 확인 간격이 지난 뒤 새 가격과 버전을 쓴다")
+    void usesNewPriceAndVersionAfterCheckIntervalWhenFileChanges() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);
         assertThat(catalog.find("openai", "new-model")).isEmpty();
 
         write(catalog("new-model"), SECOND);
-        assertThat(catalog.find("openai", "new-model")).as("간격 안에서는 디스크를 다시 보지 않는다").isEmpty();
+        assertThat(catalog.find("openai", "new-model"))
+                .as("간격 안에서는 디스크를 다시 보지 않는다")
+                .isEmpty();
 
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
         assertThat(catalog.find("openai", "new-model")).isPresent();
@@ -43,7 +47,8 @@ class ModelsDevPriceCatalogReloadTest {
     }
 
     @Test
-    void 새_파일을_읽지_못하면_이전_가격을_계속_쓴다() throws IOException {
+    @DisplayName("새 파일을 읽지 못하면 이전 가격을 계속 쓴다")
+    void keepsUsingOldPriceWhenNewFileCannotBeRead() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);
 
@@ -55,7 +60,8 @@ class ModelsDevPriceCatalogReloadTest {
     }
 
     @Test
-    void 읽기에_실패한_파일은_수정_시각이_같아도_다음_확인_때_다시_읽는다() throws IOException {
+    @DisplayName("읽기에 실패한 파일은 수정 시각이 같아도 다음 확인 때 다시 읽는다")
+    void rereadsFileThatFailedToReadOnNextCheckEvenWithSameModifiedTime() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);
         // 그 자리에 디렉터리를 두면 수정 시각은 읽히고 Files.readString 만 입출력 오류로 실패한다.
@@ -63,17 +69,22 @@ class ModelsDevPriceCatalogReloadTest {
         Files.createDirectory(file);
         Files.setLastModifiedTime(file, FileTime.from(SECOND));
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
-        assertThat(catalog.find("openai", "old-model")).as("읽지 못하는 동안에도 이전 가격을 쓴다").isPresent();
+        assertThat(catalog.find("openai", "old-model"))
+                .as("읽지 못하는 동안에도 이전 가격을 쓴다")
+                .isPresent();
 
         Files.delete(file);
         write(catalog("new-model"), SECOND);
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
 
-        assertThat(catalog.find("openai", "new-model")).as("수정 시각이 같아도 입출력 오류였으므로 다시 읽는다").isPresent();
+        assertThat(catalog.find("openai", "new-model"))
+                .as("수정 시각이 같아도 입출력 오류였으므로 다시 읽는다")
+                .isPresent();
     }
 
     @Test
-    void 사라진_파일이_돌아오면_읽는다() throws IOException {
+    @DisplayName("사라진 파일이 돌아오면 읽는다")
+    void readsFileThatReturnsAfterDisappearing() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);
         Files.delete(file);
@@ -87,7 +98,8 @@ class ModelsDevPriceCatalogReloadTest {
     }
 
     @Test
-    void 내용이_틀린_파일을_고쳐_다시_쓰면_읽는다() throws IOException {
+    @DisplayName("내용이 틀린 파일을 고쳐 다시 쓰면 읽는다")
+    void readsBrokenFileOnceItIsFixedAndRewritten() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);
         write("{ 받다가 끊긴 파일", SECOND);
@@ -101,7 +113,8 @@ class ModelsDevPriceCatalogReloadTest {
     }
 
     @Test
-    void 가격이_하나도_없는_파일은_받아들이지_않는다() throws IOException {
+    @DisplayName("가격이 하나도 없는 파일은 받아들이지 않는다")
+    void doesNotAcceptFileWithoutAnyPrice() throws IOException {
         Path file = write(catalog("old-model"), FIRST);
         ModelsDevPriceCatalog catalog = catalogOf(file);
 
@@ -112,7 +125,8 @@ class ModelsDevPriceCatalogReloadTest {
     }
 
     @Test
-    void 기동할_때_없던_파일이_나중에_생기면_읽는다() throws IOException {
+    @DisplayName("기동할 때 없던 파일이 나중에 생기면 읽는다")
+    void readsFileThatAppearsLaterThanStartup() throws IOException {
         Path file = dir.resolve("catalog.json");
         ModelsDevPriceCatalog catalog = catalogOf(file);
         assertThat(catalog.isAvailable()).isFalse();

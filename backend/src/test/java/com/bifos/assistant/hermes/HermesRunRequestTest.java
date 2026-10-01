@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -69,7 +70,8 @@ class HermesRunRequestTest {
     }
 
     @Test
-    void provider_와_모델이_모두_비면_세_키를_싣지_않는다() {
+    @DisplayName("provider 와 모델이 모두 비면 세 키를 싣지 않는다")
+    void sendsNoThreeKeysWhenProviderAndModelAreBothBlank() {
         String runId = client.submit(command(null, null, null));
 
         JsonNode body = submittedBody();
@@ -81,25 +83,29 @@ class HermesRunRequestTest {
     }
 
     @Test
-    void provider_와_모델과_effort_를_주면_셋이_모두_실린다() {
+    @DisplayName("provider 와 모델과 effort 를 주면 셋이 모두 실린다")
+    void sendsAllThreeWhenProviderModelAndEffortGiven() {
         client.submit(command("openai-codex", "example-model", "high"));
 
         JsonNode body = submittedBody();
         assertThat(body.path("provider").asString()).isEqualTo("openai-codex");
         assertThat(body.path("model").asString()).isEqualTo("example-model");
-        assertThat(body.path("model_options").path("reasoning").path("effort").asString()).isEqualTo("high");
+        assertThat(body.path("model_options").path("reasoning").path("effort").asString())
+                .isEqualTo("high");
         assertThat(body.path("model_options").has("reasoning_effort")).isFalse();
     }
 
     @Test
-    void effort_가_비어_있으면_model_options_를_싣지_않는다() {
+    @DisplayName("effort 가 비어 있으면 model options 를 싣지 않는다")
+    void sendsNoModelOptionsWhenEffortIsBlank() {
         client.submit(command("openai-codex", "example-model", " "));
 
         assertThat(submittedBody().has("model_options")).isFalse();
     }
 
     @Test
-    void provider_만_주면_Hermes_를_부르지_않고_실패한다() {
+    @DisplayName("provider 만 주면 Hermes 를 부르지 않고 실패한다")
+    void failsWithoutCallingHermesWhenOnlyProviderGiven() {
         assertThatThrownBy(() -> client.submit(command("openai-codex", null, null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
@@ -113,7 +119,8 @@ class HermesRunRequestTest {
     }
 
     @Test
-    void provider_가_비면_Hermes_를_부르지_않고_실패한다() {
+    @DisplayName("provider 가 비면 Hermes 를 부르지 않고 실패한다")
+    void failsWithoutCallingHermesWhenProviderBlank() {
         assertThatThrownBy(() -> client.submit(command(null, "example-model", null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
@@ -122,7 +129,8 @@ class HermesRunRequestTest {
     }
 
     @Test
-    void 모델이_비면_Hermes_를_부르지_않고_실패한다() {
+    @DisplayName("모델이 비면 Hermes 를 부르지 않고 실패한다")
+    void failsWithoutCallingHermesWhenModelBlank() {
         assertThatThrownBy(() -> client.submit(command("openai-codex", " ", null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException) ex).code())
@@ -137,20 +145,29 @@ class HermesRunRequestTest {
      * 판정에 쓰지 않는다.
      */
     @Test
-    void 계정이_전부_막힌_실패만_넘김_대상이다() {
+    @DisplayName("계정이 전부 막힌 실패만 넘김 대상이다")
+    void onlyFailuresWithAllAccountsBlockedAreFallbackTargets() {
         assertThat(failed(HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " No Codex credentials stored.")
                         .providerBlocked())
                 .isTrue();
         assertThat(failed("HTTP 404: 404 page not found").providerBlocked()).isFalse();
-        assertThat(failed("HTTP 402: This request requires more credits").providerBlocked()).isFalse();
+        assertThat(failed("HTTP 402: This request requires more credits").providerBlocked())
+                .isFalse();
         assertThat(failed(null).providerBlocked()).isFalse();
     }
 
     @Test
-    void 성공한_실행은_넘김_대상이_아니다() {
+    @DisplayName("성공한 실행은 넘김 대상이 아니다")
+    void succeededRunIsNotFallbackTarget() {
         HermesRunResult completed = new HermesRunResult(
-                "run-1", "sess-1", "completed", "네", "example-model", "openai-codex",
-                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " 남아 있는 글", TokenUsage.empty());
+                "run-1",
+                "sess-1",
+                "completed",
+                "네",
+                "example-model",
+                "openai-codex",
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " 남아 있는 글",
+                TokenUsage.empty());
 
         assertThat(completed.providerBlocked()).isFalse();
     }
@@ -161,7 +178,6 @@ class HermesRunRequestTest {
     }
 
     private HermesRunCommand command(String provider, String model, String reasoningEffort) {
-        return new HermesRunCommand(
-                "dad", baseUrl, "안녕", null, null, provider, model, reasoningEffort);
+        return new HermesRunCommand("dad", baseUrl, "안녕", null, null, provider, model, reasoningEffort);
     }
 }

@@ -2,13 +2,13 @@ package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -26,13 +26,14 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 실행이 끝날 때 금액을 저장하고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
 @SpringBootTest
@@ -43,16 +44,23 @@ class UsageCostRecordingTest {
 
     /** 요청에 실어 보낸 provider 와 모델이다. 에이전트는 모델을 갖지 않아 검사가 정한다. */
     private static final String PROVIDER = "openai-codex";
+
     private static final String PRICED_MODEL = "example-model";
     private static final String UNPRICED_MODEL = "gpt-가격표에-없는-모델";
     private static final String UNPRICED_AGENT_CODE = "dad-unpriced";
 
-    @Autowired ExecutionRecorder recorder;
+    @Autowired
+    ExecutionRecorder recorder;
 
     /** 실제로 돈 모델을 읽는 세션 조회를 여기서는 하지 않는다. 기록 규칙만 보는 검사다. */
-    @MockitoBean HermesRunsClient hermes;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ConversationRepository conversations;
+    @MockitoBean
+    HermesRunsClient hermes;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ConversationRepository conversations;
 
     private Conversation conversation;
 
@@ -63,8 +71,9 @@ class UsageCostRecordingTest {
 
     private static Path sampleCatalog() {
         try {
-            Path file =
-                    Path.of(UsageCostRecordingTest.class.getResource("/pricing/models-dev-sample.json").toURI());
+            Path file = Path.of(UsageCostRecordingTest.class
+                    .getResource("/pricing/models-dev-sample.json")
+                    .toURI());
             Files.setLastModifiedTime(file, FileTime.from(Instant.parse("2026-09-17T04:00:00Z")));
             return file;
         } catch (URISyntaxException | IOException ex) {
@@ -79,9 +88,9 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 구독형_바인딩의_실행도_API_가격으로_환산해_저장한다() {
-        AgentExecution execution =
-                complete(run(1_000L, 800L, 500L));
+    @DisplayName("구독형 바인딩의 실행도 API 가격으로 환산해 저장한다")
+    void convertsSubscriptionBindingRunAtApiPriceAndStoresIt() {
+        AgentExecution execution = complete(run(1_000L, 800L, 500L));
 
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isEqualTo(16_400L);
@@ -90,23 +99,23 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 실패한_실행은_금액을_남기지_않는다() {
-        AgentExecution execution =
-                fail();
+    @DisplayName("실패한 실행은 금액을 남기지 않는다")
+    void leavesNoAmountForFailedRun() {
+        AgentExecution execution = fail();
 
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.pricingVersion()).isNull();
     }
 
     @Test
-    void 한_달_합계는_금액이_잡힌_실행만_더하고_나머지는_따로_센다() {
+    @DisplayName("한 달 합계는 금액이 잡힌 실행만 더하고 나머지는 따로 센다")
+    void monthlyTotalAddsOnlyRunsWithAmountAndCountsRestSeparately() {
         complete(run(1_000L, null, 500L));
         complete(run(1_000L, null, 500L));
         fail();
 
-        MonthlyCost cost =
-                executions.sumCostBetween(
-                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        MonthlyCost cost = executions.sumCostBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
 
         assertThat(cost.totalMicros()).isEqualTo(40_000L);
         assertThat(cost.pricedExecutions()).isEqualTo(2L);
@@ -114,10 +123,10 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 기록이_없는_구간의_합계는_0_이다() {
-        MonthlyCost cost =
-                executions.sumCostBetween(
-                        USER_ID, Instant.parse("2020-01-01T00:00:00Z"), Instant.parse("2020-02-01T00:00:00Z"));
+    @DisplayName("기록이 없는 구간의 합계는 0 이다")
+    void totalOfPeriodWithoutRecordsIsZero() {
+        MonthlyCost cost = executions.sumCostBetween(
+                USER_ID, Instant.parse("2020-01-01T00:00:00Z"), Instant.parse("2020-02-01T00:00:00Z"));
 
         assertThat(cost.totalMicros()).isZero();
         assertThat(cost.pricedExecutions()).isZero();
@@ -125,26 +134,26 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    void 구독_경로_실행_둘과_API_경로_실행_하나의_합계는_API_경로_하나의_금액과_같다() {
+    @DisplayName("구독 경로 실행 둘과 API 경로 실행 하나의 합계는 API 경로 하나의 금액과 같다")
+    void totalOfTwoSubscriptionRunsAndOneApiRunEqualsAmountOfApiRun() {
         complete(run(1_000L, null, 500L), subscriptionAgent());
         complete(run(1_000L, null, 500L), subscriptionAgent());
         AgentExecution apiExecution = complete(run(1_000L, null, 500L), apiAgent());
 
-        MonthlyCostDetail cost =
-                executions.sumCostDetailBetween(
-                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        MonthlyCostDetail cost = executions.sumCostDetailBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
 
         assertThat(cost.actualMicros()).isEqualTo(apiExecution.actualCostMicros());
         assertThat(cost.subscriptionExecutions()).isEqualTo(2L);
     }
 
     @Test
-    void 가격표에_없는_모델로_돈_API_경로_실행은_구독_경로로_세지_않는다() {
+    @DisplayName("가격표에 없는 모델로 돈 API 경로 실행은 구독 경로로 세지 않는다")
+    void apiPathRunWithModelNotInPriceTableIsNotCountedAsSubscription() {
         AgentExecution unpriced = complete(run(1_000L, null, 500L), unpricedApiAgent());
 
-        MonthlyCostDetail cost =
-                executions.sumCostDetailBetween(
-                        USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        MonthlyCostDetail cost = executions.sumCostDetailBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
 
         assertThat(unpriced.estimatedCostMicros()).isNull();
         assertThat(unpriced.actualCostMicros()).isNull();

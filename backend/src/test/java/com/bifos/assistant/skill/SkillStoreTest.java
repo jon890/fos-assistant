@@ -16,6 +16,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.Map;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,14 +41,19 @@ class SkillStoreTest {
     private static Map<String, SkillBundle> skills(String... names) {
         java.util.LinkedHashMap<String, SkillBundle> result = new java.util.LinkedHashMap<>();
         for (String name : names) {
-            result.put(name, new SkillBundle(name, WEEKLY_MD.replace("weekly-plan", name),
-                    List.of(new SkillFile("references/guide.md", "안내 " + name))));
+            result.put(
+                    name,
+                    new SkillBundle(
+                            name,
+                            WEEKLY_MD.replace("weekly-plan", name),
+                            List.of(new SkillFile("references/guide.md", "안내 " + name))));
         }
         return result;
     }
 
     @Test
-    void 쓰기는_새_버전을_만들고_표식_전에는_지금_버전이_옛_것이다(@TempDir Path root) {
+    @DisplayName("쓰기는 새 버전을 만들고 표식 전에는 지금 버전이 옛 것이다")
+    void writeMakesNewVersionAndCurrentVersionIsOldBeforeMarker(@TempDir Path root) {
         SkillStore store = storeAt(root);
         assertThat(store.currentVersion(PROFILE)).isEmpty();
         assertThat(store.readCurrent(PROFILE)).isEmpty();
@@ -61,7 +67,9 @@ class SkillStoreTest {
 
         String second = store.writeVersion(PROFILE, skills("weekly-plan", "shopping"));
         assertThat(second).isGreaterThan(first);
-        assertThat(store.currentVersion(PROFILE)).as("둘째에 표식을 쓰기 전까지 첫째가 지금 버전이다").contains(first);
+        assertThat(store.currentVersion(PROFILE))
+                .as("둘째에 표식을 쓰기 전까지 첫째가 지금 버전이다")
+                .contains(first);
         assertThat(store.readCurrent(PROFILE)).containsOnlyKeys("weekly-plan");
 
         store.markPublished(PROFILE, second);
@@ -75,7 +83,8 @@ class SkillStoreTest {
     }
 
     @Test
-    void 표식_없는_버전은_지금_버전보다_새_것만_올린_스킬로_읽고_같은_이름이면_더_새_것을_쓴다(@TempDir Path root) {
+    @DisplayName("표식 없는 버전은 지금 버전보다 새 것만 올린 스킬로 읽고 같은 이름이면 더 새 것을 쓴다")
+    void readsOnlyNewerUnmarkedVersionAsUploadedAndUsesNewerOfSameName(@TempDir Path root) {
         SkillStore store = storeAt(root);
         String older = store.writeVersion(PROFILE, skills("stale"));
         String current = store.writeVersion(PROFILE, skills("weekly-plan"));
@@ -84,19 +93,20 @@ class SkillStoreTest {
 
         store.writeVersion(PROFILE, skills("weekly-plan", "shopping"));
         Map<String, SkillBundle> newer = new java.util.LinkedHashMap<>(skills("shopping"));
-        newer.put("shopping", new SkillBundle("shopping", WEEKLY_MD.replace("weekly-plan", "shopping") + "고침",
-                List.of()));
+        newer.put(
+                "shopping",
+                new SkillBundle("shopping", WEEKLY_MD.replace("weekly-plan", "shopping") + "고침", List.of()));
         store.writeVersion(PROFILE, newer);
 
         Map<String, SkillBundle> pending = store.readPending(PROFILE);
-        assertThat(pending).as("지금 버전보다 오래된 %s 의 stale 은 보지 않는다", older)
-                .containsOnlyKeys("shopping", "weekly-plan");
+        assertThat(pending).as("지금 버전보다 오래된 %s 의 stale 은 보지 않는다", older).containsOnlyKeys("shopping", "weekly-plan");
         assertThat(pending.get("shopping").skillMd()).as("같은 이름이면 더 새 버전의 것").endsWith("고침");
         assertThat(store.readCurrent(PROFILE)).containsOnlyKeys("weekly-plan");
     }
 
     @Test
-    void 지금_버전이_없어도_표식_없는_버전에_스킬이_있으면_올린_스킬이_있다고_본다(@TempDir Path root) {
+    @DisplayName("지금 버전이 없어도 표식 없는 버전에 스킬이 있으면 올린 스킬이 있다고 본다")
+    void seesUploadedSkillInUnmarkedVersionEvenWithoutCurrentVersion(@TempDir Path root) {
         SkillStore store = storeAt(root);
         assertThat(store.hasUploadedSkills(PROFILE)).isFalse();
 
@@ -108,7 +118,8 @@ class SkillStoreTest {
     }
 
     @Test
-    void prune_은_표식_있는_최근_3개만_남기고_게시한_버전보다_오래된_표식_없는_것을_지운다(@TempDir Path root) {
+    @DisplayName("prune 은 표식 있는 최근 3개만 남기고 게시한 버전보다 오래된 표식 없는 것을 지운다")
+    void pruneKeepsRecentThreeMarkedAndDeletesOlderUnmarked(@TempDir Path root) {
         SkillStore store = storeAt(root);
         String v1 = published(store);
         String v2 = store.writeVersion(PROFILE, skills("weekly-plan"));
@@ -125,22 +136,33 @@ class SkillStoreTest {
         assertThat(profileDir.resolve(v3)).exists();
         assertThat(profileDir.resolve(v4)).exists();
         assertThat(profileDir.resolve(v5)).exists();
-        assertThat(profileDir.resolve(newerUnpublished)).as("게시한 버전보다 새 표식 없는 버전은 두지 않는다").exists();
+        assertThat(profileDir.resolve(newerUnpublished))
+                .as("게시한 버전보다 새 표식 없는 버전은 두지 않는다")
+                .exists();
         assertThat(store.currentVersion(PROFILE)).contains(v5);
     }
 
     @Test
-    void 상위_경로와_절대_경로와_루트_밖_경로를_거절한다(@TempDir Path root) {
+    @DisplayName("상위 경로와 절대 경로와 루트 밖 경로를 거절한다")
+    void rejectsParentAbsoluteAndOutsideRootPaths(@TempDir Path root) {
         SkillStore store = storeAt(root);
 
-        assertValidation(() -> store.writeVersion(PROFILE, Map.of("weekly-plan",
-                new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("references/../x.md", "x"))))));
-        assertValidation(() -> store.writeVersion(PROFILE, Map.of("weekly-plan",
-                new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("/etc/passwd", "x"))))));
-        assertValidation(() -> store.writeVersion(PROFILE, Map.of("weekly-plan",
-                new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("scripts/run.sh", "x"))))));
-        assertValidation(() -> store.writeVersion(PROFILE, Map.of("..",
-                new SkillBundle("..", WEEKLY_MD, List.of()))));
+        assertValidation(() -> store.writeVersion(
+                PROFILE,
+                Map.of(
+                        "weekly-plan",
+                        new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("references/../x.md", "x"))))));
+        assertValidation(() -> store.writeVersion(
+                PROFILE,
+                Map.of(
+                        "weekly-plan",
+                        new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("/etc/passwd", "x"))))));
+        assertValidation(() -> store.writeVersion(
+                PROFILE,
+                Map.of(
+                        "weekly-plan",
+                        new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("scripts/run.sh", "x"))))));
+        assertValidation(() -> store.writeVersion(PROFILE, Map.of("..", new SkillBundle("..", WEEKLY_MD, List.of()))));
         assertValidation(() -> store.writeVersion("../other", skills("weekly-plan")));
         assertValidation(() -> store.currentVersion("/abs"));
         assertValidation(() -> store.agentPath(PROFILE, "../v0000000000000-aaaa"));
@@ -149,28 +171,31 @@ class SkillStoreTest {
     }
 
     @Test
-    void 심볼릭_링크는_읽지_않는다(@TempDir Path root, @TempDir Path outside) throws IOException {
+    @DisplayName("심볼릭 링크는 읽지 않는다")
+    void doesNotReadSymlinks(@TempDir Path root, @TempDir Path outside) throws IOException {
         SkillStore store = storeAt(root);
         String version = published(store);
         Files.writeString(outside.resolve("secret.md"), "밖의 파일");
         Path versionDir = root.resolve(PROFILE).resolve(version);
-        Files.createSymbolicLink(versionDir.resolve("weekly-plan").resolve("references").resolve("leak.md"),
+        Files.createSymbolicLink(
+                versionDir.resolve("weekly-plan").resolve("references").resolve("leak.md"),
                 outside.resolve("secret.md"));
 
         assertThatThrownBy(() -> store.readCurrent(PROFILE))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
 
         Files.delete(versionDir.resolve("weekly-plan").resolve("references").resolve("leak.md"));
         Files.createSymbolicLink(versionDir.resolve("linked"), outside);
 
         assertThatThrownBy(() -> store.readCurrent(PROFILE))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
     }
 
     @Test
-    void 파일은_644_디렉터리는_755_로_쓴다(@TempDir Path root) throws IOException {
+    @DisplayName("파일은 644 디렉터리는 755 로 쓴다")
+    void writesFilesWith644AndDirectoriesWith755(@TempDir Path root) throws IOException {
         SkillStore store = storeAt(root);
         String version = published(store);
         Path versionDir = root.resolve(PROFILE).resolve(version);
@@ -181,7 +206,9 @@ class SkillStoreTest {
                     .as("디렉터리 %s", root.relativize(dir))
                     .isEqualTo("rwxr-xr-x");
         }
-        for (Path file : List.of(skillDir.resolve("SKILL.md"), skillDir.resolve("references/guide.md"),
+        for (Path file : List.of(
+                skillDir.resolve("SKILL.md"),
+                skillDir.resolve("references/guide.md"),
                 versionDir.resolve(SkillStore.PUBLISHED_MARKER))) {
             assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(file)))
                     .as("파일 %s", root.relativize(file))
@@ -190,7 +217,8 @@ class SkillStoreTest {
     }
 
     @Test
-    void discard_와_deleteAll_은_디렉터리를_지우고_없으면_지나간다(@TempDir Path root) {
+    @DisplayName("discard 와 deleteAll 은 디렉터리를 지우고 없으면 지나간다")
+    void discardAndDeleteAllRemoveDirectoryAndPassWhenAbsent(@TempDir Path root) {
         SkillStore store = storeAt(root);
         String first = published(store);
         String second = store.writeVersion(PROFILE, skills("weekly-plan"));
@@ -214,7 +242,7 @@ class SkillStoreTest {
 
     private static void assertValidation(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 }

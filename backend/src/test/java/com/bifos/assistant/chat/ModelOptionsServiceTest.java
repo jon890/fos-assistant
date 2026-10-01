@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -54,7 +55,7 @@ class ModelOptionsServiceTest {
     private ModelOptionsService service;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         service = new ModelOptionsService(new AgentService(agentRepository), hermes, TTL, clock);
         agentOf("dad", "dad-profile", true);
         agentOf("kid", "kid-profile", true);
@@ -69,14 +70,22 @@ class ModelOptionsServiceTest {
     }
 
     private void agentOf(String code, String profile, boolean enabled) {
-        Agent agent = Agent.of(code, code, profile, "http://agent-runtime.test/p/" + profile, CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, dad.id());
+        Agent agent = Agent.of(
+                code,
+                code,
+                profile,
+                "http://agent-runtime.test/p/" + profile,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                dad.id());
         agent.changeAccess(enabled, AgentVisibility.PRIVATE, dad.id());
         when(agentRepository.findByCode(code)).thenReturn(Optional.of(agent));
     }
 
     @Test
-    void 같은_profile_을_두_번_물으면_Hermes_를_한_번만_부른다() {
+    @DisplayName("같은 profile 을 두 번 물으면 Hermes 를 한 번만 부른다")
+    void callsHermesOnlyOnceForSameProfileAskedTwice() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
@@ -91,7 +100,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void 들고_있는_시간이_지나기_직전까지는_들고_있고_지나면_다시_부른다() {
+    @DisplayName("들고 있는 시간이 지나기 직전까지는 들고 있고 지나면 다시 부른다")
+    void holdsUntilJustBeforeExpiryAndCallsAgainAfter() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "new")));
@@ -107,7 +117,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void 다시_읽다_Hermes_가_실패하면_들고_있던_목록을_돌려주고_다음에_다시_읽는다() {
+    @DisplayName("다시 읽다 Hermes 가 실패하면 들고 있던 목록을 돌려주고 다음에 다시 읽는다")
+    void returnsHeldListAndRereadsNextTimeWhenRereadFailsWithHermes() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
                 .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
@@ -124,7 +135,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void 처음_읽다_실패하면_HERMES_UNAVAILABLE_이고_실패를_들고_있지_않는다() {
+    @DisplayName("처음 읽다 실패하면 HERMES UNAVAILABLE 이고 실패를 들고 있지 않는다")
+    void firstReadFailureIsHermesUnavailableAndFailureIsNotHeld() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
@@ -136,7 +148,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void 다시_읽다_key_가_없어져도_그_예외를_올린다() {
+    @DisplayName("다시 읽다 key 가 없어져도 그 예외를 올린다")
+    void rethrowsWhenKeyDisappearsDuringReread() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
                 .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
@@ -151,7 +164,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void profile_이_다르면_따로_부른다() {
+    @DisplayName("profile 이 다르면 따로 부른다")
+    void callsSeparatelyForDifferentProfile() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
@@ -163,21 +177,22 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void agentCode_가_비었거나_없는_에이전트는_AGENT_NOT_FOUND_이고_Hermes_를_부르지_않는다() {
+    @DisplayName("agentCode 가 비었거나 없는 에이전트는 AGENT NOT FOUND 이고 Hermes 를 부르지 않는다")
+    void blankAgentCodeOrMissingAgentIsAgentNotFoundWithoutCallingHermes() {
         when(agentRepository.findByCode("ghost")).thenReturn(Optional.empty());
 
         for (String code : new String[] {null, "", "  ", "ghost"}) {
             assertThatThrownBy(() -> service.optionsFor(dad, code))
                     .as("agentCode=%s", code)
                     .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         }
         verify(hermes, never()).readCatalog(anyString(), anyString());
     }
 
     @Test
-    void 꺼진_에이전트는_AGENT_DISABLED_이고_Hermes_를_부르지_않는다() {
+    @DisplayName("꺼진 에이전트는 AGENT DISABLED 이고 Hermes 를 부르지 않는다")
+    void disabledAgentIsAgentDisabledWithoutCallingHermes() {
         agentOf("off", "off-profile", false);
 
         assertThatThrownBy(() -> service.optionsFor(dad, "off"))
@@ -187,13 +202,11 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void 기본_provider_를_맨_앞에_두고_나머지는_Hermes_가_준_차례를_지킨다() {
+    @DisplayName("기본 provider 를 맨 앞에 두고 나머지는 Hermes 가 준 차례를 지킨다")
+    void putsDefaultProviderFirstAndKeepsHermesOrderForRest() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog(
-                        "openai-codex",
-                        provider("alpha", "a"),
-                        provider("openai-codex", "b"),
-                        provider("beta", "c")));
+                        "openai-codex", provider("alpha", "a"), provider("openai-codex", "b"), provider("beta", "c")));
 
         ModelOptions options = service.optionsFor(dad, "dad");
 
@@ -201,7 +214,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void 기본_provider_가_목록에_없으면_Hermes_가_준_차례_그대로다() {
+    @DisplayName("기본 provider 가 목록에 없으면 Hermes 가 준 차례 그대로다")
+    void keepsHermesOrderWhenDefaultProviderNotInList() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog(null, provider("alpha", "a"), provider("beta", "b")));
 
@@ -211,20 +225,27 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    void reasoning_표에_모든_모델이_있고_Hermes_가_밝히지_않은_모델은_참이다() {
+    @DisplayName("reasoning 표에 모든 모델이 있고 Hermes 가 밝히지 않은 모델은 참이다")
+    void reasoningTableHasAllModelsAndUnstatedModelsAreTrue() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", new Provider("openai-codex", "OpenAI Codex",
-                        List.of("example-model", "example-model-mini", "example-model-new"),
-                        Map.of("example-model", true, "example-model-mini", false))));
+                .thenReturn(catalog(
+                        "openai-codex",
+                        new Provider(
+                                "openai-codex",
+                                "OpenAI Codex",
+                                List.of("example-model", "example-model-mini", "example-model-new"),
+                                Map.of("example-model", true, "example-model-mini", false))));
 
-        Map<String, Boolean> reasoning = service.optionsFor(dad, "dad").providers().get(0).reasoning();
+        Map<String, Boolean> reasoning =
+                service.optionsFor(dad, "dad").providers().get(0).reasoning();
 
-        assertThat(reasoning).isEqualTo(Map.of(
-                "example-model", true, "example-model-mini", false, "example-model-new", true));
+        assertThat(reasoning)
+                .isEqualTo(Map.of("example-model", true, "example-model-mini", false, "example-model-new", true));
     }
 
     @Test
-    void reasoningEfforts_는_대화가_고를_수_있는_effort_와_같다() {
+    @DisplayName("reasoningEfforts 는 대화가 고를 수 있는 effort 와 같다")
+    void reasoningEffortsEqualEffortsConversationCanChoose() {
         when(hermes.readCatalog(anyString(), anyString())).thenReturn(catalog("openai-codex"));
 
         assertThat(service.optionsFor(dad, "dad").reasoningEfforts()).isEqualTo(ModelChoice.REASONING_EFFORTS);

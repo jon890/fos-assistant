@@ -11,6 +11,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format:check": "files=$(node scripts/changed-files.mjs) && { [ -z \"$files\" ] || printf '%s\\n' \"$files\" | xargs prettier --check; }",
+    "format:changed": "files=$(node scripts/changed-files.mjs) && { [ -z \"$files\" ] || printf '%s\\n' \"$files\" | xargs prettier --write; }",
     "test:browser": "playwright test --config ../test/browser/playwright.config.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -37,6 +39,9 @@
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.7",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.0.10",
+    "prettier": "3.9.9",
     "shadcn": "^4.21.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3"

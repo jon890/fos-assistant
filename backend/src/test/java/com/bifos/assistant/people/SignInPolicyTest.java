@@ -6,6 +6,7 @@ import com.bifos.assistant.people.application.SignInPolicy;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,16 +17,20 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class SignInPolicyTest {
 
-    @Autowired SignInPolicy policy;
-    @Autowired AllowedPersonRepository people;
+    @Autowired
+    SignInPolicy policy;
+
+    @Autowired
+    AllowedPersonRepository people;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         people.deleteAll();
     }
 
     @Test
-    void 목록에_있고_켜진_주소는_profile_과_함께_통과한다() {
+    @DisplayName("목록에 있고 켜진 주소는 profile 과 함께 통과한다")
+    void passesListedEnabledAddressWithProfile() {
         people.save(AllowedPerson.of("mom@example.com", "엄마", "mom"));
 
         assertThat(policy.admit("mom@example.com"))
@@ -35,14 +40,16 @@ class SignInPolicyTest {
     }
 
     @Test
-    void 목록에_없는_주소는_거절한다() {
+    @DisplayName("목록에 없는 주소는 거절한다")
+    void rejectsAddressNotInList() {
         people.save(AllowedPerson.of("mom@example.com", "엄마", "mom"));
 
         assertThat(policy.admit("stranger@example.com")).isEmpty();
     }
 
     @Test
-    void 목록에_있어도_꺼진_주소는_거절한다() {
+    @DisplayName("목록에 있어도 꺼진 주소는 거절한다")
+    void rejectsListedButDisabledAddress() {
         AllowedPerson left = people.save(AllowedPerson.of("mom@example.com", "엄마", "mom"));
         left.disable();
         people.save(left);
@@ -51,7 +58,8 @@ class SignInPolicyTest {
     }
 
     @Test
-    void 대문자가_섞인_주소도_같은_사람으로_찾는다() {
+    @DisplayName("대문자가 섞인 주소도 같은 사람으로 찾는다")
+    void findsSamePersonForAddressWithUppercase() {
         people.save(AllowedPerson.of("mom@example.com", "엄마", "mom"));
 
         assertThat(policy.admit("Mom@Example.com"))
@@ -61,14 +69,17 @@ class SignInPolicyTest {
     }
 
     @Test
-    void 대문자가_섞인_주소로_넣어도_중복_검사에_걸린다() {
+    @DisplayName("대문자가 섞인 주소로 넣어도 중복 검사에 걸린다")
+    void uppercaseAddressStillHitsDuplicateCheck() {
         people.save(AllowedPerson.of("MOM@Example.com", "엄마", "mom"));
 
-        assertThat(people.existsByEmail(AllowedPerson.normalizeEmail("mom@example.com"))).isTrue();
+        assertThat(people.existsByEmail(AllowedPerson.normalizeEmail("mom@example.com")))
+                .isTrue();
     }
 
     @Test
-    void 빈_주소는_거절한다() {
+    @DisplayName("빈 주소는 거절한다")
+    void rejectsBlankAddress() {
         assertThat(policy.admit("")).isEmpty();
     }
 }

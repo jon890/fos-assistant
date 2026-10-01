@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.dto.RunEvent;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -20,9 +21,9 @@ class HermesRunEventStreamTest {
     }
 
     @Test
-    void 초_단위_실수로_오는_걸린_시간을_밀리초_정수로_옮긴다() {
-        RunEvent event =
-                parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");
+    @DisplayName("초 단위 실수로 오는 걸린 시간을 밀리초 정수로 옮긴다")
+    void convertsFractionalSecondsElapsedToIntegerMillis() {
+        RunEvent event = parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");
 
         assertThat(event.type()).isEqualTo("tool.completed");
         assertThat(event.toolName()).isEqualTo("web_search");
@@ -30,12 +31,15 @@ class HermesRunEventStreamTest {
     }
 
     @Test
-    void 걸린_시간이_0이면_0밀리초가_된다() {
-        assertThat(parse("{\"event\": \"tool.completed\", \"duration\": 0}").durationMs()).isZero();
+    @DisplayName("걸린 시간이 0이면 0밀리초가 된다")
+    void zeroElapsedBecomesZeroMillis() {
+        assertThat(parse("{\"event\": \"tool.completed\", \"duration\": 0}").durationMs())
+                .isZero();
     }
 
     @Test
-    void 걸린_시간을_보내지_않으면_비운다() {
+    @DisplayName("걸린 시간을 보내지 않으면 비운다")
+    void leavesElapsedEmptyWhenNotSent() {
         RunEvent event = parse("{\"event\": \"tool.started\", \"tool\": \"web_search\"}");
 
         assertThat(event.durationMs()).isNull();
@@ -43,13 +47,17 @@ class HermesRunEventStreamTest {
     }
 
     @Test
-    void 도구가_실패로_끝났는지를_읽는다() {
-        assertThat(parse("{\"event\": \"tool.completed\", \"error\": true}").failed()).isTrue();
-        assertThat(parse("{\"event\": \"tool.completed\", \"error\": false}").failed()).isFalse();
+    @DisplayName("도구가 실패로 끝났는지를 읽는다")
+    void readsWhetherToolEndedInFailure() {
+        assertThat(parse("{\"event\": \"tool.completed\", \"error\": true}").failed())
+                .isTrue();
+        assertThat(parse("{\"event\": \"tool.completed\", \"error\": false}").failed())
+                .isFalse();
     }
 
     @Test
-    void 글자_조각은_delta로_온다() {
+    @DisplayName("글자 조각은 delta로 온다")
+    void textChunksComeAsDelta() {
         RunEvent event = parse("{\"event\": \"message.delta\", \"delta\": \"안녕하\"}");
 
         assertThat(event.type()).isEqualTo("message.delta");
@@ -57,10 +65,10 @@ class HermesRunEventStreamTest {
     }
 
     @Test
-    void 사건이_data_안에_실려_와도_같은_칸을_읽는다() {
-        RunEvent event =
-                parse("{\"data\": {\"event\": \"tool.completed\", \"tool\": \"grep\", \"duration\": 2.5,"
-                        + " \"error\": true, \"preview\": \"찾지 못했다\"}}");
+    @DisplayName("사건이 data 안에 실려 와도 같은 칸을 읽는다")
+    void readsSameFieldWhenEventIsNestedInData() {
+        RunEvent event = parse("{\"data\": {\"event\": \"tool.completed\", \"tool\": \"grep\", \"duration\": 2.5,"
+                + " \"error\": true, \"preview\": \"찾지 못했다\"}}");
 
         assertThat(event.type()).isEqualTo("tool.completed");
         assertThat(event.toolName()).isEqualTo("grep");
@@ -70,7 +78,8 @@ class HermesRunEventStreamTest {
     }
 
     @Test
-    void 하위_에이전트의_목표와_모델과_토큰을_읽는다() {
+    @DisplayName("하위 에이전트의 목표와 모델과 토큰을 읽는다")
+    void readsSubagentGoalModelAndTokens() {
         RunEvent event = parse("{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-1\","
                 + "\"goal\":\"숙소 조사\",\"model\":\"model-a\",\"child_session_id\":\"child-1\","
                 + "\"input_tokens\":12300,\"output_tokens\":410,\"status\":\"completed\",\"duration_seconds\":1.5}");
@@ -87,7 +96,8 @@ class HermesRunEventStreamTest {
     }
 
     @Test
-    void data_안의_상태가_실패면_error_없이도_실패로_읽는다() {
+    @DisplayName("data 안의 상태가 실패면 error 없이도 실패로 읽는다")
+    void readsFailureFromStatusInDataEvenWithoutError() {
         RunEvent event = parse("{\"data\":{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-2\","
                 + "\"goal\":\"조사\",\"model\":\"model-b\",\"child_session_id\":\"child-2\","
                 + "\"input_tokens\":5,\"output_tokens\":2,\"status\":\"failed\",\"duration_seconds\":0.25}}");
@@ -104,7 +114,8 @@ class HermesRunEventStreamTest {
     }
 
     @Test
-    void 목표와_preview가_없으면_상태를_목표_대신_쓰지_않는다() {
+    @DisplayName("목표와 preview가 없으면 상태를 목표 대신 쓰지 않는다")
+    void doesNotUseStatusInPlaceOfGoalWhenGoalAndPreviewAreMissing() {
         RunEvent event = parse("{\"event\":\"subagent.complete\",\"status\":\"completed\"}");
 
         assertThat(event.goal()).isNull();

@@ -8,11 +8,11 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.AskFormat;
-import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ArtifactService;
-import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -36,16 +36,17 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.time.Instant;
-import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,19 +58,41 @@ import org.springframework.test.context.ActiveProfiles;
 @Import(ChatServiceTest.StubRuntime.class)
 class ChatRegenerateTest {
 
-    @Autowired ChatService chat;
+    @Autowired
+    ChatService chat;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
-    @Autowired ArtifactService artifactService;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ChatAttachmentRepository attachmentRows;
-    @Autowired ConversationRepository conversations;
-    @Autowired AttachmentService attachments;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired MemoryRepository memories;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ArtifactService artifactService;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ChatAttachmentRepository attachmentRows;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    AttachmentService attachments;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -88,7 +111,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 마지막_답을_다시_만들면_이전_답을_가리키고_질문은_늘지_않는다() {
+    @DisplayName("마지막 답을 다시 만들면 이전 답을 가리키고 질문은 늘지 않는다")
+    void regeneratingLastReplyPointsToPreviousReplyAndAddsNoQuestion() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "새 답"));
 
@@ -97,24 +121,28 @@ class ChatRegenerateTest {
         chat.regenerate(dad, conversationId, events::add);
 
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
-        assertThat(history).extracting(ChatMessage::role)
+        assertThat(history)
+                .extracting(ChatMessage::role)
                 .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.ASSISTANT);
-        assertThat(history.getLast().replacesMessageId()).isEqualTo(history.get(1).id());
+        assertThat(history.getLast().replacesMessageId())
+                .isEqualTo(history.get(1).id());
         // 다시 생성도 같은 결과물 폴더 단락을 붙인 같은 질문을 보낸다.
-        String expected = artifactService.agentPreamble(conversations.findById(conversationId).orElseThrow()) + "원래 질문";
-        assertThat(stub().received()).extracting(HermesRunCommand::input)
-                .containsExactly(expected, expected);
+        String expected = artifactService.agentPreamble(
+                        conversations.findById(conversationId).orElseThrow()) + "원래 질문";
+        assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(expected, expected);
         assertThat(stub().received().getLast().instructions())
                 .endsWith("사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.");
         assertThat(events.getLast().type()).isEqualTo("done");
     }
 
     @Test
-    void 다시_생성이_실패하면_이전_답_뒤에_새_메시지를_남기지_않는다() {
+    @DisplayName("다시 생성이 실패하면 이전 답 뒤에 새 메시지를 남기지 않는다")
+    void leavesNoNewMessageAfterPreviousReplyWhenRegenerationFails() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
-        stub().willReturn(new HermesRunResult("failed", "session", "failed", "", null, null, "failed", TokenUsage.empty()));
+        stub().willReturn(new HermesRunResult(
+                "failed", "session", "failed", "", null, null, "failed", TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.regenerate(dad, conversationId, event -> {}))
                 .isInstanceOf(ApiException.class)
@@ -125,9 +153,11 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 답_없는_질문을_다시_시도하면_답은_새로_생기고_판을_가리키지_않는다() {
+    @DisplayName("답 없는 질문을 다시 시도하면 답은 새로 생기고 판을 가리키지 않는다")
+    void retryingUnansweredQuestionCreatesReplyWithoutPointingToVersion() {
         CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(new HermesRunResult("failed", "session", "failed", "", null, null, "failed", TokenUsage.empty()));
+        stub().willReturn(new HermesRunResult(
+                "failed", "session", "failed", "", null, null, "failed", TokenUsage.empty()));
         Long conversationId;
         try {
             conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -145,7 +175,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 빈_대화는_다시_만들_답이_없다() {
+    @DisplayName("빈 대화는 다시 만들 답이 없다")
+    void emptyConversationHasNoReplyToRegenerate() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", agent.id()));
@@ -157,7 +188,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 다른_사용자의_대화는_없는_대화처럼_거절한다() {
+    @DisplayName("다른 사용자의 대화는 없는 대화처럼 거절한다")
+    void rejectsOtherUsersConversationAsMissing() {
         CurrentUser dad = member("dad@example.com", "dad");
         CurrentUser mom = member("mom@example.com", "mom");
         stub().willReturn(result("first", "첫 답"));
@@ -170,11 +202,20 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 다시_생성은_대화가_기억한_Hermes_session을_이어서_쓴다() {
+    @DisplayName("다시 생성은 대화가 기억한 Hermes session을 이어서 쓴다")
+    void regenerationContinuesHermesSessionRememberedByConversation() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(
-                HermesRunResult.of("first", "shared-session", "completed", "첫 답", "model", "provider", TokenUsage.empty()),
-                HermesRunResult.of("second", "shared-session", "completed", "새 답", "model", "provider", TokenUsage.empty()));
+                        HermesRunResult.of(
+                                "first", "shared-session", "completed", "첫 답", "model", "provider", TokenUsage.empty()),
+                        HermesRunResult.of(
+                                "second",
+                                "shared-session",
+                                "completed",
+                                "새 답",
+                                "model",
+                                "provider",
+                                TokenUsage.empty()));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
 
         chat.regenerate(dad, conversationId, event -> {});
@@ -183,7 +224,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 모델을_고른_대화에서_다시_생성하면_요청에_그_선택이_실린다() {
+    @DisplayName("모델을 고른 대화에서 다시 생성하면 요청에 그 선택이 실린다")
+    void regeneratingInConversationWithChosenModelCarriesChoiceInRequest() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "새 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -201,7 +243,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 지운_대화에서는_다시_생성을_거절한다() {
+    @DisplayName("지운 대화에서는 다시 생성을 거절한다")
+    void rejectsRegenerationInDeletedConversation() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -214,7 +257,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 도는_재생성_중에는_둘째_재생성을_거절한다() throws Exception {
+    @DisplayName("도는 재생성 중에는 둘째 재생성을 거절한다")
+    void rejectsSecondRegenerationWhileOneIsRunning() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("regenerated", "새 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -251,7 +295,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 도는_turn이_있는_대화는_재생성을_거절하고_새_실행을_만들지_않는다() throws Exception {
+    @DisplayName("도는 turn이 있는 대화는 재생성을 거절하고 새 실행을 만들지 않는다")
+    void rejectsRegenerationWhileTurnRunsAndCreatesNoNewRun() throws Exception {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("running", "새 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -287,7 +332,8 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 다시_생성을_거듭하면_새_답이_직전_답을_가리킨다() {
+    @DisplayName("다시 생성을 거듭하면 새 답이 직전 답을 가리킨다")
+    void repeatedRegenerationPointsNewReplyToPreviousOne() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "둘째 답"), result("third", "셋째 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
@@ -302,33 +348,47 @@ class ChatRegenerateTest {
     }
 
     @Test
-    void 흐름_재생성은_모든_실행의_지시에_문구를_붙이고_답_판을_잇는다() {
+    @DisplayName("흐름 재생성은 모든 실행의 지시에 문구를 붙이고 답 판을 잇는다")
+    void flowRegenerationAppendsPhraseToAllRunsAndLinksReplyVersion() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
-        Long originalAnswer = messages.findByConversationIdOrderByIdAsc(conversationId).getLast().id();
+        Long originalAnswer = messages.findByConversationIdOrderByIdAsc(conversationId)
+                .getLast()
+                .id();
         enableFlow("dad");
         flowAnswers();
         int before = stub().received().size();
 
         chat.regenerate(dad, conversationId, event -> {});
 
-        List<HermesRunCommand> commands = stub().received().subList(before, stub().received().size());
-        assertThat(commands).hasSize(4).allSatisfy(command ->
-                assertThat(command.instructions()).endsWith(
-                        "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다."));
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId).getLast().replacesMessageId())
+        List<HermesRunCommand> commands =
+                stub().received().subList(before, stub().received().size());
+        assertThat(commands)
+                .hasSize(4)
+                .allSatisfy(command -> assertThat(command.instructions())
+                        .endsWith("사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다."));
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)
+                        .getLast()
+                        .replacesMessageId())
                 .isEqualTo(originalAnswer);
     }
 
     @Test
-    void 흐름으로_바꾼_대화도_이전_질문의_사진_자리를_재생성_입력에_넣는다() {
+    @DisplayName("흐름으로 바꾼 대화도 이전 질문의 사진 자리를 재생성 입력에 넣는다")
+    void flowConversationRegenerationInputKeepsPreviousImageSlots() {
         CurrentUser dad = member("dad@example.com", "dad");
         stub().willReturn(result("first", "첫 답"));
         Long conversationId = chat.send(dad, null, "사진 질문", "dad").conversationId();
-        ChatMessage question = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst();
+        ChatMessage question =
+                messages.findByConversationIdOrderByIdAsc(conversationId).getFirst();
         ChatAttachment attachment = attachmentRows.save(ChatAttachment.of(
-                conversationId, dad.id(), "image.png", "image/png", 1, Instant.now().plus(Duration.ofDays(1))));
+                conversationId,
+                dad.id(),
+                "image.png",
+                "image/png",
+                1,
+                Instant.now().plus(Duration.ofDays(1))));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachmentRows.save(attachment);
         attachments.attach(question.id(), conversationId, List.of(attachment.id()));
@@ -338,9 +398,13 @@ class ChatRegenerateTest {
 
         chat.regenerate(dad, conversationId, event -> {});
 
-        HermesRunCommand chief = stub().received().subList(before, stub().received().size()).stream()
+        HermesRunCommand chief = stub()
+                .received()
+                .subList(before, stub().received().size())
+                .stream()
                 .filter(command -> command.input().contains("조사할 것과 만들 것을 나눈다"))
-                .findFirst().orElseThrow();
+                .findFirst()
+                .orElseThrow();
         assertThat(chief.input()).contains("[이번 메시지에 올린 사진]", attachment.id() + ".png", "사진 질문");
     }
 
@@ -368,8 +432,14 @@ class ChatRegenerateTest {
     private CurrentUser member(String email, String profileName) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         agents.save(Agent.of(
-                profileName, profileName, profileName, "http://agent-runtime.test/p/" + profileName, CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
+                profileName,
+                profileName,
+                profileName,
+                "http://agent-runtime.test/p/" + profileName,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

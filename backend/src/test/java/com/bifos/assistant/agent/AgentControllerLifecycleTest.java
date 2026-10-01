@@ -30,6 +30,7 @@ import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -43,29 +44,27 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  */
 class AgentControllerLifecycleTest {
 
-    private static final CurrentUser KID =
-            new CurrentUser(7L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
-    private static final CurrentUser ADMIN =
-            new CurrentUser(9L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
+    private static final CurrentUser KID = new CurrentUser(7L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
+    private static final CurrentUser ADMIN = new CurrentUser(9L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
 
     private final AgentRepository agents = mock(AgentRepository.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
 
-    private final MockMvc mvc = MockMvcBuilders
-            .standaloneSetup(new AgentController(new AgentService(agents), currentUser, lifecycle))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
+                    new AgentController(new AgentService(agents), currentUser, lifecycle))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(currentUser.require()).thenReturn(KID);
     }
 
     @Test
-    void 만들면_201_과_요청자가_주인인_에이전트를_준다() throws Exception {
-        when(lifecycle.create(KID, "숙제 도우미", null))
-                .thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
+    @DisplayName("만들면 201 과 요청자가 주인인 에이전트를 준다")
+    void returns201WithRequesterAsOwnerOnCreate() throws Exception {
+        when(lifecycle.create(KID, "숙제 도우미", null)).thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
 
         mvc.perform(post("/api/v1/agents")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -79,7 +78,8 @@ class AgentControllerLifecycleTest {
     }
 
     @Test
-    void 상한이면_409_AGENT_LIMIT_REACHED_다() throws Exception {
+    @DisplayName("상한이면 409 AGENT LIMIT REACHED 다")
+    void returns409AgentLimitReachedAtLimit() throws Exception {
         when(lifecycle.create(KID, "여섯째", AgentVisibility.GROUP))
                 .thenThrow(new ApiException(ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of 5 was reached"));
 
@@ -91,7 +91,8 @@ class AgentControllerLifecycleTest {
     }
 
     @Test
-    void 공개_범위를_바꾸면_200_과_바뀐_에이전트를_준다() throws Exception {
+    @DisplayName("공개 범위를 바꾸면 200 과 바뀐 에이전트를 준다")
+    void returns200WithUpdatedAgentOnVisibilityChange() throws Exception {
         when(lifecycle.changeVisibility(KID, "a0123456789", AgentVisibility.GROUP))
                 .thenReturn(agent("a0123456789", AgentVisibility.GROUP, KID.id()));
 
@@ -106,7 +107,8 @@ class AgentControllerLifecycleTest {
 
     /** {@code ADMIN} 은 남의 에이전트를 관리하지만 주인은 아니다. 화면이 「다른 사람 것」 을 이 값으로 가른다. */
     @Test
-    void ADMIN_이_남의_에이전트를_바꾸면_관리할_수_있지만_주인은_아니다() throws Exception {
+    @DisplayName("ADMIN 이 남의 에이전트를 바꾸면 관리할 수 있지만 주인은 아니다")
+    void adminEditingOthersAgentCanManageButIsNotOwner() throws Exception {
         when(currentUser.require()).thenReturn(ADMIN);
         when(lifecycle.changeVisibility(ADMIN, "a0123456789", AgentVisibility.PRIVATE))
                 .thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
@@ -120,7 +122,8 @@ class AgentControllerLifecycleTest {
     }
 
     @Test
-    void 공개_범위가_비면_VALIDATION_FAILED_이고_서비스를_부르지_않는다() throws Exception {
+    @DisplayName("공개 범위가 비면 VALIDATION FAILED 이고 서비스를 부르지 않는다")
+    void returnsValidationFailedWithoutCallingServiceOnBlankVisibility() throws Exception {
         mvc.perform(patch("/api/v1/agents/{code}/visibility", "a0123456789")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"visibility\":null}"))
@@ -131,7 +134,8 @@ class AgentControllerLifecycleTest {
     }
 
     @Test
-    void 지우면_204_이고_본문이_없다() throws Exception {
+    @DisplayName("지우면 204 이고 본문이 없다")
+    void returns204WithoutBodyOnDelete() throws Exception {
         mvc.perform(delete("/api/v1/agents/{code}", "a0123456789"))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
@@ -140,7 +144,8 @@ class AgentControllerLifecycleTest {
     }
 
     @Test
-    void 목록은_요청자_기준으로_관리_가능과_주인_여부를_채운다() throws Exception {
+    @DisplayName("목록은 요청자 기준으로 관리 가능과 주인 여부를 채운다")
+    void fillsManageableAndOwnerFlagsPerRequester() throws Exception {
         Agent mine = agent("a-mine", AgentVisibility.PRIVATE, KID.id());
         Agent shared = agent("a-shared", AgentVisibility.GROUP, ADMIN.id());
         when(agents.findByEnabledTrueOrderByCodeAsc()).thenReturn(List.of(mine, shared));
@@ -156,7 +161,14 @@ class AgentControllerLifecycleTest {
     }
 
     private static Agent agent(String code, AgentVisibility visibility, Long ownerUserId) {
-        return Agent.of(code, "숙제 도우미", "ua-" + code, "http://agent-runtime.test/p/ua-" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, visibility, ownerUserId);
+        return Agent.of(
+                code,
+                "숙제 도우미",
+                "ua-" + code,
+                "http://agent-runtime.test/p/ua-" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                visibility,
+                ownerUserId);
     }
 }

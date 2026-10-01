@@ -88,10 +88,81 @@ grep -rn 'style={{' web/src/
 | credential 범위 | AI 계정 사용 범위 |
 | Hermes profile | profile (관리 화면에서만) |
 
+## lint 와 포맷
+
+화면 코드의 규칙은 문장이 아니라 `web/eslint.config.mjs` 가 갖는다.
+도구는 eslint 9.39.5 와 `eslint-config-next` 16.0.10, Prettier 3.9.9 이고 버전을 정확한 값으로 고정한다.
+규칙을 도구 설정으로 두는 근거는 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 에 있다.
+
+```bash
+# cwd: web/
+pnpm lint
+pnpm format:check
+pnpm format:changed
+```
+
+backend 와 함께 한 번에 검사하고 고치려면 저장소 root 에서 `scripts/quality.sh check` 와 `scripts/quality.sh fix` 를 쓴다.
+`fix` 는 `eslint --fix --prune-suppressions` 와 `pnpm format:changed` 를 돌리고 새 위반은 기준에 더하지 않는다.
+
+| 규칙 | 대상 | 심각도 | 까닭 |
+| --- | --- | --- | --- |
+| `eslint-config-next/core-web-vitals`, `eslint-config-next/typescript` | 전체 | 설정대로 | Next.js 와 React 의 결함 모양 |
+| `no-restricted-syntax`: `NextResponse.json({ code, ... })`, `request.json()`(이름이 `request` 나 `req` 인 것) | `src/app/api/**` | error | 오류 응답 모양과 요청 본문 검사를 한곳의 도우미로 모은다. 라우트가 직접 만들면 모양이 라우트마다 달라진다 |
+| `no-restricted-globals`: `fetch` | `src/components/**`, `src/app/**/*.tsx` | error | 화면은 `lib/` 의 호출 함수를 거친다. 화면이 주소와 오류 처리를 각자 다시 쓰지 않게 한다 |
+| `max-lines` 400, `max-lines-per-function` 150. 빈 줄과 주석은 세지 않는다 | `src/**` | warning | 쪼갤 후보 목록이다. 실패시키지 않는다 |
+| `no-restricted-imports`: `../*` | `src/**` | error | `@/` 를 쓰면 파일을 옮겨도 import 가 깨지지 않는다 |
+
+`fetch` 가 꼭 필요한 화면 파일이 생기면 `eslint.config.mjs` 의 그 규칙 블록에 `ignores` 로 파일과 까닭을 적는다.
+
+### 기준 파일
+
+지금 있는 error 위반은 `web/eslint-suppressions.json` 에 두고 새 위반만 실패시킨다.
+eslint 의 bulk suppressions 이고, 파일과 규칙마다 위반 수를 적는다.
+warning 은 기준에 넣지 않는다.
+
+**기준에 든 위반은 허용이 아니라 줄여 갈 목록이다.**
+기준마다 연 GitHub 이슈가 있다. 위반을 고치면 기준도 같은 커밋에서 줄인다.
+
+| 언제 | 어떻게 |
+| --- | --- |
+| 기준에 든 위반을 고쳤다 | `pnpm lint` 가 「쓰지 않는 기준이 남았다」 며 2 로 끝난다. `pnpm exec eslint --prune-suppressions` 로 그 줄을 빼고 같은 커밋에 넣는다 |
+| 새 위반이 생겼다 | 기준에 더하지 않고 고친다 |
+| 꼭 받아들여야 한다 | `pnpm exec eslint --suppress-rule <규칙> <파일>` 로 더한다. 까닭을 커밋 메시지와 PR 본문에 적는다 |
+| 규칙을 새로 더했다 | `pnpm exec eslint --suppress-all` 로 기존 위반을 기준에 둔다. 그 규칙의 위반 수를 커밋 메시지에 적는다 |
+
+`eslint-suppressions.json` 은 `.prettierignore` 에 있다. eslint 는 이 파일을 끝 줄바꿈 없이 쓰고 Prettier 는 줄바꿈을 붙여, 두 도구가 번갈아 고치기 때문이다.
+
+### 상대 경로 import 예외
+
+`test/unit/*.test.ts` 는 `node --test` 로 돌고 web 파일을 상대 경로로 읽는다.
+Node 는 tsconfig 의 `@/` 별칭을 풀지 못한다.
+그래서 이 테스트가 읽는 web 파일과, 그 파일이 런타임에 import 하는 web 파일은 상대 경로 import 를 쓴다.
+타입만 가져오는 `import type` 은 실행할 때 지워지므로 `@/` 를 써도 된다.
+
+이 파일들은 `eslint.config.mjs` 의 `NODE_TEST_READ_FILES` 에 있고 `../*` 규칙에서 빠진다.
+지금 목록은 `src/components/chat/activity/activity-state.ts` 와 `src/components/chat/skill-command.ts` 이다.
+단위 테스트가 새 web 파일을 읽으면 그 파일의 `../` import 를 따라가 상대 경로로 import 하는 파일을 이 목록에 더한다.
+그 파일이 다시 import 하는 파일도 상대 경로를 써야 한다.
+
+### 포맷
+
+Prettier 는 설정 파일 없이 기본값을 쓴다. `.prettierignore` 가 빌드 결과와 잠금 파일을 뺀다.
+**저장소 전체를 검사하지 않고 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 검사한다.**
+여러 브랜치가 같은 파일을 나란히 고치므로 전체를 한 번에 포맷하면 진행 중인 브랜치가 모두 충돌한다.
+
+- `pnpm format:check` 는 바뀐 파일이 Prettier 모양인지 검사한다. 바뀐 파일이 없으면 성공한다
+- `pnpm format:changed` 는 바뀐 파일을 고쳐 쓴다
+- 바뀐 파일의 목록은 `web/scripts/changed-files.mjs` 하나가 만든다. 추적하지 않는 새 파일도 포함하고 `origin/main` 이 없으면 2 로 끝난다
+- 마크다운은 대상이 아니다. Prettier 는 표의 열을 공백으로 맞추는데 이 저장소의 문서 표는 맞추지 않고 쓴다
+
+파일을 처음 고치는 PR 은 그 파일 전체가 포맷된다. 기능 변경과 포맷을 다른 커밋으로 나눈다.
+
 ## 검사
 
 ```bash
 # cwd: web/
+pnpm lint
+pnpm format:check
 pnpm typecheck
 pnpm test:browser
 ```

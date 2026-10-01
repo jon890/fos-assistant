@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -65,8 +66,10 @@ class HermesRuntimeReadTest {
     }
 
     @Test
-    void 세션_조회는_session_안의_model_을_읽는다() {
-        bodies.put("/p/dad/api/sessions/sess-1",
+    @DisplayName("세션 조회는 session 안의 model 을 읽는다")
+    void sessionQueryReadsModelInsideSession() {
+        bodies.put(
+                "/p/dad/api/sessions/sess-1",
                 "{\"object\":\"session\",\"session\":{\"id\":\"sess-1\",\"model\":\"gpt-6-luna\"}}");
 
         SessionRuntime runtime = client.readSessionRuntime(baseUrl, "dad", "sess-1");
@@ -77,9 +80,11 @@ class HermesRuntimeReadTest {
     }
 
     @Test
-    void 실행_조회는_runtime_의_provider_와_모델을_결과에_싣는다() {
+    @DisplayName("실행 조회는 runtime 의 provider 와 모델을 결과에 싣는다")
+    void runQueryCarriesRuntimeProviderAndModelInResult() {
         // 기본값으로 보낸 실행이라 model 칸은 profile 이름을 되돌려 준다.
-        bodies.put("/p/dad/v1/runs/run-1",
+        bodies.put(
+                "/p/dad/v1/runs/run-1",
                 "{\"run_id\":\"run-1\",\"status\":\"completed\",\"session_id\":\"sess-1\",\"model\":\"dad\","
                         + "\"runtime\":{\"provider\":\"openai-codex\",\"model\":\"gpt-6-luna\",\"route_source\":\"global\"}}");
 

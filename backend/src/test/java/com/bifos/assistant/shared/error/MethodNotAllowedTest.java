@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,41 +33,47 @@ class MethodNotAllowedTest {
 
     private static final String POST_ONLY = "/api/v1/signin/allowed";
 
-    @LocalServerPort int port;
+    @LocalServerPort
+    int port;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private ListAppender<ILoggingEvent> logs;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         logs = new ListAppender<>();
         logs.start();
         handlerLogger().addAppender(logs);
     }
 
     @AfterEach
-    void 정리한다() {
+    void tearDown() {
         handlerLogger().detachAppender(logs);
     }
 
     @Test
-    void POST_만_받는_경로에_온_HEAD_는_405_와_Allow_를_받고_ERROR_로_남지_않는다() throws Exception {
+    @DisplayName("POST 만 받는 경로에 온 HEAD 는 405 와 Allow 를 받고 ERROR 로 남지 않는다")
+    void headToPostOnlyPathGets405AndAllowAndIsNotLoggedAsError() throws Exception {
         HttpResponse<String> response = send("HEAD", POST_ONLY);
 
         assertThat(response.statusCode()).isEqualTo(405);
-        assertThat(response.headers().firstValue("Allow")).hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
+        assertThat(response.headers().firstValue("Allow"))
+                .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
         assertThat(logs.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.ERROR));
-        assertThat(logs.list).anyMatch(event -> event.getLevel() == Level.WARN
-                && event.getFormattedMessage().contains("HEAD"));
+        assertThat(logs.list)
+                .anyMatch(event -> event.getLevel() == Level.WARN
+                        && event.getFormattedMessage().contains("HEAD"));
     }
 
     @Test
-    void 받지_않는_메서드의_응답_본문은_다른_오류와_같은_모양이다() throws Exception {
+    @DisplayName("받지 않는 메서드의 응답 본문은 다른 오류와 같은 모양이다")
+    void bodyForUnacceptedMethodHasSameShapeAsOtherErrors() throws Exception {
         HttpResponse<String> response = send("GET", POST_ONLY);
 
         assertThat(response.statusCode()).isEqualTo(405);
-        assertThat(response.headers().firstValue("Allow")).hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
+        assertThat(response.headers().firstValue("Allow"))
+                .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
         JsonNode body = json.readTree(response.body());
         assertThat(body.path("code").asString()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.name());
         assertThat(body.path("message").asString()).contains("GET");
@@ -74,7 +81,8 @@ class MethodNotAllowedTest {
     }
 
     @Test
-    void GET_경로에_온_HEAD_는_Spring_이_GET_으로_처리해_405_가_아니다() throws Exception {
+    @DisplayName("GET 경로에 온 HEAD 는 Spring 이 GET 으로 처리해 405 가 아니다")
+    void headToGetPathIsHandledAsGetBySpringAndIsNot405() throws Exception {
         // 인증 없이 닿는 GET 경로다. @GetMapping 은 HEAD 도 받으므로 메서드 거절에 이르지 않는다.
         HttpResponse<String> response = send("HEAD", "/api/v1/me");
 

@@ -29,6 +29,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -46,26 +47,40 @@ class AgentRunnerSubmitFailureTest {
     private final HermesRunsClient hermes = mock(HermesRunsClient.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
-    private final Agent agent = Agent.of("runner", "실행기", PROFILE, API_BASE_URL,
-            CostMode.API, CredentialScope.DEDICATED, AgentVisibility.PRIVATE, 1L);
+    private final Agent agent = Agent.of(
+            "runner",
+            "실행기",
+            PROFILE,
+            API_BASE_URL,
+            CostMode.API,
+            CredentialScope.DEDICATED,
+            AgentVisibility.PRIVATE,
+            1L);
     private final AgentExecution started = mock(AgentExecution.class);
     private final AgentExecution failed = mock(AgentExecution.class);
     private AgentRunner runner;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(contextAssembler.assemble(user)).thenReturn(new AssembledContext(null, 0));
         when(started.id()).thenReturn(3L);
         when(failed.id()).thenReturn(3L);
         when(failed.status()).thenReturn(ExecutionStatus.FAILED);
-        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(started);
+        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(started);
         when(executions.fail(any(), anyString())).thenReturn(failed);
-        runner = new AgentRunner(contextAssembler, hermes, executions, mock(ExecutionEventRecorder.class),
-                mock(ExecutionEventRepository.class), new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100));
+        runner = new AgentRunner(
+                contextAssembler,
+                hermes,
+                executions,
+                mock(ExecutionEventRecorder.class),
+                mock(ExecutionEventRepository.class),
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100));
     }
 
     @Test
-    void 제출_뒤_run_번호를_적지_못하면_그_run_을_멈추고_FAILED_로_끝낸다() {
+    @DisplayName("제출 뒤 run 번호를 적지 못하면 그 run 을 멈추고 FAILED 로 끝낸다")
+    void stopsRunAndEndsFailedWhenRunIdCannotBeRecordedAfterSubmit() {
         when(hermes.submit(any())).thenReturn(RUN_ID);
         doThrow(new IllegalStateException("저장 실패")).when(executions).attachRunId(started, RUN_ID);
 
@@ -80,7 +95,8 @@ class AgentRunnerSubmitFailureTest {
     }
 
     @Test
-    void run_을_멈추지_못해도_실행은_FAILED_로_끝난다() {
+    @DisplayName("run 을 멈추지 못해도 실행은 FAILED 로 끝난다")
+    void endsFailedEvenIfRunCannotBeStopped() {
         when(hermes.submit(any())).thenReturn(RUN_ID);
         doThrow(new IllegalStateException("저장 실패")).when(executions).attachRunId(started, RUN_ID);
         doThrow(new IllegalStateException("Hermes 에 닿지 못했다")).when(hermes).stop(API_BASE_URL, PROFILE, RUN_ID);
@@ -92,7 +108,8 @@ class AgentRunnerSubmitFailureTest {
     }
 
     @Test
-    void 제출_자체가_실패하면_멈출_run_이_없다() {
+    @DisplayName("제출 자체가 실패하면 멈출 run 이 없다")
+    void hasNoRunToStopWhenSubmitItselfFails() {
         when(hermes.submit(any())).thenThrow(new IllegalStateException("제출 실패"));
 
         AgentRunner.Run run = run();
@@ -103,7 +120,17 @@ class AgentRunnerSubmitFailureTest {
     }
 
     private AgentRunner.Run run() {
-        return runner.run(user, Conversation.startedBy(user.id(), "대화", 2L), agent, "일", null, null,
-                RunSession.fresh(), execution -> {}, (execution, runId) -> {}, () -> false, null);
+        return runner.run(
+                user,
+                Conversation.startedBy(user.id(), "대화", 2L),
+                agent,
+                "일",
+                null,
+                null,
+                RunSession.fresh(),
+                execution -> {},
+                (execution, runId) -> {},
+                () -> false,
+                null);
     }
 }

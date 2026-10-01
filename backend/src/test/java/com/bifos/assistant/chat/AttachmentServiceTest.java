@@ -26,6 +26,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,32 +37,43 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class AttachmentServiceTest {
 
-    private static final CurrentUser OWNER =
-            new CurrentUser(9101L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER = new CurrentUser(9101L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private static final CurrentUser STRANGER =
             new CurrentUser(9102L, "stranger@example.com", "남", 1L, UserRole.MEMBER);
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
 
-    @Autowired AttachmentService service;
-    @Autowired AttachmentProperties properties;
-    @Autowired ChatAttachmentRepository attachments;
-    @Autowired ConversationRepository conversations;
+    @Autowired
+    AttachmentService service;
+
+    @Autowired
+    AttachmentProperties properties;
+
+    @Autowired
+    ChatAttachmentRepository attachments;
+
+    @Autowired
+    ConversationRepository conversations;
 
     private Path root;
     private Long mine;
     private Long theirs;
 
     @BeforeEach
-    void 준비한다() throws IOException {
+    void setUp() throws IOException {
         attachments.deleteAll();
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
-        mine = conversations.save(Conversation.startedBy(OWNER.id(), "내 대화", null)).id();
-        theirs = conversations.save(Conversation.startedBy(STRANGER.id(), "남의 대화", null)).id();
+        mine = conversations
+                .save(Conversation.startedBy(OWNER.id(), "내 대화", null))
+                .id();
+        theirs = conversations
+                .save(Conversation.startedBy(STRANGER.id(), "남의 대화", null))
+                .id();
     }
 
     @Test
-    void 자기_대화에_올리면_행이_생기고_파일이_그_자리에_있다() throws IOException {
+    @DisplayName("자기 대화에 올리면 행이 생기고 파일이 그 자리에 있다")
+    void uploadToOwnConversationCreatesRowAndFileInPlace() throws IOException {
         ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
 
         ChatAttachment row = attachments.findById(saved.id()).orElseThrow();
@@ -74,7 +86,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 남의_대화에_올리면_없는_대화로_거절하고_파일을_만들지_않는다() {
+    @DisplayName("남의 대화에 올리면 없는 대화로 거절하고 파일을 만들지 않는다")
+    void uploadToOthersConversationIsRejectedAsMissingWithoutFile() {
         assertCode(() -> upload(OWNER, theirs, "image/png", IMAGE), ErrorCode.CONVERSATION_NOT_FOUND);
 
         assertThat(attachments.findByConversationIdOrderByIdAsc(theirs)).isEmpty();
@@ -82,7 +95,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 지운_대화의_첨부는_올리기_읽기_지우기_모두_404이다() {
+    @DisplayName("지운 대화의 첨부는 올리기 읽기 지우기 모두 404이다")
+    void attachmentOfDeletedConversationIs404ForUploadReadAndDelete() {
         ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
         conversations.deleteIfActive(mine, OWNER.id(), Instant.now());
 
@@ -94,14 +108,16 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 받지_않는_형식은_거절하고_행을_만들지_않는다() {
+    @DisplayName("받지 않는 형식은 거절하고 행을 만들지 않는다")
+    void rejectsUnacceptedFormatWithoutCreatingRow() {
         assertCode(() -> upload(OWNER, mine, "application/pdf", IMAGE), ErrorCode.VALIDATION_FAILED);
 
         assertThat(attachments.findByConversationIdOrderByIdAsc(mine)).isEmpty();
     }
 
     @Test
-    void 한_장_상한을_넘으면_거절하고_행을_만들지_않는다() {
+    @DisplayName("한 장 상한을 넘으면 거절하고 행을 만들지 않는다")
+    void rejectsOverPerImageLimitWithoutCreatingRow() {
         byte[] tooLarge = new byte[(int) (properties.maxBytes() + 1)];
 
         assertCode(() -> upload(OWNER, mine, "image/jpeg", tooLarge), ErrorCode.VALIDATION_FAILED);
@@ -110,7 +126,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 묶이지_않은_사진이_상한만큼_있으면_한_장_더_올리지_못한다() {
+    @DisplayName("묶이지 않은 사진이 상한만큼 있으면 한 장 더 올리지 못한다")
+    void cannotUploadOneMoreWhenUnboundImagesReachLimit() {
         for (int i = 0; i < properties.maxFiles(); i++) {
             upload(OWNER, mine, "image/png", IMAGE);
         }
@@ -120,7 +137,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 이미_보낸_사진은_세지_않아_새로_올릴_수_있다() {
+    @DisplayName("이미 보낸 사진은 세지 않아 새로 올릴 수 있다")
+    void alreadySentImagesDoNotCountSoNewOnesCanBeUploaded() {
         List<Long> sent = new ArrayList<>();
         for (int i = 0; i < properties.maxFiles(); i++) {
             sent.add(upload(OWNER, mine, "image/png", IMAGE).id());
@@ -133,7 +151,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 지운_첨부를_읽으면_있었다는_것만_알린다() {
+    @DisplayName("지운 첨부를 읽으면 있었다는 것만 알린다")
+    void readingDeletedAttachmentOnlyReportsItExisted() {
         ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
         service.deleteByUser(OWNER, mine, saved.id());
 
@@ -141,7 +160,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 행은_보이는데_파일이_없으면_지워진_첨부로_알린다() throws IOException {
+    @DisplayName("행은 보이는데 파일이 없으면 지워진 첨부로 알린다")
+    void reportsAttachmentAsRemovedWhenRowVisibleButFileMissing() throws IOException {
         ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
         // 정리 작업이 파일을 지우고 지운 시각을 아직 적지 않은 순간이다.
         Files.delete(root.resolve(String.valueOf(mine)).resolve(saved.id() + ".png"));
@@ -150,20 +170,24 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 제어_문자만으로_된_이름은_대체_이름이_된다() {
+    @DisplayName("제어 문자만으로 된 이름은 대체 이름이 된다")
+    void nameOfOnlyControlCharsBecomesFallbackName() {
         ChatAttachment saved = service.upload(
                 OWNER, mine, "\n\r\t\u0000", "image/png", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
 
-        assertThat(attachments.findById(saved.id()).orElseThrow().originalName()).isEqualTo("image");
+        assertThat(attachments.findById(saved.id()).orElseThrow().originalName())
+                .isEqualTo("image");
     }
 
     @Test
-    void 없는_번호를_읽으면_없는_대화와_같은_응답이다() {
+    @DisplayName("없는 번호를 읽으면 없는 대화와 같은 응답이다")
+    void readingMissingIdRespondsLikeMissingConversation() {
         assertCode(() -> service.read(OWNER, mine, 987654321L), ErrorCode.CONVERSATION_NOT_FOUND);
     }
 
     @Test
-    void 내_대화_번호에_남의_첨부_번호를_붙여도_읽지_못한다() {
+    @DisplayName("내 대화 번호에 남의 첨부 번호를 붙여도 읽지 못한다")
+    void cannotReadOthersAttachmentIdUnderOwnConversationId() {
         ChatAttachment others = upload(STRANGER, theirs, "image/png", IMAGE);
 
         assertCode(() -> service.read(OWNER, mine, others.id()), ErrorCode.CONVERSATION_NOT_FOUND);
@@ -172,7 +196,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 자기_첨부는_올린_본문을_그대로_읽는다() throws IOException {
+    @DisplayName("자기 첨부는 올린 본문을 그대로 읽는다")
+    void readsOwnAttachmentAsUploaded() throws IOException {
         ChatAttachment saved = upload(OWNER, mine, "image/webp", IMAGE);
 
         AttachmentContent content = service.read(OWNER, mine, saved.id());
@@ -184,7 +209,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 사용자가_지우면_파일이_사라지고_행은_남는다() {
+    @DisplayName("사용자가 지우면 파일이 사라지고 행은 남는다")
+    void userDeleteRemovesFileAndKeepsRow() {
         ChatAttachment saved = upload(OWNER, mine, "image/gif", IMAGE);
         Path file = root.resolve(String.valueOf(mine)).resolve(saved.id() + ".gif");
 
@@ -198,7 +224,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 파일을_쓰지_못하면_행을_남기지_않는다() throws IOException {
+    @DisplayName("파일을 쓰지 못하면 행을 남기지 않는다")
+    void leavesNoRowWhenFileCannotBeWritten() throws IOException {
         // 대화 디렉터리 자리에 일반 파일을 두어 디렉터리를 만들지 못하게 한다.
         Files.createDirectories(root);
         Files.write(root.resolve(String.valueOf(mine)), new byte[] {1});
@@ -209,7 +236,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 묶을_수_없는_첨부는_까닭을_가르지_않고_거절한다() {
+    @DisplayName("묶을 수 없는 첨부는 까닭을 가르지 않고 거절한다")
+    void rejectsUnbindableAttachmentWithoutRevealingReason() {
         Long others = upload(STRANGER, theirs, "image/png", IMAGE).id();
         Long bound = upload(OWNER, mine, "image/png", IMAGE).id();
         service.attach(601L, mine, List.of(bound));
@@ -225,7 +253,8 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void 이미_묶인_첨부를_다시_묶으면_거절하고_처음_메시지를_가리킨다() {
+    @DisplayName("이미 묶인 첨부를 다시 묶으면 거절하고 처음 메시지를 가리킨다")
+    void rebindingBoundAttachmentIsRejectedAndPointsToFirstMessage() {
         Long id = upload(OWNER, mine, "image/png", IMAGE).id();
         service.attach(701L, mine, List.of(id));
 
@@ -241,7 +270,8 @@ class AttachmentServiceTest {
 
     private static void assertCode(Runnable action, ErrorCode expected) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
 
     private static void deleteTree(Path path) throws IOException {

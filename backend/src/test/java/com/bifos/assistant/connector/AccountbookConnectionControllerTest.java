@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -19,7 +20,6 @@ import com.bifos.assistant.connector.domain.ConnectionStatus;
 import com.bifos.assistant.connector.presentation.AccountbookConnectionAdminController;
 import com.bifos.assistant.connector.presentation.AccountbookConnectionController;
 import com.bifos.assistant.connector.presentation.ConnectionDtos;
-import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,13 +47,14 @@ class AccountbookConnectionControllerTest {
             .build();
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(currentUser.require()).thenReturn(MEMBER);
         when(currentUser.requireAdmin()).thenReturn(ADMIN);
     }
 
     @Test
-    void 등록_본문의_profile은_무시하고_로그인_사용자로_등록한다() throws Exception {
+    @DisplayName("등록 본문의 profile은 무시하고 로그인 사용자로 등록한다")
+    void registersForLoggedInUserIgnoringProfileInBody() throws Exception {
         when(service.register(eq(MEMBER), any(), any())).thenReturn(snapshot(ConnectionStatus.PENDING, "fab_abcd"));
 
         mvc.perform(post("/api/v1/connections/accountbook")
@@ -65,18 +67,23 @@ class AccountbookConnectionControllerTest {
     }
 
     @Test
-    void 토큰_요청의_문자열_표현과_잘못된_JSON은_원문을_노출하지_않는다() throws Exception {
+    @DisplayName("토큰 요청의 문자열 표현과 잘못된 JSON은 원문을 노출하지 않는다")
+    void hidesTokenInToStringAndMalformedJson() throws Exception {
         String token = "fab_" + "a".repeat(43);
         assertThat(new ConnectionDtos.RegisterRequest(token, null).toString()).doesNotContain(token);
         var result = mvc.perform(post("/api/v1/connections/accountbook")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"token\":[\"" + token + "\"]}"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED")).andReturn();
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":[\"" + token + "\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andReturn();
         assertThat(result.getResponse().getContentAsString()).doesNotContain(token);
         verifyNoInteractions(service);
     }
 
     @Test
-    void 인증되지_않은_연결_조회는_401을_돌려준다() throws Exception {
+    @DisplayName("인증되지 않은 연결 조회는 401을 돌려준다")
+    void returns401ForUnauthenticatedConnectionLookup() throws Exception {
         when(currentUser.require()).thenThrow(new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
 
         mvc.perform(get("/api/v1/connections/accountbook"))
@@ -87,21 +94,27 @@ class AccountbookConnectionControllerTest {
     }
 
     @Test
-    void 가족_목록은_로그인_사용자의_토큰으로_읽고_토큰은_응답하지_않는다() throws Exception {
+    @DisplayName("가족 목록은 로그인 사용자의 토큰으로 읽고 토큰은 응답하지 않는다")
+    void readsFamiliesWithUserTokenWithoutReturningToken() throws Exception {
         String token = "fab_" + "a".repeat(43);
         java.util.UUID uuid = java.util.UUID.randomUUID();
-        when(service.availableFamilies(MEMBER, token)).thenReturn(List.of(
-                new com.bifos.assistant.connector.application.AccountbookTokenVerifier.FamilyOption(uuid, "공유 가족")));
+        when(service.availableFamilies(MEMBER, token))
+                .thenReturn(List.of(new com.bifos.assistant.connector.application.AccountbookTokenVerifier.FamilyOption(
+                        uuid, "공유 가족")));
         var result = mvc.perform(post("/api/v1/connections/accountbook/families")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + token + "\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].uuid").value(uuid.toString()))
-                .andExpect(jsonPath("$[0].name").value("공유 가족")).andReturn();
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].uuid").value(uuid.toString()))
+                .andExpect(jsonPath("$[0].name").value("공유 가족"))
+                .andReturn();
         assertThat(result.getResponse().getContentAsString()).doesNotContain(token);
         verify(service).availableFamilies(MEMBER, token);
     }
 
     @Test
-    void 확인은_요청_본문_없이_로그인_사용자로_수행한다() throws Exception {
+    @DisplayName("확인은 요청 본문 없이 로그인 사용자로 수행한다")
+    void verifiesForLoggedInUserWithoutRequestBody() throws Exception {
         when(service.check(MEMBER)).thenReturn(snapshot(ConnectionStatus.PENDING, "fab_abcd"));
 
         mvc.perform(post("/api/v1/connections/accountbook/check"))
@@ -112,8 +125,10 @@ class AccountbookConnectionControllerTest {
     }
 
     @Test
-    void MEMBER는_관리자_목록을_읽지_못한다() throws Exception {
-        when(currentUser.requireAdmin()).thenThrow(new ApiException(ErrorCode.FORBIDDEN, "administrator access is required"));
+    @DisplayName("MEMBER는 관리자 목록을 읽지 못한다")
+    void forbidsMemberFromReadingAdminList() throws Exception {
+        when(currentUser.requireAdmin())
+                .thenThrow(new ApiException(ErrorCode.FORBIDDEN, "administrator access is required"));
 
         mvc.perform(get("/api/v1/admin/connections/accountbook"))
                 .andExpect(status().isForbidden())
@@ -123,9 +138,11 @@ class AccountbookConnectionControllerTest {
     }
 
     @Test
-    void 관리자_목록은_다른_사용자의_prefix와_family를_내보내지_않는다() throws Exception {
-        when(service.listForAdmin(ADMIN)).thenReturn(List.of(
-                new AdminConnectionSnapshot(7L, "사용자", ConnectionStatus.PENDING, "agent-code", true)));
+    @DisplayName("관리자 목록은 다른 사용자의 prefix와 family를 내보내지 않는다")
+    void adminListHidesOtherUsersPrefixAndFamily() throws Exception {
+        when(service.listForAdmin(ADMIN))
+                .thenReturn(
+                        List.of(new AdminConnectionSnapshot(7L, "사용자", ConnectionStatus.PENDING, "agent-code", true)));
 
         mvc.perform(get("/api/v1/admin/connections/accountbook"))
                 .andExpect(status().isOk())
@@ -135,7 +152,8 @@ class AccountbookConnectionControllerTest {
     }
 
     @Test
-    void 관리자_반영_확인_응답은_prefix와_family를_내보내지_않는다() throws Exception {
+    @DisplayName("관리자 반영 확인 응답은 prefix와 family를 내보내지 않는다")
+    void adminConfirmResponseHidesPrefixAndFamily() throws Exception {
         when(service.confirmApplied(ADMIN, 7L)).thenReturn(snapshot(ConnectionStatus.READY, "fab_abcd"));
 
         mvc.perform(post("/api/v1/admin/connections/accountbook/7/confirm"))

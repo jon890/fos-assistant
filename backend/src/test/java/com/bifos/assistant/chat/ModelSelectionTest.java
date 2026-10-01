@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -73,9 +74,8 @@ class ModelSelectionTest {
     private static final String AGENT_CODE = "selection";
 
     /** 그 provider 의 계정이 전부 막혔을 때 Hermes 가 돌려주는 글이다. 실측한 문장이다. */
-    private static final String BLOCKED_ERROR =
-            HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX
-                    + " No Codex credentials stored. Run `hermes auth` to authenticate.";
+    private static final String BLOCKED_ERROR = HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX
+            + " No Codex credentials stored. Run `hermes auth` to authenticate.";
 
     /** 금액이 비는 것이 가격표가 없어서가 아니라는 것을 보이려고 표본 가격표를 가리킨다. */
     @DynamicPropertySource
@@ -85,7 +85,9 @@ class ModelSelectionTest {
 
     private static Path sampleCatalog() {
         try {
-            return Path.of(ModelSelectionTest.class.getResource("/pricing/models-dev-sample.json").toURI());
+            return Path.of(ModelSelectionTest.class
+                    .getResource("/pricing/models-dev-sample.json")
+                    .toURI());
         } catch (URISyntaxException ex) {
             throw new IllegalStateException(ex);
         }
@@ -94,16 +96,32 @@ class ModelSelectionTest {
     /** 가격표에 있는 모델로 돌았다면 금액이 나오는 사용량이다. */
     private static final TokenUsage PRICED_USAGE = new TokenUsage(1_000L, 0L, 500L, 1_500L);
 
-    @Autowired ChatService chat;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ConversationRepository conversations;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
 
-    @MockitoBean HermesRunEventStream eventStream;
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    HermesRunsClient hermes;
+
+    @MockitoBean
+    HermesRunEventStream eventStream;
 
     private CurrentUser user;
 
@@ -112,7 +130,7 @@ class ModelSelectionTest {
     }
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         stub().reset();
         executionEvents.deleteAll();
         executions.deleteAll();
@@ -135,7 +153,8 @@ class ModelSelectionTest {
     }
 
     @Test
-    void 고르지_않은_대화는_provider_모델_effort_를_모두_빼고_보낸다() {
+    @DisplayName("고르지 않은 대화는 provider 모델 effort 를 모두 빼고 보낸다")
+    void unchosenConversationSendsWithoutProviderModelAndEffort() {
         stub().willReturn(succeeded("run-1", "sess-1"));
 
         ChatTurn turn = chat.send(user, null, "안녕", AGENT_CODE);
@@ -145,11 +164,13 @@ class ModelSelectionTest {
             assertThat(command.model()).as("model").isNull();
             assertThat(command.reasoningEffort()).as("reasoning effort").isNull();
         });
-        assertThat(executions.findById(turn.executionId()).orElseThrow().reasoningEffort()).isNull();
+        assertThat(executions.findById(turn.executionId()).orElseThrow().reasoningEffort())
+                .isNull();
     }
 
     @Test
-    void 모델과_effort_를_고르면_요청에_셋이_실리고_실행_줄에_effort_가_남는다() {
+    @DisplayName("모델과 effort 를 고르면 요청에 셋이 실리고 실행 줄에 effort 가 남는다")
+    void choosingModelAndEffortCarriesAllThreeAndRecordsEffortInRunRow() {
         Long conversationId = conversationChoosing(new ModelChoice("anthropic", "example-model-large", "high"));
         stub().willReturn(succeeded("run-1", "sess-1"));
 
@@ -168,11 +189,11 @@ class ModelSelectionTest {
 
     /** 실행 조회의 {@code model} 이 아니라 세션 조회의 값이 기록돼야 한다. */
     @Test
-    void 세션이_고른_것과_다른_모델을_답하면_그_값을_적는다() {
+    @DisplayName("세션이 고른 것과 다른 모델을 답하면 그 값을 적는다")
+    void recordsModelWhenSessionAnswersOtherThanChosen() {
         Long conversationId = conversationChoosing(new ModelChoice("anthropic", "example-model-large", "low"));
         stub().willReturn(succeeded("run-1", "sess-1"));
-        stub().willReportSessionRuntime(
-                new SessionRuntime("example-provider/example-model-c", "nvidia"));
+        stub().willReportSessionRuntime(new SessionRuntime("example-provider/example-model-c", "nvidia"));
 
         ChatTurn turn = chat.send(user, conversationId, "안녕", null);
 
@@ -184,7 +205,8 @@ class ModelSelectionTest {
     }
 
     @Test
-    void 기본값으로_보냈고_세션이_답하지_못하면_provider_모델_금액이_비어_있다() {
+    @DisplayName("기본값으로 보냈고 세션이 답하지 못하면 provider 모델 금액이 비어 있다")
+    void leavesProviderModelAndAmountEmptyWhenDefaultSentAndSessionSilent() {
         stub().willReturn(succeeded("run-1", "sess-1"));
         stub().willReportSessionRuntime(null);
 
@@ -198,9 +220,18 @@ class ModelSelectionTest {
     }
 
     @Test
-    void 세션이_provider_를_주지_않아도_실행의_runtime_으로_provider_와_모델을_적는다() {
+    @DisplayName("세션이 provider 를 주지 않아도 실행의 runtime 으로 provider 와 모델을 적는다")
+    void recordsProviderAndModelFromRuntimeEvenIfSessionGivesNoProvider() {
         // v0.21.5 의 세션 조회는 model 만 주고 provider 를 주지 않는다. 실행 조회의 runtime 이 실제로 돈 값을 준다.
-        stub().willReturn(new HermesRunResult("run-1", "sess-1", "completed", "네", "dad", null, null, PRICED_USAGE,
+        stub().willReturn(new HermesRunResult(
+                "run-1",
+                "sess-1",
+                "completed",
+                "네",
+                "dad",
+                null,
+                null,
+                PRICED_USAGE,
                 new SessionRuntime("example-model-large", "anthropic")));
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", null));
 
@@ -209,11 +240,14 @@ class ModelSelectionTest {
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
         assertThat(execution.provider()).isEqualTo("anthropic");
         assertThat(execution.model()).isEqualTo("example-model-large");
-        assertThat(execution.estimatedCostMicros()).as("provider 와 모델을 알면 금액을 적는다").isNotNull();
+        assertThat(execution.estimatedCostMicros())
+                .as("provider 와 모델을 알면 금액을 적는다")
+                .isNotNull();
     }
 
     @Test
-    void 기본값으로_보냈어도_세션이_답하면_그_모델로_금액을_적는다() {
+    @DisplayName("기본값으로 보냈어도 세션이 답하면 그 모델로 금액을 적는다")
+    void recordsAmountByModelWhenSessionAnswersEvenIfSentWithDefault() {
         stub().willReturn(succeeded("run-1", "sess-1"));
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
 
@@ -226,7 +260,8 @@ class ModelSelectionTest {
     }
 
     @Test
-    void provider_가_막히면_넘기지_않고_PROVIDER_BLOCKED_로_실패한다() {
+    @DisplayName("provider 가 막히면 넘기지 않고 PROVIDER BLOCKED 로 실패한다")
+    void providerBlockedFailsAsProviderBlockedWithoutFallback() {
         Long conversationId = conversationChoosing(new ModelChoice("openai-codex", "example-model", null));
         stub().willReturnInOrder(blocked("run-1", "sess-1"), succeeded("run-2", "sess-1"));
 
@@ -236,8 +271,7 @@ class ModelSelectionTest {
                 .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
-        List<AgentExecution> recorded =
-                executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10));
+        List<AgentExecution> recorded = executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10));
         assertThat(recorded).singleElement().satisfies(failed -> {
             assertThat(failed.status()).isEqualTo(ExecutionStatus.FAILED);
             assertThat(failed.errorCode()).isEqualTo("PROVIDER_BLOCKED");
@@ -245,13 +279,15 @@ class ModelSelectionTest {
         });
         List<ExecutionEvent> events = executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
                 List.of(recorded.getFirst().id()));
-        assertThat(events).extracting(ExecutionEvent::eventType)
+        assertThat(events)
+                .extracting(ExecutionEvent::eventType)
                 .doesNotContain(ExecutionEventType.PROVIDER_SWITCHED)
                 .contains(ExecutionEventType.RUN_FAILED);
     }
 
     @Test
-    void 스트리밍에서_막혀도_넘김_알림과_조각_지우기를_보내지_않는다() {
+    @DisplayName("스트리밍에서 막혀도 넘김 알림과 조각 지우기를 보내지 않는다")
+    void blockedInStreamingSendsNoFallbackNoticeNorChunkClear() {
         Long conversationId = conversationChoosing(new ModelChoice("openai-codex", "example-model", null));
         stub().willReturn(blocked("run-1", "sess-1"));
 
@@ -261,17 +297,21 @@ class ModelSelectionTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
-        assertThat(relayed).extracting(ChatEvent::type)
-                .contains("started")
-                .doesNotContain("switched", "reset");
+        assertThat(relayed).extracting(ChatEvent::type).contains("started").doesNotContain("switched", "reset");
     }
 
     @Test
-    void 다른_실패는_넘기지_않고_한_번만_실패한다() {
-        stub().willReturn(
-                new HermesRunResult(
-                        "run-1", "sess-1", "failed", null, "example-model", "openai-codex",
-                        "HTTP 404: 404 page not found", TokenUsage.empty()));
+    @DisplayName("다른 실패는 넘기지 않고 한 번만 실패한다")
+    void otherFailuresFailOnceWithoutFallback() {
+        stub().willReturn(new HermesRunResult(
+                "run-1",
+                "sess-1",
+                "failed",
+                null,
+                "example-model",
+                "openai-codex",
+                "HTTP 404: 404 page not found",
+                TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(user, null, "안녕", AGENT_CODE))
                 .isInstanceOf(ApiException.class)
@@ -282,7 +322,8 @@ class ModelSelectionTest {
     }
 
     @Test
-    void 선택을_바꾼_뒤_이어_보내면_바꾼_값이_실린다() {
+    @DisplayName("선택을 바꾼 뒤 이어 보내면 바꾼 값이 실린다")
+    void changedChoiceIsCarriedWhenContinuingAfterChange() {
         Long conversationId = conversationChoosing(new ModelChoice("anthropic", "example-model-large", "high"));
         stub().willReturn(succeeded("run-1", "sess-1"));
         chat.send(user, conversationId, "안녕", null);

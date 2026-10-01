@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,16 +60,35 @@ class ChatRunningTurnTest {
 
     private static final String SPLIT_JSON = "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}";
 
-    @Autowired ChatService chat;
-    @Autowired TurnCancellation turns;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired MemoryRepository memories;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    TurnCancellation turns;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient) hermes;
@@ -93,15 +113,23 @@ class ChatRunningTurnTest {
     private CurrentUser member(String name, String flow) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
         Agent agent = Agent.of(
-                name, name, name, "http://agent-runtime.test/p/" + name, CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id());
+                name,
+                name,
+                name,
+                "http://agent-runtime.test/p/" + name,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id());
         if (flow != null) agent.assignFlow(flow);
         agents.save(agent);
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private AgentExecution latestExecution(CurrentUser user) {
-        return executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1)).getFirst();
+        return executions
+                .findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1))
+                .getFirst();
     }
 
     private static HermesRunResult completed(String runId, String output) {
@@ -116,7 +144,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 도는_turn이_없는_내_대화는_돌지_않는다고_답한다() {
+    @DisplayName("도는 turn이 없는 내 대화는 돌지 않는다고 답한다")
+    void ownConversationWithoutRunningTurnReportsNotRunning() {
         CurrentUser dad = member("dad");
         Conversation conversation = chat.startEmpty(dad, "dad");
 
@@ -124,7 +153,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 도는_turn이_있으면_뿌리_실행_번호와_시작_시각을_답하고_끝나면_돌지_않는다고_답한다() {
+    @DisplayName("도는 turn이 있으면 뿌리 실행 번호와 시작 시각을 답하고 끝나면 돌지 않는다고 답한다")
+    void runningTurnReportsRootRunIdAndStartTimeThenNotRunningAfterEnd() {
         CurrentUser dad = member("dad");
         stub().willReturn(completed("run-held", "답"));
         AtomicReference<RunningTurn> whileRunning = new AtomicReference<>();
@@ -138,14 +168,16 @@ class ChatRunningTurnTest {
         ChatTurn turn = chat.send(dad, null, "질문", "dad");
 
         assertThat(whileRunning.get())
-                .isEqualTo(new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
+                .isEqualTo(
+                        new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
         assertThat(whileRunning.get().executionId()).isEqualTo(turn.executionId());
         assertThat(whileRunning.get().startedAt()).isNotNull();
         assertThat(chat.running(dad, turn.conversationId())).isEqualTo(new RunningTurn(false, null, null));
     }
 
     @Test
-    void 표시는_있는데_실행_번호가_붙기_전이면_돈다고만_답한다() {
+    @DisplayName("표시는 있는데 실행 번호가 붙기 전이면 돈다고만 답한다")
+    void reportsOnlyRunningWhenMarkExistsBeforeRunIdIsAttached() {
         CurrentUser dad = member("dad");
         Conversation conversation = chat.startEmpty(dad, "dad");
         TurnCancellation.TurnHandle handle = turns.open(dad.id(), conversation.id());
@@ -157,7 +189,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 흐름에서_Chief가_끝나_뿌리_줄이_SUCCEEDED여도_자식이_도는_동안은_뿌리_번호로_돈다고_답한다() {
+    @DisplayName("흐름에서 Chief가 끝나 뿌리 줄이 SUCCEEDED여도 자식이 도는 동안은 뿌리 번호로 돈다고 답한다")
+    void reportsRunningWithRootIdWhileChildRunsEvenIfRootRowSucceeded() {
         CurrentUser dad = member("flow-dad", ResearchAndBuildFlow.NAME);
         AtomicReference<RunningTurn> whileChildRuns = new AtomicReference<>();
         AtomicReference<ExecutionStatus> rootStatus = new AtomicReference<>();
@@ -171,7 +204,10 @@ class ChatRunningTurnTest {
                     AgentExecution child = latestExecution(dad);
                     RunningTurn running = chat.running(dad, child.conversationId());
                     whileChildRuns.set(running);
-                    rootStatus.set(executions.findById(running.executionId()).orElseThrow().status());
+                    rootStatus.set(executions
+                            .findById(running.executionId())
+                            .orElseThrow()
+                            .status());
                 } catch (Throwable ex) {
                     failure.set(ex);
                 }
@@ -191,14 +227,23 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 막히면_넘기지_않고_실패하고_turn이_끝난다() {
+    @DisplayName("막히면 넘기지 않고 실패하고 turn이 끝난다")
+    void blockedFailsWithoutFallbackAndEndsTurn() {
         CurrentUser dad = member("dad");
         stub().willReturnInOrder(
-                new HermesRunResult("run-blocked", "session", "failed", "", null, null,
-                        HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account", TokenUsage.empty()),
-                completed("run-next", "답"));
+                        new HermesRunResult(
+                                "run-blocked",
+                                "session",
+                                "failed",
+                                "",
+                                null,
+                                null,
+                                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+                                TokenUsage.empty()),
+                        completed("run-next", "답"));
         AtomicReference<RunningTurn> whileRunning = new AtomicReference<>();
-        stub().beforeAwait(() -> whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
+        stub().beforeAwait(() ->
+                whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
 
         List<ChatEvent> relayed = new ArrayList<>();
         assertThatThrownBy(() -> chat.stream(dad, null, "막힌 모델로 보내 줘", "dad", relayed::add))
@@ -207,7 +252,9 @@ class ChatRunningTurnTest {
                 .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         List<Long> started = relayed.stream()
-                .filter(event -> event.type().equals("started")).map(ChatEvent::executionId).toList();
+                .filter(event -> event.type().equals("started"))
+                .map(ChatEvent::executionId)
+                .toList();
         assertThat(started).as("started 사건의 실행 번호").hasSize(1);
         assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
         assertThat(whileRunning.get().executionId()).isEqualTo(started.getFirst());
@@ -218,7 +265,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 남의_대화는_도는_turn이_있어도_찾을_수_없다고_답한다() {
+    @DisplayName("남의 대화는 도는 turn이 있어도 찾을 수 없다고 답한다")
+    void othersConversationReportsNotFoundEvenWithRunningTurn() {
         CurrentUser dad = member("dad");
         CurrentUser mom = member("mom");
         stub().willReturn(completed("run-dad", "답"));
@@ -241,7 +289,8 @@ class ChatRunningTurnTest {
     }
 
     @Test
-    void 지운_대화와_없는_대화는_찾을_수_없다고_답한다() {
+    @DisplayName("지운 대화와 없는 대화는 찾을 수 없다고 답한다")
+    void deletedAndMissingConversationsReportNotFound() {
         CurrentUser dad = member("dad");
         Conversation gone = chat.startEmpty(dad, "dad");
         chat.delete(dad, gone.id());

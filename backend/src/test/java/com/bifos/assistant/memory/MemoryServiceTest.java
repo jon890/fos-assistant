@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,16 +29,20 @@ class MemoryServiceTest {
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
     private static final CurrentUser OTHER_GROUP = user(3L, 20L, UserRole.ADMIN);
 
-    @Autowired MemoryService memories;
-    @Autowired MemoryRepository repository;
+    @Autowired
+    MemoryService memories;
+
+    @Autowired
+    MemoryRepository repository;
 
     @BeforeEach
-    void 비운다() {
+    void setUp() {
         repository.deleteAll();
     }
 
     @Test
-    void 개인_항목은_주인만_보고_그룹_항목은_같은_그룹이_본다() {
+    @DisplayName("개인 항목은 주인만 보고 그룹 항목은 같은 그룹이 본다")
+    void personalItemsOnlyOwnerSeesAndGroupItemsSameGroupSees() {
         Memory personal = memories.create(ADMIN, MemoryScope.USER, "개인", "내용", false);
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹", "내용", false);
 
@@ -48,7 +53,8 @@ class MemoryServiceTest {
     }
 
     @Test
-    void 남의_개인_항목은_목록과_주입과_본문에서_모두_없다() {
+    @DisplayName("남의 개인 항목은 목록과 주입과 본문에서 모두 없다")
+    void othersPersonalItemsAreAbsentFromListInjectionAndBody() {
         Memory personal = memories.create(ADMIN, MemoryScope.USER, "개인", "내용", true);
 
         assertThat(memories.readableBy(MEMBER)).isEmpty();
@@ -58,10 +64,11 @@ class MemoryServiceTest {
     }
 
     @Test
-    void scope가_없으면_거절하고_항상_주입은_기본으로_켜지지_않는다() {
+    @DisplayName("scope가 없으면 거절하고 항상 주입은 기본으로 켜지지 않는다")
+    void rejectsMissingScopeAndAlwaysInjectionIsNotOnByDefault() {
         assertThatThrownBy(() -> memories.create(ADMIN, null, "제목", "내용", false))
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SCOPE_REQUIRED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SCOPE_REQUIRED));
 
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "제목", "내용", false);
         assertThat(memory.alwaysInject()).isFalse();
@@ -69,7 +76,8 @@ class MemoryServiceTest {
     }
 
     @Test
-    void 제안은_승인_전까지_주입과_본문에서_제외되고_승인_뒤_주입_층이_정해진다() {
+    @DisplayName("제안은 승인 전까지 주입과 본문에서 제외되고 승인 뒤 주입 층이 정해진다")
+    void proposalIsExcludedUntilApprovedThenGetsInjectionLayer() {
         Memory proposed = memories.proposeUser(ADMIN, "제안", "내용", 99L);
 
         assertThat(proposed.scope()).isEqualTo(MemoryScope.USER);
@@ -90,7 +98,8 @@ class MemoryServiceTest {
     }
 
     @Test
-    void MEMBER_역할은_그룹_항목을_만들거나_고치거나_지우지_못한다() {
+    @DisplayName("MEMBER 역할은 그룹 항목을 만들거나 고치거나 지우지 못한다")
+    void memberCannotCreateEditOrDeleteGroupItems() {
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹", "내용", false);
 
         assertForbidden(() -> memories.create(MEMBER, MemoryScope.GROUP, "새 그룹", "내용", false));
@@ -99,7 +108,8 @@ class MemoryServiceTest {
     }
 
     @Test
-    void 같은_제목과_본문을_제안하면_한_행만_남는다() {
+    @DisplayName("같은 제목과 본문을 제안하면 한 행만 남는다")
+    void sameTitleAndBodyProposalLeavesOneRow() {
         Memory first = memories.proposeUser(ADMIN, "제안", "내용", 99L);
         memories.accept(ADMIN, first.id());
         memories.update(ADMIN, first.id(), "수정한 내용", false);
@@ -110,12 +120,12 @@ class MemoryServiceTest {
     }
 
     @Test
-    void 저장소도_동시에_들어온_중복_제안을_막는다() {
+    @DisplayName("저장소도 동시에 들어온 중복 제안을 막는다")
+    void repositoryAlsoBlocksConcurrentDuplicateProposals() {
         String key = "a".repeat(64);
         repository.saveAndFlush(Memory.proposedUser(ADMIN.id(), "제안", "내용", 99L, key));
 
-        assertThatThrownBy(() -> repository.saveAndFlush(
-                Memory.proposedUser(ADMIN.id(), "제안", "내용", 100L, key)))
+        assertThatThrownBy(() -> repository.saveAndFlush(Memory.proposedUser(ADMIN.id(), "제안", "내용", 100L, key)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -124,13 +134,15 @@ class MemoryServiceTest {
     }
 
     private static void assertNotFound(ThrowingAction action) {
-        assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class,
-                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
     }
 
     private static void assertForbidden(ThrowingAction action) {
-        assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class,
-                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThatThrownBy(action::run)
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
     }
 
     @FunctionalInterface

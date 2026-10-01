@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -75,34 +76,50 @@ class AgentLifecycleServiceTest {
     /** {@code application-test.yml} 의 공유 listener 주소다. */
     private static final String LISTENER = "https://hermes-listener.example.com";
 
-    @Autowired AgentLifecycleService lifecycle;
-    @Autowired AgentService agentService;
-    @Autowired AgentRepository agents;
-    @Autowired AppUserRepository users;
-    @Autowired AgentTokenRepository tokens;
-    @Autowired HermesProfileKeyStore keyStore;
+    @Autowired
+    AgentLifecycleService lifecycle;
 
-    @MockitoBean HermesDashboardClient dashboard;
-    @MockitoBean HermesToolsetClient toolsets;
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentTokenRepository tokens;
+
+    @Autowired
+    HermesProfileKeyStore keyStore;
+
+    @MockitoBean
+    HermesDashboardClient dashboard;
+
+    @MockitoBean
+    HermesToolsetClient toolsets;
 
     /** 실제 디렉터리에 쓰되, 지우기가 실패하는 경우만 흉내 낼 수 있게 감싼다. */
-    @MockitoSpyBean SkillStore skillStore;
+    @MockitoSpyBean
+    SkillStore skillStore;
 
     /** 이 테스트가 실제 key 디렉터리에 남긴 파일을 지우려고 적어 둔다. */
     private final List<String> createdProfiles = new ArrayList<>();
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(SAFE_TOOLSETS);
     }
 
     @AfterEach
-    void key_파일을_치운다() {
+    void tearDown() {
         createdProfiles.forEach(keyStore::delete);
     }
 
     @Test
-    void 만들면_profile_과_토큰이_생기고_요청자가_주인인_관리_대상_행이_남는다() {
+    @DisplayName("만들면 profile 과 토큰이 생기고 요청자가 주인인 관리 대상 행이 남는다")
+    void createsProfileAndTokenAndManagedRowOwnedByRequester() {
         CurrentUser kid = member();
 
         Agent created = create(kid, "  숙제 도우미  ", null);
@@ -128,7 +145,8 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 그룹_공개로_만들면_그룹에_보이고_주인은_요청자다() {
+    @DisplayName("그룹 공개로 만들면 그룹에 보이고 주인은 요청자다")
+    void groupVisibleCreateShowsInGroupWithRequesterAsOwner() {
         CurrentUser kid = member();
         CurrentUser other = member();
 
@@ -140,29 +158,34 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 이미_다섯인_MEMBER_는_만들지_못하고_Hermes_를_부르지_않는다() {
+    @DisplayName("이미 다섯인 MEMBER 는 만들지 못하고 Hermes 를 부르지 않는다")
+    void memberAtFiveCannotCreateAndSkipsHermes() {
         CurrentUser kid = member();
         seedAgents(kid, 5);
 
         assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
 
         verifyNoInteractions(dashboard);
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id())).isEqualTo(5);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isEqualTo(5);
     }
 
     @Test
-    void ADMIN_은_다섯이어도_만든다() {
+    @DisplayName("ADMIN 은 다섯이어도 만든다")
+    void adminCanCreateEvenAtFive() {
         CurrentUser admin = admin();
         seedAgents(admin, 5);
 
         Agent created = create(admin, "여섯째", null);
 
         assertThat(created.ownerUserId()).isEqualTo(admin.id());
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(admin.id())).isEqualTo(6);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(admin.id()))
+                .isEqualTo(6);
     }
 
     @Test
-    void 지운_에이전트는_상한에_세지_않는다() {
+    @DisplayName("지운 에이전트는 상한에 세지 않는다")
+    void deletedAgentDoesNotCountTowardLimit() {
         CurrentUser kid = member();
         List<Agent> seeded = seedAgents(kid, 5);
         Agent removed = seeded.get(0);
@@ -172,11 +195,13 @@ class AgentLifecycleServiceTest {
         Agent created = create(kid, "다시 다섯째", null);
 
         assertThat(created.ownerUserId()).isEqualTo(kid.id());
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id())).isEqualTo(5);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isEqualTo(5);
     }
 
     @Test
-    void 커넥터_연결용_에이전트는_다섯이어도_만들고_상한에_세지_않는다() {
+    @DisplayName("커넥터 연결용 에이전트는 다섯이어도 만들고 상한에 세지 않는다")
+    void createsConnectorAgentsBeyondLimitWithoutCounting() {
         CurrentUser kid = member();
         seedAgents(kid, 5);
 
@@ -185,7 +210,8 @@ class AgentLifecycleServiceTest {
 
         assertThat(connectorAgent.connectorManaged()).isTrue();
         assertThat(connectorAgent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id())).isEqualTo(5);
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isEqualTo(5);
         assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
     }
 
@@ -196,7 +222,8 @@ class AgentLifecycleServiceTest {
      * 스레드가 엇갈리는 차례는 매번 달라서 회차마다 새 사용자로 여러 번 돌린다.
      */
     @Test
-    void 넷인_사용자가_동시에_두_번_만들면_하나만_성공하고_하나는_상한이다() throws Exception {
+    @DisplayName("넷인 사용자가 동시에 두 번 만들면 하나만 성공하고 하나는 상한이다")
+    void concurrentCreatesAtFourSucceedOnceAndHitLimitOnce() throws Exception {
         for (int round = 0; round < 20; round++) {
             CurrentUser kid = member();
             seedAgents(kid, 4);
@@ -233,14 +260,17 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 만든_profile_에_셸_도구가_켜져_있으면_거두고_행을_남기지_않는다() {
+    @DisplayName("만든 profile 에 셸 도구가 켜져 있으면 거두고 행을 남기지 않는다")
+    void revokesAndLeavesNoRowWhenCreatedProfileHasShellTool() {
         CurrentUser kid = member();
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(WITH_TERMINAL);
         List<String> made = new ArrayList<>();
         doAnswer(call -> {
-            made.add(call.getArgument(0));
-            return null;
-        }).when(dashboard).createProfile(anyString());
+                    made.add(call.getArgument(0));
+                    return null;
+                })
+                .when(dashboard)
+                .createProfile(anyString());
 
         assertCode(() -> lifecycle.create(kid, "셸이 켜진 틀", null), ErrorCode.HERMES_PROVISION_FAILED);
 
@@ -254,11 +284,13 @@ class AgentLifecycleServiceTest {
                 .isNotEmpty()
                 .allSatisfy(token -> assertThat(token.revokedAt()).isNotNull());
         assertThat(agents.existsByHermesProfile(profile)).isFalse();
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id())).isZero();
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+                .isZero();
     }
 
     @Test
-    void 그룹으로_바꿔도_주인이_남는다() {
+    @DisplayName("그룹으로 바꿔도 주인이 남는다")
+    void keepsOwnerWhenChangedToGroup() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
 
@@ -271,21 +303,23 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 셸_도구가_켜진_에이전트는_그룹으로_바꾸지_못한다() {
+    @DisplayName("셸 도구가 켜진 에이전트는 그룹으로 바꾸지 못한다")
+    void cannotChangeToGroupWhenShellToolEnabled() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
-        when(toolsets.readEnabled(created.apiBaseUrl(), created.hermesProfile())).thenReturn(WITH_TERMINAL);
+        when(toolsets.readEnabled(created.apiBaseUrl(), created.hermesProfile()))
+                .thenReturn(WITH_TERMINAL);
 
         assertCode(
                 () -> lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP),
                 ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE);
 
-        assertThat(agents.findByCode(created.code()).orElseThrow().visibility())
-                .isEqualTo(AgentVisibility.PRIVATE);
+        assertThat(agents.findByCode(created.code()).orElseThrow().visibility()).isEqualTo(AgentVisibility.PRIVATE);
     }
 
     @Test
-    void 꺼진_에이전트는_Hermes_를_부르지_않고_그룹으로_바꾼다() {
+    @DisplayName("꺼진 에이전트는 Hermes 를 부르지 않고 그룹으로 바꾼다")
+    void changesDisabledAgentToGroupWithoutCallingHermes() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         Agent stored = agents.findByCode(created.code()).orElseThrow();
@@ -301,11 +335,19 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 주인_없는_그룹_에이전트를_ADMIN_이_자기만_보게_바꾸면_그_ADMIN_이_주인이다() {
+    @DisplayName("주인 없는 그룹 에이전트를 ADMIN 이 자기만 보게 바꾸면 그 ADMIN 이 주인이다")
+    void adminSwitchingOwnerlessGroupAgentToPrivateBecomesOwner() {
         CurrentUser administrator = admin();
         String code = "ownerless-" + UUID.randomUUID().toString().substring(0, 13);
-        agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.GROUP, null));
+        agents.save(Agent.of(
+                code,
+                code,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null));
 
         Agent changed = lifecycle.changeVisibility(administrator, code, AgentVisibility.PRIVATE);
 
@@ -317,7 +359,8 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 공개_범위가_비면_거절한다() {
+    @DisplayName("공개 범위가 비면 거절한다")
+    void rejectsBlankVisibility() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
 
@@ -325,15 +368,15 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 다른_MEMBER_는_그룹_에이전트를_바꾸거나_지우지_못하고_비공개는_없는_것과_같다() {
+    @DisplayName("다른 MEMBER 는 그룹 에이전트를 바꾸거나 지우지 못하고 비공개는 없는 것과 같다")
+    void otherMemberCannotEditOrDeleteGroupAgentAndPrivateLooksMissing() {
         CurrentUser kid = member();
         CurrentUser other = member();
         Agent shared = create(kid, "가족 요리사", AgentVisibility.GROUP);
         Agent secret = create(kid, "비밀 일기", null);
 
         assertCode(
-                () -> lifecycle.changeVisibility(other, shared.code(), AgentVisibility.PRIVATE),
-                ErrorCode.FORBIDDEN);
+                () -> lifecycle.changeVisibility(other, shared.code(), AgentVisibility.PRIVATE), ErrorCode.FORBIDDEN);
         assertCode(() -> lifecycle.delete(other, shared.code()), ErrorCode.FORBIDDEN);
         assertCode(
                 () -> lifecycle.changeVisibility(other, secret.code(), AgentVisibility.GROUP),
@@ -347,7 +390,8 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void ADMIN_은_다른_사람의_비공개_에이전트를_지운다() {
+    @DisplayName("ADMIN 은 다른 사람의 비공개 에이전트를 지운다")
+    void adminDeletesOthersPrivateAgent() {
         CurrentUser kid = member();
         Agent secret = create(kid, "비밀 일기", null);
 
@@ -358,14 +402,16 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 만든_profile_의_에이전트를_지우면_profile_을_거두고_토큰을_폐기한다() {
+    @DisplayName("만든 profile 의 에이전트를 지우면 profile 을 거두고 토큰을 폐기한다")
+    void deleteRemovesCreatedProfileAndRevokesToken() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
 
         lifecycle.delete(kid, created.code());
 
         verify(dashboard).deleteProfile(created.hermesProfile());
-        assertThat(tokens.findByProfileNameAndRevokedAtIsNull(created.hermesProfile())).isEmpty();
+        assertThat(tokens.findByProfileNameAndRevokedAtIsNull(created.hermesProfile()))
+                .isEmpty();
         Agent stored = agents.findByCode(created.code()).orElseThrow();
         assertThat(stored.isDeleted()).isTrue();
         assertThat(stored.enabled()).isFalse();
@@ -373,12 +419,19 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 만든_profile_의_에이전트를_지우면_deprovision_뒤에_스킬_디렉터리가_없다() {
+    @DisplayName("만든 profile 의 에이전트를 지우면 deprovision 뒤에 스킬 디렉터리가 없다")
+    void deleteLeavesNoSkillDirectoryAfterDeprovision() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         String profile = created.hermesProfile();
-        skillStore.markPublished(profile, skillStore.writeVersion(profile, Map.of("weekly-plan",
-                new SkillBundle("weekly-plan", "---\nname: weekly-plan\ndescription: 계획\n---\n", List.of()))));
+        skillStore.markPublished(
+                profile,
+                skillStore.writeVersion(
+                        profile,
+                        Map.of(
+                                "weekly-plan",
+                                new SkillBundle(
+                                        "weekly-plan", "---\nname: weekly-plan\ndescription: 계획\n---\n", List.of()))));
         assertThat(skillStore.currentVersion(profile)).isPresent();
 
         lifecycle.delete(kid, created.code());
@@ -391,11 +444,13 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 스킬_디렉터리를_지우지_못해도_에이전트_삭제는_성공한다() {
+    @DisplayName("스킬 디렉터리를 지우지 못해도 에이전트 삭제는 성공한다")
+    void deleteSucceedsEvenIfSkillDirectoryCannotBeRemoved() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         doThrow(new ApiException(ErrorCode.INTERNAL_ERROR, "could not access the skill store"))
-                .when(skillStore).deleteAll(created.hermesProfile());
+                .when(skillStore)
+                .deleteAll(created.hermesProfile());
 
         lifecycle.delete(kid, created.code());
 
@@ -404,7 +459,8 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 운영에서_만든_profile_의_에이전트를_지우면_profile_을_남긴다() {
+    @DisplayName("운영에서 만든 profile 의 에이전트를 지우면 profile 을 남긴다")
+    void deleteKeepsProfileCreatedInProduction() {
         CurrentUser kid = member();
         Agent seeded = seedAgents(kid, 1).get(0);
 
@@ -416,11 +472,13 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void profile_을_지우지_못하면_에이전트를_지우지_않는다() {
+    @DisplayName("profile 을 지우지 못하면 에이전트를 지우지 않는다")
+    void keepsAgentWhenProfileCannotBeRemoved() {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"))
-                .when(dashboard).deleteProfile(created.hermesProfile());
+                .when(dashboard)
+                .deleteProfile(created.hermesProfile());
 
         assertCode(() -> lifecycle.delete(kid, created.code()), ErrorCode.HERMES_UNAVAILABLE);
 
@@ -430,7 +488,8 @@ class AgentLifecycleServiceTest {
     }
 
     @Test
-    void 이름이_공백뿐이거나_101자면_거절하고_100자는_된다() {
+    @DisplayName("이름이 공백뿐이거나 101자면 거절하고 100자는 된다")
+    void rejectsBlankOr101CharNameAndAccepts100() {
         CurrentUser kid = member();
 
         assertCode(() -> lifecycle.create(kid, "   ", null), ErrorCode.VALIDATION_FAILED);
@@ -453,8 +512,14 @@ class AgentLifecycleServiceTest {
         List<Agent> seeded = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             String code = "seed-" + UUID.randomUUID().toString().substring(0, 13);
-            seeded.add(agents.save(Agent.of(code, code, code, "http://agent-runtime.test/p/" + code,
-                    CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
+            seeded.add(agents.save(Agent.of(
+                    code,
+                    code,
+                    code,
+                    "http://agent-runtime.test/p/" + code,
+                    CostMode.SUBSCRIPTION,
+                    CredentialScope.SHARED_HOUSEHOLD,
+                    AgentVisibility.PRIVATE,
                     owner.id())));
         }
         return seeded;
@@ -475,7 +540,9 @@ class AgentLifecycleServiceTest {
     }
 
     private List<AgentToken> tokensOf(String profile) {
-        return tokens.findAll().stream().filter(token -> profile.equals(token.profileName())).toList();
+        return tokens.findAll().stream()
+                .filter(token -> profile.equals(token.profileName()))
+                .toList();
     }
 
     /** 성공이면 만든 에이전트, 거절이면 그 오류 코드다. 그 밖의 실패는 그대로 드러낸다. */

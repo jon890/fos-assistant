@@ -48,6 +48,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -75,19 +76,44 @@ class ConversationModelChoiceTest {
         }
     }
 
-    @Autowired ChatService chat;
-    @Autowired AttachmentService attachments;
-    @Autowired AttachmentProperties attachmentProperties;
-    @Autowired ConversationAccess access;
-    @Autowired AgentService agentService;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ChatAttachmentRepository attachmentRows;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired AgentRepository agents;
-    @Autowired AppUserRepository users;
-    @Autowired HermesRunsClient hermes;
+    @Autowired
+    ChatService chat;
+
+    @Autowired
+    AttachmentService attachments;
+
+    @Autowired
+    AttachmentProperties attachmentProperties;
+
+    @Autowired
+    ConversationAccess access;
+
+    @Autowired
+    AgentService agentService;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ChatAttachmentRepository attachmentRows;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     @BeforeEach
     void reset() throws IOException {
@@ -103,7 +129,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 고른_모델과_effort_를_저장하고_목록_순서를_정하는_시각은_그대로다() {
+    @DisplayName("고른 모델과 effort 를 저장하고 목록 순서를 정하는 시각은 그대로다")
+    void storesChosenModelAndEffortAndKeepsListOrderTimeUnchanged() {
         CurrentUser dad = member("choice-dad");
         Long id = chat.startEmpty(dad, "choice-dad").id();
         Instant before = conversations.findById(id).orElseThrow().updatedAt();
@@ -111,19 +138,19 @@ class ConversationModelChoiceTest {
         chat.chooseModel(dad, id, new ModelChoice("openrouter", "example-model-small", "high"));
 
         Conversation stored = conversations.findById(id).orElseThrow();
-        assertThat(stored.modelChoice())
-                .isEqualTo(new ModelChoice("openrouter", "example-model-small", "high"));
+        assertThat(stored.modelChoice()).isEqualTo(new ModelChoice("openrouter", "example-model-small", "high"));
         assertThat(stored.updatedAt()).as("updatedAt after choosing a model").isEqualTo(before);
     }
 
     @Test
-    void 경로는_바뀐_대화_한_줄을_돌려주고_목록도_같은_값을_싣는다() {
+    @DisplayName("경로는 바뀐 대화 한 줄을 돌려주고 목록도 같은 값을 싣는다")
+    void pathReturnsChangedConversationRowAndListCarriesSameValues() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ChatController controller = chatController(dad);
 
-        ConversationView chosen = controller.chooseModel(created.publicId(),
-                new ChooseModelRequest("openrouter", "example-model-small", "max"));
+        ConversationView chosen = controller.chooseModel(
+                created.publicId(), new ChooseModelRequest("openrouter", "example-model-small", "max"));
 
         assertThat(chosen.id()).isEqualTo(created.publicId());
         assertThat(chosen.agentCode()).isEqualTo("choice-dad");
@@ -133,7 +160,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 고르지_않은_대화와_모두_비워_보낸_대화는_기본값이다() {
+    @DisplayName("고르지 않은 대화와 모두 비워 보낸 대화는 기본값이다")
+    void unchosenAndAllBlankConversationsUseDefault() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ChatController controller = chatController(dad);
@@ -155,7 +183,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void provider_만_주거나_모르는_effort_를_주면_거절하고_저장된_값이_그대로다() {
+    @DisplayName("provider 만 주거나 모르는 effort 를 주면 거절하고 저장된 값이 그대로다")
+    void rejectsProviderOnlyOrUnknownEffortAndKeepsStoredValue() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ModelChoice saved = new ModelChoice("openrouter", "example-model-small", "medium");
@@ -163,15 +192,18 @@ class ConversationModelChoiceTest {
         ChatController controller = chatController(dad);
 
         rejected(() -> controller.chooseModel(created.publicId(), new ChooseModelRequest("openrouter", null, null)));
-        rejected(() -> controller.chooseModel(created.publicId(), new ChooseModelRequest(null, "example-model-small", null)));
-        rejected(() -> controller.chooseModel(created.publicId(),
-                new ChooseModelRequest("openrouter", "example-model-small", "extreme")));
+        rejected(() ->
+                controller.chooseModel(created.publicId(), new ChooseModelRequest(null, "example-model-small", null)));
+        rejected(() -> controller.chooseModel(
+                created.publicId(), new ChooseModelRequest("openrouter", "example-model-small", "extreme")));
 
-        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice()).isEqualTo(saved);
+        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice())
+                .isEqualTo(saved);
     }
 
     @Test
-    void 공백을_뗀_provider_나_모델이_열보다_길면_거절하고_저장된_값이_그대로다() {
+    @DisplayName("공백을 뗀 provider 나 모델이 열보다 길면 거절하고 저장된 값이 그대로다")
+    void rejectsTrimmedProviderOrModelLongerThanColumnAndKeepsStoredValue() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ModelChoice saved = new ModelChoice("openrouter", "example-model-small", "medium");
@@ -180,13 +212,15 @@ class ConversationModelChoiceTest {
         String longestProvider = "p".repeat(64);
         String longestModel = "m".repeat(128);
 
-        rejected(() -> controller.chooseModel(created.publicId(),
-                new ChooseModelRequest(longestProvider + "p", "example-model-small", null)));
-        rejected(() -> controller.chooseModel(created.publicId(),
-                new ChooseModelRequest("openrouter", longestModel + "m", null)));
-        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice()).isEqualTo(saved);
+        rejected(() -> controller.chooseModel(
+                created.publicId(), new ChooseModelRequest(longestProvider + "p", "example-model-small", null)));
+        rejected(() -> controller.chooseModel(
+                created.publicId(), new ChooseModelRequest("openrouter", longestModel + "m", null)));
+        assertThat(conversations.findById(created.id()).orElseThrow().modelChoice())
+                .isEqualTo(saved);
 
-        ConversationView longest = controller.chooseModel(created.publicId(),
+        ConversationView longest = controller.chooseModel(
+                created.publicId(),
                 new ChooseModelRequest("  " + longestProvider + " ", "\t" + longestModel + "\n", null));
 
         assertThat(List.of(longest.provider(), longest.model())).containsExactly(longestProvider, longestModel);
@@ -195,26 +229,32 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 저장된_값이_검증에_맞지_않아도_목록과_보내기가_그_값을_그대로_싣는다() {
+    @DisplayName("저장된 값이 검증에 맞지 않아도 목록과 보내기가 그 값을 그대로 싣는다")
+    void listAndSendCarryStoredValueEvenIfItFailsValidation() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         conversations.chooseModelIfActive(created.id(), dad.id(), "openrouter", "example-model-small", "extreme");
         ChatController controller = chatController(dad);
-        ((StubHermesRunsClient) hermes).willReturn(HermesRunResult.of(
-                "run-1", "sess-1", "completed", "네", "example-model-small", "openrouter", TokenUsage.empty()));
+        ((StubHermesRunsClient) hermes)
+                .willReturn(HermesRunResult.of(
+                        "run-1", "sess-1", "completed", "네", "example-model-small", "openrouter", TokenUsage.empty()));
 
-        assertThat(controller.conversations()).singleElement().satisfies(it ->
-                assertThat(List.of(it.provider(), it.model(), it.reasoningEffort()))
+        assertThat(controller.conversations())
+                .singleElement()
+                .satisfies(it -> assertThat(List.of(it.provider(), it.model(), it.reasoningEffort()))
                         .containsExactly("openrouter", "example-model-small", "extreme"));
         chat.send(dad, created.id(), "안녕", null);
 
-        assertThat(((StubHermesRunsClient) hermes).received()).singleElement().satisfies(command ->
-                assertThat(List.of(command.provider(), command.model(), command.reasoningEffort()))
-                        .containsExactly("openrouter", "example-model-small", "extreme"));
+        assertThat(((StubHermesRunsClient) hermes).received())
+                .singleElement()
+                .satisfies(
+                        command -> assertThat(List.of(command.provider(), command.model(), command.reasoningEffort()))
+                                .containsExactly("openrouter", "example-model-small", "extreme"));
     }
 
     @Test
-    void 앞뒤_공백을_떼고_저장한다() {
+    @DisplayName("앞뒤 공백을 떼고 저장한다")
+    void trimsSurroundingWhitespaceOnSave() {
         CurrentUser dad = member("choice-dad");
         Long id = chat.startEmpty(dad, "choice-dad").id();
 
@@ -225,7 +265,8 @@ class ConversationModelChoiceTest {
     }
 
     @Test
-    void 남의_대화와_지운_대화는_없는_대화와_같다() {
+    @DisplayName("남의 대화와 지운 대화는 없는 대화와 같다")
+    void othersAndDeletedConversationsAreSameAsMissing() {
         CurrentUser dad = member("choice-dad");
         CurrentUser kid = member("choice-kid");
         Long dadsId = chat.startEmpty(dad, "choice-dad").id();
@@ -237,11 +278,13 @@ class ConversationModelChoiceTest {
         notFound(() -> chat.chooseModel(kid, deletedId, choice));
 
         assertThat(conversations.findById(dadsId).orElseThrow().modelChoice()).isEqualTo(ModelChoice.defaults());
-        assertThat(conversations.findById(deletedId).orElseThrow().modelChoice()).isEqualTo(ModelChoice.defaults());
+        assertThat(conversations.findById(deletedId).orElseThrow().modelChoice())
+                .isEqualTo(ModelChoice.defaults());
     }
 
     @Test
-    void 흐름이_붙은_에이전트의_빈_대화에_모델을_고르고_사진은_보낼_때_거절한다() {
+    @DisplayName("흐름이 붙은 에이전트의 빈 대화에 모델을 고르고 사진은 보낼 때 거절한다")
+    void choosesModelOnEmptyFlowAgentConversationAndRejectsImagesAtSend() {
         CurrentUser dad = member("choice-dad");
         Agent flowed = agents.findByCode("choice-dad").orElseThrow();
         flowed.assignFlow("research-and-build");
@@ -249,43 +292,49 @@ class ConversationModelChoiceTest {
 
         Long id = chat.startEmpty(dad, "choice-dad").id();
         chat.chooseModel(dad, id, new ModelChoice("openrouter", "example-model-small", null));
-        ChatAttachment photo = attachments.upload(
-                dad, id, "a.png", "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
+        ChatAttachment photo =
+                attachments.upload(dad, id, "a.png", "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
 
         rejected(() -> chat.send(dad, id, "사진 봐", null, List.of(photo.id())));
 
         assertThat(conversations.findById(id).orElseThrow().modelChoice())
                 .isEqualTo(new ModelChoice("openrouter", "example-model-small", null));
         assertThat(messages.findByConversationIdOrderByIdAsc(id)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId()).isNull();
+        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
+                .isNull();
     }
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
-        agents.save(Agent.of(name, name, name,
+        agents.save(Agent.of(
+                name,
+                name,
+                name,
                 "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE, user.id()));
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private ChatController chatController(CurrentUser user) {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
-        return new ChatController(chat, provider, users, agentService, access,
-                new ChatEventStreams(Duration.ofSeconds(20)), null);
+        return new ChatController(
+                chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
     }
 
     private static void rejected(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
     private static void notFound(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
     }
 
     private static void deleteTree(Path path) throws IOException {

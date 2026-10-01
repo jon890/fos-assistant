@@ -49,6 +49,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -73,23 +74,51 @@ class DelegationWakeServiceTest {
     private static final String LIMIT_NOTICE = "자동으로 이어 가는 횟수를 넘었어요. 이어서 하려면 메시지를 보내 주세요";
 
     /** 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
-    @MockitoBean HermesRunEventStream eventStream;
+    @MockitoBean
+    HermesRunEventStream eventStream;
 
     /** 자동 turn 이 결과를 전하기 전에 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @MockitoSpyBean ChatService chat;
-    @Autowired DelegationWakeService wake;
-    @Autowired ConversationEventHub hub;
-    @Autowired TurnCancellation turns;
-    @Autowired ApplicationEventPublisher publisher;
-    @Autowired AppUserRepository users;
-    @Autowired AgentRepository agents;
-    @Autowired ConversationRepository conversations;
-    @Autowired ChatMessageRepository messages;
-    @Autowired ChatAttachmentRepository attachmentRows;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository executionEvents;
-    @Autowired MemoryRepository memories;
-    @Autowired HermesRunsClient hermes;
+    @MockitoSpyBean
+    ChatService chat;
+
+    @Autowired
+    DelegationWakeService wake;
+
+    @Autowired
+    ConversationEventHub hub;
+
+    @Autowired
+    TurnCancellation turns;
+
+    @Autowired
+    ApplicationEventPublisher publisher;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ChatMessageRepository messages;
+
+    @Autowired
+    ChatAttachmentRepository attachmentRows;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository executionEvents;
+
+    @Autowired
+    MemoryRepository memories;
+
+    @Autowired
+    HermesRunsClient hermes;
 
     private CurrentUser dad;
     private Agent worker;
@@ -101,7 +130,7 @@ class DelegationWakeServiceTest {
     }
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         // 이 문맥이 뜰 때 기동 훑기가 앞 검사들이 남긴 결과로 연 turn 이 있을 수 있다. 지우기 전에 끝나기를 기다린다.
         awaitAllIdle();
         stub().reset();
@@ -131,12 +160,13 @@ class DelegationWakeServiceTest {
     }
 
     @AfterEach
-    void 자동_turn_이_끝나기를_기다린다() {
+    void tearDown() {
         awaitAllIdle();
     }
 
     @Test
-    void 끝난_결과가_있고_turn_이_없으면_자동_turn_을_열어_알림_줄과_답을_남긴다() {
+    @DisplayName("끝난 결과가 있고 turn 이 없으면 자동 turn 을 열어 알림 줄과 답을 남긴다")
+    void opensAutoTurnWithNoticeAndAnswerWhenResultFinishedAndIdle() {
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
 
         finished(done);
@@ -146,19 +176,23 @@ class DelegationWakeServiceTest {
         assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(history.getFirst().content()).isEqualTo("조사원 에이전트의 결과가 도착했어요");
         assertThat(history.getLast().content()).isEqualTo("정리한 답");
-        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt()).as("전했다는 표시").isNotNull();
-        assertThat(conversations.findById(conversation.id()).orElseThrow().autoTurnCount()).isEqualTo(1);
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("전했다는 표시")
+                .isNotNull();
+        assertThat(conversations.findById(conversation.id()).orElseThrow().autoTurnCount())
+                .isEqualTo(1);
 
         assertThat(stub().received()).hasSize(1);
         HermesRunCommand command = stub().received().getFirst();
-        assertThat(command.input()).endsWith("맡긴 일의 결과가 도착했다.\n\n"
-                + "[에이전트: 조사원, 실행 번호: " + done.id() + ", 상태: SUCCEEDED]\n조사 결과");
-        assertThat(command.instructions()).endsWith("맡긴 일의 결과가 도착했다. 결과를 사용자에게 정리해 전하고, "
-                + "이어서 할 일이 있으면 진행한다. 아직 끝나지 않은 맡긴 일은 기다리지 말고 답을 마친다.");
+        assertThat(command.input())
+                .endsWith("맡긴 일의 결과가 도착했다.\n\n" + "[에이전트: 조사원, 실행 번호: " + done.id() + ", 상태: SUCCEEDED]\n조사 결과");
+        assertThat(command.instructions())
+                .endsWith("맡긴 일의 결과가 도착했다. 결과를 사용자에게 정리해 전하고, " + "이어서 할 일이 있으면 진행한다. 아직 끝나지 않은 맡긴 일은 기다리지 말고 답을 마친다.");
     }
 
     @Test
-    void 같은_대화에_turn_이_돌고_있으면_열지_않고_그_turn_이_닫힐_때_연다() {
+    @DisplayName("같은 대화에 turn 이 돌고 있으면 열지 않고 그 turn 이 닫힐 때 연다")
+    void defersAutoTurnUntilRunningTurnCloses() {
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
         TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
 
@@ -166,18 +200,22 @@ class DelegationWakeServiceTest {
 
         assertThat(stub().received()).as("도는 turn 이 있을 때 Hermes 에 보낸 것").isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
-        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt()).isNull();
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .isNull();
 
         turns.close(running);
         awaitIdle(conversation.id());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
-        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt()).isNotNull();
+                .extracting(ChatMessage::role)
+                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .isNotNull();
     }
 
     @Test
-    void 쌓인_결과_둘은_자동_turn_하나에_함께_들어간다() {
+    @DisplayName("쌓인 결과 둘은 자동 turn 하나에 함께 들어간다")
+    void putsTwoPendingResultsIntoOneAutoTurn() {
         AgentExecution first = delegated(root, ExecutionStatus.SUCCEEDED, "첫 결과", null);
         AgentExecution second = delegated(root, ExecutionStatus.FAILED, null, "HERMES_RUN_FAILED");
         TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
@@ -191,15 +229,21 @@ class DelegationWakeServiceTest {
         assertThat(stub().received().getFirst().input())
                 .contains("[에이전트: 조사원, 실행 번호: " + first.id() + ", 상태: SUCCEEDED]\n첫 결과")
                 .endsWith("[에이전트: 조사원, 실행 번호: " + second.id() + ", 상태: FAILED, 오류: HERMES_RUN_FAILED]");
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()).getFirst().content())
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())
+                        .getFirst()
+                        .content())
                 .isEqualTo("조사원 외 1개 에이전트의 결과가 도착했어요");
-        assertThat(executions.findById(first.id()).orElseThrow().resultDeliveredAt()).isNotNull();
-        assertThat(executions.findById(second.id()).orElseThrow().resultDeliveredAt()).isNotNull();
-        assertThat(conversations.findById(conversation.id()).orElseThrow().autoTurnCount()).isEqualTo(1);
+        assertThat(executions.findById(first.id()).orElseThrow().resultDeliveredAt())
+                .isNotNull();
+        assertThat(executions.findById(second.id()).orElseThrow().resultDeliveredAt())
+                .isNotNull();
+        assertThat(conversations.findById(conversation.id()).orElseThrow().autoTurnCount())
+                .isEqualTo(1);
     }
 
     @Test
-    void 멈춘_결과와_손자_실행의_결과는_깨우지_않는다() {
+    @DisplayName("멈춘 결과와 손자 실행의 결과는 깨우지 않는다")
+    void doesNotWakeForStoppedOrGrandchildResults() {
         AgentExecution cancelled = delegated(root, ExecutionStatus.CANCELLED, "멈추기 전 답", null);
         AgentExecution child = delegated(root, ExecutionStatus.RUNNING, null, null);
         AgentExecution grandchild = delegated(child, ExecutionStatus.SUCCEEDED, "손자 결과", null);
@@ -210,11 +254,13 @@ class DelegationWakeServiceTest {
 
         assertThat(stub().received()).isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
-        assertThat(executions.findById(grandchild.id()).orElseThrow().resultDeliveredAt()).isNull();
+        assertThat(executions.findById(grandchild.id()).orElseThrow().resultDeliveredAt())
+                .isNull();
     }
 
     @Test
-    void 자동_turn_이_한도_바로_아래면_열고_한도에_닿는다() {
+    @DisplayName("자동 turn 이 한도 바로 아래면 열고 한도에 닿는다")
+    void opensAutoTurnJustBelowLimitAndReachesLimit() {
         setAutoTurns(9);
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
 
@@ -222,11 +268,13 @@ class DelegationWakeServiceTest {
         awaitIdle(conversation.id());
 
         assertThat(stub().received()).hasSize(1);
-        assertThat(conversations.findById(conversation.id()).orElseThrow().autoTurnCount()).isEqualTo(10);
+        assertThat(conversations.findById(conversation.id()).orElseThrow().autoTurnCount())
+                .isEqualTo(10);
     }
 
     @Test
-    void 자동_turn_이_한도에_닿았으면_열지_않고_알림_줄을_하나만_남긴다() {
+    @DisplayName("자동 turn 이 한도에 닿았으면 열지 않고 알림 줄을 하나만 남긴다")
+    void leavesSingleNoticeWithoutOpeningWhenLimitReached() {
         setAutoTurns(10);
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
 
@@ -238,11 +286,14 @@ class DelegationWakeServiceTest {
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
         assertThat(history).extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM);
         assertThat(history.getFirst().content()).isEqualTo(LIMIT_NOTICE);
-        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt()).as("결과는 전하지 않은 채 남는다").isNull();
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("결과는 전하지 않은 채 남는다")
+                .isNull();
     }
 
     @Test
-    void 에이전트가_꺼졌으면_열지_않고_알림_줄도_남기지_않는다() {
+    @DisplayName("에이전트가 꺼졌으면 열지 않고 알림 줄도 남기지 않는다")
+    void skipsAutoTurnAndNoticeWhenAgentDisabled() {
         Agent chief = agents.findById(conversation.agentId()).orElseThrow();
         chief.changeAccess(false, chief.visibility(), chief.ownerUserId());
         agents.save(chief);
@@ -253,23 +304,28 @@ class DelegationWakeServiceTest {
 
         assertThat(stub().received()).isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
-        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt()).isNull();
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .isNull();
     }
 
     @Test
-    void 기동_훑기는_전하지_않은_결과가_있는_대화를_깨운다() {
+    @DisplayName("기동 훑기는 전하지 않은 결과가 있는 대화를 깨운다")
+    void startupScanWakesConversationsWithUndeliveredResults() {
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
 
         wake.wakeAfterStartup();
         awaitIdle(conversation.id());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role).containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
-        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt()).isNotNull();
+                .extracting(ChatMessage::role)
+                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .isNotNull();
     }
 
     @Test
-    void 자동_turn_의_답은_다시_생성하지_않는다() {
+    @DisplayName("자동 turn 의 답은 다시 생성하지 않는다")
+    void doesNotRegenerateAutoTurnAnswer() {
         finished(delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null));
         awaitIdle(conversation.id());
 
@@ -281,7 +337,8 @@ class DelegationWakeServiceTest {
     }
 
     @Test
-    void 대화를_구독하면_알림_줄과_turn_의_시작과_끝을_받는다() {
+    @DisplayName("대화를 구독하면 알림 줄과 turn 의 시작과 끝을 받는다")
+    void subscriberReceivesNoticeAndTurnStartAndEnd() {
         List<ChatEvent> received = new CopyOnWriteArrayList<>();
         Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
         try {
@@ -295,12 +352,15 @@ class DelegationWakeServiceTest {
         ChatEvent system = received.getFirst();
         assertThat(system.text()).isEqualTo("조사원 에이전트의 결과가 도착했어요");
         assertThat(system.conversationId()).isEqualTo(conversation.publicId());
-        assertThat(system.messageId()).isEqualTo(
-                messages.findByConversationIdOrderByIdAsc(conversation.id()).getFirst().id());
+        assertThat(system.messageId())
+                .isEqualTo(messages.findByConversationIdOrderByIdAsc(conversation.id())
+                        .getFirst()
+                        .id());
     }
 
     @Test
-    void 사용자_turn_은_done_을_보낸_뒤에_잠금을_풀어_자동_turn_이_그_뒤에_열린다() {
+    @DisplayName("사용자 turn 은 done 을 보낸 뒤에 잠금을 풀어 자동 turn 이 그 뒤에 열린다")
+    void releasesLockAfterUserTurnDoneSoAutoTurnOpensAfter() {
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
         AtomicReference<ChatEvent> doneEvent = new AtomicReference<>();
         AtomicReference<TurnMark> markAtDone = new AtomicReference<>();
@@ -318,14 +378,15 @@ class DelegationWakeServiceTest {
                 .as("done 을 받은 때 잠금은 아직 사용자 turn 의 것이다")
                 .isEqualTo(new TurnMark(true, doneEvent.get().executionId()));
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("사용자 turn 이 닫힌 뒤 자동 turn 이 결과를 전했다").isNotNull();
+                .as("사용자 turn 이 닫힌 뒤 자동 turn 이 결과를 전했다")
+                .isNotNull();
         assertThat(stub().received()).as("사용자 turn 과 자동 turn").hasSize(2);
     }
 
     @Test
-    void 자동_turn_이_결과를_전하기_전에_실패하면_30초_안에는_같은_결과로_다시_열지_않는다() {
-        doThrow(new IllegalStateException("결과를 전하기 전에 실패"))
-                .when(chat).runDelegationResults(any(), any(), any(), any());
+    @DisplayName("자동 turn 이 결과를 전하기 전에 실패하면 30초 안에는 같은 결과로 다시 열지 않는다")
+    void doesNotReopenSameResultWithin30SecondsAfterFailure() {
+        doThrow(new IllegalStateException("결과를 전하기 전에 실패")).when(chat).runDelegationResults(any(), any(), any(), any());
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
         List<ChatEvent> received = new CopyOnWriteArrayList<>();
         Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
@@ -338,11 +399,13 @@ class DelegationWakeServiceTest {
             unsubscribe.run();
         }
 
-        assertThat(received).extracting(ChatEvent::type)
+        assertThat(received)
+                .extracting(ChatEvent::type)
                 .as("닫을 때와 뒤이은 사건이 다시 열지 않아 실패 알림은 하나다")
                 .containsExactly("error");
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("결과는 전하지 않은 채 남는다").isNull();
+                .as("결과는 전하지 않은 채 남는다")
+                .isNull();
         assertThat(turns.markOf(conversation.id()).running()).isFalse();
     }
 
@@ -376,8 +439,15 @@ class DelegationWakeServiceTest {
     }
 
     private static Agent agent(String code, String name, Long ownerId) {
-        return Agent.of(code, name, code, "http://agent-runtime.test/p/" + code, CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, ownerId);
+        return Agent.of(
+                code,
+                name,
+                code,
+                "http://agent-runtime.test/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                ownerId);
     }
 
     private static HermesRunResult result(String runId, String output) {

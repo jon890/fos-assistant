@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,11 +51,20 @@ class ExecutionTreeServiceTest {
     /** 서비스가 올라가고 내려가는 길에 두는 상한이다. 값을 바꾸면 이 테스트가 함께 알려야 한다. */
     private static final int MAX_DEPTH = 8;
 
-    @Autowired ExecutionTreeService trees;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired ExecutionEventRepository events;
-    @Autowired AgentRepository agents;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    ExecutionTreeService trees;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionEventRepository events;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private Agent agent;
 
@@ -62,25 +72,26 @@ class ExecutionTreeServiceTest {
     private ListAppender<ILoggingEvent> logs;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         logs = new ListAppender<>();
         logs.start();
         serviceLogger().addAppender(logs);
         events.deleteAll();
         executions.deleteAll();
-        agent = agents.findByCode("tree-dad").orElseGet(() -> agents.save(Agent.of(
-                "tree-dad",
-                "나무 아빠",
-                "dad",
-                "http://127.0.0.1:1/p/dad",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                OWNER_ID)));
+        agent = agents.findByCode("tree-dad")
+                .orElseGet(() -> agents.save(Agent.of(
+                        "tree-dad",
+                        "나무 아빠",
+                        "dad",
+                        "http://127.0.0.1:1/p/dad",
+                        CostMode.SUBSCRIPTION,
+                        CredentialScope.SHARED_HOUSEHOLD,
+                        AgentVisibility.PRIVATE,
+                        OWNER_ID)));
     }
 
     @AfterEach
-    void 로그를_떼어_낸다() {
+    void tearDown() {
         serviceLogger().detachAppender(logs);
         logs.stop();
     }
@@ -98,7 +109,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 사건은_순서대로_나오고_에이전트_이름이_붙는다() {
+    @DisplayName("사건은 순서대로 나오고 에이전트 이름이 붙는다")
+    void eventsComeInOrderWithAgentNames() {
         AgentExecution execution = execution(OWNER_ID, null, null);
         event(execution, 3, ExecutionEventType.RUN_COMPLETED, null);
         event(execution, 1, ExecutionEventType.RUN_STARTED, null);
@@ -113,15 +125,13 @@ class ExecutionTreeServiceTest {
         assertThat(tree.root().children()).isEmpty();
         assertThat(tree.root().events())
                 .extracting(ExecutionEventView::sequence, ExecutionEventView::eventType)
-                .containsExactly(
-                        tuple(1, "RUN_STARTED"),
-                        tuple(2, "TOOL_STARTED"),
-                        tuple(3, "RUN_COMPLETED"));
+                .containsExactly(tuple(1, "RUN_STARTED"), tuple(2, "TOOL_STARTED"), tuple(3, "RUN_COMPLETED"));
         assertThat(tree.root().events().get(1).toolName()).isEqualTo("fake-tool");
     }
 
     @Test
-    void 사건이_하나도_없는_실행도_오류_없이_나온다() {
+    @DisplayName("사건이 하나도 없는 실행도 오류 없이 나온다")
+    void runWithoutAnyEventComesOutWithoutError() {
         AgentExecution execution = execution(OWNER_ID, null, null);
 
         ExecutionTree tree = trees.of(owner(), execution.id());
@@ -132,7 +142,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 자식_실행은_children_에_담긴다() {
+    @DisplayName("자식 실행은 children 에 담긴다")
+    void childRunsAreInChildren() {
         AgentExecution root = execution(OWNER_ID, null, null);
         AgentExecution child = execution(OWNER_ID, root.id(), root.id());
 
@@ -145,7 +156,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 자식_실행의_에이전트_행이_없어도_나무가_나오고_그_노드의_에이전트_칸이_비어_있다() {
+    @DisplayName("자식 실행의 에이전트 행이 없어도 나무가 나오고 그 노드의 에이전트 칸이 비어 있다")
+    void treeComesOutWithEmptyAgentColumnWhenChildAgentRowIsMissing() {
         AgentExecution root = execution(OWNER_ID, null, null);
         Agent gone = agents.save(Agent.of(
                 "tree-gone",
@@ -179,7 +191,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 자식의_번호로_물어도_뿌리부터_나온다() {
+    @DisplayName("자식의 번호로 물어도 뿌리부터 나온다")
+    void askingByChildIdStartsFromRoot() {
         AgentExecution root = execution(OWNER_ID, null, null);
         AgentExecution child = execution(OWNER_ID, root.id(), root.id());
 
@@ -192,7 +205,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 남의_실행_번호로_물으면_없는_것과_같은_오류다() {
+    @DisplayName("남의 실행 번호로 물으면 없는 것과 같은 오류다")
+    void askingByOthersRunIdGivesSameErrorAsMissing() {
         AgentExecution other = execution(STRANGER_ID, null, null);
 
         assertThatThrownBy(() -> trees.of(owner(), other.id()))
@@ -202,7 +216,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 없는_실행_번호로_물어도_같은_오류다() {
+    @DisplayName("없는 실행 번호로 물어도 같은 오류다")
+    void askingByMissingRunIdGivesSameError() {
         assertThatThrownBy(() -> trees.of(owner(), 9_999_999L))
                 .isInstanceOf(ApiException.class)
                 .extracting(failure -> ((ApiException) failure).code())
@@ -210,7 +225,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 뿌리를_찾아_올라가는_길이_순환이면_멈추고_나무가_잘렸다고_알린다() {
+    @DisplayName("뿌리를 찾아 올라가는 길이 순환이면 멈추고 나무가 잘렸다고 알린다")
+    void stopsAndReportsTruncatedTreeWhenWalkUpToRootIsCyclic() {
         AgentExecution first = execution(OWNER_ID, null, null);
         AgentExecution second = execution(OWNER_ID, first.id(), null);
         pointParentTo(first, second);
@@ -224,11 +240,13 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 상한보다_깊은_나무는_상한까지만_내고_마지막_노드가_잘렸다고_알린다() {
+    @DisplayName("상한보다 깊은 나무는 상한까지만 내고 마지막 노드가 잘렸다고 알린다")
+    void emitsTreeDeeperThanLimitOnlyToLimitAndFlagsLastNodeTruncated() {
         AgentExecution root = execution(OWNER_ID, null, null);
         List<Long> chain = new ArrayList<>(List.of(root.id()));
         for (int depth = 2; depth <= MAX_DEPTH + 1; depth++) {
-            chain.add(execution(OWNER_ID, chain.get(chain.size() - 1), root.id()).id());
+            chain.add(
+                    execution(OWNER_ID, chain.get(chain.size() - 1), root.id()).id());
         }
 
         ExecutionTree tree = trees.of(owner(), root.id());
@@ -251,25 +269,22 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void 뿌리에_닿지_않는_실행은_나무에_넣지_않는다() {
+    @DisplayName("뿌리에 닿지 않는 실행은 나무에 넣지 않는다")
+    void leavesRunNotReachingRootOutOfTree() {
         AgentExecution root = execution(OWNER_ID, null, null);
         AgentExecution child = execution(OWNER_ID, root.id(), root.id());
         AgentExecution orphan = execution(OWNER_ID, 9_999_999L, root.id());
 
         ExecutionTree tree = trees.of(owner(), root.id());
 
-        assertThat(flatten(tree.root()))
-                .containsExactly(root.id(), child.id())
-                .doesNotContain(orphan.id());
+        assertThat(flatten(tree.root())).containsExactly(root.id(), child.id()).doesNotContain(orphan.id());
         assertThat(tree.truncated()).isFalse();
-        assertThat(warnings())
-                .singleElement()
-                .asString()
-                .contains(String.valueOf(orphan.id()));
+        assertThat(warnings()).singleElement().asString().contains(String.valueOf(orphan.id()));
     }
 
     @Test
-    void MEMBER_역할에게는_공개한_도구와_도구가_아닌_사건의_detail_만_실린다() {
+    @DisplayName("MEMBER 역할에게는 공개한 도구와 도구가 아닌 사건의 detail 만 실린다")
+    void memberGetsDetailOnlyOfPublicToolsAndNonToolEvents() {
         AgentExecution execution = executionWithToolAndSubagent();
 
         ExecutionTree tree = trees.of(ownerAs(UserRole.MEMBER), execution.id());
@@ -288,7 +303,8 @@ class ExecutionTreeServiceTest {
     }
 
     @Test
-    void ADMIN_역할에게는_도구의_명령_원문이_그대로_실린다() {
+    @DisplayName("ADMIN 역할에게는 도구의 명령 원문이 그대로 실린다")
+    void adminGetsToolCommandTextAsIs() {
         AgentExecution execution = executionWithToolAndSubagent();
 
         ExecutionTree tree = trees.of(ownerAs(UserRole.ADMIN), execution.id());
@@ -359,9 +375,6 @@ class ExecutionTreeServiceTest {
      * 없으므로 여기서만 데이터베이스를 직접 고친다.
      */
     private void pointParentTo(AgentExecution execution, AgentExecution parent) {
-        jdbc.update(
-                "update agent_execution set parent_execution_id = ? where id = ?",
-                parent.id(),
-                execution.id());
+        jdbc.update("update agent_execution set parent_execution_id = ? where id = ?", parent.id(), execution.id());
     }
 }

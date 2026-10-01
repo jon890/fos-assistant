@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,10 +35,17 @@ class DelegationParentResolverTest {
     private static final String OTHER_PROFILE = "parent-resolver-other";
     private static final Instant STARTED = Instant.parse("2026-09-29T00:00:00Z");
 
-    @Autowired DelegationParentResolver resolver;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AppUserRepository users;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    DelegationParentResolver resolver;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private AppUser dad;
     private AppUser kid;
@@ -50,7 +58,7 @@ class DelegationParentResolverTest {
      * 레포지토리에 메서드를 더하지 않으려고 SQL 로 지운다.
      */
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         for (String profile : List.of(PROFILE, OTHER_PROFILE)) {
             jdbc.update("DELETE FROM agent_execution WHERE profile_name = ?", profile);
         }
@@ -61,7 +69,8 @@ class DelegationParentResolverTest {
     }
 
     @Test
-    void 도는_부모가_하나면_그_실행을_돌려준다() {
+    @DisplayName("도는 부모가 하나면 그 실행을 돌려준다")
+    void returnsRunningParentWhenThereIsExactlyOne() {
         AgentExecution running = save(dad, PROFILE, root, ExecutionStatus.RUNNING);
         save(dad, PROFILE, root, ExecutionStatus.SUCCEEDED);
         save(dad, PROFILE, "fos-" + UUID.randomUUID(), ExecutionStatus.RUNNING);
@@ -70,7 +79,8 @@ class DelegationParentResolverTest {
     }
 
     @Test
-    void 끝난_실행만_있으면_실패한다() {
+    @DisplayName("끝난 실행만 있으면 실패한다")
+    void failsWhenOnlyFinishedRunsExist() {
         save(dad, PROFILE, root, ExecutionStatus.SUCCEEDED);
         save(dad, PROFILE, root, ExecutionStatus.CANCELLED);
 
@@ -78,14 +88,16 @@ class DelegationParentResolverTest {
     }
 
     @Test
-    void 다른_profile_의_도는_실행은_부모가_되지_못한다() {
+    @DisplayName("다른 profile 의 도는 실행은 부모가 되지 못한다")
+    void runningRunOfOtherProfileCannotBeParent() {
         save(dad, OTHER_PROFILE, root, ExecutionStatus.RUNNING);
 
         assertRejected(PROFILE, root);
     }
 
     @Test
-    void 같은_profile_에서_사용자가_다른_실행_둘은_뿌리가_다르면_각자_찾는다() {
+    @DisplayName("같은 profile 에서 사용자가 다른 실행 둘은 뿌리가 다르면 각자 찾는다")
+    void twoRunsOfDifferentUsersInSameProfileFindEachWhenRootsDiffer() {
         String kidRoot = "fos-" + UUID.randomUUID();
         AgentExecution dadRun = save(dad, PROFILE, root, ExecutionStatus.RUNNING);
         AgentExecution kidRun = save(kid, PROFILE, kidRoot, ExecutionStatus.RUNNING);
@@ -100,7 +112,8 @@ class DelegationParentResolverTest {
     }
 
     @Test
-    void 같은_session_의_도는_줄이_둘이면_가장_최근을_고르지_않고_실패한다() {
+    @DisplayName("같은 session 의 도는 줄이 둘이면 가장 최근을 고르지 않고 실패한다")
+    void failsWithoutPickingLatestWhenTwoRunningRowsShareSession() {
         save(dad, PROFILE, root, ExecutionStatus.RUNNING);
         save(kid, PROFILE, root, ExecutionStatus.RUNNING);
 
@@ -108,7 +121,8 @@ class DelegationParentResolverTest {
     }
 
     @Test
-    void 비어_있는_뿌리_session_이나_profile_은_session_이_없는_줄을_고르지_않는다() {
+    @DisplayName("비어 있는 뿌리 session 이나 profile 은 session 이 없는 줄을 고르지 않는다")
+    void doesNotPickRowWithoutSessionForBlankRootSessionOrProfile() {
         save(dad, PROFILE, null, ExecutionStatus.RUNNING);
 
         assertRejected(PROFILE, null);
@@ -132,7 +146,7 @@ class DelegationParentResolverTest {
     private void assertRejected(String profileName, String rootSessionId) {
         assertThatThrownBy(() -> resolver.resolve(profileName, rootSessionId))
                 .as("profile=%s root=%s", profileName, rootSessionId)
-                .isInstanceOfSatisfying(ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
 }

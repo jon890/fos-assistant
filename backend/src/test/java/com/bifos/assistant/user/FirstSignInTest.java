@@ -15,6 +15,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserProvisioningService;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,18 +36,30 @@ class FirstSignInTest {
     private static final String NAME = "이모";
     private static final String PROFILE = "aunt";
 
-    @Autowired UserProvisioningService provisioning;
-    @Autowired AppUserRepository users;
-    @Autowired AllowedPersonRepository people;
-    @Autowired AgentRepository agents;
-    @Autowired HermesProperties hermesProperties;
-    @Autowired PeopleProperties peopleProperties;
+    @Autowired
+    UserProvisioningService provisioning;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    AllowedPersonRepository people;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    HermesProperties hermesProperties;
+
+    @Autowired
+    PeopleProperties peopleProperties;
 
     /** 답을 정해 두지 않는다. 첫 로그인이 이 대역을 한 번도 부르지 않는지 본다. */
-    @MockitoBean HermesModelClient hermesModels;
+    @MockitoBean
+    HermesModelClient hermesModels;
 
     @BeforeEach
-    void 준비한다() {
+    void setUp() {
         agents.deleteAll();
         users.deleteAll();
         people.deleteAll();
@@ -58,7 +71,8 @@ class FirstSignInTest {
     }
 
     @Test
-    void 허용_목록에_있는_사람의_첫_요청에_사용자와_에이전트가_함께_생긴다() {
+    @DisplayName("허용 목록에 있는 사람의 첫 요청에 사용자와 에이전트가 함께 생긴다")
+    void firstRequestOfAllowlistedPersonCreatesUserAndAgentTogether() {
         AppUser created = provisioning.resolve(EMAIL, NAME);
 
         assertThat(created.email()).isEqualTo(EMAIL);
@@ -69,7 +83,8 @@ class FirstSignInTest {
     }
 
     @Test
-    void 만들어진_에이전트는_주인이_그_사람이고_자기만_본다() {
+    @DisplayName("만들어진 에이전트는 주인이 그 사람이고 자기만 본다")
+    void createdAgentIsOwnedByThatPersonAndPrivate() {
         AppUser created = provisioning.resolve(EMAIL, NAME);
 
         assertThat(agents.findByCode(PROFILE))
@@ -79,18 +94,19 @@ class FirstSignInTest {
     }
 
     @Test
-    void 만들어진_에이전트의_과금_설정은_설정의_기본값과_같다() {
+    @DisplayName("만들어진 에이전트의 과금 설정은 설정의 기본값과 같다")
+    void createdAgentBillingSettingEqualsConfigDefault() {
         provisioning.resolve(EMAIL, NAME);
 
         assertThat(agents.findByCode(PROFILE))
                 .get()
                 .extracting(Agent::costMode, Agent::credentialScope)
-                .containsExactly(
-                        peopleProperties.defaultCostMode(), peopleProperties.defaultCredentialScope());
+                .containsExactly(peopleProperties.defaultCostMode(), peopleProperties.defaultCredentialScope());
     }
 
     @Test
-    void 같은_사람의_두_번째_요청에는_에이전트가_늘지_않는다() {
+    @DisplayName("같은 사람의 두 번째 요청에는 에이전트가 늘지 않는다")
+    void secondRequestOfSamePersonAddsNoAgent() {
         AppUser first = provisioning.resolve(EMAIL, NAME);
 
         AppUser again = provisioning.resolve(EMAIL, NAME);
@@ -100,7 +116,8 @@ class FirstSignInTest {
     }
 
     @Test
-    void 허용_목록에_없는_주소는_사용자만_만들고_에이전트를_만들지_않는다() {
+    @DisplayName("허용 목록에 없는 주소는 사용자만 만들고 에이전트를 만들지 않는다")
+    void addressNotInAllowlistCreatesOnlyUserAndNoAgent() {
         provisioning.resolve("stranger@example.com", "낯선 사람");
 
         assertThat(users.findByEmail("stranger@example.com")).isPresent();
@@ -114,7 +131,8 @@ class FirstSignInTest {
      * 않으면 그 profile 의 기본값으로 돌기 때문에(ADR-030) 첫 로그인은 모델을 묻지 않는다.
      */
     @Test
-    void Hermes_에_모델을_묻지_않고_에이전트를_만든다() {
+    @DisplayName("Hermes 에 모델을 묻지 않고 에이전트를 만든다")
+    void createsAgentWithoutAskingHermesForModel() {
         AppUser created = provisioning.resolve(EMAIL, NAME);
 
         assertThat(created.id()).isNotNull();
@@ -125,7 +143,8 @@ class FirstSignInTest {
     }
 
     @Test
-    void 허용_목록에서_꺼진_사람은_에이전트를_만들지_않는다() {
+    @DisplayName("허용 목록에서 꺼진 사람은 에이전트를 만들지 않는다")
+    void doesNotCreateAgentForPersonDisabledInAllowlist() {
         AllowedPerson left = people.findByEmailAndEnabledTrue(EMAIL).orElseThrow();
         left.disable();
         people.save(left);
