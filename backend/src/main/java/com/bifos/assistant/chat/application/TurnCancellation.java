@@ -34,7 +34,7 @@ public class TurnCancellation {
     private final HermesRunsClient hermes;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Duration streamGrace;
-    private final List<Consumer<Long>> closeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<Consumer<TurnClosed>> closeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public TurnCancellation(HermesRunsClient hermes,
             @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
@@ -75,7 +75,7 @@ public class TurnCancellation {
      *
      * <p>맵에서 뺀 뒤에 부르므로, 받는 쪽은 그 대화에 새 turn 을 열 수 있다. 닫은 스레드에서 차례로 부른다.
      */
-    public void addCloseListener(Consumer<Long> listener) {
+    public void addCloseListener(Consumer<TurnClosed> listener) {
         closeListeners.add(listener);
     }
 
@@ -86,17 +86,17 @@ public class TurnCancellation {
         // 성공으로 끝난 것이며, 이미 끝난 turn 과 구분해야 한다.
         handle.firstStop.complete(handle.cancelled.get() && !handle.finished.get());
         if (removed) {
-            notifyClosed(handle.conversationId);
+            notifyClosed(new TurnClosed(handle.conversationId, handle.stopped.get()));
         }
     }
 
     /** 리스너의 예외가 turn 을 닫는 쪽으로 번지지 않게 경고 로그만 남긴다. */
-    private void notifyClosed(Long conversationId) {
-        for (Consumer<Long> listener : closeListeners) {
+    private void notifyClosed(TurnClosed closed) {
+        for (Consumer<TurnClosed> listener : closeListeners) {
             try {
-                listener.accept(conversationId);
+                listener.accept(closed);
             } catch (RuntimeException ex) {
-                log.warn("turn 을 닫은 뒤의 후속 처리가 실패했다 conversationId={}", conversationId, ex);
+                log.warn("turn 을 닫은 뒤의 후속 처리가 실패했다 conversationId={}", closed.conversationId(), ex);
             }
         }
     }
@@ -110,6 +110,11 @@ public class TurnCancellation {
     public boolean isStopConfirmed(Long executionId) {
         TurnHandle handle = byExecution.get(executionId);
         return handle != null && handle.cancelled.get() && handle.stopConfirmed.get();
+    }
+
+    /** 이 turn 이 중지로 끝났다고 적는다. 닫기 리스너가 {@link TurnClosed#stopped()} 로 읽는다. */
+    public void markStopped(TurnHandle handle) {
+        handle.stopped.set(true);
     }
 
     public boolean cancel(TurnHandle handle) {
@@ -253,6 +258,7 @@ public class TurnCancellation {
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private final AtomicBoolean stopConfirmed = new AtomicBoolean();
         private final AtomicBoolean finished = new AtomicBoolean();
+        private final AtomicBoolean stopped = new AtomicBoolean();
         private final List<RunRef> runs = new java.util.concurrent.CopyOnWriteArrayList<>();
         private volatile Long executionId;
         private volatile Closeable stream;

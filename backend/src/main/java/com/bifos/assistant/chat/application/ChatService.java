@@ -277,6 +277,7 @@ public class ChatService {
             }
 
             if (turns.isStopConfirmed(handle) || turns.shouldStopBeforeSubmit(pending.execution().id())) {
+                turns.markStopped(handle);
                 return recorded(cancel(pending, null, choice), startedAt);
             }
             String runId = submit(pending);
@@ -291,6 +292,7 @@ public class ChatService {
             }
 
             if (turns.isStopConfirmed(handle) || "cancelled".equalsIgnoreCase(result.status())) {
+                turns.markStopped(handle);
                 return recorded(cancel(pending, result, choice), startedAt);
             }
             if (result.succeeded()) {
@@ -347,6 +349,7 @@ public class ChatService {
                         if (streaming) onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
                     }, onEvent);
             if (!turn.cancelled()) turns.markFinished(handle);
+            else turns.markStopped(handle);
             recorded(turn, startedAt);
             if (streaming) {
                 if (!turn.cancelled()) onEvent.accept(ChatEvent.delta(turn.assistantText()));

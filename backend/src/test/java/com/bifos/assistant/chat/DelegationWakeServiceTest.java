@@ -15,6 +15,7 @@ import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationEventHub;
 import com.bifos.assistant.chat.application.DelegationWakeService;
+import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.application.TurnMark;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -83,6 +84,9 @@ class DelegationWakeServiceTest {
 
     @Autowired
     DelegationWakeService wake;
+
+    @Autowired
+    NextTurnDispatcher dispatcher;
 
     @Autowired
     ConversationEventHub hub;
@@ -313,7 +317,7 @@ class DelegationWakeServiceTest {
     void startupScanWakesConversationsWithUndeliveredResults() {
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
 
-        wake.wakeAfterStartup();
+        dispatcher.dispatchAfterStartup();
         awaitIdle(conversation.id());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
