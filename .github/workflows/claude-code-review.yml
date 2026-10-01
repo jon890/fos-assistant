@@ -72,8 +72,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          HEAD_SHA=$(gh pr view "${{ env.PR_NUMBER }}" --repo "${{ github.repository }}" \
-            --json headRefOid -q .headRefOid)
+          HEAD_SHA=$(git rev-parse HEAD)
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           CHECK_ID=$(gh api "repos/${{ github.repository }}/check-runs" -X POST \
             -f name="Claude 코드 리뷰" \
@@ -186,6 +185,18 @@ jobs:
             echo 'PROMPT_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      - name: 리뷰 대상 커밋과 이전 리뷰 번호 기록
+        id: review-target
+        if: github.event_name != 'issue_comment' || steps.fork_guard.outputs.review == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          LAST_ID=$(gh api --paginate --slurp \
+            "repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}/reviews?per_page=100" \
+            --jq '[.[][] | .id] | max // 0')
+          echo "last_review_id=$LAST_ID" >> "$GITHUB_OUTPUT"
+
       # @v1 은 v1 의 최신 릴리스를 따라간다. 버전마다 다시 고정하지 않으려고 major 태그를 쓴다.
       # --model opus 는 별칭이라 실제 모델은 action 에 든 Claude Code 가 정한다. 아래 단계가 그 값을 남긴다.
       - name: Claude 코드 리뷰 실행
@@ -216,6 +227,12 @@ jobs:
           MODEL=${MODEL:-읽지 못함}
           echo "::notice title=리뷰 모델::$MODEL"
           echo "리뷰 모델: \`$MODEL\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 본문을 제외한 리뷰 실행 진단 정보 기록
+        if: always() && (github.event_name != 'issue_comment' || steps.fork_guard.outputs.review == 'true')
+        env:
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+        run: node scripts/review-execution-summary.mjs
 
       # 게시된 인라인 댓글 중 dummy / 길이 미달 / 마커 부재 entry 를 자동 정리
       # — Claude action 이 자연어 sanity check 를 무시하고 "test body" / "test2"
@@ -251,6 +268,30 @@ jobs:
             echo "dummy 인라인 댓글 자동 삭제: id=$id"
             gh api "repos/$REPO/pulls/comments/$id" --method DELETE || true
           done
+
+      # 기존 리뷰로 성공을 판정하지 않고 이번 실행에서 제출한 리뷰만 확인한다.
+      - name: 현재 커밋에 Claude 리뷰가 게시됐는지 확인
+        if: always() && steps.review-target.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_HEAD: ${{ steps.review-target.outputs.head_sha }}
+          LAST_REVIEW_ID: ${{ steps.review-target.outputs.last_review_id }}
+        run: |
+          CURRENT_HEAD=$(gh pr view "${{ env.PR_NUMBER }}" --repo "${{ github.repository }}" \
+            --json headRefOid -q .headRefOid)
+          if [ "$CURRENT_HEAD" != "$REVIEW_HEAD" ]; then
+            echo "::error::리뷰 도중 PR 커밋이 변경되었습니다. 새 커밋을 다시 리뷰해야 합니다."
+            exit 1
+          fi
+          COUNT=$(gh api --paginate --slurp \
+            "repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}/reviews?per_page=100" \
+            | jq --arg sha "$REVIEW_HEAD" --argjson last "$LAST_REVIEW_ID" \
+              -f scripts/submitted-claude-reviews.jq)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::이번 실행에서 현재 커밋에 제출한 Claude 리뷰가 없습니다."
+            exit 1
+          fi
+          echo "현재 커밋의 새 Claude 리뷰 $COUNT 건을 확인했습니다." >> "$GITHUB_STEP_SUMMARY"
 
       # 작업 결과를 /review 댓글에 ✅/❌ reaction 으로 표시 (success/failure 분기, always 실행)
       - name: /review 댓글에 종료 reaction 추가
