@@ -1,8 +1,8 @@
-## ADR-048: 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다
+## ADR-049: 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다
 
 - **status**: `accepted`
 - Date: 2026-10-01
-- [ADR-047](ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 의 판정이 「승인 필요」 일 때의 처리를 정한다. 결과를 대화에 전하는 방법은 [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 깨우기를 넓혀 쓴다.
+- [ADR-048](ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 의 판정이 「승인 필요」 일 때의 처리를 정한다. 결과를 대화에 전하는 방법은 [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 깨우기를 넓혀 쓴다.
 
 ### 결정
 

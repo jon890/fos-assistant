@@ -546,7 +546,8 @@ public class ChatService {
                                 }
                             }
                         },
-                        stream -> turns.attachStream(handle, stream));
+                        stream -> turns.attachStream(handle, stream),
+                        pending.agent().connectorManaged());
             } catch (ApiException ex) {
                 log.warn("Hermes event stream ended before final status runId={}", runId, ex);
             } finally {
