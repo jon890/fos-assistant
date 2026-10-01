@@ -395,7 +395,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `hermes_session_id` | VARCHAR(128) NULL | 하위 에이전트가 따로 session 을 가지면 적는다 |
 | `duration_ms` | BIGINT NULL | 끝난 사건에만 있다 |
 | `failed` | BOOLEAN NULL | 완료 사건의 실패 여부. Hermes 가 알려주지 않으면 비운다 |
-| `detail` | VARCHAR(500) NULL | 화면에 한 줄로 보일 만큼만. 하위 에이전트 사건이면 그 목표. 도구 사건의 값은 모두 저장하되 응답에는 ADR-038 이 정한 사람에게만 싣는다 |
+| `detail` | VARCHAR(500) NULL | 하위 에이전트 사건이면 그 목표. 도구 사건은 ADR-047에 따라 비밀값과 UUID를 가린 뒤 저장하고, 응답에는 ADR-038이 정한 사람에게만 싣는다. 연결용 에이전트의 도구 내용은 전체를 가린다 |
 | `model` | VARCHAR(128) NULL | 하위 에이전트가 돈 모델. 하위 에이전트 사건에만 있다 |
 | `input_tokens`, `output_tokens` | BIGINT NULL | 하위 에이전트가 쓴 토큰. `SUBAGENT_COMPLETED` 에만 있다 |
 | `occurred_at` | DATETIME(6) | |

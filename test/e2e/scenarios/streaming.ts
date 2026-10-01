@@ -2,6 +2,7 @@
 import { call, expect, expectStatus, step, type Response, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { DAD_BINDING } from "./binding.ts";
+import { TOOL_DETAIL_SECRETS } from "../fake-hermes.ts";
 
 type ChatEvent = {
   type: "delta" | "tool" | "subagent" | "done" | "error";
@@ -27,6 +28,7 @@ type ExecutionEventView = {
   model: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  detail: string | null;
 };
 type ExecutionNode = {
   truncated: boolean;
@@ -94,6 +96,11 @@ export const streamingScenario: Scenario = {
       "스트림 대화",
     );
     const received = await events(response);
+    for (const secret of TOOL_DETAIL_SECRETS) {
+      expect(!response.body.includes(secret), "SSE에 도구 비밀값이나 UUID 원문이 있다");
+    }
+    expect(response.body.includes("[가림]") && response.body.includes("[항목 1]"),
+      "SSE에 가린 도구 내용이 없다");
     expect(received.filter((item) => item.type === "delta").length === 2, "delta 두 개를 받지 못했다");
     // 가짜 Hermes 가 도구 쌍 둘과 하위 에이전트 쌍 하나를 보낸다.
     expect(received.filter((item) => item.type === "tool").length === 4, "도구 사건을 받지 못했다");
@@ -153,6 +160,13 @@ export const streamingScenario: Scenario = {
       200,
       "실행 나무 조회",
     ).json<ExecutionTree>();
+
+    const savedTool = tree.root.events.find((event) => event.toolName === "fake-tool");
+    expect(savedTool?.detail?.includes("[가림]") === true, "저장된 도구 내용에 가리기 표시가 없다");
+    expect(savedTool?.detail?.includes("12000") === true, "도구 내용의 일반 금액이 사라졌다");
+    for (const secret of TOOL_DETAIL_SECRETS) {
+      expect(!JSON.stringify(tree).includes(secret), "실행 나무 API에 도구 비밀값이나 UUID 원문이 있다");
+    }
 
     expect(tree.root.executionId === done!.executionId, "물어본 실행이 뿌리로 나오지 않았다");
     expect(tree.truncated === false, "자를 것이 없는데 나무가 잘렸다고 나왔다");
