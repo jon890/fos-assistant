@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.ModelTierOptions;
 import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.ResolvedModelTier;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.chat.infra.ModelTierGroupSettingRepository;
@@ -50,19 +52,41 @@ class ModelTierPersistenceTest {
     void replacingAllTierDefinitionsDoesNotViolateUniqueConstraint() {
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", GROUP_ID, UserRole.ADMIN);
 
-        tiers.saveGroup(admin, definitions("gpt-6-luna", "gpt-6.1-sol"), ModelTier.FAST);
-        tiers.saveGroup(admin, definitions("gpt-6.1-sol", "gpt-6-luna"), ModelTier.DEEP);
+        tiers.saveGroup(admin, definitions("example-fast", "example-deep"), ModelTier.FAST);
+        tiers.saveGroup(admin, definitions("example-deep", "example-fast"), ModelTier.DEEP);
 
         assertThat(this.definitions.findByGroupIdOrderByTier(GROUP_ID))
                 .extracting(definition -> definition.model())
-                .containsExactlyInAnyOrder("gpt-6.1-sol", "gpt-6-luna", "gpt-6-luna");
+                .containsExactlyInAnyOrder("example-deep", "example-fast", "example-fast");
         assertThat(settings.findById(GROUP_ID).orElseThrow().defaultTier()).isEqualTo(ModelTier.DEEP);
+    }
+
+    @Test
+    @DisplayName("관리자가 비어 있는 세 단계를 저장하면 배포 mapping보다 profile 기본값을 계속 쓴다")
+    void storedFallbackMappingOverridesConfiguredInitialMapping() {
+        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", GROUP_ID, UserRole.ADMIN);
+        List<ModelTierOptions.Tier> fallback = List.of(
+                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, null, null),
+                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
+                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null));
+
+        tiers.saveGroup(admin, fallback, null);
+        ResolvedModelTier resolved = tiers.resolveTier(admin, ModelTier.FAST, null);
+        ModelTierOptions options = tiers.optionsFor(admin, null);
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.FAST);
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+        assertThat(options.tiers()).allSatisfy(tier -> {
+            assertThat(tier.provider()).isNull();
+            assertThat(tier.model()).isNull();
+            assertThat(tier.reasoningEffort()).isNull();
+        });
     }
 
     private static List<ModelTierOptions.Tier> definitions(String fastModel, String deepModel) {
         return List.of(
                 new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "openai-codex", fastModel, "low"),
-                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", "openai-codex", "gpt-6-luna", "medium"),
+                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", "openai-codex", "example-fast", "medium"),
                 new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", "openai-codex", deepModel, "high"));
     }
 }

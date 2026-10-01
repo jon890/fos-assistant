@@ -14,6 +14,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
+import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -47,7 +48,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Conversation conversation = mock(Conversation.class);
         when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
@@ -66,12 +67,12 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Agent agent = mock(Agent.class);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
         when(options.optionsForAgent(agent))
-                .thenReturn(new ModelOptions("openai-codex", "gpt-6-luna", List.of(), List.of()));
+                .thenReturn(new ModelOptions("openai-codex", "example-fast", List.of(), List.of()));
         when(users.findById(1L)).thenReturn(Optional.empty());
         when(settings.findById(10L)).thenReturn(Optional.empty());
 
@@ -82,7 +83,7 @@ class ModelTierServiceTest {
                 .containsExactly(ModelTier.FAST, ModelTier.BALANCED, ModelTier.DEEP);
         assertThat(result.tiers())
                 .extracting(ModelTierOptions.Tier::model)
-                .containsExactly("gpt-6-luna", "gpt-6-luna", "gpt-6.1-sol");
+                .containsExactly("example-fast", "example-balanced", "example-deep");
         assertThat(result.tiers())
                 .extracting(ModelTierOptions.Tier::reasoningEffort)
                 .containsExactly("low", "medium", "high");
@@ -96,10 +97,10 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         when(definitions.findByGroupIdOrderByTier(10L))
-                .thenReturn(List.of(ModelTierDefinition.of(10L, ModelTier.FAST, null, "gpt-6-luna", "low")));
+                .thenReturn(List.of(ModelTierDefinition.of(10L, ModelTier.FAST, null, "example-fast", "low")));
 
         assertThatThrownBy(() -> service.requireDefined(user, ModelTier.FAST))
                 .isInstanceOf(ApiException.class)
@@ -114,7 +115,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
         CurrentUser member = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> service.saveGroup(member, List.of(), null))
@@ -132,10 +133,10 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         List<ModelTierOptions.Tier> incomplete =
-                List.of(new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "gpt-6-luna", "low"));
+                List.of(new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "example-fast", "low"));
 
         assertThatThrownBy(() -> service.saveGroup(admin, incomplete, ModelTier.FAST))
                 .isInstanceOf(ApiException.class)
@@ -152,7 +153,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         doAnswer(invocation -> {
                     List<ModelTierDefinition> saved = invocation.getArgument(0);
@@ -160,15 +161,15 @@ class ModelTierServiceTest {
                             .satisfiesExactly(
                                     fast -> {
                                         assertThat(fast.provider()).isNull();
-                                        assertThat(fast.model()).isEqualTo("gpt-6-luna");
+                                        assertThat(fast.model()).isEqualTo("example-fast");
                                     },
                                     balanced -> {
                                         assertThat(balanced.provider()).isEqualTo("openai-codex");
-                                        assertThat(balanced.model()).isEqualTo("gpt-6-luna");
+                                        assertThat(balanced.model()).isEqualTo("example-balanced");
                                     },
                                     deep -> {
                                         assertThat(deep.provider()).isEqualTo("openai-codex");
-                                        assertThat(deep.model()).isEqualTo("gpt-6.1-sol");
+                                        assertThat(deep.model()).isEqualTo("example-deep");
                                     });
                     return saved;
                 })
@@ -178,10 +179,167 @@ class ModelTierServiceTest {
         service.saveGroup(
                 admin,
                 List.of(
-                        new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "   ", " gpt-6-luna ", "low"),
-                        new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", " openai-codex ", " gpt-6-luna ", "medium"),
-                        new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", " openai-codex ", " gpt-6.1-sol ", "high")),
+                        new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "   ", " example-fast ", "low"),
+                        new ModelTierOptions.Tier(
+                                ModelTier.BALANCED, "균형", " openai-codex ", " example-balanced ", "medium"),
+                        new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", " openai-codex ", " example-deep ", "high")),
                 ModelTier.FAST);
+    }
+
+    @Test
+    @DisplayName("관리자는 provider만 또는 effort만 있는 부분 단계 mapping을 저장하지 못한다")
+    void rejectsPartialTierMappings() {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
+        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+
+        assertThatThrownBy(() -> service.saveGroup(
+                        admin,
+                        List.of(
+                                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "openai-codex", null, null),
+                                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
+                                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
+                        null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThatThrownBy(() -> service.saveGroup(
+                        admin,
+                        List.of(
+                                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "example-fast", null),
+                                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
+                                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
+                        null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThatThrownBy(() -> service.saveGroup(
+                        admin,
+                        List.of(
+                                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, null, "low"),
+                                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
+                                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
+                        null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("배포 단계 설정은 provider만 또는 model만 채운 부분 mapping으로 기동하지 못한다")
+    void rejectsPartialConfiguredTierMapping() {
+        assertThatThrownBy(() -> new ModelTierProperties.Tier("openai-codex", null, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("model and reasoning-effort");
+        assertThatThrownBy(() -> new ModelTierProperties.Tier(null, "example-fast", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("model and reasoning-effort");
+    }
+
+    @Test
+    @DisplayName("배포 단계 설정은 지원하지 않는 effort와 칸 길이를 넘는 값을 기동 전에 거절한다")
+    void rejectsInvalidConfiguredTierValues() {
+        assertThatThrownBy(() -> new ModelTierProperties.Tier(null, "example-fast", "banana"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reasoning-effort");
+        assertThatThrownBy(() -> new ModelTierProperties.Tier(
+                        "p".repeat(ModelChoice.PROVIDER_MAX_LENGTH + 1), "example-fast", "low"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("provider");
+        assertThatThrownBy(
+                        () -> new ModelTierProperties.Tier(null, "m".repeat(ModelChoice.MODEL_MAX_LENGTH + 1), "low"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("model");
+    }
+
+    @Test
+    @DisplayName("설정과 저장 단계가 모두 비어 있으면 단계 기록을 남기고 profile 기본값으로 돈다")
+    void emptyTierMappingFallsBackToProfileDefault() {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service =
+                new ModelTierService(definitions, settings, users, options, new ModelTierProperties(null, null, null));
+        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
+
+        ResolvedModelTier resolved = service.resolveTier(user, ModelTier.FAST, mock(Agent.class));
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.FAST);
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+        verifyNoInteractions(options);
+    }
+
+    @Test
+    @DisplayName("각 단계는 요청 profile의 catalog에서 따로 검증한 설정 mapping을 쓴다")
+    void configuredTiersUseEachProfilesCatalog() {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
+        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+        Agent fastAgent = mock(Agent.class);
+        Agent balancedAgent = mock(Agent.class);
+        Agent deepAgent = mock(Agent.class);
+        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
+        when(options.optionsForAgent(fastAgent)).thenReturn(catalog("fast-provider", "example-fast"));
+        when(options.optionsForAgent(balancedAgent)).thenReturn(catalog("balanced-provider", "example-balanced"));
+        when(options.optionsForAgent(deepAgent)).thenReturn(catalog("deep-provider", "example-deep"));
+
+        ResolvedModelTier fast = service.resolveTier(user, ModelTier.FAST, fastAgent);
+        ResolvedModelTier balanced = service.resolveTier(user, ModelTier.BALANCED, balancedAgent);
+        ResolvedModelTier deep = service.resolveTier(user, ModelTier.DEEP, deepAgent);
+
+        assertThat(fast.choice()).isEqualTo(ModelChoice.of("fast-provider", "example-fast", "low"));
+        assertThat(balanced.choice()).isEqualTo(ModelChoice.of("balanced-provider", "example-balanced", "medium"));
+        assertThat(deep.choice()).isEqualTo(ModelChoice.of("deep-provider", "example-deep", "high"));
+    }
+
+    @Test
+    @DisplayName("설정 단계 모델이 요청 profile의 catalog에 없으면 실행 전에 거절한다")
+    void rejectsConfiguredTierMissingFromAgentCatalog() {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
+        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+        Agent agent = mock(Agent.class);
+        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
+        when(options.optionsForAgent(agent)).thenReturn(catalog("fast-provider", "another-model"));
+
+        assertThatThrownBy(() -> service.resolveTier(user, ModelTier.FAST, agent))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("관리자가 비어 있는 세 단계를 저장하면 catalog 조회 없이 profile 기본값 안내를 돌려준다")
+    void storedFallbackTiersDoNotReadCatalogForOptions() {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, properties());
+        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.ADMIN);
+        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(fallbackDefinitions());
+        when(users.findById(1L)).thenReturn(Optional.empty());
+        when(settings.findById(10L)).thenReturn(Optional.empty());
+
+        ModelTierOptions result = service.optionsFor(user, mock(Agent.class));
+
+        assertThat(result.tiers()).allSatisfy(tier -> {
+            assertThat(tier.provider()).isNull();
+            assertThat(tier.model()).isNull();
+            assertThat(tier.reasoningEffort()).isNull();
+        });
+        verifyNoInteractions(options);
     }
 
     @Test
@@ -197,7 +355,7 @@ class ModelTierServiceTest {
         ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
 
         assertThat(resolved.tier()).isEqualTo(ModelTier.FAST);
-        assertThat(resolved.choice().model()).isEqualTo("gpt-6-luna");
+        assertThat(resolved.choice().model()).isEqualTo("example-fast");
         assertThat(resolved.choice().reasoningEffort()).isEqualTo("low");
     }
 
@@ -214,7 +372,7 @@ class ModelTierServiceTest {
         ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
 
         assertThat(resolved.tier()).isEqualTo(ModelTier.DEEP);
-        assertThat(resolved.choice().model()).isEqualTo("gpt-6.1-sol");
+        assertThat(resolved.choice().model()).isEqualTo("example-deep");
         assertThat(resolved.choice().reasoningEffort()).isEqualTo("high");
     }
 
@@ -256,17 +414,17 @@ class ModelTierServiceTest {
 
         ResolvedModelTier resolved = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
         ModelTierDefinition changed =
-                ModelTierDefinition.of(10L, ModelTier.FAST, "openai-codex", "gpt-6.1-sol", "high");
+                ModelTierDefinition.of(10L, ModelTier.FAST, "openai-codex", "example-deep", "high");
         when(fixtures.definitions.findByGroupIdOrderByTier(10L))
                 .thenReturn(List.of(
                         changed,
-                        ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
-                        ModelTierDefinition.of(10L, ModelTier.DEEP, null, "gpt-6.1-sol", "high")));
+                        ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "example-balanced", "medium"),
+                        ModelTierDefinition.of(10L, ModelTier.DEEP, null, "example-deep", "high")));
 
         ResolvedModelTier updated = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
 
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "gpt-6-luna", "low"));
-        assertThat(updated.choice()).isEqualTo(ModelChoice.of("openai-codex", "gpt-6.1-sol", "high"));
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-fast", "low"));
+        assertThat(updated.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-deep", "high"));
     }
 
     private static TierFixtures tierFixtures() {
@@ -278,18 +436,21 @@ class ModelTierServiceTest {
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         when(definitions.findByGroupIdOrderByTier(10L))
                 .thenReturn(List.of(
-                        ModelTierDefinition.of(10L, ModelTier.FAST, null, "gpt-6-luna", "low"),
-                        ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
-                        ModelTierDefinition.of(10L, ModelTier.DEEP, null, "gpt-6.1-sol", "high")));
+                        ModelTierDefinition.of(10L, ModelTier.FAST, null, "example-fast", "low"),
+                        ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "example-balanced", "medium"),
+                        ModelTierDefinition.of(10L, ModelTier.DEEP, null, "example-deep", "high")));
         when(options.optionsForAgent(agent))
                 .thenReturn(new ModelOptions(
                         "openai-codex",
-                        "gpt-6-luna",
+                        "example-fast",
                         List.of(new HermesModelCatalog.Provider(
-                                "openai-codex", "OpenAI", List.of("gpt-6-luna", "gpt-6.1-sol"), Map.of())),
+                                "openai-codex",
+                                "OpenAI",
+                                List.of("example-fast", "example-balanced", "example-deep"),
+                                Map.of())),
                         List.of()));
         return new TierFixtures(
-                new ModelTierService(definitions, settings, users, options),
+                new ModelTierService(definitions, settings, users, options, properties()),
                 definitions,
                 settings,
                 users,
@@ -306,4 +467,26 @@ class ModelTierServiceTest {
             ModelOptionsService options,
             CurrentUser user,
             Agent agent) {}
+
+    private static ModelTierProperties properties() {
+        return new ModelTierProperties(
+                new ModelTierProperties.Tier(null, "example-fast", "low"),
+                new ModelTierProperties.Tier(null, "example-balanced", "medium"),
+                new ModelTierProperties.Tier(null, "example-deep", "high"));
+    }
+
+    private static ModelOptions catalog(String provider, String model) {
+        return new ModelOptions(
+                provider,
+                model,
+                List.of(new HermesModelCatalog.Provider(provider, provider, List.of(model), Map.of())),
+                List.of());
+    }
+
+    private static List<ModelTierDefinition> fallbackDefinitions() {
+        return List.of(
+                ModelTierDefinition.of(10L, ModelTier.FAST, null, null, null),
+                ModelTierDefinition.of(10L, ModelTier.BALANCED, null, null, null),
+                ModelTierDefinition.of(10L, ModelTier.DEEP, null, null, null));
+    }
 }

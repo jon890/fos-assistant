@@ -7,7 +7,7 @@
 
 | 표 | 키 | 저장하는 값 |
 | --- | --- | --- |
-| `model_tier_definition` | `id` BIGINT, `(group_id, tier)` 유일 | 그룹 번호, 단계 코드 VARCHAR(16), provider VARCHAR(64) NULL, model VARCHAR(128), reasoning_effort VARCHAR(16) |
+| `model_tier_definition` | `id` BIGINT, `(group_id, tier)` 유일 | 그룹 번호, 단계 코드 VARCHAR(16), provider VARCHAR(64) NULL, model VARCHAR(128) NULL, reasoning_effort VARCHAR(16) NULL |
 | `app_user` | 기존 `id` BIGINT | `model_default_tier` VARCHAR(16) NULL 추가 |
 | `model_tier_group_setting` | `group_id` BIGINT | `default_tier` VARCHAR(16) NULL |
 | `subagent_usage_job` | `id` BIGINT, `(execution_id, child_session_id)` 유일 | profile, API 주소, 부모 session, 자식 session, 상태, 시작/다음 조회/기한 시각, 조회 횟수 |

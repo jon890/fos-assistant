@@ -1,7 +1,9 @@
 # 모델 단계와 실행 기록
 
 입력창 옆에서 빠르게, 균형, 깊게를 고른다.
-모델과 리즈닝 강도를 직접 고르는 기능은 고급에 둔다.
+평소에는 세 단계와 설정 단추만 보인다.
+설정 안에 에이전트 기본값, 내 기본값, 관리자용 그룹 단계 설정과 고급 모델 선택을 둔다.
+provider와 모델 이름은 평소 입력창 옆에 표시하지 않는다.
 현재 디자인 토큰을 쓰고 새 색이나 화면 구조를 도입하지 않는다.
 
 ## 모델 선택
@@ -15,7 +17,11 @@
 그룹 관리자만 그룹 단계 정의와 그룹 기본값을 저장한다.
 사용자는 자기 기본 단계만 바꿀 수 있다.
 기본 단계가 없다는 값은 `null`이다.
-초기 단계의 provider는 요청자의 에이전트가 알려 준 기본 provider로 해석한다.
+초기 단계의 mapping은 운영 설정에서 받으며 제품 코드와 마이그레이션에 모델 이름을 넣지 않는다.
+설정이 없으면 세 단계의 mapping은 모두 비어 있고, 해당 단계를 골라도 profile 기본값으로 실행한다.
+이때 고른 단계는 실행 기록에 남기지만 provider, 모델, 강도를 요청에 덧붙이지 않는다.
+관리자는 설정에서 「단계 설정이 필요해요」 안내를 보고 그룹 단계를 정할 수 있다.
+초기 설정의 provider가 비면 요청자의 에이전트가 알려 준 기본 provider로 해석한다.
 관리자가 정의를 저장하면 명시한 provider를 쓴다.
 정의 저장 전에 provider와 모델의 앞뒤 공백을 없애고 빈 provider는 에이전트 기본 provider로 해석한다.
 목록 조회가 실패하면 새 단계 선택을 막고 기존 선택과 profile 기본값을 유지한다.
@@ -23,11 +29,20 @@
 지원하지 않는 정의는 Hermes 제출 전에 거절하며 다른 모델로 임의로 바꾸지 않는다.
 화면의 명시적 `DEFAULT` 선택은 「에이전트 기본값」으로 표시한다.
 
-| 단계 | 코드 | 초기 모델 | 초기 강도 |
-| --- | --- | --- | --- |
-| 빠르게 | `FAST` | `gpt-6-luna` | `low` |
-| 균형 | `BALANCED` | `gpt-6-luna` | `medium` |
-| 깊게 | `DEEP` | `gpt-6.1-sol` | `high` |
+| 단계 | 코드 | 초기 설정 접두사 |
+| --- | --- | --- |
+| 빠르게 | `FAST` | `assistant.model-tiers.fast` |
+| 균형 | `BALANCED` | `assistant.model-tiers.balanced` |
+| 깊게 | `DEEP` | `assistant.model-tiers.deep` |
+
+각 접두사 아래에 `provider`, `model`, `reasoning-effort`를 설정한다.
+환경 변수는 `ASSISTANT_MODEL_TIERS_FAST_PROVIDER`, `ASSISTANT_MODEL_TIERS_FAST_MODEL`,
+`ASSISTANT_MODEL_TIERS_FAST_REASONING_EFFORT` 형식이며 `BALANCED`, `DEEP`에도 같은 세 키를 쓴다.
+운영 값은 비공개 infra 저장소가 배포할 때 제공한다.
+설정된 mapping은 그룹이 저장한 정의가 없을 때만 쓴다.
+관리자가 저장한 정의는 비어 있는 mapping도 그대로 우선해 profile 기본값으로 실행한다.
+미설정 mapping의 세 값은 모두 `null`이다. mapping을 넣을 때는 모델과 유효한 강도가 필요하며 provider는 비울 수 있다.
+provider나 강도만 있는 부분 설정은 거절한다.
 
 단계 정의를 바꾸면 다음 실행부터 적용한다.
 이미 시작한 실행은 단계와 provider, 모델, effort를 복사해 두므로 바뀌지 않는다.

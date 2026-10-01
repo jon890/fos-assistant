@@ -31,13 +31,17 @@ public class ModelTierService {
     private final ModelTierGroupSettingRepository groupSettings;
     private final AppUserRepository users;
     private final ModelOptionsService modelOptions;
+    private final ModelTierProperties properties;
 
     @Transactional(readOnly = true)
     public ModelTierOptions optionsFor(CurrentUser user, Agent agent) {
-        ModelOptions catalog = modelOptions.optionsForAgent(agent);
+        List<ModelTierDefinition> definitions = definitionsFor(user.groupId());
+        String defaultProvider = needsDefaultProvider(definitions)
+                ? modelOptions.optionsForAgent(agent).defaultProvider()
+                : null;
         return new ModelTierOptions(
-                definitionsFor(user.groupId()).stream()
-                        .map(definition -> view(definition, catalog.defaultProvider()))
+                definitions.stream()
+                        .map(definition -> view(definition, defaultProvider))
                         .toList(),
                 users.findById(user.id())
                         .map(it -> tierOf(it.modelDefaultTier()))
@@ -72,11 +76,7 @@ public class ModelTierService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "all model tiers must be supplied exactly once");
         }
         for (ModelTierOptions.Tier tier : normalizedTiers) {
-            if (tier.tier() == null
-                    || tier.model() == null
-                    || tier.model().length() > ModelChoice.MODEL_MAX_LENGTH
-                    || tier.provider() != null && tier.provider().length() > ModelChoice.PROVIDER_MAX_LENGTH
-                    || !ModelChoice.REASONING_EFFORTS.contains(tier.reasoningEffort())) {
+            if (!isValidMapping(tier)) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid model tier definition");
             }
         }
@@ -127,6 +127,9 @@ public class ModelTierService {
                 .filter(candidate -> candidate.tier() == tier)
                 .findFirst()
                 .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier"));
+        if (isFallback(definition)) {
+            return new ResolvedModelTier(ModelChoice.defaults(), tier);
+        }
         String provider = definition.provider();
         if (provider == null) {
             provider = modelOptions.optionsForAgent(agent).defaultProvider();
@@ -153,6 +156,9 @@ public class ModelTierService {
     }
 
     private static ModelTierOptions.Tier view(ModelTierDefinition definition, String defaultProvider) {
+        if (isFallback(definition)) {
+            return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
+        }
         return new ModelTierOptions.Tier(
                 definition.tier(),
                 labelOf(definition.tier()),
@@ -168,6 +174,28 @@ public class ModelTierService {
                 blankToNull(tier.provider()),
                 blankToNull(tier.model()),
                 tier.reasoningEffort());
+    }
+
+    private static boolean isValidMapping(ModelTierOptions.Tier tier) {
+        if (tier == null || tier.tier() == null) {
+            return false;
+        }
+        if (isFallback(tier)) {
+            return true;
+        }
+        return tier.model() != null
+                && tier.model().length() <= ModelChoice.MODEL_MAX_LENGTH
+                && (tier.provider() == null || tier.provider().length() <= ModelChoice.PROVIDER_MAX_LENGTH)
+                && tier.reasoningEffort() != null
+                && ModelChoice.REASONING_EFFORTS.contains(tier.reasoningEffort());
+    }
+
+    private static boolean isFallback(ModelTierOptions.Tier tier) {
+        return tier.provider() == null && tier.model() == null && tier.reasoningEffort() == null;
+    }
+
+    private static boolean isFallback(ModelTierDefinition definition) {
+        return definition.provider() == null && definition.model() == null && definition.reasoningEffort() == null;
     }
 
     private static String blankToNull(String value) {
@@ -196,11 +224,19 @@ public class ModelTierService {
         return Arrays.stream(ModelTier.values()).map(byTier::get).toList();
     }
 
-    private static List<ModelTierDefinition> initialDefinitions(Long groupId) {
-        return List.of(
-                ModelTierDefinition.of(groupId, ModelTier.FAST, null, "gpt-6-luna", "low"),
-                ModelTierDefinition.of(groupId, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
-                ModelTierDefinition.of(groupId, ModelTier.DEEP, null, "gpt-6.1-sol", "high"));
+    private List<ModelTierDefinition> initialDefinitions(Long groupId) {
+        return Arrays.stream(ModelTier.values())
+                .map(tier -> configuredDefinition(groupId, tier))
+                .toList();
+    }
+
+    private ModelTierDefinition configuredDefinition(Long groupId, ModelTier tier) {
+        ModelTierProperties.Tier mapping = properties.forTier(tier);
+        return ModelTierDefinition.of(groupId, tier, mapping.provider(), mapping.model(), mapping.reasoningEffort());
+    }
+
+    private static boolean needsDefaultProvider(List<ModelTierDefinition> definitions) {
+        return definitions.stream().anyMatch(definition -> !isFallback(definition) && definition.provider() == null);
     }
 
     private static String labelOf(ModelTier tier) {

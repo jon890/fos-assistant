@@ -15,7 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
-/** 그룹 관리자가 정한 단계 하나다. provider 가 비면 profile의 기본 provider를 쓴다. */
+/** 그룹 관리자가 정한 단계 하나다. 세 mapping 값이 비면 profile 기본값으로 돈다. */
 @Entity
 @Table(name = "model_tier_definition", uniqueConstraints = @UniqueConstraint(columnNames = {"group_id", "tier"}))
 @Getter
@@ -37,10 +37,10 @@ public class ModelTierDefinition {
     @Column(name = "provider", length = 64)
     private String provider;
 
-    @Column(name = "model", nullable = false, length = 128)
+    @Column(name = "model", length = 128)
     private String model;
 
-    @Column(name = "reasoning_effort", nullable = false, length = 16)
+    @Column(name = "reasoning_effort", length = 16)
     private String reasoningEffort;
 
     private ModelTierDefinition(Long groupId, ModelTier tier, String provider, String model, String reasoningEffort) {
