@@ -1,6 +1,13 @@
-import { CONVERSATION_URL, expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
+import {
+  CONVERSATION_URL,
+  expect,
+  test,
+  SWITCH_AGENT_CODE,
+} from "./fixtures.ts";
 
-test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({ page }, testInfo) => {
+test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
   await page.goto("/");
 
@@ -35,17 +42,25 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
   await expect(drawer).toBeHidden();
 });
 
-test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({ page }, testInfo) => {
+test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== "desktop");
   await page.goto("/");
 
   const drawer = page.getByRole("complementary", { name: "사이드바" });
   await expect(drawer).toBeVisible();
-  await expect.poll(async () => (await drawer.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
-  await expect(page.getByRole("button", { name: "사이드바 열기" })).toBeHidden();
+  await expect
+    .poll(async () => (await drawer.boundingBox())?.x ?? -1)
+    .toBeGreaterThanOrEqual(0);
+  await expect(
+    page.getByRole("button", { name: "사이드바 열기" }),
+  ).toBeHidden();
 });
 
-test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을 알약 하나로 보인다", async ({ page }) => {
+test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을 알약 하나로 보인다", async ({
+  page,
+}) => {
   await page.goto("/");
   const composer = page.getByRole("textbox", { name: "메시지" });
   const send = page.getByRole("button", { name: "보내기" });
@@ -56,7 +71,9 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
   await page.mouse.move(0, 0);
   const sendColors = await send.evaluate((button) => ({
     background: getComputedStyle(button).backgroundColor,
-    primary: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
+    primary: getComputedStyle(document.documentElement)
+      .getPropertyValue("--primary")
+      .trim(),
   }));
   expect(sendColors.background).not.toBe("rgba(0, 0, 0, 0)");
   expect(sendColors.background).toBe("rgb(176, 90, 60)");
@@ -73,7 +90,9 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
   // 저장된 이력을 다시 읽어 시각과 답의 동작 줄이 생긴 뒤에 잰다. 그 전에 재면 그 줄이 늘어난 것까지 섞인다.
   await expect(userTime).toHaveCount(1);
   await expect(assistantTime).toHaveCount(1);
-  await expect(assistantMessage.getByRole("button", { name: "답 다시 만들기" })).toBeVisible();
+  await expect(
+    assistantMessage.getByRole("button", { name: "답 다시 만들기" }),
+  ).toBeVisible();
   await expect(userTime).toBeHidden();
   await expect(assistantTime).toBeHidden();
   // 시각이 보였다 숨었다 해도 말풍선과 답의 크기가 그대로여야 한다. 아래 메시지가 밀리면 안 된다.
@@ -92,9 +111,9 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
   expect(assistantBox).not.toBeNull();
   expect(
     Math.abs(
-      (userBox?.x ?? 0)
-      + (userBox?.width ?? 0)
-      - ((assistantBox?.x ?? 0) + (assistantBox?.width ?? 0)),
+      (userBox?.x ?? 0) +
+        (userBox?.width ?? 0) -
+        ((assistantBox?.x ?? 0) + (assistantBox?.width ?? 0)),
     ),
   ).toBeLessThanOrEqual(1);
   expect(userBox?.x ?? 0).toBeGreaterThan(assistantBox?.x ?? 0);
@@ -128,8 +147,49 @@ test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", asyn
   await page.getByRole("button", { name: "보내기" }).click();
 
   await expect(page.getByRole("table").last()).toBeVisible();
-  await expect(page.getByText("<script>window.__unsafeAgentHtml = true</script>").last()).toBeVisible();
-  expect(await page.evaluate(() => (window as typeof window & { __unsafeAgentHtml?: boolean }).__unsafeAgentHtml)).toBeUndefined();
+  await expect(
+    page.getByText("<script>window.__unsafeAgentHtml = true</script>").last(),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as typeof window & { __unsafeAgentHtml?: boolean })
+          .__unsafeAgentHtml,
+    ),
+  ).toBeUndefined();
+});
+
+test("구분 줄 없는 에이전트 답을 표로 그린다", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("textbox", { name: "메시지" })
+    .fill("구분 줄 없는 표 검사");
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const table = page.getByRole("table").last();
+  await expect(table).toBeVisible();
+  await expect(table.getByRole("columnheader")).toHaveText([
+    "번호",
+    "구분",
+    "금액",
+  ]);
+  await expect(table.getByRole("row")).toHaveCount(4);
+  await expect(table.getByRole("cell")).toHaveText([
+    "1",
+    "식비",
+    "100",
+    "2",
+    "교통",
+    "200",
+    "3",
+    "기타",
+    "300",
+  ]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
 
 test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다", async ({ page }) => {
@@ -138,17 +198,35 @@ test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다",
   await composer.fill("코드 블록 검사");
   await page.getByRole("button", { name: "보내기" }).click();
 
-  const classes = ["keyword", "string", "number", "function", "type", "comment"];
+  const classes = [
+    "keyword",
+    "string",
+    "number",
+    "function",
+    "type",
+    "comment",
+  ];
   for (const name of classes) {
     await expect(page.locator(`.text-code-${name}`).first()).toBeVisible();
   }
 
   async function colors(dark: boolean) {
-    await page.locator("html").evaluate((html, enabled) => html.classList.toggle("dark", enabled), dark);
-    return page.evaluate((names) => Object.fromEntries(names.map((name) => {
-      const element = document.querySelector(`.text-code-${name}`);
-      return [name, element ? getComputedStyle(element).color : null];
-    })), classes);
+    await page
+      .locator("html")
+      .evaluate(
+        (html, enabled) => html.classList.toggle("dark", enabled),
+        dark,
+      );
+    return page.evaluate(
+      (names) =>
+        Object.fromEntries(
+          names.map((name) => {
+            const element = document.querySelector(`.text-code-${name}`);
+            return [name, element ? getComputedStyle(element).color : null];
+          }),
+        ),
+      classes,
+    );
   }
 
   const light = await colors(false);
@@ -156,10 +234,15 @@ test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다",
   expect(new Set(Object.values(light)).size).toBe(classes.length);
   expect(new Set(Object.values(dark)).size).toBe(classes.length);
   for (const name of classes) expect(dark[name]).not.toBe(light[name]);
-  await expect(page.locator(".text-code-comment").first()).toHaveCSS("font-style", "italic");
+  await expect(page.locator(".text-code-comment").first()).toHaveCSS(
+    "font-style",
+    "italic",
+  );
 });
 
-test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨다", async ({ page }) => {
+test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨다", async ({
+  page,
+}) => {
   await page.goto("/");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("긴 답 스트림 검사");
@@ -169,7 +252,10 @@ test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨�
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
   await composer.fill("읽는 중 다음 답 검사");
   await expect(page.getByRole("button", { name: "보내기" })).toBeEnabled();
-  await expect.poll(async () => scroll.evaluate((element) => element.scrollHeight - element.clientHeight))
+  await expect
+    .poll(async () =>
+      scroll.evaluate((element) => element.scrollHeight - element.clientHeight),
+    )
     .toBeGreaterThan(100);
   await scroll.evaluate((element) => {
     element.scrollTop = 0;
@@ -182,16 +268,31 @@ test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨�
   expect(await scroll.evaluate((element) => element.scrollTop)).toBe(position);
 });
 
-test("막힌 모델을 고른 대화는 넘기지 않고 실패한다", async ({ page, hermes }, testInfo) => {
+test("막힌 모델을 고른 대화는 넘기지 않고 실패한다", async ({
+  page,
+  hermes,
+}, testInfo) => {
   const blockedProvider = `blocked-${testInfo.project.name}`;
   const created = await page.request.post("/api/chat/conversations", {
     data: { agentCode: SWITCH_AGENT_CODE },
   });
-  expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
-  const { conversationId } = (await created.json()) as { conversationId: string };
-  const chosen = await page.request.put(`/api/chat/conversations/${conversationId}/model`, {
-    data: { provider: blockedProvider, model: "blocked-model", reasoningEffort: null },
-  });
+  expect(
+    created.ok(),
+    `빈 대화를 만들지 못했다: ${created.status()}`,
+  ).toBeTruthy();
+  const { conversationId } = (await created.json()) as {
+    conversationId: string;
+  };
+  const chosen = await page.request.put(
+    `/api/chat/conversations/${conversationId}/model`,
+    {
+      data: {
+        provider: blockedProvider,
+        model: "blocked-model",
+        reasoningEffort: null,
+      },
+    },
+  );
   expect(chosen.ok(), `모델을 고르지 못했다: ${chosen.status()}`).toBeTruthy();
 
   await hermes.blockProvider(blockedProvider);
@@ -200,12 +301,16 @@ test("막힌 모델을 고른 대화는 넘기지 않고 실패한다", async ({
       data: { conversationId, text: "막힘 화면 검사" },
     });
     expect(response.ok()).toBeFalsy();
-    expect(((await response.json()) as { code: string }).code).toBe("PROVIDER_BLOCKED");
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "PROVIDER_BLOCKED",
+    );
   } finally {
     await hermes.clearBlockedProviders();
   }
 
   await page.goto(`/chat/${conversationId}`);
-  await expect(page.getByTestId("user-message").last()).toContainText("막힘 화면 검사");
+  await expect(page.getByTestId("user-message").last()).toContainText(
+    "막힘 화면 검사",
+  );
   await expect(page.getByTestId("provider-switched")).toHaveCount(0);
 });

@@ -133,6 +133,7 @@ public class AgentRunner {
             DelegationKey delegationKey) {
         AssembledContext context =
                 agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
+        context = contextAssembler.withResponseInstructions(context);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
         ModelChoice choice = conversation.modelChoice();

@@ -1,0 +1,130 @@
+function cellsOf(line: string): string[] | null {
+  if (/^(?: {4}|\t)/.test(line)) return null;
+
+  const cells: string[] = [];
+  let start = 0;
+  let backslashes = 0;
+  for (let index = 0; index < line.length; index++) {
+    const character = line[index];
+    if (character === "|" && backslashes % 2 === 0) {
+      cells.push(line.slice(start, index).trim());
+      start = index + 1;
+    }
+    backslashes = character === "\\" ? backslashes + 1 : 0;
+  }
+  if (cells.length === 0) return null;
+  cells.push(line.slice(start).trim());
+  if (cells[0] === "") cells.shift();
+  if (cells.at(-1) === "") cells.pop();
+  return cells.length >= 2 ? cells : null;
+}
+
+function isDelimiter(cells: string[]): boolean {
+  return cells.every((cell) => /^:?-+:?$/.test(cell));
+}
+
+/** 구분 줄이 빠진 표만 보완하고 코드와 원문 줄바꿈은 보존한다. */
+export function normalizeMarkdown(source: string): string {
+  const lines = source.split(/\r?\n/);
+  const newline = source.includes("\r\n") ? "\r\n" : "\n";
+  const result: string[] = [];
+  let fence: {
+    character: string;
+    length: number;
+    quoteDepth: number;
+    indent: number;
+  } | null = null;
+  let previousCells: string[] | null = null;
+  let previousQuoteDepth = 0;
+  let separatorPrefix = "";
+  let tableColumns: number | null = null;
+
+  for (const line of lines) {
+    const quotePrefix = /^(?: {0,3}> ?)+/.exec(line)?.[0] ?? "";
+    const quoteDepth = (quotePrefix.match(/>/g) ?? []).length;
+    const quotedContent = line.slice(quotePrefix.length);
+    if (fence && fence.quoteDepth > 0 && quoteDepth < fence.quoteDepth) {
+      fence = null;
+    }
+    if (
+      fence &&
+      fence.indent > 0 &&
+      quotedContent.trim() !== "" &&
+      !quotedContent.startsWith(" ".repeat(fence.indent))
+    ) {
+      fence = null;
+    }
+    const listPrefix =
+      /^ {0,3}(?:[-+*]|\d+[.)]) +/.exec(quotedContent)?.[0] ?? "";
+    let containerContent = quotedContent.slice(listPrefix.length);
+    if (fence) {
+      // 문서 최상위 코드 안의 인용 기호와 목록 기호는 코드 원문이다.
+      containerContent = fence.quoteDepth === 0 ? line : quotedContent;
+      containerContent = containerContent.slice(fence.indent);
+    }
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(containerContent);
+    if (fence) {
+      result.push(line);
+      if (
+        marker &&
+        marker[1][0] === fence.character &&
+        marker[1].length >= fence.length &&
+        marker[2].trim() === ""
+      ) {
+        fence = null;
+      }
+      previousCells = null;
+      tableColumns = null;
+      continue;
+    }
+    if (marker) {
+      fence = {
+        character: marker[1][0],
+        length: marker[1].length,
+        quoteDepth,
+        indent: listPrefix.length,
+      };
+      result.push(line);
+      previousCells = null;
+      tableColumns = null;
+      continue;
+    }
+
+    // 새 목록 항목은 앞 항목의 표와 이어지지 않는다.
+    if (listPrefix !== "" || quoteDepth !== previousQuoteDepth) {
+      previousCells = null;
+      tableColumns = null;
+    }
+    previousQuoteDepth = quoteDepth;
+    const cells = cellsOf(containerContent);
+    if (tableColumns !== null && cells) {
+      result.push(line);
+      continue;
+    }
+    tableColumns = null;
+    const headerCells = previousCells;
+    const continuesRows =
+      cells !== null &&
+      headerCells !== null &&
+      cells.length === headerCells.length;
+    if (continuesRows && !isDelimiter(cells) && !isDelimiter(headerCells)) {
+      result.push(
+        `${separatorPrefix}| ${cells.map(() => "---").join(" | ")} |`,
+      );
+      // 처음 두 행을 확인하면 표로 확정한다. 뒤의 미완성 스트림 행은 판정에 쓰지 않는다.
+      previousCells = null;
+      tableColumns = cells.length;
+      result.push(line);
+      continue;
+    }
+    result.push(line);
+    if (continuesRows && isDelimiter(cells)) {
+      previousCells = null;
+      tableColumns = cells.length;
+    } else {
+      previousCells = cells;
+      separatorPrefix = quotePrefix + " ".repeat(listPrefix.length);
+    }
+  }
+  return result.join(newline);
+}
