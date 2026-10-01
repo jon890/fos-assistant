@@ -6,17 +6,19 @@
 flowchart TD
     L[연결 목록: 카탈로그와 내 상태] --> S[커넥터 선택: manifest 로 입력 칸을 그림]
     S --> O[비밀 칸 입력 뒤 선택지 조회: call options.tool]
+    O -->|사용자별 호출 제한 초과| T[CONNECTOR_RATE_LIMITED, 외부를 부르지 않음]
     O -->|credential_rejected, forbidden, unavailable| X[고정 오류, 아무것도 저장하지 않음]
     O --> A[값 제출]
+    A -->|사용자별 호출 제한 초과| T
     A --> V[call verify.tool]
     V -->|실패| X
     V --> C[사용자 행 잠금과 전용 에이전트 바인딩]
     C --> D[에이전트 비활성화와 PENDING 저장]
-    D --> E[칸마다 env 쓰기, API 도구 목록을 fos-assistant 하나로, 설치]
+    D --> E[칸마다 env 쓰기, 설치가 API 도구 목록을 커넥터 MCP 서버와 선언한 toolset 으로 쓰고 Control Plane MCP 등록을 지움]
     E -->|실패| P[PENDING 유지와 CONNECTOR_OPERATION_FAILED]
     E -->|재시작 필요| W[재시작 대기]
     E --> P2[PENDING, desired_enabled 참]
-    P2 -->|연결 확인| F[설치 조회, 내장 도구가 보이면 목록 다시 씀, MCP probe]
+    P2 -->|연결 확인| F[설치 조회, 설치를 한 번 다시 보냄, MCP probe, 켜진 내장 도구가 선언과 같은지 확인]
     F -->|도구 확인 성공과 재시작 불필요| R[READY와 에이전트 활성화]
     F -->|실패| P
     W -->|관리자가 공유 gateway 재시작 뒤 반영 완료| F
@@ -26,6 +28,7 @@ flowchart TD
 ```
 
 같은 사용자의 요청은 사용자 행 잠금으로 차례로 처리한다. 선택지 조회와 확인 도구 호출은 저장하지 않으므로 잠그지 않는다.
+선택지 조회, 등록, 연결 확인은 사용자별 호출 제한을 먼저 지난다. 같은 사용자의 호출이 이미 돌고 있거나 60초 동안의 횟수를 넘으면 기다리지 않고 거절한다.
 실패한 외부 호출이 에이전트 비활성화를 되돌리지 않아야 한다.
 운영 목록에서 빠진 커넥터의 기존 연결은 목록에 「쓸 수 없음」 으로 보이고 해제만 된다.
 API 와 저장 계약은 [커넥터 연결](connectors.md)이 갖는다.
@@ -952,6 +955,7 @@ profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 �
 ### `always_inject` 항목이 문맥 한도를 넘을 때
 
 Control Plane 은 조립한 Memory 문맥을 8,000자로 제한한다.
+커넥터 에이전트(`connectorManaged`)의 실행은 Memory 문맥을 조립하지 않는다. 근거는 [ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md) 와 [커넥터 연결](connectors.md) 에 있다.
 항상 층을 담기 전에 색인 층의 자리를 떼어 두므로 긴 본문이 색인을 밀어내지 못한다.
 항목 하나가 남은 자리에 들어가지 않으면 그 항목만 빼고 다음 항목과 색인을 계속 담는다.
 넘친 본문은 일부만 잘라 싣지 않는다.

@@ -127,6 +127,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import hmac
+import importlib.metadata
 import json
 import logging
 import os
@@ -218,6 +219,10 @@ PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
 # 커넥터 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
 CONNECTOR_CALL_TIMEOUT_SECONDS = 10
 CONNECTOR_CALL_LIMIT = 4
+# 커넥터 도구 호출이 기대는 mcp SDK 의 주 판이다. 다른 판은 결과 속성 이름이 달라 호출하지 않는다.
+MCP_SDK_MAJOR = 2
+# `_mcp_sdk_version` 이 한 번 읽은 판 문자열이다. 설치된 패키지는 프로세스가 도는 동안 바뀌지 않는다.
+_mcp_sdk_version_cache: Optional[str] = None
 # 지금 돌고 있는 호출 수다. 이벤트 루프 하나에서만 바꾸므로 잠금이 필요 없다.
 _connector_calls = 0
 PROFILE_WRITE_LOCK = asyncio.Lock()
@@ -646,6 +651,12 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
     if set(operator_env) - set(entry["env"]):
         raise ValueError("operator_env 의 값이 운영 목록에 없다")
+    operator_secrets = declared.get("operator_secrets", [])
+    if not isinstance(operator_secrets, list) or any(not isinstance(name, str) for name in operator_secrets):
+        raise ValueError("operator_secrets 는 env 이름 목록이다")
+    if operator_secrets:
+        # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
+        raise ValueError("operator_secrets 는 아직 지원하지 않는다")
     errors = declared.get("errors", {})
     if not isinstance(errors, dict) or any(
             not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
@@ -840,8 +851,53 @@ def _connector_state(value) -> dict:
     return value
 
 
+def _connector_allowlist(state: dict, servers: dict) -> list:
+    """소유 기록의 커넥터 서버 이름과 그 커넥터들이 선언한 내장 toolset 으로 만든 API 도구 목록이다.
+
+    서버 이름을 먼저 두고 manifest 의 `toolsets` 를 뒤에 둔다. 겹친 이름은 한 번만 싣는다.
+    manifest 가 열 수 있는 내장 toolset 은 읽기 전용 이미지 도구뿐이다(ADR-044).
+    운영 목록에서 빠졌거나 검증에 실패해 manifest 를 읽을 수 없는 커넥터는 toolset 을 더하지 않는다.
+    기록이 없으면 MCP 를 전부 막는 값이다.
+    목록에 등록된 MCP 서버 이름이 하나도 없으면 Hermes 가 등록된 서버를 모두 통과시킨다.
+    그래서 빈 목록 대신 `no_mcp` 를 쓴다(ADR-045).
+    옛 기록에는 서버 이름 칸이 없어 기록과 같은 서버 정의를 설정에서 찾는다.
+    """
+    roots = _connector_roots()
+    names, toolsets = [], []
+    for plugin, entry in state.items():
+        name = entry.get("mcp_server") or next(
+            (key for key, value in servers.items() if value == entry["server"]), None)
+        if name is None:
+            raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌거나 바뀌었다")
+        names.append(name)
+        manifest = _connector_manifest(plugin) if plugin in roots else None
+        if manifest is not None:
+            toolsets.extend(manifest["toolsets"])
+    if not names:
+        return ["no_mcp"]
+    return list(dict.fromkeys(names + toolsets))
+
+
+def _remove_backup_env_copies(profile_dir: pathlib.Path) -> None:
+    """이전 판이 백업에 남긴 `.env` 사본을 지운다. 백업 디렉터리가 없으면 아무것도 하지 않는다."""
+    backups = profile_dir / "connector-backups"
+    if not backups.is_dir():
+        return
+    for stale in backups.glob("*/.env"):
+        try:
+            stale.unlink()
+        except OSError as error:
+            logger.warning("dashboard-profile-api: 백업의 옛 env 사본을 지우지 못했다: %s", type(error).__name__)
+
+
 def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> dict:
-    """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다."""
+    """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다.
+
+    설치와 제거는 API 도구 목록을 커넥터 서버 이름과 manifest 가 선언한 내장 toolset 으로 다시 쓰고,
+    설치는 Control Plane MCP 등록도 지운다(ADR-045).
+    이 설치는 커넥터 전용 profile 을 전제한다. Control Plane 이 커넥터 에이전트의 profile 로만 부른다.
+    일반 에이전트의 profile 에 설치하면 그 profile 의 Control Plane MCP 등록과 도구 목록이 사라지고 제거해도 돌아오지 않는다.
+    """
     import yaml
     if profile_dir.resolve() != profile_dir:
         raise ValueError("profile 경로에 심볼릭 링크가 있다")
@@ -852,6 +908,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     for path in (config_path, state_path, env_path, soul_path):
         if path.is_symlink():
             raise ValueError("profile 설정에 심볼릭 링크가 있다")
+    # 바뀐 것이 없어 일찍 돌아가는 요청에서도 옛 사본은 지운다.
+    _remove_backup_env_copies(profile_dir)
     originals = {path: path.read_bytes() if path.exists() else None
                  for path in (config_path, state_path, env_path, soul_path)}
     saved = yaml.safe_load(originals[config_path]) or {}
@@ -878,8 +936,6 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     if owned and name not in servers:
         raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌다")
     allowed = list((saved.get("platform_toolsets") or {}).get("api_server") or [])
-    if CONTROL_PLANE_MCP not in allowed or "memory" in allowed or "no_mcp" in allowed:
-        raise ValueError("Control Plane MCP 를 허용한 API 도구 목록이 필요하다")
     env_text = originals[env_path].decode("utf-8") if originals[env_path] else ""
     values = {}
     if enabled:
@@ -888,11 +944,13 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
         for env_name in manifest["optional_env"]:
             if not _env_value(env_text, env_name):
                 server["env"][env_name] = ""
-        added = owned["allowlist_added"] if owned else name not in allowed
+        # `allowlist_added` 는 더 읽지 않는다. 옛 판이 남긴 기록을 읽을 수 있게 칸만 남긴다.
+        added = owned["allowlist_added"] if owned else True
         servers[name] = server
-        if name not in allowed:
-            allowed.append(name)
+        # 커넥터 에이전트는 Control Plane 도구를 받지 않는다. 제거는 이 등록을 되살리지 않는다.
+        servers.pop(CONTROL_PLANE_MCP, None)
         state[plugin] = {"server": server, "allowlist_added": added, "mcp_server": name}
+        allowed = _connector_allowlist(state, servers)
         if manifest["persona"] is not None:
             # 지침은 이 커넥터의 소유 기록과 함께, 관리 표식이 있는 profile 에만 쓴다.
             # 사람이 만든 profile 과 이 요청이 가리키지 않은 profile 의 `SOUL.md` 는 건드리지 않는다.
@@ -902,9 +960,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
             values[soul_path] = manifest["persona"].encode("utf-8")
     elif owned:
         servers.pop(name, None)
-        if owned["allowlist_added"]:
-            allowed = [item for item in allowed if item != name]
         state.pop(plugin, None)
+        allowed = _connector_allowlist(state, servers)
         if manifest is None and originals[env_path] is not None:
             # Control Plane 은 목록에서 빠진 커넥터의 env 이름을 모른다. 기록이 참조하던 key 를 여기서 지운다.
             referenced = {key for key, value in owned["server"]["env"].items() if value == "${%s}" % key}
@@ -921,7 +978,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     backup.mkdir(parents=True, mode=0o700)
     os.chmod(backup.parent, 0o700)
     for path, value in originals.items():
-        if value is not None:
+        # profile `.env` 에는 사용자의 비밀 원문이 있다. 백업에 넣으면 연결을 해제한 뒤에도 남는다.
+        if value is not None and path != env_path:
             _atomic_private_write(backup / path.name, value)
     written = []
     try:
@@ -979,12 +1037,21 @@ async def _connector_request(request):
             state_path = profile_dir / CONNECTOR_STATE
             state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.exists() else {}
             servers = config.get("mcp_servers") or {}
+            try:
+                expected = _connector_allowlist(state, servers)
+            except FileExistsError:
+                expected = None
+            # 설치가 쓰는 목록과 같고 Control Plane MCP 등록이 없어야 설치가 끝난 것이다.
+            # 이 값은 profile 단위다. 목록이 profile 하나에 하나뿐이라 서버 이름을 찾지 못하는 기록이 하나라도 있으면
+            # 그 profile 의 커넥터가 모두 `configured: false` 다.
+            isolated = (expected is not None and CONTROL_PLANE_MCP not in servers
+                        and (config.get("platform_toolsets") or {}).get("api_server") == expected)
             connectors = []
             for plugin in roots:
                 manifest = _connector_manifest(plugin)
                 connectors.append({
                     "plugin": plugin, "enabled": plugin in state,
-                    "configured": (plugin in state and manifest is not None
+                    "configured": (plugin in state and manifest is not None and isolated
                                    and servers.get(manifest["mcp_server"]) == state[plugin]["server"])})
             # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False}
@@ -1035,17 +1102,53 @@ async def _run_connector_tool(manifest: dict, tool: str, env: dict):
                 return await session.call_tool(tool, {})
 
 
+def _mcp_sdk_version() -> str:
+    """설치된 `mcp` SDK 의 판이다. 읽지 못하면 `unknown` 이다. 프로세스에서 한 번만 읽는다."""
+    global _mcp_sdk_version_cache
+    if _mcp_sdk_version_cache is None:
+        try:
+            _mcp_sdk_version_cache = importlib.metadata.version("mcp")
+        except importlib.metadata.PackageNotFoundError:
+            _mcp_sdk_version_cache = "unknown"
+    return _mcp_sdk_version_cache
+
+
+def _mcp_sdk_problem() -> Optional[str]:
+    """커넥터 도구 호출이 기대는 SDK 가 아니면 까닭 한 줄을 돌려주고, 지원 범위이면 None 이다."""
+    if _mcp_sdk_version().split(".")[0] != str(MCP_SDK_MAJOR):
+        return "지원 범위 mcp>=%d.0,<%d 밖이다" % (MCP_SDK_MAJOR, MCP_SDK_MAJOR + 1)
+    try:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+        import mcp.types as mcp_types
+    except ImportError:
+        return "mcp SDK 를 읽어 오지 못했다"
+    if "read_only_hint" not in mcp_types.ToolAnnotations.model_fields:
+        return "필요한 속성 read_only_hint 가 없다"
+    for name in ("structured_content", "is_error", "content"):
+        if name not in mcp_types.CallToolResult.model_fields:
+            return "필요한 속성 %s 가 없다" % name
+    return None
+
+
+def _leaf_error_types(error) -> list:
+    """예외 묶음을 끝까지 풀어 가장 안쪽 예외의 종류 이름을 모은다."""
+    inner = getattr(error, "exceptions", None)
+    if not inner:
+        return [type(error).__name__]
+    return [name for item in inner for name in _leaf_error_types(item)]
+
+
 def _connector_call_answer(manifest: dict, result) -> dict:
     """도구 결과를 `{ok, result}` 나 `{ok, error}` 로 바꾼다. 읽지 못한 결과는 `unavailable` 이다."""
-    payload = getattr(result, "structured_content", None)
+    payload = result.structured_content
     if payload is None:
         try:
-            text = next(item.text for item in getattr(result, "content", None) or []
-                        if getattr(item, "type", None) == "text")
+            text = next(item.text for item in result.content if item.type == "text")
             payload = json.loads(text)
         except (StopIteration, ValueError, TypeError):
             return {"ok": False, "error": "unavailable"}
-    if getattr(result, "is_error", False):
+    if result.is_error:
         error = payload.get("error") if isinstance(payload, dict) else None
         code = error.get("code") if isinstance(error, dict) else None
         word = manifest["errors"].get(code, "unavailable") if isinstance(code, str) else "unavailable"
@@ -1085,6 +1188,12 @@ async def _connector_call_request(request, connector_id: str):
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 
+    problem = _mcp_sdk_problem()
+    if problem is not None:
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+                       _mcp_sdk_version(), problem)
+        return failed("unavailable")
+
     # 줄을 세우지 않는다. 가득 차 있으면 기다리는 동안 요청이 쌓여 대시보드가 느려진다.
     if _connector_calls >= CONNECTOR_CALL_LIMIT:
         logger.warning("dashboard-profile-api: 커넥터 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
@@ -1093,6 +1202,7 @@ async def _connector_call_request(request, connector_id: str):
     try:
         # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
         result = await asyncio.wait_for(_run_connector_tool(manifest, tool, env), CONNECTOR_CALL_TIMEOUT_SECONDS)
+        answer = None if result is None else _connector_call_answer(manifest, result)
     except ImportError:
         logger.warning("dashboard-profile-api: mcp SDK 를 읽어 오지 못해 커넥터 도구를 부르지 못했다")
         return failed("unavailable")
@@ -1100,15 +1210,15 @@ async def _connector_call_request(request, connector_id: str):
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, tool)
         return failed("unavailable")
     except Exception as error:
-        # 예외 본문에는 자식의 출력이 섞일 수 있다. 종류만 남긴다.
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s",
-                       connector_id, tool, type(error).__name__)
+        # 예외 본문에는 자식의 출력이 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s (mcp SDK %s)",
+                       connector_id, tool, ", ".join(sorted(set(_leaf_error_types(error)))), _mcp_sdk_version())
         return failed("unavailable")
     finally:
         _connector_calls -= 1
-    if result is None:
+    if answer is None:
         return _rejected("읽기 전용 도구가 아니다")
-    return JSONResponse(_connector_call_answer(manifest, result), status_code=200)
+    return JSONResponse(answer, status_code=200)
 
 
 async def _check_connector_probe(request):
@@ -1621,6 +1731,12 @@ def register(ctx) -> None:
         return
 
     ctx.register_dashboard_auth_provider(ProfileApiProvider(secret=secret))
+
+    # 판이 범위 밖이어도 등록은 한다. profile 관리 경로까지 닫으면 사용자 추가가 멈춘다.
+    problem = _mcp_sdk_problem()
+    if problem is not None:
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+                       _mcp_sdk_version(), problem)
 
     opened = {}
     for path, method in ALLOWED_ROUTES:

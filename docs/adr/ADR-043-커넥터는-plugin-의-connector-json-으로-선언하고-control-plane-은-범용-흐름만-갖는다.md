@@ -19,5 +19,5 @@
 - **결과**:
   - 얻는 것: 커넥터를 붙이는 일이 plugin 저장소에 `connector.json` 을 두고 운영 설정에 한 줄을 더하는 것으로 끝난다. Control Plane 은 서비스 이름과 주소를 모른다.
   - 감당할 것: 대시보드 plugin 이 자식 프로세스를 띄워 도구를 부른다. 시간 제한과 동시 실행 수 제한을 두고, manifest 가 허용한 읽기 전용 도구만 부른다.
-    `fields` JSON 에 비밀 원문이 들어가는 것을 DB 가 막지 못하므로, 코드가 비밀 칸은 앞 8자만 남기고 검사가 원문 부재를 확인한다.
+    `fields` JSON 에 비밀 원문이 들어가는 것을 DB 가 막지 못하므로, 코드가 비밀 칸은 앞부분만 남기고 검사가 원문 부재를 확인한다.
     오류 원문은 서비스마다 다르므로 manifest 의 대응 표가 공통 어휘 넷(`credential_rejected`, `forbidden`, `unavailable`, `invalid_input`)으로 바꾸고, 표에 없는 코드는 `unavailable` 로 본다.

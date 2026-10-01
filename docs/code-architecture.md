@@ -55,7 +55,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
 
 검사는 `python3 -m unittest discover -s hermes/tests` 로 돈다. 필요한 것은 Python 3.13 과 PyYAML 과 `mcp` SDK 다. Hermes 이미지와 같은 판이다.
-대시보드 plugin 은 커넥터 도구를 부를 때만 `mcp` SDK 를 쓴다. SDK 가 없어도 plugin 은 올라오고 그 경로만 `unavailable` 로 답한다.
+대시보드 plugin 은 커넥터 도구를 부를 때만 `mcp` SDK 를 쓴다. SDK 가 없거나 지원 범위(`mcp>=2.0,<3`) 밖이어도 plugin 은 올라오고 그 경로만 `unavailable` 로 답한다. 계약은 [커넥터 연결](connectors.md) 의 「MCP SDK 계약」 이 갖는다.
 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
 
 ## backend 패키지
@@ -63,8 +63,10 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 `connector`는 커넥터 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
+`connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
+커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `McpCallerResolver` 는 origin 실행의 에이전트가 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
-`test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 에 특정 서비스 이름이 들어오지 않았는지 본다.
+`test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 와 `hermes/plugins` 에 특정 서비스 이름이 들어오지 않았는지 본다.
 예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
 계약은 [커넥터 연결](connectors.md)에 있다.
 

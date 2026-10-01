@@ -26,6 +26,8 @@ export type AgentView = {
   editable: boolean;
   /** 요청자가 이 에이전트의 주인이다 */
   ownedByMe: boolean;
+  /** 커넥터 연결이 만든 에이전트다. 도구와 스킬 편집을 그리지 않는다 */
+  connectorManaged: boolean;
 };
 
 /** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */
