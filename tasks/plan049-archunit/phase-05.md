@@ -11,14 +11,14 @@ Java 포맷을 Spotless 설정으로 정하고, `origin/main` 에서 바뀐 파�
 
 ## 컨텍스트
 
-- 포매터는 palantir-java-format 2.100.0 이다. 선택 까닭은 ADR-041 「대안 기각」 에 있다. 들여쓰기 4칸, 한 줄 120자다
+- 포매터는 palantir-java-format 2.100.0 이다. 선택 까닭은 ADR-042 「대안 기각」 에 있다. 들여쓰기 4칸, 한 줄 120자다
 - 2026-09-30 에 같은 코드로 측정했다. 저장소 전체에 적용하면 palantir 는 337개 중 258개 파일, google 기본 모양은 337개, AOSP 모양은 307개 파일이 바뀐다
 - Spotless Gradle 플러그인 8.10.3. `ratchetFrom("origin/main")` 이면 `origin/main` 과 내용이 다른 파일만 검사한다
 - 이 phase 를 돌리는 작업 공간은 git linked worktree 일 수 있다. Spotless 의 ratchet 은 JGit 으로 저장소를 연다
 - 앞 phase 들이 바꾼 Java 파일은 `git diff --name-only origin/main -- 'backend/src/**/*.java'` 로 본다. phase 02 가 테스트 파일 약 110개를 바꿨으므로 그 파일들도 이번에 포맷된다
 - phase 04 의 Checkstyle 은 줄 길이와 들여쓰기를 판정하지 않는다. 포맷 뒤에도 error 0건으로 통과해야 한다. palantir 가 한 줄 본문을 여러 줄로 나누는지 확인해 phase 04 의 `LeftCurly`, `RightCurly`, `OneStatementPerLine` 과 어긋나지 않는지 본다. 어긋나면(포맷한 결과가 Checkstyle 에 걸리면) 멈추고 보고한다
 
-**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
 ## 의도 메모
 
@@ -54,7 +54,7 @@ Java 포맷을 Spotless 설정으로 정하고, `origin/main` 에서 바뀐 파�
   }
   ```
 
-  위에 한국어 주석으로 ratchet 이 무엇을 뜻하는지와 ADR-041 을 적는다
+  위에 한국어 주석으로 ratchet 이 무엇을 뜻하는지와 ADR-042 을 적는다
 
 ### 2. 이 브랜치가 바꾼 파일을 포맷한다
 

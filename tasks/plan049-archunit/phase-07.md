@@ -21,13 +21,13 @@ Prettier 를 두고 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 �
 - 2026-09-30 측정: `web/src/app/api` 에서 `NextResponse.json({ code` 60곳, `request.json()` 16곳
 - 코디네이터가 2026-09-30 에 eslint 설치와 bulk suppressions 방식, 아래 규칙 (1)~(5)와 Prettier 를 정했다
 
-**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `web/AGENTS.md`
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `web/AGENTS.md`
 
 ## 의도 메모
 
 - **시작 전에 `origin/main` 을 합친다.** `git fetch origin && git merge --no-edit origin/main`
 - 합친 main 코드가 새 ArchUnit 간선 위반, 새 Checkstyle 위반, 새 한국어 테스트 이름을 들여오면 앞 phase 의 방법으로 처리하고 이 phase 의 커밋에 넣는다. 그 변경이 있으면 회신의 「특이사항」 에 파일 목록과 무엇을 했는지 적는다
-- ADR-041 은 처음에 Prettier 를 넣지 않는다고 적었다. 코디네이터 결정으로 넣으므로 ADR-041 의 그 대안 기각 항목을 고친다(작업 항목 5)
+- ADR-042 은 처음에 Prettier 를 넣지 않는다고 적었다. 코디네이터 결정으로 넣으므로 ADR-042 의 그 대안 기각 항목을 고친다(작업 항목 5)
 - Prettier 설정은 기본값을 쓴다. 널리 쓰는 기본 모양이 좋은 포맷이고, 설정을 늘리면 읽는 사람이 규칙을 다시 배워야 한다. `components/ui` 도 포함한다
 - Prettier 는 eslint 와 겹치는 규칙이 없다. `eslint-config-next` 는 서식 규칙을 켜지 않는다. `eslint-config-prettier` 는 더하지 않는다. executor 가 실제로 겹치는 규칙이 없는지 확인한다
 - 바뀐 파일만 고르는 방법은 Spotless 와 같다. `git diff --name-only $(git merge-base HEAD origin/main)` 과 추적하지 않는 새 파일 가운데 `web/` 아래 Prettier 가 다루는 확장자다. 이 목록을 뽑는 일은 `web/scripts/changed-files.mjs` 하나에 두고(Node 내장 모듈만 쓴다. CI `unit` job 은 의존을 설치하지 않는다) `format:check` 와 `format:changed` 스크립트가 함께 쓴다. 셸과 Node 에 같은 규칙이 두 벌 생기지 않게 한다
@@ -89,7 +89,7 @@ Prettier 를 두고 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 �
 ### 5. 문서
 
 - `web/AGENTS.md` 에 「lint 와 포맷」 절: 도구와 버전, 의도 메모의 규칙 표(까닭 포함), 기준 파일, 갱신 방법(고치면 `pnpm exec eslint --prune-suppressions`, 새 위반은 고친다, 꼭 받아들여야 하면 `--suppress-rule <규칙>` 과 까닭), Prettier 가 바뀐 파일만 다룬다는 것과 `pnpm format:check`, `pnpm format:changed`, `node --test` 가 읽는 파일의 상대 경로 예외와 그 목록을 갱신하는 방법, 기준에 든 위반은 줄여 갈 목록이고 GitHub 이슈가 있다는 것
-- `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`: 결정에 web 포맷(Prettier, 바뀐 파일만)을 더하고, 「web 에 Prettier 를 더한다」 대안 기각 항목을 지운다. 대신 코디네이터 결정으로 넣었다는 것을 맥락에 한 줄 적는다
+- `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`: 결정에 web 포맷(Prettier, 바뀐 파일만)을 더하고, 「web 에 Prettier 를 더한다」 대안 기각 항목을 지운다. 대신 코디네이터 결정으로 넣었다는 것을 맥락에 한 줄 적는다
 
 ## 검증
 
@@ -120,4 +120,4 @@ scripts/check-public-safe.sh
 | `web/scripts/changed-files.mjs` | 신규 |
 | `test/unit/changed-files.test.ts` | 신규 |
 | `web/AGENTS.md` | 수정 |
-| `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md` | 수정 |
+| `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md` | 수정 |

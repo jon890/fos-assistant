@@ -306,7 +306,7 @@ profile 이 빈 토큰은 인증에서 거절한다.
 **서버 이름을 바꿀 때는 등록 이름과 허용 목록을 한 번에 바꾼다.**
 `platform_toolsets.api_server` 의 MCP 이름은 허용 목록이다. 목록에 등록되지 않은 이름만 남으면 Hermes 는 허용 목록이 없는 것으로 보고 전역 MCP 서버를 모두 켠다. 근거는 [v0.21.5 `hermes_cli/tools_config.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/tools_config.py) 의 `_get_platform_tools` 다.
 그래서 대시보드 plugin 이 옛 이름과 새 이름을 함께 받는 동안 등록과 목록을 바꾸고, backend 가 새 이름을 쓰게 한 뒤 옛 이름을 막는다.
-실제 MCP 서버 등록과 토큰 전달은 비공개 저장소 `fos-home-infra`가 맡는다.
+MCP 서버를 등록하는 설정 틀은 이 저장소의 `hermes/profile-template/` 가 갖는다. 토큰 값을 넣고 실제 연결을 확인하는 일은 비공개 저장소 `fos-home-infra` 가 맡는다.
 
 ### API server 에서 MCP 도구를 여는 범위
 

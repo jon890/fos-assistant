@@ -18,6 +18,44 @@ Next.js 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마�
 Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 다르다.
 그 두 방향은 [`flow.md`](flow.md) 의 「두 방향과 두 토큰」 절이 그림으로 갖는다.
 
+## Hermes 쪽 코드 (`hermes/`)
+
+Control Plane 이 기대는 Hermes 쪽 코드는 이 저장소가 갖는다.
+근거는 [ADR-041](adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md) 에 있다.
+
+```
+hermes/
+  plugins/
+    dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
+    fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙인다
+  profile-template/
+    config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
+  bundle.sh                  설치 묶음을 만든다
+  tests/                     Python unittest. Hermes 모듈은 가짜로 끼운다
+```
+
+**설치 묶음은 `hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>` 가 만든다.**
+묶음은 Hermes 의 `plugins/dashboard-profile-api/` 자리에 그대로 들어갈 모양이다.
+plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/` 이다.
+틀의 MCP 주소 자리는 `__FOS_ASSISTANT_MCP_URL__` 이다. 주소를 주지 않거나 자리가 남으면 묶음을 만들지 않고 실패한다.
+묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다.
+
+**운영 값은 코드에 두지 않는다.**
+
+| 값 | 어디서 받나 |
+| --- | --- |
+| Control Plane MCP 주소 | 묶음을 만들 때 `--mcp-url` |
+| 커넥터 plugin 경로 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS`. `{"<커넥터 이름>": "<plugin 디렉터리>"}` 모양의 JSON 이다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
+| 커넥터 실행 파일 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 없거나 절대 경로가 아니면 커넥터를 쓸 수 없는 것으로 본다 |
+| 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` |
+| 스킬 루트 | 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` |
+
+**plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받는다.** 운영은 plugin 을 먼저 올리고 Control Plane 을 올린다.
+경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
+
+검사는 `python3 -m unittest discover -s hermes/tests` 로 돈다. 필요한 것은 Python 3.13 과 PyYAML 뿐이다. Hermes 이미지와 같은 판이다.
+실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
+
 ## backend 패키지
 
 `connector`는 사용자별 가계부 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.

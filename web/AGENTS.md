@@ -92,7 +92,7 @@ grep -rn 'style={{' web/src/
 
 화면 코드의 규칙은 문장이 아니라 `web/eslint.config.mjs` 가 갖는다.
 도구는 eslint 9.39.5 와 `eslint-config-next` 16.0.10, Prettier 3.9.9 이고 버전을 정확한 값으로 고정한다.
-규칙을 도구 설정으로 두는 근거는 [ADR-041](../docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 에 있다.
+규칙을 도구 설정으로 두는 근거는 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 에 있다.
 
 ```bash
 # cwd: web/

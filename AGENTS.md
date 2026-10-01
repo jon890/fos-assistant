@@ -50,6 +50,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 - **이 저장소는 공개 저장소다. 홈서버의 운영 정보를 적지 않는다.** 아래 「공개 저장소」 를 본다.
 - Hermes core 를 고치지 않는다. profile, API server, plugin hook 만 쓴다.
   고쳐야 할 것 같으면 ADR-001 의 검토 순서를 따른다.
+- Hermes 에 설치하는 plugin 과 profile 틀은 `hermes/` 가 갖는다. 운영 값은 설치할 때 받고 코드에 두지 않는다.
 - 비밀값을 데이터베이스에 넣지 않는다. profile key 는 홈서버 파일에 둔다.
 - 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 을 정하지 못한다.
 - Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
@@ -125,7 +126,7 @@ scripts/check-public-safe.sh
 
 ## 확인
 
-아래 일곱 검사를 한 번에 돌린다.
+아래 여덟 검사를 한 번에 돌린다.
 
 ```bash
 # cwd: 저장소 root
@@ -149,6 +150,7 @@ cd web && pnpm typecheck && pnpm build
 cd web && pnpm test:browser
 node test/e2e/run.ts
 node --test 'test/unit/**/*.test.ts'
+python3 -m unittest discover -s hermes/tests
 scripts/check-public-safe.sh
 scripts/quality.sh check
 ```
@@ -158,7 +160,7 @@ scripts/quality.sh check
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
-GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 일곱 검사를 돌린다.
+GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 여덟 검사를 돌린다.
 PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사하고, main 에 push 하면 main 을 검사한다.
 각 검사는 독립된 job 으로 나란히 돈다. 로컬 직접 확인과 위 규칙은 그대로 유지한다.
 브라우저 검사는 `browser-mobile` 과 `browser-desktop` 으로 나눠 두 폭을 나란히 검사한다.
@@ -190,7 +192,7 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.1
 
 브랜치를 push 하고 PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
 **계획서만으로 PR 을 열지 않는다.** 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
-PR 의 merge ref 에서 CI 의 `backend`, `web`, `e2e`, `unit`, `public-safe`, `quality` 가 모두 통과했는지 확인한다. 브라우저 검사는 로컬에서 직접 돌린 결과로 본다.
+PR 의 merge ref 에서 CI 의 `backend`, `web`, `e2e`, `unit`, `hermes`, `public-safe`, `quality` 가 모두 통과했는지 확인한다. 브라우저 검사는 로컬에서 직접 돌린 결과로 본다.
 브랜치 보호의 필수 검사는 CI 가 여러 번 안정되게 돈 뒤 따로 정한다.
 PR 을 열면 `.github/workflows/claude-code-review.yml` 이 Claude 코드 리뷰를 돌린다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖고, 그 파일은 이 문서와 `docs/` 를 가리킨다.
@@ -223,7 +225,7 @@ PR 본문과 제목도 공개된다. 「공개 저장소」 절이 그대로 걸
 ## 커밋
 
 한국어로 쓴다.
-제목은 `<type>(<범위>): <메시지>` 형식을 쓰고 범위는 `backend`, `web`, `docs`, `infra` 중 하나다.
+제목은 `<type>(<범위>): <메시지>` 형식을 쓰고 범위는 `backend`, `web`, `hermes`, `docs`, `infra` 중 하나다.
 변경 대상과 달라진 동작을 함께 적는다.
 
 ## 코드 주석은 한국어로 쓴다

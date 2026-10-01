@@ -18,7 +18,7 @@
 - phase 01 이 `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 와 `ArchitectureRulesTest.java`, 기준 디렉터리 `backend/config/archunit/store/` 를 만들었다. 기준 파일 갱신 방법은 `backend/AGENTS.md` 「구조 규칙」 절에 있다
 - 나란히 도는 다른 브랜치가 테스트 파일을 고치고 있다. 이 phase 를 머지하면 그쪽이 충돌을 푼다. 사용자가 그 비용을 알고 한 번에 옮기는 쪽을 골랐다
 
-**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md` 의 「대안 기각」 에서 테스트 메서드 이름 항목
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md` 의 「대안 기각」 에서 테스트 메서드 이름 항목
 
 ## 의도 메모
 

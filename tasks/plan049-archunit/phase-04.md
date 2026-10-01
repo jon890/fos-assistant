@@ -24,7 +24,7 @@
 - 코디네이터가 main 에서 집계한 값: 전체 이름 참조 약 92곳(테스트 포함), 한 줄로 몰아 쓴 메서드 69개(11파일), 중괄호 없는 제어문 84곳, 직접 만든 로거 43파일, `@RequiredArgsConstructor` 없이 생성자를 쓴 빈 27파일, 직접 쓴 private 빈 생성자 약 16곳
 - 엔티티(`@Entity`) 가운데 `Agent`, `Memory`, `AgentExecution`, `AgentToken` 등은 Lombok `@Getter` 와 손으로 쓴 record 모양 접근자(`public String code() { return code; }`)가 함께 있다
 
-**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 의 「주석」 절(한국어 Javadoc)
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `backend/AGENTS.md` 의 「주석」 절(한국어 Javadoc)
 
 ## 의도 메모
 

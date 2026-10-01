@@ -20,7 +20,7 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 - AGENTS.md 「확인」 절은 「아래 여섯 검사를 한 번에 돌린다」 며 `scripts/check-local.sh` 를 가리키고, 그 스크립트가 차례로 돌리는 명령 여섯 줄을 적는다. 그 아래 문장이 「위 여섯 검사」 와 CI job 이름 `backend`, `web`, `e2e`, `unit`, `public-safe` 를 적는다
 - `scripts/check-local.sh` 는 `step <이름> <명령>` 으로 단계를 차례로 돌리고, 처음 실패한 단계에서 멈춘다. 마지막 단계는 `public-safe` 다
 
-**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
 ## 의도 메모
 

@@ -8,7 +8,7 @@
 지금 있는 위반은 저장소에 커밋한 기준 파일에 얼려 두고 새 위반만 `./gradlew test` 에서 실패시킨다.
 
 **범위 외**: 테스트 메서드 이름(phase 02), Checkstyle(phase 03), 포맷(phase 04), `qualityCheck` 태스크와 `scripts/quality.sh`(phase 05).
-이 phase 는 기존 위반을 고치지 않는다. 기존 위반을 줄이는 일은 기준마다 연 GitHub 이슈가 맡는다(ADR-041).
+이 phase 는 기존 위반을 고치지 않는다. 기존 위반을 줄이는 일은 기준마다 연 GitHub 이슈가 맡는다(ADR-042).
 
 ## 컨텍스트
 
@@ -28,7 +28,7 @@
   - 새 규칙을 기준에 적는 것도, 고친 위반을 기준에서 빼는 것도 저장이다. `allowStoreUpdate=false` 면 둘 다 `StoreUpdateFailedException` 으로 실패한다
   - 그래서 기준에 든 위반을 고치거나 그 클래스 이름을 바꾸면 평소의 `./gradlew test` 가 실패한다. 기준을 줄이는 커밋을 함께 넣으라는 신호로 쓴다
 
-**근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `docs/code-architecture.md` 의 「backend 패키지」, 「다른 에이전트에게 맡기기」, 「중지」, 「사용자를 더할 때」 절, `backend/AGENTS.md` 의 「패키지 배치」 와 「기술 주의점」 절
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `docs/code-architecture.md` 의 「backend 패키지」, 「다른 에이전트에게 맡기기」, 「중지」, 「사용자를 더할 때」 절, `backend/AGENTS.md` 의 「패키지 배치」 와 「기술 주의점」 절
 
 ## 의도 메모
 
