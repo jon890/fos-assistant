@@ -8,6 +8,7 @@ import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.UserRole;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class ContextAssemblerTest {
     @DisplayName("공통 표 지침은 Memory 예산 밖에 두고 누락 항목을 보존한다")
     void keepsMemoryBudgetAndOmissionsIndependent() {
         String body = "가".repeat(8_000);
-        AssembledContext memory = new AssembledContext(body, body.length(), java.util.List.of(3L));
+        AssembledContext memory = new AssembledContext(body, body.length(), List.of(3L));
 
         AssembledContext result = assembler.withResponseInstructions(memory);
 
