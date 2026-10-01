@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * 주인에게 보이는 승인 줄이다(ADR-048). 인자 원문과 결과를 담으므로 주인 밖에는 내지 않는다.
+ * 주인에게 보이는 승인 줄이다(ADR-050). 인자 원문과 결과를 담으므로 주인 밖에는 내지 않는다.
  *
  * @param actionId 승인 요청 번호. 공개 식별자다
  * @param toolName 원래 도구 이름. 확인하지 못한 호출은 null

@@ -21,7 +21,7 @@ hook 이 부를 `POST /internal/hermes/connector-policy` 를 만든다. Control 
 - 끝단 테스트의 본보기는 `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionEndpointTest.java`(실제 HTTP, `AgentTokenService.issue(...).rawToken()`)와 서명 도우미 `mcp/McpCallSigner.java` 다
 - phase 03 이 `ToolRisk`, `ToolApproval`, `ToolPolicy`, `ConnectorToolPolicies`, `ConnectorManifest.schema()`, `ConnectorManifest.tools()` 를 만들었다
 
-**근거 문서**: `docs/connectors.md` 의 「도구 호출 판정」, `docs/data-schema.md` 의 「connector_action」, `docs/flow.md` 의 「커넥터 도구를 부를 때」, `docs/code-architecture.md` 의 `connector` 클래스 표, `docs/adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
+**근거 문서**: `docs/connectors.md` 의 「도구 호출 판정」, `docs/data-schema.md` 의 「connector_action」, `docs/flow.md` 의 「커넥터 도구를 부를 때」, `docs/code-architecture.md` 의 `connector` 클래스 표, `docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
 
 ## 의도 메모
 
@@ -80,7 +80,7 @@ public record ToolPolicyDecision(ActionDecision decision, ActionDenyReason denyR
 `connector/infra/ConnectorActionRepository.java`: `Optional<ConnectorAction> findByDedupeKey(String dedupeKey)`.
 `ConnectorConnectionRepository` 에 `Optional<ConnectorConnection> findByAgentId(Long agentId)` 를 더한다. `agent` 는 `@OneToOne` 이므로 Spring Data 의 속성 경로 이름(`findByAgent_Id` 가 필요한지)을 엔티티를 읽고 맞춘다.
 
-`backend/src/main/resources/db/migration/V42__connector_action.sql` 로 표를 만든다. 관례는 `V38__connector_connection.sql` 을 따른다(`ENGINE = InnoDB DEFAULT CHARSET = utf8mb4`, `DATETIME(6)`). 외래 키는 `fk_connector_action_user`, `fk_connector_action_agent` 둘이다. 색인은 `idx_connector_action_conversation_status (conversation_id, status)` 와 `idx_connector_action_user_created (user_id, created_at)` 다.
+`backend/src/main/resources/db/migration/V46__connector_action.sql` 로 표를 만든다. 관례는 `V38__connector_connection.sql` 을 따른다(`ENGINE = InnoDB DEFAULT CHARSET = utf8mb4`, `DATETIME(6)`). 외래 키는 `fk_connector_action_user`, `fk_connector_action_agent` 둘이다. 색인은 `idx_connector_action_conversation_status (conversation_id, status)` 와 `idx_connector_action_user_created (user_id, created_at)` 다.
 
 ### 3. 카탈로그 캐시
 
@@ -126,7 +126,7 @@ public ConnectorPolicyAnswer decide(
 
 ### 5. 요청 검증과 컨트롤러 (`mcp`)
 
-`ErrorCode` 에 `CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN)` 를 Javadoc(뜻과 ADR-047)과 함께 더한다.
+`ErrorCode` 에 `CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN)` 를 Javadoc(뜻과 ADR-049)과 함께 더한다.
 
 `mcp/application/ConnectorPolicyRequest.java`:
 
@@ -171,7 +171,7 @@ public record ConnectorPolicyRequest(
 
 `backend/src/test/java/com/bifos/assistant/connector/ConnectorCatalogCacheTest.java`(신규): 고정 `Clock` 으로 TTL 안에서는 한 번만 읽고 지나면 다시 읽는다. 읽기 예외가 그대로 나온다.
 
-`backend/src/test/java/com/bifos/assistant/connector/ConnectorActionMigrationTest.java`(신규): `ConnectorConnectionMigrationTest` 의 방식으로 V42 까지 올리고 `dedupe_key` 가 겹치는 줄이 거절되는지 본다.
+`backend/src/test/java/com/bifos/assistant/connector/ConnectorActionMigrationTest.java`(신규): `ConnectorConnectionMigrationTest` 의 방식으로 V46 까지 올리고 `dedupe_key` 가 겹치는 줄이 거절되는지 본다.
 
 ### 7. `docs/` 대조
 
@@ -233,7 +233,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/shared/util/Sha256.java` | 수정 |
 | `docs/connectors.md` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
-| `backend/src/main/resources/db/migration/V42__connector_action.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V46__connector_action.sql` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ToolPolicyDecisionTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorCatalogCacheTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionMigrationTest.java` | 신규 |

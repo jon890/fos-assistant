@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 승인 줄의 조회와 승인과 거절, 상시 허락의 조회와 거두기다(ADR-048).
+ * 승인 줄의 조회와 승인과 거절, 상시 허락의 조회와 거두기다(ADR-050).
  *
  * <p>누구의 줄인지는 로그인에서만 정한다. 남의 줄과 남의 허락은 없는 것과 같은 응답이고 관리자에게도 같다.
  */

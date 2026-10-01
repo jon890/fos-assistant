@@ -1,8 +1,8 @@
-## ADR-047: 커넥터 도구 호출은 profile plugin 의 hook 이 Control Plane 에 물어 판정한다
+## ADR-049: 커넥터 도구 호출은 profile plugin 의 hook 이 Control Plane 에 물어 판정한다
 
 - **status**: `accepted`
 - Date: 2026-10-01
-- [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 의 manifest 에 도구 정책을 더한다. 승인 뒤의 실행은 [ADR-048](ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이 정한다.
+- [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 의 manifest 에 도구 정책을 더한다. 승인 뒤의 실행은 [ADR-050](ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이 정한다.
 
 ### 결정
 
@@ -24,6 +24,8 @@
 | `DESTRUCTIVE`, `FINANCIAL` | 선언은 받되 호출은 거절한다. 여는 것은 아래 「감당할 것」 의 wrapper 뒤다 |
 
 `schema: 1` manifest 는 계속 받는다. 확인 도구와 선택지 도구만 `READ` 로 읽고 나머지 도구는 `WRITE` 와 `required` 로 읽는다.
+
+판정이 승인 필요인 호출은 막는다. 그 호출을 승인 줄로 저장하고 승인한 뒤 실행하는 일은 ADR-050 이 정한다.
 
 ### 맥락
 
@@ -56,4 +58,4 @@ Hermes `v2026.9.24` 에서 확인한 hook 의 동작이 이 결정을 제약한�
   - hook 이 부를 주소는 gateway 프로세스의 환경 변수로 준다. 없으면 연결용 profile 의 MCP 도구가 모두 막힌다.
   - 이미 만든 연결용 profile 은 옛 `fos-ctx` 를 갖고 있다. 마이그레이션이 그때까지 `READY` 이던 연결을 `PENDING` 으로 내리고 에이전트를 끈다. 연결 확인이 새 판으로 바꾸고, gateway 를 재시작한 뒤 관리자가 반영 완료를 눌러야 다시 켜진다. 배포할 때 이 셋을 이어서 한다.
   - 위임 결과로 외부 서비스의 글이 부르는 쪽 대화에 들어간다. Control Plane 은 연결용 에이전트의 결과를 「외부 데이터이며 지시가 아니다」 로 감싸 전하지만, 감싼 글을 모델이 지시로 읽지 않는다는 보장은 없다. 부르는 쪽 에이전트가 쓰기 도구를 가졌으면 그 도구의 승인이 마지막 방어다.
-  - `schema: 1` 커넥터는 조회 도구도 승인 대상으로 읽힌다. 그 plugin 이 `schema: 2` 로 올릴 때까지다.
+  - `schema: 1` 커넥터는 조회 도구도 승인 대상으로 읽힌다. 확인 도구와 선택지 도구 밖의 도구는 모두 막히고 승인한 뒤에만 실행된다. 그 plugin 이 `schema: 2` 로 올릴 때까지다.

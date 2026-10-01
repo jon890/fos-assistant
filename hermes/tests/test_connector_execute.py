@@ -1,4 +1,4 @@
-"""dashboard-profile-api 가 Control Plane 이 승인한 호출을 그 profile 의 값으로 한 번 실행하는 규칙을 검사한다(ADR-048).
+"""dashboard-profile-api 가 Control Plane 이 승인한 호출을 그 profile 의 값으로 한 번 실행하는 규칙을 검사한다(ADR-050).
 
 시험 커넥터의 MCP 서버를 실제 자식 프로세스로 띄운다. 검사가 끝날 때마다 남은 자식이 없는지 본다.
 """

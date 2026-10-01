@@ -19,12 +19,12 @@
 - `/mcp` 끝단 테스트는 `backend/src/test/java/com/bifos/assistant/mcp/McpAgentToolsTest.java` 다. 서명 도우미는 `mcp/McpCallSigner.java`. 도구 여섯은 `mcp/presentation/McpController.java` 의 `handlers` 맵의 `memory_read`, `artifact_write`, `agent_list`, `agent_status`, `agent_delegate`, `agent_stop` 이다
 - 위임 결과 테스트는 `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` 다
 
-**근거 문서**: `docs/connectors.md` 의 「커넥터 에이전트의 경계」, `docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md`, `docs/adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md` 의 「감당할 것」
+**근거 문서**: `docs/connectors.md` 의 「커넥터 에이전트의 경계」, `docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md`, `docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md` 의 「감당할 것」
 
 ## 의도 메모
 
 - 감싸는 것은 연결용 에이전트의 결과뿐이다. 일반 에이전트의 결과는 지금 모양 그대로 둔다
-- 감싼다고 모델이 그 글을 지시로 읽지 않는다는 보장은 없다. 남은 위험은 ADR-047 의 「감당할 것」 에 적혀 있다
+- 감싼다고 모델이 그 글을 지시로 읽지 않는다는 보장은 없다. 남은 위험은 ADR-049 의 「감당할 것」 에 적혀 있다
 - 결과 본문 안에 닫는 표시와 같은 글이 있어도 바깥 표시가 깨지지 않게 한다
 
 ## 작업 항목

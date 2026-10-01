@@ -16,11 +16,11 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.ChangeRecorder;
+import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.Seen;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
-import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.ChangeRecorder;
-import com.bifos.assistant.connector.ConnectorPolicyTestDoubles.Seen;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
@@ -81,7 +81,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 승인 줄을 만들고 승인, 거절, 만료, 상시 허락으로 다루는 흐름을 실제 DB 로 확인한다(ADR-048).
+ * 승인 줄을 만들고 승인, 거절, 만료, 상시 허락으로 다루는 흐름을 실제 DB 로 확인한다(ADR-050).
  *
  * <p>계약은 {@code docs/connectors.md} 의 「승인」 이다. 대시보드의 실행 경로는 대역이 답한다. 카탈로그는 보관 시간에
  * 걸리지 않게 검사가 시계를 보관 시간보다 멀리 옮긴다. 컨텍스트 수를 늘리지 않으려고 판정 경로의 끝단 검사와 같은
@@ -248,8 +248,7 @@ class ConnectorActionServiceTest {
         assertThat(row.decidedAt()).isNotNull();
         assertThat(row.executedAt()).isNotNull();
         assertThat(grants.findAll()).isEmpty();
-        assertThat(recorder.seen)
-                .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
 
     @Test
@@ -305,13 +304,15 @@ class ConnectorActionServiceTest {
         CountDownLatch release = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> holder = pool.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
-                ConnectorAction row = actions.findByPublicIdForUpdate(actionId).orElseThrow();
-                row.beginExecution(Instant.parse("2026-10-01T00:00:00Z"));
-                actions.saveAndFlush(row);
-                locked.countDown();
-                await(release);
-            }));
+            Future<?> holder =
+                    pool.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+                        ConnectorAction row =
+                                actions.findByPublicIdForUpdate(actionId).orElseThrow();
+                        row.beginExecution(Instant.parse("2026-10-01T00:00:00Z"));
+                        actions.saveAndFlush(row);
+                        locked.countDown();
+                        await(release);
+                    }));
             assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
             Future<Object> rejecting = pool.submit(() -> {
                 try {
@@ -401,8 +402,7 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         assertCode(() -> service.reject(me, actionId), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
-        assertThat(recorder.seen)
-                .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
 
     @Test
@@ -411,8 +411,7 @@ class ConnectorActionServiceTest {
         UUID actionId = ask(WRITE, ARGS).actionId();
         CurrentUser other =
                 currentUser(users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.MEMBER)));
-        CurrentUser admin =
-                currentUser(users.save(AppUser.of("action-admin@example.com", "관리자", 1L, UserRole.ADMIN)));
+        CurrentUser admin = currentUser(users.save(AppUser.of("action-admin@example.com", "관리자", 1L, UserRole.ADMIN)));
 
         assertCode(() -> service.approve(other, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
         assertCode(() -> service.approve(admin, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
@@ -440,8 +439,7 @@ class ConnectorActionServiceTest {
         assertThat(service.expire(expiresAt.plusMillis(2))).isZero();
         assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
-        assertThat(recorder.seen)
-                .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
+        assertThat(recorder.seen).containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
 
     @Test
@@ -495,7 +493,8 @@ class ConnectorActionServiceTest {
         assertThat(allowed.passed()).isTrue();
         assertThat(allowed.argsJson()).isNull();
         List<ConnectorGrantView> mine = service.grants(me);
-        assertThat(mine).extracting(ConnectorGrantView::connectorId, ConnectorGrantView::toolName)
+        assertThat(mine)
+                .extracting(ConnectorGrantView::connectorId, ConnectorGrantView::toolName)
                 .containsExactly(tuple(DEMO, WRITE));
         ConnectorToolGrant stored = grants.findAll().get(0);
         assertThat(Duration.between(stored.createdAt(), stored.expiresAt())).isEqualTo(Duration.ofHours(1));
@@ -616,7 +615,8 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("연결을 해제하면 그 연결의 PENDING 이 REJECTED 가 되고 허락이 거두어지며 사건이 나간다")
     void disconnectRejectsPendingActionsAndRevokesGrants() {
-        when(connector.putConnector(anyString(), anyString(), anyBoolean())).thenReturn(new InstallResult(false, false));
+        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new InstallResult(false, false));
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         UUID waiting = ask("send_note", ARGS).actionId();
         recorder.seen.clear();
@@ -627,7 +627,8 @@ class ConnectorActionServiceTest {
                 .extracting(ConnectorAction::status)
                 .containsExactlyInAnyOrder(ActionStatus.SUCCEEDED, ActionStatus.REJECTED);
         assertThat(service.grants(me)).isEmpty();
-        assertThat(grants.findAll()).allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
+        assertThat(grants.findAll())
+                .allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
         assertThat(recorder.seen)
                 .extracting(Seen::event)
                 .containsExactly(new ConnectorActionChanged(CONVERSATION, waiting));
@@ -637,7 +638,8 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("값을 다시 등록하면 앞선 값에 한 승인 요청이 REJECTED 가 되고 허락이 거두어진다")
     void registeringAgainRejectsPendingActionsAndRevokesGrants() {
-        when(connector.putConnector(anyString(), anyString(), anyBoolean())).thenReturn(new InstallResult(false, false));
+        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new InstallResult(false, false));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
@@ -689,7 +691,8 @@ class ConnectorActionServiceTest {
 
         List<ConnectorActionView> listed = service.listForConversation(me, CONVERSATION);
 
-        assertThat(listed).extracting(ConnectorActionView::actionId, ConnectorActionView::title)
+        assertThat(listed)
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::title)
                 .containsExactly(tuple(actionId, WRITE));
     }
 
@@ -722,8 +725,8 @@ class ConnectorActionServiceTest {
 
     private static void assertCode(ThrowingCallable call, ErrorCode expected) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code())
-                        .isEqualTo(expected));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
 
     private static void await(CountDownLatch latch) {

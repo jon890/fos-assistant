@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.domain.type;
 
 /**
- * 커넥터 도구 하나가 외부에 끼치는 영향의 등급이다(ADR-047).
+ * 커넥터 도구 하나가 외부에 끼치는 영향의 등급이다(ADR-049).
  *
  * <p>값과 기본 승인 방식과 하한은 {@code docs/connectors.md} 의 「도구 정책」 표와 같다.
  */

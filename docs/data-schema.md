@@ -19,7 +19,7 @@
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
 
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
-- V41 은 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내리고 그 연결용 에이전트를 끄고 사진 받기도 내렸다. 그 profile 의 `fos-ctx` 가 옛 판이라 도구 호출이 판정 없이 나가기 때문이다([ADR-047](adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다
+- V45 는 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내리고 그 연결용 에이전트를 끄고 사진 받기도 내렸다. 그 profile 의 `fos-ctx` 가 옛 판이라 도구 호출이 판정 없이 나가기 때문이다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
@@ -42,7 +42,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 ## connector_action
 
-커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다. 근거는 [ADR-047](adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다. 근거는 [ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `approval_mode` | `VARCHAR(16)` | 판정 당시의 승인 방식. 위와 같을 때 비운다 |
 | `decision` | `VARCHAR(20) NOT NULL` | `ALLOWED`, `DENIED`, `NEEDS_APPROVAL` |
 | `deny_reason` | `VARCHAR(40)` | `DENIED` 일 때만. `POLICY_UNAVAILABLE`, `NOT_READY`, `UNDECLARED`, `RISK_NOT_OPEN`, `ARGS_TOO_LARGE` |
-| `passed` | `BOOLEAN NOT NULL` | hook 에 통과로 답했는가 |
+| `passed` | `BOOLEAN NOT NULL` | hook 에 통과로 답했는가. `decision` 이 `ALLOWED` 일 때만 참이다 |
 | `status` | `VARCHAR(20)` | 승인 줄만. `PENDING`, `EXECUTING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `REJECTED`, `EXPIRED` |
 | `origin_execution_id` | `BIGINT NOT NULL` | hook 의 session 으로 찾은 실행 |
 | `conversation_id` | `BIGINT` | 그 실행의 대화. 결과를 돌려줄 곳이다. 대화 없는 실행이면 비운다 |
@@ -73,14 +73,14 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `created_at` | `DATETIME(6) NOT NULL` | |
 
 - 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다
-- `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 가 `PENDING` 으로 시작하며 `args_json` 과 `expires_at` 을 갖는다. 승인 엔진이 켜지기 전에 남은 `NEEDS_APPROVAL` 줄은 `passed` 가 참이고 `status` 와 `args_json` 이 비어 있어 승인 줄로 다루지 않는다
+- `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 가 `PENDING` 으로 시작하며 `args_json` 과 `expires_at` 을 갖는다. 승인 엔진이 켜지기 전에 남은 `NEEDS_APPROVAL` 줄은 `status` 와 `args_json` 이 비어 있어 승인 줄로 다루지 않는다
 - `(conversation_id, status)` 와 `(user_id, created_at)` 에 색인을 둔다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다
 - 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
 
 ## connector_tool_grant
 
-사용자가 도구 하나에 준 상시 허락이다. 승인하면서 기간을 골라 준다. 근거는 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+사용자가 도구 하나에 준 상시 허락이다. 승인하면서 기간을 골라 준다. 근거는 [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -246,6 +246,34 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 
 `sender_user_id` 는 화면이 보낸 사람 이름을 보이기 위한 것이다.
 대화는 여전히 주인 한 사람의 것이고, 여러 사람이 같은 대화를 읽고 쓰는 것은 아직 만들지 않았다.
+
+## chat_pending_message
+
+turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. 보내지기 전까지만 있다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 쌓인 순서다. 합칠 때 이 순서로 잇는다 |
+| `conversation_id` | BIGINT | |
+| `user_id` | BIGINT | 이 글을 보낸 사용자. 합친 `USER` 행의 `sender_user_id` 가 된다 |
+| `content` | LONGTEXT | 글. 한 행은 8000자까지다 |
+| `held` | BOOLEAN NOT NULL DEFAULT FALSE | 멈춰 두었다. 앞 turn 을 중지했거나 보내려다 저장 전에 실패했다 |
+| `created_at` | DATETIME(6) | |
+
+색인은 `(conversation_id, id)` 다.
+
+**보낸 행은 지운다.** 대기 행을 지우는 것과 합친 글을 `chat_message` 의 `USER` 행으로 저장하는 것이 한 트랜잭션이다.
+보낸 글은 `chat_message` 에 남으므로 여기에 이력을 두지 않는다.
+취소한 행도 지운다.
+
+한 대화에 5행까지 둔다. 사이에 빈 줄 하나를 두고 이은 길이가 8000자를 넘지 못한다.
+상한은 표의 제약이 아니라 `PendingMessageService` 가 더할 때 본다.
+
+**한 행이라도 `held` 가 참이면 그 대화의 대기 행을 모두 보내지 않는다.**
+사용자가 「보내기」 를 누르면 그 대화의 `held` 를 모두 내린다.
+
+사진은 담지 않는다.
+근거는 [ADR-048](adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 에 있다.
 
 ## agent_execution
 
@@ -453,7 +481,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 | `hermes_session_id` | VARCHAR(128) NULL | 하위 에이전트가 따로 session 을 가지면 적는다 |
 | `duration_ms` | BIGINT NULL | 끝난 사건에만 있다 |
 | `failed` | BOOLEAN NULL | 완료 사건의 실패 여부. Hermes 가 알려주지 않으면 비운다 |
-| `detail` | VARCHAR(500) NULL | 화면에 한 줄로 보일 만큼만. 하위 에이전트 사건이면 그 목표. 도구 사건의 값은 모두 저장하되 응답에는 ADR-038 이 정한 사람에게만 싣는다 |
+| `detail` | VARCHAR(500) NULL | 하위 에이전트 사건이면 그 목표. 도구 사건은 ADR-047에 따라 비밀값과 UUID를 가린 뒤 저장하고, 응답에는 ADR-038이 정한 사람에게만 싣는다. 연결용 에이전트의 도구 내용은 전체를 가린다 |
 | `model` | VARCHAR(128) NULL | 하위 에이전트가 돈 모델. 하위 에이전트 사건에만 있다 |
 | `input_tokens`, `output_tokens` | BIGINT NULL | 하위 에이전트가 쓴 토큰. `SUBAGENT_COMPLETED` 에만 있다 |
 | `occurred_at` | DATETIME(6) | |
@@ -539,6 +567,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 대화도 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
 메시지와 실행 기록과 Hermes session 은 그대로 둔다.
+아직 보내지 않은 대기 메시지(`chat_pending_message`)는 함께 지운다. 지운 대화에는 보낼 곳이 없다.
 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 실행 기록이 에이전트와 대화를 가리키고 있고, 기록은 남아야 한다.
 

@@ -92,8 +92,9 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 | hook 이 본 것 | 처리 |
 | --- | --- |
 | `skill_manage` | 위와 같이 막는다 |
-| Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 |
-| 대응 파일을 읽지 못한다 | Control Plane MCP 밖의 `mcp__` 도구와 `execute_code` 를 막는다. 그 밖의 도구는 건드리지 않는다 |
+| 대응 파일을 읽지 못한다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 그 밖의 도구는 건드리지 않는다 |
+| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 |
+| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 |
 | `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 |
 | `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 |
 | `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 |
@@ -217,7 +218,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 그 profile 에 관리 표식과 그 커넥터의 소유 기록이 있어야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다
 - 인자와 결과를 로그에 싣지 않는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
-- 요청과 응답은 [커넥터 연결](../docs/connectors.md) 의 「승인」 이 소유한다. 근거는 [ADR-048](../docs/adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
+- 요청과 응답은 [커넥터 연결](../docs/connectors.md) 의 「승인」 이 소유한다. 근거는 [ADR-050](../docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
 
 **소유 기록 `.fos-connectors.json` 은 설치할 때의 서버 정의를 갖고, 요청마다 지금의 manifest 와 같은지 검증한다.**
 

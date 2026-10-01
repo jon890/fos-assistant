@@ -6,12 +6,13 @@
 
 판정이 「승인 필요」 인 호출을 막고 인자와 함께 `PENDING` 으로 저장한다. 주인이 승인하면 저장한 인자로 한 번만 실행하고, 거절하거나 24시간이 지나면 실행하지 않는다.
 상시 허락을 준 도구는 그 기간 동안 바로 통과한다.
+지금은 `NEEDS_APPROVAL` 이 `passed=false` 로 막히고 줄만 남는다. 이 phase 는 그 분기에 승인 줄 저장을 잇는다.
 
 **범위 외**: 결과를 대화에 전하는 것과 `approval` 사건(phase 09), 화면(phase 10).
 
 ## 컨텍스트
 
-- phase 04 가 만든 것: `connector/application/ConnectorPolicyService.decide(...)`, `connector/domain/ConnectorAction`, `ToolPolicyDecision`, `ActionStatus`, `ConnectorActionRepository`, `ConnectorPolicyAnswer(boolean allowed, String message, UUID actionId)`. 지금은 `NEEDS_APPROVAL` 도 `passed` 가 참이고 `granted` 에 늘 false 를 넘긴다
+- phase 04 가 만든 것: `connector/application/ConnectorPolicyService.decide(...)`, `connector/domain/ConnectorAction`, `ToolPolicyDecision`, `ActionStatus`, `ConnectorActionRepository`, `ConnectorPolicyAnswer(boolean allowed, String message, UUID actionId)`. 지금은 `NEEDS_APPROVAL` 을 `passed` 거짓으로 막고 `granted` 에 늘 false 를 넘긴다
 - phase 07 이 만든 것: 대시보드 `POST /api/connectors/{id}/execute`, 본문 `{profile, hermes_tool, args}`, 200 `{ok, result}` 나 `{ok: false, error}`, 시간 초과와 실행 여부를 모르는 실패는 504
 - 대시보드 클라이언트는 `hermes/HermesConnectorClient.java` 와 `HttpHermesConnectorClient.java` 다. `call(...)` 이 `CallResult` 를 돌려주는 방식을 본보기로 삼는다. `RestClient.builder()` 로 만들고 timeout 을 준다(`backend/AGENTS.md`)
 - 사용자 행 잠금과 외부 호출을 나누는 본보기는 `ConnectorConnectionService.register`(트랜잭션 밖 확인 호출 뒤 `TransactionTemplate`)다
@@ -20,7 +21,7 @@
 - 컨트롤러와 DTO 관례: `connector/presentation/ConnectorConnectionController.java`, `ConnectionDtos.java`. 로그인 사용자는 기존 컨트롤러가 `CurrentUser` 를 얻는 방식을 따른다
 - 대화 공개 식별자로 대화를 찾는 것은 `chat/infra/ConversationRepository.findByPublicIdAndUserIdAndDeletedAtIsNull(UUID, Long)` 다. `connector` 가 `chat` 을 import 하면 순환이 생기는지 `./gradlew archTest` 로 본다. 생기면 대화 번호를 푸는 일을 `chat` 쪽 컨트롤러에 두고 `connector` 서비스는 내부 번호를 받는다
 
-**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/data-schema.md` 의 「connector_action」, 「connector_tool_grant」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
+**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/data-schema.md` 의 「connector_action」, 「connector_tool_grant」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
 
 ## 의도 메모
 
@@ -58,7 +59,7 @@
 
 ### 2. 상시 허락
 
-`connector/domain/ConnectorToolGrant.java` 와 `backend/src/main/resources/db/migration/V43__connector_tool_grant.sql`. 칸은 `docs/data-schema.md` 의 「connector_tool_grant」 와 같다. 색인 `idx_connector_tool_grant_lookup (user_id, connector_id, tool_name)`, 외래 키 `fk_connector_tool_grant_user`.
+`connector/domain/ConnectorToolGrant.java` 와 `backend/src/main/resources/db/migration/V47__connector_tool_grant.sql`. 칸은 `docs/data-schema.md` 의 「connector_tool_grant」 와 같다. 색인 `idx_connector_tool_grant_lookup (user_id, connector_id, tool_name)`, 외래 키 `fk_connector_tool_grant_user`.
 
 `connector/domain/type/GrantPeriod.java`: `HOUR, TODAY, DAYS_30`. `Instant expiresAt(Instant now, ZoneId zone)`. `TODAY` 는 그 시간대의 다음 날 0시다.
 
@@ -220,7 +221,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/hermes/ConnectorExecutionUnknown.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
-| `backend/src/main/resources/db/migration/V43__connector_tool_grant.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V47__connector_tool_grant.sql` | 신규 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionControllerTest.java` | 신규 |

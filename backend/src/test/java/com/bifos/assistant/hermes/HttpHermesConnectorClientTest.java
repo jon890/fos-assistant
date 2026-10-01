@@ -321,8 +321,7 @@ class HttpHermesConnectorClientTest {
                 .andRespond(withSuccess("{\"ok\":true,\"result\":{\"saved\":true}}", MediaType.APPLICATION_JSON));
 
         // 저장한 글의 공백은 값에 들지 않는다. 값이 같은 JSON 으로 나간다.
-        CallResult result =
-                client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{\"text\":\"안녕\",   \"count\":2}");
+        CallResult result = client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{\"text\":\"안녕\",   \"count\":2}");
 
         assertThat(result.ok()).isTrue();
         assertThat(result.result().get("saved").asBoolean()).isTrue();
@@ -385,7 +384,8 @@ class HttpHermesConnectorClientTest {
     void executeDoesNotSendArgumentsThatAreNotAnObject() {
         assertThat(client.execute(PROFILE, DEMO, "mcp__demo__write_note", "[1]").error())
                 .isEqualTo(ConnectorCallError.INVALID_INPUT);
-        assertThat(client.execute(PROFILE, DEMO, "mcp__demo__write_note", "not json").error())
+        assertThat(client.execute(PROFILE, DEMO, "mcp__demo__write_note", "not json")
+                        .error())
                 .isEqualTo(ConnectorCallError.INVALID_INPUT);
         // 대역 서버에 기대한 요청이 없다. 요청이 나갔으면 대역이 실패시킨다.
         server.verify();

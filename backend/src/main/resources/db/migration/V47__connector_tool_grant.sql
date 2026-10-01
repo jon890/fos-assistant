@@ -1,4 +1,4 @@
--- 사용자가 커넥터 도구 하나에 준 상시 허락이다(ADR-048). 무기한은 없고, 거두면 줄을 지우지 않고 시각을 적는다.
+-- 사용자가 커넥터 도구 하나에 준 상시 허락이다(ADR-050). 무기한은 없고, 거두면 줄을 지우지 않고 시각을 적는다.
 CREATE TABLE connector_tool_grant (
     id BIGINT NOT NULL AUTO_INCREMENT,
     user_id BIGINT NOT NULL,

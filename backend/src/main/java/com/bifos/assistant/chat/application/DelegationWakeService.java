@@ -7,7 +7,6 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.orchestration.application.DelegationFinished;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -24,15 +23,12 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 /**
  * 맡긴 일의 결과가 끝나면 부모 대화의 turn 을 자동으로 연다(ADR-040).
  *
- * <p>여는지는 그 대화의 turn 잠금을 잡을 수 있는지로 정한다. 잡지 못하면 그 turn 이 닫힐 때 다시 확인한다. 기다리는
+ * <p>여는지는 그 대화의 turn 잠금을 잡을 수 있는지로 정한다. 잡지 못하면 그 turn 이 닫힐 때 {@link NextTurnDispatcher} 가 다시 부른다. 기다리는
  * 목록은 따로 두지 않는다. 아직 전하지 않은 끝난 위임 실행 줄이 곧 목록이다.
  *
  * <p>잠금은 {@link TurnCancellation} 의 메모리 맵이라 서버 하나를 전제로 한다.
@@ -87,38 +83,11 @@ public class DelegationWakeService {
         this.agents = agents;
         this.flows = flows;
         this.users = users;
-        if (properties.enabled()) {
-            // turn 이 도는 동안 끝난 결과는 그 turn 이 닫힐 때 전한다.
-            turns.addCloseListener(this::tryWake);
-        }
     }
 
-    @EventListener
-    public void onDelegationFinished(DelegationFinished event) {
-        if (event.conversationId() != null) {
-            tryWake(event.conversationId());
-        }
-    }
-
-    /**
-     * 기동 전에 끝났지만 전하지 못한 결과가 있는 대화를 차례로 깨운다.
-     *
-     * <p>기동 정리가 끊긴 위임 실행을 FAILED 로 적은 뒤에 돈다. 그래야 그 결과도 함께 전한다.
-     */
-    @EventListener(ApplicationReadyEvent.class)
-    @Order(10)
-    public void wakeAfterStartup() {
-        if (!properties.enabled()) {
-            return;
-        }
-        for (Long conversationId : executions.findConversationsWithUndeliveredResults()) {
-            try {
-                tryWake(conversationId);
-            } catch (RuntimeException ex) {
-                // 한 대화가 실패해도 나머지 대화는 깨운다.
-                log.warn("기동 뒤 대화를 깨우지 못했다 conversationId={}", conversationId, ex);
-            }
-        }
+    /** 기동 전에 끝났지만 전하지 못한 결과가 있는 대화를 돌려준다. 이 기능이 꺼져 있으면 비어 있다. */
+    public List<Long> conversationsToWake() {
+        return properties.enabled() ? executions.findConversationsWithUndeliveredResults() : List.of();
     }
 
     /**
@@ -128,7 +97,8 @@ public class DelegationWakeService {
      * 닫기 리스너가 곧바로 다시 불러 끝없이 돈다. 거른 결과는 실행 줄에 그대로 남는다.
      */
     public void tryWake(Long conversationId) {
-        if (!properties.enabled() || executions.findUndeliveredResults(conversationId).isEmpty()) {
+        if (!properties.enabled()
+                || executions.findUndeliveredResults(conversationId).isEmpty()) {
             return;
         }
         if (inFailureBackoff(conversationId)) {
@@ -140,7 +110,9 @@ public class DelegationWakeService {
         }
         Conversation conversation = found.get();
         Optional<Agent> agent = agents.findById(conversation.agentId());
-        if (agent.isEmpty() || agent.get().isDeleted() || !agent.get().enabled()
+        if (agent.isEmpty()
+                || agent.get().isDeleted()
+                || !agent.get().enabled()
                 || flows.find(agent.get().flow()) != null) {
             return;
         }

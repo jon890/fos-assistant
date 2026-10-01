@@ -46,7 +46,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 실제 HTTP 경계에서 커넥터 도구 호출 판정 경로의 인증과 판정과 기록을 확인한다(ADR-047).
+ * 실제 HTTP 경계에서 커넥터 도구 호출 판정 경로의 인증과 판정과 기록을 확인한다(ADR-049).
  *
  * <p>계약은 {@code docs/connectors.md} 의 「도구 호출 판정」 이다. 본문 서명은 운영 코드가 아니라 {@link McpCallSigner}
  * 가 따로 계산한다. 카탈로그는 대역이 내고, 보관 시간에 걸리지 않게 검사마다 시계를 보관 시간보다 멀리 옮긴다.
@@ -68,7 +68,9 @@ class ConnectorPolicyEndpointTest {
             List.of(
                     new ConnectorTool("list_scopes", "READ", "none", null),
                     new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
-                    new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null)));
+                    new ConnectorTool("share_note", "SENSITIVE", "required", null),
+                    new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null),
+                    new ConnectorTool("pay_invoice", "FINANCIAL", "always", null)));
 
     @LocalServerPort
     int port;
@@ -175,27 +177,38 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
-    @DisplayName("WRITE 도구는 block 과 action_id 로 답하고 인자 원문을 담은 PENDING 승인 줄을 남긴다")
+    @DisplayName("WRITE 와 required 인 도구는 block 과 action_id 로 답하고 인자 원문을 담은 PENDING 승인 줄을 남긴다")
     void writeToolIsBlockedWithActionIdAndRecordedAsPendingApproval() throws Exception {
         connect(true);
 
         HttpResponse<String> response = ask("mcp__demo__write_note", "write_note");
 
-        assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(200);
-        JsonNode body = json.readTree(response.body());
-        assertThat(body.path("decision").asString()).isEqualTo("block");
-        String actionId = body.path("action_id").asString();
-        assertThat(UUID.fromString(actionId)).as("action_id: %s", actionId).isNotNull();
-        assertThat(body.path("message").asString())
-                .isEqualTo("이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 " + actionId
-                        + " 다. 사용자에게 화면에서 승인해 달라고 알리고, 같은 도구를 다시 부르지 않는다. 승인하면 그대로 실행되고 결과가 이 대화로 온다.");
+        assertApprovalRequested(response);
         Map<String, Object> row = onlyRow();
         assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
+        assertThat(row.get("DENY_REASON")).isNull();
         assertThat(row.get("PASSED")).isEqualTo(false);
         assertThat(row.get("STATUS")).isEqualTo("PENDING");
         assertThat(row.get("ARGS_JSON")).isEqualTo(ARGS);
         assertThat(row.get("EXPIRES_AT")).isNotNull();
         assertThat(row.get("RISK")).isEqualTo("WRITE");
+        assertThat(row.get("APPROVAL_MODE")).isEqualTo("REQUIRED");
+        assertThat(row.get("TOOL_NAME")).isEqualTo("write_note");
+    }
+
+    @Test
+    @DisplayName("SENSITIVE 와 required 인 도구도 block 과 action_id 로 답하고 통과하지 않은 PENDING 승인 줄을 남긴다")
+    void sensitiveToolIsBlockedAndRecordedAsPendingApproval() throws Exception {
+        connect(true);
+
+        HttpResponse<String> response = ask("mcp__demo__share_note", "share_note");
+
+        assertApprovalRequested(response);
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
+        assertThat(row.get("PASSED")).isEqualTo(false);
+        assertThat(row.get("STATUS")).isEqualTo("PENDING");
+        assertThat(row.get("RISK")).isEqualTo("SENSITIVE");
         assertThat(row.get("APPROVAL_MODE")).isEqualTo("REQUIRED");
     }
 
@@ -208,9 +221,45 @@ class ConnectorPolicyEndpointTest {
         HttpResponse<String> first = send(token, body);
         HttpResponse<String> second = send(token, body);
 
-        assertThat(json.readTree(first.body()).path("action_id").isString()).isTrue();
+        assertApprovalRequested(first);
+        assertApprovalRequested(second);
+        assertThat(json.readTree(second.body())).isEqualTo(json.readTree(first.body()));
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
+        assertThat(row.get("PASSED")).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("승인 줄을 만든 요청을 연결이 READY 를 벗어난 뒤 다시 보내도 같은 번호와 같은 글을 받는다")
+    void resendingApprovalRequestAfterConnectionLeftReadyReturnsSameActionId() throws Exception {
+        connect(true);
+        String body = body(token, "mcp__demo__write_note", "write_note", root, newCall(), ARGS);
+        HttpResponse<String> first = send(token, body);
+        jdbc.update("update connector_connection set status = 'PENDING' where user_id = ?", owner.id());
+
+        HttpResponse<String> second = send(token, body);
+
+        assertApprovalRequested(first);
         assertThat(json.readTree(second.body())).isEqualTo(json.readTree(first.body()));
         assertThat(rows()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("승인 줄의 tool_call_id 로 다른 등록 이름이나 다른 인자를 보내면 그 번호를 주지 않고 block 이며 줄이 하나다")
+    void reusedToolCallIdOfApprovalRequestWithAnotherToolOrArgsIsBlocked() throws Exception {
+        connect(true);
+        String call = newCall();
+        HttpResponse<String> first = send(token, body(token, "mcp__demo__write_note", "write_note", root, call, ARGS));
+
+        HttpResponse<String> otherTool =
+                send(token, body(token, "mcp__demo__share_note", "share_note", root, call, ARGS));
+        HttpResponse<String> otherArgs =
+                send(token, body(token, "mcp__demo__write_note", "write_note", root, call, "{\"text\":\"다른 글\"}"));
+
+        assertApprovalRequested(first);
+        assertBlocked(otherTool, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
+        assertBlocked(otherArgs, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
+        assertThat(onlyRow().get("ARGS_JSON")).isEqualTo(ARGS);
     }
 
     @Test
@@ -245,7 +294,7 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
-    @DisplayName("schema 1 에서 선언이 없는 도구는 WRITE 와 required 로 읽어 막고 승인 필요 줄을 남긴다")
+    @DisplayName("schema 1 에서 선언이 없는 도구는 WRITE 와 required 로 읽어 block 이고 통과하지 않은 PENDING 승인 줄을 남긴다")
     void undeclaredToolOfLegacySchemaIsReadAsWriteAndNeedsApproval() throws Exception {
         // 도구를 선언하지 않는 판은 대시보드가 부르는 읽기 도구만 담는다.
         when(connector.readCatalog())
@@ -255,20 +304,20 @@ class ConnectorPolicyEndpointTest {
         HttpResponse<String> unknown = ask("mcp__demo__write_note", null);
         HttpResponse<String> read = ask("mcp__demo__list_scopes", "list_scopes");
 
-        assertThat(json.readTree(unknown.body()).path("decision").asString()).isEqualTo("block");
-        assertThat(json.readTree(unknown.body()).path("action_id").isString()).isTrue();
+        assertApprovalRequested(unknown);
         assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
-        assertThat(jdbc.queryForList(
-                        "SELECT decision, risk, approval_mode, tool_name, status FROM connector_action ORDER BY id"))
+        assertThat(jdbc.queryForList("SELECT decision, passed, risk, approval_mode, tool_name, status"
+                        + " FROM connector_action ORDER BY id"))
                 .extracting(
                         row -> row.get("DECISION"),
+                        row -> row.get("PASSED"),
                         row -> row.get("RISK"),
                         row -> row.get("APPROVAL_MODE"),
                         row -> row.get("TOOL_NAME"),
                         row -> row.get("STATUS"))
                 .containsExactly(
-                        tuple("NEEDS_APPROVAL", "WRITE", "REQUIRED", null, "PENDING"),
-                        tuple("ALLOWED", "READ", "NONE", "list_scopes", null));
+                        tuple("NEEDS_APPROVAL", false, "WRITE", "REQUIRED", null, "PENDING"),
+                        tuple("ALLOWED", true, "READ", "NONE", "list_scopes", null));
     }
 
     @Test
@@ -281,7 +330,25 @@ class ConnectorPolicyEndpointTest {
         assertBlocked(response, "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.");
         Map<String, Object> row = onlyRow();
         assertThat(row.get("DENY_REASON")).isEqualTo("RISK_NOT_OPEN");
+        assertThat(row.get("DECISION")).isEqualTo("DENIED");
+        assertThat(row.get("PASSED")).isEqualTo(false);
         assertThat(row.get("RISK")).isEqualTo("DESTRUCTIVE");
+        assertThat(row.get("APPROVAL_MODE")).isEqualTo("ALWAYS");
+    }
+
+    @Test
+    @DisplayName("FINANCIAL 도구는 block 이고 RISK_NOT_OPEN 줄을 남긴다")
+    void financialToolIsBlocked() throws Exception {
+        connect(true);
+
+        HttpResponse<String> response = ask("mcp__demo__pay_invoice", "pay_invoice");
+
+        assertBlocked(response, "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.");
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("DENIED");
+        assertThat(row.get("DENY_REASON")).isEqualTo("RISK_NOT_OPEN");
+        assertThat(row.get("PASSED")).isEqualTo(false);
+        assertThat(row.get("RISK")).isEqualTo("FINANCIAL");
         assertThat(row.get("APPROVAL_MODE")).isEqualTo("ALWAYS");
     }
 
@@ -359,6 +426,21 @@ class ConnectorPolicyEndpointTest {
         assertThat(json.readTree(first.body()).path("decision").asString()).isEqualTo("block");
         assertThat(second.statusCode()).isEqualTo(200);
         assertThat(json.readTree(second.body())).isEqualTo(json.readTree(first.body()));
+        assertThat(rows()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("허용한 요청을 연결이 READY 를 벗어난 뒤 다시 보내면 앞의 allow 를 돌려주지 않고 block 이며 줄이 하나다")
+    void resendingAllowedRequestAfterConnectionLeftReadyIsBlocked() throws Exception {
+        connect(true);
+        String body = body(token, "mcp__demo__list_scopes", "list_scopes", root, newCall(), ARGS);
+        HttpResponse<String> first = send(token, body);
+        jdbc.update("update connector_connection set status = 'PENDING' where user_id = ?", owner.id());
+
+        HttpResponse<String> second = send(token, body);
+
+        assertThat(json.readTree(first.body()).path("decision").asString()).isEqualTo("allow");
+        assertBlocked(second, "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.");
         assertThat(rows()).isEqualTo(1);
     }
 
@@ -542,6 +624,19 @@ class ConnectorPolicyEndpointTest {
         assertThat(body.path("action_id").isNull())
                 .as("action_id: %s", body.path("action_id"))
                 .isTrue();
+    }
+
+    /** 승인 요청 번호와 그 번호를 담은 승인 안내 글로 막았는지 본다. 번호를 돌려준다. */
+    private String assertApprovalRequested(HttpResponse<String> response) {
+        assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(200);
+        JsonNode body = json.readTree(response.body());
+        assertThat(body.path("decision").asString()).isEqualTo("block");
+        String actionId = body.path("action_id").asString();
+        assertThat(UUID.fromString(actionId)).as("action_id: %s", actionId).isNotNull();
+        assertThat(body.path("message").asString())
+                .isEqualTo("이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 " + actionId
+                        + " 다. 사용자에게 화면에서 승인해 달라고 알리고, 같은 도구를 다시 부르지 않는다. 승인하면 그대로 실행되고 결과가 이 대화로 온다.");
+        return actionId;
     }
 
     private Map<String, Object> onlyRow() {

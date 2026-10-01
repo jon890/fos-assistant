@@ -20,7 +20,7 @@
 - 테스트는 `hermes/tests/test_dashboard_profile_api.py` 의 `ProfileApiRouteTest` 다. `bundle.sh` 로 만든 묶음의 `__init__.py` 를 읽으므로 `PROFILE_PLUGIN_DIR` 이 있다. 헬퍼는 `make_profile`, `connector_fixture()`, `connector(enabled=True, **overrides)`, `connector_status()`, `alice_config()` 다
 - phase 01 이 manifest dict 에 `schema`, `tools`(도구 정책 dict), `call_tools` 를 넣었고 `_hermes_tool_name(server, tool)` 을 만들었다
 
-**근거 문서**: `docs/connectors.md` 의 「이름 대응」, 「hook 이 켜져 있는지」, `docs/hermes/connector-policy.md` 의 「도구를 모델에게서 빼는 설정」, `docs/adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
+**근거 문서**: `docs/connectors.md` 의 「이름 대응」, 「hook 이 켜져 있는지」, `docs/hermes/connector-policy.md` 의 「도구를 모델에게서 빼는 설정」, `docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
 
 ## 의도 메모
 

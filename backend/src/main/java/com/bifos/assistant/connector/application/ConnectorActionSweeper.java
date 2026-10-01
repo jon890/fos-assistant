@@ -9,7 +9,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** 기동 전에 실행을 보낸 채 끊긴 승인 줄을 결과를 모르는 것으로 마무리한다(ADR-048). 다시 실행하지 않는다. */
+/** 기동 전에 실행을 보낸 채 끊긴 승인 줄을 결과를 모르는 것으로 마무리한다(ADR-050). 다시 실행하지 않는다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor

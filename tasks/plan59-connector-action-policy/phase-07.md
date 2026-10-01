@@ -17,7 +17,7 @@
 - phase 01 이 `_hermes_tool_name(server, tool)` 과 manifest 의 `schema`, `tools` 를 만들었다
 - 테스트는 `hermes/tests/test_connector_call.py` 의 `ConnectorCallTest(base.ConnectorGateCase)` 방식이다. 실제 자식 프로세스를 띄우고 `pgrep -f server.py` 로 남은 자식이 없는지 본다. fixture `hermes/tests/fixtures/demo-connector/server.py` 의 `write_note` 는 `read_only_hint=False` 다
 
-**근거 문서**: `docs/connectors.md` 의 「승인」 절 끝의 `execute` 계약, `docs/adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
+**근거 문서**: `docs/connectors.md` 의 「승인」 절 끝의 `execute` 계약, `docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
 
 ## 의도 메모
 

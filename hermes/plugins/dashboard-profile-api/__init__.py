@@ -204,7 +204,7 @@ CONNECTOR_ROOTS_ENV = "FOS_ASSISTANT_CONNECTOR_ROOTS"
 # 커넥터 MCP 서버를 실행할 파일의 절대 경로다. 운영 목록 항목에 `command` 가 없을 때 쓴다.
 CONNECTOR_COMMAND_ENV = "FOS_ASSISTANT_CONNECTOR_COMMAND"
 CONNECTOR_STATE = ".fos-connectors.json"
-# 설치가 profile 에 쓰는 이름 대응 파일이다. 정책 hook 이 Hermes 등록 이름으로 원래 도구 이름을 찾는다(ADR-047).
+# 설치가 profile 에 쓰는 이름 대응 파일이다. 정책 hook 이 Hermes 등록 이름으로 원래 도구 이름을 찾는다(ADR-049).
 CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
 # 커넥터 도구 호출을 판정하는 hook 을 가진 profile plugin 과, 묶음의 판과 견주는 그 파일들이다.
 POLICY_PLUGIN = "fos-ctx"
@@ -219,7 +219,7 @@ ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "u
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
-# `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-047).
+# `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
 # 표는 `docs/connectors.md` 의 「도구 정책」 과 같다.
 TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
 # 느슨한 것에서 엄격한 것의 순서다. 하한 비교가 이 순서의 자리를 쓴다.
@@ -619,6 +619,15 @@ def _connector_fields(declared) -> list:
     return declared
 
 
+def _canonical_server_name(server: str) -> str:
+    """MCP 서버 이름을 견줄 수 있게 맞춘다. Hermes 등록 규칙대로 글자를 `_` 로 바꾸고 소문자로 맞춘다.
+
+    등록 규칙만 쓰면 대소문자만 다른 이름이 다른 서버로 읽힌다. 이름을 대소문자 없이 다루는 자리가
+    하나라도 있으면 두 서버의 도구가 섞이므로 가장 넓게 같은 이름으로 본다.
+    """
+    return re.sub(r"[^A-Za-z0-9_]", "_", server).lower()
+
+
 def _hermes_tool_name(server: str, tool: str) -> str:
     """Hermes 가 MCP 도구에 붙이는 등록 이름이다. `tools/mcp_tool_schema.py` 의 `mcp_prefixed_tool_name` 과 같은 규칙이다.
 
@@ -776,7 +785,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if not isinstance(mcp, dict) or len(mcp) != 1:
         raise ValueError("MCP 서버 하나만 허용한다")
     mcp_server, server = next(iter(mcp.items()))
-    if not SERVER_NAME_RE.match(mcp_server) or mcp_server == CONTROL_PLANE_MCP:
+    # 맞춘 이름으로 견준다. `fos_assistant` 나 `FOS-Assistant` 처럼 글자만 다른 이름도 Control Plane MCP 의 이름으로 읽힐 수 있어
+    # 그 커넥터의 도구가 Control Plane 도구와 같은 이름 공간에 놓인다.
+    if (not SERVER_NAME_RE.match(mcp_server)
+            or _canonical_server_name(mcp_server) == _canonical_server_name(CONTROL_PLANE_MCP)):
         raise ValueError("MCP 서버 이름이 올바르지 않다")
     if len(_hermes_tool_name(mcp_server, "")) > HERMES_TOOL_PREFIX_MAX_CHARS:
         raise ValueError("MCP 서버 이름이 길어 등록 이름의 앞부분이 %d자를 넘는다" % HERMES_TOOL_PREFIX_MAX_CHARS)
@@ -1032,7 +1044,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
 
     설치와 제거는 API 도구 목록을 커넥터 서버 이름과 manifest 가 선언한 내장 toolset 으로 다시 쓰고,
     설치는 Control Plane MCP 등록도 지운다(ADR-045).
-    둘 다 이름 대응 파일을 바뀐 소유 기록으로 다시 쓰고, 설치는 정책 hook 을 가진 profile plugin 을 묶음의 판으로 맞춘다(ADR-047).
+    둘 다 이름 대응 파일을 바뀐 소유 기록으로 다시 쓰고, 설치는 정책 hook 을 가진 profile plugin 을 묶음의 판으로 맞춘다(ADR-049).
     `plugin_updated` 는 그 plugin 파일이 바뀌었는지다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있어 따로 답한다.
     이 설치는 커넥터 전용 profile 을 전제한다. Control Plane 이 커넥터 에이전트의 profile 로만 부른다.
     일반 에이전트의 profile 에 설치하면 그 profile 의 Control Plane MCP 등록과 도구 목록이 사라지고 제거해도 돌아오지 않는다.
@@ -1473,7 +1485,7 @@ def _connector_execute_answer(manifest: dict, result) -> dict:
 
 
 async def _connector_execute_request(request, connector_id: str):
-    """Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다(ADR-048).
+    """Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다(ADR-050).
 
     승인 여부는 다시 확인하지 않는다. 서비스 토큰을 가진 Control Plane 이 승인한 줄로만 부른다.
     인자와 결과를 로그에 싣지 않는다.

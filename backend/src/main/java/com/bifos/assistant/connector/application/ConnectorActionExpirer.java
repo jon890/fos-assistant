@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 답이 없는 승인 요청을 만료로 바꾸는 일정이다(ADR-048). 무엇을 바꾸는지는 {@link ConnectorActionService#expire} 가 갖는다. */
+/** 답이 없는 승인 요청을 만료로 바꾸는 일정이다(ADR-050). 무엇을 바꾸는지는 {@link ConnectorActionService#expire} 가 갖는다. */
 @Component
 @RequiredArgsConstructor
 public class ConnectorActionExpirer {

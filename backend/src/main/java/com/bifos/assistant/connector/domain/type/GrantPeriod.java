@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 /**
- * 승인하면서 그 도구에 주는 상시 허락의 기간이다(ADR-048). 무기한은 없다.
+ * 승인하면서 그 도구에 주는 상시 허락의 기간이다(ADR-050). 무기한은 없다.
  *
  * <p>요청 본문의 글자 그대로다. 값을 바꾸면 화면도 함께 바꾼다.
  */
@@ -25,7 +25,8 @@ public enum GrantPeriod {
     public Instant expiresAt(Instant now, ZoneId zone) {
         return switch (this) {
             case HOUR -> now.plus(ONE_HOUR);
-            case TODAY -> now.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant();
+            case TODAY ->
+                now.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant();
             case DAYS_30 -> now.plus(THIRTY_DAYS);
         };
     }

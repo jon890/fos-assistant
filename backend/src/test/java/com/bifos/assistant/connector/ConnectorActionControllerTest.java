@@ -127,8 +127,7 @@ class ConnectorActionControllerTest {
                         .content("{\"grant\":null}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"));
-        mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION))
-                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION)).andExpect(status().isOk());
     }
 
     @Test
@@ -174,8 +173,8 @@ class ConnectorActionControllerTest {
     @DisplayName("허락 목록은 grantId, connectorId, toolName, expiresAt 을 낸다")
     void grantsReturnContractFields() throws Exception {
         when(service.grants(MEMBER))
-                .thenReturn(List.of(new ConnectorGrantView(
-                        5L, "demo-notes", "write_note", Instant.parse("2026-10-02T00:00:00Z"))));
+                .thenReturn(List.of(
+                        new ConnectorGrantView(5L, "demo-notes", "write_note", Instant.parse("2026-10-02T00:00:00Z"))));
 
         mvc.perform(get("/api/v1/connector-grants"))
                 .andExpect(status().isOk())

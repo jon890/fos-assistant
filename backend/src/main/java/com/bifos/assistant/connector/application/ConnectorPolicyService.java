@@ -10,6 +10,7 @@ import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
@@ -31,14 +32,15 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-047).
+ * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-049).
  *
  * <p>순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 줄을 남기지 않는 호출은 두 가지다. 실행이나 연결을
  * 찾지 못한 호출은 줄에 적을 사용자와 에이전트를 알 수 없어서이고, 같은 키로 다른 도구나 다른 인자를 보낸 호출은 키가
  * 유니크라 새 줄을 만들 수 없어서다.
  *
- * <p>승인이 필요한 호출은 막고 인자 원문과 함께 {@code PENDING} 으로 저장한다(ADR-048). 실행은 주인이 승인한 뒤
- * {@link ConnectorActionService} 가 한다. 그 밖의 줄은 인자 원문을 저장하지 않고 해시만 남긴다.
+ * <p>통과로 답하는 것은 판정이 허용일 때뿐이다. 승인이 필요한 호출은 막고 인자 원문과 함께 {@code PENDING} 으로
+ * 저장한다(ADR-050). 실행은 주인이 승인한 뒤 {@link ConnectorActionService} 가 한다. 그 밖의 줄은 인자 원문을 저장하지 않고
+ * 해시만 남긴다.
  *
  * <p>{@code mcp} 패키지의 인증 주체를 모르게 하려고 profile 이름과 session 값을 문자열로 받는다.
  */
@@ -159,6 +161,8 @@ public class ConnectorPolicyService {
                         granted(connection, confirmedTool, now),
                         argsJson.getBytes(StandardCharsets.UTF_8).length))
                 .orElseGet(ToolPolicyDecision::policyUnavailable);
+        // 허용만 통과시킨다. 승인이 필요한 호출을 통과시키면 사람의 확인 없이 쓰기가 나간다.
+        boolean passed = decision.decision() == ActionDecision.ALLOWED;
         boolean needsApproval = decision.decision() == ActionDecision.NEEDS_APPROVAL;
         if (needsApproval) {
             // 같은 실행이 같은 도구를 같은 인자로 다시 불렀다. 새 줄을 만들지 않고 앞선 요청의 번호로 답한다.
@@ -170,15 +174,7 @@ public class ConnectorPolicyService {
             }
         }
         ConnectorAction action = ConnectorAction.decided(
-                connection,
-                origin,
-                hermesTool,
-                confirmedTool,
-                decision,
-                decision.decision() == ActionDecision.ALLOWED,
-                dedupeKey,
-                argsSha256,
-                now);
+                connection, origin, hermesTool, confirmedTool, decision, passed, dedupeKey, argsSha256, now);
         if (needsApproval) {
             action.awaitApproval(argsJson, now.plus(properties.approvalTtl()));
         }
@@ -221,15 +217,29 @@ public class ConnectorPolicyService {
      *
      * <p>한 session 에서 같은 {@code tool_call_id} 가 되풀이되면 키가 같다. 줄의 판정을 그대로 주면 앞서 허용한
      * 읽기 도구의 답이 다른 도구나 다른 인자의 호출에 나간다. 새 줄은 만들지 않는다. 키가 유니크라 만들 수 없다.
+     *
+     * <p>허용한 줄은 연결이 지금도 {@code READY} 일 때만 다시 허용한다. 연결을 해제한 뒤에 같은 호출이 다시 와도
+     * 앞의 허용이 나가지 않게 한다. 막은 줄과 승인 줄은 연결 상태와 상관없이 처음 답을 돌려준다.
      */
-    private static ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
+    private ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
         if (!recorded.hermesTool().equals(hermesTool)) {
             return blockedWithoutRecord("같은 키의 줄과 등록 이름이 다르다");
         }
         if (!recorded.argsSha256().equals(argsSha256)) {
             return blockedWithoutRecord("같은 키의 줄과 인자가 다르다");
         }
+        if (recorded.passed() && !stillReady(recorded.agentId())) {
+            log.warn("connector policy replay blocked: 허용한 줄의 연결이 지금은 READY 가 아니다");
+            return new ConnectorPolicyAnswer(false, NOT_READY_MESSAGE, null);
+        }
         return answer(recorded);
+    }
+
+    private boolean stillReady(Long agentId) {
+        return connections
+                .findByAgentId(agentId)
+                .map(connection -> connection.status() == ConnectionStatus.READY)
+                .orElse(false);
     }
 
     /** 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 서버 이름까지의 앞부분이 같은지로 본다. */

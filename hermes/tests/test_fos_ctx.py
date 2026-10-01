@@ -642,6 +642,42 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertEqual(result["args"]["_fos_ctx"]["root_session_id"], VECTOR_ROOT)
         self.assertEqual(self.requests, [])
 
+    def test_tool_map_server_wins_over_the_control_plane_prefix(self):
+        """대응 파일의 서버 접두사가 Control Plane MCP 의 것과 같으면 그 도구는 _fos_ctx 를 받지 않고 정책 서버로 간다."""
+        self.write_map({"v": 1, "servers": {"fos_assistant": {
+            "connector": "impostor", "prefix": "mcp__fos_assistant__",
+            "tools": {"mcp__fos_assistant__agent_delegate": "agent_delegate"},
+        }}})
+        self.answer_json({"decision": "block", "message": "정책이 막았다"})
+        declared = self.call("mcp__fos_assistant__agent_delegate", args={"task": "x"})
+        self.assertBlocked(declared, "정책이 막았다")
+        # 대응 파일의 `tools` 에 없어도 접두사가 맞으면 정책 서버에 `tool` 을 null 로 묻는다.
+        self.assertBlocked(self.call("mcp__fos_assistant__memory_read"), "정책이 막았다")
+        self.assertEqual([(request["body"]["hermes_tool"], request["body"]["tool"]) for request in self.requests],
+                         [("mcp__fos_assistant__agent_delegate", "agent_delegate"),
+                          ("mcp__fos_assistant__memory_read", None)])
+        # 통과로 답해도 인자를 고치지 않는다. 서명한 run 맥락이 커넥터 서버로 나가지 않는다.
+        self.answer_json({"decision": "allow"})
+        self.assertIsNone(self.call("mcp__fos_assistant__agent_delegate", args={"task": "x"}))
+
+    def test_unreadable_tool_map_blocks_control_plane_tools_too(self):
+        """대응 파일을 읽지 못하면 Control Plane MCP 의 접두사를 가진 도구도 막고 _fos_ctx 를 붙이지 않는다."""
+        self.write_map("{")
+        for tool in ("mcp__fos_assistant__agent_list", "mcp__fos_assistant__memory_read",
+                     "mcp__fos_assistant__memory_search"):
+            with self.subTest(tool=tool):
+                self.assertBlocked(self.call(tool), self.plugin.POLICY_BLOCK_MESSAGE)
+        self.assertEqual(self.requests, [])
+
+    def test_profile_without_tool_map_signs_control_plane_tools(self):
+        """대응 파일이 없는 profile 의 Control Plane MCP 도구는 지금처럼 서명한 _fos_ctx 를 받는다."""
+        self.map_path.unlink()
+        result = self.call("mcp__fos_assistant__agent_list")
+        self.assertEqual(result["action"], "modify")
+        self.assertEqual(result["args"]["_fos_ctx"]["session_id"], VECTOR_SESSION)
+        self.assertEqual(result["args"]["_fos_ctx"]["root_session_id"], VECTOR_ROOT)
+        self.assertEqual(self.requests, [])
+
     def test_skill_manage_stays_blocked(self):
         """연결용 profile 에서도 skill_manage 는 같은 글로 막는다."""
         self.assertBlocked(self.call("skill_manage", args={"action": "create"}), self.plugin.SKILL_MANAGE_MESSAGE)

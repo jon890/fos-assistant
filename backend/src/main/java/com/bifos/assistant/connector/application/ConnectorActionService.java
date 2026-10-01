@@ -45,7 +45,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 승인 줄의 승인과 거절, 승인한 호출의 실행, 상시 허락, 만료를 맡는다(ADR-048).
+ * 승인 줄의 승인과 거절, 승인한 호출의 실행, 상시 허락, 만료를 맡는다(ADR-050).
  *
  * <p>계약은 {@code docs/connectors.md} 의 「승인」 이 갖는다. 줄의 주인만 다룬다. 남의 줄은 관리자에게도 없는 줄과 같은
  * 응답이다. 인자 원문과 실행 결과는 로그에 싣지 않는다.
@@ -215,14 +215,14 @@ public class ConnectorActionService {
         for (ConnectorAction due : actions.findByStatusAndExpiresAtBefore(ActionStatus.PENDING, now)) {
             try {
                 // 줄을 잠그고 다시 읽는다. 그 사이 승인이나 거절이 끝났으면 건드리지 않는다.
-                Optional<ConnectorAction> changed = transactions.execute(status -> actions.findByPublicIdForUpdate(
-                                due.publicId())
-                        .filter(action -> action.status() == ActionStatus.PENDING
-                                && action.expiresAt().isBefore(now))
-                        .map(action -> {
-                            action.expire(now);
-                            return actions.save(action);
-                        }));
+                Optional<ConnectorAction> changed =
+                        transactions.execute(status -> actions.findByPublicIdForUpdate(due.publicId())
+                                .filter(action -> action.status() == ActionStatus.PENDING
+                                        && action.expiresAt().isBefore(now))
+                                .map(action -> {
+                                    action.expire(now);
+                                    return actions.save(action);
+                                }));
                 if (changed.isPresent()) {
                     publish(changed.get());
                     expired++;

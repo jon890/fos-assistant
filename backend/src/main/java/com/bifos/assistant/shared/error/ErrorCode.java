@@ -13,6 +13,10 @@ public enum ErrorCode {
     EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),
     EXECUTION_NOT_RUNNING(HttpStatus.CONFLICT),
     CONVERSATION_BUSY(HttpStatus.CONFLICT),
+    /** 대기 메시지가 상한에 닿았다. 개수가 찼거나, 더하면 합친 글이 메시지 길이 상한을 넘는다. */
+    PENDING_QUEUE_FULL(HttpStatus.CONFLICT),
+    /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */
+    PENDING_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
     MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     AGENT_DISABLED(HttpStatus.CONFLICT),
@@ -107,7 +111,7 @@ public enum ErrorCode {
      * 커넥터 도구 호출의 판정 요청을 믿을 수 없다.
      *
      * <p>본문의 모양과 서명 중 무엇이 틀렸는지 밖에 알리지 않는다. 이유는 서버 로그에만 남긴다. hook 은 이 답을 받으면
-     * 그 호출을 막는다. 근거는 ADR-047 이다.
+     * 그 호출을 막는다. 근거는 ADR-049 이다.
      */
     CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN),
     /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */
@@ -141,7 +145,7 @@ public enum ErrorCode {
     CONNECTOR_OPERATION_FAILED(HttpStatus.BAD_GATEWAY),
     /** 선택지 조회, 등록, 연결 확인이 사용자별 호출 제한을 넘었다. 외부를 부르지 않고 거절한다. */
     CONNECTOR_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS),
-    /** 없는 승인 줄과 남의 승인 줄과 남의 상시 허락을 같은 응답으로 숨긴다. 관리자에게도 같다(ADR-048). */
+    /** 없는 승인 줄과 남의 승인 줄과 남의 상시 허락을 같은 응답으로 숨긴다. 관리자에게도 같다(ADR-050). */
     CONNECTOR_ACTION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 그 승인 줄은 이미 승인, 거절, 만료 가운데 하나로 끝났다. 같은 승인을 두 번 눌러도 실행은 한 번이다. */
     CONNECTOR_ACTION_NOT_PENDING(HttpStatus.CONFLICT),

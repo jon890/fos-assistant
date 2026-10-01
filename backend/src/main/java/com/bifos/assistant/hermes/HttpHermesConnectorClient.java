@@ -145,8 +145,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 }
                 return CallResult.success(result);
             }
-            return CallResult.failure(ConnectorCallError.fromWord(text(answer, "error"))
-                    .orElseThrow(ConnectorExecutionUnknown::new));
+            return CallResult.failure(
+                    ConnectorCallError.fromWord(text(answer, "error")).orElseThrow(ConnectorExecutionUnknown::new));
         } catch (JacksonException | IllegalStateException ex) {
             throw new ConnectorExecutionUnknown();
         }
