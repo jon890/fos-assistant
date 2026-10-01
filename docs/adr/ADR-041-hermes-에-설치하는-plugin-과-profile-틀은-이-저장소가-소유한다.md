@@ -3,12 +3,12 @@
 - **status**: `accepted`
 - **결정**: Control Plane 이 기대는 Hermes 쪽 코드를 이 저장소의 `hermes/` 에 둔다.
   대상은 대시보드 plugin `dashboard-profile-api`, MCP 호출 서명 plugin `fos-ctx`, 새 profile 설정 틀이다.
-  운영 값(Control Plane MCP 주소, 커넥터 plugin 경로, 토큰)은 코드에 두지 않고 설치할 때 받는다.
+  운영 값(Control Plane MCP 주소, 커넥터 plugin 경로, 커넥터 실행 파일, 토큰)은 코드에 두지 않고 설치할 때 받는다.
   설치 묶음은 `hermes/bundle.sh` 가 만든다. 운영은 Control Plane 을 배포할 SHA 의 묶음을 설치하고, plugin 을 먼저 올린 뒤 Control Plane 을 올린다.
 - **맥락**: 이 저장소는 사용자가 여러 에이전트를 정의하고 연결해 거느리는 Hermes Control Plane 으로 공개한다.
   그런데 에이전트 만들기, 스킬 게시, env 쓰기, MCP 호출 서명이 모두 비공개 저장소의 plugin 에 있었다.
   이 저장소만 받은 사람은 Hermes 와 연동할 수 없었고, Control Plane 과 plugin 의 계약을 바꿀 때마다 두 저장소의 PR 을 맞춰야 했다.
-  코드에 박힌 운영 값은 커넥터 경로 한 줄과 틀의 MCP 주소 한 줄뿐이었다.
+  코드에 박힌 운영 값은 커넥터 경로, 커넥터 실행 파일의 경로, 틀의 MCP 주소 셋뿐이었다.
 - **대안 기각**:
   - 비공개 저장소에 그대로 둔다: 공개한 Control Plane 이 혼자 동작하지 못한다.
   - 별도 공개 저장소를 둔다: Hermes 를 다른 용도로 쓰는 사람도 가져갈 수 있지만, Control Plane 과 plugin 의 계약을 두 저장소에서 따로 맞춰야 한다. 지금 이 plugin 을 쓰는 곳은 이 Control Plane 하나다.

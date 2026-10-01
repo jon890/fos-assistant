@@ -1,0 +1,7 @@
+name: fos-ctx
+version: 1.1.0
+description: "Control Plane MCP 호출에 서명한 run 맥락 _fos_ctx 를 붙이고, skill_manage 를 막고, delegate_task 의 자식 session 을 Control Plane 에 등록한다."
+author: "fos-assistant"
+hooks:
+  - pre_tool_call
+  - subagent_start

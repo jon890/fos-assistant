@@ -1,0 +1,98 @@
+# One family user's Hermes profile.
+#
+# The mcp_servers.fos-assistant.url value below is a placeholder. `hermes/bundle.sh --mcp-url` fills
+# it in when it builds the install bundle.
+#
+# The user's own AI credential is NOT written here. It goes into this profile's .env via
+# `hermes -p <user> config set ...`, and ${VAR} below resolves against that .env only, so no
+# other profile can see it.
+model:
+  default: __MODEL__
+  provider: __PROVIDER__
+
+providers: {}
+
+# Empty on purpose. A failing turn must not slide onto another model or another credential.
+fallback_providers: []
+credential_pool_strategies: {}
+
+# 공유 listener 에서는 listener 주인 profile 의 값만 읽힌다. profile 별 gateway 로 되돌릴 때 다시 쓴다.
+max_concurrent_sessions: 2
+
+# 새 이름 붙은 profile 이 shared listener 를 다시 열지 않게 한다.
+# platform_toolsets.api_server 는 allowlist 이므로 이 switch 와 별개로 그대로 둔다.
+platforms:
+  api_server:
+    enabled: false
+
+# An allowlist, not a switch. Hermes treats an explicit list of MCP server names on a platform as
+# the only servers that platform may use; every other registered server is dropped. The bare
+# sentinel "no_mcp" would block ALL of them, including the Control Plane MCP server, so the
+# agent could see the memory index and never read an entry's body. Listing the one server we want
+# keeps that boundary without breaking memory_read. Removing this key entirely is NOT the same: it
+# would also hand the profile the platform's native toolsets. See the README.
+# delegation is listed so the agent can hand work to a subagent. A child inherits this list with
+# memory stripped, so it never gets a tool the parent lacks. Only a child spawned as orchestrator
+# keeps delegation, and delegation.max_spawn_depth bounds how deep that goes.
+platform_toolsets:
+  api_server:
+    - delegation
+    - fos-assistant
+
+agent:
+  # The Control Plane decides what the agent may know and may do. Toolsets that reach the host,
+  # other services, or a second memory store stay off until a deliberate decision turns them on.
+  disabled_toolsets:
+    - a2a
+    - bfl
+    - browser
+    - code_execution
+    - computer_use
+    - cronjob
+    - discord
+    - discord_admin
+    - file
+    - homeassistant
+    - image_gen
+    - memory
+    - session_search
+    - spotify
+    - stt
+    - terminal
+    - tts
+    - video
+    - video_gen
+    - x_search
+    - yuanbao
+  browser_control:
+    enabled: false
+  scheduled_tasks:
+    enabled: false
+
+# Memory lives in the Control Plane database, which injects what the caller may see as
+# per-run instructions. See ADR-003 in the fos-assistant repository.
+memory:
+  provider: none
+  enabled: false
+
+# The Control Plane MCP server. The header keeps only the ${VAR} reference: the token is issued per
+# profile and lands in this profile's .env, either from the Control Plane over PUT /api/env or from
+# the operations repository's registration script. Without it the server answers 401 and the agent
+# sees no Control Plane tool.
+mcp_servers:
+  fos-assistant:
+    url: __FOS_ASSISTANT_MCP_URL__
+    headers:
+      Authorization: Bearer ${MCP_FOS_ASSISTANT_API_KEY}
+    enabled: true
+
+# fos-ctx signs every Control Plane MCP call with the token above. Its files have to sit under this
+# profile's plugins/ as well; the dashboard plugin copies them there, the operations repository's
+# registration script does it for a profile made by hand.
+plugins:
+  enabled:
+    - fos-ctx
+  disabled: []
+  entries:
+    fos-ctx:
+      allow_tool_override: false

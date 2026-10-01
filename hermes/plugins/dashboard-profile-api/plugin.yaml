@@ -1,0 +1,8 @@
+name: dashboard-profile-api
+version: 0.1.0
+description: "Control Plane 이 Hermes 대시보드의 profile 관리와 도구 목록 경로를 Authorization: Bearer 로 부를 수 있게 연다."
+author: "fos-assistant"
+kind: backend
+hooks: []
+requires_env:
+  - HERMES_DASHBOARD_PROFILE_API_SECRET

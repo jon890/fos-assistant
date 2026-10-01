@@ -46,6 +46,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | --- | --- |
 | Control Plane MCP 주소 | 묶음을 만들 때 `--mcp-url` |
 | 커넥터 plugin 경로 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS`. `{"<커넥터 이름>": "<plugin 디렉터리>"}` 모양의 JSON 이다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
+| 커넥터 실행 파일 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 없거나 절대 경로가 아니면 커넥터를 쓸 수 없는 것으로 본다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` |
 | 스킬 루트 | 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` |
 
