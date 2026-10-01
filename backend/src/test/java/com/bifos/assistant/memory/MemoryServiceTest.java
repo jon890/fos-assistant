@@ -194,6 +194,20 @@ class MemoryServiceTest {
     }
 
     @Test
+    @DisplayName("같은 번호의 판을 다시 넣으면 덮어쓰지 않고 실패한다")
+    void savingARevisionWithAnExistingNumberFailsInsteadOfOverwriting() {
+        Memory memory = memories.create(ADMIN, MemoryScope.USER, "제목", "처음 내용", false);
+        revisionRepository.saveAndFlush(MemoryRevision.of(memory, MemoryChangeType.UPDATED, ADMIN.id(), null, NOW));
+
+        assertThatThrownBy(() -> revisionRepository.saveAndFlush(
+                        MemoryRevision.of(memory, MemoryChangeType.DELETED, ADMIN.id(), null, NOW)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(memories.revisionsOf(ADMIN, memory.id()))
+                .singleElement()
+                .satisfies(revision -> assertThat(revision.changeType()).isEqualTo(MemoryChangeType.UPDATED));
+    }
+
+    @Test
     @DisplayName("승인 전인 제안을 지우면 제안이었다는 것이 판에 남는다")
     void deletingAProposalKeepsItsStatusInTheTombstone() {
         Memory proposed = memories.proposeUser(ADMIN, "제안", "내용", 99L);

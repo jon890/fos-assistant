@@ -11,12 +11,16 @@ import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.springframework.data.domain.Persistable;
 
 /**
  * 지금 값에서 물러난 판 하나다(ADR-051).
@@ -29,7 +33,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MemoryRevision {
+public class MemoryRevision implements Persistable<MemoryRevisionId> {
 
     @EmbeddedId
     private MemoryRevisionId id;
@@ -87,6 +91,10 @@ public class MemoryRevision {
     @Column(name = "changed_at", nullable = false)
     private Instant changedAt;
 
+    /** 데이터베이스에 있는 판이다. 읽어 왔거나 방금 넣었을 때 참이 된다. */
+    @Transient
+    private boolean persisted;
+
     /**
      * 항목의 지금 값을 판으로 옮긴다. 항목을 고치거나 지우기 직전에 부른다.
      *
@@ -112,5 +120,27 @@ public class MemoryRevision {
         revision.reason = reason;
         revision.changedAt = at;
         return revision;
+    }
+
+    /** Spring Data 의 {@link Persistable} 이 요구하는 이름이다. 값은 Lombok 이 만든 {@link #id()} 와 같다. */
+    @Override
+    public MemoryRevisionId getId() {
+        return id();
+    }
+
+    /**
+     * 판은 늘 새 줄로 넣는다. 번호를 직접 정하므로 이것이 없으면 저장이 같은 번호의 줄을 조용히 덮어쓴다.
+     *
+     * <p>같은 번호의 판이 이미 있으면 기본 키 위반으로 실패한다. 남긴 판은 바뀌지 않는다.
+     */
+    @Override
+    public boolean isNew() {
+        return !persisted;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markPersisted() {
+        persisted = true;
     }
 }

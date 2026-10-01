@@ -7,8 +7,8 @@ import java.util.regex.Pattern;
 /**
  * 항목을 어느 collection 에 어떤 방식과 민감도로 둘지다(ADR-051).
  *
- * <p>민감 항목은 항상 싣지 못한다. 항상 층은 그 collection 을 받는 모든 실행에 본문이 실리므로, 민감 항목을 허용받지
- * 않은 에이전트를 가려 실을 자리가 없다.
+ * <p>민감 항목은 항상 싣지 못한다. 항상 층은 고른 항목의 본문이 곧 프롬프트다. 저장할 때 막아 두면 조립 판정이 한 번
+ * 틀려도 민감 본문이 나가지 않는다.
  */
 public record MemoryPlacement(String collection, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
 

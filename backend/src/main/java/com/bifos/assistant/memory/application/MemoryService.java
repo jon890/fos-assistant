@@ -134,16 +134,14 @@ public class MemoryService {
 
     @Transactional
     public Memory accept(CurrentUser user, Long id) {
-        Memory memory = requireReadable(user, id);
-        requireWritable(user, memory);
+        Memory memory = requireWritableForUpdate(user, id);
         memory.accept(user.id(), clock.instant());
         return memories.save(memory);
     }
 
     @Transactional
     public Memory reject(CurrentUser user, Long id) {
-        Memory memory = requireReadable(user, id);
-        requireWritable(user, memory);
+        Memory memory = requireWritableForUpdate(user, id);
         memory.reject(clock.instant());
         return memories.save(memory);
     }
@@ -217,7 +215,10 @@ public class MemoryService {
     }
 
     /**
-     * 고치거나 지울 항목을 쓰기 잠금으로 읽고 쓸 수 있는지 본다.
+     * 고치거나 지우거나 승인 상태를 바꿀 항목을 쓰기 잠금으로 읽고 쓸 수 있는지 본다.
+     *
+     * <p>승인과 거절도 잠근다. 잠그지 않고 읽은 값을 통째로 저장하면 그 사이에 커밋된 수정의 본문과 판 번호를 옛 값으로
+     * 되돌린다.
      *
      * <p>잠근 뒤에 읽은 값으로 판을 남겨야 하므로, 이 트랜잭션에서 그 항목을 먼저 읽어 두지 않는다.
      */
