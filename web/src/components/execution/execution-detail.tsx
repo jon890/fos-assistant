@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { formatCost, formatDuration, formatTokens } from "@/lib/format";
-import { ExecutionTree, type ExecutionTreeNode, type ExecutionTreeResponse } from "./execution-tree";
+import {
+  ExecutionTree,
+  type ExecutionTreeNode,
+  type ExecutionTreeResponse,
+} from "./execution-tree";
 
 type FetchState =
   | { kind: "loading" }
@@ -12,7 +16,10 @@ type FetchState =
   | { kind: "error" }
   | { kind: "ready"; tree: ExecutionTreeResponse };
 
-function findNode(node: ExecutionTreeNode, executionId: number): ExecutionTreeNode | null {
+function findNode(
+  node: ExecutionTreeNode,
+  executionId: number,
+): ExecutionTreeNode | null {
   if (node.executionId === executionId) return node;
   for (const child of node.children) {
     const found = findNode(child, executionId);
@@ -85,7 +92,9 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
     <div>
       <header className="mb-6">
         <h1 className="mb-4 text-xl font-semibold">
-          {summary.agentName ?? summary.agentCode ?? `실행 #${summary.executionId}`}
+          {summary.agentName ??
+            summary.agentCode ??
+            `실행 #${summary.executionId}`}
         </h1>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <div>
@@ -95,7 +104,11 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
           <div>
             <dt className="text-muted-foreground">상태</dt>
             <dd>
-              <Badge variant={summary.status === "FAILED" ? "default" : "outline"}>{statusLabel(summary.status)}</Badge>
+              <Badge
+                variant={summary.status === "FAILED" ? "default" : "outline"}
+              >
+                {statusLabel(summary.status)}
+              </Badge>
             </dd>
           </div>
           <div>
@@ -104,11 +117,15 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
           </div>
           <div>
             <dt className="text-muted-foreground">입력 토큰</dt>
-            <dd className="tabular-nums">{formatTokens(summary.inputTokens)}</dd>
+            <dd className="tabular-nums">
+              {formatTokens(summary.inputTokens)}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">출력 토큰</dt>
-            <dd className="tabular-nums">{formatTokens(summary.outputTokens)}</dd>
+            <dd className="tabular-nums">
+              {formatTokens(summary.outputTokens)}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">환산 금액</dt>
@@ -116,7 +133,11 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
           </div>
           <div>
             <dt className="text-muted-foreground">걸린 시간</dt>
-            <dd>{running || summary.latencyMs === null ? "" : formatDuration(summary.latencyMs)}</dd>
+            <dd>
+              {running || summary.latencyMs === null
+                ? ""
+                : formatDuration(summary.latencyMs)}
+            </dd>
           </div>
         </dl>
       </header>

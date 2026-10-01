@@ -70,7 +70,8 @@ export type ExecutionTreeResponse = {
 export function hasRenderableEvent(node: ExecutionTreeNode): boolean {
   if (node.children.length > 0) return true;
   return node.events.some(
-    (event) => event.eventType !== "RUN_STARTED" && event.eventType !== "RUN_COMPLETED",
+    (event) =>
+      event.eventType !== "RUN_STARTED" && event.eventType !== "RUN_COMPLETED",
   );
 }
 
@@ -85,7 +86,10 @@ export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
   // 않는다」 를 그렸으면 여기서 또 적어 두 번 말하지 않는다.
   const truncatedAbove = tree.truncated && !anyNodeTruncated(tree.root);
   const aboveNotice = truncatedAbove ? (
-    <p className="mb-2 text-xs text-muted-foreground" data-testid="execution-tree-truncated-above">
+    <p
+      className="mb-2 text-xs text-muted-foreground"
+      data-testid="execution-tree-truncated-above"
+    >
       위쪽 기록이 없어 이곳이 첫 실행이 아닐 수 있어요
     </p>
   ) : null;

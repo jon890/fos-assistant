@@ -24,7 +24,10 @@ const MAX_DEPTH = 8;
  */
 export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
   const rows: MergedEventRow[] = [];
-  const pendingByTool = new Map<string, Extract<MergedEventRow, { kind: "tool" }>[]>();
+  const pendingByTool = new Map<
+    string,
+    Extract<MergedEventRow, { kind: "tool" }>[]
+  >();
 
   for (const event of events) {
     switch (event.eventType) {
@@ -91,26 +94,42 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
 }
 
 /** 노드 하나다. 자기 자신을 자식으로 다시 그린다. */
-export function ExecutionNode({ node, depth }: { node: ExecutionTreeNode; depth: number }) {
+export function ExecutionNode({
+  node,
+  depth,
+}: {
+  node: ExecutionTreeNode;
+  depth: number;
+}) {
   const stoppedByScreen = depth >= MAX_DEPTH;
   const rows = mergeEvents(node.events);
   const label = node.agentName ?? node.agentCode ?? `실행 #${node.executionId}`;
-  const showsTruncated = node.truncated || (stoppedByScreen && node.children.length > 0);
+  const showsTruncated =
+    node.truncated || (stoppedByScreen && node.children.length > 0);
 
   return (
-    <li className={`min-w-0 ${depth === 0 ? "" : "ml-3"}`} data-testid="execution-node">
+    <li
+      className={`min-w-0 ${depth === 0 ? "" : "ml-3"}`}
+      data-testid="execution-node"
+    >
       <div className="min-w-0 border-l border-border pl-3">
         <p className="truncate text-sm font-medium">{label}</p>
         <ul className="min-w-0">
           {rows.map((row) => (
             <ExecutionEventRow key={row.key} row={row} />
           ))}
-          {!stoppedByScreen
-            && node.children.map((child) => (
-              <ExecutionNode key={child.executionId} node={child} depth={depth + 1} />
+          {!stoppedByScreen &&
+            node.children.map((child) => (
+              <ExecutionNode
+                key={child.executionId}
+                node={child}
+                depth={depth + 1}
+              />
             ))}
           {showsTruncated ? (
-            <li className="truncate text-xs text-muted-foreground">이전 실행은 표시되지 않아요</li>
+            <li className="truncate text-xs text-muted-foreground">
+              이전 실행은 표시되지 않아요
+            </li>
           ) : null}
         </ul>
       </div>
