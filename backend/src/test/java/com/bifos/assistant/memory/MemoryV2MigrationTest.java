@@ -79,8 +79,7 @@ class MemoryV2MigrationTest {
                     .containsExactlyInAnyOrderEntriesOf(
                             Map.of("그룹 항상", "ALWAYS", "개인 색인", "SEARCH", "개인 제안", "SEARCH"));
             assertThat(pairs(statement, "SELECT title, content FROM memory"))
-                    .containsExactlyInAnyOrderEntriesOf(
-                            Map.of("그룹 항상", "그룹 내용", "개인 색인", "개인 내용", "개인 제안", "제안 내용"));
+                    .containsExactlyInAnyOrderEntriesOf(Map.of("그룹 항상", "그룹 내용", "개인 색인", "개인 내용", "개인 제안", "제안 내용"));
             assertThat(values(statement, """
                     SELECT DISTINCT CONCAT(collection, '/', entry_type, '/', sensitivity, '/', CAST(revision AS VARCHAR(10)))
                     FROM memory
@@ -104,7 +103,8 @@ class MemoryV2MigrationTest {
             assertThat(pairs(statement, """
                     SELECT a.code, CONCAT(g.collection, '/', CAST(g.allow_sensitive AS VARCHAR(5)))
                     FROM agent_memory_collection g JOIN agent a ON a.id = g.agent_id
-                    """)).containsExactlyInAnyOrderEntriesOf(Map.of("home", "core/FALSE", "dad", "core/FALSE"));
+                    """))
+                    .containsExactlyInAnyOrderEntriesOf(Map.of("home", "core/FALSE", "dad", "core/FALSE"));
         }
     }
 

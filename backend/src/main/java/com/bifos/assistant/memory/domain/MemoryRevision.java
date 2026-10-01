@@ -1,8 +1,8 @@
 package com.bifos.assistant.memory.domain;
 
-import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;

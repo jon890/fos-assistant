@@ -8,5 +8,7 @@ import java.io.Serializable;
 @Embeddable
 public record MemoryCollectionId(
         @Column(name = "group_id", nullable = false) Long groupId,
-        @Column(name = "collection_key", nullable = false, length = 64) String key)
+
+        @Column(name = "collection_key", nullable = false, length = 64)
+        String key)
         implements Serializable {}

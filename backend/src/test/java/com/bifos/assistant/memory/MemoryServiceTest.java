@@ -9,8 +9,8 @@ import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -107,7 +107,9 @@ class MemoryServiceTest {
 
         memories.update(ADMIN, proposed.id(), "내용", true);
         memories.accept(ADMIN, proposed.id());
-        assertThat(memories.alwaysInjectedFor(ADMIN, CORE)).extracting(Memory::id).contains(proposed.id());
+        assertThat(memories.alwaysInjectedFor(ADMIN, CORE))
+                .extracting(Memory::id)
+                .contains(proposed.id());
         assertThat(memories.indexedFor(ADMIN, CORE)).isEmpty();
 
         memories.update(ADMIN, proposed.id(), "내용", false);
@@ -205,23 +207,17 @@ class MemoryServiceTest {
     @DisplayName("민감 항목은 만들 때도 고칠 때도 항상 싣게 둘 수 없다")
     void sensitiveItemsCannotAlwaysBeInjected() {
         assertSensitiveAlways(() -> memories.create(
-                ADMIN,
-                MemoryScope.USER,
-                "민감",
-                "내용",
-                "identity",
-                MemoryRetrieval.ALWAYS,
-                MemorySensitivity.SENSITIVE));
+                ADMIN, MemoryScope.USER, "민감", "내용", "identity", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
 
         Memory sensitive = memories.create(
                 ADMIN, MemoryScope.USER, "민감", "내용", "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
         assertSensitiveAlways(() -> memories.update(ADMIN, sensitive.id(), "내용", true));
-        assertSensitiveAlways(() -> memories.update(
-                ADMIN, sensitive.id(), "내용", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
+        assertSensitiveAlways(() ->
+                memories.update(ADMIN, sensitive.id(), "내용", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
 
         Memory always = memories.create(ADMIN, MemoryScope.USER, "항상", "내용", true);
-        assertSensitiveAlways(() -> memories.update(
-                ADMIN, always.id(), "내용", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
+        assertSensitiveAlways(
+                () -> memories.update(ADMIN, always.id(), "내용", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
         // 거절한 수정은 판을 남기지 않는다.
         assertThat(memories.revisionsOf(ADMIN, sensitive.id())).isEmpty();
         assertThat(repository.findById(sensitive.id()).orElseThrow().revision()).isOne();
@@ -241,8 +237,12 @@ class MemoryServiceTest {
         assertThat(memories.alwaysInjectedFor(ADMIN, CORE)).isEmpty();
         assertNotFound(() -> memories.bodyFor(ADMIN, CORE, career.id()));
 
-        assertThat(memories.indexedFor(ADMIN, careerAgent)).extracting(Memory::id).containsExactly(core.id(), career.id());
-        assertThat(memories.alwaysInjectedFor(ADMIN, careerAgent)).extracting(Memory::id).containsExactly(careerAlways.id());
+        assertThat(memories.indexedFor(ADMIN, careerAgent))
+                .extracting(Memory::id)
+                .containsExactly(core.id(), career.id());
+        assertThat(memories.alwaysInjectedFor(ADMIN, careerAgent))
+                .extracting(Memory::id)
+                .containsExactly(careerAlways.id());
         assertThat(memories.bodyFor(ADMIN, careerAgent, career.id()).content()).isEqualTo("커리어 본문");
     }
 
@@ -261,7 +261,13 @@ class MemoryServiceTest {
     @DisplayName("민감 항목은 그 collection 에서 허용받은 실행만 색인과 본문으로 받는다")
     void sensitiveItemsNeedAnExplicitAllowance() {
         Memory sensitive = memories.create(
-                ADMIN, MemoryScope.USER, "신원", "민감 본문", "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+                ADMIN,
+                MemoryScope.USER,
+                "신원",
+                "민감 본문",
+                "identity",
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.SENSITIVE);
         Memory normal = memories.create(
                 ADMIN, MemoryScope.USER, "별명", "보통 본문", "identity", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
         MemoryAccess withoutSensitive = MemoryAccess.of(Set.of("identity"), Set.of());
@@ -269,15 +275,20 @@ class MemoryServiceTest {
         // 다른 collection 의 민감 허용은 이 collection 에 통하지 않는다.
         MemoryAccess otherSensitive = MemoryAccess.of(Set.of("identity", "career"), Set.of("career"));
 
-        assertThat(memories.indexedFor(ADMIN, withoutSensitive)).extracting(Memory::id).containsExactly(normal.id());
+        assertThat(memories.indexedFor(ADMIN, withoutSensitive))
+                .extracting(Memory::id)
+                .containsExactly(normal.id());
         assertNotFound(() -> memories.bodyFor(ADMIN, withoutSensitive, sensitive.id()));
-        assertThat(memories.indexedFor(ADMIN, otherSensitive)).extracting(Memory::id).containsExactly(normal.id());
+        assertThat(memories.indexedFor(ADMIN, otherSensitive))
+                .extracting(Memory::id)
+                .containsExactly(normal.id());
         assertNotFound(() -> memories.bodyFor(ADMIN, otherSensitive, sensitive.id()));
 
         assertThat(memories.indexedFor(ADMIN, withSensitive))
                 .extracting(Memory::id)
                 .containsExactly(sensitive.id(), normal.id());
-        assertThat(memories.bodyFor(ADMIN, withSensitive, sensitive.id()).content()).isEqualTo("민감 본문");
+        assertThat(memories.bodyFor(ADMIN, withSensitive, sensitive.id()).content())
+                .isEqualTo("민감 본문");
     }
 
     @Test

@@ -1,10 +1,10 @@
 package com.bifos.assistant.memory.domain;
 
-import com.bifos.assistant.memory.domain.type.MemoryStatus;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -218,9 +218,7 @@ public class Memory {
 
     /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. */
     public boolean isReadableBy(Long userId, Long groupId) {
-        return scope == MemoryScope.USER
-                ? Objects.equals(ownerUserId, userId)
-                : Objects.equals(this.groupId, groupId);
+        return scope == MemoryScope.USER ? Objects.equals(ownerUserId, userId) : Objects.equals(this.groupId, groupId);
     }
 
     /** 꺼내는 방식을 적고 옛 칸을 같은 뜻으로 맞춘다. */

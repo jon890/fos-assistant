@@ -13,8 +13,8 @@ import com.bifos.assistant.mcp.infra.AgentTokenAuthenticationFilter;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
@@ -183,9 +183,21 @@ class McpMemoryToolTest {
     @DisplayName("에이전트가 받지 않는 collection 과 허용받지 않은 민감 항목은 없는 항목과 같은 응답이다")
     void itemsOutsideTheAgentsCollectionsLookLikeMissingItems() throws Exception {
         Memory career = memories.create(
-                current(dad), MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+                current(dad),
+                MemoryScope.USER,
+                "커리어",
+                "커리어 본문",
+                "career",
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.NORMAL);
         Memory sensitive = memories.create(
-                current(dad), MemoryScope.USER, "신원", "민감 본문", "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+                current(dad),
+                MemoryScope.USER,
+                "신원",
+                "민감 본문",
+                "core",
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.SENSITIVE);
         Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
         Memory core = memories.create(current(dad), MemoryScope.USER, "기본", "기본 본문", false);
 

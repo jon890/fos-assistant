@@ -9,8 +9,8 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -254,15 +254,25 @@ class ContextAssemblerTest {
     void leavesOutItemsOfCollectionsTheAgentDoesNotReceive() {
         memories.create(ADMIN, MemoryScope.USER, "기본 제목", "기본 내용", true);
         memories.create(
-                ADMIN, MemoryScope.USER, "커리어 항상", "커리어 내용", "career", MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
+                ADMIN,
+                MemoryScope.USER,
+                "커리어 항상",
+                "커리어 내용",
+                "career",
+                MemoryRetrieval.ALWAYS,
+                MemorySensitivity.NORMAL);
         memories.create(
-                ADMIN, MemoryScope.USER, "커리어 색인", "커리어 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+                ADMIN,
+                MemoryScope.USER,
+                "커리어 색인",
+                "커리어 본문",
+                "career",
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.NORMAL);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
-        assertThat(result.instructions())
-                .contains("기본 내용")
-                .doesNotContain("커리어 내용", "커리어 색인", "커리어 본문");
+        assertThat(result.instructions()).contains("기본 내용").doesNotContain("커리어 내용", "커리어 색인", "커리어 본문");
         assertThat(result.omittedMemoryIds()).isEmpty();
     }
 
@@ -270,7 +280,13 @@ class ContextAssemblerTest {
     @DisplayName("사용자가 자기 목록을 볼 때의 조립은 collection 을 거르지 않는다")
     void ownerViewDoesNotFilterCollections() {
         memories.create(
-                ADMIN, MemoryScope.USER, "커리어 색인", "커리어 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+                ADMIN,
+                MemoryScope.USER,
+                "커리어 색인",
+                "커리어 본문",
+                "career",
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.NORMAL);
 
         assertThat(assembler.assembleForOwner(ADMIN).instructions()).contains("커리어 색인");
         assertThat(assembler.assembleForOwner(MEMBER)).isEqualTo(AssembledContext.empty());

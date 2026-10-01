@@ -61,7 +61,7 @@ public class AgentMemoryCollectionService {
         if (agent.connectorManaged()) {
             return;
         }
-        grants.save(AgentMemoryCollection.of(
-                agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false, clock.instant()));
+        grants.save(
+                AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false, clock.instant()));
     }
 }

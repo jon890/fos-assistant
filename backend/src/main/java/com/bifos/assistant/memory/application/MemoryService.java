@@ -6,12 +6,12 @@ import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.MemoryRevision;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryQueries;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -236,8 +236,7 @@ public class MemoryService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "retrieval and sensitivity are required");
         }
         if (!MemoryPlacement.allows(retrieval, sensitivity)) {
-            throw new ApiException(
-                    ErrorCode.MEMORY_SENSITIVE_ALWAYS, "a sensitive memory cannot always be injected");
+            throw new ApiException(ErrorCode.MEMORY_SENSITIVE_ALWAYS, "a sensitive memory cannot always be injected");
         }
     }
 
