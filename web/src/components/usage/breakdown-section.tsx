@@ -29,7 +29,7 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
         setFailure("묶음별 합계를 불러오지 못했어요.");
         return;
       }
-      setBreakdown(await response.json() as Breakdown);
+      setBreakdown((await response.json()) as Breakdown);
     } catch {
       setFailure("묶음별 합계를 불러오지 못했어요.");
     } finally {
@@ -50,12 +50,20 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
             onChange={(event) => changeAxis(event.target.value)}
             value={breakdown.axis}
           >
-            {AXES.map((axis) => <option key={axis.value} value={axis.value}>{axis.label}</option>)}
+            {AXES.map((axis) => (
+              <option key={axis.value} value={axis.value}>
+                {axis.label}
+              </option>
+            ))}
           </NativeSelect>
         </label>
       </div>
       {failure ? <p className="mb-3 text-sm">{failure}</p> : null}
-      <BreakdownTable axis={breakdown.axis} currency={breakdown.currency} rows={breakdown.rows} />
+      <BreakdownTable
+        axis={breakdown.axis}
+        currency={breakdown.currency}
+        rows={breakdown.rows}
+      />
     </section>
   );
 }
