@@ -2,9 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { Menu, PanelLeft, SquarePen } from "lucide-react";
-import { ConversationsProvider, useConversations } from "./conversations-provider";
+import {
+  ConversationsProvider,
+  useConversations,
+} from "./conversations-provider";
 import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
@@ -13,7 +25,9 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useMediaQuery } from "@/components/ui/use-media-query";
 
-const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(null);
+const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(
+  null,
+);
 /** 레이아웃이 한 번 읽은 사용자 이름이다. 화면마다 다시 읽지 않고 여기서 꺼낸다. 읽지 못했으면 null 이다 */
 const DisplayNameContext = createContext<string | null>(null);
 /** 레이아웃이 확인한 관리자 역할을 로딩 화면에서도 다시 조회하지 않고 쓴다. */
@@ -35,7 +49,12 @@ export function useShellTitle(title: string | null): void {
   }, [setTitle, title]);
 }
 
-function ShellBody({ isAdmin, displayName, children, signedIn }: {
+function ShellBody({
+  isAdmin,
+  displayName,
+  children,
+  signedIn,
+}: {
   isAdmin: boolean;
   displayName?: string;
   children: React.ReactNode;
@@ -55,15 +74,24 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   const wide = useMediaQuery("(min-width: 768px)");
 
   useEffect(() => {
-    try { setCollapsed(localStorage.getItem("sidebar-collapsed") === "1"); } catch { /* 저장소를 막은 브라우저에서도 화면을 연다. */ }
+    try {
+      setCollapsed(localStorage.getItem("sidebar-collapsed") === "1");
+    } catch {
+      /* 저장소를 막은 브라우저에서도 화면을 연다. */
+    }
   }, []);
 
   const updateCollapsed = useCallback((value: boolean) => {
     setCollapsed(value);
-    try { localStorage.setItem("sidebar-collapsed", value ? "1" : "0"); } catch { /* 저장할 수 없어도 현재 화면은 바꾼다. */ }
+    try {
+      localStorage.setItem("sidebar-collapsed", value ? "1" : "0");
+    } catch {
+      /* 저장할 수 없어도 현재 화면은 바꾼다. */
+    }
   }, []);
   const toggleSidebar = useCallback(() => {
-    if (window.matchMedia("(min-width: 768px)").matches) updateCollapsed(!collapsed);
+    if (window.matchMedia("(min-width: 768px)").matches)
+      updateCollapsed(!collapsed);
     else setDrawerOpen((open) => !open);
   }, [collapsed, updateCollapsed]);
   const focusSearch = useCallback(() => {
@@ -83,7 +111,9 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   // 경로가 바뀌면 여기서 닫는다.
   useEffect(() => setDrawerOpen(false), [pathname]);
   // 서랍이 열린 채 넓은 폭이 되면 닫아 둔다. 그대로 두면 다시 좁힐 때 서랍이 저절로 열린다.
-  useEffect(() => { if (wide) setDrawerOpen(false); }, [wide]);
+  useEffect(() => {
+    if (wide) setDrawerOpen(false);
+  }, [wide]);
   // 목적지가 지금 경로와 같으면 경로가 바뀌지 않으므로 곧바로 닫는다. 사진을 먼저 올려 주소만 바꾼 경우가
   // 있어 usePathname 대신 주소창의 경로와 견준다.
   const closeIfSamePath = useCallback((href: string) => {
@@ -92,7 +122,11 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   const drawerShown = drawerOpen && wide !== true;
 
   if (!signedIn) {
-    return <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">{children}</main>;
+    return (
+      <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
+        {children}
+      </main>
+    );
   }
 
   return (
@@ -100,14 +134,26 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
       <div className="flex h-full min-h-0 min-w-0 flex-1">
         {/* 좁은 폭에서는 CSS 가 숨긴다. 서랍이 열린 동안은 같은 사이드바가 두 벌 생기지 않게 그리지 않는다. */}
         {wide === false && drawerShown ? null : (
-          <aside aria-label="사이드바"
-            className={cn("hidden w-64 shrink-0 border-r border-border bg-muted", !collapsed && "md:block")}>
-            <Sidebar isAdmin={isAdmin} displayName={displayName} onNavigate={closeIfSamePath}
-              searchRef={pinnedSearchRef} onCollapse={() => updateCollapsed(true)} />
+          <aside
+            aria-label="사이드바"
+            className={cn(
+              "hidden w-64 shrink-0 border-r border-border bg-muted",
+              !collapsed && "md:block",
+            )}
+          >
+            <Sidebar
+              isAdmin={isAdmin}
+              displayName={displayName}
+              onNavigate={closeIfSamePath}
+              searchRef={pinnedSearchRef}
+              onCollapse={() => updateCollapsed(true)}
+            />
           </aside>
         )}
         <Sheet open={drawerShown} onOpenChange={setDrawerOpen}>
-          <SheetContent side="left" closeLabel="사이드바 닫기"
+          <SheetContent
+            side="left"
+            closeLabel="사이드바 닫기"
             className="gap-0 bg-muted data-[side=left]:w-72 data-[side=left]:sm:max-w-72"
             onOpenAutoFocus={(event) => {
               if (!focusSearchOnOpen.current) return;
@@ -117,32 +163,66 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
             }}
             onEscapeKeyDown={(event) => {
               // Radix 는 document 캡처 단계에서 Esc 를 먼저 받는다. 이름 입력칸은 Esc 로 편집만 취소하므로 서랍을 닫지 않는다.
-              if (event.target instanceof Element && event.target.matches("[data-rename-input]")) event.preventDefault();
-            }}>
+              if (
+                event.target instanceof Element &&
+                event.target.matches("[data-rename-input]")
+              )
+                event.preventDefault();
+            }}
+          >
             <SheetTitle className="sr-only">사이드바</SheetTitle>
             <aside aria-label="사이드바" className="h-full min-h-0">
               {/* 닫히며 사라지는 동안에는 붙박이 쪽이 안내 영역을 갖는다. 안내 영역이 한 번에 하나만 있다. */}
-              <Sidebar isAdmin={isAdmin} displayName={displayName} onNavigate={closeIfSamePath}
-                searchRef={drawerSearchRef} onCollapse={() => updateCollapsed(true)} showStatus={drawerOpen} />
+              <Sidebar
+                isAdmin={isAdmin}
+                displayName={displayName}
+                onNavigate={closeIfSamePath}
+                searchRef={drawerSearchRef}
+                onCollapse={() => updateCollapsed(true)}
+                showStatus={drawerOpen}
+              />
             </aside>
           </SheetContent>
         </Sheet>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {collapsed ? <header className="hidden h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:flex">
-            <TooltipButton label="사이드바 펴기" onClick={() => updateCollapsed(false)}><PanelLeft aria-hidden="true" /></TooltipButton>
-            <Link href="/" onClick={startNew} className="rounded-md px-2 py-1.5 text-sm hover:bg-muted">새 대화</Link>
-          </header> : null}
-          <header className={cn(
-            "flex flex-nowrap items-center gap-3 md:hidden",
-            "h-14 shrink-0 px-4",
-            "border-b border-border",
-          )}>
-            <TooltipButton label="사이드바 열기" size="icon" onClick={() => setDrawerOpen(true)}>
+          {collapsed ? (
+            <header className="hidden h-14 shrink-0 items-center gap-3 border-b border-border px-4 md:flex">
+              <TooltipButton
+                label="사이드바 펴기"
+                onClick={() => updateCollapsed(false)}
+              >
+                <PanelLeft aria-hidden="true" />
+              </TooltipButton>
+              <Link
+                href="/"
+                onClick={startNew}
+                className="rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+              >
+                새 대화
+              </Link>
+            </header>
+          ) : null}
+          <header
+            className={cn(
+              "flex flex-nowrap items-center gap-3 md:hidden",
+              "h-14 shrink-0 px-4",
+              "border-b border-border",
+            )}
+          >
+            <TooltipButton
+              label="사이드바 열기"
+              size="icon"
+              onClick={() => setDrawerOpen(true)}
+            >
               <Menu aria-hidden="true" className="size-5" />
             </TooltipButton>
-            <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">{title}</span>
+            <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">
+              {title}
+            </span>
             <TooltipButton label="새 대화" size="icon" asChild>
-              <Link href="/" onClick={startNew}><SquarePen aria-hidden="true" className="size-5" /></Link>
+              <Link href="/" onClick={startNew}>
+                <SquarePen aria-hidden="true" className="size-5" />
+              </Link>
             </TooltipButton>
           </header>
           <main className="mx-auto min-h-0 w-full flex-1 overflow-y-auto px-4 py-5">
@@ -154,7 +234,11 @@ function ShellBody({ isAdmin, displayName, children, signedIn }: {
   );
 }
 
-export function AppShell({ isAdmin, displayName, children }: {
+export function AppShell({
+  isAdmin,
+  displayName,
+  children,
+}: {
   isAdmin: boolean;
   displayName?: string;
   children: React.ReactNode;
@@ -166,7 +250,11 @@ export function AppShell({ isAdmin, displayName, children }: {
       <AdminContext.Provider value={isAdmin}>
         <DisplayNameContext.Provider value={displayName || null}>
           <ConversationsProvider enabled={signedIn}>
-            <ShellBody isAdmin={isAdmin} displayName={displayName} signedIn={signedIn}>
+            <ShellBody
+              isAdmin={isAdmin}
+              displayName={displayName}
+              signedIn={signedIn}
+            >
               {children}
             </ShellBody>
           </ConversationsProvider>
