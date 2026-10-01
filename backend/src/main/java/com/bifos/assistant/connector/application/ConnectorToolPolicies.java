@@ -45,7 +45,8 @@ public final class ConnectorToolPolicies {
             return false;
         }
         for (ConnectorField field : manifest.fields()) {
-            if (field.options() != null && !readWithoutApproval(manifest, field.options().tool())) {
+            if (field.options() != null
+                    && !readWithoutApproval(manifest, field.options().tool())) {
                 return false;
             }
         }
@@ -83,7 +84,8 @@ public final class ConnectorToolPolicies {
         if (manifest.schema() != DECLARING_SCHEMA) {
             return 0;
         }
-        Set<String> declared = manifest.tools().stream().map(ConnectorTool::name).collect(Collectors.toSet());
+        Set<String> declared =
+                manifest.tools().stream().map(ConnectorTool::name).collect(Collectors.toSet());
         return (int) toolNames.stream().filter(name -> !declared.contains(name)).count();
     }
 

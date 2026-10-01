@@ -76,8 +76,7 @@ class ConnectorConnectionControllerTest {
                         List.of(
                                 new ConnectorFieldSummary("token", "토큰", "", true, true, "^demo_.+$", false, false),
                                 new ConnectorFieldSummary("scope", "범위", "", false, false, null, true, true)),
-                        List.of(new ConnectorToolSummary(
-                                "write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED)),
+                        List.of(new ConnectorToolSummary("write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED)),
                         ConnectionStatus.PENDING,
                         true)));
 
@@ -106,9 +105,8 @@ class ConnectorConnectionControllerTest {
     @DisplayName("카탈로그에서 빠진 내 연결은 available 거짓과 빈 칸으로 나간다")
     void catalogMarksRemovedConnectorAsUnavailableWithEmptyFields() throws Exception {
         when(service.catalog(MEMBER))
-                .thenReturn(
-                        List.of(new ConnectorSummary(
-                                DEMO, "검사용 메모", "", List.of(), List.of(), ConnectionStatus.READY, false)));
+                .thenReturn(List.of(
+                        new ConnectorSummary(DEMO, "검사용 메모", "", List.of(), List.of(), ConnectionStatus.READY, false)));
 
         mvc.perform(get("/api/v1/connectors"))
                 .andExpect(status().isOk())
@@ -264,8 +262,8 @@ class ConnectorConnectionControllerTest {
     @DisplayName("관리자 목록은 다른 사용자의 비밀 앞부분과 칸 값을 내보내지 않는다")
     void adminListHidesOtherUsersPrefixesAndValues() throws Exception {
         when(service.listForAdmin(ADMIN))
-                .thenReturn(List.of(new AdminConnectionSnapshot(
-                        DEMO, 7L, "사용자", ConnectionStatus.PENDING, "agent-code", true, 3)));
+                .thenReturn(List.of(
+                        new AdminConnectionSnapshot(DEMO, 7L, "사용자", ConnectionStatus.PENDING, "agent-code", true, 3)));
 
         mvc.perform(get("/api/v1/admin/connections"))
                 .andExpect(status().isOk())

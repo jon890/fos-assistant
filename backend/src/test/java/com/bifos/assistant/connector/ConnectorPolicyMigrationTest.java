@@ -100,8 +100,8 @@ class ConnectorPolicyMigrationTest {
     private Row connection(int userId) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery(
-                        "SELECT status, restart_required, desired_enabled, undeclared_tools"
+                ResultSet row =
+                        statement.executeQuery("SELECT status, restart_required, desired_enabled, undeclared_tools"
                                 + " FROM connector_connection WHERE user_id = " + userId)) {
             assertThat(row.next()).as("사용자 %d 의 연결", userId).isTrue();
             return new Row(
@@ -115,8 +115,8 @@ class ConnectorPolicyMigrationTest {
     private AgentRow agent(int id) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery(
-                        "SELECT enabled, connector_attachments FROM agent WHERE id = " + id)) {
+                ResultSet row =
+                        statement.executeQuery("SELECT enabled, connector_attachments FROM agent WHERE id = " + id)) {
             assertThat(row.next()).as("에이전트 %d", id).isTrue();
             return new AgentRow(row.getBoolean("enabled"), row.getBoolean("connector_attachments"));
         }

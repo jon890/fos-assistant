@@ -175,7 +175,8 @@ class ConnectorConnectionServiceTest {
     @BeforeEach
     void setUp() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
-        when(connector.putConnector(anyString(), anyString(), anyBoolean())).thenReturn(new InstallResult(false, false));
+        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new InstallResult(false, false));
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST, PIN_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap()))
                 .thenReturn(CallResult.success(MAPPER.readTree(
@@ -431,7 +432,16 @@ class ConnectorConnectionServiceTest {
     void manifestAcceptingAttachmentsWithoutVisionIsLeftOut() {
         when(connector.readCatalog())
                 .thenReturn(List.of(new ConnectorManifest(
-                        DEMO, "검사용 메모", "", DEMO_MANIFEST.fields(), "list_scopes", "demo", List.of(), true, 1, List.of())));
+                        DEMO,
+                        "검사용 메모",
+                        "",
+                        DEMO_MANIFEST.fields(),
+                        "list_scopes",
+                        "demo",
+                        List.of(),
+                        true,
+                        1,
+                        List.of())));
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
         assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
@@ -1113,7 +1123,8 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         String profile = profileOf(service.register(user, DEMO, VALUES));
         when(connector.readConnector(anyString(), eq(DEMO)))
-                .thenReturn(new ConnectorState("p", true, false, false, true),
+                .thenReturn(
+                        new ConnectorState("p", true, false, false, true),
                         new ConnectorState("p", true, true, false, true));
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
 
@@ -1185,7 +1196,8 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(member, DEMO, VALUES));
         // 이전 판이 쓴 목록이라 configured 가 아니다. 다시 보낸 설치가 목록을 맞춘 뒤에는 configured 다.
         when(connector.readConnector(anyString(), eq(DEMO)))
-                .thenReturn(new ConnectorState("p", true, false, false, true),
+                .thenReturn(
+                        new ConnectorState("p", true, false, false, true),
                         new ConnectorState("p", true, true, false, true));
         when(connector.putConnector(profile, DEMO, true)).thenReturn(new InstallResult(true, false));
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
@@ -1310,7 +1322,8 @@ class ConnectorConnectionServiceTest {
     void staysPendingWithoutProbeWhenPolicyHookIsOffAfterReinstall() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         String profile = profileOf(service.register(user, DEMO, VALUES));
-        when(connector.readConnector(anyString(), eq(DEMO))).thenReturn(new ConnectorState("p", true, true, false, false));
+        when(connector.readConnector(anyString(), eq(DEMO)))
+                .thenReturn(new ConnectorState("p", true, true, false, false));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 

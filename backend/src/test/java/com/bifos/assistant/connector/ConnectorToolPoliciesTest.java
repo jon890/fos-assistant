@@ -35,9 +35,7 @@ class ConnectorToolPoliciesTest {
                 boolean valid = ConnectorToolPolicies.valid(
                         manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", risk.name(), word, null)));
 
-                assertThat(valid)
-                        .as("%s 에 %s", risk, word)
-                        .isEqualTo(!approval.looserThan(risk.floor()));
+                assertThat(valid).as("%s 에 %s", risk, word).isEqualTo(!approval.looserThan(risk.floor()));
             }
         }
         assertThat(ToolRisk.READ.floor()).isEqualTo(ToolApproval.NONE);

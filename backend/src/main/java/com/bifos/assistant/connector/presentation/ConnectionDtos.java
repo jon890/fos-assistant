@@ -50,7 +50,10 @@ public final class ConnectionDtos {
     public record ConnectorToolView(String name, String title, String risk, String approval) {
         static ConnectorToolView from(ConnectorToolSummary value) {
             return new ConnectorToolView(
-                    value.name(), value.title(), value.risk().name(), value.approval().name());
+                    value.name(),
+                    value.title(),
+                    value.risk().name(),
+                    value.approval().name());
         }
     }
 
