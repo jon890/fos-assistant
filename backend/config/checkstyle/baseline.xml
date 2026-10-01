@@ -28,9 +28,6 @@
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]ArtifactWriteService\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]AskFormat\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]AttachmentCleaner\.java$"/>
-  <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]ChatService\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]ChatService\.java$"/>
-  <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]ChatService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]ConversationEventHub\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]DelegationWakeService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]ModelOptionsService\.java$"/>
@@ -74,8 +71,6 @@
   <suppress id="rightCurlySame" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]AgentTokenService\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpCallContext\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpCallContext\.java$"/>
-  <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpCallerResolver\.java$"/>
-  <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpCallerResolver\.java$"/>
   <suppress checks="(^|\.)ConstantName(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpToolService\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpToolService\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpToolService\.java$"/>
@@ -113,7 +108,6 @@
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]presentation[\\/]MemoryDtos\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]AgentDelegationService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]AgentDelegationService\.java$"/>
-  <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]AgentRunner\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]DelegationParentResolver\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]DelegationParentResolver\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]FlowRegistry\.java$"/>

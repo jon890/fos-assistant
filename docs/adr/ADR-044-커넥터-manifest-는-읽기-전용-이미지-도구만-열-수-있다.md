@@ -6,7 +6,7 @@
   `attachments` 가 참이면 그 연결용 에이전트의 대화가 사진을 받는다. 참이려면 `toolsets` 에 `vision` 이 있어야 한다.
   [ADR-039](ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md) 의 「셸, 파일, 스킬 수정 도구를 닫는다」 는 그대로다.
   허용 목록은 대시보드 plugin 과 Control Plane 이 각자 갖고 둘 다 검사한다. 목록 밖의 이름을 선언한 커넥터는 카탈로그에 나오지 않는다.
-  연결용 에이전트의 API 도구 목록은 Control Plane MCP, 그 커넥터의 MCP 서버, 선언한 toolset 이다.
+  연결용 에이전트의 API 도구 목록은 그 커넥터의 MCP 서버와 선언한 toolset 이다. Control Plane MCP 는 두지 않는다([ADR-045](ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
   켜진 내장 도구가 선언과 정확히 같아야 `READY` 다.
 - **맥락**: 가계부 plugin 에 소비 화면 스크린샷을 읽어 등록하는 도구가 들어갔다.
   에이전트가 사진을 `vision_analyze` 로 읽은 뒤 그 서비스의 MCP 도구를 부르는 흐름이다.

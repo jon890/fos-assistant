@@ -44,6 +44,29 @@ build_web() {
   pnpm --dir "${ROOT}/web" build
 }
 
+# CI 의 hermes job 과 같은 판이어야 한다. 다른 판이 깔려 있으면 맞춰 설치한 뒤 검사한다.
+HERMES_MCP_VERSION="2.0.0"
+HERMES_PYYAML_VERSION="6.0.3"
+
+check_hermes() {
+  cd "${ROOT}" || return 1
+  if ! python3 - "$HERMES_MCP_VERSION" "$HERMES_PYYAML_VERSION" <<'PY'
+import importlib.metadata as metadata
+import sys
+
+for name, wanted in (("mcp", sys.argv[1]), ("PyYAML", sys.argv[2])):
+    try:
+        if metadata.version(name) != wanted:
+            sys.exit(1)
+    except metadata.PackageNotFoundError:
+        sys.exit(1)
+PY
+  then
+    python3 -m pip install "mcp==${HERMES_MCP_VERSION}" "PyYAML==${HERMES_PYYAML_VERSION}" || return 1
+  fi
+  python3 -m unittest discover -s hermes/tests
+}
+
 echo "로그: ${LOG_DIR}"
 step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
 step playwright      pnpm --dir "${ROOT}/web" exec playwright install chromium
@@ -53,7 +76,7 @@ step web-build       build_web
 step browser         pnpm --dir "${ROOT}/web" test:browser
 step e2e             bash -c "cd '${ROOT}' && node test/e2e/run.ts"
 step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
-step hermes          bash -c "cd '${ROOT}' && { python3 -c 'import mcp, yaml' 2>/dev/null || python3 -m pip install 'mcp==2.0.0' 'PyYAML==6.0.3'; } && python3 -m unittest discover -s hermes/tests"
+step hermes          check_hermes
 step public-safe     "${ROOT}/scripts/check-public-safe.sh"
 step quality         bash -c "cd '${ROOT}' && scripts/quality.sh check"
 echo "모두 통과했다"

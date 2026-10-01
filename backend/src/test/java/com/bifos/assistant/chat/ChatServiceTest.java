@@ -81,6 +81,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -337,6 +338,28 @@ class ChatServiceTest {
         // 실행 기록의 길이는 Memory 몫만 센다. 형식 안내는 Memory 상한과 무관하게 붙는다.
         assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
                 .isEqualTo((long) (instructions.length() - ("\n\n" + AskFormat.GUIDE).length()));
+    }
+
+    @Test
+    @DisplayName("커넥터 에이전트의 대화 turn 은 Memory 를 Hermes 에 보내지 않고 실행 기록의 길이도 0 이다")
+    void sendsNoMemoryToHermesForConnectorAgentTurn() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent connector = agents.findAll().getFirst();
+        connector.markConnectorManaged();
+        agents.save(connector);
+        memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
+
+        String instructions = stub().received().getFirst().instructions();
+        assertThat(instructions)
+                .as("커넥터 에이전트의 turn 이 Hermes 에 보낸 instructions")
+                .doesNotContain("국수는 맵지 않게 먹는다")
+                .isEqualTo(AskFormat.GUIDE);
+        assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
+                .as("실행 기록의 문맥 길이")
+                .isZero();
     }
 
     @Test
@@ -702,7 +725,7 @@ class ChatServiceTest {
         hermesStreams(
                 new RunEvent("message.delta", "저녁은 ", null, null, null, null),
                 new RunEvent("tool.started", null, "web_search", "started", null, null));
-        doThrow(new org.springframework.dao.DataIntegrityViolationException("사건을 저장할 수 없다"))
+        doThrow(new DataIntegrityViolationException("사건을 저장할 수 없다"))
                 .when(executionEvents)
                 .save(any(ExecutionEvent.class));
 

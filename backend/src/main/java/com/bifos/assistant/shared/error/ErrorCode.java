@@ -136,6 +136,8 @@ public enum ErrorCode {
     CONNECTOR_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 외부 설치, 확인, 해제가 실패했다. */
     CONNECTOR_OPERATION_FAILED(HttpStatus.BAD_GATEWAY),
+    /** 선택지 조회, 등록, 연결 확인이 사용자별 호출 제한을 넘었다. 외부를 부르지 않고 거절한다. */
+    CONNECTOR_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
