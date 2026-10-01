@@ -278,7 +278,7 @@ MCP 규약 헤더뿐이었다. `params._meta` 는 빈 객체였다.
 
 그래서 hook 이 서명하는 값은 그 호출의 session 이 아니라 **사슬의 처음 session(뿌리 session)** 이다.
 
-**플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. 배치 방법은 비공개 저장소 `fos-home-infra` 가 갖는다.
+**플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. plugin 원본은 이 저장소의 [`hermes/plugins/fos-ctx/`](../../hermes/plugins/fos-ctx/) 에 있고, 대시보드 plugin 이 새 profile 을 만들 때 그 profile 로 복사한다.
 
 **hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `agent_*` 가 모두 그렇다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 
