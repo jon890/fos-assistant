@@ -1,6 +1,11 @@
 import { ExecutionEventRow, type MergedEventRow } from "./execution-event-row";
 import type { ExecutionEventView, ExecutionTreeNode } from "./execution-tree";
-import { formatDuration, formatTokens } from "@/lib/format";
+import {
+  agentLabel,
+  formatDuration,
+  formatDurationFor,
+  formatTokens,
+} from "@/lib/format";
 
 /**
  * 서버가 여덟에서 자르지만(`ExecutionTreeService.MAX_DEPTH`), 화면도 스스로 멈춘다.
@@ -99,15 +104,20 @@ export function mergeEvents(events: ExecutionEventView[]): MergedEventRow[] {
 export function ExecutionNode({
   node,
   depth,
+  isAdmin,
   showRuntime,
 }: {
   node: ExecutionTreeNode;
   depth: number;
+  isAdmin: boolean;
   showRuntime: boolean;
 }) {
   const stoppedByScreen = depth >= MAX_DEPTH;
   const rows = mergeEvents(node.events);
-  const label = node.agentName ?? node.agentCode ?? `실행 #${node.executionId}`;
+  // 에이전트 코드는 내부 값이라 관리자에게만 이름 대신 쓴다.
+  const label = isAdmin
+    ? (node.agentName ?? node.agentCode ?? `실행 #${node.executionId}`)
+    : agentLabel(node.agentName);
   const showsTruncated =
     node.truncated || (stoppedByScreen && node.children.length > 0);
 
@@ -151,12 +161,12 @@ export function ExecutionNode({
             {node.modelTier ? tierLabel(node.modelTier) : "단계 미확인"}
             {node.latencyMs === null
               ? ""
-              : ` · ${formatDuration(node.latencyMs)}`}
+              : ` · ${formatDurationFor(node.latencyMs, false)}`}
           </p>
         )}
         <ul className="min-w-0">
           {rows.map((row) => (
-            <ExecutionEventRow key={row.key} row={row} />
+            <ExecutionEventRow key={row.key} row={row} isAdmin={isAdmin} />
           ))}
           {!stoppedByScreen &&
             node.children.map((child) => (
@@ -164,6 +174,7 @@ export function ExecutionNode({
                 key={child.executionId}
                 node={child}
                 depth={depth + 1}
+                isAdmin={isAdmin}
                 showRuntime={showRuntime}
               />
             ))}

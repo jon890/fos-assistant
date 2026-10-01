@@ -14,18 +14,31 @@ type Props = {
 };
 
 /** 입력창 위에 뜨는 스킬 고르기 목록이다. 초점은 입력칸에 둔 채 방향키로 줄을 옮긴다 */
-export function SkillCommandMenu({ id, names, query, activeIndex, onPick }: Props) {
+export function SkillCommandMenu({
+  id,
+  names,
+  query,
+  activeIndex,
+  onPick,
+}: Props) {
   const matches = filterSkillNames(names, query);
   return (
     <ul
       id={id}
       role="listbox"
       aria-label="스킬 고르기"
-      className={cn("absolute inset-x-0 bottom-full z-10 mb-2 max-h-60 overflow-y-auto",
-        "rounded-2xl border border-border bg-background p-1 shadow")}
+      className={cn(
+        "absolute inset-x-0 bottom-full z-10 mb-2 max-h-60 overflow-y-auto",
+        "rounded-lg border border-border bg-popover p-1 shadow",
+      )}
     >
       {names.length === 0 ? (
-        <li role="option" aria-selected={false} aria-disabled="true" className="px-3 py-2 text-sm text-muted-foreground">
+        <li
+          role="option"
+          aria-selected={false}
+          aria-disabled="true"
+          className="px-3 py-2 text-sm text-muted-foreground"
+        >
           이 에이전트에는 스킬이 없어요
         </li>
       ) : (
@@ -38,7 +51,7 @@ export function SkillCommandMenu({ id, names, query, activeIndex, onPick }: Prop
             // 누르는 동안 입력칸이 초점을 잃으면 커서 자리를 알 수 없다.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onPick(name)}
-            className="cursor-pointer rounded-xl px-3 py-2 hover:bg-muted aria-selected:bg-muted"
+            className="cursor-pointer rounded-md px-3 py-2 hover:bg-muted aria-selected:bg-muted"
           >
             <span className="block truncate text-sm font-medium">/{name}</span>
           </li>

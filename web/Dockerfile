@@ -23,6 +23,9 @@ ENV ASSISTANT_JWT_SECRET=build-time-placeholder
 ENV CONTROL_PLANE_BASE_URL=http://build-time-placeholder
 ENV AUTH_GOOGLE_ID=build-time-placeholder
 ENV AUTH_GOOGLE_SECRET=build-time-placeholder
+# 화면 전환을 끄려면 build arg 로 off 를 준다. 주지 않으면 코드의 기본값을 따른다.
+ARG NEXT_PUBLIC_VIEW_TRANSITION
+ENV NEXT_PUBLIC_VIEW_TRANSITION=${NEXT_PUBLIC_VIEW_TRANSITION}
 RUN pnpm build
 
 # Stage 3: runtime

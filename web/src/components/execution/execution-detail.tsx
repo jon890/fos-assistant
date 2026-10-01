@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { useShellIsAdmin } from "@/components/shell/app-shell";
 import {
+  agentLabel,
   formatCost,
   formatDuration,
+  formatDurationFor,
   formatTokens,
   formatWhen,
 } from "@/lib/format";
-import { useShellIsAdmin } from "@/components/shell/app-shell";
+import { executionStatusVariant } from "@/lib/execution-status";
 import {
   ExecutionTree,
   type ExecutionTreeNode,
@@ -137,9 +140,11 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
     <div>
       <header className="mb-6">
         <h1 className="mb-4 text-xl font-semibold">
-          {summary.agentName ??
-            summary.agentCode ??
-            `실행 #${summary.executionId}`}
+          {isAdmin
+            ? (summary.agentName ??
+              summary.agentCode ??
+              `실행 #${summary.executionId}`)
+            : agentLabel(summary.agentName)}
         </h1>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <div>
@@ -149,9 +154,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
           <div>
             <dt className="text-muted-foreground">상태</dt>
             <dd>
-              <Badge
-                variant={summary.status === "FAILED" ? "default" : "outline"}
-              >
+              <Badge variant={executionStatusVariant(summary)}>
                 {statusLabel(summary.status)}
               </Badge>
             </dd>
@@ -207,7 +210,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
             <dd>
               {running || summary.latencyMs === null
                 ? ""
-                : formatDuration(summary.latencyMs)}
+                : formatDurationFor(summary.latencyMs, isAdmin)}
             </dd>
           </div>
         </dl>
@@ -238,7 +241,11 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
           </dl>
         ) : null}
       </header>
-      <ExecutionTree tree={state.tree} showRuntime={isAdmin} />
+      <ExecutionTree
+        tree={state.tree}
+        isAdmin={isAdmin}
+        showRuntime={isAdmin}
+      />
     </div>
   );
 }

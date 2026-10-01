@@ -150,6 +150,42 @@ function ArtifactList({
   );
 }
 
+/** 비서 얼굴과 이름을 먼저 그리고, 그 아래 칸에 기다림 점이나 작업 과정이나 답을 받는다. */
+export function AssistantRow({
+  header,
+  above,
+  children,
+  className,
+  ...props
+}: React.ComponentProps<"li"> & {
+  /** 이름 옆에 두는 것이다. 보낸 시각이 여기 온다 */
+  header?: React.ReactNode;
+  /** 이름 줄 위에 두는 알림 줄이다 */
+  above?: React.ReactNode;
+}) {
+  return (
+    <li
+      className={cn(
+        "group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2",
+        className,
+      )}
+      {...props}
+    >
+      <span aria-hidden="true" className={assistantAvatar()}>
+        비
+      </span>
+      <div className="min-w-0">
+        {above}
+        <div className="mb-1 flex min-h-8 items-center gap-2">
+          <span className="text-sm font-medium">비서</span>
+          {header}
+        </div>
+        {children}
+      </div>
+    </li>
+  );
+}
+
 export function MessageBubble({
   turn,
   isAdmin,
@@ -167,6 +203,7 @@ export function MessageBubble({
   nextUserMessage,
   onOpenArtifact,
   skillCommandChip = false,
+  liveActivity,
 }: {
   turn: Turn;
   /** 모델 제공사와 모델 전환 안내는 관리자만 본다. */
@@ -189,10 +226,14 @@ export function MessageBubble({
   onOpenArtifact?(messageId: Turn["id"], path: string, name: string): void;
   /** 사용자 메시지가 스킬 커맨드로 시작하면 그 이름을 칩으로 앞에 그린다 */
   skillCommandChip?: boolean;
+  /** 답이 흘러나오는 동안의 진행 중 작업 과정이다. 저장된 블록과 같은 자리에 그린다 */
+  liveActivity?: React.ReactNode;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
   const attachments = turn.attachments ?? [];
+  // 저장되기 전의 줄은 임시 문자열 id 를 갖는다. 등장 움직임은 그 줄에만 줘서, 대화를 열 때와 답이 저장될 때 다시 움직이지 않게 한다.
+  const unsaved = typeof turn.id === "string";
 
   if (turn.role === "SYSTEM") {
     // 사람이 쓴 말도 비서의 답도 아니다. 복사, 다시 생성, 판 넘기기를 두지 않는다.
@@ -218,8 +259,9 @@ export function MessageBubble({
         <div
           data-testid="user-message"
           className={cn(
-            "relative max-w-[70%] rounded-3xl bg-primary-soft px-4 py-2.5",
-            "group-focus-visible:outline-2 group-focus-visible:outline-primary",
+            "relative max-w-[70%] rounded-xl rounded-br-sm bg-primary-soft px-4 py-2.5",
+            "group-focus-visible:outline-2 group-focus-visible:outline-ring",
+            unsaved && "animate-message-user",
           )}
         >
           <p className="whitespace-pre-wrap break-words text-sm leading-6">
@@ -237,7 +279,7 @@ export function MessageBubble({
               turn.content
             )}
           </p>
-          {userVersion && onVersionChange ? (
+          {userVersion && userVersion.count > 1 && onVersionChange ? (
             <div className="mt-2 flex gap-2">
               <VersionSwitcher
                 slot={userVersion}
@@ -267,87 +309,86 @@ export function MessageBubble({
   }
 
   return (
-    <li
+    <AssistantRow
       data-testid="assistant-message"
-      className={cn(
-        "group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2",
-        "focus-visible:outline-2 focus-visible:outline-primary",
-      )}
+      className="focus-visible:outline-2 focus-visible:outline-ring"
       tabIndex={0}
-    >
-      <span aria-hidden="true" className={assistantAvatar()}>
-        비
-      </span>
-      <div className="min-w-0">
-        {isAdmin && turn.switchedTo ? (
+      above={
+        isAdmin && turn.switchedTo ? (
           <p
             className="mb-1 text-xs text-muted-foreground"
             data-testid="provider-switched"
           >
             여기부터 {turn.switchedTo}로 실행해요
           </p>
-        ) : null}
-        <div className="mb-1 flex min-h-8 items-center gap-2">
-          <span className="text-sm font-medium">비서</span>
-          {sentAt ? (
-            <time dateTime={turn.createdAt} className={revealedTime()}>
-              {sentAt}
-            </time>
-          ) : null}
-        </div>
-        {turn.activity && turn.executionId ? (
-          <div className="mb-2">
-            <ActivityBlock
-              mode="saved"
-              summary={turn.activity}
-              executionId={turn.executionId}
-              cancelled={turn.status === "CANCELLED"}
-              initialExpanded={initialActivityExpanded}
-              onOpenPanel={() => onOpenSaved(turn.executionId!)}
-            />
-          </div>
-        ) : null}
-        <div className="leading-7">
-          <AnswerBody
-            content={turn.content}
-            streaming={streaming}
-            nextUserMessage={nextUserMessage}
-            onAnswer={streaming ? undefined : onAnswer}
+        ) : null
+      }
+      header={
+        sentAt ? (
+          <time dateTime={turn.createdAt} className={revealedTime()}>
+            {sentAt}
+          </time>
+        ) : null
+      }
+    >
+      {liveActivity ? (
+        <div className="mb-2">{liveActivity}</div>
+      ) : turn.activity && turn.executionId ? (
+        <div className="mb-2">
+          <ActivityBlock
+            mode="saved"
+            summary={turn.activity}
+            executionId={turn.executionId}
+            cancelled={turn.status === "CANCELLED"}
+            initialExpanded={initialActivityExpanded}
+            onOpenPanel={() => onOpenSaved(turn.executionId!)}
           />
         </div>
-        {turn.status === "CANCELLED" ? (
-          <p
-            data-testid="stopped-mark"
-            className="mt-2 text-xs text-muted-foreground"
-          >
-            중지됨
-          </p>
-        ) : null}
-        {!streaming ? (
-          <MessageActions
-            content={turn.content}
-            latest={latest}
-            version={answerVersion}
-            onVersionChange={(index) =>
-              answerVersion && onVersionChange?.(answerVersion.slotId, index)
-            }
-            canRegenerate={canRegenerate}
-            onRegenerate={onRegenerate}
-          />
-        ) : null}
-        <AttachmentGallery
-          conversationId={conversationId}
-          attachments={attachments}
-        />
-        <ArtifactList
-          artifacts={turn.artifacts ?? []}
-          onOpen={
-            onOpenArtifact
-              ? (path, name) => onOpenArtifact(turn.id, path, name)
-              : undefined
-          }
+      ) : null}
+      {/* 기다림 점이 있던 자리에 답이 들어올 때는 흐려짐으로만 바뀐다. */}
+      <div
+        data-testid="assistant-body"
+        className={cn("leading-7", unsaved && "animate-fade-in")}
+      >
+        <AnswerBody
+          content={turn.content}
+          streaming={streaming}
+          nextUserMessage={nextUserMessage}
+          onAnswer={streaming ? undefined : onAnswer}
         />
       </div>
-    </li>
+      {turn.status === "CANCELLED" ? (
+        <p
+          data-testid="stopped-mark"
+          className="mt-2 text-xs text-muted-foreground"
+        >
+          중지됨
+        </p>
+      ) : null}
+      {!streaming ? (
+        <MessageActions
+          content={turn.content}
+          latest={latest}
+          version={answerVersion}
+          onVersionChange={(index) =>
+            answerVersion && onVersionChange?.(answerVersion.slotId, index)
+          }
+          canRegenerate={canRegenerate}
+          onRegenerate={onRegenerate}
+        />
+      ) : null}
+      <AttachmentGallery
+        conversationId={conversationId}
+        attachments={attachments}
+      />
+      <ArtifactList
+        artifacts={turn.artifacts ?? []}
+        onOpen={
+          onOpenArtifact
+            ? (path, name) => onOpenArtifact(turn.id, path, name)
+            : undefined
+        }
+      />
+    </AssistantRow>
   );
 }

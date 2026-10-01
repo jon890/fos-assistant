@@ -1,8 +1,13 @@
 /** 이름이 없는 사건은 목표나 preview로 구분하고, 긴 본문은 코드 포인트 단위로 줄인다. */
-export function subagentLabel(name: string | null | undefined, goal: string | null | undefined): string {
-  const label = name?.trim() || goal?.trim() || "하위 에이전트";
+export function subagentLabel(
+  name: string | null | undefined,
+  goal: string | null | undefined,
+): string {
+  const label = name?.trim() || goal?.trim() || "도우미";
   const codePoints = Array.from(label);
-  return codePoints.length > 80 ? `${codePoints.slice(0, 79).join("")}…` : label;
+  return codePoints.length > 80
+    ? `${codePoints.slice(0, 79).join("")}…`
+    : label;
 }
 
 /** 에이전트 행이 없어 이름을 알 수 없는 대화와 실행은 지운 에이전트로 그린다. */
@@ -31,6 +36,25 @@ export function formatElapsed(milliseconds: number): string {
   return minutes === 0 ? `${seconds}초` : `${minutes}분 ${seconds % 60}초`;
 }
 
+/** 대화의 줄에 붙이는 걸린 시간이다. 1초가 안 되면 그리지 않도록 `null` 을 낸다. */
+export function formatSeconds(milliseconds: number): string | null {
+  return milliseconds < 1_000 ? null : formatElapsed(milliseconds);
+}
+
+/**
+ * 실행 하나의 걸린 시간을 역할에 맞춰 보인다.
+ *
+ * <p>관리자는 밀리초까지 본다. 그 밖의 사용자에게는 초 단위로 보이고, 1초가 안 되면 「1초 미만」 이다.
+ */
+export function formatDurationFor(
+  milliseconds: number,
+  isAdmin: boolean,
+): string {
+  return isAdmin
+    ? formatDuration(milliseconds)
+    : (formatSeconds(milliseconds) ?? "1초 미만");
+}
+
 /** 마이크로 단위 정수를 통화 금액으로 보인다. 한 번의 실행이 1센트 아래라서 네 자리까지 적는다. */
 export function formatAmount(micros: number, currency: string | null): string {
   const amount = (micros / 1_000_000).toLocaleString("ko-KR", {
@@ -41,7 +65,10 @@ export function formatAmount(micros: number, currency: string | null): string {
 }
 
 /** 값이 없는 금액과 무료인 금액을 구분한다. */
-export function formatCost(micros: number | null, currency: string | null): string {
+export function formatCost(
+  micros: number | null,
+  currency: string | null,
+): string {
   return micros === null ? "가격 없음" : formatAmount(micros, currency);
 }
 
@@ -52,9 +79,9 @@ export function formatWhen(value: string): string {
 
   const now = new Date();
   const isToday =
-    date.getFullYear() === now.getFullYear()
-    && date.getMonth() === now.getMonth()
-    && date.getDate() === now.getDate();
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
   return new Intl.DateTimeFormat("ko-KR", {
     ...(isToday ? {} : { month: "2-digit", day: "2-digit" }),
     hour: "2-digit",

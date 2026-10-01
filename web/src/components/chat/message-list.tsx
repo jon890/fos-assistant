@@ -3,7 +3,9 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageBubble, type Turn } from "./message-bubble";
+import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
+import { AssistantRow, MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
@@ -130,6 +132,21 @@ export function MessageList({
   const hasNoAnswer = lastVisible?.role === "USER" && latestView && !sending;
   const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}`;
 
+  const hasLiveActivity = activity !== null && activity.items.length > 0;
+  // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
+  const pendingActivity = !streamedAnswer && hasLiveActivity;
+  const waiting = !streamedAnswer && sending && !hasLiveActivity;
+  const liveActivityBlock = activity ? (
+    <ActivityBlock
+      mode="live"
+      state={activity}
+      slow={flowIsSlow}
+      expanded={liveExpanded}
+      onExpandedChange={onLiveExpandedChange}
+      onOpenPanel={onOpenLive}
+    />
+  ) : null;
+
   useEffect(() => {
     shouldFollow.current = true;
     setHasNewMessage(false);
@@ -150,7 +167,12 @@ export function MessageList({
     const element = scrollRef.current;
     if (!element) return;
     shouldFollow.current = true;
-    element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
     setHasNewMessage(false);
   };
 
@@ -176,7 +198,7 @@ export function MessageList({
             </div>
           ) : turns.length === 0 && !sending && !activity ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              무엇이든 물어봐 주세요.
+              무엇이든 물어보세요.
             </p>
           ) : (
             <ol className="flex flex-col gap-6">
@@ -189,21 +211,6 @@ export function MessageList({
                   const nextTurn = visible[index + 1]?.turn;
                   return (
                     <Fragment key={turn.id}>
-                      {pendingAssistant &&
-                      activity &&
-                      activity.items.length > 0 ? (
-                        <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
-                          <span aria-hidden="true" />
-                          <ActivityBlock
-                            mode="live"
-                            state={activity}
-                            slow={flowIsSlow}
-                            expanded={liveExpanded}
-                            onExpandedChange={onLiveExpandedChange}
-                            onOpenPanel={onOpenLive}
-                          />
-                        </li>
-                      ) : null}
                       <MessageBubble
                         turn={turn}
                         isAdmin={isAdmin}
@@ -241,21 +248,27 @@ export function MessageList({
                         }
                         onOpenArtifact={onOpenArtifact}
                         skillCommandChip={skillCommandChips}
+                        liveActivity={
+                          pendingAssistant && hasLiveActivity
+                            ? liveActivityBlock
+                            : undefined
+                        }
                       />
                       {isLast && hasNoAnswer ? (
                         <li
                           data-testid="no-answer"
-                          className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground"
+                          className="-mt-4 flex animate-fade-in items-center justify-end gap-2 text-xs text-muted-foreground"
                         >
                           <span>답을 받지 못했어요</span>
                           {onRetry ? (
-                            <button
+                            <Button
                               type="button"
+                              variant="link"
+                              size="xs"
                               onClick={onRetry}
-                              className="underline underline-offset-2"
                             >
                               다시 시도
-                            </button>
+                            </Button>
                           ) : null}
                         </li>
                       ) : null}
@@ -263,40 +276,31 @@ export function MessageList({
                   );
                 },
               )}
-              {!streamedAnswer && activity && activity.items.length > 0 ? (
-                <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
-                  <span aria-hidden="true" />
-                  <ActivityBlock
-                    mode="live"
-                    state={activity}
-                    slow={flowIsSlow}
-                    expanded={liveExpanded}
-                    onExpandedChange={onLiveExpandedChange}
-                    onOpenPanel={onOpenLive}
-                  />
-                </li>
-              ) : null}
-              {!streamedAnswer &&
-              sending &&
-              (!activity || activity.items.length === 0) ? (
-                <WaitingIndicator />
+              {pendingActivity || waiting ? (
+                <AssistantRow
+                  data-testid="pending-assistant"
+                  className="animate-message-assistant"
+                >
+                  {pendingActivity ? liveActivityBlock : <WaitingIndicator />}
+                </AssistantRow>
               ) : null}
               {turnError ? (
-                <li
-                  data-testid="turn-error"
-                  className="rounded-md bg-muted px-3 py-2 text-sm"
-                >
-                  {turnError}
-                  {onRetry && !hasNoAnswer ? (
-                    <button
-                      type="button"
-                      data-testid="turn-error-retry"
-                      onClick={onRetry}
-                      className="ml-2 text-xs underline underline-offset-2"
-                    >
-                      다시 시도
-                    </button>
-                  ) : null}
+                <li data-testid="turn-error" className="animate-fade-in">
+                  <Notice variant="error">
+                    {turnError}
+                    {onRetry && !hasNoAnswer ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        data-testid="turn-error-retry"
+                        onClick={onRetry}
+                        className="ml-2"
+                      >
+                        다시 시도
+                      </Button>
+                    ) : null}
+                  </Notice>
                 </li>
               ) : null}
             </ol>

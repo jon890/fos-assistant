@@ -24,7 +24,7 @@ export function PendingQueueView({ queue, onCancel, onRelease, busy }: Props) {
   return (
     <div
       data-testid="pending-queue"
-      className="mx-auto mb-2 w-full max-w-3xl rounded-md border border-border px-3 py-2"
+      className="mx-auto mb-2 w-full max-w-3xl px-1"
     >
       <div className="flex min-h-7 items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
@@ -47,7 +47,7 @@ export function PendingQueueView({ queue, onCancel, onRelease, busy }: Props) {
           <li
             key={item.id}
             data-testid="pending-item"
-            className="flex min-w-0 items-center gap-2"
+            className="flex min-w-0 items-center gap-2 rounded-full bg-muted pl-3 pr-1"
           >
             <span className="min-w-0 flex-1 truncate text-sm">{item.text}</span>
             <TooltipButton

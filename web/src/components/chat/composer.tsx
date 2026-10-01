@@ -624,7 +624,7 @@ export function Composer({
                       aria-hidden="true"
                       className="absolute inset-0 flex items-center justify-center bg-background/60"
                     >
-                      <LoaderCircle className="size-4 animate-spin text-primary motion-reduce:animate-none" />
+                      <LoaderCircle className="size-4 animate-spin text-foreground motion-reduce:animate-none" />
                     </span>
                   ) : null}
                 </div>
@@ -658,7 +658,7 @@ export function Composer({
         data-testid="composer-shell"
         className={cn(
           "relative flex items-end gap-2 p-1.5 pl-4",
-          "rounded-3xl border border-border bg-background focus-within:border-primary",
+          "rounded-2xl border border-input bg-card focus-within:border-ring",
         )}
       >
         {mention && openMention ? (
@@ -783,9 +783,7 @@ export function Composer({
             void trySend();
           }}
           disabled={disabled}
-          placeholder={
-            mention ? "@로 에이전트를 불러요" : "무엇을 도와드릴까요?"
-          }
+          placeholder="무엇이든 물어보세요"
           className={cn(
             "max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
             "bg-transparent text-base leading-6 outline-none disabled:opacity-50",

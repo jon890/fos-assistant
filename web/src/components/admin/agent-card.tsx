@@ -13,14 +13,22 @@ export function AgentCard({ agent, currentUserId }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="font-semibold">{agent.name}</h2>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{agent.visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}</Badge>
-          {agent.visibility === PRIVATE_VISIBILITY && agent.ownerUserId !== currentUserId ? (
+          <Badge variant="outline">
+            {agent.visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}
+          </Badge>
+          {agent.visibility === PRIVATE_VISIBILITY &&
+          agent.ownerUserId !== currentUserId ? (
             <Badge variant="outline">다른 사람 것</Badge>
           ) : null}
-          <Badge variant={agent.enabled ? "outline" : "default"}>{agent.enabled ? "사용 중" : "꺼짐"}</Badge>
+          <Badge variant={agent.enabled ? "success" : "warning"}>
+            {agent.enabled ? "사용 중" : "꺼짐"}
+          </Badge>
         </div>
       </div>
-      <Link href={`/agents/${agent.code}`} className="mt-3 inline-block text-sm text-primary underline-offset-4 hover:underline">
+      <Link
+        href={`/agents/${agent.code}`}
+        className="mt-3 inline-block text-sm text-foreground underline underline-offset-4"
+      >
         상세 보기
       </Link>
     </article>

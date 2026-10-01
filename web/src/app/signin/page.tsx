@@ -5,11 +5,11 @@ import { Card } from "@/components/ui/card";
 export default function SignInPage() {
   return (
     <section className="grid min-h-full place-items-center">
-      <Card className="w-full max-w-sm items-center gap-0 bg-muted p-6 text-center shadow-sm sm:p-8">
+      <Card className="w-full max-w-sm items-center gap-0 bg-card p-6 text-center shadow-sm sm:p-8">
         <span
           aria-hidden="true"
-          // 한 번만 쓰는 머리글자 표시다. 브랜드 색 원 안에 글자를 가운데 두는 배치라 부품으로 모으지 않는다.
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground"
+          // 한 번만 쓰는 머리글자 표시다. 흐린 바탕의 원 안에 글자를 가운데 두는 배치라 부품으로 모으지 않는다.
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground"
         >
           우
         </span>

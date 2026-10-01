@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import {
   Card,
   CardContent,
@@ -140,12 +141,9 @@ export function ConnectorAdminPanel({
           </ul>
         )}
         {error ? (
-          <p
-            role="alert"
-            className="rounded-md border border-border bg-muted p-3 text-sm"
-          >
+          <Notice variant="error" role="alert">
             {error}
-          </p>
+          </Notice>
         ) : null}
       </CardContent>
     </Card>
