@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,7 @@ public class AgentDelegationService {
     private final DelegationProperties properties;
     private final TurnCancellation turns;
     private final HermesRunsClient hermes;
+    private final ApplicationEventPublisher events;
 
     /**
      * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
@@ -84,7 +86,8 @@ public class AgentDelegationService {
             ConversationRepository conversations,
             DelegationProperties properties,
             TurnCancellation turns,
-            HermesRunsClient hermes) {
+            HermesRunsClient hermes,
+            ApplicationEventPublisher events) {
         this.agents = agents;
         this.executions = executions;
         this.children = children;
@@ -92,6 +95,7 @@ public class AgentDelegationService {
         this.properties = properties;
         this.turns = turns;
         this.hermes = hermes;
+        this.events = events;
         this.activeDelegations = new Semaphore(properties.maxActive());
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
             rootLocks[i] = new ReentrantLock();
@@ -318,6 +322,22 @@ public class AgentDelegationService {
             delegation.markEnded();
             activeDelegations.release();
             handoff.markEnded(failure);
+            if (executionId != null) {
+                publishFinished(conversation.id(), executionId);
+            }
+        }
+    }
+
+    /**
+     * 위임 실행이 끝났다고 알린다. 받는 쪽이 부모 대화에 전할지 정한다.
+     *
+     * <p>받는 쪽의 예외가 이 실행의 정리를 막지 않게, 알리다 난 예외는 경고 로그만 남긴다.
+     */
+    private void publishFinished(Long conversationId, Long executionId) {
+        try {
+            events.publishEvent(new DelegationFinished(conversationId, executionId));
+        } catch (RuntimeException ex) {
+            log.warn("위임 실행이 끝났다고 알리지 못했다 executionId={}", executionId, ex);
         }
     }
 

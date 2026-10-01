@@ -74,6 +74,38 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     @Query("update AgentExecution e set e.resultDeliveredAt = :at where e.id = :id and e.resultDeliveredAt is null")
     int markResultDelivered(@Param("id") Long id, @Param("at") Instant at);
 
+    /**
+     * 그 대화에 아직 전하지 않은 끝난 위임 결과를 오래된 순으로 읽는다.
+     *
+     * <p>대화 turn 이 직접 맡긴 실행만 낸다. 부모 실행이 다시 자식이면 손자 실행이라 빼고, 그 결과는 자식이
+     * {@code agent_status} 로 읽는다. {@code CANCELLED} 는 사용자나 부모가 멈춘 것이라 전하지 않는다.
+     */
+    @Query("""
+            select e from AgentExecution e
+            where e.conversationId = :conversationId
+                and e.delegationKey is not null
+                and e.status in (com.bifos.assistant.usage.domain.ExecutionStatus.SUCCEEDED,
+                    com.bifos.assistant.usage.domain.ExecutionStatus.FAILED)
+                and e.resultDeliveredAt is null
+                and exists (select p.id from AgentExecution p
+                    where p.id = e.parentExecutionId and p.parentExecutionId is null)
+            order by e.id asc
+            """)
+    List<AgentExecution> findUndeliveredResults(@Param("conversationId") Long conversationId);
+
+    /** 아직 전하지 않은 끝난 위임 결과가 있는 대화의 번호다. 조건은 {@link #findUndeliveredResults} 와 같다. */
+    @Query("""
+            select distinct e.conversationId from AgentExecution e
+            where e.conversationId is not null
+                and e.delegationKey is not null
+                and e.status in (com.bifos.assistant.usage.domain.ExecutionStatus.SUCCEEDED,
+                    com.bifos.assistant.usage.domain.ExecutionStatus.FAILED)
+                and e.resultDeliveredAt is null
+                and exists (select p.id from AgentExecution p
+                    where p.id = e.parentExecutionId and p.parentExecutionId is null)
+            """)
+    List<Long> findConversationsWithUndeliveredResults();
+
     /** 뿌리와 그 자손을 한 번에 읽는다. 뿌리 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);
 

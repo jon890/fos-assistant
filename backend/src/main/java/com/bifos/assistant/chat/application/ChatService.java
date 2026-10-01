@@ -146,6 +146,78 @@ public class ChatService {
     }
 
     /**
+     * 아직 전하지 않은 끝난 위임 결과를 모아 사용자의 질문 없이 turn 하나를 돌린다(ADR-040).
+     *
+     * <p>부르는 쪽이 그 대화의 turn 잠금을 이미 잡았다. 잠금을 잡기 전에 읽은 목록은 다른 자동 turn 이 이미 전했을 수
+     * 있어 여기서 다시 읽는다. 비었으면 아무것도 남기지 않고 돌아간다.
+     *
+     * <p>알림 줄 저장, 결과마다 전했다는 표시, 자동 turn 수 증가는 한 트랜잭션이다. 그 뒤 Hermes 가 실패해도 같은
+     * 결과로 다시 깨우지 않는다. 같은 실패를 되풀이하지 않기 위해서다. 실패는 예외로 올라간다.
+     *
+     * @param owner 대화 주인. 요청이 없으므로 부르는 쪽이 사용자 행으로 만든다
+     * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
+     */
+    public void runDelegationResults(
+            CurrentUser owner,
+            Long conversationId,
+            TurnCancellation.TurnHandle handle,
+            Consumer<ChatEvent> onEvent) {
+        List<AgentExecution> results = executionRepository.findUndeliveredResults(conversationId);
+        if (results.isEmpty()) {
+            return;
+        }
+        Map<Long, Agent> resultAgents = agents.byIds(results.stream().map(AgentExecution::agentId).toList());
+        String input = delegationInput(results, resultAgents);
+        Routed routed = route(owner, conversationId, input, null, List.of());
+        if (routed.flow() != null) {
+            // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
+            log.warn("흐름이 붙은 대화라 맡긴 일의 결과를 전하지 않는다 conversationId={}", conversationId);
+            return;
+        }
+        List<Long> ids = results.stream().map(AgentExecution::id).toList();
+        TurnIntent intent = new TurnIntent.DelegationResults(ids, delegationNotice(results, resultAgents));
+        ChatTurn turn = runTurn(owner, routed, input, intent, onEvent, true, handle);
+        onEvent.accept(turn.cancelled()
+                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+    }
+
+    /**
+     * 결과마다 에이전트 이름, 실행 번호, 상태를 적은 머리줄을 두고, 답이 있으면 그 아래에 잇는다. 실패는 오류 코드를
+     * 머리줄에 더한다.
+     */
+    private static String delegationInput(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
+        StringBuilder input = new StringBuilder("맡긴 일의 결과가 도착했다.");
+        for (AgentExecution result : results) {
+            input.append("\n\n[에이전트: ").append(agentName(result, resultAgents))
+                    .append(", 실행 번호: ").append(result.id())
+                    .append(", 상태: ").append(result.status().name());
+            if (result.status() == ExecutionStatus.FAILED) {
+                input.append(", 오류: ").append(result.errorCode());
+            }
+            input.append(']');
+            if (result.outputText() != null && !result.outputText().isBlank()) {
+                input.append('\n').append(result.outputText());
+            }
+        }
+        return input.toString();
+    }
+
+    private static String delegationNotice(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
+        String first = agentName(results.getFirst(), resultAgents);
+        if (results.size() == 1) {
+            return first + " 에이전트의 결과가 도착했어요";
+        }
+        return first + " 외 " + (results.size() - 1) + "개 에이전트의 결과가 도착했어요";
+    }
+
+    /** 에이전트 행이 없으면 실행 줄에 적힌 profile 이름으로 대신한다. */
+    private static String agentName(AgentExecution execution, Map<Long, Agent> resultAgents) {
+        Agent agent = resultAgents.get(execution.agentId());
+        return agent == null ? execution.profileName() : agent.name();
+    }
+
+    /**
      * 대화가 고른 모델로 turn 하나를 끝낸다.
      *
      * <p>provider 의 계정이 전부 막히면 그 실행을 {@code PROVIDER_BLOCKED} 로 실패시키고 끝낸다. 다른
@@ -174,7 +246,7 @@ public class ChatService {
                 ? turns.open(user.id(), conversation.id()) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
-            saveQuestion(user, conversation, text, attachmentIds, intent);
+            saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = Instant.now();
             artifactStore.ensureFolder(conversation.id());
@@ -544,8 +616,16 @@ public class ChatService {
         return history.stream().filter(message -> !replaced.contains(message.id())).toList();
     }
 
+    /**
+     * 답 앞의 질문을 뒤로 거슬러 찾는다.
+     *
+     * <p>답 바로 앞이 알림 줄이면 사용자 질문 없이 연 자동 turn 의 답이라 다시 만들 질문이 없다. 그때는 null 이다.
+     */
     private static ChatMessage previousQuestion(List<ChatMessage> active, ChatMessage answer) {
         int answerIndex = active.indexOf(answer);
+        if (answerIndex > 0 && active.get(answerIndex - 1).role() == MessageRole.SYSTEM) {
+            return null;
+        }
         for (int index = answerIndex - 1; index >= 0; index--) {
             ChatMessage candidate = active.get(index);
             if (candidate.role() == com.bifos.assistant.chat.domain.MessageRole.USER) {
@@ -574,8 +654,21 @@ public class ChatService {
             Conversation conversation,
             String text,
             List<Long> attachmentIds,
-            TurnIntent intent) {
+            TurnIntent intent,
+            Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.Regenerate) {
+            return;
+        }
+        if (intent instanceof TurnIntent.DelegationResults results) {
+            // 알림 줄이 곧 전했다는 표시다. 셋이 함께 남거나 함께 빠진다. 제목은 채우지 않는다.
+            ChatMessage notice = transactions.execute(status -> {
+                ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), results.notice()));
+                Instant deliveredAt = Instant.now();
+                results.executionIds().forEach(id -> executionRepository.markResultDelivered(id, deliveredAt));
+                conversations.incrementAutoTurns(conversation.id());
+                return saved;
+            });
+            onEvent.accept(ChatEvent.system(conversation.publicId(), notice.id(), results.notice()));
             return;
         }
         transactions.executeWithoutResult(status -> {

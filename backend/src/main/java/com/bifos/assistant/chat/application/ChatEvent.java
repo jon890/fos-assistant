@@ -118,6 +118,17 @@ public record ChatEvent(
                 null, null, null, null, null, null, null, null);
     }
 
+    /**
+     * 대화에 알림 줄이 저장됐다. 위임 결과가 도착했거나 자동 turn 한도에 닿았을 때 낸다.
+     *
+     * @param messageId 저장된 {@code SYSTEM} 메시지의 번호
+     * @param content 알림 줄의 글
+     */
+    public static ChatEvent system(UUID conversationId, Long messageId, String content) {
+        return new ChatEvent("system", content, null, null, conversationId, messageId, null, null, null, null, null,
+                null, null, null, null, null, null, null, null);
+    }
+
     public static ChatEvent error(String code, String message) {
         return new ChatEvent("error", null, null, null, null, null, null, code, message, null, null,
                 null, null, null, null, null, null, null, null);
