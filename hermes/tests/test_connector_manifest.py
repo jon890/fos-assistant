@@ -227,6 +227,19 @@ class ConnectorCatalogTest(ConnectorGateCase):
         # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
         self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
 
+    def test_server_name_length_boundary(self):
+        """등록 이름의 앞부분이 40자인 서버 이름은 받고, 41자가 되는 이름은 카탈로그에서 뺀다."""
+        def rename(name):
+            return lambda value: value.update(mcpServers={name: next(iter(value["mcpServers"].values()))})
+
+        longest = "s" * (40 - len("mcp____"))
+        self.rewrite(".mcp.json", rename(longest))
+        self.assertEqual(len(self.plugin._hermes_tool_name(longest, "")), 40)
+        self.assertEqual([entry["mcp_server"] for entry in self.catalog()], [longest])
+        self.rewrite(".mcp.json", rename(longest + "s"))
+        self.assertEqual(self.catalog(), [])
+        self.assertIsNone(self.plugin._connector_manifest(DEMO))
+
     def test_operator_secrets_are_rejected_as_unsupported(self):
         """`operator_secrets` 를 선언한 커넥터는 카탈로그에서 빠지고 까닭이 경고 로그에 남는다. 빈 목록은 통과한다."""
         original = (self.connector_root / "connector.json").read_bytes()
