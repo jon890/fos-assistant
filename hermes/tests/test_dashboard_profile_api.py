@@ -507,6 +507,21 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertIn("fos-assistant", after["platform_toolsets"]["api_server"])
         self.assertIn("fos-assistant", after["mcp_servers"])
 
+    def test_connector_allowlist_holds_a_name_shared_by_server_and_toolset_once(self):
+        """서버 이름과 선언한 toolset 이름이 같으면 목록에 그 이름을 한 번만 싣는다."""
+        root = self.connector_fixture()
+        manifest = root / "connector.json"
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+        mcp_path = root / ".mcp.json"
+        mcp = json.loads(mcp_path.read_text(encoding="utf-8"))
+        servers = mcp["mcpServers"] if "mcpServers" in mcp else mcp
+        servers["vision"] = servers.pop(next(iter(servers)))
+        mcp_path.write_text(json.dumps(mcp), encoding="utf-8")
+        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"], ["vision"])
+
     def test_connector_install_adds_declared_toolsets_after_the_server_name(self):
         """manifest 가 `toolsets` 를 선언하면 목록은 서버 이름 다음에 그 toolset 이고 Control Plane MCP 는 없다."""
         root = self.connector_fixture()

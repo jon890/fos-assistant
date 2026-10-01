@@ -330,15 +330,21 @@ public class ConnectorConnectionService {
     private boolean resyncedUsable(ConnectorConnection connection) {
         Agent agent = connection.agent();
         String profile = agent.hermesProfile();
-        String step = STEP_PROBE;
+        final Optional<ConnectorManifest> manifest;
         try {
-            Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
-            if (manifest.isEmpty()) {
-                return false;
-            }
+            // 카탈로그 조회 실패는 readCatalog 가 이미 로그에 남긴다. 단계 실패로 한 번 더 남기지 않는다.
+            manifest = findManifest(connection.connectorId());
+        } catch (RuntimeException ex) {
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
+        if (manifest.isEmpty()) {
+            return false;
+        }
+        String step = STEP_INSTALL;
+        try {
             // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은
             // 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
-            step = STEP_INSTALL;
             connector.putConnector(profile, connection.connectorId(), true);
             step = STEP_INSTALL_STATE;
             if (!connector.readConnector(profile, connection.connectorId()).configured()) {
