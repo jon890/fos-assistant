@@ -130,6 +130,7 @@ export type ConnectorGrant = { grantId: number; connectorId: string; toolName: s
 **이 절이 위의 내용과 다르면 이 절을 따른다.**
 
 - `docs/prd.md` 에 더하는 줄의 둘째 칸은 `승인이 필요한 도구를 에이전트가 불러도 그 서비스에 요청이 가지 않고, 승인하면 승인한 인자 그대로 한 번만 실행된다` 까지다. 같은 인자의 `PENDING` 이 있어 새 줄을 만들지 않은 호출은 줄이 남지 않으므로 「호출마다 판정이 남는다」 를 적지 않는다
+- phase 06 이 임시로 둔 `실행하고 기록해요` 와 `이 연결의 동작은 실행하고 기록해요.` 를 `실행 전에 물어봐요` 와 `이 연결은 조회를 뺀 모든 동작을 실행 전에 물어봐요.` 로 바꾸고 `test/browser/connector-connection.spec.ts` 의 기대를 맞춘다
 
 ## 검증
 
@@ -165,6 +166,8 @@ scripts/check-public-safe.sh
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/connector/connector-grants.tsx` | 신규 |
 | `web/src/components/connector/connector-connection-panel.tsx` | 수정 |
+| `web/src/lib/connection.ts` | 수정 |
+| `web/src/components/connector/connector-tools.tsx` | 수정 |
 | `test/browser/approval-card.spec.ts` | 신규 |
 | `test/browser/connector-connection.spec.ts` | 수정 |
 | `docs/prd.md` | 수정 |

@@ -40,11 +40,14 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 - 대응 파일이 없으면 이 절의 처리를 하지 않는다. 일반 에이전트의 도구는 건드리지 않는다
 - 대응 파일을 읽지 못하면 Control Plane MCP 밖의 `mcp__` 도구와 `execute_code` 를 막는다
 - `execute_code` 는 막는다. 실행 맥락 없이 도구를 부르는 경로다
+- 서버는 등록 이름이 `tools` 에 있는 서버를 먼저 고르고, 없을 때만 `prefix` 가 맞는 서버를 고른다.
+  `prefix` 가 여럿 맞으면 가장 긴 것을 고른다. 서버 `a` 와 `a__b` 가 함께 있을 때 `a__b` 의 도구가 `a` 로 읽히지 않는다
 - 대응 파일의 어느 서버 `prefix` 와도 맞지 않는 `mcp__` 도구는 막는다
 - session 이나 tool_call_id 가 없으면 막는다
 - 주소는 환경 변수 `FOS_CTX_POLICY_URL` 이 갖는다. 주소나 토큰이 없으면 막는다
 - 인자는 키를 정렬하고 공백 없이 직렬화한 글로 보내고 그 글을 서명한다. 서명할 글은 `v1-connector-policy`,
   등록 이름, 뿌리 session, session, tool_call_id, 인자 글의 SHA-256 을 줄바꿈 하나로 잇는다
+- 인자 글의 UTF-8 바이트가 `POLICY_ARGS_MAX_BYTES` 를 넘으면 Control Plane 에 보내지 않고 막는다
 - 제한 시간 `POLICY_TIMEOUT` 초로 한 번만 부른다. 기다리는 동안 run 의 스레드가 묶이므로 다시 부르지 않는다
 - 답이 200 의 `allow` 일 때만 통과한다. 200 의 `block` 이고 글이 있으면 그 글로 막고, 그 밖은 정해 둔 글로 막는다
 - 막을 때는 늘 비지 않은 글이 든 `block` 을 돌려준다. Hermes 는 글이 없는 `block` 과 `None` 을 통과로 읽는다
@@ -98,6 +101,9 @@ POLICY_URL_ENV = "FOS_CTX_POLICY_URL"
 POLICY_VERSION = "v1-connector-policy"
 # 판정을 기다리는 동안 run 의 스레드가 묶인다. 한 번만 부르고 이 시간 안에 답이 없으면 막는다.
 POLICY_TIMEOUT = 3.0
+# 판정에 보내는 인자 글의 UTF-8 바이트 상한이다. Control Plane 은 이보다 작은 글도 크다고 거절하므로,
+# 이 상한은 판정할 수 없는 큰 본문을 보내 Control Plane 이 요청째로 버리는 일을 막는 값이다.
+POLICY_ARGS_MAX_BYTES = 60 * 1024
 # 연결용 profile 디렉터리에 설치가 쓰는 이름 대응 파일이다. 이 파일이 있어야 커넥터 정책이 걸린다.
 CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
 MCP_PREFIX = "mcp__"
@@ -106,6 +112,7 @@ CODE_EXECUTION_TOOL = "execute_code"
 POLICY_BLOCK_MESSAGE = "fos-ctx: 이 도구 호출의 사용 정책을 확인하지 못해 막았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다."
 CONTEXT_BLOCK_MESSAGE = "fos-ctx: 이 도구 호출의 실행 맥락이 없어 막았다."
 UNKNOWN_SERVER_MESSAGE = "fos-ctx: 이 연결에 등록되지 않은 도구라 막았다. 다시 부르지 않는다."
+ARGS_TOO_LARGE_MESSAGE = "fos-ctx: 인자가 너무 커서 실행하지 않았다. 나눠서 요청한다."
 CODE_EXECUTION_MESSAGE = "fos-ctx: 이 연결에서는 코드 실행으로 도구를 부를 수 없다."
 
 BLOCK_MESSAGE = (
@@ -260,7 +267,11 @@ def _post_json(url: str, body: dict, token: str, timeout: float):
 
 def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, servers: dict):
     """커넥터 도구 호출을 Control Plane 에 묻는다. 통과면 None, 아니면 글이 든 `block` 이다."""
-    server = next((value for value in servers.values() if tool_name.startswith(value["prefix"])), None)
+    # 등록 이름을 가진 서버가 먼저다. 서버 이름이 다른 서버 이름의 앞부분이면 접두사만으로는 엉뚱한 서버가 잡힌다.
+    server = next((value for value in servers.values() if tool_name in value["tools"]), None)
+    if server is None:
+        matched = [value for value in servers.values() if tool_name.startswith(value["prefix"])]
+        server = max(matched, key=lambda value: len(value["prefix"]), default=None)
     if server is None:
         return _block(UNKNOWN_SERVER_MESSAGE)
     if args is None:
@@ -279,6 +290,8 @@ def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, s
         logger.warning("fos-ctx: state.db 에서 뿌리 session 을 찾지 못했다: %s", type(exc).__name__)
         root = session_id
     args_json = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    if len(args_json.encode("utf-8")) > POLICY_ARGS_MAX_BYTES:
+        return _block(ARGS_TOO_LARGE_MESSAGE)
     body = {
         "v": CTX_VERSION,
         "root_session_id": root,

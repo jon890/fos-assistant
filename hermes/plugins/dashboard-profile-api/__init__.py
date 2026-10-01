@@ -1832,23 +1832,20 @@ def _install_gate() -> bool:
                 state_path = get_profile_dir(body["profile"]) / CONNECTOR_STATE
                 state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
                 installed = [manifest for manifest in owners if manifest["id"] in state]
-                plugin_updated = False
                 for manifest in installed:
                     if body["key"] not in manifest["optional_env"]:
                         continue
                     try:
                         # 비운 선택 칸의 명시적 빈 값도 갱신한다. 재시작만으로는 바뀌지 않는다.
-                        result = await asyncio.to_thread(
+                        await asyncio.to_thread(
                             _connector_config, get_profile_dir(body["profile"]), manifest["id"], True)
-                        # 이 설치가 hook plugin 을 묶음의 판으로 바꿨으면 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있다.
-                        plugin_updated = plugin_updated or result["plugin_updated"]
                     except FileExistsError:
                         return _rejected("환경 변수는 저장했지만 connector 설정과 충돌한다", 409)
                     except (ValueError, OSError, KeyError, TypeError):
                         return _rejected("환경 변수는 저장했지만 connector 설정을 갱신하지 못했다", 503)
                 # 삭제와 교체는 떠 있는 stdio 자식의 env 를 바꾸지 못한다.
                 return JSONResponse({"profile": body["profile"], "key": body["key"],
-                                     "restart_required": bool(installed) or plugin_updated}, status_code=200)
+                                     "restart_required": bool(installed)}, status_code=200)
         if response.status_code >= 400 or not record_created:
             return response
         after = _profile_names()

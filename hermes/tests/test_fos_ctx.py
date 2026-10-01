@@ -535,6 +535,31 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertIn("tool", self.requests[0]["body"])
         self.assertIsNone(self.requests[0]["body"]["tool"])
 
+    def test_server_holding_the_tool_wins_over_shorter_prefix(self):
+        """서버 이름이 다른 서버 이름의 앞부분이어도 등록 이름을 가진 서버의 도구로 묻는다."""
+        self.write_map({"v": 1, "servers": {
+            "a": {"connector": "first", "prefix": "mcp__a__", "tools": {"mcp__a__y": "y"}},
+            "a__b": {"connector": "second", "prefix": "mcp__a__b__", "tools": {"mcp__a__b__x": "x"}},
+        }})
+        self.assertIsNone(self.call("mcp__a__b__x"))
+        self.assertIsNone(self.call("mcp__a__y"))
+        self.assertEqual([(request["body"]["hermes_tool"], request["body"]["tool"]) for request in self.requests],
+                         [("mcp__a__b__x", "x"), ("mcp__a__y", "y")])
+
+    def test_args_over_limit_block_without_request(self):
+        """인자 글이 상한과 같으면 묻고, 한 바이트 넘으면 서버를 부르지 않고 막는다."""
+        limit = self.plugin.POLICY_ARGS_MAX_BYTES
+        self.assertEqual(limit, 60 * 1024)
+        # `{"text":""}` 가 11바이트다.
+        self.assertIsNone(self.call("mcp__demo__write_note", args={"text": "a" * (limit - 11)}))
+        self.assertEqual(len(self.requests[0]["body"]["args_json"].encode("utf-8")), limit)
+        self.assertBlocked(self.call("mcp__demo__write_note", args={"text": "a" * (limit - 10)}),
+                           "fos-ctx: 인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.")
+        # 글자 수가 아니라 바이트로 센다. 한글 한 글자는 3바이트다.
+        self.assertBlocked(self.call("mcp__demo__write_note", args={"text": "가" * (limit // 3)}),
+                           self.plugin.ARGS_TOO_LARGE_MESSAGE)
+        self.assertEqual(len(self.requests), 1)
+
     def test_unknown_server_blocks_without_request(self):
         """prefix 가 맞는 서버가 없는 MCP 도구는 서버를 부르지 않고 막는다."""
         # 서버 이름이 앞부분만 같은 것도 다른 서버다.

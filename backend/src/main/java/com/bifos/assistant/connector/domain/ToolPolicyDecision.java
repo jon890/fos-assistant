@@ -31,6 +31,7 @@ public record ToolPolicyDecision(
     }
 
     /**
+     * @param ownServerTool 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 아니면 판과 상관없이 선언 없는 도구다
      * @param schema manifest 의 판
      * @param declared 그 도구의 선언. manifest 에 없으면 빈 값
      * @param granted 그 도구에 유효한 상시 허락이 있는가
@@ -38,6 +39,7 @@ public record ToolPolicyDecision(
      */
     public static ToolPolicyDecision decide(
             ConnectionStatus connectionStatus,
+            boolean ownServerTool,
             int schema,
             Optional<ToolPolicy> declared,
             boolean granted,
@@ -45,7 +47,8 @@ public record ToolPolicyDecision(
         if (connectionStatus != ConnectionStatus.READY) {
             return denied(ActionDenyReason.NOT_READY, null);
         }
-        if (declared.isEmpty() && schema != LEGACY_SCHEMA) {
+        // 도구를 선언하지 않는 판이 쓰기로 읽어 주는 것은 그 커넥터의 MCP 서버가 낸 도구뿐이다.
+        if (!ownServerTool || (declared.isEmpty() && schema != LEGACY_SCHEMA)) {
             return denied(ActionDenyReason.UNDECLARED, null);
         }
         // 도구를 선언하지 않는 판의 선언 없는 도구는 쓰기로 읽는다. 무엇을 하는지 모르므로 읽기로 풀어 주지 않는다.

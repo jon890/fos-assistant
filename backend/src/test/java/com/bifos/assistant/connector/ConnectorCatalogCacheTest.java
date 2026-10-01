@@ -2,6 +2,7 @@ package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -23,12 +24,13 @@ import org.junit.jupiter.api.Test;
 
 class ConnectorCatalogCacheTest {
     private static final Duration TTL = Duration.ofSeconds(60);
+    private static final Duration FAILURE_TTL = Duration.ofSeconds(5);
     private static final Instant START = Instant.parse("2026-10-01T00:00:00Z");
 
     private final HermesConnectorClient connector = mock(HermesConnectorClient.class);
     private final MovingClock clock = new MovingClock(START);
     private final ConnectorCatalogCache cache =
-            new ConnectorCatalogCache(connector, new ConnectorPolicyProperties(TTL), clock);
+            new ConnectorCatalogCache(connector, new ConnectorPolicyProperties(TTL, FAILURE_TTL), clock);
 
     @Test
     @DisplayName("보관 시간 안에서는 카탈로그를 한 번만 읽고 처음 읽은 값으로 답한다")
@@ -93,6 +95,26 @@ class ConnectorCatalogCacheTest {
         clock.set(START.plus(TTL));
 
         assertThatThrownBy(() -> cache.find("demo-notes")).isSameAs(failure);
+    }
+
+    @Test
+    @DisplayName("읽기 실패 뒤 5초 안에는 대시보드를 다시 부르지 않고 같은 예외를 던지며, 지나면 다시 읽는다")
+    void readFailureIsRememberedForFailureTtl() {
+        IllegalStateException failure = new IllegalStateException("catalog is unreachable");
+        when(connector.readCatalog()).thenThrow(failure);
+        assertThatThrownBy(() -> cache.find("demo-notes")).isSameAs(failure);
+        clock.set(START.plus(FAILURE_TTL).minusMillis(1));
+
+        assertThatThrownBy(() -> cache.find("demo-notes")).isSameAs(failure);
+        verify(connector, times(1)).readCatalog();
+
+        // 대시보드가 돌아온 뒤다. 기억한 시간이 지나야 다시 읽는다.
+        doReturn(List.of(manifest("demo-notes", "돌아옴"))).when(connector).readCatalog();
+        assertThatThrownBy(() -> cache.find("demo-notes")).isSameAs(failure);
+        clock.set(START.plus(FAILURE_TTL));
+
+        assertThat(cache.find("demo-notes")).map(ConnectorManifest::title).contains("돌아옴");
+        verify(connector, times(2)).readCatalog();
     }
 
     private static ConnectorManifest manifest(String id, String title) {

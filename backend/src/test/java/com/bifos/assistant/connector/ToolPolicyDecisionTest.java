@@ -33,7 +33,7 @@ class ToolPolicyDecisionTest {
     void connectionThatIsNotReadyIsDeniedBeforeAnythingElse() {
         for (ConnectionStatus status :
                 new ConnectionStatus[] {ConnectionStatus.PENDING, ConnectionStatus.DISCONNECTED}) {
-            assertThat(ToolPolicyDecision.decide(status, 2, READ, false, 2))
+            assertThat(ToolPolicyDecision.decide(status, true, 2, READ, false, 2))
                     .as("연결 상태 %s", status)
                     .isEqualTo(new ToolPolicyDecision(ActionDecision.DENIED, ActionDenyReason.NOT_READY, null, null));
         }
@@ -42,14 +42,26 @@ class ToolPolicyDecisionTest {
     @Test
     @DisplayName("schema 2 에서 선언이 없는 도구는 UNDECLARED 로 거절하고 위험도를 비운다")
     void undeclaredToolOfDeclaringSchemaIsDenied() {
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, Optional.empty(), false, 2))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, Optional.empty(), false, 2))
                 .isEqualTo(new ToolPolicyDecision(ActionDecision.DENIED, ActionDenyReason.UNDECLARED, null, null));
+    }
+
+    @Test
+    @DisplayName("등록 이름이 그 커넥터의 MCP 서버 것이 아니면 schema 1 이어도, 선언이 있어도 UNDECLARED 로 거절한다")
+    void toolOfAnotherServerIsDeniedRegardlessOfSchema() {
+        ToolPolicyDecision denied =
+                new ToolPolicyDecision(ActionDecision.DENIED, ActionDenyReason.UNDECLARED, null, null);
+
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, false, 1, Optional.empty(), false, 2))
+                .isEqualTo(denied);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, false, 2, READ, false, 2))
+                .isEqualTo(denied);
     }
 
     @Test
     @DisplayName("schema 1 에서 선언이 없는 도구는 WRITE 와 required 로 읽어 승인 필요다")
     void undeclaredToolOfLegacySchemaNeedsApprovalAsWrite() {
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 1, Optional.empty(), false, 2))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 1, Optional.empty(), false, 2))
                 .isEqualTo(new ToolPolicyDecision(
                         ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
     }
@@ -60,7 +72,7 @@ class ToolPolicyDecisionTest {
         for (ToolRisk risk : new ToolRisk[] {ToolRisk.DESTRUCTIVE, ToolRisk.FINANCIAL}) {
             Optional<ToolPolicy> declared = Optional.of(new ToolPolicy(risk, ToolApproval.ALWAYS, null));
 
-            assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, declared, true, 2))
+            assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, declared, true, 2))
                     .as("위험도 %s", risk)
                     .isEqualTo(new ToolPolicyDecision(
                             ActionDecision.DENIED, ActionDenyReason.RISK_NOT_OPEN, risk, ToolApproval.ALWAYS));
@@ -72,9 +84,9 @@ class ToolPolicyDecisionTest {
     void argsOverLimitAreDeniedAndArgsAtLimitAreNot() {
         int limit = 16 * 1024;
 
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, READ, false, limit))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, READ, false, limit))
                 .isEqualTo(new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE));
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, READ, false, limit + 1))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, READ, false, limit + 1))
                 .isEqualTo(new ToolPolicyDecision(
                         ActionDecision.DENIED, ActionDenyReason.ARGS_TOO_LARGE, ToolRisk.READ, ToolApproval.NONE));
     }
@@ -82,21 +94,21 @@ class ToolPolicyDecisionTest {
     @Test
     @DisplayName("승인 방식이 none 이면 허용이다")
     void approvalNoneIsAllowed() {
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, READ, false, 2))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, READ, false, 2))
                 .isEqualTo(new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE));
     }
 
     @Test
     @DisplayName("승인 방식이 required 이고 상시 허락이 있으면 허용이다")
     void approvalRequiredWithGrantIsAllowed() {
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, WRITE, true, 2))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, WRITE, true, 2))
                 .isEqualTo(new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
     }
 
     @Test
     @DisplayName("승인 방식이 required 이고 상시 허락이 없으면 승인 필요다")
     void approvalRequiredWithoutGrantNeedsApproval() {
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, WRITE, false, 2))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, WRITE, false, 2))
                 .isEqualTo(new ToolPolicyDecision(
                         ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
     }
@@ -106,7 +118,7 @@ class ToolPolicyDecisionTest {
     void approvalAlwaysNeedsApprovalEvenWithGrant() {
         Optional<ToolPolicy> declared = Optional.of(new ToolPolicy(ToolRisk.SENSITIVE, ToolApproval.ALWAYS, null));
 
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, declared, true, 2))
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, declared, true, 2))
                 .isEqualTo(new ToolPolicyDecision(
                         ActionDecision.NEEDS_APPROVAL, null, ToolRisk.SENSITIVE, ToolApproval.ALWAYS));
     }

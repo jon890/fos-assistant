@@ -25,6 +25,8 @@ class ConnectorPolicyMigrationTest {
     private static final int DISCONNECTED = 903;
     /** 연결이 없는 보통 에이전트다. */
     private static final int PLAIN = 904;
+    /** READY 가 아닌 연결인데 에이전트가 켜져 있고 사진을 받는 경우다. V41 이 연결의 상태를 보고 고르는지 본다. */
+    private static final int PENDING_ON = 905;
 
     private String url;
 
@@ -34,8 +36,8 @@ class ConnectorPolicyMigrationTest {
         migrate("40");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
-            for (int id = READY; id <= PLAIN; id++) {
-                boolean on = id == READY || id == PLAIN;
+            for (int id = READY; id <= PENDING_ON; id++) {
+                boolean on = id == READY || id == PLAIN || id == PENDING_ON;
                 statement.executeUpdate("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
                         + " VALUES (" + id + ", 'u" + id + "@example.com', 'u" + id + "', 1, 'MEMBER',"
                         + " CURRENT_TIMESTAMP(6))");
@@ -44,12 +46,14 @@ class ConnectorPolicyMigrationTest {
                         + " connector_attachments)"
                         + " VALUES (" + id + ", 'c" + id + "', 'n', 'p" + id + "', 'http://localhost',"
                         + " 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', " + id + ", " + on + ","
-                        + " CURRENT_TIMESTAMP(6), " + (id != PLAIN) + ", " + (id == READY) + ")");
+                        + " CURRENT_TIMESTAMP(6), " + (id != PLAIN) + ", "
+                        + (id == READY || id == PENDING_ON) + ")");
             }
             // READY 는 재시작 대기가 풀린 상태다. PENDING 은 재시작 대기로 두어 그 값이 남는지 본다.
             statement.executeUpdate(row(READY, "READY", false, true));
             statement.executeUpdate(row(PENDING, "PENDING", true, true));
             statement.executeUpdate(row(DISCONNECTED, "DISCONNECTED", false, false));
+            statement.executeUpdate(row(PENDING_ON, "PENDING", false, true));
         }
         migrate("41");
     }
@@ -75,6 +79,13 @@ class ConnectorPolicyMigrationTest {
         assertThat(agent(DISCONNECTED)).isEqualTo(new AgentRow(false, false));
         // 연결이 없는 에이전트는 켜진 채로 남는다.
         assertThat(agent(PLAIN)).isEqualTo(new AgentRow(true, false));
+    }
+
+    @Test
+    @DisplayName("V41은 READY 가 아니던 연결의 에이전트가 켜져 있고 사진을 받아도 그대로 둔다")
+    void v41LeavesEnabledAgentOfConnectionThatWasNotReady() throws SQLException {
+        assertThat(agent(PENDING_ON)).isEqualTo(new AgentRow(true, true));
+        assertThat(connection(PENDING_ON)).isEqualTo(new Row("PENDING", false, true, 0));
     }
 
     private void migrate(String target) {

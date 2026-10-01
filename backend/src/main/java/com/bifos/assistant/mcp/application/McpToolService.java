@@ -1,6 +1,7 @@
 package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
@@ -12,6 +13,7 @@ import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
@@ -57,6 +59,7 @@ public class McpToolService {
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
     private final AgentExecutionRepository executions;
+    private final AgentRepository agents;
 
     public List<Map<String, Object>> tools() {
         return List.of(
@@ -159,6 +162,9 @@ public class McpToolService {
      * run 번호, profile, 토큰 수, 금액, 예외 문구는 싣지 않는다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
      *
      * <p>끝난 결과를 돌려주면 부모가 받은 것으로 적는다. 그 결과를 부모 대화에 다시 전하지 않기 위해서다.
+     *
+     * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 부모 대화에 전할 때와 같이 {@code <external-data>} 로
+     * 감싼다. 에이전트 행이 없는 실행도 출처를 모르므로 감싼다(ADR-047).
      */
     public Map<String, Object> agentStatus(McpCaller caller, Long executionId) {
         return delegations.status(caller.user(), caller.originExecution(), executionId)
@@ -239,18 +245,30 @@ public class McpToolService {
         return summary;
     }
 
-    private static Map<String, Object> statusOf(AgentExecution execution) {
+    private Map<String, Object> statusOf(AgentExecution execution) {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("execution_id", execution.id());
         status.put("status", execution.status().name());
         ExecutionStatus value = execution.status();
         if ((value == ExecutionStatus.SUCCEEDED || value == ExecutionStatus.CANCELLED) && execution.outputText() != null) {
-            status.put("output", execution.outputText());
+            status.put(
+                    "output",
+                    isExternalResult(execution) ? ExternalData.wrap(execution.outputText()) : execution.outputText());
         }
         if (value == ExecutionStatus.FAILED && execution.errorCode() != null) {
             status.put("error_code", execution.errorCode());
         }
         return status;
+    }
+
+    /** 연결용 에이전트의 실행이거나 에이전트를 찾지 못한 실행이다. */
+    private boolean isExternalResult(AgentExecution execution) {
+        if (execution.agentId() == null) {
+            return true;
+        }
+        return agents.findById(execution.agentId())
+                .map(Agent::connectorManaged)
+                .orElse(true);
     }
 
     private static Map<String, Object> failure(String code, String message) {

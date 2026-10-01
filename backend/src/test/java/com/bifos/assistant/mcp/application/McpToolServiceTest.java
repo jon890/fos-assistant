@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -35,7 +36,11 @@ class McpToolServiceTest {
     private final ArtifactWriteService artifacts = mock(ArtifactWriteService.class);
     private final MemoryService memories = mock(MemoryService.class);
     private final McpToolService tools = new McpToolService(
-            memories, artifacts, mock(AgentDelegationService.class), mock(AgentExecutionRepository.class));
+            memories,
+            artifacts,
+            mock(AgentDelegationService.class),
+            mock(AgentExecutionRepository.class),
+            mock(AgentRepository.class));
     private final AgentExecution parent = mock(AgentExecution.class);
     private McpCaller caller;
     private ListAppender<ILoggingEvent> logs;

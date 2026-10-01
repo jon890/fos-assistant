@@ -19,7 +19,7 @@ export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
         className="text-sm text-muted-foreground"
         data-testid="connector-tools-empty"
       >
-        이 연결은 조회를 뺀 모든 동작을 실행 전에 물어봐요.
+        이 연결의 동작은 실행하고 기록해요.
       </p>
     );
   }

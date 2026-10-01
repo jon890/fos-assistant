@@ -399,7 +399,7 @@ test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", as
     .getByTestId("connector-tool")
     .filter({ hasText: "메모 쓰기" });
   await expect(write).toContainText("쓰기");
-  await expect(write).toContainText("실행 전에 물어봐요");
+  await expect(write).toContainText("실행하고 기록해요");
   await expect(
     page.getByTestId("connector-tool").filter({ hasText: "list_scopes" }),
   ).toContainText("바로 실행해요");

@@ -85,7 +85,7 @@ class ConnectorPolicyEndpointTest {
         @Bean
         @Primary
         ConnectorCatalogCache movingCatalogCache(HermesConnectorClient connector) {
-            return new ConnectorCatalogCache(connector, new ConnectorPolicyProperties(TTL), CLOCK);
+            return new ConnectorCatalogCache(connector, new ConnectorPolicyProperties(TTL, Duration.ofSeconds(5)), CLOCK);
         }
     }
 
@@ -355,6 +355,45 @@ class ConnectorPolicyEndpointTest {
         assertThat(second.statusCode()).isEqualTo(200);
         assertThat(json.readTree(second.body())).isEqualTo(json.readTree(first.body()));
         assertThat(rows()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("같은 tool_call_id 로 다른 등록 이름이나 다른 인자를 보내면 앞의 allow 를 돌려주지 않고 block 이며 줄이 하나다")
+    void reusedToolCallIdWithAnotherToolOrArgsIsBlockedWithoutNewRow() throws Exception {
+        connect(true);
+        String call = newCall();
+        HttpResponse<String> first = send(token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, ARGS));
+
+        HttpResponse<String> otherTool =
+                send(token, body(token, "mcp__demo__write_note", "write_note", root, call, ARGS));
+        HttpResponse<String> otherArgs = send(
+                token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, "{\"text\":\"다른 글\"}"));
+        HttpResponse<String> same = send(token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, ARGS));
+
+        assertThat(json.readTree(first.body()).path("decision").asString()).isEqualTo("allow");
+        assertBlocked(otherTool, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
+        assertBlocked(otherArgs, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
+        // 같은 호출을 다시 보낸 것은 처음 판정을 그대로 받는다.
+        assertThat(json.readTree(same.body()).path("decision").asString()).isEqualTo("allow");
+        assertThat(onlyRow().get("HERMES_TOOL")).isEqualTo("mcp__demo__list_scopes");
+    }
+
+    @Test
+    @DisplayName("schema 1 커넥터에서도 다른 MCP 서버의 등록 이름은 block 이고 원래 이름을 비운 UNDECLARED 줄을 남긴다")
+    void toolOfAnotherServerIsBlockedAsUndeclaredEvenOnLegacySchema() throws Exception {
+        when(connector.readCatalog())
+                .thenReturn(List.of(manifest(1, List.of(new ConnectorTool("list_scopes", "READ", "none", null)))));
+        connect(true);
+
+        HttpResponse<String> response = ask("mcp__other__x", "x");
+
+        assertBlocked(response, "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.");
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("DENIED");
+        assertThat(row.get("DENY_REASON")).isEqualTo("UNDECLARED");
+        assertThat(row.get("TOOL_NAME")).isNull();
+        assertThat(row.get("HERMES_TOOL")).isEqualTo("mcp__other__x");
+        assertThat(row.get("RISK")).isNull();
     }
 
     @Test

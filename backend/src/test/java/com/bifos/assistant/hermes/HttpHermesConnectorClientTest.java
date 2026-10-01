@@ -153,19 +153,36 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
-    @DisplayName("schema 가 정수가 아니거나 tools 가 객체가 아닌 카탈로그를 거절한다")
+    @DisplayName("schema 가 정수가 아니거나 tools 가 객체가 아닌 커넥터는 받는 쪽이 거르는 값으로 읽고 다른 커넥터는 그대로 읽는다")
     @Test
-    void rejectsMalformedSchemaAndTools() {
+    void readsMalformedSchemaOrToolsAsUnjudgeableWithoutFailingCatalog() {
         String url = BASE + "/api/connectors/catalog";
         String tail = "\"mcp_server\":\"demo\"";
-        server.expect(requestTo(url))
-                .andRespond(withSuccess(CATALOG.replace(tail, tail + ",\"schema\":\"2\""), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(url))
-                .andRespond(withSuccess(
-                        CATALOG.replace(tail, tail + ",\"tools\":[\"list_scopes\"]"), MediaType.APPLICATION_JSON));
+        String other = ",{\"id\":\"other-notes\",\"title\":\"다른 메모\",\"fields\":[],"
+                + "\"verify\":{\"tool\":\"list_scopes\"},\"mcp_server\":\"other\",\"schema\":2,"
+                + "\"tools\":{\"list_scopes\":{\"risk\":\"READ\",\"approval\":\"none\"}}}]";
+        String declared = ",\"tools\":{\"list_scopes\":{\"risk\":\"READ\",\"approval\":\"none\"}}";
+        List<String> malformed = List.of(
+                // 판이 글자다. 도구 선언이 멀쩡해도 함께 버린다.
+                ",\"schema\":\"2\"" + declared,
+                // 도구 선언이 배열이다. 판이 없어 도구를 선언하지 않는 판으로 읽히면 안 된다.
+                ",\"tools\":[\"list_scopes\"]",
+                ",\"schema\":2,\"tools\":[\"list_scopes\"]");
+        for (String broken : malformed) {
+            String catalog = CATALOG.replace(tail, tail + broken).strip();
+            server.expect(requestTo(url))
+                    .andRespond(withSuccess(
+                            catalog.substring(0, catalog.length() - 1) + other, MediaType.APPLICATION_JSON));
+        }
 
-        for (int attempt = 0; attempt < 2; attempt++) {
-            assertThatThrownBy(() -> client.readCatalog()).isInstanceOf(IllegalStateException.class);
+        for (String broken : malformed) {
+            List<ConnectorManifest> read = client.readCatalog();
+
+            assertThat(read).as("틀린 선언 %s", broken).extracting(ConnectorManifest::id).containsExactly(DEMO, "other-notes");
+            assertThat(read.get(0).schema()).as("틀린 선언 %s 의 판", broken).isZero();
+            assertThat(read.get(0).tools()).as("틀린 선언 %s 의 도구", broken).isEmpty();
+            assertThat(read.get(1).schema()).isEqualTo(2);
+            assertThat(read.get(1).tools()).containsExactly(new ConnectorTool("list_scopes", "READ", "none", null));
         }
         server.verify();
     }

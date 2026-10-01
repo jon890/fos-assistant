@@ -1419,6 +1419,28 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
+    @DisplayName("판이나 도구 선언을 읽을 수 없던 커넥터만 카탈로그에서 빠지고 다른 커넥터는 남는다")
+    void manifestWithUnreadableSchemaOrToolsIsLeftOutAlone() {
+        // 클라이언트는 판이 정수가 아니거나 도구 선언이 객체가 아닌 커넥터를 판 0 과 빈 도구로 읽는다.
+        ConnectorManifest unreadable = new ConnectorManifest(
+                DEMO,
+                DEMO_MANIFEST.title(),
+                DEMO_MANIFEST.description(),
+                DEMO_MANIFEST.fields(),
+                "list_scopes",
+                "demo",
+                List.of(),
+                false,
+                0,
+                List.of());
+        when(connector.readCatalog()).thenReturn(List.of(unreadable, PIN_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        assertThat(service.catalog(user)).extracting(ConnectorSummary::id).containsExactly(PIN);
+        assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("카탈로그는 선언한 도구의 이름과 제목과 위험도와 승인 방식을 선언한 순서로 준다")
     void catalogListsDeclaredTools() {
         when(connector.readCatalog()).thenReturn(List.of(POLICY_MANIFEST, PIN_MANIFEST));

@@ -29,8 +29,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-047).
  *
- * <p>순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 실행이나 연결을 찾지 못한 호출은 줄을 남기지
- * 않는다. 줄에 적을 사용자와 에이전트를 알 수 없기 때문이다. 승인이 필요한 호출은 승인 엔진이 들어오기 전이라 통과로
+ * <p>순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 실행이나 연결을 찾지 못한 호출과 같은 키로 다른 도구나 다른
+ * 인자를 보낸 호출은 줄을 남기지 않는다. 줄에 적을 사용자와 에이전트를 알 수 없기 때문이다. 승인이 필요한 호출은 승인 엔진이 들어오기 전이라 통과로
  * 답하고 기록만 남긴다. 인자 원문은 저장하지 않고 해시만 남긴다.
  *
  * <p>{@code mcp} 패키지의 인증 주체를 모르게 하려고 profile 이름과 session 값을 문자열로 받는다.
@@ -100,9 +100,10 @@ public class ConnectorPolicyService {
             String argsJson) {
         String dedupeKey = ConnectorActionKey.of(profileName, rootSessionId, sessionId, toolCallId)
                 .value();
+        String argsSha256 = Sha256.hex(argsJson);
         Optional<ConnectorAction> recorded = actions.findByDedupeKey(dedupeKey);
         if (recorded.isPresent()) {
-            return answer(recorded.get());
+            return replayed(recorded.get(), hermesTool, argsSha256);
         }
         final AgentExecution origin;
         try {
@@ -130,6 +131,7 @@ public class ConnectorPolicyService {
                 .orElse(null);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
                         connection.status(),
+                        ownServerTool(value, hermesTool),
                         value.schema(),
                         ConnectorToolPolicies.find(value, confirmedTool),
                         false,
@@ -144,14 +146,14 @@ public class ConnectorPolicyService {
                 decision,
                 passed,
                 dedupeKey,
-                Sha256.hex(argsJson),
+                argsSha256,
                 Instant.now(clock));
         try {
             return answer(transactions.execute(status -> actions.saveAndFlush(action)));
         } catch (DataIntegrityViolationException ex) {
             // 같은 호출이 동시에 와 유니크 제약에 걸렸다. 먼저 저장된 줄의 판정을 그대로 돌려준다.
             return actions.findByDedupeKey(dedupeKey)
-                    .map(ConnectorPolicyService::answer)
+                    .map(first -> replayed(first, hermesTool, argsSha256))
                     .orElseThrow(() -> ex);
         }
     }
@@ -169,7 +171,31 @@ public class ConnectorPolicyService {
         }
     }
 
-    /** hook 이 보낸 원래 이름으로 등록 이름을 다시 계산해 hook 이 받은 등록 이름과 다르면 이름이 없는 호출로 읽는다. */
+    /**
+     * 같은 키로 이미 남긴 줄의 판정을 돌려준다. 그 줄의 등록 이름이나 인자 해시가 이번 요청과 다르면 돌려주지 않고 막는다.
+     *
+     * <p>한 session 에서 같은 {@code tool_call_id} 가 되풀이되면 키가 같다. 줄의 판정을 그대로 주면 앞서 허용한
+     * 읽기 도구의 답이 다른 도구나 다른 인자의 호출에 나간다. 새 줄은 만들지 않는다. 키가 유니크라 만들 수 없다.
+     */
+    private static ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
+        if (!recorded.hermesTool().equals(hermesTool)) {
+            return blockedWithoutRecord("같은 키의 줄과 등록 이름이 다르다");
+        }
+        if (!recorded.argsSha256().equals(argsSha256)) {
+            return blockedWithoutRecord("같은 키의 줄과 인자가 다르다");
+        }
+        return answer(recorded);
+    }
+
+    /** 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 서버 이름까지의 앞부분이 같은지로 본다. */
+    private static boolean ownServerTool(ConnectorManifest manifest, String hermesTool) {
+        return hermesTool.startsWith(HermesToolName.of(manifest.mcpServer(), ""));
+    }
+
+    /**
+     * hook 이 보낸 원래 이름으로 등록 이름을 다시 계산해 hook 이 받은 등록 이름과 다르면 이름이 없는 호출로 읽는다. 다른
+     * 서버의 등록 이름이면 다시 계산한 값과 같을 수 없어 이름이 없는 호출이 된다.
+     */
     private static String confirmedTool(ConnectorManifest manifest, String hermesTool, String toolName) {
         if (toolName == null
                 || !HermesToolName.of(manifest.mcpServer(), toolName).equals(hermesTool)) {
