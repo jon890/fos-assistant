@@ -36,7 +36,15 @@ async function openAdvancedPicker(page: Page): Promise<void> {
 }
 
 async function closeSettings(page: Page): Promise<void> {
-  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  const settings = page.getByRole("dialog", {
+    name: "모델 단계 설정",
+    exact: true,
+  });
+  await settings
+    .getByRole("button", { name: "모델 단계 설정 닫기", exact: true })
+    .click();
+  await expect(settings).toHaveCount(0);
 }
 
 function dialog(page: Page): Locator {
@@ -552,6 +560,7 @@ test("긴 모델 이름을 골라도 가로로 넘치지 않고 입력칸 폭이
   // 저장하는 동안에도 단추는 고른 값을 보인다. 저장이 끝난 뒤의 모양을 재야 저장된 값의 폭을 본다.
   await expectSaved(page);
   await expect(picker(page)).toHaveText(`${longModel} · xhigh`);
+  await closeSettings(page);
 
   await expectNoHorizontalScroll(page);
   const textarea = await composer(page).boundingBox();
