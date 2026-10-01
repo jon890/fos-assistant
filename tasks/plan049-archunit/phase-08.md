@@ -17,7 +17,8 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 - 경고로 두어 실패시키지 않는 규칙: Checkstyle `FileLength`, `MethodLength`, `requiredArgsConstructor`(phase 04), eslint `max-lines`, `max-lines-per-function`(phase 07). Checkstyle 보고서는 `backend/build/reports/checkstyle/main.xml` 에 있다
 - Node 는 `22.18.0`, pnpm 은 `10.22.0` 이다(`web/package.json`, `.github/workflows/ci.yml`)
 - CI 는 `.github/workflows/ci.yml` 이다. 모든 job 이 `actions/checkout` 을 `persist-credentials: false` 로 쓰고 깊이를 정하지 않는다(기본 1). ratchet 과 바뀐 파일 목록에는 `origin/main` 이력이 필요하다
-- AGENTS.md 「확인」 절에 명령 여섯 줄이 있고, 그 아래 문장이 「위 여섯 검사」 와 CI job 이름 `backend`, `web`, `e2e`, `unit`, `public-safe` 를 적는다
+- AGENTS.md 「확인」 절은 「아래 여섯 검사를 한 번에 돌린다」 며 `scripts/check-local.sh` 를 가리키고, 그 스크립트가 차례로 돌리는 명령 여섯 줄을 적는다. 그 아래 문장이 「위 여섯 검사」 와 CI job 이름 `backend`, `web`, `e2e`, `unit`, `public-safe` 를 적는다
+- `scripts/check-local.sh` 는 `step <이름> <명령>` 으로 단계를 차례로 돌리고, 처음 실패한 단계에서 멈춘다. 마지막 단계는 `public-safe` 다
 
 **근거 문서**: `docs/adr/ADR-041-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
@@ -81,9 +82,10 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 - `cd web && pnpm install --frozen-lockfile` 뒤에 `scripts/quality.sh check`
 - merge ref 에서 `origin/main` 이 있는지는 PR 을 연 뒤 team-lead 가 확인한다. 회신의 「미검증」 에 적는다
 
-### 6. 문서
+### 6. `scripts/check-local.sh` 와 문서
 
-- `AGENTS.md` 「확인」 의 명령 목록 끝에 `scripts/quality.sh check` 를 더한다. 「위 여섯 검사」 를 새 개수로 고치고, 「머지는 PR 로 한다」 의 CI job 목록에 `quality` 를 더한다. `quality.sh fix` 가 무엇을 고치는지 한 줄 적고 자세한 것은 `backend/AGENTS.md` 와 `web/AGENTS.md` 를 가리킨다
+- `scripts/check-local.sh` 의 `public-safe` 단계 뒤에 `step quality bash -c "cd '${ROOT}' && scripts/quality.sh check"` 를 더한다
+- `AGENTS.md` 「확인」 의 「아래 여섯 검사」 와 명령 목록 끝에 `scripts/quality.sh check` 를 더한다. 「위 여섯 검사」 를 새 개수로 고치고, 「머지는 PR 로 한다」 의 CI job 목록에 `quality` 를 더한다. `quality.sh fix` 가 무엇을 고치는지 한 줄 적고 자세한 것은 `backend/AGENTS.md` 와 `web/AGENTS.md` 를 가리킨다
 - `backend/AGENTS.md`: 「구조 규칙」, 「코드 규칙」, 「포맷」 절 앞에 한 절을 두어 `./gradlew qualityCheck` 가 셋을 묶는다는 것과 `scripts/quality.sh` 를 가리킨다. 기준에 든 위반은 줄여 갈 목록이고 기준마다 GitHub 이슈가 있다는 것을 적는다. 「구조 규칙」 의 「위반을 고쳤을 때」 에 `scripts/quality.sh fix` 도 기준을 줄인다고 더한다
 - `web/AGENTS.md` 「lint 와 포맷」 절에 `scripts/quality.sh` 를 가리키는 한 줄을 더한다
 
@@ -102,18 +104,13 @@ CI 와 AGENTS.md 「확인」 에 `check` 를 더한다.
 
 ## 검증
 
-AGENTS.md 「확인」 절을 적힌 순서대로 모두 돌린다. 새 브랜치라면 `cd web && pnpm install --frozen-lockfile` 을 먼저 한다.
-`pnpm build` 의 환경 변수는 `web/AGENTS.md` 의 자리표시자 값을 쓴다.
+AGENTS.md 「확인」 절대로 `scripts/check-local.sh` 하나로 모두 돌린다. 이 스크립트가 web 의존성과 chromium 설치, `pnpm build` 환경 변수를 맡는다.
 브라우저 검사는 한 번에 하나만 돈다. 돌리기 전에 다른 브라우저 검사가 끝났는지 확인한다.
+**오래 걸리는 명령은 출력을 파일로 보내고 진행을 확인한다.** 이 스크립트는 10분 넘게 걸릴 수 있다. 출력이 10분 넘게 늘지 않으면 멈춘 것으로 보고 그 상태를 보고한다.
 
 ```bash
-cd backend && ./gradlew test
-cd web && pnpm typecheck && pnpm build
-cd web && pnpm test:browser
-node test/e2e/run.ts
-node --test 'test/unit/**/*.test.ts'
-scripts/check-public-safe.sh
-scripts/quality.sh check
+# cwd: 저장소 root
+scripts/check-local.sh
 ```
 
 ## 변경 파일
@@ -125,6 +122,7 @@ scripts/quality.sh check
 | `scripts/quality-report.mjs` | 신규 |
 | `test/unit/quality-script.test.ts` | 신규 |
 | `.github/workflows/ci.yml` | 수정 |
+| `scripts/check-local.sh` | 수정 |
 | `.gitignore` | 수정 |
 | `AGENTS.md` | 수정 |
 | `backend/AGENTS.md` | 수정 |
