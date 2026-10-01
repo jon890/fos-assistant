@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { describeError } from "@/components/error-message";
 
 export type Conversation = {
@@ -34,10 +42,18 @@ const ConversationsContext = createContext<ConversationsValue | null>(null);
 
 async function failure(response: Response): Promise<Error> {
   const payload = (await response.json().catch(() => ({}))) as ErrorPayload;
-  return new Error(describeError(payload.code ?? "INTERNAL_ERROR", payload.message ?? "대화 목록을 읽지 못했어요."));
+  return new Error(
+    describeError(
+      payload.code ?? "INTERNAL_ERROR",
+      payload.message ?? "대화 목록을 읽지 못했어요.",
+    ),
+  );
 }
 
-export function ConversationsProvider({ enabled, children }: {
+export function ConversationsProvider({
+  enabled,
+  children,
+}: {
   enabled: boolean;
   children: React.ReactNode;
 }) {
@@ -63,15 +79,23 @@ export function ConversationsProvider({ enabled, children }: {
       const request = ++latestRequest.current;
       latestLoad.current = request;
       try {
-        const response = await fetch("/api/chat/conversations", { cache: "no-store" });
+        const response = await fetch("/api/chat/conversations", {
+          cache: "no-store",
+        });
         if (!response.ok) throw await failure(response);
         const loaded = (await response.json()) as Conversation[];
-        if (request !== latestRequest.current) return request === latestLoad.current;
+        if (request !== latestRequest.current)
+          return request === latestLoad.current;
         setConversations(loaded);
         setError(null);
       } catch (reason) {
-        if (request !== latestRequest.current) return request === latestLoad.current;
-        setError(reason instanceof Error ? reason.message : "대화 목록을 읽지 못했어요.");
+        if (request !== latestRequest.current)
+          return request === latestLoad.current;
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "대화 목록을 읽지 못했어요.",
+        );
       } finally {
         // 버린 응답이어도 첫 읽기의 뼈대는 거둔다. 순번을 올린 `replace` 는 뼈대를 거두지 않는다.
         setLoading(false);
@@ -88,7 +112,10 @@ export function ConversationsProvider({ enabled, children }: {
     void refresh();
   }, [refresh]);
 
-  const startNew = useCallback(() => setNewConversationVersion((version) => version + 1), []);
+  const startNew = useCallback(
+    () => setNewConversationVersion((version) => version + 1),
+    [],
+  );
 
   const rename = useCallback(async (id: string, title: string) => {
     const response = await fetch(`/api/chat/conversations/${id}`, {
@@ -98,27 +125,60 @@ export function ConversationsProvider({ enabled, children }: {
     });
     if (!response.ok) throw await failure(response);
     const updated = (await response.json()) as Conversation;
-    setConversations((current) => current.map((item) => item.id === id ? updated : item));
+    setConversations((current) =>
+      current.map((item) => (item.id === id ? updated : item)),
+    );
   }, []);
 
   const replace = useCallback((conversation: Conversation) => {
     latestRequest.current += 1;
-    setConversations((current) => current.some((item) => item.id === conversation.id)
-      ? current.map((item) => item.id === conversation.id ? conversation : item)
-      : [conversation, ...current]);
+    setConversations((current) =>
+      current.some((item) => item.id === conversation.id)
+        ? current.map((item) =>
+            item.id === conversation.id ? conversation : item,
+          )
+        : [conversation, ...current],
+    );
   }, []);
 
   const remove = useCallback(async (id: string) => {
-    const response = await fetch(`/api/chat/conversations/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/chat/conversations/${id}`, {
+      method: "DELETE",
+    });
     if (!response.ok) throw await failure(response);
     setConversations((current) => current.filter((item) => item.id !== id));
   }, []);
 
-  const value = useMemo(() => ({
-    conversations, loading, error, refresh, startNew, newConversationVersion, rename, replace, remove,
-  }), [conversations, loading, error, refresh, startNew, newConversationVersion, rename, replace, remove]);
+  const value = useMemo(
+    () => ({
+      conversations,
+      loading,
+      error,
+      refresh,
+      startNew,
+      newConversationVersion,
+      rename,
+      replace,
+      remove,
+    }),
+    [
+      conversations,
+      loading,
+      error,
+      refresh,
+      startNew,
+      newConversationVersion,
+      rename,
+      replace,
+      remove,
+    ],
+  );
 
-  return <ConversationsContext.Provider value={value}>{children}</ConversationsContext.Provider>;
+  return (
+    <ConversationsContext.Provider value={value}>
+      {children}
+    </ConversationsContext.Provider>
+  );
 }
 
 export function useConversations(): ConversationsValue {
