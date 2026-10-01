@@ -400,6 +400,8 @@ export function ModelTierPicker({
   const [failed, setFailed] = useState(false);
   const [defaultsOpen, setDefaultsOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [ownDefaultSaveFailed, setOwnDefaultSaveFailed] = useState(false);
+  const [groupSaveFailed, setGroupSaveFailed] = useState(false);
   const [draftTiers, setDraftTiers] = useState<ModelTier[]>(FALLBACK_TIERS);
   const [groupDefaultTier, setGroupDefaultTier] =
     useState<ModelTierCode | null>(null);
@@ -451,6 +453,7 @@ export function ModelTierPicker({
   }
 
   async function saveOwnDefault(nextTier: ModelTierCode | null) {
+    setOwnDefaultSaveFailed(false);
     const result = await saveDefaultTier(nextTier);
     if (result.ok) {
       setState((current) =>
@@ -462,6 +465,8 @@ export function ModelTierPicker({
             },
       );
       setDefaultsOpen(false);
+    } else {
+      setOwnDefaultSaveFailed(true);
     }
   }
 
@@ -478,6 +483,7 @@ export function ModelTierPicker({
   }
 
   async function saveGroup() {
+    setGroupSaveFailed(false);
     const result = await saveGroupTiers(draftTiers, groupDefaultTier);
     if (result.ok) {
       setState((current) =>
@@ -489,6 +495,8 @@ export function ModelTierPicker({
             },
       );
       setGroupOpen(false);
+    } else {
+      setGroupSaveFailed(true);
     }
   }
 
@@ -593,6 +601,11 @@ export function ModelTierPicker({
                 >
                   내 기본값 지우기
                 </Button>
+                {ownDefaultSaveFailed ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    내 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.
+                  </p>
+                ) : null}
               </div>
             </DialogContent>
           </Dialog>
@@ -698,6 +711,12 @@ export function ModelTierPicker({
                   {hasIncompleteTierMapping ? (
                     <p role="alert" className="text-sm text-destructive">
                       모델과 강도는 함께 입력해 주세요.
+                    </p>
+                  ) : null}
+                  {groupSaveFailed ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      그룹 단계 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해
+                      주세요.
                     </p>
                   ) : null}
                   <DialogFooter>

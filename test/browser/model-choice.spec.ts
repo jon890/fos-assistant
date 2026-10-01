@@ -300,6 +300,70 @@ test("관리자에게만 그룹 단계 설정을 보인다", async ({ page }) =>
   ).toBeVisible();
 });
 
+test("내 기본값 저장이 실패하면 창을 유지하고 다시 저장할 수 있다", async ({
+  page,
+}) => {
+  let attempts = 0;
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers/default",
+    (route) => {
+      attempts += 1;
+      return route.fulfill({ status: attempts === 1 ? 500 : 204 });
+    },
+  );
+
+  await page.goto("/");
+  await tierSettings(page).click();
+  await page.getByRole("button", { name: "내 기본값" }).click();
+
+  const defaultsDialog = page.getByRole("dialog", { name: "내 기본값" });
+  await defaultsDialog.getByRole("button", { name: "빠르게" }).click();
+  const failedAlert = defaultsDialog.getByRole("alert");
+  await expect(failedAlert).toHaveText(
+    "내 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+  );
+  await expect(defaultsDialog).toBeVisible();
+
+  await defaultsDialog.getByRole("button", { name: "빠르게" }).click();
+  await expect(defaultsDialog).toHaveCount(0);
+  await expect(failedAlert).toHaveCount(0);
+});
+
+test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저장할 수 있다", async ({
+  page,
+}) => {
+  let attempts = 0;
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) => route.fulfill({ json: { ...TIERS, admin: true } }),
+  );
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers/group",
+    (route) => {
+      attempts += 1;
+      return route.fulfill({ status: attempts === 1 ? 500 : 204 });
+    },
+  );
+
+  await page.goto("/");
+  await tierSettings(page).click();
+  await page.getByRole("button", { name: "그룹 단계 설정" }).click();
+
+  const groupDialog = page.getByRole("dialog", { name: "그룹 단계 설정" });
+  const model = groupDialog.getByLabel("모델").first();
+  await model.fill("example-retry");
+  await groupDialog.getByRole("button", { name: "저장" }).click();
+  const failedAlert = groupDialog.getByRole("alert");
+  await expect(failedAlert).toHaveText(
+    "그룹 단계 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+  );
+  await expect(model).toHaveValue("example-retry");
+
+  await groupDialog.getByRole("button", { name: "저장" }).click();
+  await expect(groupDialog).toHaveCount(0);
+  await expect(failedAlert).toHaveCount(0);
+});
+
 test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행을 안내한다", async ({
   page,
 }) => {
@@ -452,6 +516,10 @@ test("저장이 실패하면 단추가 이전 값으로 돌아가고 알린다",
   await openSettings(page);
   await expect(page.getByTestId("model-picker-error")).toHaveText(
     "모델을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+  );
+  await expect(page.getByTestId("model-picker-error")).toHaveAttribute(
+    "role",
+    "alert",
   );
   await expect(picker(page)).toHaveText("기본");
 
