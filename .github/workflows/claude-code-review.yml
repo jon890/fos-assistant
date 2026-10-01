@@ -192,9 +192,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          # gh 는 --slurp 와 --jq 를 함께 받지 않는다. 모은 배열을 jq 로 따로 읽는다.
           LAST_ID=$(gh api --paginate --slurp \
             "repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}/reviews?per_page=100" \
-            --jq '[.[][] | .id] | max // 0')
+            | jq '[.[][] | .id] | max // 0')
           echo "last_review_id=$LAST_ID" >> "$GITHUB_OUTPUT"
 
       # @v1 은 v1 의 최신 릴리스를 따라간다. 버전마다 다시 고정하지 않으려고 major 태그를 쓴다.
