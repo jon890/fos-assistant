@@ -9,9 +9,11 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -278,6 +280,80 @@ class ConnectorConnectionServiceTest {
         assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
                 .isFalse();
+    }
+
+    @Test
+    @DisplayName("사진을 받던 연결이 꺼지는 경로마다 연결용 에이전트가 사진을 받지 않는다")
+    void disabledConnectorAgentNeverAcceptsAttachments() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        ConnectionSnapshot registered = service.register(member, DEMO, VALUES);
+        String profile = profileOf(registered);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+        Runnable makeReady = () -> {
+            installed(true, true);
+            assertThat(service.check(member, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+            assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                    .isTrue();
+        };
+        Runnable assertOff = () -> {
+            assertThat(agentEnabled(member)).isFalse();
+            assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                    .isFalse();
+        };
+
+        // 연결 확인의 조기 반환: 설치가 configured 가 아니다.
+        makeReady.run();
+        installed(true, false);
+        assertThat(service.check(member, DEMO).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertOff.run();
+
+        // 반영 완료의 단락 평가: 설치가 꺼져 있어 도구 확인에 닿지 않는다.
+        makeReady.run();
+        installed(false, false);
+        assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
+                .isInstanceOf(ConnectorOperationFailure.class);
+        assertOff.run();
+
+        // 다시 등록의 실패.
+        makeReady.run();
+        doThrow(new IllegalStateException()).when(connector).putEnv(anyString(), anyString(), anyString());
+        assertThatThrownBy(() -> service.register(member, DEMO, VALUES)).isInstanceOf(ConnectorOperationFailure.class);
+        assertOff.run();
+        doReturn(false).when(connector).putEnv(anyString(), anyString(), anyString());
+        service.register(member, DEMO, VALUES);
+
+        // 해제의 실패.
+        makeReady.run();
+        doThrow(new IllegalStateException()).when(connector).putConnector(profile, DEMO, false);
+        assertThatThrownBy(() -> service.disconnect(member, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+        assertOff.run();
+    }
+
+    @Test
+    @DisplayName("선언한 toolset 이 MCP 서버 이름과 겹쳐도 도구 목록에 한 번만 싣는다")
+    void allowedToolsetsHoldEachNameOnce() {
+        when(connector.readCatalog())
+                .thenReturn(List.of(new ConnectorManifest(
+                        DEMO,
+                        "검사용 메모",
+                        "",
+                        DEMO_MANIFEST.fields(),
+                        "list_scopes",
+                        "vision",
+                        List.of("vision"),
+                        false)));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "vision")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        service.check(user, DEMO);
+
+        // 등록이 한 번, 연결 확인의 다시 쓰기가 한 번이다. 뒤의 것이 서버 이름과 선언을 합친 목록이다.
+        verify(toolsets, times(2)).writeApiServer(profile, List.of("fos-assistant", "vision"));
     }
 
     @Test

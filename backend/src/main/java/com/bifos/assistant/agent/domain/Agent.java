@@ -79,10 +79,11 @@ public class Agent {
     private boolean connectorManaged;
 
     /**
-     * 참이면 이 연결용 에이전트의 커넥터가 사진을 받는다고 선언했다.
+     * 참이면 이 연결용 에이전트가 사진을 받는다. 커넥터의 선언과 도구 확인을 합친 값이다.
      *
-     * <p>선언은 대시보드가 내는 manifest 에 있고 이 엔티티는 Hermes 를 부르지 못한다. 그래서 연결 흐름이 등록,
-     * 연결 확인, 관리자 반영 완료 때 여기 적는다. 선언이 참이고 선언한 toolset 이 실제로 켜진 것을 확인했을 때만 참이다(ADR-044).
+     * <p>선언은 대시보드가 내는 manifest 에 있고 이 엔티티는 Hermes 를 부르지 못한다. 그래서 연결 흐름이 여기
+     * 적는다. 선언이 참이고 연결 확인이나 관리자 반영 완료가 선언한 toolset 이 실제로 켜진 것을 확인했을 때만
+     * 참이다. 등록 직후와 {@code READY} 가 아닌 연결은 늘 거짓이다(ADR-044).
      */
     @Column(name = "connector_attachments", nullable = false)
     private boolean connectorAttachments;
@@ -198,7 +199,11 @@ public class Agent {
         this.connectorManaged = true;
     }
 
-    /** 커넥터 manifest 가 선언한 사진 받기 여부를 옮겨 적는다. 연결용 에이전트에만 뜻이 있다. */
+    /**
+     * 연결용 에이전트가 사진을 받는지 적는다. 연결용 에이전트에만 뜻이 있다.
+     *
+     * <p>manifest 의 선언을 그대로 옮기지 않는다. 선언과 도구 확인이 모두 참일 때만 참을 넘긴다.
+     */
     public void acceptConnectorAttachments(boolean accepted) {
         this.connectorAttachments = accepted;
     }
@@ -226,7 +231,7 @@ public class Agent {
      * 이 에이전트의 대화에 사진을 붙일 수 있다.
      *
      * <p>흐름은 Hermes 를 한 번 부르는 경로를 거치지 않아 사진이 놓인 자리를 입력에 덧붙일 수 없다. 그래서
-     * 흐름이 붙은 에이전트는 받지 않는다. 연결용 에이전트는 그 커넥터가 사진을 받는다고 선언했을 때만 받는다.
+     * 흐름이 붙은 에이전트는 받지 않는다. 연결용 에이전트는 그 커넥터가 사진을 받는다고 선언했고 선언한 toolset 이 켜진 것이 확인됐을 때만 받는다.
      * 받을지 판정하는 곳은 모두 이 메서드를 부른다.
      */
     public boolean acceptsAttachments() {

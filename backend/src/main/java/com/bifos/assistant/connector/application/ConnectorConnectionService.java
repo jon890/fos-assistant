@@ -28,6 +28,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -226,9 +227,8 @@ public class ConnectorConnectionService {
             connections.save(connection);
             return null;
         }
-        connection.registered(ConnectorValues.stored(manifest, accepted), false, now());
         // 등록 직후는 선언한 toolset 이 켜졌는지 보기 전이다. 사진은 연결 확인이 그것을 본 뒤에 받는다.
-        connection.agent().acceptConnectorAttachments(false);
+        connection.registered(ConnectorValues.stored(manifest, accepted), false, now());
         return snapshot(connections.save(connection));
     }
 
@@ -257,7 +257,6 @@ public class ConnectorConnectionService {
             throw new ConnectorOperationFailure();
         }
         connection.disconnected(manifest.isEmpty(), now());
-        connection.agent().acceptConnectorAttachments(false);
         return snapshot(connections.save(connection));
     }
 
@@ -372,8 +371,6 @@ public class ConnectorConnectionService {
     private boolean usable(ConnectorConnection connection) {
         Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
         Agent agent = connection.agent();
-        // 아래 어디서 끝나든(외부 호출 실패 포함) 사진은 받지 않는 것으로 시작한다. 선언한 toolset 이 켜진 것을 본 뒤에만 참으로 둔다.
-        agent.acceptConnectorAttachments(false);
         if (manifest.isEmpty()) {
             return false;
         }
@@ -386,6 +383,7 @@ public class ConnectorConnectionService {
         ProbeResult probe =
                 connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
         boolean usable = toolsetsApplied && probe.ok() && !probe.tools().isEmpty();
+        // 쓸 수 없으면 부른 쪽이 PENDING 으로 두며 사진 받기를 내린다. 외부 호출이 실패해도 같다.
         agent.acceptConnectorAttachments(usable && manifest.get().attachments());
         return usable;
     }
@@ -406,9 +404,12 @@ public class ConnectorConnectionService {
         return declared.equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())));
     }
 
-    /** 연결용 에이전트의 API 도구 목록이다. Control Plane MCP, 설치한 뒤의 커넥터 MCP, 선언한 내장 toolset 순이다. */
+    /**
+     * 연결용 에이전트의 API 도구 목록이다. Control Plane MCP, 설치한 뒤의 커넥터 MCP, 선언한 내장 toolset 순이다.
+     * 겹친 이름은 한 번만 싣는다.
+     */
     private static List<String> allowedToolsets(ConnectorManifest manifest, boolean installed) {
-        List<String> allowed = new ArrayList<>();
+        Set<String> allowed = new LinkedHashSet<>();
         allowed.add(AgentToolPolicy.CONTROL_PLANE_MCP);
         if (installed) {
             allowed.add(manifest.mcpServer());
