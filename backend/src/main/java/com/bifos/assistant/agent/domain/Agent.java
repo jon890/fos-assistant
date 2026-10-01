@@ -95,8 +95,14 @@ public class Agent {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
-    private Agent(String code, String name, String hermesProfile, String apiBaseUrl,
-            CostMode costMode, CredentialScope credentialScope, AgentVisibility visibility,
+    private Agent(
+            String code,
+            String name,
+            String hermesProfile,
+            String apiBaseUrl,
+            CostMode costMode,
+            CredentialScope credentialScope,
+            AgentVisibility visibility,
             Long ownerUserId) {
         this.code = code;
         this.name = name;
@@ -110,31 +116,77 @@ public class Agent {
         this.createdAt = Instant.now();
     }
 
-    public static Agent of(String code, String name, String hermesProfile, String apiBaseUrl,
-            CostMode costMode, CredentialScope credentialScope, AgentVisibility visibility,
+    public static Agent of(
+            String code,
+            String name,
+            String hermesProfile,
+            String apiBaseUrl,
+            CostMode costMode,
+            CredentialScope credentialScope,
+            AgentVisibility visibility,
             Long ownerUserId) {
-        return new Agent(code, name, hermesProfile, apiBaseUrl, costMode, credentialScope,
-                visibility, ownerUserId);
+        return new Agent(code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId);
     }
 
     private static String stripTrailingSlash(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
-    public Long id() { return id; }
-    public String code() { return code; }
-    public String name() { return name; }
-    public String hermesProfile() { return hermesProfile; }
-    public String apiBaseUrl() { return apiBaseUrl; }
-    public CostMode costMode() { return costMode; }
-    public CredentialScope credentialScope() { return credentialScope; }
-    public AgentVisibility visibility() { return visibility; }
-    public Long ownerUserId() { return ownerUserId; }
-    public boolean enabled() { return enabled; }
-    public String flow() { return flow; }
-    public boolean profileManaged() { return profileManaged; }
-    public boolean connectorManaged() { return connectorManaged; }
-    public Instant deletedAt() { return deletedAt; }
+    public Long id() {
+        return id;
+    }
+
+    public String code() {
+        return code;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public String hermesProfile() {
+        return hermesProfile;
+    }
+
+    public String apiBaseUrl() {
+        return apiBaseUrl;
+    }
+
+    public CostMode costMode() {
+        return costMode;
+    }
+
+    public CredentialScope credentialScope() {
+        return credentialScope;
+    }
+
+    public AgentVisibility visibility() {
+        return visibility;
+    }
+
+    public Long ownerUserId() {
+        return ownerUserId;
+    }
+
+    public boolean enabled() {
+        return enabled;
+    }
+
+    public String flow() {
+        return flow;
+    }
+
+    public boolean profileManaged() {
+        return profileManaged;
+    }
+
+    public boolean connectorManaged() {
+        return connectorManaged;
+    }
+
+    public Instant deletedAt() {
+        return deletedAt;
+    }
 
     /** Control Plane 이 이 에이전트의 profile 을 만들었다고 적는다. 지울 때 그 profile 까지 거둔다. */
     public void markManagedProfile() {

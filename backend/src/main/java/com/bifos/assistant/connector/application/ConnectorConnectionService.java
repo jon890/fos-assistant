@@ -369,11 +369,13 @@ public class ConnectorConnectionService {
     private boolean usable(ConnectorConnection connection) {
         Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
         Agent agent = connection.agent();
-        agent.acceptConnectorAttachments(manifest.map(ConnectorManifest::attachments).orElse(false));
+        agent.acceptConnectorAttachments(
+                manifest.map(ConnectorManifest::attachments).orElse(false));
         if (manifest.isEmpty()) {
             return false;
         }
-        ProbeResult probe = connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
+        ProbeResult probe =
+                connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
         return probe.ok() && !probe.tools().isEmpty() && declaredToolsetsApplied(agent, manifest.get());
     }
 

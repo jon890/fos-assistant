@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -15,13 +15,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
-import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.application.model.ConnectorSummary;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
@@ -229,7 +229,8 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(registered);
         installed(true, true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision", "delegation"), List.of("vision"));
+        when(toolsets.readEnabled(anyString(), anyString()))
+                .thenReturn(List.of("vision", "delegation"), List.of("vision"));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
@@ -758,7 +759,8 @@ class ConnectorConnectionServiceTest {
             values.put("k" + index, "v".repeat(500));
         }
         when(connector.readCatalog())
-                .thenReturn(List.of(new ConnectorManifest("demo-wide", "넓은 칸", "", fields, "check", "wide", List.of(), false)));
+                .thenReturn(List.of(
+                        new ConnectorManifest("demo-wide", "넓은 칸", "", fields, "check", "wide", List.of(), false)));
         // {"values":{"k1":"…",…},"secretPrefixes":{}} 에서 값 말고 드는 글자 수는 33 + 칸마다 7 + 쉼표 7 이다.
         int lastLength = 4000 - (33 + 8 * 7 + 7) - 7 * 500;
         values.put("k8", "v".repeat(lastLength + 1));
