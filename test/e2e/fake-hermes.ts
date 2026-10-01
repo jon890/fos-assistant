@@ -263,6 +263,15 @@ function withoutAskGuide(instructions: string): string {
   return (instructions.slice(0, start).replace(/\n+$/, "") + instructions.slice(end)).replace(/^\n+/, "");
 }
 
+/** 모델 지침은 답에 복사하지 않고, Memory 본문은 기존처럼 되돌려 검증한다. */
+function withoutResponseGuide(instructions: string): string {
+  const header = "# 답변 형식\n\n";
+  if (!instructions.startsWith(header)) return instructions;
+
+  const nextSection = instructions.indexOf("\n\n", header.length);
+  return nextSection < 0 ? "" : instructions.slice(nextSection + 2);
+}
+
 /** Control Plane 이 모든 실행 입력 맨 앞에 붙이는 결과물 폴더 단락의 첫 줄이다. `ArtifactService` 와 같아야 한다. */
 const ARTIFACT_HEADER = "[결과물 폴더]";
 
@@ -1420,7 +1429,7 @@ export function startFakeHermes(
           });
           return send(response, 200, { run_id: runId, status: "queued" });
         }
-        const echoed = withoutAskGuide(submitted.instructions ?? "");
+        const echoed = withoutAskGuide(withoutResponseGuide(submitted.instructions ?? ""));
         const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
         const held = holdNextRun && !starterRun;
         if (held) holdNextRun = false;
