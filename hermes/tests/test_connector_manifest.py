@@ -246,6 +246,47 @@ class ConnectorCatalogTest(ConnectorGateCase):
                 self.rewrite("connector.json", lambda value: value.update(toolsets=[name]))
                 self.assertEqual(self.catalog(), [])
 
+    def test_skill_body_becomes_the_persona_without_frontmatter(self):
+        """스킬의 SKILL.md 만 읽어 앞머리를 떼고 지침으로 삼는다. 카탈로그에는 싣지 않는다."""
+        (self.connector_root / "skills/demo/NOTES.md").write_text("읽지 않는 파일", encoding="utf-8")
+        (self.connector_root / "skills/README.md").write_text("읽지 않는 파일", encoding="utf-8")
+        persona = self.plugin._connector_manifest(DEMO)["persona"]
+        self.assertTrue(persona.startswith("# 검사용 메모"))
+        self.assertNotIn("name: demo", persona)
+        self.assertNotIn("읽지 않는 파일", persona)
+        self.assertNotIn("persona", self.catalog()[0])
+        self.assertNotIn("검사용 메모\n\n`list_scopes`", json.dumps(self.catalog(), ensure_ascii=False))
+
+    def test_connector_without_skill_body_has_no_persona(self):
+        """스킬이 없는 커넥터는 지침 없이 카탈로그에 나온다."""
+        shutil.rmtree(self.connector_root / "skills/demo")
+        self.assertIsNone(self.plugin._connector_manifest(DEMO)["persona"])
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_oversized_or_linked_skill_body_leaves_the_connector_out(self):
+        """본문이 상한을 넘거나, 앞머리가 닫히지 않았거나, SKILL.md 나 스킬 디렉터리가 링크이면 카탈로그에서 빠진다."""
+        skill = self.connector_root / "skills/demo/SKILL.md"
+        original = skill.read_text(encoding="utf-8")
+        skill.write_text(original + "가" * self.plugin.CONNECTOR_PERSONA_MAX_CHARS, encoding="utf-8")
+        self.assertEqual(self.catalog(), [])
+        skill.write_text("---\nname: demo\n본문", encoding="utf-8")
+        self.assertEqual(self.catalog(), [])
+        # plugin 밖의 파일을 가리키는 링크는 읽지 않는다. 그 내용이 지침에 들어가면 안 된다.
+        outside = self.base / "outside.md"
+        outside.write_text("밖의 비밀", encoding="utf-8")
+        skill.unlink()
+        skill.symlink_to(outside)
+        self.assertEqual(self.catalog(), [])
+        skill.unlink()
+        skill.write_text(original, encoding="utf-8")
+        linked = self.base / "linked-skill"
+        linked.mkdir()
+        (linked / "SKILL.md").write_text("밖의 비밀", encoding="utf-8")
+        (self.connector_root / "skills/outside").symlink_to(linked, target_is_directory=True)
+        self.assertEqual(self.catalog(), [])
+        (self.connector_root / "skills/outside").unlink()
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
     def test_missing_or_unreadable_files_leave_the_connector_out(self):
         """`connector.json` 이 없거나, JSON 이 아니거나, 실행할 파일이 링크면 카탈로그에서 빠진다."""
         manifest = self.connector_root / "connector.json"
