@@ -70,7 +70,7 @@ class ToolDetailRedactorTest {
         assertThat(ToolDetailRedactor.redact("Authorization: Bearer short-secret", false))
                 .doesNotContain("short-secret");
         assertThat(ToolDetailRedactor.redact("Authorization: Basic short-secret\nstatus=ok", false))
-                .doesNotContain("short-secret");
+                .isEqualTo("Authorization: [가림]\nstatus=ok");
         assertThat(ToolDetailRedactor.redact("Cookie: first=tiny; second=short-secret", false))
                 .doesNotContain("tiny", "short-secret");
         assertThat(ToolDetailRedactor.redact("xoxc-shortvalue xoxe-shortvalue", false))

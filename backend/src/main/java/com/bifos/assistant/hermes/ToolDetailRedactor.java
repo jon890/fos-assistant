@@ -121,7 +121,9 @@ public final class ToolDetailRedactor {
         while (matcher.find()) {
             String key = matcher.group(1).replaceAll("[\"'\\s:=]", "");
             String value = matcher.group(2);
-            if (isSecretKey(key) && (value.startsWith("{") || value.startsWith("["))) {
+            boolean structuredValue = value.startsWith("{") || value.startsWith("[");
+            boolean alreadyHidden = HIDDEN.equals(value);
+            if (isSecretKey(key) && structuredValue && !alreadyHidden) {
                 return HIDDEN;
             }
         }
