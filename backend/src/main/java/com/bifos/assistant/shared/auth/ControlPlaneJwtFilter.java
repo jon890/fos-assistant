@@ -5,6 +5,7 @@ import com.bifos.assistant.user.domain.UserProvisioningService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +22,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import io.jsonwebtoken.security.Keys;
 
 /**
  * Accepts the short-lived token minted by the web tier after an OAuth sign-in.
@@ -65,8 +65,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith(BEARER)) {
@@ -77,7 +76,11 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
 
     private void authenticate(String token) {
         try {
-            Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+            Claims claims = Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
             String email = claims.getSubject();
             String name = claims.get("name", String.class);
             if (email == null || email.isBlank()) {
@@ -86,11 +89,10 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             AppUser user = users.resolve(email, name == null || name.isBlank() ? email : name);
             CurrentUser principal =
                     new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
-            var authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            principal,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + user.role().name())));
+            var authentication = new UsernamePasswordAuthenticationToken(
+                    principal,
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + user.role().name())));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (JwtException ex) {
             log.warn("rejected a control plane token: {}", ex.getMessage());

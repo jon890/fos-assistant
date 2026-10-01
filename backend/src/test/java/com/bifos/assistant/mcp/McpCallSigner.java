@@ -30,8 +30,7 @@ public final class McpCallSigner {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Instant STARTED = Instant.parse("2026-09-29T00:00:00Z");
 
-    private McpCallSigner() {
-    }
+    private McpCallSigner() {}
 
     /** 새 뿌리 session 이다. 검사마다 새로 만들어 다른 검사가 남긴 줄과 겹치지 않게 한다. */
     static String newRoot() {
@@ -43,7 +42,8 @@ public final class McpCallSigner {
         return context(rawToken, toolName, rootSessionId, rootSessionId, "call_" + UUID.randomUUID());
     }
 
-    static ObjectNode context(String rawToken, String toolName, String rootSessionId, String sessionId, String toolCallId) {
+    static ObjectNode context(
+            String rawToken, String toolName, String rootSessionId, String sessionId, String toolCallId) {
         ObjectNode context = JSON.createObjectNode();
         context.put("v", 1);
         context.put("root_session_id", rootSessionId);
@@ -59,7 +59,8 @@ public final class McpCallSigner {
      * <p>{@code docs/hermes/delegation.md} 의 「하위 에이전트 session 등록 계약」 대로 서명할 글은
      * {@code v1-subagent\n<parent_root>\n<parent>\n<child>} 다. 서명하지 않는 두 칸은 hook 이 받은 모양대로 채운다.
      */
-    static ObjectNode subagentBody(String rawToken, String parentRootSessionId, String parentSessionId, String childSessionId) {
+    static ObjectNode subagentBody(
+            String rawToken, String parentRootSessionId, String parentSessionId, String childSessionId) {
         ObjectNode body = JSON.createObjectNode();
         body.put("v", 1);
         body.put("parent_session_id", parentSessionId);
@@ -67,7 +68,9 @@ public final class McpCallSigner {
         body.put("child_session_id", childSessionId);
         body.put("child_subagent_id", "sa-" + UUID.randomUUID());
         body.putNull("parent_subagent_id");
-        body.put("sig", sign(rawToken, String.join("\n", "v1-subagent", parentRootSessionId, parentSessionId, childSessionId)));
+        body.put(
+                "sig",
+                sign(rawToken, String.join("\n", "v1-subagent", parentRootSessionId, parentSessionId, childSessionId)));
         return body;
     }
 
@@ -78,8 +81,14 @@ public final class McpCallSigner {
      * {@code v1-connector-policy\n<hermes_tool>\n<root>\n<session>\n<tool_call_id>\n<args_json 의 SHA-256 16진수>} 다.
      * {@code tool} 은 서명하지 않는다. null 이면 JSON null 로 싣는다.
      */
-    public static ObjectNode policyBody(String rawToken, String hermesTool, String tool, String rootSessionId,
-            String sessionId, String toolCallId, String argsJson) {
+    public static ObjectNode policyBody(
+            String rawToken,
+            String hermesTool,
+            String tool,
+            String rootSessionId,
+            String sessionId,
+            String toolCallId,
+            String argsJson) {
         ObjectNode body = JSON.createObjectNode();
         body.put("v", 1);
         body.put("root_session_id", rootSessionId);
@@ -92,8 +101,18 @@ public final class McpCallSigner {
             body.put("tool", tool);
         }
         body.put("args_json", argsJson);
-        body.put("sig", sign(rawToken, String.join("\n", "v1-connector-policy", hermesTool, rootSessionId, sessionId,
-                toolCallId, sha256(argsJson))));
+        body.put(
+                "sig",
+                sign(
+                        rawToken,
+                        String.join(
+                                "\n",
+                                "v1-connector-policy",
+                                hermesTool,
+                                rootSessionId,
+                                sessionId,
+                                toolCallId,
+                                sha256(argsJson))));
         return body;
     }
 
@@ -113,13 +132,22 @@ public final class McpCallSigner {
     }
 
     /** 그 profile 로 뿌리 session 에서 도는 실행 줄을 만든다. */
-    public static AgentExecution running(AgentExecutionRepository executions, Long userId, Long conversationId,
-            String profileName, String rootSessionId) {
+    public static AgentExecution running(
+            AgentExecutionRepository executions,
+            Long userId,
+            Long conversationId,
+            String profileName,
+            String rootSessionId) {
         return save(executions, userId, conversationId, profileName, rootSessionId, ExecutionStatus.RUNNING);
     }
 
-    public static AgentExecution save(AgentExecutionRepository executions, Long userId, Long conversationId,
-            String profileName, String rootSessionId, ExecutionStatus status) {
+    public static AgentExecution save(
+            AgentExecutionRepository executions,
+            Long userId,
+            Long conversationId,
+            String profileName,
+            String rootSessionId,
+            ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
                 .userId(userId)
                 .conversationId(conversationId)
@@ -152,8 +180,11 @@ public final class McpCallSigner {
      */
     static long insertUnboundToken(JdbcTemplate jdbc, String rawToken, String label) {
         String tokenHash = sha256(rawToken);
-        jdbc.update("INSERT INTO agent_token (token_hash, label, created_at) VALUES (?, ?, ?)",
-                tokenHash, label, Timestamp.from(Instant.now()));
+        jdbc.update(
+                "INSERT INTO agent_token (token_hash, label, created_at) VALUES (?, ?, ?)",
+                tokenHash,
+                label,
+                Timestamp.from(Instant.now()));
         return jdbc.queryForObject("SELECT id FROM agent_token WHERE token_hash = ?", Long.class, tokenHash);
     }
 
@@ -169,7 +200,8 @@ public final class McpCallSigner {
 
     private static String sha256(String raw) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }

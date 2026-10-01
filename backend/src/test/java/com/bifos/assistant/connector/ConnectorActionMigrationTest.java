@@ -35,8 +35,8 @@ class ConnectorActionMigrationTest {
                 .target("42")
                 .load()
                 .migrate();
-        execute("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
-                + " VALUES (" + OWNER + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
+        execute("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)" + " VALUES (" + OWNER
+                + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
         execute("INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,"
                 + " credential_scope, visibility, owner_user_id, enabled, created_at, connector_managed,"
                 + " connector_attachments)"

@@ -114,7 +114,10 @@ public final class ConnectionDtos {
      * @param message {@code block} 일 때 모델에게 보일 글. {@code allow} 이면 빈 글이다
      * @param actionId 승인 요청 번호. 승인 요청을 만들지 않았으면 null
      */
-    public record ConnectorPolicyResponse(String decision, String message, @JsonProperty("action_id") String actionId) {
+    public record ConnectorPolicyResponse(
+            String decision,
+            String message,
+            @JsonProperty("action_id") String actionId) {
         static ConnectorPolicyResponse from(ConnectorPolicyAnswer value) {
             return new ConnectorPolicyResponse(
                     value.allowed() ? "allow" : "block",

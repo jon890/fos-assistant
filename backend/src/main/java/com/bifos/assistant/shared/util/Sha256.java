@@ -17,8 +17,7 @@ public final class Sha256 {
     /** 지문으로 남기는 해시 길이. SHA-256 앞부분만 쓴다. */
     private static final int HASH_BYTES = 16;
 
-    private Sha256() {
-    }
+    private Sha256() {}
 
     /**
      * SHA-256 의 앞 16바이트를 16진수 32글자로 적는다.

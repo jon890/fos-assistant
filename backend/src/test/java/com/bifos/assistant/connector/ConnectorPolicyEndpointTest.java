@@ -286,8 +286,8 @@ class ConnectorPolicyEndpointTest {
         connect(true);
         String args = "{\"text\":\"" + "a".repeat(16 * 1024) + "\"}";
 
-        HttpResponse<String> response = send(
-                token, body(token, "mcp__demo__list_scopes", "list_scopes", root, newCall(), args));
+        HttpResponse<String> response =
+                send(token, body(token, "mcp__demo__list_scopes", "list_scopes", root, newCall(), args));
 
         assertBlocked(response, "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.");
         assertThat(onlyRow().get("DENY_REASON")).isEqualTo("ARGS_TOO_LARGE");
@@ -363,8 +363,8 @@ class ConnectorPolicyEndpointTest {
         connect(true);
         String unknown = "fos-" + UUID.randomUUID();
 
-        HttpResponse<String> response = send(
-                token, body(token, "mcp__demo__list_scopes", "list_scopes", unknown, newCall(), ARGS));
+        HttpResponse<String> response =
+                send(token, body(token, "mcp__demo__list_scopes", "list_scopes", unknown, newCall(), ARGS));
 
         assertBlocked(response, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
         assertThat(rows()).isZero();
@@ -399,8 +399,8 @@ class ConnectorPolicyEndpointTest {
         connect(true);
         String otherToken = tokens.issue(OTHER_PROFILE, "other").rawToken();
 
-        HttpResponse<String> response = send(
-                otherToken, body(otherToken, "mcp__demo__list_scopes", "list_scopes", root, newCall(), ARGS));
+        HttpResponse<String> response =
+                send(otherToken, body(otherToken, "mcp__demo__list_scopes", "list_scopes", root, newCall(), ARGS));
 
         assertBlocked(response, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
         assertThat(rows()).isZero();
@@ -410,12 +410,12 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("서명이나 모양이 틀리거나 JSON 이 아니거나 비어 있으면 403 CONNECTOR_POLICY_REJECTED 이고 줄이 없다")
     void badSignatureShapeNonJsonOrEmptyIs403() throws Exception {
         connect(true);
-        ObjectNode wrongSig = McpCallSigner.policyBody(
-                token, "mcp__demo__list_scopes", "list_scopes", root, root, newCall(), ARGS);
+        ObjectNode wrongSig =
+                McpCallSigner.policyBody(token, "mcp__demo__list_scopes", "list_scopes", root, root, newCall(), ARGS);
         wrongSig.put("sig", "0".repeat(64));
         // 읽기 도구로 서명한 본문의 등록 이름만 쓰기 도구로 바꾼다.
-        ObjectNode swapped = McpCallSigner.policyBody(
-                token, "mcp__demo__list_scopes", "list_scopes", root, root, newCall(), ARGS);
+        ObjectNode swapped =
+                McpCallSigner.policyBody(token, "mcp__demo__list_scopes", "list_scopes", root, root, newCall(), ARGS);
         swapped.put("hermes_tool", "mcp__demo__write_note");
         ObjectNode arrayArgs =
                 McpCallSigner.policyBody(token, "mcp__demo__list_scopes", "list_scopes", root, root, newCall(), "[1]");
@@ -494,7 +494,9 @@ class ConnectorPolicyEndpointTest {
         JsonNode body = json.readTree(response.body());
         assertThat(body.path("decision").asString()).isEqualTo("block");
         assertThat(body.path("message").asString()).isEqualTo(message);
-        assertThat(body.path("action_id").isNull()).as("action_id: %s", body.path("action_id")).isTrue();
+        assertThat(body.path("action_id").isNull())
+                .as("action_id: %s", body.path("action_id"))
+                .isTrue();
     }
 
     private Map<String, Object> onlyRow() {

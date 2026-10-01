@@ -52,7 +52,8 @@ class ConnectorPolicyRequestTest {
         ObjectNode body = vector();
         body.putNull("tool");
 
-        assertThat(ConnectorPolicyRequest.verify(body, VECTOR_TOKEN_HASH).tool()).isNull();
+        assertThat(ConnectorPolicyRequest.verify(body, VECTOR_TOKEN_HASH).tool())
+                .isNull();
     }
 
     @Test
@@ -146,7 +147,7 @@ class ConnectorPolicyRequestTest {
 
     private static void assertRejected(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code())
-                        .isEqualTo(ErrorCode.CONNECTOR_POLICY_REJECTED));
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_POLICY_REJECTED));
     }
 }

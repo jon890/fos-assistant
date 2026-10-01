@@ -42,8 +42,7 @@ public class ConnectorPolicyService {
 
     private static final String POLICY_UNAVAILABLE_MESSAGE =
             "이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
-    private static final String NOT_READY_MESSAGE =
-            "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
+    private static final String NOT_READY_MESSAGE = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
@@ -127,8 +126,8 @@ public class ConnectorPolicyService {
 
         Optional<ConnectorManifest> manifest = readManifest(connection.connectorId());
         // 등록 이름과 맞는 것을 확인한 원래 이름만 쓴다. manifest 가 없으면 확인할 수 없어 비운다.
-        String confirmedTool =
-                manifest.map(value -> confirmedTool(value, hermesTool, toolName)).orElse(null);
+        String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
+                .orElse(null);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
                         connection.status(),
                         value.schema(),
@@ -151,7 +150,9 @@ public class ConnectorPolicyService {
             return answer(transactions.execute(status -> actions.saveAndFlush(action)));
         } catch (DataIntegrityViolationException ex) {
             // 같은 호출이 동시에 와 유니크 제약에 걸렸다. 먼저 저장된 줄의 판정을 그대로 돌려준다.
-            return actions.findByDedupeKey(dedupeKey).map(ConnectorPolicyService::answer).orElseThrow(() -> ex);
+            return actions.findByDedupeKey(dedupeKey)
+                    .map(ConnectorPolicyService::answer)
+                    .orElseThrow(() -> ex);
         }
     }
 
@@ -160,14 +161,18 @@ public class ConnectorPolicyService {
         try {
             return catalog.find(connectorId);
         } catch (RuntimeException ex) {
-            log.warn("connector {} policy catalog read failed: {}", connectorId, ex.getClass().getSimpleName());
+            log.warn(
+                    "connector {} policy catalog read failed: {}",
+                    connectorId,
+                    ex.getClass().getSimpleName());
             return Optional.empty();
         }
     }
 
     /** hook 이 보낸 원래 이름으로 등록 이름을 다시 계산해 hook 이 받은 등록 이름과 다르면 이름이 없는 호출로 읽는다. */
     private static String confirmedTool(ConnectorManifest manifest, String hermesTool, String toolName) {
-        if (toolName == null || !HermesToolName.of(manifest.mcpServer(), toolName).equals(hermesTool)) {
+        if (toolName == null
+                || !HermesToolName.of(manifest.mcpServer(), toolName).equals(hermesTool)) {
             return null;
         }
         return toolName;

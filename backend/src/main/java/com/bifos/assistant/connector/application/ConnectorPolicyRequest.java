@@ -81,8 +81,8 @@ public record ConnectorPolicyRequest(
             throw reject("서명이 소문자 16진수 64자가 아니다");
         }
 
-        String signed = String.join(
-                "\n", VERSION_LINE, hermesTool, rootSessionId, sessionId, toolCallId, Sha256.hex(argsJson));
+        String signed =
+                String.join("\n", VERSION_LINE, hermesTool, rootSessionId, sessionId, toolCallId, Sha256.hex(argsJson));
         byte[] expected = McpCallContext.hmac(tokenHash, signed);
         if (!MessageDigest.isEqual(expected, HexFormat.of().parseHex(signature))) {
             throw reject("서명이 맞지 않는다");

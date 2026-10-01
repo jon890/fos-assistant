@@ -15,7 +15,8 @@ import org.junit.jupiter.api.Test;
 
 /** 판정 순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 표다. */
 class ToolPolicyDecisionTest {
-    private static final Optional<ToolPolicy> READ = Optional.of(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null));
+    private static final Optional<ToolPolicy> READ =
+            Optional.of(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null));
     private static final Optional<ToolPolicy> WRITE =
             Optional.of(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null));
 
@@ -23,15 +24,15 @@ class ToolPolicyDecisionTest {
     @DisplayName("manifest 를 읽지 못한 판정은 POLICY_UNAVAILABLE 거절이고 위험도와 승인 방식이 비어 있다")
     void policyUnavailableIsDeniedWithoutRiskAndApproval() {
         assertThat(ToolPolicyDecision.policyUnavailable())
-                .isEqualTo(new ToolPolicyDecision(
-                        ActionDecision.DENIED, ActionDenyReason.POLICY_UNAVAILABLE, null, null));
+                .isEqualTo(
+                        new ToolPolicyDecision(ActionDecision.DENIED, ActionDenyReason.POLICY_UNAVAILABLE, null, null));
     }
 
     @Test
     @DisplayName("연결이 READY 가 아니면 읽기 도구여도 NOT_READY 로 거절하고 위험도를 비운다")
     void connectionThatIsNotReadyIsDeniedBeforeAnythingElse() {
-        for (ConnectionStatus status : new ConnectionStatus[] {ConnectionStatus.PENDING, ConnectionStatus.DISCONNECTED
-        }) {
+        for (ConnectionStatus status :
+                new ConnectionStatus[] {ConnectionStatus.PENDING, ConnectionStatus.DISCONNECTED}) {
             assertThat(ToolPolicyDecision.decide(status, 2, READ, false, 2))
                     .as("연결 상태 %s", status)
                     .isEqualTo(new ToolPolicyDecision(ActionDecision.DENIED, ActionDenyReason.NOT_READY, null, null));
@@ -89,8 +90,7 @@ class ToolPolicyDecisionTest {
     @DisplayName("승인 방식이 required 이고 상시 허락이 있으면 허용이다")
     void approvalRequiredWithGrantIsAllowed() {
         assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, 2, WRITE, true, 2))
-                .isEqualTo(
-                        new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
+                .isEqualTo(new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
     }
 
     @Test

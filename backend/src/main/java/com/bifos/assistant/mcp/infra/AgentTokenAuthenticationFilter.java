@@ -34,6 +34,7 @@ public class AgentTokenAuthenticationFilter extends OncePerRequestFilter {
      */
     private static final Set<String> AGENT_TOKEN_PATHS =
             Set.of("/mcp", "/internal/hermes/session-bindings/subagent", "/internal/hermes/connector-policy");
+
     private static final String BEARER = "Bearer ";
     private static final String MCP_AUTHORITY = "ROLE_MCP";
     private final AgentTokenService tokens;
@@ -43,17 +44,32 @@ public class AgentTokenAuthenticationFilter extends OncePerRequestFilter {
         return !AGENT_TOKEN_PATHS.contains(request.getServletPath());
     }
 
-    @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
-        if (request.getHeader(HttpHeaders.ORIGIN) != null) { response.setStatus(HttpServletResponse.SC_FORBIDDEN); return; }
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        if (request.getHeader(HttpHeaders.ORIGIN) != null) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header == null || !header.startsWith(BEARER) || header.substring(BEARER.length()).trim().isEmpty()) { response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); return; }
+        if (header == null
+                || !header.startsWith(BEARER)
+                || header.substring(BEARER.length()).trim().isEmpty()) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
         try {
             String raw = header.substring(BEARER.length()).trim();
             McpPrincipal principal = tokens.authenticate(raw);
             request.setAttribute(TOKEN_HASH_ATTRIBUTE, principal.tokenHash());
             // 토큰은 사용자가 아니라 profile 을 증명한다(ADR-032). 사용자의 역할을 권한으로 싣지 않는다.
-            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority(MCP_AUTHORITY))));
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new UsernamePasswordAuthenticationToken(
+                            principal, null, List.of(new SimpleGrantedAuthority(MCP_AUTHORITY))));
             chain.doFilter(request, response);
-        } catch (ApiException ex) { SecurityContextHolder.clearContext(); response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); }
+        } catch (ApiException ex) {
+            SecurityContextHolder.clearContext();
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        }
     }
 }
