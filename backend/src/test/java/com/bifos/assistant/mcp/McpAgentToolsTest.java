@@ -1351,12 +1351,7 @@ class McpAgentToolsTest {
 
     /** {@code agentId} 의 에이전트가 돈 위임 실행이다. null 이면 에이전트를 적지 않는다. */
     private AgentExecution delegated(
-            Long userId,
-            AgentExecution parent,
-            Long agentId,
-            ExecutionStatus status,
-            String output,
-            String errorCode) {
+            Long userId, AgentExecution parent, Long agentId, ExecutionStatus status, String output, String errorCode) {
         AgentExecution execution = executions.save(AgentExecution.builder()
                 .userId(userId)
                 .agentId(agentId)

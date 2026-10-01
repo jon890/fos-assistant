@@ -178,7 +178,10 @@ class HttpHermesConnectorClientTest {
         for (String broken : malformed) {
             List<ConnectorManifest> read = client.readCatalog();
 
-            assertThat(read).as("틀린 선언 %s", broken).extracting(ConnectorManifest::id).containsExactly(DEMO, "other-notes");
+            assertThat(read)
+                    .as("틀린 선언 %s", broken)
+                    .extracting(ConnectorManifest::id)
+                    .containsExactly(DEMO, "other-notes");
             assertThat(read.get(0).schema()).as("틀린 선언 %s 의 판", broken).isZero();
             assertThat(read.get(0).tools()).as("틀린 선언 %s 의 도구", broken).isEmpty();
             assertThat(read.get(1).schema()).isEqualTo(2);

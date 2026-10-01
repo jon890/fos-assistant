@@ -14,7 +14,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.connector.policy")
 public record ConnectorPolicyProperties(
-        @DefaultValue("60s") Duration catalogTtl, @DefaultValue("5s") Duration catalogFailureTtl) {
+        @DefaultValue("60s") Duration catalogTtl,
+        @DefaultValue("5s") Duration catalogFailureTtl) {
 
     /** 둘 중 하나라도 0 이하이면 기동을 멈춘다. 판정마다 대시보드를 읽게 되는데 기동은 성공해 알아채지 못한다. */
     public ConnectorPolicyProperties {

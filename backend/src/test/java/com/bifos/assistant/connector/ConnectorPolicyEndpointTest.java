@@ -85,7 +85,8 @@ class ConnectorPolicyEndpointTest {
         @Bean
         @Primary
         ConnectorCatalogCache movingCatalogCache(HermesConnectorClient connector) {
-            return new ConnectorCatalogCache(connector, new ConnectorPolicyProperties(TTL, Duration.ofSeconds(5)), CLOCK);
+            return new ConnectorCatalogCache(
+                    connector, new ConnectorPolicyProperties(TTL, Duration.ofSeconds(5)), CLOCK);
         }
     }
 
@@ -362,12 +363,13 @@ class ConnectorPolicyEndpointTest {
     void reusedToolCallIdWithAnotherToolOrArgsIsBlockedWithoutNewRow() throws Exception {
         connect(true);
         String call = newCall();
-        HttpResponse<String> first = send(token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, ARGS));
+        HttpResponse<String> first =
+                send(token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, ARGS));
 
         HttpResponse<String> otherTool =
                 send(token, body(token, "mcp__demo__write_note", "write_note", root, call, ARGS));
-        HttpResponse<String> otherArgs = send(
-                token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, "{\"text\":\"다른 글\"}"));
+        HttpResponse<String> otherArgs =
+                send(token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, "{\"text\":\"다른 글\"}"));
         HttpResponse<String> same = send(token, body(token, "mcp__demo__list_scopes", "list_scopes", root, call, ARGS));
 
         assertThat(json.readTree(first.body()).path("decision").asString()).isEqualTo("allow");

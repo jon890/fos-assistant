@@ -32,6 +32,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
     /** 읽을 수 없는 선언에 주는 판이다. 받는 쪽이 아는 판이 아니라 그 커넥터만 카탈로그에서 빠진다. */
     private static final int SCHEMA_UNREADABLE = 0;
+
     private final RestClient client;
     private final String baseUrl;
     private final String token;
