@@ -227,7 +227,8 @@ public class ConnectorConnectionService {
             return null;
         }
         connection.registered(ConnectorValues.stored(manifest, accepted), false, now());
-        connection.agent().acceptConnectorAttachments(manifest.attachments());
+        // 등록 직후는 선언한 toolset 이 켜졌는지 보기 전이다. 사진은 연결 확인이 그것을 본 뒤에 받는다.
+        connection.agent().acceptConnectorAttachments(false);
         return snapshot(connections.save(connection));
     }
 
@@ -364,14 +365,15 @@ public class ConnectorConnectionService {
      *
      * <p>설치가 enabled 이고 configured 인 뒤에만 부른다. 카탈로그에서 빠진 커넥터는 서버 이름을 알 수 없어 쓸 수
      * 없는 것으로 본다. 설치 요청을 한 번 더 보내 연결용 에이전트의 지침을 지금 plugin 의 스킬 본문에 맞춘다.
-     * manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 이미 연결된 에이전트가 연결 확인과
+     * manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 선언한 toolset 이 실제로 켜졌을 때만 참으로 둔다.
+     * 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다. 이미 연결된 에이전트가 연결 확인과
      * 관리자 반영 완료에서 새 선언을 받는 자리다.
      */
     private boolean usable(ConnectorConnection connection) {
         Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
         Agent agent = connection.agent();
-        agent.acceptConnectorAttachments(
-                manifest.map(ConnectorManifest::attachments).orElse(false));
+        // 아래 어디서 끝나든(외부 호출 실패 포함) 사진은 받지 않는 것으로 시작한다. 선언한 toolset 이 켜진 것을 본 뒤에만 참으로 둔다.
+        agent.acceptConnectorAttachments(false);
         if (manifest.isEmpty()) {
             return false;
         }
@@ -383,7 +385,9 @@ public class ConnectorConnectionService {
         connector.putConnector(agent.hermesProfile(), connection.connectorId(), true);
         ProbeResult probe =
                 connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
-        return toolsetsApplied && probe.ok() && !probe.tools().isEmpty();
+        boolean usable = toolsetsApplied && probe.ok() && !probe.tools().isEmpty();
+        agent.acceptConnectorAttachments(usable && manifest.get().attachments());
+        return usable;
     }
 
     /**

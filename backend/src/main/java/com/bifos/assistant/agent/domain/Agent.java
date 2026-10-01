@@ -82,7 +82,7 @@ public class Agent {
      * 참이면 이 연결용 에이전트의 커넥터가 사진을 받는다고 선언했다.
      *
      * <p>선언은 대시보드가 내는 manifest 에 있고 이 엔티티는 Hermes 를 부르지 못한다. 그래서 연결 흐름이 등록,
-     * 연결 확인, 관리자 반영 완료 때 manifest 의 값을 여기 옮겨 둔다(ADR-044).
+     * 연결 확인, 관리자 반영 완료 때 여기 적는다. 선언이 참이고 선언한 toolset 이 실제로 켜진 것을 확인했을 때만 참이다(ADR-044).
      */
     @Column(name = "connector_attachments", nullable = false)
     private boolean connectorAttachments;

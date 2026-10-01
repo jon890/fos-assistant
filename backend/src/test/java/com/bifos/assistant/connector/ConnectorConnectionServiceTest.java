@@ -180,8 +180,8 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("manifest 가 선언한 toolset 을 등록의 도구 목록에 더하고 사진을 받는다")
-    void registrationAddsDeclaredToolsetsAndAcceptsAttachments() {
+    @DisplayName("manifest 가 선언한 toolset 을 등록의 도구 목록에 더하고, 사진은 연결 확인 전이라 받지 않는다")
+    void registrationAddsDeclaredToolsetsAndDefersAttachments() {
         when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
@@ -192,7 +192,7 @@ class ConnectorConnectionServiceTest {
         order.verify(toolsets).writeApiServer(profile, List.of("fos-assistant", "vision"));
         order.verify(connector).putConnector(profile, DEMO, true);
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
-                .isTrue();
+                .isFalse();
     }
 
     @Test
@@ -254,6 +254,47 @@ class ConnectorConnectionServiceTest {
         verify(toolsets).writeApiServer(profile, List.of("fos-assistant", "demo", "vision"));
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agentEnabled(user)).isFalse();
+        // 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않는다.
+        assertThat(agents.findByCode(checked.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("사진을 받던 연결도 vision 이 꺼져 다시 켜지지 않으면 READY 가 아니고 사진을 받지 않는다")
+    void stopsAcceptingAttachmentsWhenDeclaredToolsetGoesMissing() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
+        String profile = profileOf(registered);
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isTrue();
+
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
+
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("연결 확인의 probe 가 실패하면 사진을 받지 않는 것으로 남는다")
+    void probeFailureLeavesAttachmentsOff() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
+        installed(true, true);
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+        doThrow(new IllegalStateException()).when(connector).probe(anyString(), anyString());
+
+        assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
     }
 
     @Test

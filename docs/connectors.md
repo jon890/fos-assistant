@@ -125,7 +125,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 4. 칸마다 `PUT /api/env`. 비운 선택 칸은 `DELETE /api/env`
 5. API 도구 목록을 `["fos-assistant"]` 에 manifest 의 `toolsets` 를 더한 것으로 다시 쓴다(`PUT /api/config`). 새 profile 의 틀은 내장 도구 `delegation` 을 켜 두기 때문이다
 6. `PUT /api/connectors` 로 설치. 설치가 도구 목록에 그 커넥터의 MCP 서버를 덧붙인다
-7. 모두 성공하면 `desired_enabled=true`, 칸 값과 비밀 앞부분 저장, manifest 의 `attachments` 를 에이전트에 옮긴다. 상태는 여전히 `PENDING` 이다
+7. 모두 성공하면 `desired_enabled=true`, 칸 값과 비밀 앞부분 저장. 상태는 여전히 `PENDING` 이고 사진은 아직 받지 않는다
 
 연결 확인과 관리자 반영 완료는 설치의 enabled 와 configured, MCP probe 의 도구, 켜진 내장 도구가 manifest 의 `toolsets` 와 같은지를 모두 보고 `READY` 로 바꾼다.
 켜진 내장 도구가 선언과 다르면 목록을 `["fos-assistant", <mcp_server>]` 에 `toolsets` 를 더한 것으로 다시 쓰고 다시 읽어 판정한다.
@@ -151,11 +151,12 @@ plugin 을 새 판으로 바꾼 뒤 이미 설치된 연결의 지침은 다시 
 
 ### 사진과 이미지 도구
 
-연결용 에이전트는 기본으로 사진을 받지 않는다. manifest 의 `attachments` 가 참일 때만 받는다.
-Control Plane 은 그 값을 `agent.connector_attachments` 에 옮겨 두고 `Agent.acceptsAttachments()` 가 그 열을 본다.
+연결용 에이전트는 기본으로 사진을 받지 않는다. manifest 의 `attachments` 가 참이고 연결이 `READY` 로 확인됐을 때만 받는다.
+Control Plane 은 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `agent.connector_attachments` 를 참으로 두고, `Agent.acceptsAttachments()` 가 그 열을 본다.
+등록 직후, 선언한 toolset 이 켜지지 않았을 때, 확인 중 외부 호출이 실패했을 때는 거짓이다. 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다.
 화면의 사진 단추와 메시지 전송의 첨부 판정이 모두 그 메서드 하나를 부르므로 같은 값을 본다. 서비스 이름으로 나누는 곳은 없다.
 
-이미 연결된 에이전트는 다시 등록, 연결 확인, 관리자 반영 완료 가운데 어느 것에서든 지금 manifest 의 `toolsets` 와 `attachments` 를 받는다.
+이미 연결된 에이전트는 다시 등록, 연결 확인, 관리자 반영 완료 가운데 어느 것에서든 지금 manifest 의 `toolsets` 를 받는다. `attachments` 는 연결 확인과 관리자 반영 완료가 `READY` 로 판정할 때 받는다.
 plugin 이 두 칸을 새로 선언했으면 사용자가 연결 화면에서 연결 확인을 한 번 누르면 된다.
 `platform_toolsets.api_server` 는 다음 실행부터 적용되므로 공유 gateway 를 재시작하지 않는다([`hermes/tools-and-skills.md`](hermes/tools-and-skills.md)).
 해제하면 사진을 받지 않는 것으로 되돌린다. 그 커넥터가 카탈로그에서 빠지면 연결이 `PENDING` 이 되어 에이전트가 꺼지므로 사진도 받지 않는다.
