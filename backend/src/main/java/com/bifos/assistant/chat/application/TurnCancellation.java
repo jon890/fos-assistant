@@ -16,6 +16,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ public class TurnCancellation {
     private final HermesRunsClient hermes;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Duration streamGrace;
+    private final List<Consumer<Long>> closeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public TurnCancellation(HermesRunsClient hermes,
             @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
@@ -68,12 +70,35 @@ public class TurnCancellation {
         return Optional.ofNullable(byExecution.get(executionId));
     }
 
+    /**
+     * turn 이 닫힐 때 그 대화 번호로 부를 것을 더한다.
+     *
+     * <p>맵에서 뺀 뒤에 부르므로, 받는 쪽은 그 대화에 새 turn 을 열 수 있다. 닫은 스레드에서 차례로 부른다.
+     */
+    public void addCloseListener(Consumer<Long> listener) {
+        closeListeners.add(listener);
+    }
+
     public void close(TurnHandle handle) {
-        byConversation.remove(handle.conversationId, handle);
+        boolean removed = byConversation.remove(handle.conversationId, handle);
         if (handle.executionId != null) byExecution.remove(handle.executionId, handle);
         // 실행 번호가 붙기 전에 중지한 turn 은 새 run 없이 끝날 수 있다. 이 경우 중지 요청은
         // 성공으로 끝난 것이며, 이미 끝난 turn 과 구분해야 한다.
         handle.firstStop.complete(handle.cancelled.get() && !handle.finished.get());
+        if (removed) {
+            notifyClosed(handle.conversationId);
+        }
+    }
+
+    /** 리스너의 예외가 turn 을 닫는 쪽으로 번지지 않게 경고 로그만 남긴다. */
+    private void notifyClosed(Long conversationId) {
+        for (Consumer<Long> listener : closeListeners) {
+            try {
+                listener.accept(conversationId);
+            } catch (RuntimeException ex) {
+                log.warn("turn 을 닫은 뒤의 후속 처리가 실패했다 conversationId={}", conversationId, ex);
+            }
+        }
     }
 
     public boolean isCancelled(Long executionId) {

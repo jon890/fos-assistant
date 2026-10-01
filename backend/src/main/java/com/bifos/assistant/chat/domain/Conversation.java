@@ -77,6 +77,14 @@ public class Conversation {
     @Column(name = "reasoning_effort", length = 16)
     private String reasoningEffort;
 
+    /**
+     * 사용자의 질문 없이 Control Plane 이 연 turn 의 수다. 사용자가 질문을 보내면 0 으로 돌아간다.
+     *
+     * <p>이 칸만 바꾸는 갱신은 {@code ConversationRepository} 의 update 질의로 한다.
+     */
+    @Column(name = "auto_turn_count", nullable = false)
+    private int autoTurnCount;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -131,6 +139,10 @@ public class Conversation {
      */
     public ModelChoice modelChoice() {
         return ModelChoice.stored(modelProvider, model, reasoningEffort);
+    }
+
+    public int autoTurnCount() {
+        return autoTurnCount;
     }
 
     public Instant updatedAt() {

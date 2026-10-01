@@ -89,7 +89,12 @@ async function authorize(): Promise<Authorized> {
 
 export async function requestControlPlane(
   path: string,
-  init: { method?: string; body?: unknown } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    /** 끊기면 Control Plane 으로 가는 요청도 끊는다. 끝나지 않는 스트림을 넘길 때 준다. */
+    signal?: AbortSignal;
+  } = {},
 ): Promise<ControlPlaneResponse> {
   const authorized = await authorize();
   if (!authorized.ok) return authorized;
@@ -104,6 +109,7 @@ export async function requestControlPlane(
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
       cache: "no-store",
+      signal: init.signal,
     }),
   };
 }

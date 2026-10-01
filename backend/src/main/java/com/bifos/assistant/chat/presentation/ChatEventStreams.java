@@ -5,6 +5,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import java.time.Duration;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +51,47 @@ public class ChatEventStreams {
         return emitter;
     }
 
+    /**
+     * 끝나지 않는 스트림을 열고 {@code subscribe} 가 넘기는 사건을 보낸다.
+     *
+     * <p>{@code subscribe} 는 사건을 받을 소비자를 걸고 해제용 {@code Runnable} 을 돌려준다. 연결이 끊기거나
+     * 끝나면 해제하고 주석 줄도 멈춘다. 끊긴 뒤 사건이 오면 소비자가 예외를 던져 건 쪽이 구독을 빼게 한다.
+     *
+     * <p>열자마자 주석 줄 하나를 보낸다. 사건이 없는 대화는 첫 주석 줄까지 {@code heartbeat} 동안 응답 헤더도 나가지
+     * 않아, 그동안 클라이언트가 연결이 열렸는지 알 수 없다. 핸들러가 돌려주기 전에 보낸 것은 emitter 가 모아 두었다가
+     * 응답이 열리면 먼저 쓴다.
+     */
+    public SseEmitter follow(Function<Consumer<ChatEvent>, Runnable> subscribe) {
+        SseEmitter emitter = new SseEmitter(0L);
+        Channel channel = new Channel(emitter);
+        channel.comment("connected");
+        Runnable unsubscribe = subscribe.apply(event -> {
+            if (!channel.send(event)) {
+                throw new IllegalStateException("chat event stream is closed");
+            }
+        });
+        Thread heartbeatThread = Thread.ofVirtual().name("chat-follow-heartbeat-").start(() -> {
+            try {
+                do {
+                    Thread.sleep(heartbeat);
+                } while (channel.ping());
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            } finally {
+                unsubscribe.run();
+            }
+        });
+        Runnable close = () -> {
+            channel.close();
+            unsubscribe.run();
+            heartbeatThread.interrupt();
+        };
+        emitter.onCompletion(close);
+        emitter.onTimeout(close);
+        emitter.onError(error -> close.run());
+        return emitter;
+    }
+
     private void beat(Thread worker, Channel channel) {
         try {
             while (!worker.join(heartbeat)) {
@@ -79,12 +121,16 @@ public class ChatEventStreams {
             this.emitter = emitter;
         }
 
-        void send(ChatEvent event) {
-            write(SseEmitter.event().data(event, MediaType.APPLICATION_JSON));
+        boolean send(ChatEvent event) {
+            return write(SseEmitter.event().data(event, MediaType.APPLICATION_JSON));
         }
 
         boolean ping() {
-            return write(SseEmitter.event().comment("ping"));
+            return comment("ping");
+        }
+
+        boolean comment(String text) {
+            return write(SseEmitter.event().comment(text));
         }
 
         void complete() {
@@ -94,6 +140,16 @@ public class ChatEventStreams {
                     open = false;
                     emitter.complete();
                 }
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /** 연결이 이미 끝났을 때 더 쓰지 않게만 한다. 끝내는 것은 연결 쪽이 이미 했다. */
+        void close() {
+            lock.lock();
+            try {
+                open = false;
             } finally {
                 lock.unlock();
             }

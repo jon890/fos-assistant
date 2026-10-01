@@ -19,6 +19,10 @@ assistant:
     # 추천 실행이 대역 Hermes 의 받은 명령과 응답 큐를 함께 써 다른 검사의 단언을 흔든다.
     # 추천을 보는 검사만 켠다
     enabled: false
+  delegation-wake:
+    # 자동 turn 이 다른 스레드에서 대역 Hermes 와 메시지를 함께 써 위임을 끝까지 돌리는 검사의 단언을 흔든다.
+    # 깨우기를 보는 검사만 켠다
+    enabled: false
   auth:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
   attachment:

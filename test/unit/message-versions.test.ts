@@ -81,3 +81,24 @@ test("답 없던 질문을 다시 시도해 생긴 답은 첫 판이다", () => 
   const folded = foldVersions([message(1, "USER"), message(2, "ASSISTANT")], {});
   assert.deepEqual(folded[0].answers[0].version, { slotId: 2, index: 0, count: 1 });
 });
+
+test("알림 줄은 질문처럼 새 turn 을 열고 판 사슬을 만들지 않는다", () => {
+  const folded = foldVersions([
+    message(1, "USER"), message(2, "ASSISTANT"),
+    message(3, "SYSTEM"), message(4, "ASSISTANT"),
+  ], {});
+  assert.equal(folded.length, 2);
+  assert.equal(folded[1].user.role, "SYSTEM");
+  assert.equal(folded[1].user.id, 3);
+  assert.deepEqual(folded[1].userVersion, { slotId: 3, index: 0, count: 1 });
+  assert.deepEqual(folded.map((turn) => turn.answers.map(({ message: answer }) => answer.id)), [[2], [4]]);
+  assert.equal(isLatestView(folded), true);
+});
+
+test("알림 줄이 둘 이어져도 각자 turn 을 열고 답이 없는 알림 줄도 남는다", () => {
+  const folded = foldVersions([
+    message(1, "USER"), message(2, "ASSISTANT"),
+    message(3, "SYSTEM"), message(4, "SYSTEM"),
+  ], {});
+  assert.deepEqual(folded.map((turn) => [turn.user.id, turn.answers.length]), [[1, 1], [3, 0], [4, 0]]);
+});

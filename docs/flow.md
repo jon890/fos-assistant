@@ -1349,6 +1349,7 @@ sequenceDiagram
     D-->>M: 실행 번호, RUNNING
     M-->>C: 도구 결과
     Note over D,H: 끝날 때까지 Control Plane 이 따로 기다리고 결과를 실행 줄에 적는다
+    Note over C,D: 끝난 결과는 「위임 결과가 도착했을 때」 로 다음 turn 에 전한다
     C->>M: agent_status(execution_id)
     M-->>C: RUNNING 또는 SUCCEEDED 와 답
     C->>M: agent_stop(execution_id)
@@ -1374,14 +1375,14 @@ sequenceDiagram
 | `task` 가 비었거나 공백뿐이거나 8,000자를 넘는다. `agent_code` 와 `task` 밖의 인자가 온다 | 인자 오류(`-32602`)다. profile 이나 사용자를 인자로 정하지 못한다 |
 | 부모 실행에 대화가 없다 | 실행 줄을 만들지 않고 `SUBMIT_FAILED` 로 거절한다. 운영에서는 생기지 않는 방어다 |
 | 서버 전체에서 도는 위임이 한도(기본 16)에 닿았다 | `BUSY` 로 거절한다. 기다리지 않는다 |
-| 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 `SUBMIT_FAILED` 를 돌려준다. 제출은 됐는데 그 뒤의 기록(run 번호, 시작 사건)이 실패하면 그 run 에 중지를 한 번 보내고 `FAILED` 로 적는다. 흐름의 하위 실행도 같다 |
+| 실행 줄은 만들었는데 제출이 실패한다 | 그 줄을 `FAILED` 로 적고 도구는 `SUBMIT_FAILED` 를 돌려준다. 제출은 됐는데 그 뒤의 기록(run 번호, 시작 사건)이 실패하면 그 run 에 중지를 한 번 보내고 `FAILED` 로 적는다. 흐름의 하위 실행도 같다. 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때는 그 줄에 `result_delivered_at` 을 적어, 부모가 번호를 모르는 결과로 다시 깨우지 않는다 |
 | 제출이 한도 시간(기본 30초, `assistant.delegation.submit-timeout`) 안에 끝나지 않는다 | 실행 줄이 생겼으면 번호와 `RUNNING` 을 돌려주고, 뒤따르는 결과는 그 줄에 적는다. 줄도 생기지 않았으면 `SUBMIT_FAILED` 이고, 뒤늦게 줄이 생겨도 제출하지 않고 `CANCELLED` 로 끝낸다. 뿌리별 잠금도 그 시간 안에서만 기다린다. 잡지 못하거나 잡은 뒤 남은 시간이 없으면 실행 줄을 만들지 않고 `SUBMIT_FAILED` 다. 줄이 없으므로 같은 호출을 다시 보내면 새로 시작한다 |
-| 위임 실행이 끝난다 | 답을 `SUCCEEDED` 와 같은 저장에서 그 줄의 `output_text` 에 적는다. 100,000자를 넘으면 자르고 잘렸다는 한 줄을 붙인다. `chat_message` 에는 넣지 않는다 |
+| 위임 실행이 끝난다 | 답을 `SUCCEEDED` 와 같은 저장에서 그 줄의 `output_text` 에 적는다. 100,000자를 넘으면 자르고 잘렸다는 한 줄을 붙인다. `chat_message` 에는 넣지 않는다. 대화 turn 이 직접 맡긴 실행이면 「위임 결과가 도착했을 때」 로 부모 대화를 깨운다 |
 | `agent_list` 를 부른다 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 `name` 만 JSON 배열로 준다. 같은 profile 을 여럿이 써도 요청자마다 다르다 |
 | `agent_status` 로 남의 실행, 다른 대화의 실행, 위임이 아닌 실행(대화 turn, Memory 제안), 없는 번호를 묻는다 | 모두 `{"code":"NOT_FOUND","message":"실행을 찾을 수 없습니다."}` 하나로 답한다. 기준은 부르는 쪽 origin 실행의 대화다. 같은 사용자의 다른 대화여도 찾지 못한다. origin 실행이 끝났어도 같다 |
 | `agent_status` 로 같은 대화의 앞 turn 에서 맡긴 실행을 묻는다 | 답한다. turn 마다 뿌리 실행이 달라도 대화가 같으면 된다. 기다리지 않는 위임의 결과를 뒤 turn 에서 가져오는 길이다 |
 | `agent_status` 를 부른 origin 실행에 대화가 없다 | 같은 실행 나무(같은 뿌리)의 위임 실행만 답한다 |
-| `agent_status` 가 물을 수 있는 실행이다 | `execution_id` 와 `status` 를 준다. `SUCCEEDED` 는 `output`, `FAILED` 는 `error_code`, `CANCELLED` 는 답이 있으면 `output` 을 더한다. run 번호, profile, 토큰 수, 금액은 싣지 않는다 |
+| `agent_status` 가 물을 수 있는 실행이다 | `execution_id` 와 `status` 를 준다. `SUCCEEDED` 는 `output`, `FAILED` 는 `error_code`, `CANCELLED` 는 답이 있으면 `output` 을 더한다. run 번호, profile, 토큰 수, 금액은 싣지 않는다. 끝난 상태를 돌려주면 그 실행의 `result_delivered_at` 을 적어 부모를 다시 깨우지 않는다. `agent_stop` 도 같다 |
 | `agent_stop` 으로 물을 수 없는 실행을 멈추려 한다 | `agent_status` 와 같은 판정이다. 남의 실행, 다른 대화의 실행, 위임이 아닌 실행, 없는 번호는 모두 `NOT_FOUND` 하나로 답하고 멈추지 않는다 |
 | `agent_stop` 이 도는 실행에 온다 | 그 실행의 중지 표시를 켜고, run 번호가 있으면 Hermes 에 중지를 보낸다. 번호가 붙기 전이면 붙는 자리에서 보낸다. `CANCELLED` 가 적히기를 5초까지 기다려 `CANCELLED` 를 주고, 그 안에 적히지 않으면 `RUNNING` 과 `stop_requested: true` 를 준다 |
 | 멈춘 실행이 그때까지 답을 받았다 | 그 답을 `CANCELLED` 와 같은 저장에서 `output_text` 에 적는다. 받은 답이 없으면 비운다 |
@@ -1393,7 +1394,59 @@ sequenceDiagram
 | 사용자가 그 turn 을 중지한다 | turn 이 도는 동안 맡긴 위임 자식은 run 번호가 붙을 때 그 turn 에 붙어 함께 멈춘다. 중지가 확정된 뒤 제출 전이면 제출하지 않고 `CANCELLED` 로 끝나고, 확정 전에 제출됐으면 run 번호가 붙는 자리에서 곧바로 멈춘다. turn 이 끝난 뒤에 맡긴 자식은 `agent_stop` 으로만 멈춘다. 자식은 Hermes 가 turn 의 중지를 받아 확정된 뒤에만 `CANCELLED` 로 적힌다. 중지를 보내지 못해 turn 이 되돌아가면 그 사이에 끝난 자식은 `SUCCEEDED` 로 남는다 |
 | 서버가 다시 뜬다 | 도는 위임 실행은 기동 정리가 `FAILED`(`ORPHANED`) 로 적는다 |
 
-**자식의 답은 대화 이력에 넣지 않는다.** Chief 가 `agent_status` 로 받아 자기 답에 합친다. 자식 실행은 자기 줄에 사용량과 비용이 따로 남고 작업 과정과 실행 나무에 보인다.
+**자식의 답은 대화 이력에 넣지 않는다.** Chief 는 결과를 기다리지 않고 turn 을 마치며, 끝난 결과는 Control Plane 이 다음 turn 에 넣어 준다. 자식 실행은 자기 줄에 사용량과 비용이 따로 남고 작업 과정과 실행 나무에 보인다.
+
+## 위임 결과가 도착했을 때
+
+맡긴 자식이 끝나면 Control Plane 이 부모 대화의 다음 turn 을 연다. 부모는 맡긴 뒤 기다리지 않는다.
+결정은 [ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 에 있다.
+
+```mermaid
+sequenceDiagram
+    participant C as Chief (Hermes)
+    participant D as 위임 서비스
+    participant W as 깨우기 서비스
+    participant S as 대화 서비스
+    participant U as 열린 대화 창
+
+    C->>D: agent_delegate (여러 번 가능)
+    D-->>C: 실행 번호
+    C->>C: 남은 일을 계속하고 turn 을 마친다
+    Note over D: 자식이 따로 돈다
+    D->>W: 자식이 SUCCEEDED 나 FAILED 로 끝났다
+    W->>W: 그 대화에 도는 turn 이 있으면 여기서 멈춘다
+    W->>S: 전하지 않은 결과를 모아 자동 turn 을 연다
+    S->>S: SYSTEM 알림 줄을 저장하고 결과를 Hermes 입력으로 넣는다
+    S-->>U: 대화 단위 SSE 로 알림 줄과 답 조각
+    S->>W: turn 이 끝났다
+    W->>W: 그 사이 쌓인 결과가 있으면 다시 연다
+```
+
+### 갈리는 지점
+
+| 경우 | 결과 |
+| --- | --- |
+| 자식이 `SUCCEEDED` 나 `FAILED` 로 끝나고 그 대화에 도는 turn 이 없다 | 전하지 않은 결과를 모두 모아 자동 turn 을 하나 연다. 넣은 결과마다 `result_delivered_at` 을 적는다 |
+| 자식이 끝났을 때 그 대화에 turn 이 돌고 있다(부모 turn, 사용자 질문, 다른 자동 turn) | 열지 않는다. 그 turn 이 끝날 때 다시 확인해 쌓인 결과를 모아 연다 |
+| 부모가 그 turn 안에서 `agent_status` 나 `agent_stop` 으로 끝난 결과를 이미 받았다 | 전한 것으로 적혀 있어 깨우지 않는다 |
+| 자식이 `CANCELLED` 로 끝났다 | 깨우지 않는다. 사용자가 turn 을 멈췄거나 부모가 `agent_stop` 으로 멈춘 것이다 |
+| 자식이 맡긴 손자 실행이 끝났다 | 깨우지 않는다. 그 결과는 자식이 `agent_status` 로 읽는다 |
+| 자동 turn 이 사용자 질문 뒤로 10번(`assistant.delegation-wake.max-auto-turns`)에 닿았다 | 열지 않고 「자동으로 이어 가는 횟수를 넘었어요」 알림 줄만 남긴다. 결과는 전하지 않은 채 남아, 사용자가 다음 질문을 보내면 그 turn 이 끝난 뒤 전한다 |
+| 사용자가 새 질문을 보낸다 | 보통 turn 으로 돈다. 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다. 자동 turn 이 도는 중이면 지금처럼 `CONVERSATION_BUSY` 다 |
+| 자동 turn 을 사용자가 중지한다 | 보통 turn 의 중지와 같다. 넣었던 결과는 전한 것으로 남는다 |
+| 대화가 지워졌거나, 에이전트가 꺼졌거나 지워졌거나, 흐름이 붙은 에이전트다 | 열지 않는다. 결과는 실행 줄에 그대로 남는다 |
+| 서버가 다시 뜬다 | 기동 정리가 도는 위임 실행을 `FAILED`(`ORPHANED`) 로 적은 뒤, 전하지 않은 결과가 있는 대화를 차례로 깨운다 |
+| 대화 창이 열려 있다 | 대화 단위 SSE 로 `system` 사건(알림 줄)과 그 turn 의 `started`, `delta`, `tool`, `done` 을 받는다 |
+| 대화를 열 때 이미 자동 turn 이 돌고 있다(보는 중 상태) | 그 turn 은 `/running` 폴링이 그린다. 대화 단위 SSE 의 같은 turn 사건은 버린다. 조각 사건에는 실행 번호가 없어 순서로 고른다. `started` 전의 조각은 버리고, 보는 중인 번호의 `started` 부터 그 `done` 이나 `stopped` 까지 버린다. 보는 중인 번호가 아직 없으면 처음 받는 `started` 를 그 turn 으로 본다. `system` 알림 줄은 언제나 받는다 |
+| SSE 를 연결하기 전에 시작한 자동 turn 의 `done` 이나 `stopped` 만 받았다 | 이력을 다시 읽어 그 답을 보인다 |
+| 이 창이 보낸 turn(보내기, 다시 생성)이 도는 동안 자동 turn 사건이 온다 | 보류했다가 보낸 turn 의 끝 처리와 이력 다시 읽기가 끝난 뒤 받은 순서대로 그린다. 자동 turn 이 도는 동안 입력창은 「중지」 를 보인다 |
+| 대화 단위 SSE 가 끊겼다가 다시 연결된다 | 5초 뒤 다시 연다. 받던 자동 turn 이 없으면 이력을 다시 읽는다. 있으면 `/running` 으로 확인해, 돌고 있으면 보는 중 상태로 넘기고 끝났으면 정리한 뒤 이력을 다시 읽는다. 4xx 면 다시 열지 않는다 |
+| 자동 turn 이 결과를 전했다고 적기 전에 실패한다 | `error` 사건을 보내고 결과는 전하지 않은 채 남긴다. 그 대화는 30초 동안 다시 열지 않고, 그 뒤의 위임 종료 사건이나 turn 닫기나 기동 훑기가 다시 연다 |
+| 대화 창이 닫혀 있다 | 자동 turn 은 그대로 돌고, 답은 `chat_message` 에 남아 다음에 열 때 보인다 |
+
+자동 turn 의 Hermes 입력은 결과마다 에이전트 이름, 실행 번호, 상태, 답(또는 오류 코드)을 적은 글이다.
+그 turn 은 보통 turn 과 같이 실행 기록과 비용이 남는다.
+자동 turn 의 답은 다시 생성하지 않는다. 앞 줄이 사용자 질문이 아니기 때문이다.
 
 ## 결과물 파일을 볼 때
 

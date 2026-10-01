@@ -46,6 +46,18 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             """)
     int assignSessionIfAbsent(@Param("id") Long id, @Param("sessionId") String sessionId);
 
+    /** 사용자의 질문 없이 연 turn 의 수를 0 으로 돌린다. 이미 0 이면 줄을 건드리지 않고 0 을 돌려준다. */
+    @Modifying
+    @Transactional
+    @Query("update Conversation c set c.autoTurnCount = 0 where c.id = :id and c.autoTurnCount <> 0")
+    int resetAutoTurns(@Param("id") Long id);
+
+    /** 사용자의 질문 없이 연 turn 의 수를 하나 늘린다. */
+    @Modifying
+    @Transactional
+    @Query("update Conversation c set c.autoTurnCount = c.autoTurnCount + 1 where c.id = :id")
+    int incrementAutoTurns(@Param("id") Long id);
+
     @Modifying
     @Transactional
     @Query("update Conversation c set c.title = :title where c.id = :id and c.title = ''")

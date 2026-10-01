@@ -17,6 +17,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,8 @@ class McpToolServiceTest {
             UUID.randomUUID(), "image.png", null, "https://images.example.com/a.png?private=value");
     private final ArtifactWriteService artifacts = mock(ArtifactWriteService.class);
     private final MemoryService memories = mock(MemoryService.class);
-    private final McpToolService tools = new McpToolService(memories, artifacts, mock(AgentDelegationService.class));
+    private final McpToolService tools = new McpToolService(
+            memories, artifacts, mock(AgentDelegationService.class), mock(AgentExecutionRepository.class));
     private final AgentExecution parent = mock(AgentExecution.class);
     private McpCaller caller;
     private ListAppender<ILoggingEvent> logs;
