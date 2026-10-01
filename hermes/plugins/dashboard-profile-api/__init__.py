@@ -593,7 +593,8 @@ def _connector_persona(skill_dirs: list) -> str | None:
                 raise ValueError("스킬 디렉터리나 SKILL.md 가 링크다")
             if not skill.is_dir() or not source.is_file():
                 continue
-            text = source.read_text(encoding="utf-8")
+            # BOM 과 CRLF 가 있어도 앞머리를 알아보게 맞춘다.
+            text = source.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
             if text.startswith("---\n"):
                 head, separator, rest = text[4:].partition("\n---\n")
                 if not separator:
@@ -894,7 +895,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
         state[plugin] = {"server": server, "allowlist_added": added, "mcp_server": name}
         if manifest["persona"] is not None:
             # 지침은 이 커넥터의 소유 기록과 함께, 관리 표식이 있는 profile 에만 쓴다.
-            # 사람이 만든 profile 과 다른 커넥터가 없는 profile 의 `SOUL.md` 는 건드리지 않는다.
+            # 사람이 만든 profile 과 이 요청이 가리키지 않은 profile 의 `SOUL.md` 는 건드리지 않는다.
+            # 연결용 profile 인지는 여기서 알 수 없다. Control Plane 이 연결용 에이전트의 profile 만 보낸다.
             if not (profile_dir / MANAGED_MARKER).is_file():
                 raise ValueError("관리 표식이 없는 profile 에는 지침을 쓰지 않는다")
             values[soul_path] = manifest["persona"].encode("utf-8")

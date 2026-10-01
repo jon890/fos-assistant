@@ -254,6 +254,10 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertTrue(persona.startswith("# 검사용 메모"))
         self.assertNotIn("name: demo", persona)
         self.assertNotIn("읽지 않는 파일", persona)
+        # BOM 과 CRLF 로 저장한 파일도 앞머리를 뗀다.
+        skill = self.connector_root / "skills/demo/SKILL.md"
+        skill.write_bytes(b"\xef\xbb\xbf" + skill.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["persona"], persona)
         self.assertNotIn("persona", self.catalog()[0])
         self.assertNotIn("검사용 메모\n\n`list_scopes`", json.dumps(self.catalog(), ensure_ascii=False))
 
