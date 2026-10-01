@@ -291,6 +291,7 @@ test("관리자에게만 그룹 단계 설정을 보인다", async ({ page }) =>
 test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행을 안내한다", async ({
   page,
 }) => {
+  const savedBodies: unknown[] = [];
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers",
     (route) =>
@@ -298,6 +299,7 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
         json: {
           ...TIERS,
           admin: true,
+          groupDefaultTier: "BALANCED",
           tiers: TIERS.tiers.map((item) => ({
             ...item,
             provider: null,
@@ -307,6 +309,13 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
         },
       }),
   );
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers/group",
+    (route) => {
+      savedBodies.push(route.request().postDataJSON());
+      return route.fulfill({ status: 204 });
+    },
+  );
 
   await page.goto("/");
   await expect(page.getByTestId("model-tier-fast")).toBeEnabled();
@@ -314,10 +323,47 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
   await expect(page.getByTestId("model-tier-deep")).toBeEnabled();
 
   await tierSettings(page).click();
-  await page.getByRole("button", { name: "그룹 단계 설정" }).click();
-  await expect(page.getByText("단계 설정이 필요해요.")).toBeVisible();
-  await expect(page.getByLabel("모델").first()).toHaveValue("");
-  await expect(page.getByLabel("강도").first()).toHaveValue("");
+  const settingsDialog = page.getByRole("dialog", { name: "모델 단계 설정" });
+  await expect(settingsDialog.getByText("단계 설정이 필요해요.")).toBeVisible();
+  await settingsDialog.getByRole("button", { name: "그룹 단계 설정" }).click();
+
+  const groupDialog = page.getByRole("dialog", { name: "그룹 단계 설정" });
+  await expect(groupDialog.getByText("단계 설정이 필요해요.")).toBeVisible();
+  await expect(groupDialog.getByLabel("모델").first()).toHaveValue("");
+  await expect(groupDialog.getByLabel("강도").first()).toHaveValue("");
+  await expect(groupDialog.getByLabel("그룹 기본값")).toHaveValue("BALANCED");
+  await groupDialog.getByRole("button", { name: "저장" }).click();
+
+  await expect
+    .poll(() => savedBodies)
+    .toEqual([
+      {
+        tiers: [
+          {
+            tier: "FAST",
+            label: "빠르게",
+            provider: null,
+            model: null,
+            reasoningEffort: null,
+          },
+          {
+            tier: "BALANCED",
+            label: "균형",
+            provider: null,
+            model: null,
+            reasoningEffort: null,
+          },
+          {
+            tier: "DEEP",
+            label: "깊게",
+            provider: null,
+            model: null,
+            reasoningEffort: null,
+          },
+        ],
+        defaultTier: "BALANCED",
+      },
+    ]);
 });
 
 test("effort 를 받지 않는 모델을 고르면 effort 를 고를 수 없다", async ({

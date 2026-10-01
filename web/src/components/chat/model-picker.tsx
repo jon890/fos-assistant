@@ -598,6 +598,12 @@ export function ModelTierPicker({
           </Dialog>
           {state.data?.admin ? (
             <Dialog open={groupOpen} onOpenChange={setGroupOpen}>
+              {needsTierSetup ? (
+                <p className="text-sm text-muted-foreground">
+                  단계 설정이 필요해요. 그룹 단계 설정에서 모델과 강도를 정해
+                  주세요.
+                </p>
+              ) : null}
               <DialogTrigger asChild>
                 <Button type="button" variant="outline">
                   그룹 단계 설정
