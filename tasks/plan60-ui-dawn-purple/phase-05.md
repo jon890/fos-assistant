@@ -1,162 +1,138 @@
-# Phase 05. 움직임: 메시지 등장, 펼침, 시트와 대화상자, 목록, 화면 전환
+# Phase 05. 사용량과 에이전트 화면의 내부 값을 역할에 따라 가린다
 
-**Execution profile**: deep
+**Execution profile**: standard
 
 ## 목표
 
-ADR-047 「움직임」 표의 움직임을 부품에 붙이고, 모든 움직임이 줄인 움직임 설정을 따르는지 검사로 지킨다.
-조작에 화면이 부드럽게 반응하게 하려는 것이다.
+`MEMBER` 역할 사용자의 사용량, 실행 상세, 에이전트 상세 화면에서 금액, 모델 이름, 토큰 수, effort, 오류 코드, 영어 도구 이름을 빼거나 사람 말로 바꾼다.
+`ADMIN` 은 지금 값을 그대로 본다. 일반 사용자 화면이 운영 화면처럼 읽히지 않게 하려는 것이다.
 
-**범위 외**: 모션 라이브러리를 더하지 않는다. 목록 재배치 움직임은 하지 않는다. 테마 바꿈의 crossfade 는 하지 않는다.
+**범위 외**: 화면 구조(탭 재배치, 폼과 목록의 순서)는 바꾸지 않는다. Control Plane 의 응답은 바꾸지 않는다. 모델을 고르는 대화상자와 실행 상세의 모델 단계 표시는 다른 작업이 만든다.
 
 ## 컨텍스트
 
-- phase 01 이 `globals.css` 에 `duration-fast`(120ms), `duration-base`(200ms), `duration-slow`(260ms), `ease-out`, `ease-spring` 토큰과 `@media (prefers-reduced-motion: reduce)` 블록을 두었다. 그 블록이 모든 animation 과 transition 을 100ms linear 로 줄이고 `tw-animate-css` 의 이동과 크기 변화를 끈다.
-- `web/src/components/ui/dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `tooltip.tsx` 가 `tw-animate-css` 의 `animate-in`, `animate-out`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*` 와 `duration-100`, `duration-200` 을 쓴다.
-- phase 03 이 `AssistantRow` 를 만들어 기다림 점, 작업 과정 블록, 답이 같은 자리에 들어온다. `activity-block.tsx` 는 펼친 내용을 `expanded ? ... : null` 로 그린다.
-- `web/src/components/chat/message-list.tsx` 의 `scrollToBottom` 이 `behavior: "smooth"` 를 쓴다.
-- Next.js 16.0.10 이고 `web/next.config.ts` 에 `experimental` 설정이 없다. `experimental.viewTransition` 을 켜면 React 의 `ViewTransition` 을 쓸 수 있다.
-- 브라우저 검사는 Playwright 의 `page.emulateMedia({ reducedMotion: "reduce" })` 로 줄인 움직임을 켠다.
+- 역할은 `web/src/components/shell/app-shell.tsx` 의 `useShellIsAdmin()` 이 준다. 서버 컴포넌트는 `web/src/lib/me.ts` 의 `readMe()` 로 `role` 을 읽는다. `web/src/app/memory/page.tsx` 가 그 패턴이다.
+- `web/src/app/usage/page.tsx` 가 탭 넷을 그린다. 탭 목록은 `web/src/components/usage/usage-tabs.tsx` 의 `USAGE_TABS` 와 `parseUsageTab` 이 갖는다.
+- 실행 기록은 좁은 폭에서 `execution-card.tsx`, 넓은 폭에서 `execution-table.tsx` 다. 둘 다 `execution-list.tsx` 의 도우미를 쓴다.
+- 실행 상세는 `web/src/components/execution/execution-detail.tsx` 가 머리 요약을, `execution-event-row.tsx` 가 줄을 그린다. 실패 줄은 `실행 실패: {detail}` 이고 `detail` 에 `HERMES_BUSY` 같은 오류 코드가 온다.
+- 오류 코드를 문구로 바꾸는 표는 `web/src/components/error-message.ts` 의 `describeError(code, fallback)` 이다.
+- 도구 묶음의 `label` 과 `description` 은 Hermes 가 준 영어 이름과 평서체 설명이다. `name` 이 키다: `web`, `vision`, `todo`, `clarify`, `session_search`, `skills`, `tts`, `delegation`, `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `cronjob`, `image_gen`, `video_gen`, `homeassistant`, `spotify`, `discord`.
+- phase 03 이 `web/src/components/ui/switch.tsx` 의 `Switch` 를, phase 04 가 `web/src/lib/format.ts` 의 `formatSeconds` 를 만들었다.
+- 브라우저 검사의 기본 사용자는 관리자다. 다른 사용자로 로그인하는 것은 `test/browser/fixtures.ts` 의 `setSession` 이 한다. 씨 뿌린 에이전트는 모두 관리자 소유의 비공개라 `MEMBER` 는 그것으로 실행을 만들 수 없다.
+  `MEMBER` 검사는 `test/browser/agent-lifecycle.spec.ts` 25~60줄의 방법을 따른다: 전용 메일로 로그인해 자기 에이전트를 만들고, 그 에이전트로 대화를 보내 실행을 만들고, `afterEach` 에서 에이전트를 지운다. 붐빔 실패는 대역의 `hermes.busy()` 로 만든다. 그룹 공개 에이전트를 남기지 않는다(`identity.spec.ts` 가 어긋난다).
 
-**근거 문서**: `docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md` 의 「움직임」 절, `docs/flow.md` 의 「기다리는 동안 보이는 것」 절, `web/AGENTS.md` 의 「색과 간격은 테마 토큰이 소유한다」 절
+**근거 문서**: `docs/code-architecture.md` 의 「사용량 화면의 탭」 절, `docs/flow.md` 의 「실행이 실패할 때」 절, `web/AGENTS.md` 의 「화면 문구」 절, `docs/prd.md`
 
 ## 의도 메모
 
-- 등장 움직임은 **새로 생긴 줄에만** 준다. 대화를 열 때 이미 있던 메시지가 한꺼번에 움직이면 안 된다.
-- 높이 펼침은 `grid-template-rows` 0fr 에서 1fr 로 한다. `height: auto` 는 움직이지 않고, `interpolate-size` 는 Safari 가 지원하지 않는다.
-- 삭제 움직임은 서버 요청이 성공한 뒤에 시작한다. 실패하면 줄이 그대로 남아야 한다.
-- 화면 전환은 실험 기능이다. 끄면 CSS 등장 움직임만 남고 화면은 그대로 동작해야 한다.
+- 화면에서만 가린다. 비밀을 지키는 경계가 아니라 읽기 쉽게 하는 것이다. 응답에는 값이 그대로 온다.
+- 다른 작업이 실행 기록에 모델 단계(빠르게, 균형, 깊게)를 보인다. 역할 규칙을 같게 둔다: `ADMIN` 은 실제 값 전부, `MEMBER` 는 단계 이름과 걸린 시간만. 이 phase 는 숨기는 쪽만 한다.
+- 도구 이름을 Control Plane 이 한국어로 주게 바꾸지 않는다. 화면 문구는 화면이 갖는다.
 
 ## 작업 항목
 
-### 1. `web/src/app/globals.css` 의 keyframes 와 유틸리티
+### 1. `web/src/components/usage/usage-tabs.tsx` 와 `web/src/app/usage/page.tsx`
 
-`@theme` 에 `--animate-*` 로 선언해 `animate-*` 클래스를 만든다.
+- `UsageTabs` 에 `isAdmin: boolean` 을 더한다. `MEMBER` 에게는 `fingerprints` 탭을 그리지 않는다. 탭 이름 「입력 지문」 을 `web/AGENTS.md` 용어 표의 「설정별 사용량」 으로 바꾼다.
+- `parseUsageTab(value, isAdmin)` 으로 바꿔, `MEMBER` 가 `?tab=fingerprints` 로 오면 `summary` 를 돌려준다.
+- `page.tsx` 는 `readMe()` 로 역할을 읽는다. `MEMBER` 면 breakdown 두 조회를 부르지 않는다.
+- 머리 문장: `ADMIN` 은 지금 문장, `MEMBER` 는 「이번 달에 비서와 한 일을 모아 보여 드려요.」
+- 요약 탭: `MEMBER` 에게는 `MonthlySummary` 에 `isAdmin={false}` 를 줘 실행 건수 `Stat` 하나만 그린다(라벨 「이번 달 실행」, 값 `n건`, 설명 없음). `BreakdownSection` 은 그리지 않는다.
 
-| 클래스 | keyframes | 길이와 곡선 |
+### 2. `web/src/components/usage/execution-card.tsx`, `execution-table.tsx`, `execution-list.tsx`
+
+`ExecutionList` 는 서버 컴포넌트다. `web/src/app/usage/page.tsx` 가 `isAdmin` 을 `ExecutionList` 에 넘기고, 그것이 카드와 표에 넘긴다.
+
+| 값 | `ADMIN` | `MEMBER` |
 | --- | --- | --- |
-| `animate-message-user` | opacity 0 → 1, `translateY(6px) scale(0.96)` → none. `transform-origin: 100% 100%` | `duration-base`, `ease-spring`, `both` |
-| `animate-message-assistant` | opacity 0 → 1, `translateY(4px)` → none | `duration-base`, `ease-out`, `both` |
-| `animate-screen-in` | opacity 0 → 1, `translateY(8px)` → none | `duration-base`, `ease-out`, `both` |
-| `animate-fade-in` | opacity 0 → 1 | `duration-fast`, linear, `both` |
+| 에이전트 이름, 시각, 걸린 시간, 상태 배지, 스킬 이름, 다시 보낸 실행 표시 | 보인다 | 보인다 |
+| 에이전트 코드, 금액 둘, provider 와 모델, effort, 토큰, 문맥 글자 수, 문맥이 빠졌다는 줄, `title` 의 가격표 판 | 보인다 | 그리지 않는다 |
 
-줄인 움직임 블록에 이 네 keyframes 가 이동과 크기 변화를 하지 않도록 더한다. 방법은 그 블록 안에서 네 클래스의 `animation-name` 을 흐려짐만 하는 keyframes(`fade-in` 의 것)로 `!important` 로 바꾸는 것이다.
+걸린 시간은 `MEMBER` 에게 `formatSeconds` 로 보이고 1초 미만이면 「1초 미만」 이다. `ADMIN` 은 `formatDuration` 그대로다.
+표의 열 머리도 `MEMBER` 에게는 남는 열만 그린다.
+`data-testid` 는 그리는 요소에서 그대로 지킨다.
 
-펼침 유틸리티를 둔다.
+### 3. `web/src/components/execution/execution-detail.tsx` 와 `execution-event-row.tsx`
 
-```css
-@utility collapsible {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--duration-slow) var(--ease-out);
-  &[data-open="true"] { grid-template-rows: 1fr; }
-  & > * { min-height: 0; overflow: hidden; }
-}
+- 머리 요약 `dl`: `MEMBER` 에게는 에이전트, 상태, 걸린 시간만 그린다. 모델, 입력 토큰, 출력 토큰, 환산 금액은 `ADMIN` 만.
+- 제목: `summary.agentName ?? summary.agentCode ?? ...` 에서 `MEMBER` 에게는 `agentCode` 대신 `agentLabel(summary.agentName)` 을 쓴다.
+- 실패 줄: `ExecutionEventRow` 에 `isAdmin` 을 넘긴다(`ExecutionTree` 와 `ExecutionNode` 를 거친다. `activity-panel.tsx` 가 `ExecutionTree` 를 쓰면 거기서도 넘긴다).
+  - `MEMBER`: `실행 실패: ${describeError(detail, "실행을 마치지 못했어요.")}`. `detail` 이 없으면 `실행 실패`.
+  - `ADMIN`: `실행 실패: ${describeError(detail, detail)} (${detail})`. 표에 없는 코드면 `실행 실패: ${detail}`.
+  - 글자색을 `text-destructive` 로 둔다.
+- `ExecutionNode` 의 이름 `node.agentName ?? node.agentCode` 도 `MEMBER` 에게는 `agentLabel(node.agentName)` 이다.
+
+### 4. `web/src/lib/toolset-label.ts` 신규
+
+```ts
+export function toolsetText(name: string, fallback: { label: string; description: string }): { label: string; description: string }
 ```
 
-### 2. 메시지 등장
+| `name` | 이름 | 설명 |
+| --- | --- | --- |
+| `web` | 웹 검색 | 웹에서 찾아봐요 |
+| `vision` | 사진 보기 | 올린 사진을 읽어요 |
+| `todo` | 할 일 정리 | 긴 일을 할 일로 나눠 챙겨요 |
+| `clarify` | 되묻기 | 모호하면 먼저 물어봐요 |
+| `session_search` | 지난 대화 찾기 | 예전 대화에서 찾아봐요 |
+| `skills` | 스킬 | 올려 둔 스킬을 써요 |
+| `tts` | 소리 내어 읽기 | 글을 음성으로 읽어요 |
+| `delegation` | 도우미에게 맡기기 | 일을 나눠 도우미에게 맡겨요 |
+| `terminal` | 명령 실행 | 서버에서 명령을 실행해요 |
+| `file` | 파일 | 파일을 읽고 써요 |
+| `code_execution` | 코드 실행 | 코드를 돌려 계산해요 |
+| `browser` | 브라우저 | 웹 페이지를 열어 조작해요 |
+| `computer_use` | 컴퓨터 조작 | 화면을 보고 컴퓨터를 조작해요 |
+| `cronjob` | 예약 실행 | 정한 시각에 일을 해요 |
+| `image_gen` | 그림 만들기 | 그림을 만들어요 |
+| `video_gen` | 동영상 만들기 | 동영상을 만들어요 |
+| `homeassistant` | 집 기기 | 집의 기기를 살피고 조작해요 |
+| `spotify` | Spotify | 음악을 틀고 멈춰요 |
+| `discord` | Discord | Discord 에 글을 보내고 읽어요 |
 
-- `web/src/components/chat/message-list.tsx` 에서 이 화면이 대화를 처음 그린 뒤에 생긴 줄만 표시한다. 대화를 읽어 온 직후의 `turn.id` 집합을 `useRef` 에 두고(`conversationId` 가 바뀌거나 `loading` 이 끝날 때 다시 채운다), 그 집합에 없는 줄에 `data-entered="true"` 를 준다. `MessageBubble` 에 `entered?: boolean` 을 더한다.
-- `web/src/components/chat/message-bubble.tsx`: `entered` 인 내 말풍선(`data-testid="user-message"`)에 `animate-message-user`, 비서 줄 `<li>` 에 `animate-message-assistant` 를 준다.
-- `pending-assistant` 줄도 `animate-message-assistant` 를 준다. 그 줄이 저장된 답으로 바뀔 때 다시 움직이지 않게 한다: 답이 흘러나오기 시작한 줄(`pendingAssistant`)과 그 답이 저장돼 `id` 가 바뀐 줄에는 등장 움직임을 주지 않는다. `chat-panel.tsx` 가 임시 `id`(`assistant-...`)를 저장된 `id` 로 바꾸는 자리를 읽고, 바뀐 `id` 를 집합에 넣는 방법을 정한다.
-- 기다림에서 답으로: `AssistantRow` 의 아래 칸에서 기다림 점이 답 본문으로 바뀔 때 본문 쪽에 `animate-fade-in` 을 준다. 줄의 높이는 phase 03 이 맞춰 두었다.
-- `turn-error` 와 `no-answer` 줄에 `animate-fade-in` 을 준다.
-- `scrollToBottom` 의 `behavior` 를 `window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"` 로 정한다.
+표에 없는 `name` 은 `fallback` 을 그대로 돌려준다. 다른 모듈을 import 하지 않는다(`node --test` 가 직접 읽는다).
 
-### 3. 작업 과정 펼치기
+`web/src/components/agent/agent-tools-section.tsx`:
 
-`web/src/components/chat/activity/activity-block.tsx`:
+- 줄의 이름과 설명, 스위치의 `aria-label`, 확인 창 제목(`{confirming.label} 도구 켜기`)에 `toolsetText` 를 쓴다.
+- 묶음 제목 「주인 등급」 을 「바로 켤 수 있어요」, 「관리자 등급」 을 「관리자만 켤 수 있어요」 로 바꾼다. 오른쪽 위 배지(「관리자」/「주인」)는 뺀다.
+- `web/src/components/agent/agent-skills-section.tsx` 의 배지 「Hermes 기본」 을 「기본 스킬」 로 바꾼다.
 
-- 펼친 내용을 조건부로 그리지 않고 `<div className="collapsible" data-open={expanded}>` 안에 늘 둔다. 안쪽 `<div>` 가 `border-t` 와 여백을 갖는다. 접힌 동안 안쪽에 `inert` 를 줘 초점이 들어가지 않게 한다.
-- 저장된 블록의 나무는 지금처럼 처음 펼칠 때만 읽는다(`expanded` 조건을 지킨다).
-- `atBottomRef` 를 되돌리는 주석과 동작(「접으면 스크롤 상자가 사라진다」)을 새 구조에 맞게 고친다. 접어도 상자가 남으므로, 접을 때 `scrollTop` 을 0 으로 돌리고 `atBottomRef` 를 `true` 로 둔다. 도는 중에 다시 펼치면 맨 아래로 따라가야 한다(`test/browser/activity-scroll.spec.ts` 가 이 동작을 검사한다).
-- 화살표에 `transition-transform duration-base ease-out` 을 준다.
-- 접힌 내용을 「보이지 않음」 으로 단언하던 검사는 `toBeHidden()` 이 통과하는지 확인한다. 높이 0 과 `overflow: hidden` 만으로는 Playwright 가 보인다고 볼 수 있으므로, 접힌 안쪽에 `aria-hidden` 과 함께 `invisible`(`visibility: hidden`)을 주고, 펼칠 때 바로 푼다. 접을 때는 높이 transition 이 끝난 뒤(`onTransitionEnd`)에 `invisible` 을 건다.
+### 5. 검사
 
-### 4. 시트, 대화상자, 메뉴
-
-| 파일 | 바꿀 것 |
-| --- | --- |
-| `web/src/components/ui/sheet.tsx` | 덮개 `duration-base`. 본문은 `duration-slow ease-out` 이고 `slide-in-from-*-10` 을 전체 폭 밀기(`slide-in-from-left`, `slide-in-from-right`, `slide-in-from-top`, `slide-in-from-bottom` 과 짝이 되는 `slide-out-to-*`)로 바꾼다 |
-| `web/src/components/ui/dialog.tsx`, `alert-dialog.tsx` | `duration-100` 을 `duration-base` 로, `zoom-in-95`/`zoom-out-95` 를 `zoom-in-[0.96]`/`zoom-out-[0.96]` 으로. 곡선 `ease-out` |
-| `web/src/components/ui/dropdown-menu.tsx`, `tooltip.tsx` | `duration-100` 을 `duration-fast` 로 |
-
-`duration-100`, `duration-200` 같은 숫자 길이가 `web/src` 에 남지 않아야 한다.
-`test/browser/design-tokens.spec.ts` 의 `readBorder` 는 Sheet 의 transition 을 끄고 읽는다. 그대로 통과하는지 확인한다.
-
-### 5. 목록 추가와 삭제
-
-- `web/src/components/ui/use-exit.ts` 신규.
-
-  ```ts
-  /** 줄을 지우기 전에 나가는 움직임을 보인다. `leaving` 인 동안 줄에 `data-leaving` 을 주고, 끝나면 `remove` 를 부른다. */
-  export function useExit(durationMs?: number): { leaving: boolean; exit(remove: () => void): void }
-  ```
-
-  `durationMs` 기본값은 120 이다. `prefers-reduced-motion` 이면 기다리지 않고 바로 `remove` 를 부른다. 언마운트되면 타이머를 지운다.
-- `globals.css` 에 `[data-leaving="true"] { opacity: 0; transition: opacity var(--duration-fast) linear; }` 를 둔다.
-- 쓰는 곳: `web/src/components/shell/conversation-nav.tsx` 의 대화 지우기, `web/src/components/memory/memory-item.tsx` 의 기억 지우기. 서버 요청이 성공한 뒤 `exit(() => 목록 갱신)` 을 부른다.
-- 추가: 대화 목록의 새 줄과 기억 목록의 새 줄에 `animate-message-assistant` 를 준다. 처음 그릴 때 있던 줄에는 주지 않는다(작업 항목 2 와 같은 방법).
-
-### 6. 화면 전환
-
-- `web/next.config.ts`: `experimental: { viewTransition: process.env.NEXT_PUBLIC_VIEW_TRANSITION !== "off" }` 를 둔다. 영어 주석을 한국어로 고치지 않는다(이 phase 의 범위가 아니다). 새 주석은 한국어로 쓴다.
-- `web/src/components/shell/app-shell.tsx` 의 본문 자리(`children` 을 감싼 `main`)를 React 의 `ViewTransition` 으로 감싼다. import 이름은 설치된 React 가 내보내는 것을 `web/node_modules/react` 에서 확인한다(`ViewTransition` 이나 `unstable_ViewTransition`).
-- `globals.css` 에 `::view-transition-old(root)` 는 120ms linear 흐려짐, `::view-transition-new(root)` 는 200ms `ease-out` 의 8px 오름과 흐려짐을 둔다. 줄인 움직임 블록에서는 둘 다 100ms 흐려짐만 한다. 사이드바는 `view-transition-name` 을 따로 줘 전환에서 빠지게 한다.
-- **끌 수 있어야 한다.** `NEXT_PUBLIC_VIEW_TRANSITION=off` 로 빌드하면 `ViewTransition` 을 쓰지 않고 본문 자리에 `key={pathname}` 인 `animate-screen-in` 감싸개만 둔다. 두 경우를 한 부품 `web/src/components/shell/screen-transition.tsx` 가 고른다.
-- 켠 채로 전체 브라우저 검사를 돌린다. 화면 전환 때문에 실패하는 검사가 있으면 기본값을 끔으로 바꾸고(`=== "on"` 일 때만 켠다), 무엇이 실패했는지 phase 결과에 적는다. 검사를 고쳐 맞추지 않는다.
-- 대화 화면(`/c/{id}`) 사이의 이동은 사이드바에서 자주 일어난다. 그 이동에서 입력창이 깜빡이면 대화 화면을 전환 대상에서 뺀다.
-
-### 7. 검사
-
-`test/browser/motion.spec.ts` 신규.
-
-| 검사 | 방법 |
-| --- | --- |
-| 새로 보낸 내 말풍선이 등장 움직임을 갖는다 | 보낸 직후 `user-message` 의 `getComputedStyle(...).animationName` 이 `none` 이 아니고 `animationDuration` 이 `0.2s` 다 |
-| 대화를 다시 열면 이미 있던 메시지는 움직이지 않는다 | 새로 고친 뒤 같은 요소의 `animationName` 이 `none` 이다 |
-| 작업 과정 블록을 펼치면 높이가 transition 으로 바뀐다 | `.collapsible` 의 `transitionProperty` 에 `grid-template-rows` 가 있고 `transitionDuration` 이 `0.26s` 다 |
-| 줄인 움직임에서 말풍선이 이동하지 않는다 | `emulateMedia({ reducedMotion: "reduce" })` 뒤 보낸 말풍선의 `animationDuration` 이 `0.1s` 이고, 움직임이 도는 동안에도 `transform` 이 `none` 이다(`getAnimations()` 의 keyframes 에 `transform` 이 없다) |
-| 줄인 움직임에서 대화상자가 크기 변화를 하지 않는다 | 대화 지우기 확인 창을 열고 `[data-slot="alert-dialog-content"]` 의 `getAnimations()` keyframes 에서 `scale` 과 `transform` 이 처음과 끝이 같다 |
-| 줄인 움직임에서 서랍이 밀려 들어오지 않는다 | `mobile` 에서 사이드바 서랍의 `getAnimations()` keyframes 의 `translate` 가 처음과 끝이 같다 |
-| 줄인 움직임에서 「새 메시지」 단추가 바로 내려간다 | `scrollTo` 를 `addInitScript` 로 감싸 받은 `behavior` 가 `auto` 다 |
-
-`test/unit/design-tokens.test.ts` 에 더한다: `web/src` 에 `duration-100`, `duration-150`, `duration-200`, `duration-300` 이 없다. `motion-reduce:` 는 `animate-none` 과 `hidden`, `flex` 에만 붙는다(`waiting-indicator.tsx` 의 대체 문장 포함).
+- `test/unit/toolset-label.test.ts` 신규: 표의 `name` 열아홉이 모두 한국어 이름을 갖는다, 모르는 `name` 은 `fallback` 을 돌려준다, 설명이 모두 「요」 로 끝난다.
+- `test/browser/usage.spec.ts` 에 `MEMBER` 검사를 더한다: 실행 기록에 `USD`, `example-model`, `effort`, `문맥` 이 없고 에이전트 이름과 상태 배지가 있다. 요약 탭에 「API 가격」 이 없다. `?tab=fingerprints` 로 가면 요약 탭이 열린다.
+- 같은 파일의 기존 관리자 검사는 그대로 통과해야 한다. 탭 이름을 「설정별 사용량」 으로 찾게 고친다(`usage-breakdown.spec.ts` 포함).
+- `test/browser/execution-tree.spec.ts` 에 더한다: 붐빔으로 실패한 실행의 상세를 `MEMBER` 로 열면 `HERMES_BUSY` 가 없고 「지금 요청이 많아요」 가 있다. 관리자는 둘 다 본다.
+- `test/browser/agent-tools.spec.ts`: 도구 이름을 영어 `label` 로 찾는 곳을 한국어 이름으로 고친다. 「주인 등급」, 「관리자 등급」 을 찾는 곳도 고친다.
+- `test/browser/skills.spec.ts`: 「Hermes 기본」 을 찾는 곳을 고친다.
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-node --test test/unit/design-tokens.test.ts
-! grep -rnE 'duration-(100|150|200|300)\b' web/src
+node --test test/unit/toolset-label.test.ts test/unit/error-message.test.ts
+! grep -rnE '주인 등급|관리자 등급|Hermes 기본|입력 지문' web/src
 cd web && pnpm typecheck && pnpm lint
-cd web && pnpm test:browser test/browser/motion.spec.ts test/browser/activity-scroll.spec.ts
-cd web && pnpm test:browser
+cd web && pnpm test:browser test/browser/usage.spec.ts test/browser/usage-breakdown.spec.ts test/browser/execution-tree.spec.ts test/browser/agent-tools.spec.ts test/browser/skills.spec.ts test/browser/activity-panel.spec.ts
 ```
 
-기대값: 모두 종료 코드 0. 마지막 줄은 전체 브라우저 검사다.
+기대값: 모두 종료 코드 0.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `test/browser/motion.spec.ts` | 신규 |
-| `web/src/components/ui/use-exit.ts` | 신규 |
-| `web/src/components/shell/screen-transition.tsx` | 신규 |
-| `web/src/app/globals.css` | 수정 |
-| `web/next.config.ts` | 수정 |
-| `web/src/components/shell/app-shell.tsx` | 수정 |
-| `web/src/components/shell/conversation-nav.tsx` | 수정 |
-| `web/src/components/memory/memory-item.tsx` | 수정 |
-| `web/src/components/memory/memory-list.tsx` | 수정 |
-| `web/src/components/chat-panel.tsx` | 수정 |
-| `web/src/components/chat/message-list.tsx` | 수정 |
-| `web/src/components/chat/message-bubble.tsx` | 수정 |
-| `web/src/components/chat/activity/activity-block.tsx` | 수정 |
-| `web/src/components/ui/sheet.tsx` | 수정 |
-| `web/src/components/ui/dialog.tsx` | 수정 |
-| `web/src/components/ui/alert-dialog.tsx` | 수정 |
-| `web/src/components/ui/dropdown-menu.tsx` | 수정 |
-| `web/src/components/ui/tooltip.tsx` | 수정 |
-| `test/unit/design-tokens.test.ts` | 수정 |
-| `test/browser/activity-scroll.spec.ts` | 수정 |
+| `web/src/lib/toolset-label.ts` | 신규 |
+| `test/unit/toolset-label.test.ts` | 신규 |
+| `web/src/app/usage/page.tsx` | 수정 |
+| `web/src/components/usage/*.tsx` | 수정 |
+| `web/src/components/execution/*.tsx` | 수정 |
+| `web/src/components/chat/activity/activity-panel.tsx` | 수정 |
+| `web/src/components/agent/agent-tools-section.tsx` | 수정 |
+| `web/src/components/agent/agent-skills-section.tsx` | 수정 |
+| `test/browser/usage.spec.ts` | 수정 |
+| `test/browser/usage-breakdown.spec.ts` | 수정 |
+| `test/browser/execution-tree.spec.ts` | 수정 |
+| `test/browser/agent-tools.spec.ts` | 수정 |
+| `test/browser/skills.spec.ts` | 수정 |

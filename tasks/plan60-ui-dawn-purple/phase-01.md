@@ -7,11 +7,11 @@
 `web/src/app/globals.css` 의 토큰을 「새벽 보라」 값으로 바꾸고 의미 색, 모서리, 움직임 토큰과 줄인 움직임 전역 규칙을 더한다.
 뒤 phase 의 부품과 움직임이 이 토큰만 쓰게 하려는 것이다.
 
-**범위 외**: `Badge` 변형, `Notice` 부품, 스위치, 모서리 클래스 정리는 phase 02. 움직임을 부품에 붙이는 것은 phase 05.
+**범위 외**: `Badge` 변형과 `Notice` 부품은 phase 02. 스위치와 모서리 클래스 정리는 phase 03. 움직임을 부품에 붙이는 것은 phase 06.
 
 ## 컨텍스트
 
-- 토큰은 `web/src/app/globals.css` 하나에 있다. `@theme inline` 이 `--color-*` 를 `:root` 와 `.dark` 의 변수로 잇는다. Tailwind 4.1 이고 설정 파일이 없다.
+- 토큰은 `web/src/app/globals.css` 하나에 있다. `@theme inline` 이 `--color-*` 를 `:root` 와 `.dark` 의 변수로 잇는다. Tailwind 4 이고 설정 파일이 없다.
 - 값의 표는 ADR-047 의 「팔레트」, 「모서리」, 「움직임」 절에 있다. 그 표를 그대로 옮긴다. hex 로 적는다. `oklch()` 를 쓰지 않는다.
 - `test/unit/design-tokens.test.ts` 가 `globals.css` 소스에서 토큰 이름을 읽고, `test/browser/design-tokens.spec.ts` 가 두 밝기 모드의 값을 읽는다. 두 파일 모두 `TOKENS` 목록을 갖는다.
 - `test/browser/color.ts` 의 `parseRgb` 와 `contrast` 가 대비 계산을 갖는다. hex 와 `rgb()` 만 읽는다.
@@ -32,9 +32,9 @@
 - `:root` 와 `.dark` 의 색 변수를 ADR-047 「팔레트」 표의 값으로 바꾼다. `code-*` 여섯은 그대로 둔다.
 - 새 변수와 `@theme inline` 의 `--color-*` 를 더한다: `foreground-soft`, `primary-soft-foreground`, `signal`, `pill`, `pill-foreground`, `destructive-soft`, `success`, `success-soft`, `warning`, `warning-soft`, `info`, `info-soft`.
 - 모서리: `--radius-sm` 0.25rem, `--radius-md` 0.75rem, `--radius-lg` 1rem, `--radius-xl` 1.25rem, `--radius-2xl` 1.5rem, `--radius-full` 9999px. `:root` 의 `--radius` 도 0.75rem 으로 맞춘다.
-- 그림자: `--shadow-card` 를 밝음 `0 1px 2px rgba(23,19,31,.06), 0 8px 24px rgba(61,35,194,.06)`, 어두움 `0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35)` 로 둔다. `:root` 와 `.dark` 에 `--card-shadow` 변수로 값을 두고 `@theme inline` 에서 `--shadow-card: var(--card-shadow)` 로 잇는다. 그림자는 색 토큰이 아니라 rgba 를 쓴다.
-- 움직임: `--duration-fast: 120ms`, `--duration-base: 200ms`, `--duration-slow: 260ms`, `--ease-out: cubic-bezier(0.22, 1, 0.36, 1)`, `--ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1)`.
-  `duration-fast`, `duration-base`, `duration-slow`, `ease-out`, `ease-spring` 클래스가 실제로 만들어지는지 빌드한 CSS 에서 확인한다. Tailwind 4 가 `duration-*` 를 테마 이름으로 만들지 않으면 `@utility duration-fast { transition-duration: var(--duration-fast); animation-duration: var(--duration-fast); }` 처럼 셋을 직접 선언한다.
+- 그림자: `:root` 에 `--card-shadow: 0 1px 2px rgba(23,19,31,.06), 0 8px 24px rgba(61,35,194,.06)`, `.dark` 에 `--card-shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35)` 를 두고 `@theme inline` 에서 `--shadow-card: var(--card-shadow)` 로 잇는다. 그림자는 색 토큰이 아니라 rgba 를 쓴다. `web/src/components/chat/ask-card.tsx` 의 묻는 카드 바깥에 `bg-card shadow-card` 를 준다(지금 `bg-muted/40`). 답을 기다리는 카드가 한 층 위에 떠 보이게 하는 자리다.
+- 움직임: `@theme inline` 에 `--duration-fast: 120ms`, `--duration-base: 200ms`, `--duration-slow: 260ms`, `--ease-out: cubic-bezier(0.22, 1, 0.36, 1)`, `--ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1)` 를 둔다.
+  Tailwind 가 `duration-fast` 클래스를 만드는 이름은 `--transition-duration-*` 다. 그래서 `--transition-duration-fast: var(--duration-fast)`, `--transition-duration-base: var(--duration-base)`, `--transition-duration-slow: var(--duration-slow)` 를 함께 선언한다. `@utility` 로 직접 만들지 않는다. 그러면 `--tw-duration` 이 빠져 `animate-in` 의 길이가 맞지 않는다.
 - 줄인 움직임 블록 하나를 둔다.
 
   ```css
@@ -105,7 +105,7 @@
 # cwd: 저장소 root
 node --test test/unit/design-tokens.test.ts
 ! grep -rnE 'rgb\(176, 90, 60\)|#b05a3c|rgb\(16, 18, 22\)' test/browser
-! grep -rnE 'text-primary\b' web/src
+! grep -rnE 'text-primary([^-a-z]|$)' web/src
 cd web && pnpm typecheck && pnpm lint
 cd web && pnpm test:browser test/browser/design-tokens.spec.ts test/browser/theme.spec.ts test/browser/identity.spec.ts test/browser/chat.spec.ts test/browser/nav.spec.ts
 ```

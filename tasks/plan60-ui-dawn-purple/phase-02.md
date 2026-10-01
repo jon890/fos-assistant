@@ -1,13 +1,13 @@
-# Phase 02. 공통 부품: 의미 색 배지, 알림 상자, 스위치, 비활성 단추, 모서리
+# Phase 02. 의미 색 배지와 알림 상자 부품
 
 **Execution profile**: deep
 
 ## 목표
 
-상태를 색과 아이콘으로 구분하는 공통 부품을 만들고, 화면마다 손으로 복사한 알림 상자와 「꺼짐」 글자 단추를 그 부품으로 옮긴다.
+상태를 색과 아이콘으로 구분하는 `Badge` 변형과 `Notice` 부품을 만들고, 화면마다 손으로 복사한 알림 상자를 `Notice` 로 옮긴다.
 다른 화면 작업이 같은 부품을 가져다 쓰게 하려는 것이다.
 
-**범위 외**: 대화의 작업 과정 블록과 문구는 phase 03. 사용량 화면의 역할별 표시는 phase 04. 움직임은 phase 05.
+**범위 외**: 스위치, 비활성 단추, 모서리, `NativeSelect` 는 phase 03. 대화의 작업 과정 블록과 문구는 phase 04. 사용량 화면의 역할별 표시는 phase 05. 움직임은 phase 06.
 
 ## 컨텍스트
 
@@ -21,8 +21,7 @@
 ## 의도 메모
 
 - 알림 상자를 Radix 나 shadcn 의 `Alert` 로 받지 않고 직접 만든다. 필요한 것은 색 넷과 아이콘 하나이고 동작이 없다.
-- 스위치는 `<button role="switch">` 로 만든다. 지금 켜고 끄기가 단추의 `onClick` 으로 저장 요청을 보내고 `loading` 을 그리므로, 폼 값이 아니라 동작이다. 체크박스로 바꾸면 저장 중 표시를 붙일 자리가 없다.
-- 비활성 단추를 투명도로 그리지 않는다. 강조 색이 바래면 다른 색 단추로 보인다.
+- 변형은 아래 규칙으로 기계적으로 고른다. 줄마다 뜻을 새로 판단하지 않는다.
 
 ## 작업 항목
 
@@ -53,99 +52,44 @@ export function Notice({ variant = "neutral", className, children, ...props }: N
 - `data-slot="notice"` 와 `data-variant` 를 붙인다.
 - 본문은 `<div className="min-w-0 flex-1">` 로 감싼다. 안에 단추가 들어오는 곳이 있다.
 
-`rounded-md bg-muted p-3 text-sm` 이나 `rounded-md bg-muted px-3 py-2 text-sm` 로 손으로 그린 안내와 오류 상자를 `Notice` 로 옮긴다.
-아래 명령으로 후보를 찾고, 하나씩 열어 뜻에 맞는 변형을 고른다. 코드 블록(`markdown.tsx`), 링크 단추(`chat-panel.tsx` 의 「새 대화」 `Link`), 목록 줄처럼 알림이 아닌 것은 옮기지 않는다.
+`rounded-md bg-muted p-3 text-sm` 이나 `rounded-md bg-muted px-3 py-2 text-sm` 로 손으로 그린 안내와 오류 상자를 `Notice` 로 옮긴다. 후보는 아래 명령이 낸다.
 
 ```bash
 # cwd: 저장소 root
 grep -rnE 'rounded-md (border border-border )?bg-muted (p|px)-' web/src
 ```
 
-| 뜻 | 변형 |
-| --- | --- |
-| 요청이 실패했다, 저장하지 못했다 (`error` 상태 값을 그리는 곳, `role="alert"`) | `error` |
-| 조심해야 한다, 켤 수 없다, 표에 없는 도구가 켜져 있다 | `warning` |
-| 설명과 안내 | `info` |
-| 저장했다, 연결됐다 | `success` |
-| 뜻이 정해지지 않는 회색 상자 | `neutral` |
+변형은 아래 순서로 고른다. 위에서 맞으면 아래를 보지 않는다.
+
+| 순서 | 조건 | 변형 |
+| --- | --- | --- |
+| 1 | 옮기지 않는다: `web/src/components/chat/markdown.tsx` 의 `<pre>`, `web/src/components/chat-panel.tsx` 의 「새 대화」 `Link`, `<li>` 나 `<ul>` 인 목록 줄, 폼을 감싼 상자 | 없음 |
+| 2 | `web/src/components/agent/agent-tools-section.tsx` 의 「표에 없는 도구가 켜져 있어요」, `web/src/components/admin/visibility-confirm.tsx` 의 상자, `web/src/components/agent/agent-access-section.tsx` 의 공개 범위 경고 | `warning` |
+| 3 | `role="alert"` 가 있거나, 그리는 값의 이름이 `error`, `...Error`, `failure`, `message`(실패 응답의 문구) 다 | `error` |
+| 4 | 그 밖 | `info` |
+
+`neutral` 은 새 화면이 뜻 없는 회색 상자를 그릴 때를 위한 기본값이다. 이 phase 에서 옮기는 곳에는 쓰지 않는다.
 
 `text-sm text-destructive` 글자만으로 오류를 그리는 곳(`execution-detail.tsx` 의 「실행 정보를 불러오지 못했어요」, `model-picker.tsx` 의 `model-picker-error`, `agent-tools-section.tsx` 의 「이 도구를 켜지 못했어요」)은 줄 안의 짧은 글이라 그대로 둔다.
-`web/src/components/chat/message-list.tsx` 의 `turn-error` 는 `<li>` 안에 `Notice variant="error"` 를 둔다. `data-testid="turn-error"` 는 `<li>` 에 남긴다. 「다시 시도」 는 `Button variant="link" size="xs"` 로 바꾼다. `data-testid="turn-error-retry"` 를 지킨다.
+`web/src/components/chat/message-list.tsx` 의 `turn-error` 는 `<li>` 안에 `Notice variant="error"` 를 둔다(지금은 grep 에 걸리는 `<li>` 지만 알림이므로 옮긴다). `data-testid="turn-error"` 는 `<li>` 에 남긴다. 「다시 시도」 는 `Button variant="link" size="xs"` 로 바꾼다. `data-testid="turn-error-retry"` 를 지킨다.
 같은 파일의 `no-answer` 줄의 「다시 시도」 도 같은 단추로 바꾼다.
 
-### 3. `web/src/components/ui/switch.tsx` 신규
+### 3. 검사
 
-```tsx
-type SwitchProps = Omit<React.ComponentProps<"button">, "onChange"> & {
-  checked: boolean; onCheckedChange(next: boolean): void; loading?: boolean;
-};
-export function Switch(props: SwitchProps)
-```
+`test/browser/design-tokens.spec.ts` 에 더한다.
 
-- `<button type="button" role="switch" aria-checked={checked} aria-busy={loading || undefined}>` 이다. 누르면 `onCheckedChange(!checked)` 를 부른다. `disabled` 이거나 `loading` 이면 누를 수 없다.
-- 모양: 폭 40px, 높이 24px 의 알약 길. 켜지면 `bg-primary`, 꺼지면 `bg-input`. 손잡이는 20px 원 `bg-card` 이고 켜지면 16px 오른쪽으로 옮긴다(`translate-x-4`). `transition-colors` 와 손잡이의 `transition-transform` 을 둔다. 길이는 `duration-fast` 다.
-- 초점: `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`.
-- 비활성: `disabled:cursor-not-allowed disabled:opacity-60`. 스위치는 켜짐과 꺼짐의 색이 이미 달라 투명도를 써도 뜻이 흐려지지 않는다.
-- 접근성 이름은 부르는 쪽이 `aria-label` 로 준다.
-
-옮길 곳:
-
-| 파일 | 지금 | 바꿀 것 |
-| --- | --- | --- |
-| `web/src/components/agent/agent-tools-section.tsx` 의 줄마다 있는 `Button` (`aria-pressed`, 「켜짐」/「꺼짐」) | 글자 단추 | `<Switch checked={tool.enabled} loading={pendingToolName === tool.name} disabled={disabled} title={reason} aria-label={`${tool.label} 도구`} onCheckedChange={() => toggle(tool)} />` |
-| `web/src/components/agent/agent-skills-section.tsx` 의 `editable` 일 때 `Button` | 글자 단추 | `<Switch checked={skill.enabled} loading={pendingName === skill.name && confirming === null} disabled={busy} aria-label={`${skill.name} 스킬`} onCheckedChange={() => void toggle(skill)} />` |
-
-`person-list.tsx` 와 에이전트 관리의 켜고 끄기는 확인 창을 거치는 단추라 그대로 둔다.
-`test/browser/agent-tools.spec.ts`, `test/browser/skills.spec.ts`, `test/browser/admin.spec.ts` 가 이 단추를 「켜짐」, 「꺼짐」 글자와 `aria-pressed` 로 찾는다. `getByRole("switch", { name: ... })` 와 `toHaveAttribute("aria-checked", "true")` 로 고친다. 검사가 확인하던 동작(누르면 저장, 확인 창, 잠김)은 그대로 단언한다.
-
-### 4. `web/src/components/ui/button.tsx` 의 비활성과 눌림
-
-- 공통 클래스의 `disabled:opacity-50` 을 뺀다. 변형마다 비활성 모양을 둔다.
-  - `default`, `destructive`, `secondary`: `disabled:bg-muted disabled:text-muted-foreground`
-  - `outline`, `ghost`, `link`: `disabled:text-muted-foreground`. `outline` 은 `disabled:border-border` 도 둔다
-- `loading` 일 때는 원래 색을 지킨다. 「지금 보내는 중」 과 「누를 수 없음」 이 달라 보여야 한다(`docs/flow.md` 의 「기다리는 동안 보이는 것」). `busy` 일 때 `data-loading` 속성을 붙이고, 비활성 모양을 `disabled:not-data-loading:` 조건으로 건다.
-- `transition-all` 을 `transition-[color,background-color,border-color,transform]` 으로 바꾼다. `active:not-aria-[haspopup]:translate-y-px` 를 `active:not-aria-[haspopup]:scale-[0.97]` 로 바꾼다. 길이는 `duration-fast` 다.
-- `outline` 변형의 테두리는 `border-border` 그대로다.
-- 크기 변형의 `rounded-[min(var(--radius-md),10px)]`, `rounded-[min(var(--radius-md),12px)]`, `in-data-[slot=button-group]:rounded-lg` 를 `rounded-md` 로 맞춘다.
-- `badge.tsx` 의 `transition-all` 도 `transition-colors` 로 바꾼다.
-- `web/src/components/chat/composer.tsx` 의 보내기 단추가 비활성일 때 `muted` 바탕으로 보이는지 확인한다. 그 단추에 따로 적은 `disabled:` 클래스가 있으면 뺀다.
-
-### 5. 모서리 정리
-
-토큰 밖의 모서리 값을 ADR-047 「모서리」 표의 뜻에 맞게 바꾼다.
-
-| 무엇 | 클래스 |
-| --- | --- |
-| 대화 입력창(`composer.tsx`), 그 뼈대(`page-skeleton.tsx`) | `rounded-2xl` |
-| 내 말풍선(`message-bubble.tsx`) | `rounded-xl rounded-br-sm`. 시안의 말꼬리 모양이다 |
-| `Card`(`card.tsx`), 대화상자(`dialog.tsx`, `alert-dialog.tsx`), 메뉴(`dropdown-menu.tsx`), 에이전트 카드(`agent-picker.tsx`, `app/agents/page.tsx`), 연결 카드(`connector-catalog.tsx`), 묻는 카드(`ask-card.tsx`), 작업 과정 블록(`activity-block.tsx`), 멘션과 스킬 메뉴(`agent-mention.tsx`, `skill-command-menu.tsx`)의 바깥 | `rounded-lg` |
-| 메뉴 안의 줄, 실행 카드의 링크 초점 테두리 | `rounded-md` |
-
-`rounded-3xl` 과 `rounded-[...]` 가 `web/src` 에 남지 않아야 한다. `test/unit/design-tokens.test.ts` 에 이 둘이 없다는 검사를 더한다(`web/src` 의 `.tsx` 와 `.ts` 를 읽는다).
-
-### 6. `NativeSelect` 와 사이드바 검색칸
-
-- `web/src/components/ui/native-select.tsx`: `appearance-none` 으로 브라우저 화살표를 가리고, `<span className="relative">` 로 감싸 오른쪽에 `ChevronDown` 아이콘(`pointer-events-none absolute`, `text-muted-foreground`)을 둔다. `className` 은 지금처럼 `<select>` 에 준다. 오른쪽 안쪽 여백을 아이콘만큼 늘린다. 감싼 요소는 `block w-full` 이어야 지금 폭이 그대로다. 주석의 「펼침 화살표는 브라우저의 것을 그대로 둔다」 를 고친다.
-- `web/src/components/shell/sidebar.tsx` 의 맨 `<input>` 검색칸을 `Input` 부품으로 바꾼다. `ref`(`searchRef`), 접근성 이름, 단축키 동작을 지킨다. 바탕은 `bg-background` 로 둔다.
-
-### 7. 검사
-
-- `test/browser/design-tokens.spec.ts` 에 더한다.
-  - 사용량 실행 기록(`/usage?tab=executions`)에서 성공 배지의 글자색이 `--success`, 바탕이 `--success-soft` 다. 검사 대역이 만든 성공 실행 하나를 쓴다. 기존 `usage.spec.ts` 가 실행을 만드는 방법을 따른다.
-  - 비활성 보내기 단추(빈 입력)의 바탕이 `--muted`, 글자색이 `--muted-foreground` 이고 `opacity` 가 `1` 이다.
-  - `[data-slot="notice"][data-variant="error"]` 의 바탕이 `--destructive-soft` 다. `chat.spec.ts` 가 `turn-error` 를 만드는 방법(대역이 붐빔을 돌려주는 에이전트)을 따른다.
-- 스위치: `test/browser/agent-tools.spec.ts` 에 「스위치를 Space 로 켜고 끈다」 를 더한다. `role="switch"` 에 초점을 두고 Space 를 눌러 `aria-checked` 가 바뀌는 것을 본다.
-- 기존 검사가 「꺼짐」, 「켜짐」 글자를 배지에서 찾는 곳(`people.spec.ts`, `admin.spec.ts`)은 글자가 그대로라 고칠 필요가 없다. 돌려서 확인한다.
+- 사용량 실행 기록(`/usage?tab=executions`)에서 성공 배지의 글자색이 `--success`, 바탕이 `--success-soft` 다. `test/browser/usage.spec.ts` 가 실행을 만드는 방법(대화를 하나 보내고 끝나길 기다린다)을 따른다.
+- `[data-slot="notice"][data-variant="error"]` 의 바탕이 `--destructive-soft` 이고 글자색이 `--destructive` 다. `turn-error` 는 `test/browser/shell.spec.ts` 196~211줄의 방법(스트림 응답을 가로채 실패 사건을 넣는다)으로 만든다. 붐빔 거절은 `turn-error` 를 만들지 않는다.
+- 같은 검사에서 그 상자 안에 `svg` 아이콘이 하나 있다.
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
 node --test test/unit/design-tokens.test.ts
-! grep -rnE 'rounded-3xl|rounded-\[' web/src
-! grep -rnE 'disabled:opacity-50' web/src/components/ui/button.tsx
+! grep -rnE 'rounded-md bg-muted (p-3|px-3 py-2) text-sm' web/src/components/agent web/src/components/connector web/src/components/admin web/src/app
 cd web && pnpm typecheck && pnpm lint
-cd web && pnpm test:browser test/browser/design-tokens.spec.ts test/browser/agent-tools.spec.ts test/browser/skills.spec.ts test/browser/admin.spec.ts test/browser/people.spec.ts test/browser/usage.spec.ts test/browser/chat.spec.ts test/browser/shell.spec.ts test/browser/memory.spec.ts test/browser/connector-connection.spec.ts test/browser/persona.spec.ts
+cd web && pnpm test:browser test/browser/design-tokens.spec.ts test/browser/usage.spec.ts test/browser/chat.spec.ts test/browser/shell.spec.ts test/browser/memory.spec.ts test/browser/connector-connection.spec.ts test/browser/persona.spec.ts test/browser/agent-tools.spec.ts test/browser/skills.spec.ts test/browser/admin.spec.ts test/browser/people.spec.ts test/browser/execution-tree.spec.ts
 ```
 
 기대값: 모두 종료 코드 0.
@@ -155,19 +99,9 @@ cd web && pnpm test:browser test/browser/design-tokens.spec.ts test/browser/agen
 | 파일 | 변경 |
 |---|---|
 | `web/src/components/ui/notice.tsx` | 신규 |
-| `web/src/components/ui/switch.tsx` | 신규 |
 | `web/src/components/ui/badge.tsx` | 수정 |
-| `web/src/components/ui/button.tsx` | 수정 |
-| `web/src/components/ui/card.tsx` | 수정 |
-| `web/src/components/ui/dialog.tsx` | 수정 |
-| `web/src/components/ui/alert-dialog.tsx` | 수정 |
-| `web/src/components/ui/dropdown-menu.tsx` | 수정 |
-| `web/src/components/ui/native-select.tsx` | 수정 |
-| `web/src/components/ui/page-skeleton.tsx` | 수정 |
-| `web/src/components/shell/sidebar.tsx` | 수정 |
 | `web/src/components/chat-panel.tsx` | 수정 |
 | `web/src/components/chat/*.tsx` | 수정 |
-| `web/src/components/chat/activity/activity-block.tsx` | 수정 |
 | `web/src/components/agent/*.tsx` | 수정 |
 | `web/src/components/admin/*.tsx` | 수정 |
 | `web/src/components/connector/*.tsx` | 수정 |
@@ -175,11 +109,6 @@ cd web && pnpm test:browser test/browser/design-tokens.spec.ts test/browser/agen
 | `web/src/components/usage/*.tsx` | 수정 |
 | `web/src/components/execution/execution-detail.tsx` | 수정 |
 | `web/src/app/admin/people/people-admin-panel.tsx` | 수정 |
-| `web/src/app/agents/page.tsx` | 수정 |
 | `web/src/app/agents/[code]/page.tsx` | 수정 |
 | `web/src/app/agents/[code]/skills/[name]/page.tsx` | 수정 |
-| `test/unit/design-tokens.test.ts` | 수정 |
 | `test/browser/design-tokens.spec.ts` | 수정 |
-| `test/browser/agent-tools.spec.ts` | 수정 |
-| `test/browser/skills.spec.ts` | 수정 |
-| `test/browser/admin.spec.ts` | 수정 |

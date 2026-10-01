@@ -1,137 +1,170 @@
-# Phase 04. 사용량과 에이전트 화면의 내부 값을 역할에 따라 가린다
+# Phase 04. 대화의 작업 과정을 사람 말 한 줄로 접고 자리를 고정한다
 
-**Execution profile**: standard
+**Execution profile**: deep
 
 ## 목표
 
-`MEMBER` 역할 사용자의 사용량, 실행 상세, 에이전트 상세 화면에서 금액, 모델 이름, 토큰 수, effort, 오류 코드, 영어 도구 이름을 빼거나 사람 말로 바꾼다.
-`ADMIN` 은 지금 값을 그대로 본다. 일반 사용자 화면이 운영 화면처럼 읽히지 않게 하려는 것이다.
+대화 안 작업 과정 블록에서 도구 수, 하위 에이전트 수, 모델 이름, 토큰 수를 빼고 사람 말 한 줄로 접는다.
+기다림 점, 진행 중 블록, 끝난 블록, 답 본문이 같은 자리에 들어오게 해 높이 튐을 없앤다.
+대화가 실행 기록보다 먼저 읽히게 하려는 것이다.
 
-**범위 외**: 화면 구조(탭 재배치, 폼과 목록의 순서)는 바꾸지 않는다. Control Plane 의 응답은 바꾸지 않는다. 모델을 고르는 대화상자와 실행 상세의 모델 단계 표시는 다른 작업이 만든다.
+**범위 외**: 펼침과 등장의 움직임은 phase 06. 사용량 화면과 실행 상세는 phase 05. 모델 단계 칩과 대기 칩은 다른 작업이 만든다.
 
 ## 컨텍스트
 
-- 역할은 `web/src/components/shell/app-shell.tsx` 의 `useShellIsAdmin()` 이 준다. 서버 컴포넌트는 `web/src/lib/me.ts` 의 `readMe()` 로 `role` 을 읽는다. `web/src/app/memory/page.tsx` 가 그 패턴이다.
-- `web/src/app/usage/page.tsx` 가 탭 넷을 그린다. 탭 목록은 `web/src/components/usage/usage-tabs.tsx` 의 `USAGE_TABS` 와 `parseUsageTab` 이 갖는다.
-- 실행 기록은 좁은 폭에서 `execution-card.tsx`, 넓은 폭에서 `execution-table.tsx` 다. 둘 다 `execution-list.tsx` 의 도우미를 쓴다.
-- 실행 상세는 `web/src/components/execution/execution-detail.tsx` 가 머리 요약을, `execution-event-row.tsx` 가 줄을 그린다. 실패 줄은 `실행 실패: {detail}` 이고 `detail` 에 `HERMES_BUSY` 같은 오류 코드가 온다.
-- 오류 코드를 문구로 바꾸는 표는 `web/src/components/error-message.ts` 의 `describeError(code, fallback)` 이다.
-- 도구 묶음의 `label` 과 `description` 은 Hermes 가 준 영어 이름과 평서체 설명이다. `name` 이 키다: `web`, `vision`, `todo`, `clarify`, `session_search`, `skills`, `tts`, `delegation`, `terminal`, `file`, `code_execution`, `browser`, `computer_use`, `cronjob`, `image_gen`, `video_gen`, `homeassistant`, `spotify`, `discord`.
-- 브라우저 검사의 기본 사용자는 관리자다. `MEMBER` 로 검사하는 방법은 `test/browser/fixtures.ts` 와 `test/browser/people.spec.ts`, `test/browser/agent-lifecycle.spec.ts` 에서 찾는다.
+- `web/src/components/chat/activity/activity-block.tsx` 가 블록이다. `mode="live"` 는 흘러온 사건의 `ActivityState` 를, `mode="saved"` 는 `ActivitySummary`(`{ toolCount, subagentCount, durationMs }`)를 받고 펼칠 때 실행 나무를 읽는다.
+- `web/src/components/chat/activity/activity-timeline.tsx` 가 펼친 줄을 그린다. 하위 에이전트 줄 아래에 모델과 토큰 줄이 있다.
+- `web/src/components/chat/activity/activity-state.ts` 와 `web/src/lib/tool-label.ts`, `web/src/lib/format.ts` 는 `node --test` 가 직접 읽는다. 상대 경로 import 를 지킨다(`web/AGENTS.md` 의 「상대 경로 import 예외」).
+- `web/src/components/chat/message-list.tsx` 가 진행 중 블록을 `<li>` 로 따로 그린다. 답이 아직 없으면 목록 끝에, 답이 흘러나오면 그 답 `MessageBubble` 바로 위 줄에 그린다. 저장된 답은 `web/src/components/chat/message-bubble.tsx` 가 「비서」 이름 아래에 블록을 그린다. 그래서 끝나는 순간 블록이 이름 위에서 아래로 옮겨 간다.
+- `web/src/components/chat/waiting-indicator.tsx` 는 얼굴과 「비서」 글자와 점 셋을 한 줄로 그린다. 답이 오면 이 `<li>` 가 사라지고 `MessageBubble` 이 생긴다.
+- 작업 과정 패널(`activity-panel.tsx`)은 같은 `ActivityTimeline` 을 쓴다.
 
-**근거 문서**: `docs/code-architecture.md` 의 「사용량 화면의 탭」 절, `docs/flow.md` 의 「실행이 실패할 때」 절, `web/AGENTS.md` 의 「화면 문구」 절, `docs/prd.md`
+**근거 문서**: `docs/flow.md` 의 「기다리는 동안 보이는 것」, 「작업 과정」, 「도구를 보이는 말」, 「끝난 답에서 다시 볼 때」 절. `web/AGENTS.md` 의 「화면 문구」 절. `docs/adr/ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md`
 
 ## 의도 메모
 
-- 화면에서만 가린다. 비밀을 지키는 경계가 아니라 읽기 쉽게 하는 것이다. 응답에는 값이 그대로 온다.
-- 다른 작업이 실행 기록에 모델 단계(빠르게, 균형, 깊게)를 보인다. 역할 규칙을 같게 둔다: `ADMIN` 은 실제 값 전부, `MEMBER` 는 단계 이름과 걸린 시간만. 이 phase 는 숨기는 쪽만 한다.
-- 도구 이름을 Control Plane 이 한국어로 주게 바꾸지 않는다. 화면 문구는 화면이 갖는다.
+- 접힌 한 줄을 모델에게 만들게 하지 않는다. 저장된 답은 수만 알고 있어, 그 수로 고르는 고정 문장을 쓴다. 백엔드를 바꾸지 않는다.
+- 하위 에이전트의 모델과 토큰은 역할과 관계없이 대화에 그리지 않는다. 그 값은 사용량 화면이 관리자에게 보인다.
+- `ActivityItem` 의 `model`, `inputTokens`, `outputTokens` 칸은 지우지 않는다. 다른 작업이 실행 기록 표시에 쓴다.
+- `data-testid` 는 모두 지킨다: `activity-block`, `activity-toggle`, `activity-scroll`, `activity-item`, `activity-open-panel`, `activity-load-error`, `flow-slow-notice`.
 
 ## 작업 항목
 
-### 1. `web/src/components/usage/usage-tabs.tsx` 와 `web/src/app/usage/page.tsx`
+### 1. `web/src/lib/tool-label.ts` 의 문장
 
-- `UsageTabs` 에 `isAdmin: boolean` 을 더한다. `MEMBER` 에게는 `fingerprints` 탭을 그리지 않는다. 탭 이름 「입력 지문」 을 `web/AGENTS.md` 용어 표의 「설정별 사용량」 으로 바꾼다.
-- `parseUsageTab(value, isAdmin)` 으로 바꿔, `MEMBER` 가 `?tab=fingerprints` 로 오면 `summary` 를 돌려준다.
-- `page.tsx` 는 `readMe()` 로 역할을 읽는다. `MEMBER` 면 breakdown 두 조회를 부르지 않는다.
-- 머리 문장: `ADMIN` 은 지금 문장, `MEMBER` 는 「이번 달에 비서와 한 일을 모아 보여 드려요.」
-- 요약 탭: `MEMBER` 에게는 `MonthlySummary` 에 `isAdmin={false}` 를 줘 실행 건수 `Stat` 하나만 그린다(라벨 「이번 달 실행」, 값 `n건`, 설명 없음). `BreakdownSection` 은 그리지 않는다.
+`LABELS` 와 `UNKNOWN` 을 `docs/flow.md` 「도구를 보이는 말」 표의 새 문장으로 바꾼다. 함수 시그니처는 그대로다.
 
-### 2. `web/src/components/usage/execution-card.tsx`, `execution-table.tsx`, `execution-list.tsx`
+### 2. `web/src/lib/format.ts`
 
-`ExecutionList` 가 `useShellIsAdmin()` 을 읽어 `isAdmin` 을 카드와 표에 넘긴다. `ExecutionList` 가 서버 컴포넌트면 `page.tsx` 가 `isAdmin` 을 넘긴다.
+- `subagentLabel` 의 마지막 대체 문장 `"하위 에이전트"` 를 `"도우미"` 로 바꾼다.
+- `formatSeconds(milliseconds: number): string | null` 을 더한다. 1,000 미만이면 `null`, 그 밖에는 `formatElapsed` 와 같은 「n초」, 「n분 n초」 다. 대화의 줄은 이 함수를 쓴다. `formatDuration` 은 사용량 화면이 계속 쓴다.
 
-| 값 | `ADMIN` | `MEMBER` |
-| --- | --- | --- |
-| 에이전트 이름, 시각, 걸린 시간, 상태 배지, 스킬 이름, 다시 보낸 실행 표시 | 보인다 | 보인다 |
-| 에이전트 코드, 금액 둘, provider 와 모델, effort, 토큰, 문맥 글자 수, 문맥이 빠졌다는 줄, `title` 의 가격표 판 | 보인다 | 그리지 않는다 |
-
-걸린 시간은 `MEMBER` 에게 `formatSeconds` 로 보이고 1초 미만이면 「1초 미만」 이다. `ADMIN` 은 `formatDuration` 그대로다.
-표의 열 머리도 `MEMBER` 에게는 남는 열만 그린다.
-`data-testid` 는 그리는 요소에서 그대로 지킨다.
-
-### 3. `web/src/components/execution/execution-detail.tsx` 와 `execution-event-row.tsx`
-
-- 머리 요약 `dl`: `MEMBER` 에게는 에이전트, 상태, 걸린 시간만 그린다. 모델, 입력 토큰, 출력 토큰, 환산 금액은 `ADMIN` 만.
-- 제목: `summary.agentName ?? summary.agentCode ?? ...` 에서 `MEMBER` 에게는 `agentCode` 대신 `agentLabel(summary.agentName)` 을 쓴다.
-- 실패 줄: `ExecutionEventRow` 에 `isAdmin` 을 넘긴다(`ExecutionTree` 와 `ExecutionNode` 를 거친다. `activity-panel.tsx` 가 `ExecutionTree` 를 쓰면 거기서도 넘긴다).
-  - `MEMBER`: `실행 실패: ${describeError(detail, "실행을 마치지 못했어요.")}`. `detail` 이 없으면 `실행 실패`.
-  - `ADMIN`: `실행 실패: ${describeError(detail, detail)} (${detail})`. 표에 없는 코드면 `실행 실패: ${detail}`.
-  - 글자색을 `text-destructive` 로 둔다.
-- `ExecutionNode` 의 이름 `node.agentName ?? node.agentCode` 도 `MEMBER` 에게는 `agentLabel(node.agentName)` 이다.
-
-### 4. `web/src/lib/toolset-label.ts` 신규
+### 3. `web/src/components/chat/activity/activity-state.ts` 의 접힌 한 줄
 
 ```ts
-export function toolsetText(name: string, fallback: { label: string; description: string }): { label: string; description: string }
+export function activitySummaryLabel(counts: { toolCount: number; subagentCount: number },
+  outcome: "done" | "stopped" | "failed"): string
 ```
 
-| `name` | 이름 | 설명 |
-| --- | --- | --- |
-| `web` | 웹 검색 | 웹에서 찾아봐요 |
-| `vision` | 사진 보기 | 올린 사진을 읽어요 |
-| `todo` | 할 일 정리 | 긴 일을 할 일로 나눠 챙겨요 |
-| `clarify` | 되묻기 | 모호하면 먼저 물어봐요 |
-| `session_search` | 지난 대화 찾기 | 예전 대화에서 찾아봐요 |
-| `skills` | 스킬 | 올려 둔 스킬을 써요 |
-| `tts` | 소리 내어 읽기 | 글을 음성으로 읽어요 |
-| `delegation` | 도우미에게 맡기기 | 일을 나눠 도우미에게 맡겨요 |
-| `terminal` | 명령 실행 | 서버에서 명령을 실행해요 |
-| `file` | 파일 | 파일을 읽고 써요 |
-| `code_execution` | 코드 실행 | 코드를 돌려 계산해요 |
-| `browser` | 브라우저 | 웹 페이지를 열어 조작해요 |
-| `computer_use` | 컴퓨터 조작 | 화면을 보고 컴퓨터를 조작해요 |
-| `cronjob` | 예약 실행 | 정한 시각에 일을 해요 |
-| `image_gen` | 그림 만들기 | 그림을 만들어요 |
-| `video_gen` | 동영상 만들기 | 동영상을 만들어요 |
-| `homeassistant` | 집 기기 | 집의 기기를 살피고 조작해요 |
-| `spotify` | Spotify | 음악을 틀고 멈춰요 |
-| `discord` | Discord | Discord 에 글을 보내고 읽어요 |
+| 조건 | 문장 |
+| --- | --- |
+| `outcome === "stopped"` | 하다가 멈췄어요 |
+| `outcome === "failed"` | 끝까지 하지 못했어요 |
+| 도구와 하위 에이전트가 모두 1 이상 | 찾아보고 도우미와 함께 정리했어요 |
+| 하위 에이전트만 1 이상 | 도우미와 함께 정리했어요 |
+| 도구만 1 이상 | 필요한 것을 확인하고 답했어요 |
+| 둘 다 0 | 차례로 정리했어요 |
 
-표에 없는 `name` 은 `fallback` 을 그대로 돌려준다. 다른 모듈을 import 하지 않는다(`node --test` 가 직접 읽는다).
+진행 중에 끝난 블록(`mode="live"`, `endedAt !== null`)의 `outcome` 은 항목에 `stopped` 가 있으면 `"stopped"`, `unfinished` 나 `result-missing` 이 있으면 `"failed"`, 그 밖에는 `"done"` 이다.
+저장된 블록은 `cancelled` 면 `"stopped"`, 그 밖에는 `"done"` 이다.
 
-`web/src/components/agent/agent-tools-section.tsx`:
+### 4. `web/src/components/chat/activity/activity-block.tsx`
 
-- 줄의 이름과 설명, 스위치의 `aria-label`, 확인 창 제목(`{confirming.label} 도구 켜기`)에 `toolsetText` 를 쓴다.
-- 묶음 제목 「주인 등급」 을 「바로 켤 수 있어요」, 「관리자 등급」 을 「관리자만 켤 수 있어요」 로 바꾼다. 오른쪽 위 배지(「관리자」/「주인」)는 뺀다.
-- `web/src/components/agent/agent-skills-section.tsx` 의 배지 「Hermes 기본」 을 「기본 스킬」 로 바꾼다.
+- 접힌 줄의 글자를 바꾼다.
+  - 도는 중: `<span data-testid="activity-signal">` 로 `size-2 rounded-full bg-signal ring-2 ring-pill` 점, 지금 도는 줄의 말(`activityLabel(latest)`, 없으면 「준비하고 있어요」), `formatElapsed` 의 흐른 시간(`text-muted-foreground tabular-nums`).
+  - 끝남: 상태 아이콘(`done` 은 `CircleCheck` 에 `text-success`, `stopped` 는 `Square` 에 `text-muted-foreground`, `failed` 는 `CircleAlert` 에 `text-destructive`)과 `activitySummaryLabel` 의 문장.
+  - 화살표는 오른쪽 끝에 `ChevronRight` 하나를 두고 펼치면 `rotate-90` 을 준다. `ChevronDown` 과 번갈아 그리지 않는다.
+  - 단추 안 맨 앞에 `<span className="sr-only">작업 과정: </span>` 을 둔다.
+- 모양: `rounded-lg border border-border bg-card text-foreground-soft`. 단추는 `min-h-11`(44px) 이고 글자는 `text-[0.8125rem] font-medium` 이다.
+- 펼친 목록 아래 줄: 왼쪽에 걸린 시간(`걸린 시간 ${formatElapsed(...)}`. live 는 `endedAt - startedAt`, saved 는 `summary.durationMs`, 값이 없거나 도는 중이면 그리지 않는다), 오른쪽에 「자세히 보기」 단추. `data-testid="activity-duration"` 을 붙인다.
+- `activity-load-error` 의 문장과 「다시 읽기」 는 그대로 둔다.
+- `fetch` 는 지금처럼 둔다. 이 파일은 이미 eslint 기준에 있다.
 
-### 5. 검사
+### 5. `web/src/components/chat/activity/activity-timeline.tsx`
 
-- `test/unit/toolset-label.test.ts` 신규: 표의 `name` 열아홉이 모두 한국어 이름을 갖는다, 모르는 `name` 은 `fallback` 을 돌려준다, 설명이 모두 「요」 로 끝난다.
-- `test/browser/usage.spec.ts` 에 `MEMBER` 검사를 더한다: 실행 기록에 `USD`, `example-model`, `effort`, `문맥` 이 없고 에이전트 이름과 상태 배지가 있다. 요약 탭에 「API 가격」 이 없다. `?tab=fingerprints` 로 가면 요약 탭이 열린다.
-- 같은 파일의 기존 관리자 검사는 그대로 통과해야 한다. 탭 이름을 「설정별 사용량」 으로 찾게 고친다(`usage-breakdown.spec.ts` 포함).
-- `test/browser/execution-tree.spec.ts` 에 더한다: 붐빔으로 실패한 실행의 상세를 `MEMBER` 로 열면 `HERMES_BUSY` 가 없고 「지금 요청이 많아요」 가 있다. 관리자는 둘 다 본다.
-- `test/browser/agent-tools.spec.ts`: 도구 이름을 영어 `label` 로 찾는 곳을 한국어 이름으로 고친다. 「주인 등급」, 「관리자 등급」 을 찾는 곳도 고친다.
-- `test/browser/skills.spec.ts`: 「Hermes 기본」 을 찾는 곳을 고친다.
+- 하위 에이전트 줄의 앞 글자 `하위 에이전트` 를 `도우미` 로 바꾼다.
+- 모델과 토큰을 그리는 `<p>` 를 지운다. `result-missing` 일 때의 「결과를 받지 못함」 줄은 위쪽 `<p>` 가 이미 그리므로 남는다.
+- 걸린 시간은 `formatSeconds` 를 쓰고 `null` 이면 그리지 않는다.
+- 아이콘 색: `done` 은 `text-success`, `failed` 는 `text-destructive`, 그 밖에는 `text-muted-foreground`. `failed` 줄은 글자 뒤에 `<span className="text-destructive">실패</span>` 를 보이게 그리고 `sr-only` 의 「실패」 는 뺀다.
+- 글자 크기는 `text-sm`, 줄 글자색은 `text-foreground-soft` 다.
+
+### 6. 같은 자리에 들어오게 한다
+
+`web/src/components/chat/message-bubble.tsx` 에서 비서 줄의 틀을 꺼내 함께 쓴다.
+
+```tsx
+/** 비서 얼굴과 이름을 먼저 그리고, 그 아래 칸에 기다림 점이나 작업 과정이나 답을 받는다. */
+export function AssistantRow({ header, children, ...props }: React.ComponentProps<"li"> & { header?: React.ReactNode })
+```
+
+- `AssistantRow` 는 지금 비서 `<li>` 의 `grid grid-cols-[2rem_minmax(0,1fr)] gap-2`, 얼굴 `<span>`, 「비서」 이름 줄(`min-h-8`)을 그린다. `header` 는 이름 옆(보낸 시각)이다.
+- `MessageBubble` 에 `liveActivity?: React.ReactNode` 를 더한다. 주어지면 저장된 블록 자리(이름 아래, 본문 위 `<div className="mb-2">`)에 그것을 그린다. `turn.activity` 의 저장된 블록보다 먼저 본다.
+- `web/src/components/chat/message-list.tsx`:
+  - 답이 흘러나오는 중(`pendingAssistant`)의 진행 중 블록을 별도 `<li>` 로 그리지 않고 `MessageBubble` 의 `liveActivity` 로 넘긴다.
+  - 답이 아직 없을 때의 두 줄을 `AssistantRow` 하나로 합친다. 지금 조건은 둘이다: `!streamedAnswer && activity && activity.items.length > 0` 이면 진행 중 블록, `!streamedAnswer && sending && (!activity || activity.items.length === 0)` 이면 기다림 점. 둘 중 하나가 참일 때만 `AssistantRow` 를 그리고 그 안에 해당하는 것을 둔다. 둘 다 거짓이면 아무것도 그리지 않는다.
+  - 그 `<li>` 에 `data-testid="pending-assistant"` 를 붙인다. 오류로 끝난 turn 의 블록(`sending` 이 거짓이고 `activity` 가 남은 때)도 첫 조건으로 이 줄에 그려지므로 그때도 붙는다.
+- `web/src/components/chat/waiting-indicator.tsx`: 얼굴과 「비서」 글자를 빼고 점 셋과 줄인 움직임의 대체 문장만 남긴 `<div aria-label="비서의 답을 기다리는 중" role="status">` 로 바꾼다. 높이는 `min-h-7`(본문 한 줄의 `leading-7`)이다. 점은 `●` 글자 대신 `size-1.5 rounded-full bg-foreground-soft` 인 `<span>` 셋이다.
+- 메시지를 읽는 동안의 뼈대 높이 `h-[4.25rem]`(`message-list.tsx`, `page-skeleton.tsx`)은 기다림 줄과 무관하므로 그대로 둔다.
+
+### 7. 실행 나무의 같은 말
+
+`web/src/components/execution/execution-event-row.tsx` 의 `하위 에이전트: ` 를 `도우미: ` 로 바꾼다. `toolLabel` 의 새 문장이 그대로 쓰인다.
+`web/src/components/usage/execution-card.tsx` 의 `aria-label` 「하위 실행 있음」 은 그대로 둔다.
+
+### 8. 입력창 안내 문구
+
+`web/src/components/chat/composer.tsx` 의 `placeholder` 를 두 경우 모두 `"무엇이든 물어보세요"` 로 바꾼다.
+`web/src/components/chat/message-list.tsx` 의 빈 대화 문장 「무엇이든 물어봐 주세요.」 도 「무엇이든 물어보세요.」 로 맞춘다.
+`@` 안내는 입력창 아래 도움말이 이미 있으면 그대로 두고, 없으면 더하지 않는다.
+
+### 9. 검사
+
+- `test/unit/tool-label.test.ts`, `test/unit/subagent-label.test.ts`, `test/unit/activity-state.test.ts`: 새 문장에 맞춘다. `activity-state.test.ts` 에 `activitySummaryLabel` 의 여섯 조건을 더한다.
+- 새 단위 테스트를 `test/unit/activity-state.test.ts` 에 더한다: `formatSeconds(999)` 는 `null`, `formatSeconds(2_100)` 은 「2초」.
+- 브라우저 검사에서 옛 문장을 찾는 곳을 고친다. 아래로 찾는다.
+
+  ```bash
+  # cwd: 저장소 root
+  grep -rnE '하위 에이전트|작업 과정 ·|도구 [0-9]|입력 [0-9]|출력 [0-9]|하는 중|읽기"|@로 에이전트|물어봐 주세요|도와드릴까요' test/browser test/unit
+  ```
+
+  `test/e2e` 의 「하위 에이전트」 는 대역의 목표 글과 주석이다. 화면 문구가 아니므로 고치지 않는다.
+- `test/browser/activity-panel.spec.ts` 나 `test/browser/flow-progress.spec.ts` 에 더한다.
+  - 끝난 답의 접힌 블록에 「도구 」, 「하위 에이전트」, 「입력 」, 「출력 」, `example-model` 이 없다. 펼친 뒤에도 없다.
+  - 펼친 블록에 `activity-duration` 이 보인다.
+  - **자리 고정**: 도구를 쓰는 답을 보낸다. 진행 중 블록(`[data-testid="activity-block"][data-mode="live"]`)의 `top` 이 같은 줄 「비서」 이름 글자의 `bottom` 보다 크거나 같다. 답이 아직 없을 때와 답이 흘러나오는 중 두 시점 모두에서 단언한다. 지금 코드는 블록이 이름 위에 있어 이 단언이 실패한다.
+  - **기다림에서 답으로**: 도구를 쓰지 않는 답을 보낸다. `pending-assistant` 줄의 얼굴 `getBoundingClientRect().top` 과 답이 온 뒤 `assistant-message` 의 얼굴 `top` 이 같다(스크롤이 움직이지 않게 한 화면에 들어오는 짧은 대화로 검사한다). 기다림 점의 `top` 과 답 본문 첫 줄의 `top` 차이가 4px 이하다.
+- `test/browser/start-screen.spec.ts` 의 `@로 에이전트` placeholder 단언을 새 문구로 고친다.
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-node --test test/unit/toolset-label.test.ts test/unit/error-message.test.ts
-! grep -rnE '주인 등급|관리자 등급|Hermes 기본|입력 지문' web/src
+node --test test/unit/tool-label.test.ts test/unit/subagent-label.test.ts test/unit/activity-state.test.ts
+! grep -rnE '하위 에이전트' web/src/components/chat web/src/lib web/src/components/execution/execution-event-row.tsx
 cd web && pnpm typecheck && pnpm lint
-cd web && pnpm test:browser test/browser/usage.spec.ts test/browser/usage-breakdown.spec.ts test/browser/execution-tree.spec.ts test/browser/agent-tools.spec.ts test/browser/skills.spec.ts test/browser/activity-panel.spec.ts
+cd web && pnpm test:browser test/browser/activity-panel.spec.ts test/browser/flow-progress.spec.ts test/browser/start-screen.spec.ts test/browser/execution-tree.spec.ts test/browser/chat.spec.ts test/browser/chat-delegation-wake.spec.ts test/browser/observe-running.spec.ts test/browser/activity-scroll.spec.ts test/browser/stop.spec.ts test/browser/loading.spec.ts
+cd web && pnpm test:browser
 ```
 
-기대값: 모두 종료 코드 0.
+기대값: 모두 종료 코드 0. 마지막 줄은 전체 브라우저 검사다. 문구를 찾는 검사가 여러 파일에 흩어져 있어 전체를 돌린다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `web/src/lib/toolset-label.ts` | 신규 |
-| `test/unit/toolset-label.test.ts` | 신규 |
-| `web/src/app/usage/page.tsx` | 수정 |
-| `web/src/components/usage/*.tsx` | 수정 |
-| `web/src/components/execution/*.tsx` | 수정 |
-| `web/src/components/chat/activity/activity-panel.tsx` | 수정 |
-| `web/src/components/agent/agent-tools-section.tsx` | 수정 |
-| `web/src/components/agent/agent-skills-section.tsx` | 수정 |
-| `web/eslint.config.mjs` | 수정 |
-| `test/browser/usage.spec.ts` | 수정 |
-| `test/browser/usage-breakdown.spec.ts` | 수정 |
+| `web/src/lib/tool-label.ts` | 수정 |
+| `web/src/lib/format.ts` | 수정 |
+| `web/src/components/chat/activity/activity-state.ts` | 수정 |
+| `web/src/components/chat/activity/activity-block.tsx` | 수정 |
+| `web/src/components/chat/activity/activity-timeline.tsx` | 수정 |
+| `web/src/components/chat/message-bubble.tsx` | 수정 |
+| `web/src/components/chat/message-list.tsx` | 수정 |
+| `web/src/components/chat/waiting-indicator.tsx` | 수정 |
+| `web/src/components/chat/composer.tsx` | 수정 |
+| `web/src/components/execution/execution-event-row.tsx` | 수정 |
+| `test/unit/tool-label.test.ts` | 수정 |
+| `test/unit/subagent-label.test.ts` | 수정 |
+| `test/unit/activity-state.test.ts` | 수정 |
+| `test/browser/activity-panel.spec.ts` | 수정 |
+| `test/browser/flow-progress.spec.ts` | 수정 |
+| `test/browser/start-screen.spec.ts` | 수정 |
 | `test/browser/execution-tree.spec.ts` | 수정 |
-| `test/browser/agent-tools.spec.ts` | 수정 |
-| `test/browser/skills.spec.ts` | 수정 |
+| `test/browser/chat.spec.ts` | 수정 |
+| `test/browser/chat-delegation-wake.spec.ts` | 수정 |
+| `test/browser/observe-running.spec.ts` | 수정 |
+| `test/browser/activity-scroll.spec.ts` | 수정 |
+| `test/browser/stop.spec.ts` | 수정 |
+| `test/browser/loading.spec.ts` | 수정 |
+
+위 표의 브라우저 검사 가운데 옛 문구가 없어 고칠 것이 없는 파일은 건드리지 않는다. 표에 없는 검사 파일에서 옛 문구를 찾으면 고치고 phase 결과에 적는다.
