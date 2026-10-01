@@ -1,0 +1,15 @@
+{
+  "name": "plan61-memory-v2",
+  "description": "Memory 표를 collection, 종류, 꺼내는 방식, 민감도, 판, 출처로 넓히고 에이전트가 허용된 collection 만 받게 한다 — 영역이 다른 개인 지식을 한 표에 모아도 에이전트가 받는 범위가 영역으로 한정되게 한다",
+  "status": "in_progress",
+  "created_at": "2026-10-02",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    }
+  ]
+}

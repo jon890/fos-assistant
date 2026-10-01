@@ -72,7 +72,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
-커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `McpCallerResolver` 는 origin 실행의 에이전트가 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
+커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
 `test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 와 `hermes/plugins` 에 특정 서비스 이름이 들어오지 않았는지 본다.
 예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
@@ -101,11 +101,11 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | `shared/auth` | 토큰 검사와 현재 사용자 |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `user` | 사용자과 첫 로그인 처리 |
-| `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 추천 질문 생성 |
+| `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 추천 질문 생성, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택 |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회 |
-| `memory` | 개인과 그룹 공용 Memory, 제안과 승인 |
+| `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정 |
 | `context` | 실행에 넣을 `instructions` 조립 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름 |
@@ -131,7 +131,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 2. `ChatService` 가 요청한 에이전트를 사용자가 쓸 수 있는지 확인하고 `conversation` 에 기록한다.
    이어지는 대화는 요청의 `agentCode` 를 무시하고 처음 기록한 에이전트를 쓴다.
 3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다.
-   요청자가 볼 수 있는 Memory만 고르고, Memory 예산 밖에서 공통 표 지침을 추가한다.
+   요청자가 볼 수 있고 그 에이전트가 받는 collection 의 Memory만 고르고, Memory 예산 밖에서 공통 표 지침을 추가한다.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
    조립한 글자 수를 `context_chars` 에, 대화에서 고른 effort 를 `reasoning_effort` 에 적는다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
@@ -146,16 +146,17 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 
 | 순서 | 담는 것 |
 | --- | --- |
-| 1 | 그룹 공용 Memory 중 `ACCEPTED` 이고 항상 주입하는 본문 |
-| 2 | 요청자 개인 Memory 중 `ACCEPTED` 이고 항상 주입하는 본문 |
-| 3 | 나머지 접근 가능한 항목의 제목과 번호 색인 |
+| 1 | 그룹 공용 Memory 중 `ACCEPTED` 이고 `retrieval` 이 `ALWAYS` 인 본문 |
+| 2 | 요청자 개인 Memory 중 `ACCEPTED` 이고 `retrieval` 이 `ALWAYS` 인 본문 |
+| 3 | `ACCEPTED` 이고 `retrieval` 이 `SEARCH` 인 항목의 제목과 번호 색인 |
 | 4 | 묻는 형식 안내(`chat/application/AskFormat`). 사용자가 직접 답하는 대화 실행에만 붙는다 |
 | 5 | 이 실행에만 필요한 문맥. 다시 생성이면 그 지시 |
 
 1 부터 3 까지가 Memory 의 글자 상한 안에서 고르는 몫이고, 4 는 상한과 따로 붙는다.
 묻는 형식은 `web/src/lib/ask.ts` 가 카드로 읽는다. 둘이 같은 형식을 말해야 한다.
 
-다른 사용자의 개인 Memory 는 고르는 단계에서 빠진다.
+1 부터 3 까지는 그 에이전트가 받는 collection 의 항목만 담는다. `SENSITIVE` 항목은 그 collection 에서 민감 항목을 허용받은 에이전트에만 담는다.
+다른 사용자의 개인 Memory 와 받지 않는 collection 의 항목은 고르는 단계에서 빠진다.
 문자열을 만든 뒤에 지우는 것이 아니라 애초에 넣지 않는다.
 
 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다.
@@ -185,12 +186,16 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 범위는 `USER` 와 `GROUP` 둘뿐이고 등록할 때 반드시 명시한다.
 - 에이전트가 제안하면 `PROPOSED` 로 들어오고, 사람이 받아들여야 `ACCEPTED` 가 된다.
   주입되는 것은 `ACCEPTED` 뿐이다.
-- `ContextAssembler` 가 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목만 골라 조립한다.
-  다른 사용자의 개인 항목은 고르는 단계에서 빠진다.
-- `always_inject` 가 참이면 본문을 싣고, 거짓이면 제목과 번호만 색인에 싣는다.
+- 항목은 collection 하나에 속한다. 지금 화면과 제안이 만드는 항목은 모두 `core` 다.
+- `ContextAssembler.assemble(user, agentId)` 가 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목 가운데 그 에이전트가 받는 collection 의 항목만 골라 조립한다.
+  다른 사용자의 개인 항목과 받지 않는 collection 의 항목은 고르는 단계에서 빠진다.
+- `retrieval` 이 `ALWAYS` 면 본문을 싣고, `SEARCH` 면 제목과 번호만 색인에 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 싣지 않는다.
+- `SENSITIVE` 항목은 `ALWAYS` 로 저장하지 못한다. `MemoryService` 가 `MEMORY_SENSITIVE_ALWAYS` 로 거절한다.
 - 색인의 본문은 `memory_read` MCP 도구로 읽는다.
   요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
-  Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다.
+  collection 과 민감도는 그 origin 실행의 에이전트로 판정한다.
+  Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다. 받지 않는 collection 의 항목과 허용받지 않은 민감 항목도 같은 응답이다.
+- 본문이나 `retrieval` 이나 `sensitivity` 를 고치면 고치기 전의 값을 `memory_revision` 에 남기고 판 번호를 올린다. 지울 때도 마지막 값을 남긴다.
 - 공통 답변 지침과 Memory를 합친 글자 수를 실행의 `context_chars`에 남긴다.
   `instructions_hash`도 이 문자열을 대상으로 하며, turn 전용 지시는 제외한다.
   Memory가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다.
@@ -202,7 +207,46 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 빠진 항목 수를 실행의 `context_omitted_items` 에 남기고, `/memory` 목록의 그 항목에 표시를 단다.
   대화 화면에는 끼우지 않는다.
 
-근거는 [`adr/ADR-003-memory-권한은-주입으로-강제한다.md`](adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와
+### 에이전트의 실행에 보이는 항목
+
+판정은 세 조건이다. 하나라도 지나지 못한 항목은 그 실행에 없는 항목이다.
+
+| 조건 | 무엇을 본다 | 어디서 정한다 |
+| --- | --- | --- |
+| 범위 | `USER` 는 주인, `GROUP` 은 같은 그룹 | `memory.scope`, `owner_user_id`, `group_id` |
+| collection | 그 에이전트가 받는 collection 인가 | `agent_memory_collection` 의 줄 |
+| 민감도 | `SENSITIVE` 면 그 collection 의 `allow_sensitive` 가 참인가 | `agent_memory_collection.allow_sensitive` |
+
+- 줄이 하나도 없는 에이전트, 찾지 못한 에이전트, 에이전트가 없는 실행, 커넥터 에이전트는 아무것도 받지 않는다.
+- 에이전트를 처음 저장하면 `AgentRepository` 의 저장이 `AgentCreated` 사건을 내고, `AgentMemoryCollectionService` 가 그것을 받아 `core` 한 줄을 넣는다.
+  에이전트를 만드는 경로가 셋(첫 로그인, 사용자가 만들기, 관리자 등록)이라 경로마다 넣지 않고 이 사건 하나로 넣는다. 커넥터 에이전트에는 넣지 않는다.
+- 위임받은 에이전트는 자기 허용으로 판정한다. 부르는 쪽의 허용을 물려받지 않는다.
+- `ContextAssembler` 는 에이전트를 번호로 받는다. `context` 패키지가 `agent` 를 쓰면 패키지 순환이 하나 늘기 때문이다. 번호로 에이전트를 읽는 것은 이미 `agent` 를 쓰는 `memory` 가 한다.
+- `/memory` 목록의 빠짐 표시는 에이전트를 모르는 채 판정한다. `ContextAssembler.assembleForOwner` 가 collection 을 거르지 않고 조립한 결과를 쓴다.
+
+| 클래스 | 하는 일 |
+| --- | --- |
+| `memory.application.MemoryService` | 읽기와 쓰기, 판 기록, 세 조건의 판정. `accessOf(agentId)` 가 그 에이전트의 `MemoryAccess` 를 낸다 |
+| `memory.application.model.MemoryAccess` | 한 실행이 받는 collection 과 민감 허용 |
+| `memory.infra.MemoryQueries` | 볼 수 있는 항목과 실행에 실을 항목을 고르는 조건. 모두 읽어 온 뒤 거르지 않고 데이터베이스가 고른다. 검색을 붙일 때도 이 조건 뒤에 붙인다 |
+| `memory.application.MemoryCollectionService` | 그룹의 collection 목록. 줄이 없는 그룹이면 기본 일곱 개를 넣는다 |
+| `agent.application.AgentMemoryCollectionService` | 에이전트가 받는 collection 읽기, 새 에이전트에 `core` 넣기 |
+
+근거는 [`adr/ADR-051-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md`](adr/ADR-051-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 와
+[`adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md`](adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+
+### 다음
+
+아래는 아직 만들지 않았다. 스키마와 판정은 이미 받을 수 있게 되어 있다.
+
+- collection 탭, 문서(`DOCUMENT`) 편집과 판 이력 화면, 출처 표시, 민감 항목 표시
+- 관리자가 에이전트 화면에서 collection 과 민감 허용을 고치는 경로
+- 다른 서비스가 문서를 읽는 API 와 그 서비스 토큰
+- 다른 곳의 개인 지식을 들여오는 API. 사람이 승인한 항목만 들이고 같은 출처를 두 번 들이지 않는다
+- 민감 항목 본문의 암호화와 완전 삭제
+- `always_inject` 칸 제거
+
+Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제한다.md`](adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와
 [`adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md`](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md) 에 있다.
 층을 나누는 근거는
 [`adr/ADR-015-memory-는-층을-나눠-싣는다.md`](adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.

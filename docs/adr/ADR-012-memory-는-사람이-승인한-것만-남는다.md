@@ -7,6 +7,8 @@
   그룹 범위의 값 이름은 2026-09-28 에 `FAMILY` 에서 `GROUP` 으로 바꿨다. 결정은 그대로다.
   남길 것은 사람에 관한 사실로 한정한다. 작업 기록은 남기지 않는다.
   `career` profile 이 쓰던 Hermes 내장 memory 는 Control Plane 으로 옮기고 그 toolset 을 끈다.
+- **대체된 부분**: 「대안 기각」 의 「에이전트별로 Memory 를 나눈다」 는 [ADR-052](ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md) 가 뒤집었다.
+  지금은 에이전트가 허용된 collection 의 Memory 만 받는다. 나머지 결정은 그대로다.
 
 ### 맥락
 
