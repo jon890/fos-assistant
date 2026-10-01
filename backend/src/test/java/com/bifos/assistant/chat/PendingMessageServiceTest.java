@@ -34,6 +34,7 @@ import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -285,10 +286,12 @@ class PendingMessageServiceTest {
         enqueueAndStopBeforeTurnCompletes("기다린 글");
         List<ChatEvent> received = new CopyOnWriteArrayList<>();
         AtomicReference<Long> pendingEventsBeforeClose = new AtomicReference<>();
+        AtomicReference<Long> stoppedExecutionId = new AtomicReference<>();
         Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
         try {
             chat.stream(dad, conversation.id(), "질문", null, event -> {
                 if ("stopped".equals(event.type())) {
+                    stoppedExecutionId.set(event.executionId());
                     // stopped 는 잠금을 풀기 전에 온다. 이때까지 받은 것은 더할 때 나온 사건이다.
                     pendingEventsBeforeClose.set(pendingEventsIn(received));
                 }
@@ -303,6 +306,9 @@ class PendingMessageServiceTest {
                 .extracting(ChatPendingMessage::held)
                 .containsExactly(true);
         assertThat(pending.queue(dad, conversation.id()).held()).isTrue();
+        assertThat(executions.findById(stoppedExecutionId.get()).orElseThrow().status())
+                .as("중지한 turn 의 실행 줄")
+                .isEqualTo(ExecutionStatus.CANCELLED);
         assertThat(stub().received()).as("중지 뒤에 새 turn 이 열리지 않았다").hasSize(1);
         assertThat(pendingEventsBeforeClose.get())
                 .as("turn 이 닫히기 전에 받은 pending 사건")
@@ -372,6 +378,35 @@ class PendingMessageServiceTest {
                 .extracting(ChatMessage::content)
                 .as("대기 글은 사용자 메시지가 되지 않았다")
                 .containsExactly("질문");
+    }
+
+    @Test
+    @DisplayName("중지가 확정된 turn 이 실행 줄을 닫지 않는 예외로 끝나도 실행은 취소로 남고 잠금이 풀리며 대기 줄은 멈춘다")
+    void cancelsExecutionAndReleasesLockWhenStopConfirmedTurnEndsWithUnrecordedException() {
+        AtomicBoolean done = new AtomicBoolean();
+        AtomicReference<Long> executionId = new AtomicReference<>();
+        stub().beforeAwait(() -> {
+            if (!done.compareAndSet(false, true)) {
+                return;
+            }
+            pending.enqueue(dad, conversation.id(), "기다린 글");
+            executionId.set(latestExecutionId());
+            chat.stop(dad, executionId.get());
+            // ApiException 이 아니라 실행 줄을 FAILED 로 적는 자리를 지나지 않는다.
+            throw new IllegalStateException("완료를 기다리다 끊겼다");
+        });
+
+        assertThatThrownBy(() -> chat.stream(dad, conversation.id(), "질문", null, event -> {}))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("완료를 기다리다 끊겼다");
+        awaitIdle(conversation.id());
+
+        assertThat(executions.findById(executionId.get()).orElseThrow().status())
+                .as("중지를 확정한 실행 줄")
+                .isEqualTo(ExecutionStatus.CANCELLED);
+        assertThat(turns.markOf(conversation.id()).running()).as("turn 잠금").isFalse();
+        assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
+        assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
     }
 
     @Test

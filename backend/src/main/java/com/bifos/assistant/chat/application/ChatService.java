@@ -49,6 +49,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
@@ -269,13 +270,64 @@ public class ChatService {
     }
 
     /**
-     * 중지가 확정된 turn 이 예외로 끝날 때도 그 대화의 대기 줄을 멈춰 둔다.
+     * 중지가 확정된 turn 이 예외로 끝날 때 실행 줄을 취소로 남기고 대기 줄을 멈춘다.
      *
-     * <p>취소된 turn 을 돌려주는 자리를 지나지 않고 빠져나가므로 여기서 멈춘다. 멈추지 않으면 사용자가 중지한 대화에서
-     * 잠금이 풀리자마자 대기 메시지가 간다.
+     * <p>사용자가 중지를 확정한 실행은 {@code RUNNING} 으로 남지 않는다. 예외가 실행 줄을 이미 {@code FAILED} 로 적은
+     * 뒤라면 그대로 둔다. 취소 기록이 실패해도 대기 줄은 멈추고, 어느 쪽 실패도 올리지 않아 원래 예외가 그대로 올라간다.
      */
-    private void holdPendingIfStopConfirmed(TurnCancellation.TurnHandle handle, Long conversationId) {
-        if (turns.isStopConfirmed(handle)) {
+    private void cancelAndHoldIfStopConfirmed(
+            TurnCancellation.TurnHandle handle, PendingTurn pending, ModelChoice choice) {
+        if (!turns.isStopConfirmed(handle)) {
+            return;
+        }
+        try {
+            if (pending.execution().status() == ExecutionStatus.RUNNING) {
+                cancel(pending, null, choice);
+            }
+        } catch (RuntimeException ex) {
+            log.warn(
+                    "중지한 turn 의 취소를 기록하지 못했다 executionId={}",
+                    pending.execution().id(),
+                    ex);
+        } finally {
+            markStoppedAndHoldPending(handle, pending.conversation().id());
+        }
+    }
+
+    /**
+     * 중지로 끝난 흐름 turn 의 결과물을 묶은 뒤 대기 줄을 멈춘다.
+     *
+     * <p>흐름이 취소를 이미 기록했다. 결과물 묶기가 던져도 잠금을 풀기 전에 대기 줄을 멈춘다.
+     */
+    private void recordStoppedFlow(TurnCancellation.TurnHandle handle, ChatTurn turn, Instant startedAt) {
+        try {
+            recorded(turn, startedAt);
+        } finally {
+            markStoppedAndHoldPending(handle, turn.conversationId());
+        }
+    }
+
+    /**
+     * 중지가 확정된 흐름 turn 이 예외로 끝날 때 뿌리 실행 줄을 취소로 남기고 대기 줄을 멈춘다.
+     *
+     * <p>흐름이 뿌리 실행을 이미 끝난 상태로 적었으면 그대로 둔다. 실행 줄을 다시 읽어 본다. 흐름이 들고 있는 객체의
+     * 상태를 여기서는 알 수 없다. {@code rootExecutionId} 가 null 이면 실행 줄을 만들기 전에 끝난 것이다.
+     */
+    private void cancelFlowAndHoldIfStopConfirmed(
+            TurnCancellation.TurnHandle handle, Long conversationId, Long rootExecutionId) {
+        if (!turns.isStopConfirmed(handle)) {
+            return;
+        }
+        try {
+            if (rootExecutionId != null) {
+                executionRepository
+                        .findById(rootExecutionId)
+                        .filter(execution -> execution.status() == ExecutionStatus.RUNNING)
+                        .ifPresent(executions::cancel);
+            }
+        } catch (RuntimeException ex) {
+            log.warn("중지한 흐름 turn 의 취소를 기록하지 못했다 executionId={}", rootExecutionId, ex);
+        } finally {
             markStoppedAndHoldPending(handle, conversationId);
         }
     }
@@ -377,15 +429,16 @@ public class ChatService {
                     || turns.shouldStopBeforeSubmit(pending.execution().id())) {
                 return stoppedTurn(handle, pending, null, choice, startedAt);
             }
-            String runId = submit(pending);
+            String runId = null;
             HermesRunResult result;
             try {
+                runId = submit(pending);
                 if (streaming) {
                     relay(pending, runId, handle, onEvent);
                 }
                 result = awaitCompletion(pending, runId);
             } catch (RuntimeException ex) {
-                holdPendingIfStopConfirmed(handle, conversation.id());
+                cancelAndHoldIfStopConfirmed(handle, pending, choice);
                 throw ex;
             } finally {
                 turns.untrackRun(pending.execution().id(), runId);
@@ -440,27 +493,35 @@ public class ChatService {
             artifactStore.ensureFolder(conversation.id());
             String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), text);
-            ChatTurn turn = routed.flow()
-                    .run(
-                            user,
-                            conversation,
-                            routed.agent(),
-                            text,
-                            input,
-                            intent,
-                            execution -> {
-                                turns.rekey(handle, execution.id());
-                                if (streaming) {
-                                    onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
-                                }
-                            },
-                            onEvent);
+            AtomicReference<Long> rootExecutionId = new AtomicReference<>();
+            ChatTurn turn;
+            try {
+                turn = routed.flow()
+                        .run(
+                                user,
+                                conversation,
+                                routed.agent(),
+                                text,
+                                input,
+                                intent,
+                                execution -> {
+                                    rootExecutionId.set(execution.id());
+                                    turns.rekey(handle, execution.id());
+                                    if (streaming) {
+                                        onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
+                                    }
+                                },
+                                onEvent);
+            } catch (RuntimeException ex) {
+                cancelFlowAndHoldIfStopConfirmed(handle, conversation.id(), rootExecutionId.get());
+                throw ex;
+            }
             if (!turn.cancelled()) {
                 turns.markFinished(handle);
+                recorded(turn, startedAt);
             } else {
-                markStoppedAndHoldPending(handle, conversation.id());
+                recordStoppedFlow(handle, turn, startedAt);
             }
-            recorded(turn, startedAt);
             if (streaming) {
                 if (!turn.cancelled()) {
                     onEvent.accept(ChatEvent.delta(turn.assistantText()));
