@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import jakarta.annotation.PreDestroy;
 import java.io.Closeable;
 import java.time.Duration;
 import java.util.List;
@@ -17,7 +18,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,10 +34,10 @@ public class TurnCancellation {
     private final HermesRunsClient hermes;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Duration streamGrace;
-    private final List<Consumer<Long>> closeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<Consumer<TurnClosed>> closeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    public TurnCancellation(HermesRunsClient hermes,
-            @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
+    public TurnCancellation(
+            HermesRunsClient hermes, @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
         this.hermes = hermes;
         this.streamGrace = streamGrace;
     }
@@ -75,7 +75,7 @@ public class TurnCancellation {
      *
      * <p>맵에서 뺀 뒤에 부르므로, 받는 쪽은 그 대화에 새 turn 을 열 수 있다. 닫은 스레드에서 차례로 부른다.
      */
-    public void addCloseListener(Consumer<Long> listener) {
+    public void addCloseListener(Consumer<TurnClosed> listener) {
         closeListeners.add(listener);
     }
 
@@ -86,17 +86,17 @@ public class TurnCancellation {
         // 성공으로 끝난 것이며, 이미 끝난 turn 과 구분해야 한다.
         handle.firstStop.complete(handle.cancelled.get() && !handle.finished.get());
         if (removed) {
-            notifyClosed(handle.conversationId);
+            notifyClosed(new TurnClosed(handle.conversationId, handle.stopped.get()));
         }
     }
 
     /** 리스너의 예외가 turn 을 닫는 쪽으로 번지지 않게 경고 로그만 남긴다. */
-    private void notifyClosed(Long conversationId) {
-        for (Consumer<Long> listener : closeListeners) {
+    private void notifyClosed(TurnClosed closed) {
+        for (Consumer<TurnClosed> listener : closeListeners) {
             try {
-                listener.accept(conversationId);
+                listener.accept(closed);
             } catch (RuntimeException ex) {
-                log.warn("turn 을 닫은 뒤의 후속 처리가 실패했다 conversationId={}", conversationId, ex);
+                log.warn("turn 을 닫은 뒤의 후속 처리가 실패했다 conversationId={}", closed.conversationId(), ex);
             }
         }
     }
@@ -110,6 +110,11 @@ public class TurnCancellation {
     public boolean isStopConfirmed(Long executionId) {
         TurnHandle handle = byExecution.get(executionId);
         return handle != null && handle.cancelled.get() && handle.stopConfirmed.get();
+    }
+
+    /** 이 turn 이 중지로 끝났다고 적는다. 닫기 리스너가 {@link TurnClosed#stopped()} 로 읽는다. */
+    public void markStopped(TurnHandle handle) {
+        handle.stopped.set(true);
     }
 
     public boolean cancel(TurnHandle handle) {
@@ -138,10 +143,13 @@ public class TurnCancellation {
     /** Hermes 중지 요청이 모두 받아들여진 뒤에만 실행 경로가 취소로 분기한다. */
     public void confirmStop(TurnHandle handle) {
         if (!handle.cancelled.get() || !handle.stopConfirmed.compareAndSet(false, true)) return;
-        handle.closeTask = scheduler.schedule(() -> {
-            handle.streamGraceExpired.complete(null);
-            Thread.startVirtualThread(() -> closeStream(handle));
-        }, streamGrace.toMillis(), TimeUnit.MILLISECONDS);
+        handle.closeTask = scheduler.schedule(
+                () -> {
+                    handle.streamGraceExpired.complete(null);
+                    Thread.startVirtualThread(() -> closeStream(handle));
+                },
+                streamGrace.toMillis(),
+                TimeUnit.MILLISECONDS);
     }
 
     /** 중지 요청은 시작됐지만 Hermes 가 아직 받아들이지 않았는지 본다. */
@@ -160,7 +168,10 @@ public class TurnCancellation {
         if (handle == null) return true;
         RunRef run;
         synchronized (handle.runs) {
-            run = handle.runs.stream().filter(it -> it.runId.equals(runId)).findFirst().orElse(null);
+            run = handle.runs.stream()
+                    .filter(it -> it.runId.equals(runId))
+                    .findFirst()
+                    .orElse(null);
             if (run == null) {
                 run = new RunRef(apiBaseUrl, profileName, runId);
                 handle.runs.add(run);
@@ -243,7 +254,11 @@ public class TurnCancellation {
     private void closeStream(TurnHandle handle) {
         Closeable stream = handle.stream;
         if (stream == null) return;
-        try { stream.close(); } catch (Exception ex) { log.warn("중지한 turn 의 스트림을 닫지 못했다", ex); }
+        try {
+            stream.close();
+        } catch (Exception ex) {
+            log.warn("중지한 turn 의 스트림을 닫지 못했다", ex);
+        }
     }
 
     @Getter
@@ -253,15 +268,26 @@ public class TurnCancellation {
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private final AtomicBoolean stopConfirmed = new AtomicBoolean();
         private final AtomicBoolean finished = new AtomicBoolean();
+        private final AtomicBoolean stopped = new AtomicBoolean();
         private final List<RunRef> runs = new java.util.concurrent.CopyOnWriteArrayList<>();
         private volatile Long executionId;
         private volatile Closeable stream;
         private volatile CompletableFuture<Boolean> firstStop = new CompletableFuture<>();
         private volatile CompletableFuture<Void> streamGraceExpired = new CompletableFuture<>();
         private volatile ScheduledFuture<?> closeTask;
-        private TurnHandle(Long userId, Long conversationId) { this.userId = userId; this.conversationId = conversationId; }
-        public Long userId() { return userId; }
-        public AtomicBoolean cancelled() { return cancelled; }
+
+        private TurnHandle(Long userId, Long conversationId) {
+            this.userId = userId;
+            this.conversationId = conversationId;
+        }
+
+        public Long userId() {
+            return userId;
+        }
+
+        public AtomicBoolean cancelled() {
+            return cancelled;
+        }
     }
 
     @Getter
@@ -270,8 +296,11 @@ public class TurnCancellation {
         private final String profileName;
         private final String runId;
         private final AtomicBoolean stopSent = new AtomicBoolean();
+
         private RunRef(String apiBaseUrl, String profileName, String runId) {
-            this.apiBaseUrl = apiBaseUrl; this.profileName = profileName; this.runId = runId;
+            this.apiBaseUrl = apiBaseUrl;
+            this.profileName = profileName;
+            this.runId = runId;
         }
     }
 }

@@ -66,6 +66,8 @@ test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인
   await page.getByRole("textbox", { name: "메시지" }).fill("첫 답");
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last()).toBeVisible();
+  // 첫 답이 끝난 뒤에 보낸다. 답이 오는 동안 보내면 대기 메시지로 쌓여 아래에서 꾸민 스트림을 지나지 않는다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
   const conversationId = conversationIdOf(page.url());
   const events = [
     { type: "started", conversationId, executionId: 1 },

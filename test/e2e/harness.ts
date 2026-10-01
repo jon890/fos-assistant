@@ -28,6 +28,12 @@ export type Context = {
   readonly hermesProfileKey: string;
   /** 실행 완료를 제어하는 fake Hermes */
   readonly hermes: FakeHermes;
+  /**
+   * Control Plane 프로세스를 강제로 내리고 같은 환경으로 다시 띄워 건강해질 때까지 기다린다.
+   *
+   * <p>데이터베이스는 파일이라 남지만 메모리에만 있던 turn 잠금과 SSE 구독이 사라진다.
+   */
+  restartControlPlane(): Promise<void>;
 };
 
 export type Scenario = {
