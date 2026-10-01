@@ -57,6 +57,18 @@ class ConnectorSecretPrefixMigrationTest {
     }
 
     @Test
+    @DisplayName("V39는 secretPrefixes 가 객체가 아닌 값이어도 빈 객체로 바꾼다")
+    void v39ReplacesNonObjectSecretPrefixesWithEmptyObject() throws SQLException {
+        insert(901, "{\"values\":{},\"secretPrefixes\":\"fab_abcd\"}");
+        insert(902, "{\"values\":{},\"secretPrefixes\":null}");
+
+        migrate("39");
+
+        assertThat(fields(901)).isEqualTo(ALREADY_EMPTY);
+        assertThat(fields(902)).isEqualTo(ALREADY_EMPTY);
+    }
+
+    @Test
     @DisplayName("V39는 연결이 하나도 없어도 끝난다")
     void v39SucceedsWithNoRows() throws SQLException {
         migrate("39");

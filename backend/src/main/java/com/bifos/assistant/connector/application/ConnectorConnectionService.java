@@ -114,9 +114,7 @@ public class ConnectorConnectionService {
                     manifest.id(),
                     manifest.title(),
                     manifest.description(),
-                    manifest.fields().stream()
-                            .map(ConnectorConnectionService::summary)
-                            .toList(),
+                    manifest.fields().stream().map(ConnectorFieldSummary::from).toList(),
                     connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
                     true));
         }
@@ -133,7 +131,7 @@ public class ConnectorConnectionService {
     public ConnectionSnapshot read(CurrentUser user, String connectorId) {
         Optional<ConnectorConnection> connection = connections.findByUserIdAndConnectorId(user.id(), connectorId);
         if (connection.isPresent()) {
-            return snapshot(connection.get());
+            return ConnectionSnapshot.from(connection.get());
         }
         requireManifest(connectorId);
         return new ConnectionSnapshot(
@@ -152,20 +150,7 @@ public class ConnectorConnectionService {
                     .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
             // 고르는 중이라 필수 칸이 아직 비어 있을 수 있다. 채운 칸의 형식만 본다.
             JsonNode result = call(manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
-            JsonNode items = result.get(options.items());
-            if (items == null || !items.isArray()) {
-                throw ConnectorErrors.unavailable();
-            }
-            List<ConnectorOption> found = new ArrayList<>();
-            for (JsonNode item : items) {
-                JsonNode value = item.get(options.value());
-                JsonNode label = item.get(options.label());
-                if (value == null || !value.isString() || label == null || !label.isString()) {
-                    throw ConnectorErrors.unavailable();
-                }
-                found.add(new ConnectorOption(value.asString(), label.asString()));
-            }
-            return List.copyOf(found);
+            return ConnectorOption.listFrom(result, options).orElseThrow(ConnectorErrors::unavailable);
         });
     }
 
@@ -229,7 +214,7 @@ public class ConnectorConnectionService {
             return null;
         }
         connection.registered(ConnectorValues.stored(manifest, accepted), false, now());
-        return snapshot(connections.save(connection));
+        return ConnectionSnapshot.from(connections.save(connection));
     }
 
     /**
@@ -257,7 +242,7 @@ public class ConnectorConnectionService {
             throw new ConnectorOperationFailure();
         }
         connection.disconnected(manifest.isEmpty(), now());
-        return snapshot(connections.save(connection));
+        return ConnectionSnapshot.from(connections.save(connection));
     }
 
     /**
@@ -278,26 +263,26 @@ public class ConnectorConnectionService {
                 } else {
                     connection.disconnected(connection.restartRequired(), now());
                 }
-                return snapshot(connections.save(connection));
+                return ConnectionSnapshot.from(connections.save(connection));
             }
             if (!connection.restartRequired()
                     && reinstallIfNotConfigured(connection, state).isPresent()) {
                 if (connection.restartRequired()) {
                     connection.pending(now());
-                    return snapshot(connections.save(connection));
+                    return ConnectionSnapshot.from(connections.save(connection));
                 }
                 state = readState(connection);
             }
             if (connection.restartRequired() || !state.enabled() || !state.configured()) {
                 connection.pending(now());
-                return snapshot(connections.save(connection));
+                return ConnectionSnapshot.from(connections.save(connection));
             }
             if (probedUsable(connection)) {
                 connection.ready(now());
             } else {
                 connection.pending(now());
             }
-            return snapshot(connections.save(connection));
+            return ConnectionSnapshot.from(connections.save(connection));
         });
     }
 
@@ -339,7 +324,7 @@ public class ConnectorConnectionService {
         } else {
             connection.confirmDisconnected(now());
         }
-        return snapshot(connections.save(connection));
+        return ConnectionSnapshot.from(connections.save(connection));
     }
 
     /** 설치 상태를 읽는다. 읽지 못하면 {@code PENDING} 을 남기고 연결 실패로 끝낸다. */
@@ -365,10 +350,18 @@ public class ConnectorConnectionService {
         if (!connection.desiredEnabled() || !state.enabled() || state.configured()) {
             return Optional.empty();
         }
+        final boolean listed;
         try {
-            if (findManifest(connection.connectorId()).isEmpty()) {
-                return Optional.empty();
-            }
+            listed = findManifest(connection.connectorId()).isPresent();
+        } catch (RuntimeException ex) {
+            // 카탈로그 조회 실패는 읽는 쪽이 이미 로그에 남겼다. 설치 단계의 실패로 적지 않는다.
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
+        if (!listed) {
+            return Optional.empty();
+        }
+        try {
             return Optional.of(reinstall(connection));
         } catch (RuntimeException ex) {
             warn(STEP_INSTALL, connection.connectorId(), ex);
@@ -403,13 +396,7 @@ public class ConnectorConnectionService {
                 .filter(user -> user.groupId().equals(admin.groupId()))
                 .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
         return connections.findByUserIdIn(List.copyOf(names.keySet())).stream()
-                .map(connection -> new AdminConnectionSnapshot(
-                        connection.connectorId(),
-                        connection.userId(),
-                        names.get(connection.userId()),
-                        connection.status(),
-                        connection.agent().code(),
-                        connection.restartRequired()))
+                .map(connection -> AdminConnectionSnapshot.from(connection, names.get(connection.userId())))
                 .toList();
     }
 
@@ -445,19 +432,6 @@ public class ConnectorConnectionService {
             throw ConnectorErrors.of(result.error());
         }
         return result.result();
-    }
-
-    private static ConnectorFieldSummary summary(ConnectorField field) {
-        ConnectorFieldOptions options = field.options();
-        return new ConnectorFieldSummary(
-                field.key(),
-                field.label(),
-                field.description(),
-                field.secret(),
-                field.required(),
-                field.pattern(),
-                options != null,
-                options != null && options.autoSelectSingle());
     }
 
     private List<ConnectorManifest> readCatalog() {
@@ -505,17 +479,6 @@ public class ConnectorConnectionService {
         if (!admin.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "administrator access is required");
         }
-    }
-
-    private static ConnectionSnapshot snapshot(ConnectorConnection value) {
-        return new ConnectionSnapshot(
-                value.connectorId(),
-                value.status(),
-                value.fields().secretPrefixes(),
-                value.fields().values(),
-                value.restartRequired(),
-                value.checkedAt(),
-                value.agent().code());
     }
 
     /**

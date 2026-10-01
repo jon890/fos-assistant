@@ -47,6 +47,8 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -856,6 +858,23 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
+    @DisplayName("확인 중 카탈로그 조회가 실패하면 설치를 다시 쓰지 않고 PENDING 을 남기며 연결 실패로 끝난다")
+    void checkLeavesPendingWhenCatalogReadFailsBeforeReinstall() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, DEMO, VALUES);
+        installed(true, false);
+        doThrow(new IllegalStateException("dashboard unavailable")).when(connector).readCatalog();
+
+        assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agentEnabled(user)).isFalse();
+        // 등록의 설치 한 번뿐이다.
+        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
+        verify(connector, never()).probe(anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("확인 중 다시 설치가 실패하면 PENDING 을 남기고 연결 실패로 끝난다")
     void checkLeavesPendingWhenReinstallFails() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
@@ -1018,7 +1037,9 @@ class ConnectorConnectionServiceTest {
                 connector,
                 toolsets,
                 transactionManager,
-                new ConnectorCallLimiter(new ConnectorProperties(maxConcurrentCalls, callsPerMinute)),
+                new ConnectorCallLimiter(
+                        new ConnectorProperties(maxConcurrentCalls, callsPerMinute),
+                        Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)),
                 Clock.systemUTC());
     }
 

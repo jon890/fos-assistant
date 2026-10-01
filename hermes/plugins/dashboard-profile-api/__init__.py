@@ -215,6 +215,8 @@ CONNECTOR_CALL_TIMEOUT_SECONDS = 10
 CONNECTOR_CALL_LIMIT = 4
 # 커넥터 도구 호출이 기대는 mcp SDK 의 주 판이다. 다른 판은 결과 속성 이름이 달라 호출하지 않는다.
 MCP_SDK_MAJOR = 2
+# `_mcp_sdk_version` 이 한 번 읽은 판 문자열이다. 설치된 패키지는 프로세스가 도는 동안 바뀌지 않는다.
+_mcp_sdk_version_cache: Optional[str] = None
 # 지금 돌고 있는 호출 수다. 이벤트 루프 하나에서만 바꾸므로 잠금이 필요 없다.
 _connector_calls = 0
 PROFILE_WRITE_LOCK = asyncio.Lock()
@@ -662,7 +664,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if command is None or not os.access(command, os.X_OK):
         raise ValueError("커넥터 실행 파일이 없거나 실행할 수 없다")
 
-    # 스킬은 읽되 등록하지 않는다. persona 로 지침을 넣고 skills toolset 은 열지 않는다.
+    # 스킬은 읽되 등록하지 않는다. 디렉터리가 온전한지만 검증하고 skills toolset 은 열지 않는다.
     skills = plugin.get("skills", "./skills")
     if isinstance(skills, str):
         skills = [skills]
@@ -815,10 +817,24 @@ def _connector_allowlist(state: dict, servers: dict) -> list:
     return names or ["no_mcp"]
 
 
+def _remove_backup_env_copies(profile_dir: pathlib.Path) -> None:
+    """이전 판이 백업에 남긴 `.env` 사본을 지운다. 백업 디렉터리가 없으면 아무것도 하지 않는다."""
+    backups = profile_dir / "connector-backups"
+    if not backups.is_dir():
+        return
+    for stale in backups.glob("*/.env"):
+        try:
+            stale.unlink()
+        except OSError as error:
+            logger.warning("dashboard-profile-api: 백업의 옛 env 사본을 지우지 못했다: %s", type(error).__name__)
+
+
 def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> dict:
     """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다.
 
     설치와 제거는 API 도구 목록을 커넥터 서버 이름만으로 다시 쓰고, 설치는 Control Plane MCP 등록도 지운다(ADR-044).
+    이 설치는 커넥터 전용 profile 을 전제한다. Control Plane 이 커넥터 에이전트의 profile 로만 부른다.
+    일반 에이전트의 profile 에 설치하면 그 profile 의 Control Plane MCP 등록과 도구 목록이 사라지고 제거해도 돌아오지 않는다.
     """
     import yaml
     if profile_dir.resolve() != profile_dir:
@@ -829,6 +845,8 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     for path in (config_path, state_path, env_path):
         if path.is_symlink():
             raise ValueError("profile 설정에 심볼릭 링크가 있다")
+    # 바뀐 것이 없어 일찍 돌아가는 요청에서도 옛 사본은 지운다.
+    _remove_backup_env_copies(profile_dir)
     originals = {path: path.read_bytes() if path.exists() else None
                  for path in (config_path, state_path, env_path)}
     saved = yaml.safe_load(originals[config_path]) or {}
@@ -893,12 +911,6 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
         # profile `.env` 에는 사용자의 비밀 원문이 있다. 백업에 넣으면 연결을 해제한 뒤에도 남는다.
         if value is not None and path != env_path:
             _atomic_private_write(backup / path.name, value)
-    # 이전 판이 백업에 남긴 `.env` 사본을 지운다.
-    for stale in backup.parent.glob("*/.env"):
-        try:
-            stale.unlink()
-        except OSError as error:
-            logger.warning("dashboard-profile-api: 백업의 옛 env 사본을 지우지 못했다: %s", type(error).__name__)
     written = []
     try:
         if any((path.read_bytes() if path.exists() else None) != value for path, value in originals.items()):
@@ -960,6 +972,8 @@ async def _connector_request(request):
             except FileExistsError:
                 expected = None
             # 설치가 쓰는 목록과 같고 Control Plane MCP 등록이 없어야 설치가 끝난 것이다.
+            # 이 값은 profile 단위다. 목록이 profile 하나에 하나뿐이라 서버 이름을 찾지 못하는 기록이 하나라도 있으면
+            # 그 profile 의 커넥터가 모두 `configured: false` 다.
             isolated = (expected is not None and CONTROL_PLANE_MCP not in servers
                         and (config.get("platform_toolsets") or {}).get("api_server") == expected)
             connectors = []
@@ -1018,11 +1032,14 @@ async def _run_connector_tool(manifest: dict, tool: str, env: dict):
 
 
 def _mcp_sdk_version() -> str:
-    """설치된 `mcp` SDK 의 판이다. 읽지 못하면 `unknown` 이다."""
-    try:
-        return importlib.metadata.version("mcp")
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown"
+    """설치된 `mcp` SDK 의 판이다. 읽지 못하면 `unknown` 이다. 프로세스에서 한 번만 읽는다."""
+    global _mcp_sdk_version_cache
+    if _mcp_sdk_version_cache is None:
+        try:
+            _mcp_sdk_version_cache = importlib.metadata.version("mcp")
+        except importlib.metadata.PackageNotFoundError:
+            _mcp_sdk_version_cache = "unknown"
+    return _mcp_sdk_version_cache
 
 
 def _mcp_sdk_problem() -> Optional[str]:

@@ -429,6 +429,18 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertFalse(stale.exists())
         self.assertEqual(list((self.root / "alice/connector-backups").glob("*/.env")), [])
 
+    def test_unchanged_connector_install_still_removes_old_env_copies(self):
+        """이미 설치되어 바뀔 것이 없는 요청도 이전 판이 백업에 남긴 `.env` 사본을 지운다."""
+        self.connector_fixture()
+        self.assertEqual(self.connector().status_code, 200)
+        stale = self.root / "alice/connector-backups/1/.env"
+        stale.parent.mkdir(parents=True)
+        stale.write_text("DEMO_TOKEN=demo_secret_value_0123456789\n", encoding="utf-8")
+        repeated = self.connector()
+        self.assertEqual(repeated.status_code, 200)
+        self.assertFalse(repeated.body["changed"])
+        self.assertFalse(stale.exists())
+
     def test_connector_install_continues_when_old_env_copy_cannot_be_removed(self):
         """옛 `.env` 사본을 지우지 못해도 설치는 끝난다."""
         self.connector_fixture()

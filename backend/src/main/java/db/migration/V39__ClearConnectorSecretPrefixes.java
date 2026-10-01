@@ -38,7 +38,8 @@ public class V39__ClearConnectorSecretPrefixes extends BaseJavaMigration {
                 long id = rows.getLong(1);
                 ObjectNode root = read(id, rows.getString(2));
                 JsonNode prefixes = root.get(SECRET_PREFIXES);
-                if (prefixes == null || prefixes.isEmpty()) {
+                // 객체가 아닌 값(문자열, 숫자, null)도 앞부분일 수 있어 빈 객체로 바꾼다.
+                if (prefixes == null || (prefixes.isObject() && prefixes.isEmpty())) {
                     continue;
                 }
                 root.putObject(SECRET_PREFIXES);

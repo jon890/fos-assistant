@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.application.model;
 
+import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import java.time.Instant;
 import java.util.Map;
@@ -17,4 +18,16 @@ public record ConnectionSnapshot(
         Map<String, String> values,
         boolean restartRequired,
         Instant checkedAt,
-        String agentCode) {}
+        String agentCode) {
+
+    public static ConnectionSnapshot from(ConnectorConnection connection) {
+        return new ConnectionSnapshot(
+                connection.connectorId(),
+                connection.status(),
+                connection.fields().secretPrefixes(),
+                connection.fields().values(),
+                connection.restartRequired(),
+                connection.checkedAt(),
+                connection.agent().code());
+    }
+}
