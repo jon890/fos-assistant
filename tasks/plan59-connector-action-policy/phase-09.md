@@ -121,6 +121,7 @@ e2e 의 Control Plane 이 깨우기를 켜고 뜨는지 `test/e2e/run.ts` 의 �
   - `connector/application/ConnectorActionResultSource.java`(신규, `@Component`, `AutoTurnResultSource` 구현): `SUCCEEDED`, `FAILED`, `UNKNOWN` 이고 전하지 않은 승인 줄을 낸다. `key` 는 `actionId` 의 글이다. `notice` 와 `input` 의 글은 위 작업 항목의 표와 단락 모양을 그대로 쓴다. 결과가 여럿일 때 하나로 줄이는 것은 하지 않는다. 줄마다 알림 줄 하나다
   - `connector/application/ConnectorActionListener.java`(신규, `@Component`. `chat` 이 아니라 `connector` 에 둔다): `ConnectorActionChanged` 를 받아 `ConversationEventHub.publish(conversationId, ChatEvent.approval(...))`, 거절과 만료의 알림 줄은 `ConversationNotices.post` 뒤 `markDelivered`, 끝으로 `DelegationWakeService.tryWake(conversationId)`. `approval` 사건의 대화 공개 식별자는 `ConversationLookup` 에 `Optional<UUID> publicIdOf(Long conversationId)` 를 더해 읽는다
 - **알림 줄은 여럿이다.** `TurnIntent.DelegationResults` 를 `DelegationResults(List<Long> executionIds, List<String> notices, List<AutoTurnDelivery> deliveries)` 로 바꾼다. `chat/application/model/AutoTurnDelivery.java`(신규): `record AutoTurnDelivery(AutoTurnResultSource source, List<String> keys)`. `saveQuestion` 은 `notices` 마다 알림 줄을 저장하고 사건을 내고, 같은 트랜잭션에서 `delivery.source().markDelivered(delivery.keys(), now)` 를 부른다. 위임 결과가 없으면 위임 알림 줄을 만들지 않는다
+- phase 11 이 `delegationInput` 에 넣은 `<external-data>` 감싸기를 유지한다. source 의 단락은 그 뒤에 잇는다
 - e2e 의 Control Plane 은 깨우기를 켠 채 뜬다(`application.yml` 기본값). 자동 turn 단언을 그대로 둔다
 - 테스트 표의 「결과 여럿 → `승인한 동작 N개의 결과가 도착했어요`」 는 뺀다. 줄마다 알림 줄 하나다
 
