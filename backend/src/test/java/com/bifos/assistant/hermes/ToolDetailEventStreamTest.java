@@ -30,8 +30,7 @@ class ToolDetailEventStreamTest {
         try {
             List<RunEvent> events = read(server, false);
 
-            assertThat(events).extracting(RunEvent::detail)
-                    .containsExactly("[항목 1] [항목 2]", "[항목 2] [항목 1] [가림]");
+            assertThat(events).extracting(RunEvent::detail).containsExactly("[항목 1] [항목 2]", "[항목 2] [항목 1] [가림]");
         } finally {
             server.stop(0);
         }
@@ -42,7 +41,8 @@ class ToolDetailEventStreamTest {
     void hidesAllDetailsForConnectorStream() throws IOException {
         HttpServer server = startServer();
         try {
-            assertThat(read(server, true)).extracting(RunEvent::detail)
+            assertThat(read(server, true))
+                    .extracting(RunEvent::detail)
                     .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]");
         } finally {
             server.stop(0);
@@ -67,10 +67,16 @@ class ToolDetailEventStreamTest {
         HermesProfileKeyStore keys = mock(HermesProfileKeyStore.class);
         when(keys.resolve("test-profile")).thenReturn("test-key");
         HermesProperties properties = new HermesProperties(null, null, null, null, null, null, null, null);
-        HermesRunEventStream stream = new HermesRunEventStream(keys, properties, JsonMapper.builder().build());
+        HermesRunEventStream stream =
+                new HermesRunEventStream(keys, properties, JsonMapper.builder().build());
         List<RunEvent> events = new ArrayList<>();
-        stream.open("http://127.0.0.1:" + server.getAddress().getPort(), "test-profile", "run-one",
-                events::add, opened -> {}, connectorManaged);
+        stream.open(
+                "http://127.0.0.1:" + server.getAddress().getPort(),
+                "test-profile",
+                "run-one",
+                events::add,
+                opened -> {},
+                connectorManaged);
         return events;
     }
 }

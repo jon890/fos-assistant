@@ -43,8 +43,7 @@ final class ToolDetailRedactor {
             + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
     private static final Pattern ASSIGNMENT = Pattern.compile("(?i)([\"']?[A-Za-z][A-Za-z0-9_-]*[\"']?\\s*[:=]\\s*)"
             + "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\s,;}&]+)");
-    private static final Pattern AUTH_HEADER =
-            Pattern.compile("(?im)\\b(authorization|cookie)\\s*[:=]\\s*[^\\r\\n]+");
+    private static final Pattern AUTH_HEADER = Pattern.compile("(?im)\\b(authorization|cookie)\\s*[:=]\\s*[^\\r\\n]+");
 
     static String redact(String detail, boolean connectorManaged) {
         return redact(detail, connectorManaged, new LinkedHashMap<>());

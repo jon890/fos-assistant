@@ -102,8 +102,9 @@ public class HermesRunEventStream {
         }
     }
 
-    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, boolean connectorManaged,
-            Map<String, String> identifiers) throws IOException {
+    private void emit(
+            StringBuilder data, Consumer<RunEvent> onEvent, boolean connectorManaged, Map<String, String> identifiers)
+            throws IOException {
         if (data.isEmpty()) {
             return;
         }
