@@ -64,7 +64,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 경로 | 요청 | 결과 |
 | --- | --- | --- |
-| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], myStatus}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다 |
+| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], myStatus, available}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다 |
 | `GET /api/v1/connections/{id}` | 없음 | 자기 연결 상태 |
 | `POST /api/v1/connections/{id}/options/{fieldKey}` | `{values}` | `[{value, label}]`. 아무것도 저장하지 않는다 |
 | `POST /api/v1/connections/{id}` | `{values}` | 등록 또는 값 교체. 확인 도구가 통과해야 저장한다 |
@@ -76,7 +76,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 상태 응답은 `connectorId`, `status`, `secretPrefixes{key: 앞 8자}`, `values{key: 값}`, `checkedAt`, `agentCode`, `restartRequired` 를 갖는다. 등록 전에는 `DISCONNECTED` 이고 나머지는 비거나 null 이다
 - 관리자 목록 항목은 `connectorId`, `userId`, `displayName`, `status`, `agentCode`, `restartRequired` 만 담는다. 다른 사용자의 칸 값과 비밀 앞부분은 넣지 않는다
 - 모르는 `id` 는 `CONNECTOR_NOT_FOUND`(404) 다. 운영 목록에서 빠진 커넥터의 기존 연결은 읽기와 해제만 된다
-- `values` 의 키는 그 커넥터의 `fields[].key` 만 받는다. 모르는 키, 필수 칸 누락, `pattern` 불일치는 `VALIDATION_FAILED` 다
+- 목록의 `available` 은 그 커넥터가 지금 카탈로그에 있는지다. 카탈로그에서 빠졌지만 내 연결이 `DISCONNECTED` 가 아닌 커넥터는 `available: false`, 빈 `fields`, 빈 `description` 으로 함께 낸다. 이때 `title` 은 전용 에이전트의 이름이다. 화면이 해제하러 들어갈 길을 남기기 위해서다
+- `values` 의 키는 그 커넥터의 `fields[].key` 만 받는다. 모르는 키, 필수 칸 누락, `pattern` 불일치는 `VALIDATION_FAILED` 다. 비밀이 아닌 칸의 값은 500자까지다. 넘으면 같은 오류다
 - 선택지와 확인은 후보 값을 저장하지 않고 응답에 되돌려 담지 않는다
 - 외부 설치, 확인, 해제가 실패하면 `CONNECTOR_OPERATION_FAILED`(502) 다
 - `PENDING` 은 값을 등록했으나 실행 준비가 끝나지 않은 상태, `READY` 는 설치가 켜져 있고 재시작이 필요 없으며 MCP probe 에서 도구를 확인한 상태다. probe 는 공유 gateway 의 실제 실행 확인을 대신하지 않는다
@@ -111,7 +112,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 등록 순서다.
 
 1. 로그인 사용자 확인과 `values` 검사
-2. `call(verify.tool, values)` 가 통과해야 한다. 실패는 공통 어휘의 오류 코드로 끝나고 아무것도 저장하지 않는다
+2. `call(verify.tool, values)` 가 통과해야 한다. 실패는 공통 어휘의 오류 코드로 끝나고 아무것도 저장하지 않는다. 이 호출은 DB 트랜잭션 밖에서 한다. 최대 10초가 걸려 그동안 DB 연결을 쥐지 않기 위해서다
 3. 사용자 행 잠금, 전용 에이전트 바인딩(처음이면 생성), 에이전트 비활성화, `desired_enabled=false`, `PENDING` 저장
 4. 칸마다 `PUT /api/env`. 비운 선택 칸은 `DELETE /api/env`
 5. API 도구 목록을 `["fos-assistant"]` 로 다시 쓴다(`PUT /api/config`). 새 profile 의 틀은 내장 도구 `delegation` 을 켜 두기 때문이다

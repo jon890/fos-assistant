@@ -81,7 +81,9 @@ boolean deleteEnv(String profile, String key);
 ### 4. `ConnectorConnectionService`
 
 `docs/connectors.md` 의 「설치와 실패 처리」 순서대로.
-- `catalog(CurrentUser)`: 카탈로그와 내 상태
+- `catalog(CurrentUser)`: 카탈로그와 내 상태. 항목마다 `available` 을 낸다. 카탈로그에서 빠졌지만 내 연결이 `DISCONNECTED` 가 아닌 커넥터는 `available: false`, 빈 `fields`, `title` 은 전용 에이전트 이름으로 함께 낸다
+- `register` 의 확인 도구 호출은 트랜잭션 밖에서 먼저 한다. 트랜잭션 없는 바깥 메서드가 `call` 뒤에 트랜잭션 메서드를 부르고, 잠금과 저장만 트랜잭션 안에서 한다. 확인과 저장 사이에 같은 사용자의 다른 등록이나 해제가 끼어도 잠금 안의 상태 전이 규칙이 지켜지는지 검사 하나로 본다
+- 비밀이 아닌 칸의 값은 500자까지다. 넘으면 `VALIDATION_FAILED`
 - `read(user, connectorId)`, `options(user, connectorId, fieldKey, values)`, `register(user, connectorId, values)`, `check(user, connectorId)`, `disconnect(user, connectorId)`, `listForAdmin(admin)`, `confirmApplied(admin, connectorId, userId)`
 - 모르는 커넥터는 `CONNECTOR_NOT_FOUND`. 단 이미 연결 행이 있는 커넥터는 카탈로그에서 빠져도 `read` 와 `disconnect` 가 된다(env 이름은 저장된 칸 키로 알 수 없으므로, 해제는 설치 해제만 하고 env 삭제는 건너뛴 뒤 `restartRequired` 를 참으로 둔다)
 - `values` 검사: 모르는 키, 필수 누락, `pattern` 불일치 → `VALIDATION_FAILED`

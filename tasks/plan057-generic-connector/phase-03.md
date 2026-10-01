@@ -45,7 +45,7 @@
 
 ### 2. 화면
 
-- `/connections`: 카탈로그 카드(제목, 설명, 내 상태 배지). 비면 「연결할 수 있는 서비스가 없어요」. 관리자에게는 아래에 반영 대기 목록
+- `/connections`: 카탈로그 카드(제목, 설명, 내 상태 배지). `available` 이 거짓인 카드는 「지금은 쓸 수 없어요」 를 보이고 연결 화면으로 들어가 해제만 한다. 비면 「연결할 수 있는 서비스가 없어요」. 관리자에게는 아래에 반영 대기 목록
 - `/connections/[id]`: manifest 칸 렌더러, 등록, 연결 확인, 해제. 모르는 id 는 404 화면. 운영 목록에서 빠진 연결은 「지금은 쓸 수 없어요」 와 해제만
 - 상태 배지와 오류 문구: `DISCONNECTED` 연결 안 됨, `PENDING` 준비 중, `READY` 연결됨, 재시작 대기는 「관리자 반영을 기다려요」. 오류는 `CONNECTOR_CREDENTIAL_REJECTED` 「입력한 값을 확인하지 못했어요」, `CONNECTOR_FORBIDDEN` 「이 값으로는 쓸 수 없어요」, `CONNECTOR_UNAVAILABLE` 「서비스에 닿지 못했어요. 잠시 뒤 다시 해 주세요」, `CONNECTOR_OPERATION_FAILED` 「연결을 마치지 못했어요」, `VALIDATION_FAILED` 「입력 형식을 확인해 주세요」
 - 메뉴 「연결」
