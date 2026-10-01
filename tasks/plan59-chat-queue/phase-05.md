@@ -16,7 +16,7 @@
 
 - 브라우저는 Control Plane 을 직접 부르지 않는다. `web/src/app/api/` 의 서버 라우트를 거친다. 본보기는 `web/src/app/api/chat/conversations/[conversationId]/running/route.ts`(GET)와 `web/src/app/api/chat/conversations/[conversationId]/model/route.ts`(본문이 있는 요청)다.
 - `web/src/components/**` 에서 `fetch` 를 직접 부르면 lint error 다. `web/src/lib/` 의 함수를 거친다. `chat-panel.tsx` 와 `composer.tsx` 의 기존 직접 호출은 기준 파일(`web/eslint-suppressions.json`)에 든 옛 위반이다. 한 줄이라도 더하면 기준을 넘는다.
-- 서버 라우트에서 `NextResponse.json({ code, ... })` 와 `request.json()` 을 직접 쓰면 lint error 다. `web/AGENTS.md` 가 정한 도우미를 쓴다. 본보기 라우트의 직접 호출은 옛 위반이다.
+- 서버 라우트에서 `NextResponse.json({ code, ... })` 와 `request.json()` 을 직접 쓰면 lint error 다. 본문은 `web/src/lib/json-body.ts` 의 `readJsonBody` 로 읽고, Control Plane 응답은 `web/src/lib/control-plane.ts` 의 `forwardControlPlane` 으로 그대로 넘긴다. 본보기 라우트의 직접 호출은 옛 위반이다. `web/eslint-suppressions.json` 에 이름이 없는 라우트를 하나 골라 모양을 따른다.
 - 인라인 `style={{` 를 쓰지 않는다. 색과 간격은 `globals.css` 의 토큰과 Tailwind 클래스로 쓴다.
 - 문구는 해요체다. 오류는 사용자가 할 일만 알린다.
 - 운영 코드에 시험 전용 우회를 만들지 않는다.
@@ -114,6 +114,7 @@ type 목록에 `"user"` 와 `"pending"` 을 더한다.
 
 - 뿌리에 `data-testid="pending-queue"`, 줄마다 `data-testid="pending-item"`.
 - 줄은 글(길면 한 줄로 자른다)과 취소 단추다. 취소 단추의 `aria-label` 은 「대기 메시지 취소」 다.
+- 이 단추는 이름에 「보내기」 를 담는다. 기존 검사는 `getByRole("button", { name: "보내기" })` 를 `exact` 없이 쓰므로, 새 검사는 입력창의 보내기를 `composer-shell` 안으로 한정해 고른다.
 - `queue.held` 가 참이면 「중지해서 보내지 않았어요.」 문구와 단추 `data-testid="pending-release"`(글자 「보내기」, `aria-label` 「대기 메시지 보내기」)를 보인다.
 - 멈추지 않았으면 「답이 끝나면 보내요.」 문구를 보인다.
 - 단추는 `web/src/components/ui/` 의 부품을 쓴다.
@@ -131,16 +132,16 @@ type 목록에 `"user"` 와 `"pending"` 을 더한다.
 - `Composer` 에 `canQueue={conversationId !== null}` 을 준다.
 - `Composer` 의 `onSend` 가 부르는 자리에서 경로를 고른다.
   - `sending` 이 참이거나 `queue.held` 가 참이면 대기 경로다. 첨부 번호가 있으면 대기 경로를 쓰지 않고 지금처럼 거짓을 돌려준다.
-  - 대기 경로: 글을 `enqueue` 로 보낸다. 성공하면 `setDraft("")` 하고 참을 돌려준다. `queue.held` 였으면 이어서 `release` 를 부른다. 실패하면 글을 그대로 두고 `setError(describeError(code, message))` 를 한 뒤 거짓을 돌려준다.
+  - 대기 경로: 글을 `enqueue` 로 보낸다. 성공하면 `setDraft("")` 하고 참을 돌려준다. `queue.held` 였으면 이어서 `release` 를 부른다. 실패하면 글을 그대로 두고 `setError(describeError(code, message))` 를 한 뒤 거짓을 돌려준다. 대기 경로의 `CONVERSATION_BUSY` 는 흐름이 붙은 에이전트라 받지 않는다는 뜻이다. 그때는 「이 대화는 답이 끝난 뒤 보낼 수 있어요.」 를 보인다.
   - 그 밖에는 지금의 `send` 다.
 - `send` 가 `started` 전에 `CONVERSATION_BUSY` 로 거절됐고 첨부가 없으면, 글을 되돌리는 대신 대기 경로로 다시 넣는다. 자동 turn 이 막 열린 순간에 보낸 경우다.
 - 취소: `cancel` 이 성공하면 그 글을 입력창에 되돌린다. `draft` 가 비어 있으면 그 글로, 아니면 `draft` 뒤에 줄을 바꿔 붙인다. `PENDING_MESSAGE_NOT_FOUND` 면 되돌리지 않고 `reload` 한다.
 - `applyConversationEvent`:
-  - `pending`: `reload()`. 보는 중 turn 을 거르는 판정보다 앞에서 처리한다.
+  - `pending`: `reload()`. **`runConversationTask` 에 넣지 않는다.** `readEventStream` 콜백에서 type 이 `pending` 이면 곧바로 `reload()` 하고 끝낸다. 이 창이 보낸 turn 이 도는 동안에는 `runConversationTask` 가 사건을 보류하므로, 거기 넣으면 다른 창이 쌓은 대기 메시지가 turn 이 끝날 때까지 보이지 않는다.
   - `user`: `{ id: event.messageId, role: "USER", content: event.text }` 줄을 더한다. 같은 id 가 있으면 건너뛴다. `system` 처리와 같은 모양이다.
 - `<PendingQueueView>` 를 `observing-notice` 와 `<Composer>` 사이에 둔다.
 - 「다른 창에서 답하는 중」 일 때도 입력창은 잠기지 않는다. 그 안내 문구는 그대로 둔다.
-- 질문 카드의 `onAnswer` 와 추천 질문의 `onPrompt` 는 지금처럼 `send` 를 부른다. 응답 중에는 그 둘이 보이지 않는다.
+- 질문 카드의 `onAnswer` 도 `Composer` 의 `onSend` 와 같은 자리에서 경로를 고른다. 질문 카드는 응답 중에도 보이므로 그때 고른 답은 대기 메시지로 들어간다. 추천 질문의 `onPrompt` 는 지금처럼 `send` 를 부른다.
 
 ### 9. 이 phase 를 검증하는 `test/browser/chat-queue.spec.ts` 신규
 
@@ -153,14 +154,17 @@ type 목록에 `"user"` 와 `"pending"` 을 더한다.
 | 중지하면 대기 줄이 멈추고 보내기로 이어 보낸다 | 한 글을 대기시키고 「중지」 를 누른다. `stopped-mark` 가 보인 뒤 `pending-release` 가 보이고 새 답이 시작되지 않는다. `pending-release` 를 누르면 그 글의 사용자 메시지와 답이 보인다 |
 | Enter 로도 대기시킨다 | turn 을 붙잡은 채 글을 쓰고 Enter 를 누르면 `pending-item` 이 하나다 |
 | 대기 줄이 가득 차면 글을 되돌린다 | `**/api/chat/conversations/*/pending` 의 POST 를 `page.route` 로 409 `PENDING_QUEUE_FULL` 로 채운다. 보낸 글이 입력창에 남고 「대기 중인 메시지가 가득 찼어요」 가 보인다 |
+| 흐름이 붙은 에이전트라 받지 않으면 까닭을 알린다 | 같은 POST 를 409 `CONVERSATION_BUSY` 로 채운다. 글이 입력창에 남고 「이 대화는 답이 끝난 뒤 보낼 수 있어요」 가 보인다 |
 | 다른 창에서 쌓은 대기 메시지가 보인다 | turn 을 붙잡은 뒤 `page.request.post` 로 그 대화의 `/api/chat/conversations/{id}/pending` 에 글을 넣는다. 화면에 `pending-item` 이 하나 보인다 |
 
 ### 10. 응답 중에 「보내기」 가 없다고 단언하는 기존 검사
 
-`git grep -n "보내기" -- test/browser` 로 찾는다. 아래 셋은 확인한 자리다. 다른 파일에 같은 쓰임이 있으면 함께 고치고 「변경 파일」 에 더한다.
+`git grep -n "보내기" -- test/browser` 로 찾는다. 쓰임은 둘이다. 응답 중에 「보내기」 가 0개라는 단언과, 「보내기」 가 보이는 것을 turn 이 끝났다는 기다림으로 쓰는 것이다. 둘 다 「중지」 의 유무로 바꾼다. 아래는 확인한 자리다. 다른 파일에 같은 쓰임이 있으면 함께 고치고 「변경 파일」 에 더한다.
 
 - `test/browser/stop.spec.ts`: 「보내기」 가 0개라는 단언을 「중지」 가 보인다는 단언으로 남기고, 끝난 뒤의 판정을 「중지」 가 0개인 것으로 바꾼다.
-- `test/browser/chat-delegation-wake.spec.ts`: 자동 turn 이 도는 동안 「보내기」 가 0개라는 단언 셋과, 끝난 뒤 「보내기」 가 보인다는 단언을 「중지」 의 유무로 바꾼다. 검사 이름의 「보내기를 막는다」 도 고친다.
+- `test/browser/chat-delegation-wake.spec.ts`: 자동 turn 이 도는 동안 「보내기」 가 0개라는 단언 셋(236, 240, 337줄 근처)과, 끝난 뒤 「보내기」 가 보인다는 단언(119, 243, 340줄 근처)을 「중지」 의 유무로 바꾼다. 검사 이름의 「보내기를 막는다」 도 고친다.
+- `test/browser/observe-running.spec.ts`: 132줄 근처의 0개 단언과, 49, 137, 171, 234, 286, 318, 338줄 근처의 기다림.
+- `test/browser/chat-attachment.spec.ts` 203줄 근처, `test/browser/chat.spec.ts` 171줄 근처의 같은 쓰임.
 - `test/browser/ask-card.spec.ts`: 「답이 끝나 보내기 단추가 돌아온 뒤에 입력한다」 는 기다림이 이제 곧바로 통과한다. 「중지」 가 0개가 될 때까지 기다리게 바꾼다.
 
 ### 11. `docs/code-architecture.md`
@@ -171,13 +175,13 @@ type 목록에 `"user"` 와 `"pending"` 을 더한다.
 
 ```bash
 cd web && pnpm typecheck && pnpm lint && pnpm format:check
-cd web && pnpm test:browser chat-queue stop chat-delegation-wake ask-card
+cd web && pnpm test:browser
 git grep -n 'style={{' -- web/src
 ```
 
 - 첫 줄은 오류 없이 끝나야 한다. lint 의 기준 파일(`web/eslint-suppressions.json`)에 줄을 더하지 않는다.
 - 브라우저 검사는 한 기계에서 한 번에 하나만 돈다. 다른 브라우저 검사가 돌고 있으면 끝난 뒤에 돌린다.
-- 둘째 줄은 `mobile` 과 `desktop` 두 프로젝트에서 모두 통과해야 한다.
+- 둘째 줄은 브라우저 검사 전체다. `mobile` 과 `desktop` 두 프로젝트에서 모두 통과해야 한다. 응답 중의 단추 구성이 바뀌어 여러 검사의 전제가 달라지므로 일부만 돌리지 않는다.
 - 마지막 줄은 아무것도 내지 않아야 한다.
 
 ## 변경 파일
@@ -198,4 +202,7 @@ git grep -n 'style={{' -- web/src
 | `test/browser/stop.spec.ts` | 수정 |
 | `test/browser/chat-delegation-wake.spec.ts` | 수정 |
 | `test/browser/ask-card.spec.ts` | 수정 |
+| `test/browser/observe-running.spec.ts` | 수정 |
+| `test/browser/chat-attachment.spec.ts` | 수정 |
+| `test/browser/chat.spec.ts` | 수정 |
 | `docs/code-architecture.md` | 수정 |

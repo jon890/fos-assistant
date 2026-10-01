@@ -16,7 +16,7 @@
 - `Instant.now()` 를 직접 부르지 않는다(`ArchitectureRules.NO_DIRECT_INSTANT_NOW`). 만든 시각은 팩터리 인자로 받는다.
 - 저장소에 `@Transactional` 을 붙이지 않는다(`ArchitectureRules.TRANSACTIONAL_ONLY_IN_APPLICATION`). 트랜잭션은 부르는 서비스가 연다. 기존 `ConversationRepository` 의 `@Transactional` 은 기준 파일에 든 옛 위반이라 따라 하지 않는다.
 - 문자열 본문은 `columnDefinition = "LONGTEXT"` 로 못 박는다. 본보기는 `ChatMessage.content` 다.
-- 마이그레이션은 MySQL 과 H2 MySQL 모드에 함께 있는 문법만 쓴다. 지금 최신은 `V39__connector_attachments.sql` 이고 V40 은 다른 PR 이 쓴다. 이 phase 는 V41 을 쓴다.
+- 마이그레이션은 MySQL 과 H2 MySQL 모드에 함께 있는 문법만 쓴다. 지금 최신은 `V39__connector_attachments.sql` 이고 V40 은 다른 PR 이 쓴다. 이 phase 는 V41 을 쓴다. PR 을 열기 전과 머지 직전에 기준 브랜치의 최신 번호를 다시 보고 그 다음 번호로 옮긴다. 옮기는 것은 계획을 실행하는 쪽이 한다.
 
 **근거 문서**: `docs/data-schema.md` 의 「chat_pending_message」 절, `docs/adr/ADR-047-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md`, `backend/AGENTS.md` 의 「엔티티와 마이그레이션은 따로 논다」
 
@@ -74,11 +74,11 @@ CREATE INDEX idx_chat_pending_message_conversation ON chat_pending_message (conv
 
 - 정상: `chat_pending_message` 에 여섯 칸이 있고 `held` 의 기본값이 거짓이며 모든 칸이 NOT NULL 이다.
 - 정상: 색인 `idx_chat_pending_message_conversation` 의 칸 순서가 `conversation_id`, `id` 다.
-- 실패 입력: `content` 를 비운 `INSERT` 가 예외로 거절된다.
+- 실패 입력: `content` 가 `NULL` 인 `INSERT` 가 예외로 거절된다.
 
 ### 5. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/chat/ChatPendingMessageRepositoryTest.java`
 
-`@SpringBootTest`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)` 로 띄운다. 저장소 호출은 `TransactionTemplate` 안에서 한다. `@BeforeEach` 에서 `deleteAll()` 로 비운다.
+`@SpringBootTest`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)` 로 띄운다. 저장소 호출은 `TransactionTemplate` 안에서 한다. `@BeforeEach` 와 `@AfterEach` 에서 `deleteAll()` 로 비운다. 검사들이 H2 를 함께 써서, 남은 대기 행은 뒤 phase 가 만드는 기동 확인이 다른 검사 문맥에서 turn 으로 보낸다.
 
 - 정상: 두 대화에 행을 넣으면 `findByConversationIdOrderByIdAsc` 가 그 대화의 행만 넣은 순서로 준다.
 - 정상: `markHeld(id, true)` 뒤 `findConversationsReadyToSend()` 에 그 대화가 없고 다른 대화는 있다. `markHeld(id, false)` 뒤 다시 있다.

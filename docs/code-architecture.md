@@ -937,8 +937,9 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 1. 그 대화에 대기 행이 있고 멈춰 둔 행이 하나도 없으면 turn 잠금을 잡고 새 가상 스레드에서 `ChatService.runPendingMessages` 를 돌린다. 잠금을 잡지 못하면 도는 turn 이 닫힐 때 다시 온다.
 2. 보낼 대기 행이 없으면 `DelegationWakeService.tryWake` 로 넘긴다.
 
-turn 이 중지로 닫혔으면 `tryNext` 보다 먼저 그 대화의 대기 행을 모두 멈춰 둔다.
-중지로 끝났는지는 `ChatService` 가 취소된 turn 을 돌려줄 때 `TurnCancellation.markStopped` 로 적고, 닫을 때 `TurnClosed.stopped` 로 넘긴다.
+turn 이 중지로 끝나면 `ChatService` 가 취소된 turn 을 돌려주는 자리에서 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 행을 모두 멈춰 둔다.
+**잠금을 풀기 전에 멈춘다.** 잠금을 푼 뒤 종료 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다.
+닫을 때 `TurnClosed.stopped` 가 참이면 `NextTurnDispatcher` 가 `pending` 사건을 낸다.
 
 **멈춤은 행마다 `held` 로 DB 에 적는다.** 한 행이라도 멈춰 있으면 그 대화의 대기 줄 전체를 보내지 않는다.
 대기 줄이 멈춰 있을 때 더한 행은 멈춘 채로 들어간다.

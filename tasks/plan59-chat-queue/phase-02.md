@@ -82,6 +82,13 @@ Spring 문맥 없이 `new TurnCancellation(mock(HermesRunsClient.class), Duratio
 - 실패 입력: 리스너가 예외를 던져도 `close` 가 예외 없이 끝나고 둘째 리스너가 불린다.
 - 정상: 같은 handle 을 두 번 `close` 해도 리스너는 한 번만 불린다.
 
+### 8. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java`
+
+검사 하나를 더한다. `TurnCancellation.addCloseListener` 로 리스너를 걸어 받은 `TurnClosed` 를 모은다. 리스너는 지울 수 없으므로 그 대화 번호의 것만 모은다.
+
+- 정상: 이 파일의 기존 방식으로 turn 을 중지하면 그 대화의 `TurnClosed.stopped` 가 참이다.
+- 실패 입력: 중지하지 않고 끝난 turn 은 `stopped` 가 거짓이다.
+
 ## 검증
 
 ```bash
@@ -91,7 +98,7 @@ git grep -n "addCloseListener" -- backend/src/main
 ```
 
 - 앞의 둘은 `BUILD SUCCESSFUL` 이어야 한다.
-- 마지막 명령은 `TurnCancellation.java` 의 정의와 `NextTurnDispatcher.java` 의 호출 한 줄만 보여야 한다.
+- 마지막 명령은 `TurnCancellation.java` 의 정의와 `NextTurnDispatcher.java` 의 호출 한 줄만 보여야 한다. 테스트 코드의 호출은 이 명령이 보지 않는다.
 
 ## 변경 파일
 
@@ -104,3 +111,4 @@ git grep -n "addCloseListener" -- backend/src/main
 | `backend/src/main/java/com/bifos/assistant/chat/application/DelegationWakeService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/application/TurnCancellationCloseTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatStopTest.java` | 수정 |

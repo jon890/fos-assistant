@@ -83,6 +83,7 @@ record Fresh(List<Long> pendingIds) implements TurnIntent {
   3. `Routed routed = route(owner, conversationId, text, null, List.of())`. `routed.flow() != null` 이면 `ApiException(ErrorCode.CONVERSATION_BUSY, ...)` 를 던진다.
   4. `runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle)` 를 돌리고 `runDelegationResults` 와 같이 `done` 이나 `stopped` 를 낸다.
   5. `PendingQueueChangedException` 을 잡으면 1 부터 다시 한다. 세 번째에도 잡히면 `ApiException(ErrorCode.CONVERSATION_BUSY, ...)` 를 던진다.
+- 취소된 turn 을 돌려주는 자리(`runTurn` 의 두 자리와 `runFlow`)에서 `turns.markStopped(handle)` 바로 뒤에 `pendingMessages.markHeld(conversation.id(), true)` 를 트랜잭션에서 부른다. **잠금을 풀기 전에 멈춰야 한다.** `TurnCancellation.close` 는 잠금을 맵에서 뺀 뒤에 리스너를 부르므로, 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다. 세 자리가 같은 private 메서드 하나를 부르게 한다.
 - `delete(CurrentUser, Long)`: `conversations.deleteIfActive` 가 성공한 뒤 같은 트랜잭션에서 `pendingMessages.deleteAllOf(conversationId)` 를 부른다.
 
 ### 6. `application/PendingQueue.java` 신규
@@ -120,7 +121,7 @@ public record PendingQueue(boolean held, List<ChatPendingMessage> items) {}
 
 주입에 `ChatPendingMessageRepository pendingMessages`, `ConversationRepository conversations`, `AppUserRepository users`, `ChatService chat`, `ConversationEventHub hub`, `TransactionTemplate transactions` 를 더한다.
 
-- `onTurnClosed(TurnClosed closed)`: `closed.stopped()` 이면 트랜잭션에서 `pendingMessages.markHeld(conversationId, true)` 를 부르고, 바뀐 행이 있으면 `pending` 사건을 낸다. 그 뒤 `tryNext`.
+- `onTurnClosed(TurnClosed closed)`: `closed.stopped()` 이고 그 대화에 대기 행이 있으면 `pending` 사건을 낸다. 멈춤 표시는 `ChatService` 가 잠금 안에서 이미 적었다. 그 뒤 `tryNext`.
 - `tryNext(Long conversationId)`: `tryPending(conversationId)` 가 참이면 돌아간다. 거짓이면 `wake.tryWake(conversationId)`.
 - `private boolean tryPending(Long conversationId)`:
   1. 대기 행을 읽는다. 비었거나 멈춘 행이 있으면 거짓.
@@ -163,18 +164,19 @@ public record PendingQueueView(boolean held, List<PendingMessageView> items) {}
 
 ### 11. 이 phase 를 검증하는 `backend/src/test/java/com/bifos/assistant/chat/PendingMessageServiceTest.java`
 
-`@SpringBootTest`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)`, `@MockitoBean HermesRunEventStream eventStream` 으로 띄운다. 준비와 정리는 `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` 의 `setUp`, `awaitAllIdle`, `awaitIdle` 을 본보기로 쓴다. `@BeforeEach` 에서 대기 행도 비운다.
+`@SpringBootTest`, `@ActiveProfiles("test")`, `@Import(ChatServiceTest.StubRuntime.class)`, `@MockitoBean HermesRunEventStream eventStream` 으로 띄운다. 준비와 정리는 `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java` 의 `setUp`, `awaitAllIdle`, `awaitIdle` 을 본보기로 쓴다. `@BeforeEach` 와 `@AfterEach` 에서 대기 행을 비운다. 남은 행은 다른 검사 문맥의 기동 확인이 turn 으로 보낸다. `PendingBeforeDelegationTest` 도 같다.
 도는 turn 은 `StubHermesRunsClient.holdSubmits()` 와 `releaseSubmits()` 로 붙잡았다 푼다. 대기 메시지로 연 turn 은 다른 스레드에서 도므로 단언 전에 그 대화가 쉴 때까지 기다린다.
 
 | 경우 | 기대 |
 | --- | --- |
 | turn 이 도는 동안 두 글을 더하고 turn 을 푼다 | 대역 Hermes 가 받은 둘째 명령의 입력이 두 글을 빈 줄로 이은 글로 끝난다. 메시지는 `USER`, `ASSISTANT`, `USER`(합친 글), `ASSISTANT` 넷이다. 대기 행이 없다. `auto_turn_count` 가 0 이다 |
-| 위 경우에 대화를 `hub.subscribe` 로 듣는다 | `pending`, `user`, `started`, `done` 사건을 이 순서로 받는다. `user` 의 `text` 가 합친 글이다 |
+| 위 경우에 대화를 `hub.subscribe` 로 듣는다 | 받은 사건의 type 목록에 `pending`, `user`, `started`, `done` 이 이 순서의 부분열로 있다. 사이에 다른 사건(`pending`, 답 조각)이 끼어도 된다. `user` 의 `text` 가 합친 글이다 |
 | 도는 turn 이 없을 때 더한다 | 곧바로 turn 이 열리고 대기 행이 없다 |
 | 대기 메시지 하나를 취소하고 turn 을 푼다 | 남은 글만 간다. 같은 번호를 다시 취소하면 `PENDING_MESSAGE_NOT_FOUND` |
 | 여섯째를 더한다 | `PENDING_QUEUE_FULL`. 행은 다섯 |
 | 합친 길이가 8000자를 넘게 더한다 | `PENDING_QUEUE_FULL` |
 | 도는 turn 을 `chat.stop` 으로 중지한다 | 대기 행이 `held` 로 남고 새 turn 이 열리지 않는다. `release` 뒤에 합친 글이 간다 |
+| turn 을 중지한 직후, 잠금이 풀리기 전에 `dispatcher.tryNext` 가 불린다(중지 요청 스레드에서 직접 부른다) | turn 이 열리지 않는다. 대기 행이 `held` 다 |
 | 멈춘 대기 줄에 더한다 | 새 행도 `held` 다. turn 이 열리지 않는다 |
 | 앞 turn 이 실패로 끝난다(`stub().willFail(...)` 뒤 다음 응답은 정상) | 대기 메시지가 간다 |
 | 더한 뒤 에이전트를 끄고 turn 을 푼다 | 대기 행이 `held` 로 남고 `error` 사건이 `AGENT_DISABLED` 로 온다. turn 이 되풀이해 열리지 않는다(대역 Hermes 의 제출 수가 늘지 않는다) |

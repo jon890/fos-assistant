@@ -43,7 +43,7 @@
 ### 1. `test/e2e/run.ts` 와 `test/e2e/harness.ts`: 재시작
 
 - `DB_URL` 을 실행마다 만든 임시 디렉터리 아래의 파일 H2 로 바꾼다. `MODE=MySQL` 은 그대로 둔다. 다시 띄워도 같은 파일을 읽는다.
-- Control Plane 을 내리고 같은 환경으로 다시 띄운 뒤 `/actuator/health` 를 기다리는 함수를 만든다. 프로세스 그룹에 `SIGTERM` 을 보내고 그 프로세스가 끝난 것을 확인한 뒤 띄운다. `main` 의 `finally` 가 다시 띄운 프로세스를 내리게 한다.
+- Control Plane 을 내리고 같은 환경으로 다시 띄운 뒤 `/actuator/health` 를 기다리는 함수를 만든다. 프로세스 그룹에 `SIGKILL` 을 보내고 그 프로세스가 끝난 것을 확인한 뒤 띄운다. `SIGTERM` 으로 내리면 내려가는 동안 붙잡힌 turn 이 닫히며 종료 리스너가 대기 행을 소비한 채 죽을 수 있다. 끝나기를 30초까지 기다리고 넘으면 시나리오를 실패시킨다. `main` 의 `finally` 가 다시 띄운 프로세스를 내리게 한다.
 - `Context` 에 `restartControlPlane(): Promise<void>` 를 더한다. Javadoc 에 「메모리에만 있던 turn 잠금과 SSE 구독이 사라진다」 를 적는다.
 - 기존 시나리오가 파일 H2 에서도 그대로 통과해야 한다.
 
@@ -59,9 +59,9 @@
 
 `chatQueueScenario` 의 단계:
 
-1. **둘 쌓기 합쳐짐**: `holdNextRun()` 뒤 첫 글을 스트림으로 보내고 `started` 를 기다린다. 대기 메시지 둘을 더한다(둘 다 201). `GET pending` 이 두 줄이고 `held` 가 false 다. `releaseHeldRun()` 뒤 메시지가 `USER`, `ASSISTANT`, `USER`, `ASSISTANT` 가 될 때까지 기다린다. 둘째 `USER` 의 글이 두 글을 빈 줄 하나로 이은 글이다. `lastSubmittedInput()` 이 그 글로 끝난다. `GET pending` 이 비었다. 이 구간에서 `submitCount()` 가 2 늘었다.
+1. **둘 쌓기 합쳐짐**: `holdNextRun()` 뒤 첫 글을 스트림으로 보내고 `started` 를 기다린다. 대기 메시지 둘을 더한다(둘 다 201). `GET pending` 이 두 줄이고 `held` 가 false 다. `releaseHeldRun()` 뒤 메시지가 `USER`, `ASSISTANT`, `USER`, `ASSISTANT` 가 될 때까지 기다린다. 둘째 `USER` 의 글이 두 글을 빈 줄 하나로 이은 글이다. `lastSubmittedInput()` 이 그 글로 끝난다. `GET pending` 이 비었다. 제출 수는 단언하지 않는다. 추천 질문 실행도 제출로 세어진다.
 2. **대기 중 취소**: 같은 대화에서 turn 을 붙잡고 「취소할 글」 과 「남길 글」 을 더한다. 첫 줄을 `DELETE` 한다(204). 같은 번호를 다시 지우면 404 `PENDING_MESSAGE_NOT_FOUND` 다. 푼 뒤 새 `USER` 의 글이 「남길 글」 이고 「취소할 글」 을 담지 않는다.
-3. **중지하면 멈춰 둔다**: turn 을 붙잡고 대기 메시지 하나를 더한 뒤 `POST /chat/executions/{id}/stop` 으로 멈춘다. `GET pending` 의 `held` 가 true 가 될 때까지 기다린다. 1초 뒤에도 `submitCount()` 가 늘지 않았다. `POST pending/send`(202) 뒤 그 글이 `USER` 로 저장되고 답이 온다.
+3. **중지하면 멈춰 둔다**: turn 을 붙잡고 대기 메시지 하나를 더한 뒤 `POST /chat/executions/{id}/stop` 으로 멈춘다. `GET pending` 의 `held` 가 true 가 될 때까지 기다린다. 1초 뒤에도 그 대화의 메시지 목록에 대기 글의 `USER` 행이 없다. `POST pending/send`(202) 뒤 그 글이 `USER` 로 저장되고 답이 온다.
 4. **상한**: turn 을 붙잡고 다섯을 더한 뒤 여섯째가 409 `PENDING_QUEUE_FULL` 이다. 남의 토큰(`context.tokens.kid`)으로 `GET pending` 을 부르면 404 `CONVERSATION_NOT_FOUND` 다. 다섯을 모두 `DELETE` 하고 푼다.
 5. **대기열과 위임 결과의 순서**: `delegation.ts` 와 같은 방식으로 GROUP 에이전트를 등록하고 토큰을 발급한다. 에이전트 코드는 `delegation.ts` 의 것과 다르게 짓는다. 뿌리 turn 을 붙잡고, 그 turn 의 session 으로 `agent_delegate` 를 불러 자식을 맡긴다(자식은 붙잡지 않아 곧 끝난다). 실행 나무에서 자식이 `SUCCEEDED` 가 될 때까지 기다린다. 대기 메시지 하나를 더한다. 뿌리 turn 을 푼다. 메시지 끝이 `USER`(대기 글), `ASSISTANT`, `SYSTEM`, `ASSISTANT` 순서가 될 때까지 기다린다. `finally` 에서 토큰을 폐기하고 에이전트를 끈다.
 
