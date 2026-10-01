@@ -20,7 +20,15 @@ type ChatEvent = {
 };
 
 type Execution = { id: number; status: string; hasChildren: boolean };
-type ExecutionNode = { executionId: number; status: string; children: ExecutionNode[] };
+type ExecutionNode = {
+  executionId: number;
+  status: string;
+  requestReceivedAt: string | null;
+  submittedAt: string | null;
+  firstDeltaAt: string | null;
+  finishedAt: string | null;
+  children: ExecutionNode[];
+};
 type ExecutionTree = { root: ExecutionNode; truncated: boolean };
 type Message = { id: number; role: string; executionId: number | null; hasChildren: boolean };
 
@@ -127,6 +135,14 @@ export const orchestrationScenario: Scenario = {
       [tree.root, ...tree.root.children].every((node) => node.status === "SUCCEEDED"),
       "실행 넷이 모두 성공으로 남지 않았다",
     );
+    for (const node of [tree.root, ...tree.root.children]) {
+      expect(node.requestReceivedAt != null && node.submittedAt != null && node.finishedAt != null,
+        "Flow 실행의 요청·제출·완료 시각이 빠졌다");
+      expect(Date.parse(node.requestReceivedAt!) <= Date.parse(node.submittedAt!)
+        && Date.parse(node.submittedAt!) <= Date.parse(node.finishedAt!),
+        "Flow 실행의 요청·제출·완료 시각 순서가 다르다");
+      expect(node.firstDeltaAt === null, "SSE를 읽지 않는 Flow에 첫 delta 시각을 만들었다");
+    }
 
     step("사용량 목록에는 뿌리만 나온다");
     const listed = expectStatus(

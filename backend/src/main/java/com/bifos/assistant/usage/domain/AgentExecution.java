@@ -187,6 +187,10 @@ public class AgentExecution {
     @Column(name = "first_delta_at")
     private Instant firstDeltaAt;
 
+    /** profile 기본 모델 설정을 정상으로 읽어 이 실행의 기본 강도를 확인한 시각이다. */
+    @Column(name = "reasoning_defaults_checked_at")
+    private Instant reasoningDefaultsCheckedAt;
+
     /**
      * 이 실행의 끝난 결과를 부모 대화에 전한 시각이다. 전하지 않았으면 비어 있다.
      *
@@ -401,6 +405,10 @@ public class AgentExecution {
         return firstDeltaAt;
     }
 
+    public Instant reasoningDefaultsCheckedAt() {
+        return reasoningDefaultsCheckedAt;
+    }
+
     public Instant resultDeliveredAt() {
         return resultDeliveredAt;
     }
@@ -414,6 +422,13 @@ public class AgentExecution {
     public void markSubmitted(Instant at) {
         if (submittedAt == null) {
             submittedAt = at;
+        }
+    }
+
+    /** Flow 뿌리가 먼저 받은 원래 요청 시각을 보존하려고 더 이른 시각만 적는다. */
+    public void markRequestReceived(Instant at) {
+        if (at != null && (requestReceivedAt == null || at.isBefore(requestReceivedAt))) {
+            requestReceivedAt = at;
         }
     }
 
@@ -434,6 +449,13 @@ public class AgentExecution {
         reasoningEffortSource = ReasoningEffortSource.PROFILE_DEFAULT;
         if (reasoningEffort == null) {
             reasoningEffort = effort;
+        }
+    }
+
+    /** profile 기본 모델 설정의 정상 응답을 확인했음을 적어 빈 effort를 다시 조회하지 않는다. */
+    public void markReasoningDefaultsChecked(Instant at) {
+        if (reasoningDefaultsCheckedAt == null) {
+            reasoningDefaultsCheckedAt = at;
         }
     }
 

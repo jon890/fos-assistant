@@ -18,7 +18,11 @@ public record SubagentSessionUsage(
         if (inputTokens == null || cacheReadTokens == null || cacheWriteTokens == null) {
             return null;
         }
-        return Math.addExact(Math.addExact(inputTokens, cacheReadTokens), cacheWriteTokens);
+        try {
+            return Math.addExact(Math.addExact(inputTokens, cacheReadTokens), cacheWriteTokens);
+        } catch (ArithmeticException ignored) {
+            return null;
+        }
     }
 
     public Long durationMs() {

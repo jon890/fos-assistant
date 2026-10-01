@@ -78,13 +78,15 @@ public class SubagentUsageReconciler {
     public void reconcile() {
         Instant now = clock.instant();
         discover(now);
+        List<AgentExecution> unknownDefaults =
+                executions.findUnknownReasoningDefaults(now.minus(Duration.ofHours(24)), PageRequest.of(0, 20));
+        if (!unknownDefaults.isEmpty()) {
+            AgentExecution execution = unknownDefaults.getFirst();
+            launch("profile:" + execution.id(), () -> supplementDefault(execution.id(), execution.profileName()));
+        }
         for (SubagentUsageJob job :
                 jobs.findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc("WAITING", now)) {
             launch("child:" + job.id(), () -> poll(job.id()));
-        }
-        for (AgentExecution execution :
-                executions.findUnknownReasoningDefaults(now.minus(Duration.ofHours(24)), PageRequest.of(0, 20))) {
-            launch("profile:" + execution.id(), () -> supplementDefault(execution.id(), execution.profileName()));
         }
     }
 
@@ -193,17 +195,20 @@ public class SubagentUsageReconciler {
                 && usage.endedAt() != null;
     }
 
-    private void supplementDefault(Long executionId, String profile) {
+    void supplementDefault(Long executionId, String profile) {
         ProfileModelDefaults value = defaults.read(profile);
-        if (value == null
-                || value.reasoningEffort() == null
-                || value.reasoningEffort().isBlank()) {
+        if (value == null) {
             return;
         }
         transaction.executeWithoutResult(status -> {
             AgentExecution execution = executions.lockById(executionId).orElse(null);
-            if (execution != null && execution.reasoningEffort() == null) {
-                execution.recordProfileReasoningDefault(value.reasoningEffort());
+            if (execution != null
+                    && execution.reasoningEffort() == null
+                    && execution.reasoningDefaultsCheckedAt() == null) {
+                if (value.reasoningEffort() != null && !value.reasoningEffort().isBlank()) {
+                    execution.recordProfileReasoningDefault(value.reasoningEffort());
+                }
+                execution.markReasoningDefaultsChecked(clock.instant());
                 executions.save(execution);
             }
         });

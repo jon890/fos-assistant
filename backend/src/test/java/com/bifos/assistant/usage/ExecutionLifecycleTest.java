@@ -119,6 +119,25 @@ class ExecutionLifecycleTest {
     }
 
     @Test
+    @DisplayName("Flow가 늦게 시작돼도 더 이른 원래 요청 수신 시각을 보존한다")
+    void keepsEarlierOriginalRequestReceivedAt() {
+        Instant first = Instant.parse("2026-10-01T00:00:00Z");
+        AgentExecution execution = AgentExecution.builder()
+                .userId(USER_ID)
+                .profileName("dad")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(first.plusSeconds(10))
+                .requestReceivedAt(first.plusSeconds(5))
+                .build();
+
+        execution.markRequestReceived(first);
+        execution.markRequestReceived(first.plusSeconds(20));
+
+        assertThat(execution.requestReceivedAt()).isEqualTo(first);
+    }
+
+    @Test
     @DisplayName("같은 instructions 는 같은 해시로 적히고 본문은 어디에도 저장되지 않는다")
     void sameInstructionsGiveSameHashAndBodyIsStoredNowhere() {
         AssembledContext context = contextOf(SECRET_MEMORY);

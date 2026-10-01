@@ -30,6 +30,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     @Query("""
             select e from AgentExecution e where e.finishedAt >= :since
             and e.reasoningEffort is null and e.reasoningEffortSource = 'UNKNOWN'
+            and e.reasoningDefaultsCheckedAt is null
             order by e.id desc
             """)
     List<AgentExecution> findUnknownReasoningDefaults(@Param("since") Instant since, Pageable pageable);

@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -142,6 +143,46 @@ class ModelTierServiceTest {
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
         verifyNoInteractions(definitions, settings, users, options);
+    }
+
+    @Test
+    @DisplayName("그룹 단계 저장은 provider와 model의 앞뒤 공백을 없애고 빈 provider는 null로 둔다")
+    void saveGroupNormalizesProviderAndModelBeforePersisting() {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options);
+        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+        doAnswer(invocation -> {
+                    List<ModelTierDefinition> saved = invocation.getArgument(0);
+                    assertThat(saved).satisfiesExactly(
+                            fast -> {
+                                assertThat(fast.provider()).isNull();
+                                assertThat(fast.model()).isEqualTo("gpt-6-luna");
+                            },
+                            balanced -> {
+                                assertThat(balanced.provider()).isEqualTo("openai-codex");
+                                assertThat(balanced.model()).isEqualTo("gpt-6-luna");
+                            },
+                            deep -> {
+                                assertThat(deep.provider()).isEqualTo("openai-codex");
+                                assertThat(deep.model()).isEqualTo("gpt-6.1-sol");
+                            });
+                    return saved;
+                })
+                .when(definitions)
+                .saveAll(any());
+
+        service.saveGroup(
+                admin,
+                List.of(
+                        new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "   ", " gpt-6-luna ", "low"),
+                        new ModelTierOptions.Tier(
+                                ModelTier.BALANCED, "균형", " openai-codex ", " gpt-6-luna ", "medium"),
+                        new ModelTierOptions.Tier(
+                                ModelTier.DEEP, "깊게", " openai-codex ", " gpt-6.1-sol ", "high")),
+                ModelTier.FAST);
     }
 
     @Test

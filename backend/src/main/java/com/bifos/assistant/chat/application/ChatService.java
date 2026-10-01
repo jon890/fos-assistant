@@ -355,6 +355,7 @@ public class ChatService {
                             input,
                             intent,
                             execution -> {
+                                executions.markRequestReceived(execution, routed.requestReceivedAt());
                                 turns.rekey(handle, execution.id());
                                 if (streaming) {
                                     onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));

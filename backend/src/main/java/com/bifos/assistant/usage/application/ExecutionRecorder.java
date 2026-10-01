@@ -198,6 +198,12 @@ public class ExecutionRecorder {
         executions.save(execution);
     }
 
+    /** Flow 뿌리에는 실행기 진입보다 앞선 원래 요청 수신 시각을 남긴다. */
+    public void markRequestReceived(AgentExecution execution, Instant at) {
+        execution.markRequestReceived(at);
+        executions.save(execution);
+    }
+
     /** 최초 assistant delta 수신 시각만 남긴다. */
     public void markFirstDelta(AgentExecution execution) {
         if (execution.markFirstDelta(clock.instant())) {

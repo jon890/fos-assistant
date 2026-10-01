@@ -120,6 +120,25 @@ class HermesRuntimeReadTest {
     }
 
     @Test
+    @DisplayName("자식 사용량의 음수, 소수, long 범위 밖 토큰은 모르는 값으로 둔다")
+    void rejectsInvalidSubagentTokenNumbers() {
+        bodies.put(
+                "/p/dad/api/sessions/child-1",
+                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                        + "\"parent_session_id\":\"parent-1\",\"input_tokens\":-1,"
+                        + "\"output_tokens\":1.5,\"cache_read_tokens\":9223372036854775808,"
+                        + "\"cache_write_tokens\":0}}");
+
+        SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
+
+        assertThat(usage).isNotNull();
+        assertThat(usage.inputTokens()).isNull();
+        assertThat(usage.outputTokens()).isNull();
+        assertThat(usage.cacheReadTokens()).isNull();
+        assertThat(usage.cacheWriteTokens()).isZero();
+    }
+
+    @Test
     @DisplayName("요청한 child id와 다른 session 응답은 사용량으로 쓰지 않는다")
     void rejectsWrongSessionId() {
         bodies.put("/p/dad/api/sessions/child-1", "{\"session\":{\"id\":\"other\"}}");

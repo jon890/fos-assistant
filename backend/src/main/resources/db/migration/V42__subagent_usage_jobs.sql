@@ -17,6 +17,8 @@ CREATE TABLE subagent_usage_job (
 
 CREATE INDEX ix_subagent_usage_due ON subagent_usage_job (status, next_attempt_at);
 
+ALTER TABLE agent_execution ADD COLUMN reasoning_defaults_checked_at DATETIME(6) NULL;
+
 ALTER TABLE execution_event ADD COLUMN completed_child_session_id VARCHAR(128) NULL;
 
 -- 기존 중복 사건을 지우지 않고 마지막 한 줄만 자연키로 잇는다.

@@ -15,12 +15,14 @@ import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.ProfileModelDefaultsClient;
+import com.bifos.assistant.hermes.dto.ProfileModelDefaults;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.SubagentUsageJob;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
@@ -30,6 +32,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -72,6 +76,101 @@ class SubagentUsageReconcilerTest {
         assertThat(SubagentUsageReconciler.isFinalChild(job, completed)).isTrue();
         assertThat(completed.inclusiveInputTokens()).isEqualTo(15L);
         assertThat(completed.durationMs()).isEqualTo(2_500L);
+    }
+
+    @Test
+    @DisplayName("토큰 합계가 long 범위를 넘으면 기록하지 않는다")
+    void keepsOverflowingInclusiveInputUnknown() {
+        SubagentSessionUsage completed = new SubagentSessionUsage(
+                "child", "subagent", "parent", "gpt-6-luna", 1.0, 2.0, Long.MAX_VALUE, 0L, 1L, 0L);
+
+        assertThat(completed.inclusiveInputTokens()).isNull();
+    }
+
+    @Test
+    @DisplayName("정상 기본값 응답에 effort가 없어도 확인 시각을 적어 재조회를 멈춘다")
+    void supplementMarksCheckedWhenDefaultResponseHasNoEffort() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
+        when(fixtures.defaults.read("dad")).thenReturn(new ProfileModelDefaults("openai-codex", "gpt-6-luna", null));
+
+        fixtures.reconciler.supplementDefault(1L, "dad");
+
+        assertThat(fixtures.parent.reasoningEffort()).isNull();
+        assertThat(fixtures.parent.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
+        assertThat(fixtures.parent.reasoningDefaultsCheckedAt()).isEqualTo(NOW);
+        verify(fixtures.executions).save(fixtures.parent);
+    }
+
+    @Test
+    @DisplayName("기본값 조회가 실패하면 확인 시각 없이 다음 작업에서 다시 조회한다")
+    void supplementLeavesUncheckedWhenDefaultReadFails() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        when(fixtures.defaults.read("dad")).thenReturn(null);
+
+        fixtures.reconciler.supplementDefault(1L, "dad");
+
+        assertThat(fixtures.parent.reasoningDefaultsCheckedAt()).isNull();
+        verify(fixtures.executions, never()).lockById(anyLong());
+        verify(fixtures.executions, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("기본값 없음 확인 뒤 늦게 온 effort 응답은 같은 실행을 바꾸지 않는다")
+    void supplementDoesNotConsumeLateDefaultAfterChecked() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
+        when(fixtures.defaults.read("dad"))
+                .thenReturn(
+                        new ProfileModelDefaults("openai-codex", "gpt-6-luna", null),
+                        new ProfileModelDefaults("openai-codex", "gpt-6-luna", "high"));
+
+        fixtures.reconciler.supplementDefault(1L, "dad");
+        fixtures.reconciler.supplementDefault(1L, "dad");
+
+        assertThat(fixtures.parent.reasoningEffort()).isNull();
+        assertThat(fixtures.parent.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
+        assertThat(fixtures.parent.reasoningDefaultsCheckedAt()).isEqualTo(NOW);
+        verify(fixtures.executions).save(fixtures.parent);
+    }
+
+    @Test
+    @DisplayName("자식 작업이 밀려도 한 tick은 profile 하나와 자식 셋을 전역 네 슬롯에 함께 넣는다")
+    void reconcileReservesOneOfFourSlotsForProfileDefault() throws Exception {
+        Fixtures fixtures = fixtures();
+        SubagentUsageJob second = jobWithId(11L);
+        SubagentUsageJob third = jobWithId(12L);
+        SubagentUsageJob fourth = jobWithId(13L);
+        CountDownLatch profileStarted = new CountDownLatch(1);
+        CountDownLatch childrenStarted = new CountDownLatch(3);
+        CountDownLatch release = new CountDownLatch(1);
+        when(fixtures.executions.findUnknownReasoningDefaults(any(), any())).thenReturn(List.of(fixtures.parent));
+        when(fixtures.jobs.findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc(any(), any()))
+                .thenReturn(List.of(fixtures.job, second, third, fourth));
+        when(fixtures.jobs.findById(10L)).thenReturn(Optional.of(fixtures.job));
+        when(fixtures.jobs.findById(11L)).thenReturn(Optional.of(second));
+        when(fixtures.jobs.findById(12L)).thenReturn(Optional.of(third));
+        when(fixtures.jobs.findById(13L)).thenReturn(Optional.of(fourth));
+        when(fixtures.defaults.read("dad")).thenAnswer(invocation -> {
+            profileStarted.countDown();
+            await(release);
+            return new ProfileModelDefaults("openai-codex", "gpt-6-luna", null);
+        });
+        when(fixtures.hermes.readSubagentUsage(any(), any(), any())).thenAnswer(invocation -> {
+            childrenStarted.countDown();
+            await(release);
+            return null;
+        });
+
+        try {
+            fixtures.reconciler.reconcile();
+
+            assertThat(profileStarted.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(childrenStarted.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(childrenStarted.getCount()).isZero();
+        } finally {
+            release.countDown();
+        }
     }
 
     @Test
@@ -243,6 +342,7 @@ class SubagentUsageReconcilerTest {
                 .agentId(2L)
                 .profileName("dad")
                 .costMode(CostMode.SUBSCRIPTION)
+                .reasoningEffortSource(ReasoningEffortSource.UNKNOWN)
                 .status(ExecutionStatus.SUCCEEDED)
                 .startedAt(finishedAt.minusSeconds(1))
                 .hermesSessionId("parent")
@@ -263,6 +363,18 @@ class SubagentUsageReconcilerTest {
         return SubagentUsageJob.create(parent, start, "http://runtime", finishedAt);
     }
 
+    private static SubagentUsageJob jobWithId(Long id) throws ReflectiveOperationException {
+        SubagentUsageJob job = job();
+        setField(job, "id", id);
+        return job;
+    }
+
+    private static void await(CountDownLatch latch) throws InterruptedException {
+        if (!latch.await(2, TimeUnit.SECONDS)) {
+            throw new AssertionError("작업 시작 대기 시간이 지났다");
+        }
+    }
+
     private static Fixtures fixtures() throws ReflectiveOperationException {
         AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
         ExecutionEventRepository events = mock(ExecutionEventRepository.class);
@@ -275,6 +387,7 @@ class SubagentUsageReconcilerTest {
                 .agentId(2L)
                 .profileName("dad")
                 .costMode(CostMode.SUBSCRIPTION)
+                .reasoningEffortSource(ReasoningEffortSource.UNKNOWN)
                 .status(ExecutionStatus.SUCCEEDED)
                 .startedAt(NOW.minusSeconds(1))
                 .hermesSessionId("parent")
@@ -310,7 +423,7 @@ class SubagentUsageReconcilerTest {
                 defaults,
                 new TestTransactionManager(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
-        return new Fixtures(reconciler, executions, events, jobs, agents, hermes, parent, start, job, agent);
+        return new Fixtures(reconciler, executions, events, jobs, agents, hermes, defaults, parent, start, job, agent);
     }
 
     private static void setField(Object target, String name, Object value) throws ReflectiveOperationException {
@@ -326,6 +439,7 @@ class SubagentUsageReconcilerTest {
             SubagentUsageJobRepository jobs,
             AgentService agents,
             HermesRunsClient hermes,
+            ProfileModelDefaultsClient defaults,
             AgentExecution parent,
             ExecutionEvent start,
             SubagentUsageJob job,

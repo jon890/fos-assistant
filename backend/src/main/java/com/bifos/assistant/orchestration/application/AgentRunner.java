@@ -1,6 +1,8 @@
 package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.context.AssembledContext;
@@ -21,6 +23,8 @@ import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -35,7 +39,7 @@ import org.springframework.stereotype.Service;
  * 부르는 쪽이고, 이 클래스는 받은 번호를 그대로 적는다. 요청자를 확인하고 에이전트를 고르는 것도
  * 부르는 쪽이 한다. 경계를 지키는 규칙은 {@link ChildExecutionRunner} 가 갖는다.
  *
- * <p>모델과 effort 는 대화가 고른 값을 쓴다. 자식 에이전트가 달라도 같은 대화의 실행은 모두 같은 선택을
+ * <p>모델과 effort 는 대화의 단계 또는 직접 선택과 사용자·그룹 기본값을 해석한 값을 쓴다. 자식 에이전트가 달라도 같은 대화의 실행은 모두 같은 선택을
  * 따른다. 고르지 않았으면 모델을 빼고 보내 그 에이전트 profile 의 기본값으로 돈다.
  *
  * <p>Memory 는 실행마다 {@link ContextAssembler} 로 다시 조립한다. 부모에게 넣은 문자열을 복사하면
@@ -61,6 +65,8 @@ public class AgentRunner {
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
     private final DelegationProperties delegation;
+    private final ModelTierService modelTiers;
+    private final Clock clock;
 
     /**
      * 실행 하나를 끝까지 돌린다.
@@ -131,11 +137,13 @@ public class AgentRunner {
             BooleanSupplier cancelled,
             String instructionAddition,
             DelegationKey delegationKey) {
+        Instant requestReceivedAt = clock.instant();
+        ResolvedModelTier resolved = modelTiers.resolve(user, conversation, agent);
         AssembledContext context =
                 agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
-        ModelChoice choice = conversation.modelChoice();
+        ModelChoice choice = resolved.choice();
         AgentExecution execution = executions.start(
                 user,
                 conversation,
@@ -146,7 +154,9 @@ public class AgentRunner {
                 choice,
                 null,
                 session.correlationSessionId(),
-                delegationKey);
+                delegationKey,
+                resolved.tier(),
+                requestReceivedAt);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
@@ -165,6 +175,7 @@ public class AgentRunner {
 
         String runId = null;
         try {
+            executions.markSubmitted(execution);
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             onSubmitted.accept(execution, runId);

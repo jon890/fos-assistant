@@ -299,7 +299,11 @@ public class HttpHermesRunsClient implements HermesRunsClient {
 
     private static Long number(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
-        return value != null && value.isNumber() ? value.asLong() : null;
+        if (value == null || !value.isIntegralNumber() || !value.canConvertToLong()) {
+            return null;
+        }
+        long number = value.longValue();
+        return number >= 0 ? number : null;
     }
 
     private static String text(JsonNode node, String field) {

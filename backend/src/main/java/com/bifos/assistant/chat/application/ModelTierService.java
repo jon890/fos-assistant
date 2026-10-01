@@ -61,25 +61,29 @@ public class ModelTierService {
         if (!user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
-        if (tiers.size() != ModelTier.values().length
-                || tiers.stream().map(ModelTierOptions.Tier::tier).distinct().count() != ModelTier.values().length) {
+        List<ModelTierOptions.Tier> normalizedTiers = tiers.stream()
+                .map(ModelTierService::normalize)
+                .toList();
+        if (normalizedTiers.size() != ModelTier.values().length
+                || normalizedTiers.stream().map(ModelTierOptions.Tier::tier).distinct().count()
+                        != ModelTier.values().length) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "all model tiers must be supplied exactly once");
         }
-        for (ModelTierOptions.Tier tier : tiers) {
+        for (ModelTierOptions.Tier tier : normalizedTiers) {
             if (tier.tier() == null
                     || tier.model() == null
-                    || tier.model().isBlank()
-                    || tier.model().strip().length() > ModelChoice.MODEL_MAX_LENGTH
-                    || tier.provider() != null && tier.provider().strip().length() > ModelChoice.PROVIDER_MAX_LENGTH
+                    || tier.model().length() > ModelChoice.MODEL_MAX_LENGTH
+                    || tier.provider() != null && tier.provider().length() > ModelChoice.PROVIDER_MAX_LENGTH
                     || !ModelChoice.REASONING_EFFORTS.contains(tier.reasoningEffort())) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid model tier definition");
             }
         }
-        if (defaultTier != null && tiers.stream().noneMatch(tier -> tier.tier() == defaultTier)) {
+        if (defaultTier != null && normalizedTiers.stream().noneMatch(tier -> tier.tier() == defaultTier)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "group default tier must be defined");
         }
         definitions.deleteByGroupId(user.groupId());
-        definitions.saveAll(tiers.stream()
+        definitions.flush();
+        definitions.saveAll(normalizedTiers.stream()
                 .map(tier -> ModelTierDefinition.of(
                         user.groupId(), tier.tier(), tier.provider(), tier.model(), tier.reasoningEffort()))
                 .toList());
@@ -153,6 +157,23 @@ public class ModelTierService {
                 definition.provider() == null ? defaultProvider : definition.provider(),
                 definition.model(),
                 definition.reasoningEffort());
+    }
+
+    private static ModelTierOptions.Tier normalize(ModelTierOptions.Tier tier) {
+        return new ModelTierOptions.Tier(
+                tier.tier(),
+                tier.label(),
+                blankToNull(tier.provider()),
+                blankToNull(tier.model()),
+                tier.reasoningEffort());
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String stripped = value.strip();
+        return stripped.isEmpty() ? null : stripped;
     }
 
     /**

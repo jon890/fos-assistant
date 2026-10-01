@@ -13,7 +13,10 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -28,6 +31,7 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Duration;
+import java.time.Clock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +50,7 @@ class AgentRunnerSubmitFailureTest {
     private final ContextAssembler contextAssembler = mock(ContextAssembler.class);
     private final HermesRunsClient hermes = mock(HermesRunsClient.class);
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
+    private final ModelTierService modelTiers = mock(ModelTierService.class);
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
             "runner",
@@ -66,7 +71,8 @@ class AgentRunnerSubmitFailureTest {
         when(started.id()).thenReturn(3L);
         when(failed.id()).thenReturn(3L);
         when(failed.status()).thenReturn(ExecutionStatus.FAILED);
-        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
+        when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(started);
         when(executions.fail(any(), anyString())).thenReturn(failed);
         runner = new AgentRunner(
@@ -75,7 +81,9 @@ class AgentRunnerSubmitFailureTest {
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100));
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100),
+                modelTiers,
+                Clock.systemUTC());
     }
 
     @Test
