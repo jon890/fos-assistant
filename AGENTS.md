@@ -136,7 +136,7 @@ scripts/check-local.sh
 처음 받은 checkout 에서도 그대로 돈다.
 웹 의존성과 Playwright 의 chromium 을 먼저 설치하고, `pnpm build` 에 자리표시자 환경 변수를 준다.
 둘을 빠뜨려 코드와 관계없이 `playwright: command not found` 와 `Failed to collect page data` 로 실패한 적이 있다.
-hermes 검사가 쓰는 `mcp` SDK 와 PyYAML 이 없으면 hermes 단계가 설치한다.
+hermes 검사가 쓰는 `mcp` SDK 와 PyYAML 이 없거나 고정한 판과 다르면 hermes 단계가 고정한 판을 설치한다.
 처음 실패한 단계에서 멈추고 그 로그의 끝을 보인다.
 
 `scripts/quality.sh check` 는 backend 의 구조 규칙과 코드 규칙과 포맷, web 의 lint 와 포맷을 파일을 바꾸지 않고 검사한다.

@@ -28,7 +28,6 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +52,6 @@ import tools.jackson.databind.JsonNode;
 @Service
 public class ConnectorConnectionService {
     private static final String STEP_ENV = "env";
-    private static final String STEP_TOOLSET = "toolset";
     private static final String STEP_INSTALL = "install";
     private static final String STEP_INSTALL_STATE = "install-state";
     private static final String STEP_PROBE = "probe";
@@ -65,6 +63,7 @@ public class ConnectorConnectionService {
     private final HermesConnectorClient connector;
     private final HermesToolsetClient toolsets;
     private final TransactionTemplate transactions;
+    private final ConnectorCallLimiter limiter;
     private final Clock clock;
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -76,8 +75,9 @@ public class ConnectorConnectionService {
             AgentLifecycleService lifecycle,
             HermesConnectorClient connector,
             HermesToolsetClient toolsets,
-            PlatformTransactionManager transactionManager) {
-        this(connections, users, lifecycle, connector, toolsets, transactionManager, Clock.systemUTC());
+            PlatformTransactionManager transactionManager,
+            ConnectorCallLimiter limiter) {
+        this(connections, users, lifecycle, connector, toolsets, transactionManager, limiter, Clock.systemUTC());
     }
 
     public ConnectorConnectionService(
@@ -87,6 +87,7 @@ public class ConnectorConnectionService {
             HermesConnectorClient connector,
             HermesToolsetClient toolsets,
             PlatformTransactionManager transactionManager,
+            ConnectorCallLimiter limiter,
             Clock clock) {
         this.connections = connections;
         this.users = users;
@@ -94,6 +95,7 @@ public class ConnectorConnectionService {
         this.connector = connector;
         this.toolsets = toolsets;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.limiter = limiter;
         this.clock = clock;
     }
 
@@ -114,9 +116,7 @@ public class ConnectorConnectionService {
                     manifest.id(),
                     manifest.title(),
                     manifest.description(),
-                    manifest.fields().stream()
-                            .map(ConnectorConnectionService::summary)
-                            .toList(),
+                    manifest.fields().stream().map(ConnectorFieldSummary::from).toList(),
                     connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
                     true));
         }
@@ -133,7 +133,7 @@ public class ConnectorConnectionService {
     public ConnectionSnapshot read(CurrentUser user, String connectorId) {
         Optional<ConnectorConnection> connection = connections.findByUserIdAndConnectorId(user.id(), connectorId);
         if (connection.isPresent()) {
-            return snapshot(connection.get());
+            return ConnectionSnapshot.from(connection.get());
         }
         requireManifest(connectorId);
         return new ConnectionSnapshot(
@@ -143,28 +143,17 @@ public class ConnectorConnectionService {
     /** 작성 중인 값으로 선택지 도구를 부른다. 아무것도 저장하지 않으므로 사용자 행을 잠그지 않는다. */
     public List<ConnectorOption> options(
             CurrentUser user, String connectorId, String fieldKey, Map<String, String> values) {
-        ConnectorManifest manifest = requireManifest(connectorId);
-        ConnectorFieldOptions options = manifest.fields().stream()
-                .filter(field -> field.key().equals(fieldKey) && field.options() != null)
-                .map(ConnectorField::options)
-                .findFirst()
-                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
-        // 고르는 중이라 필수 칸이 아직 비어 있을 수 있다. 채운 칸의 형식만 본다.
-        JsonNode result = call(manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
-        JsonNode items = result.get(options.items());
-        if (items == null || !items.isArray()) {
-            throw ConnectorErrors.unavailable();
-        }
-        List<ConnectorOption> found = new ArrayList<>();
-        for (JsonNode item : items) {
-            JsonNode value = item.get(options.value());
-            JsonNode label = item.get(options.label());
-            if (value == null || !value.isString() || label == null || !label.isString()) {
-                throw ConnectorErrors.unavailable();
-            }
-            found.add(new ConnectorOption(value.asString(), label.asString()));
-        }
-        return List.copyOf(found);
+        return limiter.call(user.id(), () -> {
+            ConnectorManifest manifest = requireManifest(connectorId);
+            ConnectorFieldOptions options = manifest.fields().stream()
+                    .filter(field -> field.key().equals(fieldKey) && field.options() != null)
+                    .map(ConnectorField::options)
+                    .findFirst()
+                    .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
+            // 고르는 중이라 필수 칸이 아직 비어 있을 수 있다. 채운 칸의 형식만 본다.
+            JsonNode result = call(manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
+            return ConnectorOption.listFrom(result, options).orElseThrow(ConnectorErrors::unavailable);
+        });
     }
 
     /**
@@ -179,14 +168,16 @@ public class ConnectorConnectionService {
      * 안으로 들어간다.
      */
     public ConnectionSnapshot register(CurrentUser user, String connectorId, Map<String, String> values) {
-        ConnectorManifest manifest = requireManifest(connectorId);
-        Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
-        call(manifest, manifest.verifyTool(), accepted);
-        ConnectionSnapshot stored = transactions.execute(status -> apply(user, manifest, accepted));
-        if (stored == null) {
-            throw new ConnectorOperationFailure();
-        }
-        return stored;
+        return limiter.call(user.id(), () -> {
+            ConnectorManifest manifest = requireManifest(connectorId);
+            Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
+            call(manifest, manifest.verifyTool(), accepted);
+            ConnectionSnapshot stored = transactions.execute(status -> apply(user, manifest, accepted));
+            if (stored == null) {
+                throw new ConnectorOperationFailure();
+            }
+            return stored;
+        });
     }
 
     /**
@@ -215,10 +206,8 @@ public class ConnectorConnectionService {
                                 ? connector.deleteEnv(profile, field.env())
                                 : connector.putEnv(profile, field.env(), value));
             }
-            // 새 profile 의 틀이 켜 둔 내장 도구를 빼고 manifest 가 선언한 것만 남긴다.
-            // 설치가 이 목록에 커넥터의 MCP 서버를 더한다.
-            step = STEP_TOOLSET;
-            toolsets.writeApiServer(profile, allowedToolsets(manifest, false));
+            // 도구 목록은 쓰지 않는다. 설치가 API 도구 목록을 커넥터의 MCP 서버 이름과 manifest 가 선언한
+            // 내장 toolset 으로 다시 쓴다.
             step = STEP_INSTALL;
             connection.markRestartRequired(connector.putConnector(profile, manifest.id(), true));
         } catch (RuntimeException ex) {
@@ -229,7 +218,7 @@ public class ConnectorConnectionService {
         }
         // 등록 직후는 선언한 toolset 이 켜졌는지 보기 전이다. 사진은 연결 확인이 그것을 본 뒤에 받는다.
         connection.registered(ConnectorValues.stored(manifest, accepted), false, now());
-        return snapshot(connections.save(connection));
+        return ConnectionSnapshot.from(connections.save(connection));
     }
 
     /**
@@ -257,47 +246,35 @@ public class ConnectorConnectionService {
             throw new ConnectorOperationFailure();
         }
         connection.disconnected(manifest.isEmpty(), now());
-        return snapshot(connections.save(connection));
+        return ConnectionSnapshot.from(connections.save(connection));
     }
 
+    /**
+     * 설치와 probe 를 보고 연결 상태를 맞춘다.
+     *
+     * <p>재시작 대기인 연결은 설치를 다시 보내지 않는다. 관리자가 재시작한 뒤 반영 완료에서 다시 보낸다.
+     */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot check(CurrentUser user, String connectorId) {
-        lock(user.id());
-        ConnectorConnection connection = requireConnection(user.id(), connectorId);
-        final ConnectorState state;
-        try {
-            state = connector.readConnector(connection.agent().hermesProfile(), connectorId);
-        } catch (RuntimeException ex) {
-            warn(STEP_INSTALL_STATE, connectorId, ex);
-            connection.pending(now());
-            throw new ConnectorOperationFailure();
-        }
-        if (!connection.desiredEnabled()) {
-            if (state.enabled()) {
-                connection.pending(now());
-            } else {
-                connection.disconnected(connection.restartRequired(), now());
+        return limiter.call(user.id(), () -> {
+            lock(user.id());
+            ConnectorConnection connection = requireConnection(user.id(), connectorId);
+            ConnectorState state = readState(connection);
+            if (!connection.desiredEnabled()) {
+                if (state.enabled()) {
+                    connection.pending(now());
+                } else {
+                    connection.disconnected(connection.restartRequired(), now());
+                }
+                return ConnectionSnapshot.from(connections.save(connection));
             }
-            return snapshot(connections.save(connection));
-        }
-        if (connection.restartRequired() || !state.enabled() || !state.configured()) {
-            connection.pending(now());
-            return snapshot(connections.save(connection));
-        }
-        final boolean usable;
-        try {
-            usable = usable(connection);
-        } catch (RuntimeException ex) {
-            warn(STEP_PROBE, connectorId, ex);
-            connection.pending(now());
-            throw new ConnectorOperationFailure();
-        }
-        if (usable) {
-            connection.ready(now());
-        } else {
-            connection.pending(now());
-        }
-        return snapshot(connections.save(connection));
+            if (!connection.restartRequired() && state.enabled() && resyncedUsable(connection)) {
+                connection.ready(now());
+            } else {
+                connection.pending(now());
+            }
+            return ConnectionSnapshot.from(connections.save(connection));
+        });
     }
 
     /** 관리자가 공유 gateway 를 재시작한 뒤 누르는 반영 완료다. 같은 그룹의 사용자에게만 된다. */
@@ -310,36 +287,83 @@ public class ConnectorConnectionService {
             throw new ApiException(ErrorCode.FORBIDDEN, "no such user");
         }
         ConnectorConnection connection = requireConnection(userId, connectorId);
-        final boolean disconnected;
-        String step = STEP_INSTALL_STATE;
-        try {
-            ConnectorState state = connector.readConnector(connection.agent().hermesProfile(), connectorId);
-            boolean applied;
-            if (connection.desiredEnabled()) {
-                step = STEP_PROBE;
-                applied = state.enabled() && state.configured() && usable(connection);
-            } else {
-                applied = !state.enabled();
-            }
-            if (!applied) {
-                // 외부 호출은 성공했지만 반영이 끝나지 않았다. 실패 로그를 남기지 않는다.
-                connection.pending(now());
-                throw new ConnectorOperationFailure();
-            }
-            disconnected = !connection.desiredEnabled();
-        } catch (ConnectorOperationFailure ex) {
-            throw ex;
-        } catch (RuntimeException ex) {
-            warn(step, connectorId, ex);
+        ConnectorState state = readState(connection);
+        boolean applied =
+                connection.desiredEnabled() ? state.enabled() && resyncedUsable(connection) : !state.enabled();
+        if (!applied) {
+            // 외부 호출은 성공했지만 반영이 끝나지 않았다. 실패 로그를 남기지 않는다.
             connection.pending(now());
             throw new ConnectorOperationFailure();
         }
-        if (disconnected) {
-            connection.confirmDisconnected(now());
-        } else {
+        if (connection.desiredEnabled()) {
             connection.ready(now());
+        } else {
+            connection.confirmDisconnected(now());
         }
-        return snapshot(connections.save(connection));
+        return ConnectionSnapshot.from(connections.save(connection));
+    }
+
+    /** 설치 상태를 읽는다. 읽지 못하면 {@code PENDING} 을 남기고 연결 실패로 끝낸다. */
+    private ConnectorState readState(ConnectorConnection connection) {
+        try {
+            return connector.readConnector(connection.agent().hermesProfile(), connection.connectorId());
+        } catch (RuntimeException ex) {
+            warn(STEP_INSTALL_STATE, connection.connectorId(), ex);
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
+    }
+
+    /**
+     * 설치를 한 번 다시 보낸 뒤 설치 상태와 MCP probe 와 켜진 내장 도구를 본다.
+     *
+     * <p>설치가 enabled 인 뒤에만 부른다. 카탈로그에서 빠진 커넥터는 서버 이름을 알 수 없어 쓸 수 없는 것으로
+     * 보고 설치도 다시 보내지 않는다. 다시 보내는 설치가 연결용 에이전트의 지침을 지금 plugin 의 스킬 본문에
+     * 맞추고 API 도구 목록을 커넥터의 MCP 서버와 manifest 가 선언한 toolset 으로 맞춘다. 이전 판이 설치한 연결이
+     * 새 목록을 받는 자리다. 그래서 Control Plane 은 목록을 쓰지 않고, 다시 보낸 뒤에 읽은 설치가 configured 이고
+     * 켜진 내장 도구가 선언과 같은지만 본다. 선언 밖의 도구가 켜져 있어도, 선언한 도구가 꺼져 있어도 쓸 수 없다.
+     *
+     * <p>manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 선언한 toolset 이 실제로 켜졌을 때만 참으로 둔다.
+     * 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다. 외부 호출이 실패하면 {@code PENDING} 을
+     * 남기고 연결 실패로 끝낸다.
+     */
+    private boolean resyncedUsable(ConnectorConnection connection) {
+        Agent agent = connection.agent();
+        String profile = agent.hermesProfile();
+        final Optional<ConnectorManifest> manifest;
+        try {
+            // 카탈로그 조회 실패는 readCatalog 가 이미 로그에 남긴다. 단계 실패로 한 번 더 남기지 않는다.
+            manifest = findManifest(connection.connectorId());
+        } catch (RuntimeException ex) {
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
+        if (manifest.isEmpty()) {
+            return false;
+        }
+        String step = STEP_INSTALL;
+        try {
+            // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은
+            // 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
+            connector.putConnector(profile, connection.connectorId(), true);
+            step = STEP_INSTALL_STATE;
+            if (!connector.readConnector(profile, connection.connectorId()).configured()) {
+                return false;
+            }
+            step = STEP_PROBE;
+            ProbeResult probe = connector.probe(profile, manifest.get().mcpServer());
+            boolean usable = probe.ok()
+                    && !probe.tools().isEmpty()
+                    && Set.copyOf(manifest.get().toolsets())
+                            .equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), profile)));
+            // 쓸 수 없으면 부른 쪽이 PENDING 으로 두며 사진 받기를 내린다. 외부 호출이 실패해도 같다.
+            agent.acceptConnectorAttachments(usable && manifest.get().attachments());
+            return usable;
+        } catch (RuntimeException ex) {
+            warn(step, connection.connectorId(), ex);
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
     }
 
     @Transactional(readOnly = true)
@@ -349,73 +373,8 @@ public class ConnectorConnectionService {
                 .filter(user -> user.groupId().equals(admin.groupId()))
                 .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
         return connections.findByUserIdIn(List.copyOf(names.keySet())).stream()
-                .map(connection -> new AdminConnectionSnapshot(
-                        connection.connectorId(),
-                        connection.userId(),
-                        names.get(connection.userId()),
-                        connection.status(),
-                        connection.agent().code(),
-                        connection.restartRequired()))
+                .map(connection -> AdminConnectionSnapshot.from(connection, names.get(connection.userId())))
                 .toList();
-    }
-
-    /**
-     * MCP probe 가 도구를 보이고 켜진 내장 도구가 manifest 가 선언한 것과 같은가.
-     *
-     * <p>설치가 enabled 이고 configured 인 뒤에만 부른다. 카탈로그에서 빠진 커넥터는 서버 이름을 알 수 없어 쓸 수
-     * 없는 것으로 본다. 설치 요청을 한 번 더 보내 연결용 에이전트의 지침을 지금 plugin 의 스킬 본문에 맞춘다.
-     * manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 선언한 toolset 이 실제로 켜졌을 때만 참으로 둔다.
-     * 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다. 이미 연결된 에이전트가 연결 확인과
-     * 관리자 반영 완료에서 새 선언을 받는 자리다.
-     */
-    private boolean usable(ConnectorConnection connection) {
-        Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
-        Agent agent = connection.agent();
-        if (manifest.isEmpty()) {
-            return false;
-        }
-        // 도구 목록을 먼저 맞춘다. 설치 요청은 목록에 Control Plane MCP 가 없으면 거절되므로, 어긋난 목록을
-        // 여기서 다시 써야 뒤의 설치 요청이 지나간다.
-        boolean toolsetsApplied = declaredToolsetsApplied(agent, manifest.get());
-        // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. plugin 의 스킬 본문이 바뀌었으면 지침을 다시 쓴다.
-        // 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
-        connector.putConnector(agent.hermesProfile(), connection.connectorId(), true);
-        ProbeResult probe =
-                connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
-        boolean usable = toolsetsApplied && probe.ok() && !probe.tools().isEmpty();
-        // 쓸 수 없으면 부른 쪽이 PENDING 으로 두며 사진 받기를 내린다. 외부 호출이 실패해도 같다.
-        agent.acceptConnectorAttachments(usable && manifest.get().attachments());
-        return usable;
-    }
-
-    /**
-     * 켜진 내장 도구를 읽고, 선언과 다르면 허용 목록을 Control Plane MCP 와 커넥터 MCP 와 선언한 toolset 으로 다시
-     * 쓴 뒤 다시 읽는다. 다시 읽은 것이 선언과 같아야 참이다.
-     *
-     * <p>선언 밖의 내장 도구가 켜져 있어도, 선언한 도구가 꺼져 있어도 쓸 수 없는 것으로 본다. 설치 전에는 커넥터의
-     * MCP 서버가 그 profile 에서 모르는 이름이라 목록에 둘 수 없다.
-     */
-    private boolean declaredToolsetsApplied(Agent agent, ConnectorManifest manifest) {
-        Set<String> declared = Set.copyOf(manifest.toolsets());
-        if (declared.equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())))) {
-            return true;
-        }
-        toolsets.writeApiServer(agent.hermesProfile(), allowedToolsets(manifest, true));
-        return declared.equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())));
-    }
-
-    /**
-     * 연결용 에이전트의 API 도구 목록이다. Control Plane MCP, 설치한 뒤의 커넥터 MCP, 선언한 내장 toolset 순이다.
-     * 겹친 이름은 한 번만 싣는다.
-     */
-    private static List<String> allowedToolsets(ConnectorManifest manifest, boolean installed) {
-        Set<String> allowed = new LinkedHashSet<>();
-        allowed.add(AgentToolPolicy.CONTROL_PLANE_MCP);
-        if (installed) {
-            allowed.add(manifest.mcpServer());
-        }
-        allowed.addAll(manifest.toolsets());
-        return List.copyOf(allowed);
     }
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
@@ -431,19 +390,6 @@ public class ConnectorConnectionService {
             throw ConnectorErrors.of(result.error());
         }
         return result.result();
-    }
-
-    private static ConnectorFieldSummary summary(ConnectorField field) {
-        ConnectorFieldOptions options = field.options();
-        return new ConnectorFieldSummary(
-                field.key(),
-                field.label(),
-                field.description(),
-                field.secret(),
-                field.required(),
-                field.pattern(),
-                options != null,
-                options != null && options.autoSelectSingle());
     }
 
     /**
@@ -510,28 +456,10 @@ public class ConnectorConnectionService {
         }
     }
 
-    private static ConnectionSnapshot snapshot(ConnectorConnection value) {
-        return new ConnectionSnapshot(
-                value.connectorId(),
-                value.status(),
-                value.fields().secretPrefixes(),
-                value.fields().values(),
-                value.restartRequired(),
-                value.checkedAt(),
-                value.agent().code());
-    }
-
-    /**
-     * 외부 호출이 실패한 단계를 남긴다.
-     *
-     * <p>단계 이름과 커넥터 번호와 예외 종류만 적는다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다.
-     */
+    /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
     private static void warn(String step, String connectorId, RuntimeException ex) {
-        log.warn(
-                "connector {} failed at {}: {}",
-                connectorId,
-                step,
-                ex.getClass().getSimpleName());
+        String kind = ex.getClass().getSimpleName();
+        log.warn("connector {} failed at {}: {}", connectorId, step, kind);
     }
 
     private Instant now() {

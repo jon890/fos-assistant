@@ -96,6 +96,8 @@ export const DEMO_CONNECTOR = {
   ],
   verify: { tool: "list_scopes" },
   mcp_server: "demo",
+  // manifest 가 선언한 내장 toolset 이다. 설치가 도구 목록에서 서버 이름 다음에 둔다.
+  toolsets: [] as string[],
 };
 export const DEMO_TOKEN_OK = "demo_ok_0123456789";
 export const DEMO_TOKEN_BAD = "demo_bad_0123456789";
@@ -498,6 +500,8 @@ export type FakeHermes = {
   soulOf(name: string): string | undefined;
   /** 그 profile 에 마지막으로 게시된 `skills.external_dirs` 다. 게시한 적이 없으면 비어 있다. */
   skillDirsOf(name: string): string[];
+  /** 그 profile 에 마지막으로 기록된 API 도구 목록이다. 기록한 적이 없으면 `undefined` 다. */
+  apiServerToolsetsOf(name: string): string[] | undefined;
   /**
    * 커넥터 경로로 받은 요청을 받은 순서대로 적은 줄이다. `call <도구>`, `env put <profile> <key>`,
    * `env delete <profile> <key>`, `toolsets <profile>`, `install <profile> <on|off>`, `probe <profile>` 이다.
@@ -781,7 +785,10 @@ export function startFakeHermes(
         return true;
       }
       const installed = installedConnectors.get(queryProfile) ?? new Set<string>();
-      const configured = DEMO_CONNECTOR.fields.every((field) => !field.required || env[field.env] !== undefined);
+      // 도구 목록이 설치가 쓰는 목록과 같을 때만 configured 다. 다른 내장 도구나 Control Plane MCP 가 남으면 아니다.
+      const toolsets = apiServerToolsets.get(queryProfile) ?? [];
+      const configured = DEMO_CONNECTOR.fields.every((field) => !field.required || env[field.env] !== undefined)
+        && toolsets.join() === [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets].join();
       send(response, 200, {
         profile: queryProfile,
         connectors: [{ plugin: DEMO_CONNECTOR.id, enabled: installed.has(DEMO_CONNECTOR.id), configured }],
@@ -808,9 +815,12 @@ export function startFakeHermes(
       if (body.enabled) installed.add(body.plugin);
       else installed.delete(body.plugin);
       installedConnectors.set(body.profile, installed);
-      // 설치는 그 profile 의 API 도구 목록에 커넥터의 MCP 서버를 더하고, 해제는 뺀다.
-      const toolsets = (apiServerToolsets.get(body.profile) ?? []).filter((name) => name !== DEMO_CONNECTOR.mcp_server);
-      apiServerToolsets.set(body.profile, body.enabled ? [...toolsets, DEMO_CONNECTOR.mcp_server] : toolsets);
+      // 설치는 그 profile 의 API 도구 목록을 커넥터의 MCP 서버 이름과 선언한 toolset 으로 다시 쓰고,
+      // 해제는 MCP 가 없는 목록으로 쓴다.
+      apiServerToolsets.set(
+        body.profile,
+        body.enabled ? [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets] : ["no_mcp"],
+      );
       send(response, 200, {
         profile: body.profile, plugin: body.plugin, enabled: body.enabled, changed, restart_required: false,
       });
@@ -1492,6 +1502,10 @@ export function startFakeHermes(
         profileEnv: (name: string) => ({ ...(profiles.get(name) ?? {}) }),
         soulOf: (name: string) => souls.get(name),
         skillDirsOf: (name: string) => [...(externalDirs.get(name) ?? [])],
+        apiServerToolsetsOf: (name: string) => {
+          const toolsets = apiServerToolsets.get(name);
+          return toolsets === undefined ? undefined : [...toolsets];
+        },
         connectorRequests: () => [...connectorRequests],
         holdNextRun: () => {
           holdNextRun = true;
