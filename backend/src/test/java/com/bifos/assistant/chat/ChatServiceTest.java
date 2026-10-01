@@ -204,6 +204,25 @@ class ChatServiceTest {
         return (StubHermesRunsClient) hermes;
     }
 
+    /** 사건 스트림이 {@code skill_view} 시작 사건에 가리기 전 미리보기에서 꺼낸 이름을 실어 보낸 것처럼 만든다. */
+    private static RunEvent skillViewStarted(String detail, String skillName) {
+        return new RunEvent(
+                "tool.started",
+                null,
+                "skill_view",
+                detail,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                skillName);
+    }
+
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
     private void hermesStreams(RunEvent... events) {
         doAnswer(invocation -> {
@@ -593,9 +612,9 @@ class ChatServiceTest {
         stub().willReturn(
                         HermesRunResult.of("run-1", "sess-1", "completed", "장을 봤어요", "dad", null, TokenUsage.empty()));
         hermesStreams(
-                new RunEvent("tool.started", null, "skill_view", "shopping", null, null),
+                skillViewStarted("shopping", "shopping"),
                 new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
-                new RunEvent("tool.started", null, "skill_view", "shopping → references/list.md", null, null),
+                skillViewStarted("shopping → references/list.md", "shopping"),
                 new RunEvent("tool.completed", null, "skill_view", null, 50L, false),
                 new RunEvent("run.completed", null, null, null, null, null));
 

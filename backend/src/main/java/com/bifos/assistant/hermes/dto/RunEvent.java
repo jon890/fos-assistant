@@ -16,6 +16,9 @@ package com.bifos.assistant.hermes.dto;
  * @param inputTokens 하위 에이전트의 입력 토큰
  * @param outputTokens 하위 에이전트의 출력 토큰
  * @param status 하위 에이전트의 종료 상태
+ * @param skillName {@code skill_view} 도구의 시작 사건에서 모델이 읽은 스킬 이름. 가리기 전 미리보기에서 꺼내
+ *     이름 규칙으로 검증한 값이다. 원문은 담지 않는다. 스킬 사용 기록만 쓰고 화면과 사건 저장에는 싣지
+ *     않는다. 그 밖의 사건과 연결용 에이전트의 실행에서는 {@code null} 이다
  */
 public record RunEvent(
         String type,
@@ -30,9 +33,10 @@ public record RunEvent(
         String childSessionId,
         Long inputTokens,
         Long outputTokens,
-        String status) {
+        String status,
+        String skillName) {
 
     public RunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed) {
-        this(type, text, toolName, detail, durationMs, failed, null, null, null, null, null, null, null);
+        this(type, text, toolName, detail, durationMs, failed, null, null, null, null, null, null, null, null);
     }
 }
