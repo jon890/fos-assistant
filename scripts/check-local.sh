@@ -54,4 +54,5 @@ step browser         pnpm --dir "${ROOT}/web" test:browser
 step e2e             bash -c "cd '${ROOT}' && node test/e2e/run.ts"
 step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
 step public-safe     "${ROOT}/scripts/check-public-safe.sh"
+step quality         bash -c "cd '${ROOT}' && scripts/quality.sh check"
 echo "모두 통과했다"

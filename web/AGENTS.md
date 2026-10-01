@@ -101,6 +101,9 @@ pnpm format:check
 pnpm format:changed
 ```
 
+backend 와 함께 한 번에 검사하고 고치려면 저장소 root 에서 `scripts/quality.sh check` 와 `scripts/quality.sh fix` 를 쓴다.
+`fix` 는 `eslint --fix --prune-suppressions` 와 `pnpm format:changed` 를 돌리고 새 위반은 기준에 더하지 않는다.
+
 | 규칙 | 대상 | 심각도 | 까닭 |
 | --- | --- | --- | --- |
 | `eslint-config-next/core-web-vitals`, `eslint-config-next/typescript` | 전체 | 설정대로 | Next.js 와 React 의 결함 모양 |

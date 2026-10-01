@@ -135,10 +135,14 @@
       <property name="option" value="eol"/>
       <property name="tokens" value="ANNOTATION_DEF, CLASS_DEF, CTOR_DEF, ENUM_CONSTANT_DEF, ENUM_DEF, INTERFACE_DEF, LITERAL_CASE, LITERAL_CATCH, LITERAL_DEFAULT, LITERAL_DO, LITERAL_ELSE, LITERAL_FINALLY, LITERAL_FOR, LITERAL_IF, LITERAL_SWITCH, LITERAL_SYNCHRONIZED, LITERAL_TRY, LITERAL_WHILE, METHOD_DEF, OBJBLOCK, STATIC_INIT, RECORD_DEF, COMPACT_CTOR_DEF"/>
     </module>
-    <!-- 본문을 한 줄에 몰아 쓰지 않는 자리. 제어문에 alone 을 걸면 '} else {' 가 위반이 되어 포매터와 어긋난다 -->
+    <!--
+      닫는 중괄호를 자기 줄에 두는 자리. 제어문에 alone 계열을 걸면 '} else {' 가 위반이 되어 포매터와 어긋난다.
+      alone_or_singleline 을 쓰는 까닭: 포매터가 빈 본문을 'private X() {}' 처럼 한 줄에 쓰므로 alone 은 포매터와 어긋난다.
+      한 줄 본문 '{ return x; }' 은 여는 중괄호를 보는 LeftCurly(eol) 가 잡는다.
+    -->
     <module name="RightCurly">
       <property name="id" value="rightCurlyAlone"/>
-      <property name="option" value="alone"/>
+      <property name="option" value="alone_or_singleline"/>
       <property name="tokens" value="METHOD_DEF, CTOR_DEF, CLASS_DEF, LITERAL_FOR, LITERAL_WHILE, STATIC_INIT, INSTANCE_INIT"/>
     </module>
     <module name="RightCurly">

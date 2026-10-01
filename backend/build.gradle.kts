@@ -110,6 +110,16 @@ tasks.withType<Checkstyle>().configureEach {
 }
 
 /**
+ * 구조 규칙, 코드 규칙, 포맷을 한 번에 검사한다. 파일을 바꾸지 않는다.
+ * scripts/quality.sh 가 이 태스크와 web 검사를 함께 돌린다.
+ */
+tasks.register("qualityCheck") {
+    group = "verification"
+    description = "ArchUnit 구조 규칙, Checkstyle 코드 규칙, Spotless 포맷을 한 번에 검사한다."
+    dependsOn("archTest", "checkstyleMain", "checkstyleTest", "spotlessCheck")
+}
+
+/**
  * Java 포맷은 Spotless 와 palantir-java-format 이 정한다.
  * ratchetFrom 은 HEAD 와 origin/main 의 공통 조상에서 바뀐 파일만 검사하고 고친다.
  * 저장소 전체를 한 번에 바꾸지 않고, 파일을 처음 고칠 때 그 파일 전체가 포맷된다.

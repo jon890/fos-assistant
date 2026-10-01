@@ -15,11 +15,9 @@
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]Agent\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]Agent\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]Agent\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]Agent\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]AgentToolPolicy\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]AgentToolPolicy\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]AgentToolPolicy\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]domain[\\/]AgentToolPolicy\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]infra[\\/]AgentRepository\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]presentation[\\/]AgentAdminController\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]presentation[\\/]AgentDtos\.java$"/>
@@ -42,13 +40,11 @@
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]TurnCancellation\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]TurnCancellation\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]TurnCancellation\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]application[\\/]TurnCancellation\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]domain[\\/]ChatArtifact\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]domain[\\/]ChatAttachment\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]domain[\\/]ChatMessage\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]domain[\\/]Conversation\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]domain[\\/]Conversation\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]domain[\\/]Conversation\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]infra[\\/]ArtifactSourceFetcher\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]infra[\\/]ArtifactSourceFetcher\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]infra[\\/]ArtifactSourceFetcher\.java$"/>
@@ -64,18 +60,15 @@
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
   <suppress id="rightCurlySame" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookProperties\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookProperties\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookProperties\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookTokenVerifier\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]ConnectorOperationFailure\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]ConnectorOperationFailure\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]domain[\\/]AccountbookConnection\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]domain[\\/]AccountbookConnection\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]domain[\\/]AccountbookConnection\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]domain[\\/]AccountbookConnection\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]AccountbookConnectionRepository\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
@@ -86,19 +79,15 @@
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionAdminController\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionAdminController\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionAdminController\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionAdminController\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]ConnectionDtos\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]ConnectionDtos\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]ConnectionDtos\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]ConnectionDtos\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]context[\\/]ContextAssembler\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesCallFailure\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesCallFailure\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesConnectorClient\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesModelClient\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesProfileName\.java$"/>
@@ -108,7 +97,6 @@
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
   <suppress id="rightCurlySame" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesDashboardClient\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesRunsClient\.java$"/>
@@ -120,7 +108,6 @@
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]AgentTokenService\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]AgentTokenService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]AgentTokenService\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]AgentTokenService\.java$"/>
   <suppress id="rightCurlySame" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]AgentTokenService\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpCallContext\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpCallContext\.java$"/>
@@ -131,7 +118,6 @@
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpToolService\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpToolService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpToolService\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]McpToolService\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]SubagentRegistration\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]application[\\/]SubagentRegistration\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]domain[\\/]AgentToken\.java$"/>
@@ -139,22 +125,18 @@
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]domain[\\/]AgentToken\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]domain[\\/]AgentToken\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]domain[\\/]AgentToken\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]domain[\\/]AgentToken\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]infra[\\/]AgentTokenAuthenticationFilter\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]infra[\\/]AgentTokenAuthenticationFilter\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenAdminController\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenAdminController\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenAdminController\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenAdminController\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenDtos\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenDtos\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenDtos\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]AgentTokenDtos\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]McpController\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]McpController\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]McpController\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]McpController\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]McpController\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]McpDtos\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]SubagentSessionController\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]presentation[\\/]SubagentSessionController\.java$"/>
@@ -164,10 +146,8 @@
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]domain[\\/]Memory\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]domain[\\/]Memory\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]domain[\\/]Memory\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]domain[\\/]Memory\.java$"/>
   <suppress checks="(^|\.)UnusedImports(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]presentation[\\/]MemoryController\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]presentation[\\/]MemoryDtos\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]presentation[\\/]MemoryDtos\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]AgentDelegationService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]AgentDelegationService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]AgentRunner\.java$"/>
@@ -187,11 +167,9 @@
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]people[\\/]presentation[\\/]PeopleDtos\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]shared[\\/]auth[\\/]ControlPlaneJwtFilter\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]shared[\\/]error[\\/]ApiException\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]shared[\\/]error[\\/]ApiException\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]shared[\\/]error[\\/]GlobalExceptionHandler\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]shared[\\/]util[\\/]Sha256\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]skill[\\/]application[\\/]SkillAgentNotice\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]skill[\\/]application[\\/]SkillAgentNotice\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]skill[\\/]application[\\/]SkillService\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]skill[\\/]application[\\/]SkillUseRecorder\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]skill[\\/]domain[\\/]ExecutionSkillUse\.java$"/>
@@ -204,7 +182,6 @@
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]application[\\/]ToolDetailPolicy\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]domain[\\/]AgentExecution\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]domain[\\/]AgentExecution\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]domain[\\/]AgentExecution\.java$"/>
   <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]domain[\\/]ExecutionEvent\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]infra[\\/]ModelsDevPriceCatalog\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]usage[\\/]presentation[\\/]UsageController\.java$"/>
@@ -217,15 +194,12 @@
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]AgentPersonaControllerTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]AgentToolServiceTest\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]StarterSuggestionServiceTest\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]StarterSuggestionServiceTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]architecture[\\/]ArchitectureRules\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]architecture[\\/]ArchitectureRules\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]architecture[\\/]ArchitectureRules\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
   <suppress id="rightCurlySame" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactWriteServiceTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactWriteServiceTest\.java$"/>
@@ -233,7 +207,6 @@
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ChatMemoryProposalTest\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ChatMemoryProposalTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ChatMemoryProposalTest\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ChatMemoryProposalTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ChatRunningTurnTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ChatServiceTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ChatStopTest\.java$"/>
@@ -241,7 +214,6 @@
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ConversationMissingAgentTest\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]RegenerateDeletedAttachmentTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]RegenerateDeletedAttachmentTest\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]RegenerateDeletedAttachmentTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]infra[\\/]ArtifactSourceTlsTest\.java$"/>
   <suppress checks="(^|\.)UnusedImports(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]infra[\\/]ArtifactSourceTlsTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]AccountbookConnectionControllerTest\.java$"/>
@@ -252,9 +224,7 @@
   <suppress checks="(^|\.)AvoidStarImport(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClientTest\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]StubHermesRunsClient\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]StubHermesRunsClient\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]StubHermesRunsClient\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]AgentTokenServiceTest\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]AgentTokenServiceTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]AgentTokenUserIdDropMigrationTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]McpAgentToolsTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]McpArtifactWriteToolTest\.java$"/>
@@ -264,13 +234,11 @@
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]McpMemoryToolTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]McpMemoryToolTest\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]McpMemoryToolTest\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]McpMemoryToolTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]McpPrincipalTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]SubagentSessionEndpointTest\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]MemoryProposerTest\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]MemoryProposerTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]MemoryProposerTest\.java$"/>
-  <suppress id="rightCurlyAlone" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]MemoryProposerTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]AgentDelegationServiceTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]ChildExecutionRunnerTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]ResearchAndBuildFlowTest\.java$"/>

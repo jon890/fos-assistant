@@ -39,6 +39,16 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 - **`src/test/resources/application-test.yml` 은 test profile 전용이다.**
   `application.yml` 이라는 이름으로 두면 `smokeRun` 이 실제 설정 대신 이 파일을 읽는다.
 
+## 품질 검사
+
+구조 규칙, 코드 규칙, 포맷은 `./gradlew qualityCheck` 하나가 묶어 검사한다. 파일을 바꾸지 않는다.
+backend 와 web 을 함께 검사하려면 저장소 root 에서 `scripts/quality.sh check` 를 쓴다.
+기계가 고칠 수 있는 위반은 `scripts/quality.sh fix` 가 고친다.
+
+**기준 파일에 든 위반은 허용이 아니라 줄여 갈 목록이다.**
+기준마다 연 GitHub 이슈가 있다. 「구조 규칙」 과 「코드 규칙」 의 기준 파일이 모두 그렇다.
+`check` 는 끝에 「경고 목록(실패 아님)」 을 낸다. 파일과 메서드 길이를 넘은 곳이고 쪼갤 후보다.
+
 ## 구조 규칙
 
 패키지 구조 규칙은 `src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 가 갖는다.
@@ -97,7 +107,7 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 
 | 언제 | 어떻게 |
 | --- | --- |
-| 기준에 든 위반을 고쳤다 | 평소 테스트가 `StoreUpdateFailedException: Updating frozen violations is disabled` 로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다 |
+| 기준에 든 위반을 고쳤다 | 평소 테스트가 `StoreUpdateFailedException: Updating frozen violations is disabled` 로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다. `scripts/quality.sh fix` 도 같은 명령으로 기준을 줄인다 |
 | 기준에 든 클래스의 이름만 바꿨다 | 같은 예외로 실패한다. 아래 「새 위반을 받아들이거나 다시 얼린다」 를 따른다 |
 | 규칙을 새로 더했다 | `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 그 규칙의 기준 파일을 만든다. `allowStoreCreation` 은 `stored.rules` 가 없을 때만 쓴다 |
 | 새 위반을 받아들이거나 다시 얼린다 | `./gradlew archTest --rerun --tests '*ArchitectureRulesTest.<메서드>' -Parchunit.freeze.refreeze=true -Parchunit.freeze.store.default.allowStoreUpdate=true`. 까닭을 커밋 메시지와 PR 본문에 적는다 |
@@ -150,7 +160,7 @@ error 는 태스크를 실패시키고, warning 은 실패시키지 않고 보�
 | `ConstantName` (`log` 와 대문자 상수 이름) | error | 로거 이름 `log` 는 Lombok `@Slf4j` 가 만드는 이름이다 |
 | `EmptyLineSeparator` (메서드와 생성자) | error | 메서드와 생성자 사이에 빈 줄이 한 줄 이상 있어야 읽는 단위가 보인다. 인터페이스의 추상 메서드 선언 사이도 잡는다. 자동으로 고치지 않는 목록에 든다 |
 | `OneStatementPerLine` | error | 한 줄에 한 문장 |
-| `LeftCurly` (`eol`), `RightCurly` 둘 | error | `void a() { return; }` 처럼 본문을 한 줄에 몰아 쓰지 않는다. `RightCurly` 는 `rightCurlyAlone` (메서드, 생성자, 클래스, `for`, `while`, 초기화 블록) 과 `rightCurlySame` (`try`, `catch`, `finally`, `if`, `else`, `do`) 로 나눈다. 제어문에 `alone` 을 걸면 `} else {` 가 위반이 되어 포매터와 어긋나기 때문이다. `LeftCurly` 는 람다를 대상에서 뺀다. 시험 대역의 `-> { throw ...; }` 한 줄이 흔하다 |
+| `LeftCurly` (`eol`), `RightCurly` 둘 | error | `void a() { return; }` 처럼 본문을 한 줄에 몰아 쓰지 않는다. `RightCurly` 는 `rightCurlyAlone` (메서드, 생성자, 클래스, `for`, `while`, 초기화 블록) 과 `rightCurlySame` (`try`, `catch`, `finally`, `if`, `else`, `do`) 로 나눈다. 제어문에 `alone` 계열을 걸면 `} else {` 가 위반이 되어 포매터와 어긋나기 때문이다. `rightCurlyAlone` 의 옵션은 `alone_or_singleline` 이다. 포매터가 빈 본문을 `private X() {}` 처럼 한 줄에 쓰므로 `alone` 은 포매터와 어긋난다. 한 줄 본문 `{ return x; }` 은 `LeftCurly` 가 잡는다. `LeftCurly` 는 람다를 대상에서 뺀다. 시험 대역의 `-> { throw ...; }` 한 줄이 흔하다 |
 | `NeedBraces` | error | 제어문은 한 문장이어도 중괄호를 쓴다 |
 | 직접 만든 로거 금지 (`lombokLogger`) | error | 로거는 Lombok `@Slf4j` 로 둔다. 바이트코드로는 구별되지 않아 소스에서 본다. `Logger x = LoggerFactory.getLogger(...)` 형태의 선언을 잡고, 시험이 로그를 붙잡으려고 `(Logger) LoggerFactory.getLogger(...)` 로 꺼내는 것은 잡지 않는다 |
 | 직접 쓴 private 빈 생성자 금지 (`privateEmptyConstructor`) | error | 인스턴스를 만들지 않는 클래스는 `@NoArgsConstructor(access = AccessLevel.PRIVATE)` 로 쓴다 |
