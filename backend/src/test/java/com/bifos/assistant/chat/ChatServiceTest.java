@@ -340,6 +340,28 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("커넥터 에이전트의 대화 turn 은 Memory 를 Hermes 에 보내지 않고 실행 기록의 길이도 0 이다")
+    void sendsNoMemoryToHermesForConnectorAgentTurn() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent connector = agents.findAll().getFirst();
+        connector.markConnectorManaged();
+        agents.save(connector);
+        memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
+
+        String instructions = stub().received().getFirst().instructions();
+        assertThat(instructions)
+                .as("커넥터 에이전트의 turn 이 Hermes 에 보낸 instructions")
+                .doesNotContain("국수는 맵지 않게 먹는다")
+                .isEqualTo(AskFormat.GUIDE);
+        assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
+                .as("실행 기록의 문맥 길이")
+                .isZero();
+    }
+
+    @Test
     @DisplayName("message history includes the user display name only on user messages")
     void messageHistoryIncludesTheUserDisplayNameOnlyOnUserMessages() {
         CurrentUser dad = member("dad@example.com", "dad");
