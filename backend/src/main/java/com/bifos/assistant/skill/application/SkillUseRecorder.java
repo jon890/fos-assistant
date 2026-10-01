@@ -76,8 +76,7 @@ public class SkillUseRecorder {
                 uses.save(ExecutionSkillUse.of(executionId, skillName, source, Instant.now()));
             });
         } catch (DataIntegrityViolationException ex) {
-            log.debug("같은 스킬 사용이 먼저 적혀 있어 건너뛴다 executionId={} skill={} source={}",
-                    executionId, skillName, source);
+            log.debug("같은 스킬 사용이 먼저 적혀 있어 건너뛴다 executionId={} skill={} source={}", executionId, skillName, source);
         } catch (RuntimeException ex) {
             log.warn("스킬 사용을 적지 못했다 executionId={} skill={} source={}", executionId, skillName, source, ex);
         }

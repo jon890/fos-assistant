@@ -119,21 +119,30 @@ public class SkillService {
         Map<String, SkillListItem> items = new TreeMap<>();
         for (HermesSkill skill : publisher.list(profile)) {
             SkillSource source = uploadedNames.contains(skill.name()) ? SkillSource.UPLOADED : SkillSource.HERMES;
-            items.put(skill.name(), new SkillListItem(
-                    skill.name(), skill.description(), source, skill.enabled(),
-                    usageOf(editable, usages, skill.name())));
+            items.put(
+                    skill.name(),
+                    new SkillListItem(
+                            skill.name(),
+                            skill.description(),
+                            source,
+                            skill.enabled(),
+                            usageOf(editable, usages, skill.name())));
         }
         for (SkillBundle bundle : uploaded.values()) {
-            items.putIfAbsent(bundle.name(), new SkillListItem(
-                    bundle.name(), descriptionOf(bundle.skillMd()), SkillSource.UPLOADED, true,
-                    usageOf(editable, usages, bundle.name())));
+            items.putIfAbsent(
+                    bundle.name(),
+                    new SkillListItem(
+                            bundle.name(),
+                            descriptionOf(bundle.skillMd()),
+                            SkillSource.UPLOADED,
+                            true,
+                            usageOf(editable, usages, bundle.name())));
         }
         return new SkillList(
                 List.copyOf(items.values()), editable, publisher.skillsToolsetEnabled(agent), properties.maxPerAgent());
     }
 
-    private static SkillUsageSummary usageOf(
-            boolean editable, Map<String, SkillUsageSummary> usages, String name) {
+    private static SkillUsageSummary usageOf(boolean editable, Map<String, SkillUsageSummary> usages, String name) {
         if (!editable) {
             return null;
         }
@@ -171,8 +180,7 @@ public class SkillService {
      * @param files 참고 파일. {@code content} 가 {@code null} 인 파일은 지금 버전의 같은 경로 내용을 쓴다
      */
     @Transactional
-    public SkillDetail save(
-            CurrentUser user, String code, String name, String skillMd, List<SkillFileInput> files) {
+    public SkillDetail save(CurrentUser user, String code, String name, String skillMd, List<SkillFileInput> files) {
         Agent agent = requireEditableLocked(user, code);
         String profile = agent.hermesProfile();
         SkillStore.requireSkillName(name);
@@ -316,8 +324,7 @@ public class SkillService {
         }
         SkillFrontmatter frontmatter = SkillFrontmatter.parse(skillMd);
         if (!name.equals(frontmatter.name())) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "SKILL.md frontmatter name must equal the skill name");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md frontmatter name must equal the skill name");
         }
         if (frontmatter.rawDescriptionLength() > MAX_DESCRIPTION_CHARS) {
             throw new ApiException(
@@ -334,8 +341,7 @@ public class SkillService {
     private static List<SkillFileInput> requireFiles(List<SkillFileInput> files) {
         List<SkillFileInput> inputs = files == null ? List.of() : files;
         if (inputs.size() > MAX_FILES) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a skill can have at most " + MAX_FILES + " files");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a skill can have at most " + MAX_FILES + " files");
         }
         Set<String> paths = new HashSet<>();
         for (SkillFileInput input : inputs) {
@@ -357,8 +363,7 @@ public class SkillService {
     }
 
     /** 본문이 빠진 파일을 지금 버전에서 채우고, 채운 뒤의 합계 크기를 본다. */
-    private static SkillBundle bundleOf(
-            String name, String skillMd, List<SkillFileInput> inputs, SkillBundle current) {
+    private static SkillBundle bundleOf(String name, String skillMd, List<SkillFileInput> inputs, SkillBundle current) {
         Map<String, String> currentFiles = new HashMap<>();
         if (current != null) {
             current.files().forEach(file -> currentFiles.put(file.path(), file.content()));
