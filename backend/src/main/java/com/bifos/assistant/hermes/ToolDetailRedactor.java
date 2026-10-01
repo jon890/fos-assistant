@@ -37,13 +37,20 @@ final class ToolDetailRedactor {
     private static final Pattern JWT =
             Pattern.compile("(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])");
     private static final Pattern TOKEN = Pattern.compile("(?i)Bearer\\s+[^\\s\"'`,;<>}\\]]+"
-            + "|(?i)(?:sk-|gh[pousr]_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]+"
+            + "|(?i)(?:sk-|gh[pousr]_|github_pat_|xox[a-z]*-)[A-Za-z0-9_-]+"
             + "|(?<![A-Za-z0-9])[A-Fa-f0-9]{32,}(?![A-Za-z0-9])"
-            + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_+/-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
+            + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9+/]{32,}={0,2}(?![A-Za-z0-9_+/=-])"
+            + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
     private static final Pattern ASSIGNMENT = Pattern.compile("(?i)([\"']?[A-Za-z][A-Za-z0-9_-]*[\"']?\\s*[:=]\\s*)"
             + "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\s,;}&]+)");
+    private static final Pattern AUTH_HEADER =
+            Pattern.compile("(?im)\\b(authorization|cookie)\\s*[:=]\\s*[^\\r\\n]+");
 
     static String redact(String detail, boolean connectorManaged) {
+        return redact(detail, connectorManaged, new LinkedHashMap<>());
+    }
+
+    static String redact(String detail, boolean connectorManaged, Map<String, String> identifiers) {
         if (detail == null) {
             return null;
         }
@@ -53,7 +60,6 @@ final class ToolDetailRedactor {
         if (detail.length() > INPUT_LIMIT) {
             return "[긴 도구 내용 가림]";
         }
-        Map<String, String> identifiers = new LinkedHashMap<>();
         String redacted = redactContent(detail, identifiers);
         if (redacted.length() <= ExecutionEvent.DETAIL_LIMIT) {
             return redacted;
@@ -75,7 +81,7 @@ final class ToolDetailRedactor {
                 return HIDDEN;
             }
         }
-        return redactText(redactAssignments(detail), identifiers);
+        return redactAssignments(redactText(detail, identifiers));
     }
 
     private static JsonNode redactJson(JsonNode node, Map<String, String> identifiers) {
@@ -95,7 +101,7 @@ final class ToolDetailRedactor {
             return result;
         }
         if (node.isString()) {
-            return MAPPER.getNodeFactory().stringNode(redactText(redactAssignments(node.asText()), identifiers));
+            return MAPPER.getNodeFactory().stringNode(redactAssignments(redactText(node.asText(), identifiers)));
         }
         return node;
     }
@@ -110,6 +116,7 @@ final class ToolDetailRedactor {
     }
 
     private static String redactAssignments(String text) {
+        text = AUTH_HEADER.matcher(text).replaceAll(match -> match.group(1) + ": " + HIDDEN);
         Matcher matcher = ASSIGNMENT.matcher(text);
         while (matcher.find()) {
             String key = matcher.group(1).replaceAll("[\"'\\s:=]", "");

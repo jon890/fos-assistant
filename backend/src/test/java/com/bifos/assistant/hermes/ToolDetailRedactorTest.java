@@ -65,11 +65,26 @@ class ToolDetailRedactorTest {
     }
 
     @Test
+    @DisplayName("Authorization 헤더와 여러 xox 계열의 짧은 비밀값도 가린다")
+    void redactsAuthorizationHeaderAndOtherSlackTokenPrefixes() {
+        assertThat(ToolDetailRedactor.redact("Authorization: Bearer short-secret", false))
+                .doesNotContain("short-secret");
+        assertThat(ToolDetailRedactor.redact("Authorization: Basic short-secret\nstatus=ok", false))
+                .doesNotContain("short-secret");
+        assertThat(ToolDetailRedactor.redact("Cookie: first=tiny; second=short-secret", false))
+                .doesNotContain("tiny", "short-secret");
+        assertThat(ToolDetailRedactor.redact("xoxc-shortvalue xoxe-shortvalue", false))
+                .isEqualTo("[가림] [가림]");
+    }
+
+    @Test
     @DisplayName("금액과 날짜와 짧은 식별자와 일반 문장은 보존한다")
     void preservesOrdinaryTextAndValues() {
         String detail = "금액 12,000원, 날짜 2026-10-01, 2026.10.01, www.example.com, id=abc-12, 오늘 날씨를 찾았다";
 
         assertThat(ToolDetailRedactor.redact(detail, false)).isEqualTo(detail);
+        assertThat(ToolDetailRedactor.redact("2026-10-01/2026-10-31/2027-01-01", false))
+                .isEqualTo("2026-10-01/2026-10-31/2027-01-01");
         assertThat(ToolDetailRedactor.redact(null, false)).isNull();
         assertThat(ToolDetailRedactor.redact("", false)).isEmpty();
     }

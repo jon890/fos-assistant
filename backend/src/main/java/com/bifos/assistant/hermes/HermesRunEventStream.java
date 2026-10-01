@@ -8,7 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -77,12 +79,13 @@ public class HermesRunEventStream {
     }
 
     private void readEvents(InputStream body, Consumer<RunEvent> onEvent, boolean connectorManaged) throws IOException {
+        Map<String, String> identifiers = new LinkedHashMap<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
-                    emit(data, onEvent, connectorManaged);
+                    emit(data, onEvent, connectorManaged, identifiers);
                     continue;
                 }
                 if (line.startsWith(":")) {
@@ -95,18 +98,19 @@ public class HermesRunEventStream {
                     data.append(line.substring(5).stripLeading());
                 }
             }
-            emit(data, onEvent, connectorManaged);
+            emit(data, onEvent, connectorManaged, identifiers);
         }
     }
 
-    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, boolean connectorManaged) throws IOException {
+    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, boolean connectorManaged,
+            Map<String, String> identifiers) throws IOException {
         if (data.isEmpty()) {
             return;
         }
         String raw = data.toString();
         data.setLength(0);
         try {
-            onEvent.accept(toRunEvent(objectMapper.readTree(raw), connectorManaged));
+            onEvent.accept(toRunEvent(objectMapper.readTree(raw), connectorManaged, identifiers));
         } catch (JacksonException ex) {
             throw new IOException("Hermes sent an invalid event");
         }
@@ -123,11 +127,15 @@ public class HermesRunEventStream {
     }
 
     static RunEvent toRunEvent(JsonNode root, boolean connectorManaged) {
+        return toRunEvent(root, connectorManaged, new LinkedHashMap<>());
+    }
+
+    private static RunEvent toRunEvent(JsonNode root, boolean connectorManaged, Map<String, String> identifiers) {
         JsonNode payload = root.path("data");
         String type = firstText(root, payload, "event", "type");
         String detail = firstDetail(root, payload);
         if (type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.")) {
-            detail = ToolDetailRedactor.redact(detail, connectorManaged);
+            detail = ToolDetailRedactor.redact(detail, connectorManaged, identifiers);
         }
         return new RunEvent(
                 type,

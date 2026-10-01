@@ -328,9 +328,10 @@ SSE와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도 
 | JSON 비밀 키 | 중첩 객체와 배열에서도 값 전체를 `[가림]`으로 바꾼다. 키의 대소문자, `_`, `-` 차이는 무시한다 |
 | 비밀 키 이름 | `token`, `secret`, `password`, `passwd`, `api_key`, `apikey`, `authorization`, `cookie`, `credential`, `credentials`, `private_key`, `access_key`, `client_secret`과 `token`, `secret`, `password`, `privatekey`로 끝나는 키 |
 | 일반 문장의 비밀 할당 | `key=value`와 `key: value`에서 위 비밀 키의 값을 가린다. 따옴표 안의 공백도 값에 포함한다 |
-| 토큰 모양 | `Bearer` 인증값, `alg`를 가진 JSON 헤더와 base64url 세 구간으로 된 JWT, `sk-`, `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`, `xoxb-`, `xoxa-`, `xoxp-`, `xoxr-`, `xoxs-` 접두의 값을 가린다 |
+| 인증 헤더 | 일반 문장의 `Authorization`과 `Cookie`는 인증 방식과 세미콜론으로 나뉜 값도 포함해 줄 끝까지 가린다 |
+| 토큰 모양 | `Bearer` 인증값, `alg`를 가진 JSON 헤더와 base64url 세 구간으로 된 JWT, `sk-`, `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`, `xox`로 시작해 `-`로 끝나는 계열 접두의 값을 가린다 |
 | 긴 인코딩 모양 | 32자 이상의 hex와 base64/base64url 덩어리를 가린다 |
-| UUID | 표준 8-4-4-4-12 형태를 `[항목 N]`으로 바꾼다. 설명 하나 안에서 같은 UUID의 대소문자를 통일해 같은 번호로 표시한다 |
+| UUID | 표준 8-4-4-4-12 형태를 `[항목 N]`으로 바꾼다. 같은 실행 스트림 안에서 같은 UUID의 대소문자를 통일해 시작과 완료 사건에 같은 번호를 쓴다. 번호표는 스트림이 끝나면 버린다 |
 | 연결용 에이전트 | `connectorManaged`가 참이면 내용 전체를 `[연결 도구 내용 가림]`으로 바꾼다. 짧은 manifest 비밀값도 노출하지 않는다 |
 | 길이와 손상 | 가린 뒤 500자를 넘으면 끝에 `…`를 붙여 자른다. 입력이 65,536자를 넘으면 전체를 가린다. JSON으로 시작하지만 파싱할 수 없는 설명도 전체를 가린다 |
 
