@@ -96,8 +96,18 @@ public class AgentRunner {
             BooleanSupplier cancelled,
             String instructionAddition) {
         return run(
-                user, conversation, agent, task, parentExecutionId, rootExecutionId, session, onStarted, onSubmitted,
-                cancelled, instructionAddition, null);
+                user,
+                conversation,
+                agent,
+                task,
+                parentExecutionId,
+                rootExecutionId,
+                session,
+                onStarted,
+                onSubmitted,
+                cancelled,
+                instructionAddition,
+                null);
     }
 
     /**
@@ -129,8 +139,16 @@ public class AgentRunner {
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
         ModelChoice choice = conversation.modelChoice();
         AgentExecution execution = executions.start(
-                user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, choice, null,
-                session.correlationSessionId(), delegationKey);
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                snapshot,
+                choice,
+                null,
+                session.correlationSessionId(),
+                delegationKey);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
@@ -179,9 +197,7 @@ public class AgentRunner {
                     : executions.cancel(execution, agent, result, choice, partialOutput(result.output()));
             append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
             return new Run(
-                    cancelledExecution,
-                    ChildResult.failed(cancelledExecution.id(), "CANCELLED"),
-                    result.sessionId());
+                    cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), result.sessionId());
         }
 
         if (!result.succeeded()) {
@@ -208,8 +224,7 @@ public class AgentRunner {
      * @param result 성공 여부와 답
      * @param sessionId Hermes 가 알려 준 session. 대화를 이어 가려면 부르는 쪽이 기억한다
      */
-    public record Run(AgentExecution execution, ChildResult result, String sessionId) {
-    }
+    public record Run(AgentExecution execution, ChildResult result, String sessionId) {}
 
     private Run fail(AgentExecution execution, RuntimeException ex, int sequence) {
         String code = ex instanceof ApiException api ? api.code().name() : UNKNOWN_ERROR;
@@ -263,8 +278,7 @@ public class AgentRunner {
      * <p>저장이 실패해도 실행은 그대로 이어진다. 사건은 관측용이고 그것 때문에 답이 끊기면 안 된다.
      * {@code ChatService} 가 같은 이유로 같은 판단을 한다.
      */
-    private void append(
-            AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
+    private void append(AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
         try {
             ExecutionEvent event = eventRecorder.record(execution, type, detail, sequence);
             if (event != null) {

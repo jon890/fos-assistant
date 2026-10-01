@@ -74,8 +74,7 @@ public class ContextAssembler {
         return builder.build();
     }
 
-    private static void appendAlways(
-            ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope) {
+    private static void appendAlways(ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope) {
         memories.stream()
                 .filter(memory -> memory.scope() == scope)
                 .sorted(Comparator.comparing(Memory::id))
@@ -160,10 +159,7 @@ public class ContextAssembler {
 
         private AssembledContext build() {
             if (!omitted.isEmpty()) {
-                log.warn(
-                        "memory context omitted items={} chars={}",
-                        omitted.size(),
-                        full.length() - selected.length());
+                log.warn("memory context omitted items={} chars={}", omitted.size(), full.length() - selected.length());
             }
             return selected.isEmpty()
                     ? new AssembledContext(null, 0, omitted)
