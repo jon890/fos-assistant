@@ -50,6 +50,8 @@ redirect를 따라가지 않는다.
 Control Plane은 `PUT /api/connectors`에 `profile`, `plugin: fos-accountbook`, `enabled`만 보낸다.
 인프라 plugin이 신뢰된 manifest를 읽어 MCP 서버, persona와 선택 스킬 경로를 설치한다.
 허용 도구는 `accountbook`과 Control Plane MCP `fos-assistant`이며 셸, 파일, `skills` 도구는 닫는다.
+새 profile의 틀은 내장 도구 `delegation`을 켜므로, 등록은 설치 직전에 API 도구 목록을 `fos-assistant` 하나로 다시 쓰고 설치가 `accountbook`을 덧붙인다.
+연결 확인과 관리자 반영 완료는 켜진 내장 도구가 하나도 없어야 READY로 바꾼다.
 신뢰된 가계부 스킬 본문은 persona에 넣는다.
 
 토큰은 `PUT /api/env`로 `ACCOUNTBOOK_API_TOKEN`에 쓴다.

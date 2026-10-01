@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -99,6 +101,18 @@ class AccountbookConnectionServiceTest {
 
         assertThat(connections.findById(user.id())).isEmpty();
         assertThat(agents.count()).isZero();
+    }
+
+    @Test
+    void 등록은_커넥터를_설치하기_전에_API_도구를_Control_Plane_MCP_만으로_다시_쓴다() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        ConnectionSnapshot registered = service.register(user, TOKEN, null);
+
+        String profile = agents.findByCode(registered.agentCode()).orElseThrow().hermesProfile();
+        InOrder order = inOrder(toolsets, connector);
+        order.verify(toolsets).writeApiServer(profile, List.of("fos-assistant"));
+        order.verify(connector).putConnector(profile, true);
     }
 
     @Test

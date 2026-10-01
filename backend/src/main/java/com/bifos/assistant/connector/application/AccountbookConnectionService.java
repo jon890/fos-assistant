@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.connector.domain.AccountbookConnection;
 import com.bifos.assistant.connector.domain.ConnectionStatus;
 import com.bifos.assistant.connector.infra.AccountbookConnectionRepository;
@@ -65,6 +66,9 @@ public class AccountbookConnectionService {
                     : connector.putEnv(connection.getAgent().hermesProfile(), FAMILY_KEY, family.toString());
             connection.markRestartRequired(familyRestart);
             baseUrlRestart = connector.putEnv(connection.getAgent().hermesProfile(), BASE_URL_KEY, properties.apiBaseUrl()); connection.markRestartRequired(baseUrlRestart);
+            // 새 profile 의 틀은 내장 도구(delegation)를 켠다. 연결용 에이전트는 MCP 도구만 쓰므로 Control Plane MCP 만 남기고,
+            // 이어지는 설치가 커넥터 서버를 덧붙인다. 이미 설치된 연결을 다시 등록할 때도 같은 순서로 내장 도구를 뺀다.
+            toolsets.writeApiServer(connection.getAgent().hermesProfile(), List.of(AgentToolPolicy.CONTROL_PLANE_MCP));
             installRestart = connector.putConnector(connection.getAgent().hermesProfile(), true); connection.markRestartRequired(installRestart);
         } catch (RuntimeException ex) {
             connection.pending(); throw new ConnectorOperationFailure();
