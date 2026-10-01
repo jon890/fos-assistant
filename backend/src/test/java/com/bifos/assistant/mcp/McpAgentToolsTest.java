@@ -49,6 +49,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -90,7 +92,10 @@ class McpAgentToolsTest {
     private static final String OWN_A_CODE = "tools-own-a";
     private static final String OWN_B_CODE = "tools-own-b";
     private static final String OFF_CODE = "tools-off";
-    private static final List<String> CODES = List.of(GROUP_CODE, OWN_A_CODE, OWN_B_CODE, OFF_CODE);
+    /** 검사가 그 자리에서 만드는 origin 에이전트다. 연결용 에이전트이거나 그 대조군인 일반 에이전트다. */
+    private static final String ORIGIN_CODE = "tools-origin";
+
+    private static final List<String> CODES = List.of(GROUP_CODE, OWN_A_CODE, OWN_B_CODE, OFF_CODE, ORIGIN_CODE);
     /** 검사가 실행 줄을 남기는 profile 이다. 위임 자식은 에이전트의 profile 로 돈다. */
     private static final List<String> PROFILES = List.of(
             SHARED,
@@ -99,7 +104,8 @@ class McpAgentToolsTest {
             profileOf(GROUP_CODE),
             profileOf(OWN_A_CODE),
             profileOf(OWN_B_CODE),
-            profileOf(OFF_CODE));
+            profileOf(OFF_CODE),
+            profileOf(ORIGIN_CODE));
 
     private static final Instant STARTED = Instant.parse("2026-09-30T00:00:00Z");
     private static final Long CONVERSATION = 930_001L;
@@ -554,6 +560,40 @@ class McpAgentToolsTest {
             assertInvalidContext(rejection);
             assertThat(rejection.body()).isEqualTo(first);
         }
+    }
+
+    @ParameterizedTest
+    @DisplayName("연결용 에이전트의 실행에서 온 호출은 도구 여섯 모두 서명이 틀린 호출과 같은 거절이다")
+    @ValueSource(
+            strings = {"memory_read", "artifact_write", "agent_list", "agent_status", "agent_delegate", "agent_stop"})
+    void rejectsEveryToolCalledFromConnectorAgentRun(String toolName) throws Exception {
+        String token = tokens.issue(profileOf(ORIGIN_CODE), "origin").rawToken();
+        String root = originRun(true);
+        ObjectNode wrongSig = McpCallSigner.context(token, toolName, root);
+        String sig = wrongSig.path("sig").asString();
+        wrongSig.put("sig", sig.substring(0, 63) + (sig.endsWith("0") ? "1" : "0"));
+
+        HttpResponse<String> rejected = send(
+                token,
+                toolCall(toolName, withContext(json.createObjectNode(), McpCallSigner.context(token, toolName, root))));
+        HttpResponse<String> badSignature =
+                send(token, toolCall(toolName, withContext(json.createObjectNode(), wrongSig)));
+
+        assertInvalidContext(rejected);
+        assertThat(rejected.body())
+                .as("%s 의 거절 본문은 서명이 틀린 호출의 본문과 같다", toolName)
+                .isEqualTo(badSignature.body());
+    }
+
+    @Test
+    @DisplayName("같은 준비에서 origin 이 일반 에이전트이면 agent list 가 통과한다")
+    void agentListPassesWhenOriginIsOrdinaryAgentInSameSetup() throws Exception {
+        String token = tokens.issue(profileOf(ORIGIN_CODE), "origin").rawToken();
+        String root = originRun(false);
+
+        JsonNode listed = agentList(token, root);
+
+        assertThat(codes(listed)).as("일반 에이전트 origin 이 받은 목록").contains(GROUP_CODE, OWN_A_CODE);
     }
 
     @Test
@@ -1222,6 +1262,30 @@ class McpAgentToolsTest {
             }
             Thread.sleep(10);
         }
+    }
+
+    /**
+     * origin 에이전트를 만들고 그 profile 로 도는 실행 줄을 남긴 뒤 뿌리 session 을 돌려준다.
+     *
+     * <p>연결용인지만 다르고 나머지 준비는 같다. 거절이 준비 탓이 아니라 연결용이어서 난 것임을 대조군이 보인다.
+     */
+    private String originRun(boolean connectorManaged) {
+        Agent origin = agent(ORIGIN_CODE, "origin 에이전트", AgentVisibility.PRIVATE, userA.id());
+        if (connectorManaged) {
+            origin.markConnectorManaged();
+        }
+        origin = agents.save(origin);
+        String root = McpCallSigner.newRoot();
+        executions.save(AgentExecution.builder()
+                .userId(userA.id())
+                .agentId(origin.id())
+                .profileName(profileOf(ORIGIN_CODE))
+                .hermesSessionId(root)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(STARTED)
+                .build());
+        return root;
     }
 
     private static Agent agent(String code, String name, AgentVisibility visibility, Long ownerUserId) {
