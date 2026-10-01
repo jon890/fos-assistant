@@ -23,7 +23,7 @@ Hermes core 는 고치지 않는다.
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
-| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다 |
+| `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다 |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
 
@@ -718,6 +718,44 @@ async def _check_connector_probe(request):
     return None
 
 
+def _unlock_api_toolsets(config: dict, allowed: list, platforms: set, calculate) -> dict:
+    """요청한 API 도구를 `agent.disabled_toolsets` 에서 뺀 설정이다.
+
+    Hermes 는 허용 목록을 계산한 뒤 `disabled_toolsets` 를 마지막에 빼므로, 거기 남은 이름은 목록에 있어도 열리지 않는다.
+    `disabled_toolsets` 는 모든 platform 에 걸린다. 빼면 목록이 없어 기본 toolset 을 쓰는 platform 에
+    그 도구가 열리므로, 계산 결과가 바뀌는 platform 은 지금 계산 결과를 명시 목록으로 먼저 고정한다.
+    목록이 이미 있는 platform 이 바뀌면 부르는 쪽의 다른 platform 검사가 거절한다.
+    """
+    agent = config.get("agent") or {}
+    disabled = agent.get("disabled_toolsets")
+    if not isinstance(disabled, list) or not set(allowed) & set(disabled):
+        return config
+    unlocked = {**config, "agent": {**agent, "disabled_toolsets": [name for name in disabled if name not in allowed]}}
+    lists = dict(config.get("platform_toolsets") or {})
+    for name in sorted(platforms - set(lists)):
+        before = calculate(config, name)
+        if calculate(unlocked, name) != before:
+            lists[name] = sorted(before)
+    unlocked["platform_toolsets"] = lists
+    return unlocked
+
+
+def _write_checked_config(path: pathlib.Path, original: bytes, config: dict) -> bytes:
+    """검사를 마친 설정을 처리기보다 먼저 쓴다. 읽은 뒤 파일이 바뀌었으면 쓰지 않는다."""
+    import yaml
+    if path.is_symlink() or path.read_bytes() != original:
+        raise FileExistsError("검사 뒤 profile 설정이 밖에서 바뀌었다")
+    value = yaml.safe_dump(config, sort_keys=False, allow_unicode=True).encode()
+    _atomic_private_write(path, value)
+    return value
+
+
+def _restore_config(path: pathlib.Path, original: bytes, written: bytes) -> None:
+    # 이 요청이 쓴 값일 때만 복원한다. 바깥의 새 수정은 덮어쓰지 않는다.
+    if path.exists() and path.read_bytes() == written:
+        _atomic_private_write(path, original)
+
+
 def _toolset_rejection(allowed) -> Optional[object]:
     """요청한 API 도구 목록의 모양만 본다. 계산은 `_check_config_update` 가 한다."""
     if not isinstance(allowed, list) or any(not isinstance(name, str) for name in allowed):
@@ -827,8 +865,9 @@ async def _check_config_update(request):
         missing = _missing_profile(profile)
         if missing is not None:
             return missing
-        profile_dir = get_profile_dir(profile)
-        saved = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8")) or {}
+        config_path = get_profile_dir(profile) / "config.yaml"
+        original = config_path.read_bytes()
+        saved = yaml.safe_load(original) or {}
         if not isinstance(saved, dict):
             raise ValueError("profile 설정이 객체가 아니다")
         mcp_names = set((saved.get("mcp_servers") or {}).keys())
@@ -856,6 +895,8 @@ async def _check_config_update(request):
         # 공유 gateway 는 multiplex 로 돌아 profile scope 밖에서 읽으면 UnscopedSecretError 가 난다.
         # 대시보드의 설정 처리기와 같은 scope 를 쓴다.
         with _config_profile_scope(profile):
+            if platform is not None:
+                updated = _unlock_api_toolsets(updated, platform["api_server"], platforms, _get_platform_tools)
             effective = set(_get_platform_tools(updated, "api_server"))
             other_changed = any(_get_platform_tools(saved, name) != _get_platform_tools(updated, name)
                                 for name in platforms)
@@ -865,6 +906,9 @@ async def _check_config_update(request):
             return _rejected("다른 platform 의 도구 목록이 바뀐다")
         if skill_dirs and "skills" not in effective:
             return _rejected("skills 도구가 꺼진 채로 스킬을 게시할 수 없다")
+        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets 와 고정 목록은 plugin 이 먼저 쓴다.
+        if updated.get("agent") != saved.get("agent"):
+            request.state.fos_checked_config = (config_path, original, updated)
     except Exception:
         logger.exception("dashboard-profile-api: profile 설정을 검증하지 못했다")
         return _rejected("profile 설정을 검증하지 못했다", 500)
@@ -1013,13 +1057,31 @@ def _install_gate() -> bool:
             if rejected is not None:
                 return rejected
 
+        checked = getattr(request.state, "fos_checked_config", None)
+        written = None
+        if checked is not None:
+            try:
+                written = await asyncio.to_thread(_write_checked_config, *checked)
+            except FileExistsError:
+                return _rejected("검사 뒤 profile 설정이 밖에서 바뀌었다", 409)
+            except Exception:
+                logger.exception("dashboard-profile-api: 검사한 profile 설정을 쓰지 못했다")
+                return _rejected("profile 설정을 쓰지 못했다", 500)
+
         before = None
         if record_created:
             before = _profile_names()
             if before is None:
                 return _rejected("profile 목록을 읽지 못해 만들지 않았다", 500)
 
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except BaseException:
+            if written is not None:
+                _restore_config(checked[0], checked[1], written)
+            raise
+        if written is not None and response.status_code >= 400:
+            _restore_config(checked[0], checked[1], written)
         if request.url.path == "/api/env" and response.status_code < 400:
             body = await _json_object(request)
             if body and body.get("key") in ACCOUNTBOOK_ENV_KEYS:

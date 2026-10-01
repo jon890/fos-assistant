@@ -155,7 +155,7 @@ profile 의 소유 기록에는 설치할 때의 plugin 경로와 실행 파일 
 
 도구 목록은 이렇게 본다.
 
-- `agent` 키는 받지 않으므로 기존 `agent.disabled_toolsets` 가 모든 platform 에 그대로 적용된다
+- `agent` 키는 받지 않는다. `agent.disabled_toolsets` 는 아래 「켠 API 도구는 `disabled_toolsets` 에서 뺀다」 대로 plugin 이 고친다
 - 목록의 이름은 Hermes toolset 또는 그 profile 에 등록된 MCP 서버여야 한다
 - `api_server` 에는 `memory` 를 넣지 않고 Control Plane MCP `fos-assistant` 를 남긴다
 - Control Plane MCP 가 아직 등록되지 않은 profile 은 그 이름과 알려진 내장 toolset 을 함께 넣는다
@@ -173,6 +173,18 @@ profile 의 소유 기록에는 설치할 때의 plugin 경로와 실행 파일 
 - 이미 저장된 `external_dirs` 에 그 profile 의 루트 밖 경로가 있으면 409 다. 목록을 통째로 바꾸면 운영자가 넣은 경로가 지워진다
 
 경로 검사는 profile 설정을 읽기 전에 돈다. 운영 검사가 없는 profile 이름으로 거절 분기를 본다.
+
+**켠 API 도구는 `disabled_toolsets` 에서 뺀다.**
+Hermes 는 허용 목록을 계산한 뒤 `agent.disabled_toolsets` 를 마지막에 빼므로, 설정 틀이 막아 둔 `code_execution` 을 목록에 넣어도 API 실행에서 빠진다.
+그래서 요청 목록에 있는 이름이 `disabled_toolsets` 에 있으면 plugin 이 그 이름을 거기서 뺀다. API 경로의 도구는 `api_server` 목록 하나가 정한다.
+
+- `disabled_toolsets` 는 모든 platform 에 걸린다. 목록이 없어 기본 toolset 을 쓰는 platform 가운데 계산 결과가 바뀌는 것은 지금 계산 결과를 명시 목록으로 먼저 고정한다
+- 목록이 이미 있는 platform 에 그 도구가 열리게 되면 위의 다른 platform 검사가 거절한다. 운영자가 그 목록을 먼저 고친다
+- 요청 목록에 없는 이름은 그대로 둔다. 도구를 끌 때 다시 넣지 않는다. API 는 허용 목록이 막는다
+- `memory` 는 요청 목록에 들어올 수 없으므로 `disabled_toolsets` 에 남는다
+
+Hermes 처리기의 병합은 본문의 키만 쓰므로, plugin 이 검사를 마친 설정 전체를 처리기보다 먼저 쓴다.
+검사한 뒤 파일이 바뀌었으면 쓰지 않고 409 를 돌려준다. 처리기가 실패하면 파일이 plugin 이 쓴 그대로일 때만 원래 바이트로 되돌린다.
 Control Plane 은 사용자 소유권과 도구 등급을 판정한다. plugin 은 도구 등급을 판정하지 않는다.
 
 **`GET /api/skills` 는 query 에 `profile` 하나만 받는다.** 없으면 대시보드 자기 profile 의 스킬이 읽히기 때문이다.

@@ -24,7 +24,7 @@ BUNDLE_SCRIPT = ROOT / "bundle.sh"
 MCP_URL = "http://control-plane.test/mcp"
 
 # 설정이 없을 때 API 경로가 떨어지는 복합 toolset 을 줄여 흉내 낸다.
-WIDE_TOOLSETS = {"delegation", "file", "memory", "terminal", "web"}
+WIDE_TOOLSETS = {"code_execution", "delegation", "file", "memory", "terminal", "web"}
 
 
 def fake_platform_tools(config, platform):
@@ -66,7 +66,8 @@ class ProfileApiRouteTest(unittest.TestCase):
         cls.tools.PLATFORMS = {name: {} for name in ("api_server", "discord", "cli")}
         toolsets = types.ModuleType("toolsets")
         toolsets.TOOLSETS = {name: {} for name in
-                            ("delegation", "memory", "web", "terminal", "file", "skills", "hermes-api-server")}
+                            ("delegation", "memory", "web", "terminal", "file", "skills", "code_execution",
+                             "hermes-api-server")}
         cls.web_profiles = types.ModuleType("hermes_cli.web_server_profiles")
         constants = types.ModuleType("hermes_constants")
         gateway = types.ModuleType("gateway")
@@ -552,6 +553,8 @@ class ProfileApiRouteTest(unittest.TestCase):
                         self.make_profile(name)
                 return types.SimpleNamespace(status_code=self.handler_status)
             if path == "/api/config" and method == "PUT":
+                if self.handler_status >= 400:
+                    return types.SimpleNamespace(status_code=self.handler_status)
                 # Hermes 처리기의 deep merge 를 흉내 낸다. 목록은 통째로 바뀐다.
                 target = self.root / body["profile"] / "config.yaml"
                 saved = yaml.safe_load(target.read_text(encoding="utf-8"))
@@ -914,6 +917,66 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.request("/api/config", "PUT", token="valid",
                                       body=self.toolset_body()), 400)
         self.assertEqual((self.root / "owner/config.yaml").read_bytes(), original)
+
+    def disable_code_execution(self, discord=("web",)):
+        """운영 owner 처럼 API 목록과 disabled_toolsets 에 code_execution 이 함께 있다."""
+        path = self.root / "owner/config.yaml"
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+        config["platform_toolsets"] = {"discord": list(discord),
+                                       "api_server": ["code_execution", "delegation", "fos-assistant"]}
+        config["agent"] = {"disabled_toolsets": ["memory", "terminal", "code_execution"]}
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        return path
+
+    def code_execution_body(self, *extra):
+        body = self.toolset_body()
+        body["config"]["platform_toolsets"]["api_server"] = ["code_execution", "delegation", "fos-assistant", *extra]
+        return body
+
+    def test_toolset_update_lifts_disabled_names_only_for_api(self):
+        """켠 도구를 disabled_toolsets 에서 빼고, 목록 없는 다른 platform 은 지금 계산 결과로 고정한다."""
+        path = self.disable_code_execution()
+        before = yaml.safe_load(path.read_text(encoding="utf-8"))
+        self.assertNotIn("code_execution", fake_platform_tools(before, "api_server"))
+        others = {name: fake_platform_tools(before, name) for name in ("cli", "discord")}
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.code_execution_body()), 200)
+        saved = self.saved_config()
+        self.assertEqual(fake_platform_tools(saved, "api_server"), {"code_execution", "delegation", "fos-assistant"})
+        self.assertEqual({name: fake_platform_tools(saved, name) for name in others}, others)
+        # 요청하지 않은 이름과 memory 는 그대로 남는다.
+        self.assertEqual(saved["agent"]["disabled_toolsets"], ["memory", "terminal"])
+        self.assertEqual(saved["platform_toolsets"]["cli"], sorted(others["cli"]))
+        self.assertEqual(saved["platform_toolsets"]["discord"], ["web"])
+
+        # 끌 때는 허용 목록만 바뀐다. disabled_toolsets 에 다시 넣지 않는다.
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.toolset_body()), 200)
+        saved = self.saved_config()
+        self.assertEqual(fake_platform_tools(saved, "api_server"), {"delegation", "web", "fos-assistant"})
+        self.assertEqual(saved["agent"]["disabled_toolsets"], ["memory", "terminal"])
+
+    def test_toolset_update_keeps_memory_disabled(self):
+        """memory 를 요청하면 disabled_toolsets 를 건드리지 않고 거절한다."""
+        path = self.disable_code_execution()
+        original = path.read_bytes()
+        self.assertEqual(self.request("/api/config", "PUT", token="valid",
+                                      body=self.code_execution_body("memory")), 400)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_toolset_update_refuses_to_open_listed_platform(self):
+        """목록이 있는 platform 에 그 도구가 열리게 되면 고정하지 않고 거절한다."""
+        path = self.disable_code_execution(discord=("web", "code_execution"))
+        original = path.read_bytes()
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.code_execution_body()), 400)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_toolset_update_restores_config_when_handler_fails(self):
+        """plugin 이 먼저 쓴 설정은 처리기가 실패하면 원래 바이트로 되돌린다."""
+        path = self.disable_code_execution()
+        original = path.read_bytes()
+        self.handler_status = 500
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.code_execution_body()), 500)
+        self.assertEqual(path.read_bytes(), original)
 
     def make_skill_version(self, profile, version, link=None):
         skill = self.skill_root / profile / version / "note"
