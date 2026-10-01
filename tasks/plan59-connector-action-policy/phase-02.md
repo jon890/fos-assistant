@@ -103,6 +103,18 @@
 `hermes/README.md` 의 커넥터 절에 대응 파일과 `policy_hook` 을 각각 한 줄로 더한다.
 구현하다 `docs/connectors.md` 의 「이름 대응」 이나 「hook 이 켜져 있는지」 와 달라진 것이 있으면 멈추고 보고한다. 문서를 임의로 고치지 않는다.
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- 이 파일의 설치 코드는 그 뒤 바뀌었다. `_connector_config` 가 API 도구 목록을 `_connector_allowlist(state, servers)` 로 통째로 다시 쓰고 Control Plane MCP 등록을 지운다. 지금 코드를 읽고 그 위에 더한다
+- `_server_matches` 는 `tools` 를 견주지 않는다. 옛 소유 기록(`server` 에 `tools` 없음)을 가진 연결이 `always` 도구를 선언한 manifest 를 만나도 조회, 재설치, 해제가 그대로 되어야 한다. 재설치가 설정과 소유 기록의 서버 정의를 지금 manifest 의 것(`tools.exclude` 포함)으로 덮어쓴다
+- `_policy_hook_active` 는 조건을 하나 더 본다. 설치된 커넥터마다 `config["mcp_servers"][<서버>].get("tools")` 가 `manifest["server"].get("tools")` 와 같다
+- `fos-ctx` 파일이 바뀐 것을 `restart_required` 에 더하지 않는다. `PUT /api/connectors` 응답에 `"plugin_updated": <bool>` 을 따로 낸다. 제거 응답과 바뀐 것이 없는 응답은 false 다. `restart_required` 의 기존 규칙은 그대로 둔다
+- 되돌리기 테스트는 `values` 에서 **마지막에 쓰는 파일**의 쓰기를 실패시킨다. 맨 먼저 쓰는 파일을 실패시키면 되돌릴 것이 없어 되돌리기를 지워도 통과한다
+- 테스트 표의 「다시 설치 … `restart_required` 가 참」 은 「`plugin_updated` 가 참」 으로 읽는다. 같은 값으로 한 번 더 설치하면 `plugin_updated` 가 거짓이다
+- 테스트를 더한다: 옛 소유 기록과 `purge: {risk: DESTRUCTIVE}` 를 선언한 manifest 에서 (1) 조회가 200 이고 `policy_hook` 이 거짓, (2) 재설치 뒤 `tools.exclude` 가 쓰이고 `policy_hook` 이 참, (3) 해제가 200
+
 ## 검증
 
 ```bash

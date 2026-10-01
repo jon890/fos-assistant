@@ -177,11 +177,26 @@ public record ConnectorPolicyRequest(
 
 구현한 칸, 경로, 글이 `docs/connectors.md` 의 「도구 호출 판정」 과 `docs/data-schema.md` 의 「connector_action」 과 같은지 본다. 다르면 멈추고 보고한다.
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- **패키지 방향을 뒤집는다. 다른 패키지는 `connector` 를 import 하지 않는다.** `connector → agent → people → mcp` 가 이미 있어 `mcp → connector` 는 순환이다. 컨트롤러와 요청 검증을 `connector` 에 둔다
+  - `connector/presentation/ConnectorPolicyController.java`, 응답 record 는 `connector/presentation/ConnectionDtos.java` 에 `ConnectorPolicyResponse` 로 더한다(패키지에 `*Dtos.java` 는 하나다)
+  - `connector/application/ConnectorPolicyRequest.java`. `mcp.application.McpPrincipal` 과 `McpCallContext` 를 import 한다
+  - `McpCallContext` 의 `hmac`, `SIGNATURE`, `isVersionOne` 을 `public` 으로 연다. Javadoc 에 커넥터 정책 요청이 같은 key 를 쓴다고 한 줄 적는다
+  - `mcp` 아래에는 새 파일을 만들지 않는다. 테스트도 `backend/src/test/java/com/bifos/assistant/connector/` 에 둔다. 테스트의 서명 도우미 `mcp/McpCallSigner.java` 는 그대로 고쳐 쓴다
+  - `./gradlew archTest` 가 새 위반을 내면 기준 파일을 고치지 않고 멈춰 보고한다
+- **hook 이 보낸 `tool` 을 그대로 믿지 않는다.** `connector/domain/HermesToolName.java` 에 `static String of(String server, String tool)` 을 둔다. 규칙은 `docs/hermes/connector-policy.md` 의 「MCP 도구의 등록 이름」 이고 대시보드 plugin 의 `_hermes_tool_name` 과 같은 값을 내야 한다. `ConnectorPolicyService` 는 manifest 를 읽은 뒤 `tool` 이 null 이 아니고 `HermesToolName.of(manifest.mcpServer(), tool)` 이 `hermesTool` 과 다르면 `tool` 을 null 로 읽는다
+  - `ConnectorPolicyRequest.verify` 는 `tool` 이 문자열일 때 `^[A-Za-z0-9_.-]{1,128}$` 가 아니면 거절한다
+  - `backend/src/test/java/com/bifos/assistant/connector/HermesToolNameTest.java`(신규): `("policy-probe", "write_item")` 이 `mcp__policy_probe__write_item`, `("demo", "a.b")` 가 `mcp__demo__a_b`, 64자를 넘는 입력은 길이 64 이고 `hermes/tests/test_connector_manifest.py` 의 같은 입력과 같은 값(그 값을 Python 으로 계산해 두 테스트에 상수로 둔다)
+  - 끝단 테스트에 더한다: `tool` 이 `list_scopes` 인데 `hermes_tool` 이 `mcp__demo__write_note` 이면 `schema: 2` 에서 `UNDECLARED` 로 막힌다
+
 ## 검증
 
 ```bash
 # cwd: 저장소 root
-(cd backend && ./gradlew test --tests '*ToolPolicyDecisionTest' --tests '*ConnectorPolicyRequestTest' --tests '*ConnectorPolicyEndpointTest' --tests '*ConnectorCatalogCacheTest' --tests '*ConnectorActionMigrationTest')
+(cd backend && ./gradlew test --tests '*ToolPolicyDecisionTest' --tests '*ConnectorPolicyRequestTest' --tests '*ConnectorPolicyEndpointTest' --tests '*ConnectorCatalogCacheTest' --tests '*ConnectorActionMigrationTest' --tests '*HermesToolNameTest')
 (cd backend && ./gradlew test)
 (cd backend && ./gradlew qualityCheck)
 scripts/check-public-safe.sh
@@ -207,9 +222,11 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorConnectionService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/ConnectorPolicyAnswer.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/mcp/application/ConnectorPolicyRequest.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/mcp/presentation/ConnectorPolicyController.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpDtos.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyRequest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectorPolicyController.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectionDtos.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/domain/HermesToolName.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/mcp/application/McpCallContext.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/infra/AgentTokenAuthenticationFilter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
@@ -218,6 +235,7 @@ scripts/check-public-safe.sh
 | `backend/src/test/java/com/bifos/assistant/connector/ToolPolicyDecisionTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorCatalogCacheTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionMigrationTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/mcp/application/ConnectorPolicyRequestTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/mcp/ConnectorPolicyEndpointTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyRequestTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/HermesToolNameTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpCallSigner.java` | 수정 |

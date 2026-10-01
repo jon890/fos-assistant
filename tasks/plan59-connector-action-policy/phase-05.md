@@ -140,6 +140,14 @@ CODE_EXECUTION_MESSAGE = "fos-ctx: 이 연결에서는 코드 실행으로 도�
 `hermes/README.md` 의 fos-ctx 절에 운영 값 `FOS_CTX_POLICY_URL` 과 연결용 profile 에서의 동작 표를 더한다.
 구현이 `docs/connectors.md` 의 「도구 호출 판정」 표와 다르면 멈추고 보고한다.
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- 서명 벡터가 있는 Java 테스트는 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyRequestTest.java` 다
+- 연결용 profile 에는 Control Plane MCP 가 등록돼 있지 않다. `TOOL_PREFIX` 갈래는 그대로 두되, 연결용 profile 의 판정 순서는 위 작업 항목 그대로다
+- e2e 표의 마지막 줄을 이렇게 고정한다. `PENDING` 이 되면 연결용 에이전트가 꺼진다. 그 에이전트로 보낸 대화는 거절되고(꺼진 에이전트에 보낼 때의 상태 코드는 `ChatService` 의 경로를 읽고 단언한다) `connectorToolCalls()` 가 늘지 않는다
+
 ## 검증
 
 ```bash

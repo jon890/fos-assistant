@@ -209,6 +209,7 @@ Control Plane 의 판정 순서다.
 | 그 밖 | 승인 필요 | |
 
 - 판정은 Hermes 와 DB 를 모르는 함수 하나가 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
+- Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식(`^[A-Za-z0-9_.-]{1,128}$`)이 아니어도 같다
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 뿌리 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `schema: 1` 에서 `tool` 이 없는 호출은 `WRITE` 와 `required` 로 판정하고 `tool_name` 을 비운 채 `hermes_tool` 만 남긴다
 
@@ -221,7 +222,10 @@ Control Plane 의 판정 순서다.
 - 그 profile 의 `plugins/fos-ctx/` 파일이 대시보드 묶음의 것과 바이트까지 같다
 - `.fos-connector-tools.json` 이 지금 설치된 커넥터와 manifest 로 계산한 것과 같다
 
-설치는 그 profile 의 `fos-ctx` 를 묶음의 판으로 바꾼다. 파일이 바뀌었으면 `restart_required: true` 로 답한다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있기 때문이다.
+설치는 그 profile 의 `fos-ctx` 를 묶음의 판으로 바꾼다. 파일이 바뀌었으면 `plugin_updated: true` 로 답한다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있기 때문이다.
+Control Plane 은 `plugin_updated` 가 참인 연결을 재시작 대기로 둔다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 풀린다. 설치된 연결의 `restart_required` 는 늘 참이라 이 신호로 쓰지 못한다.
+서버 정의의 `tools.exclude` 가 manifest 로 계산한 것과 다를 때도 `policy_hook` 은 거짓이다. 소유 기록과 지금 manifest 의 같음 판정은 `tools` 를 보지 않는다. 옛 기록을 가진 연결이 끊기지 않고, 다시 보낸 설치가 덮어쓴다.
+연결 확인과 관리자 반영 완료는 설치를 다시 보낸 뒤에 `policy_hook` 을 읽는다. 옛 판의 `fos-ctx` 를 가진 연결은 연결 확인 한 번으로 새 판이 되고 재시작 대기가 된다.
 Control Plane 은 `policy_hook` 이 참이 아니면 그 연결을 `READY` 로 두지 않는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없는 칸은 거짓으로 읽는다.
 이 확인은 확인한 시점의 파일만 본다. 그 뒤 누가 설정을 바꾸면 다음 연결 확인 때 안다.
 
@@ -389,11 +393,14 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 - 실행 요청이 시간 안에 답하지 않았거나 연결이 끊겼으면 `UNKNOWN` 이다
 - `grant` 는 `approval: required` 인 도구에만 받는다. `always` 이거나 `tool_name` 이 빈 줄이면 `VALIDATION_FAILED` 다. `TODAY` 는 서버 시간대의 그날 끝까지다
 - 같은 실행에서 같은 도구와 같은 `args_sha256` 의 `PENDING` 이 이미 있으면 새 줄을 만들지 않고 그 번호를 돌려준다
+- 사건은 줄을 커밋한 뒤에 낸다. 화면이 사건을 받고 읽었을 때 줄이 있어야 한다
 - 대화에는 `approval` 사건을 낸다. 화면은 그 사건을 받으면 승인 줄을 다시 읽는다. 승인 카드는 이 응답으로만 그린다
 - 결과가 `SUCCEEDED`, `FAILED`, `UNKNOWN` 이면 그 대화에 알림 줄을 남기고 자동 turn 을 열어 결과를 전한다. 위임 결과와 같은 잠금과 같은 연속 상한을 쓴다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md))
 - 거절과 만료는 알림 줄만 남긴다. 자동 turn 을 열지 않는다
 - 만료 정리는 1분마다 돈다. 서버가 다시 뜨면 `EXECUTING` 을 `UNKNOWN` 으로 바꾼다
-- 연결을 해제하면 그 연결의 `PENDING` 을 모두 `REJECTED` 로 바꾸고 상시 허락을 거둔다
+- 연결을 해제하거나 값을 다시 등록하면 그 연결의 `PENDING` 을 모두 `REJECTED` 로 바꾸고 상시 허락을 거둔다. 다른 계정으로 바꾼 뒤 앞선 계정에 한 승인이 실행되지 않게 한다
+- 승인할 때 정책을 다시 읽는다. 그 도구가 선언에서 빠졌거나 `DESTRUCTIVE`, `FINANCIAL` 이 됐거나 카탈로그를 읽지 못하면 실행하지 않고 `REJECTED` 로 둔다
+- 같은 인자의 `PENDING` 이 있어 새 줄을 만들지 않은 호출은 줄이 따로 남지 않는다
 - 사용자가 turn 을 중지해도 `PENDING` 은 남는다
 
 **`POST /api/connectors/{id}/execute`** 는 대시보드 plugin 의 실행 경로다.

@@ -68,6 +68,13 @@
 | 토큰 없이 | 401 |
 | 도구가 `isError` 로 답 | 200 `{"ok": false, "error": <공통 어휘>}` |
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- `call` 은 자식을 띄우기 전에 `_mcp_sdk_problem()` 으로 `mcp` SDK 가 지원 범위인지 본다. `execute` 도 같은 자리에서 보고, 범위 밖이면 `{"ok": false, "error": "unavailable"}` 로 답한다(실행되지 않았다)
+- `hermes/README.md` 의 대시보드 경로 표에 `POST /api/connectors/<id>/execute` 한 줄을, 커넥터 절에 「Control Plane 이 승인한 호출만 부른다. 대시보드는 승인 여부를 다시 확인하지 않는다」 를 더한다
+
 ## 검증
 
 ```bash

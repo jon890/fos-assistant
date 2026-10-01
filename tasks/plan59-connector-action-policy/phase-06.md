@@ -81,6 +81,12 @@ export type ConnectorTool = { name: string; title: string | null; risk: ToolRisk
 
 web API 가 `tools` 를 주지 않은 응답(옛 모양)에도 화면이 깨지지 않는지 `tools` 없는 데이터로 한 번 본다. 이때 `connector-tools-empty` 가 보인다.
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- `ConnectorAdminPanel` 에서 `READY` 이면서 `undeclaredTools > 0` 인 줄의 상태 글은 `connectionStatusLabel` 이 내는 `연결됨` 이다. 그 줄에는 단추를 두지 않는다. 지금 코드는 `PENDING` 이 아니면 다른 글을 보이므로 조건을 `restartRequired`, `PENDING`, 그 밖의 셋으로 나눈다
+
 ## 검증
 
 브라우저 검사는 한 번에 하나만 돈다. 돌리기 전에 코디네이터가 준 대기 스크립트를 먼저 실행한다(경로는 실행 지시가 준다).

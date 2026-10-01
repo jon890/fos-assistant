@@ -109,6 +109,21 @@ e2e 의 Control Plane 이 깨우기를 켜고 뜨는지 `test/e2e/run.ts` 의 �
 - `docs/flow.md` 의 「위임 결과가 도착했을 때」 에 승인 결과가 같은 turn 에 실린다는 한 줄을 더한다
 - `docs/adr/ADR-040-*.md` 는 고치지 않는다. 넓힌 결정은 ADR-048 이 갖는다
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- **방향은 `connector → chat` 하나다. `chat` 은 `connector` 를 import 하지 않는다.** 위 작업 항목 2, 3 의 배치를 아래로 바꾼다
+  - `chat/application/AutoTurnResultSource.java`(신규, 인터페이스): `List<AutoTurnResult> undelivered(Long conversationId)`, `void markDelivered(List<String> keys, Instant now)`, `List<Long> conversationsWithUndelivered()`
+  - `chat/application/model/AutoTurnResult.java`(신규): `record AutoTurnResult(String key, String notice, String input)`. `notice` 는 알림 줄 글, `input` 은 Hermes 입력에 넣을 단락이다
+  - `chat/application/ConversationNotices.java`(신규, `@Service`): `void post(Long conversationId, String text)`. `ChatMessage.fromSystem` 을 저장하고 `ChatEvent.system` 을 hub 에 낸다. 대화가 없거나 지워졌으면 아무것도 하지 않는다
+  - `DelegationWakeService` 와 `ChatService` 는 `List<AutoTurnResultSource>` 를 주입받는다. 구현이 하나도 없어도 돈다. 위임 결과가 없어도 source 의 결과가 있으면 깨운다. `wakeAfterStartup` 은 source 들의 `conversationsWithUndelivered()` 도 훑는다
+  - `connector/application/ConnectorActionResultSource.java`(신규, `@Component`, `AutoTurnResultSource` 구현): `SUCCEEDED`, `FAILED`, `UNKNOWN` 이고 전하지 않은 승인 줄을 낸다. `key` 는 `actionId` 의 글이다. `notice` 와 `input` 의 글은 위 작업 항목의 표와 단락 모양을 그대로 쓴다. 결과가 여럿일 때 하나로 줄이는 것은 하지 않는다. 줄마다 알림 줄 하나다
+  - `connector/application/ConnectorActionListener.java`(신규, `@Component`. `chat` 이 아니라 `connector` 에 둔다): `ConnectorActionChanged` 를 받아 `ConversationEventHub.publish(conversationId, ChatEvent.approval(...))`, 거절과 만료의 알림 줄은 `ConversationNotices.post` 뒤 `markDelivered`, 끝으로 `DelegationWakeService.tryWake(conversationId)`. `approval` 사건의 대화 공개 식별자는 `ConversationLookup` 에 `Optional<UUID> publicIdOf(Long conversationId)` 를 더해 읽는다
+- **알림 줄은 여럿이다.** `TurnIntent.DelegationResults` 를 `DelegationResults(List<Long> executionIds, List<String> notices, List<AutoTurnDelivery> deliveries)` 로 바꾼다. `chat/application/model/AutoTurnDelivery.java`(신규): `record AutoTurnDelivery(AutoTurnResultSource source, List<String> keys)`. `saveQuestion` 은 `notices` 마다 알림 줄을 저장하고 사건을 내고, 같은 트랜잭션에서 `delivery.source().markDelivered(delivery.keys(), now)` 를 부른다. 위임 결과가 없으면 위임 알림 줄을 만들지 않는다
+- e2e 의 Control Plane 은 깨우기를 켠 채 뜬다(`application.yml` 기본값). 자동 turn 단언을 그대로 둔다
+- 테스트 표의 「결과 여럿 → `승인한 동작 N개의 결과가 도착했어요`」 는 뺀다. 줄마다 알림 줄 하나다
+
 ## 검증
 
 ```bash
@@ -129,7 +144,13 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/ConnectorActionResult.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/infra/ConnectorActionRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/ConnectorActionListener.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionListener.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionResultSource.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/AutoTurnResultSource.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ConversationNotices.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ConversationLookup.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/model/AutoTurnResult.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/model/AutoTurnDelivery.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatEvent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/DelegationWakeService.java` | 수정 |

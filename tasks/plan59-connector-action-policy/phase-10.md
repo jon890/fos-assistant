@@ -125,6 +125,12 @@ export type ConnectorGrant = { grantId: number; connectorId: string; toolName: s
 - `docs/code-architecture.md` 의 「web 화면 구조」 의 디렉터리 설명에 `approval-card`, `approval-list`, `connector-grants` 를 더한다
 - `docs/flow.md` 의 「승인이 필요한 호출」 에 화면 상태 한 줄씩(카드가 어디 뜨는지, 승인한 뒤 무엇이 보이는지)을 더한다
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- `docs/prd.md` 에 더하는 줄의 둘째 칸은 `승인이 필요한 도구를 에이전트가 불러도 그 서비스에 요청이 가지 않고, 승인하면 승인한 인자 그대로 한 번만 실행된다` 까지다. 같은 인자의 `PENDING` 이 있어 새 줄을 만들지 않은 호출은 줄이 남지 않으므로 「호출마다 판정이 남는다」 를 적지 않는다
+
 ## 검증
 
 브라우저 검사는 한 번에 하나만 돈다. 돌리기 전에 코디네이터가 준 대기 스크립트를 먼저 실행한다(경로는 실행 지시가 준다).

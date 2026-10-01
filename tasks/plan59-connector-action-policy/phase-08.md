@@ -169,6 +169,17 @@ void rejectPendingFor(ConnectorConnection connection, Instant now);
 
 `docs/connectors.md` 의 「승인」 절 첫머리에 있는 「이 절의 동작은 승인 엔진이 들어올 때 켜진다.」 로 시작하는 세 줄을 지운다. `docs/data-schema.md` 의 「승인 엔진이 켜지기 전에는」 줄과 「승인 엔진과 함께 들어온다」 문장, `docs/flow.md` 의 「승인 엔진 전에는 allow, 뒤에는」 을 지금 동작으로 고친다. 그 밖에 구현이 문서와 다르면 멈추고 보고한다.
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- **`connector` 가 `chat` 을 부른다. 반대는 없다.** 대화 공개 식별자를 내부 번호로 푸는 일은 `chat/application/ConversationLookup.java`(신규, `@Service`)에 `Long requireOwnedId(CurrentUser user, UUID conversationId)` 로 둔다. `ConversationRepository.findByPublicIdAndUserIdAndDeletedAtIsNull` 을 쓰고, 없으면 기존 대화 경로가 내는 것과 같은 오류를 낸다. `ConnectorActionController` 는 이 서비스를 부른다
+- **사건은 커밋한 뒤에 낸다.** `ConnectorActionChanged` 는 `TransactionTemplate.execute` 가 돌아온 뒤에 `publishEvent` 한다. `@Transactional` 메서드 안에서 내야 하면 `TransactionSynchronizationManager.registerSynchronization` 의 `afterCommit` 을 쓴다
+- 결과 글의 상한은 상수가 아니다. `orchestration/application/DelegationProperties.outputMaxChars()` 를 주입받아 쓴다
+- **값을 다시 등록할 때도 정리한다.** `ConnectorConnectionService.apply` 가 `beginRegister` 하는 자리에서 `rejectPendingFor(connection, now)` 를 부른다. 다른 계정으로 바꾼 뒤 앞선 계정에 한 승인이 실행되지 않게 한다. 테스트 한 줄을 더한다
+- **승인할 때 정책을 다시 읽는다.** `approve` 의 트랜잭션 1 에서 `ConnectorCatalogCache.find` 로 manifest 를 읽어 `ToolPolicyDecision.decide(...)` 를 `granted: false` 로 다시 돌린다. 결과가 `DENIED` 이거나 카탈로그를 읽지 못하면 `reject` 하고 커밋한 뒤 `CONNECTOR_ACTION_NOT_PENDING` 이다. 테스트 두 줄을 더한다(도구가 선언에서 빠짐, 위험도가 `DESTRUCTIVE` 로 바뀜)
+- phase 04 가 컨트롤러와 요청 검증을 `connector` 에 뒀다. 끝단 테스트는 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java` 다
+
 ## 검증
 
 ```bash
@@ -213,7 +224,8 @@ scripts/check-public-safe.sh
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionControllerTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/GrantPeriodTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/mcp/ConnectorPolicyEndpointTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ConversationLookup.java` | 신규 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/connector-policy.ts` | 수정 |
 | `docs/connectors.md` | 수정 |

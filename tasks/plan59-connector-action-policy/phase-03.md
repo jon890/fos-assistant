@@ -119,6 +119,25 @@ Control Plane 이 카탈로그의 `schema` 와 `tools` 를 읽어 하한을 다�
 
 `undeclared_tools` 줄이 구현과 같은지 본다. 다르면 멈추고 보고한다.
 
+## 검토 반영
+
+**이 절이 위의 내용과 다르면 이 절을 따른다.**
+
+- 이 서비스는 그 뒤 바뀌었다. `usable` 은 `resyncedUsable(connection)` 이 됐고 설치를 먼저 다시 보낸 뒤 `readConnector` 의 `configured` 와 probe 를 본다. Control Plane 은 도구 목록을 쓰지 않는다. 지금 코드를 읽고 그 위에 더한다
+- `policyHook` 을 설치를 다시 보내기 **전에** 판정하지 않는다. `check` 와 `confirmApplied` 의 첫 `readState` 결과로 거르지 않는다. `resyncedUsable` 안에서 `putConnector` 뒤에 다시 읽은 `ConnectorState` 가 `configured` 이고 `policyHook` 이어야 한다. 옛 판의 `fos-ctx` 를 가진 연결이 연결 확인 한 번으로 고쳐져야 하기 때문이다
+- `HermesConnectorClient.putConnector` 의 반환을 `InstallResult(boolean restartRequired, boolean pluginUpdated)` record 로 바꾼다. `plugin_updated` 가 없는 응답은 false 다. 부르는 곳 셋(`apply`, `disconnect`, `resyncedUsable`)을 맞춘다
+  - `apply`: `markRestartRequired(result.restartRequired() || result.pluginUpdated())`
+  - `resyncedUsable`: `pluginUpdated` 가 참이면 `connection.markRestartRequired(true)` 를 하고 false 를 돌려준다. `restartRequired` 는 지금처럼 쓰지 않는다
+- V41 은 칸을 더한 뒤 기존 연결을 내린다. 순서대로 쓴다
+  1. `ALTER TABLE connector_connection ADD COLUMN undeclared_tools INT NOT NULL DEFAULT 0;`
+  2. `READY` 인 연결의 에이전트를 끄고 사진 받기를 내린다. `agent` 표의 칸 이름은 `agent/domain/Agent.java` 와 `ConnectorConnection.pending(Instant)` 이 하는 일을 읽고 맞춘다
+  3. `UPDATE connector_connection SET status = 'PENDING', restart_required = TRUE WHERE status = 'READY';`
+  - H2 의 MySQL 모드와 MySQL 에서 함께 도는 SQL 만 쓴다. 자기 표를 하위 질의로 읽는 `UPDATE` 가 MySQL 에서 막히지 않게 2번은 `agent` 를 고치고 하위 질의가 `connector_connection` 을 읽는 모양으로 쓴다
+  - 파일 첫머리 주석에 까닭(옛 판의 hook 을 가진 연결은 판정 없이 호출이 나간다)과 되돌리는 방법(연결 확인, gateway 재시작, 관리자 반영 완료)을 적는다
+  - `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyMigrationTest.java`(신규): `ConnectorConnectionMigrationTest` 의 방식으로 V40 까지 올리고 `READY`, `PENDING`, `DISCONNECTED` 연결을 넣은 뒤 V41 을 올린다. `READY` 였던 줄만 `PENDING` 과 재시작 대기가 되고 그 에이전트만 꺼진다
+- 대역 `test/e2e/fake-hermes.ts`: 설치(`PUT /api/connectors`, `enabled: true`)가 그 profile 의 `policy_hook` 을 참으로 되돌린다. `setPolicyHook(profile, false)` 는 「설치해도 고쳐지지 않는 상태」 로 둔다(`setPolicyHook(profile, true)` 가 풀 때까지). 설치 응답에 `plugin_updated: false` 를 더한다
+- 서비스 테스트를 더한다: (1) 설치 뒤 읽은 상태의 `policyHook` 이 거짓이면 `PENDING` 이고 probe 를 부르지 않는다. (2) `putConnector` 가 `pluginUpdated` 참을 돌려주면 `PENDING` 과 `restartRequired` 참이다. (3) 그 뒤 `confirmApplied` 에서 `pluginUpdated` 가 거짓이면 `READY` 다
+
 ## 검증
 
 ```bash
@@ -156,6 +175,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/resources/db/migration/V41__connector_undeclared_tools.sql` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorToolPoliciesTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyMigrationTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionControllerTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
