@@ -38,7 +38,7 @@ public class MemoryController {
     @GetMapping
     public List<MemoryView> readable() {
         CurrentUser user = currentUser.require();
-        Set<Long> omitted = Set.copyOf(context.assemble(user).omittedMemoryIds());
+        Set<Long> omitted = Set.copyOf(context.assembleForOwner(user).omittedMemoryIds());
         return memories.readableBy(user).stream()
                 .map(memory -> MemoryView.from(memory, omitted.contains(memory.id())))
                 .toList();

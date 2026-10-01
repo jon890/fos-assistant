@@ -19,6 +19,8 @@ public enum ErrorCode {
     PENDING_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
     MESSAGE_NOT_LATEST(HttpStatus.CONFLICT),
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
+    /** 민감 항목을 항상 싣게 하려 했다. 항상 층은 받는 에이전트를 가려 실을 수 없다. */
+    MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),

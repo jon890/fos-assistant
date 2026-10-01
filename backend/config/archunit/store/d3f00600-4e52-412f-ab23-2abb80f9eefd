@@ -1,4 +1,3 @@
 Method <com.bifos.assistant.context.AssembledContext.instructionsHash()> calls method <java.security.MessageDigest.getInstance(java.lang.String)> in (AssembledContext.java:59)
 Method <com.bifos.assistant.mcp.application.AgentTokenService.hash(java.lang.String)> calls method <java.security.MessageDigest.getInstance(java.lang.String)> in (AgentTokenService.java:88)
-Method <com.bifos.assistant.memory.application.MemoryService.proposalDedupKey(java.lang.Long, java.lang.String, java.lang.String)> calls method <java.security.MessageDigest.getInstance(java.lang.String)> in (MemoryService.java:148)
 Method <com.bifos.assistant.usage.domain.DelegationKey.of(java.lang.String, java.lang.String, java.lang.String, java.lang.String)> calls method <java.security.MessageDigest.getInstance(java.lang.String)> in (DelegationKey.java:48)

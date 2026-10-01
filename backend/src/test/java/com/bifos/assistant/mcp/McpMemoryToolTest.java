@@ -6,13 +6,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.infra.AgentTokenAuthenticationFilter;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -89,6 +92,9 @@ class McpMemoryToolTest {
     AgentExecutionRepository executions;
 
     @Autowired
+    AgentRepository agents;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     @Autowired
@@ -117,7 +123,7 @@ class McpMemoryToolTest {
         kid = users.save(AppUser.of("kid@example.com", "아이", 1L, UserRole.MEMBER));
         dadToken = tokens.issue(PROFILE, "dad").rawToken();
         dadRoot = McpCallSigner.newRoot();
-        dadRun = McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
+        dadRun = McpCallSigner.running(executions, agents, dad.id(), 1L, PROFILE, dadRoot);
     }
 
     @Test
@@ -171,6 +177,32 @@ class McpMemoryToolTest {
         JsonNode unauthorized = body(call(dadToken, hidden.id(), null));
         JsonNode missing = body(call(dadToken, 999999L, null));
         assertThat(unauthorized.path("result")).isEqualTo(missing.path("result"));
+    }
+
+    @Test
+    @DisplayName("에이전트가 받지 않는 collection 과 허용받지 않은 민감 항목은 없는 항목과 같은 응답이다")
+    void itemsOutsideTheAgentsCollectionsLookLikeMissingItems() throws Exception {
+        Memory career = memories.create(
+                current(dad), MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        Memory sensitive = memories.create(
+                current(dad), MemoryScope.USER, "신원", "민감 본문", "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+        Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
+        Memory core = memories.create(current(dad), MemoryScope.USER, "기본", "기본 본문", false);
+
+        JsonNode missing = body(call(dadToken, 999999L, null));
+        assertThat(missing.path("result").path("isError").asBoolean()).isTrue();
+        for (Memory unreadable : List.of(career, sensitive, hidden)) {
+            HttpResponse<String> response = call(dadToken, unreadable.id(), null);
+            assertThat(body(response).path("result")).isEqualTo(missing.path("result"));
+            assertThat(response.body()).doesNotContain("커리어 본문", "민감 본문", "아이 본문");
+        }
+        assertThat(body(call(dadToken, core.id(), null))
+                        .path("result")
+                        .path("content")
+                        .get(0)
+                        .path("text")
+                        .asString())
+                .isEqualTo("기본 본문");
     }
 
     @Test

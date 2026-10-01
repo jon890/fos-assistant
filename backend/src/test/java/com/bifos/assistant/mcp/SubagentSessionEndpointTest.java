@@ -2,11 +2,12 @@ package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -77,6 +78,9 @@ class SubagentSessionEndpointTest {
     AgentExecutionRepository executions;
 
     @Autowired
+    AgentRepository agents;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     private final HttpClient client = HttpClient.newHttpClient();
@@ -100,8 +104,8 @@ class SubagentSessionEndpointTest {
         tokens.issue(PROFILE_B, "b");
         rootA = McpCallSigner.newRoot();
         rootB = McpCallSigner.newRoot();
-        dadRun = McpCallSigner.running(executions, dad.id(), 1L, PROFILE_A, rootA);
-        McpCallSigner.running(executions, kid.id(), 2L, PROFILE_B, rootB);
+        dadRun = McpCallSigner.running(executions, agents, dad.id(), 1L, PROFILE_A, rootA);
+        McpCallSigner.running(executions, agents, kid.id(), 2L, PROFILE_B, rootB);
     }
 
     @Test
@@ -137,7 +141,7 @@ class SubagentSessionEndpointTest {
         String child = newChild();
         register(tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
         String otherRoot = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, kid.id(), 3L, PROFILE_A, otherRoot);
+        McpCallSigner.running(executions, agents, kid.id(), 3L, PROFILE_A, otherRoot);
 
         HttpResponse<String> response = register(
                 tokenA,

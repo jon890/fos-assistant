@@ -2,9 +2,16 @@ package com.bifos.assistant.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.UserRole;
@@ -23,6 +30,7 @@ class ContextAssemblerTest {
 
     private static final CurrentUser ADMIN = user(1L, 10L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = user(2L, 10L, UserRole.MEMBER);
+    private static final String AGENT_CODE = "context-assembler-test";
 
     @Autowired
     ContextAssembler assembler;
@@ -33,9 +41,26 @@ class ContextAssemblerTest {
     @Autowired
     MemoryRepository repository;
 
+    @Autowired
+    AgentRepository agents;
+
+    /** core collection 을 받는 보통 에이전트의 번호다. 저장하면 core 가 딸려 온다(ADR-052). */
+    private Long agentId;
+
     @BeforeEach
     void setUp() {
         repository.deleteAll();
+        agentId = agents.findByCode(AGENT_CODE)
+                .orElseGet(() -> agents.save(Agent.of(
+                        AGENT_CODE,
+                        "조립 검사",
+                        AGENT_CODE,
+                        "http://runtime.test/p/" + AGENT_CODE,
+                        CostMode.API,
+                        CredentialScope.DEDICATED,
+                        AgentVisibility.GROUP,
+                        null)))
+                .id();
     }
 
     @Test
@@ -68,7 +93,7 @@ class ContextAssemblerTest {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", true);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions())
                 .contains("# 우리 그룹이 함께 아는 것", "그룹 내용", "# 지금 묻는 사람에 대해 아는 것", "개인 내용")
@@ -82,7 +107,7 @@ class ContextAssemblerTest {
         memories.create(ADMIN, MemoryScope.USER, "아빠 제목", "아빠만 아는 내용", true);
         memories.proposeUser(MEMBER, "제안 제목", "승인 전 내용", 1L);
 
-        AssembledContext result = assembler.assemble(MEMBER);
+        AssembledContext result = assembler.assemble(MEMBER, agentId);
 
         assertThat(result.instructions()).isNull();
         assertThat(result.chars()).isZero();
@@ -91,7 +116,7 @@ class ContextAssemblerTest {
     @Test
     @DisplayName("넣을 항목이 없으면 null과 0을 낸다")
     void returnsNullAndZeroWhenNothingToInsert() {
-        assertThat(assembler.assemble(ADMIN)).isEqualTo(AssembledContext.empty());
+        assertThat(assembler.assemble(ADMIN, agentId)).isEqualTo(AssembledContext.empty());
     }
 
     @Test
@@ -99,7 +124,7 @@ class ContextAssemblerTest {
     void insertsOnlyTitlesOfLayerWhenOnlyOneLayerExists() {
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", true);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions())
                 .contains("# 지금 묻는 사람에 대해 아는 것", "개인 내용")
@@ -113,7 +138,7 @@ class ContextAssemblerTest {
         Memory second = memories.create(ADMIN, MemoryScope.GROUP, "둘째", "나".repeat(5_000), true);
         Memory third = memories.create(ADMIN, MemoryScope.GROUP, "셋째", "짧은 내용", true);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions())
                 .contains(first.content(), third.content())
@@ -129,7 +154,7 @@ class ContextAssemblerTest {
         Memory shortOne = memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
         Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인만 하는 제목", "색인 본문", false);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions())
                 .isNotNull()
@@ -145,7 +170,7 @@ class ContextAssemblerTest {
         memories.create(ADMIN, MemoryScope.GROUP, "거의 상한", "가".repeat(7_960), true);
         Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인 제목", "색인 본문", false);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions()).isNotNull().contains("# 더 물어볼 수 있는 것", "[" + indexed.id() + "] 색인 제목");
         assertThat(result.chars()).isLessThanOrEqualTo(8_000);
@@ -157,7 +182,7 @@ class ContextAssemblerTest {
         Memory body = memories.create(ADMIN, MemoryScope.GROUP, "본문", "가".repeat(7_000), true);
         Memory indexed = memories.create(ADMIN, MemoryScope.USER, "색인 제목", "색인 본문", false);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions()).contains(body.content(), "[" + indexed.id() + "] 색인 제목");
         assertThat(result.omittedItems()).isZero();
@@ -169,7 +194,7 @@ class ContextAssemblerTest {
         memories.create(ADMIN, MemoryScope.GROUP, "첫째", "가".repeat(9_000), true);
         memories.create(ADMIN, MemoryScope.USER, "둘째", "나".repeat(9_000), true);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions()).isNull();
         assertThat(result.chars()).isZero();
@@ -182,7 +207,7 @@ class ContextAssemblerTest {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", false);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.omittedItems()).isZero();
         assertThat(result.omittedMemoryIds()).isEmpty();
@@ -194,11 +219,61 @@ class ContextAssemblerTest {
         Memory first = memories.create(ADMIN, MemoryScope.USER, "먼저 저장", "본문", false);
         Memory second = memories.create(ADMIN, MemoryScope.GROUP, "나중 저장", "본문", false);
 
-        AssembledContext result = assembler.assemble(ADMIN);
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
 
         assertThat(result.instructions())
                 .contains("# 더 물어볼 수 있는 것", "[" + first.id() + "] 먼저 저장", "[" + second.id() + "] 나중 저장")
                 .containsSubsequence("[" + first.id() + "] 먼저 저장", "[" + second.id() + "] 나중 저장");
+    }
+
+    @Test
+    @DisplayName("커넥터 에이전트와 모르는 에이전트와 에이전트가 없는 실행은 Memory 를 하나도 받지 않는다")
+    void connectorAndUnknownAgentsReceiveNoMemory() {
+        memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
+        memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", false);
+        Agent connector = Agent.of(
+                "context-connector-" + System.nanoTime(),
+                "연결",
+                "context-connector-" + System.nanoTime(),
+                "http://runtime.test/p/connector",
+                CostMode.API,
+                CredentialScope.DEDICATED,
+                AgentVisibility.PRIVATE,
+                ADMIN.id());
+        connector.markConnectorManaged();
+        Long connectorId = agents.save(connector).id();
+
+        assertThat(assembler.assemble(ADMIN, connectorId)).isEqualTo(AssembledContext.empty());
+        assertThat(assembler.assemble(ADMIN, 9_999_999L)).isEqualTo(AssembledContext.empty());
+        assertThat(assembler.assemble(ADMIN, null)).isEqualTo(AssembledContext.empty());
+        assertThat(assembler.assemble(ADMIN, agentId).instructions()).contains("그룹 내용", "개인 제목");
+    }
+
+    @Test
+    @DisplayName("에이전트가 받지 않는 collection 의 항목은 본문도 제목도 싣지 않는다")
+    void leavesOutItemsOfCollectionsTheAgentDoesNotReceive() {
+        memories.create(ADMIN, MemoryScope.USER, "기본 제목", "기본 내용", true);
+        memories.create(
+                ADMIN, MemoryScope.USER, "커리어 항상", "커리어 내용", "career", MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
+        memories.create(
+                ADMIN, MemoryScope.USER, "커리어 색인", "커리어 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions())
+                .contains("기본 내용")
+                .doesNotContain("커리어 내용", "커리어 색인", "커리어 본문");
+        assertThat(result.omittedMemoryIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("사용자가 자기 목록을 볼 때의 조립은 collection 을 거르지 않는다")
+    void ownerViewDoesNotFilterCollections() {
+        memories.create(
+                ADMIN, MemoryScope.USER, "커리어 색인", "커리어 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+
+        assertThat(assembler.assembleForOwner(ADMIN).instructions()).contains("커리어 색인");
+        assertThat(assembler.assembleForOwner(MEMBER)).isEqualTo(AssembledContext.empty());
     }
 
     private static CurrentUser user(Long id, Long groupId, UserRole role) {

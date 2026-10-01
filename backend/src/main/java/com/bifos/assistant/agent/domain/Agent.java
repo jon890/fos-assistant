@@ -8,11 +8,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.AfterDomainEventPublication;
+import org.springframework.data.domain.DomainEvents;
 
 @Entity
 @Table(name = "agent")
@@ -96,6 +100,10 @@ public class Agent {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    /** 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다. */
+    @Transient
+    private boolean created;
+
     private Agent(
             String code,
             String name,
@@ -115,6 +123,22 @@ public class Agent {
         this.ownerUserId = ownerUserId;
         this.enabled = true;
         this.createdAt = Instant.now();
+        this.created = true;
+    }
+
+    /**
+     * 처음 저장할 때 {@link AgentCreated} 를 한 번 낸다. 저장소의 저장이 끝난 직후 Spring Data 가 읽는다.
+     *
+     * <p>사건을 받는 쪽이 번호를 쓰므로 저장이 끝나 번호가 정해진 뒤에 나가야 한다.
+     */
+    @DomainEvents
+    List<AgentCreated> createdEvents() {
+        return created ? List.of(new AgentCreated(this)) : List.of();
+    }
+
+    @AfterDomainEventPublication
+    void clearCreatedEvents() {
+        created = false;
     }
 
     public static Agent of(

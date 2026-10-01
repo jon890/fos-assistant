@@ -18,7 +18,7 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.ChildExecutionRunner;
 import com.bifos.assistant.orchestration.domain.ChildResult;

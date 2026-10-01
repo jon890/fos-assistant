@@ -101,9 +101,6 @@
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]application[\\/]MemoryProposer\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]application[\\/]MemoryProposer\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]application[\\/]MemoryProposer\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]domain[\\/]Memory\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]domain[\\/]Memory\.java$"/>
-  <suppress id="entityHandwrittenAccessor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]domain[\\/]Memory\.java$"/>
   <suppress checks="(^|\.)UnusedImports(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]presentation[\\/]MemoryController\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]memory[\\/]presentation[\\/]MemoryDtos\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]orchestration[\\/]application[\\/]AgentDelegationService\.java$"/>

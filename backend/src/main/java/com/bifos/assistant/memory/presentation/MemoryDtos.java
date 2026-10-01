@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
