@@ -39,7 +39,7 @@ API 와 저장 계약은 [커넥터 연결](connectors.md)이 갖는다.
 ## 커넥터 도구를 부를 때
 
 연결용 에이전트의 모델이 커넥터 MCP 도구를 부르면 `fos-ctx` hook 이 Control Plane 에 묻는다.
-근거는 [ADR-047](adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 이고 계약은 [커넥터 연결](connectors.md)의 「도구 호출 판정」 이 갖는다.
+근거는 [ADR-048](adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 이고 계약은 [커넥터 연결](connectors.md)의 「도구 호출 판정」 이 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -81,7 +81,7 @@ sequenceDiagram
 
 ## 승인이 필요한 호출
 
-승인 엔진이 들어온 뒤의 흐름이다. 근거는 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+승인 엔진이 들어온 뒤의 흐름이다. 근거는 [ADR-049](adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 ```mermaid
 sequenceDiagram

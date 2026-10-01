@@ -9,7 +9,7 @@ PR 둘로 나눠 올린다.
 
 **실행 순서는 01~06, 11, 07~10 이다.** phase 11 은 PR 1 에 들어가므로 06 뒤에 돌린다.
 
-결정은 `docs/adr/ADR-047-*.md`, `docs/adr/ADR-048-*.md`, 계약은 `docs/connectors.md` 의 「도구 정책」 과 「승인」 에 있다.
+결정은 `docs/adr/ADR-048-*.md`, `docs/adr/ADR-049-*.md`, 계약은 `docs/connectors.md` 의 「도구 정책」 과 「승인」 에 있다.
 
 ## 모든 phase 에 걸리는 규칙
 

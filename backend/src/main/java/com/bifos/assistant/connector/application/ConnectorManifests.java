@@ -20,7 +20,7 @@ final class ConnectorManifests {
      * manifest 로 열 수 없는 내장 toolset 을 선언한 커넥터와 도구 정책이 하한보다 느슨한 커넥터는 받지 않는다.
      *
      * <p>대시보드가 같은 검사를 먼저 한다. 여기서 한 번 더 보는 것은 셸이나 파일 도구가 대시보드의 결함으로 넘어와도
-     * 연결용 에이전트에 켜지지 않게 하고(ADR-044), 느슨한 정책으로 호출을 판정하지 않기 위해서다(ADR-047).
+     * 연결용 에이전트에 켜지지 않게 하고(ADR-044), 느슨한 정책으로 호출을 판정하지 않기 위해서다(ADR-048).
      */
     static boolean accepted(ConnectorManifest manifest) {
         if (!AgentToolPolicy.allowedForConnector(manifest.toolsets())

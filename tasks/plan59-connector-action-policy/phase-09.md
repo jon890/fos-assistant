@@ -19,7 +19,7 @@ ADR-040 의 깨우기를 승인 결과로 넓힌다.
 - 레이어 규칙: `chat → connector` 간선이 순환을 만들지 않는지 `./gradlew archTest` 로 본다. `connector` 는 `chat` 을 import 하지 않는다
 - 테스트 본보기는 `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeServiceTest.java`(`@SpringBootTest(properties = "assistant.delegation-wake.enabled=true")`, `@Import(ChatServiceTest.StubRuntime.class)`)다
 
-**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/flow.md` 의 「승인이 필요한 호출」 과 「위임 결과가 도착했을 때」, `docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md`, `docs/adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
+**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/flow.md` 의 「승인이 필요한 호출」 과 「위임 결과가 도착했을 때」, `docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md`, `docs/adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
 
 ## 의도 메모
 
@@ -107,7 +107,7 @@ e2e 의 Control Plane 이 깨우기를 켜고 뜨는지 `test/e2e/run.ts` 의 �
 
 - `docs/code-architecture.md` 의 「위임 결과로 부모 대화를 깨우기」 절에 승인 결과를 함께 전한다는 것과 `ConnectorActionListener` 를 더한다. 「화면으로 보내는 사건」 절의 사건 표에 `approval` 을 더한다
 - `docs/flow.md` 의 「위임 결과가 도착했을 때」 에 승인 결과가 같은 turn 에 실린다는 한 줄을 더한다
-- `docs/adr/ADR-040-*.md` 는 고치지 않는다. 넓힌 결정은 ADR-048 이 갖는다
+- `docs/adr/ADR-040-*.md` 는 고치지 않는다. 넓힌 결정은 ADR-049 이 갖는다
 
 ## 검토 반영
 

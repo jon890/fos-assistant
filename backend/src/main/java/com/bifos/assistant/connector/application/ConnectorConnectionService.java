@@ -336,7 +336,7 @@ public class ConnectorConnectionService {
      * <p>다시 보내는 설치는 그 profile 의 hook plugin 도 지금 판으로 바꾼다. 파일이 바뀌었으면 떠 있는 gateway 가
      * 옛 코드를 쥐고 있을 수 있으므로 재시작 대기로 두고 쓸 수 없는 것으로 본다. 정책 hook 이 켜져 있는지는 다시
      * 보낸 뒤에 읽은 설치 상태로만 판정한다. 그 앞에 읽은 상태로 거르면 옛 판의 hook 을 가진 연결이 설치를 다시
-     * 받지 못한다(ADR-047). probe 가 낸 도구 가운데 manifest 가 선언하지 않은 수는 연결에 적기만 하고 쓸 수 있는지에
+     * 받지 못한다(ADR-048). probe 가 낸 도구 가운데 manifest 가 선언하지 않은 수는 연결에 적기만 하고 쓸 수 있는지에
      * 넣지 않는다. 그 도구의 호출만 거절된다.
      *
      * <p>manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 선언한 toolset 이 실제로 켜졌을 때만 참으로 둔다.
@@ -418,7 +418,7 @@ public class ConnectorConnectionService {
      * 커넥터는 없는 것으로 본다.
      *
      * <p>대시보드가 같은 검사를 먼저 한다. 여기서 한 번 더 보는 것은 셸이나 파일 도구가 대시보드의 결함으로
-     * 넘어와도 연결용 에이전트에 켜지지 않게 하고(ADR-044), 느슨한 정책으로 호출을 판정하지 않기 위해서다(ADR-047).
+     * 넘어와도 연결용 에이전트에 켜지지 않게 하고(ADR-044), 느슨한 정책으로 호출을 판정하지 않기 위해서다(ADR-048).
      */
     private List<ConnectorManifest> readCatalog() {
         final List<ConnectorManifest> manifests;

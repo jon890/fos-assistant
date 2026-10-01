@@ -3,7 +3,7 @@ package com.bifos.assistant.connector.domain;
 import com.bifos.assistant.shared.util.Sha256;
 
 /**
- * 같은 도구 호출의 판정을 두 번 남기지 않게 하는 키다. {@code connector_action.dedupe_key} 에 적는다(ADR-047).
+ * 같은 도구 호출의 판정을 두 번 남기지 않게 하는 키다. {@code connector_action.dedupe_key} 에 적는다(ADR-048).
  *
  * <p>hook 의 요청이 늦게 닿거나 다시 와도 같은 키가 나와 줄이 하나만 남는다. 첫 줄이 위임 키의 {@code v1} 과 달라
  * 두 키는 서로 겹치지 않는다.

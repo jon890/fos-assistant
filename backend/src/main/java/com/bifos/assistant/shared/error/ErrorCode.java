@@ -107,7 +107,7 @@ public enum ErrorCode {
      * 커넥터 도구 호출의 판정 요청을 믿을 수 없다.
      *
      * <p>본문의 모양과 서명 중 무엇이 틀렸는지 밖에 알리지 않는다. 이유는 서버 로그에만 남긴다. hook 은 이 답을 받으면
-     * 그 호출을 막는다. 근거는 ADR-047 이다.
+     * 그 호출을 막는다. 근거는 ADR-048 이다.
      */
     CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN),
     /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */

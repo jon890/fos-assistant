@@ -19,7 +19,7 @@
 - e2e 대역 `test/e2e/fake-hermes.ts` 는 run 안의 MCP 호출을 흉내 낼 때 Control Plane 을 직접 부른다(`writeArtifactViaMcp`, `registerSubagent`). 입력 글자가 분기를 고른다(`specialOutputFor`). profile 의 env 는 `profileEnv(name)` 로 읽는다. 서명 도우미는 `test/e2e/mcp-context.ts` 다
 - e2e 시나리오는 `test/e2e/scenarios/` 에 하나씩 두고 `test/e2e/run.ts` 의 `SCENARIOS` 에 넣는다
 
-**근거 문서**: `docs/connectors.md` 의 「도구 호출 판정」, `docs/hermes/connector-policy.md` 의 「막히는 것과 통과하는 것」, 「제한 시간」, `docs/adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
+**근거 문서**: `docs/connectors.md` 의 「도구 호출 판정」, `docs/hermes/connector-policy.md` 의 「막히는 것과 통과하는 것」, 「제한 시간」, `docs/adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
 
 ## 의도 메모
 

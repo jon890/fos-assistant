@@ -18,7 +18,7 @@
 - 브라우저 검사의 본보기: `test/browser/chat-delegation-wake.spec.ts`(`routeEvents` 로 SSE 를 대역), `test/browser/ask-card.spec.ts`
 - `web/AGENTS.md`: 해요체, 인라인 `style` 금지, 내부 용어를 사용자 문구에 쓰지 않는다
 
-**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`, `docs/adr/ADR-009-에이전트의-답은-신뢰하지-않는-글로-그린다.md`
+**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`, `docs/adr/ADR-009-에이전트의-답은-신뢰하지-않는-글로-그린다.md`
 
 ## 의도 메모
 

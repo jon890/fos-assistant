@@ -378,7 +378,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
 
 
 class ConnectorToolPolicyTest(ConnectorGateCase):
-    """`schema: 2` 의 도구 정책을 검증해 카탈로그로 내는 규칙을 검사한다(ADR-047)."""
+    """`schema: 2` 의 도구 정책을 검증해 카탈로그로 내는 규칙을 검사한다(ADR-048)."""
 
     def declare(self, change=lambda tools: None, **extra):
         """시험 커넥터를 `schema: 2` 로 바꾼다. 기준 선언에 `change` 를 입히고 `extra` 를 manifest 에 더한다."""

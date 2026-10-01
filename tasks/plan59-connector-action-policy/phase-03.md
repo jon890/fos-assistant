@@ -60,7 +60,7 @@ Control Plane 이 카탈로그의 `schema` 와 `tools` 를 읽어 하한을 다�
 - `check` 와 `confirmApplied` 에서 `state.policyHook()` 이 거짓이면 `usable` 을 부르지 않고 `pending` 이다. `desiredEnabled` 가 참인 갈래에만 건다. 해제 확인 갈래는 그대로 둔다
 - `usable(connection)` 안에서 probe 뒤에 `schema == 2` 이면 `probe.tools()` 가운데 manifest `tools` 에 이름이 없는 수를 세어 `connection.recordUndeclaredTools(count)` 로 적는다. `schema == 1` 이면 0 이다
 - `ConnectorConnection` 에 `@Column(name = "undeclared_tools", nullable = false) private int undeclaredTools` 와 `recordUndeclaredTools(int)` 를 더한다. `disconnected`, `confirmDisconnected`, `beginRegister` 는 0 으로 되돌린다
-- `backend/src/main/resources/db/migration/V41__connector_undeclared_tools.sql`: `ALTER TABLE connector_connection ADD COLUMN undeclared_tools INT NOT NULL DEFAULT 0;` 첫머리에 한국어 주석으로 목적과 ADR-047 을 적는다
+- `backend/src/main/resources/db/migration/V41__connector_undeclared_tools.sql`: `ALTER TABLE connector_connection ADD COLUMN undeclared_tools INT NOT NULL DEFAULT 0;` 첫머리에 한국어 주석으로 목적과 ADR-048 을 적는다
 
 ### 5. 응답
 

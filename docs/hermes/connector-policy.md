@@ -2,7 +2,7 @@
 
 `pre_tool_call` hook 으로 MCP 도구 호출을 막을 때 Hermes 가 지키는 것과 지키지 않는 것이다.
 2026-10-01 에 `v2026.9.24`(제품 판 `0.21.5`)의 소스를 읽고, 격리한 환경에서 stdio 대역 MCP 서버로 실행해 확인했다.
-이 계약 위에 세운 결정은 [ADR-047](../adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-048](../adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다.
+이 계약 위에 세운 결정은 [ADR-048](../adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-049](../adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다.
 
 실제 모델 turn, native `delegate_task` 의 전체 왕복, 공유 gateway 의 전체 HTTP 왕복은 실행하지 않았다. 그 셋은 소스로만 확인했다.
 

@@ -16,7 +16,7 @@ Control Plane 이 판정할 정책의 출처가 있어야 하기 때문이다.
 - 테스트는 `hermes/tests/test_connector_manifest.py` 의 `ConnectorGateCase` 를 쓴다. `rewrite(name, change)` 로 fixture 의 JSON 을 고치고 `catalog()` 로 읽는다. `ConnectorCatalogTest` 가 카탈로그 항목의 키 집합을 정확히 단언한다
 - fixture 는 `hermes/tests/fixtures/demo-connector/` 다. `server.py` 의 도구는 `list_scopes`, `env_view`(둘 다 읽기 전용), `write_note` 다
 
-**근거 문서**: `docs/connectors.md` 의 「도구 정책」, `docs/adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`, `docs/hermes/connector-policy.md` 의 「MCP 도구의 등록 이름」
+**근거 문서**: `docs/connectors.md` 의 「도구 정책」, `docs/adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`, `docs/hermes/connector-policy.md` 의 「MCP 도구의 등록 이름」
 
 ## 의도 메모
 

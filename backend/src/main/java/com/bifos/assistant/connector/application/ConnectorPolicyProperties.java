@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 커넥터 도구 호출 판정의 설정이다(ADR-047).
+ * 커넥터 도구 호출 판정의 설정이다(ADR-048).
  *
  * @param catalogTtl 판정이 쓰는 카탈로그를 메모리에 두는 시간
  * @param catalogFailureTtl 카탈로그 읽기 실패를 기억하는 시간. 그동안은 대시보드를 다시 부르지 않고 거절한다

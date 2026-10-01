@@ -19,7 +19,7 @@
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
 
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
-- V41 은 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내리고 그 연결용 에이전트를 끄고 사진 받기도 내렸다. 그 profile 의 `fos-ctx` 가 옛 판이라 도구 호출이 판정 없이 나가기 때문이다([ADR-047](adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다
+- V41 은 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내리고 그 연결용 에이전트를 끄고 사진 받기도 내렸다. 그 profile 의 `fos-ctx` 가 옛 판이라 도구 호출이 판정 없이 나가기 때문이다([ADR-048](adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
@@ -42,7 +42,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 ## connector_action
 
-커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다. 근거는 [ADR-047](adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다. 근거는 [ADR-048](adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-049](adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |

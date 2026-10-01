@@ -20,7 +20,7 @@
 - 컨트롤러와 DTO 관례: `connector/presentation/ConnectorConnectionController.java`, `ConnectionDtos.java`. 로그인 사용자는 기존 컨트롤러가 `CurrentUser` 를 얻는 방식을 따른다
 - 대화 공개 식별자로 대화를 찾는 것은 `chat/infra/ConversationRepository.findByPublicIdAndUserIdAndDeletedAtIsNull(UUID, Long)` 다. `connector` 가 `chat` 을 import 하면 순환이 생기는지 `./gradlew archTest` 로 본다. 생기면 대화 번호를 푸는 일을 `chat` 쪽 컨트롤러에 두고 `connector` 서비스는 내부 번호를 받는다
 
-**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/data-schema.md` 의 「connector_action」, 「connector_tool_grant」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
+**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/data-schema.md` 의 「connector_action」, 「connector_tool_grant」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
 
 ## 의도 메모
 

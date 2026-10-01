@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * 도구 호출 판정이 쓰는 카탈로그를 잠시 메모리에 둔다(ADR-047).
+ * 도구 호출 판정이 쓰는 카탈로그를 잠시 메모리에 둔다(ADR-048).
  *
  * <p>판정은 도구 호출마다 오므로 그때마다 대시보드를 읽지 않는다. 화면 경로는 이 값을 쓰지 않고 요청마다 다시 읽는다.
  * 운영자가 목록을 바꾼 것이 화면에는 바로 보여야 하기 때문이다. 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는

@@ -21,7 +21,7 @@ hook 이 부를 `POST /internal/hermes/connector-policy` 를 만든다. Control 
 - 끝단 테스트의 본보기는 `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionEndpointTest.java`(실제 HTTP, `AgentTokenService.issue(...).rawToken()`)와 서명 도우미 `mcp/McpCallSigner.java` 다
 - phase 03 이 `ToolRisk`, `ToolApproval`, `ToolPolicy`, `ConnectorToolPolicies`, `ConnectorManifest.schema()`, `ConnectorManifest.tools()` 를 만들었다
 
-**근거 문서**: `docs/connectors.md` 의 「도구 호출 판정」, `docs/data-schema.md` 의 「connector_action」, `docs/flow.md` 의 「커넥터 도구를 부를 때」, `docs/code-architecture.md` 의 `connector` 클래스 표, `docs/adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
+**근거 문서**: `docs/connectors.md` 의 「도구 호출 판정」, `docs/data-schema.md` 의 「connector_action」, `docs/flow.md` 의 「커넥터 도구를 부를 때」, `docs/code-architecture.md` 의 `connector` 클래스 표, `docs/adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md`
 
 ## 의도 메모
 
@@ -126,7 +126,7 @@ public ConnectorPolicyAnswer decide(
 
 ### 5. 요청 검증과 컨트롤러 (`mcp`)
 
-`ErrorCode` 에 `CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN)` 를 Javadoc(뜻과 ADR-047)과 함께 더한다.
+`ErrorCode` 에 `CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN)` 를 Javadoc(뜻과 ADR-048)과 함께 더한다.
 
 `mcp/application/ConnectorPolicyRequest.java`:
 

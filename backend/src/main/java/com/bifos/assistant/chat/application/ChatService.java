@@ -188,7 +188,7 @@ public class ChatService {
      * 머리줄에 더한다.
      *
      * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 {@code <external-data>} 로 감싸 지시가 아니라고 알린다.
-     * 에이전트 행이 없는 결과도 출처를 모르므로 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다(ADR-047).
+     * 에이전트 행이 없는 결과도 출처를 모르므로 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다(ADR-048).
      */
     private static String delegationInput(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
         StringBuilder input = new StringBuilder("맡긴 일의 결과가 도착했다.");

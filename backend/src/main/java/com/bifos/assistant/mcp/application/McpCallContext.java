@@ -88,7 +88,7 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
 
     /**
      * key 는 토큰 해시 문자열의 UTF-8 바이트다. 하위 에이전트 등록 서명도 같은 key 와 계산을 쓴다.
-     * 커넥터 정책 요청({@code connector} 패키지)도 같은 key 를 쓴다(ADR-047).
+     * 커넥터 정책 요청({@code connector} 패키지)도 같은 key 를 쓴다(ADR-048).
      */
     public static byte[] hmac(String tokenHash, String text) {
         try {

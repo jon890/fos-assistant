@@ -70,7 +70,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
 계약은 [커넥터 연결](connectors.md)에 있다.
 
-`connector` 는 커넥터 도구 호출의 판정과 그 기록도 소유한다([ADR-047](adr/ADR-047-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
+`connector` 는 커넥터 도구 호출의 판정과 그 기록도 소유한다([ADR-048](adr/ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
 
 | 클래스 | 하는 일 |
 | --- | --- |
