@@ -194,8 +194,6 @@
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]AgentPersonaControllerTest\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]AgentToolServiceTest\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]agent[\\/]StarterSuggestionServiceTest\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]architecture[\\/]ArchitectureRules\.java$"/>
-  <suppress id="privateEmptyConstructor" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]architecture[\\/]ArchitectureRules\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>
   <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]ArtifactSourceFetcherTest\.java$"/>

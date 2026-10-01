@@ -1,6 +1,7 @@
 package com.bifos.assistant.architecture;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleName;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -19,13 +20,20 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
+import java.lang.annotation.Annotation;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Optional;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -34,7 +42,12 @@ import org.springframework.validation.annotation.Validated;
  * <p>규칙의 {@code as(...)} 설명이 기준 파일의 열쇠다. 설명을 바꾸면 그 규칙을 다시 얼린다.
  * 기준 파일을 갱신하는 방법은 {@code backend/AGENTS.md} 의 「구조 규칙」 절에 있다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ArchitectureRules {
+
+    /** Spring 의 {@code Transactional} 을 import 하므로 Jakarta 쪽은 이 상수에서만 전체 이름으로 쓴다. */
+    private static final Class<? extends Annotation> JAKARTA_TRANSACTIONAL =
+            jakarta.transaction.Transactional.class; // 전체 이름 허용: Spring 과 Jakarta 의 Transactional 이름이 같다
 
     /**
      * 최상위 패키지 사이의 간선이 순환에 속하지 않는다. {@code shared} 는 그래프에서 뺀다.
@@ -56,19 +69,8 @@ public final class ArchitectureRules {
             .that()
             .resideInAPackage("com.bifos.assistant.shared..")
             .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage(
-                    "com.bifos.assistant.agent..",
-                    "com.bifos.assistant.chat..",
-                    "com.bifos.assistant.context..",
-                    "com.bifos.assistant.hermes..",
-                    "com.bifos.assistant.mcp..",
-                    "com.bifos.assistant.memory..",
-                    "com.bifos.assistant.orchestration..",
-                    "com.bifos.assistant.people..",
-                    "com.bifos.assistant.skill..",
-                    "com.bifos.assistant.usage..",
-                    "com.bifos.assistant.user..")
+            .dependOnClassesThat(resideInAPackage("com.bifos.assistant.(*)..")
+                    .and(resideOutsideOfPackage("com.bifos.assistant.shared..")))
             .as("shared 는 다른 최상위 패키지에 의존하지 않는다");
 
     /**
@@ -206,11 +208,11 @@ public final class ArchitectureRules {
      */
     public static final ArchRule TEST_METHODS_HAVE_DISPLAY_NAME = methods()
             .that()
-            .areAnnotatedWith(org.junit.jupiter.api.Test.class)
+            .areAnnotatedWith(Test.class)
             .or()
-            .areAnnotatedWith(org.junit.jupiter.params.ParameterizedTest.class)
+            .areAnnotatedWith(ParameterizedTest.class)
             .should()
-            .beAnnotatedWith(org.junit.jupiter.api.DisplayName.class)
+            .beAnnotatedWith(DisplayName.class)
             .as("테스트 메서드에는 DisplayName 이 붙는다");
 
     /**
@@ -224,24 +226,24 @@ public final class ArchitectureRules {
                     .that()
                     .resideOutsideOfPackage("..application..")
                     .should()
-                    .beAnnotatedWith(org.springframework.transaction.annotation.Transactional.class))
+                    .beAnnotatedWith(Transactional.class))
             .and(noClasses()
                     .that()
                     .resideOutsideOfPackage("..application..")
                     .should()
-                    .beAnnotatedWith(jakarta.transaction.Transactional.class))
+                    .beAnnotatedWith(JAKARTA_TRANSACTIONAL))
             .and(noMethods()
                     .that()
                     .areDeclaredInClassesThat()
                     .resideOutsideOfPackage("..application..")
                     .should()
-                    .beAnnotatedWith(org.springframework.transaction.annotation.Transactional.class))
+                    .beAnnotatedWith(Transactional.class))
             .and(noMethods()
                     .that()
                     .areDeclaredInClassesThat()
                     .resideOutsideOfPackage("..application..")
                     .should()
-                    .beAnnotatedWith(jakarta.transaction.Transactional.class))
+                    .beAnnotatedWith(JAKARTA_TRANSACTIONAL))
             .as("Transactional 은 application 안에서만 쓴다");
 
     /**
@@ -328,8 +330,6 @@ public final class ArchitectureRules {
             .resideInAnyPackage("..application..", "..infra..", "..presentation..")
             .allowEmptyShould(true)
             .as("domain.type 은 위 층에 의존하지 않는다");
-
-    private ArchitectureRules() {}
 
     private static DescribedPredicate<JavaClass> enclosedByServiceOrInfra() {
         return new DescribedPredicate<>("바깥 클래스가 서비스이거나 infra 안에 있다") {

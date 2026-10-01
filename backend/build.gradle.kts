@@ -225,7 +225,8 @@ val rewriteChangedRestore = tasks.register("rewriteChangedRestore") {
 }
 
 /**
- * rewriteChanged 로 부를 때만 rewriteRun 이 파일을 바꾸기 직전에 범위를 정하고 파일을 떠 둔다.
+ * rewriteRun 을 직접 부르면 저장소 전체를 바꾸므로 파일을 바꾸기 전에 거절한다.
+ * rewriteChanged 로 부르면 rewriteRun 이 파일을 바꾸기 직전에 범위를 정하고 파일을 떠 둔다.
  * 범위는 HEAD 와 origin/main 의 공통 조상에서 작업 트리까지 바뀐 Java 파일과 추적하지 않는 새 Java 파일이다.
  * 작업 트리와 비교하므로 커밋하지 않은 편집이 있는 파일도 범위에 든다.
  * 범위 안 파일이 없으면 rewriteRun 의 나머지 동작을 건너뛴다.
@@ -234,7 +235,7 @@ rewriteRunTask {
     finalizedBy(rewriteChangedRestore)
     doFirst {
         if (!gradle.taskGraph.hasTask(":rewriteChanged")) {
-            return@doFirst
+            throw GradleException("rewriteRun 은 저장소 전체를 바꾸므로 직접 부르지 않는다. rewriteChanged 를 쓴다.")
         }
         val base = gitLines("merge-base", "HEAD", "origin/main").single()
         val changed = gitLines("diff", "--name-only", "--relative", base) +
