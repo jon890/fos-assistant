@@ -97,7 +97,8 @@ public class DelegationWakeService {
      * 닫기 리스너가 곧바로 다시 불러 끝없이 돈다. 거른 결과는 실행 줄에 그대로 남는다.
      */
     public void tryWake(Long conversationId) {
-        if (!properties.enabled() || executions.findUndeliveredResults(conversationId).isEmpty()) {
+        if (!properties.enabled()
+                || executions.findUndeliveredResults(conversationId).isEmpty()) {
             return;
         }
         if (inFailureBackoff(conversationId)) {
@@ -109,7 +110,9 @@ public class DelegationWakeService {
         }
         Conversation conversation = found.get();
         Optional<Agent> agent = agents.findById(conversation.agentId());
-        if (agent.isEmpty() || agent.get().isDeleted() || !agent.get().enabled()
+        if (agent.isEmpty()
+                || agent.get().isDeleted()
+                || !agent.get().enabled()
                 || flows.find(agent.get().flow()) != null) {
             return;
         }

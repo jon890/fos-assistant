@@ -40,8 +40,7 @@ public class PendingMessageController {
     public PendingQueueView enqueue(
             @PathVariable UUID conversationId, @Valid @RequestBody PendingMessageRequest request) {
         CurrentUser user = currentUser.require();
-        return PendingQueueView.from(
-                pending.enqueue(user, access.requireOwnId(user, conversationId), request.text()));
+        return PendingQueueView.from(pending.enqueue(user, access.requireOwnId(user, conversationId), request.text()));
     }
 
     @DeleteMapping("/{pendingId}")

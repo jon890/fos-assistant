@@ -233,7 +233,9 @@ class PendingMessageServiceTest {
 
         assertThat(stub().received()).hasSize(1);
         assertThat(stub().received().getFirst().input()).endsWith("남길 글").doesNotContain("취소할 글");
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()).getFirst().content())
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())
+                        .getFirst()
+                        .content())
                 .isEqualTo("남길 글");
         assertThatCode(() -> pending.cancel(dad, conversation.id(), cancelledId), ErrorCode.PENDING_MESSAGE_NOT_FOUND);
     }
@@ -302,7 +304,9 @@ class PendingMessageServiceTest {
                 .containsExactly(true);
         assertThat(pending.queue(dad, conversation.id()).held()).isTrue();
         assertThat(stub().received()).as("중지 뒤에 새 turn 이 열리지 않았다").hasSize(1);
-        assertThat(pendingEventsBeforeClose.get()).as("turn 이 닫히기 전에 받은 pending 사건").isEqualTo(1L);
+        assertThat(pendingEventsBeforeClose.get())
+                .as("turn 이 닫히기 전에 받은 pending 사건")
+                .isEqualTo(1L);
         assertThat(pendingEventsIn(received))
                 .as("중지로 닫힐 때 대기 줄이 멈췄다는 pending 사건이 하나 더 온다")
                 .isEqualTo(2L);
@@ -442,8 +446,8 @@ class PendingMessageServiceTest {
     void rejectsQueueingOnFlowAgentConversation() {
         Agent flowAgent = agent("flowed", "흐름", dad.id());
         flowAgent.assignFlow(ResearchAndBuildFlow.NAME);
-        Conversation flowed =
-                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", agents.save(flowAgent).id()));
+        Conversation flowed = conversations.save(
+                Conversation.startedBy(dad.id(), "흐름 대화", agents.save(flowAgent).id()));
 
         assertThatCode(() -> pending.enqueue(dad, flowed.id(), "글"), ErrorCode.CONVERSATION_BUSY);
 
@@ -478,7 +482,8 @@ class PendingMessageServiceTest {
         assertThat(rowsOf(heldConversation))
                 .extracting(ChatPendingMessage::content)
                 .containsExactly("멈춘 글");
-        assertThat(messages.findByConversationIdOrderByIdAsc(heldConversation.id())).isEmpty();
+        assertThat(messages.findByConversationIdOrderByIdAsc(heldConversation.id()))
+                .isEmpty();
     }
 
     @Test
@@ -581,7 +586,9 @@ class PendingMessageServiceTest {
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {
-        awaitUntil("대화 " + conversationId + " 의 turn 종료", () -> !turns.markOf(conversationId).running());
+        awaitUntil(
+                "대화 " + conversationId + " 의 turn 종료",
+                () -> !turns.markOf(conversationId).running());
     }
 
     private static void awaitUntil(String what, BooleanSupplier condition) {

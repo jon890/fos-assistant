@@ -6,12 +6,10 @@ import java.util.List;
 /** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, 맡긴 일의 결과를 전하는 자동 turn 인지. */
 public sealed interface TurnIntent {
 
-    String REGENERATE_INSTRUCTION =
-            "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.";
+    String REGENERATE_INSTRUCTION = "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.";
 
     String DELEGATION_RESULTS_INSTRUCTION =
-            "맡긴 일의 결과가 도착했다. 결과를 사용자에게 정리해 전하고, 이어서 할 일이 있으면 진행한다. "
-                    + "아직 끝나지 않은 맡긴 일은 기다리지 말고 답을 마친다.";
+            "맡긴 일의 결과가 도착했다. 결과를 사용자에게 정리해 전하고, 이어서 할 일이 있으면 진행한다. " + "아직 끝나지 않은 맡긴 일은 기다리지 말고 답을 마친다.";
 
     /** @param pendingIds 이 turn 이 합쳐 보내는 대기 메시지들. 사용자가 바로 보낸 turn 은 비어 있다 */
     record Fresh(List<Long> pendingIds) implements TurnIntent {

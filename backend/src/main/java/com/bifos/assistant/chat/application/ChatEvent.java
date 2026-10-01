@@ -44,19 +44,56 @@ public record ChatEvent(
     public static final String COMPLETED = "completed";
 
     public static ChatEvent delta(String text) {
-        return new ChatEvent("delta", text, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "delta", text, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null);
     }
 
     /** 이 turn 의 실행 줄이 만들어졌다. 흐름이면 뿌리 실행의 번호다. */
     public static ChatEvent started(UUID conversationId, Long executionId) {
-        return new ChatEvent("started", null, null, null, conversationId, null, executionId, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "started",
+                null,
+                null,
+                null,
+                conversationId,
+                null,
+                executionId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     public static ChatEvent tool(String toolName, String detail, String phase, Long durationMs, Boolean failed) {
-        return new ChatEvent("tool", null, toolName, detail, null, null, null, null, null, null, null,
-                phase, durationMs, failed, null, null, null, null, null);
+        return new ChatEvent(
+                "tool",
+                null,
+                toolName,
+                detail,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                phase,
+                durationMs,
+                failed,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /**
@@ -69,21 +106,64 @@ public record ChatEvent(
         if (!"tool".equals(type) || ToolDetailPolicy.visibleTo(viewer, toolName)) {
             return this;
         }
-        return new ChatEvent(type, text, toolName, null, conversationId, messageId, executionId, code, message,
-                stepName, stepState, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens);
+        return new ChatEvent(
+                type,
+                text,
+                toolName,
+                null,
+                conversationId,
+                messageId,
+                executionId,
+                code,
+                message,
+                stepName,
+                stepState,
+                phase,
+                durationMs,
+                failed,
+                subagentId,
+                goal,
+                model,
+                inputTokens,
+                outputTokens);
     }
 
-    public static ChatEvent subagent(String subagentId, String goal, String model, String phase,
-            Long inputTokens, Long outputTokens, Long durationMs, Boolean failed) {
-        return new ChatEvent("subagent", null, null, null, null, null, null, null, null, null, null,
-                phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens);
+    public static ChatEvent subagent(
+            String subagentId,
+            String goal,
+            String model,
+            String phase,
+            Long inputTokens,
+            Long outputTokens,
+            Long durationMs,
+            Boolean failed) {
+        return new ChatEvent(
+                "subagent",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                phase,
+                durationMs,
+                failed,
+                subagentId,
+                goal,
+                model,
+                inputTokens,
+                outputTokens);
     }
 
     /** 흐름의 한 단계가 시작되거나 끝났다. */
     public static ChatEvent step(String stepName, String state) {
         return new ChatEvent(
-                "step", null, null, null, null, null, null, null, null, stepName, state,
-                null, null, null, null, null, null, null, null);
+                "step", null, null, null, null, null, null, null, null, stepName, state, null, null, null, null, null,
+                null, null, null);
     }
 
     /**
@@ -92,8 +172,26 @@ public record ChatEvent(
      * <p>{@code text} 에 넘어간 곳의 provider 와 모델을 적는다. 막힌 쪽의 오류 글은 싣지 않는다.
      */
     public static ChatEvent switched(String label) {
-        return new ChatEvent("switched", label, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "switched",
+                label,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /**
@@ -102,20 +200,55 @@ public record ChatEvent(
      * <p>실패한 시도의 조각이 화면에 남으면 읽는 사람이 그것을 답으로 읽는다.
      */
     public static ChatEvent reset() {
-        return new ChatEvent("reset", null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "reset", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null);
     }
 
     public static ChatEvent done(UUID conversationId, Long messageId, Long executionId) {
         return new ChatEvent(
-                "done", null, null, null, conversationId, messageId, executionId, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                "done",
+                null,
+                null,
+                null,
+                conversationId,
+                messageId,
+                executionId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     public static ChatEvent stopped(UUID conversationId, Long messageId, Long executionId) {
         return new ChatEvent(
-                "stopped", null, null, null, conversationId, messageId, executionId, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                "stopped",
+                null,
+                null,
+                null,
+                conversationId,
+                messageId,
+                executionId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /**
@@ -125,8 +258,26 @@ public record ChatEvent(
      * @param content 알림 줄의 글
      */
     public static ChatEvent system(UUID conversationId, Long messageId, String content) {
-        return new ChatEvent("system", content, null, null, conversationId, messageId, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "system",
+                content,
+                null,
+                null,
+                conversationId,
+                messageId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /**
@@ -136,18 +287,55 @@ public record ChatEvent(
      * @param content 합친 글
      */
     public static ChatEvent user(UUID conversationId, Long messageId, String content) {
-        return new ChatEvent("user", content, null, null, conversationId, messageId, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "user",
+                content,
+                null,
+                null,
+                conversationId,
+                messageId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     /** 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. */
     public static ChatEvent pending(UUID conversationId) {
-        return new ChatEvent("pending", null, null, null, conversationId, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "pending",
+                null,
+                null,
+                null,
+                conversationId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     public static ChatEvent error(String code, String message) {
-        return new ChatEvent("error", null, null, null, null, null, null, code, message, null, null,
-                null, null, null, null, null, null, null, null);
+        return new ChatEvent(
+                "error", null, null, null, null, null, null, code, message, null, null, null, null, null, null, null,
+                null, null, null);
     }
 }

@@ -56,7 +56,9 @@ class ChatPendingMessageMigrationTest {
         assertThat(nullableByColumn.keySet())
                 .as("chat_pending_message 의 칸")
                 .containsExactlyInAnyOrder("ID", "CONVERSATION_ID", "USER_ID", "CONTENT", "HELD", "CREATED_AT");
-        assertThat(nullableByColumn.values()).as("칸마다 NULL 허용 여부 %s", nullableByColumn).containsOnly("NO");
+        assertThat(nullableByColumn.values())
+                .as("칸마다 NULL 허용 여부 %s", nullableByColumn)
+                .containsOnly("NO");
         assertThat(heldDefault).as("held 의 기본값").isEqualToIgnoringCase("FALSE");
     }
 
@@ -96,8 +98,7 @@ class ChatPendingMessageMigrationTest {
             assertThatThrownBy(() -> statement.executeUpdate("""
                             INSERT INTO chat_pending_message (conversation_id, user_id, content, created_at)
                             VALUES (1, 1, NULL, TIMESTAMP '2026-01-01 00:00:00')
-                            """))
-                    .isInstanceOf(SQLException.class);
+                            """)).isInstanceOf(SQLException.class);
 
             try (ResultSet count = statement.executeQuery("SELECT COUNT(*) FROM chat_pending_message")) {
                 assertThat(count.next()).isTrue();

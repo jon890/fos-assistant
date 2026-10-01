@@ -96,8 +96,8 @@ class ChatPendingMessageRepositoryTest {
     @DisplayName("한 행만 멈춰 있어도 그 대화는 보낼 대화에서 빠진다")
     void excludesConversationWhenOnlyOneRowIsHeld() {
         queue(CONVERSATION, "첫째");
-        transactions.executeWithoutResult(status ->
-                pendingMessages.save(ChatPendingMessage.queued(CONVERSATION, USER, "멈춘 글", true, NOW)));
+        transactions.executeWithoutResult(
+                status -> pendingMessages.save(ChatPendingMessage.queued(CONVERSATION, USER, "멈춘 글", true, NOW)));
 
         assertThat(readyToSend()).isEmpty();
     }

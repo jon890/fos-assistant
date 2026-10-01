@@ -189,7 +189,8 @@ class ChatStopTest {
 
         ChatTurn turn = chat.send(dad, null, "멈춰 줘", "dad");
 
-        Long conversationId = executions.findById(turn.executionId()).orElseThrow().conversationId();
+        Long conversationId =
+                executions.findById(turn.executionId()).orElseThrow().conversationId();
         assertThat(closed)
                 .filteredOn(it -> it.conversationId().equals(conversationId))
                 .singleElement()
@@ -207,7 +208,8 @@ class ChatStopTest {
 
         ChatTurn turn = chat.send(dad, null, "완료해 줘", "dad");
 
-        Long conversationId = executions.findById(turn.executionId()).orElseThrow().conversationId();
+        Long conversationId =
+                executions.findById(turn.executionId()).orElseThrow().conversationId();
         assertThat(closed)
                 .filteredOn(it -> it.conversationId().equals(conversationId))
                 .singleElement()

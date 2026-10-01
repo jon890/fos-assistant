@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import jakarta.annotation.PreDestroy;
 import java.io.Closeable;
 import java.time.Duration;
 import java.util.List;
@@ -17,7 +18,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +36,8 @@ public class TurnCancellation {
     private final Duration streamGrace;
     private final List<Consumer<TurnClosed>> closeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    public TurnCancellation(HermesRunsClient hermes,
-            @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
+    public TurnCancellation(
+            HermesRunsClient hermes, @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
         this.hermes = hermes;
         this.streamGrace = streamGrace;
     }
@@ -143,10 +143,13 @@ public class TurnCancellation {
     /** Hermes 중지 요청이 모두 받아들여진 뒤에만 실행 경로가 취소로 분기한다. */
     public void confirmStop(TurnHandle handle) {
         if (!handle.cancelled.get() || !handle.stopConfirmed.compareAndSet(false, true)) return;
-        handle.closeTask = scheduler.schedule(() -> {
-            handle.streamGraceExpired.complete(null);
-            Thread.startVirtualThread(() -> closeStream(handle));
-        }, streamGrace.toMillis(), TimeUnit.MILLISECONDS);
+        handle.closeTask = scheduler.schedule(
+                () -> {
+                    handle.streamGraceExpired.complete(null);
+                    Thread.startVirtualThread(() -> closeStream(handle));
+                },
+                streamGrace.toMillis(),
+                TimeUnit.MILLISECONDS);
     }
 
     /** 중지 요청은 시작됐지만 Hermes 가 아직 받아들이지 않았는지 본다. */
@@ -165,7 +168,10 @@ public class TurnCancellation {
         if (handle == null) return true;
         RunRef run;
         synchronized (handle.runs) {
-            run = handle.runs.stream().filter(it -> it.runId.equals(runId)).findFirst().orElse(null);
+            run = handle.runs.stream()
+                    .filter(it -> it.runId.equals(runId))
+                    .findFirst()
+                    .orElse(null);
             if (run == null) {
                 run = new RunRef(apiBaseUrl, profileName, runId);
                 handle.runs.add(run);
@@ -248,7 +254,11 @@ public class TurnCancellation {
     private void closeStream(TurnHandle handle) {
         Closeable stream = handle.stream;
         if (stream == null) return;
-        try { stream.close(); } catch (Exception ex) { log.warn("중지한 turn 의 스트림을 닫지 못했다", ex); }
+        try {
+            stream.close();
+        } catch (Exception ex) {
+            log.warn("중지한 turn 의 스트림을 닫지 못했다", ex);
+        }
     }
 
     @Getter
@@ -265,9 +275,19 @@ public class TurnCancellation {
         private volatile CompletableFuture<Boolean> firstStop = new CompletableFuture<>();
         private volatile CompletableFuture<Void> streamGraceExpired = new CompletableFuture<>();
         private volatile ScheduledFuture<?> closeTask;
-        private TurnHandle(Long userId, Long conversationId) { this.userId = userId; this.conversationId = conversationId; }
-        public Long userId() { return userId; }
-        public AtomicBoolean cancelled() { return cancelled; }
+
+        private TurnHandle(Long userId, Long conversationId) {
+            this.userId = userId;
+            this.conversationId = conversationId;
+        }
+
+        public Long userId() {
+            return userId;
+        }
+
+        public AtomicBoolean cancelled() {
+            return cancelled;
+        }
     }
 
     @Getter
@@ -276,8 +296,11 @@ public class TurnCancellation {
         private final String profileName;
         private final String runId;
         private final AtomicBoolean stopSent = new AtomicBoolean();
+
         private RunRef(String apiBaseUrl, String profileName, String runId) {
-            this.apiBaseUrl = apiBaseUrl; this.profileName = profileName; this.runId = runId;
+            this.apiBaseUrl = apiBaseUrl;
+            this.profileName = profileName;
+            this.runId = runId;
         }
     }
 }

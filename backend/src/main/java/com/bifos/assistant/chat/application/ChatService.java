@@ -201,10 +201,7 @@ public class ChatService {
      * @param onEvent {@code user}, {@code pending}, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      */
     public void runPendingMessages(
-            CurrentUser owner,
-            Long conversationId,
-            TurnCancellation.TurnHandle handle,
-            Consumer<ChatEvent> onEvent) {
+            CurrentUser owner, Long conversationId, TurnCancellation.TurnHandle handle, Consumer<ChatEvent> onEvent) {
         for (int attempt = 1; ; attempt++) {
             List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
             if (rows.isEmpty() || rows.stream().anyMatch(ChatPendingMessage::held)) {
@@ -215,15 +212,15 @@ public class ChatService {
             if (routed.flow() != null) {
                 // 흐름은 질문을 흐름 안에서 저장해 대기 행 삭제와 한 트랜잭션으로 묶을 수 없다. 더할 때 이미 거르므로
                 // 그 뒤에 흐름이 붙은 경우뿐이다.
-                throw new ApiException(
-                        ErrorCode.CONVERSATION_BUSY, "this conversation does not take queued messages");
+                throw new ApiException(ErrorCode.CONVERSATION_BUSY, "this conversation does not take queued messages");
             }
             List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
             try {
                 ChatTurn turn = runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
-                onEvent.accept(turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+                onEvent.accept(
+                        turn.cancelled()
+                                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
                 return;
             } catch (PendingQueueChangedException ex) {
                 if (attempt >= PENDING_READ_ATTEMPTS) {

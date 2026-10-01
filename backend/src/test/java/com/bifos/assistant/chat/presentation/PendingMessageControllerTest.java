@@ -129,7 +129,8 @@ class PendingMessageControllerTest {
                 .andReturn()
                 .getResponse();
         assertThat(cancelled.getStatus()).isEqualTo(204);
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+                .isEmpty();
     }
 
     @Test
@@ -151,7 +152,8 @@ class PendingMessageControllerTest {
 
         assertThat(response.getStatus()).isEqualTo(400);
         assertThat(bodyOf(response).path("code").asString()).isEqualTo("VALIDATION_FAILED");
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+                .isEmpty();
     }
 
     @Test
@@ -178,7 +180,8 @@ class PendingMessageControllerTest {
         assertThat(added.getStatus()).isEqualTo(404);
         assertThat(bodyOf(added).path("code").asString()).isEqualTo("CONVERSATION_NOT_FOUND");
         assertThat(read.getStatus()).isEqualTo(404);
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+                .isEmpty();
     }
 
     @Test

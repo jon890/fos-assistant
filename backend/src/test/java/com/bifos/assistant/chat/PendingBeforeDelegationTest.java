@@ -3,8 +3,8 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -194,7 +194,8 @@ class PendingBeforeDelegationTest {
         assertThat(history.get(2).content()).isEqualTo("조사원 에이전트의 결과가 도착했어요");
         assertThat(stub().received()).hasSize(2);
         assertThat(stub().received().getFirst().input()).endsWith("대기 글");
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+                .isEmpty();
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
                 .as("전했다는 표시")
                 .isNotNull();
@@ -323,7 +324,9 @@ class PendingBeforeDelegationTest {
     private void awaitMessages(int count) {
         awaitUntil(
                 "메시지 " + count + "개",
-                () -> messages.findByConversationIdOrderByIdAsc(conversation.id()).size() >= count);
+                () -> messages.findByConversationIdOrderByIdAsc(conversation.id())
+                                .size()
+                        >= count);
     }
 
     private void awaitAllIdle() {
@@ -332,7 +335,9 @@ class PendingBeforeDelegationTest {
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {
-        awaitUntil("대화 " + conversationId + " 의 turn 종료", () -> !turns.markOf(conversationId).running());
+        awaitUntil(
+                "대화 " + conversationId + " 의 turn 종료",
+                () -> !turns.markOf(conversationId).running());
     }
 
     private static void awaitUntil(String what, BooleanSupplier condition) {
