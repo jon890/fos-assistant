@@ -8,7 +8,7 @@ import com.bifos.assistant.connector.domain.type.ToolRisk;
 import java.util.Optional;
 
 /**
- * 커넥터 도구 호출 하나의 판정이다(ADR-048).
+ * 커넥터 도구 호출 하나의 판정이다(ADR-049).
  *
  * <p>판정은 DB 와 Hermes 를 모르는 {@link #decide} 하나가 한다. 순서는 {@code docs/connectors.md} 의 「도구 호출
  * 판정」 표와 같다. 모델이 준 인자의 내용과 서버의 {@code readOnlyHint} 는 판정에 들어가지 않는다.

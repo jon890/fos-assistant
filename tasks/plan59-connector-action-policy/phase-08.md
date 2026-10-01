@@ -21,7 +21,7 @@
 - 컨트롤러와 DTO 관례: `connector/presentation/ConnectorConnectionController.java`, `ConnectionDtos.java`. 로그인 사용자는 기존 컨트롤러가 `CurrentUser` 를 얻는 방식을 따른다
 - 대화 공개 식별자로 대화를 찾는 것은 `chat/infra/ConversationRepository.findByPublicIdAndUserIdAndDeletedAtIsNull(UUID, Long)` 다. `connector` 가 `chat` 을 import 하면 순환이 생기는지 `./gradlew archTest` 로 본다. 생기면 대화 번호를 푸는 일을 `chat` 쪽 컨트롤러에 두고 `connector` 서비스는 내부 번호를 받는다
 
-**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/data-schema.md` 의 「connector_action」, 「connector_tool_grant」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
+**근거 문서**: `docs/connectors.md` 의 「승인」, `docs/data-schema.md` 의 「connector_action」, 「connector_tool_grant」, `docs/flow.md` 의 「승인이 필요한 호출」, `docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md`
 
 ## 의도 메모
 
@@ -59,7 +59,7 @@
 
 ### 2. 상시 허락
 
-`connector/domain/ConnectorToolGrant.java` 와 `backend/src/main/resources/db/migration/V44__connector_tool_grant.sql`. 칸은 `docs/data-schema.md` 의 「connector_tool_grant」 와 같다. 색인 `idx_connector_tool_grant_lookup (user_id, connector_id, tool_name)`, 외래 키 `fk_connector_tool_grant_user`.
+`connector/domain/ConnectorToolGrant.java` 와 `backend/src/main/resources/db/migration/V47__connector_tool_grant.sql`. 칸은 `docs/data-schema.md` 의 「connector_tool_grant」 와 같다. 색인 `idx_connector_tool_grant_lookup (user_id, connector_id, tool_name)`, 외래 키 `fk_connector_tool_grant_user`.
 
 `connector/domain/type/GrantPeriod.java`: `HOUR, TODAY, DAYS_30`. `Instant expiresAt(Instant now, ZoneId zone)`. `TODAY` 는 그 시간대의 다음 날 0시다.
 
@@ -221,7 +221,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/hermes/ConnectorExecutionUnknown.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
-| `backend/src/main/resources/db/migration/V44__connector_tool_grant.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V47__connector_tool_grant.sql` | 신규 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionControllerTest.java` | 신규 |

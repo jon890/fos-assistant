@@ -34,7 +34,7 @@ hook 이 예외를 던지면 호출이 막힌다.
 ## 커넥터 정책
 
 profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 그 profile 은 연결용 profile 이다.
-그 profile 에서는 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다(fos-assistant ADR-048).
+그 profile 에서는 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다(fos-assistant ADR-049).
 계약의 정본은 fos-assistant `docs/connectors.md` 의 「도구 호출 판정」 이고, 이 파일은 그 계약을 그대로 따른다.
 
 - 대응 파일이 없으면 이 절의 처리를 하지 않는다. 일반 에이전트의 도구는 건드리지 않는다

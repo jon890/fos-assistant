@@ -230,7 +230,7 @@ public class McpToolService {
      * <p>끝난 결과를 돌려주면 부모가 받은 것으로 적는다. 그 결과를 부모 대화에 다시 전하지 않기 위해서다.
      *
      * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 부모 대화에 전할 때와 같이 {@code <external-data>} 로
-     * 감싼다. 에이전트 행이 없는 실행도 출처를 모르므로 감싼다(ADR-048).
+     * 감싼다. 에이전트 행이 없는 실행도 출처를 모르므로 감싼다(ADR-049).
      */
     public Map<String, Object> agentStatus(McpCaller caller, Long executionId) {
         return delegations

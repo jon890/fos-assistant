@@ -15,7 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V43 가 만든 {@code connector_action} 이 판정 줄을 받고 같은 호출의 둘째 줄을 거절하는지 본다.
+ * V46 이 만든 {@code connector_action} 이 판정 줄을 받고 같은 호출의 둘째 줄을 거절하는지 본다.
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다.
  */
@@ -32,7 +32,7 @@ class ConnectorActionMigrationTest {
         Flyway.configure()
                 .dataSource(url, "sa", "")
                 .locations("classpath:db/migration")
-                .target("43")
+                .target("46")
                 .load()
                 .migrate();
         execute("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)" + " VALUES (" + OWNER
@@ -45,7 +45,7 @@ class ConnectorActionMigrationTest {
     }
 
     @Test
-    @DisplayName("V43는 승인 상태와 인자 원문과 원래 도구 이름이 빈 판정 줄을 받는다")
+    @DisplayName("V46은 승인 상태와 인자 원문과 원래 도구 이름이 빈 판정 줄을 받는다")
     void v42AcceptsDecisionRowWithoutApprovalColumns() throws SQLException {
         execute(row("01", KEY_A, OWNER, OWNER));
 
@@ -65,7 +65,7 @@ class ConnectorActionMigrationTest {
     }
 
     @Test
-    @DisplayName("V43는 dedupe_key 가 겹치는 둘째 줄을 거절한다")
+    @DisplayName("V46은 dedupe_key 가 겹치는 둘째 줄을 거절한다")
     void v42RejectsSecondRowWithSameDedupeKey() throws SQLException {
         execute(row("01", KEY_A, OWNER, OWNER));
 
@@ -74,7 +74,7 @@ class ConnectorActionMigrationTest {
     }
 
     @Test
-    @DisplayName("V43는 public_id 가 겹치는 둘째 줄을 거절한다")
+    @DisplayName("V46은 public_id 가 겹치는 둘째 줄을 거절한다")
     void v42RejectsSecondRowWithSamePublicId() throws SQLException {
         execute(row("01", KEY_A, OWNER, OWNER));
 
@@ -83,7 +83,7 @@ class ConnectorActionMigrationTest {
     }
 
     @Test
-    @DisplayName("V43는 없는 사용자나 없는 에이전트를 가리키는 줄을 거절한다")
+    @DisplayName("V46은 없는 사용자나 없는 에이전트를 가리키는 줄을 거절한다")
     void v42RejectsRowOfUnknownUserOrAgent() throws SQLException {
         assertThatThrownBy(() -> execute(row("01", KEY_A, OWNER + 1, OWNER))).isInstanceOf(SQLException.class);
         assertThatThrownBy(() -> execute(row("02", KEY_B, OWNER, OWNER + 1))).isInstanceOf(SQLException.class);

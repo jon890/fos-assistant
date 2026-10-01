@@ -1,8 +1,8 @@
-## ADR-048: 커넥터 도구 호출은 profile plugin 의 hook 이 Control Plane 에 물어 판정한다
+## ADR-049: 커넥터 도구 호출은 profile plugin 의 hook 이 Control Plane 에 물어 판정한다
 
 - **status**: `accepted`
 - Date: 2026-10-01
-- [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 의 manifest 에 도구 정책을 더한다. 승인 뒤의 실행은 [ADR-049](ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이 정한다.
+- [ADR-043](ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 의 manifest 에 도구 정책을 더한다. 승인 뒤의 실행은 [ADR-050](ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이 정한다.
 
 ### 결정
 
@@ -25,7 +25,7 @@
 
 `schema: 1` manifest 는 계속 받는다. 확인 도구와 선택지 도구만 `READ` 로 읽고 나머지 도구는 `WRITE` 와 `required` 로 읽는다.
 
-판정이 승인 필요인 호출은 막는다. 승인해 실행하는 길은 ADR-049 의 승인 엔진이 들어올 때 생기고, 그때까지 그 호출은 `NEEDS_APPROVAL` 줄만 남기고 실행되지 않는다.
+판정이 승인 필요인 호출은 막는다. 승인해 실행하는 길은 ADR-050 의 승인 엔진이 들어올 때 생기고, 그때까지 그 호출은 `NEEDS_APPROVAL` 줄만 남기고 실행되지 않는다.
 
 ### 맥락
 

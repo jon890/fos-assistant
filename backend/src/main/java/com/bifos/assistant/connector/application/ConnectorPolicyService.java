@@ -28,13 +28,13 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-048).
+ * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-049).
  *
  * <p>순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 실행이나 연결을 찾지 못한 호출과 같은 키로 다른 도구나 다른
  * 인자를 보낸 호출은 줄을 남기지 않는다. 줄에 적을 사용자와 에이전트를 알 수 없기 때문이다.
  *
  * <p>통과로 답하는 것은 판정이 허용일 때뿐이다. 승인이 필요한 호출은 막고 {@code NEEDS_APPROVAL} 줄을 남긴다. 승인해 실행하는 길은
- * 아직 없으므로 그 호출은 실행되지 않는다(ADR-049). 승인 엔진은 이 분기에 승인 줄 저장을 잇는다. 인자 원문은 저장하지 않고 해시만 남긴다.
+ * 아직 없으므로 그 호출은 실행되지 않는다(ADR-050). 승인 엔진은 이 분기에 승인 줄 저장을 잇는다. 인자 원문은 저장하지 않고 해시만 남긴다.
  *
  * <p>{@code mcp} 패키지의 인증 주체를 모르게 하려고 profile 이름과 session 값을 문자열로 받는다.
  */

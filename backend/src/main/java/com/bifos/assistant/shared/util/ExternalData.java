@@ -6,7 +6,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 외부 서비스에서 온 글을 모델에게 넘길 때 {@code <external-data>} 로 감싼다(ADR-048).
+ * 외부 서비스에서 온 글을 모델에게 넘길 때 {@code <external-data>} 로 감싼다(ADR-049).
  *
  * <p>연결용 에이전트의 답은 외부 서비스의 글을 담는다. 그 글을 부모 에이전트에게 전하는 자리가 모두 이 함수 하나를
  * 써야 한 곳에서만 감싸고 다른 곳에서는 그대로 나가는 일이 없다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다.
