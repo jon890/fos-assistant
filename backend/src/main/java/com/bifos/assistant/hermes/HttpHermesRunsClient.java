@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
+import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -114,6 +115,37 @@ public class HttpHermesRunsClient implements HermesRunsClient {
             log.warn("실제로 돈 모델을 읽지 못했다 profile={} sessionId={}", profileName, sessionId, ex);
             return null;
         }
+    }
+
+    @Override
+    public SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
+        try {
+            JsonNode response = restClient.get()
+                    .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
+                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                    .retrieve().body(JsonNode.class);
+            JsonNode row = response == null ? null : response.get("session");
+            if (row == null || !sessionId.equals(text(row, "id"))) {
+                return null;
+            }
+            return new SubagentSessionUsage(text(row, "id"), text(row, "source"),
+                    text(row, "parent_session_id"), text(row, "model"),
+                    decimal(row, "started_at"), decimal(row, "ended_at"),
+                    number(row, "input_tokens"), number(row, "output_tokens"),
+                    number(row, "cache_read_tokens"), number(row, "cache_write_tokens"));
+        } catch (RuntimeException ex) {
+            log.warn("하위 에이전트 사용량을 읽지 못했다 profile={} sessionId={}", profileName, sessionId);
+            return null;
+        }
+    }
+
+    private static Double decimal(JsonNode row, String field) {
+        JsonNode value = row.get(field);
+        if (value == null || !value.isNumber()) {
+            return null;
+        }
+        double number = value.asDouble();
+        return Double.isFinite(number) && number >= 0 ? number : null;
     }
 
     /**

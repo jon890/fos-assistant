@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
+import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 
 /**
  * turn 하나를 Hermes runtime 에 제출하고 끝날 때까지 기다린다.
@@ -32,5 +33,10 @@ public interface HermesRunsClient {
 
     default HermesRunResult runToCompletion(HermesRunCommand command) {
         return awaitCompletion(command, submit(command));
+    }
+
+    /** 읽지 못한 session은 null이며 미완료 사용량을 최종값으로 쓰지 않는다. */
+    default SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
+        return null;
     }
 }

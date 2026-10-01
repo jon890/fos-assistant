@@ -27,6 +27,8 @@ type ExecutionEventView = {
   model: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  durationMs: number | null;
+  failed: boolean | null;
 };
 type ExecutionNode = {
   truncated: boolean;
@@ -125,6 +127,30 @@ export const streamingScenario: Scenario = {
     const savedSubagent = richTree.root.events.find((item) => item.eventType === "SUBAGENT_COMPLETED");
     expect(savedSubagent?.model === "z-ai/glm-5.2", "하위 에이전트 모델이 저장되지 않았다");
     expect(savedSubagent?.inputTokens === 12300 && savedSubagent.outputTokens === 410, "하위 에이전트 토큰이 저장되지 않았다");
+
+    for (const text of ["자식 늦은 완료 검사", "자식 완료 사건 없음 검사"]) {
+      step(`${text}: 부모 종료 뒤 session 사용량을 보완한다`);
+      const receivedChild = await events(expectStatus(await call(context, "/chat/messages/stream", {
+        method: "POST", token: context.tokens.dad, body: { text, agentCode: "dad" },
+      }), 200, text));
+      const doneChild = receivedChild.at(-1)!;
+      let recordedChild: ExecutionEventView | undefined;
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        const childTree = expectStatus(await call(context, `/usage/executions/${doneChild.executionId}/tree`, {
+          token: context.tokens.dad,
+        }), 200, "비동기 자식 실행 나무").json<ExecutionTree>();
+        const completedChildren = childTree.root.events.filter((item) => item.eventType === "SUBAGENT_COMPLETED");
+        expect(completedChildren.length <= 1, "자식 완료가 중복으로 기록됐다");
+        recordedChild = completedChildren.at(0);
+        if (recordedChild !== undefined) break;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      expect(recordedChild?.inputTokens === 160 && recordedChild.outputTokens === 20,
+        "session의 일반 입력과 cache read/write를 합산하지 못했다");
+      expect(recordedChild?.durationMs === 2500, "자식 session의 종료 시각으로 시간을 계산하지 못했다");
+      expect(recordedChild?.failed === null, "agent_close만으로 자식의 성공을 추정했다");
+    }
 
     step("Hermes 이벤트 스트림이 중간에 끝나도 최종 답과 실행 기록을 남긴다");
     const interrupted = await events(expectStatus(

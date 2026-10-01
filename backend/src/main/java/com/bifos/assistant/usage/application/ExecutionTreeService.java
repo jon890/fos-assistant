@@ -9,6 +9,9 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
+import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.domain.SubagentUsageJob;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -51,6 +54,7 @@ public class ExecutionTreeService {
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
     private final AgentService agents;
+    private final SubagentUsageJobRepository jobs;
 
     /**
      * 질의를 여럿 내므로 한 트랜잭션으로 묶는다.
@@ -75,7 +79,8 @@ public class ExecutionTreeService {
         Branch rootBranch = branch(root, byParent, used, cut, 1);
         warnAboutUnreachable(root, descendants, used, cut);
 
-        ExecutionNode rootNode = node(rootBranch, eventsOf(used), user);
+        Map<Long, List<ExecutionEvent>> byExecution = eventsOf(used);
+        ExecutionNode rootNode = node(rootBranch, byExecution, usageStatuses(used, byExecution), user);
         return new ExecutionTree(rootNode, ascent.truncated() || isTruncatedSomewhere(rootBranch));
     }
 
@@ -197,7 +202,8 @@ public class ExecutionTreeService {
 
     /** 나무를 응답으로 옮긴다. 도구 사건의 {@code detail} 은 보는 사람에 맞춰 싣는다. */
     private ExecutionNode node(
-            Branch branch, Map<Long, List<ExecutionEvent>> byExecution, CurrentUser viewer) {
+            Branch branch, Map<Long, List<ExecutionEvent>> byExecution,
+            Map<Long, Map<String, String>> usageStatuses, CurrentUser viewer) {
         AgentExecution execution = branch.execution();
         Agent agent = agents.findById(execution.agentId()).orElse(null);
         return new ExecutionNode(
@@ -206,16 +212,47 @@ public class ExecutionTreeService {
                 agent == null ? null : agent.code(),
                 agent == null ? null : agent.name(),
                 execution.status().name(),
+                execution.provider(),
                 execution.model(),
+                execution.reasoningEffort(),
+                execution.reasoningEffortSource() == null ? null : execution.reasoningEffortSource().name(),
+                execution.modelTier() == null ? null : execution.modelTier().name(),
                 execution.inputTokens(),
+                execution.cachedInputTokens(),
                 execution.outputTokens(),
+                execution.totalTokens(),
                 execution.estimatedCostMicros(),
                 execution.latencyMs(),
+                execution.requestReceivedAt(),
+                execution.submittedAt(),
+                execution.firstDeltaAt(),
                 execution.startedAt(),
+                execution.finishedAt(),
                 byExecution.getOrDefault(execution.id(), List.of()).stream()
-                        .map(event -> ExecutionEventView.from(event, viewer))
+                        .map(event -> ExecutionEventView.from(event, viewer,
+                                event.hermesSessionId() == null ? null
+                                        : usageStatuses.getOrDefault(execution.id(), Map.of()).get(event.hermesSessionId())))
                         .toList(),
-                branch.children().stream().map(child -> node(child, byExecution, viewer)).toList());
+                branch.children().stream().map(child -> node(child, byExecution, usageStatuses, viewer)).toList());
+    }
+
+    private Map<Long, Map<String, String>> usageStatuses(Set<Long> executionIds,
+            Map<Long, List<ExecutionEvent>> byExecution) {
+        Map<Long, Map<String, String>> statuses = new LinkedHashMap<>();
+        for (SubagentUsageJob job : jobs.findByExecutionIdIn(executionIds)) {
+            String status = "EXPIRED".equals(job.status()) ? "UNCONFIRMED" : "WAITING";
+            statuses.computeIfAbsent(job.executionId(), ignored -> new LinkedHashMap<>())
+                    .put(job.childSessionId(), status);
+        }
+        for (List<ExecutionEvent> executionEvents : byExecution.values()) {
+            for (ExecutionEvent event : executionEvents) {
+                if (event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED && event.hermesSessionId() != null) {
+                    statuses.computeIfAbsent(event.executionId(), ignored -> new LinkedHashMap<>())
+                            .put(event.hermesSessionId(), "RECORDED");
+                }
+            }
+        }
+        return statuses;
     }
 
     private static boolean isTruncatedSomewhere(Branch branch) {

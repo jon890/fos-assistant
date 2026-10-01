@@ -17,9 +17,22 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface AgentExecutionRepository extends JpaRepository<AgentExecution, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from AgentExecution e where e.id = :id")
+    Optional<AgentExecution> lockById(@Param("id") Long id);
+
+    @Query("""
+            select e from AgentExecution e where e.finishedAt >= :since
+            and e.reasoningEffort is null and e.reasoningEffortSource = 'UNKNOWN'
+            order by e.id desc
+            """)
+    List<AgentExecution> findUnknownReasoningDefaults(@Param("since") Instant since, Pageable pageable);
 
     List<AgentExecution> findByUserIdOrderByIdDesc(Long userId, Pageable pageable);
 

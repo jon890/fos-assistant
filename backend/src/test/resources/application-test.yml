@@ -13,6 +13,8 @@ spring:
     enabled: false
 
 assistant:
+  usage:
+    reconcile-cron: "-"
   context:
     max-chars: 8000
   starters:

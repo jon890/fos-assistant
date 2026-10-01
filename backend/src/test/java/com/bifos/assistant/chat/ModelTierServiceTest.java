@@ -215,11 +215,16 @@ class ModelTierServiceTest {
         ResolvedModelTier resolved = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
         ModelTierDefinition changed = ModelTierDefinition.of(10L, ModelTier.FAST,
                 "openai-codex", "gpt-6.1-sol", "high");
+        when(fixtures.definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of(
+                changed,
+                ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
+                ModelTierDefinition.of(10L, ModelTier.DEEP, null, "gpt-6.1-sol", "high")));
+
+        ResolvedModelTier updated = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
 
         assertThat(resolved.choice())
                 .isEqualTo(ModelChoice.of("openai-codex", "gpt-6-luna", "low"));
-        assertThat(changed.model()).isNotEqualTo(resolved.choice().model());
-        assertThat(changed.reasoningEffort()).isNotEqualTo(resolved.choice().reasoningEffort());
+        assertThat(updated.choice()).isEqualTo(ModelChoice.of("openai-codex", "gpt-6.1-sol", "high"));
     }
 
     private static TierFixtures tierFixtures() {

@@ -94,6 +94,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 경로 | 요청 | 성공 |
 | --- | --- | --- |
+| `GET /api/profiles/{name}/model-defaults` | Control Plane 토큰. 서버가 바인딩에서 정한 profile | `provider`, `model`, `reasoningEffort`만. 설정 전체와 비밀값은 반환하지 않는다. [모델 기본값 계약](model-tiers.md#profile-기본-강도)을 따른다 |
 | `GET /api/connectors/catalog` | 없음 | `[{id, title, description, fields[], verify, mcp_server, toolsets, attachments}]`. 운영 목록에 있고 검증을 통과한 manifest 만. `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다. `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다 |
 | `POST /api/connectors/{id}/call` | `{tool, values}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` |
 | `GET /api/connectors?profile=<p>` | query `profile` | `{profile, connectors: [{plugin, enabled, configured}]}` |

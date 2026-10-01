@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
+import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -95,5 +96,34 @@ class HermesRuntimeReadTest {
         assertThat(result.runtime().provider()).isEqualTo("openai-codex");
         assertThat(result.runtime().model()).isEqualTo("gpt-6-luna");
         assertThat(result.model()).as("model 칸은 요청을 되돌려 준 값 그대로다").isEqualTo("dad");
+    }
+
+    @Test
+    @DisplayName("자식 session의 중첩 응답에서 id와 source와 최종 카운터를 읽는다")
+    void readsFinalSubagentUsageFromNestedSession() {
+        bodies.put(
+                "/p/dad/api/sessions/child-1",
+                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                        + "\"parent_session_id\":\"parent-1\",\"model\":\"gpt-6-luna\","
+                        + "\"started_at\":10.25,\"ended_at\":12.75,\"input_tokens\":100,"
+                        + "\"output_tokens\":40,\"cache_read_tokens\":20,\"cache_write_tokens\":5}}");
+
+        SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
+
+        assertThat(usage).isNotNull();
+        assertThat(usage.id()).isEqualTo("child-1");
+        assertThat(usage.source()).isEqualTo("subagent");
+        assertThat(usage.parentSessionId()).isEqualTo("parent-1");
+        assertThat(usage.inclusiveInputTokens()).isEqualTo(125L);
+        assertThat(usage.outputTokens()).isEqualTo(40L);
+        assertThat(usage.durationMs()).isEqualTo(2_500L);
+    }
+
+    @Test
+    @DisplayName("요청한 child id와 다른 session 응답은 사용량으로 쓰지 않는다")
+    void rejectsWrongSessionId() {
+        bodies.put("/p/dad/api/sessions/child-1", "{\"session\":{\"id\":\"other\"}}");
+
+        assertThat(client.readSubagentUsage(baseUrl, "dad", "child-1")).isNull();
     }
 }

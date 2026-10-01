@@ -224,6 +224,28 @@ class ProfileApiRouteTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def test_model_defaults_only_returns_public_fields(self):
+        path = self.root / "owner/config.yaml"
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+        config["agent"]["reasoning_effort"] = "medium"
+        config["secret"] = "must-not-return"
+        path.write_text(yaml.safe_dump(config), encoding="utf-8")
+        response = self.request("/api/profiles/owner/model-defaults", "GET", token="valid", full_response=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, {"provider": "openai-codex", "model": "gpt-5.6-sol", "reasoningEffort": "medium"})
+
+    def test_model_defaults_requires_control_plane_token(self):
+        self.assertEqual(self.request("/api/profiles/owner/model-defaults", "GET", cookie=True), 401)
+        self.assertEqual(self.request("/api/profiles/owner/model-defaults", "GET", token="invalid"), 401)
+
+    def test_model_defaults_reads_default_without_allowing_writes(self):
+        self.make_profile("default")
+        response = self.request("/api/profiles/default/model-defaults", "GET", token="valid", full_response=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.body["reasoningEffort"])
+        self.assertEqual(self.request("/api/profiles/default", "DELETE", token="valid"), 401)
+        self.assertEqual(self.request("/api/profiles/missing/model-defaults", "GET", token="valid"), 404)
+
     def connector_environment(self, roots):
         """운영 목록과 기본 실행 파일을 환경 변수로 준다. 검사가 끝나면 되돌린다."""
         # 커넥터 실행 파일은 검사가 만든 파일이다. 실행 정의가 이 경로를 그대로 싣는지 본다.
