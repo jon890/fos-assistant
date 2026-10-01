@@ -2,7 +2,6 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
@@ -429,18 +428,7 @@ public class ConnectorConnectionService {
             log.warn("connector catalog read failed: {}", ex.getClass().getSimpleName());
             throw ConnectorErrors.unavailable();
         }
-        List<ConnectorManifest> allowed = new ArrayList<>();
-        for (ConnectorManifest manifest : manifests) {
-            if (!AgentToolPolicy.allowedForConnector(manifest.toolsets())
-                    || (manifest.attachments() && !manifest.toolsets().contains(AgentToolPolicy.VISION))) {
-                log.warn("connector {} declares toolsets a manifest cannot open", manifest.id());
-            } else if (!ConnectorToolPolicies.valid(manifest)) {
-                log.warn("connector {} declares a tool policy that cannot be judged", manifest.id());
-            } else {
-                allowed.add(manifest);
-            }
-        }
-        return List.copyOf(allowed);
+        return manifests.stream().filter(ConnectorManifests::accepted).toList();
     }
 
     private Optional<ConnectorManifest> findManifest(String connectorId) {

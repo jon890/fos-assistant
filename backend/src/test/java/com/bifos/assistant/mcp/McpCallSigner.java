@@ -72,6 +72,32 @@ public final class McpCallSigner {
     }
 
     /**
+     * 플러그인이 커넥터 도구 호출 전에 보내는 판정 요청 본문이다.
+     *
+     * <p>{@code docs/connectors.md} 의 「도구 호출 판정」 대로 서명할 글은
+     * {@code v1-connector-policy\n<hermes_tool>\n<root>\n<session>\n<tool_call_id>\n<args_json 의 SHA-256 16진수>} 다.
+     * {@code tool} 은 서명하지 않는다. null 이면 JSON null 로 싣는다.
+     */
+    public static ObjectNode policyBody(String rawToken, String hermesTool, String tool, String rootSessionId,
+            String sessionId, String toolCallId, String argsJson) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("v", 1);
+        body.put("root_session_id", rootSessionId);
+        body.put("session_id", sessionId);
+        body.put("tool_call_id", toolCallId);
+        body.put("hermes_tool", hermesTool);
+        if (tool == null) {
+            body.putNull("tool");
+        } else {
+            body.put("tool", tool);
+        }
+        body.put("args_json", argsJson);
+        body.put("sig", sign(rawToken, String.join("\n", "v1-connector-policy", hermesTool, rootSessionId, sessionId,
+                toolCallId, sha256(argsJson))));
+        return body;
+    }
+
+    /**
      * 요청 본문이 {@code tools/call} 이고 인자에 {@code _fos_ctx} 가 없으면 서명한 값을 붙인다.
      *
      * <p>인자 검사를 보는 검사가 요청자 판정에서 먼저 막히지 않게 쓴다. 그 밖의 요청은 그대로 돌려준다.

@@ -37,8 +37,8 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
     private static final Logger log = LoggerFactory.getLogger(McpCallContext.class);
     private static final String VERSION_LINE = "v1";
     private static final String HMAC = "HmacSHA256";
-    /** {@code sig} 가 받는 모양이다. 하위 에이전트 등록 서명도 같은 모양이다. */
-    static final Pattern SIGNATURE = Pattern.compile("^[0-9a-f]{64}$");
+    /** {@code sig} 가 받는 모양이다. 하위 에이전트 등록 서명과 커넥터 정책 요청의 서명도 같은 모양이다. */
+    public static final Pattern SIGNATURE = Pattern.compile("^[0-9a-f]{64}$");
 
     /**
      * {@code _fos_ctx} 를 읽고 서명을 확인한다.
@@ -72,9 +72,9 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
      *
      * <p>{@code 1.0} 과 {@code 1e0} 은 소수 노드로 읽혀 거절한다. 플러그인은 정수 1 을 보내고, 같은 값을 여러
      * 표기로 받아 주면 판을 올릴 때 구분할 자리가 흐려진다. 문자열 {@code "1"} 도 거절한다.
-     * 하위 에이전트 등록의 {@code v} 도 같은 규칙으로 본다.
+     * 하위 에이전트 등록과 커넥터 정책 요청의 {@code v} 도 같은 규칙으로 본다.
      */
-    static boolean isVersionOne(JsonNode version) {
+    public static boolean isVersionOne(JsonNode version) {
         return version != null && version.isIntegralNumber() && version.canConvertToLong() && version.longValue() == 1L;
     }
 
@@ -86,8 +86,11 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
         return value.asString();
     }
 
-    /** key 는 토큰 해시 문자열의 UTF-8 바이트다. 하위 에이전트 등록 서명도 같은 key 와 계산을 쓴다. */
-    static byte[] hmac(String tokenHash, String text) {
+    /**
+     * key 는 토큰 해시 문자열의 UTF-8 바이트다. 하위 에이전트 등록 서명도 같은 key 와 계산을 쓴다.
+     * 커넥터 정책 요청({@code connector} 패키지)도 같은 key 를 쓴다(ADR-047).
+     */
+    public static byte[] hmac(String tokenHash, String text) {
         try {
             Mac mac = Mac.getInstance(HMAC);
             mac.init(new SecretKeySpec(tokenHash.getBytes(StandardCharsets.UTF_8), HMAC));

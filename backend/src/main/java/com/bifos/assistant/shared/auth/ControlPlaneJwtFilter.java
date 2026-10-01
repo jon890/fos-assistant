@@ -38,13 +38,18 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     /**
      * 이 필터가 해석하지 않는 경로다.
      *
-     * <p>{@code /mcp} 와 하위 에이전트 session 등록 경로 {@code /internal/hermes/session-bindings/subagent} 는
+     * <p>{@code /mcp} 와 하위 에이전트 session 등록 경로 {@code /internal/hermes/session-bindings/subagent} 와
+     * 커넥터 도구 호출 판정 경로 {@code /internal/hermes/connector-policy} 는
      * 장기 토큰을 쓰는 다른 인증 경계다. {@code /api/v1/signin/allowed} 는 아직
      * 사용자가 없는 시점에 돌므로 여기를 지나면 안 된다. 이 필터는 토큰을 받으면 그 자리에서
      * {@code app_user} 를 만들고, 그러면 허용되지 않은 주소로도 사용자가 생긴다. 그 경로는 토큰을
      * 스스로 검사한다.
      */
-    private static final Set<String> UNFILTERED_PATHS = Set.of("/mcp", "/internal/hermes/session-bindings/subagent", "/api/v1/signin/allowed");
+    private static final Set<String> UNFILTERED_PATHS = Set.of(
+            "/mcp",
+            "/internal/hermes/session-bindings/subagent",
+            "/internal/hermes/connector-policy",
+            "/api/v1/signin/allowed");
 
     private final SecretKey key;
     private final UserProvisioningService users;
