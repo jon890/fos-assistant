@@ -99,18 +99,29 @@ export const connectorScenario: Scenario = {
     );
     expect(context.hermes.profileEnv(profile).DEMO_TOKEN === DEMO_TOKEN_OK, "토큰이 profile env 에 들어가지 않았다");
 
-    step("연결을 확인하면 READY 이고 16자 이상인 비밀은 앞 4자만 보인다");
+    step("연결을 확인하면 설치를 다시 보낸 뒤 READY 이고 16자 이상인 비밀은 앞 4자만 보인다");
+    const requestsAtCheck = context.hermes.connectorRequests().length;
     const checked = expectStatus(await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인");
     const ready = checked.json<ConnectionView>();
     expect(ready.status === "READY", `READY 가 아니다\n${checked.body}`);
+    const checkRequests = context.hermes.connectorRequests().slice(requestsAtCheck);
+    const reinstalledAt = checkRequests.indexOf(`install ${profile} on`);
+    expect(
+      reinstalledAt >= 0 && reinstalledAt < checkRequests.indexOf(`probe ${profile}`),
+      `연결 확인이 probe 앞에서 설치를 다시 보내지 않았다: ${checkRequests.join(" | ")}`,
+    );
+    expect(
+      !checkRequests.some((line) => line.startsWith("toolsets ")),
+      `연결 확인 동안 PUT /api/config 로 도구 목록을 쓰면 안 된다: ${checkRequests.join(" | ")}`,
+    );
     expect(DEMO_TOKEN_OK.length >= 16, "검사용 토큰이 앞부분을 저장하는 길이보다 짧다");
     expect(ready.secretPrefixes.token === DEMO_TOKEN_OK.slice(0, 4), `비밀 앞부분이 다르다\n${checked.body}`);
     expect(ready.values.scope === "a" && ready.values.token === undefined, `칸 값이 다르다\n${checked.body}`);
     expect(context.hermes.connectorRequests().some((line) => line === `probe ${profile}`), "MCP 서버 확인 요청이 없었다");
     const toolsets = context.hermes.apiServerToolsetsOf(profile) ?? [];
     expect(
-      toolsets.join() === DEMO_CONNECTOR.mcp_server,
-      `연결 확인 뒤 도구 목록이 커넥터 서버 하나가 아니다: ${toolsets.join()}`,
+      toolsets.join() === [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets].join(),
+      `연결 확인 뒤 도구 목록이 커넥터 서버와 선언한 toolset 이 아니다: ${toolsets.join()}`,
     );
     const reads = [
       registered.body,

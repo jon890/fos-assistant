@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -204,7 +206,8 @@ public class ConnectorConnectionService {
                                 ? connector.deleteEnv(profile, field.env())
                                 : connector.putEnv(profile, field.env(), value));
             }
-            // 도구 목록은 쓰지 않는다. 설치가 API 도구 목록을 커넥터의 MCP 서버 이름만으로 다시 쓴다.
+            // 도구 목록은 쓰지 않는다. 설치가 API 도구 목록을 커넥터의 MCP 서버 이름과 manifest 가 선언한
+            // 내장 toolset 으로 다시 쓴다.
             step = STEP_INSTALL;
             connection.markRestartRequired(connector.putConnector(profile, manifest.id(), true));
         } catch (RuntimeException ex) {
@@ -213,6 +216,7 @@ public class ConnectorConnectionService {
             connections.save(connection);
             return null;
         }
+        // 등록 직후는 선언한 toolset 이 켜졌는지 보기 전이다. 사진은 연결 확인이 그것을 본 뒤에 받는다.
         connection.registered(ConnectorValues.stored(manifest, accepted), false, now());
         return ConnectionSnapshot.from(connections.save(connection));
     }
@@ -248,8 +252,7 @@ public class ConnectorConnectionService {
     /**
      * 설치와 probe 를 보고 연결 상태를 맞춘다.
      *
-     * <p>설치가 켜져 있는데 configured 가 아니면 설치를 한 번 다시 써서 도구 목록을 맞춘다. 재시작 대기인 연결은
-     * 다시 쓰지 않는다. 관리자가 재시작한 뒤 반영 완료에서 다시 쓴다.
+     * <p>재시작 대기인 연결은 설치를 다시 보내지 않는다. 관리자가 재시작한 뒤 반영 완료에서 다시 보낸다.
      */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot check(CurrentUser user, String connectorId) {
@@ -265,19 +268,7 @@ public class ConnectorConnectionService {
                 }
                 return ConnectionSnapshot.from(connections.save(connection));
             }
-            if (!connection.restartRequired()
-                    && reinstallIfNotConfigured(connection, state).isPresent()) {
-                if (connection.restartRequired()) {
-                    connection.pending(now());
-                    return ConnectionSnapshot.from(connections.save(connection));
-                }
-                state = readState(connection);
-            }
-            if (connection.restartRequired() || !state.enabled() || !state.configured()) {
-                connection.pending(now());
-                return ConnectionSnapshot.from(connections.save(connection));
-            }
-            if (probedUsable(connection)) {
+            if (!connection.restartRequired() && state.enabled() && resyncedUsable(connection)) {
                 connection.ready(now());
             } else {
                 connection.pending(now());
@@ -286,12 +277,7 @@ public class ConnectorConnectionService {
         });
     }
 
-    /**
-     * 관리자가 공유 gateway 를 재시작한 뒤 누르는 반영 완료다. 같은 그룹의 사용자에게만 된다.
-     *
-     * <p>설치가 켜져 있는데 configured 가 아니면 재시작 대기인 연결이어도 설치를 다시 쓴다. 그 응답이 재시작을
-     * 요구하면 실패로 답한다. 관리자가 한 번 더 재시작한 뒤 다시 누른다.
-     */
+    /** 관리자가 공유 gateway 를 재시작한 뒤 누르는 반영 완료다. 같은 그룹의 사용자에게만 된다. */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot confirmApplied(CurrentUser admin, String connectorId, Long userId) {
         requireAdmin(admin);
@@ -302,18 +288,8 @@ public class ConnectorConnectionService {
         }
         ConnectorConnection connection = requireConnection(userId, connectorId);
         ConnectorState state = readState(connection);
-        Optional<Boolean> reinstalled = reinstallIfNotConfigured(connection, state);
-        if (reinstalled.isPresent()) {
-            if (reinstalled.get()) {
-                // 다시 쓴 설치는 gateway 를 재시작해야 반영된다. 재시작 대기는 저장된다.
-                connection.pending(now());
-                throw new ConnectorOperationFailure();
-            }
-            state = readState(connection);
-        }
-        boolean applied = connection.desiredEnabled()
-                ? state.enabled() && state.configured() && probedUsable(connection)
-                : !state.enabled();
+        boolean applied =
+                connection.desiredEnabled() ? state.enabled() && resyncedUsable(connection) : !state.enabled();
         if (!applied) {
             // 외부 호출은 성공했지만 반영이 끝나지 않았다. 실패 로그를 남기지 않는다.
             connection.pending(now());
@@ -339,51 +315,46 @@ public class ConnectorConnectionService {
     }
 
     /**
-     * 활성화 후보인 연결의 설치가 켜져 있는데 configured 가 아니면 설치를 다시 쓴다.
+     * 설치를 한 번 다시 보낸 뒤 설치 상태와 MCP probe 와 켜진 내장 도구를 본다.
      *
-     * <p>이전 판이 설치한 연결은 도구 목록에 Control Plane MCP 가 남아 configured 가 아니다. configured 인 설치는
-     * 다시 쓰지 않는다. 바뀌는 것 없이 재시작 대기만 서기 때문이다. 카탈로그에서 빠진 커넥터도 다시 쓰지 않는다.
+     * <p>설치가 enabled 인 뒤에만 부른다. 카탈로그에서 빠진 커넥터는 서버 이름을 알 수 없어 쓸 수 없는 것으로
+     * 보고 설치도 다시 보내지 않는다. 다시 보내는 설치가 연결용 에이전트의 지침을 지금 plugin 의 스킬 본문에
+     * 맞추고 API 도구 목록을 커넥터의 MCP 서버와 manifest 가 선언한 toolset 으로 맞춘다. 이전 판이 설치한 연결이
+     * 새 목록을 받는 자리다. 그래서 Control Plane 은 목록을 쓰지 않고, 다시 보낸 뒤에 읽은 설치가 configured 이고
+     * 켜진 내장 도구가 선언과 같은지만 본다. 선언 밖의 도구가 켜져 있어도, 선언한 도구가 꺼져 있어도 쓸 수 없다.
      *
-     * @return 다시 썼으면 그 응답의 재시작 필요 여부. 다시 쓰지 않았으면 비어 있다
+     * <p>manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 선언한 toolset 이 실제로 켜졌을 때만 참으로 둔다.
+     * 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다. 외부 호출이 실패하면 {@code PENDING} 을
+     * 남기고 연결 실패로 끝낸다.
      */
-    private Optional<Boolean> reinstallIfNotConfigured(ConnectorConnection connection, ConnectorState state) {
-        if (!connection.desiredEnabled() || !state.enabled() || state.configured()) {
-            return Optional.empty();
-        }
-        final boolean listed;
+    private boolean resyncedUsable(ConnectorConnection connection) {
+        Agent agent = connection.agent();
+        String profile = agent.hermesProfile();
+        String step = STEP_PROBE;
         try {
-            listed = findManifest(connection.connectorId()).isPresent();
+            Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
+            if (manifest.isEmpty()) {
+                return false;
+            }
+            // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은
+            // 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
+            step = STEP_INSTALL;
+            connector.putConnector(profile, connection.connectorId(), true);
+            step = STEP_INSTALL_STATE;
+            if (!connector.readConnector(profile, connection.connectorId()).configured()) {
+                return false;
+            }
+            step = STEP_PROBE;
+            ProbeResult probe = connector.probe(profile, manifest.get().mcpServer());
+            boolean usable = probe.ok()
+                    && !probe.tools().isEmpty()
+                    && Set.copyOf(manifest.get().toolsets())
+                            .equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), profile)));
+            // 쓸 수 없으면 부른 쪽이 PENDING 으로 두며 사진 받기를 내린다. 외부 호출이 실패해도 같다.
+            agent.acceptConnectorAttachments(usable && manifest.get().attachments());
+            return usable;
         } catch (RuntimeException ex) {
-            // 카탈로그 조회 실패는 읽는 쪽이 이미 로그에 남겼다. 설치 단계의 실패로 적지 않는다.
-            connection.pending(now());
-            throw new ConnectorOperationFailure();
-        }
-        if (!listed) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(reinstall(connection));
-        } catch (RuntimeException ex) {
-            warn(STEP_INSTALL, connection.connectorId(), ex);
-            connection.pending(now());
-            throw new ConnectorOperationFailure();
-        }
-    }
-
-    /** 설치를 다시 쓰고 그 응답의 재시작 필요 여부를 연결에 누적한다. 칸 값은 profile 의 env 에 그대로 있다. */
-    private boolean reinstall(ConnectorConnection connection) {
-        boolean restartRequired =
-                connector.putConnector(connection.agent().hermesProfile(), connection.connectorId(), true);
-        connection.markRestartRequired(restartRequired);
-        return restartRequired;
-    }
-
-    /** {@link #usable} 을 부른다. 외부 호출이 실패하면 {@code PENDING} 을 남기고 연결 실패로 끝낸다. */
-    private boolean probedUsable(ConnectorConnection connection) {
-        try {
-            return usable(connection);
-        } catch (RuntimeException ex) {
-            warn(STEP_PROBE, connection.connectorId(), ex);
+            warn(step, connection.connectorId(), ex);
             connection.pending(now());
             throw new ConnectorOperationFailure();
         }
@@ -398,27 +369,6 @@ public class ConnectorConnectionService {
         return connections.findByUserIdIn(List.copyOf(names.keySet())).stream()
                 .map(connection -> AdminConnectionSnapshot.from(connection, names.get(connection.userId())))
                 .toList();
-    }
-
-    /**
-     * MCP probe 가 도구를 보이고 켜진 내장 도구가 없는가.
-     *
-     * <p>설치가 enabled 이고 configured 인 뒤에만 부른다. 카탈로그에서 빠진 커넥터는 서버 이름을 알 수 없어 쓸 수
-     * 없는 것으로 본다.
-     */
-    private boolean usable(ConnectorConnection connection) {
-        Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
-        if (manifest.isEmpty()) {
-            return false;
-        }
-        Agent agent = connection.agent();
-        ProbeResult probe =
-                connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
-        // configured 인 뒤에 보이는 내장 도구는 목록이 아니라 다른 설정에서 온 것이다. 목록을 다시 쓰지 않는다.
-        return probe.ok()
-                && !probe.tools().isEmpty()
-                && toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())
-                        .isEmpty();
     }
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
@@ -436,13 +386,30 @@ public class ConnectorConnectionService {
         return result.result();
     }
 
+    /**
+     * 카탈로그를 읽는다. manifest 로 열 수 없는 내장 toolset 을 선언한 커넥터는 없는 것으로 본다.
+     *
+     * <p>대시보드가 같은 검사를 먼저 한다. 여기서 한 번 더 보는 것은 셸이나 파일 도구가 대시보드의 결함으로
+     * 넘어와도 연결용 에이전트에 켜지지 않게 하기 위해서다(ADR-044).
+     */
     private List<ConnectorManifest> readCatalog() {
+        final List<ConnectorManifest> manifests;
         try {
-            return connector.readCatalog();
+            manifests = connector.readCatalog();
         } catch (RuntimeException ex) {
             log.warn("connector catalog read failed: {}", ex.getClass().getSimpleName());
             throw ConnectorErrors.unavailable();
         }
+        List<ConnectorManifest> allowed = new ArrayList<>();
+        for (ConnectorManifest manifest : manifests) {
+            if (AgentToolPolicy.allowedForConnector(manifest.toolsets())
+                    && (!manifest.attachments() || manifest.toolsets().contains(AgentToolPolicy.VISION))) {
+                allowed.add(manifest);
+            } else {
+                log.warn("connector {} declares toolsets a manifest cannot open", manifest.id());
+            }
+        }
+        return List.copyOf(allowed);
     }
 
     private Optional<ConnectorManifest> findManifest(String connectorId) {

@@ -20,7 +20,7 @@ export type AgentView = {
   code: string;
   name: string;
   visibility: "PRIVATE" | "GROUP";
-  /** 이 에이전트의 대화에 사진을 붙일 수 있다. 흐름이 붙은 에이전트는 거짓이다 */
+  /** 이 에이전트의 대화에 사진을 붙일 수 있다. 흐름이 붙은 에이전트와 사진을 받는다고 선언하지 않은 연결용 에이전트는 거짓이다 */
   acceptsAttachments: boolean;
   /** 요청자가 이 에이전트를 관리할 수 있다. 주인이거나 `ADMIN` 이다 */
   editable: boolean;

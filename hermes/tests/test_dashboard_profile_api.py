@@ -507,6 +507,86 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertIn("fos-assistant", after["platform_toolsets"]["api_server"])
         self.assertIn("fos-assistant", after["mcp_servers"])
 
+    def test_connector_install_adds_declared_toolsets_after_the_server_name(self):
+        """manifest 가 `toolsets` 를 선언하면 목록은 서버 이름 다음에 그 toolset 이고 Control Plane MCP 는 없다."""
+        root = self.connector_fixture()
+        manifest = root / "connector.json"
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+        self.assertEqual(self.connector().status_code, 200)
+        config = self.alice_config()
+        self.assertEqual(config["platform_toolsets"]["api_server"], ["demo", "vision"])
+        self.assertNotIn("fos-assistant", config["mcp_servers"])
+        self.assertEqual(self.connector_status().body["connectors"],
+                         [{"plugin": DEMO, "enabled": True, "configured": True}])
+        # 선언이 바뀌면 같은 목록이 아니라 설치가 덜 된 것으로 보고, 다시 설치하면 새 목록이 된다.
+        del declared["toolsets"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+        self.assertEqual(self.connector_status().body["connectors"],
+                         [{"plugin": DEMO, "enabled": True, "configured": False}])
+        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"], ["demo"])
+        # 마지막 커넥터를 끄면 선언한 toolset 도 남지 않는다.
+        declared["toolsets"] = ["vision"]
+        manifest.write_text(json.dumps(declared), encoding="utf-8")
+        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.connector(False).status_code, 200)
+        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"], ["no_mcp"])
+
+    def test_connector_install_writes_skill_body_as_persona(self):
+        """설치는 스킬 본문을 앞머리 없이 그 profile 의 SOUL.md 에 쓰고, 본문이 바뀌면 다시 설치할 때 다시 쓴다."""
+        root = self.connector_fixture()
+        soul = self.root / "alice/SOUL.md"
+        soul.write_text("기본 성격\n", encoding="utf-8")
+        other = self.root / "bob/SOUL.md"
+        self.make_profile("bob")
+        other.write_text("bob 의 성격\n", encoding="utf-8")
+        self.assertEqual(self.connector().status_code, 200)
+        body = soul.read_text(encoding="utf-8")
+        self.assertEqual(body, "# 검사용 메모\n\n`list_scopes` 로 볼 수 있는 범위를 조회한다.\n")
+        self.assertNotIn("description:", body)
+        # 다른 profile 의 지침은 그대로다.
+        self.assertEqual(other.read_text(encoding="utf-8"), "bob 의 성격\n")
+        # plugin 의 스킬 본문이 바뀌면 같은 설치 요청이 지침을 다시 쓴다. 서버 정의는 그대로다.
+        skill = root / "skills/demo/SKILL.md"
+        skill.write_text(skill.read_text(encoding="utf-8") + "\n새 절차다.\n", encoding="utf-8")
+        config_before = (self.root / "alice/config.yaml").read_bytes()
+        repeated = self.connector()
+        self.assertEqual(repeated.status_code, 200)
+        self.assertTrue(repeated.body["changed"])
+        self.assertTrue(soul.read_text(encoding="utf-8").endswith("새 절차다.\n"))
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), config_before)
+        self.assertFalse(self.connector().body["changed"])
+        # 해제는 지침을 지우지 않는다. 에이전트가 꺼지고 다시 등록하면 다시 쓴다.
+        self.assertEqual(self.connector(False).status_code, 200)
+        self.assertTrue(soul.read_text(encoding="utf-8").endswith("새 절차다.\n"))
+
+    def test_connector_persona_is_rolled_back_and_kept_off_unmanaged_profiles(self):
+        """지침 쓰기가 실패하면 설정과 기록을 되돌리고, 관리 표식이 없는 profile 에는 쓰지 않는다."""
+        self.connector_fixture()
+        soul = self.root / "alice/SOUL.md"
+        soul.write_text("기본 성격\n", encoding="utf-8")
+        before = (self.root / "alice/config.yaml").read_bytes()
+        write = self.plugin._atomic_private_write
+
+        def failing_write(target, value):
+            if target.name == "SOUL.md" and target.parent.name == "alice":
+                raise OSError("injected")
+            return write(target, value)
+
+        with mock.patch.object(self.plugin, "_atomic_private_write", side_effect=failing_write):
+            self.assertEqual(self.connector().status_code, 503)
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+        self.assertEqual(soul.read_text(encoding="utf-8"), "기본 성격\n")
+        self.assertFalse((self.root / "alice" / self.plugin.CONNECTOR_STATE).exists())
+        # 요청 경로는 표식을 먼저 본다. 함수만 불러도 표식 없는 profile 의 지침은 바뀌지 않는다.
+        (self.root / "alice" / self.plugin.MANAGED_MARKER).unlink()
+        self.assertEqual(self.connector().status_code, 401)
+        with self.assertRaises(ValueError):
+            self.plugin._connector_config(self.root / "alice", DEMO, True)
+        self.assertEqual(soul.read_text(encoding="utf-8"), "기본 성격\n")
+
     def test_connector_uses_operator_command_and_rejects_unsafe_manifests(self):
         """manifest 의 명령은 운영 실행 파일로 바뀌고, 치환 있는 인자와 비밀값 원문과 plugin 밖 링크는 거절한다."""
         root = self.connector_fixture()

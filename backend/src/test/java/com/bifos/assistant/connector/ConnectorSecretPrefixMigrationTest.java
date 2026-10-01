@@ -16,10 +16,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V39 가 이미 저장된 비밀 앞부분을 모든 행에서 비우는지 본다.
+ * V40 이 이미 저장된 비밀 앞부분을 모든 행에서 비우는지 본다.
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다. 옛 규칙의 행을 넣으려고
- * V38 까지만 올린 뒤 V39 를 올린다.
+ * V39 까지만 올린 뒤 V40 을 올린다.
  */
 class ConnectorSecretPrefixMigrationTest {
     private static final String WITH_PREFIX =
@@ -31,48 +31,48 @@ class ConnectorSecretPrefixMigrationTest {
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-prefix-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrate("38");
+        migrate("39");
     }
 
     @Test
-    @DisplayName("V39는 앞부분이 있는 행의 secretPrefixes 만 비우고 values 와 updated_at 은 그대로 둔다")
-    void v39ClearsSecretPrefixesAndKeepsValuesAndUpdatedAt() throws SQLException {
+    @DisplayName("V40은 앞부분이 있는 행의 secretPrefixes 만 비우고 values 와 updated_at 은 그대로 둔다")
+    void v40ClearsSecretPrefixesAndKeepsValuesAndUpdatedAt() throws SQLException {
         insert(901, WITH_PREFIX);
 
-        migrate("39");
+        migrate("40");
 
         assertThat(fields(901)).isEqualTo("{\"values\":{\"family\":\"x\"},\"secretPrefixes\":{}}");
         assertThat(updatedAt(901)).isEqualTo(Timestamp.valueOf(UPDATED_AT));
     }
 
     @Test
-    @DisplayName("V39는 이미 빈 행을 그대로 둔다")
-    void v39LeavesAlreadyEmptyRowUnchanged() throws SQLException {
+    @DisplayName("V40은 이미 빈 행을 그대로 둔다")
+    void v40LeavesAlreadyEmptyRowUnchanged() throws SQLException {
         insert(901, WITH_PREFIX);
         insert(902, ALREADY_EMPTY);
 
-        migrate("39");
+        migrate("40");
 
         assertThat(fields(902)).isEqualTo(ALREADY_EMPTY);
         assertThat(updatedAt(902)).isEqualTo(Timestamp.valueOf(UPDATED_AT));
     }
 
     @Test
-    @DisplayName("V39는 secretPrefixes 가 객체가 아닌 값이어도 빈 객체로 바꾼다")
-    void v39ReplacesNonObjectSecretPrefixesWithEmptyObject() throws SQLException {
+    @DisplayName("V40은 secretPrefixes 가 객체가 아닌 값이어도 빈 객체로 바꾼다")
+    void v40ReplacesNonObjectSecretPrefixesWithEmptyObject() throws SQLException {
         insert(901, "{\"values\":{},\"secretPrefixes\":\"fab_abcd\"}");
         insert(902, "{\"values\":{},\"secretPrefixes\":null}");
 
-        migrate("39");
+        migrate("40");
 
         assertThat(fields(901)).isEqualTo(ALREADY_EMPTY);
         assertThat(fields(902)).isEqualTo(ALREADY_EMPTY);
     }
 
     @Test
-    @DisplayName("V39는 연결이 하나도 없어도 끝난다")
-    void v39SucceedsWithNoRows() throws SQLException {
-        migrate("39");
+    @DisplayName("V40은 연결이 하나도 없어도 끝난다")
+    void v40SucceedsWithNoRows() throws SQLException {
+        migrate("40");
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement();
@@ -83,13 +83,13 @@ class ConnectorSecretPrefixMigrationTest {
     }
 
     @Test
-    @DisplayName("V39는 JSON 으로 읽지 못하는 행에서 행 번호만 알리고 멈추며 어느 행도 고치지 않는다")
-    void v39StopsOnUnreadableRowWithoutLeakingColumnText() throws SQLException {
+    @DisplayName("V40은 JSON 으로 읽지 못하는 행에서 행 번호만 알리고 멈추며 어느 행도 고치지 않는다")
+    void v40StopsOnUnreadableRowWithoutLeakingColumnText() throws SQLException {
         insert(901, WITH_PREFIX);
         insert(902, "fab_broken{");
         long brokenId = id(902);
 
-        assertThatThrownBy(() -> migrate("39"))
+        assertThatThrownBy(() -> migrate("40"))
                 .hasStackTraceContaining("id " + brokenId + " 행")
                 .satisfies(ex -> {
                     for (Throwable cause = ex; cause != null; cause = cause.getCause()) {

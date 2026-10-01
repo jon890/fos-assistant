@@ -5,10 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -17,6 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.ConnectorCallLimiter;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
@@ -96,7 +99,19 @@ class ConnectorConnectionServiceTest {
                             null,
                             new ConnectorFieldOptions("list_scopes", "scopes", "id", "name", true))),
             "list_scopes",
-            "demo");
+            "demo",
+            List.of(),
+            false);
+    /** 이미지 도구와 사진 받기를 선언한 커넥터다. 번호와 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
+    private static final ConnectorManifest VISION_MANIFEST = new ConnectorManifest(
+            DEMO,
+            DEMO_MANIFEST.title(),
+            DEMO_MANIFEST.description(),
+            DEMO_MANIFEST.fields(),
+            "list_scopes",
+            "demo",
+            List.of("vision"),
+            true);
     /** 형식이 없는 비밀 칸 하나만 가진 커넥터다. 비밀값의 길이 경계를 보는 데 쓴다. */
     private static final ConnectorManifest PIN_MANIFEST = new ConnectorManifest(
             PIN,
@@ -104,7 +119,9 @@ class ConnectorConnectionServiceTest {
             "",
             List.of(new ConnectorField("pin", "DEMO_PIN", "번호", "", true, true, null, null)),
             "check_pin",
-            "pin");
+            "pin",
+            List.of(),
+            false);
 
     @Autowired
     ConnectorConnectionService service;
@@ -173,8 +190,274 @@ class ConnectorConnectionServiceTest {
         verify(toolsets, never()).writeApiServer(any(), any());
         assertThat(registered.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).desiredEnabled()).isTrue();
-        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().name())
-                .isEqualTo("검사용 메모");
+        Agent agent = agents.findByCode(registered.agentCode()).orElseThrow();
+        assertThat(agent.name()).isEqualTo("검사용 메모");
+        // 선언이 없는 커넥터의 연결용 에이전트는 사진을 받지 않는다.
+        assertThat(agent.acceptsAttachments()).isFalse();
+    }
+
+    @Test
+    @DisplayName("manifest 가 toolset 을 선언해도 등록은 도구 목록을 쓰지 않고, 사진은 연결 확인 전이라 받지 않는다")
+    void registrationLeavesDeclaredToolsetsToInstallAndDefersAttachments() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
+
+        String profile = profileOf(registered);
+        // 목록은 설치가 커넥터의 MCP 서버와 선언한 toolset 으로 쓴다.
+        verify(connector).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("이미 연결된 에이전트는 연결 확인에서 새로 선언된 toolset 과 사진 받기를 받는다")
+    void checkAppliesNewlyDeclaredToolsetsToExistingConnection() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
+        String profile = profileOf(registered);
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
+
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        // 다시 보낸 설치가 목록에 선언한 toolset 을 더한 뒤다.
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        // 등록의 설치와 연결 확인마다 다시 보낸 설치다.
+        verify(connector, times(3)).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("관리자 반영 완료도 설치를 다시 보내고 선언한 toolset 이 켜졌으면 사진 받기를 옮긴다")
+    void adminConfirmResendsInstallAndAcceptsAttachmentsWhenDeclaredToolsetsEnabled() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        ConnectionSnapshot registered = service.register(member, DEMO, VALUES);
+        String profile = profileOf(registered);
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+
+        ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
+
+        // 등록의 설치와 다시 보낸 설치다.
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
+        assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("선언한 toolset 이 설치를 다시 보낸 뒤에도 켜지지 않으면 목록을 쓰지 않고 PENDING이다")
+    void staysPendingWhenDeclaredToolsetIsNotApplied() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agentEnabled(user)).isFalse();
+        // 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않는다.
+        assertThat(agents.findByCode(checked.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("사진을 받던 연결도 vision 이 꺼져 다시 켜지지 않으면 READY 가 아니고 사진을 받지 않는다")
+    void stopsAcceptingAttachmentsWhenDeclaredToolsetGoesMissing() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
+        String profile = profileOf(registered);
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isTrue();
+
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of());
+
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("사진을 받던 연결이 꺼지는 경로마다 연결용 에이전트가 사진을 받지 않는다")
+    void disabledConnectorAgentNeverAcceptsAttachments() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        ConnectionSnapshot registered = service.register(member, DEMO, VALUES);
+        String profile = profileOf(registered);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+        Runnable makeReady = () -> {
+            installed(true, true);
+            assertThat(service.check(member, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+            assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                    .isTrue();
+        };
+        Runnable assertOff = () -> {
+            assertThat(agentEnabled(member)).isFalse();
+            assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                    .isFalse();
+        };
+
+        // 연결 확인의 조기 반환: 설치가 configured 가 아니다.
+        makeReady.run();
+        installed(true, false);
+        assertThat(service.check(member, DEMO).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertOff.run();
+
+        // 반영 완료의 단락 평가: 설치가 꺼져 있어 도구 확인에 닿지 않는다.
+        makeReady.run();
+        installed(false, false);
+        assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
+                .isInstanceOf(ConnectorOperationFailure.class);
+        assertOff.run();
+
+        // 다시 등록의 실패.
+        makeReady.run();
+        doThrow(new IllegalStateException()).when(connector).putEnv(anyString(), anyString(), anyString());
+        assertThatThrownBy(() -> service.register(member, DEMO, VALUES)).isInstanceOf(ConnectorOperationFailure.class);
+        assertOff.run();
+        doReturn(false).when(connector).putEnv(anyString(), anyString(), anyString());
+        service.register(member, DEMO, VALUES);
+
+        // 해제의 실패.
+        makeReady.run();
+        doThrow(new IllegalStateException()).when(connector).putConnector(profile, DEMO, false);
+        assertThatThrownBy(() -> service.disconnect(member, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+        assertOff.run();
+    }
+
+    @Test
+    @DisplayName("연결 확인의 probe 가 실패하면 사진을 받지 않는 것으로 남는다")
+    void probeFailureLeavesAttachmentsOff() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
+        installed(true, true);
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+        doThrow(new IllegalStateException()).when(connector).probe(anyString(), anyString());
+
+        assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("선언과 켜진 도구가 같으면 연결 확인이 도구 목록을 쓰지 않고 READY다")
+    void checkBecomesReadyWithoutWritingToolsetWhenDeclaredToolsetsMatch() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
+
+        assertThat(service.check(user, DEMO).status()).isEqualTo(ConnectionStatus.READY);
+
+        verify(toolsets, never()).writeApiServer(any(), any());
+    }
+
+    @Test
+    @DisplayName("manifest 로 열 수 없는 toolset 을 선언한 커넥터는 없는 커넥터다")
+    void manifestDeclaringClosedToolsetsIsLeftOut() {
+        for (List<String> declared : List.of(List.of("terminal"), List.of("vision", "file"), List.of("sight"))) {
+            when(connector.readCatalog())
+                    .thenReturn(List.of(
+                            new ConnectorManifest(
+                                    DEMO, "검사용 메모", "", DEMO_MANIFEST.fields(), "list_scopes", "demo", declared, false),
+                            PIN_MANIFEST));
+            CurrentUser user = user(UserRole.MEMBER, 1L);
+
+            assertThat(service.catalog(user)).extracting(ConnectorSummary::id).containsExactly(PIN);
+            assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
+        }
+        verify(toolsets, never()).writeApiServer(anyString(), anyList());
+    }
+
+    @Test
+    @DisplayName("vision 없이 사진 받기를 선언한 커넥터는 없는 커넥터다")
+    void manifestAcceptingAttachmentsWithoutVisionIsLeftOut() {
+        when(connector.readCatalog())
+                .thenReturn(List.of(new ConnectorManifest(
+                        DEMO, "검사용 메모", "", DEMO_MANIFEST.fields(), "list_scopes", "demo", List.of(), true)));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("연결 확인은 설치 요청을 다시 보내 지침과 도구 목록을 맞추고 그 재시작 값은 쓰지 않는다")
+    void checkResendsInstallAndIgnoresItsRestartAnswer() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        InOrder order = inOrder(connector);
+        order.verify(connector).readConnector(profile, DEMO);
+        order.verify(connector).putConnector(profile, DEMO, true);
+        // 다시 보낸 뒤의 설치 상태를 읽고 나서 probe 한다.
+        order.verify(connector).readConnector(profile, DEMO);
+        order.verify(connector).probe(profile, "demo");
+        verify(toolsets, never()).writeApiServer(any(), any());
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(checked.restartRequired()).isFalse();
+    }
+
+    @Test
+    @DisplayName("연결 확인의 설치 요청이 실패하면 PENDING 을 남기고 연결 실패로 끝난다")
+    void checkStaysPendingWhenReinstallFails() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        doThrow(new IllegalStateException()).when(connector).putConnector(profile, DEMO, true);
+
+        assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agentEnabled(user)).isFalse();
+    }
+
+    @Test
+    @DisplayName("해제하면 연결용 에이전트가 사진을 받지 않는다")
+    void disconnectStopsAcceptingAttachments() {
+        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
+
+        service.disconnect(user, DEMO);
+
+        assertThat(agents.findByCode(registered.agentCode()).orElseThrow().acceptsAttachments())
+                .isFalse();
     }
 
     @Test
@@ -638,7 +921,8 @@ class ConnectorConnectionServiceTest {
             values.put("k" + index, "v".repeat(500));
         }
         when(connector.readCatalog())
-                .thenReturn(List.of(new ConnectorManifest("demo-wide", "넓은 칸", "", fields, "check", "wide")));
+                .thenReturn(List.of(
+                        new ConnectorManifest("demo-wide", "넓은 칸", "", fields, "check", "wide", List.of(), false)));
         // {"values":{"k1":"…",…},"secretPrefixes":{}} 에서 값 말고 드는 글자 수는 33 + 칸마다 7 + 쉼표 7 이다.
         int lastLength = 4000 - (33 + 8 * 7 + 7) - 7 * 500;
         values.put("k8", "v".repeat(lastLength + 1));
@@ -762,8 +1046,8 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("configured 인 설치에 내장 도구가 켜져 있으면 설치와 목록을 다시 쓰지 않고 PENDING이다")
-    void staysPendingWithoutRewritingWhenBuiltinsEnabledOnConfiguredInstall() {
+    @DisplayName("configured 인 설치에 선언 밖의 내장 도구가 켜져 있으면 목록을 쓰지 않고 PENDING이다")
+    void staysPendingWithoutWritingToolsetWhenUndeclaredBuiltinsEnabled() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         String profile = profileOf(service.register(user, DEMO, VALUES));
         installed(true, true);
@@ -773,7 +1057,8 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot checked = service.check(user, DEMO);
 
         verify(toolsets, never()).writeApiServer(any(), any());
-        verify(connector, times(1)).putConnector(profile, DEMO, true);
+        // 등록의 설치와 다시 보낸 설치다.
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(agentEnabled(user)).isFalse();
     }
@@ -794,7 +1079,7 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("설치가 configured 가 아니면 확인이 설치를 다시 쓰고 다시 읽어 READY가 된다")
+    @DisplayName("이전 판이 설치해 configured 가 아닌 연결은 확인이 설치를 다시 보내고 다시 읽어 READY가 된다")
     void checkReinstallsWhenInstallIsNotConfigured() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         String profile = profileOf(service.register(user, DEMO, VALUES));
@@ -804,7 +1089,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        // 등록의 설치와 다시 설치다.
+        // 등록의 설치와 다시 보낸 설치다.
         verify(connector, times(2)).putConnector(profile, DEMO, true);
         verify(toolsets, never()).writeApiServer(any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
@@ -813,38 +1098,7 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("다시 쓴 설치가 재시작을 요구하면 확인은 probe 없이 재시작 대기 PENDING 으로 남긴다")
-    void checkStaysPendingWhenReinstallNeedsRestart() {
-        CurrentUser user = user(UserRole.MEMBER, 1L);
-        String profile = profileOf(service.register(user, DEMO, VALUES));
-        installed(true, false);
-        when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
-
-        ConnectionSnapshot checked = service.check(user, DEMO);
-
-        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
-        assertThat(checked.restartRequired()).isTrue();
-        assertThat(stored(user).restartRequired()).isTrue();
-        assertThat(agentEnabled(user)).isFalse();
-        verify(connector, never()).probe(anyString(), anyString());
-    }
-
-    @Test
-    @DisplayName("configured 인 설치는 확인에서 다시 쓰지 않는다")
-    void checkDoesNotReinstallConfiguredConnection() {
-        CurrentUser user = user(UserRole.MEMBER, 1L);
-        String profile = profileOf(service.register(user, DEMO, VALUES));
-        installed(true, true);
-        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-
-        service.check(user, DEMO);
-
-        // 등록의 설치 한 번뿐이다.
-        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
-    }
-
-    @Test
-    @DisplayName("카탈로그에서 빠진 커넥터는 configured 가 아니어도 확인에서 다시 쓰지 않고 PENDING이다")
+    @DisplayName("카탈로그에서 빠진 커넥터는 확인에서 설치를 다시 보내지 않고 PENDING이다")
     void checkDoesNotReinstallConnectorRemovedFromCatalog() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
@@ -858,7 +1112,7 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("확인 중 카탈로그 조회가 실패하면 설치를 다시 쓰지 않고 PENDING 을 남기며 연결 실패로 끝난다")
+    @DisplayName("확인 중 카탈로그 조회가 실패하면 설치를 다시 보내지 않고 PENDING 을 남기며 연결 실패로 끝난다")
     void checkLeavesPendingWhenCatalogReadFailsBeforeReinstall() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
@@ -894,30 +1148,20 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("관리자 반영 완료는 옛 목록의 설치를 다시 쓰고 재시작을 기다리며 재시작 뒤 다시 누르면 READY다")
-    void confirmAppliedReinstallsOldAllowlistAndWaitsForRestart() {
+    @DisplayName("관리자 반영 완료는 옛 목록의 설치를 다시 보내고 그 재시작 값을 쓰지 않으며 다시 읽은 설치가 configured 이면 READY다")
+    void confirmAppliedReinstallsOldAllowlistAndIgnoresItsRestartAnswer() {
         CurrentUser member = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         String profile = profileOf(service.register(member, DEMO, VALUES));
-        installed(true, false);
+        // 이전 판이 쓴 목록이라 configured 가 아니다. 다시 보낸 설치가 목록을 맞춘 뒤에는 configured 다.
+        when(connector.readConnector(anyString(), eq(DEMO)))
+                .thenReturn(new ConnectorState("p", true, false, false), new ConnectorState("p", true, true, false));
         when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
 
-        assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
-                .isInstanceOf(ConnectorOperationFailure.class);
-
-        // 등록의 설치와 다시 설치다.
-        verify(connector, times(2)).putConnector(profile, DEMO, true);
-        verify(connector, never()).probe(anyString(), anyString());
-        assertThat(stored(member).status()).isEqualTo(ConnectionStatus.PENDING);
-        assertThat(stored(member).restartRequired()).isTrue();
-        assertThat(agentEnabled(member)).isFalse();
-
-        // 관리자가 gateway 를 재시작한 뒤다.
-        installed(true, true);
-
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
+        // 등록의 설치와 다시 보낸 설치다.
         verify(connector, times(2)).putConnector(profile, DEMO, true);
         verify(toolsets, never()).writeApiServer(any(), any());
         assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
@@ -937,7 +1181,7 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("재시작 대기인 연결은 configured 가 아니어도 확인에서 다시 쓰지 않는다")
+    @DisplayName("재시작 대기인 연결은 확인에서 설치를 다시 보내지 않는다")
     void checkDoesNotReinstallRestartPendingConnection() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         when(connector.putEnv(anyString(), anyString(), anyString())).thenReturn(true);
@@ -952,7 +1196,7 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("다시 쓴 뒤에도 설치가 configured가 아니면 확인은 목록을 쓰지 않고 PENDING으로 둔다")
+    @DisplayName("다시 보낸 뒤에도 설치가 configured가 아니면 확인은 목록을 쓰지 않고 PENDING으로 둔다")
     void checkStaysPendingWithoutWritingToolsetWhenStillNotConfigured() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
@@ -980,7 +1224,7 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("관리자 확인도 다시 쓴 뒤 설치가 configured가 아니면 목록을 쓰지 않고 PENDING으로 둔다")
+    @DisplayName("관리자 확인도 다시 보낸 뒤 설치가 configured가 아니면 목록을 쓰지 않고 PENDING으로 둔다")
     void adminConfirmKeepsPendingWithoutToolsetWhenStillNotConfigured() {
         CurrentUser member = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);

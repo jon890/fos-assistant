@@ -1,4 +1,4 @@
-## ADR-045: 운영 비밀은 operator_env 와 다른 칸으로 선언하고 자식 MCP 프로세스에만 넣는다
+## ADR-046: 운영 비밀은 operator_env 와 다른 칸으로 선언하고 자식 MCP 프로세스에만 넣는다
 
 - **status**: `accepted`
 - **결정**: `connector.json` 의 `operator_env` 는 비밀이 아닌 운영 설정만 담는다. 서비스 주소가 그 예다.

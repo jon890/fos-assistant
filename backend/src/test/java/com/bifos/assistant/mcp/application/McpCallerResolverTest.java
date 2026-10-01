@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 /**
- * 커넥터 에이전트의 실행에서 온 Control Plane 도구 호출을 요청자 판정에서 거절하는 것을 고정한다(ADR-044).
+ * 커넥터 에이전트의 실행에서 온 Control Plane 도구 호출을 요청자 판정에서 거절하는 것을 고정한다(ADR-045).
  *
  * <p>서명이 맞고 origin 실행도 찾았는데 거절하는 경우라, 서명이 틀린 호출과 같은 코드로 답하는지를 함께 본다.
  */

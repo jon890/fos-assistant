@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>SQL 이 아니라 Java 로 쓴 까닭은 마이그레이션 검사가 H2 의 MySQL 모드에서 모든 마이그레이션을 돌리기
  * 때문이다. JSON 텍스트 안의 한 키만 고치는 문장을 H2 와 MySQL 에서 함께 쓸 방법이 SQL 에 없다.
  */
-public class V39__ClearConnectorSecretPrefixes extends BaseJavaMigration {
+public class V40__ClearConnectorSecretPrefixes extends BaseJavaMigration {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String SECRET_PREFIXES = "secretPrefixes";
 

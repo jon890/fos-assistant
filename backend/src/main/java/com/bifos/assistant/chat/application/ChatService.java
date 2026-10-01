@@ -257,7 +257,7 @@ public class ChatService {
             String asked = command == null ? text : command.hermesInput();
             String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), asked);
-            // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-044). turn 지시는 그대로 붙는다.
+            // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045). turn 지시는 그대로 붙는다.
             AssembledContext context =
                     routed.agent().connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(

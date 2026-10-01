@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /**
- * 커넥터 에이전트의 실행이 Memory 문맥을 받지 않는 것을 고정한다(ADR-044).
+ * 커넥터 에이전트의 실행이 Memory 문맥을 받지 않는 것을 고정한다(ADR-045).
  *
  * <p>외부 서비스의 글을 읽는 실행에 개인 Memory 를 넣으면 그 글이 모델을 속여 Memory 를 밖으로 내보낼 수 있다.
  * 일반 에이전트의 실행은 그대로 Memory 를 받는다.

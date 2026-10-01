@@ -135,7 +135,11 @@ class ConnectorCatalogTest(ConnectorGateCase):
         body = self.catalog()
         self.assertEqual(len(body), 1)
         entry = body[0]
-        self.assertEqual(set(entry), {"id", "title", "description", "fields", "verify", "mcp_server"})
+        self.assertEqual(set(entry), {"id", "title", "description", "fields", "verify", "mcp_server",
+                                      "toolsets", "attachments"})
+        # 두 칸이 없는 manifest 는 내장 도구를 열지 않고 사진을 받지 않는다.
+        self.assertEqual(entry["toolsets"], [])
+        self.assertIs(entry["attachments"], False)
         self.assertEqual(entry["id"], DEMO)
         self.assertEqual(entry["title"], "검사용 메모")
         self.assertEqual(entry["mcp_server"], "demo")
@@ -184,6 +188,16 @@ class ConnectorCatalogTest(ConnectorGateCase):
             ("verify.tool is not a string", "connector.json", lambda value: value.update(verify={"tool": 1})),
             ("errors value outside the vocabulary", "connector.json",
              lambda value: value["errors"].update(DEMO_FORBIDDEN="denied")),
+            ("toolsets opens the shell", "connector.json", lambda value: value.update(toolsets=["terminal"])),
+            ("toolsets mixes an allowed and a closed name", "connector.json",
+             lambda value: value.update(toolsets=["vision", "file"])),
+            ("toolsets has an unknown name", "connector.json", lambda value: value.update(toolsets=["sight"])),
+            ("toolsets repeats a name", "connector.json", lambda value: value.update(toolsets=["vision", "vision"])),
+            ("toolsets is not a list", "connector.json", lambda value: value.update(toolsets="vision")),
+            ("toolsets item is not a string", "connector.json", lambda value: value.update(toolsets=[["vision"]])),
+            ("attachments without vision", "connector.json", lambda value: value.update(attachments=True)),
+            ("attachments is not a boolean", "connector.json",
+             lambda value: value.update(toolsets=["vision"], attachments="true")),
             ("operator_env missing from .mcp.json", "connector.json", lambda value: value.update(operator_env=[])),
             ("operator_env repeats a field env", "connector.json",
              lambda value: value.update(operator_env=["DEMO_BASE", "DEMO_TOKEN"])),
@@ -232,6 +246,71 @@ class ConnectorCatalogTest(ConnectorGateCase):
             with self.subTest(label):
                 self.rewrite("connector.json", lambda value: value.update(operator_secrets=wrong))
                 self.assertEqual(self.catalog(), [])
+
+    def test_declared_toolsets_and_attachments_reach_the_catalog(self):
+        """허용한 내장 toolset 과 사진 받기를 선언하면 카탈로그가 그대로 낸다."""
+        self.rewrite("connector.json", lambda value: value.update(toolsets=["vision"], attachments=True))
+        entry = self.catalog()[0]
+        self.assertEqual(entry["toolsets"], ["vision"])
+        self.assertIs(entry["attachments"], True)
+        # 이미지 도구만 열고 사진은 받지 않는 선언도 된다.
+        self.rewrite("connector.json", lambda value: value.update(attachments=False))
+        entry = self.catalog()[0]
+        self.assertEqual(entry["toolsets"], ["vision"])
+        self.assertIs(entry["attachments"], False)
+
+    def test_closed_toolsets_are_never_allowed(self):
+        """셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다."""
+        for name in ("terminal", "file", "memory", "skills", "delegation", "code_execution", "browser"):
+            with self.subTest(name):
+                self.assertNotIn(name, self.plugin.CONNECTOR_TOOLSETS)
+                self.rewrite("connector.json", lambda value: value.update(toolsets=[name]))
+                self.assertEqual(self.catalog(), [])
+
+    def test_skill_body_becomes_the_persona_without_frontmatter(self):
+        """스킬의 SKILL.md 만 읽어 앞머리를 떼고 지침으로 삼는다. 카탈로그에는 싣지 않는다."""
+        (self.connector_root / "skills/demo/NOTES.md").write_text("읽지 않는 파일", encoding="utf-8")
+        (self.connector_root / "skills/README.md").write_text("읽지 않는 파일", encoding="utf-8")
+        persona = self.plugin._connector_manifest(DEMO)["persona"]
+        self.assertTrue(persona.startswith("# 검사용 메모"))
+        self.assertNotIn("name: demo", persona)
+        self.assertNotIn("읽지 않는 파일", persona)
+        # BOM 과 CRLF 로 저장한 파일도 앞머리를 뗀다.
+        skill = self.connector_root / "skills/demo/SKILL.md"
+        skill.write_bytes(b"\xef\xbb\xbf" + skill.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["persona"], persona)
+        self.assertNotIn("persona", self.catalog()[0])
+        self.assertNotIn("검사용 메모\n\n`list_scopes`", json.dumps(self.catalog(), ensure_ascii=False))
+
+    def test_connector_without_skill_body_has_no_persona(self):
+        """스킬이 없는 커넥터는 지침 없이 카탈로그에 나온다."""
+        shutil.rmtree(self.connector_root / "skills/demo")
+        self.assertIsNone(self.plugin._connector_manifest(DEMO)["persona"])
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_oversized_or_linked_skill_body_leaves_the_connector_out(self):
+        """본문이 상한을 넘거나, 앞머리가 닫히지 않았거나, SKILL.md 나 스킬 디렉터리가 링크이면 카탈로그에서 빠진다."""
+        skill = self.connector_root / "skills/demo/SKILL.md"
+        original = skill.read_text(encoding="utf-8")
+        skill.write_text(original + "가" * self.plugin.CONNECTOR_PERSONA_MAX_CHARS, encoding="utf-8")
+        self.assertEqual(self.catalog(), [])
+        skill.write_text("---\nname: demo\n본문", encoding="utf-8")
+        self.assertEqual(self.catalog(), [])
+        # plugin 밖의 파일을 가리키는 링크는 읽지 않는다. 그 내용이 지침에 들어가면 안 된다.
+        outside = self.base / "outside.md"
+        outside.write_text("밖의 비밀", encoding="utf-8")
+        skill.unlink()
+        skill.symlink_to(outside)
+        self.assertEqual(self.catalog(), [])
+        skill.unlink()
+        skill.write_text(original, encoding="utf-8")
+        linked = self.base / "linked-skill"
+        linked.mkdir()
+        (linked / "SKILL.md").write_text("밖의 비밀", encoding="utf-8")
+        (self.connector_root / "skills/outside").symlink_to(linked, target_is_directory=True)
+        self.assertEqual(self.catalog(), [])
+        (self.connector_root / "skills/outside").unlink()
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
 
     def test_missing_or_unreadable_files_leave_the_connector_out(self):
         """`connector.json` 이 없거나, JSON 이 아니거나, 실행할 파일이 링크면 카탈로그에서 빠진다."""
