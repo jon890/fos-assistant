@@ -18,7 +18,7 @@ Hermes core 는 고치지 않는다.
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
 | `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다. 설치는 plugin 의 스킬 본문을 그 profile 의 SOUL.md 에 쓴다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
@@ -126,6 +126,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import hashlib
 import hmac
 import importlib.metadata
 import json
@@ -211,6 +212,18 @@ ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "u
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
+# `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-047).
+# 표는 `docs/connectors.md` 의 「도구 정책」 과 같다.
+TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
+# 느슨한 것에서 엄격한 것의 순서다. 하한 비교가 이 순서의 자리를 쓴다.
+TOOL_APPROVALS = ("none", "required", "always")
+# 위험도마다 (`approval` 이 없을 때의 기본값, 선언이 내려갈 수 없는 하한) 이다.
+TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "required"),
+                      "WRITE": ("required", "required"), "DESTRUCTIVE": ("always", "always"),
+                      "FINANCIAL": ("always", "always")}
+TOOL_TITLE_MAX_CHARS = 80
+# Hermes 가 MCP 도구의 등록 이름에 허용하는 길이다. 넘으면 앞부분에 해시를 붙여 줄인다.
+HERMES_TOOL_NAME_MAX_CHARS = 64
 # 설치가 연결용 profile 의 `SOUL.md` 에 쓰는 스킬 본문의 상한이다. Control Plane 의 성격 본문 상한과 같다.
 CONNECTOR_PERSONA_MAX_CHARS = 8000
 SOUL_FILE = "SOUL.md"
@@ -583,6 +596,66 @@ def _connector_fields(declared) -> list:
     return declared
 
 
+def _hermes_tool_name(server: str, tool: str) -> str:
+    """Hermes 가 MCP 도구에 붙이는 등록 이름이다. `tools/mcp_tool_schema.py` 의 `mcp_prefixed_tool_name` 과 같은 규칙이다.
+
+    규칙은 `docs/hermes/connector-policy.md` 의 「MCP 도구의 등록 이름」 이 갖는다.
+    글자를 바꾸고 줄이므로 서로 다른 도구가 같은 등록 이름이 될 수 있다.
+    """
+    full = "mcp__%s__%s" % (re.sub(r"[^A-Za-z0-9_]", "_", server), re.sub(r"[^A-Za-z0-9_]", "_", tool))
+    if len(full) <= HERMES_TOOL_NAME_MAX_CHARS:
+        return full
+    return full[:HERMES_TOOL_NAME_MAX_CHARS - 9] + "_" + hashlib.sha256(full.encode("utf-8")).hexdigest()[:8]
+
+
+def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
+    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title"}}` 로 낸다. 틀리면 예외다.
+
+    하한보다 느슨한 선언은 고쳐서 받지 않고 거절한다. 조용히 엄격하게 읽으면 선언이 틀린 것을 만든 사람이 모른다.
+    `schema: 1` 은 도구 정책을 선언하지 않는다. 대시보드가 부르는 읽기 전용 도구만 정책으로 낸다.
+    """
+    call_tools = {verify_tool} | set(option_tools)
+    if declared["schema"] == 1:
+        if "tools" in declared or "default_tool_policy" in declared:
+            raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
+        return {name: {"risk": "READ", "approval": "none", "title": None} for name in sorted(call_tools)}
+    if declared["schema"] != 2:
+        raise ValueError("schema 는 1 이나 2 만 받는다")
+
+    tools = declared.get("tools")
+    if not isinstance(tools, dict) or not tools:
+        raise ValueError("schema 2 의 tools 는 비어 있지 않은 객체다")
+    if "default_tool_policy" in declared and declared["default_tool_policy"] != "deny":
+        raise ValueError("default_tool_policy 는 deny 만 받는다")
+    policies = {}
+    for name, declared_tool in tools.items():
+        if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
+            raise ValueError("tools 의 키는 도구 이름이다")
+        if not isinstance(declared_tool, dict) or set(declared_tool) - {"risk", "approval", "title"}:
+            raise ValueError("tools 의 값은 risk, approval, title 만 갖는 객체다")
+        risk = declared_tool.get("risk")
+        if not isinstance(risk, str) or risk not in TOOL_RISKS:
+            raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
+        default, floor = TOOL_RISK_DEFAULTS[risk]
+        approval = declared_tool.get("approval", default)
+        if not isinstance(approval, str) or approval not in TOOL_APPROVALS:
+            raise ValueError("approval 은 none, required, always 가운데 하나다")
+        if TOOL_APPROVALS.index(approval) < TOOL_APPROVALS.index(floor):
+            raise ValueError("approval 이 그 위험도의 하한보다 느슨하다")
+        title = declared_tool.get("title")
+        if "title" in declared_tool and (not isinstance(title, str) or not 1 <= len(title) <= TOOL_TITLE_MAX_CHARS):
+            raise ValueError("title 은 1자에서 %d자까지의 문자열이다" % TOOL_TITLE_MAX_CHARS)
+        policies[name] = {"risk": risk, "approval": approval, "title": title}
+    for name in call_tools:
+        # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
+        if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":
+            raise ValueError("확인 도구와 선택지 도구는 tools 에 READ 와 none 으로 선언한다")
+    # 판정은 등록 이름으로 도구를 찾는다. 두 도구의 등록 이름이 같으면 어느 정책인지 알 수 없다.
+    if len({_hermes_tool_name(mcp_server, name) for name in policies}) != len(policies):
+        raise ValueError("tools 의 두 도구가 같은 Hermes 등록 이름이 된다")
+    return policies
+
+
 def _connector_persona(skill_dirs: list) -> str | None:
     """스킬 디렉터리들의 `<스킬>/SKILL.md` 본문을 이름 순으로 이어 붙인다. 스킬이 없으면 None 이다.
 
@@ -630,8 +703,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("plugin.json 의 이름이 운영 목록과 다르다")
 
     declared = _read_connector_json(root, "connector.json")
-    if not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] != 1:
-        raise ValueError("schema 는 1 만 받는다")
+    if not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] not in (1, 2):
+        raise ValueError("schema 는 1 이나 2 만 받는다")
     if declared.get("id") != connector_id:
         raise ValueError("id 가 운영 목록의 이름과 다르다")
     if (not isinstance(declared.get("title"), str) or not declared["title"]
@@ -726,9 +799,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     env = {name: "${%s}" % name for name in server["env"]}
     # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
     env.update({name: entry["env"][name] for name in operator_env})
-    tools = {verify["tool"]} | {field["options"]["tool"] for field in fields if "options" in field}
+    option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     return {
         "id": connector_id,
+        "schema": declared["schema"],
         "title": declared["title"],
         "description": declared.get("description", ""),
         "fields": fields,
@@ -740,7 +814,9 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "toolsets": list(toolsets),
         "attachments": attachments,
         "persona": persona,
-        "tools": frozenset(tools),
+        # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
+        "call_tools": frozenset({verify["tool"]} | option_tools),
+        "tools": _connector_tools(declared, verify["tool"], option_tools, mcp_server),
         "server": {"command": command, "args": args, "env": env, "enabled": True},
     }
 
@@ -1071,9 +1147,13 @@ def _connector_catalog_response():
     from starlette.responses import JSONResponse
 
     return JSONResponse(
-        [{"id": manifest["id"], "title": manifest["title"], "description": manifest["description"],
+        [{"id": manifest["id"], "schema": manifest["schema"], "title": manifest["title"],
+          "description": manifest["description"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
-          "toolsets": manifest["toolsets"], "attachments": manifest["attachments"]}
+          "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
+          # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
+          "tools": {name: {key: value for key, value in policy.items() if value is not None}
+                    for name, policy in manifest["tools"].items()}}
          for manifest in _connector_catalog().values()],
         status_code=200,
     )
@@ -1171,7 +1251,7 @@ async def _connector_call_request(request, connector_id: str):
     if body is None or set(body) != {"tool", "values"} or not isinstance(body["values"], dict):
         return _rejected("tool 과 values 만 필요하다")
     tool = body["tool"]
-    if not isinstance(tool, str) or tool not in manifest["tools"]:
+    if not isinstance(tool, str) or tool not in manifest["call_tools"]:
         return _rejected("이 커넥터가 선택지나 확인에 쓰는 도구가 아니다")
     fields = {field["key"]: field for field in manifest["fields"]}
     env = {}
