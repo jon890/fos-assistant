@@ -21,6 +21,34 @@ class HermesRunEventStreamTest {
     }
 
     @Test
+    @DisplayName("도구 결과 객체와 문자열을 중계 전에 같은 규칙으로 가린다")
+    void redactsStructuredAndStringToolDetailsBeforeForwarding() {
+        RunEvent object = parse("""
+                {"event":"tool.completed","tool":"web_search","result":
+                  {"token":"small-secret","id":"12345678-1234-5678-9012-123456789abc","price":12000}}
+                """);
+        RunEvent text = parse("""
+                {"data":{"event":"tool.started","tool":"terminal","preview":"Bearer small-secret"}}
+                """);
+
+        assertThat(object.detail()).isEqualTo("{\"token\":\"[가림]\",\"id\":\"[항목 1]\",\"price\":12000}");
+        assertThat(text.detail()).isEqualTo("[가림]");
+    }
+
+    @Test
+    @DisplayName("연결용 도구의 결과는 가리되 이름과 성공 여부와 걸린 시간은 남긴다")
+    void hidesConnectorDetailAndPreservesToolMetadata() {
+        RunEvent event = HermesRunEventStream.toRunEvent(mapper.readTree("""
+                {"event":"tool.completed","tool":"lookup","detail":"tiny secret","duration":0.5,"error":false}
+                """), true);
+
+        assertThat(event.detail()).isEqualTo("[연결 도구 내용 가림]");
+        assertThat(event.toolName()).isEqualTo("lookup");
+        assertThat(event.durationMs()).isEqualTo(500L);
+        assertThat(event.failed()).isFalse();
+    }
+
+    @Test
     @DisplayName("초 단위 실수로 오는 걸린 시간을 밀리초 정수로 옮긴다")
     void convertsFractionalSecondsElapsedToIntegerMillis() {
         RunEvent event = parse("{\"event\": \"tool.completed\", \"tool\": \"web_search\", \"duration\": 1.25}");

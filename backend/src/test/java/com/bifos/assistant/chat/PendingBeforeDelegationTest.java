@@ -60,7 +60,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
- * 보낼 대기 메시지와 끝난 위임 결과가 함께 있을 때 사용자의 말이 먼저 가는지 본다(ADR-047).
+ * 보낼 대기 메시지와 끝난 위임 결과가 함께 있을 때 사용자의 말이 먼저 가는지 본다(ADR-048).
  *
  * <p>두 turn 이 모두 테스트 스레드 밖에서 돈다. 앞 turn 이 닫히고 다음 turn 이 열리는 사이에는 잠금이 잠깐 비므로,
  * 잠금이 아니라 쌓인 메시지 수를 기다린 뒤 단언한다.

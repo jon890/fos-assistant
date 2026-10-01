@@ -76,6 +76,19 @@ const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 /** 마지막 실행 요청이 실어 온 provider, 모델, effort 를 돌려준다. 브라우저 검사는 대역을 다른 프로세스에서 띄워 이 길로 묻는다. */
 const TEST_LAST_SUBMITTED_RUNTIME_PATH = "/__test/last-submitted-runtime";
 
+/** 도구 가리기 검사만 쓰는 가짜 값이다. 실제 연결 값이 아니다. */
+export const TOOL_DETAIL_SECRETS = [
+  "12345678-1234-5678-9012-123456789abc",
+  "short-test-secret",
+  "ghp_redactionexample",
+] as const;
+export const TOOL_DETAIL_SAMPLE = JSON.stringify({
+  id: TOOL_DETAIL_SECRETS[0],
+  token: TOOL_DETAIL_SECRETS[1],
+  note: TOOL_DETAIL_SECRETS[2],
+  price: 12000,
+});
+
 /**
  * 대역이 카탈로그로 내는 시험 커넥터다. 선언 모양은 plugin 이 읽는 `connector.json` 과 같고, 카탈로그 응답에는
  * 거기에 `mcp_server` 가 더해진다. 칸의 이름과 env 이름을 어느 서비스의 것과도 다르게 둔다.
@@ -1299,8 +1312,11 @@ export function startFakeHermes(
               event(response, { event: "message.delta", delta: streamedOutput.slice(offset, offset + 80) });
             }
           }
-          event(response, { event: "tool.started", tool: "fake-tool", preview: "started" });
+          const redactDetail = run.input === "도구 가리기 검사" || run.input === "스트림 정본 검사";
+          event(response, { event: "tool.started", tool: "fake-tool",
+            preview: redactDetail ? TOOL_DETAIL_SAMPLE : "started" });
           event(response, { event: "tool.completed", tool: "fake-tool", duration: 0.1,
+            result: redactDetail ? JSON.parse(TOOL_DETAIL_SAMPLE) : undefined,
             error: run.input === "병렬 하위 에이전트 검사" });
           event(response, { event: "tool.started", tool: "fake-reader", preview: "started" });
           event(response, { event: "tool.completed", tool: "fake-reader", duration: 0.25, error: false });

@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -126,7 +127,7 @@ class ChatStopTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any());
+                .open(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     private AgentExecution latestExecution(CurrentUser user) {
@@ -333,7 +334,7 @@ class ChatStopTest {
                     return null;
                 })
                 .when(eventStream)
-                .open(any(), any(), any(), any(), any());
+                .open(any(), any(), any(), any(), any(), anyBoolean());
 
         List<ChatEvent> relayed = new ArrayList<>();
         chat.stream(dad, null, "계속해 줘", "dad", relayed::add);

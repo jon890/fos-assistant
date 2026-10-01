@@ -914,7 +914,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 ### 응답 중 대기열
 
-결정은 [ADR-047](adr/ADR-047-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md), 흐름은 [flow.md](flow.md) 의 「응답 중에 보낼 때」 에 있다.
+결정은 [ADR-048](adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md), 흐름은 [flow.md](flow.md) 의 「응답 중에 보낼 때」 에 있다.
 
 | 자리 | 맡는 것 |
 | --- | --- |

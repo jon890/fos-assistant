@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * turn 이 도는 동안 보낸 글을 대기 줄에 쌓고, 취소하고, 멈춘 줄을 푼다(ADR-047).
+ * turn 이 도는 동안 보낸 글을 대기 줄에 쌓고, 취소하고, 멈춘 줄을 푼다(ADR-048).
  *
  * <p>보내는 것은 {@link NextTurnDispatcher} 가 맡는다. 여기서는 줄을 바꾼 뒤 그 자리를 부르기만 한다.
  */

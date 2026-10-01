@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * turn 이 도는 동안 사용자가 보낸 메시지다(ADR-047).
+ * turn 이 도는 동안 사용자가 보낸 메시지다(ADR-048).
  *
  * <p>보내기 전까지만 있는 행이다. 다음 turn 으로 보내면 지우고, 보낸 글은 {@code chat_message} 에 남는다.
  */

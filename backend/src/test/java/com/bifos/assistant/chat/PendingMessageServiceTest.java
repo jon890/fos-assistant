@@ -59,7 +59,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * turn 이 도는 동안 보낸 글이 대기 줄에 쌓였다가 다음 turn 으로 합쳐 가는지 본다(ADR-047).
+ * turn 이 도는 동안 보낸 글이 대기 줄에 쌓였다가 다음 turn 으로 합쳐 가는지 본다(ADR-048).
  *
  * <p>대기 메시지로 연 turn 은 테스트 스레드 밖의 가상 스레드에서 돈다. 검사마다 그 turn 이 끝날 때까지 기다린 뒤
  * 단언한다. 남은 대기 행은 다른 검사 문맥의 기동 확인이 turn 으로 보내므로 앞뒤에서 비운다.

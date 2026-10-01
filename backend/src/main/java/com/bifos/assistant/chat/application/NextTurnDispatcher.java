@@ -31,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때 다음 turn 을 정한다.
  *
- * <p>다음 turn 을 정하는 자리는 이것 하나다(ADR-047). 리스너를 여럿 걸면 같은 순간에 turn 잠금을 다투고 순서가 등록
+ * <p>다음 turn 을 정하는 자리는 이것 하나다(ADR-048). 리스너를 여럿 걸면 같은 순간에 turn 잠금을 다투고 순서가 등록
  * 순서에 달리기 때문이다. 잠금은 {@link TurnCancellation} 의 메모리 맵이라 서버 하나를 전제로 한다.
  *
  * <p>대기 메시지를 먼저 보고, 보낼 것이 없으면 끝난 위임 결과를 본다. 사용자의 말이 위임 결과보다 먼저 간다.

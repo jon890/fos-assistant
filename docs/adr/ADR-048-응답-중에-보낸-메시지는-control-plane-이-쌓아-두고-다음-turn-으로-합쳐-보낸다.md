@@ -1,4 +1,4 @@
-## ADR-047: 응답 중에 보낸 메시지는 Control Plane 이 쌓아 두고 다음 turn 으로 합쳐 보낸다
+## ADR-048: 응답 중에 보낸 메시지는 Control Plane 이 쌓아 두고 다음 turn 으로 합쳐 보낸다
 
 - **status**: `accepted`
 - Date: 2026-10-01

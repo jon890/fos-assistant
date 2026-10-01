@@ -189,7 +189,7 @@ public class ChatService {
     private static final int PENDING_READ_ATTEMPTS = 3;
 
     /**
-     * 쌓인 대기 메시지를 합쳐 사용자 메시지 하나로 turn 을 돌린다(ADR-047).
+     * 쌓인 대기 메시지를 합쳐 사용자 메시지 하나로 turn 을 돌린다(ADR-048).
      *
      * <p>부르는 쪽이 그 대화의 turn 잠금을 이미 잡았다. 잠금을 잡기 전에 읽은 대기 줄은 그 사이 취소되거나 멈췄을 수
      * 있어 여기서 다시 읽는다. 비었거나 멈춘 행이 있으면 아무것도 남기지 않고 돌아간다.
@@ -618,7 +618,8 @@ public class ChatService {
                                 }
                             }
                         },
-                        stream -> turns.attachStream(handle, stream));
+                        stream -> turns.attachStream(handle, stream),
+                        pending.agent().connectorManaged());
             } catch (ApiException ex) {
                 log.warn("Hermes event stream ended before final status runId={}", runId, ex);
             } finally {

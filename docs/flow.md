@@ -1535,7 +1535,7 @@ sequenceDiagram
 
 turn 이 도는 동안 보낸 글은 Control Plane 이 대기 메시지로 저장한다.
 그 turn 이 끝나면 쌓인 것을 합쳐 사용자 메시지 하나로 다음 turn 을 연다.
-결정은 [ADR-047](adr/ADR-047-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 에 있다.
+결정은 [ADR-048](adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 에 있다.
 
 ```mermaid
 sequenceDiagram

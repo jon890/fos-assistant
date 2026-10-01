@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** turn 이 도는 동안 보낸 글의 대기 줄을 읽고, 더하고, 취소하고, 멈춘 줄을 푸는 경로다(ADR-047). */
+/** turn 이 도는 동안 보낸 글의 대기 줄을 읽고, 더하고, 취소하고, 멈춘 줄을 푸는 경로다(ADR-048). */
 @RestController
 @RequestMapping("/api/v1/chat/conversations/{conversationId}/pending")
 @RequiredArgsConstructor
