@@ -87,13 +87,14 @@ test("제안을 물리면 제안 절과 머리의 미처리 수가 사라진다"
   await expect(page.getByTestId("memory-proposal-count")).toHaveCount(0);
 });
 
-test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인다", async ({ page }) => {
+test("Memory 변경이 실패하면 성공처럼 닫지 않고 오류를 보인다", async ({ page }, testInfo) => {
+  const title = `${testInfo.project.name} 실패 검사`;
   await page.goto("/memory");
   await page.getByLabel("범위").selectOption("USER");
-  await page.getByLabel("제목", { exact: true }).fill("실패 검사");
+  await page.getByLabel("제목", { exact: true }).fill(title);
   await page.getByLabel("내용").fill("원래 내용");
   await page.getByRole("button", { name: "저장" }).click();
-  const item = page.getByRole("heading", { name: "실패 검사" }).locator("xpath=ancestor::article");
+  const item = page.getByRole("heading", { name: title, exact: true }).locator("xpath=ancestor::article");
   await page.route("**/api/memories/*", async (route) => route.fulfill({ status: 500 }));
   await item.getByRole("button", { name: "고치기" }).click();
   await item.getByRole("textbox").fill("바뀐 내용");
