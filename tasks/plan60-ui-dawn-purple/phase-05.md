@@ -1,0 +1,162 @@
+# Phase 05. 움직임: 메시지 등장, 펼침, 시트와 대화상자, 목록, 화면 전환
+
+**Execution profile**: deep
+
+## 목표
+
+ADR-047 「움직임」 표의 움직임을 부품에 붙이고, 모든 움직임이 줄인 움직임 설정을 따르는지 검사로 지킨다.
+조작에 화면이 부드럽게 반응하게 하려는 것이다.
+
+**범위 외**: 모션 라이브러리를 더하지 않는다. 목록 재배치 움직임은 하지 않는다. 테마 바꿈의 crossfade 는 하지 않는다.
+
+## 컨텍스트
+
+- phase 01 이 `globals.css` 에 `duration-fast`(120ms), `duration-base`(200ms), `duration-slow`(260ms), `ease-out`, `ease-spring` 토큰과 `@media (prefers-reduced-motion: reduce)` 블록을 두었다. 그 블록이 모든 animation 과 transition 을 100ms linear 로 줄이고 `tw-animate-css` 의 이동과 크기 변화를 끈다.
+- `web/src/components/ui/dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `tooltip.tsx` 가 `tw-animate-css` 의 `animate-in`, `animate-out`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*` 와 `duration-100`, `duration-200` 을 쓴다.
+- phase 03 이 `AssistantRow` 를 만들어 기다림 점, 작업 과정 블록, 답이 같은 자리에 들어온다. `activity-block.tsx` 는 펼친 내용을 `expanded ? ... : null` 로 그린다.
+- `web/src/components/chat/message-list.tsx` 의 `scrollToBottom` 이 `behavior: "smooth"` 를 쓴다.
+- Next.js 16.0.10 이고 `web/next.config.ts` 에 `experimental` 설정이 없다. `experimental.viewTransition` 을 켜면 React 의 `ViewTransition` 을 쓸 수 있다.
+- 브라우저 검사는 Playwright 의 `page.emulateMedia({ reducedMotion: "reduce" })` 로 줄인 움직임을 켠다.
+
+**근거 문서**: `docs/adr/ADR-047-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md` 의 「움직임」 절, `docs/flow.md` 의 「기다리는 동안 보이는 것」 절, `web/AGENTS.md` 의 「색과 간격은 테마 토큰이 소유한다」 절
+
+## 의도 메모
+
+- 등장 움직임은 **새로 생긴 줄에만** 준다. 대화를 열 때 이미 있던 메시지가 한꺼번에 움직이면 안 된다.
+- 높이 펼침은 `grid-template-rows` 0fr 에서 1fr 로 한다. `height: auto` 는 움직이지 않고, `interpolate-size` 는 Safari 가 지원하지 않는다.
+- 삭제 움직임은 서버 요청이 성공한 뒤에 시작한다. 실패하면 줄이 그대로 남아야 한다.
+- 화면 전환은 실험 기능이다. 끄면 CSS 등장 움직임만 남고 화면은 그대로 동작해야 한다.
+
+## 작업 항목
+
+### 1. `web/src/app/globals.css` 의 keyframes 와 유틸리티
+
+`@theme` 에 `--animate-*` 로 선언해 `animate-*` 클래스를 만든다.
+
+| 클래스 | keyframes | 길이와 곡선 |
+| --- | --- | --- |
+| `animate-message-user` | opacity 0 → 1, `translateY(6px) scale(0.96)` → none. `transform-origin: 100% 100%` | `duration-base`, `ease-spring`, `both` |
+| `animate-message-assistant` | opacity 0 → 1, `translateY(4px)` → none | `duration-base`, `ease-out`, `both` |
+| `animate-screen-in` | opacity 0 → 1, `translateY(8px)` → none | `duration-base`, `ease-out`, `both` |
+| `animate-fade-in` | opacity 0 → 1 | `duration-fast`, linear, `both` |
+
+줄인 움직임 블록에 이 네 keyframes 가 이동과 크기 변화를 하지 않도록 더한다. 방법은 그 블록 안에서 네 클래스의 `animation-name` 을 흐려짐만 하는 keyframes(`fade-in` 의 것)로 `!important` 로 바꾸는 것이다.
+
+펼침 유틸리티를 둔다.
+
+```css
+@utility collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-slow) var(--ease-out);
+  &[data-open="true"] { grid-template-rows: 1fr; }
+  & > * { min-height: 0; overflow: hidden; }
+}
+```
+
+### 2. 메시지 등장
+
+- `web/src/components/chat/message-list.tsx` 에서 이 화면이 대화를 처음 그린 뒤에 생긴 줄만 표시한다. 대화를 읽어 온 직후의 `turn.id` 집합을 `useRef` 에 두고(`conversationId` 가 바뀌거나 `loading` 이 끝날 때 다시 채운다), 그 집합에 없는 줄에 `data-entered="true"` 를 준다. `MessageBubble` 에 `entered?: boolean` 을 더한다.
+- `web/src/components/chat/message-bubble.tsx`: `entered` 인 내 말풍선(`data-testid="user-message"`)에 `animate-message-user`, 비서 줄 `<li>` 에 `animate-message-assistant` 를 준다.
+- `pending-assistant` 줄도 `animate-message-assistant` 를 준다. 그 줄이 저장된 답으로 바뀔 때 다시 움직이지 않게 한다: 답이 흘러나오기 시작한 줄(`pendingAssistant`)과 그 답이 저장돼 `id` 가 바뀐 줄에는 등장 움직임을 주지 않는다. `chat-panel.tsx` 가 임시 `id`(`assistant-...`)를 저장된 `id` 로 바꾸는 자리를 읽고, 바뀐 `id` 를 집합에 넣는 방법을 정한다.
+- 기다림에서 답으로: `AssistantRow` 의 아래 칸에서 기다림 점이 답 본문으로 바뀔 때 본문 쪽에 `animate-fade-in` 을 준다. 줄의 높이는 phase 03 이 맞춰 두었다.
+- `turn-error` 와 `no-answer` 줄에 `animate-fade-in` 을 준다.
+- `scrollToBottom` 의 `behavior` 를 `window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"` 로 정한다.
+
+### 3. 작업 과정 펼치기
+
+`web/src/components/chat/activity/activity-block.tsx`:
+
+- 펼친 내용을 조건부로 그리지 않고 `<div className="collapsible" data-open={expanded}>` 안에 늘 둔다. 안쪽 `<div>` 가 `border-t` 와 여백을 갖는다. 접힌 동안 안쪽에 `inert` 를 줘 초점이 들어가지 않게 한다.
+- 저장된 블록의 나무는 지금처럼 처음 펼칠 때만 읽는다(`expanded` 조건을 지킨다).
+- `atBottomRef` 를 되돌리는 주석과 동작(「접으면 스크롤 상자가 사라진다」)을 새 구조에 맞게 고친다. 접어도 상자가 남으므로, 접을 때 `scrollTop` 을 0 으로 돌리고 `atBottomRef` 를 `true` 로 둔다. 도는 중에 다시 펼치면 맨 아래로 따라가야 한다(`test/browser/activity-scroll.spec.ts` 가 이 동작을 검사한다).
+- 화살표에 `transition-transform duration-base ease-out` 을 준다.
+- 접힌 내용을 「보이지 않음」 으로 단언하던 검사는 `toBeHidden()` 이 통과하는지 확인한다. 높이 0 과 `overflow: hidden` 만으로는 Playwright 가 보인다고 볼 수 있으므로, 접힌 안쪽에 `aria-hidden` 과 함께 `invisible`(`visibility: hidden`)을 주고, 펼칠 때 바로 푼다. 접을 때는 높이 transition 이 끝난 뒤(`onTransitionEnd`)에 `invisible` 을 건다.
+
+### 4. 시트, 대화상자, 메뉴
+
+| 파일 | 바꿀 것 |
+| --- | --- |
+| `web/src/components/ui/sheet.tsx` | 덮개 `duration-base`. 본문은 `duration-slow ease-out` 이고 `slide-in-from-*-10` 을 전체 폭 밀기(`slide-in-from-left`, `slide-in-from-right`, `slide-in-from-top`, `slide-in-from-bottom` 과 짝이 되는 `slide-out-to-*`)로 바꾼다 |
+| `web/src/components/ui/dialog.tsx`, `alert-dialog.tsx` | `duration-100` 을 `duration-base` 로, `zoom-in-95`/`zoom-out-95` 를 `zoom-in-[0.96]`/`zoom-out-[0.96]` 으로. 곡선 `ease-out` |
+| `web/src/components/ui/dropdown-menu.tsx`, `tooltip.tsx` | `duration-100` 을 `duration-fast` 로 |
+
+`duration-100`, `duration-200` 같은 숫자 길이가 `web/src` 에 남지 않아야 한다.
+`test/browser/design-tokens.spec.ts` 의 `readBorder` 는 Sheet 의 transition 을 끄고 읽는다. 그대로 통과하는지 확인한다.
+
+### 5. 목록 추가와 삭제
+
+- `web/src/components/ui/use-exit.ts` 신규.
+
+  ```ts
+  /** 줄을 지우기 전에 나가는 움직임을 보인다. `leaving` 인 동안 줄에 `data-leaving` 을 주고, 끝나면 `remove` 를 부른다. */
+  export function useExit(durationMs?: number): { leaving: boolean; exit(remove: () => void): void }
+  ```
+
+  `durationMs` 기본값은 120 이다. `prefers-reduced-motion` 이면 기다리지 않고 바로 `remove` 를 부른다. 언마운트되면 타이머를 지운다.
+- `globals.css` 에 `[data-leaving="true"] { opacity: 0; transition: opacity var(--duration-fast) linear; }` 를 둔다.
+- 쓰는 곳: `web/src/components/shell/conversation-nav.tsx` 의 대화 지우기, `web/src/components/memory/memory-item.tsx` 의 기억 지우기. 서버 요청이 성공한 뒤 `exit(() => 목록 갱신)` 을 부른다.
+- 추가: 대화 목록의 새 줄과 기억 목록의 새 줄에 `animate-message-assistant` 를 준다. 처음 그릴 때 있던 줄에는 주지 않는다(작업 항목 2 와 같은 방법).
+
+### 6. 화면 전환
+
+- `web/next.config.ts`: `experimental: { viewTransition: process.env.NEXT_PUBLIC_VIEW_TRANSITION !== "off" }` 를 둔다. 영어 주석을 한국어로 고치지 않는다(이 phase 의 범위가 아니다). 새 주석은 한국어로 쓴다.
+- `web/src/components/shell/app-shell.tsx` 의 본문 자리(`children` 을 감싼 `main`)를 React 의 `ViewTransition` 으로 감싼다. import 이름은 설치된 React 가 내보내는 것을 `web/node_modules/react` 에서 확인한다(`ViewTransition` 이나 `unstable_ViewTransition`).
+- `globals.css` 에 `::view-transition-old(root)` 는 120ms linear 흐려짐, `::view-transition-new(root)` 는 200ms `ease-out` 의 8px 오름과 흐려짐을 둔다. 줄인 움직임 블록에서는 둘 다 100ms 흐려짐만 한다. 사이드바는 `view-transition-name` 을 따로 줘 전환에서 빠지게 한다.
+- **끌 수 있어야 한다.** `NEXT_PUBLIC_VIEW_TRANSITION=off` 로 빌드하면 `ViewTransition` 을 쓰지 않고 본문 자리에 `key={pathname}` 인 `animate-screen-in` 감싸개만 둔다. 두 경우를 한 부품 `web/src/components/shell/screen-transition.tsx` 가 고른다.
+- 켠 채로 전체 브라우저 검사를 돌린다. 화면 전환 때문에 실패하는 검사가 있으면 기본값을 끔으로 바꾸고(`=== "on"` 일 때만 켠다), 무엇이 실패했는지 phase 결과에 적는다. 검사를 고쳐 맞추지 않는다.
+- 대화 화면(`/c/{id}`) 사이의 이동은 사이드바에서 자주 일어난다. 그 이동에서 입력창이 깜빡이면 대화 화면을 전환 대상에서 뺀다.
+
+### 7. 검사
+
+`test/browser/motion.spec.ts` 신규.
+
+| 검사 | 방법 |
+| --- | --- |
+| 새로 보낸 내 말풍선이 등장 움직임을 갖는다 | 보낸 직후 `user-message` 의 `getComputedStyle(...).animationName` 이 `none` 이 아니고 `animationDuration` 이 `0.2s` 다 |
+| 대화를 다시 열면 이미 있던 메시지는 움직이지 않는다 | 새로 고친 뒤 같은 요소의 `animationName` 이 `none` 이다 |
+| 작업 과정 블록을 펼치면 높이가 transition 으로 바뀐다 | `.collapsible` 의 `transitionProperty` 에 `grid-template-rows` 가 있고 `transitionDuration` 이 `0.26s` 다 |
+| 줄인 움직임에서 말풍선이 이동하지 않는다 | `emulateMedia({ reducedMotion: "reduce" })` 뒤 보낸 말풍선의 `animationDuration` 이 `0.1s` 이고, 움직임이 도는 동안에도 `transform` 이 `none` 이다(`getAnimations()` 의 keyframes 에 `transform` 이 없다) |
+| 줄인 움직임에서 대화상자가 크기 변화를 하지 않는다 | 대화 지우기 확인 창을 열고 `[data-slot="alert-dialog-content"]` 의 `getAnimations()` keyframes 에서 `scale` 과 `transform` 이 처음과 끝이 같다 |
+| 줄인 움직임에서 서랍이 밀려 들어오지 않는다 | `mobile` 에서 사이드바 서랍의 `getAnimations()` keyframes 의 `translate` 가 처음과 끝이 같다 |
+| 줄인 움직임에서 「새 메시지」 단추가 바로 내려간다 | `scrollTo` 를 `addInitScript` 로 감싸 받은 `behavior` 가 `auto` 다 |
+
+`test/unit/design-tokens.test.ts` 에 더한다: `web/src` 에 `duration-100`, `duration-150`, `duration-200`, `duration-300` 이 없다. `motion-reduce:` 는 `animate-none` 과 `hidden`, `flex` 에만 붙는다(`waiting-indicator.tsx` 의 대체 문장 포함).
+
+## 검증
+
+```bash
+# cwd: 저장소 root
+node --test test/unit/design-tokens.test.ts
+! grep -rnE 'duration-(100|150|200|300)\b' web/src
+cd web && pnpm typecheck && pnpm lint
+cd web && pnpm test:browser test/browser/motion.spec.ts test/browser/activity-scroll.spec.ts
+cd web && pnpm test:browser
+```
+
+기대값: 모두 종료 코드 0. 마지막 줄은 전체 브라우저 검사다.
+
+## 변경 파일
+
+| 파일 | 변경 |
+|---|---|
+| `test/browser/motion.spec.ts` | 신규 |
+| `web/src/components/ui/use-exit.ts` | 신규 |
+| `web/src/components/shell/screen-transition.tsx` | 신규 |
+| `web/src/app/globals.css` | 수정 |
+| `web/next.config.ts` | 수정 |
+| `web/src/components/shell/app-shell.tsx` | 수정 |
+| `web/src/components/shell/conversation-nav.tsx` | 수정 |
+| `web/src/components/memory/memory-item.tsx` | 수정 |
+| `web/src/components/memory/memory-list.tsx` | 수정 |
+| `web/src/components/chat-panel.tsx` | 수정 |
+| `web/src/components/chat/message-list.tsx` | 수정 |
+| `web/src/components/chat/message-bubble.tsx` | 수정 |
+| `web/src/components/chat/activity/activity-block.tsx` | 수정 |
+| `web/src/components/ui/sheet.tsx` | 수정 |
+| `web/src/components/ui/dialog.tsx` | 수정 |
+| `web/src/components/ui/alert-dialog.tsx` | 수정 |
+| `web/src/components/ui/dropdown-menu.tsx` | 수정 |
+| `web/src/components/ui/tooltip.tsx` | 수정 |
+| `test/unit/design-tokens.test.ts` | 수정 |
+| `test/browser/activity-scroll.spec.ts` | 수정 |
