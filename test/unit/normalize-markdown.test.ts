@@ -48,6 +48,13 @@ test("이스케이프한 파이프는 열로 세지 않고 CRLF를 보존한다"
   );
 });
 
+test("인용문 표에는 인용 접두사를 붙이고 닫지 않은 컨테이너 코드는 밖에서 끝난다", () => {
+  assert.equal(normalizeMarkdown("> A | B\n> C | D"), "> A | B\n> | --- | --- |\n> C | D");
+  for (const code of ["> ```\n> A | B\n> C | D", "- ```\n  A | B\n  C | D"]) {
+    assert.equal(normalizeMarkdown(code + "\n\nH | I\nJ | K"), code + "\n\nH | I\n| --- | --- |\nJ | K");
+  }
+});
+
 test("첫 두 행이 확인된 뒤 스트림의 미완성 행이 붙어도 표 판정을 유지한다", () => {
   const prefix = "번호 | 구분 | 금액\n1 | 식비 | 100\n";
   assert.equal(normalizeMarkdown("번호 | 구분 | 금액\n1"), "번호 | 구분 | 금액\n1");

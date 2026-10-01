@@ -171,7 +171,7 @@ class ChatRegenerateTest {
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
         assertThat(history).hasSize(2);
         assertThat(history.getLast().replacesMessageId()).isNull();
-        assertThat(stub().received().getLast().instructions()).isEqualTo(AskFormat.GUIDE);
+        assertThat(stub().received().getLast().instructions()).contains("GFM", "| --- | --- |").endsWith(AskFormat.GUIDE);
     }
 
     @Test

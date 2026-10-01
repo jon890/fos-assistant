@@ -290,7 +290,7 @@ class ChatServiceTest {
                                             .findById(turn.conversationId())
                                             .orElseThrow()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
-            assertThat(command.instructions()).isEqualTo(AskFormat.GUIDE);
+            assertThat(command.instructions()).contains("GFM", "| --- | --- |").endsWith(AskFormat.GUIDE);
             // 새 대화도 Control Plane 이 정한 session 으로 첫 turn 을 보낸다.
             assertThat(command.sessionId()).startsWith("fos-");
         });

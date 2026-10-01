@@ -1,5 +1,5 @@
 function cellsOf(line: string): string[] | null {
-  if (/^(?: {4}|\t| {0,3}>)/.test(line)) return null;
+  if (/^(?: {4}|\t)/.test(line)) return null;
 
   const cells: string[] = [];
   let start = 0;
@@ -28,14 +28,40 @@ export function normalizeMarkdown(source: string): string {
   const lines = source.split(/\r?\n/);
   const newline = source.includes("\r\n") ? "\r\n" : "\n";
   const result: string[] = [];
-  let fence: { character: string; length: number } | null = null;
+  let fence: {
+    character: string;
+    length: number;
+    quoteDepth: number;
+    indent: number;
+  } | null = null;
   let previousCells: string[] | null = null;
+  let previousQuoteDepth = 0;
+  let separatorPrefix = "";
   let tableColumns: number | null = null;
 
   for (const line of lines) {
-    const containerContent = line
-      .replace(/^(?: {0,3}> ?)+/, "")
-      .replace(/^ {0,3}(?:[-+*]|\d+[.)]) +/, "");
+    const quotePrefix = /^(?: {0,3}> ?)+/.exec(line)?.[0] ?? "";
+    const quoteDepth = (quotePrefix.match(/>/g) ?? []).length;
+    const quotedContent = line.slice(quotePrefix.length);
+    if (fence && fence.quoteDepth > 0 && quoteDepth < fence.quoteDepth) {
+      fence = null;
+    }
+    if (
+      fence &&
+      fence.indent > 0 &&
+      quotedContent.trim() !== "" &&
+      !quotedContent.startsWith(" ".repeat(fence.indent))
+    ) {
+      fence = null;
+    }
+    const listPrefix =
+      /^ {0,3}(?:[-+*]|\d+[.)]) +/.exec(quotedContent)?.[0] ?? "";
+    let containerContent = quotedContent.slice(listPrefix.length);
+    if (fence) {
+      // 문서 최상위 코드 안의 인용 기호와 목록 기호는 코드 원문이다.
+      containerContent = fence.quoteDepth === 0 ? line : quotedContent;
+      containerContent = containerContent.slice(fence.indent);
+    }
     const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(containerContent);
     if (fence) {
       result.push(line);
@@ -52,14 +78,24 @@ export function normalizeMarkdown(source: string): string {
       continue;
     }
     if (marker) {
-      fence = { character: marker[1][0], length: marker[1].length };
+      fence = {
+        character: marker[1][0],
+        length: marker[1].length,
+        quoteDepth,
+        indent: listPrefix.length,
+      };
       result.push(line);
       previousCells = null;
       tableColumns = null;
       continue;
     }
 
-    const cells = cellsOf(line);
+    if (quoteDepth !== previousQuoteDepth) {
+      previousCells = null;
+      tableColumns = null;
+    }
+    previousQuoteDepth = quoteDepth;
+    const cells = cellsOf(containerContent);
     if (tableColumns !== null && cells) {
       result.push(line);
       continue;
@@ -71,7 +107,9 @@ export function normalizeMarkdown(source: string): string {
       headerCells !== null &&
       cells.length === headerCells.length;
     if (continuesRows && !isDelimiter(cells) && !isDelimiter(headerCells)) {
-      result.push(`| ${cells.map(() => "---").join(" | ")} |`);
+      result.push(
+        `${separatorPrefix}| ${cells.map(() => "---").join(" | ")} |`,
+      );
       // 처음 두 행을 확인하면 표로 확정한다. 뒤의 미완성 스트림 행은 판정에 쓰지 않는다.
       previousCells = null;
       tableColumns = cells.length;
@@ -84,6 +122,7 @@ export function normalizeMarkdown(source: string): string {
       tableColumns = cells.length;
     } else {
       previousCells = cells;
+      separatorPrefix = quotePrefix + " ".repeat(listPrefix.length);
     }
   }
   return result.join(newline);
