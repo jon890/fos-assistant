@@ -1,9 +1,17 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const LABEL = "브라우저 실패";
+
+export function latestJobs(jobs) {
+  const grouped = Map.groupBy(jobs, (job) => job.name);
+  return [...grouped.values()].flatMap((executions) => {
+    const attempt = Math.max(...executions.map((job) => job.run_attempt));
+    return executions.filter((job) => job.run_attempt === attempt);
+  });
+}
 
 export function checkShards(jobs, project, total) {
   const expected = Array.from(
@@ -74,6 +82,52 @@ export function collectFailures(report, project) {
     for (const child of suite.suites ?? []) visit(child, ancestors);
   }
   for (const suite of report.suites ?? []) visit(suite);
+  return failures;
+}
+
+export async function collectJobFailures(jobs, readReport) {
+  const failures = [];
+  const shards = jobs.filter((job) =>
+    /^browser-(mobile|desktop)-shard-\d+$/.test(job.name),
+  );
+  for (const job of shards) {
+    if (job.conclusion === "success") continue;
+    const [, project, shard] = job.name.match(
+      /^browser-(mobile|desktop)-shard-(\d+)$/,
+    );
+    let found = [];
+    try {
+      const report = await readReport(
+        `browser-report-${project}-${shard}.json`,
+      );
+      found = collectFailures(report, project);
+      if (found.length === 0 && report.errors?.length) {
+        found.push({
+          file: `shard-${shard}-setup`,
+          project,
+          title: "검사 기동 또는 전역 설정 실패",
+          error: publicError(report.errors[0].message),
+        });
+      }
+    } catch {
+      // 취소 도중 잘린 JSON 도 다른 shard 의 실패 집계를 막지 않는다.
+      found.push({
+        file: `shard-${shard}-setup`,
+        project,
+        title: "JSON 결과가 없거나 읽을 수 없는 shard 실패",
+        error: `job 결과: ${job.conclusion}`,
+      });
+    }
+    if (found.length === 0) {
+      found.push({
+        file: `shard-${shard}-setup`,
+        project,
+        title: "실패한 테스트 기록 없이 shard 실패 또는 취소",
+        error: `job 결과: ${job.conclusion}`,
+      });
+    }
+    failures.push(...found);
+  }
   return failures;
 }
 
@@ -175,9 +229,12 @@ async function main() {
     serverUrl: process.env.GITHUB_SERVER_URL,
   };
   const api = githubApi(process.env.GH_TOKEN);
-  const jobs = await api(
-    "GET",
-    `repos/${context.repository}/actions/runs/${context.runId}/attempts/${context.attempt}/jobs?per_page=100`,
+  // 실패한 job 만 재실행하면 앞 attempt 에서 성공한 shard 는 다시 돌지 않는다.
+  const jobs = latestJobs(
+    await api(
+      "GET",
+      `repos/${context.repository}/actions/runs/${context.runId}/jobs?filter=all&per_page=100`,
+    ),
   );
   if (command === "check") {
     checkShards(jobs, argument, Number(count));
@@ -191,44 +248,9 @@ async function main() {
   ) {
     throw new Error("main push 와 schedule 에서만 실패 이슈를 등록한다");
   }
-  const failures = [];
-  const names = await readdir(argument).catch((error) => {
-    if (error.code === "ENOENT") return [];
-    throw error;
-  });
-  for (const job of jobs.filter((item) =>
-    /^browser-(mobile|desktop)-shard-\d+$/.test(item.name),
-  )) {
-    if (job.conclusion === "success") continue;
-    const [, project, shard] = job.name.match(
-      /^browser-(mobile|desktop)-shard-(\d+)$/,
-    );
-    const filename = `browser-report-${project}-${shard}.json`;
-    let found = [];
-    if (names.includes(filename)) {
-      const report = JSON.parse(
-        await readFile(resolve(argument, filename), "utf8"),
-      );
-      found = collectFailures(report, project);
-      if (found.length === 0 && report.errors?.length) {
-        found.push({
-          file: `shard-${shard}-setup`,
-          project,
-          title: "검사 기동 또는 전역 설정 실패",
-          error: publicError(report.errors[0].message),
-        });
-      }
-    }
-    if (found.length === 0) {
-      found.push({
-        file: `shard-${shard}-setup`,
-        project,
-        title: "JSON 결과 없이 shard 실패 또는 취소",
-        error: `job 결과: ${job.conclusion}`,
-      });
-    }
-    failures.push(...found);
-  }
+  const failures = await collectJobFailures(jobs, async (filename) =>
+    JSON.parse(await readFile(resolve(argument, filename), "utf8")),
+  );
   await publishFailures(failures, api, context);
 }
 

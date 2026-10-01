@@ -113,7 +113,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: browser-report-${{ matrix.project }}-${{ matrix.shard }}
+          name: browser-report-${{ matrix.project }}-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/browser-report-${{ matrix.project }}-${{ matrix.shard }}.json
           if-no-files-found: ignore
           retention-days: 7
@@ -121,7 +121,7 @@ jobs:
         if: failure() || cancelled()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: browser-results-${{ matrix.project }}-${{ matrix.shard }}
+          name: browser-results-${{ matrix.project }}-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           # Playwright 설정의 outputDir 은 os.tmpdir() 아래에 있다.
           path: /tmp/fos-assistant-playwright-results-*
           if-no-files-found: ignore
@@ -179,7 +179,7 @@ jobs:
           package-manager-cache: false
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          pattern: browser-report-*
+          pattern: browser-report-*-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/browser-reports
           merge-multiple: true
       - name: main 브라우저 실패 이슈 집계

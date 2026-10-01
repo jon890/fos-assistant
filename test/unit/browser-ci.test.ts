@@ -3,10 +3,29 @@ import { test } from "node:test";
 import {
   checkShards,
   collectFailures,
+  collectJobFailures,
   githubApi,
+  latestJobs,
   publicError,
   publishFailures,
 } from "../../scripts/browser-ci.mjs";
+
+test("실패한 job 만 재실행하면 이전 성공과 최신 재실행 결과로 판정한다", () => {
+  const previous = Array.from({ length: 4 }, (_, index) => ({
+    name: `browser-mobile-shard-${index + 1}`,
+    run_attempt: 1,
+    conclusion: index === 0 ? "failure" : "success",
+  }));
+  const rerun = { ...previous[0], run_attempt: 2, conclusion: "success" };
+  checkShards(latestJobs([...previous, rerun]), "mobile", 4);
+  assert.throws(() =>
+    checkShards(
+      latestJobs([...previous, { ...rerun, conclusion: "cancelled" }]),
+      "mobile",
+      4,
+    ),
+  );
+});
 
 test("필수 검사는 각 폭의 모든 shard 가 성공했을 때만 통과한다", () => {
   const jobs = Array.from({ length: 4 }, (_, index) => ({
@@ -59,6 +78,25 @@ function report(status = "unexpected") {
   };
 }
 
+test("잘린 JSON, 누락 결과, 기동 실패가 다른 shard 의 실패 집계를 막지 않는다", async () => {
+  const jobs = [1, 2, 3, 4].map((shard) => ({
+    name: `browser-mobile-shard-${shard}`,
+    conclusion: shard === 1 ? "cancelled" : "failure",
+  }));
+  const failures = await collectJobFailures(jobs, async (filename: string) => {
+    if (filename.endsWith("1.json")) return JSON.parse("{");
+    if (filename.endsWith("2.json")) throw new Error("missing");
+    if (filename.endsWith("3.json"))
+      return { errors: [{ message: "Error: 전역 설정 실패" }] };
+    return report();
+  });
+  assert.deepEqual(
+    failures.map((failure: any) => failure.file),
+    ["shard-1-setup", "shard-2-setup", "shard-3-setup", "chat.spec.ts"],
+  );
+  assert.equal(failures[2].error, "Error: 전역 설정 실패");
+});
+
 test("중첩된 JSON 에서 실패한 테스트와 첫 오류 두 줄만 모은다", () => {
   assert.deepEqual(collectFailures(report(), "mobile"), [
     {
@@ -98,15 +136,15 @@ test("동일 spec 은 열린 이슈에 재발 횟수를 남기고 실행 재시�
   const api = async (method: string, path: string, body?: any) => {
     if (method === "GET") {
       if (path.includes("/labels?")) return labels;
-      if (path.includes("/comments?")) return comments;
-      return issues;
+      if (path.includes("/comments?")) return [...comments];
+      return [...issues];
     }
     posts.push(path);
     if (path.endsWith("/labels")) labels = [body];
     if (path.endsWith("/comments")) comments.push(body);
     if (path.endsWith("/issues")) {
       const issue = { ...body, number: issues.length + 1 };
-      // 반환값을 실제 API 처럼 별도 배열에서 조회한다.
+      issues.push(issue);
       return issue;
     }
     return body;
