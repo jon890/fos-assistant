@@ -227,7 +227,9 @@ test("탭 넷이 보이고 주소의 tab 값이 고른 탭이 된다", async ({ 
   await expect(usageTabs(page).getByRole("link", { name: "요약", exact: true })).toHaveAttribute("aria-current", "page");
 
   await usageTabs(page).getByRole("link", { name: "실행 기록", exact: true }).click();
-  await expect(page).toHaveURL(/\/usage\?tab=executions$/);
+  // 탭은 서버 컴포넌트의 Link 라 다음 화면을 서버에서 받은 뒤에 주소가 바뀐다.
+  // 다른 검사와 함께 돌아 서버가 바쁘면 기본 5초를 넘겨, 이 단언만 기다리는 시간을 늘린다.
+  await expect(page).toHaveURL(/\/usage\?tab=executions$/, { timeout: 15_000 });
   await expect(usageTabs(page).getByRole("link", { name: "실행 기록", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
