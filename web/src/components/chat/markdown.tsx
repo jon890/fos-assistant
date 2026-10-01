@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CopyButton } from "@/components/ui/copy-button";
+import { normalizeMarkdown } from "@/components/chat/normalize-markdown";
 
 type HighlightedToken = {
   content: string;
@@ -255,7 +256,7 @@ export function Markdown({ children }: { children: string }) {
           },
         }}
       >
-        {children}
+        {normalizeMarkdown(children)}
       </ReactMarkdown>
     </div>
   );

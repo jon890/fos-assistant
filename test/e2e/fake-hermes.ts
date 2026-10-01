@@ -398,6 +398,9 @@ function specialOutputFor(input: string): string | null {
       "<script>window.__unsafeAgentHtml = true</script>",
     ].join("\n");
   }
+  if (input === "구분 줄 없는 표 검사") {
+    return "번호 | 구분 | 금액\n1 | 식비 | 100\n2 | 교통 | 200\n3 | 기타 | 300";
+  }
   if (input === "긴 답 스트림 검사") {
     return Array.from({ length: 80 }, (_, index) => `${index + 1}번째 긴 답 줄`).join("\n\n");
   }

@@ -159,6 +159,39 @@ test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", asyn
   ).toBeUndefined();
 });
 
+test("구분 줄 없는 에이전트 답을 표로 그린다", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("textbox", { name: "메시지" })
+    .fill("구분 줄 없는 표 검사");
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const table = page.getByRole("table").last();
+  await expect(table).toBeVisible();
+  await expect(table.getByRole("columnheader")).toHaveText([
+    "번호",
+    "구분",
+    "금액",
+  ]);
+  await expect(table.getByRole("row")).toHaveCount(4);
+  await expect(table.getByRole("cell")).toHaveText([
+    "1",
+    "식비",
+    "100",
+    "2",
+    "교통",
+    "200",
+    "3",
+    "기타",
+    "300",
+  ]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
 test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다", async ({ page }) => {
   await page.goto("/");
   const composer = page.getByRole("textbox", { name: "메시지" });
