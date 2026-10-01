@@ -1,5 +1,5 @@
 function cellsOf(line: string): string[] | null {
-  if (/^(?: {4}|\t)/.test(line)) return null;
+  if (/^(?: {4}|\t| {0,3}>)/.test(line)) return null;
 
   const cells: string[] = [];
   let start = 0;
@@ -33,7 +33,10 @@ export function normalizeMarkdown(source: string): string {
   let tableColumns: number | null = null;
 
   for (const line of lines) {
-    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    const containerContent = line
+      .replace(/^(?: {0,3}> ?)+/, "")
+      .replace(/^ {0,3}(?:[-+*]|\d+[.)]) +/, "");
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(containerContent);
     if (fence) {
       result.push(line);
       if (
@@ -62,9 +65,12 @@ export function normalizeMarkdown(source: string): string {
       continue;
     }
     tableColumns = null;
+    const headerCells = previousCells;
     const continuesRows =
-      cells && previousCells && cells.length === previousCells.length;
-    if (continuesRows && !isDelimiter(cells) && !isDelimiter(previousCells)) {
+      cells !== null &&
+      headerCells !== null &&
+      cells.length === headerCells.length;
+    if (continuesRows && !isDelimiter(cells) && !isDelimiter(headerCells)) {
       result.push(`| ${cells.map(() => "---").join(" | ")} |`);
       // 처음 두 행을 확인하면 표로 확정한다. 뒤의 미완성 스트림 행은 판정에 쓰지 않는다.
       previousCells = null;

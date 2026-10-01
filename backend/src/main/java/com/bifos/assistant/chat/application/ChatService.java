@@ -263,6 +263,7 @@ public class ChatService {
             String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), asked);
             AssembledContext context = contextAssembler.assemble(user);
+            context = contextAssembler.withResponseInstructions(context);
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(), null, context.instructionsHash(), context.omittedItems());
 

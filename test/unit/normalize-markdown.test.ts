@@ -33,6 +33,9 @@ test("펜스의 종류와 길이와 들여쓴 코드를 보존한다", () => {
     "    A | B\n    C | D",
     "\tA | B\n\tC | D",
     "```\nA | B\nC | D",
+    "> ```\n> A | B\n> C | D\n> ```",
+    ">     A | B\n>     C | D",
+    "- ```\n  A | B\n  C | D\n  ```",
   ]) {
     assert.equal(normalizeMarkdown(source), source);
   }
