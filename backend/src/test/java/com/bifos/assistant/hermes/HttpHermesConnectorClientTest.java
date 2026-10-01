@@ -256,12 +256,47 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
-    @DisplayName("받은 커넥터가 목록에 없으면 연결이 끊겼다고 확인하지 않고 거절한다")
+    @DisplayName("모양이 맞는 목록에 받은 커넥터가 없으면 설치되지 않은 것으로 읽는다")
     @Test
-    void rejectsMissingConnectorInsteadOfConfirmingDisconnection() {
-        server.expect(requestTo(BASE + "/api/connectors?profile=user-demo"))
+    void readsConnectorMissingFromWellFormedListAsNotInstalled() {
+        String url = BASE + "/api/connectors?profile=user-demo";
+        server.expect(requestTo(url))
                 .andRespond(withSuccess("{\"profile\":\"user-demo\",\"connectors\":[]}", MediaType.APPLICATION_JSON));
-        assertThatThrownBy(() -> client.readConnector(PROFILE, DEMO)).isInstanceOf(IllegalStateException.class);
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"connectors\":["
+                                + "{\"plugin\":\"other\",\"enabled\":true,\"configured\":true}]}",
+                        MediaType.APPLICATION_JSON));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var state = client.readConnector(PROFILE, DEMO);
+            assertThat(state.profile()).isEqualTo(PROFILE);
+            assertThat(state.enabled()).isFalse();
+            assertThat(state.configured()).isFalse();
+        }
+        server.verify();
+    }
+
+    @DisplayName("설치 목록의 모양이 틀리면 설치되지 않은 것으로 읽지 않고 거절한다")
+    @Test
+    void rejectsMalformedConnectorListInsteadOfReadingAsNotInstalled() {
+        String url = BASE + "/api/connectors?profile=user-demo";
+        server.expect(requestTo(url))
+                .andRespond(withSuccess("{\"profile\":\"user-demo\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess("{\"profile\":\"user-demo\",\"connectors\":{}}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(
+                        withSuccess("{\"profile\":\"another-user\",\"connectors\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess(
+                        "{\"profile\":\"user-demo\",\"connectors\":[{\"plugin\":\"demo-notes\",\"enabled\":true}]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThatThrownBy(() -> client.readConnector(PROFILE, DEMO)).isInstanceOf(IllegalStateException.class);
+        }
         server.verify();
     }
 

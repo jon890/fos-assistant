@@ -349,8 +349,15 @@ class ProfileApiRouteTest(unittest.TestCase):
             self.assertEqual(env.read_text(encoding="utf-8"), "OTHER=keep\nMCP_FOS_ASSISTANT_API_KEY=keep-too\n")
             self.assertEqual(json.loads((self.root / "alice/.fos-connectors.json").read_text()), {})
             self.assertEqual(self.connector_status().body["connectors"], [])
-            # 기록이 사라진 뒤에는 모르는 이름이다.
-            self.assertEqual(self.connector(False).status_code, 400)
+            # 기록이 사라진 뒤에는 끌 것이 없다. 바꾸지 않고 성공으로 답하고 설치는 거절한다.
+            before = {path.name: path.read_bytes() for path in (self.root / "alice").iterdir() if path.is_file()}
+            again = self.connector(False)
+            self.assertEqual(again.status_code, 200)
+            self.assertFalse(again.body["changed"])
+            self.assertFalse(again.body["restart_required"])
+            self.assertEqual(self.connector(True).status_code, 400)
+            after = {path.name: path.read_bytes() for path in (self.root / "alice").iterdir() if path.is_file()}
+            self.assertEqual(after, before)
 
     def test_connector_installs_idempotently_and_preserves_profile_secrets(self):
         """connector 는 manifest 에서 등록하고 사용자 토큰과 다른 MCP 를 보존한다."""
@@ -429,7 +436,18 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.connector(profile="missing").status_code, 404)
         self.assertEqual(self.connector(profile="owner").status_code, 401)
         self.assertEqual(self.connector(plugin="unknown").status_code, 400)
-        self.assertEqual(self.connector(False, plugin="unknown").status_code, 400)
+        # 운영 목록에도 소유 기록에도 없는 이름을 끄는 것은 끌 것이 없어 성공이다. 설정은 그대로다.
+        before = (self.root / "alice/config.yaml").read_bytes()
+        unknown = self.connector(False, plugin="unknown")
+        self.assertEqual(unknown.status_code, 200)
+        self.assertEqual(unknown.body, {"profile": "alice", "plugin": "unknown", "enabled": False,
+                                        "changed": False, "restart_required": False})
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+        self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
+        self.assertEqual(self.connector_status().body["connectors"],
+                         [{"plugin": DEMO, "enabled": False, "configured": False}])
+        # 이름 형식 검사와 관리 표식 검사는 끄기에도 그대로 걸린다.
+        self.assertEqual(self.connector(False, plugin="unknown", profile="owner").status_code, 401)
         self.assertEqual(self.connector(False, plugin="../demo-notes").status_code, 400)
         self.assertEqual(self.connector(command="sh").status_code, 400)
         self.assertEqual(self.request("/api/connectors", "PUT", cookie=True), 401)

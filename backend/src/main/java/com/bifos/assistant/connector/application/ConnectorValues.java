@@ -1,10 +1,10 @@
 package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.domain.ConnectionFields;
+import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.infra.ConnectionFieldsConverter;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
-import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -26,31 +26,45 @@ final class ConnectorValues {
     /** 비밀이 아닌 칸 값의 상한이다. 칸 값은 {@code fields} 열 하나에 JSON 으로 함께 들어간다. */
     private static final int MAX_STORED_VALUE_LENGTH = 500;
 
+    /** 비밀 칸 값의 상한이다. 저장하지 않지만 대시보드와 env 파일로 그대로 넘어간다. */
+    private static final int MAX_SECRET_VALUE_LENGTH = 4096;
+
+    private static final ConnectionFieldsConverter COLUMN = new ConnectionFieldsConverter();
+
     /**
      * 요청의 값을 manifest 로 검사하고 채운 칸만 남긴다.
      *
      * <p>비운 선택 칸은 결과에 넣지 않는다. 오류 메시지에는 칸 이름과 값을 싣지 않는다.
+     *
+     * @param requireAll 등록이면 참. 필수 칸이 모두 있어야 하고, 저장할 칸 값 전체가 {@code fields} 열에 들어가야 한다.
+     *     외부에 반영한 뒤 저장에서 실패하지 않도록 여기서 먼저 본다
      */
     static Map<String, String> validated(ConnectorManifest manifest, Map<String, String> values, boolean requireAll) {
         Map<String, String> given = values == null ? Map.of() : values;
         Map<String, ConnectorField> fields =
                 manifest.fields().stream().collect(Collectors.toMap(ConnectorField::key, field -> field));
         if (!fields.keySet().containsAll(given.keySet())) {
-            throw invalid();
+            throw ConnectorErrors.invalid();
         }
         Map<String, String> accepted = new LinkedHashMap<>();
         for (ConnectorField field : manifest.fields()) {
             String value = given.get(field.key());
             if (value == null || value.isBlank()) {
                 if (requireAll && field.required()) {
-                    throw invalid();
+                    throw ConnectorErrors.invalid();
                 }
                 continue;
             }
-            if (!matches(field, value) || !field.secret() && value.length() > MAX_STORED_VALUE_LENGTH) {
-                throw invalid();
+            int limit = field.secret() ? MAX_SECRET_VALUE_LENGTH : MAX_STORED_VALUE_LENGTH;
+            if (!matches(field, value) || value.length() > limit) {
+                throw ConnectorErrors.invalid();
             }
             accepted.put(field.key(), value);
+        }
+        if (requireAll
+                && COLUMN.convertToDatabaseColumn(stored(manifest, accepted)).length()
+                        > ConnectorConnection.FIELDS_LENGTH) {
+            throw ConnectorErrors.invalid();
         }
         return accepted;
     }
@@ -87,9 +101,5 @@ final class ConnectorValues {
             }
         }
         return new ConnectionFields(values, secretPrefixes);
-    }
-
-    static ApiException invalid() {
-        return new ApiException(ErrorCode.VALIDATION_FAILED, "connector values are invalid");
     }
 }

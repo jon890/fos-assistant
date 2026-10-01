@@ -24,6 +24,7 @@ public interface HermesConnectorClient {
 
     boolean putConnector(String profile, String connectorId, boolean enabled);
 
+    /** 그 profile 의 설치 상태다. 대시보드의 목록에 그 커넥터가 없으면 설치되지 않은 것으로 돌려준다. */
     ConnectorState readConnector(String profile, String connectorId);
 
     ProbeResult probe(String profile, String mcpServer);

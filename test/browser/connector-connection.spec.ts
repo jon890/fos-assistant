@@ -191,6 +191,50 @@ test("모르는 id 는 찾을 수 없는 화면을 보인다", async ({ page }) 
   await expect(page.getByText("raw upstream")).toHaveCount(0);
 });
 
+test("형식이 틀린 id 는 서버를 부르지 않고 찾을 수 없는 화면을 보인다", async ({
+  page,
+}) => {
+  const called: string[] = [];
+  await page.route("**/api/connections/**", (route) => {
+    called.push(route.request().url());
+    return route.fulfill({ status: 404, json: notFound });
+  });
+  await page.goto("/connections/Bad_Id");
+  await expect(page.getByTestId("connector-not-found")).toContainText(
+    "찾을 수 없는 서비스예요",
+  );
+  await expect(
+    page.getByRole("button", { name: "상태 다시 읽기" }),
+  ).toHaveCount(0);
+  expect(called).toEqual([]);
+});
+
+test("카탈로그를 읽지 못하면 쓸 수 없다고 하지 않고 다시 읽게 한다", async ({
+  page,
+}) => {
+  let catalogOk = false;
+  await page.route("**/api/connectors", (route) =>
+    catalogOk
+      ? route.fulfill({ json: [demoConnector] })
+      : route.fulfill({
+          status: 503,
+          json: { code: "CONNECTOR_UNAVAILABLE", message: "raw" },
+        }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: disconnected }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "연결 상태를 읽지 못했어요",
+  );
+  await expect(page.getByText("지금은 쓸 수 없어요")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "연결 해제" })).toHaveCount(0);
+  catalogOk = true;
+  await page.getByRole("button", { name: "상태 다시 읽기" }).click();
+  await expect(page.getByLabel("토큰")).toBeVisible();
+});
+
 test("운영 목록에서 빠진 연결은 쓸 수 없다고 알리고 해제만 한다", async ({
   page,
 }) => {

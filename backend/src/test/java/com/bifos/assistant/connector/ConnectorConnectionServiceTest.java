@@ -42,6 +42,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -542,15 +543,85 @@ class ConnectorConnectionServiceTest {
     void adminConfirmClearsRestartOfRemovedConnectorDisconnect() {
         CurrentUser member = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
-        service.register(member, DEMO, VALUES);
+        String profile = profileOf(service.register(member, DEMO, VALUES));
         when(connector.readCatalog()).thenReturn(List.of());
         service.disconnect(member, DEMO);
-        installed(false, false);
+        // 대시보드의 목록에 그 커넥터가 없을 때 클라이언트가 돌려주는 모양이다.
+        when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false));
 
         ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
 
         assertThat(confirmed.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(confirmed.restartRequired()).isFalse();
+        assertThat(service.check(member, DEMO).status()).isEqualTo(ConnectionStatus.DISCONNECTED);
+    }
+
+    @Test
+    @DisplayName("env 단계에서 실패해 설치 전 PENDING 으로 남은 연결도 카탈로그에서 빠진 뒤 해제와 반영 완료가 끝난다")
+    void pendingBeforeInstallCanBeDisconnectedAfterConnectorIsRemoved() {
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        doThrow(new IllegalStateException()).when(connector).putEnv(anyString(), eq("DEMO_TOKEN"), anyString());
+        assertThatThrownBy(() -> service.register(member, DEMO, VALUES)).isInstanceOf(ConnectorOperationFailure.class);
+        String profile = agents.findAll().get(0).hermesProfile();
+        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
+        when(connector.readCatalog()).thenReturn(List.of());
+        // 대시보드는 모르는 plugin 의 해제를 바뀐 것 없는 성공으로 답한다.
+        when(connector.putConnector(profile, DEMO, false)).thenReturn(false);
+        when(connector.readConnector(profile, DEMO)).thenReturn(new ConnectorState(profile, false, false, false));
+
+        ConnectionSnapshot disconnected = service.disconnect(member, DEMO);
+
+        assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
+        assertThat(disconnected.restartRequired()).isTrue();
+        verify(connector, never()).deleteEnv(anyString(), anyString());
+
+        ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
+
+        assertThat(confirmed.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
+        assertThat(confirmed.restartRequired()).isFalse();
+        assertThat(service.catalog(member)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("비밀 칸은 4096자까지 받고 넘으면 확인 도구를 부르기 전에 거절한다")
+    void acceptsSecretUpTo4096CharactersAndRejectsLongerBeforeVerify() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+
+        assertCode(() -> service.register(user, PIN, Map.of("pin", "1".repeat(4097))), ErrorCode.VALIDATION_FAILED);
+        verify(connector, never()).call(anyString(), anyString(), anyMap());
+        assertThat(connections.count()).isZero();
+
+        ConnectionSnapshot registered = service.register(user, PIN, Map.of("pin", "1".repeat(4096)));
+
+        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("pin", "11111111"));
+    }
+
+    @Test
+    @DisplayName("저장할 칸 값이 fields 열 크기를 넘으면 외부에 반영하기 전에 거절하고 딱 맞으면 저장한다")
+    void rejectsFieldsLongerThanColumnBeforeExternalCallsAndStoresExactFit() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        List<ConnectorField> fields = new ArrayList<>();
+        Map<String, String> values = new LinkedHashMap<>();
+        for (int index = 1; index <= 8; index++) {
+            fields.add(new ConnectorField("k" + index, "DEMO_K" + index, "칸", "", false, true, null, null));
+            values.put("k" + index, "v".repeat(500));
+        }
+        when(connector.readCatalog())
+                .thenReturn(List.of(new ConnectorManifest("demo-wide", "넓은 칸", "", fields, "check", "wide")));
+        // {"values":{"k1":"…",…},"secretPrefixes":{}} 에서 값 말고 드는 글자 수는 33 + 칸마다 7 + 쉼표 7 이다.
+        int lastLength = 4000 - (33 + 8 * 7 + 7) - 7 * 500;
+        values.put("k8", "v".repeat(lastLength + 1));
+
+        assertCode(() -> service.register(user, "demo-wide", values), ErrorCode.VALIDATION_FAILED);
+        verify(connector, never()).call(anyString(), anyString(), anyMap());
+        verify(connector, never()).putEnv(anyString(), anyString(), anyString());
+        assertThat(connections.count()).isZero();
+
+        values.put("k8", "v".repeat(lastLength));
+        service.register(user, "demo-wide", values);
+
+        assertThat(fieldsColumn(user, "demo-wide")).hasSize(4000);
     }
 
     @Test

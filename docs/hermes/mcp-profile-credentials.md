@@ -16,10 +16,11 @@ MCP 서버 설정의 `env`에 명시한 값이 자식 프로세스에 전달된�
 [환경 값 처리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/mcp_tool_config.py)와
 [`StdioServerParameters` 생성](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/mcp_tool_transport.py)이 근거다.
 
-따라서 가계부 토큰을 profile `.env`에 저장하는 것과 함께,
-MCP 서버의 `env.ACCOUNTBOOK_API_TOKEN`에 `${ACCOUNTBOOK_API_TOKEN}` 참조가 있어야 한다.
+따라서 커넥터의 토큰을 profile `.env`에 저장하는 것과 함께,
+MCP 서버의 `env`에 그 이름의 `${이름}` 참조가 있어야 한다. 가계부라면 `env.ACCOUNTBOOK_API_TOKEN`에 `${ACCOUNTBOOK_API_TOKEN}` 이다.
 토큰 원문을 `.mcp.json`이나 `config.yaml`에 쓰지 않는다.
-같은 방식으로 `ACCOUNTBOOK_API_BASE_URL`, `ACCOUNTBOOK_FAMILY_UUID`, `ACCOUNTBOOK_PRIVATE_DIR`를 전달한다.
+사용자가 넣는 다른 칸(`connector.json` 의 `fields[].env`)도 같은 방식으로 전달한다.
+운영자가 주는 값(`operator_env`)은 profile `.env` 를 거치지 않는다. 대시보드 plugin 이 설치할 때 운영 목록의 값을 서버 정의의 `env` 에 직접 넣는다([커넥터 연결](../connectors.md)).
 선택 값을 쓰지 않을 때에는 MCP 설정의 해당 env 항목을 빼거나 값으로 빈 문자열을 직접 쓴다.
 profile `.env`의 빈 값을 참조하면 보간 함수가 `${VAR}` 원문을 남긴다.
 다른 profile의 값을 기본값으로 쓰지 않는다.
@@ -65,4 +66,4 @@ Hermes의 `DELETE /api/env`는 본문 `{ "profile": "<profile>", "key": "ACCOUNT
 `PUT /api/env`에 빈 값을 넣는 것과 항목 제거를 구분한다.
 [환경 API](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/config_env.py)와
 [요청 모델](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_models.py)이 근거다.
-기계용 인증에서 이 메서드와 가계부 key를 허용하는 정책은 `fos-home-infra`가 소유한다.
+기계용 인증에서 이 메서드와 커넥터 칸 key를 허용하는 정책은 `fos-home-infra`가 소유한다.

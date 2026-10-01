@@ -36,6 +36,8 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ConnectorConnection {
+    /** {@code fields} 열의 크기다. 저장할 JSON 텍스트가 이보다 길면 등록을 받지 않는다. */
+    public static final int FIELDS_LENGTH = 4000;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,7 +58,7 @@ public class ConnectorConnection {
     private ConnectionStatus status;
 
     /** JSON 텍스트 열이다. {@code ConnectionFieldsConverter} 가 자동으로 읽고 쓴다. */
-    @Column(nullable = false, length = 4000)
+    @Column(nullable = false, length = FIELDS_LENGTH)
     private ConnectionFields fields;
 
     @Column(name = "restart_required", nullable = false)

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
+  CONNECTOR_ID_PATTERN,
   checkConnection,
   connectionStatusLabel,
   disconnectConnection,
@@ -63,6 +64,20 @@ async function fetchLoaded(id: string): Promise<Loaded> {
   return { kind: "ready", connector, connection: connection.data };
 }
 
+function NotFound() {
+  return (
+    <div className="mx-auto w-full max-w-2xl" data-testid="connector-not-found">
+      <h1 className="mb-4 text-xl font-semibold">찾을 수 없는 서비스예요</h1>
+      <Link
+        href="/connections"
+        className="text-sm text-primary underline-offset-4 hover:underline"
+      >
+        연결 목록으로 돌아가기
+      </Link>
+    </div>
+  );
+}
+
 export function ConnectorConnectionPanel({ id }: { id: string }) {
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
   const [values, setValues] = useState<Record<string, string>>({});
@@ -71,28 +86,16 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const busy = pending !== null;
 
-  useEffect(() => {
-    void fetchLoaded(id).then(setLoaded);
-  }, [id]);
+  const validId = CONNECTOR_ID_PATTERN.test(id);
 
+  useEffect(() => {
+    // 형식이 틀린 id 로는 서버를 부르지 않는다.
+    if (validId) void fetchLoaded(id).then(setLoaded);
+  }, [id, validId]);
+
+  if (!validId || loaded.kind === "notFound") return <NotFound />;
   if (loaded.kind === "loading")
     return <p className="text-sm text-muted-foreground">불러오는 중…</p>;
-  if (loaded.kind === "notFound") {
-    return (
-      <div
-        className="mx-auto w-full max-w-2xl"
-        data-testid="connector-not-found"
-      >
-        <h1 className="mb-4 text-xl font-semibold">찾을 수 없는 서비스예요</h1>
-        <Link
-          href="/connections"
-          className="text-sm text-primary underline-offset-4 hover:underline"
-        >
-          연결 목록으로 돌아가기
-        </Link>
-      </div>
-    );
-  }
   if (loaded.kind === "failed") {
     return (
       <div className="mx-auto w-full max-w-2xl space-y-3">

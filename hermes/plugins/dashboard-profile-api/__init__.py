@@ -789,10 +789,6 @@ def _connector_state(value) -> dict:
     return value
 
 
-class _UnknownConnector(Exception):
-    """운영 목록에도 그 profile 의 소유 기록에도 없는 커넥터다."""
-
-
 def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> dict:
     """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다."""
     import yaml
@@ -817,8 +813,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     elif enabled:
         raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
     elif not owned:
-        if not listed:
-            raise _UnknownConnector(plugin)
+        # 끌 것이 없다. 운영 목록에서 빠진 연결의 해제가 끝까지 가도록 성공으로 답한다.
         return {"changed": False, "restart_required": False}
     else:
         # 운영 목록에서 빠진 커넥터다. 옛 기록에는 서버 이름이 없어 기록과 같은 정의를 설정에서 찾는다.
@@ -903,7 +898,7 @@ async def _connector_request(request):
         body = {"profile": profiles[0]}
     else:
         body = await _json_object(request)
-        # 운영 목록에 없는 이름은 끄기만 받는다. 그 profile 에 소유 기록이 남아 있는지는 아래에서 본다.
+        # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
         if (body is None or set(body) != {"profile", "plugin", "enabled"}
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
                 or not isinstance(body["enabled"], bool)
@@ -938,8 +933,6 @@ async def _connector_request(request):
             return JSONResponse({"profile": body["profile"], "connectors": connectors}, status_code=200)
         result = await asyncio.to_thread(_connector_config, profile_dir, body["plugin"], body["enabled"])
         return JSONResponse({**body, **result}, status_code=200)
-    except _UnknownConnector:
-        return _rejected("profile, 알려진 plugin, enabled 만 필요하다")
     except FileExistsError:
         return _rejected("운영자 설정과 충돌한다", 409)
     except Exception:

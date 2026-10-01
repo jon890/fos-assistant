@@ -64,6 +64,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
 `test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 에 특정 서비스 이름이 들어오지 않았는지 본다.
+예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
 계약은 [커넥터 연결](connectors.md)에 있다.
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.

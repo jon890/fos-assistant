@@ -24,8 +24,13 @@ SLOW_TOKEN = "demo_slow_0123456789"
 SCOPES = {"scopes": [{"id": "a", "name": "A"}]}
 UNAVAILABLE = (200, {"ok": False, "error": "unavailable"})
 INVALID = (200, {"ok": False, "error": "invalid_input"})
-# 대시보드 프로세스에만 있어야 하는 값이다. 자식에게 넘어가면 안 된다.
-PARENT_ONLY = "HERMES_DASHBOARD_PROFILE_API_SECRET"
+# 대시보드 프로세스에만 있어야 하는 값이다. 서비스 토큰과 다른 커넥터의 값 구실이다. 자식에게 넘어가면 안 된다.
+PARENT_ONLY = {"HERMES_DASHBOARD_PROFILE_API_SECRET": "parent-secret", "OTHER_CONNECTOR_TOKEN": "other-secret",
+               "DEMO_SCOPE": "from-parent"}
+# MCP SDK 가 자식에게 늘 더하는 기본 env 다. 대시보드 프로세스에 있는 것만 간다.
+SDK_DEFAULT_ENV = {"HOME", "LOGNAME", "PATH", "SHELL", "TERM", "USER"}
+# 자식의 Python 이 뜨면서 스스로 더하는 이름이다. 대시보드가 넘긴 것이 아니다.
+INTERPRETER_ENV = {"LC_CTYPE", "__CF_USER_TEXT_ENCODING"}
 
 
 class ConnectorCallTest(base.ConnectorGateCase):
@@ -103,17 +108,17 @@ class ConnectorCallTest(base.ConnectorGateCase):
             runner.assert_not_called()
 
     def test_child_receives_only_declared_env(self):
-        """자식은 칸 값과 운영자 env 만 받는다. 대시보드의 비밀값과 PATH 를 물려받지 않는다."""
+        """자식이 받는 env 는 정확히 칸 값, 운영자 env, MCP SDK 의 기본 env 다. 대시보드의 다른 env 는 가지 않는다."""
         self.rewrite("connector.json", lambda value: value.update(verify={"tool": "env_view"}))
-        with mock.patch.dict(os.environ, {PARENT_ONLY: "parent-secret", "DEMO_SCOPE": "from-parent"}):
+        with mock.patch.dict(os.environ, PARENT_ONLY):
+            inherited = SDK_DEFAULT_ENV & set(os.environ)
             status, body = self.call(tool="env_view")
         self.assertEqual(status, 200)
         self.assertTrue(body["ok"], body)
-        names = set(body["result"]["names"])
-        self.assertLessEqual({"DEMO_TOKEN", "DEMO_BASE", "PATH"}, names)
-        self.assertNotIn(PARENT_ONLY, names)
-        # 넘기지 않은 칸은 대시보드 프로세스에 같은 이름이 있어도 자식에게 가지 않는다.
-        self.assertNotIn("DEMO_SCOPE", names)
+        # 넘기지 않은 칸(DEMO_SCOPE)은 대시보드 프로세스에 같은 이름이 있어도 자식에게 가지 않는다.
+        names = set(body["result"]["names"]) - INTERPRETER_ENV
+        self.assertEqual(names, {"DEMO_TOKEN", "DEMO_BASE", "PATH"} | inherited)
+        # PATH 는 대시보드의 것이 아니라 실행 파일이 있는 디렉터리만이다.
         self.assertEqual(body["result"]["path"], os.path.dirname(sys.executable))
 
     def test_fifth_concurrent_call_is_refused_without_waiting(self):

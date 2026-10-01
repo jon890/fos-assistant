@@ -17,7 +17,6 @@ import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.CallResult;
-import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
@@ -33,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -47,8 +47,16 @@ import tools.jackson.databind.JsonNode;
  * 요청마다 다시 읽는다. 운영자가 목록을 바꾸면 바로 반영되어야 하고 호출이 드물기 때문이다. 순서와 실패 처리는
  * {@code docs/connectors.md} 의 「설치와 실패 처리」 가 갖는다.
  */
+@Slf4j
 @Service
 public class ConnectorConnectionService {
+    private static final String STEP_ENV = "env";
+    private static final String STEP_TOOLSET = "toolset";
+    private static final String STEP_INSTALL = "install";
+    private static final String STEP_INSTALL_STATE = "install-state";
+    private static final String STEP_PROBE = "probe";
+    private static final String STEP_TOOL_CALL = "tool-call";
+
     private final ConnectorConnectionRepository connections;
     private final AppUserRepository users;
     private final AgentLifecycleService lifecycle;
@@ -57,6 +65,8 @@ public class ConnectorConnectionService {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+    // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
+    // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
     public ConnectorConnectionService(
             ConnectorConnectionRepository connections,
@@ -141,14 +151,14 @@ public class ConnectorConnectionService {
         JsonNode result = call(manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
         JsonNode items = result.get(options.items());
         if (items == null || !items.isArray()) {
-            throw unavailable();
+            throw ConnectorErrors.unavailable();
         }
         List<ConnectorOption> found = new ArrayList<>();
         for (JsonNode item : items) {
             JsonNode value = item.get(options.value());
             JsonNode label = item.get(options.label());
             if (value == null || !value.isString() || label == null || !label.isString()) {
-                throw unavailable();
+                throw ConnectorErrors.unavailable();
             }
             found.add(new ConnectorOption(value.asString(), label.asString()));
         }
@@ -193,6 +203,7 @@ public class ConnectorConnectionService {
         connection.beginRegister(now());
         connections.save(connection);
         String profile = connection.agent().hermesProfile();
+        String step = STEP_ENV;
         try {
             for (ConnectorField field : manifest.fields()) {
                 String value = accepted.get(field.key());
@@ -203,9 +214,12 @@ public class ConnectorConnectionService {
                                 : connector.putEnv(profile, field.env(), value));
             }
             // 새 profile 의 틀이 켜 둔 내장 도구를 뺀다. 설치가 이 목록에 커넥터의 MCP 서버를 더한다.
+            step = STEP_TOOLSET;
             toolsets.writeApiServer(profile, List.of(AgentToolPolicy.CONTROL_PLANE_MCP));
+            step = STEP_INSTALL;
             connection.markRestartRequired(connector.putConnector(profile, manifest.id(), true));
         } catch (RuntimeException ex) {
+            warn(step, manifest.id(), ex);
             connection.pending(now());
             connections.save(connection);
             return null;
@@ -227,12 +241,15 @@ public class ConnectorConnectionService {
         ConnectorConnection connection = requireConnection(user.id(), connectorId, manifest.isPresent());
         connection.beginDisconnect(now());
         String profile = connection.agent().hermesProfile();
+        String step = STEP_ENV;
         try {
             for (ConnectorField field : manifest.map(ConnectorManifest::fields).orElse(List.of())) {
                 connection.markRestartRequired(connector.deleteEnv(profile, field.env()));
             }
+            step = STEP_INSTALL;
             connection.markRestartRequired(connector.putConnector(profile, connectorId, false));
         } catch (RuntimeException ex) {
+            warn(step, connectorId, ex);
             throw new ConnectorOperationFailure();
         }
         connection.disconnected(manifest.isEmpty(), now());
@@ -247,6 +264,7 @@ public class ConnectorConnectionService {
         try {
             state = connector.readConnector(connection.agent().hermesProfile(), connectorId);
         } catch (RuntimeException ex) {
+            warn(STEP_INSTALL_STATE, connectorId, ex);
             connection.pending(now());
             throw new ConnectorOperationFailure();
         }
@@ -266,6 +284,7 @@ public class ConnectorConnectionService {
         try {
             usable = usable(connection);
         } catch (RuntimeException ex) {
+            warn(STEP_PROBE, connectorId, ex);
             connection.pending(now());
             throw new ConnectorOperationFailure();
         }
@@ -288,20 +307,26 @@ public class ConnectorConnectionService {
         }
         ConnectorConnection connection = requireConnection(userId, connectorId);
         final boolean disconnected;
+        String step = STEP_INSTALL_STATE;
         try {
             ConnectorState state = connector.readConnector(connection.agent().hermesProfile(), connectorId);
+            boolean applied;
             if (connection.desiredEnabled()) {
-                if (!state.enabled() || !state.configured() || !usable(connection)) {
-                    throw new IllegalStateException();
-                }
-                disconnected = false;
+                step = STEP_PROBE;
+                applied = state.enabled() && state.configured() && usable(connection);
             } else {
-                if (state.enabled()) {
-                    throw new IllegalStateException();
-                }
-                disconnected = true;
+                applied = !state.enabled();
             }
+            if (!applied) {
+                // 외부 호출은 성공했지만 반영이 끝나지 않았다. 실패 로그를 남기지 않는다.
+                connection.pending(now());
+                throw new ConnectorOperationFailure();
+            }
+            disconnected = !connection.desiredEnabled();
+        } catch (ConnectorOperationFailure ex) {
+            throw ex;
         } catch (RuntimeException ex) {
+            warn(step, connectorId, ex);
             connection.pending(now());
             throw new ConnectorOperationFailure();
         }
@@ -369,22 +394,13 @@ public class ConnectorConnectionService {
         try {
             result = connector.call(manifest.id(), tool, values);
         } catch (RuntimeException ex) {
-            throw unavailable();
+            warn(STEP_TOOL_CALL, manifest.id(), ex);
+            throw ConnectorErrors.unavailable();
         }
         if (!result.ok()) {
-            throw failure(result.error());
+            throw ConnectorErrors.of(result.error());
         }
         return result.result();
-    }
-
-    private static ApiException failure(ConnectorCallError error) {
-        return switch (error) {
-            case CREDENTIAL_REJECTED ->
-                new ApiException(ErrorCode.CONNECTOR_CREDENTIAL_REJECTED, "the connector rejected the given values");
-            case FORBIDDEN -> new ApiException(ErrorCode.CONNECTOR_FORBIDDEN, "the given values are not allowed");
-            case INVALID_INPUT -> ConnectorValues.invalid();
-            case UNAVAILABLE -> unavailable();
-        };
     }
 
     private static ConnectorFieldSummary summary(ConnectorField field) {
@@ -404,7 +420,8 @@ public class ConnectorConnectionService {
         try {
             return connector.readCatalog();
         } catch (RuntimeException ex) {
-            throw unavailable();
+            log.warn("connector catalog read failed: {}", ex.getClass().getSimpleName());
+            throw ConnectorErrors.unavailable();
         }
     }
 
@@ -415,7 +432,7 @@ public class ConnectorConnectionService {
     }
 
     private ConnectorManifest requireManifest(String connectorId) {
-        return findManifest(connectorId).orElseThrow(ConnectorConnectionService::notFound);
+        return findManifest(connectorId).orElseThrow(ConnectorErrors::notFound);
     }
 
     private ConnectorConnection requireConnection(Long userId, String connectorId) {
@@ -432,7 +449,7 @@ public class ConnectorConnectionService {
                 .findByUserIdAndConnectorId(userId, connectorId)
                 .orElseThrow(() -> known
                         ? new ApiException(ErrorCode.VALIDATION_FAILED, "no connection for this connector")
-                        : notFound());
+                        : ConnectorErrors.notFound());
     }
 
     private AppUser lock(Long userId) {
@@ -457,12 +474,17 @@ public class ConnectorConnectionService {
                 value.agent().code());
     }
 
-    private static ApiException notFound() {
-        return new ApiException(ErrorCode.CONNECTOR_NOT_FOUND, "no such connector");
-    }
-
-    private static ApiException unavailable() {
-        return new ApiException(ErrorCode.CONNECTOR_UNAVAILABLE, "the connector is unavailable");
+    /**
+     * 외부 호출이 실패한 단계를 남긴다.
+     *
+     * <p>단계 이름과 커넥터 번호와 예외 종류만 적는다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다.
+     */
+    private static void warn(String step, String connectorId, RuntimeException ex) {
+        log.warn(
+                "connector {} failed at {}: {}",
+                connectorId,
+                step,
+                ex.getClass().getSimpleName());
     }
 
     private Instant now() {

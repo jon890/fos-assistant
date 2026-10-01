@@ -113,8 +113,9 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                         profile, requiredBoolean(item, ENABLED), requiredBoolean(item, "configured"), false);
             }
         }
-        // 목록에 없다고 해제된 것으로 보지 않는다. 설치 상태를 확인하지 못한 것이다.
-        throw new IllegalStateException();
+        // 대시보드는 운영 목록에도 없고 소유 기록도 없는 plugin 을 목록에 넣지 않는다. 설치되지 않은 것이다.
+        // 응답 모양이 틀린 것은 위에서 예외로 끝났으므로 여기 오는 것은 모양이 맞는 응답뿐이다.
+        return new ConnectorState(profile, false, false, false);
     }
 
     @Override
