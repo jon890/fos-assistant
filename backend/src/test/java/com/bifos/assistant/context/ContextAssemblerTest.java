@@ -38,6 +38,30 @@ class ContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("Memory 없이도 GFM 표 지침과 길이와 지문을 보낸다")
+    void addsResponseInstructionsWithoutMemory() {
+        AssembledContext result = assembler.withResponseInstructions(AssembledContext.empty());
+
+        assertThat(result.instructions()).contains("GFM", "| --- | --- |");
+        assertThat(result.chars()).isEqualTo(result.instructions().length());
+        assertThat(result.instructionsHash()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("공통 표 지침은 Memory 예산 밖에 두고 누락 항목을 보존한다")
+    void keepsMemoryBudgetAndOmissionsIndependent() {
+        String body = "가".repeat(8_000);
+        AssembledContext memory = new AssembledContext(body, body.length(), java.util.List.of(3L));
+
+        AssembledContext result = assembler.withResponseInstructions(memory);
+
+        assertThat(result.instructions()).startsWith("# 답변 형식").endsWith(body);
+        assertThat(result.chars()).isEqualTo(result.instructions().length()).isGreaterThan(8_000);
+        assertThat(result.omittedMemoryIds()).containsExactly(3L);
+        assertThat(result.instructionsHash()).isNotEqualTo(memory.instructionsHash());
+    }
+
+    @Test
     @DisplayName("그룹과 개인 항목을 층 순서대로 본문까지 넣는다")
     void assemblesGroupAndUserItemsInLayerOrderWithBodies() {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);

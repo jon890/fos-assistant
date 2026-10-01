@@ -124,6 +124,7 @@ public class AgentRunner {
             String instructionAddition,
             DelegationKey delegationKey) {
         AssembledContext context = contextAssembler.assemble(user);
+        context = contextAssembler.withResponseInstructions(context);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
         ModelChoice choice = conversation.modelChoice();
