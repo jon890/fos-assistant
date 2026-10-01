@@ -1,21 +1,30 @@
 # 저장 모델
 
-## accountbook_connection
+## connector_connection
 
-사용자마다 가계부 연결 하나를 둔다.
-`user_id BIGINT`가 기본키이며 `app_user`를 참조한다.
-`agent_id BIGINT`는 필수이며 유니크하고 `agent`를 참조한다.
-`status VARCHAR(20)`은 `DISCONNECTED`, `PENDING`, `READY` 중 하나다.
-`token_prefix VARCHAR(8)`, `family_uuid CHAR(36)`, `checked_at DATETIME(6)`는 비어도 된다.
-`restart_required BOOLEAN`은 필수다.
-`desired_enabled BOOLEAN`은 env와 설치 반영이 모두 성공해 활성화 후보가 되었는지를 뜻한다.
-등록·교체·해제 시작과 반영 실패에서는 false이며, true여도 실행 확인 전에는 PENDING이다.
-연결 해제 때 행은 남기고 prefix와 가족을 비운다.
-토큰 원문과 해시는 저장하지 않는다.
+사용자마다 커넥터 하나에 연결 하나를 둔다. 근거는 [ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 이다.
 
-`agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE`는 전용 연결 에이전트를 표시한다.
-이 값이 참인 에이전트는 일반 설정 편집과 공개, 삭제 경로를 막는다.
-상태 변화는 [가계부 연결](connectors.md)이 갖는다.
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | `BIGINT` 기본키 | |
+| `user_id` | `BIGINT NOT NULL` | `app_user` 참조 |
+| `connector_id` | `VARCHAR(64) NOT NULL` | manifest 의 `id` |
+| `agent_id` | `BIGINT NOT NULL`, 유니크 | `agent` 참조. 연결 전용 에이전트 |
+| `status` | `VARCHAR(20) NOT NULL` | `DISCONNECTED`, `PENDING`, `READY` |
+| `fields` | `JSON NOT NULL` | `{"values": {key: 값}, "secretPrefixes": {key: 앞 8자}}`. 비밀 칸의 원문과 해시는 넣지 않는다 |
+| `restart_required` | `BOOLEAN NOT NULL` | 공유 gateway 재시작 뒤 반영 완료를 기다린다 |
+| `desired_enabled` | `BOOLEAN NOT NULL` | env 와 설치 반영이 모두 성공해 활성화 후보가 되었는가. 등록, 교체, 해제 시작과 반영 실패에서 false. true 여도 실행 확인 전에는 `PENDING` |
+| `checked_at` | `DATETIME(6)` | 마지막 확인 시각. 비어도 된다 |
+| `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
+
+- `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
+- 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
+- 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
+- 가계부 전용으로 먼저 만든 `accountbook_connection` 은 V38 이 이 표로 옮기고 지웠다. `connector_id` 는 `fos-accountbook`, `token_prefix` 는 `secretPrefixes.token`, `family_uuid` 는 `values.family` 가 됐다
+
+`agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE` 는 연결 전용 에이전트를 표시한다.
+이 값이 참인 에이전트는 일반 설정 편집과 공개, 삭제 경로를 막고 사용자당 에이전트 상한에 세지 않는다.
+상태 변화는 [커넥터 연결](connectors.md)이 갖는다.
 
 MySQL 8.4 에 둔다.
 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.

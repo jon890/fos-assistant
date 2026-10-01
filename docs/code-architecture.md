@@ -45,8 +45,8 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | 값 | 어디서 받나 |
 | --- | --- |
 | Control Plane MCP 주소 | 묶음을 만들 때 `--mcp-url` |
-| 커넥터 plugin 경로 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS`. `{"<커넥터 이름>": "<plugin 디렉터리>"}` 모양의 JSON 이다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
-| 커넥터 실행 파일 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 없거나 절대 경로가 아니면 커넥터를 쓸 수 없는 것으로 본다 |
+| 커넥터 목록 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS`. 값마다 문자열(plugin 디렉터리)이나 `{"root": "<plugin 디렉터리>", "command": "<실행 파일>", "env": {"<operator_env 이름>": "<값>"}}` 다. `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 이 목록에 있고 `connector.json` 검증을 통과한 것만 카탈로그에 나온다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
+| 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` |
 | 스킬 루트 | 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` |
 
@@ -58,11 +58,12 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 
 ## backend 패키지
 
-`connector`는 사용자별 가계부 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
-Hermes의 이름 기반 plugin 설치와 env 삭제, MCP probe는 `hermes`가 HTTP로 호출한다.
-외부 가계부 토큰 검증은 `connector/infra`가 공통 설정 주소로 호출한다.
-웹은 `components/connector`와 `app/connections/accountbook`, 대응 서버 라우트가 맡는다.
-계약은 [가계부 연결](connectors.md)에 있다.
+`connector`는 커넥터 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
+특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
+웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
+`test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 에 특정 서비스 이름이 들어오지 않았는지 본다.
+계약은 [커넥터 연결](connectors.md)에 있다.
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
 `presentation` 은 `infra` 를 바로 쓰지 않는다.
