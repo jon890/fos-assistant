@@ -48,6 +48,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -414,7 +415,7 @@ class ChatAttachmentTurnTest {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
         return new ChatController(
-                chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
+                chat, provider, new UserDisplayNameService(users), agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
     }
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {

@@ -28,7 +28,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.StartConversationResponse;
 import com.bifos.assistant.chat.presentation.ChatDtos.StopResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import jakarta.validation.Valid;
@@ -60,7 +60,7 @@ public class ChatController {
 
     private final ChatService chat;
     private final CurrentUserProvider currentUser;
-    private final AppUserRepository users;
+    private final UserDisplayNameService userNames;
     private final AgentService agents;
     private final ConversationAccess access;
     private final ChatEventStreams streams;
@@ -206,7 +206,7 @@ public class ChatController {
     public List<MessageView> messages(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         Long number = access.requireOwnId(user, conversationId);
-        String senderName = users.findById(user.id()).map(it -> it.displayName()).orElse(null);
+        String senderName = userNames.find(user.id());
         List<ChatMessage> history = chat.history(user, number);
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);

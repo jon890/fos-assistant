@@ -32,6 +32,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,7 +100,7 @@ class ConversationMissingAgentTest {
         mvc = MockMvcBuilders.standaloneSetup(new ChatController(
                         chat,
                         currentUser,
-                        users,
+                        new UserDisplayNameService(users),
                         agentService,
                         access,
                         new ChatEventStreams(Duration.ofSeconds(20)),

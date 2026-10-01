@@ -38,6 +38,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -149,7 +150,7 @@ class ToolDetailStreamTest {
         mvc = MockMvcBuilders.standaloneSetup(new ChatController(
                         chat,
                         currentUser,
-                        users,
+                        new UserDisplayNameService(users),
                         agentService,
                         access,
                         new ChatEventStreams(Duration.ofSeconds(20)),
