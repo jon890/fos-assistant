@@ -5,10 +5,11 @@
  * 앞의 커넥터 연결 시나리오가 해제로 끝나므로 여기서 다시 등록하고 끝에서 해제한다.
  */
 import { call, expect, expectStatus, step, type Context, type Scenario } from "../harness.ts";
-import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK } from "../fake-hermes.ts";
+import { CONNECTOR_TOOL_PROBE, DEMO_CONNECTOR, DEMO_TOKEN_OK, type ConnectorToolCall } from "../fake-hermes.ts";
 
 type ConnectionView = { status: string; agentCode: string | null };
 type Turn = { assistantText: string };
+type ActionView = { actionId: string; status: string; resultText: string | null };
 
 const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
@@ -59,7 +60,7 @@ export const connectorPolicyScenario: Scenario = {
         (context.hermes.profileEnv(profile).MCP_FOS_ASSISTANT_API_KEY ?? "") !== "",
         "연결용 profile 의 env 에 MCP 토큰이 없다. hook 이 판정을 물을 때 쓰는 토큰이다",
       );
-      const mine = (): { hermesTool: string; argsJson: string }[] =>
+      const mine = (): ConnectorToolCall[] =>
         context.hermes.connectorToolCalls().filter((entry) => entry.profile === profile);
       expect(mine().length === 0, `호출하기 전인데 커넥터 서버에 닿은 호출이 있다: ${JSON.stringify(mine())}`);
 
@@ -67,18 +68,65 @@ export const connectorPolicyScenario: Scenario = {
       const listed = await probe(context, agentCode, `${PREFIX}list_scopes`, "{}");
       expect(listed === "allow", `list_scopes 가 허용되지 않았다: ${listed}`);
       expect(
-        JSON.stringify(mine()) === JSON.stringify([{ profile, hermesTool: `${PREFIX}list_scopes`, argsJson: "{}" }]),
+        JSON.stringify(mine())
+          === JSON.stringify([{ profile, hermesTool: `${PREFIX}list_scopes`, argsJson: "{}", via: "hook" }]),
         `list_scopes 호출 하나만 닿아야 한다: ${JSON.stringify(mine())}`,
       );
 
-      step("승인이 필요한 쓰기 도구는 지금은 기록만 하고 허용된다");
-      const noteArgs = JSON.stringify({ text: "안녕" });
+      step("승인이 필요한 쓰기 도구는 승인 요청 번호와 함께 막히고 커넥터 서버에 닿지 않는다");
+      const noteArgs = JSON.stringify({ text: "안녕", tags: ["가", "나"] });
       const written = await probe(context, agentCode, `${PREFIX}write_note`, noteArgs);
-      expect(written === "allow", `write_note 가 허용되지 않았다: ${written}`);
-      expect(
-        mine().length === 2 && mine()[1]!.hermesTool === `${PREFIX}write_note` && mine()[1]!.argsJson === noteArgs,
-        `write_note 호출이 인자 그대로 닿아야 한다: ${JSON.stringify(mine())}`,
+      const actionId = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.exec(written)?.[0];
+      expect(written.startsWith("block ") && actionId !== undefined, `write_note 가 승인 요청 번호와 함께 막히지 않았다: ${written}`);
+      expect(mine().length === 1, `승인하기 전인데 write_note 가 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+
+      step("다른 사용자는 그 승인 요청을 승인하지 못한다");
+      const foreignApproval = expectStatus(
+        await call(context, `/connector-actions/${actionId}/approve`, {
+          method: "POST", token: context.tokens.kid, body: { grant: null },
+        }),
+        404,
+        "다른 사용자의 승인",
       );
+      expect(
+        foreignApproval.json<{ code: string }>().code === "CONNECTOR_ACTION_NOT_FOUND",
+        `오류 코드가 다르다\n${foreignApproval.body}`,
+      );
+      expect(mine().length === 1, `남이 승인한 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+
+      step("주인이 승인하면 저장한 인자로 실행 경로를 한 번 부르고 결과를 줄에 남긴다");
+      const approved = expectStatus(
+        await call(context, `/connector-actions/${actionId}/approve`, {
+          method: "POST", token: context.tokens.dad, body: { grant: null },
+        }),
+        200,
+        "승인",
+      ).json<ActionView>();
+      expect(
+        approved.status === "SUCCEEDED" && approved.actionId === actionId && approved.resultText !== null
+          && JSON.stringify(JSON.parse(approved.resultText)) === JSON.stringify({ saved: true }),
+        `승인한 줄이 SUCCEEDED 와 결과를 갖지 않는다: ${JSON.stringify(approved)}`,
+      );
+      const executed = mine().filter((entry) => entry.via === "execute");
+      expect(executed.length === 1, `실행 경로의 호출이 하나가 아니다: ${JSON.stringify(mine())}`);
+      expect(
+        executed[0]!.hermesTool === `${PREFIX}write_note`
+          && JSON.stringify(JSON.parse(executed[0]!.argsJson)) === JSON.stringify(JSON.parse(noteArgs)),
+        `실행한 인자의 JSON 값이 보낸 것과 다르다: ${JSON.stringify(executed[0])}`,
+      );
+
+      step("같은 승인을 다시 누르면 409 이고 실행은 한 번이다");
+      const again = expectStatus(
+        await call(context, `/connector-actions/${actionId}/approve`, {
+          method: "POST", token: context.tokens.dad, body: { grant: null },
+        }),
+        409,
+        "두 번째 승인",
+      );
+      expect(
+        again.json<{ code: string }>().code === "CONNECTOR_ACTION_NOT_PENDING", `오류 코드가 다르다\n${again.body}`,
+      );
+      expect(mine().length === 2, `두 번째 승인이 다시 실행됐다: ${JSON.stringify(mine())}`);
 
       step("선언하지 않은 도구와 파괴적인 도구는 글과 함께 막히고 커넥터 서버에 닿지 않는다");
       for (const tool of ["hidden_tool", "purge_notes"]) {

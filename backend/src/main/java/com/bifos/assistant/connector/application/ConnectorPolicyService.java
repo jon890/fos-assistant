@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionKey;
@@ -8,8 +9,10 @@ import com.bifos.assistant.connector.domain.HermesToolName;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
+import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.error.ApiException;
@@ -21,6 +24,7 @@ import java.time.Instant;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -29,9 +33,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-047).
  *
- * <p>순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 실행이나 연결을 찾지 못한 호출과 같은 키로 다른 도구나 다른
- * 인자를 보낸 호출은 줄을 남기지 않는다. 줄에 적을 사용자와 에이전트를 알 수 없기 때문이다. 승인이 필요한 호출은 승인 엔진이 들어오기 전이라 통과로
- * 답하고 기록만 남긴다. 인자 원문은 저장하지 않고 해시만 남긴다.
+ * <p>순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 줄을 남기지 않는 호출은 두 가지다. 실행이나 연결을
+ * 찾지 못한 호출은 줄에 적을 사용자와 에이전트를 알 수 없어서이고, 같은 키로 다른 도구나 다른 인자를 보낸 호출은 키가
+ * 유니크라 새 줄을 만들 수 없어서다.
+ *
+ * <p>승인이 필요한 호출은 막고 인자 원문과 함께 {@code PENDING} 으로 저장한다(ADR-048). 실행은 주인이 승인한 뒤
+ * {@link ConnectorActionService} 가 한다. 그 밖의 줄은 인자 원문을 저장하지 않고 해시만 남긴다.
  *
  * <p>{@code mcp} 패키지의 인증 주체를 모르게 하려고 profile 이름과 session 값을 문자열로 받는다.
  */
@@ -46,11 +53,16 @@ public class ConnectorPolicyService {
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
+    private static final String APPROVAL_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. "
+            + "사용자에게 화면에서 승인해 달라고 알리고, 같은 도구를 다시 부르지 않는다. 승인하면 그대로 실행되고 결과가 이 대화로 온다.";
 
     private final ConnectorActionRepository actions;
     private final ConnectorConnectionRepository connections;
+    private final ConnectorToolGrantRepository grants;
     private final SessionOwnerResolver owners;
     private final ConnectorCatalogCache catalog;
+    private final ConnectorPolicyProperties properties;
+    private final ApplicationEventPublisher events;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -60,23 +72,32 @@ public class ConnectorPolicyService {
     public ConnectorPolicyService(
             ConnectorActionRepository actions,
             ConnectorConnectionRepository connections,
+            ConnectorToolGrantRepository grants,
             SessionOwnerResolver owners,
             ConnectorCatalogCache catalog,
+            ConnectorPolicyProperties properties,
+            ApplicationEventPublisher events,
             PlatformTransactionManager transactionManager) {
-        this(actions, connections, owners, catalog, transactionManager, Clock.systemUTC());
+        this(actions, connections, grants, owners, catalog, properties, events, transactionManager, Clock.systemUTC());
     }
 
     public ConnectorPolicyService(
             ConnectorActionRepository actions,
             ConnectorConnectionRepository connections,
+            ConnectorToolGrantRepository grants,
             SessionOwnerResolver owners,
             ConnectorCatalogCache catalog,
+            ConnectorPolicyProperties properties,
+            ApplicationEventPublisher events,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         this.actions = actions;
         this.connections = connections;
+        this.grants = grants;
         this.owners = owners;
         this.catalog = catalog;
+        this.properties = properties;
+        this.events = events;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -125,6 +146,7 @@ public class ConnectorPolicyService {
             return blockedWithoutRecord("연결용 에이전트의 profile 이 토큰의 profile 과 다르다");
         }
 
+        Instant now = Instant.now(clock);
         Optional<ConnectorManifest> manifest = readManifest(connection.connectorId());
         // 등록 이름과 맞는 것을 확인한 원래 이름만 쓴다. manifest 가 없으면 확인할 수 없어 비운다.
         String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
@@ -134,28 +156,51 @@ public class ConnectorPolicyService {
                         ownServerTool(value, hermesTool),
                         value.schema(),
                         ConnectorToolPolicies.find(value, confirmedTool),
-                        false,
+                        granted(connection, confirmedTool, now),
                         argsJson.getBytes(StandardCharsets.UTF_8).length))
                 .orElseGet(ToolPolicyDecision::policyUnavailable);
-        boolean passed = decision.decision() != ActionDecision.DENIED;
+        boolean needsApproval = decision.decision() == ActionDecision.NEEDS_APPROVAL;
+        if (needsApproval) {
+            // 같은 실행이 같은 도구를 같은 인자로 다시 불렀다. 새 줄을 만들지 않고 앞선 요청의 번호로 답한다.
+            Optional<ConnectorAction> waiting =
+                    actions.findFirstByOriginExecutionIdAndHermesToolAndArgsSha256AndStatusOrderByIdAsc(
+                            origin.id(), hermesTool, argsSha256, ActionStatus.PENDING);
+            if (waiting.isPresent()) {
+                return answer(waiting.get());
+            }
+        }
         ConnectorAction action = ConnectorAction.decided(
                 connection,
                 origin,
                 hermesTool,
                 confirmedTool,
                 decision,
-                passed,
+                decision.decision() == ActionDecision.ALLOWED,
                 dedupeKey,
                 argsSha256,
-                Instant.now(clock));
+                now);
+        if (needsApproval) {
+            action.awaitApproval(argsJson, now.plus(properties.approvalTtl()));
+        }
         try {
-            return answer(transactions.execute(status -> actions.saveAndFlush(action)));
+            ConnectorAction saved = transactions.execute(status -> actions.saveAndFlush(action));
+            // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽었을 때 줄이 있어야 한다.
+            if (needsApproval && saved.conversationId() != null) {
+                events.publishEvent(new ConnectorActionChanged(saved.conversationId(), saved.publicId()));
+            }
+            return answer(saved);
         } catch (DataIntegrityViolationException ex) {
             // 같은 호출이 동시에 와 유니크 제약에 걸렸다. 먼저 저장된 줄의 판정을 그대로 돌려준다.
             return actions.findByDedupeKey(dedupeKey)
                     .map(first -> replayed(first, hermesTool, argsSha256))
                     .orElseThrow(() -> ex);
         }
+    }
+
+    /** 그 사용자가 그 커넥터의 그 도구에 준 유효한 상시 허락이 있는가. 원래 이름을 확인하지 못한 호출은 없는 것이다. */
+    private boolean granted(ConnectorConnection connection, String confirmedTool, Instant now) {
+        return confirmedTool != null
+                && grants.existsActive(connection.userId(), connection.connectorId(), confirmedTool, now);
     }
 
     /** 읽지 못했거나 카탈로그에 없으면 빈 값이다. 예외 종류만 남긴다. 예외 메시지에는 원격 응답이 섞일 수 있다. */
@@ -188,7 +233,7 @@ public class ConnectorPolicyService {
     }
 
     /** 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 서버 이름까지의 앞부분이 같은지로 본다. */
-    private static boolean ownServerTool(ConnectorManifest manifest, String hermesTool) {
+    static boolean ownServerTool(ConnectorManifest manifest, String hermesTool) {
         return hermesTool.startsWith(HermesToolName.of(manifest.mcpServer(), ""));
     }
 
@@ -209,7 +254,12 @@ public class ConnectorPolicyService {
         return new ConnectorPolicyAnswer(false, CONTEXT_MESSAGE, null);
     }
 
+    /** 승인 줄은 지금 상태와 상관없이 승인을 기다리라는 글과 그 번호로 답한다. 같은 호출이 다시 와도 답이 같다. */
     private static ConnectorPolicyAnswer answer(ConnectorAction action) {
+        if (action.status() != null) {
+            return new ConnectorPolicyAnswer(
+                    false, String.format(APPROVAL_MESSAGE, action.publicId()), action.publicId());
+        }
         if (action.passed()) {
             return new ConnectorPolicyAnswer(true, "", null);
         }

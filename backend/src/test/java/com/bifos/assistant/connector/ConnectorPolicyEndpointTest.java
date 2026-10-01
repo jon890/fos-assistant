@@ -9,8 +9,6 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.connector.application.ConnectorCatalogCache;
-import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
@@ -29,11 +27,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,10 +36,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -61,15 +53,14 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(ConnectorPolicyTestDoubles.class)
 class ConnectorPolicyEndpointTest {
     private static final String PATH = "/internal/hermes/connector-policy";
     private static final String PROFILE = "connector-policy-owner";
     private static final String OTHER_PROFILE = "connector-policy-other";
     private static final String DEMO = "demo-notes";
     private static final String ARGS = "{\"text\":\"안녕\"}";
-    private static final Duration TTL = Duration.ofSeconds(60);
-    private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");
-    private static final MovingClock CLOCK = new MovingClock(NOW);
+    private static final Instant NOW = ConnectorPolicyTestDoubles.NOW;
 
     /** 도구마다 정책을 선언한 커넥터다. MCP 서버 이름이 {@code demo} 라 등록 이름은 {@code mcp__demo__<도구>} 다. */
     private static final ConnectorManifest DECLARING = manifest(
@@ -78,17 +69,6 @@ class ConnectorPolicyEndpointTest {
                     new ConnectorTool("list_scopes", "READ", "none", null),
                     new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
                     new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null)));
-
-    @TestConfiguration
-    static class MovingCatalogClock {
-        /** 운영의 캐시 대신 검사가 시각을 옮길 수 있는 캐시를 끼운다. */
-        @Bean
-        @Primary
-        ConnectorCatalogCache movingCatalogCache(HermesConnectorClient connector) {
-            return new ConnectorCatalogCache(
-                    connector, new ConnectorPolicyProperties(TTL, Duration.ofSeconds(5)), CLOCK);
-        }
-    }
 
     @LocalServerPort
     int port;
@@ -128,13 +108,14 @@ class ConnectorPolicyEndpointTest {
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM connector_action");
+        jdbc.update("DELETE FROM connector_tool_grant");
         connections.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));
         agents.deleteAll();
         tokenRepository.deleteAll();
         users.deleteAll();
         // 앞선 검사가 읽은 카탈로그가 남지 않게 보관 시간보다 멀리 옮긴다.
-        CLOCK.advance(TTL.plusSeconds(1));
+        ConnectorPolicyTestDoubles.expireCatalog();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING));
 
         owner = users.save(AppUser.of("policy-owner@example.com", "주인", 1L, UserRole.MEMBER));
@@ -194,21 +175,42 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
-    @DisplayName("WRITE 도구는 승인 엔진 전이라 allow 로 답하고 승인 필요 줄을 승인 상태 없이 남긴다")
-    void writeToolPassesAndIsRecordedAsNeedingApproval() throws Exception {
+    @DisplayName("WRITE 도구는 block 과 action_id 로 답하고 인자 원문을 담은 PENDING 승인 줄을 남긴다")
+    void writeToolIsBlockedWithActionIdAndRecordedAsPendingApproval() throws Exception {
         connect(true);
 
         HttpResponse<String> response = ask("mcp__demo__write_note", "write_note");
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(200);
-        assertThat(json.readTree(response.body()).path("decision").asString()).isEqualTo("allow");
+        JsonNode body = json.readTree(response.body());
+        assertThat(body.path("decision").asString()).isEqualTo("block");
+        String actionId = body.path("action_id").asString();
+        assertThat(UUID.fromString(actionId)).as("action_id: %s", actionId).isNotNull();
+        assertThat(body.path("message").asString())
+                .isEqualTo("이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 " + actionId
+                        + " 다. 사용자에게 화면에서 승인해 달라고 알리고, 같은 도구를 다시 부르지 않는다. 승인하면 그대로 실행되고 결과가 이 대화로 온다.");
         Map<String, Object> row = onlyRow();
         assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
-        assertThat(row.get("PASSED")).isEqualTo(true);
-        assertThat(row.get("STATUS")).isNull();
-        assertThat(row.get("ARGS_JSON")).isNull();
+        assertThat(row.get("PASSED")).isEqualTo(false);
+        assertThat(row.get("STATUS")).isEqualTo("PENDING");
+        assertThat(row.get("ARGS_JSON")).isEqualTo(ARGS);
+        assertThat(row.get("EXPIRES_AT")).isNotNull();
         assertThat(row.get("RISK")).isEqualTo("WRITE");
         assertThat(row.get("APPROVAL_MODE")).isEqualTo("REQUIRED");
+    }
+
+    @Test
+    @DisplayName("승인 줄을 만든 요청을 같은 본문으로 다시 보내면 같은 번호와 같은 글을 받고 줄이 하나다")
+    void resendingApprovalRequestReturnsSameActionId() throws Exception {
+        connect(true);
+        String body = body(token, "mcp__demo__write_note", "write_note", root, newCall(), ARGS);
+
+        HttpResponse<String> first = send(token, body);
+        HttpResponse<String> second = send(token, body);
+
+        assertThat(json.readTree(first.body()).path("action_id").isString()).isTrue();
+        assertThat(json.readTree(second.body())).isEqualTo(json.readTree(first.body()));
+        assertThat(rows()).isEqualTo(1);
     }
 
     @Test
@@ -243,8 +245,8 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
-    @DisplayName("schema 1 에서 선언이 없는 도구는 WRITE 와 required 로 읽어 통과시키고 승인 필요 줄을 남긴다")
-    void undeclaredToolOfLegacySchemaIsReadAsWrite() throws Exception {
+    @DisplayName("schema 1 에서 선언이 없는 도구는 WRITE 와 required 로 읽어 막고 승인 필요 줄을 남긴다")
+    void undeclaredToolOfLegacySchemaIsReadAsWriteAndNeedsApproval() throws Exception {
         // 도구를 선언하지 않는 판은 대시보드가 부르는 읽기 도구만 담는다.
         when(connector.readCatalog())
                 .thenReturn(List.of(manifest(1, List.of(new ConnectorTool("list_scopes", "READ", "none", null)))));
@@ -253,18 +255,20 @@ class ConnectorPolicyEndpointTest {
         HttpResponse<String> unknown = ask("mcp__demo__write_note", null);
         HttpResponse<String> read = ask("mcp__demo__list_scopes", "list_scopes");
 
-        assertThat(json.readTree(unknown.body()).path("decision").asString()).isEqualTo("allow");
+        assertThat(json.readTree(unknown.body()).path("decision").asString()).isEqualTo("block");
+        assertThat(json.readTree(unknown.body()).path("action_id").isString()).isTrue();
         assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(jdbc.queryForList(
-                        "SELECT decision, risk, approval_mode, tool_name FROM connector_action ORDER BY id"))
+                        "SELECT decision, risk, approval_mode, tool_name, status FROM connector_action ORDER BY id"))
                 .extracting(
                         row -> row.get("DECISION"),
                         row -> row.get("RISK"),
                         row -> row.get("APPROVAL_MODE"),
-                        row -> row.get("TOOL_NAME"))
+                        row -> row.get("TOOL_NAME"),
+                        row -> row.get("STATUS"))
                 .containsExactly(
-                        tuple("NEEDS_APPROVAL", "WRITE", "REQUIRED", null),
-                        tuple("ALLOWED", "READ", "NONE", "list_scopes"));
+                        tuple("NEEDS_APPROVAL", "WRITE", "REQUIRED", null, "PENDING"),
+                        tuple("ALLOWED", "READ", "NONE", "list_scopes", null));
     }
 
     @Test
@@ -347,7 +351,7 @@ class ConnectorPolicyEndpointTest {
                         List.of(
                                 new ConnectorTool("list_scopes", "READ", "none", null),
                                 new ConnectorTool("purge_notes", "READ", "none", null)))));
-        CLOCK.advance(TTL.plusSeconds(1));
+        ConnectorPolicyTestDoubles.expireCatalog();
 
         HttpResponse<String> second = send(token, body);
 
@@ -557,33 +561,5 @@ class ConnectorPolicyEndpointTest {
     private static ConnectorManifest manifest(int schema, List<ConnectorTool> tools) {
         return new ConnectorManifest(
                 DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", List.of(), false, schema, tools);
-    }
-
-    /** 검사가 시각을 옮기는 시계다. */
-    private static final class MovingClock extends Clock {
-        private Instant now;
-
-        private MovingClock(Instant now) {
-            this.now = now;
-        }
-
-        private synchronized void advance(Duration duration) {
-            now = now.plus(duration);
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
-
-        @Override
-        public synchronized Instant instant() {
-            return now;
-        }
     }
 }

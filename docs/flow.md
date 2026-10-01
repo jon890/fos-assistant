@@ -61,7 +61,7 @@ sequenceDiagram
         C-->>H: block 과 까닭
         H-->>M: 도구 오류 결과
     else 승인 필요
-        C-->>H: 승인 엔진 전에는 allow, 뒤에는 block 과 승인 요청 번호
+        C-->>H: block 과 승인 요청 번호
     end
 ```
 
@@ -81,7 +81,7 @@ sequenceDiagram
 
 ## 승인이 필요한 호출
 
-승인 엔진이 들어온 뒤의 흐름이다. 근거는 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
+판정이 「승인 필요」 인 호출의 흐름이다. 근거는 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 ```mermaid
 sequenceDiagram

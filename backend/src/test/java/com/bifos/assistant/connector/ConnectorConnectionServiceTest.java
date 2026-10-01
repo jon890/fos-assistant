@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorCallLimiter;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorProperties;
@@ -144,6 +145,9 @@ class ConnectorConnectionServiceTest {
 
     @Autowired
     ConnectorConnectionRepository connections;
+
+    @Autowired
+    ConnectorActionService approvals;
 
     @Autowired
     AgentRepository agents;
@@ -1571,6 +1575,7 @@ class ConnectorConnectionServiceTest {
                 new ConnectorCallLimiter(
                         new ConnectorProperties(maxConcurrentCalls, callsPerMinute),
                         Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)),
+                approvals,
                 Clock.systemUTC());
     }
 

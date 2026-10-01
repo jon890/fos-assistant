@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -53,6 +54,8 @@ class HttpHermesConnectorClientTest {
         client = new HttpHermesConnectorClient(
                 new HermesProperties("unused", BASE, "test-dashboard-token", BASE, null, null, null, null));
         ReflectionTestUtils.setField(client, "client", builder.build());
+        // 실행 경로는 읽기 제한이 다른 클라이언트를 쓴다. 같은 대역 서버에 붙인다.
+        ReflectionTestUtils.setField(client, "executeClient", builder.build());
     }
 
     @DisplayName("카탈로그에서 칸의 env, 선택지, 확인 도구, MCP 서버 이름을 읽는다")
@@ -301,6 +304,90 @@ class HttpHermesConnectorClientTest {
                         ConnectorCallError.FORBIDDEN,
                         ConnectorCallError.INVALID_INPUT,
                         ConnectorCallError.UNAVAILABLE);
+        server.verify();
+    }
+
+    @DisplayName("실행은 profile 과 등록 이름과 JSON 값으로 읽은 인자를 보내고 성공 결과를 돌려준다")
+    @Test
+    void executeSendsProfileToolAndArgumentsAsJsonAndReturnsResult() {
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/execute"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer test-dashboard-token"))
+                .andExpect(content()
+                        .json(
+                                "{\"profile\":\"user-demo\",\"hermes_tool\":\"mcp__demo__write_note\","
+                                        + "\"args\":{\"text\":\"안녕\",\"count\":2}}",
+                                JsonCompareMode.STRICT))
+                .andRespond(withSuccess("{\"ok\":true,\"result\":{\"saved\":true}}", MediaType.APPLICATION_JSON));
+
+        // 저장한 글의 공백은 값에 들지 않는다. 값이 같은 JSON 으로 나간다.
+        CallResult result =
+                client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{\"text\":\"안녕\",   \"count\":2}");
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.result().get("saved").asBoolean()).isTrue();
+        server.verify();
+    }
+
+    @DisplayName("실행의 200 실패 응답은 공통 어휘 하나로 읽는다")
+    @Test
+    void executeReadsFailureAsCommonErrorWord() {
+        server.expect(requestTo(BASE + "/api/connectors/demo-notes/execute"))
+                .andRespond(withSuccess("{\"ok\":false,\"error\":\"forbidden\"}", MediaType.APPLICATION_JSON));
+
+        CallResult result = client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{}");
+
+        assertThat(result.ok()).isFalse();
+        assertThat(result.error()).isEqualTo(ConnectorCallError.FORBIDDEN);
+        server.verify();
+    }
+
+    @DisplayName("실행의 504 와 5xx 와 읽을 수 없는 본문은 원문 없는 ConnectorExecutionUnknown 이다")
+    @Test
+    void executeTreatsTimeoutServerErrorAndUnreadableBodyAsUnknown() {
+        String url = BASE + "/api/connectors/demo-notes/execute";
+        server.expect(requestTo(url))
+                .andRespond(withStatus(HttpStatus.GATEWAY_TIMEOUT).body("{\"detail\":\"remote secret detail\"}"));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+        server.expect(requestTo(url)).andRespond(withSuccess("not json", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url))
+                .andRespond(withSuccess("{\"ok\":false,\"error\":\"unheard_of\"}", MediaType.APPLICATION_JSON));
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThatThrownBy(() -> client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{}"))
+                    .as("%d번째 응답", attempt + 1)
+                    .isInstanceOfSatisfying(ConnectorExecutionUnknown.class, ex -> {
+                        assertThat(ex.getMessage()).isNull();
+                        assertThat(ex.getCause()).isNull();
+                    });
+        }
+        server.verify();
+    }
+
+    @DisplayName("실행의 400 과 401 과 404 는 실행되지 않은 것이라 unavailable 실패 결과다")
+    @Test
+    void executeReadsRefusalsAsNotExecutedFailure() {
+        String url = BASE + "/api/connectors/demo-notes/execute";
+        for (HttpStatus refused : List.of(HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED, HttpStatus.NOT_FOUND)) {
+            server.expect(requestTo(url)).andRespond(withStatus(refused).body("{\"detail\":\"refused\"}"));
+        }
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+            CallResult result = client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{}");
+            assertThat(result.error()).as("%d번째 응답", attempt + 1).isEqualTo(ConnectorCallError.UNAVAILABLE);
+        }
+        server.verify();
+    }
+
+    @DisplayName("저장한 인자가 JSON object 가 아니면 보내지 않고 invalid_input 실패 결과다")
+    @Test
+    void executeDoesNotSendArgumentsThatAreNotAnObject() {
+        assertThat(client.execute(PROFILE, DEMO, "mcp__demo__write_note", "[1]").error())
+                .isEqualTo(ConnectorCallError.INVALID_INPUT);
+        assertThat(client.execute(PROFILE, DEMO, "mcp__demo__write_note", "not json").error())
+                .isEqualTo(ConnectorCallError.INVALID_INPUT);
+        // 대역 서버에 기대한 요청이 없다. 요청이 나갔으면 대역이 실패시킨다.
         server.verify();
     }
 

@@ -30,7 +30,7 @@ class ConnectorCatalogCacheTest {
     private final HermesConnectorClient connector = mock(HermesConnectorClient.class);
     private final MovingClock clock = new MovingClock(START);
     private final ConnectorCatalogCache cache =
-            new ConnectorCatalogCache(connector, new ConnectorPolicyProperties(TTL, FAILURE_TTL), clock);
+            new ConnectorCatalogCache(connector, new ConnectorPolicyProperties(TTL, FAILURE_TTL, Duration.ofHours(24), "-"), clock);
 
     @Test
     @DisplayName("보관 시간 안에서는 카탈로그를 한 번만 읽고 처음 읽은 값으로 답한다")

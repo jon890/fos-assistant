@@ -73,14 +73,14 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `created_at` | `DATETIME(6) NOT NULL` | |
 
 - 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다
-- 승인 엔진이 켜지기 전에는 `NEEDS_APPROVAL` 인 줄도 `passed` 가 참이고 `status` 와 `args_json` 이 빈다
+- `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 가 `PENDING` 으로 시작하며 `args_json` 과 `expires_at` 을 갖는다. 승인 엔진이 켜지기 전에 남은 `NEEDS_APPROVAL` 줄은 `passed` 가 참이고 `status` 와 `args_json` 이 비어 있어 승인 줄로 다루지 않는다
 - `(conversation_id, status)` 와 `(user_id, created_at)` 에 색인을 둔다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다
 - 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
 
 ## connector_tool_grant
 
-사용자가 도구 하나에 준 상시 허락이다. 승인 엔진과 함께 들어온다.
+사용자가 도구 하나에 준 상시 허락이다. 승인하면서 기간을 골라 준다. 근거는 [ADR-048](adr/ADR-048-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |

@@ -74,6 +74,10 @@ assistant:
       catalog-ttl: 60s
       # 카탈로그 읽기 실패를 기억하는 시간. 그동안 판정은 대시보드를 다시 부르지 않고 바로 거절한다
       catalog-failure-ttl: 5s
+      # 승인 요청이 사용자의 답을 기다리는 시간. 지나면 실행하지 않고 만료로 둔다(ADR-048)
+      approval-ttl: 24h
+      # 답이 없는 승인 요청을 만료로 바꾸는 주기
+      expire-cron: "0 * * * * *"
   delegation-wake:
     # 맡긴 일의 결과가 끝나면 부모 대화의 turn 을 자동으로 연다(ADR-040)
     enabled: true
