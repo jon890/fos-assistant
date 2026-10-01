@@ -1,8 +1,8 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
-import { LoaderCircle } from "lucide-react"
-import { Slot } from "radix-ui"
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "cn";
+import { LoaderCircle } from "lucide-react";
+import { Slot } from "radix-ui";
 
 const buttonVariants = cva(
   // 고침: 모서리를 rounded-md 로. 바탕 밖 투명 테두리(border-transparent)를 빼 단추 높이가 여백만으로 정해지게 한다. aria-invalid 의 dark: 덮어쓰기도 뺐다.
@@ -11,7 +11,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         // 고침: 마우스 올림과 누름을 primary-strong 으로 칠한다.
-        default: "bg-primary text-primary-foreground hover:bg-primary-strong active:bg-primary-strong",
+        default:
+          "bg-primary text-primary-foreground hover:bg-primary-strong active:bg-primary-strong",
         // 고침: 두 밝기 모드 모두 테두리는 border, 바탕은 비워 둔다. dark: 덮어쓰기와 bg-background 를 뺐다.
         outline:
           "border border-border hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
@@ -44,8 +45,8 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
-)
+  },
+);
 
 function Button({
   className,
@@ -60,14 +61,14 @@ function Button({
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
+    asChild?: boolean;
     /** 고침: 보내는 동안 단추를 잠그고 회전 표시를 앞에 둔다. */
-    loading?: boolean
+    loading?: boolean;
     /** 보내는 동안 보일 글자다. 주지 않으면 폭이 줄지 않게 원래 글자를 그대로 둔다. */
-    loadingText?: string
+    loadingText?: string;
   }) {
-  const Comp = asChild ? Slot.Root : "button"
-  const busy = loading && !asChild
+  const Comp = asChild ? Slot.Root : "button";
+  const busy = loading && !asChild;
 
   return (
     <Comp
@@ -83,14 +84,17 @@ function Button({
     >
       {busy ? (
         <>
-          <LoaderCircle aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
+          <LoaderCircle
+            aria-hidden="true"
+            className="animate-spin motion-reduce:animate-none"
+          />
           {loadingText ?? children}
         </>
       ) : (
         children
       )}
     </Comp>
-  )
+  );
 }
 
-export { Button, buttonVariants }
+export { Button, buttonVariants };

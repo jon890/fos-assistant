@@ -15,13 +15,25 @@ type Props = {
 export const AGENT_CARD_HEIGHT = "h-20";
 
 /** 새 대화 화면의 에이전트 카드 묶음이다. 라디오 묶음처럼 방향키로 고름과 초점이 함께 옮겨 간다 */
-export function AgentPicker({ agents, selectedCode, onSelect, disabled = false }: Props) {
+export function AgentPicker({
+  agents,
+  selectedCode,
+  onSelect,
+  disabled = false,
+}: Props) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  const selectedIndex = Math.max(0, agents.findIndex((agent) => agent.code === selectedCode));
+  const selectedIndex = Math.max(
+    0,
+    agents.findIndex((agent) => agent.code === selectedCode),
+  );
 
   function move(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1
-      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
     if (step === 0 || disabled) return;
     event.preventDefault();
     const next = (index + step + agents.length) % agents.length;
@@ -41,7 +53,9 @@ export function AgentPicker({ agents, selectedCode, onSelect, disabled = false }
         return (
           <button
             key={agent.code}
-            ref={(element) => { buttons.current[index] = element; }}
+            ref={(element) => {
+              buttons.current[index] = element;
+            }}
             type="button"
             role="radio"
             aria-checked={checked}
@@ -53,7 +67,9 @@ export function AgentPicker({ agents, selectedCode, onSelect, disabled = false }
               checked ? "border-primary" : "border-border"
             }`}
           >
-            <span className="w-full truncate text-sm font-medium leading-5">{agent.name}</span>
+            <span className="w-full truncate text-sm font-medium leading-5">
+              {agent.name}
+            </span>
           </button>
         );
       })}

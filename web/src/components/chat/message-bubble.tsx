@@ -2,7 +2,11 @@
 
 import { FileText } from "lucide-react";
 import { cn } from "cn";
-import { assistantAvatar, attachmentPlaceholder, revealedTime } from "./variants";
+import {
+  assistantAvatar,
+  attachmentPlaceholder,
+  revealedTime,
+} from "./variants";
 import { AnswerBody } from "./answer-body";
 import { describeError } from "../error-message";
 import { formatWhen } from "@/lib/format";
@@ -113,19 +117,31 @@ function ArtifactList({
           </>
         );
         return (
-          <li key={artifact.path} data-testid="message-artifact" className="flex min-w-0 items-center gap-2 text-sm">
+          <li
+            key={artifact.path}
+            data-testid="message-artifact"
+            className="flex min-w-0 items-center gap-2 text-sm"
+          >
             {artifact.deleted || !onOpen ? (
-              <span aria-disabled="true" className="flex min-w-0 items-center gap-2 text-muted-foreground opacity-60">
+              <span
+                aria-disabled="true"
+                className="flex min-w-0 items-center gap-2 text-muted-foreground opacity-60"
+              >
                 {content}
               </span>
             ) : (
-              <button type="button" onClick={() => onOpen(artifact.path, name)}
-                className="flex min-w-0 items-center gap-2 rounded-sm underline-offset-4 hover:underline">
+              <button
+                type="button"
+                onClick={() => onOpen(artifact.path, name)}
+                className="flex min-w-0 items-center gap-2 rounded-sm underline-offset-4 hover:underline"
+              >
                 {content}
               </button>
             )}
             {artifact.deleted ? (
-              <span className="shrink-0 text-xs text-muted-foreground">보관 기간이 지나 볼 수 없어요.</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                보관 기간이 지나 볼 수 없어요.
+              </span>
             ) : null}
           </li>
         );
@@ -157,8 +173,11 @@ export function MessageBubble({
   initialActivityExpanded: boolean;
   latest: boolean;
   streaming: boolean;
-  userVersion?: VersionSlot; answerVersion?: VersionSlot; onVersionChange?(slotId: number, index: number): void;
-  canRegenerate?: boolean; onRegenerate?(): void;
+  userVersion?: VersionSlot;
+  answerVersion?: VersionSlot;
+  onVersionChange?(slotId: number, index: number): void;
+  canRegenerate?: boolean;
+  onRegenerate?(): void;
   /** 이 답 끝의 질문에 답할 수 있을 때만 준다. 마지막 답이고 돌고 있는 turn 이 없을 때다 */
   onAnswer?(text: string): void;
   /** 이 답 바로 다음의 사용자 메시지다. 카드 답을 복원할 때 쓴다 */
@@ -175,7 +194,10 @@ export function MessageBubble({
   if (turn.role === "SYSTEM") {
     // 사람이 쓴 말도 비서의 답도 아니다. 복사, 다시 생성, 판 넘기기를 두지 않는다.
     return (
-      <li data-testid="system-message" className="flex min-w-0 justify-center px-4">
+      <li
+        data-testid="system-message"
+        className="flex min-w-0 justify-center px-4"
+      >
         <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-center text-xs text-muted-foreground">
           {turn.content}
         </p>
@@ -192,31 +214,46 @@ export function MessageBubble({
       >
         <div
           data-testid="user-message"
-          className={cn("relative max-w-[70%] rounded-3xl bg-primary-soft px-4 py-2.5",
-            "group-focus-visible:outline-2 group-focus-visible:outline-primary")}
+          className={cn(
+            "relative max-w-[70%] rounded-3xl bg-primary-soft px-4 py-2.5",
+            "group-focus-visible:outline-2 group-focus-visible:outline-primary",
+          )}
         >
           <p className="whitespace-pre-wrap break-words text-sm leading-6">
             {command ? (
               <>
-                <span data-testid="skill-chip"
-                  className="mr-1.5 inline-block rounded-full border border-border bg-background px-2 text-xs font-medium leading-5">
+                <span
+                  data-testid="skill-chip"
+                  className="mr-1.5 inline-block rounded-full border border-border bg-background px-2 text-xs font-medium leading-5"
+                >
                   /{command.name}
                 </span>
                 {command.rest}
               </>
-            ) : turn.content}
+            ) : (
+              turn.content
+            )}
           </p>
           {userVersion && onVersionChange ? (
             <div className="mt-2 flex gap-2">
-              <VersionSwitcher slot={userVersion} onChange={(index) => onVersionChange(userVersion.slotId, index)} />
+              <VersionSwitcher
+                slot={userVersion}
+                onChange={(index) => onVersionChange(userVersion.slotId, index)}
+              />
             </div>
           ) : null}
-          <AttachmentGallery conversationId={conversationId} attachments={attachments} />
+          <AttachmentGallery
+            conversationId={conversationId}
+            attachments={attachments}
+          />
           {sentAt ? (
             // 말풍선 바깥 왼쪽에 겹쳐 둔다. 안에 두면 보일 때마다 말풍선이 한 줄 늘어 아래가 밀린다.
             <time
               dateTime={turn.createdAt}
-              className={cn(revealedTime(), "absolute bottom-2 right-full mr-2 whitespace-nowrap")}
+              className={cn(
+                revealedTime(),
+                "absolute bottom-2 right-full mr-2 whitespace-nowrap",
+              )}
             >
               {sentAt}
             </time>
@@ -229,50 +266,84 @@ export function MessageBubble({
   return (
     <li
       data-testid="assistant-message"
-      className={cn("group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2",
-        "focus-visible:outline-2 focus-visible:outline-primary")}
+      className={cn(
+        "group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2",
+        "focus-visible:outline-2 focus-visible:outline-primary",
+      )}
       tabIndex={0}
     >
-      <span
-        aria-hidden="true"
-        className={assistantAvatar()}
-      >
+      <span aria-hidden="true" className={assistantAvatar()}>
         비
       </span>
       <div className="min-w-0">
         {turn.switchedTo ? (
-          <p className="mb-1 text-xs text-muted-foreground" data-testid="provider-switched">
+          <p
+            className="mb-1 text-xs text-muted-foreground"
+            data-testid="provider-switched"
+          >
             여기부터 {turn.switchedTo}로 실행해요
           </p>
         ) : null}
         <div className="mb-1 flex min-h-8 items-center gap-2">
           <span className="text-sm font-medium">비서</span>
           {sentAt ? (
-            <time
-              dateTime={turn.createdAt}
-              className={revealedTime()}
-            >
+            <time dateTime={turn.createdAt} className={revealedTime()}>
               {sentAt}
             </time>
           ) : null}
         </div>
         {turn.activity && turn.executionId ? (
-          <div className="mb-2"><ActivityBlock mode="saved" summary={turn.activity} executionId={turn.executionId}
-            cancelled={turn.status === "CANCELLED"}
-            initialExpanded={initialActivityExpanded}
-            onOpenPanel={() => onOpenSaved(turn.executionId!)} /></div>
+          <div className="mb-2">
+            <ActivityBlock
+              mode="saved"
+              summary={turn.activity}
+              executionId={turn.executionId}
+              cancelled={turn.status === "CANCELLED"}
+              initialExpanded={initialActivityExpanded}
+              onOpenPanel={() => onOpenSaved(turn.executionId!)}
+            />
+          </div>
         ) : null}
         <div className="leading-7">
-          <AnswerBody content={turn.content} streaming={streaming} nextUserMessage={nextUserMessage}
-            onAnswer={streaming ? undefined : onAnswer} />
+          <AnswerBody
+            content={turn.content}
+            streaming={streaming}
+            nextUserMessage={nextUserMessage}
+            onAnswer={streaming ? undefined : onAnswer}
+          />
         </div>
-        {turn.status === "CANCELLED" ? <p data-testid="stopped-mark" className="mt-2 text-xs text-muted-foreground">중지됨</p> : null}
-        {!streaming ? <MessageActions content={turn.content} latest={latest} version={answerVersion}
-          onVersionChange={(index) => answerVersion && onVersionChange?.(answerVersion.slotId, index)}
-          canRegenerate={canRegenerate} onRegenerate={onRegenerate} /> : null}
-        <AttachmentGallery conversationId={conversationId} attachments={attachments} />
-        <ArtifactList artifacts={turn.artifacts ?? []}
-          onOpen={onOpenArtifact ? (path, name) => onOpenArtifact(turn.id, path, name) : undefined} />
+        {turn.status === "CANCELLED" ? (
+          <p
+            data-testid="stopped-mark"
+            className="mt-2 text-xs text-muted-foreground"
+          >
+            중지됨
+          </p>
+        ) : null}
+        {!streaming ? (
+          <MessageActions
+            content={turn.content}
+            latest={latest}
+            version={answerVersion}
+            onVersionChange={(index) =>
+              answerVersion && onVersionChange?.(answerVersion.slotId, index)
+            }
+            canRegenerate={canRegenerate}
+            onRegenerate={onRegenerate}
+          />
+        ) : null}
+        <AttachmentGallery
+          conversationId={conversationId}
+          attachments={attachments}
+        />
+        <ArtifactList
+          artifacts={turn.artifacts ?? []}
+          onOpen={
+            onOpenArtifact
+              ? (path, name) => onOpenArtifact(turn.id, path, name)
+              : undefined
+          }
+        />
       </div>
     </li>
   );

@@ -1,7 +1,7 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
-import { Slot } from "radix-ui"
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "cn";
+import { Slot } from "radix-ui";
 
 const badgeVariants = cva(
   // 고침: 알약 모서리(rounded-full)로 짧은 표시임을 드러낸다. 고정 높이와 font-medium 을 빼 글자 크기가 높이를 정하게 한다.
@@ -17,8 +17,7 @@ const badgeVariants = cva(
           // 고침: 밝기 모드는 토큰이 나누므로 dark: 덮어쓰기를 뺐다.
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 [a]:hover:bg-destructive/20",
         // 고침: 흐린 표시다. 테두리 위에 muted 바탕과 muted-foreground 글자를 둔다.
-        outline:
-          "border-border bg-muted text-muted-foreground",
+        outline: "border-border bg-muted text-muted-foreground",
         ghost:
           // 고침: 밝기 모드는 토큰이 나누므로 dark: 덮어쓰기를 뺐다.
           "hover:bg-muted hover:text-muted-foreground",
@@ -28,8 +27,8 @@ const badgeVariants = cva(
     defaultVariants: {
       variant: "default",
     },
-  }
-)
+  },
+);
 
 function Badge({
   className,
@@ -38,7 +37,7 @@ function Badge({
   ...props
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot.Root : "span"
+  const Comp = asChild ? Slot.Root : "span";
 
   return (
     <Comp
@@ -47,7 +46,7 @@ function Badge({
       className={cn(badgeVariants({ variant }), className)}
       {...props}
     />
-  )
+  );
 }
 
-export { Badge, badgeVariants }
+export { Badge, badgeVariants };

@@ -48,7 +48,8 @@ export function MonthlySummary({ monthly }: Props) {
       ) : null}
       <div className="sm:col-span-2 md:col-span-3">
         <p className="text-xs text-muted-foreground">
-          두 금액은 공개 가격표를 이용한 계산값이에요. 실제 청구 금액과 다를 수 있어요.
+          두 금액은 공개 가격표를 이용한 계산값이에요. 실제 청구 금액과 다를 수
+          있어요.
         </p>
       </div>
     </dl>

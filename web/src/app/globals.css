@@ -112,7 +112,11 @@
 }
 
 html {
-  font-family: var(--font-pretendard), system-ui, -apple-system, sans-serif;
+  font-family:
+    var(--font-pretendard),
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 /* 작은 모서리는 코드 조각, 보통 모서리는 단추·입력·카드, 알약은 짧은 표시와 원형 조작에 쓴다. */
