@@ -192,6 +192,7 @@ git grep -n 'style={{' -- web/src
 | `web/src/app/api/chat/conversations/[conversationId]/pending/[pendingId]/route.ts` | 신규 |
 | `web/src/app/api/chat/conversations/[conversationId]/pending/send/route.ts` | 신규 |
 | `web/src/lib/pending-messages.ts` | 신규 |
+| `web/src/lib/pending-route.ts` | 신규 |
 | `web/src/lib/chat-event.ts` | 수정 |
 | `web/src/components/error-message.ts` | 수정 |
 | `web/src/components/chat/use-pending-queue.ts` | 신규 |
@@ -205,4 +206,8 @@ git grep -n 'style={{' -- web/src
 | `test/browser/observe-running.spec.ts` | 수정 |
 | `test/browser/chat-attachment.spec.ts` | 수정 |
 | `test/browser/chat.spec.ts` | 수정 |
+| `test/browser/regenerate.spec.ts` | 수정 |
+| `test/browser/model-choice.spec.ts` | 수정 |
+| `test/browser/flow-progress.spec.ts` | 수정 |
+| `test/browser/activity-panel.spec.ts` | 수정 |
 | `docs/code-architecture.md` | 수정 |
