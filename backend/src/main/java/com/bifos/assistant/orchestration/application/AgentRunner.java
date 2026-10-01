@@ -25,8 +25,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -40,16 +39,15 @@ import org.springframework.stereotype.Service;
  * 따른다. 고르지 않았으면 모델을 빼고 보내 그 에이전트 profile 의 기본값으로 돈다.
  *
  * <p>Memory 는 실행마다 {@link ContextAssembler} 로 다시 조립한다. 부모에게 넣은 문자열을 복사하면
- * 그 사이에 바뀐 권한이 반영되지 않는다.
+ * 그 사이에 바뀐 권한이 반영되지 않는다. 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045).
  *
  * <p>실패를 예외로 올리지 않는다. 실행 줄을 FAILED 로 갱신하고 {@link ChildResult} 로 돌려준다.
  * 나란히 도는 다른 단계를 중간에 끊지 않기 위해서다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AgentRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentRunner.class);
 
     /** 실행이 어떤 이유로 끝났는지 알 수 없을 때 실행 줄에 적는 값이다. */
     private static final String UNKNOWN_ERROR = "ORCHESTRATION_STEP_FAILED";
@@ -96,8 +94,18 @@ public class AgentRunner {
             BooleanSupplier cancelled,
             String instructionAddition) {
         return run(
-                user, conversation, agent, task, parentExecutionId, rootExecutionId, session, onStarted, onSubmitted,
-                cancelled, instructionAddition, null);
+                user,
+                conversation,
+                agent,
+                task,
+                parentExecutionId,
+                rootExecutionId,
+                session,
+                onStarted,
+                onSubmitted,
+                cancelled,
+                instructionAddition,
+                null);
     }
 
     /**
@@ -123,13 +131,22 @@ public class AgentRunner {
             BooleanSupplier cancelled,
             String instructionAddition,
             DelegationKey delegationKey) {
-        AssembledContext context = contextAssembler.assemble(user);
+        AssembledContext context =
+                agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
         ModelChoice choice = conversation.modelChoice();
         AgentExecution execution = executions.start(
-                user, conversation, agent, parentExecutionId, rootExecutionId, snapshot, choice, null,
-                session.correlationSessionId(), delegationKey);
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                snapshot,
+                choice,
+                null,
+                session.correlationSessionId(),
+                delegationKey);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
@@ -178,9 +195,7 @@ public class AgentRunner {
                     : executions.cancel(execution, agent, result, choice, partialOutput(result.output()));
             append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
             return new Run(
-                    cancelledExecution,
-                    ChildResult.failed(cancelledExecution.id(), "CANCELLED"),
-                    result.sessionId());
+                    cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), result.sessionId());
         }
 
         if (!result.succeeded()) {
@@ -207,8 +222,7 @@ public class AgentRunner {
      * @param result 성공 여부와 답
      * @param sessionId Hermes 가 알려 준 session. 대화를 이어 가려면 부르는 쪽이 기억한다
      */
-    public record Run(AgentExecution execution, ChildResult result, String sessionId) {
-    }
+    public record Run(AgentExecution execution, ChildResult result, String sessionId) {}
 
     private Run fail(AgentExecution execution, RuntimeException ex, int sequence) {
         String code = ex instanceof ApiException api ? api.code().name() : UNKNOWN_ERROR;
@@ -262,8 +276,7 @@ public class AgentRunner {
      * <p>저장이 실패해도 실행은 그대로 이어진다. 사건은 관측용이고 그것 때문에 답이 끊기면 안 된다.
      * {@code ChatService} 가 같은 이유로 같은 판단을 한다.
      */
-    private void append(
-            AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
+    private void append(AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
         try {
             ExecutionEvent event = eventRecorder.record(execution, type, detail, sequence);
             if (event != null) {

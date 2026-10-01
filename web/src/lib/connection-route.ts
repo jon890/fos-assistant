@@ -184,7 +184,7 @@ function safeConnection(value: unknown) {
   if (checkedAt !== null && !Number.isFinite(Date.parse(checkedAt)))
     throw new Error();
   const secretPrefixes = stringMap(item.secretPrefixes);
-  if (Object.values(secretPrefixes).some((prefix) => prefix.length > 8))
+  if (Object.values(secretPrefixes).some((prefix) => prefix.length > 4))
     throw new Error();
   return {
     connectorId: connectorId(item.connectorId),

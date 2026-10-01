@@ -5,6 +5,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /** 에이전트가 쓸 수 있는 toolset과 변경 권한을 한곳에서 판정한다. */
@@ -59,8 +60,12 @@ public final class AgentToolPolicy {
     }
 
     public static Tier tierOf(String name) {
-        if (OWNER_TOOLSETS.contains(name)) return Tier.OWNER;
-        if (ADMIN_TOOLSETS.contains(name)) return Tier.ADMIN;
+        if (OWNER_TOOLSETS.contains(name)) {
+            return Tier.OWNER;
+        }
+        if (ADMIN_TOOLSETS.contains(name)) {
+            return Tier.ADMIN;
+        }
         throw new IllegalArgumentException("unknown toolset");
     }
 
@@ -70,7 +75,7 @@ public final class AgentToolPolicy {
 
     public static boolean mayEdit(CurrentUser user, Agent agent, String name) {
         return tierOf(name) == Tier.OWNER
-                ? (user.isAdmin() || java.util.Objects.equals(user.id(), agent.ownerUserId()))
+                ? (user.isAdmin() || Objects.equals(user.id(), agent.ownerUserId()))
                 : user.isAdmin();
     }
 
@@ -103,10 +108,14 @@ public final class AgentToolPolicy {
 
         LinkedHashSet<String> result = new LinkedHashSet<>();
         for (String name : requestedSet) {
-            if (mayEdit(user, agent, name)) result.add(name);
+            if (mayEdit(user, agent, name)) {
+                result.add(name);
+            }
         }
         for (String name : ADMIN_TOOLSETS) {
-            if (!mayEdit(user, agent, name) && current.contains(name)) result.add(name);
+            if (!mayEdit(user, agent, name) && current.contains(name)) {
+                result.add(name);
+            }
         }
         if (agent.visibility() == AgentVisibility.GROUP && result.stream().anyMatch(AgentToolPolicy::requiresPrivate)) {
             throw new ApiException(

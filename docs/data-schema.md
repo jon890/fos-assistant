@@ -34,7 +34,7 @@
 | `connector_id` | `VARCHAR(64) NOT NULL` | manifest 의 `id` |
 | `agent_id` | `BIGINT NOT NULL`, 유니크 | `agent` 참조. 연결 전용 에이전트 |
 | `status` | `VARCHAR(20) NOT NULL` | `DISCONNECTED`, `PENDING`, `READY` |
-| `fields` | `VARCHAR(4000) NOT NULL` | JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 8자}}`. 비밀 칸의 원문과 해시는 넣지 않는다 |
+| `fields` | `VARCHAR(4000) NOT NULL` | JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}`. 비밀 칸의 원문과 해시는 넣지 않는다. 앞부분은 값이 16자 이상일 때만 넣는다 |
 | `restart_required` | `BOOLEAN NOT NULL` | 공유 gateway 재시작 뒤 반영 완료를 기다린다 |
 | `desired_enabled` | `BOOLEAN NOT NULL` | env 와 설치 반영이 모두 성공해 활성화 후보가 되었는가. 등록, 교체, 해제 시작과 반영 실패에서 false. true 여도 실행 확인 전에는 `PENDING` |
 | `checked_at` | `DATETIME(6)` | 마지막 확인 시각. 비어도 된다 |
@@ -44,6 +44,7 @@
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
+- V40 이 모든 행의 `secretPrefixes` 를 비웠다. 그 전에는 앞부분을 8자까지 저장했고 원래 길이를 남기지 않아, 짧은 비밀의 대부분이 저장된 행을 골라낼 수 없었다. `values` 는 그대로 둔다
 - 가계부 전용으로 먼저 만든 `accountbook_connection` 은 V38 이 이 표로 옮기고 지웠다. `connector_id` 는 `fos-accountbook`, `token_prefix` 는 `secretPrefixes.token`, `family_uuid` 는 `values.family` 가 됐다
 
 `agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE` 는 연결 전용 에이전트를 표시한다.
