@@ -31,13 +31,15 @@ while IFS= read -r path; do
     web/src/auth.ts | \
     web/src/lib/control-plane.ts | \
     web/src/app/api/* | \
-    scripts/check-public-safe.sh)
+    scripts/check-public-safe.sh | \
+    hermes/plugins/*)
       security=1 ;;
   esac
   case "$path" in
     backend/src/main/java/com/bifos/assistant/hermes/* | \
     test/e2e/fake-hermes.ts | \
-    docs/hermes/*)
+    docs/hermes/* | \
+    hermes/*)
       hermes=1 ;;
   esac
   case "$path" in

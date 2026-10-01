@@ -53,5 +53,6 @@ step web-build       build_web
 step browser         pnpm --dir "${ROOT}/web" test:browser
 step e2e             bash -c "cd '${ROOT}' && node test/e2e/run.ts"
 step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
+step hermes          bash -c "cd '${ROOT}' && python3 -m unittest discover -s hermes/tests"
 step public-safe     "${ROOT}/scripts/check-public-safe.sh"
 echo "모두 통과했다"

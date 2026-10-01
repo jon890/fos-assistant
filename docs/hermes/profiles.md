@@ -253,7 +253,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 
 ## Control Plane 이 부르는 대시보드 plugin 경로
 
-Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 `fos-home-infra` 에 있고, 서비스 토큰으로 오는 요청을 아래 계약으로만 받는다.
+Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../../hermes/plugins/dashboard-profile-api/) 에 있고, 서비스 토큰으로 오는 요청을 아래 계약으로만 받는다.
 2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
 인증은 모두 `Authorization: Bearer <대시보드 서비스 토큰>` 이고 없거나 틀리면 401 이다. 「그 profile」 은 있고 `default` 가 아닌 이름이다.
 
