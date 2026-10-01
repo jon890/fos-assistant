@@ -174,3 +174,5 @@ scripts/check-public-safe.sh
 | `test/e2e/mcp-context.ts` | 수정 |
 | `test/e2e/scenarios/connector-policy.ts` | 신규 |
 | `test/e2e/run.ts` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyRequestTest.java` | 수정 |
+| `docs/connectors.md` | 수정 |
