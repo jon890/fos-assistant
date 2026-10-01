@@ -217,7 +217,7 @@ public class ChatController {
 
     @PutMapping("/model-tiers/group")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateGroupModelTiers(@RequestBody UpdateGroupModelTiersRequest request) {
+    public void updateGroupModelTiers(@Valid @RequestBody UpdateGroupModelTiersRequest request) {
         CurrentUser user = currentUser.require();
         modelTiers.saveGroup(
                 user,
@@ -230,7 +230,7 @@ public class ChatController {
 
     @PutMapping("/conversations/{conversationId}/model-tier")
     public ConversationView chooseModelTier(
-            @PathVariable UUID conversationId, @RequestBody ChooseModelTierRequest request) {
+            @PathVariable UUID conversationId, @Valid @RequestBody ChooseModelTierRequest request) {
         CurrentUser user = currentUser.require();
         Conversation chosen =
                 chat.chooseModelTier(user, access.requireOwnId(user, conversationId), request.mode(), request.tier());

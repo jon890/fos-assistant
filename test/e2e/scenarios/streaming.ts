@@ -34,6 +34,10 @@ type ExecutionNode = {
   truncated: boolean;
   executionId: number;
   agentCode: string;
+  requestReceivedAt: string | null;
+  submittedAt: string | null;
+  firstDeltaAt: string | null;
+  finishedAt: string | null;
   events: ExecutionEventView[];
   children: ExecutionNode[];
 };
@@ -127,6 +131,12 @@ export const streamingScenario: Scenario = {
     const savedSubagent = richTree.root.events.find((item) => item.eventType === "SUBAGENT_COMPLETED");
     expect(savedSubagent?.model === "z-ai/glm-5.2", "하위 에이전트 모델이 저장되지 않았다");
     expect(savedSubagent?.inputTokens === 12300 && savedSubagent.outputTokens === 410, "하위 에이전트 토큰이 저장되지 않았다");
+    const timings = [richTree.root.requestReceivedAt, richTree.root.submittedAt,
+      richTree.root.firstDeltaAt, richTree.root.finishedAt];
+    expect(timings.every((value) => value !== null), "스트림 실행의 네 시각을 기록하지 못했다");
+    const timingValues = timings.map((value) => Date.parse(value!));
+    expect(timingValues.every((value, index) => Number.isFinite(value)
+      && (index === 0 || value >= timingValues[index - 1]!)), "실행 시각의 순서가 뒤집혔다");
 
     for (const text of ["자식 늦은 완료 검사", "자식 완료 사건 없음 검사"]) {
       step(`${text}: 부모 종료 뒤 session 사용량을 보완한다`);
@@ -150,6 +160,8 @@ export const streamingScenario: Scenario = {
         "session의 일반 입력과 cache read/write를 합산하지 못했다");
       expect(recordedChild?.durationMs === 2500, "자식 session의 종료 시각으로 시간을 계산하지 못했다");
       expect(recordedChild?.failed === null, "agent_close만으로 자식의 성공을 추정했다");
+      expect(recordedChild?.subagentName?.startsWith("sa-") === true,
+        "이름이 없는 자식의 subagent_id를 표시 이름으로 보존하지 못했다");
     }
 
     step("Hermes 이벤트 스트림이 중간에 끝나도 최종 답과 실행 기록을 남긴다");
