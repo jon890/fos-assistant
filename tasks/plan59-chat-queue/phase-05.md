@@ -114,9 +114,9 @@ type 목록에 `"user"` 와 `"pending"` 을 더한다.
 
 - 뿌리에 `data-testid="pending-queue"`, 줄마다 `data-testid="pending-item"`.
 - 줄은 글(길면 한 줄로 자른다)과 취소 단추다. 취소 단추의 `aria-label` 은 「대기 메시지 취소」 다.
-- 이 단추는 이름에 「보내기」 를 담는다. 기존 검사는 `getByRole("button", { name: "보내기" })` 를 `exact` 없이 쓰므로, 새 검사는 입력창의 보내기를 `composer-shell` 안으로 한정해 고른다.
 - `queue.held` 가 참이면 「중지해서 보내지 않았어요.」 문구와 단추 `data-testid="pending-release"`(글자 「보내기」, `aria-label` 「대기 메시지 보내기」)를 보인다.
 - 멈추지 않았으면 「답이 끝나면 보내요.」 문구를 보인다.
+- `pending-release` 단추는 이름에 「보내기」 를 담는다. 기존 검사는 `getByRole("button", { name: "보내기" })` 를 `exact` 없이 쓰므로, 새 검사는 입력창의 보내기를 `composer-shell` 안으로 한정해 고른다.
 - 단추는 `web/src/components/ui/` 의 부품을 쓴다.
 
 ### 7. `web/src/components/chat/composer.tsx`
