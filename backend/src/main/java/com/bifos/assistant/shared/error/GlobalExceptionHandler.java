@@ -2,15 +2,16 @@ package com.bifos.assistant.shared.error;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
-import org.springframework.dao.PessimisticLockingFailureException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -76,8 +77,14 @@ public class GlobalExceptionHandler {
         var supported = ex.getSupportedHttpMethods();
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.status())
                 .allow(supported == null ? new HttpMethod[0] : supported.toArray(HttpMethod[]::new))
-                .body(new ErrorResponse(ErrorCode.METHOD_NOT_ALLOWED.name(),
-                        "method " + ex.getMethod() + " is not supported"));
+                .body(new ErrorResponse(
+                        ErrorCode.METHOD_NOT_ALLOWED.name(), "method " + ex.getMethod() + " is not supported"));
+    }
+
+    /** 이미 쓸 수 없는 비동기 응답에는 오류 본문을 쓰지 않는다. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex) {
+        log.debug("async response is no longer usable: {}", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
