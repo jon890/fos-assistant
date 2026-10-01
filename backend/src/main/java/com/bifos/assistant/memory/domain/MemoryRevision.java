@@ -1,9 +1,11 @@
 package com.bifos.assistant.memory.domain;
 
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
+import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
@@ -49,6 +51,18 @@ public class MemoryRevision {
     @Column(nullable = false, length = 64)
     private String collection;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "entry_type", nullable = false, length = 20)
+    private MemoryEntryType entryType;
+
+    @Column(name = "document_key", length = 128)
+    private String documentKey;
+
+    /** 그때의 승인 상태다. 지운 항목이 제안이었는지 받아들인 항목이었는지 남긴다. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MemoryStatus status;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -87,6 +101,9 @@ public class MemoryRevision {
         revision.ownerUserId = memory.ownerUserId();
         revision.groupId = memory.groupId();
         revision.collection = memory.collection();
+        revision.entryType = memory.entryType();
+        revision.documentKey = memory.documentKey();
+        revision.status = memory.status();
         revision.title = memory.title();
         revision.content = memory.content();
         revision.retrieval = memory.retrieval();

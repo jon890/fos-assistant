@@ -156,33 +156,24 @@ public class MemoryService {
      */
     @Transactional
     public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject) {
-        Memory memory = requireReadable(user, id);
+        Memory memory = requireWritableForUpdate(user, id);
         MemoryRetrieval retrieval = alwaysInject
                 ? MemoryRetrieval.ALWAYS
                 : memory.retrieval() == MemoryRetrieval.ARCHIVE ? MemoryRetrieval.ARCHIVE : MemoryRetrieval.SEARCH;
-        return update(user, id, content, retrieval, memory.sensitivity());
+        return revise(user, memory, content, retrieval, memory.sensitivity());
     }
 
     /** 본문과 꺼내는 방식과 민감도를 고친다. 고치기 전의 값을 판으로 남기고 판 번호를 하나 올린다. */
     @Transactional
     public Memory update(
             CurrentUser user, Long id, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
-        Memory memory = requireReadable(user, id);
-        requireWritable(user, memory);
-        requirePlaceable(retrieval, sensitivity);
-        String dedupKey = memory.proposalDedupKey() == null
-                ? null
-                : proposalDedupKey(memory.ownerUserId(), memory.title(), content);
-        revisions.save(MemoryRevision.of(memory, MemoryChangeType.UPDATED, user.id(), null, clock.instant()));
-        memory.revise(content, retrieval, sensitivity, dedupKey, clock.instant());
-        return memories.save(memory);
+        return revise(user, requireWritableForUpdate(user, id), content, retrieval, sensitivity);
     }
 
     /** 항목을 지운다. 마지막 값을 판으로 남긴 뒤 줄을 지운다. */
     @Transactional
     public void delete(CurrentUser user, Long id) {
-        Memory memory = requireReadable(user, id);
-        requireWritable(user, memory);
+        Memory memory = requireWritableForUpdate(user, id);
         revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
         memories.delete(memory);
     }
@@ -212,6 +203,31 @@ public class MemoryService {
                         access.unrestricted() ? null : access.collections(),
                         access.sensitiveCollections()),
                 BY_ID);
+    }
+
+    private Memory revise(
+            CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
+        requirePlaceable(retrieval, sensitivity);
+        String dedupKey = memory.proposalDedupKey() == null
+                ? null
+                : proposalDedupKey(memory.ownerUserId(), memory.title(), content);
+        revisions.save(MemoryRevision.of(memory, MemoryChangeType.UPDATED, user.id(), null, clock.instant()));
+        memory.revise(content, retrieval, sensitivity, dedupKey, clock.instant());
+        return memories.save(memory);
+    }
+
+    /**
+     * 고치거나 지울 항목을 쓰기 잠금으로 읽고 쓸 수 있는지 본다.
+     *
+     * <p>잠근 뒤에 읽은 값으로 판을 남겨야 하므로, 이 트랜잭션에서 그 항목을 먼저 읽어 두지 않는다.
+     */
+    private Memory requireWritableForUpdate(CurrentUser user, Long id) {
+        Memory memory = memories.findByIdForUpdate(id).orElseThrow(MemoryService::notFound);
+        if (!memory.isReadableBy(user.id(), user.groupId())) {
+            throw notFound();
+        }
+        requireWritable(user, memory);
+        return memory;
     }
 
     private Memory requireReadable(CurrentUser user, Long id) {

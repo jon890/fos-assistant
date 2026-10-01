@@ -216,9 +216,11 @@ public class Memory {
         this.updatedAt = at;
     }
 
-    /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. */
+    /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. 그룹이 없는 사용자는 GROUP 항목을 보지 못한다. */
     public boolean isReadableBy(Long userId, Long groupId) {
-        return scope == MemoryScope.USER ? Objects.equals(ownerUserId, userId) : Objects.equals(this.groupId, groupId);
+        return scope == MemoryScope.USER
+                ? userId != null && Objects.equals(ownerUserId, userId)
+                : groupId != null && Objects.equals(this.groupId, groupId);
     }
 
     /** 꺼내는 방식을 적고 옛 칸을 같은 뜻으로 맞춘다. */

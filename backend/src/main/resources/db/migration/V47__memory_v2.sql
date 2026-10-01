@@ -10,7 +10,8 @@ ALTER TABLE memory ADD COLUMN source_type VARCHAR(32) NULL;
 ALTER TABLE memory ADD COLUMN source_ref VARCHAR(512) NULL;
 ALTER TABLE memory ADD COLUMN source_date DATE NULL;
 
--- always_inject 는 한 배포 동안 남긴다. 옛 판으로 되돌려도 그 칸으로 동작한다.
+-- always_inject 는 한 배포 동안 남긴다. 옛 판으로 되돌린 동안에는 옛 코드가 그 칸으로 동작한다.
+-- 그동안 옛 코드가 쓴 줄은 retrieval 이 맞춰지지 않는다. 다시 올리기 전에 맞추는 방법은 docs/data-schema.md 의 memory 절에 있다.
 UPDATE memory SET retrieval = 'ALWAYS' WHERE always_inject = TRUE;
 
 -- DOCUMENT 는 주인과 collection 안에서 document_key 가 하나다. document_key 가 비어 있는 MEMORY 와 SOURCE 는 걸리지 않는다.
@@ -27,6 +28,9 @@ CREATE TABLE memory_revision (
     owner_user_id BIGINT NULL,
     group_id BIGINT NULL,
     collection VARCHAR(64) NOT NULL,
+    entry_type VARCHAR(20) NOT NULL,
+    document_key VARCHAR(128) NULL,
+    status VARCHAR(20) NOT NULL,
     title VARCHAR(200) NOT NULL,
     content TEXT NOT NULL,
     retrieval VARCHAR(20) NOT NULL,

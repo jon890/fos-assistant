@@ -6,8 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
+import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
@@ -187,6 +189,41 @@ class MemoryServiceTest {
                 .containsExactly(MemoryChangeType.UPDATED, MemoryChangeType.DELETED);
         assertThat(history).extracting(MemoryRevision::content).containsExactly("처음 내용", "고친 내용");
         assertThat(history.getLast().id().revision()).isEqualTo(2);
+        assertThat(history.getLast().status()).isEqualTo(MemoryStatus.ACCEPTED);
+        assertThat(history.getLast().entryType()).isEqualTo(MemoryEntryType.MEMORY);
+    }
+
+    @Test
+    @DisplayName("승인 전인 제안을 지우면 제안이었다는 것이 판에 남는다")
+    void deletingAProposalKeepsItsStatusInTheTombstone() {
+        Memory proposed = memories.proposeUser(ADMIN, "제안", "내용", 99L);
+
+        memories.delete(ADMIN, proposed.id());
+
+        assertThat(memories.revisionsOf(ADMIN, proposed.id())).singleElement().satisfies(revision -> {
+            assertThat(revision.changeType()).isEqualTo(MemoryChangeType.DELETED);
+            assertThat(revision.status()).isEqualTo(MemoryStatus.PROPOSED);
+        });
+    }
+
+    @Test
+    @DisplayName("그룹이 없는 사용자는 그룹이 비어 있는 그룹 항목을 보지 못한다")
+    void usersWithoutAGroupDoNotMatchGroupItemsWithoutAGroup() {
+        Memory orphan = repository.save(Memory.accepted(
+                MemoryScope.GROUP,
+                null,
+                null,
+                "주인 없는 그룹 항목",
+                "내용",
+                MemoryPlacement.core(MemoryRetrieval.SEARCH),
+                1L,
+                NOW));
+        CurrentUser noGroup = user(9L, null, UserRole.ADMIN);
+
+        assertThat(memories.readableBy(noGroup)).isEmpty();
+        assertNotFound(() -> memories.bodyFor(noGroup, CORE, orphan.id()));
+        assertNotFound(() -> memories.update(noGroup, orphan.id(), "고침", false));
+        assertNotFound(() -> memories.delete(noGroup, orphan.id()));
     }
 
     @Test

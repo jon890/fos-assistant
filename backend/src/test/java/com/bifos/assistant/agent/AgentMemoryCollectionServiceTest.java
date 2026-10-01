@@ -51,6 +51,23 @@ class AgentMemoryCollectionServiceTest {
     }
 
     @Test
+    @DisplayName("이미 저장한 에이전트를 다시 저장해도 관리자가 바꾼 허용을 되돌리지 않는다")
+    void savingAnExistingAgentAgainDoesNotResetItsGrants() {
+        Agent agent = agents.save(agent());
+        // 관리자가 core 의 민감 허용을 켰다. 사건이 다시 나가면 이 줄이 거짓으로 덮인다.
+        grants.save(AgentMemoryCollection.of(agent.id(), "core", true, NOW));
+        agent.assignFlow(null);
+        agents.save(agent);
+        agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
+        assertThat(service.grantsOf(agent.id()).sensitiveCollections()).containsExactly("core");
+
+        // 관리자가 core 를 뺐다. 사건이 다시 나가면 이 줄이 되살아난다.
+        grants.deleteAll(grants.findByIdAgentId(agent.id()));
+        agents.save(agents.findById(agent.id()).orElseThrow());
+        assertThat(grants.findByIdAgentId(agent.id())).isEmpty();
+    }
+
+    @Test
     @DisplayName("saveAndFlush 로 저장한 에이전트도 core 를 받는다")
     void agentsSavedWithFlushAlsoReceiveCore() {
         Agent agent = agents.saveAndFlush(agent());

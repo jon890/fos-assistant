@@ -415,6 +415,16 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 
 주인 칸이 범위에 따라 달라 문서 제약을 둘로 둔다. 비어 있는 칸은 유일 검사에 들지 않으므로 `document_key` 가 없는 줄은 걸리지 않는다.
 
+### 옛 판으로 되돌렸다가 다시 올릴 때
+
+새 칸에는 모두 기본값이 있어 옛 코드도 이 표에 쓴다. 다만 옛 코드는 새 칸을 모르므로, 되돌린 동안 쓴 것은 다시 올리기 전에 맞춘다.
+
+| 되돌린 동안 옛 코드가 한 일 | 다시 올리면 | 맞추는 것 |
+| --- | --- | --- |
+| `always_inject` 를 참으로 만들거나 고쳤다 | `retrieval` 이 `SEARCH` 로 남아 항상 층에서 색인으로 내려간다 | `always_inject` 가 참이고 `retrieval` 이 `SEARCH` 인 줄을 `ALWAYS` 로, 거짓이고 `ALWAYS` 인 줄을 `SEARCH` 로 고친다 |
+| 에이전트를 만들었다 | `agent_memory_collection` 에 줄이 없어 그 에이전트가 Memory 를 받지 않는다 | 줄이 하나도 없고 커넥터 에이전트가 아닌 에이전트에 `core` 를 넣는다 |
+| Memory 를 고치거나 지웠다 | `memory_revision` 에 그 판이 없다 | 맞출 수 없다. 그 사이의 이력은 비어 있다 |
+
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
 [ADR-051](adr/ADR-051-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md),
 [ADR-052](adr/ADR-052-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
@@ -431,6 +441,8 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 | `change_type` | VARCHAR(20) | `UPDATED` 는 고쳐서 다음 판이 생겼다. `DELETED` 는 지웠고 이 판이 마지막 값이다 |
 | `scope`, `owner_user_id`, `group_id` | | 그때의 범위와 주인. 지운 뒤에도 누가 볼 수 있는지 정한다 |
 | `collection` | VARCHAR(64) | 그때의 collection |
+| `entry_type`, `document_key` | | 그때의 종류와 문서 이름. 지운 문서의 판을 이름으로 찾는다 |
+| `status` | VARCHAR(20) | 그때의 승인 상태. 지운 항목이 제안이었는지 받아들인 항목이었는지 남는다 |
 | `title` | VARCHAR(200) | |
 | `content` | TEXT | 그 판의 본문 |
 | `retrieval`, `sensitivity` | VARCHAR(20) | 그 판의 값 |
@@ -440,6 +452,8 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 
 한 항목을 두 번 고치고 지우면 줄이 셋이다. 판 1 과 2 가 `UPDATED` 로, 판 3 이 `DELETED` 로 남는다.
 승인 전인 제안을 지워도 같은 방식으로 남는다.
+출처 칸은 판에 남기지 않는다. 고칠 때 바뀌지 않는 값이다.
+고치거나 지울 때 그 항목을 쓰기 잠금으로 읽는다. 두 요청이 같은 판 번호로 판을 남기려 하지 않게 한 번에 하나씩 돈다.
 
 ## memory_collection
 
