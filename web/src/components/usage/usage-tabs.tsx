@@ -19,7 +19,10 @@ export function parseUsageTab(value: string | string[] | undefined): UsageTab {
 /** 탭 줄이다. 단추마다 주소의 `?tab=` 만 바꾸는 링크이고, 고른 탭은 새로 고쳐도 남는다. */
 export function UsageTabs({ current }: { current: UsageTab }) {
   return (
-    <nav aria-label="사용량 탭" className="mb-6 flex overflow-x-auto border-b border-border">
+    <nav
+      aria-label="사용량 탭"
+      className="mb-6 flex overflow-x-auto border-b border-border"
+    >
       {USAGE_TABS.map((tab) => (
         <Link
           key={tab.value}
