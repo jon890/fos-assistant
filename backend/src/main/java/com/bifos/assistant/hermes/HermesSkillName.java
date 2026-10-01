@@ -18,6 +18,9 @@ public final class HermesSkillName {
     /** {@code skill_view} 미리보기에서 이름과 참고 파일 경로를 나누는 글자다. */
     private static final String PREVIEW_PATH_SEPARATOR = "→";
 
+    /** Hermes 가 미리보기를 길이 상한에서 자를 때 끝에 붙이는 표시다. */
+    private static final String TRUNCATION_MARK = "...";
+
     /** 이름이 규칙에 맞는지 본다. {@code null} 은 맞지 않는다. */
     public static boolean isValid(String name) {
         return name != null && PATTERN.matcher(name).matches();
@@ -26,8 +29,13 @@ public final class HermesSkillName {
     /**
      * {@code skill_view} 미리보기에서 이름만 꺼낸다.
      *
+     * <p>Hermes 는 미리보기가 길이 상한을 넘으면 앞부분만 남기고 끝에 {@code ...} 을 붙인다. 이름 규칙이 점을
+     * 받으므로 이름 중간에서 잘린 값도 규칙에는 맞는다. 그대로 받으면 없는 스킬 이름이 사용 기록에 남으므로,
+     * 이름 부분이 {@code ...} 로 끝나면 잘린 것으로 보고 버린다. 파일 경로 쪽만 잘린 미리보기는 이름이
+     * 온전하므로 받는다. 이 판정은 미리보기를 읽는 여기에만 두고 {@link #isValid} 의 규칙에는 넣지 않는다.
+     *
      * @param preview 스킬 이름이거나 {@code 이름 → 파일 경로} 다
-     * @return 규칙에 맞는 이름. 맞지 않으면 {@code null} 이다
+     * @return 규칙에 맞고 잘리지 않은 이름. 그렇지 않으면 {@code null} 이다
      */
     public static String fromPreview(String preview) {
         if (preview == null) {
@@ -35,6 +43,6 @@ public final class HermesSkillName {
         }
         int separator = preview.indexOf(PREVIEW_PATH_SEPARATOR);
         String name = (separator < 0 ? preview : preview.substring(0, separator)).strip();
-        return isValid(name) ? name : null;
+        return isValid(name) && !name.endsWith(TRUNCATION_MARK) ? name : null;
     }
 }

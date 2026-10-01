@@ -83,6 +83,19 @@ class SkillViewStreamTest {
     }
 
     @Test
+    @DisplayName("길이 상한에서 이름이 잘린 미리보기는 기록하지 않고 경로만 잘린 미리보기는 이름을 기록한다")
+    void dropsPreviewTruncatedInsideNameAndRecordsWhenOnlyPathIsTruncated() throws IOException {
+        Long truncatedName = store(streamed(started("skill_view", LONG_NAME.substring(0, 37) + "..."), false));
+        Long truncatedPath = store(streamed(started("skill_view", LONG_NAME + " → references/li..."), false));
+
+        assertThat(storedDetails(truncatedName)).hasSize(1);
+        assertThat(usesOf(truncatedName)).isEmpty();
+        assertThat(usesOf(truncatedPath))
+                .extracting(ExecutionSkillUse::skillName)
+                .containsExactly(LONG_NAME);
+    }
+
+    @Test
     @DisplayName("이름 규칙에 맞지 않는 미리보기는 스킬 사용으로 기록하지 않는다")
     void doesNotRecordSkillUseForPreviewBreakingNameRule() throws IOException {
         Long executionId = store(streamed(

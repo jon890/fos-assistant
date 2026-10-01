@@ -52,4 +52,29 @@ class HermesSkillNameTest {
         assertThat(HermesSkillName.fromPreview("../secret → a.md")).isNull();
         assertThat(HermesSkillName.fromPreview("→ references/list.md")).isNull();
     }
+
+    /** Hermes 는 길이 상한을 넘는 미리보기의 앞부분만 남기고 끝에 {@code ...} 을 붙인다. */
+    @Test
+    @DisplayName("이름 중간에서 잘린 미리보기와 점만 남은 미리보기에서는 이름을 꺼내지 않는다")
+    void extractsNothingWhenNameItselfIsTruncated() {
+        assertThat(HermesSkillName.fromPreview("weekly-grocery-shopp...")).isNull();
+        assertThat(HermesSkillName.fromPreview("a...")).isNull();
+        assertThat(HermesSkillName.fromPreview("...")).isNull();
+        assertThat(HermesSkillName.fromPreview("weekly-grocery-shopp... → references/list.md"))
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("파일 경로만 잘린 미리보기에서는 온전한 이름을 꺼낸다")
+    void extractsWholeNameWhenOnlyPathIsTruncated() {
+        assertThat(HermesSkillName.fromPreview("shopping → references/li...")).isEqualTo("shopping");
+        assertThat(HermesSkillName.fromPreview("shopping →...")).isEqualTo("shopping");
+    }
+
+    @Test
+    @DisplayName("잘린 표시는 미리보기에서만 보고 이름 규칙 자체는 바꾸지 않는다")
+    void truncationMarkDoesNotChangeNameRule() {
+        assertThat(HermesSkillName.isValid("shopping...")).isTrue();
+        assertThat(HermesSkillName.fromPreview("note_taking.v2")).isEqualTo("note_taking.v2");
+    }
 }

@@ -40,11 +40,11 @@ public class SkillUseRecorder {
     /**
      * 모델이 {@code skill_view} 로 읽은 것을 적는다.
      *
-     * @param preview 사건 스트림이 가리기 전 미리보기에서 꺼내 넘긴 스킬 이름. {@code 이름 → 파일 경로} 모양도
+     * @param skillName 사건 스트림이 가리기 전 미리보기에서 꺼내 넘긴 스킬 이름. {@code 이름 → 파일 경로} 모양도
      *     받는다. 넘겨받은 값을 믿지 않고 Hermes 스킬 이름 규칙으로 다시 보아, 맞지 않으면 버린다
      */
-    public void recordModel(Long executionId, String preview) {
-        record(executionId, HermesSkillName.fromPreview(preview), SkillUseSource.MODEL);
+    public void recordModel(Long executionId, String skillName) {
+        record(executionId, HermesSkillName.fromPreview(skillName), SkillUseSource.MODEL);
     }
 
     /** 사용자가 {@code /이름} 으로 부른 것을 적는다. */
