@@ -62,16 +62,17 @@ export function MessageList({
     .map((turn) => ({ ...turn, replacesMessageId: turn.replacesMessageId ?? null }));
   const folded = foldVersions(persisted, selectedVersions);
   const latestView = isLatestView(folded);
-  const pendingVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot }[] = turns.filter((turn): turn is Turn & { id: string } => typeof turn.id === "string").map((turn) => ({
+  const pendingVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot; afterSystem?: boolean }[] = turns.filter((turn): turn is Turn & { id: string } => typeof turn.id === "string").map((turn) => ({
     turn, userVersion: undefined as VersionSlot | undefined, answerVersion: undefined as VersionSlot | undefined,
   }));
   const regenerating = pendingVisible.some(({ turn }) => String(turn.id).startsWith("assistant-regenerate-"));
-  const foldedVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot }[] = folded.flatMap((fold, turnIndex) => {
+  // `afterSystem` 은 알림 줄이 연 turn 의 답이다. 다시 만들 질문이 없어 다시 생성 단추를 두지 않는다.
+  const foldedVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot; afterSystem?: boolean }[] = folded.flatMap((fold, turnIndex) => {
     return [
-      { turn: fold.user, userVersion: fold.userVersion },
+      { turn: fold.user, userVersion: fold.user.role === "SYSTEM" ? undefined : fold.userVersion },
       ...fold.answers.flatMap((answer, answerIndex) =>
         regenerating && turnIndex === folded.length - 1 && answerIndex === fold.answers.length - 1
-          ? [] : [{ turn: answer.message, answerVersion: answer.version }]),
+          ? [] : [{ turn: answer.message, answerVersion: answer.version, afterSystem: fold.user.role === "SYSTEM" }]),
     ];
   });
   const visible = [...foldedVisible, ...pendingVisible];
@@ -126,7 +127,7 @@ export function MessageList({
             <p className="py-8 text-center text-sm text-muted-foreground">무엇이든 물어봐 주세요.</p>
           ) : (
             <ol className="flex flex-col gap-6">
-              {visible.map(({ turn, userVersion, answerVersion }, index) => {
+              {visible.map(({ turn, userVersion, answerVersion, afterSystem }, index) => {
                 const pendingAssistant = typeof turn.id === "string" && turn.id.startsWith("assistant-");
                 const isLast = visible.at(-1)?.turn.id === turn.id;
                 const nextTurn = visible[index + 1]?.turn;
@@ -146,7 +147,7 @@ export function MessageList({
                       latest={isLast}
                       streaming={pendingAssistant && sending}
                       userVersion={userVersion} answerVersion={answerVersion} onVersionChange={onVersionChange}
-                      canRegenerate={isLast && turn.role === "ASSISTANT" && latestView && !sending}
+                      canRegenerate={isLast && turn.role === "ASSISTANT" && !afterSystem && latestView && !sending}
                       onRegenerate={onRegenerate}
                       onAnswer={isLast && turn.role === "ASSISTANT" && latestView && !sending ? onAnswer : undefined}
                       nextUserMessage={turn.role === "ASSISTANT" && nextTurn?.role === "USER"
