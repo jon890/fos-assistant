@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,11 +14,11 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.chat.application.ModelTierService;
+import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.ModelTier;
-import com.bifos.assistant.chat.application.ModelTierService;
-import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -36,8 +36,8 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
-import java.time.Duration;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,9 +105,20 @@ class AgentRunnerConnectorContextTest {
         assertThat(command.provider()).isEqualTo(choice.provider());
         assertThat(command.model()).isEqualTo(choice.model());
         assertThat(command.reasoningEffort()).isEqualTo(choice.reasoningEffort());
-        verify(executions).start(
-                same(user), any(), any(), any(), any(), any(), same(choice), any(), any(), any(),
-                eq(ModelTier.DEEP), eq(REQUEST_RECEIVED_AT));
+        verify(executions)
+                .start(
+                        same(user),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        same(choice),
+                        any(),
+                        any(),
+                        any(),
+                        eq(ModelTier.DEEP),
+                        eq(REQUEST_RECEIVED_AT));
         verify(executions).markSubmitted(started);
         verify(executions, never()).markFirstDelta(any());
         var submissionOrder = inOrder(executions, hermes);
@@ -169,7 +180,8 @@ class AgentRunnerConnectorContextTest {
 
     private ExecutionContextSnapshot recordedSnapshot() {
         ArgumentCaptor<ExecutionContextSnapshot> snapshot = ArgumentCaptor.forClass(ExecutionContextSnapshot.class);
-        verify(executions).start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
+        verify(executions)
+                .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
         return snapshot.getValue();
     }
 

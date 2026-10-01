@@ -32,7 +32,8 @@ class ModelTierRequestValidationTest {
     void rejectsMissingNullOrNullEntryTierDefinitions() throws Exception {
         for (String body : new String[] {"{}", "{\"tiers\":null}", "{\"tiers\":[null]}"}) {
             mvc.perform(put("/api/v1/chat/model-tiers/group")
-                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
@@ -43,7 +44,8 @@ class ModelTierRequestValidationTest {
     @DisplayName("대화 단계 선택 모드가 없으면 내부 상속값을 저장하지 않고 400이다")
     void rejectsMissingSelectionMode() throws Exception {
         mvc.perform(put("/api/v1/chat/conversations/{id}/model-tier", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"tier\":\"FAST\"}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tier\":\"FAST\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         verifyNoInteractions(chat, tiers);

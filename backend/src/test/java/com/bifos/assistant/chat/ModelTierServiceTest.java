@@ -156,19 +156,20 @@ class ModelTierServiceTest {
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         doAnswer(invocation -> {
                     List<ModelTierDefinition> saved = invocation.getArgument(0);
-                    assertThat(saved).satisfiesExactly(
-                            fast -> {
-                                assertThat(fast.provider()).isNull();
-                                assertThat(fast.model()).isEqualTo("gpt-6-luna");
-                            },
-                            balanced -> {
-                                assertThat(balanced.provider()).isEqualTo("openai-codex");
-                                assertThat(balanced.model()).isEqualTo("gpt-6-luna");
-                            },
-                            deep -> {
-                                assertThat(deep.provider()).isEqualTo("openai-codex");
-                                assertThat(deep.model()).isEqualTo("gpt-6.1-sol");
-                            });
+                    assertThat(saved)
+                            .satisfiesExactly(
+                                    fast -> {
+                                        assertThat(fast.provider()).isNull();
+                                        assertThat(fast.model()).isEqualTo("gpt-6-luna");
+                                    },
+                                    balanced -> {
+                                        assertThat(balanced.provider()).isEqualTo("openai-codex");
+                                        assertThat(balanced.model()).isEqualTo("gpt-6-luna");
+                                    },
+                                    deep -> {
+                                        assertThat(deep.provider()).isEqualTo("openai-codex");
+                                        assertThat(deep.model()).isEqualTo("gpt-6.1-sol");
+                                    });
                     return saved;
                 })
                 .when(definitions)
@@ -178,10 +179,8 @@ class ModelTierServiceTest {
                 admin,
                 List.of(
                         new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "   ", " gpt-6-luna ", "low"),
-                        new ModelTierOptions.Tier(
-                                ModelTier.BALANCED, "균형", " openai-codex ", " gpt-6-luna ", "medium"),
-                        new ModelTierOptions.Tier(
-                                ModelTier.DEEP, "깊게", " openai-codex ", " gpt-6.1-sol ", "high")),
+                        new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", " openai-codex ", " gpt-6-luna ", "medium"),
+                        new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", " openai-codex ", " gpt-6.1-sol ", "high")),
                 ModelTier.FAST);
     }
 

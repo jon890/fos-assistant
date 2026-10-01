@@ -61,11 +61,13 @@ public class ModelTierService {
         if (!user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
-        List<ModelTierOptions.Tier> normalizedTiers = tiers.stream()
-                .map(ModelTierService::normalize)
-                .toList();
+        List<ModelTierOptions.Tier> normalizedTiers =
+                tiers.stream().map(ModelTierService::normalize).toList();
         if (normalizedTiers.size() != ModelTier.values().length
-                || normalizedTiers.stream().map(ModelTierOptions.Tier::tier).distinct().count()
+                || normalizedTiers.stream()
+                                .map(ModelTierOptions.Tier::tier)
+                                .distinct()
+                                .count()
                         != ModelTier.values().length) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "all model tiers must be supplied exactly once");
         }
