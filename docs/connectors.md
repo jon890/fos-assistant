@@ -187,12 +187,13 @@ hook 이 부를 주소는 gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_
 | `action_id` | 승인 요청 번호. 승인 요청을 만들었을 때만 있다 |
 
 토큰이나 서명이 틀리면 403 이고 hook 은 막는다.
+`args_json` 이 UTF-8 로 64KB 를 넘거나 JSON object 가 아닐 때, `root_session_id`, `session_id`, `tool_call_id`, `hermes_tool` 이 128자를 넘을 때도 서명이 틀린 요청처럼 403 이고 줄을 남기지 않는다.
 
 Control Plane 의 판정 순서다.
 
 1. 토큰으로 profile 을 알고 서명을 확인한다
 2. session 으로 origin 실행과 사용자와 대화를 찾는다. `_fos_ctx` 와 같은 방법이다. 찾지 못하면 막고 줄을 남기지 않는다
-3. 그 실행의 에이전트가 가진 연결을 찾는다. 연결이 없거나 주인이 다르면 막고 줄을 남기지 않는다
+3. 그 실행의 에이전트가 가진 연결을 찾는다. 연결이 없거나, 주인이 다르거나, 연결용 에이전트의 profile 이 토큰의 profile 과 다르면 막고 줄을 남기지 않는다
 4. 카탈로그에서 도구 정책을 읽는다. 카탈로그는 60초 동안 메모리에 둔다
 5. 아래 표로 판정하고 `connector_action` 에 한 줄을 남긴다
 
@@ -208,6 +209,7 @@ Control Plane 의 판정 순서다.
 | `approval` 이 `required` 이고 유효한 상시 허락이 있다 | 허용 | |
 | 그 밖 | 승인 필요 | |
 
+- 상시 허락은 승인 엔진이 들어올 때 켜진다. 지금은 늘 없는 것으로 판정한다
 - 판정은 Hermes 와 DB 를 모르는 함수 하나가 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식(`^[A-Za-z0-9_.-]{1,128}$`)이 아닌 요청은 서명이 틀린 요청처럼 403 으로 거절한다
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 뿌리 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
@@ -240,7 +242,7 @@ Control Plane 은 `policy_hook` 이 참이 아니면 그 연결을 `READY` 로 �
 
 | 경로 | 요청 | 결과 |
 | --- | --- | --- |
-| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], tools[], myStatus, available}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval` 이고 `schema: 1` 은 빈 목록이다 |
+| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], tools[], myStatus, available}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다. `tools[]` 는 `name, title, risk, approval` 이고 `schema: 1` 은 빈 목록이다. `risk` 와 `approval` 은 `READ`, `NONE` 같은 대문자 enum 이름이다 |
 | `GET /api/v1/connections/{id}` | 없음 | 자기 연결 상태 |
 | `POST /api/v1/connections/{id}/options/{fieldKey}` | `{values}` | `[{value, label}]`. 아무것도 저장하지 않는다 |
 | `POST /api/v1/connections/{id}` | `{values}` | 등록 또는 값 교체. 확인 도구가 통과해야 저장한다 |
