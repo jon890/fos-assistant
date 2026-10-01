@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -111,7 +112,7 @@ class McpToolServiceTest {
     void memoryReadUsesParentRunUserAndLogsRunId() {
         Memory memory = mock(Memory.class);
         when(memory.content()).thenReturn("본문");
-        when(memories.bodyFor(user, 5L)).thenReturn(memory);
+        when(memories.bodyFor(eq(user), any(), eq(5L))).thenReturn(memory);
 
         assertThat(tools.readMemory(caller, 5L).get("isError")).isEqualTo(false);
 

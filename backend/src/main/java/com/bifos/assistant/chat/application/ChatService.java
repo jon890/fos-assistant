@@ -427,8 +427,9 @@ public class ChatService {
             String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), asked);
             // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045). turn 지시는 그대로 붙는다.
-            AssembledContext context =
-                    routed.agent().connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
+            AssembledContext context = routed.agent().connectorManaged()
+                    ? AssembledContext.empty()
+                    : contextAssembler.assemble(user, routed.agent().id());
             context = contextAssembler.withResponseInstructions(context);
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(), null, context.instructionsHash(), context.omittedItems());

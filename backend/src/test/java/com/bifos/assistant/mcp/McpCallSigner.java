@@ -1,6 +1,10 @@
 package com.bifos.assistant.mcp;
 
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -139,6 +143,47 @@ public final class McpCallSigner {
             String profileName,
             String rootSessionId) {
         return save(executions, userId, conversationId, profileName, rootSessionId, ExecutionStatus.RUNNING);
+    }
+
+    /**
+     * 그 profile 의 에이전트로 뿌리 session 에서 도는 실행 줄을 만든다.
+     *
+     * <p>{@code memory_read} 는 origin 실행의 에이전트가 받는 collection 만 읽는다(ADR-053). 에이전트가 없는 실행은
+     * 아무것도 읽지 못하므로, Memory 를 읽는 검사는 이 메서드로 실행을 만든다.
+     */
+    public static AgentExecution running(
+            AgentExecutionRepository executions,
+            AgentRepository agents,
+            Long userId,
+            Long conversationId,
+            String profileName,
+            String rootSessionId) {
+        return executions.save(AgentExecution.builder()
+                .userId(userId)
+                .agentId(agentFor(agents, profileName).id())
+                .conversationId(conversationId)
+                .profileName(profileName)
+                .hermesSessionId(rootSessionId)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(STARTED)
+                .build());
+    }
+
+    /** 그 profile 을 가리키는 에이전트를 찾고, 없으면 만든다. 새로 저장한 에이전트는 core collection 을 받는다. */
+    public static Agent agentFor(AgentRepository agents, String profileName) {
+        return agents.findAll().stream()
+                .filter(agent -> profileName.equals(agent.hermesProfile()))
+                .findFirst()
+                .orElseGet(() -> agents.save(Agent.of(
+                        profileName,
+                        profileName,
+                        profileName,
+                        "http://runtime.test/p/" + profileName,
+                        CostMode.SUBSCRIPTION,
+                        CredentialScope.SHARED_HOUSEHOLD,
+                        AgentVisibility.GROUP,
+                        null)));
     }
 
     public static AgentExecution save(

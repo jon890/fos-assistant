@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -9,7 +10,7 @@ import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -81,6 +82,9 @@ class McpPrincipalTest {
     AgentExecutionRepository executions;
 
     @Autowired
+    AgentRepository agents;
+
+    @Autowired
     ArtifactStore store;
 
     @Autowired
@@ -120,7 +124,7 @@ class McpPrincipalTest {
     @DisplayName("개인 profile 토큰은 그 사용자의 도는 실행으로 읽고 쓴다")
     void personalProfileTokenReadsAndWritesAsUsersRunningRun() throws Exception {
         String root = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), PRIVATE_A, root);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), PRIVATE_A, root);
 
         String path = uniquePath("own");
 
@@ -137,8 +141,8 @@ class McpPrincipalTest {
     void sharedProfileTokenRunsAsRootSessionRunUser() throws Exception {
         String rootA = McpCallSigner.newRoot();
         String rootB = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
-        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
+        McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, rootB);
 
         assertBody(readMemory(sharedToken, rootA, memoryA.id()), "가의 본문");
         assertBody(readMemory(sharedToken, rootB, memoryB.id()), "나의 본문");
@@ -149,8 +153,8 @@ class McpPrincipalTest {
     void sharedProfileSubagentRunsAsRegisteredOriginUserEvenAfterParentsEnd() throws Exception {
         String rootA = McpCallSigner.newRoot();
         String rootB = McpCallSigner.newRoot();
-        AgentExecution runA = McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
-        AgentExecution runB = McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
+        AgentExecution runA = McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
+        AgentExecution runB = McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, rootB);
         String sa = newSubagent();
         String sb = newSubagent();
         registrar.register(SHARED, rootA, rootA, sa);
@@ -169,8 +173,8 @@ class McpPrincipalTest {
     void eachCallRunsAsOwnUserWithoutMixingWhenTwoUsersRunTogether() throws Exception {
         String rootA = McpCallSigner.newRoot();
         String rootB = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
-        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
+        McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, rootB);
 
         for (int i = 0; i < 3; i++) {
             assertBody(readMemory(sharedToken, rootA, memoryA.id()), "가의 본문");
@@ -199,8 +203,8 @@ class McpPrincipalTest {
     void signingWithRootOfOtherProfileRunIsCallContextError() throws Exception {
         String sharedRoot = McpCallSigner.newRoot();
         String privateRoot = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, sharedRoot);
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), PRIVATE_A, privateRoot);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, sharedRoot);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), PRIVATE_A, privateRoot);
 
         assertInvalidContext(readMemory(privateAToken, sharedRoot, memoryA.id()));
         assertInvalidContext(readMemory(sharedToken, privateRoot, memoryA.id()));
@@ -214,8 +218,8 @@ class McpPrincipalTest {
     void readingOthersMemoryWithOthersRootGivesSameResponseAsMissingItem() throws Exception {
         String rootA = McpCallSigner.newRoot();
         String rootB = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
-        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
+        McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, rootB);
 
         JsonNode missing = body(readMemory(sharedToken, rootA, 999_999_999L)).path("result");
         JsonNode aReadsB = body(readMemory(sharedToken, rootA, memoryB.id())).path("result");
@@ -230,7 +234,7 @@ class McpPrincipalTest {
     @DisplayName("남의 대화에는 쓰지 못하고 같은 사용자의 다른 대화에는 쓴다")
     void cannotWriteToOthersConversationButWritesToOwnOtherConversation() throws Exception {
         String rootA = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
         Conversation otherOfA = conversations.save(Conversation.startedBy(userA.id(), "", null));
 
         String forbiddenPath = uniquePath("b");
@@ -252,7 +256,7 @@ class McpPrincipalTest {
     @Test
     @DisplayName("뿌리 칸이 빈 옛 대화의 session 으로 서명해도 그 실행의 사용자로 돈다")
     void runsAsRunUserEvenIfSignedWithSessionOfOldConversationWithBlankRoot() throws Exception {
-        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, "legacy-session");
+        McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, "legacy-session");
 
         assertBody(readMemory(sharedToken, "legacy-session", memoryB.id()), "나의 본문");
     }
@@ -266,7 +270,7 @@ class McpPrincipalTest {
                 .orElseThrow()
                 .id());
         String root = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, root);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, root);
 
         assertThat(readMemory(revoked, root, memoryA.id()).statusCode()).isEqualTo(401);
         assertThat(readMemory("unknown-" + UUID.randomUUID(), root, memoryA.id())
@@ -290,18 +294,18 @@ class McpPrincipalTest {
     @DisplayName("요청자를 정하지 못한 이유가 무엇이든 응답 본문은 바이트까지 같다")
     void responseBodyIsByteIdenticalWhateverReasonRequesterIsUndetermined() throws Exception {
         String rootA = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
         String finishedRoot = McpCallSigner.newRoot();
         McpCallSigner.save(executions, userA.id(), conversationA.id(), SHARED, finishedRoot, ExecutionStatus.SUCCEEDED);
         String doubledRoot = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, doubledRoot);
-        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, doubledRoot);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, doubledRoot);
+        McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, doubledRoot);
         String privateRoot = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), PRIVATE_A, privateRoot);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), PRIVATE_A, privateRoot);
         String registered = newSubagent();
         registrar.register(SHARED, rootA, rootA, registered);
         String rootB = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userB.id(), conversationB.id(), SHARED, rootB);
+        McpCallSigner.running(executions, agents, userB.id(), conversationB.id(), SHARED, rootB);
 
         ObjectNode wrongSig = McpCallSigner.context(sharedToken, "memory_read", rootA);
         String sig = wrongSig.path("sig").asString();
@@ -359,7 +363,7 @@ class McpPrincipalTest {
     @DisplayName("모델이 인자에 사용자나 profile 을 더해도 요청자가 바뀌지 않는다")
     void requesterDoesNotChangeWhenModelAddsUserOrProfileToArguments() throws Exception {
         String rootA = McpCallSigner.newRoot();
-        McpCallSigner.running(executions, userA.id(), conversationA.id(), SHARED, rootA);
+        McpCallSigner.running(executions, agents, userA.id(), conversationA.id(), SHARED, rootA);
 
         ObjectNode readArguments = json.createObjectNode();
         readArguments.put("id", memoryB.id());

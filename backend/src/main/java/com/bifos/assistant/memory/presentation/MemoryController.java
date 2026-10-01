@@ -2,7 +2,6 @@ package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateMemoryRequest;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.UpdateMemoryRequest;
@@ -38,7 +37,7 @@ public class MemoryController {
     @GetMapping
     public List<MemoryView> readable() {
         CurrentUser user = currentUser.require();
-        Set<Long> omitted = Set.copyOf(context.assemble(user).omittedMemoryIds());
+        Set<Long> omitted = Set.copyOf(context.assembleForOwner(user).omittedMemoryIds());
         return memories.readableBy(user).stream()
                 .map(memory -> MemoryView.from(memory, omitted.contains(memory.id())))
                 .toList();
@@ -47,7 +46,11 @@ public class MemoryController {
     @PostMapping
     public MemoryView create(@Valid @RequestBody CreateMemoryRequest request) {
         CurrentUser user = currentUser.require();
-        return MemoryView.from(memories.create(user, request.scope(), request.title(), request.content(),
+        return MemoryView.from(memories.create(
+                user,
+                request.scope(),
+                request.title(),
+                request.content(),
                 Boolean.TRUE.equals(request.alwaysInject())));
     }
 

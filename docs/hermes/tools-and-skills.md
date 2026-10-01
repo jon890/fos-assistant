@@ -326,10 +326,10 @@ MCP 서버를 등록하는 설정 틀은 이 저장소의 `hermes/profile-templa
 한 턴에서 항목을 한 개 읽든 세 개를 병렬로 읽든 API 콜 수는 같았다.
 항목 수보다 도구를 부르는 턴 수가 입력 비용을 정한다.
 
-Memory 색인 한 줄은 약 12 토큰이고, `always_inject` 본문은 한 글자당 약 0.49 토큰이다.
-`always_inject` 는 API 콜 수를 늘리지 않는다.
+Memory 색인 한 줄은 약 12 토큰이고, 항상 층(`retrieval` 이 `ALWAYS`)의 본문은 한 글자당 약 0.49 토큰이다.
+항상 층은 API 콜 수를 늘리지 않는다.
 Control Plane 이 두 방식을 고르는 기준은
-[`flow.md`](../flow.md#도구와-always_inject-를-고르는-기준)에 둔다.
+[`flow.md`](../flow.md#도구와-항상-층을-고르는-기준)에 둔다.
 
 ## 결과물 쓰기 도구
 

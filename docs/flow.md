@@ -720,7 +720,7 @@ sequenceDiagram
         W->>C: POST /api/v1/chat/messages/stream
     end
     C->>C: 대화에 고정된 에이전트에서 profile 을 꺼낸다
-    C->>C: 요청자가 볼 수 있는 Memory 만 골라 instructions 를 조립한다
+    C->>C: 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 Memory 만 골라 instructions 를 조립한다
     C->>C: 실행 한 줄을 RUNNING 으로 만든다
     C->>H: POST {profile}/v1/runs
     C->>C: 받은 run_id 를 그 줄에 적고 RUN_STARTED 를 남긴다
@@ -928,7 +928,9 @@ Memory가 없어도 공통 표 지침의 길이와 지문을 기록하며, 이 �
 ## Memory 본문을 읽는 길
 
 대화 한 번에 Memory 가 실리는데 전부 싣지 않는다.
-본문까지 싣는 항상 층과 제목만 싣는 색인 층으로 나눈다.
+본문까지 싣는 항상 층(`retrieval` 이 `ALWAYS`)과 제목만 싣는 색인 층(`SEARCH`)으로 나눈다.
+보관한 항목(`ARCHIVE`)과 출처 원문(`SOURCE`)은 어느 층에도 싣지 않는다.
+두 층 모두 그 에이전트가 받는 collection 의 항목만 담는다.
 
 색인에 실린 항목의 본문이 필요해지면 에이전트가 도구로 읽는다.
 **그때 요청이 Hermes 에서 Control Plane 으로 거꾸로 온다.**
@@ -945,7 +947,7 @@ sequenceDiagram
     M-->>H: 12번 본문이 필요하다
     H->>C: POST /mcp  memory_read(id=12)
     Note over H,C: Authorization 에 그 profile 의 agent_token, 인자에 서명한 _fos_ctx
-    C->>C: origin 실행으로 사용자를 정하고 그 사용자가 볼 수 있는지 검사
+    C->>C: origin 실행으로 사용자와 에이전트를 정하고 범위, collection, 민감도를 검사
     C-->>H: 본문 또는 읽을 수 없다는 응답
     H->>M: 도구 결과를 준다
     M-->>H: 그 본문으로 답한다
@@ -959,6 +961,47 @@ sequenceDiagram
 볼 수 없는 항목과 없는 항목은 **같은 응답**으로 답한다.
 다르게 답하면 그 항목이 있다는 사실 자체가 새어 나간다.
 
+### 갈리는 지점
+
+| 무엇이 | 어떻게 되는가 |
+| --- | --- |
+| 남의 개인 항목, 다른 그룹의 항목, 없는 번호 | 「읽을 수 없다」 는 같은 응답이다 |
+| origin 실행의 에이전트가 받지 않는 collection 의 항목 | 같은 응답이다. 색인에도 없던 번호다 |
+| `SENSITIVE` 항목이고 그 collection 에서 민감 항목을 허용받지 않았다 | 같은 응답이다 |
+| 승인 전인 항목, 항상 층에 이미 실린 항목, 보관한 항목, 출처 원문 | 같은 응답이다 |
+| origin 실행에 에이전트가 없거나 그 에이전트를 찾지 못한다 | 같은 응답이다. 받는 collection 이 없다 |
+| origin 실행의 에이전트가 커넥터 에이전트다 | 요청자 판정에서 먼저 거절한다. 「호출 맥락을 확인할 수 없다」 는 응답이다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)) |
+| 위임받아 도는 에이전트가 읽는다 | 그 에이전트의 허용으로 판정한다. 부르는 쪽의 허용을 물려받지 않는다 |
+
+근거는 [ADR-053](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+
+### Memory 를 고치고 지울 때
+
+```mermaid
+sequenceDiagram
+    participant W as 웹
+    participant C as Control Plane
+    participant D as 데이터베이스
+
+    W->>C: PATCH /api/v1/memories/{id}
+    C->>C: 범위와 쓰기 권한을 본다
+    alt 민감 항목을 항상 싣게 하려 한다
+        C-->>W: 400 MEMORY_SENSITIVE_ALWAYS
+    else 고칠 수 있다
+        C->>D: 고치기 전의 값을 memory_revision 에 UPDATED 로 넣는다
+        C->>D: memory 를 고치고 판 번호를 하나 올린다
+        C-->>W: 고친 항목
+    end
+    W->>C: DELETE /api/v1/memories/{id}
+    C->>D: 마지막 값을 memory_revision 에 DELETED 로 넣는다
+    C->>D: memory 의 줄을 지운다
+```
+
+판을 남기는 것과 항목을 고치는 것은 한 트랜잭션이다. 한쪽만 남지 않는다.
+거절한 수정은 판을 남기지 않는다.
+지금 화면은 민감도를 보내지 않으므로 민감 항목이 생기지 않는다. 그 거절은 민감 항목을 다루는 경로가 생길 때부터 화면에 보인다.
+지금 화면의 수정이 「항상 싣기」 를 끄면 색인으로 간다. 이미 보관한 항목은 보관한 채로 둔다.
+
 ### 이 왕복은 비싸다
 
 Hermes 는 도구를 부른 턴의 API 콜을 한 번에서 두 번이나 세 번으로 늘린다.
@@ -966,10 +1009,10 @@ Hermes 는 도구를 부른 턴의 API 콜을 한 번에서 두 번이나 세 �
 한 턴에서 항목을 한 개 읽든 세 개를 읽든 API 콜 수는 같고, 색인 한 줄은 약 12 토큰이다.
 자세한 Hermes 동작은 [`hermes/tools-and-skills.md`](hermes/tools-and-skills.md#입력-비용은-api-콜-수가-정한다)에 둔다.
 
-### 도구와 `always_inject` 를 고르는 기준
+### 도구와 항상 층을 고르는 기준
 
-항목이 필요한 실행 하나만 비교하면 `always_inject` 가 도구보다 싸다.
-`always_inject` 본문은 한 글자당 약 0.49 토큰이고 API 콜을 늘리지 않지만,
+항목이 필요한 실행 하나만 비교하면 항상 층(`ALWAYS`)이 도구보다 싸다.
+항상 층의 본문은 한 글자당 약 0.49 토큰이고 API 콜을 늘리지 않지만,
 도구는 현재 문맥 전체를 담은 API 콜을 한 번이나 두 번 더 만들기 때문이다.
 
 항목이 필요 없는 실행에도 본문을 싣는 비용까지 포함하면 사용 빈도가 손익분기를 정한다.
@@ -985,7 +1028,7 @@ Hermes 는 도구를 부른 턴의 API 콜을 한 번에서 두 번이나 세 �
 이 값은 측정한 프롬프트 크기와 API 콜 수를 기준으로 한 판단값이다.
 profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 달라진다.
 
-### `always_inject` 항목이 문맥 한도를 넘을 때
+### 항상 층의 항목이 문맥 한도를 넘을 때
 
 Control Plane 은 조립한 Memory 문맥을 8,000자로 제한한다.
 커넥터 에이전트(`connectorManaged`)의 실행은 Memory 문맥을 조립하지 않는다. 근거는 [ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md) 와 [커넥터 연결](connectors.md) 에 있다.
