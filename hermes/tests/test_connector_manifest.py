@@ -212,6 +212,27 @@ class ConnectorCatalogTest(ConnectorGateCase):
         # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
         self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
 
+    def test_operator_secrets_are_rejected_as_unsupported(self):
+        """`operator_secrets` 를 선언한 커넥터는 카탈로그에서 빠지고 까닭이 경고 로그에 남는다. 빈 목록은 통과한다."""
+        original = (self.connector_root / "connector.json").read_bytes()
+        self.rewrite("connector.json", lambda value: value.update(operator_secrets=["DEMO_SERVICE_KEY"]))
+        # 준비가 로그를 꺼 둔다. 경고를 읽는 동안만 켠다.
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, logging.CRITICAL)
+        with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+            self.assertEqual(self.catalog(), [])
+        logging.disable(logging.CRITICAL)
+        self.assertIn("operator_secrets 는 아직 지원하지 않는다", "\n".join(logs.output))
+
+        (self.connector_root / "connector.json").write_bytes(original)
+        self.rewrite("connector.json", lambda value: value.update(operator_secrets=[]))
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+        for label, wrong in (("string", "X"), ("non-string item", [1])):
+            with self.subTest(label):
+                self.rewrite("connector.json", lambda value: value.update(operator_secrets=wrong))
+                self.assertEqual(self.catalog(), [])
+
     def test_missing_or_unreadable_files_leave_the_connector_out(self):
         """`connector.json` 이 없거나, JSON 이 아니거나, 실행할 파일이 링크면 카탈로그에서 빠진다."""
         manifest = self.connector_root / "connector.json"

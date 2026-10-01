@@ -611,6 +611,12 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
     if set(operator_env) - set(entry["env"]):
         raise ValueError("operator_env 의 값이 운영 목록에 없다")
+    operator_secrets = declared.get("operator_secrets", [])
+    if not isinstance(operator_secrets, list) or any(not isinstance(name, str) for name in operator_secrets):
+        raise ValueError("operator_secrets 는 env 이름 목록이다")
+    if operator_secrets:
+        # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-045).
+        raise ValueError("operator_secrets 는 아직 지원하지 않는다")
     errors = declared.get("errors", {})
     if not isinstance(errors, dict) or any(
             not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
@@ -792,8 +798,28 @@ def _connector_state(value) -> dict:
     return value
 
 
+def _connector_allowlist(state: dict, servers: dict) -> list:
+    """소유 기록의 커넥터 서버 이름만으로 만든 API 도구 목록이다. 기록이 없으면 MCP 를 전부 막는 값이다.
+
+    목록에 등록된 MCP 서버 이름이 하나도 없으면 Hermes 가 등록된 서버를 모두 통과시킨다.
+    그래서 빈 목록 대신 `no_mcp` 를 쓴다(ADR-044).
+    옛 기록에는 서버 이름 칸이 없어 기록과 같은 서버 정의를 설정에서 찾는다.
+    """
+    names = []
+    for entry in state.values():
+        name = entry.get("mcp_server") or next(
+            (key for key, value in servers.items() if value == entry["server"]), None)
+        if name is None:
+            raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌거나 바뀌었다")
+        names.append(name)
+    return names or ["no_mcp"]
+
+
 def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> dict:
-    """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다."""
+    """관리 표식 profile 의 설정을 바꾸고 실패하면 같은 요청 안에서 되돌린다.
+
+    설치와 제거는 API 도구 목록을 커넥터 서버 이름만으로 다시 쓰고, 설치는 Control Plane MCP 등록도 지운다(ADR-044).
+    """
     import yaml
     if profile_dir.resolve() != profile_dir:
         raise ValueError("profile 경로에 심볼릭 링크가 있다")
@@ -829,8 +855,6 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     if owned and name not in servers:
         raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌다")
     allowed = list((saved.get("platform_toolsets") or {}).get("api_server") or [])
-    if CONTROL_PLANE_MCP not in allowed or "memory" in allowed or "no_mcp" in allowed:
-        raise ValueError("Control Plane MCP 를 허용한 API 도구 목록이 필요하다")
     env_text = originals[env_path].decode("utf-8") if originals[env_path] else ""
     values = {}
     if enabled:
@@ -839,16 +863,17 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
         for env_name in manifest["optional_env"]:
             if not _env_value(env_text, env_name):
                 server["env"][env_name] = ""
-        added = owned["allowlist_added"] if owned else name not in allowed
+        # `allowlist_added` 는 더 읽지 않는다. 옛 판이 남긴 기록을 읽을 수 있게 칸만 남긴다.
+        added = owned["allowlist_added"] if owned else True
         servers[name] = server
-        if name not in allowed:
-            allowed.append(name)
+        # 커넥터 에이전트는 Control Plane 도구를 받지 않는다. 제거는 이 등록을 되살리지 않는다.
+        servers.pop(CONTROL_PLANE_MCP, None)
         state[plugin] = {"server": server, "allowlist_added": added, "mcp_server": name}
+        allowed = _connector_allowlist(state, servers)
     elif owned:
         servers.pop(name, None)
-        if owned["allowlist_added"]:
-            allowed = [item for item in allowed if item != name]
         state.pop(plugin, None)
+        allowed = _connector_allowlist(state, servers)
         if manifest is None and originals[env_path] is not None:
             # Control Plane 은 목록에서 빠진 커넥터의 env 이름을 모른다. 기록이 참조하던 key 를 여기서 지운다.
             referenced = {key for key, value in owned["server"]["env"].items() if value == "${%s}" % key}
@@ -865,8 +890,15 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     backup.mkdir(parents=True, mode=0o700)
     os.chmod(backup.parent, 0o700)
     for path, value in originals.items():
-        if value is not None:
+        # profile `.env` 에는 사용자의 비밀 원문이 있다. 백업에 넣으면 연결을 해제한 뒤에도 남는다.
+        if value is not None and path != env_path:
             _atomic_private_write(backup / path.name, value)
+    # 이전 판이 백업에 남긴 `.env` 사본을 지운다.
+    for stale in backup.parent.glob("*/.env"):
+        try:
+            stale.unlink()
+        except OSError as error:
+            logger.warning("dashboard-profile-api: 백업의 옛 env 사본을 지우지 못했다: %s", type(error).__name__)
     written = []
     try:
         if any((path.read_bytes() if path.exists() else None) != value for path, value in originals.items()):
@@ -923,12 +955,19 @@ async def _connector_request(request):
             state_path = profile_dir / CONNECTOR_STATE
             state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.exists() else {}
             servers = config.get("mcp_servers") or {}
+            try:
+                expected = _connector_allowlist(state, servers)
+            except FileExistsError:
+                expected = None
+            # 설치가 쓰는 목록과 같고 Control Plane MCP 등록이 없어야 설치가 끝난 것이다.
+            isolated = (expected is not None and CONTROL_PLANE_MCP not in servers
+                        and (config.get("platform_toolsets") or {}).get("api_server") == expected)
             connectors = []
             for plugin in roots:
                 manifest = _connector_manifest(plugin)
                 connectors.append({
                     "plugin": plugin, "enabled": plugin in state,
-                    "configured": (plugin in state and manifest is not None
+                    "configured": (plugin in state and manifest is not None and isolated
                                    and servers.get(manifest["mcp_server"]) == state[plugin]["server"])})
             # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False}
