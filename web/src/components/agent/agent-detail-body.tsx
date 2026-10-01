@@ -45,7 +45,10 @@ async function read<T>(path: string): Promise<Loaded<T>> {
     const payload = (await response.json()) as ErrorPayload;
     return { ok: false, message: describeError(payload.code, payload.message) };
   } catch {
-    return { ok: false, message: describeError("HERMES_UNAVAILABLE", "불러오지 못했어요.") };
+    return {
+      ok: false,
+      message: describeError("HERMES_UNAVAILABLE", "불러오지 못했어요."),
+    };
   }
 }
 
@@ -94,7 +97,10 @@ export function AgentDetailBody({
         <>
           {adminError ? (
             <div className="mx-auto mb-8 w-full max-w-2xl">
-              <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm">
+              <p
+                role="alert"
+                className="rounded-md border border-border bg-muted p-3 text-sm"
+              >
                 관리 정보를 불러오지 못했어요. {adminError}
               </p>
             </div>
@@ -102,39 +108,70 @@ export function AgentDetailBody({
           {connectorManaged ? (
             <div className="mx-auto w-full max-w-2xl">
               <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-              <p className="rounded-md border border-border bg-muted p-3 text-sm">가계부 연결 화면에서 이 에이전트의 연결 상태를 관리해요.</p>
+              <p className="rounded-md border border-border bg-muted p-3 text-sm">
+                연결 화면에서 이 에이전트의 연결 상태를 관리해요.
+              </p>
             </div>
           ) : persona.ok ? (
-            <PersonaEditor code={code} name={name} initialPersona={persona.data} />
+            <PersonaEditor
+              code={code}
+              name={name}
+              initialPersona={persona.data}
+            />
           ) : (
             <div className="mx-auto w-full max-w-2xl">
               <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-              <p role="alert" className="rounded-md border border-border bg-muted p-3 text-sm">{persona.message}</p>
+              <p
+                role="alert"
+                className="rounded-md border border-border bg-muted p-3 text-sm"
+              >
+                {persona.message}
+              </p>
             </div>
           )}
         </>
       )}
       {connectorManaged || tools === null ? null : tools.ok ? (
-        <AgentToolsSection code={code} initialTools={tools.data.initialTools} admin={tools.data.admin}
-          visibility={visibility} />
+        <AgentToolsSection
+          code={code}
+          initialTools={tools.data.initialTools}
+          admin={tools.data.admin}
+          visibility={visibility}
+        />
       ) : (
-        <section aria-label="도구" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
+        <section
+          aria-label="도구"
+          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+        >
           <h2 className="font-semibold">도구</h2>
-          <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">{tools.message}</p>
+          <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">
+            {tools.message}
+          </p>
         </section>
       )}
       {connectorManaged || skills === null ? null : skills.ok ? (
         <AgentSkillsSection code={code} initialSkills={skills.data} />
       ) : (
-        <section aria-label="스킬" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
+        <section
+          aria-label="스킬"
+          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+        >
           <h2 className="font-semibold">스킬</h2>
-          <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">{skills.message}</p>
+          <p role="alert" className="mt-3 rounded-md bg-muted p-3 text-sm">
+            {skills.message}
+          </p>
         </section>
       )}
-      {adminAgent && visibility ? <AgentAdminSection initialAgent={adminAgent} visibility={visibility} /> : null}
+      {adminAgent && visibility ? (
+        <AgentAdminSection initialAgent={adminAgent} visibility={visibility} />
+      ) : null}
       {canManageAccess && visibility ? (
-        <AgentAccessSection code={code} name={name} visibility={visibility}
-          onVisibilityChange={(next) => void changeVisibility(next)} />
+        <AgentAccessSection
+          code={code}
+          name={name}
+          visibility={visibility}
+          onVisibilityChange={(next) => void changeVisibility(next)}
+        />
       ) : null}
     </>
   );

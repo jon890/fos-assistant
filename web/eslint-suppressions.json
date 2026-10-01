@@ -14,11 +14,6 @@
       "count": 1
     }
   },
-  "src/app/api/admin/connections/accountbook/[userId]/confirm/route.ts": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/app/api/admin/people/[id]/route.ts": {
     "no-restricted-syntax": {
       "count": 2
@@ -271,16 +266,6 @@
     }
   },
   "src/components/chat/use-starter-suggestions.ts": {
-    "no-restricted-globals": {
-      "count": 1
-    }
-  },
-  "src/components/connector/accountbook-admin-panel.tsx": {
-    "no-restricted-globals": {
-      "count": 2
-    }
-  },
-  "src/components/connector/accountbook-connection-panel.tsx": {
     "no-restricted-globals": {
       "count": 1
     }

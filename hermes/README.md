@@ -27,8 +27,8 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 | 값 | 받는 곳 |
 | --- | --- |
 | Control Plane MCP 주소 | `bundle.sh --mcp-url` |
-| 커넥터 plugin 경로 | `FOS_ASSISTANT_CONNECTOR_ROOTS` |
-| 커넥터 실행 파일 | `FOS_ASSISTANT_CONNECTOR_COMMAND` |
+| 커넥터 목록 | `FOS_ASSISTANT_CONNECTOR_ROOTS` |
+| 커넥터 실행 파일 기본값 | `FOS_ASSISTANT_CONNECTOR_COMMAND` |
 | 대시보드 서비스 토큰 | `HERMES_DASHBOARD_PROFILE_API_SECRET` |
 | 스킬 루트 | `FOS_ASSISTANT_SKILL_AGENT_ROOT` |
 
@@ -40,6 +40,7 @@ python3 -m unittest discover -s hermes/tests
 ```
 
 Hermes 모듈은 가짜로 끼우므로 Hermes 를 설치하지 않아도 돈다. 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
+PyYAML 과 `mcp` SDK 가 있어야 한다. 커넥터 도구 호출 검사는 `tests/fixtures/demo-connector/` 의 시험 커넥터를 자식 프로세스로 띄운다.
 
 ## fos-ctx 가 붙이는 것
 
@@ -97,9 +98,11 @@ key 는 그 profile `.env` 의 MCP 토큰에서 나오고, terminal 도구는 He
 | `POST /api/profiles` | profile 을 만들고 같은 요청 안에서 설정 틀과 서명 plugin 과 관리 표식을 둔다 |
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 |
-| `DELETE /api/env` | 관리 profile 의 가계부 key 만 지운다 |
-| `GET PUT /api/connectors` | 알려진 connector 의 상태를 읽거나 관리 profile 에 설치하고 제거한다 |
-| `POST /api/mcp/servers/accountbook/test` | 설치한 가계부 MCP 서버만 probe 한다 |
+| `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 |
+| `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
+| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다 |
+| `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
 | `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로를 쓴다 |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
@@ -130,24 +133,69 @@ MCP 도구는 만든 뒤 1~2분 안에 붙는다. 이유는 운영 저장소의 
 사람이 만든 profile 과 기본 profile 은 401 이다. 파일이라 대시보드를 다시 띄워도 남는다.
 
 **`PUT /api/env` 는 [plugin 의 허용 목록](plugins/dashboard-profile-api/__init__.py) 에 있는 key 만 받는다.**
-가계부 key 는 [가계부 연결](../docs/connectors.md) 과 운영 저장소의 커넥터 운영 문서를 따른다.
+기본 key 는 plugin 이 갖고, 커넥터 key 는 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
 본문은 `{profile, key, value}` 이고 값은 한 줄이어야 한다.
 provider credential 은 이 토큰으로 쓰지 못한다.
 
-**커넥터는 경로와 실행 파일을 환경 변수로 받는다.**
-`GET PUT /api/connectors` 와 `POST /api/mcp/servers/accountbook/test` 가 다루는 커넥터는 요청에서 이름만 받는다.
-그 이름의 plugin 디렉터리는 `FOS_ASSISTANT_CONNECTOR_ROOTS` 에서, MCP 서버를 실행할 파일은 `FOS_ASSISTANT_CONNECTOR_COMMAND` 에서 읽는다.
-둘 가운데 하나라도 없거나 읽지 못하면 대시보드는 그대로 뜨고 커넥터만 쓸 수 없다.
+### 커넥터
+
+**plugin 은 커넥터의 이름을 코드에 두지 않는다.**
+운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다.
+`connector.json` 의 형식과 각 경로의 요청과 응답은 [커넥터 연결](../docs/connectors.md) 의 「connector.json」 과 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
+
+**운영 목록은 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` 로 받는다.** 커넥터 이름마다 값 하나를 둔 JSON object 다.
+
+```json
+{
+  "<커넥터 이름>": {
+    "root": "<plugin 디렉터리>",
+    "command": "<MCP 서버를 실행할 파일>",
+    "env": { "<operator_env 이름>": "<값>" }
+  },
+  "<다른 커넥터 이름>": "<plugin 디렉터리>"
+}
+```
+
+- 값이 문자열이면 `{"root": 그 값}` 으로 읽는다
+- `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 둘 다 없거나 실행 권한이 없으면 그 커넥터는 쓸 수 없다
+- `connector.json` 이 `operator_env` 로 적은 이름은 모두 `env` 에 값이 있어야 한다. 그 값은 설치할 때 서버 정의에 직접 들어가고 profile `.env` 를 거치지 않는다
+- 경로는 절대 경로다. 모양이 틀린 항목은 그 항목만 버린다
+
+**plugin 디렉터리에서 읽는 것은 넷이다.** `.claude-plugin/plugin.json`, `.mcp.json`, `connector.json`, 스킬 디렉터리다.
+하나라도 검증에 실패하면 그 커넥터는 카탈로그에서 빠지고 경고 로그 한 줄이 남는다. 대시보드와 다른 커넥터는 그대로 돈다.
+
+- `.mcp.json` 은 서버 하나만 둔다. 그 이름이 커넥터의 MCP 서버 이름이다
+- 서버의 `command` 는 쓰지 않고 운영 목록의 실행 파일로 바꾼다
+- 서버의 `args` 가운데 `${CLAUDE_PLUGIN_ROOT}/` 로 시작하는 것은 plugin 디렉터리 안의 링크 없는 파일이어야 하고 실제 경로로 바꾼다. 그 밖의 `$` 치환은 받지 않는다
+- 서버의 `env` 는 자기 이름의 `${이름}` 참조만 둔다. 선택 칸은 `${이름:-}` 도 된다
+- 값이 없는 선택 칸은 설치할 때 서버 정의에 빈 값을 명시한다. Hermes 는 빈 변수의 참조를 그대로 남기기 때문이다
+
+**`POST /api/connectors/<id>/call` 은 자식 프로세스를 띄운다.**
+
+- 자식이 받는 환경 변수는 요청의 칸 값, 운영 목록의 `env`, MCP SDK 가 늘 더하는 기본 env(`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`)뿐이다.
+  대시보드 프로세스의 다른 env(서비스 토큰, 다른 커넥터의 값)는 넘어가지 않는다. `PATH` 는 대시보드의 값 대신 실행 파일이 있는 디렉터리만 준다
+- 후보 값은 디스크, 응답, 로그에 남기지 않는다. 자식의 stderr 도 대시보드 로그로 보내지 않는다
+- 도구는 인자 없이 부른다. 값은 환경 변수로만 간다
+- profile 쓰기 잠금 밖에서 돈다. 도구를 기다리는 동안 다른 profile 요청이 멈추지 않는다
+- 시간을 넘기거나 예외가 나면 SDK 의 정리 구간이 자식의 stdin 을 닫고, 끝나지 않으면 프로세스 묶음을 죽인 뒤에 응답한다
+- `mcp` SDK 는 이 경로 안에서 import 한다. SDK 가 없으면 이 경로만 `unavailable` 이고 나머지는 그대로 돈다
+
+**소유 기록 `.fos-connectors.json` 은 설치할 때의 서버 정의를 갖고, 요청마다 지금의 manifest 와 같은지 검증한다.**
 
 | 상태 | 설치한 적 없는 profile | 이미 설치한 profile |
 | --- | --- | --- |
-| 경로를 받지 못했다 | 상태 조회는 빈 목록이고 설치는 400 이다. 알려진 커넥터가 하나도 없다 | 상태 조회와 probe 는 503 이고 제거는 400 이다 |
+| 운영 목록에서 빠졌다 | 상태 조회에 나오지 않고 설치는 400 이다. 제거는 끌 것이 없어 `changed: false` 로 성공한다 | 상태 조회는 `configured: false` 다. 제거는 되고 probe 는 404 다 |
 | 실행 파일을 받지 못했다 | 설치가 503 이다 | 상태 조회, 제거, probe 가 모두 503 이다 |
-| 설치한 뒤 값이 바뀌었다 | 해당 없음 | 상태 조회, 제거, probe 가 모두 503 이다 |
+| 설치한 뒤 실행 파일, plugin 경로, 운영자 env 값이 바뀌었다 | 해당 없음 | 상태 조회, 제거, probe 가 모두 503 이다 |
 
-profile 의 소유 기록에는 설치할 때의 plugin 경로와 실행 파일 경로가 남고, 요청마다 지금의 환경 변수와 같은지 검증한다.
-그래서 값이 없거나 바뀌면 이미 설치한 profile 은 상태를 읽지도 제거하지도 못한다. 값을 되돌리면 다시 읽힌다.
-**운영은 두 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
+운영 목록에서 빠진 커넥터를 제거하면 plugin 이 그 기록의 서버 env 가 `${이름}` 으로 참조하던 key 를 profile `.env` 에서 함께 지운다. Control Plane 이 그 이름을 더는 알 수 없기 때문이다.
+값이 바뀌어 503 이 된 profile 은 값을 되돌리면 다시 읽힌다.
+**운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
+
+**한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록을 그대로 받는다**([ADR-041](../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)).
+
+- 옛 기록은 운영자 env 를 `${이름}` 참조로 갖고 MCP 서버 이름 칸이 없다. 운영자 env 는 그 참조와 지금의 직접 값을 같다고 본다. 다음 설치 요청이 기록을 새 모양으로 다시 쓴다
+- 운영자 env 이름의 `PUT /api/env` 와 `DELETE /api/env` 는 성공으로 답하고 아무것도 쓰지 않는다
 
 **토큰으로 부른 `PUT /api/config` 는 본문을 검사한 뒤 Hermes 처리기에 넘긴다.**
 최상위에는 `profile` 과 `config` 만 둔다.
@@ -224,4 +272,4 @@ plugin 스킬은 `plugin:이름` 으로만 불려 겹치지 않는다.
 
 **여기 없는 것은 맞는 토큰으로도 열리지 않는다.**
 `GET /api/config` 와 이름을 바꾸는 `PATCH`, 스킬을 만들고 고치는 `POST /api/skills`, `PUT /api/skills/content` 가 여기 해당한다.
-`DELETE /api/env` 는 관리 profile 의 가계부 key 만 받는다.
+`DELETE /api/env` 는 관리 profile 의 커넥터 칸 key 만 받는다.

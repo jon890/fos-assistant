@@ -17,9 +17,11 @@ Hermes core 는 고치지 않는다.
 | `POST /api/profiles` | profile 을 만든다. 아래 「만든 자리에서 설정 틀을 쓴다」 를 거친다 |
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 |
-| `DELETE /api/env` | 관리 profile 의 가계부 key 만 지운다 |
-| `GET PUT /api/connectors` | 알려진 connector 의 상태를 읽거나 관리 profile 에 설치하고 제거한다 |
-| `POST /api/mcp/servers/accountbook/test` | 설치한 가계부 MCP 서버만 probe 한다 |
+| `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 |
+| `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
+| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다 |
+| `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
@@ -35,6 +37,9 @@ Hermes core 는 고치지 않는다.
 - 본문과 query 에 profile 이 둘 다 있으면 같아야 한다
 
 사람의 쿠키 요청은 기존 Hermes 처리기가 맡는다. 검사하지 않는다.
+
+커넥터 경로의 계약은 `docs/connectors.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
+이 plugin 은 커넥터의 이름을 코드에 두지 않는다. 운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽는다.
 
 ## 만든 자리에서 설정 틀을 쓴다
 
@@ -152,12 +157,17 @@ ALLOWED_ROUTES = {
     ("/api/profiles", "POST"): "_check_profile_create",
     ("/api/env", "PUT"): "_check_env_update",
     ("/api/env", "DELETE"): "_check_env_delete",
-    ("/api/mcp/servers/accountbook/test", "POST"): "_check_connector_probe",
     ("/api/tools/toolsets", "GET"): None,
     ("/api/config", "PUT"): "_check_config_update",
     ("/api/skills", "GET"): "_check_skills_list",
     ("/api/skills/toggle", "PUT"): "_check_skill_toggle",
 }
+
+# 설치한 커넥터의 MCP 서버 probe 다. 서버 이름은 그 profile 의 소유 기록과 manifest 로 확인한다.
+PROBE_ROUTE_RE = re.compile(r"^/api/mcp/servers/([^/]+)/test$")
+CONNECTORS_PATH = "/api/connectors"
+CATALOG_PATH = "/api/connectors/catalog"
+CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 
 PROFILES_PATH = "/api/profiles"
 PROFILE_PREFIX = "/api/profiles/"
@@ -181,16 +191,29 @@ FORBIDDEN_TOOLSETS = frozenset({"memory", "terminal", "file", "code_execution", 
 # Control Plane MCP 서버 이름이다.
 CONTROL_PLANE_MCP = "fos-assistant"
 
-# PUT /api/env 로 쓸 수 있는 key 다. Control Plane 이 profile 마다 넣는 값만 둔다.
-ACCOUNTBOOK_ENV_KEYS = frozenset({"ACCOUNTBOOK_API_BASE_URL", "ACCOUNTBOOK_API_TOKEN", "ACCOUNTBOOK_FAMILY_UUID"})
-ENV_KEYS = frozenset({"API_SERVER_KEY", "API_SERVER_MODEL_NAME", "MCP_FOS_ASSISTANT_API_KEY"}) | ACCOUNTBOOK_ENV_KEYS
+# PUT /api/env 로 쓸 수 있는 기본 key 다. Control Plane 이 profile 마다 넣는 값만 둔다.
+# 커넥터 key 는 여기 두지 않는다. 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
+BASE_ENV_KEYS = frozenset({"API_SERVER_KEY", "API_SERVER_MODEL_NAME", "MCP_FOS_ASSISTANT_API_KEY"})
 # 요청은 이름만 받는다. 실행 정의는 커넥터 checkout 의 manifest 가 소유한다.
 # 커넥터 이름과 plugin 디렉터리를 묶은 JSON 을 대시보드 프로세스의 환경 변수로 받는다. 근거는 ADR-041 이 갖는다.
 CONNECTOR_ROOTS_ENV = "FOS_ASSISTANT_CONNECTOR_ROOTS"
-# 커넥터 MCP 서버를 실행할 파일의 절대 경로다. 같은 방식으로 받는다.
+# 커넥터 MCP 서버를 실행할 파일의 절대 경로다. 운영 목록 항목에 `command` 가 없을 때 쓴다.
 CONNECTOR_COMMAND_ENV = "FOS_ASSISTANT_CONNECTOR_COMMAND"
-CONNECTOR_SERVER = "accountbook"
 CONNECTOR_STATE = ".fos-connectors.json"
+# `connector.json` 의 형식 규칙이다. `docs/connectors.md` 의 「connector.json」 표와 같다.
+CONNECTOR_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable"})
+# `.mcp.json` 의 인자가 plugin 디렉터리를 가리키는 자리다. 그 밖의 치환은 받지 않는다.
+PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
+# 커넥터 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
+CONNECTOR_CALL_TIMEOUT_SECONDS = 10
+CONNECTOR_CALL_LIMIT = 4
+# 지금 돌고 있는 호출 수다. 이벤트 루프 하나에서만 바꾸므로 잠금이 필요 없다.
+_connector_calls = 0
 PROFILE_WRITE_LOCK = asyncio.Lock()
 # POST /api/profiles 본문에 둘 수 있는 키다. clone_from 처럼 다른 profile 의 파일을 끌어오는 키를 막는다.
 PROFILE_CREATE_KEYS = frozenset({"name", "no_skills", "description"})
@@ -398,6 +421,18 @@ async def _check_profile_create(request):
     return None
 
 
+def _operator_env_ignored(body: dict):
+    """운영자 env 이름의 쓰기와 지우기에 주는 답이다. 성공으로 답하고 아무것도 쓰지 않는다.
+
+    그 값은 운영 목록이 갖고 설치할 때 서버 정의에 직접 들어간다.
+    옛 Control Plane 이 한 배포 동안 이 이름을 쓰려 하므로 거절하지 않는다(ADR-041).
+    """
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({"profile": body["profile"], "key": body["key"], "restart_required": False},
+                        status_code=200)
+
+
 async def _check_env_update(request):
     """`.env` 쓰기를 허용한 key 와 Control Plane 이 쓰는 profile 로 제한한다."""
     body = await _json_object(request)
@@ -406,7 +441,8 @@ async def _check_env_update(request):
     rejected = _profile_rejection(body["profile"], request)
     if rejected is not None:
         return rejected
-    if not isinstance(body["key"], str) or body["key"] not in ENV_KEYS:
+    field_keys, operator_keys = _connector_env_keys()
+    if not isinstance(body["key"], str) or body["key"] not in BASE_ENV_KEYS | field_keys | operator_keys:
         return _rejected("쓸 수 없는 key 다")
     value = body["value"]
     if not isinstance(value, str) or any(ch in value for ch in "\r\n\0"):
@@ -415,10 +451,12 @@ async def _check_env_update(request):
         missing = _missing_profile(body["profile"])
         if missing is not None:
             return missing
-        if body["key"] in ACCOUNTBOOK_ENV_KEYS:
+        if body["key"] not in BASE_ENV_KEYS:
             from hermes_cli.profiles import get_profile_dir
             if not (get_profile_dir(body["profile"]) / MANAGED_MARKER).is_file():
                 return _rejected("관리 표식이 없는 profile 이다", 401)
+            if body["key"] in operator_keys:
+                return _operator_env_ignored(body)
         return None
     except Exception:
         logger.exception("dashboard-profile-api: profile 을 확인하지 못했다")
@@ -426,26 +464,34 @@ async def _check_env_update(request):
 
 
 async def _check_env_delete(request):
-    """연결 해제는 가계부 key 만 지운다. 모델과 Control Plane credential 은 보존한다."""
+    """연결 해제는 커넥터 칸의 key 만 지운다. 모델과 Control Plane credential 은 보존한다."""
     body = await _json_object(request)
     if body is None or set(body) != {"profile", "key"}:
         return _rejected("profile 과 key 만 필요하다")
     rejected = _profile_rejection(body["profile"], request)
     if rejected is not None:
         return rejected
-    if not isinstance(body["key"], str) or body["key"] not in ACCOUNTBOOK_ENV_KEYS:
-        return _rejected("가계부 환경 변수만 지울 수 있다")
+    field_keys, operator_keys = _connector_env_keys()
+    if not isinstance(body["key"], str) or body["key"] not in field_keys | operator_keys:
+        return _rejected("커넥터 환경 변수만 지울 수 있다")
     missing = _missing_profile(body["profile"])
     if missing is not None:
         return missing
     from hermes_cli.profiles import get_profile_dir
     if not (get_profile_dir(body["profile"]) / MANAGED_MARKER).is_file():
         return _rejected("관리 표식이 없는 profile 이다", 401)
+    if body["key"] in operator_keys:
+        return _operator_env_ignored(body)
     return None
 
 
-def _connector_roots() -> dict[str, pathlib.Path]:
-    """`{"<커넥터 이름>": "<plugin 디렉터리>"}` JSON 을 읽는다. 없거나 틀리면 빈 dict 다."""
+def _connector_roots() -> dict[str, dict]:
+    """운영 목록을 읽는다. `{"<커넥터 이름>": {"root", "command", "env"}}` 다. 없거나 틀리면 빈 dict 다.
+
+    환경 변수의 값은 이름마다 문자열(plugin 디렉터리)이나
+    `{"root": "<plugin 디렉터리>", "command": "<실행 파일>", "env": {"<이름>": "<값>"}}` 다.
+    문자열은 `{"root": 그 값}` 으로 읽는다.
+    """
     raw = os.environ.get(CONNECTOR_ROOTS_ENV, "").strip()
     if not raw:
         return {}
@@ -453,22 +499,29 @@ def _connector_roots() -> dict[str, pathlib.Path]:
         value = json.loads(raw)
     except ValueError:
         value = None
-    if not isinstance(value, dict) or any(not isinstance(entry, str) for entry in value.values()):
+    if not isinstance(value, dict) or any(not isinstance(entry, (str, dict)) for entry in value.values()):
         # 값에는 운영 경로가 들어 있어 로그에 싣지 않는다.
-        logger.warning("dashboard-profile-api: %s 가 문자열 값의 JSON object 가 아니다", CONNECTOR_ROOTS_ENV)
+        logger.warning("dashboard-profile-api: %s 가 문자열이나 object 값의 JSON object 가 아니다", CONNECTOR_ROOTS_ENV)
         return {}
     roots = {}
     for name, entry in value.items():
-        path = pathlib.Path(entry)
-        if not path.is_absolute():
+        if isinstance(entry, str):
+            entry = {"root": entry}
+        root, command, env = entry.get("root"), entry.get("command"), entry.get("env", {})
+        if (set(entry) - {"root", "command", "env"} or not isinstance(root, str)
+                or not (command is None or isinstance(command, str)) or not isinstance(env, dict)
+                or any(not isinstance(key, str) or not isinstance(item, str) for key, item in env.items())):
+            logger.warning("dashboard-profile-api: %s 의 %s 항목 모양이 올바르지 않아 버렸다", CONNECTOR_ROOTS_ENV, name)
+            continue
+        if not os.path.isabs(root) or (command is not None and not os.path.isabs(command)):
             logger.warning("dashboard-profile-api: %s 의 %s 경로가 절대 경로가 아니라 버렸다", CONNECTOR_ROOTS_ENV, name)
             continue
-        roots[name] = path
+        roots[name] = {"root": pathlib.Path(root), "command": command, "env": dict(env)}
     return roots
 
 
 def _connector_command() -> str | None:
-    """커넥터 MCP 서버를 실행할 파일의 절대 경로다. 없거나 절대 경로가 아니면 None 이다."""
+    """커넥터 MCP 서버를 실행할 파일의 기본 절대 경로다. 없거나 절대 경로가 아니면 None 이다."""
     command = os.environ.get(CONNECTOR_COMMAND_ENV, "").strip()
     if not command:
         return None
@@ -478,58 +531,199 @@ def _connector_command() -> str | None:
     return command
 
 
-def _connector_definition(plugin: str) -> dict:
-    """신뢰한 checkout 의 고정 manifest 만 읽고 stdio 실행을 bundle 하나로 제한한다."""
-    root = _connector_roots()[plugin]
+def _read_connector_json(root: pathlib.Path, relative: str):
+    path = root / relative
+    if path.resolve() != path or not path.is_file():
+        raise ValueError("%s 가 없거나 링크다" % relative)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _connector_fields(declared) -> list:
+    """`connector.json` 의 `fields` 를 검증한다. 틀리면 예외다."""
+    if not isinstance(declared, list) or not declared:
+        raise ValueError("fields 는 비어 있지 않은 목록이다")
+    for field in declared:
+        if (not isinstance(field, dict)
+                or not isinstance(field.get("key"), str) or not FIELD_KEY_RE.match(field["key"])
+                or not isinstance(field.get("env"), str) or not ENV_NAME_RE.match(field["env"])
+                or field["env"] in BASE_ENV_KEYS
+                or not isinstance(field.get("label"), str)
+                or not isinstance(field.get("description", ""), str)
+                or not isinstance(field.get("secret", False), bool)
+                or not isinstance(field.get("required", True), bool)):
+            raise ValueError("fields 의 칸 모양이 올바르지 않다")
+        if "pattern" in field:
+            if not isinstance(field["pattern"], str):
+                raise ValueError("pattern 은 문자열이다")
+            try:
+                re.compile(field["pattern"])
+            except re.error:
+                raise ValueError("pattern 을 정규식으로 읽지 못한다") from None
+        if "options" in field:
+            options = field["options"]
+            if (not isinstance(options, dict)
+                    or not isinstance(options.get("tool"), str) or not TOOL_NAME_RE.match(options["tool"])
+                    or any(not isinstance(options.get(name), str) for name in ("items", "value", "label"))
+                    or not isinstance(options.get("auto_select_single", False), bool)):
+                raise ValueError("options 모양이 올바르지 않다")
+    for name in ("key", "env"):
+        if len({field[name] for field in declared}) != len(declared):
+            raise ValueError("fields 의 %s 가 겹친다" % name)
+    return declared
+
+
+def _load_connector(connector_id: str, entry: dict) -> dict:
+    """plugin 디렉터리의 `connector.json`, `.mcp.json`, `plugin.json` 을 읽어 검증한다. 틀리면 예외다.
+
+    형식 규칙은 `docs/connectors.md` 의 「connector.json」 이 소유한다(ADR-043).
+    """
+    root = entry["root"]
+    if not CONNECTOR_ID_RE.match(connector_id):
+        raise ValueError("커넥터 이름이 올바르지 않다")
     if root.resolve() != root:
         raise ValueError("connector 경로에 심볼릭 링크가 있다")
-    def read(relative):
-        path = root / relative
-        if path.resolve() != path or not path.is_file():
-            raise ValueError("connector manifest 가 없거나 링크다")
-        return json.loads(path.read_text(encoding="utf-8"))
-    manifest = read(".claude-plugin/plugin.json")
-    if not isinstance(manifest, dict) or manifest.get("name") != plugin:
-        raise ValueError("connector 이름이 manifest 와 다르다")
-    mcp = read(".mcp.json")
+    plugin = _read_connector_json(root, ".claude-plugin/plugin.json")
+    if not isinstance(plugin, dict) or plugin.get("name") != connector_id:
+        raise ValueError("plugin.json 의 이름이 운영 목록과 다르다")
+
+    declared = _read_connector_json(root, "connector.json")
+    if not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] != 1:
+        raise ValueError("schema 는 1 만 받는다")
+    if declared.get("id") != connector_id:
+        raise ValueError("id 가 운영 목록의 이름과 다르다")
+    if (not isinstance(declared.get("title"), str) or not declared["title"]
+            or not isinstance(declared.get("description", ""), str)):
+        raise ValueError("title 과 description 은 문자열이다")
+    fields = _connector_fields(declared.get("fields"))
+    verify = declared.get("verify")
+    if (not isinstance(verify, dict) or not isinstance(verify.get("tool"), str)
+            or not TOOL_NAME_RE.match(verify["tool"])):
+        raise ValueError("verify.tool 은 도구 이름이다")
+    field_env = {field["env"] for field in fields}
+    operator_env = declared.get("operator_env", [])
+    if (not isinstance(operator_env, list)
+            or any(not isinstance(name, str) or not ENV_NAME_RE.match(name) or name in BASE_ENV_KEYS
+                   for name in operator_env)
+            or len(set(operator_env)) != len(operator_env) or set(operator_env) & field_env):
+        raise ValueError("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
+    if set(operator_env) - set(entry["env"]):
+        raise ValueError("operator_env 의 값이 운영 목록에 없다")
+    errors = declared.get("errors", {})
+    if not isinstance(errors, dict) or any(
+            not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
+            for code, word in errors.items()):
+        raise ValueError("errors 의 값은 공통 어휘 넷 가운데 하나다")
+
+    mcp = _read_connector_json(root, ".mcp.json")
     if not isinstance(mcp, dict):
         raise ValueError("MCP manifest 는 객체여야 한다")
     if "mcpServers" in mcp:
         if set(mcp) != {"mcpServers"}:
             raise ValueError("MCP manifest 에 다른 필드가 있다")
         mcp = mcp["mcpServers"]
-    if not isinstance(mcp, dict) or set(mcp) != {CONNECTOR_SERVER}:
-        raise ValueError("알려진 MCP 서버 하나만 허용한다")
-    server = mcp[CONNECTOR_SERVER]
+    if not isinstance(mcp, dict) or len(mcp) != 1:
+        raise ValueError("MCP 서버 하나만 허용한다")
+    mcp_server, server = next(iter(mcp.items()))
+    if not SERVER_NAME_RE.match(mcp_server) or mcp_server == CONTROL_PLANE_MCP:
+        raise ValueError("MCP 서버 이름이 올바르지 않다")
     if (not isinstance(server, dict) or set(server) - {"command", "args", "env"}
-            or server.get("command") != "bun"
-            or server.get("args") != ["${CLAUDE_PLUGIN_ROOT}/dist/accountbook-mcp.js"]):
-        raise ValueError("bun 으로 connector bundle 하나만 실행한다")
-    env = server.get("env")
-    if (not isinstance(env, dict) or not {"ACCOUNTBOOK_API_BASE_URL", "ACCOUNTBOOK_API_TOKEN"} <= set(env)
-            or set(env) - ACCOUNTBOOK_ENV_KEYS
-            or any(value != "${%s}" % key and not
-                   (key == "ACCOUNTBOOK_FAMILY_UUID" and value == "${ACCOUNTBOOK_FAMILY_UUID:-}")
-                   for key, value in env.items())):
-        raise ValueError("MCP 환경 변수는 자기 이름의 참조만 허용한다")
-    env = {key: "${%s}" % key for key in env}
-    bundle = root / "dist/accountbook-mcp.js"
-    if bundle.resolve() != bundle or not bundle.is_file():
-        raise ValueError("MCP bundle 이 없거나 링크다")
-    command = _connector_command()
+            or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):
+        raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
+    optional_env = frozenset(field["env"] for field in fields if field.get("required", True) is False)
+    if set(server["env"]) != field_env | set(operator_env):
+        raise ValueError("MCP 서버 env 가 fields 와 operator_env 의 합과 다르다")
+    for name, value in server["env"].items():
+        # 비밀값 원문이나 다른 변수의 참조를 받지 않는다. 선택 칸만 빈 기본값 참조를 쓸 수 있다.
+        if value != "${%s}" % name and not (name in optional_env and value == "${%s:-}" % name):
+            raise ValueError("MCP 서버 env 는 자기 이름의 참조만 허용한다")
+    args = []
+    for arg in server["args"]:
+        if not isinstance(arg, str):
+            raise ValueError("MCP 서버 인자는 문자열이다")
+        if arg.startswith(PLUGIN_ROOT_REF + "/"):
+            target = root / arg[len(PLUGIN_ROOT_REF) + 1:]
+            if target.resolve() != target or not target.is_relative_to(root) or not target.is_file():
+                raise ValueError("MCP 서버 인자의 파일이 plugin 안의 링크 없는 파일이 아니다")
+            arg = str(target)
+        elif "$" in arg:
+            raise ValueError("MCP 서버 인자에 plugin root 밖의 치환이 있다")
+        args.append(arg)
+    # 실행 파일은 manifest 가 정하지 못한다. 운영 목록의 값이나 기본 실행 파일만 쓴다.
+    command = entry["command"] or _connector_command()
     if command is None or not os.access(command, os.X_OK):
-        raise ValueError("bun 실행 파일이 없다")
+        raise ValueError("커넥터 실행 파일이 없거나 실행할 수 없다")
+
     # 스킬은 읽되 등록하지 않는다. persona 로 지침을 넣고 skills toolset 은 열지 않는다.
-    skills = manifest.get("skills", "./skills")
+    skills = plugin.get("skills", "./skills")
     if isinstance(skills, str):
         skills = [skills]
-    if not isinstance(skills, list) or any(not isinstance(entry, str) for entry in skills):
+    if not isinstance(skills, list) or any(not isinstance(item, str) for item in skills):
         raise ValueError("스킬 경로 목록이 올바르지 않다")
-    for entry in skills:
-        path = root / entry
+    for item in skills:
+        path = root / item
         if not path.resolve().is_relative_to(root) or not path.is_dir() or path.resolve() != path.absolute():
             raise ValueError("스킬은 plugin 안의 링크 없는 디렉터리여야 한다")
-    return {"command": command, "args": [str(bundle)], "env": env, "enabled": True}
+
+    env = {name: "${%s}" % name for name in server["env"]}
+    # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
+    env.update({name: entry["env"][name] for name in operator_env})
+    tools = {verify["tool"]} | {field["options"]["tool"] for field in fields if "options" in field}
+    return {
+        "id": connector_id,
+        "title": declared["title"],
+        "description": declared.get("description", ""),
+        "fields": fields,
+        "verify": {"tool": verify["tool"]},
+        "mcp_server": mcp_server,
+        "operator_env": frozenset(operator_env),
+        "optional_env": optional_env,
+        "errors": errors,
+        "tools": frozenset(tools),
+        "server": {"command": command, "args": args, "env": env, "enabled": True},
+    }
+
+
+def _connector_manifest(connector_id: str) -> dict | None:
+    """운영 목록에 있고 검증을 통과한 커넥터의 manifest 다. 아니면 경고 한 줄을 남기고 None 이다."""
+    entry = _connector_roots().get(connector_id)
+    if entry is None:
+        logger.warning("dashboard-profile-api: 커넥터 %r 가 운영 목록에 없다", connector_id)
+        return None
+    try:
+        return _load_connector(connector_id, entry)
+    except Exception as error:
+        # 파일 내용과 운영 경로를 로그에 싣지 않는다. 직접 낸 사유만 그대로 적는다.
+        reason = str(error) if type(error) is ValueError else type(error).__name__
+        logger.warning("dashboard-profile-api: 커넥터 %r 를 쓸 수 없다: %s", connector_id, reason)
+        return None
+
+
+def _connector_catalog() -> dict[str, dict]:
+    """운영 목록의 커넥터 가운데 검증을 통과한 manifest 다."""
+    manifests = {name: _connector_manifest(name) for name in _connector_roots()}
+    return {name: manifest for name, manifest in manifests.items() if manifest is not None}
+
+
+def _connector_env_keys() -> tuple[frozenset, frozenset]:
+    """카탈로그 manifest 의 칸 env 이름과 운영자 env 이름이다. 칸 이름과 겹치는 운영자 이름은 칸으로 본다."""
+    fields, operator = set(), set()
+    for manifest in _connector_catalog().values():
+        fields.update(field["env"] for field in manifest["fields"])
+        operator.update(manifest["operator_env"])
+    return frozenset(fields), frozenset(operator - fields)
+
+
+def _connector_server(manifest: dict) -> dict:
+    """profile 설정에 쓸 서버 정의의 사본이다."""
+    server = manifest["server"]
+    return {**server, "args": list(server["args"]), "env": dict(server["env"])}
+
+
+def _env_value(env_text: str, key: str) -> str:
+    """profile `.env` 본문에서 그 key 의 마지막 값을 읽는다. 없으면 빈 문자열이다."""
+    values = [line.partition("=")[2].strip().strip("\"'")
+              for line in env_text.splitlines() if line.startswith(key + "=")]
+    return values[-1] if values else ""
 
 
 def _atomic_private_write(path: pathlib.Path, value: bytes) -> None:
@@ -543,27 +737,55 @@ def _atomic_private_write(path: pathlib.Path, value: bytes) -> None:
         temp.unlink(missing_ok=True)
 
 
+def _server_matches(manifest: dict, server: dict) -> bool:
+    """소유 기록의 서버 정의가 지금 manifest 의 실행 정의와 같은지 본다.
+
+    칸의 env 는 자기 이름의 참조이고, 선택 칸은 명시한 빈 값도 된다.
+    운영자 env 는 옛 기록의 `${이름}` 참조와 지금 정의의 직접 값을 같다고 본다.
+    옛 판이 남긴 기록을 그대로 인정해야 이미 설치한 연결이 끊기지 않는다(ADR-041).
+    """
+    expected = manifest["server"]
+    if (server["command"] != expected["command"] or server["args"] != expected["args"]
+            or set(server["env"]) != set(expected["env"])):
+        return False
+    for name, value in server["env"].items():
+        reference = "${%s}" % name
+        if name in manifest["operator_env"]:
+            if value not in (reference, expected["env"][name]):
+                return False
+        elif value != reference and not (value == "" and name in manifest["optional_env"]):
+            return False
+    return True
+
+
 def _connector_state(value) -> dict:
-    """소유 기록도 고정 실행 계약과 boolean 필드로 검증한다."""
-    roots = _connector_roots()
-    command = _connector_command()
-    if not isinstance(value, dict) or set(value) - set(roots):
+    """소유 기록의 모양을 보고, 운영 목록의 커넥터는 지금 manifest 의 실행 정의와 맞는지 본다.
+
+    운영 목록에서 빠진 커넥터의 기록은 모양만 본다. 그 기록으로는 설치를 끄는 것만 한다.
+    """
+    if not isinstance(value, dict):
         raise ValueError("connector 소유 기록이 올바르지 않다")
+    roots = _connector_roots()
     for plugin, entry in value.items():
-        if (not isinstance(entry, dict) or set(entry) != {"server", "allowlist_added"}
-                or not isinstance(entry["allowlist_added"], bool)):
+        if (not isinstance(entry, dict) or not {"server", "allowlist_added"} <= set(entry)
+                or set(entry) - {"server", "allowlist_added", "mcp_server"}
+                or not isinstance(entry["allowlist_added"], bool)
+                or not isinstance(entry.get("mcp_server", ""), str)):
             raise ValueError("connector 소유 기록의 필드가 올바르지 않다")
         server = entry["server"]
         if (not isinstance(server, dict) or set(server) != {"command", "args", "env", "enabled"}
-                or command is None or server["command"] != command or server["enabled"] is not True
-                or server["args"] != [str(roots[plugin] / "dist/accountbook-mcp.js")]):
-            raise ValueError("소유 기록의 실행 정의가 알려진 connector 가 아니다")
-        env = server["env"]
-        if (not isinstance(env, dict) or set(env) - ACCOUNTBOOK_ENV_KEYS
-                or not {"ACCOUNTBOOK_API_BASE_URL", "ACCOUNTBOOK_API_TOKEN"} <= set(env)
-                or any(v != "${%s}" % k and not (k == "ACCOUNTBOOK_FAMILY_UUID" and v == "")
-                       for k, v in env.items())):
-            raise ValueError("소유 기록의 환경 변수가 알려진 참조가 아니다")
+                or not isinstance(server["command"], str) or server["enabled"] is not True
+                or not isinstance(server["args"], list) or any(not isinstance(arg, str) for arg in server["args"])
+                or not isinstance(server["env"], dict)
+                or any(not isinstance(name, str) or not isinstance(item, str)
+                       for name, item in server["env"].items())):
+            raise ValueError("소유 기록의 실행 정의 모양이 올바르지 않다")
+        if plugin not in roots:
+            continue
+        manifest = _connector_manifest(plugin)
+        if (manifest is None or not _server_matches(manifest, server)
+                or entry.get("mcp_server", manifest["mcp_server"]) != manifest["mcp_server"]):
+            raise ValueError("소유 기록의 실행 정의가 지금 connector 와 다르다")
     return value
 
 
@@ -584,37 +806,56 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     state = _connector_state(json.loads(originals[state_path])) if originals[state_path] else {}
     servers = dict(saved.get("mcp_servers") or {})
     owned = state.get(plugin)
-    if CONNECTOR_SERVER in servers and (not owned or servers[CONNECTOR_SERVER] != owned["server"]):
+    listed = plugin in _connector_roots()
+    manifest = _connector_manifest(plugin) if listed else None
+    if manifest is not None:
+        name = manifest["mcp_server"]
+    elif enabled:
+        raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
+    elif not owned:
+        # 끌 것이 없다. 운영 목록에서 빠진 연결의 해제가 끝까지 가도록 성공으로 답한다.
+        return {"changed": False, "restart_required": False}
+    else:
+        # 운영 목록에서 빠진 커넥터다. 옛 기록에는 서버 이름이 없어 기록과 같은 정의를 설정에서 찾는다.
+        name = owned.get("mcp_server") or next(
+            (key for key, value in servers.items() if value == owned["server"]), None)
+        if name is None:
+            raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌거나 바뀌었다")
+    if name in servers and (not owned or servers[name] != owned["server"]):
         raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
-    if owned and CONNECTOR_SERVER not in servers:
+    if owned and name not in servers:
         raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌다")
     allowed = list((saved.get("platform_toolsets") or {}).get("api_server") or [])
     if CONTROL_PLANE_MCP not in allowed or "memory" in allowed or "no_mcp" in allowed:
         raise ValueError("Control Plane MCP 를 허용한 API 도구 목록이 필요하다")
     env_text = originals[env_path].decode("utf-8") if originals[env_path] else ""
+    values = {}
     if enabled:
-        server = _connector_definition(plugin)
-        # Hermes 는 빈 변수의 참조를 그대로 남긴다. 선택한 가족이 없으면 빈 값을 명시한다.
-        family_lines = [line.partition("=")[2].strip().strip("\"'")
-                        for line in env_text.splitlines() if line.startswith("ACCOUNTBOOK_FAMILY_UUID=")]
-        if not family_lines or not family_lines[-1]:
-            if "ACCOUNTBOOK_FAMILY_UUID" in server["env"]:
-                server["env"]["ACCOUNTBOOK_FAMILY_UUID"] = ""
-        added = owned["allowlist_added"] if owned else CONNECTOR_SERVER not in allowed
-        servers[CONNECTOR_SERVER] = server
-        if CONNECTOR_SERVER not in allowed:
-            allowed.append(CONNECTOR_SERVER)
-        state[plugin] = {"server": server, "allowlist_added": added}
-    else:
-        if owned:
-            servers.pop(CONNECTOR_SERVER, None)
-            if owned["allowlist_added"]:
-                allowed = [name for name in allowed if name != CONNECTOR_SERVER]
-            state.pop(plugin, None)
+        server = _connector_server(manifest)
+        # Hermes 는 빈 변수의 참조를 그대로 남긴다. 값이 없는 선택 칸은 빈 값을 명시한다.
+        for env_name in manifest["optional_env"]:
+            if not _env_value(env_text, env_name):
+                server["env"][env_name] = ""
+        added = owned["allowlist_added"] if owned else name not in allowed
+        servers[name] = server
+        if name not in allowed:
+            allowed.append(name)
+        state[plugin] = {"server": server, "allowlist_added": added, "mcp_server": name}
+    elif owned:
+        servers.pop(name, None)
+        if owned["allowlist_added"]:
+            allowed = [item for item in allowed if item != name]
+        state.pop(plugin, None)
+        if manifest is None and originals[env_path] is not None:
+            # Control Plane 은 목록에서 빠진 커넥터의 env 이름을 모른다. 기록이 참조하던 key 를 여기서 지운다.
+            referenced = {key for key, value in owned["server"]["env"].items() if value == "${%s}" % key}
+            kept = [line for line in env_text.splitlines(keepends=True)
+                    if line.partition("=")[0] not in referenced]
+            values[env_path] = "".join(kept).encode("utf-8")
     updated = {**saved, "mcp_servers": servers,
                "platform_toolsets": {**(saved.get("platform_toolsets") or {}), "api_server": allowed}}
     values = {config_path: yaml.safe_dump(updated, sort_keys=False, allow_unicode=True).encode(),
-              state_path: (json.dumps(state) + "\n").encode()}
+              state_path: (json.dumps(state) + "\n").encode(), **values}
     if all(originals[path] == value for path, value in values.items()):
         return {"changed": False, "restart_required": bool(owned)}
     backup = profile_dir / "connector-backups" / str(time.time_ns())
@@ -649,6 +890,7 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
 async def _connector_request(request):
     from hermes_cli.profiles import get_profile_dir
     from starlette.responses import JSONResponse
+    roots = _connector_roots()
     if request.method.upper() == "GET":
         profiles = request.query_params.getlist("profile")
         if len(profiles) != 1 or set(request.query_params.keys()) != {"profile"}:
@@ -656,9 +898,11 @@ async def _connector_request(request):
         body = {"profile": profiles[0]}
     else:
         body = await _json_object(request)
+        # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
         if (body is None or set(body) != {"profile", "plugin", "enabled"}
-                or not isinstance(body["plugin"], str) or body["plugin"] not in _connector_roots()
-                or not isinstance(body["enabled"], bool)):
+                or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
+                or not isinstance(body["enabled"], bool)
+                or (body["enabled"] and body["plugin"] not in roots)):
             return _rejected("profile, 알려진 plugin, enabled 만 필요하다")
     rejected = _profile_rejection(body["profile"], request)
     if rejected is not None:
@@ -676,9 +920,16 @@ async def _connector_request(request):
             state_path = profile_dir / CONNECTOR_STATE
             state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.exists() else {}
             servers = config.get("mcp_servers") or {}
-            connectors = [{"plugin": plugin, "enabled": plugin in state,
-                           "configured": plugin in state and servers.get(CONNECTOR_SERVER) == state[plugin]["server"]}
-                          for plugin in _connector_roots()]
+            connectors = []
+            for plugin in roots:
+                manifest = _connector_manifest(plugin)
+                connectors.append({
+                    "plugin": plugin, "enabled": plugin in state,
+                    "configured": (plugin in state and manifest is not None
+                                   and servers.get(manifest["mcp_server"]) == state[plugin]["server"])})
+            # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
+            connectors.extend({"plugin": plugin, "enabled": True, "configured": False}
+                              for plugin in state if plugin not in roots)
             return JSONResponse({"profile": body["profile"], "connectors": connectors}, status_code=200)
         result = await asyncio.to_thread(_connector_config, profile_dir, body["plugin"], body["enabled"])
         return JSONResponse({**body, **result}, status_code=200)
@@ -689,11 +940,124 @@ async def _connector_request(request):
         return _rejected("connector 파일 또는 설정을 확인하지 못했다", 503)
 
 
+def _connector_catalog_response():
+    """검증을 통과한 커넥터의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표는 담지 않는다."""
+    from starlette.responses import JSONResponse
+
+    return JSONResponse(
+        [{"id": manifest["id"], "title": manifest["title"], "description": manifest["description"],
+          "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"]}
+         for manifest in _connector_catalog().values()],
+        status_code=200,
+    )
+
+
+async def _run_connector_tool(manifest: dict, tool: str, env: dict):
+    """커넥터 MCP 서버를 자식 프로세스로 한 번 띄워 도구 하나를 부르고 닫는다.
+
+    도구가 `tools/list` 에서 읽기 전용이 아니면 부르지 않고 None 을 돌려준다.
+    `mcp` 는 여기서 import 한다. SDK 가 없는 환경에서도 plugin 이 올라오고 이 경로만 실패한다.
+    """
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    server = manifest["server"]
+    params = StdioServerParameters(command=server["command"], args=list(server["args"]), env=env)
+    # 자식의 stderr 에 무엇이 찍힐지 모른다. 후보 값이 대시보드 로그로 가지 않게 버린다.
+    with open(os.devnull, "w", encoding="utf-8") as sink:
+        async with stdio_client(params, errlog=sink) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                listed = await session.list_tools()
+                annotations = next((item.annotations for item in listed.tools if item.name == tool), None)
+                if annotations is None or annotations.read_only_hint is not True:
+                    return None
+                return await session.call_tool(tool, {})
+
+
+def _connector_call_answer(manifest: dict, result) -> dict:
+    """도구 결과를 `{ok, result}` 나 `{ok, error}` 로 바꾼다. 읽지 못한 결과는 `unavailable` 이다."""
+    payload = getattr(result, "structured_content", None)
+    if payload is None:
+        try:
+            text = next(item.text for item in getattr(result, "content", None) or []
+                        if getattr(item, "type", None) == "text")
+            payload = json.loads(text)
+        except (StopIteration, ValueError, TypeError):
+            return {"ok": False, "error": "unavailable"}
+    if getattr(result, "is_error", False):
+        error = payload.get("error") if isinstance(payload, dict) else None
+        code = error.get("code") if isinstance(error, dict) else None
+        word = manifest["errors"].get(code, "unavailable") if isinstance(code, str) else "unavailable"
+        return {"ok": False, "error": word}
+    return {"ok": True, "result": payload}
+
+
+async def _connector_call_request(request, connector_id: str):
+    """후보 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값을 디스크와 응답과 로그에 남기지 않는다."""
+    from starlette.responses import JSONResponse
+    global _connector_calls
+
+    def failed(word):
+        return JSONResponse({"ok": False, "error": word}, status_code=200)
+
+    manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
+    if manifest is None:
+        return _rejected("없는 connector 다", 404)
+    body = await _json_object(request)
+    if body is None or set(body) != {"tool", "values"} or not isinstance(body["values"], dict):
+        return _rejected("tool 과 values 만 필요하다")
+    tool = body["tool"]
+    if not isinstance(tool, str) or tool not in manifest["tools"]:
+        return _rejected("이 커넥터가 선택지나 확인에 쓰는 도구가 아니다")
+    fields = {field["key"]: field for field in manifest["fields"]}
+    env = {}
+    for key, value in body["values"].items():
+        field = fields.get(key)
+        if field is None or not isinstance(value, str) or any(ch in value for ch in "\r\n\0"):
+            return failed("invalid_input")
+        # 비운 선택 칸은 형식을 보지 않는다. 필수 칸은 빈 값도 형식에 맞아야 한다.
+        if "pattern" in field and (value or field.get("required", True)) and not re.fullmatch(field["pattern"], value):
+            return failed("invalid_input")
+        env[field["env"]] = value
+    server = manifest["server"]
+    env.update({name: server["env"][name] for name in manifest["operator_env"]})
+    # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
+    env["PATH"] = os.path.dirname(server["command"])
+
+    # 줄을 세우지 않는다. 가득 차 있으면 기다리는 동안 요청이 쌓여 대시보드가 느려진다.
+    if _connector_calls >= CONNECTOR_CALL_LIMIT:
+        logger.warning("dashboard-profile-api: 커넥터 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
+        return failed("unavailable")
+    _connector_calls += 1
+    try:
+        # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
+        result = await asyncio.wait_for(_run_connector_tool(manifest, tool, env), CONNECTOR_CALL_TIMEOUT_SECONDS)
+    except ImportError:
+        logger.warning("dashboard-profile-api: mcp SDK 를 읽어 오지 못해 커넥터 도구를 부르지 못했다")
+        return failed("unavailable")
+    except asyncio.TimeoutError:
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, tool)
+        return failed("unavailable")
+    except Exception as error:
+        # 예외 본문에는 자식의 출력이 섞일 수 있다. 종류만 남긴다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s",
+                       connector_id, tool, type(error).__name__)
+        return failed("unavailable")
+    finally:
+        _connector_calls -= 1
+    if result is None:
+        return _rejected("읽기 전용 도구가 아니다")
+    return JSONResponse(_connector_call_answer(manifest, result), status_code=200)
+
+
 async def _check_connector_probe(request):
+    """probe 는 그 profile 에 설치한 커넥터의 MCP 서버 이름일 때만 넘긴다."""
     rejected = await _check_skills_list(request)
     if rejected is not None:
         return rejected
     from hermes_cli.profiles import get_profile_dir
+    server = PROBE_ROUTE_RE.match(request.url.path).group(1)
     profile_dir = get_profile_dir(request.query_params.getlist("profile")[0])
     if not (profile_dir / MANAGED_MARKER).is_file():
         return _rejected("관리 표식이 없는 profile 이다", 401)
@@ -702,16 +1066,17 @@ async def _check_connector_probe(request):
         import yaml
         if not state_path.is_file():
             return _rejected("설치하지 않은 connector 다", 404)
-        owned = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))).get("fos-accountbook")
+        # 기록을 검증하면서 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
+        state = _connector_state(json.loads(state_path.read_text(encoding="utf-8")))
+        roots = _connector_roots()
+        owned = next((entry for plugin, entry in state.items() if plugin in roots
+                      and (_connector_manifest(plugin) or {}).get("mcp_server") == server), None)
         if not owned:
             return _rejected("설치하지 않은 connector 다", 404)
         config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8")) or {}
-        if (config.get("mcp_servers") or {}).get(CONNECTOR_SERVER) != owned["server"]:
+        if (config.get("mcp_servers") or {}).get(server) != owned["server"]:
             return _rejected("운영자 설정과 충돌한다", 409)
-        definition = _connector_definition("fos-accountbook")
-        if owned["server"]["env"].get("ACCOUNTBOOK_FAMILY_UUID") == "":
-            definition["env"]["ACCOUNTBOOK_FAMILY_UUID"] = ""
-        if definition != owned["server"] or CONNECTOR_SERVER not in (config.get("platform_toolsets") or {}).get("api_server", []):
+        if server not in (config.get("platform_toolsets") or {}).get("api_server", []):
             return _rejected("현재 manifest 와 profile 설정이 다르다", 409)
     except Exception:
         return _rejected("connector 설정을 확인하지 못했다", 503)
@@ -1084,15 +1449,21 @@ def _install_gate() -> bool:
             _restore_config(checked[0], checked[1], written)
         if request.url.path == "/api/env" and response.status_code < 400:
             body = await _json_object(request)
-            if body and body.get("key") in ACCOUNTBOOK_ENV_KEYS:
+            # 그 key 를 칸으로 가진 커넥터다. 기본 key 는 여기 걸리지 않는다.
+            owners = [manifest for manifest in _connector_catalog().values()
+                      if body and any(field["env"] == body.get("key") for field in manifest["fields"])]
+            if owners:
                 from hermes_cli.profiles import get_profile_dir
                 from starlette.responses import JSONResponse
                 state_path = get_profile_dir(body["profile"]) / CONNECTOR_STATE
-                installed = state_path.exists() and "fos-accountbook" in json.loads(state_path.read_text(encoding="utf-8"))
-                if installed and body["key"] == "ACCOUNTBOOK_FAMILY_UUID":
+                state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+                installed = [manifest for manifest in owners if manifest["id"] in state]
+                for manifest in installed:
+                    if body["key"] not in manifest["optional_env"]:
+                        continue
                     try:
-                        # 선택하지 않은 가족의 명시적 빈 값도 갱신한다. 재시작만으로는 바뀌지 않는다.
-                        await asyncio.to_thread(_connector_config, get_profile_dir(body["profile"]), "fos-accountbook", True)
+                        # 비운 선택 칸의 명시적 빈 값도 갱신한다. 재시작만으로는 바뀌지 않는다.
+                        await asyncio.to_thread(_connector_config, get_profile_dir(body["profile"]), manifest["id"], True)
                     except FileExistsError:
                         return _rejected("환경 변수는 저장했지만 connector 설정과 충돌한다", 409)
                     except (ValueError, OSError, KeyError, TypeError):
@@ -1114,12 +1485,23 @@ def _install_gate() -> bool:
         path = request.url.path
         method = request.method.upper()
 
-        if path == "/api/connectors" and method in {"GET", "PUT"}:
+        call = CALL_ROUTE_RE.match(path) if method == "POST" else None
+        if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
+                or (path == CATALOG_PATH and method == "GET") or call is not None):
             principal, _ = seam.authenticate_token(request)
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
+            if path == CATALOG_PATH:
+                return _connector_catalog_response()
+            if call is not None:
+                # profile 쓰기 잠금 밖에서 돈다. 안에서 돌면 도구를 기다리는 동안 모든 profile 요청이 멈춘다.
+                return await _connector_call_request(request, call.group(1))
             async with PROFILE_WRITE_LOCK:
                 return await _connector_request(request)
+
+        if method == "POST" and PROBE_ROUTE_RE.match(path):
+            async with PROFILE_WRITE_LOCK:
+                return await machine_gate(request, call_next, _check_connector_probe)
 
         if method == "DELETE":
             name = _profile_segment(path)
@@ -1183,12 +1565,14 @@ def register(ctx) -> None:
     opened = {}
     for path, method in ALLOWED_ROUTES:
         opened.setdefault(path, []).append(method)
-    opened["/api/connectors"] = ["GET", "PUT"]
+    opened[CONNECTORS_PATH] = ["GET", "PUT"]
+    opened[CATALOG_PATH] = ["GET"]
     logger.info(
         "dashboard-profile-api: %s 를 토큰으로 연다. 스킬 루트는 %s 다",
         ", ".join(
             ["%s %s" % (" ".join(sorted(methods)), path) for path, methods in sorted(opened.items())]
-            + ["GET PUT /api/profiles/<이름>/soul", "DELETE /api/profiles/<관리 표식 profile>"]
+            + ["GET PUT /api/profiles/<이름>/soul", "DELETE /api/profiles/<관리 표식 profile>",
+               "POST /api/connectors/<id>/call", "POST /api/mcp/servers/<설치한 커넥터의 서버>/test"]
         ),
         _skill_root() or "설정되지 않음",
     )

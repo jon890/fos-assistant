@@ -45,24 +45,27 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | 값 | 어디서 받나 |
 | --- | --- |
 | Control Plane MCP 주소 | 묶음을 만들 때 `--mcp-url` |
-| 커넥터 plugin 경로 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS`. `{"<커넥터 이름>": "<plugin 디렉터리>"}` 모양의 JSON 이다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
-| 커넥터 실행 파일 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 없거나 절대 경로가 아니면 커넥터를 쓸 수 없는 것으로 본다 |
+| 커넥터 목록 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS`. 값마다 문자열(plugin 디렉터리)이나 `{"root": "<plugin 디렉터리>", "command": "<실행 파일>", "env": {"<operator_env 이름>": "<값>"}}` 다. `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 이 목록에 있고 `connector.json` 검증을 통과한 것만 카탈로그에 나온다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
+| 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` |
 | 스킬 루트 | 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` |
 
 **plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받는다.** 운영은 plugin 을 먼저 올리고 Control Plane 을 올린다.
 경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
 
-검사는 `python3 -m unittest discover -s hermes/tests` 로 돈다. 필요한 것은 Python 3.13 과 PyYAML 뿐이다. Hermes 이미지와 같은 판이다.
+검사는 `python3 -m unittest discover -s hermes/tests` 로 돈다. 필요한 것은 Python 3.13 과 PyYAML 과 `mcp` SDK 다. Hermes 이미지와 같은 판이다.
+대시보드 plugin 은 커넥터 도구를 부를 때만 `mcp` SDK 를 쓴다. SDK 가 없어도 plugin 은 올라오고 그 경로만 `unavailable` 로 답한다.
 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
 
 ## backend 패키지
 
-`connector`는 사용자별 가계부 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
-Hermes의 이름 기반 plugin 설치와 env 삭제, MCP probe는 `hermes`가 HTTP로 호출한다.
-외부 가계부 토큰 검증은 `connector/infra`가 공통 설정 주소로 호출한다.
-웹은 `components/connector`와 `app/connections/accountbook`, 대응 서버 라우트가 맡는다.
-계약은 [가계부 연결](connectors.md)에 있다.
+`connector`는 커넥터 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
+특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
+웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
+`test/unit/connector-neutral.test.ts` 가 `backend/src/main` 과 `web/src` 에 특정 서비스 이름이 들어오지 않았는지 본다.
+예외는 셋이다. 옛 표를 만든 V36 과 그 행을 옮기는 V38 은 이관 기록이라 이름을 갖는다. `web/src/app/connections/accountbook/page.tsx` 는 전용 화면이 있던 옛 주소를 새 연결 화면으로 넘기려고 커넥터 번호를 갖는다. 이 페이지는 옛 주소로 들어오는 사용자가 없어지면 지운다.
+계약은 [커넥터 연결](connectors.md)에 있다.
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
 `presentation` 은 `infra` 를 바로 쓰지 않는다.

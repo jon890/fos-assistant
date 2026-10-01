@@ -1,29 +1,34 @@
 # 흐름
 
-## 가계부 연결
+## 커넥터 연결
 
 ```mermaid
 flowchart TD
-    A[토큰과 선택 가족 제출] --> B[로그인 사용자 확인과 토큰 검증]
-    B -->|인증 실패 또는 가족 권한 없음| X[고정 오류]
-    B --> C[사용자 행 잠금과 전용 에이전트 바인딩]
+    L[연결 목록: 카탈로그와 내 상태] --> S[커넥터 선택: manifest 로 입력 칸을 그림]
+    S --> O[비밀 칸 입력 뒤 선택지 조회: call options.tool]
+    O -->|credential_rejected, forbidden, unavailable| X[고정 오류, 아무것도 저장하지 않음]
+    O --> A[값 제출]
+    A --> V[call verify.tool]
+    V -->|실패| X
+    V --> C[사용자 행 잠금과 전용 에이전트 바인딩]
     C --> D[에이전트 비활성화와 PENDING 저장]
-    D --> T[API 도구 목록을 fos-assistant 하나로 줄임]
-    T -->|실패| P
-    T --> E[profile env와 이름 기반 plugin 설치]
-    E -->|실패 또는 재시작 필요| P[PENDING 유지]
-    E --> F[설치 조회, 켜진 내장 도구가 있으면 목록 다시 씀, MCP probe]
+    D --> E[칸마다 env 쓰기, API 도구 목록을 fos-assistant 하나로, 설치]
+    E -->|실패| P[PENDING 유지와 CONNECTOR_OPERATION_FAILED]
+    E -->|재시작 필요| W[재시작 대기]
+    E --> P2[PENDING, desired_enabled 참]
+    P2 -->|연결 확인| F[설치 조회, 내장 도구가 보이면 목록 다시 씀, MCP probe]
     F -->|도구 확인 성공과 재시작 불필요| R[READY와 에이전트 활성화]
     F -->|실패| P
-    P -->|연결 확인| F
-    R -->|해제| U[비활성화 후 토큰 삭제와 plugin 해제]
+    W -->|관리자가 공유 gateway 재시작 뒤 반영 완료| F
+    R -->|해제| U[비활성화 뒤 env 삭제와 설치 해제]
     U -->|실패| P
     U --> Z[DISCONNECTED]
 ```
 
-동일 사용자의 요청은 잠금으로 순서대로 처리한다.
+같은 사용자의 요청은 사용자 행 잠금으로 차례로 처리한다. 선택지 조회와 확인 도구 호출은 저장하지 않으므로 잠그지 않는다.
 실패한 외부 호출이 에이전트 비활성화를 되돌리지 않아야 한다.
-API와 저장 계약은 [가계부 연결](connectors.md)이 갖는다.
+운영 목록에서 빠진 커넥터의 기존 연결은 목록에 「쓸 수 없음」 으로 보이고 해제만 된다.
+API 와 저장 계약은 [커넥터 연결](connectors.md)이 갖는다.
 
 화면 전환과 호출 순서를 담는다.
 모듈 배치는 [`code-architecture.md`](code-architecture.md), 저장 모델은 [`data-schema.md`](data-schema.md)가 가진다.

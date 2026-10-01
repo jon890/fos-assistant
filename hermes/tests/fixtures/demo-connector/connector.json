@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "demo-notes",
+  "title": "검사용 메모",
+  "description": "검사에서만 쓰는 커넥터입니다.",
+  "fields": [
+    { "key": "token", "env": "DEMO_TOKEN", "label": "토큰",
+      "description": "검사용 토큰입니다.",
+      "secret": true, "required": true, "pattern": "^demo_[a-z]+_[0-9]{10}$" },
+    { "key": "scope", "env": "DEMO_SCOPE", "label": "범위", "required": false,
+      "options": { "tool": "list_scopes", "items": "scopes", "value": "id",
+                   "label": "name", "auto_select_single": true } }
+  ],
+  "verify": { "tool": "list_scopes" },
+  "operator_env": ["DEMO_BASE"],
+  "errors": { "DEMO_UNAUTHORIZED": "credential_rejected",
+              "DEMO_FORBIDDEN": "forbidden",
+              "DEMO_UNAVAILABLE": "unavailable" }
+}

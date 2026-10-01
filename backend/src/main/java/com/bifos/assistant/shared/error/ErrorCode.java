@@ -122,9 +122,15 @@ public enum ErrorCode {
      */
     SKILL_COMMAND_UNKNOWN(HttpStatus.BAD_REQUEST),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
-    ACCOUNTBOOK_TOKEN_REJECTED(HttpStatus.BAD_REQUEST),
-    ACCOUNTBOOK_FAMILY_FORBIDDEN(HttpStatus.FORBIDDEN),
-    ACCOUNTBOOK_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    /** 커넥터의 확인 도구가 입력한 값을 거절했다. 공통 어휘 {@code credential_rejected} 다(ADR-043). */
+    CONNECTOR_CREDENTIAL_REJECTED(HttpStatus.BAD_REQUEST),
+    /** 입력한 값으로는 그 대상에 접근할 수 없다. 공통 어휘 {@code forbidden} 이다. */
+    CONNECTOR_FORBIDDEN(HttpStatus.FORBIDDEN),
+    /** 커넥터의 서비스나 카탈로그에 닿지 못했다. 공통 어휘 {@code unavailable} 이다. */
+    CONNECTOR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    /** 카탈로그에 없고 그 사용자의 연결도 없는 커넥터다. */
+    CONNECTOR_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 외부 설치, 확인, 해제가 실패했다. */
     CONNECTOR_OPERATION_FAILED(HttpStatus.BAD_GATEWAY),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),

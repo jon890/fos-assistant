@@ -1,123 +1,145 @@
-# 가계부 연결
+# 커넥터 연결
 
-사용자는 `/connections/accountbook`에서 가계부 개인 연동 토큰을 등록한다.
-연결은 사용자별 전용 profile과 비공개 에이전트를 갖는다.
-임의 plugin을 설치하는 화면은 제공하지 않는다.
+사용자는 「연결」 화면에서 외부 서비스의 개인 토큰을 넣어 그 서비스 전용 에이전트를 만든다.
+연결은 사용자별 전용 profile 과 비공개 에이전트를 갖는다([ADR-039](adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)).
+어떤 커넥터가 있고 무엇을 입력받는지는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 서비스 이름과 주소를 모른다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+임의 plugin 을 설치하는 화면은 없다. 연결할 수 있는 커넥터는 운영자가 대시보드 plugin 에 준 목록뿐이다.
 
-## API와 상태
+## connector.json
+
+plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같은 디렉터리의 `.mcp.json` 이 MCP 서버 하나를 정의하고, `connector.json` 은 그 서버를 사람에게 어떻게 연결하는지를 정한다.
+
+```json
+{
+  "schema": 1,
+  "id": "fos-accountbook",
+  "title": "가계부",
+  "description": "가족 가계부의 수입과 지출을 조회하고 기록합니다.",
+  "fields": [
+    { "key": "token", "env": "ACCOUNTBOOK_API_TOKEN", "label": "연동 토큰",
+      "description": "가계부 설정 화면에서 발급합니다.",
+      "secret": true, "required": true, "pattern": "^fab_[A-Za-z0-9_-]{43}$" },
+    { "key": "family", "env": "ACCOUNTBOOK_FAMILY_UUID", "label": "가족", "required": false,
+      "options": { "tool": "list_families", "items": "families", "value": "uuid",
+                   "label": "name", "auto_select_single": true } }
+  ],
+  "verify": { "tool": "list_families" },
+  "operator_env": ["ACCOUNTBOOK_API_BASE_URL"],
+  "errors": { "ACCOUNTBOOK_UNAUTHORIZED": "credential_rejected",
+              "ACCOUNTBOOK_FORBIDDEN": "forbidden",
+              "ACCOUNTBOOK_NETWORK": "unavailable",
+              "ACCOUNTBOOK_UNAVAILABLE": "unavailable" }
+}
+```
+
+| 칸 | 뜻 |
+| --- | --- |
+| `schema` | 지금은 `1` 만 받는다 |
+| `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
+| `title`, `description` | 화면에 그대로 보인다. 전용 에이전트의 이름은 `title` 이다 |
+| `fields[].key` | 칸 번호. 요청의 `values` 와 저장의 키다. `^[a-z][a-z0-9_]{0,31}$`, 커넥터 안에서 유일 |
+| `fields[].env` | 이 칸 값을 쓸 profile `.env` 이름. `.mcp.json` 의 서버 env 가 `${이름}` 으로 참조해야 한다 |
+| `fields[].secret` | 참이면 화면이 가리고, 저장은 앞 8자만, 응답에 원문을 담지 않는다. 값이 8자 이하이면 앞부분도 저장하지 않는다 |
+| `fields[].required` | 거짓이면 비워 둘 수 있다. 비우면 그 env 를 지운다 |
+| `fields[].pattern` | 있으면 Control Plane 과 대시보드가 모두 검사한다 |
+| `fields[].options` | 선택지 칸. `tool` 을 불러 결과의 `items` 배열에서 `value`, `label` 칸을 꺼낸다. `auto_select_single` 이 참이면 하나뿐일 때 화면이 고른다 |
+| `verify.tool` | 등록 전에 후보 값으로 부르는 확인 도구. 성공하면 값이 유효하다고 본다 |
+| `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다 |
+| `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 표에 없는 코드는 `unavailable` 이다 |
+
+- `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
+- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env` 의 합과 같아야 한다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
+- 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
+
+공통 오류 어휘는 넷이다.
+
+| 어휘 | Control Plane 오류 코드 | HTTP |
+| --- | --- | --- |
+| `credential_rejected` | `CONNECTOR_CREDENTIAL_REJECTED` | 400 |
+| `forbidden` | `CONNECTOR_FORBIDDEN` | 403 |
+| `invalid_input` | `VALIDATION_FAILED` | 400 |
+| `unavailable` | `CONNECTOR_UNAVAILABLE` | 503 |
+
+## Control Plane API
 
 | 경로 | 요청 | 결과 |
 | --- | --- | --- |
-| `GET /api/v1/connections/accountbook` | 없음 | 자신의 연결 상태 |
-| `POST /api/v1/connections/accountbook/families` | `token` | 토큰 주인의 가족 목록 `uuid`, `name` |
-| `POST /api/v1/connections/accountbook` | `token`, 선택 `familyUuid` | 등록 또는 토큰 교체 |
-| `POST /api/v1/connections/accountbook/check` | 없음 | 설치 상태와 MCP probe 재확인 |
-| `DELETE /api/v1/connections/accountbook` | 없음 | 토큰 제거와 에이전트 비활성화 |
-| `GET /api/v1/admin/connections/accountbook` | 없음 | 같은 그룹의 연결 목록, ADMIN 전용 |
-| `POST /api/v1/admin/connections/accountbook/{userId}/confirm` | 없음 | 운영 반영 완료 확인, ADMIN 전용 |
+| `GET /api/v1/connectors` | 없음 | `[{id, title, description, fields[], myStatus, available}]`. `fields[]` 는 `key, label, description, secret, required, pattern, hasOptions, autoSelectSingle` 만 담는다 |
+| `GET /api/v1/connections/{id}` | 없음 | 자기 연결 상태 |
+| `POST /api/v1/connections/{id}/options/{fieldKey}` | `{values}` | `[{value, label}]`. 아무것도 저장하지 않는다 |
+| `POST /api/v1/connections/{id}` | `{values}` | 등록 또는 값 교체. 확인 도구가 통과해야 저장한다 |
+| `POST /api/v1/connections/{id}/check` | 없음 | 설치 상태와 MCP probe 재확인 |
+| `DELETE /api/v1/connections/{id}` | 없음 | env 제거와 에이전트 비활성화 |
+| `GET /api/v1/admin/connections` | 없음 | 같은 그룹의 연결 목록. ADMIN 전용 |
+| `POST /api/v1/admin/connections/{id}/{userId}/confirm` | 없음 | 운영 반영 완료 확인. ADMIN 전용 |
 
-상태 응답은 `status`, `tokenPrefix`, `familyUuid`, `checkedAt`, `agentCode`, `restartRequired`를 갖는다.
-관리자 목록은 `userId`, `displayName`, `status`, `agentCode`, `restartRequired`만 반환한다.
-다른 사용자의 토큰 앞부분과 가족 UUID는 목록에 넣지 않는다.
-등록 전에는 `DISCONNECTED`이며 선택 값은 null이다.
-`PENDING`은 토큰을 등록했으나 실행 준비가 끝나지 않은 상태다.
-`READY`는 설치가 켜져 있고 재시작이 필요 없으며 MCP probe에서 가계부 도구를 확인한 상태다.
-probe는 공유 gateway의 실제 실행 확인을 대신하지 않는다.
-운영에서 실제 도구를 호출하는 확인은 `fos-home-infra`가 맡는다.
+- 상태 응답은 `connectorId`, `status`, `secretPrefixes{key: 앞 8자}`, `values{key: 값}`, `checkedAt`, `agentCode`, `restartRequired` 를 갖는다. 등록 전에는 `DISCONNECTED` 이고 나머지는 비거나 null 이다
+- 관리자 목록 항목은 `connectorId`, `userId`, `displayName`, `status`, `agentCode`, `restartRequired` 만 담는다. 다른 사용자의 칸 값과 비밀 앞부분은 넣지 않는다
+- 모르는 `id` 는 `CONNECTOR_NOT_FOUND`(404) 다. 운영 목록에서 빠진 커넥터의 기존 연결은 읽기와 해제만 된다
+- 목록의 `available` 은 그 커넥터가 지금 카탈로그에 있는지다. 카탈로그에서 빠졌지만 내 연결이 `DISCONNECTED` 가 아닌 커넥터는 `available: false`, 빈 `fields`, 빈 `description` 으로 함께 낸다. 이때 `title` 은 전용 에이전트의 이름이다. 화면이 해제하러 들어갈 길을 남기기 위해서다
+- `values` 의 키는 그 커넥터의 `fields[].key` 만 받는다. 모르는 키, 필수 칸 누락, `pattern` 불일치는 `VALIDATION_FAILED` 다. 비밀이 아닌 칸의 값은 500자까지, 비밀 칸의 값은 4096자까지다. 저장할 칸 값 전체가 `fields` 열에 들어가지 않아도 같은 오류다. 외부에 반영하기 전에 검사한다
+- 선택지와 확인은 후보 값을 저장하지 않고 응답에 되돌려 담지 않는다
+- 외부 설치, 확인, 해제가 실패하면 `CONNECTOR_OPERATION_FAILED`(502) 다
+- `PENDING` 은 값을 등록했으나 실행 준비가 끝나지 않은 상태, `READY` 는 설치가 켜져 있고 재시작이 필요 없으며 MCP probe 에서 도구를 확인한 상태다. probe 는 공유 gateway 의 실제 실행 확인을 대신하지 않는다
 
-등록 요청은 profile, 사용자 번호, plugin 경로, MCP 정의를 받지 않는다.
-화면은 토큰으로 가족 목록을 불러오며 가족이 하나면 자동으로 고른다.
-여럿이면 사용자가 선택한 가족 UUID를 등록 요청에 함께 보낸다.
-가족과 함께 쓰는 사용자들은 각자 발급한 토큰으로 같은 가족을 선택한다.
-가족 조회는 연결이나 토큰을 저장하지 않으며 조회한 토큰은 응답하지 않는다.
-토큰을 바꾸면 조회한 가족 목록을 비우고 다시 확인한다.
-서버가 로그인 사용자와 저장된 에이전트 바인딩으로 profile을 정한다.
-`ACCOUNTBOOK_API_BASE_URL`은 Control Plane 환경 변수로 받으며 HTTPS 공인 경로여야 한다.
-등록 전에 그 주소의 `/families`를 한 번 불러 토큰과 선택 가족의 권한을 확인한다.
-redirect를 따라가지 않는다.
-인증 실패, 가족 권한 없음, 외부 호출 실패는 원문 응답을 노출하지 않는 고정 오류다.
-오류 코드는 `ACCOUNTBOOK_TOKEN_REJECTED`(400), `ACCOUNTBOOK_FAMILY_FORBIDDEN`(403),
-`ACCOUNTBOOK_UNAVAILABLE`(503), 외부 설치·확인·해제 실패인 `CONNECTOR_OPERATION_FAILED`(502)다.
+## 대시보드 plugin 계약
+
+대시보드 plugin(`hermes/plugins/dashboard-profile-api`) 이 여는 커넥터 경로다. 인증은 다른 경로와 같은 서비스 토큰이다.
+
+| 경로 | 요청 | 성공 |
+| --- | --- | --- |
+| `GET /api/connectors/catalog` | 없음 | `[{id, title, description, fields[], verify, mcp_server}]`. 운영 목록에 있고 검증을 통과한 manifest 만. `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다 |
+| `POST /api/connectors/{id}/call` | `{tool, values}` | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` |
+| `GET /api/connectors?profile=<p>` | query `profile` | `{profile, connectors: [{plugin, enabled, configured}]}` |
+| `PUT /api/connectors` | `{profile, plugin, enabled}` | `{profile, plugin, enabled, changed, restart_required}` |
+| `PUT /api/env`, `DELETE /api/env` | `{profile, key, value?}` | 커넥터 key 는 `{profile, key, restart_required}` |
+| `POST /api/mcp/servers/{server}/test?profile=<p>` | 없음 | `{ok, tools: [{name}]}`. 그 profile 에 설치된 커넥터의 서버만 |
+
+- `call` 은 `tool` 이 그 커넥터의 `options.tool` 이나 `verify.tool` 일 때만 받는다. `values` 를 메모리에서 env 로 넘겨 MCP 서버를 한 번 띄우고, `initialize` 와 `tools/call` 한 번 뒤 닫는다. 디스크에 쓰지 않는다
+- `call` 의 자식 프로세스가 받는 env 는 칸 값, 운영 목록의 `env`, 그리고 MCP SDK 가 늘 더하는 기본 env(`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`)뿐이다. 대시보드 프로세스의 다른 env(서비스 토큰, 다른 커넥터의 값)는 넘어가지 않는다
+- `call` 의 시간 제한은 10초, 동시 실행은 대시보드 프로세스 전체에서 4개다. 시간을 넘기면 자식 프로세스를 끝내고 `unavailable` 이다. 이미 4개가 돌고 있으면 기다리지 않고 `unavailable` 이다
+- 커넥터 key 의 `PUT /api/env` 와 `DELETE /api/env` 는 관리 표식이 있는 profile 에만 된다. 허용 key 는 카탈로그 manifest 의 `fields[].env` 다. `operator_env` 는 사용자 요청으로 쓰지 못한다. 그 이름의 `PUT` 과 `DELETE` 는 성공으로 답하되 아무것도 쓰지 않고 `restart_required` 는 false 다. 한 배포 동안 옛 Control Plane 이 그 이름을 쓰려 하기 때문이다([ADR-041](adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md))
+- Control Plane 은 카탈로그의 `fields[].env` 로 `PUT /api/env` 의 key 를 정하고 `verify.tool` 로 확인 도구를 부른다. `env` 이름은 Control Plane 의 응답에 담지 않는다
+- 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `PUT /api/connectors` 의 `enabled: false` 를 받는다. 이때 대시보드가 그 기록의 서버 env 가 참조하던 key 를 profile `.env` 에서 지운다. `GET /api/connectors` 는 그 기록을 `configured: false` 로 낸다
+- 운영 목록에도 없고 소유 기록도 없는 plugin 의 `enabled: false` 는 끌 것이 없으므로 `changed: false` 로 성공한다. `enabled: true` 는 거절한다. `GET /api/connectors` 는 그런 plugin 을 목록에 넣지 않고, Control Plane 은 목록에 없는 것을 설치 안 됨(`enabled: false`, `configured: false`)으로 읽는다. 카탈로그에서 빠진 연결의 해제와 반영 완료가 끝까지 가게 하기 위해서다
+- 운영자는 대시보드 프로세스의 환경 변수로 커넥터 목록을 준다. 자세한 모양은 [`code-architecture.md`](code-architecture.md) 의 「Hermes 쪽 코드」 절이 갖는다
 
 ## 설치와 실패 처리
 
-기존 `AgentLifecycleService`로 안전한 profile과 비공개 에이전트를 만든다.
+처음 등록하면 `AgentLifecycleService.createConnectorAgent` 로 안전한 profile 과 비공개 에이전트를 만든다. 이름은 manifest 의 `title` 이다.
 연결용 에이전트는 사용자가 지울 수 없으므로 사용자당 에이전트 상한을 거치지 않고 상한 계산에서도 빠진다.
-연결 확인 전에는 에이전트를 끈다.
-연결용 에이전트의 공개 범위, 주인, 도구, 성격과 스킬은 일반 편집 경로로 바꾸지 못한다.
-연결 화면에서 토큰 등록과 확인, 해제만 한다.
+연결용 에이전트의 공개 범위, 주인, 도구, 성격과 스킬은 일반 편집 경로로 바꾸지 못한다. 연결 화면에서 등록과 확인, 해제만 한다.
+성격과 지침은 대시보드 plugin 이 설치할 때 plugin 의 스킬 본문을 persona 에 넣는다.
 
-Control Plane은 `PUT /api/connectors`에 `profile`, `plugin: fos-accountbook`, `enabled`만 보낸다.
-인프라 plugin이 신뢰된 manifest를 읽어 MCP 서버, persona와 선택 스킬 경로를 설치한다.
-허용 도구는 `accountbook`과 Control Plane MCP `fos-assistant`이며 셸, 파일, `skills` 도구는 닫는다.
-신뢰된 가계부 스킬 본문은 persona에 넣는다.
+등록 순서다.
 
-**허용 목록은 Control Plane이 줄인다.**
-새 profile의 설정 틀은 `platform_toolsets.api_server`에 `delegation`과 `fos-assistant`를 넣는다.
-인프라 plugin의 설치는 그 목록에 `accountbook`을 더할 뿐 내장 도구를 빼지 않는다.
-그대로 두면 `delegation`이 켜진 채 남아, 내장 도구 미노출을 요구하는 확인이 READY로 넘어가지 못한다.
-실제로 그렇게 모든 연결이 `PENDING`에 머물렀다.
+1. 로그인 사용자 확인과 `values` 검사
+2. `call(verify.tool, values)` 가 통과해야 한다. 실패는 공통 어휘의 오류 코드로 끝나고 아무것도 저장하지 않는다. 이 호출은 DB 트랜잭션 밖에서 한다. 최대 10초가 걸려 그동안 DB 연결을 쥐지 않기 위해서다
+3. 사용자 행 잠금, 전용 에이전트 바인딩(처음이면 생성), 에이전트 비활성화, `desired_enabled=false`, `PENDING` 저장
+4. 칸마다 `PUT /api/env`. 비운 선택 칸은 `DELETE /api/env`
+5. API 도구 목록을 `["fos-assistant"]` 로 다시 쓴다(`PUT /api/config`). 새 profile 의 틀은 내장 도구 `delegation` 을 켜 두기 때문이다
+6. `PUT /api/connectors` 로 설치. 설치가 도구 목록에 그 커넥터의 MCP 서버를 덧붙인다
+7. 모두 성공하면 `desired_enabled=true`, 칸 값과 비밀 앞부분 저장. 상태는 여전히 `PENDING` 이다
 
-| 시점 | 쓰는 목록 |
-| --- | --- |
-| 등록할 때, 설치 요청 전 | `["fos-assistant"]`. 설치가 `accountbook`을 더한다 |
-| 연결 확인과 관리자 반영 완료에서 켜진 내장 도구가 보일 때 | `["fos-assistant", "accountbook"]` |
-
-목록은 `PUT /api/config`의 `platform_toolsets.api_server`로 쓴다.
-다시 등록할 때도 `["fos-assistant"]`로 줄인다.
-설치 요청은 이미 설치된 profile이라도 목록에 `accountbook`이 없으면 다시 더한다.
-`GET /api/connectors`의 `configured`는 목록에 `accountbook`이 없으면 false라서, 빠진 채로는 READY가 되지 않는다.
-확인 경로는 설치의 enabled와 configured가 참일 때만 쓰고, 쓴 뒤 다시 읽어 내장 도구가 비었는지 판정한다.
-이미 연결된 사용자도 토큰을 다시 넣지 않고 연결 확인만으로 READY가 된다.
-
-토큰은 `PUT /api/env`로 `ACCOUNTBOOK_API_TOKEN`에 쓴다.
-공통 주소와 선택 가족도 `ACCOUNTBOOK_API_BASE_URL`, `ACCOUNTBOOK_FAMILY_UUID`에 쓴다.
-`ACCOUNTBOOK_PRIVATE_DIR`는 인프라 plugin이 profile별로 정한다.
-env 전달 근거는 [MCP profile 비밀값 계약](hermes/mcp-profile-credentials.md)에 있다.
+연결 확인과 관리자 반영 완료는 설치의 enabled 와 configured, MCP probe 의 도구, 켜진 내장 도구 없음을 모두 보고 `READY` 로 바꾼다.
+켜진 내장 도구가 보이면 목록을 `["fos-assistant", <mcp_server>]` 로 다시 쓰고 다시 읽어 판정한다.
 
 같은 사용자의 등록, 확인과 해제는 사용자 행 잠금으로 순서대로 처리한다.
-토큰 교체와 해제 전에 에이전트를 끄고 상태를 `PENDING`으로 둔다.
-`desired_enabled`는 이번 등록의 env와 설치 단계가 모두 성공해 활성화 후보가 되었는지를 뜻한다.
-등록과 교체를 시작할 때 false로 바꾸고 모든 외부 반영이 성공한 뒤에만 true로 둔다.
-해제 시작 때도 false로 둔다.
-false인 연결은 확인이나 관리자 반영 완료로 READY가 되지 않는다.
-외부 API가 실패해도 이전 토큰으로 실행할 수 있는 활성 상태로 되돌리지 않는다.
-등록 실패 뒤에는 다시 등록하거나 해제할 수 있어야 한다.
-새 profile 생성 실패는 기존 생성기의 정리 절차를 따른다.
-외부 호출 실패는 별도 예외로 반환하면서 비활성화와 `PENDING`을 커밋한다.
-DB 커밋 자체가 실패하면 이미 반영한 env나 plugin 변경은 되돌리지 못한다.
-운영에서 남은 변경을 확인하고 다시 등록하거나 해제해 상태를 맞춘다.
+`desired_enabled` 는 이번 등록의 env 와 설치 단계가 모두 성공해 활성화 후보가 되었는지를 뜻한다. 등록, 교체, 해제를 시작할 때 false 로 두고 모든 외부 반영이 성공한 뒤에만 true 로 둔다. false 인 연결은 확인이나 관리자 반영 완료로 `READY` 가 되지 않는다.
+외부 호출이 실패하면 비활성화와 `PENDING` 을 커밋하고 `CONNECTOR_OPERATION_FAILED` 를 돌려준다. 이전 값으로 실행할 수 있는 활성 상태로 되돌리지 않는다.
+DB 커밋 자체가 실패하면 이미 반영한 env 나 설치는 되돌리지 못한다. 다시 등록하거나 해제해 상태를 맞춘다.
 
-해제는 `DELETE /api/env`로 토큰을 제거하고 plugin을 끈다.
-선택 가족을 비운 등록과 해제는 `ACCOUNTBOOK_FAMILY_UUID` 환경 항목도 제거한다.
-에이전트와 연결 행은 이력을 위해 남긴다.
-기존 MCP 프로세스의 환경 값은 파일 변경만으로 바뀌지 않으므로,
-설치 응답의 `restart_required`가 참이면 관리자 반영 대기로 보인다.
-공유 gateway 재시작을 사용자 요청에서 실행하지 않는다.
-가계부 토큰 폐기는 사용자가 가계부 설정에서 한다.
-가계부 설정에서 토큰을 폐기하면 다음 요청부터 거절되므로 즉시 외부 접근을 막을 수 있다.
-최초 설치는 새 profile의 자동 MCP 발견을 사용한다.
-이미 설치된 연결의 토큰 교체, 환경 항목 삭제와 해제는 재시작 필요 상태를 반환한다.
-해제 뒤에도 `restartRequired`를 표시해 기존 프로세스 정리가 필요하다는 것을 알린다.
-
-`GET /api/connectors?profile=`은 `profile`과 `connectors` 배열을 반환한다.
-알려진 plugin 항목은 `plugin`, `enabled`, `configured`를 갖고 미설치이면 두 판정은 모두 false다.
-GET에는 재시작 판정이 없으므로 연결 확인만으로 저장된 `restartRequired`를 지우지 않는다.
-저장된 대기 값과 각 env·설치 변경 응답의 `restart_required`를 논리 OR로 저장한다.
-도중 호출이 실패해도 앞선 응답의 true를 보존한다.
-관리자는 실제 gateway 반영을 마친 뒤 연결 화면에서 반영 완료를 확인한다.
-대기 연결은 설치의 enabled와 configured, MCP probe, 내장 도구 미노출을 다시 검사해 READY로 바꾼다.
-해제 연결은 설치의 disabled를 확인하고 DISCONNECTED를 유지한 채 재시작 대기를 지운다.
-일반 연결 확인도 활성화 후보가 아닌 연결의 disabled를 확인해 DISCONNECTED로 바꿀 수 있지만 재시작 대기는 보존한다.
-이 확인도 대상 사용자 행을 잠그며 ADMIN과 같은 그룹인지 검사한다.
+해제는 칸마다 `DELETE /api/env` 뒤 설치를 끈다. 운영 목록에서 빠진 커넥터는 Control Plane 이 env 이름을 알 수 없으므로 설치만 끄고, env 는 대시보드가 소유 기록으로 지운다. 이때는 재시작 대기로 둔다. 에이전트와 연결 행은 이력을 위해 남기고 칸 값과 비밀 앞부분을 비운다.
+이미 떠 있는 MCP 프로세스는 env 파일이 바뀌어도 옛 값을 쓰고, gateway 는 처음 발견한 도구 목록을 계속 쓴다. 그래서 설치된 연결의 값 교체, env 삭제와 해제는 `restart_required` 를 돌려받고, 관리자가 공유 gateway 를 재시작한 뒤 반영 완료를 누를 때까지 재시작 대기로 남는다.
+profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/reload-mcp` 는 API server 경로에서 명령으로 처리되지 않고, 웹 대화창은 `/` 로 시작하는 입력을 스킬 호출로 읽는다(2026-10-01 운영 확인). MCP 자식 프로세스만 끝내도 도구 목록은 바뀌지 않는다.
+처음 설치는 새 profile 의 자동 MCP 발견을 쓰므로 재시작이 필요 없다. 공유 gateway 재시작은 사용자 요청에서 실행하지 않는다.
+저장된 대기 값과 각 env, 설치 응답의 `restart_required` 는 논리 OR 로 누적한다. 도중 호출이 실패해도 앞선 true 를 보존한다.
+토큰 폐기는 사용자가 그 서비스에서 한다. 폐기하면 다음 요청부터 거절되므로 재시작을 기다리지 않고 외부 접근을 막을 수 있다.
 
 ## 저장과 비밀값
 
-`accountbook_connection`은 사용자와 에이전트 바인딩, 상태, 토큰 앞 8자,
-선택 가족 UUID, 마지막 확인 시각과 재시작 필요 여부만 저장한다.
-활성화 후보 여부도 저장해 실패한 등록이나 해제가 기존 토큰의 실행을 다시 허용하지 못하게 한다.
-토큰 원문과 해시는 저장하지 않는다.
-브라우저는 연결 등록을 제출한 직후 토큰 입력을 비우고 다시 표시하지 않는다.
-가족을 고르는 동안은 작성 중인 토큰 입력을 사용하며 가족 조회가 실패해도 입력을 비운다.
-요청 record의 문자열 표현, 외부 API 오류, 로그와 응답에 원문을 남기지 않는다.
-인프라의 대시보드 권한과 운영 확인은 `fos-home-infra`가 소유한다.
+`connector_connection` 은 사용자, 커넥터, 에이전트 바인딩, 상태, 칸 값, 마지막 확인 시각, 재시작 필요 여부, 활성화 후보 여부를 저장한다([`data-schema.md`](data-schema.md)).
+비밀 칸의 원문과 해시는 저장하지 않는다. 앞 8자만 `fields.secretPrefixes` 에 둔다.
+값이 8자 이하이면 앞 8자가 원문 전체이므로 그 칸은 `secretPrefixes` 에 넣지 않는다.
+브라우저는 등록을 제출한 직후 비밀 칸 입력을 비우고 다시 표시하지 않는다. 선택지를 고르는 동안은 작성 중인 입력을 쓰고, 조회가 실패해도 입력을 비운다.
+요청 record 의 문자열 표현, 외부 오류, 로그와 응답에 비밀 원문을 남기지 않는다.
