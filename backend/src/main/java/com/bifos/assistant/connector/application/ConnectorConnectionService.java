@@ -363,7 +363,8 @@ public class ConnectorConnectionService {
      * MCP probe 가 도구를 보이고 켜진 내장 도구가 manifest 가 선언한 것과 같은가.
      *
      * <p>설치가 enabled 이고 configured 인 뒤에만 부른다. 카탈로그에서 빠진 커넥터는 서버 이름을 알 수 없어 쓸 수
-     * 없는 것으로 본다. manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 이미 연결된 에이전트가 연결 확인과
+     * 없는 것으로 본다. 설치 요청을 한 번 더 보내 연결용 에이전트의 지침을 지금 plugin 의 스킬 본문에 맞춘다.
+     * manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 이미 연결된 에이전트가 연결 확인과
      * 관리자 반영 완료에서 새 선언을 받는 자리다.
      */
     private boolean usable(ConnectorConnection connection) {
@@ -374,6 +375,9 @@ public class ConnectorConnectionService {
         if (manifest.isEmpty()) {
             return false;
         }
+        // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. plugin 의 스킬 본문이 바뀌었으면 지침을 다시 쓴다.
+        // 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
+        connector.putConnector(agent.hermesProfile(), connection.connectorId(), true);
         ProbeResult probe =
                 connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
         return probe.ok() && !probe.tools().isEmpty() && declaredToolsetsApplied(agent, manifest.get());

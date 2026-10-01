@@ -300,6 +300,39 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
+    @DisplayName("연결 확인은 설치 요청을 다시 보내 지침을 맞추고 그 재시작 값은 쓰지 않는다")
+    void checkResendsInstallAndIgnoresItsRestartAnswer() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        InOrder order = inOrder(connector);
+        order.verify(connector).readConnector(profile, DEMO);
+        order.verify(connector).putConnector(profile, DEMO, true);
+        order.verify(connector).probe(profile, "demo");
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(checked.restartRequired()).isFalse();
+    }
+
+    @Test
+    @DisplayName("연결 확인의 설치 요청이 실패하면 PENDING 을 남기고 연결 실패로 끝난다")
+    void checkStaysPendingWhenReinstallFails() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        doThrow(new IllegalStateException()).when(connector).putConnector(profile, DEMO, true);
+
+        assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agentEnabled(user)).isFalse();
+    }
+
+    @Test
     @DisplayName("해제하면 연결용 에이전트가 사진을 받지 않는다")
     void disconnectStopsAcceptingAttachments() {
         when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
