@@ -66,11 +66,12 @@
 cd web && pnpm typecheck && cd ..
 # 다른 브라우저 검사가 돌고 있으면 끝난 뒤에 돌린다
 cd web && pnpm test:browser connector-connection && cd ..
-node --test 'test/unit/**/*.test.ts'
 ! git grep -niE "accountbook|ACCOUNTBOOK_|fab_|가계부" -- web/src ':!web/src/app/connections/accountbook/page.tsx'
 scripts/quality.sh check
 scripts/check-public-safe.sh
 ```
+
+- 위 명령 뒤에 단위 검사 전체(`test/unit` 아래 모든 `*.test.ts` 를 `node --test` 로)도 돌린다. 새 `page.tsx` 가 라우트 규칙 검사(`test/unit/loading-routes.test.ts`)에 걸리는지 여기서 본다
 
 ## 변경 파일
 
