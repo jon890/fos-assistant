@@ -41,7 +41,8 @@ class ToolDetailRedactionMigrationTest {
         Map<Long, String> details = new LinkedHashMap<>();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement query = connection.createStatement();
-                ResultSet rows = query.executeQuery("SELECT id, detail, tool_name, duration_ms, failed FROM execution_event ORDER BY id")) {
+                ResultSet rows = query.executeQuery(
+                        "SELECT id, detail, tool_name, duration_ms, failed FROM execution_event ORDER BY id")) {
             while (rows.next()) {
                 details.put(rows.getLong("id"), rows.getString("detail"));
                 assertThat(rows.getString("tool_name")).isEqualTo("test-tool");
@@ -63,8 +64,12 @@ class ToolDetailRedactionMigrationTest {
     }
 
     private static void migrate(String url, String version) {
-        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration")
-                .target(version).load().migrate();
+        Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .target(version)
+                .load()
+                .migrate();
     }
 
     private static void seedExecutions(String url) throws SQLException {
