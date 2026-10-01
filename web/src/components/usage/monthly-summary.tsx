@@ -21,11 +21,7 @@ export function MonthlySummary({ monthly }: Props) {
     <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
       <Stat
         label="예상 추가 사용 요금"
-        value={
-          <span className="text-primary">
-            {formatAmount(monthly.actualCostMicros, monthly.currency)}
-          </span>
-        }
+        value={formatAmount(monthly.actualCostMicros, monthly.currency)}
         detail={`${monthly.month}의 예상 추가 사용 요금`}
       />
       <Stat

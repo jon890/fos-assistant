@@ -216,7 +216,7 @@ export function MessageBubble({
           data-testid="user-message"
           className={cn(
             "relative max-w-[70%] rounded-3xl bg-primary-soft px-4 py-2.5",
-            "group-focus-visible:outline-2 group-focus-visible:outline-primary",
+            "group-focus-visible:outline-2 group-focus-visible:outline-ring",
           )}
         >
           <p className="whitespace-pre-wrap break-words text-sm leading-6">
@@ -268,7 +268,7 @@ export function MessageBubble({
       data-testid="assistant-message"
       className={cn(
         "group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2",
-        "focus-visible:outline-2 focus-visible:outline-primary",
+        "focus-visible:outline-2 focus-visible:outline-ring",
       )}
       tabIndex={0}
     >

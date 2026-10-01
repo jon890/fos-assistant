@@ -24,7 +24,8 @@ const buttonVariants = cva(
         // 고침: destructive 바탕에 destructive-foreground 글자로 칠한다. 두 밝기 모드의 대비를 토큰 짝이 보장한다.
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20",
-        link: "text-primary underline-offset-4 hover:underline",
+        // 고침: 링크는 강조 색을 쓰지 않는다. 글자색에 밑줄로 그린다.
+        link: "text-foreground underline underline-offset-4 hover:text-foreground-soft",
       },
       size: {
         // 고침: 고정 높이 대신 control 토큰 여백으로 크기를 정한다.

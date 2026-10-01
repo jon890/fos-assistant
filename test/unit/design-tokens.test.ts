@@ -6,7 +6,7 @@ import test from "node:test";
 const GLOBALS_CSS = join(import.meta.dirname, "../../web/src/app/globals.css");
 
 /**
- * ADR-023 의 표가 정한 색 토큰 이름이다.
+ * ADR-023 과 ADR-047 의 표가 정한 색 토큰 이름이다.
  *
  * Tailwind v4 는 쓰지 않는 유틸리티를 만들지 않아, 아직 아무 화면도 `bg-popover` 를 쓰지 않으면
  * `--color-popover` 가 빠져도 브라우저 검사가 알아채지 못한다. 그래서 소스를 직접 읽는다.
@@ -33,6 +33,18 @@ const TOKENS = [
   "primary-soft",
   "destructive",
   "destructive-foreground",
+  "foreground-soft",
+  "primary-soft-foreground",
+  "signal",
+  "pill",
+  "pill-foreground",
+  "destructive-soft",
+  "success",
+  "success-soft",
+  "warning",
+  "warning-soft",
+  "info",
+  "info-soft",
   "code-keyword",
   "code-string",
   "code-number",
@@ -81,4 +93,46 @@ test("옛 토큰 이름이 globals.css 어디에도 남지 않는다", async () 
   ]);
   const left = RETIRED_TOKENS.flatMap((name) => [`--${name}`, `--color-${name}`]).filter((name) => variables.has(name));
   assert.deepEqual(left, [], `남아 있는 옛 토큰: ${left.join(", ")}`);
+});
+
+test("줄인 움직임 설정을 따르는 블록이 globals.css 에 있다", async () => {
+  const source = await readFile(GLOBALS_CSS, "utf-8");
+  const start = source.indexOf("@media (prefers-reduced-motion: reduce)");
+  assert.notEqual(start, -1, "globals.css 에 prefers-reduced-motion: reduce 블록이 없다");
+  const body = source.slice(start);
+  // 이동과 크기 변화를 만드는 tw-animate-css 변수를 이 블록이 덮어야 흐려짐만 남는다.
+  const overrides = [
+    "--tw-enter-scale: 1 !important",
+    "--tw-enter-translate-x: 0 !important",
+    "--tw-enter-translate-y: 0 !important",
+    "--tw-exit-scale: 1 !important",
+    "--tw-exit-translate-x: 0 !important",
+    "--tw-exit-translate-y: 0 !important",
+    "animation-duration: 100ms !important",
+    "transition-duration: 100ms !important",
+  ];
+  const missing = overrides.filter((declaration) => !body.includes(declaration));
+  assert.deepEqual(missing, [], `줄인 움직임 블록에 빠진 선언: ${missing.join(", ")}`);
+});
+
+test("@theme inline 이 움직임의 길이와 곡선 토큰을 선언한다", async () => {
+  const variables = declared(block(await readFile(GLOBALS_CSS, "utf-8"), "@theme inline"));
+  const names = ["--duration-fast", "--duration-base", "--duration-slow", "--ease-out", "--ease-spring"];
+  const missing = names.filter((name) => !variables.has(name));
+  assert.deepEqual(missing, [], `@theme inline 에 빠진 움직임 토큰: ${missing.join(", ")}`);
+});
+
+test("한국어 낱말 가운데서 줄을 바꾸지 않는다", async () => {
+  const source = await readFile(GLOBALS_CSS, "utf-8");
+  assert.match(source, /word-break:\s*keep-all;/, "globals.css 에 word-break: keep-all 이 없다");
+});
+
+test("색 변수 값은 모두 hex 로 적는다", async () => {
+  const source = await readFile(GLOBALS_CSS, "utf-8");
+  assert.equal(source.includes("oklch("), false, "globals.css 에 oklch( 가 남아 있다");
+  for (const selector of [":root", ".dark"]) {
+    const body = block(source, selector);
+    const notHex = TOKENS.filter((name) => !new RegExp(`^\\s*--${name}:\\s*#(?:[\\da-f]{3}|[\\da-f]{6});`, "im").test(body));
+    assert.deepEqual(notHex, [], `${selector} 에서 hex 가 아닌 색: ${notHex.join(", ")}`);
+  }
 });

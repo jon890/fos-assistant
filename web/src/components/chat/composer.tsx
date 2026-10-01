@@ -589,7 +589,7 @@ export function Composer({
                       aria-hidden="true"
                       className="absolute inset-0 flex items-center justify-center bg-background/60"
                     >
-                      <LoaderCircle className="size-4 animate-spin text-primary motion-reduce:animate-none" />
+                      <LoaderCircle className="size-4 animate-spin text-foreground motion-reduce:animate-none" />
                     </span>
                   ) : null}
                 </div>
@@ -623,7 +623,7 @@ export function Composer({
         data-testid="composer-shell"
         className={cn(
           "relative flex items-end gap-2 p-1.5 pl-4",
-          "rounded-3xl border border-border bg-background focus-within:border-primary",
+          "rounded-3xl border border-input bg-card focus-within:border-ring",
         )}
       >
         {mention && openMention ? (

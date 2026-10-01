@@ -71,6 +71,7 @@ export function ArtifactPanel({
   );
   const body = (
     // 결과물 HTML 은 제 배경을 적지 않는 일이 많다. 어두운 테마에서도 글이 읽히도록 흰 바탕에 띄운다.
+    // 에이전트가 만든 HTML 은 흰 바탕을 전제로 하므로 토큰이 아니라 bg-white 를 그대로 둔다.
     <iframe
       key={src}
       title={name}

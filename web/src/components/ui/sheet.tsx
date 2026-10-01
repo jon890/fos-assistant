@@ -36,7 +36,7 @@ function SheetOverlay({
   return (
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
-      // 고침: 덮개를 bg-black/10 에서 전의 서랍 덮개와 같은 토큰 bg-foreground/35 로 바꿨다. 밝기 모드는 토큰이 나눈다.
+      // 고침: 덮개는 서랍 덮개와 같은 토큰 bg-foreground/35 로 칠한다. 밝기 모드는 토큰이 나눈다.
       className={cn(
         "fixed inset-0 z-50 bg-foreground/35 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className,

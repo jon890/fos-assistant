@@ -1,3 +1,4 @@
+import { parseRgb } from "./color.ts";
 import { CONVERSATION_URL, expect, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
 
 test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({ page }, testInfo) => {
@@ -59,8 +60,7 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
     primary: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
   }));
   expect(sendColors.background).not.toBe("rgba(0, 0, 0, 0)");
-  expect(sendColors.background).toBe("rgb(176, 90, 60)");
-  expect(sendColors.primary).toBe("#b05a3c");
+  expect(parseRgb(sendColors.background), `보내기 단추 바탕이 --primary(${sendColors.primary}) 이어야 한다`).toEqual(parseRgb(sendColors.primary));
   await send.click();
   await expect(composer).toBeEnabled();
 

@@ -71,7 +71,7 @@ function NotFound() {
       <h1 className="mb-4 text-xl font-semibold">찾을 수 없는 서비스예요</h1>
       <Link
         href="/connections"
-        className="text-sm text-primary underline-offset-4 hover:underline"
+        className="text-sm text-foreground underline underline-offset-4"
       >
         연결 목록으로 돌아가기
       </Link>
@@ -280,7 +280,7 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
             <p className="text-sm">
               <Link
                 href={`/agents/${connection.agentCode}`}
-                className="text-primary underline-offset-4 hover:underline"
+                className="text-foreground underline underline-offset-4"
               >
                 에이전트 열기
               </Link>

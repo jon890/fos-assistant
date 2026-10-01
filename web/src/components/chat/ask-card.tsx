@@ -62,7 +62,7 @@ export function AskCard({
   return (
     <form
       data-testid="ask-card"
-      className="my-3 flex flex-col gap-4 rounded-lg border border-border bg-muted/40 p-4"
+      className="my-3 flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-card"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -155,7 +155,8 @@ function QuestionField({
           data-testid="ask-option"
           className={cn(
             "flex cursor-pointer items-start gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm",
-            "has-[:checked]:border-primary has-[:disabled]:cursor-default",
+            "has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:checked]:text-primary-soft-foreground",
+            "has-[:disabled]:cursor-default",
           )}
         >
           <input

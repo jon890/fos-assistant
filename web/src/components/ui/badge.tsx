@@ -21,7 +21,8 @@ const badgeVariants = cva(
         ghost:
           // 고침: 밝기 모드는 토큰이 나누므로 dark: 덮어쓰기를 뺐다.
           "hover:bg-muted hover:text-muted-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        // 고침: 링크는 강조 색을 쓰지 않는다. 글자색에 밑줄로 그린다.
+        link: "text-foreground underline underline-offset-4 hover:text-foreground-soft",
       },
     },
     defaultVariants: {

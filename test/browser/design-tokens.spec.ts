@@ -2,7 +2,7 @@ import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright
 import { contrast, parseRgb } from "./color.ts";
 import { expect, test } from "./fixtures.ts";
 
-/** `globals.css` 가 두 밝기 모드에서 모두 값을 가져야 하는 색 토큰이다. 이름은 ADR-023 의 표를 따른다. */
+/** `globals.css` 가 두 밝기 모드에서 모두 값을 가져야 하는 색 토큰이다. 이름은 ADR-023 과 ADR-047 의 표를 따른다. */
 const TOKENS = [
   "--background",
   "--foreground",
@@ -25,6 +25,18 @@ const TOKENS = [
   "--primary-soft",
   "--destructive",
   "--destructive-foreground",
+  "--foreground-soft",
+  "--primary-soft-foreground",
+  "--signal",
+  "--pill",
+  "--pill-foreground",
+  "--destructive-soft",
+  "--success",
+  "--success-soft",
+  "--warning",
+  "--warning-soft",
+  "--info",
+  "--info-soft",
 ];
 
 /** 옮기기 전의 이름이다. 새 이름의 별칭으로도 남기지 않는다. */
@@ -96,6 +108,98 @@ test("두 밝기 모드에서 destructive 가 그 위 글자와 화면 바탕 �
     const { "--destructive": destructive, "--destructive-foreground": foreground, "--background": background } = values[theme];
     expect(contrast(foreground, destructive), `${theme}: ${foreground} 글자 / ${destructive} 바탕`).toBeGreaterThanOrEqual(4.5);
     expect(contrast(destructive, background), `${theme}: ${destructive} 글자 / ${background} 바탕`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+/** 글자나 선, 그것이 놓이는 바탕, 넘어야 하는 대비다. 글자는 4.5, 입력칸 테두리와 초점 테두리는 3 이다. */
+const CONTRAST_PAIRS: { foregrounds: string[]; backgrounds: string[]; minimum: number }[] = [
+  {
+    foregrounds: ["--foreground", "--foreground-soft", "--muted-foreground"],
+    backgrounds: ["--background", "--card", "--muted"],
+    minimum: 4.5,
+  },
+  { foregrounds: ["--primary-foreground"], backgrounds: ["--primary", "--primary-strong"], minimum: 4.5 },
+  { foregrounds: ["--primary-soft-foreground"], backgrounds: ["--primary-soft"], minimum: 4.5 },
+  ...["--success", "--warning", "--info", "--destructive"].map((name) => ({
+    foregrounds: [name],
+    backgrounds: [`${name}-soft`, "--background", "--card"],
+    minimum: 4.5,
+  })),
+  { foregrounds: ["--pill-foreground"], backgrounds: ["--pill"], minimum: 4.5 },
+  { foregrounds: ["--input", "--ring"], backgrounds: ["--background", "--card"], minimum: 3 },
+];
+
+test("두 밝기 모드에서 글자와 선이 제 바탕과 기준 대비를 넘는다", async ({ page }) => {
+  await page.goto("/");
+  const values = await readVariables(page, TOKENS);
+
+  for (const theme of ["light", "dark"] as const) {
+    const low = CONTRAST_PAIRS.flatMap(({ foregrounds, backgrounds, minimum }) =>
+      foregrounds.flatMap((foreground) =>
+        backgrounds
+          .map((background) => ({ foreground, background, ratio: contrast(values[theme][foreground], values[theme][background]) }))
+          .filter(({ ratio }) => ratio < minimum)
+          .map(({ foreground, background, ratio }) => `${foreground} / ${background} = ${ratio.toFixed(2)} (기준 ${minimum})`),
+      ),
+    );
+    expect(low, `${theme} 에서 대비가 모자란 짝`).toEqual([]);
+  }
+});
+
+test("밝음에서 사이드바 메뉴 글자가 사이드바 바탕과 대비 4.5 이상이다", async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  await page.goto("/");
+  await openSidebar(page, testInfo);
+
+  // 좁은 폭은 서랍, 넓은 폭은 aside 가 사이드바다.
+  const sidebar =
+    testInfo.project.name === "mobile"
+      ? page.locator('[data-slot="sheet-content"][data-side="left"]')
+      : page.locator('aside[aria-label="사이드바"]');
+  const surface = sidebar.getByTestId("new-conversation-link").locator("xpath=..");
+  const links = sidebar.getByRole("navigation", { name: "주요 화면" }).getByRole("link");
+  await expect(links.first()).toBeVisible();
+
+  const background = await surface.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(background, "사이드바 바탕이 칠해져 있어야 한다").not.toBe("rgba(0, 0, 0, 0)");
+  const texts = await links.evaluateAll((elements) =>
+    elements.map((element) => ({ label: element.textContent ?? "", color: getComputedStyle(element).color })),
+  );
+  expect(texts.length, "사이드바 메뉴 링크 수").toBeGreaterThan(0);
+  for (const { label, color } of texts) {
+    expect(contrast(color, background), `「${label}」 글자 ${color} / 사이드바 바탕 ${background}`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test("두 밝기 모드에서 대화 입력창의 테두리는 input 색이다", async ({ page }) => {
+  await page.goto("/");
+  const shell = page.getByTestId("composer-shell");
+  await expect(shell).toBeVisible();
+
+  const colors = await shell.evaluate((node) => {
+    const html = document.documentElement;
+    // 초점이 안에 있으면 테두리가 초점 색이 된다. 초점을 빼고 색 바뀜의 transition 을 끈 뒤 읽는다.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    (node as HTMLElement).style.transition = "none";
+    const read = () => ({
+      width: getComputedStyle(node).borderTopWidth,
+      color: getComputedStyle(node).borderTopColor,
+      token: getComputedStyle(html).getPropertyValue("--input").trim(),
+      border: getComputedStyle(html).getPropertyValue("--border").trim(),
+    });
+    html.classList.remove("dark");
+    const light = read();
+    html.classList.add("dark");
+    const dark = read();
+    html.classList.remove("dark");
+    return { light, dark };
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    const { width, color, token, border } = colors[theme];
+    expect(parseRgb(token), `${theme}: --input 과 --border 는 다른 색이어야 이 검사가 뜻이 있다`).not.toEqual(parseRgb(border));
+    expect(width, `${theme} 대화 입력창 테두리 두께`).toBe("1px");
+    expect(parseRgb(color), `${theme} 대화 입력창 테두리가 --input(${token}) 이어야 한다`).toEqual(parseRgb(token));
   }
 });
 

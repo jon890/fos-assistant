@@ -27,7 +27,7 @@ export function AgentCard({ agent, currentUserId }: Props) {
       </div>
       <Link
         href={`/agents/${agent.code}`}
-        className="mt-3 inline-block text-sm text-primary underline-offset-4 hover:underline"
+        className="mt-3 inline-block text-sm text-foreground underline underline-offset-4"
       >
         상세 보기
       </Link>

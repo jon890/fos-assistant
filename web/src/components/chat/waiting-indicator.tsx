@@ -14,11 +14,13 @@ export function WaitingIndicator() {
         aria-hidden="true"
       >
         <span className="mr-1 font-medium text-foreground">비서</span>
-        <span className="inline-block animate-pulse text-primary">●</span>
-        <span className="inline-block animate-pulse text-primary [animation-delay:150ms]">
+        <span className="inline-block animate-pulse text-foreground-soft">
           ●
         </span>
-        <span className="inline-block animate-pulse text-primary [animation-delay:300ms]">
+        <span className="inline-block animate-pulse text-foreground-soft [animation-delay:150ms]">
+          ●
+        </span>
+        <span className="inline-block animate-pulse text-foreground-soft [animation-delay:300ms]">
           ●
         </span>
       </span>

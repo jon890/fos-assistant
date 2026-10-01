@@ -7,6 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-foreground-soft: var(--foreground-soft);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -24,8 +25,19 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-strong: var(--primary-strong);
   --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
+  --color-signal: var(--signal);
+  --color-pill: var(--pill);
+  --color-pill-foreground: var(--pill-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --color-code-keyword: var(--code-keyword);
   --color-code-string: var(--code-string);
   --color-code-number: var(--code-number);
@@ -33,8 +45,20 @@
   --color-code-type: var(--code-type);
   --color-code-comment: var(--code-comment);
   --radius-sm: 0.25rem;
-  --radius-md: 0.625rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
   --radius-full: 9999px;
+  --shadow-card: var(--card-shadow);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 260ms;
+  --transition-duration-fast: var(--duration-fast);
+  --transition-duration-base: var(--duration-base);
+  --transition-duration-slow: var(--duration-slow);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
   --spacing-control-x-sm: 0.75rem;
   --spacing-control-x-md: 1rem;
   --spacing-control-y-sm: 0.375rem;
@@ -42,28 +66,42 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: #ffffff;
-  --foreground: #16181d;
-  --muted: #f5f6f8;
-  --muted-foreground: #6b7280;
-  --accent: #eef0f3;
-  --accent-foreground: #16181d;
-  --secondary: #eef0f3;
-  --secondary-foreground: #16181d;
+  --radius: 0.75rem;
+  --background: #faf8ff;
+  --foreground: #17131f;
+  --foreground-soft: #4a4458;
+  --muted: #f1eefa;
+  --muted-foreground: #625b70;
+  --accent: #e6e1f2;
+  --accent-foreground: #17131f;
+  --secondary: #e6e1f2;
+  --secondary-foreground: #17131f;
   --card: #ffffff;
-  --card-foreground: #16181d;
+  --card-foreground: #17131f;
   --popover: #ffffff;
-  --popover-foreground: #16181d;
-  --border: #e3e5ea;
-  --input: #e3e5ea;
-  --ring: #b05a3c;
-  --primary: #b05a3c;
+  --popover-foreground: #17131f;
+  --border: #e6e1f2;
+  --input: #918aa2;
+  --ring: #6d4aff;
+  --primary: #6d4aff;
   --primary-foreground: #ffffff;
-  --primary-strong: #8f4530;
-  --primary-soft: #f5e6e0;
-  --destructive: #c62828;
+  --primary-strong: #5b39e8;
+  --primary-soft: #ece6ff;
+  --primary-soft-foreground: #3d23c2;
+  --signal: #b6f23a;
+  --pill: #17131f;
+  --pill-foreground: #ffffff;
+  --destructive: #c8243f;
   --destructive-foreground: #ffffff;
+  --destructive-soft: #fde9ec;
+  --success: #18794a;
+  --success-soft: #e6f5ec;
+  --warning: #9a5b00;
+  --warning-soft: #fff3df;
+  --info: #2563c9;
+  --info-soft: #e7effc;
+  --card-shadow:
+    0 1px 2px rgba(23, 19, 31, 0.06), 0 8px 24px rgba(61, 35, 194, 0.06);
   --code-keyword: #6d28d9;
   --code-string: #166534;
   --code-number: #9a3412;
@@ -73,27 +111,40 @@
 }
 
 .dark {
-  --background: #101216;
-  --foreground: #eceef2;
-  --muted: #191c22;
-  --muted-foreground: #9aa1ad;
-  --accent: #20242b;
-  --accent-foreground: #eceef2;
-  --secondary: #20242b;
-  --secondary-foreground: #eceef2;
-  --card: #101216;
-  --card-foreground: #eceef2;
-  --popover: #101216;
-  --popover-foreground: #eceef2;
-  --border: #2a2e37;
-  --input: #2a2e37;
-  --ring: #c96f52;
-  --primary: #c96f52;
-  --primary-foreground: #21130e;
-  --primary-strong: #e08a69;
-  --primary-soft: #3a241d;
-  --destructive: #f87171;
-  --destructive-foreground: #1f0a0a;
+  --background: #0e0b16;
+  --foreground: #f1eef8;
+  --foreground-soft: #cfc8de;
+  --muted: #1e1a2a;
+  --muted-foreground: #a79fb8;
+  --accent: #2a2438;
+  --accent-foreground: #f1eef8;
+  --secondary: #2a2438;
+  --secondary-foreground: #f1eef8;
+  --card: #17131f;
+  --card-foreground: #f1eef8;
+  --popover: #17131f;
+  --popover-foreground: #f1eef8;
+  --border: #2a2438;
+  --input: #706886;
+  --ring: #8b70ff;
+  --primary: #6f51f5;
+  --primary-foreground: #ffffff;
+  --primary-strong: #5f42e3;
+  --primary-soft: #2b2350;
+  --primary-soft-foreground: #cbbeff;
+  --signal: #c4f55a;
+  --pill: #26213a;
+  --pill-foreground: #f1eef8;
+  --destructive: #ff7a8e;
+  --destructive-foreground: #2a0a10;
+  --destructive-soft: #301a20;
+  --success: #5ad08d;
+  --success-soft: #1a2a22;
+  --warning: #f2b54c;
+  --warning-soft: #2d2416;
+  --info: #79a8ff;
+  --info-soft: #18213a;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
   --code-keyword: #c4b5fd;
   --code-string: #86efac;
   --code-number: #fdba74;
@@ -119,5 +170,40 @@ html {
     sans-serif;
 }
 
-/* 작은 모서리는 코드 조각, 보통 모서리는 단추·입력·카드, 알약은 짧은 표시와 원형 조작에 쓴다. */
+/* 한국어는 낱말 가운데서 줄을 바꾸지 않는다. 낱말 하나가 줄보다 길면 넘치지 않게 끊는다. */
+/* base 층에 둬서 break-words 나 break-all 을 적은 곳은 그 클래스가 이긴다. */
+@layer base {
+  body {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  pre,
+  code {
+    word-break: normal;
+  }
+}
+
+/* 줄인 움직임 설정에서는 이동과 크기 변화를 하지 않고 짧은 흐려짐만 남긴다. 부품마다 따로 챙기지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 100ms !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 100ms !important;
+    transition-timing-function: linear !important;
+    scroll-behavior: auto !important;
+    /* tw-animate-css 의 들어오고 나가는 keyframes 가 읽는 변수다. */
+    --tw-enter-scale: 1 !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+  }
+}
+
+/* 모서리는 코드 조각(sm), 단추·입력칸·알림 상자(md), 카드·대화상자(lg), 말풍선(xl), 대화 입력창(2xl), 알약과 원형 단추(full)에 쓴다. */
 /* 조작 요소의 가로·세로 여백은 control 토큰만 써서 같은 크기끼리 리듬을 맞춘다. */
