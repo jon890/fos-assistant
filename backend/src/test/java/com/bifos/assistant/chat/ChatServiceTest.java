@@ -81,6 +81,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -724,7 +725,7 @@ class ChatServiceTest {
         hermesStreams(
                 new RunEvent("message.delta", "저녁은 ", null, null, null, null),
                 new RunEvent("tool.started", null, "web_search", "started", null, null));
-        doThrow(new org.springframework.dao.DataIntegrityViolationException("사건을 저장할 수 없다"))
+        doThrow(new DataIntegrityViolationException("사건을 저장할 수 없다"))
                 .when(executionEvents)
                 .save(any(ExecutionEvent.class));
 

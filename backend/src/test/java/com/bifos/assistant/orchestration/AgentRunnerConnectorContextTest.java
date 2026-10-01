@@ -86,9 +86,7 @@ class AgentRunnerConnectorContextTest {
         run(connectorAgent(), ADDITION, null);
 
         verify(contextAssembler, never()).assemble(any());
-        assertThat(submitted().instructions())
-                .as("Hermes 에 보낸 instructions")
-                .isEqualTo(ADDITION);
+        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isEqualTo(ADDITION);
         ExecutionContextSnapshot snapshot = recordedSnapshot();
         assertThat(snapshot.contextChars()).as("실행 줄에 적는 문맥 길이").isZero();
         assertThat(snapshot.instructionsHash()).as("실행 줄에 적는 문맥 지문").isNull();
@@ -109,12 +107,8 @@ class AgentRunnerConnectorContextTest {
         run(agent(), ADDITION, null);
 
         verify(contextAssembler).assemble(user);
-        assertThat(submitted().instructions())
-                .as("Hermes 에 보낸 instructions")
-                .isEqualTo(MEMORY + "\n\n" + ADDITION);
-        assertThat(recordedSnapshot().contextChars())
-                .as("실행 줄에 적는 문맥 길이")
-                .isEqualTo((long) MEMORY.length());
+        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isEqualTo(MEMORY + "\n\n" + ADDITION);
+        assertThat(recordedSnapshot().contextChars()).as("실행 줄에 적는 문맥 길이").isEqualTo((long) MEMORY.length());
     }
 
     @Test
@@ -140,8 +134,7 @@ class AgentRunnerConnectorContextTest {
 
     private ExecutionContextSnapshot recordedSnapshot() {
         ArgumentCaptor<ExecutionContextSnapshot> snapshot = ArgumentCaptor.forClass(ExecutionContextSnapshot.class);
-        verify(executions)
-                .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any());
+        verify(executions).start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any());
         return snapshot.getValue();
     }
 

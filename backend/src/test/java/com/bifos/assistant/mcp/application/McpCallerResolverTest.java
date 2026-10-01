@@ -67,9 +67,11 @@ class McpCallerResolverTest {
         when(agents.findById(AGENT_ID)).thenReturn(Optional.of(connector));
 
         assertThatThrownBy(() -> resolver.resolve(principal, TOOL, signedContext()))
-                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code())
-                        .as("커넥터 에이전트의 호출을 거절한 코드")
-                        .isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        ex -> assertThat(ex.code())
+                                .as("커넥터 에이전트의 호출을 거절한 코드")
+                                .isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
 
     @Test

@@ -412,11 +412,13 @@ public class ConnectorConnectionService {
             return false;
         }
         Agent agent = connection.agent();
-        ProbeResult probe = connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
+        ProbeResult probe =
+                connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
         // configured 인 뒤에 보이는 내장 도구는 목록이 아니라 다른 설정에서 온 것이다. 목록을 다시 쓰지 않는다.
         return probe.ok()
                 && !probe.tools().isEmpty()
-                && toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).isEmpty();
+                && toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())
+                        .isEmpty();
     }
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
@@ -481,13 +483,10 @@ public class ConnectorConnectionService {
         }
     }
 
-    /**
-     * 외부 호출이 실패한 단계를 남긴다.
-     *
-     * <p>단계 이름과 커넥터 번호와 예외 종류만 적는다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다.
-     */
+    /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
     private static void warn(String step, String connectorId, RuntimeException ex) {
-        log.warn("connector {} failed at {}: {}", connectorId, step, ex.getClass().getSimpleName());
+        String kind = ex.getClass().getSimpleName();
+        log.warn("connector {} failed at {}: {}", connectorId, step, kind);
     }
 
     private Instant now() {

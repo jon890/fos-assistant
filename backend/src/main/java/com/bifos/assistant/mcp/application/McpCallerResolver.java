@@ -11,8 +11,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -32,10 +31,9 @@ import tools.jackson.databind.JsonNode;
  * 한다. 이유는 로그에만 남기고 토큰 해시와 {@code sig} 는 적지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class McpCallerResolver {
-
-    private static final Logger log = LoggerFactory.getLogger(McpCallerResolver.class);
 
     private final SessionOwnerResolver owners;
     private final AppUserRepository users;
@@ -49,14 +47,15 @@ public class McpCallerResolver {
      */
     @Transactional(readOnly = true)
     public McpCaller resolve(McpPrincipal principal, String toolName, JsonNode fosCtx) {
-        if (principal == null) throw reject(toolName, "인증 주체가 MCP 토큰이 아니다");
+        if (principal == null) {
+            throw reject(toolName, "인증 주체가 MCP 토큰이 아니다");
+        }
         McpCallContext context = McpCallContext.verify(toolName, fosCtx, principal.tokenHash());
         AgentExecution origin = owners.resolve(principal.profileName(), context.rootSessionId(), context.sessionId());
         if (isConnectorAgent(origin.agentId())) {
             throw reject(toolName, "커넥터 에이전트는 Control Plane 도구를 쓰지 못한다");
         }
-        AppUser user = findUser(origin.userId())
-                .orElseThrow(() -> reject(toolName, "origin 실행의 사용자가 없다"));
+        AppUser user = findUser(origin.userId()).orElseThrow(() -> reject(toolName, "origin 실행의 사용자가 없다"));
         return new McpCaller(current(user), origin, context);
     }
 

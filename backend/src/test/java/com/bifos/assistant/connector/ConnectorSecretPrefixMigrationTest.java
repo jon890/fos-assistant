@@ -22,7 +22,8 @@ import org.junit.jupiter.api.Test;
  * V38 까지만 올린 뒤 V39 를 올린다.
  */
 class ConnectorSecretPrefixMigrationTest {
-    private static final String WITH_PREFIX = "{\"values\":{\"family\":\"x\"},\"secretPrefixes\":{\"token\":\"fab_abcd\"}}";
+    private static final String WITH_PREFIX =
+            "{\"values\":{\"family\":\"x\"},\"secretPrefixes\":{\"token\":\"fab_abcd\"}}";
     private static final String ALREADY_EMPTY = "{\"values\":{},\"secretPrefixes\":{}}";
     private static final String UPDATED_AT = "2026-01-02 03:04:05.000000";
     private String url;

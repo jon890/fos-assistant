@@ -67,8 +67,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
@@ -863,7 +863,9 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
         installed(true, false);
-        doThrow(new IllegalStateException("dashboard unavailable")).when(connector).readCatalog();
+        doThrow(new IllegalStateException("dashboard unavailable"))
+                .when(connector)
+                .readCatalog();
 
         assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
 

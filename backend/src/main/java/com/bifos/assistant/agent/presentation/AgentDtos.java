@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.presentation;
 
+import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.application.PersonaSnapshot;
 import com.bifos.assistant.agent.application.StarterSuggestions;
 import com.bifos.assistant.agent.domain.Agent;
@@ -28,8 +29,7 @@ public final class AgentDtos {
      */
     public static final int PERSONA_MAX_CHARS = 8000;
 
-    private AgentDtos() {
-    }
+    private AgentDtos() {}
 
     /**
      * 에이전트의 성격 화면이 받는 것이다.
@@ -41,8 +41,7 @@ public final class AgentDtos {
      */
     public record PersonaView(String body, String bodyHash, boolean editable, int maxChars) {
         static PersonaView from(PersonaSnapshot snapshot) {
-            return new PersonaView(
-                    snapshot.body(), snapshot.bodyHash(), snapshot.editable(), PERSONA_MAX_CHARS);
+            return new PersonaView(snapshot.body(), snapshot.bodyHash(), snapshot.editable(), PERSONA_MAX_CHARS);
         }
     }
 
@@ -113,7 +112,9 @@ public final class AgentDtos {
     public record ChangeVisibilityRequest(@NotNull AgentVisibility visibility) {}
 
     public record CreateAgentRequest(
-            @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{0,63}") String code,
+            @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{0,63}")
+            String code,
+
             @NotBlank String name,
             @NotBlank String hermesProfile,
             @NotBlank String apiBaseUrl,
@@ -130,22 +131,29 @@ public final class AgentDtos {
      *     주소를 지우면 안 되기 때문이다
      */
     public record UpdateAgentRequest(
-            @NotNull Boolean enabled,
-            @NotNull AgentVisibility visibility,
-            String ownerEmail,
-            String apiBaseUrl) {}
+            @NotNull Boolean enabled, @NotNull AgentVisibility visibility, String ownerEmail, String apiBaseUrl) {}
 
     /** 에이전트 API 실행에 켤 toolset 전체다. */
     public record UpdateToolsetsRequest(@NotNull List<@NotBlank String> enabled) {}
 
     /** 도구 선택 화면이 보여 주는 toolset 한 줄이다. */
     public record ToolsetView(
-            String name, String label, String description, String tier,
-            boolean enabled, boolean editable, boolean requiresPrivate) {
-        static ToolsetView from(com.bifos.assistant.agent.application.AgentToolService.ToolView source) {
+            String name,
+            String label,
+            String description,
+            String tier,
+            boolean enabled,
+            boolean editable,
+            boolean requiresPrivate) {
+        static ToolsetView from(AgentToolService.ToolView source) {
             return new ToolsetView(
-                    source.name(), source.label(), source.description(), source.tier().name(),
-                    source.enabled(), source.editable(), source.requiresPrivate());
+                    source.name(),
+                    source.label(),
+                    source.description(),
+                    source.tier().name(),
+                    source.enabled(),
+                    source.editable(),
+                    source.requiresPrivate());
         }
     }
 
@@ -156,13 +164,33 @@ public final class AgentDtos {
      *
      * <p>모델 칸을 두지 않는다. 에이전트는 모델을 갖지 않고 대화가 고른다(ADR-030).
      */
-    public record AdminAgentView(Long id, String code, String name, String hermesProfile,
-            String apiBaseUrl, String costMode, String credentialScope, String visibility,
-            Long ownerUserId, boolean enabled, String flow, boolean connectorManaged) {
+    public record AdminAgentView(
+            Long id,
+            String code,
+            String name,
+            String hermesProfile,
+            String apiBaseUrl,
+            String costMode,
+            String credentialScope,
+            String visibility,
+            Long ownerUserId,
+            boolean enabled,
+            String flow,
+            boolean connectorManaged) {
         static AdminAgentView from(Agent agent) {
-            return new AdminAgentView(agent.id(), agent.code(), agent.name(), agent.hermesProfile(),
-                    agent.apiBaseUrl(), agent.costMode().name(), agent.credentialScope().name(),
-                    agent.visibility().name(), agent.ownerUserId(), agent.enabled(), agent.flow(), agent.connectorManaged());
+            return new AdminAgentView(
+                    agent.id(),
+                    agent.code(),
+                    agent.name(),
+                    agent.hermesProfile(),
+                    agent.apiBaseUrl(),
+                    agent.costMode().name(),
+                    agent.credentialScope().name(),
+                    agent.visibility().name(),
+                    agent.ownerUserId(),
+                    agent.enabled(),
+                    agent.flow(),
+                    agent.connectorManaged());
         }
     }
 }
