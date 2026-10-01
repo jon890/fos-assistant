@@ -59,6 +59,12 @@
   --transition-duration-slow: var(--duration-slow);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --animate-message-user: message-user var(--duration-base) var(--ease-spring)
+    both;
+  --animate-message-assistant: message-assistant var(--duration-base)
+    var(--ease-out) both;
+  --animate-screen-in: screen-in var(--duration-base) var(--ease-out) both;
+  --animate-fade-in: fade-in var(--duration-fast) linear both;
   --spacing-control-x-sm: 0.75rem;
   --spacing-control-x-md: 1rem;
   --spacing-control-y-sm: 0.375rem;
@@ -184,6 +190,84 @@ html {
   }
 }
 
+/* 등장 움직임이다. 새로 생긴 줄과 새로 들어온 화면에만 준다. */
+@keyframes message-user {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes message-assistant {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 내 말풍선은 꼬리가 있는 오른쪽 아래에서 커진다. */
+.animate-message-user {
+  transform-origin: 100% 100%;
+}
+
+/*
+ * 높이를 펼치고 접는다. height: auto 는 움직이지 않아 grid 의 행 크기를 0fr 에서 1fr 로 바꾼다.
+ * 접힌 내용은 높이가 0 이어도 화면 읽기와 검사에 보이는 것으로 잡히므로 visibility 로 숨긴다.
+ * 펼칠 때는 바로 보이고, 접을 때는 높이가 다 줄어든 뒤에 숨는다.
+ */
+@utility collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-slow) var(--ease-out);
+  &[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+  & > * {
+    min-height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    transition: visibility 0s linear var(--duration-slow);
+  }
+  &[data-open="true"] > * {
+    visibility: visible;
+    transition-delay: 0s;
+  }
+}
+
+/* 지우는 줄은 흐려진 뒤에 목록에서 빠진다. 빼는 시점은 useExit 이 정한다. */
+[data-leaving="true"] {
+  opacity: 0;
+  transition: opacity var(--duration-fast) linear;
+}
+
 /* 줄인 움직임 설정에서는 이동과 크기 변화를 하지 않고 짧은 흐려짐만 남긴다. 부품마다 따로 챙기지 않는다. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -202,6 +286,20 @@ html {
     --tw-exit-scale: 1 !important;
     --tw-exit-translate-x: 0 !important;
     --tw-exit-translate-y: 0 !important;
+  }
+
+  /* 등장 움직임은 이동과 크기 변화를 빼고 흐려짐만 남긴다. */
+  .animate-message-user,
+  .animate-message-assistant,
+  .animate-screen-in,
+  .animate-fade-in {
+    animation-name: fade-in !important;
+  }
+
+  /* 높이는 바로 바뀐다. */
+  .collapsible,
+  .collapsible > * {
+    transition: none !important;
   }
 }
 

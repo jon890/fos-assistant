@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useExit } from "@/components/ui/use-exit";
 import { useConversations, type Conversation } from "./conversations-provider";
 import { groupByDate } from "./group-by-date";
 import { NavPending } from "./nav-pending";
@@ -38,8 +39,15 @@ export function ConversationNav({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { conversations, loading, error, rename, remove, startNew } =
+  const { conversations, loading, error, rename, remove, drop, startNew } =
     useConversations();
+  const { exit } = useExit();
+  /** 지우기 요청이 성공해 나가는 움직임을 보이는 줄이다 */
+  const [leavingId, setLeavingId] = useState<string | null>(null);
+  /** 목록을 처음 읽어 왔을 때 있던 대화들이다. 여기 없는 줄만 새 줄로 보고 등장 움직임을 준다 */
+  const [initialIds, setInitialIds] = useState<Set<string> | null>(null);
+  if (initialIds === null && !loading && !error)
+    setInitialIds(new Set(conversations.map((item) => item.id)));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
@@ -92,10 +100,16 @@ export function ConversationNav({
     try {
       await remove(id);
       setActionError(null);
-      if (pathname === `/chat/${id}`) {
-        startNew();
-        router.push("/");
-      }
+      // 요청이 성공한 뒤에만 줄을 흐리게 하고 뺀다. 실패하면 줄이 그대로 남는다.
+      setLeavingId(id);
+      exit(() => {
+        drop(id);
+        setLeavingId(null);
+        if (pathname === `/chat/${id}`) {
+          startNew();
+          router.push("/");
+        }
+      });
     } catch (reason) {
       setActionError(
         reason instanceof Error ? reason.message : "대화를 지우지 못했어요.",
@@ -141,7 +155,13 @@ export function ConversationNav({
                 return (
                   <li
                     key={conversation.id}
-                    className="group relative flex min-w-0 items-center"
+                    data-leaving={leavingId === conversation.id || undefined}
+                    className={cn(
+                      "group relative flex min-w-0 items-center",
+                      initialIds !== null &&
+                        !initialIds.has(conversation.id) &&
+                        "animate-message-assistant",
+                    )}
                   >
                     {editingId === conversation.id ? (
                       <input

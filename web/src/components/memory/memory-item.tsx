@@ -5,17 +5,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useExit } from "@/components/ui/use-exit";
+import { cn } from "cn";
 import type { Memory } from "./memory-list";
 
 export function MemoryItem({
   memory,
   canEdit,
+  entering = false,
   onChanged,
 }: {
   memory: Memory;
   canEdit: boolean;
+  /** 화면을 연 뒤에 생긴 줄이다. 등장 움직임을 준다 */
+  entering?: boolean;
   onChanged(): Promise<void>;
 }) {
+  const { leaving, exit } = useExit();
   const [editing, setEditing] = useState(false);
   /** 보내는 중인 요청이다. 누른 단추에만 회전 표시를 두려고 어느 쪽인지 기억한다. */
   const [pending, setPending] = useState<"update" | "remove" | null>(null);
@@ -67,11 +73,18 @@ export function MemoryItem({
       setError("기억을 지우지 못했어요.");
       return;
     }
-    await onChanged();
+    // 요청이 성공한 뒤에만 줄을 흐리게 하고 목록을 다시 읽는다.
+    exit(() => void onChanged());
   }
 
   return (
-    <article className="rounded-md border border-border p-4">
+    <article
+      data-leaving={leaving || undefined}
+      className={cn(
+        "rounded-md border border-border p-4",
+        entering && "animate-message-assistant",
+      )}
+    >
       <h3 className="font-semibold">{memory.title}</h3>
       {memory.omittedFromContext ? (
         <Badge

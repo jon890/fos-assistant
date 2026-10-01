@@ -196,7 +196,8 @@ for (const { durationMs, duration } of [
   const toggle = block.getByTestId("activity-toggle");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(toggle).toHaveText("작업 과정: 찾아보고 도우미와 함께 정리했어요");
-  await expect(block.getByTestId("activity-duration")).toHaveCount(0);
+  // 접힌 내용은 높이가 움직이도록 그려 두고 숨긴다. 걸린 시간이 없는 경우에는 그 줄이 아예 없다.
+  await expect(block.getByTestId("activity-duration")).toBeHidden();
   await expectNoInternalValues(block);
   expect((await toggle.boundingBox())?.height).toBeGreaterThanOrEqual(44);
 
@@ -290,6 +291,8 @@ test("기다림 점이 있던 자리에 답이 들어와 얼굴과 첫 줄이 �
     const pending = page.getByTestId("pending-assistant");
     const dots = pending.getByRole("status", { name: "비서의 답을 기다리는 중" });
     await expect(dots).toBeVisible();
+    // 기다림 줄은 4px 올라오며 등장한다. 다 올라온 뒤의 자리를 측정한다.
+    await pending.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
     // 좁은 폭에서는 답이 오면 대화 위의 에이전트 줄이 숨어 대화 영역이 통째로 올라간다. 그래서 자리는
     // 대화 영역의 위쪽에서부터 측정한다. 그 안에서 얼굴이 움직이면 이 값이 달라진다.
     const scrollTop = () => page.getByTestId("message-scroll")

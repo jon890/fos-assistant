@@ -154,3 +154,4 @@ cd web && pnpm test:browser
 | `web/src/components/ui/tooltip.tsx` | 수정 |
 | `test/unit/design-tokens.test.ts` | 수정 |
 | `test/browser/activity-scroll.spec.ts` | 수정 |
+| `test/browser/flow-progress.spec.ts` | 수정 |

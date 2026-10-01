@@ -145,10 +145,14 @@ export function ActivityBlock(props: Props) {
 
   // 도는 중이고 사용자가 맨 아래를 보고 있을 때만 새 줄을 따라간다. 끝난 답은 맨 위부터 보인다.
   useLayoutEffect(() => {
-    // 접으면 스크롤 상자가 사라진다. 다시 펼친 새 상자는 맨 위에서 시작하므로 맨 아래를 보는 것으로 되돌린다.
-    if (!expanded) atBottomRef.current = true;
     const box = scrollRef.current;
-    if (!following || !expanded || !box || !atBottomRef.current) return;
+    if (!expanded) {
+      // 접어도 스크롤 상자는 남는다. 다시 펼치면 처음 펼친 것처럼 보이도록 맨 위로 돌리고 맨 아래를 보는 것으로 되돌린다.
+      if (box) box.scrollTop = 0;
+      atBottomRef.current = true;
+      return;
+    }
+    if (!following || !box || !atBottomRef.current) return;
     box.scrollTop = box.scrollHeight;
   }, [following, expanded, items?.length]);
 
@@ -193,7 +197,7 @@ export function ActivityBlock(props: Props) {
         <ChevronRight
           aria-hidden="true"
           className={cn(
-            "size-4 shrink-0 text-muted-foreground",
+            "size-4 shrink-0 text-muted-foreground transition-transform duration-base ease-out",
             expanded && "rotate-90",
           )}
         />
@@ -207,65 +211,73 @@ export function ActivityBlock(props: Props) {
           다시 열면 저장된 답을 볼 수 있어요.
         </p>
       ) : null}
-      {expanded ? (
-        <div className="min-w-0 border-t border-border px-3 py-2">
-          {items ? (
-            <div
-              ref={scrollRef}
-              data-testid="activity-scroll"
-              className="max-h-64 overflow-y-auto overscroll-contain"
-              onScroll={(event) => {
-                const box = event.currentTarget;
-                atBottomRef.current =
-                  box.scrollHeight - box.scrollTop - box.clientHeight <=
-                  BOTTOM_TOLERANCE_PX;
-              }}
-            >
-              <ActivityTimeline items={items} />
-            </div>
-          ) : loadFailed ? (
-            <p
-              data-testid="activity-load-error"
-              className="text-xs text-muted-foreground"
-            >
-              작업 과정을 읽지 못했어요
-              <button
-                type="button"
-                className="ml-2 underline"
-                onClick={() => {
-                  setLoadFailed(false);
-                  setLoadVersion((value) => value + 1);
+      {/* 높이가 움직이도록 접힌 동안에도 그려 둔다. 접힌 내용에는 초점과 화면 읽기가 닿지 않게 한다. */}
+      <div className="collapsible" data-open={expanded}>
+        <div aria-hidden={!expanded} inert={!expanded}>
+          <div className="min-w-0 border-t border-border px-3 py-2">
+            {items ? (
+              <div
+                ref={scrollRef}
+                data-testid="activity-scroll"
+                className="max-h-64 overflow-y-auto overscroll-contain"
+                onScroll={(event) => {
+                  // 접을 때 맨 위로 돌린 것은 사용자가 올려 읽은 것이 아니다.
+                  if (!expanded) return;
+                  const box = event.currentTarget;
+                  atBottomRef.current =
+                    box.scrollHeight - box.scrollTop - box.clientHeight <=
+                    BOTTOM_TOLERANCE_PX;
                 }}
               >
-                다시 읽기
-              </button>
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              작업 과정을 읽고 있어요
-            </p>
-          )}
-          {duration !== null || props.onOpenPanel ? (
-            <div className="mt-2 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              {duration !== null ? (
-                <span data-testid="activity-duration" className="tabular-nums">
-                  걸린 시간 {duration}
-                </span>
-              ) : null}
-              {props.onOpenPanel ? (
+                <ActivityTimeline items={items} />
+              </div>
+            ) : loadFailed ? (
+              <p
+                data-testid="activity-load-error"
+                className="text-xs text-muted-foreground"
+              >
+                작업 과정을 읽지 못했어요
                 <button
                   type="button"
-                  data-testid="activity-open-panel"
-                  onClick={props.onOpenPanel}
-                  className="ml-auto underline underline-offset-4"
+                  className="ml-2 underline"
+                  onClick={() => {
+                    setLoadFailed(false);
+                    setLoadVersion((value) => value + 1);
+                  }}
                 >
-                  자세히 보기
+                  다시 읽기
                 </button>
-              ) : null}
-            </div>
-          ) : null}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                작업 과정을 읽고 있어요
+              </p>
+            )}
+            {duration !== null || props.onOpenPanel ? (
+              <div className="mt-2 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                {duration !== null ? (
+                  <span
+                    data-testid="activity-duration"
+                    className="tabular-nums"
+                  >
+                    걸린 시간 {duration}
+                  </span>
+                ) : null}
+                {props.onOpenPanel ? (
+                  <button
+                    type="button"
+                    data-testid="activity-open-panel"
+                    onClick={props.onOpenPanel}
+                    className="ml-auto underline underline-offset-4"
+                  >
+                    자세히 보기
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

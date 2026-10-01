@@ -156,3 +156,35 @@ test("화면 코드가 토큰 밖의 모서리 값을 쓰지 않는다", async (
   }
   assert.deepEqual(found, [], `토큰 밖의 모서리 값: ${found.join(", ")}`);
 });
+
+/** web/src 의 .ts 와 .tsx 를 줄 단위로 읽어 `pattern` 에 걸린 곳을 `파일:줄 낱말` 로 모은다. */
+async function findInSources(pattern: RegExp, allowed: (match: RegExpMatchArray) => boolean = () => false): Promise<string[]> {
+  const entries = await readdir(WEB_SRC, { recursive: true, withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+    .map((entry) => join(entry.parentPath, entry.name));
+  assert.notEqual(files.length, 0, "web/src 에서 .ts 와 .tsx 파일을 찾지 못했다");
+
+  const found: string[] = [];
+  for (const file of files) {
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    lines.forEach((line, index) => {
+      for (const match of line.matchAll(pattern)) {
+        if (!allowed(match)) found.push(`${relative(WEB_SRC, file)}:${index + 1} ${match[0]}`);
+      }
+    });
+  }
+  return found;
+}
+
+test("화면 코드가 움직임의 길이를 숫자로 적지 않는다", async () => {
+  const found = await findInSources(/duration-(?:100|150|200|300)\b/g);
+  assert.deepEqual(found, [], `토큰 밖의 움직임 길이: ${found.join(", ")}`);
+});
+
+test("motion-reduce: 는 끝없이 도는 움직임을 끄고 대체 문장으로 바꾸는 데에만 쓴다", async () => {
+  // 줄인 움직임은 globals.css 의 블록 하나가 정한다. 부품은 끝없이 도는 표시를 끄거나 그 자리를 문장으로 바꿀 때만 적는다.
+  const allowedTargets = new Set(["animate-none", "hidden", "flex", "inline"]);
+  const found = await findInSources(/motion-reduce:([\w-]+)/g, (match) => allowedTargets.has(match[1]));
+  assert.deepEqual(found, [], `motion-reduce: 를 허용하지 않는 곳에 썼다: ${found.join(", ")}`);
+});

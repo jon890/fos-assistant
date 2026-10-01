@@ -229,6 +229,8 @@ export function MessageBubble({
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
   const attachments = turn.attachments ?? [];
+  // 저장되기 전의 줄은 임시 문자열 id 를 갖는다. 등장 움직임은 그 줄에만 줘서, 대화를 열 때와 답이 저장될 때 다시 움직이지 않게 한다.
+  const unsaved = typeof turn.id === "string";
 
   if (turn.role === "SYSTEM") {
     // 사람이 쓴 말도 비서의 답도 아니다. 복사, 다시 생성, 판 넘기기를 두지 않는다.
@@ -256,6 +258,7 @@ export function MessageBubble({
           className={cn(
             "relative max-w-[70%] rounded-xl rounded-br-sm bg-primary-soft px-4 py-2.5",
             "group-focus-visible:outline-2 group-focus-visible:outline-ring",
+            unsaved && "animate-message-user",
           )}
         >
           <p className="whitespace-pre-wrap break-words text-sm leading-6">
@@ -339,7 +342,11 @@ export function MessageBubble({
           />
         </div>
       ) : null}
-      <div data-testid="assistant-body" className="leading-7">
+      {/* 기다림 점이 있던 자리에 답이 들어올 때는 흐려짐으로만 바뀐다. */}
+      <div
+        data-testid="assistant-body"
+        className={cn("leading-7", unsaved && "animate-fade-in")}
+      >
         <AnswerBody
           content={turn.content}
           streaming={streaming}

@@ -165,7 +165,12 @@ export function MessageList({
     const element = scrollRef.current;
     if (!element) return;
     shouldFollow.current = true;
-    element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
     setHasNewMessage(false);
   };
 
@@ -249,7 +254,7 @@ export function MessageList({
                       {isLast && hasNoAnswer ? (
                         <li
                           data-testid="no-answer"
-                          className="-mt-4 flex items-center justify-end gap-2 text-xs text-muted-foreground"
+                          className="-mt-4 flex animate-fade-in items-center justify-end gap-2 text-xs text-muted-foreground"
                         >
                           <span>답을 받지 못했어요</span>
                           {onRetry ? (
@@ -269,12 +274,15 @@ export function MessageList({
                 },
               )}
               {pendingActivity || waiting ? (
-                <AssistantRow data-testid="pending-assistant">
+                <AssistantRow
+                  data-testid="pending-assistant"
+                  className="animate-message-assistant"
+                >
                   {pendingActivity ? liveActivityBlock : <WaitingIndicator />}
                 </AssistantRow>
               ) : null}
               {turnError ? (
-                <li data-testid="turn-error">
+                <li data-testid="turn-error" className="animate-fade-in">
                   <Notice variant="error">
                     {turnError}
                     {onRetry && !hasNoAnswer ? (

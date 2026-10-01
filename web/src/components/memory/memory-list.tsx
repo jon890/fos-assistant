@@ -41,6 +41,10 @@ export function MemoryList({
   currentUserId?: number;
 }) {
   const [memories, setMemories] = useState(initialMemories);
+  /** 화면을 처음 그릴 때 있던 기억들이다. 여기 없는 줄만 새 줄로 보고 등장 움직임을 준다 */
+  const [initialIds] = useState(
+    () => new Set(initialMemories.map((memory) => memory.id)),
+  );
   async function reload() {
     const response = await fetch("/api/memories", { cache: "no-store" });
     if (response.ok) {
@@ -85,6 +89,7 @@ export function MemoryList({
               key={memory.id}
               memory={memory}
               canEdit={isAdmin}
+              entering={!initialIds.has(memory.id)}
               onChanged={reload}
             />
           ))
@@ -101,6 +106,7 @@ export function MemoryList({
               key={memory.id}
               memory={memory}
               canEdit={memory.ownerUserId === currentUserId}
+              entering={!initialIds.has(memory.id)}
               onChanged={reload}
             />
           ))

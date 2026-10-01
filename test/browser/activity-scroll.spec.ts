@@ -46,6 +46,13 @@ test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 맨 아래
     await expect(items).toHaveCount(42);
     await expect.poll(async () => (await measure()).fromBottom).toBeLessThanOrEqual(16);
 
+    // 접어도 스크롤 상자는 남는다. 도는 중에 접었다가 다시 펼치면 맨 아래부터 따라간다.
+    await title.click();
+    await expect(scroll).toBeHidden();
+    await title.click();
+    await expect(scroll).toBeVisible();
+    await expect.poll(async () => (await measure()).fromBottom).toBeLessThanOrEqual(16);
+
     // 사용자가 위로 올려 읽는 중이면 새 줄이 와도 따라가지 않는다.
     await scroll.evaluate((element) => new Promise<void>((done) => {
       element.scrollTop = 0;
