@@ -6,7 +6,7 @@ import {
   LoaderCircle,
   Square,
 } from "lucide-react";
-import { formatDuration, formatTokens } from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 import {
   activityLabel,
   type ActivityItem,
@@ -84,26 +84,6 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
             ) : null}
             {item.kind === "tool" && item.detail ? (
               <p className="break-words text-muted-foreground">{item.detail}</p>
-            ) : null}
-            {item.kind === "subagent" &&
-            (item.model ||
-              item.inputTokens !== null ||
-              item.outputTokens !== null ||
-              item.state === "result-missing") ? (
-              <p className="break-words text-muted-foreground">
-                {[
-                  item.model,
-                  item.state === "result-missing" ? "결과를 받지 못함" : null,
-                  item.inputTokens === null && item.state !== "result-missing"
-                    ? null
-                    : `입력 ${formatTokens(item.inputTokens)}`,
-                  item.outputTokens === null && item.state !== "result-missing"
-                    ? null
-                    : `출력 ${formatTokens(item.outputTokens)}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
             ) : null}
           </div>
         </li>

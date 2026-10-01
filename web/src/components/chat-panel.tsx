@@ -25,7 +25,11 @@ import { ArtifactPanel } from "./chat/artifact/artifact-panel";
 import type { Turn } from "./chat/message-bubble";
 import { useConversations } from "./shell/conversations-provider";
 import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
-import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
+import {
+  useShellDisplayName,
+  useShellIsAdmin,
+  useShellTitle,
+} from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 import { agentLabel } from "@/lib/format";
 import type { ChatEvent } from "@/lib/chat-event";
@@ -196,6 +200,7 @@ export function ChatPanel({
   const { conversations, refresh, replace, newConversationVersion } =
     useConversations();
   const displayName = useShellDisplayName();
+  const isAdmin = useShellIsAdmin();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(
     initialConversationId,
@@ -1647,6 +1652,7 @@ export function ChatPanel({
         {startScreen ? null : (
           <MessageList
             turns={turns}
+            isAdmin={isAdmin}
             loading={messagesLoading}
             sending={sending}
             activity={activity}
@@ -1769,6 +1775,8 @@ export function ChatPanel({
             modelChoiceUnknown={
               conversationId !== null && currentConversation === undefined
             }
+            modelSelectionMode={currentConversation?.modelSelectionMode ?? null}
+            modelTier={currentConversation?.modelTier ?? null}
             // 저장 응답으로 그 줄만 바꾼다. 목록을 다시 읽으면 먼저 나간 읽기가 늦게 와 저장한 줄을 저장 전의 줄로 되돌릴 수 있다.
             onModelChoiceSaved={replace}
           />

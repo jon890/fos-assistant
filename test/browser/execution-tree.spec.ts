@@ -1,5 +1,5 @@
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import { expect, test } from "./fixtures.ts";
+import { expect, setSession, test } from "./fixtures.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
 async function controlPlaneToken(): Promise<string> {
@@ -36,12 +36,21 @@ function deepTreeFixture(depth: number) {
       agentCode: `깊은-에이전트-${level}`,
       agentName: `아주 길고 긴 하위 에이전트 이름을 넣어 가로 폭을 시험하는 자리 ${level}`,
       status: "SUCCEEDED",
+      provider: "openai-codex",
       model: "example-model",
       inputTokens: 10,
+      cachedInputTokens: 4,
       outputTokens: 20,
       estimatedCostMicros: 1000,
       latencyMs: 500,
       startedAt: new Date().toISOString(),
+      reasoningEffort: "medium",
+      reasoningEffortSource: "PROFILE_DEFAULT",
+      modelTier: "BALANCED",
+      requestReceivedAt: "2026-10-01T00:00:00.000Z",
+      submittedAt: "2026-10-01T00:00:00.100Z",
+      firstDeltaAt: "2026-10-01T00:00:00.300Z",
+      finishedAt: "2026-10-01T00:00:01.000Z",
       events: [
         {
           sequence: 1,
@@ -74,7 +83,7 @@ function deepTreeFixture(depth: number) {
  * <p>자식은 Memory 제안 실행처럼 하위 에이전트와 무관하게 달릴 수 있다. 그런 자식이 있어도
  * `SUBAGENT_STARTED` 줄이 사라지면 안 된다는 것을 이 나무로 확인한다.
  */
-function treeWithChildAndSubagentFixture() {
+function treeWithChildAndSubagentFixture(usageStatus: "WAITING" | "RECORDED" | "UNCONFIRMED" | null = null) {
   return {
     truncated: false,
     root: {
@@ -98,6 +107,7 @@ function treeWithChildAndSubagentFixture() {
           durationMs: null,
           detail: "하위 에이전트가 찾기 시작했다",
           occurredAt: new Date().toISOString(),
+          subagentUsageStatus: usageStatus,
         },
         {
           sequence: 2,
@@ -140,6 +150,53 @@ test("자식 노드가 있어도 하위 에이전트 사건 줄이 사라지지 
   await expect(tree).toBeVisible();
   expect(await tree.locator("[data-testid=execution-node]").count()).toBe(2);
   await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(1);
+});
+
+test("하위 에이전트 사용량 확인 상태를 실패와 다르게 보인다", async ({ page }) => {
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: treeWithChildAndSubagentFixture("WAITING") });
+  });
+  await page.goto("/executions/950");
+  await expect(page.getByText("수치 확인 중", { exact: true })).toBeVisible();
+  await expect(page.getByText("실패", { exact: true })).toHaveCount(0);
+
+  await page.unroute("**/api/usage/executions/*/tree");
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: treeWithChildAndSubagentFixture("UNCONFIRMED") });
+  });
+  await page.reload();
+  await expect(page.getByText("사용량 미확인", { exact: true })).toBeVisible();
+});
+
+test("실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 기록된 시각만 보인다", async ({ page }) => {
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: deepTreeFixture(1) });
+  });
+  await page.goto("/executions/900");
+
+  await expect(page.getByText("openai-codex · example-model", { exact: true })).toBeVisible();
+  await expect(page.getByText("균형", { exact: true })).toBeVisible();
+  await expect(page.getByText("기본값 medium", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("execution-timing")).toContainText("요청 수신");
+  await expect(page.getByTestId("execution-node-runtime").first()).toContainText("균형");
+});
+
+test("MEMBER는 실행 상세에서 단계와 걸린 시간만 본다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  await page.route("**/api/usage/executions/*/tree", async (route) => {
+    await route.fulfill({ json: deepTreeFixture(1) });
+  });
+  await page.goto("/executions/900");
+
+  await expect(page.getByText("균형", { exact: true })).toBeVisible();
+  await expect(page.getByText("500ms", { exact: true })).toBeVisible();
+  await expect(page.getByText("openai-codex · example-model", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("기본값 medium", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("입력 토큰", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("환산 금액", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("execution-timing")).toHaveCount(0);
+  await expect(page.getByTestId("execution-node-runtime")).toHaveCount(0);
+  await expect(page.getByTestId("execution-node-tokens")).toHaveCount(0);
 });
 
 test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보인다", async ({ page }) => {

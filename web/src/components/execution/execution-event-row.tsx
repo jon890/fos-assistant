@@ -16,6 +16,7 @@ export type MergedEventRow =
       key: number;
       subagentName: string | null;
       detail: string | null;
+      usageStatus: "WAITING" | "RECORDED" | "UNCONFIRMED" | null;
     }
   | { kind: "error"; key: number; detail: string | null }
   | { kind: "cancelled"; key: number };
@@ -49,6 +50,9 @@ export function ExecutionEventRow({ row }: { row: MergedEventRow }) {
       >
         하위 에이전트: {subagentLabel(row.subagentName, row.detail)}
         {row.subagentName?.trim() && row.detail ? ` · ${row.detail}` : ""}
+        {usageStatusLabel(row.usageStatus)
+          ? ` · ${usageStatusLabel(row.usageStatus)}`
+          : ""}
       </li>
     );
   }
@@ -73,4 +77,14 @@ export function ExecutionEventRow({ row }: { row: MergedEventRow }) {
       {row.detail ? ` · ${row.detail}` : ""}
     </li>
   );
+}
+
+/** 사용량 보완은 실행 성공과 별개라 실패 상태와 같은 모양이나 문구를 쓰지 않는다. */
+function usageStatusLabel(
+  status: Extract<MergedEventRow, { kind: "subagent" }>["usageStatus"],
+): string | null {
+  if (status === "WAITING") return "수치 확인 중";
+  if (status === "UNCONFIRMED") return "사용량 미확인";
+  if (status === "RECORDED") return "수치 확인됨";
+  return null;
 }

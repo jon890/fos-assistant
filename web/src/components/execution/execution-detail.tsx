@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { formatCost, formatDuration, formatTokens } from "@/lib/format";
+import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+  formatWhen,
+} from "@/lib/format";
+import { useShellIsAdmin } from "@/components/shell/app-shell";
 import {
   ExecutionTree,
   type ExecutionTreeNode,
@@ -36,9 +42,47 @@ function statusLabel(status: string): string {
   return status;
 }
 
+function tierLabel(tier: ExecutionTreeNode["modelTier"]): string {
+  if (tier === "FAST") return "빠르게";
+  if (tier === "BALANCED") return "균형";
+  if (tier === "DEEP") return "깊게";
+  return "-";
+}
+
+function effortSourceLabel(node: ExecutionTreeNode): string {
+  if (node.reasoningEffort === null || node.reasoningEffort === undefined)
+    return "미확인";
+  if (node.reasoningEffortSource === "PROFILE_DEFAULT")
+    return `기본값 ${node.reasoningEffort}`;
+  if (node.reasoningEffortSource === "UNKNOWN") return "미확인";
+  return `선택한 값 ${node.reasoningEffort}`;
+}
+
+function recordedTimes(
+  node: ExecutionTreeNode,
+): Array<{ label: string; value: string }> {
+  return [
+    { label: "요청 수신", value: node.requestReceivedAt },
+    { label: "Hermes 제출", value: node.submittedAt },
+    { label: "첫 응답", value: node.firstDeltaAt },
+    { label: "완료", value: node.finishedAt },
+  ].filter(
+    (item): item is { label: string; value: string } =>
+      item.value !== null && item.value !== undefined,
+  );
+}
+
+function interval(from: string, to: string): string | null {
+  const milliseconds = new Date(to).getTime() - new Date(from).getTime();
+  return Number.isFinite(milliseconds) && milliseconds >= 0
+    ? formatDuration(milliseconds)
+    : null;
+}
+
 /** 실행 하나의 머리 요약과 나무를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다. */
 export function ExecutionDetail({ executionId }: { executionId: number }) {
   const router = useRouter();
+  const isAdmin = useShellIsAdmin();
   const [state, setState] = useState<FetchState>({ kind: "loading" });
 
   useEffect(() => {
@@ -87,6 +131,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
 
   const summary = findNode(state.tree.root, executionId) ?? state.tree.root;
   const running = summary.status === "RUNNING";
+  const times = recordedTimes(summary);
 
   return (
     <div>
@@ -111,26 +156,52 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
               </Badge>
             </dd>
           </div>
+          {isAdmin ? (
+            <div>
+              <dt className="text-muted-foreground">모델</dt>
+              <dd className="truncate">
+                {[summary.provider, summary.model]
+                  .filter(Boolean)
+                  .join(" · ") || "-"}
+              </dd>
+            </div>
+          ) : null}
           <div>
-            <dt className="text-muted-foreground">모델</dt>
-            <dd className="truncate">{summary.model ?? "-"}</dd>
+            <dt className="text-muted-foreground">단계</dt>
+            <dd>{tierLabel(summary.modelTier)}</dd>
           </div>
-          <div>
-            <dt className="text-muted-foreground">입력 토큰</dt>
-            <dd className="tabular-nums">
-              {formatTokens(summary.inputTokens)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">출력 토큰</dt>
-            <dd className="tabular-nums">
-              {formatTokens(summary.outputTokens)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">환산 금액</dt>
-            <dd>{formatCost(summary.estimatedCostMicros, null)}</dd>
-          </div>
+          {isAdmin ? (
+            <>
+              <div>
+                <dt className="text-muted-foreground">리즈닝 강도</dt>
+                <dd>{effortSourceLabel(summary)}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">입력 토큰</dt>
+                <dd className="tabular-nums">
+                  {formatTokens(summary.inputTokens)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">출력 토큰</dt>
+                <dd className="tabular-nums">
+                  {formatTokens(summary.outputTokens)}
+                </dd>
+              </div>
+              {summary.cachedInputTokens === undefined ? null : (
+                <div>
+                  <dt className="text-muted-foreground">캐시 토큰</dt>
+                  <dd className="tabular-nums">
+                    {formatTokens(summary.cachedInputTokens ?? null)}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-muted-foreground">환산 금액</dt>
+                <dd>{formatCost(summary.estimatedCostMicros, null)}</dd>
+              </div>
+            </>
+          ) : null}
           <div>
             <dt className="text-muted-foreground">걸린 시간</dt>
             <dd>
@@ -140,8 +211,34 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
             </dd>
           </div>
         </dl>
+        {isAdmin && times.length > 0 ? (
+          <dl
+            className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4"
+            data-testid="execution-timing"
+          >
+            {times.map((item, index) => (
+              <div key={item.label}>
+                <dt className="text-muted-foreground">{item.label}</dt>
+                <dd className="tabular-nums">{formatWhen(item.value)}</dd>
+                {index === 0
+                  ? null
+                  : (() => {
+                      const elapsed = interval(
+                        times[index - 1].value,
+                        item.value,
+                      );
+                      return elapsed === null ? null : (
+                        <span className="text-xs text-muted-foreground">
+                          앞 단계 뒤 {elapsed}
+                        </span>
+                      );
+                    })()}
+              </div>
+            ))}
+          </dl>
+        ) : null}
       </header>
-      <ExecutionTree tree={state.tree} />
+      <ExecutionTree tree={state.tree} showRuntime={isAdmin} />
     </div>
   );
 }

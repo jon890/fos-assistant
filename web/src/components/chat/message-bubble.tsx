@@ -152,6 +152,7 @@ function ArtifactList({
 
 export function MessageBubble({
   turn,
+  isAdmin,
   conversationId,
   onOpenSaved,
   initialActivityExpanded,
@@ -168,6 +169,8 @@ export function MessageBubble({
   skillCommandChip = false,
 }: {
   turn: Turn;
+  /** 모델 제공사와 모델 전환 안내는 관리자만 본다. */
+  isAdmin: boolean;
   conversationId: string | null;
   onOpenSaved(executionId: number): void;
   initialActivityExpanded: boolean;
@@ -276,7 +279,7 @@ export function MessageBubble({
         비
       </span>
       <div className="min-w-0">
-        {turn.switchedTo ? (
+        {isAdmin && turn.switchedTo ? (
           <p
             className="mb-1 text-xs text-muted-foreground"
             data-testid="provider-switched"

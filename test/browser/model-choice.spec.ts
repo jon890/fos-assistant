@@ -30,6 +30,17 @@ function effortSelect(page: Page): Locator {
   return dialog(page).getByRole("combobox", { name: "effort", exact: true });
 }
 
+const TIERS = {
+  tiers: [
+    { tier: "FAST", label: "빠르게", provider: "openai-codex", model: "gpt-6-luna", reasoningEffort: "low" },
+    { tier: "BALANCED", label: "균형", provider: "openai-codex", model: "gpt-6-luna", reasoningEffort: "medium" },
+    { tier: "DEEP", label: "깊게", provider: "openai-codex", model: "gpt-6.1-sol", reasoningEffort: "high" },
+  ],
+  userDefaultTier: null,
+  groupDefaultTier: null,
+  admin: false,
+};
+
 /**
  * 저장이 끝났는지 본다. 단추는 저장하는 동안 고른 값을 먼저 보이므로 글자만으로는 저장됐는지 알 수 없다.
  * 저장이 끝나 대화 목록의 그 줄이 바뀌어야 단추가 다시 눌린다.
@@ -106,6 +117,49 @@ test("고르지 않고 보내면 실행 요청에 provider 와 model 이 빠진�
   expect(runtime.model, "기본값으로 보낸 실행의 model").toBeUndefined();
   expect(runtime.reasoningEffort, "기본값으로 보낸 실행의 effort").toBeUndefined();
   await expect(picker(page)).toHaveText("기본");
+});
+
+test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전트 기본값으로 돌아갈 수 있다", async ({ page }) => {
+  const savedBodies: unknown[] = [];
+  await page.route((url) => url.pathname === "/api/chat/model-tiers", (route) => route.fulfill({ json: TIERS }));
+  await page.route((url) => /\/api\/chat\/conversations\/[^/]+\/model-tier$/.test(url.pathname), async (route) => {
+    savedBodies.push(route.request().postDataJSON());
+    await route.fulfill({
+      json: {
+        id: route.request().url().split("/").at(-2),
+        title: "새 대화",
+        agentCode: "browser",
+        agentName: "브라우저 비서",
+        updatedAt: new Date().toISOString(),
+        provider: null,
+        model: null,
+        reasoningEffort: null,
+        modelSelectionMode: savedBodies.length === 1 ? "TIER" : "DEFAULT",
+        modelTier: savedBodies.length === 1 ? "DEEP" : null,
+      },
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("model-tier-picker")).toContainText("빠르게");
+  await expect(page.getByTestId("model-tier-picker")).toContainText("균형");
+  await expect(page.getByTestId("model-tier-picker")).toContainText("깊게");
+  await expect(page.getByRole("button", { name: "그룹 단계 설정" })).toHaveCount(0);
+
+  await page.getByTestId("model-tier-deep").click();
+  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute("data-variant", "secondary");
+  await page.getByTestId("model-tier-profile-default").click();
+
+  expect(savedBodies).toEqual([{ mode: "TIER", tier: "DEEP" }, { mode: "DEFAULT", tier: null }]);
+});
+
+test("관리자에게만 그룹 단계 설정을 보인다", async ({ page }) => {
+  await page.route((url) => url.pathname === "/api/chat/model-tiers", (route) => route.fulfill({
+    json: { ...TIERS, admin: true },
+  }));
+
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "그룹 단계 설정" })).toBeVisible();
 });
 
 test("effort 를 받지 않는 모델을 고르면 effort 를 고를 수 없다", async ({ page }) => {

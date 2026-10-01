@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
+import {
+  getModelTiers,
+  saveDefaultTier,
+  saveGroupTiers,
+  type ModelSelectionMode,
+  type ModelTier,
+  type ModelTierCode,
+  type ModelTiers,
+} from "@/lib/model-tiers";
 
 /** 대화에 적힌 모델 선택이다. 셋 다 null 이면 그 profile 의 기본값으로 돈다 */
 export type ModelChoice = {
@@ -98,6 +108,8 @@ function sameChoice(left: ModelChoice | null, right: ModelChoice): boolean {
  * 이 부품은 안내를 더 띄우지 않는다. 두 안내가 겹치면 무엇이 실패했는지 읽기 어렵다.
  */
 export type ModelChoiceSaveResult = "saved" | "failed" | "reported";
+
+export type ModelTierSaveResult = ModelChoiceSaveResult;
 
 type Props = {
   agentCode: string;
@@ -209,6 +221,7 @@ export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
 
   return (
     <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
+      <span className="px-2 text-xs text-muted-foreground">고급</span>
       <Dialog open={open} onOpenChange={changeOpen}>
         <DialogTrigger asChild>
           <Button
@@ -314,6 +327,324 @@ export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
           모델을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+type TierPickerProps = {
+  agentCode: string;
+  mode: ModelSelectionMode | null;
+  tier: ModelTierCode | null;
+  disabled: boolean;
+  onChange(
+    mode: "DEFAULT" | "TIER",
+    tier: ModelTierCode | null,
+  ): Promise<ModelTierSaveResult>;
+};
+
+const FALLBACK_TIERS: ModelTier[] = [
+  {
+    tier: "FAST",
+    label: "빠르게",
+    provider: null,
+    model: "gpt-6-luna",
+    reasoningEffort: "low",
+  },
+  {
+    tier: "BALANCED",
+    label: "균형",
+    provider: null,
+    model: "gpt-6-luna",
+    reasoningEffort: "medium",
+  },
+  {
+    tier: "DEEP",
+    label: "깊게",
+    provider: null,
+    model: "gpt-6.1-sol",
+    reasoningEffort: "high",
+  },
+];
+
+function defaultTierLabel(
+  tiers: ModelTier[],
+  tier: ModelTierCode | null,
+): string {
+  return tiers.find((item) => item.tier === tier)?.label ?? "없음";
+}
+
+/** 입력창 가까이에서 세 단계와 기본값을 고른다. 고급 직접 선택은 `ModelPicker`가 맡는다. */
+export function ModelTierPicker({
+  agentCode,
+  mode,
+  tier,
+  disabled,
+  onChange,
+}: TierPickerProps) {
+  const [state, setState] = useState<{
+    loading: boolean;
+    data: ModelTiers | null;
+  }>({ loading: true, data: null });
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [draftTiers, setDraftTiers] = useState<ModelTier[]>(FALLBACK_TIERS);
+  const [groupDefaultTier, setGroupDefaultTier] =
+    useState<ModelTierCode | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getModelTiers(agentCode).then((result) => {
+      if (!active) return;
+      if (result.ok) {
+        setState({ loading: false, data: result.data });
+        setDraftTiers(result.data.tiers);
+        setGroupDefaultTier(result.data.groupDefaultTier);
+      } else {
+        setState({ loading: false, data: null });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [agentCode]);
+
+  const tiers = state.data?.tiers ?? FALLBACK_TIERS;
+  const selectedTier = mode === "TIER" ? tier : null;
+
+  async function choose(nextTier: ModelTierCode) {
+    setSaving(true);
+    setFailed(false);
+    const result = await onChange("TIER", nextTier);
+    setSaving(false);
+    if (result === "failed") setFailed(true);
+  }
+
+  async function returnToProfileDefault() {
+    setSaving(true);
+    setFailed(false);
+    const result = await onChange("DEFAULT", null);
+    setSaving(false);
+    if (result === "failed") setFailed(true);
+  }
+
+  async function saveOwnDefault(nextTier: ModelTierCode | null) {
+    const result = await saveDefaultTier(nextTier);
+    if (result.ok) {
+      setState((current) =>
+        current.data === null
+          ? current
+          : {
+              ...current,
+              data: { ...current.data, userDefaultTier: nextTier },
+            },
+      );
+      setDefaultsOpen(false);
+    }
+  }
+
+  function updateDraft(
+    tier: ModelTierCode,
+    field: keyof Pick<ModelTier, "provider" | "model" | "reasoningEffort">,
+    value: string,
+  ) {
+    setDraftTiers((current) =>
+      current.map((item) =>
+        item.tier === tier
+          ? { ...item, [field]: field === "provider" ? value || null : value }
+          : item,
+      ),
+    );
+  }
+
+  async function saveGroup() {
+    const result = await saveGroupTiers(draftTiers, groupDefaultTier);
+    if (result.ok) {
+      setState((current) =>
+        current.data === null
+          ? current
+          : {
+              ...current,
+              data: { ...current.data, tiers: draftTiers, groupDefaultTier },
+            },
+      );
+      setGroupOpen(false);
+    }
+  }
+
+  return (
+    <div
+      className="flex min-w-0 flex-wrap items-center gap-1"
+      data-testid="model-tier-picker"
+    >
+      {tiers.map((item) => (
+        <Button
+          key={item.tier}
+          type="button"
+          size="sm"
+          variant={selectedTier === item.tier ? "secondary" : "ghost"}
+          disabled={disabled || state.loading || state.data === null || saving}
+          data-testid={`model-tier-${item.tier.toLowerCase()}`}
+          onClick={() => void choose(item.tier)}
+        >
+          {item.label}
+        </Button>
+      ))}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={disabled || saving}
+        data-testid="model-tier-profile-default"
+        onClick={() => void returnToProfileDefault()}
+      >
+        에이전트 기본값
+      </Button>
+      <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
+        <DialogTrigger asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={state.data === null}
+          >
+            내 기본값
+          </Button>
+        </DialogTrigger>
+        <DialogContent closeLabel="내 기본값 닫기">
+          <DialogHeader>
+            <DialogTitle>내 기본값</DialogTitle>
+            <DialogDescription>
+              새 대화에서 먼저 쓸 단계를 고르세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {tiers.map((item) => (
+              <Button
+                key={item.tier}
+                variant="outline"
+                onClick={() => void saveOwnDefault(item.tier)}
+              >
+                {item.label}
+                {state.data?.userDefaultTier === item.tier
+                  ? " · 지금 기본값"
+                  : ""}
+              </Button>
+            ))}
+            <Button variant="outline" onClick={() => void saveOwnDefault(null)}>
+              내 기본값 지우기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {state.data?.admin ? (
+        <Dialog open={groupOpen} onOpenChange={setGroupOpen}>
+          <DialogTrigger asChild>
+            <Button type="button" size="sm" variant="ghost">
+              그룹 단계 설정
+            </Button>
+          </DialogTrigger>
+          <DialogContent
+            closeLabel="그룹 단계 설정 닫기"
+            className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
+          >
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveGroup();
+              }}
+              className="grid gap-4"
+            >
+              <DialogHeader>
+                <DialogTitle>그룹 단계 설정</DialogTitle>
+                <DialogDescription>
+                  다음 실행부터 각 단계에 이 모델과 강도를 적용해요.
+                </DialogDescription>
+              </DialogHeader>
+              {draftTiers.map((item) => (
+                <fieldset
+                  key={item.tier}
+                  className="grid gap-2 rounded-md border border-border p-3"
+                >
+                  <legend className="px-1 text-sm font-medium">
+                    {item.label}
+                  </legend>
+                  <label className="grid gap-1 text-sm">
+                    모델 제공사
+                    <Input
+                      value={item.provider ?? ""}
+                      onChange={(event) =>
+                        updateDraft(item.tier, "provider", event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    모델
+                    <Input
+                      required
+                      value={item.model}
+                      onChange={(event) =>
+                        updateDraft(item.tier, "model", event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    강도
+                    <Input
+                      required
+                      value={item.reasoningEffort}
+                      onChange={(event) =>
+                        updateDraft(
+                          item.tier,
+                          "reasoningEffort",
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </label>
+                </fieldset>
+              ))}
+              <label className="grid gap-1 text-sm">
+                그룹 기본값
+                <NativeSelect
+                  value={groupDefaultTier ?? ""}
+                  onChange={(event) =>
+                    setGroupDefaultTier(
+                      (event.target.value || null) as ModelTierCode | null,
+                    )
+                  }
+                >
+                  <option value="">없음</option>
+                  {draftTiers.map((item) => (
+                    <option key={item.tier} value={item.tier}>
+                      {item.label}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <DialogFooter>
+                <Button type="submit">저장</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+      {failed ? (
+        <p role="alert" className="text-xs text-destructive">
+          단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
+        </p>
+      ) : null}
+      {state.data ? null : (
+        <p className="text-xs text-muted-foreground">
+          단계를 불러오지 못했어요.
+        </p>
+      )}
+      {mode === "DEFAULT" ? null : (
+        <span className="sr-only">
+          선택한 단계: {defaultTierLabel(tiers, selectedTier)}
+        </span>
+      )}
     </div>
   );
 }
