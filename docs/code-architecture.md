@@ -725,11 +725,12 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | 자리 | 맡는 것 |
 | --- | --- |
 | `orchestration.application.AgentDelegationService` | 위임 실행이 끝나면 `run()` 의 `finally` 에서 `DelegationFinished(conversationId, executionId)` 사건을 낸다. `chat` 을 직접 부르지 않는다 |
-| `chat.application.DelegationWakeService` | 사건과 turn 종료를 받아 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 기동할 때 전하지 않은 결과가 있는 대화를 한 번 훑는다. `OrphanedExecutionSweeper` 보다 뒤에 돈다 |
+| `chat.application.NextTurnDispatcher` | 위임 종료 사건, turn 종료, 기동을 받아 다음 turn 을 정한다. 대기 메시지를 먼저 보고 보낼 것이 없으면 깨우기 서비스에 넘긴다. 아래 「응답 중 대기열」 이 갖는다 |
+| `chat.application.DelegationWakeService` | 그 대화를 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 사건과 turn 종료를 직접 듣지 않는다 |
 | `chat.application.DelegationWakeProperties` | `assistant.delegation-wake.enabled`, `max-auto-turns`. 테스트 profile 은 끈다. 같은 H2 와 대역 Hermes 를 쓰는 다른 검사에서 자동 turn 이 열리지 않게 하기 위해서다 |
 | `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
-| `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(깨우기 서비스)를 부른다 |
-| `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 자동 turn 의 사건을 모든 구독에 보낸다 |
+| `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(`NextTurnDispatcher`)를 `TurnClosed(conversationId, stopped)` 로 부른다 |
+| `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 요청한 연결이 없는 turn(자동 turn, 대기 메시지로 연 turn)의 사건을 모든 구독에 보낸다 |
 | `chat.presentation.ConversationEventController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다. 보내기 전에 `forViewer` 를 적용한다(ADR-038) |
 | `mcp.application.McpToolService` | `agent_status` 와 `agent_stop` 이 끝난 상태를 돌려주면 `result_delivered_at` 을 적는다. `agent_delegate` 가 줄을 만든 뒤 `SUBMIT_FAILED` 를 돌려줄 때도 위임 서비스가 적는다 |
 | 웹 `app/api/chat/conversations/[conversationId]/events/route.ts` | 대화 단위 SSE 를 그대로 넘긴다 |
@@ -778,7 +779,11 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | `POST /api/v1/chat/messages/stream` | 사건으로 받는다 |
 | `POST /api/v1/chat/conversations/{id}/regenerate/stream` | 마지막 답을 다시 만든다. 본문이 없다 |
 | `POST /api/v1/chat/executions/{id}/stop` | 돌고 있는 실행을 멈춘다. 202 와 `{ "status": "stopping" }` |
-| `GET /api/v1/chat/conversations/{id}/events` | 대화 단위 SSE. 끝나지 않는다. 위임 결과로 열린 자동 turn 의 사건과 `system` 사건만 싣는다. 연결 직후 `: connected` 주석 줄을 보내 사건이 없어도 응답 헤더가 바로 나가고, 20초마다 `: ping` 을 보낸다 |
+| `GET /api/v1/chat/conversations/{id}/events` | 대화 단위 SSE. 끝나지 않는다. 요청한 연결이 없는 turn(위임 결과로 열린 자동 turn, 대기 메시지로 연 turn)의 사건과 `system`, `user`, `pending` 사건을 싣는다. 연결 직후 `: connected` 주석 줄을 보내 사건이 없어도 응답 헤더가 바로 나가고, 20초마다 `: ping` 을 보낸다 |
+| `GET /api/v1/chat/conversations/{id}/pending` | 대기 줄. `{ "held", "items": [{ "id", "text", "createdAt" }] }`. 없으면 `held` 가 false 이고 `items` 가 빈 목록이다 |
+| `POST /api/v1/chat/conversations/{id}/pending` | 대기 메시지를 더한다. 본문 `{ "text": "..." }`. 201 과 대기 줄을 돌려준다. 도는 turn 이 없으면 곧바로 보낸다 |
+| `DELETE /api/v1/chat/conversations/{id}/pending/{pendingId}` | 대기 메시지 하나를 취소한다. 204. 이미 보내졌거나 없으면 `PENDING_MESSAGE_NOT_FOUND` |
+| `POST /api/v1/chat/conversations/{id}/pending/send` | 멈춰 둔 대기 줄을 풀어 보낸다. 본문이 없다. 202 와 대기 줄을 돌려준다 |
 | `GET /api/v1/chat/conversations/{id}/running` | 이 대화에 지금 도는 turn. `{ "running", "executionId", "startedAt" }`. 돌지 않으면 `running` 이 false 이고 나머지는 null |
 | `GET /api/v1/chat/conversations/by-number/{number}` | 옛 주소 `/c/{번호}` 를 넘겨 주려고 번호로 대화를 찾는다. `{ "id": "<공개 식별자>" }` |
 
@@ -872,6 +877,9 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `done` | 끝나서 저장했다 | `conversationId`, `messageId`, `executionId` |
 | `stopped` | 중지로 끝나서 저장했다 | `conversationId`, `messageId`, `executionId`. 남긴 답이 없으면 `messageId` 가 null |
 | `error` | 실패했다 | `code`, `message` |
+| `system` | 알림 줄을 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
+| `user` | 대기 메시지를 합쳐 사용자 메시지로 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
+| `pending` | 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. 대화 단위 SSE 로만 간다 | `conversationId` |
 
 `phase` 는 `started` 와 `completed` 둘이다.
 `subagent` 의 칸은 Hermes 가 실어 보낼 때만 찬다. `goal` 이 비어 오면 Hermes 의 `preview` 를 그 자리에 싣는다.
@@ -901,6 +909,55 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 도구 사건이 아닌 사건의 `detail` 은 모두에게 싣는다. 하위 에이전트의 목표, 실패 코드, 넘어간 모델 이름이다.
 판정은 도구 이름 전체로 한다. `mcp__{서버}__web_search` 처럼 다른 MCP 서버가 같은 이름을 붙인 도구는 공개하지 않는다.
 
+### 응답 중 대기열
+
+결정은 [ADR-047](adr/ADR-047-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md), 흐름은 [flow.md](flow.md) 의 「응답 중에 보낼 때」 에 있다.
+
+| 자리 | 맡는 것 |
+| --- | --- |
+| `chat.domain.ChatPendingMessage` | 대기 메시지 한 행. `chat_pending_message` 표다 |
+| `chat.infra.ChatPendingMessageRepository` | 대화별 대기 행 읽기, 세기, 지우기, 멈춤 표시 바꾸기. 트랜잭션은 부르는 서비스가 연다 |
+| `chat.application.PendingMessageService` | 대기 줄 읽기, 더하기, 취소, 멈춤 풀기. 상한을 보고 `pending` 사건을 낸다. 더하거나 푼 뒤 `NextTurnDispatcher` 를 부른다 |
+| `chat.application.PendingQueue` | 서비스가 돌려주는 대기 줄. `held` 와 대기 행 목록 |
+| `chat.application.NextTurnDispatcher` | 다음 turn 을 정하는 한 자리. turn 종료, 위임 종료 사건, 기동을 받는다 |
+| `chat.application.TurnClosed` | turn 이 닫혔다는 알림. 대화 번호와 중지로 끝났는지를 싣는다 |
+| `chat.application.ChatService` | `runPendingMessages` 가 대기 행을 합쳐 `TurnIntent.Fresh` 로 turn 을 돌린다. 대화를 지울 때 대기 행도 지운다 |
+| `chat.presentation.PendingMessageController` | 위 「경로」 의 `pending` 경로 넷 |
+| 웹 `app/api/chat/conversations/[conversationId]/pending/` | `route.ts`(GET, POST), `[pendingId]/route.ts`(DELETE), `send/route.ts`(POST). Control Plane 으로 그대로 넘긴다 |
+| 웹 `lib/pending-messages.ts` | 브라우저가 위 서버 라우트를 부르는 함수 |
+| 웹 `components/chat/use-pending-queue.ts` | 대기 줄 상태. 대화를 열 때와 `pending` 사건을 받을 때 다시 읽는다 |
+| 웹 `components/chat/pending-queue.tsx` | 입력창 위의 대기 줄. 취소 단추와, 멈춰 있을 때의 「보내기」 |
+
+**다음 turn 을 정하는 자리는 `NextTurnDispatcher.tryNext` 하나다.**
+`TurnCancellation` 의 종료 리스너는 이것 하나만 건다.
+대기 메시지와 위임 결과가 리스너를 따로 걸면 같은 순간에 잠금을 다투고 순서가 등록 순서에 달린다.
+
+`tryNext` 는 아래 순서로 본다.
+
+1. 그 대화에 대기 행이 있고 멈춰 둔 행이 하나도 없으면 turn 잠금을 잡고 새 가상 스레드에서 `ChatService.runPendingMessages` 를 돌린다. 잠금을 잡지 못하면 도는 turn 이 닫힐 때 다시 온다.
+2. 보낼 대기 행이 없으면 `DelegationWakeService.tryWake` 로 넘긴다.
+
+turn 이 중지로 닫혔으면 `tryNext` 보다 먼저 그 대화의 대기 행을 모두 멈춰 둔다.
+중지로 끝났는지는 `ChatService` 가 취소된 turn 을 돌려줄 때 `TurnCancellation.markStopped` 로 적고, 닫을 때 `TurnClosed.stopped` 로 넘긴다.
+
+**멈춤은 행마다 `held` 로 DB 에 적는다.** 한 행이라도 멈춰 있으면 그 대화의 대기 줄 전체를 보내지 않는다.
+대기 줄이 멈춰 있을 때 더한 행은 멈춘 채로 들어간다.
+메모리에만 두면 서버가 다시 뜬 뒤 기동 확인이 사용자가 멈춘 글을 보내 버린다.
+
+대기 행을 지우는 것과 `USER` 행을 저장하는 것은 `ChatService.saveQuestion` 의 같은 트랜잭션이다.
+지운 행 수가 읽은 행 수와 다르면 되돌리고 대기 행을 다시 읽어 합친다. 읽은 뒤 취소된 행이 있었다는 뜻이다.
+그 트랜잭션 뒤에 `user` 사건과 `pending` 사건을 낸다.
+
+사용자 메시지를 저장하기 전에 실패하면 대기 행이 그대로 남는다.
+그대로 닫으면 종료 리스너가 같은 행으로 곧바로 다시 열어 같은 실패를 되풀이한다.
+그래서 `NextTurnDispatcher` 가 남은 행을 멈춰 두고 `error` 사건을 낸다.
+
+더할 때의 상한 확인과 저장은 대화별 잠금 안에서 한다. 잠금은 메모리에 있고, turn 잠금과 같이 서버 한 대를 전제로 한다.
+`POST .../pending` 은 저장한 뒤 언제나 `tryNext` 를 부른다.
+turn 이 도는지 먼저 보고 저장할지 정하면, 보는 순간과 저장하는 순간 사이에 turn 이 닫혔을 때 그 글을 보낼 계기가 없다.
+
+대기 메시지 경로는 `assistant.delegation-wake.enabled` 와 무관하게 켜져 있다. 그 설정은 위임 결과 쪽만 끈다.
+
 ### 중지
 
 `chat/application` 의 `TurnCancellation` 이 도는 turn 마다 중지 표시를 하나 갖는다. 뿌리 실행 번호가 열쇠다.
@@ -908,6 +965,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 실행 줄을 만들면 열쇠를 그 실행 번호로 옮긴다.
 중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
 같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성이 `CONVERSATION_BUSY` 를 판정하는 자리다.
+화면은 turn 이 도는 동안 보내기 대신 대기 메시지 경로를 쓴다. 아래 「응답 중 대기열」 이 갖는다.
 같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.
 
 `ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다.
