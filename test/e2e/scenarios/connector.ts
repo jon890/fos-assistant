@@ -67,7 +67,7 @@ export const connectorScenario: Scenario = {
       `거절 뒤에는 확인 호출만 있어야 한다: ${context.hermes.connectorRequests().slice(requestsBefore).join()}`,
     );
 
-    step("통과한 토큰으로 등록하면 PENDING 이고 대역이 확인, env, 도구 목록, 설치 순으로 받는다");
+    step("통과한 토큰으로 등록하면 PENDING 이고 대역이 확인, env, 설치 순으로 받고 도구 목록 쓰기는 받지 않는다");
     const knownProfiles = new Set(context.hermes.profiles());
     const requestsAtRegister = context.hermes.connectorRequests().length;
     const registered = expectStatus(
@@ -87,12 +87,15 @@ export const connectorScenario: Scenario = {
       at("call list_scopes"),
       at(`env put ${profile} DEMO_TOKEN`),
       at(`env put ${profile} DEMO_SCOPE`),
-      requests.lastIndexOf(`toolsets ${profile}`),
       at(`install ${profile} on`),
     ];
     expect(
       order.every((index, position) => index >= 0 && (position === 0 || index > order[position - 1]!)),
-      `요청 순서가 확인, env, 도구 목록, 설치가 아니다: ${requests.join(" | ")}`,
+      `요청 순서가 확인, env, 설치가 아니다: ${requests.join(" | ")}`,
+    );
+    expect(
+      !requests.some((line) => line.startsWith("toolsets ")),
+      `등록 동안 PUT /api/config 로 도구 목록을 쓰면 안 된다: ${requests.join(" | ")}`,
     );
     expect(context.hermes.profileEnv(profile).DEMO_TOKEN === DEMO_TOKEN_OK, "토큰이 profile env 에 들어가지 않았다");
 
@@ -103,6 +106,11 @@ export const connectorScenario: Scenario = {
     expect(ready.secretPrefixes.token === DEMO_TOKEN_OK.slice(0, 8), `비밀 앞부분이 다르다\n${checked.body}`);
     expect(ready.values.scope === "a" && ready.values.token === undefined, `칸 값이 다르다\n${checked.body}`);
     expect(context.hermes.connectorRequests().some((line) => line === `probe ${profile}`), "MCP 서버 확인 요청이 없었다");
+    const toolsets = context.hermes.apiServerToolsetsOf(profile) ?? [];
+    expect(
+      toolsets.join() === DEMO_CONNECTOR.mcp_server,
+      `연결 확인 뒤 도구 목록이 커넥터 서버 하나가 아니다: ${toolsets.join()}`,
+    );
     const reads = [
       registered.body,
       checked.body,

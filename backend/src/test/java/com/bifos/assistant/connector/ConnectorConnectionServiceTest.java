@@ -3,6 +3,7 @@ package com.bifos.assistant.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -11,6 +12,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,20 +143,20 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("등록은 확인, 잠금, env, 도구 목록, 설치 순서로 반영한다")
-    void registrationVerifiesThenLocksThenWritesEnvThenToolsetThenInstalls() {
+    @DisplayName("등록은 확인, 잠금, env, 설치 순서로 반영하고 도구 목록을 쓰지 않는다")
+    void registrationVerifiesThenLocksThenWritesEnvThenInstallsWithoutWritingToolset() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
         ConnectionSnapshot registered = service.register(user, DEMO, VALUES);
 
         String profile = profileOf(registered);
-        InOrder order = inOrder(connector, users, toolsets);
+        InOrder order = inOrder(connector, users);
         order.verify(connector).call(DEMO, "list_scopes", VALUES);
         order.verify(users).findByIdForUpdate(user.id());
         order.verify(connector).putEnv(profile, "DEMO_TOKEN", TOKEN);
         order.verify(connector).deleteEnv(profile, "DEMO_SCOPE");
-        order.verify(toolsets).writeApiServer(profile, List.of("fos-assistant"));
         order.verify(connector).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
         assertThat(registered.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).desiredEnabled()).isTrue();
         assertThat(agents.findByCode(registered.agentCode()).orElseThrow().name())
@@ -732,19 +734,148 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("확인에서 내장 도구가 켜져 있으면 목록을 줄이고 READY가 된다")
-    void verifyLimitsToolsetAndBecomesReadyWhenBuiltinsEnabled() {
+    @DisplayName("configured 인 설치에 내장 도구가 켜져 있으면 설치와 목록을 다시 쓰지 않고 PENDING이다")
+    void staysPendingWithoutRewritingWhenBuiltinsEnabledOnConfiguredInstall() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         String profile = profileOf(service.register(user, DEMO, VALUES));
         installed(true, true);
         when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"), List.of());
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(toolsets).writeApiServer(profile, List.of("fos-assistant", "demo"));
+        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(connector, times(1)).putConnector(profile, DEMO, true);
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agentEnabled(user)).isFalse();
+    }
+
+    @Test
+    @DisplayName("내장 도구가 켜져 있지 않으면 확인에서 READY가 된다")
+    void checkBecomesReadyWhenNoBuiltinsEnabled() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        verify(toolsets, never()).writeApiServer(any(), any());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(agentEnabled(user)).isTrue();
+    }
+
+    @Test
+    @DisplayName("설치가 configured 가 아니면 확인이 설치를 다시 쓰고 다시 읽어 READY가 된다")
+    void checkReinstallsWhenInstallIsNotConfigured() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        when(connector.readConnector(anyString(), eq(DEMO)))
+                .thenReturn(new ConnectorState("p", true, false, false), new ConnectorState("p", true, true, false));
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        // 등록의 설치와 다시 설치다.
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(checked.restartRequired()).isFalse();
+        assertThat(agentEnabled(user)).isTrue();
+    }
+
+    @Test
+    @DisplayName("다시 쓴 설치가 재시작을 요구하면 확인은 probe 없이 재시작 대기 PENDING 으로 남긴다")
+    void checkStaysPendingWhenReinstallNeedsRestart() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, false);
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(checked.restartRequired()).isTrue();
+        assertThat(stored(user).restartRequired()).isTrue();
+        assertThat(agentEnabled(user)).isFalse();
+        verify(connector, never()).probe(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("configured 인 설치는 확인에서 다시 쓰지 않는다")
+    void checkDoesNotReinstallConfiguredConnection() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        String profile = profileOf(service.register(user, DEMO, VALUES));
+        installed(true, true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        service.check(user, DEMO);
+
+        // 등록의 설치 한 번뿐이다.
+        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("카탈로그에서 빠진 커넥터는 configured 가 아니어도 확인에서 다시 쓰지 않고 PENDING이다")
+    void checkDoesNotReinstallConnectorRemovedFromCatalog() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, DEMO, VALUES);
+        installed(true, false);
+        when(connector.readCatalog()).thenReturn(List.of(PIN_MANIFEST));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("확인 중 다시 설치가 실패하면 PENDING 을 남기고 연결 실패로 끝난다")
+    void checkLeavesPendingWhenReinstallFails() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, DEMO, VALUES);
+        installed(true, false);
+        doThrow(new IllegalStateException("dashboard unavailable"))
+                .when(connector)
+                .putConnector(anyString(), anyString(), anyBoolean());
+
+        assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
+
+        assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(agentEnabled(user)).isFalse();
+        verify(connector, never()).probe(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("관리자 반영 완료는 옛 목록의 설치를 다시 쓰고 재시작을 기다리며 재시작 뒤 다시 누르면 READY다")
+    void confirmAppliedReinstallsOldAllowlistAndWaitsForRestart() {
+        CurrentUser member = user(UserRole.MEMBER, 1L);
+        CurrentUser admin = user(UserRole.ADMIN, 1L);
+        String profile = profileOf(service.register(member, DEMO, VALUES));
+        installed(true, false);
+        when(connector.putConnector(profile, DEMO, true)).thenReturn(true);
+        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
+
+        assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
+                .isInstanceOf(ConnectorOperationFailure.class);
+
+        // 등록의 설치와 다시 설치다.
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(connector, never()).probe(anyString(), anyString());
+        assertThat(stored(member).status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(stored(member).restartRequired()).isTrue();
+        assertThat(agentEnabled(member)).isFalse();
+
+        // 관리자가 gateway 를 재시작한 뒤다.
+        installed(true, true);
+
+        ConnectionSnapshot confirmed = service.confirmApplied(admin, DEMO, member.id());
+
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
+        assertThat(confirmed.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(confirmed.restartRequired()).isFalse();
+        assertThat(agentEnabled(member)).isTrue();
     }
 
     @Test
@@ -759,30 +890,32 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("목록을 줄인 뒤에도 내장 도구가 남으면 PENDING이다")
-    void staysPendingWhenBuiltinToolsRemainAfterLimiting() {
+    @DisplayName("재시작 대기인 연결은 configured 가 아니어도 확인에서 다시 쓰지 않는다")
+    void checkDoesNotReinstallRestartPendingConnection() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
-        String profile = profileOf(service.register(user, DEMO, VALUES));
-        installed(true, true);
-        when(connector.probe(profile, "demo")).thenReturn(new ProbeResult(true, List.of("list_scopes")));
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"));
+        when(connector.putEnv(anyString(), anyString(), anyString())).thenReturn(true);
+        service.register(user, DEMO, VALUES);
+        installed(true, false);
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
+        verify(connector, times(1)).putConnector(anyString(), anyString(), anyBoolean());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
+        assertThat(checked.restartRequired()).isTrue();
     }
 
     @Test
-    @DisplayName("설치가 configured가 아니면 확인에서 목록을 쓰지 않는다")
-    void verifyDoesNotWriteToolsetUnlessInstallConfigured() {
+    @DisplayName("다시 쓴 뒤에도 설치가 configured가 아니면 확인은 목록을 쓰지 않고 PENDING으로 둔다")
+    void checkStaysPendingWithoutWritingToolsetWhenStillNotConfigured() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
-        String profile = profileOf(service.register(user, DEMO, VALUES));
+        service.register(user, DEMO, VALUES);
         installed(true, false);
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("delegation"));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
 
-        verify(toolsets, never()).writeApiServer(profile, List.of("fos-assistant", "demo"));
+        verify(toolsets, never()).writeApiServer(any(), any());
+        verify(connector, never()).probe(anyString(), anyString());
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
     }
 
@@ -800,8 +933,8 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("관리자 확인도 설치가 configured가 아니면 목록을 쓰지 않고 PENDING으로 둔다")
-    void adminConfirmKeepsPendingWithoutToolsetUnlessConfigured() {
+    @DisplayName("관리자 확인도 다시 쓴 뒤 설치가 configured가 아니면 목록을 쓰지 않고 PENDING으로 둔다")
+    void adminConfirmKeepsPendingWithoutToolsetWhenStillNotConfigured() {
         CurrentUser member = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         String profile = profileOf(service.register(member, DEMO, VALUES));
@@ -811,7 +944,9 @@ class ConnectorConnectionServiceTest {
         assertThatThrownBy(() -> service.confirmApplied(admin, DEMO, member.id()))
                 .isInstanceOf(ConnectorOperationFailure.class);
 
-        verify(toolsets, never()).writeApiServer(profile, List.of("fos-assistant", "demo"));
+        // 등록의 설치와 다시 설치다.
+        verify(connector, times(2)).putConnector(profile, DEMO, true);
+        verify(toolsets, never()).writeApiServer(any(), any());
         assertThat(stored(member).status()).isEqualTo(ConnectionStatus.PENDING);
     }
 

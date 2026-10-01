@@ -2,7 +2,6 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
@@ -51,7 +50,6 @@ import tools.jackson.databind.JsonNode;
 @Service
 public class ConnectorConnectionService {
     private static final String STEP_ENV = "env";
-    private static final String STEP_TOOLSET = "toolset";
     private static final String STEP_INSTALL = "install";
     private static final String STEP_INSTALL_STATE = "install-state";
     private static final String STEP_PROBE = "probe";
@@ -213,9 +211,7 @@ public class ConnectorConnectionService {
                                 ? connector.deleteEnv(profile, field.env())
                                 : connector.putEnv(profile, field.env(), value));
             }
-            // 새 profile 의 틀이 켜 둔 내장 도구를 뺀다. 설치가 이 목록에 커넥터의 MCP 서버를 더한다.
-            step = STEP_TOOLSET;
-            toolsets.writeApiServer(profile, List.of(AgentToolPolicy.CONTROL_PLANE_MCP));
+            // 도구 목록은 쓰지 않는다. 설치가 API 도구 목록을 커넥터의 MCP 서버 이름만으로 다시 쓴다.
             step = STEP_INSTALL;
             connection.markRestartRequired(connector.putConnector(profile, manifest.id(), true));
         } catch (RuntimeException ex) {
@@ -256,18 +252,17 @@ public class ConnectorConnectionService {
         return snapshot(connections.save(connection));
     }
 
+    /**
+     * 설치와 probe 를 보고 연결 상태를 맞춘다.
+     *
+     * <p>설치가 켜져 있는데 configured 가 아니면 설치를 한 번 다시 써서 도구 목록을 맞춘다. 재시작 대기인 연결은
+     * 다시 쓰지 않는다. 관리자가 재시작한 뒤 반영 완료에서 다시 쓴다.
+     */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot check(CurrentUser user, String connectorId) {
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId);
-        final ConnectorState state;
-        try {
-            state = connector.readConnector(connection.agent().hermesProfile(), connectorId);
-        } catch (RuntimeException ex) {
-            warn(STEP_INSTALL_STATE, connectorId, ex);
-            connection.pending(now());
-            throw new ConnectorOperationFailure();
-        }
+        ConnectorState state = readState(connection);
         if (!connection.desiredEnabled()) {
             if (state.enabled()) {
                 connection.pending(now());
@@ -276,19 +271,19 @@ public class ConnectorConnectionService {
             }
             return snapshot(connections.save(connection));
         }
+        if (!connection.restartRequired()
+                && reinstallIfNotConfigured(connection, state).isPresent()) {
+            if (connection.restartRequired()) {
+                connection.pending(now());
+                return snapshot(connections.save(connection));
+            }
+            state = readState(connection);
+        }
         if (connection.restartRequired() || !state.enabled() || !state.configured()) {
             connection.pending(now());
             return snapshot(connections.save(connection));
         }
-        final boolean usable;
-        try {
-            usable = usable(connection);
-        } catch (RuntimeException ex) {
-            warn(STEP_PROBE, connectorId, ex);
-            connection.pending(now());
-            throw new ConnectorOperationFailure();
-        }
-        if (usable) {
+        if (probedUsable(connection)) {
             connection.ready(now());
         } else {
             connection.pending(now());
@@ -296,7 +291,12 @@ public class ConnectorConnectionService {
         return snapshot(connections.save(connection));
     }
 
-    /** 관리자가 공유 gateway 를 재시작한 뒤 누르는 반영 완료다. 같은 그룹의 사용자에게만 된다. */
+    /**
+     * 관리자가 공유 gateway 를 재시작한 뒤 누르는 반영 완료다. 같은 그룹의 사용자에게만 된다.
+     *
+     * <p>설치가 켜져 있는데 configured 가 아니면 재시작 대기인 연결이어도 설치를 다시 쓴다. 그 응답이 재시작을
+     * 요구하면 실패로 답한다. 관리자가 한 번 더 재시작한 뒤 다시 누른다.
+     */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot confirmApplied(CurrentUser admin, String connectorId, Long userId) {
         requireAdmin(admin);
@@ -306,36 +306,84 @@ public class ConnectorConnectionService {
             throw new ApiException(ErrorCode.FORBIDDEN, "no such user");
         }
         ConnectorConnection connection = requireConnection(userId, connectorId);
-        final boolean disconnected;
-        String step = STEP_INSTALL_STATE;
-        try {
-            ConnectorState state = connector.readConnector(connection.agent().hermesProfile(), connectorId);
-            boolean applied;
-            if (connection.desiredEnabled()) {
-                step = STEP_PROBE;
-                applied = state.enabled() && state.configured() && usable(connection);
-            } else {
-                applied = !state.enabled();
-            }
-            if (!applied) {
-                // 외부 호출은 성공했지만 반영이 끝나지 않았다. 실패 로그를 남기지 않는다.
+        ConnectorState state = readState(connection);
+        Optional<Boolean> reinstalled = reinstallIfNotConfigured(connection, state);
+        if (reinstalled.isPresent()) {
+            if (reinstalled.get()) {
+                // 다시 쓴 설치는 gateway 를 재시작해야 반영된다. 재시작 대기는 저장된다.
                 connection.pending(now());
                 throw new ConnectorOperationFailure();
             }
-            disconnected = !connection.desiredEnabled();
-        } catch (ConnectorOperationFailure ex) {
-            throw ex;
-        } catch (RuntimeException ex) {
-            warn(step, connectorId, ex);
+            state = readState(connection);
+        }
+        boolean applied = connection.desiredEnabled()
+                ? state.enabled() && state.configured() && probedUsable(connection)
+                : !state.enabled();
+        if (!applied) {
+            // 외부 호출은 성공했지만 반영이 끝나지 않았다. 실패 로그를 남기지 않는다.
             connection.pending(now());
             throw new ConnectorOperationFailure();
         }
-        if (disconnected) {
-            connection.confirmDisconnected(now());
-        } else {
+        if (connection.desiredEnabled()) {
             connection.ready(now());
+        } else {
+            connection.confirmDisconnected(now());
         }
         return snapshot(connections.save(connection));
+    }
+
+    /** 설치 상태를 읽는다. 읽지 못하면 {@code PENDING} 을 남기고 연결 실패로 끝낸다. */
+    private ConnectorState readState(ConnectorConnection connection) {
+        try {
+            return connector.readConnector(connection.agent().hermesProfile(), connection.connectorId());
+        } catch (RuntimeException ex) {
+            warn(STEP_INSTALL_STATE, connection.connectorId(), ex);
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
+    }
+
+    /**
+     * 활성화 후보인 연결의 설치가 켜져 있는데 configured 가 아니면 설치를 다시 쓴다.
+     *
+     * <p>이전 판이 설치한 연결은 도구 목록에 Control Plane MCP 가 남아 configured 가 아니다. configured 인 설치는
+     * 다시 쓰지 않는다. 바뀌는 것 없이 재시작 대기만 서기 때문이다. 카탈로그에서 빠진 커넥터도 다시 쓰지 않는다.
+     *
+     * @return 다시 썼으면 그 응답의 재시작 필요 여부. 다시 쓰지 않았으면 비어 있다
+     */
+    private Optional<Boolean> reinstallIfNotConfigured(ConnectorConnection connection, ConnectorState state) {
+        if (!connection.desiredEnabled() || !state.enabled() || state.configured()) {
+            return Optional.empty();
+        }
+        try {
+            if (findManifest(connection.connectorId()).isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(reinstall(connection));
+        } catch (RuntimeException ex) {
+            warn(STEP_INSTALL, connection.connectorId(), ex);
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
+    }
+
+    /** 설치를 다시 쓰고 그 응답의 재시작 필요 여부를 연결에 누적한다. 칸 값은 profile 의 env 에 그대로 있다. */
+    private boolean reinstall(ConnectorConnection connection) {
+        boolean restartRequired =
+                connector.putConnector(connection.agent().hermesProfile(), connection.connectorId(), true);
+        connection.markRestartRequired(restartRequired);
+        return restartRequired;
+    }
+
+    /** {@link #usable} 을 부른다. 외부 호출이 실패하면 {@code PENDING} 을 남기고 연결 실패로 끝낸다. */
+    private boolean probedUsable(ConnectorConnection connection) {
+        try {
+            return usable(connection);
+        } catch (RuntimeException ex) {
+            warn(STEP_PROBE, connection.connectorId(), ex);
+            connection.pending(now());
+            throw new ConnectorOperationFailure();
+        }
     }
 
     @Transactional(readOnly = true)
@@ -367,25 +415,11 @@ public class ConnectorConnectionService {
             return false;
         }
         Agent agent = connection.agent();
-        String mcpServer = manifest.get().mcpServer();
-        ProbeResult probe = connector.probe(agent.hermesProfile(), mcpServer);
+        ProbeResult probe = connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
+        // configured 인 뒤에 보이는 내장 도구는 목록이 아니라 다른 설정에서 온 것이다. 목록을 다시 쓰지 않는다.
         return probe.ok()
                 && !probe.tools().isEmpty()
-                && narrowedEnabled(agent, mcpServer).isEmpty();
-    }
-
-    /**
-     * 켜진 내장 도구를 읽고, 남아 있으면 허용 목록을 Control Plane MCP 와 커넥터 MCP 로 줄인 뒤 다시 읽는다.
-     *
-     * <p>설치 전에는 커넥터의 MCP 서버가 그 profile 에서 모르는 이름이라 목록에 둘 수 없다.
-     */
-    private List<String> narrowedEnabled(Agent agent, String mcpServer) {
-        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        if (enabled.isEmpty()) {
-            return enabled;
-        }
-        toolsets.writeApiServer(agent.hermesProfile(), List.of(AgentToolPolicy.CONTROL_PLANE_MCP, mcpServer));
-        return toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
+                && toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).isEmpty();
     }
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
