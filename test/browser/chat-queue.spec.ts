@@ -247,14 +247,12 @@ test("대화 단위 SSE 가 다시 붙으면 대기 줄을 다시 읽는다", as
   let eventRequests = 0;
   await page.route(`**/api/chat/conversations/${conversationId}/events`, async (route) => {
     eventRequests += 1;
-    if (eventRequests > 1) {
-      // 다시 붙은 연결은 사건 없이 붙잡아 둔다.
-      await new Promise(() => {});
-      return;
+    if (eventRequests === 1) {
+      // 대기 줄이 화면에 보인 뒤에 첫 연결을 사건 없이 닫는다. 화면이 잠시 뒤 다시 연다.
+      await expect(page.getByTestId("pending-item")).toHaveCount(1);
+      sentWhileDisconnected = true;
     }
-    // 대기 줄이 화면에 보인 뒤에 첫 연결을 사건 없이 닫는다. 화면이 잠시 뒤 다시 연다.
-    await expect(page.getByTestId("pending-item")).toHaveCount(1);
-    sentWhileDisconnected = true;
+    // 다시 붙은 연결도 응답을 준다. 화면은 응답 머리글을 받아야 다시 붙었다고 본다. 붙잡아 두면 끝내 붙지 않는다.
     await route.fulfill({
       status: 200,
       headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
