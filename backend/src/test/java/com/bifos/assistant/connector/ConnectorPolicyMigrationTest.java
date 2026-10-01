@@ -14,10 +14,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V41 이 그때까지 {@code READY} 이던 연결만 내리는지 본다.
+ * V42 이 그때까지 {@code READY} 이던 연결만 내리는지 본다.
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다. 앞선 상태의 행을
- * 넣으려고 V40 까지만 올린 뒤 V41 을 올린다.
+ * 넣으려고 V41 까지만 올린 뒤 V42 을 올린다.
  */
 class ConnectorPolicyMigrationTest {
     private static final int READY = 901;
@@ -25,7 +25,7 @@ class ConnectorPolicyMigrationTest {
     private static final int DISCONNECTED = 903;
     /** 연결이 없는 보통 에이전트다. */
     private static final int PLAIN = 904;
-    /** READY 가 아닌 연결인데 에이전트가 켜져 있고 사진을 받는 경우다. V41 이 연결의 상태를 보고 고르는지 본다. */
+    /** READY 가 아닌 연결인데 에이전트가 켜져 있고 사진을 받는 경우다. V42 이 연결의 상태를 보고 고르는지 본다. */
     private static final int PENDING_ON = 905;
 
     private String url;
@@ -33,7 +33,7 @@ class ConnectorPolicyMigrationTest {
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-policy-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrate("40");
+        migrate("41");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
             for (int id = READY; id <= PENDING_ON; id++) {
@@ -55,24 +55,24 @@ class ConnectorPolicyMigrationTest {
             statement.executeUpdate(row(DISCONNECTED, "DISCONNECTED", false, false));
             statement.executeUpdate(row(PENDING_ON, "PENDING", false, true));
         }
-        migrate("41");
+        migrate("42");
     }
 
     @Test
-    @DisplayName("V41은 READY 이던 연결을 PENDING 으로 내리고 재시작 대기와 활성화 후보는 그대로 둔다")
+    @DisplayName("V42은 READY 이던 연결을 PENDING 으로 내리고 재시작 대기와 활성화 후보는 그대로 둔다")
     void v41LowersReadyConnectionToPendingWithoutTouchingRestart() throws SQLException {
         assertThat(connection(READY)).isEqualTo(new Row("PENDING", false, true, 0));
     }
 
     @Test
-    @DisplayName("V41은 READY 가 아니던 연결의 상태와 재시작 대기를 바꾸지 않는다")
+    @DisplayName("V42은 READY 가 아니던 연결의 상태와 재시작 대기를 바꾸지 않는다")
     void v41LeavesOtherConnectionsAsTheyWere() throws SQLException {
         assertThat(connection(PENDING)).isEqualTo(new Row("PENDING", true, true, 0));
         assertThat(connection(DISCONNECTED)).isEqualTo(new Row("DISCONNECTED", false, false, 0));
     }
 
     @Test
-    @DisplayName("V41은 READY 이던 연결의 에이전트만 끄고 사진 받기를 내린다")
+    @DisplayName("V42은 READY 이던 연결의 에이전트만 끄고 사진 받기를 내린다")
     void v41DisablesOnlyAgentOfReadyConnection() throws SQLException {
         assertThat(agent(READY)).isEqualTo(new AgentRow(false, false));
         assertThat(agent(PENDING)).isEqualTo(new AgentRow(false, false));
@@ -82,7 +82,7 @@ class ConnectorPolicyMigrationTest {
     }
 
     @Test
-    @DisplayName("V41은 READY 가 아니던 연결의 에이전트가 켜져 있고 사진을 받아도 그대로 둔다")
+    @DisplayName("V42은 READY 가 아니던 연결의 에이전트가 켜져 있고 사진을 받아도 그대로 둔다")
     void v41LeavesEnabledAgentOfConnectionThatWasNotReady() throws SQLException {
         assertThat(agent(PENDING_ON)).isEqualTo(new AgentRow(true, true));
         assertThat(connection(PENDING_ON)).isEqualTo(new Row("PENDING", false, true, 0));

@@ -58,7 +58,7 @@
 
 ### 2. 상시 허락
 
-`connector/domain/ConnectorToolGrant.java` 와 `backend/src/main/resources/db/migration/V43__connector_tool_grant.sql`. 칸은 `docs/data-schema.md` 의 「connector_tool_grant」 와 같다. 색인 `idx_connector_tool_grant_lookup (user_id, connector_id, tool_name)`, 외래 키 `fk_connector_tool_grant_user`.
+`connector/domain/ConnectorToolGrant.java` 와 `backend/src/main/resources/db/migration/V44__connector_tool_grant.sql`. 칸은 `docs/data-schema.md` 의 「connector_tool_grant」 와 같다. 색인 `idx_connector_tool_grant_lookup (user_id, connector_id, tool_name)`, 외래 키 `fk_connector_tool_grant_user`.
 
 `connector/domain/type/GrantPeriod.java`: `HOUR, TODAY, DAYS_30`. `Instant expiresAt(Instant now, ZoneId zone)`. `TODAY` 는 그 시간대의 다음 날 0시다.
 
@@ -220,7 +220,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/hermes/ConnectorExecutionUnknown.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
-| `backend/src/main/resources/db/migration/V43__connector_tool_grant.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V44__connector_tool_grant.sql` | 신규 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionServiceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionControllerTest.java` | 신규 |

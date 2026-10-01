@@ -60,7 +60,7 @@ Control Plane 이 카탈로그의 `schema` 와 `tools` 를 읽어 하한을 다�
 - `check` 와 `confirmApplied` 에서 `state.policyHook()` 이 거짓이면 `usable` 을 부르지 않고 `pending` 이다. `desiredEnabled` 가 참인 갈래에만 건다. 해제 확인 갈래는 그대로 둔다
 - `usable(connection)` 안에서 probe 뒤에 `schema == 2` 이면 `probe.tools()` 가운데 manifest `tools` 에 이름이 없는 수를 세어 `connection.recordUndeclaredTools(count)` 로 적는다. `schema == 1` 이면 0 이다
 - `ConnectorConnection` 에 `@Column(name = "undeclared_tools", nullable = false) private int undeclaredTools` 와 `recordUndeclaredTools(int)` 를 더한다. `disconnected`, `confirmDisconnected`, `beginRegister` 는 0 으로 되돌린다
-- `backend/src/main/resources/db/migration/V41__connector_undeclared_tools.sql`: `ALTER TABLE connector_connection ADD COLUMN undeclared_tools INT NOT NULL DEFAULT 0;` 첫머리에 한국어 주석으로 목적과 ADR-048 을 적는다
+- `backend/src/main/resources/db/migration/V42__connector_undeclared_tools.sql`: `ALTER TABLE connector_connection ADD COLUMN undeclared_tools INT NOT NULL DEFAULT 0;` 첫머리에 한국어 주석으로 목적과 ADR-048 을 적는다
 
 ### 5. 응답
 
@@ -128,13 +128,13 @@ Control Plane 이 카탈로그의 `schema` 와 `tools` 를 읽어 하한을 다�
 - `HermesConnectorClient.putConnector` 의 반환을 `InstallResult(boolean restartRequired, boolean pluginUpdated)` record 로 바꾼다. `plugin_updated` 가 없는 응답은 false 다. 부르는 곳 셋(`apply`, `disconnect`, `resyncedUsable`)을 맞춘다
   - `apply`: `markRestartRequired(result.restartRequired() || result.pluginUpdated())`
   - `resyncedUsable`: `pluginUpdated` 가 참이면 `connection.markRestartRequired(true)` 를 하고 false 를 돌려준다. `restartRequired` 는 지금처럼 쓰지 않는다
-- V41 은 칸을 더한 뒤 기존 연결을 내린다. 순서대로 쓴다
+- V42 은 칸을 더한 뒤 기존 연결을 내린다. 순서대로 쓴다
   1. `ALTER TABLE connector_connection ADD COLUMN undeclared_tools INT NOT NULL DEFAULT 0;`
   2. `READY` 인 연결의 에이전트를 끄고 사진 받기를 내린다. `agent` 표의 칸 이름은 `agent/domain/Agent.java` 와 `ConnectorConnection.pending(Instant)` 이 하는 일을 읽고 맞춘다
   3. `UPDATE connector_connection SET status = 'PENDING' WHERE status = 'READY';` `restart_required` 는 건드리지 않는다. `check` 는 재시작 대기인 연결에 설치를 다시 보내지 않으므로, 참으로 두면 연결 확인으로 `fos-ctx` 가 새 판이 되지 않는다
   - H2 의 MySQL 모드와 MySQL 에서 함께 도는 SQL 만 쓴다. 자기 표를 하위 질의로 읽는 `UPDATE` 가 MySQL 에서 막히지 않게 2번은 `agent` 를 고치고 하위 질의가 `connector_connection` 을 읽는 모양으로 쓴다
   - 파일 첫머리 주석에 까닭(옛 판의 hook 을 가진 연결은 판정 없이 호출이 나간다)과 되돌리는 방법(연결 확인, gateway 재시작, 관리자 반영 완료)을 적는다
-  - `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyMigrationTest.java`(신규): `ConnectorConnectionMigrationTest` 의 방식으로 V40 까지 올리고 `READY`, `PENDING`, `DISCONNECTED` 연결을 넣은 뒤 V41 을 올린다. `READY` 였던 줄만 `PENDING` 이 되고 `restart_required` 는 그대로이며 그 에이전트만 꺼진다
+  - `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyMigrationTest.java`(신규): `ConnectorConnectionMigrationTest` 의 방식으로 V41 까지 올리고 `READY`, `PENDING`, `DISCONNECTED` 연결을 넣은 뒤 V42 을 올린다. `READY` 였던 줄만 `PENDING` 이 되고 `restart_required` 는 그대로이며 그 에이전트만 꺼진다
 - 대역 `test/e2e/fake-hermes.ts`: 설치(`PUT /api/connectors`, `enabled: true`)가 그 profile 의 `policy_hook` 을 참으로 되돌린다. `setPolicyHook(profile, false)` 는 「설치해도 고쳐지지 않는 상태」 로 둔다(`setPolicyHook(profile, true)` 가 풀 때까지). 설치 응답에 `plugin_updated: false` 를 더한다
 - 서비스 테스트를 더한다: (1) 설치 뒤 읽은 상태의 `policyHook` 이 거짓이면 `PENDING` 이고 probe 를 부르지 않는다. (2) `putConnector` 가 `pluginUpdated` 참을 돌려주면 `PENDING` 과 `restartRequired` 참이다. (3) 그 뒤 `confirmApplied` 에서 `pluginUpdated` 가 거짓이면 `READY` 다. (4) 마이그레이션이 내린 모양(`PENDING`, `desiredEnabled` 참, `restartRequired` 거짓, 에이전트 꺼짐)의 연결이 `check`(설치가 `pluginUpdated` 참) 뒤 재시작 대기가 되고 `confirmApplied` 뒤 `READY` 와 에이전트 켜짐으로 돌아온다
 
@@ -173,7 +173,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/connector/domain/ConnectorConnection.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectionDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectorConnectionAdminController.java` | 수정 |
-| `backend/src/main/resources/db/migration/V41__connector_undeclared_tools.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V42__connector_undeclared_tools.sql` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorToolPoliciesTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyMigrationTest.java` | 신규 |
