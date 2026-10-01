@@ -1,9 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-export type PageSkeletonShape = "cards" | "list" | "table" | "editor" | "tree" | "chat";
+export type PageSkeletonShape =
+  "cards" | "list" | "table" | "editor" | "tree" | "chat";
 export type PageSkeletonWidth = "2xl" | "3xl" | "4xl" | "5xl";
 export type PageSkeletonForm = "memory" | "person" | "agent";
-export type PageSkeletonDescription = "usage" | "memory" | "agent" | "person" | "persona";
+export type PageSkeletonDescription =
+  "usage" | "memory" | "agent" | "person" | "persona";
 
 type Props = {
   shape: PageSkeletonShape;
@@ -54,7 +56,11 @@ const DESCRIPTION_LINES: Record<PageSkeletonDescription, readonly string[]> = {
 };
 
 /** 제목과, 있으면 그 아래 설명 문단 자리다. `page.tsx` 의 `h1` 여백과 같게 맞춘다. */
-function TitleBlock({ description }: { description?: PageSkeletonDescription }) {
+function TitleBlock({
+  description,
+}: {
+  description?: PageSkeletonDescription;
+}) {
   return (
     <>
       <Skeleton className={`h-7 w-48 ${description ? "mb-2" : "mb-6"}`} />
@@ -164,12 +170,18 @@ function TreeBody() {
  */
 function ChatSkeleton({ width }: { width: PageSkeletonWidth }) {
   return (
-    <div data-testid="page-skeleton" aria-busy="true" className="flex h-full min-h-0 flex-col">
+    <div
+      data-testid="page-skeleton"
+      aria-busy="true"
+      className="flex h-full min-h-0 flex-col"
+    >
       <div className="border-b border-border pb-3">
         <Skeleton className="h-4 w-32" />
       </div>
       <div className="min-h-0 flex-1 overflow-hidden px-1 py-3">
-        <div className={`mx-auto flex w-full flex-col gap-5 ${WIDTH_CLASS[width]}`}>
+        <div
+          className={`mx-auto flex w-full flex-col gap-5 ${WIDTH_CLASS[width]}`}
+        >
           <Skeleton className="h-[4.25rem]" />
           <Skeleton className="h-[4.25rem]" />
         </div>
@@ -181,11 +193,21 @@ function ChatSkeleton({ width }: { width: PageSkeletonWidth }) {
   );
 }
 
-export function PageSkeleton({ shape, width, title = false, description, form }: Props) {
+export function PageSkeleton({
+  shape,
+  width,
+  title = false,
+  description,
+  form,
+}: Props) {
   if (shape === "chat") return <ChatSkeleton width={width} />;
 
   return (
-    <div data-testid="page-skeleton" aria-busy="true" className={`mx-auto w-full ${WIDTH_CLASS[width]}`}>
+    <div
+      data-testid="page-skeleton"
+      aria-busy="true"
+      className={`mx-auto w-full ${WIDTH_CLASS[width]}`}
+    >
       {title ? <TitleBlock description={description} /> : null}
       {form ? <FormBlock form={form} /> : null}
       {shape === "cards" ? <CardsBody tall={form === "agent"} /> : null}

@@ -17,7 +17,13 @@ export default async function AgentsPage() {
   if (me?.role === "ADMIN") {
     const result = await callControlPlane<AdminAgent[]>("/api/v1/admin/agents");
     if (!result.ok) return <p className="text-sm">{result.message}</p>;
-    return <AgentAdminPanel initialAgents={result.data} ownerEmail={session.user.email} currentUserId={me.id} />;
+    return (
+      <AgentAdminPanel
+        initialAgents={result.data}
+        ownerEmail={session.user.email}
+        currentUserId={me.id}
+      />
+    );
   }
 
   const result = await callControlPlane<AgentView[]>("/api/v1/agents");
