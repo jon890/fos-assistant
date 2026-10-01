@@ -56,48 +56,11 @@
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]presentation[\\/]ChatController\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]presentation[\\/]ChatDtos\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]presentation[\\/]ChatEventStreams\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
-  <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
-  <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
-  <suppress id="rightCurlySame" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookConnectionService\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookProperties\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookProperties\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookProperties\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]AccountbookTokenVerifier\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]application[\\/]ConnectorOperationFailure\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]domain[\\/]AccountbookConnection\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]domain[\\/]AccountbookConnection\.java$"/>
-  <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]domain[\\/]AccountbookConnection\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]AccountbookConnectionRepository\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
-  <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
-  <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
-  <suppress id="rightCurlySame" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]infra[\\/]HttpAccountbookTokenVerifier\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionAdminController\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionAdminController\.java$"/>
-  <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionAdminController\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
-  <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]AccountbookConnectionController\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]ConnectionDtos\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]ConnectionDtos\.java$"/>
-  <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]presentation[\\/]ConnectionDtos\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]context[\\/]ContextAssembler\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesCallFailure\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesConnectorClient\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesModelClient\.java$"/>
   <suppress id="privateEmptyConstructor" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesProfileName\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HermesRunEventStream\.java$"/>
-  <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
-  <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
-  <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
-  <suppress checks="(^|\.)OneStatementPerLine(Check)?$" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
-  <suppress id="rightCurlySame" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClient\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesDashboardClient\.java$"/>
   <suppress id="fullyQualifiedName" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesRunsClient\.java$"/>
   <suppress id="lombokLogger" files="src[\\/]main[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesRunsClient\.java$"/>
@@ -214,12 +177,6 @@
   <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]RegenerateDeletedAttachmentTest\.java$"/>
   <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]infra[\\/]ArtifactSourceTlsTest\.java$"/>
   <suppress checks="(^|\.)UnusedImports(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]chat[\\/]infra[\\/]ArtifactSourceTlsTest\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]AccountbookConnectionControllerTest\.java$"/>
-  <suppress checks="(^|\.)NeedBraces(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]AccountbookConnectionMigrationTest\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]AccountbookConnectionServiceTest\.java$"/>
-  <suppress checks="(^|\.)AvoidStarImport(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]HttpAccountbookTokenVerifierTest\.java$"/>
-  <suppress id="fullyQualifiedName" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]connector[\\/]HttpAccountbookTokenVerifierTest\.java$"/>
-  <suppress checks="(^|\.)AvoidStarImport(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]HttpHermesConnectorClientTest\.java$"/>
   <suppress checks="(^|\.)EmptyLineSeparator(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]StubHermesRunsClient\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]hermes[\\/]StubHermesRunsClient\.java$"/>
   <suppress checks="(^|\.)LeftCurly(Check)?$" files="src[\\/]test[\\/]java[\\/]com[\\/]bifos[\\/]assistant[\\/]mcp[\\/]AgentTokenServiceTest\.java$"/>

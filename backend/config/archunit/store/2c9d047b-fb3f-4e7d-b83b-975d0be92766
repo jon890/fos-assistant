@@ -2,7 +2,6 @@ Field <com.bifos.assistant.agent.domain.Agent.costMode> does not have raw type r
 Field <com.bifos.assistant.agent.domain.Agent.credentialScope> does not have raw type reside in a package '..domain.type..' in (Agent.java:0)
 Field <com.bifos.assistant.agent.domain.Agent.visibility> does not have raw type reside in a package '..domain.type..' in (Agent.java:0)
 Field <com.bifos.assistant.chat.domain.ChatMessage.role> does not have raw type reside in a package '..domain.type..' in (ChatMessage.java:0)
-Field <com.bifos.assistant.connector.domain.AccountbookConnection.status> does not have raw type reside in a package '..domain.type..' in (AccountbookConnection.java:0)
 Field <com.bifos.assistant.memory.domain.Memory.scope> does not have raw type reside in a package '..domain.type..' in (Memory.java:0)
 Field <com.bifos.assistant.memory.domain.Memory.status> does not have raw type reside in a package '..domain.type..' in (Memory.java:0)
 Field <com.bifos.assistant.skill.domain.ExecutionSkillUse.source> does not have raw type reside in a package '..domain.type..' in (ExecutionSkillUse.java:0)
