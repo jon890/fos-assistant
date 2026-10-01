@@ -162,6 +162,16 @@ export function ConversationNav({
                         !initialIds.has(conversation.id) &&
                         "animate-message-assistant",
                     )}
+                    onAnimationEnd={(event) => {
+                      // 한 번 움직인 줄은 처음 있던 줄로 친다. 검색으로 걸러졌다 다시 나타나도 다시 움직이지 않는다.
+                      // 줄 안의 다른 animation 이 끝난 것은 건너뛴다.
+                      if (event.target !== event.currentTarget) return;
+                      setInitialIds((ids) =>
+                        ids === null || ids.has(conversation.id)
+                          ? ids
+                          : new Set(ids).add(conversation.id),
+                      );
+                    }}
                   >
                     {editingId === conversation.id ? (
                       <input

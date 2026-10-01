@@ -181,7 +181,7 @@ html {
 @layer base {
   body {
     word-break: keep-all;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 
   pre,

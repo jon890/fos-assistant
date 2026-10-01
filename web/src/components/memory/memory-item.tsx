@@ -73,8 +73,8 @@ export function MemoryItem({
       setError("기억을 지우지 못했어요.");
       return;
     }
-    // 요청이 성공한 뒤에만 줄을 흐리게 하고 목록을 다시 읽는다.
-    exit(() => void onChanged());
+    // 요청이 성공한 뒤에만 줄을 흐리게 하고 목록을 다시 읽는다. 다시 읽기가 끝나야 줄의 흐림이 풀린다.
+    exit(onChanged);
   }
 
   return (

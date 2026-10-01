@@ -65,6 +65,19 @@ function block(source: string, selector: string): string {
   return source.slice(start, end);
 }
 
+/** `start` 뒤의 첫 `{` 부터 짝이 맞는 `}` 까지를 꺼낸다. 안에 든 블록의 중괄호를 세어 바깥 블록의 끝을 찾는다. */
+function nestedBlock(source: string, start: number): string {
+  const open = source.indexOf("{", start);
+  assert.notEqual(open, -1, "블록을 여는 중괄호가 없다");
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    else if (source[index] === "}") depth -= 1;
+    if (depth === 0) return source.slice(open, index + 1);
+  }
+  assert.fail("블록을 닫는 중괄호가 없다");
+}
+
 /** 블록 안에서 선언한 변수 이름을 모두 읽는다. */
 function declared(body: string): Set<string> {
   return new Set([...body.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((match) => match[1]));
@@ -100,7 +113,7 @@ test("줄인 움직임 설정을 따르는 블록이 globals.css 에 있다", as
   const source = await readFile(GLOBALS_CSS, "utf-8");
   const start = source.indexOf("@media (prefers-reduced-motion: reduce)");
   assert.notEqual(start, -1, "globals.css 에 prefers-reduced-motion: reduce 블록이 없다");
-  const body = source.slice(start);
+  const body = nestedBlock(source, start);
   // 이동과 크기 변화를 만드는 tw-animate-css 변수를 이 블록이 덮어야 흐려짐만 남는다.
   const overrides = [
     "--tw-enter-scale: 1 !important",

@@ -118,6 +118,14 @@ test("새로 보낸 줄만 등장 움직임을 갖고 답이 저장된 뒤와 �
       await expect(row(id)).toBeVisible();
       expect(await animationOf(row(id)), "새로 생긴 대화 줄").toEqual({ name: "message-assistant", duration: "0.2s" });
       expect((await animationOf(row(existingId))).name, "처음부터 있던 대화 줄").toBe("none");
+      // 한 번 움직인 줄은 검색으로 걸러졌다 다시 나타나도 다시 움직이지 않는다.
+      await expect.poll(async () => (await animationOf(row(id))).name, { message: "움직임이 끝난 대화 줄" }).toBe("none");
+      const search = page.getByRole("searchbox", { name: "대화 검색" });
+      await search.fill("없는 제목 123456");
+      await expect(row(id)).toHaveCount(0);
+      await search.fill("");
+      await expect(row(id)).toBeVisible();
+      expect((await animationOf(row(id))).name, "걸러졌다 다시 나타난 대화 줄").toBe("none");
     }
 
     await page.reload();
@@ -271,6 +279,33 @@ test("새 기억은 등장 움직임을 갖고 지운 기억은 나가는 움직
   expect((await leavingSeen(page)).length, "사라지기 전에 data-leaving 이 붙은 기억 수").toBe(1);
 });
 
+test("기억을 지운 뒤 목록을 다시 읽지 못해도 남은 줄이 투명한 채로 있지 않다", async ({ page }, testInfo) => {
+  const title = `움직임 다시 읽기 실패 ${testInfo.project.name} ${Date.now()}`;
+  await recordLeavingRows(page);
+  await page.goto("/memory");
+  await page.getByLabel("범위").selectOption("USER");
+  await page.getByLabel("제목", { exact: true }).fill(title);
+  await page.getByLabel("내용").fill("다시 읽기가 실패하는 기억");
+  await page.getByRole("button", { name: "저장" }).click();
+  const item = page.getByRole("heading", { name: title }).locator("xpath=ancestor::article");
+  await expect(item).toBeVisible();
+
+  // 지우기 요청은 그대로 보내 성공시키고, 뒤이어 목록을 다시 읽는 요청만 실패시킨다.
+  await page.route("**/api/memories", (route) => route.request().method() === "GET"
+    ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL_ERROR", message: "다시 읽기 실패" }) })
+    : route.continue());
+  const removed = page.waitForResponse((response) => response.request().method() === "DELETE" && /\/api\/memories\/\d+$/.test(new URL(response.url()).pathname));
+  const reloaded = page.waitForResponse((response) => response.request().method() === "GET" && new URL(response.url()).pathname === "/api/memories");
+  await item.getByRole("button", { name: "지우기" }).click();
+  expect((await removed).ok(), "기억 지우기 요청의 성공 여부").toBe(true);
+  expect((await reloaded).status(), "목록 다시 읽기의 상태 코드").toBe(500);
+
+  await expect(item, "다시 읽지 못해 남은 줄").toBeVisible();
+  await expect(item, "남은 줄의 data-leaving 속성").not.toHaveAttribute("data-leaving");
+  expect(await item.evaluate((node) => getComputedStyle(node).opacity), "남은 줄의 불투명도").toBe("1");
+  expect((await leavingSeen(page)).length, "다시 읽기 전에 data-leaving 이 붙은 기억 수").toBe(1);
+});
+
 test("줄인 움직임에서 「새 메시지」 단추는 바로 내려간다", async ({ page }) => {
   await page.addInitScript(() => {
     const behaviors: unknown[] = [];
@@ -349,6 +384,12 @@ test("줄인 움직임에서 화면을 옮겨도 본문 제목이 보인다", as
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await goToUsage(page, testInfo);
-  expect(await page.getByRole("heading", { name: "사용량", exact: true, level: 1 }).evaluate((node) => getComputedStyle(node).opacity), "옮긴 뒤 제목의 불투명도")
-    .toBe("1");
+  // 본문 제목이 보이는 것은 goToUsage 가 단언한다.
+  const wrapper = page.locator(".animate-screen-in");
+  if (await wrapper.count() > 0) {
+    // 화면 전환을 끈 빌드에서만 들어오는 화면을 감싼 요소가 있다. 오르며 나타나지 않고 짧게 흐려지기만 한다.
+    expect(await animationOf(wrapper), "줄인 움직임에서 들어오는 화면").toEqual({ name: "fade-in", duration: "0.1s" });
+  }
+  // 화면 전환을 켠 빌드에는 감싼 요소가 없다. 줄인 움직임 규칙이 `::view-transition-new` 가상 요소에 걸리는데,
+  // 그 요소는 전환이 도는 짧은 동안에만 있어 계산값을 읽을 방법이 없다. 그래서 이 분기에서는 단언하지 않는다.
 });

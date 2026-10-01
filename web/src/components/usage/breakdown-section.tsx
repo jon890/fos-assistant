@@ -44,7 +44,7 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">묶는 기준</span>
           <NativeSelect
-            className="w-auto"
+            wrapperClassName="w-auto"
             data-testid="breakdown-axis"
             disabled={pending}
             onChange={(event) => changeAxis(event.target.value)}

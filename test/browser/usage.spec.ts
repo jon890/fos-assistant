@@ -291,6 +291,27 @@ test("스킬을 부른 적이 없으면 스킬 탭이 빈 상태를 보인다", 
   await expect(page.getByText("아직 부른 스킬이 없어요.", { exact: true })).toBeVisible();
 });
 
+const RAW_COMMAND = "ls-원본-명령";
+const RAW_RESULT = '{"output":"terminal-raw-result"}';
+
+/** `terminal` 도구를 쓴 실행 하나짜리 나무다. 명령과 결과는 사람 말이 아니라 줄에 그리지 않는 원본이다. */
+function terminalTreeFixture() {
+  const event = (sequence: number, eventType: string, detail: string) => ({
+    sequence, eventType, toolName: "terminal", subagentName: null, hermesSessionId: null, detail, model: null,
+    inputTokens: null, outputTokens: null, durationMs: eventType === "TOOL_COMPLETED" ? 2_100 : null,
+    failed: eventType === "TOOL_COMPLETED" ? false : null, occurredAt: new Date().toISOString(),
+  });
+  return {
+    truncated: false,
+    root: {
+      truncated: false, executionId: 980, agentCode: "terminal-agent-code", agentName: "명령 비서", status: "SUCCEEDED",
+      model: "example-model", inputTokens: 10, outputTokens: 20, estimatedCostMicros: 1000, latencyMs: 2_500,
+      startedAt: new Date().toISOString(), children: [],
+      events: [event(1, "TOOL_STARTED", RAW_COMMAND), event(2, "TOOL_COMPLETED", RAW_RESULT)],
+    },
+  };
+}
+
 /**
  * `MEMBER` 역할 사용자의 사용량 화면에는 금액, 모델, effort, 문맥 글자 수 같은 내부 값이 없어야 한다.
  *
@@ -329,10 +350,15 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
     await page.getByRole("button", { name: "보내기" }).click();
     const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
     await expect(block).toBeVisible({ timeout: 30_000 });
+    // 가짜 도구는 줄에 그릴 원본이 없어 관리자에게도 원본 자리가 생기지 않는다.
+    // 원본이 있는 `terminal` 도구의 나무로 바꿔야 역할에 따라 가리는지 드러난다.
+    await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalTreeFixture() }));
     await block.getByTestId("activity-toggle").click();
     // 도구 줄은 보이지만 도구 결과의 원본을 펼치는 자리는 없다.
-    await expect(block.locator('[data-tool="fake-tool"]')).toBeVisible();
+    await expect(block.locator('[data-tool="terminal"]')).toBeVisible();
     await expect(page.getByTestId("activity-raw")).toHaveCount(0);
+    await expect(block.getByText(RAW_RESULT)).toHaveCount(0);
+    await page.unroute("**/api/usage/executions/*/tree");
 
     await page.goto("/usage?tab=executions");
     const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");

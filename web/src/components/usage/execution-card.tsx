@@ -4,13 +4,13 @@ import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
+import { executionStatusVariant } from "@/lib/execution-status";
 import {
   actualCostLabel,
   contextCharsLabel,
   contextOmittedLabel,
   durationLabel,
   executionStatusLabel,
-  executionStatusVariant,
   isRunning,
   reasoningEffortLabel,
   retryOfLabel,

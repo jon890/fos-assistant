@@ -49,7 +49,7 @@ src/
 - 모서리는 `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-full` 만 쓴다
 - 안내와 오류 상자는 `components/ui/notice.tsx` 의 `Notice` 로, 상태 배지는 `Badge` 의 의미 색 변형으로 그린다
 - 움직임의 길이와 곡선은 토큰(`duration-fast`, `duration-base`, `duration-slow`, `ease-out`, `ease-spring`)만 쓴다.
-  줄인 움직임 설정은 `globals.css` 의 블록 하나가 정하므로 부품에 `motion-reduce:` 를 적지 않는다. 끝없이 도는 회전 표시와 뼈대만 `motion-reduce:animate-none` 을 적는다
+  줄인 움직임 설정은 `globals.css` 의 블록 하나가 정하므로 부품에 `motion-reduce:` 를 적지 않는다. 끝없이 도는 회전 표시와 뼈대만 `motion-reduce:animate-none` 을 적고, 그 표시를 문장으로 바꿔 보일 때만 `motion-reduce:hidden`, `motion-reduce:flex`, `motion-reduce:inline` 을 적는다
 
 고쳤으면 아래가 아무것도 내지 않아야 한다.
 
