@@ -60,6 +60,7 @@
   - `MEMBER`: `실행 실패: ${describeError(detail, "실행을 마치지 못했어요.")}`. `detail` 이 없으면 `실행 실패`.
   - `ADMIN`: `실행 실패: ${describeError(detail, detail)} (${detail})`. 표에 없는 코드면 `실행 실패: ${detail}`.
   - 글자색을 `text-destructive` 로 둔다.
+- 도구 줄: phase 04 가 읽을 수 없는 `detail` 을 줄에서 뺐다. `isAdmin` 이면 그 `detail` 을 `activity-timeline.tsx` 와 같은 `<details data-testid="activity-raw">` 「원본 보기」 로 보인다. 줄의 `truncate` 가 `<details>` 를 자르지 않게 줄 아래 따로 둔다.
 - `ExecutionNode` 의 이름 `node.agentName ?? node.agentCode` 도 `MEMBER` 에게는 `agentLabel(node.agentName)` 이다.
 
 ### 4. `web/src/lib/toolset-label.ts` 신규

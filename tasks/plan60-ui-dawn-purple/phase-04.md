@@ -78,6 +78,26 @@ export function activitySummaryLabel(counts: { toolCount: number; subagentCount:
 - 아이콘 색: `done` 은 `text-success`, `failed` 는 `text-destructive`, 그 밖에는 `text-muted-foreground`. `failed` 줄은 글자 뒤에 `<span className="text-destructive">실패</span>` 를 보이게 그리고 `sr-only` 의 「실패」 는 뺀다.
 - 글자 크기는 `text-sm`, 줄 글자색은 `text-foreground-soft` 다.
 
+### 5-1. 도구 줄의 `detail` 과 MCP 도구 이름
+
+운영에서 `ADMIN` 이 작업 과정을 펼치면 도구 결과의 원본 JSON 이 줄마다 그대로 보였다. Control Plane 은 `ADMIN` 에게 모든 도구의 `detail` 을 주고(ADR-038), 화면이 받은 것을 그대로 그렸기 때문이다.
+
+- `web/src/lib/tool-label.ts` 에 더한다.
+
+  ```ts
+  /** 줄에 바로 보여도 되는 `detail` 인가. 검색어와 사진 질문만 사람 말이다. */
+  export function isReadableDetail(toolName: string | null): boolean
+  ```
+
+  `mcp__` 접두사를 벗긴 이름이 `web_search` 나 `vision_analyze` 일 때만 참이다.
+- `toolLabel`: 표에 없는 도구 가운데 원래 이름이 `mcp__` 로 시작하는 것은 `{ running: "연결된 서비스를 쓰고 있어요", done: "연결된 서비스를 썼어요" }` 로 보인다. 그 밖의 모르는 도구는 `UNKNOWN` 그대로다. 도구 이름 원문(`mcp__서버__도구`)은 줄에 그리지 않는다.
+- `activity-timeline.tsx` 의 도구 줄:
+  - `isReadableDetail(item.name)` 이 참이면 지금처럼 `detail` 을 줄 아래에 그린다.
+  - 거짓이고 `detail` 이 있으면 `useShellIsAdmin()` 이 참일 때만 `<details data-testid="activity-raw">` 를 그린다. `<summary>` 는 「원본 보기」 이고, 펼치면 도구 이름 원문과 `detail` 을 `<pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-muted p-2 font-mono text-xs">` 로 보인다. 기본은 접혀 있다.
+  - `MEMBER` 에게는 아무것도 더 그리지 않는다. Control Plane 이 그 `detail` 을 주지 않지만, 화면도 그리지 않는다.
+- `activity-timeline.tsx` 는 `"use client"` 가 아니면 붙인다. `useShellIsAdmin` 은 `web/src/components/shell/app-shell.tsx` 에 있다.
+- `web/src/components/execution/execution-event-row.tsx` 의 도구 줄도 같은 규칙을 쓴다: 읽을 수 있는 `detail` 만 줄에 붙이고, 나머지는 붙이지 않는다. 원본 보기는 phase 05 가 `isAdmin` 을 이 부품에 넘길 때 더한다.
+
 ### 6. 같은 자리에 들어오게 한다
 
 `web/src/components/chat/message-bubble.tsx` 에서 비서 줄의 틀을 꺼내 함께 쓴다.
@@ -109,7 +129,8 @@ export function AssistantRow({ header, children, ...props }: React.ComponentProp
 
 ### 9. 검사
 
-- `test/unit/tool-label.test.ts`, `test/unit/subagent-label.test.ts`, `test/unit/activity-state.test.ts`: 새 문장에 맞춘다. `activity-state.test.ts` 에 `activitySummaryLabel` 의 여섯 조건을 더한다.
+- `test/unit/tool-label.test.ts`, `test/unit/subagent-label.test.ts`, `test/unit/activity-state.test.ts`: 새 문장에 맞춘다. `tool-label.test.ts` 에 더한다: `toolLabel("mcp__ledger__query", false)` 는 「연결된 서비스를 썼어요」, `toolLabel("mcp__fos__artifact_write", false)` 는 표의 문장, `isReadableDetail("web_search")` 는 참, `isReadableDetail("terminal")` 과 `isReadableDetail("mcp__ledger__query")` 는 거짓.
+- `test/browser/activity-panel.spec.ts` 에 더한다: 관리자가 `terminal` 도구를 쓴 답을 펼치면 `detail` 글자가 보이지 않고 `activity-raw` 의 「원본 보기」 를 눌러야 보인다. `MEMBER` 검사는 phase 05 가 한다. `activity-state.test.ts` 에 `activitySummaryLabel` 의 여섯 조건을 더한다.
 - 새 단위 테스트를 `test/unit/activity-state.test.ts` 에 더한다: `formatSeconds(999)` 는 `null`, `formatSeconds(2_100)` 은 「2초」.
 - 브라우저 검사에서 옛 문장을 찾는 곳을 고친다. 아래로 찾는다.
 
