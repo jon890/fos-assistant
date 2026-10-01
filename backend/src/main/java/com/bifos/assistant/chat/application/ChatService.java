@@ -236,27 +236,47 @@ public class ChatService {
      *
      * <p>turn 잠금을 풀기 전에 멈춘다. 잠금을 푼 뒤 닫기 리스너에서 멈추면 그 사이 다른 스레드가 아직 멈추지 않은
      * 행으로 turn 을 연다.
+     *
+     * <p>대기 줄을 멈추다 실패해도 예외를 올리지 않고 경고 로그만 남긴다. 멈춤 때문에 중지한 turn 이 오류로 끝나거나
+     * 원래 예외가 가려지면 안 된다.
      */
     private void markStoppedAndHoldPending(TurnCancellation.TurnHandle handle, Long conversationId) {
         turns.markStopped(handle);
-        transactions.executeWithoutResult(status -> pendingMessages.markHeld(conversationId, true));
+        try {
+            transactions.executeWithoutResult(status -> pendingMessages.markHeld(conversationId, true));
+        } catch (RuntimeException ex) {
+            log.warn("중지한 turn 의 대기 줄을 멈춰 두지 못했다 conversationId={}", conversationId, ex);
+        }
+    }
+
+    /**
+     * 중지로 끝난 turn 의 취소 기록을 남긴 뒤 대기 줄을 멈추고 그 turn 을 돌려준다.
+     *
+     * <p>취소 기록이 먼저다. 대기 줄을 먼저 멈추다 실패하면 실행 줄이 {@code CANCELLED} 로 남지 않는다. 취소 기록이
+     * 실패해도 대기 줄은 멈춘다. 둘 다 turn 잠금을 풀기 전이다.
+     */
+    private ChatTurn stoppedTurn(
+            TurnCancellation.TurnHandle handle,
+            PendingTurn pending,
+            HermesRunResult result,
+            ModelChoice choice,
+            Instant startedAt) {
+        try {
+            return recorded(cancel(pending, result, choice), startedAt);
+        } finally {
+            markStoppedAndHoldPending(handle, pending.conversation().id());
+        }
     }
 
     /**
      * 중지가 확정된 turn 이 예외로 끝날 때도 그 대화의 대기 줄을 멈춰 둔다.
      *
      * <p>취소된 turn 을 돌려주는 자리를 지나지 않고 빠져나가므로 여기서 멈춘다. 멈추지 않으면 사용자가 중지한 대화에서
-     * 잠금이 풀리자마자 대기 메시지가 간다. 멈추다 난 예외는 원래 예외에 붙여 원래 예외가 그대로 올라가게 한다.
+     * 잠금이 풀리자마자 대기 메시지가 간다.
      */
-    private void holdPendingIfStopConfirmed(
-            TurnCancellation.TurnHandle handle, Long conversationId, RuntimeException failure) {
-        if (!turns.isStopConfirmed(handle)) {
-            return;
-        }
-        try {
+    private void holdPendingIfStopConfirmed(TurnCancellation.TurnHandle handle, Long conversationId) {
+        if (turns.isStopConfirmed(handle)) {
             markStoppedAndHoldPending(handle, conversationId);
-        } catch (RuntimeException ex) {
-            failure.addSuppressed(ex);
         }
     }
 
@@ -355,8 +375,7 @@ public class ChatService {
 
             if (turns.isStopConfirmed(handle)
                     || turns.shouldStopBeforeSubmit(pending.execution().id())) {
-                markStoppedAndHoldPending(handle, conversation.id());
-                return recorded(cancel(pending, null, choice), startedAt);
+                return stoppedTurn(handle, pending, null, choice, startedAt);
             }
             String runId = submit(pending);
             HermesRunResult result;
@@ -366,15 +385,14 @@ public class ChatService {
                 }
                 result = awaitCompletion(pending, runId);
             } catch (RuntimeException ex) {
-                holdPendingIfStopConfirmed(handle, conversation.id(), ex);
+                holdPendingIfStopConfirmed(handle, conversation.id());
                 throw ex;
             } finally {
                 turns.untrackRun(pending.execution().id(), runId);
             }
 
             if (turns.isStopConfirmed(handle) || "cancelled".equalsIgnoreCase(result.status())) {
-                markStoppedAndHoldPending(handle, conversation.id());
-                return recorded(cancel(pending, result, choice), startedAt);
+                return stoppedTurn(handle, pending, result, choice, startedAt);
             }
             if (result.succeeded()) {
                 ChatTurn completed = finish(pending, result, choice);

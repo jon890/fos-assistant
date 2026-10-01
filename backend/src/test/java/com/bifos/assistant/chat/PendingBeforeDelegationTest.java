@@ -55,6 +55,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -285,6 +286,34 @@ class PendingBeforeDelegationTest {
                 .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
                 .isNotNull();
+    }
+
+    @Test
+    @DisplayName("중지한 turn 의 대기 줄을 멈추지 못해도 실행은 CANCELLED 로 남고 stopped 사건이 온다")
+    void recordsCancelledAndSendsStoppedEvenWhenHoldFails() {
+        doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
+        stub().willReturn(HermesRunResult.of(
+                "run-stop", "session", "cancelled", "절반", "model", "provider", TokenUsage.empty()));
+        stub().beforeAwait(() -> chat.stop(
+                dad,
+                executions
+                        .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
+                        .getFirst()
+                        .id()));
+        List<ChatEvent> relayed = new CopyOnWriteArrayList<>();
+
+        chat.stream(dad, conversation.id(), "질문", null, relayed::add);
+        awaitIdle(conversation.id());
+
+        ChatEvent last = relayed.getLast();
+        assertThat(last.type()).as("받은 사건: %s", relayed).isEqualTo("stopped");
+        assertThat(executions.findById(last.executionId()).orElseThrow().status())
+                .as("중지한 turn 의 실행 줄")
+                .isEqualTo(ExecutionStatus.CANCELLED);
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::content)
+                .as("멈추기 전까지의 답이 남는다")
+                .containsExactly("질문", "절반");
     }
 
     private void finished(AgentExecution execution) {
