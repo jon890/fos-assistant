@@ -240,9 +240,9 @@ FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, �
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
-| `context_chars` | BIGINT NULL | 이 실행의 `instructions` 에 넣은 Memory 문맥의 글자 수. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다 |
+| `context_chars` | BIGINT NULL | 이 실행의 공통 답변 지침과 Memory 문맥의 글자 수. Memory가 없어도 공통 지침은 센다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다 |
 | `runtime_fingerprint` | VARCHAR(64) NULL | 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문. 그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있고, 그동안 사용량 화면의 지문 축은 빈 목록을 돌려준다 |
-| `instructions_hash` | VARCHAR(64) NULL | 넣은 Memory 문맥의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory 를 담고 있어 저장하지 않는다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 세지 않는다. 넣은 Memory 가 없으면 비어 있다 |
+| `instructions_hash` | VARCHAR(64) NULL | 공통 답변 지침과 Memory 문맥의 SHA-256 앞 16바이트를 16진수로 적은 값. 본문은 개인 Memory를 담을 수 있어 저장하지 않는다. 뒤에 붙는 묻는 형식 안내와 다시 생성 지시는 제외한다. Memory가 없어도 공통 지침의 지문을 기록한다 |
 | `latency_ms` | BIGINT NULL | 끝나지 않은 실행은 비어 있다 |
 | `estimated_cost_micros` | BIGINT NULL | 공개 API 가격으로 환산한 금액. 통화 단위의 100만분의 1 |
 | `actual_cost_micros` | BIGINT NULL | 실제로 청구되는 금액. 구독 경로는 비어 있다 |

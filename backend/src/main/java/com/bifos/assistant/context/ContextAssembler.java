@@ -22,6 +22,15 @@ public class ContextAssembler {
     private static final Logger log = LoggerFactory.getLogger(ContextAssembler.class);
     private static final String GROUP_HEADER = "# 우리 그룹이 함께 아는 것";
     private static final String USER_HEADER = "# 지금 묻는 사람에 대해 아는 것";
+    private static final String RESPONSE_INSTRUCTIONS = """
+            # 답변 형식
+
+            표는 GFM 마크다운 형식으로 작성한다. 머리 줄 바로 다음에 각 열의 구분 줄을 반드시 둔다.
+            예:
+            | 항목 | 값 |
+            | --- | --- |
+            | 예시 | 내용 |
+            """.stripTrailing();
     private static final String INDEX_HEADER = """
             # 더 물어볼 수 있는 것
 
@@ -33,6 +42,15 @@ public class ContextAssembler {
 
     private final MemoryService memories;
     private final ContextProperties properties;
+
+    /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변 지침을 넣는다. */
+    public AssembledContext withResponseInstructions(AssembledContext context) {
+        String instructions = RESPONSE_INSTRUCTIONS;
+        if (context.instructions() != null && !context.instructions().isBlank()) {
+            instructions += SEPARATOR + context.instructions();
+        }
+        return new AssembledContext(instructions, instructions.length(), context.omittedMemoryIds());
+    }
 
     /**
      * 고르는 자리를 여기 하나로 모은다. 항목이 많아지면 이 클래스에서 검색으로 바꾼다.
@@ -56,8 +74,7 @@ public class ContextAssembler {
         return builder.build();
     }
 
-    private static void appendAlways(
-            ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope) {
+    private static void appendAlways(ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope) {
         memories.stream()
                 .filter(memory -> memory.scope() == scope)
                 .sorted(Comparator.comparing(Memory::id))
@@ -142,10 +159,7 @@ public class ContextAssembler {
 
         private AssembledContext build() {
             if (!omitted.isEmpty()) {
-                log.warn(
-                        "memory context omitted items={} chars={}",
-                        omitted.size(),
-                        full.length() - selected.length());
+                log.warn("memory context omitted items={} chars={}", omitted.size(), full.length() - selected.length());
             }
             return selected.isEmpty()
                     ? new AssembledContext(null, 0, omitted)

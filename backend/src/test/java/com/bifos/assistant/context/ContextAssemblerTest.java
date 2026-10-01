@@ -8,6 +8,7 @@ import com.bifos.assistant.memory.domain.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.UserRole;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,30 @@ class ContextAssemblerTest {
     @BeforeEach
     void setUp() {
         repository.deleteAll();
+    }
+
+    @Test
+    @DisplayName("Memory 없이도 GFM 표 지침과 길이와 지문을 보낸다")
+    void addsResponseInstructionsWithoutMemory() {
+        AssembledContext result = assembler.withResponseInstructions(AssembledContext.empty());
+
+        assertThat(result.instructions()).contains("GFM", "| --- | --- |");
+        assertThat(result.chars()).isEqualTo(result.instructions().length());
+        assertThat(result.instructionsHash()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("공통 표 지침은 Memory 예산 밖에 두고 누락 항목을 보존한다")
+    void keepsMemoryBudgetAndOmissionsIndependent() {
+        String body = "가".repeat(8_000);
+        AssembledContext memory = new AssembledContext(body, body.length(), List.of(3L));
+
+        AssembledContext result = assembler.withResponseInstructions(memory);
+
+        assertThat(result.instructions()).startsWith("# 답변 형식").endsWith(body);
+        assertThat(result.chars()).isEqualTo(result.instructions().length()).isGreaterThan(8_000);
+        assertThat(result.omittedMemoryIds()).containsExactly(3L);
+        assertThat(result.instructionsHash()).isNotEqualTo(memory.instructionsHash());
     }
 
     @Test

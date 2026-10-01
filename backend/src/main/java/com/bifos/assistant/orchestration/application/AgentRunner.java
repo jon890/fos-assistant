@@ -141,6 +141,7 @@ public class AgentRunner {
         ResolvedModelTier resolved = modelTiers.resolve(user, conversation, agent);
         AssembledContext context =
                 agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
+        context = contextAssembler.withResponseInstructions(context);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());
         ModelChoice choice = resolved.choice();

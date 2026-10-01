@@ -116,7 +116,7 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 2. `ChatService` 가 요청한 에이전트를 사용자가 쓸 수 있는지 확인하고 `conversation` 에 기록한다.
    이어지는 대화는 요청의 `agentCode` 를 무시하고 처음 기록한 에이전트를 쓴다.
 3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다.
-   요청자가 볼 수 있는 Memory 만 고른다.
+   요청자가 볼 수 있는 Memory만 고르고, Memory 예산 밖에서 공통 표 지침을 추가한다.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
    조립한 글자 수를 `context_chars` 에, 대화에서 고른 effort 를 `reasoning_effort` 에 적는다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
@@ -176,8 +176,9 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 색인의 본문은 `memory_read` MCP 도구로 읽는다.
   요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
   Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다.
-- 조립한 글자 수를 실행의 `context_chars` 에 남긴다.
-  주입할 양이 실제로 문제가 되는 시점을 숫자로 판단하기 위해서다.
+- 공통 답변 지침과 Memory를 합친 글자 수를 실행의 `context_chars`에 남긴다.
+  `instructions_hash`도 이 문자열을 대상으로 하며, turn 전용 지시는 제외한다.
+  Memory가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다.
 - 항목 하나가 남은 자리에 들어가지 않으면 그 항목만 빼고 다음 항목을 계속 담는다.
   넘친 항목을 잘라서 싣지는 않는다. 잘린 사실은 틀린 사실이 될 수 있다.
 - 색인 층에 쓸 자리를 먼저 떼어 두고 항상 층을 담는다.

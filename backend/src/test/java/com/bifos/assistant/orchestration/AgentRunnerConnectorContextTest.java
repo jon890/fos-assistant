@@ -71,6 +71,7 @@ class AgentRunnerConnectorContextTest {
     @BeforeEach
     void setUp() {
         when(contextAssembler.assemble(user)).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
+        when(contextAssembler.withResponseInstructions(any())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
         when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
@@ -127,24 +128,29 @@ class AgentRunnerConnectorContextTest {
     }
 
     @Test
-    @DisplayName("커넥터 에이전트의 실행은 Memory 를 조립하지 않고 덧붙인 지시만 보낸다")
+    @DisplayName("커넥터 실행은 Memory 없이 공통 지침과 덧붙인 지시를 보낸다")
     void sendsOnlyInstructionAdditionForConnectorAgent() {
         run(connectorAgent(), ADDITION, null);
 
         verify(contextAssembler, never()).assemble(any());
-        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isEqualTo(ADDITION);
+        String instructions = submitted().instructions();
+        assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY).endsWith("\n\n" + ADDITION);
+        String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + ADDITION));
         ExecutionContextSnapshot snapshot = recordedSnapshot();
-        assertThat(snapshot.contextChars()).as("실행 줄에 적는 문맥 길이").isZero();
-        assertThat(snapshot.instructionsHash()).as("실행 줄에 적는 문맥 지문").isNull();
+        assertThat(snapshot.contextChars()).isEqualTo(commonInstructions.length());
+        assertThat(snapshot.instructionsHash())
+                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
     }
 
     @Test
-    @DisplayName("커넥터 에이전트의 실행에 덧붙일 지시가 없으면 instructions 를 비워 보낸다")
+    @DisplayName("커넥터 실행에 덧붙일 지시가 없어도 공통 표 지침은 보낸다")
     void sendsNoInstructionsForConnectorAgentWithoutAddition() {
         run(connectorAgent(), null, null);
 
         verify(contextAssembler, never()).assemble(any());
-        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isNull();
+        String instructions = submitted().instructions();
+        assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY);
+        assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length());
     }
 
     @Test
@@ -153,8 +159,9 @@ class AgentRunnerConnectorContextTest {
         run(agent(), ADDITION, null);
 
         verify(contextAssembler).assemble(user);
-        assertThat(submitted().instructions()).as("Hermes 에 보낸 instructions").isEqualTo(MEMORY + "\n\n" + ADDITION);
-        assertThat(recordedSnapshot().contextChars()).as("실행 줄에 적는 문맥 길이").isEqualTo((long) MEMORY.length());
+        String instructions = submitted().instructions();
+        assertThat(instructions).contains("GFM", MEMORY).endsWith("\n\n" + ADDITION);
+        assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
     }
 
     @Test
@@ -166,6 +173,7 @@ class AgentRunnerConnectorContextTest {
         AgentRunner.Run run = run(agent, null, key);
 
         verify(contextAssembler, never()).assemble(any());
+        assertThat(submitted().instructions()).contains("GFM", "구분 줄").doesNotContain(MEMORY);
         verify(executions).complete(same(started), same(agent), any(), any(), eq(ANSWER));
         assertThat(run.execution()).isSameAs(completed);
         assertThat(run.result().succeeded()).as("위임 실행의 성공 여부").isTrue();

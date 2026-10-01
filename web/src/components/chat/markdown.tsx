@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CopyButton } from "@/components/ui/copy-button";
+import { normalizeMarkdown } from "@/components/chat/normalize-markdown";
 
 type HighlightedToken = {
   content: string;
@@ -44,27 +45,43 @@ function tokenClass(scopes: string[]): string {
    * keyword 와 storage.modifier 는 흐름과 선언을, function 계열은 호출 대상을, type 계열은 자료형과 클래스 이름을 나타낸다.
    * 더 구체적인 역할부터 검사하며, 어느 역할에도 맞지 않는 식별자와 기호는 본문 색을 쓴다.
    */
-  if (scopes.some((scope) => scope.includes("comment"))) return "text-code-comment italic";
-  if (scopes.some((scope) => scope.includes("string"))) return "text-code-string";
-  if (scopes.some((scope) => scope.includes("constant.numeric"))) return "text-code-number";
-  if (scopes.some((scope) => scope.includes("keyword") || scope.includes("storage.modifier"))) {
+  if (scopes.some((scope) => scope.includes("comment")))
+    return "text-code-comment italic";
+  if (scopes.some((scope) => scope.includes("string")))
+    return "text-code-string";
+  if (scopes.some((scope) => scope.includes("constant.numeric")))
+    return "text-code-number";
+  if (
+    scopes.some(
+      (scope) =>
+        scope.includes("keyword") || scope.includes("storage.modifier"),
+    )
+  ) {
     return "text-code-keyword";
   }
-  if (scopes.some((scope) =>
-    scope.includes("entity.name.function")
-    || scope.includes("support.function")
-    || scope.includes("variable.function")
-    || scope.includes("meta.function-call"))) {
+  if (
+    scopes.some(
+      (scope) =>
+        scope.includes("entity.name.function") ||
+        scope.includes("support.function") ||
+        scope.includes("variable.function") ||
+        scope.includes("meta.function-call"),
+    )
+  ) {
     return "text-code-function";
   }
-  if (scopes.some((scope) =>
-    scope.includes("entity.name.type")
-    || scope.includes("entity.name.class")
-    || scope.includes("entity.name.interface")
-    || scope.includes("entity.name.enum")
-    || scope.includes("support.type")
-    || scope.includes("support.class")
-    || scope.includes("storage.type"))) {
+  if (
+    scopes.some(
+      (scope) =>
+        scope.includes("entity.name.type") ||
+        scope.includes("entity.name.class") ||
+        scope.includes("entity.name.interface") ||
+        scope.includes("entity.name.enum") ||
+        scope.includes("support.type") ||
+        scope.includes("support.class") ||
+        scope.includes("storage.type"),
+    )
+  ) {
     return "text-code-type";
   }
   return "text-foreground";
@@ -84,32 +101,44 @@ function loadTokenizer(): Promise<Tokenizer> {
     import("shiki/langs/python.mjs"),
     import("shiki/langs/sql.mjs"),
     import("shiki/langs/typescript.mjs"),
-  ]).then(async ([{ createHighlighterCore }, { createJavaScriptRegexEngine }, theme, ...languages]) => {
-    const highlighter = await createHighlighterCore({
-      engine: createJavaScriptRegexEngine(),
-      themes: [theme.default],
-      langs: languages.map((loaded) => loaded.default),
-    });
-    return (code: string, language: string) => {
-      const result = highlighter.codeToTokens(code, {
-        lang: language,
-        theme: "github-dark",
-        includeExplanation: "scopeName",
+  ]).then(
+    async ([
+      { createHighlighterCore },
+      { createJavaScriptRegexEngine },
+      theme,
+      ...languages
+    ]) => {
+      const highlighter = await createHighlighterCore({
+        engine: createJavaScriptRegexEngine(),
+        themes: [theme.default],
+        langs: languages.map((loaded) => loaded.default),
       });
-      return result.tokens.map((line) =>
-        line.map((token) => ({
-          content: token.content,
-          className: tokenClass(
-            token.explanation?.flatMap((entry) => entry.scopes.map((scope) => scope.scopeName)) ?? [],
-          ),
-        })),
-      );
-    };
-  });
+      return (code: string, language: string) => {
+        const result = highlighter.codeToTokens(code, {
+          lang: language,
+          theme: "github-dark",
+          includeExplanation: "scopeName",
+        });
+        return result.tokens.map((line) =>
+          line.map((token) => ({
+            content: token.content,
+            className: tokenClass(
+              token.explanation?.flatMap((entry) =>
+                entry.scopes.map((scope) => scope.scopeName),
+              ) ?? [],
+            ),
+          })),
+        );
+      };
+    },
+  );
   return tokenizerPromise;
 }
 
-async function highlight(code: string, requestedLanguage: string): Promise<HighlightedLine[]> {
+async function highlight(
+  code: string,
+  requestedLanguage: string,
+): Promise<HighlightedLine[]> {
   const language = LANGUAGE_ALIASES[requestedLanguage] ?? requestedLanguage;
   if (!SUPPORTED_LANGUAGES.has(language)) return [];
 
@@ -133,20 +162,22 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
 
   return (
     <div className="relative my-3">
-      <div className="absolute right-2 top-2 z-10"><CopyButton text={code} label="코드 복사" /></div>
+      <div className="absolute right-2 top-2 z-10">
+        <CopyButton text={code} label="코드 복사" />
+      </div>
       <pre className="overflow-x-auto rounded-md bg-muted px-3 pb-3 pt-12 font-mono text-sm leading-6">
         <code className="block min-w-max">
-        {lines.length > 0
-          ? lines.map((line, lineIndex) => (
-              <span key={lineIndex} className="block min-h-6">
-                {line.map((token, tokenIndex) => (
-                  <span key={tokenIndex} className={token.className}>
-                    {token.content}
-                  </span>
-                ))}
-              </span>
-            ))
-          : code}
+          {lines.length > 0
+            ? lines.map((line, lineIndex) => (
+                <span key={lineIndex} className="block min-h-6">
+                  {line.map((token, tokenIndex) => (
+                    <span key={tokenIndex} className={token.className}>
+                      {token.content}
+                    </span>
+                  ))}
+                </span>
+              ))
+            : code}
         </code>
       </pre>
     </div>
@@ -171,13 +202,19 @@ export function Markdown({ children }: { children: string }) {
           ),
           table: ({ children: tableChildren, ...props }) => (
             <div className="my-3 max-w-full overflow-x-auto">
-              <table {...props} className="w-max min-w-full border-collapse text-left">
+              <table
+                {...props}
+                className="w-max min-w-full border-collapse text-left"
+              >
                 {tableChildren}
               </table>
             </div>
           ),
           th: ({ children: cell, ...props }) => (
-            <th {...props} className="border border-border bg-muted px-3 py-2 font-semibold">
+            <th
+              {...props}
+              className="border border-border bg-muted px-3 py-2 font-semibold"
+            >
               {cell}
             </th>
           ),
@@ -209,14 +246,17 @@ export function Markdown({ children }: { children: string }) {
               return <CodeBlock code={text} language={language ?? "text"} />;
             }
             return (
-              <code {...props} className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.9em]">
+              <code
+                {...props}
+                className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.9em]"
+              >
                 {source}
               </code>
             );
           },
         }}
       >
-        {children}
+        {normalizeMarkdown(children)}
       </ReactMarkdown>
     </div>
   );
