@@ -10,6 +10,7 @@ import java.util.Map;
  *
  * @param secretPrefixes 비밀 칸의 앞 4자. 값이 16자 미만인 칸은 없다
  * @param values 비밀이 아닌 칸의 값
+ * @param undeclaredTools 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 가 선언하지 않은 수
  */
 public record ConnectionSnapshot(
         String connectorId,
@@ -18,7 +19,8 @@ public record ConnectionSnapshot(
         Map<String, String> values,
         boolean restartRequired,
         Instant checkedAt,
-        String agentCode) {
+        String agentCode,
+        int undeclaredTools) {
 
     public static ConnectionSnapshot from(ConnectorConnection connection) {
         return new ConnectionSnapshot(
@@ -28,6 +30,7 @@ public record ConnectionSnapshot(
                 connection.fields().values(),
                 connection.restartRequired(),
                 connection.checkedAt(),
-                connection.agent().code());
+                connection.agent().code(),
+                connection.undeclaredTools());
     }
 }

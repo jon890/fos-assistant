@@ -21,7 +21,10 @@ import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
 import com.bifos.assistant.connector.application.model.ConnectorSummary;
+import com.bifos.assistant.connector.application.model.ConnectorToolSummary;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.domain.type.ToolApproval;
+import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.presentation.ConnectionDtos;
 import com.bifos.assistant.connector.presentation.ConnectorConnectionAdminController;
 import com.bifos.assistant.connector.presentation.ConnectorConnectionController;
@@ -73,6 +76,8 @@ class ConnectorConnectionControllerTest {
                         List.of(
                                 new ConnectorFieldSummary("token", "토큰", "", true, true, "^demo_.+$", false, false),
                                 new ConnectorFieldSummary("scope", "범위", "", false, false, null, true, true)),
+                        List.of(new ConnectorToolSummary(
+                                "write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED)),
                         ConnectionStatus.PENDING,
                         true)));
 
@@ -87,6 +92,10 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].fields[0].pattern").value("^demo_.+$"))
                 .andExpect(jsonPath("$[0].fields[1].hasOptions").value(true))
                 .andExpect(jsonPath("$[0].fields[1].autoSelectSingle").value(true))
+                .andExpect(jsonPath("$[0].tools[0].name").value("write_note"))
+                .andExpect(jsonPath("$[0].tools[0].title").value("메모 쓰기"))
+                .andExpect(jsonPath("$[0].tools[0].risk").value("WRITE"))
+                .andExpect(jsonPath("$[0].tools[0].approval").value("REQUIRED"))
                 .andExpect(jsonPath("$[0].fields[0].env").doesNotExist())
                 .andExpect(jsonPath("$[0].fields[1].options").doesNotExist())
                 .andReturn();
@@ -98,7 +107,8 @@ class ConnectorConnectionControllerTest {
     void catalogMarksRemovedConnectorAsUnavailableWithEmptyFields() throws Exception {
         when(service.catalog(MEMBER))
                 .thenReturn(
-                        List.of(new ConnectorSummary(DEMO, "검사용 메모", "", List.of(), ConnectionStatus.READY, false)));
+                        List.of(new ConnectorSummary(
+                                DEMO, "검사용 메모", "", List.of(), List.of(), ConnectionStatus.READY, false)));
 
         mvc.perform(get("/api/v1/connectors"))
                 .andExpect(status().isOk())
@@ -107,7 +117,8 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].description").value(""))
                 .andExpect(jsonPath("$[0].myStatus").value("READY"))
                 .andExpect(jsonPath("$[0].available").value(false))
-                .andExpect(jsonPath("$[0].fields").isEmpty());
+                .andExpect(jsonPath("$[0].fields").isEmpty())
+                .andExpect(jsonPath("$[0].tools").isEmpty());
     }
 
     @Test
@@ -193,11 +204,12 @@ class ConnectorConnectionControllerTest {
         when(service.check(MEMBER, DEMO)).thenReturn(snapshot(ConnectionStatus.PENDING));
         when(service.disconnect(MEMBER, DEMO))
                 .thenReturn(new ConnectionSnapshot(
-                        DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), true, null, "agent-code"));
+                        DEMO, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), true, null, "agent-code", 0));
 
         mvc.perform(post("/api/v1/connections/" + DEMO + "/check"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.undeclaredTools").value(2));
         mvc.perform(delete("/api/v1/connections/" + DEMO))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DISCONNECTED"))
@@ -252,8 +264,8 @@ class ConnectorConnectionControllerTest {
     @DisplayName("관리자 목록은 다른 사용자의 비밀 앞부분과 칸 값을 내보내지 않는다")
     void adminListHidesOtherUsersPrefixesAndValues() throws Exception {
         when(service.listForAdmin(ADMIN))
-                .thenReturn(List.of(
-                        new AdminConnectionSnapshot(DEMO, 7L, "사용자", ConnectionStatus.PENDING, "agent-code", true)));
+                .thenReturn(List.of(new AdminConnectionSnapshot(
+                        DEMO, 7L, "사용자", ConnectionStatus.PENDING, "agent-code", true, 3)));
 
         mvc.perform(get("/api/v1/admin/connections"))
                 .andExpect(status().isOk())
@@ -261,6 +273,7 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].userId").value(7))
                 .andExpect(jsonPath("$[0].displayName").value("사용자"))
                 .andExpect(jsonPath("$[0].restartRequired").value(true))
+                .andExpect(jsonPath("$[0].undeclaredTools").value(3))
                 .andExpect(jsonPath("$[0].secretPrefixes").doesNotExist())
                 .andExpect(jsonPath("$[0].values").doesNotExist());
     }
@@ -293,6 +306,6 @@ class ConnectorConnectionControllerTest {
 
     private static ConnectionSnapshot snapshot(ConnectionStatus status) {
         return new ConnectionSnapshot(
-                DEMO, status, Map.of("token", "demo"), Map.of("scope", "a"), false, null, "agent-code");
+                DEMO, status, Map.of("token", "demo"), Map.of("scope", "a"), false, null, "agent-code", 2);
     }
 }

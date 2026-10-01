@@ -82,6 +82,7 @@ const TEST_LAST_SUBMITTED_RUNTIME_PATH = "/__test/last-submitted-runtime";
  */
 export const DEMO_CONNECTOR = {
   id: "demo-notes",
+  schema: 2,
   title: "검사용 메모",
   description: "검사에서만 쓰는 커넥터입니다.",
   fields: [
@@ -98,7 +99,16 @@ export const DEMO_CONNECTOR = {
   mcp_server: "demo",
   // manifest 가 선언한 내장 toolset 이다. 설치가 도구 목록에서 서버 이름 다음에 둔다.
   toolsets: [] as string[],
+  attachments: false,
+  // 도구마다의 정책이다. 확인 도구이자 선택지 도구인 `list_scopes` 는 읽기 전용이고 승인이 없다.
+  tools: {
+    list_scopes: { risk: "READ", approval: "none" },
+    write_note: { risk: "WRITE", approval: "required", title: "메모 쓰기" },
+    purge_notes: { risk: "DESTRUCTIVE", approval: "always" },
+  },
 };
+/** MCP 서버가 실제로 내는 도구다. `hidden_tool` 은 manifest 가 선언하지 않은 도구다. */
+const DEMO_SERVER_TOOLS = ["list_scopes", "write_note", "purge_notes", "hidden_tool"];
 export const DEMO_TOKEN_OK = "demo_ok_0123456789";
 export const DEMO_TOKEN_BAD = "demo_bad_0123456789";
 
@@ -508,6 +518,11 @@ export type FakeHermes = {
    * 비밀 값은 적지 않는다.
    */
   connectorRequests(): readonly string[];
+  /**
+   * 그 profile 의 정책 hook 이 켜져 있다고 답할지 정한다. `false` 로 두면 설치를 다시 보내도 고쳐지지 않는
+   * 상태가 되고, `true` 로 풀 때까지 설치 목록이 `policy_hook: false` 로 답한다.
+   */
+  setPolicyHook(profile: string, active: boolean): void;
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -581,6 +596,10 @@ export function startFakeHermes(
   /** profile 이름과 그 profile 에 설치된 커넥터 id 들이다. */
   const installedConnectors = new Map<string, Set<string>>();
   const connectorRequests: string[] = [];
+  /** 설치가 정책 hook 을 지금 판으로 맞춘 profile 이다. 설치한 적이 없는 profile 의 hook 은 꺼져 있다. */
+  const policyHookInstalled = new Set<string>();
+  /** 설치해도 정책 hook 이 고쳐지지 않게 둔 profile 이다. */
+  const policyHookOff = new Set<string>();
   const connectorEnvNames = new Set(DEMO_CONNECTOR.fields.map((field) => field.env));
   /** profile 이름과 전역으로 끈 스킬 이름들이다. */
   const disabledSkills = new Map<string, Set<string>>();
@@ -791,6 +810,7 @@ export function startFakeHermes(
         && toolsets.join() === [DEMO_CONNECTOR.mcp_server, ...DEMO_CONNECTOR.toolsets].join();
       send(response, 200, {
         profile: queryProfile,
+        policy_hook: policyHookInstalled.has(queryProfile) && !policyHookOff.has(queryProfile),
         connectors: [{ plugin: DEMO_CONNECTOR.id, enabled: installed.has(DEMO_CONNECTOR.id), configured }],
       });
       return true;
@@ -806,14 +826,24 @@ export function startFakeHermes(
       if (body.plugin !== DEMO_CONNECTOR.id) {
         // 모르는 plugin 은 켜지 못한다. 끄기는 끌 것이 없으므로 바뀐 것 없이 성공한다.
         if (body.enabled) send(response, 400, { error: "invalid connector request" });
-        else send(response, 200, { profile: body.profile, plugin: body.plugin, enabled: false, changed: false, restart_required: false });
+        else {
+          send(response, 200, {
+            profile: body.profile, plugin: body.plugin, enabled: false, changed: false, restart_required: false,
+            plugin_updated: false,
+          });
+        }
         return true;
       }
       connectorRequests.push(`install ${body.profile} ${body.enabled ? "on" : "off"}`);
       const installed = installedConnectors.get(body.profile) ?? new Set<string>();
       const changed = installed.has(body.plugin) !== body.enabled;
-      if (body.enabled) installed.add(body.plugin);
-      else installed.delete(body.plugin);
+      if (body.enabled) {
+        installed.add(body.plugin);
+        // 설치는 그 profile 의 정책 hook 을 지금 판으로 맞춘다.
+        policyHookInstalled.add(body.profile);
+      } else {
+        installed.delete(body.plugin);
+      }
       installedConnectors.set(body.profile, installed);
       // 설치는 그 profile 의 API 도구 목록을 커넥터의 MCP 서버 이름과 선언한 toolset 으로 다시 쓰고,
       // 해제는 MCP 가 없는 목록으로 쓴다.
@@ -823,6 +853,7 @@ export function startFakeHermes(
       );
       send(response, 200, {
         profile: body.profile, plugin: body.plugin, enabled: body.enabled, changed, restart_required: false,
+        plugin_updated: false,
       });
       return true;
     }
@@ -836,7 +867,7 @@ export function startFakeHermes(
         return true;
       }
       connectorRequests.push(`probe ${queryProfile}`);
-      send(response, 200, { ok: true, tools: [{ name: DEMO_CONNECTOR.verify.tool }] });
+      send(response, 200, { ok: true, tools: DEMO_SERVER_TOOLS.map((name) => ({ name })) });
       return true;
     }
 
@@ -1507,6 +1538,10 @@ export function startFakeHermes(
           return toolsets === undefined ? undefined : [...toolsets];
         },
         connectorRequests: () => [...connectorRequests],
+        setPolicyHook: (profile: string, active: boolean) => {
+          if (active) policyHookOff.delete(profile);
+          else policyHookOff.add(profile);
+        },
         holdNextRun: () => {
           holdNextRun = true;
           heldRunReady = new Promise<void>((done) => {

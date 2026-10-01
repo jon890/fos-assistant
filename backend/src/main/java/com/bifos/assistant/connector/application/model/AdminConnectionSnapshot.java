@@ -10,7 +10,8 @@ public record AdminConnectionSnapshot(
         String displayName,
         ConnectionStatus status,
         String agentCode,
-        boolean restartRequired) {
+        boolean restartRequired,
+        int undeclaredTools) {
 
     public static AdminConnectionSnapshot from(ConnectorConnection connection, String displayName) {
         return new AdminConnectionSnapshot(
@@ -19,6 +20,7 @@ public record AdminConnectionSnapshot(
                 displayName,
                 connection.status(),
                 connection.agent().code(),
-                connection.restartRequired());
+                connection.restartRequired(),
+                connection.undeclaredTools());
     }
 }
