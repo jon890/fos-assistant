@@ -275,6 +275,15 @@ function withoutAskGuide(instructions: string): string {
   return (instructions.slice(0, start).replace(/\n+$/, "") + instructions.slice(end)).replace(/^\n+/, "");
 }
 
+/** 모델 지침은 답에 복사하지 않고, Memory 본문은 기존처럼 되돌려 검증한다. */
+function withoutResponseGuide(instructions: string): string {
+  const header = "# 답변 형식\n\n";
+  if (!instructions.startsWith(header)) return instructions;
+
+  const nextSection = instructions.indexOf("\n\n", header.length);
+  return nextSection < 0 ? "" : instructions.slice(nextSection + 2);
+}
+
 /** Control Plane 이 모든 실행 입력 맨 앞에 붙이는 결과물 폴더 단락의 첫 줄이다. `ArtifactService` 와 같아야 한다. */
 const ARTIFACT_HEADER = "[결과물 폴더]";
 
@@ -416,6 +425,9 @@ function specialOutputFor(input: string): string | null {
       "",
       "<script>window.__unsafeAgentHtml = true</script>",
     ].join("\n");
+  }
+  if (input === "구분 줄 없는 표 검사") {
+    return "번호 | 구분 | 금액\n1 | 식비 | 100\n2 | 교통 | 200\n3 | 기타 | 300";
   }
   if (input === "긴 답 스트림 검사") {
     return Array.from({ length: 80 }, (_, index) => `${index + 1}번째 긴 답 줄`).join("\n\n");
@@ -1525,7 +1537,7 @@ export function startFakeHermes(
           });
           return send(response, 200, { run_id: runId, status: "queued" });
         }
-        const echoed = withoutAskGuide(submitted.instructions ?? "");
+        const echoed = withoutAskGuide(withoutResponseGuide(submitted.instructions ?? ""));
         const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
         const held = holdNextRun && !starterRun;
         if (held) holdNextRun = false;

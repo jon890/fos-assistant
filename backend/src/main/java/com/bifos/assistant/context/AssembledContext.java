@@ -48,16 +48,15 @@ public record AssembledContext(String instructions, long chars, List<Long> omitt
      * <p>본문에 개인 Memory 가 들어 있어 본문 대신 이 값만 남긴다. 같은 문맥은 같은 값을, 다른 문맥은
      * 다른 값을 낸다.
      *
-     * <p>넣은 문맥이 없으면 null 이다. 빈 문자열의 해시는 언제나 같은 값이라, 그것을 적으면 문맥 없이
-     * 돈 실행이 모두 한 지문으로 묶여 잘못 읽힌다.
+     * <p>문자열이 없으면 null 이다. 실행 기록에는 공통 답변 지침을 추가한 뒤의 지문을 남긴다.
+     * Memory가 없어도 공통 지침이 같으면 같은 지문을 기록하므로, 지문만으로 Memory 주입 여부를 판단하지 않는다.
      */
     public String instructionsHash() {
         if (instructions == null || instructions.isEmpty()) {
             return null;
         }
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(instructions.getBytes(StandardCharsets.UTF_8));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(instructions.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(Arrays.copyOf(digest, HASH_BYTES));
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is unavailable", ex);

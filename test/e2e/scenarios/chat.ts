@@ -33,6 +33,7 @@ export const chatScenario: Scenario = {
     const instructions = context.hermes.lastSubmittedInstructions() ?? "";
     expect(instructions.includes(ASK_GUIDE_HEADER), "Hermes 요청에 묻는 형식 안내가 없다");
     expect(instructions.includes("<ask>"), "묻는 형식 안내에 <ask> 예시가 없다");
+    expect(instructions.includes("GFM") && instructions.includes("| --- | --- |"), "Hermes 요청에 공통 표 지침이 없다");
     expect(!first.assistantText.includes(ASK_GUIDE_HEADER), "대역이 형식 안내를 답에 되돌려 줬다");
 
     step("같은 대화를 이어서 보낸다");
