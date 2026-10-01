@@ -126,7 +126,7 @@ scripts/check-public-safe.sh
 
 ## 확인
 
-아래 여섯 검사를 한 번에 돌린다.
+아래 일곱 검사를 한 번에 돌린다.
 
 ```bash
 # cwd: 저장소 root
