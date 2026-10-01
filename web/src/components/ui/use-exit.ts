@@ -47,7 +47,8 @@ export function useExit(durationMs = 120): {
       // 앞서 지운 줄이 아직 나가는 중이면 그 줄부터 뺀다.
       flush();
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        void remove();
+        // 던지는 Promise 를 잡는 곳이 없으면 unhandled rejection 이 된다. 실패는 부른 쪽이 화면에 알린다.
+        void Promise.resolve(remove()).catch(() => {});
         return;
       }
       setLeaving(true);
