@@ -24,6 +24,11 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class HermesRunEventStream {
 
+    /** 모델이 스킬을 읽는 Hermes 도구의 이름이다. */
+    private static final String SKILL_VIEW_TOOL = "skill_view";
+
+    private static final String SKILL_VIEW_STARTED = "tool.started";
+
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
     private final ObjectMapper objectMapper;
@@ -134,14 +139,20 @@ public class HermesRunEventStream {
     private static RunEvent toRunEvent(JsonNode root, boolean connectorManaged, Map<String, String> identifiers) {
         JsonNode payload = root.path("data");
         String type = firstText(root, payload, "event", "type");
+        String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
         String detail = firstDetail(root, payload);
+        String skillName = null;
         if (type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.")) {
+            // 긴 스킬 이름은 token 으로 보여 가려진다. 스킬 사용 기록에 넘길 이름은 가리기 전에 꺼내 검증한다.
+            if (!connectorManaged && SKILL_VIEW_STARTED.equalsIgnoreCase(type) && SKILL_VIEW_TOOL.equals(toolName)) {
+                skillName = HermesSkillName.fromPreview(detail);
+            }
             detail = ToolDetailRedactor.redact(detail, connectorManaged, identifiers);
         }
         return new RunEvent(
                 type,
                 firstText(root, payload, "delta", "text", "output"),
-                firstText(root, payload, "tool", "tool_name", "toolName", "name"),
+                toolName,
                 detail,
                 durationMs(root, payload),
                 failed(root, payload),
@@ -151,7 +162,8 @@ public class HermesRunEventStream {
                 firstText(root, payload, "child_session_id"),
                 firstNumber(root, payload, "input_tokens"),
                 firstNumber(root, payload, "output_tokens"),
-                firstText(root, payload, "status"));
+                firstText(root, payload, "status"),
+                skillName);
     }
 
     private static String firstDetail(JsonNode root, JsonNode payload) {
