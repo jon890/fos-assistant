@@ -172,6 +172,7 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/AdminConnectionSnapshot.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/domain/ConnectorConnection.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectionDtos.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectorConnectionAdminController.java` | 수정 |
 | `backend/src/main/resources/db/migration/V41__connector_undeclared_tools.sql` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HttpHermesConnectorClientTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorToolPoliciesTest.java` | 신규 |
