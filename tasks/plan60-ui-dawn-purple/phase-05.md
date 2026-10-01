@@ -139,3 +139,6 @@ cd web && pnpm test:browser test/browser/usage.spec.ts test/browser/usage-breakd
 | `test/browser/execution-tree.spec.ts` | 수정 |
 | `test/browser/agent-tools.spec.ts` | 수정 |
 | `test/browser/skills.spec.ts` | 수정 |
+| `test/browser/admin.spec.ts` | 수정 |
+| `web/src/lib/format.ts` | 수정 |
+| `docs/code-architecture.md` | 수정 |

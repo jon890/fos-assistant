@@ -80,7 +80,14 @@ function anyNodeTruncated(node: ExecutionTreeNode): boolean {
   return node.truncated || node.children.some(anyNodeTruncated);
 }
 
-export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
+/** 나무를 그린다. `isAdmin` 이면 오류 코드와 도구 결과의 원본 같은 내부 값도 함께 그린다. */
+export function ExecutionTree({
+  tree,
+  isAdmin,
+}: {
+  tree: ExecutionTreeResponse;
+  isAdmin: boolean;
+}) {
   // 나무의 truncated 가 참인데 그 안 어느 노드도 truncated 가 아니면, 아래쪽이 아니라 뿌리로
   // 올라가는 길이 잘린 것이다. 그 경우에만 위쪽 안내를 그린다 — 노드가 이미 「여기부터 보이지
   // 않는다」 를 그렸으면 여기서 또 적어 두 번 말하지 않는다.
@@ -106,7 +113,7 @@ export function ExecutionTree({ tree }: { tree: ExecutionTreeResponse }) {
     <>
       {aboveNotice}
       <ul className="min-w-0" data-testid="execution-tree">
-        <ExecutionNode node={tree.root} depth={0} />
+        <ExecutionNode node={tree.root} depth={0} isAdmin={isAdmin} />
       </ul>
     </>
   );

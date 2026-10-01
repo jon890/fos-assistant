@@ -369,7 +369,7 @@ test("미리보기는 앞머리를 빼고 마크다운으로 그리며 들어온
 test("관리하는 사람이 Hermes 기본 스킬을 끄고 켠다", async ({ page }) => {
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   const row = skillRow(page, "hermes-help");
-  await expect(row.getByText("Hermes 기본")).toBeVisible();
+  await expect(row.getByText("기본 스킬")).toBeVisible();
   // Hermes 기본 스킬에는 편집과 삭제가 없다.
   await expect(row.getByRole("link", { name: /편집/ })).toHaveCount(0);
   await expect(row.getByRole("button", { name: /삭제/ })).toHaveCount(0);
@@ -391,7 +391,7 @@ test("점과 밑줄이 든 Hermes 스킬도 끄고 켠다", async ({ page }) => 
   const name = "note_taking.v2";
   await page.goto(`/agents/${PERSONA_AGENT_CODE}`);
   const row = skillRow(page, name);
-  await expect(row.getByText("Hermes 기본")).toBeVisible();
+  await expect(row.getByText("기본 스킬")).toBeVisible();
   try {
     await expect(row.getByRole("switch")).toHaveAttribute("aria-checked", "true");
     await row.getByRole("switch").click();

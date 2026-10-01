@@ -3,17 +3,12 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import {
-  agentLabel,
-  formatCost,
-  formatDuration,
-  formatTokens,
-  formatWhen,
-} from "@/lib/format";
+import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
 import {
   actualCostLabel,
   contextCharsLabel,
   contextOmittedLabel,
+  durationLabel,
   executionStatusLabel,
   executionStatusVariant,
   isRunning,
@@ -22,10 +17,16 @@ import {
   type UsageExecution,
 } from "./execution-list";
 
-export function ExecutionCard({ execution }: { execution: UsageExecution }) {
+export function ExecutionCard({
+  execution,
+  isAdmin,
+}: {
+  execution: UsageExecution;
+  isAdmin: boolean;
+}) {
   const failed = execution.status === "FAILED" || execution.errorCode !== null;
   const running = isRunning(execution);
-  const omitted = contextOmittedLabel(execution);
+  const omitted = isAdmin ? contextOmittedLabel(execution) : "";
   const retryOf = retryOfLabel(execution);
   return (
     // 브라우저 검사가 카드를 `article` 조상으로 찾으므로 원소 이름을 지킨다. 실패한 실행은 테두리를 destructive 색으로 올린다.
@@ -50,59 +51,71 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
                 />
               ) : null}
             </h2>
-            {execution.agentCode === null ? null : (
+            {!isAdmin || execution.agentCode === null ? null : (
               <p className="truncate text-xs text-muted-foreground">
                 {execution.agentCode}
               </p>
             )}
           </div>
-          <span
-            className="shrink-0 text-sm font-semibold"
-            data-testid="execution-cost"
-            title={execution.pricingVersion ?? undefined}
-          >
-            {running
-              ? ""
-              : formatCost(
-                  execution.estimatedCostMicros,
-                  execution.costCurrency,
-                )}
-          </span>
+          {isAdmin ? (
+            <span
+              className="shrink-0 text-sm font-semibold"
+              data-testid="execution-cost"
+              title={execution.pricingVersion ?? undefined}
+            >
+              {running
+                ? ""
+                : formatCost(
+                    execution.estimatedCostMicros,
+                    execution.costCurrency,
+                  )}
+            </span>
+          ) : null}
         </div>
-        <p className="mt-3 truncate text-sm text-muted-foreground">
-          {execution.provider ?? "-"} / {execution.model ?? "-"}
-        </p>
-        {/* 표처럼 모델 옆에 붙이지 않고 다음 줄에 따로 둔다. 까닭은 `reasoningEffortLabel` 에 있고, 붙이면 긴 모델 이름과 함께 잘린다. */}
-        <p className="text-xs text-muted-foreground">
-          effort{" "}
-          <span data-testid="execution-effort">
-            {reasoningEffortLabel(execution)}
-          </span>
-        </p>
+        {isAdmin ? (
+          <>
+            <p className="mt-3 truncate text-sm text-muted-foreground">
+              {execution.provider ?? "-"} / {execution.model ?? "-"}
+            </p>
+            {/* 표처럼 모델 옆에 붙이지 않고 다음 줄에 따로 둔다. 까닭은 `reasoningEffortLabel` 에 있고, 붙이면 긴 모델 이름과 함께 잘린다. */}
+            <p className="text-xs text-muted-foreground">
+              effort{" "}
+              <span data-testid="execution-effort">
+                {reasoningEffortLabel(execution)}
+              </span>
+            </p>
+          </>
+        ) : null}
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-          <span
-            title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}
-          >
-            {formatTokens(execution.inputTokens)} →{" "}
-            {formatTokens(execution.outputTokens)}
-          </span>
-          <span data-testid="execution-context-chars">
-            문맥 {contextCharsLabel(execution)}
-          </span>
+          {isAdmin ? (
+            <>
+              <span
+                title={`캐시 입력 ${formatTokens(execution.cachedInputTokens)}`}
+              >
+                {formatTokens(execution.inputTokens)} →{" "}
+                {formatTokens(execution.outputTokens)}
+              </span>
+              <span data-testid="execution-context-chars">
+                문맥 {contextCharsLabel(execution)}
+              </span>
+            </>
+          ) : null}
           <span data-testid="execution-duration">
-            {running ? "" : formatDuration(execution.latencyMs ?? 0)}
+            {durationLabel(execution, isAdmin)}
           </span>
           <span>{formatWhen(execution.startedAt)}</span>
           <Badge variant={executionStatusVariant(execution)}>
-            {executionStatusLabel(execution)}
+            {executionStatusLabel(execution, isAdmin)}
           </Badge>
         </div>
-        <p
-          className="mt-2 text-xs text-muted-foreground"
-          data-testid="execution-actual-cost"
-        >
-          예상 추가 사용 요금 {actualCostLabel(execution)}
-        </p>
+        {isAdmin ? (
+          <p
+            className="mt-2 text-xs text-muted-foreground"
+            data-testid="execution-actual-cost"
+          >
+            예상 추가 사용 요금 {actualCostLabel(execution)}
+          </p>
+        ) : null}
         {execution.skillNames.length > 0 ? (
           <p
             className="mt-1 text-xs text-muted-foreground"

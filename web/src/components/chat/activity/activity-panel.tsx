@@ -15,6 +15,7 @@ import {
   ExecutionTree,
   type ExecutionTreeResponse,
 } from "@/components/execution/execution-tree";
+import { useShellIsAdmin } from "@/components/shell/app-shell";
 import { ActivityTimeline } from "./activity-timeline";
 import type { ActivityState } from "./activity-state";
 
@@ -25,6 +26,7 @@ export type ActivityPanelTarget =
 type Props = { target: ActivityPanelTarget; onClose(): void };
 
 export function ActivityPanel({ target, onClose }: Props) {
+  const isAdmin = useShellIsAdmin();
   const [loaded, setLoaded] = useState<{
     executionId: number;
     tree: ExecutionTreeResponse;
@@ -97,7 +99,7 @@ export function ActivityPanel({ target, onClose }: Props) {
           </button>
         </p>
       ) : loaded?.executionId === executionId ? (
-        <ExecutionTree tree={loaded.tree} />
+        <ExecutionTree tree={loaded.tree} isAdmin={isAdmin} />
       ) : (
         <div
           aria-label="작업 과정을 불러오고 있어요"

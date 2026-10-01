@@ -1,19 +1,22 @@
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import { expect, test } from "./fixtures.ts";
+import { expect, setSession, test } from "./fixtures.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
-async function controlPlaneToken(): Promise<string> {
+async function controlPlaneToken(email = TEST_EMAIL): Promise<string> {
   return new SignJWT({ name: "브라우저 테스트" })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(TEST_EMAIL)
+    .setSubject(email)
     .setIssuedAt()
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
 }
 
 /** 방금 만든 실행 중 가장 최근 것의 번호를 읽는다. */
-async function lastExecutionId(page: import("../../web/node_modules/@playwright/test/index.js").Page): Promise<number> {
-  const token = await controlPlaneToken();
+async function lastExecutionId(
+  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  email = TEST_EMAIL,
+): Promise<number> {
+  const token = await controlPlaneToken(email);
   const response = await page.request.get(`${CONTROL_PLANE_BASE_URL}/api/v1/usage/executions?limit=1`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -263,4 +266,153 @@ test("노드 아래가 잘린 것이면 위쪽 안내를 따로 그리지 않아
 
   await expect(page.getByTestId("execution-tree-truncated-above")).toHaveCount(0);
   await expect(page.getByText("이전 실행은 표시되지 않아요")).toHaveCount(1);
+});
+
+const RAW_COMMAND = "ls-원본-명령";
+const RAW_RESULT = '{"output":"terminal-raw-result-아주-길게-적어-좁은-화면에서-가로로-넘치는지-확인하는-자리-0123456789-0123456789-0123456789"}';
+
+/** `terminal` 도구를 쓴 실행 하나짜리 나무다. 명령과 결과는 사람 말이 아니라 줄에 그리지 않는 원본이다. */
+function terminalTreeFixture() {
+  const event = (sequence: number, eventType: string, detail: string) => ({
+    sequence, eventType, toolName: "terminal", subagentName: null, hermesSessionId: null, detail, model: null,
+    inputTokens: null, outputTokens: null, durationMs: eventType === "TOOL_COMPLETED" ? 2_100 : null,
+    failed: eventType === "TOOL_COMPLETED" ? false : null, occurredAt: new Date().toISOString(),
+  });
+  return {
+    truncated: false,
+    root: {
+      truncated: false, executionId: 980, agentCode: "terminal-agent-code", agentName: "명령 비서", status: "SUCCEEDED",
+      model: "example-model", inputTokens: 10, outputTokens: 20, estimatedCostMicros: 1000, latencyMs: 2_500,
+      startedAt: new Date().toISOString(), children: [],
+      events: [event(1, "TOOL_STARTED", RAW_COMMAND), event(2, "TOOL_COMPLETED", RAW_RESULT)],
+    },
+  };
+}
+
+test("관리자는 붐벼서 실패한 실행의 상세에서 안내 문구와 오류 코드를 함께 본다", async ({ page, hermes }) => {
+  await hermes.busy();
+  try {
+    const response = await page.request.post("/api/chat", {
+      data: { text: "실행 나무 붐빔 검사", agentCode: "browser" },
+    });
+    expect(response.status()).toBe(429);
+  } finally {
+    await hermes.clearBusy();
+  }
+  const id = await lastExecutionId(page);
+
+  await page.goto(`/executions/${id}`);
+  const row = page.getByTestId("execution-event-row");
+  await expect(row).toHaveText("실행 실패: 지금 요청이 많아요. 잠시 뒤 다시 보내 주세요. (HERMES_BUSY)");
+  // 머리 요약의 내부 값도 그대로 보인다.
+  await expect(page.getByText("입력 토큰", { exact: true })).toBeVisible();
+  await expect(page.getByText("환산 금액", { exact: true })).toBeVisible();
+});
+
+test("관리자는 도구 결과의 원본을 줄에서 보지 않고 원본 보기를 눌러야 본다", async ({ page }) => {
+  await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalTreeFixture() }));
+  await page.goto("/executions/980");
+
+  const terminal = page.getByTestId("execution-tree").locator('[data-tool="terminal"]');
+  await expect(terminal).toContainText("작업을 했어요");
+  await expect(terminal.getByText(RAW_RESULT)).toBeHidden();
+  await expect(terminal.getByText(RAW_COMMAND)).toHaveCount(0);
+
+  const raw = terminal.getByTestId("activity-raw");
+  await expect(raw).toHaveCount(1);
+  await raw.getByText("원본 보기").click();
+  await expect(terminal.getByText(RAW_RESULT)).toBeVisible();
+  await expect(raw).toContainText("terminal");
+  // 펼친 원본이 좁은 폭에서도 화면을 가로로 밀지 않는다.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(0);
+});
+
+/**
+ * `MEMBER` 역할 사용자의 실행 상세에는 오류 코드, 모델, 토큰, 금액, 도구 결과의 원본이 없어야 한다.
+ *
+ * <p>씨 뿌린 에이전트는 관리자 소유의 비공개라, 전용 사용자로 로그인해 자기 에이전트를 만들고 그것으로 실행을 만든다.
+ * mobile 과 desktop 이 같은 Control Plane 을 쓰므로 project 마다 다른 사용자다. 만든 에이전트는 검사가 끝나면 지운다.
+ */
+test.describe("MEMBER 역할 사용자의 실행 상세", () => {
+  const AGENT_NAME = "심부름 비서";
+
+  function memberOf(projectName: string) {
+    return { email: `tree-member-${projectName}@example.com`, name: "실행 상세 보는 사용자" };
+  }
+
+  async function createAgent(page: import("../../web/node_modules/@playwright/test/index.js").Page): Promise<string> {
+    const created = await page.request.post("/api/agents", { data: { name: AGENT_NAME } });
+    expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
+    return ((await created.json()) as { code: string }).code;
+  }
+
+  test.beforeEach(async ({ context, page }, testInfo) => {
+    await setSession(context, memberOf(testInfo.project.name));
+    expect((await page.request.get("/api/me")).ok()).toBeTruthy();
+  });
+
+  test.afterEach(async ({ context, page }, testInfo) => {
+    await setSession(context, memberOf(testInfo.project.name));
+    const response = await page.request.get("/api/agents");
+    const mine = ((await response.json()) as { code: string; ownedByMe: boolean }[]).filter((agent) => agent.ownedByMe);
+    for (const agent of mine) {
+      const deleted = await page.request.delete(`/api/agents/${agent.code}`);
+      expect(deleted.status(), `검사가 만든 에이전트 ${agent.code} 를 지우지 못했다`).toBe(204);
+    }
+  });
+
+  test("붐벼서 실패한 실행의 상세에 오류 코드 없이 안내 문구만 보인다", async ({ page, hermes }, testInfo) => {
+    const agentCode = await createAgent(page);
+    await hermes.busy();
+    try {
+      const response = await page.request.post("/api/chat", { data: { text: "붐빔 상세 검사", agentCode } });
+      expect(response.status()).toBe(429);
+    } finally {
+      await hermes.clearBusy();
+    }
+    const id = await lastExecutionId(page, memberOf(testInfo.project.name).email);
+
+    await page.goto(`/executions/${id}`);
+    await expect(page.getByTestId("execution-event-row")).toHaveText(
+      "실행 실패: 지금 요청이 많아요. 잠시 뒤 다시 보내 주세요.",
+    );
+    const main = page.getByRole("main");
+    await expect(main).not.toContainText("HERMES_BUSY");
+    // 제목과 머리 요약에는 에이전트 이름, 상태, 걸린 시간만 남는다.
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(AGENT_NAME);
+    await expect(main).not.toContainText(agentCode);
+    await expect(main.locator("dt")).toHaveText(["에이전트", "상태", "걸린 시간"]);
+    // 걸린 시간은 밀리초로 보이지 않는다.
+    await expect(main.locator("dl")).not.toContainText("ms");
+  });
+
+  test("자기 실행의 상세에 도구 결과의 원본을 펼치는 자리가 없다", async ({ page }, testInfo) => {
+    const agentCode = await createAgent(page);
+    const sent = await page.request.post("/api/chat/stream", { data: { text: "원본 가림 검사", agentCode } });
+    expect(sent.ok(), `대화를 보내지 못했다: ${sent.status()}`).toBeTruthy();
+    await sent.text();
+    const id = await lastExecutionId(page, memberOf(testInfo.project.name).email);
+
+    await page.goto(`/executions/${id}`);
+    const tree = page.getByTestId("execution-tree");
+    await expect(tree.locator('[data-tool="fake-tool"]')).toContainText("도구를 썼어요");
+    await expect(page.getByTestId("activity-raw")).toHaveCount(0);
+  });
+
+  test("도구 결과의 원본이 응답에 와도 줄에도 원본 보기에도 그리지 않는다", async ({ page }) => {
+    await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalTreeFixture() }));
+    await page.goto("/executions/980");
+
+    const terminal = page.getByTestId("execution-tree").locator('[data-tool="terminal"]');
+    await expect(terminal).toContainText("작업을 했어요");
+    await expect(page.getByTestId("activity-raw")).toHaveCount(0);
+    await expect(page.getByText(RAW_RESULT)).toHaveCount(0);
+    // 에이전트 코드와 모델은 응답에 있어도 그리지 않는다.
+    await expect(page.getByRole("main")).not.toContainText("terminal-agent-code");
+    await expect(page.getByRole("main")).not.toContainText("example-model");
+    // 나무가 준 걸린 시간 2.5초는 초 단위로만 보인다.
+    await expect(page.getByRole("main").locator("dl")).not.toContainText("ms");
+    await expect(page.getByRole("main").locator("dl dd").last()).toHaveText("2초");
+  });
 });

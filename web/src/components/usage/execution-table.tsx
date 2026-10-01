@@ -12,17 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  agentLabel,
-  formatCost,
-  formatDuration,
-  formatTokens,
-  formatWhen,
-} from "@/lib/format";
+import { agentLabel, formatCost, formatTokens, formatWhen } from "@/lib/format";
 import {
   actualCostLabel,
   contextCharsLabel,
   contextOmittedLabel,
+  durationLabel,
   executionStatusLabel,
   executionStatusVariant,
   isRunning,
@@ -33,8 +28,10 @@ import {
 
 export function ExecutionTable({
   executions,
+  isAdmin,
 }: {
   executions: UsageExecution[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   return (
@@ -43,20 +40,29 @@ export function ExecutionTable({
         <TableRow className="hover:bg-transparent">
           <TableHead>시각</TableHead>
           <TableHead>에이전트</TableHead>
-          <TableHead>모델</TableHead>
+          {isAdmin ? <TableHead>모델</TableHead> : null}
           <TableHead>상태</TableHead>
-          <TableHead className="text-right">입력</TableHead>
-          <TableHead className="text-right">캐시</TableHead>
-          <TableHead className="text-right">출력</TableHead>
-          <TableHead className="text-right">문맥</TableHead>
+          {isAdmin ? (
+            <>
+              <TableHead className="text-right">입력</TableHead>
+              <TableHead className="text-right">캐시</TableHead>
+              <TableHead className="text-right">출력</TableHead>
+              <TableHead className="text-right">문맥</TableHead>
+            </>
+          ) : null}
           <TableHead className="text-right">소요</TableHead>
-          <TableHead className="text-right">API 환산 비용</TableHead>
-          <TableHead className="text-right">예상 추가 사용 요금</TableHead>
+          {isAdmin ? (
+            <>
+              <TableHead className="text-right">API 환산 비용</TableHead>
+              <TableHead className="text-right">예상 추가 사용 요금</TableHead>
+            </>
+          ) : null}
         </TableRow>
       </TableHeader>
       <TableBody>
         {executions.map((execution) => {
           const running = isRunning(execution);
+          const omitted = contextOmittedLabel(execution);
           return (
             <TableRow
               key={execution.id}
@@ -83,7 +89,7 @@ export function ExecutionTable({
                     className="ml-1 inline-block size-4 text-muted-foreground"
                   />
                 ) : null}
-                {execution.agentCode === null ? null : (
+                {!isAdmin || execution.agentCode === null ? null : (
                   <span className="block text-xs text-muted-foreground">
                     {execution.agentCode}
                   </span>
@@ -97,21 +103,25 @@ export function ExecutionTable({
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell className="max-w-40 py-3">
-                <span className="block truncate">{execution.model ?? "-"}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {execution.provider ?? "-"}
-                </span>
-                <span
-                  className="block truncate text-xs text-muted-foreground"
-                  data-testid="execution-effort"
-                >
-                  {reasoningEffortLabel(execution)}
-                </span>
-              </TableCell>
+              {isAdmin ? (
+                <TableCell className="max-w-40 py-3">
+                  <span className="block truncate">
+                    {execution.model ?? "-"}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {execution.provider ?? "-"}
+                  </span>
+                  <span
+                    className="block truncate text-xs text-muted-foreground"
+                    data-testid="execution-effort"
+                  >
+                    {reasoningEffortLabel(execution)}
+                  </span>
+                </TableCell>
+              ) : null}
               <TableCell className="max-w-40 py-3 whitespace-normal">
                 <Badge variant={executionStatusVariant(execution)}>
-                  {executionStatusLabel(execution)}
+                  {executionStatusLabel(execution, isAdmin)}
                 </Badge>
                 {retryOfLabel(execution) ? (
                   <span
@@ -122,53 +132,63 @@ export function ExecutionTable({
                   </span>
                 ) : null}
               </TableCell>
-              <TableCell className="py-3 text-right tabular-nums">
-                {formatTokens(execution.inputTokens)}
-              </TableCell>
-              <TableCell className="py-3 text-right tabular-nums">
-                {formatTokens(execution.cachedInputTokens)}
-              </TableCell>
-              <TableCell className="py-3 text-right tabular-nums">
-                {formatTokens(execution.outputTokens)}
-              </TableCell>
-              <TableCell
-                className="py-3 text-right tabular-nums"
-                data-testid="execution-context-chars"
-              >
-                <span className="block">{contextCharsLabel(execution)}</span>
-                {contextOmittedLabel(execution) ? (
-                  <span
-                    className="block text-xs text-destructive"
-                    data-testid="execution-context-omitted"
+              {isAdmin ? (
+                <>
+                  <TableCell className="py-3 text-right tabular-nums">
+                    {formatTokens(execution.inputTokens)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right tabular-nums">
+                    {formatTokens(execution.cachedInputTokens)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right tabular-nums">
+                    {formatTokens(execution.outputTokens)}
+                  </TableCell>
+                  <TableCell
+                    className="py-3 text-right tabular-nums"
+                    data-testid="execution-context-chars"
                   >
-                    {contextOmittedLabel(execution)}
-                  </span>
-                ) : null}
-              </TableCell>
+                    <span className="block">
+                      {contextCharsLabel(execution)}
+                    </span>
+                    {omitted ? (
+                      <span
+                        className="block text-xs text-destructive"
+                        data-testid="execution-context-omitted"
+                      >
+                        {omitted}
+                      </span>
+                    ) : null}
+                  </TableCell>
+                </>
+              ) : null}
               <TableCell
                 className="py-3 text-right"
                 data-testid="execution-duration"
               >
-                {running ? "" : formatDuration(execution.latencyMs ?? 0)}
+                {durationLabel(execution, isAdmin)}
               </TableCell>
-              <TableCell
-                className="py-3 text-right"
-                data-testid="execution-cost"
-                title={execution.pricingVersion ?? undefined}
-              >
-                {running
-                  ? ""
-                  : formatCost(
-                      execution.estimatedCostMicros,
-                      execution.costCurrency,
-                    )}
-              </TableCell>
-              <TableCell
-                className="py-3 text-right"
-                data-testid="execution-actual-cost"
-              >
-                {actualCostLabel(execution)}
-              </TableCell>
+              {isAdmin ? (
+                <>
+                  <TableCell
+                    className="py-3 text-right"
+                    data-testid="execution-cost"
+                    title={execution.pricingVersion ?? undefined}
+                  >
+                    {running
+                      ? ""
+                      : formatCost(
+                          execution.estimatedCostMicros,
+                          execution.costCurrency,
+                        )}
+                  </TableCell>
+                  <TableCell
+                    className="py-3 text-right"
+                    data-testid="execution-actual-cost"
+                  >
+                    {actualCostLabel(execution)}
+                  </TableCell>
+                </>
+              ) : null}
             </TableRow>
           );
         })}

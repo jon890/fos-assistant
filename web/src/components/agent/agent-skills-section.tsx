@@ -219,7 +219,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
                       {skill.name}
                     </p>
                     <Badge variant="outline">
-                      {uploaded ? "올린 스킬" : "Hermes 기본"}
+                      {uploaded ? "올린 스킬" : "기본 스킬"}
                     </Badge>
                   </div>
                   {skill.description ? (

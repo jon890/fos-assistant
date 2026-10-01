@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { formatCost, formatDuration, formatTokens } from "@/lib/format";
+import { useShellIsAdmin } from "@/components/shell/app-shell";
+import {
+  agentLabel,
+  formatCost,
+  formatDurationFor,
+  formatTokens,
+} from "@/lib/format";
 import {
   ExecutionTree,
   type ExecutionTreeNode,
@@ -49,6 +55,7 @@ function statusVariant(
 /** 실행 하나의 머리 요약과 나무를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다. */
 export function ExecutionDetail({ executionId }: { executionId: number }) {
   const router = useRouter();
+  const isAdmin = useShellIsAdmin();
   const [state, setState] = useState<FetchState>({ kind: "loading" });
 
   useEffect(() => {
@@ -102,9 +109,11 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
     <div>
       <header className="mb-6">
         <h1 className="mb-4 text-xl font-semibold">
-          {summary.agentName ??
-            summary.agentCode ??
-            `실행 #${summary.executionId}`}
+          {isAdmin
+            ? (summary.agentName ??
+              summary.agentCode ??
+              `실행 #${summary.executionId}`)
+            : agentLabel(summary.agentName)}
         </h1>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <div>
@@ -119,37 +128,41 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
               </Badge>
             </dd>
           </div>
-          <div>
-            <dt className="text-muted-foreground">모델</dt>
-            <dd className="truncate">{summary.model ?? "-"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">입력 토큰</dt>
-            <dd className="tabular-nums">
-              {formatTokens(summary.inputTokens)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">출력 토큰</dt>
-            <dd className="tabular-nums">
-              {formatTokens(summary.outputTokens)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">환산 금액</dt>
-            <dd>{formatCost(summary.estimatedCostMicros, null)}</dd>
-          </div>
+          {isAdmin ? (
+            <>
+              <div>
+                <dt className="text-muted-foreground">모델</dt>
+                <dd className="truncate">{summary.model ?? "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">입력 토큰</dt>
+                <dd className="tabular-nums">
+                  {formatTokens(summary.inputTokens)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">출력 토큰</dt>
+                <dd className="tabular-nums">
+                  {formatTokens(summary.outputTokens)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">환산 금액</dt>
+                <dd>{formatCost(summary.estimatedCostMicros, null)}</dd>
+              </div>
+            </>
+          ) : null}
           <div>
             <dt className="text-muted-foreground">걸린 시간</dt>
             <dd>
               {running || summary.latencyMs === null
                 ? ""
-                : formatDuration(summary.latencyMs)}
+                : formatDurationFor(summary.latencyMs, isAdmin)}
             </dd>
           </div>
         </dl>
       </header>
-      <ExecutionTree tree={state.tree} />
+      <ExecutionTree tree={state.tree} isAdmin={isAdmin} />
     </div>
   );
 }

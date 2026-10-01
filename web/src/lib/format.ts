@@ -41,6 +41,20 @@ export function formatSeconds(milliseconds: number): string | null {
   return milliseconds < 1_000 ? null : formatElapsed(milliseconds);
 }
 
+/**
+ * 실행 하나의 걸린 시간을 역할에 맞춰 보인다.
+ *
+ * <p>관리자는 밀리초까지 본다. 그 밖의 사용자에게는 초 단위로 보이고, 1초가 안 되면 「1초 미만」 이다.
+ */
+export function formatDurationFor(
+  milliseconds: number,
+  isAdmin: boolean,
+): string {
+  return isAdmin
+    ? formatDuration(milliseconds)
+    : (formatSeconds(milliseconds) ?? "1초 미만");
+}
+
 /** 마이크로 단위 정수를 통화 금액으로 보인다. 한 번의 실행이 1센트 아래라서 네 자리까지 적는다. */
 export function formatAmount(micros: number, currency: string | null): string {
   const amount = (micros / 1_000_000).toLocaleString("ko-KR", {

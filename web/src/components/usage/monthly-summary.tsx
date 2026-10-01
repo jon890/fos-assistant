@@ -13,10 +13,22 @@ export type MonthlyCost = {
 
 type Props = {
   monthly: MonthlyCost;
+  isAdmin: boolean;
 };
 
-export function MonthlySummary({ monthly }: Props) {
+/** 이번 달 합계다. 금액과 가격표 이야기는 관리자에게만 그리고, 그 밖의 사용자에게는 실행 건수만 그린다. */
+export function MonthlySummary({ monthly, isAdmin }: Props) {
   const totalExecutions = monthly.pricedExecutions + monthly.unpricedExecutions;
+  if (!isAdmin) {
+    return (
+      <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <Stat
+          label="이번 달 실행"
+          value={`${totalExecutions.toLocaleString("ko-KR")}건`}
+        />
+      </dl>
+    );
+  }
   return (
     <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
       <Stat

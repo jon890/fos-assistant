@@ -10,7 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +20,7 @@ import {
   type AgentToolsView,
   type ToolsetView,
 } from "@/lib/agent";
+import { toolsetText } from "@/lib/toolset-label";
 
 type ErrorPayload = {
   code: string;
@@ -174,15 +174,16 @@ export function AgentToolsSection({
           {entries.map((tool) => {
             const reason = disabledReason(tool);
             const disabled = pendingToolName !== null || reason !== undefined;
+            const text = toolsetText(tool.name, tool);
             return (
               <li
                 key={tool.name}
                 className="flex items-center justify-between gap-3 p-3"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">{tool.label}</p>
+                  <p className="text-sm font-medium">{text.label}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {tool.description}
+                    {text.description}
                   </p>
                   {reason ? (
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -200,7 +201,7 @@ export function AgentToolsSection({
                   loading={pendingToolName === tool.name}
                   disabled={disabled}
                   title={reason}
-                  aria-label={`${tool.label} 도구`}
+                  aria-label={`${text.label} 도구`}
                   onCheckedChange={() => toggle(tool)}
                 />
               </li>
@@ -216,15 +217,10 @@ export function AgentToolsSection({
       aria-label="도구"
       className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold">도구</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            저장하면 다음 실행부터 반영돼요.
-          </p>
-        </div>
-        <Badge variant="outline">{admin ? "관리자" : "주인"}</Badge>
-      </div>
+      <h2 className="font-semibold">도구</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        저장하면 다음 실행부터 반영돼요.
+      </p>
       {error ? (
         <Notice variant="error" role="alert" className="mt-4">
           {error}
@@ -235,8 +231,8 @@ export function AgentToolsSection({
           표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.
         </Notice>
       ) : null}
-      {list("주인 등급", ownerTools)}
-      {list("관리자 등급", adminTools)}
+      {list("바로 켤 수 있어요", ownerTools)}
+      {list("관리자만 켤 수 있어요", adminTools)}
       {confirming ? (
         <AlertDialog
           open
@@ -250,7 +246,9 @@ export function AgentToolsSection({
             }}
           >
             <AlertDialogHeader>
-              <AlertDialogTitle>{confirming.label} 도구 켜기</AlertDialogTitle>
+              <AlertDialogTitle>
+                {toolsetText(confirming.name, confirming).label} 도구 켜기
+              </AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmationDescription(confirming.name)} 다음 실행부터 이
                 에이전트가 쓸 수 있어요.
