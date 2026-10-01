@@ -45,7 +45,7 @@ const disconnected = {
 const pending = {
   ...disconnected,
   status: "PENDING",
-  secretPrefixes: { token: "demo_ok_" },
+  secretPrefixes: { token: "demo" },
   values: { scope: SCOPE_ID },
   agentCode: "demo-notes-browser",
 };
@@ -96,6 +96,7 @@ test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 �
   await page.getByRole("button", { name: "연결하기" }).click();
 
   await expect(page.getByTestId("connection-status")).toHaveText("준비 중");
+  await expect(page.getByText("토큰: demo", { exact: true })).toBeVisible();
   expect(submitted).toEqual({
     values: { token: "demo_ok_0123456789", scope: SCOPE_ID },
   });
@@ -137,6 +138,23 @@ test("등록이 거절되면 비밀 칸을 비우고 정해 둔 문구만 보인
   );
   await expect(page.getByText("raw upstream secret")).toHaveCount(0);
   await expect(page.getByLabel("토큰", { exact: true })).toHaveValue("");
+});
+
+test("앞부분이 없는 필수 비밀 칸은 연결된 상태에서만 입력됨으로 보인다", async ({
+  page,
+}) => {
+  let current: unknown = { ...ready, secretPrefixes: {} };
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: current }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
+  await expect(page.getByText("토큰: 입력됨", { exact: true })).toBeVisible();
+
+  current = disconnected;
+  await page.reload();
+  await expect(page.getByTestId("connection-status")).toHaveText("연결 안 됨");
+  await expect(page.getByText("입력됨")).toHaveCount(0);
 });
 
 test("선택지 조회가 실패하면 비밀 칸을 비운다", async ({ page }) => {

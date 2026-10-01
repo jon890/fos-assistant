@@ -121,7 +121,7 @@ class ConnectorConnectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.connectorId").value(DEMO))
                 .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.secretPrefixes.token").value("demo_ok_"))
+                .andExpect(jsonPath("$.secretPrefixes.token").value("demo"))
                 .andExpect(jsonPath("$.values.scope").value("a"))
                 .andExpect(jsonPath("$.agentCode").value("agent-code"))
                 .andExpect(jsonPath("$.restartRequired").value(false))
@@ -293,6 +293,6 @@ class ConnectorConnectionControllerTest {
 
     private static ConnectionSnapshot snapshot(ConnectionStatus status) {
         return new ConnectionSnapshot(
-                DEMO, status, Map.of("token", "demo_ok_"), Map.of("scope", "a"), false, null, "agent-code");
+                DEMO, status, Map.of("token", "demo"), Map.of("scope", "a"), false, null, "agent-code");
     }
 }

@@ -216,10 +216,17 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
 
   const status = connection.status;
   const shown = fields.flatMap((field) => {
-    const value = field.secret
-      ? connection.secretPrefixes[field.key]
-      : connection.values[field.key];
-    return value ? [{ field, value }] : [];
+    if (!field.secret) {
+      const value = connection.values[field.key];
+      return value ? [{ field, value }] : [];
+    }
+    const prefix = connection.secretPrefixes[field.key];
+    if (prefix) return [{ field, value: prefix }];
+    // 짧은 비밀은 앞부분이 없다. 필수 칸은 등록됐다면 반드시 값이 있으므로 입력된 사실만 알린다.
+    // 선택 칸은 입력했는지 응답으로 알 수 없어 보이지 않는다.
+    return status !== "DISCONNECTED" && field.required
+      ? [{ field, value: "입력됨" }]
+      : [];
   });
 
   return (

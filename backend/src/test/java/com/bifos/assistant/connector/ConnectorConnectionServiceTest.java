@@ -241,35 +241,48 @@ class ConnectorConnectionServiceTest {
     }
 
     @Test
-    @DisplayName("비밀 칸은 앞 8자만 저장하고 DB 의 fields 에 원문이 없다")
-    void storesOnlyFirstEightCharactersOfSecretFields() throws Exception {
+    @DisplayName("16자 이상인 비밀 칸은 앞 4자만 저장하고 DB 의 fields 에 원문이 없다")
+    void storesOnlyFirstFourCharactersOfSecretFields() throws Exception {
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
         ConnectionSnapshot registered = service.register(user, DEMO, Map.of("token", TOKEN, "scope", "a"));
 
-        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("token", "demo_ok_"));
+        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("token", "demo"));
         assertThat(registered.values()).isEqualTo(Map.of("scope", "a"));
         String column = fieldsColumn(user, DEMO);
         assertThat(column).doesNotContain(TOKEN);
         assertThat(MAPPER.readTree(column))
-                .isEqualTo(
-                        MAPPER.readTree("{\"values\":{\"scope\":\"a\"},\"secretPrefixes\":{\"token\":\"demo_ok_\"}}"));
+                .isEqualTo(MAPPER.readTree("{\"values\":{\"scope\":\"a\"},\"secretPrefixes\":{\"token\":\"demo\"}}"));
         verify(connector).putEnv(profileOf(registered), "DEMO_SCOPE", "a");
     }
 
     @Test
-    @DisplayName("8자 비밀값은 앞부분도 저장하지 않고 9자는 앞 8자를 저장한다")
-    void doesNotStorePrefixOfEightCharacterSecretButStoresNineCharacterPrefix() {
-        CurrentUser eight = user(UserRole.MEMBER, 1L);
-        CurrentUser nine = user(UserRole.MEMBER, 1L);
+    @DisplayName("15자 비밀값은 앞부분도 저장하지 않고 16자는 앞 4자를 저장한다")
+    void doesNotStorePrefixOfFifteenCharacterSecretButStoresSixteenCharacterPrefix() {
+        CurrentUser fifteen = user(UserRole.MEMBER, 1L);
+        CurrentUser sixteen = user(UserRole.MEMBER, 1L);
+        String secret15 = "abcdefghijklmno";
+        String secret16 = "abcdefghijklmnop";
 
-        ConnectionSnapshot short8 = service.register(eight, PIN, Map.of("pin", "12345678"));
-        ConnectionSnapshot long9 = service.register(nine, PIN, Map.of("pin", "123456789"));
+        ConnectionSnapshot short15 = service.register(fifteen, PIN, Map.of("pin", secret15));
+        ConnectionSnapshot long16 = service.register(sixteen, PIN, Map.of("pin", secret16));
 
-        assertThat(short8.secretPrefixes()).isEmpty();
-        assertThat(fieldsColumn(eight, PIN)).doesNotContain("12345678");
-        assertThat(long9.secretPrefixes()).isEqualTo(Map.of("pin", "12345678"));
-        assertThat(fieldsColumn(nine, PIN)).doesNotContain("123456789");
+        assertThat(short15.secretPrefixes()).isEmpty();
+        assertThat(fieldsColumn(fifteen, PIN)).doesNotContain("abcd");
+        assertThat(long16.secretPrefixes()).isEqualTo(Map.of("pin", "abcd"));
+        assertThat(fieldsColumn(sixteen, PIN)).doesNotContain("abcde");
+    }
+
+    @Test
+    @DisplayName("앞 4자 자리에서 대리 쌍이 갈리는 비밀값은 그 앞 3자만 저장한다")
+    void cutsSecretPrefixBeforeSplitSurrogatePair() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        // 넷째와 다섯째 char 가 한 글자의 대리 쌍이다.
+        String secret = "abc" + new String(Character.toChars(0x1F600)) + "0123456789ab";
+
+        ConnectionSnapshot registered = service.register(user, PIN, Map.of("pin", secret));
+
+        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("pin", "abc"));
     }
 
     @Test
@@ -333,9 +346,8 @@ class ConnectorConnectionServiceTest {
 
         assertThat(service.read(first, DEMO).agentCode()).isEqualTo(firstResult.agentCode());
         assertThat(service.read(first, DEMO).agentCode()).isNotEqualTo(secondResult.agentCode());
-        assertThat(service.read(second, DEMO).secretPrefixes()).isEqualTo(Map.of("token", "demo_zz_"));
+        assertThat(service.read(second, DEMO).secretPrefixes()).isEqualTo(Map.of("token", "demo"));
         assertThat(firstResult.values()).isEqualTo(secondResult.values()).isEqualTo(Map.of("scope", "a"));
-        assertThat(firstResult.secretPrefixes()).isNotEqualTo(secondResult.secretPrefixes());
         verify(connector).call(DEMO, "list_scopes", firstValues);
         verify(connector).call(DEMO, "list_scopes", secondValues);
     }
@@ -427,11 +439,11 @@ class ConnectorConnectionServiceTest {
 
         assertThat(transactionActive).containsExactly(false);
         assertThat(registered.status()).isEqualTo(ConnectionStatus.PENDING);
-        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("token", "demo_zz_"));
+        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("token", "demo"));
         ConnectorConnection stored = stored(user);
         assertThat(stored.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored.desiredEnabled()).isTrue();
-        assertThat(stored.fields().secretPrefixes()).isEqualTo(Map.of("token", "demo_zz_"));
+        assertThat(stored.fields().secretPrefixes()).isEqualTo(Map.of("token", "demo"));
         assertThat(agentEnabled(user)).isFalse();
         assertThat(connections.count()).isEqualTo(1);
         assertThat(agents.count()).isEqualTo(1);
@@ -453,7 +465,7 @@ class ConnectorConnectionServiceTest {
 
         assertThat(connections.count()).isEqualTo(1);
         assertThat(agents.count()).isEqualTo(1);
-        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("token", "demo_zz_"));
+        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("token", "demo"));
         assertThat(stored(user).desiredEnabled()).isTrue();
     }
 
@@ -540,7 +552,7 @@ class ConnectorConnectionServiceTest {
         String profile = profileOf(service.register(user, DEMO, VALUES));
         when(connector.readCatalog()).thenReturn(List.of(PIN_MANIFEST));
 
-        assertThat(service.read(user, DEMO).secretPrefixes()).isEqualTo(Map.of("token", "demo_ok_"));
+        assertThat(service.read(user, DEMO).secretPrefixes()).isEqualTo(Map.of("token", "demo"));
         assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
         assertCode(() -> service.options(user, DEMO, "scope", VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
 
@@ -610,7 +622,7 @@ class ConnectorConnectionServiceTest {
 
         ConnectionSnapshot registered = service.register(user, PIN, Map.of("pin", "1".repeat(4096)));
 
-        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("pin", "11111111"));
+        assertThat(registered.secretPrefixes()).isEqualTo(Map.of("pin", "1111"));
     }
 
     @Test

@@ -99,11 +99,12 @@ export const connectorScenario: Scenario = {
     );
     expect(context.hermes.profileEnv(profile).DEMO_TOKEN === DEMO_TOKEN_OK, "토큰이 profile env 에 들어가지 않았다");
 
-    step("연결을 확인하면 READY 이고 비밀은 앞 8자만 보인다");
+    step("연결을 확인하면 READY 이고 16자 이상인 비밀은 앞 4자만 보인다");
     const checked = expectStatus(await call(context, `${CONNECTION}/check`, { method: "POST", token: context.tokens.dad }), 200, "연결 확인");
     const ready = checked.json<ConnectionView>();
     expect(ready.status === "READY", `READY 가 아니다\n${checked.body}`);
-    expect(ready.secretPrefixes.token === DEMO_TOKEN_OK.slice(0, 8), `비밀 앞부분이 다르다\n${checked.body}`);
+    expect(DEMO_TOKEN_OK.length >= 16, "검사용 토큰이 앞부분을 저장하는 길이보다 짧다");
+    expect(ready.secretPrefixes.token === DEMO_TOKEN_OK.slice(0, 4), `비밀 앞부분이 다르다\n${checked.body}`);
     expect(ready.values.scope === "a" && ready.values.token === undefined, `칸 값이 다르다\n${checked.body}`);
     expect(context.hermes.connectorRequests().some((line) => line === `probe ${profile}`), "MCP 서버 확인 요청이 없었다");
     const toolsets = context.hermes.apiServerToolsetsOf(profile) ?? [];
