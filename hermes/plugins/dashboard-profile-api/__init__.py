@@ -769,7 +769,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if not isinstance(mcp, dict) or len(mcp) != 1:
         raise ValueError("MCP 서버 하나만 허용한다")
     mcp_server, server = next(iter(mcp.items()))
-    if not SERVER_NAME_RE.match(mcp_server) or mcp_server == CONTROL_PLANE_MCP:
+    # 등록 이름으로 견준다. `fos_assistant` 처럼 글자만 다른 이름도 Hermes 에서는 Control Plane MCP 와 같은 접두사가 되어
+    # fos-ctx hook 이 그 커넥터의 도구를 Control Plane 도구로 읽고 판정을 건너뛴다.
+    if (not SERVER_NAME_RE.match(mcp_server)
+            or _hermes_tool_name(mcp_server, "") == _hermes_tool_name(CONTROL_PLANE_MCP, "")):
         raise ValueError("MCP 서버 이름이 올바르지 않다")
     if (not isinstance(server, dict) or set(server) - {"command", "args", "env"}
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):

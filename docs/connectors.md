@@ -113,6 +113,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - `approval` 이 하한보다 느슨하면 그 커넥터를 카탈로그에 내지 않는다. `WRITE` 에 `none` 을 선언하지 못한다
 - `verify.tool` 과 `options.tool` 은 `tools` 에 있고 `risk: READ`, `approval: none` 이어야 한다. 아니면 카탈로그에 내지 않는다
 - `schema: 2` 인데 `tools` 가 없거나 비었으면 카탈로그에 내지 않는다
+- MCP 서버 이름의 등록 이름 접두사가 Control Plane MCP 의 것과 같으면 카탈로그에 내지 않는다. `fos_assistant` 가 그 예다. hook 이 그 커넥터의 도구를 Control Plane 도구로 읽어 판정을 건너뛰기 때문이다
 - 등록 이름이 겹치는 도구가 둘 이상이면 카탈로그에 내지 않는다. 등록 이름은 아래 「이름 대응」 이 정한다
 - `DESTRUCTIVE` 와 `FINANCIAL` 은 선언할 수 있지만 호출은 늘 거절한다. 그 도구는 모델에게 보이지 않는다
 - `approval: always` 인 도구는 설치가 서버 정의의 `tools.exclude` 에 넣어 모델에게 보이지 않게 한다

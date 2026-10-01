@@ -212,6 +212,8 @@ class ConnectorCatalogTest(ConnectorGateCase):
              lambda value: value["mcpServers"].update(other=value["mcpServers"]["demo"])),
             ("server named after the Control Plane MCP", ".mcp.json",
              lambda value: value.update(mcpServers={"fos-assistant": value["mcpServers"]["demo"]})),
+            ("server whose registered prefix equals the Control Plane MCP", ".mcp.json",
+             lambda value: value.update(mcpServers={"fos_assistant": value["mcpServers"]["demo"]})),
             ("plugin name differs from the list", ".claude-plugin/plugin.json",
              lambda value: value.update(name="other")),
             ("skills outside the plugin", ".claude-plugin/plugin.json", lambda value: value.update(skills="..")),
