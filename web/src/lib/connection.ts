@@ -184,10 +184,12 @@ export function toolRiskLabel(risk: ToolRisk): string {
 
 /**
  * 도구를 호출할 때 일어나는 일을 사용자에게 보이는 말로 바꾼다. 막힌 위험도가 승인 방식보다 앞선다.
- * 승인이 필요한 도구는 아직 묻지 않고 실행한 뒤 기록만 남기므로 그렇게 적는다.
+ * 승인이 필요한 도구는 승인을 받는 길이 아직 없어 실행되지 않으므로 그렇게 적는다.
  */
 export function toolPolicyLabel(tool: ConnectorTool): string {
   if (tool.risk === "DESTRUCTIVE" || tool.risk === "FINANCIAL")
     return "아직 쓸 수 없어요";
-  return tool.approval === "NONE" ? "바로 실행해요" : "실행하고 기록해요";
+  return tool.approval === "NONE"
+    ? "바로 실행해요"
+    : "승인 기능이 준비될 때까지 실행하지 않아요";
 }

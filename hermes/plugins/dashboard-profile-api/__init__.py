@@ -612,6 +612,15 @@ def _connector_fields(declared) -> list:
     return declared
 
 
+def _canonical_server_name(server: str) -> str:
+    """MCP 서버 이름을 견줄 수 있게 맞춘다. Hermes 등록 규칙대로 글자를 `_` 로 바꾸고 소문자로 맞춘다.
+
+    등록 규칙만 쓰면 대소문자만 다른 이름이 다른 서버로 읽힌다. 이름을 대소문자 없이 다루는 자리가
+    하나라도 있으면 두 서버의 도구가 섞이므로 가장 넓게 같은 이름으로 본다.
+    """
+    return re.sub(r"[^A-Za-z0-9_]", "_", server).lower()
+
+
 def _hermes_tool_name(server: str, tool: str) -> str:
     """Hermes 가 MCP 도구에 붙이는 등록 이름이다. `tools/mcp_tool_schema.py` 의 `mcp_prefixed_tool_name` 과 같은 규칙이다.
 
@@ -769,10 +778,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if not isinstance(mcp, dict) or len(mcp) != 1:
         raise ValueError("MCP 서버 하나만 허용한다")
     mcp_server, server = next(iter(mcp.items()))
-    # 등록 이름으로 견준다. `fos_assistant` 처럼 글자만 다른 이름도 Hermes 에서는 Control Plane MCP 와 같은 접두사가 되어
-    # fos-ctx hook 이 그 커넥터의 도구를 Control Plane 도구로 읽고 판정을 건너뛴다.
+    # 맞춘 이름으로 견준다. `fos_assistant` 나 `FOS-Assistant` 처럼 글자만 다른 이름도 Control Plane MCP 의 이름으로 읽힐 수 있어
+    # 그 커넥터의 도구가 Control Plane 도구와 같은 이름 공간에 놓인다.
     if (not SERVER_NAME_RE.match(mcp_server)
-            or _hermes_tool_name(mcp_server, "") == _hermes_tool_name(CONTROL_PLANE_MCP, "")):
+            or _canonical_server_name(mcp_server) == _canonical_server_name(CONTROL_PLANE_MCP)):
         raise ValueError("MCP 서버 이름이 올바르지 않다")
     if (not isinstance(server, dict) or set(server) - {"command", "args", "env"}
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):

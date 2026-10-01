@@ -38,7 +38,11 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 계약의 정본은 fos-assistant `docs/connectors.md` 의 「도구 호출 판정」 이고, 이 파일은 그 계약을 그대로 따른다.
 
 - 대응 파일이 없으면 이 절의 처리를 하지 않는다. 일반 에이전트의 도구는 건드리지 않는다
-- 대응 파일을 읽지 못하면 Control Plane MCP 밖의 `mcp__` 도구와 `execute_code` 를 막는다
+- 대응 파일을 읽지 못하면 `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다.
+  연결용 profile 일 수 있고, 연결용 profile 에는 Control Plane MCP 가 없다
+- 대응 파일의 서버를 Control Plane MCP 의 접두사보다 먼저 본다. 대응 파일의 서버와 맞는 도구는 등록 이름이
+  Control Plane MCP 의 접두사로 시작해도 판정으로 보내고 `_fos_ctx` 를 붙이지 않는다
+- 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 도구는 위와 같이 `_fos_ctx` 를 붙인다
 - `execute_code` 는 막는다. 실행 맥락 없이 도구를 부르는 경로다
 - 서버는 등록 이름이 `tools` 에 있는 서버를 먼저 고르고, 없을 때만 `prefix` 가 맞는 서버를 고른다.
   `prefix` 가 여럿 맞으면 가장 긴 것을 고른다. 서버 `a` 와 `a__b` 가 함께 있을 때 `a__b` 의 도구가 `a` 로 읽히지 않는다
@@ -265,13 +269,19 @@ def _post_json(url: str, body: dict, token: str, timeout: float):
         return status, None
 
 
-def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, servers: dict):
-    """커넥터 도구 호출을 Control Plane 에 묻는다. 통과면 None, 아니면 글이 든 `block` 이다."""
+def _connector_server(tool_name: str, servers: dict):
+    """그 도구를 낸 대응 파일의 서버를 고른다. 맞는 서버가 없으면 None 이다."""
     # 등록 이름을 가진 서버가 먼저다. 서버 이름이 다른 서버 이름의 앞부분이면 접두사만으로는 엉뚱한 서버가 잡힌다.
     server = next((value for value in servers.values() if tool_name in value["tools"]), None)
     if server is None:
         matched = [value for value in servers.values() if tool_name.startswith(value["prefix"])]
         server = max(matched, key=lambda value: len(value["prefix"]), default=None)
+    return server
+
+
+def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, servers: dict):
+    """커넥터 도구 호출을 Control Plane 에 묻는다. 통과면 None, 아니면 글이 든 `block` 이다."""
+    server = _connector_server(tool_name, servers)
     if server is None:
         return _block(UNKNOWN_SERVER_MESSAGE)
     if args is None:
@@ -320,17 +330,21 @@ def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", **_):
         return {"action": "block", "message": SKILL_MANAGE_MESSAGE}
     if not isinstance(tool_name, str):
         return None
-    if tool_name.startswith(TOOL_PREFIX):
-        return _control_plane_context(tool_name, session_id, tool_call_id)
+    control_plane = tool_name.startswith(TOOL_PREFIX)
     guarded = tool_name.startswith(MCP_PREFIX) or tool_name == CODE_EXECUTION_TOOL
+    # 대응 파일을 Control Plane MCP 의 접두사보다 먼저 본다. 접두사를 먼저 보면 등록 이름이 그 접두사로 시작하는
+    # 커넥터 도구가 판정 없이 `_fos_ctx` 를 받는다.
     try:
         servers = read_tool_map()
     except Exception as exc:  # noqa: BLE001 - 읽지 못한 까닭을 가리지 않고 커넥터로 갈 수 있는 호출을 막는다
+        # 연결용 profile 일 수 있다. 그 profile 에는 Control Plane MCP 가 없으므로 그 접두사의 도구도 막는다.
         logger.warning("fos-ctx: 이름 대응 파일을 읽지 못했다: %s", type(exc).__name__)
         return _block(POLICY_BLOCK_MESSAGE) if guarded else None
     if servers is None:
         # 연결용 profile 이 아니다. 여기까지가 커넥터 정책이 없던 때와 같은 동작이다.
-        return None
+        return _control_plane_context(tool_name, session_id, tool_call_id) if control_plane else None
+    if control_plane and _connector_server(tool_name, servers) is None:
+        return _control_plane_context(tool_name, session_id, tool_call_id)
     if tool_name == CODE_EXECUTION_TOOL:
         return _block(CODE_EXECUTION_MESSAGE)
     if not tool_name.startswith(MCP_PREFIX):

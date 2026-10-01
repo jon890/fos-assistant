@@ -71,14 +71,11 @@ export const connectorPolicyScenario: Scenario = {
         `list_scopes 호출 하나만 닿아야 한다: ${JSON.stringify(mine())}`,
       );
 
-      step("승인이 필요한 쓰기 도구는 지금은 기록만 하고 허용된다");
-      const noteArgs = JSON.stringify({ text: "안녕" });
-      const written = await probe(context, agentCode, `${PREFIX}write_note`, noteArgs);
-      expect(written === "allow", `write_note 가 허용되지 않았다: ${written}`);
-      expect(
-        mine().length === 2 && mine()[1]!.hermesTool === `${PREFIX}write_note` && mine()[1]!.argsJson === noteArgs,
-        `write_note 호출이 인자 그대로 닿아야 한다: ${JSON.stringify(mine())}`,
-      );
+      step("승인이 필요한 쓰기 도구는 승인이 필요하다는 글과 함께 막히고 커넥터 서버에 닿지 않는다");
+      const written = await probe(context, agentCode, `${PREFIX}write_note`, JSON.stringify({ text: "안녕" }));
+      expect(written.startsWith("block "), `write_note 가 막히지 않았다: ${written}`);
+      expect(written.includes("사용자 승인이 필요해"), `write_note 를 막은 글이 승인을 말하지 않는다: ${written}`);
+      expect(mine().length === 1, `승인 없이 write_note 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("선언하지 않은 도구와 파괴적인 도구는 글과 함께 막히고 커넥터 서버에 닿지 않는다");
       for (const tool of ["hidden_tool", "purge_notes"]) {
@@ -87,12 +84,12 @@ export const connectorPolicyScenario: Scenario = {
         expect(answer.slice("block ".length).trim() !== "", `${tool} 을 막은 글이 비었다`);
         expect(!answer.includes("정책을 확인하지 못했다"), `${tool} 을 Control Plane 의 판정이 아닌 까닭으로 막았다: ${answer}`);
       }
-      expect(mine().length === 2, `막힌 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 1, `막힌 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("다른 서버의 등록 이름은 선언한 도구와 이름이 같아도 막힌다");
       const foreign = await probe(context, agentCode, "mcp__other__list_scopes", "{}");
       expect(foreign.startsWith("block "), `다른 서버의 도구가 막히지 않았다: ${foreign}`);
-      expect(mine().length === 2, `다른 서버의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 1, `다른 서버의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("정책 hook 이 꺼져 PENDING 이 되면 연결용 에이전트가 꺼져 대화가 거절되고 도구 호출이 없다");
       context.hermes.setPolicyHook(profile, false);
@@ -112,7 +109,7 @@ export const connectorPolicyScenario: Scenario = {
       );
       expect(refused.json<{ code: string }>().code === "AGENT_DISABLED", `오류 코드가 다르다\n${refused.body}`);
       expect(context.hermes.submitCount() === submitsBefore, "꺼진 에이전트의 대화가 Hermes 에 제출됐다");
-      expect(mine().length === 2, `PENDING 인 연결의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 1, `PENDING 인 연결의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
     } catch (error) {
       failed = true;
       throw error;

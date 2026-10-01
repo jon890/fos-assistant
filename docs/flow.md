@@ -61,7 +61,8 @@ sequenceDiagram
         C-->>H: block 과 까닭
         H-->>M: 도구 오류 결과
     else 승인 필요
-        C-->>H: 승인 엔진 전에는 allow, 뒤에는 block 과 승인 요청 번호
+        C-->>H: block 과 승인이 필요하다는 글
+        H-->>M: 도구 오류 결과 (S 를 부르지 않는다)
     end
 ```
 
@@ -71,7 +72,8 @@ sequenceDiagram
 | --- | --- |
 | Control Plane 이 3초 안에 답하지 않는다 | hook 이 막는다. 요청이 뒤늦게 닿아도 `dedupe_key` 로 줄이 하나다 |
 | hook 이 부를 주소가 없다 | 그 profile 의 커넥터 도구를 모두 막는다 |
-| 대응 파일에 없는 도구 | `schema: 2` 는 `UNDECLARED` 로 거절한다. `schema: 1` 은 `WRITE` 로 읽는다 |
+| 대응 파일에 없는 도구 | `schema: 2` 는 `UNDECLARED` 로 거절한다. `schema: 1` 은 `WRITE` 로 읽어 승인 필요로 막는다 |
+| 판정이 승인 필요다 | 막고 `NEEDS_APPROVAL` 줄을 남긴다. 승인 엔진이 들어오기 전에는 승인 줄과 승인 요청 번호가 없고 그 호출은 실행되지 않는다 |
 | 실행을 찾지 못한다(중지한 실행, 등록 안 된 자식 session) | 막고 줄을 남기지 않는다 |
 | 연결이 `READY` 가 아니다 | `NOT_READY` 로 거절한다 |
 | 카탈로그를 읽지 못한다 | `POLICY_UNAVAILABLE` 로 거절한다 |

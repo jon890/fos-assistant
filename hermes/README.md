@@ -92,8 +92,9 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 | hook 이 본 것 | 처리 |
 | --- | --- |
 | `skill_manage` | 위와 같이 막는다 |
-| Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 |
-| 대응 파일을 읽지 못한다 | Control Plane MCP 밖의 `mcp__` 도구와 `execute_code` 를 막는다. 그 밖의 도구는 건드리지 않는다 |
+| 대응 파일을 읽지 못한다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 그 밖의 도구는 건드리지 않는다 |
+| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 |
+| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 |
 | `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 |
 | `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 |
 | `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 |

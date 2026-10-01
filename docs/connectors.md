@@ -104,16 +104,17 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | `approval` | 뜻 |
 | --- | --- |
-| `none` | 바로 실행하고 기록만 남긴다 |
+| `none` | 승인 없이 바로 실행한다. 판정 줄은 남긴다 |
 | `required` | 호출마다 승인을 받는다. 사용자가 상시 허락을 주면 그 기간에는 바로 실행한다 |
 | `always` | 호출마다 승인을 받는다. 상시 허락을 만들 수 없다 |
 
 엄격한 순서는 `none`, `required`, `always` 다.
+승인을 받는 길은 승인 엔진이 들어올 때 생긴다. 그때까지 `required` 와 `always` 인 도구의 호출은 막히고 실행되지 않는다. 아래 「승인」 이 갖는다.
 
 - `approval` 이 하한보다 느슨하면 그 커넥터를 카탈로그에 내지 않는다. `WRITE` 에 `none` 을 선언하지 못한다
 - `verify.tool` 과 `options.tool` 은 `tools` 에 있고 `risk: READ`, `approval: none` 이어야 한다. 아니면 카탈로그에 내지 않는다
 - `schema: 2` 인데 `tools` 가 없거나 비었으면 카탈로그에 내지 않는다
-- MCP 서버 이름의 등록 이름 접두사가 Control Plane MCP 의 것과 같으면 카탈로그에 내지 않는다. `fos_assistant` 가 그 예다. hook 이 그 커넥터의 도구를 Control Plane 도구로 읽어 판정을 건너뛰기 때문이다
+- MCP 서버 이름을 등록 규칙으로 바꾸고 소문자로 맞춘 값이 Control Plane MCP 의 것과 같으면 카탈로그에 내지 않는다. `fos_assistant` 와 `FOS-Assistant` 가 그 예다. 그 커넥터의 도구가 Control Plane 도구와 같은 이름으로 읽힐 수 있기 때문이다. hook 도 대응 파일의 서버를 Control Plane MCP 의 접두사보다 먼저 봐서, 그런 서버가 대응 파일에 들어와도 판정을 건너뛰지 않는다
 - 등록 이름이 겹치는 도구가 둘 이상이면 카탈로그에 내지 않는다. 등록 이름은 아래 「이름 대응」 이 정한다
 - `DESTRUCTIVE` 와 `FINANCIAL` 은 선언할 수 있지만 호출은 늘 거절한다. 그 도구는 모델에게 보이지 않는다
 - `approval: always` 인 도구는 설치가 서버 정의의 `tools.exclude` 에 넣어 모델에게 보이지 않게 한다
@@ -122,6 +123,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 `schema: 1` 은 `tools` 를 선언하지 않는다. `verify.tool` 과 `options.tool` 은 `READ` 와 `none` 으로, 그 밖의 도구는 모두 `WRITE` 와 `required` 로 읽는다.
 조회 도구도 승인 대상이 되므로 `schema: 2` 로 올리는 것이 그 plugin 의 할 일이다.
+**승인 엔진이 들어오기 전에는 `schema: 1` 커넥터에서 확인 도구와 선택지 도구 밖의 도구가 모두 막힌다.** 조회 도구도 마찬가지다.
+그 호출은 `NEEDS_APPROVAL` 줄만 남기고 실행되지 않는다. 조회를 쓰려면 그 plugin 이 `schema: 2` 로 올려 조회 도구를 `READ` 로 선언해야 한다.
 
 ### 이름 대응
 
@@ -153,8 +156,9 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 | hook 이 본 것 | 처리 |
 | --- | --- |
 | 대응 파일이 없다 | 연결용 profile 이 아니다. 이 절의 처리를 하지 않는다 |
-| 대응 파일을 읽지 못한다 | Control Plane MCP 밖의 `mcp__` 도구와 `execute_code` 를 모두 막는다 |
-| Control Plane MCP 의 도구 | 지금처럼 `_fos_ctx` 를 붙인다 |
+| 대응 파일을 읽지 못한다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 연결용 profile 일 수 있고, 연결용 profile 에는 Control Plane MCP 가 없다 |
+| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 |
+| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 지금처럼 `_fos_ctx` 를 붙인다 |
 | `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 |
 | `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다 |
 | `session_id` 나 `tool_call_id` 가 없다 | 막는다 |
@@ -188,7 +192,7 @@ hook 이 부를 주소는 gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_
 | --- | --- |
 | `decision` | `allow` 나 `block` |
 | `message` | `block` 일 때 모델에게 보일 글. 비지 않는다 |
-| `action_id` | 승인 요청 번호. 승인 요청을 만들었을 때만 있다 |
+| `action_id` | 승인 요청 번호. 승인 요청을 만들었을 때만 있다. 승인 엔진이 들어오기 전에는 늘 `null` 이다 |
 
 토큰이나 서명이 틀리면 403 이고 hook 은 막는다.
 `args_json` 이 UTF-8 로 64KB 를 넘거나 JSON object 가 아닐 때, `root_session_id`, `session_id`, `tool_call_id`, `hermes_tool` 이 128자를 넘을 때도 서명이 틀린 요청처럼 403 이고 줄을 남기지 않는다.
@@ -214,12 +218,14 @@ Control Plane 의 판정 순서다.
 | `approval` 이 `required` 이고 유효한 상시 허락이 있다 | 허용 | |
 | 그 밖 | 승인 필요 | |
 
+- `allow` 로 답하는 것은 판정이 허용일 때뿐이다. 거절과 승인 필요는 `block` 이다
+- 승인 필요인 호출은 막고 `connector_action` 에 `decision: NEEDS_APPROVAL`, `passed: false` 로 남긴다. `status` 와 `args_json` 은 비운다. 모델에게는 사용자 승인이 필요해 실행하지 않았으니 같은 호출을 다시 시도하지 말고 사용자에게 알리라는 글을 준다. 승인해 실행하는 길은 승인 엔진이 들어올 때 생긴다
 - 상시 허락은 승인 엔진이 들어올 때 켜진다. 지금은 늘 없는 것으로 판정한다
 - 판정은 Hermes 와 DB 를 모르는 함수 하나가 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식(`^[A-Za-z0-9_.-]{1,128}$`)이 아닌 요청은 서명이 틀린 요청처럼 403 으로 거절한다
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 뿌리 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 `args_json` 의 해시가 처음 줄과 다르면 처음 판정을 돌려주지 않고 막는다. 새 줄은 남기지 않는다. 한 session 에서 같은 `tool_call_id` 가 되풀이될 때 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
-- `schema: 1` 에서 `tool` 이 없는 호출은 `WRITE` 와 `required` 로 판정하고 `tool_name` 을 비운 채 `hermes_tool` 만 남긴다. 다른 서버의 등록 이름은 `schema: 1` 에서도 `UNDECLARED` 로 거절하고 `tool_name` 을 비운다
+- `schema: 1` 에서 `tool` 이 없는 호출은 `WRITE` 와 `required` 로 판정해 승인 필요로 막고 `tool_name` 을 비운 채 `hermes_tool` 만 남긴다. 다른 서버의 등록 이름은 `schema: 1` 에서도 `UNDECLARED` 로 거절하고 `tool_name` 을 비운다
 
 ### hook 이 켜져 있는지
 
@@ -371,9 +377,19 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 
 ## 승인
 
-**이 절의 동작은 승인 엔진이 들어올 때 켜진다.**
-지금은 판정이 「승인 필요」 여도 호출을 통과시키고 `connector_action` 에 `NEEDS_APPROVAL` 과 `passed: true` 로 기록만 남긴다.
+**이 절의 승인 줄과 승인 경로는 승인 엔진이 들어올 때 켜진다.**
+지금은 판정이 「승인 필요」 인 호출을 막고 `connector_action` 에 `NEEDS_APPROVAL` 과 `passed: false` 로 남긴다. 인자 원문과 `status` 는 저장하지 않는다.
+승인해 실행하는 길이 아직 없으므로 그 호출은 실행되지 않는다. 승인 엔진은 이 막는 분기에 승인 줄 저장을 잇는다.
 결정은 [ADR-049](adr/ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다.
+
+### 승인의 불변식
+
+승인 엔진이 지켜야 하는 것이다. 지금의 판정 줄이 이 구조를 그대로 받는다.
+
+- **승인은 처음 요청한 정확한 도구와 인자에만 적용된다.** 줄은 `dedupe_key` 로 호출 하나를 가리키고, `hermes_tool` 과 `args_sha256` 으로 무엇을 어떤 인자로 불렀는지 못 박는다
+- **모델이 다시 만든 비슷한 호출은 새 줄이고 승인되지 않는다.** `tool_call_id` 가 다르면 `dedupe_key` 가 달라 새 판정을 받는다. `dedupe_key` 가 같아도 `hermes_tool` 이나 `args_sha256` 이 다르면 앞 줄의 판정을 돌려주지 않고 막는다
+- **승인한 호출은 저장한 인자로 한 번만 실행한다.** 실행하는 쪽은 Control Plane 이고 `args_json` 에 저장한 글 그대로 보낸다. 모델이 승인 뒤에 같은 도구를 다시 불러 실행하는 길은 없다. hook 은 승인된 줄이 있어도 그 호출을 통과시키지 않는다
+- 승인 줄의 상태는 한 방향으로만 바뀐다. `PENDING` 을 떠난 줄은 다시 승인하거나 실행하지 못한다
 
 판정이 「승인 필요」 이면 Control Plane 은 인자를 `connector_action` 에 `PENDING` 으로 저장하고 `block` 을 돌려준다.
 글은 승인 요청 번호를 담고, 사용자의 승인을 기다리고 있으니 같은 도구를 다시 부르지 말라고 말한다.

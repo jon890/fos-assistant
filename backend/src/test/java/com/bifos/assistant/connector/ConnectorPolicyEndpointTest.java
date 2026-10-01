@@ -70,6 +70,8 @@ class ConnectorPolicyEndpointTest {
     private static final Duration TTL = Duration.ofSeconds(60);
     private static final Instant NOW = Instant.parse("2026-10-01T00:00:00Z");
     private static final MovingClock CLOCK = new MovingClock(NOW);
+    private static final String NEEDS_APPROVAL_MESSAGE =
+            "이 작업은 사용자 승인이 필요해 아직 실행하지 않았다. 같은 호출을 다시 시도하지 말고 사용자에게 승인이 필요하다고 알린다.";
 
     /** 도구마다 정책을 선언한 커넥터다. MCP 서버 이름이 {@code demo} 라 등록 이름은 {@code mcp__demo__<도구>} 다. */
     private static final ConnectorManifest DECLARING = manifest(
@@ -77,7 +79,9 @@ class ConnectorPolicyEndpointTest {
             List.of(
                     new ConnectorTool("list_scopes", "READ", "none", null),
                     new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
-                    new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null)));
+                    new ConnectorTool("share_note", "SENSITIVE", "required", null),
+                    new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null),
+                    new ConnectorTool("pay_invoice", "FINANCIAL", "always", null)));
 
     @TestConfiguration
     static class MovingCatalogClock {
@@ -194,21 +198,54 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
-    @DisplayName("WRITE 도구는 승인 엔진 전이라 allow 로 답하고 승인 필요 줄을 승인 상태 없이 남긴다")
-    void writeToolPassesAndIsRecordedAsNeedingApproval() throws Exception {
+    @DisplayName("WRITE 와 required 인 도구는 block 이고 통과하지 않은 승인 필요 줄을 승인 상태와 인자 원문 없이 남긴다")
+    void writeToolIsBlockedAndRecordedAsNeedingApproval() throws Exception {
         connect(true);
 
         HttpResponse<String> response = ask("mcp__demo__write_note", "write_note");
 
-        assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(200);
-        assertThat(json.readTree(response.body()).path("decision").asString()).isEqualTo("allow");
+        assertBlocked(response, NEEDS_APPROVAL_MESSAGE);
         Map<String, Object> row = onlyRow();
         assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
-        assertThat(row.get("PASSED")).isEqualTo(true);
+        assertThat(row.get("DENY_REASON")).isNull();
+        assertThat(row.get("PASSED")).isEqualTo(false);
         assertThat(row.get("STATUS")).isNull();
         assertThat(row.get("ARGS_JSON")).isNull();
         assertThat(row.get("RISK")).isEqualTo("WRITE");
         assertThat(row.get("APPROVAL_MODE")).isEqualTo("REQUIRED");
+        assertThat(row.get("TOOL_NAME")).isEqualTo("write_note");
+    }
+
+    @Test
+    @DisplayName("SENSITIVE 와 required 인 도구도 block 이고 통과하지 않은 승인 필요 줄을 남긴다")
+    void sensitiveToolIsBlockedAndRecordedAsNeedingApproval() throws Exception {
+        connect(true);
+
+        HttpResponse<String> response = ask("mcp__demo__share_note", "share_note");
+
+        assertBlocked(response, NEEDS_APPROVAL_MESSAGE);
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
+        assertThat(row.get("PASSED")).isEqualTo(false);
+        assertThat(row.get("RISK")).isEqualTo("SENSITIVE");
+        assertThat(row.get("APPROVAL_MODE")).isEqualTo("REQUIRED");
+    }
+
+    @Test
+    @DisplayName("승인이 필요한 같은 요청을 다시 보내면 같은 block 답이고 줄이 하나다")
+    void resendingRequestThatNeedsApprovalReturnsSameBlock() throws Exception {
+        connect(true);
+        String body = body(token, "mcp__demo__write_note", "write_note", root, newCall(), ARGS);
+
+        HttpResponse<String> first = send(token, body);
+        HttpResponse<String> second = send(token, body);
+
+        assertBlocked(first, NEEDS_APPROVAL_MESSAGE);
+        assertBlocked(second, NEEDS_APPROVAL_MESSAGE);
+        assertThat(json.readTree(second.body())).isEqualTo(json.readTree(first.body()));
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
+        assertThat(row.get("PASSED")).isEqualTo(false);
     }
 
     @Test
@@ -243,7 +280,7 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
-    @DisplayName("schema 1 에서 선언이 없는 도구는 WRITE 와 required 로 읽어 통과시키고 승인 필요 줄을 남긴다")
+    @DisplayName("schema 1 에서 선언이 없는 도구는 WRITE 와 required 로 읽어 block 이고 통과하지 않은 승인 필요 줄을 남긴다")
     void undeclaredToolOfLegacySchemaIsReadAsWrite() throws Exception {
         // 도구를 선언하지 않는 판은 대시보드가 부르는 읽기 도구만 담는다.
         when(connector.readCatalog())
@@ -253,18 +290,19 @@ class ConnectorPolicyEndpointTest {
         HttpResponse<String> unknown = ask("mcp__demo__write_note", null);
         HttpResponse<String> read = ask("mcp__demo__list_scopes", "list_scopes");
 
-        assertThat(json.readTree(unknown.body()).path("decision").asString()).isEqualTo("allow");
+        assertBlocked(unknown, NEEDS_APPROVAL_MESSAGE);
         assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(jdbc.queryForList(
-                        "SELECT decision, risk, approval_mode, tool_name FROM connector_action ORDER BY id"))
+                        "SELECT decision, passed, risk, approval_mode, tool_name FROM connector_action ORDER BY id"))
                 .extracting(
                         row -> row.get("DECISION"),
+                        row -> row.get("PASSED"),
                         row -> row.get("RISK"),
                         row -> row.get("APPROVAL_MODE"),
                         row -> row.get("TOOL_NAME"))
                 .containsExactly(
-                        tuple("NEEDS_APPROVAL", "WRITE", "REQUIRED", null),
-                        tuple("ALLOWED", "READ", "NONE", "list_scopes"));
+                        tuple("NEEDS_APPROVAL", false, "WRITE", "REQUIRED", null),
+                        tuple("ALLOWED", true, "READ", "NONE", "list_scopes"));
     }
 
     @Test
@@ -277,7 +315,25 @@ class ConnectorPolicyEndpointTest {
         assertBlocked(response, "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.");
         Map<String, Object> row = onlyRow();
         assertThat(row.get("DENY_REASON")).isEqualTo("RISK_NOT_OPEN");
+        assertThat(row.get("DECISION")).isEqualTo("DENIED");
+        assertThat(row.get("PASSED")).isEqualTo(false);
         assertThat(row.get("RISK")).isEqualTo("DESTRUCTIVE");
+        assertThat(row.get("APPROVAL_MODE")).isEqualTo("ALWAYS");
+    }
+
+    @Test
+    @DisplayName("FINANCIAL 도구는 block 이고 RISK_NOT_OPEN 줄을 남긴다")
+    void financialToolIsBlocked() throws Exception {
+        connect(true);
+
+        HttpResponse<String> response = ask("mcp__demo__pay_invoice", "pay_invoice");
+
+        assertBlocked(response, "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.");
+        Map<String, Object> row = onlyRow();
+        assertThat(row.get("DECISION")).isEqualTo("DENIED");
+        assertThat(row.get("DENY_REASON")).isEqualTo("RISK_NOT_OPEN");
+        assertThat(row.get("PASSED")).isEqualTo(false);
+        assertThat(row.get("RISK")).isEqualTo("FINANCIAL");
         assertThat(row.get("APPROVAL_MODE")).isEqualTo("ALWAYS");
     }
 

@@ -50,4 +50,4 @@
 | [ADR-046](ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md) | 운영 비밀은 operator_env 와 다른 칸으로 선언하고 자식 MCP 프로세스에만 넣는다 | Accepted. ADR-043 의 manifest 에 칸을 더한다. 지금은 그 칸을 거절한다 |
 | [ADR-047](ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) | 도구 내용은 비밀값과 UUID를 가린 뒤 중계하고 저장한다 | Accepted. ADR-038의 관리자 원문 보기를 가린 값으로 바꾼다 |
 | [ADR-048](ADR-048-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) | 커넥터 도구 호출은 profile plugin 의 hook 이 Control Plane 에 물어 판정한다 | Accepted. ADR-043 의 manifest 에 도구 정책을 더한다 |
-| [ADR-049](ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) | 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다 | Accepted. ADR-040 의 깨우기를 승인 결과로 넓힌다. 승인 엔진은 아직 구현 전이고 지금은 판정과 기록만 한다 |
+| [ADR-049](ADR-049-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) | 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다 | Accepted. ADR-040 의 깨우기를 승인 결과로 넓힌다. 승인 엔진은 아직 구현 전이고 지금은 승인 필요인 호출을 막고 판정 줄만 남긴다 |

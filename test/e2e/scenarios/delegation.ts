@@ -17,8 +17,8 @@ const AGENT_CODE = "delegation";
 const INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다";
 
 type ChatEvent = { type: string; executionId?: number };
-type ToolResult = { isError: boolean; text: string };
-type Status = { execution_id: number; status: string; output?: string; error_code?: string; stop_requested?: boolean };
+export type ToolResult = { isError: boolean; text: string };
+export type Status = { execution_id: number; status: string; output?: string; error_code?: string; stop_requested?: boolean };
 type TreeNode = {
   executionId: number;
   status: string;
@@ -29,7 +29,7 @@ type TreeNode = {
 };
 type Tree = { root: TreeNode; truncated: boolean };
 
-function within<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+export function within<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     promise,
@@ -42,14 +42,15 @@ function within<T>(promise: Promise<T>, milliseconds: number, message: string): 
 }
 
 /** 스트림으로 turn 하나를 열고 `started` 사건의 실행 번호와 스트림이 끝나는 약속을 돌려준다. */
-async function openStream(
+export async function openStream(
   context: Context,
   text: string,
+  agentCode: string = AGENT_CODE,
 ): Promise<{ executionId: Promise<number>; completed: Promise<ChatEvent[]> }> {
   const response = await fetch(`${context.api}/chat/messages/stream`, {
     method: "POST",
     headers: { Authorization: `Bearer ${context.tokens.dad}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ text, agentCode: AGENT_CODE }),
+    body: JSON.stringify({ text, agentCode }),
   });
   expect(response.status === 200, `위임 검사 turn 의 스트림을 열지 못했다: ${response.status}`);
   const received: ChatEvent[] = [];
@@ -79,7 +80,7 @@ async function openStream(
 }
 
 /** 플러그인처럼 서명한 `_fos_ctx` 를 붙여 도구 하나를 부르고 도구 결과를 돌려준다. */
-async function callTool(
+export async function callTool(
   context: Context,
   token: string,
   name: string,
@@ -99,11 +100,11 @@ async function callTool(
 }
 
 /** 뿌리 session 에서 부른 것처럼 서명한다. 도구 호출 id 를 주지 않으면 새로 만든다. */
-function contextFor(token: string, name: string, rootSession: string, toolCallId = `call_${randomUUID()}`): FosCallContext {
+export function contextFor(token: string, name: string, rootSession: string, toolCallId = `call_${randomUUID()}`): FosCallContext {
   return signedCallContext(token, name, rootSession, rootSession, toolCallId);
 }
 
-function parsed<T>(result: ToolResult, what: string): T {
+export function parsed<T>(result: ToolResult, what: string): T {
   expect(!result.isError, `${what} 가 실패했다: ${result.text}`);
   return JSON.parse(result.text) as T;
 }

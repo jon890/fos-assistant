@@ -214,6 +214,8 @@ class ConnectorCatalogTest(ConnectorGateCase):
              lambda value: value.update(mcpServers={"fos-assistant": value["mcpServers"]["demo"]})),
             ("server whose registered prefix equals the Control Plane MCP", ".mcp.json",
              lambda value: value.update(mcpServers={"fos_assistant": value["mcpServers"]["demo"]})),
+            ("server that differs from the Control Plane MCP only by case", ".mcp.json",
+             lambda value: value.update(mcpServers={"FOS-Assistant": value["mcpServers"]["demo"]})),
             ("plugin name differs from the list", ".claude-plugin/plugin.json",
              lambda value: value.update(name="other")),
             ("skills outside the plugin", ".claude-plugin/plugin.json", lambda value: value.update(skills="..")),
@@ -228,6 +230,25 @@ class ConnectorCatalogTest(ConnectorGateCase):
                 (self.connector_root / name).write_bytes(originals[name])
         # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
         self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+
+    def test_server_name_is_compared_with_the_control_plane_mcp_in_canonical_form(self):
+        """MCP 서버 이름은 등록 규칙으로 바꾸고 소문자로 맞춰 Control Plane MCP 와 견준다."""
+        original = (self.connector_root / ".mcp.json").read_bytes()
+        for name in ("fos-assistant", "fos_assistant", "FOS-Assistant", "Fos_Assistant", "fos.assistant"):
+            with self.subTest(name=name):
+                self.rewrite(".mcp.json", lambda value, name=name: value.update(
+                    mcpServers={name: value["mcpServers"]["demo"]}))
+                self.assertEqual(self.catalog(), [], "%s 가 카탈로그에 남았다" % name)
+                self.assertIsNone(self.plugin._connector_manifest(DEMO))
+                (self.connector_root / ".mcp.json").write_bytes(original)
+        # 이름이 다른 서버는 대문자가 섞여도 받는다. 위의 거절이 대문자 때문이 아님을 확인한다.
+        for name in ("demo", "Demo-Notes", "fos-assistant-notes"):
+            with self.subTest(name=name):
+                self.rewrite(".mcp.json", lambda value, name=name: value.update(
+                    mcpServers={name: value["mcpServers"]["demo"]}))
+                self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO], "%s 가 거절됐다" % name)
+                self.assertEqual(self.plugin._connector_manifest(DEMO)["mcp_server"], name)
+                (self.connector_root / ".mcp.json").write_bytes(original)
 
     def test_operator_secrets_are_rejected_as_unsupported(self):
         """`operator_secrets` 를 선언한 커넥터는 카탈로그에서 빠지고 까닭이 경고 로그에 남는다. 빈 목록은 통과한다."""

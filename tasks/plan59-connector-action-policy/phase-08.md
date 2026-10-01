@@ -6,12 +6,13 @@
 
 판정이 「승인 필요」 인 호출을 막고 인자와 함께 `PENDING` 으로 저장한다. 주인이 승인하면 저장한 인자로 한 번만 실행하고, 거절하거나 24시간이 지나면 실행하지 않는다.
 상시 허락을 준 도구는 그 기간 동안 바로 통과한다.
+지금은 `NEEDS_APPROVAL` 이 `passed=false` 로 막히고 줄만 남는다. 이 phase 는 그 분기에 승인 줄 저장을 잇는다.
 
 **범위 외**: 결과를 대화에 전하는 것과 `approval` 사건(phase 09), 화면(phase 10).
 
 ## 컨텍스트
 
-- phase 04 가 만든 것: `connector/application/ConnectorPolicyService.decide(...)`, `connector/domain/ConnectorAction`, `ToolPolicyDecision`, `ActionStatus`, `ConnectorActionRepository`, `ConnectorPolicyAnswer(boolean allowed, String message, UUID actionId)`. 지금은 `NEEDS_APPROVAL` 도 `passed` 가 참이고 `granted` 에 늘 false 를 넘긴다
+- phase 04 가 만든 것: `connector/application/ConnectorPolicyService.decide(...)`, `connector/domain/ConnectorAction`, `ToolPolicyDecision`, `ActionStatus`, `ConnectorActionRepository`, `ConnectorPolicyAnswer(boolean allowed, String message, UUID actionId)`. 지금은 `NEEDS_APPROVAL` 을 `passed` 거짓으로 막고 `granted` 에 늘 false 를 넘긴다
 - phase 07 이 만든 것: 대시보드 `POST /api/connectors/{id}/execute`, 본문 `{profile, hermes_tool, args}`, 200 `{ok, result}` 나 `{ok: false, error}`, 시간 초과와 실행 여부를 모르는 실패는 504
 - 대시보드 클라이언트는 `hermes/HermesConnectorClient.java` 와 `HttpHermesConnectorClient.java` 다. `call(...)` 이 `CallResult` 를 돌려주는 방식을 본보기로 삼는다. `RestClient.builder()` 로 만들고 timeout 을 준다(`backend/AGENTS.md`)
 - 사용자 행 잠금과 외부 호출을 나누는 본보기는 `ConnectorConnectionService.register`(트랜잭션 밖 확인 호출 뒤 `TransactionTemplate`)다

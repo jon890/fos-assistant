@@ -30,8 +30,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-048).
  *
  * <p>순서는 {@code docs/connectors.md} 의 「도구 호출 판정」 이 갖는다. 실행이나 연결을 찾지 못한 호출과 같은 키로 다른 도구나 다른
- * 인자를 보낸 호출은 줄을 남기지 않는다. 줄에 적을 사용자와 에이전트를 알 수 없기 때문이다. 승인이 필요한 호출은 승인 엔진이 들어오기 전이라 통과로
- * 답하고 기록만 남긴다. 인자 원문은 저장하지 않고 해시만 남긴다.
+ * 인자를 보낸 호출은 줄을 남기지 않는다. 줄에 적을 사용자와 에이전트를 알 수 없기 때문이다.
+ *
+ * <p>통과로 답하는 것은 판정이 허용일 때뿐이다. 승인이 필요한 호출은 막고 {@code NEEDS_APPROVAL} 줄을 남긴다. 승인해 실행하는 길은
+ * 아직 없으므로 그 호출은 실행되지 않는다(ADR-049). 승인 엔진은 이 분기에 승인 줄 저장을 잇는다. 인자 원문은 저장하지 않고 해시만 남긴다.
  *
  * <p>{@code mcp} 패키지의 인증 주체를 모르게 하려고 profile 이름과 session 값을 문자열로 받는다.
  */
@@ -46,6 +48,8 @@ public class ConnectorPolicyService {
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
+    private static final String NEEDS_APPROVAL_MESSAGE =
+            "이 작업은 사용자 승인이 필요해 아직 실행하지 않았다. 같은 호출을 다시 시도하지 말고 사용자에게 승인이 필요하다고 알린다.";
 
     private final ConnectorActionRepository actions;
     private final ConnectorConnectionRepository connections;
@@ -137,7 +141,8 @@ public class ConnectorPolicyService {
                         false,
                         argsJson.getBytes(StandardCharsets.UTF_8).length))
                 .orElseGet(ToolPolicyDecision::policyUnavailable);
-        boolean passed = decision.decision() != ActionDecision.DENIED;
+        // 허용만 통과시킨다. 승인이 필요한 호출을 통과시키면 사람의 확인 없이 쓰기가 나간다.
+        boolean passed = decision.decision() == ActionDecision.ALLOWED;
         ConnectorAction action = ConnectorAction.decided(
                 connection,
                 origin,
@@ -212,6 +217,9 @@ public class ConnectorPolicyService {
     private static ConnectorPolicyAnswer answer(ConnectorAction action) {
         if (action.passed()) {
             return new ConnectorPolicyAnswer(true, "", null);
+        }
+        if (action.decision() == ActionDecision.NEEDS_APPROVAL) {
+            return new ConnectorPolicyAnswer(false, NEEDS_APPROVAL_MESSAGE, null);
         }
         return new ConnectorPolicyAnswer(false, message(action.denyReason()), null);
     }

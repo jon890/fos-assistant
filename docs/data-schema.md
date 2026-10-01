@@ -57,7 +57,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `approval_mode` | `VARCHAR(16)` | 판정 당시의 승인 방식. 위와 같을 때 비운다 |
 | `decision` | `VARCHAR(20) NOT NULL` | `ALLOWED`, `DENIED`, `NEEDS_APPROVAL` |
 | `deny_reason` | `VARCHAR(40)` | `DENIED` 일 때만. `POLICY_UNAVAILABLE`, `NOT_READY`, `UNDECLARED`, `RISK_NOT_OPEN`, `ARGS_TOO_LARGE` |
-| `passed` | `BOOLEAN NOT NULL` | hook 에 통과로 답했는가 |
+| `passed` | `BOOLEAN NOT NULL` | hook 에 통과로 답했는가. `decision` 이 `ALLOWED` 일 때만 참이다 |
 | `status` | `VARCHAR(20)` | 승인 줄만. `PENDING`, `EXECUTING`, `SUCCEEDED`, `FAILED`, `UNKNOWN`, `REJECTED`, `EXPIRED` |
 | `origin_execution_id` | `BIGINT NOT NULL` | hook 의 session 으로 찾은 실행 |
 | `conversation_id` | `BIGINT` | 그 실행의 대화. 결과를 돌려줄 곳이다. 대화 없는 실행이면 비운다 |
@@ -73,7 +73,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `created_at` | `DATETIME(6) NOT NULL` | |
 
 - 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다
-- 승인 엔진이 켜지기 전에는 `NEEDS_APPROVAL` 인 줄도 `passed` 가 참이고 `status` 와 `args_json` 이 빈다
+- 승인 엔진이 켜지기 전에는 `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 와 `args_json` 이 빈다. 그 호출은 막혀 실행되지 않는다
 - `(conversation_id, status)` 와 `(user_id, created_at)` 에 색인을 둔다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다
 - 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
