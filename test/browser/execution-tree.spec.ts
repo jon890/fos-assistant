@@ -170,7 +170,8 @@ test("하위 에이전트 사용량 확인 상태를 실패와 다르게 보인�
     await route.fulfill({ json: treeWithChildAndSubagentFixture("WAITING") });
   });
   await page.goto("/executions/950");
-  await expect(page.getByText("수치 확인 중", { exact: true })).toBeVisible();
+  const eventRows = page.getByTestId("execution-event-row");
+  await expect(eventRows.filter({ hasText: "수치 확인 중" })).toHaveCount(1);
   await expect(page.getByText("실패", { exact: true })).toHaveCount(0);
 
   await page.unroute("**/api/usage/executions/*/tree");
@@ -180,7 +181,7 @@ test("하위 에이전트 사용량 확인 상태를 실패와 다르게 보인�
     });
   });
   await page.reload();
-  await expect(page.getByText("사용량 미확인", { exact: true })).toBeVisible();
+  await expect(eventRows.filter({ hasText: "사용량 미확인" })).toHaveCount(1);
 });
 
 test("실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 기록된 시각만 보인다", async ({

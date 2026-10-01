@@ -1336,11 +1336,8 @@ export function startFakeHermes(
               model: "gpt-6-luna", child_session_id: childSessionId };
             event(response, { event: "subagent.start", ...child });
             event(response, { event: "run.completed" });
-            if (run.input === "자식 늦은 완료 검사") {
-              // 부모 종료 뒤 오는 사건이다. 소비자가 닫은 스트림으로 최종 사용량을 받는다고 기대하면 안 된다.
-              event(response, { event: "subagent.complete", ...child, status: "completed",
-                input_tokens: 160, output_tokens: 20, duration_seconds: 2.5 });
-            }
+            // 부모 스트림을 먼저 닫는다. 늦은 자식 완료는 첫 session 조회 뒤에만 보이며,
+            // 이미 닫힌 부모 스트림에는 완료 사건을 전달할 수 없다.
             response.end();
             return;
           }

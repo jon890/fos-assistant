@@ -176,6 +176,20 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
   page,
 }) => {
   const savedBodies: unknown[] = [];
+  let savedConversation: Record<string, unknown> | null = null;
+
+  await page.route(
+    (url) => isConversationList(url),
+    async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        json: savedConversation === null ? [] : [savedConversation],
+      });
+    },
+  );
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers",
     (route) => route.fulfill({ json: TIERS }),
@@ -185,20 +199,19 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
       /\/api\/chat\/conversations\/[^/]+\/model-tier$/.test(url.pathname),
     async (route) => {
       savedBodies.push(route.request().postDataJSON());
-      await route.fulfill({
-        json: {
-          id: route.request().url().split("/").at(-2),
-          title: "새 대화",
-          agentCode: "browser",
-          agentName: "브라우저 비서",
-          updatedAt: new Date().toISOString(),
-          provider: null,
-          model: null,
-          reasoningEffort: null,
-          modelSelectionMode: savedBodies.length === 1 ? "TIER" : "DEFAULT",
-          modelTier: savedBodies.length === 1 ? "DEEP" : null,
-        },
-      });
+      savedConversation = {
+        id: route.request().url().split("/").at(-2),
+        title: "새 대화",
+        agentCode: "browser",
+        agentName: "브라우저 비서",
+        updatedAt: new Date().toISOString(),
+        provider: null,
+        model: null,
+        reasoningEffort: null,
+        modelSelectionMode: savedBodies.length === 1 ? "TIER" : "DEFAULT",
+        modelTier: savedBodies.length === 1 ? "DEEP" : null,
+      };
+      await route.fulfill({ json: savedConversation });
     },
   );
 
@@ -215,8 +228,15 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
     "data-variant",
     "secondary",
   );
+  await expect(page.getByTestId("model-tier-deep")).toBeEnabled();
   await page.getByTestId("model-tier-profile-default").click();
+  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
+    "data-variant",
+    "ghost",
+  );
+  await expect(page.getByTestId("model-tier-profile-default")).toBeEnabled();
 
+  await expect.poll(() => savedBodies.length).toBe(2);
   expect(savedBodies).toEqual([
     { mode: "TIER", tier: "DEEP" },
     { mode: "DEFAULT", tier: null },
