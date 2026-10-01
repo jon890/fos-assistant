@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -117,10 +124,17 @@ type Props = {
   /** 고른 값을 저장한다 */
   onChange(choice: ModelChoice): Promise<ModelChoiceSaveResult>;
   disabled: boolean;
+  inSettings?: boolean;
 };
 
 /** 입력창 아래에서 대화의 모델과 effort 를 고른다. 고른 값은 다음 보내기부터 쓰인다 */
-export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
+export function ModelPicker({
+  agentCode,
+  choice,
+  onChange,
+  disabled,
+  inSettings = false,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [optionsState, setOptionsState] = useState<OptionsState>({
     status: "loading",
@@ -221,7 +235,9 @@ export function ModelPicker({ agentCode, choice, onChange, disabled }: Props) {
 
   return (
     <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
-      <span className="px-2 text-xs text-muted-foreground">고급</span>
+      {inSettings ? null : (
+        <span className="px-2 text-xs text-muted-foreground">고급</span>
+      )}
       <Dialog open={open} onOpenChange={changeOpen}>
         <DialogTrigger asChild>
           <Button
@@ -340,6 +356,7 @@ type TierPickerProps = {
     mode: "DEFAULT" | "TIER",
     tier: ModelTierCode | null,
   ): Promise<ModelTierSaveResult>;
+  advancedPicker: ReactNode;
 };
 
 const FALLBACK_TIERS: ModelTier[] = [
@@ -347,39 +364,33 @@ const FALLBACK_TIERS: ModelTier[] = [
     tier: "FAST",
     label: "빠르게",
     provider: null,
-    model: "gpt-6-luna",
-    reasoningEffort: "low",
+    model: null,
+    reasoningEffort: null,
   },
   {
     tier: "BALANCED",
     label: "균형",
     provider: null,
-    model: "gpt-6-luna",
-    reasoningEffort: "medium",
+    model: null,
+    reasoningEffort: null,
   },
   {
     tier: "DEEP",
     label: "깊게",
     provider: null,
-    model: "gpt-6.1-sol",
-    reasoningEffort: "high",
+    model: null,
+    reasoningEffort: null,
   },
 ];
 
-function defaultTierLabel(
-  tiers: ModelTier[],
-  tier: ModelTierCode | null,
-): string {
-  return tiers.find((item) => item.tier === tier)?.label ?? "없음";
-}
-
-/** 입력창 가까이에서 세 단계와 기본값을 고른다. 고급 직접 선택은 `ModelPicker`가 맡는다. */
+/** 입력창 가까이에서 세 단계와 기본값을 고른다. 고급 직접 선택은 설정 안에 둔다. */
 export function ModelTierPicker({
   agentCode,
   mode,
   tier,
   disabled,
   onChange,
+  advancedPicker,
 }: TierPickerProps) {
   const [state, setState] = useState<{
     loading: boolean;
@@ -412,6 +423,16 @@ export function ModelTierPicker({
 
   const tiers = state.data?.tiers ?? FALLBACK_TIERS;
   const selectedTier = mode === "TIER" ? tier : null;
+  const needsTierSetup =
+    state.data?.admin === true &&
+    state.data.tiers.some((item) => item.model === null);
+  const hasIncompleteTierMapping = draftTiers.some((item) => {
+    const hasModel = item.model !== null;
+    const hasReasoningEffort = item.reasoningEffort !== null;
+    return (
+      hasModel !== hasReasoningEffort || (!hasModel && item.provider !== null)
+    );
+  });
 
   async function choose(nextTier: ModelTierCode) {
     setSaving(true);
@@ -445,15 +466,13 @@ export function ModelTierPicker({
   }
 
   function updateDraft(
-    tier: ModelTierCode,
+    tierCode: ModelTierCode,
     field: keyof Pick<ModelTier, "provider" | "model" | "reasoningEffort">,
     value: string,
   ) {
     setDraftTiers((current) =>
       current.map((item) =>
-        item.tier === tier
-          ? { ...item, [field]: field === "provider" ? value || null : value }
-          : item,
+        item.tier === tierCode ? { ...item, [field]: value || null } : item,
       ),
     );
   }
@@ -491,160 +510,205 @@ export function ModelTierPicker({
           {item.label}
         </Button>
       ))}
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        disabled={disabled || saving}
-        data-testid="model-tier-profile-default"
-        onClick={() => void returnToProfileDefault()}
-      >
-        에이전트 기본값
-      </Button>
-      <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
+      <Dialog>
         <DialogTrigger asChild>
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            disabled={state.data === null}
+            disabled={disabled || saving}
+            data-testid="model-tier-settings"
           >
-            내 기본값
+            설정
           </Button>
         </DialogTrigger>
-        <DialogContent closeLabel="내 기본값 닫기">
+        <DialogContent
+          closeLabel="모델 단계 설정 닫기"
+          className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
+        >
           <DialogHeader>
-            <DialogTitle>내 기본값</DialogTitle>
+            <DialogTitle>모델 단계 설정</DialogTitle>
             <DialogDescription>
-              새 대화에서 먼저 쓸 단계를 고르세요.
+              기본 단계를 고르거나 이 대화에서만 쓸 모델을 정할 수 있어요.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2">
-            {tiers.map((item) => (
-              <Button
-                key={item.tier}
-                variant="outline"
-                onClick={() => void saveOwnDefault(item.tier)}
-              >
-                {item.label}
-                {state.data?.userDefaultTier === item.tier
-                  ? " · 지금 기본값"
-                  : ""}
-              </Button>
-            ))}
-            <Button variant="outline" onClick={() => void saveOwnDefault(null)}>
-              내 기본값 지우기
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {state.data?.admin ? (
-        <Dialog open={groupOpen} onOpenChange={setGroupOpen}>
-          <DialogTrigger asChild>
-            <Button type="button" size="sm" variant="ghost">
-              그룹 단계 설정
-            </Button>
-          </DialogTrigger>
-          <DialogContent
-            closeLabel="그룹 단계 설정 닫기"
-            className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
-          >
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void saveGroup();
-              }}
-              className="grid gap-4"
+          {failed ? (
+            <p role="alert" className="text-sm text-destructive">
+              단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
+            </p>
+          ) : null}
+          {state.data === null ? (
+            <p className="text-sm text-muted-foreground">
+              단계를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.
+            </p>
+          ) : null}
+          <section className="grid gap-2">
+            <h3 className="text-sm font-medium">에이전트 기본값</h3>
+            <p className="text-sm text-muted-foreground">
+              이 대화의 단계 선택을 지우고 에이전트 기본값으로 돌아가요.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disabled || saving}
+              data-testid="model-tier-profile-default"
+              onClick={() => void returnToProfileDefault()}
             >
+              에이전트 기본값으로 돌아가기
+            </Button>
+          </section>
+          <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={state.data === null}
+              >
+                내 기본값
+              </Button>
+            </DialogTrigger>
+            <DialogContent closeLabel="내 기본값 닫기">
               <DialogHeader>
-                <DialogTitle>그룹 단계 설정</DialogTitle>
+                <DialogTitle>내 기본값</DialogTitle>
                 <DialogDescription>
-                  다음 실행부터 각 단계에 이 모델과 강도를 적용해요.
+                  새 대화에서 먼저 쓸 단계를 고르세요.
                 </DialogDescription>
               </DialogHeader>
-              {draftTiers.map((item) => (
-                <fieldset
-                  key={item.tier}
-                  className="grid gap-2 rounded-md border border-border p-3"
-                >
-                  <legend className="px-1 text-sm font-medium">
+              <div className="grid gap-2">
+                {tiers.map((item) => (
+                  <Button
+                    key={item.tier}
+                    variant="outline"
+                    onClick={() => void saveOwnDefault(item.tier)}
+                  >
                     {item.label}
-                  </legend>
+                    {state.data?.userDefaultTier === item.tier
+                      ? " · 지금 기본값"
+                      : ""}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  onClick={() => void saveOwnDefault(null)}
+                >
+                  내 기본값 지우기
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          {state.data?.admin ? (
+            <Dialog open={groupOpen} onOpenChange={setGroupOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline">
+                  그룹 단계 설정
+                </Button>
+              </DialogTrigger>
+              <DialogContent
+                closeLabel="그룹 단계 설정 닫기"
+                className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
+              >
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveGroup();
+                  }}
+                  className="grid gap-4"
+                >
+                  <DialogHeader>
+                    <DialogTitle>그룹 단계 설정</DialogTitle>
+                    <DialogDescription>
+                      다음 실행부터 각 단계에 이 모델과 강도를 적용해요.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {needsTierSetup ? (
+                    <p className="text-sm text-muted-foreground">
+                      단계 설정이 필요해요. 비워 두면 에이전트 기본값으로
+                      실행해요.
+                    </p>
+                  ) : null}
+                  {draftTiers.map((item) => (
+                    <fieldset
+                      key={item.tier}
+                      className="grid gap-2 rounded-md border border-border p-3"
+                    >
+                      <legend className="px-1 text-sm font-medium">
+                        {item.label}
+                      </legend>
+                      <label className="grid gap-1 text-sm">
+                        모델 제공사
+                        <Input
+                          value={item.provider ?? ""}
+                          onChange={(event) =>
+                            updateDraft(
+                              item.tier,
+                              "provider",
+                              event.target.value,
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1 text-sm">
+                        모델
+                        <Input
+                          value={item.model ?? ""}
+                          onChange={(event) =>
+                            updateDraft(item.tier, "model", event.target.value)
+                          }
+                        />
+                      </label>
+                      <label className="grid gap-1 text-sm">
+                        강도
+                        <Input
+                          value={item.reasoningEffort ?? ""}
+                          onChange={(event) =>
+                            updateDraft(
+                              item.tier,
+                              "reasoningEffort",
+                              event.target.value,
+                            )
+                          }
+                        />
+                      </label>
+                    </fieldset>
+                  ))}
                   <label className="grid gap-1 text-sm">
-                    모델 제공사
-                    <Input
-                      value={item.provider ?? ""}
+                    그룹 기본값
+                    <NativeSelect
+                      value={groupDefaultTier ?? ""}
                       onChange={(event) =>
-                        updateDraft(item.tier, "provider", event.target.value)
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1 text-sm">
-                    모델
-                    <Input
-                      required
-                      value={item.model}
-                      onChange={(event) =>
-                        updateDraft(item.tier, "model", event.target.value)
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1 text-sm">
-                    강도
-                    <Input
-                      required
-                      value={item.reasoningEffort}
-                      onChange={(event) =>
-                        updateDraft(
-                          item.tier,
-                          "reasoningEffort",
-                          event.target.value,
+                        setGroupDefaultTier(
+                          (event.target.value || null) as ModelTierCode | null,
                         )
                       }
-                    />
+                    >
+                      <option value="">없음</option>
+                      {draftTiers.map((item) => (
+                        <option key={item.tier} value={item.tier}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
                   </label>
-                </fieldset>
-              ))}
-              <label className="grid gap-1 text-sm">
-                그룹 기본값
-                <NativeSelect
-                  value={groupDefaultTier ?? ""}
-                  onChange={(event) =>
-                    setGroupDefaultTier(
-                      (event.target.value || null) as ModelTierCode | null,
-                    )
-                  }
-                >
-                  <option value="">없음</option>
-                  {draftTiers.map((item) => (
-                    <option key={item.tier} value={item.tier}>
-                      {item.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
-              <DialogFooter>
-                <Button type="submit">저장</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-      {failed ? (
-        <p role="alert" className="text-xs text-destructive">
-          단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
-        </p>
-      ) : null}
-      {state.data ? null : (
-        <p className="text-xs text-muted-foreground">
-          단계를 불러오지 못했어요.
-        </p>
-      )}
-      {mode === "DEFAULT" ? null : (
-        <span className="sr-only">
-          선택한 단계: {defaultTierLabel(tiers, selectedTier)}
-        </span>
-      )}
+                  {hasIncompleteTierMapping ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      모델과 강도는 함께 입력해 주세요.
+                    </p>
+                  ) : null}
+                  <DialogFooter>
+                    <Button type="submit" disabled={hasIncompleteTierMapping}>
+                      저장
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+          <section className="grid gap-2">
+            <h3 className="text-sm font-medium">고급 직접 선택</h3>
+            {advancedPicker}
+          </section>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

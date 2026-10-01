@@ -21,6 +21,24 @@ function picker(page: Page): Locator {
   return page.getByTestId("model-picker");
 }
 
+function tierSettings(page: Page): Locator {
+  return page.getByTestId("model-tier-settings");
+}
+
+async function openSettings(page: Page): Promise<void> {
+  if ((await picker(page).count()) === 0) await tierSettings(page).click();
+  await expect(picker(page)).toBeVisible();
+}
+
+async function openAdvancedPicker(page: Page): Promise<void> {
+  await openSettings(page);
+  await picker(page).click();
+}
+
+async function closeSettings(page: Page): Promise<void> {
+  await page.keyboard.press("Escape");
+}
+
 function dialog(page: Page): Locator {
   return page.getByRole("dialog", { name: "모델 고르기" });
 }
@@ -38,22 +56,22 @@ const TIERS = {
     {
       tier: "FAST",
       label: "빠르게",
-      provider: "openai-codex",
-      model: "gpt-6-luna",
+      provider: null,
+      model: "example-fast",
       reasoningEffort: "low",
     },
     {
       tier: "BALANCED",
       label: "균형",
-      provider: "openai-codex",
-      model: "gpt-6-luna",
+      provider: null,
+      model: "example-balanced",
       reasoningEffort: "medium",
     },
     {
       tier: "DEEP",
       label: "깊게",
-      provider: "openai-codex",
-      model: "gpt-6.1-sol",
+      provider: null,
+      model: "example-deep",
       reasoningEffort: "high",
     },
   ],
@@ -67,6 +85,7 @@ const TIERS = {
  * 저장이 끝나 대화 목록의 그 줄이 바뀌어야 단추가 다시 눌린다.
  */
 async function expectSaved(page: Page): Promise<void> {
+  await openSettings(page);
   await expect(picker(page)).toBeEnabled();
   await expect(page.getByTestId("model-picker-error")).toHaveCount(0);
 }
@@ -125,9 +144,10 @@ test("모델과 effort 를 고르면 다음 보내기가 그 값을 싣고 다�
   hermes,
 }, testInfo) => {
   await page.goto("/");
+  await openSettings(page);
   await expect(picker(page)).toHaveText("기본");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(modelSelect(page).locator("option").first()).toHaveText(
     "기본 (example-model)",
   );
@@ -137,7 +157,9 @@ test("모델과 effort 를 고르면 다음 보내기가 그 값을 싣고 다�
   await dialog(page).getByRole("button", { name: "적용" }).click();
 
   await expect(dialog(page)).toHaveCount(0);
+  await openSettings(page);
   await expect(picker(page)).toHaveText("example-model · high");
+  await closeSettings(page);
   await sendAndWait(page, `모델 고르기 검사 ${testInfo.project.name}`);
 
   expect(
@@ -150,6 +172,7 @@ test("모델과 effort 를 고르면 다음 보내기가 그 값을 싣고 다�
   });
 
   await page.reload();
+  await openSettings(page);
   await expect(picker(page)).toHaveText("example-model · high");
 });
 
@@ -158,7 +181,9 @@ test("고르지 않고 보내면 실행 요청에 provider 와 model 이 빠진�
   hermes,
 }, testInfo) => {
   await page.goto("/");
+  await openSettings(page);
   await expect(picker(page)).toHaveText("기본");
+  await page.keyboard.press("Escape");
 
   await sendAndWait(page, `기본 모델 검사 ${testInfo.project.name}`);
 
@@ -169,6 +194,7 @@ test("고르지 않고 보내면 실행 요청에 provider 와 model 이 빠진�
     runtime.reasoningEffort,
     "기본값으로 보낸 실행의 effort",
   ).toBeUndefined();
+  await openSettings(page);
   await expect(picker(page)).toHaveText("기본");
 });
 
@@ -219,9 +245,11 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
   await expect(page.getByTestId("model-tier-picker")).toContainText("빠르게");
   await expect(page.getByTestId("model-tier-picker")).toContainText("균형");
   await expect(page.getByTestId("model-tier-picker")).toContainText("깊게");
+  await tierSettings(page).click();
   await expect(
     page.getByRole("button", { name: "그룹 단계 설정" }),
   ).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   await page.getByTestId("model-tier-deep").click();
   await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
@@ -229,6 +257,7 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
     "secondary",
   );
   await expect(page.getByTestId("model-tier-deep")).toBeEnabled();
+  await tierSettings(page).click();
   await page.getByTestId("model-tier-profile-default").click();
   await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
     "data-variant",
@@ -253,16 +282,49 @@ test("관리자에게만 그룹 단계 설정을 보인다", async ({ page }) =>
   );
 
   await page.goto("/");
+  await tierSettings(page).click();
   await expect(
     page.getByRole("button", { name: "그룹 단계 설정" }),
   ).toBeVisible();
+});
+
+test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행을 안내한다", async ({
+  page,
+}) => {
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) =>
+      route.fulfill({
+        json: {
+          ...TIERS,
+          admin: true,
+          tiers: TIERS.tiers.map((item) => ({
+            ...item,
+            provider: null,
+            model: null,
+            reasoningEffort: null,
+          })),
+        },
+      }),
+  );
+
+  await page.goto("/");
+  await expect(page.getByTestId("model-tier-fast")).toBeEnabled();
+  await expect(page.getByTestId("model-tier-balanced")).toBeEnabled();
+  await expect(page.getByTestId("model-tier-deep")).toBeEnabled();
+
+  await tierSettings(page).click();
+  await page.getByRole("button", { name: "그룹 단계 설정" }).click();
+  await expect(page.getByText("단계 설정이 필요해요.")).toBeVisible();
+  await expect(page.getByLabel("모델").first()).toHaveValue("");
+  await expect(page.getByLabel("강도").first()).toHaveValue("");
 });
 
 test("effort 를 받지 않는 모델을 고르면 effort 를 고를 수 없다", async ({
   page,
 }) => {
   await page.goto("/");
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(modelSelect(page)).toBeEnabled();
   await effortSelect(page).selectOption("high");
 
@@ -274,6 +336,7 @@ test("effort 를 받지 않는 모델을 고르면 effort 를 고를 수 없다"
   await expectSaved(page);
   await expect(picker(page)).toHaveText("example-model-mini");
   await page.reload();
+  await openSettings(page);
   await expect(picker(page)).toHaveText("example-model-mini");
 });
 
@@ -294,7 +357,7 @@ test("모델 목록을 읽지 못하면 창에 알리고 기본값으로는 보�
   );
   await page.goto("/");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(dialog(page)).toContainText(
     "모델 목록을 불러오지 못했어요. 기본 모델로는 계속 보낼 수 있어요.",
   );
@@ -302,6 +365,7 @@ test("모델 목록을 읽지 못하면 창에 알리고 기본값으로는 보�
   await expect(effortSelect(page)).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
+  await closeSettings(page);
 
   await sendAndWait(page, `목록 실패 검사 ${testInfo.project.name}`);
   const runtime = await hermes.lastSubmittedRuntime();
@@ -322,18 +386,19 @@ test("저장이 실패하면 단추가 이전 값으로 돌아가고 알린다",
   );
   await page.goto("/");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(modelSelect(page)).toBeEnabled();
   await effortSelect(page).selectOption("low");
   await dialog(page).getByRole("button", { name: "적용" }).click();
 
+  await openSettings(page);
   await expect(page.getByTestId("model-picker-error")).toHaveText(
     "모델을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   );
   await expect(picker(page)).toHaveText("기본");
 
   // 다시 고르러 창을 열면 지난 실패 안내는 사라진다.
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(dialog(page)).toBeVisible();
   await expect(page.getByTestId("model-picker-error")).toHaveCount(0);
 });
@@ -356,7 +421,7 @@ test("빈 대화를 만들지 못하면 입력창의 안내 하나만 보인다"
   );
   await page.goto("/");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(modelSelect(page)).toBeEnabled();
   await effortSelect(page).selectOption("low");
   await dialog(page).getByRole("button", { name: "적용" }).click();
@@ -364,6 +429,7 @@ test("빈 대화를 만들지 못하면 입력창의 안내 하나만 보인다"
   await expect(page.getByTestId("attachment-notice")).toHaveText(
     "대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   );
+  await openSettings(page);
   await expect(picker(page)).toBeEnabled();
   await expect(page.getByTestId("model-picker-error")).toHaveCount(0);
   await expect(picker(page)).toHaveText("기본");
@@ -376,7 +442,7 @@ test("새 대화에서 모델을 먼저 고르면 에이전트 카드가 잠기�
   const browserCard = page.getByRole("radio", { name: "브라우저 비서" });
   await expect(browserCard).toHaveAttribute("aria-checked", "true");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(modelSelect(page)).toBeEnabled();
   await effortSelect(page).selectOption("medium");
   await dialog(page).getByRole("button", { name: "적용" }).click();
@@ -385,6 +451,7 @@ test("새 대화에서 모델을 먼저 고르면 에이전트 카드가 잠기�
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expectSaved(page);
   await expect(picker(page)).toHaveText("기본 · medium");
+  await closeSettings(page);
   await expect(page.getByRole("radio", { name: "흐름 비서" })).toBeDisabled();
 
   await page
@@ -430,7 +497,7 @@ test("긴 모델 이름을 골라도 가로로 넘치지 않고 입력칸 폭이
   );
   await page.goto("/");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(modelSelect(page)).toBeEnabled();
   await modelSelect(page).selectOption({ label: longModel });
   await effortSelect(page).selectOption("xhigh");
@@ -445,12 +512,6 @@ test("긴 모델 이름을 골라도 가로로 넘치지 않고 입력칸 폭이
   expect(textarea?.width ?? 0, "입력칸 폭(px)").toBeGreaterThanOrEqual(
     MIN_TEXTAREA_WIDTH,
   );
-  const button = await picker(page).boundingBox();
-  const shell = await page.getByTestId("composer-shell").boundingBox();
-  expect(
-    (button?.x ?? 0) + (button?.width ?? 0),
-    "모델 단추의 오른쪽 끝(px)",
-  ).toBeLessThanOrEqual((shell?.x ?? 0) + (shell?.width ?? 0));
 });
 
 test("목록을 읽지 못해도 대화에 적힌 모델이 남고 effort 만 바꿔도 모델이 그대로다", async ({
@@ -473,9 +534,10 @@ test("목록을 읽지 못해도 대화에 적힌 모델이 남고 effort 만 �
       }),
   );
   await page.goto(`/chat/${conversationId}`);
+  await openSettings(page);
   await expect(picker(page)).toHaveText("example-model · high");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(page.getByTestId("model-options-failed")).toBeVisible();
   await expect(modelSelect(page).locator("option")).toHaveText([
     "기본",
@@ -490,6 +552,7 @@ test("목록을 읽지 못해도 대화에 적힌 모델이 남고 effort 만 �
   await expectSaved(page);
   await expect(picker(page)).toHaveText("example-model · low");
   await page.reload();
+  await openSettings(page);
   await expect(picker(page)).toHaveText("example-model · low");
 });
 
@@ -517,9 +580,10 @@ test("대화 목록이 오기 전에는 이미 있는 대화의 모델 단추를
   // 에이전트 목록이 오기 전에는 다른 까닭으로도 막혀 있다. 사진 단추가 보이면 에이전트가 정해진 뒤다.
   await expect(page.getByTestId("attachment-input")).toBeAttached();
   // 적힌 값을 모르는 채 고르면 「기본」 으로 보고 저장해 적힌 모델을 지운다.
-  await expect(picker(page)).toBeDisabled();
+  await expect(tierSettings(page)).toBeDisabled();
   release();
-  await expect(picker(page)).toBeEnabled();
+  await expect(tierSettings(page)).toBeEnabled();
+  await openSettings(page);
   await expect(picker(page)).toHaveText("example-model · high");
 });
 
@@ -552,7 +616,7 @@ test("모델 저장 때문에 버린 대화 목록 응답은 한 번 더 읽는�
   );
   await page.goto("/");
 
-  await picker(page).click();
+  await openAdvancedPicker(page);
   await expect(modelSelect(page)).toBeEnabled();
   await effortSelect(page).selectOption("low");
   const saved = page.waitForResponse((response) =>

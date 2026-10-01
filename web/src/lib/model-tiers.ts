@@ -7,8 +7,8 @@ export type ModelTier = {
   tier: ModelTierCode;
   label: string;
   provider: string | null;
-  model: string;
-  reasoningEffort: string;
+  model: string | null;
+  reasoningEffort: string | null;
 };
 
 export type ModelTiers = {

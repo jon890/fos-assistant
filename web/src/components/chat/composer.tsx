@@ -853,12 +853,17 @@ export function Composer({
             tier={modelTier}
             onChange={saveModelTier}
             disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
-          />
-          <ModelPicker
-            agentCode={agentCode}
-            choice={modelChoice}
-            onChange={saveModelChoice}
-            disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
+            advancedPicker={
+              <ModelPicker
+                agentCode={agentCode}
+                choice={modelChoice}
+                onChange={saveModelChoice}
+                disabled={
+                  disabled || agentCode.length === 0 || modelChoiceUnknown
+                }
+                inSettings
+              />
+            }
           />
         </div>
       </div>
