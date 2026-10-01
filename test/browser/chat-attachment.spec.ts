@@ -201,6 +201,8 @@ test("흐름이 붙은 에이전트의 대화에는 사진 단추가 없다", as
     .click();
 
   await expect(page.getByRole("button", { name: "보내기" })).toBeVisible();
+  // 보내기는 답이 오는 동안에도 보인다. 답이 끝난 것은 중지가 사라진 것으로 본다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "사진 첨부" })).toBeHidden();
 });
 

@@ -25,8 +25,10 @@ type Props = {
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 거짓이면 사진 단추를 그리지 않는다 */
   acceptsAttachments: boolean;
   onConversationCreated(id: string): void;
-  /** 답을 만드는 중이다. 참이면 보내기 자리에서 중지를 보인다. */
+  /** 답을 만드는 중이다. 참이면 보내기 옆에 중지를 함께 보인다. */
   running: boolean;
+  /** 답을 만드는 중에도 보내기를 받을 수 있다. 거짓이면 그동안 보내기와 Enter 를 막는다. */
+  canQueue: boolean;
   /** `started` 사건 뒤, 아직 중지를 누르지 않았을 때 참이다. */
   canStop: boolean;
   onStop(): void;
@@ -109,6 +111,7 @@ export function Composer({
   acceptsAttachments,
   onConversationCreated,
   running,
+  canQueue,
   canStop,
   onStop,
   mention,
@@ -597,7 +600,7 @@ export function Composer({
               || event.shiftKey
               || composing.current
               || event.nativeEvent.isComposing
-              || running
+              || (running && !canQueue)
             ) {
               return;
             }
@@ -637,7 +640,7 @@ export function Composer({
           <TooltipButton
             label="중지"
             passEscape
-            variant="default"
+            variant="outline"
             disabled={!canStop}
             onClick={onStop}
             size="icon"
@@ -645,22 +648,21 @@ export function Composer({
           >
             <Square aria-hidden="true" className="size-4 fill-current" />
           </TooltipButton>
-        ) : (
-          <TooltipButton
-            label="보내기"
-            variant="default"
-            type="submit"
-            disabled={sendDisabled}
-            size="icon"
-            className="size-10 shrink-0 rounded-full"
-          >
-            {uploading ? (
-              <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
-            ) : (
-              <ArrowUp aria-hidden="true" className="size-5" />
-            )}
-          </TooltipButton>
-        )}
+        ) : null}
+        <TooltipButton
+          label="보내기"
+          variant="default"
+          type="submit"
+          disabled={sendDisabled || (running && !canQueue)}
+          size="icon"
+          className="size-10 shrink-0 rounded-full"
+        >
+          {uploading ? (
+            <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
+          ) : (
+            <ArrowUp aria-hidden="true" className="size-5" />
+          )}
+        </TooltipButton>
       </div>
       {/* 알약 안에 두면 좁은 폭에서 입력칸이 줄어든다. 그래서 알약 아래 줄에 둔다. */}
       <div className="mt-1 flex min-w-0 px-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "cn";
@@ -9,6 +9,8 @@ import { Composer } from "./chat/composer";
 import { commandSkillNames, parseSkillCommand } from "./chat/skill-command";
 import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
 import { useStarterSuggestions } from "./chat/use-starter-suggestions";
+import { PendingQueueView } from "@/components/chat/pending-queue";
+import { usePendingQueue } from "@/components/chat/use-pending-queue";
 import { MessageList } from "./chat/message-list";
 import { applyChatEvent, emptyActivity, failActivity, fromTree, type ActivityState } from "./chat/activity/activity-state";
 import { ActivityPanel, type ActivityPanelTarget } from "./chat/activity/activity-panel";
@@ -20,6 +22,7 @@ import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 import { agentLabel } from "@/lib/format";
 import type { ChatEvent } from "@/lib/chat-event";
+import type { PendingResult } from "@/lib/pending-messages";
 import { foldVersions } from "@/lib/message-versions";
 import type { AgentView } from "@/lib/agent";
 import type { SkillListView } from "@/lib/skill";
@@ -127,6 +130,17 @@ const OBSERVE_MAX_FAILURES = 3;
 const EVENTS_RECONNECT_MS = 5_000;
 
 /**
+ * 대기 메시지 요청의 실패를 문구로 바꾼다.
+ *
+ * <p>대기 경로의 `CONVERSATION_BUSY` 는 답을 만드는 중이라는 뜻이 아니다. 흐름이 붙은 에이전트라 대기 메시지를
+ * 받지 않는다는 뜻이라 이 경로에서만 문구를 바꾼다. 요청이 닿지 못했으면 문구가 비어 오므로 `fallback` 을 쓴다.
+ */
+function describePendingFailure(failure: Extract<PendingResult<unknown>, { ok: false }>, fallback: string): string {
+  if (failure.code === "CONVERSATION_BUSY") return "이 대화는 답이 끝난 뒤 보낼 수 있어요.";
+  return describeError(failure.code, failure.message || fallback);
+}
+
+/**
  * 보는 중인 turn 의 사건이면 참이다. 그 turn 은 폴링이 그리므로 대화 단위 SSE 로 받은 것은 버린다.
  *
  * <p>`filter` 의 단계를 이 자리에서 옮긴다. `system` 은 turn 의 사건이 아니므로 언제나 받는다.
@@ -215,6 +229,17 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
    * 올리는 중인 사진이 사라진다.
    */
   const [composerGeneration, setComposerGeneration] = useState(0);
+  const pending = usePendingQueue(conversationId);
+  /** 대기 줄의 취소나 보내기 요청이 도는 중이다. 그동안 대기 줄의 단추를 잠근다 */
+  const [pendingBusy, setPendingBusy] = useState(false);
+  /** 대기 메시지로 더하는 요청이 도는 중이다. 같은 글이 두 번 쌓이지 않게 그동안의 보내기를 받지 않는다 */
+  const enqueueing = useRef(false);
+  /** 대기 줄에 쌓인 글이 있는지다. 대화 단위 SSE 의 처리기는 연결을 열 때의 렌더에 묶여 있어 최신 값을 여기서 읽는다 */
+  const hasPendingItems = useRef(false);
+
+  useLayoutEffect(() => {
+    hasPendingItems.current = pending.queue.items.length > 0;
+  }, [pending.queue]);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -461,8 +486,15 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           if (reconnected) {
             await runConversationTask(() => resumeAfterReconnect(id));
           }
-          await readEventStream<ChatEvent>(response,
-            (event) => runConversationTask(() => applyConversationEvent(id, event)));
+          await readEventStream<ChatEvent>(response, (event) => {
+            // 대기 줄 사건은 보류하지 않는다. 이 창이 보낸 turn 이 도는 동안 보류하면 다른 창이 쌓은 대기
+            // 메시지가 그 turn 이 끝날 때까지 보이지 않는다. 대기 줄은 turn 의 그림과 겹치지 않는다.
+            if (event.type === "pending") {
+              void pending.reload();
+              return;
+            }
+            return runConversationTask(() => applyConversationEvent(id, event));
+          });
         } else {
           reconnect = response.status >= 500;
         }
@@ -845,10 +877,11 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
   }
 
   /**
-   * 대화 단위 SSE 로 받은 사건을 그린다. 이 스트림에는 위임 결과로 열린 자동 turn 의 사건만 온다.
+   * 대화 단위 SSE 로 받은 사건을 그린다. 이 스트림에는 요청한 연결 없이 도는 turn 의 사건만 온다.
    *
    * <p>보는 중인 turn 의 사건은 폴링이 그리므로 버린다. `started` 를 받지 못한 채 온 끝 사건은 이력을 다시 읽어
-   * 저장된 답을 보인다.
+   * 저장된 답을 보인다. 대기 메시지로 연 turn 도 이 길로 온다. `pending` 사건은 여기까지 오지 않고 받는 자리에서
+   * 곧바로 대기 줄을 다시 읽는다.
    */
   async function applyConversationEvent(id: string, event: ChatEvent) {
     if (conversationIdRef.current !== id) return;
@@ -856,6 +889,17 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       const line: Turn = {
         id: event.messageId ?? `system-${Date.now()}`,
         role: "SYSTEM",
+        content: event.text ?? "",
+        senderName: null,
+      };
+      setTurns((previous) => previous.some((turn) => turn.id === line.id) ? previous : [...previous, line]);
+      return;
+    }
+    if (event.type === "user") {
+      // 대기 메시지를 합쳐 저장한 사용자 메시지다. 요청한 연결이 없어 이 사건으로만 온다. 이어 오는 `started` 가 그 답을 연다.
+      const line: Turn = {
+        id: event.messageId ?? `user-${Date.now()}`,
+        role: "USER",
         content: event.text ?? "",
         senderName: null,
       };
@@ -883,6 +927,10 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       // 이 창이 연결되기 전에 시작한 turn 이다. 끝나면 저장된 답을 읽어 보인다.
       if (event.type === "done" || event.type === "stopped") {
         await refreshMessages(id, selectionVersion.current).catch(() => {});
+      } else if (event.type === "error" && hasPendingItems.current) {
+        // 대기 메시지를 보내려다 사용자 메시지를 저장하기 전에 실패했다. turn 이 열리지 않아 답 자리가 없으므로
+        // 입력창 위에 까닭을 알린다. 대기 줄은 멈춘 채 남고 이어 오는 `pending` 사건이 그것을 보인다.
+        setError(describeError(event.code ?? "INTERNAL_ERROR", event.message ?? "요청을 처리하지 못했어요."));
       }
       return;
     }
@@ -1012,6 +1060,30 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       }
     };
 
+    /** `started` 전에 거절된 글을 대기 메시지로 넣었다. 전송이 끝난 것으로 알린다. */
+    let queuedInstead = false;
+    /**
+     * `started` 전에 거절된 보내기를 마무리한다.
+     *
+     * <p>`CONVERSATION_BUSY` 는 자동 turn 이 막 열린 순간에 보낸 경우다. 화면은 아직 그 turn 을 모른다. 글을
+     * 입력창에 되돌리지 않고 대기 메시지로 넣는다. 사진을 실었으면 대기 메시지가 글만 받으므로 되돌린다.
+     */
+    const rejectBeforeStart = async (code: string, message: string): Promise<boolean> => {
+      if (code === "CONVERSATION_BUSY" && attachmentIds.length === 0 && conversationIdRef.current !== null) {
+        setTurns((previous) => previous.filter((turn) => turn.id !== pendingId && turn.id !== assistantPendingId));
+        if (await queueMessage(text, false)) {
+          queuedInstead = true;
+          return true;
+        }
+        // 대기 메시지로도 넣지 못했다. 까닭은 대기 경로가 이미 알렸으므로 글만 되돌린다.
+        restoreFailedMessage();
+        return false;
+      }
+      restoreFailedMessage();
+      reportRejected(code, message);
+      return false;
+    };
+
     const requestBody = {
       conversationId,
       text,
@@ -1028,11 +1100,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       const payload = await readPayload<
         ErrorPayload & { conversationId: string; assistantText: string }
       >(response);
-      if (!response.ok) {
-        restoreFailedMessage();
-        reportRejected(payload.code, payload.message);
-        return false;
-      }
+      if (!response.ok) return rejectBeforeStart(payload.code, payload.message);
       if (selectionVersion.current !== version) return true;
       if (conversationIdRef.current === null) {
         window.history.replaceState(null, "", `/chat/${payload.conversationId}`);
@@ -1069,9 +1137,7 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           return await sendWithoutStream();
         }
         const payload = await readPayload<ErrorPayload>(response);
-        restoreFailedMessage();
-        reportRejected(payload.code, payload.message);
-        return false;
+        return await rejectBeforeStart(payload.code, payload.message);
       }
 
       try {
@@ -1112,17 +1178,16 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
               const refreshed = await refreshAfterStartedFailure();
               setTurnError(startedFailureMessage(describeError(code, fallback), refreshed));
             } else {
-              restoreFailedMessage();
-              reportRejected(code, fallback);
+              await rejectBeforeStart(code, fallback);
             }
           },
         });
       } catch {
         if (!stream.done && !stream.reportedError) return await finishInterrupted();
-        return stream.started || stream.done;
+        return queuedInstead || stream.started || stream.done;
       }
       if (!stream.done && !stream.reportedError) return await finishInterrupted();
-      return stream.started || stream.done;
+      return queuedInstead || stream.started || stream.done;
     } catch (reason) {
       finishFailedActivity();
       restoreFailedMessage();
@@ -1131,6 +1196,91 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
     } finally {
       if (selectionVersion.current === version && !handedOff) setSending(false);
       void finishSentTurn(pendingId);
+    }
+  }
+
+  /**
+   * 글을 대기 메시지로 더한다. 더했는지를 돌려준다.
+   *
+   * <p>대기 줄이 멈춰 있었으면 이어서 푼다. 멈춰 둔 글과 새 글이 순서대로 합쳐져 간다. 실패하면 입력창의 글을
+   * 그대로 두고 까닭을 알린다.
+   *
+   * @param fromDraft 입력창의 글을 보냈다. 더한 뒤 입력창을 비운다. 질문 카드의 답은 입력창과 무관하다.
+   */
+  async function queueMessage(text: string, fromDraft: boolean): Promise<boolean> {
+    // 새 대화의 첫 turn 은 `started` 가 대화 식별자를 실어 올 때까지 대기 메시지를 받을 대화가 없다.
+    if (text.length === 0 || conversationIdRef.current === null || enqueueing.current) return false;
+    const version = selectionVersion.current;
+    const wasHeld = pending.queue.held;
+    enqueueing.current = true;
+    setError(null);
+    try {
+      const result = await pending.enqueue(text);
+      if (selectionVersion.current !== version) return result.ok;
+      if (!result.ok) {
+        setError(describePendingFailure(result, "메시지를 보내지 못했어요. 잠시 뒤 다시 보내 주세요."));
+        return false;
+      }
+      // 기다리는 동안 다음 글을 쓰기 시작했으면 그 글은 지우지 않는다.
+      if (fromDraft) setDraft((current) => current.trim() === text ? "" : current);
+      if (wasHeld) {
+        const released = await pending.release();
+        if (!released.ok && selectionVersion.current === version) {
+          setError(describePendingFailure(released, "대기 메시지를 보내지 못했어요. 「보내기」 를 다시 눌러 주세요."));
+        }
+      }
+      return true;
+    } finally {
+      enqueueing.current = false;
+    }
+  }
+
+  /**
+   * 입력창과 질문 카드의 보내기가 지나는 자리다. 보통 보내기와 대기 경로 중 하나를 고른다.
+   *
+   * <p>답이 오는 중이거나 대기 줄이 멈춰 있으면 대기 경로다. 대기 메시지는 글만 받으므로 사진을 실었으면 보내지 않는다.
+   */
+  async function submit(attachmentIds: number[], replacementText?: string): Promise<boolean> {
+    if (!sending && !pending.queue.held) return send(attachmentIds, replacementText);
+    if (attachmentIds.length > 0) {
+      // 답이 오는 동안은 사진 첨부가 잠겨 있다. 여기 오는 것은 멈춰 둔 대기 줄이 있을 때 사진을 붙인 경우다.
+      if (!sending) setError("사진은 대기 중인 메시지를 보내거나 취소한 뒤에 보낼 수 있어요.");
+      return false;
+    }
+    return queueMessage((replacementText ?? draft).trim(), replacementText === undefined);
+  }
+
+  /** 대기 메시지를 취소하고 그 글을 입력창에 되돌린다. 쓰던 글이 있으면 그 뒤에 줄을 바꿔 붙인다. */
+  async function cancelPendingMessage(pendingId: number) {
+    const version = selectionVersion.current;
+    setPendingBusy(true);
+    try {
+      const result = await pending.cancel(pendingId);
+      if (selectionVersion.current !== version) return;
+      if (result.ok) {
+        setError(null);
+        setDraft((current) => current.trim().length === 0 ? result.data : `${current}\n${result.data}`);
+        return;
+      }
+      setError(describePendingFailure(result, "대기 메시지를 취소하지 못했어요. 다시 시도해 주세요."));
+      // 취소하는 사이에 이미 보내졌다. 그 글은 사용자 메시지로 저장됐으므로 되돌리지 않고 대기 줄만 맞춘다.
+      if (result.code === "PENDING_MESSAGE_NOT_FOUND") await pending.reload();
+    } finally {
+      setPendingBusy(false);
+    }
+  }
+
+  /** 멈춰 둔 대기 줄을 푼다. turn 이 돌고 있으면 그 turn 이 끝난 뒤 간다. */
+  async function releasePendingMessages() {
+    const version = selectionVersion.current;
+    setPendingBusy(true);
+    try {
+      const result = await pending.release();
+      if (selectionVersion.current !== version) return;
+      if (result.ok) setError(null);
+      else setError(describePendingFailure(result, "대기 메시지를 보내지 못했어요. 「보내기」 를 다시 눌러 주세요."));
+    } finally {
+      setPendingBusy(false);
     }
   }
 
@@ -1322,7 +1472,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           onVersionChange={(slotId, index) => setSelectedVersions((previous) => ({ ...previous, [slotId]: index }))}
           onRegenerate={() => { void regenerate(); }}
           onRetry={() => { void regenerate(); }}
-          onAnswer={(text) => { void send([], text); }}
+          // 질문 카드는 답이 오는 중에도 보인다. 그때 고른 답은 입력창의 보내기와 같이 대기 메시지로 들어간다.
+          onAnswer={(text) => { void submit([], text); }}
         />}
 
         <div className={startScreen ? "flex min-h-0 flex-1 flex-col overflow-y-auto" : "shrink-0"}>
@@ -1344,11 +1495,17 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
                 : "다른 창에서 답을 만들고 있어요. 완성되면 이 창에도 나타나요."}
             </p>
           ) : null}
+          <PendingQueueView
+            queue={pending.queue}
+            onCancel={(pendingId) => { void cancelPendingMessage(pendingId); }}
+            onRelease={() => { void releasePendingMessages(); }}
+            busy={pendingBusy}
+          />
           <Composer
             key={composerGeneration}
             value={draft}
             onChange={setDraft}
-            onSend={(attachmentIds) => send(attachmentIds)}
+            onSend={(attachmentIds) => submit(attachmentIds)}
             disabled={conversationId === null && agents.length === 0}
             conversationId={conversationId}
             agentCode={agentMissing ? "" : agentCode}
@@ -1362,6 +1519,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
               void refresh();
             }}
             running={sending}
+            // 새 대화의 첫 turn 은 `started` 가 대화 식별자를 실어 온 뒤부터 대기 메시지를 받는다.
+            canQueue={conversationId !== null}
             canStop={executionId !== null && !stopRequested}
             onStop={() => { void stop(); }}
             mention={startScreen && !agentLocked && agents.length > 0

@@ -20,6 +20,8 @@ const MESSAGES: Record<string, string> = {
   CONVERSATION_NOT_FOUND: "대화를 찾지 못했어요. 대화 목록으로 돌아가 다시 골라 주세요.",
   MESSAGE_NOT_LATEST: "그사이 대화가 바뀌었어요. 최신 대화를 다시 불러왔어요.",
   CONVERSATION_BUSY: "아직 답을 만들고 있어요. 답이 끝난 뒤 다시 눌러 주세요.",
+  PENDING_QUEUE_FULL: "대기 중인 메시지가 가득 찼어요. 답이 끝난 뒤 보내 주세요.",
+  PENDING_MESSAGE_NOT_FOUND: "이미 보낸 메시지예요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
   PERSONA_STALE: "그사이 다른 사용자가 이 성격을 고쳤어요. 최신 본문을 다시 불러왔어요.",
   AGENT_TOOLS_REQUIRE_PRIVATE: "그룹 공개 에이전트에는 셸, 파일, 지난 대화 검색 도구를 켤 수 없어요.",

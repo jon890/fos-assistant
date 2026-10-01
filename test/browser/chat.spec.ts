@@ -168,6 +168,8 @@ test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨�
   const scroll = page.getByTestId("message-scroll");
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
   await composer.fill("읽는 중 다음 답 검사");
+  // 앞 답이 끝난 뒤에 보낸다. 답이 오는 동안 보내면 대기 메시지로 쌓인다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "보내기" })).toBeEnabled();
   await expect.poll(async () => scroll.evaluate((element) => element.scrollHeight - element.clientHeight))
     .toBeGreaterThan(100);

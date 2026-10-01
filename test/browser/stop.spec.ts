@@ -18,11 +18,12 @@ test("답을 만드는 동안 중지 단추를 보이고 중지한 답을 남긴
   await hermes.waitForHeldRun();
   const stop = page.getByTestId("composer-shell").getByRole("button", { name: "중지" });
   await expect(stop).toBeVisible();
-  await expect(page.getByRole("button", { name: "보내기" })).toHaveCount(0);
+  // 답이 오는 동안에도 보내기는 중지 옆에 그대로 있다.
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "보내기" })).toBeVisible();
   await expect(page.getByRole("button", { name: "답 복사" })).toHaveCount(0);
   await stop.click();
   await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("button", { name: "보내기" })).toBeVisible();
+  await expect(stop).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId("stopped-mark")).toBeVisible();
 });
@@ -110,7 +111,7 @@ test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({ p
   await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "보내기" })).toBeVisible();
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
 });
 
 test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({ page, hermes }) => {
