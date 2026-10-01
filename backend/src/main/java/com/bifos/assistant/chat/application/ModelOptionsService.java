@@ -44,8 +44,7 @@ public class ModelOptionsService {
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
     /** 읽은 시각과 그때 읽은 목록이다. */
-    private record Cached(Instant readAt, HermesModelCatalog catalog) {
-    }
+    private record Cached(Instant readAt, HermesModelCatalog catalog) {}
 
     @Autowired
     public ModelOptionsService(
@@ -94,8 +93,9 @@ public class ModelOptionsService {
     }
 
     private static ModelOptions optionsOf(HermesModelCatalog catalog) {
-        List<HermesModelCatalog.Provider> providers = new ArrayList<>(
-                catalog.providers().stream().map(ModelOptionsService::withEveryModelReasoning).toList());
+        List<HermesModelCatalog.Provider> providers = new ArrayList<>(catalog.providers().stream()
+                .map(ModelOptionsService::withEveryModelReasoning)
+                .toList());
         // 기본 provider 를 맨 앞에 둔다. 나머지는 Hermes 가 준 차례를 지킨다.
         providers.sort((left, right) -> Boolean.compare(
                 !Objects.equals(left.slug(), catalog.defaultProvider()),

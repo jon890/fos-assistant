@@ -92,8 +92,16 @@ public class ExecutionRecorder {
             Long retryOfExecutionId,
             String hermesSessionId) {
         return start(
-                user, conversation, agent, parentExecutionId, rootExecutionId, context, requested, retryOfExecutionId,
-                hermesSessionId, null);
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                context,
+                requested,
+                retryOfExecutionId,
+                hermesSessionId,
+                null);
     }
 
     /**
@@ -116,35 +124,56 @@ public class ExecutionRecorder {
             Long retryOfExecutionId,
             String hermesSessionId,
             DelegationKey delegationKey) {
-        return start(user, conversation, agent, parentExecutionId, rootExecutionId, context, requested,
-                retryOfExecutionId, hermesSessionId, delegationKey, null, null);
+        return start(
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                context,
+                requested,
+                retryOfExecutionId,
+                hermesSessionId,
+                delegationKey,
+                null,
+                null);
     }
 
     /** 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다. */
     public AgentExecution start(
-            CurrentUser user, Conversation conversation, Agent agent, Long parentExecutionId, Long rootExecutionId,
-            ExecutionContextSnapshot context, ModelChoice requested, Long retryOfExecutionId, String hermesSessionId,
-            DelegationKey delegationKey, ModelTier modelTier, Instant requestReceivedAt) {
-        return executions.save(
-                base(user, conversation, agent)
-                        .hermesSessionId(hermesSessionId)
-                        .delegationKey(delegationKey == null ? null : delegationKey.value())
-                        .parentExecutionId(parentExecutionId)
-                        .rootExecutionId(rootExecutionId)
-                        .retryOfExecutionId(retryOfExecutionId)
-                        .provider(requested == null ? null : requested.provider())
-                        .model(requested == null ? null : requested.model())
-                        .reasoningEffort(requested == null ? null : requested.reasoningEffort())
-                        .reasoningEffortSource(requested != null && requested.reasoningEffort() != null
-                                ? ReasoningEffortSource.REQUESTED : ReasoningEffortSource.UNKNOWN)
-                        .modelTier(modelTier)
-                        .requestReceivedAt(requestReceivedAt)
-                        .contextChars(context.contextChars())
-                        .contextOmittedItems(context.contextOmittedItems())
-                        .runtimeFingerprint(context.runtimeFingerprint())
-                        .instructionsHash(context.instructionsHash())
-                        .status(ExecutionStatus.RUNNING)
-                        .build());
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            ExecutionContextSnapshot context,
+            ModelChoice requested,
+            Long retryOfExecutionId,
+            String hermesSessionId,
+            DelegationKey delegationKey,
+            ModelTier modelTier,
+            Instant requestReceivedAt) {
+        return executions.save(base(user, conversation, agent)
+                .hermesSessionId(hermesSessionId)
+                .delegationKey(delegationKey == null ? null : delegationKey.value())
+                .parentExecutionId(parentExecutionId)
+                .rootExecutionId(rootExecutionId)
+                .retryOfExecutionId(retryOfExecutionId)
+                .provider(requested == null ? null : requested.provider())
+                .model(requested == null ? null : requested.model())
+                .reasoningEffort(requested == null ? null : requested.reasoningEffort())
+                .reasoningEffortSource(
+                        requested != null && requested.reasoningEffort() != null
+                                ? ReasoningEffortSource.REQUESTED
+                                : ReasoningEffortSource.UNKNOWN)
+                .modelTier(modelTier)
+                .requestReceivedAt(requestReceivedAt)
+                .contextChars(context.contextChars())
+                .contextOmittedItems(context.contextOmittedItems())
+                .runtimeFingerprint(context.runtimeFingerprint())
+                .instructionsHash(context.instructionsHash())
+                .status(ExecutionStatus.RUNNING)
+                .build());
     }
 
     /**
@@ -230,8 +259,7 @@ public class ExecutionRecorder {
     }
 
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
-    public AgentExecution cancel(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+    public AgentExecution cancel(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
         return cancel(execution, agent, result, requested, null);
     }
 
@@ -253,7 +281,8 @@ public class ExecutionRecorder {
         String provider = served.provider();
         String model = served.model();
         execution.attachRunId(result.runId());
-        execution.markCancelled(provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+        execution.markCancelled(
+                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
         if (outputText != null) {
             execution.recordOutput(outputText);
         }
@@ -278,9 +307,12 @@ public class ExecutionRecorder {
             return runtime;
         }
         SessionRuntime actual = readActualRuntime(agent, result);
-        String provider = firstNonBlank(actual == null ? null : actual.provider(),
-                firstNonBlank(runtime == null ? null : runtime.provider(), requested == null ? null : requested.provider()));
-        String model = firstNonBlank(actual == null ? null : actual.model(),
+        String provider = firstNonBlank(
+                actual == null ? null : actual.provider(),
+                firstNonBlank(
+                        runtime == null ? null : runtime.provider(), requested == null ? null : requested.provider()));
+        String model = firstNonBlank(
+                actual == null ? null : actual.model(),
                 firstNonBlank(runtime == null ? null : runtime.model(), requested == null ? null : requested.model()));
         return new SessionRuntime(model, provider);
     }
@@ -294,9 +326,7 @@ public class ExecutionRecorder {
                 hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), result.sessionId());
         if (actual == null) {
             log.info(
-                    "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}",
-                    agent.hermesProfile(),
-                    result.sessionId());
+                    "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}", agent.hermesProfile(), result.sessionId());
         }
         return actual;
     }

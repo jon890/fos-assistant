@@ -16,8 +16,13 @@ import lombok.experimental.Accessors;
 
 /** 부모 종료 뒤에도 남아 있는 자식의 사용량 조회 작업이다. */
 @Entity
-@Table(name = "subagent_usage_job", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_subagent_usage_child", columnNames = {"execution_id", "child_session_id"})})
+@Table(
+        name = "subagent_usage_job",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_subagent_usage_child",
+                    columnNames = {"execution_id", "child_session_id"})
+        })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -25,28 +30,40 @@ public class SubagentUsageJob {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "execution_id", nullable = false)
     private Long executionId;
+
     @Column(name = "child_session_id", nullable = false, length = 128)
     private String childSessionId;
+
     @Column(name = "parent_session_id", length = 128)
     private String parentSessionId;
+
     @Column(name = "profile_name", nullable = false, length = 64)
     private String profileName;
+
     @Column(name = "api_base_url", nullable = false, length = 512)
     private String apiBaseUrl;
+
     @Column(name = "status", nullable = false, length = 16)
     private String status;
+
     @Column(name = "unconfirmed_reason", length = 32)
     private String unconfirmedReason;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
     @Column(name = "next_attempt_at", nullable = false)
     private Instant nextAttemptAt;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
+
     @Column(name = "attempts", nullable = false)
     private int attempts;
+
     @Column(name = "backoff_attempts", nullable = false)
     private int backoffAttempts;
 

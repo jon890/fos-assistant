@@ -55,5 +55,4 @@ public class ModelTierDefinition {
             Long groupId, ModelTier tier, String provider, String model, String reasoningEffort) {
         return new ModelTierDefinition(groupId, tier, provider, model, reasoningEffort);
     }
-
 }

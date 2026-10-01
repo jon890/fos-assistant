@@ -23,8 +23,13 @@ import lombok.NoArgsConstructor;
  * Flyway 가 만든 스키마를 검증하므로, 둘이 어긋나면 테스트는 통과하고 배포에서 기동이 실패한다.
  */
 @Entity
-@Table(name = "execution_event", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_execution_completed_child", columnNames = {"execution_id", "completed_child_session_id"})})
+@Table(
+        name = "execution_event",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_execution_completed_child",
+                    columnNames = {"execution_id", "completed_child_session_id"})
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ExecutionEvent {
 
@@ -88,8 +93,8 @@ public class ExecutionEvent {
         this.toolName = builder.toolName;
         this.subagentName = builder.subagentName;
         this.hermesSessionId = builder.hermesSessionId;
-        this.completedChildSessionId = builder.eventType == ExecutionEventType.SUBAGENT_COMPLETED
-                ? builder.hermesSessionId : null;
+        this.completedChildSessionId =
+                builder.eventType == ExecutionEventType.SUBAGENT_COMPLETED ? builder.hermesSessionId : null;
         this.durationMs = builder.durationMs;
         this.failed = builder.failed;
         this.detail = builder.detail;
@@ -217,9 +222,7 @@ public class ExecutionEvent {
         /** 길이가 넘으면 자른다. 잘랐다는 표시는 남기지 않는다. */
         public Builder detail(String detail) {
             this.detail =
-                    detail == null || detail.length() <= DETAIL_LIMIT
-                            ? detail
-                            : detail.substring(0, DETAIL_LIMIT);
+                    detail == null || detail.length() <= DETAIL_LIMIT ? detail : detail.substring(0, DETAIL_LIMIT);
             return this;
         }
 

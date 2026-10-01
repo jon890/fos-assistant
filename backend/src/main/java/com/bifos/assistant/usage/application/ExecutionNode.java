@@ -34,5 +34,4 @@ public record ExecutionNode(
         Instant startedAt,
         Instant finishedAt,
         List<ExecutionEventView> events,
-        List<ExecutionNode> children) {
-}
+        List<ExecutionNode> children) {}

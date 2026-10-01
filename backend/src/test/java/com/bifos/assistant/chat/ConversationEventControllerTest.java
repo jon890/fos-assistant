@@ -27,10 +27,10 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import com.bifos.assistant.user.application.UserDisplayNameService;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -165,7 +165,13 @@ class ConversationEventControllerTest {
                 .andReturn()
                 .getResponse();
         MockHttpServletResponse running = MockMvcBuilders.standaloneSetup(new ChatController(
-                        chat, currentUser, new UserDisplayNameService(users), null, access, new ChatEventStreams(Duration.ofSeconds(20)), null))
+                        chat,
+                        currentUser,
+                        new UserDisplayNameService(users),
+                        null,
+                        access,
+                        new ChatEventStreams(Duration.ofSeconds(20)),
+                        null))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build()
                 .perform(get("/api/v1/chat/conversations/{id}/running", dadsConversation))

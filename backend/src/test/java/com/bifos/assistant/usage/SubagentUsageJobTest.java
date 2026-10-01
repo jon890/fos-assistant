@@ -44,7 +44,8 @@ class SubagentUsageJobTest {
         Instant finishedAt = Instant.parse("2026-10-01T00:00:00Z");
         SubagentUsageJob job = job(finishedAt);
 
-        assertThat(job.expired(finishedAt.plus(Duration.ofHours(24)).minusMillis(1))).isFalse();
+        assertThat(job.expired(finishedAt.plus(Duration.ofHours(24)).minusMillis(1)))
+                .isFalse();
         assertThat(job.expired(finishedAt.plus(Duration.ofHours(24)))).isTrue();
 
         job.expire();

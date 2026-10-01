@@ -8,17 +8,17 @@ import com.bifos.assistant.usage.domain.CostByModel;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.jpa.repository.Lock;
-import jakarta.persistence.LockModeType;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface AgentExecutionRepository extends JpaRepository<AgentExecution, Long> {
@@ -42,8 +42,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * <p>흐름 하나가 실행 넷을 남기므로, 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행 나무 화면에서
      * 본다. 월 비용 합계는 자식을 포함하고, 그 이유는 {@link #sumCostBetween} 이 적는다.
      */
-    List<AgentExecution> findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(
-            Long userId, Pageable pageable);
+    List<AgentExecution> findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(Long userId, Pageable pageable);
 
     List<AgentExecution> findByStatus(ExecutionStatus status);
 
@@ -138,8 +137,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * <p>줄을 다 읽어 와서 더하지 않는 이유는, 한 달치 실행 수가 화면이 보여 주는 50줄보다 훨씬 많아질 수
      * 있기 때문이다. 금액이 비어 있는 줄은 합계에 더해지지 않고 따로 세어진다.
      */
-    @Query(
-            """
+    @Query("""
             select new com.bifos.assistant.usage.domain.MonthlyCost(
                 sum(e.estimatedCostMicros),
                 sum(case when e.estimatedCostMicros is null then 0L else 1L end),
@@ -148,8 +146,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
                 and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
             """)
-    MonthlyCost sumCostBetween(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+    MonthlyCost sumCostBetween(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
      * 환산액과 실제 청구액을 함께 합친다. RUNNING 은 빠진다.
@@ -158,8 +155,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 모델로 돈 API 경로 실행은 환산액과 실제 청구액이 모두 비어 있어, 금액으로 세면 구독 경로로
      * 잘못 세어진다. 그런 실행은 {@code unpricedExecutions} 로만 세어진다.
      */
-    @Query(
-            """
+    @Query("""
             select new com.bifos.assistant.usage.domain.MonthlyCostDetail(
                 sum(e.estimatedCostMicros),
                 sum(e.actualCostMicros),
@@ -182,8 +178,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * <p>실행 줄을 전부 센다. 자식 토큰이 부모의 usage 에 포함되지 않는 것을 ADR-016 이 실측으로
      * 확정했으므로, 전부 세는 것이 실제 사용량이고 두 번 세어지지 않는다.
      */
-    @Query(
-            """
+    @Query("""
             select new com.bifos.assistant.usage.domain.CostByAgent(
                 e.agentId,
                 a.code,
@@ -207,8 +202,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
     /** 모델과 provider 별 합계. RUNNING 은 빠진다. */
-    @Query(
-            """
+    @Query("""
             select new com.bifos.assistant.usage.domain.CostByModel(
                 e.provider,
                 e.model,
@@ -240,8 +234,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * <p>같은 시간대를 {@code UsageController.HOUSEHOLD_ZONE} 도 갖는다. 그쪽은 달의 경계를 끊는 데
      * 쓰고 여기는 날짜를 뽑는 데 쓴다. 가족이 사는 곳이 바뀌면 두 자리를 함께 고친다.
      */
-    @Query(
-            """
+    @Query("""
             select new com.bifos.assistant.usage.domain.CostByDay(
                 year(e.startedAt + 9 hour),
                 month(e.startedAt + 9 hour),
@@ -266,8 +259,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 month(e.startedAt + 9 hour) asc,
                 day(e.startedAt + 9 hour) asc
             """)
-    List<CostByDay> sumByDayBetween(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+    List<CostByDay> sumByDayBetween(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
      * 설정 지문별 합계. 무엇이 달라져서 비용이 움직였는지 본다. RUNNING 은 빠진다.
@@ -275,8 +267,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * <p>지문이 비어 있는 실행은 한 묶음으로 모으지 않고 통째로 뺀다. 지문을 모르는 것끼리 묶어도
      * 견줄 것이 없기 때문이다.
      */
-    @Query(
-            """
+    @Query("""
             select new com.bifos.assistant.usage.domain.CostByFingerprint(
                 e.runtimeFingerprint,
                 count(e),

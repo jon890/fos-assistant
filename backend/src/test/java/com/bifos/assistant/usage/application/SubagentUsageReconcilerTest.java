@@ -32,10 +32,10 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
-import org.mockito.ArgumentCaptor;
 
 /** 자식 session 응답이 완료 사건으로 바뀔 수 있는지의 필수 조건을 고정한다. */
 class SubagentUsageReconcilerTest {
@@ -46,8 +46,8 @@ class SubagentUsageReconcilerTest {
     @DisplayName("아직 끝나지 않은 자식은 재조회 대상으로 남는다")
     void unfinishedChildIsNotFinal() throws ReflectiveOperationException {
         SubagentUsageJob job = job();
-        SubagentSessionUsage running = new SubagentSessionUsage(
-                "child", "subagent", "parent", "gpt-6-luna", 1.0, null, 10L, 2L, 1L, 1L);
+        SubagentSessionUsage running =
+                new SubagentSessionUsage("child", "subagent", "parent", "gpt-6-luna", 1.0, null, 10L, 2L, 1L, 1L);
 
         assertThat(SubagentUsageReconciler.isFinalChild(job, running)).isFalse();
     }
@@ -56,8 +56,8 @@ class SubagentUsageReconcilerTest {
     @DisplayName("다른 부모에 속한 종료 session은 완료 사용량으로 기록하지 않는다")
     void rejectsChildOfAnotherParent() throws ReflectiveOperationException {
         SubagentUsageJob job = job();
-        SubagentSessionUsage wrongParent = new SubagentSessionUsage(
-                "child", "subagent", "other-parent", "gpt-6-luna", 1.0, 2.0, 10L, 2L, 1L, 1L);
+        SubagentSessionUsage wrongParent =
+                new SubagentSessionUsage("child", "subagent", "other-parent", "gpt-6-luna", 1.0, 2.0, 10L, 2L, 1L, 1L);
 
         assertThat(SubagentUsageReconciler.isFinalChild(job, wrongParent)).isFalse();
     }
@@ -66,8 +66,8 @@ class SubagentUsageReconcilerTest {
     @DisplayName("종료한 같은 자식만 캐시를 포함한 입력 토큰과 소요 시간을 기록할 수 있다")
     void acceptsCompletedChildWithInclusiveUsage() throws ReflectiveOperationException {
         SubagentUsageJob job = job();
-        SubagentSessionUsage completed = new SubagentSessionUsage(
-                "child", "subagent", "parent", "gpt-6-luna", 1.25, 3.75, 10L, 4L, 2L, 3L);
+        SubagentSessionUsage completed =
+                new SubagentSessionUsage("child", "subagent", "parent", "gpt-6-luna", 1.25, 3.75, 10L, 4L, 2L, 3L);
 
         assertThat(SubagentUsageReconciler.isFinalChild(job, completed)).isTrue();
         assertThat(completed.inclusiveInputTokens()).isEqualTo(15L);
@@ -132,8 +132,15 @@ class SubagentUsageReconcilerTest {
     @DisplayName("에이전트 profile이 바뀌었으면 만료 작업을 남겨 다시 발견하지 않는다")
     void discoverExpiresJobWhenProfileChanged() throws ReflectiveOperationException {
         Fixtures fixtures = fixtures();
-        Agent agentWithChangedProfile = Agent.of("agent", "에이전트", "changed", "http://runtime",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+        Agent agentWithChangedProfile = Agent.of(
+                "agent",
+                "에이전트",
+                "changed",
+                "http://runtime",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                1L);
         setField(agentWithChangedProfile, "id", 2L);
         when(fixtures.events.findUnscheduledChildren(any(), any())).thenReturn(List.of(fixtures.start));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
@@ -155,12 +162,14 @@ class SubagentUsageReconcilerTest {
         when(fixtures.jobs.findById(10L)).thenReturn(Optional.of(fixtures.job));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.events.existsByExecutionIdAndHermesSessionIdAndEventType(
-                1L, "child", ExecutionEventType.SUBAGENT_COMPLETED)).thenReturn(false);
+                        1L, "child", ExecutionEventType.SUBAGENT_COMPLETED))
+                .thenReturn(false);
         when(fixtures.events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(1L)))
                 .thenReturn(List.of(fixtures.start));
         when(fixtures.events.lastSequence(1L)).thenReturn(7);
-        when(fixtures.hermes.readSubagentUsage(any(), any(), any())).thenReturn(new SubagentSessionUsage(
-                "child", "subagent", "parent", "gpt-6-luna", 1.0, 2.5, 10L, 4L, 2L, 3L));
+        when(fixtures.hermes.readSubagentUsage(any(), any(), any()))
+                .thenReturn(new SubagentSessionUsage(
+                        "child", "subagent", "parent", "gpt-6-luna", 1.0, 2.5, 10L, 4L, 2L, 3L));
 
         fixtures.reconciler.poll(10L);
 
@@ -182,7 +191,8 @@ class SubagentUsageReconcilerTest {
         when(fixtures.jobs.findById(10L)).thenReturn(Optional.of(fixtures.job));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.events.existsByExecutionIdAndHermesSessionIdAndEventType(
-                1L, "child", ExecutionEventType.SUBAGENT_COMPLETED)).thenReturn(true);
+                        1L, "child", ExecutionEventType.SUBAGENT_COMPLETED))
+                .thenReturn(true);
 
         fixtures.reconciler.poll(10L);
 
@@ -215,8 +225,9 @@ class SubagentUsageReconcilerTest {
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
         when(fixtures.events.existsByExecutionIdAndHermesSessionIdAndEventType(anyLong(), any(), any()))
                 .thenReturn(false);
-        when(fixtures.hermes.readSubagentUsage(any(), any(), any())).thenReturn(new SubagentSessionUsage(
-                "child", "subagent", "parent", "gpt-6-luna", 1.0, null, 10L, 4L, 2L, 3L));
+        when(fixtures.hermes.readSubagentUsage(any(), any(), any()))
+                .thenReturn(new SubagentSessionUsage(
+                        "child", "subagent", "parent", "gpt-6-luna", 1.0, null, 10L, 4L, 2L, 3L));
 
         fixtures.reconciler.poll(10L);
 
@@ -228,18 +239,27 @@ class SubagentUsageReconcilerTest {
     private static SubagentUsageJob job() throws ReflectiveOperationException {
         Instant finishedAt = Instant.parse("2026-10-01T00:00:00Z");
         AgentExecution parent = AgentExecution.builder()
-                .userId(1L).agentId(2L).profileName("dad").costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED).startedAt(finishedAt.minusSeconds(1))
-                .hermesSessionId("parent").build();
+                .userId(1L)
+                .agentId(2L)
+                .profileName("dad")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(finishedAt.minusSeconds(1))
+                .hermesSessionId("parent")
+                .build();
         Field parentId = AgentExecution.class.getDeclaredField("id");
         parentId.setAccessible(true);
         parentId.set(parent, 1L);
         Field finished = AgentExecution.class.getDeclaredField("finishedAt");
         finished.setAccessible(true);
         finished.set(parent, finishedAt);
-        ExecutionEvent start = ExecutionEvent.builder().executionId(1L).sequence(1)
-                .eventType(ExecutionEventType.SUBAGENT_STARTED).hermesSessionId("child")
-                .occurredAt(finishedAt).build();
+        ExecutionEvent start = ExecutionEvent.builder()
+                .executionId(1L)
+                .sequence(1)
+                .eventType(ExecutionEventType.SUBAGENT_STARTED)
+                .hermesSessionId("child")
+                .occurredAt(finishedAt)
+                .build();
         return SubagentUsageJob.create(parent, start, "http://runtime", finishedAt);
     }
 
@@ -250,21 +270,46 @@ class SubagentUsageReconcilerTest {
         AgentService agents = mock(AgentService.class);
         HermesRunsClient hermes = mock(HermesRunsClient.class);
         ProfileModelDefaultsClient defaults = mock(ProfileModelDefaultsClient.class);
-        AgentExecution parent = AgentExecution.builder().userId(1L).agentId(2L).profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION).status(ExecutionStatus.SUCCEEDED)
-                .startedAt(NOW.minusSeconds(1)).hermesSessionId("parent").build();
+        AgentExecution parent = AgentExecution.builder()
+                .userId(1L)
+                .agentId(2L)
+                .profileName("dad")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .startedAt(NOW.minusSeconds(1))
+                .hermesSessionId("parent")
+                .build();
         setField(parent, "id", 1L);
         setField(parent, "finishedAt", NOW.minusSeconds(1));
-        ExecutionEvent start = ExecutionEvent.builder().executionId(1L).sequence(1)
-                .eventType(ExecutionEventType.SUBAGENT_STARTED).subagentName("child name")
-                .hermesSessionId("child").occurredAt(NOW.minusSeconds(1)).build();
+        ExecutionEvent start = ExecutionEvent.builder()
+                .executionId(1L)
+                .sequence(1)
+                .eventType(ExecutionEventType.SUBAGENT_STARTED)
+                .subagentName("child name")
+                .hermesSessionId("child")
+                .occurredAt(NOW.minusSeconds(1))
+                .build();
         SubagentUsageJob job = SubagentUsageJob.create(parent, start, "http://runtime", NOW.minusSeconds(1));
         setField(job, "id", 10L);
-        Agent agent = Agent.of("agent", "에이전트", "dad", "http://runtime", CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 1L);
+        Agent agent = Agent.of(
+                "agent",
+                "에이전트",
+                "dad",
+                "http://runtime",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                1L);
         setField(agent, "id", 2L);
-        SubagentUsageReconciler reconciler = new SubagentUsageReconciler(executions, events, jobs, agents, hermes,
-                defaults, new TestTransactionManager(), Clock.fixed(NOW, ZoneOffset.UTC));
+        SubagentUsageReconciler reconciler = new SubagentUsageReconciler(
+                executions,
+                events,
+                jobs,
+                agents,
+                hermes,
+                defaults,
+                new TestTransactionManager(),
+                Clock.fixed(NOW, ZoneOffset.UTC));
         return new Fixtures(reconciler, executions, events, jobs, agents, hermes, parent, start, job, agent);
     }
 
@@ -274,10 +319,17 @@ class SubagentUsageReconcilerTest {
         field.set(target, value);
     }
 
-    private record Fixtures(SubagentUsageReconciler reconciler, AgentExecutionRepository executions,
-            ExecutionEventRepository events, SubagentUsageJobRepository jobs, AgentService agents,
-            HermesRunsClient hermes, AgentExecution parent, ExecutionEvent start, SubagentUsageJob job, Agent agent) {
-    }
+    private record Fixtures(
+            SubagentUsageReconciler reconciler,
+            AgentExecutionRepository executions,
+            ExecutionEventRepository events,
+            SubagentUsageJobRepository jobs,
+            AgentService agents,
+            HermesRunsClient hermes,
+            AgentExecution parent,
+            ExecutionEvent start,
+            SubagentUsageJob job,
+            Agent agent) {}
 
     private static final class TestTransactionManager extends AbstractPlatformTransactionManager {
         @Override
@@ -286,15 +338,12 @@ class SubagentUsageReconcilerTest {
         }
 
         @Override
-        protected void doBegin(Object transaction, TransactionDefinition definition) {
-        }
+        protected void doBegin(Object transaction, TransactionDefinition definition) {}
 
         @Override
-        protected void doCommit(DefaultTransactionStatus status) {
-        }
+        protected void doCommit(DefaultTransactionStatus status) {}
 
         @Override
-        protected void doRollback(DefaultTransactionStatus status) {
-        }
+        protected void doRollback(DefaultTransactionStatus status) {}
     }
 }

@@ -1,12 +1,12 @@
 package com.bifos.assistant.chat.presentation;
 
+import com.bifos.assistant.chat.application.ActivitySummary;
+import com.bifos.assistant.chat.application.RunningTurn;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.domain.type.ModelTier;
-import com.bifos.assistant.chat.application.ActivitySummary;
-import com.bifos.assistant.chat.application.RunningTurn;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,8 +17,7 @@ import java.util.UUID;
 
 public final class ChatDtos {
 
-    private ChatDtos() {
-    }
+    private ChatDtos() {}
 
     /**
      * @param conversationId 이어 쓸 대화의 공개 식별자. 없으면 새 대화를 만든다
@@ -26,10 +25,7 @@ public final class ChatDtos {
      *     null 을 빈 목록으로 바꾼다
      */
     public record SendMessageRequest(
-            UUID conversationId,
-            @NotBlank @Size(max = 8000) String text,
-            String agentCode,
-            List<Long> attachmentIds) {
+            UUID conversationId, @NotBlank @Size(max = 8000) String text, String agentCode, List<Long> attachmentIds) {
 
         public SendMessageRequest {
             attachmentIds = attachmentIds == null ? List.of() : attachmentIds;
@@ -37,14 +33,11 @@ public final class ChatDtos {
     }
 
     /** 사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려고 메시지 없이 대화를 만든다. */
-    public record StartConversationRequest(String agentCode) {
-    }
+    public record StartConversationRequest(String agentCode) {}
 
-    public record StartConversationResponse(UUID conversationId) {
-    }
+    public record StartConversationResponse(UUID conversationId) {}
 
-    public record SendMessageResponse(UUID conversationId, Long executionId, String assistantText) {
-    }
+    public record SendMessageResponse(UUID conversationId, Long executionId, String assistantText) {}
 
     /**
      * @param hasChildren 이 답이 여러 실행으로 만들어졌다. 화면이 이때만 실행 나무로 가는 길을 보인다
@@ -67,8 +60,7 @@ public final class ChatDtos {
             List<AttachmentView> attachments,
             List<ArtifactView> artifacts,
             ActivitySummary activity,
-            String status) {
-    }
+            String status) {}
 
     public record StopResponse(String status) {}
 
@@ -90,8 +82,7 @@ public final class ChatDtos {
      * @param visible 아직 볼 수 있다. 보관 기간이 지났거나 사용자가 지웠으면 false
      * @param expiresAt 파일을 지울 시각
      */
-    public record AttachmentView(
-            Long id, String originalName, long byteSize, boolean visible, Instant expiresAt) {
+    public record AttachmentView(Long id, String originalName, long byteSize, boolean visible, Instant expiresAt) {
         static AttachmentView from(ChatAttachment attachment) {
             return new AttachmentView(
                     attachment.id(),
@@ -125,17 +116,22 @@ public final class ChatDtos {
      * @param model 이 대화에서 고른 모델. 고르지 않았으면 null 이고 그 profile 의 기본 모델로 돈다
      * @param reasoningEffort 이 대화에서 고른 effort. 고르지 않았으면 null
      */
-    public record ConversationView(UUID id, String title, String agentCode, String agentName,
-            Instant updatedAt, String provider, String model, String reasoningEffort,
-            ModelSelectionMode modelSelectionMode, ModelTier modelTier) {
-    }
+    public record ConversationView(
+            UUID id,
+            String title,
+            String agentCode,
+            String agentName,
+            Instant updatedAt,
+            String provider,
+            String model,
+            String reasoningEffort,
+            ModelSelectionMode modelSelectionMode,
+            ModelTier modelTier) {}
 
     /** 옛 대화 번호로 찾은 대화의 공개 식별자다. 옛 링크를 새 주소로 넘길 때만 쓴다. */
-    public record ConversationRefView(UUID id) {
-    }
+    public record ConversationRefView(UUID id) {}
 
-    public record RenameConversationRequest(@NotNull String title) {
-    }
+    public record RenameConversationRequest(@NotNull String title) {}
 
     /** 대화에서 쓸 모델과 effort 다. 모두 비워 보내면 그 profile 의 기본값으로 돌아간다. */
     public record ChooseModelRequest(String provider, String model, String reasoningEffort) {
@@ -146,24 +142,18 @@ public final class ChatDtos {
         }
     }
 
-    public record ChooseModelTierRequest(@NotNull ModelSelectionMode mode, ModelTier tier) {
-    }
+    public record ChooseModelTierRequest(@NotNull ModelSelectionMode mode, ModelTier tier) {}
 
-    public record UpdateDefaultModelTierRequest(ModelTier tier) {
-    }
+    public record UpdateDefaultModelTierRequest(ModelTier tier) {}
 
-    public record ModelTierDefinitionRequest(
-            ModelTier tier, String provider, String model, String reasoningEffort) {
-    }
+    public record ModelTierDefinitionRequest(ModelTier tier, String provider, String model, String reasoningEffort) {}
 
     public record UpdateGroupModelTiersRequest(
-            @NotNull List<@NotNull ModelTierDefinitionRequest> tiers, ModelTier defaultTier) {
-    }
+            @NotNull List<@NotNull ModelTierDefinitionRequest> tiers, ModelTier defaultTier) {}
 
     /** 그 에이전트의 profile 로 고를 수 있는 모델이다. */
-    public record ModelOptionsView(String defaultProvider, String defaultModel, List<ProviderView> providers,
-            List<String> reasoningEfforts) {
-    }
+    public record ModelOptionsView(
+            String defaultProvider, String defaultModel, List<ProviderView> providers, List<String> reasoningEfforts) {}
 
     /**
      * @param provider Hermes 가 부르는 provider 이름
@@ -171,7 +161,6 @@ public final class ChatDtos {
      * @param models 그 provider 의 모델 이름
      * @param reasoningCapable 모델 이름을 열쇠로 한 reasoning 지원 여부. Hermes 가 밝히지 않은 모델은 참으로 본다
      */
-    public record ProviderView(String provider, String name, List<String> models,
-            Map<String, Boolean> reasoningCapable) {
-    }
+    public record ProviderView(
+            String provider, String name, List<String> models, Map<String, Boolean> reasoningCapable) {}
 }

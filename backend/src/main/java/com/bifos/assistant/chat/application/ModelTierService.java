@@ -13,9 +13,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Arrays;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +39,13 @@ public class ModelTierService {
                 definitionsFor(user.groupId()).stream()
                         .map(definition -> view(definition, catalog.defaultProvider()))
                         .toList(),
-                users.findById(user.id()).map(it -> tierOf(it.modelDefaultTier())).orElse(null),
-                groupSettings.findById(user.groupId()).map(it -> it.defaultTier()).orElse(null),
+                users.findById(user.id())
+                        .map(it -> tierOf(it.modelDefaultTier()))
+                        .orElse(null),
+                groupSettings
+                        .findById(user.groupId())
+                        .map(it -> it.defaultTier())
+                        .orElse(null),
                 user.isAdmin());
     }
 
@@ -61,7 +66,9 @@ public class ModelTierService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "all model tiers must be supplied exactly once");
         }
         for (ModelTierOptions.Tier tier : tiers) {
-            if (tier.tier() == null || tier.model() == null || tier.model().isBlank()
+            if (tier.tier() == null
+                    || tier.model() == null
+                    || tier.model().isBlank()
                     || tier.model().strip().length() > ModelChoice.MODEL_MAX_LENGTH
                     || tier.provider() != null && tier.provider().strip().length() > ModelChoice.PROVIDER_MAX_LENGTH
                     || !ModelChoice.REASONING_EFFORTS.contains(tier.reasoningEffort())) {
@@ -73,7 +80,8 @@ public class ModelTierService {
         }
         definitions.deleteByGroupId(user.groupId());
         definitions.saveAll(tiers.stream()
-                .map(tier -> ModelTierDefinition.of(user.groupId(), tier.tier(), tier.provider(), tier.model(), tier.reasoningEffort()))
+                .map(tier -> ModelTierDefinition.of(
+                        user.groupId(), tier.tier(), tier.provider(), tier.model(), tier.reasoningEffort()))
                 .toList());
         groupSettings.save(ModelTierGroupSetting.of(user.groupId(), defaultTier));
     }
@@ -88,9 +96,14 @@ public class ModelTierService {
         }
         ModelTier selected = conversation.modelSelectionMode() == ModelSelectionMode.TIER
                 ? conversation.modelTier()
-                : users.findById(user.id()).map(it -> tierOf(it.modelDefaultTier())).orElse(null);
+                : users.findById(user.id())
+                        .map(it -> tierOf(it.modelDefaultTier()))
+                        .orElse(null);
         if (selected == null) {
-            selected = groupSettings.findById(user.groupId()).map(it -> it.defaultTier()).orElse(null);
+            selected = groupSettings
+                    .findById(user.groupId())
+                    .map(it -> it.defaultTier())
+                    .orElse(null);
         }
         if (selected == null) {
             return new ResolvedModelTier(ModelChoice.defaults(), null);
@@ -119,7 +132,8 @@ public class ModelTierService {
 
     @Transactional(readOnly = true)
     public void requireDefined(CurrentUser user, ModelTier tier) {
-        if (tier == null || definitionsFor(user.groupId()).stream().noneMatch(definition -> definition.tier() == tier)) {
+        if (tier == null
+                || definitionsFor(user.groupId()).stream().noneMatch(definition -> definition.tier() == tier)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier");
         }
     }
@@ -133,9 +147,12 @@ public class ModelTierService {
     }
 
     private static ModelTierOptions.Tier view(ModelTierDefinition definition, String defaultProvider) {
-        return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()),
+        return new ModelTierOptions.Tier(
+                definition.tier(),
+                labelOf(definition.tier()),
                 definition.provider() == null ? defaultProvider : definition.provider(),
-                definition.model(), definition.reasoningEffort());
+                definition.model(),
+                definition.reasoningEffort());
     }
 
     /**
@@ -173,7 +190,8 @@ public class ModelTierService {
 
     private static void requireAvailable(ModelOptions options, ModelChoice choice) {
         boolean available = options.providers().stream()
-                .anyMatch(provider -> provider.slug().equals(choice.provider()) && provider.models().contains(choice.model()));
+                .anyMatch(provider -> provider.slug().equals(choice.provider())
+                        && provider.models().contains(choice.model()));
         if (!available) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable for this agent");
         }

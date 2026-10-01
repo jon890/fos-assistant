@@ -26,8 +26,7 @@ public interface HermesRunsClient {
      * <p>읽지 못하면 null 이다. 모델 이름을 모르는 것이 답을 버릴 이유가 되지 않으므로 부르는 쪽은
      * null 을 받아도 실행을 성공으로 남긴다.
      */
-    default SessionRuntime readSessionRuntime(
-            String apiBaseUrl, String profileName, String sessionId) {
+    default SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
         return null;
     }
 

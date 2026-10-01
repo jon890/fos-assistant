@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -69,17 +69,21 @@ class ModelTierServiceTest {
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Agent agent = mock(Agent.class);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
-        when(options.optionsForAgent(agent)).thenReturn(new ModelOptions("openai-codex", "gpt-6-luna", List.of(), List.of()));
+        when(options.optionsForAgent(agent))
+                .thenReturn(new ModelOptions("openai-codex", "gpt-6-luna", List.of(), List.of()));
         when(users.findById(1L)).thenReturn(Optional.empty());
         when(settings.findById(10L)).thenReturn(Optional.empty());
 
         ModelTierOptions result = service.optionsFor(user, agent);
 
-        assertThat(result.tiers()).extracting(ModelTierOptions.Tier::tier)
+        assertThat(result.tiers())
+                .extracting(ModelTierOptions.Tier::tier)
                 .containsExactly(ModelTier.FAST, ModelTier.BALANCED, ModelTier.DEEP);
-        assertThat(result.tiers()).extracting(ModelTierOptions.Tier::model)
+        assertThat(result.tiers())
+                .extracting(ModelTierOptions.Tier::model)
                 .containsExactly("gpt-6-luna", "gpt-6-luna", "gpt-6.1-sol");
-        assertThat(result.tiers()).extracting(ModelTierOptions.Tier::reasoningEffort)
+        assertThat(result.tiers())
+                .extracting(ModelTierOptions.Tier::reasoningEffort)
                 .containsExactly("low", "medium", "high");
         verify(definitions, never()).save(any());
     }
@@ -93,8 +97,8 @@ class ModelTierServiceTest {
         ModelOptionsService options = mock(ModelOptionsService.class);
         ModelTierService service = new ModelTierService(definitions, settings, users, options);
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
-        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of(
-                ModelTierDefinition.of(10L, ModelTier.FAST, null, "gpt-6-luna", "low")));
+        when(definitions.findByGroupIdOrderByTier(10L))
+                .thenReturn(List.of(ModelTierDefinition.of(10L, ModelTier.FAST, null, "gpt-6-luna", "low")));
 
         assertThatThrownBy(() -> service.requireDefined(user, ModelTier.FAST))
                 .isInstanceOf(ApiException.class)
@@ -129,8 +133,8 @@ class ModelTierServiceTest {
         ModelOptionsService options = mock(ModelOptionsService.class);
         ModelTierService service = new ModelTierService(definitions, settings, users, options);
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
-        List<ModelTierOptions.Tier> incomplete = List.of(
-                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "gpt-6-luna", "low"));
+        List<ModelTierOptions.Tier> incomplete =
+                List.of(new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "gpt-6-luna", "low"));
 
         assertThatThrownBy(() -> service.saveGroup(admin, incomplete, ModelTier.FAST))
                 .isInstanceOf(ApiException.class)
@@ -147,8 +151,7 @@ class ModelTierServiceTest {
         AppUser appUser = mock(AppUser.class);
         when(appUser.modelDefaultTier()).thenReturn("FAST");
         when(fixtures.users.findById(1L)).thenReturn(Optional.of(appUser));
-        when(fixtures.settings.findById(10L)).thenReturn(Optional.of(
-                ModelTierGroupSetting.of(10L, ModelTier.DEEP)));
+        when(fixtures.settings.findById(10L)).thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.DEEP)));
         Conversation conversation = mock(Conversation.class);
 
         ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
@@ -165,8 +168,7 @@ class ModelTierServiceTest {
         AppUser appUser = mock(AppUser.class);
         when(appUser.modelDefaultTier()).thenReturn(null);
         when(fixtures.users.findById(1L)).thenReturn(Optional.of(appUser));
-        when(fixtures.settings.findById(10L)).thenReturn(Optional.of(
-                ModelTierGroupSetting.of(10L, ModelTier.DEEP)));
+        when(fixtures.settings.findById(10L)).thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.DEEP)));
         Conversation conversation = mock(Conversation.class);
 
         ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
@@ -213,17 +215,17 @@ class ModelTierServiceTest {
         TierFixtures fixtures = tierFixtures();
 
         ResolvedModelTier resolved = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
-        ModelTierDefinition changed = ModelTierDefinition.of(10L, ModelTier.FAST,
-                "openai-codex", "gpt-6.1-sol", "high");
-        when(fixtures.definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of(
-                changed,
-                ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
-                ModelTierDefinition.of(10L, ModelTier.DEEP, null, "gpt-6.1-sol", "high")));
+        ModelTierDefinition changed =
+                ModelTierDefinition.of(10L, ModelTier.FAST, "openai-codex", "gpt-6.1-sol", "high");
+        when(fixtures.definitions.findByGroupIdOrderByTier(10L))
+                .thenReturn(List.of(
+                        changed,
+                        ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
+                        ModelTierDefinition.of(10L, ModelTier.DEEP, null, "gpt-6.1-sol", "high")));
 
         ResolvedModelTier updated = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
 
-        assertThat(resolved.choice())
-                .isEqualTo(ModelChoice.of("openai-codex", "gpt-6-luna", "low"));
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "gpt-6-luna", "low"));
         assertThat(updated.choice()).isEqualTo(ModelChoice.of("openai-codex", "gpt-6.1-sol", "high"));
     }
 
@@ -234,19 +236,34 @@ class ModelTierServiceTest {
         ModelOptionsService options = mock(ModelOptionsService.class);
         Agent agent = mock(Agent.class);
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
-        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of(
-                ModelTierDefinition.of(10L, ModelTier.FAST, null, "gpt-6-luna", "low"),
-                ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
-                ModelTierDefinition.of(10L, ModelTier.DEEP, null, "gpt-6.1-sol", "high")));
-        when(options.optionsForAgent(agent)).thenReturn(new ModelOptions("openai-codex", "gpt-6-luna", List.of(
-                new HermesModelCatalog.Provider("openai-codex", "OpenAI",
-                        List.of("gpt-6-luna", "gpt-6.1-sol"), Map.of())), List.of()));
-        return new TierFixtures(new ModelTierService(definitions, settings, users, options), definitions,
-                settings, users, options, user, agent);
+        when(definitions.findByGroupIdOrderByTier(10L))
+                .thenReturn(List.of(
+                        ModelTierDefinition.of(10L, ModelTier.FAST, null, "gpt-6-luna", "low"),
+                        ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "gpt-6-luna", "medium"),
+                        ModelTierDefinition.of(10L, ModelTier.DEEP, null, "gpt-6.1-sol", "high")));
+        when(options.optionsForAgent(agent))
+                .thenReturn(new ModelOptions(
+                        "openai-codex",
+                        "gpt-6-luna",
+                        List.of(new HermesModelCatalog.Provider(
+                                "openai-codex", "OpenAI", List.of("gpt-6-luna", "gpt-6.1-sol"), Map.of())),
+                        List.of()));
+        return new TierFixtures(
+                new ModelTierService(definitions, settings, users, options),
+                definitions,
+                settings,
+                users,
+                options,
+                user,
+                agent);
     }
 
-    private record TierFixtures(ModelTierService service, ModelTierDefinitionRepository definitions,
-            ModelTierGroupSettingRepository settings, AppUserRepository users, ModelOptionsService options,
-            CurrentUser user, Agent agent) {
-    }
+    private record TierFixtures(
+            ModelTierService service,
+            ModelTierDefinitionRepository definitions,
+            ModelTierGroupSettingRepository settings,
+            AppUserRepository users,
+            ModelOptionsService options,
+            CurrentUser user,
+            Agent agent) {}
 }

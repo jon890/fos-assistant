@@ -1,14 +1,16 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -18,8 +20,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
-import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.domain.type.ModelTier;
 
 @Entity
 @Table(name = "conversation")
@@ -130,7 +130,9 @@ public class Conversation {
         return userId;
     }
 
-    public Long agentId() { return agentId; }
+    public Long agentId() {
+        return agentId;
+    }
 
     public String hermesSessionId() {
         return hermesSessionId;
@@ -153,9 +155,13 @@ public class Conversation {
         return ModelChoice.stored(modelProvider, model, reasoningEffort);
     }
 
-    public ModelSelectionMode modelSelectionMode() { return modelSelectionMode; }
+    public ModelSelectionMode modelSelectionMode() {
+        return modelSelectionMode;
+    }
 
-    public ModelTier modelTier() { return modelTier; }
+    public ModelTier modelTier() {
+        return modelTier;
+    }
 
     public int autoTurnCount() {
         return autoTurnCount;

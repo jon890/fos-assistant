@@ -31,7 +31,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     @Modifying
     @Transactional
-    @Query("update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")
+    @Query(
+            "update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")
     int touchSession(@Param("id") Long id, @Param("sessionId") String sessionId, @Param("now") Instant now);
 
     /**
@@ -71,8 +72,11 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             update Conversation c set c.title = :title, c.updatedAt = :now
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
-    int renameIfActive(@Param("id") Long id, @Param("userId") Long userId,
-            @Param("title") String title, @Param("now") Instant now);
+    int renameIfActive(
+            @Param("id") Long id,
+            @Param("userId") Long userId,
+            @Param("title") String title,
+            @Param("now") Instant now);
 
     /** 고른 모델과 effort 만 바꾼다. 대화 목록의 순서를 흔들지 않도록 {@code updatedAt} 은 건드리지 않는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -83,14 +87,16 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
                    c.modelTier = null
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
-    int chooseModelIfActive(@Param("id") Long id, @Param("userId") Long userId,
-            @Param("provider") String provider, @Param("model") String model,
+    int chooseModelIfActive(
+            @Param("id") Long id,
+            @Param("userId") Long userId,
+            @Param("provider") String provider,
+            @Param("model") String model,
             @Param("reasoningEffort") String reasoningEffort,
             @Param("customMode") ModelSelectionMode customMode);
 
     /** 기존 호출은 직접 선택으로 보존한다. */
-    default int chooseModelIfActive(
-            Long id, Long userId, String provider, String model, String reasoningEffort) {
+    default int chooseModelIfActive(Long id, Long userId, String provider, String model, String reasoningEffort) {
         return chooseModelIfActive(id, userId, provider, model, reasoningEffort, ModelSelectionMode.CUSTOM);
     }
 
@@ -100,8 +106,11 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
                 c.modelProvider = null, c.model = null, c.reasoningEffort = null
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
-    int chooseModelTierIfActive(@Param("id") Long id, @Param("userId") Long userId,
-            @Param("mode") ModelSelectionMode mode, @Param("tier") ModelTier tier);
+    int chooseModelTierIfActive(
+            @Param("id") Long id,
+            @Param("userId") Long userId,
+            @Param("mode") ModelSelectionMode mode,
+            @Param("tier") ModelTier tier);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional

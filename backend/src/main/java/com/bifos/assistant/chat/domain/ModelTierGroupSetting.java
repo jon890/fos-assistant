@@ -8,8 +8,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /** 그룹 전체에 적용하는 기본 단계다. */
@@ -36,5 +36,4 @@ public class ModelTierGroupSetting {
     public static ModelTierGroupSetting of(Long groupId, ModelTier defaultTier) {
         return new ModelTierGroupSetting(groupId, defaultTier);
     }
-
 }

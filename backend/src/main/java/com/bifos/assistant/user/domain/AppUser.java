@@ -41,9 +41,7 @@ public class AppUser {
     @Accessors(fluent = true)
     private String modelDefaultTier;
 
-
-    protected AppUser() {
-    }
+    protected AppUser() {}
 
     private AppUser(String email, String displayName, Long groupId, UserRole role) {
         this.email = email;

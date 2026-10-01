@@ -79,8 +79,10 @@ public class ExecutionEventRecorder {
                 .subagentName(type.isSubagent() ? subagentName(event) : null)
                 .hermesSessionId(type.isSubagent() ? event.childSessionId() : null)
                 .durationMs(event.durationMs())
-                .failed(type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
-                        ? event.failed() : null)
+                .failed(
+                        type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
+                                ? event.failed()
+                                : null)
                 .detail(type.isSubagent() && event.goal() != null ? event.goal() : event.detail())
                 .model(type.isSubagent() ? event.model() : null)
                 .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
@@ -108,8 +110,7 @@ public class ExecutionEventRecorder {
      *
      * <p>실행의 시작과 끝은 스트림을 열지 않는 경로에서도 남아야 한다.
      */
-    public ExecutionEvent record(
-            AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
+    public ExecutionEvent record(AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
         return ExecutionEvent.builder()
                 .executionId(execution.id())
                 .sequence(sequence)

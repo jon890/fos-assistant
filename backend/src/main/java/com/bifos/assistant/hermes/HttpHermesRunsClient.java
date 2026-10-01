@@ -7,7 +7,6 @@ import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import tools.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +17,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.databind.JsonNode;
 
 /**
  * profile 별 경로로 Hermes Runs API 와 이야기한다.
@@ -40,7 +40,8 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private final HermesProperties properties;
 
     public HttpHermesRunsClient(HermesProfileKeyStore keyStore, HermesProperties properties) {
-        this.restClient = RestClient.builder().requestFactory(requestFactory(properties)).build();
+        this.restClient =
+                RestClient.builder().requestFactory(requestFactory(properties)).build();
         this.keyStore = keyStore;
         this.properties = properties;
     }
@@ -72,9 +73,12 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     @Override
     public void stop(String apiBaseUrl, String profileName, String runId) {
         try {
-            restClient.post().uri(apiBaseUrl + "/v1/runs/{runId}/stop", runId)
+            restClient
+                    .post()
+                    .uri(apiBaseUrl + "/v1/runs/{runId}/stop", runId)
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .retrieve().toBodilessEntity();
+                    .retrieve()
+                    .toBodilessEntity();
         } catch (org.springframework.web.client.HttpClientErrorException.NotFound ex) {
             log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
         } catch (RestClientException ex) {
@@ -120,19 +124,27 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     @Override
     public SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
         try {
-            JsonNode response = restClient.get()
+            JsonNode response = restClient
+                    .get()
                     .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .retrieve().body(JsonNode.class);
+                    .retrieve()
+                    .body(JsonNode.class);
             JsonNode row = response == null ? null : response.get("session");
             if (row == null || !sessionId.equals(text(row, "id"))) {
                 return null;
             }
-            return new SubagentSessionUsage(text(row, "id"), text(row, "source"),
-                    text(row, "parent_session_id"), text(row, "model"),
-                    decimal(row, "started_at"), decimal(row, "ended_at"),
-                    number(row, "input_tokens"), number(row, "output_tokens"),
-                    number(row, "cache_read_tokens"), number(row, "cache_write_tokens"));
+            return new SubagentSessionUsage(
+                    text(row, "id"),
+                    text(row, "source"),
+                    text(row, "parent_session_id"),
+                    text(row, "model"),
+                    decimal(row, "started_at"),
+                    decimal(row, "ended_at"),
+                    number(row, "input_tokens"),
+                    number(row, "output_tokens"),
+                    number(row, "cache_read_tokens"),
+                    number(row, "cache_write_tokens"));
         } catch (RuntimeException ex) {
             log.warn("하위 에이전트 사용량을 읽지 못했다 profile={} sessionId={}", profileName, sessionId);
             return null;
@@ -157,8 +169,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
      */
     private static void requireProviderAndModel(HermesRunCommand command) {
         if (isBlank(command.provider()) != isBlank(command.model())) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a run needs both a provider and a model, or neither");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a run needs both a provider and a model, or neither");
         }
     }
 

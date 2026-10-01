@@ -1,8 +1,8 @@
 package com.bifos.assistant.usage.domain;
 
 import com.bifos.assistant.agent.domain.CostMode;
-import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.chat.domain.type.ModelTier;
+import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -251,11 +251,17 @@ public class AgentExecution {
         return conversationId;
     }
 
-    public Long agentId() { return agentId; }
+    public Long agentId() {
+        return agentId;
+    }
 
-    public Long parentExecutionId() { return parentExecutionId; }
+    public Long parentExecutionId() {
+        return parentExecutionId;
+    }
 
-    public Long rootExecutionId() { return rootExecutionId; }
+    public Long rootExecutionId() {
+        return rootExecutionId;
+    }
 
     /**
      * 이 실행이 속한 실행 나무의 뿌리 번호다.
@@ -263,9 +269,13 @@ public class AgentExecution {
      * <p>뿌리 자신은 {@code rootExecutionId} 가 비어 있으므로 자기 번호를 쓴다. 자식을 열 때와 위임 실행을 물을 때
      * 같은 규칙으로 나무를 정한다.
      */
-    public Long treeRootId() { return rootExecutionId == null ? id : rootExecutionId; }
+    public Long treeRootId() {
+        return rootExecutionId == null ? id : rootExecutionId;
+    }
 
-    public Long retryOfExecutionId() { return retryOfExecutionId; }
+    public Long retryOfExecutionId() {
+        return retryOfExecutionId;
+    }
 
     public String profileName() {
         return profileName;
@@ -299,9 +309,13 @@ public class AgentExecution {
         return reasoningEffort;
     }
 
-    public ReasoningEffortSource reasoningEffortSource() { return reasoningEffortSource; }
+    public ReasoningEffortSource reasoningEffortSource() {
+        return reasoningEffortSource;
+    }
 
-    public ModelTier modelTier() { return modelTier; }
+    public ModelTier modelTier() {
+        return modelTier;
+    }
 
     public CostMode costMode() {
         return costMode;
@@ -335,19 +349,29 @@ public class AgentExecution {
         return latencyMs;
     }
 
-    public Long contextChars() { return contextChars; }
+    public Long contextChars() {
+        return contextChars;
+    }
 
-    public Integer contextOmittedItems() { return contextOmittedItems; }
+    public Integer contextOmittedItems() {
+        return contextOmittedItems;
+    }
 
-    public String runtimeFingerprint() { return runtimeFingerprint; }
+    public String runtimeFingerprint() {
+        return runtimeFingerprint;
+    }
 
-    public String instructionsHash() { return instructionsHash; }
+    public String instructionsHash() {
+        return instructionsHash;
+    }
 
     public Long estimatedCostMicros() {
         return estimatedCostMicros;
     }
 
-    public Long actualCostMicros() { return actualCostMicros; }
+    public Long actualCostMicros() {
+        return actualCostMicros;
+    }
 
     public String costCurrency() {
         return costCurrency;
@@ -365,11 +389,17 @@ public class AgentExecution {
         return finishedAt;
     }
 
-    public Instant requestReceivedAt() { return requestReceivedAt; }
+    public Instant requestReceivedAt() {
+        return requestReceivedAt;
+    }
 
-    public Instant submittedAt() { return submittedAt; }
+    public Instant submittedAt() {
+        return submittedAt;
+    }
 
-    public Instant firstDeltaAt() { return firstDeltaAt; }
+    public Instant firstDeltaAt() {
+        return firstDeltaAt;
+    }
 
     public Instant resultDeliveredAt() {
         return resultDeliveredAt;
@@ -413,8 +443,7 @@ public class AgentExecution {
     }
 
     /** 끝난 시각과 토큰과 금액을 채우고 SUCCEEDED 로 옮긴다. */
-    public void markSucceeded(
-            String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
+    public void markSucceeded(String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
         this.provider = provider;
         this.model = model;
         this.inputTokens = usage.inputTokens();
@@ -430,8 +459,7 @@ public class AgentExecution {
     }
 
     /** 끝난 시각과 토큰과 환산액과 실제 청구액을 채우고 SUCCEEDED 로 옮긴다. */
-    public void markSucceeded(
-            String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
+    public void markSucceeded(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
         this.provider = provider;
         this.model = model;
         this.inputTokens = usage.inputTokens();
@@ -456,8 +484,7 @@ public class AgentExecution {
     }
 
     /** 끝난 시각과 토큰과 금액을 채우고 CANCELLED 로 옮긴다. */
-    public void markCancelled(
-            String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
+    public void markCancelled(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
         this.provider = provider;
         this.model = model;
         this.inputTokens = usage.inputTokens();
