@@ -20,7 +20,7 @@ Hermes core 는 고치지 않는다.
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
-| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다 |
+| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다. 설치는 plugin 의 스킬 본문을 그 profile 의 SOUL.md 에 쓴다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
@@ -207,6 +207,12 @@ ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 ERROR_WORDS = frozenset({"credential_rejected", "forbidden", "invalid_input", "unavailable"})
+# `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
+# 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
+CONNECTOR_TOOLSETS = frozenset({"vision"})
+# 설치가 연결용 profile 의 `SOUL.md` 에 쓰는 스킬 본문의 상한이다. Control Plane 의 성격 본문 상한과 같다.
+CONNECTOR_PERSONA_MAX_CHARS = 8000
+SOUL_FILE = "SOUL.md"
 # `.mcp.json` 의 인자가 plugin 디렉터리를 가리키는 자리다. 그 밖의 치환은 받지 않는다.
 PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
 # 커넥터 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
@@ -572,6 +578,38 @@ def _connector_fields(declared) -> list:
     return declared
 
 
+def _connector_persona(skill_dirs: list) -> str | None:
+    """스킬 디렉터리들의 `<스킬>/SKILL.md` 본문을 이름 순으로 이어 붙인다. 스킬이 없으면 None 이다.
+
+    `SKILL.md` 밖의 파일은 읽지 않는다. 스킬 디렉터리나 `SKILL.md` 가 링크이면 읽지 않고 예외를 낸다.
+    링크가 plugin 밖의 파일을 가리키면 그 내용이 모델의 지침으로 들어가기 때문이다.
+    앞머리(frontmatter)는 뗀다. 합친 본문이 상한을 넘으면 예외다. 본문은 로그에 싣지 않는다.
+    """
+    bodies = []
+    for directory in skill_dirs:
+        for skill in sorted(directory.iterdir()):
+            source = skill / "SKILL.md"
+            if skill.is_symlink() or source.is_symlink():
+                raise ValueError("스킬 디렉터리나 SKILL.md 가 링크다")
+            if not skill.is_dir() or not source.is_file():
+                continue
+            # BOM 과 CRLF 가 있어도 앞머리를 알아보게 맞춘다.
+            text = source.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+            if text.startswith("---\n"):
+                head, separator, rest = text[4:].partition("\n---\n")
+                if not separator:
+                    raise ValueError("SKILL.md 의 앞머리가 닫히지 않았다")
+                text = rest
+            if text.strip():
+                bodies.append(text.strip())
+    if not bodies:
+        return None
+    persona = "\n\n".join(bodies) + "\n"
+    if len(persona) > CONNECTOR_PERSONA_MAX_CHARS:
+        raise ValueError("스킬 본문이 %d자를 넘는다" % CONNECTOR_PERSONA_MAX_CHARS)
+    return persona
+
+
 def _load_connector(connector_id: str, entry: dict) -> dict:
     """plugin 디렉터리의 `connector.json`, `.mcp.json`, `plugin.json` 을 읽어 검증한다. 틀리면 예외다.
 
@@ -613,6 +651,13 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
             not isinstance(code, str) or not isinstance(word, str) or word not in ERROR_WORDS
             for code, word in errors.items()):
         raise ValueError("errors 의 값은 공통 어휘 넷 가운데 하나다")
+    toolsets = declared.get("toolsets", [])
+    if (not isinstance(toolsets, list) or any(not isinstance(name, str) for name in toolsets)
+            or len(set(toolsets)) != len(toolsets) or set(toolsets) - CONNECTOR_TOOLSETS):
+        raise ValueError("toolsets 는 허용한 내장 toolset 이름의 겹치지 않는 목록이다")
+    attachments = declared.get("attachments", False)
+    if not isinstance(attachments, bool) or (attachments and "vision" not in toolsets):
+        raise ValueError("attachments 는 boolean 이고 참이면 toolsets 에 vision 이 있어야 한다")
 
     mcp = _read_connector_json(root, ".mcp.json")
     if not isinstance(mcp, dict):
@@ -653,16 +698,19 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if command is None or not os.access(command, os.X_OK):
         raise ValueError("커넥터 실행 파일이 없거나 실행할 수 없다")
 
-    # 스킬은 읽되 등록하지 않는다. persona 로 지침을 넣고 skills toolset 은 열지 않는다.
+    # 스킬은 읽되 등록하지 않는다. 설치가 본문을 `SOUL.md` 에 써 지침으로 넣고 skills toolset 은 열지 않는다.
     skills = plugin.get("skills", "./skills")
     if isinstance(skills, str):
         skills = [skills]
     if not isinstance(skills, list) or any(not isinstance(item, str) for item in skills):
         raise ValueError("스킬 경로 목록이 올바르지 않다")
+    skill_dirs = []
     for item in skills:
         path = root / item
         if not path.resolve().is_relative_to(root) or not path.is_dir() or path.resolve() != path.absolute():
             raise ValueError("스킬은 plugin 안의 링크 없는 디렉터리여야 한다")
+        skill_dirs.append(path.resolve())
+    persona = _connector_persona(skill_dirs)
 
     env = {name: "${%s}" % name for name in server["env"]}
     # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
@@ -678,6 +726,9 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "operator_env": frozenset(operator_env),
         "optional_env": optional_env,
         "errors": errors,
+        "toolsets": list(toolsets),
+        "attachments": attachments,
+        "persona": persona,
         "tools": frozenset(tools),
         "server": {"command": command, "args": args, "env": env, "enabled": True},
     }
@@ -797,11 +848,12 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
     config_path = profile_dir / "config.yaml"
     state_path = profile_dir / CONNECTOR_STATE
     env_path = profile_dir / ".env"
-    for path in (config_path, state_path, env_path):
+    soul_path = profile_dir / SOUL_FILE
+    for path in (config_path, state_path, env_path, soul_path):
         if path.is_symlink():
             raise ValueError("profile 설정에 심볼릭 링크가 있다")
     originals = {path: path.read_bytes() if path.exists() else None
-                 for path in (config_path, state_path, env_path)}
+                 for path in (config_path, state_path, env_path, soul_path)}
     saved = yaml.safe_load(originals[config_path]) or {}
     state = _connector_state(json.loads(originals[state_path])) if originals[state_path] else {}
     servers = dict(saved.get("mcp_servers") or {})
@@ -841,6 +893,13 @@ def _connector_config(profile_dir: pathlib.Path, plugin: str, enabled: bool) -> 
         if name not in allowed:
             allowed.append(name)
         state[plugin] = {"server": server, "allowlist_added": added, "mcp_server": name}
+        if manifest["persona"] is not None:
+            # 지침은 이 커넥터의 소유 기록과 함께, 관리 표식이 있는 profile 에만 쓴다.
+            # 사람이 만든 profile 과 이 요청이 가리키지 않은 profile 의 `SOUL.md` 는 건드리지 않는다.
+            # 연결용 profile 인지는 여기서 알 수 없다. Control Plane 이 연결용 에이전트의 profile 만 보낸다.
+            if not (profile_dir / MANAGED_MARKER).is_file():
+                raise ValueError("관리 표식이 없는 profile 에는 지침을 쓰지 않는다")
+            values[soul_path] = manifest["persona"].encode("utf-8")
     elif owned:
         servers.pop(name, None)
         if owned["allowlist_added"]:
@@ -946,7 +1005,8 @@ def _connector_catalog_response():
 
     return JSONResponse(
         [{"id": manifest["id"], "title": manifest["title"], "description": manifest["description"],
-          "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"]}
+          "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
+          "toolsets": manifest["toolsets"], "attachments": manifest["attachments"]}
          for manifest in _connector_catalog().values()],
         status_code=200,
     )

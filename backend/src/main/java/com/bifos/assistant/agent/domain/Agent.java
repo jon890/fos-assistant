@@ -79,6 +79,16 @@ public class Agent {
     private boolean connectorManaged;
 
     /**
+     * 참이면 이 연결용 에이전트가 사진을 받는다. 커넥터의 선언과 도구 확인을 합친 값이다.
+     *
+     * <p>선언은 대시보드가 내는 manifest 에 있고 이 엔티티는 Hermes 를 부르지 못한다. 그래서 연결 흐름이 여기
+     * 적는다. 선언이 참이고 연결 확인이나 관리자 반영 완료가 선언한 toolset 이 실제로 켜진 것을 확인했을 때만
+     * 참이다. 등록 직후와 {@code READY} 가 아닌 연결은 늘 거짓이다(ADR-044).
+     */
+    @Column(name = "connector_attachments", nullable = false)
+    private boolean connectorAttachments;
+
+    /**
      * 지운 시각. 비어 있으면 지우지 않았다.
      *
      * <p>행은 지우지 않는다. 대화, 실행, 사용량이 {@code agent_id} 로 이 에이전트의 이름을 읽기 때문이다.
@@ -86,8 +96,14 @@ public class Agent {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
-    private Agent(String code, String name, String hermesProfile, String apiBaseUrl,
-            CostMode costMode, CredentialScope credentialScope, AgentVisibility visibility,
+    private Agent(
+            String code,
+            String name,
+            String hermesProfile,
+            String apiBaseUrl,
+            CostMode costMode,
+            CredentialScope credentialScope,
+            AgentVisibility visibility,
             Long ownerUserId) {
         this.code = code;
         this.name = name;
@@ -101,31 +117,77 @@ public class Agent {
         this.createdAt = Instant.now();
     }
 
-    public static Agent of(String code, String name, String hermesProfile, String apiBaseUrl,
-            CostMode costMode, CredentialScope credentialScope, AgentVisibility visibility,
+    public static Agent of(
+            String code,
+            String name,
+            String hermesProfile,
+            String apiBaseUrl,
+            CostMode costMode,
+            CredentialScope credentialScope,
+            AgentVisibility visibility,
             Long ownerUserId) {
-        return new Agent(code, name, hermesProfile, apiBaseUrl, costMode, credentialScope,
-                visibility, ownerUserId);
+        return new Agent(code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId);
     }
 
     private static String stripTrailingSlash(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
-    public Long id() { return id; }
-    public String code() { return code; }
-    public String name() { return name; }
-    public String hermesProfile() { return hermesProfile; }
-    public String apiBaseUrl() { return apiBaseUrl; }
-    public CostMode costMode() { return costMode; }
-    public CredentialScope credentialScope() { return credentialScope; }
-    public AgentVisibility visibility() { return visibility; }
-    public Long ownerUserId() { return ownerUserId; }
-    public boolean enabled() { return enabled; }
-    public String flow() { return flow; }
-    public boolean profileManaged() { return profileManaged; }
-    public boolean connectorManaged() { return connectorManaged; }
-    public Instant deletedAt() { return deletedAt; }
+    public Long id() {
+        return id;
+    }
+
+    public String code() {
+        return code;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public String hermesProfile() {
+        return hermesProfile;
+    }
+
+    public String apiBaseUrl() {
+        return apiBaseUrl;
+    }
+
+    public CostMode costMode() {
+        return costMode;
+    }
+
+    public CredentialScope credentialScope() {
+        return credentialScope;
+    }
+
+    public AgentVisibility visibility() {
+        return visibility;
+    }
+
+    public Long ownerUserId() {
+        return ownerUserId;
+    }
+
+    public boolean enabled() {
+        return enabled;
+    }
+
+    public String flow() {
+        return flow;
+    }
+
+    public boolean profileManaged() {
+        return profileManaged;
+    }
+
+    public boolean connectorManaged() {
+        return connectorManaged;
+    }
+
+    public Instant deletedAt() {
+        return deletedAt;
+    }
 
     /** Control Plane 이 이 에이전트의 profile 을 만들었다고 적는다. 지울 때 그 profile 까지 거둔다. */
     public void markManagedProfile() {
@@ -135,6 +197,15 @@ public class Agent {
     /** connector 가 만든 에이전트는 일반 설정 화면에서 바꾸지 않는다. */
     public void markConnectorManaged() {
         this.connectorManaged = true;
+    }
+
+    /**
+     * 연결용 에이전트가 사진을 받는지 적는다. 연결용 에이전트에만 뜻이 있다.
+     *
+     * <p>manifest 의 선언을 그대로 옮기지 않는다. 선언과 도구 확인이 모두 참일 때만 참을 넘긴다.
+     */
+    public void acceptConnectorAttachments(boolean accepted) {
+        this.connectorAttachments = accepted;
     }
 
     /**
@@ -160,10 +231,11 @@ public class Agent {
      * 이 에이전트의 대화에 사진을 붙일 수 있다.
      *
      * <p>흐름은 Hermes 를 한 번 부르는 경로를 거치지 않아 사진이 놓인 자리를 입력에 덧붙일 수 없다. 그래서
-     * 흐름이 붙은 에이전트는 받지 않는다. 받을지 판정하는 곳은 모두 이 메서드를 부른다.
+     * 흐름이 붙은 에이전트는 받지 않는다. 연결용 에이전트는 그 커넥터가 사진을 받는다고 선언했고 선언한 toolset 이 켜진 것이 확인됐을 때만 받는다.
+     * 받을지 판정하는 곳은 모두 이 메서드를 부른다.
      */
     public boolean acceptsAttachments() {
-        return !connectorManaged && (flow == null || flow.isBlank());
+        return (!connectorManaged || connectorAttachments) && (flow == null || flow.isBlank());
     }
 
     public boolean isReadableBy(Long userId) {

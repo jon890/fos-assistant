@@ -27,6 +27,10 @@
 이 값이 참인 에이전트는 일반 설정 편집과 공개, 삭제 경로를 막고 사용자당 에이전트 상한에 세지 않는다.
 상태 변화는 [커넥터 연결](connectors.md)이 갖는다.
 
+`agent.connector_attachments BOOLEAN NOT NULL DEFAULT FALSE` 는 그 연결용 에이전트가 사진을 받는지다.
+선언은 plugin 의 `connector.json` 에 있다. Control Plane 이 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 켜진 것을 확인했을 때만 참으로 둔다.
+연결용이 아닌 에이전트에서는 쓰지 않는다.
+
 MySQL 8.4 에 둔다.
 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
 

@@ -28,9 +28,11 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -213,9 +215,10 @@ public class ConnectorConnectionService {
                                 ? connector.deleteEnv(profile, field.env())
                                 : connector.putEnv(profile, field.env(), value));
             }
-            // 새 profile 의 틀이 켜 둔 내장 도구를 뺀다. 설치가 이 목록에 커넥터의 MCP 서버를 더한다.
+            // 새 profile 의 틀이 켜 둔 내장 도구를 빼고 manifest 가 선언한 것만 남긴다.
+            // 설치가 이 목록에 커넥터의 MCP 서버를 더한다.
             step = STEP_TOOLSET;
-            toolsets.writeApiServer(profile, List.of(AgentToolPolicy.CONTROL_PLANE_MCP));
+            toolsets.writeApiServer(profile, allowedToolsets(manifest, false));
             step = STEP_INSTALL;
             connection.markRestartRequired(connector.putConnector(profile, manifest.id(), true));
         } catch (RuntimeException ex) {
@@ -224,6 +227,7 @@ public class ConnectorConnectionService {
             connections.save(connection);
             return null;
         }
+        // 등록 직후는 선언한 toolset 이 켜졌는지 보기 전이다. 사진은 연결 확인이 그것을 본 뒤에 받는다.
         connection.registered(ConnectorValues.stored(manifest, accepted), false, now());
         return snapshot(connections.save(connection));
     }
@@ -356,36 +360,62 @@ public class ConnectorConnectionService {
     }
 
     /**
-     * MCP probe 가 도구를 보이고 켜진 내장 도구가 없는가.
+     * MCP probe 가 도구를 보이고 켜진 내장 도구가 manifest 가 선언한 것과 같은가.
      *
      * <p>설치가 enabled 이고 configured 인 뒤에만 부른다. 카탈로그에서 빠진 커넥터는 서버 이름을 알 수 없어 쓸 수
-     * 없는 것으로 본다.
+     * 없는 것으로 본다. 설치 요청을 한 번 더 보내 연결용 에이전트의 지침을 지금 plugin 의 스킬 본문에 맞춘다.
+     * manifest 의 사진 받기 선언도 여기서 에이전트에 옮긴다. 선언한 toolset 이 실제로 켜졌을 때만 참으로 둔다.
+     * 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다. 이미 연결된 에이전트가 연결 확인과
+     * 관리자 반영 완료에서 새 선언을 받는 자리다.
      */
     private boolean usable(ConnectorConnection connection) {
         Optional<ConnectorManifest> manifest = findManifest(connection.connectorId());
+        Agent agent = connection.agent();
         if (manifest.isEmpty()) {
             return false;
         }
-        Agent agent = connection.agent();
-        String mcpServer = manifest.get().mcpServer();
-        ProbeResult probe = connector.probe(agent.hermesProfile(), mcpServer);
-        return probe.ok()
-                && !probe.tools().isEmpty()
-                && narrowedEnabled(agent, mcpServer).isEmpty();
+        // 도구 목록을 먼저 맞춘다. 설치 요청은 목록에 Control Plane MCP 가 없으면 거절되므로, 어긋난 목록을
+        // 여기서 다시 써야 뒤의 설치 요청이 지나간다.
+        boolean toolsetsApplied = declaredToolsetsApplied(agent, manifest.get());
+        // 설치 요청은 같은 값이면 아무것도 바꾸지 않는다. plugin 의 스킬 본문이 바뀌었으면 지침을 다시 쓴다.
+        // 설치된 연결에는 늘 재시작 필요로 답하므로 그 값은 쓰지 않는다. 실행 정의가 바뀌었으면 요청이 실패한다.
+        connector.putConnector(agent.hermesProfile(), connection.connectorId(), true);
+        ProbeResult probe =
+                connector.probe(agent.hermesProfile(), manifest.get().mcpServer());
+        boolean usable = toolsetsApplied && probe.ok() && !probe.tools().isEmpty();
+        // 쓸 수 없으면 부른 쪽이 PENDING 으로 두며 사진 받기를 내린다. 외부 호출이 실패해도 같다.
+        agent.acceptConnectorAttachments(usable && manifest.get().attachments());
+        return usable;
     }
 
     /**
-     * 켜진 내장 도구를 읽고, 남아 있으면 허용 목록을 Control Plane MCP 와 커넥터 MCP 로 줄인 뒤 다시 읽는다.
+     * 켜진 내장 도구를 읽고, 선언과 다르면 허용 목록을 Control Plane MCP 와 커넥터 MCP 와 선언한 toolset 으로 다시
+     * 쓴 뒤 다시 읽는다. 다시 읽은 것이 선언과 같아야 참이다.
      *
-     * <p>설치 전에는 커넥터의 MCP 서버가 그 profile 에서 모르는 이름이라 목록에 둘 수 없다.
+     * <p>선언 밖의 내장 도구가 켜져 있어도, 선언한 도구가 꺼져 있어도 쓸 수 없는 것으로 본다. 설치 전에는 커넥터의
+     * MCP 서버가 그 profile 에서 모르는 이름이라 목록에 둘 수 없다.
      */
-    private List<String> narrowedEnabled(Agent agent, String mcpServer) {
-        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        if (enabled.isEmpty()) {
-            return enabled;
+    private boolean declaredToolsetsApplied(Agent agent, ConnectorManifest manifest) {
+        Set<String> declared = Set.copyOf(manifest.toolsets());
+        if (declared.equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())))) {
+            return true;
         }
-        toolsets.writeApiServer(agent.hermesProfile(), List.of(AgentToolPolicy.CONTROL_PLANE_MCP, mcpServer));
-        return toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
+        toolsets.writeApiServer(agent.hermesProfile(), allowedToolsets(manifest, true));
+        return declared.equals(Set.copyOf(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())));
+    }
+
+    /**
+     * 연결용 에이전트의 API 도구 목록이다. Control Plane MCP, 설치한 뒤의 커넥터 MCP, 선언한 내장 toolset 순이다.
+     * 겹친 이름은 한 번만 싣는다.
+     */
+    private static List<String> allowedToolsets(ConnectorManifest manifest, boolean installed) {
+        Set<String> allowed = new LinkedHashSet<>();
+        allowed.add(AgentToolPolicy.CONTROL_PLANE_MCP);
+        if (installed) {
+            allowed.add(manifest.mcpServer());
+        }
+        allowed.addAll(manifest.toolsets());
+        return List.copyOf(allowed);
     }
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
@@ -416,13 +446,30 @@ public class ConnectorConnectionService {
                 options != null && options.autoSelectSingle());
     }
 
+    /**
+     * 카탈로그를 읽는다. manifest 로 열 수 없는 내장 toolset 을 선언한 커넥터는 없는 것으로 본다.
+     *
+     * <p>대시보드가 같은 검사를 먼저 한다. 여기서 한 번 더 보는 것은 셸이나 파일 도구가 대시보드의 결함으로
+     * 넘어와도 연결용 에이전트에 켜지지 않게 하기 위해서다(ADR-044).
+     */
     private List<ConnectorManifest> readCatalog() {
+        final List<ConnectorManifest> manifests;
         try {
-            return connector.readCatalog();
+            manifests = connector.readCatalog();
         } catch (RuntimeException ex) {
             log.warn("connector catalog read failed: {}", ex.getClass().getSimpleName());
             throw ConnectorErrors.unavailable();
         }
+        List<ConnectorManifest> allowed = new ArrayList<>();
+        for (ConnectorManifest manifest : manifests) {
+            if (AgentToolPolicy.allowedForConnector(manifest.toolsets())
+                    && (!manifest.attachments() || manifest.toolsets().contains(AgentToolPolicy.VISION))) {
+                allowed.add(manifest);
+            } else {
+                log.warn("connector {} declares toolsets a manifest cannot open", manifest.id());
+            }
+        }
+        return List.copyOf(allowed);
     }
 
     private Optional<ConnectorManifest> findManifest(String connectorId) {

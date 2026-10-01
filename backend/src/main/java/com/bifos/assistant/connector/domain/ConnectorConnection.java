@@ -146,7 +146,15 @@ public class ConnectorConnection {
         disableAgent();
     }
 
+    /**
+     * 에이전트를 끄고 사진도 받지 않는 것으로 둔다.
+     *
+     * <p>{@code READY} 가 아닌 연결의 에이전트에 사진 받기가 참으로 남지 않게 한다. 등록, 등록과 해제의 실패,
+     * 연결 확인의 조기 반환이 모두 여기를 거친다. 참으로 두는 곳은 연결 확인과 관리자 반영 완료가 선언한
+     * toolset 을 확인한 자리 하나다.
+     */
     private void disableAgent() {
         agent.changeAccess(false, agent.visibility(), agent.ownerUserId());
+        agent.acceptConnectorAttachments(false);
     }
 }

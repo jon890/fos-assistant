@@ -13,17 +13,32 @@ public final class AgentToolPolicy {
     public static final String MEMORY = "memory";
     /** 올린 스킬을 모델이 읽는 toolset 이다. 올린 스킬이 있는 동안은 끄지 못한다(ADR-034). */
     public static final String SKILLS = "skills";
+    /** 사진을 읽는 toolset 이다. 사진을 받는 커넥터는 이것을 함께 선언한다(ADR-044). */
+    public static final String VISION = "vision";
     /** Control Plane 이 여는 MCP 서버의 Hermes 등록 이름이며, 도구 저장 때 허용 목록에 늘 남긴다. */
     public static final String CONTROL_PLANE_MCP = "fos-assistant";
 
-    private static final Set<String> OWNER_TOOLSETS = Set.of(
-            "web", "vision", "todo", "clarify", "skills", "tts", "delegation");
+    private static final Set<String> OWNER_TOOLSETS =
+            Set.of("web", "vision", "todo", "clarify", "skills", "tts", "delegation");
     private static final Set<String> ADMIN_TOOLSETS = Set.of(
-            "terminal", "file", "code_execution", "browser", "computer_use", "cronjob", "image_gen",
-            "video_gen", "homeassistant", "spotify", "discord", "session_search");
+            "terminal",
+            "file",
+            "code_execution",
+            "browser",
+            "computer_use",
+            "cronjob",
+            "image_gen",
+            "video_gen",
+            "homeassistant",
+            "spotify",
+            "discord",
+            "session_search");
     // session_search 는 그 profile 의 모든 플랫폼 대화와, `profile` 인자로 다른 profile 의 대화까지 읽는다.
-    private static final Set<String> PRIVATE_ONLY_TOOLSETS = Set.of(
-            "terminal", "file", "code_execution", "browser", "computer_use", "session_search");
+    private static final Set<String> PRIVATE_ONLY_TOOLSETS =
+            Set.of("terminal", "file", "code_execution", "browser", "computer_use", "session_search");
+    /** 커넥터 manifest 가 연결용 에이전트에 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구뿐이다(ADR-044). */
+    private static final Set<String> CONNECTOR_TOOLSETS = Set.of(AgentToolPolicy.VISION);
+
     private static final Set<String> CONFIGURABLE_TOOLSETS;
 
     static {
@@ -67,7 +82,11 @@ public final class AgentToolPolicy {
         }
         LinkedHashSet<String> requestedSet = new LinkedHashSet<>();
         for (String name : requested) {
-            if (name == null || name.isBlank() || MEMORY.equals(name) || CONTROL_PLANE_MCP.equals(name) || !isKnown(name)) {
+            if (name == null
+                    || name.isBlank()
+                    || MEMORY.equals(name)
+                    || CONTROL_PLANE_MCP.equals(name)
+                    || !isKnown(name)) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "the requested toolset is not allowed");
             }
             if (!requestedSet.add(name)) {
@@ -89,14 +108,17 @@ public final class AgentToolPolicy {
         for (String name : ADMIN_TOOLSETS) {
             if (!mayEdit(user, agent, name) && current.contains(name)) result.add(name);
         }
-        if (agent.visibility() == AgentVisibility.GROUP
-                && result.stream().anyMatch(AgentToolPolicy::requiresPrivate)) {
+        if (agent.visibility() == AgentVisibility.GROUP && result.stream().anyMatch(AgentToolPolicy::requiresPrivate)) {
             throw new ApiException(
-                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE,
-                    "shell and file toolsets require a private agent");
+                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
         result.add(CONTROL_PLANE_MCP);
         return List.copyOf(result);
+    }
+
+    /** 커넥터가 선언한 toolset 이 모두 manifest 로 열 수 있는 것인가. */
+    public static boolean allowedForConnector(List<String> declared) {
+        return CONNECTOR_TOOLSETS.containsAll(declared);
     }
 
     public static boolean hasPrivateOnlyToolset(List<String> enabled) {
