@@ -22,6 +22,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 BUNDLE_SCRIPT = ROOT / "bundle.sh"
 # 묶음을 만들 때 주는 검사용 Control Plane MCP 주소다.
 MCP_URL = "http://control-plane.test/mcp"
+# 시험 커넥터다. 운영 목록의 이름과 운영자가 주는 env 값이다.
+DEMO_CONNECTOR = ROOT / "tests/fixtures/demo-connector"
+DEMO = "demo-notes"
+DEMO_BASE = "http://demo.test/base"
+# 앞선 판의 plugin 이 이름으로 알던 커넥터다. 그 판이 남긴 소유 기록을 인정하는지 보는 검사만 쓴다.
+LEGACY = "fos-accountbook"
+LEGACY_BASE = "http://legacy.test/base"
 
 # 설정이 없을 때 API 경로가 떨어지는 복합 toolset 을 줄여 흉내 낸다.
 WIDE_TOOLSETS = {"code_execution", "delegation", "file", "memory", "terminal", "web"}
@@ -217,24 +224,8 @@ class ProfileApiRouteTest(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def connector_fixture(self):
-        access = mock.patch.object(self.plugin.os, "access", return_value=True)
-        access.start()
-        self.addCleanup(access.stop)
-        self.make_profile("alice")
-        self.plugin._apply_template("alice")
-        root = self.root.parent / "plugin"
-        (root / ".claude-plugin").mkdir(parents=True)
-        (root / "skills").mkdir()
-        (root / "dist").mkdir()
-        (root / "dist/accountbook-mcp.js").write_text("// fixture", encoding="utf-8")
-        (root / ".claude-plugin/plugin.json").write_text(
-            json.dumps({"name": "fos-accountbook", "skills": "./skills"}), encoding="utf-8")
-        (root / ".mcp.json").write_text(json.dumps({"mcpServers": {"accountbook": {
-            "command": "bun", "args": ["${CLAUDE_PLUGIN_ROOT}/dist/accountbook-mcp.js"],
-            "env": {key: "${%s}" % key for key in
-                    ("ACCOUNTBOOK_API_BASE_URL", "ACCOUNTBOOK_API_TOKEN", "ACCOUNTBOOK_FAMILY_UUID")}
-        }}}), encoding="utf-8")
+    def connector_environment(self, roots):
+        """운영 목록과 기본 실행 파일을 환경 변수로 준다. 검사가 끝나면 되돌린다."""
         # 커넥터 실행 파일은 검사가 만든 파일이다. 실행 정의가 이 경로를 그대로 싣는지 본다.
         command = self.root.parent / "bin/connector-runner"
         command.parent.mkdir()
@@ -242,23 +233,33 @@ class ProfileApiRouteTest(unittest.TestCase):
         command.chmod(0o755)
         self.connector_command = str(command)
         environ = mock.patch.dict(os.environ, {
-            "FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps({"fos-accountbook": str(root)}),
+            "FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(roots),
             "FOS_ASSISTANT_CONNECTOR_COMMAND": self.connector_command,
         })
         environ.start()
         self.addCleanup(environ.stop)
+
+    def connector_fixture(self):
+        """시험 커넥터를 운영 목록에 올리고 관리 profile 하나를 만든다."""
+        self.make_profile("alice")
+        self.plugin._apply_template("alice")
+        root = self.root.parent / "demo-connector"
+        shutil.copytree(DEMO_CONNECTOR, root)
+        self.connector_environment({DEMO: {"root": str(root), "env": {"DEMO_BASE": DEMO_BASE}}})
         return root
 
     def connector(self, enabled=True, **overrides):
-        with mock.patch.object(self.plugin.os, "access", return_value=True):
-            return self.request("/api/connectors", "PUT", token="valid", full_response=True, body={
-                "profile": "alice", "plugin": "fos-accountbook", "enabled": enabled, **overrides})
+        return self.request("/api/connectors", "PUT", token="valid", full_response=True, body={
+            "profile": "alice", "plugin": DEMO, "enabled": enabled, **overrides})
 
     def connector_status(self):
         return self.request("/api/connectors", "GET", token="valid", query_profiles=["alice"], full_response=True)
 
-    def connector_probe(self):
-        return self.request("/api/mcp/servers/accountbook/test", "POST", token="valid", query_profiles=["alice"])
+    def connector_probe(self, server="demo", profile="alice"):
+        return self.request("/api/mcp/servers/%s/test" % server, "POST", token="valid", query_profiles=[profile])
+
+    def alice_config(self):
+        return yaml.safe_load((self.root / "alice/config.yaml").read_text(encoding="utf-8"))
 
     @contextlib.contextmanager
     def without_environment(self, *names):
@@ -292,8 +293,8 @@ class ProfileApiRouteTest(unittest.TestCase):
                 self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
                 self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
 
-    def test_installed_connector_is_blocked_when_environment_is_missing_or_changed(self):
-        """설치한 뒤 환경 변수가 빠지거나 바뀌면 상태 조회, 제거, probe 가 막히고, 값이 돌아오면 다시 읽힌다."""
+    def test_installed_connector_is_blocked_when_command_is_missing_or_changed(self):
+        """설치한 뒤 실행 파일이 빠지거나 바뀌면 상태 조회, 제거, probe 가 막히고, 값이 돌아오면 다시 읽힌다."""
         self.connector_fixture()
         self.assertEqual(self.connector().status_code, 200)
         self.assertEqual(self.connector_probe(), 204)
@@ -306,36 +307,73 @@ class ProfileApiRouteTest(unittest.TestCase):
             self.assertEqual(self.connector_status().status_code, 503)
             self.assertEqual(self.connector(False).status_code, 503)
             self.assertEqual(self.connector_probe(), 503)
-        with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
-            self.assertEqual(self.connector_status().status_code, 503)
-            self.assertEqual(self.connector(False).status_code, 400)
-            self.assertEqual(self.connector_probe(), 503)
         self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
         self.assertEqual(self.connector_probe(), 204)
         status = self.connector_status()
         self.assertEqual(status.status_code, 200)
-        self.assertEqual(status.body["connectors"], [{"plugin": "fos-accountbook", "enabled": True, "configured": True}])
+        self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True}])
         self.assertEqual(self.connector(False).status_code, 200)
 
-    def test_connector_installs_idempotently_and_preserves_profile_secrets(self):
-        """connector 는 고정 manifest 에서 등록하고 사용자 토큰과 다른 MCP 를 보존한다."""
+    def test_installed_connector_is_blocked_when_operator_env_value_changes(self):
+        """설치한 뒤 운영 목록의 운영자 env 값이 바뀌면 소유 기록과 달라 상태 조회가 503 이다."""
+        root = self.connector_fixture()
+        self.assertEqual(self.connector().status_code, 200)
+        changed = {DEMO: {"root": str(root), "env": {"DEMO_BASE": DEMO_BASE + "/other"}}}
+        with mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(changed)}):
+            self.assertEqual(self.connector_status().status_code, 503)
+        self.assertEqual(self.connector_status().status_code, 200)
+
+    def test_connector_removed_from_operator_list_can_only_be_turned_off(self):
+        """운영 목록에서 빠진 커넥터는 소유 기록으로 설치를 끄고 그 기록이 참조하던 env key 를 지운다."""
         self.connector_fixture()
         env = self.root / "alice/.env"
-        env.write_text("ACCOUNTBOOK_API_TOKEN=test-token\nOTHER=keep\n", encoding="utf-8")
+        env.write_text("DEMO_TOKEN=demo_ok_0123456789\nOTHER=keep\nDEMO_SCOPE=a\n"
+                       "MCP_FOS_ASSISTANT_API_KEY=keep-too\n", encoding="utf-8")
+        self.assertEqual(self.connector().status_code, 200)
+        with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
+            status = self.connector_status()
+            self.assertEqual(status.status_code, 200)
+            self.assertEqual(status.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": False}])
+            self.assertEqual(self.connector_probe(), 404)
+            self.assertEqual(self.connector(True).status_code, 400)
+            self.assertIn("demo", self.alice_config()["mcp_servers"])
+
+            removed = self.connector(False)
+            self.assertEqual(removed.status_code, 200)
+            self.assertTrue(removed.body["changed"])
+            self.assertTrue(removed.body["restart_required"])
+            config = self.alice_config()
+            self.assertNotIn("demo", config["mcp_servers"])
+            self.assertNotIn("demo", config["platform_toolsets"]["api_server"])
+            self.assertIn("fos-assistant", config["mcp_servers"])
+            self.assertEqual(env.read_text(encoding="utf-8"), "OTHER=keep\nMCP_FOS_ASSISTANT_API_KEY=keep-too\n")
+            self.assertEqual(json.loads((self.root / "alice/.fos-connectors.json").read_text()), {})
+            self.assertEqual(self.connector_status().body["connectors"], [])
+            # 기록이 사라진 뒤에는 모르는 이름이다.
+            self.assertEqual(self.connector(False).status_code, 400)
+
+    def test_connector_installs_idempotently_and_preserves_profile_secrets(self):
+        """connector 는 manifest 에서 등록하고 사용자 토큰과 다른 MCP 를 보존한다."""
+        root = self.connector_fixture()
+        env = self.root / "alice/.env"
+        env.write_text("DEMO_TOKEN=test-token\nOTHER=keep\n", encoding="utf-8")
         env.chmod(0o600)
         response = self.connector()
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.body["changed"])
         self.assertFalse(response.body["restart_required"])
-        config_path = self.root / "alice/config.yaml"
-        config = yaml.safe_load(config_path.read_text())
-        server = config["mcp_servers"]["accountbook"]
+        config = self.alice_config()
+        server = config["mcp_servers"]["demo"]
+        # 실행 파일은 manifest 의 것이 아니라 운영이 준 것이고, 인자는 plugin 안의 실제 경로다.
         self.assertEqual(server["command"], self.connector_command)
-        self.assertEqual(server["env"]["ACCOUNTBOOK_API_TOKEN"], "${ACCOUNTBOOK_API_TOKEN}")
-        self.assertEqual(server["env"]["ACCOUNTBOOK_FAMILY_UUID"], "")
+        self.assertEqual(server["args"], [str(root / "server.py")])
+        self.assertEqual(server["env"], {"DEMO_TOKEN": "${DEMO_TOKEN}", "DEMO_SCOPE": "", "DEMO_BASE": DEMO_BASE})
+        self.assertIn("demo", config["platform_toolsets"]["api_server"])
         self.assertIn("fos-assistant", config["mcp_servers"])
         self.assertNotIn("skills", config["platform_toolsets"]["api_server"])
-        self.assertIn("ACCOUNTBOOK_API_TOKEN=test-token", env.read_text())
+        record = json.loads((self.root / "alice/.fos-connectors.json").read_text())
+        self.assertEqual(record, {DEMO: {"server": server, "allowlist_added": True, "mcp_server": "demo"}})
+        self.assertIn("DEMO_TOKEN=test-token", env.read_text())
         self.assertEqual(env.stat().st_mode & 0o777, 0o600)
         for backup in (self.root / "alice/connector-backups").glob("*/*"):
             self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
@@ -345,33 +383,43 @@ class ProfileApiRouteTest(unittest.TestCase):
         removed = self.connector(False)
         self.assertEqual(removed.status_code, 200)
         self.assertTrue(removed.body["restart_required"])
-        config = yaml.safe_load(config_path.read_text())
-        self.assertNotIn("accountbook", config["mcp_servers"])
-        self.assertNotIn("accountbook", config["platform_toolsets"]["api_server"])
+        config = self.alice_config()
+        self.assertNotIn("demo", config["mcp_servers"])
+        self.assertNotIn("demo", config["platform_toolsets"]["api_server"])
         self.assertIn("fos-assistant", config["mcp_servers"])
-        self.assertIn("ACCOUNTBOOK_API_TOKEN=test-token", env.read_text())
+        # 운영 목록에 있는 커넥터의 env 는 Control Plane 이 칸마다 지운다. 설치를 끄는 것이 지우지 않는다.
+        self.assertIn("DEMO_TOKEN=test-token", env.read_text())
 
-    def test_connector_rejects_arbitrary_commands_literal_env_and_symlinks(self):
-        """manifest 의 임의 명령과 비밀값 원문, plugin 밖으로 가는 링크를 거절한다."""
+    def test_connector_uses_operator_command_and_rejects_unsafe_manifests(self):
+        """manifest 의 명령은 운영 실행 파일로 바뀌고, 치환 있는 인자와 비밀값 원문과 plugin 밖 링크는 거절한다."""
         root = self.connector_fixture()
         manifest = root / ".mcp.json"
         original = manifest.read_text()
         before = (self.root / "alice/config.yaml").read_bytes()
-        for mutate in (
-            lambda server: server.update(command="sh"),
-            lambda server: server.update(args=["-c", "echo wrong"]),
-            lambda server: server["env"].update(ACCOUNTBOOK_API_TOKEN="literal"),
-            lambda server: server["env"].update(OTHER="${OTHER}"),
+        for label, mutate in (
+            ("shell expansion", lambda server: server.update(args=["-c", "echo $HOME"])),
+            ("outside plugin", lambda server: server.update(args=["${CLAUDE_PLUGIN_ROOT}/../bin/connector-runner"])),
+            ("missing file", lambda server: server.update(args=["${CLAUDE_PLUGIN_ROOT}/missing.py"])),
+            ("literal env", lambda server: server["env"].update(DEMO_TOKEN="literal")),
+            ("other reference", lambda server: server["env"].update(DEMO_TOKEN="${DEMO_BASE}")),
+            ("undeclared env", lambda server: server["env"].update(OTHER="${OTHER}")),
+            ("extra field", lambda server: server.update(cwd="/")),
         ):
-            value = json.loads(original)
-            mutate(value["mcpServers"]["accountbook"])
-            manifest.write_text(json.dumps(value), encoding="utf-8")
-            self.assertEqual(self.connector().status_code, 503)
-            self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
-        manifest.write_text(original, encoding="utf-8")
-        bundle = root / "dist/accountbook-mcp.js"
-        bundle.unlink()
-        bundle.symlink_to(self.root / "alice/config.yaml")
+            with self.subTest(label):
+                value = json.loads(original)
+                mutate(value["mcpServers"]["demo"])
+                manifest.write_text(json.dumps(value), encoding="utf-8")
+                self.assertEqual(self.connector().status_code, 503)
+                self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+        value = json.loads(original)
+        value["mcpServers"]["demo"]["command"] = "sh"
+        manifest.write_text(json.dumps(value), encoding="utf-8")
+        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["command"], self.connector_command)
+        self.assertEqual(self.connector(False).status_code, 200)
+        script = root / "server.py"
+        script.unlink()
+        script.symlink_to(self.root / "alice/config.yaml")
         self.assertEqual(self.connector().status_code, 503)
 
     def test_connector_routes_reject_unmanaged_profile_unknown_plugin_and_extra_fields(self):
@@ -381,6 +429,8 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(self.connector(profile="missing").status_code, 404)
         self.assertEqual(self.connector(profile="owner").status_code, 401)
         self.assertEqual(self.connector(plugin="unknown").status_code, 400)
+        self.assertEqual(self.connector(False, plugin="unknown").status_code, 400)
+        self.assertEqual(self.connector(False, plugin="../demo-notes").status_code, 400)
         self.assertEqual(self.connector(command="sh").status_code, 400)
         self.assertEqual(self.request("/api/connectors", "PUT", cookie=True), 401)
         self.assertEqual(self.request("/api/connectors", "GET", token="valid"), 400)
@@ -390,10 +440,10 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.connector_fixture()
         path = self.root / "alice/config.yaml"
         config = yaml.safe_load(path.read_text())
-        config["mcp_servers"]["accountbook"] = {"command": "operator"}
+        config["mcp_servers"]["demo"] = {"command": "operator"}
         path.write_text(yaml.safe_dump(config), encoding="utf-8")
         self.assertEqual(self.connector().status_code, 409)
-        del config["mcp_servers"]["accountbook"]
+        del config["mcp_servers"]["demo"]
         path.write_text(yaml.safe_dump(config), encoding="utf-8")
         before = path.read_bytes()
         write = self.plugin._atomic_private_write
@@ -411,39 +461,78 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertFalse((self.root / "alice" / self.plugin.CONNECTOR_STATE).exists())
 
     def test_connector_status_and_probe_are_limited_to_installed_managed_profile(self):
-        """상태 조회는 비밀값을 내지 않고 probe 는 설치된 가계부 서버만 부른다."""
+        """상태 조회는 비밀값을 내지 않고 probe 는 그 profile 에 설치한 커넥터의 서버만 부른다."""
         self.connector_fixture()
+        self.assertEqual(self.connector_probe(), 404)
         self.connector()
-        response = self.request("/api/connectors", "GET", token="valid", query_profiles=["alice"], full_response=True)
+        response = self.connector_status()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.body["connectors"], [{"plugin": "fos-accountbook", "enabled": True, "configured": True}])
-        self.assertEqual(self.request("/api/mcp/servers/accountbook/test", "POST", token="valid", query_profiles=["alice"]), 204)
-        self.assertEqual(self.request("/api/mcp/servers/accountbook/test", "POST", token="valid", query_profiles=["owner"]), 401)
-        self.assertEqual(self.request("/api/mcp/servers/accountbook/test", "POST", token="valid"), 400)
+        self.assertEqual(response.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True}])
+        self.assertNotIn(DEMO_BASE, json.dumps(response.body))
+        self.assertEqual(self.connector_probe(), 204)
+        # 설치한 커넥터의 서버가 아니면 등록된 MCP 서버여도 넘기지 않는다.
+        self.assertEqual(self.connector_probe("fos-assistant"), 404)
+        self.assertEqual(self.connector_probe("other"), 404)
+        self.assertEqual(self.connector_probe(profile="owner"), 401)
+        self.assertEqual(self.request("/api/mcp/servers/demo/test", "POST", token="valid"), 400)
+        self.assertEqual(self.request("/api/mcp/servers/demo/test", "GET", token="valid", query_profiles=["alice"]), 401)
+        self.assertEqual(self.request("/api/mcp/servers/demo/nested/test", "POST", token="valid",
+                                      query_profiles=["alice"]), 401)
         self.connector(False)
-        self.assertEqual(self.request("/api/mcp/servers/accountbook/test", "POST", token="valid", query_profiles=["alice"]), 404)
+        self.assertEqual(self.connector_probe(), 404)
 
     def test_connector_env_delete_preserves_other_credentials(self):
-        """가계부 환경 변수 삭제는 AI credential 과 Control Plane 토큰을 지우지 않는다."""
+        """커넥터 칸의 환경 변수 삭제는 AI credential 과 Control Plane 토큰을 지우지 않는다."""
         self.connector_fixture()
-        for key in ("ACCOUNTBOOK_API_BASE_URL", "ACCOUNTBOOK_API_TOKEN", "ACCOUNTBOOK_FAMILY_UUID"):
+        for key in ("DEMO_TOKEN", "DEMO_SCOPE"):
             response = self.request("/api/env", "DELETE", token="valid", body={"profile": "alice", "key": key})
             self.assertEqual(response, 200)
         for key in ("OPENAI_API_KEY", "MCP_FOS_ASSISTANT_API_KEY", "API_SERVER_KEY"):
             response = self.request("/api/env", "DELETE", token="valid", body={"profile": "alice", "key": key})
             self.assertEqual(response, 400)
+        self.assertEqual(self.request("/api/env", "DELETE", token="valid",
+                                      body={"profile": "owner", "key": "DEMO_TOKEN"}), 401)
+
+    def test_connector_env_keys_follow_the_catalog(self):
+        """커넥터 key 는 카탈로그에 있는 동안만 쓸 수 있다. 목록에서 빠지면 400 이다."""
+        self.connector_fixture()
+        body = {"profile": "alice", "key": "DEMO_TOKEN", "value": "demo_ok_0123456789"}
+        self.assertEqual(self.request("/api/env", "PUT", token="valid", body=body), 200)
+        with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
+            self.assertEqual(self.request("/api/env", "PUT", token="valid", body=body), 400)
+            self.assertEqual(self.request("/api/env", "DELETE", token="valid",
+                                          body={"profile": "alice", "key": "DEMO_TOKEN"}), 400)
+
+    def test_operator_env_write_is_answered_without_writing(self):
+        """운영자 env 이름의 쓰기와 지우기는 성공으로 답하고 profile `.env` 를 바꾸지 않는다."""
+        self.connector_fixture()
+        self.connector()
+        env = self.root / "alice/.env"
+        env.write_text("DEMO_TOKEN=demo_ok_0123456789\n", encoding="utf-8")
+        for method, body in (("PUT", {"profile": "alice", "key": "DEMO_BASE", "value": "http://changed.test"}),
+                             ("DELETE", {"profile": "alice", "key": "DEMO_BASE"})):
+            with self.subTest(method):
+                response = self.request("/api/env", method, token="valid", full_response=True, body=body)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.body, {"profile": "alice", "key": "DEMO_BASE", "restart_required": False})
+                self.assertEqual(env.read_text(encoding="utf-8"), "DEMO_TOKEN=demo_ok_0123456789\n")
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_BASE"], DEMO_BASE)
+        self.assertEqual(self.request("/api/env", "PUT", token="valid", body={
+            "profile": "owner", "key": "DEMO_BASE", "value": "x"}), 401)
 
     def test_connector_env_update_reports_live_process_restart_without_echoing_token(self):
         """토큰 교체는 설치한 자식의 재시작을 알리고 응답에 토큰 원문을 싣지 않는다."""
         self.connector_fixture()
+        body = {"profile": "alice", "key": "DEMO_TOKEN", "value": "demo_ok_0123456789"}
+        response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.body["restart_required"])
         self.connector()
-        response = self.request("/api/env", "PUT", token="valid", full_response=True,
-                                body={"profile": "alice", "key": "ACCOUNTBOOK_API_TOKEN", "value": "test-token"})
+        response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.body["restart_required"])
-        self.assertNotIn("test-token", json.dumps(response.body))
-        self.assertEqual(self.request("/api/env", "PUT", token="valid", body={
-            "profile": "owner", "key": "ACCOUNTBOOK_API_TOKEN", "value": "test-token"}), 401)
+        self.assertNotIn("demo_ok_0123456789", json.dumps(response.body))
+        self.assertEqual(self.request("/api/env", "PUT", token="valid", body={**body, "profile": "owner"}), 401)
 
     def test_connector_probe_rejects_operator_changes_and_other_token_providers(self):
         """변조한 MCP 명령과 다른 provider 의 유효한 토큰으로 probe 를 실행하지 않는다."""
@@ -451,13 +540,13 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.connector()
         path = self.root / "alice/config.yaml"
         config = yaml.safe_load(path.read_text())
-        config["mcp_servers"]["accountbook"]["command"] = "sh"
+        config["mcp_servers"]["demo"]["command"] = "sh"
         path.write_text(yaml.safe_dump(config))
-        self.assertEqual(self.request("/api/mcp/servers/accountbook/test", "POST", token="valid", query_profiles=["alice"]), 409)
+        self.assertEqual(self.connector_probe(), 409)
         seam = sys.modules["hermes_cli.dashboard_auth.token_auth"]
         with mock.patch.object(seam, "authenticate_token", return_value=(types.SimpleNamespace(provider="other"), None)):
-            self.assertEqual(self.request("/api/mcp/servers/accountbook/test", "POST", token="valid", query_profiles=["alice"]), 401)
-            self.assertEqual(self.request("/api/env", "DELETE", token="valid", body={"profile": "alice", "key": "ACCOUNTBOOK_API_TOKEN"}), 401)
+            self.assertEqual(self.connector_probe(), 401)
+            self.assertEqual(self.request("/api/env", "DELETE", token="valid", body={"profile": "alice", "key": "DEMO_TOKEN"}), 401)
 
     def test_connector_preserves_external_edits(self):
         """외부에서 바꾼 환경 변수를 복원으로 덮지 않는다."""
@@ -478,35 +567,157 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.connector()
         path = self.root / "alice" / self.plugin.CONNECTOR_STATE
         original = json.loads(path.read_text())
-        for field, value in (("allowlist_added", "yes"), ("server", {"command": "sh"})):
-            state = json.loads(json.dumps(original))
-            state["fos-accountbook"][field] = value
-            path.write_text(json.dumps(state))
-            self.assertEqual(self.connector(False).status_code, 503)
+        changed_args = {**original[DEMO]["server"], "args": ["/elsewhere/server.py"]}
+        literal_env = {**original[DEMO]["server"],
+                       "env": {**original[DEMO]["server"]["env"], "DEMO_TOKEN": "literal"}}
+        for field, value in (("allowlist_added", "yes"), ("server", {"command": "sh"}), ("server", changed_args),
+                             ("server", literal_env), ("mcp_server", "fos-assistant")):
+            with self.subTest(field=field, value=value):
+                state = json.loads(json.dumps(original))
+                state[DEMO][field] = value
+                path.write_text(json.dumps(state))
+                self.assertEqual(self.connector(False).status_code, 503)
+                self.assertEqual(self.connector_status().status_code, 503)
+        self.assertIn("demo", self.alice_config()["mcp_servers"])
 
-    def test_connector_family_selection_updates_explicit_empty_env(self):
-        """가족 선택과 삭제는 MCP 설정의 빈 값과 변수 참조를 함께 갱신한다."""
+    def test_optional_field_updates_explicit_empty_env(self):
+        """선택 칸을 채우고 비우면 MCP 설정의 변수 참조와 빈 값이 함께 바뀐다."""
         self.connector_fixture()
         self.connector()
-        path = self.root / "alice/config.yaml"
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
         response = self.request("/api/env", "PUT", token="valid", body={
-            "profile": "alice", "key": "ACCOUNTBOOK_FAMILY_UUID", "value": "family-fixture"})
+            "profile": "alice", "key": "DEMO_SCOPE", "value": "a"})
         self.assertEqual(response, 200)
-        self.assertEqual(yaml.safe_load(path.read_text())["mcp_servers"]["accountbook"]["env"]["ACCOUNTBOOK_FAMILY_UUID"], "${ACCOUNTBOOK_FAMILY_UUID}")
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "${DEMO_SCOPE}")
         self.assertEqual(self.request("/api/env", "DELETE", token="valid", body={
-            "profile": "alice", "key": "ACCOUNTBOOK_FAMILY_UUID"}), 200)
-        self.assertEqual(yaml.safe_load(path.read_text())["mcp_servers"]["accountbook"]["env"]["ACCOUNTBOOK_FAMILY_UUID"], "")
+            "profile": "alice", "key": "DEMO_SCOPE"}), 200)
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
+        self.assertEqual(self.connector_probe(), 204)
 
-    def test_connector_normalizes_optional_env_and_accepts_direct_server_manifest(self):
-        """서버 직접 객체와 빈 기본값 참조도 고정 실행 계약으로 정규화한다."""
+    def test_connector_accepts_direct_server_manifest_and_plain_optional_reference(self):
+        """`mcpServers` 없이 서버를 바로 둔 `.mcp.json` 과 기본값 없는 선택 칸 참조도 같은 정의가 된다."""
         root = self.connector_fixture()
         path = root / ".mcp.json"
         value = json.loads(path.read_text())["mcpServers"]
-        value["accountbook"]["env"]["ACCOUNTBOOK_FAMILY_UUID"] = "${ACCOUNTBOOK_FAMILY_UUID:-}"
+        value["demo"]["env"]["DEMO_SCOPE"] = "${DEMO_SCOPE}"
         path.write_text(json.dumps(value))
         self.assertEqual(self.connector().status_code, 200)
-        config = yaml.safe_load((self.root / "alice/config.yaml").read_text())
-        self.assertEqual(config["mcp_servers"]["accountbook"]["env"]["ACCOUNTBOOK_FAMILY_UUID"], "")
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
+
+    def legacy_fixture(self):
+        """앞선 판의 plugin 이 설치한 profile 이다. 소유 기록과 서버 정의가 그 판이 쓴 모양 그대로다.
+
+        앞선 판은 커넥터 하나를 이름으로 알았다. 그 이름과 env 이름은 이 호환 검사에만 둔다.
+        """
+        self.make_profile("alice")
+        self.plugin._apply_template("alice")
+        root = self.root.parent / "legacy-connector"
+        (root / ".claude-plugin").mkdir(parents=True)
+        (root / "skills").mkdir()
+        (root / "dist").mkdir()
+        (root / "dist/accountbook-mcp.js").write_text("// fixture", encoding="utf-8")
+        (root / ".claude-plugin/plugin.json").write_text(
+            json.dumps({"name": LEGACY, "skills": "./skills"}), encoding="utf-8")
+        (root / ".mcp.json").write_text(json.dumps({"mcpServers": {"accountbook": {
+            "command": "bun", "args": ["${CLAUDE_PLUGIN_ROOT}/dist/accountbook-mcp.js"],
+            "env": {"ACCOUNTBOOK_API_BASE_URL": "${ACCOUNTBOOK_API_BASE_URL}",
+                    "ACCOUNTBOOK_API_TOKEN": "${ACCOUNTBOOK_API_TOKEN}",
+                    "ACCOUNTBOOK_FAMILY_UUID": "${ACCOUNTBOOK_FAMILY_UUID:-}"},
+        }}}), encoding="utf-8")
+        (root / "connector.json").write_text(json.dumps({
+            "schema": 1, "id": LEGACY, "title": "가계부", "description": "호환 검사용",
+            "fields": [
+                {"key": "token", "env": "ACCOUNTBOOK_API_TOKEN", "label": "연동 토큰", "secret": True,
+                 "required": True},
+                {"key": "family", "env": "ACCOUNTBOOK_FAMILY_UUID", "label": "가족", "required": False,
+                 "options": {"tool": "list_families", "items": "families", "value": "uuid", "label": "name"}},
+            ],
+            "verify": {"tool": "list_families"},
+            "operator_env": ["ACCOUNTBOOK_API_BASE_URL"],
+            "errors": {"ACCOUNTBOOK_UNAUTHORIZED": "credential_rejected"},
+        }), encoding="utf-8")
+        self.connector_environment(
+            {LEGACY: {"root": str(root), "env": {"ACCOUNTBOOK_API_BASE_URL": LEGACY_BASE}}})
+        # 앞선 판의 설치가 남긴 것이다. 운영자 env 를 참조로 갖고, 고르지 않은 가족은 빈 값이고, 서버 이름 칸이 없다.
+        server = {"command": self.connector_command, "args": [str(root / "dist/accountbook-mcp.js")],
+                  "env": {"ACCOUNTBOOK_API_BASE_URL": "${ACCOUNTBOOK_API_BASE_URL}",
+                          "ACCOUNTBOOK_API_TOKEN": "${ACCOUNTBOOK_API_TOKEN}",
+                          "ACCOUNTBOOK_FAMILY_UUID": ""},
+                  "enabled": True}
+        path = self.root / "alice/config.yaml"
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+        config["mcp_servers"]["accountbook"] = server
+        config["platform_toolsets"]["api_server"].append("accountbook")
+        path.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        (self.root / "alice/.fos-connectors.json").write_text(
+            json.dumps({LEGACY: {"server": server, "allowlist_added": True}}) + "\n", encoding="utf-8")
+        (self.root / "alice/.env").write_text(
+            "ACCOUNTBOOK_API_BASE_URL=%s\nACCOUNTBOOK_API_TOKEN=legacy-token\nOTHER=keep\n" % LEGACY_BASE,
+            encoding="utf-8")
+        return server
+
+    def test_legacy_ownership_record_and_calls_are_still_accepted(self):
+        """앞선 판이 남긴 소유 기록을 그대로 인정하고, 앞선 Control Plane 이 부르는 모양을 그대로 받는다."""
+        self.legacy_fixture()
+        env = self.root / "alice/.env"
+        record_path = self.root / "alice/.fos-connectors.json"
+        record_before = record_path.read_bytes()
+
+        status = self.connector_status()
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.body["connectors"], [{"plugin": LEGACY, "enabled": True, "configured": True}])
+        self.assertEqual(self.connector_probe("accountbook"), 204)
+        self.assertEqual(record_path.read_bytes(), record_before)
+
+        # 앞선 Control Plane 은 공통 주소도 PUT /api/env 로 쓴다. 성공으로 답하고 쓰지 않는다.
+        env_before = env.read_bytes()
+        response = self.request("/api/env", "PUT", token="valid", full_response=True, body={
+            "profile": "alice", "key": "ACCOUNTBOOK_API_BASE_URL", "value": "http://changed.test"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.body["restart_required"])
+        self.assertEqual(env.read_bytes(), env_before)
+        response = self.request("/api/env", "PUT", token="valid", full_response=True, body={
+            "profile": "alice", "key": "ACCOUNTBOOK_API_TOKEN", "value": "legacy-token-2"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.body["restart_required"])
+
+        # 다음 설치 요청이 기록을 새 모양으로 다시 쓴다. 운영자 env 는 운영 목록의 값이 직접 들어간다.
+        installed = self.connector(plugin=LEGACY)
+        self.assertEqual(installed.status_code, 200)
+        self.assertTrue(installed.body["changed"])
+        self.assertTrue(installed.body["restart_required"])
+        record = json.loads(record_path.read_text())[LEGACY]
+        self.assertEqual(record["mcp_server"], "accountbook")
+        self.assertEqual(record["server"]["env"], {"ACCOUNTBOOK_API_BASE_URL": LEGACY_BASE,
+                                                   "ACCOUNTBOOK_API_TOKEN": "${ACCOUNTBOOK_API_TOKEN}",
+                                                   "ACCOUNTBOOK_FAMILY_UUID": ""})
+        self.assertEqual(self.alice_config()["mcp_servers"]["accountbook"], record["server"])
+        self.assertEqual(self.connector_status().body["connectors"],
+                         [{"plugin": LEGACY, "enabled": True, "configured": True}])
+        self.assertEqual(self.connector_probe("accountbook"), 204)
+
+    def test_legacy_ownership_record_keeps_working_after_optional_field_changes(self):
+        """앞선 기록 위에서 선택 칸을 채워도 설정과 기록이 함께 바뀌고 probe 가 통과한다."""
+        self.legacy_fixture()
+        self.assertEqual(self.request("/api/env", "PUT", token="valid", body={
+            "profile": "alice", "key": "ACCOUNTBOOK_FAMILY_UUID", "value": "family-fixture"}), 200)
+        env = self.alice_config()["mcp_servers"]["accountbook"]["env"]
+        self.assertEqual(env["ACCOUNTBOOK_FAMILY_UUID"], "${ACCOUNTBOOK_FAMILY_UUID}")
+        self.assertEqual(self.connector_probe("accountbook"), 204)
+        self.assertEqual(self.connector(False, plugin=LEGACY).status_code, 200)
+        self.assertNotIn("accountbook", self.alice_config()["mcp_servers"])
+
+    def test_legacy_ownership_record_can_be_turned_off_after_removal_from_operator_list(self):
+        """서버 이름 칸이 없는 앞선 기록도 운영 목록에서 빠진 뒤 설치를 끄고 참조하던 env key 를 지운다."""
+        self.legacy_fixture()
+        with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
+            self.assertEqual(self.connector_status().body["connectors"],
+                             [{"plugin": LEGACY, "enabled": True, "configured": False}])
+            self.assertEqual(self.connector(False, plugin=LEGACY).status_code, 200)
+        config = self.alice_config()
+        self.assertNotIn("accountbook", config["mcp_servers"])
+        self.assertNotIn("accountbook", config["platform_toolsets"]["api_server"])
+        self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8"), "OTHER=keep\n")
 
     def register_memory(self, name, server="fos-assistant"):
         path = self.root / name / "config.yaml"

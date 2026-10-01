@@ -58,16 +58,33 @@ class ConnectorEnvironmentTest(unittest.TestCase):
             if name not in values:
                 os.environ.pop(name, None)
 
-    def test_roots_reads_absolute_paths(self):
-        """커넥터 이름마다 준 절대 경로를 돌려준다."""
-        self.environment(**{ROOTS_ENV: json.dumps({"fos-accountbook": "/abs/path"})})
-        self.assertEqual(self.plugin._connector_roots(), {"fos-accountbook": pathlib.Path("/abs/path")})
+    def entry(self, root, command=None, env=None):
+        """읽은 운영 목록 항목 하나의 모양이다."""
+        return {"root": pathlib.Path(root), "command": command, "env": env or {}}
+
+    def test_roots_reads_string_entries_as_plugin_directories(self):
+        """문자열 값은 plugin 디렉터리로 읽는다. 실행 파일과 운영자 env 는 없다."""
+        self.environment(**{ROOTS_ENV: json.dumps({"demo-notes": "/abs/path"})})
+        self.assertEqual(self.plugin._connector_roots(), {"demo-notes": self.entry("/abs/path")})
+
+    def test_roots_reads_object_entries(self):
+        """object 값은 plugin 디렉터리와 실행 파일과 운영자 env 를 함께 준다. 두 모양을 섞어도 된다."""
+        self.environment(**{ROOTS_ENV: json.dumps({
+            "demo-notes": {"root": "/abs/demo", "command": "/abs/bin/runner", "env": {"DEMO_BASE": "value"}},
+            "root-only": {"root": "/abs/only"},
+            "plain": "/abs/plain",
+        })})
+        self.assertEqual(self.plugin._connector_roots(), {
+            "demo-notes": self.entry("/abs/demo", "/abs/bin/runner", {"DEMO_BASE": "value"}),
+            "root-only": self.entry("/abs/only"),
+            "plain": self.entry("/abs/plain"),
+        })
 
     def test_roots_is_empty_when_missing_or_malformed(self):
         """없거나 읽지 못하는 값은 커넥터가 없는 것으로 본다. 예외를 던지지 않는다."""
         self.environment()
         self.assertEqual(self.plugin._connector_roots(), {})
-        for raw in ("", "   ", "not json", "[]", "null", '"text"', '{"x": 1}', '{"x": null}'):
+        for raw in ("", "   ", "not json", "[]", "null", '"text"', '{"x": 1}', '{"x": null}', '{"x": ["/abs"]}'):
             with self.subTest(raw=raw):
                 self.environment(**{ROOTS_ENV: raw})
                 self.assertEqual(self.plugin._connector_roots(), {})
@@ -76,8 +93,23 @@ class ConnectorEnvironmentTest(unittest.TestCase):
         """상대 경로 항목은 버리고 절대 경로 항목은 남긴다."""
         self.environment(**{ROOTS_ENV: json.dumps({"x": "relative"})})
         self.assertEqual(self.plugin._connector_roots(), {})
-        self.environment(**{ROOTS_ENV: json.dumps({"x": "relative", "y": "/abs/y"})})
-        self.assertEqual(self.plugin._connector_roots(), {"y": pathlib.Path("/abs/y")})
+        self.environment(**{ROOTS_ENV: json.dumps({
+            "x": "relative", "y": "/abs/y", "z": {"root": "/abs/z", "command": "runner"}})})
+        self.assertEqual(self.plugin._connector_roots(), {"y": self.entry("/abs/y")})
+
+    def test_roots_drops_only_malformed_object_entries(self):
+        """모양이 틀린 object 항목만 버린다. 모르는 칸, 문자열이 아닌 값, root 없는 항목이 여기 해당한다."""
+        for label, entry in (
+            ("no root", {"command": "/abs/bin/runner"}),
+            ("root type", {"root": 1}),
+            ("command type", {"root": "/abs/x", "command": 1}),
+            ("env type", {"root": "/abs/x", "env": ["DEMO_BASE"]}),
+            ("env value type", {"root": "/abs/x", "env": {"DEMO_BASE": 1}}),
+            ("unknown key", {"root": "/abs/x", "args": ["-c"]}),
+        ):
+            with self.subTest(label):
+                self.environment(**{ROOTS_ENV: json.dumps({"x": entry, "y": "/abs/y"})})
+                self.assertEqual(self.plugin._connector_roots(), {"y": self.entry("/abs/y")})
 
     def test_command_reads_absolute_path(self):
         """절대 경로를 주면 그 값을 그대로 돌려준다."""

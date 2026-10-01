@@ -53,7 +53,8 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 **plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받는다.** 운영은 plugin 을 먼저 올리고 Control Plane 을 올린다.
 경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
 
-검사는 `python3 -m unittest discover -s hermes/tests` 로 돈다. 필요한 것은 Python 3.13 과 PyYAML 뿐이다. Hermes 이미지와 같은 판이다.
+검사는 `python3 -m unittest discover -s hermes/tests` 로 돈다. 필요한 것은 Python 3.13 과 PyYAML 과 `mcp` SDK 다. Hermes 이미지와 같은 판이다.
+대시보드 plugin 은 커넥터 도구를 부를 때만 `mcp` SDK 를 쓴다. SDK 가 없어도 plugin 은 올라오고 그 경로만 `unavailable` 로 답한다.
 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
 
 ## backend 패키지
