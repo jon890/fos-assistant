@@ -3,6 +3,9 @@ import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 
 const PENDING_ROUTE = "**/api/chat/conversations/*/pending";
 
+/** 화면이 대화 단위 SSE 를 다시 열기까지 기다리는 시간이다. 화면의 값과 같아야 한다. */
+const EVENTS_RECONNECT_MS = 5_000;
+
 function composer(page: Page) {
   return page.getByTestId("composer-shell");
 }
@@ -219,5 +222,50 @@ test("대기 메시지를 보내지 못하면 입력창 위에 까닭을 알린�
   await expect(page.getByTestId("pending-release")).toBeVisible();
   await expect(page.getByTestId("pending-item")).toContainText("보내지 못한 대기 글");
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("대화 단위 SSE 가 다시 붙으면 대기 줄을 다시 읽는다", async ({ page }) => {
+  const created = await page.request.post("/api/chat", {
+    data: { text: `대기 줄 재연결 검사 ${Date.now()}`, agentCode: "browser" },
+  });
+  expect(created.ok(), "대화를 만든 응답").toBeTruthy();
+  const { conversationId } = (await created.json()) as { conversationId: string };
+
+  // 연결이 끊긴 사이에 대기 메시지가 보내져 대기 줄이 비었다. 그 `pending` 사건은 화면에 닿지 않는다.
+  let sentWhileDisconnected = false;
+  await page.route(`**/api/chat/conversations/${conversationId}/pending`, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      held: false,
+      items: sentWhileDisconnected
+        ? []
+        : [{ id: 90_000_201, text: "끊긴 사이에 보내진 글", createdAt: new Date().toISOString() }],
+    }),
+  }));
+  let eventRequests = 0;
+  await page.route(`**/api/chat/conversations/${conversationId}/events`, async (route) => {
+    eventRequests += 1;
+    if (eventRequests > 1) {
+      // 다시 붙은 연결은 사건 없이 붙잡아 둔다.
+      await new Promise(() => {});
+      return;
+    }
+    // 대기 줄이 화면에 보인 뒤에 첫 연결을 사건 없이 닫는다. 화면이 잠시 뒤 다시 연다.
+    await expect(page.getByTestId("pending-item")).toHaveCount(1);
+    sentWhileDisconnected = true;
+    await route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
+      body: ": connected\n\n",
+    });
+  });
+
+  await page.goto(`/chat/${conversationId}`);
+
+  await expect(page.getByTestId("pending-item")).toContainText("끊긴 사이에 보내진 글");
+  await expect(page.getByTestId("pending-queue")).toHaveCount(0, { timeout: EVENTS_RECONNECT_MS + 10_000 });
+  expect(eventRequests, "다시 연결하기 전에 대기 줄이 비었다").toBeGreaterThanOrEqual(2);
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });

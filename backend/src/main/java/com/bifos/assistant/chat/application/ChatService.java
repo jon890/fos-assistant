@@ -254,6 +254,24 @@ public class ChatService {
     }
 
     /**
+     * 중지가 확정된 turn 이 예외로 끝날 때도 그 대화의 대기 줄을 멈춰 둔다.
+     *
+     * <p>취소된 turn 을 돌려주는 자리를 지나지 않고 빠져나가므로 여기서 멈춘다. 멈추지 않으면 사용자가 중지한 대화에서
+     * 잠금이 풀리자마자 대기 메시지가 간다. 멈추다 난 예외는 원래 예외에 붙여 원래 예외가 그대로 올라가게 한다.
+     */
+    private void holdPendingIfStopConfirmed(
+            TurnCancellation.TurnHandle handle, Long conversationId, RuntimeException failure) {
+        if (!turns.isStopConfirmed(handle)) {
+            return;
+        }
+        try {
+            markStoppedAndHoldPending(handle, conversationId);
+        } catch (RuntimeException ex) {
+            failure.addSuppressed(ex);
+        }
+    }
+
+    /**
      * 결과마다 에이전트 이름, 실행 번호, 상태를 적은 머리줄을 두고, 답이 있으면 그 아래에 잇는다. 실패는 오류 코드를
      * 머리줄에 더한다.
      */
@@ -350,6 +368,9 @@ public class ChatService {
                     relay(pending, runId, handle, onEvent);
                 }
                 result = awaitCompletion(pending, runId);
+            } catch (RuntimeException ex) {
+                holdPendingIfStopConfirmed(handle, conversation.id(), ex);
+                throw ex;
             } finally {
                 turns.untrackRun(pending.execution().id(), runId);
             }

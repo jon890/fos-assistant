@@ -484,6 +484,9 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
           { cache: "no-store", signal: controller.signal });
         if (response.ok) {
           if (reconnected) {
+            // 끊긴 사이의 `pending` 사건은 다시 오지 않는다. 놓치면 이미 보낸 글이 대기 줄에 남으므로 다시 읽는다.
+            // 대기 줄 사건과 같이 보류하지 않는다.
+            void pending.reload();
             await runConversationTask(() => resumeAfterReconnect(id));
           }
           await readEventStream<ChatEvent>(response, (event) => {
@@ -1259,6 +1262,8 @@ export function ChatPanel({ initialConversationId }: { initialConversationId: st
       if (selectionVersion.current !== version) return;
       if (result.ok) {
         setError(null);
+        // 화면이 그 줄을 모르면 되돌릴 글이 없다. 입력창에 빈 줄만 붙지 않게 그대로 둔다.
+        if (result.data.length === 0) return;
         setDraft((current) => current.trim().length === 0 ? result.data : `${current}\n${result.data}`);
         return;
       }

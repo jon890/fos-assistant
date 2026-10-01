@@ -2,12 +2,20 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ChatEvent;
+import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.application.ConversationEventHub;
+import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.PendingMessageService;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -37,6 +45,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +57,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * 보낼 대기 메시지와 끝난 위임 결과가 함께 있을 때 사용자의 말이 먼저 가는지 본다(ADR-047).
@@ -66,8 +76,23 @@ class PendingBeforeDelegationTest {
     @MockitoBean
     HermesRunEventStream eventStream;
 
+    /** 대기 메시지 turn 이 사용자 메시지를 저장하기 전에 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
+    @MockitoSpyBean
+    ChatService chat;
+
+    /** 대기 행을 멈추다 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
+    @MockitoSpyBean
+    ChatPendingMessageRepository pendingRows;
+
     @Autowired
     PendingMessageService pending;
+
+    @Autowired
+    NextTurnDispatcher dispatcher;
+
+    /** 대기 줄이 멈췄다는 알림이 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
+    @MockitoSpyBean
+    ConversationEventHub hub;
 
     @Autowired
     TurnCancellation turns;
@@ -86,9 +111,6 @@ class PendingBeforeDelegationTest {
 
     @Autowired
     ChatMessageRepository messages;
-
-    @Autowired
-    ChatPendingMessageRepository pendingRows;
 
     @Autowired
     ChatAttachmentRepository attachmentRows;
@@ -197,6 +219,71 @@ class PendingBeforeDelegationTest {
         assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
                 .extracting(ChatPendingMessage::held)
                 .containsExactly(true);
+    }
+
+    @Test
+    @DisplayName("중지로 닫힌 turn 뒤에 대기 줄 알림이 실패해도 위임 결과의 자동 turn 은 열린다")
+    void opensAutoTurnEvenWhenHeldNoticeFailsAfterStoppedTurn() {
+        // 자동 turn 의 사건은 그대로 나가고, 대기 줄이 멈췄다는 알림만 실패한다.
+        doThrow(new IllegalStateException("알림을 보내지 못했다"))
+                .when(hub)
+                .publish(eq(conversation.id()), argThat(event -> event != null && "pending".equals(event.type())));
+        pendingRows.save(ChatPendingMessage.queued(
+                conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
+        AgentExecution done = delegated();
+        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        finished(done);
+        turns.markStopped(running);
+
+        turns.close(running);
+        awaitMessages(2);
+        awaitIdle(conversation.id());
+
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::role)
+                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .as("전했다는 표시")
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("보내려다 실패하고 대기 행을 멈추지도 못하면 한동안 다시 열지 않고 위임 결과는 전한다")
+    void backsOffQueuedTurnWhenHoldFailsAndStillDeliversDelegationResult() {
+        doThrow(new IllegalStateException("사용자 메시지를 저장하기 전에 실패"))
+                .when(chat)
+                .runPendingMessages(any(), any(), any(), any());
+        doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
+        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        AgentExecution done = delegated();
+        finished(done);
+        pending.enqueue(dad, conversation.id(), "대기 글");
+        List<ChatEvent> received = new CopyOnWriteArrayList<>();
+        Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
+        try {
+            turns.close(running);
+            awaitMessages(2);
+            awaitIdle(conversation.id());
+            dispatcher.tryNext(conversation.id());
+            awaitIdle(conversation.id());
+        } finally {
+            unsubscribe.run();
+        }
+
+        assertThat(received.stream().filter(event -> "error".equals(event.type())))
+                .as("닫을 때와 뒤이은 호출이 다시 열지 않아 실패 알림은 하나다")
+                .singleElement()
+                .satisfies(error -> assertThat(error.code()).isEqualTo("INTERNAL_ERROR"));
+        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+                .as("멈추지 못한 대기 행")
+                .extracting(ChatPendingMessage::held)
+                .containsExactly(false);
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::role)
+                .as("그동안에도 위임 결과의 자동 turn 은 열린다")
+                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+                .isNotNull();
     }
 
     private void finished(AgentExecution execution) {

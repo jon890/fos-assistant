@@ -282,9 +282,15 @@ class PendingMessageServiceTest {
         stub().willReturnInOrder(cancelled("run-stop"), result("run-next", "다음 답"));
         enqueueAndStopBeforeTurnCompletes("기다린 글");
         List<ChatEvent> received = new CopyOnWriteArrayList<>();
+        AtomicReference<Long> pendingEventsBeforeClose = new AtomicReference<>();
         Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
         try {
-            chat.stream(dad, conversation.id(), "질문", null, event -> {});
+            chat.stream(dad, conversation.id(), "질문", null, event -> {
+                if ("stopped".equals(event.type())) {
+                    // stopped 는 잠금을 풀기 전에 온다. 이때까지 받은 것은 더할 때 나온 사건이다.
+                    pendingEventsBeforeClose.set(pendingEventsIn(received));
+                }
+            });
         } finally {
             unsubscribe.run();
         }
@@ -296,7 +302,10 @@ class PendingMessageServiceTest {
                 .containsExactly(true);
         assertThat(pending.queue(dad, conversation.id()).held()).isTrue();
         assertThat(stub().received()).as("중지 뒤에 새 turn 이 열리지 않았다").hasSize(1);
-        assertThat(received).extracting(ChatEvent::type).as("더할 때와 멈출 때").contains("pending");
+        assertThat(pendingEventsBeforeClose.get()).as("turn 이 닫히기 전에 받은 pending 사건").isEqualTo(1L);
+        assertThat(pendingEventsIn(received))
+                .as("중지로 닫힐 때 대기 줄이 멈췄다는 pending 사건이 하나 더 온다")
+                .isEqualTo(2L);
 
         PendingQueue released = pending.release(dad, conversation.id());
         awaitIdle(conversation.id());
@@ -331,6 +340,34 @@ class PendingMessageServiceTest {
         assertThat(heldAtStop.get()).as("잠금이 풀리기 전에 읽은 대기 행의 held").containsExactly(true);
         assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
         assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
+    }
+
+    @Test
+    @DisplayName("중지가 확정된 turn 이 예외로 끝나도 잠금을 풀기 전에 대기 줄을 멈춰 둔다")
+    void holdsQueueWhenStopConfirmedTurnEndsWithException() {
+        AtomicBoolean done = new AtomicBoolean();
+        stub().beforeAwait(() -> {
+            if (!done.compareAndSet(false, true)) {
+                return;
+            }
+            pending.enqueue(dad, conversation.id(), "기다린 글");
+            chat.stop(dad, latestExecutionId());
+            stub().willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "agent runtime is down"));
+        });
+
+        assertThatCode(
+                () -> chat.stream(dad, conversation.id(), "질문", null, event -> {}), ErrorCode.HERMES_UNAVAILABLE);
+        awaitIdle(conversation.id());
+
+        assertThat(rowsOf(conversation))
+                .as("중지한 turn 이 예외로 끝난 뒤의 대기 행")
+                .extracting(ChatPendingMessage::held)
+                .containsExactly(true);
+        assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .extracting(ChatMessage::content)
+                .as("대기 글은 사용자 메시지가 되지 않았다")
+                .containsExactly("질문");
     }
 
     @Test
@@ -498,12 +535,19 @@ class PendingMessageServiceTest {
                 return;
             }
             pending.enqueue(dad, conversation.id(), text);
-            Long executionId = executions
-                    .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
-                    .getFirst()
-                    .id();
-            chat.stop(dad, executionId);
+            chat.stop(dad, latestExecutionId());
         });
+    }
+
+    private Long latestExecutionId() {
+        return executions
+                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
+                .getFirst()
+                .id();
+    }
+
+    private static long pendingEventsIn(List<ChatEvent> events) {
+        return events.stream().filter(event -> "pending".equals(event.type())).count();
     }
 
     private CurrentUser signedUp(String email, String name) {
