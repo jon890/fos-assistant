@@ -27,6 +27,7 @@ import com.bifos.assistant.chat.domain.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -309,7 +310,11 @@ class ChatServiceTest {
         assertThat(execution.costMode()).isEqualTo(CostMode.SUBSCRIPTION);
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.latencyMs()).isGreaterThanOrEqualTo(0);
-        assertThat(execution.contextChars()).isZero();
+        String sentInstructions = stub().received().getFirst().instructions();
+        String commonInstructions = sentInstructions.substring(0, sentInstructions.indexOf("\n\n" + AskFormat.GUIDE));
+        assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
+        assertThat(execution.instructionsHash())
+                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
                 .satisfiesExactly(
