@@ -1,7 +1,7 @@
 """Hermes 설치 없이 fos-ctx plugin 의 모양과 서명 계약, hook 분기를 검사한다.
 
-서명 기대값은 fos-assistant `docs/hermes/delegation.md` 「`_fos_ctx` 계약」 표의 값을 그대로 옮겼다.
-서버 쪽 `McpCallContextTest` 도 같은 값을 쓴다. 한쪽 계약이 바뀌면 두 저장소를 함께 고친다.
+서명 기대값은 `docs/hermes/delegation.md` 「`_fos_ctx` 계약」 표의 값을 그대로 옮겼다.
+서버 쪽 `McpCallContextTest` 도 같은 값을 쓴다. 한쪽 계약이 바뀌면 두 쪽을 함께 고친다.
 자식 session 등록의 서명 기대값은 같은 문서의 「하위 에이전트 session 등록 계약」 확인 값이다.
 """
 

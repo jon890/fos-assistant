@@ -93,22 +93,6 @@ class ConnectorEnvironmentTest(unittest.TestCase):
                 self.environment(**{COMMAND_ENV: raw})
                 self.assertIsNone(self.plugin._connector_command())
 
-    def test_owned_record_is_rejected_without_command(self):
-        """실행 파일을 받지 못하면 소유 기록 검증이 원본의 ValueError 갈래로 간다."""
-        record = {"fos-accountbook": {"allowlist_added": True, "server": {
-            "command": "/abs/bin/runner", "args": ["/abs/path/dist/accountbook-mcp.js"], "enabled": True,
-            "env": {"ACCOUNTBOOK_API_BASE_URL": "${ACCOUNTBOOK_API_BASE_URL}",
-                    "ACCOUNTBOOK_API_TOKEN": "${ACCOUNTBOOK_API_TOKEN}"}}}}
-        roots = json.dumps({"fos-accountbook": "/abs/path"})
-        self.environment(**{ROOTS_ENV: roots, COMMAND_ENV: "/abs/bin/runner"})
-        self.assertEqual(self.plugin._connector_state(record), record)
-        self.environment(**{ROOTS_ENV: roots})
-        with self.assertRaises(ValueError):
-            self.plugin._connector_state(record)
-        self.environment(**{ROOTS_ENV: roots, COMMAND_ENV: "/abs/bin/other"})
-        with self.assertRaises(ValueError):
-            self.plugin._connector_state(record)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -30,7 +30,7 @@ platforms:
 # sentinel "no_mcp" would block ALL of them, including the Control Plane MCP server, so the
 # agent could see the memory index and never read an entry's body. Listing the one server we want
 # keeps that boundary without breaking memory_read. Removing this key entirely is NOT the same: it
-# would also hand the profile the platform's native toolsets. See the README.
+# would also hand the profile the platform's native toolsets.
 # delegation is listed so the agent can hand work to a subagent. A child inherits this list with
 # memory stripped, so it never gets a tool the parent lacks. Only a child spawned as orchestrator
 # keeps delegation, and delegation.max_spawn_depth bounds how deep that goes.

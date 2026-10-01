@@ -327,7 +327,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 
 결정은 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
-플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 비공개 저장소 `fos-home-infra` 가 갖고, 이 저장소는 그 동작을 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
+플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고 `hermes/tests/test_fos_ctx.py` 가 그 동작을 검사한다. 다만 profile 에 실제로 설치되어 켜졌는지는 이 저장소가 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
 
 #### 호출은 profile 마다 하나씩 나간다
 
@@ -559,7 +559,7 @@ gateway 의 `/stop` 과 같은 함수이고, 부모 session 이 정확히 같은
 - 압축으로 turn 중간에 session 이 바뀌면 값이 맞지 않아 자식을 놓친다. 엉뚱한 자식을 멈추지는 않는다
 - 한 프로세스가 여러 profile 을 multiplex 하면 기록이 공유된다. 격리는 session 이 고유한 것에만 기댄다
 
-**이 저장소는 이 길을 구현하지 않는다.** 플러그인은 비공개 저장소 `fos-home-infra` 가 갖고, 거기의 후속 작업 후보다.
+**이 저장소는 이 길을 구현하지 않는다.** 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고, 이 길은 그 플러그인의 후속 작업 후보다.
 그 전까지 Control Plane 이 막는 것은 아래 표와 같다. 멈춘 turn 의 자식이 사용자의 권한을 쓰는 길은 이미 막혀 있다([ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 
 그래서 Control Plane 은 지금 이만큼 막는다.

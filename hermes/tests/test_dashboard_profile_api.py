@@ -47,8 +47,10 @@ class ProfileApiRouteTest(unittest.TestCase):
         cls.bundle_tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls.bundle_tmp.cleanup)
         bundle = pathlib.Path(cls.bundle_tmp.name).resolve() / "bundle"
-        subprocess.run([str(BUNDLE_SCRIPT), "--out", str(bundle), "--mcp-url", MCP_URL],
-                       check=True, capture_output=True, text=True)
+        built = subprocess.run([str(BUNDLE_SCRIPT), "--out", str(bundle), "--mcp-url", MCP_URL],
+                               capture_output=True, text=True)
+        if built.returncode != 0:
+            raise AssertionError("bundle.sh 가 %d 로 끝났다: %s" % (built.returncode, built.stderr.strip()))
         cls.template = bundle / "default-config.yaml.template"
         cls.profile_plugins = bundle / "profile-plugins"
         auth = types.ModuleType("hermes_cli.dashboard_auth")
@@ -250,6 +252,69 @@ class ProfileApiRouteTest(unittest.TestCase):
         with mock.patch.object(self.plugin.os, "access", return_value=True):
             return self.request("/api/connectors", "PUT", token="valid", full_response=True, body={
                 "profile": "alice", "plugin": "fos-accountbook", "enabled": enabled, **overrides})
+
+    def connector_status(self):
+        return self.request("/api/connectors", "GET", token="valid", query_profiles=["alice"], full_response=True)
+
+    def connector_probe(self):
+        return self.request("/api/mcp/servers/accountbook/test", "POST", token="valid", query_profiles=["alice"])
+
+    @contextlib.contextmanager
+    def without_environment(self, *names):
+        """그 안에서만 환경 변수를 뺀다. 나오면 커넥터 준비가 준 값으로 돌아간다."""
+        with mock.patch.dict(os.environ):
+            for name in names:
+                os.environ.pop(name, None)
+            yield
+
+    def test_connector_install_is_rejected_without_environment(self):
+        """두 환경 변수가 없으면 알려진 커넥터가 없어 설치 요청이 400 이고 설정은 그대로다."""
+        self.connector_fixture()
+        before = (self.root / "alice/config.yaml").read_bytes()
+        with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS", "FOS_ASSISTANT_CONNECTOR_COMMAND"):
+            self.assertEqual(self.connector().status_code, 400)
+            status = self.connector_status()
+            self.assertEqual(status.status_code, 200)
+            self.assertEqual(status.body["connectors"], [])
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+        self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
+
+    def test_connector_install_fails_without_command(self):
+        """경로만 받고 실행 파일을 받지 못하면 설치가 503 이고 설정은 그대로다."""
+        self.connector_fixture()
+        before = (self.root / "alice/config.yaml").read_bytes()
+        for label, value in (("missing", None), ("relative", "bin/connector-runner")):
+            with self.subTest(label), self.without_environment("FOS_ASSISTANT_CONNECTOR_COMMAND"):
+                if value is not None:
+                    os.environ["FOS_ASSISTANT_CONNECTOR_COMMAND"] = value
+                self.assertEqual(self.connector().status_code, 503)
+                self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+                self.assertFalse((self.root / "alice/.fos-connectors.json").exists())
+
+    def test_installed_connector_is_blocked_when_environment_is_missing_or_changed(self):
+        """설치한 뒤 환경 변수가 빠지거나 바뀌면 상태 조회, 제거, probe 가 막히고, 값이 돌아오면 다시 읽힌다."""
+        self.connector_fixture()
+        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.connector_probe(), 204)
+        before = (self.root / "alice/config.yaml").read_bytes()
+        with self.without_environment("FOS_ASSISTANT_CONNECTOR_COMMAND"):
+            self.assertEqual(self.connector_status().status_code, 503)
+            self.assertEqual(self.connector(False).status_code, 503)
+            self.assertEqual(self.connector_probe(), 503)
+            os.environ["FOS_ASSISTANT_CONNECTOR_COMMAND"] = self.connector_command + "-other"
+            self.assertEqual(self.connector_status().status_code, 503)
+            self.assertEqual(self.connector(False).status_code, 503)
+            self.assertEqual(self.connector_probe(), 503)
+        with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
+            self.assertEqual(self.connector_status().status_code, 503)
+            self.assertEqual(self.connector(False).status_code, 400)
+            self.assertEqual(self.connector_probe(), 503)
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
+        self.assertEqual(self.connector_probe(), 204)
+        status = self.connector_status()
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.body["connectors"], [{"plugin": "fos-accountbook", "enabled": True, "configured": True}])
+        self.assertEqual(self.connector(False).status_code, 200)
 
     def test_connector_installs_idempotently_and_preserves_profile_secrets(self):
         """connector 는 고정 manifest 에서 등록하고 사용자 토큰과 다른 MCP 를 보존한다."""

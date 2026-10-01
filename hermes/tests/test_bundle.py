@@ -12,6 +12,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 BUNDLE_SCRIPT = ROOT / "bundle.sh"
 MCP_URL = "http://control-plane.test/mcp"
 PLACEHOLDER = "__FOS_ASSISTANT_MCP_URL__"
+# 인자 검사는 지나지만 `:` 로 끝나 채운 틀이 YAML 로 읽히지 않는 주소다. 채우기 시작한 뒤의 실패를 만든다.
+UNREADABLE_URL = "http://control-plane.test/mcp:"
 
 
 class BundleTest(unittest.TestCase):
@@ -68,6 +70,41 @@ class BundleTest(unittest.TestCase):
                 result = self.bundle(*args)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(self.out.exists(), "실패했는데 %s 가 남았다" % self.out)
+
+    def test_failure_leaves_an_existing_empty_directory_empty(self):
+        """미리 만들어 둔 빈 디렉터리는 실패해도 지우지 않고 빈 채로 둔다."""
+        self.out.mkdir()
+        result = self.bundle("--out", str(self.out), "--mcp-url", UNREADABLE_URL)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(self.out.is_dir(), "있던 디렉터리 %s 가 지워졌다" % self.out)
+        self.assertEqual(sorted(p.name for p in self.out.iterdir()), [])
+
+    def test_failure_after_filling_removes_a_directory_it_created(self):
+        """채우다 실패하면 이 실행이 만든 디렉터리를 남기지 않는다."""
+        result = self.bundle("--out", str(self.out), "--mcp-url", UNREADABLE_URL)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.out.exists(), "실패했는데 %s 가 남았다" % self.out)
+
+    def test_relative_out_starting_with_dash_is_a_directory_name(self):
+        """`-` 로 시작하는 상대 경로도 디렉터리 이름으로 다룬다. 실패하면 있던 디렉터리가 빈 채로 남는다."""
+        out = self.base / "-bundle"
+        result = subprocess.run([str(BUNDLE_SCRIPT), "--out", "-bundle", "--mcp-url", MCP_URL],
+                                capture_output=True, text=True, cwd=self.base)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((out / "profile-plugins/fos-ctx/__init__.py").is_file())
+        empty = self.base / "-empty"
+        empty.mkdir()
+        result = subprocess.run([str(BUNDLE_SCRIPT), "--out", "-empty", "--mcp-url", UNREADABLE_URL],
+                                capture_output=True, text=True, cwd=self.base)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(sorted(p.name for p in empty.iterdir()), [])
+
+    def test_failure_message_is_one_line_without_traceback(self):
+        """실패 메시지는 원인을 적은 줄이고 Python traceback 을 싣지 않는다."""
+        result = self.bundle("--out", str(self.out), "--mcp-url", UNREADABLE_URL)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("YAML 로 읽히지 않는다", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
     def test_missing_out_fails(self):
         """--out 이 없으면 실패한다."""
