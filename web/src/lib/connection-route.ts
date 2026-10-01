@@ -1,80 +1,72 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import type { ControlPlaneResult } from "@/lib/control-plane-result";
+import {
+  CONNECTION_ERROR_MESSAGES,
+  CONNECTOR_ID_PATTERN,
+  FIELD_KEY_PATTERN,
+  connectionErrorMessage,
+} from "@/lib/connection";
+import { readJsonBody } from "@/lib/json-body";
 
-const MESSAGES: Record<string, string> = {
-  ACCOUNTBOOK_TOKEN_REJECTED:
-    "가계부 토큰을 확인하지 못했어요. 토큰을 다시 확인해 주세요.",
-  ACCOUNTBOOK_FAMILY_FORBIDDEN:
-    "선택한 가족에 접근할 수 없어요. 가족 식별자를 다시 확인해 주세요.",
-  ACCOUNTBOOK_UNAVAILABLE:
-    "가계부에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
-  CONNECTOR_OPERATION_FAILED:
-    "연결 설정을 적용하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
-  FORBIDDEN: "이 작업을 관리할 수 없어요.",
-  UNAUTHENTICATED: "로그인이 필요해요.",
-  VALIDATION_FAILED: "입력 내용을 다시 확인해 주세요.",
-};
-
-function message(code: string): string {
-  return MESSAGES[code] ?? "요청을 처리하지 못했어요.";
-}
-
-/** Control Plane 의 오류 본문을 브라우저에 그대로 전달하지 않는다. */
+/** Control Plane 의 오류 본문을 브라우저에 그대로 전달하지 않는다. 표에 없는 코드는 연결 실패로 바꾼다. */
 export function connectionResponse<T>(result: ControlPlaneResult<T>) {
   if (!result.ok) {
-    const code = Object.hasOwn(MESSAGES, result.code)
+    const code = Object.hasOwn(CONNECTION_ERROR_MESSAGES, result.code)
       ? result.code
       : "CONNECTOR_OPERATION_FAILED";
     return NextResponse.json(
-      { code, message: message(code) },
+      { code, message: connectionErrorMessage(code) },
       { status: result.status },
     );
   }
   return NextResponse.json(result.data, { status: result.status });
 }
 
-export async function readConnectionBody(
-  request: Request,
-): Promise<{ token: string; familyUuid?: string } | null> {
-  try {
-    const body = (await request.json()) as {
-      token?: unknown;
-      familyUuid?: unknown;
-    };
-    if (typeof body.token !== "string" || body.token.trim().length === 0)
-      return null;
-    if (body.familyUuid !== undefined && typeof body.familyUuid !== "string")
-      return null;
-    const familyUuid = body.familyUuid?.trim();
-    return { token: body.token, ...(familyUuid ? { familyUuid } : {}) };
-  } catch {
-    return null;
-  }
-}
-
 export function invalidConnectionRequest() {
   return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: message("VALIDATION_FAILED") },
+    {
+      code: "VALIDATION_FAILED",
+      message: connectionErrorMessage("VALIDATION_FAILED"),
+    },
     { status: 400 },
   );
 }
 
+export function isConnectorId(value: string): boolean {
+  return CONNECTOR_ID_PATTERN.test(value);
+}
+
+export function isFieldKey(value: string): boolean {
+  return FIELD_KEY_PATTERN.test(value);
+}
+
+/** 요청 본문의 `values` 만 읽는다. 문자열이 아닌 값이 하나라도 있으면 거절한다. */
+export async function readValuesBody(
+  request: Request,
+): Promise<Record<string, string> | null> {
+  const parsed = await readJsonBody(request);
+  if (!parsed.ok) return null;
+  const values = parsed.body.values;
+  if (!values || typeof values !== "object" || Array.isArray(values))
+    return null;
+  const entries = Object.entries(values);
+  if (entries.some(([, value]) => typeof value !== "string")) return null;
+  return Object.fromEntries(entries) as Record<string, string>;
+}
+
+type Kind = "catalog" | "connection" | "options" | "admin" | "adminItem";
+
 /** 비정상 응답 본문 때문에 Control Plane 호출 자체가 던져도 고정 오류로 돌린다. */
 export async function connectorCall<T>(
   path: string,
+  kind: Kind,
   init: { method?: string; body?: unknown } = {},
 ) {
   try {
     const result = await callControlPlane<unknown>(path, init);
     if (!result.ok) return result;
-    const admin = path.startsWith("/api/v1/admin/");
-    const data = path.endsWith("/families")
-      ? safeFamilies(result.data)
-      : Array.isArray(result.data) && admin
-        ? result.data.map((item) => safeConnection(item, true))
-        : safeConnection(result.data, admin);
-    return { ...result, data: data as T };
+    return { ...result, data: safeData(kind, result.data) as T };
   } catch {
     return {
       ok: false as const,
@@ -85,77 +77,136 @@ export async function connectorCall<T>(
   }
 }
 
-function safeFamilies(value: unknown) {
+function safeData(kind: Kind, value: unknown) {
+  switch (kind) {
+    case "catalog":
+      return list(value).map(safeSummary);
+    case "connection":
+      return safeConnection(value);
+    case "options":
+      return list(value).map(safeOption);
+    case "admin":
+      return list(value).map(safeAdmin);
+    case "adminItem":
+      return safeAdmin(value);
+  }
+}
+
+function list(value: unknown): unknown[] {
   if (!Array.isArray(value)) throw new Error();
-  return value.map((entry: unknown) => {
-    if (!entry || typeof entry !== "object") throw new Error();
-    const item = entry as Record<string, unknown>;
-    if (
-      typeof item.uuid !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        item.uuid,
-      ) ||
-      typeof item.name !== "string" ||
-      !item.name.trim()
-    )
-      throw new Error();
-    return { uuid: item.uuid, name: item.name };
-  });
+  return value;
+}
+
+function record(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error();
+  return value as Record<string, unknown>;
+}
+
+function text(value: unknown): string {
+  if (typeof value !== "string") throw new Error();
+  return value;
+}
+
+function nullableText(value: unknown): string | null {
+  return value === null || value === undefined ? null : text(value);
+}
+
+function bool(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error();
+  return value;
+}
+
+function connectorId(value: unknown): string {
+  const id = text(value);
+  if (!isConnectorId(id)) throw new Error();
+  return id;
+}
+
+function status(value: unknown) {
+  if (value !== "DISCONNECTED" && value !== "PENDING" && value !== "READY")
+    throw new Error();
+  return value;
+}
+
+function agentCode(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const code = text(value);
+  if (!CONNECTOR_ID_PATTERN.test(code)) throw new Error();
+  return code;
+}
+
+function stringMap(value: unknown): Record<string, string> {
+  if (value === null || value === undefined) return {};
+  const source = record(value);
+  const result: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(source)) result[key] = text(entry);
+  return result;
 }
 
 /** 응답 계약의 칸만 복사해 비밀값이 추가된 원격 응답도 브라우저로 옮기지 않는다. */
-function safeConnection(value: unknown, admin: boolean) {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error();
-  const item = value as Record<string, unknown>;
-  if (
-    !["DISCONNECTED", "PENDING", "READY"].includes(String(item.status)) ||
-    typeof item.restartRequired !== "boolean"
-  )
-    throw new Error();
-  if (
-    item.agentCode !== null &&
-    (typeof item.agentCode !== "string" ||
-      !/^[a-z0-9][a-z0-9-]{0,63}$/.test(item.agentCode))
-  )
-    throw new Error();
-  const common = {
-    status: item.status,
-    restartRequired: item.restartRequired,
-    agentCode: item.agentCode,
+function safeSummary(value: unknown) {
+  const item = record(value);
+  return {
+    id: connectorId(item.id),
+    title: text(item.title),
+    description: text(item.description ?? ""),
+    fields: list(item.fields ?? []).map(safeField),
+    myStatus: status(item.myStatus),
+    available: bool(item.available),
   };
-  if (admin) {
-    if (
-      !Number.isSafeInteger(item.userId) ||
-      (item.userId as number) <= 0 ||
-      (item.displayName !== null && typeof item.displayName !== "string")
-    )
-      throw new Error();
-    return { ...common, userId: item.userId, displayName: item.displayName };
-  }
-  if (
-    item.tokenPrefix !== null &&
-    (typeof item.tokenPrefix !== "string" || item.tokenPrefix.length !== 8)
-  )
+}
+
+function safeField(value: unknown) {
+  const item = record(value);
+  const key = text(item.key);
+  if (!isFieldKey(key)) throw new Error();
+  return {
+    key,
+    label: text(item.label),
+    description: nullableText(item.description),
+    secret: bool(item.secret),
+    required: bool(item.required),
+    pattern: nullableText(item.pattern),
+    hasOptions: bool(item.hasOptions),
+    autoSelectSingle: bool(item.autoSelectSingle),
+  };
+}
+
+function safeOption(value: unknown) {
+  const item = record(value);
+  return { value: text(item.value), label: text(item.label) };
+}
+
+function safeConnection(value: unknown) {
+  const item = record(value);
+  const checkedAt = nullableText(item.checkedAt);
+  if (checkedAt !== null && !Number.isFinite(Date.parse(checkedAt)))
     throw new Error();
-  if (
-    item.familyUuid !== null &&
-    (typeof item.familyUuid !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        item.familyUuid,
-      ))
-  )
-    throw new Error();
-  if (
-    item.checkedAt !== null &&
-    (typeof item.checkedAt !== "string" ||
-      !Number.isFinite(Date.parse(item.checkedAt)))
-  )
+  const secretPrefixes = stringMap(item.secretPrefixes);
+  if (Object.values(secretPrefixes).some((prefix) => prefix.length > 8))
     throw new Error();
   return {
-    ...common,
-    tokenPrefix: item.tokenPrefix,
-    familyUuid: item.familyUuid,
-    checkedAt: item.checkedAt,
+    connectorId: connectorId(item.connectorId),
+    status: status(item.status),
+    secretPrefixes,
+    values: stringMap(item.values),
+    checkedAt,
+    agentCode: agentCode(item.agentCode),
+    restartRequired: bool(item.restartRequired),
+  };
+}
+
+function safeAdmin(value: unknown) {
+  const item = record(value);
+  if (!Number.isSafeInteger(item.userId) || (item.userId as number) <= 0)
+    throw new Error();
+  return {
+    connectorId: connectorId(item.connectorId),
+    userId: item.userId as number,
+    displayName: nullableText(item.displayName),
+    status: status(item.status),
+    agentCode: agentCode(item.agentCode),
+    restartRequired: bool(item.restartRequired),
   };
 }

@@ -109,7 +109,7 @@ export function AgentDetailBody({
             <div className="mx-auto w-full max-w-2xl">
               <h1 className="mb-4 text-xl font-semibold">{name}</h1>
               <p className="rounded-md border border-border bg-muted p-3 text-sm">
-                가계부 연결 화면에서 이 에이전트의 연결 상태를 관리해요.
+                연결 화면에서 이 에이전트의 연결 상태를 관리해요.
               </p>
             </div>
           ) : persona.ok ? (
