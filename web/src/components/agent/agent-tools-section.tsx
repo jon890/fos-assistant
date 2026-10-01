@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/components/error-message";
 import {
   GROUP_VISIBILITY,
@@ -194,18 +195,14 @@ export function AgentToolsSection({
                     </p>
                   ) : null}
                 </div>
-                <Button
-                  size="sm"
-                  variant={tool.enabled ? "default" : "outline"}
-                  disabled={disabled}
+                <Switch
+                  checked={tool.enabled}
                   loading={pendingToolName === tool.name}
-                  loadingText="저장 중"
-                  aria-pressed={tool.enabled}
+                  disabled={disabled}
                   title={reason}
-                  onClick={() => toggle(tool)}
-                >
-                  {tool.enabled ? "켜짐" : "꺼짐"}
-                </Button>
+                  aria-label={`${tool.label} 도구`}
+                  onCheckedChange={() => toggle(tool)}
+                />
               </li>
             );
           })}

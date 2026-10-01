@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import test from "node:test";
 
-const GLOBALS_CSS = join(import.meta.dirname, "../../web/src/app/globals.css");
+const WEB_SRC = join(import.meta.dirname, "../../web/src");
+const GLOBALS_CSS = join(WEB_SRC, "app/globals.css");
 
 /**
  * ADR-023 과 ADR-047 의 표가 정한 색 토큰 이름이다.
@@ -135,4 +136,23 @@ test("색 변수 값은 모두 hex 로 적는다", async () => {
     const notHex = TOKENS.filter((name) => !new RegExp(`^\\s*--${name}:\\s*#(?:[\\da-f]{3}|[\\da-f]{6});`, "im").test(body));
     assert.deepEqual(notHex, [], `${selector} 에서 hex 가 아닌 색: ${notHex.join(", ")}`);
   }
+});
+
+test("화면 코드가 토큰 밖의 모서리 값을 쓰지 않는다", async () => {
+  const entries = await readdir(WEB_SRC, { recursive: true, withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+    .map((entry) => join(entry.parentPath, entry.name));
+  assert.notEqual(files.length, 0, "web/src 에서 .ts 와 .tsx 파일을 찾지 못했다");
+
+  const found: string[] = [];
+  for (const file of files) {
+    const lines = (await readFile(file, "utf-8")).split("\n");
+    lines.forEach((line, index) => {
+      for (const match of line.matchAll(/rounded-3xl|rounded-\[/g)) {
+        found.push(`${relative(WEB_SRC, file)}:${index + 1} ${match[0]}`);
+      }
+    });
+  }
+  assert.deepEqual(found, [], `토큰 밖의 모서리 값: ${found.join(", ")}`);
 });

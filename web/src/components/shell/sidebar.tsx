@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type RefObject } from "react";
 import { PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { TooltipButton } from "@/components/ui/tooltip-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConversationNav } from "./conversation-nav";
@@ -87,14 +88,14 @@ export function Sidebar({
           새 대화
         </Link>
       </Button>
-      <input
+      <Input
         ref={searchRef}
         type="search"
         aria-label="대화 검색"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="대화 검색"
-        className="mb-4 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+        className="mb-4 shrink-0 bg-background"
       />
       <ConversationNav onNavigate={onNavigate} query={query} />
       <div className="border-t border-border pt-3">

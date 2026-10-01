@@ -44,7 +44,7 @@ export default async function AgentsPage() {
         <ul aria-label="쓸 수 있는 에이전트" className="grid gap-3">
           {result.data.map((agent) => (
             <li key={agent.code}>
-              <Link href={`/agents/${agent.code}`} className="block rounded-xl">
+              <Link href={`/agents/${agent.code}`} className="block rounded-lg">
                 <Card className="flex-row items-center px-4 hover:bg-accent">
                   <span className="text-base font-medium">{agent.name}</span>
                 </Card>

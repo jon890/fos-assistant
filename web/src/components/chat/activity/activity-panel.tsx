@@ -121,7 +121,7 @@ export function ActivityPanel({ target, onClose }: Props) {
         className={cn(
           "relative flex min-w-0 flex-col",
           "w-96 shrink-0",
-          "border-l border-border bg-background",
+          "border-l border-border bg-card",
         )}
       >
         {header(<h2 className={titleClass}>작업 과정</h2>)}
@@ -149,7 +149,7 @@ export function ActivityPanel({ target, onClose }: Props) {
           focusWithoutTooltip(closeRef.current);
         }}
         className={cn(
-          "min-w-0 gap-0 border-border bg-background",
+          "min-w-0 gap-0 border-border bg-card",
           // md 미만은 화면 전체, md 부터는 w-96 으로 겹친다.
           "data-[side=right]:w-full data-[side=right]:sm:max-w-none data-[side=right]:md:w-96",
         )}

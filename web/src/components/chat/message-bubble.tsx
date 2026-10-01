@@ -215,7 +215,7 @@ export function MessageBubble({
         <div
           data-testid="user-message"
           className={cn(
-            "relative max-w-[70%] rounded-3xl bg-primary-soft px-4 py-2.5",
+            "relative max-w-[70%] rounded-xl rounded-br-sm bg-primary-soft px-4 py-2.5",
             "group-focus-visible:outline-2 group-focus-visible:outline-ring",
           )}
         >

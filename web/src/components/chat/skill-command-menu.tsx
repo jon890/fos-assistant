@@ -29,7 +29,7 @@ export function SkillCommandMenu({
       aria-label="스킬 고르기"
       className={cn(
         "absolute inset-x-0 bottom-full z-10 mb-2 max-h-60 overflow-y-auto",
-        "rounded-2xl border border-border bg-background p-1 shadow",
+        "rounded-lg border border-border bg-popover p-1 shadow",
       )}
     >
       {names.length === 0 ? (
@@ -51,7 +51,7 @@ export function SkillCommandMenu({
             // 누르는 동안 입력칸이 초점을 잃으면 커서 자리를 알 수 없다.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onPick(name)}
-            className="cursor-pointer rounded-xl px-3 py-2 hover:bg-muted aria-selected:bg-muted"
+            className="cursor-pointer rounded-md px-3 py-2 hover:bg-muted aria-selected:bg-muted"
           >
             <span className="block truncate text-sm font-medium">/{name}</span>
           </li>

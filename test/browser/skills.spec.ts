@@ -374,10 +374,11 @@ test("관리하는 사람이 Hermes 기본 스킬을 끄고 켠다", async ({ pa
   await expect(row.getByRole("link", { name: /편집/ })).toHaveCount(0);
   await expect(row.getByRole("button", { name: /삭제/ })).toHaveCount(0);
   try {
-    await row.getByRole("button", { name: "켜짐" }).click();
-    await expect(row.getByRole("button", { name: "꺼짐" })).toBeVisible();
+    await expect(row.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+    await row.getByRole("switch").click();
+    await expect(row.getByRole("switch")).toHaveAttribute("aria-checked", "false");
     await page.reload();
-    await expect(skillRow(page, "hermes-help").getByRole("button", { name: "꺼짐" })).toBeVisible();
+    await expect(skillRow(page, "hermes-help").getByRole("switch")).toHaveAttribute("aria-checked", "false");
   } finally {
     const restore = await page.request.put(`/api/agents/${PERSONA_AGENT_CODE}/skills/hermes-help/enabled`, {
       data: { enabled: true },
@@ -392,10 +393,11 @@ test("점과 밑줄이 든 Hermes 스킬도 끄고 켠다", async ({ page }) => 
   const row = skillRow(page, name);
   await expect(row.getByText("Hermes 기본")).toBeVisible();
   try {
-    await row.getByRole("button", { name: "켜짐" }).click();
-    await expect(row.getByRole("button", { name: "꺼짐" })).toBeVisible();
+    await expect(row.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+    await row.getByRole("switch").click();
+    await expect(row.getByRole("switch")).toHaveAttribute("aria-checked", "false");
     await page.reload();
-    await expect(skillRow(page, name).getByRole("button", { name: "꺼짐" })).toBeVisible();
+    await expect(skillRow(page, name).getByRole("switch")).toHaveAttribute("aria-checked", "false");
   } finally {
     const restore = await page.request.put(`/api/agents/${PERSONA_AGENT_CODE}/skills/${name}/enabled`, {
       data: { enabled: true },

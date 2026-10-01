@@ -63,10 +63,10 @@ export function AgentPicker({
             disabled={disabled}
             onClick={() => onSelect(agent.code)}
             onKeyDown={(event) => move(event, index)}
-            className={`flex ${AGENT_CARD_HEIGHT} w-44 shrink-0 flex-col items-start gap-1 overflow-hidden rounded-xl border px-3 py-2.5 text-left hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent ${
+            className={`flex ${AGENT_CARD_HEIGHT} w-44 shrink-0 flex-col items-start gap-1 overflow-hidden rounded-lg border px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-60 ${
               checked
                 ? "border-primary bg-primary-soft text-primary-soft-foreground"
-                : "border-border"
+                : "border-border hover:bg-muted disabled:hover:bg-transparent"
             }`}
           >
             <span className="w-full truncate text-sm font-medium leading-5">

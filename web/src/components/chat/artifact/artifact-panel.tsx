@@ -92,7 +92,7 @@ export function ArtifactPanel({
         className={cn(
           "relative flex min-w-0 flex-col",
           "w-[min(48rem,50vw)] shrink-0",
-          "border-l border-border bg-background",
+          "border-l border-border bg-card",
         )}
       >
         {header(
@@ -123,7 +123,7 @@ export function ArtifactPanel({
           event.preventDefault();
           focusWithoutTooltip(closeRef.current);
         }}
-        className="min-w-0 gap-0 border-border bg-background data-[side=right]:w-full data-[side=right]:sm:max-w-none"
+        className="min-w-0 gap-0 border-border bg-card data-[side=right]:w-full data-[side=right]:sm:max-w-none"
       >
         {header(
           <SheetTitle className={titleClass} title={path}>

@@ -55,12 +55,13 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
   await composer.fill("말풍선 배치 검사");
   await expect(send).toBeEnabled();
   await page.mouse.move(0, 0);
-  const sendColors = await send.evaluate((button) => ({
-    background: getComputedStyle(button).backgroundColor,
-    primary: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
-  }));
-  expect(sendColors.background).not.toBe("rgba(0, 0, 0, 0)");
-  expect(parseRgb(sendColors.background), `보내기 단추 바탕이 --primary(${sendColors.primary}) 이어야 한다`).toEqual(parseRgb(sendColors.primary));
+  const primary = await page.locator("html").evaluate((html) => getComputedStyle(html).getPropertyValue("--primary").trim());
+  // 잠김이 풀리면 바탕이 muted 에서 primary 로 전환 효과를 거쳐 바뀐다. 전환이 끝날 때까지 기다린다.
+  await expect
+    .poll(async () => parseRgb(await send.evaluate((button) => getComputedStyle(button).backgroundColor)), {
+      message: `보내기 단추 바탕이 --primary(${primary}) 이어야 한다`,
+    })
+    .toEqual(parseRgb(primary));
   await send.click();
   await expect(composer).toBeEnabled();
 

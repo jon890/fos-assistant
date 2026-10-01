@@ -623,7 +623,7 @@ export function Composer({
         data-testid="composer-shell"
         className={cn(
           "relative flex items-end gap-2 p-1.5 pl-4",
-          "rounded-3xl border border-input bg-card focus-within:border-ring",
+          "rounded-2xl border border-input bg-card focus-within:border-ring",
         )}
       >
         {mention && openMention ? (

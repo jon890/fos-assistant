@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { Switch } from "@/components/ui/switch";
 import { describeError, describeFailure } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
 import type { SkillItemView, SkillListView } from "@/lib/skill";
@@ -257,17 +258,13 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
                   ) : null}
                 </div>
                 {editable ? (
-                  <Button
-                    size="sm"
-                    variant={skill.enabled ? "default" : "outline"}
-                    disabled={busy}
+                  <Switch
+                    checked={skill.enabled}
                     loading={pendingName === skill.name && confirming === null}
-                    loadingText="저장 중"
-                    aria-pressed={skill.enabled}
-                    onClick={() => void toggle(skill)}
-                  >
-                    {skill.enabled ? "켜짐" : "꺼짐"}
-                  </Button>
+                    disabled={busy}
+                    aria-label={`${skill.name} 스킬`}
+                    onCheckedChange={() => void toggle(skill)}
+                  />
                 ) : (
                   <Badge variant={skill.enabled ? "success" : "outline"}>
                     {skill.enabled ? "켜짐" : "꺼짐"}

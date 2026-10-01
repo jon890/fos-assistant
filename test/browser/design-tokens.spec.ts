@@ -265,6 +265,47 @@ test("보내기 단추에 마우스를 올리면 바탕이 primary-strong 이다
     .toEqual(parseRgb(primaryStrong));
 });
 
+test("두 밝기 모드에서 비활성 보내기 단추는 muted 바탕에 muted-foreground 글자이고 투명도를 쓰지 않는다", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
+  const send = page.getByRole("button", { name: "보내기" });
+  await expect(send).toBeDisabled();
+
+  const colors = await send.evaluate((button) => {
+    const html = document.documentElement;
+    // Button 은 색 바뀜을 transition 으로 보인다. 밝기를 바꾼 바로 뒤에 읽으면 바뀌는 중의 색이 나오므로 끈다.
+    (button as HTMLElement).style.transition = "none";
+    const read = () => {
+      const root = getComputedStyle(html);
+      const own = getComputedStyle(button);
+      return {
+        background: own.backgroundColor,
+        color: own.color,
+        opacity: own.opacity,
+        muted: root.getPropertyValue("--muted").trim(),
+        mutedForeground: root.getPropertyValue("--muted-foreground").trim(),
+        primary: root.getPropertyValue("--primary").trim(),
+      };
+    };
+    html.classList.remove("dark");
+    const light = read();
+    html.classList.add("dark");
+    const dark = read();
+    html.classList.remove("dark");
+    return { light, dark };
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    const { background, color, opacity, muted, mutedForeground, primary } = colors[theme];
+    expect(parseRgb(muted), `${theme}: --muted 와 --primary 는 다른 색이어야 이 검사가 뜻이 있다`).not.toEqual(parseRgb(primary));
+    expect(parseRgb(background), `${theme} 비활성 보내기 단추 바탕이 --muted(${muted}) 이어야 한다`).toEqual(parseRgb(muted));
+    expect(parseRgb(color), `${theme} 비활성 보내기 단추 글자가 --muted-foreground(${mutedForeground}) 이어야 한다`).toEqual(
+      parseRgb(mutedForeground),
+    );
+    expect(opacity, `${theme} 비활성 보내기 단추의 opacity`).toBe("1");
+  }
+});
+
 test("어두움 모드의 outline 단추는 테두리가 border 색이고 바탕이 비어 있다", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("theme", "dark"));
   await page.goto("/");

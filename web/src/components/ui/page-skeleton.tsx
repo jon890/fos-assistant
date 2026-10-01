@@ -187,7 +187,7 @@ function ChatSkeleton({ width }: { width: PageSkeletonWidth }) {
         </div>
       </div>
       <div className={`mx-auto w-full pt-3 ${WIDTH_CLASS[width]}`}>
-        <Skeleton className="h-12 w-full rounded-3xl" />
+        <Skeleton className="h-12 w-full rounded-2xl" />
       </div>
     </div>
   );

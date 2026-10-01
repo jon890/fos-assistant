@@ -53,7 +53,7 @@ export function ConnectorCatalog() {
               <Link
                 href={`/connections/${connector.id}`}
                 data-testid="connector-card"
-                className="block rounded-xl focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <Card className="transition-colors hover:bg-accent">
                   <CardHeader>

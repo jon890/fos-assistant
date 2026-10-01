@@ -138,3 +138,6 @@ cd web && pnpm test:browser test/browser/design-tokens.spec.ts test/browser/agen
 | `test/browser/design-tokens.spec.ts` | 수정 |
 | `test/browser/agent-tools.spec.ts` | 수정 |
 | `test/browser/skills.spec.ts` | 수정 |
+| `test/browser/chat.spec.ts` | 수정 |
+| `web/src/components/chat/activity/activity-panel.tsx` | 수정 |
+| `web/src/components/chat/artifact/artifact-panel.tsx` | 수정 |
