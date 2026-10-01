@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { describeAdminError, describeError } from "@/components/error-message";
 import { AgentDetailBody } from "@/components/agent/agent-detail-body";
+import { Notice } from "@/components/ui/notice";
 import { callControlPlane } from "@/lib/control-plane";
 import type {
   AdminAgent,
@@ -108,19 +109,13 @@ export default async function AgentPersonaPage({
     return (
       <div className="mx-auto w-full max-w-2xl">
         <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-        <p
-          role="alert"
-          className="rounded-md border border-border bg-muted p-3 text-sm"
-        >
+        <Notice variant="error" role="alert">
           {describeError(personaResult.code, personaResult.message)}
-        </p>
+        </Notice>
         {adminError ? (
-          <p
-            role="alert"
-            className="mt-4 rounded-md border border-border bg-muted p-3 text-sm"
-          >
+          <Notice variant="error" role="alert" className="mt-4">
             관리 정보를 불러오지 못했어요. {adminError}
-          </p>
+          </Notice>
         ) : null}
       </div>
     );

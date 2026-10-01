@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Notice } from "@/components/ui/notice";
 import { describeError, describeFailure } from "@/components/error-message";
 import {
   GROUP_VISIBILITY,
@@ -119,9 +120,9 @@ export function CreateAgentDialog() {
               </NativeSelect>
             </div>
             {error ? (
-              <p role="alert" className="rounded-md bg-muted p-3 text-sm">
+              <Notice variant="error" role="alert">
                 {error}
-              </p>
+              </Notice>
             ) : null}
             <DialogFooter>
               <Button

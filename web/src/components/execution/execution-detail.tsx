@@ -36,6 +36,16 @@ function statusLabel(status: string): string {
   return status;
 }
 
+/** 상태 배지의 색이다. 취소됨과 모르는 상태는 흐린 표시로 둔다. */
+function statusVariant(
+  status: string,
+): "destructive" | "info" | "outline" | "success" {
+  if (status === "FAILED") return "destructive";
+  if (status === "SUCCEEDED") return "success";
+  if (status === "RUNNING") return "info";
+  return "outline";
+}
+
 /** 실행 하나의 머리 요약과 나무를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다. */
 export function ExecutionDetail({ executionId }: { executionId: number }) {
   const router = useRouter();
@@ -104,9 +114,7 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
           <div>
             <dt className="text-muted-foreground">상태</dt>
             <dd>
-              <Badge
-                variant={summary.status === "FAILED" ? "default" : "outline"}
-              >
+              <Badge variant={statusVariant(summary.status)}>
                 {statusLabel(summary.status)}
               </Badge>
             </dd>

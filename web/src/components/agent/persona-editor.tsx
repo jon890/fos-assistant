@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import { describeError } from "@/components/error-message";
 import type { PersonaView } from "@/lib/agent";
@@ -107,12 +108,9 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
       />
       <p className="mt-2 text-xs text-muted-foreground">남은 {remaining}자</p>
       {error ? (
-        <p
-          role="alert"
-          className="mt-2 rounded-md bg-muted p-3 text-sm break-all"
-        >
+        <Notice variant="error" role="alert" className="mt-2 break-all">
           {error}
-        </p>
+        </Notice>
       ) : null}
       {serverBody !== null ? (
         <section className="mt-3 rounded-md border border-border p-3">

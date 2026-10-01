@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { describeError, describeFailure } from "@/components/error-message";
 import {
   GROUP_VISIBILITY,
@@ -80,9 +81,9 @@ function DeleteConfirm({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (
-          <p role="alert" className="rounded-md bg-muted p-3 text-sm">
+          <Notice variant="error" role="alert">
             {error}
-          </p>
+          </Notice>
         ) : null}
         <AlertDialogFooter>
           {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}
@@ -190,9 +191,9 @@ export function AgentAccessSection({
         </Badge>
       </div>
       {error && confirming === null ? (
-        <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
+        <Notice variant="error" role="alert" className="mt-4">
           {error}
-        </p>
+        </Notice>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button

@@ -8,6 +8,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 
 type Props = {
   /** 화면에 보이는 에이전트 이름이다 */
@@ -52,9 +53,9 @@ export function VisibilityConfirm({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (
-          <p role="alert" className="rounded-md bg-muted p-3 text-sm">
+          <Notice variant="error" role="alert">
             {error}
-          </p>
+          </Notice>
         ) : null}
         <AlertDialogFooter>
           {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}

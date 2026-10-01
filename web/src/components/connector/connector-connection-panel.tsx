@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Notice } from "@/components/ui/notice";
 import {
   CONNECTOR_ID_PATTERN,
   checkConnection,
@@ -100,12 +101,9 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
   if (loaded.kind === "failed") {
     return (
       <div className="mx-auto w-full max-w-2xl space-y-3">
-        <p
-          role="alert"
-          className="rounded-md border border-border bg-muted p-3 text-sm"
-        >
+        <Notice variant="error" role="alert">
           연결 상태를 읽지 못했어요. {loaded.message}
-        </p>
+        </Notice>
         <Button
           variant="outline"
           onClick={() => void fetchLoaded(id).then(setLoaded)}
@@ -261,20 +259,14 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
             </p>
           ) : null}
           {connection.restartRequired ? (
-            <p
-              role="status"
-              className="rounded-md border border-border bg-muted p-3 text-sm"
-            >
+            <Notice variant="info" role="status">
               관리자가 실행 반영을 확인할 때까지 기다려 주세요.
-            </p>
+            </Notice>
           ) : null}
           {!available ? (
-            <p
-              role="status"
-              className="rounded-md border border-border bg-muted p-3 text-sm"
-            >
+            <Notice variant="info" role="status">
               지금은 쓸 수 없어요. 연결을 해제할 수만 있어요.
-            </p>
+            </Notice>
           ) : null}
           {status === "READY" && connection.agentCode ? (
             <p className="text-sm">
@@ -381,12 +373,9 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
             </Button>
           ) : null}
           {error ? (
-            <p
-              role="alert"
-              className="rounded-md border border-border bg-muted p-3 text-sm"
-            >
+            <Notice variant="error" role="alert">
               {error}
-            </p>
+            </Notice>
           ) : null}
         </CardContent>
       </Card>

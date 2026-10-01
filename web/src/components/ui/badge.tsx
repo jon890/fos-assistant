@@ -9,13 +9,16 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        // 고침: 강조 표시다. 실패나 사용 중지처럼 눈에 띄어야 하는 상태를 글자색 테두리와 굵은 글자로 그린다.
+        // 고침: 강조 표시다. 글자색 테두리와 굵은 글자로 그린다. 실패나 꺼짐 같은 상태는 아래 의미 색 변형으로 그린다.
         default: "border-foreground font-semibold text-foreground",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
+        // 고침: 상태는 의미 색으로 그린다. 옅은 바탕(-soft)에 같은 색 글자를 둔다. 밝기 모드는 토큰이 나눈다.
         destructive:
-          // 고침: 밝기 모드는 토큰이 나누므로 dark: 덮어쓰기를 뺐다.
-          "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 [a]:hover:bg-destructive/20",
+          "bg-destructive-soft text-destructive focus-visible:ring-destructive/20",
+        success: "bg-success-soft text-success",
+        warning: "bg-warning-soft text-warning",
+        info: "bg-info-soft text-info",
         // 고침: 흐린 표시다. 테두리 위에 muted 바탕과 muted-foreground 글자를 둔다.
         outline: "border-border bg-muted text-muted-foreground",
         ghost:

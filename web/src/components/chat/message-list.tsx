@@ -3,6 +3,8 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
@@ -242,17 +244,18 @@ export function MessageList({
                       {isLast && hasNoAnswer ? (
                         <li
                           data-testid="no-answer"
-                          className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground"
+                          className="-mt-4 flex items-center justify-end gap-2 text-xs text-muted-foreground"
                         >
                           <span>답을 받지 못했어요</span>
                           {onRetry ? (
-                            <button
+                            <Button
                               type="button"
+                              variant="link"
+                              size="xs"
                               onClick={onRetry}
-                              className="underline underline-offset-2"
                             >
                               다시 시도
-                            </button>
+                            </Button>
                           ) : null}
                         </li>
                       ) : null}
@@ -279,21 +282,22 @@ export function MessageList({
                 <WaitingIndicator />
               ) : null}
               {turnError ? (
-                <li
-                  data-testid="turn-error"
-                  className="rounded-md bg-muted px-3 py-2 text-sm"
-                >
-                  {turnError}
-                  {onRetry && !hasNoAnswer ? (
-                    <button
-                      type="button"
-                      data-testid="turn-error-retry"
-                      onClick={onRetry}
-                      className="ml-2 text-xs underline underline-offset-2"
-                    >
-                      다시 시도
-                    </button>
-                  ) : null}
+                <li data-testid="turn-error">
+                  <Notice variant="error">
+                    {turnError}
+                    {onRetry && !hasNoAnswer ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        data-testid="turn-error-retry"
+                        onClick={onRetry}
+                        className="ml-2"
+                      >
+                        다시 시도
+                      </Button>
+                    ) : null}
+                  </Notice>
                 </li>
               ) : null}
             </ol>

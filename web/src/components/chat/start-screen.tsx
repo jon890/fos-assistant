@@ -2,6 +2,7 @@
 
 import type { AgentView } from "@/lib/agent";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AGENT_CARD_HEIGHT, AgentPicker } from "./agent-picker";
@@ -48,9 +49,9 @@ export function StartScreenHeader({
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
         </div>
       ) : agents.length === 0 ? (
-        <p className="rounded-md bg-muted px-3 py-2 text-center text-sm">
+        <Notice variant="info" className="text-center">
           사용할 수 있는 에이전트가 없어요. 관리자에게 등록을 요청해 주세요.
-        </p>
+        </Notice>
       ) : only ? (
         <p className="text-center text-sm font-medium">{only.name}</p>
       ) : (

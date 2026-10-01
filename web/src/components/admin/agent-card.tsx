@@ -20,7 +20,7 @@ export function AgentCard({ agent, currentUserId }: Props) {
           agent.ownerUserId !== currentUserId ? (
             <Badge variant="outline">다른 사람 것</Badge>
           ) : null}
-          <Badge variant={agent.enabled ? "outline" : "default"}>
+          <Badge variant={agent.enabled ? "success" : "warning"}>
             {agent.enabled ? "사용 중" : "꺼짐"}
           </Badge>
         </div>

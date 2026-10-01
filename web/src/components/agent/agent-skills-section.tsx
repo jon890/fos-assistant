@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { describeError, describeFailure } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
 import type { SkillItemView, SkillListView } from "@/lib/skill";
@@ -62,9 +63,9 @@ function DeleteConfirm({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (
-          <p role="alert" className="rounded-md bg-muted p-3 text-sm">
+          <Notice variant="error" role="alert">
             {error}
-          </p>
+          </Notice>
         ) : null}
         <AlertDialogFooter>
           {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}
@@ -191,16 +192,16 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
         ) : null}
       </div>
       {error ? (
-        <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
+        <Notice variant="error" role="alert" className="mt-4">
           {error}
-        </p>
+        </Notice>
       ) : null}
       {list.skills.length === 0 ? (
-        <p className="mt-4 rounded-md bg-muted p-3 text-sm">
+        <Notice variant="info" className="mt-4">
           {editable && !list.skillsToolsetEnabled
             ? "스킬을 추가하면 스킬 도구가 함께 켜져요."
             : "아직 스킬이 없어요."}
-        </p>
+        </Notice>
       ) : (
         <ul className="mt-4 divide-y divide-border rounded-md border border-border">
           {list.skills.map((skill) => {
@@ -268,7 +269,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
                     {skill.enabled ? "켜짐" : "꺼짐"}
                   </Button>
                 ) : (
-                  <Badge variant={skill.enabled ? "default" : "outline"}>
+                  <Badge variant={skill.enabled ? "success" : "outline"}>
                     {skill.enabled ? "켜짐" : "꺼짐"}
                   </Badge>
                 )}

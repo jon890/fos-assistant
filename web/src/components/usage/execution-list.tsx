@@ -92,6 +92,21 @@ export function executionStatusLabel(execution: UsageExecution): string {
 }
 
 /**
+ * 상태 배지의 색을 고른다. 실패는 destructive, 도는 중은 info, 취소는 흐린 표시, 그 밖은 success 다.
+ *
+ * <p>실패 판단은 `executionStatusLabel` 과 같다. 상태가 실패가 아니어도 오류 코드가 있으면 실패로 그린다.
+ */
+export function executionStatusVariant(
+  execution: UsageExecution,
+): "destructive" | "info" | "outline" | "success" {
+  if (isRunning(execution)) return "info";
+  if (execution.status === "FAILED" || execution.errorCode !== null)
+    return "destructive";
+  if (execution.status === "CANCELLED") return "outline";
+  return "success";
+}
+
+/**
  * 앞 실행에서 이어진 것임을 적는다. 첫 시도면 빈 문자열이다.
  *
  * <p>막혀서 만든 실행은 토큰을 쓰지 않아 금액이 0 이지만 목록에는 남아야 무엇이 있었는지 안다.

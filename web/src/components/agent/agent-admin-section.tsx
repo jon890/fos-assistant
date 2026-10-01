@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Notice } from "@/components/ui/notice";
 import { describeAdminError } from "@/components/error-message";
 import type { AdminAgent } from "@/lib/agent";
 
@@ -83,15 +84,15 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant={agent.enabled ? "outline" : "default"}>
+          <Badge variant={agent.enabled ? "success" : "warning"}>
             {agent.enabled ? "사용 중" : "꺼짐"}
           </Badge>
         </div>
       </div>
       {error ? (
-        <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
+        <Notice variant="error" role="alert" className="mt-4">
           {error}
-        </p>
+        </Notice>
       ) : null}
       <form onSubmit={(event) => void saveAddress(event)} className="mt-4">
         <div className="grid gap-1.5">

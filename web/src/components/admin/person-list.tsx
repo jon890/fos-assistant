@@ -71,7 +71,7 @@ export function PersonList({
                 {person.joined ? "로그인한 적 있음" : "로그인한 적 없음"}
               </TableCell>
               <TableCell className="px-3">
-                <Badge variant={person.enabled ? "outline" : "default"}>
+                <Badge variant={person.enabled ? "success" : "warning"}>
                   {person.enabled ? "켜짐" : "꺼짐"}
                 </Badge>
               </TableCell>

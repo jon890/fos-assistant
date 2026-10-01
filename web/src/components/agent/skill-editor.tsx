@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import {
   hasBodyAfterFrontmatter,
@@ -470,19 +471,16 @@ export function SkillEditor({ code, initial }: Props) {
           />
         </div>
         {fileError ? (
-          <p role="alert" className="mt-2 rounded-md bg-muted p-3 text-sm">
+          <Notice variant="error" role="alert" className="mt-2">
             {fileError}
-          </p>
+          </Notice>
         ) : null}
       </section>
 
       {error ? (
-        <p
-          role="alert"
-          className="mt-4 rounded-md bg-muted p-3 text-sm break-all"
-        >
+        <Notice variant="error" role="alert" className="mt-4 break-all">
           {error}
-        </p>
+        </Notice>
       ) : null}
       <div className="mt-4 flex gap-2">
         <Button

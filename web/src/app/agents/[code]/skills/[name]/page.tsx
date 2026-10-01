@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { describeError } from "@/components/error-message";
 import { SkillEditor } from "@/components/agent/skill-editor";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
 import { callControlPlane } from "@/lib/control-plane";
 import { SKILL_NAME_PATTERN, type SkillDetailView } from "@/lib/skill";
@@ -30,12 +31,9 @@ export default async function EditSkillPage({
     return (
       <div className="mx-auto w-full max-w-3xl">
         <h1 className="mb-4 text-xl font-semibold">{name} 스킬</h1>
-        <p
-          role="alert"
-          className="rounded-md border border-border bg-muted p-3 text-sm"
-        >
+        <Notice variant="error" role="alert">
           {message}
-        </p>
+        </Notice>
         <Button asChild variant="outline" className="mt-4">
           <Link href={`/agents/${code}`}>에이전트로 돌아가기</Link>
         </Button>

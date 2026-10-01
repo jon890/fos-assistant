@@ -5,6 +5,7 @@ import { AgentForm } from "@/components/admin/agent-form";
 import { AgentList } from "@/components/admin/agent-list";
 import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
 import { describeAdminError } from "@/components/error-message";
+import { Notice } from "@/components/ui/notice";
 import { PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
 
 export type { AdminAgent } from "@/lib/agent";
@@ -90,7 +91,9 @@ export function AgentAdminPanel({
         onCreate={(event) => void create(event)}
       />
       {error ? (
-        <p className="mb-4 rounded-md bg-muted p-3 text-sm">{error}</p>
+        <Notice variant="error" className="mb-4">
+          {error}
+        </Notice>
       ) : null}
       <AgentList agents={agents} currentUserId={currentUserId} />
     </div>

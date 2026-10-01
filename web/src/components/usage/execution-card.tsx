@@ -15,6 +15,7 @@ import {
   contextCharsLabel,
   contextOmittedLabel,
   executionStatusLabel,
+  executionStatusVariant,
   isRunning,
   reasoningEffortLabel,
   retryOfLabel,
@@ -27,9 +28,9 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
   const omitted = contextOmittedLabel(execution);
   const retryOf = retryOfLabel(execution);
   return (
-    // 브라우저 검사가 카드를 `article` 조상으로 찾으므로 원소 이름을 지킨다. 실패한 실행은 테두리를 글자색으로 올린다.
+    // 브라우저 검사가 카드를 `article` 조상으로 찾으므로 원소 이름을 지킨다. 실패한 실행은 테두리를 destructive 색으로 올린다.
     <article>
-      <Card className={cn("relative gap-0 px-4", failed && "ring-foreground")}>
+      <Card className={cn("relative gap-0 px-4", failed && "ring-destructive")}>
         <Link
           href={`/executions/${execution.id}`}
           // Card 가 overflow-hidden 이라 바깥으로 그린 초점 테두리가 잘린다. 브라우저의 초점 테두리를 안쪽으로 들인다.
@@ -92,7 +93,7 @@ export function ExecutionCard({ execution }: { execution: UsageExecution }) {
             {running ? "" : formatDuration(execution.latencyMs ?? 0)}
           </span>
           <span>{formatWhen(execution.startedAt)}</span>
-          <Badge variant={failed ? "default" : "outline"}>
+          <Badge variant={executionStatusVariant(execution)}>
             {executionStatusLabel(execution)}
           </Badge>
         </div>

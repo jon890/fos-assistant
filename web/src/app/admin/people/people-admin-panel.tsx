@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PersonForm } from "@/components/admin/person-form";
 import { PersonList } from "@/components/admin/person-list";
 import { describeAdminError } from "@/components/error-message";
+import { Notice } from "@/components/ui/notice";
 import type { Person } from "@/lib/people";
 
 type Props = { initialPeople: Person[] };
@@ -89,13 +90,14 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
         onCreate={(event) => void create(event)}
       />
       {error ? (
-        <p
+        <Notice
+          variant="error"
           role="alert"
           data-testid="people-error"
-          className="mb-4 rounded-md bg-muted p-3 text-sm"
+          className="mb-4"
         >
           {error}
-        </p>
+        </Notice>
       ) : null}
       <PersonList
         people={people}

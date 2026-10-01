@@ -24,6 +24,7 @@ import {
   contextCharsLabel,
   contextOmittedLabel,
   executionStatusLabel,
+  executionStatusVariant,
   isRunning,
   reasoningEffortLabel,
   retryOfLabel,
@@ -56,8 +57,6 @@ export function ExecutionTable({
       <TableBody>
         {executions.map((execution) => {
           const running = isRunning(execution);
-          const failed =
-            execution.status === "FAILED" || execution.errorCode !== null;
           return (
             <TableRow
               key={execution.id}
@@ -111,7 +110,7 @@ export function ExecutionTable({
                 </span>
               </TableCell>
               <TableCell className="max-w-40 py-3 whitespace-normal">
-                <Badge variant={failed ? "default" : "outline"}>
+                <Badge variant={executionStatusVariant(execution)}>
                   {executionStatusLabel(execution)}
                 </Badge>
                 {retryOfLabel(execution) ? (

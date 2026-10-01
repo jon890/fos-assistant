@@ -349,3 +349,69 @@ test("두 밝기 모드에서 사이드바와 작업 과정 패널의 테두리�
     expectBorderToken(await readBorder(page.locator('aside[aria-label="사이드바"]'), "right"), "사이드바");
   }
 });
+
+/** 그 요소의 글자색과 바탕, 견줄 두 토큰의 값을 함께 읽는다. */
+async function readSemanticColors(element: Locator, name: string) {
+  return element.evaluate((node, tokenName) => {
+    const own = getComputedStyle(node);
+    const root = getComputedStyle(document.documentElement);
+    return {
+      color: own.color,
+      background: own.backgroundColor,
+      token: root.getPropertyValue(`--${tokenName}`).trim(),
+      softToken: root.getPropertyValue(`--${tokenName}-soft`).trim(),
+    };
+  }, name);
+}
+
+test("실행 기록의 성공 배지는 글자가 success 색이고 바탕이 success-soft 다", async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  const response = await page.request.post("/api/chat", {
+    data: { text: "성공 배지 색 검사", agentCode: "browser" },
+  });
+  expect(response.ok()).toBeTruthy();
+  await page.goto("/usage?tab=executions");
+
+  const records = page.getByTestId(testInfo.project.name === "mobile" ? "execution-cards" : "execution-table");
+  const badge = records.locator('[data-slot="badge"]').filter({ hasText: /^성공$/ }).first();
+  await expect(badge).toBeVisible();
+  await expect(badge).toHaveAttribute("data-variant", "success");
+
+  const colors = await readSemanticColors(badge, "success");
+  expect(parseRgb(colors.color), `성공 배지 글자가 --success(${colors.token}) 이어야 한다`).toEqual(parseRgb(colors.token));
+  expect(parseRgb(colors.background), `성공 배지 바탕이 --success-soft(${colors.softToken}) 이어야 한다`).toEqual(
+    parseRgb(colors.softToken),
+  );
+});
+
+test("실패한 turn 의 알림 상자는 destructive 색이고 아이콘을 하나 갖는다", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  await page.goto("/");
+  // 시작 사건 뒤에 실패 사건을 넣어 그 turn 을 실패로 끝낸다.
+  await page.route("**/api/chat/stream", async (route) => {
+    const response = await route.fetch();
+    const raw = await response.text();
+    const started = raw
+      .split("\n")
+      .find((line) => line.startsWith("data:") && JSON.parse(line.slice(5).trim()).type === "started");
+    if (!started) throw new Error("started 사건을 찾지 못했다");
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: `${started}\n\ndata: {"type":"error","code":"HERMES_RUN_FAILED","message":"failed"}\n\n`,
+    });
+  });
+  await page.getByRole("textbox", { name: "메시지" }).fill(`알림 상자 색 검사 ${Date.now()}`);
+  await page.getByRole("button", { name: "보내기" }).click();
+
+  const notice = page.getByTestId("turn-error").locator('[data-slot="notice"][data-variant="error"]');
+  await expect(notice).toBeVisible();
+  await expect(notice.locator("svg"), "알림 상자의 아이콘").toHaveCount(1);
+  await expect(notice.locator("svg")).toHaveAttribute("aria-hidden", "true");
+
+  const colors = await readSemanticColors(notice, "destructive");
+  expect(parseRgb(colors.color), `알림 상자 글자가 --destructive(${colors.token}) 이어야 한다`).toEqual(parseRgb(colors.token));
+  expect(parseRgb(colors.background), `알림 상자 바탕이 --destructive-soft(${colors.softToken}) 이어야 한다`).toEqual(
+    parseRgb(colors.softToken),
+  );
+});

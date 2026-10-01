@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { describeError } from "@/components/error-message";
 import {
   GROUP_VISIBILITY,
@@ -228,14 +229,14 @@ export function AgentToolsSection({
         <Badge variant="outline">{admin ? "관리자" : "주인"}</Badge>
       </div>
       {error ? (
-        <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
+        <Notice variant="error" role="alert" className="mt-4">
           {error}
-        </p>
+        </Notice>
       ) : null}
       {unclassifiedEnabled.length > 0 ? (
-        <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">
+        <Notice variant="warning" role="alert" className="mt-4">
           표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.
-        </p>
+        </Notice>
       ) : null}
       {list("주인 등급", ownerTools)}
       {list("관리자 등급", adminTools)}
