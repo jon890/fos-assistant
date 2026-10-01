@@ -127,6 +127,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import hmac
+import importlib.metadata
 import json
 import logging
 import os
@@ -212,6 +213,8 @@ PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
 # 커넥터 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
 CONNECTOR_CALL_TIMEOUT_SECONDS = 10
 CONNECTOR_CALL_LIMIT = 4
+# 커넥터 도구 호출이 기대는 mcp SDK 의 주 판이다. 다른 판은 결과 속성 이름이 달라 호출하지 않는다.
+MCP_SDK_MAJOR = 2
 # 지금 돌고 있는 호출 수다. 이벤트 루프 하나에서만 바꾸므로 잠금이 필요 없다.
 _connector_calls = 0
 PROFILE_WRITE_LOCK = asyncio.Lock()
@@ -975,17 +978,50 @@ async def _run_connector_tool(manifest: dict, tool: str, env: dict):
                 return await session.call_tool(tool, {})
 
 
+def _mcp_sdk_version() -> str:
+    """설치된 `mcp` SDK 의 판이다. 읽지 못하면 `unknown` 이다."""
+    try:
+        return importlib.metadata.version("mcp")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def _mcp_sdk_problem() -> Optional[str]:
+    """커넥터 도구 호출이 기대는 SDK 가 아니면 까닭 한 줄을 돌려주고, 지원 범위이면 None 이다."""
+    if _mcp_sdk_version().split(".")[0] != str(MCP_SDK_MAJOR):
+        return "지원 범위 mcp>=%d.0,<%d 밖이다" % (MCP_SDK_MAJOR, MCP_SDK_MAJOR + 1)
+    try:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+        import mcp.types as mcp_types
+    except ImportError:
+        return "mcp SDK 를 읽어 오지 못했다"
+    if "read_only_hint" not in mcp_types.ToolAnnotations.model_fields:
+        return "필요한 속성 read_only_hint 가 없다"
+    for name in ("structured_content", "is_error", "content"):
+        if name not in mcp_types.CallToolResult.model_fields:
+            return "필요한 속성 %s 가 없다" % name
+    return None
+
+
+def _leaf_error_types(error) -> list:
+    """예외 묶음을 끝까지 풀어 가장 안쪽 예외의 종류 이름을 모은다."""
+    inner = getattr(error, "exceptions", None)
+    if not inner:
+        return [type(error).__name__]
+    return [name for item in inner for name in _leaf_error_types(item)]
+
+
 def _connector_call_answer(manifest: dict, result) -> dict:
     """도구 결과를 `{ok, result}` 나 `{ok, error}` 로 바꾼다. 읽지 못한 결과는 `unavailable` 이다."""
-    payload = getattr(result, "structured_content", None)
+    payload = result.structured_content
     if payload is None:
         try:
-            text = next(item.text for item in getattr(result, "content", None) or []
-                        if getattr(item, "type", None) == "text")
+            text = next(item.text for item in result.content if item.type == "text")
             payload = json.loads(text)
         except (StopIteration, ValueError, TypeError):
             return {"ok": False, "error": "unavailable"}
-    if getattr(result, "is_error", False):
+    if result.is_error:
         error = payload.get("error") if isinstance(payload, dict) else None
         code = error.get("code") if isinstance(error, dict) else None
         word = manifest["errors"].get(code, "unavailable") if isinstance(code, str) else "unavailable"
@@ -1025,6 +1061,12 @@ async def _connector_call_request(request, connector_id: str):
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
 
+    problem = _mcp_sdk_problem()
+    if problem is not None:
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+                       _mcp_sdk_version(), problem)
+        return failed("unavailable")
+
     # 줄을 세우지 않는다. 가득 차 있으면 기다리는 동안 요청이 쌓여 대시보드가 느려진다.
     if _connector_calls >= CONNECTOR_CALL_LIMIT:
         logger.warning("dashboard-profile-api: 커넥터 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
@@ -1033,6 +1075,7 @@ async def _connector_call_request(request, connector_id: str):
     try:
         # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
         result = await asyncio.wait_for(_run_connector_tool(manifest, tool, env), CONNECTOR_CALL_TIMEOUT_SECONDS)
+        answer = None if result is None else _connector_call_answer(manifest, result)
     except ImportError:
         logger.warning("dashboard-profile-api: mcp SDK 를 읽어 오지 못해 커넥터 도구를 부르지 못했다")
         return failed("unavailable")
@@ -1040,15 +1083,15 @@ async def _connector_call_request(request, connector_id: str):
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, tool)
         return failed("unavailable")
     except Exception as error:
-        # 예외 본문에는 자식의 출력이 섞일 수 있다. 종류만 남긴다.
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s",
-                       connector_id, tool, type(error).__name__)
+        # 예외 본문에는 자식의 출력이 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s (mcp SDK %s)",
+                       connector_id, tool, ", ".join(sorted(set(_leaf_error_types(error)))), _mcp_sdk_version())
         return failed("unavailable")
     finally:
         _connector_calls -= 1
-    if result is None:
+    if answer is None:
         return _rejected("읽기 전용 도구가 아니다")
-    return JSONResponse(_connector_call_answer(manifest, result), status_code=200)
+    return JSONResponse(answer, status_code=200)
 
 
 async def _check_connector_probe(request):
@@ -1561,6 +1604,12 @@ def register(ctx) -> None:
         return
 
     ctx.register_dashboard_auth_provider(ProfileApiProvider(secret=secret))
+
+    # 판이 범위 밖이어도 등록은 한다. profile 관리 경로까지 닫으면 사용자 추가가 멈춘다.
+    problem = _mcp_sdk_problem()
+    if problem is not None:
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+                       _mcp_sdk_version(), problem)
 
     opened = {}
     for path, method in ALLOWED_ROUTES:
