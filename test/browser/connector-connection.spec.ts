@@ -9,6 +9,21 @@ const demoConnector = {
   description: "검사에서만 쓰는 커넥터입니다.",
   myStatus: "DISCONNECTED",
   available: true,
+  tools: [
+    { name: "list_scopes", title: null, risk: "READ", approval: "NONE" },
+    {
+      name: "write_note",
+      title: "메모 쓰기",
+      risk: "WRITE",
+      approval: "REQUIRED",
+    },
+    {
+      name: "purge_notes",
+      title: null,
+      risk: "DESTRUCTIVE",
+      approval: "ALWAYS",
+    },
+  ],
   fields: [
     {
       key: "token",
@@ -41,6 +56,7 @@ const disconnected = {
   checkedAt: null,
   agentCode: null,
   restartRequired: false,
+  undeclaredTools: 0,
 };
 const pending = {
   ...disconnected,
@@ -337,6 +353,7 @@ test("관리자는 반영 대기 연결을 완료로 확인한다", async ({ pag
           status: "PENDING",
           agentCode: "demo-notes-browser",
           restartRequired: true,
+          undeclaredTools: 0,
         },
       ],
     }),
@@ -351,6 +368,7 @@ test("관리자는 반영 대기 연결을 완료로 확인한다", async ({ pag
         status: "READY",
         agentCode: "demo-notes-browser",
         restartRequired: false,
+        undeclaredTools: 0,
       },
     });
   });
@@ -364,6 +382,104 @@ test("관리자는 반영 대기 연결을 완료로 확인한다", async ({ pag
     panel.getByText("반영 확인이 필요한 연결이 없어요."),
   ).toBeVisible();
   expect(confirmedPath).toBe(`/api/admin/connections/${DEMO_ID}/77/confirm`);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", async ({ page }) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: disconnected }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-tool")).toHaveCount(3);
+  const write = page
+    .getByTestId("connector-tool")
+    .filter({ hasText: "메모 쓰기" });
+  await expect(write).toContainText("쓰기");
+  await expect(write).toContainText("실행 전에 물어봐요");
+  await expect(
+    page.getByTestId("connector-tool").filter({ hasText: "list_scopes" }),
+  ).toContainText("바로 실행해요");
+  await expect(
+    page.getByTestId("connector-tool").filter({ hasText: "purge_notes" }),
+  ).toContainText("아직 쓸 수 없어요");
+  await expect(page.getByTestId("connection-undeclared")).toHaveCount(0);
+});
+
+test("도구를 선언하지 않은 커넥터는 안내 한 줄을 보인다", async ({ page }) => {
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({ json: [{ ...demoConnector, tools: [] }] }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: disconnected }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-tools-empty")).toBeVisible();
+  await expect(page.getByTestId("connector-tool")).toHaveCount(0);
+});
+
+test("web API 가 도구를 주지 않는 옛 응답도 안내 한 줄로 보인다", async ({
+  page,
+}) => {
+  const { tools: _omitted, ...legacy } = demoConnector;
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({ json: [legacy] }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: disconnected }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-tools-empty")).toBeVisible();
+});
+
+test("선언하지 않은 도구가 있으면 본인에게 개수를 알린다", async ({ page }) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: { ...ready, undeclaredTools: 2 } }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connection-undeclared")).toContainText("2개");
+});
+
+test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 없이 보인다", async ({
+  page,
+}) => {
+  await page.route("**/api/admin/connections", (route) =>
+    route.fulfill({
+      json: [
+        {
+          connectorId: DEMO_ID,
+          userId: 78,
+          displayName: "도구 확인 사용자",
+          status: "READY",
+          agentCode: "demo-notes-browser",
+          restartRequired: false,
+          undeclaredTools: 1,
+        },
+      ],
+    }),
+  );
+  await page.goto("/connections");
+  const panel = page.getByTestId("connector-admin-panel");
+  await expect(panel).toContainText("도구 확인 사용자");
+  await expect(panel).toContainText("연결됨");
+  await expect(panel.getByTestId("admin-undeclared")).toContainText(
+    "선언하지 않은 도구 1개",
+  );
+  await expect(
+    panel.getByRole("button", { name: "반영 완료 확인" }),
+  ).toHaveCount(0);
+});
+
+test("390px 폭에서도 도구 목록이 가로로 넘치지 않는다", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: { ...ready, undeclaredTools: 2 } }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-tool")).toHaveCount(3);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
