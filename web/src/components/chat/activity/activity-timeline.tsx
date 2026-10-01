@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import {
   Check,
@@ -6,7 +8,10 @@ import {
   LoaderCircle,
   Square,
 } from "lucide-react";
-import { formatDuration, formatTokens } from "@/lib/format";
+import { cn } from "cn";
+import { formatSeconds } from "@/lib/format";
+import { isReadableDetail } from "@/lib/tool-label";
+import { useShellIsAdmin } from "@/components/shell/app-shell";
 import {
   activityLabel,
   type ActivityItem,
@@ -32,82 +37,96 @@ const MARKS: Record<ActivityItemState, ReactNode> = {
   ),
   "result-missing": <CircleHelp aria-hidden="true" className={ICON_CLASS} />,
 };
-const SPOKEN: Record<ActivityItemState, string> = {
+/** 화면 낭독기에만 읽히는 상태다. 실패와 결과 누락은 글자로 보이므로 여기 없다. */
+const SPOKEN: Partial<Record<ActivityItemState, string>> = {
   running: "실행 중",
   done: "끝남",
-  failed: "실패",
   stopped: "중지됨",
   unfinished: "끝나지 않음",
-  "result-missing": "결과를 받지 못함",
 };
 
+function markColor(state: ActivityItemState): string {
+  return state === "done"
+    ? "text-success"
+    : state === "failed"
+      ? "text-destructive"
+      : "text-muted-foreground";
+}
+
 export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
+  const isAdmin = useShellIsAdmin();
   return (
     <ol className="flex min-w-0 flex-col gap-2" aria-label="작업 과정">
-      {items.map((item) => (
-        <li
-          key={item.key}
-          data-testid="activity-item"
-          data-kind={item.kind}
-          data-state={item.state}
-          data-tool={item.kind === "tool" ? item.name : undefined}
-          data-step={
-            item.kind === "step" ? (item.pairKey ?? undefined) : undefined
-          }
-          className="flex min-w-0 gap-2 text-xs"
-        >
-          <span
-            aria-hidden="true"
-            className="flex h-4 w-4 shrink-0 items-center justify-center"
+      {items.map((item) => {
+        const seconds =
+          item.durationMs !== null && item.state !== "running"
+            ? formatSeconds(item.durationMs)
+            : null;
+        const spoken = SPOKEN[item.state];
+        return (
+          <li
+            key={item.key}
+            data-testid="activity-item"
+            data-kind={item.kind}
+            data-state={item.state}
+            data-tool={item.kind === "tool" ? item.name : undefined}
+            data-step={
+              item.kind === "step" ? (item.pairKey ?? undefined) : undefined
+            }
+            className="flex min-w-0 gap-2 text-sm text-foreground-soft"
           >
-            {MARKS[item.state]}
-          </span>
-          {item.state !== "result-missing" ? (
-            <span className="sr-only">{SPOKEN[item.state]}</span>
-          ) : null}
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-baseline gap-2">
-              {item.kind === "subagent" ? (
-                <span className="shrink-0 text-muted-foreground">
-                  하위 에이전트
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex h-5 w-4 shrink-0 items-center justify-center",
+                markColor(item.state),
+              )}
+            >
+              {MARKS[item.state]}
+            </span>
+            {spoken ? <span className="sr-only">{spoken}</span> : null}
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-baseline gap-2">
+                {item.kind === "subagent" ? (
+                  <span className="shrink-0 text-muted-foreground">도우미</span>
+                ) : null}
+                <span className="min-w-0 break-words">
+                  {activityLabel(item)}
                 </span>
+                {item.state === "failed" ? (
+                  <span className="shrink-0 text-destructive">실패</span>
+                ) : null}
+                {seconds !== null ? (
+                  <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
+                    {seconds}
+                  </span>
+                ) : null}
+              </div>
+              {item.state === "result-missing" ? (
+                <p className="text-muted-foreground">결과를 받지 못함</p>
               ) : null}
-              <span className="min-w-0 break-words">{activityLabel(item)}</span>
-              {item.durationMs !== null && item.state !== "running" ? (
-                <span className="ml-auto shrink-0 text-muted-foreground">
-                  {formatDuration(item.durationMs)}
-                </span>
+              {item.kind === "tool" && item.detail ? (
+                isReadableDetail(item.name) ? (
+                  <p className="break-words text-muted-foreground">
+                    {item.detail}
+                  </p>
+                ) : isAdmin ? (
+                  // 명령과 도구 결과의 원본은 JSON 이나 내부 경로다. 관리자에게도 접어 두고 펼칠 때만 보인다.
+                  <details
+                    data-testid="activity-raw"
+                    className="min-w-0 text-xs text-muted-foreground"
+                  >
+                    <summary className="cursor-pointer">원본 보기</summary>
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-muted p-2 font-mono text-xs">
+                      {`${item.name}\n${item.detail}`}
+                    </pre>
+                  </details>
+                ) : null
               ) : null}
             </div>
-            {item.state === "result-missing" ? (
-              <p className="text-muted-foreground">{SPOKEN[item.state]}</p>
-            ) : null}
-            {item.kind === "tool" && item.detail ? (
-              <p className="break-words text-muted-foreground">{item.detail}</p>
-            ) : null}
-            {item.kind === "subagent" &&
-            (item.model ||
-              item.inputTokens !== null ||
-              item.outputTokens !== null ||
-              item.state === "result-missing") ? (
-              <p className="break-words text-muted-foreground">
-                {[
-                  item.model,
-                  item.state === "result-missing" ? "결과를 받지 못함" : null,
-                  item.inputTokens === null && item.state !== "result-missing"
-                    ? null
-                    : `입력 ${formatTokens(item.inputTokens)}`,
-                  item.outputTokens === null && item.state !== "result-missing"
-                    ? null
-                    : `출력 ${formatTokens(item.outputTokens)}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            ) : null}
-          </div>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ol>
   );
 }

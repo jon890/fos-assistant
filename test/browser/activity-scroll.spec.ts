@@ -23,7 +23,7 @@ test("펼친 작업 과정 목록은 높이 안에서 스크롤하고 맨 아래
     await expect(items).toHaveCount(31);
 
     const title = block.getByTestId("activity-toggle");
-    await expect(title).toContainText("작업을 실행하는 중");
+    await expect(title).toContainText("작업하고 있어요");
     await expect(title).not.toContainText("terminal");
 
     const scroll = block.getByTestId("activity-scroll");

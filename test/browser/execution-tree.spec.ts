@@ -26,7 +26,8 @@ async function lastExecutionId(page: import("../../web/node_modules/@playwright/
  * 깊이 `depth` 짜리 가짜 나무를 만든다.
  *
  * <p>가짜 Hermes 로는 깊은 나무를 만들 수 없어 서버 응답을 가로채 만든다. 도구 이름은 화면에서 사람 말로
- * 바뀌므로, 긴 글자는 상세에 넣어 좁은 화면에서 가로로 미는지 본다.
+ * 바뀌므로, 긴 글자는 상세에 넣어 좁은 화면에서 가로로 미는지 본다. 상세를 줄에 그리는 도구는 검색과
+ * 사진 보기뿐이라 검색 도구로 만든다.
  */
 function deepTreeFixture(depth: number) {
   function node(level: number) {
@@ -46,7 +47,7 @@ function deepTreeFixture(depth: number) {
         {
           sequence: 1,
           eventType: "TOOL_STARTED",
-          toolName: "fake-tool",
+          toolName: "web_search",
           subagentName: null,
           durationMs: null,
           detail: `매우-길게-적은-도구-상세-가로로-넘치는지-확인하는-자리-${level}`,
@@ -55,7 +56,7 @@ function deepTreeFixture(depth: number) {
         {
           sequence: 2,
           eventType: "TOOL_COMPLETED",
-          toolName: "fake-tool",
+          toolName: "web_search",
           subagentName: null,
           durationMs: 1234,
           detail: `매우-길게-적은-도구-상세-가로로-넘치는지-확인하는-자리-${level} 아주 길고 긴 상세 설명 문자열을 넣어서 좁은 화면에서도 가로로 넘치지 않는지 시험한다`,
@@ -139,7 +140,7 @@ test("자식 노드가 있어도 하위 에이전트 사건 줄이 사라지지 
   const tree = page.getByTestId("execution-tree");
   await expect(tree).toBeVisible();
   expect(await tree.locator("[data-testid=execution-node]").count()).toBe(2);
-  await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(1);
+  await expect(tree.getByText("도우미: ", { exact: false })).toHaveCount(1);
 });
 
 test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보인다", async ({ page }) => {
@@ -154,10 +155,10 @@ test("도구 사건 둘과 하위 에이전트 사건이 각각 한 줄로 보�
   await expect(tree).toBeVisible();
   await expect(tree.locator('[data-tool="fake-tool"]')).toHaveCount(1);
   await expect(tree.locator('[data-tool="fake-reader"]')).toHaveCount(1);
-  await expect(tree.locator('[data-tool="fake-tool"]')).toContainText("도구 사용");
-  await expect(tree.locator('[data-tool="fake-reader"]')).toContainText("도구 사용");
+  await expect(tree.locator('[data-tool="fake-tool"]')).toContainText("도구를 썼어요");
+  await expect(tree.locator('[data-tool="fake-reader"]')).toContainText("도구를 썼어요");
   await expect(tree.getByText("도구: ", { exact: false })).toHaveCount(0);
-  await expect(tree.getByText("하위 에이전트", { exact: false })).toHaveCount(1);
+  await expect(tree.getByText("도우미: ", { exact: false })).toHaveCount(1);
   await expect(tree.getByText("끝나지 않음")).toHaveCount(0);
 });
 

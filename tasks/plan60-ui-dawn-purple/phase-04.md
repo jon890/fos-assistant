@@ -181,6 +181,7 @@ cd web && pnpm test:browser
 | `test/browser/activity-panel.spec.ts` | 수정 |
 | `test/browser/flow-progress.spec.ts` | 수정 |
 | `test/browser/start-screen.spec.ts` | 수정 |
+| `test/browser/identity.spec.ts` | 수정 |
 | `test/browser/execution-tree.spec.ts` | 수정 |
 | `test/browser/chat.spec.ts` | 수정 |
 | `test/browser/chat-delegation-wake.spec.ts` | 수정 |

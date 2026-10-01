@@ -748,9 +748,7 @@ export function Composer({
             void trySend();
           }}
           disabled={disabled}
-          placeholder={
-            mention ? "@로 에이전트를 불러요" : "무엇을 도와드릴까요?"
-          }
+          placeholder="무엇이든 물어보세요"
           className={cn(
             "max-h-[7.5rem] min-h-10 flex-1 resize-none overflow-y-auto py-2",
             "bg-transparent text-base leading-6 outline-none disabled:opacity-50",

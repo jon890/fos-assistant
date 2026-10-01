@@ -5,7 +5,7 @@ import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { MessageBubble, type Turn } from "./message-bubble";
+import { AssistantRow, MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
@@ -130,6 +130,21 @@ export function MessageList({
   const hasNoAnswer = lastVisible?.role === "USER" && latestView && !sending;
   const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}`;
 
+  const hasLiveActivity = activity !== null && activity.items.length > 0;
+  // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
+  const pendingActivity = !streamedAnswer && hasLiveActivity;
+  const waiting = !streamedAnswer && sending && !hasLiveActivity;
+  const liveActivityBlock = activity ? (
+    <ActivityBlock
+      mode="live"
+      state={activity}
+      slow={flowIsSlow}
+      expanded={liveExpanded}
+      onExpandedChange={onLiveExpandedChange}
+      onOpenPanel={onOpenLive}
+    />
+  ) : null;
+
   useEffect(() => {
     shouldFollow.current = true;
     setHasNewMessage(false);
@@ -176,7 +191,7 @@ export function MessageList({
             </div>
           ) : turns.length === 0 && !sending && !activity ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              무엇이든 물어봐 주세요.
+              무엇이든 물어보세요.
             </p>
           ) : (
             <ol className="flex flex-col gap-6">
@@ -189,21 +204,6 @@ export function MessageList({
                   const nextTurn = visible[index + 1]?.turn;
                   return (
                     <Fragment key={turn.id}>
-                      {pendingAssistant &&
-                      activity &&
-                      activity.items.length > 0 ? (
-                        <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
-                          <span aria-hidden="true" />
-                          <ActivityBlock
-                            mode="live"
-                            state={activity}
-                            slow={flowIsSlow}
-                            expanded={liveExpanded}
-                            onExpandedChange={onLiveExpandedChange}
-                            onOpenPanel={onOpenLive}
-                          />
-                        </li>
-                      ) : null}
                       <MessageBubble
                         turn={turn}
                         conversationId={conversationId}
@@ -240,6 +240,11 @@ export function MessageList({
                         }
                         onOpenArtifact={onOpenArtifact}
                         skillCommandChip={skillCommandChips}
+                        liveActivity={
+                          pendingAssistant && hasLiveActivity
+                            ? liveActivityBlock
+                            : undefined
+                        }
                       />
                       {isLast && hasNoAnswer ? (
                         <li
@@ -263,23 +268,10 @@ export function MessageList({
                   );
                 },
               )}
-              {!streamedAnswer && activity && activity.items.length > 0 ? (
-                <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
-                  <span aria-hidden="true" />
-                  <ActivityBlock
-                    mode="live"
-                    state={activity}
-                    slow={flowIsSlow}
-                    expanded={liveExpanded}
-                    onExpandedChange={onLiveExpandedChange}
-                    onOpenPanel={onOpenLive}
-                  />
-                </li>
-              ) : null}
-              {!streamedAnswer &&
-              sending &&
-              (!activity || activity.items.length === 0) ? (
-                <WaitingIndicator />
+              {pendingActivity || waiting ? (
+                <AssistantRow data-testid="pending-assistant">
+                  {pendingActivity ? liveActivityBlock : <WaitingIndicator />}
+                </AssistantRow>
               ) : null}
               {turnError ? (
                 <li data-testid="turn-error">

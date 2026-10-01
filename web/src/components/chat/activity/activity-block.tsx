@@ -1,20 +1,52 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight, CircleAlert, CircleCheck, Square } from "lucide-react";
+import { cn } from "cn";
 import type { ActivitySummary } from "@/lib/chat-event";
-import { formatElapsed } from "@/lib/format";
+import { formatElapsed, formatSeconds } from "@/lib/format";
 import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
 import { ActivityTimeline } from "./activity-timeline";
 import {
   activityLabel,
+  activityOutcome,
+  activitySummaryLabel,
   fromTree,
   type ActivityItem,
+  type ActivityOutcome,
   type ActivityState,
 } from "./activity-state";
 
 /** 맨 아래에서 이 값(px) 안이면 사용자가 맨 아래를 보고 있는 것으로 본다. */
 const BOTTOM_TOLERANCE_PX = 16;
+
+const OUTCOME_ICON_CLASS = "size-4 shrink-0";
+
+/** 끝난 블록의 접힌 줄 앞에 두는 상태 아이콘이다. */
+function OutcomeIcon({ outcome }: { outcome: ActivityOutcome }) {
+  if (outcome === "stopped") {
+    return (
+      <Square
+        aria-hidden="true"
+        className={cn(OUTCOME_ICON_CLASS, "text-muted-foreground")}
+      />
+    );
+  }
+  if (outcome === "failed") {
+    return (
+      <CircleAlert
+        aria-hidden="true"
+        className={cn(OUTCOME_ICON_CLASS, "text-destructive")}
+      />
+    );
+  }
+  return (
+    <CircleCheck
+      aria-hidden="true"
+      className={cn(OUTCOME_ICON_CLASS, "text-success")}
+    />
+  );
+}
 
 type Props =
   | {
@@ -77,33 +109,39 @@ export function ActivityBlock(props: Props) {
   }, [expanded, executionId, cancelled, loadVersion, savedItems]);
 
   const live = props.mode === "live";
-  const latest =
-    live && props.state.endedAt === null
-      ? props.state.items.findLast((item) => item.state === "running")
-      : null;
-  const title = live
-    ? props.state.endedAt === null
-      ? `작업 과정${latest ? ` · ${activityLabel(latest)}` : ""} · ${formatElapsed(now - props.state.startedAt)}`
-      : [
-          "작업 과정",
-          `도구 ${props.state.items.filter((item) => item.kind === "tool").length}`,
-          `하위 에이전트 ${props.state.items.filter((item) => item.kind === "subagent").length}`,
-          formatElapsed(props.state.endedAt - props.state.startedAt),
-        ].join(" · ")
-    : [
-        "작업 과정",
-        props.summary.toolCount ? `도구 ${props.summary.toolCount}` : null,
-        props.summary.subagentCount
-          ? `하위 에이전트 ${props.summary.subagentCount}`
-          : null,
-        props.summary.durationMs === null
-          ? null
-          : formatElapsed(props.summary.durationMs),
-      ]
-        .filter(Boolean)
-        .join(" · ");
+  const running = props.mode === "live" && props.state.endedAt === null;
+  const latest = running
+    ? props.state.items.findLast((item) => item.state === "running")
+    : null;
+  // 끝난 블록의 한 줄은 수로 고르는 고정 문장이다. 수와 모델과 토큰은 대화에 그리지 않는다.
+  const outcome: ActivityOutcome =
+    props.mode === "live"
+      ? activityOutcome(props.state.items)
+      : cancelled
+        ? "stopped"
+        : "done";
+  const summaryLabel = activitySummaryLabel(
+    props.mode === "live"
+      ? {
+          toolCount: props.state.items.filter((item) => item.kind === "tool")
+            .length,
+          subagentCount: props.state.items.filter(
+            (item) => item.kind === "subagent",
+          ).length,
+        }
+      : props.summary,
+    outcome,
+  );
+  const durationMs =
+    props.mode === "saved"
+      ? props.summary.durationMs
+      : props.state.endedAt === null
+        ? null
+        : props.state.endedAt - props.state.startedAt;
+  // 1초가 안 되는 걸린 시간은 그리지 않는다.
+  const duration = durationMs === null ? null : formatSeconds(durationMs);
   const items = live ? props.state.items : savedItems;
-  const following = props.mode === "live" && props.state.endedAt === null;
+  const following = running;
 
   // 도는 중이고 사용자가 맨 아래를 보고 있을 때만 새 줄을 따라간다. 끝난 답은 맨 위부터 보인다.
   useLayoutEffect(() => {
@@ -118,7 +156,7 @@ export function ActivityBlock(props: Props) {
     <div
       data-testid="activity-block"
       data-mode={props.mode}
-      className="min-w-0 rounded-lg border border-border bg-muted text-foreground"
+      className="min-w-0 rounded-lg border border-border bg-card text-foreground-soft"
     >
       <button
         type="button"
@@ -129,14 +167,36 @@ export function ActivityBlock(props: Props) {
             ? props.onExpandedChange(!expanded)
             : setSavedExpanded(!expanded)
         }
-        className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-xs"
+        className="flex min-h-11 w-full min-w-0 items-center gap-2 px-3 text-left text-[0.8125rem] font-medium"
       >
-        {expanded ? (
-          <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
+        <span className="sr-only">작업 과정: </span>
+        {props.mode === "live" && props.state.endedAt === null ? (
+          <>
+            <span
+              data-testid="activity-signal"
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full bg-signal ring-2 ring-pill"
+            />
+            <span className="min-w-0 flex-1 truncate">
+              {latest ? activityLabel(latest) : "준비하고 있어요"}
+            </span>
+            <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
+              {formatElapsed(now - props.state.startedAt)}
+            </span>
+          </>
         ) : (
-          <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+          <>
+            <OutcomeIcon outcome={outcome} />
+            <span className="min-w-0 flex-1 truncate">{summaryLabel}</span>
+          </>
         )}
-        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <ChevronRight
+          aria-hidden="true"
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground",
+            expanded && "rotate-90",
+          )}
+        />
       </button>
       {live && props.slow && props.state.endedAt === null ? (
         <p
@@ -185,16 +245,23 @@ export function ActivityBlock(props: Props) {
               작업 과정을 읽고 있어요
             </p>
           )}
-          {props.onOpenPanel ? (
-            <div className="mt-2 text-right">
-              <button
-                type="button"
-                data-testid="activity-open-panel"
-                onClick={props.onOpenPanel}
-                className="text-xs text-muted-foreground underline underline-offset-4"
-              >
-                작업 과정 자세히 보기
-              </button>
+          {duration !== null || props.onOpenPanel ? (
+            <div className="mt-2 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+              {duration !== null ? (
+                <span data-testid="activity-duration" className="tabular-nums">
+                  걸린 시간 {duration}
+                </span>
+              ) : null}
+              {props.onOpenPanel ? (
+                <button
+                  type="button"
+                  data-testid="activity-open-panel"
+                  onClick={props.onOpenPanel}
+                  className="ml-auto underline underline-offset-4"
+                >
+                  자세히 보기
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

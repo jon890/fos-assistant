@@ -126,7 +126,7 @@ test("다른 창에서 답하는 중이면 기다리는 표시와 중지를 보�
     const other = await openOtherWindow(context, conversationId);
     await expect(other.getByTestId("observing-notice")).toBeVisible();
     // 붙잡힌 run 이 이미 사건을 남겼으면 작업 과정이, 아니면 기다리는 점이 보인다. 어느 쪽이든 기다리는 표시다.
-    await expect(other.getByLabel("비서의 답을 기다리고 있어요")
+    await expect(other.getByLabel("비서의 답을 기다리는 중")
       .or(other.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(composer(other).getByRole("button", { name: "중지" })).toBeEnabled({ timeout: 10_000 });
     await expect(composer(other).getByRole("button", { name: "보내기" })).toHaveCount(0);
@@ -247,7 +247,7 @@ test("보낸 창을 새로 고치면 기다리는 표시를 보이고 끝나면 
   try {
     await page.reload();
     await expect(page.getByTestId("observing-notice")).toBeVisible();
-    await expect(page.getByLabel("비서의 답을 기다리고 있어요")
+    await expect(page.getByLabel("비서의 답을 기다리는 중")
       .or(page.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(page.getByTestId("no-answer")).toHaveCount(0);
     await expect(page.getByTestId("turn-error")).toHaveCount(0);
@@ -271,7 +271,7 @@ test("보낸 창의 스트림이 끊겨도 turn 이 돌면 기다리는 표시�
     await expect(notice).toBeVisible();
     await expect(notice).toContainText("답을 기다리고 있어요");
     await expect(notice).not.toContainText("다른 창");
-    await expect(page.getByLabel("비서의 답을 기다리고 있어요")
+    await expect(page.getByLabel("비서의 답을 기다리는 중")
       .or(page.locator('[data-testid="activity-block"][data-mode="live"]')).first()).toBeVisible();
     await expect(page.getByText(INTERRUPTED_MESSAGE)).toHaveCount(0);
     await expect(page.getByTestId("turn-error")).toHaveCount(0);

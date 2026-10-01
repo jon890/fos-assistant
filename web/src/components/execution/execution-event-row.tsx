@@ -1,5 +1,5 @@
 import { formatDuration, subagentLabel } from "@/lib/format";
-import { toolLabel } from "@/lib/tool-label";
+import { isReadableDetail, toolLabel } from "@/lib/tool-label";
 
 /** 여러 사건을 합쳐 그리려고 만든 한 줄이다. */
 export type MergedEventRow =
@@ -47,7 +47,7 @@ export function ExecutionEventRow({ row }: { row: MergedEventRow }) {
         className="truncate text-sm text-muted-foreground"
         data-testid="execution-event-row"
       >
-        하위 에이전트: {subagentLabel(row.subagentName, row.detail)}
+        도우미: {subagentLabel(row.subagentName, row.detail)}
         {row.subagentName?.trim() && row.detail ? ` · ${row.detail}` : ""}
       </li>
     );
@@ -70,7 +70,7 @@ export function ExecutionEventRow({ row }: { row: MergedEventRow }) {
       data-tool={row.toolName ?? "도구"}
     >
       {toolLabel(row.toolName, false)} · {formatDuration(row.durationMs ?? 0)}
-      {row.detail ? ` · ${row.detail}` : ""}
+      {row.detail && isReadableDetail(row.toolName) ? ` · ${row.detail}` : ""}
     </li>
   );
 }

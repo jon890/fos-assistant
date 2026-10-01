@@ -3,7 +3,7 @@ export function subagentLabel(
   name: string | null | undefined,
   goal: string | null | undefined,
 ): string {
-  const label = name?.trim() || goal?.trim() || "하위 에이전트";
+  const label = name?.trim() || goal?.trim() || "도우미";
   const codePoints = Array.from(label);
   return codePoints.length > 80
     ? `${codePoints.slice(0, 79).join("")}…`
@@ -34,6 +34,11 @@ export function formatElapsed(milliseconds: number): string {
   const seconds = Math.max(0, Math.floor(milliseconds / 1_000));
   const minutes = Math.floor(seconds / 60);
   return minutes === 0 ? `${seconds}초` : `${minutes}분 ${seconds % 60}초`;
+}
+
+/** 대화의 줄에 붙이는 걸린 시간이다. 1초가 안 되면 그리지 않도록 `null` 을 낸다. */
+export function formatSeconds(milliseconds: number): string | null {
+  return milliseconds < 1_000 ? null : formatElapsed(milliseconds);
 }
 
 /** 마이크로 단위 정수를 통화 금액으로 보인다. 한 번의 실행이 1센트 아래라서 네 자리까지 적는다. */

@@ -43,6 +43,38 @@ export function activityLabel(item: ActivityItem): string {
     : item.name;
 }
 
+export type ActivityOutcome = "done" | "stopped" | "failed";
+
+/**
+ * 끝난 블록의 접힌 한 줄이다.
+ *
+ * <p>저장된 답은 도구와 도우미의 수만 알고 있어, 그 수로 고정 문장을 고른다. 수 자체는 그리지 않는다.
+ */
+export function activitySummaryLabel(
+  counts: { toolCount: number; subagentCount: number },
+  outcome: ActivityOutcome,
+): string {
+  if (outcome === "stopped") return "하다가 멈췄어요";
+  if (outcome === "failed") return "끝까지 하지 못했어요";
+  if (counts.toolCount > 0 && counts.subagentCount > 0)
+    return "찾아보고 도우미와 함께 정리했어요";
+  if (counts.subagentCount > 0) return "도우미와 함께 정리했어요";
+  if (counts.toolCount > 0) return "필요한 것을 확인하고 답했어요";
+  return "차례로 정리했어요";
+}
+
+/** 흘러온 사건으로 끝난 블록이 어떻게 끝났는지 고른다. 중지가 오류보다 먼저다. */
+export function activityOutcome(items: ActivityItem[]): ActivityOutcome {
+  if (items.some((item) => item.state === "stopped")) return "stopped";
+  if (
+    items.some(
+      (item) => item.state === "unfinished" || item.state === "result-missing",
+    )
+  )
+    return "failed";
+  return "done";
+}
+
 export function emptyActivity(startedAt: number): ActivityState {
   return { items: [], startedAt, endedAt: null };
 }
