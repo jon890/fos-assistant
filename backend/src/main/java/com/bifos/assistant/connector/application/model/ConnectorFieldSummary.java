@@ -1,5 +1,8 @@
 package com.bifos.assistant.connector.application.model;
 
+import com.bifos.assistant.hermes.dto.ConnectorField;
+import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
+
 /**
  * 화면이 입력 칸을 그리는 데 쓰는 선언이다.
  *
@@ -13,4 +16,18 @@ public record ConnectorFieldSummary(
         boolean required,
         String pattern,
         boolean hasOptions,
-        boolean autoSelectSingle) {}
+        boolean autoSelectSingle) {
+
+    public static ConnectorFieldSummary from(ConnectorField field) {
+        ConnectorFieldOptions options = field.options();
+        return new ConnectorFieldSummary(
+                field.key(),
+                field.label(),
+                field.description(),
+                field.secret(),
+                field.required(),
+                field.pattern(),
+                options != null,
+                options != null && options.autoSelectSingle());
+    }
+}

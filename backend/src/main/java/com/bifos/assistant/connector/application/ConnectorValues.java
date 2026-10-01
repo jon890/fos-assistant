@@ -20,8 +20,11 @@ import lombok.NoArgsConstructor;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorValues {
-    /** 비밀 칸에서 저장하는 앞부분의 길이다. 값이 이보다 길 때만 저장한다. */
-    private static final int SECRET_PREFIX_LENGTH = 8;
+    /** 비밀 칸에서 저장하는 앞부분의 길이다. */
+    private static final int SECRET_PREFIX_LENGTH = 4;
+
+    /** 앞부분을 저장하는 비밀값의 최소 길이다. 이보다 짧으면 앞부분이 원문의 4분의 1 을 넘는다. */
+    private static final int SECRET_PREFIX_MIN_VALUE_LENGTH = 16;
 
     /** 비밀이 아닌 칸 값의 상한이다. 칸 값은 {@code fields} 열 하나에 JSON 으로 함께 들어간다. */
     private static final int MAX_STORED_VALUE_LENGTH = 500;
@@ -85,7 +88,12 @@ final class ConnectorValues {
         }
     }
 
-    /** 저장할 칸 값이다. 비밀 칸은 앞부분만 남기고, 앞부분이 원문 전체인 짧은 값은 남기지 않는다. */
+    /**
+     * 저장할 칸 값이다.
+     *
+     * <p>비밀 칸은 값이 {@value #SECRET_PREFIX_MIN_VALUE_LENGTH}자 이상일 때만 앞
+     * {@value #SECRET_PREFIX_LENGTH}자를 남긴다. 그보다 짧은 값은 앞부분이 원문의 큰 부분이라 아무것도 남기지 않는다.
+     */
     static ConnectionFields stored(ConnectorManifest manifest, Map<String, String> accepted) {
         Map<String, String> values = new LinkedHashMap<>();
         Map<String, String> secretPrefixes = new LinkedHashMap<>();
@@ -96,10 +104,18 @@ final class ConnectorValues {
             }
             if (!field.secret()) {
                 values.put(field.key(), value);
-            } else if (value.length() > SECRET_PREFIX_LENGTH) {
-                secretPrefixes.put(field.key(), value.substring(0, SECRET_PREFIX_LENGTH));
+            } else if (value.length() >= SECRET_PREFIX_MIN_VALUE_LENGTH) {
+                secretPrefixes.put(field.key(), secretPrefix(value));
             }
         }
         return new ConnectionFields(values, secretPrefixes);
+    }
+
+    /** 비밀값의 앞부분이다. 끝 자리에서 대리 쌍이 갈리면 그 앞에서 자른다. */
+    private static String secretPrefix(String value) {
+        int end = Character.isHighSurrogate(value.charAt(SECRET_PREFIX_LENGTH - 1))
+                ? SECRET_PREFIX_LENGTH - 1
+                : SECRET_PREFIX_LENGTH;
+        return value.substring(0, end);
     }
 }

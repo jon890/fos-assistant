@@ -25,8 +25,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -40,16 +39,15 @@ import org.springframework.stereotype.Service;
  * 따른다. 고르지 않았으면 모델을 빼고 보내 그 에이전트 profile 의 기본값으로 돈다.
  *
  * <p>Memory 는 실행마다 {@link ContextAssembler} 로 다시 조립한다. 부모에게 넣은 문자열을 복사하면
- * 그 사이에 바뀐 권한이 반영되지 않는다.
+ * 그 사이에 바뀐 권한이 반영되지 않는다. 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045).
  *
  * <p>실패를 예외로 올리지 않는다. 실행 줄을 FAILED 로 갱신하고 {@link ChildResult} 로 돌려준다.
  * 나란히 도는 다른 단계를 중간에 끊지 않기 위해서다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AgentRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentRunner.class);
 
     /** 실행이 어떤 이유로 끝났는지 알 수 없을 때 실행 줄에 적는 값이다. */
     private static final String UNKNOWN_ERROR = "ORCHESTRATION_STEP_FAILED";
@@ -133,7 +131,8 @@ public class AgentRunner {
             BooleanSupplier cancelled,
             String instructionAddition,
             DelegationKey delegationKey) {
-        AssembledContext context = contextAssembler.assemble(user);
+        AssembledContext context =
+                agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
         context = contextAssembler.withResponseInstructions(context);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());

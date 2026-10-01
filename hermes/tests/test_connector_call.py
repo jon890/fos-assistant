@@ -4,15 +4,17 @@
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
 import subprocess
 import sys
 import time
-import types
 import unittest
 from unittest import mock
+
+import mcp.types as mcp_types
 
 import test_connector_manifest as base
 
@@ -31,6 +33,37 @@ PARENT_ONLY = {"HERMES_DASHBOARD_PROFILE_API_SECRET": "parent-secret", "OTHER_CO
 SDK_DEFAULT_ENV = {"HOME", "LOGNAME", "PATH", "SHELL", "TERM", "USER"}
 # 자식의 Python 이 뜨면서 스스로 더하는 이름이다. 대시보드가 넘긴 것이 아니다.
 INTERPRETER_ENV = {"LC_CTYPE", "__CF_USER_TEXT_ENCODING"}
+
+
+def text_content(text):
+    return mcp_types.TextContent(type="text", text=text)
+
+
+def tool_result(structured=None, is_error=False, content=()):
+    return mcp_types.CallToolResult(structuredContent=structured, isError=is_error, content=list(content))
+
+
+@contextlib.contextmanager
+def collected_logs():
+    """동안에 남은 로그를 줄 단위 문자열로 모아 돌려준다. 시험 기반이 꺼 둔 로그를 잠시 켠다."""
+    records = []
+
+    class Collect(logging.Handler):
+        def emit(self, record):
+            records.append(self.format(record))
+
+    handler = Collect(level=logging.DEBUG)
+    root = logging.getLogger()
+    previous = root.level
+    logging.disable(logging.NOTSET)
+    root.addHandler(handler)
+    root.setLevel(logging.DEBUG)
+    try:
+        yield records
+    finally:
+        root.setLevel(previous)
+        root.removeHandler(handler)
+        logging.disable(logging.CRITICAL)
 
 
 class ConnectorCallTest(base.ConnectorGateCase):
@@ -133,7 +166,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
                 nonlocal started
                 started += 1
                 await release.wait()
-                return types.SimpleNamespace(structured_content=SCOPES, is_error=False)
+                return tool_result(SCOPES)
 
             with mock.patch.object(self.plugin, "_run_connector_tool", held):
                 running = [asyncio.ensure_future(self.send(CALL, "POST", body)) for _ in range(4)]
@@ -197,57 +230,93 @@ class ConnectorCallTest(base.ConnectorGateCase):
 
     def test_unreadable_tool_results_are_unavailable(self):
         """구조화 결과도 JSON 텍스트도 없는 결과는 unavailable 이다. 구조화 결과가 있으면 그것을 먼저 쓴다."""
-        text = types.SimpleNamespace(type="text", text=json.dumps({"from": "text"}))
+        text = text_content(json.dumps({"from": "text"}))
+        image = mcp_types.ImageContent(type="image", data="AAAA", mimeType="image/png")
         for label, result, expected in (
-            ("structured first", types.SimpleNamespace(structured_content={"from": "structured"}, content=[text],
-                                                       is_error=False),
+            ("structured first", tool_result({"from": "structured"}, content=[text]),
              (200, {"ok": True, "result": {"from": "structured"}})),
-            ("first text", types.SimpleNamespace(structured_content=None, is_error=False, content=[
-                types.SimpleNamespace(type="image"), text]), (200, {"ok": True, "result": {"from": "text"}})),
-            ("not json", types.SimpleNamespace(structured_content=None, is_error=False, content=[
-                types.SimpleNamespace(type="text", text="plain")]), UNAVAILABLE),
-            ("no content", types.SimpleNamespace(structured_content=None, is_error=False, content=[]), UNAVAILABLE),
-            ("error without code", types.SimpleNamespace(structured_content=None, is_error=True, content=[
-                types.SimpleNamespace(type="text", text="[]")]), UNAVAILABLE),
-            ("input required", types.SimpleNamespace(), UNAVAILABLE),
+            ("first text", tool_result(content=[image, text]), (200, {"ok": True, "result": {"from": "text"}})),
+            ("not json", tool_result(content=[text_content("plain")]), UNAVAILABLE),
+            ("no content", tool_result(), UNAVAILABLE),
+            ("error without code", tool_result(is_error=True, content=[text_content("[]")]), UNAVAILABLE),
+            ("input required", object(), UNAVAILABLE),
         ):
             with self.subTest(label):
                 async def fixed(manifest, tool, env, result=result):
                     return result
 
-                with mock.patch.object(self.plugin, "_run_connector_tool", fixed):
+                with mock.patch.object(self.plugin, "_run_connector_tool", fixed), collected_logs() as records:
                     self.assertEqual(self.call(), expected)
+                if label == "input required":
+                    ours = [line for line in records if "dashboard-profile-api" in line]
+                    self.assertEqual(len(ours), 1, records)
+                    self.assertIn("AttributeError", ours[0])
+
+    def test_sdk_outside_supported_range_is_unavailable_without_starting_child(self):
+        """지원 범위 밖의 SDK 판이면 자식을 띄우지 않고 unavailable 이며, 로그에 판과 까닭이 남는다."""
+        with mock.patch.object(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
+                mock.patch.object(self.plugin, "_run_connector_tool") as runner, collected_logs() as records:
+            self.assertEqual(self.call(), UNAVAILABLE)
+        runner.assert_not_called()
+        ours = [line for line in records if "dashboard-profile-api" in line]
+        self.assertEqual(len(ours), 1, records)
+        self.assertIn("1.30.0", ours[0])
+        self.assertIn("지원 범위", ours[0])
+
+    def test_missing_sdk_attribute_is_unavailable(self):
+        """SDK 타입에 필요한 속성이 없으면 까닭에 그 이름이 들어가고 호출은 unavailable 이다."""
+        self.assertIsNone(self.plugin._mcp_sdk_problem())
+        with mock.patch.dict(mcp_types.ToolAnnotations.model_fields, clear=False):
+            del mcp_types.ToolAnnotations.model_fields["read_only_hint"]
+            self.assertIn("read_only_hint", self.plugin._mcp_sdk_problem())
+            with collected_logs():
+                self.assertEqual(self.call(), UNAVAILABLE)
+        self.assertIsNone(self.plugin._mcp_sdk_problem())
+
+    def test_failure_log_names_innermost_error_and_sdk_version(self):
+        """묶인 예외는 가장 안쪽 종류와 SDK 판을 로그에 남기고, 예외 본문은 남기지 않는다."""
+        async def broken(manifest, tool, env):
+            raise ExceptionGroup("outer", [AttributeError("secret-text")])
+
+        with mock.patch.object(self.plugin, "_run_connector_tool", broken), collected_logs() as records:
+            self.assertEqual(self.call(), UNAVAILABLE)
+        log = "\n".join(records)
+        self.assertIn("AttributeError", log)
+        self.assertIn(self.plugin._mcp_sdk_version(), log)
+        self.assertNotIn("ExceptionGroup", log)
+        self.assertNotIn("secret-text", log)
+
+    def test_register_logs_sdk_problem_once(self):
+        """판이 범위 밖이어도 register 는 provider 를 등록하고 경고 한 줄만 남긴다."""
+        drain = mock.Mock(assess_secret_strength=mock.Mock(return_value=None))
+        modules = {"plugins": mock.Mock(), "plugins.dashboard_auth": mock.Mock(drain=drain),
+                   "plugins.dashboard_auth.drain": drain}
+        ctx = mock.Mock(register_dashboard_auth_provider=mock.Mock())
+        with mock.patch.dict(sys.modules, modules), \
+                mock.patch.dict(os.environ, {self.plugin.ENV_VAR: "x7Kq9mZp2Lw5Rt8Vb3Nc6Hd1Fg4Js0Ya"}), \
+                mock.patch.object(self.plugin, "_install_gate", return_value=True), \
+                mock.patch.object(self.plugin, "_mcp_sdk_version", return_value="1.30.0"), \
+                collected_logs() as records:
+            self.plugin.register(ctx)
+        ctx.register_dashboard_auth_provider.assert_called_once()
+        warnings = [line for line in records if "1.30.0" in line]
+        self.assertEqual(len(warnings), 1, records)
+        self.assertIn("지원 범위", warnings[0])
 
     def test_candidate_secret_is_not_in_responses_logs_or_files(self):
         """후보 토큰 원문은 응답 본문과 로그에 없고, 호출이 디스크에 아무것도 쓰지 않는다."""
-        records = []
-
         def files():
             return {path: path.read_bytes() for path in self.base.rglob("*")
                     if path.is_file() and "__pycache__" not in path.parts}
 
         before = files()
 
-        class Collect(logging.Handler):
-            def emit(self, record):
-                records.append(self.format(record))
-
-        handler = Collect(level=logging.DEBUG)
-        root = logging.getLogger()
-        previous = root.level
-        logging.disable(logging.NOTSET)
-        root.addHandler(handler)
-        root.setLevel(logging.DEBUG)
-        try:
+        with collected_logs() as records:
             responses = [self.call(), self.call(BAD_TOKEN), self.call(ODD_TOKEN), self.call(OK_TOKEN, scope="zzz")]
             with mock.patch.object(self.plugin, "CONNECTOR_CALL_TIMEOUT_SECONDS", 2):
                 responses.append(self.call(SLOW_TOKEN))
             responses.append(self.request(CALL, "POST", {"tool": "list_scopes",
                                                          "values": {"token": OK_TOKEN, "other": "x"}}))
-        finally:
-            root.setLevel(previous)
-            root.removeHandler(handler)
-            logging.disable(logging.CRITICAL)
         self.assertTrue(records, "로그를 하나도 모으지 못하면 이 검사는 아무것도 보지 않는다")
         for token in (OK_TOKEN, BAD_TOKEN, ODD_TOKEN, SLOW_TOKEN):
             self.assertNotIn(token, json.dumps(responses))

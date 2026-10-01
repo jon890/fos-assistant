@@ -46,12 +46,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -67,10 +67,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 이미 하므로 여기서 하지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ChatService {
-
-    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     private static final int TITLE_LIMIT = 60;
 
     private final ConversationRepository conversations;
@@ -258,7 +257,9 @@ public class ChatService {
             String asked = command == null ? text : command.hermesInput();
             String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), asked);
-            AssembledContext context = contextAssembler.assemble(user);
+            // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045). turn 지시는 그대로 붙는다.
+            AssembledContext context =
+                    routed.agent().connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
             context = contextAssembler.withResponseInstructions(context);
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                     context.chars(), null, context.instructionsHash(), context.omittedItems());
@@ -348,14 +349,19 @@ public class ChatService {
                             intent,
                             execution -> {
                                 turns.rekey(handle, execution.id());
-                                if (streaming)
+                                if (streaming) {
                                     onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
+                                }
                             },
                             onEvent);
-            if (!turn.cancelled()) turns.markFinished(handle);
+            if (!turn.cancelled()) {
+                turns.markFinished(handle);
+            }
             recorded(turn, startedAt);
             if (streaming) {
-                if (!turn.cancelled()) onEvent.accept(ChatEvent.delta(turn.assistantText()));
+                if (!turn.cancelled()) {
+                    onEvent.accept(ChatEvent.delta(turn.assistantText()));
+                }
                 onEvent.accept(
                         turn.cancelled()
                                 ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
@@ -513,7 +519,7 @@ public class ChatService {
             PendingTurn pending, String runId, TurnCancellation.TurnHandle handle, Consumer<ChatEvent> onEvent) {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
-        java.util.concurrent.CompletableFuture<Void> streamDone = new java.util.concurrent.CompletableFuture<>();
+        CompletableFuture<Void> streamDone = new CompletableFuture<>();
         Thread.startVirtualThread(() -> {
             try {
                 eventStream.open(
@@ -605,10 +611,9 @@ public class ChatService {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "there is no message to regenerate");
             }
             ChatMessage last = active.getLast();
-            ChatMessage previousAnswer =
-                    last.role() == com.bifos.assistant.chat.domain.MessageRole.ASSISTANT ? last : null;
+            ChatMessage previousAnswer = last.role() == MessageRole.ASSISTANT ? last : null;
             ChatMessage question = previousAnswer == null ? last : previousQuestion(active, previousAnswer);
-            if (question == null || question.role() != com.bifos.assistant.chat.domain.MessageRole.USER) {
+            if (question == null || question.role() != MessageRole.USER) {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
             }
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
@@ -653,7 +658,7 @@ public class ChatService {
         }
         for (int index = answerIndex - 1; index >= 0; index--) {
             ChatMessage candidate = active.get(index);
-            if (candidate.role() == com.bifos.assistant.chat.domain.MessageRole.USER) {
+            if (candidate.role() == MessageRole.USER) {
                 return candidate;
             }
         }
@@ -737,7 +742,9 @@ public class ChatService {
             turns.stopRun(run);
         }
         for (AgentExecution child : executionRepository.findByRootExecutionId(executionId)) {
-            if (child.status() != ExecutionStatus.RUNNING || child.hermesRunId() == null) continue;
+            if (child.status() != ExecutionStatus.RUNNING || child.hermesRunId() == null) {
+                continue;
+            }
             Optional<Agent> childAgent = agents.findById(child.agentId());
             if (childAgent.isEmpty()) {
                 // 뿌리 turn 의 중지는 이미 켰다. 에이전트 행이 없는 자식 하나 때문에 오류로 끝내지 않는다.
@@ -757,7 +764,9 @@ public class ChatService {
         boolean stopped = firstStopSent || turns.hasStoppedRuns(handle);
         boolean failed = !stopped || !turns.pendingStops(handle).isEmpty();
         if (failed) {
-            if (!turns.hasStoppedRuns(handle)) turns.resume(handle);
+            if (!turns.hasStoppedRuns(handle)) {
+                turns.resume(handle);
+            }
             throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
         }
         turns.confirmStop(handle);
@@ -789,7 +798,9 @@ public class ChatService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        if (ids.isEmpty()) return Map.of();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
         return executionRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(AgentExecution::id, AgentExecution::status));
     }

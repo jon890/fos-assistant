@@ -64,6 +64,11 @@ assistant:
     submit-timeout: 30s
     # 실행 줄에 적는 위임 답의 길이 상한. 넘으면 자르고 잘렸다는 한 줄을 붙인다
     output-max-chars: 100000
+  connector:
+    # 한 사용자가 동시에 돌릴 수 있는 선택지 조회, 등록, 연결 확인 수
+    max-concurrent-calls: 1
+    # 한 사용자가 60초 동안 돌릴 수 있는 그 호출 수. 상태는 JVM 메모리에 둔다
+    calls-per-minute: 10
   delegation-wake:
     # 맡긴 일의 결과가 끝나면 부모 대화의 turn 을 자동으로 연다(ADR-040)
     enabled: true

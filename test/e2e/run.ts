@@ -183,6 +183,8 @@ function startControlPlane(
       DB_PASSWORD: "",
       SERVER_PORT: String(APP_PORT),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
+      // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
+      ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
       HERMES_PROFILE_KEY_DIR: keyDir,
       // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
