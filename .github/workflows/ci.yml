@@ -64,8 +64,7 @@ jobs:
 
   browser:
     name: browser-${{ matrix.project }}
-    # PR 에서는 머지 전에 로컬에서 돌린다(AGENTS.md 「확인」). CI 는 main 에 들어간 뒤에만 돌려 사후 확인한다.
-    if: github.event_name == 'push'
+    # PR 과 main 모두에서 돈다. 머지 전 브라우저 확인은 이 job 이 맡는다(AGENTS.md 「확인」).
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
