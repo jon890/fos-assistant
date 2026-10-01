@@ -16,8 +16,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.connector.application.ConnectorCallLimiter;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
+import com.bifos.assistant.connector.application.ConnectorProperties;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
@@ -43,6 +46,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,6 +64,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -109,6 +115,12 @@ class ConnectorConnectionServiceTest {
 
     @Autowired
     AgentTokenRepository tokens;
+
+    @Autowired
+    AgentLifecycleService lifecycle;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @MockitoSpyBean
     AppUserRepository users;
@@ -429,13 +441,15 @@ class ConnectorConnectionServiceTest {
     @DisplayName("처음 등록의 확인 사이에 같은 사용자의 다른 등록이 끼어도 연결과 에이전트는 하나다")
     void interleavedFirstRegistrationsShareOneConnectionAndAgent() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
+        // 기본 한도는 같은 사용자의 겹친 등록을 거절한다. 동시 한도를 올린 설정에서도 행이 하나임을 본다.
+        ConnectorConnectionService relaxed = serviceLimitedTo(2, 1000);
         Map<String, String> outer = Map.of("token", "demo_zz_0123456789");
         when(connector.call(DEMO, "list_scopes", outer)).thenAnswer(invocation -> {
-            service.register(user, DEMO, VALUES);
+            relaxed.register(user, DEMO, VALUES);
             return CallResult.success(MAPPER.readTree("{\"scopes\":[]}"));
         });
 
-        ConnectionSnapshot registered = service.register(user, DEMO, outer);
+        ConnectionSnapshot registered = relaxed.register(user, DEMO, outer);
 
         assertThat(connections.count()).isEqualTo(1);
         assertThat(agents.count()).isEqualTo(1);
@@ -948,6 +962,52 @@ class ConnectorConnectionServiceTest {
         verify(connector, times(2)).putConnector(profile, DEMO, true);
         verify(toolsets, never()).writeApiServer(any(), any());
         assertThat(stored(member).status()).isEqualTo(ConnectionStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("호출 제한을 넘은 선택지 조회는 도구를 부르지 않고 거절되며 해제는 제한과 관계없이 된다")
+    void rejectsOptionsOverLimitWithoutCallingToolAndStillDisconnects() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, DEMO, VALUES);
+        ConnectorConnectionService limited = serviceLimitedTo(1, 1);
+
+        assertThat(limited.options(user, DEMO, "scope", VALUES)).hasSize(2);
+        assertCode(() -> limited.options(user, DEMO, "scope", VALUES), ErrorCode.CONNECTOR_RATE_LIMITED);
+        assertCode(() -> limited.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_RATE_LIMITED);
+        assertCode(() -> limited.check(user, DEMO), ErrorCode.CONNECTOR_RATE_LIMITED);
+
+        // 등록의 확인 한 번과 받아들인 선택지 조회 한 번이다.
+        verify(connector, times(2)).call(DEMO, "list_scopes", VALUES);
+        verify(connector, never()).readConnector(anyString(), anyString());
+        // 직접 만든 서비스는 프록시를 거치지 않아 해제의 트랜잭션을 여기서 연다.
+        ConnectionSnapshot disconnected =
+                new TransactionTemplate(transactionManager).execute(status -> limited.disconnect(user, DEMO));
+        assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
+    }
+
+    @Test
+    @DisplayName("한 사용자가 호출 제한에 걸려도 다른 사용자의 선택지 조회는 된다")
+    void limitsEachUserSeparately() {
+        CurrentUser first = user(UserRole.MEMBER, 1L);
+        CurrentUser second = user(UserRole.MEMBER, 1L);
+        ConnectorConnectionService limited = serviceLimitedTo(1, 1);
+        limited.options(first, DEMO, "scope", VALUES);
+
+        assertCode(() -> limited.options(first, DEMO, "scope", VALUES), ErrorCode.CONNECTOR_RATE_LIMITED);
+        assertThat(limited.options(second, DEMO, "scope", VALUES)).hasSize(2);
+    }
+
+    /** 주어진 한도의 limiter 를 쓰는 서비스를 직접 만든다. 주입된 서비스는 검사 설정의 넉넉한 한도를 쓴다. */
+    private ConnectorConnectionService serviceLimitedTo(int maxConcurrentCalls, int callsPerMinute) {
+        return new ConnectorConnectionService(
+                connections,
+                users,
+                lifecycle,
+                connector,
+                toolsets,
+                transactionManager,
+                new ConnectorCallLimiter(new ConnectorProperties(maxConcurrentCalls, callsPerMinute)),
+                Clock.systemUTC());
     }
 
     private void assertVerifyFailure(

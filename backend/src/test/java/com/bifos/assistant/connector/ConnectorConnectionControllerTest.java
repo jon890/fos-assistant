@@ -220,6 +220,22 @@ class ConnectorConnectionControllerTest {
     }
 
     @Test
+    @DisplayName("호출 제한에 걸린 선택지 조회는 429 와 CONNECTOR_RATE_LIMITED 를 돌려준다")
+    void returns429WhenOptionsCallIsRateLimited() throws Exception {
+        when(service.options(any(), any(), any(), any()))
+                .thenThrow(new ApiException(ErrorCode.CONNECTOR_RATE_LIMITED, "too many connector calls"));
+
+        MvcResult result = mvc.perform(post("/api/v1/connections/" + DEMO + "/options/scope")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(BODY))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("CONNECTOR_RATE_LIMITED"))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(TOKEN);
+    }
+
+    @Test
     @DisplayName("MEMBER는 관리자 목록을 읽지 못한다")
     void forbidsMemberFromReadingAdminList() throws Exception {
         when(currentUser.requireAdmin())

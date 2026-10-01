@@ -159,6 +159,27 @@ test("선택지 조회가 실패하면 비밀 칸을 비운다", async ({ page }
   await expect(token).toHaveValue("");
 });
 
+test("선택지 조회가 호출 제한에 걸리면 정해 둔 문구만 보인다", async ({
+  page,
+}) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: disconnected }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}/options/scope`, (route) =>
+    route.fulfill({
+      status: 429,
+      json: { code: "CONNECTOR_RATE_LIMITED", message: "raw upstream" },
+    }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await page.getByLabel("토큰", { exact: true }).fill("demo_ok_0123456789");
+  await page.getByRole("button", { name: "불러오기" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "요청이 많아요. 잠시 뒤 다시 해 주세요.",
+  );
+  await expect(page.getByText("raw upstream")).toHaveCount(0);
+});
+
 test("비밀 칸이 비어 있으면 선택지를 불러오지 못하고 입력 형식 오류를 문구로 보인다", async ({
   page,
 }) => {

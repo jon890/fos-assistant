@@ -55,6 +55,7 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_UNAVAILABLE: "서비스에 닿지 못했어요. 잠시 뒤 다시 해 주세요.",
   CONNECTOR_OPERATION_FAILED: "연결을 마치지 못했어요.",
   CONNECTOR_NOT_FOUND: "찾을 수 없는 서비스예요.",
+  CONNECTOR_RATE_LIMITED: "요청이 많아요. 잠시 뒤 다시 해 주세요.",
   FORBIDDEN: "이 작업을 관리할 수 없어요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
   VALIDATION_FAILED: "입력 형식을 확인해 주세요.",

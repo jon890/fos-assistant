@@ -23,6 +23,10 @@ assistant:
     # 자동 turn 이 다른 스레드에서 대역 Hermes 와 메시지를 함께 써 위임을 끝까지 돌리는 검사의 단언을 흔든다.
     # 깨우기를 보는 검사만 켠다
     enabled: false
+  connector:
+    max-concurrent-calls: 1
+    # 검사는 같은 사용자로 짧은 시간에 여러 번 부른다. 제한 자체는 ConnectorCallLimiterTest 가 본다
+    calls-per-minute: 1000
   auth:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
   attachment:

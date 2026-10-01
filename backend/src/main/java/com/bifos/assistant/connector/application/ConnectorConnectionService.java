@@ -61,6 +61,7 @@ public class ConnectorConnectionService {
     private final HermesConnectorClient connector;
     private final HermesToolsetClient toolsets;
     private final TransactionTemplate transactions;
+    private final ConnectorCallLimiter limiter;
     private final Clock clock;
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -72,8 +73,9 @@ public class ConnectorConnectionService {
             AgentLifecycleService lifecycle,
             HermesConnectorClient connector,
             HermesToolsetClient toolsets,
-            PlatformTransactionManager transactionManager) {
-        this(connections, users, lifecycle, connector, toolsets, transactionManager, Clock.systemUTC());
+            PlatformTransactionManager transactionManager,
+            ConnectorCallLimiter limiter) {
+        this(connections, users, lifecycle, connector, toolsets, transactionManager, limiter, Clock.systemUTC());
     }
 
     public ConnectorConnectionService(
@@ -83,6 +85,7 @@ public class ConnectorConnectionService {
             HermesConnectorClient connector,
             HermesToolsetClient toolsets,
             PlatformTransactionManager transactionManager,
+            ConnectorCallLimiter limiter,
             Clock clock) {
         this.connections = connections;
         this.users = users;
@@ -90,6 +93,7 @@ public class ConnectorConnectionService {
         this.connector = connector;
         this.toolsets = toolsets;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.limiter = limiter;
         this.clock = clock;
     }
 
@@ -139,28 +143,30 @@ public class ConnectorConnectionService {
     /** 작성 중인 값으로 선택지 도구를 부른다. 아무것도 저장하지 않으므로 사용자 행을 잠그지 않는다. */
     public List<ConnectorOption> options(
             CurrentUser user, String connectorId, String fieldKey, Map<String, String> values) {
-        ConnectorManifest manifest = requireManifest(connectorId);
-        ConnectorFieldOptions options = manifest.fields().stream()
-                .filter(field -> field.key().equals(fieldKey) && field.options() != null)
-                .map(ConnectorField::options)
-                .findFirst()
-                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
-        // 고르는 중이라 필수 칸이 아직 비어 있을 수 있다. 채운 칸의 형식만 본다.
-        JsonNode result = call(manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
-        JsonNode items = result.get(options.items());
-        if (items == null || !items.isArray()) {
-            throw ConnectorErrors.unavailable();
-        }
-        List<ConnectorOption> found = new ArrayList<>();
-        for (JsonNode item : items) {
-            JsonNode value = item.get(options.value());
-            JsonNode label = item.get(options.label());
-            if (value == null || !value.isString() || label == null || !label.isString()) {
+        return limiter.call(user.id(), () -> {
+            ConnectorManifest manifest = requireManifest(connectorId);
+            ConnectorFieldOptions options = manifest.fields().stream()
+                    .filter(field -> field.key().equals(fieldKey) && field.options() != null)
+                    .map(ConnectorField::options)
+                    .findFirst()
+                    .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
+            // 고르는 중이라 필수 칸이 아직 비어 있을 수 있다. 채운 칸의 형식만 본다.
+            JsonNode result = call(manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
+            JsonNode items = result.get(options.items());
+            if (items == null || !items.isArray()) {
                 throw ConnectorErrors.unavailable();
             }
-            found.add(new ConnectorOption(value.asString(), label.asString()));
-        }
-        return List.copyOf(found);
+            List<ConnectorOption> found = new ArrayList<>();
+            for (JsonNode item : items) {
+                JsonNode value = item.get(options.value());
+                JsonNode label = item.get(options.label());
+                if (value == null || !value.isString() || label == null || !label.isString()) {
+                    throw ConnectorErrors.unavailable();
+                }
+                found.add(new ConnectorOption(value.asString(), label.asString()));
+            }
+            return List.copyOf(found);
+        });
     }
 
     /**
@@ -175,14 +181,16 @@ public class ConnectorConnectionService {
      * 안으로 들어간다.
      */
     public ConnectionSnapshot register(CurrentUser user, String connectorId, Map<String, String> values) {
-        ConnectorManifest manifest = requireManifest(connectorId);
-        Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
-        call(manifest, manifest.verifyTool(), accepted);
-        ConnectionSnapshot stored = transactions.execute(status -> apply(user, manifest, accepted));
-        if (stored == null) {
-            throw new ConnectorOperationFailure();
-        }
-        return stored;
+        return limiter.call(user.id(), () -> {
+            ConnectorManifest manifest = requireManifest(connectorId);
+            Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
+            call(manifest, manifest.verifyTool(), accepted);
+            ConnectionSnapshot stored = transactions.execute(status -> apply(user, manifest, accepted));
+            if (stored == null) {
+                throw new ConnectorOperationFailure();
+            }
+            return stored;
+        });
     }
 
     /**
@@ -260,35 +268,37 @@ public class ConnectorConnectionService {
      */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot check(CurrentUser user, String connectorId) {
-        lock(user.id());
-        ConnectorConnection connection = requireConnection(user.id(), connectorId);
-        ConnectorState state = readState(connection);
-        if (!connection.desiredEnabled()) {
-            if (state.enabled()) {
-                connection.pending(now());
-            } else {
-                connection.disconnected(connection.restartRequired(), now());
+        return limiter.call(user.id(), () -> {
+            lock(user.id());
+            ConnectorConnection connection = requireConnection(user.id(), connectorId);
+            ConnectorState state = readState(connection);
+            if (!connection.desiredEnabled()) {
+                if (state.enabled()) {
+                    connection.pending(now());
+                } else {
+                    connection.disconnected(connection.restartRequired(), now());
+                }
+                return snapshot(connections.save(connection));
             }
-            return snapshot(connections.save(connection));
-        }
-        if (!connection.restartRequired()
-                && reinstallIfNotConfigured(connection, state).isPresent()) {
-            if (connection.restartRequired()) {
+            if (!connection.restartRequired()
+                    && reinstallIfNotConfigured(connection, state).isPresent()) {
+                if (connection.restartRequired()) {
+                    connection.pending(now());
+                    return snapshot(connections.save(connection));
+                }
+                state = readState(connection);
+            }
+            if (connection.restartRequired() || !state.enabled() || !state.configured()) {
                 connection.pending(now());
                 return snapshot(connections.save(connection));
             }
-            state = readState(connection);
-        }
-        if (connection.restartRequired() || !state.enabled() || !state.configured()) {
-            connection.pending(now());
+            if (probedUsable(connection)) {
+                connection.ready(now());
+            } else {
+                connection.pending(now());
+            }
             return snapshot(connections.save(connection));
-        }
-        if (probedUsable(connection)) {
-            connection.ready(now());
-        } else {
-            connection.pending(now());
-        }
-        return snapshot(connections.save(connection));
+        });
     }
 
     /**
@@ -514,11 +524,7 @@ public class ConnectorConnectionService {
      * <p>단계 이름과 커넥터 번호와 예외 종류만 적는다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다.
      */
     private static void warn(String step, String connectorId, RuntimeException ex) {
-        log.warn(
-                "connector {} failed at {}: {}",
-                connectorId,
-                step,
-                ex.getClass().getSimpleName());
+        log.warn("connector {} failed at {}: {}", connectorId, step, ex.getClass().getSimpleName());
     }
 
     private Instant now() {
