@@ -52,6 +52,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -115,6 +116,9 @@ class ConversationModelChoiceTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    TransactionTemplate transaction;
 
     @BeforeEach
     void reset() throws IOException {
@@ -234,7 +238,8 @@ class ConversationModelChoiceTest {
     void listAndSendCarryStoredValueEvenIfItFailsValidation() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
-        conversations.chooseModelIfActive(created.id(), dad.id(), "openrouter", "example-model-small", "extreme");
+        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
+                created.id(), dad.id(), "openrouter", "example-model-small", "extreme"));
         ChatController controller = chatController(dad);
         ((StubHermesRunsClient) hermes)
                 .willReturn(HermesRunResult.of(
