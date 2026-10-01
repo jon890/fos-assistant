@@ -1356,9 +1356,12 @@ export function startFakeHermes(
           }
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
           // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
-          if (run.input === "자식 늦은 완료 검사" || run.input === "자식 완료 사건 없음 검사") {
+          if (run.input === "자식 늦은 완료 검사" || run.input === "자식 완료 사건 없음 검사" || run.input === "압축 뒤 자식 완료 검사") {
             const childSessionId = `child-${run.run_id}`;
-            childUsages.set(childSessionId, { profile: profile!, parent: run.session_id,
+            const parentSessionId = run.input === "압축 뒤 자식 완료 검사"
+              ? `compacted-${run.session_id}`
+              : run.session_id;
+            childUsages.set(childSessionId, { profile: profile!, parent: parentSessionId,
               reads: 0, delayed: run.input === "자식 늦은 완료 검사" });
             const child = { subagent_id: `sa-${run.run_id}`, goal: "부모 뒤에 끝나는 조사",
               model: "example-fast", child_session_id: childSessionId };

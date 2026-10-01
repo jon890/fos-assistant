@@ -145,7 +145,7 @@ export const streamingScenario: Scenario = {
     expect(timingValues.every((value, index) => Number.isFinite(value)
       && (index === 0 || value >= timingValues[index - 1]!)), "실행 시각의 순서가 뒤집혔다");
 
-    for (const text of ["자식 늦은 완료 검사", "자식 완료 사건 없음 검사"]) {
+    for (const text of ["자식 늦은 완료 검사", "자식 완료 사건 없음 검사", "압축 뒤 자식 완료 검사"]) {
       step(`${text}: 부모 종료 뒤 session 사용량을 보완한다`);
       const receivedChild = await events(expectStatus(await call(context, "/chat/messages/stream", {
         method: "POST", token: context.tokens.dad, body: { text, agentCode: "dad" },
