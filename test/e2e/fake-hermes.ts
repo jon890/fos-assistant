@@ -32,6 +32,7 @@ const PROFILE_PATH = /^\/api\/profiles\/(.+)$/;
  * `<이름>/soul` 까지 함께 먹어 이 경로를 DELETE 분기로 잘못 보낸다.
  */
 const SOUL_PATH = /^\/api\/profiles\/([^/]+)\/soul$/;
+const MODEL_DEFAULTS_PATH = /^\/api\/profiles\/([^/]+)\/model-defaults$/;
 const ENV_PATH = "/api/env";
 const TOOLSET_CATALOG_PATH = "/api/tools/toolsets";
 const CONFIG_PATH = "/api/config";
@@ -589,6 +590,7 @@ export function startFakeHermes(
   const keys: Record<string, string> = { ...profileKeys };
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
+  const childUsages = new Map<string, { profile: string; parent: string; reads: number; delayed: boolean }>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
   const profiles = new Map<string, Record<string, string>>();
   const apiServerToolsets = new Map(
@@ -766,6 +768,7 @@ export function startFakeHermes(
     queryProfile: string | null,
   ): Promise<boolean> => {
     const soulMatch = SOUL_PATH.exec(path);
+    const modelDefaultsMatch = MODEL_DEFAULTS_PATH.exec(path);
     const profileMatch = PROFILE_PATH.exec(path);
     const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || path === TOOLSET_CATALOG_PATH
       || path === CONFIG_PATH || path === SKILLS_PATH || path === SKILL_TOGGLE_PATH || profileMatch !== null
@@ -994,6 +997,15 @@ export function startFakeHermes(
       return true;
     }
 
+    if (modelDefaultsMatch !== null && request.method === "GET") {
+      send(response, 200, {
+        provider: DEFAULT_RUNTIME.provider,
+        model: DEFAULT_RUNTIME.model,
+        reasoningEffort: "medium",
+      });
+      return true;
+    }
+
     // `PROFILE_PATH` 의 `.+` 가 이 경로도 함께 먹으므로 그 분기보다 앞에서 처리한다.
     if (soulMatch !== null) {
       const name = decodeURIComponent(soulMatch[1]!);
@@ -1197,7 +1209,7 @@ export function startFakeHermes(
                 slug: DEFAULT_RUNTIME.provider,
                 name: "OpenAI Codex",
                 authenticated: true,
-                models: [DEFAULT_RUNTIME.model, "example-model-mini"],
+                models: [DEFAULT_RUNTIME.model, "example-model-mini", "example-fast", "example-balanced", "example-deep"],
                 capabilities: {
                   [DEFAULT_RUNTIME.model]: { reasoning: true },
                   "example-model-mini": { reasoning: false },
@@ -1213,6 +1225,17 @@ export function startFakeHermes(
           const [, profile, sessionId] = sessionMatch;
           if (!authorized(request, profile!)) {
             return send(response, 401, { error: "bad key for this profile" });
+          }
+          const child = childUsages.get(sessionId!);
+          if (child && child.profile === profile) {
+            child.reads += 1;
+            const ended = !child.delayed || child.reads > 1;
+            return send(response, 200, { object: "session", session: {
+              id: sessionId, source: "subagent", parent_session_id: child.parent,
+              model: "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
+              end_reason: ended ? "agent_close" : null,
+              input_tokens: 100, cache_read_tokens: 50, cache_write_tokens: 10, output_tokens: 20,
+            } });
           }
           const session = sessions.get(sessionId!);
           if (!session) return send(response, 404, { error: "no such session" });
@@ -1333,6 +1356,22 @@ export function startFakeHermes(
           }
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
           // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
+          if (run.input === "자식 늦은 완료 검사" || run.input === "자식 완료 사건 없음 검사" || run.input === "압축 뒤 자식 완료 검사") {
+            const childSessionId = `child-${run.run_id}`;
+            const parentSessionId = run.input === "압축 뒤 자식 완료 검사"
+              ? `compacted-${run.session_id}`
+              : run.session_id;
+            childUsages.set(childSessionId, { profile: profile!, parent: parentSessionId,
+              reads: 0, delayed: run.input === "자식 늦은 완료 검사" });
+            const child = { subagent_id: `sa-${run.run_id}`, goal: "부모 뒤에 끝나는 조사",
+              model: "example-fast", child_session_id: childSessionId };
+            event(response, { event: "subagent.start", ...child });
+            event(response, { event: "run.completed" });
+            // 부모 스트림을 먼저 닫는다. 늦은 자식 완료는 첫 session 조회 뒤에만 보이며,
+            // 이미 닫힌 부모 스트림에는 완료 사건을 전달할 수 없다.
+            response.end();
+            return;
+          }
           if (run.input === "병렬 하위 에이전트 검사") {
             const first = { goal: "첫째 조사", child_session_id: "child-first" };
             const second = { goal: "둘째 조사", child_session_id: "child-second" };

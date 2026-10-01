@@ -7,10 +7,15 @@ import { MessageBubble, type Turn } from "./message-bubble";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
-import { foldVersions, isLatestView, type VersionSlot } from "@/lib/message-versions";
+import {
+  foldVersions,
+  isLatestView,
+  type VersionSlot,
+} from "@/lib/message-versions";
 
 type Props = {
   turns: Turn[];
+  isAdmin: boolean;
   loading: boolean;
   sending: boolean;
   activity: ActivityState | null;
@@ -37,6 +42,7 @@ type Props = {
 
 export function MessageList({
   turns,
+  isAdmin,
   loading,
   sending,
   activity,
@@ -49,30 +55,74 @@ export function MessageList({
   onOpenSaved,
   onOpenLive,
   onRetry,
-  selectedVersions, onVersionChange, onRegenerate, onAnswer, onOpenArtifact, skillCommandChips,
+  selectedVersions,
+  onVersionChange,
+  onRegenerate,
+  onAnswer,
+  onOpenArtifact,
+  skillCommandChips,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const streamedAnswer = turns.some(
-    (turn) => typeof turn.id === "string" && turn.id.startsWith("assistant-") && turn.content,
+    (turn) =>
+      typeof turn.id === "string" &&
+      turn.id.startsWith("assistant-") &&
+      turn.content,
   );
   const persisted = turns
-    .filter((turn): turn is Turn & { id: number } => typeof turn.id === "number")
-    .map((turn) => ({ ...turn, replacesMessageId: turn.replacesMessageId ?? null }));
+    .filter(
+      (turn): turn is Turn & { id: number } => typeof turn.id === "number",
+    )
+    .map((turn) => ({
+      ...turn,
+      replacesMessageId: turn.replacesMessageId ?? null,
+    }));
   const folded = foldVersions(persisted, selectedVersions);
   const latestView = isLatestView(folded);
-  const pendingVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot; afterSystem?: boolean }[] = turns.filter((turn): turn is Turn & { id: string } => typeof turn.id === "string").map((turn) => ({
-    turn, userVersion: undefined as VersionSlot | undefined, answerVersion: undefined as VersionSlot | undefined,
-  }));
-  const regenerating = pendingVisible.some(({ turn }) => String(turn.id).startsWith("assistant-regenerate-"));
+  const pendingVisible: {
+    turn: Turn;
+    userVersion?: VersionSlot;
+    answerVersion?: VersionSlot;
+    afterSystem?: boolean;
+  }[] = turns
+    .filter(
+      (turn): turn is Turn & { id: string } => typeof turn.id === "string",
+    )
+    .map((turn) => ({
+      turn,
+      userVersion: undefined as VersionSlot | undefined,
+      answerVersion: undefined as VersionSlot | undefined,
+    }));
+  const regenerating = pendingVisible.some(({ turn }) =>
+    String(turn.id).startsWith("assistant-regenerate-"),
+  );
   // `afterSystem` 은 알림 줄이 연 turn 의 답이다. 다시 만들 질문이 없어 다시 생성 단추를 두지 않는다.
-  const foldedVisible: { turn: Turn; userVersion?: VersionSlot; answerVersion?: VersionSlot; afterSystem?: boolean }[] = folded.flatMap((fold, turnIndex) => {
+  const foldedVisible: {
+    turn: Turn;
+    userVersion?: VersionSlot;
+    answerVersion?: VersionSlot;
+    afterSystem?: boolean;
+  }[] = folded.flatMap((fold, turnIndex) => {
     return [
-      { turn: fold.user, userVersion: fold.user.role === "SYSTEM" ? undefined : fold.userVersion },
+      {
+        turn: fold.user,
+        userVersion: fold.user.role === "SYSTEM" ? undefined : fold.userVersion,
+      },
       ...fold.answers.flatMap((answer, answerIndex) =>
-        regenerating && turnIndex === folded.length - 1 && answerIndex === fold.answers.length - 1
-          ? [] : [{ turn: answer.message, answerVersion: answer.version, afterSystem: fold.user.role === "SYSTEM" }]),
+        regenerating &&
+        turnIndex === folded.length - 1 &&
+        answerIndex === fold.answers.length - 1
+          ? []
+          : [
+              {
+                turn: answer.message,
+                answerVersion: answer.version,
+                afterSystem: fold.user.role === "SYSTEM",
+              },
+            ],
+      ),
     ];
   });
   const visible = [...foldedVisible, ...pendingVisible];
@@ -112,7 +162,8 @@ export function MessageList({
         onScroll={(event) => {
           const element = event.currentTarget;
           shouldFollow.current =
-            element.scrollHeight - element.scrollTop - element.clientHeight <= 100;
+            element.scrollHeight - element.scrollTop - element.clientHeight <=
+            100;
           if (shouldFollow.current) setHasNewMessage(false);
         }}
         className="h-full overflow-y-auto px-1 py-3"
@@ -124,60 +175,128 @@ export function MessageList({
               <Skeleton className="h-[4.25rem]" />
             </div>
           ) : turns.length === 0 && !sending && !activity ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">무엇이든 물어봐 주세요.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              무엇이든 물어봐 주세요.
+            </p>
           ) : (
             <ol className="flex flex-col gap-6">
-              {visible.map(({ turn, userVersion, answerVersion, afterSystem }, index) => {
-                const pendingAssistant = typeof turn.id === "string" && turn.id.startsWith("assistant-");
-                const isLast = visible.at(-1)?.turn.id === turn.id;
-                const nextTurn = visible[index + 1]?.turn;
-                return (
-                  <Fragment key={turn.id}>
-                    {pendingAssistant && activity && activity.items.length > 0 ? (
-                      <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
-                        <span aria-hidden="true" />
-                        <ActivityBlock mode="live" state={activity} slow={flowIsSlow}
-                          expanded={liveExpanded} onExpandedChange={onLiveExpandedChange}
-                          onOpenPanel={onOpenLive} />
-                      </li>
-                    ) : null}
-                    <MessageBubble turn={turn} conversationId={conversationId} onOpenSaved={onOpenSaved}
-                      initialActivityExpanded={turn.executionId === expandedOnDone?.executionId
-                        && (expandedOnDone?.expanded ?? false)}
-                      latest={isLast}
-                      streaming={pendingAssistant && sending}
-                      userVersion={userVersion} answerVersion={answerVersion} onVersionChange={onVersionChange}
-                      canRegenerate={isLast && turn.role === "ASSISTANT" && !afterSystem && latestView && !sending}
-                      onRegenerate={onRegenerate}
-                      onAnswer={isLast && turn.role === "ASSISTANT" && latestView && !sending ? onAnswer : undefined}
-                      nextUserMessage={turn.role === "ASSISTANT" && nextTurn?.role === "USER"
-                        ? nextTurn.content : undefined}
-                      onOpenArtifact={onOpenArtifact} skillCommandChip={skillCommandChips} />
-                    {isLast && hasNoAnswer ? (
-                      <li data-testid="no-answer" className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground">
-                        <span>답을 받지 못했어요</span>
-                        {onRetry ? <button type="button" onClick={onRetry} className="underline underline-offset-2">다시 시도</button> : null}
-                      </li>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
+              {visible.map(
+                ({ turn, userVersion, answerVersion, afterSystem }, index) => {
+                  const pendingAssistant =
+                    typeof turn.id === "string" &&
+                    turn.id.startsWith("assistant-");
+                  const isLast = visible.at(-1)?.turn.id === turn.id;
+                  const nextTurn = visible[index + 1]?.turn;
+                  return (
+                    <Fragment key={turn.id}>
+                      {pendingAssistant &&
+                      activity &&
+                      activity.items.length > 0 ? (
+                        <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
+                          <span aria-hidden="true" />
+                          <ActivityBlock
+                            mode="live"
+                            state={activity}
+                            slow={flowIsSlow}
+                            expanded={liveExpanded}
+                            onExpandedChange={onLiveExpandedChange}
+                            onOpenPanel={onOpenLive}
+                          />
+                        </li>
+                      ) : null}
+                      <MessageBubble
+                        turn={turn}
+                        isAdmin={isAdmin}
+                        conversationId={conversationId}
+                        onOpenSaved={onOpenSaved}
+                        initialActivityExpanded={
+                          turn.executionId === expandedOnDone?.executionId &&
+                          (expandedOnDone?.expanded ?? false)
+                        }
+                        latest={isLast}
+                        streaming={pendingAssistant && sending}
+                        userVersion={userVersion}
+                        answerVersion={answerVersion}
+                        onVersionChange={onVersionChange}
+                        canRegenerate={
+                          isLast &&
+                          turn.role === "ASSISTANT" &&
+                          !afterSystem &&
+                          latestView &&
+                          !sending
+                        }
+                        onRegenerate={onRegenerate}
+                        onAnswer={
+                          isLast &&
+                          turn.role === "ASSISTANT" &&
+                          latestView &&
+                          !sending
+                            ? onAnswer
+                            : undefined
+                        }
+                        nextUserMessage={
+                          turn.role === "ASSISTANT" && nextTurn?.role === "USER"
+                            ? nextTurn.content
+                            : undefined
+                        }
+                        onOpenArtifact={onOpenArtifact}
+                        skillCommandChip={skillCommandChips}
+                      />
+                      {isLast && hasNoAnswer ? (
+                        <li
+                          data-testid="no-answer"
+                          className="-mt-4 flex justify-end gap-2 text-xs text-muted-foreground"
+                        >
+                          <span>답을 받지 못했어요</span>
+                          {onRetry ? (
+                            <button
+                              type="button"
+                              onClick={onRetry}
+                              className="underline underline-offset-2"
+                            >
+                              다시 시도
+                            </button>
+                          ) : null}
+                        </li>
+                      ) : null}
+                    </Fragment>
+                  );
+                },
+              )}
               {!streamedAnswer && activity && activity.items.length > 0 ? (
                 <li className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2">
                   <span aria-hidden="true" />
-                  <ActivityBlock mode="live" state={activity} slow={flowIsSlow}
-                    expanded={liveExpanded} onExpandedChange={onLiveExpandedChange}
-                    onOpenPanel={onOpenLive} />
+                  <ActivityBlock
+                    mode="live"
+                    state={activity}
+                    slow={flowIsSlow}
+                    expanded={liveExpanded}
+                    onExpandedChange={onLiveExpandedChange}
+                    onOpenPanel={onOpenLive}
+                  />
                 </li>
               ) : null}
-              {!streamedAnswer && sending && (!activity || activity.items.length === 0) ? (
+              {!streamedAnswer &&
+              sending &&
+              (!activity || activity.items.length === 0) ? (
                 <WaitingIndicator />
               ) : null}
               {turnError ? (
-                <li data-testid="turn-error" className="rounded-md bg-muted px-3 py-2 text-sm">
+                <li
+                  data-testid="turn-error"
+                  className="rounded-md bg-muted px-3 py-2 text-sm"
+                >
                   {turnError}
-                  {onRetry && !hasNoAnswer ? <button type="button" data-testid="turn-error-retry"
-                    onClick={onRetry} className="ml-2 text-xs underline underline-offset-2">다시 시도</button> : null}
+                  {onRetry && !hasNoAnswer ? (
+                    <button
+                      type="button"
+                      data-testid="turn-error-retry"
+                      onClick={onRetry}
+                      className="ml-2 text-xs underline underline-offset-2"
+                    >
+                      다시 시도
+                    </button>
+                  ) : null}
                 </li>
               ) : null}
             </ol>
@@ -188,8 +307,10 @@ export function MessageList({
         <button
           type="button"
           onClick={scrollToBottom}
-          className={cn("absolute bottom-3 left-1/2 -translate-x-1/2",
-          "rounded-full border border-border bg-background px-3 py-1.5 text-xs shadow")}
+          className={cn(
+            "absolute bottom-3 left-1/2 -translate-x-1/2",
+            "rounded-full border border-border bg-background px-3 py-1.5 text-xs shadow",
+          )}
         >
           새 메시지
         </button>

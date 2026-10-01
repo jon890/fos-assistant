@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -22,7 +23,13 @@ import lombok.NoArgsConstructor;
  * Flyway 가 만든 스키마를 검증하므로, 둘이 어긋나면 테스트는 통과하고 배포에서 기동이 실패한다.
  */
 @Entity
-@Table(name = "execution_event")
+@Table(
+        name = "execution_event",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_execution_completed_child",
+                    columnNames = {"execution_id", "completed_child_session_id"})
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ExecutionEvent {
 
@@ -54,6 +61,10 @@ public class ExecutionEvent {
     @Column(name = "hermes_session_id", length = 128)
     private String hermesSessionId;
 
+    /** 같은 자식 완료가 SSE와 재조회에서 겹쳐도 한 번만 기록하는 자연키다. */
+    @Column(name = "completed_child_session_id", length = 128)
+    private String completedChildSessionId;
+
     @Column(name = "duration_ms")
     private Long durationMs;
 
@@ -82,6 +93,8 @@ public class ExecutionEvent {
         this.toolName = builder.toolName;
         this.subagentName = builder.subagentName;
         this.hermesSessionId = builder.hermesSessionId;
+        this.completedChildSessionId =
+                builder.eventType == ExecutionEventType.SUBAGENT_COMPLETED ? builder.hermesSessionId : null;
         this.durationMs = builder.durationMs;
         this.failed = builder.failed;
         this.detail = builder.detail;
@@ -209,9 +222,7 @@ public class ExecutionEvent {
         /** 길이가 넘으면 자른다. 잘랐다는 표시는 남기지 않는다. */
         public Builder detail(String detail) {
             this.detail =
-                    detail == null || detail.length() <= DETAIL_LIMIT
-                            ? detail
-                            : detail.substring(0, DETAIL_LIMIT);
+                    detail == null || detail.length() <= DETAIL_LIMIT ? detail : detail.substring(0, DETAIL_LIMIT);
             return this;
         }
 

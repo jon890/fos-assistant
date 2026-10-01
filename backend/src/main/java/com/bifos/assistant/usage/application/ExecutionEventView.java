@@ -22,7 +22,8 @@ public record ExecutionEventView(
         String model,
         Long inputTokens,
         Long outputTokens,
-        Instant occurredAt) {
+        Instant occurredAt,
+        String subagentUsageStatus) {
 
     /**
      * 사건 한 줄을 보는 사람에게 맞춰 옮긴다.
@@ -31,6 +32,10 @@ public record ExecutionEventView(
      * 사건의 {@code detail} 은 그대로 싣는다.
      */
     static ExecutionEventView from(ExecutionEvent event, CurrentUser viewer) {
+        return from(event, viewer, null);
+    }
+
+    static ExecutionEventView from(ExecutionEvent event, CurrentUser viewer, String subagentUsageStatus) {
         boolean hidden = event.eventType().isTool() && !ToolDetailPolicy.visibleTo(viewer, event.toolName());
         return new ExecutionEventView(
                 event.sequence(),
@@ -44,6 +49,7 @@ public record ExecutionEventView(
                 event.model(),
                 event.inputTokens(),
                 event.outputTokens(),
-                event.occurredAt());
+                event.occurredAt(),
+                subagentUsageStatus);
     }
 }

@@ -1,12 +1,27 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import playwright, { type BrowserContext } from "../../web/node_modules/@playwright/test/index.js";
-import { DEMO_CONNECTOR, DEMO_TOKEN_OK, FAKE_DASHBOARD_TOKEN, startFakeHermes, type FakeHermes } from "../e2e/fake-hermes.ts";
+import playwright, {
+  type BrowserContext,
+} from "../../web/node_modules/@playwright/test/index.js";
+import {
+  DEMO_CONNECTOR,
+  DEMO_TOKEN_OK,
+  FAKE_DASHBOARD_TOKEN,
+  startFakeHermes,
+  type FakeHermes,
+} from "../e2e/fake-hermes.ts";
 import {
   AUTH_SECRET,
   CONTROL_PLANE_BASE_URL,
@@ -22,7 +37,10 @@ const { expect, test: base } = playwright;
 const ROOT = join(import.meta.dirname, "../..");
 const SESSION_COOKIE = "authjs.session-token";
 const HEALTH_TIMEOUT_MS = 90_000;
-const HERMES_CONTROL_PATH = join(tmpdir(), `fos-assistant-browser-hermes-${RUN_ID}.url`);
+const HERMES_CONTROL_PATH = join(
+  tmpdir(),
+  `fos-assistant-browser-hermes-${RUN_ID}.url`,
+);
 
 /** 흐름이 붙은 에이전트의 코드다. 흐름 검사가 이 코드로 대화를 시작한다. */
 export const FLOW_AGENT_CODE = "browserflow";
@@ -52,7 +70,8 @@ export const PERSONA_GROUP_AGENT_CODE = "browserpersonagroup";
 export const PERSONA_EMPTY_AGENT_CODE = "browserpersonaempty";
 
 /** 대화 공개 식별자(UUID)의 정규식 조각이다. 대화 번호는 주소와 API 에 나오지 않는다. */
-export const CONVERSATION_ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+export const CONVERSATION_ID =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 /** 대화 화면의 주소다. 첫째 묶음이 공개 식별자다. */
 export const CONVERSATION_URL = new RegExp(`/chat/(${CONVERSATION_ID})$`);
@@ -91,14 +110,19 @@ export type FakeHermesControl = {
   busy(): Promise<void>;
   clearBusy(): Promise<void>;
   /** 마지막 실행 요청이 실어 온 provider, 모델, effort 다. 싣지 않은 칸은 빠진다. */
-  lastSubmittedRuntime(): Promise<{ provider?: string; model?: string; reasoningEffort?: string }>;
+  lastSubmittedRuntime(): Promise<{
+    provider?: string;
+    model?: string;
+    reasoningEffort?: string;
+  }>;
 };
 
 async function fakeHermesControl(): Promise<FakeHermesControl> {
   const baseUrl = await hermesBaseUrl();
   const call = async (path: string, method: "GET" | "POST") => {
     const response = await fetch(`${baseUrl}${path}`, { method });
-    if (!response.ok) throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
+    if (!response.ok)
+      throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
   };
   return {
     holdNextRun: () => call("/__test/hold-next-run", "POST"),
@@ -107,14 +131,21 @@ async function fakeHermesControl(): Promise<FakeHermesControl> {
     releaseLongActivity: () => call("/__test/release-long-activity", "POST"),
     holdNextSoul: () => call("/__test/hold-next-soul", "POST"),
     releaseHeldSoul: () => call("/__test/release-held-soul", "POST"),
-    blockProvider: (provider: string) => call(`/__test/block-provider/${provider}`, "POST"),
-    clearBlockedProviders: () => call("/__test/clear-blocked-providers", "POST"),
+    blockProvider: (provider: string) =>
+      call(`/__test/block-provider/${provider}`, "POST"),
+    clearBlockedProviders: () =>
+      call("/__test/clear-blocked-providers", "POST"),
     busy: () => call("/__test/busy", "POST"),
     clearBusy: () => call("/__test/clear-busy", "POST"),
     lastSubmittedRuntime: async () => {
       const response = await fetch(`${baseUrl}/__test/last-submitted-runtime`);
-      if (!response.ok) throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
-      return (await response.json()) as { provider?: string; model?: string; reasoningEffort?: string };
+      if (!response.ok)
+        throw new Error(`가짜 Hermes 제어 요청이 실패했다: ${response.status}`);
+      return (await response.json()) as {
+        provider?: string;
+        model?: string;
+        reasoningEffort?: string;
+      };
     },
   };
 }
@@ -141,31 +172,47 @@ export async function setAgentVisibility(
     .setIssuedAt()
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
-  const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents/${code}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents/${code}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ enabled: true, visibility, ownerEmail }),
     },
-    body: JSON.stringify({ enabled: true, visibility, ownerEmail }),
-  });
+  );
   if (!response.ok) {
-    throw new Error(`에이전트 공개 범위를 바꾸지 못했다: ${code} ${response.status} ${await response.text()}`);
+    throw new Error(
+      `에이전트 공개 범위를 바꾸지 못했다: ${code} ${response.status} ${await response.text()}`,
+    );
   }
 }
 
-async function connectorCall(email: string, method: "POST" | "DELETE", path: string, body?: unknown): Promise<Response> {
+async function connectorCall(
+  email: string,
+  method: "POST" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<Response> {
   const token = await new SignJWT({ name: "브라우저 테스트" })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(email)
     .setIssuedAt()
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
-  return fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/connections/${DEMO_CONNECTOR.id}${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  return fetch(
+    `${CONTROL_PLANE_BASE_URL}/api/v1/connections/${DEMO_CONNECTOR.id}${path}`,
+    {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
+  );
 }
 
 /**
@@ -174,11 +221,22 @@ async function connectorCall(email: string, method: "POST" | "DELETE", path: str
  * <p>커넥터 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
  */
 export async function connectDemoConnector(email: string): Promise<string> {
-  const registered = await connectorCall(email, "POST", "", { values: { token: DEMO_TOKEN_OK } });
-  if (!registered.ok) throw new Error(`시험 커넥터를 등록하지 못했다: ${registered.status} ${await registered.text()}`);
+  const registered = await connectorCall(email, "POST", "", {
+    values: { token: DEMO_TOKEN_OK },
+  });
+  if (!registered.ok)
+    throw new Error(
+      `시험 커넥터를 등록하지 못했다: ${registered.status} ${await registered.text()}`,
+    );
   const checked = await connectorCall(email, "POST", "/check");
-  if (!checked.ok) throw new Error(`시험 커넥터를 확인하지 못했다: ${checked.status} ${await checked.text()}`);
-  const view = (await checked.json()) as { status: string; agentCode: string | null };
+  if (!checked.ok)
+    throw new Error(
+      `시험 커넥터를 확인하지 못했다: ${checked.status} ${await checked.text()}`,
+    );
+  const view = (await checked.json()) as {
+    status: string;
+    agentCode: string | null;
+  };
   if (view.status !== "READY" || !view.agentCode) {
     throw new Error(`시험 커넥터가 READY 가 아니다: ${view.status}`);
   }
@@ -188,7 +246,10 @@ export async function connectDemoConnector(email: string): Promise<string> {
 /** 그 사용자의 시험 커넥터 연결을 해제한다. */
 export async function disconnectDemoConnector(email: string): Promise<void> {
   const response = await connectorCall(email, "DELETE", "");
-  if (!response.ok) throw new Error(`시험 커넥터를 해제하지 못했다: ${response.status} ${await response.text()}`);
+  if (!response.ok)
+    throw new Error(
+      `시험 커넥터를 해제하지 못했다: ${response.status} ${await response.text()}`,
+    );
 }
 
 export async function setSession(
@@ -216,19 +277,53 @@ export async function setSession(
   ]);
 }
 
-async function waitForHealth(logPath: string): Promise<void> {
+async function readControlPlaneLog(logPath: string): Promise<string> {
+  return readFile(logPath, "utf-8").catch(() => "");
+}
+
+function childExitState(app: ChildProcess): string | null {
+  if (app.exitCode !== null) return `종료 코드 ${app.exitCode}`;
+  if (app.signalCode !== null) return `${app.signalCode} 신호`;
+  return null;
+}
+
+async function controlPlaneStartError(
+  logPath: string,
+  message: string,
+): Promise<Error> {
+  const log = await readControlPlaneLog(logPath);
+  return new Error(`${message}\n${log.split("\n").slice(-40).join("\n")}`);
+}
+
+async function waitForHealth(
+  logPath: string,
+  app: ChildProcess,
+): Promise<void> {
   const deadline = Date.now() + HEALTH_TIMEOUT_MS;
   while (Date.now() < deadline) {
+    const exitState = childExitState(app);
+    if (exitState !== null) {
+      throw await controlPlaneStartError(
+        logPath,
+        `Control Plane 이 시작 전에 끝났다: ${exitState}`,
+      );
+    }
+
+    const log = await readControlPlaneLog(logPath);
+    if (!log.includes("Started Assistant")) {
+      await new Promise((done) => setTimeout(done, 1_000));
+      continue;
+    }
+
     try {
       const response = await fetch(`${CONTROL_PLANE_BASE_URL}/actuator/health`);
-      if (response.ok) return;
+      if (response.ok && childExitState(app) === null) return;
     } catch {
       // 아직 듣지 않는다. 다시 두드린다.
     }
     await new Promise((done) => setTimeout(done, 1_000));
   }
-  const log = await readFile(logPath, "utf-8").catch(() => "");
-  throw new Error(`Control Plane 이 뜨지 않았다\n${log.split("\n").slice(-40).join("\n")}`);
+  throw await controlPlaneStartError(logPath, "Control Plane 이 뜨지 않았다");
 }
 
 /**
@@ -268,38 +363,77 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
     .setExpirationTime("2m")
     .sign(new TextEncoder().encode(JWT_SECRET));
   for (const agent of [
-    { code: "browser", name: "브라우저 비서", profile: "browser", flow: null, visibility: "PRIVATE" as const },
+    {
+      code: "browser",
+      name: "브라우저 비서",
+      profile: "browser",
+      flow: null,
+      visibility: "PRIVATE" as const,
+    },
     // 흐름 검사 전용이다. 하나만 두면 흐름이 붙지 않은 대화를 함께 검사할 수 없다.
-    { code: FLOW_AGENT_CODE, name: "흐름 비서", profile: "browserflow", flow: "research-and-build", visibility: "PRIVATE" as const },
+    {
+      code: FLOW_AGENT_CODE,
+      name: "흐름 비서",
+      profile: "browserflow",
+      flow: "research-and-build",
+      visibility: "PRIVATE" as const,
+    },
     // 막힘 검사 전용이다. 다른 검사가 쓰는 에이전트와 섞이지 않게 나눈다.
-    { code: SWITCH_AGENT_CODE, name: "막힘 비서", profile: "browserswitch", flow: null, visibility: "PRIVATE" as const },
+    {
+      code: SWITCH_AGENT_CODE,
+      name: "막힘 비서",
+      profile: "browserswitch",
+      flow: null,
+      visibility: "PRIVATE" as const,
+    },
     // 성격을 읽고 쓰는 검사 전용이다. 주인이 TEST_EMAIL 이라 admin 세션이 언제나 고칠 수 있다.
-    { code: PERSONA_AGENT_CODE, name: "성격 비서", profile: "browserpersona", flow: null, visibility: "PRIVATE" as const },
+    {
+      code: PERSONA_AGENT_CODE,
+      name: "성격 비서",
+      profile: "browserpersona",
+      flow: null,
+      visibility: "PRIVATE" as const,
+    },
     // 그룹에 공개할 에이전트다. 검사가 실행 중에만 GROUP 으로 바꿨다 되돌린다. 여기서 바로 GROUP 으로
     // 씨 뿌리면 관리 화면에 "그룹 공개로 변경"/"나만으로 변경" 단추가 하나 더 생겨, 정확히 하나만
     // 있다고 가정하는 identity.spec.ts 가 어긋난다.
-    { code: PERSONA_GROUP_AGENT_CODE, name: "그룹 성격 비서", profile: "browserpersonagroup", flow: null, visibility: "PRIVATE" as const },
+    {
+      code: PERSONA_GROUP_AGENT_CODE,
+      name: "그룹 성격 비서",
+      profile: "browserpersonagroup",
+      flow: null,
+      visibility: "PRIVATE" as const,
+    },
     // 본문이 비어 있는 채로 두는 검사 전용이다.
-    { code: PERSONA_EMPTY_AGENT_CODE, name: "빈 성격 비서", profile: "browserpersonaempty", flow: null, visibility: "PRIVATE" as const },
+    {
+      code: PERSONA_EMPTY_AGENT_CODE,
+      name: "빈 성격 비서",
+      profile: "browserpersonaempty",
+      flow: null,
+      visibility: "PRIVATE" as const,
+    },
   ]) {
-    const response = await fetch(`${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `${CONTROL_PLANE_BASE_URL}/api/v1/admin/agents`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          code: agent.code,
+          name: agent.name,
+          hermesProfile: agent.profile,
+          apiBaseUrl: `${hermesBaseUrl}/p/${agent.profile}`,
+          costMode: "SUBSCRIPTION",
+          credentialScope: "SHARED_HOUSEHOLD",
+          visibility: agent.visibility,
+          ownerEmail: agent.visibility === "PRIVATE" ? TEST_EMAIL : null,
+          flow: agent.flow,
+        }),
       },
-      body: JSON.stringify({
-        code: agent.code,
-        name: agent.name,
-        hermesProfile: agent.profile,
-        apiBaseUrl: `${hermesBaseUrl}/p/${agent.profile}`,
-        costMode: "SUBSCRIPTION",
-        credentialScope: "SHARED_HOUSEHOLD",
-        visibility: agent.visibility,
-        ownerEmail: agent.visibility === "PRIVATE" ? TEST_EMAIL : null,
-        flow: agent.flow,
-      }),
-    });
+    );
     if (!response.ok) {
       throw new Error(
         `브라우저 테스트 에이전트를 등록하지 못했다: ${agent.code} ${response.status} ${await response.text()}`,
@@ -323,7 +457,9 @@ async function seedBrowserToolsets(hermesBaseUrl: string): Promise<void> {
       }),
     });
     if (!response.ok) {
-      throw new Error(`브라우저 테스트 도구 설정을 준비하지 못했다: ${profile} ${response.status}`);
+      throw new Error(
+        `브라우저 테스트 도구 설정을 준비하지 못했다: ${profile} ${response.status}`,
+      );
     }
   }
 }
@@ -348,6 +484,12 @@ function startControlPlane(
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
+      ASSISTANT_MODEL_TIERS_FAST_MODEL: "example-fast",
+      ASSISTANT_MODEL_TIERS_FAST_REASONING_EFFORT: "low",
+      ASSISTANT_MODEL_TIERS_BALANCED_MODEL: "example-balanced",
+      ASSISTANT_MODEL_TIERS_BALANCED_REASONING_EFFORT: "medium",
+      ASSISTANT_MODEL_TIERS_DEEP_MODEL: "example-deep",
+      ASSISTANT_MODEL_TIERS_DEEP_REASONING_EFFORT: "high",
       HERMES_PROFILE_KEY_DIR: keyDir,
       // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
@@ -400,7 +542,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
     hermes = await startFakeHermes(PROFILE_KEYS, undefined, {}, skillRoot);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
     await seedBrowserToolsets(hermes.baseUrl);
-    app = startControlPlane(
+    const controlPlane = startControlPlane(
       await writeProfileKeys(work),
       hermes.baseUrl,
       logPath,
@@ -408,7 +550,8 @@ export default async function setupServices(): Promise<() => Promise<void>> {
       await makeArtifactRoot(work),
       skillRoot,
     );
-    await waitForHealth(logPath);
+    app = controlPlane;
+    await waitForHealth(logPath, controlPlane);
     await seedAgents(hermes.baseUrl);
   } catch (error) {
     await stopProcess(app);
@@ -434,11 +577,17 @@ export default async function setupServices(): Promise<() => Promise<void>> {
  * 조각이 없는 경로는 곧바로 지나가고, 시간 안에 옮겨지지 않으면 그 검사를 실패시킨다.
  * 링크를 눌러 옮기는 것은 RSC 로 오므로 숨은 조각이 생기지 않는다.
  */
-export function waitForStreamedContentAfterLoad(page: import("../../web/node_modules/@playwright/test/index.js").Page) {
+export function waitForStreamedContentAfterLoad(
+  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+) {
   const streamedContentPlaced = () =>
-    page.waitForFunction(() => document.querySelector('div[hidden][id^="S:"]') === null, undefined, {
-      timeout: 10_000,
-    });
+    page.waitForFunction(
+      () => document.querySelector('div[hidden][id^="S:"]') === null,
+      undefined,
+      {
+        timeout: 10_000,
+      },
+    );
   const goto = page.goto.bind(page);
   page.goto = async (...args) => {
     const response = await goto(...args);

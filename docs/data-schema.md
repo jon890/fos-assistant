@@ -1,5 +1,28 @@
 # 저장 모델
 
+## 모델 단계와 재조회
+
+선택의 우선순위와 초기값은 [모델 단계와 실행 기록](model-tiers.md)이 정한다.
+비밀값은 아래 표에 저장하지 않는다.
+
+| 표 | 키 | 저장하는 값 |
+| --- | --- | --- |
+| `model_tier_definition` | `id` BIGINT, `(group_id, tier)` 유일 | 그룹 번호, 단계 코드 VARCHAR(16), provider VARCHAR(64) NULL, model VARCHAR(128) NULL, reasoning_effort VARCHAR(16) NULL |
+| `app_user` | 기존 `id` BIGINT | `model_default_tier` VARCHAR(16) NULL 추가 |
+| `model_tier_group_setting` | `group_id` BIGINT | `default_tier` VARCHAR(16) NULL |
+| `subagent_usage_job` | `id` BIGINT, `(execution_id, child_session_id)` 유일 | profile, API 주소, 부모 session, 자식 session, 상태, 시작/다음 조회/기한 시각, 조회 횟수 |
+
+`conversation`은 `model_selection_mode` VARCHAR(16) NULL과 `model_tier` VARCHAR(16) NULL을 더한다.
+선택 모드는 `DEFAULT`, `TIER`, `CUSTOM`이며 null은 사용자와 그룹 기본값을 따른다.
+`agent_execution`은 `model_tier` VARCHAR(16) NULL과 `reasoning_effort_source` VARCHAR(20) NULL을 더한다.
+`request_received_at`, `submitted_at`, `first_delta_at`은 DATETIME(6) NULL이며
+기존 `finished_at`과 함께 실행 구간을 표시한다. 끝난 실행의 재조회는 `finished_at` 색인을 쓴다.
+첫 assistant delta 본문은 이 칸들과 함께 저장하지 않는다.
+단계와 요청값은 실행 시작 시 복사하고 실제 제공사와 모델은 완료 시 갱신한다.
+이전 실행의 출처는 null로 두고 추정해 채우지 않는다.
+재조회 작업의 완료 사건은 기존 `(execution_id, sequence)` 유일 제약을 지키며 같은 자식 완료를 중복 저장하지 않는다.
+실행이나 사용자 삭제에 의한 cascade를 추가하지 않는다. 기존 실행 기록과 같은 보존 규칙을 따른다.
+
 ## connector_connection
 
 사용자마다 커넥터 하나에 연결 하나를 둔다. 근거는 [ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 이다.
@@ -241,6 +264,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이다. �
 | `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 `FAILED` 로 적은 뒤 전한다. 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
+| `reasoning_defaults_checked_at` | DATETIME(6) NULL | `reasoning_effort`가 비어 있고 profile 기본값을 정상 응답으로 읽어 확인한 시각. 응답에 effort가 없어도 적어 같은 실행을 다시 조회하지 않는다. 조회 실패면 비워 다시 시도한다 |
 | `status` | VARCHAR(20) | `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` |
 | `error_code` | VARCHAR(64) NULL | |
 | `input_tokens`, `cached_input_tokens`, `output_tokens`, `total_tokens` | BIGINT NULL | provider 가 알려준 것만 채운다 |
@@ -430,15 +454,20 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 
 `execution_id` 와 `sequence` 를 함께 유일하게 둔다.
 
-**`subagent_name` 은 Hermes 가 이름을 보낼 때만 채운다.**
+**`subagent_name`은 이름, `subagent_id`, `goal` 순서로 채운다.**
 이름이 없는 사건의 `preview` 에서 이름처럼 보이는 글자를 뽑아 채우지 않는다.
 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 
-**`hermes_session_id` 와 `model` 과 토큰은 Hermes 가 실어 보낼 때만 채운다.**
+**`hermes_session_id`, `model`, 토큰은 SSE 또는 종료된 자식 session 조회에서 확인한 값이다.**
 [`hermes/delegation.md`](hermes/delegation.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
 `subagent.start` 와 `subagent.complete` 에 오는 칸을 적는다.
 `child_session_id` 를 `hermes_session_id` 에, `goal` 을 `detail` 에 옮긴다.
 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.
+
+부모가 끝난 뒤에도 완료 사건이 없으면 [모델 단계와 실행 기록](model-tiers.md)의 재조회로 보완한다.
+`completed_child_session_id` VARCHAR(128) NULL은 자식 완료 사건의 중복 저장을 막는다.
+`(execution_id, completed_child_session_id)`가 유일하며 다른 종류의 사건은 이 칸을 비운다.
+기존 중복 완료 사건은 최신 한 줄만 키를 채우고 나머지 이력은 보존한다.
 
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓴다.
 사용량 합계에 더하지 않는다. 합계는 여전히 `agent_execution` 한 줄씩의 값이다.

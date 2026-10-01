@@ -1,6 +1,8 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -29,7 +31,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     @Modifying
     @Transactional
-    @Query("update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")
+    @Query(
+            "update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")
     int touchSession(@Param("id") Long id, @Param("sessionId") String sessionId, @Param("now") Instant now);
 
     /**
@@ -69,20 +72,40 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             update Conversation c set c.title = :title, c.updatedAt = :now
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
-    int renameIfActive(@Param("id") Long id, @Param("userId") Long userId,
-            @Param("title") String title, @Param("now") Instant now);
+    int renameIfActive(
+            @Param("id") Long id,
+            @Param("userId") Long userId,
+            @Param("title") String title,
+            @Param("now") Instant now);
 
     /** 고른 모델과 effort 만 바꾼다. 대화 목록의 순서를 흔들지 않도록 {@code updatedAt} 은 건드리지 않는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
     @Query("""
             update Conversation c
-               set c.modelProvider = :provider, c.model = :model, c.reasoningEffort = :reasoningEffort
+               set c.modelProvider = :provider, c.model = :model, c.reasoningEffort = :reasoningEffort,
+                   c.modelSelectionMode = :customMode,
+                   c.modelTier = null
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
-    int chooseModelIfActive(@Param("id") Long id, @Param("userId") Long userId,
-            @Param("provider") String provider, @Param("model") String model,
-            @Param("reasoningEffort") String reasoningEffort);
+    int chooseModelIfActive(
+            @Param("id") Long id,
+            @Param("userId") Long userId,
+            @Param("provider") String provider,
+            @Param("model") String model,
+            @Param("reasoningEffort") String reasoningEffort,
+            @Param("customMode") ModelSelectionMode customMode);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier,
+                c.modelProvider = null, c.model = null, c.reasoningEffort = null
+             where c.id = :id and c.userId = :userId and c.deletedAt is null
+            """)
+    int chooseModelTierIfActive(
+            @Param("id") Long id,
+            @Param("userId") Long userId,
+            @Param("mode") ModelSelectionMode mode,
+            @Param("tier") ModelTier tier);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional

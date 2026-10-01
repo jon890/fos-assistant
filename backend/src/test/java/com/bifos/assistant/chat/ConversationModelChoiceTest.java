@@ -15,9 +15,11 @@ import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -35,6 +37,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -58,6 +61,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 대화마다 고르는 모델과 effort 를 저장하고 돌려주는 것을 확인한다. 실행이 그 값을 쓰는 것은 따로 본다. */
 @SpringBootTest
@@ -114,6 +118,9 @@ class ConversationModelChoiceTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    TransactionTemplate transaction;
 
     @BeforeEach
     void reset() throws IOException {
@@ -233,7 +240,8 @@ class ConversationModelChoiceTest {
     void listAndSendCarryStoredValueEvenIfItFailsValidation() {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
-        conversations.chooseModelIfActive(created.id(), dad.id(), "openrouter", "example-model-small", "extreme");
+        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
+                created.id(), dad.id(), "openrouter", "example-model-small", "extreme", ModelSelectionMode.CUSTOM));
         ChatController controller = chatController(dad);
         ((StubHermesRunsClient) hermes)
                 .willReturn(HermesRunResult.of(
@@ -322,7 +330,14 @@ class ConversationModelChoiceTest {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
         return new ChatController(
-                chat, provider, users, agentService, access, new ChatEventStreams(Duration.ofSeconds(20)), null);
+                chat,
+                provider,
+                new UserDisplayNameService(users),
+                agentService,
+                access,
+                new ChatEventStreams(Duration.ofSeconds(20)),
+                null,
+                mock(ModelTierService.class));
     }
 
     private static void rejected(Runnable action) {

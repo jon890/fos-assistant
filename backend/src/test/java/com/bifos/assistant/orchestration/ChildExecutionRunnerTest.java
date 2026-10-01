@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -44,6 +45,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 자식 실행 하나가 부모의 경계를 그대로 물려받는 것을 고정한다. */
 @SpringBootTest
@@ -74,6 +76,9 @@ class ChildExecutionRunnerTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    TransactionTemplate transaction;
 
     @Autowired
     ChatMessageRepository messages;
@@ -197,7 +202,8 @@ class ChildExecutionRunnerTest {
         shared.changeAccess(true, com.bifos.assistant.agent.domain.AgentVisibility.GROUP, null);
         agents.save(shared);
         Conversation started = conversationOf(dad, "child-dad");
-        conversations.chooseModelIfActive(started.id(), dad.id(), "nvidia", "nemotron", "high");
+        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
+                started.id(), dad.id(), "nvidia", "nemotron", "high", ModelSelectionMode.CUSTOM));
         Conversation conversation = conversations.findById(started.id()).orElseThrow();
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "조사 결과"));
@@ -219,7 +225,8 @@ class ChildExecutionRunnerTest {
     void childRunLeavesProviderBlockedWhenBlockedWithChosenModel() {
         CurrentUser dad = member("child-dad@example.com", "child-dad");
         Conversation started = conversationOf(dad, "child-dad");
-        conversations.chooseModelIfActive(started.id(), dad.id(), "nvidia", "nemotron", null);
+        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
+                started.id(), dad.id(), "nvidia", "nemotron", null, ModelSelectionMode.CUSTOM));
         Conversation conversation = conversations.findById(started.id()).orElseThrow();
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(new HermesRunResult(

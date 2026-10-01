@@ -3,6 +3,7 @@ package com.bifos.assistant.usage.application;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
@@ -11,7 +12,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -29,6 +32,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ExecutionRecorder {
+    private final Clock clock;
 
     private static final Logger log = LoggerFactory.getLogger(ExecutionRecorder.class);
 
@@ -88,8 +92,16 @@ public class ExecutionRecorder {
             Long retryOfExecutionId,
             String hermesSessionId) {
         return start(
-                user, conversation, agent, parentExecutionId, rootExecutionId, context, requested, retryOfExecutionId,
-                hermesSessionId, null);
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                context,
+                requested,
+                retryOfExecutionId,
+                hermesSessionId,
+                null);
     }
 
     /**
@@ -112,22 +124,56 @@ public class ExecutionRecorder {
             Long retryOfExecutionId,
             String hermesSessionId,
             DelegationKey delegationKey) {
-        return executions.save(
-                base(user, conversation, agent)
-                        .hermesSessionId(hermesSessionId)
-                        .delegationKey(delegationKey == null ? null : delegationKey.value())
-                        .parentExecutionId(parentExecutionId)
-                        .rootExecutionId(rootExecutionId)
-                        .retryOfExecutionId(retryOfExecutionId)
-                        .provider(requested == null ? null : requested.provider())
-                        .model(requested == null ? null : requested.model())
-                        .reasoningEffort(requested == null ? null : requested.reasoningEffort())
-                        .contextChars(context.contextChars())
-                        .contextOmittedItems(context.contextOmittedItems())
-                        .runtimeFingerprint(context.runtimeFingerprint())
-                        .instructionsHash(context.instructionsHash())
-                        .status(ExecutionStatus.RUNNING)
-                        .build());
+        return start(
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                context,
+                requested,
+                retryOfExecutionId,
+                hermesSessionId,
+                delegationKey,
+                null,
+                null);
+    }
+
+    /** 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다. */
+    public AgentExecution start(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            ExecutionContextSnapshot context,
+            ModelChoice requested,
+            Long retryOfExecutionId,
+            String hermesSessionId,
+            DelegationKey delegationKey,
+            ModelTier modelTier,
+            Instant requestReceivedAt) {
+        return executions.save(base(user, conversation, agent)
+                .hermesSessionId(hermesSessionId)
+                .delegationKey(delegationKey == null ? null : delegationKey.value())
+                .parentExecutionId(parentExecutionId)
+                .rootExecutionId(rootExecutionId)
+                .retryOfExecutionId(retryOfExecutionId)
+                .provider(requested == null ? null : requested.provider())
+                .model(requested == null ? null : requested.model())
+                .reasoningEffort(requested == null ? null : requested.reasoningEffort())
+                .reasoningEffortSource(
+                        requested != null && requested.reasoningEffort() != null
+                                ? ReasoningEffortSource.REQUESTED
+                                : ReasoningEffortSource.UNKNOWN)
+                .modelTier(modelTier)
+                .requestReceivedAt(requestReceivedAt)
+                .contextChars(context.contextChars())
+                .contextOmittedItems(context.contextOmittedItems())
+                .runtimeFingerprint(context.runtimeFingerprint())
+                .instructionsHash(context.instructionsHash())
+                .status(ExecutionStatus.RUNNING)
+                .build());
     }
 
     /**
@@ -144,6 +190,25 @@ public class ExecutionRecorder {
     public void attachRunId(AgentExecution execution, String hermesRunId) {
         execution.attachRunId(hermesRunId);
         executions.save(execution);
+    }
+
+    /** Hermes 제출 직전 시각을 실행 줄에 남긴다. */
+    public void markSubmitted(AgentExecution execution) {
+        execution.markSubmitted(clock.instant());
+        executions.save(execution);
+    }
+
+    /** Flow 뿌리에는 실행기 진입보다 앞선 원래 요청 수신 시각을 남긴다. */
+    public void markRequestReceived(AgentExecution execution, Instant at) {
+        execution.markRequestReceived(at);
+        executions.save(execution);
+    }
+
+    /** 최초 assistant delta 수신 시각만 남긴다. */
+    public void markFirstDelta(AgentExecution execution) {
+        if (execution.markFirstDelta(clock.instant())) {
+            executions.save(execution);
+        }
     }
 
     /**
@@ -200,8 +265,7 @@ public class ExecutionRecorder {
     }
 
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
-    public AgentExecution cancel(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+    public AgentExecution cancel(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
         return cancel(execution, agent, result, requested, null);
     }
 
@@ -223,7 +287,8 @@ public class ExecutionRecorder {
         String provider = served.provider();
         String model = served.model();
         execution.attachRunId(result.runId());
-        execution.markCancelled(provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+        execution.markCancelled(
+                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
         if (outputText != null) {
             execution.recordOutput(outputText);
         }
@@ -248,9 +313,12 @@ public class ExecutionRecorder {
             return runtime;
         }
         SessionRuntime actual = readActualRuntime(agent, result);
-        String provider = firstNonBlank(actual == null ? null : actual.provider(),
-                firstNonBlank(runtime == null ? null : runtime.provider(), requested == null ? null : requested.provider()));
-        String model = firstNonBlank(actual == null ? null : actual.model(),
+        String provider = firstNonBlank(
+                actual == null ? null : actual.provider(),
+                firstNonBlank(
+                        runtime == null ? null : runtime.provider(), requested == null ? null : requested.provider()));
+        String model = firstNonBlank(
+                actual == null ? null : actual.model(),
                 firstNonBlank(runtime == null ? null : runtime.model(), requested == null ? null : requested.model()));
         return new SessionRuntime(model, provider);
     }
@@ -264,9 +332,7 @@ public class ExecutionRecorder {
                 hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), result.sessionId());
         if (actual == null) {
             log.info(
-                    "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}",
-                    agent.hermesProfile(),
-                    result.sessionId());
+                    "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}", agent.hermesProfile(), result.sessionId());
         }
         return actual;
     }
