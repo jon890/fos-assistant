@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  * V45 가 그때까지 {@code READY} 이던 연결만 내리는지 본다.
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다. 앞선 상태의 행을
- * 넣으려고 V44 까지만 올린 뒤 V45 를 올린다.
+ * 넣으려고 V45 앞의 마이그레이션까지만 올린 뒤 V45 를 올린다.
  */
 class ConnectorPolicyMigrationTest {
     private static final int READY = 901;
@@ -33,7 +33,7 @@ class ConnectorPolicyMigrationTest {
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-policy-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrate("44");
+        migrate("42");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
             for (int id = READY; id <= PENDING_ON; id++) {
