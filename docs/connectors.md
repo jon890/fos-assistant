@@ -223,6 +223,7 @@ Control Plane 의 판정 순서다.
 - `.fos-connector-tools.json` 이 지금 설치된 커넥터와 manifest 로 계산한 것과 같다
 
 설치는 그 profile 의 `fos-ctx` 를 묶음의 판으로 바꾼다. 파일이 바뀌었으면 `plugin_updated: true` 로 답한다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있기 때문이다.
+선택 칸의 `PUT /api/env` 와 `DELETE /api/env` 도 설치를 다시 쓴다. 그때 `fos-ctx` 가 바뀌었으면 그 응답의 `restart_required` 가 참이다.
 Control Plane 은 `plugin_updated` 가 참인 연결을 재시작 대기로 둔다. 관리자가 공유 gateway 를 재시작하고 반영 완료를 누르면 풀린다. 설치된 연결의 `restart_required` 는 늘 참이라 이 신호로 쓰지 못한다.
 서버 정의의 `tools.exclude` 가 manifest 로 계산한 것과 다를 때도 `policy_hook` 은 거짓이다. 소유 기록과 지금 manifest 의 같음 판정은 `tools` 를 보지 않는다. 옛 기록을 가진 연결이 끊기지 않고, 다시 보낸 설치가 덮어쓴다.
 연결 확인과 관리자 반영 완료는 설치를 다시 보낸 뒤에 `policy_hook` 을 읽는다. 옛 판의 `fos-ctx` 를 가진 연결은 연결 확인 한 번으로 새 판이 되고 재시작 대기가 된다.
