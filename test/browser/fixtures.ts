@@ -216,19 +216,53 @@ export async function setSession(
   ]);
 }
 
-async function waitForHealth(logPath: string): Promise<void> {
+async function readControlPlaneLog(logPath: string): Promise<string> {
+  return readFile(logPath, "utf-8").catch(() => "");
+}
+
+function childExitState(app: ChildProcess): string | null {
+  if (app.exitCode !== null) return `종료 코드 ${app.exitCode}`;
+  if (app.signalCode !== null) return `${app.signalCode} 신호`;
+  return null;
+}
+
+async function controlPlaneStartError(
+  logPath: string,
+  message: string,
+): Promise<Error> {
+  const log = await readControlPlaneLog(logPath);
+  return new Error(`${message}\n${log.split("\n").slice(-40).join("\n")}`);
+}
+
+async function waitForHealth(
+  logPath: string,
+  app: ChildProcess,
+): Promise<void> {
   const deadline = Date.now() + HEALTH_TIMEOUT_MS;
   while (Date.now() < deadline) {
+    const exitState = childExitState(app);
+    if (exitState !== null) {
+      throw await controlPlaneStartError(
+        logPath,
+        `Control Plane 이 시작 전에 끝났다: ${exitState}`,
+      );
+    }
+
+    const log = await readControlPlaneLog(logPath);
+    if (!log.includes("Started Assistant")) {
+      await new Promise((done) => setTimeout(done, 1_000));
+      continue;
+    }
+
     try {
       const response = await fetch(`${CONTROL_PLANE_BASE_URL}/actuator/health`);
-      if (response.ok) return;
+      if (response.ok && childExitState(app) === null) return;
     } catch {
       // 아직 듣지 않는다. 다시 두드린다.
     }
     await new Promise((done) => setTimeout(done, 1_000));
   }
-  const log = await readFile(logPath, "utf-8").catch(() => "");
-  throw new Error(`Control Plane 이 뜨지 않았다\n${log.split("\n").slice(-40).join("\n")}`);
+  throw await controlPlaneStartError(logPath, "Control Plane 이 뜨지 않았다");
 }
 
 /**
@@ -400,7 +434,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
     hermes = await startFakeHermes(PROFILE_KEYS, undefined, {}, skillRoot);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
     await seedBrowserToolsets(hermes.baseUrl);
-    app = startControlPlane(
+    const controlPlane = startControlPlane(
       await writeProfileKeys(work),
       hermes.baseUrl,
       logPath,
@@ -408,7 +442,8 @@ export default async function setupServices(): Promise<() => Promise<void>> {
       await makeArtifactRoot(work),
       skillRoot,
     );
-    await waitForHealth(logPath);
+    app = controlPlane;
+    await waitForHealth(logPath, controlPlane);
     await seedAgents(hermes.baseUrl);
   } catch (error) {
     await stopProcess(app);
