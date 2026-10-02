@@ -47,6 +47,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -131,6 +132,9 @@ class RestartReconcilerTest {
 
     @Autowired
     RestartReconcileProperties properties;
+
+    @Autowired
+    ConversationEventHub hub;
 
     @Autowired
     TurnCancellation turns;
@@ -682,6 +686,86 @@ class RestartReconcilerTest {
     }
 
     @Test
+    @DisplayName("자식만 돌던 흐름 turn 을 사용자가 멈췄으면 풀 때 stopped 를 내고 대기 줄을 멈춘다")
+    void publishesStoppedAndHoldsPendingWhenUserStoppedChildOnlyFlowTurn() {
+        Conversation flowConversation = flowConversation();
+        AgentExecution child = runningFlowChild(flowConversation);
+        stub.willLookup(child.hermesRunId(), finished(child, "cancelled", ""));
+        pendingMessages.save(
+                ChatPendingMessage.queued(flowConversation.id(), dad.id(), "기다리는 글", false, Instant.now()));
+        List<ChatEvent> events = new CopyOnWriteArrayList<>();
+        Runnable stopListening = hub.subscribe(flowConversation.id(), events::add);
+
+        try {
+            reconciler.claim();
+            turns.cancel(turns.find(child.treeRootId()).orElseThrow());
+            reconciler.reconcile(LONG_WAIT);
+            awaitStatus(child, ExecutionStatus.CANCELLED);
+            awaitIdle(flowConversation.id());
+        } finally {
+            stopListening.run();
+        }
+
+        assertThat(events)
+                .filteredOn(event -> !"pending".equals(event.type()))
+                .extracting(ChatEvent::type, ChatEvent::messageId, ChatEvent::executionId)
+                .containsExactly(tuple("stopped", null, child.treeRootId()));
+        assertThat(pendingMessages.findByConversationIdOrderByIdAsc(flowConversation.id()))
+                .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+                .containsExactly(tuple("기다리는 글", true));
+        assertThat(stub.received()).as("멈춘 대기 줄은 보내지 않는다").isEmpty();
+    }
+
+    @Test
+    @DisplayName("자식만 돌던 흐름 turn 이 사용자의 중지 없이 끝나면 풀 때 error 를 한 번 낸다")
+    void publishesErrorOnceWhenChildOnlyFlowTurnEndsWithoutUserStop() {
+        Conversation flowConversation = flowConversation();
+        AgentExecution child = runningFlowChild(flowConversation);
+        stub.willLookup(child.hermesRunId(), HermesRunLookup.running());
+        stub.onStop(runId -> stub.willLookup(runId, finished(child, "cancelled", "")));
+        List<ChatEvent> events = new CopyOnWriteArrayList<>();
+        Runnable stopListening = hub.subscribe(flowConversation.id(), events::add);
+
+        try {
+            reconciler.claim();
+            reconciler.reconcile(LONG_WAIT);
+            awaitStatus(child, ExecutionStatus.CANCELLED);
+            awaitIdle(flowConversation.id());
+        } finally {
+            stopListening.run();
+        }
+
+        assertThat(events)
+                .extracting(ChatEvent::type, ChatEvent::code)
+                .containsExactly(tuple("error", "HERMES_RUN_FAILED"));
+    }
+
+    @Test
+    @DisplayName("기동 때의 잡기와 다시 잡기가 모두 도중에 실패해도 이미 잡은 줄은 묻고 잠금을 푼다")
+    void asksAlreadyClaimedRowsEvenWhenClaimAndRetryBothFail() {
+        AgentExecution claimedRow = chatTurn(conversation, chief);
+        Conversation other = conversations.save(Conversation.startedBy(dad.id(), "다른 대화", worker.id()));
+        AgentExecution failingRow = chatTurn(other, worker);
+        stub.willLookup(claimedRow.hermesRunId(), finished(claimedRow, "completed", "끝난 답"));
+        stub.willLookup(failingRow.hermesRunId(), finished(failingRow, "completed", "묻지 않는 답"));
+        doThrow(new IllegalStateException("계속되는 DB 오류")).when(agentService).findById(worker.id());
+        // 기준 시각을 지금으로 옮긴다. 테스트 profile 은 꺼 두었으므로 여기서 잡지는 않는다.
+        reconciler.start();
+
+        assertThatThrownBy(() -> reconciler.claim()).isInstanceOf(IllegalStateException.class);
+        assertThat(turns.markOf(conversation.id()).running())
+                .as("먼저 잡은 줄의 잠금")
+                .isTrue();
+        reconciler.resumeAfterStart();
+
+        awaitStatus(claimedRow, ExecutionStatus.SUCCEEDED);
+        awaitIdle(conversation.id());
+        assertThat(turns.markOf(other.id()).running()).as("잡지 못한 줄의 대화").isFalse();
+        assertThat(statusOf(failingRow)).as("다음 기동이 정하도록 남긴다").isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(stub.lookups()).containsExactly(claimedRow.hermesRunId());
+    }
+
+    @Test
     @DisplayName("웹 서버를 여는 lifecycle 보다 먼저 시작한다")
     void startsBeforeWebServerLifecycle() {
         assertThat(reconciler.getPhase()).isLessThan(WebServerApplicationContext.START_STOP_LIFECYCLE_PHASE);
@@ -696,6 +780,39 @@ class RestartReconcilerTest {
         assertThatThrownBy(() -> new RestartReconcileProperties(true, Duration.ZERO))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("assistant.restart-reconcile.max-wait");
+    }
+
+    private Conversation flowConversation() {
+        Agent flowed = agent("flowed", "흐름");
+        flowed.assignFlow(ResearchAndBuildFlow.NAME);
+        flowed = agents.save(flowed);
+        return conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+    }
+
+    /** 뿌리 줄은 이미 성공으로 끝났고 자식만 아직 도는 흐름 turn 의 자식 줄이다. */
+    private AgentExecution runningFlowChild(Conversation flowConversation) {
+        AgentExecution root = executions.save(AgentExecution.builder()
+                .userId(dad.id())
+                .conversationId(flowConversation.id())
+                .agentId(flowConversation.agentId())
+                .profileName("flowed")
+                .hermesRunId("run-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.SUCCEEDED)
+                .timing(Instant.now().minus(Duration.ofMinutes(2)), Instant.now().minus(Duration.ofMinutes(1)))
+                .build());
+        return executions.save(AgentExecution.builder()
+                .userId(dad.id())
+                .conversationId(flowConversation.id())
+                .agentId(worker.id())
+                .parentExecutionId(root.id())
+                .rootExecutionId(root.treeRootId())
+                .profileName("worker")
+                .hermesRunId("run-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.now().minus(Duration.ofMinutes(1)))
+                .build());
     }
 
     /** 이전 프로세스가 돌리던 대화 turn 의 뿌리 줄이다. */
