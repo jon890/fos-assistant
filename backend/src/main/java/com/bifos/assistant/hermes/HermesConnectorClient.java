@@ -37,6 +37,16 @@ public interface HermesConnectorClient {
     /** 후보 값으로 선택지 도구나 확인 도구를 한 번 부른다. 대시보드는 값을 저장하지 않는다. */
     CallResult call(String connectorId, String tool, Map<String, String> values);
 
+    /**
+     * 승인한 호출을 한 번 실행한다. 결과를 알 수 없으면 {@link ConnectorExecutionUnknown} 을 던진다.
+     *
+     * <p>실행되지 않은 것이 분명한 거절은 실패 결과로 돌려준다. 받은 쪽은 어느 경우에도 다시 부르지 않는다.
+     *
+     * @param hermesTool 실행할 도구의 등록 이름
+     * @param argsJson 승인한 인자의 JSON object 글. 값이 같은 JSON 으로 다시 써서 보낸다
+     */
+    CallResult execute(String profile, String connectorId, String hermesTool, String argsJson);
+
     InstallResult putConnector(String profile, String connectorId, boolean enabled);
 
     /** 그 profile 의 설치 상태다. 대시보드의 목록에 그 커넥터가 없으면 설치되지 않은 것으로 돌려준다. */

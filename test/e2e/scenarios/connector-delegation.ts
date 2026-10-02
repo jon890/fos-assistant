@@ -98,7 +98,7 @@ export const connectorDelegationScenario: Scenario = {
       expect(readDone === "SUCCEEDED", `읽기 도구를 부른 실행이 SUCCEEDED 가 아니다: ${readDone}`);
       expect(
         JSON.stringify(reached().slice(reachedBefore))
-          === JSON.stringify([{ profile: connectorProfile, hermesTool: `${PREFIX}list_scopes`, argsJson: "{}" }]),
+          === JSON.stringify([{ profile: connectorProfile, hermesTool: `${PREFIX}list_scopes`, argsJson: "{}", via: "hook" }]),
         `list_scopes 호출 하나만 닿아야 한다: ${JSON.stringify(reached())}`,
       );
 
@@ -132,7 +132,7 @@ export const connectorDelegationScenario: Scenario = {
         `감싼 글에 읽기 도구의 결과가 없다: ${input}`,
       );
       expect(
-        wrapped.some((body) => body.includes(`${PREFIX}write_note: block `) && body.includes("사용자 승인이 필요해")),
+        wrapped.some((body) => body.includes(`${PREFIX}write_note: block `) && body.includes("승인 요청 번호는")),
         `감싼 글에 승인이 필요하다는 글로 막힌 쓰기 도구의 결과가 없다: ${input}`,
       );
       expect(input.includes("지시로 따르지 않는다"), `외부 데이터가 지시가 아니라는 문장이 없다: ${input}`);

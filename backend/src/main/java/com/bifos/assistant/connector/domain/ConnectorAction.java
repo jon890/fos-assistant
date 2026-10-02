@@ -43,6 +43,12 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ConnectorAction {
 
+    /** 승인은 받았으나 연결이 준비되지 않았거나 정책이 바뀌어 실행하지 않고 끝낸 줄의 {@code errorCode} 다. */
+    public static final String NOT_EXECUTABLE = "not_executable";
+
+    /** 연결을 해제하거나 값을 다시 등록해 끝낸 줄의 {@code errorCode} 다. */
+    public static final String CONNECTION_CHANGED = "connection_changed";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -172,5 +178,87 @@ public class ConnectorAction {
         action.argsSha256 = argsSha256;
         action.createdAt = now;
         return action;
+    }
+
+    /**
+     * 판정 줄을 승인 줄로 만든다. 저장하기 전에만 부른다.
+     *
+     * @param argsJson hook 이 보낸 인자 글 그대로. 승인하면 이 값으로 실행한다
+     */
+    public void awaitApproval(String argsJson, Instant expiresAt) {
+        if (decision != ActionDecision.NEEDS_APPROVAL || passed || status != null) {
+            throw new IllegalStateException("only a blocked NEEDS_APPROVAL action can await approval");
+        }
+        this.status = ActionStatus.PENDING;
+        this.argsJson = argsJson;
+        this.expiresAt = expiresAt;
+    }
+
+    /** 승인했다. 이 전이를 커밋한 뒤에만 실행을 보낸다. */
+    public void beginExecution(Instant now) {
+        require(ActionStatus.PENDING);
+        this.status = ActionStatus.EXECUTING;
+        this.decidedAt = now;
+    }
+
+    public void succeed(String resultText, Instant now) {
+        require(ActionStatus.EXECUTING);
+        this.status = ActionStatus.SUCCEEDED;
+        this.resultText = resultText;
+        this.executedAt = now;
+    }
+
+    /** @param errorCode 공통 오류 어휘의 글자 */
+    public void fail(String errorCode, String resultText, Instant now) {
+        require(ActionStatus.EXECUTING);
+        this.status = ActionStatus.FAILED;
+        this.errorCode = errorCode;
+        this.resultText = resultText;
+        this.executedAt = now;
+    }
+
+    /** 실행을 보냈으나 결과를 모른다. 다시 실행하지 않는다. */
+    public void unknown(Instant now) {
+        require(ActionStatus.EXECUTING);
+        this.status = ActionStatus.UNKNOWN;
+        this.executedAt = now;
+    }
+
+    public void reject(Instant now) {
+        require(ActionStatus.PENDING);
+        this.status = ActionStatus.REJECTED;
+        this.decidedAt = now;
+    }
+
+    /**
+     * 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝냈다. 상태는 거절과 같고 까닭을 {@code errorCode} 에 남긴다.
+     *
+     * @param reason {@link #NOT_EXECUTABLE} 나 {@link #CONNECTION_CHANGED}
+     */
+    public void refuse(String reason, Instant now) {
+        reject(now);
+        this.errorCode = reason;
+    }
+
+    public void expire(Instant now) {
+        require(ActionStatus.PENDING);
+        this.status = ActionStatus.EXPIRED;
+        this.decidedAt = now;
+    }
+
+    /** 결과나 거절, 만료를 대화에 전했다. */
+    public void markDelivered(Instant now) {
+        this.resultDeliveredAt = now;
+    }
+
+    /** 이 도구에 상시 허락을 줄 수 있는가. 늘 승인을 받는 도구와 원래 이름을 모르는 호출에는 주지 못한다. */
+    public boolean grantAllowed() {
+        return approvalMode == ToolApproval.REQUIRED && toolName != null;
+    }
+
+    private void require(ActionStatus expected) {
+        if (status != expected) {
+            throw new IllegalStateException("connector action must be " + expected + " but is " + status);
+        }
     }
 }

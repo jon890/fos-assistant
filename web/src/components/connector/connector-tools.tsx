@@ -1,14 +1,14 @@
 import { Badge } from "@/components/ui/badge";
 import {
+  toolBlocked,
   toolPolicyLabel,
   toolRiskLabel,
   type ConnectorTool,
 } from "@/lib/connection";
 
-/** 실행 방식은 상태라 의미 색으로 그린다. 바로 실행은 success, 승인을 기다리는 것은 warning 이다. */
+/** 실행 방식은 상태라 의미 색으로 그린다. 바로 실행은 success, 실행 전에 묻는 것은 warning 이다. */
 function policyVariant(tool: ConnectorTool) {
-  if (tool.risk === "DESTRUCTIVE" || tool.risk === "FINANCIAL")
-    return "destructive";
+  if (toolBlocked(tool)) return "destructive";
   return tool.approval === "NONE" ? "success" : "warning";
 }
 
@@ -20,7 +20,7 @@ export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
         className="text-sm text-muted-foreground"
         data-testid="connector-tools-empty"
       >
-        이 연결은 조회를 뺀 동작을 승인 기능이 준비될 때까지 실행하지 않아요.
+        이 연결은 조회를 뺀 모든 동작을 실행 전에 물어봐요.
       </p>
     );
   }

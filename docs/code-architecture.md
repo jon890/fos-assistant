@@ -87,9 +87,9 @@ plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.
 | `connector.application.ConnectorPolicyService` | 실행과 연결과 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다 |
 | `connector.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
-| `connector.domain.ConnectorAction` | 판정 한 줄. 승인 상태 전이는 승인 엔진이 들어올 때 더한다 |
+| `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 
-**다른 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 승인 엔진이 들어오면 `chat` 도 부른다. `agent` 가 `people` 을 거쳐 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다.
+**다른 패키지는 `connector` 를 import 하지 않는다.** `connector` 가 `agent`, `hermes`, `mcp`, `orchestration`, `usage`, `user` 를 부른다. 승인 줄의 대화 권한을 확인하려고 `chat` 도 부른다. `agent` 가 `people` 을 거쳐 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다. `chat` 이 승인 결과를 읽어야 할 때는 `chat` 에 port 를 두고 `connector` 가 구현한다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
@@ -796,9 +796,13 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 | --- | --- |
 | `orchestration.application.AgentDelegationService` | 위임 실행이 끝나면 `run()` 의 `finally` 에서 `DelegationFinished(conversationId, executionId)` 사건을 낸다. `chat` 을 직접 부르지 않는다 |
 | `chat.application.NextTurnDispatcher` | 위임 종료 사건, turn 종료, 기동을 받아 다음 turn 을 정한다. 대기 메시지를 먼저 보고 보낼 것이 없으면 깨우기 서비스에 넘긴다. 아래 「응답 중 대기열」 이 갖는다 |
-| `chat.application.DelegationWakeService` | 그 대화를 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 사건과 turn 종료를 직접 듣지 않는다 |
+| `chat.application.DelegationWakeService` | 그 대화를 깨울지 정하고, 자동 turn 을 새 가상 스레드에서 연다. 사건과 turn 종료를 직접 듣지 않는다. 위임 결과와 `AutoTurnResultSource` 들의 결과 가운데 하나라도 있으면 깨운다 |
+| `chat.application.AutoTurnResultSource` | 위임 결과 말고 자동 turn 에 실을 결과를 내는 쪽의 인터페이스다. 전하지 않은 결과, 전했다는 표시, 기동 때 훑을 대화를 낸다. `chat` 은 구현을 모른다. 구현이 없어도 깨우기는 돈다 |
+| `chat.application.ConversationNotices` | turn 을 열지 않고 알림 줄만 저장하고 `system` 사건을 낸다. 지운 대화에는 아무것도 하지 않는다 |
+| `connector.application.ConnectorActionResultSource` | `AutoTurnResultSource` 의 구현이다. 승인해 실행한 호출의 결과(`SUCCEEDED`, `FAILED`, `UNKNOWN`)를 알림 줄 글과 모델 입력 단락으로 낸다([ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)) |
+| `connector.application.ConnectorActionListener` | `ConnectorActionChanged` 를 받아 그 대화에 `approval` 사건을 내고, 거절과 만료의 알림 줄을 남기고, 깨우기 서비스를 부른다. 방향은 `connector` 에서 `chat` 으로 하나다 |
 | `chat.application.DelegationWakeProperties` | `assistant.delegation-wake.enabled`, `max-auto-turns`. 테스트 profile 은 끈다. 같은 H2 와 대역 Hermes 를 쓰는 다른 검사에서 자동 turn 이 열리지 않게 하기 위해서다 |
-| `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
+| `chat.application.ChatService` | `TurnIntent.DelegationResults` 로 도는 자동 turn. 사용자 질문 대신 `SYSTEM` 알림 줄들을 저장하고, 결과를 적은 글을 Hermes 입력으로 넣는다. 위임 결과 뒤에 `AutoTurnResultSource` 의 단락을 잇고, 알림 줄과 같은 트랜잭션에서 그쪽에 전했다고 적는다. 사용자 질문을 저장할 때 `auto_turn_count` 를 0 으로 돌린다 |
 | `chat.application.TurnCancellation` | turn 을 닫을 때 등록된 종료 리스너(`NextTurnDispatcher`)를 `TurnClosed(conversationId, stopped)` 로 부른다 |
 | `chat.application.ConversationEventHub` | 대화 번호마다 열린 SSE 구독을 들고, 요청한 연결이 없는 turn(자동 turn, 대기 메시지로 연 turn)의 사건을 모든 구독에 보낸다 |
 | `chat.presentation.ConversationEventController` | `GET /api/v1/chat/conversations/{conversationId}/events` 로 대화 단위 SSE 를 연다. 보내기 전에 `forViewer` 를 적용한다(ADR-038) |
@@ -950,6 +954,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | `system` | 알림 줄을 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
 | `user` | 대기 메시지를 합쳐 사용자 메시지로 저장했다. 대화 단위 SSE 로만 간다 | `conversationId`, `messageId`, `text` |
 | `pending` | 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. 대화 단위 SSE 로만 간다 | `conversationId` |
+| `approval` | 그 대화의 승인 줄이 생겼거나 상태가 바뀌었다. 화면이 승인 줄을 다시 읽는다. 줄의 내용은 싣지 않는다. 대화 단위 SSE 로만 간다 | `conversationId`, `detail`(승인 요청 번호) |
 
 `phase` 는 `started` 와 `completed` 둘이다.
 `subagent` 의 칸은 Hermes 가 실어 보낼 때만 찬다. `goal` 이 비어 오면 Hermes 의 `preview` 를 그 자리에 싣는다.
@@ -1246,6 +1251,10 @@ web/src/
     shell/                모든 화면을 감싸는 사이드바와 대화 목록
     chat/                 대화 화면의 부품
       activity/           작업 과정 블록과 패널
+      approval-list.tsx   입력창 위에 모아 보이는 승인 카드 목록
+      approval-card.tsx   승인 카드 한 장. 인자를 키와 값으로 보이고 승인과 거절을 받는다
+    connector/            연결 화면의 부품
+      connector-grants.tsx  묻지 않고 실행하게 허락한 동작과 「다시 묻기」
     usage/                사용량 화면의 부품
     execution/            실행 나무 화면의 부품
     agent/                에이전트와 성격 화면의 부품

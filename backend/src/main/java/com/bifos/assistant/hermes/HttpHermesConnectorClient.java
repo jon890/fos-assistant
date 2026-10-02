@@ -6,19 +6,25 @@ import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** connector 요청은 비밀값을 포함하므로 원격 오류 본문이나 cause 를 로그와 예외에 남기지 않는다. */
 @Component
@@ -32,8 +38,13 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
     /** 읽을 수 없는 선언에 주는 판이다. 받는 쪽이 아는 판이 아니라 그 커넥터만 카탈로그에서 빠진다. */
     private static final int SCHEMA_UNREADABLE = 0;
+    /** 실행 경로의 읽기 제한이다. 대시보드의 실행 제한 60초보다 길어야 대시보드가 내는 시간 초과 응답을 받는다. */
+    private static final Duration EXECUTE_READ_TIMEOUT = Duration.ofSeconds(75);
+    /** 실행 경로가 호출을 실행하지 않고 거절했다는 뜻의 상태다. */
+    private static final Set<Integer> EXECUTE_NOT_RUN = Set.of(400, 401, 404);
 
     private final RestClient client;
+    private final RestClient executeClient;
     private final String baseUrl;
     private final String token;
 
@@ -42,6 +53,11 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
         this.client = RestClient.builder().requestFactory(factory).build();
+        SimpleClientHttpRequestFactory executeFactory = new SimpleClientHttpRequestFactory();
+        executeFactory.setConnectTimeout(properties.connectTimeout());
+        executeFactory.setReadTimeout(EXECUTE_READ_TIMEOUT);
+        // 읽기 제한만 다르다. 나머지 구성은 위의 클라이언트와 함께 쓴다.
+        this.executeClient = client.mutate().requestFactory(executeFactory).build();
         this.baseUrl = properties.dashboardBaseUrl().replaceAll("/$", "");
         this.token = properties.dashboardToken();
     }
@@ -81,6 +97,69 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         }
         return CallResult.failure(
                 ConnectorCallError.fromWord(text(body, "error")).orElseThrow(IllegalStateException::new));
+    }
+
+    /**
+     * 성공 응답만 결과로 읽는다. 시간 초과, 끊긴 연결, 서버 오류, 읽을 수 없는 본문은 실행됐는지 알 수 없는 것이다.
+     *
+     * <p>인자는 글자가 아니라 JSON 값으로 보낸다. 바이트는 승인한 글과 달라질 수 있고 값은 같다.
+     */
+    @Override
+    public CallResult execute(String profile, String connectorId, String hermesTool, String argsJson) {
+        JsonNode args = arguments(argsJson);
+        if (args == null) {
+            // 보내지 않았으므로 실행되지 않은 것이 분명하다.
+            return CallResult.failure(ConnectorCallError.INVALID_INPUT);
+        }
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put(PROFILE, profile);
+        body.put("hermes_tool", hermesTool);
+        body.set("args", args);
+        final ResponseEntity<String> response;
+        try {
+            response = executeClient
+                    .post()
+                    .uri(baseUrl + "/api/connectors/{id}/execute", connectorId)
+                    .header(AUTHORIZATION, bearer())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body.toString().getBytes(StandardCharsets.UTF_8))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (request, ignored) -> {})
+                    .toEntity(String.class);
+        } catch (RestClientException ex) {
+            throw new ConnectorExecutionUnknown();
+        }
+        int status = response.getStatusCode().value();
+        if (EXECUTE_NOT_RUN.contains(status)) {
+            return CallResult.failure(ConnectorCallError.UNAVAILABLE);
+        }
+        if (status != 200 || response.getBody() == null) {
+            throw new ConnectorExecutionUnknown();
+        }
+        try {
+            JsonNode answer = MAPPER.readTree(response.getBody());
+            if (requiredBoolean(answer, "ok")) {
+                JsonNode result = answer.get("result");
+                if (result == null || result.isNull()) {
+                    throw new ConnectorExecutionUnknown();
+                }
+                return CallResult.success(result);
+            }
+            return CallResult.failure(
+                    ConnectorCallError.fromWord(text(answer, "error")).orElseThrow(ConnectorExecutionUnknown::new));
+        } catch (JacksonException | IllegalStateException ex) {
+            throw new ConnectorExecutionUnknown();
+        }
+    }
+
+    /** 승인 줄에 저장한 인자 글을 JSON object 로 읽는다. object 로 읽을 수 없으면 null 이다. */
+    private static JsonNode arguments(String argsJson) {
+        try {
+            JsonNode args = MAPPER.readTree(argsJson);
+            return args != null && args.isObject() ? args : null;
+        } catch (JacksonException ex) {
+            return null;
+        }
     }
 
     @Override

@@ -39,6 +39,7 @@ const CONFIG_PATH = "/api/config";
 /** 커넥터 plugin 의 경로다. 카탈로그, 도구 호출, 설치 상태, MCP 서버 확인이 있다. */
 const CONNECTOR_CATALOG_PATH = "/api/connectors/catalog";
 const CONNECTOR_CALL_PATH = /^\/api\/connectors\/([a-z0-9-]+)\/call$/;
+const CONNECTOR_EXECUTE_PATH = /^\/api\/connectors\/([a-z0-9-]+)\/execute$/;
 const CONNECTORS_PATH = "/api/connectors";
 const MCP_SERVER_TEST_PATH = /^\/api\/mcp\/servers\/([a-z0-9-]+)\/test$/;
 /** 대시보드의 스킬 목록과 전역 켜고 끄기 경로다. */
@@ -354,6 +355,8 @@ export const SUBAGENT_MEMORY_PROBE = "MCP 하위 에이전트 검사";
  */
 export const CONNECTOR_TOOL_PROBE = "커넥터 도구 검사";
 
+export type ConnectorToolCall = { profile: string; hermesTool: string; argsJson: string; via: "hook" | "execute" };
+
 /**
  * 이 글을 보내면 `terminal` 도구 사건을 많이 보내고, 도구 줄 하나를 시작만 한 채 `releaseLongActivity` 를
  * 기다린다. 첫 번째로 풀리면 그 줄을 끝내고 열 쌍과 시작만 한 줄 하나를 더 보내 다시 기다린다. 두 번째로 풀리면 그 줄을
@@ -558,8 +561,12 @@ export type FakeHermes = {
   setPolicyHook(profile: string, active: boolean): void;
   /** 커넥터 도구 호출의 판정을 물을 Control Plane 주소를 준다. 주지 않으면 `CONNECTOR_TOOL_PROBE` 의 호출은 모두 막힌다. */
   setConnectorPolicy(endpoint: string): void;
-  /** 판정이 `allow` 여서 커넥터 서버에 닿은 것으로 친 도구 호출이다. 막힌 호출은 없다. */
-  connectorToolCalls(): readonly { profile: string; hermesTool: string; argsJson: string }[];
+  /**
+   * 커넥터 서버에 닿은 도구 호출이다. 막힌 호출은 없다. `via` 가 `hook` 이면 판정이 `allow` 여서 지나간 호출이고,
+   * `execute` 이면 Control Plane 이 승인한 뒤 대시보드의 실행 경로로 보낸 호출이다. 실행 경로의 `argsJson` 은 받은
+   * `args` 를 다시 직렬화한 글이다.
+   */
+  connectorToolCalls(): readonly ConnectorToolCall[];
   holdNextRun(): void;
   waitForHeldRun(): Promise<void>;
   releaseHeldRun(): void;
@@ -668,7 +675,7 @@ export function startFakeHermes(
   let memoryReadMcp: { endpoint: string; token: string } | undefined;
   const subagentRegistrations: { childSessionId: string; rootSessionId: string; status: number }[] = [];
   let connectorPolicyEndpoint: string | undefined;
-  const connectorToolCalls: { profile: string; hermesTool: string; argsJson: string }[] = [];
+  const connectorToolCalls: ConnectorToolCall[] = [];
 
   /**
    * profile 플러그인의 `pre_tool_call` hook 처럼 커넥터 도구 호출마다 Control Plane 에 판정을 묻는다.
@@ -705,7 +712,7 @@ export function startFakeHermes(
         if (response.status === 200) {
           const answer = await response.json() as { decision?: unknown; message?: unknown };
           if (answer.decision === "allow") {
-            connectorToolCalls.push({ profile, hermesTool, argsJson });
+            connectorToolCalls.push({ profile, hermesTool, argsJson, via: "hook" });
             output.push(`${hermesTool}: allow`);
             continue;
           }
@@ -856,7 +863,7 @@ export function startFakeHermes(
     const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || path === TOOLSET_CATALOG_PATH
       || path === CONFIG_PATH || path === SKILLS_PATH || path === SKILL_TOGGLE_PATH || profileMatch !== null
       || path === CONNECTORS_PATH || path === CONNECTOR_CATALOG_PATH
-      || CONNECTOR_CALL_PATH.test(path) || MCP_SERVER_TEST_PATH.test(path);
+      || CONNECTOR_CALL_PATH.test(path) || CONNECTOR_EXECUTE_PATH.test(path) || MCP_SERVER_TEST_PATH.test(path);
     if (!isDashboardPath) return false;
 
     if (!dashboardAuthorized(request)) {
@@ -886,6 +893,28 @@ export function startFakeHermes(
       } else {
         send(response, 200, { ok: false, error: "credential_rejected" });
       }
+      return true;
+    }
+
+    // 대시보드의 실행 경로다. 승인 여부를 다시 보지 않고 받은 호출을 한 번 실행한 것으로 친다.
+    const executeMatch = CONNECTOR_EXECUTE_PATH.exec(path);
+    if (request.method === "POST" && executeMatch !== null) {
+      const body = JSON.parse((await readBody(request)) || "{}") as {
+        profile?: string; hermes_tool?: string; args?: unknown;
+      };
+      const installed = body.profile === undefined ? undefined : installedConnectors.get(body.profile);
+      if (executeMatch[1] !== DEMO_CONNECTOR.id || installed === undefined || !installed.has(DEMO_CONNECTOR.id)) {
+        send(response, 404, { error: "no such connector" });
+        return true;
+      }
+      if (typeof body.hermes_tool !== "string" || typeof body.args !== "object" || body.args === null) {
+        send(response, 400, { error: "invalid request" });
+        return true;
+      }
+      connectorToolCalls.push({
+        profile: body.profile!, hermesTool: body.hermes_tool, argsJson: JSON.stringify(body.args), via: "execute",
+      });
+      send(response, 200, { ok: true, result: { saved: true } });
       return true;
     }
 
