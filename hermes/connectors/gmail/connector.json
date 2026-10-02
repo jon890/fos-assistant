@@ -1,0 +1,37 @@
+{
+  "schema": 2,
+  "id": "gmail",
+  "title": "Gmail",
+  "description": "Gmail 의 메일을 찾고 읽고, 승인한 초안과 메일을 씁니다.",
+  "fields": [
+    { "key": "client_id", "env": "GMAIL_OAUTH_CLIENT_ID", "label": "OAuth 클라이언트 ID",
+      "description": "Google Cloud 콘솔의 「사용자 인증 정보」 에서 만든 데스크톱 앱 클라이언트의 ID 입니다.",
+      "secret": false, "required": true,
+      "pattern": "^[0-9A-Za-z_-]+\\.apps\\.googleusercontent\\.com$" },
+    { "key": "client_secret", "env": "GMAIL_OAUTH_CLIENT_SECRET", "label": "OAuth 클라이언트 secret",
+      "description": "같은 클라이언트의 보안 비밀번호입니다. Google Cloud 콘솔에서 봅니다.",
+      "secret": true, "required": true },
+    { "key": "refresh_token", "env": "GMAIL_OAUTH_REFRESH_TOKEN", "label": "refresh token",
+      "description": "설정 안내의 스크립트를 자기 컴퓨터에서 돌려 받은 값입니다.",
+      "secret": true, "required": true }
+  ],
+  "verify": { "tool": "get_profile" },
+  "default_tool_policy": "deny",
+  "tools": {
+    "get_profile": { "risk": "READ" },
+    "list_labels": { "risk": "READ" },
+    "search_messages": { "risk": "READ" },
+    "get_message": { "risk": "READ" },
+    "get_thread": { "risk": "READ" },
+    "create_draft": { "risk": "WRITE", "title": "초안 만들기" },
+    "modify_labels": { "risk": "WRITE", "title": "라벨 바꾸기" },
+    "send_message": { "risk": "WRITE", "title": "메일 보내기", "grant": false },
+    "reply_to_message": { "risk": "WRITE", "title": "답장 보내기", "grant": false }
+  },
+  "errors": {
+    "GMAIL_UNAUTHORIZED": "credential_rejected",
+    "GMAIL_FORBIDDEN": "forbidden",
+    "GMAIL_INVALID_INPUT": "invalid_input",
+    "GMAIL_UNAVAILABLE": "unavailable"
+  }
+}
