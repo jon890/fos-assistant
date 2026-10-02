@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.domain;
+package com.bifos.assistant.chat.domain.type;
 
 public enum MessageRole {
     USER,

@@ -1,7 +1,7 @@
 package com.bifos.assistant.people.application;
 
-import com.bifos.assistant.agent.domain.CostMode;
-import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.agent.domain.type.CredentialScope;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 

@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.domain;
 
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

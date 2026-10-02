@@ -1,6 +1,6 @@
 package com.bifos.assistant.agent.application;
 
-import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 
 /**
  * 관리자가 에이전트의 접근 범위와 Hermes 주소를 고칠 때 넘기는 값이다.

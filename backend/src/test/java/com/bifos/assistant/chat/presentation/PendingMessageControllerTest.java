@@ -8,9 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentVisibility;
-import com.bifos.assistant.agent.domain.CostMode;
-import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
@@ -22,7 +22,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;

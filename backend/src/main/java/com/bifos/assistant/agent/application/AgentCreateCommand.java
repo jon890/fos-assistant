@@ -1,8 +1,8 @@
 package com.bifos.assistant.agent.application;
 
-import com.bifos.assistant.agent.domain.AgentVisibility;
-import com.bifos.assistant.agent.domain.CostMode;
-import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.agent.domain.type.CredentialScope;
 
 /**
  * 관리자가 에이전트를 등록할 때 넘기는 값이다.

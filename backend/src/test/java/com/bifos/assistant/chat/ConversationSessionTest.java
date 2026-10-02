@@ -8,7 +8,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;

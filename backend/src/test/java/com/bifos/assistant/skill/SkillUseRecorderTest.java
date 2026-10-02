@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doThrow;
 
 import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
-import com.bifos.assistant.skill.domain.SkillUseSource;
+import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

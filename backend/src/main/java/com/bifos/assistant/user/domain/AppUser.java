@@ -1,5 +1,6 @@
 package com.bifos.assistant.user.domain;
 
+import com.bifos.assistant.user.domain.type.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

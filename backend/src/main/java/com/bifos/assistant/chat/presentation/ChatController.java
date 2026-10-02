@@ -35,7 +35,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.UpdateDefaultModelTierRequ
 import com.bifos.assistant.chat.presentation.ChatDtos.UpdateGroupModelTiersRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import jakarta.validation.Valid;
 import java.util.List;

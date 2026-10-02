@@ -1,7 +1,7 @@
 package com.bifos.assistant.usage.infra;
 
 import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;

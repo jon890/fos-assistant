@@ -1,6 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
-import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.util.Objects;
 
 /**

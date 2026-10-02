@@ -2,7 +2,7 @@ package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.application.CostEstimator;
 import com.bifos.assistant.usage.domain.CatalogPrice;

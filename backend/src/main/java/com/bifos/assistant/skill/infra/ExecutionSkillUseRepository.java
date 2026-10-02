@@ -3,7 +3,7 @@ package com.bifos.assistant.skill.infra;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseCount;
 import com.bifos.assistant.skill.domain.SkillUseOccurrence;
-import com.bifos.assistant.skill.domain.SkillUseSource;
+import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
