@@ -10,6 +10,7 @@ import {
   type AgentModelSettings,
   type HiddenModelEntry,
 } from "@/lib/model-settings";
+import { providerLabel } from "@/lib/provider-label";
 
 type Props = {
   settings: AgentModelSettings;
@@ -36,9 +37,7 @@ function ProviderHiddenFields({
   );
   return (
     <fieldset className="grid gap-2 rounded-md border border-border p-3">
-      <legend className="px-1 text-sm font-medium">
-        {row.name === row.provider ? row.name : `${row.name} (${row.provider})`}
-      </legend>
+      <legend className="px-1 text-sm font-medium">{row.name}</legend>
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -172,8 +171,8 @@ export function ModelHiddenForm({ settings, onSaved }: Props) {
               />
               <span className="min-w-0 break-all">
                 {entry.model === null
-                  ? `${entry.provider} 전체 숨기기`
-                  : `${entry.provider} ${entry.model} 숨기기`}
+                  ? `${providerLabel(entry.provider)} 전체 숨기기`
+                  : `${providerLabel(entry.provider)} ${entry.model} 숨기기`}
               </span>
             </label>
           ))}
