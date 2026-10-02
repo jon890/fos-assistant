@@ -839,7 +839,8 @@ Hermes 가 Control Plane MCP 의 `agent_*` 도구로 다른 에이전트를 부�
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/chat/conversations` | 내 대화 목록. 지운 대화는 빠진다 |
+| `GET /api/v1/chat/conversations?cursor=&limit=` | 내 대화 목록의 한 쪽. `{ "items": [...], "nextCursor": "..." }`. 지운 대화는 빠진다. 정렬은 `updatedAt desc, id desc`, `limit` 기본 30 상한 100. `nextCursor` 는 뜻을 알 수 없는 문자열이고 다음 쪽의 `cursor` 로 그대로 넘긴다. 마지막 쪽이면 null 이다. 읽을 수 없는 `cursor` 는 `VALIDATION_FAILED` 다 |
+| `GET /api/v1/chat/conversations/{id}` | 대화 한 줄. 첫 쪽에 없는 오래된 대화를 열 때 모델 칸과 에이전트 칸이 쓴다 |
 | `PATCH /api/v1/chat/conversations/{id}` | 이름을 바꾼다. 본문 `{ "title": "..." }`. 바뀐 대화 한 줄을 돌려준다 |
 | `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. 바뀐 대화 한 줄을 돌려준다 |
 | `GET /api/v1/chat/model-options?agentCode=` | 그 에이전트의 profile 로 고를 수 있는 모델. 요청자가 쓸 수 있는 에이전트만 받는다 |
@@ -1317,6 +1318,11 @@ web/src/
 **사이드바의 대화 목록은 화면 틀이 갖는다.** 대화 화면이 갖지 않는다.
 다른 화면에서도 목록이 보여야 하고, 대화 화면은 보낸 뒤 목록에 알리기만 한다.
 `components/shell/` 의 목록 context 가 목록을 읽고, 대화 화면이 그 context 의 갱신 함수를 부른다.
+
+**목록은 한 쪽(30개)만 읽고 끝에 닿으면 이어 읽는다.** 사용자의 대화가 수백 개가 돼도 첫 화면은 한 쪽만 부른다.
+갱신 함수(`refresh`)는 첫 쪽만 다시 읽고 이어 읽어 둔 줄은 남긴다. 읽는 중에 여러 번 불려도 진행 중인 읽기에 얹혀 많아야 두 번 나간다.
+첫 쪽에 없는 오래된 대화를 주소로 열면 `useConversation` 이 그 대화 한 줄만 따로 읽는다. 목록의 순서에는 끼지 않는다.
+사이드바의 대화 링크는 `prefetch={false}` 다. 보이는 링크마다 대화 화면을 미리 읽으면 한 화면에서 요청이 수십 개 한꺼번에 나가 edge 의 요청 상한(429)에 닿는다.
 
 비서의 답만 폭을 다 쓰는 이유는 표와 코드 블록이 오기 때문이다.
 좁은 말풍선에 넣으면 그 안에서 가로로 밀어야 읽힌다.
