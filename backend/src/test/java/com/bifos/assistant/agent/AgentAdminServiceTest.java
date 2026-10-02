@@ -13,12 +13,12 @@ import com.bifos.assistant.agent.application.AgentAdminService;
 import com.bifos.assistant.agent.application.AgentCreateCommand;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
+import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -38,7 +38,7 @@ class AgentAdminServiceTest {
     private final AppUserRepository users = mock(AppUserRepository.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
-    private final FlowRegistry flows = mock(FlowRegistry.class);
+    private final KnownFlows flows = mock(KnownFlows.class);
 
     private final AgentAdminService service =
             new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, Clock.systemUTC());

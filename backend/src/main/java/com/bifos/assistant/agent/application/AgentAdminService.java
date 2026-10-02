@@ -3,7 +3,6 @@ package com.bifos.assistant.agent.application;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -25,7 +24,7 @@ public class AgentAdminService {
     private final AppUserRepository users;
     private final AgentLifecycleService lifecycle;
     private final AgentEndpointProbe endpointProbe;
-    private final FlowRegistry flows;
+    private final KnownFlows flows;
     private final Clock clock;
 
     @Transactional
@@ -89,7 +88,7 @@ public class AgentAdminService {
      * 위해서다.
      */
     private String requireKnownFlow(String flow) {
-        if (flow == null || flow.isBlank() || flows.find(flow) != null) {
+        if (flow == null || flow.isBlank() || flows.known(flow)) {
             return flow;
         }
         throw new ApiException(ErrorCode.VALIDATION_FAILED, "no such flow");

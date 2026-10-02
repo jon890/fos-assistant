@@ -16,6 +16,8 @@ import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentProperties;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.KnownFlows;
+import com.bifos.assistant.agent.application.ProfileSkillFiles;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -27,14 +29,12 @@ import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesToolsetClient;
-import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.agent.application.ProfileProvisioning;
 import com.bifos.assistant.agent.application.PeopleProperties;
 import com.bifos.assistant.agent.application.ReservedProfileNames;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
@@ -55,7 +55,7 @@ class AgentApiBaseUrlUpdateTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final HermesToolsetClient hermesToolsets = mock(HermesToolsetClient.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
-    private final FlowRegistry flows = mock(FlowRegistry.class);
+    private final KnownFlows flows = mock(KnownFlows.class);
 
     /** 그룹 공개 검사는 실제 서비스가 한다. 도구 목록을 읽는 대역만 이 테스트가 정한다. */
     private final AgentLifecycleService lifecycle = new AgentLifecycleService(
@@ -68,7 +68,7 @@ class AgentApiBaseUrlUpdateTest {
             mock(HermesProperties.class),
             mock(PeopleProperties.class),
             mock(AgentProperties.class),
-            mock(SkillStore.class),
+            mock(ProfileSkillFiles.class),
             Clock.systemUTC());
 
     private final AgentAdminController controller = new AgentAdminController(

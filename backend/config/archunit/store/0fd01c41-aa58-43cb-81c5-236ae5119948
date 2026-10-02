@@ -1,6 +1,4 @@
 agent -> chat 는 순환에 속한다
-agent -> orchestration 는 순환에 속한다
-agent -> skill 는 순환에 속한다
 agent -> usage 는 순환에 속한다
 chat -> agent 는 순환에 속한다
 chat -> context 는 순환에 속한다

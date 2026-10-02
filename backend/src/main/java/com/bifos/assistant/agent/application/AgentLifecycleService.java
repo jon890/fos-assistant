@@ -10,7 +10,6 @@ import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -57,7 +56,7 @@ public class AgentLifecycleService {
     private final HermesProperties hermesProperties;
     private final PeopleProperties peopleProperties;
     private final AgentProperties properties;
-    private final SkillStore skillStore;
+    private final ProfileSkillFiles skillFiles;
     private final Clock clock;
 
     /**
@@ -194,7 +193,7 @@ public class AgentLifecycleService {
 
     private void removeSkillDirectory(String profileName) {
         try {
-            skillStore.deleteAll(profileName);
+            skillFiles.deleteAll(profileName);
         } catch (RuntimeException failure) {
             log.warn("지운 에이전트의 스킬 디렉터리를 지우지 못했다. 쓰이지 않을 디렉터리가 남는다 profile={}", profileName, failure);
         }
