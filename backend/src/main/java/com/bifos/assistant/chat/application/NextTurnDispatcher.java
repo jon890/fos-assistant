@@ -107,8 +107,9 @@ public class NextTurnDispatcher {
     /**
      * 기동 전에 보내지 못한 대기 메시지나 전하지 못한 결과가 있는 대화를 차례로 이어 준다.
      *
-     * <p>기동 정리가 끊긴 위임 실행을 FAILED 로 적은 뒤에 돈다. 그래야 그 결과도 함께 전한다. 멈춰 둔 대기 줄은
-     * 그대로 둔다.
+     * <p>{@link RestartReconciler} 의 묻기가 시작한 뒤에 돈다. run 번호가 없어 그때 FAILED 로 적힌 위임 실행의 결과는
+     * 이 깨우기가 전한다. {@link RestartReconciler} 가 turn 잠금을 잡은 대화는 건너뛰고, 그 잠금이 풀릴 때 닫기
+     * 리스너로 다시 온다. 멈춰 둔 대기 줄은 그대로 둔다.
      */
     @EventListener(ApplicationReadyEvent.class)
     @Order(10)

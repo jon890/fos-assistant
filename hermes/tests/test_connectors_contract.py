@@ -1,4 +1,4 @@
-"""`hermes/connectors/` 아래의 모든 커넥터가 `docs/connector-authoring.md` 「공통 검사」 를 지키는지 본다(ADR-061).
+"""`hermes/connectors/` 아래의 모든 커넥터가 `docs/connector-authoring.md` 「공통 검사」 를 지키는지 본다(ADR-062).
 
 커넥터 목록을 코드에 적지 않는다. 디렉터리를 찾아 돌므로 커넥터를 더하면 검사 대상이 된다.
 서버는 자식으로 띄우되 `initialize` 와 `tools/list` 만 부른다. 외부 서비스를 부르지 않는다.

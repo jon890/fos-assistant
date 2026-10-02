@@ -59,6 +59,7 @@ import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
 import { connectorDelegationScenario } from "./scenarios/connector-delegation.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
+import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
 import { pickPort } from "../support/pick-port.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -127,6 +128,8 @@ const SCENARIOS: readonly Scenario[] = [
   modelSelectionScenario,
   // Control Plane 을 다시 띄우므로 맨 끝에 둔다. 막힌 provider 를 먼저 푼다.
   chatQueueRestartScenario,
+  // 이것도 Control Plane 을 다시 띄운다. 앞 시나리오가 남긴 상태에 기대지 않는다.
+  restartReconcileScenario,
 ];
 
 async function waitForHealth(url: string, logPath: string): Promise<void> {

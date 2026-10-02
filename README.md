@@ -62,7 +62,7 @@ To get there, the goal is to let you connect general-purpose connectors into an 
 - **Yours.** You decide which tools and memory an agent has and which model a conversation uses.
 - **It is the source of truth for long-term knowledge about you.** Agents and outside services read only the part they are allowed to. Service tokens are read-only, and the body of a sensitive entry is encrypted at rest.
 
-General-purpose connectors live in this repository under `hermes/connectors/` and are maintained here ([ADR-061](docs/adr/ADR-061-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
+General-purpose connectors live in this repository under `hermes/connectors/` and are maintained here ([ADR-062](docs/adr/ADR-062-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
 The first one is Gmail: it searches and reads your mail without asking, and creates drafts, sends, replies and changes labels only after you approve. It never moves mail to the trash or deletes it.
 A connector for a service that only one household or organization uses, such as the household account book attached today, stays in its own repository.
 Growing the set of general-purpose connectors is where the work is headed. It is not done yet.

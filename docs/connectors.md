@@ -4,7 +4,7 @@
 연결은 사용자별 전용 profile 과 비공개 에이전트를 갖는다([ADR-039](adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)).
 어떤 커넥터가 있고 무엇을 입력받는지는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 서비스 이름과 주소를 모른다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 임의 plugin 을 설치하는 화면은 없다. 연결할 수 있는 커넥터는 운영자가 대시보드 plugin 에 준 목록뿐이다.
-이 저장소가 갖는 범용 커넥터는 `hermes/connectors/` 에 있고([ADR-061](adr/ADR-061-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)), 만드는 방법은 [커넥터 만들기](connector-authoring.md) 가 갖는다.
+이 저장소가 갖는 범용 커넥터는 `hermes/connectors/` 에 있고([ADR-062](adr/ADR-062-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)), 만드는 방법은 [커넥터 만들기](connector-authoring.md) 가 갖는다.
 
 ## connector.json
 
@@ -142,7 +142,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - 승인은 받았으나 실행할 수 없어 그 요청이 끝낸 줄은 오류가 아니라 200 과 끝난 줄을 돌려준다. 기다리는 시간이 지났으면 `EXPIRED`, 연결이 `READY` 가 아니거나 정책이 바뀌었으면 `REJECTED` 와 `errorCode: not_executable` 이다. 부른 쪽은 「이미 처리된 요청」(409)과 「승인했지만 실행하지 않은 요청」(200 의 `status`)을 구분한다
 - 승인은 행 잠금 아래에서 `EXECUTING` 으로 바꾸고 커밋한 뒤, 트랜잭션 밖에서 대시보드의 실행 경로를 부른다. 연결이 `READY` 가 아니면 실행하지 않고 `REJECTED` 로 둔다. 승인은 그 사용자의 행을 먼저 잠그고 승인 줄을 잠근다. 연결을 다시 등록하거나 해제하는 쪽과 같은 순서다
 - 실행 요청이 시간 안에 답하지 않았거나 연결이 끊겼으면 `UNKNOWN` 이다
-- `grant` 는 `approval: required` 이고 선언이 상시 허락을 닫지 않은 도구에만 받는다. `always` 이거나, 선언이 `"grant": false` 이거나, `tool_name` 이 빈 줄이면 `VALIDATION_FAILED` 다. 승인 줄의 `grantAllowed` 도 같은 조건으로 낸다. 선언은 승인 줄을 읽을 때의 카탈로그로 보고, 카탈로그를 읽지 못하면 거짓이다([ADR-062](adr/ADR-062-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)). `TODAY` 는 `Asia/Seoul` 의 그날 끝(다음 날 0시)까지다. 서버의 시간대 설정과 상관없다. 사용량 화면의 달 경계와 같은 고정 시간대다
+- `grant` 는 `approval: required` 이고 선언이 상시 허락을 닫지 않은 도구에만 받는다. `always` 이거나, 선언이 `"grant": false` 이거나, `tool_name` 이 빈 줄이면 `VALIDATION_FAILED` 다. 승인 줄의 `grantAllowed` 도 같은 조건으로 낸다. 선언은 승인 줄을 읽을 때의 카탈로그로 보고, 카탈로그를 읽지 못하면 거짓이다([ADR-063](adr/ADR-063-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)). `TODAY` 는 `Asia/Seoul` 의 그날 끝(다음 날 0시)까지다. 서버의 시간대 설정과 상관없다. 사용량 화면의 달 경계와 같은 고정 시간대다
 - 같은 실행에서 같은 도구와 같은 `args_sha256` 의 `PENDING` 이 이미 있으면 새 줄을 만들지 않고 그 번호를 돌려준다
 - 사건은 줄을 커밋한 뒤에 낸다. 화면이 사건을 받고 읽었을 때 줄이 있어야 한다
 - 대화에는 `approval` 사건을 낸다. 사건은 승인 요청 번호만 싣고 줄의 내용을 싣지 않는다. 화면은 그 사건을 받으면 승인 줄을 다시 읽는다. 승인 카드는 이 응답으로만 그린다. 깨우기(`assistant.delegation-wake.enabled`)가 꺼져 있어도 이 사건과 아래의 거절, 만료 알림 줄은 나간다

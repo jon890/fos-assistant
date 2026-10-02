@@ -22,6 +22,7 @@ import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.orchestration.application.AgentRunner;
+import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -85,7 +86,7 @@ class AgentRunnerSubmitFailureTest {
                 executions,
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
-                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100),
+                new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100)),
                 modelTiers,
                 Clock.systemUTC());
     }
