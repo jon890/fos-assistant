@@ -38,6 +38,7 @@
 
 `backend/src/main/java/com/bifos/assistant/user/domain/type/UserRole.java` 를
 `backend/src/main/java/com/bifos/assistant/shared/domain/type/UserRole.java` 로 옮긴다. 본문은 `package` 줄만 바꾼다.
+`git mv` 는 빈 `user/domain/type` 디렉터리를 남긴다. `rmdir backend/src/main/java/com/bifos/assistant/user/domain/type` 으로 지운다.
 
 ### 2. 참조를 고친다
 

@@ -83,7 +83,11 @@ Javadoc 에 「웹 토큰이 가리키는 주소를 현재 사용자로 바꾼�
 
 ### 6. 이 phase 를 검증하는 테스트
 
-- `backend/src/test/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilterTest.java`: 대역을 `mock(TokenUserResolver.class)` 로 바꾸고 `resolveCurrentUser` 가 `CurrentUser` 를 돌려주게 한다. 기존 단언(인증 주체의 칸, 권한 문자열, 꺼진 사용자의 응답, 건너뛰는 경로)은 바꾸지 않는다. `user` 패키지의 import 가 남지 않게 한다
+- `backend/src/test/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilterTest.java`: 대역을 `mock(TokenUserResolver.class)` 로 바꾸고 `resolveCurrentUser` 가 `Optional.of(new CurrentUser(1L, EMAIL, NAME, 1L, UserRole.MEMBER))` 를 돌려주게 한다. 상수 이름은 그 테스트가 쓰는 것을 따른다.
+  - `verify(users, never()).resolveAllowed(any(), any())` 셋은 메서드 이름만 `resolveCurrentUser` 로 바꾼다
+  - 기존 단언(인증 주체의 `email` 과 `role`, 꺼진 사용자의 응답, 건너뛰는 경로)은 바꾸지 않는다
+  - 허용된 사용자를 인증하는 테스트(`continuesChainAndAuthenticatesAllowedUser`)에 단언을 하나 더한다. 인증의 권한이 `ROLE_MEMBER` 하나다. 권한 문자열을 만드는 줄을 이 phase 가 다시 쓰는데 지금은 그것을 보는 테스트가 없다
+  - `AppUser` 를 만들던 줄이 사라지면 `java.time.Instant` 와 `user` 패키지의 import 가 쓰이지 않게 된다. 지운다. 쓰지 않는 import 는 Checkstyle error 다
 - `backend/src/test/java/com/bifos/assistant/user/RevokedUserTest.java` 에 테스트 둘을 더한다
   - 정상: 허용된 주소로 `resolveCurrentUser` 를 부르면 번호, 주소, 표시 이름, 그룹, 역할이 저장된 사용자와 같은 `CurrentUser` 가 온다
   - 실패: 꺼진 주소로 부르면 비어 있는 값이고 `app_user` 줄이 새로 생기지 않는다
@@ -97,7 +101,7 @@ Javadoc 에 「웹 토큰이 가리키는 주소를 현재 사용자로 바꾼�
 ./gradlew test
 ./gradlew checkstyleMain checkstyleTest
 test "$(wc -l < config/archunit/store/25192a86-f325-4b77-b6d1-3c590c06ead7)" -eq 0
-! grep -rnP "^import com\.bifos\.assistant\.(?!shared\.)" src/main/java/com/bifos/assistant/shared
+! grep -rnE "^import (static )?com\.bifos\.assistant\." src/main/java/com/bifos/assistant/shared | grep -v "com\.bifos\.assistant\.shared\."
 ```
 
 ```bash
