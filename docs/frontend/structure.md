@@ -24,6 +24,24 @@
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
 | `/admin/people` | 사용자 관리. `ADMIN` 만 연다 |
 
+## 꺼진 사용자의 세션
+
+관리자가 끈 사용자가 세션을 가진 채 요청하면 Control Plane 이 401 과 `ACCESS_REVOKED` 로 답한다.
+`web/src/lib/control-plane.ts` 가 Control Plane 응답을 받는 한곳에서 그 코드를 보고 세션을 끊는다.
+화면마다 따로 처리하지 않는다.
+
+| 어디서 불렀나 | 어떻게 되나 |
+| --- | --- |
+| API 라우트 | 그 자리에서 세션 쿠키를 지우고 401 `ACCESS_REVOKED` 를 그대로 돌려준다. 화면은 「사용이 중지된 계정이에요」 문구를 보인다. 그다음 화면 이동은 세션이 없어 `/signin` 으로 간다 |
+| 서버 컴포넌트 | 그리는 중에는 쿠키를 지울 수 없어 `/signout/revoked` 로 넘긴다. 그 경로가 쿠키를 지우고 `/signin` 으로 보낸다 |
+
+`/signout/revoked` 는 화면이 아니라 라우트다.
+스스로 Control Plane 에 다시 물어 `ACCESS_REVOKED` 일 때만 세션을 지운다.
+그래서 다른 사이트가 이 주소로 보내도 켜져 있는 사용자는 로그아웃되지 않는다.
+
+이미 열린 대화 스트림은 끝날 때까지 이어진다.
+근거는 [ADR-059](../adr/ADR-059-꺼진-사용자는-control-plane-이-요청마다-막고-웹이-세션을-끊는다.md) 에 있다.
+
 ## 에이전트 화면
 
 에이전트의 설정은 메뉴 「에이전트」 한 곳에 모은다.

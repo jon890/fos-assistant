@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 /** 웹 클라이언트에 돌려주는 고정 오류 코드다. */
 public enum ErrorCode {
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED),
+    /** 관리자가 허용 목록에서 끈 사용자의 웹 토큰이다. 웹이 이 코드를 받으면 세션을 끊는다(ADR-059). */
+    ACCESS_REVOKED(HttpStatus.UNAUTHORIZED),
     FORBIDDEN(HttpStatus.FORBIDDEN),
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     AGENT_NOT_FOUND(HttpStatus.NOT_FOUND),
