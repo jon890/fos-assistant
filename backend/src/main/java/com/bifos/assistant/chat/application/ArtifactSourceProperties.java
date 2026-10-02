@@ -4,8 +4,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /** 결과물 주소 다운로드에 허용할 호스트와 제한 시간을 정한다. */
+@Validated
 @ConfigurationProperties(prefix = "assistant.artifact.source")
 public record ArtifactSourceProperties(
         List<String> allowedHosts, Duration connectTimeout, Duration readTimeout, Duration totalTimeout) {

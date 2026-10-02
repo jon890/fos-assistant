@@ -2,6 +2,7 @@ package com.bifos.assistant.agent.application;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * 새 대화 화면의 추천 질문을 언제 어떻게 만들지 정한다.
@@ -14,6 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param retryAfterFailure 만들기가 실패한 뒤 같은 사용자와 에이전트의 추천을 다시 만들지 않는 시간. Hermes 가
  *     막혔을 때 화면이 다시 읽을 때마다 실패한 실행이 쌓이지 않게 한다. 기본 10분
  */
+@Validated
 @ConfigurationProperties(prefix = "assistant.starters")
 public record StarterProperties(
         Boolean enabled, Duration refreshAfter, Integer historyConversations, Duration retryAfterFailure) {

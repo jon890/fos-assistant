@@ -2,6 +2,7 @@ package com.bifos.assistant.hermes;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * @param profileKeyDir profile 마다 mode 600 파일 하나가 들어 있는 디렉터리. 파일 이름이 profile
@@ -19,6 +20,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param readTimeout Hermes 호출 한 번의 응답 한도. 제출과 조회가 모두 곧바로 돌아오므로 {@code
  *     runTimeout} 보다 훨씬 짧다
  */
+@Validated
 @ConfigurationProperties(prefix = "hermes")
 public record HermesProperties(
         String profileKeyDir,

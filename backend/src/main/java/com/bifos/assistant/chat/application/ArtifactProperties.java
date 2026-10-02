@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * 에이전트가 turn 안에 만든 결과물 파일을 어디에 얼마나 둘지 정한다.
@@ -15,6 +16,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *     적는다. 비어 있으면 기동을 멈춘다
  * @param retentionDays 파일이 마지막으로 바뀐 뒤 두는 날 수
  */
+@Validated
 @ConfigurationProperties(prefix = "assistant.artifact")
 public record ArtifactProperties(String root, String agentRoot, Integer retentionDays) {
 

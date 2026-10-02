@@ -2,6 +2,7 @@ package com.bifos.assistant.orchestration.application;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * MCP {@code agent_delegate} 로 다른 에이전트에게 맡길 때의 한도다(ADR-017 「도구 넷과 한도」).
@@ -12,6 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param submitTimeout 도구가 Hermes 제출을 기다리는 시간. 넘으면 실행 번호만 돌려준다
  * @param outputMaxChars 실행 줄에 적는 답의 길이 상한. 넘으면 자르고 잘렸다는 한 줄을 붙인다
  */
+@Validated
 @ConfigurationProperties(prefix = "assistant.delegation")
 public record DelegationProperties(
         int maxDepth, int maxConcurrentChildren, int maxActive, Duration submitTimeout, int outputMaxChars) {

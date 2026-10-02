@@ -1,6 +1,7 @@
 package com.bifos.assistant.context;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * 실행마다 instructions 로 보낼 Memory 글자 수 상한과 색인 층에 떼어 둘 자리의 몫이다.
@@ -9,6 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 떼어 두고, 항상 층은 나머지 안에서 담는다. 색인이 그보다 짧으면 떼어 둔 자리가 남으므로 항상 층이
  * 그만큼 더 쓴다.
  */
+@Validated
 @ConfigurationProperties(prefix = "assistant.context")
 public record ContextProperties(long maxChars, int indexBudgetRatio) {
 

@@ -1,6 +1,7 @@
 package com.bifos.assistant.skill.application;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * 올린 스킬을 어느 공유 디렉터리에 두고 옛 버전을 몇 개 남기며 에이전트마다 몇 개까지 받을지 정한다.
@@ -17,6 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param maxPerAgent 에이전트 하나에 올릴 수 있는 스킬 수. 새 스킬을 만들 때만 본다. Hermes 색인이 커지지
  *     않게 하려는 것이다. 근거는 ADR-034 에 있다
  */
+@Validated
 @ConfigurationProperties(prefix = "assistant.skill")
 public record SkillProperties(String root, String agentRoot, Integer keepVersions, Integer maxPerAgent) {
 

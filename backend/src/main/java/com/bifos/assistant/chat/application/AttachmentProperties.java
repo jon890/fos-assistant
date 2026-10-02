@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * 대화에 올리는 사진을 어디에 얼마나 둘지 정한다.
@@ -17,6 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param maxBytes 한 장의 상한
  * @param retentionDays 올린 뒤 파일을 두는 날 수
  */
+@Validated
 @ConfigurationProperties(prefix = "assistant.attachment")
 public record AttachmentProperties(
         String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays) {
