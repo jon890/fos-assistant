@@ -163,7 +163,7 @@ class ConversationModelChoiceTest {
         assertThat(chosen.agentCode()).isEqualTo("choice-dad");
         assertThat(List.of(chosen.provider(), chosen.model(), chosen.reasoningEffort()))
                 .containsExactly("openrouter", "example-model-small", "max");
-        assertThat(controller.conversations()).singleElement().isEqualTo(chosen);
+        assertThat(controller.conversations(null, 30).items()).singleElement().isEqualTo(chosen);
     }
 
     @Test
@@ -172,7 +172,7 @@ class ConversationModelChoiceTest {
         CurrentUser dad = member("choice-dad");
         Conversation created = chat.startEmpty(dad, "choice-dad");
         ChatController controller = chatController(dad);
-        assertThat(controller.conversations()).singleElement().satisfies(it -> {
+        assertThat(controller.conversations(null, 30).items()).singleElement().satisfies(it -> {
             assertThat(it.provider()).isNull();
             assertThat(it.model()).isNull();
             assertThat(it.reasoningEffort()).isNull();
@@ -247,7 +247,7 @@ class ConversationModelChoiceTest {
                 .willReturn(HermesRunResult.of(
                         "run-1", "sess-1", "completed", "네", "example-model-small", "openrouter", TokenUsage.empty()));
 
-        assertThat(controller.conversations())
+        assertThat(controller.conversations(null, 30).items())
                 .singleElement()
                 .satisfies(it -> assertThat(List.of(it.provider(), it.model(), it.reasoningEffort()))
                         .containsExactly("openrouter", "example-model-small", "extreme"));

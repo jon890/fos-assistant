@@ -305,7 +305,7 @@
   },
   "src/components/shell/conversations-provider.tsx": {
     "no-restricted-globals": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/shell/main-nav.tsx": {

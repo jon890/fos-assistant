@@ -107,7 +107,7 @@ test("사진을 먼저 올려 대화가 생겨도 미리보기가 남고 다른 
   const uploadedId = conversationIdOf(page.url());
   const listed = await page.request.get("/api/chat/conversations");
   expect(listed.ok()).toBeTruthy();
-  expect((await listed.json() as { id: string; title: string }[])
+  expect((await listed.json() as { items: { id: string; title: string }[] }).items
     .some((item) => item.id === uploadedId && item.title === "")).toBeTruthy();
   await openSidebar(page, testInfo);
   await expect(conversationNav(page).locator(`a[href="/chat/${uploadedId}"]`)).toHaveText("새 대화");
@@ -136,17 +136,16 @@ test("사진을 먼저 올리고 보내면 같은 대화에 첫 메시지와 제
   if (testInfo.project.name === "mobile") {
     await page.keyboard.press("Escape");
   }
-  const before = await page.request.get("/api/chat/conversations");
-  expect(before.ok()).toBeTruthy();
-  const beforeCount = (await before.json() as { id: string }[]).length;
   await send(page, title);
   await expect(page).toHaveURL(new RegExp(`/chat/${id}$`));
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
   await openSidebar(page, testInfo);
   await expect(conversationNav(page).locator(`a[href="/chat/${id}"]`)).toHaveText(title);
+  // 목록은 쪽으로 읽으므로 개수 대신, 첫 메시지가 새 대화를 만들지 않고 사진을 올린 그 대화의 제목을 채웠는지 본다.
   const after = await page.request.get("/api/chat/conversations");
   expect(after.ok()).toBeTruthy();
-  expect((await after.json() as { id: string }[]).length).toBe(beforeCount);
+  const items = (await after.json() as { items: { id: string; title: string }[] }).items;
+  expect(items.filter((item) => item.title === title).map((item) => item.id)).toEqual([id]);
 });
 
 test("사진을 올린 뒤 같은 대화 링크를 눌러도 미리보기와 파일이 남는다", async ({ page }, testInfo) => {

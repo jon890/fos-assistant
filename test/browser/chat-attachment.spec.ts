@@ -276,11 +276,10 @@ test("대화를 바꾸면 미리보기가 비워진다", async ({ page }, testIn
  * 요청이나 기다리지 않고 그 대화의 메시지 응답만 기다린다.
  */
 async function selectConversationByText(page: Page, text: string): Promise<string> {
-  const listed = (await (await page.request.get("/api/chat/conversations")).json()) as Array<{
-    id: string;
-    title: string;
-  }>;
-  const conversation = listed.find((candidate) => candidate.title.includes(text));
+  const listed = (await (await page.request.get("/api/chat/conversations")).json()) as {
+    items: Array<{ id: string; title: string }>;
+  };
+  const conversation = listed.items.find((candidate) => candidate.title.includes(text));
   if (!conversation) throw new Error(`목록에 「${text}」 대화가 없다`);
   const id = conversation.id;
 

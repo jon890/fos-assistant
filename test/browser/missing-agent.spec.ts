@@ -8,13 +8,15 @@ test("에이전트 행이 없는 대화는 지운 에이전트로 보이고 다�
 }, testInfo) => {
   // 목록에는 진짜 대화 뒤에 에이전트 칸이 null 인 줄을 하나 더한다. 에이전트 목록은 그대로 두므로
   // 첫 에이전트의 코드가 이 대화에 채워지면 모델 설정과 사진 단추가 살아난다.
-  await page.route("**/api/chat/conversations", async (route) => {
+  await page.route((url) => url.pathname === "/api/chat/conversations", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
     const response = await route.fetch();
-    const conversations = (await response.json()) as unknown[];
+    const listed = (await response.json()) as { items: unknown[]; nextCursor: string | null };
     await route.fulfill({
       response,
-      json: [
+      json: {
+        nextCursor: listed.nextCursor,
+        items: [
         {
           id: MISSING_ID,
           title: "에이전트 행이 없는 대화",
@@ -25,8 +27,9 @@ test("에이전트 행이 없는 대화는 지운 에이전트로 보이고 다�
           model: null,
           reasoningEffort: null,
         },
-        ...conversations,
-      ],
+        ...listed.items,
+        ],
+      },
     });
   });
   await page.route(`**/api/chat/conversations/${MISSING_ID}/running`, (route) =>

@@ -475,7 +475,7 @@ class ResearchAndBuildFlowTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(conversationOf(started.conversationId()).deletedAt()).isNotNull();
-        assertThat(chat.conversationsOf(dad)).isEmpty();
+        assertThat(chat.conversationsOf(dad, null, 100).items()).isEmpty();
     }
 
     @Test

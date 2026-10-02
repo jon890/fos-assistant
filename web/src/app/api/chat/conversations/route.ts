@@ -2,10 +2,23 @@ import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { readJsonBody } from "@/lib/json-body";
 
-export async function GET() {
-  const result = await callControlPlane<unknown[]>("/api/v1/chat/conversations");
+/** 대화 목록 한 쪽이다. `cursor` 와 `limit` 만 Control Plane 에 넘긴다. */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const query = new URLSearchParams();
+  for (const name of ["cursor", "limit"]) {
+    const value = searchParams.get(name);
+    if (value !== null) query.set(name, value);
+  }
+  const suffix = query.size > 0 ? `?${query}` : "";
+  const result = await callControlPlane<unknown>(
+    `/api/v1/chat/conversations${suffix}`,
+  );
   if (!result.ok) {
-    return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
+    return NextResponse.json(
+      { code: result.code, message: result.message },
+      { status: result.status },
+    );
   }
   return NextResponse.json(result.data);
 }
@@ -16,12 +29,18 @@ export async function POST(request: Request) {
   if (!parsed.ok) return parsed.response;
   const body = parsed.body as { agentCode?: string };
 
-  const result = await callControlPlane<{ conversationId: string }>("/api/v1/chat/conversations", {
-    method: "POST",
-    body: { agentCode: body.agentCode ?? null },
-  });
+  const result = await callControlPlane<{ conversationId: string }>(
+    "/api/v1/chat/conversations",
+    {
+      method: "POST",
+      body: { agentCode: body.agentCode ?? null },
+    },
+  );
   if (!result.ok) {
-    return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
+    return NextResponse.json(
+      { code: result.code, message: result.message },
+      { status: result.status },
+    );
   }
   return NextResponse.json(result.data);
 }

@@ -51,6 +51,7 @@ export function ConnectorCatalog() {
           {connectors.map((connector) => (
             <li key={connector.id}>
               <Link
+                prefetch={false}
                 href={`/connections/${connector.id}`}
                 data-testid="connector-card"
                 className="block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"

@@ -8,11 +8,17 @@ function SkillUsageContent({ row }: { row: SkillUsageRow }) {
     <>
       <span className="min-w-0">
         <span className="block truncate font-medium">{row.skillName}</span>
-        <span className="block truncate text-xs text-muted-foreground">{row.agentName}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {row.agentName}
+        </span>
       </span>
       <span className="shrink-0 text-right text-sm">
-        <span className="block font-medium">{row.count.toLocaleString("ko-KR")}회</span>
-        <span className="block text-xs text-muted-foreground">마지막 호출 {formatWhen(row.lastInvokedAt)}</span>
+        <span className="block font-medium">
+          {row.count.toLocaleString("ko-KR")}회
+        </span>
+        <span className="block text-xs text-muted-foreground">
+          마지막 호출 {formatWhen(row.lastInvokedAt)}
+        </span>
       </span>
     </>
   );
@@ -25,17 +31,27 @@ function SkillUsageContent({ row }: { row: SkillUsageRow }) {
  */
 export function SkillUsageList({ rows }: { rows: SkillUsageRow[] }) {
   if (rows.length === 0) {
-    return <EmptyState title="아직 부른 스킬이 없어요." description="에이전트가 스킬을 읽으면 여기에 쌓여요." />;
+    return (
+      <EmptyState
+        title="아직 부른 스킬이 없어요."
+        description="에이전트가 스킬을 읽으면 여기에 쌓여요."
+      />
+    );
   }
 
-  const rowClass = "flex items-center justify-between gap-3 rounded-md border border-border px-4 py-3";
+  const rowClass =
+    "flex items-center justify-between gap-3 rounded-md border border-border px-4 py-3";
   return (
     <section aria-label="스킬 호출">
       <ul className="grid gap-3" data-testid="skill-usage-list">
         {rows.map((row) => (
           <li key={`${row.agentCode}/${row.skillName}`}>
             {row.lastConversationId ? (
-              <Link href={`/chat/${row.lastConversationId}`} className={`${rowClass} hover:bg-muted`}>
+              <Link
+                prefetch={false}
+                href={`/chat/${row.lastConversationId}`}
+                className={`${rowClass} hover:bg-muted`}
+              >
                 <SkillUsageContent row={row} />
               </Link>
             ) : (
