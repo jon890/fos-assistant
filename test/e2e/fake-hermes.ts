@@ -1334,9 +1334,15 @@ export function startFakeHermes(
                 name: "OpenAI Codex",
                 authenticated: true,
                 models: [DEFAULT_RUNTIME.model, "example-model-mini", "example-fast", "example-balanced", "example-deep"],
+                // 실제로 can_disable_reasoning 은 aggregator provider 의 모델에만 온다.
+                // 이 대역은 reasoning 끄기(none)를 시험하려고 기본 모델에도 준다.
+                // example-balanced 는 칸이 없는 모델(UNKNOWN)이다.
                 capabilities: {
-                  [DEFAULT_RUNTIME.model]: { reasoning: true },
+                  [DEFAULT_RUNTIME.model]: { reasoning: true, can_disable_reasoning: true },
                   "example-model-mini": { reasoning: false },
+                  "example-fast": { reasoning: true },
+                  "example-balanced": {},
+                  "example-deep": { reasoning: true, can_disable_reasoning: false },
                 },
               },
               { slug: "unconfigured", name: "Unconfigured", authenticated: false, models: [] },

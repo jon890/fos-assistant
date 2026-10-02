@@ -17,12 +17,23 @@ import java.util.List;
  *
  * @param provider Hermes 가 아는 provider 이름. 기본 모델이면 null
  * @param model 그 provider 의 모델 이름. 기본 모델이면 null
- * @param reasoningEffort {@link #REASONING_EFFORTS} 중 하나. 기본값이면 null
+ * @param reasoningEffort {@link #ACCEPTED_EFFORTS} 중 하나. 미지정이면 null 이고 {@code none}(reasoning 끄기)과 다르다
  */
 public record ModelChoice(String provider, String model, String reasoningEffort) {
 
     /** 고를 수 있는 effort 다. 낮은 것부터 적는다. */
     public static final List<String> REASONING_EFFORTS = List.of("low", "medium", "high", "xhigh", "max");
+
+    /** reasoning 을 끄는 effort 다. 그 모델의 끄기 지원을 확인해야 저장한다(ADR-059). */
+    public static final String EFFORT_NONE = "none";
+
+    /**
+     * 요청으로 받는 effort 다. {@link #REASONING_EFFORTS} 에 {@link #EFFORT_NONE} 을 더한 것이다.
+     *
+     * <p>{@code minimal} 은 지원을 확인할 신호가 없어 받지 않는다. 그룹 단계 정의는 여전히 {@link #REASONING_EFFORTS}
+     * 만 받는다.
+     */
+    public static final List<String> ACCEPTED_EFFORTS = List.of(EFFORT_NONE, "low", "medium", "high", "xhigh", "max");
 
     /** provider 이름의 최대 길이다. {@code conversation.model_provider} 열의 길이와 같다. */
     public static final int PROVIDER_MAX_LENGTH = 64;
@@ -41,23 +52,22 @@ public record ModelChoice(String provider, String model, String reasoningEffort)
      * 요청으로 들어온 선택을 검증해 만든다.
      *
      * @throws ApiException {@code VALIDATION_FAILED}. provider 와 모델 중 하나만 있거나, 길이가 열보다 길거나,
-     *     effort 가 {@link #REASONING_EFFORTS} 에 없을 때
+     *     effort 가 {@link #ACCEPTED_EFFORTS} 에 없을 때
      */
     public static ModelChoice of(String provider, String model, String reasoningEffort) {
         ModelChoice choice = new ModelChoice(provider, model, reasoningEffort);
         if ((choice.provider == null) != (choice.model == null)) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "provider and model must be chosen together");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "provider and model must be chosen together");
         }
         if (choice.provider != null && choice.provider.length() > PROVIDER_MAX_LENGTH) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                    "provider must have at most " + PROVIDER_MAX_LENGTH + " characters");
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "provider must have at most " + PROVIDER_MAX_LENGTH + " characters");
         }
         if (choice.model != null && choice.model.length() > MODEL_MAX_LENGTH) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                    "model must have at most " + MODEL_MAX_LENGTH + " characters");
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "model must have at most " + MODEL_MAX_LENGTH + " characters");
         }
-        if (choice.reasoningEffort != null && !REASONING_EFFORTS.contains(choice.reasoningEffort)) {
+        if (choice.reasoningEffort != null && !ACCEPTED_EFFORTS.contains(choice.reasoningEffort)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "unknown reasoning effort");
         }
         return choice;

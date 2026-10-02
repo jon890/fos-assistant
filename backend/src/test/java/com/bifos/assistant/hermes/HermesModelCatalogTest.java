@@ -1,9 +1,13 @@
 package com.bifos.assistant.hermes;
 
+import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.SUPPORTED;
+import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNKNOWN;
+import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNSUPPORTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.dto.ReasoningCapability;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;
@@ -126,12 +130,14 @@ class HermesModelCatalogTest {
         HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
 
         assertThat(catalog.providers().get(0).reasoning())
-                .isEqualTo(Map.of("example-model", true, "example-model-mini", false));
+                .isEqualTo(Map.of(
+                        "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)));
     }
 
     @Test
-    @DisplayName("capabilities 에 없는 모델은 표에 넣지 않는다")
-    void leavesModelsMissingFromCapabilitiesOutOfTable() {
+    @DisplayName("capabilities 에 칸이 없는 모델도 표에 넣고 UNKNOWN 으로 둔다")
+    void keepsModelsMissingFromCapabilitiesAsUnknown() {
         respondWith(200, """
                 {"providers": [{"slug": "p", "authenticated": true, "models": ["a", "b"],
                  "capabilities": {"a": {"reasoning": true}, "b": {}}}]}
@@ -142,7 +148,50 @@ class HermesModelCatalogTest {
         assertThat(catalog.defaultProvider()).isNull();
         assertThat(catalog.defaultModel()).isNull();
         assertThat(catalog.providers().get(0).name()).isEqualTo("p");
-        assertThat(catalog.providers().get(0).reasoning()).isEqualTo(Map.of("a", true));
+        assertThat(catalog.providers().get(0).reasoning())
+                .isEqualTo(
+                        Map.of("a", new ReasoningCapability(SUPPORTED, UNKNOWN), "b", ReasoningCapability.UNKNOWN_ALL));
+    }
+
+    @Test
+    @DisplayName("reasoning 이 거짓인 모델은 UNSUPPORTED 이고 칸이 없거나 capabilities 가 없는 모델은 UNKNOWN 이다")
+    void distinguishesExplicitFalseFromMissingReasoning() {
+        respondWith(200, """
+                {"providers": [
+                  {"slug": "described", "authenticated": true, "models": ["on", "off", "silent", "odd"],
+                   "capabilities": {"on": {"reasoning": true}, "off": {"reasoning": false},
+                                    "silent": {}, "odd": {"reasoning": "yes"}}},
+                  {"slug": "bare", "authenticated": true, "models": ["x"]}
+                ]}
+                """);
+
+        HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
+
+        Map<String, ReasoningCapability> described = catalog.providers().get(0).reasoning();
+        assertThat(described.get("on").support()).isEqualTo(SUPPORTED);
+        assertThat(described.get("off").support()).isEqualTo(UNSUPPORTED);
+        assertThat(described.get("silent").support()).isEqualTo(UNKNOWN);
+        assertThat(described.get("odd").support()).isEqualTo(UNKNOWN);
+        assertThat(catalog.providers().get(1).reasoning()).isEqualTo(Map.of("x", ReasoningCapability.UNKNOWN_ALL));
+    }
+
+    @Test
+    @DisplayName("can_disable_reasoning 이 참이면 SUPPORTED, 거짓이면 UNSUPPORTED, 없으면 UNKNOWN 이다")
+    void mapsCanDisableReasoningToDisableSupport() {
+        respondWith(200, """
+                {"providers": [{"slug": "aggregator", "authenticated": true, "models": ["yes", "no", "unsaid"],
+                 "capabilities": {
+                   "yes": {"reasoning": true, "can_disable_reasoning": true},
+                   "no": {"reasoning": true, "can_disable_reasoning": false},
+                   "unsaid": {"reasoning": true}}}]}
+                """);
+
+        Map<String, ReasoningCapability> reasoning =
+                client.readCatalog(baseUrl(), "dad").providers().get(0).reasoning();
+
+        assertThat(reasoning.get("yes")).isEqualTo(new ReasoningCapability(SUPPORTED, SUPPORTED));
+        assertThat(reasoning.get("no")).isEqualTo(new ReasoningCapability(SUPPORTED, UNSUPPORTED));
+        assertThat(reasoning.get("unsaid")).isEqualTo(new ReasoningCapability(SUPPORTED, UNKNOWN));
     }
 
     @Test

@@ -18,8 +18,8 @@ public record HermesModelCatalog(String defaultProvider, String defaultModel, Li
      * @param slug Hermes 가 부르는 provider 이름
      * @param name 화면에 보일 이름. Hermes 가 주지 않으면 {@code slug} 다
      * @param models 그 provider 의 모델 이름. Hermes 가 준 차례 그대로다
-     * @param reasoning 모델 이름을 열쇠로 한 reasoning 지원 여부. Hermes 가 밝히지 않은 모델은 없다
+     * @param reasoning 모델 이름을 열쇠로 한 reasoning 지원과 끄기 지원. 모든 모델이 표에 있다. Hermes 가 밝히지
+     *     않은 칸은 {@code UNKNOWN} 이다
      */
-    public record Provider(String slug, String name, List<String> models, Map<String, Boolean> reasoning) {
-    }
+    public record Provider(String slug, String name, List<String> models, Map<String, ReasoningCapability> reasoning) {}
 }
