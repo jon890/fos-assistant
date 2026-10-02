@@ -15,11 +15,13 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 그러려고 여러 범용 커넥터를 연결해 자기만의 agentic workflow 를 만들 수 있게 하는 것이 목표다.
 
 - **모델에 종속되지 않는다.** 대화는 빠르게, 균형, 깊게 가운데 한 단계를 고르고, 그 단계가 실제로 어느 모델인지는 Control Plane 의 데이터베이스가 정책으로 갖는다. 런타임도 떨어져 있다. 에이전트를 돌리는 것은 Hermes Agent 이고, 이 저장소는 누가 무엇을 쓸 수 있는지 정하고 화면을 만들고 쓴 것을 기록한다.
-- **제품에 종속되지 않는다.** 커넥터는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 범용 흐름만 갖는다. Control Plane 은 커넥터 뒤에 있는 서비스의 이름과 주소를 모른다. 커넥터를 더할 때는 plugin 에 `connector.json` 을 두고 Hermes 대시보드의 커넥터 목록에 한 줄을 더하며, 이 저장소는 고치지 않는다([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+- **제품에 종속되지 않는다.** 커넥터는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 범용 흐름만 갖는다. Control Plane 은 커넥터 뒤에 있는 서비스의 이름과 주소를 모른다. 커넥터를 더할 때는 plugin 에 `connector.json` 을 두고 Hermes 대시보드의 커넥터 목록에 한 줄을 더하며, Control Plane 과 웹은 고치지 않는다([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 - **자기 것이다.** 에이전트가 쓰는 도구와 기억, 대화가 쓰는 모델을 그 사람이 정한다.
 - **이 비서가 사용자에 대한 장기 지식의 기준 원본이다.** 에이전트와 외부 서비스는 허용된 범위만 읽는다. 서비스 토큰은 읽기 전용이고, 민감 항목의 본문은 암호화해 저장한다.
 
-지금 붙어 있는 커넥터는 가계부 하나다. 그 커넥터는 다른 저장소에 있고, 이 저장소에는 검사에 쓰는 시험 커넥터만 있다.
+범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 여기서 유지보수한다([ADR-059](docs/adr/ADR-059-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
+첫 커넥터는 Gmail 이다. 메일을 찾고 읽는 것은 묻지 않고 하고, 초안 만들기와 보내기와 답장과 라벨 바꾸기는 승인한 뒤에만 한다. 메일을 휴지통으로 옮기거나 지우지 않는다.
+한 집이나 한 조직만 쓰는 서비스의 커넥터는 그 서비스의 저장소에 둔다. 지금 붙어 있는 가계부가 그렇다.
 범용 커넥터를 늘리는 것은 진행하고 있는 방향이고, 이미 끝난 일이 아니다.
 
 ## 지키는 원칙
@@ -138,6 +140,19 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 - [`docs/README.md`](docs/README.md) 는 문서 전체의 색인이다.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 는 되돌리기 어려운 결정의 목록이다.
 - `scripts/check-local.sh` 는 CI 가 돌리는 검사를 모두 돌린다. PR 을 열기 전에 돌린다.
+
+### 커넥터 기여
+
+범용 커넥터는 `hermes/connectors/<id>/` 디렉터리 하나다. 커넥터를 더하는 PR 은 아래를 갖춘다.
+
+- `schema: 2` 인 `connector.json`. MCP 서버가 내는 도구를 모두 선언하고, 도구마다 위험도와 그 까닭을 커넥터 문서에 적는다.
+- 쓰는 호출은 승인을 받는다. 데이터를 계정 밖의 사람에게 보내는 도구는 `"grant": false` 도 선언해 호출마다 사람이 승인한다. 지우는 도구는 열지 않는다.
+- 비밀값은 `fields` 에 선언한 환경 변수로만 받고, 동작하는 가장 작은 OAuth scope 나 권한을 쓴다.
+- MCP 서버는 Python 으로 쓰고 `mcp` SDK 밖의 의존성을 두지 않는다. 검사는 그 서비스를 흉내 낸 로컬 대역으로 돌고 실제 서비스에 닿지 않는다.
+- `docs/connectors/` 아래의 설정 안내 문서와 `.github/CODEOWNERS` 의 소유자 한 줄.
+
+`hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 아래 디렉터리를 모두 찾아 계약을 본다. 새 커넥터는 더하는 순간 검사 대상이 된다.
+자세한 안내는 [`docs/connector-authoring.md`](docs/connector-authoring.md) 에 있고, 따라 할 본보기는 [`hermes/connectors/gmail/`](hermes/connectors/gmail) 이다.
 
 ## 라이선스
 
