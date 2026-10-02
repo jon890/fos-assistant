@@ -8,6 +8,7 @@ import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.MemoryRevision;
+import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -218,7 +219,7 @@ class MemoryServiceTest {
             transactions.executeWithoutResult(status -> {
                 Memory held = repository.findByIdForUpdate(proposed.id()).orElseThrow();
                 revisionRepository.save(MemoryRevision.of(held, MemoryChangeType.UPDATED, ADMIN.id(), null, NOW));
-                held.revise("고친 내용", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL, null, NOW);
+                held.revise(StoredContent.plain("고친 내용"), MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL, null, NOW);
                 locked.countDown();
                 // 승인 쪽이 읽기에 닿을 틈을 준다. 잠금이 있으면 이 커밋 뒤에야 읽는다.
                 LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500));
@@ -272,7 +273,7 @@ class MemoryServiceTest {
                 null,
                 null,
                 "주인 없는 그룹 항목",
-                "내용",
+                StoredContent.plain("내용"),
                 MemoryPlacement.core(MemoryRetrieval.SEARCH),
                 1L,
                 NOW));
@@ -382,7 +383,7 @@ class MemoryServiceTest {
         assertThat(memories.indexedFor(ADMIN, withSensitive))
                 .extracting(Memory::id)
                 .containsExactly(sensitive.id(), normal.id());
-        assertThat(memories.bodyFor(ADMIN, withSensitive, sensitive.id()).content())
+        assertThat(memories.contentOf(memories.bodyFor(ADMIN, withSensitive, sensitive.id())))
                 .isEqualTo("민감 본문");
     }
 

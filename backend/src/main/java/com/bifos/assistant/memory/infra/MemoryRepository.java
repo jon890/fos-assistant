@@ -1,7 +1,9 @@
 package com.bifos.assistant.memory.infra;
 
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -12,6 +14,9 @@ import org.springframework.data.repository.query.Param;
 public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecificationExecutor<Memory> {
 
     Optional<Memory> findByProposalDedupKey(String proposalDedupKey);
+
+    /** 암호화되지 않은 채 남은 줄을 찾는다. 민감도로 좁혀 부른다(ADR-055). */
+    List<Memory> findBySensitivityAndContentKeyIdIsNull(MemorySensitivity sensitivity);
 
     /**
      * 항목 한 줄을 쓰기 잠금으로 읽는다.

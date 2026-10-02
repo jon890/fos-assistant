@@ -12,6 +12,7 @@ type MemoryView = {
   scope: string;
   alwaysInject: boolean;
   status: string;
+  sensitive: boolean;
   omittedFromContext: boolean;
 };
 

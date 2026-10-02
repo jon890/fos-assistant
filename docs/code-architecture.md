@@ -196,6 +196,10 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
   요청자는 장기 토큰이 아니라 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다(「MCP 요청자」). 요청 본문은 사용자를 바꾸지 못한다.
   collection 과 민감도는 그 origin 실행의 에이전트로 판정한다.
   Control Plane 은 접근할 수 없는 항목과 없는 항목을 같은 응답으로 숨긴다. 받지 않는 collection 의 항목과 허용받지 않은 민감 항목도 같은 응답이다.
+- 민감 항목의 본문은 `memory.content` 와 `memory_revision.content` 에 암호문으로 저장한다. `content_key_id` 가 key 를 적는다.
+- 본문을 밖으로 내는 자리는 `MemoryService.contentOf` 를 거친다. Memory 목록은 민감 본문을 싣지 않는다.
+- key 가 없으면 민감 항목의 저장과 읽기를 `MEMORY_ENCRYPTION_UNAVAILABLE` 로 거절한다. 평문으로 내려 저장하지 않는다.
+- 기동할 때 `MemoryContentBackfill` 이 평문으로 남은 민감 줄을 암호화한다.
 - 본문이나 `retrieval` 이나 `sensitivity` 를 고치면 고치기 전의 값을 `memory_revision` 에 남기고 판 번호를 올린다. 지울 때도 마지막 값을 남긴다.
 - 공통 답변 지침과 Memory를 합친 글자 수를 실행의 `context_chars`에 남긴다.
   `instructions_hash`도 이 문자열을 대상으로 하며, turn 전용 지시는 제외한다.
@@ -228,13 +232,16 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | 클래스 | 하는 일 |
 | --- | --- |
 | `memory.application.MemoryService` | 읽기와 쓰기, 판 기록, 세 조건의 판정. `accessOf(agentId)` 가 그 에이전트의 `MemoryAccess` 를 낸다 |
+| `memory.application.MemoryContentCipher` | 민감 본문 하나를 AES-256-GCM 으로 암호화하고 푼다. key 가 없으면 암호화를 거절한다 |
+| `memory.application.MemoryContentBackfill` | 기동할 때 평문으로 남은 민감 줄을 암호화한다 |
 | `memory.application.model.MemoryAccess` | 한 실행이 받는 collection 과 민감 허용 |
 | `memory.infra.MemoryQueries` | 볼 수 있는 항목과 실행에 실을 항목을 고르는 조건. 모두 읽어 온 뒤 거르지 않고 데이터베이스가 고른다. 검색을 붙일 때도 이 조건 뒤에 붙인다 |
 | `memory.application.MemoryCollectionService` | 그룹의 collection 목록. 줄이 없는 그룹이면 기본 일곱 개를 넣는다 |
 | `agent.application.AgentMemoryCollectionService` | 에이전트가 받는 collection 읽기, 새 에이전트에 `core` 넣기 |
 
 근거는 [`adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md`](adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 와
-[`adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md`](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 에 있다.
+[`adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md`](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 와
+[`adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md`](adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 에 있다.
 
 ### 다음
 
@@ -244,7 +251,7 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 - 관리자가 에이전트 화면에서 collection 과 민감 허용을 고치는 경로
 - 다른 서비스가 문서를 읽는 API 와 그 서비스 토큰
 - 다른 곳의 개인 지식을 들여오는 API. 사람이 승인한 항목만 들이고 같은 출처를 두 번 들이지 않는다
-- 민감 항목 본문의 암호화와 완전 삭제
+- 민감 항목 본문의 완전 삭제
 - `always_inject` 칸 제거
 
 Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제한다.md`](adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와

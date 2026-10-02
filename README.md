@@ -53,6 +53,8 @@ Backend 는 `backend/src/main/resources/application.yml`, Web 은 `web/.env.exam
 | 이름 | 쓰는 곳 | 설명 |
 | --- | --- | --- |
 | `ASSISTANT_JWT_SECRET` | 양쪽 | 웹이 발급하고 Control Plane 이 검증하는 토큰의 HMAC 비밀값 |
+| `ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID` | Backend | 민감 Memory 본문을 새로 암호화할 때 쓰는 key 의 id. 비우면 민감 항목을 저장하지 못한다 |
+| `ASSISTANT_MEMORY_ENCRYPTION_KEYS` | Backend | `<id>:<base64 32바이트>` 를 쉼표로 이은 목록. 잃으면 민감 본문을 되찾지 못한다 |
 | `HERMES_BASE_URL` | Backend | Hermes API server 주소 |
 | `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |
 | `HERMES_DASHBOARD_BASE_URL` | Backend | profile 을 만드는 Hermes 대시보드 주소 |
