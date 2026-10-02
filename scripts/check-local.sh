@@ -71,6 +71,7 @@ echo "로그: ${LOG_DIR}"
 step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
 step playwright      pnpm --dir "${ROOT}/web" exec playwright install chromium
 step backend         bash -c "cd '${ROOT}/backend' && ./gradlew test"
+step mysql-migration "${ROOT}/scripts/check-mysql-migration.sh"
 step web-typecheck   pnpm --dir "${ROOT}/web" typecheck
 step web-build       build_web
 step browser         pnpm --dir "${ROOT}/web" test:browser
