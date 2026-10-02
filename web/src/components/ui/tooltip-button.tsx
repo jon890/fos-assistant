@@ -40,6 +40,7 @@ const escapesPassedThrough = new WeakSet<Event>();
  *
  * <p>Radix 는 풀이를 `Esc` 로 닫을 때 반드시 `preventDefault` 를 부른다. `onEscapeKeyDown` 에서 막지 않으면
  * 스스로 막고 닫으며, 막으면 닫지 않는다. 그래서 기본 동작으로는 풀이만 닫은 사건을 가려낼 수 없어 따로 적어 둔다.
+ * 닫히는 움직임을 하는 중인 풀이가 받은 `Esc` 도 닫을 것이 없으므로 여기에 든다.
  */
 export function escapeOnlyClosedTooltip(event: Event): boolean {
   return escapesPassedThrough.has(event);
@@ -51,6 +52,7 @@ export function escapeOnlyClosedTooltip(event: Event): boolean {
  * <p>`title` 속성은 쓰지 않는다. 풀이는 Tooltip 이 보인다. 화면 틀 맨 위의 `TooltipProvider` 안에서 쓴다.
  * `passEscape` 를 주면 풀이가 열려 있어도 첫 `Esc` 가 풀이를 닫으며 대화 화면에도 간다. 「중지」 가 그렇다.
  * 마우스를 올려 둔 채 `Esc` 를 눌렀는데 풀이만 닫히고 답이 계속 흐르면 안 된다.
+ * 이미 닫혀 닫히는 움직임만 남은 풀이는 `passEscape` 와 상관없이 `Esc` 를 대화 화면에 넘긴다.
  */
 export function TooltipButton({
   label,
@@ -75,13 +77,10 @@ export function TooltipButton({
         </Button>
       </TooltipTrigger>
       <TooltipContent
-        onEscapeKeyDown={
-          passEscape
-            ? (event) => {
-                escapesPassedThrough.add(event);
-              }
-            : undefined
-        }
+        onEscapeKeyDown={(event) => {
+          // 닫히는 움직임을 하는 동안에도 풀이는 `Esc` 를 받는다. 사용자에게는 닫을 것이 없으므로 대화 화면에 넘긴다.
+          if (passEscape || !open) escapesPassedThrough.add(event);
+        }}
       >
         {label}
       </TooltipContent>
