@@ -15,6 +15,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.skill.application.SkillUsageQuery;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -58,6 +59,9 @@ class UsageControllerTest {
     ExecutionTreeService trees;
 
     @Autowired
+    UsageSummaryService summaries;
+
+    @Autowired
     ConversationRepository conversations;
 
     @Autowired
@@ -83,7 +87,8 @@ class UsageControllerTest {
                         CredentialScope.SHARED_HOUSEHOLD,
                         AgentVisibility.PRIVATE,
                         USER_ID)));
-        controller = new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage);
+        controller =
+                new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage, summaries);
         when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
     }
 

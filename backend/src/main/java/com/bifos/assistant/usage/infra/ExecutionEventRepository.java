@@ -23,6 +23,45 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
             """)
     List<ExecutionEvent> findUnscheduledChildren(@Param("since") Instant since, Pageable pageable);
 
+    /**
+     * 한 구간에 시작한 실행에서 session 없이 온 하위 에이전트 시작 사건의 수다.
+     *
+     * <p>session 이 없으면 사용량을 조회할 길이 없어 그 자식의 금액은 끝내 확인하지 못한다. 부모가 RUNNING
+     * 이면 세지 않는다.
+     */
+    @Query("""
+            select count(event) from ExecutionEvent event, AgentExecution e
+            where event.executionId = e.id
+                and e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> 'RUNNING'
+                and event.eventType = 'SUBAGENT_STARTED' and event.hermesSessionId is null
+            """)
+    long countSessionlessChildren(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * 한 구간에 시작한 실행에서 session 은 있는데 원장 줄이 아직 없는 자식의 수다.
+     *
+     * <p>부모가 끝난 시각으로 한 번 더 거른다. {@link #findUnscheduledChildren} 이 찾는 구간 안이면 곧 줄이
+     * 생길 자식이고, 그 구간이 지났으면 더는 찾지 않는 자식이다. 같은 자식의 시작 사건이 겹쳐 와도 한 번만
+     * 센다.
+     */
+    @Query("""
+            select count(distinct event.hermesSessionId) from ExecutionEvent event, AgentExecution e
+            where event.executionId = e.id
+                and e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
+                and e.status <> 'RUNNING'
+                and e.finishedAt >= :finishedFrom and e.finishedAt < :finishedBefore
+                and event.eventType = 'SUBAGENT_STARTED' and event.hermesSessionId is not null
+                and not exists (select job.id from SubagentUsageJob job
+                    where job.profileName = e.profileName and job.childSessionId = event.hermesSessionId)
+            """)
+    long countUnscheduledChildren(
+            @Param("userId") Long userId,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            @Param("finishedFrom") Instant finishedFrom,
+            @Param("finishedBefore") Instant finishedBefore);
+
     boolean existsByExecutionIdAndHermesSessionIdAndEventType(
             Long executionId, String hermesSessionId, ExecutionEventType eventType);
 
