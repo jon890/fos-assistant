@@ -1,4 +1,4 @@
-## ADR-063: native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다
+## ADR-067: native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다
 
 - **status**: `accepted`
 - **결정**: 대시보드 plugin `dashboard-profile-api` 가 `GET /api/profiles/<이름>/sessions/<session id>/provider` 를 연다.

@@ -77,7 +77,7 @@ test("관리자는 다른 주인의 비공개 에이전트 도구를 관리자 �
   await makePrivate(page, "member@example.com");
   await disableConfigurableTools(page);
   try {
-    await page.goto(`/agents/${AGENT_CODE}`);
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
     const terminal = toolRow(page, "명령 실행");
     await terminal.getByRole("switch").click();
     const response = page.waitForResponse((candidate) =>

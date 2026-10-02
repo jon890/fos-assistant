@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { useShellIsAdmin } from "@/components/shell/app-shell";
+import { useAdminView } from "@/components/shell/app-shell";
 import {
   agentLabel,
   formatCost,
@@ -88,7 +88,7 @@ function interval(from: string, to: string): string | null {
 /** 실행 하나의 머리 요약과 나무를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다. */
 export function ExecutionDetail({ executionId }: { executionId: number }) {
   const router = useRouter();
-  const isAdmin = useShellIsAdmin();
+  const isAdmin = useAdminView();
   const [state, setState] = useState<FetchState>({ kind: "loading" });
 
   useEffect(() => {
@@ -117,8 +117,9 @@ export function ExecutionDetail({ executionId }: { executionId: number }) {
   }, [executionId]);
 
   useEffect(() => {
-    if (state.kind === "not-found") router.replace("/usage");
-  }, [state.kind, router]);
+    if (state.kind === "not-found")
+      router.replace(isAdmin ? "/admin/usage" : "/usage");
+  }, [state.kind, router, isAdmin]);
 
   if (state.kind === "loading" || state.kind === "not-found") {
     return <p className="text-sm text-muted-foreground">불러오고 있어요.</p>;

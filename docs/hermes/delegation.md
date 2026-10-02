@@ -259,7 +259,7 @@ session 은 cache 를 뺀 `input_tokens` 와 cache read·write 를 따로 누적
 근거는 [`hermes_cli/web_server_sessions.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/web_server_sessions.py) 의 `_open_session_db_for_profile` 이다.
 이 함수의 읽기 전용 열기는 저장소가 비었거나 스키마가 낡았으면 쓰기 연결을 한 번 열어 고친다.
 
-Control Plane 은 이 값을 대시보드 plugin 의 읽기 경로로 받는다([ADR-063](../adr/ADR-063-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
+Control Plane 은 이 값을 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
 plugin 은 Hermes 의 저장소 클래스를 쓰지 않고 SQLite 의 읽기 전용 방식으로 파일을 직접 연다.
 **Hermes 판을 올릴 때 위 표의 표 이름과 칸 이름을 다시 확인한다.**
 

@@ -52,9 +52,10 @@ export type SkillDetailView = {
  * 내가 부른 스킬의 호출 이력 한 줄이다. 에이전트와 스킬 이름마다 하나다.
  *
  * <p>`lastConversationId` 는 마지막 호출이 속한 대화의 공개 식별자이고, 그 대화를 지웠으면 null 이다.
+ * `agentCode` 는 관리자에게만 오고 그 밖의 사용자에게는 null 이다.
  */
 export type SkillUsageRow = {
-  agentCode: string;
+  agentCode: string | null;
   agentName: string;
   skillName: string;
   count: number;
@@ -79,7 +80,12 @@ export const MAX_DESCRIPTION_CHARS = 1024;
  * 이모지가 둘로 세어지지 않게 code point 로 센다. 백엔드 `SkillFrontmatter.indexedDescriptionLength` 와 함께 고친다.
  */
 export function indexedDescriptionLength(value: string): number {
-  return Array.from(value.trim().replace(/^['"]+/, "").replace(/['"]+$/, "")).length;
+  return Array.from(
+    value
+      .trim()
+      .replace(/^['"]+/, "")
+      .replace(/['"]+$/, ""),
+  ).length;
 }
 
 /**
@@ -87,7 +93,10 @@ export function indexedDescriptionLength(value: string): number {
  * YAML 이 따옴표 안에서 한 글자로 줄이며, 여는 따옴표가 남았으면 뒤에 주석이 붙어 따옴표를 못 벗긴 것이다.
  * 이런 값을 화면이 세면 서버보다 많이 세어 저장할 수 있는 값을 막으므로, 세지 않고 서버에 맡긴다.
  */
-export function isCountableDescription(value: string, multiline: boolean): boolean {
+export function isCountableDescription(
+  value: string,
+  multiline: boolean,
+): boolean {
   return !multiline && !/[\\]|''|^['"]/.test(value);
 }
 

@@ -175,7 +175,7 @@ CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
-# native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-063).
+# native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-067).
 SESSION_PROVIDER_RE = re.compile(r"^/api/profiles/([^/]+)/sessions/([^/]+)/provider$")
 # 경로에서 온 session id 다. 저장소 조회의 인자로만 쓰고 파일 경로에는 쓰지 않는다.
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
@@ -1958,7 +1958,7 @@ def _session_provider_response(name, session_id):
     """자식 session 한 줄에서 provider 와 모델만 돌려준다.
 
     Hermes 의 session 저장소를 읽기 전용으로 연다. Hermes 의 저장소 모듈은 스키마가 낡았으면
-    쓰기 연결을 열 수 있어 쓰지 않고 표준 `sqlite3` 만 쓴다(ADR-063).
+    쓰기 연결을 열 수 있어 쓰지 않고 표준 `sqlite3` 만 쓴다(ADR-067).
     주 호출이 쓴 모델과 provider 의 짝이 둘 이상이면 어느 것으로 환산할지 알 수 없어 provider 를 주지 않는다.
     짝이 하나여도 그 provider 가 session 줄의 값과 다르면 주지 않는다.
     """

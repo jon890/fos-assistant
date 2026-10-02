@@ -21,8 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 잇는다. 한 실행의 자식 수가 많아질 일이 없고, 재귀 질의는 읽기 어렵다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ExecutionTreeService {
 
@@ -48,8 +48,6 @@ public class ExecutionTreeService {
      * 않는 깊이에 {@code truncated} 가 실려, 잘렸다는 것이 아무 데도 보이지 않게 된다. 함께 바꾼다.
      */
     static final int MAX_DEPTH = 8;
-
-    private static final Logger log = LoggerFactory.getLogger(ExecutionTreeService.class);
 
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
@@ -190,7 +188,12 @@ public class ExecutionTreeService {
                 .collect(Collectors.groupingBy(ExecutionEvent::executionId, LinkedHashMap::new, Collectors.toList()));
     }
 
-    /** 나무를 응답으로 옮긴다. 도구 사건의 {@code detail} 은 보는 사람에 맞춰 싣는다. */
+    /**
+     * 실행 트리를 응답으로 옮긴다. 도구 사건의 {@code detail} 은 보는 사람에 맞춰 싣는다.
+     *
+     * <p>{@link InternalValuePolicy} 가 허락하지 않는 사람에게는 노드의 에이전트 코드, 모델, 토큰, 금액, 시각
+     * 구간을 비우고 {@code PROVIDER_SWITCHED} 사건을 사건째 뺀다. 근거는 ADR-063 에 있다.
+     */
     private ExecutionNode node(
             Branch branch,
             Map<Long, List<ExecutionEvent>> byExecution,
@@ -198,31 +201,33 @@ public class ExecutionTreeService {
             CurrentUser viewer) {
         AgentExecution execution = branch.execution();
         Agent agent = agents.findById(execution.agentId()).orElse(null);
+        boolean internal = InternalValuePolicy.visibleTo(viewer);
         return new ExecutionNode(
                 branch.truncated(),
                 execution.id(),
-                agent == null ? null : agent.code(),
+                !internal || agent == null ? null : agent.code(),
                 agent == null ? null : agent.name(),
                 execution.status().name(),
-                execution.provider(),
-                execution.model(),
-                execution.reasoningEffort(),
-                execution.reasoningEffortSource() == null
+                internal ? execution.provider() : null,
+                internal ? execution.model() : null,
+                internal ? execution.reasoningEffort() : null,
+                !internal || execution.reasoningEffortSource() == null
                         ? null
                         : execution.reasoningEffortSource().name(),
                 execution.modelTier() == null ? null : execution.modelTier().name(),
-                execution.inputTokens(),
-                execution.cachedInputTokens(),
-                execution.outputTokens(),
-                execution.totalTokens(),
-                execution.estimatedCostMicros(),
+                internal ? execution.inputTokens() : null,
+                internal ? execution.cachedInputTokens() : null,
+                internal ? execution.outputTokens() : null,
+                internal ? execution.totalTokens() : null,
+                internal ? execution.estimatedCostMicros() : null,
                 execution.latencyMs(),
-                execution.requestReceivedAt(),
-                execution.submittedAt(),
-                execution.firstDeltaAt(),
+                internal ? execution.requestReceivedAt() : null,
+                internal ? execution.submittedAt() : null,
+                internal ? execution.firstDeltaAt() : null,
                 execution.startedAt(),
-                execution.finishedAt(),
+                internal ? execution.finishedAt() : null,
                 byExecution.getOrDefault(execution.id(), List.of()).stream()
+                        .filter(event -> internal || event.eventType() != ExecutionEventType.PROVIDER_SWITCHED)
                         .map(event -> ExecutionEventView.from(
                                 event,
                                 viewer,

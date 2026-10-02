@@ -39,7 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 환산 금액을 그 줄에 한 번만 적고, 합계는 그 줄의 값을 더한다. 완료 사건은 표시용으로만 남긴다.
  * 근거는 ADR-062 에 있다.
  *
- * <p>session 응답에 provider 가 없으면 대시보드 plugin 의 읽기 경로에서 자식의 provider 를 읽어 환산한다(ADR-063).
+ * <p>session 응답에 provider 가 없으면 대시보드 plugin 의 읽기 경로에서 자식의 provider 를 읽어 환산한다(ADR-067).
  */
 @Service
 @Slf4j

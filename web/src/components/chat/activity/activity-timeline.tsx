@@ -11,7 +11,6 @@ import {
 import { cn } from "cn";
 import { formatSeconds } from "@/lib/format";
 import { isReadableDetail } from "@/lib/tool-label";
-import { useShellIsAdmin } from "@/components/shell/app-shell";
 import {
   activityLabel,
   type ActivityItem,
@@ -54,7 +53,6 @@ function markColor(state: ActivityItemState): string {
 }
 
 export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
-  const isAdmin = useShellIsAdmin();
   return (
     <ol className="flex min-w-0 flex-col gap-2" aria-label="작업 과정">
       {items.map((item) => {
@@ -105,23 +103,13 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
               {item.state === "result-missing" ? (
                 <p className="text-muted-foreground">결과를 받지 못함</p>
               ) : null}
-              {item.kind === "tool" && item.detail ? (
-                isReadableDetail(item.name) ? (
-                  <p className="break-words text-muted-foreground">
-                    {item.detail}
-                  </p>
-                ) : isAdmin ? (
-                  // 명령과 도구 결과의 원본은 JSON 이나 내부 경로다. 관리자에게도 접어 두고 펼칠 때만 보인다.
-                  <details
-                    data-testid="activity-raw"
-                    className="min-w-0 text-xs text-muted-foreground"
-                  >
-                    <summary className="cursor-pointer">원본 보기</summary>
-                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-muted p-2 font-mono text-xs">
-                      {`${item.name}\n${item.detail}`}
-                    </pre>
-                  </details>
-                ) : null
+              {/* 명령과 도구 결과의 원본은 JSON 이나 내부 경로라 대화 화면에서는 그리지 않는다. */}
+              {item.kind === "tool" &&
+              item.detail &&
+              isReadableDetail(item.name) ? (
+                <p className="break-words text-muted-foreground">
+                  {item.detail}
+                </p>
               ) : null}
             </div>
           </li>

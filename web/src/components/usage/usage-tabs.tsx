@@ -30,9 +30,12 @@ export function parseUsageTab(
 export function UsageTabs({
   current,
   isAdmin,
+  basePath,
 }: {
   current: UsageTab;
   isAdmin: boolean;
+  /** 탭 링크의 바탕 경로다. 일반 화면은 `/usage`, 관리자 영역은 `/admin/usage` 다. */
+  basePath: string;
 }) {
   return (
     <nav
@@ -42,7 +45,9 @@ export function UsageTabs({
       {visibleTabs(isAdmin).map((tab) => (
         <Link
           key={tab.value}
-          href={tab.value === "summary" ? "/usage" : `/usage?tab=${tab.value}`}
+          href={
+            tab.value === "summary" ? basePath : `${basePath}?tab=${tab.value}`
+          }
           aria-current={tab.value === current ? "page" : undefined}
           className={cn(
             "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap hover:text-foreground",

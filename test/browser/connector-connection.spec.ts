@@ -372,7 +372,7 @@ test("관리자는 반영 대기 연결을 완료로 확인한다", async ({ pag
       },
     });
   });
-  await page.goto("/connections");
+  await page.goto("/admin/connections");
   const panel = page.getByTestId("connector-admin-panel");
   await expect(panel).toContainText("연결 확인 사용자");
   await expect(panel).toContainText("검사용 메모");
@@ -677,7 +677,7 @@ test("관리자 목록은 선언하지 않은 도구가 있는 연결을 단추 
       ],
     }),
   );
-  await page.goto("/connections");
+  await page.goto("/admin/connections");
   const panel = page.getByTestId("connector-admin-panel");
   await expect(panel).toContainText("도구 확인 사용자");
   await expect(panel).toContainText("연결됨");

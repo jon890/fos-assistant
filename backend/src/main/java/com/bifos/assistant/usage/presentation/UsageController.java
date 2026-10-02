@@ -4,12 +4,14 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.application.SkillUsageQuery;
 import com.bifos.assistant.usage.application.ExecutionTree;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.usage.application.MonthlyUsageSummary;
 import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -66,12 +68,16 @@ public class UsageController {
      *
      * <p>뿌리만 낸다. 흐름 하나가 실행 넷을 남기므로 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행
      * 나무 화면에서 본다.
+     *
+     * <p>{@code MEMBER} 역할에게는 내부 값을 비워 보낸다(ADR-063).
      */
     @GetMapping("/executions")
     public List<ExecutionView> myExecutions(@RequestParam(defaultValue = "50") int limit) {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
-        List<AgentExecution> page = executions.findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(
-                currentUser.require().id(), PageRequest.of(0, size));
+        CurrentUser user = currentUser.require();
+        boolean internal = InternalValuePolicy.visibleTo(user);
+        List<AgentExecution> page =
+                executions.findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(user.id(), PageRequest.of(0, size));
         Set<Long> withChildren = idsHavingChildren(page);
         Map<Long, UUID> publicIds = conversationPublicIds(page);
         // 한 페이지의 실행 번호로 한 번에 읽는다. 줄마다 질의하지 않는다.
@@ -86,7 +92,8 @@ public class UsageController {
                         agentsById.get(execution.agentId()),
                         execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
                         withChildren.contains(execution.id()),
-                        skillNames.getOrDefault(execution.id(), List.of())))
+                        skillNames.getOrDefault(execution.id(), List.of()),
+                        internal))
                 .toList();
     }
 
@@ -98,8 +105,10 @@ public class UsageController {
      */
     @GetMapping("/skills")
     public List<MySkillUsageView> mySkillUsage() {
-        return skillUsage.byUser(currentUser.require().id()).stream()
-                .map(MySkillUsageView::from)
+        CurrentUser user = currentUser.require();
+        boolean internal = InternalValuePolicy.visibleTo(user);
+        return skillUsage.byUser(user.id()).stream()
+                .map(usage -> MySkillUsageView.from(usage, internal))
                 .toList();
     }
 
@@ -149,25 +158,17 @@ public class UsageController {
      *
      * <p>구독료와 견줄 숫자라서 화면이 목록과 함께 보여 준다. 저장된 금액을 더하기만 하고 여기서 다시
      * 환산하지 않는다. native 자식의 금액을 포함하고, 금액을 확인하지 못한 자식 수를 함께 낸다(ADR-062).
+     *
+     * <p>{@code MEMBER} 역할에게는 실행 건수만 싣고 금액과 건수 구분은 비운다(ADR-063).
      */
     @GetMapping("/monthly-cost")
     public MonthlyCostView thisMonthCost() {
         YearMonth month = YearMonth.now(HOUSEHOLD_ZONE);
         Instant from = month.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
         Instant to = month.plusMonths(1).atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
-        MonthlyUsageSummary cost = summaries.monthly(currentUser.require().id(), from, to);
-        return new MonthlyCostView(
-                month.toString(),
-                "USD",
-                cost.estimatedMicros(),
-                cost.pricedExecutions(),
-                cost.unpricedExecutions(),
-                cost.actualMicros(),
-                cost.subscriptionExecutions(),
-                cost.pricedSubagents(),
-                cost.pendingSubagents(),
-                cost.unconfirmedSubagents(),
-                cost.unpricedSubagents());
+        CurrentUser user = currentUser.require();
+        MonthlyUsageSummary cost = summaries.monthly(user.id(), from, to);
+        return MonthlyCostView.from(month.toString(), cost, InternalValuePolicy.visibleTo(user));
     }
 
     /**
@@ -179,15 +180,17 @@ public class UsageController {
      *
      * <p>자기 것만 낸다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
      *
+     * <p>응답 전체가 내부 값이라 {@code MEMBER} 역할은 {@code FORBIDDEN} 을 받는다(ADR-063).
+     *
      * @param axis {@code agent}, {@code model}, {@code day}, {@code fingerprint} 중 하나
      * @param month {@code 2026-09} 형태의 대상 달. 없으면 이번 달
      */
     @GetMapping("/breakdown")
     public BreakdownView breakdown(@RequestParam String axis, @RequestParam(required = false) String month) {
+        Long userId = currentUser.requireAdmin().id();
         YearMonth target = parseMonth(month);
         Instant from = target.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
         Instant to = target.plusMonths(1).atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
-        Long userId = currentUser.require().id();
         return new BreakdownView(axis, target.toString(), "USD", rows(axis, userId, from, to));
     }
 
@@ -216,7 +219,9 @@ public class UsageController {
     }
 
     private static YearMonth parseMonth(String month) {
-        if (month == null || month.isBlank()) return YearMonth.now(HOUSEHOLD_ZONE);
+        if (month == null || month.isBlank()) {
+            return YearMonth.now(HOUSEHOLD_ZONE);
+        }
         try {
             return YearMonth.parse(month);
         } catch (DateTimeParseException ex) {

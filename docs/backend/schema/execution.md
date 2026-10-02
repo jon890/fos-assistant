@@ -163,7 +163,7 @@ native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session �
 | `next_attempt_at` | DATETIME(6) | 다음 조회 시각 |
 | `expires_at` | DATETIME(6) | 조회 기한. 부모 실행이 끝난 뒤 24시간이다 |
 | `attempts`, `backoff_attempts` | INT | 조회 횟수 |
-| `provider` | VARCHAR(64) NULL | 자식이 돈 provider. session 응답이 주지 않으면 대시보드 plugin 에서 읽고([ADR-063](../../adr/ADR-063-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)), 거기서도 읽지 못하면 비운다. 부모의 값으로 채우지 않는다 |
+| `provider` | VARCHAR(64) NULL | 자식이 돈 provider. session 응답이 주지 않으면 대시보드 plugin 에서 읽고([ADR-067](../../adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)), 거기서도 읽지 못하면 비운다. 부모의 값으로 채우지 않는다 |
 | `model` | VARCHAR(128) NULL | 자식이 돈 모델 |
 | `input_tokens` | BIGINT NULL | cache 를 뺀 일반 입력 토큰 |
 | `cache_read_tokens`, `cache_write_tokens` | BIGINT NULL | cache 에서 읽은 입력과 cache 에 쓴 입력 |

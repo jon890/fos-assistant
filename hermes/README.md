@@ -166,7 +166,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 ### 자식 session 의 provider
 
 API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Hermes 의 session 저장소에만 있다.
-이 경로는 그 값을 Control Plane 에 읽어 준다. 근거는 [ADR-063](../docs/adr/ADR-063-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) 에,
+이 경로는 그 값을 Control Plane 에 읽어 준다. 근거는 [ADR-067](../docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) 에,
 저장소의 어느 칸이 무엇을 뜻하는지는 [`../docs/hermes/delegation.md`](../docs/hermes/delegation.md) 의 「자식 session 의 provider 는 저장소에만 있다」 에 있다.
 
 | 항목 | 값 |

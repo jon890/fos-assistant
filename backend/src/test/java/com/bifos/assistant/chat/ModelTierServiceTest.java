@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.GroupModelTiers;
 import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
@@ -88,6 +90,90 @@ class ModelTierServiceTest {
         });
         verify(definitions, never()).save(any());
         verifyNoInteractions(options);
+    }
+
+    @Test
+    @DisplayName("MEMBER 역할이 받는 단계에는 provider 와 모델과 effort 가 비고 단계와 이름과 기본값은 남는다")
+    void memberGetsTiersWithoutProviderModelOrEffort() {
+        TierFixtures fixtures = tierFixtures();
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+        when(fixtures.settings().findById(10L))
+                .thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.BALANCED)));
+
+        ModelTierOptions result = fixtures.service().optionsFor(fixtures.user(), fixtures.agent());
+
+        assertThat(result.tiers())
+                .extracting(ModelTierOptions.Tier::tier, ModelTierOptions.Tier::label)
+                .containsExactly(
+                        tuple(ModelTier.FAST, "빠르게"), tuple(ModelTier.BALANCED, "균형"), tuple(ModelTier.DEEP, "깊게"));
+        assertThat(result.tiers()).allSatisfy(tier -> {
+            assertThat(tier.provider()).as("provider").isNull();
+            assertThat(tier.model()).as("model").isNull();
+            assertThat(tier.reasoningEffort()).as("reasoningEffort").isNull();
+        });
+        assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.BALANCED);
+        assertThat(result.admin()).isFalse();
+        // 싣지 않을 provider 를 알아내려고 Hermes 목록을 읽지 않는다.
+        verifyNoInteractions(fixtures.options());
+    }
+
+    @Test
+    @DisplayName("ADMIN 역할이 받는 단계에는 provider 와 모델과 effort 가 그대로 실린다")
+    void adminGetsTiersWithProviderModelAndEffort() {
+        TierFixtures fixtures = tierFixtures();
+        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+        when(fixtures.settings().findById(10L)).thenReturn(Optional.empty());
+
+        ModelTierOptions result = fixtures.service().optionsFor(admin, fixtures.agent());
+
+        assertThat(result.tiers())
+                .extracting(
+                        ModelTierOptions.Tier::tier,
+                        ModelTierOptions.Tier::provider,
+                        ModelTierOptions.Tier::model,
+                        ModelTierOptions.Tier::reasoningEffort)
+                .containsExactly(
+                        tuple(ModelTier.FAST, "openai-codex", "example-fast", "low"),
+                        tuple(ModelTier.BALANCED, "openai-codex", "example-balanced", "medium"),
+                        tuple(ModelTier.DEEP, "openai-codex", "example-deep", "high"));
+        assertThat(result.admin()).isTrue();
+    }
+
+    @Test
+    @DisplayName("관리자는 에이전트 없이 그룹 단계를 읽고 provider 를 비운 단계는 비운 채 받는다")
+    void adminReadsGroupTiersWithoutAgentAndBlankProviderStaysBlank() {
+        TierFixtures fixtures = tierFixtures();
+        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+        when(fixtures.settings().findById(10L))
+                .thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.BALANCED)));
+
+        GroupModelTiers result = fixtures.service().groupTiers(admin);
+
+        assertThat(result.tiers())
+                .extracting(
+                        ModelTierOptions.Tier::tier,
+                        ModelTierOptions.Tier::provider,
+                        ModelTierOptions.Tier::model,
+                        ModelTierOptions.Tier::reasoningEffort)
+                .containsExactly(
+                        tuple(ModelTier.FAST, null, "example-fast", "low"),
+                        tuple(ModelTier.BALANCED, null, "example-balanced", "medium"),
+                        tuple(ModelTier.DEEP, null, "example-deep", "high"));
+        assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.BALANCED);
+        // 에이전트의 목록을 읽지 않는다. 관리자가 시작할 수 없는 에이전트만 있어도 그룹 단계를 읽는다.
+        verifyNoInteractions(fixtures.options());
+    }
+
+    @Test
+    @DisplayName("MEMBER 역할은 그룹 단계의 관리자 조회를 받지 못한다")
+    void memberCannotReadGroupTiers() {
+        TierFixtures fixtures = tierFixtures();
+
+        assertThatThrownBy(() -> fixtures.service().groupTiers(fixtures.user()))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.FORBIDDEN);
     }
 
     @Test

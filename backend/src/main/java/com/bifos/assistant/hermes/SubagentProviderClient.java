@@ -9,7 +9,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 
 /**
- * 자식 session 의 provider 를 대시보드 plugin 에서 읽는다. 근거는 ADR-063 에 있다.
+ * 자식 session 의 provider 를 대시보드 plugin 에서 읽는다. 근거는 ADR-067 에 있다.
  *
  * <p>자식마다 한 번 읽는 값이라 캐시하지 않는다. 예외를 던지지 않고, 다시 읽을 만한 실패만
  * {@link SubagentProviderLookup#unreachable()} 로 구분한다.

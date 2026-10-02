@@ -28,6 +28,8 @@ type Props = {
   code: string;
   name: string;
   visibility: Visibility;
+  /** 에이전트를 지운 뒤 돌아갈 목록 주소다. 일반 화면과 관리자 영역의 목록이 다르다. */
+  listHref: string;
   /** 공개 범위를 바꾼 요청이 성공하면 바뀐 값으로 부른다. 그 범위에 따라 달라지는 이웃 절이 받는다. */
   onVisibilityChange(visibility: Visibility): void;
 };
@@ -112,6 +114,7 @@ export function AgentAccessSection({
   code,
   name,
   visibility,
+  listHref,
   onVisibilityChange,
 }: Props) {
   const router = useRouter();
@@ -162,7 +165,7 @@ export function AgentAccessSection({
         return;
       }
       // 성공하면 목록으로 옮겨 가며 이 절이 사라지므로, 그때까지 창을 진행 중인 채로 둔다.
-      router.push("/agents");
+      router.push(listHref);
     } catch {
       setError(describeError("HERMES_UNAVAILABLE", "연결할 수 없어요."));
       setPending(null);

@@ -88,7 +88,7 @@ test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않�
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
 
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "사용자 관리" })).toHaveCount(0);
+  await expect(page.getByTestId("admin-entry")).toHaveCount(0);
 
   await page.goto("/admin/people");
   await expect(page).toHaveURL(/\/$/);

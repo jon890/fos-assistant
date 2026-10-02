@@ -77,7 +77,14 @@ test("존재하지 않는 주소는 새 대화 링크를 보인다", async ({ pa
 test("사이드바는 일반 화면에 있고 로그인 화면에는 없다", async ({ page, context }, testInfo) => {
   await page.goto("/usage");
   await openSidebar(page, testInfo);
-  await expect(page.getByRole("complementary", { name: "사이드바" })).toBeVisible();
+  const sidebar = page.getByRole("complementary", { name: "사이드바" });
+  await expect(sidebar).toBeVisible();
+  // 사이드바는 대화 목록, 주요 화면 메뉴, 맨 아래 줄의 세 구역이다. 관리자 입구는 메뉴가 아니라 맨 아래 줄에 있다.
+  await expect(sidebar.getByRole("navigation", { name: "대화 목록" })).toBeVisible();
+  const menu = sidebar.getByRole("navigation", { name: "주요 화면" });
+  await expect(menu.getByRole("link")).toHaveText([/^에이전트/, /^연결/, /^기억/, /^사용량/]);
+  await expect(sidebar.getByTestId("admin-entry")).toBeVisible();
+  await expect(menu.getByTestId("admin-entry")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(page.viewportSize()?.width ?? 0);
   await context.clearCookies();
