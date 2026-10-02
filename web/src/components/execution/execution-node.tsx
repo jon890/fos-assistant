@@ -200,6 +200,7 @@ function effortLabel(
   source: ExecutionTreeNode["reasoningEffortSource"],
 ): string {
   if (source === "PROFILE_DEFAULT") return `기본 강도 ${effort}`;
+  if (source === "AGENT_DEFAULT") return `에이전트 기본 강도 ${effort}`;
   if (source === "UNKNOWN") return "강도 미확인";
   return `선택한 강도 ${effort}`;
 }
