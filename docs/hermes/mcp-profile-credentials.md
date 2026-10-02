@@ -20,7 +20,7 @@ MCP 서버 설정의 `env`에 명시한 값이 자식 프로세스에 전달된�
 MCP 서버의 `env`에 그 이름의 `${이름}` 참조가 있어야 한다. 가계부라면 `env.ACCOUNTBOOK_API_TOKEN`에 `${ACCOUNTBOOK_API_TOKEN}` 이다.
 토큰 원문을 `.mcp.json`이나 `config.yaml`에 쓰지 않는다.
 사용자가 넣는 다른 칸(`connector.json` 의 `fields[].env`)도 같은 방식으로 전달한다.
-운영자가 주는 값(`operator_env`)은 profile `.env` 를 거치지 않는다. 대시보드 plugin 이 설치할 때 운영 목록의 값을 서버 정의의 `env` 에 직접 넣는다([커넥터 연결](../backend/connector-install.md)).
+운영자가 주는 값(`operator_env`)은 profile `.env` 를 거치지 않는다. 대시보드 plugin 이 설치할 때 운영 목록의 값을 서버 정의의 `env` 에 직접 넣는다([커넥터 설치](../backend/connector-install.md)).
 운영자가 주는 비밀은 이 방식으로 넘기지 못한다. `${이름}` 은 그 profile 의 secret scope 에서만 풀리고, 공유 gateway 는 scope 에 없는 이름을 프로세스 env 에서 찾지 않는다(v0.21.5 의 `agent/secret_scope.py` `get_secret`). 그래서 `operator_secrets` 는 지원하지 않는다([ADR-046](../adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)).
 선택 값을 쓰지 않을 때에는 MCP 설정의 해당 env 항목을 빼거나 값으로 빈 문자열을 직접 쓴다.
 profile `.env`의 빈 값을 참조하면 보간 함수가 `${VAR}` 원문을 남긴다.

@@ -1,5 +1,9 @@
 # 커넥터 도구 정책
 
+커넥터의 도구마다 선언하는 위험도와 승인 방식, 도구 호출을 판정하는 경로와 그 순서를 갖는다.
+판정이 승인 필요인 호출이 실행되기까지의 흐름과 사용자별 호출 제한도 이 파일이 갖는다.
+승인 줄의 상태와 API 는 [커넥터 연결](../connectors.md) 의 「승인」 이, 설치는 [커넥터 설치](connector-install.md) 가 갖는다.
+
 ## 도구 정책
 
 `schema: 2` 는 그 MCP 서버의 도구마다 위험도와 승인 방식을 선언한다([ADR-049](../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
@@ -40,7 +44,7 @@
 | `always` | 호출마다 승인을 받는다. 상시 허락을 만들 수 없다 |
 
 엄격한 순서는 `none`, `required`, `always` 다.
-승인을 받는 호출은 막고 승인 줄로 저장한다. 주인이 승인하면 저장한 인자로 한 번 실행한다. 아래 「승인」 이 갖는다.
+승인을 받는 호출은 막고 승인 줄로 저장한다. 주인이 승인하면 저장한 인자로 한 번 실행한다. [커넥터 연결](../connectors.md) 의 「승인」 이 갖는다.
 
 - `approval` 이 하한보다 느슨하면 그 커넥터를 카탈로그에 내지 않는다. `WRITE` 에 `none` 을 선언하지 못한다
 - `verify.tool` 과 `options.tool` 은 `tools` 에 있고 `risk: READ`, `approval: none` 이어야 한다. 아니면 카탈로그에 내지 않는다
@@ -84,24 +88,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 ### 도구 호출 판정
 
 연결용 profile 의 `fos-ctx` hook 은 MCP 도구 호출마다 Control Plane 에 묻는다.
-
-| hook 이 본 것 | 처리 |
-| --- | --- |
-| 대응 파일이 없다 | 연결용 profile 이 아니다. 이 절의 처리를 하지 않는다 |
-| 대응 파일을 읽지 못한다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 연결용 profile 일 수 있고, 연결용 profile 에는 Control Plane MCP 가 없다 |
-| 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 |
-| 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 지금처럼 `_fos_ctx` 를 붙인다 |
-| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 |
-| `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다 |
-| `session_id` 나 `tool_call_id` 가 없다 | 막는다 |
-| 직렬화한 인자 글이 UTF-8 로 60KB 를 넘는다 | Control Plane 에 묻지 않고 막는다 |
-| 그 밖의 커넥터 도구 | Control Plane 에 묻고 답대로 한다 |
-| 주소가 없다, 3초 안에 답이 없다, 200 이 아니다, 답을 읽지 못한다 | 막는다 |
-
-막을 때는 늘 글이 있는 `block` 을 돌려준다. 예외의 본문을 글에 넣지 않는다.
-hook 은 등록 이름이 `tools` 에 있는 서버를 먼저 고르고, 없을 때만 `prefix` 가 맞는 서버를 고른다. `prefix` 가 여럿 맞으면 가장 긴 것을 고른다.
-서버 이름이 다른 서버 이름의 앞부분일 때 원래 도구 이름을 엉뚱한 서버에서 찾지 않게 한다.
-hook 이 부를 주소는 gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` 이 갖는다.
+hook 이 어느 호출을 묻고 어느 호출을 묻지 않고 막는지는 [`hermes/README.md`](../../hermes/README.md) 의 「연결용 profile 의 커넥터 도구 호출을 묻는다」 가 갖는다.
 
 **`POST /internal/hermes/connector-policy`**
 
@@ -151,8 +138,8 @@ Control Plane 의 판정 순서다.
 | 그 밖 | 승인 필요 | |
 
 - `allow` 로 답하는 것은 판정이 허용일 때뿐이다. 거절과 승인 필요는 `block` 이다
-- 승인 필요인 호출은 막고 `connector_action` 에 `decision: NEEDS_APPROVAL`, `passed: false`, `status: PENDING` 으로 남긴다. `args_json` 에 인자 원문을 저장한다. 모델에게는 승인 요청 번호를 담은 글을 주고, 사용자의 승인을 기다리고 있으니 같은 도구를 다시 부르지 말라고 말한다. 아래 「승인」 이 갖는다
-- 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다. 아래 「승인」 이 갖는다
+- 승인 필요인 호출은 막고 `connector_action` 에 `decision: NEEDS_APPROVAL`, `passed: false`, `status: PENDING` 으로 남긴다. `args_json` 에 인자 원문을 저장한다. 모델에게는 승인 요청 번호를 담은 글을 주고, 사용자의 승인을 기다리고 있으니 같은 도구를 다시 부르지 말라고 말한다. 승인 줄이 그 뒤에 지나는 상태는 [커넥터 연결](../connectors.md) 의 「승인」 이 갖는다
+- 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 판정은 Hermes 와 DB 를 모르는 함수 하나가 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 `mcp_server` 와 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다. `tool` 이 도구 이름 형식(`^[A-Za-z0-9_.-]{1,128}$`)이 아닌 요청은 서명이 틀린 요청처럼 403 으로 거절한다
 - 허용한 호출이 다시 왔을 때 연결이 `READY` 가 아니면 처음의 허용을 돌려주지 않고 막는다. 해제한 연결에 앞의 허용이 나가지 않게 한다
@@ -202,7 +189,7 @@ Control Plane 은 `policy_hook` 이 참이 아니면 그 연결을 `READY` 로 �
 ## 커넥터 도구를 부를 때
 
 연결용 에이전트의 모델이 커넥터 MCP 도구를 부르면 `fos-ctx` hook 이 Control Plane 에 묻는다.
-근거는 [ADR-049](../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 이고 계약은 [커넥터 연결](connector-tool-policy.md)의 「도구 호출 판정」 이 갖는다.
+근거는 [ADR-049](../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 이고, 요청과 응답과 판정 순서는 위 「도구 호출 판정」 이 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -229,18 +216,14 @@ sequenceDiagram
     end
 ```
 
-### 갈리는 지점
+### 도구 호출이 갈리는 지점
+
+거절 사유마다의 조건은 위 「도구 호출 판정」 의 표가 갖는다. 아래는 그 표에 없는 경우다.
 
 | 상황 | 처리 |
 | --- | --- |
 | Control Plane 이 3초 안에 답하지 않는다 | hook 이 막는다. 요청이 뒤늦게 닿아도 `dedupe_key` 로 줄이 하나다 |
-| hook 이 부를 주소가 없다 | 그 profile 의 커넥터 도구를 모두 막는다 |
-| 대응 파일에 없는 도구 | `schema: 2` 는 `UNDECLARED` 로 거절한다. `schema: 1` 은 `WRITE` 로 읽어 승인 필요로 막는다 |
-| 판정이 승인 필요다 | 막고 인자와 함께 `PENDING` 승인 줄을 남긴다. 승인 요청 번호를 돌려준다. 주인이 승인하면 저장한 인자로 한 번 실행한다 |
 | 실행을 찾지 못한다(중지한 실행, 등록 안 된 자식 session) | 막고 줄을 남기지 않는다 |
-| 연결이 `READY` 가 아니다 | `NOT_READY` 로 거절한다 |
-| 카탈로그를 읽지 못한다 | `POLICY_UNAVAILABLE` 로 거절한다 |
-| 같은 호출이 다시 온다 | 처음 판정을 그대로 돌려준다 |
 | 동시에 같은 `dedupe_key` 로 둘이 온다 | 유니크 제약에 걸린 쪽이 먼저 저장된 줄을 다시 읽어 돌려준다 |
 | profile 의 `fos-ctx` 가 꺼졌거나 옛 판이다 | 호출은 판정 없이 나간다. 연결 확인이 `policy_hook` 을 보고 `PENDING` 으로 둔다 |
 
@@ -275,7 +258,7 @@ sequenceDiagram
     C->>C: 알림 줄, 자동 turn 으로 결과 전달
 ```
 
-### 갈리는 지점
+### 승인이 갈리는 지점
 
 | 상황 | 처리 |
 | --- | --- |

@@ -1,5 +1,8 @@
 # 에이전트
 
+에이전트의 페르소나와 추천 질문, 에이전트가 쓰는 도구의 등급 판정, 사용자가 에이전트를 만들고 공개하고 지우는 규칙을 갖는다.
+페르소나 본문과 도구 목록은 Hermes profile 이 갖고, 이 파일은 Control Plane 이 그것을 읽고 쓰는 경로와 권한을 적는다.
+
 ## 페르소나
 
 에이전트의 성격이다. 본문은 그 profile 의 `SOUL.md` 가 갖고 이 저장소는 화면만 준다.
@@ -39,8 +42,6 @@
 **해시를 함께 받는 이유는 두 사람이 같은 에이전트를 고칠 수 있기 때문이다.**
 `SOUL.md` 에는 판 번호가 없어서 값으로 달라진 것을 알 수 없다.
 쓰기 직전에 다시 읽어 그 해시와 다르면 거절하고, 화면이 새 본문을 다시 읽는다.
-
-본문 대신 해시를 주고받는다. 상한이 8000자라 본문을 되보내면 그만큼이 요청에 실린다.
 
 ### 추천 질문
 
@@ -104,7 +105,7 @@
 주인이 비어 있는 옛 그룹 공개 에이전트를 `ADMIN` 이 `PRIVATE` 로 바꾸면 그 `ADMIN` 이 주인이 된다.
 
 **만들기는 한 요청 안에서 끝낸다.** 차례는 아래와 같고, 중간에 실패하면 만든 것을 역순으로 거둔다(`people.application.HermesProfileProvisioner` 와 같은 규칙).
-대시보드 plugin 의 계약은 [`hermes/profiles.md`](../hermes/profiles.md) 의 「Control Plane 이 부르는 대시보드 plugin 경로」 가 갖는다.
+대시보드 plugin 이 받는 요청과 응답은 [`hermes/README.md`](../../hermes/README.md) 의 「dashboard-profile-api 가 여는 것」 표가, 그 경로를 지날 때의 Hermes 동작은 [`hermes/profiles.md`](../hermes/profiles.md) 의 「Control Plane 이 부르는 대시보드 plugin 경로」 가 갖는다.
 
 1. 주인의 `app_user` 행을 잠그고 그 사용자의 지우지 않은 에이전트 수가 `assistant.agents.max-per-user`(기본 5)보다 적은지 본다. `ADMIN` 은 세지 않는다
 2. `code` 와 profile 이름을 만든다. 둘 다 사용자가 넣은 이름과 무관한 무작위 값이다
@@ -139,22 +140,21 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 
 대화 화면과 실행 기록은 null 이름을 「지운 에이전트」 로 그린다. 사이드바의 대화 목록은 에이전트 이름을 그리지 않는다.
 에이전트가 없는 대화를 열면 모델 고르기와 사진 단추를 끈다. 다른 에이전트의 모델과 스킬이 보이지 않게 하려는 것이다.
-실행 나무는 에이전트가 없는 노드를 전부터 `실행 #번호` 로 그린다. 그대로 둔다.
+실행 나무는 에이전트가 없는 노드를 `실행 #번호` 로 그린다.
 대화 목록과 실행 기록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다(`AgentService.byIds`).
 실행 나무는 노드마다 읽는다. 깊이와 노드 수에 상한이 있어 한 번에 읽는 이득이 작다.
-내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음을 이미 빼고 있어 그대로 둔다.
-사용량 요약의 에이전트별 합계는 에이전트 표를 `left join` 해 행이 없는 실행을 에이전트 번호로 묶어 보인다. 이것도 그대로 둔다.
+내가 부른 스킬 합계(`SkillUsageQuery.byUser`)는 에이전트를 찾지 못한 묶음을 뺀다.
+사용량 요약의 에이전트별 합계는 에이전트 표를 `left join` 해 행이 없는 실행을 에이전트 번호로 묶어 보인다.
 
 | 무엇 | 어디 |
 | --- | --- |
 | 만들기, 공개 범위, 지우기의 순서 | `agent/application/AgentLifecycleService` |
-| profile 을 만들고 거두기 | `people/application/HermesProfileProvisioner` 를 넓혀 쓴다 |
+| profile 을 만들고 거두기 | `people/application/HermesProfileProvisioner` 를 쓴다 |
 | 대시보드 호출 | `hermes` |
 
 ## 페르소나를 고칠 때
 
-에이전트의 성격은 그 profile 의 `SOUL.md` 가 갖고 이 저장소는 화면만 준다.
-근거는 [ADR-019](../adr/ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) 에 있다.
+경로와 권한은 위 「페르소나」 가 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -175,9 +175,8 @@ sequenceDiagram
 ```
 
 **저장한 것이 곧 다음 실행에 쓰인다.** Hermes 가 실행할 때 그 파일을 읽는다.
-데이터베이스에 사본이 없어 어긋날 것이 없고, 반영 상태를 보일 일도 없다.
 
-### 갈리는 지점
+### 페르소나 수정이 갈리는 지점
 
 | 무엇 | 어떻게 되나 |
 | --- | --- |
@@ -193,8 +192,7 @@ sequenceDiagram
 
 ## 에이전트 도구를 고를 때
 
-도구 목록의 정본은 profile 설정이고, 누가 무엇을 켤 수 있는지는 Control Plane 이 등급으로 정한다.
-근거는 [ADR-029](../adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 에 있다.
+등급 판정과 경로는 위 「에이전트 도구」 가 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -219,7 +217,7 @@ sequenceDiagram
 
 **저장한 것은 다음 실행부터 쓰인다.** 재시작이 필요 없다. 이미 돌고 있는 실행은 시작할 때의 도구를 쓴다.
 
-### 갈리는 지점
+### 도구 변경이 갈리는 지점
 
 | 무엇 | 어떻게 되나 |
 | --- | --- |
@@ -238,29 +236,10 @@ sequenceDiagram
 ## 에이전트를 만들 때
 
 사용자가 에이전트 목록의 「새 에이전트」 에서 이름을 넣는다.
-근거는 [ADR-033](../adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) 에 있다.
+만드는 차례와 실패했을 때 거두는 순서는 위 「에이전트 만들기와 지우기」 의 일곱 단계가 갖는다.
+201 을 받으면 화면은 그 에이전트의 상세로 간다.
 
-```mermaid
-sequenceDiagram
-    participant U as 사용자 브라우저
-    participant C as Control Plane
-    participant D as Hermes 대시보드
-
-    U->>C: POST /api/v1/agents {name, visibility}
-    C->>C: 주인 행을 잠그고 상한을 본다
-    C->>C: code 와 profile 이름을 만든다
-    C->>D: POST /api/profiles (no_skills)
-    D->>D: 틀로 안전한 도구, MCP 등록, 서명 plugin, 관리 표식
-    C->>C: 그 profile 에 묶인 MCP 토큰을 발급한다
-    C->>D: PUT /api/env (MCP 토큰, API_SERVER_MODEL_NAME, API_SERVER_KEY)
-    C->>C: key 파일을 쓴다
-    C->>D: 그 key 로 도구 목록을 읽어 셸·파일 등급이 없는지 확인한다
-    C->>C: 에이전트 행을 저장한다 (profile_managed)
-    C-->>U: 201 과 에이전트
-    U->>U: 상세로 간다
-```
-
-### 갈리는 지점
+### 에이전트 만들기가 갈리는 지점
 
 | 무엇 | 어떻게 되나 |
 | --- | --- |

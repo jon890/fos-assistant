@@ -1,13 +1,7 @@
 # 대화와 실행 사건
 
-## 모델 단계와 실행 정보 보완
-
-`chat`이 그룹 단계 정의, 사용자와 그룹 기본값, 대화의 선택, 그룹의 모델 숨김을 소유한다.
-에이전트 기본 모델의 값은 `agent` 표에 있고, 그 검증과 해석은 `chat` 이 한다.
-실행을 시작할 때 선택을 해석하고 `usage`에 선택 스냅샷을 넘긴다.
-`usage`는 부모 종료 뒤 자식 session의 최종 사용량을 별도 작업으로 보완한다.
-`hermes`는 session 조회와 최소한의 profile 기본값 조회를 소유한다.
-선택과 실패 처리 계약은 [모델 단계와 실행 기록](../model-tiers.md)이 정한다.
+`chat` 패키지가 갖는 대화와 메시지의 경로, 대화의 모델 선택, 화면으로 보내는 사건을 갖는다.
+Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 나무를 잇는 방법, 도구 내용을 가리는 규칙도 이 파일이 갖는다.
 
 ## 대화
 
@@ -83,7 +77,7 @@ Memory 제안은 원래 실행이 해석한 값을 받아 쓰고, 추천 질문�
 
 컨트롤러가 `ConversationAccess.requireOwnId(user, publicId)` 로 주인을 확인하며 번호로 바꾸고,
 `application` 안쪽은 지금처럼 번호를 쓴다. 사건과 응답에 싣는 공개 식별자는 `Conversation.publicId()` 에서 읽는다.
-UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. 「backend 패키지」 의 형식 오류 규칙이 모든 경로에 걸린다.
+UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다. [`packages.md`](packages.md) 의 형식 오류 규칙이 모든 경로에 걸린다.
 
 `by-number` 경로는 옛 링크가 쓰이지 않게 되면 지운다.
 근거는 [ADR-025](../adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)에 있다.
@@ -97,14 +91,14 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 
 ### 메시지 한 줄
 
-`GET .../messages` 가 주는 한 줄이다. 이미 있는 칸에 아래를 더한다.
+`GET .../messages` 가 주는 한 줄의 칸 가운데 뜻을 따로 적어 둘 것이다.
 
 | 칸 | 뜻 |
 | --- | --- |
 | `status` | 답을 만든 실행의 상태. `SUCCEEDED`, `FAILED`, `CANCELLED`, `RUNNING` 중 하나. 사용자 메시지는 null |
 | `replacesMessageId` | 이 메시지가 새 판으로 대신하는 이전 메시지. 없으면 null |
 | `activity` | 작업 과정의 요약. `{ toolCount, subagentCount, durationMs }`. 사건이 없는 답과 사용자 메시지는 null |
-| `artifacts` | 그 답의 turn 이 만든 결과물 파일. 위 「결과물 파일」 절이 모양을 갖는다 |
+| `artifacts` | 그 답의 turn 이 만든 결과물 파일. [`artifact.md`](artifact.md) 의 「메시지 한 줄의 `artifacts`」 절이 모양을 갖는다 |
 
 `activity` 는 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 모두 센다.
 예전에 provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도가 따로 실행 줄을 갖는다. 요약은 답을 만든 실행만 세고 막힌 시도의 사건은 넣지 않는다. 지금은 Control Plane 이 provider 를 넘기지 않아 새 turn 에는 이런 줄이 생기지 않는다.
@@ -179,9 +173,8 @@ Hermes 가 스트림으로 보내는 사건을 우리 이름으로 옮겨 `execu
   도구가 읽어 온 문서 전체가 사건에 실려 오는 것을 그대로 저장하지 않기 위해서다.
 - 모르는 사건은 버리고 버렸다는 사실만 로그로 남긴다.
 
-실시간 스트리밍은 그대로 둔다.
-화면에 흘리는 것과 저장하는 것이 같은 스트림을 두 가지로 쓴다.
-저장하는 답은 여전히 실행 결과에서 가져온다.
+화면에 흘리는 것과 사건을 저장하는 것이 같은 스트림을 두 가지로 쓴다.
+저장하는 답은 스트림이 아니라 실행 결과에서 가져온다.
 
 근거는 [`adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md`](../adr/ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) 에 있다.
 
@@ -229,7 +222,12 @@ Hermes 도 `run.completed` 를 보내지만 그것을 옮겨 적지 않는다.
 
 ## 모델 단계와 자식 기록
 
-선택과 재조회 조건은 [모델 단계와 실행 기록](../model-tiers.md)이 정한다.
+`chat`이 그룹 단계 정의, 사용자와 그룹 기본값, 대화의 선택, 그룹의 모델 숨김을 소유한다.
+에이전트 기본 모델의 값은 `agent` 표에 있고, 그 검증과 해석은 `chat` 이 한다.
+실행을 시작할 때 선택을 해석하고 `usage`에 선택 스냅샷을 넘긴다.
+`usage`는 부모 종료 뒤 자식 session의 최종 사용량을 별도 작업으로 보완한다.
+`hermes`는 session 조회와 최소한의 profile 기본값 조회를 소유한다.
+선택과 재조회 조건, 실패 처리 계약은 [모델 단계와 실행 기록](../model-tiers.md)이 정한다.
 
 ```mermaid
 flowchart TD

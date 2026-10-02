@@ -1,5 +1,8 @@
 # 대화
 
+대화와 메시지, 대기 메시지, 사진 첨부, 결과물을 저장하는 표 다섯의 칸과 제약을 갖는다.
+이 표들을 읽고 쓰는 경로는 [`backend/conversation.md`](../conversation.md) 와 그 옆의 문서들이 갖는다.
+
 ## conversation
 
 주고받는 하나의 스레드다.

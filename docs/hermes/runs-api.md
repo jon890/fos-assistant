@@ -1,7 +1,5 @@
 # Runs API
 
-## Runs API
-
 우리가 쓰는 것은 Runs API 다.
 
 | 메서드와 경로 | 쓰임 |
@@ -20,7 +18,7 @@
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
 Control Plane 이 Memory 를 주입하는 자리가 여기다.
 
-### 도는 실행에 지시를 더하는 `steer`
+## 도는 실행에 지시를 더하는 `steer`
 
 **이 문서는 2026-10-01 까지 「도는 실행에 메시지를 끼워 넣는 경로는 없다」 고 적었다. 틀린 기술이었다.**
 v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 있다.
@@ -48,7 +46,7 @@ v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 �
 `steer` 를 쓰기 전에 운영 Hermes 에서 `steer` 와 `pending_steer` 의 왕복을 확인한다.
 가짜 Hermes 에는 이 경로가 없다.
 
-### `/v1/runs` 는 이미지를 받지 않는다
+## `/v1/runs` 는 이미지를 받지 않는다
 
 v0.21.3 에서 확인했다. `content` 에 이미지를 담은 항목을 해석하는 자리가 경로마다 다르다.
 
@@ -70,13 +68,13 @@ v0.21.3 에서 확인했다. `content` 에 이미지를 담은 항목을 해석�
 **그래서 사진을 대화 본문에 실어 보내는 길이 없다.**
 Control Plane 은 `/v1/runs` 를 쓰고, 그것을 버리면 `run_id` 와 사건 스트림과 실행 기록을 함께 버린다.
 
-### 이미지 파일은 `vision_analyze` 로 본다
+## 이미지 파일은 `vision_analyze` 로 본다
 
 `read_file` 이 이미지 확장자를 만나면 내용을 돌려주지 않고 `vision_analyze` 를 쓰라는 안내를 낸다.
 에이전트가 사진을 보는 길은 대화 본문이 아니라 이 도구다.
 그러므로 사진을 에이전트가 닿는 자리에 놓아 두면 모델이 그것을 읽는다.
 
-### 모델은 실행마다 정한다
+## 모델은 실행마다 정한다
 
 `POST /v1/runs` 는 요청 본문의 `provider` 와 `model` 을 그 실행에만 적용한다.
 profile 의 `config.yaml` 이 정한 것은 기본값일 뿐이다.
@@ -99,7 +97,7 @@ Control Plane 은 사용자가 대화에서 모델을 고르지 않았으면 두
 근거는 [v0.21.3 `gateway/platforms/api_server.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의 `_request_reasoning_config`, `_request_agent_overrides` 와
 [v0.21.3 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server_runs.py) 가 그것을 넘기는 자리다. v0.21.5 에서도 같다.
 
-### 조회 응답의 `model` 은 실제로 돈 모델이 아니다
+## 조회 응답의 `model` 은 실제로 돈 모델이 아니다
 
 아래는 v0.21.0 과 v0.21.3 의 계약이다.
 v0.21.5 에서 추가한 실제 실행 `runtime` 과의 차이는 [「Runs 응답과 사건의 버전 차이」](upgrades.md#runs-응답과-사건의-버전-차이) 에 있다.
@@ -122,7 +120,7 @@ fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 `POST /api/sessions/{id}/chat` 은 응답에 `runtime` 을 담아 요청한 것과 실제로 돈 것을
 한 응답에서 대조할 수 있다. v0.21.3 까지는 그 블록이 `/v1/runs` 에 없었다. v0.21.5 는 아래처럼 실행 조회에도 싣는다.
 
-#### 그 칸이 어디서 오는가
+### 그 칸이 어디서 오는가
 
 `gateway/platforms/api_server.py` 의 `_resolve_model_name` 이 정하고,
 그 결과를 platform 을 만들 때 한 번 담는다. 요청마다 다시 정하지 않는다.
@@ -145,7 +143,7 @@ fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 platform 을 만들 때 listener 주인의 범위에서 한 번 정해지기 때문이다.
 주인에게 `API_SERVER_MODEL_NAME` 이 없으면 셋째 단계인 `hermes-agent` 가 나온다.
 
-#### 경로마다 다르다
+### 경로마다 다르다
 
 세 경로가 같은 값을 주지 않는다.
 
@@ -179,7 +177,7 @@ model_name = (
 
 실제 모델을 알아야 하면 `/api/model/options` 가 그 profile 의 것을 답한다.
 
-### `/api/model/options` 는 provider 와 모델 목록을 함께 준다
+## `/api/model/options` 는 provider 와 모델 목록을 함께 준다
 
 2026-09-24 에 `openai-codex` 를 쓰는 profile 두 곳에서 불러 확인했다.
 두 응답의 모양이 같았다.
@@ -232,7 +230,7 @@ API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 
 대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
 둘 다 provider 별 모델 목록이 아니다.
 
-### 소진은 본문으로만 알 수 있다
+## 소진은 본문으로만 알 수 있다
 
 HTTP 상태로는 판정하지 못한다. 제출은 늘 202 이고 조회는 늘 200 이다.
 
@@ -252,7 +250,7 @@ Control Plane 은 그 위층만 맡는다. credential 을 다루는 코드를 �
 
 소진 상태를 HTTP 로 읽는 경로는 없다. `hermes auth list` 는 정확히 알지만 CLI 뿐이다.
 
-### 모델을 바꿔 이어도 맥락이 남는다
+## 모델을 바꿔 이어도 맥락이 남는다
 
 같은 `session_id` 로 모델만 바꿔 이어 보내면 앞 turn 의 내용이 그대로 실려 간다.
 도구 호출이 있던 turn 이 섞여도 `tool_calls` 와 `tool_call_id` 가 복원된다.

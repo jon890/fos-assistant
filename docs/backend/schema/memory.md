@@ -1,5 +1,8 @@
 # Memory
 
+Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 collection 을 저장하는 표 넷의 칸과 제약을 갖는다.
+실행에 실을 항목을 고르는 규칙은 [`backend/memory.md`](../memory.md) 가 갖는다.
+
 ## memory
 
 사용자와 그룹에 대해 에이전트가 알아야 할 것 하나가 한 줄이다.

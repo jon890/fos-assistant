@@ -1,12 +1,12 @@
 # MCP 요청자
 
-## MCP 요청자
-
 Control Plane MCP 의 토큰은 profile 만 증명하고, 사용자가 걸린 도구의 요청자는 서명한 `_fos_ctx` 로 찾은 **origin 실행**의 사용자다.
 origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행이고, 최상위 session 이면 그 뿌리 session 으로 도는 실행이다.
-결정은 [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md), 흐름과 갈리는 지점은 [`backend/mcp-caller.md`](#mcp-호출의-요청자를-정할-때) 에 있다.
+토큰이 요청자를 정하지 못하는 까닭은 GROUP 에이전트에서 여러 사용자가 같은 profile 을 쓰기 때문이다. 요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
+이 파일은 요청자를 정하는 클래스와 흐름, 하위 에이전트 session 등록, Control Plane MCP 서버와 결과물 쓰기 도구의 계약을 갖는다.
+결정은 [ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
-### 어느 클래스가 무엇을 하나
+## 어느 클래스가 무엇을 하나
 
 | 자리 | 하는 일 |
 | --- | --- |
@@ -29,7 +29,7 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 등록 경로는 MCP 도구가 아니다. `tools/list` 에 나오지 않고 `McpController` 를 지나지 않는다.
 `ControlPlaneJwtFilter` 는 이 경로를 `/mcp` 처럼 건너뛴다. 사용자 JWT 로 부르면 `AgentTokenAuthenticationFilter` 가 토큰으로 인증하지 못해 401 이다. 컨트롤러의 `McpPrincipal` 확인은 그 뒤의 방어 검사다.
 
-### 토큰 관리 경로
+## 토큰 관리 경로
 
 관리자만 부른다.
 
@@ -41,7 +41,7 @@ origin 실행은 하위 에이전트 session 이면 만들 때 등록한 실행�
 
 profile 이름은 `HermesProfileName` 의 규칙을 따른다. 그 profile 에 에이전트가 있는지는 보지 않는다. profile 을 먼저 만들고 에이전트를 나중에 붙이는 순서가 있어서다.
 
-### 실행 줄에 적는 session
+## 실행 줄에 적는 session
 
 Hermes 에 보낼 session 과 실행 줄에 적을 session 은 뜻이 다르다. 둘을 `orchestration.domain.RunSession` 하나로 넘긴다.
 문자열 둘을 나란히 받으면 순서를 바꿔도 컴파일되기 때문이다.
@@ -49,10 +49,10 @@ Hermes 에 보낼 session 과 실행 줄에 적을 session 은 뜻이 다르다.
 | 만드는 자리 | `runtimeSessionId`(보낼 session) | `correlationSessionId`(실행 줄에 적을 session) |
 | --- | --- | --- |
 | `ConversationSessions.ensure` 가 대화 turn 에 | 대화의 `hermes_session_id` | 대화의 `hermes_root_session_id`, 비었으면 보낼 session |
-| `RunSession.fresh()` 가 흐름의 하위 실행과 위임 자식에 | 새 `fos-<uuid>` | 같은 값 |
+| `RunSession.fresh()` 가 흐름의 하위 실행과 `agent_delegate` 의 위임 자식에 | 제출하기 전에 새로 정한 `fos-<uuid>`. 부모의 session 을 잇지 않는다 | 같은 값 |
 
 `ChatService` 와 `ResearchAndBuildFlow` 의 Chief 는 `ensure` 의 값을, `ChildExecutionRunner` 는 `fresh()` 의 값을 `AgentRunner.run` 에 넘긴다.
-Memory 제안은 session 을 적지 않는다.
+Memory 제안은 session 을 적지 않는다. 그래서 그 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다.
 
 ## MCP 호출의 요청자를 정할 때
 
@@ -98,7 +98,7 @@ sequenceDiagram
 
 토큰이 어느 사용자로 발급됐었는지는 결과를 바꾸지 않는다.
 
-### 갈리는 지점
+### 요청자 판정이 갈리는 지점
 
 | 경우 | 결과 |
 | --- | --- |
@@ -117,14 +117,7 @@ sequenceDiagram
 서명이 틀린 것과 남의 profile 이 도는 것을 밖에서 나누지 못하게 해, 다른 사용자가 지금 실행 중인지 훑어 알아내지 못하게 한다.
 이유는 서버 로그에만 남는다. 뿌리 session 으로 도는 실행이 없을 때는 옛 대화의 압축 교체일 수 있다는 표시(`DELEGATION_CONTEXT_UNAVAILABLE`)를 함께 남긴다. 등록이 없는 하위 에이전트 session 이면 `SUBAGENT_SESSION_UNREGISTERED` 를, 등록의 origin 실행이나 그 뿌리가 중지됐으면 `ORIGIN_CANCELLED` 를 남긴다.
 
-**실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.**
-
-| 실행 | 적는 session |
-| --- | --- |
-| 대화 turn, 흐름의 Chief | 그 대화의 뿌리 session. 뿌리 칸이 빈 옛 대화는 Hermes 에 보내는 session |
-| 흐름의 하위 실행 | 제출하기 전에 새로 정한 `fos-<uuid>`. 부모의 session 을 잇지 않는다 |
-| `agent_delegate` 의 위임 자식 | 위와 같다 |
-| Memory 제안 | 적지 않는다. 이 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다 |
+**실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.** 어느 실행이 어떤 session 을 적는지는 위 「실행 줄에 적는 session」 이 갖는다.
 
 ### 하위 에이전트 session 을 등록할 때
 
@@ -192,18 +185,19 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
 | 도구 | `memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` |
-| 요청자 | `memory_read`, `artifact_write`, `agent_*` 모두 profile 플러그인이 덮어쓴 `_fos_ctx` 로 origin 실행을 찾고, 그 실행의 사용자로 돈다. 하위 에이전트 session 은 만들 때 등록한 실행이고 끝난 실행이어도 되지만, 그 실행이나 뿌리 실행이 `CANCELLED` 면 거절한다. 최상위 session 은 서명한 뿌리 session 으로 도는 실행이다. 서명이 없거나 틀리거나, profile 이 다르거나, 등록 없는 하위 에이전트 session 이면 거절한다. 계약은 [`../hermes/fos-ctx.md`](../hermes/fos-ctx.md#부모-실행을-잇는-방법) 와 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다 |
+| 요청자 | 모든 도구가 위 「MCP 호출의 요청자를 정할 때」 의 판정을 지난다. 서명하는 쪽의 계약은 [`../hermes/fos-ctx.md`](../hermes/fos-ctx.md#부모-실행을-잇는-방법) 에 있다 |
 
-토큰은 요청자를 정하지 않는다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰기 때문이다.
-요청자는 서명한 `_fos_ctx` 로 찾은 origin 실행의 사용자다([ADR-032](../adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md), [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
-요청 본문에 사용자 번호를 넣어도 사용자를 바꿀 수 없다.
-profile 이 빈 토큰은 인증에서 거절한다.
-`agent_list` 는 인자가 없고 `[{"code":"...","name":"..."}]` 를 글로 준다. `agent_delegate` 는 `agent_code`, `task` 문자열 둘만 받고 제출까지만 기다린 뒤 `{"execution_id":123,"status":"RUNNING"}` 을 준다. 거절하면 `{"code":"...","message":"..."}` 를 준다. 코드는 `AGENT_UNAVAILABLE`(없거나 쓸 수 없음), `AGENT_DISABLED`, `DEPTH_EXCEEDED`, `TOO_MANY_CHILDREN`, `BUSY`, `SUBMIT_FAILED` 여섯이다. `agent_status` 는 `execution_id` 정수 하나를 받고 `{"execution_id":123,"status":"SUCCEEDED","output":"..."}` 처럼 준다. 물을 수 있는 실행은 요청자의 위임 실행 중 부르는 쪽 origin 실행과 같은 대화의 것이다. origin 실행에 대화가 없으면 같은 실행 나무의 것이다. 물을 수 없는 실행은 모두 `NOT_FOUND` 하나다. `agent_stop` 은 `execution_id` 정수 하나를 받고 `agent_status` 와 같은 모양을 준다. 5초 안에 `CANCELLED` 가 적히지 않으면 `"status":"RUNNING","stop_requested":true` 다. 이 서버가 돌리지 않는 실행에 run 번호가 없거나 중지를 보내지 못하면 `stop_requested` 없이 `RUNNING` 만 준다. 멈출 수 있는 범위는 `agent_status` 와 같다. 갈리는 지점은 [`backend/agent-delegation.md`](agent-delegation.md#다른-에이전트에게-맡길-때) 에 있다.
-`memory_read` 는 그 사용자가 볼 수 있고 승인됐으며 항상 주입하지 않는 항목만 응답한다.
+도구마다의 인자와 결과는 아래가 갖는다.
+
+| 도구 | 계약을 갖는 곳 |
+| --- | --- |
+| `memory_read` | [`memory.md`](memory.md) 의 「Memory 본문을 읽는 길」 |
+| `artifact_write` | 아래 「결과물 쓰기 도구」 |
+| `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` | [`agent-delegation.md`](agent-delegation.md) 의 「도구 계약」 |
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 처음에는 Memory 만 담아 서버 이름이 `fos-assistant-memory` 였다.
 결과물 쓰기가 같은 서버에 들어오면서 `mcp__fos_assistant_memory__artifact_write` 처럼 Memory 와 무관한 도구에 Memory 가 붙어 2026-09-29 에 `fos-assistant` 로 바꿨다.
-앞으로 Control Plane 이 여는 도구도 이 서버에 더한다.
+Control Plane 이 여는 도구는 모두 이 서버 하나에 둔다.
 
 **서버 이름을 바꿀 때는 등록 이름과 허용 목록을 한 번에 바꾼다.**
 `platform_toolsets.api_server` 의 MCP 이름은 허용 목록이다. 목록에 등록되지 않은 이름만 남으면 Hermes 는 허용 목록이 없는 것으로 보고 전역 MCP 서버를 모두 켠다. 근거는 [v0.21.5 `hermes_cli/tools_config.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/tools_config.py) 의 `_get_platform_tools` 다.
@@ -230,13 +224,29 @@ MCP 서버를 등록하는 설정 틀은 이 저장소의 `hermes/profile-templa
 
 Memory 색인 한 줄은 약 12 토큰이고, 항상 층(`retrieval` 이 `ALWAYS`)의 본문은 한 글자당 약 0.49 토큰이다.
 항상 층은 API 콜 수를 늘리지 않는다.
-Control Plane 이 두 방식을 고르는 기준은
-[`backend/memory.md`](memory.md#도구와-항상-층을-고르는-기준)에 둔다.
+
+#### 도구와 항상 층을 고르는 기준
+
+항목이 필요한 실행 하나만 비교하면 항상 층(`ALWAYS`)이 도구보다 싸다.
+항상 층은 API 콜을 늘리지 않지만, 도구는 현재 문맥 전체를 담은 API 콜을 한 번이나 두 번 더 만들기 때문이다.
+
+항목이 필요 없는 실행에도 본문을 싣는 비용까지 포함하면 사용 빈도가 손익분기를 정한다.
+아래 값보다 본문이 길면 도구가 유리하다.
+
+| 항목이 필요한 비율 | 새 대화 | 이어진 대화 |
+| --- | --- | --- |
+| 2회에 1회 | 8,000자 한도 안에서는 해당하지 않음 | 8,000자 한도 안에서는 해당하지 않음 |
+| 4회에 1회 | 약 7,600자 | 8,000자 한도 안에서는 해당하지 않음 |
+| 10회에 1회 | 약 3,000자 | 약 4,100자 |
+| 50회에 1회 | 약 600자 | 약 800자 |
+
+이 값은 측정한 프롬프트 크기와 API 콜 수를 기준으로 한 판단값이다.
+profile 의 도구 구성이나 대화 길이가 달라지면 손익분기도 달라진다.
 
 ## 결과물 쓰기 도구
 
 `artifact_write` 는 일반 파일 도구가 없는 profile 에 결과물 저장만 연다.
-`fos-assistant` 서버가 등록된 profile 에서만 보인다. 기존 서버에 도구를 추가하므로 Hermes 서버 등록과 허용 목록을 바꾸지 않는다.
+`fos-assistant` 서버가 등록된 profile 에서만 보인다. 다른 도구와 같은 서버에 있어 Hermes 서버 등록과 허용 목록을 따로 두지 않는다.
 실행 입력은 이 도구가 있으면 MCP 로 저장하고, 도구가 없고 파일 도구가 있으면 대화 폴더에 직접 쓰도록 안내한다.
 결정은 [ADR-028](../adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) 에 있다.
 
@@ -273,8 +283,7 @@ URL 의 query, 응답 본문, 파일시스템 경로를 오류나 로그에 노�
 
 같은 경로를 덮어쓸 때도 임시 파일을 완성한 뒤 교체한다.
 상한 초과나 다운로드 실패는 임시 파일을 지우고 기존 파일을 보존한다.
-HTML 을 답에 묶는 일은 쓰기 도구가 하지 않는다.
-turn 끝의 `ArtifactService.recordTurn` 이 기존대로 바뀐 HTML 을 찾는다.
+HTML 을 답에 묶는 일은 쓰기 도구가 하지 않는다. 묶는 시점은 [`artifact.md`](artifact.md#결과물을-mcp-로-쓸-때) 가 갖는다.
 
 ### 주소 방식과 SSRF 방어
 

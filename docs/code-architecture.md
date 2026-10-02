@@ -34,29 +34,12 @@ hermes/
   tests/                     Python unittest. Hermes 모듈은 가짜로 끼운다
 ```
 
-**설치 묶음은 `hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>` 가 만든다.**
-묶음은 Hermes 의 `plugins/dashboard-profile-api/` 자리에 그대로 들어갈 모양이다.
-plugin 파일, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/` 이다.
-틀의 MCP 주소 자리는 `__FOS_ASSISTANT_MCP_URL__` 이다. 주소를 주지 않거나 자리가 남으면 묶음을 만들지 않고 실패한다.
+**운영 값은 코드에 두지 않는다.** 설치 묶음을 만들 때와 프로세스의 환경 변수로 받는다.
 묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다.
-
-**운영 값은 코드에 두지 않는다.**
-
-| 값 | 어디서 받나 |
-| --- | --- |
-| Control Plane MCP 주소 | 묶음을 만들 때 `--mcp-url` |
-| 커넥터 목록 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS`. 값마다 문자열(plugin 디렉터리)이나 `{"root": "<plugin 디렉터리>", "command": "<실행 파일>", "env": {"<operator_env 이름>": "<값>"}}` 다. `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 이 목록에 있고 `connector.json` 검증을 통과한 것만 카탈로그에 나온다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
-| 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND`. 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
-| 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` |
-| 스킬 루트 | 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` |
-| 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL`. Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 연결용 profile 의 커넥터 도구를 모두 막는다 |
+설치 묶음의 모양, 운영 값의 목록, 검사 방법은 [`hermes/README.md`](../hermes/README.md) 가 갖는다.
 
 **plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받는다.** 운영은 plugin 을 먼저 올리고 Control Plane 을 올린다.
 경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
-
-검사는 `python3 -m unittest discover -s hermes/tests` 로 돈다. 필요한 것은 Python 3.13 과 PyYAML 과 `mcp` SDK 다. Hermes 이미지와 같은 판이다.
-대시보드 plugin 은 커넥터 도구를 부를 때만 `mcp` SDK 를 쓴다. SDK 가 없거나 지원 범위(`mcp>=2.0,<3`) 밖이어도 plugin 은 올라오고 그 경로만 `unavailable` 로 답한다. 계약은 [커넥터 연결](backend/connector-install.md) 의 「MCP SDK 계약」 이 갖는다.
-실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
 
 ## 다음
 

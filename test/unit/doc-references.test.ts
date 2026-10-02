@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -95,22 +95,44 @@ async function collectReferences(): Promise<
   return all;
 }
 
-/** 코드 펜스 밖의 `#` 부터 `######` 까지 모든 헤딩을 정규화해 모은다. */
-async function headingsOf(path: string): Promise<Set<string>> {
-  const text = await readFile(join(REPO_ROOT, path), "utf8");
-  const headings = new Set<string>();
+/** 코드 펜스 밖의 `#` 부터 `######` 까지 모든 헤딩의 글을 나온 순서대로 모은다. */
+function headingTexts(markdown: string): string[] {
+  const headings: string[] = [];
   let inFence = false;
-  for (const line of text.split("\n")) {
+  for (const line of markdown.split("\n")) {
     if (/^\s*(```|~~~)/.test(line)) {
       inFence = !inFence;
       continue;
     }
     if (inFence) continue;
     const match = /^#{1,6}\s+(.*)$/.exec(line);
-    if (match) headings.add(normalizeHeading(match[1]));
+    if (match) headings.push(match[1].trim());
   }
   return headings;
 }
+
+/** 코드 펜스 밖의 `#` 부터 `######` 까지 모든 헤딩을 정규화해 모은다. */
+async function headingsOf(path: string): Promise<Set<string>> {
+  const text = await readFile(join(REPO_ROOT, path), "utf8");
+  return new Set(headingTexts(text).map(normalizeHeading));
+}
+
+/** 한 문서에서 두 번 이상 나오는 헤딩의 글을 처음 나온 순서대로 한 번씩 낸다. */
+export function duplicateHeadings(markdown: string): string[] {
+  const counts = new Map<string, number>();
+  for (const heading of headingTexts(markdown)) {
+    counts.set(heading, (counts.get(heading) ?? 0) + 1);
+  }
+  return [...counts].filter(([, count]) => count > 1).map(([heading]) => heading);
+}
+
+/** 같은 헤딩이 되풀이되면 안 되는 문서 디렉터리다. 하위 디렉터리는 따로 적는다. */
+const UNIQUE_HEADING_DIRECTORIES = [
+  "docs",
+  "docs/backend",
+  "docs/backend/schema",
+  "docs/frontend",
+];
 
 test("코드와 프롬프트가 가리키는 문서 파일이 있다", async () => {
   const problems: string[] = [];
@@ -174,4 +196,42 @@ test("AGENTS.md 는 하위 경로와 절 이름까지 읽는다", () => {
   const [reference] = findDocReferences("{@code backend/AGENTS.md} 「패키지 배치」");
   assert.equal(reference.path, "backend/AGENTS.md");
   assert.equal(reference.section, "패키지 배치");
+});
+
+test("한 문서 안에 같은 헤딩이 두 번 나오지 않는다", async () => {
+  const problems: string[] = [];
+  for (const directory of UNIQUE_HEADING_DIRECTORIES) {
+    const names = (await readdir(join(REPO_ROOT, directory))).sort();
+    for (const name of names) {
+      if (!name.endsWith(".md")) continue;
+      const file = `${directory}/${name}`;
+      const text = await readFile(join(REPO_ROOT, file), "utf8");
+      for (const heading of duplicateHeadings(text)) {
+        problems.push(`${file}  「${heading}」`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test("헤딩이 모두 다르면 되풀이된 헤딩이 없다", () => {
+  assert.deepEqual(duplicateHeadings("# 스킬\n\n## 저장\n\n### 갈리는 지점\n"), []);
+});
+
+test("같은 헤딩이 둘이면 그 글을 한 번 낸다", () => {
+  assert.deepEqual(
+    duplicateHeadings("# 스킬\n\n## 갈리는 지점\n\n글\n\n## 갈리는 지점\n"),
+    ["갈리는 지점"],
+  );
+});
+
+test("단계가 달라도 글이 같으면 되풀이된 헤딩이다", () => {
+  assert.deepEqual(duplicateHeadings("# 스킬\n\n## 스킬\n"), ["스킬"]);
+});
+
+test("코드 펜스 안의 # 줄은 헤딩으로 세지 않는다", () => {
+  assert.deepEqual(
+    duplicateHeadings("# 검사\n\n```bash\n# 주석\n# 주석\n```\n"),
+    [],
+  );
 });

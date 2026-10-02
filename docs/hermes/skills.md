@@ -1,5 +1,8 @@
 # 스킬
 
+Hermes 가 스킬을 어디서 읽고 입력에 얼마나 싣는지, API server 가 스킬 커맨드를 어떻게 다루는지를 갖는다.
+Control Plane 이 올린 스킬을 저장하고 게시하는 규칙은 [`backend/skill.md`](../backend/skill.md) 가 갖는다.
+
 ## 스킬을 profile 에 붙이는 방법
 
 **정식 설정 키는 `skills.external_dirs` 다.**

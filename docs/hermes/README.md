@@ -17,7 +17,7 @@
 
 NousResearch 의 Hermes Agent 를 Agent Runtime 으로 쓴다.
 이 문서는 core 를 수정하지 않고 쓸 수 있는 확장 지점을 정리한다.
-그 확장 지점에 설치하는 plugin 과 profile 틀은 이 저장소의 [`hermes/`](../../hermes/) 에 있다. 배치와 설치 묶음은 [`code-architecture.md`](../code-architecture.md) 의 「Hermes 쪽 코드」 절이 갖는다.
+그 확장 지점에 설치하는 plugin 과 profile 틀은 이 저장소의 [`hermes/`](../../hermes/) 에 있다. 배치는 [`code-architecture.md`](../code-architecture.md) 의 「Hermes 쪽 코드 (`hermes/`)」 절이, 설치 묶음과 운영 값은 [`hermes/README.md`](../../hermes/README.md) 가 갖는다.
 운영값과 실행 절차는 비공개 저장소 `fos-home-infra` 에 둔다.
 버전이 붙은 설명은 그 버전에서 확인한 계약이다.
 2026-09-28 조사로 확인한 버전 차이는 [「버전을 올릴 때 달라지는 계약」](upgrades.md#버전을-올릴-때-달라지는-계약) 에 모았다.

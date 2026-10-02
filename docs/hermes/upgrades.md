@@ -41,7 +41,7 @@ Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profil
 그 검사의 절차는 `fos-home-infra` 가 갖는다. 까닭은 [ADR-034](../adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「Hermes 를 올릴 때 이름 충돌을 본다」 에 있다.
 
 **올린 Hermes 이미지의 `mcp` SDK 판을 본다.**
-대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 연결](../backend/connector-install.md) 의 「MCP SDK 계약」).
+대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 설치](../backend/connector-install.md) 의 「MCP SDK 계약」).
 Hermes 는 `mcp` 를 정확한 판 하나로 고정한다. v0.19.0 은 1.26.0, v0.20.0 부터 v0.20.2 까지는 1.28.1, v0.20.3 부터 v0.21.5 까지는 2.0.0 이다. 그래서 판은 이미지를 올릴 때만 바뀐다.
 1.x 는 속성 이름이 camelCase(`readOnlyHint`, `structuredContent`, `isError`)라 plugin 의 모든 커넥터 도구 호출이 `unavailable` 이 된다. 2.0.0, 2.0.1, 2.1.1, 2.2.0 에서는 plugin 의 호출 순서가 같게 동작함을 2026-10-01 에 확인했다.
 올릴 때 확인할 것은 셋이다.

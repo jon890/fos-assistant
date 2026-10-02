@@ -1,5 +1,8 @@
 # 커넥터
 
+커넥터 연결과 도구 호출의 판정과 승인, 상시 허락을 저장하는 표 셋의 칸과 제약을 갖는다.
+상태가 바뀌는 조건과 API 는 [커넥터 연결](../../connectors.md) 이 갖는다.
+
 ## connector_connection
 
 사용자마다 커넥터 하나에 연결 하나를 둔다. 근거는 [ADR-043](../../adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 이다.
@@ -11,7 +14,7 @@
 | `connector_id` | `VARCHAR(64) NOT NULL` | manifest 의 `id` |
 | `agent_id` | `BIGINT NOT NULL`, 유니크 | `agent` 참조. 연결 전용 에이전트 |
 | `status` | `VARCHAR(20) NOT NULL` | `DISCONNECTED`, `PENDING`, `READY` |
-| `fields` | `VARCHAR(4000) NOT NULL` | JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}`. 비밀 칸의 원문과 해시는 넣지 않는다. 앞부분은 값이 16자 이상일 때만 넣는다 |
+| `fields` | `VARCHAR(4000) NOT NULL` | JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}`. 비밀 칸의 원문과 해시는 넣지 않는다. 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다 |
 | `restart_required` | `BOOLEAN NOT NULL` | 공유 gateway 재시작 뒤 반영 완료를 기다린다 |
 | `desired_enabled` | `BOOLEAN NOT NULL` | env 와 설치 반영이 모두 성공해 활성화 후보가 되었는가. 등록, 교체, 해제 시작과 반영 실패에서 false. true 여도 실행 확인 전에는 `PENDING` |
 | `checked_at` | `DATETIME(6)` | 마지막 확인 시각. 비어도 된다 |
@@ -19,12 +22,12 @@
 | `created_at`, `updated_at` | `DATETIME(6) NOT NULL` | |
 
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
-- V45 는 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내리고 그 연결용 에이전트를 끄고 사진 받기도 내렸다. 그 profile 의 `fos-ctx` 가 옛 판이라 도구 호출이 판정 없이 나가기 때문이다([ADR-049](../../adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다
+- V45 가 그때까지 `READY` 이던 연결을 모두 `PENDING` 으로 내렸다. 연결 확인과 gateway 재시작과 관리자 반영 완료로 다시 `READY` 가 된다. 까닭은 그 마이그레이션의 주석에 있다
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
-- V40 이 모든 행의 `secretPrefixes` 를 비웠다. 그 전에는 앞부분을 8자까지 저장했고 원래 길이를 남기지 않아, 짧은 비밀의 대부분이 저장된 행을 골라낼 수 없었다. `values` 는 그대로 둔다
-- 가계부 전용으로 먼저 만든 `accountbook_connection` 은 V38 이 이 표로 옮기고 지웠다. `connector_id` 는 `fos-accountbook`, `token_prefix` 는 `secretPrefixes.token`, `family_uuid` 는 `values.family` 가 됐다
+- V40 이전에 저장한 앞부분은 원래 길이를 알 수 없어 V40 이 모든 행의 `secretPrefixes` 를 비웠다. `values` 는 그대로 뒀다
+- 가계부 전용으로 먼저 만든 `accountbook_connection` 은 V38 이 이 표로 옮기고 지웠다
 
 `agent.connector_managed BOOLEAN NOT NULL DEFAULT FALSE` 는 연결 전용 에이전트를 표시한다.
 이 값이 참인 에이전트는 일반 설정 편집과 공개, 삭제 경로를 막고 사용자당 에이전트 상한에 세지 않는다.
@@ -33,12 +36,6 @@
 `agent.connector_attachments BOOLEAN NOT NULL DEFAULT FALSE` 는 그 연결용 에이전트가 사진을 받는지다.
 선언은 plugin 의 `connector.json` 에 있다. Control Plane 이 연결 확인과 관리자 반영 완료에서 선언한 toolset 이 켜진 것을 확인했을 때만 참으로 둔다.
 연결용이 아닌 에이전트에서는 쓰지 않는다.
-
-MySQL 8.4 에 둔다.
-마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
-
-비밀값은 어느 표에도 넣지 않는다.
-AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 홈서버의 파일에 있다.
 
 ## connector_action
 

@@ -1,5 +1,9 @@
 # _fos_ctx 와 session 등록
 
+Hermes 의 MCP 도구 호출에 실행을 가리키는 값을 싣는 방법과 그 근거가 된 Hermes 동작을 갖는다.
+profile 플러그인이 붙이는 `_fos_ctx` 의 서명 계약과 하위 에이전트 session 등록 계약이 여기 있다.
+Control Plane 이 그 값으로 요청자를 정하는 순서는 [`backend/mcp-caller.md`](../backend/mcp-caller.md) 가 갖는다.
+
 ## Control Plane 의 MCP 도구로 다른 실행을 부를 때
 
 `memory_read` 를 두고 있는 그 자리에 실행을 시작하는 도구를 하나 더 두는 구조를
@@ -88,13 +92,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 | 기대 `sig` | `b28a128dbb642aba7a8b4c35dcb237e2feb5a452305ec275909c32a00ae1b25b` |
 | 같은 칸에 도구 이름만 `agent_status` 일 때 | `62109c6c99e7ed4638e4343f1e5b6b22a3f55dd974560916149986866c253236` |
 
-서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 차례로 본다.
-
-1. 토큰이 증명한 profile 과 그 호출의 `session_id` 로 하위 에이전트 등록을 찾는다. 있으면 그 origin 실행의 사용자로 돈다. origin 실행이 끝났어도 된다. origin 실행이나 그 실행 나무의 뿌리 실행이 `CANCELLED` 면 거절한다
-2. 등록이 없고 `session_id` 가 `root_session_id` 와 같으면, 그 profile 과 뿌리 session 으로 도는 실행 하나를 찾아 그 실행의 사용자로 돈다
-3. 등록이 없고 `session_id` 가 뿌리와 다르면 거절한다
-
-결정은 [ADR-037](../adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 보는 순서는 [`backend/mcp-caller.md`](../backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 갖는다.
 도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
 플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고 `hermes/tests/test_fos_ctx.py` 가 그 동작을 검사한다. 다만 profile 에 실제로 설치되어 켜졌는지는 이 저장소가 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
 
@@ -218,7 +216,7 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 
 #### 모든 토큰이 profile 에 묶여 있다
 
-등록과 origin 판정, 아래 「취소가 아래로 내려가지 않는다」 의 취소 차단은 토큰이 profile 을 증명하는 것을 전제로 한다.
+등록과 origin 판정, [위임](delegation.md#취소가-아래로-내려가지-않는다) 의 「취소가 아래로 내려가지 않는다」 가 적은 취소 차단은 토큰이 profile 을 증명하는 것을 전제로 한다.
 `agent_token` 에는 사용자 칸이 없고, 폐기되지 않은 토큰은 늘 `profile_name` 을 갖는다. profile 이 빈 토큰은 `/mcp` 와 등록 경로 모두 인증에서 `401` 이다.
 
 전에는 사용자 기준으로 발급한 옛 토큰이 설정이 허용할 때 `_fos_ctx` 를 보지 않고 그 토큰의 사용자로 돌았다.

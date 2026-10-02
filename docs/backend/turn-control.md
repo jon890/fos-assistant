@@ -1,8 +1,11 @@
 # 대기열과 중지
 
+한 대화에 turn 이 하나만 돌게 하는 규칙을 갖는다.
+응답 중에 보낸 메시지를 쌓았다가 다음 turn 으로 보내는 대기열, 도는 turn 의 중지, 기동할 때 남은 실행의 정리가 여기 있다.
+
 ## 응답 중 대기열
 
-결정은 [ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md), 흐름은 [backend/turn-control.md](turn-control.md) 의 「응답 중에 보낼 때」 에 있다.
+결정은 [ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md), 흐름은 아래 「응답 중에 보낼 때」 에 있다.
 
 | 자리 | 맡는 것 |
 | --- | --- |
@@ -13,7 +16,7 @@
 | `chat.application.NextTurnDispatcher` | 다음 turn 을 정하는 한 자리. turn 종료, 위임 종료 사건, 기동을 받는다 |
 | `chat.application.TurnClosed` | turn 이 닫혔다는 알림. 대화 번호와 중지로 끝났는지를 싣는다 |
 | `chat.application.ChatService` | `runPendingMessages` 가 대기 행을 합쳐 `TurnIntent.Fresh` 로 turn 을 돌린다. 대화를 지울 때 대기 행도 지운다 |
-| `chat.presentation.PendingMessageController` | 위 「경로」 의 `pending` 경로 넷 |
+| `chat.presentation.PendingMessageController` | [`conversation.md`](conversation.md) 의 「경로」 가 적은 `pending` 경로 넷 |
 | 웹 `app/api/chat/conversations/[conversationId]/pending/` | `route.ts`(GET, POST), `[pendingId]/route.ts`(DELETE), `send/route.ts`(POST). Control Plane 으로 그대로 넘긴다 |
 | 웹 `lib/pending-route.ts` | 위 서버 라우트 셋이 함께 쓰는 넘기기와 형식 오류 응답. Control Plane 의 상태와 본문을 다시 감싸지 않는다 |
 | 웹 `lib/pending-messages.ts` | 브라우저가 위 서버 라우트를 부르는 함수 |
@@ -29,6 +32,8 @@
 
 1. 그 대화에 대기 행이 있고 멈춰 둔 행이 하나도 없으면 turn 잠금을 잡고 새 가상 스레드에서 `ChatService.runPendingMessages` 를 돌린다. 잠금을 잡지 못하면 도는 turn 이 닫힐 때 다시 온다.
 2. 보낼 대기 행이 없으면 `DelegationWakeService.tryWake` 로 넘긴다.
+
+turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때 모두 이 자리를 지난다. 그래서 사용자의 말이 위임 결과보다 먼저 간다.
 
 turn 이 중지로 끝나면 `ChatService` 가 취소된 turn 을 돌려주는 자리에서 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 행을 모두 멈춰 둔다.
 **잠금을 풀기 전에 멈춘다.** 잠금을 푼 뒤 종료 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다.
@@ -63,7 +68,7 @@ turn 이 도는지 먼저 보고 저장할지 정하면, 보는 순간과 저장
 실행 줄을 만들면 열쇠를 그 실행 번호로 옮긴다.
 중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
 같은 대화에 도는 turn 이 있는지도 여기서 본다. 보내기와 다시 생성이 `CONVERSATION_BUSY` 를 판정하는 자리다.
-화면은 turn 이 도는 동안 보내기 대신 대기 메시지 경로를 쓴다. 아래 「응답 중 대기열」 이 갖는다.
+화면은 turn 이 도는 동안 보내기 대신 대기 메시지 경로를 쓴다. 위 「응답 중 대기열」 이 갖는다.
 같은 Hermes session 에 두 turn 이 겹쳐 들어가면 어느 답이 어느 질문의 것인지 모델도 모른다.
 
 `ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다.
@@ -80,12 +85,17 @@ turn 이 도는지 먼저 보고 저장할지 정하면, 보는 순간과 저장
 
 Hermes 에 중지를 보내는 것은 `hermes` 가, 누구의 무엇을 멈출지 정하는 것은 `chat` 이 한다.
 뿌리 아래에서 도는 실행은 `root_execution_id` 로 찾는다.
-그 자식의 에이전트 행이 없으면 그 자식은 로그만 남기고 건너뛰고, 뿌리의 중지는 계속한다(「에이전트 만들기와 지우기」 절).
+그 자식의 에이전트 행이 없으면 그 자식은 로그만 남기고 건너뛰고, 뿌리의 중지는 계속한다([`agent.md`](agent.md) 의 「에이전트 만들기와 지우기」 절).
 `agent_delegate` 로 맡긴 자식도 run 번호가 붙을 때 `AgentDelegationService` 가 뿌리 turn 의 표시에 그 run 을 붙인다.
 turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으로만 멈춘다.
 
-**다른 창이 도는 turn 을 물을 때도 이 표시를 본다.** 실행 줄의 상태로 보지 않는다.
+**중지할 수 있는지를 실행 줄의 상태로 판정하지 않는다.**
 흐름으로 도는 turn 은 Chief 가 끝나면 뿌리 줄이 `SUCCEEDED` 가 되고 그 뒤에 자식이 돈다.
+줄 상태로 보면 자식이 도는 동안 중지를 거절하게 된다.
+그래서 이 프로세스에 등록된 도는 turn 이 그 번호를 뿌리로 갖는지로 본다.
+멈춘 turn 의 뿌리 줄은 이미 `SUCCEEDED` 였어도 `CANCELLED` 로 덮어쓴다. 토큰과 비용은 그대로 둔다.
+
+**다른 창이 도는 turn 을 물을 때도 이 표시를 본다.** 실행 줄의 상태로 보지 않는다.
 줄 상태로 보면 자식이 도는 동안 「돌지 않는다」고 답하게 된다. 중지 판정과 같은 까닭이다.
 `running` 경로는 대화의 표시가 가진 뿌리 실행 번호를 돌려주고, `startedAt` 은 그 실행 줄에서 읽는다.
 표시가 있는데 실행 번호가 아직 붙지 않았으면 `running` 은 true 이고 `executionId` 와 `startedAt` 은 null 이다.
@@ -146,9 +156,7 @@ sequenceDiagram
     end
 ```
 
-**다음 turn 을 정하는 자리는 하나다.** turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때 모두 그 자리를 지난다.
-그 자리는 대기 메시지를 먼저 보고, 보낼 것이 없으면 끝난 위임 결과를 본다.
-사용자의 말이 위임 결과보다 먼저 간다.
+다음 turn 을 정하는 순서는 위 「응답 중 대기열」 이 갖는다.
 
 합친 글은 쌓인 순서대로 빈 줄 하나를 사이에 두고 잇는다.
 대화에는 `USER` 행 하나만 남는다.
@@ -234,8 +242,4 @@ sequenceDiagram
 중지 단추를 누른 뒤 `stopped` 가 올 때까지 단추는 잠긴다.
 Hermes 에 보내지 못해 오류를 받았을 때만 다시 풀린다.
 
-**중지할 수 있는지를 실행 줄의 상태로 판정하지 않는다.**
-흐름으로 도는 turn 은 Chief 가 끝나면 뿌리 줄이 `SUCCEEDED` 가 되고 그 뒤에 자식이 돈다.
-줄 상태로 보면 자식이 도는 동안 중지를 거절하게 된다.
-그래서 이 프로세스에 등록된 도는 turn 이 그 번호를 뿌리로 갖는지로 본다.
-멈춘 turn 의 뿌리 줄은 이미 `SUCCEEDED` 였어도 `CANCELLED` 로 덮어쓴다. 토큰과 비용은 그대로 둔다.
+중지할 수 있는지를 판정하는 기준은 위 「중지」 가 갖는다.

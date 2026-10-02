@@ -26,10 +26,10 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`backend/agent-delegation.md`](backend/agent-delegation.md) | `agent_*` 도구로 다른 에이전트에게 맡기는 경로와 결과 도착 |
 | [`backend/artifact.md`](backend/artifact.md) | 에이전트가 만든 결과물 파일의 저장과 조회 |
 | [`backend/attachment.md`](backend/attachment.md) | 대화에 올린 사진의 저장과 전달 |
-| [`backend/connector-install.md`](backend/connector-install.md) | 대시보드 plugin 계약, 커넥터 설치와 실패 처리, 커넥터 에이전트의 경계 |
-| [`backend/connector-tool-policy.md`](backend/connector-tool-policy.md) | 커넥터 도구의 위험도와 승인 방식, 사용자별 호출 제한 |
+| [`backend/connector-install.md`](backend/connector-install.md) | 대시보드 plugin 의 커넥터 경로를 쓰는 방법, 커넥터 설치와 실패 처리, 커넥터 에이전트의 경계 |
+| [`backend/connector-tool-policy.md`](backend/connector-tool-policy.md) | 커넥터 도구의 위험도와 승인 방식, 도구 호출 판정, 승인이 필요한 호출의 흐름, 사용자별 호출 제한 |
 | [`backend/conversation.md`](backend/conversation.md) | 대화와 실행 사건, 모델 단계와 자식 기록, 도구 내용 가리기 |
-| [`backend/mcp-caller.md`](backend/mcp-caller.md) | Control Plane MCP 호출의 요청자를 정하는 방법 |
+| [`backend/mcp-caller.md`](backend/mcp-caller.md) | Control Plane MCP 호출의 요청자를 정하는 방법, MCP 서버와 결과물 쓰기 도구의 계약, 도구 호출의 입력 비용 |
 | [`backend/memory.md`](backend/memory.md) | Memory 의 범위와 제안과 수락, 본문을 읽는 길 |
 | [`backend/people.md`](backend/people.md) | 관리자가 사용자를 더하는 절차 |
 | [`backend/skill.md`](backend/skill.md) | 스킬의 저장과 스킬 커맨드 전달 |
@@ -39,7 +39,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 
 | 문서 | 소유하는 것 |
 | --- | --- |
-| [`frontend/structure.md`](frontend/structure.md) | 화면 목록, 디렉터리, 테마 토큰, 마크다운 렌더링 |
+| [`frontend/structure.md`](frontend/structure.md) | 화면 목록, 에이전트 화면과 사용량 화면의 구성, 화면의 정체성 |
 | [`frontend/shell.md`](frontend/shell.md) | 대화 이력과 목록, 화면 틀, 로딩 표시, 밝기 모드 |
 | [`frontend/chat.md`](frontend/chat.md) | 대화 화면의 모델 선택, 에이전트 질문, 다시 생성, 메시지 동작 |
 | [`frontend/activity.md`](frontend/activity.md) | 실행 하나를 다시 보는 화면과 작업 과정 표시 |
@@ -51,4 +51,4 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | 문서 | 소유하는 것 |
 | --- | --- |
 | [`hermes/README.md`](hermes/README.md) | Hermes 의 확장 지점과 `docs/hermes/` 개별 문서의 색인 |
-| [`../hermes/README.md`](../hermes/README.md) | Hermes 에 설치하는 plugin 과 profile 틀 |
+| [`../hermes/README.md`](../hermes/README.md) | Hermes 에 설치하는 plugin 과 profile 틀, 설치 묶음과 운영 값, 대시보드 plugin 이 여는 경로 목록 |
