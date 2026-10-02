@@ -17,6 +17,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -200,6 +201,26 @@ class ContextAssemblerTest {
 
         assertThat(result.instructions()).contains(body.content(), "[" + indexed.id() + "] 색인 제목");
         assertThat(result.omittedItems()).isZero();
+    }
+
+    @Test
+    @DisplayName("빠질 Memory 번호를 port 로 돌려준다")
+    void returnsOmittedMemoryIdsThroughPort() {
+        Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
+        memories.create(ADMIN, MemoryScope.GROUP, "짧은 항목", "짧은 내용", true);
+
+        assertThat(assembler.omittedFor(ADMIN))
+                .containsExactly(tooLong.id())
+                .isEqualTo(Set.copyOf(assembler.assembleForOwner(ADMIN).omittedMemoryIds()));
+    }
+
+    @Test
+    @DisplayName("모두 실리면 빠질 Memory 번호가 비어 있다")
+    void returnsNoOmittedMemoryIdsWhenEverythingFits() {
+        memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
+        memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", false);
+
+        assertThat(assembler.omittedFor(ADMIN)).isEmpty();
     }
 
     @Test

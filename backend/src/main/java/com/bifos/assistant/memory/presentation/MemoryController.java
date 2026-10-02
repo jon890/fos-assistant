@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.presentation;
 
-import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.OmittedMemories;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateMemoryRequest;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.UpdateMemoryRequest;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class MemoryController {
     private final MemoryService memories;
-    private final ContextAssembler context;
+    private final OmittedMemories omittedMemories;
     private final CurrentUserProvider currentUser;
 
     /**
@@ -37,7 +37,7 @@ public class MemoryController {
     @GetMapping
     public List<MemoryView> readable() {
         CurrentUser user = currentUser.require();
-        Set<Long> omitted = Set.copyOf(context.assembleForOwner(user).omittedMemoryIds());
+        Set<Long> omitted = omittedMemories.omittedFor(user);
         return memories.readableBy(user).stream()
                 .map(memory -> MemoryView.from(memory, omitted.contains(memory.id())))
                 .toList();
