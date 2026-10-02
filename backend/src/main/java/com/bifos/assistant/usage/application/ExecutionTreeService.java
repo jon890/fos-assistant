@@ -7,7 +7,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.SubagentUsageJob;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;

@@ -5,7 +5,7 @@ import com.bifos.assistant.usage.domain.CostByAgent;
 import com.bifos.assistant.usage.domain.CostByDay;
 import com.bifos.assistant.usage.domain.CostByFingerprint;
 import com.bifos.assistant.usage.domain.CostByModel;
-import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import jakarta.persistence.LockModeType;
@@ -97,8 +97,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             select e from AgentExecution e
             where e.conversationId = :conversationId
                 and e.delegationKey is not null
-                and e.status in (com.bifos.assistant.usage.domain.ExecutionStatus.SUCCEEDED,
-                    com.bifos.assistant.usage.domain.ExecutionStatus.FAILED)
+                and e.status in (com.bifos.assistant.usage.domain.type.ExecutionStatus.SUCCEEDED,
+                    com.bifos.assistant.usage.domain.type.ExecutionStatus.FAILED)
                 and e.resultDeliveredAt is null
                 and exists (select p.id from AgentExecution p
                     where p.id = e.parentExecutionId and p.parentExecutionId is null)
@@ -111,8 +111,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             select distinct e.conversationId from AgentExecution e
             where e.conversationId is not null
                 and e.delegationKey is not null
-                and e.status in (com.bifos.assistant.usage.domain.ExecutionStatus.SUCCEEDED,
-                    com.bifos.assistant.usage.domain.ExecutionStatus.FAILED)
+                and e.status in (com.bifos.assistant.usage.domain.type.ExecutionStatus.SUCCEEDED,
+                    com.bifos.assistant.usage.domain.type.ExecutionStatus.FAILED)
                 and e.resultDeliveredAt is null
                 and exists (select p.id from AgentExecution p
                     where p.id = e.parentExecutionId and p.parentExecutionId is null)
@@ -148,7 +148,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 sum(case when e.estimatedCostMicros is null then 1L else 0L end))
             from AgentExecution e
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
-                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+                and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
             """)
     MonthlyCost sumCostBetween(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
@@ -165,10 +165,10 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 sum(e.actualCostMicros),
                 sum(case when e.estimatedCostMicros is null then 0L else 1L end),
                 sum(case when e.estimatedCostMicros is null then 1L else 0L end),
-                sum(case when e.costMode = com.bifos.assistant.agent.domain.CostMode.SUBSCRIPTION then 1L else 0L end))
+                sum(case when e.costMode = com.bifos.assistant.agent.domain.type.CostMode.SUBSCRIPTION then 1L else 0L end))
             from AgentExecution e
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
-                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+                and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
             """)
     MonthlyCostDetail sumCostDetailBetween(
             @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
@@ -199,7 +199,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             from AgentExecution e
                 left join Agent a on a.id = e.agentId
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
-                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+                and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
             group by e.agentId, a.code, a.name
             order by sum(coalesce(e.estimatedCostMicros, 0L)) desc, e.agentId asc
             """)
@@ -221,7 +221,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 max(e.startedAt))
             from AgentExecution e
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
-                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+                and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
             group by e.provider, e.model
             order by sum(coalesce(e.estimatedCostMicros, 0L)) desc, e.model asc
             """)
@@ -254,7 +254,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 max(e.startedAt))
             from AgentExecution e
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
-                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+                and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
             group by
                 year(e.startedAt + 9 hour),
                 month(e.startedAt + 9 hour),
@@ -285,7 +285,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 max(e.startedAt))
             from AgentExecution e
             where e.userId = :userId and e.startedAt >= :from and e.startedAt < :to
-                and e.status <> com.bifos.assistant.usage.domain.ExecutionStatus.RUNNING
+                and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
                 and e.runtimeFingerprint is not null
             group by e.runtimeFingerprint
             order by max(e.startedAt) desc, e.runtimeFingerprint asc

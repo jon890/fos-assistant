@@ -1,4 +1,4 @@
-package com.bifos.assistant.usage.domain;
+package com.bifos.assistant.usage.domain.type;
 
 /**
  * 실행 하나가 도는 동안 일어난 일을 우리 이름으로 적은 것이다.

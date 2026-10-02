@@ -14,7 +14,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.domain.type.UserRole;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;

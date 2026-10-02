@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.user.application.AllowedUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.domain.type.UserRole;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;

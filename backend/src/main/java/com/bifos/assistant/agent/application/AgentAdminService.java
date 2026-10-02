@@ -1,7 +1,7 @@
 package com.bifos.assistant.agent.application;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.error.ApiException;

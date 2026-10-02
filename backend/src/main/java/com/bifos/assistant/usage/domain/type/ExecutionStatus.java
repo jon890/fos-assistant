@@ -1,4 +1,4 @@
-package com.bifos.assistant.usage.domain;
+package com.bifos.assistant.usage.domain.type;
 
 public enum ExecutionStatus {
     RUNNING,

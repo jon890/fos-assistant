@@ -12,7 +12,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.SubagentUsageJob;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;

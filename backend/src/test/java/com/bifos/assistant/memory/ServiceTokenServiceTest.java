@@ -29,7 +29,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.domain.type.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

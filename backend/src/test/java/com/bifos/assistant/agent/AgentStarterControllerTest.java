@@ -14,7 +14,7 @@ import com.bifos.assistant.agent.presentation.AgentStarterController;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
-import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.domain.type.UserRole;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

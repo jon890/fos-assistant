@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesProperties;

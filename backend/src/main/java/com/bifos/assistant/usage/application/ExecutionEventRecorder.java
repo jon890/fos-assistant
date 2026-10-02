@@ -4,7 +4,7 @@ import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.ExecutionEventType;
+import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import java.time.Clock;
 import java.util.Locale;
 import java.util.Map;

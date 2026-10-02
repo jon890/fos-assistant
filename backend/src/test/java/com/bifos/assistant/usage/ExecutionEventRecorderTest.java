@@ -6,14 +6,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.ExecutionEventType;
-import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ExecutionEventType;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;

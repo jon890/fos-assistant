@@ -11,7 +11,7 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
-import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Clock;

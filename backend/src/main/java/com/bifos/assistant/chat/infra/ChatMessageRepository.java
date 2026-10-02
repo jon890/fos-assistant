@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.infra;
 
 import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.MessageRole;
+import com.bifos.assistant.chat.domain.type.MessageRole;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

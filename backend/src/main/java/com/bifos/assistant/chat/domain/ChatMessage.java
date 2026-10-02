@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.chat.domain.type.MessageRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

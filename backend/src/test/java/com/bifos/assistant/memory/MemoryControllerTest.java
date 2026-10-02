@@ -13,7 +13,7 @@ import com.bifos.assistant.memory.presentation.MemoryController;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.user.domain.UserRole;
+import com.bifos.assistant.user.domain.type.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
