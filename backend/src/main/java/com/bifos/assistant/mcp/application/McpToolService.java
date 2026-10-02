@@ -176,7 +176,7 @@ public class McpToolService {
             Memory memory = memories.bodyFor(
                     user, memories.accessOf(caller.originExecution().agentId()), id);
             log.info("memory read userId={} memoryId={} executionId={}", user.id(), id, caller.executionId());
-            return result(memory.content(), false);
+            return result(memories.contentOf(memory), false);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_NOT_FOUND) {
                 return result("Memory 항목을 읽을 수 없습니다.", true);
