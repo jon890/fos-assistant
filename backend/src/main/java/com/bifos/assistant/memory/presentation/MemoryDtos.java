@@ -1,13 +1,20 @@
 package com.bifos.assistant.memory.presentation;
 
+import com.bifos.assistant.memory.application.model.ServiceTokenGrant;
+import com.bifos.assistant.memory.application.model.ServiceTokenSnapshot;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.util.List;
 
 public final class MemoryDtos {
     private MemoryDtos() {}
@@ -132,4 +139,43 @@ public final class MemoryDtos {
             return new CollectionView(collection.key(), collection.displayName());
         }
     }
+
+    public record ServiceTokenGrantBody(@NotBlank String collection, boolean allowSensitive) {
+        ServiceTokenGrant toGrant() {
+            return new ServiceTokenGrant(collection, allowSensitive);
+        }
+    }
+
+    /** 서비스 토큰을 발급한다. 만료는 필수이고 1일에서 365일 사이다(ADR-056). */
+    public record IssueServiceTokenRequest(
+            @NotBlank @Size(max = 100) String label,
+            @NotNull @Min(1) @Max(365) Integer expiresInDays,
+            @NotEmpty @Valid List<ServiceTokenGrantBody> collections) {}
+
+    /** 서비스 토큰 한 줄이다. 원문과 해시는 담지 않는다. */
+    public record ServiceTokenView(
+            Long id,
+            String label,
+            Instant createdAt,
+            Instant expiresAt,
+            Instant lastUsedAt,
+            Instant revokedAt,
+            List<ServiceTokenGrantBody> collections) {
+        static ServiceTokenView from(ServiceTokenSnapshot snapshot) {
+            var token = snapshot.token();
+            return new ServiceTokenView(
+                    token.id(),
+                    token.label(),
+                    token.createdAt(),
+                    token.expiresAt(),
+                    token.lastUsedAt(),
+                    token.revokedAt(),
+                    snapshot.grants().stream()
+                            .map(grant -> new ServiceTokenGrantBody(grant.collection(), grant.allowSensitive()))
+                            .toList());
+        }
+    }
+
+    /** 발급 응답이다. 원문 {@code token} 은 여기서만 나온다. */
+    public record IssuedServiceTokenView(ServiceTokenView info, String token) {}
 }
