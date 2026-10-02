@@ -1,0 +1,11 @@
+{
+  "name": "plan70-cycles-user",
+  "description": "user 가 people 과 agent 를 쓰는 간선을 port 와 이동으로 끊어 순환 기준을 38 줄에서 32 줄로 줄인다 — user 는 층 순서의 아래 패키지다(ADR-068 의 C5)",
+  "status": "pending",
+  "created_at": "2026-10-03",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" }
+  ]
+}
