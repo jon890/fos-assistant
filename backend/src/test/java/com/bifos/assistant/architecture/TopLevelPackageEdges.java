@@ -3,6 +3,7 @@ package com.bifos.assistant.architecture;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
@@ -52,7 +53,7 @@ final class TopLevelPackageEdges {
     }
 
     Map<String, SortedSet<String>> edges() {
-        return edges;
+        return Collections.unmodifiableMap(edges);
     }
 
     /** 그 클래스가 자기 최상위 패키지에서 이름 순으로 첫 클래스인지 돌려준다. */

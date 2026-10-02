@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** 도구 설명을 외부로 중계하거나 저장하기 전에 비밀값과 식별자를 제거한다. */
 public final class ToolDetailRedactor {
-    /** 가린 뒤 중계하고 저장하는 도구 내용의 글자 상한이다. 실행 사건의 `detail` 열 길이와 같다. */
+    /** 가린 뒤 중계하고 저장하는 도구 내용의 글자 상한이다. 실행 사건의 {@code detail} 열 길이와 같다. */
     public static final int DETAIL_LIMIT = 500;
 
     private static final String HIDDEN = "[가림]";

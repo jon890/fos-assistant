@@ -38,7 +38,7 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class ExecutionEvent {
 
-    /** 화면에 한 줄로 보일 만큼만 담는다. 넘으면 자른다. 값은 `hermes` 의 `ToolDetailRedactor` 가 갖는다. */
+    /** 화면에 한 줄로 보일 만큼만 담는다. 넘으면 자른다. 값은 {@code hermes} 의 {@code ToolDetailRedactor} 가 갖는다. */
     public static final int DETAIL_LIMIT = ToolDetailRedactor.DETAIL_LIMIT;
 
     @Id
