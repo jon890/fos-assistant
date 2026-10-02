@@ -9,7 +9,7 @@
   v0.21.5 의 `GET /api/sessions/{id}` 는 provider 를 내보내지 않아 금액이 모두 비었다.
   Hermes 는 그 값을 session 저장소의 `sessions.billing_provider` 에 적는다([`hermes/delegation.md`](../hermes/delegation.md) 의 「자식 session 의 provider 는 저장소에만 있다」).
   2026-10-02 에 운영 Hermes v0.21.5 에서 자식 session 115줄을 읽기 전용으로 집계했다. 115줄 모두 `billing_provider` 가 채워져 있었고, 줄마다 모델과 provider 의 짝이 하나였다.
-  [ADR-001](ADR-001-hermes-를-런타임으로-두고-core-를-고치지-않는다.md) 의 검토 순서로 보면 profile 설정에는 이 값이 없고, API server 의 어느 경로도 이 값을 주지 않는다.
+  [ADR-001](ADR-001-hermes를-런타임으로-두고-core를-고치지-않는다.md) 의 검토 순서로 보면 profile 설정에는 이 값이 없고, API server 의 어느 경로도 이 값을 주지 않는다.
   남는 것은 plugin 이다.
 - **대안 기각**:
   - profile plugin 의 `post_llm_call` hook 으로 호출마다 provider 를 Control Plane 에 보낸다. LLM 호출마다 gateway 스레드가 HTTP 를 한 번 더 기다리고, Control Plane 에 쓰는 경로와 그 중복 제거가 새로 필요하다.
