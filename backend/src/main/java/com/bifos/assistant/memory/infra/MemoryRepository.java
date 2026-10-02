@@ -5,6 +5,7 @@ import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +23,12 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
 
     Optional<Memory> findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
             MemoryScope scope, Long ownerUserId, String collection, String documentKey);
+
+    List<Memory> findByScopeAndOwnerUserIdAndSourceTypeAndSourceRefIn(
+            MemoryScope scope, Long ownerUserId, String sourceType, Collection<String> sourceRefs);
+
+    boolean existsByScopeAndOwnerUserIdAndEntryTypeAndCollectionAndTitle(
+            MemoryScope scope, Long ownerUserId, MemoryEntryType entryType, String collection, String title);
 
     /** 암호화되지 않은 채 남은 줄의 번호를 찾는다. 잠그지 않고 읽으므로 쓰기 전에 잠가 다시 읽는다(ADR-055). */
     @Query("select m.id from Memory m where m.sensitivity = :sensitivity and m.contentKeyId is null")
