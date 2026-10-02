@@ -51,7 +51,9 @@ MySQL 8.4 의 `utf8mb4` 기본 정렬 규칙은 `utf8mb4_0900_ai_ci` 다.
   바이트로 비교하므로 대소문자를 구분한다. 식별자 비교에만 쓴다
 - `COLLATE` 는 쓰지 않는다. H2 가 받지 않아 H2 로 도는 검사가 실패한다
 - 숫자 키로 조인할 수 있으면 문자열 비교를 쓰지 않는다
-- **새 표에는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4` 를 적는다.** 적지 않으면 그 표가 `utf8mb4_unicode_ci` 로 생긴다
+- **새 표에는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다.**
+  적지 않으면 그 표가 `utf8mb4_unicode_ci` 로 생긴다. H2 도 이 구절을 받는다.
+  검사: `test/unit/migration-collation.test.ts`. V57 까지의 파일은 이미 적용돼 검사에서 뺀다
 
 애플리케이션의 쿼리도 같은 규칙에 걸린다. 두 표의 문자열 칸을 조인하는 JPQL 과 native 쿼리를 쓰면 실제 MySQL 검사로 확인한다.
 
