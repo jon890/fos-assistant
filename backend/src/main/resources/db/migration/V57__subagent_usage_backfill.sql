@@ -1,15 +1,12 @@
--- native 자식 한 명의 사용량과 금액을 재조회 작업 줄에 적는다(ADR-062).
-ALTER TABLE subagent_usage_job ADD COLUMN provider VARCHAR(64) NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN model VARCHAR(128) NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN input_tokens BIGINT NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN cache_read_tokens BIGINT NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN cache_write_tokens BIGINT NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN output_tokens BIGINT NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN estimated_cost_micros BIGINT NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN actual_cost_micros BIGINT NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN cost_currency CHAR(3) NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN pricing_version VARCHAR(32) NULL;
-ALTER TABLE subagent_usage_job ADD COLUMN recorded_at DATETIME(6) NULL;
+-- V56 이 더한 사용량 칸을 지난 자식에게도 채우게 한다(ADR-062). DML 만 둔다.
+--
+-- 서로 다른 표의 문자열 칸은 CAST(... AS BINARY) 로 바꿔 바이트로 비교한다.
+-- 운영 MySQL 은 표마다 정렬 규칙이 다르다. 서버 기본값은 utf8mb4_unicode_ci 인데
+-- `DEFAULT CHARSET = utf8mb4` 를 적은 표는 utf8mb4_0900_ai_ci 가 된다.
+-- 두 정렬 규칙의 칸을 그대로 비교하면 오류 1267(Illegal mix of collations)로 실패한다.
+-- subagent_usage_job.profile_name 과 agent_execution.profile_name 이 실제로 그랬다.
+-- `COLLATE` 는 H2 가 받지 않아 쓰지 않는다. 마이그레이션 검사는 H2 에서도 이 파일을 돌린다.
+-- 바이트 비교는 대소문자를 구분한다. profile 이름과 session 번호는 식별자라 그쪽이 맞다.
 
 -- 이미 끝난 줄은 사용량을 적지 않고 끝났다. 다시 조회 대기로 넣어 session 에서 사용량을 읽게 한다.
 UPDATE subagent_usage_job
@@ -34,12 +31,12 @@ SELECT
     COALESCE(agent.api_base_url, ''),
     CASE
         WHEN agent.id IS NULL OR agent.deleted_at IS NOT NULL THEN 'EXPIRED'
-        WHEN agent.hermes_profile <> parent.profile_name THEN 'EXPIRED'
+        WHEN CAST(agent.hermes_profile AS BINARY) <> CAST(parent.profile_name AS BINARY) THEN 'EXPIRED'
         ELSE 'WAITING'
     END,
     CASE
         WHEN agent.id IS NULL OR agent.deleted_at IS NOT NULL THEN 'AGENT_MISSING'
-        WHEN agent.hermes_profile <> parent.profile_name THEN 'PROFILE_CHANGED'
+        WHEN CAST(agent.hermes_profile AS BINARY) <> CAST(parent.profile_name AS BINARY) THEN 'PROFILE_CHANGED'
         ELSE NULL
     END,
     child.started_at,
@@ -66,10 +63,12 @@ JOIN (
     WHERE started.event_type = 'SUBAGENT_STARTED'
       AND started.hermes_session_id IS NOT NULL
     GROUP BY started.execution_id, started.hermes_session_id
+-- 두 쪽 모두 execution_event.hermes_session_id 에서 온 값이라 정렬 규칙이 같다.
 ) child ON child.execution_id = owner.execution_id AND child.child_session_id = owner.child_session_id
 JOIN agent_execution parent ON parent.id = owner.execution_id
 LEFT JOIN agent ON agent.id = parent.agent_id
 WHERE NOT EXISTS (
     SELECT 1 FROM subagent_usage_job job
-    WHERE job.profile_name = parent.profile_name AND job.child_session_id = child.child_session_id
+    WHERE CAST(job.profile_name AS BINARY) = CAST(parent.profile_name AS BINARY)
+      AND CAST(job.child_session_id AS BINARY) = CAST(child.child_session_id AS BINARY)
 );

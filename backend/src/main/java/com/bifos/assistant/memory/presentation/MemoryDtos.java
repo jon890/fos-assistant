@@ -14,6 +14,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 public final class MemoryDtos {
@@ -182,4 +183,26 @@ public final class MemoryDtos {
     /** 서비스가 읽는 문서다. 본문은 평문이고 {@code revision} 은 지금 값의 판 번호다(ADR-056). */
     public record ServiceDocumentView(
             String collection, String documentKey, String title, String content, int revision, Instant updatedAt) {}
+
+    /** 묶음의 항목 하나다. 틀린 칸은 요청 전체가 아니라 그 항목의 REJECTED 로 답하므로 검증 주석을 달지 않는다(ADR-058). */
+    public record ImportItemBody(
+            String sourceRef,
+            LocalDate sourceDate,
+            String collection,
+            String entryType,
+            String documentKey,
+            String title,
+            String content,
+            boolean sensitive,
+            String retrieval) {}
+
+    public record ImportRequest(
+            @NotNull Integer schemaVersion,
+            @NotEmpty @Size(max = 100) List<ImportItemBody> items) {}
+
+    /** 항목의 결과다. {@code sourceRef} 를 싣지 않는다. 화면은 {@code index} 로 자기가 올린 항목과 맞춘다. */
+    public record ImportOutcomeView(int index, String status, String reason, Long memoryId) {}
+
+    public record ImportResponse(
+            int newCount, int duplicateCount, int conflictCount, int rejectedCount, List<ImportOutcomeView> items) {}
 }

@@ -221,6 +221,12 @@ Javadoc 본문은 포맷하지 않는다. 한국어 Javadoc 의 줄바꿈이 바
 이미 적용된 마이그레이션 파일을 고치지 않는다. Flyway 의 검사가 실패한다.
 새 번호로 파일을 하나 더 만든다.
 
+**H2 가 통과해도 MySQL 에서 실패할 수 있다.**
+정렬 규칙이 다른 두 표의 문자열 칸을 비교한 마이그레이션이 운영에서만 실패한 적이 있다.
+DDL 과 DML 을 나누는 규칙, 정렬 규칙, 실제 MySQL 검사는
+[`../docs/backend/schema/README.md`](../docs/backend/schema/README.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
+마이그레이션을 고쳤으면 저장소 root 에서 `scripts/check-mysql-migration.sh` 를 돌린다. Docker 가 있어야 한다.
+
 ## 실행 기록
 
 `agent_execution` 한 줄은 실행이 끝난 뒤가 아니라 **시작할 때** 만들어진다.
