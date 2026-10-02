@@ -115,3 +115,4 @@ scripts/check-public-safe.sh
 | `test/browser/people.spec.ts` | 수정 |
 | `test/browser/nav.spec.ts` | 수정 |
 | `test/browser/shell.spec.ts` | 수정 |
+| `test/browser/admin.spec.ts` | 수정 |
