@@ -65,6 +65,8 @@ export type Report = {
 
 export const MAX_ITEMS_PER_BUNDLE = 100;
 export const MAX_CONTENT_CHARS = 12000;
+// 화면의 웹 라우트가 2MB 를 넘는 요청을 거절한다. 묶음 밖 칸의 여유를 두고 그 아래로 나눈다.
+export const MAX_BUNDLE_BYTES = 1900 * 1024;
 export const IDENTITY_COLLECTION = "identity";
 
 const COLLECTION_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -196,5 +198,24 @@ export function chunk<T>(items: T[], size: number): T[][] {
   for (let i = 0; i < items.length; i += size) {
     chunks.push(items.slice(i, i + size));
   }
+  return chunks;
+}
+
+// 개수와 직렬화한 크기가 모두 상한 안에 들도록 차례를 지켜 나눈다. 항목 하나가 상한을 넘어도 홀로 한 묶음이 된다.
+export function chunkBySize<T>(items: T[], maxItems: number, maxBytes: number): T[][] {
+  const chunks: T[][] = [];
+  let current: T[] = [];
+  let bytes = 0;
+  for (const item of items) {
+    const size = Buffer.byteLength(JSON.stringify(item));
+    if (current.length > 0 && (current.length >= maxItems || bytes + size > maxBytes)) {
+      chunks.push(current);
+      current = [];
+      bytes = 0;
+    }
+    current.push(item);
+    bytes += size;
+  }
+  if (current.length > 0) chunks.push(current);
   return chunks;
 }

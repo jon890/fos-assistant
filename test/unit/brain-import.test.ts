@@ -326,6 +326,24 @@ test("항목 101개는 100개와 1개로 나눠 묶는다", () => {
   assert.equal(second.items.length, 1);
 });
 
+test("항목 수가 100개 아래여도 크기가 1.9MB 를 넘으면 묶음을 나눈다", () => {
+  const ws = workspace();
+  const items: DecisionItem[] = [];
+  for (let i = 0; i < 80; i += 1) {
+    fs.writeFileSync(path.join(ws.privateRoot, `wiki/sample/b${i}.md`), "가".repeat(11000));
+    items.push(decisionItem({ id: `private/wiki/sample/b${i}.md`, documentKey: `big-${i}` }));
+  }
+  const reportFile = writeJson(path.join(ws.base, "report.json"), report());
+  const decisionsFile = writeJson(path.join(ws.base, "d.json"), decisionFile(...items));
+  const result = run(BUNDLE, bundleArgs(ws, reportFile, decisionsFile));
+  assert.equal(result.status, 0, result.stderr);
+  const names = fs.readdirSync(ws.outDir).filter((name) => name.startsWith("bundle-"));
+  assert.ok(names.length >= 2);
+  for (const name of names) {
+    assert.ok(fs.statSync(path.join(ws.outDir, name)).size < 2 * 1024 * 1024);
+  }
+});
+
 test("신원 묶음은 identity-bundle 로 따로 만든다", () => {
   const ws = workspace();
   fs.writeFileSync(path.join(ws.privateRoot, "wiki/sample/note-a.md"), MARKER);

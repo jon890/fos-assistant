@@ -12,8 +12,9 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { emit, insideGitWorkTree } from "./fs-guard.ts";
 import {
-  chunk,
+  chunkBySize,
   MAX_CONTENT_CHARS,
+  MAX_BUNDLE_BYTES,
   MAX_ITEMS_PER_BUNDLE,
   retrievalFor,
   selectForBundle,
@@ -156,7 +157,7 @@ if (stale.length > 0) fail("OUT_DIR_NOT_CLEAN", { existing: stale.length });
 fs.rmSync(path.join(outDir, "problems.json"), { force: true });
 
 const createdAt = new Date().toISOString();
-const parts = chunk(bundleItems, MAX_ITEMS_PER_BUNDLE);
+const parts = chunkBySize(bundleItems, MAX_ITEMS_PER_BUNDLE, MAX_BUNDLE_BYTES);
 parts.forEach((items, index) => {
   const bundle: Bundle = { schemaVersion: 1, createdAt, items };
   const name = `${prefix}-${String(index + 1).padStart(3, "0")}.json`;

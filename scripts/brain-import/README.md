@@ -70,4 +70,4 @@
 
 `retrieval` 은 묶을 때 종류로 고정한다. `DOCUMENT` 는 `SEARCH`, `SOURCE` 는 `ARCHIVE`, `MEMORY` 는 결정 파일의 값이되 `ARCHIVE` 면 `SEARCH` 로 둔다.
 본문은 맨 앞의 frontmatter 를 떼고, 12,000자를 넘으면 `CONTENT_TOO_LONG` 이다.
-한 묶음은 100개까지이고 넘으면 `bundle-002.json` 으로 나눈다.
+한 묶음은 100개와 약 1.9MB 까지이고 넘으면 `bundle-002.json` 으로 나눈다. 화면의 웹 라우트가 2MB 를 넘는 요청을 거절하기 때문이다.
