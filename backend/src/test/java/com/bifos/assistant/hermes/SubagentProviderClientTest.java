@@ -22,8 +22,9 @@ class SubagentProviderClientTest {
     private final List<String> authorizations = new CopyOnWriteArrayList<>();
     private HttpServer server;
     private SubagentProviderClient client;
-    private int status = 200;
-    private String body = "{}";
+    // 검사 스레드가 쓰고 서버 스레드가 읽는다.
+    private volatile int status = 200;
+    private volatile String body = "{}";
 
     @BeforeEach
     void start() throws IOException {

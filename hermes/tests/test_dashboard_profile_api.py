@@ -304,6 +304,20 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.body, {"provider": None, "model": "m1"})
 
+    def test_session_provider_is_withheld_when_the_single_pair_names_another_provider(self):
+        """주 호출의 짝이 하나여도 그 provider 가 session 줄과 다르면 provider 를 주지 않는다."""
+        self.session_store(usage=[("m1", "p2", "")])
+        response = self.session_provider()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, {"provider": None, "model": "m1"})
+
+    def test_session_provider_is_returned_when_the_single_pair_has_no_provider(self):
+        """주 호출의 짝에 provider 가 비어 있으면 견줄 값이 없어 session 줄의 값을 준다."""
+        self.session_store(usage=[("m1", "", "")])
+        response = self.session_provider()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.body, {"provider": "p1", "model": "m1"})
+
     def test_session_provider_is_none_when_the_row_has_no_provider(self):
         for label, provider in (("null", None), ("empty", "")):
             with self.subTest(label):

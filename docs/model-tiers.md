@@ -212,7 +212,7 @@ provider 는 session 응답의 `provider`, 없으면 `billing_provider` 에서 �
 | 200 이고 `model` 이 session 응답의 모델과 다르다 | provider 를 비운다. 두 조회 사이에 줄이 바뀐 것이다 |
 | 404 | provider 를 비운다 |
 | 400, 401 같은 그 밖의 4xx | provider 를 비우고 경고 로그를 남긴다. 옛 plugin 은 이 경로를 401 로 답한다 |
-| 5xx 이거나 닿지 못했다 | 자식이 끝난 뒤 10분 안이면 줄을 `WAITING` 으로 두고 다음 조회 때 다시 부른다. 10분이 지났으면 provider 를 비운다 |
+| 5xx 이거나 닿지 못했거나 200 의 본문이 JSON 객체가 아니다 | 자식이 끝난 뒤 10분 안이면 줄을 `WAITING` 으로 두고 다음 조회 때 다시 부른다. 10분이 지났으면 provider 를 비운다 |
 
 session 응답에 provider 가 있으면 대시보드를 부르지 않는다.
 부모 실행의 provider 나 자식 모델 이름으로 provider 를 추정하지 않는다.

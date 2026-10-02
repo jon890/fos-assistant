@@ -42,6 +42,7 @@ public class SubagentProviderClient {
                     .body(JsonNode.class);
             if (row == null || !row.isObject()) {
                 // 200 인데 약속한 모양이 아니면 읽지 못한 본문으로 본다.
+                log.warn("자식 session 의 provider 응답이 객체가 아니다 profile={}", profile);
                 return SubagentProviderLookup.unreachable();
             }
             String provider = text(row, "provider");
@@ -59,6 +60,11 @@ public class SubagentProviderClient {
             return SubagentProviderLookup.absent();
         } catch (RuntimeException ex) {
             // 5xx, 연결 실패, 시간 초과, 읽지 못한 본문이다. 잠시 뒤 다시 읽을 수 있다.
+            // 예외 본문에는 주소와 응답 본문이 섞일 수 있어 종류만 남긴다.
+            log.warn(
+                    "자식 session 의 provider 를 읽지 못했다 error={} profile={}",
+                    ex.getClass().getSimpleName(),
+                    profile);
             return SubagentProviderLookup.unreachable();
         }
     }
