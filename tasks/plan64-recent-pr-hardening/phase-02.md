@@ -91,7 +91,7 @@ public AgentExecution startDetached(CurrentUser user, Agent agent, ModelChoice r
   - 에이전트 기본값이 있으면 Hermes 에 보낸 세 값과 실행 줄의 `provider`, `model`, `reasoningEffort` 가 같고 출처가 `AGENT_DEFAULT` 다.
   - 기본값이 비면 Hermes 에 세 값을 보내지 않고 실행 줄의 세 값이 null 이며 출처가 `UNKNOWN` 이다.
   - `startDetached` 의 모양이 바뀌어 깨지는 기존 호출을 고친다.
-- 저장소 전체에서 `startDetached(` 를 찾아 남은 호출이 없게 한다.
+- 저장소 전체에서 `startDetached(` 를 찾아 2인자 호출이 남지 않게 한다. 3인자 호출만 남는다.
 
 ## 검증
 

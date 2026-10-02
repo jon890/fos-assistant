@@ -127,16 +127,28 @@ public ModelChoice profileDefaultOf(Agent agent)
   - Hermes 가 기본 모델을 주지 않으면 통과한다. 기본 provider 만 주지 않으면 모델 이름으로 판정한다.
   - 빈 mapping 인 단계의 `resolveTier` 도 같은 판정을 지난다.
   - `resolveDetached` 가 같은 판정을 지나고 에이전트 기본값을 돌려준다.
+  - 이 파일의 기존 테스트는 `mock(ModelVisibilityService.class)` 를 넘긴다. 새 판정이 `visibility.hiddenFor(groupId)` 를 먼저 부르므로
+    기존 준비 코드와 `tierFixtures()` 에 `when(visibility.hiddenFor(any())).thenReturn(HiddenModels.none())` 을 더한다. 빠뜨리면 null 로 NPE 가 난다.
+  - 기존 `hiddenModelIsRejectedInsteadOfReplaced` 는 `visibility.requireVisible(10L, choice)` 에 `doThrow` 를 걸어 둔다. `resolve` 가 그 메서드를 더 부르지 않으므로
+    `hiddenFor(10L)` 이 그 모델을 담은 `HiddenModels` 를 돌려주게 바꾼다. `MODEL_HIDDEN` 단언은 그대로 둔다.
 - `backend/src/test/java/com/bifos/assistant/chat/ModelOptionsServiceTest.java`: `profileDefaultOf` 가 들고 있는 목록을 다시 쓰고(Hermes 호출 한 번), 다시 읽기가 실패하면 옛 값을 돌려준다.
 - `backend/src/test/java/com/bifos/assistant/agent/StarterSuggestionServiceTest.java`:
-  profile 의 기본 모델이 숨긴 모델이면 Hermes 에 제출하지 않고 실행 줄이 `FAILED` 와 `MODEL_HIDDEN` 으로 남는다. 생성자 인자가 늘어 깨지는 준비 코드를 고친다.
-- `backend/src/test/java/com/bifos/assistant/chat/ModelVisibilityTest.java`:
-  에이전트 기본 모델이 없는 에이전트로 보낼 때 profile 의 기본 모델을 숨기면 409 `MODEL_HIDDEN` 이고 `FAILED` 실행 줄이 남는다. 숨김을 풀면 다시 돈다.
+  `resolveDetached` 가 `MODEL_HIDDEN` 을 던지면 Hermes 에 제출하지 않고 실행 줄이 `FAILED` 와 `MODEL_HIDDEN` 으로 남는다.
+  이 경우만 Mockito 가짜 `ModelTierService` 를 생성자에 넘긴다. 이 테스트의 사용자는 다른 테스트와 같은 그룹을 써서, `model_hidden` 줄을 실제로 넣으면
+  같은 DB 를 쓰는 다른 테스트의 기본값 실행이 막힌다. 나머지 기존 테스트의 생성자에는 주입받은 실제 `ModelTierService` bean 을 넘긴다. 그 그룹에는 숨김이 없어 목록을 읽지 않는다.
+- `backend/src/test/java/com/bifos/assistant/chat/ModelSelectionTest.java`(`ChatService` 를 직접 부르는 통합 테스트다):
+  `HermesModelClient` 를 `@MockitoBean` 으로 두고 `readCatalog` 가 profile 의 기본 provider 와 모델을 담은 `HermesModelCatalog` 를 돌려주게 한다.
+  에이전트 기본 모델이 없는 에이전트로 보낼 때 그 기본 모델을 숨기면 `ApiException` 의 코드가 `MODEL_HIDDEN` 이고 `FAILED` 실행 줄이 남으며 Hermes 에 제출되지 않는다.
+  숨김을 비우면 같은 대화가 다시 돈다. 넣은 `model_hidden` 줄은 그 테스트 안의 `finally` 나 `@AfterEach` 에서 그 그룹 것을 지운다.
+  HTTP 409 는 아래 e2e 단계가 확인한다. `@MockitoBean` 이 이 클래스의 다른 테스트를 깨면 기존 테스트가 기대하던 응답을 같은 가짜에 준비한다.
 - `test/e2e/scenarios/model-selection.ts`: 기존 「숨긴 모델은 목록에서 빠지고…」 단계의 `finally` 뒤(에이전트 기본 모델을 비운 뒤)에 단계를 더한다.
-  `PROFILE_DEFAULT` 의 모델을 숨기고 에이전트 기본 모델이 없는 채로 보내면 409 `MODEL_HIDDEN` 이고 맨 위 실행이 `FAILED`, `MODEL_HIDDEN` 이며
-  Hermes 에 제출되지 않는다. `finally` 에서 숨김을 비우고, 그 뒤의 기존 단계가 그대로 통과하는지 본다.
-- `test/browser/agent-model.spec.ts`: 에이전트 기본 모델이 없고 profile 의 기본 모델을 숨긴 응답에서 `agent-model-profile-default-hidden` 이 보이고,
-  숨김이 없으면 보이지 않는다. 이 파일의 기존 준비 방식을 따른다.
+  `PROFILE_DEFAULT` 의 모델을 숨기고, **`DEFAULT` 로 되돌려 둔 `tierConversationId` 로** 보낸다. 새 대화로 보내면 앞에서 저장한 그룹 단계 정의로 해석돼 모델이 실리고 이 판정을 지나지 않는다.
+  응답이 409 `MODEL_HIDDEN` 이고 맨 위 실행이 `FAILED`, `MODEL_HIDDEN` 이다. 가짜 Hermes 가 받은 실행 수가 보내기 앞뒤로 같은지로 제출되지 않았음을 확인한다.
+  가짜 Hermes 에 그 수를 읽는 길이 없으면 `test/e2e/fake-hermes.ts` 에 읽기 전용 접근자 하나를 더한다.
+  `finally` 에서 숨김을 비우고, 그 뒤의 기존 단계가 그대로 통과하는지 본다.
+- `test/browser/agent-model.spec.ts`: 이 파일에서 `model-settings` 응답을 `page.route` 로 바꿔 끼우는 기존 테스트와 같은 방식을 쓴다.
+  **실제 숨김 저장으로 profile 의 기본 모델을 숨기지 않는다.** 숨기면 그 그룹의 기본값 실행이 막혀 다른 브라우저 검사가 깨진다.
+  에이전트 기본 모델이 없고 profile 의 기본 모델을 숨긴 응답에서 `agent-model-profile-default-hidden` 이 보이고, 숨김이 빈 응답에서는 보이지 않는다.
 - 기존 테스트 가운데 「에이전트 기본 모델 없이 숨김을 건 채 모델을 싣지 않고 실행해 성공한다」 를 전제한 것이 깨지면,
   그 테스트가 지키던 뜻을 유지하도록 숨기는 모델을 profile 의 기본 모델이 아닌 것으로 바꾼다. 단언을 지우지 않는다.
 
@@ -144,7 +156,7 @@ public ModelChoice profileDefaultOf(Agent agent)
 
 ```bash
 # cwd: 저장소 root
-cd backend && ./gradlew test --tests '*ModelTierServiceTest' --tests '*ModelOptionsServiceTest' --tests '*ModelVisibilityTest' --tests '*StarterSuggestionServiceTest' --tests '*ArchitectureRulesTest'
+cd backend && ./gradlew test --tests '*ModelTierServiceTest' --tests '*ModelOptionsServiceTest' --tests '*ModelSelectionTest' --tests '*ModelVisibilityTest' --tests '*StarterSuggestionServiceTest' --tests '*ArchitectureRulesTest'
 cd backend && ./gradlew test
 cd backend && ./gradlew qualityCheck
 cd web && pnpm typecheck && pnpm lint && pnpm format:check
@@ -167,7 +179,8 @@ cd web && pnpm test:browser agent-model
 | `web/src/lib/model-settings.ts` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ModelTierServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ModelOptionsServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ModelVisibilityTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ModelSelectionTest.java` | 수정 |
+| `test/e2e/fake-hermes.ts` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/agent/StarterSuggestionServiceTest.java` | 수정 |
 | `test/e2e/scenarios/model-selection.ts` | 수정 |
 | `test/browser/agent-model.spec.ts` | 수정 |
