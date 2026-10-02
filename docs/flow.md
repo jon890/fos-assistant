@@ -36,6 +36,7 @@ flowchart LR
 | ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다 |
 
 **①은 사용자를 정하고 ③은 profile 만 정한다.** 둘은 성질도 다르다.
+①을 받을 때마다 Control Plane 이 그 사용자가 허용 목록에서 꺼졌는지 확인한다. 꺼졌으면 401 `ACCESS_REVOKED` 로 답하고 웹이 세션을 끊는다. 흐름은 [`backend/people.md`](backend/people.md#사용자를-껐을-때) 의 「사용자를 껐을 때」 가 갖는다.
 ④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다.
 
 | 축 | ① 웹 토큰 | ③ agent_token |

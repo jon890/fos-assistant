@@ -1,0 +1,12 @@
+{
+  "name": "plan67-session-allow-check",
+  "description": "꺼진 사용자의 웹 세션을 요청마다 막는다 — 허용 목록을 로그인할 때만 봐서 관리자가 꺼도 세션이 남은 동안 모든 사용자 API 가 열려 있다",
+  "status": "pending",
+  "created_at": "2026-10-02",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}
