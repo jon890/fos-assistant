@@ -56,18 +56,18 @@ export function subagentGapDetail(gap: SubagentGap): string
 
 ### 4. `test/e2e/fake-hermes.ts` 와 e2e 시나리오
 
-- 입력 「자식 provider 확인 검사」 를 더한다. 기존 세 입력과 같은 흐름이되 자식 session 응답에 `billing_provider` 와 표본 가격표에 있는 모델을 싣는다. provider 와 모델은 `backend/src/test/resources/pricing/models-dev-sample.json` 에서 고르고, 부모 바인딩(`test/e2e/scenarios/binding.ts` 의 `DAD_BINDING`)과 다른 짝이 있으면 그것을 쓴다. `childUsages` 의 값에 provider 와 모델을 담을 칸을 더한다
+- 입력 「자식 provider 확인 검사」 를 더한다. 기존 세 입력과 같은 흐름이되 자식 session 응답에 `billing_provider: "anthropic"` 과 `model: "example-model-large"` 를 싣는다. 표본 가격표에서 부모 바인딩(`openai-codex` / `example-model`)과 다른 유일한 짝이다. 토큰은 기존 자식과 같다. `childUsages` 의 값에 provider 와 모델을 담을 칸을 더한다. 자식 금액은 일반 입력과 cache write 110 × 15, cache read 50 × 1.5, 출력 20 × 75 를 더한 3225 마이크로 달러다
 - `test/e2e/scenarios/streaming.ts` 에 step 을 더한다
   - 「자식 provider 확인 검사」 를 보내고 `/usage/monthly-cost` 의 `pricedSubagents` 가 1 늘 때까지 기다린다(기존 자식 검사와 같은 20초 기한). 늘기 전과 뒤의 `estimatedCostMicros` 차이가 부모 실행의 금액과 자식 금액(표본 단가로 계산한 상수)의 합과 같다
   - 5초 더 기다린 뒤에도 `pricedSubagents` 와 `estimatedCostMicros` 가 그대로다(다시 조회해도 두 번 더하지 않는다)
-  - 기존 세 입력의 자식은 `unpricedSubagents` 로 세어진다
-- `test/e2e/scenarios/usage-cost.ts` 의 합계 기대값이 위 자식 금액 때문에 달라지면 그 상수를 고치고, 까닭을 그 파일의 주석에 적는다. 달라지지 않으면 고치지 않는다
+  - 기존 세 입력의 반복 앞에서 읽은 `unpricedSubagents` 가 세 입력을 모두 확인한 뒤 3 늘었는지 본다(줄이 `DONE` 이 되는 것은 완료 사건이 보인 것과 같은 트랜잭션이다)
+- `test/e2e/scenarios/usage-cost.ts` 는 고치지 않는다. `test/e2e/run.ts` 에서 `usageCostScenario` 가 `streamingScenario` 보다 먼저 돌아 합계 기대값이 달라지지 않는다
 
 ### 5. 이 phase 를 검증하는 테스트
 
 - `test/unit/subagent-gap.test.ts`(신규): 셋 다 0 이면 합계 0 과 빈 문자열, 하나만 0 이 아니면 그 하나만, 셋 다 있으면 순서대로 쉼표로 이어진 문구
-- `test/browser/usage.spec.ts`: 「자식 완료 사건 없음 검사」 를 보낸 뒤 `/usage` 를 다시 열어 가며(30초 기한) 「금액을 확인하지 못한 하위 에이전트」 가 보이는지 본다. `MEMBER` 역할 화면에는 그 문구가 없는지 기존 `MEMBER` 검사에 한 줄 더한다
-- `test/browser/usage-breakdown.spec.ts`: 줄 타입에 `subagents` 가 필요해 고칠 곳이 있으면 고친다
+- `test/browser/usage.spec.ts`: 「자식 완료 사건 없음 검사」 를 보낸 뒤 `/usage` 를 다시 열어 가며(30초 기한) 「금액을 확인하지 못한 하위 에이전트」 가 보이는지 본다. 기존 `MEMBER` 검사(「실행 기록과 요약과 대화의 작업 과정에 내부 값이 없다」)에서도 「자식 완료 사건 없음 검사」 를 먼저 보내고 그 문구가 없는지 본다. 부모가 끝나면 그 자식은 바로 `pendingSubagents` 로 세어지므로, 자식 없이 문구가 없는 것과 구분된다
+- `test/browser/usage-breakdown.spec.ts`: 「자식 완료 사건 없음 검사」 를 보낸 뒤 에이전트 축을 다시 열어 가며(30초 기한) 「하위 에이전트 1건」 이 보이는지 보는 검사를 더한다. 토큰이 적힌 줄만 세므로 재조회 한 주기를 기다려야 한다. 이름이 겹치지 않게 그 spec 의 기존 검사가 쓰는 에이전트와 project 구분 방식을 따른다
 
 ## 검증
 
@@ -92,7 +92,6 @@ scripts/check-public-safe.sh
 | `web/src/components/usage/breakdown-table.tsx` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/streaming.ts` | 수정 |
-| `test/e2e/scenarios/usage-cost.ts` | 수정 |
 | `test/unit/subagent-gap.test.ts` | 신규 |
 | `test/browser/usage.spec.ts` | 수정 |
 | `test/browser/usage-breakdown.spec.ts` | 수정 |

@@ -227,8 +227,8 @@ provider 를 읽는 경로는 이슈 #110 이 다룬다.
 
 | 응답 칸 | 세는 것 |
 | --- | --- |
-| `pendingSubagents` | `WAITING` 줄. session 이 있는 시작 사건인데 아직 작업 줄이 없는 자식도 여기 센다 |
-| `unconfirmedSubagents` | `EXPIRED` 줄과 session 없이 온 시작 사건 |
+| `pendingSubagents` | `WAITING` 줄. session 이 있는 시작 사건인데 아직 작업 줄이 없고 부모가 끝난 지 24시간 안인 자식도 여기 센다 |
+| `unconfirmedSubagents` | `EXPIRED` 줄과 session 없이 온 시작 사건. 작업 줄 없이 부모가 끝난 지 24시간이 지난 자식도 여기 센다. 재조회가 그 자식을 더는 찾지 않기 때문이다 |
 | `unpricedSubagents` | 금액이 없는 `DONE` 줄 |
 
 `pricedSubagents` 는 금액이 있는 `DONE` 줄의 수다.

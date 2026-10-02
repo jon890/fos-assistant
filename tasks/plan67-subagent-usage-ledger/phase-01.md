@@ -29,6 +29,7 @@ Hermes `delegate_task` 가 만든 native 자식의 provider, 모델, 토큰, 환
 - provider 를 부모 실행이나 모델 이름에서 추정하지 않는다. session 응답에 없으면 비운다
 - 완료 사건(`SUBAGENT_COMPLETED`)은 표시용으로 그대로 둔다. 사건이 없을 때만 새로 만드는 지금 동작을 유지한다
 - 표와 클래스 이름을 바꾸지 않는다. 같은 저장소에서 다른 작업이 `usage` 패키지를 함께 고친다
+- 지난 자식을 다시 조회 대기로 넣어도 조회는 기존 한도(5초마다 batch 20, 동시 4)를 따른다. 2026-10-02 에 운영에서 센 지난 자식은 6건이다
 - 마이그레이션 번호는 `origin/main` 의 최신 다음 번호다. 작업을 시작할 때 `git fetch origin` 뒤 `git ls-tree --name-only origin/main backend/src/main/resources/db/migration/` 로 V55 가 비어 있는지 다시 본다. 이미 쓰였으면 다음 번호로 옮기고 테스트 이름의 번호도 맞춘다
 
 ## 작업 항목
@@ -52,8 +53,8 @@ Hermes `delegate_task` 가 만든 native 자식의 provider, 모델, 토큰, 환
 1. `status = 'DONE'` 인 줄을 `status = 'WAITING'`, `next_attempt_at = created_at`, `expires_at = TIMESTAMPADD(HOUR, 24, CURRENT_TIMESTAMP(6))`, `attempts = 0`, `backoff_attempts = 0` 으로 바꾼다. 칸을 더한 뒤이므로 이 줄들은 사용량 칸이 비어 있다
 2. `execution_event` 의 `event_type = 'SUBAGENT_STARTED'` 이고 `hermes_session_id IS NOT NULL` 이며 부모 `agent_execution.finished_at IS NOT NULL` 인 자식 중, 같은 `profile_name` 과 `child_session_id` 의 작업 줄이 없는 것을 넣는다. 한 `(execution_id, hermes_session_id)` 에 한 줄만 넣는다(시작 사건이 중복돼도). 같은 profile 의 같은 session 이 여러 실행에 있으면 `execution_id` 가 가장 작은 것만 넣는다
    - `parent_session_id` 는 부모의 `hermes_session_id`, `profile_name` 은 부모의 `profile_name`, `created_at` 과 `next_attempt_at` 은 그 시작 사건의 가장 이른 `occurred_at`, `expires_at` 은 위와 같은 식이다
-   - 부모의 에이전트가 없거나 `deleted_at IS NOT NULL` 이면 `status = 'EXPIRED'`, `unconfirmed_reason = 'AGENT_MISSING'`, `api_base_url = ''` 이다
-   - 에이전트의 `hermes_profile` 이 부모의 `profile_name` 과 다르면 `status = 'EXPIRED'`, `unconfirmed_reason = 'PROFILE_CHANGED'` 다
+   - 부모의 에이전트가 없거나 `deleted_at IS NOT NULL` 이면 `status = 'EXPIRED'`, `unconfirmed_reason = 'AGENT_MISSING'` 이다. `api_base_url` 은 에이전트 행이 있으면 그 값, 없으면 `''` 다(`discover` 와 같다)
+   - 에이전트의 `hermes_profile` 이 부모의 `profile_name` 과 다르면 `status = 'EXPIRED'`, `unconfirmed_reason = 'PROFILE_CHANGED'` 이고 `api_base_url` 은 에이전트의 값이다
    - 그 밖에는 `status = 'WAITING'` 이고 `api_base_url` 은 에이전트의 값이다
 
 문은 MySQL 과 H2 `MODE=MySQL` 에서 모두 돌아야 한다. `backend/src/main/resources/db/migration/V44__subagent_usage_jobs.sql` 의 파생 표 쓰는 방식을 선례로 삼는다.
@@ -113,6 +114,8 @@ public void record(SubagentSessionUsage usage, ExecutionCost cost, String reason
   - `DONE` 이던 줄이 `WAITING` 이 되고 `next_attempt_at` 이 `created_at` 과 같다
   - 작업 줄이 없던 자식(시작 사건이 둘 중복)이 `WAITING` 한 줄로 들어온다
   - 에이전트가 지워진 부모의 자식은 `EXPIRED` 와 `AGENT_MISSING` 이다
+  - 에이전트의 `hermes_profile` 이 부모의 `profile_name` 과 다른 자식은 `EXPIRED` 와 `PROFILE_CHANGED` 다
+  - 같은 profile 의 같은 session 이 두 실행의 시작 사건에 있으면 `execution_id` 가 작은 쪽 한 줄만 들어온다
   - `WAITING` 과 `EXPIRED` 이던 줄은 그대로다
   - 새 칸이 모두 있다
 - `backend/src/test/java/com/bifos/assistant/usage/application/SubagentUsageReconcilerTest.java`: `fixtures()` 에 `CostEstimator` 를 넣는다(가짜 `PriceCatalog` 로 만든 실제 `CostEstimator` 나 mock). 아래를 더하고, 「완료 사건이 있으면 조회 없이 끝낸다」 는 기존 검사는 새 동작에 맞게 고친다
@@ -129,11 +132,13 @@ public void record(SubagentSessionUsage usage, ExecutionCost cost, String reason
 ```bash
 cd backend && ./gradlew test --tests '*SubagentUsageLedgerMigrationTest' --tests '*SubagentUsageReconcilerTest' --tests '*SubagentUsageJobTest' --tests '*HermesRuntimeReadTest'
 cd backend && ./gradlew test
+node test/e2e/run.ts
 scripts/quality.sh check
 scripts/check-public-safe.sh
 ```
 
 모두 종료 코드 0 이다. `./gradlew test` 는 `backend/src/test` 전체를 돌려 위 네 테스트를 포함한다.
+`node test/e2e/run.ts` 는 Flyway 로 만든 스키마를 엔티티와 대조(`ddl-auto: validate`)하며 backend 를 띄운다. 마이그레이션과 엔티티의 칸이 어긋나면 여기서 기동이 실패한다. `test/e2e/scenarios/streaming.ts` 의 자식 세 입력이 바뀐 `poll` 의 회귀도 확인한다. 이 phase 에서는 e2e 파일을 고치지 않는다.
 
 ## 변경 파일
 
