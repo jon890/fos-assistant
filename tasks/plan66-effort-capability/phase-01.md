@@ -8,7 +8,7 @@
 `none` 을 끄기 지원이 확인된 모델에서만 저장하게 한다.
 Hermes 가 주지 않은 값을 우리가 참으로 채우던 것을 없앤다.
 
-**범위 외**: web 화면(phase 02). `reasoningCapable` 의 제거(phase 02). 그룹 단계 정의는 `none` 을 받지 않으므로 바꾸지 않는다.
+**범위 외**: web 화면(phase 02). `reasoningCapable` 의 제거(다음 배포). 그룹 단계 정의는 `none` 을 받지 않으므로 바꾸지 않는다.
 
 ## 컨텍스트
 
@@ -33,7 +33,7 @@ Hermes 가 주지 않은 값을 우리가 참으로 채우던 것을 없앤다.
 - `minimal` 은 추가하지 않는다. 지원을 확인할 신호가 없다
 - 그룹 단계 정의(`ModelTierService`, `ModelTierProperties`)는 `none` 을 받지 않는다. 모델을 가리키는 profile 이 하나가 아니라 검증할 목록이 없다. `ModelChoice.REASONING_EFFORTS` 는 `low` 부터 `max` 그대로 두고, 요청 검증용 허용 값을 따로 둔다
 - 요청한 effort 와 적용한 effort 는 다르다. 실행 줄의 `reasoning_effort` 는 보낸 값이고 출처 구분(`ReasoningEffortSource`)은 바꾸지 않는다. `none` 도 보낸 값으로 적는다
-- 이 phase 에서 응답의 `reasoningCapable` 은 지우지 않고 `support != UNSUPPORTED` 로 계산해 남긴다. web 이 phase 02 에서 새 칸으로 옮긴 뒤 지운다
+- 응답의 `reasoningCapable` 은 지우지 않고 `support != UNSUPPORTED` 로 계산해 남긴다. backend 와 web 이 같은 순간에 배포된다고 확인하지 못해, 옛 web 이 깨지지 않게 다음 배포까지 둔다
 
 ## 작업 항목
 
@@ -57,7 +57,7 @@ JSON 으로는 `{"support": "SUPPORTED", "disable": "UNKNOWN"}` 가 나간다. J
 
 ### 3. `ModelOptionsService`
 
-- `withEveryModelReasoning` 과 그 호출을 없앤다. `optionsOf` 는 `withoutHidden` 의 결과를 그대로 `providers` 에 담는다
+- `withEveryModelReasoning` 과 그 호출을 없앤다. 시험과 mock 이 `Provider(..., Map.of())` 로 만든 목록을 넘긴다(`ModelSelectionTest`, `ModelTierServiceTest`, `ModelVisibilityTest`). 항목이 없는 모델은 `reasoning().getOrDefault(model, ReasoningCapability.UNKNOWN_ALL)` 로 읽어 `UNKNOWN` 으로 본다. `allowsEffort` 와 `ProviderView` 계산이 모두 이 방식으로 읽는다 `optionsOf` 는 `withoutHidden` 의 결과를 그대로 `providers` 에 담는다
 - `withoutHidden` 은 남은 모델의 항목만 `reasoning` 에 담는다(숨긴 모델의 항목을 뺀다)
 - 클래스 Javadoc 과 `ModelOptions` 의 `providers` 설명에서 「Hermes 가 밝히지 않은 모델은 참이다」 를 지운다
 
@@ -80,24 +80,24 @@ public boolean allowsEffort(String provider, String model, String effort)
 ### 6. 저장 경로의 `none` 판정
 
 - `ModelTierService` 에 `public void requireEffortAllowed(CurrentUser user, Agent agent, ModelChoice choice)` 를 둔다. `choice.reasoningEffort()` 가 `none` 이 아니면 아무것도 하지 않는다. `none` 이면 `modelOptions.optionsForAgent(user.groupId(), agent).allowsEffort(choice.provider(), choice.model(), "none")` 이 거짓일 때 `ApiException(ErrorCode.VALIDATION_FAILED, "reasoning cannot be turned off for this model")` 을 던다. 목록 조회 실패(`HERMES_UNAVAILABLE`)는 그대로 올린다
-- `ChatService.chooseModel` 은 `modelTiers.requireVisible` 다음에 대화의 에이전트를 얻어(`chooseModelTier` 와 같은 방식) `modelTiers.requireEffortAllowed` 를 부른다
+- `ChatService.chooseModel` 은 `choice.reasoningEffort()` 가 `none` 일 때만, `modelTiers.requireVisible` 다음에 대화의 에이전트를 얻어(`chooseModelTier` 와 같은 방식) `modelTiers.requireEffortAllowed` 를 부른다. `none` 이 아니면 에이전트를 얻지 않는다. 꺼진 에이전트나 `agentId` 가 없는 대화의 기존 동작(`AGENT_DISABLED`, `AGENT_NOT_FOUND` 로 바뀌지 않는 것)을 지키려는 것이다
 - `AgentModelDefaultService.save` 는 `choice.reasoningEffort()` 가 `none` 일 때 `modelOptions.unfilteredForAgent(agent).allowsEffort(choice.provider(), choice.model(), "none")` 이 거짓이면 같은 예외를 던다. 모델이 비어 있으면 profile 의 기본 모델로 판정한다(`unfilteredForAgent` 의 기본 모델이 profile 의 값이다)
 - 그룹 단계 정의 저장(`ModelTierService.saveGroup`)과 `ModelTierProperties` 는 바꾸지 않는다. `none` 은 여전히 거절된다. 이 사실을 확인하는 테스트를 둔다(아래)
 
 ### 7. `ChatDtos.ProviderView`
 
-`ProviderView(String provider, String name, List<String> models, Map<String, ReasoningCapability> reasoning, Map<String, Boolean> reasoningCapable)` 로 바꾼다. `reasoningCapable` 은 각 모델의 `support != UNSUPPORTED` 로 계산한 임시 호환 칸이고 phase 02 가 지운다. `ModelOptionsView.from` 을 맞춘다.
+`ProviderView(String provider, String name, List<String> models, Map<String, ReasoningCapability> reasoning, Map<String, Boolean> reasoningCapable)` 로 바꾼다. `reasoningCapable` 은 각 모델의 `support != UNSUPPORTED` 로 계산한 호환 칸이다(항목이 없으면 `UNKNOWN_ALL` 로 읽어 참이다). 이미 배포된 옛 web 이 새 backend 응답을 읽어도 깨지지 않게 이번 배포에서는 남기고 Javadoc 에 「옛 web 호환용이고 다음 배포에서 지운다」 를 적는다. 지우는 일은 이 plan 의 범위 밖이다 `ModelOptionsView.from` 을 맞춘다.
 
 ### 8. 테스트와 e2e 대역
 
 - `backend/src/test/java/com/bifos/assistant/hermes/HermesModelCatalogTest.java`: 기존 두 시험(`mapsCapabilitiesReasoningToModelNameTable`, `leavesModelsMissingFromCapabilitiesOutOfTable`)을 새 타입에 맞게 바꾼다. 새 시험: `reasoning:true`→`SUPPORTED`, `reasoning:false`→`UNSUPPORTED`, 칸 없음(`{}`)과 `capabilities` 자체가 없는 provider→`UNKNOWN`(누락과 명시적 `false` 가 다른 사례임을 한 시험에서 함께 단언한다), `can_disable_reasoning` 참과 거짓과 없음의 세 가지
 - `backend/src/test/java/com/bifos/assistant/chat/ModelOptionsServiceTest.java`: 302 줄 근처의 기존 시험을 새 타입으로 바꾸고, Hermes 가 밝히지 않은 모델이 `UNKNOWN` 으로 남는지(참으로 채우지 않는지), 숨긴 모델의 항목이 빠지는지, `allowsEffort` 가 `none` 에서 `disable` 의 세 값과 `support` 가 `UNSUPPORTED` 인 경우와 모델이 목록에 없는 경우에 각각 맞게 답하는지를 확인한다
-- `backend/src/test/java/com/bifos/assistant/chat/ConversationModelChoiceTest.java`(없으면 `ModelSelectionTest.java`): `none` 이 `ModelChoice.of` 를 통과하고 `minimal` 은 `VALIDATION_FAILED` 인 것, `PUT .../model` 이 끄기 지원이 `SUPPORTED` 인 모델에서는 `none` 을 저장하고 `UNKNOWN` 과 `UNSUPPORTED` 인 모델에서는 `VALIDATION_FAILED` 로 거절하며 저장된 값을 바꾸지 않는 것. 이 시험들은 기존 시험이 Hermes 목록을 대신하는 방식(같은 폴더의 시험에서 쓰는 stub)을 따른다
-- `backend/src/test/java/com/bifos/assistant/chat/ModelTierRequestValidationTest.java`: 그룹 단계 정의에 `none` 을 넣으면 거절되는 시험을 더한다
-- 에이전트 기본 모델 저장 시험(`AgentModelDefault` 를 다루는 기존 시험 파일을 `grep -rln "AgentModelDefaultService" backend/src/test` 로 찾는다): `none` 이 끄기 지원이 `SUPPORTED` 인 모델이나 profile 기본 모델에서만 저장되고, 아니면 `VALIDATION_FAILED` 인 시험
+- `backend/src/test/java/com/bifos/assistant/chat/ModelSelectionTest.java`(`@MockitoBean HermesModelClient` 로 목록을 대신한다). `ConversationModelChoiceTest` 에는 목록 대역이 없어 쓰지 않는다. `ModelOptionsService` 는 시험에서도 profile 마다 10분 동안 목록을 들고 있으므로 시험마다 목록을 바꾸지 말고 `SUPPORTED`, `UNKNOWN`, `UNSUPPORTED` 모델을 한 목록에 모두 넣는다. 시험: `none` 이 `ModelChoice.of` 를 통과하고 `minimal` 은 `VALIDATION_FAILED` 인 것, `PUT .../model` 이 끄기 지원이 `SUPPORTED` 인 모델에서는 `none` 을 저장하고 `UNKNOWN` 과 `UNSUPPORTED` 인 모델에서는 `VALIDATION_FAILED` 로 거절하며 저장된 값을 바꾸지 않는 것. `ModelOptionsService` 를 직접 만드는 기존 시험은 `ModelOptionsServiceTest` 가 선례다
+- `backend/src/test/java/com/bifos/assistant/chat/ModelTierServiceTest.java`: `saveGroup` 의 거절 시험(190 줄 근처) 옆에 그룹 단계 정의에 `none` 을 넣으면 거절되는 시험을 더한다. `ModelTierRequestValidationTest` 는 서비스를 mock 으로 넣어 실제 판정이 돌지 않아 쓰지 않는다
+- `backend/src/test/java/com/bifos/assistant/chat/ModelVisibilityTest.java`(`AgentModelDefaultService` 시험이 있는 유일한 파일): 에이전트 기본 모델 저장에서 `none` 이 끄기 지원이 `SUPPORTED` 인 모델이나 profile 기본 모델에서만 저장되고, 아니면 `VALIDATION_FAILED` 인 시험
 - `backend/src/test/java/com/bifos/assistant/hermes/HermesRunRequestTest.java`: effort `none` 이 `model_options.reasoning.effort` 로 그대로 실리고, effort 가 null 이면 `model_options` 가 빠지는 것(미지정과 `none` 이 다르게 나가는 것)을 확인하는 시험을 더한다
-- `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java`(`grep -n REQUESTED` 로 effort 출처를 다루는 시험을 찾는다): effort `none` 으로 요청한 실행이 `reasoning_effort = none`, 출처 `REQUESTED` 로 남고, Hermes 가 완료 때 다른 provider 나 모델을 알려도 요청한 effort 가 바뀌지 않는 것을 확인한다(요청값을 적용값으로 보이지 않는다)
-- `test/e2e/fake-hermes.ts` 의 `/api/model/options` 응답(1338 줄 근처 `capabilities`)을 아래로 바꾼다. 모델 이름은 그 파일의 상수를 쓴다
+- `backend/src/test/java/com/bifos/assistant/chat/ModelSelectionTest.java`(보내기 흐름으로 실행 줄의 effort 를 이미 단언하는 205~230 줄 근처): 대화에 `none` 을 저장해 둔 채 보낸 실행이 `reasoning_effort = none`, 출처 `REQUESTED` 로 남고, Hermes 가 완료 때 다른 provider 나 모델을 알려도 요청한 effort 가 바뀌지 않는 것을 확인한다(요청값을 적용값으로 보이지 않는다)
+- `test/e2e/fake-hermes.ts` 의 `/api/model/options` 응답(1338 줄 근처 `capabilities`)을 아래로 바꾼다. 모델 이름은 그 파일의 상수를 쓴다. `can_disable_reasoning` 은 실제로는 aggregator provider 에만 오지만 대역은 `none` 을 시험하려고 기본 모델에도 준다. 이 사실을 대역에 주석으로 남긴다
 
   | 모델 | capabilities |
   | --- | --- |
@@ -113,14 +113,14 @@ public boolean allowsEffort(String provider, String model, String effort)
 
 ```bash
 # cwd: 저장소 root
-cd backend && ./gradlew test --tests '*HermesModelCatalogTest' --tests '*ModelOptionsServiceTest' --tests '*ConversationModelChoiceTest' --tests '*ModelSelectionTest' --tests '*ModelTierRequestValidationTest' --tests '*HermesRunRequestTest' --tests '*ExecutionLifecycleTest'
+cd backend && ./gradlew test --tests '*HermesModelCatalogTest' --tests '*ModelOptionsServiceTest' --tests '*ModelSelectionTest' --tests '*ModelTierServiceTest' --tests '*ModelVisibilityTest' --tests '*HermesRunRequestTest'
 cd backend && ./gradlew test
 node test/e2e/run.ts
 scripts/quality.sh check
 scripts/check-public-safe.sh
 ```
 
-기대값: 모두 종료 코드 0. `./gradlew test` 는 에이전트 기본 모델 저장 시험을 포함한다. `grep -rn "withEveryModelReasoning" backend/src` 가 비어 있어야 한다.
+기대값: 모두 종료 코드 0.  `grep -rn "withEveryModelReasoning" backend/src` 가 비어 있어야 한다.
 
 ## 변경 파일
 
@@ -138,9 +138,9 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesModelCatalogTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ModelOptionsServiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ConversationModelChoiceTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/chat/ModelTierRequestValidationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ModelSelectionTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ModelTierServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ModelVisibilityTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesRunRequestTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/usage/ExecutionLifecycleTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/model-selection.ts` | 수정 |
