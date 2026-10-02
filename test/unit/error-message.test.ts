@@ -34,3 +34,8 @@ test("문서를 만들고 고치다 거절되면 사용자가 할 일을 알린�
   assert.equal(describeError("MEMORY_ENCRYPTION_UNAVAILABLE", "no key"),
     "민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.");
 });
+
+test("없는 토큰을 폐기하려 하면 새로고침을 권한다", () => {
+  assert.equal(describeError("SERVICE_TOKEN_NOT_FOUND", "not found"),
+    "토큰을 찾지 못했어요. 화면을 새로고침해 확인해 주세요.");
+});
