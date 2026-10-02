@@ -12,7 +12,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 | 패키지 | 책임 |
 | --- | --- |
-| `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입 |
+| `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입, 토큰의 주소를 현재 사용자로 바꾸는 port |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `shared/config` | 시계, 스케줄링, 보안 필터 설정 |
 | `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문 |
