@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.AgentToolService;
+import com.bifos.assistant.agent.application.ProfileSkillFiles;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -21,7 +22,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.infra.SkillStore;
 import java.time.Instant;
 import java.util.List;
 import org.assertj.core.api.Assertions;
@@ -35,9 +35,9 @@ import org.mockito.Mockito;
 class AgentToolServiceTest {
 
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
-    private final SkillStore skillStore = mock(SkillStore.class);
+    private final ProfileSkillFiles skillFiles = mock(ProfileSkillFiles.class);
     private final AgentToolService service =
-            new AgentToolService(toolsets, skillStore, mock(AgentService.class), mock(AgentRepository.class));
+            new AgentToolService(toolsets, skillFiles, mock(AgentService.class), mock(AgentRepository.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
             "tools",
@@ -85,7 +85,7 @@ class AgentToolServiceTest {
     void otherUserReadingGroupAgentCannotChangeOwnerTier() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(
-                isolatedToolsets, mock(SkillStore.class), mock(AgentService.class), mock(AgentRepository.class));
+                isolatedToolsets, mock(ProfileSkillFiles.class), mock(AgentService.class), mock(AgentRepository.class));
         Agent groupAgent = Agent.of(
                 "group-tools",
                 "그룹 도구",
@@ -111,7 +111,7 @@ class AgentToolServiceTest {
     void otherUserReadingGroupAgentCannotReadToolList() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
         AgentToolService isolatedService = new AgentToolService(
-                isolatedToolsets, mock(SkillStore.class), mock(AgentService.class), mock(AgentRepository.class));
+                isolatedToolsets, mock(ProfileSkillFiles.class), mock(AgentService.class), mock(AgentRepository.class));
         Agent groupAgent = Agent.of(
                 "group-read",
                 "그룹 도구",
@@ -173,7 +173,7 @@ class AgentToolServiceTest {
     @Test
     @DisplayName("올린 스킬이 있으면 skills 를 끄는 저장을 거절하고 Hermes 를 부르지 않는다")
     void rejectsDisablingSkillsWhenUploadedSkillsExistAndSkipsHermes() {
-        when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
+        when(skillFiles.hasUploaded(agent.hermesProfile())).thenReturn(true);
 
         assertThatThrownBy(() -> service.write(owner, agent, List.of("web")))
                 .isInstanceOf(ApiException.class)
@@ -186,7 +186,7 @@ class AgentToolServiceTest {
     @Test
     @DisplayName("올린 스킬이 있어도 skills 를 둔 저장은 그대로 쓴다")
     void keepsSaveThatLeavesSkillsOnEvenWithUploadedSkills() {
-        when(skillStore.hasUploadedSkills(agent.hermesProfile())).thenReturn(true);
+        when(skillFiles.hasUploaded(agent.hermesProfile())).thenReturn(true);
         when(toolsets.readCatalog())
                 .thenReturn(List.of(
                         new ToolsetCatalogEntry("web", "Web", "검색"),

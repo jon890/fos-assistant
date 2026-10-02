@@ -1,5 +1,6 @@
 package com.bifos.assistant.people.application;
 
+import com.bifos.assistant.agent.application.ProfileProvisioning;
 import com.bifos.assistant.hermes.HermesDashboardClient;
 import com.bifos.assistant.hermes.HermesProfileKeyStore;
 import com.bifos.assistant.mcp.application.AgentTokenService;
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class HermesProfileProvisioner {
+public class HermesProfileProvisioner implements ProfileProvisioning {
 
     /** 접두를 붙여 부를 때 Hermes 가 이 profile 을 가리키는 이름이다. */
     private static final String MODEL_NAME_ENV = "API_SERVER_MODEL_NAME";
@@ -50,6 +51,7 @@ public class HermesProfileProvisioner {
      * <p>MCP 토큰은 profile 을 만든 직후 가장 먼저 넣는다. profile 이 만들어지면 MCP 등록이 이미 붙어
      * 있어, 토큰 없이 연결에 실패하는 일이 쌓이면 Hermes 가 다시 붙는 간격을 늘린다.
      */
+    @Override
     public void provision(String profileName) {
         dashboard.createProfile(profileName);
         try {
@@ -71,6 +73,7 @@ public class HermesProfileProvisioner {
      * 그 오류를 그대로 던진다. 부르는 쪽이 그것을 보고 에이전트를 지우지 않게 하기 위해서다. 없는 profile
      * 은 이미 지운 것으로 보므로, 다시 부르면 끝까지 거둔다.
      */
+    @Override
     public void deprovision(String profileName) {
         tokens.revokeAllFor(profileName);
         dashboard.deleteProfile(profileName);

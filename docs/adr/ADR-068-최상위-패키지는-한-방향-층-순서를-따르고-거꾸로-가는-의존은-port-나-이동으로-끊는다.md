@@ -1,6 +1,6 @@
 ## ADR-068: 최상위 패키지는 한 방향 층 순서를 따르고 거꾸로 가는 의존은 port 나 이동으로 끊는다
 
-- **status**: `accepted`. S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘을 끊었다(C5 의 첫 에이전트 만들기). 나머지 간선과 C1 부터 C4, C5 의 profile 만들기, C7 은 아직 구현 전이다
+- **status**: `accepted`. S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘과 `agent` 가 `people` 을 쓰는 하나(C5), `agent` 가 `skill` 과 `orchestration` 을 쓰는 둘을 끊었다. 나머지 간선과 C1 부터 C4, C7 은 아직 구현 전이다
 - **결정**: backend 의 최상위 패키지를 아래에서 위로 다음 순서에 둔다. 위 패키지는 아래 패키지를 쓰고, 아래 패키지는 위 패키지를 import 하지 않는다.
   `hermes`, `user`, `model`, `agent`, `skill`, `usage`, `memory`, `context`, `chat`, `orchestration`, `mcp`, `people`, `connector` 순이다. `shared` 는 이 순서 밖이고 어느 패키지도 쓰지 않는다.
   이 순서에서 거꾸로 가는 의존은 아래 셋 가운데 하나로 끊는다.

@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import java.util.LinkedHashMap;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @Slf4j
-public class FlowRegistry implements ApplicationRunner {
+public class FlowRegistry implements ApplicationRunner, KnownFlows {
 
     private final Map<String, Flow> byName;
     private final AgentRepository agents;
@@ -34,6 +35,11 @@ public class FlowRegistry implements ApplicationRunner {
     /** 그 이름의 흐름. 없으면 null 이다. */
     public Flow find(String name) {
         return name == null ? null : byName.get(name);
+    }
+
+    @Override
+    public boolean known(String name) {
+        return find(name) != null;
     }
 
     /** 기동할 때 저장된 에이전트의 흐름 이름을 모두 확인한다. */

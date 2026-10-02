@@ -149,7 +149,10 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 무엇 | 어디 |
 | --- | --- |
 | 만들기, 공개 범위, 지우기의 순서 | `agent/application/AgentLifecycleService` |
-| profile 을 만들고 거두기 | `people/application/HermesProfileProvisioner` 를 쓴다 |
+| profile 을 만들고 거두기 | `agent/application/ProfileProvisioning` port 로 부른다. 구현은 `people/application/HermesProfileProvisioner` 다 |
+| 허용 목록이 쥔 profile 이름인지 확인 | `agent/application/ReservedProfileNames` port 로 묻는다. 구현은 `people/application/AllowedPersonProfileNames` 다 |
+| 올린 스킬이 있는지 확인하고 지울 때 스킬 디렉터리 지우기 | `agent/application/ProfileSkillFiles` port 로 부른다. 구현은 `skill/application/ProfileSkillFilesAdapter` 다 |
+| 에이전트에 적는 흐름 이름 확인 | `agent/application/KnownFlows` port 로 묻는다. 구현은 `orchestration/application/FlowRegistry` 다 |
 | 대시보드 호출 | `hermes` |
 
 ## 페르소나를 고칠 때

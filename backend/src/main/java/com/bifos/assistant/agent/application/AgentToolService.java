@@ -8,7 +8,6 @@ import com.bifos.assistant.hermes.HermesToolsetClient.ToolsetCatalogEntry;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.infra.SkillStore;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,7 +34,7 @@ public class AgentToolService {
     public record ToolsetsView(List<ToolView> toolsets, List<String> unclassifiedEnabled) {}
 
     private final HermesToolsetClient toolsets;
-    private final SkillStore skillStore;
+    private final ProfileSkillFiles skillFiles;
     private final AgentService agents;
     private final AgentRepository agentRepository;
 
@@ -49,7 +48,7 @@ public class AgentToolService {
         requireOwnerOrAdmin(user, agent);
         // 올린 스킬은 skills toolset 으로만 읽힌다. 스킬을 둔 채 끄면 화면에 보이는 스킬이 돌지 않는다(ADR-034).
         if ((requested == null || !requested.contains(AgentToolPolicy.SKILLS))
-                && skillStore.hasUploadedSkills(agent.hermesProfile())) {
+                && skillFiles.hasUploaded(agent.hermesProfile())) {
             throw new ApiException(
                     ErrorCode.VALIDATION_FAILED, "the skills toolset stays on while this agent has uploaded skills");
         }

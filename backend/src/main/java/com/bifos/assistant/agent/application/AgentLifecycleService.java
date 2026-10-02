@@ -7,13 +7,9 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesToolsetClient;
-import com.bifos.assistant.people.application.HermesProfileProvisioner;
-import com.bifos.assistant.people.application.PeopleProperties;
-import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -54,13 +50,13 @@ public class AgentLifecycleService {
     private final AgentRepository agents;
     private final AgentService agentService;
     private final AppUserRepository users;
-    private final AllowedPersonRepository allowedPeople;
-    private final HermesProfileProvisioner provisioner;
+    private final ReservedProfileNames reservedProfileNames;
+    private final ProfileProvisioning provisioner;
     private final HermesToolsetClient hermesToolsets;
     private final HermesProperties hermesProperties;
     private final PeopleProperties peopleProperties;
     private final AgentProperties properties;
-    private final SkillStore skillStore;
+    private final ProfileSkillFiles skillFiles;
     private final Clock clock;
 
     /**
@@ -197,7 +193,7 @@ public class AgentLifecycleService {
 
     private void removeSkillDirectory(String profileName) {
         try {
-            skillStore.deleteAll(profileName);
+            skillFiles.deleteAll(profileName);
         } catch (RuntimeException failure) {
             log.warn("지운 에이전트의 스킬 디렉터리를 지우지 못했다. 쓰이지 않을 디렉터리가 남는다 profile={}", profileName, failure);
         }
@@ -244,7 +240,7 @@ public class AgentLifecycleService {
     private boolean isTaken(String code, String profileName) {
         return agents.findByCode(code).isPresent()
                 || agents.existsByHermesProfile(profileName)
-                || allowedPeople.existsByHermesProfile(profileName);
+                || reservedProfileNames.reservedByPerson(profileName);
     }
 
     /**
