@@ -8,5 +8,4 @@ package com.bifos.assistant.chat.application;
  * @param conversationId 위임을 맡긴 부모 실행의 대화
  * @param executionId 끝난 위임 실행
  */
-public record DelegationFinished(Long conversationId, Long executionId) {
-}
+public record DelegationFinished(Long conversationId, Long executionId) {}
