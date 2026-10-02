@@ -1,6 +1,9 @@
 import { SignJWT } from "jose";
 import { auth } from "@/auth";
-import { readControlPlaneResult, type ControlPlaneResult } from "@/lib/control-plane-result";
+import {
+  readControlPlaneResult,
+  type ControlPlaneResult,
+} from "@/lib/control-plane-result";
 
 /** Control Plane 토큰은 한 요청 동안만 산다. 브라우저는 이 토큰을 보지 않는다. */
 const TOKEN_LIFETIME = "2m";
@@ -71,7 +74,9 @@ export type ControlPlaneResponse =
   | { ok: true; response: Response }
   | { ok: false; status: number; code: string; message: string };
 
-type Authorized = { ok: true; token: string } | { ok: false; status: number; code: string; message: string };
+type Authorized =
+  | { ok: true; token: string }
+  | { ok: false; status: number; code: string; message: string };
 
 /**
  * 세션에서 메일 주소를 꺼내 Control Plane 토큰을 만든다.
@@ -82,9 +87,17 @@ async function authorize(): Promise<Authorized> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email) {
-    return { ok: false, status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요해요." };
+    return {
+      ok: false,
+      status: 401,
+      code: "UNAUTHENTICATED",
+      message: "로그인이 필요해요.",
+    };
   }
-  return { ok: true, token: await mintToken(email, session.user?.name ?? email) };
+  return {
+    ok: true,
+    token: await mintToken(email, session.user?.name ?? email),
+  };
 }
 
 export async function requestControlPlane(
@@ -105,7 +118,9 @@ export async function requestControlPlane(
       method: init.method ?? "GET",
       headers: {
         Authorization: `Bearer ${authorized.token}`,
-        ...(init.body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(init.body === undefined
+          ? {}
+          : { "Content-Type": "application/json" }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
       cache: "no-store",
@@ -150,9 +165,17 @@ export async function forwardControlPlane(
 
   // 연결이 끊기면 fetch 가 던진다. 라우트가 JSON 이 아닌 500 을 내지 않게 오류 결과로 바꿔 돌려준다.
   try {
-    return { ok: true, response: await fetch(`${baseUrl()}${path}`, requestInit) };
+    return {
+      ok: true,
+      response: await fetch(`${baseUrl()}${path}`, requestInit),
+    };
   } catch {
-    return { ok: false, status: 502, code: "INTERNAL_ERROR", message: "요청을 처리하지 못했어요." };
+    return {
+      ok: false,
+      status: 502,
+      code: "INTERNAL_ERROR",
+      message: "요청을 처리하지 못했어요.",
+    };
   }
 }
 
