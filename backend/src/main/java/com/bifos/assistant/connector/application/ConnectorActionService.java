@@ -568,15 +568,13 @@ public class ConnectorActionService {
      * 지금 카탈로그로 볼 때 그 줄의 도구가 상시 허락을 닫은 도구인가(ADR-065).
      *
      * <p>승인을 받는 도구이고 선언이 상시 허락을 닫았을 때다. 밖으로 나가는 호출이라 사람이 인자를 다 읽어야 한다.
-     * 카탈로그를 읽지 못했으면 닫은 것으로 본다. 선언 없는 도구와 상시 허락을 줄 수 있는 도구는 아니다.
+     * 카탈로그를 읽지 못했으면 닫았는지 알 수 없으므로 거짓이다. 그 줄은 판정이 이미 {@code NOT_EXECUTABLE} 로
+     * 끝내 실행되지 않는다. 선언 없는 도구와 상시 허락을 줄 수 있는 도구도 거짓이다.
      *
      * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
      */
     private static boolean grantClosed(Optional<ConnectorManifest> manifest, ConnectorAction action) {
-        if (manifest.isEmpty()) {
-            return true;
-        }
-        return ConnectorToolPolicies.find(manifest.get(), action.toolName())
+        return manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName()))
                 .filter(declared -> declared.approval() == ToolApproval.REQUIRED && !declared.grantable())
                 .isPresent();
     }
@@ -613,6 +611,9 @@ public class ConnectorActionService {
         if (action.conversationId() == null) {
             return;
         }
+     *
+     * <p>카탈로그를 읽지 못했으면 거짓이다. 그 도구가 상시 허락을 닫았는지 모르는 채 다른 커넥터의 줄에도 경고를 붙이면
+     * 화면이 알리는 까닭이 틀린다. 실행은 {@link #beginApproval} 이 지금 정책을 판정하지 못한 줄로 막는다.
         try {
             events.publishEvent(new ConnectorActionChanged(action.conversationId(), action.publicId()));
         } catch (RuntimeException ex) {

@@ -679,8 +679,8 @@ class ConnectorActionServiceTest {
     }
 
     @Test
-    @DisplayName("카탈로그를 읽지 못하면 가려지는 글이 있는 줄은 hiddenArgs 가 참이고 승인해도 hidden_args 로 끝나며, 가려지는 글이 없는 줄은 거짓이다")
-    void unreadableCatalogTreatsToolAsClosed() {
+    @DisplayName("카탈로그를 읽지 못하면 가려지는 글이 있는 줄도 hiddenArgs 가 거짓이고 승인하면 판정하지 못한 줄로 NOT_EXECUTABLE 로 끝난다")
+    void unreadableCatalogDoesNotWarnAboutHiddenArguments() {
         UUID hidden = ask(WRITE, "{\"text\":\"" + HIDDEN_TOKEN + "\"}").actionId();
         UUID plain = ask(WRITE, ARGS).actionId();
         ConnectorPolicyTestDoubles.expireCatalog();
@@ -688,11 +688,11 @@ class ConnectorActionServiceTest {
 
         assertThat(service.listForConversation(me, CONVERSATION))
                 .extracting(ConnectorActionView::actionId, ConnectorActionView::hiddenArgs)
-                .containsExactly(tuple(hidden, true), tuple(plain, false));
-        ConnectorActionView closed = service.approve(me, hidden, null);
+                .containsExactly(tuple(hidden, false), tuple(plain, false));
+        ConnectorActionView refused = service.approve(me, hidden, null);
 
-        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
-        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.HIDDEN_ARGS);
+        assertThat(refused.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(refused.errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
