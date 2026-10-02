@@ -1,10 +1,12 @@
 package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 
 public final class MemoryDtos {
@@ -64,6 +66,70 @@ public final class MemoryDtos {
                     memory.updatedAt(),
                     sensitive,
                     omittedFromContext);
+        }
+    }
+
+    /** 문서를 만든다. 꺼내는 방식은 받지 않는다. 늘 SEARCH 다(ADR-057). */
+    public record CreateDocumentRequest(
+            @NotBlank String collection,
+            @NotBlank String documentKey,
+            @NotBlank @Size(max = 200) String title,
+            @NotBlank @Size(max = 12000) String content,
+            boolean sensitive) {}
+
+    /** 문서를 고친다. {@code expectedRevision} 은 화면이 읽은 판 번호다. */
+    public record UpdateDocumentRequest(
+            @NotBlank @Size(max = 12000) String content,
+            @NotNull Boolean sensitive,
+            @NotNull Integer expectedRevision) {}
+
+    /** 문서 목록의 한 줄이다. 본문을 싣지 않는다. */
+    public record DocumentSummaryView(
+            Long id,
+            String collection,
+            String documentKey,
+            String title,
+            boolean sensitive,
+            int revision,
+            Instant updatedAt) {
+        static DocumentSummaryView from(Memory memory) {
+            return new DocumentSummaryView(
+                    memory.id(),
+                    memory.collection(),
+                    memory.documentKey(),
+                    memory.title(),
+                    memory.sensitivity() == MemorySensitivity.SENSITIVE,
+                    memory.revision(),
+                    memory.updatedAt());
+        }
+    }
+
+    /** 문서 하나다. 본문은 평문이다. */
+    public record DocumentView(
+            Long id,
+            String collection,
+            String documentKey,
+            String title,
+            boolean sensitive,
+            int revision,
+            Instant updatedAt,
+            String content) {
+        static DocumentView from(Memory memory, String content) {
+            return new DocumentView(
+                    memory.id(),
+                    memory.collection(),
+                    memory.documentKey(),
+                    memory.title(),
+                    memory.sensitivity() == MemorySensitivity.SENSITIVE,
+                    memory.revision(),
+                    memory.updatedAt(),
+                    content);
+        }
+    }
+
+    public record CollectionView(String key, String displayName) {
+        static CollectionView from(MemoryCollection collection) {
+            return new CollectionView(collection.key(), collection.displayName());
         }
     }
 }

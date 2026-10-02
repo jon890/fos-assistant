@@ -27,6 +27,12 @@ public final class MemoryQueries {
         return (root, query, builder) -> readable(root, builder, userId, groupId);
     }
 
+    /** 목록 API 가 내는 항목이다. 볼 수 있는 항목 가운데 종류가 MEMORY 인 것이다. 문서는 문서 API 가 따로 낸다(ADR-057). */
+    public static Specification<Memory> listedFor(Long userId, Long groupId) {
+        return (root, query, builder) -> builder.and(
+                readable(root, builder, userId, groupId), builder.equal(root.get("entryType"), MemoryEntryType.MEMORY));
+    }
+
     /**
      * 에이전트의 실행에 실을 수 있는 항목이다.
      *
