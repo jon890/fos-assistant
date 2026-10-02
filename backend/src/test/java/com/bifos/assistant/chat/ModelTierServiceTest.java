@@ -211,6 +211,30 @@ class ModelTierServiceTest {
     }
 
     @Test
+    @DisplayName("그룹 단계 정의는 effort none 을 받지 않는다")
+    void rejectsNoneEffortInGroupTierDefinition() {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+
+        assertThatThrownBy(() -> service.saveGroup(
+                        admin,
+                        List.of(
+                                new ModelTierOptions.Tier(
+                                        ModelTier.FAST, "빠르게", "openai-codex", "example-fast", "none"),
+                                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
+                                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
+                        null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        verify(definitions, never()).saveAll(any());
+    }
+
+    @Test
     @DisplayName("배포 단계 설정은 provider만 또는 model만 채운 부분 mapping으로 기동하지 못한다")
     void rejectsPartialConfiguredTierMapping() {
         assertThatThrownBy(() -> new ModelTierProperties.Tier("openai-codex", null, null))

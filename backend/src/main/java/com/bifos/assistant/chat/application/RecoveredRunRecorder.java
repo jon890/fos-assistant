@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 기동할 때 {@code RUNNING} 으로 남은 실행 줄 하나에 Hermes 의 답을 적는다(ADR-060).
+ * 기동할 때 {@code RUNNING} 으로 남은 실행 줄 하나에 Hermes 의 답을 적는다(ADR-061).
  *
  * <p>실행 줄은 보통 turn 과 같은 기록 경로({@link ExecutionRecorder})로 적는다. 종류마다 함께 적는 것이 다르고,
  * 그 표는 {@code docs/backend/turn-control.md} 의 「기동할 때 남은 실행 정리」 가 갖는다.

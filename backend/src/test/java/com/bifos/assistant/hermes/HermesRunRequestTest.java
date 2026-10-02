@@ -104,6 +104,23 @@ class HermesRunRequestTest {
     }
 
     @Test
+    @DisplayName("effort none 은 model options 에 그대로 싣고 null 은 model options 를 빼 둘을 다르게 보낸다")
+    void sendsNoneAsEffortButLeavesModelOptionsOutForNull() {
+        client.submit(command("openai-codex", "example-model", "none"));
+        JsonNode disabled = submittedBody();
+
+        client.submit(command("openai-codex", "example-model", null));
+        JsonNode unspecified = submittedBody();
+
+        assertThat(disabled.path("model_options")
+                        .path("reasoning")
+                        .path("effort")
+                        .asString())
+                .isEqualTo("none");
+        assertThat(unspecified.has("model_options")).isFalse();
+    }
+
+    @Test
     @DisplayName("provider 만 주면 Hermes 를 부르지 않고 실패한다")
     void failsWithoutCallingHermesWhenOnlyProviderGiven() {
         assertThatThrownBy(() -> client.submit(command("openai-codex", null, null)))

@@ -14,7 +14,13 @@ export type AgentModelDefault = {
 export type ModelCatalog = {
   defaultProvider: string | null;
   defaultModel: string | null;
-  providers: { provider: string; name: string; models: string[] }[];
+  providers: {
+    provider: string;
+    name: string;
+    models: string[];
+    /** 모델 이름을 열쇠로 한 reasoning 지원과 끄기(`none`) 지원이다. 값은 `SUPPORTED`, `UNSUPPORTED`, `UNKNOWN` 이다 */
+    reasoning: Record<string, { support: string; disable: string }>;
+  }[];
   reasoningEfforts: string[];
 };
 

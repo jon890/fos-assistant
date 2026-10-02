@@ -9,6 +9,50 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 
 제품 이름은 아직 정하지 않았다. 지금은 `fos-assistant` 라고 부른다.
 
+## 한눈에 보기
+
+아래 화면에 보이는 값은 모두 지어낸 데모 데이터다.
+브라우저 검사와 같은 로컬 구성에서 스크립트가 찍었고, 실제 운영 화면은 찍지 않았다.
+
+**대화를 시작한다.** 자기 에이전트 하나와 단계(빠르게, 균형, 깊게)를 고르고, 글을 쓰거나 추천 질문을 누른다.
+
+![에이전트 카드 셋과 빠르게, 균형, 깊게 단계 단추, 추천 질문 넷이 있는 새 대화 화면](docs/images/tour-01-new-conversation.png)
+
+**일하는 과정을 본다.** 답을 만드는 동안 도구 호출과 도우미 에이전트가 한 줄씩 보인다.
+
+![기억 읽기, 검색, 도우미 에이전트 둘, 웹 페이지 읽기가 한 줄씩 보이는 진행 중인 답](docs/images/tour-02-working.png)
+
+**쓰기 전에 승인한다.** 외부 서비스에 쓰는 커넥터 호출은 보낼 내용을 그대로 보이는 카드에서 승인을 기다린다.
+
+![메모의 제목과 본문을 보이고 승인과 거절 단추가 있는 커넥터 쓰기 승인 카드](docs/images/tour-04-approval.png)
+
+**무엇을 기억할지 정한다.** 에이전트는 기억을 제안만 한다. 사용자가 받아들인 뒤에야 다음 대화에 쓰인다.
+
+![받아들이기와 거절을 기다리는 제안 둘과, 그 아래 받아들인 그룹 기억과 개인 기억이 있는 기억 화면](docs/images/tour-05-memory.png)
+
+<details>
+<summary>화면 더 보기: 실행 트리, 문서, 에이전트 설정, 사용량과 비용</summary>
+
+**실행 트리.** 끝난 답을 열면 그 답이 한 일을 옆 패널에서 차례로 본다.
+
+![표가 있는 끝난 답과, 그 실행의 도구 호출과 도우미 에이전트를 나열한 옆 패널](docs/images/tour-03-run-tree.png)
+
+**문서와 collection.** 긴 글은 collection 에 속한 문서로 둔다. 민감 문서는 암호화해 저장한다.
+
+![collection 을 고르는 문서 폼과, 하나에 민감 배지가 붙은 저장된 문서 둘](docs/images/tour-08-documents.png)
+
+**에이전트 설정.** 에이전트의 성격을 쓰고 도구를 켜고 끈다.
+
+![성격을 쓰는 글 칸과 도구 스위치 목록이 있는 에이전트 상세 화면](docs/images/tour-06-agent.png)
+
+**사용량과 비용.** 관리자는 에이전트별 실행 수를 보고, 구독제로 돌린 실행은 API 가격으로 환산한 금액으로 본다.
+
+![이번 달 합계와 에이전트별 실행 수, 환산 비용, 토큰 수 표가 있는 사용량 화면](docs/images/tour-07-usage.png)
+
+</details>
+
+다시 찍으려면 `web/` 에서 `pnpm screenshots` 를 돌린다. 스크립트는 `test/screenshots/tour.shots.ts` 다.
+
 ## 만드는 까닭
 
 특정 모델이나 제품에 종속되지 않고, 자유로운 개인 누구나 자기 비서를 갖게 되기를 바란다.
@@ -21,6 +65,31 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 
 지금 붙어 있는 커넥터는 가계부 하나다. 그 커넥터는 다른 저장소에 있고, 이 저장소에는 검사에 쓰는 시험 커넥터만 있다.
 범용 커넥터를 늘리는 것은 진행하고 있는 방향이고, 이미 끝난 일이 아니다.
+
+## 다른 선택지와 다른 점
+
+비슷한 일을 하는 도구가 이미 있고, 그 가운데 여럿은 이 프로젝트보다 훨씬 성숙했다.
+아래 표는 각 도구가 무엇인지를 되도록 그 도구의 공식 문서에 적힌 대로 옮기고, 이 프로젝트가 다르게 하는 것을 적는다.
+
+| 선택지 | 무엇인지 | 이 프로젝트가 다른 점 |
+| --- | --- | --- |
+| ChatGPT, Claude 같은 호스팅 비서 앱 | 모델을 만든 회사가 운영하고 설치할 것이 없다. 예를 들어 Claude 는 [대화하는 동안 기억을 저장](<https://support.claude.com/en/articles/11817273-using-claude-s-chat-search-and-memory-to-build-on-previous-context>)하고, 사용자는 설정에서 그 기억을 읽고 고치고 지운다. | 자기 서버에서 돈다. 단계가 어느 모델인지는 자기 데이터베이스의 정책 행이 정한다. 에이전트는 기억을 제안만 하고, 사람이 받아들이기 전에는 쓰이지 않는다. |
+| [Open WebUI](https://docs.openwebui.com/), [LibreChat](https://www.librechat.ai/docs) 같은 자체 호스팅 채팅 화면 | Open WebUI 는 스스로를 Ollama 와 OpenAI 호환 API 를 지원하는 self-hosted AI platform 이라고 소개한다. LibreChat 은 agent 와 MCP, custom endpoint 를 갖춘 self-hosted web application 이다. | 이 프로젝트는 모델 API 를 직접 부르지 않고 에이전트 런타임 위에 얹는다. 거기에 사람마다 격리된 Hermes profile, 어느 에이전트가 어느 기억을 받는지 정하는 collection, 커넥터 쓰기의 승인 단계, 에이전트 사이의 위임과 실행 트리, 사용량을 API 가격으로 환산하는 원장을 더한다. |
+| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) 를 혼자 쓰는 경우 | CLI 나 메시징 gateway 로 쓰는 자율 에이전트이고, 자체 persistent memory 와 skill 과 subagent 를 갖는다. | 여러 사람이 함께 쓰는 웹 화면을 더한다. 실행할 profile 은 요청자의 바인딩에서 꺼낸다. 기억은 Control Plane 만 거치고, Hermes 내장 memory 도구는 에이전트에 주지 않는다. 외부 서비스는 읽기 전용 서비스 토큰으로 읽고, 민감 항목은 암호화한다. 커넥터는 범용 구조 하나를 따른다([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
+
+### 맞는 사람과 맞지 않는 사람
+
+이런 사람에게 맞는다.
+
+- 자기 서버를 운영하고, 가족이나 작은 그룹이 비서 하나를 함께 쓰되 에이전트와 기억은 각자 갖기를 바라는 사람
+- 쓰는 제품은 그대로 두고 대화 뒤의 모델만 바꾸고 싶은 사람
+- 되풀이되는 일을 에이전트와 커넥터에 맡기되, 무엇을 쓰고 무엇을 기억할지는 사람이 승인하기를 바라는 사람
+
+이런 사람에게는 아직 맞지 않는다.
+
+- 설치 없이 바로 쓰고 싶은 사람
+- 누구나 가입하는 서비스를 찾는 사람
+- Hermes Agent 를 직접 설치하고 운영하기 어려운 사람. 단계별 self-hosting 안내서가 아직 없고 API 와 스키마도 바뀔 수 있다. [상태](#상태) 절을 본다.
 
 ## 지키는 원칙
 

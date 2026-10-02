@@ -1,5 +1,8 @@
 package com.bifos.assistant.chat;
 
+import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.SUPPORTED;
+import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNKNOWN;
+import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNSUPPORTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -23,6 +26,7 @@ import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog.Provider;
+import com.bifos.assistant.hermes.dto.ReasoningCapability;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -288,8 +292,8 @@ class ModelOptionsServiceTest {
     }
 
     @Test
-    @DisplayName("reasoning 표에 모든 모델이 있고 Hermes 가 밝히지 않은 모델은 참이다")
-    void reasoningTableHasAllModelsAndUnstatedModelsAreTrue() {
+    @DisplayName("Hermes 가 밝히지 않은 모델은 참으로 채우지 않고 UNKNOWN 으로 읽는다")
+    void leavesUnstatedModelsUnknownInsteadOfTrue() {
         when(hermes.readCatalog(anyString(), anyString()))
                 .thenReturn(catalog(
                         "openai-codex",
@@ -297,13 +301,104 @@ class ModelOptionsServiceTest {
                                 "openai-codex",
                                 "OpenAI Codex",
                                 List.of("example-model", "example-model-mini", "example-model-new"),
-                                Map.of("example-model", true, "example-model-mini", false))));
+                                Map.of(
+                                        "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
 
-        Map<String, Boolean> reasoning =
-                service.optionsFor(dad, "dad").providers().get(0).reasoning();
+        Provider provider = service.optionsFor(dad, "dad").providers().get(0);
 
-        assertThat(reasoning)
-                .isEqualTo(Map.of("example-model", true, "example-model-mini", false, "example-model-new", true));
+        assertThat(provider.reasoning())
+                .isEqualTo(Map.of(
+                        "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)));
+        assertThat(provider.reasoning().getOrDefault("example-model-new", ReasoningCapability.UNKNOWN_ALL))
+                .isEqualTo(ReasoningCapability.UNKNOWN_ALL);
+    }
+
+    @Test
+    @DisplayName("숨긴 모델의 reasoning 항목은 표에서 빠진다")
+    void dropsReasoningEntriesOfHiddenModels() {
+        when(visibility.hiddenFor(1L))
+                .thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "example-model-mini"))));
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenReturn(catalog(
+                        "openai-codex",
+                        new Provider(
+                                "openai-codex",
+                                "OpenAI Codex",
+                                List.of("example-model", "example-model-mini"),
+                                Map.of(
+                                        "example-model", new ReasoningCapability(SUPPORTED, SUPPORTED),
+                                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
+
+        Provider provider = service.optionsFor(dad, "dad").providers().get(0);
+
+        assertThat(provider.models()).containsExactly("example-model");
+        assertThat(provider.reasoning()).containsOnlyKeys("example-model");
+    }
+
+    @Test
+    @DisplayName("none 은 끄기 지원이 SUPPORTED 이고 reasoning 이 UNSUPPORTED 가 아닌 모델에서만 고를 수 있다")
+    void allowsNoneOnlyWhereDisableIsSupported() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenReturn(new HermesModelCatalog(
+                        "p",
+                        "can-off",
+                        List.of(new Provider(
+                                "p",
+                                "p",
+                                List.of("can-off", "cannot-off", "unsaid-off", "no-reasoning", "unknown-reasoning"),
+                                Map.of(
+                                        "can-off", new ReasoningCapability(SUPPORTED, SUPPORTED),
+                                        "cannot-off", new ReasoningCapability(SUPPORTED, UNSUPPORTED),
+                                        "unsaid-off", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                                        "no-reasoning", new ReasoningCapability(UNSUPPORTED, SUPPORTED),
+                                        "unknown-reasoning", new ReasoningCapability(UNKNOWN, SUPPORTED))))));
+
+        ModelOptions options = service.optionsFor(dad, "dad");
+
+        assertThat(options.allowsEffort("p", "can-off", "none"))
+                .as("disable SUPPORTED")
+                .isTrue();
+        assertThat(options.allowsEffort("p", "cannot-off", "none"))
+                .as("disable UNSUPPORTED")
+                .isFalse();
+        assertThat(options.allowsEffort("p", "unsaid-off", "none"))
+                .as("disable UNKNOWN")
+                .isFalse();
+        assertThat(options.allowsEffort("p", "no-reasoning", "none"))
+                .as("support UNSUPPORTED")
+                .isFalse();
+        assertThat(options.allowsEffort("p", "unknown-reasoning", "none"))
+                .as("support UNKNOWN")
+                .isTrue();
+        assertThat(options.allowsEffort("p", "missing", "none")).as("목록에 없는 모델").isFalse();
+        assertThat(options.allowsEffort("other", "can-off", "none"))
+                .as("다른 provider")
+                .isFalse();
+        assertThat(options.allowsEffort(null, null, "none")).as("기본 모델").isTrue();
+        assertThat(options.allowsEffort("p", "cannot-off", "low"))
+                .as("none 이 아닌 effort")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("모델을 비운 none 은 기본 모델이 없으면 고를 수 없다")
+    void rejectsNoneWithoutAnyModel() {
+        ModelOptions options = new ModelOptions(
+                null,
+                null,
+                List.of(new Provider(
+                        "p",
+                        "p",
+                        List.of("can-off"),
+                        Map.of("can-off", new ReasoningCapability(SUPPORTED, SUPPORTED)))),
+                ModelChoice.REASONING_EFFORTS);
+
+        assertThat(options.allowsEffort(null, null, "none")).isFalse();
+        assertThat(options.allowsEffort(null, "can-off", "none"))
+                .as("provider 를 비우면 그 모델을 가진 provider")
+                .isTrue();
     }
 
     @Test

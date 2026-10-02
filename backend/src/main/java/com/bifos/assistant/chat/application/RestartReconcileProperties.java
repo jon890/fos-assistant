@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정하는 설정이다(ADR-060).
+ * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정하는 설정이다(ADR-061).
  *
  * @param enabled 꺼 두면 기동 때 잡지도 묻지도 않는다. 그 줄은 {@code RUNNING} 으로 남는다
  * @param maxWait 다시 붙어 기다리는 상한. null 이면 쓰는 쪽이 {@code hermes.run-timeout} 을 쓴다

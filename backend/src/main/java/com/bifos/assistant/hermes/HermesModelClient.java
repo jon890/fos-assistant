@@ -1,9 +1,11 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.dto.ReasoningCapability;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +44,8 @@ public class HermesModelClient {
         String apiKey = keyStore.resolve(profileName);
         JsonNode response;
         try {
-            response = restClient.get()
+            response = restClient
+                    .get()
                     .uri(stripTrailingSlash(apiBaseUrl) + "/api/model/options")
                     .header("Authorization", "Bearer " + apiKey)
                     .retrieve()
@@ -69,8 +72,11 @@ public class HermesModelClient {
         String slug = text(row, "slug");
         JsonNode authenticated = row.get("authenticated");
         JsonNode modelRows = row.get("models");
-        if (slug == null || authenticated == null || !authenticated.asBoolean(false)
-                || modelRows == null || !modelRows.isArray()) {
+        if (slug == null
+                || authenticated == null
+                || !authenticated.asBoolean(false)
+                || modelRows == null
+                || !modelRows.isArray()) {
             return null;
         }
         List<String> models = new ArrayList<>();
@@ -82,19 +88,33 @@ public class HermesModelClient {
         if (models.isEmpty()) {
             return null;
         }
-        Map<String, Boolean> reasoning = new LinkedHashMap<>();
+        // 모든 모델에 항목을 만든다. Hermes 가 밝히지 않은 칸은 UNKNOWN 으로 두고 참으로 채우지 않는다(ADR-060).
+        Map<String, ReasoningCapability> reasoning = new LinkedHashMap<>();
         JsonNode capabilities = row.get("capabilities");
-        if (capabilities != null && capabilities.isObject()) {
-            for (String model : models) {
-                JsonNode flag = capabilities.path(model).get("reasoning");
-                if (flag != null && flag.isBoolean()) {
-                    reasoning.put(model, flag.asBoolean());
-                }
+        boolean hasCapabilities = capabilities != null && capabilities.isObject();
+        for (String model : models) {
+            if (!hasCapabilities) {
+                reasoning.put(model, ReasoningCapability.UNKNOWN_ALL);
+                continue;
             }
+            JsonNode modelCapabilities = capabilities.path(model);
+            reasoning.put(
+                    model,
+                    new ReasoningCapability(
+                            supportOf(modelCapabilities.get("reasoning")),
+                            supportOf(modelCapabilities.get("can_disable_reasoning"))));
         }
         String name = text(row, "name");
         return new HermesModelCatalog.Provider(
-                slug, name == null ? slug : name, List.copyOf(models), Map.copyOf(reasoning));
+                slug, name == null ? slug : name, List.copyOf(models), Collections.unmodifiableMap(reasoning));
+    }
+
+    /** boolean 칸이면 참은 {@code SUPPORTED}, 거짓은 {@code UNSUPPORTED} 다. 칸이 없거나 boolean 이 아니면 {@code UNKNOWN} 이다. */
+    private static ReasoningCapability.Support supportOf(JsonNode flag) {
+        if (flag == null || !flag.isBoolean()) {
+            return ReasoningCapability.Support.UNKNOWN;
+        }
+        return flag.asBoolean() ? ReasoningCapability.Support.SUPPORTED : ReasoningCapability.Support.UNSUPPORTED;
     }
 
     private static String text(JsonNode node, String field) {
