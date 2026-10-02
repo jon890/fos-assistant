@@ -18,7 +18,7 @@
 - Jackson 은 `tools.jackson` 이다(`backend/AGENTS.md` 의 「기술 주의점」)
 - HTTP 모양을 검사하는 선례는 `backend/src/test/java/com/bifos/assistant/hermes/HermesRuntimeReadTest.java` 와 `HermesRunRequestTest.java` 다. 같은 방식(같은 가짜 서버 도구)을 쓴다
 
-**근거 문서**: `docs/hermes/runs-api.md` 의 「실행 조회가 답하는 기간」, `docs/adr/ADR-059-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
+**근거 문서**: `docs/hermes/runs-api.md` 의 「실행 조회가 답하는 기간」, `docs/adr/ADR-060-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
 
 ## 의도 메모
 

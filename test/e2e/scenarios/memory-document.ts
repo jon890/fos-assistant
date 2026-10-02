@@ -226,14 +226,18 @@ export const memoryDocumentScenario: Scenario = {
     expect(off.body.length === 0, `끈 뒤 401 에 본문이 있다: ${off.body}`);
 
     step("끈 사용자는 살아 있는 세션으로도 새 토큰을 받지 못한다");
-    expectStatus(
+    const revokedIssue = expectStatus(
       await call(context, "/service-tokens", {
         method: "POST",
         token: aunt,
         body: { label: "e2e", expiresInDays: 90, collections: [{ collection: "identity", allowSensitive: true }] },
       }),
-      403,
+      401,
       "끈 사용자의 발급",
+    );
+    expect(
+      revokedIssue.json<{ code: string }>().code === "ACCESS_REVOKED",
+      `끈 사용자의 발급이 ACCESS_REVOKED 가 아니다: ${revokedIssue.body}`,
     );
 
     step("다시 켜도 되살아나지 않는다");

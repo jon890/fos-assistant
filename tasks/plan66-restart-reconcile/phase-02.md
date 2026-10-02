@@ -30,14 +30,14 @@
 - 패키지 방향 규칙은 `backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 가 검사한다. `chat` 은 이미 `usage`, `orchestration`, `hermes`, `agent` 를 쓴다
 - `application` 은 타입 하나에 파일 하나다. 저장되지 않는 enum 은 `<기능>.application.model` 에 둔다(`backend/AGENTS.md`). `chat/application/model` 이 이미 있다
 
-**근거 문서**: `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」(「실행의 종류마다 적는 것이 다르다」 표와 「갈리는 지점」 표), `docs/adr/ADR-059-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
+**근거 문서**: `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」(「실행의 종류마다 적는 것이 다르다」 표와 「갈리는 지점」 표), `docs/adr/ADR-060-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
 
 ## 의도 메모
 
 - **멱등의 근거는 실행 줄 하나다.** 트랜잭션에서 `lockById` 로 잠그고 `status` 가 `RUNNING` 이 아니면 아무것도 하지 않고 거짓을 돌려준다. 메시지, 사건, session 은 그 트랜잭션 안에서만 적는다. 화면 알림과 `DelegationFinished` 는 트랜잭션이 끝난 뒤, 실제로 적었을 때만 낸다
 - `ExecutionRecorder` 의 메서드는 넘겨받은 엔티티를 고쳐 `save` 한다. 잠근 뒤 읽은 엔티티를 넘긴다. 부르는 쪽이 들고 있던 옛 엔티티를 넘기지 않는다
 - `ExecutionRecorder.complete` 는 실제로 돈 모델을 알려고 Hermes 세션 조회를 할 수 있다(`served`). 잠금을 쥔 채 HTTP 를 부르게 되지만 한 실행에 한 번이고 `hermes.read-timeout` 안에 끝난다. 받아들인다
-- 다시 붙어 끝난 대화 turn 은 `memoryProposer.proposeFrom` 과 `starterSuggestions.refreshIfStale` 을 부르지 않는다(ADR-059 의 「감당할 것」)
+- 다시 붙어 끝난 대화 turn 은 `memoryProposer.proposeFrom` 과 `starterSuggestions.refreshIfStale` 을 부르지 않는다(ADR-060 의 「감당할 것」)
 - 대기 줄을 멈추는 것(`pendingMessages.markHeld`)과 turn 잠금은 이 클래스가 하지 않는다. phase 03 의 `RestartReconciler` 가 잠금을 풀기 전에 한다
 - `ChatService` 는 이미 1400줄이 넘는다. 여기에 더하지 않고 새 클래스로 둔다. `ChatService.finish` 를 고쳐 함께 쓰게 만들지 않는다. 다른 워커가 같은 파일을 고치고 있다
 

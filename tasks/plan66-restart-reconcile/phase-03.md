@@ -31,7 +31,7 @@ Control Plane 이 뜰 때 `RUNNING` 으로 남은 실행을 Hermes 에 물어 �
 - e2e 의 `test/e2e/scenarios/chat-queue.ts` 에 있는 `chatQueueRestartScenario` 는 turn 을 붙잡은 채(`holdTurn`) Control Plane 을 다시 띄우고, 쌓인 글이 곧바로 간다고 단언한다. 붙잡힌 turn 이 `ORPHANED` 로 끝난다는 전제다. 가짜 Hermes(`test/e2e/fake-hermes.ts`)는 붙잡힌 run 의 조회에 `running` 을 주므로, 이 phase 뒤에는 그 turn 에 다시 붙고 쌓인 글은 그 turn 이 끝난 뒤에 간다. 붙잡은 run 은 `context.hermes.releaseHeldRun()` 으로 놓는다
 - 가상 스레드를 띄우는 선례는 `NextTurnDispatcher.tryPending` 의 `Thread.ofVirtual().name(...).start(...)` 다
 
-**근거 문서**: `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」 전체, `docs/adr/ADR-059-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
+**근거 문서**: `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」 전체, `docs/adr/ADR-060-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`
 
 ## 의도 메모
 
@@ -57,7 +57,7 @@ public record RestartReconcileProperties(@DefaultValue("true") boolean enabled, 
 
 ```yaml
   restart-reconcile:
-    # 기동할 때 RUNNING 으로 남은 실행을 Hermes 에 물어 정한다(ADR-059). 끄면 그 줄이 그대로 남는다
+    # 기동할 때 RUNNING 으로 남은 실행을 Hermes 에 물어 정한다(ADR-060). 끄면 그 줄이 그대로 남는다
     enabled: true
     # 다시 붙어 기다리는 상한. 비우면 hermes.run-timeout 과 같다. 넘으면 중지를 보내고 FAILED 로 적는다
     max-wait: ${ASSISTANT_RESTART_RECONCILE_MAX_WAIT:}

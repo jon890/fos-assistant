@@ -13,6 +13,13 @@ public interface AllowedPersonRepository extends JpaRepository<AllowedPerson, Lo
      */
     Optional<AllowedPerson> findByEmailAndEnabledTrue(String email);
 
+    /**
+     * 그 주소의 줄이 꺼져 있는가. 줄이 없으면 거짓이다.
+     *
+     * <p>메일 주소는 {@link AllowedPerson#normalizeEmail(String)} 을 지난 값이어야 한다.
+     */
+    boolean existsByEmailAndEnabledFalse(String email);
+
     boolean existsByEmail(String email);
 
     boolean existsByHermesProfile(String hermesProfile);

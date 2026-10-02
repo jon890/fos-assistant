@@ -70,7 +70,7 @@ gateway 가 내려가며 끊은 실행은 `interrupted` 로 적힌다. 그 상�
 제출할 때 `Idempotency-Key` 머리말을 주면 Hermes 가 그 run 의 상태를 디스크에 남기고, 다시 뜬 뒤에도 조회에 답한다. 도는 중에 gateway 가 죽은 run 은 `interrupted` 로 답한다.
 **Control Plane 은 이 머리말을 보내지 않는다.**
 
-Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다([ADR-059](../adr/ADR-059-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md)).
+Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다([ADR-060](../adr/ADR-060-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md)).
 
 **가짜 Hermes 의 실행 조회도 이 모양으로 둔다.** 도는 실행은 `running`, 끝난 실행은 같은 답을 되풀이하고, 지운 run 과 모르는 run 은 404 다.
 

@@ -1,6 +1,6 @@
 # plan66. 재기동 때 남은 실행을 Hermes 에 물어 정한다
 
-이슈 #98 을 닫는다. 결정은 `docs/adr/ADR-059-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`, 동작 계약은 `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」 에 있다.
+이슈 #98 을 닫는다. 결정은 `docs/adr/ADR-060-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md`, 동작 계약은 `docs/backend/turn-control.md` 의 「기동할 때 남은 실행 정리」 에 있다.
 docs 는 이 계획과 같은 브랜치에서 이미 고쳤다. phase 는 docs 를 다시 쓰지 않고, 구현이 docs 와 달라질 때만 그 절을 같은 커밋에서 고친다.
 
 | phase | 만드는 것 |

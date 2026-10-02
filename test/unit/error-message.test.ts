@@ -19,9 +19,28 @@ test("민감 항목을 목록에서 고치려다 거절되면 여기서 고칠 �
     "민감한 항목은 여기서 고칠 수 없어요.");
 });
 
+test("꺼진 사용자에게는 계정이 중지됐다고 알리고 관리자에게 문의하게 한다", () => {
+  assert.equal(describeError("ACCESS_REVOKED", "x"),
+    "사용이 중지된 계정이에요. 관리자에게 문의해 주세요.");
+});
+
 test("관리 화면에는 profile과 연결 실패 원인을 구분해 알린다", () => {
   assert.match(describeAdminError("PERSON_PROFILE_TAKEN", "원본 오류"), /profile 이름/);
   assert.match(describeAdminError("HERMES_PROFILE_EXISTS", "원본 오류"), /Hermes profile/);
   assert.match(describeAdminError("HERMES_PROFILE_KEY_MISSING", "원본 오류"), /API key/);
   assert.match(describeAdminError("HERMES_UNAVAILABLE", "원본 오류"), /Hermes 런타임/);
+});
+
+test("문서를 만들고 고치다 거절되면 사용자가 할 일을 알린다", () => {
+  assert.equal(describeError("MEMORY_DOCUMENT_EXISTS", "duplicate"),
+    "같은 이름의 문서가 이미 있어요. 다른 이름을 입력해 주세요.");
+  assert.equal(describeError("MEMORY_REVISION_CONFLICT", "conflict"),
+    "그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.");
+  assert.equal(describeError("MEMORY_ENCRYPTION_UNAVAILABLE", "no key"),
+    "민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.");
+});
+
+test("없는 토큰을 폐기하려 하면 새로고침을 권한다", () => {
+  assert.equal(describeError("SERVICE_TOKEN_NOT_FOUND", "not found"),
+    "토큰을 찾지 못했어요. 화면을 새로고침해 확인해 주세요.");
 });
