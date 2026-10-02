@@ -2,8 +2,6 @@ package com.bifos.assistant.shared.auth;
 
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.ErrorResponse;
-import com.bifos.assistant.user.application.AllowedUserResolver;
-import com.bifos.assistant.user.domain.AppUser;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -74,10 +72,10 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     }
 
     private final SecretKey key;
-    private final AllowedUserResolver users;
+    private final TokenUserResolver users;
     private final ObjectMapper json;
 
-    public ControlPlaneJwtFilter(AuthProperties properties, AllowedUserResolver users, ObjectMapper json) {
+    public ControlPlaneJwtFilter(AuthProperties properties, TokenUserResolver users, ObjectMapper json) {
         this.key = Keys.hmacShaKeyFor(properties.jwtSecret().getBytes(StandardCharsets.UTF_8));
         this.users = users;
         this.json = json;
@@ -121,17 +119,16 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             if (email == null || email.isBlank()) {
                 return TokenOutcome.ANONYMOUS;
             }
-            Optional<AppUser> allowed = users.resolveAllowed(email, name == null || name.isBlank() ? email : name);
+            Optional<CurrentUser> allowed =
+                    users.resolveCurrentUser(email, name == null || name.isBlank() ? email : name);
             if (allowed.isEmpty()) {
                 return TokenOutcome.REVOKED;
             }
-            AppUser user = allowed.get();
-            CurrentUser principal =
-                    new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+            CurrentUser principal = allowed.get();
             var authentication = new UsernamePasswordAuthenticationToken(
                     principal,
                     null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + user.role().name())));
+                    List.of(new SimpleGrantedAuthority("ROLE_" + principal.role().name())));
             SecurityContextHolder.getContext().setAuthentication(authentication);
             return TokenOutcome.AUTHENTICATED;
         } catch (JwtException ex) {

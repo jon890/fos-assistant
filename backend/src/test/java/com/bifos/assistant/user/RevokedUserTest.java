@@ -6,6 +6,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.application.AllowedUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -120,5 +121,33 @@ class RevokedUserTest {
 
         assertThat(resolver.resolveAllowed(EMAIL, NAME)).map(AppUser::id).contains(joined.id());
         assertThat(users.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("허용된 주소는 저장된 사용자와 칸이 같은 CurrentUser 를 받는다")
+    void resolvesCurrentUserMatchingStoredUserForEnabledAddress() {
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+
+        Optional<CurrentUser> resolved = resolver.resolveCurrentUser(EMAIL, NAME);
+
+        AppUser stored = users.findByEmail(EMAIL).orElseThrow();
+        assertThat(resolved)
+                .contains(new CurrentUser(
+                        stored.id(), stored.email(), stored.displayName(), stored.groupId(), stored.role()));
+        assertThat(resolved).map(CurrentUser::email).contains(EMAIL);
+        assertThat(resolved).map(CurrentUser::displayName).contains(NAME);
+        assertThat(users.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("꺼진 주소는 CurrentUser 를 받지 못하고 사용자가 생기지 않는다")
+    void resolvesNoCurrentUserAndCreatesNoUserForDisabledAddress() {
+        saveDisabledPerson();
+
+        Optional<CurrentUser> resolved = resolver.resolveCurrentUser(EMAIL, NAME);
+
+        assertThat(resolved).isEmpty();
+        assertThat(users.findByEmail(EMAIL)).isEmpty();
+        assertThat(users.count()).isZero();
     }
 }
