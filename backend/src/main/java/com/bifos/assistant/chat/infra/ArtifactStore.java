@@ -1,6 +1,5 @@
 package com.bifos.assistant.chat.infra;
 
-import com.bifos.assistant.chat.application.ArtifactProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;

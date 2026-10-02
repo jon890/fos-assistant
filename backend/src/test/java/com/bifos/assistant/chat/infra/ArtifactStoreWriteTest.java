@@ -3,7 +3,6 @@ package com.bifos.assistant.chat.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.application.ArtifactProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;

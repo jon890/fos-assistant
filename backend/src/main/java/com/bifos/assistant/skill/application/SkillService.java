@@ -1,5 +1,6 @@
 package com.bifos.assistant.skill.application;
 
+import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesRequestRejected;

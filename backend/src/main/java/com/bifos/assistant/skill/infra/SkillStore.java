@@ -5,7 +5,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.application.SkillBundle;
 import com.bifos.assistant.skill.application.SkillFile;
-import com.bifos.assistant.skill.application.SkillProperties;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;

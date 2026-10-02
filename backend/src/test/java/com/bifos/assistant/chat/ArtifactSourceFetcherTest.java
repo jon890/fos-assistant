@@ -3,7 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.application.ArtifactSourceProperties;
+import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
 import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
 import com.bifos.assistant.shared.error.ApiException;
 import java.io.ByteArrayInputStream;

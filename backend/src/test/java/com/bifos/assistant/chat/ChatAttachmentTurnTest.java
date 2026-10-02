@@ -19,7 +19,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.chat.application.ArtifactService;
-import com.bifos.assistant.chat.application.AttachmentProperties;
+import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;

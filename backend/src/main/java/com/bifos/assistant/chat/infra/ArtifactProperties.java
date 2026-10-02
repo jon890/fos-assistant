@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.application;
+package com.bifos.assistant.chat.infra;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;

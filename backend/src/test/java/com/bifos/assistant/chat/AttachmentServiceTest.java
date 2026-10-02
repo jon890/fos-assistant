@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.AttachmentContent;
-import com.bifos.assistant.chat.application.AttachmentProperties;
+import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.ChatAttachment;

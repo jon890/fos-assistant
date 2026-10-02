@@ -9,7 +9,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ArtifactCleaner;
-import com.bifos.assistant.chat.application.ArtifactProperties;
+import com.bifos.assistant.chat.infra.ArtifactProperties;
 import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.ChatArtifact;

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
