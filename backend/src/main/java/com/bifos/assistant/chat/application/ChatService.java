@@ -456,7 +456,7 @@ public class ChatService {
         try {
             saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
-            Instant startedAt = Instant.now();
+            Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
             SkillCommand command = routed.command();
             String asked = command == null ? text : command.hermesInput();
@@ -566,7 +566,7 @@ public class ChatService {
             if (intent instanceof TurnIntent.Fresh) {
                 fillBlankTitle(conversation, text);
             }
-            Instant startedAt = Instant.now();
+            Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
             String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), text);
@@ -817,7 +817,7 @@ public class ChatService {
         conversationWriter.touchSession(
                 pending.conversation().id(),
                 result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
-                Instant.now());
+                clock.instant());
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
         append(pending, ExecutionEventType.RUN_COMPLETED, null);
@@ -849,7 +849,7 @@ public class ChatService {
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
         if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
             pending.conversation().rememberSession(result.sessionId());
-            conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), Instant.now());
+            conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), clock.instant());
         }
         return new ChatTurn(
                 pending.conversation().id(),
@@ -1267,7 +1267,7 @@ public class ChatService {
     public Conversation rename(CurrentUser user, Long conversationId, String title) {
         String normalized = Conversation.normalizedTitle(title);
         access.requireOwn(user, conversationId);
-        if (conversationWriter.renameIfActive(conversationId, user.id(), normalized, Instant.now()) == 0) {
+        if (conversationWriter.renameIfActive(conversationId, user.id(), normalized, clock.instant()) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
         return access.requireOwn(user, conversationId);
@@ -1330,7 +1330,7 @@ public class ChatService {
     @Transactional
     public void delete(CurrentUser user, Long conversationId) {
         access.requireOwn(user, conversationId);
-        if (conversationWriter.deleteIfActive(conversationId, user.id(), Instant.now()) == 0) {
+        if (conversationWriter.deleteIfActive(conversationId, user.id(), clock.instant()) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
         // 지운 대화에는 더 보낼 수 없다. 남기면 기동 확인이 보낼 수 없는 행을 계속 만난다.

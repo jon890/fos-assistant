@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ class SkillStoreTest {
             """;
 
     private static SkillStore storeAt(Path root) {
-        return new SkillStore(new SkillProperties(root.toString(), AGENT_ROOT + "/", 3, null));
+        return new SkillStore(new SkillProperties(root.toString(), AGENT_ROOT + "/", 3, null), Clock.systemUTC());
     }
 
     private static Map<String, SkillBundle> skills(String... names) {

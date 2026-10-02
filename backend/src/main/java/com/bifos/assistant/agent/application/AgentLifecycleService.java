@@ -16,7 +16,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.security.SecureRandom;
-import java.time.Instant;
+import java.time.Clock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -61,6 +61,7 @@ public class AgentLifecycleService {
     private final PeopleProperties peopleProperties;
     private final AgentProperties properties;
     private final SkillStore skillStore;
+    private final Clock clock;
 
     /**
      * 요청자의 에이전트를 만든다. 주인은 요청자다. {@code ADMIN} 이 만들어도 자기 것이 된다.
@@ -189,7 +190,7 @@ public class AgentLifecycleService {
             provisioner.deprovision(agent.hermesProfile());
             removeSkillDirectory(agent.hermesProfile());
         }
-        agent.markDeleted(Instant.now());
+        agent.markDeleted(clock.instant());
         agents.save(agent);
     }
 

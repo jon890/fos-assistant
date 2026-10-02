@@ -4,7 +4,7 @@ import com.bifos.assistant.hermes.HermesSkillName;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
-import java.time.Instant;
+import java.time.Clock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -28,9 +28,12 @@ public class SkillUseRecorder {
 
     private final ExecutionSkillUseRepository uses;
     private final TransactionTemplate newTransaction;
+    private final Clock clock;
 
-    public SkillUseRecorder(ExecutionSkillUseRepository uses, PlatformTransactionManager transactionManager) {
+    public SkillUseRecorder(
+            ExecutionSkillUseRepository uses, PlatformTransactionManager transactionManager, Clock clock) {
         this.uses = uses;
+        this.clock = clock;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -59,7 +62,7 @@ public class SkillUseRecorder {
                 if (uses.existsByExecutionIdAndSkillNameAndSource(executionId, skillName, source)) {
                     return;
                 }
-                uses.save(ExecutionSkillUse.of(executionId, skillName, source, Instant.now()));
+                uses.save(ExecutionSkillUse.of(executionId, skillName, source, clock.instant()));
             });
         } catch (DataIntegrityViolationException ex) {
             log.debug("같은 스킬 사용이 먼저 적혀 있어 건너뛴다 executionId={} skill={} source={}", executionId, skillName, source);

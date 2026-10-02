@@ -25,6 +25,7 @@ import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -80,7 +81,8 @@ class AgentDelegationServiceRaceTest {
                 new DelegationProperties(2, 4, 1, SUBMIT_TIMEOUT, 100),
                 mock(TurnCancellation.class),
                 mock(HermesRunsClient.class),
-                event -> {});
+                event -> {},
+                Clock.systemUTC());
     }
 
     @Test

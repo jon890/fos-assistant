@@ -8,6 +8,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -40,6 +41,7 @@ public class AttachmentService {
     private final ChatAttachmentRepository attachments;
     private final AttachmentStore store;
     private final AttachmentProperties properties;
+    private final Clock clock;
 
     /**
      * 사진 한 장을 올린다.
@@ -71,7 +73,7 @@ public class AttachmentService {
                     ErrorCode.VALIDATION_FAILED, "too many images are waiting to be sent");
         }
 
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
                 conversationId,
                 user.id(),
@@ -107,7 +109,7 @@ public class AttachmentService {
             return;
         }
         store.delete(attachment);
-        attachment.markDeleted(Instant.now());
+        attachment.markDeleted(clock.instant());
     }
 
     /**

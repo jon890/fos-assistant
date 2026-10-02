@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -23,11 +24,12 @@ public class AttachmentCleaner {
 
     private final ChatAttachmentRepository attachments;
     private final AttachmentStore store;
+    private final Clock clock;
 
     /** 하루에 한 번 돈다. 시각은 Control Plane 의 시간대를 따르고, 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.attachment.cleanup-cron}")
     public void runScheduled() {
-        cleanExpired(Instant.now());
+        cleanExpired(clock.instant());
     }
 
     /**

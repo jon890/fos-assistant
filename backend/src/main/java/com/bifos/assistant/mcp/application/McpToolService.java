@@ -18,7 +18,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +60,7 @@ public class McpToolService {
     private final AgentDelegationService delegations;
     private final ExecutionDeliveryWriter deliveryWriter;
     private final AgentRepository agents;
+    private final Clock clock;
 
     public List<Map<String, Object>> tools() {
         return List.of(
@@ -302,7 +303,7 @@ public class McpToolService {
     /** 끝난 실행이면 결과를 전했다고 적는다. {@code RUNNING} 은 결과가 아직 없으므로 적지 않는다. */
     private void markDeliveredIfFinished(AgentExecution execution) {
         if (execution.status() != ExecutionStatus.RUNNING) {
-            deliveryWriter.markResultDelivered(execution.id(), Instant.now());
+            deliveryWriter.markResultDelivered(execution.id(), clock.instant());
         }
     }
 

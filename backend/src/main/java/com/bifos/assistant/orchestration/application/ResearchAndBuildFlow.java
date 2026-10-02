@@ -21,7 +21,7 @@ import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -90,6 +90,7 @@ public class ResearchAndBuildFlow implements Flow {
     private final TurnCancellation cancellation;
     private final ArtifactService artifacts;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Override
     public String name() {
@@ -146,7 +147,7 @@ public class ResearchAndBuildFlow implements Flow {
         conversationWriter.touchSession(
                 conversation.id(),
                 chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(),
-                Instant.now());
+                clock.instant());
         onEvent.accept(ChatEvent.step(CHIEF, COMPLETED));
 
         Split split = split(root, chief.result().output(), onEvent);
@@ -339,7 +340,7 @@ public class ResearchAndBuildFlow implements Flow {
         }
         if (sessionId != null && !sessionId.isBlank()) {
             conversation.rememberSession(sessionId);
-            conversationWriter.touchSession(conversation.id(), sessionId, Instant.now());
+            conversationWriter.touchSession(conversation.id(), sessionId, clock.instant());
         }
         return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), "", null, true);
     }

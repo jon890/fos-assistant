@@ -5,7 +5,7 @@ import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +37,7 @@ public class ExecutionEventRecorder {
     private static final String SKILL_VIEW_TOOL = "skill_view";
 
     private final SkillUseRecorder skillUses;
+    private final Clock clock;
 
     /**
      * Hermes 이름에서 우리 이름으로 가는 표다.
@@ -86,7 +87,7 @@ public class ExecutionEventRecorder {
                 .model(type.isSubagent() ? event.model() : null)
                 .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
                 .outputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.outputTokens() : null)
-                .occurredAt(Instant.now())
+                .occurredAt(clock.instant())
                 .build();
     }
 
@@ -115,7 +116,7 @@ public class ExecutionEventRecorder {
                 .sequence(sequence)
                 .eventType(type)
                 .detail(detail)
-                .occurredAt(Instant.now())
+                .occurredAt(clock.instant())
                 .build();
     }
 }

@@ -325,7 +325,7 @@ public class ExecutionRecorder {
         String model = served.model();
         execution.attachRunId(result.runId());
         execution.markSucceeded(
-                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), clock.instant());
         if (outputText != null) {
             execution.recordOutput(outputText);
         }
@@ -344,7 +344,7 @@ public class ExecutionRecorder {
 
     /** 최종 결과를 받지 못한 실행을 FAILED 로 갱신한다. 이미 적힌 사용량은 보존한다. */
     public AgentExecution fail(AgentExecution execution, String errorCode) {
-        execution.markFailed(errorCode, Instant.now());
+        execution.markFailed(errorCode, clock.instant());
         return executions.save(execution);
     }
 
@@ -393,7 +393,7 @@ public class ExecutionRecorder {
         String model = served.model();
         execution.attachRunId(result.runId());
         execution.markCancelled(
-                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), Instant.now());
+                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), clock.instant());
         if (outputText != null) {
             execution.recordOutput(outputText);
         }
@@ -402,7 +402,7 @@ public class ExecutionRecorder {
 
     /** 이미 적은 토큰을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(AgentExecution execution) {
-        execution.markCancelled(Instant.now());
+        execution.markCancelled(clock.instant());
         return executions.save(execution);
     }
 
@@ -449,7 +449,7 @@ public class ExecutionRecorder {
                 .agentId(agent.id())
                 .profileName(agent.hermesProfile())
                 .costMode(agent.costMode())
-                .startedAt(Instant.now());
+                .startedAt(clock.instant());
     }
 
     private static String firstNonBlank(String preferred, String fallback) {

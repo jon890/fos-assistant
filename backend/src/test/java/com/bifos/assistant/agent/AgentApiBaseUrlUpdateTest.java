@@ -37,6 +37,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +67,8 @@ class AgentApiBaseUrlUpdateTest {
             mock(HermesProperties.class),
             mock(PeopleProperties.class),
             mock(AgentProperties.class),
-            mock(SkillStore.class));
+            mock(SkillStore.class),
+            Clock.systemUTC());
 
     private final AgentAdminController controller =
             new AgentAdminController(
