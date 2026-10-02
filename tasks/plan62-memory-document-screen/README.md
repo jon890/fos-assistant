@@ -12,7 +12,7 @@
 ## PR 과 계획서 삭제
 
 - plan 하나를 PR 하나로 올린다. 그 plan 의 계획서 디렉터리는 그 PR 의 마감 단계에서 지운다. phase 는 `tasks/` 를 바꾸지 않는다
-- 세 plan 의 계획서와 ADR-054, ADR-055, ADR-056 초안은 한 브랜치에서 함께 썼다. 먼저 올리는 PR 에 뒤 plan 의 계획서와 아직 구현하지 않은 ADR 이 함께 실린다. 그 ADR 의 `status` 와 `docs/adr/INDEX.md` 는 「아직 구현 전이다」 로 적혀 있고, 구현한 plan 의 마지막 phase 가 그 글을 지운다
+- 세 plan 의 계획서와 ADR-054, ADR-055, ADR-056 초안은 구현이 없는 계획 PR 하나로 먼저 main 에 들어간다. 구현은 plan 마다 main 에서 새 브랜치를 따고, 그 plan 의 PR 하나로 올린다. 아직 구현하지 않은 ADR 의 `status` 와 `docs/adr/INDEX.md` 는 「아직 구현 전이다」 로 적혀 있고, 구현한 plan 의 마지막 phase 가 그 글을 지운다
 
 ## 모든 phase 에 걸리는 규칙
 
