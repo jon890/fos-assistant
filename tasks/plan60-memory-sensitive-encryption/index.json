@@ -1,0 +1,13 @@
+{
+  "name": "plan60-memory-sensitive-encryption",
+  "description": "민감 Memory 본문을 저장할 때 암호화한다 — 신원 문서를 들이기 전에 데이터베이스와 백업에 평문이 남지 않게 한다",
+  "status": "pending",
+  "created_at": "2026-10-02",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" }
+  ]
+}
