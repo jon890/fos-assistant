@@ -6,7 +6,7 @@ import test from "node:test";
 const MIGRATION_DIR = join(import.meta.dirname, "../../backend/src/main/resources/db/migration");
 
 /**
- * 이 번호까지의 파일은 검사하지 않는다. 이미 적용돼 고칠 수 없고, 그 표들의 정렬 규칙은 따로 맞춘다.
+ * 이 번호까지의 파일은 검사하지 않는다. 이미 적용돼 고칠 수 없고, 그 표들의 정렬 규칙은 V58 부터 V65 까지가 맞췄다.
  * 이 값을 올리지 않는다. 새 파일은 모두 검사를 받는다.
  */
 const LAST_UNCHECKED_VERSION = 57;

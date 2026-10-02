@@ -53,25 +53,26 @@ class MysqlMigrationTest {
     }
 
     @Test
-    @DisplayName("운영처럼 두 정렬 규칙이 섞여 있다")
-    void reproducesMixedCollations() {
-        List<String> collations = jdbc.queryForList("""
-                SELECT DISTINCT collation_name FROM information_schema.columns
+    @DisplayName("모든 표와 문자열 칸의 정렬 규칙이 하나다")
+    void keepsSingleCollation() {
+        assertThat(jdbc.queryForObject("SELECT @@collation_server", String.class))
+                .as("서버 기본 정렬 규칙이 운영과 다르면 이 검사가 마이그레이션을 확인하지 못한다")
+                .isEqualTo(SERVER_COLLATION);
+
+        List<String> columns = jdbc.queryForList("""
+                SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND collation_name IS NOT NULL
-                  AND table_name <> 'flyway_schema_history'
-                """, String.class);
+                  AND table_name <> 'flyway_schema_history' AND collation_name <> ?
+                ORDER BY table_name, ordinal_position
+                """, String.class, DEFAULT_COLLATION);
+        assertThat(columns).as("정렬 규칙이 %s 가 아닌 문자열 칸", DEFAULT_COLLATION).isEmpty();
 
-        assertThat(collations)
-                .as("서버 기본 정렬 규칙이 운영과 다르면 섞임이 재현되지 않는다")
-                .containsExactlyInAnyOrder(DEFAULT_COLLATION, SERVER_COLLATION);
-        assertThat(collation("agent_execution", "profile_name")).isEqualTo(DEFAULT_COLLATION);
-        assertThat(collation("subagent_usage_job", "profile_name")).isEqualTo(SERVER_COLLATION);
-    }
-
-    private String collation(String table, String column) {
-        return jdbc.queryForObject("""
-                SELECT collation_name FROM information_schema.columns
-                WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
-                """, String.class, table, column);
+        List<String> tables = jdbc.queryForList("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+                  AND table_name <> 'flyway_schema_history' AND table_collation <> ?
+                ORDER BY table_name
+                """, String.class, DEFAULT_COLLATION);
+        assertThat(tables).as("정렬 규칙이 %s 가 아닌 표", DEFAULT_COLLATION).isEmpty();
     }
 }
