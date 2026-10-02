@@ -56,6 +56,11 @@ public class TurnCancellation {
      * <p>잠금을 푸는 자리에서 닫기 리스너가 불리므로, 그 사이 쌓인 대기 메시지와 결과가 이어서 간다. 도는 turn 이 있어
      * 잡지 못하면 작업을 돌리지 않고 거짓을 돌려준다. 그 turn 이 닫힐 때 호출한 쪽이 다시 시도해야 한다.
      *
+     * <p>작업이 도는 동안 그 대화는 도는 turn 이 있는 것으로 보인다. {@link #markOf} 는 실행 번호가 없는 표시를 돌려주고
+     * {@link #open} 은 {@code CONVERSATION_BUSY} 를 던진다. 부르는 쪽은 트랜잭션 하나처럼 짧은 작업만 넘기고, Hermes 호출처럼
+     * 오래 걸리는 작업은 넘기지 않는다. 그 사이 거절된 보내기는 화면이 대기 메시지로 다시 넣고, 잠금을 풀 때 닫기 리스너가
+     * 이어서 보낸다.
+     *
      * @return 잠금을 잡아 작업을 돌렸다
      */
     public boolean runIfIdle(Long conversationId, Runnable work) {
@@ -81,7 +86,11 @@ public class TurnCancellation {
         byExecution.put(executionId, handle);
     }
 
-    /** 대화 번호로 도는 turn 표시를 읽는다. 표시를 바꾸지 않는다. */
+    /**
+     * 대화 번호로 도는 turn 표시를 읽는다. 표시를 바꾸지 않는다.
+     *
+     * <p>{@link #runIfIdle} 이 잡은 잠금도 도는 turn 으로 읽힌다. 그때 실행 번호는 null 이다.
+     */
     public TurnMark markOf(Long conversationId) {
         TurnHandle handle = byConversation.get(conversationId);
         return handle == null ? TurnMark.NONE : new TurnMark(true, handle.executionId);

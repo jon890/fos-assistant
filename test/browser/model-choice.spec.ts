@@ -259,7 +259,7 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
   await expect(page.getByTestId("model-tier-picker")).toContainText("깊게");
   await tierSettings(page).click();
   await expect(
-    page.getByRole("button", { name: "그룹 단계 설정" }),
+    page.getByRole("button", { name: "그룹 모델 설정" }),
   ).toHaveCount(0);
   await page.keyboard.press("Escape");
 
@@ -284,7 +284,7 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
   ]);
 });
 
-test("관리자에게만 그룹 단계 설정을 보인다", async ({ page }) => {
+test("관리자에게만 그룹 모델 설정을 보인다", async ({ page }) => {
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers",
     (route) =>
@@ -296,8 +296,66 @@ test("관리자에게만 그룹 단계 설정을 보인다", async ({ page }) =>
   await page.goto("/");
   await tierSettings(page).click();
   await expect(
-    page.getByRole("button", { name: "그룹 단계 설정" }),
+    page.getByRole("button", { name: "그룹 모델 설정" }),
   ).toBeVisible();
+});
+
+test("그룹 모델 설정 창은 그룹 기본 단계를 단계별 모델보다 위에 보인다", async ({
+  page,
+}) => {
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) => route.fulfill({ json: { ...TIERS, admin: true } }),
+  );
+
+  await page.goto("/");
+  await tierSettings(page).click();
+  await page.getByRole("button", { name: "그룹 모델 설정" }).click();
+
+  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
+  const defaultHeading = groupDialog.getByRole("heading", {
+    name: "그룹 기본 단계",
+  });
+  const tiersHeading = groupDialog.getByRole("heading", {
+    name: "단계별 모델",
+  });
+  await expect(defaultHeading).toBeVisible();
+  await expect(tiersHeading).toBeVisible();
+  const defaultBox = await defaultHeading.boundingBox();
+  const tiersBox = await tiersHeading.boundingBox();
+  expect(defaultBox).not.toBeNull();
+  expect(tiersBox).not.toBeNull();
+  expect(defaultBox!.y).toBeLessThan(tiersBox!.y);
+});
+
+test("내 기본값 창은 정하지 않았을 때 도는 기준을 알린다", async ({ page }) => {
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) => route.fulfill({ json: { ...TIERS, groupDefaultTier: "DEEP" } }),
+  );
+
+  await page.goto("/");
+  await tierSettings(page).click();
+  await page.getByRole("button", { name: "내 기본값" }).click();
+  await expect(page.getByRole("dialog", { name: "내 기본값" })).toContainText(
+    "정하지 않으면 그룹 기본 단계(깊게)로 돌아요.",
+  );
+});
+
+test("그룹 기본 단계가 없으면 내 기본값 창이 에이전트 기본 모델을 알린다", async ({
+  page,
+}) => {
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) => route.fulfill({ json: { ...TIERS, groupDefaultTier: null } }),
+  );
+
+  await page.goto("/");
+  await tierSettings(page).click();
+  await page.getByRole("button", { name: "내 기본값" }).click();
+  await expect(page.getByRole("dialog", { name: "내 기본값" })).toContainText(
+    "정하지 않으면 에이전트 기본 모델로 돌아요.",
+  );
 });
 
 test("내 기본값 저장이 실패하면 창을 유지하고 다시 저장할 수 있다", async ({
@@ -388,15 +446,15 @@ test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저�
 
   await page.goto("/");
   await tierSettings(page).click();
-  await page.getByRole("button", { name: "그룹 단계 설정" }).click();
+  await page.getByRole("button", { name: "그룹 모델 설정" }).click();
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 단계 설정" });
-  const model = groupDialog.getByLabel("모델").first();
+  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
+  const model = groupDialog.getByLabel("모델", { exact: true }).first();
   await model.fill("example-retry");
   await groupDialog.getByRole("button", { name: "저장" }).click();
   const failedAlert = groupDialog.getByRole("alert");
   await expect(failedAlert).toHaveText(
-    "그룹 단계 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+    "그룹 모델 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   );
   await expect(model).toHaveValue("example-retry");
 
@@ -441,14 +499,24 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
 
   await tierSettings(page).click();
   const settingsDialog = page.getByRole("dialog", { name: "모델 단계 설정" });
-  await expect(settingsDialog.getByText("단계 설정이 필요해요.")).toBeVisible();
-  await settingsDialog.getByRole("button", { name: "그룹 단계 설정" }).click();
+  await expect(
+    settingsDialog.getByText("단계별 모델을 아직 정하지 않았어요."),
+  ).toBeVisible();
+  await settingsDialog.getByRole("button", { name: "그룹 모델 설정" }).click();
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 단계 설정" });
-  await expect(groupDialog.getByText("단계 설정이 필요해요.")).toBeVisible();
-  await expect(groupDialog.getByLabel("모델").first()).toHaveValue("");
-  await expect(groupDialog.getByLabel("강도").first()).toHaveValue("");
-  await expect(groupDialog.getByLabel("그룹 기본값")).toHaveValue("BALANCED");
+  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
+  await expect(
+    groupDialog.getByText("단계별 모델을 아직 정하지 않았어요."),
+  ).toBeVisible();
+  await expect(
+    groupDialog.getByLabel("모델", { exact: true }).first(),
+  ).toHaveValue("");
+  await expect(
+    groupDialog.getByLabel("강도", { exact: true }).first(),
+  ).toHaveValue("");
+  await expect(groupDialog.getByLabel("그룹 기본 단계")).toHaveValue(
+    "BALANCED",
+  );
   await groupDialog.getByRole("button", { name: "저장" }).click();
 
   await expect

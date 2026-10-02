@@ -192,8 +192,9 @@ test("실행 상세와 작업 과정에 실제 모델, 단계, 기본 강도와 
   await page.goto("/executions/900");
 
   await expect(
-    page.getByText("openai-codex · example-model", { exact: true }),
+    page.getByText("ChatGPT 구독 · example-model", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("openai-codex")).toHaveCount(0);
   await expect(page.getByText("균형", { exact: true })).toBeVisible();
   await expect(page.getByText("기본값 medium", { exact: true })).toBeVisible();
   await expect(page.getByTestId("execution-timing")).toContainText("요청 수신");
@@ -220,7 +221,7 @@ test("MEMBER는 실행 상세에서 단계와 걸린 시간만 본다", async ({
   await expect(page.getByText("1초 미만", { exact: true })).toBeVisible();
   await expect(page.getByText("500ms", { exact: false })).toHaveCount(0);
   await expect(
-    page.getByText("openai-codex · example-model", { exact: true }),
+    page.getByText("ChatGPT 구독 · example-model", { exact: true }),
   ).toHaveCount(0);
   await expect(page.getByText("기본값 medium", { exact: true })).toHaveCount(0);
   await expect(page.getByText("입력 토큰", { exact: true })).toHaveCount(0);

@@ -16,6 +16,9 @@ const AGENT_CODE = PERSONA_EMPTY_AGENT_CODE;
 const DEFAULT_MODEL = "example-model-mini";
 const HIDDEN_MODEL = "example-deep";
 
+/** 응답을 바꿔 끼우는 검사가 profile 의 기본 모델로 쓰는 이름이다. */
+const PROFILE_DEFAULT_MODEL = "example-model";
+
 function section(page: Page): Locator {
   return page.getByTestId("agent-model-section");
 }
@@ -186,7 +189,7 @@ test("모델 목록을 읽지 못해도 관리자가 숨김을 풀 수 있다", 
       section(page).getByTestId("agent-model-catalog-missing"),
     ).toBeVisible();
     await section(page)
-      .getByRole("checkbox", { name: `openai-codex ${HIDDEN_MODEL} 숨기기` })
+      .getByRole("checkbox", { name: `ChatGPT 구독 ${HIDDEN_MODEL} 숨기기` })
       // 체크를 풀면 그 줄이 사라진다. uncheck 는 사라진 요소의 상태를 확인하려다 멈추므로 누르기만 한다.
       .click();
     await section(page).getByRole("button", { name: "숨김 저장" }).click();
@@ -200,4 +203,64 @@ test("모델 목록을 읽지 못해도 관리자가 숨김을 풀 수 있다", 
   } finally {
     await reset(page);
   }
+});
+
+/** 실제로 숨기면 그 그룹의 기본값 실행이 막혀 다른 검사가 깨진다. 그래서 응답만 바꿔 끼운다. */
+async function routeSettings(
+  page: Page,
+  hiddenEntries: { provider: string; model: string | null }[],
+): Promise<void> {
+  await page.route(
+    (url) => url.pathname === `/api/admin/agents/${AGENT_CODE}/model-settings`,
+    (route) =>
+      route.fulfill({
+        json: {
+          agentDefault: { provider: null, model: null, reasoningEffort: null },
+          catalog: {
+            defaultProvider: "openai-codex",
+            defaultModel: PROFILE_DEFAULT_MODEL,
+            providers: [
+              {
+                provider: "openai-codex",
+                name: "openai-codex",
+                models: [PROFILE_DEFAULT_MODEL, DEFAULT_MODEL],
+              },
+            ],
+            reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+          },
+          hidden: { entries: hiddenEntries },
+        },
+      }),
+  );
+}
+
+test("기본 모델을 정하지 않은 에이전트의 profile 기본 모델이 숨겨져 있으면 경고를 보인다", async ({
+  page,
+}) => {
+  await routeSettings(page, [
+    { provider: "openai-codex", model: PROFILE_DEFAULT_MODEL },
+  ]);
+  await page.goto(`/agents/${AGENT_CODE}`);
+  await expect(
+    section(page).getByTestId("agent-model-profile-default-hidden"),
+  ).toHaveText(
+    "이 에이전트는 기본 모델을 정하지 않았는데 profile 의 기본 모델이 숨겨져 있어요. 기본 모델을 정하거나 숨김을 풀기 전에는 모델을 고르지 않은 대화가 실패해요.",
+  );
+});
+
+test("숨김이 비어 있으면 profile 기본 모델 경고를 보이지 않는다", async ({
+  page,
+}) => {
+  await routeSettings(page, []);
+  await page.goto(`/agents/${AGENT_CODE}`);
+  await expect(
+    section(page).getByRole("combobox", { name: "모델" }),
+  ).toBeVisible();
+  // 준비 응답은 Hermes 가 이름을 주지 않아 이름 칸에 id 가 온 모양이다. 아는 id 는 표시 이름으로 그린다.
+  await expect(
+    section(page).getByRole("checkbox", { name: "ChatGPT 구독 전체 숨기기" }),
+  ).toBeVisible();
+  await expect(
+    section(page).getByTestId("agent-model-profile-default-hidden"),
+  ).toHaveCount(0);
 });

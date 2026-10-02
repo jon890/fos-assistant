@@ -10,6 +10,7 @@ import {
   type AgentModelSettings,
   type HiddenModelEntry,
 } from "@/lib/model-settings";
+import { knownProviderLabel } from "@/lib/provider-label";
 
 type Props = {
   settings: AgentModelSettings;
@@ -20,6 +21,14 @@ type Props = {
 const MODELS_OPEN_LIMIT = 10;
 
 type ProviderRow = AgentModelSettings["catalog"]["providers"][number];
+
+/**
+ * 숨김을 편집하는 관리자에게 보일 제공사 이름이다. 표에 없는 id 는 「다른 제공사」 로 뭉치지 않고 id 를 그대로
+ * 보인다. 뭉치면 무엇을 숨기는지 구분할 수 없다.
+ */
+function editableProviderName(provider: string): string {
+  return knownProviderLabel(provider) ?? provider;
+}
 
 /** 모델 제공사 하나의 숨김 고르기다. 전체를 숨기면 모델별 고르기를 접는다. */
 function ProviderHiddenFields({
@@ -34,11 +43,12 @@ function ProviderHiddenFields({
   const wholeProvider = draft.some(
     (entry) => entry.provider === row.provider && entry.model === null,
   );
+  // Hermes 가 이름을 주지 않으면 이름 칸에 id 가 그대로 온다.
+  const name =
+    row.name === row.provider ? editableProviderName(row.provider) : row.name;
   return (
     <fieldset className="grid gap-2 rounded-md border border-border p-3">
-      <legend className="px-1 text-sm font-medium">
-        {row.name === row.provider ? row.name : `${row.name} (${row.provider})`}
-      </legend>
+      <legend className="px-1 text-sm font-medium">{name}</legend>
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -51,7 +61,7 @@ function ProviderHiddenFields({
             )
           }
         />
-        {row.name} 전체 숨기기
+        {name} 전체 숨기기
       </label>
       {wholeProvider ? (
         <p className="text-sm text-muted-foreground">
@@ -172,8 +182,8 @@ export function ModelHiddenForm({ settings, onSaved }: Props) {
               />
               <span className="min-w-0 break-all">
                 {entry.model === null
-                  ? `${entry.provider} 전체 숨기기`
-                  : `${entry.provider} ${entry.model} 숨기기`}
+                  ? `${editableProviderName(entry.provider)} 전체 숨기기`
+                  : `${editableProviderName(entry.provider)} ${entry.model} 숨기기`}
               </span>
             </label>
           ))}

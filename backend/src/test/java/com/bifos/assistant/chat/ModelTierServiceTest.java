@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
@@ -50,8 +52,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Conversation conversation = mock(Conversation.class);
         when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
@@ -70,8 +71,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
         when(users.findById(1L)).thenReturn(Optional.empty());
@@ -97,8 +97,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser member = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> service.saveGroup(member, List.of(), null))
@@ -116,8 +115,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         List<ModelTierOptions.Tier> incomplete =
                 List.of(new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "example-fast", "low"));
@@ -137,8 +135,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         doAnswer(invocation -> {
                     List<ModelTierDefinition> saved = invocation.getArgument(0);
@@ -178,8 +175,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
 
         assertThatThrownBy(() -> service.saveGroup(
@@ -248,8 +244,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
 
@@ -267,8 +262,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Agent fastAgent = mock(Agent.class);
         Agent balancedAgent = mock(Agent.class);
@@ -294,8 +288,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Agent agent = mock(Agent.class);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(storedDefinitions());
@@ -314,8 +307,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service =
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class));
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.ADMIN);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(fallbackDefinitions());
         when(users.findById(1L)).thenReturn(Optional.empty());
@@ -487,9 +479,8 @@ class ModelTierServiceTest {
         ModelChoice choice = ModelChoice.stored("openai-codex", "hidden-model", null);
         when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
         when(conversation.modelChoice()).thenReturn(choice);
-        doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
-                .when(visibility)
-                .requireVisible(10L, choice);
+        when(visibility.hiddenFor(10L))
+                .thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "hidden-model"))));
 
         assertThatThrownBy(() -> service.resolve(user, conversation, mock(Agent.class)))
                 .isInstanceOf(ApiException.class)
@@ -527,6 +518,205 @@ class ModelTierServiceTest {
         verifyNoInteractions(definitions);
     }
 
+    @Test
+    @DisplayName("숨김이 없으면 모델을 싣지 않는 해석은 목록을 읽지 않고 통과한다")
+    void resolvesDefaultWithoutReadingCatalogWhenNothingIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(HiddenModels.none());
+
+        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+        verifyNoInteractions(fixtures.options);
+    }
+
+    @Test
+    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
+    void rejectsDefaultRunWhenProfileDefaultModelIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(fixtures.options.profileDefaultOf(fixtures.agent))
+                .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+    @Test
+    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 provider 전체를 숨겼으면 MODEL_HIDDEN 으로 거절한다")
+    void rejectsDefaultRunWhenProfileDefaultProviderIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", null));
+        when(fixtures.options.profileDefaultOf(fixtures.agent))
+                .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+    @Test
+    @DisplayName("숨김이 있어도 profile 의 기본 모델이 숨기지 않은 모델이면 세 값을 비운 채 통과한다")
+    void passesDefaultRunWhenProfileDefaultModelIsNotHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-other"));
+        when(fixtures.options.profileDefaultOf(fixtures.agent))
+                .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+    }
+
+    @Test
+    @DisplayName("숨김이 있는데 목록을 한 번도 읽지 못했으면 통과시키지 않고 HERMES_UNAVAILABLE 로 거절한다")
+    void rejectsDefaultRunWhenCatalogWasNeverRead() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(fixtures.options.profileDefaultOf(fixtures.agent))
+                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+
+        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("숨김이 있어도 에이전트 기본 모델이 있으면 목록을 읽지 않고 그 모델로 판정한다")
+    void judgesAgentDefaultModelWithoutReadingCatalog() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        agentDefault(fixtures.agent, "example-provider", "example-agent", null);
+
+        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("example-provider", "example-agent", null));
+        verifyNoInteractions(fixtures.options);
+    }
+
+    @Test
+    @DisplayName("숨김이 있고 에이전트 기본 모델이 숨긴 모델이면 목록을 읽지 않고 MODEL_HIDDEN 으로 거절한다")
+    void rejectsHiddenAgentDefaultModelWithoutReadingCatalog() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-agent"));
+        agentDefault(fixtures.agent, "example-provider", "example-agent", null);
+
+        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+        verifyNoInteractions(fixtures.options);
+    }
+
+    @Test
+    @DisplayName("Hermes 가 profile 의 기본 모델을 주지 않으면 판정할 값이 없어 통과한다")
+    void passesDefaultRunWhenHermesGivesNoDefaultModel() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", null));
+        when(fixtures.options.profileDefaultOf(fixtures.agent))
+                .thenReturn(ModelChoice.stored("example-provider", null, null));
+
+        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+    }
+
+    @Test
+    @DisplayName("Hermes 가 기본 provider 만 주지 않으면 모델 이름으로 판정하고 provider 전체 숨김은 견주지 않는다")
+    void judgesByModelNameWhenHermesGivesNoDefaultProvider() {
+        HiddenFixtures sameModel = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(sameModel.options.profileDefaultOf(sameModel.agent))
+                .thenReturn(ModelChoice.stored(null, "example-model", null));
+        HiddenFixtures wholeProvider = hiddenFixtures(hiding("example-provider", null));
+        when(wholeProvider.options.profileDefaultOf(wholeProvider.agent))
+                .thenReturn(ModelChoice.stored(null, "example-model", null));
+
+        assertThatThrownBy(() -> sameModel.service.resolve(sameModel.user, defaultConversation(), sameModel.agent))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+        assertThat(wholeProvider
+                        .service
+                        .resolve(wholeProvider.user, defaultConversation(), wholeProvider.agent)
+                        .choice())
+                .isEqualTo(ModelChoice.defaults());
+    }
+
+    @Test
+    @DisplayName("mapping이 빈 단계도 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
+    void rejectsEmptyTierMappingWhenProfileDefaultModelIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(fixtures.definitions.findByGroupIdOrderByTier(10L)).thenReturn(fallbackDefinitions());
+        when(fixtures.options.profileDefaultOf(fixtures.agent))
+                .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        assertThatThrownBy(() -> fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+    @Test
+    @DisplayName("대화 없는 실행이 보낼 값은 에이전트 기본값이고 그 값이 같은 숨김 판정을 지난다")
+    void detachedChoiceIsAgentDefaultAndPassesSameHiddenCheck() {
+        HiddenFixtures visible = hiddenFixtures(hiding("example-provider", "example-other"));
+        agentDefault(visible.agent, "example-provider", "example-agent", "medium");
+        HiddenFixtures hiddenDefault = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(hiddenDefault.options.profileDefaultOf(hiddenDefault.agent))
+                .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        ModelChoice sent = visible.service.detachedChoice(visible.agent);
+        ModelChoice empty = hiddenDefault.service.detachedChoice(hiddenDefault.agent);
+
+        assertThat(sent).isEqualTo(ModelChoice.stored("example-provider", "example-agent", "medium"));
+        assertThatCode(() -> visible.service.requireRunnable(visible.user, visible.agent, sent))
+                .doesNotThrowAnyException();
+        assertThat(empty.usesDefaultModel()).as("기본값이 빈 에이전트는 모델을 싣지 않는다").isTrue();
+        assertThatThrownBy(() -> hiddenDefault.service.requireRunnable(hiddenDefault.user, hiddenDefault.agent, empty))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+    /** 숨김이 없는 그룹의 대역이다. 실행 직전 판정이 숨김 목록을 먼저 읽는다. */
+    private static ModelVisibilityService nothingHidden() {
+        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
+        when(visibility.hiddenFor(any())).thenReturn(HiddenModels.none());
+        return visibility;
+    }
+
+    private static HiddenModels hiding(String provider, String model) {
+        return new HiddenModels(List.of(new HiddenModels.Entry(provider, model)));
+    }
+
+    private static Conversation defaultConversation() {
+        Conversation conversation = mock(Conversation.class);
+        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
+        return conversation;
+    }
+
+    /** 그룹 10 이 {@code hidden} 을 숨긴 상태의 서비스와 대역이다. 에이전트 기본 모델은 비어 있다. */
+    private static HiddenFixtures hiddenFixtures(HiddenModels hidden) {
+        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
+        when(visibility.hiddenFor(10L)).thenReturn(hidden);
+        return new HiddenFixtures(
+                new ModelTierService(
+                        definitions,
+                        mock(ModelTierGroupSettingRepository.class),
+                        mock(AppUserRepository.class),
+                        options,
+                        visibility),
+                definitions,
+                options,
+                new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER),
+                mock(Agent.class));
+    }
+
+    private record HiddenFixtures(
+            ModelTierService service,
+            ModelTierDefinitionRepository definitions,
+            ModelOptionsService options,
+            CurrentUser user,
+            Agent agent) {}
+
     private static void agentDefault(Agent agent, String provider, String model, String effort) {
         when(agent.defaultModelProvider()).thenReturn(provider);
         when(agent.defaultModel()).thenReturn(model);
@@ -556,7 +746,7 @@ class ModelTierServiceTest {
                                 Map.of())),
                         List.of()));
         return new TierFixtures(
-                new ModelTierService(definitions, settings, users, options, mock(ModelVisibilityService.class)),
+                new ModelTierService(definitions, settings, users, options, nothingHidden()),
                 definitions,
                 settings,
                 users,

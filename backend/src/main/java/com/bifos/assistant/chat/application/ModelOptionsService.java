@@ -7,7 +7,6 @@ import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,14 +25,23 @@ import org.springframework.stereotype.Service;
 /**
  * 대화가 고를 수 있는 모델 목록을 Hermes 에 물어 돌려준다.
  *
- * <p>목록은 저장하지 않고 profile 마다 메모리에 {@code ttl} 동안 들고 있는다. 시간이 지나 다시 읽다가
- * Hermes 가 답하지 못하면 들고 있던 옛 목록을 돌려준다. 그 profile 의 목록을 한 번도 읽지 못했다면
- * {@code HERMES_UNAVAILABLE} 이다. 동시에 여러 요청이 와도 Hermes 를 한 번만 부르도록 막지 않는다.
- * 가족 몇 명이 쓰는 규모라 같은 조회가 겹쳐도 비용이 작다.
+ * <p>목록은 저장하지 않고 profile 마다 메모리에 {@code ttl} 동안 들고 있는다. 이 목록은 실행 직전의 숨김
+ * 판정에도 쓰인다. 시간이 지나 다시 읽다가 실패하면 실패의 종류와 관계없이 들고 있던 옛 목록을 돌려주고,
+ * 다음 다시 읽기를 {@link #RETRY_DELAY} 만큼 미룬다. 그 profile 의 목록을 한 번도 읽지 못했다면 읽기의
+ * 예외가 그대로 나간다. Hermes 가 답하지 않을 때는 {@code HERMES_UNAVAILABLE} 이다. 동시에 여러 요청이 와도
+ * Hermes 를 한 번만 부르도록 막지 않는다. 가족 몇 명이 쓰는 규모라 같은 조회가 겹쳐도 비용이 작다.
  */
 @Service
 @Slf4j
 public class ModelOptionsService {
+
+    /**
+     * 다시 읽기가 실패한 뒤 다음 다시 읽기까지 기다리는 시간이다.
+     *
+     * <p>미루지 않으면 Hermes 가 답하지 않는 동안 실행마다 목록 읽기의 timeout 까지 기다린다. 길게 잡으면 Hermes 가
+     * 돌아온 뒤에도 옛 목록으로 판정하는 시간이 늘어나므로 1분으로 둔다.
+     */
+    private static final Duration RETRY_DELAY = Duration.ofMinutes(1);
 
     private final AgentService agents;
     private final HermesModelClient hermes;
@@ -42,8 +50,8 @@ public class ModelOptionsService {
     private final Clock clock;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
-    /** 읽은 시각과 그때 읽은 목록이다. */
-    private record Cached(Instant readAt, HermesModelCatalog catalog) {}
+    /** 다음에 다시 읽을 시각과 마지막으로 읽은 목록이다. */
+    private record Cached(Instant rereadAt, HermesModelCatalog catalog) {}
 
     @Autowired
     public ModelOptionsService(
@@ -91,22 +99,30 @@ public class ModelOptionsService {
         return optionsOf(catalogFor(agent), null, HiddenModels.none());
     }
 
+    /** 그 profile 의 기본 provider 와 모델을 들고 있는 목록에서 읽는다. Hermes 가 주지 않은 값은 null 이다. */
+    public ModelChoice profileDefaultOf(Agent agent) {
+        HermesModelCatalog catalog = catalogFor(agent);
+        return ModelChoice.stored(catalog.defaultProvider(), catalog.defaultModel(), null);
+    }
+
     private HermesModelCatalog catalogFor(Agent agent) {
         String profile = agent.hermesProfile();
         Instant now = clock.instant();
         Cached cached = cache.get(profile);
-        if (cached != null && now.isBefore(cached.readAt().plus(ttl))) {
+        if (cached != null && now.isBefore(cached.rereadAt())) {
             return cached.catalog();
         }
         try {
             HermesModelCatalog fresh = hermes.readCatalog(agent.apiBaseUrl(), profile);
-            cache.put(profile, new Cached(now, fresh));
+            cache.put(profile, new Cached(now.plus(ttl), fresh));
             return fresh;
         } catch (ApiException ex) {
-            if (cached == null || ex.code() != ErrorCode.HERMES_UNAVAILABLE) {
+            if (cached == null) {
                 throw ex;
             }
-            log.warn("모델 목록을 다시 읽지 못해 들고 있던 목록을 돌려준다 profile={}", profile);
+            log.warn("모델 목록을 다시 읽지 못해 들고 있던 목록을 돌려준다 profile={} code={}", profile, ex.code());
+            // 목록은 그대로 두고 다시 읽을 시각만 미룬다.
+            cache.put(profile, new Cached(now.plus(RETRY_DELAY), cached.catalog()));
             return cached.catalog();
         }
     }

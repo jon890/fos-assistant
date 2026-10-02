@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { providerLabel } from "@/lib/provider-label";
 import {
   Table,
   TableBody,
@@ -110,7 +111,7 @@ export function ExecutionTable({
                     {execution.model ?? "-"}
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {execution.provider ?? "-"}
+                    {providerLabel(execution.provider) ?? "-"}
                   </span>
                   <span
                     className="block truncate text-xs text-muted-foreground"
