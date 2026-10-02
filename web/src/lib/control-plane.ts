@@ -107,6 +107,9 @@ async function authorize(): Promise<Authorized> {
  *
  * <p>그 오류 클래스는 Next.js 가 내보내지 않는다. 안쪽 경로에서 가져오면 서버 묶음에 든 것과 다른 사본이라
  * `instanceof` 가 맞지 않으므로 문구의 앞부분으로 알아본다.
+ *
+ * <p>next 를 올릴 때 이 문구가 그대로인지 다시 본다. 달라지면 `test/browser/access-revoked.spec.ts` 의 첫
+ * 검사가 실패한다.
  */
 const READONLY_COOKIES_MESSAGE =
   "Cookies can only be modified in a Server Action or Route Handler";
@@ -125,7 +128,8 @@ async function endRevokedSession(response: Response): Promise<void> {
   if (response.status !== 401) return;
   if (!isAccessRevoked(response.status, await response.clone().text())) return;
   try {
-    await signOut({ redirect: false });
+    // redirectTo 가 없으면 next-auth 가 Referer 를 callbackUrl 로 쓴다.
+    await signOut({ redirect: false, redirectTo: "/signin" });
   } catch (error) {
     // 쿠키를 고칠 수 없다는 오류일 때만 넘긴다. 모든 오류에 넘기면 그 라우트 안에서 실패했을 때 같은
     // 주소로 되돌아오는 루프가 된다.

@@ -120,6 +120,26 @@ class ControlPlaneJwtFilterTest {
     }
 
     @Test
+    @DisplayName("subject 가 없는 토큰은 사용자를 찾지 않고 인증 없이 체인을 잇는다")
+    void continuesChainWithoutAuthenticationForTokenWithoutSubject() throws Exception {
+        AllowedUserResolver users = mock(AllowedUserResolver.class);
+        String withoutSubject = Jwts.builder()
+                .claim("name", NAME)
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+                .compact();
+        MockHttpServletRequest request = requestWith(withoutSubject);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter(users).doFilter(request, response, chain);
+
+        assertThat(chain.getRequest()).isSameAs(request);
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(users, never()).resolveAllowed(any(), any());
+    }
+
+    @Test
     @DisplayName("Authorization 헤더가 없으면 사용자를 찾지 않고 체인을 잇는다")
     void continuesChainWithoutAuthorizationHeader() throws Exception {
         AllowedUserResolver users = mock(AllowedUserResolver.class);

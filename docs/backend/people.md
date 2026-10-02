@@ -174,7 +174,7 @@ sequenceDiagram
 `ACCESS_REVOKED` 는 이 판정만 내는 코드다.
 세션이 없을 때 웹이 만드는 `UNAUTHENTICATED` 와 달라, 웹이 세션을 지울지 이 코드로 판단한다.
 
-`/mcp` 와 `/internal/hermes/` 아래 경로, 서비스 토큰 경로는 이 필터를 지나지 않아 이 판정을 받지 않는다.
+`/mcp` 와 `/internal/hermes/` 아래 경로, 서비스 토큰 경로, 로그인 판정 경로 `/api/v1/signin/allowed` 는 이 필터를 지나지 않아 이 판정을 받지 않는다.
 서비스 토큰은 주인이 켜져 있는지 따로 확인한다([`memory.md`](memory.md)).
 
 ### 아무도 없을 때

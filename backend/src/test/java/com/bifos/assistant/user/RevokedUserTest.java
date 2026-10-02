@@ -32,7 +32,7 @@ class RevokedUserTest {
     private static final String PROFILE = "aunt";
 
     @Autowired
-    AllowedUserResolver provisioning;
+    AllowedUserResolver resolver;
 
     @Autowired
     AppUserRepository users;
@@ -65,7 +65,7 @@ class RevokedUserTest {
     void returnsEmptyAndCreatesNoUserForDisabledAddress() {
         saveDisabledPerson();
 
-        Optional<AppUser> resolved = provisioning.resolveAllowed(EMAIL, NAME);
+        Optional<AppUser> resolved = resolver.resolveAllowed(EMAIL, NAME);
 
         assertThat(resolved).isEmpty();
         assertThat(users.findByEmail(EMAIL)).isEmpty();
@@ -77,7 +77,7 @@ class RevokedUserTest {
     void returnsEmptyForDisabledAddressInMixedCase() {
         saveDisabledPerson();
 
-        Optional<AppUser> resolved = provisioning.resolveAllowed("Aunt@Example.COM", NAME);
+        Optional<AppUser> resolved = resolver.resolveAllowed("Aunt@Example.COM", NAME);
 
         assertThat(resolved).isEmpty();
         assertThat(users.count()).isZero();
@@ -88,7 +88,7 @@ class RevokedUserTest {
     void createsUserForEnabledAddress() {
         people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
 
-        Optional<AppUser> resolved = provisioning.resolveAllowed(EMAIL, NAME);
+        Optional<AppUser> resolved = resolver.resolveAllowed(EMAIL, NAME);
 
         assertThat(resolved).map(AppUser::email).contains(EMAIL);
         assertThat(users.findByEmail(EMAIL)).isPresent();
@@ -97,7 +97,7 @@ class RevokedUserTest {
     @Test
     @DisplayName("허용 목록에 줄이 없는 주소는 막지 않고 사용자가 생긴다")
     void createsUserForAddressWithoutAllowlistRow() {
-        Optional<AppUser> resolved = provisioning.resolveAllowed("stranger@example.com", "낯선 사람");
+        Optional<AppUser> resolved = resolver.resolveAllowed("stranger@example.com", "낯선 사람");
 
         assertThat(resolved).map(AppUser::email).contains("stranger@example.com");
         assertThat(users.findByEmail("stranger@example.com")).isPresent();
@@ -107,17 +107,17 @@ class RevokedUserTest {
     @DisplayName("이미 들어온 사용자의 줄을 끄면 막히고 다시 켜면 같은 사용자가 돌아온다")
     void blocksJoinedUserWhenDisabledAndReturnsSameUserWhenEnabledAgain() {
         AllowedPerson person = people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
-        AppUser joined = provisioning.resolveAllowed(EMAIL, NAME).orElseThrow();
+        AppUser joined = resolver.resolveAllowed(EMAIL, NAME).orElseThrow();
 
         person.disable();
         people.save(person);
 
-        assertThat(provisioning.resolveAllowed(EMAIL, NAME)).isEmpty();
+        assertThat(resolver.resolveAllowed(EMAIL, NAME)).isEmpty();
 
         person.enable();
         people.save(person);
 
-        assertThat(provisioning.resolveAllowed(EMAIL, NAME)).map(AppUser::id).contains(joined.id());
+        assertThat(resolver.resolveAllowed(EMAIL, NAME)).map(AppUser::id).contains(joined.id());
         assertThat(users.count()).isEqualTo(1);
     }
 }

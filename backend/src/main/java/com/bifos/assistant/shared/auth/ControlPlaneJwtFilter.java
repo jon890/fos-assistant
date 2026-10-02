@@ -65,6 +65,16 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             "/internal/hermes/connector-policy",
             "/api/v1/signin/allowed");
 
+    /** 토큰 하나를 판정한 결과다. */
+    private enum TokenOutcome {
+        /** 사용자를 인증으로 올렸다. */
+        AUTHENTICATED,
+        /** 서명이 틀렸거나 주소가 없어 인증 없이 지나간다. */
+        ANONYMOUS,
+        /** 관리자가 허용 목록에서 끈 사용자다. 401 로 거절한다. */
+        REVOKED
+    }
+
     private final SecretKey key;
     private final AllowedUserResolver users;
     private final ObjectMapper json;
@@ -86,8 +96,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith(BEARER)) {
-            boolean revoked = !authenticate(header.substring(BEARER.length()).trim());
-            if (revoked) {
+            if (authenticate(header.substring(BEARER.length()).trim()) == TokenOutcome.REVOKED) {
                 log.warn("rejected a revoked user");
                 writeRevoked(response);
                 return;
@@ -99,10 +108,10 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     /**
      * 토큰이 가리키는 사용자를 인증으로 올린다.
      *
-     * <p>꺼진 사용자일 때만 거짓을 돌려준다. 서명이 틀렸거나 주소가 없는 토큰은 인증을 올리지 않고 참을
-     * 돌려줘, 요청이 인증 없이 지나가게 한다.
+     * <p>서명이 틀렸거나 주소가 없는 토큰은 인증을 올리지 않고 {@code ANONYMOUS} 를 돌려줘, 요청이 인증
+     * 없이 지나가게 한다.
      */
-    private boolean authenticate(String token) {
+    private TokenOutcome authenticate(String token) {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(key)
@@ -112,11 +121,11 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             String email = claims.getSubject();
             String name = claims.get("name", String.class);
             if (email == null || email.isBlank()) {
-                return true;
+                return TokenOutcome.ANONYMOUS;
             }
             Optional<AppUser> allowed = users.resolveAllowed(email, name == null || name.isBlank() ? email : name);
             if (allowed.isEmpty()) {
-                return false;
+                return TokenOutcome.REVOKED;
             }
             AppUser user = allowed.get();
             CurrentUser principal =
@@ -126,10 +135,11 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
                     null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + user.role().name())));
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            return TokenOutcome.AUTHENTICATED;
         } catch (JwtException ex) {
             log.warn("rejected a control plane token: {}", ex.getMessage());
+            return TokenOutcome.ANONYMOUS;
         }
-        return true;
     }
 
     /**

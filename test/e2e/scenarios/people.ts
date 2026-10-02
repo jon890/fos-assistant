@@ -166,10 +166,14 @@ export const peopleScenario: Scenario = {
       `사용 중지한 사람의 오류 코드가 다르다: ${revoked.body}`,
     );
     // 이 경로는 인증 없이도 열려 있어, 필터가 직접 막는지 본다.
-    expectStatus(
+    const revokedMe = expectStatus(
       await call(context, "/me", { token: context.tokens.aunt }),
       401,
       "사용 중지한 사람의 내 정보",
+    );
+    expect(
+      revokedMe.json<{ code: string }>().code === "ACCESS_REVOKED",
+      `사용 중지한 사람의 내 정보 오류 코드가 다르다: ${revokedMe.body}`,
     );
 
     step("다시 허용하면 통과한다");
