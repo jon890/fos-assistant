@@ -82,7 +82,7 @@ public final class MemoryDtos {
             @NotBlank String documentKey,
             @NotBlank @Size(max = 200) String title,
             @NotBlank @Size(max = 12000) String content,
-            boolean sensitive) {}
+            @NotNull Boolean sensitive) {}
 
     /** 문서를 고친다. {@code expectedRevision} 은 화면이 읽은 판 번호다. */
     public record UpdateDocumentRequest(
