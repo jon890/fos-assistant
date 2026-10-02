@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.infra.ArtifactProperties;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactStore.Removed;
 import java.time.Clock;

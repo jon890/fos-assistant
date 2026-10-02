@@ -1,6 +1,6 @@
 package com.bifos.assistant.shared.config;
 
-import com.bifos.assistant.mcp.infra.AgentTokenAuthenticationFilter;
+import com.bifos.assistant.shared.auth.AgentTokenFilter;
 import com.bifos.assistant.shared.auth.ControlPlaneJwtFilter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -23,18 +23,16 @@ public class SecurityConfig {
     }
 
     @Bean
-    public FilterRegistrationBean<AgentTokenAuthenticationFilter> disableDirectAgentTokenFilterRegistration(
-            AgentTokenAuthenticationFilter agentTokenFilter) {
-        FilterRegistrationBean<AgentTokenAuthenticationFilter> registration =
-                new FilterRegistrationBean<>(agentTokenFilter);
+    public FilterRegistrationBean<AgentTokenFilter> disableDirectAgentTokenFilterRegistration(
+            AgentTokenFilter agentTokenFilter) {
+        FilterRegistrationBean<AgentTokenFilter> registration = new FilterRegistrationBean<>(agentTokenFilter);
         registration.setEnabled(false);
         return registration;
     }
 
     @Bean
     public SecurityFilterChain filterChain(
-            HttpSecurity http, ControlPlaneJwtFilter jwtFilter, AgentTokenAuthenticationFilter agentTokenFilter)
-            throws Exception {
+            HttpSecurity http, ControlPlaneJwtFilter jwtFilter, AgentTokenFilter agentTokenFilter) throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ASYNC)

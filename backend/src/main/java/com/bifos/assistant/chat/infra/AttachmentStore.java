@@ -1,6 +1,5 @@
 package com.bifos.assistant.chat.infra;
 
-import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -87,7 +86,8 @@ public class AttachmentStore {
     }
 
     private Path resolve(Long conversationId, String storedName) {
-        Path path = root.resolve(String.valueOf(conversationId)).resolve(storedName).normalize();
+        Path path =
+                root.resolve(String.valueOf(conversationId)).resolve(storedName).normalize();
         if (!path.startsWith(root)) {
             throw new IllegalArgumentException("attachment path escapes the root");
         }

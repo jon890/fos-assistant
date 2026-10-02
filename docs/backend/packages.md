@@ -12,7 +12,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 | 패키지 | 책임 |
 | --- | --- |
-| `shared/auth` | 토큰 검사와 현재 사용자 |
+| `shared/auth` | 토큰 검사와 현재 사용자, profile 토큰 필터의 타입 |
 | `shared/error` | 오류 코드와 응답 형태 |
 | `shared/config` | 시계, 스케줄링, 보안 필터 설정 |
 | `shared/util` | 외부 서비스의 글을 감싸는 함수와 문자열 지문 |
@@ -30,7 +30,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `connector` | 커넥터 카탈로그, 사용자별 연결, 커넥터 도구 호출의 판정과 기록 |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
-`shared` 가 `user` 와 `mcp` 를 쓰는 기존 위반은 기준 파일 `backend/config/archunit/store/` 에 있고, 새 위반만 검사에 걸린다.
+`shared` 가 `user` 를 쓰는 기존 위반은 기준 파일 `backend/config/archunit/store/` 에 있고, 새 위반만 검사에 걸린다.
 
 **`mcp` 는 `orchestration` 을 부르고, `orchestration` 은 `mcp` 를 import 하지 않는다.**
 위임 서비스는 `McpCaller` 를 받지 않고 요청자와 origin 실행을 따로 받는다.

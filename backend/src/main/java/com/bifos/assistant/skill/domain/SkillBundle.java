@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.domain;
 
 import java.util.List;
 

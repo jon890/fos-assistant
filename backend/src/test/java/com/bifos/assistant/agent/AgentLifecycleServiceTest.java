@@ -27,7 +27,7 @@ import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.application.SkillBundle;
+import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.type.UserRole;

@@ -69,7 +69,7 @@ Hermes 기본 스킬만 있어도 색인 안내문이 `skill_manage` 를 권하�
 | `mcp/application/McpToolService` | 도구 목록과 MCP `content`, `isError` 결과를 만든다 |
 | `chat/application/ArtifactWriteRequest`, `ArtifactWriteResult` | 각각 UUID, 상대 경로와 입력 방식, 저장된 경로와 바이트 수를 전달한다 |
 | `chat/application/ArtifactWriteService` | `ConversationAccess.requireOwn` 으로 주인을 확인한 뒤 본문 또는 내려받은 이미지를 저장한다 |
-| `chat/application/ArtifactSourceProperties` | 허용 호스트와 연결, 읽기, 호출 전체 제한 시간을 받는다 |
+| `chat/infra/ArtifactSourceProperties` | 허용 호스트와 연결, 읽기, 호출 전체 제한 시간을 받는다 |
 | `chat/infra/ArtifactStore` | 쓰기용 경로 판정, 부모 폴더 생성, 임시 파일 저장과 교체를 기존 경로 규칙과 함께 갖는다 |
 | `chat/infra/ArtifactSourceFetcher` | URL 과 DNS 를 검사하고 검증한 IP 에 HTTPS 로 연결해 제한된 이미지 본문만 반환한다 |
 

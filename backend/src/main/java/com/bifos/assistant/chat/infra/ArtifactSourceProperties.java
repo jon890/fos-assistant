@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.application;
+package com.bifos.assistant.chat.infra;
 
 import java.time.Duration;
 import java.util.List;
