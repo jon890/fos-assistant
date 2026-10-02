@@ -67,6 +67,12 @@ assistant:
   memory:
     propose:
       enabled: false
+    encryption:
+      # 민감 Memory 본문을 암호화하는 key 다(ADR-055). 둘 다 비우면 기동은 되고 민감 항목의 저장과 수정, 암호화한 줄의 읽기만 거절한다
+      # 새로 쓸 때 쓰는 key 의 id
+      active-key-id: ${ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID:}
+      # <id>:<base64 32바이트> 를 쉼표로 이은 목록. 옛 key 를 남겨 두어야 옛 줄을 읽는다
+      keys: ${ASSISTANT_MEMORY_ENCRYPTION_KEYS:}
   delegation:
     # 새 자식이 가질 수 있는 가장 깊은 깊이. 사용자가 부른 실행이 0 이다
     max-depth: 2

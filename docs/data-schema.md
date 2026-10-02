@@ -393,7 +393,8 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 | `entry_type` | VARCHAR(20) | `MEMORY`, `DOCUMENT`, `SOURCE`. 기본값은 `MEMORY` |
 | `document_key` | VARCHAR(128) NULL | `DOCUMENT` 의 이름. 같은 주인과 `collection` 안에서 하나다. `MEMORY` 와 `SOURCE` 는 비어 있다 |
 | `title` | VARCHAR(200) | 색인에 실을 제목 한 줄 |
-| `content` | TEXT | 본문 |
+| `content` | TEXT | 본문. 민감 항목이면 암호문이다 |
+| `content_key_id` | VARCHAR(32) NULL | 본문을 암호화한 key 의 id. 비어 있으면 `content` 는 평문이다. `SENSITIVE` 인 줄은 key 가 있을 때 기동하며 채운다. key 가 없으면 평문으로 남은 줄이 비어 있을 수 있다 |
 | `retrieval` | VARCHAR(20) | `ALWAYS` 는 본문을 매 실행에 싣는다. `SEARCH` 는 제목과 번호만 색인에 싣는다. `ARCHIVE` 는 색인에도 싣지 않는다. 기본값은 `SEARCH` |
 | `always_inject` | BOOLEAN | `retrieval` 로 옮긴 옛 칸. `retrieval` 이 `ALWAYS` 일 때만 참으로 적는다. 읽지 않는다. 다음 배포에서 지운다 |
 | `sensitivity` | VARCHAR(20) | `NORMAL` 또는 `SENSITIVE`. 기본값은 `NORMAL`. `SENSITIVE` 는 `ALWAYS` 로 둘 수 없다 |
@@ -453,7 +454,8 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 | `entry_type`, `document_key` | | 그때의 종류와 문서 이름. 지운 문서의 판을 이름으로 찾는다 |
 | `status` | VARCHAR(20) | 그때의 승인 상태. 지운 항목이 제안이었는지 받아들인 항목이었는지 남는다 |
 | `title` | VARCHAR(200) | |
-| `content` | TEXT | 그 판의 본문 |
+| `content` | TEXT | 그 판의 본문. 그때 민감 항목이었으면 암호문이다 |
+| `content_key_id` | VARCHAR(32) NULL | 그 판의 본문을 암호화한 key 의 id. 비어 있으면 평문이다 |
 | `retrieval`, `sensitivity` | VARCHAR(20) | 그 판의 값 |
 | `changed_by_user_id` | BIGINT NULL | 이 판을 물러나게 한 사용자 |
 | `reason` | VARCHAR(200) NULL | 바꾼 까닭. 지금 화면은 적지 않는다 |
@@ -707,7 +709,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 
-Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다.
+Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 그대로 둔다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
 

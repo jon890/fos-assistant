@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.agent.domain.AgentMemoryCollection;
+import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpToolService;
@@ -93,6 +95,9 @@ class McpMemoryToolTest {
 
     @Autowired
     AgentRepository agents;
+
+    @Autowired
+    AgentMemoryCollectionRepository agentCollections;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -215,6 +220,30 @@ class McpMemoryToolTest {
                         .path("text")
                         .asString())
                 .isEqualTo("기본 본문");
+    }
+
+    @Test
+    @DisplayName("민감 허용을 받은 에이전트가 읽으면 암호화돼 저장된 민감 본문이 평문으로 나온다")
+    void allowedAgentReadsSensitiveBodyAsPlaintext() throws Exception {
+        Memory sensitive = memories.create(
+                current(dad),
+                MemoryScope.USER,
+                "신원",
+                "민감 본문",
+                "core",
+                MemoryRetrieval.SEARCH,
+                MemorySensitivity.SENSITIVE);
+        agentCollections.save(AgentMemoryCollection.of(dadRun.agentId(), "core", true, Instant.now()));
+
+        assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, sensitive.id()))
+                .doesNotContain("민감 본문");
+        assertThat(body(call(dadToken, sensitive.id(), null))
+                        .path("result")
+                        .path("content")
+                        .get(0)
+                        .path("text")
+                        .asString())
+                .isEqualTo("민감 본문");
     }
 
     @Test

@@ -111,7 +111,7 @@ class McpToolServiceTest {
     @DisplayName("Memory 를 읽으면 부모 실행의 사용자로 읽고 실행 번호를 로그에 남긴다")
     void memoryReadUsesParentRunUserAndLogsRunId() {
         Memory memory = mock(Memory.class);
-        when(memory.content()).thenReturn("본문");
+        when(memories.contentOf(memory)).thenReturn("본문");
         when(memories.bodyFor(eq(user), any(), eq(5L))).thenReturn(memory);
 
         assertThat(tools.readMemory(caller, 5L).get("isError")).isEqualTo(false);

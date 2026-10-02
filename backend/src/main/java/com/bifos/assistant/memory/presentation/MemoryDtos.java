@@ -2,6 +2,7 @@ package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -39,19 +40,21 @@ public final class MemoryDtos {
             Instant acceptedAt,
             Instant createdAt,
             Instant updatedAt,
+            boolean sensitive,
             boolean omittedFromContext) {
         static MemoryView from(Memory memory) {
             return from(memory, false);
         }
 
         static MemoryView from(Memory memory, boolean omittedFromContext) {
+            boolean sensitive = memory.sensitivity() == MemorySensitivity.SENSITIVE;
             return new MemoryView(
                     memory.id(),
                     memory.scope().name(),
                     memory.ownerUserId(),
                     memory.groupId(),
                     memory.title(),
-                    memory.content(),
+                    sensitive || memory.sealed() ? "" : memory.content(),
                     memory.alwaysInject(),
                     memory.status().name(),
                     memory.proposedByExecutionId(),
@@ -59,6 +62,7 @@ public final class MemoryDtos {
                     memory.acceptedAt(),
                     memory.createdAt(),
                     memory.updatedAt(),
+                    sensitive,
                     omittedFromContext);
         }
     }
