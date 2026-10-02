@@ -67,6 +67,10 @@ REPLY_HEADER_UNSAFE_RE = re.compile(r"[^\t\r\n\x20-\x7e]")
 ADDRESS_RE = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_{|}~-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+")
 # RFC 2047 의 인코딩된 낱말이 시작하는 모양이다.
 ENCODED_WORD_RE = re.compile(r"=\?[^?\s]*\?[bBqQ]\?")
+# 범주가 Cf 는 아니지만 화면에 빈칸처럼 보이는 글자다. 한글 채움 문자와 점자 빈칸이다.
+BLANK_LOOKING = frozenset("\u3164\u115f\u1160\uffa0\u2800")
+# 답장 머리에 옮길 원래 메일의 번호 하나의 모양이다. `<...>` 안에 꺾쇠와 공백이 없다.
+MESSAGE_ID_RE = re.compile(r"<[^<>\s]{1,250}>")
 # 본문에서 받는 Cf 문자다. 그림 글자와 일부 글자를 잇는 U+200C 와 U+200D 다.
 BODY_JOINERS = "\u200c\u200d"
 REJECTING_TOKEN_ERRORS = frozenset({"invalid_grant", "invalid_client"})
@@ -378,13 +382,18 @@ def _names(value: str) -> list:
 
 
 def _invisible(value: str, allowed: str = "") -> bool:
-    """화면에 보이지 않거나 글의 방향을 바꾸는 문자(Unicode 범주 Cf)가 있는지 본다. `allowed` 의 글자는 받는다."""
-    return any(unicodedata.category(character) == "Cf" and character not in allowed for character in value)
+    """화면에 보이지 않거나 글의 방향을 바꾸는 문자(Unicode 범주 Cf)나 빈칸처럼 보이는 글자가 있는지 본다.
+
+    `allowed` 의 글자는 받는다.
+    """
+    return any((unicodedata.category(character) == "Cf" and character not in allowed) or character in BLANK_LOOKING
+               for character in value)
 
 
 def _address(item: str) -> str:
     """받는 사람 항목 하나가 주소뿐인지 확인해 그 주소를 낸다. 표시 이름과 그 밖의 모양은 거절한다."""
-    if not ADDRESS_RE.fullmatch(item):
+    # 주소 안의 인코딩된 낱말 모양도 받지 않는다. 받는 쪽이 풀어 읽으면 카드의 글과 다른 주소가 된다.
+    if not ADDRESS_RE.fullmatch(item) or ENCODED_WORD_RE.search(item):
         raise GmailError(INVALID_INPUT)
     return item
 
@@ -473,7 +482,11 @@ async def _reply_context(token: str, message_id: str) -> dict:
         if REPLY_HEADER_UNSAFE_RE.search(value):
             return ""
         # 접힌 머리의 줄바꿈을 공백 하나로 편다. 그대로 넣으면 머리에 줄이 끼어든다.
-        return " ".join(value.split())
+        parts = value.split()
+        # 번호 모양이 아닌 조각이 하나라도 있으면 버린다. 남이 쓴 임의의 글을 내 메일의 머리에 싣지 않는다.
+        if not parts or not all(MESSAGE_ID_RE.fullmatch(part) for part in parts):
+            return ""
+        return " ".join(parts)
 
     return {
         "thread_id": thread_id if isinstance(thread_id, str) else "",

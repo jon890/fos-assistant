@@ -770,6 +770,10 @@ class WriteTest(GmailCase):
             "control in id": ("<orig\x0b@mail.example.com>", "<root@mail.example.com>", None, None),
             "non-ascii references": ("<orig-1@mail.example.com>", "<루트@mail.example.com>",
                                      "<orig-1@mail.example.com>", "<orig-1@mail.example.com>"),
+            # 번호 모양이 아닌 글이 붙은 머리는 통째로 버린다. 남이 쓴 글을 내 메일의 머리에 싣지 않는다.
+            "text after id": ("<orig-1@mail.example.com> Bcc: c@evil.example", "<root@mail.example.com>", None, None),
+            "text in references": ("<orig-1@mail.example.com>", "<root@mail.example.com> To: c@evil.example",
+                                   "<orig-1@mail.example.com>", "<orig-1@mail.example.com>"),
         }
         for name, (message_id, references, in_reply_to, expected_references) in cases.items():
             with self.subTest(name=name):
@@ -880,6 +884,17 @@ class RecipientDisguiseTest(GmailCase):
             # 닫지 않은 낱말은 다시 읽어도 같은 글이다. 느슨하게 푸는 메일 프로그램이 있어 모양만으로 거절한다.
             {"subject": "=?utf-8?b?eA=="}, {"subject": "hello =?utf-8?q?x"},
             {"subject": "s‮t"}, {"subject": "s​t"}, {"subject": "﻿s"}, {"subject": "s‍t"},
+        ])
+
+        self.assertEqual(self.fake.seen(), [])
+
+    def test_blank_looking_letters_and_encoded_words_inside_an_address_are_rejected(self):
+        self.rejected_everywhere([
+            # 범주가 Cf 가 아니어도 빈칸처럼 보이는 글자다.
+            {"subject": "hi \u3164\u3164 there"}, {"body": "a\u3164b"}, {"subject": "a\u2800b"},
+            # 주소 안의 인코딩된 낱말 모양이다.
+            {"to": "a=?utf-8?q?=40evil.example=2C?=b@example.com"},
+            {"cc": "a=?utf-8?b?QGV2aWw=?=b@example.com"},
         ])
 
         self.assertEqual(self.fake.seen(), [])
