@@ -394,6 +394,65 @@ class RecoveredRunRecorderTest {
         assertThat(saved.totalTokens()).isEqualTo(1_500L);
         assertThat(messages.findByConversationIdOrderByIdAsc(flowConversation.id()))
                 .isEmpty();
+        assertThat(eventsOf(row))
+                .as("흐름 뿌리의 끝 사건")
+                .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
+                .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "ORPHANED"));
+    }
+
+    @Test
+    @DisplayName("흐름 turn 의 자식 줄은 끝난 상태대로 적고 끝 사건을 남긴다")
+    void flowChildIsRecordedAsItEndedWithEndEvent() {
+        Agent flowed = agent("flowed", "흐름");
+        flowed.assignFlow(ResearchAndBuildFlow.NAME);
+        flowed = agents.save(flowed);
+        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+        AgentExecution root = chatTurn(flowConversation, flowed);
+        AgentExecution child = executions.save(AgentExecution.builder()
+                .userId(dad.id())
+                .conversationId(flowConversation.id())
+                .agentId(worker.id())
+                .parentExecutionId(root.id())
+                .rootExecutionId(root.treeRootId())
+                .profileName("worker")
+                .hermesRunId("run-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.now())
+                .build());
+        assertThat(recorder.kindOf(child)).isEqualTo(RecoveredRunKind.FLOW);
+
+        boolean written = recorder.settle(child.id(), result("cancelled", "일부 답"));
+
+        assertThat(written).isTrue();
+        assertThat(executions.findById(child.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.CANCELLED);
+        assertThat(eventsOf(child))
+                .extracting(ExecutionEvent::eventType)
+                .containsExactly(ExecutionEventType.RUN_CANCELLED);
+    }
+
+    @Test
+    @DisplayName("대화가 없는 그 밖의 실행은 실행 줄과 끝 사건만 남긴다")
+    void auxiliaryRunRecordsRowAndEndEventOnly() {
+        AgentExecution completed = auxiliary();
+        AgentExecution failed = auxiliary();
+        assertThat(recorder.kindOf(completed)).isEqualTo(RecoveredRunKind.AUXILIARY);
+
+        recorder.settle(completed.id(), result("completed", "쓰지 않는 답"));
+        recorder.settle(failed.id(), result("failed", null));
+
+        AgentExecution saved = executions.findById(completed.id()).orElseThrow();
+        assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        assertThat(saved.totalTokens()).isEqualTo(1_500L);
+        assertThat(eventsOf(completed))
+                .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
+                .containsExactly(tuple(ExecutionEventType.RUN_COMPLETED, null));
+        assertThat(executions.findById(failed.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(eventsOf(failed))
+                .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
+                .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "FAILED"));
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+        assertThat(received).as("대화에 알리지 않는다").isEmpty();
     }
 
     @Test
@@ -409,7 +468,10 @@ class RecoveredRunRecorderTest {
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
         assertThat(saved.status()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(saved.errorCode()).isEqualTo("REMOTE_RUN_LOST");
-        assertThat(eventsOf(row)).as("끝 사건을 남기지 않는다").isEmpty();
+        assertThat(eventsOf(row))
+                .as("끝 사건은 한 번만, 처음 준 오류 코드로 남는다")
+                .extracting(ExecutionEvent::sequence, ExecutionEvent::eventType, ExecutionEvent::detail)
+                .containsExactly(tuple(1, ExecutionEventType.RUN_FAILED, "REMOTE_RUN_LOST"));
         assertThat(received)
                 .extracting(ChatEvent::type, ChatEvent::code)
                 .containsExactly(tuple("error", "HERMES_RUN_FAILED"));
@@ -454,6 +516,9 @@ class RecoveredRunRecorderTest {
         assertThat(saved.status()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(saved.errorCode()).isEqualTo("ORPHANED");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
+        assertThat(eventsOf(row))
+                .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
+                .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "ORPHANED"));
     }
 
     /** 이전 프로세스가 돌리던 대화 turn 의 뿌리 줄이다. 실행은 1분 전에 시작했다. */
@@ -467,6 +532,19 @@ class RecoveredRunRecorderTest {
                 .costMode(CostMode.SUBSCRIPTION)
                 .status(ExecutionStatus.RUNNING)
                 .startedAt(Instant.now().minus(Duration.ofMinutes(1)))
+                .build());
+    }
+
+    /** Memory 제안이나 추천 질문처럼 대화 없이 돌던 실행이다. */
+    private AgentExecution auxiliary() {
+        return executions.save(AgentExecution.builder()
+                .userId(dad.id())
+                .agentId(chief.id())
+                .profileName(chief.hermesProfile())
+                .hermesRunId("run-" + UUID.randomUUID())
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.now())
                 .build());
     }
 

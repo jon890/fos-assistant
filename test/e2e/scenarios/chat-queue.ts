@@ -362,13 +362,22 @@ export const chatQueueRestartScenario: Scenario = {
       step("Control Plane 을 강제로 내리고 다시 띄운다");
       await context.restartControlPlane();
 
-      step("재시작 뒤 쌓인 글이 USER 로 저장되고 답이 온다");
+      step("붙잡힌 turn 에 다시 붙어 있는 동안에는 쌓인 글이 대기 줄에 남는다");
+      const waiting = await pendingOf(context, sendConversation);
+      expect(waiting.items.length === 1, `다시 붙은 turn 이 끝나기 전에 대기 줄이 달라졌다: ${JSON.stringify(waiting)}`);
+
+      step("붙잡은 turn 을 놓으면 그 답이 먼저 오고, 그 뒤에 쌓인 글이 USER 로 저장되고 답이 온다");
+      context.hermes.releaseHeldRun();
       await awaitMessages(
         context,
         sendConversation,
         (list) => {
           const index = list.findIndex((message) => message.role === "USER" && message.content === "재시작 뒤 보낼 글");
-          return index >= 0 && list.slice(index + 1).some((message) => message.role === "ASSISTANT");
+          return (
+            index >= 0 &&
+            list.slice(0, index).some((message) => message.role === "ASSISTANT") &&
+            list.slice(index + 1).some((message) => message.role === "ASSISTANT")
+          );
         },
         TURN_TIMEOUT_MS,
         "재시작 뒤 보낸 turn",

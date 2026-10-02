@@ -87,7 +87,7 @@ public class RecoveredRunRecorder {
                         .orElseGet(() -> failLocked(row, ORPHANED)));
     }
 
-    /** Hermes 의 결과 없이 FAILED 로 적는다. 이미 끝난 줄이면 거짓이다. 끝 사건은 남기지 않는다. */
+    /** Hermes 의 결과 없이 FAILED 로 적는다. 이미 끝난 줄이면 거짓이다. 끝 사건의 detail 은 그 오류 코드다. */
     public boolean failWithout(Long executionId, String errorCode) {
         return finishOnce(executionId, row -> failLocked(row, errorCode));
     }
@@ -159,16 +159,20 @@ public class RecoveredRunRecorder {
         if (result.succeeded()) {
             // 흐름의 단계 순서와 합치기는 내려간 프로세스의 메모리에만 있었다. 뿌리는 성공으로 끝났어도 답을
             // 합쳐 줄 곳이 없어 실패로 적고 사용량만 남긴다.
-            boolean flowRoot = kind == RecoveredRunKind.FLOW && row.parentExecutionId() == null;
-            AgentExecution saved = flowRoot
-                    ? executions.fail(row, agent, result, requested, ORPHANED)
-                    : executions.complete(row, agent, result, requested);
-            return Written.rowOnly(saved, kind);
+            if (kind == RecoveredRunKind.FLOW && row.parentExecutionId() == null) {
+                AgentExecution saved = executions.fail(row, agent, result, requested, ORPHANED);
+                return new Written(saved, kind, ExecutionEventType.RUN_FAILED, ORPHANED, null, null);
+            }
+            AgentExecution saved = executions.complete(row, agent, result, requested);
+            return new Written(saved, kind, ExecutionEventType.RUN_COMPLETED, null, null, null);
         }
         if (isCancelled(result)) {
-            return Written.rowOnly(executions.cancel(row, agent, result, requested), kind);
+            AgentExecution saved = executions.cancel(row, agent, result, requested);
+            return new Written(saved, kind, ExecutionEventType.RUN_CANCELLED, null, null, null);
         }
-        return Written.rowOnly(executions.fail(row, agent, result, requested, errorCodeOf(result)), kind);
+        String code = errorCodeOf(result);
+        AgentExecution saved = executions.fail(row, agent, result, requested, code);
+        return new Written(saved, kind, ExecutionEventType.RUN_FAILED, code, null, null);
     }
 
     private Written settleChatTurn(AgentExecution row, Agent agent, HermesRunResult result, ModelChoice requested) {
@@ -231,12 +235,13 @@ public class RecoveredRunRecorder {
         return new Written(saved, RecoveredRunKind.DELEGATION, ExecutionEventType.RUN_FAILED, code, null, null);
     }
 
-    /** Hermes 의 결과 없이 실패로 적는다. 사용량을 적지 않고 끝 사건도 남기지 않는다. */
+    /** Hermes 의 결과 없이 실패로 적는다. 사용량을 적지 않는다. */
     private Written failLocked(AgentExecution row, String errorCode) {
         RecoveredRunKind kind = kindOf(row);
         ChatEvent notice =
                 kind == RecoveredRunKind.CHAT_TURN && liveConversation(row) != null ? failureNotice(false) : null;
-        return new Written(executions.fail(row, errorCode), kind, null, null, null, notice);
+        return new Written(
+                executions.fail(row, errorCode), kind, ExecutionEventType.RUN_FAILED, errorCode, null, notice);
     }
 
     /** 그 실행의 대화다. 대화가 없거나 지워졌으면 null 이고, 그때는 실행 줄만 적는다. */
@@ -342,7 +347,7 @@ public class RecoveredRunRecorder {
      * 트랜잭션에서 적은 것과 그 뒤에 할 일이다.
      *
      * @param row 적은 실행 줄
-     * @param endEvent 남길 끝 사건. 남기지 않으면 null
+     * @param endEvent 남길 끝 사건
      * @param detail 끝 사건의 detail. 실패면 오류 코드다
      * @param messageId 저장한 답 메시지. 저장하지 않았으면 null
      * @param notice 대화 단위 SSE 로 낼 사건. 내지 않으면 null
@@ -353,10 +358,5 @@ public class RecoveredRunRecorder {
             ExecutionEventType endEvent,
             String detail,
             Long messageId,
-            ChatEvent notice) {
-
-        static Written rowOnly(AgentExecution row, RecoveredRunKind kind) {
-            return new Written(row, kind, null, null, null, null);
-        }
-    }
+            ChatEvent notice) {}
 }
