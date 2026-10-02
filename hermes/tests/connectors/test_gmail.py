@@ -892,7 +892,7 @@ class RecipientDisguiseTest(GmailCase):
         self.rejected_everywhere([
             # 앞 글자에 붙어 아무것도 그리지 않는 결합 문자(범주 Mn)다. 글자 결합 문자와 변이 선택자다.
             {"subject": "s\u034ft"}, {"subject": "Hi\ufe0f"}, {"subject": "a\ufe00b"},
-            {"subject": "a\U000e0100b"}, {"subject": "a\u180bb"},
+            {"subject": "a\U000e0100b"}, {"subject": "a\u180bb"}, {"subject": "s\u17b4t"}, {"subject": "s\u17b5t"},
             # 이모지 뒤여도 U+FE0F 를 겹쳐 쓰면 받지 않는다. 글자가 아닌 글자 바로 뒤의 하나만 받는다.
             {"subject": "\u2764\ufe0f\ufe0f"}, {"subject": "\ufe0f"}, {"subject": "가\ufe0f"},
         ])

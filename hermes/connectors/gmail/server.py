@@ -71,8 +71,9 @@ ENCODED_WORD_RE = re.compile(r"=\?[^?\s]*\?[bBqQ]\?")
 BLANK_LOOKING = frozenset("\u3164\u115f\u1160\uffa0\u2800")
 # 답장 머리에 옮길 원래 메일의 번호 하나의 모양이다. `<...>` 안에 꺾쇠와 공백이 없다.
 MESSAGE_ID_RE = re.compile(r"<[^<>\s]{1,250}>")
-# 앞 글자에 붙어 그 자체로는 아무것도 그리지 않는 결합 문자(범주 Mn)다. U+034F, 변이 선택자, 몽골어 자유 변이 선택자다.
-INVISIBLE_MARKS = frozenset("\u034f\u180b\u180c\u180d\u180f") | frozenset(map(chr, range(0xFE00, 0xFE10))) | frozenset(
+# 앞 글자에 붙어 그 자체로는 아무것도 그리지 않는 결합 문자(범주 Mn)다. U+034F, 크메르 고유 모음 U+17B4 와 U+17B5, 변이 선택자,
+# 몽골어 자유 변이 선택자다. 모두 Unicode 가 Default_Ignorable 로 둔 문자다.
+INVISIBLE_MARKS = frozenset("\u034f\u17b4\u17b5\u180b\u180c\u180d\u180f") | frozenset(map(chr, range(0xFE00, 0xFE10))) | frozenset(
     map(chr, range(0xE0100, 0xE01F0)))
 # 이모지 표현을 고르는 U+FE0F 다. 글자가 아닌 글자(범주 So, Sk, Sm, Po, Nd) 바로 뒤에서만 받는다.
 EMOJI_SELECTOR = "\ufe0f"
