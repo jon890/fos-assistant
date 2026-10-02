@@ -90,7 +90,7 @@ test("하위 에이전트가 있는 묶음은 건수를 따로 보인다", async
 
   // 토큰이 적힌 줄만 세므로 재조회가 한 주기 돌 때까지 다시 열어 본다.
   await expect(async () => {
-    await page.goto("/usage");
+    await page.goto("/admin/usage");
     await expect(breakdown(page, testInfo.project.name).getByText("도우미 1건")).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 30_000 });
 });

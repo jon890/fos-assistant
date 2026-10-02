@@ -65,7 +65,7 @@ test("금액을 확인하지 못한 도우미 수를 요약에 보인다", async
   expect(response.ok()).toBeTruthy();
   // 부모가 끝나면 자식은 금액을 확인하기 전까지 세어진다. 재조회가 끝나기 전에도 건수에는 들어 있다.
   await expect(async () => {
-    await page.goto("/usage");
+    await page.goto("/admin/usage");
     await expect(page.getByText("금액을 확인하지 못한 도우미", { exact: true })).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 30_000 });
 });

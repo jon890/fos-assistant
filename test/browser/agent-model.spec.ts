@@ -141,7 +141,7 @@ test("강도의 끄기는 끄기 지원이 확인된 모델에서만 보이고 �
 }) => {
   await reset(page);
   try {
-    await page.goto(`/agents/${AGENT_CODE}`);
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
     const model = section(page).getByRole("combobox", { name: "모델" });
     // 비워 둔 모델은 profile 의 기본 모델(example-model)로 본다. 대역은 이 모델의 끄기 지원을 알린다.
     await expect(model).toHaveValue("");
@@ -184,7 +184,7 @@ test("서버가 끄기를 거절하면 저장 실패 알림을 보인다", async
     [DEFAULT_MODEL]: { support: "SUPPORTED", disable: "SUPPORTED" },
   });
   try {
-    await page.goto(`/agents/${AGENT_CODE}`);
+    await page.goto(`/admin/agents/${AGENT_CODE}`);
     await section(page)
       .getByRole("combobox", { name: "모델" })
       .selectOption({ label: DEFAULT_MODEL });
