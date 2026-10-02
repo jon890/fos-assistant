@@ -6,7 +6,7 @@ import com.bifos.assistant.chat.application.ConversationSessions;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.orchestration.domain.RunSession;
+import com.bifos.assistant.chat.domain.RunSession;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;

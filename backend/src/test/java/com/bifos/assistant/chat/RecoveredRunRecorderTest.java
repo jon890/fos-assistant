@@ -28,7 +28,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
-import com.bifos.assistant.orchestration.application.DelegationFinished;
+import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.domain.AgentExecution;

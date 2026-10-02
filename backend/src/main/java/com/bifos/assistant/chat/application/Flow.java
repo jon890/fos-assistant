@@ -1,9 +1,6 @@
-package com.bifos.assistant.orchestration.application;
+package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.application.ChatEvent;
-import com.bifos.assistant.chat.application.ChatTurn;
-import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -12,7 +9,7 @@ import java.util.function.Consumer;
 /**
  * 요청 하나를 여러 실행으로 나눠 돌리고 답 하나를 만든다.
  *
- * <p>지금 흐름은 {@link ResearchAndBuildFlow} 하나다. 범용 workflow 엔진이 아니라, 흐름 하나가
+ * <p>지금 흐름은 {@code ResearchAndBuildFlow} 하나다. 범용 workflow 엔진이 아니라, 흐름 하나가
  * 끝까지 도는 것을 먼저 보고 무엇이 어려운지 안 뒤에 일반화하기 위해 둔 자리다.
  */
 public interface Flow {

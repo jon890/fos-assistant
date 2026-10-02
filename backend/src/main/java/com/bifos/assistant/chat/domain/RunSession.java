@@ -1,4 +1,4 @@
-package com.bifos.assistant.orchestration.domain;
+package com.bifos.assistant.chat.domain;
 
 import java.util.UUID;
 

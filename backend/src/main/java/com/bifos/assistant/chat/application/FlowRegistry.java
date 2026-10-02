@@ -1,4 +1,4 @@
-package com.bifos.assistant.orchestration.application;
+package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;

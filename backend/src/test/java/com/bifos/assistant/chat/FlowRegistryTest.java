@@ -1,12 +1,12 @@
-package com.bifos.assistant.orchestration;
+package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.orchestration.application.Flow;
-import com.bifos.assistant.orchestration.application.FlowRegistry;
+import com.bifos.assistant.chat.application.Flow;
+import com.bifos.assistant.chat.application.FlowRegistry;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

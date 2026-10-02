@@ -24,7 +24,7 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
-import com.bifos.assistant.orchestration.domain.RunSession;
+import com.bifos.assistant.chat.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
