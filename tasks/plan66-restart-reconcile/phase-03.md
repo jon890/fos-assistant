@@ -150,7 +150,7 @@ finally:
 
 **상한은 `reconcile(Duration maxWait)` 으로 준다.** 상한을 검사하는 두 경우만 300ms 를 주고, 나머지는 30초를 준다. 테스트 profile 의 `hermes.run-timeout` 이 1초라 `reconcile()` 을 그대로 부르면 느린 머신에서 「도는 중」 경우가 `RECONCILE_TIMEOUT` 으로 끝난다.
 
-**「아직 돈다」 와 「닿지 못한다」 를 지나가는 답으로 두지 않는다.** `poll-interval` 이 10ms 라 `running(), running(), finished(...)` 처럼 주면 20ms 안에 끝나 그 사이의 단언이 흔들린다. `willLookup(run, running())` 하나만 주어 되풀이하게 하고, `RUNNING` 과 잠금을 단언한 뒤 `willLookup(run, finished(...))` 을 다시 불러 끝낸다. 닿지 못하는 경우도 `willFailLookup(run, failure, Integer.MAX_VALUE)` 로 두고 단언한 뒤 `willLookup` 과 `willFailLookup(run, failure, 0)` 으로 푼다(대역이 그렇게 풀리지 않으면 phase 01 의 대역에 푸는 메서드를 더하고 그 파일을 「변경 파일」 에 더한다).
+**「아직 돈다」 와 「닿지 못한다」 를 지나가는 답으로 두지 않는다.** `poll-interval` 이 10ms 라 `running(), running(), finished(...)` 처럼 주면 20ms 안에 끝나 그 사이의 단언이 흔들린다. `willLookup(run, running())` 하나만 주어 되풀이하게 하고, `RUNNING` 과 잠금을 단언한 뒤 `willLookup(run, finished(...))` 을 다시 불러 끝낸다. 닿지 못하는 경우도 `willFailLookup(run, failure, Integer.MAX_VALUE)` 로 두고 단언한 뒤 `willLookup` 과 `willFailLookup(run, failure, 0)` 으로 푼다.
 
 **`stop()` 을 부른 테스트는 끝에서 `start()` 를 부른다.** 이 빈은 캐시된 Spring context 가 함께 쓴다. 「내려가는 중」 표시가 남으면 뒤 테스트의 `reconcile()` 이 아무것도 적지 않는다. 테스트 profile 은 `enabled: false` 라 `start()` 가 `claim()` 을 부르지 않는다.
 
@@ -191,7 +191,7 @@ finally:
 ```bash
 # cwd: 저장소 root
 cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.application.RestartReconcilerTest' --tests 'com.bifos.assistant.chat.*' --tests 'com.bifos.assistant.orchestration.*' --tests 'com.bifos.assistant.usage.*' --tests 'com.bifos.assistant.architecture.*'
-cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+cd backend && ./gradlew checkstyleMain checkstyleTest
 node test/e2e/run.ts
 ! git grep -n "OrphanedExecutionSweeper" -- backend/src/main docs
 ```

@@ -142,7 +142,7 @@ public RecoveredRunKind kindOf(AgentExecution row)
 ```bash
 # cwd: 저장소 root
 cd backend && ./gradlew test --tests 'com.bifos.assistant.chat.RecoveredRunRecorderTest' --tests 'com.bifos.assistant.orchestration.*' --tests 'com.bifos.assistant.usage.*' --tests 'com.bifos.assistant.architecture.*'
-cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+cd backend && ./gradlew checkstyleMain checkstyleTest
 ```
 
 둘 다 종료 코드 0. `orchestration` 테스트는 `DelegationOutput` 으로 옮긴 자르기가 그대로인지, `architecture` 는 패키지 방향을 본다.

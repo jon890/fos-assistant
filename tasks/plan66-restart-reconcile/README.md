@@ -11,6 +11,7 @@ docs 는 이 계획과 같은 브랜치에서 이미 고쳤다. phase 는 docs �
 | 04 | 가짜 Hermes 의 실행 조회와 e2e 시나리오, 사용량 화면의 문구 |
 
 순서대로 한다. 뒤 phase 가 앞 phase 의 타입을 쓴다.
+phase 검증에는 포맷 검사를 넣지 않는다. Spotless 는 처음 고치는 파일 전체를 검사하므로, 통합 검증 전에 `./gradlew spotlessApply` 결과를 기능 변경과 다른 커밋으로 올린다.
 
 ## 배포 뒤 확인할 것
 
