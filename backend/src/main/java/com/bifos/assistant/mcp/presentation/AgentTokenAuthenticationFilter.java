@@ -1,7 +1,8 @@
-package com.bifos.assistant.mcp.infra;
+package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpPrincipal;
+import com.bifos.assistant.shared.auth.AgentTokenFilter;
 import com.bifos.assistant.shared.error.ApiException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,11 +17,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 @RequiredArgsConstructor
-public class AgentTokenAuthenticationFilter extends OncePerRequestFilter {
+public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
     /**
      * 인증한 토큰의 SHA-256 소문자 16진수를 담는 요청 속성 이름이다.
      *
