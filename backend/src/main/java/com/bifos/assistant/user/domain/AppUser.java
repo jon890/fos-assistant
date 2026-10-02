@@ -14,23 +14,29 @@ import lombok.experimental.Accessors;
 
 @Entity
 @Table(name = "app_user")
+@Accessors(fluent = true)
 public class AppUser {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(name = "email", nullable = false, unique = true, length = 320)
+    @Getter
     private String email;
 
     @Column(name = "display_name", nullable = false, length = 100)
+    @Getter
     private String displayName;
 
     @Column(name = "group_id", nullable = false)
+    @Getter
     private Long groupId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
+    @Getter
     private UserRole role;
 
     @Column(name = "created_at", nullable = false)
@@ -53,26 +59,6 @@ public class AppUser {
 
     public static AppUser of(String email, String displayName, Long groupId, UserRole role) {
         return new AppUser(email, displayName, groupId, role);
-    }
-
-    public Long id() {
-        return id;
-    }
-
-    public String email() {
-        return email;
-    }
-
-    public String displayName() {
-        return displayName;
-    }
-
-    public Long groupId() {
-        return groupId;
-    }
-
-    public UserRole role() {
-        return role;
     }
 
     public boolean isAdmin() {

@@ -15,6 +15,7 @@ import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 import org.springframework.data.domain.AfterDomainEventPublication;
 import org.springframework.data.domain.DomainEvents;
 
@@ -22,40 +23,51 @@ import org.springframework.data.domain.DomainEvents;
 @Table(name = "agent")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
 public class Agent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(nullable = false, unique = true, length = 64)
+    @Getter
     private String code;
 
     @Column(nullable = false, length = 100)
+    @Getter
     private String name;
 
     @Column(name = "hermes_profile", nullable = false, unique = true, length = 64)
+    @Getter
     private String hermesProfile;
 
     @Column(name = "api_base_url", nullable = false, length = 255)
+    @Getter
     private String apiBaseUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
+    @Getter
     private CostMode costMode;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "credential_scope", nullable = false, length = 20)
+    @Getter
     private CredentialScope credentialScope;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Getter
     private AgentVisibility visibility;
 
     @Column(name = "owner_user_id")
+    @Getter
     private Long ownerUserId;
 
     @Column(nullable = false)
+    @Getter
     private boolean enabled;
 
     /**
@@ -65,6 +77,7 @@ public class Agent {
      * 사용자가 그 에이전트를 고를 때 알게 되면 늦기 때문이다.
      */
     @Column(name = "flow", length = 64)
+    @Getter
     private String flow;
 
     @Column(name = "created_at", nullable = false)
@@ -77,9 +90,11 @@ public class Agent {
      * 사용자의 기본 profile 을 가리키는 에이전트는 거짓이다(ADR-033).
      */
     @Column(name = "profile_managed", nullable = false)
+    @Getter
     private boolean profileManaged;
 
     @Column(name = "connector_managed", nullable = false)
+    @Getter
     private boolean connectorManaged;
 
     /**
@@ -98,6 +113,7 @@ public class Agent {
      * <p>행은 지우지 않는다. 대화, 실행, 사용량이 {@code agent_id} 로 이 에이전트의 이름을 읽기 때문이다.
      */
     @Column(name = "deleted_at")
+    @Getter
     private Instant deletedAt;
 
     /**
@@ -106,14 +122,17 @@ public class Agent {
      * <p>대화가 모델을 고르지 않았을 때 Hermes 에 명시해 보낸다(ADR-054). 비면 profile 의 값으로 돈다.
      */
     @Column(name = "default_model_provider", length = 64)
+    @Getter
     private String defaultModelProvider;
 
     /** 이 에이전트의 기본 모델이다. */
     @Column(name = "default_model", length = 128)
+    @Getter
     private String defaultModel;
 
     /** 이 에이전트의 기본 effort 다. 모델 없이 이 값만 둘 수 있다. */
     @Column(name = "default_reasoning_effort", length = 16)
+    @Getter
     private String defaultReasoningEffort;
 
     /** 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다. */
@@ -171,74 +190,6 @@ public class Agent {
 
     private static String stripTrailingSlash(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-    }
-
-    public Long id() {
-        return id;
-    }
-
-    public String code() {
-        return code;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    public String hermesProfile() {
-        return hermesProfile;
-    }
-
-    public String apiBaseUrl() {
-        return apiBaseUrl;
-    }
-
-    public CostMode costMode() {
-        return costMode;
-    }
-
-    public CredentialScope credentialScope() {
-        return credentialScope;
-    }
-
-    public AgentVisibility visibility() {
-        return visibility;
-    }
-
-    public Long ownerUserId() {
-        return ownerUserId;
-    }
-
-    public boolean enabled() {
-        return enabled;
-    }
-
-    public String flow() {
-        return flow;
-    }
-
-    public boolean profileManaged() {
-        return profileManaged;
-    }
-
-    public boolean connectorManaged() {
-        return connectorManaged;
-    }
-
-    public Instant deletedAt() {
-        return deletedAt;
-    }
-
-    public String defaultModelProvider() {
-        return defaultModelProvider;
-    }
-
-    public String defaultModel() {
-        return defaultModel;
-    }
-
-    public String defaultReasoningEffort() {
-        return defaultReasoningEffort;
     }
 
     /** 기본 모델과 effort 를 바꾼다. 검증은 부르는 쪽이 끝낸 값만 받는다. 모두 null 이면 profile 의 값으로 돌아간다. */

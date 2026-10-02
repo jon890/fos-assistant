@@ -16,6 +16,7 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 /**
  * 사용량과 비용 보고를 위해 남기는 에이전트 turn 하나다.
@@ -28,26 +29,33 @@ import lombok.NoArgsConstructor;
 @Table(name = "agent_execution")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
 public class AgentExecution {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(name = "user_id", nullable = false)
+    @Getter
     private Long userId;
 
     /** 이 실행이 속한 대화. 추천 질문을 만드는 실행처럼 대화 없이 돈 실행은 비어 있다. */
     @Column(name = "conversation_id")
+    @Getter
     private Long conversationId;
 
     @Column(name = "agent_id")
+    @Getter
     private Long agentId;
 
     @Column(name = "parent_execution_id")
+    @Getter
     private Long parentExecutionId;
 
     @Column(name = "root_execution_id")
+    @Getter
     private Long rootExecutionId;
 
     /**
@@ -57,12 +65,15 @@ public class AgentExecution {
      * 시도는 비어 있다.
      */
     @Column(name = "retry_of_execution_id")
+    @Getter
     private Long retryOfExecutionId;
 
     @Column(name = "profile_name", nullable = false, length = 64)
+    @Getter
     private String profileName;
 
     @Column(name = "hermes_run_id", length = 128)
+    @Getter
     private String hermesRunId;
 
     /**
@@ -74,61 +85,78 @@ public class AgentExecution {
      * {@code fos-<uuid>} 이고, Memory 제안은 비어 있다.
      */
     @Column(name = "hermes_session_id", length = 128)
+    @Getter
     private String hermesSessionId;
 
     /** 다른 에이전트에게 맡겨 만든 실행만 채운다. 같은 호출이 다시 와도 실행을 하나만 만든다. */
     @Column(name = "delegation_key", unique = true, length = 64)
+    @Getter
     private String delegationKey;
 
     /** 다른 에이전트에게 맡겨 만든 실행이 끝났을 때의 답. 대화 turn 의 답은 {@code chat_message} 가 갖는다. */
     @Column(name = "output_text", columnDefinition = "MEDIUMTEXT")
+    @Getter
     private String outputText;
 
     @Column(name = "provider", length = 64)
+    @Getter
     private String provider;
 
     @Column(name = "model", length = 128)
+    @Getter
     private String model;
 
     /** 이 실행에 요청한 reasoning effort. 기본값으로 보냈으면 비어 있다. */
     @Column(name = "reasoning_effort", length = 16)
+    @Getter
     private String reasoningEffort;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "reasoning_effort_source", length = 20)
+    @Getter
     private ReasoningEffortSource reasoningEffortSource;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "model_tier", length = 16)
+    @Getter
     private ModelTier modelTier;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
+    @Getter
     private CostMode costMode;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
+    @Getter
     private ExecutionStatus status;
 
     @Column(name = "error_code", length = 64)
+    @Getter
     private String errorCode;
 
     @Column(name = "input_tokens")
+    @Getter
     private Long inputTokens;
 
     @Column(name = "cached_input_tokens")
+    @Getter
     private Long cachedInputTokens;
 
     @Column(name = "output_tokens")
+    @Getter
     private Long outputTokens;
 
     @Column(name = "total_tokens")
+    @Getter
     private Long totalTokens;
 
     @Column(name = "latency_ms")
+    @Getter
     private Long latencyMs;
 
     @Column(name = "context_chars")
+    @Getter
     private Long contextChars;
 
     /**
@@ -138,6 +166,7 @@ public class AgentExecution {
      * 기록과 문맥을 조립하지 않은 실행은 비어 있다.
      */
     @Column(name = "context_omitted_items")
+    @Getter
     private Integer contextOmittedItems;
 
     /**
@@ -147,6 +176,7 @@ public class AgentExecution {
      * 않도록 미리 둔다.
      */
     @Column(name = "runtime_fingerprint", length = 64)
+    @Getter
     private String runtimeFingerprint;
 
     /**
@@ -156,39 +186,50 @@ public class AgentExecution {
      * 들어 있어 본문 자체는 어디에도 저장하지 않는다. 넣은 문맥이 없으면 비운다.
      */
     @Column(name = "instructions_hash", length = 64)
+    @Getter
     private String instructionsHash;
 
     /** 통화 단위의 100만분의 1로 적은 환산 금액. 가격을 찾지 못했으면 null 이다. */
     @Column(name = "estimated_cost_micros")
+    @Getter
     private Long estimatedCostMicros;
 
     @Column(name = "actual_cost_micros")
+    @Getter
     private Long actualCostMicros;
 
     @Column(name = "cost_currency", length = 3, columnDefinition = "CHAR(3)")
+    @Getter
     private String costCurrency;
 
     /** 계산에 쓴 가격표를 적는다. 나중에 가격이 바뀌어도 지난 기록이 다시 쓰이지 않게 한다. */
     @Column(name = "pricing_version", length = 32)
+    @Getter
     private String pricingVersion;
 
     @Column(name = "started_at", nullable = false)
+    @Getter
     private Instant startedAt;
 
     @Column(name = "finished_at")
+    @Getter
     private Instant finishedAt;
 
     @Column(name = "request_received_at")
+    @Getter
     private Instant requestReceivedAt;
 
     @Column(name = "submitted_at")
+    @Getter
     private Instant submittedAt;
 
     @Column(name = "first_delta_at")
+    @Getter
     private Instant firstDeltaAt;
 
     /** profile 기본 모델 설정을 정상으로 읽어 이 실행의 기본 강도를 확인한 시각이다. */
     @Column(name = "reasoning_defaults_checked_at")
+    @Getter
     private Instant reasoningDefaultsCheckedAt;
 
     /**
@@ -198,6 +239,7 @@ public class AgentExecution {
      * 한 번만 전하므로 {@code AgentExecutionRepository#markResultDelivered} 가 비어 있을 때만 채운다.
      */
     @Column(name = "result_delivered_at")
+    @Getter
     private Instant resultDeliveredAt;
 
     private AgentExecution(Builder builder) {
@@ -243,30 +285,6 @@ public class AgentExecution {
         return new Builder();
     }
 
-    public Long id() {
-        return id;
-    }
-
-    public Long userId() {
-        return userId;
-    }
-
-    public Long conversationId() {
-        return conversationId;
-    }
-
-    public Long agentId() {
-        return agentId;
-    }
-
-    public Long parentExecutionId() {
-        return parentExecutionId;
-    }
-
-    public Long rootExecutionId() {
-        return rootExecutionId;
-    }
-
     /**
      * 이 실행이 속한 실행 트리의 루트 번호다.
      *
@@ -275,142 +293,6 @@ public class AgentExecution {
      */
     public Long treeRootId() {
         return rootExecutionId == null ? id : rootExecutionId;
-    }
-
-    public Long retryOfExecutionId() {
-        return retryOfExecutionId;
-    }
-
-    public String profileName() {
-        return profileName;
-    }
-
-    public String hermesRunId() {
-        return hermesRunId;
-    }
-
-    public String hermesSessionId() {
-        return hermesSessionId;
-    }
-
-    public String delegationKey() {
-        return delegationKey;
-    }
-
-    public String outputText() {
-        return outputText;
-    }
-
-    public String provider() {
-        return provider;
-    }
-
-    public String model() {
-        return model;
-    }
-
-    public String reasoningEffort() {
-        return reasoningEffort;
-    }
-
-    public ReasoningEffortSource reasoningEffortSource() {
-        return reasoningEffortSource;
-    }
-
-    public ModelTier modelTier() {
-        return modelTier;
-    }
-
-    public CostMode costMode() {
-        return costMode;
-    }
-
-    public ExecutionStatus status() {
-        return status;
-    }
-
-    public String errorCode() {
-        return errorCode;
-    }
-
-    public Long inputTokens() {
-        return inputTokens;
-    }
-
-    public Long cachedInputTokens() {
-        return cachedInputTokens;
-    }
-
-    public Long outputTokens() {
-        return outputTokens;
-    }
-
-    public Long totalTokens() {
-        return totalTokens;
-    }
-
-    public Long latencyMs() {
-        return latencyMs;
-    }
-
-    public Long contextChars() {
-        return contextChars;
-    }
-
-    public Integer contextOmittedItems() {
-        return contextOmittedItems;
-    }
-
-    public String runtimeFingerprint() {
-        return runtimeFingerprint;
-    }
-
-    public String instructionsHash() {
-        return instructionsHash;
-    }
-
-    public Long estimatedCostMicros() {
-        return estimatedCostMicros;
-    }
-
-    public Long actualCostMicros() {
-        return actualCostMicros;
-    }
-
-    public String costCurrency() {
-        return costCurrency;
-    }
-
-    public String pricingVersion() {
-        return pricingVersion;
-    }
-
-    public Instant startedAt() {
-        return startedAt;
-    }
-
-    public Instant finishedAt() {
-        return finishedAt;
-    }
-
-    public Instant requestReceivedAt() {
-        return requestReceivedAt;
-    }
-
-    public Instant submittedAt() {
-        return submittedAt;
-    }
-
-    public Instant firstDeltaAt() {
-        return firstDeltaAt;
-    }
-
-    public Instant reasoningDefaultsCheckedAt() {
-        return reasoningDefaultsCheckedAt;
-    }
-
-    public Instant resultDeliveredAt() {
-        return resultDeliveredAt;
     }
 
     /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */

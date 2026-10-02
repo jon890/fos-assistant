@@ -11,7 +11,9 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 /**
  * 실행 하나에서 스킬 하나가 쓰인 것을 적은 한 줄이다. 스킬 호출 이력의 원천이다.
@@ -31,6 +33,7 @@ import lombok.NoArgsConstructor;
                         name = "uk_execution_skill_use_execution_skill_source",
                         columnNames = {"execution_id", "skill_name", "source"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
 public class ExecutionSkillUse {
 
     /** 스킬 이름 칸의 길이다. 이름 규칙의 상한과 같다. */
@@ -38,19 +41,24 @@ public class ExecutionSkillUse {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(name = "execution_id", nullable = false)
+    @Getter
     private Long executionId;
 
     @Column(name = "skill_name", nullable = false, length = NAME_MAX_LENGTH)
+    @Getter
     private String skillName;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 20)
+    @Getter
     private SkillUseSource source;
 
     @Column(name = "occurred_at", nullable = false)
+    @Getter
     private Instant occurredAt;
 
     private ExecutionSkillUse(Long executionId, String skillName, SkillUseSource source, Instant occurredAt) {
@@ -62,25 +70,5 @@ public class ExecutionSkillUse {
 
     public static ExecutionSkillUse of(Long executionId, String skillName, SkillUseSource source, Instant occurredAt) {
         return new ExecutionSkillUse(executionId, skillName, source, occurredAt);
-    }
-
-    public Long id() {
-        return id;
-    }
-
-    public Long executionId() {
-        return executionId;
-    }
-
-    public String skillName() {
-        return skillName;
-    }
-
-    public SkillUseSource source() {
-        return source;
-    }
-
-    public Instant occurredAt() {
-        return occurredAt;
     }
 }

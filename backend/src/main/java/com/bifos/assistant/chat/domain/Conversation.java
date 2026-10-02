@@ -17,6 +17,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
@@ -25,10 +26,12 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "conversation")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
 public class Conversation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     /**
@@ -40,12 +43,15 @@ public class Conversation {
     @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
     @JdbcTypeCode(SqlTypes.BINARY)
     @Column(name = "public_id", nullable = false, updatable = false, unique = true, columnDefinition = "BINARY(16)")
+    @Getter
     private UUID publicId;
 
     @Column(name = "user_id", nullable = false)
+    @Getter
     private Long userId;
 
     @Column(name = "agent_id")
+    @Getter
     private Long agentId;
 
     /**
@@ -55,6 +61,7 @@ public class Conversation {
      * 돌려주면 그 값으로 바뀐다.
      */
     @Column(name = "hermes_session_id", length = 128)
+    @Getter
     private String hermesSessionId;
 
     /**
@@ -64,9 +71,11 @@ public class Conversation {
      * 전에 Hermes 가 session 을 정한 대화는 비어 있다.
      */
     @Column(name = "hermes_root_session_id", length = 128)
+    @Getter
     private String hermesRootSessionId;
 
     @Column(name = "title", nullable = false, length = 200)
+    @Getter
     private String title;
 
     /** 이 대화에서 고른 provider. {@code model} 과 함께 채우거나 함께 비운다. */
@@ -83,10 +92,12 @@ public class Conversation {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "model_selection_mode", length = 16)
+    @Getter
     private ModelSelectionMode modelSelectionMode;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "model_tier", length = 16)
+    @Getter
     private ModelTier modelTier;
 
     /**
@@ -95,15 +106,18 @@ public class Conversation {
      * <p>이 칸만 바꾸는 갱신은 {@code ConversationRepository} 의 update 질의로 한다.
      */
     @Column(name = "auto_turn_count", nullable = false)
+    @Getter
     private int autoTurnCount;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
+    @Getter
     private Instant updatedAt;
 
     @Column(name = "deleted_at")
+    @Getter
     private Instant deletedAt;
 
     private Conversation(Long userId, String title, Long agentId) {
@@ -118,34 +132,6 @@ public class Conversation {
         return new Conversation(userId, title, agentId);
     }
 
-    public Long id() {
-        return id;
-    }
-
-    public UUID publicId() {
-        return publicId;
-    }
-
-    public Long userId() {
-        return userId;
-    }
-
-    public Long agentId() {
-        return agentId;
-    }
-
-    public String hermesSessionId() {
-        return hermesSessionId;
-    }
-
-    public String hermesRootSessionId() {
-        return hermesRootSessionId;
-    }
-
-    public String title() {
-        return title;
-    }
-
     /**
      * 이 대화에서 고른 모델과 effort 다. 고르지 않았으면 셋 다 null 이다.
      *
@@ -153,26 +139,6 @@ public class Conversation {
      */
     public ModelChoice modelChoice() {
         return ModelChoice.stored(modelProvider, model, reasoningEffort);
-    }
-
-    public ModelSelectionMode modelSelectionMode() {
-        return modelSelectionMode;
-    }
-
-    public ModelTier modelTier() {
-        return modelTier;
-    }
-
-    public int autoTurnCount() {
-        return autoTurnCount;
-    }
-
-    public Instant updatedAt() {
-        return updatedAt;
-    }
-
-    public Instant deletedAt() {
-        return deletedAt;
     }
 
     public static String normalizedTitle(String title) {

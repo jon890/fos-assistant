@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 사람을 다루는 경로의 요청과 응답 모양이다.
@@ -13,9 +15,8 @@ import jakarta.validation.constraints.Size;
  * <p>컨트롤러는 경로와 권한과 흐름만 맡고 모양은 여기 둔다. 같은 저장소의 {@code UserDtos} 와
  * {@code MemoryDtos} 가 같은 규칙을 따른다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class PeopleDtos {
-
-    private PeopleDtos() {}
 
     /**
      * 들어와도 되는지 묻는 주소다.
@@ -56,7 +57,7 @@ public final class PeopleDtos {
                     person.email(),
                     person.displayName(),
                     person.hermesProfile(),
-                    person.isEnabled(),
+                    person.enabled(),
                     joined);
         }
     }
