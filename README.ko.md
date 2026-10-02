@@ -3,7 +3,7 @@
 [English](README.md) | 한국어
 
 모델에도 어떤 제품에도 종속되지 않고, 쓰는 사람 자신의 것인 개인 AI 비서다.
-[Hermes Agent](docs/hermes/README.md) 위에 얹는 self-hosted Control Plane 과 웹이고, 범용 커넥터와 자기 에이전트를 연결해 자기만의 agentic workflow 를 만든다.
+Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) 위에 얹는 self-hosted Control Plane 과 웹이고, 범용 커넥터와 자기 에이전트를 연결해 자기만의 agentic workflow 를 만든다.
 기억에는 사람이 승인한 것만 남는다.
 같은 목적을 가진 사람들은 그룹(예: 가족)으로 함께 쓰고, 에이전트는 각자 갖는다.
 
@@ -15,11 +15,11 @@
 그러려고 여러 범용 커넥터를 연결해 자기만의 agentic workflow 를 만들 수 있게 하는 것이 목표다.
 
 - **모델에 종속되지 않는다.** 대화는 빠르게, 균형, 깊게 가운데 한 단계를 고르고, 그 단계가 실제로 어느 모델인지는 Control Plane 의 데이터베이스가 정책으로 갖는다. 런타임도 떨어져 있다. 에이전트를 돌리는 것은 Hermes Agent 이고, 이 저장소는 누가 무엇을 쓸 수 있는지 정하고 화면을 만들고 쓴 것을 기록한다.
-- **제품에 종속되지 않는다.** 커넥터는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 범용 흐름만 갖는다. Control Plane 이 커넥터 뒤에 있는 서비스의 이름과 주소를 모르므로, 커넥터를 더할 때 이 저장소를 고치지 않는다([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+- **제품에 종속되지 않는다.** 커넥터는 plugin 의 `connector.json` 이 선언하고, Control Plane 은 범용 흐름만 갖는다. Control Plane 은 커넥터 뒤에 있는 서비스의 이름과 주소를 모른다. 커넥터를 더할 때는 plugin 에 `connector.json` 을 두고 Hermes 대시보드의 커넥터 목록에 한 줄을 더하며, 이 저장소는 고치지 않는다([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 - **자기 것이다.** 에이전트가 쓰는 도구와 기억, 대화가 쓰는 모델을 그 사람이 정한다.
-- **사용자에 대한 장기 지식의 기준 원본이다.** 에이전트와 외부 서비스는 허용된 범위만 읽는다. 서비스 토큰은 읽기 전용이고, 민감 항목의 본문은 암호화해 저장한다.
+- **이 비서가 사용자에 대한 장기 지식의 기준 원본이다.** 에이전트와 외부 서비스는 허용된 범위만 읽는다. 서비스 토큰은 읽기 전용이고, 민감 항목의 본문은 암호화해 저장한다.
 
-지금 붙어 있는 커넥터는 가계부 하나다.
+지금 붙어 있는 커넥터는 가계부 하나다. 그 커넥터는 다른 저장소에 있고, 이 저장소에는 검사에 쓰는 시험 커넥터만 있다.
 범용 커넥터를 늘리는 것은 진행하고 있는 방향이고, 이미 끝난 일이 아니다.
 
 ## 지키는 원칙
@@ -44,14 +44,14 @@
 - **사진과 HTML 결과물.** 사진을 올려 에이전트에게 보이고, 에이전트가 만든 HTML 페이지를 옆 패널에서 본다. 그 페이지의 스크립트는 돌지 않는다.
 - **다른 서비스의 읽기 전용 접근.** 사용자에 묶인 서비스 토큰으로 다른 서비스가 그 사용자의 문서만 읽는다.
 
-collection 을 고치는 화면과 문서를 사람이 직접 쓰는 화면은 계획이고 아직 만들지 않았다.
+collection 을 고치는 화면, 앞선 판을 읽는 화면, 문서를 사람이 직접 쓰는 화면은 계획이고 아직 만들지 않았다.
 전체 범위와 항목별 확인 방법은 [`docs/prd.md`](docs/prd.md) 에 있다.
 
 ## 하지 않는 일
 
 - **Hermes core 를 고치지 않는다.** profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 - **사람이 보지 않은 것을 기억에 남기지 않는다.** Hermes 내장 memory 도구를 에이전트에 주지 않는다. 기억에 닿는 길은 Control Plane 하나다.
-- **비밀값을 데이터베이스에 넣지 않는다.** AI credential 은 각 사용자의 Hermes profile 안에만 있다.
+- **비밀값을 데이터베이스에 넣지 않는다.** AI credential 과 커넥터 토큰은 Hermes profile 안에만 있고, 서비스 토큰은 해시로만 저장한다.
 - **누구나 가입하는 서비스가 아니다.** 그룹에 사람을 더하는 것은 관리자가 한다.
 - **에이전트가 만든 페이지의 스크립트를 돌리지 않는다.**
 - **운영 절차를 갖지 않는다.** 배포와 환경마다 다른 값은 운영하는 쪽이 갖는다.
@@ -63,13 +63,14 @@ flowchart LR
     U[사용자] --> W["Web (web/)"]
     W --> C["Control Plane (backend/)"]
     C --> DB[(데이터베이스)]
-    C --> H
+    C --> A
+    C --> G
     subgraph H[Hermes Agent]
         A[API server]
         P[사용자별 profile]
         G["plugin (hermes/)"]
     end
-    G -. "MCP: memory, 에이전트, 결과물" .-> C
+    P -. "MCP 호출, plugin 이 서명" .-> C
 ```
 
 | 층 | 맡는 일 |
@@ -85,10 +86,11 @@ flowchart LR
 ## 상태
 
 초기 단계의 프로젝트다.
-한 가족이 매일 쓰고 있고, 배포된 곳은 아직 그 하나다.
+한 가족이 실제로 쓰고 있고, 배포된 곳은 아직 그 하나다.
 
 - 공개 API 와 데이터베이스 스키마는 예고 없이 바뀔 수 있다.
 - 결정만 기록하고 아직 구현하지 않은 것이 있다. [ADR 색인](docs/adr/INDEX.md)이 그것을 표시한다.
+- 단계별 self-hosting 안내서는 아직 없다.
 - 로드맵은 [이슈 #97](https://github.com/jon890/fos-assistant/issues/97) 에서 관리한다.
 
 ## 시작하기
@@ -101,10 +103,12 @@ flowchart LR
 | Node.js | 22.18 이상 |
 | pnpm | 10 |
 | Python | 3.13 (Hermes plugin 검사에 쓴다) |
+| Hermes Agent | v2026.9.24 에서 확인했다 |
 
 ### 서버 없이 전체 흐름 보기
 
 `test/e2e` 가 Hermes Runs API 대역을 같은 프로세스에 띄우므로 Hermes 를 설치하지 않아도 된다.
+backend 는 이 검사가 직접 띄우므로 Java 는 있어야 한다.
 
 ```bash
 node test/e2e/run.ts
@@ -113,7 +117,7 @@ node test/e2e/run.ts
 로그인 토큰 발급부터 에이전트 등록, 대화 한 번, 사용량 기록과 비용 환산까지 한 번에 돌린다.
 시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있다.
 
-### 자기 Hermes 에 연결하기
+### Hermes 설치 묶음 만들기
 
 `hermes/bundle.sh` 가 plugin 과 profile 틀을 담은 설치 묶음을 만든다.
 
@@ -127,7 +131,8 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 ## 기여
 
 이슈와 PR 은 영어와 한국어를 모두 받는다.
-내부 문서(`docs/`, `AGENTS.md`, 커밋 메시지)는 한국어로 쓴다.
+내부 문서(`docs/`, `AGENTS.md`, 커밋 메시지)는 한국어로 쓴다. 이 글이 가리키는 문서도 한국어다.
+이 프로젝트가 Hermes 를 어떻게 쓰는지는 [`docs/hermes/README.md`](docs/hermes/README.md) 에 있다.
 
 - [`AGENTS.md`](AGENTS.md) 에 저장소의 규칙이 있다. 공개 저장소에 적으면 안 되는 것도 거기 있다.
 - [`docs/README.md`](docs/README.md) 는 문서 전체의 색인이다.

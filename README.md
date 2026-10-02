@@ -3,7 +3,7 @@
 English | [한국어](README.ko.md)
 
 A personal AI assistant that belongs to the person using it, not to a model vendor or to any one product.
-It is a self-hosted Control Plane and web app on top of [Hermes Agent](docs/hermes/README.md), where you connect general-purpose connectors and your own agents into an agentic workflow of your own, backed by a memory that only keeps what a person has approved.
+It is a self-hosted Control Plane and web app on top of [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research, where you connect general-purpose connectors and your own agents into an agentic workflow of your own, backed by a memory that only keeps what a person has approved.
 People who share a purpose, a family for example, use it together as a group, each with their own agents.
 
 The product name is not final. For now it is called `fos-assistant`.
@@ -13,22 +13,22 @@ The product name is not final. For now it is called `fos-assistant`.
 We want any individual to be free to have an assistant of their own, without depending on a particular model or product.
 To get there, the goal is to let you connect general-purpose connectors into an agentic workflow that is yours.
 
-- **Independent of the model.** A conversation picks a tier (fast, balanced, or deep), and the Control Plane database holds the policy that maps a tier to an actual model. The runtime is separate too: Hermes Agent runs the agents, and this repository decides who may use what, draws the screens, and records what was used.
-- **Independent of any product.** A connector is declared by a plugin's `connector.json`, and the Control Plane only has the generic flow. It does not know the name or the address of the service behind a connector, so adding one does not mean changing this repository ([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
-- **Your own.** You decide which tools and memory an agent has and which model a conversation uses.
-- **The source of truth for long-term knowledge about you.** Agents and outside services read only the part they are allowed to. Service tokens are read-only, and the body of a sensitive entry is encrypted at rest.
+- **Independent of the model.** A conversation picks a tier (fast, balanced, or deep), and the Control Plane database holds the policy that maps a tier to an actual model. The runtime is separate too: Hermes Agent runs the agents, and this repository decides who may use what, provides the web UI, and records what was used.
+- **Independent of any product.** A connector is declared by a plugin's `connector.json`, and the Control Plane only has the generic flow. It does not know the name or the address of the service behind a connector, so adding one means writing a plugin with a `connector.json` and listing it in the Hermes dashboard's connector list, not changing this repository ([ADR-043](docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+- **Yours.** You decide which tools and memory an agent has and which model a conversation uses.
+- **It is the source of truth for long-term knowledge about you.** Agents and outside services read only the part they are allowed to. Service tokens are read-only, and the body of a sensitive entry is encrypted at rest.
 
-One connector is attached today, a household account book.
-Growing the set of general-purpose connectors is the direction the work is going in, not something that is already done.
+One connector is attached today, a household account book. It lives in its own repository, and this one ships only a demo connector used by tests.
+Growing the set of general-purpose connectors is where the work is headed. It is not done yet.
 
 ## Principles
 
 1. **Yours.** The person owns the agent's tools, memory, and model choice.
 2. **Not mixed.** Someone else's memory and credentials never enter your run.
-3. **Orchestrated.** Work is split across several agents and merged, instead of waiting on one. The agent decides what to split. The Control Plane decides who can see what.
-4. **It stays.** What was learned once is not asked again in the next conversation.
+3. **Orchestrated.** Work is split across several agents and merged, rather than queued behind a single one. The agent decides what to split. The Control Plane decides who can see what.
+4. **It remembers.** What was learned once is not asked again in the next conversation.
 
-And one more that holds the others together: **adding people scales the same way.**
+And one more that holds the others together: **it grows by adding people the same way every time.**
 Adding a user is a single decision by an administrator, and it must not slow anyone else down or expose anything to them.
 
 ## What it does
@@ -43,14 +43,14 @@ Adding a user is a single decision by an administrator, and it must not slow any
 - **Photos and HTML results.** Attach photos for an agent to read, and open the HTML pages an agent produces in a side panel. Scripts in those pages do not run.
 - **Read-only access for other services.** A service token bound to a user lets another service read that user's documents and nothing else.
 
-Screens for editing collections and for writing documents by hand are planned and not built yet.
+Screens for editing collections, viewing earlier revisions, and writing documents by hand are planned and not built yet.
 The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.md).
 
 ## What it does not do
 
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
 - **It does not remember what no person has seen.** Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
-- **It does not store secrets in the database.** AI credentials live only in each user's Hermes profile.
+- **It does not store secrets in the database.** AI credentials and connector tokens live only in Hermes profiles, and service tokens are stored only as hashes.
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**
 - **It does not carry operating procedures.** Deployment and host-specific values belong to whoever runs it.
@@ -62,13 +62,14 @@ flowchart LR
     U[User] --> W["Web (web/)"]
     W --> C["Control Plane (backend/)"]
     C --> DB[(Database)]
-    C --> H
+    C --> A
+    C --> G
     subgraph H[Hermes Agent]
         A[API server]
         P[Profile per user]
         G["Plugins (hermes/)"]
     end
-    G -. "MCP: memory, agents, artifacts" .-> C
+    P -. "MCP calls, signed by a plugin" .-> C
 ```
 
 | Layer | Responsibility |
@@ -84,10 +85,11 @@ The request body cannot choose it.
 ## Status
 
 This is an early-stage project.
-One family uses it every day, and that is the only deployment so far.
+One family actually uses it, and that is the only deployment so far.
 
 - The public API and the database schema can still change without notice.
 - Some decisions are recorded but not implemented yet. The [ADR index](docs/adr/INDEX.md) marks them.
+- There is no step-by-step self-hosting guide yet.
 - The roadmap is tracked in [issue #97](https://github.com/jon890/fos-assistant/issues/97).
 
 ## Getting started
@@ -100,10 +102,12 @@ One family uses it every day, and that is the only deployment so far.
 | Node.js | 22.18 or later |
 | pnpm | 10 |
 | Python | 3.13 (for the Hermes plugin tests) |
+| Hermes Agent | checked against v2026.9.24 |
 
 ### See the whole flow without a server
 
 `test/e2e` starts a stand-in for the Hermes Runs API in the same process, so no Hermes installation is needed.
+It boots the backend itself, so Java is still required.
 
 ```bash
 node test/e2e/run.ts
@@ -112,7 +116,7 @@ node test/e2e/run.ts
 It goes from issuing a login token to registering an agent, holding a conversation, and recording usage and cost.
 The scenarios live one per file under `test/e2e/scenarios/`.
 
-### Connect it to your own Hermes
+### Build the Hermes install bundle
 
 `hermes/bundle.sh` builds an install bundle with the plugins and the profile template.
 
@@ -126,7 +130,8 @@ Environment variables and the tech stack are in [`docs/self-hosting.md`](docs/se
 ## Contributing
 
 Issues and pull requests are welcome in English or Korean.
-The internal documents (`docs/`, `AGENTS.md`, commit messages) are written in Korean.
+The internal documents (`docs/`, `AGENTS.md`, commit messages) are written in Korean, so the documents linked from this page are in Korean too.
+How this project uses Hermes is described in [`docs/hermes/README.md`](docs/hermes/README.md).
 
 - [`AGENTS.md`](AGENTS.md) has the rules of the repository, including what must never be written into a public repository.
 - [`docs/README.md`](docs/README.md) is the index of all documents.

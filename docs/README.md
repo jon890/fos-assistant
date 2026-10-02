@@ -13,7 +13,7 @@ frontend 는 화면의 동작과 구조이고, hermes 는 외부 런타임인 He
 | [`code-architecture.md`](code-architecture.md) | 패키지 경계, Hermes 쪽 코드의 배치, 비밀값을 두는 곳, 아직 만들지 않은 것 |
 | [`flow.md`](flow.md) | 화면 전환과 호출 순서, 두 방향의 토큰, 실행이 실패할 때의 흐름 |
 | [`connectors.md`](connectors.md) | 커넥터 선언 파일, 연결 API, 승인, 토큰 저장 |
-| [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, Control Plane 과 Web 이 읽는 환경 변수 |
+| [`self-hosting.md`](self-hosting.md) | 기술 스택, 개별 실행, 주요 환경 변수 |
 | [`model-tiers.md`](model-tiers.md) | 모델 단계의 선택 규칙, 에이전트 기본 모델, 모델 숨김, 비동기 자식 사용량 |
 | [`adr/INDEX.md`](adr/INDEX.md) | 되돌리기 어려운 결정의 목록 |
 
