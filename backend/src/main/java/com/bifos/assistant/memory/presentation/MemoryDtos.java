@@ -16,10 +16,11 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MemoryDtos {
-    private MemoryDtos() {}
-
     public record CreateMemoryRequest(
             MemoryScope scope,
             @NotBlank String title,

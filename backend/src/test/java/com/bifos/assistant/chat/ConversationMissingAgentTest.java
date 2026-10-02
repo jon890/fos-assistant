@@ -36,6 +36,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.util.UUID;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -155,9 +156,9 @@ class ConversationMissingAgentTest {
                 .andExpect(
                         jsonPath("$.items[?(@.id == '" + orphanId + "')].title").value("행이 없는 대화"))
                 .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentCode")
-                        .value(org.hamcrest.Matchers.contains((Object) null)))
+                        .value(Matchers.contains((Object) null)))
                 .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentName")
-                        .value(org.hamcrest.Matchers.contains((Object) null)));
+                        .value(Matchers.contains((Object) null)));
     }
 
     @Test

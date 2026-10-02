@@ -24,16 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class McpToolService {
-    private static final Logger log = LoggerFactory.getLogger(McpToolService.class);
-    private static final JsonMapper json = JsonMapper.builder().build();
+    private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
     private static final Set<String> SAFE_ARTIFACT_FAILURE_MESSAGES = Set.of(
             "this conversation does not exist",
@@ -219,7 +218,7 @@ public class McpToolService {
         List<Map<String, Object>> listed = delegations.list(caller.user()).stream()
                 .map(McpToolService::agentSummary)
                 .toList();
-        return result(json.writeValueAsString(listed), false);
+        return result(JSON.writeValueAsString(listed), false);
     }
 
     /**
@@ -238,9 +237,9 @@ public class McpToolService {
                 .status(caller.user(), caller.originExecution(), executionId)
                 .map(execution -> {
                     markDeliveredIfFinished(execution);
-                    return result(json.writeValueAsString(statusOf(execution)), false);
+                    return result(JSON.writeValueAsString(statusOf(execution)), false);
                 })
-                .orElseGet(() -> result(json.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
+                .orElseGet(() -> result(JSON.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
     }
 
     /**
@@ -262,9 +261,9 @@ public class McpToolService {
                     if (execution.status() == ExecutionStatus.RUNNING && stop.stopRequested()) {
                         status.put("stop_requested", true);
                     }
-                    return result(json.writeValueAsString(status), false);
+                    return result(JSON.writeValueAsString(status), false);
                 })
-                .orElseGet(() -> result(json.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
+                .orElseGet(() -> result(JSON.writeValueAsString(failure("NOT_FOUND", EXECUTION_NOT_FOUND)), true));
     }
 
     /**
@@ -281,12 +280,12 @@ public class McpToolService {
         DelegationResult delegated = delegations.delegate(caller.user(), origin, key, agentCode, task);
         if (!delegated.accepted()) {
             Failure failure = delegated.failure();
-            return result(json.writeValueAsString(failure(failure.name(), delegationFailureMessage(failure))), true);
+            return result(JSON.writeValueAsString(failure(failure.name(), delegationFailureMessage(failure))), true);
         }
         Map<String, Object> started = new LinkedHashMap<>();
         started.put("execution_id", delegated.executionId());
         started.put("status", delegated.status().name());
-        return result(json.writeValueAsString(started), false);
+        return result(JSON.writeValueAsString(started), false);
     }
 
     private static String delegationFailureMessage(Failure failure) {
@@ -352,7 +351,7 @@ public class McpToolService {
     }
 
     private static String toJson(ArtifactWriteResult result) {
-        return json.writeValueAsString(Map.of("path", result.path(), "byteSize", result.byteSize()));
+        return JSON.writeValueAsString(Map.of("path", result.path(), "byteSize", result.byteSize()));
     }
 
     private static Map<String, Object> result(String text, boolean error) {

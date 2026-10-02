@@ -4,8 +4,7 @@ import com.bifos.assistant.hermes.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -20,8 +19,8 @@ import org.springframework.web.client.RestClient;
  * 돌아와, 주소가 틀린 것인지 key 가 틀린 것인지 구분하지 못한다.
  */
 @Component
+@Slf4j
 public class AgentEndpointProbe {
-    private static final Logger log = LoggerFactory.getLogger(AgentEndpointProbe.class);
 
     /** 실행을 만들지 않고 라우팅과 인증만 확인할 수 있는 경로다. */
     private static final String PROBE_PATH = "/v1/capabilities";
@@ -50,18 +49,18 @@ public class AgentEndpointProbe {
         String uri = stripTrailingSlash(apiBaseUrl) + PROBE_PATH;
         int status;
         try {
-            status = restClient.get()
+            status = restClient
+                    .get()
                     .uri(uri)
                     .header("Authorization", "Bearer " + apiKey)
                     .exchange((request, response) -> response.getStatusCode().value());
         } catch (RuntimeException ex) {
             log.warn("could not reach the new agent address profile={}", profileName, ex);
-            throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                    "could not reach " + uri + ": " + rootMessage(ex), ex);
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "could not reach " + uri + ": " + rootMessage(ex), ex);
         }
         if (status != 200) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                    "the new address answered " + status + " for " + PROBE_PATH);
+            throw new ApiException(
+                    ErrorCode.VALIDATION_FAILED, "the new address answered " + status + " for " + PROBE_PATH);
         }
     }
 

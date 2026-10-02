@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
@@ -139,8 +140,7 @@ class AgentPersonaControllerTest {
                 .andExpect(jsonPath("$.code").value(ErrorCode.HERMES_UNAVAILABLE.name()));
     }
 
-    private static org.springframework.test.web.servlet.RequestBuilder write(
-            String code, String body, String baseHash) {
+    private static RequestBuilder write(String code, String body, String baseHash) {
         return put("/api/v1/agents/{code}/persona", code)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"body\":%s,\"baseHash\":\"%s\"}".formatted(quote(body), baseHash));

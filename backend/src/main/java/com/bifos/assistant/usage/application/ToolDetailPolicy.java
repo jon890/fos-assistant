@@ -2,6 +2,8 @@ package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.util.Set;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 도구 사건의 {@code detail} 을 보는 사람에게 실어 보낼지 정한다.
@@ -14,12 +16,11 @@ import java.util.Set;
  *
  * <p>대화 스트림과 실행 트리 조회가 이 판정을 함께 쓴다. 저장은 바꾸지 않고 응답을 만들 때만 뺀다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ToolDetailPolicy {
 
     /** {@code MEMBER} 역할에게도 {@code detail} 을 싣는 도구다. */
     static final Set<String> PUBLIC_TOOLS = Set.of("web_search", "vision_analyze");
-
-    private ToolDetailPolicy() {}
 
     /** 이 사람에게 이 도구의 {@code detail} 을 실어도 되는가. 도구 이름이 없으면 싣지 않는다. */
     public static boolean visibleTo(CurrentUser viewer, String toolName) {

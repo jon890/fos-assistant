@@ -20,14 +20,20 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 /** 결과물 본문 요청이 대화 주인 확인 뒤에만 저장소에 닿는지 확인한다. */
 class ArtifactWriteServiceTest {
@@ -116,7 +122,7 @@ class ArtifactWriteServiceTest {
         assertThatThrownBy(() -> service.write(USER, new ArtifactWriteRequest(publicId, "a.svg", "본문", null)))
                 .isInstanceOf(ApiException.class);
 
-        verify(access, org.mockito.Mockito.times(2)).requireOwn(USER, publicId);
+        verify(access, Mockito.times(2)).requireOwn(USER, publicId);
         verifyNoInteractions(store);
     }
 
@@ -132,12 +138,12 @@ class ArtifactWriteServiceTest {
         byte[] image = {1, 2, 3};
         when(store.write(42L, "a.png", image)).thenReturn(3L);
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
-                new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
-                host -> new java.net.InetAddress[] {java.net.InetAddress.getByName("8.8.8.8")},
+                new ArtifactSourceProperties(List.of("images.example.com"), null, null, null),
+                host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                 (address, host, uri, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
                         200,
-                        java.util.Map.of("content-type", "image/png", "content-length", "3"),
-                        new java.io.ByteArrayInputStream(image)));
+                        Map.of("content-type", "image/png", "content-length", "3"),
+                        new ByteArrayInputStream(image)));
 
         assertThat(new ArtifactWriteService(access, store, source)
                         .write(
@@ -155,7 +161,7 @@ class ArtifactWriteServiceTest {
         UUID publicId = UUID.randomUUID();
         when(access.requireOwn(USER, publicId)).thenReturn(conversation);
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
-                new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
+                new ArtifactSourceProperties(List.of("images.example.com"), null, null, null),
                 host -> {
                     throw new AssertionError("DNS must not run");
                 },
@@ -180,7 +186,7 @@ class ArtifactWriteServiceTest {
         ArtifactStore store = mock(ArtifactStore.class);
         AtomicInteger dnsCalls = new AtomicInteger();
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
-                new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
+                new ArtifactSourceProperties(List.of("images.example.com"), null, null, null),
                 host -> {
                     dnsCalls.incrementAndGet();
                     throw new AssertionError("DNS must not run");
@@ -190,7 +196,7 @@ class ArtifactWriteServiceTest {
                 });
         ArtifactWriteService service = new ArtifactWriteService(access, store, source);
 
-        for (UUID publicId : java.util.List.of(UUID.randomUUID(), UUID.randomUUID())) {
+        for (UUID publicId : List.of(UUID.randomUUID(), UUID.randomUUID())) {
             when(access.requireOwn(USER, publicId))
                     .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
             assertThatThrownBy(() -> service.write(
@@ -216,10 +222,10 @@ class ArtifactWriteServiceTest {
         ArtifactStore store = new ArtifactStore(new ArtifactProperties(root.toString(), "/agent/artifacts", 30));
         store.write(42L, "a.png", new byte[] {1, 2, 3});
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
-                new ArtifactSourceProperties(java.util.List.of("images.example.com"), null, null, null),
-                host -> new java.net.InetAddress[] {java.net.InetAddress.getByName("8.8.8.8")},
+                new ArtifactSourceProperties(List.of("images.example.com"), null, null, null),
+                host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                 (address, host, uri, connect, read, cancellation) -> {
-                    throw new java.io.IOException("download failed");
+                    throw new IOException("download failed");
                 });
 
         assertThatThrownBy(() -> new ArtifactWriteService(access, store, source)
@@ -235,10 +241,10 @@ class ArtifactWriteServiceTest {
 
     private static ArtifactSourceFetcher fetcher() {
         return new ArtifactSourceFetcher(
-                new ArtifactSourceProperties(java.util.List.of(), null, null, null),
-                host -> new java.net.InetAddress[0],
+                new ArtifactSourceProperties(List.of(), null, null, null),
+                host -> new InetAddress[0],
                 (address, host, source, connectTimeout, readTimeout, cancellation) -> {
-                    throw new java.io.IOException("unused");
+                    throw new IOException("unused");
                 });
     }
 }

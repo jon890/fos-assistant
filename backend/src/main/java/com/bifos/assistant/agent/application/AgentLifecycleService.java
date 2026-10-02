@@ -18,8 +18,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.security.SecureRandom;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,10 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>그룹 공개 검사도 여기 둔다. 관리자 경로와 사용자 경로가 같은 코드를 불러야 한쪽만 느슨해지지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AgentLifecycleService {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentLifecycleService.class);
 
     /** {@code agent.name} 칸의 길이와 같다. */
     private static final int MAX_NAME_CHARS = 100;
@@ -125,12 +123,17 @@ public class AgentLifecycleService {
         try {
             if (AgentToolPolicy.hasPrivateOnlyToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
                 throw new ApiException(
-                        ErrorCode.HERMES_PROVISION_FAILED,
-                        "the new profile did not get the safe default toolsets");
+                        ErrorCode.HERMES_PROVISION_FAILED, "the new profile did not get the safe default toolsets");
             }
-            Agent agent = Agent.of(code, agentName, profileName, apiBaseUrl,
-                    peopleProperties.defaultCostMode(), CredentialScope.SHARED_HOUSEHOLD,
-                    effectiveVisibility, user.id());
+            Agent agent = Agent.of(
+                    code,
+                    agentName,
+                    profileName,
+                    apiBaseUrl,
+                    peopleProperties.defaultCostMode(),
+                    CredentialScope.SHARED_HOUSEHOLD,
+                    effectiveVisibility,
+                    user.id());
             agent.markManagedProfile();
             if (connectorManaged) {
                 agent.markConnectorManaged();
@@ -159,9 +162,8 @@ public class AgentLifecycleService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a visibility is required");
         }
         Agent agent = requireManageable(user, code);
-        Long ownerId = visibility == AgentVisibility.PRIVATE && agent.ownerUserId() == null
-                ? user.id()
-                : agent.ownerUserId();
+        Long ownerId =
+                visibility == AgentVisibility.PRIVATE && agent.ownerUserId() == null ? user.id() : agent.ownerUserId();
         // 꺼진 에이전트는 여기서 검사하지 않는다. 켤 때 관리자 경로의 수정이 같은 검사를 한다.
         if (agent.enabled() && visibility == AgentVisibility.GROUP) {
             requireGroupSafe(agent.apiBaseUrl(), agent.hermesProfile());
@@ -195,8 +197,7 @@ public class AgentLifecycleService {
         try {
             skillStore.deleteAll(profileName);
         } catch (RuntimeException failure) {
-            log.warn("지운 에이전트의 스킬 디렉터리를 지우지 못했다. 쓰이지 않을 디렉터리가 남는다 profile={}",
-                    profileName, failure);
+            log.warn("지운 에이전트의 스킬 디렉터리를 지우지 못했다. 쓰이지 않을 디렉터리가 남는다 profile={}", profileName, failure);
         }
     }
 
@@ -209,8 +210,7 @@ public class AgentLifecycleService {
     public void requireGroupSafe(String apiBaseUrl, String profileName) {
         if (AgentToolPolicy.hasPrivateOnlyToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
             throw new ApiException(
-                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE,
-                    "shell and file toolsets require a private agent");
+                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
     }
 
@@ -229,8 +229,7 @@ public class AgentLifecycleService {
                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
         if (agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(user.id()) >= properties.maxPerUser()) {
             throw new ApiException(
-                    ErrorCode.AGENT_LIMIT_REACHED,
-                    "an agent limit of " + properties.maxPerUser() + " was reached");
+                    ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of " + properties.maxPerUser() + " was reached");
         }
     }
 

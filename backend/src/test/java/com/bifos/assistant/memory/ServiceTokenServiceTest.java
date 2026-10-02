@@ -270,7 +270,7 @@ class ServiceTokenServiceTest {
 
         admin.update(person.id(), new UpdatePersonRequest(false));
 
-        assertThat(people.findById(person.id()).orElseThrow().isEnabled()).isFalse();
+        assertThat(people.findById(person.id()).orElseThrow().enabled()).isFalse();
     }
 
     @Test

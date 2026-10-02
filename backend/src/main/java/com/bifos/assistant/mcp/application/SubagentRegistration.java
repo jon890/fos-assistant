@@ -4,8 +4,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -26,9 +25,8 @@ import tools.jackson.databind.JsonNode;
  * @param parentSessionId 하위 에이전트를 만든 session
  * @param childSessionId 등록할 하위 에이전트 session
  */
+@Slf4j
 public record SubagentRegistration(String parentRootSessionId, String parentSessionId, String childSessionId) {
-
-    private static final Logger log = LoggerFactory.getLogger(SubagentRegistration.class);
     private static final String VERSION_LINE = "v1-subagent";
 
     /**
@@ -39,14 +37,22 @@ public record SubagentRegistration(String parentRootSessionId, String parentSess
      * @throws ApiException {@link ErrorCode#SESSION_BINDING_REJECTED}. 모양이 틀리거나 서명이 맞지 않을 때
      */
     public static SubagentRegistration verify(JsonNode body, String tokenHash) {
-        if (tokenHash == null || tokenHash.isBlank()) throw reject("요청에 토큰 해시가 없다");
-        if (body == null || !body.isObject()) throw reject("본문이 객체가 아니다");
-        if (!McpCallContext.isVersionOne(body.get("v"))) throw reject("v 가 정수 1 이 아니다");
+        if (tokenHash == null || tokenHash.isBlank()) {
+            throw reject("요청에 토큰 해시가 없다");
+        }
+        if (body == null || !body.isObject()) {
+            throw reject("본문이 객체가 아니다");
+        }
+        if (!McpCallContext.isVersionOne(body.get("v"))) {
+            throw reject("v 가 정수 1 이 아니다");
+        }
         String parentSessionId = requireText(body, "parent_session_id");
         String parentRootSessionId = requireText(body, "parent_root_session_id");
         String childSessionId = requireText(body, "child_session_id");
         String signature = requireText(body, "sig");
-        if (!McpCallContext.SIGNATURE.matcher(signature).matches()) throw reject("서명이 소문자 16진수 64자가 아니다");
+        if (!McpCallContext.SIGNATURE.matcher(signature).matches()) {
+            throw reject("서명이 소문자 16진수 64자가 아니다");
+        }
         requireTextOrNull(body, "child_subagent_id");
         requireTextOrNull(body, "parent_subagent_id");
 

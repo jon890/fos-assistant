@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -413,7 +414,7 @@ class ArtifactSourceFetcherTest {
                         200,
                         Map.of("content-type", "image/png", "content-length", "0"),
                         new ByteArrayInputStream(new byte[0])));
-        List<Thread> callers = java.util.stream.IntStream.range(0, 4)
+        List<Thread> callers = IntStream.range(0, 4)
                 .mapToObj(index -> Thread.startVirtualThread(
                         () -> blocked.fetch(URI.create("https://images.example.com/a.png"), "image/png")))
                 .toList();

@@ -11,16 +11,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /** 실행 하나에 넣을 instructions 를 조립한다. */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ContextAssembler {
-
-    private static final Logger log = LoggerFactory.getLogger(ContextAssembler.class);
     private static final String GROUP_HEADER = "# 우리 그룹이 함께 아는 것";
     private static final String USER_HEADER = "# 지금 묻는 사람에 대해 아는 것";
     private static final String RESPONSE_INSTRUCTIONS = """

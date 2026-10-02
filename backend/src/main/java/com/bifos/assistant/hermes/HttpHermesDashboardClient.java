@@ -4,8 +4,7 @@ import com.bifos.assistant.hermes.dto.SoulDocument;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -22,9 +21,8 @@ import org.springframework.web.client.RestClientResponseException;
  * Authorization: Bearer} 로 연다. 주소와 토큰은 설정으로만 받는다.
  */
 @Component
+@Slf4j
 public class HttpHermesDashboardClient implements HermesDashboardClient {
-
-    private static final Logger log = LoggerFactory.getLogger(HttpHermesDashboardClient.class);
 
     private final RestClient restClient;
     private final String baseUrl;
@@ -151,8 +149,7 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
      */
     private static void requireValidProfileName(String profileName) {
         if (!HermesProfileName.isValid(profileName)) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "profile name is not a valid Hermes profile");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "profile name is not a valid Hermes profile");
         }
     }
 

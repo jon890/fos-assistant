@@ -6,8 +6,7 @@ import java.time.Duration;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -21,9 +20,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * 동안 {@code heartbeat} 마다 SSE 주석 줄을 보낸다. 주석 줄은 사건이 아니라 web 의 파서가 건너뛴다.
  */
 @Component
+@Slf4j
 public class ChatEventStreams {
-
-    private static final Logger log = LoggerFactory.getLogger(ChatEventStreams.class);
 
     private final Duration heartbeat;
 
@@ -70,17 +68,19 @@ public class ChatEventStreams {
                 throw new IllegalStateException("chat event stream is closed");
             }
         });
-        Thread heartbeatThread = Thread.ofVirtual().name("chat-follow-heartbeat-").start(() -> {
-            try {
-                do {
-                    Thread.sleep(heartbeat);
-                } while (channel.ping());
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-            } finally {
-                unsubscribe.run();
-            }
-        });
+        Thread heartbeatThread = Thread.ofVirtual()
+                .name("chat-follow-heartbeat-")
+                .start(() -> {
+                    try {
+                        do {
+                            Thread.sleep(heartbeat);
+                        } while (channel.ping());
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        unsubscribe.run();
+                    }
+                });
         Runnable close = () -> {
             channel.close();
             unsubscribe.run();

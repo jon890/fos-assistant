@@ -8,7 +8,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 /**
  * 대화에 올린 사진 한 장이다. 본문은 파일로 두고 이 행은 그 파일을 가리키기만 한다.
@@ -19,42 +21,53 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "chat_attachment")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
 public class ChatAttachment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(name = "conversation_id", nullable = false)
+    @Getter
     private Long conversationId;
 
     /** 함께 보낸 메시지. 아직 보내지 않았으면 비어 있다. */
     @Column(name = "message_id")
+    @Getter
     private Long messageId;
 
     @Column(name = "uploaded_by_user_id", nullable = false)
+    @Getter
     private Long uploadedByUserId;
 
     /** 올릴 때의 파일 이름. 화면에 보이기만 하고 디스크 이름으로 쓰지 않는다. */
     @Column(name = "original_name", nullable = false, length = 255)
+    @Getter
     private String originalName;
 
     /** 디스크에 둔 이름. 번호가 생긴 뒤 같은 트랜잭션에서 채운다. */
     @Column(name = "stored_name", length = 255)
+    @Getter
     private String storedName;
 
     @Column(name = "content_type", nullable = false, length = 100)
+    @Getter
     private String contentType;
 
     @Column(name = "byte_size", nullable = false)
+    @Getter
     private long byteSize;
 
     /** 이 시각이 지나면 파일을 지운다. 볼 수 있는지는 정하지 않는다. */
     @Column(name = "expires_at", nullable = false)
+    @Getter
     private Instant expiresAt;
 
     /** 파일을 실제로 지운 시각. 비어 있으면 아직 볼 수 있다. */
     @Column(name = "deleted_at")
+    @Getter
     private Instant deletedAt;
 
     @Column(name = "created_at", nullable = false)
@@ -84,48 +97,7 @@ public class ChatAttachment {
             String contentType,
             long byteSize,
             Instant expiresAt) {
-        return new ChatAttachment(
-                conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
-    }
-
-    public Long id() {
-        return id;
-    }
-
-    public Long conversationId() {
-        return conversationId;
-    }
-
-    public Long messageId() {
-        return messageId;
-    }
-
-    public Long uploadedByUserId() {
-        return uploadedByUserId;
-    }
-
-    public String originalName() {
-        return originalName;
-    }
-
-    public String storedName() {
-        return storedName;
-    }
-
-    public String contentType() {
-        return contentType;
-    }
-
-    public long byteSize() {
-        return byteSize;
-    }
-
-    public Instant expiresAt() {
-        return expiresAt;
-    }
-
-    public Instant deletedAt() {
-        return deletedAt;
+        return new ChatAttachment(conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
     }
 
     public void nameStoredFile(String storedName) {

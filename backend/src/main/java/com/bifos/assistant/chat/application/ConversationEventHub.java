@@ -4,8 +4,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,9 +14,8 @@ import org.springframework.stereotype.Component;
  * 이 프로세스의 메모리에만 있다. 서버가 다시 뜨면 구독도 사라진다.
  */
 @Component
+@Slf4j
 public class ConversationEventHub {
-
-    private static final Logger log = LoggerFactory.getLogger(ConversationEventHub.class);
 
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<ChatEvent>>> subscribers =
             new ConcurrentHashMap<>();

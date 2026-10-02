@@ -9,8 +9,7 @@ import java.util.HexFormat;
 import java.util.regex.Pattern;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -29,12 +28,12 @@ import tools.jackson.databind.JsonNode;
  * @param sessionId 그 호출의 session
  * @param toolCallId 그 도구 호출의 id. Hermes 가 다시 보내도 같다
  */
+@Slf4j
 public record McpCallContext(String rootSessionId, String sessionId, String toolCallId) {
 
     /** 도구 인자 안에서 이 값이 놓이는 키다. */
     public static final String FIELD = "_fos_ctx";
 
-    private static final Logger log = LoggerFactory.getLogger(McpCallContext.class);
     private static final String VERSION_LINE = "v1";
     private static final String HMAC = "HmacSHA256";
     /** {@code sig} 가 받는 모양이다. 하위 에이전트 등록 서명과 커넥터 정책 요청의 서명도 같은 모양이다. */
@@ -49,15 +48,25 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
      * @throws ApiException {@link ErrorCode#MCP_CALL_CONTEXT_INVALID}. 모양이 틀리거나 서명이 맞지 않을 때
      */
     public static McpCallContext verify(String toolName, JsonNode fosCtx, String tokenHash) {
-        if (toolName == null || toolName.isBlank()) throw reject(toolName, "도구 이름이 없다");
-        if (tokenHash == null || tokenHash.isBlank()) throw reject(toolName, "요청에 토큰 해시가 없다");
-        if (fosCtx == null || !fosCtx.isObject()) throw reject(toolName, "_fos_ctx 가 없거나 객체가 아니다");
-        if (!isVersionOne(fosCtx.get("v"))) throw reject(toolName, "v 가 정수 1 이 아니다");
+        if (toolName == null || toolName.isBlank()) {
+            throw reject(toolName, "도구 이름이 없다");
+        }
+        if (tokenHash == null || tokenHash.isBlank()) {
+            throw reject(toolName, "요청에 토큰 해시가 없다");
+        }
+        if (fosCtx == null || !fosCtx.isObject()) {
+            throw reject(toolName, "_fos_ctx 가 없거나 객체가 아니다");
+        }
+        if (!isVersionOne(fosCtx.get("v"))) {
+            throw reject(toolName, "v 가 정수 1 이 아니다");
+        }
         String rootSessionId = requireText(toolName, fosCtx, "root_session_id");
         String sessionId = requireText(toolName, fosCtx, "session_id");
         String toolCallId = requireText(toolName, fosCtx, "tool_call_id");
         String signature = requireText(toolName, fosCtx, "sig");
-        if (!SIGNATURE.matcher(signature).matches()) throw reject(toolName, "sig 가 소문자 16진수 64자가 아니다");
+        if (!SIGNATURE.matcher(signature).matches()) {
+            throw reject(toolName, "sig 가 소문자 16진수 64자가 아니다");
+        }
 
         String signed = String.join("\n", VERSION_LINE, toolName, rootSessionId, sessionId, toolCallId);
         byte[] expected = hmac(tokenHash, signed);

@@ -1,5 +1,8 @@
 package com.bifos.assistant.skill.application;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * 모델에게 스킬을 직접 만들거나 고치지 말라고 알리는 단락이다. 근거는 ADR-034 에 있다.
  *
@@ -11,6 +14,7 @@ package com.bifos.assistant.skill.application;
  * 안내문이 붙기 때문이다. 글은 {@code docs/backend/artifact.md} 의 「결과물 파일」 절 아래 「에이전트에게 알리는
  * 법」 과 같아야 하고, 가짜 Hermes({@code test/e2e/fake-hermes.ts})의 머리글 상수와도 맞아야 한다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class SkillAgentNotice {
 
     /** 끝에 빈 줄 하나를 둔다. 뒤에 사용자가 쓴 글이나 다른 단락이 이어진다. */
@@ -20,6 +24,4 @@ public final class SkillAgentNotice {
             + "스킬에 고칠 점이 보이면 직접 고치지 말고 사용자에게 알려 준다.\n"
             + "스킬을 읽을 때는 skill_view 를 그대로 쓴다.\n"
             + "\n";
-
-    private SkillAgentNotice() {}
 }

@@ -2,6 +2,8 @@ package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
@@ -16,9 +18,8 @@ import org.springframework.web.client.RestClientResponseException;
  * <p>여기서 다시 보내지 않는다. 한도에 닿은 상태에서 다시 보내면 한도를 더 밀어붙인다. 다시 보낼지는
  * 사람이 정한다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class HermesCallFailure {
-
-    private HermesCallFailure() {}
 
     static ApiException of(RestClientException cause, String message) {
         return new ApiException(codeOf(cause), message, cause);

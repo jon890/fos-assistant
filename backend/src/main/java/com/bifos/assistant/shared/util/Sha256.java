@@ -5,6 +5,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HexFormat;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 임의의 문자열에 붙이는 짧은 지문이다.
@@ -12,12 +14,11 @@ import java.util.HexFormat;
  * <p>페르소나 본문처럼 판 번호가 없는 글이 그 사이에 바뀌었는지 보는 데 쓴다. 본문을 되보내지 않고 이
  * 값만 주고받는다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class Sha256 {
 
     /** 지문으로 남기는 해시 길이. SHA-256 앞부분만 쓴다. */
     private static final int HASH_BYTES = 16;
-
-    private Sha256() {}
 
     /**
      * SHA-256 의 앞 16바이트를 16진수 32글자로 적는다.

@@ -65,7 +65,7 @@ class PersonRegistrarTest {
         AllowedPerson added = registrar.register(EMAIL, NAME, PROFILE);
 
         verify(profiles).provision(PROFILE);
-        assertThat(added.isEnabled()).isTrue();
+        assertThat(added.enabled()).isTrue();
         assertThat(people.findByEmailAndEnabledTrue(EMAIL))
                 .get()
                 .extracting(AllowedPerson::displayName, AllowedPerson::hermesProfile)

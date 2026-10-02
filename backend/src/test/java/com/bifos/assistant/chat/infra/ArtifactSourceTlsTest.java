@@ -229,7 +229,9 @@ class ArtifactSourceTlsTest {
                             .orElse(null));
                 }
                 hostHeader.set(readHostHeader(connection.getInputStream()));
-                if (!splitBody && !delayedBody.isZero()) Thread.sleep(delayedBody);
+                if (!splitBody && !delayedBody.isZero()) {
+                    Thread.sleep(delayedBody);
+                }
                 connection
                         .getOutputStream()
                         .write("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: 2\r\n\r\n"
@@ -238,7 +240,9 @@ class ArtifactSourceTlsTest {
                     connection.getOutputStream().write('o');
                     connection.getOutputStream().flush();
                 }
-                if (splitBody && !delayedBody.isZero()) Thread.sleep(delayedBody);
+                if (splitBody && !delayedBody.isZero()) {
+                    Thread.sleep(delayedBody);
+                }
                 if (splitBody) {
                     connection.getOutputStream().write('k');
                 } else {

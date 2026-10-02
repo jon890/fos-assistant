@@ -30,8 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -46,9 +45,8 @@ import org.springframework.stereotype.Component;
  * 하기 위해서다. Hermes 가 읽을 수 있게 파일은 644, 디렉터리는 755 로 쓴다.
  */
 @Component
+@Slf4j
 public class SkillStore {
-
-    private static final Logger log = LoggerFactory.getLogger(SkillStore.class);
 
     /** 게시에 성공한 버전 디렉터리 안에 두는 표식 파일이다. */
     public static final String PUBLISHED_MARKER = ".published";
@@ -68,10 +66,8 @@ public class SkillStore {
     /** 참고 파일 경로. 두 디렉터리 아래 한 단계뿐이라 {@code ..} 과 {@code /} 가 이름에 들어오지 못한다. */
     private static final Pattern FILE_PATH = Pattern.compile("(references|templates)/[a-z0-9][a-z0-9._-]{0,99}");
 
-    private static final Set<PosixFilePermission> DIRECTORY_PERMISSIONS =
-            PosixFilePermissions.fromString("rwxr-xr-x");
-    private static final Set<PosixFilePermission> FILE_PERMISSIONS =
-            PosixFilePermissions.fromString("rw-r--r--");
+    private static final Set<PosixFilePermission> DIRECTORY_PERMISSIONS = PosixFilePermissions.fromString("rwxr-xr-x");
+    private static final Set<PosixFilePermission> FILE_PERMISSIONS = PosixFilePermissions.fromString("rw-r--r--");
 
     private static final String VERSION_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
     private static final int VERSION_RANDOM_CHARS = 4;

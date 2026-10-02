@@ -24,6 +24,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -111,7 +112,7 @@ class RegenerateDeletedAttachmentTest {
                 Instant.now().plusSeconds(1)));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachments.save(attachment);
-        attachments.attachToMessage(question.id(), first.conversationId(), java.util.List.of(attachment.id()));
+        attachments.attachToMessage(question.id(), first.conversationId(), List.of(attachment.id()));
         attachment = attachments.findById(attachment.id()).orElseThrow();
         attachment.markDeleted(Instant.now());
         attachments.save(attachment);

@@ -29,5 +29,7 @@ public class ApiException extends RuntimeException {
         return code;
     }
 
-    public List<String> missingToolsets() { return missingToolsets; }
+    public List<String> missingToolsets() {
+        return missingToolsets;
+    }
 }

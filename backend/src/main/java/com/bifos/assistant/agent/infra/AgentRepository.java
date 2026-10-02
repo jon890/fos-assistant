@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface AgentRepository extends JpaRepository<Agent, Long> {
     Optional<Agent> findByCode(String code);
+
     List<Agent> findByEnabledTrueOrderByCodeAsc();
 
     /**

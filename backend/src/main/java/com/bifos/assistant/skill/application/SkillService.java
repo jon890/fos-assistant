@@ -20,8 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,10 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
  * 서비스를 받기 때문이다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class SkillService {
-
-    private static final Logger log = LoggerFactory.getLogger(SkillService.class);
 
     // 아래 파일 세 한도는 화면(web/src/components/agent/skill-editor.tsx)이, 설명 두 한도는 web/src/lib/skill.ts 가
     // 같은 값으로 저장 전에 검사한다. 바꾸면 함께 고친다.

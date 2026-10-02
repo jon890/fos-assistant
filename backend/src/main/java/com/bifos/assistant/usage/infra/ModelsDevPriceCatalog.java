@@ -19,8 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -39,9 +38,8 @@ import tools.jackson.databind.json.JsonMapper;
  * 비서를 못 돌릴 이유가 아니다.
  */
 @Component
+@Slf4j
 public class ModelsDevPriceCatalog implements PriceCatalog {
-
-    private static final Logger log = LoggerFactory.getLogger(ModelsDevPriceCatalog.class);
 
     private static final DateTimeFormatter CAPTURED_ON =
             DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
@@ -171,8 +169,7 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
     }
 
     /** 한 번 읽은 가격표다. 가격과 그 버전과 파일의 수정 시각을 함께 바꿔 조회가 섞인 값을 보지 않게 한다. */
-    private record Snapshot(
-            Map<String, Map<String, ModelPrice>> pricesByProvider, String version, Instant modifiedAt) {
+    private record Snapshot(Map<String, Map<String, ModelPrice>> pricesByProvider, String version, Instant modifiedAt) {
 
         static final Snapshot EMPTY = new Snapshot(Map.of(), null, null);
     }
@@ -184,27 +181,23 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
 
     private static Map<String, Map<String, ModelPrice>> readProviders(JsonNode root) {
         Map<String, Map<String, ModelPrice>> byProvider = new HashMap<>();
-        root.properties()
-                .forEach(
-                        provider -> {
-                            Map<String, ModelPrice> models = readModels(provider.getValue().path("models"));
-                            if (!models.isEmpty()) {
-                                byProvider.put(provider.getKey().toLowerCase(Locale.ROOT), models);
-                            }
-                        });
+        root.properties().forEach(provider -> {
+            Map<String, ModelPrice> models = readModels(provider.getValue().path("models"));
+            if (!models.isEmpty()) {
+                byProvider.put(provider.getKey().toLowerCase(Locale.ROOT), models);
+            }
+        });
         return Map.copyOf(byProvider);
     }
 
     private static Map<String, ModelPrice> readModels(JsonNode models) {
         Map<String, ModelPrice> byModel = new HashMap<>();
-        models.properties()
-                .forEach(
-                        model -> {
-                            ModelPrice price = readPrice(model.getValue().path("cost"));
-                            if (price != null) {
-                                byModel.put(model.getKey().toLowerCase(Locale.ROOT), price);
-                            }
-                        });
+        models.properties().forEach(model -> {
+            ModelPrice price = readPrice(model.getValue().path("cost"));
+            if (price != null) {
+                byModel.put(model.getKey().toLowerCase(Locale.ROOT), price);
+            }
+        });
         return byModel;
     }
 
@@ -213,11 +206,7 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
             return null;
         }
         ModelPrice price =
-                new ModelPrice(
-                        rate(cost, "input"),
-                        rate(cost, "output"),
-                        rate(cost, "cache_read"),
-                        readTiers(cost));
+                new ModelPrice(rate(cost, "input"), rate(cost, "output"), rate(cost, "cache_read"), readTiers(cost));
         return price.isUnusable() ? null : price;
     }
 
@@ -233,22 +222,21 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
         if (declared.isArray()) {
             for (JsonNode tier : declared) {
                 JsonNode bound = tier.path("tier");
-                if (!"context".equals(bound.path("type").asString(null)) || !bound.path("size").isNumber()) {
+                if (!"context".equals(bound.path("type").asString(null))
+                        || !bound.path("size").isNumber()) {
                     continue;
                 }
-                tiers.add(
-                        new ModelPrice.ContextTier(
-                                bound.path("size").asLong(),
-                                rate(tier, "input"),
-                                rate(tier, "output"),
-                                rate(tier, "cache_read")));
+                tiers.add(new ModelPrice.ContextTier(
+                        bound.path("size").asLong(),
+                        rate(tier, "input"),
+                        rate(tier, "output"),
+                        rate(tier, "cache_read")));
             }
         }
         JsonNode legacy = cost.path("context_over_200k");
         if (tiers.isEmpty() && legacy.isObject()) {
-            tiers.add(
-                    new ModelPrice.ContextTier(
-                            200_000L, rate(legacy, "input"), rate(legacy, "output"), rate(legacy, "cache_read")));
+            tiers.add(new ModelPrice.ContextTier(
+                    200_000L, rate(legacy, "input"), rate(legacy, "output"), rate(legacy, "cache_read")));
         }
         return tiers;
     }

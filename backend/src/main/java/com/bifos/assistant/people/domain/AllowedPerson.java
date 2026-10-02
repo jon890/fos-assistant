@@ -8,6 +8,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Locale;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 
 /**
  * 들어와도 된다고 정한 사람이다.
@@ -20,29 +22,35 @@ import java.util.Locale;
  */
 @Entity
 @Table(name = "allowed_person")
+@Accessors(fluent = true)
 public class AllowedPerson {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(name = "email", nullable = false, unique = true, length = 320)
+    @Getter
     private String email;
 
     @Column(name = "display_name", nullable = false, length = 100)
+    @Getter
     private String displayName;
 
     @Column(name = "hermes_profile", nullable = false, unique = true, length = 64)
+    @Getter
     private String hermesProfile;
 
     @Column(name = "enabled", nullable = false)
+    @Getter
     private boolean enabled;
 
     @Column(name = "created_at", nullable = false)
+    @Getter
     private Instant createdAt;
 
-    protected AllowedPerson() {
-    }
+    protected AllowedPerson() {}
 
     private AllowedPerson(String email, String displayName, String hermesProfile) {
         this.email = normalizeEmail(email);
@@ -64,30 +72,6 @@ public class AllowedPerson {
      */
     public static String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    public Long id() {
-        return id;
-    }
-
-    public String email() {
-        return email;
-    }
-
-    public String displayName() {
-        return displayName;
-    }
-
-    public String hermesProfile() {
-        return hermesProfile;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public Instant createdAt() {
-        return createdAt;
     }
 
     /** 들어오지 못하게 막는다. 행은 남는다. */

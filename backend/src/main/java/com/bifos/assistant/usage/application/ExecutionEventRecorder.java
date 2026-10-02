@@ -9,8 +9,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,10 +29,9 @@ import org.springframework.stereotype.Service;
  * 실패를 감싸므로 여기로 던지지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ExecutionEventRecorder {
-
-    private static final Logger log = LoggerFactory.getLogger(ExecutionEventRecorder.class);
 
     /** 모델이 스킬을 읽는 Hermes 도구의 이름이다. */
     private static final String SKILL_VIEW_TOOL = "skill_view";

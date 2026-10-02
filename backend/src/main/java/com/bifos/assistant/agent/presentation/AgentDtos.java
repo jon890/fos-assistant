@@ -12,6 +12,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 에이전트 화면과 관리 화면이 주고받는 모양이다.
@@ -19,6 +21,7 @@ import java.util.List;
  * <p>컨트롤러는 경로와 권한만 맡고 오가는 모양은 여기 둔다. 같은 저장소의 {@code ChatDtos} 와
  * {@code MemoryDtos} 가 같은 규칙을 따른다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AgentDtos {
 
     /**
@@ -28,8 +31,6 @@ public final class AgentDtos {
      * docs/backend/agent.md} 의 「페르소나」가 갖는다.
      */
     public static final int PERSONA_MAX_CHARS = 8000;
-
-    private AgentDtos() {}
 
     /**
      * 에이전트의 성격 화면이 받는 것이다.

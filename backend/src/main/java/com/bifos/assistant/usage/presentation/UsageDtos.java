@@ -12,6 +12,8 @@ import com.bifos.assistant.usage.domain.CostByModel;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 사용량 화면이 받는 모양이다.
@@ -19,9 +21,8 @@ import java.util.UUID;
  * <p>컨트롤러는 경로와 권한만 맡고 화면에 나가는 모양은 여기 둔다. 같은 저장소의 {@code ChatDtos} 와
  * {@code MemoryDtos} 가 같은 규칙을 따른다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class UsageDtos {
-
-    private UsageDtos() {}
 
     /**
      * 한 달치 환산액과 실제 청구액.

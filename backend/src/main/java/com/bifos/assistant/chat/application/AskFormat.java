@@ -1,5 +1,8 @@
 package com.bifos.assistant.chat.application;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * 에이전트가 사용자에게 물을 때 답 끝에 둘 형식을 알린다.
  *
@@ -9,6 +12,7 @@ package com.bifos.assistant.chat.application;
  *
  * <p>실행이 멈춰 답을 기다리지 않는다. 답은 평범한 다음 메시지로 온다. 그래서 기다리는 상태와 시간 제한이 없다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AskFormat {
 
     public static final String GUIDE = """
@@ -33,9 +37,6 @@ public final class AskFormat {
             - 이름이나 날짜처럼 고를 수 없는 답이면 option 없이 question 만 둔다
             - 왜 묻는지는 <ask> 앞의 본문에 쓴다. 물을 것이 없으면 두지 않는다
             """.stripTrailing();
-
-    private AskFormat() {
-    }
 
     /** 사용자가 직접 답하는 대화의 instructions 에 안내를 붙인다. 흐름의 Chief 와 자식에게는 붙이지 않는다. */
     static String appendTo(String instructions) {

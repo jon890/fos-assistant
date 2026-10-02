@@ -21,8 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -33,10 +32,9 @@ import org.springframework.stereotype.Service;
  * 있다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ArtifactService {
-
-    private static final Logger log = LoggerFactory.getLogger(ArtifactService.class);
 
     private final ArtifactStore store;
     private final ChatArtifactRepository artifacts;
@@ -80,8 +78,8 @@ public class ArtifactService {
         try {
             found = store.changedHtmlSince(conversationId, turnStartedAt);
         } catch (RuntimeException ex) {
-            log.warn("could not scan artifacts of a turn conversationId={} messageId={}",
-                    conversationId, messageId, ex);
+            log.warn(
+                    "could not scan artifacts of a turn conversationId={} messageId={}", conversationId, messageId, ex);
             return;
         }
         if (found.isEmpty()) {
@@ -104,8 +102,7 @@ public class ArtifactService {
                 artifacts.save(ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize()));
             } catch (RuntimeException ex) {
                 // 한 파일이 실패해도 나머지는 묶는다. 경로가 칸 길이를 넘는 것도 여기로 온다.
-                log.warn("could not record an artifact conversationId={} messageId={}",
-                        conversationId, messageId, ex);
+                log.warn("could not record an artifact conversationId={} messageId={}", conversationId, messageId, ex);
             }
         }
     }
@@ -146,8 +143,7 @@ public class ArtifactService {
             // 판정과 여는 사이에 정리 작업이 지운 경우다.
             throw missing(file.conversationId(), file.relativePath());
         } catch (IOException ex) {
-            throw new UncheckedIOException(
-                    "could not open an artifact of conversation " + file.conversationId(), ex);
+            throw new UncheckedIOException("could not open an artifact of conversation " + file.conversationId(), ex);
         }
     }
 

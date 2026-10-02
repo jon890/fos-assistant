@@ -8,8 +8,7 @@ import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,10 +27,9 @@ import tools.jackson.databind.json.JsonMapper;
  * 본문도 다른 거절과 같은 {@link ErrorCode#SESSION_BINDING_REJECTED} 로 끝나야 하기 때문이다.
  */
 @RestController
+@Slf4j
 @RequiredArgsConstructor
 public class SubagentSessionController {
-
-    private static final Logger log = LoggerFactory.getLogger(SubagentSessionController.class);
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final SubagentSessionRegistrar registrar;
@@ -39,7 +37,9 @@ public class SubagentSessionController {
     @PostMapping("/internal/hermes/session-bindings/subagent")
     public ResponseEntity<SubagentRegistrationResponse> register(
             @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
-        if (!(principal instanceof McpPrincipal mcp)) throw reject("MCP 토큰으로 인증한 요청이 아니다");
+        if (!(principal instanceof McpPrincipal mcp)) {
+            throw reject("MCP 토큰으로 인증한 요청이 아니다");
+        }
         SubagentRegistration registration = SubagentRegistration.verify(read(body), mcp.tokenHash());
         SubagentRegistrationResult result = registrar.register(
                 mcp.profileName(),
@@ -53,7 +53,9 @@ public class SubagentSessionController {
     }
 
     private static JsonNode read(String body) {
-        if (body == null || body.isBlank()) throw reject("본문이 비었다");
+        if (body == null || body.isBlank()) {
+            throw reject("본문이 비었다");
+        }
         try {
             return JSON.readTree(body);
         } catch (JacksonException ex) {

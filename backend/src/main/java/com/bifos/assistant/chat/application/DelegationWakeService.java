@@ -23,8 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -38,9 +37,8 @@ import org.springframework.stereotype.Service;
  * <p>잠금은 {@link TurnCancellation} 의 메모리 맵이라 서버 하나를 전제로 한다.
  */
 @Service
+@Slf4j
 public class DelegationWakeService {
-
-    private static final Logger log = LoggerFactory.getLogger(DelegationWakeService.class);
 
     /** 자동 turn 한도에 닿았을 때 대화에 남기는 알림 줄이다. 같은 줄이 연달아 쌓이지 않게 글로 견준다. */
     static final String LIMIT_NOTICE = "자동으로 이어 가는 횟수를 넘었어요. 이어서 하려면 메시지를 보내 주세요";

@@ -1,6 +1,8 @@
 package com.bifos.assistant.hermes;
 
 import java.util.regex.Pattern;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * Hermes profile 이름이 규칙에 맞는지 본다.
@@ -11,12 +13,10 @@ import java.util.regex.Pattern;
  * <p>참거짓만 내고 던지지 않는다. 부르는 자리마다 던질 오류 코드가 달라서다. key 파일을 읽을 때와 쓸
  * 때가 다른 코드를 쓴다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class HermesProfileName {
 
     private static final Pattern PROFILE_NAME = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
-
-    private HermesProfileName() {
-    }
 
     public static boolean isValid(String name) {
         return name != null && PROFILE_NAME.matcher(name).matches();

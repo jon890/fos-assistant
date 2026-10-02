@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -29,12 +31,11 @@ import tools.jackson.databind.node.ObjectNode;
  * 계산한다. key 는 토큰 원문을 SHA-256 한 소문자 16진수 문자열의 UTF-8 바이트이고, 서명할 글은
  * {@code v1\n<tool>\n<root>\n<session>\n<tool_call_id>} 다. 운영 코드로 서명하면 구현과 함께 틀려도 통과한다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpCallSigner {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Instant STARTED = Instant.parse("2026-09-29T00:00:00Z");
-
-    private McpCallSigner() {}
 
     /** 새 루트 session 이다. 검사마다 새로 만들어 다른 검사가 남긴 줄과 겹치지 않게 한다. */
     static String newRoot() {

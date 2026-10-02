@@ -21,9 +21,12 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 
 /** Hermes 설정 저장 뒤의 재조회와 대시보드 실패 처리를 본다. */
 class AgentToolServiceTest {
@@ -128,10 +131,10 @@ class AgentToolServiceTest {
 
         AgentToolService.ToolsetsView result = service.read(owner, agent);
 
-        org.assertj.core.api.Assertions.assertThat(result.toolsets())
+        Assertions.assertThat(result.toolsets())
                 .extracting(AgentToolService.ToolView::name)
                 .containsExactly("web");
-        org.assertj.core.api.Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
+        Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
     }
 
     @Test
@@ -168,8 +171,7 @@ class AgentToolServiceTest {
                 .extracting(ex -> ((ApiException) ex).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
-        verify(toolsets, org.mockito.Mockito.never())
-                .writeApiServer(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
+        verify(toolsets, Mockito.never()).writeApiServer(ArgumentMatchers.anyString(), ArgumentMatchers.anyList());
     }
 
     @Test

@@ -114,7 +114,9 @@ class AgentTokenUserIdDropMigrationTest {
     private static List<String> messages(Throwable error) {
         List<String> messages = new ArrayList<>();
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
-            if (cause.getMessage() != null) messages.add(cause.getMessage());
+            if (cause.getMessage() != null) {
+                messages.add(cause.getMessage());
+            }
         }
         return messages;
     }

@@ -11,7 +11,9 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
 /**
  * 실행 하나가 도는 동안 일어난 일을 우리 이름으로 옮겨 적은 한 줄이다.
@@ -31,6 +33,7 @@ import lombok.NoArgsConstructor;
                     columnNames = {"execution_id", "completed_child_session_id"})
         })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
 public class ExecutionEvent {
 
     /** 화면에 한 줄로 보일 만큼만 담는다. 넘으면 자른다. */
@@ -38,27 +41,34 @@ public class ExecutionEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(name = "execution_id", nullable = false)
+    @Getter
     private Long executionId;
 
     /** 그 실행 안에서의 순서다. 1부터 센다. */
     @Column(name = "sequence", nullable = false)
+    @Getter
     private int sequence;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, length = 40)
+    @Getter
     private ExecutionEventType eventType;
 
     @Column(name = "tool_name", length = 128)
+    @Getter
     private String toolName;
 
     @Column(name = "subagent_name", length = 128)
+    @Getter
     private String subagentName;
 
     /** 하위 에이전트가 따로 session 을 가지면 적는다. 그 경로가 없으면 비운다. */
     @Column(name = "hermes_session_id", length = 128)
+    @Getter
     private String hermesSessionId;
 
     /** 같은 자식 완료가 SSE와 재조회에서 겹쳐도 한 번만 기록하는 자연키다. */
@@ -66,24 +76,31 @@ public class ExecutionEvent {
     private String completedChildSessionId;
 
     @Column(name = "duration_ms")
+    @Getter
     private Long durationMs;
 
     @Column(name = "failed")
+    @Getter
     private Boolean failed;
 
     @Column(name = "detail", length = DETAIL_LIMIT)
+    @Getter
     private String detail;
 
     @Column(name = "model", length = 128)
+    @Getter
     private String model;
 
     @Column(name = "input_tokens")
+    @Getter
     private Long inputTokens;
 
     @Column(name = "output_tokens")
+    @Getter
     private Long outputTokens;
 
     @Column(name = "occurred_at", nullable = false)
+    @Getter
     private Instant occurredAt;
 
     private ExecutionEvent(Builder builder) {
@@ -106,62 +123,6 @@ public class ExecutionEvent {
 
     public static Builder builder() {
         return new Builder();
-    }
-
-    public Long id() {
-        return id;
-    }
-
-    public Long executionId() {
-        return executionId;
-    }
-
-    public int sequence() {
-        return sequence;
-    }
-
-    public ExecutionEventType eventType() {
-        return eventType;
-    }
-
-    public String toolName() {
-        return toolName;
-    }
-
-    public String subagentName() {
-        return subagentName;
-    }
-
-    public String hermesSessionId() {
-        return hermesSessionId;
-    }
-
-    public Long durationMs() {
-        return durationMs;
-    }
-
-    public Boolean failed() {
-        return failed;
-    }
-
-    public String detail() {
-        return detail;
-    }
-
-    public String model() {
-        return model;
-    }
-
-    public Long inputTokens() {
-        return inputTokens;
-    }
-
-    public Long outputTokens() {
-        return outputTokens;
-    }
-
-    public Instant occurredAt() {
-        return occurredAt;
     }
 
     public static final class Builder {

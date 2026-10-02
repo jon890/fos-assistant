@@ -72,6 +72,6 @@ class PersonAccessRollbackTest {
 
         assertThatThrownBy(() -> access.setEnabled(person.id(), false)).isInstanceOf(IllegalStateException.class);
 
-        assertThat(people.findById(person.id()).orElseThrow().isEnabled()).isTrue();
+        assertThat(people.findById(person.id()).orElseThrow().enabled()).isTrue();
     }
 }

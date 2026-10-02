@@ -5,8 +5,7 @@ import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import java.time.Instant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -24,9 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 걸리면 이미 적힌 것이므로 {@code debug} 로만 남긴다.
  */
 @Service
+@Slf4j
 public class SkillUseRecorder {
-
-    private static final Logger log = LoggerFactory.getLogger(SkillUseRecorder.class);
 
     private final ExecutionSkillUseRepository uses;
     private final TransactionTemplate newTransaction;

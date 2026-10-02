@@ -11,6 +11,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 스킬 화면이 주고받는 모양이다.
@@ -18,10 +20,8 @@ import java.util.List;
  * <p>컨트롤러는 경로와 권한만 맡고 오가는 모양은 여기 둔다. 같은 저장소의 {@code AgentDtos} 가 같은
  * 규칙을 따른다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class SkillDtos {
-
-    private SkillDtos() {
-    }
 
     /**
      * 스킬 목록 화면이 받는 것이다.
@@ -82,7 +82,9 @@ public final class SkillDtos {
                     detail.name(),
                     detail.description(),
                     detail.body(),
-                    detail.files().stream().map(file -> new SkillFileView(file.path(), file.size())).toList());
+                    detail.files().stream()
+                            .map(file -> new SkillFileView(file.path(), file.size()))
+                            .toList());
         }
     }
 
@@ -101,7 +103,9 @@ public final class SkillDtos {
         List<SkillFileInput> inputs() {
             return files == null
                     ? List.of()
-                    : files.stream().map(file -> new SkillFileInput(file.path(), file.content())).toList();
+                    : files.stream()
+                            .map(file -> new SkillFileInput(file.path(), file.content()))
+                            .toList();
         }
     }
 

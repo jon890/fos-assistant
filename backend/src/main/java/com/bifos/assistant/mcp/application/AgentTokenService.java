@@ -13,8 +13,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,10 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>토큰은 profile 만 증명한다(ADR-032). profile 이 빈 토큰은 인증하지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AgentTokenService {
-    private static final Logger log = LoggerFactory.getLogger(AgentTokenService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
     private final AgentTokenRepository tokens;
 
@@ -41,16 +40,23 @@ public class AgentTokenService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IssuedToken issue(String profileName, String label) {
         requireProfileName(profileName);
-        byte[] bytes = new byte[32]; RANDOM.nextBytes(bytes);
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         AgentToken saved = tokens.save(AgentToken.issueFor(profileName, hash(raw), label));
         return new IssuedToken(saved, raw);
     }
 
-    public List<AgentToken> list() { return tokens.findAll(); }
+    public List<AgentToken> list() {
+        return tokens.findAll();
+    }
 
     @Transactional
-    public void revoke(Long id) { tokens.findById(id).orElseThrow(() -> new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such token")).revoke(); }
+    public void revoke(Long id) {
+        tokens.findById(id)
+                .orElseThrow(() -> new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such token"))
+                .revoke();
+    }
 
     /**
      * 그 profile 에 묶인 폐기 안 된 토큰을 모두 폐기한다. 없으면 아무것도 하지 않는다.
@@ -74,7 +80,8 @@ public class AgentTokenService {
     @Transactional
     public McpPrincipal authenticate(String raw) {
         String tokenHash = hash(raw);
-        AgentToken token = tokens.findByTokenHash(tokenHash).filter(value -> value.revokedAt() == null)
+        AgentToken token = tokens.findByTokenHash(tokenHash)
+                .filter(value -> value.revokedAt() == null)
                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "invalid agent token"));
         if (token.profileName() == null) {
             log.warn("profile 이 묶이지 않은 옛 MCP 토큰을 거절했다 tokenId={}", token.id());
@@ -85,8 +92,12 @@ public class AgentTokenService {
     }
 
     public static String hash(String raw) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8))); }
-        catch (NoSuchAlgorithmException ex) { throw new IllegalStateException("SHA-256 is unavailable", ex); }
+        try {
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
     }
 
     private static void requireProfileName(String profileName) {
