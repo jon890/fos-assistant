@@ -137,4 +137,6 @@ scripts/check-public-safe.sh
 | `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilterTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/user/RevokedUserTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/user/application/AllowedUserResolver.java` | 신규 |
+| `backend/config/archunit/store/25192a86-f325-4b77-b6d1-3c590c06ead7` | 수정 |
 | `test/e2e/scenarios/people.ts` | 수정 |
