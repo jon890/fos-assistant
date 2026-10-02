@@ -1,7 +1,7 @@
 # AGENTS.md
 
 가족용 AI 비서다.
-Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 웹을 맡는다.
+Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 웹, Hermes 에 설치하는 plugin 과 profile 틀을 맡는다.
 
 ## 읽기 순서
 
@@ -121,9 +121,11 @@ scripts/check-public-safe.sh
 조사는 `orchestration` 으로 워커에 직접 맡기고, 그 결과를 ADR 이나 `docs/` 에 남긴다.
 그 결론이 나온 뒤에 구현 계획을 세운다.
 
+`docs/` 와 코드는 계획서를 번호로 가리키지 않는다. 계획서는 지워지고 지난 계획은 git 이력에서 찾는다.
+
 ## 확인
 
-아래 여덟 검사를 한 번에 돌린다.
+아래 검사를 한 번에 돌린다.
 
 ```bash
 # cwd: 저장소 root
@@ -131,13 +133,9 @@ scripts/check-local.sh
 ```
 
 처음 받은 checkout 에서도 그대로 돈다.
-웹 의존성과 Playwright 의 chromium 을 먼저 설치하고, `pnpm build` 에 자리표시자 환경 변수를 준다.
-둘을 빠뜨려 코드와 관계없이 `playwright: command not found` 와 `Failed to collect page data` 로 실패한 적이 있다.
-hermes 검사가 쓰는 `mcp` SDK 와 PyYAML 이 없거나 고정한 판과 다르면 hermes 단계가 고정한 판을 설치한다.
 처음 실패한 단계에서 멈추고 그 로그의 끝을 보인다.
 
-`scripts/quality.sh check` 는 backend 의 구조 규칙과 코드 규칙과 포맷, web 의 lint 와 포맷을 파일을 바꾸지 않고 검사한다.
-`scripts/quality.sh fix` 는 기계가 고칠 수 있는 위반(OpenRewrite, Spotless, `eslint --fix`, Prettier, 고친 위반의 기준 줄)만 고친 뒤 `check` 를 돌려 사람이 판단할 위반을 보인다. 새 위반은 기준에 더하지 않는다.
+`scripts/quality.sh check` 는 파일을 바꾸지 않고 검사하고, `fix` 는 기계가 고칠 수 있는 위반만 고친다. 새 위반은 기준에 더하지 않는다.
 자세한 것은 [`backend/AGENTS.md`](backend/AGENTS.md) 와 [`web/AGENTS.md`](web/AGENTS.md) 에 있다.
 
 스크립트가 차례로 돌리는 명령은 아래와 같다.
@@ -159,25 +157,15 @@ scripts/quality.sh check
 워커의 보고를 읽는 것은 확인이 아니다.
 실제로 워커가 통과했다고 보고한 것이 전체로 돌리니 실패한 적이 있다.
 
-GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 여덟 검사를 돌린다.
-PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사하고, main 에 push 하면 main 을 검사한다.
-각 검사는 독립된 job 으로 나란히 돈다. 브라우저를 뺀 검사는 로컬 직접 확인과 위 규칙을 그대로 유지한다.
-브라우저 검사는 폭마다 파일 단위 shard 4개로 나눠 총 8개 job 을 나란히 돌린다.
-각 job 은 별도 runner 에서 웹과 Control Plane, H2 메모리 DB 를 새로 띄우며 job 안에서는 직렬로 검사한다.
-필수 검사 `browser-mobile` 과 `browser-desktop` 은 해당 폭의 shard 4개가 모두 성공했는지 판정한다.
-실패, 취소, 누락된 shard 가 있으면 통과하지 않는다. 실패 trace 와 폭별 shard JSON 결과는 CI artifact 에 남는다.
+GitHub Actions 의 [CI](.github/workflows/ci.yml) 도 위 검사를 돌린다. job 구조와 shard, 매일 실행, 실패 이슈는 그 파일이 갖는다.
+PR 에서는 대상 브랜치와 합친 결과인 merge ref 를 검사한다.
+필수 검사 `browser-mobile` 과 `browser-desktop` 은 해당 폭의 shard 가 모두 성공해야 통과한다.
 **브라우저 검사는 PR 에서도 CI 가 돌리고, 그 결과가 머지 전 확인이다.**
-main push 와 한국 시간 매일 04:23 에도 전체 검사를 돌린다. 변경이 없는 날에도 외부 의존성과 흔들리는 검사를 확인한다.
-main 과 매일 실행의 실패는 `브라우저 실패` 라벨 이슈에 파일과 폭별로 모으며, 같은 파일의 열린 이슈에는 재발 횟수와 실행 링크를 댓글로 남긴다.
-PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 한 번에 처리하고, 흔들리는 검사는 고치거나 까닭을 적어 닫는다.
+PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까닭을 적어 닫는다.
 
-공개 정보 검사는 repository secret `PUBLIC_REPO_DENYLIST` 를 값 목록으로 쓴다.
-`fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣어야 한다.
-fork PR 처럼 secret 을 받지 못하는 실행은 형태 패턴만 검사하고 그 사실을 로그에 남긴다.
+공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
 
 **위 명령을 적힌 순서대로 모두 돌린다.**
-`test/e2e` 는 앞선 실행이 남긴 데이터에 걸려,
-`gradlew test` 를 건너뛰면 `this agent code is already used` 로 실패할 수 있다.
 
 **브라우저 검사는 운영과 같은 빌드 결과를 띄워 검사한다.**
 `pnpm test:browser` 가 웹 서버를 띄우기 전에 빌드하므로, 따로 빌드하지 않아도 옛 화면을 검사하지 않는다.
@@ -191,7 +179,7 @@ fork PR 처럼 secret 을 받지 못하는 실행은 형태 패턴만 검사하�
 
 `test/e2e` 는 Hermes 대역을 같은 프로세스에 띄워 홈서버 없이 전체 흐름을 검사한다.
 시나리오는 `test/e2e/scenarios/` 에 하나씩 나뉘어 있고 `run.ts` 가 차례로 돌린다.
-Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. Node 22.18 이상이 필요하다.
+Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. 필요한 Node 버전은 `scripts/check-local.sh` 가 검사한다.
 
 ## 머지는 PR 로 한다
 
@@ -201,6 +189,7 @@ PR 의 merge ref 에서 CI 의 `backend`, `web`, `browser-mobile`, `browser-desk
 main 은 브랜치 보호가 켜져 있고 위 job 이 필수 검사다.
 PR 을 열면 `.github/workflows/claude-code-review.yml` 이 Claude 코드 리뷰를 돌린다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖고, 그 파일은 이 문서와 `docs/` 를 가리킨다.
+이 문서의 절 이름을 바꾸면 `.github/workflows/` 의 프롬프트 둘도 함께 고친다.
 
 | 무엇 | 어떻게 |
 | --- | --- |
@@ -221,9 +210,7 @@ PR 본문과 제목도 공개된다. 「공개 저장소」 절이 그대로 걸
 
 ## 주간 점검
 
-`.github/workflows/claude-architecture-audit.yml` 이 일요일 새벽에 main 전체를 보고 찾은 것을 이슈로 연다.
-관점은 아키텍처, 보안, 자원, 문서, 테스트이고 이슈에 `점검` 과 관점 라벨이 붙는다.
-그 주에 바뀐 것이 없으면 돌지 않는다. Actions 화면에서 손으로도 돌린다.
+`.github/workflows/claude-architecture-audit.yml` 이 main 전체를 보고 찾은 것을 이슈로 연다.
 
 점검 이슈는 결함 후보다. 고치기 전에 코드에서 사실인지 확인한다. 사실이 아니면 까닭을 적고 닫는다.
 
@@ -250,11 +237,9 @@ PR 본문과 제목도 공개된다. 「공개 저장소」 절이 그대로 걸
 
 무엇을 적지 않는지는 위의 「공개 저장소」 절이 정한다.
 
-### 배포했다고 말하기 전에 보는 것
+### Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다
 
-- 컨테이너가 실제로 새로 만들어졌는가. `docker ps` 의 생성 시각으로 본다
-- 기동 로그에 `Started Assistant` 가 있는가
-- 스키마를 바꿨으면 `Schema validation` 이 실패하지 않았는가
+배포 확인 항목은 운영 저장소가 갖는다.
 
 **테스트가 모두 통과해도 운영에서 동작하지 않을 수 있다.**
 가짜 Hermes 가 실제와 다른 형태를 보내도록 쓰여 있으면 테스트는 통과한다.
