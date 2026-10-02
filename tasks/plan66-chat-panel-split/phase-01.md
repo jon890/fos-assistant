@@ -79,7 +79,7 @@ type ConversationSessionProps = {
 | 지금 | 바꾼 뒤 |
 | --- | --- |
 | `const [conversationId, setConversationId] = useState(...)` | 없앤다. prop `conversationId` 를 읽는다 |
-| `conversationIdRef.current = X; setConversationId(X);` 를 나란히 적은 네 자리(`sendWithoutStream`, `send` 의 `onStarted` 와 `onDone`, `Composer` 의 `onConversationCreated`) | 부품 안에 `function assignConversationId(id: string) { conversationIdRef.current = id; onConversationIdChange(id); }` 를 두고 그것을 부른다 |
+| `conversationIdRef.current = X; setConversationId(X);` 를 나란히 적은 네 자리(`sendWithoutStream`, `send` 의 `onStarted` 와 `onDone`, `Composer` 의 `onConversationCreated`) | 부품 안에 `assignConversationId(id: string)` 를 두고 그것을 부른다. 본문은 아래 「더할 것」 에 있다 |
 | `agents`, `agentsLoading`, `agentCode` state 와 `fetchChatAgents` effect | 없앤다. props 를 읽는다. `setAgentCode` 를 넘기던 `StartScreenHeader` 의 `onSelect` 와 `Composer` 의 `mention.onPick` 에는 `onAgentCodeChange` 를 넘긴다 |
 | `currentConversation = useConversation(conversationId)` 와 `seenConversation` 맞추기 | 없앤다. prop `currentConversation` 을 읽는다. 맞추기는 `ChatPanel` 로 간다 |
 | `const [freshStart, setFreshStart] = useState(initialConversationId === null)` | `const freshStart = initialConversationId === null;` |
@@ -87,20 +87,33 @@ type ConversationSessionProps = {
 | `startNewConversation()`, `pathname` effect, `newConversationVersion` effect, `previousPathname`, `previousNewVersion`, `usePathname()`, `newConversationVersion` | 지운다. `ChatPanel` 이 한다 |
 | `composerGeneration` 과 `<Composer key={composerGeneration}` | 지운다. `Composer` 는 `ConversationSession` 과 함께 새로 만들어진다 |
 
-더할 것은 부품이 없어질 때의 정리 하나다. 지금 전환 effect 가 하던 것 가운데 없어진 부품에도 필요한 것만 남긴다.
+더할 것은 부품이 없어질 때의 정리와 `assignConversationId` 다. 지금 전환 effect 가 하던 것 가운데 없어진 부품에도 필요한 것만 남긴다.
 
 ```ts
+/** 이 부품이 없어졌다. 그 뒤에 온 사건이 `ChatPanel` 의 대화 식별자를 바꾸지 않게 한다 */
+const disposed = useRef(false);
+
 // 이 부품이 없어진 뒤에 온 응답과 스트림 사건을 버린다. 받던 스트림은 서버에서 계속 돌고 계속 읽힌다.
-useEffect(
-  () => () => {
+useEffect(() => {
+  // 개발 모드는 effect 를 한 번 정리하고 다시 돌린다. 그때 다시 살아 있는 것으로 둔다.
+  disposed.current = false;
+  return () => {
+    disposed.current = true;
     selectionVersion.current += 1;
     sentTurnToken.current = null;
     conversationTasks.current = [];
     autoTurn.current = null;
-  },
-  [],
-);
+  };
+}, []);
+
+function assignConversationId(id: string) {
+  if (disposed.current) return;
+  conversationIdRef.current = id;
+  onConversationIdChange(id);
+}
 ```
+
+`conversationId` 는 `ChatPanel` 의 state 라 없어진 부품이 불러도 바뀐다. 그러면 새 대화 화면에서 보낸 글이 앞 대화에 저장된다. `disposed` 가 그것을 막는다.
 
 `messagesLoading` 의 초깃값 `initialConversationId !== null` 은 그대로다.
 `useShellTitle`, `usePendingQueue`, `useStarterSuggestions`, 스킬 목록 effect, 반환하는 JSX 는 `ConversationSession` 에 남는다.
@@ -208,6 +221,10 @@ test("답을 만드는 중에 새 대화를 누르면 늦게 온 답이 새 대�
   await expect(page.getByTestId("user-message")).toHaveCount(0);
   await expect(page.getByTestId("assistant-message")).toHaveCount(0);
   await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
+  // 늦게 온 사건이 대화 식별자를 앞 대화로 되돌렸으면 이 글이 앞 대화에 저장되고 주소가 앞 대화가 된다.
+  await send(page, `늦은 답 뒤 새 대화 ${testInfo.project.name} ${Date.now()}`);
+  await expect(page).toHaveURL(CONVERSATION_URL);
+  expect(page.url()).not.toBe(firstUrl);
 });
 ```
 
@@ -240,10 +257,11 @@ grep -n "composerGeneration\|startNewConversation\|previousPathname" web/src/com
 
 ```bash
 # cwd: web/
-pnpm test:browser shell.spec.ts chat stop.spec.ts start-screen observe-running regenerate conversation-requests legacy-conversation-url flow-progress activity-panel missing-agent model-choice skill-command ask-card approval-card artifact.spec
+pnpm test:browser shell.spec.ts browser/chat stop.spec.ts start-screen starters observe-running regenerate conversation-requests legacy-conversation-url flow-progress activity-panel activity-scroll missing-agent model-choice skill-command ask-card approval-card artifact.spec
 ```
 
-인자는 파일 경로에 맞는 정규식이다. `chat` 은 `chat.spec`, `chat-queue`, `chat-attachment`, `chat-delegation-wake`, `chat-outer-scroll` 을 모두 고른다.
+인자는 파일의 절대 경로에 맞는 정규식이다. `browser/chat` 은 `chat.spec`, `chat-queue`, `chat-attachment`, `chat-delegation-wake`, `chat-outer-scroll` 을 고른다.
+`chat` 만 적으면 작업 공간 경로에 같은 글자가 들어 있을 때 모든 spec 을 고른다.
 모두 통과해야 한다. `stop.spec.ts` 의 「입력칸에 초점이 있어도 Esc 로 답을 중지한다」 가 30초 초과로 실패하면 phase 02 가 고치는 문제다. 그 검사만 다시 돌려 통과하면 넘어간다.
 
 ```bash
