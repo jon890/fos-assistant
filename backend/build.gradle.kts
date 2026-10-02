@@ -56,7 +56,7 @@ dependencies {
 }
 
 tasks.test {
-    // mysql 태그는 실제 MySQL 서버가 있어야 돈다. mysqlMigrationTest 가 따로 돌린다.
+    // mysql 태그는 실제 MySQL 서버가 있어야 돈다. 마이그레이션 검사와 저장소 쿼리 검사가 그 태그이고 mysqlMigrationTest 가 따로 돌린다.
     useJUnitPlatform {
         excludeTags("mysql")
     }
@@ -97,12 +97,13 @@ tasks.register<Test>("archTest") {
 }
 
 /**
- * 마이그레이션을 실제 MySQL 에서 검사한다. H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다.
+ * 마이그레이션과 저장소 쿼리를 실제 MySQL 에서 검사한다. H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다.
+ * 태스크 이름은 마이그레이션만 말하지만 mysql 태그가 붙은 검사를 모두 돌린다.
  * 서버 접속 값을 환경 변수로 받으므로 직접 부르지 않고 scripts/check-mysql-migration.sh 로 돌린다.
  */
 tasks.register<Test>("mysqlMigrationTest") {
     group = "verification"
-    description = "마이그레이션과 스키마 검증을 실제 MySQL 에서 검사한다."
+    description = "마이그레이션과 스키마 검증, 저장소 쿼리를 실제 MySQL 에서 검사한다."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform {

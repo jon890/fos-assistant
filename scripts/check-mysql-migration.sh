@@ -2,6 +2,7 @@
 # 마이그레이션을 실제 MySQL 에서 검사한다. 로컬과 CI 가 이 스크립트를 함께 쓴다.
 #
 # 일회용 MySQL 컨테이너를 띄우고 backend 의 mysqlMigrationTest 를 돌린 뒤 컨테이너를 지운다.
+# 그 태스크는 마이그레이션 검사와 함께 모든 저장소 쿼리를 한 번씩 실행하는 검사(RepositoryQueryMysqlTest)도 돌린다.
 # Docker 가 있어야 한다.
 #
 # 서버의 기본 정렬 규칙을 utf8mb4_unicode_ci 로 준다. 운영 서버가 그렇게 떠 있다.
