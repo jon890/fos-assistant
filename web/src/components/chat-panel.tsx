@@ -34,6 +34,18 @@ import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
 import { Notice } from "./ui/notice";
 import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
+import {
+  fetchChatAgents,
+  fetchCommandSkills,
+  fetchConversationMessages,
+  fetchRunningTurn,
+  openConversationEvents,
+  regenerateLatestAnswer,
+  sendChatMessage,
+  startChatStream,
+  stopExecution,
+} from "@/lib/chat-api";
+import { fetchExecutionTree } from "@/lib/usage-api";
 import { agentLabel } from "@/lib/format";
 import type { ChatEvent } from "@/lib/chat-event";
 import type { PendingResult } from "@/lib/pending-messages";
@@ -315,7 +327,7 @@ export function ChatPanel({
   }, [pending.queue]);
 
   useEffect(() => {
-    fetch("/api/agents")
+    fetchChatAgents()
       .then((response) => (response.ok ? response.json() : []))
       .then((data: AgentView[]) => {
         setAgents(data);
@@ -360,10 +372,7 @@ export function ChatPanel({
         // 이력과 `running=false` 를 함께 받아, 새로 고칠 때까지 답이 보이지 않는다.
         let running: RunningTurn | null = null;
         try {
-          const runningResponse = await fetch(
-            `/api/chat/conversations/${initialConversationId}/running`,
-            { cache: "no-store" },
-          );
+          const runningResponse = await fetchRunningTurn(initialConversationId);
           if (runningResponse.ok) {
             running = await readPayload<RunningTurn>(runningResponse);
           } else if (runningResponse.status === 404) {
@@ -381,9 +390,7 @@ export function ChatPanel({
         if (selectionVersion.current !== version) return;
         if (running?.running)
           beginObserving(initialConversationId, version, running);
-        const response = await fetch(
-          `/api/chat/conversations/${initialConversationId}/messages`,
-        );
+        const response = await fetchConversationMessages(initialConversationId);
         if (!response.ok) {
           const payload = await readPayload<ErrorPayload>(response);
           if (payload.code === "CONVERSATION_NOT_FOUND") {
@@ -440,10 +447,7 @@ export function ChatPanel({
 
     const loadTree = async (treeExecutionId: number) => {
       try {
-        const response = await fetch(
-          `/api/usage/executions/${treeExecutionId}/tree`,
-          { cache: "no-store" },
-        );
+        const response = await fetchExecutionTree(treeExecutionId);
         if (!response.ok) return;
         const tree = await readPayload<ExecutionTreeResponse>(response);
         if (!current() || currentExecutionId.current !== treeExecutionId)
@@ -482,9 +486,7 @@ export function ChatPanel({
     const pollOnce = async (): Promise<boolean> => {
       let running: RunningTurn | null = null;
       try {
-        const response = await fetch(`/api/chat/conversations/${id}/running`, {
-          cache: "no-store",
-        });
+        const response = await fetchRunningTurn(id);
         if (response.ok) {
           running = await readPayload<RunningTurn>(response);
         } else if (response.status === 404) {
@@ -589,10 +591,7 @@ export function ChatPanel({
       const reconnected = attempts > 0;
       attempts += 1;
       try {
-        const response = await fetch(`/api/chat/conversations/${id}/events`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        const response = await openConversationEvents(id, controller.signal);
         if (response.ok) {
           if (reconnected) {
             // 끊긴 사이의 `pending` 사건은 다시 오지 않는다. 놓치면 이미 보낸 글이 대기 줄에 남으므로 다시 읽는다.
@@ -633,9 +632,13 @@ export function ChatPanel({
   }, [conversationId]);
 
   const currentConversation = useConversation(conversationId);
-  useEffect(() => {
+  // 대화 줄이 바뀌면 그리는 중에 그 대화의 에이전트로 맞춘다. 처음 그릴 때 이미 줄이 있으면 그때도 맞춘다.
+  const [seenConversation, setSeenConversation] =
+    useState<typeof currentConversation>(undefined);
+  if (seenConversation !== currentConversation) {
+    setSeenConversation(currentConversation);
     if (currentConversation) setAgentCode(currentConversation.agentCode ?? "");
-  }, [currentConversation]);
+  }
 
   useEffect(() => {
     const previous = previousPathname.current;
@@ -774,9 +777,7 @@ export function ChatPanel({
     if (id === null) return { kind: "missing", history: null };
     let running: RunningTurn | null = null;
     try {
-      const response = await fetch(`/api/chat/conversations/${id}/running`, {
-        cache: "no-store",
-      });
+      const response = await fetchRunningTurn(id);
       if (response.ok) {
         running = await readPayload<RunningTurn>(response);
       } else if (response.status === 404) {
@@ -884,7 +885,7 @@ export function ChatPanel({
   }
 
   async function refreshMessages(id: string, version: number): Promise<Turn[]> {
-    const response = await fetch(`/api/chat/conversations/${id}/messages`);
+    const response = await fetchConversationMessages(id);
     if (!response.ok) {
       const payload = await readPayload<ErrorPayload>(response);
       throw new Error(describeError(payload.code, payload.message));
@@ -996,9 +997,7 @@ export function ChatPanel({
     }
     let running: RunningTurn | null = null;
     try {
-      const response = await fetch(`/api/chat/conversations/${id}/running`, {
-        cache: "no-store",
-      });
+      const response = await fetchRunningTurn(id);
       if (response.ok) {
         running = await readPayload<RunningTurn>(response);
       } else if (response.status === 404) {
@@ -1363,11 +1362,7 @@ export function ChatPanel({
     };
 
     const sendWithoutStream = async () => {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
+      const response = await sendChatMessage(requestBody);
       const payload = await readPayload<
         ErrorPayload & { conversationId: string; assistantText: string }
       >(response);
@@ -1401,11 +1396,7 @@ export function ChatPanel({
     try {
       let response: Response;
       try {
-        response = await fetch("/api/chat/stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
-        });
+        response = await startChatStream(requestBody);
       } catch {
         return await sendWithoutStream();
       }
@@ -1658,10 +1649,7 @@ export function ChatPanel({
     setStopRequested(false);
     setFlowIsSlow(false);
     try {
-      const response = await fetch(
-        `/api/chat/conversations/${conversationId}/regenerate`,
-        { method: "POST" },
-      );
+      const response = await regenerateLatestAnswer(conversationId);
       if (!response.ok) {
         const payload = await readPayload<ErrorPayload>(response);
         setError(describeError(payload.code, payload.message));
@@ -1772,9 +1760,7 @@ export function ChatPanel({
     if (executionId === null || stopRequested) return;
     setStopRequested(true);
     try {
-      const response = await fetch(`/api/chat/executions/${executionId}/stop`, {
-        method: "POST",
-      });
+      const response = await stopExecution(executionId);
       if (response.status === 202) return;
       const payload = await readPayload<ErrorPayload>(response);
       if (payload.code === "EXECUTION_NOT_RUNNING") return;
@@ -1815,7 +1801,7 @@ export function ChatPanel({
   useEffect(() => {
     if (commandAgentCode === null) return;
     let active = true;
-    fetch(`/api/agents/${commandAgentCode}/skills`)
+    fetchCommandSkills(commandAgentCode)
       .then((response) =>
         response.ok ? (response.json() as Promise<SkillListView>) : null,
       )

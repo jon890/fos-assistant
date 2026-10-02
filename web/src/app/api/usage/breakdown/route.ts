@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
+import { errorResponse } from "@/lib/api-response";
 
 /**
  * 축별 합계를 Control Plane 에서 받아 온다.
@@ -13,9 +14,11 @@ export async function GET(request: Request) {
   const month = asked.get("month");
   if (month) query.set("month", month);
 
-  const result = await callControlPlane<unknown>(`/api/v1/usage/breakdown?${query.toString()}`);
+  const result = await callControlPlane<unknown>(
+    `/api/v1/usage/breakdown?${query.toString()}`,
+  );
   if (!result.ok) {
-    return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
+    return errorResponse(result.code, result.message, result.status);
   }
   return NextResponse.json(result.data);
 }

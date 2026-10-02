@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
 import { describeAdminError } from "@/components/error-message";
 import type { AdminAgent } from "@/lib/agent";
+import { updateAdminAgent } from "@/lib/agent-api";
 
 type AgentAction = "enabled" | "address";
 
@@ -38,16 +39,12 @@ export function AgentAdminSection({ initialAgent, visibility }: Props) {
     setPending(action);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/agents/${agent.code}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          enabled: changes.enabled ?? agent.enabled,
-          visibility,
-          // 공개 범위와 주인은 바꾸지 않는다. 주인을 비워 보내 기존 주인을 그대로 둔다.
-          ownerEmail: null,
-          apiBaseUrl: changes.apiBaseUrl,
-        }),
+      const response = await updateAdminAgent(agent.code, {
+        enabled: changes.enabled ?? agent.enabled,
+        visibility,
+        // 공개 범위와 주인은 바꾸지 않는다. 주인을 비워 보내 기존 주인을 그대로 둔다.
+        ownerEmail: null,
+        apiBaseUrl: changes.apiBaseUrl,
       });
       if (!response.ok) {
         const result = await payload<{ code: string; message: string }>(

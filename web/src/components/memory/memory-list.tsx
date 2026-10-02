@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchMemories } from "@/lib/memory-api";
 import { MEMORY_IMPORTED_EVENT } from "@/lib/memory-import";
 import { MemoryForm } from "./memory-form";
 import { MemoryItem } from "./memory-item";
@@ -50,7 +51,7 @@ export function MemoryList({
     () => new Set(initialMemories.map((memory) => memory.id)),
   );
   async function reload() {
-    const response = await fetch("/api/memories", { cache: "no-store" });
+    const response = await fetchMemories();
     if (response.ok) {
       const next = (await response.json()) as Memory[];
       setMemories(next);

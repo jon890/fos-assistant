@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requestControlPlane } from "@/lib/control-plane";
 import { isConversationId } from "@/lib/conversation-id";
+import { errorResponse } from "@/lib/api-response";
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
@@ -14,20 +15,21 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
   if (!isConversationId(conversationId)) {
-    return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않아요." },
-      { status: 400 },
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "대화 주소가 올바르지 않아요.",
+      400,
     );
   }
 
-  const opened = await requestControlPlane(`/api/v1/chat/conversations/${conversationId}/events`, {
-    signal: request.signal,
-  });
+  const opened = await requestControlPlane(
+    `/api/v1/chat/conversations/${conversationId}/events`,
+    {
+      signal: request.signal,
+    },
+  );
   if (!opened.ok) {
-    return NextResponse.json(
-      { code: opened.code, message: opened.message },
-      { status: opened.status },
-    );
+    return errorResponse(opened.code, opened.message, opened.status);
   }
 
   const upstream = opened.response;

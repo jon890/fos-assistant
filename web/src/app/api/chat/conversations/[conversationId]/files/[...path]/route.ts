@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { forwardControlPlane } from "@/lib/control-plane";
 import { isConversationId } from "@/lib/conversation-id";
+import { errorResponse } from "@/lib/api-response";
 
 type RouteContext = {
   params: Promise<{ conversationId: string; path: string[] }>;
@@ -25,9 +26,10 @@ const FORWARDED_HEADERS = [
 const CONDITIONAL_REQUEST_HEADERS = ["if-none-match", "if-modified-since"];
 
 function badRequest() {
-  return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: "대화 주소나 파일 경로가 올바르지 않아요." },
-    { status: 400 },
+  return errorResponse(
+    "VALIDATION_FAILED",
+    "대화 주소나 파일 경로가 올바르지 않아요.",
+    400,
   );
 }
 
@@ -40,7 +42,11 @@ function badRequest() {
 export async function GET(request: Request, context: RouteContext) {
   const { conversationId, path } = await context.params;
   if (!isConversationId(conversationId)) return badRequest();
-  if (path.length === 0 || path.some((segment) => segment === "" || segment === "..")) return badRequest();
+  if (
+    path.length === 0 ||
+    path.some((segment) => segment === "" || segment === "..")
+  )
+    return badRequest();
 
   const conditional: Record<string, string> = {};
   for (const name of CONDITIONAL_REQUEST_HEADERS) {
@@ -53,7 +59,7 @@ export async function GET(request: Request, context: RouteContext) {
     { method: "GET", headers: conditional },
   );
   if (!opened.ok) {
-    return NextResponse.json({ code: opened.code, message: opened.message }, { status: opened.status });
+    return errorResponse(opened.code, opened.message, opened.status);
   }
 
   const upstream = opened.response;
@@ -63,7 +69,8 @@ export async function GET(request: Request, context: RouteContext) {
     if (value !== null) headers.set(name, value);
   }
   // 304 는 오류가 아니다. 본문 없이 옮긴 머리글만 돌려주면 브라우저가 가진 사본을 쓴다.
-  if (upstream.status === 304) return new Response(null, { status: 304, headers });
+  if (upstream.status === 304)
+    return new Response(null, { status: 304, headers });
 
   if (!upstream.ok || !upstream.body) {
     const payload = await upstream.json().catch(() => ({

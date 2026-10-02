@@ -22,6 +22,7 @@ import {
   type AdminAgent,
   type AgentView,
 } from "@/lib/agent";
+import { createAgent } from "@/lib/agent-api";
 
 /** 대화상자에서만 뜻이 정해지는 오류 코드의 문구다. 나머지는 공용 문구를 쓴다. */
 const CREATE_FAILURES: Record<string, string> = {
@@ -63,11 +64,7 @@ export function CreateAgentDialog() {
     setCreating(true);
     setError(null);
     try {
-      const response = await fetch("/api/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), visibility }),
-      });
+      const response = await createAgent({ name: name.trim(), visibility });
       if (!response.ok) {
         setError(await describeFailure(response, CREATE_FAILURES));
         setCreating(false);

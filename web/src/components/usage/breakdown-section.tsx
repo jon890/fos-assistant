@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
+import { fetchUsageBreakdown } from "@/lib/usage-api";
 import { BreakdownTable, type Breakdown } from "./breakdown-table";
 
 /** 화면이 고를 수 있는 축이다. Control Plane 이 받는 값과 같아야 한다. */
@@ -21,10 +22,7 @@ export function BreakdownSection({ initial }: { initial: Breakdown }) {
     setPending(true);
     setFailure(null);
     try {
-      const response = await fetch(
-        `/api/usage/breakdown?axis=${encodeURIComponent(axis)}&month=${encodeURIComponent(breakdown.month)}`,
-        { cache: "no-store" },
-      );
+      const response = await fetchUsageBreakdown(axis, breakdown.month);
       if (!response.ok) {
         setFailure("묶음별 합계를 불러오지 못했어요.");
         return;

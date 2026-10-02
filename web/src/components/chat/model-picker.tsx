@@ -29,6 +29,7 @@ import {
   type ModelTierCode,
   type ModelTiers,
 } from "@/lib/model-tiers";
+import { fetchModelOptions } from "@/lib/chat-api";
 
 /** 대화에 적힌 모델 선택이다. 셋 다 null 이면 그 profile 의 기본값으로 돈다 */
 export type ModelChoice = {
@@ -176,10 +177,7 @@ export function ModelPicker({
     const version = ++loadVersion.current;
     setOptionsState({ status: "loading" });
     try {
-      const response = await fetch(
-        `/api/chat/model-options?agentCode=${encodeURIComponent(agentCode)}`,
-        { cache: "no-store" },
-      );
+      const response = await fetchModelOptions(agentCode);
       if (!response.ok) throw new Error("모델 목록을 읽지 못했어요.");
       const options = (await response.json()) as ModelOptions;
       if (loadVersion.current === version)

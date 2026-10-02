@@ -5,6 +5,7 @@ import { PersonForm } from "@/components/admin/person-form";
 import { PersonList } from "@/components/admin/person-list";
 import { describeAdminError } from "@/components/error-message";
 import { Notice } from "@/components/ui/notice";
+import { createPerson, fetchPeople, setPersonEnabled } from "@/lib/people-api";
 import type { Person } from "@/lib/people";
 
 type Props = { initialPeople: Person[] };
@@ -25,7 +26,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
   const busy = pending !== null;
 
   async function reload() {
-    const response = await fetch("/api/admin/people");
+    const response = await fetchPeople();
     if (!response.ok) throw await payload<Failure>(response);
     setPeople(await payload<Person[]>(response));
   }
@@ -37,14 +38,10 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
     setError(null);
     try {
       const form = new FormData(formElement);
-      const response = await fetch("/api/admin/people", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: form.get("email"),
-          displayName: form.get("displayName"),
-          hermesProfile: form.get("hermesProfile"),
-        }),
+      const response = await createPerson({
+        email: form.get("email"),
+        displayName: form.get("displayName"),
+        hermesProfile: form.get("hermesProfile"),
       });
       if (response.ok) {
         formElement.reset();
@@ -62,11 +59,7 @@ export function PeopleAdminPanel({ initialPeople }: Props) {
     setPending({ action: "enabled", id: person.id });
     setError(null);
     try {
-      const response = await fetch(`/api/admin/people/${person.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: !person.enabled }),
-      });
+      const response = await setPersonEnabled(person.id, !person.enabled);
       if (response.ok) await reload();
       else {
         const result = await payload<Failure>(response);

@@ -15,6 +15,7 @@ import {
   type AgentToolsView,
   type PersonaView,
 } from "@/lib/agent";
+import { fetchPersona } from "@/lib/agent-api";
 import type { SkillListView } from "@/lib/skill";
 
 /** 서버가 읽어 온 값이거나, 읽지 못했을 때 화면에 보일 안내다. */
@@ -42,10 +43,11 @@ type Props = {
 
 type ErrorPayload = { code: string; message: string };
 
-async function read<T>(path: string): Promise<Loaded<T>> {
+async function readPersona(code: string): Promise<Loaded<PersonaView>> {
   try {
-    const response = await fetch(path, { cache: "no-store" });
-    if (response.ok) return { ok: true, data: (await response.json()) as T };
+    const response = await fetchPersona(code);
+    if (response.ok)
+      return { ok: true, data: (await response.json()) as PersonaView };
     const payload = (await response.json()) as ErrorPayload;
     return { ok: false, message: describeError(payload.code, payload.message) };
   } catch {
@@ -86,7 +88,7 @@ export function AgentDetailBody({
     setVisibility(next);
     // 그룹에 공개하면 관리자도 성격을 읽을 수 있다. 비공개로 되돌리면 요청자가 주인이 되므로 그대로 읽힌다.
     if (persona !== null || next !== GROUP_VISIBILITY) return;
-    setPersona(await read<PersonaView>(`/api/agents/${code}/persona`));
+    setPersona(await readPersona(code));
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { StartersView } from "@/lib/agent";
+import { fetchAgentStarters } from "@/lib/chat-api";
 
 /** 추천을 만드는 중이면 다시 읽는 간격이다 */
 const RETRY_INTERVAL_MS = 2000;
@@ -22,7 +23,10 @@ export type StarterSuggestions = {
  * 이전 읽기를 멈추고, 그 뒤에 도착한 옛 응답은 요청 순번으로 버린다. `code` 가 null 이면 읽지 않는다.
  */
 export function useStarterSuggestions(code: string | null): StarterSuggestions {
-  const [loaded, setLoaded] = useState<{ code: string; prompts: string[] } | null>(null);
+  const [loaded, setLoaded] = useState<{
+    code: string;
+    prompts: string[];
+  } | null>(null);
   /** 마지막으로 시작한 읽기의 순번이다. 에이전트가 바뀌면 올라 옛 응답을 버린다 */
   const latestRequest = useRef(0);
 
@@ -35,7 +39,7 @@ export function useStarterSuggestions(code: string | null): StarterSuggestions {
     async function load(retries: number): Promise<void> {
       let view: StartersView | null = null;
       try {
-        const response = await fetch(`/api/agents/${agentCode}/starters`, { cache: "no-store" });
+        const response = await fetchAgentStarters(agentCode);
         if (response.ok) view = (await response.json()) as StartersView;
       } catch {
         // 추천은 없어도 대화를 시작할 수 있다. 읽지 못하면 자리를 비워 둔다.
@@ -46,7 +50,10 @@ export function useStarterSuggestions(code: string | null): StarterSuggestions {
         return;
       }
       // 읽지 못했거나 끝내 만드는 중이면 빈 목록으로 마친다. 자리를 계속 불러오는 중으로 두지 않는다.
-      setLoaded({ code: agentCode, prompts: view?.status === "READY" ? view.prompts : [] });
+      setLoaded({
+        code: agentCode,
+        prompts: view?.status === "READY" ? view.prompts : [],
+      });
     }
 
     void load(0);
@@ -59,5 +66,8 @@ export function useStarterSuggestions(code: string | null): StarterSuggestions {
 
   // 다른 에이전트의 추천이 잠시라도 보이지 않게 읽은 에이전트와 맞을 때만 돌려준다.
   const settled = loaded !== null && loaded.code === code;
-  return { prompts: settled ? loaded.prompts : [], pending: code !== null && !settled };
+  return {
+    prompts: settled ? loaded.prompts : [],
+    pending: code !== null && !settled,
+  };
 }

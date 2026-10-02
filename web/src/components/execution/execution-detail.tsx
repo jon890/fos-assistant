@@ -14,6 +14,7 @@ import {
 } from "@/lib/format";
 import { providerLabel } from "@/lib/provider-label";
 import { executionStatusVariant } from "@/lib/execution-status";
+import { fetchExecutionTree } from "@/lib/usage-api";
 import {
   ExecutionTree,
   type ExecutionTreeNode,
@@ -89,12 +90,19 @@ function interval(from: string, to: string): string | null {
 export function ExecutionDetail({ executionId }: { executionId: number }) {
   const router = useRouter();
   const isAdmin = useAdminView();
-  const [state, setState] = useState<FetchState>({ kind: "loading" });
+  // 어느 실행을 읽은 결과인지 함께 둔다. 실행이 바뀌면 새 결과가 올 때까지 읽는 중으로 그린다.
+  const [loaded, setLoaded] = useState<{
+    executionId: number;
+    state: FetchState;
+  } | null>(null);
+  const state: FetchState =
+    loaded?.executionId === executionId ? loaded.state : { kind: "loading" };
 
   useEffect(() => {
     let cancelled = false;
-    setState({ kind: "loading" });
-    fetch(`/api/usage/executions/${executionId}/tree`, { cache: "no-store" })
+    const setState = (next: FetchState) =>
+      setLoaded({ executionId, state: next });
+    fetchExecutionTree(executionId)
       .then(async (response) => {
         if (cancelled) return;
         if (response.status === 404) {

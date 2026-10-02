@@ -11,6 +11,7 @@ import {
 } from "react";
 import { describeError } from "@/components/error-message";
 import { coalesce } from "@/lib/coalesce";
+import { deleteConversation, renameConversation } from "@/lib/chat-api";
 import {
   requestConversation,
   requestConversationPage,
@@ -233,11 +234,7 @@ export function ConversationsProvider({
 
   const rename = useCallback(
     async (id: string, title: string) => {
-      const response = await fetch(`/api/chat/conversations/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
+      const response = await renameConversation(id, title);
       if (!response.ok) throw await failure(response);
       const updated = (await response.json()) as Conversation;
       commit((current) => ({
@@ -279,9 +276,7 @@ export function ConversationsProvider({
   );
 
   const remove = useCallback(async (id: string) => {
-    const response = await fetch(`/api/chat/conversations/${id}`, {
-      method: "DELETE",
-    });
+    const response = await deleteConversation(id);
     if (!response.ok) throw await failure(response);
   }, []);
 

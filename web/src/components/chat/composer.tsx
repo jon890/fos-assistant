@@ -13,7 +13,7 @@ import { TooltipButton } from "@/components/ui/tooltip-button";
 import { cn } from "cn";
 import { attachmentPlaceholder } from "./variants";
 import type { AgentView } from "@/lib/agent";
-import { describeError } from "../error-message";
+import { describeError } from "@/components/error-message";
 import {
   AgentMention,
   filterAgents,
@@ -34,8 +34,14 @@ import {
   type ModelChoiceSaveResult,
   type ModelTierSaveResult,
 } from "./model-picker";
-import type { Conversation } from "../shell/conversations-provider";
+import type { Conversation } from "@/components/shell/conversations-provider";
 import { saveConversationTier, type ModelTierCode } from "@/lib/model-tiers";
+import {
+  createConversation,
+  deleteConversationAttachment,
+  saveConversationModel,
+  uploadConversationAttachment,
+} from "@/lib/chat-api";
 
 type Props = {
   value: string;
@@ -310,11 +316,7 @@ export function Composer({
     const promise = (async () => {
       setCreatingConversation(true);
       try {
-        const response = await fetch("/api/chat/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agentCode }),
-        });
+        const response = await createConversation(agentCode);
         const payload = (await response.json()) as {
           conversationId?: string;
           code?: string;
@@ -360,12 +362,7 @@ export function Composer({
     attachmentId: number,
   ) {
     try {
-      await fetch(
-        `/api/chat/conversations/${targetConversationId}/attachments/${attachmentId}`,
-        {
-          method: "DELETE",
-        },
-      );
+      await deleteConversationAttachment(targetConversationId, attachmentId);
     } catch {
       // 지우기 요청이 실패해도 화면은 이미 그 미리보기를 치웠다. 사용자가 다시 시도할 자리가 없어 조용히 넘어간다.
     }
@@ -398,12 +395,9 @@ export function Composer({
     try {
       const form = new FormData();
       form.append("file", file, file.name);
-      const response = await fetch(
-        `/api/chat/conversations/${targetConversationId}/attachments`,
-        {
-          method: "POST",
-          body: form,
-        },
+      const response = await uploadConversationAttachment(
+        targetConversationId,
+        form,
       );
       const payload = (await response.json()) as {
         id?: number;
@@ -498,13 +492,9 @@ export function Composer({
       // 빈 대화를 만들지 못했으면 `ensureConversationId` 가 이미 알렸다.
       if (targetConversationId === null || !mountedRef.current)
         return "reported";
-      const response = await fetch(
-        `/api/chat/conversations/${targetConversationId}/model`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(choice),
-        },
+      const response = await saveConversationModel(
+        targetConversationId,
+        choice,
       );
       if (!response.ok) return "failed";
       // 기다리는 동안 대화를 바꿨어도 알린다. 받은 줄은 그 대화의 것이라 목록의 그 줄만 바뀐다.

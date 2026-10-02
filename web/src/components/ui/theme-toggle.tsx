@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentType } from "react";
+import { useSyncExternalStore, type ComponentType } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun, SunMoon, type LucideProps } from "lucide-react";
 import { TooltipButton } from "@/components/ui/tooltip-button";
@@ -24,11 +24,18 @@ function isTheme(value: string | undefined): value is Theme {
   return THEMES.some((theme) => theme === value);
 }
 
+function subscribeNothing(): () => void {
+  return () => {};
+}
+
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  // 서버와 hydration 동안은 저장된 테마를 모르므로 거짓이고, 브라우저에서 그린 뒤로는 참이다.
+  const mounted = useSyncExternalStore(
+    subscribeNothing,
+    () => true,
+    () => false,
+  );
 
   if (!mounted || !isTheme(theme)) {
     return <span className="size-8 shrink-0" aria-hidden="true" />;

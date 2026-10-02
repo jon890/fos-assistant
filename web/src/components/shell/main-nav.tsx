@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { fetchMemories } from "@/lib/memory-api";
 import { NavPending } from "./nav-pending";
 
 const LINKS = [
@@ -16,7 +17,7 @@ export function MainNav({ onNavigate }: { onNavigate(href: string): void }) {
   const pathname = usePathname();
   const [proposalCount, setProposalCount] = useState(0);
   useEffect(() => {
-    void fetch("/api/memories", { cache: "no-store" })
+    void fetchMemories()
       .then((response) => (response.ok ? response.json() : []))
       .then((memories: { status: string }[]) =>
         setProposalCount(

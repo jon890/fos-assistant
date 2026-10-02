@@ -8,7 +8,7 @@ import {
   revealedTime,
 } from "./variants";
 import { AnswerBody } from "./answer-body";
-import { describeError } from "../error-message";
+import { describeError } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
 import { artifactNames } from "@/lib/artifact-name";
 import type { ActivitySummary } from "@/lib/chat-event";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,12 @@ export function MessageList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  // 대화가 바뀌면 그리는 중에 「새 메시지」 표시를 지운다.
+  const [seenConversationId, setSeenConversationId] = useState(conversationId);
+  if (seenConversationId !== conversationId) {
+    setSeenConversationId(conversationId);
+    setHasNewMessage(false);
+  }
   const streamedAnswer = turns.some(
     (turn) =>
       typeof turn.id === "string" &&
@@ -145,9 +151,9 @@ export function MessageList({
     />
   ) : null;
 
-  useEffect(() => {
+  // 아래 스크롤 맞춤보다 먼저 돌아야 바뀐 대화의 첫 그림부터 맨 아래를 따라간다.
+  useLayoutEffect(() => {
     shouldFollow.current = true;
-    setHasNewMessage(false);
   }, [conversationId]);
 
   useLayoutEffect(() => {

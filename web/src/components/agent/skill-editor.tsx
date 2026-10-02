@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Markdown } from "@/components/chat/markdown";
 import { describeError, describeFailure } from "@/components/error-message";
+import { fetchAgentSkills, saveSkill } from "@/lib/agent-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -260,9 +261,7 @@ export function SkillEditor({ code, initial }: Props) {
       // 저장 요청은 같은 이름이 있으면 덮어쓴다. 새 스킬이 남의 스킬을 지우지 않게 먼저 목록을 읽는다.
       let response: Response;
       try {
-        response = await fetch(`/api/agents/${code}/skills`, {
-          cache: "no-store",
-        });
+        response = await fetchAgentSkills(code);
       } catch {
         return describeError("HERMES_UNAVAILABLE", "연결할 수 없어요.");
       }
@@ -298,17 +297,13 @@ export function SkillEditor({ code, initial }: Props) {
         setSaving(false);
         return;
       }
-      const response = await fetch(`/api/agents/${code}/skills/${skillName}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          skillMd: body,
-          files: files.map((entry) => {
-            const path = `${entry.directory}/${entry.fileName}`;
-            return entry.content === undefined
-              ? { path }
-              : { path, content: entry.content };
-          }),
+      const response = await saveSkill(code, skillName, {
+        skillMd: body,
+        files: files.map((entry) => {
+          const path = `${entry.directory}/${entry.fileName}`;
+          return entry.content === undefined
+            ? { path }
+            : { path, content: entry.content };
         }),
       });
       if (!response.ok) {
