@@ -59,10 +59,6 @@ function isAdminArea(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
-export function useShellIsAdmin(): boolean {
-  return useContext(AdminContext);
-}
-
 /** 관리자 전용 표시를 그릴지 정한다. 역할이 `ADMIN` 이어도 관리자 영역 밖에서는 거짓이다. */
 export function useAdminView(): boolean {
   const isAdmin = useContext(AdminContext);

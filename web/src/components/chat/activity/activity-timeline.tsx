@@ -11,7 +11,7 @@ import {
 import { cn } from "cn";
 import { formatSeconds } from "@/lib/format";
 import { isReadableDetail } from "@/lib/tool-label";
-import { useShellIsAdmin } from "@/components/shell/app-shell";
+import { useAdminView } from "@/components/shell/app-shell";
 import {
   activityLabel,
   type ActivityItem,
@@ -54,7 +54,7 @@ function markColor(state: ActivityItemState): string {
 }
 
 export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
-  const isAdmin = useShellIsAdmin();
+  const isAdmin = useAdminView();
   return (
     <ol className="flex min-w-0 flex-col gap-2" aria-label="작업 과정">
       {items.map((item) => {

@@ -156,3 +156,79 @@ test("MEMBER 역할이 관리자 영역의 에이전트 주소를 열면 홈으�
   await page.goto("/admin/agents/browser");
   await expect(page).toHaveURL(/\/$/);
 });
+
+test("ADMIN 역할도 일반 사용량 화면에서는 금액과 설정별 사용량 탭과 사용량 내역을 보지 않고 실행 건수를 본다", async ({ page }) => {
+  const sent = await page.request.post("/api/chat", { data: { text: "일반 사용량 검사", agentCode: "browser" } });
+  expect(sent.ok()).toBeTruthy();
+
+  await page.goto("/usage");
+  await expect(page.getByRole("heading", { name: "사용량", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
+  await expect(page.getByText("API 가격으로 계산한 금액", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("main")).not.toContainText("USD");
+  await expect(page.getByRole("link", { name: "설정별 사용량", exact: true })).toHaveCount(0);
+  await expect(page.getByText("사용량 내역", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("breakdown-axis")).toHaveCount(0);
+});
+
+test("관리자 영역의 사용량에는 금액과 탭 넷이 있고 실행 한 줄은 관리자 영역의 상세로 간다", async ({ page }) => {
+  const sent = await page.request.post("/api/chat", { data: { text: "관리자 사용량 검사", agentCode: "browser" } });
+  expect(sent.ok()).toBeTruthy();
+  const executionId = ((await sent.json()) as { executionId: number }).executionId;
+
+  await page.goto("/admin/usage");
+  await expect(page.getByRole("heading", { name: "사용량과 비용", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByText("API 가격으로 계산한 금액", { exact: true })).toBeVisible();
+  const tabs = page.getByRole("navigation", { name: "사용량 탭" });
+  await expect(tabs.getByRole("link")).toHaveText(["요약", "실행 기록", "스킬", "설정별 사용량"]);
+
+  await tabs.getByRole("link", { name: "설정별 사용량", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/usage\?tab=fingerprints$/, { timeout: 15_000 });
+
+  await page.goto("/admin/usage?tab=executions");
+  const link = page.locator(`a[href="/admin/executions/${executionId}"]:visible`);
+  await expect(link).toHaveCount(1);
+  await link.click();
+  await expect(page).toHaveURL(new RegExp(`/admin/executions/${executionId}$`), { timeout: 15_000 });
+  await expect(page.getByText("입력 토큰", { exact: true })).toBeVisible();
+  await expect(page.getByText("환산 금액", { exact: true })).toBeVisible();
+});
+
+test("ADMIN 역할도 일반 실행 상세에서는 모델과 토큰과 원본 보기를 보지 않는다", async ({ page }) => {
+  await page.route("**/api/usage/executions/*/tree", (route) => route.fulfill({ json: terminalFixture() }));
+  await page.goto("/executions/980");
+
+  const terminal = page.getByTestId("execution-tree").locator('[data-tool="terminal"]');
+  await expect(terminal).toContainText("작업을 했어요");
+  await expect(page.getByTestId("activity-raw")).toHaveCount(0);
+  await expect(page.getByText("입력 토큰", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("환산 금액", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("main")).not.toContainText("example-model");
+  await expect(page.getByTestId("execution-node-tokens")).toHaveCount(0);
+});
+
+test("MEMBER 역할이 관리자 영역의 사용량 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  await page.goto("/admin/usage");
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/admin/executions/980");
+  await expect(page).toHaveURL(/\/$/);
+});
+
+/** `terminal` 도구를 쓴 실행 하나짜리 응답이다. 모델과 토큰과 도구 결과의 원본이 실려 있다. */
+function terminalFixture() {
+  const event = (sequence: number, eventType: string, detail: string) => ({
+    sequence, eventType, toolName: "terminal", subagentName: null, hermesSessionId: null, detail, model: null,
+    inputTokens: null, outputTokens: null, durationMs: eventType === "TOOL_COMPLETED" ? 2_100 : null,
+    failed: eventType === "TOOL_COMPLETED" ? false : null, occurredAt: new Date().toISOString(),
+  });
+  return {
+    truncated: false,
+    root: {
+      truncated: false, executionId: 980, agentCode: "terminal-agent-code", agentName: "명령 비서", status: "SUCCEEDED",
+      model: "example-model", inputTokens: 10, outputTokens: 20, estimatedCostMicros: 1000, latencyMs: 2_500,
+      startedAt: new Date().toISOString(), children: [],
+      events: [event(1, "TOOL_STARTED", "ls-원본-명령"), event(2, "TOOL_COMPLETED", '{"output":"terminal-raw-result"}')],
+    },
+  };
+}

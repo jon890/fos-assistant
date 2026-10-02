@@ -20,8 +20,10 @@ const ROUTE_FRAMES: Record<string, string> = {
   "admin/agents": "components/agent/agent-admin-panel.tsx",
   "admin/agents/[code]": "components/agent/persona-editor.tsx",
   memory: "components/memory/memory-list.tsx",
-  usage: "app/usage/page.tsx",
+  usage: "components/usage/usage-screen.tsx",
+  "admin/usage": "components/usage/usage-screen.tsx",
   "executions/[id]": "app/executions/[id]/page.tsx",
+  "admin/executions/[id]": "app/admin/executions/[id]/page.tsx",
   "admin/people": "app/admin/people/people-admin-panel.tsx",
   "chat/[conversationId]": "components/chat/message-list.tsx",
   "c/[conversationId]": "components/chat/message-list.tsx",
@@ -85,9 +87,9 @@ test("에이전트 목록 뼈대는 일반 화면과 관리자 영역이 각자 
   const adminFrame = await readFile(join(SRC_ROOT, "components/agent/agent-admin-panel.tsx"), "utf-8");
   assert.equal(frameWidth(memberFrame), "2xl");
   assert.equal(frameWidth(adminFrame), "4xl");
-  assert.doesNotMatch(member, /useShellIsAdmin|readMe|await/);
+  assert.doesNotMatch(member, /useAdminView|readMe|await/);
   assert.match(member, /width="2xl" title/);
-  assert.match(admin, /width="4xl" title description="agent" form="agent"/);
+  assert.match(admin, /width="4xl"\s+title\s+description="agent"\s+form="agent"/);
 });
 
 test("loading.tsx 는 뼈대를 두기로 한 경로에만 있다", async () => {

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { UsageScreen } from "@/components/usage/usage-screen";
 
-export default async function UsagePage({
+export default async function AdminUsagePage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string | string[] }>;
@@ -13,6 +13,10 @@ export default async function UsagePage({
   }
 
   return (
-    <UsageScreen admin={false} basePath="/usage" searchParams={searchParams} />
+    <UsageScreen
+      admin={true}
+      basePath="/admin/usage"
+      searchParams={searchParams}
+    />
   );
 }

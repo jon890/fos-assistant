@@ -6,6 +6,7 @@ import { cn } from "cn";
 import type { ActivitySummary } from "@/lib/chat-event";
 import { formatElapsed, formatSeconds } from "@/lib/format";
 import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
+import { useAdminView } from "@/components/shell/app-shell";
 import { ActivityTimeline } from "./activity-timeline";
 import {
   activityLabel,
@@ -86,6 +87,7 @@ export function ActivityBlock(props: Props) {
   const expanded = props.mode === "live" ? props.expanded : savedExpanded;
   const executionId = props.mode === "saved" ? props.executionId : null;
   const cancelled = props.mode === "saved" && props.cancelled === true;
+  const showSwitched = useAdminView();
   useEffect(() => {
     if (!expanded || executionId === null || savedItems !== null) return;
     let active = true;
@@ -96,7 +98,7 @@ export function ActivityBlock(props: Props) {
       })
       .then((tree) => {
         if (active) {
-          setSavedItems(fromTree(tree, { cancelled }));
+          setSavedItems(fromTree(tree, { cancelled, showSwitched }));
           setLoadFailed(false);
         }
       })
@@ -106,7 +108,7 @@ export function ActivityBlock(props: Props) {
     return () => {
       active = false;
     };
-  }, [expanded, executionId, cancelled, loadVersion, savedItems]);
+  }, [expanded, executionId, cancelled, showSwitched, loadVersion, savedItems]);
 
   const live = props.mode === "live";
   const running = props.mode === "live" && props.state.endedAt === null;

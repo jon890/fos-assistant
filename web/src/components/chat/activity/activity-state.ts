@@ -150,6 +150,7 @@ function finish(
 export function applyChatEvent(
   state: ActivityState,
   event: ChatEvent,
+  showSwitched = false,
 ): ActivityState {
   if (event.type === "reset") return { ...state, items: [] };
   if (event.type === "done") return failActivity(state, Date.now());
@@ -238,6 +239,8 @@ export function applyChatEvent(
     };
   }
   if (event.type === "switched") {
+    // 모델이 바뀐 줄은 관리자 영역에서만 그린다. 일반 화면에서는 `ADMIN` 에게도 만들지 않는다.
+    if (!showSwitched) return state;
     // 넘어간 곳의 모델은 관리자에게만 온다. 글이 비면 「여기부터 로 실행해요」 가 되므로 줄을 만들지 않는다.
     const switchedTo = event.text?.trim();
     if (!switchedTo) return state;
@@ -267,7 +270,12 @@ export function applyChatEvent(
  */
 export function fromTree(
   tree: ExecutionTreeResponse,
-  options: { running?: boolean; cancelled?: boolean } = {},
+  options: {
+    running?: boolean;
+    cancelled?: boolean;
+    /** 모델이 바뀐 줄을 만들지 정한다. 관리자 영역에서만 참이다. */
+    showSwitched?: boolean;
+  } = {},
 ): ActivityItem[] {
   const cancelled = (node: ExecutionTreeNode) =>
     node.status === "CANCELLED" ||
@@ -332,10 +340,11 @@ export function fromTree(
           });
           break;
         case "PROVIDER_SWITCHED":
-          state = applyChatEvent(state, {
-            type: "switched",
-            text: event.detail,
-          });
+          state = applyChatEvent(
+            state,
+            { type: "switched", text: event.detail },
+            options.showSwitched,
+          );
           break;
       }
     }

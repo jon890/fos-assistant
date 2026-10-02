@@ -15,7 +15,7 @@ import {
   ExecutionTree,
   type ExecutionTreeResponse,
 } from "@/components/execution/execution-tree";
-import { useShellIsAdmin } from "@/components/shell/app-shell";
+import { useAdminView } from "@/components/shell/app-shell";
 import { ActivityTimeline } from "./activity-timeline";
 import type { ActivityState } from "./activity-state";
 
@@ -26,7 +26,7 @@ export type ActivityPanelTarget =
 type Props = { target: ActivityPanelTarget; onClose(): void };
 
 export function ActivityPanel({ target, onClose }: Props) {
-  const isAdmin = useShellIsAdmin();
+  const isAdmin = useAdminView();
   const [loaded, setLoaded] = useState<{
     executionId: number;
     tree: ExecutionTreeResponse;
