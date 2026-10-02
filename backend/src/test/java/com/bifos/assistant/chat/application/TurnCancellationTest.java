@@ -1,14 +1,19 @@
 package com.bifos.assistant.chat.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.Closeable;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,5 +57,42 @@ class TurnCancellationTest {
         } finally {
             delayed.shutdown();
         }
+    }
+
+    @Test
+    @DisplayName("알림 줄을 저장하는 동안에는 도는 turn 으로 보이고 실행 번호가 없다")
+    void showsRunningTurnWithoutExecutionIdWhileRunIfIdleWorks() {
+        AtomicReference<TurnMark> markInside = new AtomicReference<>();
+        AtomicReference<Throwable> openInside = new AtomicReference<>();
+        AtomicInteger closed = new AtomicInteger();
+        turns.addCloseListener(event -> closed.incrementAndGet());
+
+        boolean ran = turns.runIfIdle(2L, () -> {
+            markInside.set(turns.markOf(2L));
+            try {
+                turns.open(1L, 2L);
+            } catch (ApiException e) {
+                openInside.set(e);
+            }
+        });
+
+        assertThat(ran).isTrue();
+        assertThat(markInside.get().running()).isTrue();
+        assertThat(markInside.get().executionId()).isNull();
+        assertThat(openInside.get()).isInstanceOf(ApiException.class);
+        assertThat(((ApiException) openInside.get()).code()).isEqualTo(ErrorCode.CONVERSATION_BUSY);
+        assertThat(turns.markOf(2L)).isEqualTo(TurnMark.NONE);
+        assertThat(closed.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("도는 turn 이 있으면 작업을 돌리지 않는다")
+    void doesNotRunWorkWhileTurnIsOpen() {
+        AtomicInteger worked = new AtomicInteger();
+        turns.open(1L, 2L);
+
+        assertThat(turns.runIfIdle(2L, worked::incrementAndGet)).isFalse();
+        assertThat(worked.get()).isZero();
+        assertThatThrownBy(() -> turns.open(1L, 2L)).isInstanceOf(ApiException.class);
     }
 }
