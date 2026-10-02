@@ -898,7 +898,9 @@ web 은 입력창 아래의 `chat/model-picker.tsx` 로 고른다.
 실행을 보낼 때 `chat/application/ModelTierService` 가 대화의 선택, 단계, 에이전트 기본 모델 차례로 세 값을 정하고 `chat/domain/ModelChoice` 에 담는다.
 모델이 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
 effort 가 비어 있으면 `model_options` 를 뺀다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
-Memory 제안은 원래 실행이 해석한 값을 받아 쓰고, 추천 질문은 대화가 없어 에이전트 기본 모델을 싣는다.
+모델이 비어 있고 그룹에 숨김이 있으면 `ModelOptionsService.profileDefaultOf` 가 들고 있는 목록에서 읽은 profile 의 기본 모델로 같은 판정을 한다.
+Memory 제안은 원래 실행이 해석한 값을 받아 쓰고 `ExecutionRecorder.startInheriting` 으로 원래 실행의 단계와 effort 출처를 이어받는다.
+추천 질문은 대화가 없어 `ModelTierService.resolveDetached` 가 준 에이전트 기본 모델을 싣고 `ExecutionRecorder.startDetached` 가 그 값을 실행 줄에 적는다.
 보내기, 다시 생성, 흐름의 하위 실행이 모두 같은 해석을 쓴다.
 
 **대화 경로의 `{id}` 는 대화의 공개 식별자(UUID)다.** 대화 표의 번호가 아니다.
@@ -1264,7 +1266,7 @@ web/src/
       approval-list.tsx   입력창 위에 모아 보이는 승인 카드 목록
       approval-card.tsx   승인 카드 한 장. 인자를 키와 값으로 보이고 승인과 거절을 받는다
     connector/            연결 화면의 부품
-      connector-grants.tsx  묻지 않고 실행하게 허락한 동작과 「다시 묻기」
+      connector-grants.tsx  묻지 않고 실행하게 허락한 동작과 「다시 묻기」. 읽지 못하면 옛 허락을 지우고 안내를 보인다
     usage/                사용량 화면의 부품
     execution/            실행 나무 화면의 부품
     agent/                에이전트와 성격 화면의 부품
