@@ -1,6 +1,8 @@
 package com.bifos.assistant.user.application;
 
 import com.bifos.assistant.people.application.SignInPolicy;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.auth.TokenUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class AllowedUserResolver {
+public class AllowedUserResolver implements TokenUserResolver {
 
     private final SignInPolicy signInPolicy;
     private final UserProvisioningService provisioning;
@@ -32,5 +34,18 @@ public class AllowedUserResolver {
             return Optional.empty();
         }
         return Optional.of(provisioning.resolve(email, displayName));
+    }
+
+    /**
+     * {@link #resolveAllowed} 의 사용자를 인증 주체로 바꿔 돌려준다. 꺼진 주소면 비어 있는 값이다.
+     *
+     * <p>같은 클래스의 메서드를 부르면 프록시를 거치지 않으므로 여기서도 트랜잭션을 연다. 판정과 조회가
+     * 한 트랜잭션에서 돈다.
+     */
+    @Override
+    @Transactional
+    public Optional<CurrentUser> resolveCurrentUser(String email, String displayName) {
+        return resolveAllowed(email, displayName)
+                .map(user -> new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()));
     }
 }

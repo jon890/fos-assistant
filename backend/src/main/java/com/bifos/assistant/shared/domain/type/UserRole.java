@@ -1,4 +1,4 @@
-package com.bifos.assistant.user.domain.type;
+package com.bifos.assistant.shared.domain.type;
 
 public enum UserRole {
     ADMIN,
