@@ -69,6 +69,28 @@ public class ModelTierService {
                 user.isAdmin());
     }
 
+    /**
+     * 관리자가 고칠 그룹의 단계 정의와 그룹 기본 단계다.
+     *
+     * <p>에이전트를 받지 않는다. 단계 정의는 그룹의 설정이고 특정 에이전트에 매이지 않는다. 에이전트로 읽으면
+     * 관리자가 대화를 시작할 수 없는 에이전트(다른 사용자의 비공개 에이전트)를 고른 화면이 설정을 읽지 못한다.
+     * provider 를 비운 단계는 비운 채 낸다. 에이전트의 기본 provider 로 채워 보이면 저장할 때 그 값으로 굳는다.
+     */
+    @Transactional(readOnly = true)
+    public GroupModelTiers groupTiers(CurrentUser admin) {
+        if (!admin.isAdmin()) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
+        }
+        return new GroupModelTiers(
+                definitionsFor(admin.groupId()).stream()
+                        .map(ModelTierService::stored)
+                        .toList(),
+                groupSettings
+                        .findById(admin.groupId())
+                        .map(it -> it.defaultTier())
+                        .orElse(null));
+    }
+
     @Transactional
     public void saveUserDefault(CurrentUser user, ModelTier tier) {
         if (users.updateModelDefaultTier(user.id(), tier == null ? null : tier.name()) == 0) {
@@ -269,6 +291,16 @@ public class ModelTierService {
                 definition.tier(),
                 labelOf(definition.tier()),
                 definition.provider() == null ? defaultProvider : definition.provider(),
+                definition.model(),
+                definition.reasoningEffort());
+    }
+
+    /** 저장된 값 그대로 담는다. 빈 칸을 채우지 않는다. */
+    private static ModelTierOptions.Tier stored(ModelTierDefinition definition) {
+        return new ModelTierOptions.Tier(
+                definition.tier(),
+                labelOf(definition.tier()),
+                definition.provider(),
                 definition.model(),
                 definition.reasoningEffort());
     }

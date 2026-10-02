@@ -296,3 +296,44 @@ function terminalFixture() {
     },
   };
 }
+
+test("에이전트로 읽는 단계 조회가 실패해도 관리자 영역의 모델 화면은 그룹 단계를 읽고 저장한다", async ({ page }) => {
+  // 목록의 첫 에이전트가 다른 사용자의 비공개 에이전트면 에이전트로 읽는 조회는 AGENT_NOT_FOUND 로 실패한다.
+  // 그룹 단계는 에이전트 없이 읽으므로 그 조회가 통째로 실패해도 화면이 읽고 저장해야 한다.
+  let agentScopedReads = 0;
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) => {
+      agentScopedReads += 1;
+      return route.fulfill({ status: 404, json: { code: "AGENT_NOT_FOUND", message: "agent not found" } });
+    },
+  );
+  const groupRead = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/admin/model-tiers");
+
+  await page.goto("/admin/models");
+  expect((await groupRead).ok()).toBeTruthy();
+  const section = page.getByRole("region", { name: "그룹 모델 설정" });
+  const defaultTier = section.getByLabel("그룹 기본 단계");
+  await expect(defaultTier).toHaveValue("");
+  await expect(section.getByRole("alert")).toHaveCount(0);
+  try {
+    await defaultTier.selectOption("DEEP");
+    await section.getByRole("button", { name: "저장" }).click();
+    await expect(section.getByText("저장했어요", { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(defaultTier).toHaveValue("DEEP");
+  } finally {
+    // 다른 검사가 그룹 기본 단계가 없다고 보고 돌므로 원래대로 되돌린다.
+    await page.goto("/admin/models");
+    await defaultTier.selectOption("");
+    await section.getByRole("button", { name: "저장" }).click();
+    await expect(section.getByText("저장했어요", { exact: true })).toBeVisible();
+  }
+  expect(agentScopedReads, "관리자 영역의 모델 화면은 에이전트로 읽는 단계 조회를 부르지 않는다").toBe(0);
+});
+
+test("MEMBER 역할은 그룹 단계의 관리자 조회를 받지 못한다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  const response = await page.request.get("/api/admin/model-tiers");
+  expect(response.status()).toBe(403);
+});

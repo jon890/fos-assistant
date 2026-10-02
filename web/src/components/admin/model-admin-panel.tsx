@@ -18,13 +18,12 @@ type Settings =
 
 /**
  * 그룹 전체에 걸리는 모델 설정이다. 에이전트를 고르는 칸은 「모델 숨김」 절 안에 있고 숨길 모델의 목록만 정한다.
- * 목록이 에이전트의 profile 마다 다르기 때문이다. 그룹 모델 설정은 첫 에이전트로 읽고, 고른 에이전트가
- * 바뀌어도 다시 그리지 않아 저장하지 않은 입력이 남는다.
+ * 목록이 에이전트의 profile 마다 다르기 때문이다. 그룹 모델 설정은 에이전트 없이 읽어, 고른 에이전트가
+ * 바뀌어도 다시 그리지 않고 저장하지 않은 입력이 남는다.
  */
 export function ModelAdminPanel({ agents }: Props) {
   const selectId = useId();
-  const tierAgentCode = agents[0]?.code ?? "";
-  const [code, setCode] = useState(tierAgentCode);
+  const [code, setCode] = useState(agents[0]?.code ?? "");
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
@@ -46,22 +45,22 @@ export function ModelAdminPanel({ agents }: Props) {
   return (
     <div className="mx-auto w-full max-w-2xl">
       <h1 className="mb-6 text-xl font-semibold">모델</h1>
-      {agents.length === 0 ? (
+      <div className="grid gap-6">
         <p className="text-sm text-muted-foreground">
-          먼저 에이전트를 등록해 주세요.
+          그룹 모델 설정과 모델 숨김은 그룹 전체에 걸려요.
         </p>
-      ) : (
-        <div className="grid gap-6">
+        <section
+          aria-label="그룹 모델 설정"
+          className="rounded-md border border-border p-4"
+        >
+          <h2 className="font-semibold">그룹 모델 설정</h2>
+          <GroupTierSettings />
+        </section>
+        {agents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            그룹 모델 설정과 모델 숨김은 그룹 전체에 걸려요.
+            모델을 숨기려면 먼저 에이전트를 등록해 주세요.
           </p>
-          <section
-            aria-label="그룹 모델 설정"
-            className="rounded-md border border-border p-4"
-          >
-            <h2 className="font-semibold">그룹 모델 설정</h2>
-            <GroupTierSettings agentCode={tierAgentCode} />
-          </section>
+        ) : (
           <section
             aria-label="모델 숨김"
             className="grid gap-4 rounded-md border border-border p-4"
@@ -107,8 +106,8 @@ export function ModelAdminPanel({ agents }: Props) {
               />
             )}
           </section>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

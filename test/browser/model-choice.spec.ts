@@ -468,7 +468,9 @@ test("그룹 모델 설정은 그룹 기본 단계를 단계별 모델보다 위
   page,
 }) => {
   await page.route(
-    (url) => url.pathname === "/api/chat/model-tiers",
+    (url) =>
+      url.pathname === "/api/chat/model-tiers" ||
+      url.pathname === "/api/admin/model-tiers",
     (route) => route.fulfill({ json: { ...TIERS, admin: true } }),
   );
 
@@ -595,7 +597,9 @@ test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저�
 }) => {
   let attempts = 0;
   await page.route(
-    (url) => url.pathname === "/api/chat/model-tiers",
+    (url) =>
+      url.pathname === "/api/chat/model-tiers" ||
+      url.pathname === "/api/admin/model-tiers",
     (route) => route.fulfill({ json: { ...TIERS, admin: true } }),
   );
   await page.route(
@@ -630,7 +634,9 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
 }) => {
   const savedBodies: unknown[] = [];
   await page.route(
-    (url) => url.pathname === "/api/chat/model-tiers",
+    (url) =>
+      url.pathname === "/api/chat/model-tiers" ||
+      url.pathname === "/api/admin/model-tiers",
     (route) =>
       route.fulfill({
         json: {

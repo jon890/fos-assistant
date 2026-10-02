@@ -6,13 +6,11 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Notice } from "@/components/ui/notice";
 import {
-  getModelTiers,
+  getGroupModelTiers,
   saveGroupTiers,
   type ModelTier,
   type ModelTierCode,
 } from "@/lib/model-tiers";
-
-type Props = { agentCode: string };
 
 type Load =
   | { status: "loading" }
@@ -71,10 +69,10 @@ function TierFields({ item, onChange }: TierFieldsProps) {
 }
 
 /**
- * 그룹의 기본 단계와 단계별 모델을 정한다. 단계 정의는 그룹에 하나뿐이라 어느 에이전트로 읽어도 같다.
- * `agentCode` 는 조회에만 쓴다. 부모는 처음 고른 코드를 그대로 넘겨, 저장하지 않은 입력이 다시 읽기로 사라지지 않게 한다.
+ * 그룹의 기본 단계와 단계별 모델을 정한다. 단계 정의는 그룹의 설정이라 에이전트 없이 읽는다.
+ * 에이전트로 읽으면 관리자가 대화를 시작할 수 없는 에이전트(다른 사용자의 비공개 에이전트)에서 조회가 실패한다.
  */
-export function GroupTierSettings({ agentCode }: Props) {
+export function GroupTierSettings() {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [draftTiers, setDraftTiers] = useState<ModelTier[]>([]);
   const [groupDefaultTier, setGroupDefaultTier] =
@@ -84,7 +82,7 @@ export function GroupTierSettings({ agentCode }: Props) {
 
   useEffect(() => {
     let active = true;
-    void getModelTiers(agentCode).then((result) => {
+    void getGroupModelTiers().then((result) => {
       if (!active) return;
       if (result.ok) {
         setDraftTiers(result.data.tiers);
@@ -97,7 +95,7 @@ export function GroupTierSettings({ agentCode }: Props) {
     return () => {
       active = false;
     };
-  }, [agentCode]);
+  }, []);
 
   const needsTierSetup = draftTiers.some((item) => item.model === null);
   const hasIncompleteTierMapping = draftTiers.some((item) => {
