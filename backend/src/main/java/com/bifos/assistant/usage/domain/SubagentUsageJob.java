@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.domain;
 
+import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -14,7 +15,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
-/** 부모 종료 뒤에도 남아 있는 자식의 사용량 조회 작업이다. */
+/**
+ * native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session 에서 조회하는 작업이다.
+ *
+ * <p>합계에 더할 토큰과 금액은 이 줄에 한 번만 적는다. 근거는 ADR-059 에 있다.
+ */
 @Entity
 @Table(
         name = "subagent_usage_job",
@@ -67,6 +72,40 @@ public class SubagentUsageJob {
     @Column(name = "backoff_attempts", nullable = false)
     private int backoffAttempts;
 
+    @Column(name = "provider", length = 64)
+    private String provider;
+
+    @Column(name = "model", length = 128)
+    private String model;
+
+    /** cache 를 뺀 일반 입력 토큰이다. */
+    @Column(name = "input_tokens")
+    private Long inputTokens;
+
+    @Column(name = "cache_read_tokens")
+    private Long cacheReadTokens;
+
+    @Column(name = "cache_write_tokens")
+    private Long cacheWriteTokens;
+
+    @Column(name = "output_tokens")
+    private Long outputTokens;
+
+    @Column(name = "estimated_cost_micros")
+    private Long estimatedCostMicros;
+
+    @Column(name = "actual_cost_micros")
+    private Long actualCostMicros;
+
+    @Column(name = "cost_currency", length = 3, columnDefinition = "CHAR(3)")
+    private String costCurrency;
+
+    @Column(name = "pricing_version", length = 32)
+    private String pricingVersion;
+
+    @Column(name = "recorded_at")
+    private Instant recordedAt;
+
     public static SubagentUsageJob create(AgentExecution parent, ExecutionEvent start, String apiBaseUrl, Instant now) {
         SubagentUsageJob job = new SubagentUsageJob();
         job.executionId = parent.id();
@@ -85,8 +124,25 @@ public class SubagentUsageJob {
         return !now.isBefore(expiresAt);
     }
 
-    public void done() {
+    /**
+     * 종료를 확인한 자식의 사용량과 금액을 적고 줄을 끝낸다.
+     *
+     * <p>금액을 내지 못했으면 {@code cost} 는 비어 있고 {@code reason} 에 그 까닭이 온다.
+     */
+    public void record(SubagentSessionUsage usage, ExecutionCost cost, String reason, Instant now) {
+        provider = usage.provider() == null || usage.provider().isBlank() ? null : usage.provider();
+        model = usage.model();
+        inputTokens = usage.inputTokens();
+        cacheReadTokens = usage.cacheReadTokens();
+        cacheWriteTokens = usage.cacheWriteTokens();
+        outputTokens = usage.outputTokens();
+        estimatedCostMicros = cost.estimatedMicros();
+        actualCostMicros = cost.actualMicros();
+        costCurrency = cost.currency();
+        pricingVersion = cost.pricingVersion();
+        recordedAt = now;
         status = "DONE";
+        unconfirmedReason = reason;
     }
 
     public void expire() {

@@ -134,11 +134,16 @@ public class HttpHermesRunsClient implements HermesRunsClient {
             if (row == null || !sessionId.equals(text(row, "id"))) {
                 return null;
             }
+            String provider = text(row, "provider");
+            if (provider == null) {
+                provider = text(row, "billing_provider");
+            }
             return new SubagentSessionUsage(
                     text(row, "id"),
                     text(row, "source"),
                     text(row, "parent_session_id"),
                     text(row, "model"),
+                    provider,
                     decimal(row, "started_at"),
                     decimal(row, "ended_at"),
                     number(row, "input_tokens"),

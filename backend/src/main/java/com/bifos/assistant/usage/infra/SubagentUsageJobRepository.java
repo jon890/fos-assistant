@@ -7,7 +7,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SubagentUsageJobRepository extends JpaRepository<SubagentUsageJob, Long> {
-    boolean existsByExecutionIdAndChildSessionId(Long executionId, String childSessionId);
+    boolean existsByProfileNameAndChildSessionId(String profileName, String childSessionId);
 
     List<SubagentUsageJob> findByExecutionIdIn(Collection<Long> executionIds);
 

@@ -18,10 +18,7 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
             and parent.finishedAt >= :since and event.eventType = 'SUBAGENT_STARTED'
             and event.hermesSessionId is not null
             and not exists (select job.id from SubagentUsageJob job
-                where job.executionId = event.executionId and job.childSessionId = event.hermesSessionId)
-            and not exists (select done.id from ExecutionEvent done
-                where done.executionId = event.executionId and done.hermesSessionId = event.hermesSessionId
-                and done.eventType = 'SUBAGENT_COMPLETED')
+                where job.profileName = parent.profileName and job.childSessionId = event.hermesSessionId)
             order by event.id
             """)
     List<ExecutionEvent> findUnscheduledChildren(@Param("since") Instant since, Pageable pageable);
