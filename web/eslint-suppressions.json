@@ -1,7 +1,2 @@
 {
-  "src/components/chat-panel.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  }
 }

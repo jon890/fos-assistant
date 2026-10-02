@@ -67,6 +67,36 @@ test("시작 사건 뒤 새 대화를 누르면 기존 메시지와 입력이 �
   expect(page.url()).not.toBe(firstUrl);
 });
 
+test("답을 만드는 중에 새 대화를 누르면 늦게 온 답이 새 대화 화면과 주소를 바꾸지 않는다", async ({ page, hermes }, testInfo) => {
+  await hermes.holdNextRun();
+  await page.goto("/");
+  await send(page, `늦은 답 ${testInfo.project.name} ${Date.now()}`);
+  await hermes.waitForHeldRun();
+  await expect(page).toHaveURL(CONVERSATION_URL);
+  const firstUrl = page.url();
+  await newConversation(page, testInfo);
+  if (testInfo.project.name === "mobile") {
+    // 서랍이 닫힌 뒤에 입력창을 본다.
+    await expect(page.getByRole("complementary", { name: "사이드바" })).toBeHidden();
+  }
+  await expect(page.getByTestId("user-message")).toHaveCount(0);
+  await hermes.releaseHeldRun();
+  // 앞 대화의 답이 저장될 때까지 기다린다. 그 뒤에도 새 대화 화면이 그대로여야 한다.
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/chat/conversations/${conversationIdOf(firstUrl)}/messages`);
+    const messages = (await response.json()) as { role: string }[];
+    return messages.some((message) => message.role === "ASSISTANT");
+  }, { timeout: 30_000 }).toBe(true);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId("user-message")).toHaveCount(0);
+  await expect(page.getByTestId("assistant-message")).toHaveCount(0);
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
+  // 늦게 온 사건이 대화 식별자를 앞 대화로 되돌렸으면 이 글이 앞 대화에 저장되고 주소가 앞 대화가 된다.
+  await send(page, `늦은 답 뒤 새 대화 ${testInfo.project.name} ${Date.now()}`);
+  await expect(page).toHaveURL(CONVERSATION_URL);
+  expect(page.url()).not.toBe(firstUrl);
+});
+
 test("존재하지 않는 주소는 새 대화 링크를 보인다", async ({ page }) => {
   await page.goto("/chat/00000000-0000-4000-8000-000000000000");
   await expect(page.getByTestId("conversation-not-found")).toBeVisible();

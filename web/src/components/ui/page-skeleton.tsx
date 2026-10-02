@@ -165,7 +165,7 @@ function TreeBody() {
 }
 
 /**
- * `/chat/{id}` 다. `chat-panel.tsx` 의 세로 배치(머리 줄, 메시지 자리, 맨 아래 입력창 자리)를 따른다.
+ * `/chat/{id}` 다. `chat/conversation-session.tsx` 의 세로 배치(머리 줄, 메시지 자리, 맨 아래 입력창 자리)를 따른다.
  * 가운데 두 줄은 `message-list.tsx` 가 메시지를 읽는 동안 그리는 뼈대와 높이·간격이 같다.
  */
 function ChatSkeleton({ width }: { width: PageSkeletonWidth }) {

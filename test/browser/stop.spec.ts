@@ -139,6 +139,23 @@ test("중지에 마우스를 올려 풀이가 열려 있어도 첫 Esc 로 답�
   await expect(page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first()).toBeVisible({ timeout: 30_000 });
 });
 
+test("닫히는 중인 풀이가 남아 있어도 Esc 로 답을 중지한다", async ({ page, hermes }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "마우스를 올려 여는 풀이는 넓은 화면에서만 확인한다");
+  await hermes.holdNextRun();
+  await beginHeldTurn(page, "닫히는 풀이 Esc 검사");
+  await hermes.waitForHeldRun();
+  await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toBeEnabled();
+  // 닫히는 움직임을 늘려 풀이가 닫힌 채 남아 있는 동안 Esc 를 누른다.
+  await page.addStyleTag({ content: '[data-slot="tooltip-content"]{animation-duration:5s !important}' });
+  await page.getByRole("button", { name: "사이드바 접기" }).hover();
+  await expect(page.getByRole("tooltip")).toHaveText("사이드바 접기");
+  await page.mouse.move(600, 300, { steps: 10 });
+  await expect(page.locator('[data-slot="tooltip-content"][data-state="closed"]')).toBeVisible();
+  await page.getByRole("textbox", { name: "메시지" }).focus();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("stopped-mark").or(page.getByTestId("no-answer")).first()).toBeVisible({ timeout: 30_000 });
+});
+
 test("좁은 화면에서 열린 서랍은 Esc 로 닫고 실행은 계속한다", async ({ page, hermes }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "좁은 화면 서랍 동작만 확인한다");
   await hermes.holdNextRun();
