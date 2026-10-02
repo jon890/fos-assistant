@@ -8,11 +8,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.HermesToolsetClient.ToolsetCatalogEntry;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -33,7 +35,7 @@ class AgentToolServiceTest {
 
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final SkillStore skillStore = mock(SkillStore.class);
-    private final AgentToolService service = new AgentToolService(toolsets, skillStore);
+    private final AgentToolService service = new AgentToolService(toolsets, skillStore, mock(AgentService.class), mock(AgentRepository.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
             "tools",
@@ -79,7 +81,8 @@ class AgentToolServiceTest {
     @DisplayName("그룹 에이전트를 읽을 수 있는 다른 사용자도 주인 등급을 바꾸지 못한다")
     void otherUserReadingGroupAgentCannotChangeOwnerTier() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
-        AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
+        AgentToolService isolatedService = new AgentToolService(
+                isolatedToolsets, mock(SkillStore.class), mock(AgentService.class), mock(AgentRepository.class));
         Agent groupAgent = Agent.of(
                 "group-tools",
                 "그룹 도구",
@@ -103,7 +106,8 @@ class AgentToolServiceTest {
     @DisplayName("그룹 에이전트를 읽을 수 있는 다른 사용자도 도구 목록을 읽지 못한다")
     void otherUserReadingGroupAgentCannotReadToolList() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
-        AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
+        AgentToolService isolatedService = new AgentToolService(
+                isolatedToolsets, mock(SkillStore.class), mock(AgentService.class), mock(AgentRepository.class));
         Agent groupAgent = Agent.of(
                 "group-read",
                 "그룹 도구",

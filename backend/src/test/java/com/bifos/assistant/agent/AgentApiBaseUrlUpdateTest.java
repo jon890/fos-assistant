@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentAdminService;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentProperties;
@@ -68,7 +69,8 @@ class AgentApiBaseUrlUpdateTest {
             mock(SkillStore.class));
 
     private final AgentAdminController controller =
-            new AgentAdminController(agents, users, currentUser, lifecycle, endpointProbe, flows);
+            new AgentAdminController(
+            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows), currentUser);
 
     private Agent agent;
 

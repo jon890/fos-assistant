@@ -2,6 +2,7 @@ package com.bifos.assistant.agent.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.HermesToolsetClient.ToolsetCatalogEntry;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 에이전트 toolset의 조회, 권한 판정, Hermes 설정 반영을 맡는다. */
 @Service
@@ -28,6 +30,8 @@ public class AgentToolService {
 
     private final HermesToolsetClient toolsets;
     private final SkillStore skillStore;
+    private final AgentService agents;
+    private final AgentRepository agentRepository;
 
     public ToolsetsView read(CurrentUser user, Agent agent) {
         requireOwnerOrAdmin(user, agent);
@@ -65,6 +69,55 @@ public class AgentToolService {
                     ErrorCode.AGENT_TOOLS_NOT_APPLIED, "Hermes did not apply the requested toolsets", missing);
         }
         return response(user, agent, catalog, applied);
+    }
+
+    /** 관리자가 다른 사람의 에이전트까지 도구 목록을 읽는다. 관리자인지는 부르는 쪽이 먼저 확인한다. */
+    public ToolsetsView readAsAdmin(CurrentUser user, String code) {
+        return read(user, requireAgent(code));
+    }
+
+    /**
+     * 요청자가 읽을 수 있는 에이전트를 잠그고 도구를 바꾼다.
+     *
+     * <p>잠금 조회와 Hermes 설정 반영이 한 트랜잭션 안에서 돈다. 잠금은 트랜잭션이 끝날 때 풀린다.
+     */
+    @Transactional
+    public ToolsetsView writeReadable(CurrentUser user, String code, List<String> enabled) {
+        return write(user, agents.requireReadableForUpdate(user, code), enabled);
+    }
+
+    /**
+     * 관리자가 다른 사람의 에이전트까지 잠그고 도구를 바꾼다. 관리자인지는 부르는 쪽이 먼저 확인한다.
+     *
+     * <p>잠금 조회와 Hermes 설정 반영이 한 트랜잭션 안에서 돈다.
+     */
+    @Transactional
+    public ToolsetsView writeAsAdmin(CurrentUser user, String code, List<String> enabled) {
+        return write(user, requireAgentForUpdate(code), enabled);
+    }
+
+    /** 관리자가 읽을 에이전트다. 지운 에이전트는 없는 에이전트와 같다. */
+    private Agent requireAgent(String code) {
+        Agent agent = agentRepository.findByCode(code)
+                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+        if (agent.isDeleted()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
+        return agent;
+    }
+
+    /**
+     * 관리자가 고칠 에이전트를 잠그고 읽는다. 지운 에이전트는 없는 에이전트와 같다.
+     *
+     * <p>지운 에이전트의 profile 은 이미 거둬졌을 수 있어 도구를 바꿀 곳이 없다.
+     */
+    private Agent requireAgentForUpdate(String code) {
+        Agent agent = agentRepository.findByCodeForUpdate(code)
+                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+        if (agent.isDeleted()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
+        return agent;
     }
 
     private static List<ToolView> views(
