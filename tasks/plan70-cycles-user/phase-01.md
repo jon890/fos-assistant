@@ -77,8 +77,8 @@ Javadoc 에 「사용자를 새로 저장한 바로 뒤, 같은 트랜잭션에�
 ### 6. 문서를 고친다
 
 - `docs/backend/packages.md` 의 「패키지와 책임」 표에서 `people` 의 책임에 「첫 로그인에 그 사람의 에이전트 만들기」 를 더한다. `user` 의 책임 「사용자와 첫 로그인 처리」 는 그대로 둔다
-- `docs/backend/people.md` 의 패키지별 책임 표에서 `user` 줄의 「첫 로그인에 에이전트까지 만든다」 를 「첫 로그인에 사용자를 만들고 `FirstSignInListener` 를 같은 트랜잭션에서 부른다」 로 고친다. 그 표의 `people` 줄에 「첫 로그인에 그 사람의 에이전트를 만든다(`FirstAgentCreator`)」 를 더한다. `people` 줄이 없으면 `user` 줄 다음에 새로 넣는다
-- ADR-068 의 `status` 줄과 `docs/adr/INDEX.md` 의 ADR-068 줄의 구현 상태 문장 끝에 「C5 가운데 첫 에이전트 만들기는 구현됐다」 를 더한다
+- `docs/backend/people.md` 의 패키지별 책임 표에서 `user` 줄의 「첫 로그인에 에이전트까지 만든다」 를 「첫 로그인에 사용자를 만들고 `FirstSignInListener` 를 같은 트랜잭션에서 부른다」 로 고친다. 그 표의 `people` 줄(「허용 목록, 사람을 더하는 흐름 전체의 조립」)의 칸 끝에 「, 첫 로그인에 그 사람의 에이전트 만들기(`FirstAgentCreator`)」 를 더한다
+- ADR-068 의 `status` 줄의 구현 상태를 「S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘을 끊었다(C5 의 첫 에이전트 만들기). 나머지 간선과 C1 부터 C4, C5 의 profile 만들기, C7 은 아직 구현 전이다」 로 고친다. `docs/adr/INDEX.md` 의 ADR-068 줄에도 `Accepted.` 뒤에 같은 문장을 적는다
 
 고친 문서에 `bash /Users/nhn/personal/fos-skills/content-preview/scripts/style-check.sh <파일>` 을 돌려 종료 코드 0 인지 본다.
 
@@ -94,9 +94,9 @@ Javadoc 에 「사용자를 새로 저장한 바로 뒤, 같은 트랜잭션에�
 
 ### 8. 이 phase 를 검증하는 테스트
 
-- `backend/src/test/java/com/bifos/assistant/user/FirstSignInTest.java` 는 `@SpringBootTest` 로 첫 로그인을 확인한다. 허용 목록에 있는 사람의 첫 요청에 사용자와 에이전트가 함께 생기는 것(정상), 허용 목록에 없는 주소는 사용자만 생기는 것(경계), 꺼진 사람은 에이전트가 생기지 않는 것을 이미 단언한다. 이 테스트가 단언을 바꾸지 않은 채 통과해야 한다. 컴파일에 필요하면 import 만 고친다
+- `backend/src/test/java/com/bifos/assistant/user/FirstSignInTest.java` 는 `@SpringBootTest` 로 첫 로그인을 확인한다. 허용 목록에 있는 사람의 첫 요청에 사용자와 에이전트가 함께 생기는 것(정상), 허용 목록에 없는 주소는 사용자만 생기는 것(경계), 꺼진 사람은 에이전트가 생기지 않는 것을 이미 단언한다. 이 테스트는 `UserProvisioningService` 를 주입받아 `resolve` 만 부르므로 고치지 않는다. 그대로 통과해야 한다
 - `backend/src/test/java/com/bifos/assistant/people/FirstAgentCreatorTest.java` 를 새로 만든다. `@SpringBootTest` 이고 `FirstSignInTest` 의 준비 방식을 따른다
-  - 실패: `AgentRepository` 저장이 예외를 내면 `UserProvisioningService.resolve` 가 그 예외를 그대로 던지고 `app_user` 에 그 주소의 줄이 남지 않는다. 저장소를 `@MockitoSpyBean` 으로 감싸 예외를 내게 한다. 같은 방식의 본보기는 `backend/src/test/java/com/bifos/assistant/skill/SkillUseRecorderTest.java` 다
+  - 실패: `AgentRepository` 저장이 예외를 내면 `UserProvisioningService.resolve` 가 그 예외를 그대로 던지고 `app_user` 에 그 주소의 줄이 남지 않는다. 저장소를 `@MockitoSpyBean` 으로 감싸 `DataIntegrityViolationException` 을 내게 한다. 주소는 허용 목록에 넣어 둔다. 테스트 클래스와 메서드에 `@Transactional` 을 두지 않는다. 두면 되돌려지는 것을 볼 수 없다. 같은 방식의 본보기는 `backend/src/test/java/com/bifos/assistant/skill/SkillUseRecorderTest.java` 다
 
 ## 검증
 
@@ -127,7 +127,6 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/user/application/UserProvisioningService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/user/application/AllowedUserResolver.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/people/FirstAgentCreatorTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/user/FirstSignInTest.java` | 수정 |
 | `docs/backend/packages.md` | 수정 |
 | `docs/backend/people.md` | 수정 |
 | `docs/adr/ADR-068-최상위-패키지는-한-방향-층-순서를-따르고-거꾸로-가는-의존은-port-나-이동으로-끊는다.md` | 수정 |
