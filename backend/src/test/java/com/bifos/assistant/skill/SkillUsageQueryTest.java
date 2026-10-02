@@ -30,6 +30,7 @@ import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -81,6 +82,9 @@ class SkillUsageQueryTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    RootExecutionQuery rootExecutions;
 
     @Autowired
     ConversationWriter conversationWriter;
@@ -140,7 +144,7 @@ class SkillUsageQueryTest {
         use(execution(dad, dadFirst), "shopping", SkillUseSource.MODEL, T1);
         use(execution(dad, dadSecond), "shopping", SkillUseSource.COMMAND, T2);
         use(execution(kid, kidOnly), "shopping", SkillUseSource.MODEL, T3);
-        controller = new UsageController(executions, currentUser, agentService, trees, conversations, query, summaries);
+        controller = new UsageController(rootExecutions, currentUser, agentService, trees, query, summaries);
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString()))
                 .thenReturn(List.of(

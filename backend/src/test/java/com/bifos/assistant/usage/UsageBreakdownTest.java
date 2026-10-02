@@ -12,13 +12,13 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.application.SkillUsageQuery;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
@@ -78,7 +78,7 @@ class UsageBreakdownTest {
     UsageSummaryService summaries;
 
     @Autowired
-    ConversationRepository conversations;
+    RootExecutionQuery rootExecutions;
 
     @Autowired
     SkillUsageQuery skillUsage;
@@ -94,7 +94,7 @@ class UsageBreakdownTest {
         career = agent(CAREER_CODE, "진로 비서");
         chore = agent(CHORE_CODE, "집안일 비서");
         controller =
-                new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage, summaries);
+                new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
         when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
         // 묶음 합계는 관리자만 받는다. 대역이어도 관리자 확인은 실제 판정을 타게 한다.
         doCallRealMethod().when(currentUser).requireAdmin();

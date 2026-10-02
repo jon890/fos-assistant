@@ -2,8 +2,6 @@ package com.bifos.assistant.usage.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -13,9 +11,10 @@ import com.bifos.assistant.usage.application.ExecutionTree;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.usage.application.MonthlyUsageSummary;
+import com.bifos.assistant.usage.application.RootExecutionPage;
+import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownView;
 import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
@@ -27,12 +26,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,11 +51,10 @@ public class UsageController {
      */
     private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
 
-    private final AgentExecutionRepository executions;
+    private final RootExecutionQuery rootExecutions;
     private final CurrentUserProvider currentUser;
     private final AgentService agents;
     private final ExecutionTreeService executionTrees;
-    private final ConversationRepository conversations;
     private final SkillUsageQuery skillUsage;
     private final UsageSummaryService summaries;
 
@@ -76,10 +71,10 @@ public class UsageController {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
         CurrentUser user = currentUser.require();
         boolean internal = InternalValuePolicy.visibleTo(user);
-        List<AgentExecution> page =
-                executions.findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(user.id(), PageRequest.of(0, size));
-        Set<Long> withChildren = idsHavingChildren(page);
-        Map<Long, UUID> publicIds = conversationPublicIds(page);
+        RootExecutionPage rootPage = rootExecutions.page(user.id(), size);
+        List<AgentExecution> page = rootPage.executions();
+        Set<Long> withChildren = rootPage.idsHavingChildren();
+        Map<Long, UUID> publicIds = rootPage.conversationPublicIds();
         // 한 페이지의 실행 번호로 한 번에 읽는다. 줄마다 질의하지 않는다.
         Map<Long, List<String>> skillNames = skillUsage.skillNamesByExecution(
                 page.stream().map(AgentExecution::id).toList());
@@ -110,37 +105,6 @@ public class UsageController {
         return skillUsage.byUser(user.id()).stream()
                 .map(usage -> MySkillUsageView.from(usage, internal))
                 .toList();
-    }
-
-    /**
-     * 목록의 대화 번호를 공개 식별자로 한 번에 바꾼다.
-     *
-     * <p>실행마다 읽으면 질의가 목록 길이만큼 늘어난다. 대화 번호가 하나도 없으면 부르지 않는다.
-     */
-    private Map<Long, UUID> conversationPublicIds(List<AgentExecution> page) {
-        Set<Long> ids = page.stream()
-                .map(AgentExecution::conversationId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        return conversations.findAllById(ids).stream()
-                .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
-    }
-
-    /**
-     * 목록의 실행 중 자식을 가진 것을 한 번에 읽는다.
-     *
-     * <p>실행마다 세면 질의가 목록 길이만큼 늘어난다. 목록이 비면 부르지 않는다. 빈 {@code in} 절은
-     * 데이터베이스마다 다르게 동작한다.
-     */
-    private Set<Long> idsHavingChildren(List<AgentExecution> page) {
-        if (page.isEmpty()) {
-            return Set.of();
-        }
-        return Set.copyOf(executions.findParentIdsHavingChildren(
-                page.stream().map(AgentExecution::id).toList()));
     }
 
     /**

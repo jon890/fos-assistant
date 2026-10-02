@@ -12,7 +12,6 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
@@ -22,6 +21,7 @@ import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.usage.application.ExecutionTreeService;
+import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
@@ -70,7 +70,7 @@ class UsageControllerTest {
     UsageSummaryService summaries;
 
     @Autowired
-    ConversationRepository conversations;
+    RootExecutionQuery rootExecutions;
 
     @Autowired
     SkillUsageQuery skillUsage;
@@ -100,7 +100,7 @@ class UsageControllerTest {
                         USER_ID,
                         Instant.now())));
         controller =
-                new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage, summaries);
+                new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
         doCallRealMethod().when(currentUser).requireAdmin();
         signInAs(UserRole.ADMIN);
