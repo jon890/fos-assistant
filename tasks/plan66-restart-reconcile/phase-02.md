@@ -157,3 +157,5 @@ cd backend && ./gradlew checkstyleMain checkstyleTest
 | `backend/src/main/java/com/bifos/assistant/chat/application/model/RecoveredRunKind.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunRecorder.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/RecoveredRunRecorderTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerConnectorContextTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerSubmitFailureTest.java` | 수정 |
