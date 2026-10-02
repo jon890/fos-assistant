@@ -24,6 +24,7 @@ const ROUTE_FRAMES: Record<string, string> = {
   "admin/usage": "components/usage/usage-screen.tsx",
   "executions/[id]": "app/executions/[id]/page.tsx",
   "admin/executions/[id]": "app/admin/executions/[id]/page.tsx",
+  "admin/models": "components/admin/model-admin-panel.tsx",
   "admin/people": "app/admin/people/people-admin-panel.tsx",
   "chat/[conversationId]": "components/chat/message-list.tsx",
   "c/[conversationId]": "components/chat/message-list.tsx",

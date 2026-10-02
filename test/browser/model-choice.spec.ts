@@ -284,7 +284,9 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
   ]);
 });
 
-test("관리자에게만 그룹 모델 설정을 보인다", async ({ page }) => {
+test("관리자도 대화 화면의 설정 창에서는 그룹 모델 설정을 보지 않는다", async ({
+  page,
+}) => {
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers",
     (route) =>
@@ -295,12 +297,13 @@ test("관리자에게만 그룹 모델 설정을 보인다", async ({ page }) =>
 
   await page.goto("/");
   await tierSettings(page).click();
+  await expect(picker(page)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "그룹 모델 설정" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
-test("그룹 모델 설정 창은 그룹 기본 단계를 단계별 모델보다 위에 보인다", async ({
+test("그룹 모델 설정은 그룹 기본 단계를 단계별 모델보다 위에 보인다", async ({
   page,
 }) => {
   await page.route(
@@ -308,15 +311,13 @@ test("그룹 모델 설정 창은 그룹 기본 단계를 단계별 모델보다
     (route) => route.fulfill({ json: { ...TIERS, admin: true } }),
   );
 
-  await page.goto("/");
-  await tierSettings(page).click();
-  await page.getByRole("button", { name: "그룹 모델 설정" }).click();
+  await page.goto("/admin/models");
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
-  const defaultHeading = groupDialog.getByRole("heading", {
+  const groupSection = page.getByRole("region", { name: "그룹 모델 설정" });
+  const defaultHeading = groupSection.getByRole("heading", {
     name: "그룹 기본 단계",
   });
-  const tiersHeading = groupDialog.getByRole("heading", {
+  const tiersHeading = groupSection.getByRole("heading", {
     name: "단계별 모델",
   });
   await expect(defaultHeading).toBeVisible();
@@ -444,22 +445,22 @@ test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저�
     },
   );
 
-  await page.goto("/");
-  await tierSettings(page).click();
-  await page.getByRole("button", { name: "그룹 모델 설정" }).click();
+  await page.goto("/admin/models");
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
-  const model = groupDialog.getByLabel("모델", { exact: true }).first();
+  const groupSection = page.getByRole("region", { name: "그룹 모델 설정" });
+  const model = groupSection.getByLabel("모델", { exact: true }).first();
   await model.fill("example-retry");
-  await groupDialog.getByRole("button", { name: "저장" }).click();
-  const failedAlert = groupDialog.getByRole("alert");
+  await groupSection.getByRole("button", { name: "저장" }).click();
+  const failedAlert = groupSection.getByRole("alert");
   await expect(failedAlert).toHaveText(
     "그룹 모델 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   );
   await expect(model).toHaveValue("example-retry");
 
-  await groupDialog.getByRole("button", { name: "저장" }).click();
-  await expect(groupDialog).toHaveCount(0);
+  await groupSection.getByRole("button", { name: "저장" }).click();
+  await expect(
+    groupSection.getByText("저장했어요", { exact: true }),
+  ).toBeVisible();
   await expect(failedAlert).toHaveCount(0);
 });
 
@@ -499,25 +500,26 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
 
   await tierSettings(page).click();
   const settingsDialog = page.getByRole("dialog", { name: "모델 단계 설정" });
+  await expect(settingsDialog).toBeVisible();
   await expect(
     settingsDialog.getByText("단계별 모델을 아직 정하지 않았어요."),
-  ).toBeVisible();
-  await settingsDialog.getByRole("button", { name: "그룹 모델 설정" }).click();
+  ).toHaveCount(0);
 
-  const groupDialog = page.getByRole("dialog", { name: "그룹 모델 설정" });
+  await page.goto("/admin/models");
+  const groupSection = page.getByRole("region", { name: "그룹 모델 설정" });
   await expect(
-    groupDialog.getByText("단계별 모델을 아직 정하지 않았어요."),
+    groupSection.getByText("단계별 모델을 아직 정하지 않았어요."),
   ).toBeVisible();
   await expect(
-    groupDialog.getByLabel("모델", { exact: true }).first(),
+    groupSection.getByLabel("모델", { exact: true }).first(),
   ).toHaveValue("");
   await expect(
-    groupDialog.getByLabel("강도", { exact: true }).first(),
+    groupSection.getByLabel("강도", { exact: true }).first(),
   ).toHaveValue("");
-  await expect(groupDialog.getByLabel("그룹 기본 단계")).toHaveValue(
+  await expect(groupSection.getByLabel("그룹 기본 단계")).toHaveValue(
     "BALANCED",
   );
-  await groupDialog.getByRole("button", { name: "저장" }).click();
+  await groupSection.getByRole("button", { name: "저장" }).click();
 
   await expect
     .poll(() => savedBodies)

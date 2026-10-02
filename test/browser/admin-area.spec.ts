@@ -215,6 +215,45 @@ test("MEMBER 역할이 관리자 영역의 사용량 주소를 열면 홈으로 
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("ADMIN 역할의 대화 화면 설정 창에는 그룹 모델 설정 단추가 없다", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("model-tier-settings").click();
+  await expect(page.getByRole("dialog", { name: "모델 단계 설정" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "그룹 모델 설정" })).toHaveCount(0);
+});
+
+test("관리자 영역의 모델 화면에서 그룹 기본 단계를 저장하면 새로 고쳐도 남고 모델 숨김 양식이 보인다", async ({ page }) => {
+  await page.goto("/admin/models");
+  await expect(page.getByRole("heading", { name: "모델", exact: true, level: 1 })).toBeVisible();
+  const hidden = page.getByRole("region", { name: "모델 숨김" });
+  await expect(hidden.getByRole("heading", { name: "모델 숨김", exact: true })).toBeVisible();
+  await expect(hidden.getByRole("button", { name: "저장" })).toBeVisible();
+
+  const section = page.getByRole("region", { name: "그룹 모델 설정" });
+  const defaultTier = section.getByLabel("그룹 기본 단계");
+  await expect(defaultTier).toHaveValue("");
+  try {
+    await defaultTier.selectOption("BALANCED");
+    await section.getByRole("button", { name: "저장" }).click();
+    await expect(section.getByText("저장했어요", { exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(defaultTier).toHaveValue("BALANCED");
+  } finally {
+    // 다른 검사가 그룹 기본 단계가 없다고 보고 돌므로 원래대로 되돌린다.
+    await page.goto("/admin/models");
+    await defaultTier.selectOption("");
+    await section.getByRole("button", { name: "저장" }).click();
+    await expect(section.getByText("저장했어요", { exact: true })).toBeVisible();
+  }
+});
+
+test("MEMBER 역할이 관리자 영역의 모델 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
+  await setSession(context, { email: "member@example.com", name: "가족 사용자" });
+  await page.goto("/admin/models");
+  await expect(page).toHaveURL(/\/$/);
+});
+
 /** `terminal` 도구를 쓴 실행 하나짜리 응답이다. 모델과 토큰과 도구 결과의 원본이 실려 있다. */
 function terminalFixture() {
   const event = (sequence: number, eventType: string, detail: string) => ({
