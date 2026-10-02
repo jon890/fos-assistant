@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { forwardControlPlane } from "@/lib/control-plane";
 import { isConversationId } from "@/lib/conversation-id";
+import { errorResponse } from "@/lib/api-response";
 
 type RouteContext = {
   params: Promise<{ conversationId: string; path: string[] }>;
@@ -25,10 +26,7 @@ const FORWARDED_HEADERS = [
 const CONDITIONAL_REQUEST_HEADERS = ["if-none-match", "if-modified-since"];
 
 function badRequest() {
-  return NextResponse.json(
-    { code: "VALIDATION_FAILED", message: "대화 주소나 파일 경로가 올바르지 않아요." },
-    { status: 400 },
-  );
+  return errorResponse("VALIDATION_FAILED", "대화 주소나 파일 경로가 올바르지 않아요.", 400);
 }
 
 /**
@@ -53,7 +51,7 @@ export async function GET(request: Request, context: RouteContext) {
     { method: "GET", headers: conditional },
   );
   if (!opened.ok) {
-    return NextResponse.json({ code: opened.code, message: opened.message }, { status: opened.status });
+    return errorResponse(opened.code, opened.message, opened.status);
   }
 
   const upstream = opened.response;

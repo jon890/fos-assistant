@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { readJsonBody } from "@/lib/json-body";
+import { errorResponse } from "@/lib/api-response";
 
 function response(result: Awaited<ReturnType<typeof callControlPlane>>) {
   if (!result.ok) {
-    return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
+    return errorResponse(result.code, result.message, result.status);
   }
   return NextResponse.json(result.data);
 }

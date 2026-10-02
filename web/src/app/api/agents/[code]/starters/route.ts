@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
+import { errorResponse } from "@/lib/api-response";
 
 export async function GET(_request: Request, context: { params: Promise<{ code: string }> }) {
   const { code } = await context.params;
   if (!AGENT_CODE_PATTERN.test(code)) {
-    return NextResponse.json({ code: "VALIDATION_FAILED", message: "에이전트 코드 형식이 올바르지 않아요." }, { status: 400 });
+    return errorResponse("VALIDATION_FAILED", "에이전트 코드 형식이 올바르지 않아요.", 400);
   }
   const result = await callControlPlane(`/api/v1/agents/${code}/starters`);
   if (!result.ok) {
-    return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
+    return errorResponse(result.code, result.message, result.status);
   }
   return NextResponse.json(result.data);
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { readJsonBody } from "@/lib/json-body";
+import { errorResponse } from "@/lib/api-response";
 
 async function idOf(context: { params: Promise<{ id: string }> }): Promise<number | null> {
   const { id } = await context.params;
@@ -8,11 +9,11 @@ async function idOf(context: { params: Promise<{ id: string }> }): Promise<numbe
 }
 
 function invalid() {
-  return NextResponse.json({ code: "VALIDATION_FAILED", message: "기억 번호가 올바르지 않아요." }, { status: 400 });
+  return errorResponse("VALIDATION_FAILED", "기억 번호가 올바르지 않아요.", 400);
 }
 
 function response(result: Awaited<ReturnType<typeof callControlPlane>>) {
-  if (!result.ok) return NextResponse.json({ code: result.code, message: result.message }, { status: result.status });
+  if (!result.ok) return errorResponse(result.code, result.message, result.status);
   return result.data === null ? new NextResponse(null, { status: result.status }) : NextResponse.json(result.data);
 }
 

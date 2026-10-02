@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requestControlPlane } from "@/lib/control-plane";
 import { readJsonBody } from "@/lib/json-body";
 import { isConversationId } from "@/lib/conversation-id";
+import { errorResponse } from "@/lib/api-response";
 
 export async function POST(request: Request) {
   const parsed = await readJsonBody(request);
@@ -13,16 +14,10 @@ export async function POST(request: Request) {
     attachmentIds?: number[];
   };
   if (!body.text || body.text.trim().length === 0) {
-    return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "보낼 내용을 입력해 주세요." },
-      { status: 400 },
-    );
+    return errorResponse("VALIDATION_FAILED", "보낼 내용을 입력해 주세요.", 400);
   }
   if (body.conversationId != null && !isConversationId(body.conversationId)) {
-    return NextResponse.json(
-      { code: "VALIDATION_FAILED", message: "대화 주소가 올바르지 않아요." },
-      { status: 400 },
-    );
+    return errorResponse("VALIDATION_FAILED", "대화 주소가 올바르지 않아요.", 400);
   }
 
   const opened = await requestControlPlane("/api/v1/chat/messages/stream", {
@@ -35,10 +30,7 @@ export async function POST(request: Request) {
     },
   });
   if (!opened.ok) {
-    return NextResponse.json(
-      { code: opened.code, message: opened.message },
-      { status: opened.status },
-    );
+    return errorResponse(opened.code, opened.message, opened.status);
   }
 
   const upstream = opened.response;

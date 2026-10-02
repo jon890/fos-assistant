@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { readJsonBody } from "@/lib/json-body";
+import { errorResponse } from "@/lib/api-response";
 
 /** 대화 목록 한 쪽이다. `cursor` 와 `limit` 만 Control Plane 에 넘긴다. */
 export async function GET(request: Request) {
@@ -15,10 +16,7 @@ export async function GET(request: Request) {
     `/api/v1/chat/conversations${suffix}`,
   );
   if (!result.ok) {
-    return NextResponse.json(
-      { code: result.code, message: result.message },
-      { status: result.status },
-    );
+    return errorResponse(result.code, result.message, result.status);
   }
   return NextResponse.json(result.data);
 }
@@ -37,10 +35,7 @@ export async function POST(request: Request) {
     },
   );
   if (!result.ok) {
-    return NextResponse.json(
-      { code: result.code, message: result.message },
-      { status: result.status },
-    );
+    return errorResponse(result.code, result.message, result.status);
   }
   return NextResponse.json(result.data);
 }
