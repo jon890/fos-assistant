@@ -40,7 +40,7 @@ import org.springframework.validation.annotation.Validated;
  * backend 의 구조 규칙이다. 문서는 규칙을 이 클래스의 상수 이름으로 가리킨다.
  *
  * <p>규칙의 {@code as(...)} 설명이 기준 파일의 열쇠다. 설명을 바꾸면 그 규칙을 다시 얼린다.
- * 기준 파일을 갱신하는 방법은 {@code backend/AGENTS.md} 의 「구조 규칙」 절에 있다.
+ * 기준 파일을 갱신하는 방법은 {@code docs/backend/quality.md} 의 「구조 규칙의 기준 파일」 절에 있다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ArchitectureRules {
@@ -78,7 +78,7 @@ public final class ArchitectureRules {
      * 아래 층이 위 층을 쓰는 것과 {@code presentation} 이 {@code infra} 를 바로 쓰는 것을 막는다.
      * 컨트롤러가 저장소를 바로 쓰면 권한 확인과 트랜잭션 경계를 서비스가 갖지 못한다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「패키지 배치」, {@code docs/backend/packages.md} 「backend 패키지」.
+     * <p>근거: {@code docs/backend/packages.md} 「backend 패키지」.
      */
     public static final ArchRule LAYER_DIRECTION = layeredArchitecture()
             .consideringOnlyDependenciesInLayers()
@@ -102,8 +102,9 @@ public final class ArchitectureRules {
 
     /**
      * {@code domain} 은 웹 계층의 타입에 의존하지 않는다.
+     * Spring Web, HTTP, Servlet 타입과 {@code presentation} 을 쓰지 않는다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「패키지 배치」, {@code docs/backend/packages.md} 「backend 패키지」.
+     * <p>근거: {@code docs/backend/packages.md} 「backend 패키지」.
      */
     public static final ArchRule DOMAIN_DOES_NOT_DEPEND_ON_WEB = noClasses()
             .that()
@@ -133,6 +134,7 @@ public final class ArchitectureRules {
 
     /**
      * {@code mcp} 는 Hermes 를 부르는 타입에 의존하지 않는다.
+     * 이름이 {@code Client} 로 끝나는 타입과 {@code HermesRunEventStream}, {@code HermesProfileKeyStore} 가 대상이다.
      * {@code hermes.HermesProfileName} 같은 이름 규칙 값은 허용한다.
      *
      * <p>근거: {@code docs/backend/agent-delegation.md} 「다른 에이전트에게 맡기기」 의 「MCP 쪽은 Hermes 를 부르지 않는다」.
@@ -203,6 +205,7 @@ public final class ArchitectureRules {
     /**
      * {@code @Test} 와 {@code @ParameterizedTest} 메서드에는 {@code @DisplayName} 이 붙는다.
      * 메서드 이름은 영문 camelCase 이고, 테스트 보고서에 보이는 한국어 문장은 {@code @DisplayName} 이 갖는다.
+     * 테스트 클래스만 읽는다.
      *
      * <p>근거: {@code backend/AGENTS.md} 「테스트」 의 「테스트 이름」.
      */
@@ -218,9 +221,8 @@ public final class ArchitectureRules {
     /**
      * {@code application} 밖의 클래스와 메서드에는 {@code @Transactional} 을 붙이지 않는다.
      * Spring 과 Jakarta 의 두 {@code @Transactional} 을 모두 막는다.
-     * 트랜잭션 경계는 유스케이스를 아는 층이 정한다. 컨트롤러와 저장소에 두면 경계가 둘로 갈린다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「구조 규칙」.
+     * <p>근거: 트랜잭션 경계는 유스케이스를 아는 층이 정한다. 컨트롤러와 저장소에 두면 경계가 둘로 갈린다.
      */
     public static final ArchRule TRANSACTIONAL_ONLY_IN_APPLICATION = CompositeArchRule.of(noClasses()
                     .that()
@@ -248,18 +250,17 @@ public final class ArchitectureRules {
 
     /**
      * {@code Instant.now()} 를 직접 부르지 않는다.
-     * 시각을 주입받아야 테스트가 시각을 고정한다. {@code Clock} 을 받는 {@code Instant.now(Clock)} 은 허용한다.
+     * {@code Clock} 을 받는 {@code Instant.now(Clock)} 은 허용한다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「구조 규칙」.
+     * <p>근거: 시각을 주입받아야 테스트가 시각을 고정한다.
      */
     public static final ArchRule NO_DIRECT_INSTANT_NOW =
             noClasses().should().callMethod(Instant.class, "now").as("Instant.now() 를 직접 부르지 않는다");
 
     /**
      * {@code MessageDigest.getInstance} 는 {@code shared.util.Sha256} 만 부른다.
-     * 해시 구현을 한 곳에 둔다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「구조 규칙」.
+     * <p>근거: 해시 구현을 한 곳에 둔다.
      */
     public static final ArchRule MESSAGE_DIGEST_ONLY_IN_SHA256 = noClasses()
             .that()
@@ -270,9 +271,8 @@ public final class ArchitectureRules {
 
     /**
      * {@code @ConfigurationProperties} 클래스에는 {@code @Validated} 도 붙는다.
-     * 잘못된 설정은 기동에서 멈춘다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「구조 규칙」.
+     * <p>근거: 잘못된 설정은 기동에서 멈춘다.
      */
     public static final ArchRule CONFIGURATION_PROPERTIES_ARE_VALIDATED = classes()
             .that()
@@ -287,7 +287,7 @@ public final class ArchitectureRules {
      * {@code private} 이다. 익명 클래스와 지역 클래스는 대상이 아니다.
      * 서비스가 돌려주는 모델은 서비스 파일 밖으로 뺀다. 캐시 키 같은 구현 세부는 {@code private} 으로 둔다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「데이터 클래스는 컨트롤러 안에 두지 않는다」 와 같은 까닭이다.
+     * <p>근거: 서비스가 돌려주는 모델을 서비스 안에 두면 그 모델을 쓰는 쪽이 서비스를 import 하게 된다.
      */
     public static final ArchRule SERVICES_DO_NOT_EXPOSE_NESTED_TYPES = classes()
             .that()
@@ -300,11 +300,10 @@ public final class ArchitectureRules {
 
     /**
      * 엔티티의 {@code @Enumerated} 필드 타입은 {@code ..domain.type..} 에 둔다.
-     * 저장되는 값은 바꾸면 마이그레이션을 판단해야 하므로 한곳에 모아 보이게 한다.
      * 저장되지 않는 서비스 결과와 화면용 enum 은 {@code <기능>.application.model} 에 두고,
      * {@code ErrorCode} 는 {@code shared.error} 에 둔다. 이 둘은 규칙으로 검사하지 않는다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「구조 규칙」.
+     * <p>근거: 저장되는 값은 바꾸면 마이그레이션을 판단해야 하므로 한곳에 모아 보이게 한다.
      */
     public static final ArchRule ENUMERATED_FIELDS_USE_DOMAIN_TYPE = fields().that()
             .areAnnotatedWith(Enumerated.class)
@@ -318,9 +317,8 @@ public final class ArchitectureRules {
 
     /**
      * {@code ..domain.type..} 의 클래스는 {@code application}, {@code infra}, {@code presentation} 에 의존하지 않는다.
-     * 저장되는 enum 은 가장 아래 층이다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「구조 규칙」.
+     * <p>근거: 저장되는 enum 은 가장 아래 층이다.
      */
     public static final ArchRule DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE = noClasses()
             .that()
