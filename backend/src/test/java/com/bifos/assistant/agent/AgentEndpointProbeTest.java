@@ -32,7 +32,9 @@ class AgentEndpointProbeTest {
 
     @AfterEach
     void stop() {
-        if (server != null) server.stop(0);
+        if (server != null) {
+            server.stop(0);
+        }
     }
 
     @Test

@@ -21,8 +21,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -33,10 +33,9 @@ import org.springframework.stereotype.Service;
  * 있다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ArtifactService {
-
-    private static final Logger log = LoggerFactory.getLogger(ArtifactService.class);
 
     private final ArtifactStore store;
     private final ChatArtifactRepository artifacts;

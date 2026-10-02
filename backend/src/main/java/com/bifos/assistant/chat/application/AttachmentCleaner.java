@@ -6,8 +6,8 @@ import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -19,9 +19,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class AttachmentCleaner {
-
-    private static final Logger log = LoggerFactory.getLogger(AttachmentCleaner.class);
 
     private final ChatAttachmentRepository attachments;
     private final AttachmentStore store;

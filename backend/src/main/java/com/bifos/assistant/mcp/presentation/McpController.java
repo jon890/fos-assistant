@@ -67,7 +67,9 @@ public class McpController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         JsonNode id = request.get("id"); String method = request.path("method").asString();
-        if ("notifications/initialized".equals(method)) return ResponseEntity.status(HttpStatus.ACCEPTED).build();
+        if ("notifications/initialized".equals(method)) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED).build();
+        }
         return ResponseEntity.ok(switch (method) {
             case "initialize" -> response(id, Map.of("protocolVersion", "2025-03-26", "capabilities", Map.of("tools", Map.of("listChanged", false)), "serverInfo", Map.of("name", AgentToolPolicy.CONTROL_PLANE_MCP, "version", buildProperties.getVersion())));
             case "tools/list" -> response(id, Map.of("tools", tools.tools()));
@@ -75,6 +77,7 @@ public class McpController {
             default -> error(id, -32601, "Method not found");
         });
     }
+
     /**
      * 도구 호출을 네 단계로 판정한다. 모든 도구가 같은 순서를 지난다.
      *
@@ -101,7 +104,9 @@ public class McpController {
         try {
             caller = callers.resolve(principal, toolName, fosCtx);
         } catch (ApiException ex) {
-            if (ex.code() != ErrorCode.MCP_CALL_CONTEXT_INVALID) throw ex;
+            if (ex.code() != ErrorCode.MCP_CALL_CONTEXT_INVALID) {
+                throw ex;
+            }
             return response(id, tools.invalidContext());
         }
         return handler.handle(caller, id, withoutCallContext(arguments));
@@ -114,7 +119,9 @@ public class McpController {
      * hook 이 더한 키를 도구 규격으로 검증하지 않는다. 받은 노드는 바꾸지 않는다.
      */
     private static JsonNode withoutCallContext(JsonNode arguments) {
-        if (!arguments.has(McpCallContext.FIELD)) return arguments;
+        if (!arguments.has(McpCallContext.FIELD)) {
+            return arguments;
+        }
         ObjectNode copy = ((ObjectNode) arguments).deepCopy();
         copy.remove(McpCallContext.FIELD);
         return copy;
@@ -130,18 +137,24 @@ public class McpController {
 
     /** 인자가 없는 도구다. {@code _fos_ctx} 를 뗀 뒤 키가 하나라도 남으면 인자 오류다. */
     private Map<String, Object> listAgents(McpCaller caller, JsonNode id, JsonNode arguments) {
-        if (!arguments.isEmpty()) return invalidParams(id, INVALID_ARGUMENTS);
+        if (!arguments.isEmpty()) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
         return response(id, tools.listAgents(caller));
     }
 
     private Map<String, Object> agentStatus(McpCaller caller, JsonNode id, JsonNode arguments) {
-        if (!onlyExecutionId(arguments)) return invalidParams(id, INVALID_ARGUMENTS);
+        if (!onlyExecutionId(arguments)) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
         return response(id, tools.agentStatus(caller, arguments.get("execution_id").longValue()));
     }
 
     /** 인자는 {@code agent_status} 와 같이 정수 {@code execution_id} 하나뿐이다. */
     private Map<String, Object> agentStop(McpCaller caller, JsonNode id, JsonNode arguments) {
-        if (!onlyExecutionId(arguments)) return invalidParams(id, INVALID_ARGUMENTS);
+        if (!onlyExecutionId(arguments)) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
         return response(id, tools.agentStop(caller, arguments.get("execution_id").longValue()));
     }
 
@@ -172,7 +185,9 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         String conversationId = arguments.get("conversation_id").asString();
-        if (!UUID_TEXT.matcher(conversationId).matches()) return invalidParams(id, INVALID_ARGUMENTS);
+        if (!UUID_TEXT.matcher(conversationId).matches()) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
         UUID parsed;
         try {
             parsed = UUID.fromString(conversationId);
@@ -207,7 +222,9 @@ public class McpController {
     /** 내부 예외 문구를 그대로 내보내지 않고, 정해 둔 오류 이유만 반환한다. */
     private static String artifactValidationReason(ApiException exception) {
         String message = exception.getMessage();
-        if (message == null) return INVALID_ARGUMENTS;
+        if (message == null) {
+            return INVALID_ARGUMENTS;
+        }
         return switch (message) {
             case "inline artifact content must be HTML or CSS", "URL artifact path must be an image" -> "허용하지 않은 확장자입니다.";
             case "artifact path is invalid", "artifact path is required" -> "경로 형식이 올바르지 않습니다.";
@@ -224,6 +241,8 @@ public class McpController {
     }
 
     private static Map<String, Object> response(JsonNode id, Map<String, Object> result) { Map<String, Object> body = base(id); body.put("result", result); return body; }
+
     private static Map<String, Object> error(JsonNode id, int code, String message) { Map<String, Object> body = base(id); body.put("error", Map.of("code", code, "message", message)); return body; }
+
     private static Map<String, Object> base(JsonNode id) { Map<String, Object> body = new LinkedHashMap<>(); body.put("jsonrpc", "2.0"); body.put("id", id); return body; }
 }

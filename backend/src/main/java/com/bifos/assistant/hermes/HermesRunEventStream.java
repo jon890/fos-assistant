@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.dto.RunEvent;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -52,7 +53,7 @@ public class HermesRunEventStream {
             String profileName,
             String runId,
             Consumer<RunEvent> onEvent,
-            Consumer<java.io.Closeable> onOpened) {
+            Consumer<Closeable> onOpened) {
         open(apiBaseUrl, profileName, runId, onEvent, onOpened, false);
     }
 
@@ -61,7 +62,7 @@ public class HermesRunEventStream {
             String profileName,
             String runId,
             Consumer<RunEvent> onEvent,
-            Consumer<java.io.Closeable> onOpened,
+            Consumer<Closeable> onOpened,
             boolean connectorManaged) {
         String apiKey = keyStore.resolve(profileName);
         try (InputStream body = restClient

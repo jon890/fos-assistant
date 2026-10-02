@@ -13,8 +13,8 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,10 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>토큰은 profile 만 증명한다(ADR-032). profile 이 빈 토큰은 인증하지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AgentTokenService {
-    private static final Logger log = LoggerFactory.getLogger(AgentTokenService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
     private final AgentTokenRepository tokens;
 

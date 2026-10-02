@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -19,22 +20,21 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /** 이 프로세스에서 도는 대화 turn 과 Hermes 실행 중지 상태를 함께 관리한다. */
 @Component
+@Slf4j
 public class TurnCancellation {
-
-    private static final Logger log = LoggerFactory.getLogger(TurnCancellation.class);
     private final ConcurrentHashMap<Long, TurnHandle> byConversation = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, TurnHandle> byExecution = new ConcurrentHashMap<>();
     private final HermesRunsClient hermes;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Duration streamGrace;
-    private final List<Consumer<TurnClosed>> closeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<Consumer<TurnClosed>> closeListeners = new CopyOnWriteArrayList<>();
 
     public TurnCancellation(
             HermesRunsClient hermes, @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace) {
@@ -111,7 +111,9 @@ public class TurnCancellation {
 
     public void close(TurnHandle handle) {
         boolean removed = byConversation.remove(handle.conversationId, handle);
-        if (handle.executionId != null) byExecution.remove(handle.executionId, handle);
+        if (handle.executionId != null) {
+            byExecution.remove(handle.executionId, handle);
+        }
         // 실행 번호가 붙기 전에 중지한 turn 은 새 run 없이 끝날 수 있다. 이 경우 중지 요청은
         // 성공으로 끝난 것이며, 이미 끝난 turn 과 구분해야 한다.
         handle.firstStop.complete(handle.cancelled.get() && !handle.finished.get());
@@ -162,9 +164,13 @@ public class TurnCancellation {
 
     /** Hermes 에 중지 요청을 보내지 못하면 turn 을 원래 실행 상태로 되돌린다. */
     public void resume(TurnHandle handle) {
-        if (!handle.cancelled.compareAndSet(true, false)) return;
+        if (!handle.cancelled.compareAndSet(true, false)) {
+            return;
+        }
         ScheduledFuture<?> closeTask = handle.closeTask;
-        if (closeTask != null) closeTask.cancel(false);
+        if (closeTask != null) {
+            closeTask.cancel(false);
+        }
         handle.streamGraceExpired = new CompletableFuture<>();
         handle.firstStop = new CompletableFuture<>();
         handle.stopConfirmed.set(false);
@@ -172,7 +178,9 @@ public class TurnCancellation {
 
     /** Hermes 중지 요청이 모두 받아들여진 뒤에만 실행 경로가 취소로 분기한다. */
     public void confirmStop(TurnHandle handle) {
-        if (!handle.cancelled.get() || !handle.stopConfirmed.compareAndSet(false, true)) return;
+        if (!handle.cancelled.get() || !handle.stopConfirmed.compareAndSet(false, true)) {
+            return;
+        }
         handle.closeTask = scheduler.schedule(
                 () -> {
                     handle.streamGraceExpired.complete(null);
@@ -195,7 +203,9 @@ public class TurnCancellation {
 
     public boolean trackRun(Long executionId, String apiBaseUrl, String profileName, String runId) {
         TurnHandle handle = byExecution.get(executionId);
-        if (handle == null) return true;
+        if (handle == null) {
+            return true;
+        }
         RunRef run;
         synchronized (handle.runs) {
             run = handle.runs.stream()
@@ -207,9 +217,13 @@ public class TurnCancellation {
                 handle.runs.add(run);
             }
         }
-        if (!handle.cancelled.get()) return true;
+        if (!handle.cancelled.get()) {
+            return true;
+        }
         boolean sent = stopRun(run);
-        if (sent) confirmStop(handle);
+        if (sent) {
+            confirmStop(handle);
+        }
         handle.firstStop.complete(sent);
         return sent;
     }
@@ -217,7 +231,9 @@ public class TurnCancellation {
     /** 완료된 실행은 이후 자식을 멈출 때 다시 중지하지 않는다. */
     public void untrackRun(Long executionId, String runId) {
         TurnHandle handle = byExecution.get(executionId);
-        if (handle == null || runId == null) return;
+        if (handle == null || runId == null) {
+            return;
+        }
         handle.runs.removeIf(run -> run.runId.equals(runId));
     }
 
@@ -228,7 +244,9 @@ public class TurnCancellation {
     /** 같은 run 에 중지를 두 번 보내지 않고, 실패한 run 은 다음 요청에서 다시 보낸다. */
     public boolean stopRun(RunRef run) {
         synchronized (run) {
-            if (run.stopSent.get()) return true;
+            if (run.stopSent.get()) {
+                return true;
+            }
             try {
                 hermes.stop(run.apiBaseUrl, run.profileName, run.runId);
                 run.stopSent.set(true);
@@ -283,7 +301,9 @@ public class TurnCancellation {
 
     private void closeStream(TurnHandle handle) {
         Closeable stream = handle.stream;
-        if (stream == null) return;
+        if (stream == null) {
+            return;
+        }
         try {
             stream.close();
         } catch (Exception ex) {
@@ -299,7 +319,7 @@ public class TurnCancellation {
         private final AtomicBoolean stopConfirmed = new AtomicBoolean();
         private final AtomicBoolean finished = new AtomicBoolean();
         private final AtomicBoolean stopped = new AtomicBoolean();
-        private final List<RunRef> runs = new java.util.concurrent.CopyOnWriteArrayList<>();
+        private final List<RunRef> runs = new CopyOnWriteArrayList<>();
         private volatile Long executionId;
         private volatile Closeable stream;
         private volatile CompletableFuture<Boolean> firstStop = new CompletableFuture<>();

@@ -37,12 +37,24 @@ public class AgentToken {
     }
 
     public void markUsed() { lastUsedAt = Instant.now(); }
-    public void revoke() { if (revokedAt == null) revokedAt = Instant.now(); }
+
+    public void revoke() {
+        if (revokedAt == null) {
+            revokedAt = Instant.now();
+        }
+    }
+
     public Long id() { return id; }
+
     public String profileName() { return profileName; }
+
     public String tokenHash() { return tokenHash; }
+
     public String label() { return label; }
+
     public Instant createdAt() { return createdAt; }
+
     public Instant lastUsedAt() { return lastUsedAt; }
+
     public Instant revokedAt() { return revokedAt; }
 }

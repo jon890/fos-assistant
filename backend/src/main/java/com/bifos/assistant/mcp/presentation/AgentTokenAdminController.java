@@ -21,7 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AgentTokenAdminController {
     private final AgentTokenService tokens; private final CurrentUserProvider currentUser;
+
     @PostMapping public IssuedTokenResponse issue(@Valid @RequestBody IssueRequest request) { currentUser.requireAdmin(); return IssuedTokenResponse.from(tokens.issue(request.profileName(), request.label())); }
+
     @GetMapping public List<TokenResponse> list() { currentUser.requireAdmin(); return tokens.list().stream().map(TokenResponse::from).toList(); }
+
     @DeleteMapping("/{id}") public void revoke(@PathVariable Long id) { currentUser.requireAdmin(); tokens.revoke(id); }
 }

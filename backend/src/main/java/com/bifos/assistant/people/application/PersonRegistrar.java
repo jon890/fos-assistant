@@ -6,8 +6,8 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -21,10 +21,9 @@ import org.springframework.stereotype.Service;
  * 전에는 존재하지 않기 때문이다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PersonRegistrar {
-
-    private static final Logger log = LoggerFactory.getLogger(PersonRegistrar.class);
 
     private final AllowedPersonRepository people;
     private final AgentRepository agents;

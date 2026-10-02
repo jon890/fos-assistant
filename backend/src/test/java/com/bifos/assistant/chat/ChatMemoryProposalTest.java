@@ -18,6 +18,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -27,6 +28,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -99,10 +101,10 @@ class ChatMemoryProposalTest {
         doNothing()
                 .when(events)
                 .open(
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.any());
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.any());
     }
 
     @Test
@@ -162,7 +164,7 @@ class ChatMemoryProposalTest {
         assertThat(memories.findAll())
                 .singleElement()
                 .satisfies(memory -> assertThat(memory.status().name()).isEqualTo("PROPOSED"));
-        List<com.bifos.assistant.usage.domain.AgentExecution> all = executions.findAll();
+        List<AgentExecution> all = executions.findAll();
         assertThat(all).hasSize(2);
         var parent = all.stream()
                 .filter(execution -> execution.parentExecutionId() == null)

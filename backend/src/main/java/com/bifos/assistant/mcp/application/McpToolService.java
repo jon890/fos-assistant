@@ -24,15 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class McpToolService {
-    private static final Logger log = LoggerFactory.getLogger(McpToolService.class);
     private static final JsonMapper json = JsonMapper.builder().build();
     private static final String INVALID_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
     private static final Set<String> SAFE_ARTIFACT_FAILURE_MESSAGES = Set.of(

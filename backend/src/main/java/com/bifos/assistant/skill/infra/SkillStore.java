@@ -30,8 +30,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -46,9 +46,8 @@ import org.springframework.stereotype.Component;
  * 하기 위해서다. Hermes 가 읽을 수 있게 파일은 644, 디렉터리는 755 로 쓴다.
  */
 @Component
+@Slf4j
 public class SkillStore {
-
-    private static final Logger log = LoggerFactory.getLogger(SkillStore.class);
 
     /** 게시에 성공한 버전 디렉터리 안에 두는 표식 파일이다. */
     public static final String PUBLISHED_MARKER = ".published";

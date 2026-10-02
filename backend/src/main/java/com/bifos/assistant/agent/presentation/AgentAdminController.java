@@ -100,7 +100,9 @@ public class AgentAdminController {
             lifecycle.requireGroupSafe(apiBaseUrl, agent.hermesProfile());
         }
         agent.changeAccess(request.enabled(), request.visibility(), ownerId);
-        if (!apiBaseUrl.equals(agent.apiBaseUrl())) agent.changeApiBaseUrl(apiBaseUrl);
+        if (!apiBaseUrl.equals(agent.apiBaseUrl())) {
+            agent.changeApiBaseUrl(apiBaseUrl);
+        }
         return AdminAgentView.from(agents.save(agent));
     }
 
@@ -111,9 +113,13 @@ public class AgentAdminController {
      * 쓸데없이 Hermes 를 부르지 않게 한다. 끝의 {@code /} 만 다른 것도 같은 값으로 본다.
      */
     private String effectiveApiBaseUrl(Agent agent, String apiBaseUrl) {
-        if (apiBaseUrl == null || apiBaseUrl.isBlank()) return agent.apiBaseUrl();
+        if (apiBaseUrl == null || apiBaseUrl.isBlank()) {
+            return agent.apiBaseUrl();
+        }
         String next = stripTrailingSlash(apiBaseUrl.strip());
-        if (next.equals(agent.apiBaseUrl())) return agent.apiBaseUrl();
+        if (next.equals(agent.apiBaseUrl())) {
+            return agent.apiBaseUrl();
+        }
         endpointProbe.requireReachable(next, agent.hermesProfile());
         return next;
     }

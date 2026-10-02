@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Service;
@@ -20,9 +20,8 @@ import org.springframework.stereotype.Service;
  * 사용자가 그 에이전트를 고를 때 알게 되면 늦다.
  */
 @Service
+@Slf4j
 public class FlowRegistry implements ApplicationRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(FlowRegistry.class);
 
     private final Map<String, Flow> byName;
     private final AgentRepository agents;

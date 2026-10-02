@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -39,7 +40,7 @@ class SkillStoreTest {
     }
 
     private static Map<String, SkillBundle> skills(String... names) {
-        java.util.LinkedHashMap<String, SkillBundle> result = new java.util.LinkedHashMap<>();
+        LinkedHashMap<String, SkillBundle> result = new LinkedHashMap<>();
         for (String name : names) {
             result.put(
                     name,
@@ -92,7 +93,7 @@ class SkillStoreTest {
         assertThat(store.readPending(PROFILE)).as("표식 없는 새 버전이 없으면 비어 있다").isEmpty();
 
         store.writeVersion(PROFILE, skills("weekly-plan", "shopping"));
-        Map<String, SkillBundle> newer = new java.util.LinkedHashMap<>(skills("shopping"));
+        Map<String, SkillBundle> newer = new LinkedHashMap<>(skills("shopping"));
         newer.put(
                 "shopping",
                 new SkillBundle("shopping", WEEKLY_MD.replace("weekly-plan", "shopping") + "고침", List.of()));

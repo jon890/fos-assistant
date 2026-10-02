@@ -18,8 +18,8 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.security.SecureRandom;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,10 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>그룹 공개 검사도 여기 둔다. 관리자 경로와 사용자 경로가 같은 코드를 불러야 한쪽만 느슨해지지 않는다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AgentLifecycleService {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentLifecycleService.class);
 
     /** {@code agent.name} 칸의 길이와 같다. */
     private static final int MAX_NAME_CHARS = 100;

@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
@@ -146,7 +147,7 @@ class ModelsDevPriceCatalogReloadTest {
             }
 
             @Override
-            public Clock withZone(java.time.ZoneId zone) {
+            public Clock withZone(ZoneId zone) {
                 return this;
             }
 

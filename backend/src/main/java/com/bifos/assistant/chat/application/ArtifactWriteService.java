@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.springframework.stereotype.Service;
@@ -47,7 +48,7 @@ public class ArtifactWriteService {
             ArtifactStore.requireWritablePath(request.path());
             String contentType = imageContentType(request.path());
             try {
-                return sourceFetcher.fetch(java.net.URI.create(request.sourceUrl()), contentType);
+                return sourceFetcher.fetch(URI.create(request.sourceUrl()), contentType);
             } catch (IllegalArgumentException ex) {
                 throw validation("artifact source URL is invalid");
             }
@@ -73,10 +74,14 @@ public class ArtifactWriteService {
     }
 
     private static String imageContentType(String path) {
-        if (path == null) throw validation("artifact path is required");
+        if (path == null) {
+            throw validation("artifact path is required");
+        }
         String contentType = ArtifactStore.contentTypeOf(path).orElseThrow(() -> validation("URL artifact path must be an image"));
         String mediaType = contentType.split(";", 2)[0];
-        if (!mediaType.startsWith("image/")) throw validation("URL artifact path must be an image");
+        if (!mediaType.startsWith("image/")) {
+            throw validation("URL artifact path must be an image");
+        }
         return mediaType;
     }
 

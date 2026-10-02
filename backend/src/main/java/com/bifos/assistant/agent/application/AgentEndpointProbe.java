@@ -4,8 +4,8 @@ import com.bifos.assistant.hermes.HermesProfileKeyStore;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -20,8 +20,8 @@ import org.springframework.web.client.RestClient;
  * 돌아와, 주소가 틀린 것인지 key 가 틀린 것인지 구분하지 못한다.
  */
 @Component
+@Slf4j
 public class AgentEndpointProbe {
-    private static final Logger log = LoggerFactory.getLogger(AgentEndpointProbe.class);
 
     /** 실행을 만들지 않고 라우팅과 인증만 확인할 수 있는 경로다. */
     private static final String PROBE_PATH = "/v1/capabilities";

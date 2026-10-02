@@ -36,6 +36,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -179,7 +180,7 @@ class AgentApiBaseUrlUpdateTest {
                 1L);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
-        when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/dad", "dad")).thenReturn(java.util.List.of("terminal"));
+        when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/dad", "dad")).thenReturn(List.of("terminal"));
 
         assertThatThrownBy(() -> controller.update("dad", request("http://127.0.0.1:2/p/dad")))
                 .isInstanceOf(ApiException.class)
@@ -196,7 +197,7 @@ class AgentApiBaseUrlUpdateTest {
     void rejectsPrivateToolsetWhenCreatingGroupAgent() {
         when(agents.findByCode("group")).thenReturn(Optional.empty());
         when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/group", "group-profile"))
-                .thenReturn(java.util.List.of("terminal"));
+                .thenReturn(List.of("terminal"));
 
         assertThatThrownBy(() -> controller.create(new CreateAgentRequest(
                         "group",
@@ -267,7 +268,7 @@ class AgentApiBaseUrlUpdateTest {
     @DisplayName("꺼진 그룹 에이전트를 켜기 전에는 private toolset을 검사한다")
     void checksPrivateToolsetBeforeEnablingDisabledGroupAgent() {
         agent.changeAccess(false, AgentVisibility.GROUP, null);
-        when(hermesToolsets.readEnabled(CURRENT_URL, "dad")).thenReturn(java.util.List.of("terminal"));
+        when(hermesToolsets.readEnabled(CURRENT_URL, "dad")).thenReturn(List.of("terminal"));
 
         assertThatThrownBy(() -> controller.update("dad", request(null)))
                 .isInstanceOf(ApiException.class)

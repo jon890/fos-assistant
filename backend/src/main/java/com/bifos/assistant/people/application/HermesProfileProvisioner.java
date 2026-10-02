@@ -7,8 +7,8 @@ import com.bifos.assistant.mcp.application.IssuedToken;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -21,10 +21,9 @@ import org.springframework.stereotype.Service;
  * 거둘 때 폐기한다. 토큰은 profile 만 증명하므로(ADR-032) profile 과 함께 생기고 함께 사라져야 한다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class HermesProfileProvisioner {
-
-    private static final Logger log = LoggerFactory.getLogger(HermesProfileProvisioner.class);
 
     /** 접두를 붙여 부를 때 Hermes 가 이 profile 을 가리키는 이름이다. */
     private static final String MODEL_NAME_ENV = "API_SERVER_MODEL_NAME";

@@ -6,8 +6,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -17,9 +17,8 @@ import tools.jackson.databind.JsonNode;
 
 /** Hermes 대시보드의 스킬 경로를 HTTP 로 부른다. 주소와 토큰은 설정으로만 받는다. */
 @Component
+@Slf4j
 public class HttpHermesSkillClient implements HermesSkillClient {
-
-    private static final Logger log = LoggerFactory.getLogger(HttpHermesSkillClient.class);
 
     private final RestClient restClient;
     private final String baseUrl;
