@@ -5,7 +5,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.RecoveredRunKind;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;

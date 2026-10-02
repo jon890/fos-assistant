@@ -22,7 +22,7 @@ import com.bifos.assistant.chat.application.StarterSuggestionService;
 import com.bifos.assistant.chat.application.StarterSuggestions;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;

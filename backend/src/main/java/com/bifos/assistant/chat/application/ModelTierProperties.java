@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.ModelChoice;
-import com.bifos.assistant.chat.domain.type.ModelTier;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 

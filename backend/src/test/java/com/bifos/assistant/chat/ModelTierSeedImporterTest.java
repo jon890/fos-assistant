@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.ModelTierSeedImporter;
 import com.bifos.assistant.chat.domain.ModelTierDefinition;
-import com.bifos.assistant.chat.domain.type.ModelTier;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.ArrayList;

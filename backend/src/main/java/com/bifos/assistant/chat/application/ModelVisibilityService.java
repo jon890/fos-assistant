@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.ModelHidden;
 import com.bifos.assistant.chat.infra.ModelHiddenRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
