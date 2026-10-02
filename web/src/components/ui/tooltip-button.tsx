@@ -46,6 +46,15 @@ export function escapeOnlyClosedTooltip(event: Event): boolean {
   return escapesPassedThrough.has(event);
 }
 
+/** 열려 있는 창, 확인 창, 메뉴가 있는지다. 그것들이 열려 있는 동안의 `Esc` 는 대화 화면의 것이 아니다 */
+function overlayOpen(): boolean {
+  return (
+    document.querySelector(
+      '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"]',
+    ) !== null
+  );
+}
+
 /**
  * 글자 없이 아이콘만 있는 단추다. 접근성 이름과 마우스를 올렸을 때의 풀이 글이 같은 `label` 에서 나온다.
  *
@@ -79,7 +88,9 @@ export function TooltipButton({
       <TooltipContent
         onEscapeKeyDown={(event) => {
           // 닫히는 움직임을 하는 동안에도 풀이는 `Esc` 를 받는다. 사용자에게는 닫을 것이 없으므로 대화 화면에 넘긴다.
-          if (passEscape || !open) escapesPassedThrough.add(event);
+          // 창이나 메뉴가 열려 있으면 넘기지 않는다. 그 `Esc` 는 창을 닫으려던 것이라 답을 멈추면 안 된다.
+          if (passEscape || (!open && !overlayOpen()))
+            escapesPassedThrough.add(event);
         }}
       >
         {label}

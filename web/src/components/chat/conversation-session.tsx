@@ -315,7 +315,12 @@ export function ConversationSession({
     initialConversationId !== null,
   );
   const selectionVersion = useRef(0);
-  /** 이 부품이 없어졌다. 그 뒤에 온 사건이 `ChatPanel` 의 대화 식별자를 바꾸지 않게 한다 */
+  /**
+   * 이 부품이 없어졌다. 그 뒤에 온 사건이 `ChatPanel` 의 대화 식별자를 바꾸지 않게 한다.
+   *
+   * <p>부르는 자리마다 `selectionVersion` 비교가 먼저 막는다. 그 비교를 빠뜨린 자리가 생겨도 새 대화 화면의
+   * 글이 앞 대화에 저장되지 않게 한 번 더 막는 것이다.
+   */
   const disposed = useRef(false);
   const pending = usePendingQueue(conversationId);
   /** 대기 줄의 취소나 보내기 요청이 도는 중이다. 그동안 대기 줄의 단추를 잠근다 */
