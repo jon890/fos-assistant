@@ -627,7 +627,7 @@ public class ConnectorActionService {
             return catalog.find(connectorId);
         } catch (RuntimeException ex) {
             log.warn(
-                    "connector {} catalog read failed for an approval: {}",
+                    "connector {} catalog read failed: {}",
                     connectorId,
                     ex.getClass().getSimpleName());
             return Optional.empty();

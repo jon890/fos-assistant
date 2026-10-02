@@ -87,8 +87,8 @@
 | `tool_name` | `VARCHAR(128) NOT NULL` | 원래 도구 이름 |
 | `expires_at` | `DATETIME(6) NOT NULL` | 무기한은 없다 |
 | `created_at` | `DATETIME(6) NOT NULL` | |
-| `revoked_at` | `DATETIME(6)` | 사용자가 거두었거나 연결을 해제한 시각 |
+| `revoked_at` | `DATETIME(6)` | 사용자가 거두었거나 연결을 해제한 시각. 선언이 상시 허락을 닫아 정리가 거둔 시각도 이 칸이다 |
 
 - `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤인 줄만 유효하다
-- `approval: always` 인 도구와 선언이 `"grant": false` 인 도구에는 만들지 않는다. 판정할 때도 그 도구는 허락을 보지 않고, 선언이 닫은 도구에 남은 줄은 1분마다 `revoked_at` 으로 거둔다([ADR-065](../../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
+- `approval: always` 인 도구와 선언이 `"grant": false` 인 도구에는 만들지 않는다. 판정할 때도 그 도구는 허락을 보지 않고, 선언이 닫은 도구(또는 `approval` 이 `required` 가 아니게 된 도구)에 남은 줄은 1분마다 `revoked_at` 으로 거둔다([ADR-065](../../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
 - 같은 도구에 허락을 다시 주면 새 줄을 만든다. 유니크 제약은 없다

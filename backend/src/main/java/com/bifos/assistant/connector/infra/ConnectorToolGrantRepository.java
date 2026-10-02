@@ -52,7 +52,7 @@ public interface ConnectorToolGrantRepository extends JpaRepository<ConnectorToo
      *
      * @return 거둔 건수
      */
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update ConnectorToolGrant g set g.revokedAt = :now where g.id in :ids and g.revokedAt is null")
     int revokeAll(@Param("ids") List<Long> ids, @Param("now") Instant now);
 }

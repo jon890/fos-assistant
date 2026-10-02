@@ -747,6 +747,21 @@ class ConnectorActionServiceTest {
     }
 
     @Test
+    @DisplayName("도구가 승인을 늘 받는 것으로 바뀌어 허락을 줄 수 없게 되어도 그 도구의 허락 줄을 거둔다")
+    void grantIsRevokedWhenToolBecameAlwaysApproved() {
+        service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
+        catalogBecomes(manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "always", null, null))));
+
+        assertThat(service.revokeClosedGrants(Instant.now())).isEqualTo(1);
+
+        assertThat(grants.findAll())
+                .extracting(grant -> grant.revokedAt() != null)
+                .containsExactly(true);
+    }
+
+    @Test
     @DisplayName("이미 거두었거나 기간이 지난 줄은 건드리지 않고, 카탈로그를 읽지 못하거나 선언에 없는 도구의 줄은 거두지 않는다")
     void closedGrantSweepLeavesUnknownAndFinishedLinesAlone() {
         Instant now = Instant.now();
@@ -762,8 +777,10 @@ class ConnectorActionServiceTest {
 
         assertThat(grants.findAll())
                 .filteredOn(grant -> grant.revokedAt() != null)
-                .hasSize(1);
-        assertThat(grants.findAll().get(0).revokedAt()).as("처음 거둔 시각을 그대로 둔다").isEqualTo(earlier);
+                .singleElement()
+                .extracting(ConnectorToolGrant::revokedAt)
+                .as("처음 거둔 시각을 그대로 둔다")
+                .isEqualTo(earlier);
 
         grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now));
         ConnectorPolicyTestDoubles.expireCatalog();
