@@ -29,6 +29,10 @@ public record MemoryEncryptionProperties(String activeKeyId, String keys) {
         if (activeKeyId.isEmpty() != keys.isEmpty()) {
             throw new IllegalArgumentException("memory encryption: active-key-id 와 keys 는 함께 채우거나 함께 비워야 한다");
         }
+        // 모양 검사를 지나지 못한 글은 key 값일 수 있어 메시지에 넣지 않는다
+        if (!activeKeyId.isEmpty() && !KEY_ID.matcher(activeKeyId).matches()) {
+            throw new IllegalArgumentException("memory encryption: active-key-id 모양이 틀렸다");
+        }
         if (!keys.isEmpty() && !parse(keys).containsKey(activeKeyId)) {
             throw new IllegalArgumentException("memory encryption: active-key-id 가 keys 에 없다: " + activeKeyId);
         }
@@ -44,14 +48,16 @@ public record MemoryEncryptionProperties(String activeKeyId, String keys) {
         if (keys.isEmpty()) {
             return parsed;
         }
-        for (String piece : keys.split(",")) {
+        String[] pieces = keys.split(",");
+        for (int index = 0; index < pieces.length; index++) {
+            String piece = pieces[index];
             int colon = piece.indexOf(':');
             if (colon < 0) {
-                throw new IllegalArgumentException("memory encryption: <id>:<값> 모양이 아닌 항목이 있다");
+                throw new IllegalArgumentException("memory encryption: " + (index + 1) + "번째 항목이 <id>:<값> 모양이 아니다");
             }
             String id = piece.substring(0, colon).strip();
             if (!KEY_ID.matcher(id).matches()) {
-                throw new IllegalArgumentException("memory encryption: key id 모양이 틀렸다: " + id);
+                throw new IllegalArgumentException("memory encryption: " + (index + 1) + "번째 항목의 key id 모양이 틀렸다");
             }
             byte[] bytes;
             try {

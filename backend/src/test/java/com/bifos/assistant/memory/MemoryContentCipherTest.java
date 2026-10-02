@@ -141,6 +141,24 @@ class MemoryContentCipherTest {
     }
 
     @Test
+    @DisplayName("keys 를 <값>:<id> 순서로 적어도 메시지에 key 값을 담지 않는다")
+    void swappedKeysDoNotLeakValue() {
+        assertThatThrownBy(() -> new MemoryEncryptionProperties("test-1", KEY_VALUE + ":test-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .message()
+                .doesNotContain(KEY_VALUE);
+    }
+
+    @Test
+    @DisplayName("active-key-id 에 key 값을 넣어도 메시지에 key 값을 담지 않는다")
+    void keyValueAsActiveKeyIdDoesNotLeak() {
+        assertThatThrownBy(() -> new MemoryEncryptionProperties(KEY_VALUE, TEST_KEYS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .message()
+                .doesNotContain(KEY_VALUE);
+    }
+
+    @Test
     @DisplayName("설정의 toString 은 key 값을 담지 않는다")
     void toStringHidesKeys() {
         assertThat(new MemoryEncryptionProperties("test-1", TEST_KEYS).toString())
