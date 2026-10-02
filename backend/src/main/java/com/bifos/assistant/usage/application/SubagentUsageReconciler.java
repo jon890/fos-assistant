@@ -35,7 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>재조회 작업 줄은 native 자식 한 명의 사용량 원장이다. 종료를 확인한 자식의 provider, 모델, 토큰,
  * 환산 금액을 그 줄에 한 번만 적고, 합계는 그 줄의 값을 더한다. 완료 사건은 표시용으로만 남긴다.
- * 근거는 ADR-060 에 있다.
+ * 근거는 ADR-062 에 있다.
  */
 @Service
 @Slf4j

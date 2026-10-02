@@ -12,11 +12,15 @@ import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.domain.type.ModelTier;
+import com.bifos.assistant.hermes.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.dto.ReasoningCapability;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -208,10 +212,7 @@ public final class ChatDtos {
                     options.defaultReasoningEffort(),
                     options.defaultFromAgent(),
                     options.defaultAvailable(),
-                    options.providers().stream()
-                            .map(provider -> new ProviderView(
-                                    provider.slug(), provider.name(), provider.models(), provider.reasoning()))
-                            .toList(),
+                    options.providers().stream().map(ProviderView::from).toList(),
                     options.reasoningEfforts());
         }
     }
@@ -270,8 +271,33 @@ public final class ChatDtos {
      * @param provider Hermes 가 부르는 provider 이름
      * @param name 화면에 보일 이름
      * @param models 그 provider 의 모델 이름
-     * @param reasoningCapable 모델 이름을 열쇠로 한 reasoning 지원 여부. Hermes 가 밝히지 않은 모델은 참으로 본다
+     * @param reasoning 모델 이름을 열쇠로 한 reasoning 지원과 끄기 지원. 모든 모델이 표에 있고, Hermes 가 밝히지 않은
+     *     칸은 {@code UNKNOWN} 이다
+     * @param reasoningCapable 옛 web 호환용이고 다음 배포에서 지운다. 각 모델의 {@code support} 가
+     *     {@code UNSUPPORTED} 가 아니면 참이다
      */
     public record ProviderView(
-            String provider, String name, List<String> models, Map<String, Boolean> reasoningCapable) {}
+            String provider,
+            String name,
+            List<String> models,
+            Map<String, ReasoningCapability> reasoning,
+            Map<String, Boolean> reasoningCapable) {
+
+        static ProviderView from(HermesModelCatalog.Provider provider) {
+            Map<String, ReasoningCapability> reasoning = new LinkedHashMap<>();
+            Map<String, Boolean> reasoningCapable = new LinkedHashMap<>();
+            for (String model : provider.models()) {
+                ReasoningCapability capability =
+                        provider.reasoning().getOrDefault(model, ReasoningCapability.UNKNOWN_ALL);
+                reasoning.put(model, capability);
+                reasoningCapable.put(model, capability.support() != ReasoningCapability.Support.UNSUPPORTED);
+            }
+            return new ProviderView(
+                    provider.slug(),
+                    provider.name(),
+                    provider.models(),
+                    Collections.unmodifiableMap(reasoning),
+                    Collections.unmodifiableMap(reasoningCapable));
+        }
+    }
 }

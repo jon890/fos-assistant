@@ -356,7 +356,8 @@ async function writeProfileKeys(work: string): Promise<string> {
 }
 
 async function seedAgents(hermesBaseUrl: string): Promise<void> {
-  const token = await new SignJWT({ name: "브라우저 테스트" })
+  // 첫 요청이 관리자를 만들고 표시 이름은 그때 굳는다. README 화면을 찍는 설정만 이 이름을 바꾼다.
+  const token = await new SignJWT({ name: process.env.BROWSER_ADMIN_NAME ?? "브라우저 테스트" })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(TEST_EMAIL)
     .setIssuedAt()

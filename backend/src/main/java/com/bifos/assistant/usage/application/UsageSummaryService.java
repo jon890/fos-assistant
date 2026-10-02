@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>실행 합계는 데이터베이스가 낸다. 자식 줄은 한 달치를 한 번 읽어 여기서 월 합계와 네 축에 나눠 더한다.
  * 자식 줄은 실행 줄보다 훨씬 적고, 어느 자식을 세는지의 규칙이 질의 하나에 남는다. {@code agent_delegate} 로
- * 만든 자식은 자기 실행 줄로 이미 합계에 들어 있어 여기서 다시 더하지 않는다. 근거는 ADR-060 에 있다.
+ * 만든 자식은 자기 실행 줄로 이미 합계에 들어 있어 여기서 다시 더하지 않는다. 근거는 ADR-062 에 있다.
  */
 @Service
 @Transactional(readOnly = true)

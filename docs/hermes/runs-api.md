@@ -92,8 +92,20 @@ Control Plane 은 사용자가 대화에서 모델을 고르지 않았으면 두
 **reasoning effort 는 `model_options` 로 그 실행에만 준다.**
 본문의 `model_options: {"reasoning": {"effort": "<값>"}}` 을 받는다. 옛 형식 `model_options.reasoning_effort` 도 받는다.
 받는 값은 `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` 다. 모르는 값은 오류 없이 버리고 기본값으로 돈다.
-모델이 받지 않는 값은 그 provider 의 값으로 맞춘다.
-`model_options` 를 보내지 않으면 그 모델에 정해 둔 설정값을 쓴다.
+모델이 받지 않는 값은 그 provider 의 값으로 맞춘다. 맞추는 규칙은 provider 와 모델마다 다르고 Hermes 가 갖는다.
+`model_options` 를 보내지 않으면 그 모델에 정해 둔 설정값을 쓴다. 이것이 「미지정」 이다.
+
+| 보낸 값 | 상류가 해석하는 것 |
+| --- | --- |
+| 없음(`model_options` 없음, `effort` 없음, 모르는 값) | `reasoning_config` 가 비어 그 모델의 profile 설정값으로 돈다 |
+| `none` | `{"enabled": false}`. 이 실행에서 reasoning 을 끈다. 미지정과 다른 의도다 |
+| `minimal` 부터 `max` | `{"enabled": true, "effort": "<값>"}` 을 전달한다. provider 가 받지 않는 값은 더 약한 쪽의 가까운 값으로 줄이고, 약한 값이 없으면 가장 약한 값으로 맞춘다 |
+
+`none` 을 받아도 모든 route 가 reasoning 을 끌 수 있는 것은 아니다. 끌 수 없는 provider 는 그 값을 줄이거나 빼고, 오류로 알리지 않는다.
+요청이 받아들여졌는지와 provider 가 실제로 무엇을 받았는지는 응답에서 알 수 없다.
+
+위는 v0.21.3(`v2026.9.14`)과 v0.21.5(`v2026.9.24`)의 `_request_reasoning_config` 와 `agent/reasoning_effort.py` 의 `EFFORT_LADDER`, `clamp_effort` 를 읽어 확인했다.
+두 판의 해석이 같았다. 실제 Runs API 왕복으로 확인하지는 않았다.
 근거는 [v0.21.3 `gateway/platforms/api_server.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의 `_request_reasoning_config`, `_request_agent_overrides` 와
 [v0.21.3 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server_runs.py) 가 그것을 넘기는 자리다. v0.21.5 에서도 같다.
 
@@ -211,6 +223,11 @@ model_name = (
 | `providers[].authenticated` | 그 provider 로 실제로 부를 수 있는가 |
 | `providers[].models` | 그 provider 로 고를 수 있는 모델 |
 | `providers[].is_current` | 기본 provider 인가 |
+| `providers[].capabilities.<모델>.reasoning` | 그 모델이 reasoning 을 받는가. 상류 카탈로그가 모르면 상류가 `true` 로 채운다. 그래서 `true` 는 지원이 검증됐다는 뜻이 아니다. 칸이 없을 수도 있다 |
+| `providers[].capabilities.<모델>.can_disable_reasoning` | reasoning 을 끌 수 있는가. 모델 카탈로그를 주는 aggregator provider(`nous`, `openrouter`)의 모델에만 있다. 다른 provider 는 칸이 없다 |
+
+모델별로 받는 effort 수준(`supported_efforts`)은 상류가 일부러 내보내지 않는다. 실제 지원보다 적게 알려 주기 때문이다.
+그래서 `minimal` 을 받는 모델인지 알려 주는 칸은 없다. v2026.9.24 의 `hermes_cli/inventory.py` 의 `_apply_capabilities` 에서 확인했다.
 
 **설정하지 않은 provider 도 목록에 나온다.**
 API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 것을 빈 행으로 채운다.

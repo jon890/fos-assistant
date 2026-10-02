@@ -71,7 +71,7 @@
 | `connector_attachments` | BOOLEAN | 참이면 이 연결용 에이전트가 사진을 받는다. 커넥터가 선언한 toolset 이 실제로 켜진 것을 확인했을 때만 참이다. 기본 거짓 |
 | `default_model_provider` | VARCHAR(64) NULL | 기본 provider. `default_model` 과 함께 채우거나 함께 비운다 |
 | `default_model` | VARCHAR(128) NULL | 기본 모델. 대화가 모델을 고르지 않았을 때 Hermes 에 명시해 보낸다 |
-| `default_reasoning_effort` | VARCHAR(16) NULL | 기본 effort. 모델 없이 이 값만 둘 수 있다 |
+| `default_reasoning_effort` | VARCHAR(16) NULL | 기본 effort. `none`, `low` 부터 `max` 까지다. 모델 없이 이 값만 둘 수 있다 |
 
 **모델과 effort 는 대화가 고르고, 고르지 않으면 에이전트 기본 모델로 돈다.** 세 칸이 모두 비면 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다.
 V52 가 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이그레이션은 넣지 않는다.

@@ -4,7 +4,7 @@ package com.bifos.assistant.usage.application;
  * 한 달치 실행과 native 자식을 함께 합친 금액과 완전성 건수다.
  *
  * <p>자식은 실행 건수에 세지 않고 따로 센다. 금액을 확인하지 못한 자식이 있으면 합계가 실제보다 작다는
- * 뜻이고, 그 수를 셋으로 나눠 낸다. 근거는 ADR-060 에 있다.
+ * 뜻이고, 그 수를 셋으로 나눠 낸다. 근거는 ADR-062 에 있다.
  *
  * @param estimatedMicros 환산 금액의 합. 금액이 있는 자식을 포함한다
  * @param actualMicros 실제 청구액의 합. 금액이 있는 자식을 포함한다

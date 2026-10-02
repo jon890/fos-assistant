@@ -63,4 +63,5 @@
 | [ADR-057](ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) | 문서는 사람이 화면에서 직접 쓰고 고친다 | backend, frontend | Accepted. ADR-012 의 승인 원칙을 문서에 적용한다 |
 | [ADR-058](ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) | 기존 개인 지식 저장소는 주인이 검토한 묶음을 화면에서 올려 들여온다 | backend, frontend | Accepted. ADR-057 의 「옮길 때 사람이 붙여 넣는다」 를 일회성 이관에 한해 넓힌다. 아직 구현 전이다 |
 | [ADR-059](ADR-059-꺼진-사용자는-control-plane-이-요청마다-막고-웹이-세션을-끊는다.md) | 꺼진 사용자는 Control Plane 이 요청마다 막고 웹이 세션을 끊는다 | backend, frontend | Accepted |
-| [ADR-060](ADR-060-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | backend | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다 |
+| [ADR-060](ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md) | reasoning effort 의 지원은 Hermes 가 알린 것만 확인으로 보이고 모르면 미확인으로 둔다 | backend, frontend | Accepted. ADR-030 의 「받지 않는 effort 는 Hermes 가 맞춘다」 는 그대로 두고 지원 표시와 `none` 선택을 더한다 |
+| [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | backend | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다 |

@@ -11,6 +11,7 @@ import {
   saveAgentModelDefault,
   type AgentModelDefault,
   type AgentModelSettings,
+  type ModelCatalog,
 } from "@/lib/model-settings";
 
 type Props = {
@@ -21,6 +22,46 @@ type Props = {
 
 /** 기본 모델 고르기의 「profile 값」 자리 값이다 */
 const PROFILE_KEY = "";
+
+/** reasoning 을 끄는 강도다. 「profile 값」(강도를 보내지 않음)과 다른 의도다 */
+const EFFORT_NONE = "none";
+
+/** 고른 모델이 reasoning 끄기를 받는다고 확인됐는가. 비웠으면 profile 의 기본 모델을 본다 */
+function acceptsNone(catalog: ModelCatalog, key: string): boolean {
+  const picked =
+    key === PROFILE_KEY ? null : (JSON.parse(key) as [string, string]);
+  const provider = picked?.[0] ?? catalog.defaultProvider;
+  const model = picked?.[1] ?? catalog.defaultModel;
+  if (model === null) return false;
+  const row = catalog.providers.find((item) => item.provider === provider);
+  const capability = row?.reasoning?.[model];
+  // backend 의 판정과 같다. reasoning 자체를 받지 않는 모델은 끄기 지원이 참이어도 거절한다.
+  return (
+    capability?.disable === "SUPPORTED" && capability.support !== "UNSUPPORTED"
+  );
+}
+
+/** 강도 선택지다. `none` 은 끄기를 받는 모델에서만 맨 앞에 둔다 */
+function effortChoices(settings: AgentModelSettings, key: string): string[] {
+  const efforts = [
+    ...(acceptsNone(settings.catalog, key) ? [EFFORT_NONE] : []),
+    ...settings.catalog.reasoningEfforts,
+  ];
+  const storedEffort = settings.agentDefault.reasoningEffort;
+  // 저장된 강도가 선택지에 없어도 둔다. 없으면 모델만 바꿔 저장해도 강도가 지워진다.
+  return storedEffort !== null && !efforts.includes(storedEffort)
+    ? [...efforts, storedEffort]
+    : efforts;
+}
+
+/** 모델을 바꾼 뒤의 강도다. 새 모델이 끄기를 받지 않으면 고른 `none` 을 「profile 값」 으로 비운다 */
+function effortAfterModel(
+  catalog: ModelCatalog,
+  key: string,
+  effort: string,
+): string {
+  return effort === EFFORT_NONE && !acceptsNone(catalog, key) ? "" : effort;
+}
 
 function keyOf(agentDefault: AgentModelDefault): string {
   return agentDefault.provider && agentDefault.model
@@ -54,6 +95,7 @@ export function AgentModelDefaultForm({ code, settings, onSaved }: Props) {
     stored.provider !== null &&
     stored.model !== null &&
     hidesModel(hidden, stored.provider, stored.model);
+  const efforts = effortChoices(settings, draftModel);
   const profileLabel = settings.catalog.defaultModel
     ? `profile 값 (${settings.catalog.defaultModel})`
     : "profile 값";
@@ -109,7 +151,11 @@ export function AgentModelDefaultForm({ code, settings, onSaved }: Props) {
           value={draftModel}
           onChange={(event) => {
             setMessage(null);
-            setDraftModel(event.target.value);
+            const next = event.target.value;
+            setDraftModel(next);
+            setDraftEffort(
+              effortAfterModel(settings.catalog, next, draftEffort),
+            );
           }}
         >
           <option value={PROFILE_KEY}>{profileLabel}</option>
@@ -149,9 +195,9 @@ export function AgentModelDefaultForm({ code, settings, onSaved }: Props) {
           }}
         >
           <option value="">profile 값</option>
-          {settings.catalog.reasoningEfforts.map((effort) => (
+          {efforts.map((effort) => (
             <option key={effort} value={effort}>
-              {effort}
+              {effort === EFFORT_NONE ? "끄기" : effort}
             </option>
           ))}
         </NativeSelect>

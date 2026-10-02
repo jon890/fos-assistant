@@ -27,7 +27,7 @@ public final class UsageDtos {
      *
      * <p>두 금액은 native 자식의 금액을 포함한다. 자식은 실행 수에 세지 않고 아래 네 칸으로 따로 센다.
      * {@code pendingSubagents}, {@code unconfirmedSubagents}, {@code unpricedSubagents} 가운데 하나라도 0 이
-     * 아니면 합계가 실제보다 작다(ADR-060).
+     * 아니면 합계가 실제보다 작다(ADR-062).
      *
      * @param month {@code 2026-09} 형태의 대상 달
      * @param estimatedCostMicros 환산 금액의 합. 금액이 있는 native 자식을 포함한다

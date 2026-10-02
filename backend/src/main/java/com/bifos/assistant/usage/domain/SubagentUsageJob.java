@@ -18,7 +18,7 @@ import lombok.experimental.Accessors;
 /**
  * native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session 에서 조회하는 작업이다.
  *
- * <p>합계에 더할 토큰과 금액은 이 줄에 한 번만 적는다. 근거는 ADR-060 에 있다.
+ * <p>합계에 더할 토큰과 금액은 이 줄에 한 번만 적는다. 근거는 ADR-062 에 있다.
  */
 @Entity
 @Table(
