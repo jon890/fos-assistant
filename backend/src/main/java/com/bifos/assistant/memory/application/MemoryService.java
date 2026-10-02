@@ -6,6 +6,7 @@ import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.MemoryRevision;
+import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -31,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>에이전트의 실행이 받는 항목은 세 조건을 모두 지난 것이다. 범위(USER 의 주인, GROUP 의 같은 그룹), 그 에이전트가
  * 받는 collection, 그 collection 에서 허용받은 민감도다(ADR-053). 사람이 화면에서 보는 목록은 범위만 본다.
+ *
+ * <p>민감 항목의 본문은 암호문으로 저장한다(ADR-054).
  */
 @Service
 @RequiredArgsConstructor
@@ -42,6 +45,7 @@ public class MemoryService {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final AgentMemoryCollectionService agentCollections;
+    private final MemoryContentCipher cipher;
     private final Clock clock;
 
     /** 이 사용자가 볼 수 있는 항목만 낸다. 상태로 거르지 않는다. 화면이 제안도 봐야 한다. */
@@ -116,11 +120,13 @@ public class MemoryService {
         MemoryPlacement placement = placement(collection, retrieval, sensitivity);
         if (scope == MemoryScope.GROUP) {
             requireAdmin(user);
-            return memories.save(Memory.accepted(
-                    scope, null, user.groupId(), title, content, placement, user.id(), clock.instant()));
+            StoredContent body = stored(content, sensitivity, "GROUP:" + user.groupId());
+            return memories.save(
+                    Memory.accepted(scope, null, user.groupId(), title, body, placement, user.id(), clock.instant()));
         }
+        StoredContent body = stored(content, sensitivity, "USER:" + user.id());
         return memories.save(
-                Memory.accepted(scope, user.id(), null, title, content, placement, user.id(), clock.instant()));
+                Memory.accepted(scope, user.id(), null, title, body, placement, user.id(), clock.instant()));
     }
 
     /** 에이전트가 제안한 개인 항목을 만든다. GROUP 제안은 만들지 않는다. */
@@ -189,6 +195,21 @@ public class MemoryService {
                 .toList();
     }
 
+    /**
+     * 본문을 평문으로 낸다. 본문을 밖으로 내는 자리는 엔티티의 {@code content()} 가 아니라 이것을 쓴다.
+     *
+     * @throws ApiException 암호화 key 가 없을 때. MEMORY_ENCRYPTION_UNAVAILABLE
+     */
+    public String contentOf(Memory memory) {
+        return memory.sealed()
+                ? cipher.open(memory.content(), memory.contentKeyId(), memory.contentBinding())
+                : memory.content();
+    }
+
+    private StoredContent stored(String plain, MemorySensitivity sensitivity, String binding) {
+        return sensitivity == MemorySensitivity.SENSITIVE ? cipher.seal(plain, binding) : StoredContent.plain(plain);
+    }
+
     private List<Memory> injectableFor(CurrentUser user, MemoryAccess access, MemoryRetrieval retrieval) {
         if (access.isEmpty()) {
             return List.of();
@@ -206,11 +227,14 @@ public class MemoryService {
     private Memory revise(
             CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
         requirePlaceable(retrieval, sensitivity);
-        String dedupKey = memory.proposalDedupKey() == null
+        // 판을 남기기 전에 암호화한다. key 가 없으면 여기서 거절돼 판도 본문도 바뀌지 않는다
+        StoredContent body = stored(content, sensitivity, memory.contentBinding());
+        // 제안 중복 키는 본문의 해시라, 민감 본문이면 지문이 평문 칸에 남는다. 민감 항목은 키를 비운다
+        String dedupKey = memory.proposalDedupKey() == null || sensitivity == MemorySensitivity.SENSITIVE
                 ? null
                 : proposalDedupKey(memory.ownerUserId(), memory.title(), content);
         revisions.save(MemoryRevision.of(memory, MemoryChangeType.UPDATED, user.id(), null, clock.instant()));
-        memory.revise(content, retrieval, sensitivity, dedupKey, clock.instant());
+        memory.revise(body, retrieval, sensitivity, dedupKey, clock.instant());
         return memories.save(memory);
     }
 

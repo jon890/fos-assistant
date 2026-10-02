@@ -26,6 +26,9 @@ import lombok.experimental.Accessors;
  *
  * <p>{@code alwaysInject} 는 {@code retrieval} 로 옮겨 가는 옛 칸이다. 한 배포 동안 남기고 쓸 때마다 {@code retrieval}
  * 과 맞춘다. 읽을 때는 {@code retrieval} 만 본다.
+ *
+ * <p>{@code content} 는 저장된 글이다. 민감 줄이면 암호문이고 {@code contentKeyId} 가 그 key 를 적는다. 평문은
+ * {@code MemoryService.contentOf} 로 읽는다(ADR-054).
  */
 @Entity
 @Table(name = "memory")
@@ -66,6 +69,10 @@ public class Memory {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
+
+    /** 본문을 암호화한 key 의 id 다. 비어 있으면 {@code content} 는 평문이다. */
+    @Column(name = "content_key_id", length = 32)
+    private String contentKeyId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -118,7 +125,7 @@ public class Memory {
             Long ownerUserId,
             Long groupId,
             String title,
-            String content,
+            StoredContent body,
             MemoryPlacement placement,
             MemoryStatus status,
             Long proposedByExecutionId,
@@ -127,7 +134,8 @@ public class Memory {
         this.ownerUserId = ownerUserId;
         this.groupId = groupId;
         this.title = title;
-        this.content = content;
+        this.content = body.content();
+        this.contentKeyId = body.keyId();
         this.collection = placement.collection();
         this.entryType = MemoryEntryType.MEMORY;
         this.sensitivity = placement.sensitivity();
@@ -144,12 +152,12 @@ public class Memory {
             Long ownerUserId,
             Long groupId,
             String title,
-            String content,
+            StoredContent body,
             MemoryPlacement placement,
             Long acceptedByUserId,
             Instant now) {
         Memory memory =
-                new Memory(scope, ownerUserId, groupId, title, content, placement, MemoryStatus.ACCEPTED, null, now);
+                new Memory(scope, ownerUserId, groupId, title, body, placement, MemoryStatus.ACCEPTED, null, now);
         memory.acceptedByUserId = acceptedByUserId;
         memory.acceptedAt = now;
         return memory;
@@ -167,7 +175,7 @@ public class Memory {
                 ownerUserId,
                 null,
                 title,
-                content,
+                StoredContent.plain(content),
                 MemoryPlacement.core(MemoryRetrieval.SEARCH),
                 MemoryStatus.PROPOSED,
                 proposedByExecutionId,
@@ -198,7 +206,7 @@ public class Memory {
      * @throws IllegalArgumentException 민감 항목을 항상 싣게 하려 할 때. {@link MemoryPlacement#allows} 로 먼저 본다
      */
     public void revise(
-            String content,
+            StoredContent body,
             MemoryRetrieval retrieval,
             MemorySensitivity sensitivity,
             String updatedProposalDedupKey,
@@ -206,7 +214,8 @@ public class Memory {
         if (!MemoryPlacement.allows(retrieval, sensitivity)) {
             throw new IllegalArgumentException("a sensitive memory cannot always be injected");
         }
-        this.content = content;
+        this.content = body.content();
+        this.contentKeyId = body.keyId();
         this.sensitivity = sensitivity;
         place(retrieval);
         if (proposalDedupKey != null) {
@@ -214,6 +223,16 @@ public class Memory {
         }
         this.revision += 1;
         this.updatedAt = at;
+    }
+
+    /** 본문이 암호문으로 저장돼 있는가. */
+    public boolean sealed() {
+        return contentKeyId != null;
+    }
+
+    /** 암호문이 누구의 것인지 적은 글이다. 암호화와 풀기가 같은 값을 써야 한다(ADR-054). */
+    public String contentBinding() {
+        return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
     }
 
     /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. 그룹이 없는 사용자는 GROUP 항목을 보지 못한다. */
