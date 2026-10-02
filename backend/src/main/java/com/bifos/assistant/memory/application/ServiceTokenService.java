@@ -93,8 +93,7 @@ public class ServiceTokenService {
         ServiceToken token = tokens.findById(id)
                 .filter(found -> found.userId().equals(user.id()))
                 .orElseThrow(() -> new ApiException(ErrorCode.SERVICE_TOKEN_NOT_FOUND, "no such service token"));
-        token.revoke(clock.instant());
-        tokens.save(token);
+        tokens.revoke(token.id(), clock.instant());
         log.info("service token revoked userId={} tokenId={}", user.id(), token.id());
     }
 
@@ -106,11 +105,8 @@ public class ServiceTokenService {
     @EventListener
     @Transactional
     public void revokeAllOf(UserAccessRevoked event) {
-        Instant now = clock.instant();
-        List<ServiceToken> live = tokens.findByUserIdAndRevokedAtIsNull(event.userId());
-        live.forEach(token -> token.revoke(now));
-        tokens.saveAll(live);
-        log.info("service tokens revoked on access removal userId={} count={}", event.userId(), live.size());
+        int revoked = tokens.revokeAllOf(event.userId(), clock.instant());
+        log.info("service tokens revoked on access removal userId={} count={}", event.userId(), revoked);
     }
 
     /**
@@ -130,8 +126,7 @@ public class ServiceTokenService {
             log.warn("service token rejected tokenId={}", token.id());
             throw rejected();
         }
-        token.markUsed(now);
-        tokens.save(token);
+        tokens.markUsed(token.id(), now);
         List<ServiceTokenCollection> rows = tokenCollections.findByIdTokenIdIn(List.of(token.id()));
         Set<String> collections =
                 rows.stream().map(ServiceTokenCollection::collection).collect(Collectors.toSet());

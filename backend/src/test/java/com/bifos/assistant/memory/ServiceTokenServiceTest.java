@@ -43,6 +43,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 서비스 토큰의 발급과 폐기와 만료 규칙, 사용자를 끌 때의 일괄 폐기를 확인한다(ADR-056). */
@@ -68,6 +71,9 @@ class ServiceTokenServiceTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Autowired
     AppUserRepository users;
@@ -245,6 +251,25 @@ class ServiceTokenServiceTest {
         admin.update(person.id(), new UpdatePersonRequest(false));
 
         assertThat(people.findById(person.id()).orElseThrow().isEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("인증이 토큰을 읽은 뒤 폐기가 먼저 커밋돼도 사용 시각을 적는 갱신이 폐기를 되돌리지 않는다")
+    void markUsedDoesNotUndoConcurrentRevoke() {
+        Long id = service.issue(DAD, "a", 90, IDENTITY).snapshot().token().id();
+        TransactionTemplate outer = new TransactionTemplate(transactionManager);
+        TransactionTemplate inner = new TransactionTemplate(transactionManager);
+        inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        outer.executeWithoutResult(status -> {
+            // 인증이 토큰을 읽어 영속성 컨텍스트에 올린 상태다
+            repository.findById(id).orElseThrow();
+            inner.executeWithoutResult(other -> service.revoke(DAD, id));
+            repository.markUsed(id, Instant.now());
+        });
+
+        assertThat(reload(id).revokedAt()).isNotNull();
+        assertThat(reload(id).lastUsedAt()).isNotNull();
     }
 
     @Test

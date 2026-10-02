@@ -11,15 +11,20 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 다른 서비스가 사용자의 문서를 읽을 때 쓰는 토큰이다(ADR-056).
  *
  * <p>원문은 저장하지 않고 해시만 둔다. 사용자 한 사람에 묶이고 만료가 늘 있다. 폐기해도 줄을 지우지 않는다.
+ *
+ * <p>마지막 사용 시각과 폐기 시각은 엔티티를 고쳐 저장하지 않고 {@code ServiceTokenRepository} 의 갱신 쿼리로 그 칸만
+ * 적는다. 엔티티를 통째로 저장하면 동시에 커밋된 폐기를 되돌린다.
  */
 @Entity
 @Table(name = "service_token")
 @Getter
+@DynamicUpdate
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ServiceToken {
@@ -59,17 +64,6 @@ public class ServiceToken {
 
     public static ServiceToken issue(Long userId, String tokenHash, String label, Instant expiresAt, Instant now) {
         return new ServiceToken(userId, tokenHash, label, expiresAt, now);
-    }
-
-    public void markUsed(Instant at) {
-        this.lastUsedAt = at;
-    }
-
-    /** 폐기한다. 이미 폐기됐으면 처음 시각을 그대로 둔다. */
-    public void revoke(Instant at) {
-        if (revokedAt == null) {
-            this.revokedAt = at;
-        }
     }
 
     /** 폐기되지 않았고 만료 시각이 아직 오지 않았는가. */
