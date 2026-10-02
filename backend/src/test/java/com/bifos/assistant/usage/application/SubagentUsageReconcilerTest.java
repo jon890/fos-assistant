@@ -643,10 +643,18 @@ class SubagentUsageReconcilerTest {
             assertThat(fixtures.job.unconfirmedReason())
                     .as("종료 뒤 %d초의 미확인 까닭", elapsed)
                     .isEqualTo("PROVIDER_UNKNOWN");
-            assertThat(fixtures.job.provider()).as("종료 뒤 %d초의 provider", elapsed).isNull();
-            assertThat(fixtures.job.inputTokens()).as("종료 뒤 %d초의 입력 토큰", elapsed).isEqualTo(10L);
-            assertThat(fixtures.job.outputTokens()).as("종료 뒤 %d초의 출력 토큰", elapsed).isEqualTo(4L);
-            assertThat(fixtures.job.estimatedCostMicros()).as("종료 뒤 %d초의 환산액", elapsed).isNull();
+            assertThat(fixtures.job.provider())
+                    .as("종료 뒤 %d초의 provider", elapsed)
+                    .isNull();
+            assertThat(fixtures.job.inputTokens())
+                    .as("종료 뒤 %d초의 입력 토큰", elapsed)
+                    .isEqualTo(10L);
+            assertThat(fixtures.job.outputTokens())
+                    .as("종료 뒤 %d초의 출력 토큰", elapsed)
+                    .isEqualTo(4L);
+            assertThat(fixtures.job.estimatedCostMicros())
+                    .as("종료 뒤 %d초의 환산액", elapsed)
+                    .isNull();
         }
     }
 
