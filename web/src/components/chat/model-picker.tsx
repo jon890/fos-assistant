@@ -114,7 +114,7 @@ function capabilityOf(
   const model = picked?.model ?? options.defaultModel;
   if (model === null) return UNKNOWN_CAPABILITY;
   const row = options.providers.find((item) => item.provider === provider);
-  return row?.reasoning[model] ?? UNKNOWN_CAPABILITY;
+  return row?.reasoning?.[model] ?? UNKNOWN_CAPABILITY;
 }
 
 /** effort 선택지에 보이는 글자다. `none` 만 뜻을 풀어 보인다 */

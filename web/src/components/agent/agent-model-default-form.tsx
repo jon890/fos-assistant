@@ -34,7 +34,7 @@ function acceptsNone(catalog: ModelCatalog, key: string): boolean {
   const model = picked?.[1] ?? catalog.defaultModel;
   if (model === null) return false;
   const row = catalog.providers.find((item) => item.provider === provider);
-  const capability = row?.reasoning[model];
+  const capability = row?.reasoning?.[model];
   // backend 의 판정과 같다. reasoning 자체를 받지 않는 모델은 끄기 지원이 참이어도 거절한다.
   return (
     capability?.disable === "SUPPORTED" && capability.support !== "UNSUPPORTED"
