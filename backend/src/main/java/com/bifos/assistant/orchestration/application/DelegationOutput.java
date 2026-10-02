@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.chat.application.DelegationOutputClip;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class DelegationOutput {
+public class DelegationOutput implements DelegationOutputClip {
 
     /** 위임 답을 잘랐을 때 끝에 붙이는 한 줄이다. 읽는 쪽은 모델이다. */
     static final String TRUNCATED_NOTICE = "[답이 %d자를 넘어 뒷부분을 잘랐다]";
@@ -23,6 +24,7 @@ public class DelegationOutput {
      *
      * <p>상한 자리에서 대리 쌍이 갈리면 그 앞에서 자른다. 반쪽 글자가 남으면 저장과 JSON 쓰기에서 깨진다.
      */
+    @Override
     public String clip(String output) {
         if (output == null) {
             return "";
@@ -36,6 +38,7 @@ public class DelegationOutput {
     }
 
     /** 멈춘 위임 실행이 그때까지 받은 답이다. 받은 답이 없으면 null 이라 실행 줄의 답을 비워 둔다. */
+    @Override
     public String partial(String output) {
         return output == null || output.isBlank() ? null : clip(output);
     }
