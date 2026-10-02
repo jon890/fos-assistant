@@ -15,6 +15,8 @@ Control Plane 이 401 과 `ACCESS_REVOKED` 로 답하면 웹이 세션 쿠키를
 
 ## 컨텍스트
 
+- **작업을 시작하기 전에 `web/node_modules` 가 있는지 보고, 없으면 `cd web && pnpm install --frozen-lockfile` 을 돌린다**
+
 - Control Plane 을 부르는 곳은 `web/src/lib/control-plane.ts` 하나다.
   `requestControlPlane(path, init)` 과 `forwardControlPlane(path, init)` 이 `fetch` 한 `Response` 를 그대로 돌려주고, `callControlPlane<T>(path, init)` 은 `requestControlPlane` 을 거쳐 `readControlPlaneResult` 로 읽는다.
   API 라우트(`web/src/app/api/` 아래)와 서버 컴포넌트(`page.tsx`, `layout.tsx`)가 모두 이 세 함수를 쓴다
@@ -61,7 +63,7 @@ export function isAccessRevoked(status: number, text: string): boolean
 1. `response.status !== 401` 이면 바로 돌아간다
 2. `isAccessRevoked(401, await response.clone().text())` 가 거짓이면 돌아간다. 원래 `response` 의 본문은 읽지 않는다
 3. `await signOut({ redirect: false })` 를 부른다. Route Handler 에서는 여기서 쿠키가 지워지고 함수가 돌아간다
-4. `signOut` 이 던지면(서버 컴포넌트) `redirect(REVOKED_SIGN_OUT_PATH)` 를 부른다. `redirect` 는 `next/navigation` 에서 가져온다. `redirect` 가 던지는 것을 다시 잡지 않도록 `catch` 블록 안에서 부른다
+4. `signOut` 이 쿠키를 고칠 수 없다는 오류(서버 컴포넌트를 그리는 중이다. Next.js 의 문구는 `Cookies can only be modified in a Server Action or Route Handler` 다)를 던지면 `redirect(REVOKED_SIGN_OUT_PATH)` 를 부른다. 그 밖의 오류는 그대로 다시 던진다. 모든 오류에 `redirect` 하면 `/signout/revoked` 안에서 실패했을 때 같은 주소로 되돌아오는 루프가 된다. 어떤 오류인지 가리는 조건은 `web/node_modules/next` 의 그 오류 정의를 읽고 정한다. `redirect` 는 `next/navigation` 에서 가져온다. `redirect` 가 던지는 것을 다시 잡지 않도록 `catch` 블록 안에서 부른다
 
 `requestControlPlane` 과 `forwardControlPlane` 이 `fetch` 가 돌려준 `Response` 를 돌려주기 전에 `await endRevokedSession(response)` 를 부른다.
 `forwardControlPlane` 은 `fetch` 를 `try/catch` 로 감싸고 있다. `endRevokedSession` 은 그 `try` 밖에서 부른다. 안에서 부르면 `redirect` 가 던진 것이 502 로 바뀐다.
@@ -115,12 +117,12 @@ ACCESS_REVOKED: "사용이 중지된 계정이에요. 관리자에게 문의해 
 
 ### 7. `test/browser/access-revoked.spec.ts` (신규)
 
-관리자 세션으로 사람을 더하고 끈 뒤, 그 사람의 세션으로 본다. 주소와 profile 이름은 `revoked-${testInfo.project.name}` 꼴로 만든다.
+관리자 세션으로 사람을 더하고 끈 뒤, 그 사람의 세션으로 본다. **검사마다 다른 사람을 만든다.** 같은 주소를 두 검사가 더하면 뒤 검사가 `PERSON_EMAIL_TAKEN` 409 로 실패한다. 첫 검사는 주소 `revoked-page-${project}@example.com` 과 profile `revokedpage${project}`, 둘째 검사는 `revoked-api-${project}@example.com` 과 `revokedapi${project}` 를 쓴다. `project` 는 `testInfo.project.name` 이다.
 
 | 검사 | 순서 | 기대 |
 | --- | --- | --- |
 | 꺼진 사용자가 화면을 열면 로그인 화면으로 간다 | 사람을 더한다. `setSession(context, 그 사람)` 뒤 `/` 를 열어 한 번 들어오게 한다. `setSession` 으로 관리자로 돌아가 끈다. 다시 그 사람으로 `setSession` 하고 `/agents` 를 연다 | 주소가 `/signin` 으로 끝난다. 세션 쿠키가 없다 |
-| 꺼진 사용자의 API 요청은 401 이고 세션이 지워진다 | 위와 같이 끈 뒤 그 사람의 세션으로 `page.request.get("/api/me")` | 상태 401, 본문의 `code` 가 `ACCESS_REVOKED`. 이어서 `/` 를 열면 `/signin` 으로 간다 |
+| 꺼진 사용자의 API 요청은 401 이고 세션이 지워진다 | 위와 같이 끈 뒤 그 사람의 세션으로 `page.request.get("/api/me")` | 상태 401, 본문의 `code` 가 `ACCESS_REVOKED`. **응답 직후 `context.cookies()` 에 세션 쿠키가 없는지를 먼저 단언한다.** 이 단언이 없으면 API 라우트가 쿠키를 지우지 못해도 서버 컴포넌트 경로가 대신 지워 통과한다. 이어서 `/` 를 열면 `/signin` 으로 간다 |
 | 켜져 있는 사용자는 `/signout/revoked` 를 열어도 로그아웃되지 않는다 | 기본 세션으로 `/signout/revoked` 를 연다 | 주소가 `/` 이고 `/signin` 이 아니다 |
 
 세션 쿠키 이름은 `test/browser/fixtures.ts` 의 `setSession` 이 쓰는 상수와 같은 값을 쓴다. 그 상수가 내보내지지 않았으면 `context.cookies()` 에서 이름에 `session-token` 이 든 쿠키가 없는지로 본다.
@@ -136,7 +138,6 @@ scripts/check-public-safe.sh
 ```
 
 모두 종료 코드 0 이어야 한다. `node --test` 는 저장소 root 에서 돌린다.
-`pnpm test:browser` 를 돌리기 전에 `web/node_modules` 가 있는지 보고 없으면 `cd web && pnpm install --frozen-lockfile` 을 먼저 돌린다.
 `pnpm test:browser` 가 `access-revoked.spec.ts` 와 `people.spec.ts` 를 실제로 돌렸는지 출력의 파일 이름으로 확인한다.
 
 ## 변경 파일

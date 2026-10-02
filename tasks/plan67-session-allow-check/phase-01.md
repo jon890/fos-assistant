@@ -19,7 +19,7 @@
 - 로그인 판정은 `backend/src/main/java/com/bifos/assistant/people/application/SignInPolicy.java` 의 `admit(String email)` 이다.
   주소를 `AllowedPerson.normalizeEmail(email)` 로 맞춘 뒤 `AllowedPersonRepository.findByEmailAndEnabledTrue` 로 찾는다
 - 허용 목록 저장소는 `backend/src/main/java/com/bifos/assistant/people/infra/AllowedPersonRepository.java` 다. `allowed_person.email` 은 유일 키이고 정규화한 주소가 들어 있다
-- 오류 코드는 `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` 의 enum 이고, 응답 본문은 같은 패키지의 record `ErrorResponse(String code, String message)` 다
+- 오류 코드는 `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` 의 enum 이고, 응답 본문은 같은 패키지의 record `ErrorResponse(String code, String message, List<String> missingToolsets)` 다. 인자 둘짜리 생성자가 있고 `missingToolsets` 는 null 이면 JSON 에서 빠진다
 - 관리자가 끄는 경로는 `PATCH /api/v1/admin/people/{id}` 본문 `{"enabled": false}` 다
 - e2e 의 `dad@example.com` 과 `kid@example.com` 은 허용 목록에 줄이 없다. `aunt@example.com` 은 `test/e2e/scenarios/people.ts` 가 허용 목록에 더한다. 토큰은 `context.tokens.dad`, `context.tokens.aunt` 다
 
@@ -68,7 +68,7 @@ public Optional<AppUser> resolveAllowed(String email, String displayName)
 ```
 
 `signInPolicy.revoked(email)` 이 참이면 `Optional.empty()` 를 돌려주고 `resolve` 를 부르지 않는다.
-`resolve` 는 그대로 둔다. 다른 호출자와 테스트가 쓴다.
+`resolve` 는 그대로 둔다. `FirstSignInTest` 가 쓴다.
 클래스 주석의 「이 경로는 `ControlPlaneJwtFilter` 가 매 요청 부른다」 를 필터가 부르는 것이 `resolveAllowed` 라는 사실에 맞게 고친다.
 
 ### 4. `ControlPlaneJwtFilter` 가 꺼진 사용자에게 401 로 답한다
@@ -76,7 +76,8 @@ public Optional<AppUser> resolveAllowed(String email, String displayName)
 - `authenticate` 가 판정 결과를 돌려주게 바꾼다. 꺼진 사용자면 `doFilterInternal` 이 `chain.doFilter` 를 부르지 않고 응답을 쓴다
 - `users.resolve(...)` 호출을 `users.resolveAllowed(...)` 로 바꾼다
 - 응답: 상태 401, `Content-Type: application/json`, 문자 집합 UTF-8, 본문은 `ErrorResponse` 를 JSON 으로 쓴 `{"code":"ACCESS_REVOKED","message":"access was revoked"}`.
-  본문은 Spring 이 주는 `ObjectMapper` 를 생성자로 받아 쓴다. 생성자가 바뀌므로 `ControlPlaneJwtFilterTest` 의 `new ControlPlaneJwtFilter(...)` 세 곳도 고친다
+  `response.setStatus(401)` 뒤 본문을 직접 쓴다. `response.sendError` 는 쓰지 않는다. ERROR 디스패치가 돌아 본문이 바뀐다.
+  본문은 Spring 이 주는 `tools.jackson.databind.ObjectMapper` 를 생성자로 받아 쓴다. `com.fasterxml` 의 것을 쓰면 `ArchitectureRules.NO_JACKSON_2_DATABIND` 에 걸린다(`backend/AGENTS.md` 의 「기술 주의점」). 생성자가 바뀌므로 `ControlPlaneJwtFilterTest` 의 `new ControlPlaneJwtFilter(...)` 세 곳도 고친다
 - 메일 주소를 로그에 남기지 않는다. `log.warn("rejected a revoked user")` 정도로 둔다
 - 클래스 주석과 `UNFILTERED_PATHS` 주석을 한국어로 고쳐 이 판정을 적는다
 
