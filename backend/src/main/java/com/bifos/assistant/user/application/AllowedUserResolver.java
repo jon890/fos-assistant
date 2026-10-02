@@ -46,7 +46,6 @@ public class AllowedUserResolver implements TokenUserResolver {
     @Transactional
     public Optional<CurrentUser> resolveCurrentUser(String email, String displayName) {
         return resolveAllowed(email, displayName)
-                .map(user ->
-                        new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()));
+                .map(user -> new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()));
     }
 }

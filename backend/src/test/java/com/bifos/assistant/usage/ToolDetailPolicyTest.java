@@ -3,8 +3,8 @@ package com.bifos.assistant.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.usage.application.ToolDetailPolicy;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.usage.application.ToolDetailPolicy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

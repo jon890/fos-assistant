@@ -6,8 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.usage.domain.AgentExecution;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

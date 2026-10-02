@@ -128,7 +128,8 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             var authentication = new UsernamePasswordAuthenticationToken(
                     principal,
                     null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + principal.role().name())));
+                    List.of(new SimpleGrantedAuthority(
+                            "ROLE_" + principal.role().name())));
             SecurityContextHolder.getContext().setAuthentication(authentication);
             return TokenOutcome.AUTHENTICATED;
         } catch (JwtException ex) {
