@@ -162,7 +162,42 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 | 대화 스트림의 `tool` 사건 | `ChatController` 가 `ChatService` 에 넘기는 사건 소비자 |
 | `GET /api/v1/usage/executions/{id}/tree` 의 `TOOL_STARTED`, `TOOL_COMPLETED` 사건 | `ExecutionTreeService` 가 `ExecutionEventView` 를 만들 때 |
 
-도구 사건이 아닌 사건의 `detail` 은 모두에게 싣는다. 하위 에이전트의 목표, 실패 코드, 넘어간 모델 이름이다.
+도구 사건이 아닌 사건의 `detail` 가운데 하위 에이전트의 목표와 실패 코드는 모두에게 싣는다.
+넘어간 모델 이름은 아래 절의 규칙을 따른다.
+
+#### 역할에 따라 응답에서 빼는 값
+
+**화면이 `MEMBER` 역할 사용자에게 그리지 않는 내부 값은 Control Plane 도 보내지 않는다.**
+화면에서만 가리면 브라우저의 개발자 도구로 자기 실행의 금액과 모델과 토큰이 보인다.
+근거는 [ADR-060](../adr/ADR-060-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) 에 있다.
+
+`ADMIN` 역할에게는 아래 응답이 그대로 간다. `MEMBER` 역할에게는 「빼는 값」 이 `null` 로 간다.
+
+| 응답 | 빼는 값 |
+| --- | --- |
+| `GET /api/v1/usage/executions` 의 실행 한 줄 | `agentCode`, `provider`, `model`, `reasoningEffort`, `costMode`, `runtimeFingerprint`, `instructionsHash`, `costCurrency`, `pricingVersion`, `inputTokens`, `cachedInputTokens`, `outputTokens`, `totalTokens`, `contextChars`, `contextOmittedItems`, `estimatedCostMicros`, `actualCostMicros` |
+| `GET /api/v1/usage/monthly-cost` | `currency`, `estimatedCostMicros`, `actualCostMicros`, `pricedExecutions`, `unpricedExecutions`, `subscriptionExecutions`. 실행 건수 `totalExecutions` 는 모두에게 싣는다 |
+| `GET /api/v1/usage/breakdown` | 응답 전체. `MEMBER` 역할이 부르면 `FORBIDDEN` 이다 |
+| `GET /api/v1/usage/skills` 의 한 줄 | `agentCode` |
+| `GET /api/v1/usage/executions/{id}/tree` 의 실행 노드 | `agentCode`, `provider`, `model`, `reasoningEffort`, `reasoningEffortSource`, `inputTokens`, `cachedInputTokens`, `outputTokens`, `totalTokens`, `estimatedCostMicros`, `requestReceivedAt`, `submittedAt`, `firstDeltaAt`, `finishedAt` |
+| 같은 응답의 사건 | `model`, `inputTokens`, `outputTokens`. `PROVIDER_SWITCHED` 사건은 사건째 뺀다 |
+| `GET /api/v1/chat/conversations/{id}/messages` 의 메시지 | `switchedTo` |
+| 대화 스트림과 대화 단위 SSE 의 `subagent` 사건 | `model`, `inputTokens`, `outputTokens` |
+| 같은 흐름의 `switched` 사건 | 사건째 보내지 않는다 |
+| `GET /api/v1/chat/model-tiers` 의 단계 한 줄 | `provider`, `model`, `reasoningEffort` |
+
+**빼지 않는 값과 그 까닭.**
+
+| 값 | 까닭 |
+| --- | --- |
+| 실행 한 줄의 `errorCode`, `RUN_FAILED` 사건의 `detail`, SSE `error` 사건의 `code` | 화면이 코드를 사람 말 문구로 바꾸는 데 쓴다. 빼면 모든 실패가 같은 문구가 되고, 화면의 분기가 깨진다. 코드 원문은 화면이 `MEMBER` 역할에게 그리지 않는다 |
+| `latencyMs`, `modelTier`, `skillNames` | `MEMBER` 역할에게 보이는 값이다 |
+| `subagentName` | 목표가 비었을 때 도우미 줄의 이름으로 쓴다 |
+| `GET /api/v1/chat/model-options` 와 대화 응답의 `provider`, `model`, `reasoningEffort` | `MEMBER` 역할도 쓰는 고급 모델 선택의 입력이다. 숨김 목록을 적용한 것만 간다 |
+| 에이전트 목록의 `code`, 대화의 `agentCode` | 주소와 요청 본문에 쓰는 열쇠다 |
+
+판정은 한 자리에 둔다. 응답 DTO 를 만드는 쪽이 요청자의 역할을 받아 `ADMIN` 이 아니면 위 값을 비운다.
+도구 `detail` 의 판정(`ToolDetailPolicy`)과 같은 자리에서 함께 적용한다.
 판정은 도구 이름 전체로 한다. `mcp__{서버}__web_search` 처럼 다른 MCP 서버가 같은 이름을 붙인 도구는 공개하지 않는다.
 
 ## 실행 사건
