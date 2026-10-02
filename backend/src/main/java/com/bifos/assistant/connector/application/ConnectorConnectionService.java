@@ -64,6 +64,7 @@ public class ConnectorConnectionService {
     private final HermesToolsetClient toolsets;
     private final TransactionTemplate transactions;
     private final ConnectorCallLimiter limiter;
+    private final ConnectorActionService approvals;
     private final Clock clock;
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -76,8 +77,18 @@ public class ConnectorConnectionService {
             HermesConnectorClient connector,
             HermesToolsetClient toolsets,
             PlatformTransactionManager transactionManager,
-            ConnectorCallLimiter limiter) {
-        this(connections, users, lifecycle, connector, toolsets, transactionManager, limiter, Clock.systemUTC());
+            ConnectorCallLimiter limiter,
+            ConnectorActionService approvals) {
+        this(
+                connections,
+                users,
+                lifecycle,
+                connector,
+                toolsets,
+                transactionManager,
+                limiter,
+                approvals,
+                Clock.systemUTC());
     }
 
     public ConnectorConnectionService(
@@ -88,6 +99,7 @@ public class ConnectorConnectionService {
             HermesToolsetClient toolsets,
             PlatformTransactionManager transactionManager,
             ConnectorCallLimiter limiter,
+            ConnectorActionService approvals,
             Clock clock) {
         this.connections = connections;
         this.users = users;
@@ -96,6 +108,7 @@ public class ConnectorConnectionService {
         this.toolsets = toolsets;
         this.transactions = new TransactionTemplate(transactionManager);
         this.limiter = limiter;
+        this.approvals = approvals;
         this.clock = clock;
     }
 
@@ -202,6 +215,8 @@ public class ConnectorConnectionService {
                 });
         connection.beginRegister(now());
         connections.save(connection);
+        // 다른 계정의 값으로 바꿀 수 있다. 앞선 값에 한 승인 요청과 상시 허락을 남기지 않는다(ADR-050).
+        approvals.rejectPendingFor(connection, now());
         String profile = connection.agent().hermesProfile();
         String step = STEP_ENV;
         try {
@@ -242,6 +257,7 @@ public class ConnectorConnectionService {
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, manifest.isPresent());
         connection.beginDisconnect(now());
+        approvals.rejectPendingFor(connection, now());
         String profile = connection.agent().hermesProfile();
         String step = STEP_ENV;
         try {

@@ -47,9 +47,18 @@ async def env_view() -> dict:
 
 
 @server.tool(annotations=ToolAnnotations(read_only_hint=False))
-async def write_note() -> dict:
-    """쓰는 도구다. 대시보드가 이 도구를 부르면 안 된다."""
-    return {"written": True}
+async def write_note(text: str = "") -> dict:
+    """쓰는 도구다. 대시보드의 `call` 이 이 도구를 부르면 안 된다.
+
+    받은 인자와 토큰의 앞 4자를 그대로 돌려준다. 실행 경로의 검사가 인자와 env 가 닿았는지 본다.
+    """
+    return {"written": True, "text": text, "token": os.environ.get("DEMO_TOKEN", "")[:4]}
+
+
+@server.tool(annotations=ToolAnnotations(read_only_hint=False), structured_output=False)
+async def append_line() -> CallToolResult:
+    """쓰는 도구다. 구조화 결과도 JSON 도 아닌 평문만 돌려준다."""
+    return CallToolResult(content=[TextContent(type="text", text="appended one line")])
 
 
 if __name__ == "__main__":

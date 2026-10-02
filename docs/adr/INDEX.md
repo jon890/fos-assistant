@@ -51,7 +51,7 @@
 | [ADR-047](ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) | 도구 내용은 비밀값과 UUID를 가린 뒤 중계하고 저장한다 | Accepted. ADR-038의 관리자 원문 보기를 가린 값으로 바꾼다 |
 | [ADR-048](ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) | 응답 중에 보낸 메시지는 Control Plane 이 쌓아 두고 다음 turn 으로 합쳐 보낸다 | Accepted. ADR-040 의 다음 turn 을 여는 자리를 함께 쓴다 |
 | [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) | 커넥터 도구 호출은 profile plugin 의 hook 이 Control Plane 에 물어 판정한다 | Accepted. ADR-043 의 manifest 에 도구 정책을 더한다 |
-| [ADR-050](ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) | 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다 | Accepted. ADR-040 의 깨우기를 승인 결과로 넓힌다. 승인 엔진은 아직 구현 전이고 지금은 승인 필요인 호출을 막고 판정 줄만 남긴다 |
+| [ADR-050](ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) | 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다 | Accepted. ADR-040 의 깨우기를 승인 결과로 넓힌다 |
 | [ADR-051](ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) | 화면 색은 새벽 보라로 바꾸고 강조 색은 누를 것과 고른 것과 초점에만 쓴다 | Accepted. ADR-023 의 색 값 부분을 대체한다 |
 | [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) | Memory 는 collection, 종류, 꺼내는 방식, 민감도, 판, 출처를 가진다 | Accepted. ADR-015 의 `always_inject` 를 `retrieval` 로 넓힌다 |
 | [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다 |

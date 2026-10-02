@@ -72,6 +72,8 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_OPERATION_FAILED: "연결을 마치지 못했어요.",
   CONNECTOR_NOT_FOUND: "찾을 수 없는 서비스예요.",
   CONNECTOR_RATE_LIMITED: "요청이 많아요. 잠시 뒤 다시 해 주세요.",
+  CONNECTOR_ACTION_EXECUTING:
+    "승인한 동작을 실행하는 중이에요. 끝난 뒤 다시 시도해 주세요.",
   FORBIDDEN: "이 작업을 관리할 수 없어요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
   VALIDATION_FAILED: "입력 형식을 확인해 주세요.",
@@ -183,13 +185,18 @@ export function toolRiskLabel(risk: ToolRisk): string {
 }
 
 /**
- * 도구를 호출할 때 일어나는 일을 사용자에게 보이는 말로 바꾼다. 막힌 위험도가 승인 방식보다 앞선다.
- * 승인이 필요한 도구는 승인을 받는 길이 아직 없어 실행되지 않으므로 그렇게 적는다.
+ * 도구를 쓸 수 없으면 참이다. 막힌 위험도이거나, 승인 방식이 `ALWAYS` 라 설치가 모델에게서 뺀 도구다.
  */
+export function toolBlocked(tool: ConnectorTool): boolean {
+  return (
+    tool.risk === "DESTRUCTIVE" ||
+    tool.risk === "FINANCIAL" ||
+    tool.approval === "ALWAYS"
+  );
+}
+
+/** 도구를 호출할 때 일어나는 일을 사용자에게 보이는 말로 바꾼다. 쓸 수 없는 도구가 승인 방식보다 앞선다. */
 export function toolPolicyLabel(tool: ConnectorTool): string {
-  if (tool.risk === "DESTRUCTIVE" || tool.risk === "FINANCIAL")
-    return "아직 쓸 수 없어요";
-  return tool.approval === "NONE"
-    ? "바로 실행해요"
-    : "승인 기능이 준비될 때까지 실행하지 않아요";
+  if (toolBlocked(tool)) return "아직 쓸 수 없어요";
+  return tool.approval === "NONE" ? "바로 실행해요" : "실행 전에 물어봐요";
 }

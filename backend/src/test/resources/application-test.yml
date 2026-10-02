@@ -39,6 +39,9 @@ assistant:
     max-concurrent-calls: 1
     # 검사는 같은 사용자로 짧은 시간에 여러 번 부른다. 제한 자체는 ConnectorCallLimiterTest 가 본다
     calls-per-minute: 1000
+    policy:
+      # 검사가 뜰 때마다 만료 정리가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+      expire-cron: "-"
   auth:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
   attachment:

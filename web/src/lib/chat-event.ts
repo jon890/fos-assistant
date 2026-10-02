@@ -5,6 +5,8 @@
  *
  * <p>`user` 는 대기 메시지를 합쳐 사용자 메시지로 저장했다는 사건이고 `system` 과 같은 칸을 쓴다. `pending` 은
  * 대기 줄이 바뀌었다는 사건이다. 바뀐 내용은 싣지 않으므로 받은 쪽이 대기 줄을 다시 읽는다.
+ *
+ * <p>`approval` 은 승인 줄이 생겼다는 사건이다. 요청 번호만 `detail` 에 오므로 받은 쪽이 승인 줄을 다시 읽는다.
  */
 export type ChatEvent = {
   type:
@@ -20,7 +22,8 @@ export type ChatEvent = {
     | "error"
     | "system"
     | "user"
-    | "pending";
+    | "pending"
+    | "approval";
   text?: string | null;
   toolName?: string | null;
   detail?: string | null;
