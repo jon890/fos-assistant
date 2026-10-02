@@ -23,7 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * profile 플러그인이 {@code subagent_start} hook 에서 하위 에이전트 session 을 등록하는 경로다(ADR-037).
  *
- * <p>계약은 {@code docs/hermes/delegation.md} 의 「하위 에이전트 session 등록 계약」 이 갖는다. 인증은
+ * <p>계약은 {@code docs/hermes/fos-ctx.md} 의 「하위 에이전트 session 등록 계약」 이 갖는다. 인증은
  * {@code /mcp} 와 같은 profile 토큰이고 모델 도구가 아니다. 본문을 문자열로 받아 여기서 읽는다. JSON 이 아닌
  * 본문도 다른 거절과 같은 {@link ErrorCode#SESSION_BINDING_REJECTED} 로 끝나야 하기 때문이다.
  */

@@ -52,7 +52,7 @@ public final class ArchitectureRules {
     /**
      * 최상위 패키지 사이의 간선이 순환에 속하지 않는다. {@code shared} 는 그래프에서 뺀다.
      *
-     * <p>근거: {@code docs/code-architecture.md} 「backend 패키지」 의 {@code mcp} 와 {@code orchestration} 문단.
+     * <p>근거: {@code docs/backend/packages.md} 「backend 패키지」 의 {@code mcp} 와 {@code orchestration} 문단.
      */
     public static final ArchRule TOP_LEVEL_PACKAGES_FREE_OF_CYCLES = classes()
             .that()
@@ -63,7 +63,7 @@ public final class ArchitectureRules {
     /**
      * {@code shared} 는 다른 최상위 패키지에 의존하지 않는다.
      *
-     * <p>근거: {@code docs/code-architecture.md} 「backend 패키지」 의 {@code shared/auth}, {@code shared/error} 책임.
+     * <p>근거: {@code docs/backend/packages.md} 「backend 패키지」 의 {@code shared/auth}, {@code shared/error} 책임.
      */
     public static final ArchRule SHARED_DOES_NOT_DEPEND_ON_DOMAINS = noClasses()
             .that()
@@ -78,7 +78,7 @@ public final class ArchitectureRules {
      * 아래 층이 위 층을 쓰는 것과 {@code presentation} 이 {@code infra} 를 바로 쓰는 것을 막는다.
      * 컨트롤러가 저장소를 바로 쓰면 권한 확인과 트랜잭션 경계를 서비스가 갖지 못한다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「패키지 배치」, {@code docs/code-architecture.md} 「backend 패키지」.
+     * <p>근거: {@code backend/AGENTS.md} 「패키지 배치」, {@code docs/backend/packages.md} 「backend 패키지」.
      */
     public static final ArchRule LAYER_DIRECTION = layeredArchitecture()
             .consideringOnlyDependenciesInLayers()
@@ -103,7 +103,7 @@ public final class ArchitectureRules {
     /**
      * {@code domain} 은 웹 계층의 타입에 의존하지 않는다.
      *
-     * <p>근거: {@code backend/AGENTS.md} 「패키지 배치」, {@code docs/code-architecture.md} 「backend 패키지」.
+     * <p>근거: {@code backend/AGENTS.md} 「패키지 배치」, {@code docs/backend/packages.md} 「backend 패키지」.
      */
     public static final ArchRule DOMAIN_DOES_NOT_DEPEND_ON_WEB = noClasses()
             .that()
@@ -120,7 +120,7 @@ public final class ArchitectureRules {
     /**
      * {@code orchestration} 은 {@code mcp} 에 의존하지 않는다.
      *
-     * <p>근거: {@code docs/code-architecture.md} 「backend 패키지」 의
+     * <p>근거: {@code docs/backend/packages.md} 「backend 패키지」 의
      * 「{@code mcp} 는 {@code orchestration} 을 부르고, {@code orchestration} 은 {@code mcp} 를 import 하지 않는다」.
      */
     public static final ArchRule ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP = noClasses()
@@ -135,7 +135,7 @@ public final class ArchitectureRules {
      * {@code mcp} 는 Hermes 를 부르는 타입에 의존하지 않는다.
      * {@code hermes.HermesProfileName} 같은 이름 규칙 값은 허용한다.
      *
-     * <p>근거: {@code docs/code-architecture.md} 「다른 에이전트에게 맡기기」 의 「MCP 쪽은 Hermes 를 부르지 않는다」.
+     * <p>근거: {@code docs/backend/agent-delegation.md} 「다른 에이전트에게 맡기기」 의 「MCP 쪽은 Hermes 를 부르지 않는다」.
      */
     public static final ArchRule MCP_DOES_NOT_CALL_HERMES = noClasses()
             .that()
@@ -150,7 +150,7 @@ public final class ArchitectureRules {
     /**
      * {@code orchestration} 은 {@code ChatService} 에 의존하지 않는다.
      *
-     * <p>근거: {@code docs/code-architecture.md} 「중지」 의 「{@code ChatService} 와 흐름이 서로를 부르지 않게」.
+     * <p>근거: {@code docs/backend/turn-control.md} 「중지」 의 「{@code ChatService} 와 흐름이 서로를 부르지 않게」.
      */
     public static final ArchRule ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE = noClasses()
             .that()
@@ -163,7 +163,7 @@ public final class ArchitectureRules {
     /**
      * {@code hermes} 는 {@code people} 에 의존하지 않는다.
      *
-     * <p>근거: {@code docs/code-architecture.md} 「사용자를 더할 때」 의
+     * <p>근거: {@code docs/backend/people.md} 「사용자를 더할 때」 의
      * 「{@code hermes} 는 부르는 방법만 알고 순서를 모른다」.
      */
     public static final ArchRule HERMES_DOES_NOT_DEPEND_ON_PEOPLE = noClasses()

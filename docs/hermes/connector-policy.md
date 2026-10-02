@@ -120,3 +120,63 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 - 떠 있는 공유 gateway 가 profile 의 `fos-ctx` 를 새 판으로 바꾼 뒤 재시작 없이 새 코드를 읽는지
 - native 자식과 공유 gateway 에서 실제 커넥터 호출이 hook 을 거치는지. 대역 서버의 호출 기록과 `connector_action` 을 견준다
 - Control Plane 이 내려가 있을 때 연결용 에이전트의 도구가 막히는지
+
+## 승인 방식 `smart` 는 추론 모델에서 `manual` 과 같아진다
+
+`approvals.mode` 가 `smart` 이면 위험한 모양으로 분류된 명령마다
+보조 LLM 에 한 번 물어 `APPROVE`, `DENY`, `ESCALATE` 가운데 하나를 받는다.
+`tools/approval.py` 의 `_smart_approve` 가 그 호출을 갖는다.
+
+**그 호출이 `max_tokens=16` 으로 걸려 있다.**
+받은 내용을 대문자로 바꿔 세 낱말과 정확히 비교하고, 어느 것과도 맞지 않으면 `escalate` 로 읽는다.
+
+추론 모델은 답을 내기 전에 생각을 먼저 내보낸다.
+그 문장이 16 토큰을 넘으면 거기서 잘리고, 잘린 문장은 세 낱말 어느 것과도 맞지 않는다.
+**그래서 모든 판정이 `escalate` 가 된다.**
+
+`nvidia/nemotron-3-super-120b-a12b` 로 실측했다. 받은 내용이 이것이다.
+
+```text
+We need to decide: The user gave a command: python3 -c print
+```
+
+위험한 모양으로 분류된 명령 여덟 가지를 넣어 모두 `escalate` 를 받았다.
+`python3 -c "print(1+1)"` 처럼 무해한 것도, `curl ... | sh` 처럼 실제로 위험한 것도 같았다.
+요청이 모델을 OpenAI codex 계열로 덮어쓰면 같은 명령이 `approve` 로 나온다.
+
+### 알아채기 어려운 이유
+
+오류가 아니다. 예외도 로그의 실패 표시도 나지 않는다.
+`escalate` 는 「사람에게 물어라」라는 정상 판정이고, `smart` 는 그때 `manual` 과 같은 길로 간다.
+**설정에는 `smart` 라고 적혀 있으므로 설정만 읽어서는 알 수 없다.**
+
+보조 LLM 호출 자체가 실패할 때도 같은 모양이 된다.
+`_smart_approve` 의 예외 처리가 `escalate` 를 돌려주기 때문이다.
+그쪽은 경고 한 줄을 남기지만, 토큰이 잘리는 쪽은 그 줄도 남기지 않는다.
+
+### 부르는 쪽이 보는 것
+
+사람이 승인할 자리가 없는 경로에서는 실행이 `waiting_for_approval` 로 멈춘다.
+`approvals.timeout` 이 지나면 그 명령이 거절되고, 에이전트는 다른 길을 찾아 실행을 마친다.
+
+**그래서 최종 상태가 `failed` 가 아니라 `completed` 다.**
+호출한 쪽은 성공으로 받지만, 실제로는 에이전트가 하려던 것을 하지 못하고 우회한 결과다.
+실행 시간이 `approvals.timeout` 만큼 길어지는 것이 유일하게 겉으로 드러나는 신호다.
+
+### 같은 부류의 계약 둘
+
+**`command_allowlist` 는 프로세스 전역이고 import 시점에 한 번만 읽는다.**
+`tools/approval.py` 가 모듈을 읽을 때 한 번 불러 결과를 프로세스 전역 집합에 담는다.
+실행마다 다시 읽지 않는다.
+
+한 프로세스가 여러 profile 을 서비스하는 구성이면,
+그 프로세스의 Hermes home 이 아닌 profile 의 설정에 적은 항목은 실리지 않고,
+그 home 의 설정에 적은 항목은 모든 profile 에 적용된다.
+**적어 두어도 아무 일도 일어나지 않으므로 설정을 읽어서는 어느 쪽인지 알 수 없다.**
+
+반면 `approvals.mode` 와 `approvals.deny` 는 판정할 때마다 그 실행의 profile 설정을 다시 읽는다.
+값을 바꾸면 프로세스를 다시 띄우지 않아도 반영된다.
+
+**`approvals.mode` 의 값 `off` 는 따옴표가 없으면 YAML 이 거짓으로 읽는다.**
+Hermes 가 그 거짓을 다시 `off` 로 되돌려 주므로 결과는 같다.
+받는 값은 `manual`, `smart`, `off` 셋뿐이고, 그 밖의 문자열은 경고를 남기고 `manual` 이 된다.

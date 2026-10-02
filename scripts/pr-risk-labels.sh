@@ -39,6 +39,8 @@ while IFS= read -r path; do
     backend/src/main/java/com/bifos/assistant/hermes/* | \
     test/e2e/fake-hermes.ts | \
     docs/hermes/* | \
+    docs/backend/mcp-caller.md | \
+    docs/backend/conversation.md | \
     hermes/*)
       hermes=1 ;;
   esac

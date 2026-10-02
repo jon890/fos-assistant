@@ -45,7 +45,7 @@ PyYAML 과 `mcp` SDK 가 있어야 한다. 검사는 `mcp==2.0.0` 으로 돌고 
 ## fos-ctx 가 붙이는 것
 
 Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서명이 없거나 틀리면 거절한다.
-키와 서명 규칙은 [`../docs/hermes/delegation.md`](../docs/hermes/delegation.md) 의 「`_fos_ctx` 계약」 이 소유한다.
+키와 서명 규칙은 [`../docs/hermes/fos-ctx.md`](../docs/hermes/fos-ctx.md) 의 「`_fos_ctx` 계약」 이 소유한다.
 `hermes/tests/test_fos_ctx.py` 가 그 절의 기대 서명으로 plugin 을 검사한다.
 
 | 도구 | 서명하지 못할 때 |
@@ -69,7 +69,7 @@ fos-ctx 를 켠 모든 profile 에 걸린다. 사람이 운영하는 profile 도
 
 최상위 run 의 `delegate_task` 자식은 부모 run 이 끝난 뒤에도 백그라운드로 돈다.
 Control Plane 은 부모 run 으로 자식의 요청자를 찾지 못하므로, fos-ctx 가 `subagent_start` hook 에서 자식 session 의 부모와 뿌리를 등록한다.
-경로, 본문, 서명, 응답은 [`../docs/hermes/delegation.md`](../docs/hermes/delegation.md) 「하위 에이전트 session 등록 계약」 이 소유한다.
+경로, 본문, 서명, 응답은 [`../docs/hermes/fos-ctx.md`](../docs/hermes/fos-ctx.md) 「하위 에이전트 session 등록 계약」 이 소유한다.
 
 | 항목 | 값 |
 | --- | --- |
@@ -86,7 +86,7 @@ Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동
 
 profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 을 연결용 profile 로 읽는다.
 그 profile 에서는 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
-경로, 본문, 서명, 응답은 [`../docs/connectors.md`](../docs/connectors.md) 의 「도구 호출 판정」 이 소유한다.
+경로, 본문, 서명, 응답은 [`../docs/backend/connector-tool-policy.md`](../docs/backend/connector-tool-policy.md) 의 「도구 호출 판정」 이 소유한다.
 대응 파일이 없는 profile 에서는 아래 처리를 하지 않는다.
 
 | hook 이 본 것 | 처리 |
@@ -233,7 +233,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 **운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
-`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 연결](../docs/connectors.md) 의 「hook 이 켜져 있는지」 가 갖는다.
+`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 연결](../docs/backend/connector-tool-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
 
 **한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록을 그대로 받는다**([ADR-041](../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)).
 

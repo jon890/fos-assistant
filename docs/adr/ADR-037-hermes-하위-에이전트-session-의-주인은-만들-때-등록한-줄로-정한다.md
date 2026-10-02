@@ -6,7 +6,7 @@
   등록이 없으면 그 호출의 session 이 뿌리 session 과 같을 때만 [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 의 규칙(profile, 뿌리 session, `RUNNING`)으로 최상위 실행을 찾는다. session 이 뿌리와 다르고 등록이 없으면 거절한다.
   등록은 profile 플러그인이 `subagent_start` hook 에서 내부 경로 `POST /internal/hermes/session-bindings/subagent` 로 보낸다. 모델 도구가 아니다.
 - **맥락**:
-  - Hermes v0.21.5(`v2026.9.24`)에서 모델이 부르는 최상위 `delegate_task` 는 늘 background 로 요청된다. `/v1/runs` 가 `conversation_history` 와 `previous_response_id` 없이 오면 자식이 부모 run 에서 떨어져 나가 따로 돈다. Control Plane 은 `session_id` 만 보내므로 **자식이 부모 FOS 실행보다 오래 산다.** 근거는 [`hermes/delegation.md`](../hermes/delegation.md#하위-에이전트는-부모-run-보다-오래-산다) 에 있다.
+  - Hermes v0.21.5(`v2026.9.24`)에서 모델이 부르는 최상위 `delegate_task` 는 늘 background 로 요청된다. `/v1/runs` 가 `conversation_history` 와 `previous_response_id` 없이 오면 자식이 부모 run 에서 떨어져 나가 따로 돈다. Control Plane 은 `session_id` 만 보내므로 **자식이 부모 FOS 실행보다 오래 산다.** 근거는 [`hermes/fos-ctx.md`](../hermes/fos-ctx.md#하위-에이전트는-부모-run-보다-오래-산다) 에 있다.
   - ADR-032 의 판정은 뿌리 session 과 `RUNNING` 으로 부모를 찾는다. 부모 실행이 끝나면 자식의 `memory_read` 가 거절된다. 같은 대화의 다음 turn 이 돌고 있으면 자식 호출이 그 turn 에 붙는다. 사용자는 같지만 부모 실행이 틀린다. 앞으로의 `agent_delegate` 가 이 부모 아래에 자식을 붙이므로 실행 나무가 틀린다.
   - 같은 대화 session 은 여러 turn 이 이어 쓴다. session 하나가 실행 하나라고 볼 수 없다. 반면 하위 에이전트 session 은 한 turn 에서 만들어져 그 turn 에 속한다. 다음 turn 이 시작돼도 바뀌지 않아야 한다.
   - `subagent_start` hook 은 자식을 만드는 `_build_children` 안에서 부모 스레드가 동기로 부른다. 제한 시간 목록에 없어 끝날 때까지 기다린다. 이때 부모 run 은 아직 돌고 있고, 자식은 hook 이 끝난 뒤에 돌기 시작한다. hook 예외는 Hermes 가 삼키고 자식은 그대로 돈다.
@@ -43,7 +43,7 @@
     - 사용자가 멈추지 않았어도 Hermes 가 run 을 `cancelled` 로 끝내면 실행이 `CANCELLED` 로 적혀 같이 거절된다
     - 취소한 origin 의 자식도 등록은 받는다. 그 자식의 호출이 판정에서 거절된다
     - 플러그인이 `subagent_start` hook 을 보내야 한다. 배치와 확인은 `fos-home-infra` 가 갖는다
-- **적용 범위**: ADR-032 의 「도는 부모 실행 하나를 찾는다」 는 최상위 session 에만 남고, 하위 에이전트 session 은 이 결정을 따른다. ADR-031 의 `_fos_ctx` 서명할 글과 key 는 그대로다. 등록 경로의 계약과 오류 코드는 [`hermes/delegation.md`](../hermes/delegation.md#하위-에이전트-session-등록-계약) 에, 저장 모델은 [`data-schema.md`](../data-schema.md#hermes_session_binding) 에 있다.
+- **적용 범위**: ADR-032 의 「도는 부모 실행 하나를 찾는다」 는 최상위 session 에만 남고, 하위 에이전트 session 은 이 결정을 따른다. ADR-031 의 `_fos_ctx` 서명할 글과 key 는 그대로다. 등록 경로의 계약과 오류 코드는 [`hermes/fos-ctx.md`](../hermes/fos-ctx.md#하위-에이전트-session-등록-계약) 에, 저장 모델은 [`backend/schema/execution.md`](../backend/schema/execution.md#hermes_session_binding) 에 있다.
 
 ### 판정 순서
 
@@ -80,4 +80,4 @@ _fos_ctx 서명 확인
 이제 사용자가 걸린 모든 MCP 호출의 `McpCaller` 는 요청자, origin 실행, 서명을 확인한 `_fos_ctx` 를 늘 갖는다.
 
 **이 결정은 profile 에 묶인 토큰을 전제로 한다.** 지금은 폐기되지 않은 토큰이 모두 그렇다.
-정리한 내용은 [`hermes/delegation.md`](../hermes/delegation.md#모든-토큰이-profile-에-묶여-있다) 에 있다.
+정리한 내용은 [`hermes/fos-ctx.md`](../hermes/fos-ctx.md#모든-토큰이-profile-에-묶여-있다) 에 있다.

@@ -1,0 +1,152 @@
+# 사용자를 더할 때
+
+## 사용자를 더할 때
+
+**관리자가 화면에서 한 번 더하면 끝난다.** 홈서버에 들어가지 않는다.
+
+| 누가 | 무엇을 |
+| --- | --- |
+| 관리자 | 관리 화면에서 이메일과 이름과 profile 이름을 적는다 |
+| Control Plane | 허용 목록에 넣고, Hermes profile 을 만들고, key 와 그 profile 에 묶인 MCP 토큰을 넣는다. 만들기 경로가 에이전트 만들기와 같아 MCP 등록과 서명 plugin 도 함께 붙는다 |
+| 그 사람 | 로그인한다. 그때 `app_user` 와 에이전트가 생긴다 |
+
+Google 동의 화면의 테스트 사용자에 주소를 더하는 것만 사람이 따로 한다.
+그 화면은 Google 계정 소유자만 고칠 수 있다.
+
+순서와 어긋나는 지점은 [`backend/people.md`](people.md) 의 「사람을 더할 때」가 갖는다.
+profile 을 사람마다 나누는 근거는
+[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
+Control Plane 이 Hermes 를 고치는 호출을 하게 된 근거는
+[`adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md`](../adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) 에 있다.
+
+### 어느 패키지가 무엇을 하나
+
+| 패키지 | 더하는 것 |
+| --- | --- |
+| `people` | 허용 목록, 사람을 더하는 흐름 전체의 조립 |
+| `hermes` | 대시보드 호출과 key 파일 쓰기 |
+| `user` | 첫 로그인에 에이전트까지 만든다 |
+| `agent` | 지금 있는 등록 경로를 그대로 쓴다 |
+
+**`people` 이 순서를 안다.** 허용 목록에 넣고 profile 을 만들고 key 를 넣는 차례와,
+중간에 실패했을 때 되돌리는 역순이 그 패키지 하나에 있다.
+`hermes` 는 부르는 방법만 알고 순서를 모른다.
+검사: `ArchitectureRules.HERMES_DOES_NOT_DEPEND_ON_PEOPLE`
+
+### 첫 에이전트의 과금 설정은 `people` 이 갖는다
+
+첫 로그인에 만드는 에이전트의 `cost_mode` 와 `credential_scope` 를 설정에서 읽는다.
+
+| 설정 | 기본값 |
+| --- | --- |
+| `assistant.people.default-cost-mode` | `SUBSCRIPTION` |
+| `assistant.people.default-credential-scope` | `SHARED_HOUSEHOLD` |
+
+`people` 패키지가 갖는다. Hermes 를 부르는 값이 아니라 `hermes` 쪽에 두지 않는다.
+
+두 값이 사람마다 다르지 않은 근거는
+[`adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md`](../adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
+profile 은 사람마다 나누고 AI 계정은 가족이 함께 쓴다.
+
+에이전트는 실행에 쓸 모델을 갖지 않는다.
+첫 로그인에 에이전트를 만들 때도 Hermes 에서 모델을 읽지 않는다.
+
+### key 를 두 곳에 같이 쓴다
+
+같은 값을 Hermes 의 `.env` 와 우리 key 디렉터리에 각각 쓴다.
+한쪽만 들어가면 실행할 때 401 이 난다.
+
+`HermesProfileKeyStore` 가 지금 읽기만 한다. 쓰는 경로를 그 옆에 둔다.
+**읽는 규칙과 쓰는 규칙이 같은 파일에 있어야 파일 이름 규칙이 갈리지 않는다.**
+
+## 사람을 더할 때
+
+두 시점에 나뉘어 일어난다.
+**관리자가 더할 때 Hermes 쪽이 끝나고, 그 사람이 처음 로그인할 때 우리 쪽이 끝난다.**
+
+한 시점에 몰지 않는 이유는 하나다.
+자기 profile 만 쓰는 에이전트는 주인이 있어야 하고,
+주인은 그 사람이 로그인하기 전에는 존재하지 않는다.
+
+### 관리자가 더할 때
+
+```mermaid
+sequenceDiagram
+    participant A as 관리자 브라우저
+    participant C as Control Plane
+    participant D as Hermes 대시보드
+    participant F as key 디렉터리
+
+    A->>C: POST /api/admin/people<br/>이메일, 이름, profile 이름
+    C->>C: 허용 목록에 행을 만든다
+    C->>D: POST /api/profiles
+    D-->>C: 만들어졌다
+    C->>C: 그 profile 에 묶인 MCP 토큰을 발급한다
+    C->>D: PUT /api/env (MCP_FOS_ASSISTANT_API_KEY)
+    C->>C: key 를 만든다
+    C->>D: PUT /api/env (API_SERVER_MODEL_NAME 과 API_SERVER_KEY)
+    D-->>C: 들어갔다
+    C->>F: 같은 key 를 파일로 쓴다
+    C-->>A: 더해졌다
+```
+
+`clone_from` 을 쓰지 않는다.
+그 값을 주면 본뜬 profile 의 `API_SERVER_KEY` 까지 복사되어
+key 하나로 두 profile 이 열린다. 실측으로 확인했다.
+
+### 그 사람이 처음 로그인할 때
+
+```mermaid
+sequenceDiagram
+    participant U as 새 사용자 브라우저
+    participant W as Next.js 서버 라우트
+    participant C as Control Plane
+
+    U->>W: Google 로그인
+    W->>C: 허용 목록에 있는가
+    C-->>W: 있다. profile 이름은 이것이다
+    W->>C: 짧은 수명 JWT 로 첫 요청
+    C->>C: app_user 를 만든다
+    C->>C: 그 profile 을 가리키는 에이전트를 만든다
+    C-->>U: 에이전트 목록에 하나가 보인다
+```
+
+에이전트는 자기만 보는 것으로 만들고 주인을 그 사람으로 둔다.
+`API_SERVER_KEY` 를 파일에서 찾는 규칙은 바뀌지 않는다. profile 이름으로 찾는다.
+
+### 어긋나는 지점
+
+| 무엇 | 어떻게 되나 |
+| --- | --- |
+| 이미 있는 이메일 | 거절한다. 허용 목록의 이메일은 하나뿐이다 |
+| 이미 있는 profile 이름 | 거절한다. 우리 표에서도 Hermes 에서도 본다 |
+| profile 은 만들었는데 토큰이나 key 주입이 실패 | **발급한 토큰을 폐기하고 만든 profile 을 지운다.** 아무것도 남기지 않는다 |
+| key 파일 쓰기가 실패 | 같다. profile 을 지우고 허용 목록 행도 되돌린다 |
+| Hermes 가 응답하지 않는다 | 허용 목록 행을 만들기 전이므로 아무것도 남지 않는다 |
+| 같은 요청이 두 번 온다 | 뒤의 것이 이메일 유니크 제약에 걸려 거절된다 |
+| 허용 목록에 없는 사람이 로그인 | 지금과 같다. 토큰을 만들지 않는다 |
+| 허용 목록에는 있는데 profile 이 없어졌다 | 실행할 때 key 를 찾지 못해 실패한다. 관리자가 다시 더한다 |
+| 첫 로그인에 Hermes 가 답하지 않는다 | 첫 로그인은 모델을 읽지 않고 에이전트를 만든다. Hermes 를 부르지 않으므로 로그인도 에이전트 생성도 막히지 않는다 |
+
+에이전트를 만드는 것은 `app_user` 를 새로 저장하는 그 순간뿐이다.
+허용 목록에서 그 사람을 찾지 못했거나, 첫 로그인이 모델을 읽던 때에 에이전트 없이 들어온 사람은 관리자가 기존 에이전트 등록 화면에서 만든다.
+그 사람의 `app_user` 가 이미 있어 주인을 지정할 수 있다.
+**다시 시도하는 것을 요청 경로에 두지 않는다.**
+로그인 판정이 매 요청 도는 자리라, 거기서 에이전트가 있는지 다시 보지 않는다.
+
+**되돌리는 순서가 만드는 순서의 역순이다.**
+Hermes 쪽을 먼저 지우고 우리 표를 나중에 지운다.
+반대로 하면 우리 표에 없는 profile 이 Hermes 에 남는다.
+
+### 관리자가 아닌 사람
+
+사람을 더하는 화면은 `ADMIN` 만 연다.
+`MEMBER` 는 그 화면도 그 API 도 보지 못한다.
+
+### 아무도 없을 때
+
+허용 목록이 비면 아무도 로그인하지 못한다.
+**마이그레이션은 표만 만들고 어떤 주소도 넣지 않는다.** 이 저장소는 공개다.
+배포할 때 지금 쓰는 주소를 한 번 넣어야 하고, 그 절차는 비공개 저장소가 소유한다.
+데이터베이스를 새로 만들거나 그 표를 비우면 들어갈 길이 사라진다.
+그때는 데이터베이스에 직접 행을 넣어야 한다.
