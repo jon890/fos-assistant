@@ -29,6 +29,7 @@ Hermes core 는 고치지 않는다.
 | `PUT /api/config` | 지정한 profile 의 API 도구 목록과 올린 스킬 경로만 쓴다. 켠 도구는 `agent.disabled_toolsets` 에서 뺀다 |
 | `GET /api/skills` | 지정한 profile 의 스킬 목록을 읽는다 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 |
+| `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다 |
 
 `PUT /api/profiles/<이름>/soul` 과 `GET /api/tools/toolsets` 를 뺀 요청은 토큰 요청의 본문이나 query 를
 먼저 검사한다. 검사 규칙은 각 `_check_*` 함수가 소유한다. 공통으로 지키는 것은 셋이다.
@@ -136,6 +137,7 @@ import os
 import pathlib
 import re
 import shutil
+import sqlite3
 import tempfile
 import time
 from typing import Optional
@@ -173,6 +175,14 @@ CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
+# native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-063).
+SESSION_PROVIDER_RE = re.compile(r"^/api/profiles/([^/]+)/sessions/([^/]+)/provider$")
+# 경로에서 온 session id 다. 저장소 조회의 인자로만 쓰고 파일 경로에는 쓰지 않는다.
+SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+# profile 디렉터리 아래 Hermes 의 session 저장소 파일이다.
+SESSION_DB_FILE = "state.db"
+# 저장소가 잠겨 있을 때 기다리는 시간이다. 넘으면 503 으로 답한다.
+SESSION_DB_TIMEOUT_SECONDS = 2
 
 PROFILES_PATH = "/api/profiles"
 PROFILE_PREFIX = "/api/profiles/"
@@ -1944,6 +1954,48 @@ def _model_defaults_response(name):
         return _rejected("profile 설정을 읽지 못했다", 503)
 
 
+def _session_provider_response(name, session_id):
+    """자식 session 한 줄에서 provider 와 모델만 돌려준다.
+
+    Hermes 의 session 저장소를 읽기 전용으로 연다. Hermes 의 저장소 모듈은 스키마가 낡았으면
+    쓰기 연결을 열 수 있어 쓰지 않고 표준 `sqlite3` 만 쓴다(ADR-063).
+    주 호출이 쓴 모델과 provider 의 짝이 둘 이상이면 어느 것으로 환산할지 알 수 없어 provider 를 주지 않는다.
+    """
+    if (not isinstance(name, str) or not PROFILE_NAME_RE.fullmatch(name)
+            or not isinstance(session_id, str) or not SESSION_ID_RE.fullmatch(session_id)):
+        return _rejected("profile 이름이나 session id 가 올바르지 않다", 400)
+    try:
+        from hermes_cli.profiles import get_profile_dir, profile_exists
+        from starlette.responses import JSONResponse
+
+        if not profile_exists(name):
+            return _rejected("없는 profile 이다", 404)
+        database = get_profile_dir(name) / SESSION_DB_FILE
+        if not database.is_file():
+            return _rejected("없는 session 이다", 404)
+        connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True,
+                                     timeout=SESSION_DB_TIMEOUT_SECONDS)
+        try:
+            row = connection.execute(
+                "SELECT source, model, billing_provider FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            if row is None or row[0] != "subagent":
+                return _rejected("없는 session 이다", 404)
+            pairs = connection.execute(
+                "SELECT COUNT(*) FROM (SELECT DISTINCT model, billing_provider FROM session_model_usage"
+                " WHERE session_id = ? AND task = '')", (session_id,)).fetchone()[0]
+        finally:
+            connection.close()
+
+        def public_text(value):
+            return value if isinstance(value, str) and value else None
+
+        provider = public_text(row[2]) if pairs <= 1 else None
+        return JSONResponse({"provider": provider, "model": public_text(row[1])}, status_code=200)
+    except Exception:
+        logger.warning("dashboard-profile-api: session 저장소를 읽지 못했다")
+        return _rejected("session 저장소를 읽지 못했다", 503)
+
+
 def _install_gate() -> bool:
     """`token_auth_middleware` 를 감싼다. 감싸지 못하면 False 를 돌려준다."""
     try:
@@ -2044,6 +2096,14 @@ def _install_gate() -> bool:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
             return await asyncio.to_thread(_model_defaults_response, defaults_match.group(1))
 
+        provider_match = SESSION_PROVIDER_RE.match(path) if method == "GET" else None
+        if provider_match is not None:
+            principal, _ = seam.authenticate_token(request)
+            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
+                return _rejected("Control Plane 토큰이 필요하다", 401)
+            return await asyncio.to_thread(
+                _session_provider_response, provider_match.group(1), provider_match.group(2))
+
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
         if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
@@ -2137,6 +2197,7 @@ def register(ctx) -> None:
     opened[CONNECTORS_PATH] = ["GET", "PUT"]
     opened[CATALOG_PATH] = ["GET"]
     opened["/api/profiles/<이름>/model-defaults"] = ["GET"]
+    opened["/api/profiles/<이름>/sessions/<session id>/provider"] = ["GET"]
     logger.info(
         "dashboard-profile-api: %s 를 토큰으로 연다. 스킬 루트는 %s 다",
         ", ".join(
