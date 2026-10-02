@@ -132,7 +132,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                     .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                     .retrieve()
                     .body(JsonNode.class);
-            // v0.21.5 는 `{"object": ..., "session": {...}}` 로 감싸고 provider 를 `billing_provider` 로 둔다.
+            // v0.21.5 는 `{"object": ..., "session": {...}}` 로 감싸고 provider 칸을 주지 않는다. 주는 판을 위해 두 이름을 읽는다.
             JsonNode row = session != null && session.has("session") ? session.get("session") : session;
             String model = text(row, "model");
             String provider = text(row, "provider");
