@@ -176,8 +176,8 @@ export const connectorPolicyScenario: Scenario = {
       );
       const autoTurnInput = context.hermes.lastSubmittedInput() ?? "";
       expect(
-        autoTurnInput.includes("승인한 동작의 결과가 도착했다.") && autoTurnInput.includes(`요청 번호: ${actionId}`)
-          && autoTurnInput.includes("상태: SUCCEEDED") && autoTurnInput.includes("<external-data>"),
+        autoTurnInput.includes("승인한 동작의 결과가 도착했다.") && autoTurnInput.includes("[동작: 메모 쓰기, 상태: SUCCEEDED]")
+          && !autoTurnInput.includes(actionId) && !autoTurnInput.includes("write_note") && autoTurnInput.includes("<external-data>"),
         `자동 turn 의 입력에 승인 결과가 실리지 않았다: ${autoTurnInput}`,
       );
       expect(mine().length === 2, `자동 turn 이 도구를 다시 실행했다: ${JSON.stringify(mine())}`);
