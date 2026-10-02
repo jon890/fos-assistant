@@ -1,6 +1,6 @@
 ## ADR-002: 사용자마다 profile 을 나누되 AI 계정은 가족이 함께 쓴다
 
-- Status: Accepted
+- **status**: `accepted`
 - Date: 2026-09-17
 - 개정: 2026-09-17, OAuth credential 이 profile 로 격리되지 않는 사실을 확인하고 공유를 채택
 
@@ -53,6 +53,14 @@ profile 은 그래도 사용자마다 하나씩 둔다.
 `credential_scope` 를 `DEDICATED` 로 적는다.
 그때 `cost_mode` 를 `API` 로 두면 그 사람 몫 비용을 계산할 수 있다.
 나머지 사용자는 그대로 공유를 쓴다. 둘이 한 시스템에 함께 있을 수 있다.
+
+### 대체된 부분
+
+- 「profile 은 사용자마다 하나씩 둔다」 는 [ADR-007](ADR-007-에이전트가-모델과-도구를-함께-정한다.md) 이 바꿨다. 에이전트가 profile 을 가리키므로 한 사용자가 profile 을 여럿 쓸 수 있다.
+- 「구독형이라 실행 하나의 금액을 계산할 수 없다」 는 [ADR-004](ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 가 바꿨다. 구독형도 API 가격으로 환산해 적는다.
+- `hermes_profile_binding.credential_scope` 의 표는 없어졌다. 같은 칸이 지금은 `agent.credential_scope` 에 있다.
+
+AI 계정을 가족이 함께 쓴다는 결정은 그대로다.
 
 ### 거절한 대안
 
