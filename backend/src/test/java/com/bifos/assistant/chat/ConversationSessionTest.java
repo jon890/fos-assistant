@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.ConversationSessions;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.domain.RunSession;
@@ -26,6 +27,9 @@ class ConversationSessionTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     @Autowired
     AppUserRepository users;
@@ -94,7 +98,7 @@ class ConversationSessionTest {
     @DisplayName("Hermes가 정한 session이 있는 옛 대화는 그대로 쓰고 루트를 채우지 않는다")
     void keepsOldConversationWithHermesSessionAndDoesNotFillRoot() {
         Conversation conversation = newConversation();
-        conversations.touchSession(conversation.id(), "legacy-session", Instant.now());
+        conversationWriter.touchSession(conversation.id(), "legacy-session", Instant.now());
         Conversation legacy = reload(conversation);
 
         RunSession session = sessions.ensure(legacy);

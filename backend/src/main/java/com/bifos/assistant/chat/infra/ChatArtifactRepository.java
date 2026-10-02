@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long> {
 
@@ -24,8 +23,9 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
      * 그 파일을 가리키는 행 모두에 지운 시각을 적는다. 같은 파일이 여러 답에 묶였으면 모두 적는다.
      *
      * <p>이미 적힌 행은 처음 시각을 그대로 둔다.
+     *
+     * <p>트랜잭션은 {@code ChatArtifactWriter} 가 연다.
      */
-    @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update ChatArtifact a

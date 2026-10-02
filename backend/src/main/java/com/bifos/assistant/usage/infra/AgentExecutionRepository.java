@@ -19,7 +19,6 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface AgentExecutionRepository extends JpaRepository<AgentExecution, Long> {
 
@@ -81,9 +80,10 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 이 실행의 결과를 부모에게 전했다고 적는다. 이미 적혀 있으면 바꾸지 않고 0 을 돌려준다.
      *
      * <p>한 실행의 결과는 한 번만 전한다. 먼저 적은 쪽의 시각이 남는다.
+     *
+     * <p>트랜잭션은 {@code ExecutionDeliveryWriter} 가 연다.
      */
     @Modifying
-    @Transactional
     @Query("update AgentExecution e set e.resultDeliveredAt = :at where e.id = :id and e.resultDeliveredAt is null")
     int markResultDelivered(@Param("id") Long id, @Param("at") Instant at);
 

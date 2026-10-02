@@ -3,6 +3,7 @@ package com.bifos.assistant.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.ArtifactProperties;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
@@ -61,6 +62,9 @@ class McpArtifactWriteToolTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     @Autowired
     ArtifactStore store;
@@ -376,7 +380,7 @@ class McpArtifactWriteToolTest {
     void missingDeletedAndOthersConversationsGiveSameError() throws Exception {
         Conversation active = conversations.save(Conversation.startedBy(dad.id(), "", null));
         Conversation deleted = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        conversations.deleteIfActive(deleted.id(), dad.id(), Instant.now());
+        conversationWriter.deleteIfActive(deleted.id(), dad.id(), Instant.now());
         AppUser kid = users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER));
         Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null));
 

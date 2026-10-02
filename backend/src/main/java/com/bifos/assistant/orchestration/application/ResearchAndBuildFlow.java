@@ -5,12 +5,12 @@ import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationSessions;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.application.TurnIntent;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.orchestration.domain.RunSession;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -80,7 +80,7 @@ public class ResearchAndBuildFlow implements Flow {
     private static final String FAILED = "failed";
 
     private final ChatMessageRepository messages;
-    private final ConversationRepository conversations;
+    private final ConversationWriter conversationWriter;
     private final ConversationSessions sessions;
     private final AgentRunner runner;
     private final ChildExecutionRunner children;
@@ -143,7 +143,7 @@ public class ResearchAndBuildFlow implements Flow {
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the flow could not start");
         }
         conversation.rememberSession(chief.sessionId());
-        conversations.touchSession(
+        conversationWriter.touchSession(
                 conversation.id(),
                 chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(),
                 Instant.now());
@@ -339,7 +339,7 @@ public class ResearchAndBuildFlow implements Flow {
         }
         if (sessionId != null && !sessionId.isBlank()) {
             conversation.rememberSession(sessionId);
-            conversations.touchSession(conversation.id(), sessionId, Instant.now());
+            conversationWriter.touchSession(conversation.id(), sessionId, Instant.now());
         }
         return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), "", null, true);
     }

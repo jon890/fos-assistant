@@ -18,8 +18,8 @@ import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +40,7 @@ class McpToolServiceTest {
             memories,
             artifacts,
             mock(AgentDelegationService.class),
-            mock(AgentExecutionRepository.class),
+            mock(ExecutionDeliveryWriter.class),
             mock(AgentRepository.class));
     private final AgentExecution parent = mock(AgentExecution.class);
     private McpCaller caller;

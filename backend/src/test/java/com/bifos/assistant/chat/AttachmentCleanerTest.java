@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.AttachmentStore;
@@ -52,6 +53,9 @@ class AttachmentCleanerTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     private Path root;
     private Long conversationId;
@@ -115,7 +119,7 @@ class AttachmentCleanerTest {
     @DisplayName("지운 대화의 보내지 않은 첨부도 기간이 지나면 지운다")
     void deletesExpiredUnsentAttachmentsOfDeletedConversation() {
         ChatAttachment unbound = stored(EXPIRED);
-        conversations.deleteIfActive(conversationId, 9201L, NOW.minus(Duration.ofHours(2)));
+        conversationWriter.deleteIfActive(conversationId, 9201L, NOW.minus(Duration.ofHours(2)));
 
         int deleted = cleaner.cleanExpired(NOW);
 

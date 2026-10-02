@@ -22,6 +22,7 @@ import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.SkillCommand;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -170,6 +171,9 @@ class ChatServiceTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     @Autowired
     ChatMessageRepository messages;
@@ -558,7 +562,7 @@ class ChatServiceTest {
         CurrentUser dad = member("dad@example.com", "dad");
         Long agentId = agents.findByCode("dad").orElseThrow().id();
         Conversation legacy = conversations.save(Conversation.startedBy(dad.id(), "옛 대화", agentId));
-        conversations.touchSession(legacy.id(), "hermes-made-session", Instant.now());
+        conversationWriter.touchSession(legacy.id(), "hermes-made-session", Instant.now());
         hermesEchoesSession();
 
         ChatTurn turn = chat.send(dad, legacy.id(), "이어서", "dad");

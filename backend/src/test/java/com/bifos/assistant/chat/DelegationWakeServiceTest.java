@@ -14,6 +14,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationEventHub;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.DelegationWakeService;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
@@ -106,6 +107,9 @@ class DelegationWakeServiceTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     @Autowired
     ChatMessageRepository messages;
@@ -551,7 +555,7 @@ class DelegationWakeServiceTest {
 
     private void setAutoTurns(int count) {
         for (int i = 0; i < count; i++) {
-            conversations.incrementAutoTurns(conversation.id());
+            conversationWriter.incrementAutoTurns(conversation.id());
         }
     }
 

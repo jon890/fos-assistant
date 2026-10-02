@@ -12,6 +12,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ConversationEventHub;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -104,6 +105,9 @@ class ConnectorActionDeliveryTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     @Autowired
     ChatMessageRepository messages;
@@ -419,7 +423,7 @@ class ConnectorActionDeliveryTest {
     @DisplayName("연속 상한에 닿았으면 자동 turn 없이 한도 알림을 남기고 결과는 전하지 않은 채 둔다")
     void limitReachedLeavesResultUndelivered() {
         for (int i = 0; i < 10; i++) {
-            conversations.incrementAutoTurns(conversation.id());
+            conversationWriter.incrementAutoTurns(conversation.id());
         }
         UUID actionId = action("SUCCEEDED", "{\"saved\":true}", null, conversation.id());
 

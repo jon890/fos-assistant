@@ -19,6 +19,7 @@ import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.orchestration.application.DelegationResult;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
@@ -73,6 +74,7 @@ class AgentDelegationServiceRaceTest {
         delegations = new AgentDelegationService(
                 mock(AgentService.class),
                 executions,
+                mock(ExecutionDeliveryWriter.class),
                 children,
                 conversations,
                 new DelegationProperties(2, 4, 1, SUBMIT_TIMEOUT, 100),

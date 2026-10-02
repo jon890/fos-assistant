@@ -12,6 +12,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesSkillClient;
@@ -80,6 +81,9 @@ class SkillUsageQueryTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     @Autowired
     AgentRepository agents;
@@ -216,7 +220,7 @@ class SkillUsageQueryTest {
     @Test
     @DisplayName("마지막 호출의 대화를 지웠으면 lastConversationId 가 비고 합계는 남는다")
     void lastConversationIdIsEmptyWhenItsConversationDeletedAndTotalRemains() {
-        conversations.deleteIfActive(dadSecond.id(), dad.id(), Instant.now());
+        conversationWriter.deleteIfActive(dadSecond.id(), dad.id(), Instant.now());
 
         List<UserSkillUsage> usages = query.byUser(dad.id());
 

@@ -67,6 +67,7 @@ public class RecoveredRunRecorder {
     private final AgentService agents;
     private final FlowRegistry flows;
     private final ConversationRepository conversations;
+    private final ConversationWriter conversationWriter;
     private final ChatMessageRepository messages;
     private final DelegationOutput delegationOutput;
     private final ArtifactService artifacts;
@@ -210,7 +211,7 @@ public class RecoveredRunRecorder {
                         saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_COMPLETED, null, null, null);
             }
             Long messageId = saveAnswer(saved, result.output() == null ? "" : result.output());
-            conversations.touchSession(conversation.id(), blankToNull(result.sessionId()), clock.instant());
+            conversationWriter.touchSession(conversation.id(), blankToNull(result.sessionId()), clock.instant());
             return new Written(
                     saved,
                     RecoveredRunKind.CHAT_TURN,
@@ -229,7 +230,7 @@ public class RecoveredRunRecorder {
             Long messageId = answer == null || answer.isBlank() ? null : saveAnswer(saved, answer);
             String sessionId = blankToNull(result.sessionId());
             if (sessionId != null) {
-                conversations.touchSession(conversation.id(), sessionId, clock.instant());
+                conversationWriter.touchSession(conversation.id(), sessionId, clock.instant());
             }
             return new Written(
                     saved,

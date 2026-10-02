@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 public class ConversationSessions {
 
     private final ConversationRepository conversations;
+    private final ConversationWriter conversationWriter;
 
     /**
      * 이 turn 에 보낼 session 을 돌려준다. 대화에 없으면 새로 정해 저장한다.
@@ -36,7 +37,7 @@ public class ConversationSessions {
             return sessionOf(conversation);
         }
         String created = RunSession.newSessionId();
-        if (conversations.assignSessionIfAbsent(conversation.id(), created) == 1) {
+        if (conversationWriter.assignSessionIfAbsent(conversation.id(), created) == 1) {
             conversation.assignNewSession(created);
             return sessionOf(conversation);
         }

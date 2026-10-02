@@ -2,7 +2,6 @@ package com.bifos.assistant.user.application;
 
 import com.bifos.assistant.people.application.SignInPolicy;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserProvisioningService;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -18,6 +18,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -109,6 +110,9 @@ class StarterSuggestionServiceTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    ConversationWriter conversationWriter;
 
     @Autowired
     ChatMessageRepository messages;
@@ -288,7 +292,7 @@ class StarterSuggestionServiceTest {
         conversationOf(DAD, family, "장보기 목록 정리해 줘");
         conversationOf(KID, family, "다른 사용자의 질문");
         Conversation deleted = conversationOf(DAD, family, "지운 대화의 질문");
-        conversations.deleteIfActive(deleted.id(), DAD.id(), Instant.now());
+        conversationWriter.deleteIfActive(deleted.id(), DAD.id(), Instant.now());
         Agent other = agents.save(Agent.of(
                 "starter-other",
                 "다른",

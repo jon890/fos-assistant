@@ -1,4 +1,4 @@
-package com.bifos.assistant.user.domain;
+package com.bifos.assistant.user.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -7,6 +7,8 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.people.application.PeopleProperties;
 import com.bifos.assistant.people.application.SignInPolicy;
 import com.bifos.assistant.people.domain.AllowedPerson;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
