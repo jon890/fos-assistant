@@ -592,6 +592,11 @@ export type FakeHermes = {
   /** 그 run 을 잊는다. 이 뒤 조회와 중지는 404 다. gateway 가 다시 떴거나 종료 뒤 1시간이 지난 것과 같다. */
   forgetRun(runId: string): void;
   /**
+   * Control Plane 이 그 run 의 사건 스트림을 열 때까지 기다린다. Control Plane 은 run 번호를 실행 줄에 적은 뒤에 연다.
+   * 제출을 받은 것만으로는 run 번호가 아직 적히지 않았을 수 있어, 재시작 검사가 이것으로 그 순간을 지난 뒤 내린다.
+   */
+  waitForRunEvents(runId: string): Promise<void>;
+  /**
    * `LONG_ACTIVITY_PROBE` 스트림이 시작만 한 도구 줄을 남기고 기다리는 멈춤 지점 하나를 푼다. 실행 상태는 바꾸지 않는다.
    * 멈춤 지점이 둘이므로 끝까지 흘리려면 두 번 부른다. 기다리는 스트림이 없으면 아무것도 하지 않는다.
    */
@@ -682,6 +687,9 @@ export function startFakeHermes(
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
+  /** 사건 스트림이 한 번이라도 열린 run 과, 열리기를 기다리는 쪽이다. */
+  const eventsOpened = new Set<string>();
+  const eventsWaiters = new Map<string, (() => void)[]>();
   /** `LONG_ACTIVITY_PROBE` 스트림이 기다리는 자리다. 풀면 나머지 사건을 보낸다. */
   let longActivityGate: (() => void) | undefined;
   let holdNextSoul = false;
@@ -1419,6 +1427,9 @@ export function startFakeHermes(
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
+          eventsOpened.add(runId!);
+          for (const done of eventsWaiters.get(runId!) ?? []) done();
+          eventsWaiters.delete(runId!);
           const run = runs.get(runId);
           if (!run) return send(response, 404, runNotFound(runId!));
           response.writeHead(200, {
@@ -1783,6 +1794,12 @@ export function startFakeHermes(
         forgetRun: (runId: string) => {
           runs.delete(runId);
         },
+        waitForRunEvents: (runId: string) =>
+          eventsOpened.has(runId)
+            ? Promise.resolve()
+            : new Promise<void>((done) => {
+                eventsWaiters.set(runId, [...(eventsWaiters.get(runId) ?? []), done]);
+              }),
         heldRun: () => {
           const run = heldRunId === undefined ? undefined : runs.get(heldRunId);
           return run === undefined ? undefined : { runId: run.run_id, sessionId: run.session_id };

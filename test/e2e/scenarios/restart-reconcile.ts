@@ -4,6 +4,7 @@
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
 import { FAKE_USAGE } from "../fake-hermes.ts";
+import { within } from "../delegation-support.ts";
 import { awaitMessages, enqueue, holdTurn, messagesOf, pendingOf } from "./chat-queue.ts";
 
 const TURN_TIMEOUT_MS = 15_000;
@@ -73,12 +74,25 @@ export const restartReconcileScenario: Scenario = {
   },
 };
 
+/**
+ * 붙잡은 run 의 번호가 실행 줄에 적힐 때까지 기다린다.
+ *
+ * <p>제출을 받은 순간 내리면 run 번호가 적히기 전이라 그 줄은 대조하지 못하고 ORPHANED 로 남는다(ADR-061 이 남긴 한계).
+ * 이 검사가 보려는 것은 번호가 적힌 줄의 대조이므로, Control Plane 이 사건 스트림을 연 뒤에 내린다.
+ */
+async function runNumberSaved(context: Context): Promise<void> {
+  const run = context.hermes.heldRun();
+  if (run === undefined) fail("붙잡은 turn 의 run 이 없다");
+  await within(context.hermes.waitForRunEvents(run.runId), 5_000, "Control Plane 이 붙잡은 run 의 사건 스트림을 열지 않았다");
+}
+
 /** Control Plane 만 다시 뜨고 Hermes 의 run 은 계속 돈다. */
 async function hermesKeepsRunning(context: Context): Promise<void> {
   step("도는 turn 이 있을 때 Control Plane 만 다시 띄운다");
   const held = await holdTurn(context, "재시작 대조 첫 글", "dad");
   const conversationId = held.started.conversationId!;
   const executionId = held.started.executionId!;
+  await runNumberSaved(context);
   await context.restartControlPlane();
 
   step("다시 뜬 뒤에도 그 대화에 도는 turn 이 있고 보통 보내기는 거절된다");
@@ -158,6 +172,7 @@ async function hermesForgotRun(context: Context): Promise<void> {
   const executionId = held.started.executionId!;
   const run = context.hermes.heldRun();
   if (run === undefined) fail("붙잡은 turn 의 run 이 없다");
+  await runNumberSaved(context);
   context.hermes.forgetRun(run.runId);
   await context.restartControlPlane();
 
