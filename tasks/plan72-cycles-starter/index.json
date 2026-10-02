@@ -1,0 +1,11 @@
+{
+  "name": "plan72-cycles-starter",
+  "description": "추천 질문 생성을 agent 에서 chat 으로 옮겨 agent 가 chat 과 usage 를 쓰는 간선을 끊는다 — 대화와 메시지를 읽고 실행을 적는 일은 chat 의 층이다(ADR-068 의 C1)",
+  "status": "pending",
+  "created_at": "2026-10-03",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}
