@@ -59,10 +59,16 @@ public class ServiceTokenService {
     /**
      * 토큰을 발급한다. 원문은 이 응답에만 있고 저장하는 것은 해시뿐이다.
      *
-     * @throws ApiException 만료 일수나 collection 이 틀리면 VALIDATION_FAILED
+     * <p>주인이 허용 목록에서 꺼졌으면 발급하지 않는다. 꺼진 사용자의 웹 세션이 살아 있어도 새 토큰이 생기지 않아야
+     * 다시 켰을 때 그 토큰이 통하는 일이 없다(ADR-056).
+     *
+     * @throws ApiException 주인이 꺼졌으면 FORBIDDEN, 만료 일수나 collection 이 틀리면 VALIDATION_FAILED
      */
     @Transactional
     public IssuedServiceToken issue(CurrentUser user, String label, int expiresInDays, List<ServiceTokenGrant> grants) {
+        if (!userAccess.allowed(user.id())) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "this user is not allowed to issue service tokens");
+        }
         requireValid(user, expiresInDays, grants);
         byte[] bytes = new byte[TOKEN_BYTES];
         random.nextBytes(bytes);
