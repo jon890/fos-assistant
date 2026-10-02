@@ -100,7 +100,7 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
   - **`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다
   - `expires_at` 이 비어 있으면 만료가 없다. 폐기는 줄을 지우지 않는다
   - 근거는 ADR-056 다
-- 「지울 때」 에 한 문장을 더한다: 서비스 토큰은 폐기해도 줄이 남는다
+- `docs/backend/schema/README.md` 의 「지울 때」 에 한 문장을 더한다: 서비스 토큰은 폐기해도 줄이 남는다
 
 ### 6. `docs/flow.md`, `docs/backend/memory.md`
 
