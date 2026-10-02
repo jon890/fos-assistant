@@ -19,6 +19,11 @@ test("민감 항목을 목록에서 고치려다 거절되면 여기서 고칠 �
     "민감한 항목은 여기서 고칠 수 없어요.");
 });
 
+test("꺼진 사용자에게는 계정이 중지됐다고 알리고 관리자에게 문의하게 한다", () => {
+  assert.equal(describeError("ACCESS_REVOKED", "x"),
+    "사용이 중지된 계정이에요. 관리자에게 문의해 주세요.");
+});
+
 test("관리 화면에는 profile과 연결 실패 원인을 구분해 알린다", () => {
   assert.match(describeAdminError("PERSON_PROFILE_TAKEN", "원본 오류"), /profile 이름/);
   assert.match(describeAdminError("HERMES_PROFILE_EXISTS", "원본 오류"), /Hermes profile/);

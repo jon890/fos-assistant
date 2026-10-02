@@ -35,6 +35,7 @@ const MESSAGES: Record<string, string> = {
     "대기 중인 메시지가 가득 찼어요. 답이 끝난 뒤 보내 주세요.",
   PENDING_MESSAGE_NOT_FOUND: "이미 보낸 메시지예요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
+  ACCESS_REVOKED: "사용이 중지된 계정이에요. 관리자에게 문의해 주세요.",
   PERSONA_STALE:
     "그사이 다른 사용자가 이 성격을 고쳤어요. 최신 본문을 다시 불러왔어요.",
   AGENT_TOOLS_REQUIRE_PRIVATE:

@@ -1,5 +1,7 @@
 import { SignJWT } from "jose";
-import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import { auth, signOut } from "@/auth";
+import { isAccessRevoked, REVOKED_SIGN_OUT_PATH } from "@/lib/access-revoked";
 import {
   readControlPlaneResult,
   type ControlPlaneResult,
@@ -100,6 +102,43 @@ async function authorize(): Promise<Authorized> {
   };
 }
 
+/**
+ * Next.js 가 화면을 그리는 중에 쿠키를 고치려 할 때 던지는 오류의 문구다.
+ *
+ * <p>그 오류 클래스는 Next.js 가 내보내지 않는다. 안쪽 경로에서 가져오면 서버 묶음에 든 것과 다른 사본이라
+ * `instanceof` 가 맞지 않으므로 문구의 앞부분으로 알아본다.
+ */
+const READONLY_COOKIES_MESSAGE =
+  "Cookies can only be modified in a Server Action or Route Handler";
+
+/**
+ * Control Plane 이 꺼진 사용자라고 답하면 세션을 끊는다.
+ *
+ * <p>세션이 남으면 꺼진 사용자가 화면마다 오류만 보고 로그인 화면으로 가지 못한다. 401 전체가 아니라
+ * `ACCESS_REVOKED` 일 때만 끊는다. 본문은 사본에서 읽으므로 부르는 쪽이 원래 응답을 그대로 읽을 수 있다.
+ *
+ * <p>Route Handler 와 Server Action 에서는 여기서 쿠키가 지워지고 401 이 그대로 나간다. `redirect` 하지
+ * 않는 것은 브라우저의 `fetch` 가 로그인 화면 HTML 을 JSON 으로 읽게 되기 때문이다. 서버 컴포넌트는 쿠키를
+ * 고치지 못하므로 쿠키를 지울 수 있는 라우트로 보낸다.
+ */
+async function endRevokedSession(response: Response): Promise<void> {
+  if (response.status !== 401) return;
+  if (!isAccessRevoked(response.status, await response.clone().text())) return;
+  try {
+    await signOut({ redirect: false });
+  } catch (error) {
+    // 쿠키를 고칠 수 없다는 오류일 때만 넘긴다. 모든 오류에 넘기면 그 라우트 안에서 실패했을 때 같은
+    // 주소로 되돌아오는 루프가 된다.
+    if (
+      error instanceof Error &&
+      error.message.startsWith(READONLY_COOKIES_MESSAGE)
+    ) {
+      redirect(REVOKED_SIGN_OUT_PATH);
+    }
+    throw error;
+  }
+}
+
 export async function requestControlPlane(
   path: string,
   init: {
@@ -112,21 +151,20 @@ export async function requestControlPlane(
   const authorized = await authorize();
   if (!authorized.ok) return authorized;
 
-  return {
-    ok: true,
-    response: await fetch(`${baseUrl()}${path}`, {
-      method: init.method ?? "GET",
-      headers: {
-        Authorization: `Bearer ${authorized.token}`,
-        ...(init.body === undefined
-          ? {}
-          : { "Content-Type": "application/json" }),
-      },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      cache: "no-store",
-      signal: init.signal,
-    }),
-  };
+  const response = await fetch(`${baseUrl()}${path}`, {
+    method: init.method ?? "GET",
+    headers: {
+      Authorization: `Bearer ${authorized.token}`,
+      ...(init.body === undefined
+        ? {}
+        : { "Content-Type": "application/json" }),
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    cache: "no-store",
+    signal: init.signal,
+  });
+  await endRevokedSession(response);
+  return { ok: true, response };
 }
 
 /**
@@ -164,11 +202,9 @@ export async function forwardControlPlane(
   if (init.body) requestInit.duplex = "half";
 
   // 연결이 끊기면 fetch 가 던진다. 라우트가 JSON 이 아닌 500 을 내지 않게 오류 결과로 바꿔 돌려준다.
+  let response: Response;
   try {
-    return {
-      ok: true,
-      response: await fetch(`${baseUrl()}${path}`, requestInit),
-    };
+    response = await fetch(`${baseUrl()}${path}`, requestInit);
   } catch {
     return {
       ok: false,
@@ -177,6 +213,9 @@ export async function forwardControlPlane(
       message: "요청을 처리하지 못했어요.",
     };
   }
+  // 위 `try` 밖에서 부른다. 안에서 부르면 `redirect` 가 던진 것이 502 로 바뀐다.
+  await endRevokedSession(response);
+  return { ok: true, response };
 }
 
 /**
