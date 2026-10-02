@@ -33,8 +33,10 @@ flowchart LR
 | ① | 웹 → Control Plane | 짧은 수명 JWT | 이 사람이 로그인했다 |
 | ② | Control Plane → Hermes | `API_SERVER_KEY` | 이 profile 을 쓸 자격이 있다 |
 | ③ | Hermes → Control Plane | `agent_token` | 이 요청이 어느 profile 에서 왔다 |
+| ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다 |
 
 **①은 사용자를 정하고 ③은 profile 만 정한다.** 둘은 성질도 다르다.
+④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다.
 
 | 축 | ① 웹 토큰 | ③ agent_token |
 | --- | --- | --- |

@@ -149,3 +149,34 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 **토큰에는 사용자 칸이 없다.** 사용자 기준으로 발급하던 옛 토큰의 `user_id` 칸은 운영의 토큰을 모두 profile 에 묶은 뒤 V35 가 지웠다.
 폐기된 옛 토큰은 이력으로 남기므로 `profile_name` 은 NULL 을 그대로 받는다.
+
+## service_token
+
+다른 서비스가 사용자의 Memory 문서를 읽을 때 쓰는 토큰이다. 근거는 [ADR-056](../../adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) 에 있다.
+원문은 발급 응답에서 한 번만 내고 데이터베이스에는 SHA-256 해시만 저장한다.
+
+**`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다. 관리자도 다른 사용자의 토큰을 발급하거나 폐기하지 못한다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `id` | BIGINT | 기본 키 |
+| `user_id` | BIGINT | `app_user.id`. 이 토큰이 읽을 수 있는 문서의 주인이다 |
+| `token_hash` | VARCHAR(64) | 토큰 원문의 SHA-256 해시. 원문은 저장하지 않는다. 유일하다 |
+| `label` | VARCHAR(100) | 사용자가 토큰 용도를 구분하는 이름 |
+| `created_at` | DATETIME(6) | 발급 시각 |
+| `expires_at` | DATETIME(6) | 만료 시각. 늘 있다. 발급할 때 1일에서 365일 사이로 정하고 고치지 않는다 |
+| `last_used_at` | DATETIME(6) NULL | 마지막으로 읽은 시각. 거절한 요청은 적지 않는다 |
+| `revoked_at` | DATETIME(6) NULL | 폐기 시각. 행은 삭제하지 않는다 |
+
+허용 목록에서 사용자를 끄면 그 사용자의 폐기되지 않은 토큰에 모두 `revoked_at` 을 적는다. 다시 켜도 지우지 않는다.
+인증할 때도 주인이 지금 허용 목록에 켜져 있는지 본다. 폐기가 한 번 실패해도 끈 사용자의 토큰이 통하지 않게 하기 위해서다.
+
+## service_token_collection
+
+서비스 토큰이 받는 collection 하나가 한 줄이다. `agent_memory_collection` 과 같은 뜻이고 같은 세 조건으로 판정한다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `token_id` | BIGINT | `service_token.id`. `collection` 과 함께 기본 키다 |
+| `collection` | VARCHAR(64) | 받는 collection 의 key |
+| `allow_sensitive` | BOOLEAN | 참이면 이 collection 의 `SENSITIVE` 문서까지 읽는다. 기본값은 `FALSE` |

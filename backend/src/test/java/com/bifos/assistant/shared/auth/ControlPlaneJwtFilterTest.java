@@ -33,4 +33,18 @@ class ControlPlaneJwtFilterTest {
 
         assertThat(filter.shouldNotFilter(request)).isTrue();
     }
+
+    @Test
+    @DisplayName("서비스 토큰 경로는 건너뛰고 서비스 토큰 관리 경로는 웹 JWT 로 해석한다")
+    void serviceApiSkipsButServiceTokenManagementDoesNot() {
+        ControlPlaneJwtFilter filter = new ControlPlaneJwtFilter(
+                new AuthProperties("test-secret-test-secret-test-secret-test-secret"),
+                mock(UserProvisioningService.class));
+
+        assertThat(filter.shouldNotFilter(
+                        new MockHttpServletRequest("GET", "/api/v1/service/memory-documents/identity/x")))
+                .isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/service-tokens")))
+                .isFalse();
+    }
 }

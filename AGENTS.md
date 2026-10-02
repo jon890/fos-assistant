@@ -52,6 +52,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 - 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 을 정하지 못한다.
 - Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
   제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다.
+  실행 밖의 서비스는 사용자에 묶인 서비스 토큰으로 문서만 읽는다(ADR-056).
 - 실행 기록은 실패해도 남긴다.
 
 ## 공개 저장소
