@@ -81,10 +81,35 @@ function leavingSeen(page: Page) {
   return page.evaluate(() => (window as unknown as { leavingSeen: string[] }).leavingSeen);
 }
 
+/**
+ * 대화 목록 줄에서 animation 이 시작되는 순간 그 줄의 주소와 animation 이름과 길이를 `window.rowAnimationsStarted` 에 적어 둔다.
+ * 등장 움직임은 0.2초면 끝나고 끝나면 클래스가 떨어지므로, 나중에 계산값을 읽으면 느린 실행에서 이미 지나가 있다.
+ */
+async function recordRowAnimationStarts(page: Page) {
+  await page.addInitScript(() => {
+    const started: Record<string, { name: string; duration: string }> = {};
+    (window as unknown as { rowAnimationsStarted: typeof started }).rowAnimationsStarted = started;
+    document.addEventListener("animationstart", (event) => {
+      const row = event.target as Element;
+      if (row.tagName !== "LI" || !row.closest('nav[aria-label="대화 목록"]')) return;
+      const href = row.querySelector("a")?.getAttribute("href");
+      if (href) started[href] = { name: event.animationName, duration: getComputedStyle(row).animationDuration };
+    }, true);
+  });
+}
+
+function rowAnimationStarted(page: Page, id: string) {
+  return page.evaluate(
+    (href) => (window as unknown as { rowAnimationsStarted: Record<string, { name: string; duration: string }> }).rowAnimationsStarted[href],
+    `/chat/${id}`,
+  );
+}
+
 test("새로 보낸 줄만 등장 움직임을 갖고 답이 저장된 뒤와 대화를 다시 연 뒤에는 움직이지 않는다", async ({ page }, testInfo) => {
   const existingTitle = `움직임 앞선 대화 ${testInfo.project.name} ${Date.now()}`;
   const existingId = await createConversation(page, existingTitle);
   const release = await holdChatStream(page);
+  await recordRowAnimationStarts(page);
   try {
     await page.goto("/");
     await send(page, "등장 움직임 검사");
@@ -116,8 +141,10 @@ test("새로 보낸 줄만 등장 움직임을 갖고 답이 저장된 뒤와 �
       const id = conversationIdOf(page.url());
       const row = (conversationId: string) => conversationNav(page).locator("li").filter({ has: page.locator(`a[href="/chat/${conversationId}"]`) });
       await expect(row(id)).toBeVisible();
-      expect(await animationOf(row(id)), "새로 생긴 대화 줄").toEqual({ name: "message-assistant", duration: "0.2s" });
-      expect((await animationOf(row(existingId))).name, "처음부터 있던 대화 줄").toBe("none");
+      // 읽는 시점에 이미 끝났을 수 있어 움직임이 시작된 순간의 기록을 본다.
+      await expect.poll(() => rowAnimationStarted(page, id), { message: "새로 생긴 대화 줄의 움직임" })
+        .toEqual({ name: "message-assistant", duration: "0.2s" });
+      expect(await rowAnimationStarted(page, existingId), "처음부터 있던 대화 줄의 움직임").toBeUndefined();
       // 한 번 움직인 줄은 검색으로 걸러졌다 다시 나타나도 다시 움직이지 않는다.
       await expect.poll(async () => (await animationOf(row(id))).name, { message: "움직임이 끝난 대화 줄" }).toBe("none");
       const search = page.getByRole("searchbox", { name: "대화 검색" });
