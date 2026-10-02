@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /** 실행 instructions 에 들어갈 Memory 층과 권한 경계를 확인한다. */
@@ -43,6 +44,9 @@ class ContextAssemblerTest {
 
     @Autowired
     AgentRepository agents;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     /** core collection 을 받는 보통 에이전트의 번호다. 저장하면 core 가 딸려 온다(ADR-053). */
     private Long agentId;
@@ -274,6 +278,23 @@ class ContextAssemblerTest {
 
         assertThat(result.instructions()).contains("기본 내용").doesNotContain("커리어 내용", "커리어 색인", "커리어 본문");
         assertThat(result.omittedMemoryIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("항상 층에 암호문인 줄이 있으면 그 줄만 건너뛰고 평문 항목은 싣는다")
+    void skipsSealedRowsInAlwaysLayer() {
+        // 그 에이전트는 core 만 받는다. collection 이 core 가 아니면 걸러지지 않아도 통과해 검사가 뜻을 잃는다
+        jdbc.update("""
+                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, content_key_id,
+                    retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                VALUES ('USER', 1, 'core', 'MEMORY', '직접 넣은 줄', 'v1.봉인-표식-5512', 'test-1', 'ALWAYS', TRUE,
+                    'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """);
+        memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", true);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.instructions()).contains("개인 내용").doesNotContain("봉인-표식-5512");
     }
 
     @Test

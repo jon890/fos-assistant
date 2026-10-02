@@ -185,6 +185,15 @@ Node 의 TypeScript 실행을 쓰므로 설치할 의존성이 없다. 필요한
 
 브랜치를 push 하고 PR 을 연다. main 에 로컬에서 바로 머지하지 않는다.
 **계획서만으로 PR 을 열지 않는다.** 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
+예외는 하나다. 아래 셋이 모두 맞을 때만 ADR 과 계획서만 담은 PR 을 연다.
+
+- 서로 기대는 구현 PR 이 둘 이상이다
+- 그 PR 들이 함께 따르는 ADR 이나 계약을 먼저 정해야 뒤의 구현이 앞의 구현을 뒤집지 않는다
+- 그 ADR 마다 `status` 와 `docs/adr/INDEX.md` 에 「아직 구현 전이다」 를 적는다. 구현한 PR 이 그 글을 지운다
+
+이 예외로 먼저 들어온 계획서도 그 plan 을 구현한 PR 에서 지운다. 구현 순서는 계획서의 `README.md` 가 적는다.
+구현이 하나뿐인 계획은 이 예외에 들지 않는다. 그 구현과 한 PR 로 올린다.
+
 PR 의 merge ref 에서 CI 의 `backend`, `web`, `browser-mobile`, `browser-desktop`, `e2e`, `unit`, `hermes`, `public-safe`, `quality` 가 모두 통과했는지 확인한다.
 main 은 브랜치 보호가 켜져 있고 위 job 이 필수 검사다.
 PR 을 열면 `.github/workflows/claude-code-review.yml` 이 Claude 코드 리뷰를 돌린다.

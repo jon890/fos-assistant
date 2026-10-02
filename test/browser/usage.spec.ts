@@ -32,6 +32,10 @@ test("화면 폭에 맞춰 실행 기록을 카드나 표로 보인다", async (
     await expect(table).toBeVisible();
     await expect(cards).toBeHidden();
   }
+  // 관리자는 provider id 원문 대신 표시 이름을 본다.
+  const list = testInfo.project.name === "mobile" ? cards : table;
+  await expect(list).toContainText("ChatGPT 구독");
+  await expect(list).not.toContainText("openai-codex");
 });
 
 test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", async ({ page }, testInfo) => {

@@ -79,8 +79,8 @@ Memory 항목과 그 판, 그룹의 collection 목록, 에이전트가 받는 co
 | `entry_type`, `document_key` | | 그때의 종류와 문서 이름. 지운 문서의 판을 이름으로 찾는다 |
 | `status` | VARCHAR(20) | 그때의 승인 상태. 지운 항목이 제안이었는지 받아들인 항목이었는지 남는다 |
 | `title` | VARCHAR(200) | |
-| `content` | TEXT | 그 판의 본문. 그때 민감 항목이었으면 암호문이다 |
-| `content_key_id` | VARCHAR(32) NULL | 그 판의 본문을 암호화한 key 의 id. 비어 있으면 평문이다 |
+| `content` | TEXT | 그 판의 본문. 그때 민감 항목이었으면 암호문이다. 일반 항목이었어도 그 항목이 뒤에 민감 항목이 되면 암호문으로 바뀐다 |
+| `content_key_id` | VARCHAR(32) NULL | 그 판의 본문을 암호화한 key 의 id. 비어 있으면 평문이다. 판이 암호문인지는 `sensitivity` 가 아니라 이 칸으로 본다 |
 | `retrieval`, `sensitivity` | VARCHAR(20) | 그 판의 값 |
 | `changed_by_user_id` | BIGINT NULL | 이 판을 물러나게 한 사용자 |
 | `reason` | VARCHAR(200) NULL | 바꾼 까닭. 지금 화면은 적지 않는다 |

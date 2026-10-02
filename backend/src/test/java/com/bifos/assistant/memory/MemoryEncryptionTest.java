@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -14,6 +15,8 @@ import com.bifos.assistant.memory.presentation.MemoryController;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +37,8 @@ class MemoryEncryptionTest {
     private static final CurrentUser ADMIN = new CurrentUser(1L, "admin@example.com", "admin", 1L, UserRole.ADMIN);
     private static final String FIRST = "평문-표식-7391";
     private static final String SECOND = "평문-표식-8802";
+    private static final String THIRD = "평문-표식-4417";
+    private static final String OTHER = "평문-표식-6035";
 
     @Autowired
     MemoryService memories;
@@ -63,6 +68,13 @@ class MemoryEncryptionTest {
 
     private Map<String, Object> memoryRow(Long id) {
         return jdbc.queryForMap("SELECT content, content_key_id FROM memory WHERE id = ?", id);
+    }
+
+    private Map<String, Object> revisionRow(Long memoryId, int revision) {
+        return jdbc.queryForMap(
+                "SELECT content, content_key_id, sensitivity FROM memory_revision WHERE memory_id = ? AND revision = ?",
+                memoryId,
+                revision);
     }
 
     @Test
@@ -111,7 +123,7 @@ class MemoryEncryptionTest {
     }
 
     @Test
-    @DisplayName("일반 항목을 민감으로 고치면 지금 줄은 암호문이고 물러난 판은 평문이다")
+    @DisplayName("일반 항목을 민감으로 고치면 지금 줄과 물러난 판이 모두 암호문이다")
     void normalToSensitive() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
 
@@ -120,11 +132,69 @@ class MemoryEncryptionTest {
         assertThat((String) memoryRow(memory.id()).get("CONTENT"))
                 .startsWith("v1.")
                 .doesNotContain(FIRST);
-        Map<String, Object> revision = jdbc.queryForMap(
-                "SELECT content, content_key_id FROM memory_revision WHERE memory_id = ? AND revision = 1",
-                memory.id());
-        assertThat(revision.get("CONTENT")).isEqualTo(FIRST);
-        assertThat(revision.get("CONTENT_KEY_ID")).isNull();
+        Map<String, Object> revision = revisionRow(memory.id(), 1);
+        assertThat((String) revision.get("CONTENT")).startsWith("v1.").doesNotContain(FIRST);
+        assertThat(revision.get("CONTENT_KEY_ID")).isEqualTo("test-1");
+        // 판의 뜻은 그대로다. 저장 모양만 바뀐다
+        assertThat(revision.get("SENSITIVITY")).isEqualTo("NORMAL");
+    }
+
+    @Test
+    @DisplayName("여러 번 고친 일반 항목을 민감으로 고치면 앞선 판이 모두 암호문이고 다른 항목의 판은 평문 그대로다")
+    void normalToSensitiveSealsEveryEarlierRevisionOfThatItemOnly() {
+        Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
+        memories.update(ADMIN, memory.id(), SECOND, false);
+        memories.update(ADMIN, memory.id(), THIRD, false);
+        Memory other = memories.create(ADMIN, MemoryScope.USER, "다른 항목", OTHER, false);
+        memories.update(ADMIN, other.id(), "고친 글", false);
+
+        memories.update(ADMIN, memory.id(), THIRD, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+
+        for (int number = 1; number <= 3; number++) {
+            Map<String, Object> revision = revisionRow(memory.id(), number);
+            assertThat((String) revision.get("CONTENT"))
+                    .as("판 %d 의 본문", number)
+                    .startsWith("v1.")
+                    .doesNotContain(FIRST, SECOND, THIRD);
+            assertThat(revision.get("CONTENT_KEY_ID")).as("판 %d 의 key", number).isEqualTo("test-1");
+        }
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM memory_revision WHERE memory_id = ? AND content_key_id IS NULL",
+                        Long.class,
+                        memory.id()))
+                .isZero();
+        Map<String, Object> untouched = revisionRow(other.id(), 1);
+        assertThat(untouched.get("CONTENT")).isEqualTo(OTHER);
+        assertThat(untouched.get("CONTENT_KEY_ID")).isNull();
+    }
+
+    @Test
+    @DisplayName("민감 항목은 목록의 수정 경로로 고치지 못하고 본문과 판이 그대로다")
+    void sensitiveItemIsNotEditableFromList() {
+        Memory memory = sensitive(MemoryScope.USER, FIRST);
+        String before = (String) memoryRow(memory.id()).get("CONTENT");
+
+        assertThatThrownBy(() -> memories.update(ADMIN, memory.id(), "x", false))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE));
+
+        assertThat(memoryRow(memory.id()).get("CONTENT")).isEqualTo(before);
+        assertThat(repository.findById(memory.id()).orElseThrow().revision()).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM memory_revision WHERE memory_id = ?", Long.class, memory.id()))
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("일반 항목은 목록의 수정 경로로 고친다")
+    void normalItemIsEditableFromList() {
+        Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
+
+        memories.update(ADMIN, memory.id(), "x", false);
+
+        assertThat(memoryRow(memory.id()).get("CONTENT")).isEqualTo("x");
+        assertThat(repository.findById(memory.id()).orElseThrow().revision()).isEqualTo(2);
     }
 
     @Test

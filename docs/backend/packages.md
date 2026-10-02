@@ -79,7 +79,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
    조립한 글자 수를 `context_chars` 에, 대화에서 고른 effort 를 `reasoning_effort` 에 적는다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
-6. `HttpHermesRunsClient` 가 실행을 제출한다. 어느 모델과 effort 를 싣는지는 [모델 단계와 실행 기록](../model-tiers.md) 의 「모델 선택」 이 정한 순서를 따른다. 실을 모델이 없으면 빼서 profile 의 값으로 돌게 한다. 받은 `run_id` 를 그 자리에서 실행 줄에 적는다.
+6. `HttpHermesRunsClient` 가 실행을 제출한다. 어느 모델과 effort 를 싣는지는 [모델 단계와 실행 기록](../model-tiers.md) 의 「모델 선택」 이 정한 순서를 따른다. 실을 모델이 없으면 빼서 profile 의 값으로 돌게 한다. 그룹에 숨김이 있으면 그 전에 profile 의 기본 모델을 숨김과 견준다. 받은 `run_id` 를 그 자리에서 실행 줄에 적는다.
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
 8. 실행이 끝나면 `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다.
 9. `ExecutionRecorder` 가 4번에서 만든 줄을 `SUCCEEDED` 로 갱신한다.

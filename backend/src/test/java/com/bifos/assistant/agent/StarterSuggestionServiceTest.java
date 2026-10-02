@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.StarterProperties;
@@ -16,8 +18,10 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -30,6 +34,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Clock;
@@ -106,6 +111,9 @@ class StarterSuggestionServiceTest {
     ExecutionRecorder executions;
 
     @Autowired
+    ModelTierService modelTiers;
+
+    @Autowired
     HermesRunsClient hermes;
 
     @Autowired
@@ -133,7 +141,16 @@ class StarterSuggestionServiceTest {
                 AgentVisibility.GROUP,
                 DAD.id()));
         service = new StarterSuggestionService(
-                properties, agentService, conversations, messages, hermes, executions, objectMapper, clock, executor);
+                properties,
+                agentService,
+                conversations,
+                messages,
+                hermes,
+                executions,
+                modelTiers,
+                objectMapper,
+                clock,
+                executor);
     }
 
     @Test
@@ -171,6 +188,85 @@ class StarterSuggestionServiceTest {
             assertThat(row.agentId()).isEqualTo(family.id());
             assertThat(row.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         });
+    }
+
+    @Test
+    @DisplayName("에이전트 기본값이 있으면 Hermes 에 보낸 세 값이 실행 줄에 적히고 출처는 AGENT DEFAULT 다")
+    void recordsSentAgentDefaultsOnRunRowWithAgentDefaultSource() {
+        family.changeDefaultModel("example-provider", "example-agent", "medium");
+        agents.save(family);
+        answerWith(json(FOUR));
+
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.provider()).isEqualTo("example-provider");
+            assertThat(command.model()).isEqualTo("example-agent");
+            assertThat(command.reasoningEffort()).isEqualTo("medium");
+        });
+        assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.provider()).isEqualTo("example-provider");
+            assertThat(row.model()).isEqualTo("example-agent");
+            assertThat(row.reasoningEffort()).isEqualTo("medium");
+            assertThat(row.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
+        });
+    }
+
+    @Test
+    @DisplayName("에이전트 기본값이 비면 Hermes 에 세 값을 보내지 않고 실행 줄의 세 값은 null 이며 출처는 UNKNOWN 이다")
+    void sendsNothingAndRecordsUnknownSourceWhenAgentHasNoDefaults() {
+        answerWith(json(FOUR));
+
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.provider()).isNull();
+            assertThat(command.model()).isNull();
+            assertThat(command.reasoningEffort()).isNull();
+        });
+        assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.provider()).isNull();
+            assertThat(row.model()).isNull();
+            assertThat(row.reasoningEffort()).isNull();
+            assertThat(row.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
+        });
+    }
+
+    /** 숨김 줄을 실제로 넣으면 같은 그룹을 쓰는 다른 검사의 기본값 실행이 막힌다. 그래서 판정만 대역으로 둔다. */
+    @Test
+    @DisplayName("숨김 판정이 거절하면 Hermes 에 제출하지 않고 실행 줄이 FAILED 와 MODEL HIDDEN 으로 남는다")
+    void leavesFailedRunRowWithoutSubmittingWhenHiddenCheckRejects() {
+        ModelTierService rejecting = mock(ModelTierService.class);
+        when(rejecting.detachedChoice(any())).thenReturn(ModelChoice.defaults());
+        doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
+                .when(rejecting)
+                .requireRunnable(any(), any(), any());
+        service = new StarterSuggestionService(
+                properties,
+                agentService,
+                conversations,
+                messages,
+                hermes,
+                executions,
+                rejecting,
+                objectMapper,
+                clock,
+                executor);
+        answerWith(json(FOUR));
+
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        assertThat(stub().received()).as("Hermes 에 제출한 수").isEmpty();
+        assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED);
+            assertThat(row.errorCode()).isEqualTo(ErrorCode.MODEL_HIDDEN.name());
+        });
+        assertThat(service.read(DAD, "starter-family"))
+                .as("재시도 간격 안의 추천")
+                .isEqualTo(new StarterSuggestions(List.of(), StarterStatus.NONE));
     }
 
     @Test
@@ -276,6 +372,7 @@ class StarterSuggestionServiceTest {
                 messages,
                 hermes,
                 failingRecorder,
+                modelTiers,
                 objectMapper,
                 clock,
                 executor);

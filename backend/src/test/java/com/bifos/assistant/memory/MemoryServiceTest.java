@@ -307,7 +307,10 @@ class MemoryServiceTest {
 
         Memory sensitive = memories.create(
                 ADMIN, MemoryScope.USER, "민감", "내용", "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
-        assertSensitiveAlways(() -> memories.update(ADMIN, sensitive.id(), "내용", true));
+        assertThatThrownBy(() -> memories.update(ADMIN, sensitive.id(), "내용", true))
+                .isInstanceOfSatisfying(
+                        ApiException.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE));
         assertSensitiveAlways(() ->
                 memories.update(ADMIN, sensitive.id(), "내용", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
 

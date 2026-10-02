@@ -1,0 +1,15 @@
+{
+  "name": "plan63-brain-migration",
+  "description": "기존 개인 지식 저장소를 주인이 검토한 묶음으로 Memory 에 들여온다 — 장기 지식의 기준 원본을 이 서비스로 옮기되 사람의 승인과 출처를 남긴다",
+  "status": "pending",
+  "created_at": "2026-10-02",
+  "total_phases": 5,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" },
+    { "number": 5, "file": "phase-05.md", "execution_profile": "deep" }
+  ]
+}

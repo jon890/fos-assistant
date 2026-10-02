@@ -57,6 +57,8 @@
 | `MEMORY_REVISION_CONFLICT` | 그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요. |
 | `MEMORY_ENCRYPTION_UNAVAILABLE` | 민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요. |
 
+`MEMORY_SENSITIVE_NOT_EDITABLE` 의 문구는 이미 있다. 고치지 않는다.
+
 이 파일의 문구를 단언하는 `test/unit/error-message.test.ts` 가 있다. 코드 수나 목록을 세는 단언이 있으면 맞춘다.
 
 ### 3. `web/src/components/memory/document-section.tsx`
