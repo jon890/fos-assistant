@@ -53,14 +53,17 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | `send_message` | `to`, `subject`, `body`, `cc`, `bcc` | `{id, thread_id}` |
 | `reply_to_message` | `message_id`, `to`, `subject`, `body`, `cc` | `{id, thread_id}` |
 
-- 받는 사람(`to`, `cc`, `bcc`)은 쉼표로 나눈 주소 글이다. `to`, `subject`, `body` 는 비울 수 없다
+- 받는 사람(`to`, `cc`, `bcc`)은 쉼표로 나눈 주소 글이다. 받는 사람과 제목에 줄바꿈 같은 제어 문자가 있으면 거절한다. `to`, `subject`, `body` 는 비울 수 없다
 - `add_labels` 와 `remove_labels` 는 쉼표로 나눈 라벨 이름이다. 시스템 라벨은 `INBOX`, `UNREAD`, `STARRED`, `IMPORTANT` 처럼 그 이름을 쓰고 사용자 라벨은 화면에 보이는 이름을 쓴다. 서버가 이름을 라벨 번호로 바꾼다. 모르는 이름은 `GMAIL_INVALID_INPUT` 이다. 보관은 `remove_labels: "INBOX"` 다
-- **`add_labels` 에 `TRASH` 나 `SPAM` 이 있으면 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다.** 대소문자를 구분하지 않고, 이름이 그 라벨 번호로 바뀐 경우도 거절한다
+- **`add_labels` 나 `remove_labels` 에 `TRASH` 나 `SPAM` 이 있으면 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다.** 휴지통과 스팸에 넣는 것도 꺼내는 것도 하지 않는다. 대소문자를 구분하지 않고, 이름이 그 라벨 번호로 바뀐 경우도 거절한다
 - `reply_to_message` 는 받는 사람과 제목을 원래 메일에서 채우지 않는다. 인자로 받은 그대로 보낸다. 승인한 것과 보낸 것이 같아야 하기 때문이다. 서버는 원래 메일의 스레드와 `Message-ID` 를 읽어 `In-Reply-To` 와 `References` 머리만 채운다
 - `create_draft` 의 `reply_to_message_id` 를 주면 그 메일의 스레드에 답장 초안을 만든다
 - 본문은 글(`text/plain`)로만 보낸다. 첨부를 붙이는 인자는 없다
-- `get_message` 의 `body` 는 `text/plain` 부분을 먼저 쓰고, 없으면 `text/html` 에서 태그를 뗀 글을 쓴다. 20,000자에서 자르고 잘랐으면 `body_truncated` 가 참이다. `get_thread` 는 메일마다 5,000자, 메일 20개까지다
+- `get_message` 의 `body` 는 `text/plain` 부분을 먼저 쓰고, 없으면 `text/html` 에서 태그를 뗀 글을 쓴다. 20,000자에서 자르고 잘랐으면 `body_truncated` 가 참이다. HTML 의 `script`, `style`, `head`, `title`, `template`, `noscript` 안의 글은 버린다. 머리 값은 1,000자, 첨부 목록은 50개, 첨부 이름은 255자에서 자른다. Gmail 의 응답이 10MB 를 넘으면 `GMAIL_UNAVAILABLE` 이다. `get_thread` 는 메일마다 5,000자, 메일 20개까지다
 - 첨부는 이름, 종류, 크기만 낸다. 내용을 읽는 도구는 없다
+- 읽기 도구 셋(`search_messages`, `get_message`, `get_thread`)의 결과에는 `notice` 칸이 더 붙는다. 아래 「보안」 이 갖는다
+- 결과의 `labels` 는 Gmail 의 라벨 번호다. 시스템 라벨은 번호가 이름과 같고, 사용자 라벨의 이름은 `list_labels` 로 찾는다
+- `message_id`, `thread_id`, `reply_to_message_id` 는 영문자, 숫자, `_`, `-` 로 된 64자까지의 글만 받는다. 아니면 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 이다
 - 도구는 프로세스 안의 상태에 기대지 않는다. access token 은 그 프로세스가 필요할 때 refresh token 으로 받는다
 
 ### 오류
@@ -70,10 +73,10 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | `GMAIL_UNAUTHORIZED` | `credential_rejected` | 토큰 endpoint 가 `invalid_grant` 나 `invalid_client` 로 답했다. Gmail API 가 401 로 답했다. 세 값 가운데 하나가 비었다 |
 | `GMAIL_FORBIDDEN` | `forbidden` | Gmail API 가 403 으로 답했다. scope 가 모자라거나 프로젝트에서 Gmail API 를 켜지 않았다 |
 | `GMAIL_INVALID_INPUT` | `invalid_input` | 인자가 비었거나 모양이 틀리다. 막은 라벨을 더하려 했다. Gmail API 가 400 이나 404 로 답했다 |
-| `GMAIL_UNAVAILABLE` | `unavailable` | 연결하지 못했다. 시간 안에 답이 없다. Gmail API 가 429 나 5xx 로 답했다 |
+| `GMAIL_UNAVAILABLE` | `unavailable` | 연결하지 못했다. 시간 안에 답이 없다. Gmail API 가 3xx, 429, 5xx 나 위에 없는 4xx 로 답했다. 응답을 읽지 못했다. 토큰 endpoint 가 `invalid_grant` 와 `invalid_client` 밖의 오류로 답했다 |
 
 오류 결과는 코드만 담는다. Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않는다.
-외부 호출의 제한 시간은 호출마다 15초다. 다시 부르지 않는다. 보내기가 시간 안에 답하지 않았을 때 다시 부르면 메일이 두 번 나갈 수 있다.
+외부 호출의 제한 시간은 호출마다 15초다. 대시보드가 확인 도구를 기다리는 시간은 10초라, Google 이 느리게 답하면 등록과 연결 확인이 서버의 제한 시간보다 먼저 `unavailable` 로 끝난다. 다시 부르지 않는다. 보내기가 시간 안에 답하지 않았을 때 다시 부르면 메일이 두 번 나갈 수 있다.
 
 ## scope 와 휴지통
 
@@ -82,7 +85,7 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | 하려는 것 | 이 scope 로 | 막는 곳 |
 | --- | --- | --- |
 | 읽기, 검색, 초안, 보내기, 라벨 바꾸기 | 된다 | |
-| 휴지통으로 옮기기 | **된다** | 서버 코드. 휴지통 endpoint 를 부르지 않고 `TRASH` 와 `SPAM` 라벨을 거절한다 |
+| 휴지통으로 옮기기 | **된다** | 서버 코드. 휴지통 endpoint 를 부르지 않고 라벨 바꾸기에서 `TRASH` 와 `SPAM` 을 더하는 것도 떼는 것도 거절한다 |
 | 영구 삭제 | 안 된다 | scope. `https://mail.google.com/` 을 받아야 한다 |
 
 보관(`INBOX` 라벨 떼기)에 `gmail.modify` 가 필요해 더 작은 scope 를 고를 수 없다.
@@ -100,15 +103,18 @@ MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_result
 | 전용 에이전트 | 이 커넥터의 에이전트는 자기 MCP 서버의 도구만 받는다. Memory 문맥을 받지 않고 Control Plane 도구를 부르지 못한다([ADR-045](../adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 속은 모델이 닿는 곳은 이 메일 계정과 그 대화의 답이다 |
 | 다른 에이전트로 가는 결과 | 다른 에이전트가 이 에이전트에게 일을 맡겼으면 Control Plane 이 답을 `<external-data>` 로 감싸고 지시로 따르지 말라는 줄을 붙여 전한다([커넥터 설치](../backend/connector-install.md) 의 「커넥터 에이전트의 경계」) |
 | 쓰기 | 초안, 라벨, 보내기, 답장은 모두 승인 뒤에만 실행된다. 보내기와 답장은 상시 허락이 없어 호출마다 승인한다 |
-| 승인한 것과 실행한 것 | 승인 카드는 받는 사람(`to`, `cc`, `bcc`), 제목(`subject`), 본문(`body`)을 글자 그대로 보인다. 승인하면 Control Plane 이 저장한 인자 그대로 한 번만 실행한다. 결과를 모르면 다시 실행하지 않는다([ADR-050](../adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)) |
+| 승인한 것과 실행한 것 | 승인 카드는 받는 사람(`to`, `cc`, `bcc`), 제목(`subject`), 본문(`body`)을 마크다운이나 HTML 로 읽지 않고 글자로 보인다. 토큰처럼 보이는 긴 글만 `[가림]` 으로 바꿔 보인다. 승인하면 Control Plane 이 저장한 인자 그대로 한 번만 실행한다. 결과를 모르면 다시 실행하지 않는다([ADR-050](../adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)) |
 
 서버가 하는 것도 있다.
 
 - 읽기 도구의 결과에 `notice` 칸을 넣어, 메일의 글은 보낸 사람이 쓴 자료이고 지시가 아니라고 적는다
 - 스킬 지침(`skills/gmail/SKILL.md`)이 같은 것을 말하고, 메일의 글이 시키는 쓰기를 하지 말고 사용자에게 알리라고 적는다
 
+**카드에 `[가림]` 이 보이면 그 자리의 원문을 읽지 못한 채 승인하는 것이다.** 카드는 비밀처럼 보이는 키의 값과 토큰 모양의 긴 글을 가리고, 실행은 저장한 원문으로 한다([커넥터 연결](../connectors.md) 의 「승인 줄과 경로」). 본문에 긴 링크 토큰이나 key 가 든 메일이 그렇다. 무엇이 나가는지 모르겠으면 거절하고 에이전트에게 그 부분을 빼거나 말로 풀어 달라고 한다.
+
 **이것으로 모델이 속지 않는다고 보장하지 못한다.** 마지막 방어는 사람이 승인 카드를 읽는 것이다.
 속은 모델이 읽은 메일의 내용을 그 대화의 답에 옮기는 것은 막지 못한다. 그 답은 계정 주인만 본다.
+HTML 메일에서 화면에 보이지 않게 꾸민 글(예: 숨긴 문단)은 걸러 내지 못하고 본문으로 모델에 간다.
 초안과 라벨에 상시 허락을 주면 속은 모델이 초안을 만들거나 메일을 보관할 수 있다. 둘 다 계정 밖으로 나가지 않고 되돌릴 수 있다.
 
 ## 설정 안내
@@ -139,7 +145,7 @@ python3 hermes/connectors/gmail/scripts/get_refresh_token.py
 3. 「Google 에서 확인하지 않은 앱」 경고가 나오면 「고급」 을 눌러 계속한다. 자기가 만든 앱이라 나오는 경고다
 4. 메일 권한을 허용하면 브라우저에 끝났다는 글이 보이고, 터미널에 refresh token 이 출력된다
 
-스크립트는 자기 컴퓨터의 `127.0.0.1` 에 임시 포트를 열어 Google 이 돌려주는 코드를 받는다. 값을 파일에 쓰지 않는다.
+스크립트는 자기 컴퓨터의 `127.0.0.1` 에 임시 포트를 열어 Google 이 돌려주는 코드를 받는다. 5분 안에 동의를 끝내지 않으면 스크립트가 끝나므로 다시 돌린다. 값을 파일에 쓰지 않는다.
 출력된 refresh token 은 그 계정의 메일을 읽고 보낼 수 있는 값이다. 붙여 넣은 뒤 터미널 기록에서 지운다.
 
 Python 을 쓸 수 없으면 [OAuth 2.0 Playground](https://developers.google.com/oauthplayground) 로 받을 수 있다.

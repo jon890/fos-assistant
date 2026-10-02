@@ -18,7 +18,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | --- | --- | --- |
 | `gmail` | 사용자의 Gmail 을 찾고 읽고, 승인받은 초안과 메일을 쓴다 | [Gmail 커넥터](../docs/connectors/gmail.md) |
 
-커넥터의 MCP 서버는 Python 으로 쓰고 `mcp` SDK 밖의 의존성을 두지 않는다. 운영 목록의 `command` 는 그 SDK 가 있는 Python 실행 파일이어야 한다.
+커넥터의 MCP 서버는 Python 으로 쓰고 `mcp` SDK 와 그 SDK 가 함께 설치하는 것 밖의 의존성을 두지 않는다. 운영 목록의 `command` 는 그 SDK 가 있는 Python 실행 파일이어야 한다.
 만드는 방법과 공통 검사는 [커넥터 만들기](../docs/connector-authoring.md) 가 갖는다.
 
 ## 설치 묶음

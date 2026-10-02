@@ -7,7 +7,9 @@
 
 import base64
 import binascii
+import email.errors
 import email.header
+import email.headerregistry
 import email.message
 import email.policy
 import email.utils
@@ -34,6 +36,11 @@ BODY_MAX_CHARS = 20000
 THREAD_BODY_MAX_CHARS = 5000
 THREAD_MAX_MESSAGES = 20
 SEARCH_MAX_RESULTS = 25
+# 외부에서 온 글의 상한이다. 남이 보낸 메일이 결과와 메모리를 끝없이 키우지 못하게 한다.
+HEADER_MAX_CHARS = 1000
+ATTACHMENTS_MAX = 50
+FILENAME_MAX_CHARS = 255
+RESPONSE_MAX_BYTES = 10 * 1024 * 1024
 # 더할 수 없는 라벨이다. `gmail.modify` scope 가 휴지통을 허용하므로 서버가 막는다.
 BLOCKED_LABELS = frozenset({"TRASH", "SPAM"})
 
@@ -48,6 +55,10 @@ SEARCH_CONCURRENCY = 5
 SEARCH_HEADERS = ("From", "To", "Subject", "Date")
 # 경로에 넣는 번호의 모양이다. `/` 가 들어오면 다른 경로를 부르게 되므로 받지 않는다.
 ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+# 머리 값에 들어오면 안 되는 글자다. 줄을 끼워 다른 머리를 넣는 데 쓰인다. 표준 라이브러리의 거절에 기대지 않고 직접 본다.
+CONTROL_RE = re.compile("[\x00-\x1f\x7f\x85\u2028\u2029]")
+# 답장 머리에 옮겨도 되는 글자다. 접힌 줄의 공백과 눈에 보이는 ASCII 뿐이다.
+REPLY_HEADER_UNSAFE_RE = re.compile(r"[^\t\r\n\x20-\x7e]")
 REJECTING_TOKEN_ERRORS = frozenset({"invalid_grant", "invalid_client"})
 READ = ToolAnnotations(read_only_hint=True)
 WRITE = ToolAnnotations(read_only_hint=False)
@@ -68,7 +79,16 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect)
+# 환경의 프록시 설정을 쓰지 않는다. 자격 증명이 든 요청이 실행 환경이 정한 다른 곳을 거치지 않게 한다.
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
+
+
+def _read_limited(response) -> bytes:
+    """응답 본문을 상한까지만 읽는다. 넘으면 읽지 못한 응답으로 본다."""
+    raw = response.read(RESPONSE_MAX_BYTES + 1)
+    if len(raw) > RESPONSE_MAX_BYTES:
+        raise GmailError(UNAVAILABLE)
+    return raw
 
 
 def _http(method: str, url: str, headers: dict, body: bytes | None, token_endpoint: bool) -> dict:
@@ -79,15 +99,17 @@ def _http(method: str, url: str, headers: dict, body: bytes | None, token_endpoi
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with _OPENER.open(request, timeout=TIMEOUT_SECONDS) as response:
-            status, raw = response.status, response.read()
+            status, raw = response.status, _read_limited(response)
     except urllib.error.HTTPError as error:
         status = error.code
         try:
-            raw = error.read()
+            raw = error.read(RESPONSE_MAX_BYTES + 1)
         except (OSError, http.client.HTTPException):
             raw = b""
         finally:
             error.close()
+        if len(raw) > RESPONSE_MAX_BYTES:
+            raw = b""
     except (OSError, http.client.HTTPException, ValueError):
         raise GmailError(UNAVAILABLE) from None
     try:
@@ -183,6 +205,11 @@ def _decode_header(value: str) -> str:
         return "".join(pieces)
 
 
+def _header_text(headers: dict, name: str) -> str:
+    """결과에 싣는 머리 값이다. RFC 2047 을 풀고 상한에서 자른다."""
+    return _decode_header(headers.get(name, ""))[:HEADER_MAX_CHARS]
+
+
 def _headers(part: dict) -> dict:
     """MIME 부분의 머리를 소문자 이름으로 찾게 모은다. 같은 이름은 처음 것을 쓴다."""
     found = {}
@@ -214,9 +241,9 @@ def _part_text(part: dict) -> str:
 
 
 class _TextOnly(html.parser.HTMLParser):
-    """HTML 에서 태그를 떼고 글만 모은다. `script` 와 `style` 의 내용은 버린다."""
+    """HTML 에서 태그를 떼고 글만 모은다. 화면에 보이지 않는 태그(`HIDDEN`)의 내용은 버린다."""
 
-    HIDDEN = frozenset({"script", "style"})
+    HIDDEN = frozenset({"script", "style", "title", "head", "template", "noscript"})
     BREAKS = frozenset({"br", "p", "div", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"})
 
     def __init__(self):
@@ -225,7 +252,10 @@ class _TextOnly(html.parser.HTMLParser):
         self.hidden = 0
 
     def handle_starttag(self, tag, attrs):
-        if tag in self.HIDDEN:
+        if tag == "body":
+            # `head` 를 닫지 않은 메일도 본문은 읽는다.
+            self.hidden = 0
+        elif tag in self.HIDDEN:
             self.hidden += 1
         elif tag in self.BREAKS:
             self.pieces.append("\n")
@@ -256,10 +286,12 @@ def _collect(part: dict, found: dict) -> None:
     mime_type = part.get("mimeType") if isinstance(part.get("mimeType"), str) else ""
     filename = part.get("filename") if isinstance(part.get("filename"), str) else ""
     if filename:
-        size = (part.get("body") or {}).get("size")
-        found["attachments"].append({
-            "filename": filename, "mime_type": mime_type, "size": size if isinstance(size, int) else 0,
-        })
+        if len(found["attachments"]) < ATTACHMENTS_MAX:
+            size = (part.get("body") or {}).get("size")
+            found["attachments"].append({
+                "filename": filename[:FILENAME_MAX_CHARS], "mime_type": mime_type[:HEADER_MAX_CHARS],
+                "size": size if isinstance(size, int) else 0,
+            })
         return
     if mime_type.lower().startswith("multipart/"):
         for child in part.get("parts") or []:
@@ -280,10 +312,10 @@ def _summary(resource: dict) -> dict:
     return {
         "id": resource.get("id"),
         "thread_id": resource.get("threadId"),
-        "from": _decode_header(headers.get("from", "")),
-        "to": _decode_header(headers.get("to", "")),
-        "subject": _decode_header(headers.get("subject", "")),
-        "date": headers.get("date", ""),
+        "from": _header_text(headers, "from"),
+        "to": _header_text(headers, "to"),
+        "subject": _header_text(headers, "subject"),
+        "date": headers.get("date", "")[:HEADER_MAX_CHARS],
         "snippet": resource.get("snippet") if isinstance(resource.get("snippet"), str) else "",
         "labels": _label_ids(resource),
     }
@@ -304,11 +336,11 @@ def _message(resource: dict, limit: int) -> dict:
     return {
         "id": resource.get("id"),
         "thread_id": resource.get("threadId"),
-        "from": _decode_header(headers.get("from", "")),
-        "to": _decode_header(headers.get("to", "")),
-        "cc": _decode_header(headers.get("cc", "")),
-        "subject": _decode_header(headers.get("subject", "")),
-        "date": headers.get("date", ""),
+        "from": _header_text(headers, "from"),
+        "to": _header_text(headers, "to"),
+        "cc": _header_text(headers, "cc"),
+        "subject": _header_text(headers, "subject"),
+        "date": headers.get("date", "")[:HEADER_MAX_CHARS],
         "labels": _label_ids(resource),
         "body": body[:limit],
         "body_truncated": len(body) > limit,
@@ -323,43 +355,54 @@ def _names(value: str) -> list:
     return [name.strip() for name in value.split(",") if name.strip()]
 
 
-def _recipients(value: str) -> list:
-    """받는 사람 글을 주소 목록으로 바꾼다. 줄바꿈이 있거나 `@` 가 없는 주소가 있으면 거절한다."""
-    if not isinstance(value, str) or "\r" in value or "\n" in value:
+def _recipients(value: str) -> tuple:
+    """받는 사람 글을 주소 목록으로 바꾼다. 제어 문자가 있거나 주소가 비었거나 `@` 가 없는 항목이 있으면 거절한다.
+
+    쉼표로 직접 나누지 않는다. 따옴표 안에 쉼표가 든 이름(`"Kim, A" <a@example.com>`)이 한 사람으로 읽혀야 한다.
+    """
+    if not isinstance(value, str) or CONTROL_RE.search(value):
         raise GmailError(INVALID_INPUT)
-    addresses = _names(value)
-    for address in addresses:
-        if "@" not in email.utils.parseaddr(address)[1]:
+    if not value.strip():
+        return ()
+    addresses = []
+    for name, address in email.utils.getaddresses([value]):
+        if not address or "@" not in address:
             raise GmailError(INVALID_INPUT)
-    return addresses
+        try:
+            addresses.append(email.headerregistry.Address(display_name=name, addr_spec=address))
+        except (ValueError, TypeError, IndexError, email.errors.MessageError):
+            raise GmailError(INVALID_INPUT) from None
+    if not addresses:
+        raise GmailError(INVALID_INPUT)
+    return tuple(addresses)
 
 
 def _compose(to: str, subject: str, body: str, cc: str, bcc: str, reply: dict | None = None) -> str:
     """인자 그대로 RFC 2822 메일을 만들어 base64url 로 낸다. 본문은 `text/plain` 뿐이다.
 
-    줄바꿈이 든 머리 값을 거절한다. 받는 사람이나 제목에 줄을 끼워 다른 머리를 넣지 못하게 한다.
+    제어 문자가 든 머리 값을 거절한다. 받는 사람이나 제목에 줄을 끼워 다른 머리를 넣지 못하게 한다.
     """
     if not isinstance(subject, str) or not isinstance(body, str):
         raise GmailError(INVALID_INPUT)
-    if "\r" in subject or "\n" in subject or not subject.strip() or not body.strip():
+    if CONTROL_RE.search(subject) or not subject.strip() or not body.strip():
         raise GmailError(INVALID_INPUT)
     to_list, cc_list, bcc_list = _recipients(to), _recipients(cc), _recipients(bcc)
     if not to_list:
         raise GmailError(INVALID_INPUT)
     message = email.message.EmailMessage(policy=email.policy.SMTP)
     try:
-        message["To"] = ", ".join(to_list)
+        message["To"] = to_list
         if cc_list:
-            message["Cc"] = ", ".join(cc_list)
+            message["Cc"] = cc_list
         if bcc_list:
-            message["Bcc"] = ", ".join(bcc_list)
+            message["Bcc"] = bcc_list
         message["Subject"] = subject
         if reply and reply["message_id"]:
             message["In-Reply-To"] = reply["message_id"]
             message["References"] = (reply["references"] + " " + reply["message_id"]).strip()
         message.set_content(body, charset="utf-8")
         raw = message.as_bytes()
-    except (ValueError, TypeError, LookupError, IndexError):
+    except (ValueError, TypeError, LookupError, IndexError, email.errors.MessageError):
         raise GmailError(INVALID_INPUT) from None
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
@@ -376,11 +419,19 @@ async def _reply_context(token: str, message_id: str) -> dict:
     ])
     headers = _headers(original.get("payload") or {})
     thread_id = original.get("threadId")
+
+    def safe(name: str) -> str:
+        """남이 보낸 메일의 머리다. ASCII 밖의 글이나 제어 문자가 있으면 버리고 스레드 번호만으로 답장한다."""
+        value = headers.get(name, "")
+        if REPLY_HEADER_UNSAFE_RE.search(value):
+            return ""
+        # 접힌 머리의 줄바꿈을 공백 하나로 편다. 그대로 넣으면 머리에 줄이 끼어든다.
+        return " ".join(value.split())
+
     return {
         "thread_id": thread_id if isinstance(thread_id, str) else "",
-        # 접힌 머리의 줄바꿈을 공백 하나로 편다. 그대로 넣으면 머리에 줄이 끼어든다.
-        "message_id": " ".join(headers.get("message-id", "").split()),
-        "references": " ".join(headers.get("references", "").split()),
+        "message_id": safe("message-id"),
+        "references": safe("references"),
     }
 
 
@@ -486,7 +537,8 @@ async def _modify_labels(message_id: str, add_labels: str, remove_labels: str) -
     if not add and not remove:
         raise GmailError(INVALID_INPUT)
     # 이름으로 먼저 막는다. 막을 것이 뻔한 호출로 Gmail 을 부르지 않는다.
-    if any(name.upper() in BLOCKED_LABELS for name in add):
+    # 떼는 쪽도 막는다. 휴지통과 스팸에 관한 변경은 어느 방향도 하지 않는다.
+    if any(name.upper() in BLOCKED_LABELS for name in add + remove):
         raise GmailError(INVALID_INPUT)
     token = await _access_token()
     labels = await _labels(token)
@@ -506,7 +558,7 @@ async def _modify_labels(message_id: str, add_labels: str, remove_labels: str) -
 
     add_ids, remove_ids = [resolve(name) for name in add], [resolve(name) for name in remove]
     # 번호로 한 번 더 막는다. 화면의 이름이 다른 라벨도 번호는 휴지통일 수 있다.
-    if any(label_id.upper() in BLOCKED_LABELS for label_id in add_ids):
+    if any(label_id.upper() in BLOCKED_LABELS for label_id in add_ids + remove_ids):
         raise GmailError(INVALID_INPUT)
     changed = await _api(token, "POST", "/messages/" + message_id + "/modify",
                          body={"addLabelIds": add_ids, "removeLabelIds": remove_ids})
@@ -588,7 +640,7 @@ async def modify_labels(message_id: str = "", add_labels: str = "", remove_label
 
     `message_id` 는 메일의 `id` 다. `add_labels` 와 `remove_labels` 는 쉼표로 나눈 라벨 이름이다.
     보관은 `remove_labels` 에 `INBOX`, 읽음 처리는 `remove_labels` 에 `UNREAD` 를 준다.
-    휴지통과 스팸 라벨은 더할 수 없다.
+    휴지통과 스팸 라벨은 더할 수도 뗄 수도 없다.
     """
     return await _answer(_modify_labels(message_id, add_labels, remove_labels))
 

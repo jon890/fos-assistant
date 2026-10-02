@@ -63,7 +63,7 @@ docs/connectors/<id>.md                 도구와 정책, 보안, 설정 안내,
 
 ### MCP 서버
 
-- Python 으로 쓰고 `mcp` SDK 와 표준 라이브러리만 쓴다. 운영자가 준 실행 파일의 환경에 다른 패키지가 없다
+- Python 으로 쓰고 표준 라이브러리와 `mcp` SDK, 그 SDK 와 함께 설치되는 `mcp_types`, `anyio` 만 쓴다. 운영자가 준 실행 파일의 환경에 다른 패키지가 없다
 - `.mcp.json` 의 `command` 는 `python3`, 첫 인자는 `${CLAUDE_PLUGIN_ROOT}/server.py` 다. 실제 실행 파일은 운영 목록이 정한다
 - 외부 호출에는 제한 시간을 둔다. 대시보드가 확인 도구를 기다리는 시간은 10초, 승인한 호출을 기다리는 시간은 60초다
 - 외부에서 온 글을 결과에 담을 때 길이를 자른다
@@ -124,7 +124,7 @@ CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더
 
 - 위 「갖출 것」 과 공통 검사 통과
 - 도구마다의 분류 까닭이 커넥터 문서에 있다
-- `README.md` 와 `README.ko.md`, [`hermes/README.md`](../hermes/README.md) 의 커넥터 표에 한 줄
+- [`hermes/README.md`](../hermes/README.md) 의 커넥터 표에 한 줄. `README.md` 와 `README.ko.md` 의 커넥터 소개도 맞는지 본다
 - `test/unit/connector-neutral.test.ts` 의 금지 낱말에 그 서비스의 이름을 더한다. Control Plane 과 웹과 `hermes/plugins` 에 그 이름이 들어오지 않게 한다
 - 실제 계정으로 확인한 결과를 PR 에 적는다. 계정 주소와 토큰은 적지 않는다
 - 저장소의 검사는 [`AGENTS.md`](../AGENTS.md) 의 「확인」 이 갖는다

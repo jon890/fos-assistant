@@ -18,7 +18,10 @@ import sys
 import threading
 import time
 import unittest
+import urllib.error
 import urllib.parse
+import urllib.request
+from http.server import HTTPServer
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest import mock
 
@@ -320,6 +323,48 @@ class TransportTest(GmailCase):
         self.assertEqual(other.seen(), [], "Authorization 머리가 다른 호스트로 갔다")
         self.assertEqual(len(self.fake.seen("GET", "/gmail/profile")), 1)
 
+    def test_token_redirect_is_not_followed(self):
+        other = FakeGoogle()
+        self.addCleanup(other.close)
+        other.on("POST", "/elsewhere", 200, {"access_token": ACCESS_TOKEN})
+        other.on("GET", "/elsewhere", 200, {"access_token": ACCESS_TOKEN})
+        self.fake.on("POST", "/token", 302, {}, {"Location": other.url + "/elsewhere"})
+
+        self.fails("GMAIL_UNAVAILABLE", "get_profile")
+
+        self.assertEqual(other.seen(), [], "토큰 요청이 다른 호스트로 갔다")
+        self.assertEqual(len(self.fake.seen("POST", "/token")), 1)
+        self.assertEqual(self.fake.api_requests(), [])
+
+    def test_environment_proxy_is_not_used(self):
+        proxy = FakeGoogle()
+        self.addCleanup(proxy.close)
+        self.fake.on("GET", "/gmail/profile", 200, {"emailAddress": "me@example.com"})
+        settings = {"http_proxy": proxy.url, "HTTP_PROXY": proxy.url, "all_proxy": proxy.url,
+                    "ALL_PROXY": proxy.url, "no_proxy": "", "NO_PROXY": ""}
+        # opener 는 모듈을 읽을 때 만든다. 프록시가 설정된 환경에서 새로 읽는다.
+        with mock.patch.dict(os.environ, settings):
+            fresh = load(SERVER_FILE, "gmail_connector_server_behind_proxy")
+            with mock.patch.object(fresh, "TOKEN_URL", self.fake.url + "/token"), \
+                    mock.patch.object(fresh, "API_BASE", self.fake.url + "/gmail"):
+                result = asyncio.run(fresh.server.call_tool("get_profile", {}))
+
+        self.assertFalse(result.is_error, result.content[0].text)
+        self.assertEqual(proxy.seen(), [], "자격 증명이 든 요청이 환경의 프록시로 갔다")
+        self.assertEqual(len(self.fake.seen("GET", "/gmail/profile")), 1)
+
+    def test_response_size_boundary(self):
+        payload = {"emailAddress": "me@example.com", "messagesTotal": 1, "threadsTotal": 1}
+        size = len(json.dumps(payload).encode("utf-8"))
+        self.fake.on("GET", "/gmail/profile", 200, payload)
+        with mock.patch.object(self.module, "RESPONSE_MAX_BYTES", size):
+            self.assertEqual(self.ok("get_profile")["email"], "me@example.com")
+        with mock.patch.object(self.module, "RESPONSE_MAX_BYTES", size - 1):
+            self.fails("GMAIL_UNAVAILABLE", "get_profile")
+
+    def test_response_limit_is_ten_megabytes(self):
+        self.assertEqual(self.module.RESPONSE_MAX_BYTES, 10 * 1024 * 1024)
+
     def test_slow_answer_is_unavailable_and_not_retried(self):
         def slow(request):
             time.sleep(1.0)
@@ -462,6 +507,53 @@ class ReadTest(GmailCase):
         body = self.ok("get_message", message_id="m1")["body"]
 
         self.assertEqual(body, "first & line\nsecond line")
+
+    def test_invisible_html_elements_are_dropped(self):
+        source = ("<html><head><title>hidden title</title><meta charset=\"utf-8\"></head><body>"
+                  "<template><p>hidden template</p></template><noscript>hidden noscript</noscript>"
+                  "<p>visible</p></body></html>")
+        self.fake.on("GET", "/gmail/messages/m1", 200, mail("m1", text_part("text/html", source)))
+
+        self.assertEqual(self.ok("get_message", message_id="m1")["body"], "visible")
+
+    def test_unclosed_head_does_not_hide_the_body(self):
+        source = "<html><head><title>hidden title</title><body><p>visible</p></body></html>"
+        self.fake.on("GET", "/gmail/messages/m1", 200, mail("m1", text_part("text/html", source)))
+
+        self.assertEqual(self.ok("get_message", message_id="m1")["body"], "visible")
+
+    def test_header_values_are_cut_at_one_thousand_characters(self):
+        long = {"From": "f" * 1001, "To": "t" * 1001, "Cc": "c" * 1001, "Subject": "s" * 1001, "Date": "d" * 1001}
+        self.fake.on("GET", "/gmail/messages/m1", 200, mail("m1", text_part("text/plain", "hi"), headers=long))
+        self.fake.on("GET", "/gmail/messages", 200, {"messages": [{"id": "m1"}]})
+
+        message = self.ok("get_message", message_id="m1")
+        [summary] = self.ok("search_messages")["messages"]
+
+        for key, letter in (("from", "f"), ("to", "t"), ("cc", "c"), ("subject", "s"), ("date", "d")):
+            with self.subTest(key=key):
+                self.assertEqual(message[key], letter * 1000)
+                if key != "cc":
+                    self.assertEqual(summary[key], letter * 1000)
+
+    def test_header_of_exactly_one_thousand_characters_is_whole(self):
+        self.fake.on("GET", "/gmail/messages/m1", 200,
+                     mail("m1", text_part("text/plain", "hi"), headers={"Subject": "s" * 1000}))
+
+        self.assertEqual(self.ok("get_message", message_id="m1")["subject"], "s" * 1000)
+
+    def test_attachments_are_cut_at_fifty_and_names_at_255_characters(self):
+        def attachment(name):
+            return {"mimeType": "application/pdf", "filename": name, "headers": [], "body": {"size": 1}}
+
+        parts = [text_part("text/plain", "hi"), attachment("n" * 256)] + [attachment("a%d.pdf" % i) for i in range(50)]
+        self.fake.on("GET", "/gmail/messages/m1", 200, mail("m1", {"mimeType": "multipart/mixed", "parts": parts}))
+
+        attachments = self.ok("get_message", message_id="m1")["attachments"]
+
+        self.assertEqual(len(attachments), 50)
+        self.assertEqual(attachments[0]["filename"], "n" * 255)
+        self.assertEqual(attachments[-1]["filename"], "a48.pdf")
 
     def test_korean_charset_and_encoded_subject_are_decoded(self):
         text = "안녕하세요. 회의 일정입니다."
@@ -607,6 +699,39 @@ class WriteTest(GmailCase):
         self.assertEqual(parsed["Subject"], "승인한 제목")
         self.assertEqual(parsed.get_content().strip(), "답장입니다.")
 
+    def test_unsafe_reply_headers_of_the_original_are_dropped(self):
+        cases = {
+            "non-ascii id": ("<원래@mail.example.com>", "<root@mail.example.com>", None, None),
+            "control in id": ("<orig\x0b@mail.example.com>", "<root@mail.example.com>", None, None),
+            "non-ascii references": ("<orig-1@mail.example.com>", "<루트@mail.example.com>",
+                                     "<orig-1@mail.example.com>", "<orig-1@mail.example.com>"),
+        }
+        for name, (message_id, references, in_reply_to, expected_references) in cases.items():
+            with self.subTest(name=name):
+                self.fake.requests.clear()
+                original = {"id": "orig-1", "threadId": "thread-9", "payload": {"headers": [
+                    {"name": "Message-ID", "value": message_id}, {"name": "References", "value": references}]}}
+                self.fake.on("GET", "/gmail/messages/orig-1", 200, original)
+                self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-3", "threadId": "thread-9"})
+
+                self.ok("reply_to_message", message_id="orig-1", to="a@example.com", subject="Re: hi", body="b")
+
+                [request] = self.fake.seen("POST", "/gmail/messages/send")
+                payload, parsed = self.sent_mail(request)
+                self.assertEqual(payload["threadId"], "thread-9")
+                self.assertEqual(parsed["In-Reply-To"], in_reply_to)
+                self.assertEqual(parsed["References"], expected_references)
+
+    def test_quoted_display_name_with_a_comma_is_one_recipient(self):
+        self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-1", "threadId": "thread-2"})
+
+        self.ok("send_message", to='"Kim, A" <a@example.com>, 홍길동 <b@example.com>', subject="s", body="b")
+
+        [request] = self.fake.seen("POST", "/gmail/messages/send")
+        _, parsed = self.sent_mail(request)
+        self.assertEqual([(address.display_name, address.addr_spec) for address in parsed["To"].addresses],
+                         [("Kim, A", "a@example.com"), ("홍길동", "b@example.com")])
+
     def test_invalid_mail_arguments_are_rejected_before_any_request(self):
         good = {"to": "a@example.com", "subject": "s", "body": "b"}
         bad = [
@@ -614,13 +739,19 @@ class WriteTest(GmailCase):
             {"cc": "c@example.com\nBcc: x@example.com"}, {"subject": "s\nBcc: x@example.com"},
             {"subject": "s\r"}, {"to": ""}, {"to": "  "}, {"to": " , "}, {"subject": ""}, {"subject": "  "},
             {"body": ""}, {"body": " \n "}, {"to": "not-an-address"}, {"to": "a@example.com, nobody"},
-            {"cc": "nobody"},
+            {"cc": "nobody"}, {"to": "a@example.com,"}, {"to": "<>"}, {"to": "Kim, A <a@example.com>"},
         ]
+        # 줄바꿈으로 읽힐 수 있는 제어 문자다. 받는 사람과 제목 어디에 있어도 거절한다.
+        for character in ("\x0b", "\x0c", "\x00", "\x85", "\u2028", "\u2029", "\x7f", "\x1f", "\t"):
+            bad += [{"to": "a@example.com" + character}, {"to": "Name" + character + " <a@example.com>"},
+                    {"cc": "c" + character + "@example.com"}, {"subject": "s" + character + "t"}]
         for change in bad:
             for tool, extra in (("send_message", {}), ("create_draft", {}), ("reply_to_message", {"message_id": "m1"})):
                 with self.subTest(tool=tool, change=change):
                     self.fails("GMAIL_INVALID_INPUT", tool, **{**good, **change, **extra})
         self.fails("GMAIL_INVALID_INPUT", "send_message", **good, bcc="x@example.com\nSubject: other")
+        self.fails("GMAIL_INVALID_INPUT", "send_message", **good, bcc="x@example.com\x0bSubject: other")
+        self.fails("GMAIL_INVALID_INPUT", "create_draft", **good, bcc="x@example.com\u2028")
 
         self.assertEqual(self.fake.seen(), [])
 
@@ -673,6 +804,15 @@ class LabelTest(GmailCase):
         # 이름만 봐도 막을 수 있는 호출은 Gmail 에 닿지 않는다.
         self.assertEqual(self.fake.seen(), [])
 
+    def test_trash_and_spam_are_never_removed(self):
+        for name in ("TRASH", "trash", "Spam", " SPAM ", "UNREAD, trash"):
+            with self.subTest(name=name):
+                self.fails("GMAIL_INVALID_INPUT", "modify_labels", message_id="m1", remove_labels=name)
+                self.fails("GMAIL_INVALID_INPUT", "modify_labels", message_id="m1", add_labels="STARRED",
+                           remove_labels=name)
+
+        self.assertEqual(self.fake.seen(), [])
+
     def test_label_whose_id_is_trash_is_rejected_under_any_name(self):
         renamed = [{"id": "TRASH", "name": "휴지통", "type": "system"},
                    {"id": "SPAM", "name": "스팸함", "type": "system"},
@@ -681,6 +821,7 @@ class LabelTest(GmailCase):
         for name in ("휴지통", "스팸함"):
             with self.subTest(name=name):
                 self.fails("GMAIL_INVALID_INPUT", "modify_labels", message_id="m1", add_labels=name)
+                self.fails("GMAIL_INVALID_INPUT", "modify_labels", message_id="m1", remove_labels=name)
 
         self.assertEqual(self.modify_requests(), [])
 
@@ -811,6 +952,62 @@ class RefreshTokenScriptTest(unittest.TestCase):
 
         for secret in SECRETS + (UPSTREAM_TEXT,):
             self.assertNotIn(secret, str(raised.exception))
+
+
+    def listen(self, wait_seconds):
+        """`_Callback` 을 임시 포트에 띄우고 기다리는 일을 스레드로 돌린다. `(주소, 결과를 받는 함수)` 를 낸다."""
+        listener = HTTPServer(("127.0.0.1", 0), self.script._Callback)
+        self.addCleanup(listener.server_close)
+        patcher = mock.patch.object(self.script, "WAIT_SECONDS", wait_seconds)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        outcome = []
+        thread = threading.Thread(
+            target=lambda: outcome.append(self.script.wait_for_callback(listener, "right-state")), daemon=True)
+        thread.start()
+
+        def result():
+            thread.join(timeout=10)
+            self.assertFalse(thread.is_alive(), "기다림이 끝나지 않았다")
+            return outcome[0]
+
+        return "http://127.0.0.1:%d" % listener.server_address[1], result
+
+    def status(self, url):
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with opener.open(url, timeout=5) as response:
+                return response.status
+        except urllib.error.HTTPError as error:
+            error.close()
+            return error.code
+
+    def test_callback_ignores_wrong_or_missing_state_and_keeps_waiting(self):
+        url, result = self.listen(10)
+
+        self.assertEqual(self.status(url + "/?state=wrong-state&code=stolen-code"), 400)
+        self.assertEqual(self.status(url + "/?code=no-state-code"), 400)
+        self.assertEqual(self.status(url + "/favicon.ico"), 400)
+        self.assertEqual(self.status(url + "/?state=right-state&code=fake-code"), 200)
+
+        self.assertEqual(result(), {"state": "right-state", "code": "fake-code"})
+
+    def test_denied_consent_with_the_right_state_ends_the_wait(self):
+        url, result = self.listen(10)
+
+        self.assertEqual(self.status(url + "/?state=right-state&error=access_denied"), 400)
+
+        self.assertEqual(result(), {"state": "right-state", "error": "access_denied"})
+
+    def test_wait_gives_up_after_the_limit(self):
+        url, result = self.listen(0.3)
+
+        self.assertEqual(self.status(url + "/?state=wrong-state&code=stolen-code"), 400)
+
+        self.assertIsNone(result())
+
+    def test_wait_limit_is_three_hundred_seconds(self):
+        self.assertEqual(self.script.WAIT_SECONDS, 300)
 
 
 if __name__ == "__main__":
