@@ -188,7 +188,8 @@ export function MessageList({
             100;
           if (shouldFollow.current) setHasNewMessage(false);
         }}
-        className="h-full overflow-y-auto px-1 py-3"
+        // relative 가 없으면 안쪽의 sr-only(absolute) 기준 상자가 스크롤 상자 바깥이 되어 바깥 main 의 스크롤 높이를 늘린다.
+        className="relative h-full overflow-y-auto px-1 py-3"
       >
         <div className="mx-auto w-full max-w-3xl">
           {loading ? (
