@@ -58,8 +58,9 @@
 - `ToolPolicy` 에 `boolean grantable` 을 더한다. `ConnectorToolPolicies.policy` 가 `approval == REQUIRED && !Boolean.FALSE.equals(tool.grant())` 로 채운다
 - `ToolPolicyDecision.decide` 의 허용 조건을 `NONE` 이거나 `REQUIRED && granted && policy.grantable()` 로 바꾼다. `schema: 1` 의 선언 없는 도구에 쓰는 기본 정책은 `grantable` 을 참으로 둔다(지금 동작 그대로)
 - `ConnectorToolSummary` 와 `ConnectionDtos.ConnectorToolView` 에 `boolean grant` 를 더하고 `policy.grantable()` 을 싣는다
-- `ConnectorActionView.from` 이 선언한 정책을 받게 바꾼다: `from(ConnectorAction action, Optional<ToolPolicy> declared)`. 제목은 `declared.map(ToolPolicy::title)`, `grantAllowed` 는 `action.grantAllowed() && declared.map(ToolPolicy::grantable).orElse(false)` 다. 부르는 세 곳을 고친다
-- `beginApproval` 의 두 번째 검사를 「지금 정책이 `REQUIRED` 이고 `grantable`」 로 바꾼다. 지금 정책은 `ConnectorToolPolicies.find(manifest, action.toolName())` 로 읽는다. 아니면 `grantNotAllowed()` 다. 승인 줄은 `PENDING` 으로 남는다(지금 동작 그대로)
+- `ConnectorActionView.from` 이 선언한 정책을 받게 바꾼다: `from(ConnectorAction action, Optional<ToolPolicy> declared)`. 그리고 `boolean grantable` 을 함께 받는다: `from(ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable)`. 제목은 `declared.map(ToolPolicy::title)`, `grantAllowed` 는 `action.grantAllowed() && grantable` 이다. 부르는 세 곳을 고친다
+- `grantable` 은 `ConnectorActionService` 의 도움 메서드 하나가 정한다. manifest 를 읽지 못했으면 거짓, 선언을 찾았으면 `policy.grantable()`, **manifest 를 읽었고 `schema` 가 1 이며 선언이 없으면 참**(지금 동작 그대로. `schema: 1` 은 `grant` 를 선언할 수 없다), `schema` 가 2 인데 선언이 없으면 거짓이다
+- `beginApproval` 의 두 번째 검사를 「지금 정책이 `REQUIRED` 이고 `grantable`」 로 바꾼다. `grantable` 은 위의 도움 메서드로 읽는다. 아니면 `grantNotAllowed()` 다. 승인 줄은 `PENDING` 으로 남는다(지금 동작 그대로)
 - `ToolPolicy` 생성자를 쓰는 다른 곳과 `ConnectorTool` 생성자를 쓰는 검사 코드(`backend/src/test/java/com/bifos/assistant/connector/` 아래)를 모두 고친다. `grep -rn "new ConnectorTool(\|new ToolPolicy(" backend/src` 로 찾는다
 
 ### 4. backend 검사
@@ -67,6 +68,7 @@
 - `backend/src/test/java/com/bifos/assistant/connector/ToolPolicyDecisionTest.java`: `grantable` 이 거짓인 `REQUIRED` 정책은 `granted` 가 참이어도 `NEEDS_APPROVAL` 이다. 참이면 `ALLOWED` 다
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorToolPoliciesTest.java`: `grant` 가 `null`, `TRUE`, `FALSE` 일 때의 `grantable` 과 `summaries` 의 `grant`. `none` 도구는 `grant` 가 `TRUE` 여도 `grantable` 이 거짓이다
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionServiceTest.java`: `grant: false` 인 도구의 승인 줄은 `grantAllowed` 가 거짓이다. 그 줄에 기간을 실어 승인하면 `VALIDATION_FAILED` 이고 줄은 `PENDING` 이며 실행되지 않고 허락 줄이 생기지 않는다. 기간 없이 승인하면 실행된다
+- 같은 파일: `schema: 1` manifest 에서 `tool_name` 이 있는 `REQUIRED` 승인 줄(확인 도구가 아닌 줄을 만들 수 없으면 줄을 직접 저장해 만든다)의 `grantAllowed` 가 지금과 같고, 카탈로그를 읽지 못하면 `grantAllowed` 가 거짓이며 기간을 실은 승인이 `VALIDATION_FAILED` 다
 - `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyEndpointTest.java`: `grant: false` 인 도구에 유효한 상시 허락 줄이 있어도 판정이 `block` 이고 승인 줄이 생긴다
 - 카탈로그 parse 검사가 있는 파일(`grep -rln "HttpHermesConnectorClient" backend/src/test`)에 `grant` 가 없을 때, `false` 일 때, 문자열일 때를 더한다
 
@@ -76,7 +78,7 @@
 - `web/src/lib/connection-route.ts` 의 `safeTools`: `grant: item.grant === true`
 - `ConnectorTool` 을 만드는 다른 곳(`grep -rn "approval:" web/src test/browser test/unit`)을 고친다
 - `test/unit/` 에 `toolPolicyLabel` 의 네 갈래를 보는 검사를 더한다. 같은 디렉터리의 `toolset-label.test.ts` 가 `web/src/lib` 의 함수를 불러 검사하는 선례다. 파일 이름은 `test/unit/connector-tool-label.test.ts`
-- `test/browser/connector-connection.spec.ts` 가 도구 목록의 문구를 단언하면 대역의 값에 맞게 고친다
+- `test/browser/connector-connection.spec.ts` 의 `write_note` 대역에 `grant: true` 를 넣는다. 그 파일이 「실행 전에 물어봐요」 를 단언하고, `grant` 가 없으면 새 문구 「실행할 때마다 물어봐요」 가 된다. 다른 도구 대역에는 `grant: false` 를 넣는다
 
 ### 6. e2e
 
@@ -93,10 +95,12 @@ cd backend && ./gradlew test && cd ..
 node --test 'test/unit/**/*.test.ts'
 node test/e2e/run.ts
 cd web && pnpm typecheck && cd ..
+cd web && pnpm test:browser connector-connection && cd ..
 scripts/quality.sh check
 ```
 
 모두 종료 코드 0 이다. `gradlew` 의 위치와 `pnpm` 이 요구하는 환경 변수는 `backend/AGENTS.md` 와 `web/AGENTS.md` 에 있다.
+브라우저 검사는 이 spec 하나만 돌린다. 전체 브라우저 검사는 PR 의 CI 가 돌린다(`AGENTS.md` 의 「확인」).
 hermes 검사는 `mcp==2.0.0` 과 `PyYAML==6.0.3` 이 있어야 돈다(`scripts/check-local.sh` 의 `check_hermes` 가 맞춰 설치한다).
 
 ## 변경 파일

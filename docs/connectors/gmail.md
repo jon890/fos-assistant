@@ -18,7 +18,7 @@
 
 ## 도구와 정책
 
-MCP 서버 이름은 `gmail` 이다. 인자는 모두 글자다. 승인 카드가 인자를 키와 값으로 그대로 보이기 때문이다.
+MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_results`(정수)를 빼고 모두 글자다. 승인 카드가 인자를 키와 값으로 그대로 보이기 때문이다.
 
 | 도구 | 위험도 | 승인 | 상시 허락 | 카드 제목 | 하는 일 |
 | --- | --- | --- | --- | --- | --- |
@@ -53,7 +53,7 @@ MCP 서버 이름은 `gmail` 이다. 인자는 모두 글자다. 승인 카드�
 | `send_message` | `to`, `subject`, `body`, `cc`, `bcc` | `{id, thread_id}` |
 | `reply_to_message` | `message_id`, `to`, `subject`, `body`, `cc` | `{id, thread_id}` |
 
-- 받는 사람(`to`, `cc`, `bcc`)은 쉼표로 나눈 주소 글이다. `to` 는 비울 수 없다
+- 받는 사람(`to`, `cc`, `bcc`)은 쉼표로 나눈 주소 글이다. `to`, `subject`, `body` 는 비울 수 없다
 - `add_labels` 와 `remove_labels` 는 쉼표로 나눈 라벨 이름이다. 시스템 라벨은 `INBOX`, `UNREAD`, `STARRED`, `IMPORTANT` 처럼 그 이름을 쓰고 사용자 라벨은 화면에 보이는 이름을 쓴다. 서버가 이름을 라벨 번호로 바꾼다. 모르는 이름은 `GMAIL_INVALID_INPUT` 이다. 보관은 `remove_labels: "INBOX"` 다
 - **`add_labels` 에 `TRASH` 나 `SPAM` 이 있으면 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다.** 대소문자를 구분하지 않고, 이름이 그 라벨 번호로 바뀐 경우도 거절한다
 - `reply_to_message` 는 받는 사람과 제목을 원래 메일에서 채우지 않는다. 인자로 받은 그대로 보낸다. 승인한 것과 보낸 것이 같아야 하기 때문이다. 서버는 원래 메일의 스레드와 `Message-ID` 를 읽어 `In-Reply-To` 와 `References` 머리만 채운다

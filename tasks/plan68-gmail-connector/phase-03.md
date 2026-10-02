@@ -79,7 +79,6 @@ scripts/quality.sh check
 
 - 첫 명령은 0 보다 큰 수를 낸다
 - 나머지는 종료 코드 0 이다
-- `test/unit/` 에 `.github/` 의 파일 목록이나 workflow 를 단언하는 검사가 있다(`review-workflow.test.ts`, `pr-risk-labels.test.ts`). `CODEOWNERS` 를 더해 그 검사가 깨지면 그 검사의 기대값을 이 phase 에서 고치고 변경 파일에 더한다
 
 ## 변경 파일
 
