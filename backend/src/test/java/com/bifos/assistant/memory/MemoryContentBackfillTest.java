@@ -1,13 +1,16 @@
 package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.memory.application.MemoryContentBackfill;
+import com.bifos.assistant.memory.application.MemoryContentCipher;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 기동할 때 평문으로 남은 민감 줄을 암호화하는 보정을 본다(ADR-055). */
 @SpringBootTest
@@ -32,6 +36,9 @@ class MemoryContentBackfillTest {
 
     @Autowired
     MemoryRepository repository;
+
+    @MockitoSpyBean
+    MemoryContentCipher cipher;
 
     @Autowired
     MemoryRevisionRepository revisionRepository;
@@ -101,5 +108,50 @@ class MemoryContentBackfillTest {
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, id))
                 .isEqualTo(first);
+    }
+
+    /**
+     * 보정이 번호를 읽은 뒤 줄을 잠그기 전에 줄을 바꾼다. 번호를 읽은 다음 처음 부르는 {@code cipher.enabled()} 에서
+     * 한 번만 바꿔, 잠그지 않고 읽은 뒤 사용자가 고친 상황을 만든다.
+     */
+    private void changeAfterIdsRead(String sql, Object... args) {
+        AtomicBoolean changed = new AtomicBoolean();
+        doAnswer(invocation -> {
+                    if (changed.compareAndSet(false, true)) {
+                        jdbc.update(sql, args);
+                    }
+                    return invocation.callRealMethod();
+                })
+                .when(cipher)
+                .enabled();
+    }
+
+    @Test
+    @DisplayName("보정이 번호를 읽은 뒤 사용자가 본문을 고치고 NORMAL 로 바꾼 줄은 덮어쓰지 않는다")
+    void doesNotOverwriteRowChangedToNormalAfterRead() {
+        long id = insertMemory("SENSITIVE", MEMORY_MARK);
+        changeAfterIdsRead(
+                "UPDATE memory SET sensitivity = 'NORMAL', content = '사용자가 고친 본문', revision = 4 WHERE id = ?", id);
+
+        assertThat(backfill.sealPlaintext()).isZero();
+
+        Map<String, Object> row =
+                jdbc.queryForMap("SELECT content, content_key_id, revision FROM memory WHERE id = ?", id);
+        assertThat(row.get("CONTENT")).isEqualTo("사용자가 고친 본문");
+        assertThat(row.get("CONTENT_KEY_ID")).isNull();
+        assertThat(row.get("REVISION")).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("보정이 번호를 읽은 뒤 다른 곳이 먼저 암호화한 줄은 다시 암호화하지 않는다")
+    void doesNotSealRowSealedAfterRead() {
+        long id = insertMemory("SENSITIVE", MEMORY_MARK);
+        changeAfterIdsRead("UPDATE memory SET content = 'v1:먼저-암호화', content_key_id = 'other-1' WHERE id = ?", id);
+
+        assertThat(backfill.sealPlaintext()).isZero();
+
+        Map<String, Object> row = jdbc.queryForMap("SELECT content, content_key_id FROM memory WHERE id = ?", id);
+        assertThat(row.get("CONTENT")).isEqualTo("v1:먼저-암호화");
+        assertThat(row.get("CONTENT_KEY_ID")).isEqualTo("other-1");
     }
 }
