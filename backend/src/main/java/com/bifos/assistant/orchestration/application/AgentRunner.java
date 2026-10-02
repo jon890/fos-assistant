@@ -56,15 +56,12 @@ public class AgentRunner {
     /** 실행이 어떤 이유로 끝났는지 알 수 없을 때 실행 줄에 적는 값이다. */
     private static final String UNKNOWN_ERROR = "ORCHESTRATION_STEP_FAILED";
 
-    /** 위임 답을 잘랐을 때 끝에 붙이는 한 줄이다. 읽는 쪽은 모델이다. */
-    static final String TRUNCATED_NOTICE = "[답이 %d자를 넘어 뒷부분을 잘랐다]";
-
     private final ContextAssembler contextAssembler;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
-    private final DelegationProperties delegation;
+    private final DelegationOutput delegationOutput;
     private final ModelTierService modelTiers;
     private final Clock clock;
 
@@ -223,7 +220,7 @@ public class AgentRunner {
         if (cancelled.getAsBoolean() || "cancelled".equalsIgnoreCase(result.status())) {
             AgentExecution cancelledExecution = delegationKey == null
                     ? executions.cancel(execution, agent, result, choice)
-                    : executions.cancel(execution, agent, result, choice, partialOutput(result.output()));
+                    : executions.cancel(execution, agent, result, choice, delegationOutput.partial(result.output()));
             append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
             return new Run(
                     cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), result.sessionId());
@@ -241,7 +238,7 @@ public class AgentRunner {
 
         AgentExecution completed = delegationKey == null
                 ? executions.complete(execution, agent, result, choice)
-                : executions.complete(execution, agent, result, choice, clip(result.output()));
+                : executions.complete(execution, agent, result, choice, delegationOutput.clip(result.output()));
         append(completed, ExecutionEventType.RUN_COMPLETED, null, 2);
         return new Run(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
     }
@@ -270,28 +267,6 @@ public class AgentRunner {
         } catch (RuntimeException ex) {
             log.warn("실패로 끝내는 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", execution.id(), runId, ex);
         }
-    }
-
-    /**
-     * 위임 답을 상한까지 자르고 잘렸다는 한 줄을 붙인다.
-     *
-     * <p>상한 자리에서 대리 쌍이 갈리면 그 앞에서 자른다. 반쪽 글자가 남으면 저장과 JSON 쓰기에서 깨진다.
-     */
-    private String clip(String output) {
-        if (output == null) {
-            return "";
-        }
-        int max = delegation.outputMaxChars();
-        if (output.length() <= max) {
-            return output;
-        }
-        int end = max > 0 && Character.isHighSurrogate(output.charAt(max - 1)) ? max - 1 : max;
-        return output.substring(0, end) + "\n\n" + String.format(TRUNCATED_NOTICE, max);
-    }
-
-    /** 멈춘 위임 실행이 그때까지 받은 답이다. 받은 답이 없으면 null 이라 실행 줄의 답을 비워 둔다. */
-    private String partialOutput(String output) {
-        return output == null || output.isBlank() ? null : clip(output);
     }
 
     private static String appendInstruction(String instructions, String addition) {
