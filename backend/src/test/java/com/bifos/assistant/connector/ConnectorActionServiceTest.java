@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -714,6 +715,62 @@ class ConnectorActionServiceTest {
                 .as("카탈로그를 읽지 못했다")
                 .extracting(ConnectorGrantView::toolName)
                 .containsExactly(WRITE);
+    }
+
+    @Test
+    @DisplayName("선언이 상시 허락을 닫으면 그 도구의 허락 줄을 거두고, 선언이 다시 열려도 되살아나지 않으며 다른 도구의 줄은 그대로다")
+    void closedGrantIsRevokedAndStaysRevokedWhenDeclarationReopens() {
+        service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
+        Instant now = Instant.now();
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "other_note", now.plus(Duration.ofDays(1)), now));
+        catalogBecomes(manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", Boolean.FALSE),
+                new ConnectorTool("other_note", "WRITE", "required", null, null))));
+
+        assertThat(service.revokeClosedGrants(now)).isEqualTo(1);
+
+        assertThat(grants.findAll())
+                .extracting(ConnectorToolGrant::toolName, grant -> grant.revokedAt() != null)
+                .containsExactlyInAnyOrder(tuple(WRITE, true), tuple("other_note", false));
+        assertThat(service.revokeClosedGrants(now)).as("거둔 줄은 다시 세지 않는다").isZero();
+
+        catalogBecomes(manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null),
+                new ConnectorTool("other_note", "WRITE", "required", null, null))));
+        ConnectorPolicyAnswer reopened = ask(WRITE, "{\"text\":\"다시 열린 뒤\"}");
+
+        assertThat(reopened.allowed()).as("다시 열려도 옛 허락은 되살아나지 않는다").isFalse();
+        assertThat(reopened.actionId()).isNotNull();
+        assertThat(service.grants(me)).extracting(ConnectorGrantView::toolName).containsExactly("other_note");
+    }
+
+    @Test
+    @DisplayName("이미 거두었거나 기간이 지난 줄은 건드리지 않고, 카탈로그를 읽지 못하거나 선언에 없는 도구의 줄은 거두지 않는다")
+    void closedGrantSweepLeavesUnknownAndFinishedLinesAlone() {
+        Instant now = Instant.now();
+        ConnectorToolGrant revoked = ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now);
+        Instant earlier = now.minus(Duration.ofHours(1));
+        revoked.revoke(earlier);
+        grants.save(revoked);
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.minusSeconds(1), now.minus(Duration.ofDays(1))));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "removed_note", now.plus(Duration.ofDays(1)), now));
+        grants.save(ConnectorToolGrant.of(owner.id(), "other-connector", MAIL, now.plus(Duration.ofDays(1)), now));
+
+        assertThat(service.revokeClosedGrants(now)).isZero();
+
+        assertThat(grants.findAll()).filteredOn(grant -> grant.revokedAt() != null).hasSize(1);
+        assertThat(grants.findAll().get(0).revokedAt()).as("처음 거둔 시각을 그대로 둔다").isEqualTo(earlier);
+
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now));
+        ConnectorPolicyTestDoubles.expireCatalog();
+        when(connector.readCatalog()).thenThrow(new IllegalStateException());
+        assertThat(service.revokeClosedGrants(now)).as("카탈로그를 읽지 못했다").isZero();
+
+        doReturn(List.of(DECLARING)).when(connector).readCatalog();
+        ConnectorPolicyTestDoubles.expireCatalog();
+        assertThat(service.revokeClosedGrants(now)).as("닫은 도구의 유효한 줄 하나").isEqualTo(1);
     }
 
     @Test

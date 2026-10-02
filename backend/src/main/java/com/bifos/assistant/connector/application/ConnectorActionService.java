@@ -274,7 +274,7 @@ public class ConnectorActionService {
      * 내 상시 허락 가운데 유효한 것이다.
      *
      * <p>지금 선언이 상시 허락을 닫은 도구의 줄은 내지 않는다(ADR-065). 판정이 그 줄을 보지 않아 효력이 없다.
-     * 카탈로그를 읽지 못했으면 낸다.
+     * 그런 줄은 {@link #revokeClosedGrants} 가 곧 거둔다. 카탈로그를 읽지 못했으면 낸다.
      */
     @Transactional(readOnly = true)
     public List<ConnectorGrantView> grants(CurrentUser user) {
@@ -291,6 +291,35 @@ public class ConnectorActionService {
                     grant, declared.map(ToolPolicy::title).orElse(null)));
         }
         return views;
+    }
+
+    /**
+     * 지금 선언이 상시 허락을 닫은 도구의 유효한 허락 줄을 거둔다(ADR-065).
+     *
+     * <p>판정이 그 줄을 보지 않아 효력은 이미 없다. 그래도 줄이 남으면 사용자는 목록에서 못 보는 줄을 거둘 수 없고,
+     * 선언이 상시 허락을 다시 열 때 그 줄이 조용히 되살아난다. 선언이 닫혀 있는 동안 거둬 둔다.
+     * 카탈로그를 읽지 못한 커넥터는 닫았는지 알 수 없어 건드리지 않는다. 카탈로그에서 빠졌거나 도구 선언이 없는
+     * 줄도 건드리지 않는다. 닫는 선언을 읽은 줄만 거둔다.
+     *
+     * <p>카탈로그 읽기는 트랜잭션 밖에서 하고 거두는 갱신만 트랜잭션에 넣는다.
+     *
+     * @return 거둔 건수
+     */
+    public int revokeClosedGrants(Instant now) {
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
+        List<Long> closed = grants.findActive(now).stream()
+                .filter(grant -> manifests
+                        .computeIfAbsent(grant.connectorId(), this::readManifest)
+                        .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
+                        .filter(declared -> !declared.grantable())
+                        .isPresent())
+                .map(ConnectorToolGrant::id)
+                .toList();
+        if (closed.isEmpty()) {
+            return 0;
+        }
+        Integer revoked = transactions.execute(status -> grants.revokeAll(closed, now));
+        return revoked == null ? 0 : revoked;
     }
 
     /** 허락을 거둔다. 남의 허락은 없는 것과 같은 응답이다. 있는지를 알리지 않는다. */
@@ -582,6 +611,9 @@ public class ConnectorActionService {
     /**
      * 답을 기다리는 줄인데 사람이 인자를 다 읽을 수 없는가. 상시 허락을 닫은 도구의 인자에 화면에서 가려지는 글이
      * 있을 때다. 이런 줄은 승인할 수 없다.
+     *
+     * <p>카탈로그를 읽지 못했으면 거짓이다. 그 도구가 상시 허락을 닫았는지 모르는 채 다른 커넥터의 줄에도 경고를 붙이면
+     * 화면이 알리는 까닭이 틀린다. 실행은 {@link #beginApproval} 이 지금 정책을 판정하지 못한 줄로 막는다.
      */
     private static boolean hiddenArgs(Optional<ConnectorManifest> manifest, ConnectorAction action) {
         return action.status() == ActionStatus.PENDING
@@ -611,9 +643,6 @@ public class ConnectorActionService {
         if (action.conversationId() == null) {
             return;
         }
-     *
-     * <p>카탈로그를 읽지 못했으면 거짓이다. 그 도구가 상시 허락을 닫았는지 모르는 채 다른 커넥터의 줄에도 경고를 붙이면
-     * 화면이 알리는 까닭이 틀린다. 실행은 {@link #beginApproval} 이 지금 정책을 판정하지 못한 줄로 막는다.
         try {
             events.publishEvent(new ConnectorActionChanged(action.conversationId(), action.publicId()));
         } catch (RuntimeException ex) {
