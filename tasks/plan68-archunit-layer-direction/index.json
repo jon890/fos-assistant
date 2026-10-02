@@ -1,0 +1,14 @@
+{
+  "name": "plan68-archunit-layer-direction",
+  "description": "infra 가 application 을 쓰는 곳과 presentation 이 infra 를 바로 쓰는 곳을 고쳐 LAYER_DIRECTION 의 기준을 0 으로 줄인다 — 층은 presentation 에서 application 을 거쳐 infra 와 domain 으로 흐른다",
+  "status": "pending",
+  "created_at": "2026-10-03",
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" }
+  ]
+}
