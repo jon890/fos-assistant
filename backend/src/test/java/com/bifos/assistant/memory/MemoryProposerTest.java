@@ -31,9 +31,11 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -133,8 +135,7 @@ class MemoryProposerTest {
                     assertThat(child.parentExecutionId()).isEqualTo(parent.id());
                     assertThat(child.rootExecutionId()).isEqualTo(parent.id());
                     assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
-                                    java.util.List.of(child.id())))
+                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(child.id())))
                             .isEmpty();
                 });
     }
@@ -183,8 +184,7 @@ class MemoryProposerTest {
                 .satisfies(child -> {
                     assertThat(child.status()).isEqualTo(ExecutionStatus.FAILED);
                     assertThat(child.errorCode()).isEqualTo(ErrorCode.PROVIDER_BLOCKED.name());
-                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
-                                    java.util.List.of(child.id())))
+                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(child.id())))
                             .singleElement()
                             .satisfies(event -> {
                                 assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
@@ -211,15 +211,15 @@ class MemoryProposerTest {
         doThrow(new IllegalStateException("database unavailable"))
                 .when(failingRecorder)
                 .start(
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any());
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any());
         MemoryProposer isolated = new MemoryProposer(
                 new MemoryProposalProperties(true),
                 mock(MemoryService.class),

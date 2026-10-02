@@ -19,8 +19,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,11 +29,10 @@ import org.springframework.stereotype.Service;
  * 가격이 바뀔 때 지난달 합계가 따라 움직인다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ExecutionRecorder {
     private final Clock clock;
-
-    private static final Logger log = LoggerFactory.getLogger(ExecutionRecorder.class);
 
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;

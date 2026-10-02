@@ -31,8 +31,7 @@ public class AgentService {
 
     /** 요청자가 읽을 수 있는 에이전트다. 지운 에이전트는 없는 에이전트와 같게 {@code AGENT_NOT_FOUND} 다. */
     public Agent requireReadable(CurrentUser user, String code) {
-        Agent agent = agents.findByCode(code)
-                .orElseThrow(() -> notFound());
+        Agent agent = agents.findByCode(code).orElseThrow(() -> notFound());
         if (agent.isDeleted() || !agent.isReadableBy(user.id())) {
             throw notFound();
         }
@@ -58,7 +57,9 @@ public class AgentService {
      */
     public Agent requireReadableForUpdate(CurrentUser user, String code) {
         Agent locked = agents.findByCodeForUpdate(code).orElseThrow(() -> notFound());
-        if (locked.isDeleted() || !locked.isReadableBy(user.id())) throw notFound();
+        if (locked.isDeleted() || !locked.isReadableBy(user.id())) {
+            throw notFound();
+        }
         return locked;
     }
 
@@ -71,7 +72,9 @@ public class AgentService {
      */
     public Agent lockForUpdate(CurrentUser user, Agent agent) {
         Agent locked = agents.findByIdForUpdate(agent.id()).orElseThrow(() -> notFound());
-        if (locked.isDeleted() || !locked.isReadableBy(user.id())) throw notFound();
+        if (locked.isDeleted() || !locked.isReadableBy(user.id())) {
+            throw notFound();
+        }
         return locked;
     }
 

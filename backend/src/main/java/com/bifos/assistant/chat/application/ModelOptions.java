@@ -16,5 +16,4 @@ public record ModelOptions(
         String defaultProvider,
         String defaultModel,
         List<HermesModelCatalog.Provider> providers,
-        List<String> reasoningEfforts) {
-}
+        List<String> reasoningEfforts) {}

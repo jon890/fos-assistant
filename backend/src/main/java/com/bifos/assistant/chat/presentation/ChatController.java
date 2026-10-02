@@ -35,6 +35,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.UpdateDefaultModelTierRequ
 import com.bifos.assistant.chat.presentation.ChatDtos.UpdateGroupModelTiersRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -279,7 +280,7 @@ public class ChatController {
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
         Map<Long, ActivitySummary> activity = chat.activitySummaries(history);
-        Map<Long, com.bifos.assistant.usage.domain.ExecutionStatus> statuses = chat.statuses(history);
+        Map<Long, ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
         return history.stream()

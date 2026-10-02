@@ -18,8 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -33,9 +32,8 @@ import org.springframework.stereotype.Service;
  * 가족 몇 명이 쓰는 규모라 같은 조회가 겹쳐도 비용이 작다.
  */
 @Service
+@Slf4j
 public class ModelOptionsService {
-
-    private static final Logger log = LoggerFactory.getLogger(ModelOptionsService.class);
 
     private final AgentService agents;
     private final HermesModelClient hermes;
