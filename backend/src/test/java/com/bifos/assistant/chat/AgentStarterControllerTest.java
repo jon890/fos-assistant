@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent;
+package com.bifos.assistant.chat;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -7,10 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bifos.assistant.agent.application.StarterStatus;
-import com.bifos.assistant.agent.application.StarterSuggestionService;
-import com.bifos.assistant.agent.application.StarterSuggestions;
-import com.bifos.assistant.agent.presentation.AgentStarterController;
+import com.bifos.assistant.chat.application.StarterStatus;
+import com.bifos.assistant.chat.application.StarterSuggestionService;
+import com.bifos.assistant.chat.application.StarterSuggestions;
+import com.bifos.assistant.chat.presentation.AgentStarterController;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;

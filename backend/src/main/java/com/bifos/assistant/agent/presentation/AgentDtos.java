@@ -2,7 +2,6 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.application.PersonaSnapshot;
-import com.bifos.assistant.agent.application.StarterSuggestions;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -54,19 +53,6 @@ public final class AgentDtos {
      */
     public record WritePersonaRequest(
             @NotBlank @Size(max = PERSONA_MAX_CHARS) String body, String baseHash) {}
-
-    /**
-     * 새 대화 화면이 받는 추천 질문이다.
-     *
-     * @param prompts 추천 질문. 보이는 차례대로다. {@code READY} 가 아니면 빈 목록
-     * @param status {@code READY}, {@code GENERATING}, {@code NONE} 가운데 하나. {@code GENERATING} 이면
-     *     화면이 잠시 뒤 다시 읽는다
-     */
-    public record StartersView(List<String> prompts, String status) {
-        static StartersView from(StarterSuggestions suggestions) {
-            return new StartersView(suggestions.prompts(), suggestions.status().name());
-        }
-    }
 
     /**
      * 사용자가 대화를 시작할 때 고르는 에이전트 한 줄.

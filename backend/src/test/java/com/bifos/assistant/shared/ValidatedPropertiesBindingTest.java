@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.application.AgentProperties;
 import com.bifos.assistant.agent.application.PeopleProperties;
-import com.bifos.assistant.agent.application.StarterProperties;
+import com.bifos.assistant.chat.application.StarterProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.infra.ArtifactProperties;
 import com.bifos.assistant.chat.infra.ArtifactSourceProperties;

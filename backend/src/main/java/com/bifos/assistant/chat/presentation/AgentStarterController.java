@@ -1,7 +1,7 @@
-package com.bifos.assistant.agent.presentation;
+package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.agent.application.StarterSuggestionService;
-import com.bifos.assistant.agent.presentation.AgentDtos.StartersView;
+import com.bifos.assistant.chat.application.StarterSuggestionService;
+import com.bifos.assistant.chat.presentation.ChatDtos.StartersView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

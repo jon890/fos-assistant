@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent;
+package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,10 +9,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.StarterProperties;
-import com.bifos.assistant.agent.application.StarterStatus;
-import com.bifos.assistant.agent.application.StarterSuggestionService;
-import com.bifos.assistant.agent.application.StarterSuggestions;
+import com.bifos.assistant.chat.application.StarterProperties;
+import com.bifos.assistant.chat.application.StarterStatus;
+import com.bifos.assistant.chat.application.StarterSuggestionService;
+import com.bifos.assistant.chat.application.StarterSuggestions;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
