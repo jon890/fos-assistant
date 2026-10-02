@@ -98,6 +98,7 @@ scripts/check-public-safe.sh
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/restart-reconcile.ts` | 신규 |
 | `test/e2e/run.ts` | 수정 |
+| `test/e2e/scenarios/chat-queue.ts` | 수정 |
 | `web/src/lib/execution-status.ts` | 수정 |
 | `web/src/components/usage/execution-list.tsx` | 수정 |
 | `test/unit/execution-status.test.ts` | 수정 |
