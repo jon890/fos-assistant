@@ -22,14 +22,21 @@ export const viewport: Viewport = {
   interactiveWidget: "resizes-content",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const me = await readMe();
 
   return (
     <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
       <body className="flex h-dvh overflow-hidden bg-background text-foreground">
         <ThemeProvider>
-          <AppShell isAdmin={me?.role === "ADMIN"} displayName={me?.displayName}>
+          <AppShell
+            isAdmin={me?.role === "ADMIN"}
+            displayName={me?.displayName}
+          >
             {children}
           </AppShell>
         </ThemeProvider>
