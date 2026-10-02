@@ -785,7 +785,8 @@ class ArtifactTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id(), Instant.now());
+                owner.id(),
+                Instant.now());
         if (flow != null) {
             agent.assignFlow(flow);
         }

@@ -291,7 +291,8 @@ class SubagentUsageReconcilerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                1L, Instant.now());
+                1L,
+                Instant.now());
         setField(agentWithChangedProfile, "id", 2L);
         when(fixtures.events.findUnscheduledChildren(any(), any())).thenReturn(List.of(fixtures.start));
         when(fixtures.executions.lockById(1L)).thenReturn(Optional.of(fixtures.parent));
@@ -788,7 +789,8 @@ class SubagentUsageReconcilerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                1L, Instant.now());
+                1L,
+                Instant.now());
         setField(agent, "id", 2L);
         SubagentUsageReconciler reconciler = new SubagentUsageReconciler(
                 executions,

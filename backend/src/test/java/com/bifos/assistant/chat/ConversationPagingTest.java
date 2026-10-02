@@ -88,7 +88,8 @@ class ConversationPagingTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id(), Instant.now()));
+                user.id(),
+                Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

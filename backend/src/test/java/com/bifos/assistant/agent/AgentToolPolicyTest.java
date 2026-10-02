@@ -134,6 +134,7 @@ class AgentToolPolicyTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 visibility,
-                1L, Instant.now());
+                1L,
+                Instant.now());
     }
 }

@@ -503,7 +503,8 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("기동 확인은 멈추지 않은 대기 메시지를 보내고 멈춘 대기 줄은 그대로 둔다")
     void startupDispatchSendsReadyQueueAndLeavesHeldQueue() {
-        Conversation heldConversation = conversations.save(Conversation.startedBy(dad.id(), "멈춘 대화", chief.id(), Instant.now()));
+        Conversation heldConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "멈춘 대화", chief.id(), Instant.now()));
         pendingRows.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "기동 뒤에 갈 글", false, QUEUED_AT));
         pendingRows.save(ChatPendingMessage.queued(heldConversation.id(), dad.id(), "멈춘 글", true, QUEUED_AT));
 
@@ -604,7 +605,8 @@ class PendingMessageServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                ownerId, Instant.now());
+                ownerId,
+                Instant.now());
     }
 
     private static HermesRunResult result(String runId, String output) {

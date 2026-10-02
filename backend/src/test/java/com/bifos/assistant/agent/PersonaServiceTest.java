@@ -165,6 +165,7 @@ class PersonaServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                ownerUserId, Instant.now());
+                ownerUserId,
+                Instant.now());
     }
 }

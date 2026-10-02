@@ -28,7 +28,8 @@ public record StarterProperties(
         enabled = enabled == null || enabled;
         refreshAfter = refreshAfter == null ? DEFAULT_REFRESH_AFTER : refreshAfter;
         historyConversations = historyConversations == null || historyConversations <= 0
-                ? DEFAULT_HISTORY_CONVERSATIONS : historyConversations;
+                ? DEFAULT_HISTORY_CONVERSATIONS
+                : historyConversations;
         retryAfterFailure = retryAfterFailure == null ? DEFAULT_RETRY_AFTER_FAILURE : retryAfterFailure;
     }
 }

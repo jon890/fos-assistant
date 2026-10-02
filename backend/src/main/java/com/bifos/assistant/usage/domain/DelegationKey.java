@@ -33,9 +33,9 @@ public record DelegationKey(String value) {
      * <p>어느 칸이든 비어 있거나 null 이면 {@link IllegalArgumentException} 을 던진다. 빈 칸으로 만든 키가
      * 다른 호출과 겹치지 않게 하기 위해서다.
      */
-    public static DelegationKey of(
-            String profileName, String rootSessionId, String sessionId, String toolCallId) {
-        String joined = String.join("\n",
+    public static DelegationKey of(String profileName, String rootSessionId, String sessionId, String toolCallId) {
+        String joined = String.join(
+                "\n",
                 "v1",
                 require("profileName", profileName),
                 require("rootSessionId", rootSessionId),

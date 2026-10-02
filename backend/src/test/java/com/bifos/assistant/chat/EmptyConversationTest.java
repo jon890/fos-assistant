@@ -162,7 +162,8 @@ class EmptyConversationTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id(), Instant.now()));
+                owner.id(),
+                Instant.now()));
         return saved;
     }
 

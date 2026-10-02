@@ -291,7 +291,8 @@ class ChatServiceTest {
                     CostMode.SUBSCRIPTION,
                     CredentialScope.SHARED_HOUSEHOLD,
                     AgentVisibility.PRIVATE,
-                    user.id(), Instant.now()));
+                    user.id(),
+                    Instant.now()));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -301,7 +302,8 @@ class ChatServiceTest {
     void recordsFailedExecutionWhenStoredTierDefinitionIsMalformed() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
+        Conversation conversation =
+                conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
         transactions.executeWithoutResult(status -> conversations.chooseModelTierIfActive(
                 conversation.id(), dad.id(), ModelSelectionMode.TIER, ModelTier.FAST));
         tierDefinitions.save(ModelTierDefinition.of(dad.groupId(), ModelTier.FAST, null, "example-fast", "low"));

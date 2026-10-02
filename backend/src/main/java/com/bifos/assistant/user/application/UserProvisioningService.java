@@ -56,7 +56,8 @@ public class UserProvisioningService {
     }
 
     private AppUser createUser(String email, String displayName) {
-        AppUser created = users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole(), clock.instant()));
+        AppUser created =
+                users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole(), clock.instant()));
         signInPolicy.admit(email).ifPresent(person -> createFirstAgent(created, person));
         return created;
     }

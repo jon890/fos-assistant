@@ -19,10 +19,12 @@ public record ArtifactSourceProperties(
     public ArtifactSourceProperties {
         allowedHosts = allowedHosts == null ? List.of() : List.copyOf(allowedHosts);
         for (String host : allowedHosts) {
-            if (host == null || host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")
+            if (host == null
+                    || host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")
                     || !host.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")
                     || !host.equals(host.toLowerCase(Locale.ROOT))) {
-                throw new IllegalStateException("assistant.artifact.source.allowed-hosts must contain lowercase ASCII DNS names");
+                throw new IllegalStateException(
+                        "assistant.artifact.source.allowed-hosts must contain lowercase ASCII DNS names");
             }
         }
         connectTimeout = positive(connectTimeout, DEFAULT_CONNECT_TIMEOUT, "connect-timeout");

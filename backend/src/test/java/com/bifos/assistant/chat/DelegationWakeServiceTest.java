@@ -568,7 +568,8 @@ class DelegationWakeServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                ownerId, Instant.now());
+                ownerId,
+                Instant.now());
     }
 
     private static HermesRunResult result(String runId, String output) {

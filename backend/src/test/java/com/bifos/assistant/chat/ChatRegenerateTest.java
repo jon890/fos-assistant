@@ -390,7 +390,8 @@ class ChatRegenerateTest {
                 "image.png",
                 "image/png",
                 1,
-                Instant.now().plus(Duration.ofDays(1)), Instant.now()));
+                Instant.now().plus(Duration.ofDays(1)),
+                Instant.now()));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachmentRows.save(attachment);
         attachments.attach(question.id(), conversationId, List.of(attachment.id()));
@@ -441,7 +442,8 @@ class ChatRegenerateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id(), Instant.now()));
+                user.id(),
+                Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

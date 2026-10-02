@@ -147,7 +147,8 @@ class AgentDelegationServiceTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                saved.id(), Instant.now()));
+                saved.id(),
+                Instant.now()));
         conversation = conversations.save(Conversation.startedBy(saved.id(), "맡기기", worker.id(), Instant.now()));
         root = "fos-" + UUID.randomUUID();
         origin = turn(root);

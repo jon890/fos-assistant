@@ -137,7 +137,8 @@ class PersonRegistrarTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null, Instant.now()));
+                null,
+                Instant.now()));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
                 .isInstanceOf(ApiException.class)

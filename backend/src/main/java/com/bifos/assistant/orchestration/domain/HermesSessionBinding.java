@@ -69,7 +69,12 @@ public class HermesSessionBinding {
     private Instant createdAt;
 
     private HermesSessionBinding(
-            String profileName, String sessionId, AgentExecution origin, String rootSessionId, String parentSessionId, Instant now) {
+            String profileName,
+            String sessionId,
+            AgentExecution origin,
+            String rootSessionId,
+            String parentSessionId,
+            Instant now) {
         this.profileName = profileName;
         this.sessionId = sessionId;
         this.userId = origin.userId();
@@ -80,7 +85,12 @@ public class HermesSessionBinding {
     }
 
     public static HermesSessionBinding of(
-            String profileName, String sessionId, AgentExecution origin, String rootSessionId, String parentSessionId, Instant now) {
+            String profileName,
+            String sessionId,
+            AgentExecution origin,
+            String rootSessionId,
+            String parentSessionId,
+            Instant now) {
         return new HermesSessionBinding(profileName, sessionId, origin, rootSessionId, parentSessionId, now);
     }
 }

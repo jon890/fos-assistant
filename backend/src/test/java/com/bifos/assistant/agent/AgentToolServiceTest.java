@@ -36,7 +36,8 @@ class AgentToolServiceTest {
 
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final SkillStore skillStore = mock(SkillStore.class);
-    private final AgentToolService service = new AgentToolService(toolsets, skillStore, mock(AgentService.class), mock(AgentRepository.class));
+    private final AgentToolService service =
+            new AgentToolService(toolsets, skillStore, mock(AgentService.class), mock(AgentRepository.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
             "tools",
@@ -46,7 +47,8 @@ class AgentToolServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L, Instant.now());
+            1L,
+            Instant.now());
 
     @BeforeEach
     void setUp() {
@@ -92,7 +94,8 @@ class AgentToolServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null, Instant.now());
+                null,
+                Instant.now());
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.write(reader, groupAgent, List.of()))
@@ -117,7 +120,8 @@ class AgentToolServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null, Instant.now());
+                null,
+                Instant.now());
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.read(reader, groupAgent))

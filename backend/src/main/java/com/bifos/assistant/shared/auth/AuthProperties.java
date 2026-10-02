@@ -9,5 +9,4 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.auth")
-public record AuthProperties(String jwtSecret) {
-}
+public record AuthProperties(String jwtSecret) {}

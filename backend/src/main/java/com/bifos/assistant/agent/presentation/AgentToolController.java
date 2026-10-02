@@ -32,8 +32,7 @@ public class AgentToolController {
     }
 
     @PutMapping("/agents/{code}/tools")
-    public AgentDtos.ToolsetsView write(
-            @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
+    public AgentDtos.ToolsetsView write(@PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
         CurrentUser user = currentUser.require();
         return view(tools.writeReadable(user, code, request.enabled()));
     }

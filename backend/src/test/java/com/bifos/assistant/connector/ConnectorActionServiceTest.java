@@ -197,7 +197,8 @@ class ConnectorActionServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id(), Instant.now());
+                owner.id(),
+                Instant.now());
         agent.markConnectorManaged();
         agent = agents.save(agent);
         root = "fos-" + UUID.randomUUID();
@@ -425,9 +426,10 @@ class ConnectorActionServiceTest {
     @DisplayName("다른 사용자와 관리자의 승인과 거절, 없는 번호는 CONNECTOR_ACTION_NOT_FOUND 이고 줄은 PENDING 그대로다")
     void othersAndAdminsCannotDecide() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        CurrentUser other =
-                currentUser(users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.MEMBER, Instant.now())));
-        CurrentUser admin = currentUser(users.save(AppUser.of("action-admin@example.com", "관리자", 1L, UserRole.ADMIN, Instant.now())));
+        CurrentUser other = currentUser(
+                users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.MEMBER, Instant.now())));
+        CurrentUser admin = currentUser(
+                users.save(AppUser.of("action-admin@example.com", "관리자", 1L, UserRole.ADMIN, Instant.now())));
 
         assertCode(() -> service.approve(other, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
         assertCode(() -> service.approve(admin, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
@@ -537,8 +539,8 @@ class ConnectorActionServiceTest {
     void revokedGrantNoLongerPasses() {
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         Long grantId = service.grants(me).get(0).grantId();
-        CurrentUser other =
-                currentUser(users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.ADMIN, Instant.now())));
+        CurrentUser other = currentUser(
+                users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.ADMIN, Instant.now())));
 
         assertCode(() -> service.revokeGrant(other, grantId), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
         assertCode(() -> service.revokeGrant(me, grantId + 1000), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);

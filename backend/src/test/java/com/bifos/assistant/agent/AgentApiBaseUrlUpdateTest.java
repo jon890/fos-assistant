@@ -71,8 +71,7 @@ class AgentApiBaseUrlUpdateTest {
             mock(SkillStore.class),
             Clock.systemUTC());
 
-    private final AgentAdminController controller =
-            new AgentAdminController(
+    private final AgentAdminController controller = new AgentAdminController(
             new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, Clock.systemUTC()), currentUser);
 
     private Agent agent;
@@ -87,7 +86,8 @@ class AgentApiBaseUrlUpdateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null, Instant.now());
+                null,
+                Instant.now());
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
@@ -155,7 +155,8 @@ class AgentApiBaseUrlUpdateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                1L, Instant.now());
+                1L,
+                Instant.now());
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "invalid toolset response"))
@@ -182,7 +183,8 @@ class AgentApiBaseUrlUpdateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                1L, Instant.now());
+                1L,
+                Instant.now());
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/dad", "dad")).thenReturn(List.of("terminal"));

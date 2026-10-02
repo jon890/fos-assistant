@@ -314,7 +314,8 @@ class MemoryDocumentServiceApiTest {
     @DisplayName("허용 목록에 줄이 없는 사용자의 토큰은 401 이다")
     void ownerWithoutAllowListRowIsRejected() throws Exception {
         String email = "svc-stranger-" + UUID.randomUUID() + "@example.com";
-        AllowedPerson row = people.save(AllowedPerson.of(email, "x", "svc-stranger-" + UUID.randomUUID(), Instant.now()));
+        AllowedPerson row =
+                people.save(AllowedPerson.of(email, "x", "svc-stranger-" + UUID.randomUUID(), Instant.now()));
         CurrentUser stranger = saveUser(email, "x", UserRole.MEMBER);
         String token = issue(stranger, 90, IDENTITY);
         // 발급은 허용된 사용자만 받는다. 허용 목록에서 줄이 사라진 뒤에도 그 토큰이 통하지 않아야 한다

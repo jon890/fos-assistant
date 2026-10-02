@@ -203,7 +203,8 @@ class ModelSelectionTest {
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                saved.id(), Instant.now()));
+                saved.id(),
+                Instant.now()));
     }
 
     @Test

@@ -101,7 +101,8 @@ public class ArtifactService {
                 continue;
             }
             try {
-                artifacts.save(ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize(), clock.instant()));
+                artifacts.save(
+                        ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize(), clock.instant()));
             } catch (RuntimeException ex) {
                 // 한 파일이 실패해도 나머지는 묶는다. 경로가 칸 길이를 넘는 것도 여기로 온다.
                 log.warn("could not record an artifact conversationId={} messageId={}", conversationId, messageId, ex);

@@ -176,7 +176,8 @@ class McpArtifactWriteToolTest {
     @DisplayName("등록한 하위 에이전트는 부모 실행이 끝난 뒤에도 그 사용자의 대화에만 쓴다")
     void registeredSubagentWritesOnlyToItsUsersConversationAfterParentEnds() throws Exception {
         Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
-        AppUser kid = users.save(AppUser.of("mcp-artifact-subagent-kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser kid = users.save(
+                AppUser.of("mcp-artifact-subagent-kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
         Conversation kids = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
         String subagent = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, subagent);
@@ -381,7 +382,8 @@ class McpArtifactWriteToolTest {
         Conversation active = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         Conversation deleted = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         conversationWriter.deleteIfActive(deleted.id(), dad.id(), Instant.now());
-        AppUser kid = users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser kid =
+                users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
         Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
 
         JsonNode missing = body(call(dadToken, UUID.randomUUID().toString(), "a.html", "x"))

@@ -75,13 +75,11 @@ public class ChatMessage {
         this.createdAt = now;
     }
 
-    public static ChatMessage fromUser(
-            Long conversationId, Long senderUserId, String content, Instant now) {
+    public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content, Instant now) {
         return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null, now);
     }
 
-    public static ChatMessage fromAssistant(
-            Long conversationId, String content, Long executionId, Instant now) {
+    public static ChatMessage fromAssistant(Long conversationId, String content, Long executionId, Instant now) {
         return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, null, now);
     }
 

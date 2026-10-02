@@ -52,7 +52,8 @@ class ModelTierFallbackIntegrationTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null, Instant.now());
+            null,
+            Instant.now());
 
     private static final Long GROUP_ID = 9_000_000_002L;
 

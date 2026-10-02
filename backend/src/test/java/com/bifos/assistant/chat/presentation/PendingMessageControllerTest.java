@@ -224,7 +224,8 @@ class PendingMessageControllerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id(), Instant.now()));
+                user.id(),
+                Instant.now()));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         when(currentUser.require()).thenReturn(current);
         return current;

@@ -347,7 +347,8 @@ class AgentLifecycleServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null, Instant.now()));
+                null,
+                Instant.now()));
 
         Agent changed = lifecycle.changeVisibility(administrator, code, AgentVisibility.PRIVATE);
 
@@ -520,7 +521,8 @@ class AgentLifecycleServiceTest {
                     CostMode.SUBSCRIPTION,
                     CredentialScope.SHARED_HOUSEHOLD,
                     AgentVisibility.PRIVATE,
-                    owner.id(), Instant.now())));
+                    owner.id(),
+                    Instant.now())));
         }
         return seeded;
     }

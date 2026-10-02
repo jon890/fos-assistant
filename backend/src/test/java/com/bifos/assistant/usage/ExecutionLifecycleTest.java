@@ -256,7 +256,8 @@ class ExecutionLifecycleTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                USER_ID, Instant.now());
+                USER_ID,
+                Instant.now());
     }
 
     /** 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다. */

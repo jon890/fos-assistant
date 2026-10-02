@@ -128,7 +128,8 @@ class MemoryProposerTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                USER.id(), Instant.now()));
+                USER.id(),
+                Instant.now()));
         conversation = conversations.save(Conversation.startedBy(USER.id(), "대화", agent.id(), Instant.now()));
     }
 

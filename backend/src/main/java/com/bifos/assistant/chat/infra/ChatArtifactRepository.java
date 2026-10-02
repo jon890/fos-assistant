@@ -35,7 +35,5 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
                and a.deletedAt is null
             """)
     int markDeleted(
-            @Param("conversationId") Long conversationId,
-            @Param("path") String path,
-            @Param("now") Instant now);
+            @Param("conversationId") Long conversationId, @Param("path") String path, @Param("now") Instant now);
 }

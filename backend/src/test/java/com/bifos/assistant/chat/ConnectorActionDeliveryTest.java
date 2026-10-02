@@ -547,7 +547,8 @@ class ConnectorActionDeliveryTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                ownerId, Instant.now());
+                ownerId,
+                Instant.now());
     }
 
     private void awaitReceived(int count) {

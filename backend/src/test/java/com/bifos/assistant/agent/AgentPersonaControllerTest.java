@@ -160,6 +160,7 @@ class AgentPersonaControllerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 visibility,
-                ownerUserId, Instant.now());
+                ownerUserId,
+                Instant.now());
     }
 }

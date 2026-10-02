@@ -121,7 +121,8 @@ class ChatRunningTurnTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id(), Instant.now());
+                user.id(),
+                Instant.now());
         if (flow != null) {
             agent.assignFlow(flow);
         }

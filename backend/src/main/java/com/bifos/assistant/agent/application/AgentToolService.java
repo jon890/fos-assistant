@@ -24,8 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentToolService {
 
     public record ToolView(
-            String name, String label, String description, AgentToolPolicy.Tier tier,
-            boolean enabled, boolean editable, boolean requiresPrivate) {}
+            String name,
+            String label,
+            String description,
+            AgentToolPolicy.Tier tier,
+            boolean enabled,
+            boolean editable,
+            boolean requiresPrivate) {}
+
     public record ToolsetsView(List<ToolView> toolsets, List<String> unclassifiedEnabled) {}
 
     private final HermesToolsetClient toolsets;
@@ -64,7 +70,8 @@ public class AgentToolService {
                 .toList();
         if (controlledApplied.contains(AgentToolPolicy.MEMORY)
                 || !new LinkedHashSet<>(controlledApplied).equals(new LinkedHashSet<>(desiredBuiltin))) {
-            List<String> missing = requested.stream().filter(name -> !applied.contains(name)).toList();
+            List<String> missing =
+                    requested.stream().filter(name -> !applied.contains(name)).toList();
             throw new ApiException(
                     ErrorCode.AGENT_TOOLS_NOT_APPLIED, "Hermes did not apply the requested toolsets", missing);
         }
@@ -98,7 +105,8 @@ public class AgentToolService {
 
     /** 관리자가 읽을 에이전트다. 지운 에이전트는 없는 에이전트와 같다. */
     private Agent requireAgent(String code) {
-        Agent agent = agentRepository.findByCode(code)
+        Agent agent = agentRepository
+                .findByCode(code)
                 .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -112,7 +120,8 @@ public class AgentToolService {
      * <p>지운 에이전트의 profile 은 이미 거둬졌을 수 있어 도구를 바꿀 곳이 없다.
      */
     private Agent requireAgentForUpdate(String code) {
-        Agent agent = agentRepository.findByCodeForUpdate(code)
+        Agent agent = agentRepository
+                .findByCodeForUpdate(code)
                 .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");

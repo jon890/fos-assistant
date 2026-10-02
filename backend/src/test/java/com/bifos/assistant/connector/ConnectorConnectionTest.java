@@ -99,6 +99,7 @@ class ConnectorConnectionTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                1L, Instant.now());
+                1L,
+                Instant.now());
     }
 }

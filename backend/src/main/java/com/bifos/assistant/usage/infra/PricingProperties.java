@@ -10,5 +10,4 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.pricing")
-public record PricingProperties(String catalogPath) {
-}
+public record PricingProperties(String catalogPath) {}

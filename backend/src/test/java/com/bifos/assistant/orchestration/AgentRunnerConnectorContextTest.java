@@ -209,7 +209,8 @@ class AgentRunnerConnectorContextTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                1L, Instant.now());
+                1L,
+                Instant.now());
     }
 
     private AgentRunner.Run run(Agent agent, String instructionAddition, DelegationKey delegationKey) {

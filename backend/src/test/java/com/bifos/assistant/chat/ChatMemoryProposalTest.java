@@ -98,7 +98,8 @@ class ChatMemoryProposalTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                user.id(), Instant.now()));
+                user.id(),
+                Instant.now()));
         doNothing()
                 .when(events)
                 .open(

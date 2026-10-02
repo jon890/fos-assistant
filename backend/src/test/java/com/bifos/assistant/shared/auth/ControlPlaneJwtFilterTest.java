@@ -88,7 +88,8 @@ class ControlPlaneJwtFilterTest {
     @DisplayName("꺼지지 않은 사용자의 토큰은 체인을 잇고 CurrentUser 를 인증으로 올린다")
     void continuesChainAndAuthenticatesAllowedUser() throws Exception {
         AllowedUserResolver users = mock(AllowedUserResolver.class);
-        when(users.resolveAllowed(EMAIL, NAME)).thenReturn(Optional.of(AppUser.of(EMAIL, NAME, 1L, UserRole.MEMBER, Instant.now())));
+        when(users.resolveAllowed(EMAIL, NAME))
+                .thenReturn(Optional.of(AppUser.of(EMAIL, NAME, 1L, UserRole.MEMBER, Instant.now())));
         MockHttpServletRequest request = requestWith(token(SECRET));
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();

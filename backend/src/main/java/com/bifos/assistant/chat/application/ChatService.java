@@ -977,7 +977,8 @@ public class ChatService {
         List<Long> pendingIds = fresh.pendingIds();
         ChatMessage question = transactions.execute(status -> {
             fillBlankTitle(conversation, text);
-            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
+            ChatMessage saved =
+                    messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
             attachments.attach(saved.id(), conversation.id(), attachmentIds);
             // 사람이 질문했으니 사용자의 질문 없이 연 turn 의 수를 새로 센다.
             conversationWriter.resetAutoTurns(conversation.id());

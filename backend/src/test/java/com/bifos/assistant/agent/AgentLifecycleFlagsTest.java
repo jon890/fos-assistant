@@ -285,7 +285,8 @@ class AgentLifecycleFlagsTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id(), Instant.now());
+                owner.id(),
+                Instant.now());
     }
 
     private static void signIn(CurrentUser user) {

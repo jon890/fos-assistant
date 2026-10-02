@@ -814,7 +814,8 @@ class SkillServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 visibility,
-                ownerId, Instant.now());
+                ownerId,
+                Instant.now());
     }
 
     private static List<String> versionDirs(String profile) {

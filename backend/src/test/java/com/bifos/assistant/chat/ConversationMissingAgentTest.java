@@ -125,7 +125,8 @@ class ConversationMissingAgentTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                dad.id(), Instant.now()));
+                dad.id(),
+                Instant.now()));
     }
 
     private UUID conversationOf(Long agentId, String title) {

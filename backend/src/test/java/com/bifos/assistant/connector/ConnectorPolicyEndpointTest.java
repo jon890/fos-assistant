@@ -136,7 +136,8 @@ class ConnectorPolicyEndpointTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id(), Instant.now());
+                owner.id(),
+                Instant.now());
         agent.markConnectorManaged();
         agent = agents.save(agent);
         token = tokens.issue(PROFILE, "owner").rawToken();

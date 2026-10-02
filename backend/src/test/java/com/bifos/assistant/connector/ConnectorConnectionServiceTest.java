@@ -1645,7 +1645,8 @@ class ConnectorConnectionServiceTest {
 
     private CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved = users.save(AppUser.of("connector-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
+        AppUser saved =
+                users.save(AppUser.of("connector-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

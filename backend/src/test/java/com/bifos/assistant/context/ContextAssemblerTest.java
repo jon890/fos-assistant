@@ -64,7 +64,8 @@ class ContextAssemblerTest {
                         CostMode.API,
                         CredentialScope.DEDICATED,
                         AgentVisibility.GROUP,
-                        null, Instant.now())))
+                        null,
+                        Instant.now())))
                 .id();
     }
 
@@ -252,7 +253,8 @@ class ContextAssemblerTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                ADMIN.id(), Instant.now());
+                ADMIN.id(),
+                Instant.now());
         connector.markConnectorManaged();
         Long connectorId = agents.save(connector).id();
 

@@ -119,6 +119,7 @@ class McpCallerResolverTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                USER_ID, Instant.now());
+                USER_ID,
+                Instant.now());
     }
 }

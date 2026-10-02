@@ -443,7 +443,8 @@ class RestartReconcilerTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
+        Conversation flowConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution row = chatTurn(flowConversation, flowed);
         stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
         stub.onStop(runId -> stub.willLookup(runId, finished(row, "cancelled", "")));
@@ -638,7 +639,8 @@ class RestartReconcilerTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
+        Conversation flowConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution root = executions.save(AgentExecution.builder()
                 .userId(dad.id())
                 .conversationId(flowConversation.id())
@@ -865,7 +867,8 @@ class RestartReconcilerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                dad.id(), Instant.now());
+                dad.id(),
+                Instant.now());
     }
 
     private static HermesRunLookup finished(AgentExecution row, String status, String output) {
