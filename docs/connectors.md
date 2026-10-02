@@ -91,7 +91,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `tools.<이름>` | 키는 MCP 서버의 원래 도구 이름이다. `^[A-Za-z0-9_.-]{1,128}$` |
 | `tools.<이름>.risk` | `READ`, `SENSITIVE`, `WRITE`, `DESTRUCTIVE`, `FINANCIAL` 가운데 하나. 필수 |
 | `tools.<이름>.approval` | `none`, `required`, `always`. 없으면 그 위험도의 기본값 |
-| `tools.<이름>.title` | 승인 카드에 보일 사람 말. 80자까지. 없으면 도구 이름을 보인다 |
+| `tools.<이름>.title` | 승인 카드와 알림 줄에 보일 사람 말. 80자까지. 없으면 승인 카드와 알림 줄은 `이름 없는 동작` 으로 보인다 |
 | `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다. 없으면 `deny` 다 |
 
 | 위험도 | 뜻 | 기본 `approval` | 하한 |
@@ -418,9 +418,10 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 | `DELETE /api/v1/connector-grants/{grantId}` | 없음 | 그 허락을 거둔다 |
 
 - 승인 줄 응답은 `actionId`, `connectorId`, `toolName`, `title`, `risk`, `status`, `argsJson`, `resultText`, `errorCode`, `createdAt`, `expiresAt`, `grantAllowed` 를 갖는다. `actionId` 는 공개 식별자(UUID)다
-- 응답의 `argsJson` 은 사용자가 읽고 승인하는 글이다. 비밀처럼 보이는 키의 값과 토큰 모양의 글은 `[가림]` 으로, UUID 는 `[항목 N]` 으로 바꿔 낸다(도구 내용을 가리는 규칙과 같다, [ADR-047](adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md)). 길이로 자르지 않는다. 실행은 저장한 원문으로 한다
-- 상시 허락 응답은 `grantId`, `connectorId`, `toolName`, `title`, `expiresAt` 을 갖는다. `title` 은 카탈로그가 선언한 이름이고 없으면 도구 이름이다
-- 화면은 `toolName`, `actionId`, `errorCode` 를 그리지 않는다. 이름은 `title` 로, 인자는 키와 값으로 보인다
+- 응답의 `argsJson` 은 사용자가 읽고 승인하는 글이다. 비밀처럼 보이는 키의 값과 토큰 모양의 글은 `[가림]` 으로 바꿔 낸다([ADR-047](adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) 의 규칙 가운데 비밀값 부분). UUID 는 가리지 않는다. 무엇을 고치는지 가리키는 값이라 가리면 서로 다른 대상의 요청이 같게 보이고, 이 응답은 주인만 읽는다. 길이로 자르지 않는다. 실행은 저장한 원문으로 한다
+- 상시 허락 응답은 `grantId`, `connectorId`, `toolName`, `title`, `expiresAt` 을 갖는다. `title` 은 카탈로그가 선언한 이름이다
+- `title` 은 선언에 이름이 없거나 카탈로그를 읽지 못했으면 고정 문구 `이름 없는 동작` 이다. 도구의 원래 이름은 내부 값이라 `title` 과 알림 줄에 싣지 않는다. 모델 입력에는 원래 이름을 쓴다
+- 화면은 `toolName`, `actionId`, `errorCode` 를 그리지 않는다. 이름은 `title` 로, 인자는 키와 값으로 보인다. web 의 서버 라우트는 `resultText` 를 브라우저로 옮기지 않는다
 - 그 줄의 `user_id` 가 로그인 사용자와 다르면 `CONNECTOR_ACTION_NOT_FOUND`(404) 다. 관리자도 같다
 - 요청이 왔을 때 이미 `PENDING` 이 아니던 줄의 승인과 거절은 `CONNECTOR_ACTION_NOT_PENDING`(409) 다. 같은 승인을 두 번 눌러도 실행은 한 번이다
 - 승인은 받았으나 실행할 수 없어 그 요청이 끝낸 줄은 오류가 아니라 200 과 끝난 줄을 돌려준다. 기다리는 시간이 지났으면 `EXPIRED`, 연결이 `READY` 가 아니거나 정책이 바뀌었으면 `REJECTED` 와 `errorCode: not_executable` 이다. 부른 쪽은 「이미 처리된 요청」(409)과 「승인했지만 실행하지 않은 요청」(200 의 `status`)을 구분한다
@@ -433,8 +434,8 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 - 결과가 `SUCCEEDED`, `FAILED`, `UNKNOWN` 이면 그 대화에 알림 줄을 남기고 자동 turn 을 열어 결과를 전한다. 위임 결과와 같은 잠금과 같은 연속 상한을 쓴다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 위임 결과가 함께 있으면 한 turn 에 모아 전한다
 - 알림 줄은 결과마다 한 줄이고 이름과 상태만 쓴다. 결과 본문은 모델 입력에만 넣고 `<external-data>` 로 감싼다. 입력의 머리줄은 `[동작: <이름>, 요청 번호: <번호>, 상태: <상태>]` 이다. `UNKNOWN` 은 본문 대신 다시 실행하지 말고 사용자에게 확인을 부탁하라는 글을 넣는다
 - 알림 줄 저장, 줄의 `result_delivered_at`, 자동 turn 수 증가는 한 트랜잭션이다. 연속 상한에 닿아 turn 을 열지 못한 결과는 전하지 않은 채 남고, 사용자가 메시지를 보낸 뒤의 turn 이 닫힐 때 전해진다
-- 거절과 만료는 알림 줄만 남긴다. 자동 turn 을 열지 않는다. 시스템이 실행하지 않고 끝낸 줄(`errorCode` 가 `not_executable`, `connection_changed`)은 거절이 아니라 취소했다는 글로 알린다. 전했다고 먼저 적고 알림 줄을 남기므로 같은 줄의 사건이 겹쳐도 알림 줄은 하나다
-- 만료 정리는 1분마다 돈다. 서버가 다시 뜨면 `EXECUTING` 을 `UNKNOWN` 으로 바꾼다
+- 거절과 만료는 알림 줄만 남긴다. 자동 turn 을 열지 않는다. 시스템이 실행하지 않고 끝낸 줄(`errorCode` 가 `not_executable`, `connection_changed`)은 거절이 아니라 취소했다는 글로 알린다. 전했다는 표시와 알림 줄을 새 트랜잭션 하나에 넣고 표시를 먼저 적으므로, 같은 줄의 사건이 겹쳐도 알림 줄은 하나다. 그 대화의 turn 이 도는 동안에는 남기지 않고 turn 이 닫힐 때 남긴다. 답보다 먼저 알림 줄이 끼면 그 답이 알림 줄에 이어진 자동 turn 의 답으로 읽히기 때문이다
+- 만료 정리는 1분마다 돈다. 같은 일정이 승인한 지 5분이 넘도록 `EXECUTING` 인 줄을 `UNKNOWN` 으로 바꾼다. 실행의 시간 제한은 60초라 그보다 오래 남은 줄은 결과를 적지 못한 것이다. 서버가 다시 뜨면 `EXECUTING` 을 모두 `UNKNOWN` 으로 바꾼다
 - 연결을 해제하거나 값을 다시 등록하면 그 연결의 `PENDING` 을 모두 `REJECTED`(`errorCode: connection_changed`)로 바꾸고 상시 허락을 거둔다. 다른 계정으로 바꾼 뒤 앞선 계정에 한 승인이 실행되지 않게 한다
 - 그 연결에 `EXECUTING` 인 줄이 있으면 해제와 다시 등록을 `CONNECTOR_ACTION_EXECUTING`(409)으로 거절한다. 외부에 아무것도 반영하지 않는다. 실행은 트랜잭션 밖에서 그때의 계정 값으로 돌기 때문에, 그 사이 값을 바꾸면 앞선 계정에 한 승인이 새 계정으로 실행된다. 실행이 끝나거나 기동 정리가 `UNKNOWN` 으로 바꾼 뒤에는 받는다
 - 승인할 때 정책을 다시 읽는다. 그 도구가 선언에서 빠졌거나 `DESTRUCTIVE`, `FINANCIAL` 이 됐거나 카탈로그를 읽지 못하면 실행하지 않고 `REJECTED`(`errorCode: not_executable`)로 둔다

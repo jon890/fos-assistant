@@ -54,6 +54,8 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
 
     List<ConnectorAction> findByStatus(ActionStatus status);
 
+    List<ConnectorAction> findByStatusAndDecidedAtBefore(ActionStatus status, Instant before);
+
     /** 그 대화에서 아직 전하지 않은 끝난 승인 줄이다. 만든 순이다. */
     List<ConnectorAction> findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(
             Long conversationId, Collection<ActionStatus> statuses);

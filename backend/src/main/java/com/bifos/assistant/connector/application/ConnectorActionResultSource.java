@@ -44,9 +44,9 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
 
     private static String notice(ConnectorActionResult result) {
         return switch (result.status()) {
-            case SUCCEEDED -> "승인한 " + result.title() + " 실행이 끝났어요";
-            case FAILED -> "승인한 " + result.title() + " 실행이 실패했어요";
-            default -> "승인한 " + result.title() + " 을 실행했는지 알 수 없어요. 그 서비스에서 확인해 주세요";
+            case SUCCEEDED -> "승인한 「" + result.title() + "」 실행이 끝났어요";
+            case FAILED -> "승인한 「" + result.title() + "」 실행이 실패했어요";
+            default -> "승인한 「" + result.title() + "」 실행 결과를 알 수 없어요. 그 서비스에서 확인해 주세요";
         };
     }
 
@@ -57,7 +57,7 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
      */
     private static String input(ConnectorActionResult result) {
         StringBuilder input = new StringBuilder("승인한 동작의 결과가 도착했다.\n[동작: ")
-                .append(result.title())
+                .append(result.tool())
                 .append(", 요청 번호: ")
                 .append(result.actionId())
                 .append(", 상태: ")

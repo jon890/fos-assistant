@@ -54,6 +54,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -647,6 +648,11 @@ class ConnectorActionServiceTest {
         assertThat(recorder.seen)
                 .extracting(Seen::event)
                 .containsExactly(new ConnectorActionChanged(CONVERSATION, waiting));
+        // 사건은 해제의 트랜잭션이 커밋한 직후 그 스레드에서 나간다. 그 자리에서도 전했다는 표시가 저장돼야 한다.
+        assertThat(actions.findAll())
+                .filteredOn(action -> action.publicId().equals(waiting))
+                .extracting(ConnectorAction::resultDeliveredAt)
+                .doesNotContainNull();
         assertCode(() -> service.approve(me, waiting, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
     }
 
@@ -738,6 +744,41 @@ class ConnectorActionServiceTest {
     }
 
     @Test
+    @DisplayName("오래 EXECUTING 으로 남은 줄만 UNKNOWN 으로 바꿔 그 연결의 다시 등록이 다시 열린다")
+    void staleExecutionBecomesUnknown() {
+        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new InstallResult(false, false));
+        when(connector.call(anyString(), anyString(), anyMap()))
+                .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
+        ask(WRITE, ARGS);
+        Instant decided = Instant.parse("2026-10-01T00:00:00Z");
+        jdbc.update("UPDATE connector_action SET status = 'EXECUTING', decided_at = ?", Timestamp.from(decided));
+
+        assertThat(service.markStale(decided, decided.plusSeconds(600)))
+                .as("경계 시각의 줄")
+                .isZero();
+        assertCode(() -> connectionService.register(me, DEMO, Map.of()), ErrorCode.CONNECTOR_ACTION_EXECUTING);
+
+        assertThat(service.markStale(decided.plusSeconds(1), decided.plusSeconds(600)))
+                .isEqualTo(1);
+
+        assertThat(onlyAction().status()).isEqualTo(ActionStatus.UNKNOWN);
+        connectionService.register(me, DEMO, Map.of());
+    }
+
+    @Test
+    @DisplayName("승인 줄 응답의 인자는 비밀처럼 보이는 값만 가리고 식별자는 그대로 보인다")
+    void viewRedactsSecretsButKeepsIdentifiers() {
+        String id = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+        ask(WRITE, "{\"page_id\":\"" + id + "\",\"api_token\":\"abc\",\"text\":\"안녕\"}");
+
+        String shown = service.listForConversation(me, CONVERSATION).getFirst().argsJson();
+
+        assertThat(shown).contains(id, "안녕", "[가림]").doesNotContain("abc");
+        assertThat(onlyAction().argsJson()).as("실행에 쓰는 저장한 원문").contains("abc");
+    }
+
+    @Test
     @DisplayName("TODAY 허락은 서버 시간대와 상관없이 Asia/Seoul 의 다음 날 0시에 끝난다")
     void todayGrantEndsAtSeoulMidnightRegardlessOfServerZone() {
         UUID actionId = ask(WRITE, ARGS).actionId();
@@ -770,16 +811,16 @@ class ConnectorActionServiceTest {
         expected.add(firstPending);
         expected.add(secondPending);
         assertThat(listed).extracting(ConnectorActionView::actionId).containsExactlyElementsOf(expected);
-        // 이름은 카탈로그의 선언에서 읽고, 선언에 이름이 없으면 원래 도구 이름이다.
+        // 이름은 카탈로그의 선언에서 읽고, 선언에 이름이 없으면 고정 문구다. 도구의 원래 이름은 싣지 않는다.
         assertThat(listed.get(20).title()).isEqualTo("메모 쓰기");
         assertThat(listed.get(20).argsJson()).isEqualTo("{\"text\":\"기다림 1\"}");
-        assertThat(listed.get(21).title()).isEqualTo("send_note");
+        assertThat(listed.get(21).title()).isEqualTo(ConnectorActionView.UNNAMED_TITLE);
         assertThat(listed.get(21).grantAllowed()).isFalse();
         assertThat(service.listForConversation(me, CONVERSATION + 1)).isEmpty();
     }
 
     @Test
-    @DisplayName("카탈로그를 읽지 못해도 승인 줄 목록은 나오고 이름은 원래 도구 이름이다")
+    @DisplayName("카탈로그를 읽지 못해도 승인 줄 목록은 나오고 이름은 고정 문구다")
     void listSurvivesUnreadableCatalog() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         ConnectorPolicyTestDoubles.expireCatalog();
@@ -789,7 +830,7 @@ class ConnectorActionServiceTest {
 
         assertThat(listed)
                 .extracting(ConnectorActionView::actionId, ConnectorActionView::title)
-                .containsExactly(tuple(actionId, WRITE));
+                .containsExactly(tuple(actionId, ConnectorActionView.UNNAMED_TITLE));
     }
 
     /** 주인의 연결을 만든다. {@code ready} 가 거짓이면 {@code PENDING} 으로 둔다. */

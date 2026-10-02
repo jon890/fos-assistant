@@ -17,6 +17,10 @@ import tools.jackson.databind.node.ObjectNode;
 /** 도구 설명을 외부로 중계하거나 저장하기 전에 비밀값과 식별자를 제거한다. */
 public final class ToolDetailRedactor {
     private static final String HIDDEN = "[가림]";
+
+    /** 식별자를 번호표로 바꾸지 않고 남기라는 표식이다. 같은 객체인지로 견준다. */
+    private static final Map<String, String> KEEP_IDENTIFIERS = new LinkedHashMap<>();
+
     private static final int INPUT_LIMIT = 65_536;
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> SECRET_KEYS = Set.of(
@@ -74,10 +78,12 @@ public final class ToolDetailRedactor {
     /**
      * 사용자가 승인하기 전에 읽는 도구 인자에서 비밀값과 식별자를 가린다.
      *
-     * <p>사용자는 이 글을 읽고 승인하므로 길이로 자르지 않는다. 인자의 크기는 정책 판정이 이미 제한한다.
+     * <p>사용자는 이 글을 읽고 승인하므로 길이로 자르지 않는다. 인자의 크기는 정책 판정이 이미 제한한다. UUID 는
+     * 가리지 않는다. 무엇을 고치거나 지우는지 가리키는 값이라, 가리면 서로 다른 대상의 요청이 같게 보인다. 이 글은
+     * 주인만 읽는다.
      */
     public static String redactArguments(String argsJson) {
-        return argsJson == null ? null : redactContent(argsJson, new LinkedHashMap<>());
+        return argsJson == null ? null : redactContent(argsJson, KEEP_IDENTIFIERS);
     }
 
     private static String redactContent(String detail, Map<String, String> identifiers) {
@@ -145,12 +151,27 @@ public final class ToolDetailRedactor {
     }
 
     private static String redactText(String text, Map<String, String> identifiers) {
+        if (identifiers == KEEP_IDENTIFIERS) {
+            // UUID 는 긴 토큰 모양에도 걸린다. UUID 사이의 글에서만 토큰을 가린다.
+            StringBuilder kept = new StringBuilder();
+            Matcher uuids = UUID.matcher(text);
+            int from = 0;
+            while (uuids.find()) {
+                kept.append(redactTokens(text.substring(from, uuids.start()))).append(uuids.group());
+                from = uuids.end();
+            }
+            return kept.append(redactTokens(text.substring(from))).toString();
+        }
         String withoutUuids = UUID.matcher(text).replaceAll(match -> {
             String key = match.group().toLowerCase(Locale.ROOT);
             String label = identifiers.computeIfAbsent(key, ignored -> "[항목 " + (identifiers.size() + 1) + "]");
             return Matcher.quoteReplacement(label);
         });
-        String withoutJwt = JWT.matcher(withoutUuids).replaceAll(match -> {
+        return redactTokens(withoutUuids);
+    }
+
+    private static String redactTokens(String text) {
+        String withoutJwt = JWT.matcher(text).replaceAll(match -> {
             try {
                 JsonNode header = MAPPER.readTree(Base64.getUrlDecoder().decode(match.group(1)));
                 if (header != null && header.isObject() && header.has("alg")) {

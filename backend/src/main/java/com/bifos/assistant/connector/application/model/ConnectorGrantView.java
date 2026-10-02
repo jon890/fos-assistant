@@ -6,7 +6,7 @@ import java.time.Instant;
 /**
  * 주인에게 보이는 상시 허락 한 줄이다.
  *
- * @param title 사람에게 보일 이름. 카탈로그의 선언에 없으면 원래 도구 이름
+ * @param title 사람에게 보일 이름. 카탈로그의 선언에 이름이 없으면 고정 문구다
  */
 public record ConnectorGrantView(Long grantId, String connectorId, String toolName, String title, Instant expiresAt) {
 
@@ -16,7 +16,7 @@ public record ConnectorGrantView(Long grantId, String connectorId, String toolNa
                 grant.id(),
                 grant.connectorId(),
                 grant.toolName(),
-                declaredTitle == null ? grant.toolName() : declaredTitle,
+                declaredTitle == null || declaredTitle.isBlank() ? ConnectorActionView.UNNAMED_TITLE : declaredTitle,
                 grant.expiresAt());
     }
 }

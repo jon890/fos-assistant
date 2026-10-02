@@ -267,7 +267,12 @@ public class ConnectorActionService {
                                     .map(ToolPolicy::title)
                                     .orElse(null));
                     return new ConnectorActionResult(
-                            action.publicId(), view.title(), action.status(), action.errorCode(), action.resultText());
+                            action.publicId(),
+                            view.title(),
+                            action.toolName() == null ? action.hermesTool() : action.toolName(),
+                            action.status(),
+                            action.errorCode(),
+                            action.resultText());
                 })
                 .toList();
     }
@@ -342,6 +347,40 @@ public class ConnectorActionService {
         });
         interrupted.forEach(this::publish);
         return interrupted.size();
+    }
+
+    /**
+     * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
+     *
+     * <p>실행은 끝났는데 결과를 적는 저장이 실패하면 줄이 이 상태로 남고, 그 연결의 해제와 다시 등록이 다음 기동까지
+     * 막힌다. 결과를 적는 쪽은 {@code EXECUTING} 이 아닌 줄을 건드리지 않으므로 늦게 온 결과와 겹쳐도 안전하다.
+     *
+     * @param before 이 시각보다 먼저 승인한 줄만 바꾼다. 실행의 시간 제한보다 넉넉히 앞선 시각을 준다
+     * @return 바꾼 건수
+     */
+    public int markStale(Instant before, Instant now) {
+        int changed = 0;
+        for (ConnectorAction stale : actions.findByStatusAndDecidedAtBefore(ActionStatus.EXECUTING, before)) {
+            try {
+                Optional<ConnectorAction> unknown =
+                        transactions.execute(status -> actions.findByPublicIdForUpdate(stale.publicId())
+                                .filter(action -> action.status() == ActionStatus.EXECUTING)
+                                .map(action -> {
+                                    action.unknown(now);
+                                    return actions.save(action);
+                                }));
+                if (unknown.isPresent()) {
+                    publish(unknown.get());
+                    changed++;
+                }
+            } catch (RuntimeException ex) {
+                log.warn(
+                        "오래 남은 실행 줄을 정리하지 못했다 actionId={} kind={}",
+                        stale.publicId(),
+                        ex.getClass().getSimpleName());
+            }
+        }
+        return changed;
     }
 
     /**

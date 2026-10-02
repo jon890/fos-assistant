@@ -142,7 +142,7 @@ class ConnectorActionDeliveryWithoutWakeTest {
         assertThat(seen).extracting(ChatEvent::type).containsExactly("approval", "system", "approval");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
                 .extracting(ChatMessage::content)
-                .containsExactly("write_note 요청을 거절했어요");
+                .containsExactly("「이름 없는 동작」 요청을 거절했어요");
         assertThat(((StubHermesRunsClient) hermes).received()).isEmpty();
     }
 
