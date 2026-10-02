@@ -52,7 +52,7 @@ List<MemoryRevision> findByIdMemoryIdAndContentKeyIdIsNull(Long memoryId);
 새 민감도가 `SENSITIVE` 이면 판을 남긴 뒤 그 항목의 평문 판을 모두 암호화한다.
 
 ```java
-MemoryRevision retired = revisions.save(MemoryRevision.of(memory, MemoryChangeType.UPDATED, user.id(), null, clock.instant()));
+revisions.save(MemoryRevision.of(memory, MemoryChangeType.UPDATED, user.id(), null, clock.instant()));
 if (sensitivity == MemorySensitivity.SENSITIVE) {
     sealPlainRevisions(memory.id());
 }
@@ -90,13 +90,19 @@ private `sealPlainRevisions(Long memoryId)`: `revisions.flush()` 뒤 `findByIdMe
 
 | 입력 | 기대 |
 | --- | --- |
-| 기존 `normalToSensitiveIsRejected` 에 단언을 더한다. 일반 항목을 한 번 고쳐 평문 판 1 을 둔 뒤 민감으로 고친다 | `MEMORY_ENCRYPTION_UNAVAILABLE` 이다. 판 1 의 `content` 가 평문 그대로이고 `memory_revision` 의 줄 수가 그대로다 |
+| 기존 `normalToSensitiveIsRejected` 를 고친다. 일반 항목을 먼저 한 번 고쳐 평문 판 1 을 둔 뒤 민감으로 고친다. 그 테스트의 기존 단언 둘(`revision` 이 1, `memory_revision` 이 0 줄)을 `revision` 2, 줄 수 1 로 바꾼다 | `MEMORY_ENCRYPTION_UNAVAILABLE` 이다. 판 1 의 `content` 가 평문 그대로이고 `content_key_id` 가 null 이다. `memory.revision` 이 2 그대로이고 `memory_revision` 의 줄 수가 1 그대로다 |
+
+`MemoryServiceTest.java`
+
+| 입력 | 기대 |
+| --- | --- |
+| 기존 `sensitiveItemsCannotAlwaysBeInjected` 가 민감 항목에 `memories.update(ADMIN, sensitive.id(), "내용", true)` 를 부르고 `MEMORY_SENSITIVE_ALWAYS` 를 기대한다. 그 단언의 기대 코드를 `MEMORY_SENSITIVE_NOT_EDITABLE` 로 바꾼다. 같은 테스트의 다른 단언(만들 때와 민감도를 바꾸는 `update` 의 `MEMORY_SENSITIVE_ALWAYS`)은 그대로 둔다 | 테스트가 통과한다 |
 
 `ContextAssemblerTest.java`
 
 | 입력 | 기대 |
 | --- | --- |
-| `JdbcTemplate` 으로 `retrieval` 이 `ALWAYS`, `always_inject` 가 참, `sensitivity` 가 `NORMAL`, `content` 가 `v1.봉인-표식-5512`, `content_key_id` 가 `test-1` 인 `ACCEPTED` 개인 줄을 넣고, 평문인 `ALWAYS` 항목 하나를 서비스로 만든다 | 조립한 글이 `봉인-표식-5512` 를 담지 않고 평문 항목의 본문은 담는다 |
+| 이 클래스에는 `JdbcTemplate` 주입이 없다. `@Autowired JdbcTemplate jdbc` 를 더한다. `JdbcTemplate` 으로 `scope` 가 `USER`, `owner_user_id` 가 1, `collection` 이 `core`, `retrieval` 이 `ALWAYS`, `always_inject` 가 참, `sensitivity` 가 `NORMAL`, `content` 가 `v1.봉인-표식-5512`, `content_key_id` 가 `test-1` 인 `ACCEPTED` 개인 줄을 넣고, 평문인 `ALWAYS` 항목 하나를 서비스로 만든 뒤 `assembler.assemble(ADMIN, agentId)` 를 부른다. 그 에이전트는 `core` 만 받으므로 collection 이 `core` 가 아니면 필터 없이도 통과해 검사가 뜻을 잃는다 | 조립한 글이 `봉인-표식-5512` 를 담지 않고 평문 항목의 본문은 담는다 |
 
 넣는 줄의 칸은 `MemoryContentBackfillTest.insertMemory` 의 INSERT 를 선례로 삼는다.
 
@@ -129,3 +135,4 @@ scripts/check-public-safe.sh
 | `backend/src/test/java/com/bifos/assistant/memory/MemoryEncryptionTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/memory/MemoryEncryptionDisabledTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/context/ContextAssemblerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/memory/MemoryServiceTest.java` | 수정 |
