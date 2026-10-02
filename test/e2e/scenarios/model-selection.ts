@@ -29,7 +29,13 @@ type ModelOptionsView = {
   defaultReasoningEffort: string | null;
   defaultFromAgent: boolean;
   defaultAvailable: boolean;
-  providers: { provider: string; name: string; models: string[]; reasoningCapable: Record<string, boolean> }[];
+  providers: {
+    provider: string;
+    name: string;
+    models: string[];
+    reasoning: Record<string, { support: string; disable: string }>;
+    reasoningCapable: Record<string, boolean>;
+  }[];
   reasoningEfforts: string[];
 };
 
@@ -58,6 +64,39 @@ export const modelSelectionScenario: Scenario = {
       options.reasoningEfforts.join(",") === "low,medium,high,xhigh,max",
       `effort 선택지가 다르다: ${JSON.stringify(options.reasoningEfforts)}`,
     );
+
+    step("reasoning 표는 Hermes 가 밝힌 값만 SUPPORTED 나 UNSUPPORTED 로 주고 밝히지 않은 칸은 UNKNOWN 이다");
+    const expectedReasoning: Record<string, { support: string; disable: string }> = {
+      [PROFILE_DEFAULT.model]: { support: "SUPPORTED", disable: "SUPPORTED" },
+      "example-model-mini": { support: "UNSUPPORTED", disable: "UNKNOWN" },
+      "example-fast": { support: "SUPPORTED", disable: "UNKNOWN" },
+      "example-balanced": { support: "UNKNOWN", disable: "UNKNOWN" },
+      "example-deep": { support: "SUPPORTED", disable: "UNSUPPORTED" },
+    };
+    const reasoning = options.providers[0]?.reasoning ?? {};
+    for (const [model, expected] of Object.entries(expectedReasoning)) {
+      expect(
+        reasoning[model]?.support === expected.support && reasoning[model]?.disable === expected.disable,
+        `${model} 의 reasoning 이 ${JSON.stringify(expected)} 가 아니다: ${JSON.stringify(reasoning[model])}`,
+      );
+    }
+
+    step("none 은 끄기 지원이 확인된 모델에서만 대화에 저장한다");
+    const noneConversationId = await emptyConversation(context);
+    const noneOnDefault = await call(context, `/chat/conversations/${noneConversationId}/model`, {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: { ...PROFILE_DEFAULT, reasoningEffort: "none" },
+    });
+    expect(noneOnDefault.status === 200, `기본 모델에 none 을 저장하지 못했다: ${noneOnDefault.status}`);
+    for (const model of ["example-balanced", "example-deep", "example-model-mini"]) {
+      const rejected = await call(context, `/chat/conversations/${noneConversationId}/model`, {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: { provider: PROFILE_DEFAULT.provider, model, reasoningEffort: "none" },
+      });
+      expect(rejected.status === 400, `${model} 에 none 을 저장할 수 있었다: ${rejected.status}`);
+    }
     expectStatus(
       await call(context, "/chat/model-options?agentCode=dad", { token: context.tokens.dad }),
       200,
