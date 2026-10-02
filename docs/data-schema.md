@@ -189,7 +189,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `default_reasoning_effort` | VARCHAR(16) NULL | 기본 effort. 모델 없이 이 값만 둘 수 있다 |
 
 **모델과 effort 는 대화가 고르고, 고르지 않으면 에이전트 기본 모델로 돈다.** 세 칸이 모두 비면 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다.
-V48 이 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이그레이션은 넣지 않는다.
+V50 이 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이그레이션은 넣지 않는다.
 근거는 [ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) 에 있다.
 예전의 `provider`, `model`, `model_synced_at` 칸과 에이전트별 모델 목록 표 `agent_model_option`, 막힌 provider 를 기억하던 표 `provider_state` 는 V27 이 지웠다.
 대화가 모델을 고르게 한 근거는 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
