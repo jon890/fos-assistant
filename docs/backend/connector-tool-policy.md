@@ -27,7 +27,7 @@
 | `tools.<이름>.risk` | `READ`, `SENSITIVE`, `WRITE`, `DESTRUCTIVE`, `FINANCIAL` 가운데 하나. 필수 |
 | `tools.<이름>.approval` | `none`, `required`, `always`. 없으면 그 위험도의 기본값 |
 | `tools.<이름>.title` | 승인 카드와 알림 줄에 보일 사람 말. 80자까지. 없으면 승인 카드와 알림 줄은 `이름 없는 동작` 으로 보인다 |
-| `tools.<이름>.grant` | boolean. 거짓이면 그 도구에 상시 허락을 줄 수 없고 호출마다 승인을 받는다. 없으면 참이다. `approval` 이 `required` 인 도구에만 선언한다([ADR-063](../adr/ADR-063-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)) |
+| `tools.<이름>.grant` | boolean. 거짓이면 그 도구에 상시 허락을 줄 수 없고 호출마다 승인을 받는다. 없으면 참이다. `approval` 이 `required` 인 도구에만 선언한다([ADR-064](../adr/ADR-064-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)) |
 | `tools.<이름>.outbound` | boolean. 참이면 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다. 아니면 그 커넥터를 카탈로그에 내지 않는다. 없으면 거짓이다 |
 | `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다. 없으면 `deny` 다 |
 

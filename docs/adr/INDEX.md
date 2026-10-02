@@ -65,6 +65,7 @@
 | [ADR-059](ADR-059-꺼진-사용자는-control-plane-이-요청마다-막고-웹이-세션을-끊는다.md) | 꺼진 사용자는 Control Plane 이 요청마다 막고 웹이 세션을 끊는다 | backend, frontend | Accepted |
 | [ADR-060](ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md) | reasoning effort 의 지원은 Hermes 가 알린 것만 확인으로 보이고 모르면 미확인으로 둔다 | backend, frontend | Accepted. ADR-030 의 「받지 않는 effort 는 Hermes 가 맞춘다」 는 그대로 두고 지원 표시와 `none` 선택을 더한다 |
 | [ADR-061](ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) | 재기동 때 남은 실행은 Hermes 에 물어 정하고 도는 실행에는 다시 붙는다 | backend | Accepted. ADR-011 의 기동 정리 부분을 대체한다 |
-| [ADR-062](ADR-062-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | hermes | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다 |
-| [ADR-063](ADR-063-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md) | 외부로 나가는 도구는 상시 허락을 닫는 선언을 둔다 | backend, hermes | Accepted. ADR-050 의 상시 허락에 도구별 선언을 더한다 |
-| [ADR-064](ADR-064-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md) | Gmail 커넥터는 직접 만든 MCP 서버와 `gmail.modify` scope 하나로 돌고 휴지통은 서버가 막는다 | hermes | Accepted. ADR-062 의 첫 커넥터다 |
+| [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | backend | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다 |
+| [ADR-063](ADR-063-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | hermes | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다 |
+| [ADR-064](ADR-064-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md) | 외부로 나가는 도구는 상시 허락을 닫는 선언을 둔다 | backend, hermes | Accepted. ADR-050 의 상시 허락에 도구별 선언을 더한다 |
+| [ADR-065](ADR-065-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md) | Gmail 커넥터는 직접 만든 MCP 서버와 `gmail.modify` scope 하나로 돌고 휴지통은 서버가 막는다 | hermes | Accepted. ADR-063 의 첫 커넥터다 |

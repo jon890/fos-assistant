@@ -6,7 +6,9 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.ProfileModelDefaultsClient;
 import com.bifos.assistant.hermes.dto.ProfileModelDefaults;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.SubagentUsageJob;
@@ -28,16 +30,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 대화 응답과 분리해 최종 자식 사용량과 profile 기본 강도를 보완한다. */
+/**
+ * 대화 응답과 분리해 최종 자식 사용량과 profile 기본 강도를 보완한다.
+ *
+ * <p>재조회 작업 줄은 native 자식 한 명의 사용량 원장이다. 종료를 확인한 자식의 provider, 모델, 토큰,
+ * 환산 금액을 그 줄에 한 번만 적고, 합계는 그 줄의 값을 더한다. 완료 사건은 표시용으로만 남긴다.
+ * 근거는 ADR-062 에 있다.
+ */
 @Service
 @Slf4j
 public class SubagentUsageReconciler {
+    private static final int EVENT_MODEL_LIMIT = 128;
+
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
     private final SubagentUsageJobRepository jobs;
     private final AgentService agents;
     private final HermesRunsClient hermes;
     private final ProfileModelDefaultsClient defaults;
+    private final CostEstimator estimator;
     private final TransactionTemplate transaction;
     private final Clock clock;
     private final Semaphore slots = new Semaphore(4);
@@ -51,8 +62,9 @@ public class SubagentUsageReconciler {
             AgentService agents,
             HermesRunsClient hermes,
             ProfileModelDefaultsClient defaults,
+            CostEstimator estimator,
             PlatformTransactionManager manager) {
-        this(executions, events, jobs, agents, hermes, defaults, manager, Clock.systemUTC());
+        this(executions, events, jobs, agents, hermes, defaults, estimator, manager, Clock.systemUTC());
     }
 
     SubagentUsageReconciler(
@@ -62,6 +74,7 @@ public class SubagentUsageReconciler {
             AgentService agents,
             HermesRunsClient hermes,
             ProfileModelDefaultsClient defaults,
+            CostEstimator estimator,
             PlatformTransactionManager manager,
             Clock clock) {
         this.executions = executions;
@@ -70,6 +83,7 @@ public class SubagentUsageReconciler {
         this.agents = agents;
         this.hermes = hermes;
         this.defaults = defaults;
+        this.estimator = estimator;
         this.transaction = new TransactionTemplate(manager);
         this.clock = clock;
     }
@@ -98,7 +112,7 @@ public class SubagentUsageReconciler {
                 if (parent == null || parent.finishedAt() == null) {
                     return;
                 }
-                if (jobs.existsByExecutionIdAndChildSessionId(parent.id(), start.hermesSessionId())) {
+                if (jobs.existsByProfileNameAndChildSessionId(parent.profileName(), start.hermesSessionId())) {
                     return;
                 }
                 Agent agent = agents.findById(parent.agentId()).orElse(null);
@@ -150,39 +164,73 @@ public class SubagentUsageReconciler {
             if (parent == null || current == null || !"WAITING".equals(current.status())) {
                 return;
             }
-            if (events.existsByExecutionIdAndHermesSessionIdAndEventType(
-                    parent.id(), current.childSessionId(), ExecutionEventType.SUBAGENT_COMPLETED)) {
-                current.done();
+            if (isFinalChild(current, usage)) {
+                // 완료 사건은 표시용이다. 부모 스트림으로 이미 왔으면 다시 만들지 않는다.
+                if (!events.existsByExecutionIdAndHermesSessionIdAndEventType(
+                        parent.id(), current.childSessionId(), ExecutionEventType.SUBAGENT_COMPLETED)) {
+                    saveCompletion(parent, current, usage, now);
+                }
+                String reason = unpricedReason(usage);
+                ExecutionCost cost = ExecutionCost.unknown();
+                if (reason == null) {
+                    cost = estimator.estimate(
+                            usage.provider(),
+                            usage.model(),
+                            new TokenUsage(
+                                    usage.inclusiveInputTokens(), usage.cacheReadTokens(), usage.outputTokens(), null),
+                            parent.costMode());
+                    if (!cost.isKnown()) {
+                        cost = ExecutionCost.unknown();
+                        reason = "PRICE_UNKNOWN";
+                    }
+                }
+                current.record(usage, cost, reason, now);
             } else if (current.expired(now)) {
                 current.expire();
-            } else if (isFinalChild(current, usage)) {
-                List<ExecutionEvent> starts =
-                        events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id()));
-                ExecutionEvent start = starts.stream()
-                        .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED
-                                && current.childSessionId().equals(event.hermesSessionId()))
-                        .findFirst()
-                        .orElse(null);
-                events.save(ExecutionEvent.builder()
-                        .executionId(parent.id())
-                        .sequence(events.lastSequence(parent.id()) + 1)
-                        .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
-                        .subagentName(start == null ? null : start.subagentName())
-                        .hermesSessionId(current.childSessionId())
-                        .model(usage.model())
-                        .inputTokens(usage.inclusiveInputTokens())
-                        .outputTokens(usage.outputTokens())
-                        .durationMs(usage.durationMs())
-                        .failed(null)
-                        .detail(start == null ? null : start.detail())
-                        .occurredAt(now)
-                        .build());
-                current.done();
             } else {
                 current.retry(now);
             }
             jobs.save(current);
         });
+    }
+
+    private void saveCompletion(AgentExecution parent, SubagentUsageJob job, SubagentSessionUsage usage, Instant now) {
+        List<ExecutionEvent> starts = events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id()));
+        ExecutionEvent start = starts.stream()
+                .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED
+                        && job.childSessionId().equals(event.hermesSessionId()))
+                .findFirst()
+                .orElse(null);
+        events.save(ExecutionEvent.builder()
+                .executionId(parent.id())
+                .sequence(events.lastSequence(parent.id()) + 1)
+                .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
+                .subagentName(start == null ? null : start.subagentName())
+                .hermesSessionId(job.childSessionId())
+                .model(eventModel(usage.model()))
+                .inputTokens(usage.inclusiveInputTokens())
+                .outputTokens(usage.outputTokens())
+                .durationMs(usage.durationMs())
+                .failed(null)
+                .detail(start == null ? null : start.detail())
+                .occurredAt(now)
+                .build());
+    }
+
+    /** 사건의 모델 칸 길이를 넘는 이름은 잘라 넣는다. 넘는 값은 저장이 실패해 작업 줄까지 되돌린다. */
+    private static String eventModel(String model) {
+        return model == null || model.length() <= EVENT_MODEL_LIMIT ? model : model.substring(0, EVENT_MODEL_LIMIT);
+    }
+
+    /** 환산을 시도하기 전에 알 수 있는 금액 미확인 까닭이다. 환산할 수 있으면 null 이다. */
+    private static String unpricedReason(SubagentSessionUsage usage) {
+        if (usage.provider() == null || usage.provider().isBlank()) {
+            return "PROVIDER_UNKNOWN";
+        }
+        if (usage.inclusiveInputTokens() == null || usage.outputTokens() == null) {
+            return "USAGE_UNKNOWN";
+        }
+        return null;
     }
 
     static boolean isFinalChild(SubagentUsageJob job, SubagentSessionUsage usage) {

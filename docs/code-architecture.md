@@ -29,7 +29,7 @@ hermes/
     dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
     fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 연결용 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
   connectors/
-    <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-062)
+    <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-063)
   profile-template/
     config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
   bundle.sh                  설치 묶음을 만든다
@@ -93,7 +93,9 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
-  우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다
+  우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
+  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-062](adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md))
+- native 하위 에이전트의 provider 를 Hermes 에서 읽는 경로. 지금은 session 응답에 provider 가 없어 그 금액이 가격 미확인으로 남는다(이슈 #110)
 - `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
 - 사용자가 turn 을 중지할 때 Hermes `delegate_task` 하위 에이전트를 실제로 멈추는 것.
   지금은 origin 실행이나 그 뿌리 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).

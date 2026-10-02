@@ -49,7 +49,7 @@ public class ConnectorAction {
     /** 연결을 해제하거나 값을 다시 등록해 끝낸 줄의 {@code errorCode} 다. */
     public static final String CONNECTION_CHANGED = "connection_changed";
 
-    /** 상시 허락을 닫은 도구의 인자에 화면에서 가려지는 글이 있어 실행하지 않고 끝낸 줄의 {@code errorCode} 다(ADR-063). */
+    /** 상시 허락을 닫은 도구의 인자에 화면에서 가려지는 글이 있어 실행하지 않고 끝낸 줄의 {@code errorCode} 다(ADR-064). */
     public static final String HIDDEN_ARGS = "hidden_args";
 
     @Id

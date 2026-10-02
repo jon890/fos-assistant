@@ -57,6 +57,19 @@ test("이번 달 합계와 가격을 찾지 못한 실행을 구분한다", asyn
   await expect(records.getByText("0.0000 USD").first()).toBeVisible();
 });
 
+test("금액을 확인하지 못한 도우미 수를 요약에 보인다", async ({ page }) => {
+  test.setTimeout(60_000);
+  const response = await page.request.post("/api/chat/stream", {
+    data: { text: "자식 완료 사건 없음 검사", agentCode: "browser" },
+  });
+  expect(response.ok()).toBeTruthy();
+  // 부모가 끝나면 자식은 금액을 확인하기 전까지 세어진다. 재조회가 끝나기 전에도 건수에는 들어 있다.
+  await expect(async () => {
+    await page.goto("/usage");
+    await expect(page.getByText("금액을 확인하지 못한 도우미", { exact: true })).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+});
+
 test("돌고 있는 실행은 시간과 금액 없이 보이고 완료 뒤에 끝난다", async ({ page, hermes }, testInfo) => {
   await hermes.holdNextRun();
   const chat = page.request.post("/api/chat", {
@@ -347,6 +360,14 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
   test("실행 기록과 요약과 대화의 작업 과정에 내부 값이 없다", async ({ page }, testInfo) => {
     const created = await page.request.post("/api/agents", { data: { name: AGENT_NAME } });
     expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
+    const agentCode = ((await created.json()) as { code: string }).code;
+
+    // 자식이 달린 실행을 먼저 만든다. 부모가 끝나면 그 자식은 바로 확인 중으로 세어지므로,
+    // 아래에서 문구가 없는 것이 자식이 없어서가 아니라 역할 때문임을 구분한다.
+    const withChild = await page.request.post("/api/chat/stream", {
+      data: { text: "자식 완료 사건 없음 검사", agentCode: agentCode },
+    });
+    expect(withChild.ok()).toBeTruthy();
 
     // 대화에서 보내야 도구 사건이 실린 실행이 생긴다.
     await page.goto("/");
@@ -380,6 +401,7 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
     await page.goto("/usage");
     await expect(page.getByText("이번 달에 비서와 한 일을 모아 보여 드려요.", { exact: true })).toBeVisible();
     await expect(page.getByText("이번 달 실행", { exact: true })).toBeVisible();
+    await expect(page.getByText("금액을 확인하지 못한 도우미")).toHaveCount(0);
     await expect(page.getByText("API 가격")).toHaveCount(0);
     await expect(page.getByRole("main")).not.toContainText("USD");
     await expect(page.getByTestId("breakdown-axis")).toHaveCount(0);
