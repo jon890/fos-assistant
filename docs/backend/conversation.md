@@ -16,7 +16,7 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 나무를 
 | `GET /api/v1/chat/conversations?cursor=&limit=` | 내 대화 목록의 한 쪽. `{ "items": [...], "nextCursor": "..." }`. 지운 대화는 빠진다. 정렬은 `updatedAt desc, id desc`, `limit` 기본 30 상한 100. `nextCursor` 는 뜻을 알 수 없는 문자열이고 다음 쪽의 `cursor` 로 그대로 넘긴다. 마지막 쪽이면 null 이다. 읽을 수 없는 `cursor` 는 `VALIDATION_FAILED` 다 |
 | `GET /api/v1/chat/conversations/{id}` | 대화 한 줄. 첫 쪽에 없는 오래된 대화를 열 때 모델 칸과 에이전트 칸이 쓴다 |
 | `PATCH /api/v1/chat/conversations/{id}` | 이름을 바꾼다. 본문 `{ "title": "..." }`. 바뀐 대화 한 줄을 돌려준다 |
-| `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. 바뀐 대화 한 줄을 돌려준다 |
+| `PUT /api/v1/chat/conversations/{id}/model` | 대화의 모델과 effort 를 바꾼다. 본문 `{ "provider", "model", "reasoningEffort" }`. 셋 다 null 이면 기본값으로 되돌린다. effort 는 `ModelChoice` 가 받는 값(`none`, `low` 부터 `max`)이어야 하고, `none` 은 그 모델의 `disable` 이 `SUPPORTED` 일 때만 받는다. 모델을 비웠으면 에이전트 기본 모델로 판정한다. 아니면 `VALIDATION_FAILED` 다. 바뀐 대화 한 줄을 돌려준다 |
 | `GET /api/v1/chat/model-options?agentCode=` | 그 에이전트의 profile 로 고를 수 있는 모델. 요청자가 쓸 수 있는 에이전트만 받는다 |
 | `DELETE /api/v1/chat/conversations/{id}` | 목록에서 숨긴다. 204 |
 | `GET /api/v1/chat/conversations/{id}/messages` | 메시지 목록. 이전 판도 모두 온다 |
@@ -46,9 +46,11 @@ Hermes 사건을 `execution_event` 로 옮겨 적는 규칙과 실행 나무를 
 | `defaultReasoningEffort` | 에이전트 기본 effort. 정하지 않았으면 null |
 | `defaultFromAgent` | 기본 모델을 에이전트 기본값이 정했으면 참 |
 | `defaultAvailable` | 기본 모델이 `providers[]` 에 있으면 참. 그룹이 숨겼거나 목록에서 빠졌으면 거짓이고, 화면이 다른 모델을 고르라고 알린다 |
-| `providers[]` | `{ "provider", "name", "models": [...], "reasoningCapable": {...} }`. Hermes 가 `authenticated` 를 참으로 준 provider 만 남기고, 그룹이 숨긴 provider 와 모델을 뺀다. 기본 provider 가 맨 앞에 오고, 모델은 Hermes 가 준 차례 그대로다 |
-| `providers[].reasoningCapable` | 모델 이름을 열쇠로 한 참거짓 표. Hermes 의 `capabilities.<모델>.reasoning` 이다. 값이 없는 모델은 참으로 본다. 화면은 거짓인 모델에서 effort 를 고르지 못하게 한다 |
-| `reasoningEfforts` | `["low", "medium", "high", "xhigh", "max"]`. 고정이다 |
+| `providers[]` | `{ "provider", "name", "models": [...], "reasoning": {...} }`. Hermes 가 `authenticated` 를 참으로 준 provider 만 남기고, 그룹이 숨긴 provider 와 모델을 뺀다. 기본 provider 가 맨 앞에 오고, 모델은 Hermes 가 준 차례 그대로다 |
+| `providers[].reasoning` | 모델 이름을 열쇠로 한 표. 값은 `{ "support", "disable" }` 이고 각각 `SUPPORTED`, `UNSUPPORTED`, `UNKNOWN` 이다. 모든 모델이 표에 있다 |
+| `reasoning.<모델>.support` | Hermes 의 `capabilities.<모델>.reasoning` 이 참이면 `SUPPORTED`, 거짓이면 `UNSUPPORTED`, 칸이 없으면 `UNKNOWN` 이다. 우리가 없는 값을 채우지 않는다. 화면은 `UNSUPPORTED` 인 모델에서 effort 를 고르지 못하게 하고, `UNKNOWN` 인 모델은 고르게 두되 지원 미확인으로 알린다 |
+| `reasoning.<모델>.disable` | reasoning 끄기(`none`)를 받는가. Hermes 의 `can_disable_reasoning` 이 참이면 `SUPPORTED`, 거짓이면 `UNSUPPORTED`, 칸이 없으면 `UNKNOWN` 이다. `SUPPORTED` 이고 `support` 가 `UNSUPPORTED` 가 아닌 모델에서만 `none` 을 고를 수 있다 |
+| `reasoningEfforts` | `["low", "medium", "high", "xhigh", "max"]`. 고정이다. `none` 은 여기 없고 모델마다 `disable` 이 정한다. `minimal` 은 지원을 확인할 신호가 없어 어디에도 없다 |
 
 `hermes/HermesModelClient` 가 `GET {profile}/api/model/options` 를 부르고, `chat/application/ModelOptionsService` 가 profile 마다 10분 들고 있는다.
 10분이 지나 다시 읽다 Hermes 가 답하지 못하면 들고 있던 옛 목록을 돌려준다. 그 profile 의 목록을 한 번도 읽지 못했으면 `HERMES_UNAVAILABLE` 이다.
@@ -66,7 +68,7 @@ web 은 입력창 아래의 `chat/model-picker.tsx` 로 고른다.
 
 실행을 보낼 때 `chat/application/ModelTierService` 가 대화의 선택, 단계, 에이전트 기본 모델 차례로 세 값을 정하고 `chat/domain/ModelChoice` 에 담는다.
 모델이 비어 있으면 `/v1/runs` 에 `provider`, `model` 을 빼고,
-effort 가 비어 있으면 `model_options` 를 뺀다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
+effort 가 비어 있으면 `model_options` 를 뺀다. 비어 있음(미지정)과 `none`(reasoning 끔)은 다른 의도라, `none` 은 `model_options.reasoning.effort` 에 그대로 싣는다. 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다.
 모델이 비어 있고 그룹에 숨김이 있으면 `ModelOptionsService.profileDefaultOf` 가 들고 있는 목록에서 읽은 profile 의 기본 모델로 같은 판정을 한다.
 Memory 제안은 원래 실행이 해석한 값을 받아 쓰고 `ExecutionRecorder.startInheriting` 으로 원래 실행의 단계와 effort 출처를 이어받는다.
 추천 질문은 대화가 없어 `ModelTierService.detachedChoice` 가 준 에이전트 기본 모델을 싣고 `ExecutionRecorder.startDetached` 가 그 값을 실행 줄에 적는다. 같은 값을 `ModelTierService.requireRunnable` 이 숨김과 견준다.
