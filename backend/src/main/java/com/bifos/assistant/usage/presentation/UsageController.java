@@ -148,7 +148,7 @@ public class UsageController {
      * 이번 달 환산 금액의 합계다.
      *
      * <p>구독료와 견줄 숫자라서 화면이 목록과 함께 보여 준다. 저장된 금액을 더하기만 하고 여기서 다시
-     * 환산하지 않는다. native 자식의 금액을 포함하고, 금액을 확인하지 못한 자식 수를 함께 낸다(ADR-059).
+     * 환산하지 않는다. native 자식의 금액을 포함하고, 금액을 확인하지 못한 자식 수를 함께 낸다(ADR-060).
      */
     @GetMapping("/monthly-cost")
     public MonthlyCostView thisMonthCost() {
@@ -175,7 +175,7 @@ public class UsageController {
      *
      * <p>네 축이 같은 줄 모양을 쓴다. 화면이 표 하나로 네 축을 모두 그릴 수 있게 하려는 것이다.
      * 실행 합계는 데이터베이스가 내고, native 자식의 원장 줄은 {@code UsageSummaryService} 가 그 줄에
-     * 더한다(ADR-059).
+     * 더한다(ADR-060).
      *
      * <p>자기 것만 낸다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
      *

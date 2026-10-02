@@ -19,7 +19,7 @@
 - `application` 은 `presentation` 을 부르지 않는다. 구조 규칙은 `./gradlew archTest` 가 검사한다(`backend/AGENTS.md`)
 - 하위 에이전트는 orca 명령을 쓰지 않는다
 
-**근거 문서**: `docs/model-tiers.md` 의 「합계와 완전성」, `docs/adr/ADR-059-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md`, `docs/backend/packages.md`, `backend/AGENTS.md`
+**근거 문서**: `docs/model-tiers.md` 의 「합계와 완전성」, `docs/adr/ADR-060-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md`, `docs/backend/packages.md`, `backend/AGENTS.md`
 
 ## 의도 메모
 

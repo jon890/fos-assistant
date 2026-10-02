@@ -6,7 +6,7 @@ import java.time.Instant;
  * 합계에 더할 native 자식 원장 한 줄을 부모 실행의 축 값과 함께 읽은 것이다.
  *
  * <p>자식은 부모 실행의 에이전트, 시작 시각, 지문에 붙고 모델 축에서는 자기 provider 와 모델에 붙는다.
- * 근거는 ADR-059 에 있다.
+ * 근거는 ADR-060 에 있다.
  *
  * @param agentId 부모 실행의 에이전트 번호
  * @param parentStartedAt 부모 실행의 시작 시각. 날짜 축이 이 값으로 날짜를 뽑는다

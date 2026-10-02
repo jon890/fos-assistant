@@ -90,7 +90,7 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
   그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
   우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
-  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-059](adr/ADR-059-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md))
+  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-060](adr/ADR-060-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md))
 - native 하위 에이전트의 provider 를 Hermes 에서 읽는 경로. 지금은 session 응답에 provider 가 없어 그 금액이 가격 미확인으로 남는다(이슈 #110)
 - `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
 - 사용자가 turn 을 중지할 때 Hermes `delegate_task` 하위 에이전트를 실제로 멈추는 것.

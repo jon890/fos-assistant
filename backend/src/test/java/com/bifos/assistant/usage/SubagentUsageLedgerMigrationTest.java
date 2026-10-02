@@ -18,7 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 재조회 작업 줄을 사용량 원장으로 넓히는 마이그레이션이 칸을 더하고 지난 자식을 다시 조회 대기로 넣는지 본다(ADR-059).
+ * 재조회 작업 줄을 사용량 원장으로 넓히는 마이그레이션이 칸을 더하고 지난 자식을 다시 조회 대기로 넣는지 본다(ADR-060).
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다.
  */

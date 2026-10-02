@@ -139,7 +139,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 있기 때문이다. 금액이 비어 있는 줄은 합계에 더해지지 않고 따로 세어진다.
      *
      * <p>실행 줄만 더한다. 실행 줄이 없는 native 자식은 {@code UsageSummaryService} 가 원장 줄로
-     * 더한다(ADR-059).
+     * 더한다(ADR-060).
      */
     @Query("""
             select new com.bifos.assistant.usage.domain.MonthlyCost(
@@ -181,7 +181,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      *
      * <p>실행 줄을 전부 센다. 자식 토큰이 부모의 usage 에 포함되지 않는 것을 ADR-016 이 실측으로
      * 확정했으므로, 전부 세는 것이 실제 사용량이고 두 번 세어지지 않는다.
-     * 실행 줄이 없는 native 자식은 {@code UsageSummaryService} 가 원장 줄로 더한다(ADR-059).
+     * 실행 줄이 없는 native 자식은 {@code UsageSummaryService} 가 원장 줄로 더한다(ADR-060).
      */
     @Query("""
             select new com.bifos.assistant.usage.domain.CostByAgent(

@@ -42,7 +42,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * native 자식의 원장 줄이 월 합계와 축별 합계에 한 번만 더해지고, 금액을 확인하지 못한 자식이 건수로
- * 드러나는지 본다. 근거는 ADR-059 에 있다.
+ * 드러나는지 본다. 근거는 ADR-060 에 있다.
  *
  * <p>재조회 빈이 실제 시계를 읽으므로 시각은 모두 검사를 시작한 순간에서 떨어진 거리로 적는다.
  */

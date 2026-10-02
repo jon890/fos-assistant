@@ -1,4 +1,4 @@
--- native 자식 한 명의 사용량과 금액을 재조회 작업 줄에 적는다(ADR-059).
+-- native 자식 한 명의 사용량과 금액을 재조회 작업 줄에 적는다(ADR-060).
 ALTER TABLE subagent_usage_job ADD COLUMN provider VARCHAR(64) NULL;
 ALTER TABLE subagent_usage_job ADD COLUMN model VARCHAR(128) NULL;
 ALTER TABLE subagent_usage_job ADD COLUMN input_tokens BIGINT NULL;

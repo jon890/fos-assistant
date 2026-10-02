@@ -1,4 +1,4 @@
-## ADR-059: native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다
+## ADR-060: native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다
 
 - **status**: `accepted`
 - **결정**: Hermes `delegate_task` 가 만든 native 자식의 사용량과 금액을 `subagent_usage_job` 한 줄에 적는다.

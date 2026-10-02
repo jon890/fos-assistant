@@ -21,11 +21,11 @@ Hermes `delegate_task` 가 만든 native 자식의 provider, 모델, 토큰, 환
 - `agent` 표의 칸: `hermes_profile`, `api_base_url`(VARCHAR(255)), `deleted_at`. `agent_execution` 의 칸: `agent_id`, `profile_name`, `hermes_session_id`, `finished_at`, `cost_mode`
 - 하위 에이전트는 orca 명령을 쓰지 않는다
 
-**근거 문서**: `docs/adr/ADR-059-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md`, `docs/model-tiers.md` 의 「비동기 자식 사용량」 과 그 아래 「원장 줄에 적는 것」, `docs/backend/schema/execution.md` 의 「subagent_usage_job」, `docs/hermes/delegation.md` 의 「자식 session 으로 결과와 토큰을 보완한다」, `backend/AGENTS.md`
+**근거 문서**: `docs/adr/ADR-060-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md`, `docs/model-tiers.md` 의 「비동기 자식 사용량」 과 그 아래 「원장 줄에 적는 것」, `docs/backend/schema/execution.md` 의 「subagent_usage_job」, `docs/hermes/delegation.md` 의 「자식 session 으로 결과와 토큰을 보완한다」, `backend/AGENTS.md`
 
 ## 의도 메모
 
-- native 자식마다 `agent_execution` 줄을 만들지 않는다. `execution_event` 에 금액 칸을 두지도 않는다. 까닭은 ADR-059 에 있다
+- native 자식마다 `agent_execution` 줄을 만들지 않는다. `execution_event` 에 금액 칸을 두지도 않는다. 까닭은 ADR-060 에 있다
 - provider 를 부모 실행이나 모델 이름에서 추정하지 않는다. session 응답에 없으면 비운다
 - 완료 사건(`SUBAGENT_COMPLETED`)은 표시용으로 그대로 둔다. 사건이 없을 때만 새로 만드는 지금 동작을 유지한다
 - 표와 클래스 이름을 바꾸지 않는다. 같은 저장소에서 다른 작업이 `usage` 패키지를 함께 고친다
@@ -106,7 +106,7 @@ public void record(SubagentSessionUsage usage, ExecutionCost cost, String reason
 2. 아니고 `current.expired(now)` 이면 `current.expire()`
 3. 그 밖에는 `current.retry(now)`
 
-완료 사건이 있다는 이유로 조회 없이 끝내던 분기를 없앤다. 클래스 Javadoc 에 이 줄이 원장이라는 것과 ADR-059 를 적는다.
+완료 사건이 있다는 이유로 조회 없이 끝내던 분기를 없앤다. 클래스 Javadoc 에 이 줄이 원장이라는 것과 ADR-060 를 적는다.
 
 ### 6. 이 phase 를 검증하는 테스트
 
