@@ -1,0 +1,16 @@
+{
+  "name": "plan66-archunit-easy-rules",
+  "description": "ArchUnit 기준 파일 가운데 구조를 바꾸지 않고 고칠 수 있는 규칙 넷의 위반을 0 으로 줄인다 — 기준에 든 위반은 줄여 갈 목록이다(ADR-042)",
+  "status": "pending",
+  "created_at": "2026-10-02",
+  "total_phases": 6,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "fast" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "fast" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" },
+    { "number": 5, "file": "phase-05.md", "execution_profile": "standard" },
+    { "number": 6, "file": "phase-06.md", "execution_profile": "standard" }
+  ]
+}
