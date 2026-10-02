@@ -136,7 +136,7 @@ public class DelegationWakeService {
             return;
         }
         AppUser owner = user.get();
-        TurnCancellation.TurnHandle handle;
+        TurnHandle handle;
         try {
             handle = turns.open(owner.id(), conversationId);
         } catch (ApiException ex) {
@@ -164,7 +164,7 @@ public class DelegationWakeService {
      * <p>결과를 전했다고 적기 전에 실패하면 잠금을 풀기 전에 실패 시각을 적는다. 그래야 닫기 리스너가 같은 결과로 곧바로
      * 다시 열지 않는다.
      */
-    private void runAutoTurn(CurrentUser owner, Long conversationId, TurnCancellation.TurnHandle handle) {
+    private void runAutoTurn(CurrentUser owner, Long conversationId, TurnHandle handle) {
         Set<String> pending = Set.of();
         try {
             pending = undeliveredMarks(conversationId);

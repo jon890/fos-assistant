@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.PendingMessageService;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -77,7 +78,7 @@ class PendingMessageControllerTest {
     private MockMvc mvc;
     private CurrentUser dad;
     private Conversation conversation;
-    private TurnCancellation.TurnHandle running;
+    private TurnHandle running;
 
     @BeforeEach
     void setUp() {

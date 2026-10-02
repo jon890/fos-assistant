@@ -495,7 +495,7 @@ class RestartReconcilerTest {
         awaitLookups(row, 1);
 
         // 사용자의 중지가 Hermes 에 중지를 보낸 뒤 확정하기 전인 상태다.
-        TurnCancellation.TurnHandle handle = turns.find(row.id()).orElseThrow();
+        TurnHandle handle = turns.find(row.id()).orElseThrow();
         turns.cancel(handle);
         assertThat(turns.isStopConfirmed(handle)).as("아직 확정 전이다").isFalse();
         stub.willLookup(row.hermesRunId(), finished(row, "cancelled", "일부 답"));

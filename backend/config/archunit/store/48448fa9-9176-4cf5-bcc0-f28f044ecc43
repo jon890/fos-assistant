@@ -1,5 +1,3 @@
-Class <com.bifos.assistant.chat.application.TurnCancellation$RunRef> does not have modifier PRIVATE in (TurnCancellation.java:0)
-Class <com.bifos.assistant.chat.application.TurnCancellation$TurnHandle> does not have modifier PRIVATE in (TurnCancellation.java:0)
 Class <com.bifos.assistant.chat.infra.ArtifactSourceFetcher$Cancellation> does not have modifier PRIVATE in (ArtifactSourceFetcher.java:0)
 Class <com.bifos.assistant.chat.infra.ArtifactSourceFetcher$DnsResolver> does not have modifier PRIVATE in (ArtifactSourceFetcher.java:0)
 Class <com.bifos.assistant.chat.infra.ArtifactSourceFetcher$Response> does not have modifier PRIVATE in (ArtifactSourceFetcher.java:0)

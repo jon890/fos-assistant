@@ -19,6 +19,7 @@ import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.PendingMessageService;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -179,7 +180,7 @@ class PendingBeforeDelegationTest {
     @Test
     @DisplayName("대기 메시지와 끝난 위임 결과가 함께 있으면 대기 메시지를 먼저 보내고 그 뒤에 결과를 전한다")
     void sendsQueuedMessageBeforeDeliveringDelegationResult() {
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         AgentExecution done = delegated();
         finished(done);
         pending.enqueue(dad, conversation.id(), "대기 글");
@@ -234,7 +235,7 @@ class PendingBeforeDelegationTest {
         pendingRows.save(ChatPendingMessage.queued(
                 conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
         AgentExecution done = delegated();
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         finished(done);
         turns.markStopped(running);
 
@@ -257,7 +258,7 @@ class PendingBeforeDelegationTest {
                 .when(chat)
                 .runPendingMessages(any(), any(), any(), any());
         doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         AgentExecution done = delegated();
         finished(done);
         pending.enqueue(dad, conversation.id(), "대기 글");
@@ -349,7 +350,7 @@ class PendingBeforeDelegationTest {
         assertThat(turns.markOf(conversation.id()).running())
                 .as("중지한 turn 의 잠금")
                 .isFalse();
-        TurnCancellation.TurnHandle next = turns.open(dad.id(), conversation.id());
+        TurnHandle next = turns.open(dad.id(), conversation.id());
         turns.close(next);
     }
 

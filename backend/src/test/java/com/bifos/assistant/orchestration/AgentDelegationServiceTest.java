@@ -9,6 +9,8 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnHandle;
+import com.bifos.assistant.chat.application.TurnRunRef;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -372,7 +374,7 @@ class AgentDelegationServiceTest {
         // 대역 Hermes 는 중지를 받은 뒤에도 completed 를 준다. 루트 turn 의 중지가 확정된 뒤에 답하게 해, 확정된 중지를
         // 보고 CANCELLED 로 적는지 본다.
         CountDownLatch awaiting = holdUntilRootStopConfirmed();
-        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
             turns.rekey(handle, origin.id());
             DelegationResult started = delegate("turn 이 도는 동안 맡긴 일");
@@ -383,7 +385,7 @@ class AgentDelegationServiceTest {
                     executions.findById(started.executionId()).orElseThrow().hermesRunId();
             assertThat(turns.pendingStops(handle))
                     .as("turn 에 자식 run 이 붙었다")
-                    .extracting(TurnCancellation.RunRef::getRunId)
+                    .extracting(TurnRunRef::getRunId)
                     .containsExactly(runId);
 
             chat.stop(user, origin.id());
@@ -408,7 +410,7 @@ class AgentDelegationServiceTest {
             awaiting.countDown();
             await(stopAttempted);
         });
-        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
             turns.rekey(handle, origin.id());
             DelegationResult started = delegate("중지가 실패하는 turn 의 일");
@@ -452,7 +454,7 @@ class AgentDelegationServiceTest {
     void doesNotAttachChildRunToEndedTurnOrOtherConversationTurnOfSameUser() throws Exception {
         stub().willAnswer(command -> completed(command, "답"));
         CountDownLatch awaiting = holdUntilStopped();
-        TurnCancellation.TurnHandle ended = turns.open(user.id(), conversation.id());
+        TurnHandle ended = turns.open(user.id(), conversation.id());
         turns.rekey(ended, origin.id());
         turns.close(ended);
         Conversation otherConversation =
@@ -466,7 +468,7 @@ class AgentDelegationServiceTest {
                 .status(ExecutionStatus.RUNNING)
                 .startedAt(Instant.parse("2026-09-30T00:00:00Z"))
                 .build());
-        TurnCancellation.TurnHandle other = turns.open(user.id(), otherConversation.id());
+        TurnHandle other = turns.open(user.id(), otherConversation.id());
         try {
             turns.rekey(other, otherTurn.id());
 

@@ -160,7 +160,7 @@ public class NextTurnDispatcher {
             return false;
         }
         AppUser owner = user.get();
-        TurnCancellation.TurnHandle handle;
+        TurnHandle handle;
         try {
             handle = turns.open(owner.id(), conversationId);
         } catch (ApiException ex) {
@@ -191,7 +191,7 @@ public class NextTurnDispatcher {
      * 시각을 적어 한동안 다시 열지 않는다.
      */
     private void runQueuedTurn(
-            CurrentUser owner, Conversation conversation, TurnCancellation.TurnHandle handle, List<Long> ids) {
+            CurrentUser owner, Conversation conversation, TurnHandle handle, List<Long> ids) {
         Long conversationId = conversation.id();
         try {
             chat.runPendingMessages(owner, conversationId, handle, event -> hub.publish(conversationId, event));

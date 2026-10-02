@@ -19,6 +19,7 @@ import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.chat.application.DelegationWakeService;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.application.TurnMark;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -258,7 +259,7 @@ class DelegationWakeServiceTest {
         Agent connector = connectorAgent();
         AgentExecution failed = delegated(root, connector, ExecutionStatus.FAILED, null, "HERMES_RUN_FAILED");
         AgentExecution blank = delegated(root, connector, ExecutionStatus.SUCCEEDED, "  \n ", null);
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         finished(failed);
         finished(blank);
 
@@ -293,7 +294,7 @@ class DelegationWakeServiceTest {
     @DisplayName("같은 대화에 turn 이 돌고 있으면 열지 않고 그 turn 이 닫힐 때 연다")
     void defersAutoTurnUntilRunningTurnCloses() {
         AgentExecution done = delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null);
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
 
         finished(done);
 
@@ -317,7 +318,7 @@ class DelegationWakeServiceTest {
     void putsTwoPendingResultsIntoOneAutoTurn() {
         AgentExecution first = delegated(root, ExecutionStatus.SUCCEEDED, "첫 결과", null);
         AgentExecution second = delegated(root, ExecutionStatus.FAILED, null, "HERMES_RUN_FAILED");
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         finished(first);
         finished(second);
 

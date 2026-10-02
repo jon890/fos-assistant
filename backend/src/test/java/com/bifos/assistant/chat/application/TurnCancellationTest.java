@@ -28,9 +28,23 @@ class TurnCancellationTest {
     }
 
     @Test
+    @DisplayName("연 핸들은 연 사용자와 대화를 갖고 중지한 뒤에야 중지 표시가 선다")
+    void openedHandleKeepsOwnerAndConversationAndTurnsCancelledOnlyAfterCancel() {
+        TurnHandle handle = turns.open(1L, 2L);
+
+        assertThat(handle.userId()).isEqualTo(1L);
+        assertThat(handle.getConversationId()).isEqualTo(2L);
+        assertThat(handle.cancelled().get()).isFalse();
+
+        assertThat(turns.cancel(handle)).isTrue();
+
+        assertThat(handle.cancelled().get()).isTrue();
+    }
+
+    @Test
     @DisplayName("중지 뒤에 붙은 스트림도 유예 시간이 지나면 닫는다")
     void closesStreamAttachedAfterStopOnceGracePeriodPasses() throws InterruptedException {
-        TurnCancellation.TurnHandle handle = turns.open(1L, 2L);
+        TurnHandle handle = turns.open(1L, 2L);
         CountDownLatch closed = new CountDownLatch(1);
         Closeable stream = closed::countDown;
 
@@ -47,7 +61,7 @@ class TurnCancellationTest {
     void doesNotCloseStreamByGracePeriodBeforeHermesStopIsConfirmed() throws InterruptedException {
         TurnCancellation delayed = new TurnCancellation(mock(HermesRunsClient.class), Duration.ofMillis(10));
         try {
-            TurnCancellation.TurnHandle handle = delayed.open(1L, 2L);
+            TurnHandle handle = delayed.open(1L, 2L);
             CountDownLatch closed = new CountDownLatch(1);
 
             delayed.cancel(handle);

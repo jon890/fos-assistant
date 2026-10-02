@@ -147,7 +147,7 @@ public class ChatService {
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
-        TurnCancellation.TurnHandle handle =
+        TurnHandle handle =
                 turns.open(user.id(), routed.conversation().id());
         try {
             if (routed.flow() != null) {
@@ -179,7 +179,7 @@ public class ChatService {
      * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      */
     public void runDelegationResults(
-            CurrentUser owner, Long conversationId, TurnCancellation.TurnHandle handle, Consumer<ChatEvent> onEvent) {
+            CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         List<AgentExecution> results = executionRepository.findUndeliveredResults(conversationId);
         List<AutoTurnDelivery> deliveries = new ArrayList<>();
         List<String> notices = new ArrayList<>();
@@ -241,7 +241,7 @@ public class ChatService {
      * @param onEvent {@code user}, {@code pending}, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      */
     public void runPendingMessages(
-            CurrentUser owner, Long conversationId, TurnCancellation.TurnHandle handle, Consumer<ChatEvent> onEvent) {
+            CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         for (int attempt = 1; ; attempt++) {
             List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
             if (rows.isEmpty() || rows.stream().anyMatch(ChatPendingMessage::held)) {
@@ -280,7 +280,7 @@ public class ChatService {
      * <p>대기 줄을 멈추다 실패해도 예외를 올리지 않고 경고 로그만 남긴다. 멈춤 때문에 중지한 turn 이 오류로 끝나거나
      * 원래 예외가 가려지면 안 된다.
      */
-    private void markStoppedAndHoldPending(TurnCancellation.TurnHandle handle, Long conversationId) {
+    private void markStoppedAndHoldPending(TurnHandle handle, Long conversationId) {
         turns.markStopped(handle);
         try {
             transactions.executeWithoutResult(status -> pendingMessages.markHeld(conversationId, true));
@@ -296,7 +296,7 @@ public class ChatService {
      * 실패해도 대기 줄은 멈춘다. 둘 다 turn 잠금을 풀기 전이다.
      */
     private ChatTurn stoppedTurn(
-            TurnCancellation.TurnHandle handle,
+            TurnHandle handle,
             PendingTurn pending,
             HermesRunResult result,
             ModelChoice choice,
@@ -315,7 +315,7 @@ public class ChatService {
      * 뒤라면 그대로 둔다. 취소 기록이 실패해도 대기 줄은 멈추고, 어느 쪽 실패도 올리지 않아 원래 예외가 그대로 올라간다.
      */
     private void cancelAndHoldIfStopConfirmed(
-            TurnCancellation.TurnHandle handle, PendingTurn pending, ModelChoice choice) {
+            TurnHandle handle, PendingTurn pending, ModelChoice choice) {
         if (!turns.isStopConfirmed(handle)) {
             return;
         }
@@ -338,7 +338,7 @@ public class ChatService {
      *
      * <p>흐름이 취소를 이미 기록했다. 결과물 묶기가 던져도 잠금을 풀기 전에 대기 줄을 멈춘다.
      */
-    private void recordStoppedFlow(TurnCancellation.TurnHandle handle, ChatTurn turn, Instant startedAt) {
+    private void recordStoppedFlow(TurnHandle handle, ChatTurn turn, Instant startedAt) {
         try {
             recorded(turn, startedAt);
         } finally {
@@ -353,7 +353,7 @@ public class ChatService {
      * 상태를 여기서는 알 수 없다. {@code rootExecutionId} 가 null 이면 실행 줄을 만들기 전에 끝난 것이다.
      */
     private void cancelFlowAndHoldIfStopConfirmed(
-            TurnCancellation.TurnHandle handle, Long conversationId, Long rootExecutionId) {
+            TurnHandle handle, Long conversationId, Long rootExecutionId) {
         if (!turns.isStopConfirmed(handle)) {
             return;
         }
@@ -442,12 +442,12 @@ public class ChatService {
             TurnIntent intent,
             Consumer<ChatEvent> onEvent,
             boolean streaming,
-            TurnCancellation.TurnHandle existingHandle) {
+            TurnHandle existingHandle) {
         Instant requestReceivedAt = routed.requestReceivedAt();
         Conversation conversation = routed.conversation();
         List<Long> attachmentIds =
                 routed.attached().stream().map(ChatAttachment::id).toList();
-        TurnCancellation.TurnHandle handle =
+        TurnHandle handle =
                 existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
@@ -554,9 +554,9 @@ public class ChatService {
             TurnIntent intent,
             Consumer<ChatEvent> onEvent,
             boolean streaming,
-            TurnCancellation.TurnHandle existingHandle) {
+            TurnHandle existingHandle) {
         Conversation conversation = routed.conversation();
-        TurnCancellation.TurnHandle handle =
+        TurnHandle handle =
                 existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
@@ -770,7 +770,7 @@ public class ChatService {
     }
 
     private void relay(
-            PendingTurn pending, String runId, TurnCancellation.TurnHandle handle, Consumer<ChatEvent> onEvent) {
+            PendingTurn pending, String runId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
@@ -868,7 +868,7 @@ public class ChatService {
     public void regenerate(CurrentUser user, Long conversationId, Consumer<ChatEvent> onEvent) {
         Instant requestReceivedAt = clock.instant();
         Conversation conversation = access.requireOwn(user, conversationId);
-        TurnCancellation.TurnHandle handle = turns.open(user.id(), conversation.id());
+        TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
             List<ChatMessage> active = activeMessages(conversation.id());
             if (active.isEmpty()) {
@@ -1010,7 +1010,7 @@ public class ChatService {
     }
 
     public void stop(CurrentUser user, Long executionId) {
-        TurnCancellation.TurnHandle handle = turns.find(executionId).orElseGet(() -> {
+        TurnHandle handle = turns.find(executionId).orElseGet(() -> {
             AgentExecution execution = executionRepository
                     .findById(executionId)
                     .orElseThrow(() -> new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "execution not found"));
@@ -1024,7 +1024,7 @@ public class ChatService {
         }
         turns.cancel(handle);
         boolean hadRuns = turns.hasRuns(handle);
-        for (TurnCancellation.RunRef run : turns.pendingStops(handle)) {
+        for (TurnRunRef run : turns.pendingStops(handle)) {
             turns.stopRun(run);
         }
         for (AgentExecution child : executionRepository.findByRootExecutionId(executionId)) {

@@ -278,7 +278,7 @@ public class RestartReconciler implements SmartLifecycle {
         ConversationLock lock = locks.get(row.conversationId());
         boolean opened = lock == null;
         if (opened) {
-            TurnCancellation.TurnHandle handle;
+            TurnHandle handle;
             try {
                 handle = turns.open(row.userId(), row.conversationId());
             } catch (ApiException ex) {
@@ -514,7 +514,7 @@ public class RestartReconciler implements SmartLifecycle {
             executionIds = List.copyOf(lock.executionIds);
             rootClaimed = lock.rootClaimed;
         }
-        TurnCancellation.TurnHandle handle = lock.handle;
+        TurnHandle handle = lock.handle;
         boolean stopped = false;
         try {
             // 중지가 확정됐는지가 아니라 요청됐는지를 본다. 중지를 보낸 뒤 확정하기 전에 취소 결과를 먼저 적을 수 있다.
@@ -585,7 +585,7 @@ public class RestartReconciler implements SmartLifecycle {
         /** 중지 표시에 붙인 실행 번호다. 그 대화에서 먼저 잡은 줄의 루트 실행이다. */
         private final Long executionId;
 
-        private final TurnCancellation.TurnHandle handle;
+        private final TurnHandle handle;
 
         /** 이 잠금을 함께 쓰는 줄 가운데 아직 정해지지 않은 수다. */
         private int remaining;
@@ -596,7 +596,7 @@ public class RestartReconciler implements SmartLifecycle {
         /** 루트 줄도 이 잠금으로 정한다. 거짓이면 루트가 이미 끝나고 자식만 돌던 흐름 turn 이다. */
         private boolean rootClaimed;
 
-        private ConversationLock(Long conversationId, Long executionId, TurnCancellation.TurnHandle handle) {
+        private ConversationLock(Long conversationId, Long executionId, TurnHandle handle) {
             this.conversationId = conversationId;
             this.executionId = executionId;
             this.handle = handle;

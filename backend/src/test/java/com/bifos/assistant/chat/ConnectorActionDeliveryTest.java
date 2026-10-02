@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -267,7 +268,7 @@ class ConnectorActionDeliveryTest {
     @DisplayName("turn 이 도는 중에 거절하면 알림 줄을 미뤘다가 그 turn 이 닫힐 때 남긴다")
     void closureNoticeWaitsForRunningTurn() {
         UUID actionId = action("PENDING", null, null, conversation.id());
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
 
         actionService.reject(dad, actionId);
 
@@ -331,7 +332,7 @@ class ConnectorActionDeliveryTest {
     @Test
     @DisplayName("그 대화의 turn 이 도는 중에 끝난 결과는 쌓였다가 turn 이 닫힌 뒤 전해진다")
     void resultWaitsForRunningTurn() {
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         UUID actionId = action("SUCCEEDED", "{\"saved\":true}", null, conversation.id());
 
         changed(actionId);
@@ -376,7 +377,7 @@ class ConnectorActionDeliveryTest {
         assertThat(runningInside).containsExactly(true);
         assertThat(turns.markOf(conversation.id()).running()).isFalse();
 
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         assertThat(turns.runIfIdle(conversation.id(), () -> runningInside.add(false)))
                 .isFalse();
         assertThat(runningInside).hasSize(1);
@@ -387,7 +388,7 @@ class ConnectorActionDeliveryTest {
     @DisplayName("위임 결과와 승인 결과가 함께 있으면 자동 turn 한 번에 알림 줄 둘과 두 단락으로 전한다")
     void delegationAndApprovalResultsShareOneAutoTurn() {
         Agent worker = agents.save(agent("worker", "조사원", dad.id()));
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         AgentExecution execution = AgentExecution.builder()
                 .userId(dad.id())
                 .conversationId(conversation.id())
