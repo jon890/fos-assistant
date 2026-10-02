@@ -198,6 +198,38 @@ test("작업 과정 블록은 높이가 transition 으로 바뀌고 접힌 내�
   expect(await openPanel.evaluate((node) => node.closest("[inert]") !== null), "접힌 내용은 inert 다").toBe(true);
 });
 
+test("작업 과정 블록을 펼치는 동안 단추를 화면에 맞춰도 안쪽 내용이 스크롤로 밀리지 않는다", async ({ page }) => {
+  await page.goto("/");
+  await send(page, "펼치는 중 스크롤 검사");
+  const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
+  await expect(block).toBeVisible({ timeout: 30_000 });
+
+  // Playwright 의 click 은 누르기 전에 단추를 화면에 맞춘다(scrollIntoView). 펼치는 transition 이 처음일 때는 단추가 잘려 있다.
+  // 안쪽 칸이 스크롤 상자면 내용이 위로 밀렸다가 다 펼쳐질 때 제자리로 튀어, 누른 자리와 단추의 자리가 어긋난다.
+  // transition 을 처음에 세워 두고 한 번에 재서, 타이밍에 기대지 않고 같은 상황을 만든다.
+  const probe = await block.evaluate(async (root) => {
+    const collapsible = root.querySelector(".collapsible") as HTMLElement;
+    const inner = collapsible.firstElementChild as HTMLElement;
+    const button = root.querySelector('[data-testid="activity-open-panel"]') as HTMLElement;
+    (root.querySelector('[data-testid="activity-toggle"]') as HTMLElement).click();
+    // React 가 펼친 상태를 그리고 transition 이 걸릴 때까지 한 프레임 기다린다.
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const animations = collapsible.getAnimations();
+    for (const animation of animations) {
+      animation.pause();
+      animation.currentTime = 0;
+    }
+    const clipped = inner.clientHeight < button.offsetHeight;
+    button.scrollIntoView({ block: "nearest" });
+    const scrollTop = inner.scrollTop;
+    for (const animation of animations) animation.finish();
+    return { animations: animations.length, clipped, scrollTop };
+  });
+  expect(probe.animations, "펼치는 transition 이 걸려 있다").toBeGreaterThan(0);
+  expect(probe.clipped, "처음에는 단추가 잘려 있다").toBe(true);
+  expect(probe.scrollTop, "안쪽 칸은 스크롤되지 않는다").toBe(0);
+});
+
 test("줄인 움직임에서 말풍선은 이동하지 않고 흐려짐만 한다", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const release = await holdChatStream(page);

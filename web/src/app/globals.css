@@ -260,6 +260,8 @@ html {
  * 높이를 펼치고 접는다. height: auto 는 움직이지 않아 grid 의 행 크기를 0fr 에서 1fr 로 바꾼다.
  * 접힌 내용은 높이가 0 이어도 화면 읽기와 검사에 보이는 것으로 잡히므로 visibility 로 숨긴다.
  * 펼칠 때는 바로 보이고, 접을 때는 높이가 다 줄어든 뒤에 숨는다.
+ * 안쪽 칸은 overflow: hidden 이 아니라 clip 으로 자른다. hidden 은 스크롤 상자라서 초점이나 scrollIntoView 가
+ * 펼치는 도중 잘린 단추를 보이게 하려고 안쪽 칸을 스크롤하고, 다 펼쳐지면 제자리로 튀어 누르려던 단추가 밀린다.
  */
 @utility collapsible {
   display: grid;
@@ -270,7 +272,7 @@ html {
   }
   & > * {
     min-height: 0;
-    overflow: hidden;
+    overflow: clip;
     visibility: hidden;
     transition: visibility 0s linear var(--duration-slow);
   }
