@@ -219,7 +219,7 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
 
-색인은 `(user_id, deleted_at, updated_at, id)` 다(V48). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
+색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
 지운 대화가 쌓여도 한 쪽을 읽는 줄 수가 쪽 크기에 머문다.
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
