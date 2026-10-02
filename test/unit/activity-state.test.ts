@@ -160,6 +160,28 @@ test("activityLabel 은 도구가 아닌 항목의 이름을 그대로 낸다", 
   assert.equal(activityLabel(state.items[0]!), state.items[0]!.name);
 });
 
+test("글이 빈 switched 사건은 줄을 만들지 않는다", () => {
+  for (const text of [undefined, null, "", "  "]) {
+    const state = applyChatEvent(emptyActivity(0), { type: "switched", text });
+
+    assert.deepEqual(state.items, [], `text=${JSON.stringify(text)} 인데 줄이 생겼다`);
+  }
+});
+
+test("글이 있는 switched 사건은 넘어간 곳을 적은 줄 하나를 만든다", () => {
+  const state = applyChatEvent(emptyActivity(0), { type: "switched", text: "다른 모델" });
+
+  assert.deepEqual(state.items.map((item) => item.name), ["여기부터 다른 모델로 실행해요"]);
+});
+
+test("실행 트리의 PROVIDER_SWITCHED 사건도 글이 비면 줄을 만들지 않는다", () => {
+  const switched: ExecutionEventView = { ...toolStarted(1, "검색"), eventType: "PROVIDER_SWITCHED", toolName: null };
+
+  const items = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [switched]) });
+
+  assert.deepEqual(items.filter((item) => item.kind === "switched"), []);
+});
+
 test("끝난 블록의 접힌 한 줄은 중지와 오류를 먼저 보고 그 밖에는 도구와 도우미의 수로 고른다", () => {
   const both = { toolCount: 2, subagentCount: 1 };
   assert.equal(activitySummaryLabel(both, "stopped"), "하다가 멈췄어요");

@@ -237,12 +237,15 @@ export function applyChatEvent(
       ),
     };
   }
-  if (event.type === "switched")
+  if (event.type === "switched") {
+    // 넘어간 곳의 모델은 관리자에게만 온다. 글이 비면 「여기부터 로 실행해요」 가 되므로 줄을 만들지 않는다.
+    const switchedTo = event.text?.trim();
+    if (!switchedTo) return state;
     return {
       ...state,
       items: append(items, {
         kind: "switched",
-        name: `여기부터 ${event.text ?? ""}로 실행해요`,
+        name: `여기부터 ${switchedTo}로 실행해요`,
         detail: null,
         model: null,
         inputTokens: null,
@@ -252,6 +255,7 @@ export function applyChatEvent(
         pairKey: null,
       }),
     };
+  }
   return state;
 }
 

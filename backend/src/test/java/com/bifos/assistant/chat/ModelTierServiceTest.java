@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -88,6 +89,57 @@ class ModelTierServiceTest {
         });
         verify(definitions, never()).save(any());
         verifyNoInteractions(options);
+    }
+
+    @Test
+    @DisplayName("MEMBER 역할이 받는 단계에는 provider 와 모델과 effort 가 비고 단계와 이름과 기본값은 남는다")
+    void memberGetsTiersWithoutProviderModelOrEffort() {
+        TierFixtures fixtures = tierFixtures();
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+        when(fixtures.settings().findById(10L))
+                .thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.BALANCED)));
+
+        ModelTierOptions result = fixtures.service().optionsFor(fixtures.user(), fixtures.agent());
+
+        assertThat(result.tiers())
+                .extracting(ModelTierOptions.Tier::tier, ModelTierOptions.Tier::label)
+                .containsExactly(
+                        tuple(ModelTier.FAST, "빠르게"),
+                        tuple(ModelTier.BALANCED, "균형"),
+                        tuple(ModelTier.DEEP, "깊게"));
+        assertThat(result.tiers()).allSatisfy(tier -> {
+            assertThat(tier.provider()).as("provider").isNull();
+            assertThat(tier.model()).as("model").isNull();
+            assertThat(tier.reasoningEffort()).as("reasoningEffort").isNull();
+        });
+        assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.BALANCED);
+        assertThat(result.admin()).isFalse();
+        // 싣지 않을 provider 를 알아내려고 Hermes 목록을 읽지 않는다.
+        verifyNoInteractions(fixtures.options());
+    }
+
+    @Test
+    @DisplayName("ADMIN 역할이 받는 단계에는 provider 와 모델과 effort 가 그대로 실린다")
+    void adminGetsTiersWithProviderModelAndEffort() {
+        TierFixtures fixtures = tierFixtures();
+        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+        when(fixtures.settings().findById(10L)).thenReturn(Optional.empty());
+
+        ModelTierOptions result = fixtures.service().optionsFor(admin, fixtures.agent());
+
+        assertThat(result.tiers())
+                .extracting(
+                        ModelTierOptions.Tier::tier,
+                        ModelTierOptions.Tier::provider,
+                        ModelTierOptions.Tier::model,
+                        ModelTierOptions.Tier::reasoningEffort)
+                .containsExactly(
+                        tuple(ModelTier.FAST, "openai-codex", "example-fast", "low"),
+                        tuple(
+                                ModelTier.BALANCED, "openai-codex", "example-balanced", "medium"),
+                        tuple(ModelTier.DEEP, "openai-codex", "example-deep", "high"));
+        assertThat(result.admin()).isTrue();
     }
 
     @Test

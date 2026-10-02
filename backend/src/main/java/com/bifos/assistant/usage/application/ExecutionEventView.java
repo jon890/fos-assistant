@@ -30,6 +30,8 @@ public record ExecutionEventView(
      *
      * <p>도구 사건의 {@code detail} 은 {@link ToolDetailPolicy} 가 허락할 때만 싣는다. 도구 사건이 아닌
      * 사건의 {@code detail} 은 그대로 싣는다.
+     *
+     * <p>{@code model} 과 토큰은 {@link InternalValuePolicy} 가 허락할 때만 싣는다.
      */
     static ExecutionEventView from(ExecutionEvent event, CurrentUser viewer) {
         return from(event, viewer, null);
@@ -37,6 +39,7 @@ public record ExecutionEventView(
 
     static ExecutionEventView from(ExecutionEvent event, CurrentUser viewer, String subagentUsageStatus) {
         boolean hidden = event.eventType().isTool() && !ToolDetailPolicy.visibleTo(viewer, event.toolName());
+        boolean internal = InternalValuePolicy.visibleTo(viewer);
         return new ExecutionEventView(
                 event.sequence(),
                 event.eventType().name(),
@@ -46,9 +49,9 @@ public record ExecutionEventView(
                 event.durationMs(),
                 event.failed(),
                 hidden ? null : event.detail(),
-                event.model(),
-                event.inputTokens(),
-                event.outputTokens(),
+                internal ? event.model() : null,
+                internal ? event.inputTokens() : null,
+                internal ? event.outputTokens() : null,
                 event.occurredAt(),
                 subagentUsageStatus);
     }

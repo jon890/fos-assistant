@@ -38,6 +38,7 @@ import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
+import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
@@ -1086,8 +1087,13 @@ public class ChatService {
      *
      * <p>사건을 실행마다 세지 않고 한 번에 읽는다. 빈 {@code in} 절은 데이터베이스마다 다르게
      * 동작하므로 목록이 비면 부르지 않는다.
+     *
+     * <p>넘어간 곳의 모델은 내부 값이라 {@code ADMIN} 역할이 아니면 빈 묶음을 돌려준다(ADR-060).
      */
-    public Map<Long, String> switchedLabels(List<ChatMessage> history) {
+    public Map<Long, String> switchedLabels(CurrentUser viewer, List<ChatMessage> history) {
+        if (!InternalValuePolicy.visibleTo(viewer)) {
+            return Map.of();
+        }
         List<Long> executionIds = history.stream()
                 .map(ChatMessage::executionId)
                 .filter(Objects::nonNull)

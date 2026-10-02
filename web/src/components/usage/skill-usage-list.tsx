@@ -44,8 +44,9 @@ export function SkillUsageList({ rows }: { rows: SkillUsageRow[] }) {
   return (
     <section aria-label="스킬 호출">
       <ul className="grid gap-3" data-testid="skill-usage-list">
-        {rows.map((row) => (
-          <li key={`${row.agentCode}/${row.skillName}`}>
+        {rows.map((row, index) => (
+          // 에이전트 코드는 관리자에게만 와서 key 로 쓰지 않는다. 이름이 같은 에이전트가 있어도 겹치지 않게 순번을 붙인다.
+          <li key={`${row.agentName}/${row.skillName}/${index}`}>
             {row.lastConversationId ? (
               <Link
                 prefetch={false}

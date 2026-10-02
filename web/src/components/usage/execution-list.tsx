@@ -11,7 +11,8 @@ export type UsageExecution = {
   model: string | null;
   /** 요청에 실은 reasoning effort. 고르지 않았거나 이 칸이 생기기 전 실행이면 null */
   reasoningEffort: string | null;
-  costMode: string;
+  /** 관리자에게만 온다. 그 밖의 사용자에게는 null */
+  costMode: string | null;
   status: string;
   errorCode: string | null;
   inputTokens: number | null;

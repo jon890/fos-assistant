@@ -1,7 +1,9 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.usage.application.ToolDetailPolicy;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -100,17 +102,36 @@ public record ChatEvent(
      * 이 사건을 보는 사람에게 맞춰 돌려준다.
      *
      * <p>{@code tool} 사건의 {@code detail} 은 {@link ToolDetailPolicy} 가 허락할 때만 싣는다. 허락하지
-     * 않으면 {@code detail} 만 비운 새 사건을, 그 밖에는 이 사건을 그대로 돌려준다. 근거는 ADR-038 에 있다.
+     * 않으면 {@code detail} 만 비운 새 사건을 돌려준다. 근거는 ADR-038 에 있다.
+     *
+     * <p>{@link InternalValuePolicy} 가 허락하지 않는 사람에게는 {@code subagent} 사건의 모델과 토큰을 비우고,
+     * {@code switched} 사건은 보내지 않는다. 보내지 않는 사건은 빈 값으로 돌려준다. 근거는 ADR-060 에 있다.
+     *
+     * <p>그 밖에는 이 사건을 그대로 돌려준다.
      */
-    public ChatEvent forViewer(CurrentUser viewer) {
-        if (!"tool".equals(type) || ToolDetailPolicy.visibleTo(viewer, toolName)) {
-            return this;
+    public Optional<ChatEvent> forViewer(CurrentUser viewer) {
+        if ("tool".equals(type) && !ToolDetailPolicy.visibleTo(viewer, toolName)) {
+            return Optional.of(redacted(null, model, inputTokens, outputTokens));
         }
+        if (InternalValuePolicy.visibleTo(viewer)) {
+            return Optional.of(this);
+        }
+        if ("switched".equals(type)) {
+            return Optional.empty();
+        }
+        if ("subagent".equals(type)) {
+            return Optional.of(redacted(detail, null, null, null));
+        }
+        return Optional.of(this);
+    }
+
+    /** 보는 사람에 따라 빼는 칸만 바꾼 새 사건이다. 나머지 칸은 그대로 옮긴다. */
+    private ChatEvent redacted(String detail, String model, Long inputTokens, Long outputTokens) {
         return new ChatEvent(
                 type,
                 text,
                 toolName,
-                null,
+                detail,
                 conversationId,
                 messageId,
                 executionId,

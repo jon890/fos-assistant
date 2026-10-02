@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.infra.ModelTierGroupSettingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.Arrays;
 import java.util.List;
@@ -41,15 +42,22 @@ public class ModelTierService {
     private final ModelOptionsService modelOptions;
     private final ModelVisibilityService visibility;
 
+    /**
+     * 요청자가 고를 수 있는 단계와 기본값이다.
+     *
+     * <p>단계가 가리키는 provider 와 모델과 effort 는 내부 값이라 {@code ADMIN} 역할에게만 싣는다(ADR-060).
+     * 그 밖의 요청자는 단계와 이름만 받는다.
+     */
     @Transactional(readOnly = true)
     public ModelTierOptions optionsFor(CurrentUser user, Agent agent) {
         List<ModelTierDefinition> definitions = definitionsFor(user.groupId());
-        String defaultProvider = needsDefaultProvider(definitions)
+        boolean internal = InternalValuePolicy.visibleTo(user);
+        String defaultProvider = internal && needsDefaultProvider(definitions)
                 ? modelOptions.optionsForAgent(user.groupId(), agent).defaultProvider()
                 : null;
         return new ModelTierOptions(
                 definitions.stream()
-                        .map(definition -> view(definition, defaultProvider))
+                        .map(definition -> internal ? view(definition, defaultProvider) : nameOnly(definition))
                         .toList(),
                 users.findById(user.id())
                         .map(it -> tierOf(it.modelDefaultTier()))
@@ -235,7 +243,7 @@ public class ModelTierService {
 
     private static ModelTierOptions.Tier view(ModelTierDefinition definition, String defaultProvider) {
         if (isFallback(definition)) {
-            return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
+            return nameOnly(definition);
         }
         return new ModelTierOptions.Tier(
                 definition.tier(),
@@ -243,6 +251,11 @@ public class ModelTierService {
                 definition.provider() == null ? defaultProvider : definition.provider(),
                 definition.model(),
                 definition.reasoningEffort());
+    }
+
+    /** 단계와 이름만 담는다. 가리키는 모델을 싣지 않는 요청자와 mapping 이 빈 단계가 함께 쓴다. */
+    private static ModelTierOptions.Tier nameOnly(ModelTierDefinition definition) {
+        return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
     }
 
     private static ModelTierOptions.Tier normalize(ModelTierOptions.Tier tier) {
