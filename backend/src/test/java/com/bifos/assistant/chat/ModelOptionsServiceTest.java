@@ -139,6 +139,48 @@ class ModelOptionsServiceTest {
     }
 
     @Test
+    @DisplayName("profile 기본값은 들고 있는 목록에서 읽어 Hermes 를 다시 부르지 않는다")
+    void readsProfileDefaultFromHeldCatalog() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        service.optionsFor(dad, "dad");
+
+        ModelChoice profileDefault = service.profileDefaultOf(agent);
+
+        assertThat(profileDefault).isEqualTo(ModelChoice.stored("openai-codex", "example-model", null));
+        verify(hermes, times(1)).readCatalog(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("profile 기본값을 다시 읽다 Hermes 가 실패하면 들고 있던 값을 돌려준다")
+    void returnsHeldProfileDefaultWhenRereadFails() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
+                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        service.profileDefaultOf(agent);
+
+        clock.advance(TTL);
+
+        assertThat(service.profileDefaultOf(agent))
+                .isEqualTo(ModelChoice.stored("openai-codex", "example-model", null));
+        verify(hermes, times(2)).readCatalog(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("profile 기본값을 한 번도 읽지 못했으면 HERMES UNAVAILABLE 을 삼키지 않는다")
+    void profileDefaultThrowsHermesUnavailableWhenNeverRead() {
+        when(hermes.readCatalog(anyString(), anyString()))
+                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+
+        assertThatThrownBy(() -> service.profileDefaultOf(agent))
+                .isInstanceOfSatisfying(
+                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+    }
+
+    @Test
     @DisplayName("처음 읽다 실패하면 HERMES UNAVAILABLE 이고 실패를 들고 있지 않는다")
     void firstReadFailureIsHermesUnavailableAndFailureIsNotHeld() {
         when(hermes.readCatalog(anyString(), anyString()))

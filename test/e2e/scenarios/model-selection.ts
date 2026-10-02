@@ -310,6 +310,41 @@ export const modelSelectionScenario: Scenario = {
       `기본 모델을 비웠는데 profile 의 값으로 돌아가지 않았다: ${JSON.stringify(restoredOptions)}`,
     );
 
+    step("profile 의 기본 모델을 숨기면 모델을 싣지 않는 실행도 제출하지 않고 MODEL_HIDDEN 으로 거절한다");
+    expectStatus(await call(context, "/admin/model-hidden", {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: { entries: [{ provider: PROFILE_DEFAULT.provider, model: PROFILE_DEFAULT.model }] },
+    }), 204, "profile 기본 모델 숨김 저장");
+    try {
+      const submitsBefore = context.hermes.submitCount();
+      // 새 대화는 앞에서 저장한 그룹 단계 정의로 해석돼 모델이 실린다. DEFAULT 로 되돌려 둔 대화로 보낸다.
+      const hiddenDefaultRun = await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { conversationId: tierConversationId, text: "숨긴 profile 기본 모델 검사" },
+      });
+      expect(
+        hiddenDefaultRun.status === 409 && hiddenDefaultRun.json<{ code?: string }>().code === "MODEL_HIDDEN",
+        `profile 기본 모델을 숨겼는데 MODEL_HIDDEN 으로 거절하지 않았다: ${hiddenDefaultRun.status}`,
+      );
+      const hiddenDefaultExecution = (await executionsOf(context))[0];
+      expect(
+        hiddenDefaultExecution?.status === "FAILED" && hiddenDefaultExecution?.errorCode === "MODEL_HIDDEN",
+        `거절한 기본값 실행이 남지 않았다: ${JSON.stringify(hiddenDefaultExecution)}`,
+      );
+      expect(
+        context.hermes.submitCount() === submitsBefore,
+        `거절한 실행을 Hermes 에 제출했다: ${context.hermes.submitCount() - submitsBefore}번`,
+      );
+    } finally {
+      expectStatus(await call(context, "/admin/model-hidden", {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: { entries: [] },
+      }), 204, "profile 기본 모델 숨김 비우기");
+    }
+
     step("대화에서 모델과 effort 를 고르면 그 값을 싣는다");
     const conversationId = await emptyConversation(context);
     await chooseModel(context, conversationId, CHOSEN);

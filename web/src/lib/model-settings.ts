@@ -122,3 +122,22 @@ export function hidesModel(
       (entry.model === null || entry.model === model),
   );
 }
+
+/**
+ * 에이전트 기본 모델이 없어 profile 의 기본 모델로 도는데 그 모델이 숨겨졌는가.
+ *
+ * Control Plane 이 실행 직전에 하는 판정과 같다. profile 의 기본 provider 를 모르면 모델 이름만 견주고,
+ * 그때 provider 전체를 숨긴 항목은 견주지 않는다.
+ */
+export function hidesProfileDefault(settings: AgentModelSettings): boolean {
+  const { defaultProvider, defaultModel } = settings.catalog;
+  if (
+    settings.catalogMissing ||
+    settings.agentDefault.model !== null ||
+    defaultModel === null
+  )
+    return false;
+  if (defaultProvider !== null)
+    return hidesModel(settings.hidden.entries, defaultProvider, defaultModel);
+  return settings.hidden.entries.some((entry) => entry.model === defaultModel);
+}

@@ -1,6 +1,7 @@
 package com.bifos.assistant.agent.application;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
@@ -69,6 +70,7 @@ public class StarterSuggestionService {
     private final ChatMessageRepository messages;
     private final HermesRunsClient hermes;
     private final ExecutionRecorder executions;
+    private final ModelTierService modelTiers;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final Executor executor;
@@ -91,6 +93,7 @@ public class StarterSuggestionService {
             ChatMessageRepository messages,
             HermesRunsClient hermes,
             ExecutionRecorder executions,
+            ModelTierService modelTiers,
             ObjectMapper objectMapper) {
         this(
                 properties,
@@ -99,6 +102,7 @@ public class StarterSuggestionService {
                 messages,
                 hermes,
                 executions,
+                modelTiers,
                 objectMapper,
                 Clock.systemUTC(),
                 Executors.newVirtualThreadPerTaskExecutor());
@@ -112,6 +116,7 @@ public class StarterSuggestionService {
             ChatMessageRepository messages,
             HermesRunsClient hermes,
             ExecutionRecorder executions,
+            ModelTierService modelTiers,
             ObjectMapper objectMapper,
             Clock clock,
             Executor executor) {
@@ -121,6 +126,7 @@ public class StarterSuggestionService {
         this.messages = messages;
         this.hermes = hermes;
         this.executions = executions;
+        this.modelTiers = modelTiers;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.executor = executor;
@@ -211,6 +217,8 @@ public class StarterSuggestionService {
             ModelChoice choice = ModelChoice.stored(
                     agent.defaultModelProvider(), agent.defaultModel(), agent.defaultReasoningEffort());
             execution = executions.startDetached(user, agent, choice);
+            // 실행 줄을 먼저 만들고 숨김을 판정한다. 거절해도 그 오류 코드로 실패한 줄이 남는다.
+            modelTiers.resolveDetached(user, agent);
             // 대화가 없는 실행이라 에이전트 기본 모델로 돈다. 비어 있으면 profile 의 값이다(ADR-054).
             HermesRunCommand command = new HermesRunCommand(
                     agent.hermesProfile(),

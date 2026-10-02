@@ -27,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>단계 정의는 DB 의 행만 읽는다. 행이 없는 그룹의 세 단계는 모두 빈 mapping 이고 에이전트 기본값으로 돈다.
  * 에이전트 기본값도 없으면 요청에 모델을 싣지 않아 Hermes profile 의 값으로 돈다(ADR-054).
+ *
+ * <p>실행 직전의 숨김 판정은 profile 의 기본 모델까지 본다. 요청에 모델을 싣지 않는 실행도 그 모델이 그룹이
+ * 숨긴 것이면 거절한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -117,8 +120,35 @@ public class ModelTierService {
     @Transactional(readOnly = true)
     public ResolvedModelTier resolve(CurrentUser user, Conversation conversation, Agent agent) {
         ResolvedModelTier resolved = resolveUnchecked(user, conversation, agent);
-        visibility.requireVisible(user.groupId(), resolved.choice());
+        requireRunnable(user.groupId(), agent, resolved.choice());
         return resolved;
+    }
+
+    /** 대화 없이 도는 실행이 보낼 에이전트 기본값이다. 숨김 판정을 지난다. */
+    @Transactional(readOnly = true)
+    public ModelChoice resolveDetached(CurrentUser user, Agent agent) {
+        ModelChoice choice = agentDefault(agent);
+        requireRunnable(user.groupId(), agent, choice);
+        return choice;
+    }
+
+    /** 이 실행이 돌 모델이 그룹이 숨긴 것이면 거절한다. 모델을 싣지 않는 실행은 profile 의 기본 모델로 본다(ADR-054). */
+    private void requireRunnable(Long groupId, Agent agent, ModelChoice choice) {
+        HiddenModels hidden = visibility.hiddenFor(groupId);
+        if (hidden.isEmpty()) {
+            return;
+        }
+        if (!choice.usesDefaultModel()) {
+            if (hidden.hides(choice.provider(), choice.model())) {
+                throw new ApiException(ErrorCode.MODEL_HIDDEN, "the selected model is hidden for this group");
+            }
+            return;
+        }
+        // 숨김이 있는 그룹만 여기에 온다. Hermes 를 실행마다 부르지 않도록 들고 있는 목록에서 읽는다.
+        ModelChoice profile = modelOptions.profileDefaultOf(agent);
+        if (hidden.hidesProfileDefault(profile.provider(), profile.model())) {
+            throw new ApiException(ErrorCode.MODEL_HIDDEN, "the profile default model is hidden for this group");
+        }
     }
 
     private ResolvedModelTier resolveUnchecked(CurrentUser user, Conversation conversation, Agent agent) {
@@ -157,7 +187,7 @@ public class ModelTierService {
                 .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier"));
         if (isFallback(definition)) {
             ModelChoice fallback = agentDefault(agent);
-            visibility.requireVisible(user.groupId(), fallback);
+            requireRunnable(user.groupId(), agent, fallback);
             return new ResolvedModelTier(fallback, tier);
         }
         ModelOptions options = modelOptions.optionsForAgent(user.groupId(), agent);

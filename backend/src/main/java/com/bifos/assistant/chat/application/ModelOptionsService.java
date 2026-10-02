@@ -91,6 +91,12 @@ public class ModelOptionsService {
         return optionsOf(catalogFor(agent), null, HiddenModels.none());
     }
 
+    /** 그 profile 의 기본 provider 와 모델을 들고 있는 목록에서 읽는다. Hermes 가 주지 않은 값은 null 이다. */
+    public ModelChoice profileDefaultOf(Agent agent) {
+        HermesModelCatalog catalog = catalogFor(agent);
+        return ModelChoice.stored(catalog.defaultProvider(), catalog.defaultModel(), null);
+    }
+
     private HermesModelCatalog catalogFor(Agent agent) {
         String profile = agent.hermesProfile();
         Instant now = clock.instant();
