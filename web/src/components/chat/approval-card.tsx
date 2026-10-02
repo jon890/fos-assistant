@@ -59,7 +59,8 @@ export function ApprovalCard({
     setSending(null);
     if (result.ok) return onChanged(result.data);
     setError(result.message);
-    if (result.code === "CONNECTOR_ACTION_NOT_PENDING") onChanged(null);
+    // 실패해도 서버의 줄은 이미 실행 중이거나 끝났을 수 있다. 다시 읽어 지금 상태로 그린다.
+    onChanged(null);
   }
 
   const args = readableArgs(action.argsJson);

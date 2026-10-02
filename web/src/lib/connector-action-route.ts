@@ -128,7 +128,8 @@ function safeAction(value: unknown): ConnectorAction {
         : null,
     status,
     argsJson: nullableText(item.argsJson),
-    resultText: nullableText(item.resultText),
+    // 실행 결과의 본문은 화면이 그리지 않는다. 외부 서비스의 글이라 브라우저로 옮기지 않는다.
+    resultText: null,
     errorCode: nullableText(item.errorCode),
     createdAt: text(item.createdAt),
     expiresAt: nullableText(item.expiresAt),

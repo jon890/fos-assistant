@@ -36,7 +36,14 @@ export function ApprovalList({
     let stale = false;
     void readConnectorActions(conversationId).then((result) => {
       if (stale) return;
-      setLoaded({ conversationId, actions: result.ok ? result.data : [] });
+      // 한 번 못 읽었다고 떠 있던 카드를 치우지 않는다. 같은 대화의 앞선 목록을 그대로 둔다.
+      setLoaded((current) =>
+        result.ok
+          ? { conversationId, actions: result.data }
+          : current?.conversationId === conversationId
+            ? current
+            : { conversationId, actions: [] },
+      );
     });
     return () => {
       stale = true;
