@@ -35,7 +35,7 @@ Java 주석, Python 주석, TypeScript 주석, 워크플로 프롬프트가 문�
 **검사 대상 파일.** `git ls-files` 의 결과에서 고른다. `child_process` 의 `execFileSync("git", ["ls-files"])` 를 쓴다. 디렉터리를 직접 훑으면 `node_modules` 와 빌드 결과를 읽는다.
 
 - 넣는다: 확장자가 `.java`, `.kt`, `.kts`, `.sql`, `.xml`, `.py`, `.ts`, `.tsx`, `.mjs`, `.sh`, `.yml`, `.txt`, `.template` 인 파일과 `docs/` 밖의 `.md`(`AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `hermes/README.md`, `README.md`)
-- 뺀다: `docs/**`, `tasks/**`, 이 테스트 파일 자신, 심볼릭 링크(`CLAUDE.md`, `backend/CLAUDE.md`, `web/CLAUDE.md` 가 `AGENTS.md` 를 가리킨다. `git ls-files -s` 의 모드 `120000` 으로 가린다)
+- 뺀다: `docs/**`, `tasks/**`, 이 테스트 파일 자신, `backend/src/main/resources/db/migration/**`(이미 적용된 마이그레이션은 주석만 바꿔도 Flyway checksum 이 달라져 고치지 않는다. 옛 문서 경로를 적은 주석이 남아 있다), 심볼릭 링크(`CLAUDE.md`, `backend/CLAUDE.md`, `web/CLAUDE.md` 가 `AGENTS.md` 를 가리킨다. `git ls-files -s` 의 모드 `120000` 으로 가린다)
 
 **경로 검사.** 각 파일에서 정규식 `docs/[A-Za-z0-9_./-]+\.md` 로 경로를 찾고, 저장소 root 기준으로 그 파일이 있는지 확인한다.
 `../docs/…` 처럼 앞에 `../` 가 붙은 것도 `docs/` 부터 읽으면 root 기준 경로가 된다.
