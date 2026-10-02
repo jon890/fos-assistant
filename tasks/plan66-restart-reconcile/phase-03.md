@@ -212,3 +212,8 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/chat/application/NextTurnDispatcher.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java` | 수정 |
 | `test/e2e/scenarios/chat-queue.ts` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunRecorder.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/RecoveredRunRecorderTest.java` | 수정 |
+| `backend/config/archunit/store/d3d721a0-86e5-4069-8051-dd3e7adf2c55` | 수정 |
+| `backend/config/checkstyle/baseline.xml` | 수정 |
+| `docs/flow.md` | 수정 |
