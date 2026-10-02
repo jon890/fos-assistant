@@ -1,7 +1,5 @@
 package com.bifos.assistant.usage.application;
 
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.util.List;
@@ -24,7 +22,7 @@ import org.springframework.stereotype.Service;
 public class RootExecutionQuery {
 
     private final AgentExecutionRepository executions;
-    private final ConversationRepository conversations;
+    private final ConversationPublicIds conversations;
 
     /** 가장 최근 루트 실행을 {@code size} 개까지 읽고, 자식 여부와 대화의 공개 식별자를 붙인다. */
     public RootExecutionPage page(Long userId, int size) {
@@ -46,8 +44,7 @@ public class RootExecutionQuery {
         if (ids.isEmpty()) {
             return Map.of();
         }
-        return conversations.findAllById(ids).stream()
-                .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
+        return conversations.publicIdsOf(ids);
     }
 
     /**

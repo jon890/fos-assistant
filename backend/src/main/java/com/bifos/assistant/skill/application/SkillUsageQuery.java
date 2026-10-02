@@ -2,8 +2,6 @@ package com.bifos.assistant.skill.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.SkillUseCount;
 import com.bifos.assistant.skill.domain.SkillUseOccurrence;
@@ -38,7 +36,7 @@ public class SkillUsageQuery {
 
     private final ExecutionSkillUseRepository uses;
     private final AgentRepository agents;
-    private final ConversationRepository conversations;
+    private final ActiveConversationPublicIds conversations;
 
     /** 그 에이전트의 실행 전체에서 센 스킬 이름별 합계다. 횟수는 실행 수다. 누가 불렀는지는 담지 않는다. */
     public Map<String, SkillUsageSummary> byAgent(Long agentId) {
@@ -66,7 +64,7 @@ public class SkillUsageQuery {
                         groups.keySet().stream().map(GroupKey::agentId).filter(Objects::nonNull).toList())
                 .stream()
                 .collect(Collectors.toMap(Agent::id, Function.identity()));
-        Map<Long, UUID> activeConversations = activeConversationPublicIds(
+        Map<Long, UUID> activeConversations = conversations.activePublicIdsOf(
                 groups.values().stream().map(group -> group.lastConversationId).filter(Objects::nonNull).toList());
         List<UserSkillUsage> usages = new ArrayList<>();
         for (Map.Entry<GroupKey, Group> entry : groups.entrySet()) {
@@ -106,16 +104,6 @@ public class SkillUsageQuery {
         Map<Long, List<String>> result = new LinkedHashMap<>();
         names.forEach((executionId, skillNames) -> result.put(executionId, List.copyOf(skillNames)));
         return result;
-    }
-
-    /** 지우지 않은 대화의 공개 식별자만 낸다. 지운 대화는 결과에 없다. */
-    private Map<Long, UUID> activeConversationPublicIds(Collection<Long> conversationIds) {
-        if (conversationIds.isEmpty()) {
-            return Map.of();
-        }
-        return conversations.findAllById(conversationIds).stream()
-                .filter(conversation -> conversation.deletedAt() == null)
-                .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
     }
 
     private record GroupKey(Long agentId, String skillName) {
