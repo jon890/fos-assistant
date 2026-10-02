@@ -1,67 +1,80 @@
-# Phase 05. 컨트롤러의 트랜잭션을 application 서비스로 옮긴다
+# Phase 05. 서비스의 Instant.now() 를 주입받은 Clock 으로 바꾼다
 
 **Execution profile**: standard
 
 ## 목표
 
-`AgentAdminController` 와 `AgentToolController` 의 `@Transactional` 메서드 넷의 본문을 `agent.application` 의 서비스로 옮긴다.
-트랜잭션 경계는 유스케이스를 아는 층이 정한다. `TRANSACTIONAL_ONLY_IN_APPLICATION` 의 기준에서 컨트롤러 줄 넷이 빠지고,
-두 컨트롤러가 저장소를 바로 쓰던 `LAYER_DIRECTION` 의 줄도 함께 빠진다.
+`application` 과 `infra` 의 클래스가 `Instant.now()` 를 직접 부르는 자리를 주입받은 `java.time.Clock` 으로 바꾼다.
+시각을 주입받아야 테스트가 시각을 고정할 수 있다. `NO_DIRECT_INSTANT_NOW` 의 기준에서 서비스 쪽 줄이 빠진다.
 
-**범위 외**: 저장소의 `@Transactional` 과 `UserProvisioningService`. 다음 phase 가 맡는다. 다른 컨트롤러.
+**범위 외**: `*.domain` 의 엔티티가 부르는 `Instant.now()`. 다음 phase 가 맡는다. 이 phase 가 끝나도 기준 파일은 0 줄이 아니다.
 
 ## 컨텍스트
 
 - 먼저 `tasks/plan66-archunit-easy-rules/README.md` 를 읽는다.
-- `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentAdminController.java` 의 `create`, `update` 와
-  `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentToolController.java` 의 `write`, `writeAdmin` 이 대상이다.
-- `application` 은 `presentation` 의 타입(`AgentDtos`)을 쓰지 못한다. 서비스는 값을 풀어서 받거나 `application` 의 record 로 받는다.
-- 층 방향은 `docs/backend/packages.md` 가 갖는다. `backend/AGENTS.md` 의 「데이터 클래스는 컨트롤러 안에 두지 않는다」 도 읽는다. `application` 은 타입 하나에 파일 하나다.
+- `Clock` 빈은 `backend/src/main/java/com/bifos/assistant/shared/config/ClockConfig.java` 가 `Clock.systemUTC()` 로 준다.
+- 본보기: `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunRecorder.java` 가 `private final Clock clock;` 을 받고 `clock.instant()` 를 쓴다.
+- 규칙은 `Instant.now()` 만 막고 `Instant.now(Clock)` 과 `clock.instant()` 는 허용한다.
 
-**근거 문서**: `docs/backend/packages.md` 의 「backend 패키지」, `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md`
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
 ## 의도 메모
 
-- **검사 순서와 오류 응답이 그대로여야 한다.** 관리자 확인이 가장 먼저이고, 그 뒤의 검사 순서(코드 중복, 주인, 닿는지 확인, 그룹 안전, 흐름 이름)를 옮긴 메서드에서도 지킨다.
-- 잠금 조회(`findByCodeForUpdate`, `requireReadableForUpdate`)와 저장이 지금처럼 한 트랜잭션 안에 있어야 한다.
-- 닿는지 확인(`AgentEndpointProbe.requireReachable`)은 지금도 트랜잭션 안에서 돈다. 밖으로 빼지 않는다. 빼면 동작이 바뀐다.
-- 컨트롤러에는 경로, 관리자 확인, 요청을 풀어 넘기는 것, 응답 변환만 남긴다.
+- `Clock.systemUTC().instant()` 는 `Instant.now()` 와 같은 값을 준다. 운영 동작은 그대로다.
+- 정적 시계 보관 클래스를 만들지 않는다. 규칙만 통과하고 테스트가 시각을 고정하지 못한다.
+- 생성자 주입은 Lombok `@RequiredArgsConstructor` 를 그대로 쓴다. 손으로 쓴 생성자가 있는 클래스는 그 생성자에 인자를 더한다.
 
 ## 작업 항목
 
-### 1. `agent/application/AgentAdminService.java` 신규
+### 1. 아래 클래스의 `Instant.now()` 를 `clock.instant()` 로 바꾼다
 
-`@Service`, `@RequiredArgsConstructor`. `AgentRepository`, `AppUserRepository`, `AgentLifecycleService`, `AgentEndpointProbe`, `FlowRegistry`, `Clock` 을 받는다.
+`backend/src/main/java/com/bifos/assistant/` 아래다. `Clock` 필드가 없으면 더한다. `ChatService` 와 `ExecutionRecorder` 는 이미 갖고 있다.
 
-- `@Transactional public Agent create(AgentCreateCommand command)` — `AgentAdminController.create` 의 `currentUser.requireAdmin()` 뒤 본문 전체
-- `@Transactional public Agent update(String code, AgentUpdateCommand command)` — `update` 의 `requireAdmin()` 뒤 본문 전체
-- `@Transactional(readOnly = true) public List<Agent> list()` — 지우지 않은 에이전트 목록
-- 컨트롤러의 private 보조 메서드 `requireKnownFlow`, `effectiveApiBaseUrl`, `stripTrailingSlash`, `requireAgentForUpdate`, `ownerId` 를 Javadoc 과 함께 옮긴다
+| 파일 | 자리 |
+| --- | --- |
+| `chat/application/ChatService.java` | 여섯 곳. turn 시작 시각 둘, `touchSession` 둘, `renameIfActive`, `deleteIfActive` |
+| `chat/application/AttachmentService.java` | `upload` 와 `deleteByUser` |
+| `chat/application/ArtifactCleaner.java` | `runScheduled` |
+| `chat/application/AttachmentCleaner.java` | `runScheduled` |
+| `usage/application/ExecutionRecorder.java` | 다섯 곳 |
+| `usage/application/ExecutionEventRecorder.java` | 두 곳 |
+| `skill/application/SkillUseRecorder.java` | `record` |
+| `skill/infra/SkillStore.java` | `newVersionName`. 생성자 인자로 `Clock` 을 받고 `newVersionName` 을 인스턴스 메서드로 바꿔 `clock.millis()` 를 쓴다. 공개 메서드의 시그니처는 바꾸지 않는다 |
+| `agent/application/AgentLifecycleService.java` | `delete` |
+| `mcp/application/McpToolService.java` | `markDeliveredIfFinished` |
+| `orchestration/application/ResearchAndBuildFlow.java` | 두 곳 |
+| `orchestration/application/AgentDelegationService.java` | `delegate` |
 
-`list` 는 지금 트랜잭션 없이 `findAll` 을 부른다. `readOnly` 트랜잭션을 더해도 응답이 같으면 그대로 두고, 테스트가 달라지면 `@Transactional` 을 뺀다.
+### 2. `LAYER_DIRECTION` 을 다시 얼린다
 
-### 2. `agent/application/AgentCreateCommand.java`, `agent/application/AgentUpdateCommand.java` 신규
+`SkillStore` 의 생성자 시그니처가 바뀌어 `backend/config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5` 의 `SkillStore.<init>` 줄이 글자만 달라진다.
+기준을 줄이는 명령이 그 줄을 새 위반으로 잡아 실패하면 아래로 그 규칙만 다시 얼린다.
 
-`AgentDtos.CreateAgentRequest` 와 `AgentDtos.UpdateAgentRequest` 의 칸을 그대로 가진 record 다. 칸 이름과 타입은 `AgentDtos.java` 에서 읽는다. 검증 애너테이션은 요청 DTO 에 남기고 여기에는 달지 않는다.
+```bash
+# cwd: backend/
+./gradlew archTest --rerun --tests '*ArchitectureRulesTest.layerDirection' -Parchunit.freeze.refreeze=true -Parchunit.freeze.store.default.allowStoreUpdate=true
+```
 
-### 3. `agent/application/AgentToolService.java` 에 메서드 추가
+다시 얼리면 줄 끝의 `in (파일:줄번호)` 도 지금 값으로 다시 적혀 `SkillStore` 의 줄이 여럿 달라진다. 그래서 줄 끝을 떼고 견준다.
 
-- `@Transactional public ToolsetsView writeReadable(CurrentUser user, String code, List<String> enabled)` — `agents.requireReadableForUpdate(user, code)` 뒤 `write`
-- `@Transactional public ToolsetsView writeAsAdmin(CurrentUser user, String code, List<String> enabled)` — 컨트롤러의 `requireAgentForUpdate(code)` 뒤 `write`
-- `public ToolsetsView readAsAdmin(CurrentUser user, String code)` — 컨트롤러의 `requireAgent(code)` 뒤 `read`
+```bash
+# cwd: backend/
+F=config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5
+diff <(git show "HEAD:backend/$F" | sed 's/ in (.*)$//' | sort) <(sed 's/ in (.*)$//' "$F" | sort)
+```
 
-같은 클래스 안의 `write` 를 부르는 것은 프록시를 거치지 않아도 된다. `write` 에는 `@Transactional` 이 없다.
-`AgentService` 를 주입해 빈 순환이 생기면 이 셋을 새 클래스 `agent/application/AgentToolAccessService.java` 에 둔다.
+다시 얼리기 전과 뒤의 `wc -l` 이 같아야 하고, 위 `diff` 의 차이가 `SkillStore.<init>` 줄의 인자 목록뿐이어야 한다. 다른 줄이 더해졌으면 기준 파일을 `git checkout` 하지 말고 team-lead 에게 보고한다.
 
-### 4. 두 컨트롤러의 변경
+### 2-1. 이 클래스들을 손으로 만드는 테스트를 고친다
 
-`@Transactional` 과 저장소 필드를 지우고 서비스를 부른다. `currentUser.requireAdmin()` 과 `currentUser.require()` 는 컨트롤러에 남기고 서비스 호출보다 먼저 부른다.
+`backend/src/test/java` 에서 위 클래스를 `new` 로 만드는 테스트에 `Clock.systemUTC()` 나 그 테스트가 이미 가진 시계를 넘긴다.
+`git grep -n "new SkillStore(\|new AttachmentService(\|new ArtifactCleaner(\|new AttachmentCleaner(\|new ExecutionEventRecorder(\|new SkillUseRecorder(\|new AgentLifecycleService(\|new McpToolService(\|new ResearchAndBuildFlow(\|new AgentDelegationService(" -- backend/src/test` 로 찾는다.
 
-### 5. 이 phase 를 검증하는 테스트
+### 3. 이 phase 를 검증하는 테스트
 
-- `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` 는 컨트롤러를 `new` 로 만든다. `AgentAdminService` 를 만들어 넘기도록 고치고 단언은 바꾸지 않는다.
-- `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleFlagsTest.java` 가 컴파일되고 통과하게 고친다.
-- `backend/src/test/java/com/bifos/assistant/agent/AgentAdminServiceTest.java` 를 새로 만든다. 정상: 그룹 공개 에이전트를 만들면 저장된 에이전트를 돌려준다. 실패: 이미 쓰는 코드면 `ApiException` 의 `ErrorCode.VALIDATION_FAILED` 이고 `AgentEndpointProbe.requireReachable` 을 부르지 않는다.
+`backend/src/test/java/com/bifos/assistant/chat/AttachmentCleanerClockTest.java` 를 새로 만든다.
+고정한 `Clock` 을 준 `AttachmentCleaner.runScheduled()` 가 그 시각보다 앞서 만료된 첨부만 지우고, 그 시각 뒤에 만료되는 첨부는 남긴다는 것을 단언한다.
+준비 방식은 `backend/src/test/java/com/bifos/assistant/chat/AttachmentCleanerTest.java` 를 따른다.
 
 ## 검증
 
@@ -69,28 +82,29 @@
 # cwd: backend/
 ./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
 ./gradlew test
-! grep -n "presentation" config/archunit/store/54473729-2b30-4508-9d02-64e810d6f34b
-! grep -n "AgentAdminController\|AgentToolController" config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5
+! grep -n "application\.\|infra\." config/archunit/store/d3d721a0-86e5-4069-8051-dd3e7adf2c55
+! grep -rn "Instant\.now()" src/main/java --include='*.java' | grep -v "/domain/"
 ```
 
-```bash
-# cwd: 저장소 root
-node test/e2e/run.ts
-```
-
-모두 종료 코드 0 이어야 한다.
+모두 종료 코드 0 이어야 한다. 기준 파일에는 `domain` 의 줄만 남는다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/java/com/bifos/assistant/agent/application/AgentAdminService.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/agent/application/AgentCreateCommand.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/agent/application/AgentUpdateCommand.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentAdminController.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/agent/presentation/AgentToolController.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/agent/AgentAdminServiceTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleFlagsTest.java` | 수정 |
-| `backend/config/archunit/store/*` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/AttachmentService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ArtifactCleaner.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/AttachmentCleaner.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionEventRecorder.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/application/SkillUseRecorder.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/infra/SkillStore.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/agent/application/AgentLifecycleService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/ResearchAndBuildFlow.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/AgentDelegationService.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/AttachmentCleanerClockTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
+| `backend/config/archunit/store/d3d721a0-86e5-4069-8051-dd3e7adf2c55` | 수정 |
+| `backend/config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5` | 수정 |

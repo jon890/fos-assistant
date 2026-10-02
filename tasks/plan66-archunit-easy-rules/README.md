@@ -7,10 +7,11 @@ GitHub 이슈 66 의 첫 묶음이다.
 | --- | --- | --- | --- |
 | 1 | `MESSAGE_DIGEST_ONLY_IN_SHA256` | `d3f00600-4e52-412f-ab23-2abb80f9eefd` | 3 |
 | 2 | `CONFIGURATION_PROPERTIES_ARE_VALIDATED` | `f875bef7-581f-41c7-8e85-cf4b3d36f833` | 14 |
-| 3, 4 | `NO_DIRECT_INSTANT_NOW` | `d3d721a0-86e5-4069-8051-dd3e7adf2c55` | 36 |
-| 5, 6 | `TRANSACTIONAL_ONLY_IN_APPLICATION` | `54473729-2b30-4508-9d02-64e810d6f34b` | 14 |
+| 3, 4 | `TRANSACTIONAL_ONLY_IN_APPLICATION` | `54473729-2b30-4508-9d02-64e810d6f34b` | 14 |
+| 5, 6 | `NO_DIRECT_INSTANT_NOW` | `d3d721a0-86e5-4069-8051-dd3e7adf2c55` | 36 |
 
 phase 는 번호 순서로 실행한다. 3 과 4, 5 와 6 은 같은 기준 파일을 줄인다.
+트랜잭션을 먼저 옮기는 까닭은 뒤의 phase 가 `Clock` 을 더할 클래스가 그때는 모두 `application` 에 있어 다른 규칙의 기준 줄이 달라지지 않기 때문이다.
 
 ## 모든 phase 에 걸리는 규칙
 

@@ -57,7 +57,7 @@ null 이나 빈 문자열이면 null 을 돌려주는 앞부분은 그대로 두
 ./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
 ./gradlew test
 test "$(wc -l < config/archunit/store/d3f00600-4e52-412f-ab23-2abb80f9eefd)" -eq 0
-! grep -rn "MessageDigest" src/main/java --include='*.java' | grep -v "shared/util/Sha256.java"
+! grep -rn "MessageDigest\.getInstance" src/main/java --include='*.java' | grep -v "shared/util/Sha256.java"
 ```
 
 모두 종료 코드 0 이어야 한다.
