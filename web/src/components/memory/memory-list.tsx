@@ -35,10 +35,13 @@ export function MemoryList({
   initialMemories,
   isAdmin,
   currentUserId,
+  after,
 }: {
   initialMemories: Memory[];
   isAdmin: boolean;
   currentUserId?: number;
+  /** 기억 절 뒤에 이어 그릴 절이다. 문서와 외부 서비스 연결이 들어온다. */
+  after?: React.ReactNode;
 }) {
   const [memories, setMemories] = useState(initialMemories);
   /** 화면을 처음 그릴 때 있던 기억들이다. 여기 없는 줄만 새 줄로 보고 등장 움직임을 준다 */
@@ -116,6 +119,7 @@ export function MemoryList({
           </p>
         )}
       </Section>
+      {after}
     </div>
   );
 }
