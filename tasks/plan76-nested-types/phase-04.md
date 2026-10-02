@@ -15,7 +15,7 @@
 - `application` 과 `domain` 은 타입 하나에 파일 하나다(`backend/AGENTS.md`).
 - **동작을 바꾸지 않는다.** 타입의 칸과 메서드 본문은 그대로다. 바뀌는 것은 타입이 놓인 파일과 이름, 그리고 바깥 클래스가 쓰던 멤버의 접근 수준뿐이다. `ArchitectureRules.java` 를 고치지 않는다.
 - 최상위 패키지 사이에 새 간선을 만들지 않는다. 타입은 지금 바깥 클래스와 같은 패키지에 둔다. `TOP_LEVEL_PACKAGES_FREE_OF_CYCLES` 와 `TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER` 와 `LAYER_DIRECTION` 의 기준은 0 줄이고 그대로여야 한다.
-- 포맷은 이 phase 에서 돌리지 않는다. 이 phase 커밋 뒤 team-lead 가 `./gradlew spotlessApply` 결과를 별도 커밋으로 낸다. import 순서를 손으로 정렬하지 않는다. BSD `sed` 는 `\b` 를 모른다. 여러 파일의 이름을 바꿀 때는 `perl -pi -e` 를 쓴다.
+- 포맷은 이 phase 에서 돌리지 않는다. 이 phase 커밋 뒤 team-lead 가 `./gradlew spotlessApply` 결과를 별도 커밋으로 낸다. import 순서를 손으로 정렬하지 않는다. 쓰지 않게 된 import 는 이 phase 에서 지운다. checkstyle 의 `UnusedImports` 가 error 다. BSD `sed` 는 `\b` 를 모른다. 여러 파일의 이름을 바꿀 때는 `perl -pi -e` 를 쓴다.
 - 주석과 Javadoc 은 한국어로 쓴다. 테스트 메서드는 영문 camelCase 이름과 한국어 `@DisplayName` 을 갖는다. `gradlew` 는 `backend/` 안에 있다.
 - 바깥에서 쓰는 운영 코드는 `orchestration/application/ResearchAndBuildFlow.java` 다. 테스트는 `usage/FailedExecutionUsageRoutesTest.java`, `orchestration/AgentRunnerSubmitFailureTest.java`, `orchestration/AgentRunnerConnectorContextTest.java` 다.
 - 이 phase 뒤 `backend/config/archunit/store/` 의 기준 파일은 모두 0 줄이다.
@@ -45,7 +45,10 @@
 ### 3. 이 phase 를 검증하는 테스트
 
 - 타입 이름만 바뀌는 기존 테스트 셋은 이름만 고치고 단언은 바꾸지 않는다. `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerSubmitFailureTest.java` 가 제출이 실패한 실행의 결과(실패 경로)를, `backend/src/test/java/com/bifos/assistant/orchestration/AgentRunnerConnectorContextTest.java` 가 정상 실행의 결과를 이 record 로 단언한다
-- 문서를 고친다. `backend/AGENTS.md` 의 「품질 검사」 에서 「**기준 파일에 든 위반은 허용이 아니라 줄여 갈 목록이다.** 기준마다 연 GitHub 이슈가 있다.」 다음에 「구조 규칙의 기준은 지금 모두 비어 있다. 파일은 새 위반을 받아들여야 할 때를 위해 남긴다.」 를 더한다. `docs/backend/quality.md` 의 「구조 규칙의 기준 파일」 첫 문단에도 같은 뜻의 한 줄을 더한다. 고친 문서에 `한국어 문체 검사기 <파일>` 을 돌려 종료 코드 0 인지 본다
+- 문서를 고친다. 두 곳에 같은 두 문장을 새 줄로 더한다. 문장은 「지금은 구조 규칙의 위반을 모두 고쳐 기준 파일이 비어 있다. 파일은 새 위반을 받아들여야 할 때를 위해 남긴다.」 다
+  - `backend/AGENTS.md` 의 「기준마다 연 GitHub 이슈가 있다. 「구조 규칙」 과 「코드 규칙」 의 기준 파일이 모두 그렇다.」 줄 바로 다음
+  - `docs/backend/quality.md` 의 「구조 규칙의 기준 파일」 에서 「기준마다 연 GitHub 이슈가 있다. 위반을 고치면 그 기준 파일도 같은 커밋에서 줄인다.」 줄 바로 다음
+- 문서의 한국어 문체 검사는 이 phase 에서 돌리지 않는다. 통합 검증에서 team-lead 가 돌린다
 
 ### 4. 기준 파일을 줄인다
 
