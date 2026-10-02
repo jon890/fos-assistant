@@ -15,9 +15,11 @@
 - 사용자 토큰은 `context.tokens.dad`, `context.tokens.kid`, `context.tokens.aunt` 다. 들이기는 웹 JWT 만 보므로 허용 목록과 관계없이 dad 로 부른다
 - e2e 만 Flyway 를 지난다. phase 02 가 더한 유일 제약 `uk_memory_user_source` 가 실제로 붙는 곳이 e2e 다
 - 문서가 지금 적고 있는 것
-  - `docs/code-architecture.md`: 패키지 표의 `memory` 줄, 「Memory」 절과 그 클래스 표, 「다음」 목록의 「다른 곳의 개인 지식을 들여오는 API. 사람이 승인한 항목만 들이고 같은 출처를 두 번 들이지 않는다」, 화면 표의 `/memory` 줄
-  - `docs/data-schema.md`: 「memory」 의 `source_type`, `source_ref`, `source_date` 줄. `source_ref` 가 「출처를 가리키는 값. 다른 항목이면 `memory:<번호>`」 로 적혀 있다
-  - `docs/flow.md`: 「Memory 본문을 읽는 길」 아래에 「Memory 를 고치고 지울 때」 가 있다
+  - `docs/backend/packages.md`: 패키지 표의 `memory` 줄
+  - `docs/backend/memory.md`: 「범위와 조립」 절과 그 클래스 표. 「Memory 본문을 읽는 길」 아래에 「Memory 를 고치고 지울 때」 가 있다
+  - `docs/code-architecture.md`: 「Memory 에서 아직 만들지 않은 것」 목록의 「다른 곳의 개인 지식을 들여오는 API. 사람이 승인한 항목만 들이고 같은 출처를 두 번 들이지 않는다」
+  - `docs/frontend/structure.md`: 화면 표의 `/memory` 줄
+  - `docs/backend/schema/memory.md`: 「memory」 의 `source_type`, `source_ref`, `source_date` 줄. `source_ref` 가 「출처를 가리키는 값. 다른 항목이면 `memory:<번호>`」 로 적혀 있다
   - `web/AGENTS.md` 의 「화면 문구」 표
   - `docs/adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md` 의 `status` 가 「아직 구현 전이다」 로 적혀 있다
 
@@ -47,28 +49,28 @@
 
 `test/e2e/run.ts` 에 import 하고 `SCENARIOS` 의 `memoryDocumentScenario` 바로 뒤에 넣는다. 대화 turn 을 돌리지 않고 항목을 지우고 끝나므로 뒤 시나리오의 Memory 주입과 사용량에 걸리지 않는다. 돌려 보아 뒤 시나리오가 실패하면, 실패한 단언이 무엇을 세는지 읽고 자리를 옮긴 뒤 까닭을 배열의 주석으로 남긴다.
 
-### 2. `docs/code-architecture.md`
+### 2. `docs/backend/packages.md`, `docs/backend/memory.md`, `docs/code-architecture.md`, `docs/frontend/structure.md`
 
-- 패키지 표의 `memory` 줄에 「기존 개인 지식의 들이기」 를 더한다
-- 「Memory」 절에 아래 뜻을 더한다. 문장은 그 절의 문체에 맞춘다
+- `docs/backend/packages.md` 의 패키지 표 `memory` 줄에 「기존 개인 지식의 들이기」 를 더한다
+- `docs/backend/memory.md` 의 「범위와 조립」 절에 아래 뜻을 더한다. 문장은 그 절의 문체에 맞춘다
   - 기존 개인 지식은 주인이 검토한 묶음을 `/memory` 화면에서 올려 들인다. `POST /api/v1/memory-imports/preview` 는 대조만 하고 `POST /api/v1/memory-imports` 가 `NEW` 인 항목만 한 트랜잭션으로 저장한다
   - 들인 줄은 요청자가 주인인 `USER` 범위의 `ACCEPTED` 이고 `source_type` 이 `brain` 이다. 같은 `source_ref` 는 `DUPLICATE`, 같은 문서 이름이나 같은 제목은 `CONFLICT` 로 답하고 저장하지 않는다
   - 쓰는 길은 웹 JWT 뿐이다. 서비스 토큰은 읽기만 한다
   - 묶음을 만드는 스크립트는 `scripts/brain-import/` 에 있고 주인의 기기에서 돈다. 어디에도 저장하지 않는다
-- 클래스 표에 `memory.application.MemoryImportService`, `memory.presentation.MemoryImportController` 를 더한다
-- 「다음」 목록에서 「다른 곳의 개인 지식을 들여오는 API. …」 줄을 「신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다」 로 바꾼다
-- 화면 표의 `/memory` 줄에 「기존 기록 가져오기」 를 더한다
-- 근거 줄에 ADR-058 링크를 더한다
+- 같은 절의 클래스 표에 `memory.application.MemoryImportService`, `memory.presentation.MemoryImportController` 를 더한다
+- `docs/code-architecture.md` 의 「Memory 에서 아직 만들지 않은 것」 목록에서 「다른 곳의 개인 지식을 들여오는 API. …」 줄을 「신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다」 로 바꾼다
+- `docs/frontend/structure.md` 의 화면 표 `/memory` 줄에 「기존 기록 가져오기」 를 더한다
+- `docs/backend/memory.md` 「범위와 조립」 의 근거 줄에 ADR-058 링크를 더한다
 
-### 3. `docs/data-schema.md`
+### 3. `docs/backend/schema/memory.md`
 
 - 「memory」 의 `source_type` 줄에 「기존 개인 지식에서 들인 줄은 `brain` 이다」 를, `source_ref` 줄에 「들인 줄은 `<namespace>/<저장소 안의 경로>` 다」 를 더한다
 - 그 절의 제약을 적은 자리에 `uk_memory_user_source`(`owner_user_id`, `source_type`, `source_ref`)를 더한다. 출처가 없는 줄은 걸리지 않는다고 적는다
 - 근거에 ADR-058 을 더한다
 
-### 4. `docs/flow.md`
+### 4. `docs/backend/memory.md` 의 흐름
 
-「Memory 를 고치고 지울 때」 뒤에 「### 기존 개인 지식을 들일 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 주인, 주인의 기기, 웹, Control Plane, 데이터베이스. 분석기의 보고서, 결정 파일 고치기, 묶기, 화면에 올리기, 미리보기, 확인, 저장)와 「갈리는 지점」 표를 둔다. 표의 줄은 ADR-058 의 「항목의 결과」 표와 요청 전체를 거절하는 세 경우(`VALIDATION_FAILED`, `MEMORY_ENCRYPTION_UNAVAILABLE`, `MEMORY_IMPORT_RETRY`)다.
+`docs/backend/memory.md` 의 「Memory 를 고치고 지울 때」 뒤에 「### 기존 개인 지식을 들일 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 주인, 주인의 기기, 웹, Control Plane, 데이터베이스. 분석기의 보고서, 결정 파일 고치기, 묶기, 화면에 올리기, 미리보기, 확인, 저장)와 「들이기가 갈리는 지점」 표를 둔다. 한 문서 안에 같은 헤딩을 둘 두지 않는다. 표의 줄은 ADR-058 의 「항목의 결과」 표와 요청 전체를 거절하는 세 경우(`VALIDATION_FAILED`, `MEMORY_ENCRYPTION_UNAVAILABLE`, `MEMORY_IMPORT_RETRY`)다.
 
 ### 5. `web/AGENTS.md`
 
@@ -87,8 +89,8 @@
 node test/e2e/run.ts
 node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
-grep -n "uk_memory_user_source" docs/data-schema.md
-grep -n "ADR-058" docs/code-architecture.md docs/flow.md
+grep -n "uk_memory_user_source" docs/backend/schema/memory.md
+grep -n "ADR-058" docs/backend/memory.md
 ! grep -n "다른 곳의 개인 지식을 들여오는 API" docs/code-architecture.md
 ```
 
@@ -102,8 +104,10 @@ grep -n "ADR-058" docs/code-architecture.md docs/flow.md
 | `test/e2e/run.ts` | 수정 |
 | `test/e2e/scenarios/memory-import.ts` | 신규 |
 | `docs/code-architecture.md` | 수정 |
-| `docs/data-schema.md` | 수정 |
-| `docs/flow.md` | 수정 |
+| `docs/backend/packages.md` | 수정 |
+| `docs/backend/memory.md` | 수정 |
+| `docs/backend/schema/memory.md` | 수정 |
+| `docs/frontend/structure.md` | 수정 |
 | `web/AGENTS.md` | 수정 |
 | `docs/adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md` | 수정 |
 | `docs/adr/INDEX.md` | 수정 |

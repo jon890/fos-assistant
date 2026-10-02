@@ -6,8 +6,8 @@ import java.util.List;
  * Hermes 대시보드의 스킬 경로를 부른다.
  *
  * <p>인터페이스로 둔 것은 실제 Hermes 없이 Control Plane 을 검사하기 위해서다. 무엇을 부르는지는
- * {@code docs/hermes/profiles.md} 의 「Control Plane 이 부르는 대시보드 plugin 경로」가 갖는다. 게시할
- * 경로와 도구 목록을 정하는 일은 {@code SkillPublisher} 가 안다.
+ * {@code hermes/README.md} 의 「dashboard-profile-api 가 여는 것」이 갖는다. 게시할 경로와 도구 목록을
+ * 정하는 일은 {@code SkillPublisher} 가 안다.
  */
 public interface HermesSkillClient {
 

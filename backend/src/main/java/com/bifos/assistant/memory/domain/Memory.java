@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * Memory 한 줄이다. 칸의 뜻은 {@code docs/data-schema.md} 의 「memory」 가 갖는다(ADR-052).
+ * Memory 한 줄이다. 칸의 뜻은 {@code docs/backend/schema/memory.md} 의 「memory」 가 갖는다(ADR-052).
  *
  * <p>{@code alwaysInject} 는 {@code retrieval} 로 옮겨 가는 옛 칸이다. 한 배포 동안 남기고 쓸 때마다 {@code retrieval}
  * 과 맞춘다. 읽을 때는 {@code retrieval} 만 본다.

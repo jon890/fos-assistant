@@ -1,7 +1,5 @@
 # Runs API
 
-## Runs API
-
 우리가 쓰는 것은 Runs API 다.
 
 | 메서드와 경로 | 쓰임 |
@@ -12,8 +10,6 @@
 | `POST /v1/runs/{run_id}/stop` | 실행 중단 |
 | `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 우리는 아직 부르지 않는다 |
 
-MVP 는 제출과 조회만 쓴다.
-
 **실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단만 쓴다.
 끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
 응답 중에 사용자가 보낸 메시지도 그 turn 이 끝난 뒤 새 실행으로 보낸다([ADR-048](../adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)).
@@ -22,7 +18,7 @@ MVP 는 제출과 조회만 쓴다.
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
 Control Plane 이 Memory 를 주입하는 자리가 여기다.
 
-### 도는 실행에 지시를 더하는 `steer`
+## 도는 실행에 지시를 더하는 `steer`
 
 **이 문서는 2026-10-01 까지 「도는 실행에 메시지를 끼워 넣는 경로는 없다」 고 적었다. 틀린 기술이었다.**
 v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 있다.
@@ -50,7 +46,7 @@ v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 �
 `steer` 를 쓰기 전에 운영 Hermes 에서 `steer` 와 `pending_steer` 의 왕복을 확인한다.
 가짜 Hermes 에는 이 경로가 없다.
 
-### `/v1/runs` 는 이미지를 받지 않는다
+## `/v1/runs` 는 이미지를 받지 않는다
 
 v0.21.3 에서 확인했다. `content` 에 이미지를 담은 항목을 해석하는 자리가 경로마다 다르다.
 
@@ -72,13 +68,13 @@ v0.21.3 에서 확인했다. `content` 에 이미지를 담은 항목을 해석�
 **그래서 사진을 대화 본문에 실어 보내는 길이 없다.**
 Control Plane 은 `/v1/runs` 를 쓰고, 그것을 버리면 `run_id` 와 사건 스트림과 실행 기록을 함께 버린다.
 
-### 이미지 파일은 `vision_analyze` 로 본다
+## 이미지 파일은 `vision_analyze` 로 본다
 
 `read_file` 이 이미지 확장자를 만나면 내용을 돌려주지 않고 `vision_analyze` 를 쓰라는 안내를 낸다.
 에이전트가 사진을 보는 길은 대화 본문이 아니라 이 도구다.
 그러므로 사진을 에이전트가 닿는 자리에 놓아 두면 모델이 그것을 읽는다.
 
-### 모델은 실행마다 정한다
+## 모델은 실행마다 정한다
 
 `POST /v1/runs` 는 요청 본문의 `provider` 와 `model` 을 그 실행에만 적용한다.
 profile 의 `config.yaml` 이 정한 것은 기본값일 뿐이다.
@@ -101,7 +97,7 @@ Control Plane 은 사용자가 대화에서 모델을 고르지 않았으면 두
 근거는 [v0.21.3 `gateway/platforms/api_server.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server.py) 의 `_request_reasoning_config`, `_request_agent_overrides` 와
 [v0.21.3 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/gateway/platforms/api_server_runs.py) 가 그것을 넘기는 자리다. v0.21.5 에서도 같다.
 
-### 조회 응답의 `model` 은 실제로 돈 모델이 아니다
+## 조회 응답의 `model` 은 실제로 돈 모델이 아니다
 
 아래는 v0.21.0 과 v0.21.3 의 계약이다.
 v0.21.5 에서 추가한 실제 실행 `runtime` 과의 차이는 [「Runs 응답과 사건의 버전 차이」](upgrades.md#runs-응답과-사건의-버전-차이) 에 있다.
@@ -117,13 +113,14 @@ fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 - `GET /api/sessions/{session_id}` 는 행을 `{"object": "session", "session": {...}}` 로 감싸고, `model` 은 `session` 안에 있다. provider 칸은 응답에 없다. Hermes 저장소에는 `billing_provider` 로 남는다
 - `GET /v1/runs/{run_id}` 는 끝난 실행에 `runtime: {"provider", "model", "route_source"}` 를 싣는다. fallback 으로 넘어간 경우도 실제로 돈 값이다. 근거는 [v0.21.5 `gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_served_runtime` 과 `api_server.py` 의 `_sanitize_runtime_metadata` 다
 
-그래서 Control Plane 은 실행 기록의 provider 와 모델을 세션 조회, 실행의 `runtime`, 대화가 고른 값 순서로 먼저 있는 것에서 읽는다. provider 는 보통 `runtime` 에서 온다.
+그래서 Control Plane 은 실행의 `runtime` 에 provider 와 모델이 둘 다 있으면 그 짝을 실행 기록에 적는다.
+둘 중 하나라도 없으면 세션 조회, 실행의 `runtime`, 대화가 고른 값 순서로 먼저 있는 것을 칸마다 따로 채운다.
 처음에는 세션 응답을 감싸지 않은 모양으로 읽어, 모델을 보내지 않은 실행의 provider, 모델, 금액이 비었다.
 
 `POST /api/sessions/{id}/chat` 은 응답에 `runtime` 을 담아 요청한 것과 실제로 돈 것을
 한 응답에서 대조할 수 있다. v0.21.3 까지는 그 블록이 `/v1/runs` 에 없었다. v0.21.5 는 아래처럼 실행 조회에도 싣는다.
 
-#### 그 칸이 어디서 오는가
+### 그 칸이 어디서 오는가
 
 `gateway/platforms/api_server.py` 의 `_resolve_model_name` 이 정하고,
 그 결과를 platform 을 만들 때 한 번 담는다. 요청마다 다시 정하지 않는다.
@@ -146,7 +143,7 @@ fallback 으로 넘어간 뒤의 모델까지 그쪽에 들어 있다.
 platform 을 만들 때 listener 주인의 범위에서 한 번 정해지기 때문이다.
 주인에게 `API_SERVER_MODEL_NAME` 이 없으면 셋째 단계인 `hermes-agent` 가 나온다.
 
-#### 경로마다 다르다
+### 경로마다 다르다
 
 세 경로가 같은 값을 주지 않는다.
 
@@ -180,7 +177,7 @@ model_name = (
 
 실제 모델을 알아야 하면 `/api/model/options` 가 그 profile 의 것을 답한다.
 
-### `/api/model/options` 는 provider 와 모델 목록을 함께 준다
+## `/api/model/options` 는 provider 와 모델 목록을 함께 준다
 
 2026-09-24 에 `openai-codex` 를 쓰는 profile 두 곳에서 불러 확인했다.
 두 응답의 모양이 같았다.
@@ -233,67 +230,7 @@ API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 
 대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
 둘 다 provider 별 모델 목록이 아니다.
 
-### 승인 방식 `smart` 는 추론 모델에서 `manual` 과 같아진다
-
-`approvals.mode` 가 `smart` 이면 위험한 모양으로 분류된 명령마다
-보조 LLM 에 한 번 물어 `APPROVE`, `DENY`, `ESCALATE` 가운데 하나를 받는다.
-`tools/approval.py` 의 `_smart_approve` 가 그 호출을 갖는다.
-
-**그 호출이 `max_tokens=16` 으로 걸려 있다.**
-받은 내용을 대문자로 바꿔 세 낱말과 정확히 비교하고, 어느 것과도 맞지 않으면 `escalate` 로 읽는다.
-
-추론 모델은 답을 내기 전에 생각을 먼저 내보낸다.
-그 문장이 16 토큰을 넘으면 거기서 잘리고, 잘린 문장은 세 낱말 어느 것과도 맞지 않는다.
-**그래서 모든 판정이 `escalate` 가 된다.**
-
-`nvidia/nemotron-3-super-120b-a12b` 로 실측했다. 받은 내용이 이것이다.
-
-```text
-We need to decide: The user gave a command: python3 -c print
-```
-
-위험한 모양으로 분류된 명령 여덟 가지를 넣어 모두 `escalate` 를 받았다.
-`python3 -c "print(1+1)"` 처럼 무해한 것도, `curl ... | sh` 처럼 실제로 위험한 것도 같았다.
-요청이 모델을 OpenAI codex 계열로 덮어쓰면 같은 명령이 `approve` 로 나온다.
-
-#### 알아채기 어려운 이유
-
-오류가 아니다. 예외도 로그의 실패 표시도 나지 않는다.
-`escalate` 는 「사람에게 물어라」라는 정상 판정이고, `smart` 는 그때 `manual` 과 같은 길로 간다.
-**설정에는 `smart` 라고 적혀 있으므로 설정만 읽어서는 알 수 없다.**
-
-보조 LLM 호출 자체가 실패할 때도 같은 모양이 된다.
-`_smart_approve` 의 예외 처리가 `escalate` 를 돌려주기 때문이다.
-그쪽은 경고 한 줄을 남기지만, 토큰이 잘리는 쪽은 그 줄도 남기지 않는다.
-
-#### 부르는 쪽이 보는 것
-
-사람이 승인할 자리가 없는 경로에서는 실행이 `waiting_for_approval` 로 멈춘다.
-`approvals.timeout` 이 지나면 그 명령이 거절되고, 에이전트는 다른 길을 찾아 실행을 마친다.
-
-**그래서 최종 상태가 `failed` 가 아니라 `completed` 다.**
-호출한 쪽은 성공으로 받지만, 실제로는 에이전트가 하려던 것을 하지 못하고 우회한 결과다.
-실행 시간이 `approvals.timeout` 만큼 길어지는 것이 유일하게 겉으로 드러나는 신호다.
-
-#### 같은 부류의 계약 둘
-
-**`command_allowlist` 는 프로세스 전역이고 import 시점에 한 번만 읽는다.**
-`tools/approval.py` 가 모듈을 읽을 때 한 번 불러 결과를 프로세스 전역 집합에 담는다.
-실행마다 다시 읽지 않는다.
-
-한 프로세스가 여러 profile 을 서비스하는 구성이면,
-그 프로세스의 Hermes home 이 아닌 profile 의 설정에 적은 항목은 실리지 않고,
-그 home 의 설정에 적은 항목은 모든 profile 에 적용된다.
-**적어 두어도 아무 일도 일어나지 않으므로 설정을 읽어서는 어느 쪽인지 알 수 없다.**
-
-반면 `approvals.mode` 와 `approvals.deny` 는 판정할 때마다 그 실행의 profile 설정을 다시 읽는다.
-값을 바꾸면 프로세스를 다시 띄우지 않아도 반영된다.
-
-**`approvals.mode` 의 값 `off` 는 따옴표가 없으면 YAML 이 거짓으로 읽는다.**
-Hermes 가 그 거짓을 다시 `off` 로 되돌려 주므로 결과는 같다.
-받는 값은 `manual`, `smart`, `off` 셋뿐이고, 그 밖의 문자열은 경고를 남기고 `manual` 이 된다.
-
-### 소진은 본문으로만 알 수 있다
+## 소진은 본문으로만 알 수 있다
 
 HTTP 상태로는 판정하지 못한다. 제출은 늘 202 이고 조회는 늘 200 이다.
 
@@ -313,7 +250,7 @@ Control Plane 은 그 위층만 맡는다. credential 을 다루는 코드를 �
 
 소진 상태를 HTTP 로 읽는 경로는 없다. `hermes auth list` 는 정확히 알지만 CLI 뿐이다.
 
-### 모델을 바꿔 이어도 맥락이 남는다
+## 모델을 바꿔 이어도 맥락이 남는다
 
 같은 `session_id` 로 모델만 바꿔 이어 보내면 앞 turn 의 내용이 그대로 실려 간다.
 도구 호출이 있던 turn 이 섞여도 `tool_calls` 와 `tool_call_id` 가 복원된다.
@@ -344,42 +281,3 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 
 **가짜 Hermes 를 이 형태로 맞춰 둔다.**
 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다. 실측으로 그렇게 한 번 놓쳤다.
-
-### 도구 내용 가리기
-
-`tool.` 사건의 `preview`, `detail`, `result` 중 처음 있는 값을 설명으로 읽는다.
-문자열과 JSON 객체, 배열을 모두 받는다.
-`HermesRunEventStream`은 이 값을 가린 뒤 `RunEvent.detail`에 넣는다.
-SSE와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도 이 실행 기록을 조회한다.
-관리자도 가리기 전 원문을 받지 않는다.
-근거는 [ADR-047](../adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md)에 있다.
-
-| 대상 | 처리 |
-| --- | --- |
-| JSON 비밀 키 | 중첩 객체와 배열에서도 값 전체를 `[가림]`으로 바꾼다. 키의 대소문자, `_`, `-` 차이는 무시한다 |
-| 비밀 키 이름 | `token`, `secret`, `password`, `passwd`, `api_key`, `apikey`, `authorization`, `cookie`, `credential`, `credentials`, `private_key`, `access_key`, `client_secret`과 `token`, `secret`, `password`, `privatekey`로 끝나는 키 |
-| 일반 문장의 비밀 할당 | `key=value`와 `key: value`에서 위 비밀 키의 값을 가린다. 따옴표 안의 공백도 값에 포함한다 |
-| 인증 헤더 | 일반 문장의 `Authorization`과 `Cookie`는 인증 방식과 세미콜론으로 나뉜 값도 포함해 줄 끝까지 가린다 |
-| 토큰 모양 | `Bearer` 인증값, `alg`를 가진 JSON 헤더와 base64url 세 구간으로 된 JWT, `sk-`, `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`, `xox`로 시작해 `-`로 끝나는 계열 접두의 값을 가린다 |
-| 긴 인코딩 모양 | 32자 이상의 hex와 base64/base64url 덩어리를 가린다 |
-| UUID | 표준 8-4-4-4-12 형태를 `[항목 N]`으로 바꾼다. 같은 실행 스트림 안에서 같은 UUID의 대소문자를 통일해 시작과 완료 사건에 같은 번호를 쓴다. 번호표는 스트림이 끝나면 버린다 |
-| 연결용 에이전트 | `connectorManaged`가 참이면 내용 전체를 `[연결 도구 내용 가림]`으로 바꾼다. 짧은 manifest 비밀값도 노출하지 않는다 |
-| 길이와 손상 | 가린 뒤 500자를 넘으면 끝에 `…`를 붙여 자른다. 입력이 65,536자를 넘으면 전체를 가린다. JSON으로 시작하지만 파싱할 수 없는 설명도 전체를 가린다 |
-
-원문을 저장하거나 파싱 오류의 원문과 예외를 로그에 남기지 않는다.
-가리기는 되돌릴 수 없고, 원문이 필요하면 Hermes에서 조사한다.
-도구 이름, 성공 여부, 걸린 시간은 유지한다.
-일반 도구의 금액, 날짜, 짧은 식별자와 일반 문장도 위 규칙에 걸리지 않으면 유지한다.
-답 본문과 하위 에이전트 목표는 이 계약의 대상이 아니다.
-
-`skill_view` 도구의 `tool.started` 사건은 가리기 전에 `preview` 에서 스킬 이름을 따로 꺼낸다.
-32자를 넘는 스킬 이름은 토큰 모양이라 도구 내용에서 가려지기 때문이다.
-꺼낸 이름은 Hermes 스킬 이름 규칙에 맞을 때만 스킬 사용 기록으로 넘기고, 도구 내용에는 싣지 않는다.
-이름이 `...` 로 끝나면 길이 상한에서 잘린 것으로 보고 넘기지 않는다([도구와 스킬](tools-and-skills.md)).
-연결용 에이전트의 실행에서는 꺼내지 않는다.
-
-V41은 이미 저장된 `TOOL_STARTED`, `TOOL_COMPLETED`의 `detail`에도 같은 규칙을 적용한다.
-UUID 번호표는 실행마다 새로 만들고 사건 순서대로 읽는다.
-연결용 에이전트는 실행의 에이전트 번호나 profile로 판별한다.
-다른 사건과 도구 이름, 성공 여부, 걸린 시간은 바꾸지 않는다.
-기존 원문을 복원할 수 없으므로 배포 전에 데이터베이스를 백업해야 한다.

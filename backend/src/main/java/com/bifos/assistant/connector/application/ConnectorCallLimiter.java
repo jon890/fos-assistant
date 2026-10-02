@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * 커넥터의 선택지 조회, 등록, 연결 확인을 사용자마다 제한한다({@code docs/connectors.md} 의 「사용자별 호출 제한」).
+ * 커넥터의 선택지 조회, 등록, 연결 확인을 사용자마다 제한한다({@code docs/backend/connector-tool-policy.md} 의 「사용자별 호출 제한」).
  *
  * <p>넘으면 기다리게 하지 않고 거절한다. 줄을 세우면 요청 스레드와 DB 연결을 쥔 채로 쌓인다. 상태는 JVM 메모리에
  * 둔다. Control Plane 이 한 대이고, 재시작으로 횟수가 비워져도 잃는 것이 없다.

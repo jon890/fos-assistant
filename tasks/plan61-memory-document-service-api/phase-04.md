@@ -21,9 +21,12 @@
   - `POST /api/v1/service-tokens`, `GET /api/v1/service-tokens`, `DELETE /api/v1/service-tokens/{id}`
   - `GET /api/v1/service/memory-documents/{collection}/{documentKey}`
 - 문서가 지금 적고 있는 것
-  - `docs/code-architecture.md`: 패키지 표의 `memory` 줄, 「Memory」 절, 그 아래 「다음」 목록. 그 목록에 「다른 서비스가 문서를 읽는 API 와 그 서비스 토큰」 과 「collection 탭, 문서 편집과 판 이력 화면, 출처 표시, 민감 항목 표시」 가 미구현으로 있다
-  - `docs/data-schema.md`: 「memory」 가 「지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다」 로 적는다. 「memory_collection」 이 「`collectionsOf` 와 `revisionsOf` 는 아직 부르는 API 가 없다」 로 적는다. 「agent_token」 다음에 서비스 토큰 표가 없다
-  - `docs/flow.md`: 「두 방향과 두 토큰」 의 토큰 표가 ①②③ 셋이다. 「Memory 본문을 읽는 길」 이 `memory_read` 만 적는다
+  - `docs/backend/packages.md`: 패키지 표의 `memory` 줄
+  - `docs/backend/memory.md`: 「범위와 조립」 절
+  - `docs/code-architecture.md`: 「Memory 에서 아직 만들지 않은 것」 목록. 그 목록에 「다른 서비스가 문서를 읽는 API 와 그 서비스 토큰」 과 「collection 탭, 문서 편집과 판 이력 화면, 출처 표시, 민감 항목 표시」 가 미구현으로 있다
+  - `docs/backend/schema/memory.md`: 「memory」 가 「지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다」 로 적는다. 「memory_collection」 이 「`collectionsOf` 와 `revisionsOf` 는 아직 부르는 API 가 없다」 로 적는다. `docs/backend/schema/users-agents.md` 의 「agent_token」 다음에 서비스 토큰 표가 없다
+  - `docs/flow.md`: 「두 방향과 두 토큰」 의 토큰 표가 ①②③ 셋이다
+  - `docs/backend/memory.md`: 「Memory 본문을 읽는 길」 이 `memory_read` 만 적는다
   - 루트 `AGENTS.md` 의 「지켜야 할 것」: 「제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다」
   - `docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md` 의 「다음」 이 서비스 토큰을 앞으로 할 일로 적는다
 
@@ -82,35 +85,35 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
 이 시나리오는 대화 turn 을 돌리지 않고 에이전트를 만들지 않는다. 문서를 지우고 끝나므로 Memory 주입과 사용량을 세는 뒤 시나리오에 걸리지 않는다.
 돌려 보아 뒤 시나리오가 실패하면, 실패한 단언이 무엇을 세는지 읽고 자리를 옮긴다. 옮긴 까닭을 배열의 주석으로 남긴다.
 
-### 4. `docs/code-architecture.md`
+### 4. `docs/backend/packages.md`, `docs/backend/memory.md`, `docs/code-architecture.md`
 
 - 패키지 표의 `memory` 줄에 「문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기」 를 더한다
-- 「Memory」 절에 아래 뜻을 더한다. 문장은 그 절의 문체에 맞춘다
+- `docs/backend/memory.md` 의 「범위와 조립」 절에 아래 뜻을 더한다. 문장은 그 절의 문체에 맞춘다
   - 문서(`DOCUMENT`)는 사용자가 직접 쓰고 고친다. 곧 `ACCEPTED` 이고 꺼내는 방식은 `SEARCH` 다. Memory 목록과 `PATCH /api/v1/memories/{id}` 는 문서를 다루지 않는다
   - 서비스 토큰은 만료가 필수이고(1일에서 365일), 주인이 허용 목록에 켜져 있을 때만 통한다. 인증마다 `shared.auth.UserAccessPolicy` 로 묻고 `people.application.AllowedUserAccessPolicy` 가 로그인 판정과 같은 답을 낸다. 관리자가 사용자를 끄면 `PeopleAdminController` 가 `shared.auth.UserAccessRevoked` 를 내고 `ServiceTokenService` 가 그 사용자의 토큰을 모두 폐기한다. `memory` 가 `people` 을 import 하지 않게 하려고 두 타입을 `shared.auth` 에 둔다
   - 다른 서비스는 서비스 토큰으로 `GET /api/v1/service/memory-documents/{collection}/{documentKey}` 를 부른다. 요청자는 토큰이 묶인 사용자이고, 판정은 「에이전트의 실행에 보이는 항목」 의 세 조건과 같다. collection 과 민감 허용은 `service_token_collection` 이 정한다
   - 이 경로의 인증은 `memory.presentation.ServiceTokenInterceptor` 가 한다. `SecurityConfig` 는 그 경로를 `permitAll` 로 열고 `ControlPlaneJwtFilter` 는 건너뛴다. `shared` 가 `memory` 를 쓰지 않게 하기 위해서다
 - 클래스 표에 `memory.application.ServiceTokenService`, `memory.presentation.ServiceTokenInterceptor`, `memory.presentation.MemoryDocumentController`, `memory.presentation.MemoryDocumentServiceController` 를 더한다
-- 「다음」 목록에서 「다른 서비스가 문서를 읽는 API 와 그 서비스 토큰」 을 지운다. collection 탭과 문서 편집 화면을 적은 줄은 그대로 둔다. 화면은 아직 없다
+- `docs/code-architecture.md` 의 「Memory 에서 아직 만들지 않은 것」 목록에서 「다른 서비스가 문서를 읽는 API 와 그 서비스 토큰」 을 지운다. collection 탭과 문서 편집 화면을 적은 줄은 그대로 둔다. 화면은 아직 없다
 - 근거 줄에 ADR-056 와 ADR-057 링크를 더한다
 
-### 5. `docs/data-schema.md`
+### 5. `docs/backend/schema/memory.md`, `docs/backend/schema/users-agents.md`
 
-- 「memory」 의 「지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다」 뒤에 「문서 API 가 만드는 줄은 `USER` 범위의 `DOCUMENT` 이고 `ACCEPTED` 다」 를 더한다
-- 「memory_collection」 의 「아직 부르는 API 가 없다」 문장을 고친다. `collectionsOf` 는 `GET /api/v1/memory-collections` 가 부른다. `revisionsOf` 는 아직 부르는 API 가 없다
-- 「agent_token」 절 다음에 「service_token」 과 「service_token_collection」 절을 더한다. 칸 표는 `V54__service_token.sql` 과 같게 적는다. 아래 뜻을 담는다
+- `docs/backend/schema/memory.md` 「memory」 의 「지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다」 뒤에 「문서 API 가 만드는 줄은 `USER` 범위의 `DOCUMENT` 이고 `ACCEPTED` 다」 를 더한다
+- 같은 파일 「memory_collection」 의 「아직 부르는 API 가 없다」 문장을 고친다. `collectionsOf` 는 `GET /api/v1/memory-collections` 가 부른다. `revisionsOf` 는 아직 부르는 API 가 없다
+- `docs/backend/schema/users-agents.md` 의 「agent_token」 절 다음에 「service_token」 과 「service_token_collection」 절을 더한다. `docs/backend/schema/README.md` 의 색인 표에도 두 표를 더한다. 칸 표는 `V54__service_token.sql` 과 같게 적는다. 아래 뜻을 담는다
   - 원문은 발급 응답에서 한 번만 내고 해시만 저장한다
   - **`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다
   - `expires_at` 은 늘 있다. 발급할 때 1일에서 365일 사이로 정한다. 폐기는 줄을 지우지 않는다
   - 허용 목록에서 사용자를 끄면 그 사용자의 토큰에 모두 `revoked_at` 을 적는다. 다시 켜도 지우지 않는다
   - 근거는 ADR-056 다
-- 「지울 때」 에 한 문장을 더한다: 서비스 토큰은 폐기해도 줄이 남는다. 같은 절의 「허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다」 뒤에 「그 사람의 서비스 토큰은 모두 폐기한다」 를 더한다
+- `docs/backend/schema/README.md` 의 「지울 때」 에 한 문장을 더한다: 서비스 토큰은 폐기해도 줄이 남는다. 같은 절의 「허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다」 뒤에 「그 사람의 서비스 토큰은 모두 폐기한다」 를 더한다
 
-### 6. `docs/flow.md`
+### 6. `docs/flow.md`, `docs/backend/memory.md`
 
-- 「두 방향과 두 토큰」 의 토큰 표에 줄을 더한다: ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다. 그 아래 「①은 사용자를 정하고 ③은 profile 만 정한다」 뒤에 「④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다」 를 더한다. 그 절의 mermaid 그림에는 손대지 않는다
-- 「Memory 본문을 읽는 길」 의 「이 왕복은 비싸다」 앞에 「### 다른 서비스가 문서를 읽을 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 다른 서비스, Control Plane, 데이터베이스. 토큰 인증, 주인의 허용 여부 확인, 문서 조회와 세 조건 판정, 민감 문서 복호화, 본문과 판 번호 응답)와 「갈리는 지점」 표를 둔다. 표의 줄은 ADR-056 의 「적용 범위」 첫 표와 같게 한다
-- 「다른 서비스가 문서를 읽을 때」 의 「갈리는 지점」 표 아래에 「관리자가 허용 목록에서 사용자를 끄면 그 사람의 서비스 토큰을 모두 폐기한다. 다시 켜도 되살아나지 않는다(ADR-056)」 를 적는다. 「사람을 더할 때」 절은 사용자를 끄는 흐름을 다루지 않으므로 고치지 않는다
+- `docs/flow.md` 「두 방향과 두 토큰」 의 토큰 표에 줄을 더한다: ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다. 그 아래 「①은 사용자를 정하고 ③은 profile 만 정한다」 뒤에 「④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다」 를 더한다. 그 절의 mermaid 그림에는 손대지 않는다
+- `docs/backend/memory.md` 「Memory 본문을 읽는 길」 의 「이 왕복은 비싸다」 앞에 「### 다른 서비스가 문서를 읽을 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 다른 서비스, Control Plane, 데이터베이스. 토큰 인증, 주인의 허용 여부 확인, 문서 조회와 세 조건 판정, 민감 문서 복호화, 본문과 판 번호 응답)와 「서비스 읽기가 갈리는 지점」 표를 둔다. 한 문서 안에 같은 헤딩을 둘 두지 않는다. 표의 줄은 ADR-056 의 「적용 범위」 첫 표와 같게 한다
+- 같은 파일 「다른 서비스가 문서를 읽을 때」 의 「서비스 읽기가 갈리는 지점」 표 아래에 「관리자가 허용 목록에서 사용자를 끄면 그 사람의 서비스 토큰을 모두 폐기한다. 다시 켜도 되살아나지 않는다(ADR-056)」 를 적는다. 「사람을 더할 때」 절은 사용자를 끄는 흐름을 다루지 않으므로 고치지 않는다
 
 ### 7. 루트 `AGENTS.md`
 
@@ -139,13 +142,13 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
 node test/e2e/run.ts
 node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
-grep -n "service_token_collection" docs/data-schema.md
-grep -n "ADR-056" docs/code-architecture.md docs/flow.md AGENTS.md
+grep -n "service_token_collection" docs/backend/schema/users-agents.md
+grep -n "ADR-056" docs/backend/memory.md docs/flow.md AGENTS.md
 ! grep -n "다른 서비스가 문서를 읽는 API 와 그 서비스 토큰" docs/code-architecture.md
 ```
 
 - 모두 종료 코드 0. `grep` 둘은 줄이 나와야 하고 마지막 줄은 나오지 않아야 한다
-- `node test/e2e/run.ts` 는 `./gradlew test` 뒤에 돌린다. 앞선 실행이 남긴 데이터에 걸린다. 출력에 `Memory 문서와 서비스 토큰` 시나리오가 통과로 나와야 한다
+- `node test/e2e/run.ts` 는 `./gradlew test` 뒤에 돌린다. 출력에 `Memory 문서와 서비스 토큰` 시나리오가 통과로 나와야 한다
 
 ## 변경 파일
 
@@ -154,7 +157,11 @@ grep -n "ADR-056" docs/code-architecture.md docs/flow.md AGENTS.md
 | `test/e2e/run.ts` | 수정 |
 | `test/e2e/scenarios/memory-document.ts` | 신규 |
 | `docs/code-architecture.md` | 수정 |
-| `docs/data-schema.md` | 수정 |
+| `docs/backend/packages.md` | 수정 |
+| `docs/backend/memory.md` | 수정 |
+| `docs/backend/schema/memory.md` | 수정 |
+| `docs/backend/schema/users-agents.md` | 수정 |
+| `docs/backend/schema/README.md` | 수정 |
 | `docs/flow.md` | 수정 |
 | `AGENTS.md` | 수정 |
 | `docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md` | 수정 |

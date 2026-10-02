@@ -1,6 +1,6 @@
 ## ADR-001: Hermes 를 런타임으로 두고 core 를 고치지 않는다
 
-- Status: Accepted
+- **status**: `accepted`
 - Date: 2026-09-17
 
 ### 맥락
