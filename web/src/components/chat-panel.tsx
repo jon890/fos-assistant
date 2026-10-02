@@ -11,6 +11,7 @@ import { StartScreenHeader, StarterPrompts } from "./chat/start-screen";
 import { useStarterSuggestions } from "./chat/use-starter-suggestions";
 import { PendingQueueView } from "@/components/chat/pending-queue";
 import { usePendingQueue } from "@/components/chat/use-pending-queue";
+import { ApprovalList } from "@/components/chat/approval-list";
 import { MessageList } from "./chat/message-list";
 import {
   applyChatEvent,
@@ -185,13 +186,18 @@ function describePendingFailure(
 /**
  * 보는 중인 turn 의 사건이면 참이다. 그 turn 은 폴링이 그리므로 대화 단위 SSE 로 받은 것은 버린다.
  *
- * <p>`filter` 의 단계를 이 자리에서 옮긴다. `system` 은 turn 의 사건이 아니므로 언제나 받는다.
+ * <p>`filter` 의 단계를 이 자리에서 옮긴다. `system` 과 `approval` 은 turn 의 사건이 아니므로 언제나 받는다.
  */
 function belongsToObservedTurn(
   filter: ObservedTurnFilter | null,
   event: ChatEvent,
 ): boolean {
-  if (filter === null || filter.phase === "passed" || event.type === "system")
+  if (
+    filter === null ||
+    filter.phase === "passed" ||
+    event.type === "system" ||
+    event.type === "approval"
+  )
     return false;
   if (event.type === "started") {
     // 번호가 붙기 전에 보기 시작했으면 처음 받는 `started` 가 보는 turn 이다.
@@ -300,6 +306,8 @@ export function ChatPanel({
   const pending = usePendingQueue(conversationId);
   /** 대기 줄의 취소나 보내기 요청이 도는 중이다. 그동안 대기 줄의 단추를 잠근다 */
   const [pendingBusy, setPendingBusy] = useState(false);
+  /** 승인 줄을 다시 읽게 하는 값이다. `approval` 사건과 알림 줄을 받을 때 올린다 */
+  const [approvalRefresh, setApprovalRefresh] = useState(0);
   /** 대기 메시지로 더하는 요청이 도는 중이다. 같은 글이 두 번 쌓이지 않게 그동안의 보내기를 받지 않는다 */
   const enqueueing = useRef(false);
   /** 대기 줄에 쌓인 글이 있는지다. 대화 단위 SSE 의 처리기는 연결을 열 때의 렌더에 묶여 있어 최신 값을 여기서 읽는다 */
@@ -593,6 +601,7 @@ export function ChatPanel({
             // 끊긴 사이의 `pending` 사건은 다시 오지 않는다. 놓치면 이미 보낸 글이 대기 줄에 남으므로 다시 읽는다.
             // 대기 줄 사건과 같이 보류하지 않는다.
             void pending.reload();
+            setApprovalRefresh((count) => count + 1);
             await runConversationTask(() => resumeAfterReconnect(id));
           }
           await readEventStream<ChatEvent>(response, (event) => {
@@ -600,6 +609,11 @@ export function ChatPanel({
             // 메시지가 그 turn 이 끝날 때까지 보이지 않는다. 대기 줄은 turn 의 그림과 겹치지 않는다.
             if (event.type === "pending") {
               void pending.reload();
+              return;
+            }
+            // 승인 줄 사건도 보류하지 않는다. 승인 요청은 보낸 turn 이 도는 중에 생긴다.
+            if (event.type === "approval") {
+              setApprovalRefresh((count) => count + 1);
               return;
             }
             return runConversationTask(() => applyConversationEvent(id, event));
@@ -1058,6 +1072,8 @@ export function ChatPanel({
   async function applyConversationEvent(id: string, event: ChatEvent) {
     if (conversationIdRef.current !== id) return;
     if (event.type === "system") {
+      // 승인 줄의 결과는 알림 줄로 온다. 끝난 카드를 치우게 승인 줄도 다시 읽는다.
+      setApprovalRefresh((count) => count + 1);
       const line: Turn = {
         id: event.messageId ?? `system-${Date.now()}`,
         role: "SYSTEM",
@@ -1958,6 +1974,10 @@ export function ChatPanel({
                 : "다른 창에서 답을 만들고 있어요. 완성되면 이 창에도 나타나요."}
             </p>
           ) : null}
+          <ApprovalList
+            conversationId={conversationId}
+            refreshKey={approvalRefresh}
+          />
           <PendingQueueView
             queue={pending.queue}
             onCancel={(pendingId) => {
