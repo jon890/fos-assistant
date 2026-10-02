@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.chat.application;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;

@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.RunningTurn;
+import com.bifos.assistant.chat.application.StarterSuggestions;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
@@ -299,6 +300,19 @@ public final class ChatDtos {
                     provider.models(),
                     Collections.unmodifiableMap(reasoning),
                     Collections.unmodifiableMap(reasoningCapable));
+        }
+    }
+
+    /**
+     * 새 대화 화면이 받는 추천 질문이다.
+     *
+     * @param prompts 추천 질문. 보이는 차례대로다. {@code READY} 가 아니면 빈 목록
+     * @param status {@code READY}, {@code GENERATING}, {@code NONE} 가운데 하나. {@code GENERATING} 이면
+     *     화면이 잠시 뒤 다시 읽는다
+     */
+    public record StartersView(List<String> prompts, String status) {
+        static StartersView from(StarterSuggestions suggestions) {
+            return new StartersView(suggestions.prompts(), suggestions.status().name());
         }
     }
 }

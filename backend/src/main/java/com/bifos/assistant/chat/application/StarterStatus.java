@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.chat.application;
 
 /** 추천 질문을 읽었을 때의 상태다. */
 public enum StarterStatus {
