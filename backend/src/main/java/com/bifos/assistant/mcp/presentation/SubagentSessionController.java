@@ -41,8 +41,11 @@ public class SubagentSessionController {
             @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
         if (!(principal instanceof McpPrincipal mcp)) throw reject("MCP 토큰으로 인증한 요청이 아니다");
         SubagentRegistration registration = SubagentRegistration.verify(read(body), mcp.tokenHash());
-        SubagentRegistrationResult result = registrar.register(mcp.profileName(),
-                registration.parentRootSessionId(), registration.parentSessionId(), registration.childSessionId());
+        SubagentRegistrationResult result = registrar.register(
+                mcp.profileName(),
+                registration.parentRootSessionId(),
+                registration.parentSessionId(),
+                registration.childSessionId());
         return switch (result) {
             case CREATED -> ResponseEntity.status(HttpStatus.CREATED).body(new SubagentRegistrationResponse("created"));
             case EXISTS -> ResponseEntity.ok(new SubagentRegistrationResponse("exists"));
