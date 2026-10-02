@@ -5,6 +5,10 @@
 저장소 전체에 걸리는 규칙은 루트 [`AGENTS.md`](../AGENTS.md) 가 갖는다.
 공개 저장소에 무엇을 적지 않는지도 그 문서가 정한다.
 
+- 화면 구조: [`../docs/frontend/structure.md`](../docs/frontend/structure.md)
+- 화면 동작: [`../docs/frontend/shell.md`](../docs/frontend/shell.md), [`../docs/frontend/chat.md`](../docs/frontend/chat.md), [`../docs/frontend/activity.md`](../docs/frontend/activity.md)
+- 화면 부품과 색의 결정: [`../docs/adr/INDEX.md`](../docs/adr/INDEX.md) 에서 층 칸이 frontend 인 것
+
 ## 디렉터리
 
 `app/` 은 경로와 서버에서 읽는 것만 담고, 화면을 이루는 부품은 `components/` 에 둔다.

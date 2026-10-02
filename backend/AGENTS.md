@@ -5,6 +5,11 @@ Control Plane 이다. Spring Boot 4 와 MySQL 8.4 를 쓴다.
 저장소 전체에 걸리는 규칙은 루트 [`AGENTS.md`](../AGENTS.md) 가 갖는다.
 공개 저장소에 무엇을 적지 않는지도 그 문서가 정한다.
 
+- 패키지와 경계: [`../docs/backend/packages.md`](../docs/backend/packages.md)
+- 표와 칸: [`../docs/backend/schema/README.md`](../docs/backend/schema/README.md)
+- Hermes 호출: [`../docs/hermes/README.md`](../docs/hermes/README.md)
+- 그 밖의 주제: [`../docs/README.md`](../docs/README.md) 의 backend 표
+
 ## 패키지 배치
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.

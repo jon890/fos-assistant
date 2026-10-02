@@ -7,10 +7,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 
 | 문서 | 언제 보는지 |
 | --- | --- |
-| [`docs/prd.md`](docs/prd.md) | 새 기능이 이 제품에 속하는지 판단할 때 |
-| [`docs/code-architecture.md`](docs/code-architecture.md) | 패키지와 경계를 바꿀 때 |
-| [`docs/hermes/README.md`](docs/hermes/README.md) | Hermes 를 호출하거나 설정을 바꿀 때 |
-| [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정을 할 때 |
+| [`docs/README.md`](docs/README.md) | 문서 전체의 색인. 제품 범위, 경계, Hermes 연동, ADR 을 여기서 찾는다 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 

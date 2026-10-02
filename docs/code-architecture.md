@@ -103,15 +103,6 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 `agent` 는 profile 이름과 주소만 적는다.
 profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
-## 문서
-
-| 문서 | 담는 것 |
-| --- | --- |
-| [`flow.md`](flow.md) | 화면 전환과 호출 순서 |
-| [`backend/schema/README.md`](backend/schema/README.md) | 표와 칸의 뜻 |
-| [`hermes/README.md`](hermes/README.md) | Hermes 확장 지점 |
-| [`adr/INDEX.md`](adr/INDEX.md) | 되돌리기 어려운 결정 |
-
 ## 아직 만들지 않은 것
 
 - Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.

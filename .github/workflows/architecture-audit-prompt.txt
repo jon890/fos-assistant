@@ -10,7 +10,7 @@ PR 리뷰는 바뀐 줄만 봅니다. 당신은 **main 전체를 보고 여러 P
 판정 기준은 저장소 지침이 소유합니다. 먼저 읽습니다.
 
 - 루트 `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`
-- `docs/code-architecture.md`, `docs/backend/schema/README.md`, `docs/flow.md`, `docs/adr/INDEX.md`
+- `docs/README.md`, `docs/code-architecture.md`, `docs/backend/schema/README.md`, `docs/flow.md`, `docs/adr/INDEX.md`
 
 이번 주에 바뀐 파일 목록이 `$CHANGED_FILES` 에 있습니다. 이 파일들과 그 주변부터 봅니다.
 바뀐 파일만 보지 않습니다. 쌓여 온 문제는 오래된 파일에 있을 수 있습니다.

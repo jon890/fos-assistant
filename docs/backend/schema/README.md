@@ -1,5 +1,13 @@
 # 저장 모델
 
+| 파일 | 표 |
+| --- | --- |
+| [`users-agents.md`](users-agents.md) | `app_user`, `allowed_person`, `agent`, `agent_token` |
+| [`chat.md`](chat.md) | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact` |
+| [`execution.md`](execution.md) | `agent_execution`, `execution_event`, `execution_skill_use`, `hermes_session_binding` |
+| [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
+| [`connector.md`](connector.md) | `connector_connection`, `connector_action`, `connector_tool_grant` |
+
 ## 모델 단계와 재조회
 
 선택의 우선순위와 초기값은 [모델 단계와 실행 기록](../../model-tiers.md)이 정한다.
