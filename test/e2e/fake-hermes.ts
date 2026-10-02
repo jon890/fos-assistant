@@ -33,6 +33,7 @@ const PROFILE_PATH = /^\/api\/profiles\/(.+)$/;
  */
 const SOUL_PATH = /^\/api\/profiles\/([^/]+)\/soul$/;
 const MODEL_DEFAULTS_PATH = /^\/api\/profiles\/([^/]+)\/model-defaults$/;
+const SESSION_PROVIDER_PATH = /^\/api\/profiles\/([^/]+)\/sessions\/([^/]+)\/provider$/;
 const ENV_PATH = "/api/env";
 const TOOLSET_CATALOG_PATH = "/api/tools/toolsets";
 const CONFIG_PATH = "/api/config";
@@ -656,7 +657,7 @@ export function startFakeHermes(
   });
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
-  /** 자식 session 응답이 싣는 모델과 provider 다. 비우면 일반 자식처럼 provider 없이 `example-fast` 를 준다. */
+  /** 자식 session 의 모델과 provider 다. provider 는 session 응답이 아니라 대시보드의 provider 경로가 준다. 비우면 provider 없이 `example-fast` 를 준다. */
   const childUsages = new Map<string, { profile: string; parent: string; reads: number; delayed: boolean;
     model?: string; provider?: string }>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
@@ -899,6 +900,7 @@ export function startFakeHermes(
   ): Promise<boolean> => {
     const soulMatch = SOUL_PATH.exec(path);
     const modelDefaultsMatch = MODEL_DEFAULTS_PATH.exec(path);
+    const sessionProviderMatch = SESSION_PROVIDER_PATH.exec(path);
     const profileMatch = PROFILE_PATH.exec(path);
     const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || path === TOOLSET_CATALOG_PATH
       || path === CONFIG_PATH || path === SKILLS_PATH || path === SKILL_TOGGLE_PATH || profileMatch !== null
@@ -1171,6 +1173,16 @@ export function startFakeHermes(
     }
 
     // `PROFILE_PATH` 의 `.+` 가 이 경로도 함께 먹으므로 그 분기보다 앞에서 처리한다.
+    if (request.method === "GET" && sessionProviderMatch !== null) {
+      const child = childUsages.get(decodeURIComponent(sessionProviderMatch[2]!));
+      if (child === undefined || child.profile !== decodeURIComponent(sessionProviderMatch[1]!)) {
+        send(response, 404, { detail: "없는 session 이다" });
+        return true;
+      }
+      send(response, 200, { provider: child.provider ?? null, model: child.model ?? "example-fast" });
+      return true;
+    }
+
     if (soulMatch !== null) {
       const name = decodeURIComponent(soulMatch[1]!);
       if (request.method === "GET") {
@@ -1409,7 +1421,6 @@ export function startFakeHermes(
             return send(response, 200, { object: "session", session: {
               id: sessionId, source: "subagent", parent_session_id: child.parent,
               model: child.model ?? "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
-              ...(child.provider === undefined ? {} : { billing_provider: child.provider }),
               end_reason: ended ? "agent_close" : null,
               input_tokens: 100, cache_read_tokens: 50, cache_write_tokens: 10, output_tokens: 20,
             } });
