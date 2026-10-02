@@ -297,10 +297,12 @@ test("사이드바의 이름 입력칸 Esc 는 열린 패널을 닫지 않는다
     testInfo.project.name !== "desktop",
     "사이드바가 보이는 폭에서 검사한다",
   );
-  await send(page, "이름 입력 검사");
+  // 서버가 검사 사이에 대화를 지우지 않으므로 반복 실행에서도 목록에서 이 대화 하나만 찾도록 제목을 나눈다.
+  const title = `이름 입력 검사 ${testInfo.repeatEachIndex}`;
+  await send(page, title);
   const panel = await openSavedPanel(page);
   await expect(panel).toBeVisible();
-  const menu = page.getByRole("button", { name: /이름 입력 검사 메뉴/ });
+  const menu = page.getByRole("button", { name: `${title} 메뉴` });
   await menu.click();
   await page.getByRole("menuitem", { name: "이름 바꾸기" }).click();
   await page.getByRole("textbox", { name: "대화 이름" }).press("Escape");
