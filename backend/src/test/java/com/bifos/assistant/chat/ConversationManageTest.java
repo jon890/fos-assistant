@@ -131,7 +131,7 @@ class ConversationManageTest {
         Long id = chat.send(dad, null, "첫 질문", "manage-dad").conversationId();
 
         chat.rename(dad, id, "  새 이름  ");
-        assertThat(chat.conversationsOf(dad))
+        assertThat(chat.conversationsOf(dad, null, 100).items())
                 .singleElement()
                 .satisfies(it -> assertThat(it.title()).isEqualTo("새 이름"));
         assertThatThrownBy(() -> chat.rename(dad, id, "   "))
@@ -152,7 +152,7 @@ class ConversationManageTest {
         ChatTurn turn = chat.send(dad, null, "첫 질문", "manage-dad");
         chat.delete(dad, turn.conversationId());
 
-        assertThat(chat.conversationsOf(dad)).isEmpty();
+        assertThat(chat.conversationsOf(dad, null, 100).items()).isEmpty();
         notFound(() -> chat.history(dad, turn.conversationId()));
         notFound(() -> chat.send(dad, turn.conversationId(), "이어 보내기", "manage-dad"));
         assertThat(executions.findById(turn.executionId())).isPresent();
@@ -168,7 +168,7 @@ class ConversationManageTest {
 
         notFound(() -> chat.rename(kid, id, "남의 이름"));
         notFound(() -> chat.delete(kid, id));
-        assertThat(chat.conversationsOf(dad)).singleElement();
+        assertThat(chat.conversationsOf(dad, null, 100).items()).singleElement();
     }
 
     @Test
@@ -235,7 +235,7 @@ class ConversationManageTest {
                 "anthropic",
                 TokenUsage.empty()));
         stub().beforeAwait(() ->
-                chat.rename(dad, chat.conversationsOf(dad).getFirst().id(), "바뀐 이름"));
+                chat.rename(dad, chat.conversationsOf(dad, null, 100).items().getFirst().id(), "바뀐 이름"));
         Long renamedId = chat.send(dad, null, "다른 질문", "manage-dad").conversationId();
         assertThat(conversations.findById(renamedId).orElseThrow().title()).isEqualTo("바뀐 이름");
         assertThat(conversations.findById(renamedId).orElseThrow().hermesSessionId())

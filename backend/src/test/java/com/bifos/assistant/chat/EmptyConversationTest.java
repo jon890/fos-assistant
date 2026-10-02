@@ -128,7 +128,7 @@ class EmptyConversationTest {
                 () -> chat.startEmpty(dad, "kid"), () -> chat.send(dad, null, "안녕", "kid"), ErrorCode.AGENT_NOT_FOUND);
         assertSameCode(
                 () -> chat.startEmpty(dad, "off"), () -> chat.send(dad, null, "안녕", "off"), ErrorCode.AGENT_DISABLED);
-        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id()))
+        assertThat(chat.conversationsOf(dad, null, 100).items())
                 .isEmpty();
     }
 
@@ -142,7 +142,7 @@ class EmptyConversationTest {
 
         chat.startEmpty(dad, "flowed");
 
-        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id()))
+        assertThat(chat.conversationsOf(dad, null, 100).items())
                 .singleElement()
                 .satisfies(it -> {
                     assertThat(it.agentId()).isEqualTo(flowAgent.id());

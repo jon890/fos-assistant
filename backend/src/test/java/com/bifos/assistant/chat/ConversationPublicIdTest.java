@@ -199,7 +199,24 @@ class ConversationPublicIdTest {
         assertThat(id.version()).isEqualTo(7);
         mvc.perform(get("/api/v1/chat/conversations"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(id.toString()));
+                .andExpect(jsonPath("$.items[0].id").value(id.toString()));
+    }
+
+    @Test
+    @DisplayName("대화 한 줄을 공개 식별자로 읽고 남의 대화는 없는 대화로 답한다")
+    void readsOneConversationAndHidesOthers() throws Exception {
+        CurrentUser dad = member("public-dad");
+        CurrentUser kid = member("public-kid");
+        UUID id = started(dad);
+
+        signedIn(dad);
+        mvc.perform(get("/api/v1/chat/conversations/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
+        signedIn(kid);
+        mvc.perform(get("/api/v1/chat/conversations/{id}", id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
     }
 
     @Test

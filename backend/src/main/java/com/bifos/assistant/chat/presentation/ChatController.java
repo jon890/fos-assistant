@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ConversationPage;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
@@ -19,6 +20,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ArtifactView;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.ChooseModelTierRequest;
+import com.bifos.assistant.chat.presentation.ChatDtos.ConversationPageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
@@ -145,15 +147,27 @@ public class ChatController {
                 chat.startEmpty(currentUser.require(), request.agentCode()).publicId());
     }
 
+    /** 대화 목록을 최근에 바뀐 것부터 한 쪽 돌려준다. 다음 쪽은 {@code nextCursor} 를 {@code cursor} 로 넘겨 읽는다. */
     @GetMapping("/conversations")
-    public List<ConversationView> conversations() {
-        List<Conversation> page = chat.conversationsOf(currentUser.require());
+    public ConversationPageView conversations(
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "30") int limit) {
+        ConversationPage page = chat.conversationsOf(currentUser.require(), cursor, limit);
         // 목록은 에이전트를 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
-        Map<Long, Agent> byId =
-                agents.byIds(page.stream().map(Conversation::agentId).toList());
-        return page.stream()
-                .map(conversation -> viewOf(conversation, byId.get(conversation.agentId())))
-                .toList();
+        Map<Long, Agent> byId = agents.byIds(
+                page.items().stream().map(Conversation::agentId).toList());
+        return new ConversationPageView(
+                page.items().stream()
+                        .map(conversation -> viewOf(conversation, byId.get(conversation.agentId())))
+                        .toList(),
+                page.nextCursor());
+    }
+
+    /** 대화 한 줄을 읽는다. 목록의 첫 쪽에 없는 오래된 대화를 열 때 쓴다. */
+    @GetMapping("/conversations/{conversationId}")
+    public ConversationView conversation(@PathVariable UUID conversationId) {
+        Conversation found = chat.conversationOf(currentUser.require(), conversationId);
+        return viewOf(found, agents.findById(found.agentId()).orElse(null));
     }
 
     @PatchMapping("/conversations/{conversationId}")

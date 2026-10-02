@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -59,6 +60,7 @@ import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -78,6 +80,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ChatService {
     private static final int TITLE_LIMIT = 60;
+
+    /** 대화 목록 한 쪽의 상한이다. 웹이 더 크게 요청해도 이만큼만 읽는다. */
+    public static final int MAX_CONVERSATION_PAGE = 100;
 
     private final ConversationRepository conversations;
     private final ConversationSessions sessions;
@@ -1186,8 +1191,33 @@ public class ChatService {
         return new RunningTurn(true, mark.executionId(), startedAt);
     }
 
-    public List<Conversation> conversationsOf(CurrentUser user) {
-        return conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user.id());
+    /**
+     * 사용자의 대화를 최근에 바뀐 것부터 한 쪽 읽는다.
+     *
+     * @param cursor 앞 쪽이 돌려준 {@code nextCursor}. 처음이면 null
+     * @param limit 한 쪽의 최대 개수. {@link #MAX_CONVERSATION_PAGE} 를 넘으면 그 값으로 줄인다
+     */
+    public ConversationPage conversationsOf(CurrentUser user, String cursor, int limit) {
+        int size = Math.clamp(limit, 1, MAX_CONVERSATION_PAGE);
+        // 한 줄을 더 읽어 다음 쪽이 있는지 안다. 개수를 한 쪽에 딱 맞게 읽으면 마지막 쪽에서도 빈 쪽을 한 번 더 부르게 된다.
+        PageRequest window = PageRequest.ofSize(size + 1);
+        List<Conversation> rows;
+        if (cursor == null) {
+            rows = conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(user.id(), window);
+        } else {
+            ConversationCursor from = ConversationCursor.decode(cursor);
+            rows = conversations.findPageAfter(user.id(), from.updatedAt(), from.id(), window);
+        }
+        if (rows.size() <= size) {
+            return new ConversationPage(rows, null);
+        }
+        List<Conversation> items = rows.subList(0, size);
+        return new ConversationPage(items, ConversationCursor.of(items.getLast()).encode());
+    }
+
+    /** 사용자의 대화 한 줄을 읽는다. 없거나 남의 것이면 같은 응답으로 숨긴다. */
+    public Conversation conversationOf(CurrentUser user, UUID publicId) {
+        return access.requireOwn(user, publicId);
     }
 
     @Transactional

@@ -970,7 +970,7 @@ class ChatServiceTest {
         List<ChatEvent> relayed = new ArrayList<>();
         assertCode(() -> chat.stream(dad, null, "/nope 해 줘", "dad", relayed::add), ErrorCode.SKILL_COMMAND_UNKNOWN);
 
-        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id()))
+        assertThat(chat.conversationsOf(dad, null, 100).items())
                 .as("대화")
                 .isEmpty();
         assertThat(messages.count()).as("메시지 수").isZero();

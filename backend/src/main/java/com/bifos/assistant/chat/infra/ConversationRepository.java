@@ -20,7 +20,21 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     Optional<Conversation> findByPublicIdAndUserIdAndDeletedAtIsNull(UUID publicId, Long userId);
 
-    List<Conversation> findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(Long userId);
+    /** 그 사용자의 지우지 않은 대화를 최근 것부터 첫 쪽만큼 읽는다. 개수는 {@code pageable} 이 정한다. */
+    List<Conversation> findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(Long userId, Pageable pageable);
+
+    /** {@code (updatedAt, id)} 로 정한 자리 바로 다음 줄부터 읽는다. 정렬은 첫 쪽과 같다. */
+    @Query("""
+            select c from Conversation c
+             where c.userId = :userId and c.deletedAt is null
+               and (c.updatedAt < :updatedAt or (c.updatedAt = :updatedAt and c.id < :id))
+             order by c.updatedAt desc, c.id desc
+            """)
+    List<Conversation> findPageAfter(
+            @Param("userId") Long userId,
+            @Param("updatedAt") Instant updatedAt,
+            @Param("id") Long id,
+            Pageable pageable);
 
     /** 그 사용자가 그 에이전트와 나눈 지우지 않은 대화를 최근 것부터 읽는다. 개수는 {@code pageable} 이 정한다. */
     List<Conversation> findByUserIdAndAgentIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
