@@ -184,6 +184,7 @@ function safeTools(value: unknown): ConnectorTool[] {
         title: typeof item.title === "string" ? item.title : null,
         risk: item.risk as ToolRisk,
         approval: item.approval as ToolApproval,
+        grant: item.grant === true,
       },
     ];
   });

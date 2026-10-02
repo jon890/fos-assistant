@@ -16,12 +16,16 @@ export type ToolRisk =
   "READ" | "SENSITIVE" | "WRITE" | "DESTRUCTIVE" | "FINANCIAL";
 export type ToolApproval = "NONE" | "REQUIRED" | "ALWAYS";
 
-/** 커넥터가 선언한 도구 한 개다. `title` 이 없으면 `name` 으로 보인다. */
+/**
+ * 커넥터가 선언한 도구 한 개다. `title` 이 없으면 `name` 으로 보인다.
+ * `grant` 는 승인하면서 그 도구에 상시 허락을 줄 수 있는지다.
+ */
 export type ConnectorTool = {
   name: string;
   title: string | null;
   risk: ToolRisk;
   approval: ToolApproval;
+  grant: boolean;
 };
 
 /** 연결 목록의 카드 한 장이다. `available` 이 거짓이면 운영 목록에서 빠진 커넥터다. */
@@ -195,8 +199,12 @@ export function toolBlocked(tool: ConnectorTool): boolean {
   );
 }
 
-/** 도구를 호출할 때 일어나는 일을 사용자에게 보이는 말로 바꾼다. 쓸 수 없는 도구가 승인 방식보다 앞선다. */
+/**
+ * 도구를 호출할 때 일어나는 일을 사용자에게 보이는 말로 바꾼다. 쓸 수 없는 도구가 승인 방식보다 앞선다.
+ * 상시 허락을 줄 수 없는 도구는 호출마다 승인을 받는다.
+ */
 export function toolPolicyLabel(tool: ConnectorTool): string {
   if (toolBlocked(tool)) return "아직 쓸 수 없어요";
-  return tool.approval === "NONE" ? "바로 실행해요" : "실행 전에 물어봐요";
+  if (tool.approval === "NONE") return "바로 실행해요";
+  return tool.grant ? "실행 전에 물어봐요" : "실행할 때마다 물어봐요";
 }

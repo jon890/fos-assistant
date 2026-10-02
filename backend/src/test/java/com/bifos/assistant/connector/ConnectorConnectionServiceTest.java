@@ -136,9 +136,9 @@ class ConnectorConnectionServiceTest {
             List.of());
     /** 도구마다 정책을 선언한 커넥터다. 번호와 칸과 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
     private static final ConnectorManifest POLICY_MANIFEST = policyManifest(List.of(
-            new ConnectorTool("list_scopes", "READ", "none", null),
-            new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
-            new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null)));
+            new ConnectorTool("list_scopes", "READ", "none", null, null),
+            new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기", null),
+            new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null, null)));
 
     @Autowired
     ConnectorConnectionService service;
@@ -1413,8 +1413,8 @@ class ConnectorConnectionServiceTest {
         when(connector.readCatalog())
                 .thenReturn(List.of(
                         policyManifest(List.of(
-                                new ConnectorTool("list_scopes", "READ", "none", null),
-                                new ConnectorTool("write_note", "WRITE", "none", null))),
+                                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                                new ConnectorTool("write_note", "WRITE", "none", null, null))),
                         PIN_MANIFEST));
         CurrentUser user = user(UserRole.MEMBER, 1L);
 
@@ -1454,11 +1454,33 @@ class ConnectorConnectionServiceTest {
 
         assertThat(listed.get(0).tools())
                 .containsExactly(
-                        new ConnectorToolSummary("list_scopes", null, ToolRisk.READ, ToolApproval.NONE),
-                        new ConnectorToolSummary("write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED),
-                        new ConnectorToolSummary("purge_notes", null, ToolRisk.DESTRUCTIVE, ToolApproval.ALWAYS));
+                        new ConnectorToolSummary("list_scopes", null, ToolRisk.READ, ToolApproval.NONE, false),
+                        new ConnectorToolSummary("write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true),
+                        new ConnectorToolSummary(
+                                "purge_notes", null, ToolRisk.DESTRUCTIVE, ToolApproval.ALWAYS, false));
         // 도구를 선언하지 않는 판의 커넥터는 빈 목록이다.
         assertThat(listed.get(1).tools()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("카탈로그의 도구는 상시 허락을 줄 수 있는지를 함께 주고 required 도구만 참이 될 수 있다")
+    void catalogListsWhetherEachToolCanBeGranted() {
+        when(connector.readCatalog())
+                .thenReturn(List.of(policyManifest(List.of(
+                        new ConnectorTool("list_scopes", "READ", "none", null, Boolean.TRUE),
+                        new ConnectorTool("write_note", "WRITE", "required", null, null),
+                        new ConnectorTool("share_note", "WRITE", "required", null, Boolean.TRUE),
+                        new ConnectorTool("mail_note", "WRITE", "required", null, Boolean.FALSE)))));
+
+        List<ConnectorSummary> listed = service.catalog(user(UserRole.MEMBER, 1L));
+
+        assertThat(listed.get(0).tools())
+                .extracting(ConnectorToolSummary::name, ConnectorToolSummary::grant)
+                .containsExactly(
+                        tuple("list_scopes", false),
+                        tuple("write_note", true),
+                        tuple("share_note", true),
+                        tuple("mail_note", false));
     }
 
     @Test

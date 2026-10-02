@@ -75,6 +75,9 @@ public class ConnectorActionService {
 
     private static final String EXECUTING_MESSAGE = "an approved action of this connection is still executing";
 
+    /** 도구를 선언하지 않는 manifest 판이다. */
+    private static final int SCHEMA_WITHOUT_TOOLS = 1;
+
     /**
      * 「오늘」 의 끝을 정하는 시간대다. 가족이 사는 곳의 날짜로 끝나야 하므로 서버 시간대에 기대지 않는다.
      *
@@ -156,13 +159,7 @@ public class ConnectorActionService {
         found.sort(Comparator.comparing(ConnectorAction::id));
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return found.stream()
-                .map(action -> ConnectorActionView.from(
-                        action,
-                        manifests
-                                .computeIfAbsent(action.connectorId(), this::readManifest)
-                                .flatMap(manifest -> ConnectorToolPolicies.find(manifest, action.toolName()))
-                                .map(ToolPolicy::title)
-                                .orElse(null)))
+                .map(action -> view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest)))
                 .toList();
     }
 
@@ -259,13 +256,8 @@ public class ConnectorActionService {
                 .findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(conversationId, statuses)
                 .stream()
                 .map(action -> {
-                    ConnectorActionView view = ConnectorActionView.from(
-                            action,
-                            manifests
-                                    .computeIfAbsent(action.connectorId(), this::readManifest)
-                                    .flatMap(manifest -> ConnectorToolPolicies.find(manifest, action.toolName()))
-                                    .map(ToolPolicy::title)
-                                    .orElse(null));
+                    ConnectorActionView view =
+                            view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest));
                     return new ConnectorActionResult(
                             action.publicId(),
                             view.title(),
@@ -439,21 +431,24 @@ public class ConnectorActionService {
             action.expire(now);
             return Approval.refused(actions.save(action));
         }
-        if (grant != null && !action.grantAllowed()) {
+        Optional<ConnectorManifest> manifest = readManifest(action.connectorId());
+        // 승인 줄이 `grantAllowed` 로 낸 것과 같은 조건이다. 카탈로그를 읽지 못했으면 허락을 줄 수 없다.
+        if (grant != null && !(action.grantAllowed() && grantable(manifest, action))) {
             throw grantNotAllowed();
         }
         Optional<ConnectorConnection> connection =
                 connections.findByUserIdAndConnectorId(action.userId(), action.connectorId());
         Optional<ToolPolicyDecision> decision = connection
                 .filter(found -> found.status() == ConnectionStatus.READY)
-                .flatMap(found -> readManifest(found.connectorId()).map(manifest -> redecide(found, manifest, action)));
+                .flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
         if (decision.isEmpty() || decision.get().decision() == ActionDecision.DENIED) {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
         }
         if (grant != null) {
-            // 요청을 만든 뒤 늘 승인을 받는 도구로 바뀌었으면 허락을 주지 않는다.
-            if (decision.get().approval() != ToolApproval.REQUIRED) {
+            // 지금 정책으로 다시 본다. 요청을 만든 뒤 늘 승인을 받는 도구로 바뀌었거나 선언이 상시 허락을 닫았으면
+            // 허락을 주지 않는다.
+            if (decision.get().approval() != ToolApproval.REQUIRED || !grantable(manifest, action)) {
                 throw grantNotAllowed();
             }
             grants.save(ConnectorToolGrant.of(
@@ -524,12 +519,33 @@ public class ConnectorActionService {
 
     /** 카탈로그에서 그 도구의 이름을 찾아 붙인다. 카탈로그를 읽지 못해도 줄은 돌려준다. */
     private ConnectorActionView view(ConnectorAction action) {
+        return view(action, readManifest(action.connectorId()));
+    }
+
+    /** @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값 */
+    private static ConnectorActionView view(ConnectorAction action, Optional<ConnectorManifest> manifest) {
         return ConnectorActionView.from(
                 action,
-                readManifest(action.connectorId())
-                        .flatMap(manifest -> ConnectorToolPolicies.find(manifest, action.toolName()))
-                        .map(ToolPolicy::title)
-                        .orElse(null));
+                manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())),
+                grantable(manifest, action));
+    }
+
+    /**
+     * 지금 카탈로그로 볼 때 그 줄의 도구에 상시 허락을 줄 수 있는가(ADR-060).
+     *
+     * <p>승인 줄에 저장하지 않고 읽을 때마다 본다. 선언이 바뀌면 바로 따른다. 카탈로그를 읽지 못했으면 줄 수 없는
+     * 것으로 낸다. 도구를 선언하지 않는 판은 상시 허락을 닫는 선언을 둘 수 없으므로 선언 없는 도구에도 줄 수 있다.
+     * 도구를 선언하는 판에서 선언이 없는 도구는 호출이 거절되므로 줄 수 없다.
+     *
+     * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     */
+    private static boolean grantable(Optional<ConnectorManifest> manifest, ConnectorAction action) {
+        if (manifest.isEmpty()) {
+            return false;
+        }
+        return ConnectorToolPolicies.find(manifest.get(), action.toolName())
+                .map(ToolPolicy::grantable)
+                .orElse(manifest.get().schema() == SCHEMA_WITHOUT_TOOLS);
     }
 
     /** 읽지 못했거나 카탈로그에 없으면 빈 값이다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다. */

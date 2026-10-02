@@ -642,16 +642,19 @@ def _hermes_tool_name(server: str, tool: str) -> str:
 
 
 def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
-    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title"}}` 로 낸다. 틀리면 예외다.
+    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant"}}` 로 낸다. 틀리면 예외다.
 
     하한보다 느슨한 선언은 고쳐서 받지 않고 거절한다. 조용히 엄격하게 읽으면 선언이 틀린 것을 만든 사람이 모른다.
     `schema: 1` 은 도구 정책을 선언하지 않는다. 대시보드가 부르는 읽기 전용 도구만 정책으로 낸다.
+    `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-060). 기본값을 채운 값이고,
+    `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
     """
     call_tools = {verify_tool} | set(option_tools)
     if declared["schema"] == 1:
         if "tools" in declared or "default_tool_policy" in declared:
             raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
-        return {name: {"risk": "READ", "approval": "none", "title": None} for name in sorted(call_tools)}
+        return {name: {"risk": "READ", "approval": "none", "title": None, "grant": False}
+                for name in sorted(call_tools)}
     if declared["schema"] != 2:
         raise ValueError("schema 는 1 이나 2 만 받는다")
 
@@ -664,8 +667,8 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     for name, declared_tool in tools.items():
         if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
             raise ValueError("tools 의 키는 도구 이름이다")
-        if not isinstance(declared_tool, dict) or set(declared_tool) - {"risk", "approval", "title"}:
-            raise ValueError("tools 의 값은 risk, approval, title 만 갖는 객체다")
+        if not isinstance(declared_tool, dict) or set(declared_tool) - {"risk", "approval", "title", "grant"}:
+            raise ValueError("tools 의 값은 risk, approval, title, grant 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
@@ -678,7 +681,14 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         title = declared_tool.get("title")
         if "title" in declared_tool and (not isinstance(title, str) or not 1 <= len(title) <= TOOL_TITLE_MAX_CHARS):
             raise ValueError("title 은 1자에서 %d자까지의 문자열이다" % TOOL_TITLE_MAX_CHARS)
-        policies[name] = {"risk": risk, "approval": approval, "title": title}
+        if "grant" in declared_tool:
+            # `1` 이나 `0` 을 boolean 으로 받지 않는다.
+            if type(declared_tool["grant"]) is not bool:
+                raise ValueError("grant 는 true 나 false 다")
+            if approval != "required":
+                raise ValueError("grant 는 approval 이 required 인 도구에만 선언한다")
+        grant = approval == "required" and declared_tool.get("grant") is not False
+        policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant}
     for name in call_tools:
         # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
         if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":

@@ -10,7 +10,9 @@ import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
@@ -27,6 +29,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -66,11 +69,12 @@ class ConnectorPolicyEndpointTest {
     private static final ConnectorManifest DECLARING = manifest(
             2,
             List.of(
-                    new ConnectorTool("list_scopes", "READ", "none", null),
-                    new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기"),
-                    new ConnectorTool("share_note", "SENSITIVE", "required", null),
-                    new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null),
-                    new ConnectorTool("pay_invoice", "FINANCIAL", "always", null)));
+                    new ConnectorTool("list_scopes", "READ", "none", null, null),
+                    new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기", null),
+                    new ConnectorTool("share_note", "SENSITIVE", "required", null, null),
+                    new ConnectorTool("mail_note", "WRITE", "required", null, Boolean.FALSE),
+                    new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null, null),
+                    new ConnectorTool("pay_invoice", "FINANCIAL", "always", null, null)));
 
     @LocalServerPort
     int port;
@@ -92,6 +96,9 @@ class ConnectorPolicyEndpointTest {
 
     @Autowired
     AgentExecutionRepository executions;
+
+    @Autowired
+    ConnectorToolGrantRepository grants;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -197,6 +204,33 @@ class ConnectorPolicyEndpointTest {
     }
 
     @Test
+    @DisplayName("선언이 상시 허락을 닫은 도구는 유효한 허락 줄이 있어도 block 이고 PENDING 승인 줄을 남긴다")
+    void toolWithClosedGrantIsBlockedEvenWithValidGrantRow() throws Exception {
+        connect(true);
+        Instant later = NOW.plus(Duration.ofDays(3650));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "mail_note", later, NOW));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", later, NOW));
+
+        HttpResponse<String> closed = ask("mcp__demo__mail_note", "mail_note");
+        // 같은 모양의 허락 줄이 닫지 않은 도구는 통과시킨다. 위의 block 이 선언 때문임을 확인한다.
+        HttpResponse<String> open = ask("mcp__demo__write_note", "write_note");
+
+        assertApprovalRequested(closed);
+        assertThat(json.readTree(open.body()).path("decision").asString()).isEqualTo("allow");
+        assertThat(jdbc.queryForList("SELECT decision, passed, approval_mode, tool_name, status"
+                        + " FROM connector_action ORDER BY id"))
+                .extracting(
+                        row -> row.get("DECISION"),
+                        row -> row.get("PASSED"),
+                        row -> row.get("APPROVAL_MODE"),
+                        row -> row.get("TOOL_NAME"),
+                        row -> row.get("STATUS"))
+                .containsExactly(
+                        tuple("NEEDS_APPROVAL", false, "REQUIRED", "mail_note", "PENDING"),
+                        tuple("ALLOWED", true, "REQUIRED", "write_note", null));
+    }
+
+    @Test
     @DisplayName("SENSITIVE 와 required 인 도구도 block 과 action_id 로 답하고 통과하지 않은 PENDING 승인 줄을 남긴다")
     void sensitiveToolIsBlockedAndRecordedAsPendingApproval() throws Exception {
         connect(true);
@@ -298,7 +332,8 @@ class ConnectorPolicyEndpointTest {
     void undeclaredToolOfLegacySchemaIsReadAsWriteAndNeedsApproval() throws Exception {
         // 도구를 선언하지 않는 판은 대시보드가 부르는 읽기 도구만 담는다.
         when(connector.readCatalog())
-                .thenReturn(List.of(manifest(1, List.of(new ConnectorTool("list_scopes", "READ", "none", null)))));
+                .thenReturn(
+                        List.of(manifest(1, List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)))));
         connect(true);
 
         HttpResponse<String> unknown = ask("mcp__demo__write_note", null);
@@ -416,8 +451,8 @@ class ConnectorPolicyEndpointTest {
                 .thenReturn(List.of(manifest(
                         2,
                         List.of(
-                                new ConnectorTool("list_scopes", "READ", "none", null),
-                                new ConnectorTool("purge_notes", "READ", "none", null)))));
+                                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                                new ConnectorTool("purge_notes", "READ", "none", null, null)))));
         ConnectorPolicyTestDoubles.expireCatalog();
 
         HttpResponse<String> second = send(token, body);
@@ -470,7 +505,8 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("schema 1 커넥터에서도 다른 MCP 서버의 등록 이름은 block 이고 원래 이름을 비운 UNDECLARED 줄을 남긴다")
     void toolOfAnotherServerIsBlockedAsUndeclaredEvenOnLegacySchema() throws Exception {
         when(connector.readCatalog())
-                .thenReturn(List.of(manifest(1, List.of(new ConnectorTool("list_scopes", "READ", "none", null)))));
+                .thenReturn(
+                        List.of(manifest(1, List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)))));
         connect(true);
 
         HttpResponse<String> response = ask("mcp__other__x", "x");

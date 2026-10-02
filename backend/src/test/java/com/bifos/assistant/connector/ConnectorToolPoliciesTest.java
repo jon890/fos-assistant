@@ -15,14 +15,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class ConnectorToolPoliciesTest {
-    private static final ConnectorTool VERIFY = new ConnectorTool("check", "READ", "none", null);
-    private static final ConnectorTool OPTIONS = new ConnectorTool("list_scopes", "READ", "none", null);
+    private static final ConnectorTool VERIFY = new ConnectorTool("check", "READ", "none", null, null);
+    private static final ConnectorTool OPTIONS = new ConnectorTool("list_scopes", "READ", "none", null, null);
 
     @Test
     @DisplayName("WRITE 에 none 을 선언한 manifest 는 하한보다 느슨해 받지 않는다")
     void rejectsWriteToolDeclaredWithoutApproval() {
         assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("write_note", "WRITE", "none", null))))
+                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("write_note", "WRITE", "none", null, null))))
                 .isFalse();
     }
 
@@ -33,7 +33,7 @@ class ConnectorToolPoliciesTest {
             for (ToolApproval approval : ToolApproval.values()) {
                 String word = approval.name().toLowerCase();
                 boolean valid = ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", risk.name(), word, null)));
+                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", risk.name(), word, null, null)));
 
                 assertThat(valid).as("%s 에 %s", risk, word).isEqualTo(!approval.looserThan(risk.floor()));
             }
@@ -48,8 +48,8 @@ class ConnectorToolPoliciesTest {
     @Test
     @DisplayName("DESTRUCTIVE 에 always 를 선언한 manifest 는 받는다")
     void acceptsDestructiveToolDeclaredWithAlways() {
-        assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null))))
+        assertThat(ConnectorToolPolicies.valid(manifest(
+                        2, VERIFY, OPTIONS, new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null, null))))
                 .isTrue();
     }
 
@@ -65,10 +65,10 @@ class ConnectorToolPoliciesTest {
     @DisplayName("확인 도구와 선택지 도구는 READ 와 none 으로 선언해야 받는다")
     void rejectsVerifyOrOptionsToolNotDeclaredAsReadWithoutApproval() {
         assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, new ConnectorTool("check", "READ", "required", null), OPTIONS)))
+                        manifest(2, new ConnectorTool("check", "READ", "required", null, null), OPTIONS)))
                 .isFalse();
         assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, new ConnectorTool("list_scopes", "SENSITIVE", "required", null))))
+                        manifest(2, VERIFY, new ConnectorTool("list_scopes", "SENSITIVE", "required", null, null))))
                 .isFalse();
     }
 
@@ -76,16 +76,16 @@ class ConnectorToolPoliciesTest {
     @DisplayName("모르는 위험도나 승인 방식, 비어 있는 선언은 받지 않는다")
     void rejectsUnknownRiskOrApproval() {
         assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", "HARMLESS", "none", null))))
+                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", "HARMLESS", "none", null, null))))
                 .isFalse();
         assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", "read", "none", null))))
+                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", "read", "none", null, null))))
                 .isFalse();
         assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", "WRITE", "sometimes", null))))
+                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", "WRITE", "sometimes", null, null))))
                 .isFalse();
         assertThat(ConnectorToolPolicies.valid(
-                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", null, null, null))))
+                        manifest(2, VERIFY, OPTIONS, new ConnectorTool("tool", null, null, null, null))))
                 .isFalse();
     }
 
@@ -102,12 +102,48 @@ class ConnectorToolPoliciesTest {
     @DisplayName("find 는 이름이 같은 선언을 주고 null 이름과 선언하지 않은 이름에는 빈 값을 준다")
     void findsDeclaredPolicyByNameAndReturnsEmptyForNullOrUnknown() {
         ConnectorManifest manifest =
-                manifest(2, VERIFY, OPTIONS, new ConnectorTool("write_note", "WRITE", "always", "메모 쓰기"));
+                manifest(2, VERIFY, OPTIONS, new ConnectorTool("write_note", "WRITE", "always", "메모 쓰기", null));
 
         assertThat(ConnectorToolPolicies.find(manifest, "write_note"))
-                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "메모 쓰기"));
+                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, "메모 쓰기", false));
         assertThat(ConnectorToolPolicies.find(manifest, null)).isEmpty();
         assertThat(ConnectorToolPolicies.find(manifest, "hidden_tool")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("required 도구는 grant 가 없거나 참이면 상시 허락을 줄 수 있고 거짓이면 줄 수 없다")
+    void readsGrantOfRequiredTool() {
+        ConnectorManifest manifest = manifest(
+                2,
+                VERIFY,
+                OPTIONS,
+                new ConnectorTool("absent", "WRITE", "required", null, null),
+                new ConnectorTool("open", "WRITE", "required", null, Boolean.TRUE),
+                new ConnectorTool("closed", "WRITE", "required", null, Boolean.FALSE));
+
+        assertThat(ConnectorToolPolicies.valid(manifest)).isTrue();
+        assertThat(ConnectorToolPolicies.find(manifest, "absent"))
+                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
+        assertThat(ConnectorToolPolicies.find(manifest, "open"))
+                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
+        assertThat(ConnectorToolPolicies.find(manifest, "closed"))
+                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, false));
+    }
+
+    @Test
+    @DisplayName("none 이나 always 인 도구는 grant 가 참이어도 상시 허락을 줄 수 없다")
+    void toolWithoutRequiredApprovalIsNeverGrantable() {
+        ConnectorManifest manifest = manifest(
+                2,
+                VERIFY,
+                OPTIONS,
+                new ConnectorTool("read_note", "READ", "none", null, Boolean.TRUE),
+                new ConnectorTool("send_note", "WRITE", "always", null, Boolean.TRUE));
+
+        assertThat(ConnectorToolPolicies.find(manifest, "read_note"))
+                .contains(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null, false));
+        assertThat(ConnectorToolPolicies.find(manifest, "send_note"))
+                .contains(new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, null, false));
     }
 
     @Test

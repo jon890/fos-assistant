@@ -10,18 +10,26 @@ const demoConnector = {
   myStatus: "DISCONNECTED",
   available: true,
   tools: [
-    { name: "list_scopes", title: null, risk: "READ", approval: "NONE" },
+    {
+      name: "list_scopes",
+      title: null,
+      risk: "READ",
+      approval: "NONE",
+      grant: false,
+    },
     {
       name: "write_note",
       title: "메모 쓰기",
       risk: "WRITE",
       approval: "REQUIRED",
+      grant: true,
     },
     {
       name: "purge_notes",
       title: null,
       risk: "DESTRUCTIVE",
       approval: "ALWAYS",
+      grant: false,
     },
   ],
   fields: [
@@ -423,6 +431,7 @@ test("쓰기 도구라도 늘 승인을 받게 선언했으면 아직 쓸 수 �
               title: "메모 공유",
               risk: "WRITE",
               approval: "ALWAYS",
+              grant: false,
             },
           ],
         },

@@ -100,14 +100,16 @@ class ConnectorActionServiceTest {
     private static final String PROFILE = "connector-action-owner";
     private static final String DEMO = "demo-notes";
     private static final String WRITE = "write_note";
+    private static final String MAIL = "mail_note";
     private static final String ARGS = "{\"text\":\"안녕\",  \"count\":2}";
     private static final long CONVERSATION = 7L;
 
-    /** 승인 방식이 셋 다 있는 커넥터다. MCP 서버 이름이 {@code demo} 라 등록 이름은 {@code mcp__demo__<도구>} 다. */
+    /** 승인 방식이 셋 다 있고 상시 허락을 닫은 도구가 하나 있는 커넥터다. MCP 서버 이름이 {@code demo} 라 등록 이름은 {@code mcp__demo__<도구>} 다. */
     private static final ConnectorManifest DECLARING = manifest(List.of(
-            new ConnectorTool("list_scopes", "READ", "none", null),
-            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기"),
-            new ConnectorTool("send_note", "WRITE", "always", null)));
+            new ConnectorTool("list_scopes", "READ", "none", null, null),
+            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null),
+            new ConnectorTool("send_note", "WRITE", "always", null, null),
+            new ConnectorTool(MAIL, "WRITE", "required", "메모 보내기", Boolean.FALSE)));
 
     @Autowired
     ConnectorPolicyService policies;
@@ -556,6 +558,88 @@ class ConnectorActionServiceTest {
     }
 
     @Test
+    @DisplayName("선언이 상시 허락을 닫은 도구의 승인 줄은 grantAllowed 가 거짓이고 기간을 실은 승인은 VALIDATION_FAILED 이며 줄은 PENDING 그대로다")
+    void grantOnToolWithClosedGrantIsRejectedAndActionStaysPending() {
+        UUID actionId = ask(MAIL, ARGS).actionId();
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::grantAllowed)
+                .containsExactly(tuple(actionId, false));
+        assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
+
+        assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(grants.findAll()).isEmpty();
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("선언이 상시 허락을 닫은 도구도 기간 없이 승인하면 한 번 실행하고 다음 호출은 다시 승인을 기다린다")
+    void toolWithClosedGrantIsApprovedEachTime() {
+        UUID actionId = ask(MAIL, ARGS).actionId();
+
+        ConnectorActionView approved = service.approve(me, actionId, null);
+
+        verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__mail_note", ARGS);
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(approved.title()).isEqualTo("메모 보내기");
+        assertThat(approved.grantAllowed()).isFalse();
+        assertThat(grants.findAll()).isEmpty();
+        assertThat(ask(MAIL, "{\"text\":\"다음 글\"}").allowed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("승인할 때 그 도구의 선언이 상시 허락을 닫는 것으로 바뀌었으면 허락을 주지 않고 줄은 PENDING 그대로다")
+    void grantIsRefusedWhenDeclarationClosedTheGrant() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        catalogBecomes(manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "required", null, Boolean.FALSE))));
+
+        assertCode(() -> service.approve(me, actionId, GrantPeriod.TODAY), ErrorCode.VALIDATION_FAILED);
+
+        assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(grants.findAll()).isEmpty();
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("도구를 선언하지 않는 판의 선언 없는 도구는 승인 줄의 grantAllowed 가 참이고 기간을 실어 승인하면 허락이 생긴다")
+    void undeclaredToolOfLegacySchemaCanStillBeGranted() {
+        catalogBecomes(legacyManifest());
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        assertThat(onlyAction().toolName()).isEqualTo(WRITE);
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::grantAllowed)
+                .containsExactly(tuple(actionId, true));
+        ConnectorActionView approved = service.approve(me, actionId, GrantPeriod.HOUR);
+
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(approved.grantAllowed()).isTrue();
+        assertThat(service.grants(me))
+                .extracting(ConnectorGrantView::connectorId, ConnectorGrantView::toolName)
+                .containsExactly(tuple(DEMO, WRITE));
+    }
+
+    @Test
+    @DisplayName("카탈로그를 읽지 못하면 승인 줄의 grantAllowed 가 거짓이고 기간을 실은 승인은 VALIDATION_FAILED 이며 줄은 PENDING 그대로다")
+    void grantIsRefusedWhenCatalogIsUnreadable() {
+        catalogBecomes(legacyManifest());
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        ConnectorPolicyTestDoubles.expireCatalog();
+        when(connector.readCatalog()).thenThrow(new IllegalStateException());
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+                .extracting(ConnectorActionView::actionId, ConnectorActionView::grantAllowed)
+                .containsExactly(tuple(actionId, false));
+        assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
+
+        assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(grants.findAll()).isEmpty();
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("승인할 때 연결이 PENDING 이면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalOfNotReadyConnectionRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
@@ -573,7 +657,7 @@ class ConnectorActionServiceTest {
     @DisplayName("승인할 때 그 도구가 선언에서 빠졌으면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalOfToolRemovedFromDeclarationRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
-        catalogBecomes(manifest(List.of(new ConnectorTool("list_scopes", "READ", "none", null))));
+        catalogBecomes(manifest(List.of(new ConnectorTool("list_scopes", "READ", "none", null, null))));
 
         ConnectorActionView closed = service.approve(me, actionId, null);
 
@@ -588,8 +672,8 @@ class ConnectorActionServiceTest {
     void approvalOfToolThatBecameDestructiveRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         catalogBecomes(manifest(List.of(
-                new ConnectorTool("list_scopes", "READ", "none", null),
-                new ConnectorTool(WRITE, "DESTRUCTIVE", "always", null))));
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "DESTRUCTIVE", "always", null, null))));
 
         ConnectorActionView closed = service.approve(me, actionId, null);
 
@@ -619,8 +703,8 @@ class ConnectorActionServiceTest {
     void grantIsRefusedWhenToolBecameAlwaysApproved() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         catalogBecomes(manifest(List.of(
-                new ConnectorTool("list_scopes", "READ", "none", null),
-                new ConnectorTool(WRITE, "WRITE", "always", null))));
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "always", null, null))));
 
         assertCode(() -> service.approve(me, actionId, GrantPeriod.TODAY), ErrorCode.VALIDATION_FAILED);
 
@@ -876,6 +960,21 @@ class ConnectorActionServiceTest {
 
     private static CurrentUser currentUser(AppUser user) {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
+    }
+
+    /** 도구를 선언하지 않는 판의 커넥터다. 대시보드가 부르는 읽기 도구만 담는다. */
+    private static ConnectorManifest legacyManifest() {
+        return new ConnectorManifest(
+                DEMO,
+                "검사용 메모",
+                "",
+                List.of(),
+                "list_scopes",
+                "demo",
+                List.of(),
+                false,
+                1,
+                List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
     }
 
     private static ConnectorManifest manifest(List<ConnectorTool> tools) {
