@@ -365,6 +365,12 @@ export const MEMORY_READ_PROBE = "MCP Memory 읽기 검사";
 export const SUBAGENT_MEMORY_PROBE = "MCP 하위 에이전트 검사";
 
 /**
+ * 기존 자식 검사와 같은 흐름이되, 자식 session 응답에 부모 바인딩과 다른 provider 와 모델을 싣는 입력이다.
+ * 자식 금액이 부모의 가격이 아니라 자식의 provider 와 모델로 계산되는지 본다.
+ */
+export const SUBAGENT_PROVIDER_PROBE = "자식 provider 확인 검사";
+
+/**
  * 이 글로 시작하는 입력을 받으면 그 뒤의 줄마다 `<등록 이름> <JSON 인자>` 를 읽어, profile 플러그인의 hook 처럼
  * 차례로 Control Plane 에 판정을 묻는다. 답은 줄마다 `<등록 이름>: allow` 나 `<등록 이름>: block <글>` 이다.
  * `allow` 인 호출만 커넥터 서버에 닿은 것으로 치고 `connectorToolCalls` 에 남긴다.
@@ -650,7 +656,9 @@ export function startFakeHermes(
   });
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
-  const childUsages = new Map<string, { profile: string; parent: string; reads: number; delayed: boolean }>();
+  /** 자식 session 응답이 싣는 모델과 provider 다. 비우면 일반 자식처럼 provider 없이 `example-fast` 를 준다. */
+  const childUsages = new Map<string, { profile: string; parent: string; reads: number; delayed: boolean;
+    model?: string; provider?: string }>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
   const profiles = new Map<string, Record<string, string>>();
   const apiServerToolsets = new Map(
@@ -1400,7 +1408,8 @@ export function startFakeHermes(
             const ended = !child.delayed || child.reads > 1;
             return send(response, 200, { object: "session", session: {
               id: sessionId, source: "subagent", parent_session_id: child.parent,
-              model: "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
+              model: child.model ?? "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
+              ...(child.provider === undefined ? {} : { billing_provider: child.provider }),
               end_reason: ended ? "agent_close" : null,
               input_tokens: 100, cache_read_tokens: 50, cache_write_tokens: 10, output_tokens: 20,
             } });
@@ -1545,13 +1554,15 @@ export function startFakeHermes(
           }
           // 하위 에이전트 사건은 도구 사건과 어미가 다르다. `.started` 와 `.completed` 가 아니다.
           // Hermes v0.21.0 은 여기에 session 번호를 싣지 않고 `preview` 만 보낸다.
-          if (run.input === "자식 늦은 완료 검사" || run.input === "자식 완료 사건 없음 검사" || run.input === "압축 뒤 자식 완료 검사") {
+          if (run.input === "자식 늦은 완료 검사" || run.input === "자식 완료 사건 없음 검사" || run.input === "압축 뒤 자식 완료 검사"
+            || run.input === SUBAGENT_PROVIDER_PROBE) {
             const childSessionId = `child-${run.run_id}`;
             const parentSessionId = run.input === "압축 뒤 자식 완료 검사"
               ? `compacted-${run.session_id}`
               : run.session_id;
             childUsages.set(childSessionId, { profile: profile!, parent: parentSessionId,
-              reads: 0, delayed: run.input === "자식 늦은 완료 검사" });
+              reads: 0, delayed: run.input === "자식 늦은 완료 검사",
+              ...(run.input === SUBAGENT_PROVIDER_PROBE ? { model: "example-model-large", provider: "anthropic" } : {}) });
             const child = { subagent_id: `sa-${run.run_id}`, goal: "부모 뒤에 끝나는 조사",
               model: "example-fast", child_session_id: childSessionId };
             event(response, { event: "subagent.start", ...child });

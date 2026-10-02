@@ -170,7 +170,9 @@ profile은 서버가 확인한 바인딩에서 고른다.
 
 ## 비동기 자식 사용량
 
-`SUBAGENT_STARTED`가 남았지만 같은 child session의 완료 기록이 없으면 부모 종료 뒤 별도로 조회한다.
+부모 실행이 끝나면 `SUBAGENT_STARTED` 가 남은 child session 마다 재조회 작업 줄을 하나 만들고 session 을 조회한다.
+완료 사건이 부모 스트림으로 이미 왔어도 조회한다. 사건에는 cache 구분과 provider 가 없기 때문이다.
+이 줄이 native 자식 한 명의 사용량 원장이다. 근거는 [ADR-062](adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 에 있다.
 재조회 작업은 DB에 저장하고 서버 재기동 뒤에도 이어 간다.
 처음 2분은 5초 간격, 이후 지수로 늘려 최대 5분 간격으로 조회한다.
 24시간 뒤 멈추며 서버 전체 동시 조회 수를 제한한다.
@@ -184,6 +186,7 @@ profile은 서버가 확인한 바인딩에서 고른다.
 서버 한 대가 작업 ID별로 실행 중인 조회를 추적해 같은 작업을 겹쳐 부르지 않는다.
 완료 기록을 넣는 트랜잭션은 실행 줄을 잠그고 다음 sequence를 정한다.
 자식 완료 자연키는 `(execution_id, child_session_id)`이며 기존 완료 중복은 최신 한 줄만 키를 가진다.
+작업 줄도 `(execution_id, child_session_id)` 가 유일하다. 같은 profile 의 같은 child session 줄이 다른 실행 아래 이미 있으면 새 줄을 만들지 않는다.
 자식이 아직 끝나지 않았거나 읽지 못하면 토큰을 0으로 채우지 않는다.
 기간을 넘긴 자식은 사용량 미확인으로 표시한다.
 
@@ -192,8 +195,44 @@ profile은 서버가 확인한 바인딩에서 고른다.
 `ended_at`과 `agent_close`는 성공의 증명이 아니므로 실패 여부는 확인되지 않은 값으로 둔다.
 입력은 일반 입력, cache read, cache write를 합산해 부모 실행의 입력 정의와 맞춘다.
 시간은 `(ended_at - started_at) * 1000`의 밀리초다.
-SSE 완료 기록이 먼저 생기면 재조회 작업은 완료 처리하고 새 사건을 만들지 않는다.
-이 토큰은 자식 표시용이며 기존 월별 사용량 합계에는 추가하지 않는다.
+SSE 완료 기록이 먼저 생겼으면 새 사건을 만들지 않고 작업 줄에만 사용량을 적는다.
+사건의 토큰은 자식 표시용이다. 합계에는 작업 줄의 값만 더한다.
+
+### 원장 줄에 적는 것
+
+종료를 확인한 자식은 작업 줄에 provider, 모델, 일반 입력, cache read, cache write, 출력 토큰을 따로 적고 `DONE` 으로 바꾼다.
+provider 는 session 응답의 `provider`, 없으면 `billing_provider` 에서 읽는다. 둘 다 없으면 비운다.
+부모 실행의 provider 나 자식 모델 이름으로 provider 를 추정하지 않는다.
+금액은 그 provider 와 모델을 가격표에서 찾아 환산하고 가격표 버전을 함께 적는다.
+입력은 일반 입력, cache read, cache write 를 합친 값으로, cache read 는 cache 단가로 환산한다. cache write 는 입력 단가로 센다.
+실제 청구액은 부모 실행의 `cost_mode` 가 `API` 일 때만 환산액과 같은 값으로 적는다.
+금액을 내지 못한 `DONE` 줄은 `unconfirmed_reason` 에 까닭을 적는다.
+
+| `unconfirmed_reason` | 언제 |
+| --- | --- |
+| `PROVIDER_UNKNOWN` | session 응답에 provider 가 없다 |
+| `USAGE_UNKNOWN` | 입력이나 출력 토큰을 읽지 못했다 |
+| `PRICE_UNKNOWN` | 가격표에 그 provider 와 모델이 없다 |
+
+v0.21.5 의 session 응답은 provider 를 주지 않아([`hermes/runs-api.md`](hermes/runs-api.md)) 그동안 native 자식은 `PROVIDER_UNKNOWN` 으로 남는다.
+provider 를 읽는 경로는 이슈 #110 이 다룬다.
+
+### 합계와 완전성
+
+월 합계와 축별 합계는 `agent_execution` 의 합에 금액이 있는 `DONE` 줄을 더한다.
+부모 실행이 `RUNNING` 이면 그 자식도 뺀다. 작업 줄은 부모가 끝난 뒤에만 생긴다.
+자식은 부모 실행의 사용자, 에이전트, 시작 시각, 지문에 붙고, 모델 축에서는 자식의 provider 와 모델에 붙는다.
+자식은 실행 건수에 세지 않고 `subagents` 로 따로 센다. `agent_delegate` 로 만든 자식은 자기 실행 줄이 있어 이 줄을 만들지 않는다.
+
+금액을 확인하지 못한 자식은 셋으로 나눠 센다.
+
+| 응답 칸 | 세는 것 |
+| --- | --- |
+| `pendingSubagents` | `WAITING` 줄. session 이 있는 시작 사건인데 아직 작업 줄이 없고 부모가 끝난 지 24시간 안인 자식도 여기 센다 |
+| `unconfirmedSubagents` | `EXPIRED` 줄과 session 없이 온 시작 사건. 작업 줄 없이 부모가 끝난 지 24시간이 지난 자식도 여기 센다. 재조회가 그 자식을 더는 찾지 않기 때문이다 |
+| `unpricedSubagents` | 금액이 없는 `DONE` 줄 |
+
+`pricedSubagents` 는 금액이 있는 `DONE` 줄의 수다.
 
 종료된 session 을 다시 조회해도 값이 같다는 실측은 [`hermes/delegation.md`](hermes/delegation.md#자식-session-으로-결과와-토큰을-보완한다) 에 있다.
 
@@ -221,8 +260,9 @@ API 응답은 그대로 두며 화면에서 역할에 따라 표시한다.
 
 가짜 Hermes는 자식 완료가 부모 완료 뒤에 오거나 오지 않는 순서를 검사한다.
 세션 조회 지연, 끝내 미완료, 중복 SSE, 재기동, 다른 부모 session, 권한과 기본값 우선순위도 검사한다.
+부모와 자식이 다른 provider 와 모델로 돈 경우의 합계와 완전성 건수도 검사한다.
 
 실행 나무는 시작 사건에 `subagentUsageStatus`를 합쳐 반환한다.
-완료 사건이 있으면 `RECORDED`, 만료 작업이면 `UNCONFIRMED`, 기다리는 작업이면 `WAITING`이다.
+완료 사건이 있으면 `RECORDED`, 만료 작업이면 `UNCONFIRMED`, 그 밖의 작업이면 `WAITING`이다.
 작업 설명은 상태 안내로 바꾸지 않는다.
 profile에도 강도 설정이 없으면 실제 강도를 모르므로 출처를 `UNKNOWN`으로 둔다.

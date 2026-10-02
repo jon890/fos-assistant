@@ -1,5 +1,6 @@
 import { Stat } from "@/components/ui/stat";
 import { formatAmount } from "@/lib/format";
+import { subagentGapDetail, subagentGapTotal } from "@/lib/subagent-gap";
 
 export type MonthlyCost = {
   month: string;
@@ -9,6 +10,10 @@ export type MonthlyCost = {
   unpricedExecutions: number;
   actualCostMicros: number;
   subscriptionExecutions: number;
+  pricedSubagents: number;
+  pendingSubagents: number;
+  unconfirmedSubagents: number;
+  unpricedSubagents: number;
 };
 
 type Props = {
@@ -29,6 +34,12 @@ export function MonthlySummary({ monthly, isAdmin }: Props) {
       </dl>
     );
   }
+  const gap = {
+    pending: monthly.pendingSubagents,
+    unconfirmed: monthly.unconfirmedSubagents,
+    unpriced: monthly.unpricedSubagents,
+  };
+  const gapTotal = subagentGapTotal(gap);
   return (
     <dl className="mb-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
       <Stat
@@ -51,6 +62,14 @@ export function MonthlySummary({ monthly, isAdmin }: Props) {
           label="가격을 찾지 못한 실행"
           value={`${monthly.unpricedExecutions.toLocaleString("ko-KR")}건`}
           detail="환산 합계에서 제외됨"
+          className="sm:col-span-2 md:col-span-1"
+        />
+      ) : null}
+      {gapTotal > 0 ? (
+        <Stat
+          label="금액을 확인하지 못한 도우미"
+          value={`${gapTotal.toLocaleString("ko-KR")}건`}
+          detail={`${subagentGapDetail(gap)} · 환산 합계에서 제외됨`}
           className="sm:col-span-2 md:col-span-1"
         />
       ) : null}
