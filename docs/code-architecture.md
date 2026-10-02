@@ -67,7 +67,7 @@ Memory 의 기본 근거는 [`adr/ADR-003-memory-권한은-주입으로-강제�
 | `test/browser/` | 화면의 배치와 동작 | 위에 더해 웹과 Chromium |
 | `test/unit/` | 화면이 쓰는 순수 함수 | 없음 |
 
-브라우저 테스트는 `mobile` 과 `desktop` 두 폭에서 돈다. 각각 390px 와 1280px 다.
+브라우저 테스트는 `mobile` 과 `desktop` 두 폭에서 돈다. 폭의 값은 `test/browser/playwright.config.ts` 가 갖는다.
 
 **운영 코드에 시험용 문을 만들지 않는다.**
 로그인은 테스트가 NextAuth 세션 쿠키를 직접 만들어 넣는다.

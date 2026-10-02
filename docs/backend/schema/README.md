@@ -2,7 +2,7 @@
 
 Control Plane 의 표와 칸이 무엇을 뜻하는지를 갖는다. 표는 주제별로 아래 다섯 파일에 나눠 적는다.
 MySQL 8.4 에 둔다. 마이그레이션은 `backend/src/main/resources/db/migration/` 이 소유하고 이 문서는 뜻을 적는다.
-색인은 마이그레이션이 갖는다. 이 문서는 표마다 칸과 유일 제약과 FK 만 적는다.
+DB 색인(index)은 마이그레이션이 갖는다. 이 문서는 표마다 칸과 유일 제약과 FK 만 적는다.
 
 비밀값은 어느 표에도 넣지 않는다.
 AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 홈서버의 파일에 있다.

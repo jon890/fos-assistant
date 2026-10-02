@@ -14,7 +14,6 @@ Control Plane 이다. Spring Boot 4 와 MySQL 8.4 를 쓴다.
 
 층 방향은 [`../docs/backend/packages.md`](../docs/backend/packages.md) 가 갖는다.
 검사: `ArchitectureRules.LAYER_DIRECTION`
-자세한 것은 [`docs/code-architecture.md`](../docs/code-architecture.md) 에 있다.
 
 ### 데이터 클래스는 컨트롤러 안에 두지 않는다
 

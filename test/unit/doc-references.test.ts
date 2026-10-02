@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -25,9 +25,12 @@ const CODE_EXTENSIONS = [
   ".template",
 ];
 
-/** 문서 경로(`docs/…`)나루트와 하위의 `AGENTS.md` 다. 뒤에 절 이름 「…」 이 바로 올 수 있다. */
+/**
+ * 문서 경로(`docs/…`)와 루트, 하위의 `AGENTS.md`, `hermes/README.md` 다. 뒤에 절 이름 「…」 이 바로 올 수 있다.
+ * 경로 문자 클래스가 ASCII 만 받아 한글 파일 이름(ADR 경로 등)은 검사에서 빠진다.
+ */
 const REFERENCE =
-  /(docs\/[A-Za-z0-9_./-]+\.md|(?:backend\/|web\/)?AGENTS\.md)(?:[`})]{0,2} ?(?:의)? ?「([^」]+)」)?/g;
+  /(docs\/[A-Za-z0-9_./-]+\.md|(?:backend\/|web\/)?AGENTS\.md|hermes\/README\.md)(?:[`})]{0,2} ?(?:의)? ?「([^」]+)」)?/g;
 
 export interface DocReference {
   /** 저장소 root 기준 경로다. */
@@ -52,20 +55,24 @@ export function findDocReferences(text: string): DocReference[] {
   text.split("\n").forEach((lineText, index) => {
     for (const match of lineText.matchAll(REFERENCE)) {
       const path = match[1];
-      if (/NNN|<|\*/.test(path)) continue;
+      if (path.includes("NNN")) continue;
       found.push({ path, section: match[2], line: index + 1 });
     }
   });
   return found;
 }
 
-/** 코드와 프롬프트 파일 가운데 문서를 가리킬 수 있는 것을 `git ls-files` 에서 고른다. */
-function targetFiles(): string[] {
-  const output = execFileSync("git", ["ls-files", "-s"], {
+function gitLsFiles(args: string[]): string {
+  return execFileSync("git", ["ls-files", ...args], {
     cwd: REPO_ROOT,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   });
+}
+
+/** 코드와 프롬프트 파일 가운데 문서를 가리킬 수 있는 것을 `git ls-files` 에서 고른다. */
+function targetFiles(): string[] {
+  const output = gitLsFiles(["-s"]);
   const files: string[] = [];
   for (const row of output.split("\n")) {
     const match = /^(\d+) \S+ \d+\t(.+)$/.exec(row);
@@ -189,7 +196,15 @@ test("절 이름이 없으면 경로만 얻는다", () => {
 });
 
 test("자리표시자 경로는 건너뛴다", () => {
-  assert.deepEqual(findDocReferences("docs/adr/NNN-<슬러그>.md"), []);
+  assert.deepEqual(findDocReferences("docs/adr/NNN-slug.md"), []);
+});
+
+test("hermes/README.md 도 절 이름까지 읽는다", () => {
+  const [reference] = findDocReferences(
+    "{@code hermes/README.md} 의 「dashboard-profile-api 가 여는 것」",
+  );
+  assert.equal(reference.path, "hermes/README.md");
+  assert.equal(reference.section, "dashboard-profile-api 가 여는 것");
 });
 
 test("AGENTS.md 는 하위 경로와 절 이름까지 읽는다", () => {
@@ -201,10 +216,10 @@ test("AGENTS.md 는 하위 경로와 절 이름까지 읽는다", () => {
 test("한 문서 안에 같은 헤딩이 두 번 나오지 않는다", async () => {
   const problems: string[] = [];
   for (const directory of UNIQUE_HEADING_DIRECTORIES) {
-    const names = (await readdir(join(REPO_ROOT, directory))).sort();
-    for (const name of names) {
-      if (!name.endsWith(".md")) continue;
-      const file = `${directory}/${name}`;
+    const files = gitLsFiles([`${directory}/*.md`])
+      .split("\n")
+      .filter((file) => file !== "" && file.split("/").length === directory.split("/").length + 1);
+    for (const file of files) {
       const text = await readFile(join(REPO_ROOT, file), "utf8");
       for (const heading of duplicateHeadings(text)) {
         problems.push(`${file}  「${heading}」`);
