@@ -1,6 +1,5 @@
 package com.bifos.assistant.architecture;
 
-import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -9,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -33,14 +31,10 @@ import java.util.TreeSet;
  */
 final class TopLevelPackageCycles extends ArchCondition<JavaClass> {
 
-    private static final String ROOT_PACKAGE = "com.bifos.assistant";
-    private static final String EXCLUDED_PACKAGE = "shared";
-
     /** 출발 패키지마다 순환에 속한 간선의 도착 패키지. 이름 순이다. */
     private final Map<String, SortedSet<String>> cyclicEdges = new TreeMap<>();
 
-    /** 패키지마다 이름 순으로 첫 클래스. 그 패키지의 간선 위반은 이 클래스에서만 낸다. */
-    private final Map<String, String> reportingClass = new TreeMap<>();
+    private TopLevelPackageEdges packageEdges = TopLevelPackageEdges.of(List.of());
 
     TopLevelPackageCycles() {
         super("최상위 패키지 사이의 간선이 순환에 속하지 않는다");
@@ -49,25 +43,8 @@ final class TopLevelPackageCycles extends ArchCondition<JavaClass> {
     @Override
     public void init(Collection<JavaClass> allObjectsToTest) {
         cyclicEdges.clear();
-        reportingClass.clear();
-
-        Map<String, SortedSet<String>> edges = new TreeMap<>();
-        for (JavaClass javaClass : allObjectsToTest) {
-            Optional<String> source = topLevelPackageOf(javaClass);
-            if (source.isEmpty()) {
-                continue;
-            }
-            edges.computeIfAbsent(source.get(), ignored -> new TreeSet<>());
-            reportingClass.merge(source.get(), javaClass.getName(), (a, b) -> a.compareTo(b) <= 0 ? a : b);
-            for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
-                topLevelPackageOf(dependency.getTargetClass().getBaseComponentType())
-                        .filter(target -> !target.equals(source.get()))
-                        .ifPresent(target -> {
-                            edges.get(source.get()).add(target);
-                            edges.computeIfAbsent(target, ignored -> new TreeSet<>());
-                        });
-            }
-        }
+        packageEdges = TopLevelPackageEdges.of(allObjectsToTest);
+        Map<String, SortedSet<String>> edges = packageEdges.edges();
 
         List<String> nodes = new ArrayList<>(edges.keySet());
         boolean[][] reach = reachability(nodes, edges);
@@ -80,12 +57,12 @@ final class TopLevelPackageCycles extends ArchCondition<JavaClass> {
 
     @Override
     public void check(JavaClass item, ConditionEvents events) {
-        Optional<String> source = topLevelPackageOf(item);
-        if (source.isEmpty() || !item.getName().equals(reportingClass.get(source.get()))) {
+        if (!packageEdges.reports(item)) {
             return;
         }
-        for (String target : cyclicEdges.getOrDefault(source.get(), new TreeSet<>())) {
-            events.add(SimpleConditionEvent.violated(item, source.get() + " -> " + target + " 는 순환에 속한다"));
+        String source = TopLevelPackageEdges.topLevelPackageOf(item).orElseThrow();
+        for (String target : cyclicEdges.getOrDefault(source, new TreeSet<>())) {
+            events.add(SimpleConditionEvent.violated(item, source + " -> " + target + " 는 순환에 속한다"));
         }
     }
 
@@ -108,16 +85,5 @@ final class TopLevelPackageCycles extends ArchCondition<JavaClass> {
             }
         }
         return reach;
-    }
-
-    private static Optional<String> topLevelPackageOf(JavaClass javaClass) {
-        String packageName = javaClass.getPackageName();
-        if (!packageName.startsWith(ROOT_PACKAGE + ".")) {
-            return Optional.empty();
-        }
-        String rest = packageName.substring(ROOT_PACKAGE.length() + 1);
-        int dot = rest.indexOf('.');
-        String topLevel = dot < 0 ? rest : rest.substring(0, dot);
-        return EXCLUDED_PACKAGE.equals(topLevel) ? Optional.empty() : Optional.of(topLevel);
     }
 }

@@ -1,6 +1,6 @@
 ## ADR-068: 최상위 패키지는 한 방향 층 순서를 따르고 거꾸로 가는 의존은 port 나 이동으로 끊는다
 
-- **status**: `accepted`. S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘과 `agent` 가 `people` 을 쓰는 하나(C5), `agent` 가 `skill` 과 `orchestration` 을 쓰는 둘, `agent` 가 `chat` 과 `usage` 를 쓰는 둘(C1), `usage` 와 `memory` 가 `chat` 을 쓰는 둘(C2), `skill` 이 `chat` 을 쓰는 하나, `chat` 이 `orchestration` 을 쓰는 하나(C3, C4)를 끊었다. `memory` 가 `context` 를 쓰는 간선과 C7 은 아직 구현 전이다
+- **status**: `accepted`
 - **결정**: backend 의 최상위 패키지를 아래에서 위로 다음 순서에 둔다. 위 패키지는 아래 패키지를 쓰고, 아래 패키지는 위 패키지를 import 하지 않는다.
   `hermes`, `user`, `model`, `agent`, `skill`, `usage`, `memory`, `context`, `chat`, `orchestration`, `mcp`, `people`, `connector` 순이다. `shared` 는 이 순서 밖이고 어느 패키지도 쓰지 않는다.
   이 순서에서 거꾸로 가는 의존은 아래 셋 가운데 하나로 끊는다.
@@ -42,7 +42,7 @@
   `agent`, `chat`, `context`, `mcp`, `memory`, `orchestration`, `people`, `skill`, `usage`, `user` 열 개가 한 순환 덩어리였다.
   2026-10-03 에 import 로 간선을 뽑아 보니 기준에 든 38 개 가운데 위 순서에서 거꾸로 가는 간선은 12 개이고 클래스 참조로는 43 개였다. 12 는 끊어야 하는 간선의 최소 수다.
   `model` 은 그때 없던 패키지다. C2 로 만들며 `user` 바로 위에 둔다.
-  기준에 없는 거꾸로 간선이 하나 더 있다. `hermes` 가 `usage` 의 길이 상한 상수를 읽는다. 컴파일 때 값으로 바뀌는 상수라 규칙이 보지 못한다. 상한을 인자로 받게 고쳐 함께 끊는다.
+  기준에 없는 거꾸로 간선이 하나 더 있다. `hermes` 가 `usage` 의 길이 상한 상수를 읽는다. 컴파일 때 값으로 바뀌는 상수라 규칙이 보지 못한다. 상한 상수를 `hermes` 로 옮기고 `usage` 가 그 값을 읽게 해 함께 끊는다. 인자로 받게 하면 적용된 마이그레이션 `V41` 이 부르는 시그니처가 바뀐다.
   원인은 셋으로 모였다. 아래 층이어야 할 `user` 와 `agent` 가 조율을 직접 한다. 값 타입이 쓰는 쪽보다 위 패키지에 있다. 서비스가 다른 패키지의 엔티티를 통째로 받아 값 둘만 읽는다.
   `SHARED_DOES_NOT_DEPEND_ON_DOMAINS` 의 기준 17 줄은 `shared` 가 `user` 와 `mcp` 를 쓰는 것이었다.
 - **대안 기각**:

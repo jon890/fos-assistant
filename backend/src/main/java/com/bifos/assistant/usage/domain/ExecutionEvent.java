@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.domain;
 
+import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,8 +38,8 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class ExecutionEvent {
 
-    /** 화면에 한 줄로 보일 만큼만 담는다. 넘으면 자른다. */
-    public static final int DETAIL_LIMIT = 500;
+    /** 화면에 한 줄로 보일 만큼만 담는다. 넘으면 자른다. 값은 {@code hermes} 의 {@code ToolDetailRedactor} 가 갖는다. */
+    public static final int DETAIL_LIMIT = ToolDetailRedactor.DETAIL_LIMIT;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

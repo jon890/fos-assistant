@@ -31,6 +31,13 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    @DisplayName("최상위 패키지가 층 순서의 위쪽을 새로 쓰지 않는다")
+    void topLevelPackagesFollowLayerOrder() {
+        FreezingArchRule.freeze(ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER)
+                .check(MAIN);
+    }
+
+    @Test
     @DisplayName("shared 가 다른 최상위 패키지를 새로 쓰지 않는다")
     void sharedDoesNotDependOnDomains() {
         FreezingArchRule.freeze(ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS)

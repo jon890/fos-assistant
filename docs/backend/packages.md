@@ -44,6 +44,32 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다.
 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
 
+### 최상위 패키지의 층 순서
+
+최상위 패키지는 아래 순서를 따른다. 자리 1 이 맨 아래이고 13 이 맨 위다.
+
+| 자리 | 패키지 |
+| --- | --- |
+| 1 | `hermes` |
+| 2 | `user` |
+| 3 | `model` |
+| 4 | `agent` |
+| 5 | `skill` |
+| 6 | `usage` |
+| 7 | `memory` |
+| 8 | `context` |
+| 9 | `chat` |
+| 10 | `orchestration` |
+| 11 | `mcp` |
+| 12 | `people` |
+| 13 | `connector` |
+
+위 패키지는 아래 패키지를 쓰고 아래 패키지는 위 패키지를 import 하지 않는다.
+거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
+새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
+`shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
+검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
+
 ### connector
 
 `connector`는 커넥터 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.

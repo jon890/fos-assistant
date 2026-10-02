@@ -1,6 +1,7 @@
 package com.bifos.assistant.context;
 
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.OmittedMemories;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class ContextAssembler {
+public class ContextAssembler implements OmittedMemories {
     private static final String GROUP_HEADER = "# 우리 그룹이 함께 아는 것";
     private static final String USER_HEADER = "# 지금 묻는 사람에 대해 아는 것";
     private static final String RESPONSE_INSTRUCTIONS = """
@@ -74,6 +75,11 @@ public class ContextAssembler {
      */
     public AssembledContext assembleForOwner(CurrentUser user) {
         return assemble(user, MemoryAccess.owner());
+    }
+
+    @Override
+    public Set<Long> omittedFor(CurrentUser user) {
+        return Set.copyOf(assembleForOwner(user).omittedMemoryIds());
     }
 
     private AssembledContext assemble(CurrentUser user, MemoryAccess access) {
