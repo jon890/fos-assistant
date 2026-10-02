@@ -1,6 +1,5 @@
 package com.bifos.assistant.hermes;
 
-import com.bifos.assistant.usage.domain.ExecutionEvent;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -16,6 +15,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** 도구 설명을 외부로 중계하거나 저장하기 전에 비밀값과 식별자를 제거한다. */
 public final class ToolDetailRedactor {
+    /** 가린 뒤 중계하고 저장하는 도구 내용의 글자 상한이다. 실행 사건의 `detail` 열 길이와 같다. */
+    public static final int DETAIL_LIMIT = 500;
+
     private static final String HIDDEN = "[가림]";
 
     /** 식별자를 번호표로 바꾸지 않고 남기라는 표식이다. 같은 객체인지로 견준다. */
@@ -65,10 +67,10 @@ public final class ToolDetailRedactor {
             return "[긴 도구 내용 가림]";
         }
         String redacted = redactContent(detail, identifiers);
-        if (redacted.length() <= ExecutionEvent.DETAIL_LIMIT) {
+        if (redacted.length() <= DETAIL_LIMIT) {
             return redacted;
         }
-        int end = ExecutionEvent.DETAIL_LIMIT - 1;
+        int end = DETAIL_LIMIT - 1;
         if (Character.isHighSurrogate(redacted.charAt(end - 1))) {
             end--;
         }

@@ -2,6 +2,7 @@ package com.bifos.assistant.hermes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.usage.domain.ExecutionEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -149,5 +150,12 @@ class ToolDetailRedactorTest {
                 .hasSize(500)
                 .endsWith("…");
         assertThat(ToolDetailRedactor.redact("가".repeat(65_537), false)).isEqualTo("[긴 도구 내용 가림]");
+    }
+
+    @Test
+    @DisplayName("상한 상수는 500이고 실행 사건의 상한과 같다")
+    void detailLimitIsSharedWithExecutionEvent() {
+        assertThat(ToolDetailRedactor.DETAIL_LIMIT).isEqualTo(500);
+        assertThat(ExecutionEvent.DETAIL_LIMIT).isEqualTo(ToolDetailRedactor.DETAIL_LIMIT);
     }
 }
