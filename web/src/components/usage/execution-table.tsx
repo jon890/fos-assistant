@@ -20,6 +20,7 @@ import {
   contextCharsLabel,
   contextOmittedLabel,
   durationLabel,
+  executionPath,
   executionStatusLabel,
   isRunning,
   reasoningEffortLabel,
@@ -68,7 +69,7 @@ export function ExecutionTable({
             <TableRow
               key={execution.id}
               className="cursor-pointer align-top hover:bg-muted"
-              onClick={() => router.push(`/executions/${execution.id}`)}
+              onClick={() => router.push(executionPath(execution.id, isAdmin))}
             >
               <TableCell className="py-3">
                 {formatWhen(execution.startedAt)}
@@ -76,7 +77,7 @@ export function ExecutionTable({
               <TableCell className="py-3 whitespace-normal">
                 <Link
                   prefetch={false}
-                  href={`/executions/${execution.id}`}
+                  href={executionPath(execution.id, isAdmin)}
                   className="font-medium hover:underline"
                   aria-label={`${agentLabel(execution.agentName)} 실행 상세 보기 (${execution.id}번)${
                     execution.hasChildren ? ", 하위 실행 있음" : ""

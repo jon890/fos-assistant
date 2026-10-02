@@ -35,7 +35,8 @@ public class ConversationEventController {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 다른 경로와 같은 404 를 돌려준다.
         Long number = access.requireOwnId(user, conversationId);
-        // 도구의 명령 원문은 보내기 직전에 보는 사람에 맞춰 뺀다. 근거는 ADR-038 에 있다.
-        return streams.follow(send -> hub.subscribe(number, event -> send.accept(event.forViewer(user))));
+        // 도구의 명령 원문과 내부 값은 보내기 직전에 보는 사람에 맞춰 뺀다. 근거는 ADR-038 과 ADR-063 에 있다.
+        return streams.follow(
+                send -> hub.subscribe(number, event -> event.forViewer(user).ifPresent(send)));
     }
 }

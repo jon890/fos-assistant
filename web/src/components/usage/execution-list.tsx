@@ -12,7 +12,8 @@ export type UsageExecution = {
   model: string | null;
   /** 요청에 실은 reasoning effort. 고르지 않았거나 이 칸이 생기기 전 실행이면 null */
   reasoningEffort: string | null;
-  costMode: string;
+  /** 관리자에게만 온다. 그 밖의 사용자에게는 null */
+  costMode: string | null;
   status: string;
   errorCode: string | null;
   inputTokens: number | null;
@@ -61,6 +62,11 @@ export function contextOmittedLabel(execution: UsageExecution): string {
  */
 export function reasoningEffortLabel(execution: UsageExecution): string {
   return execution.reasoningEffort ?? "기본";
+}
+
+/** 실행 상세 경로다. 내부 값을 그리는 상세는 관리자 영역에만 있다. */
+export function executionPath(id: number, isAdmin: boolean): string {
+  return isAdmin ? `/admin/executions/${id}` : `/executions/${id}`;
 }
 
 export function isRunning(execution: UsageExecution): boolean {

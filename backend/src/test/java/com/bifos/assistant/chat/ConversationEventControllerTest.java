@@ -63,6 +63,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ConversationEventControllerTest {
 
     private static final String COMMAND = "python3 run.py";
+    private static final String SWITCHED_TO = "example-provider/example-model-small";
 
     @Autowired
     ChatService chat;
@@ -212,6 +213,41 @@ class ConversationEventControllerTest {
 
         JsonNode tool = received(subscribed).getFirst();
         assertThat(tool.path("detail").asString()).isEqualTo(COMMAND);
+    }
+
+    @Test
+    @DisplayName("MEMBER 역할의 스트림에는 switched 사건이 없고 뒤따른 사건은 온다")
+    void dropsSwitchedEventFromMemberStream() throws Exception {
+        CurrentUser kid = signedIn("events-switched-kid", UserRole.MEMBER);
+        Conversation conversation = conversationOf(kid);
+        MvcResult subscribed = subscribe(conversation.publicId());
+
+        hub.publish(conversation.id(), ChatEvent.switched(SWITCHED_TO));
+        hub.publish(conversation.id(), ChatEvent.system(conversation.publicId(), 9L, "알림"));
+
+        List<JsonNode> events = received(subscribed);
+        assertThat(events)
+                .as("MEMBER 역할이 받은 사건: %s", events)
+                .extracting(event -> event.path("type").asString())
+                .containsExactly("system");
+        assertThat(subscribed.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .as("MEMBER 역할의 응답에 넘어간 곳의 모델이 실렸다")
+                .doesNotContain(SWITCHED_TO);
+    }
+
+    @Test
+    @DisplayName("ADMIN 역할의 스트림에는 switched 사건이 넘어간 곳과 함께 온다")
+    void keepsSwitchedEventInAdminStream() throws Exception {
+        CurrentUser dad = signedIn("events-switched-dad", UserRole.ADMIN);
+        Conversation conversation = conversationOf(dad);
+        MvcResult subscribed = subscribe(conversation.publicId());
+
+        hub.publish(conversation.id(), ChatEvent.switched(SWITCHED_TO));
+
+        List<JsonNode> events = received(subscribed);
+        assertThat(events).as("ADMIN 역할이 받은 사건: %s", events).hasSize(1);
+        assertThat(events.getFirst().path("type").asString()).isEqualTo("switched");
+        assertThat(events.getFirst().path("text").asString()).isEqualTo(SWITCHED_TO);
     }
 
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */

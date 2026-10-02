@@ -44,6 +44,7 @@ type MonthlyCostView = {
   unpricedExecutions: number;
   actualCostMicros: number;
   subscriptionExecutions: number;
+  totalExecutions: number;
 };
 
 export const usageCostScenario: Scenario = {
@@ -104,6 +105,10 @@ export const usageCostScenario: Scenario = {
       `가격을 찾지 못한 실행이 있다: ${JSON.stringify(monthly)}`,
     );
     expect(monthly.currency === "USD", `합계의 통화가 USD 가 아니다: ${monthly.currency}`);
+    expect(
+      monthly.totalExecutions === monthly.pricedExecutions + monthly.unpricedExecutions,
+      `실행 건수가 가격을 찾은 것과 찾지 못한 것의 합이 아니다: ${JSON.stringify(monthly)}`,
+    );
 
     step("이 시나리오의 실행은 전부 구독 경로라 실제 청구액이 없다");
     expect(

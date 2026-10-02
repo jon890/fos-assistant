@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ConnectorAdminPanel } from "@/components/connector/connector-admin-panel";
-import { useShellIsAdmin } from "@/components/shell/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import {
@@ -21,7 +19,6 @@ import {
 } from "@/lib/connection";
 
 export function ConnectorCatalog() {
-  const isAdmin = useShellIsAdmin();
   const [connectors, setConnectors] = useState<ConnectorSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,7 +78,6 @@ export function ConnectorCatalog() {
           ))}
         </ul>
       )}
-      {isAdmin ? <ConnectorAdminPanel connectors={connectors ?? []} /> : null}
     </div>
   );
 }

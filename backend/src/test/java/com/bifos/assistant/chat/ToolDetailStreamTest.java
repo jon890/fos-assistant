@@ -16,6 +16,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelTierService;
@@ -67,10 +68,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 대화 스트림의 {@code tool} 사건이 도구의 명령 원문을 관리자에게만 싣는지 본다.
+ * 대화 스트림의 {@code tool} 사건이 도구의 명령 원문을, {@code subagent} 사건이 모델과 토큰을 관리자에게만
+ * 싣는지 본다.
  *
  * <p>판정은 컨트롤러가 서비스에 넘기는 사건 소비자에서 하므로 컨트롤러를 거쳐 SSE 응답을 끝까지 읽는다.
- * 근거는 ADR-038 에 있다.
+ * 근거는 ADR-038 과 ADR-063 에 있다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -79,6 +81,8 @@ class ToolDetailStreamTest {
 
     private static final String COMMAND = "python3 run.py";
     private static final String QUERY = "제주 날씨";
+    private static final String GOAL = "숙소를 찾는다";
+    private static final String SUBAGENT_MODEL = "example-model-small";
 
     @TestConfiguration
     static class StubRuntime {
@@ -225,6 +229,111 @@ class ToolDetailStreamTest {
                 .isFalse();
         assertThat(toolEvent(events, "web_search").path("detail").asString()).isEqualTo(QUERY);
         assertThat(storedDetails(events)).containsExactly(COMMAND, QUERY);
+    }
+
+    @Test
+    @DisplayName("MEMBER 역할의 subagent 사건에는 모델과 토큰이 비고 목표와 걸린 시간은 남는다")
+    void memberSubagentEventHasNoModelOrTokensButKeepsGoalAndDuration() throws Exception {
+        CurrentUser kid = signedIn("subagent-kid", UserRole.MEMBER);
+        hermesStreamsSubagent();
+
+        List<JsonNode> events = sent(kid);
+
+        assertThat(subagentEvents(events)).hasSize(2).allSatisfy(event -> {
+            assertThat(event.hasNonNull("model")).as("model 이 실렸다: %s", event).isFalse();
+            assertThat(event.hasNonNull("inputTokens"))
+                    .as("inputTokens 가 실렸다: %s", event)
+                    .isFalse();
+            assertThat(event.hasNonNull("outputTokens"))
+                    .as("outputTokens 가 실렸다: %s", event)
+                    .isFalse();
+            assertThat(event.path("goal").asString()).isEqualTo(GOAL);
+            assertThat(event.path("subagentId").asString()).isEqualTo("sub-1");
+        });
+        assertThat(subagentEvents(events).get(1).path("durationMs").asLong()).isEqualTo(900L);
+        assertThat(events.getLast().path("type").asString()).isEqualTo("done");
+    }
+
+    @Test
+    @DisplayName("ADMIN 역할의 subagent 사건에는 모델과 토큰이 그대로 실린다")
+    void adminSubagentEventKeepsModelAndTokens() throws Exception {
+        CurrentUser dad = signedIn("subagent-dad", UserRole.ADMIN);
+        hermesStreamsSubagent();
+
+        List<JsonNode> events = sent(dad);
+
+        assertThat(subagentEvents(events))
+                .hasSize(2)
+                .allSatisfy(event -> assertThat(event.path("model").asString()).isEqualTo(SUBAGENT_MODEL));
+        JsonNode completed = subagentEvents(events).get(1);
+        assertThat(completed.path("inputTokens").asLong()).isEqualTo(70L);
+        assertThat(completed.path("outputTokens").asLong()).isEqualTo(9L);
+        assertThat(completed.path("durationMs").asLong()).isEqualTo(900L);
+    }
+
+    @Test
+    @DisplayName("switched 사건은 MEMBER 역할에게 보내지 않고 ADMIN 역할에게는 그대로 보낸다")
+    void switchedEventIsDroppedForMemberAndKeptForAdmin() {
+        ChatEvent switched = ChatEvent.switched("example-provider/" + SUBAGENT_MODEL);
+
+        assertThat(switched.forViewer(viewer(UserRole.MEMBER))).isEmpty();
+        assertThat(switched.forViewer(viewer(UserRole.ADMIN))).contains(switched);
+    }
+
+    @Test
+    @DisplayName("오류 코드와 답 조각은 MEMBER 역할에게도 그대로 보낸다")
+    void errorCodeAndDeltaAreKeptForMember() {
+        ChatEvent error = ChatEvent.error("PROVIDER_BLOCKED", "blocked");
+        ChatEvent delta = ChatEvent.delta("조각");
+
+        assertThat(error.forViewer(viewer(UserRole.MEMBER))).contains(error);
+        assertThat(delta.forViewer(viewer(UserRole.MEMBER))).contains(delta);
+    }
+
+    private static CurrentUser viewer(UserRole role) {
+        return new CurrentUser(1L, "viewer@example.com", "viewer", 1L, role);
+    }
+
+    /** Hermes 가 모델과 토큰을 실은 하위 에이전트의 시작과 완료를 보낸 것처럼 만든다. */
+    private void hermesStreamsSubagent() {
+        hermesStreams(
+                new RunEvent(
+                        "subagent.start",
+                        null,
+                        "researcher",
+                        null,
+                        null,
+                        null,
+                        "sub-1",
+                        GOAL,
+                        SUBAGENT_MODEL,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null),
+                new RunEvent(
+                        "subagent.complete",
+                        null,
+                        "researcher",
+                        null,
+                        900L,
+                        false,
+                        "sub-1",
+                        GOAL,
+                        SUBAGENT_MODEL,
+                        "child-session",
+                        70L,
+                        9L,
+                        "completed",
+                        null),
+                new RunEvent("run.completed", null, null, null, null, null));
+    }
+
+    private static List<JsonNode> subagentEvents(List<JsonNode> events) {
+        return events.stream()
+                .filter(event -> "subagent".equals(event.path("type").asString()))
+                .toList();
     }
 
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
