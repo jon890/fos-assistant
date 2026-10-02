@@ -17,7 +17,7 @@ type PendingItem = { id: number; text: string; createdAt: string };
 type PendingQueue = { held: boolean; items: PendingItem[] };
 type TurnStream = Awaited<ReturnType<typeof openStream>>;
 
-async function messagesOf(context: Context, conversationId: string): Promise<Message[]> {
+export async function messagesOf(context: Context, conversationId: string): Promise<Message[]> {
   return expectStatus(
     await call(context, `/chat/conversations/${conversationId}/messages`, { token: context.tokens.dad }),
     200,
@@ -26,7 +26,7 @@ async function messagesOf(context: Context, conversationId: string): Promise<Mes
 }
 
 /** 대화의 메시지 목록을 조건이 참이 될 때까지 다시 읽는다. */
-async function awaitMessages(
+export async function awaitMessages(
   context: Context,
   conversationId: string,
   predicate: (messages: Message[]) => boolean,
@@ -43,7 +43,7 @@ async function awaitMessages(
   fail(`${what}: ${timeoutMs / 1000}초 안에 기대한 메시지가 오지 않았다. 마지막 목록: ${JSON.stringify(last.map((m) => [m.role, m.content]))}`);
 }
 
-async function pendingOf(context: Context, conversationId: string): Promise<PendingQueue> {
+export async function pendingOf(context: Context, conversationId: string): Promise<PendingQueue> {
   return expectStatus(
     await call(context, `/chat/conversations/${conversationId}/pending`, { token: context.tokens.dad }),
     200,
@@ -62,7 +62,7 @@ async function awaitHeld(context: Context, conversationId: string): Promise<Pend
   return fail(`대기 줄이 10초 안에 멈추지 않았다: ${JSON.stringify(last)}`);
 }
 
-async function enqueue(context: Context, conversationId: string, text: string): Promise<PendingQueue> {
+export async function enqueue(context: Context, conversationId: string, text: string): Promise<PendingQueue> {
   return expectStatus(
     await call(context, `/chat/conversations/${conversationId}/pending`, {
       method: "POST",
@@ -86,7 +86,7 @@ async function cancelPending(context: Context, conversationId: string, pendingId
 }
 
 /** 다음 run 을 붙잡고 turn 을 열어 `started` 사건과 run 이 제출된 것까지 기다린다. */
-async function holdTurn(
+export async function holdTurn(
   context: Context,
   text: string,
   agentCode: string,

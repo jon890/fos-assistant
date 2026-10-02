@@ -21,3 +21,15 @@ export function executionStatusVariant(execution: {
   if (execution.status === "SUCCEEDED") return "success";
   return "outline";
 }
+
+const RESTART_INTERRUPTED_CODES: ReadonlySet<string> = new Set([
+  "ORPHANED",
+  "REMOTE_RUN_LOST",
+  "RECONCILE_TIMEOUT",
+  "RECONCILE_UNREACHABLE",
+]);
+
+/** 기동 정리가 실패로 적을 때 쓰는 오류 코드인가. 사용량 화면이 「중간에 중단됨」 으로 보인다. */
+export function isInterruptedByRestart(errorCode: string | null | undefined): boolean {
+  return errorCode !== null && errorCode !== undefined && RESTART_INTERRUPTED_CODES.has(errorCode);
+}
