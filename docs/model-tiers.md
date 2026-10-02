@@ -207,7 +207,7 @@ provider 는 session 응답의 `provider`, 없으면 `billing_provider` 에서 �
 
 | 대시보드의 답 | 원장 줄 |
 | --- | --- |
-| 200 이고 `provider` 가 있고, `model` 이 session 응답의 모델과 같다 | 그 provider 로 환산한다 |
+| 200 이고 `provider` 가 있고, `model` 이 `null` 이거나 session 응답의 모델과 같다 | 그 provider 로 환산한다 |
 | 200 이고 `provider` 가 `null` 이다 | provider 를 비운다 |
 | 200 이고 `model` 이 session 응답의 모델과 다르다 | provider 를 비운다. 두 조회 사이에 줄이 바뀐 것이다 |
 | 404 | provider 를 비운다 |

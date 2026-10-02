@@ -15,7 +15,7 @@
 - API server 쪽 session 응답은 `SESSION_PATH` 분기가 만든다. 지금 `child.provider` 가 있으면 `billing_provider` 를 싣는다
 - 대시보드 대역은 `handleDashboard` 다. `isDashboardPath` 로 맡을 경로를 고르고 `dashboardAuthorized` 로 토큰을 본다. `MODEL_DEFAULTS_PATH` 분기가 본보기다
 - `PROFILE_PATH` 의 `.+` 는 뒤의 조각까지 먹는다. 새 경로는 `SOUL_PATH` 처럼 `PROFILE_PATH` 분기보다 앞에서 처리한다
-- 시나리오는 `test/e2e/scenarios/streaming.ts` 다. 「session 의 provider 와 모델로 자식 금액을 합계에 한 번만 더한다」 단계가 `SUBAGENT_PROVIDER_PROBE` 로 자식 금액을 확인하고, 그 앞 단계가 provider 없는 자식 3건이 가격 미확인으로 세어지는지 본다
+- 시나리오는 `test/e2e/scenarios/streaming.ts` 다. 「session 의 provider 와 모델로 자식 금액을 합계에 한 번만 더한다」 단계가 `SUBAGENT_PROVIDER_PROBE` 로 자식 금액을 확인하고, 같은 단계의 앞머리가 provider 없는 자식 3건이 가격 미확인으로 세어지는지 본다
 
 **근거 문서**: `docs/hermes/delegation.md` 의 「자식 session 의 provider 는 저장소에만 있다」, `hermes/README.md` 의 「자식 session 의 provider」
 
@@ -30,7 +30,7 @@
 
 - `SESSION_PATH` 분기의 자식 응답에서 `billing_provider` 를 싣는 줄을 지운다
 - 상수 `SESSION_PROVIDER_PATH = /^\/api\/profiles\/([^/]+)\/sessions\/([^/]+)\/provider$/` 를 `MODEL_DEFAULTS_PATH` 옆에 더한다
-- `handleDashboard` 가 이 경로를 대시보드 경로로 보게 하고, `PROFILE_PATH` 분기보다 앞에 `GET` 분기를 더한다
+- 이 경로는 `PROFILE_PATH` 의 `.+` 에 이미 맞아 `isDashboardPath` 는 고칠 것이 없다. `handleDashboard` 에서 `PROFILE_PATH` 를 처리하는 분기보다 앞에 `GET` 분기를 더한다
 
   | 상황 | 답 |
   | --- | --- |

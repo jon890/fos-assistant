@@ -80,15 +80,20 @@ provider 만 바꾼 새 record 를 돌려준다.
   | --- | --- |
   | 부르지 않았다(session 응답에 provider 가 있다) | 지금과 같다 |
   | null 이거나 `absent` | provider 없이 적는다. `PROVIDER_UNKNOWN` |
-  | `found` 이고 조회의 `model` 이 null 이거나 `usage.model()` 과 같다 | `usage.withProvider(provider)` 로 환산해 적는다 |
+  | `found` 이고 조회의 `model` 이 null 이거나 `usage.model()` 과 같다. null 은 저장소 줄에 모델이 비었다는 뜻이고 어긋남이 아니다 | `usage.withProvider(provider)` 로 환산해 적는다 |
   | `found` 이고 조회의 `model` 이 `usage.model()` 과 다르다 | provider 없이 적는다. `PROVIDER_UNKNOWN` |
-  | `unavailable` 이고 `usage.endedAt()` 에 10분을 더한 시각이 지금보다 뒤다 | 줄을 적지 않고 `current.retry(now)` 로 `WAITING` 에 둔다. 완료 사건도 만들지 않는다 |
-  | `unavailable` 이고 10분이 지났다 | provider 없이 적는다. `PROVIDER_UNKNOWN` |
+  | `unavailable` 이고 `usage.endedAt()` 에 600초를 더한 값이 지금보다 크다 | 줄을 적지 않고 `current.retry(now)` 로 `WAITING` 에 둔다. 완료 사건도 만들지 않는다 |
+  | `unavailable` 이고 위가 아니다. 정확히 600초가 지난 때도 여기다 | provider 없이 적는다. `PROVIDER_UNKNOWN` |
 
   `usage.endedAt()` 은 epoch 초다. 비교는 `now.getEpochSecond()` 와 한다
+- `endedAt` 은 `NOW.getEpochSecond()` 에서 뺀 값으로 준다
 - 클래스 Javadoc 에 provider 를 대시보드에서 읽는다는 것과 ADR-063 을 한 문장으로 더한다
 
-### 5. `backend/src/test/java/com/bifos/assistant/hermes/SubagentProviderClientTest.java` 를 만든다
+### 5. `HttpHermesRunsClient` 의 주석을 고친다
+
+`backend/src/main/java/com/bifos/assistant/hermes/HttpHermesRunsClient.java` 의 `readSessionRuntime` 안 주석 「v0.21.5 는 ... provider 를 `billing_provider` 로 둔다」 는 실제와 다르다. v0.21.5 의 session 응답에는 provider 칸이 없다. 「v0.21.5 는 `{"object": ..., "session": {...}}` 로 감싸고 provider 칸을 주지 않는다. 주는 판을 위해 두 이름을 읽는다」 로 고친다. 동작은 바꾸지 않는다.
+
+### 6. `backend/src/test/java/com/bifos/assistant/hermes/SubagentProviderClientTest.java` 를 만든다
 
 `backend/src/test/java/com/bifos/assistant/hermes/HermesRuntimeReadTest.java` 처럼 `com.sun.net.httpserver.HttpServer` 를 `127.0.0.1` 의 빈 포트에 띄우고, `HermesProperties` 의 `dashboardBaseUrl` 을 그 주소로 준다.
 
@@ -102,19 +107,20 @@ provider 만 바꾼 새 record 를 돌려준다.
 | 서버를 내린 뒤 부른다 | `unavailable` 참 |
 | profile 이름이 `Bad Name` | `absent` 이고 서버가 요청을 받지 않았다 |
 
-### 6. `backend/src/test/java/com/bifos/assistant/usage/application/SubagentUsageReconcilerTest.java` 를 고친다
+### 7. `backend/src/test/java/com/bifos/assistant/usage/application/SubagentUsageReconcilerTest.java` 를 고친다
 
 `fixtures(...)` 가 `SubagentProviderClient` 를 `mock` 으로 만들어 생성자와 `Fixtures` record 에 넣는다.
-기존 검사 `pollLeavesCostEmptyWhenProviderIsMissing` 는 조회가 `absent()` 일 때의 검사로 둔다. 아래를 더한다. 자식 session 은 기존 검사처럼 `stubFinalChild` 로 준다.
+기존 검사 `pollLeavesCostEmptyWhenProviderIsMissing` 는 조회를 `absent()` 로 stub 해 「부모의 provider 로 채우지 않는다」 의 검사로 둔다. 같은 검사를 새로 만들지 않는다. 아래를 더한다. 자식 session 은 기존 검사처럼 `stubFinalChild` 로 준다.
 
 | 검사 | 입력 | 기대 |
 | --- | --- | --- |
 | 대시보드의 provider 로 환산한다 | session 에 provider 없음, 모델 `example-fast`, 조회 `found("openai-codex", "example-fast")` | `DONE`, `provider` 가 `openai-codex`, `estimatedCostMicros` 가 null 이 아니다, `unconfirmedReason` 이 null |
 | session 에 provider 가 있으면 대시보드를 부르지 않는다 | session provider `openai-codex` | `verify(providers, never()).read(any(), any())` |
 | 조회의 모델이 다르면 채우지 않는다 | 조회 `found("openai-codex", "other-model")` | `provider` null, `PROVIDER_UNKNOWN` |
-| 부모의 provider 로 채우지 않는다 | 부모 `provider` 가 `openai-codex`, 조회 `absent()` | `provider` null, `PROVIDER_UNKNOWN` |
+| 조회의 모델이 비어도 환산한다 | 조회 `found("openai-codex", null)` | `provider` 가 `openai-codex`, `unconfirmedReason` 이 null |
 | 닿지 못했고 자식이 막 끝났다 | 조회 `unreachable()`, `endedAt` 이 지금보다 60초 앞 | `status` 가 `WAITING`, `attempts` 가 1 늘었다, 완료 사건을 저장하지 않았다 |
-| 닿지 못했고 10분이 지났다 | 조회 `unreachable()`, `endedAt` 이 지금보다 601초 앞 | `DONE`, `PROVIDER_UNKNOWN`, 토큰이 적혔다 |
+| 닿지 못했고 10분이 지났다 | 조회 `unreachable()`, `endedAt` 이 지금보다 정확히 600초 앞인 경우와 601초 앞인 경우 | 둘 다 `DONE`, `PROVIDER_UNKNOWN`, 토큰이 적혔다 |
+| 닿지 못했고 599초가 지났다 | 조회 `unreachable()`, `endedAt` 이 지금보다 599초 앞 | `WAITING` |
 | 아직 끝나지 않은 자식은 대시보드를 부르지 않는다 | `endedAt` null | `verify(providers, never())` |
 
 `SubagentUsageReconciler` 를 `new` 로 만드는 다른 검사가 있으면 생성자 인자를 함께 고친다. `git grep -n "new SubagentUsageReconciler" backend/src` 로 찾는다.
@@ -139,5 +145,6 @@ provider 만 바꾼 새 record 를 돌려준다.
 | `backend/src/main/java/com/bifos/assistant/hermes/SubagentProviderClient.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/hermes/dto/SubagentSessionUsage.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/application/SubagentUsageReconciler.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesRunsClient.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/hermes/SubagentProviderClientTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/usage/application/SubagentUsageReconcilerTest.java` | 수정 |

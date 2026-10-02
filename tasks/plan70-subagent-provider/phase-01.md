@@ -39,7 +39,7 @@ profile 디렉터리는 `hermes_cli.profiles` 의 `get_profile_dir(name)` 과 `p
   - `SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")`
   - `SESSION_DB_FILE = "state.db"`, `SESSION_DB_TIMEOUT_SECONDS = 2`
 - 함수 `_session_provider_response(name, session_id)` 를 `_model_defaults_response` 아래에 더한다. 순서는 아래와 같다
-  1. `name` 이 `PROFILE_NAME_RE` 에 맞지 않거나 `session_id` 가 `SESSION_ID_RE` 에 맞지 않으면 `_rejected(..., 400)`
+  1. `name` 이 `PROFILE_NAME_RE.fullmatch` 에 맞지 않거나 `session_id` 가 `SESSION_ID_RE.fullmatch` 에 맞지 않으면 `_rejected(..., 400)`. 문자열이 아닌 값도 400 이다
   2. `profile_exists(name)` 이 거짓이면 `_rejected("없는 profile 이다", 404)`
   3. `get_profile_dir(name) / SESSION_DB_FILE` 이 파일이 아니면 `_rejected("없는 session 이다", 404)`
   4. `sqlite3.connect(경로.resolve().as_uri() + "?mode=ro", uri=True, timeout=SESSION_DB_TIMEOUT_SECONDS)` 로 연다. 연결은 `finally` 에서 닫는다
@@ -47,7 +47,7 @@ profile 디렉터리는 `hermes_cli.profiles` 의 `get_profile_dir(name)` 과 `p
   6. `SELECT COUNT(*) FROM (SELECT DISTINCT model, billing_provider FROM session_model_usage WHERE session_id = ? AND task = '')` 를 읽는다
   7. `provider` 는 `billing_provider` 가 비어 있지 않은 문자열이고 6 의 값이 1 이하일 때만 그 값이고, 아니면 `None` 이다. `model` 은 비어 있지 않은 문자열이면 그 값이고 아니면 `None` 이다
   8. `JSONResponse({"provider": provider, "model": model}, status_code=200)`
-  9. 4 부터 6 사이의 어떤 예외든 `logger.warning` 고정 문장 한 줄을 남기고 `_rejected("session 저장소를 읽지 못했다", 503)`
+  9. 2 부터 8 사이의 어떤 예외든. `_model_defaults_response` 처럼 2 부터 `try` 로 감싼다. 그 예외는 `logger.warning` 고정 문장 한 줄을 남기고 `_rejected("session 저장소를 읽지 못했다", 503)`
 - `token_auth_middleware` 의 `defaults_match` 분기 바로 아래에 같은 모양의 분기를 더한다. `method == "GET"` 이고 `SESSION_PROVIDER_RE` 가 맞을 때만 탄다
 - `register` 의 `opened` 에 `opened["/api/profiles/<이름>/sessions/<session id>/provider"] = ["GET"]` 를 더한다
 - 모듈 docstring 의 「여는 것」 표에 한 줄을 더한다. `| \`GET /api/profiles/<이름>/sessions/<session id>/provider\` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다 |`
@@ -74,6 +74,7 @@ CREATE TABLE session_model_usage (session_id TEXT, model TEXT, billing_provider 
 | 표가 없는 저장소 | `sessions` 만 있고 `session_model_usage` 가 없다 | 503 |
 | 토큰 | `cookie=True`, `token="invalid"` | 401 |
 | 저장소를 바꾸지 않는다 | 요청 전후 `state.db` 의 바이트가 같다 | 같다 |
+| WAL 저장소 | 표를 만들기 전에 `PRAGMA journal_mode=WAL` 을 주고 쓰는 연결을 닫는다. 실제 Hermes 는 WAL 을 쓴다 | 200, `provider` 가 `p1`, 요청 전후 `state.db` 의 바이트가 같다 |
 | 기본 profile | `self.make_profile("default")` 뒤 같은 표를 만든다 | 200 |
 
 ## 검증
