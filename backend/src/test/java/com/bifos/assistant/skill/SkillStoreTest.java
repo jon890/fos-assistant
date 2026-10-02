@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.application.SkillBundle;
-import com.bifos.assistant.skill.application.SkillFile;
+import com.bifos.assistant.skill.domain.SkillBundle;
+import com.bifos.assistant.skill.domain.SkillFile;
 import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.skill.infra.SkillStore;
 import java.io.IOException;

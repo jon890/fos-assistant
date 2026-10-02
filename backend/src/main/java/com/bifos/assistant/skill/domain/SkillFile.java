@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.domain;
 
 /**
  * 스킬의 참고 파일 하나다.
