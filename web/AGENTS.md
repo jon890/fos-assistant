@@ -14,19 +14,6 @@
 `app/` 은 경로와 서버에서 읽는 것만 담고, 화면을 이루는 부품은 `components/` 에 둔다.
 `components/ui/` 는 어느 화면에도 속하지 않는 조각이고, 그 밖의 파일은 한 화면의 부품이다.
 
-```
-src/
-  app/                    경로, 서버 컴포넌트, 서버 라우트
-  components/
-    ui/                   shadcn/ui 에서 받은 부품과 우리가 만든 조각
-    chat/                 대화 화면의 부품
-    usage/                사용량 화면의 부품
-    execution/            실행 나무 화면의 부품
-    agent/                에이전트와 성격 화면의 부품
-    admin/                관리 화면의 부품
-  lib/                    Control Plane 호출과 형식 변환
-```
-
 ## 브라우저는 Control Plane 토큰을 갖지 않는다
 
 서버 라우트가 세션에서 메일 주소를 꺼내 매 요청마다 토큰을 새로 만든다.
@@ -105,7 +92,7 @@ grep -rn 'style={{' web/src/
 ## lint 와 포맷
 
 화면 코드의 규칙은 문장이 아니라 `web/eslint.config.mjs` 가 갖는다.
-도구는 eslint 9.39.5 와 `eslint-config-next` 16.0.10, Prettier 3.9.9 이고 버전을 정확한 값으로 고정한다.
+도구 버전은 `web/package.json` 이 정확한 값으로 고정한다.
 규칙을 도구 설정으로 두는 근거는 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 에 있다.
 
 ```bash
@@ -115,18 +102,13 @@ pnpm format:check
 pnpm format:changed
 ```
 
-backend 와 함께 한 번에 검사하고 고치려면 저장소 root 에서 `scripts/quality.sh check` 와 `scripts/quality.sh fix` 를 쓴다.
-`fix` 는 `eslint --fix --prune-suppressions` 와 `pnpm format:changed` 를 돌리고 새 위반은 기준에 더하지 않는다.
+backend 와 함께 한 번에 검사하고 고치는 `scripts/quality.sh` 는 루트 [`AGENTS.md`](../AGENTS.md) 의 「확인」 절이 설명한다.
 
 | 규칙 | 대상 | 심각도 | 까닭 |
 | --- | --- | --- | --- |
 | `eslint-config-next/core-web-vitals`, `eslint-config-next/typescript` | 전체 | 설정대로 | Next.js 와 React 의 결함 모양 |
-| `no-restricted-syntax`: `NextResponse.json({ code, ... })`, `request.json()`(이름이 `request` 나 `req` 인 것) | `src/app/api/**` | error | 오류 응답 모양과 요청 본문 검사를 한곳의 도우미로 모은다. 라우트가 직접 만들면 모양이 라우트마다 달라진다 |
-| `no-restricted-globals`: `fetch` | `src/components/**`, `src/app/**/*.tsx` | error | 화면은 `lib/` 의 호출 함수를 거친다. 화면이 주소와 오류 처리를 각자 다시 쓰지 않게 한다 |
-| `max-lines` 400, `max-lines-per-function` 150. 빈 줄과 주석은 세지 않는다 | `src/**` | warning | 쪼갤 후보 목록이다. 실패시키지 않는다 |
-| `no-restricted-imports`: `../*` | `src/**` | error | `@/` 를 쓰면 파일을 옮겨도 import 가 깨지지 않는다 |
 
-`fetch` 가 꼭 필요한 화면 파일이 생기면 `eslint.config.mjs` 의 그 규칙 블록에 `ignores` 로 파일과 까닭을 적는다.
+`fetch` 가 꼭 필요한 화면 파일이 생기면 `eslint.config.mjs` 의 `fetch` 규칙 블록에 `ignores` 로 파일과 까닭을 적는다.
 
 ### 기준 파일
 
@@ -154,13 +136,12 @@ Node 는 tsconfig 의 `@/` 별칭을 풀지 못한다.
 타입만 가져오는 `import type` 은 실행할 때 지워지므로 `@/` 를 써도 된다.
 
 이 파일들은 `eslint.config.mjs` 의 `NODE_TEST_READ_FILES` 에 있고 `../*` 규칙에서 빠진다.
-지금 목록은 `src/components/chat/activity/activity-state.ts` 와 `src/components/chat/skill-command.ts` 이다.
 단위 테스트가 새 web 파일을 읽으면 그 파일의 `../` import 를 따라가 상대 경로로 import 하는 파일을 이 목록에 더한다.
 그 파일이 다시 import 하는 파일도 상대 경로를 써야 한다.
 
 ### 포맷
 
-Prettier 는 설정 파일 없이 기본값을 쓴다. `.prettierignore` 가 빌드 결과와 잠금 파일을 뺀다.
+Prettier 는 설정 파일 없이 기본값을 쓴다.
 **저장소 전체를 검사하지 않고 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 검사한다.**
 여러 브랜치가 같은 파일을 나란히 고치므로 전체를 한 번에 포맷하면 진행 중인 브랜치가 모두 충돌한다.
 
@@ -226,18 +207,12 @@ BROWSER_WEB_SERVER=dev pnpm test:browser
 고정하고 싶으면 `BROWSER_WEB_PORT` 와 `BROWSER_CONTROL_PLANE_PORT` 를 준다.
 
 `test/browser` 는 웹과 Chromium 을 띄워 화면을 검사한다.
-`mobile` 과 `desktop` 두 폭에서 돌고 각각 390px 와 1280px 다.
+`mobile` 과 `desktop` 두 폭에서 돌고, 폭의 값은 `test/browser/playwright.config.ts` 가 갖는다.
 
-PR 과 main 의 CI 는 폭마다 `--shard=1/4` 부터 `--shard=4/4` 까지 별도 runner 에서 나란히 돌린다.
-`fullyParallel: false` 와 `workers: 1` 은 유지하므로 파일을 나누되 파일 안의 검사와 서버 상태는 직렬로 처리한다.
+`fullyParallel: false` 와 `workers: 1` 은 유지하므로 파일 안의 검사와 서버 상태는 직렬로 처리한다.
 globalSetup 은 shard 마다 새 Control Plane 과 H2 메모리 DB, 실행별 임시 파일을 만든다.
-필수 검사 `browser-mobile` 과 `browser-desktop` 은 해당 폭의 shard 4개가 모두 성공해야 통과한다.
-JSON 결과와 실패 trace 는 폭과 shard 번호를 붙인 CI artifact 에서 읽는다.
 
-한국 시간 매일 04:23 에 main 전체를 다시 검사하며 변경이 없는 날도 건너뛰지 않는다.
-main push 와 매일 실행의 실패는 `브라우저 실패` 이슈에 파일과 폭별로 모은다.
-같은 파일의 열린 이슈에는 재발 횟수와 실행 링크를 남긴다. PR 실패는 이슈를 만들지 않고 그 PR 에서 고친다.
-모인 실패는 한 번에 고치고, 흔들리는 검사는 고치거나 까닭을 적어 이슈를 닫는다.
+CI 가 이 검사를 어떻게 나눠 돌리는지는 `.github/workflows/ci.yml` 이 갖고, 머지 전에 무엇을 확인하는지는 루트 [`AGENTS.md`](../AGENTS.md) 의 「확인」 절이 갖는다.
 
 **운영 코드에 시험용 문을 만들지 않는다.**
 로그인은 테스트가 NextAuth 세션 쿠키를 직접 만들어 넣는다.
