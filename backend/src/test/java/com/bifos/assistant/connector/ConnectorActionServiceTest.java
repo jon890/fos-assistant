@@ -61,6 +61,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -764,7 +765,8 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("이미 거두었거나 기간이 지난 줄은 건드리지 않고, 카탈로그를 읽지 못하거나 선언에 없는 도구의 줄은 거두지 않는다")
     void closedGrantSweepLeavesUnknownAndFinishedLinesAlone() {
-        Instant now = Instant.now();
+        // DB 칸이 마이크로초까지라 나노초가 남은 시각은 저장한 뒤 읽으면 달라진다.
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         ConnectorToolGrant revoked = ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now);
         Instant earlier = now.minus(Duration.ofHours(1));
         revoked.revoke(earlier);
