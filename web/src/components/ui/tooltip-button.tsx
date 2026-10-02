@@ -2,7 +2,11 @@
 
 import { useState, type ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /** 코드가 초점을 옮기는 동안만 참이다. 그 한 번의 focus 로는 Tooltip 을 열지 않는다 */
 let focusingWithoutTooltip = false;
@@ -16,7 +20,9 @@ let focusingWithoutTooltip = false;
  * Radix Tooltip 이 `focus` 를 받은 그 자리에서 열림을 알린다는 것에 기댄다. `radix-ui` 를 올리면
  * `shell.spec.ts` 의 메뉴와 지우기 창 `Esc` 검사를 desktop 폭에서 함께 돌려 이 성질이 남았는지 본다.
  */
-export function focusWithoutTooltip(element: HTMLElement | null | undefined): void {
+export function focusWithoutTooltip(
+  element: HTMLElement | null | undefined,
+): void {
   if (!element) return;
   focusingWithoutTooltip = true;
   try {
@@ -46,18 +52,37 @@ export function escapeOnlyClosedTooltip(event: Event): boolean {
  * `passEscape` 를 주면 풀이가 열려 있어도 첫 `Esc` 가 풀이를 닫으며 대화 화면에도 간다. 「중지」 가 그렇다.
  * 마우스를 올려 둔 채 `Esc` 를 눌렀는데 풀이만 닫히고 답이 계속 흐르면 안 된다.
  */
-export function TooltipButton({ label, children, variant = "ghost", size = "icon-sm", passEscape = false, ...props }:
-  ComponentProps<typeof Button> & { label: string; passEscape?: boolean }) {
+export function TooltipButton({
+  label,
+  children,
+  variant = "ghost",
+  size = "icon-sm",
+  passEscape = false,
+  ...props
+}: ComponentProps<typeof Button> & { label: string; passEscape?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <Tooltip open={open} onOpenChange={(next) => {
-      if (next && focusingWithoutTooltip) return;
-      setOpen(next);
-    }}>
+    <Tooltip
+      open={open}
+      onOpenChange={(next) => {
+        if (next && focusingWithoutTooltip) return;
+        setOpen(next);
+      }}
+    >
       <TooltipTrigger asChild>
-        <Button variant={variant} size={size} aria-label={label} {...props}>{children}</Button>
+        <Button variant={variant} size={size} aria-label={label} {...props}>
+          {children}
+        </Button>
       </TooltipTrigger>
-      <TooltipContent onEscapeKeyDown={passEscape ? (event) => { escapesPassedThrough.add(event); } : undefined}>
+      <TooltipContent
+        onEscapeKeyDown={
+          passEscape
+            ? (event) => {
+                escapesPassedThrough.add(event);
+              }
+            : undefined
+        }
+      >
         {label}
       </TooltipContent>
     </Tooltip>
