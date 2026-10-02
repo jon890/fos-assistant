@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.usage.domain.ExecutionConversation;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
@@ -47,7 +47,7 @@ public class MemoryProposer {
      */
     public void proposeFrom(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             AgentExecution parentExecution,
             String answer,

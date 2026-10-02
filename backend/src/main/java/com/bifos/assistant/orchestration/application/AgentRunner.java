@@ -146,7 +146,7 @@ public class AgentRunner {
         } catch (RuntimeException ex) {
             AgentExecution execution = executions.start(
                     user,
-                    conversation,
+                    conversation == null ? null : conversation.executionConversation(),
                     agent,
                     parentExecutionId,
                     rootExecutionId,
@@ -163,7 +163,7 @@ public class AgentRunner {
         ModelChoice choice = resolved.choice();
         AgentExecution execution = executions.start(
                 user,
-                conversation,
+                conversation.executionConversation(),
                 agent,
                 parentExecutionId,
                 rootExecutionId,

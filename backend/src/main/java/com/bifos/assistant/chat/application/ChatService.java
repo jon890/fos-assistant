@@ -737,7 +737,7 @@ public class ChatService {
                 choice.reasoningEffort());
         AgentExecution execution = executions.start(
                 user,
-                conversation,
+                conversation.executionConversation(),
                 agent,
                 null,
                 null,
@@ -824,7 +824,7 @@ public class ChatService {
         String answer = result.output() == null ? "" : result.output();
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
         memoryProposer.proposeFrom(
-                pending.user(), pending.conversation(), pending.agent(), execution, answer, requested);
+                pending.user(), pending.conversation().executionConversation(), pending.agent(), execution, answer, requested);
         starterSuggestions.refreshIfStale(pending.user(), pending.agent());
         return new ChatTurn(
                 pending.conversation().id(),

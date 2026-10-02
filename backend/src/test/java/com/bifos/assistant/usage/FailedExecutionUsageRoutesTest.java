@@ -158,7 +158,7 @@ class FailedExecutionUsageRoutesTest {
     @DisplayName("위임 실행은 실패 응답의 사용량과 실제 모델 비용을 남기고 실패 결과를 전달한다")
     void preservesUsageAndCostWhenDelegatedRunReceivesFailedResult(String errorCode) {
         when(hermes.awaitCompletion(any(), any())).thenReturn(failedResult(errorCode));
-        AgentExecution parent = recorder.start(user, conversation, agent, null, null, 0L);
+        AgentExecution parent = recorder.start(user, conversation.executionConversation(), agent, null, null, 0L);
         RunSession session = RunSession.fresh();
         DelegationKey key =
                 DelegationKey.of(agent.hermesProfile(), "fos-root", "fos-root", "call_" + UUID.randomUUID());

@@ -4,7 +4,6 @@ chat -> orchestration 는 순환에 속한다
 chat -> skill 는 순환에 속한다
 chat -> usage 는 순환에 속한다
 context -> memory 는 순환에 속한다
-memory -> chat 는 순환에 속한다
 memory -> context 는 순환에 속한다
 memory -> usage 는 순환에 속한다
 orchestration -> chat 는 순환에 속한다

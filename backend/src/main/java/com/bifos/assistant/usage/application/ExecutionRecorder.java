@@ -1,7 +1,7 @@
 package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.usage.domain.ExecutionConversation;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -41,7 +41,7 @@ public class ExecutionRecorder {
     /** 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다. */
     public AgentExecution start(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             Long parentExecutionId,
             Long rootExecutionId,
@@ -58,7 +58,7 @@ public class ExecutionRecorder {
     /** 실행 당시의 상태를 함께 적으며 RUNNING 으로 만들어 돌려준다. */
     public AgentExecution start(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             Long parentExecutionId,
             Long rootExecutionId,
@@ -81,7 +81,7 @@ public class ExecutionRecorder {
      */
     public AgentExecution start(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             Long parentExecutionId,
             Long rootExecutionId,
@@ -113,7 +113,7 @@ public class ExecutionRecorder {
      */
     public AgentExecution start(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             Long parentExecutionId,
             Long rootExecutionId,
@@ -144,12 +144,12 @@ public class ExecutionRecorder {
      * 단계를 거친 실행은 그 단계의 mapping 이 비어 에이전트 기본값으로 돌았어도 {@code REQUESTED} 로 적는다.
      */
     private static ReasoningEffortSource effortSource(
-            Conversation conversation, ModelChoice requested, ModelTier modelTier) {
+            ExecutionConversation conversation, ModelChoice requested, ModelTier modelTier) {
         if (requested == null || requested.reasoningEffort() == null) {
             return ReasoningEffortSource.UNKNOWN;
         }
         boolean chosenByConversation =
-                conversation != null && conversation.modelChoice().reasoningEffort() != null;
+                conversation != null && conversation.reasoningEffort() != null;
         return modelTier == null && !chosenByConversation
                 ? ReasoningEffortSource.AGENT_DEFAULT
                 : ReasoningEffortSource.REQUESTED;
@@ -158,7 +158,7 @@ public class ExecutionRecorder {
     /** 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다. */
     public AgentExecution start(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             Long parentExecutionId,
             Long rootExecutionId,
@@ -197,7 +197,7 @@ public class ExecutionRecorder {
      * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution startInheriting(
-            CurrentUser user, Conversation conversation, Agent agent, AgentExecution parent, ModelChoice requested) {
+            CurrentUser user, ExecutionConversation conversation, Agent agent, AgentExecution parent, ModelChoice requested) {
         ModelChoice sent = requested == null ? ModelChoice.defaults() : requested;
         ReasoningEffortSource source;
         if (sent.reasoningEffort() == null) {
@@ -225,7 +225,7 @@ public class ExecutionRecorder {
 
     private AgentExecution record(
             CurrentUser user,
-            Conversation conversation,
+            ExecutionConversation conversation,
             Agent agent,
             Long parentExecutionId,
             Long rootExecutionId,
@@ -442,7 +442,7 @@ public class ExecutionRecorder {
         return actual;
     }
 
-    private AgentExecution.Builder base(CurrentUser user, Conversation conversation, Agent agent) {
+    private AgentExecution.Builder base(CurrentUser user, ExecutionConversation conversation, Agent agent) {
         return AgentExecution.builder()
                 .userId(user.id())
                 .conversationId(conversation == null ? null : conversation.id())

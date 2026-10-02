@@ -139,7 +139,7 @@ class MemoryProposerTest {
     @Test
     @DisplayName("제안을 만들면 부모와 루트 실행을 기록하고 PROPOSED로 저장한다")
     void proposalRecordsParentAndRootRunAndSavesAsProposed() {
-        AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
         ((StubHermesRunsClient) hermes)
                 .willReturn(HermesRunResult.of(
                         "proposal",
@@ -150,7 +150,7 @@ class MemoryProposerTest {
                         "provider",
                         TokenUsage.empty()));
 
-        proposer.proposeFrom(USER, conversation, agent, parent, "국수 이야기", RESOLVED);
+        proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "국수 이야기", RESOLVED);
 
         // 대화에는 고른 모델이 없다. 본 실행이 해석한 값을 그대로 보내야 단계와 에이전트 기본 모델이 빠지지 않는다.
         assertThat(((StubHermesRunsClient) hermes).received()).last().satisfies(command -> {
@@ -232,9 +232,9 @@ class MemoryProposerTest {
     @Test
     @DisplayName("보낸 값을 받지 못한 이어받는 실행은 세 값을 비우고 출처를 UNKNOWN 으로 남긴다")
     void inheritingRunWithoutRequestedChoiceLeavesValuesEmptyAndUnknownSource() {
-        parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
 
-        AgentExecution child = recorder.startInheriting(USER, conversation, agent, parent, null);
+        AgentExecution child = recorder.startInheriting(USER, conversation.executionConversation(), agent, parent, null);
 
         assertThat(child.provider()).isNull();
         assertThat(child.model()).isNull();
@@ -267,7 +267,7 @@ class MemoryProposerTest {
         }
         parent = recorder.start(
                 USER,
-                source,
+                source.executionConversation(),
                 agent,
                 null,
                 null,
@@ -286,7 +286,7 @@ class MemoryProposerTest {
                 .willReturn(HermesRunResult.of(
                         "proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));
 
-        proposer.proposeFrom(USER, source, agent, parent, "답", sent);
+        proposer.proposeFrom(USER, source.executionConversation(), agent, parent, "답", sent);
 
         assertThat(((StubHermesRunsClient) hermes).received()).last().satisfies(command -> {
             assertThat(command.provider()).isEqualTo(sent.provider());
@@ -305,10 +305,10 @@ class MemoryProposerTest {
     @Test
     @DisplayName("제안 실행이 실패해도 예외를 던지지 않고 자식 실행은 실패로 남긴다")
     void keepsChildRunFailedWithoutThrowingWhenProposalRunFails() {
-        AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
         ((StubHermesRunsClient) hermes).willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
-        proposer.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults());
+        proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults());
 
         assertThat(memories.findAll()).isEmpty();
         assertThat(executions.findAll())
@@ -324,7 +324,7 @@ class MemoryProposerTest {
     @Test
     @DisplayName("제안 실행의 provider 가 막히면 PROVIDER BLOCKED 로 남기고 예외를 던지지 않는다")
     void leavesProviderBlockedWithoutThrowingWhenProposalProviderIsBlocked() {
-        AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
         ((StubHermesRunsClient) hermes)
                 .willReturn(new HermesRunResult(
                         "proposal",
@@ -336,7 +336,7 @@ class MemoryProposerTest {
                         HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked",
                         TokenUsage.empty()));
 
-        assertThatCode(() -> proposer.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults()))
+        assertThatCode(() -> proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults()))
                 .doesNotThrowAnyException();
 
         assertThat(memories.findAll()).isEmpty();
@@ -359,7 +359,7 @@ class MemoryProposerTest {
     @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED"})
     @DisplayName("실패한 Memory 제안도 사용량과 실제 모델 비용을 보존하고 원래 대화에는 오류를 전하지 않는다")
     void preservesUsageAndCostWithoutThrowingWhenProposalReturnsFailure(String errorCode) {
-        AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
         when(prices.find("served-provider", "served-model"))
                 .thenReturn(Optional.of(new CatalogPrice(
                         new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
@@ -379,7 +379,7 @@ class MemoryProposerTest {
                         new TokenUsage(1_000L, 800L, 500L, 1_500L),
                         new SessionRuntime("served-model", "served-provider")));
 
-        assertThatCode(() -> proposer.proposeFrom(USER, conversation, agent, parent, "답", RESOLVED))
+        assertThatCode(() -> proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", RESOLVED))
                 .doesNotThrowAnyException();
 
         assertThat(memories.findAll()).isEmpty();
@@ -411,11 +411,11 @@ class MemoryProposerTest {
     @Test
     @DisplayName("NONE과 잘못된 JSON은 Memory를 만들지 않는다")
     void noneAndMalformedJsonCreateNoMemory() {
-        AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
         ((StubHermesRunsClient) hermes)
                 .willReturn(HermesRunResult.of(
                         "proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));
-        proposer.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults());
+        proposer.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults());
         assertThat(memories.findAll()).isEmpty();
     }
 
@@ -439,9 +439,9 @@ class MemoryProposerTest {
                 mock(ExecutionEventRecorder.class),
                 mock(ExecutionEventRepository.class),
                 new ObjectMapper());
-        AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
+        AgentExecution parent = recorder.start(USER, conversation.executionConversation(), agent, null, null, 0L);
 
-        assertThatCode(() -> isolated.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults()))
+        assertThatCode(() -> isolated.proposeFrom(USER, conversation.executionConversation(), agent, parent, "답", ModelChoice.defaults()))
                 .doesNotThrowAnyException();
     }
 }
