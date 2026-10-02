@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.memory.application.MemoryContentBackfill;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -48,6 +49,9 @@ class MemoryEncryptionDisabledTest {
 
     @Autowired
     MemoryRevisionRepository revisionRepository;
+
+    @Autowired
+    MemoryContentBackfill backfill;
 
     @Autowired
     ContextAssembler context;
@@ -168,6 +172,17 @@ class MemoryEncryptionDisabledTest {
         assertThat(views())
                 .singleElement()
                 .satisfies(view -> assertThat(view.content()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("key 가 없으면 평문으로 남은 민감 줄을 옮기지 않고 그대로 둔다")
+    void backfillLeavesPlainRowsWithoutKey() {
+        long id = insertSensitiveRow(PLAIN, null);
+
+        assertThat(backfill.sealPlaintext()).isZero();
+
+        assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, id))
+                .isEqualTo(PLAIN);
     }
 
     private List<MemoryView> views() {

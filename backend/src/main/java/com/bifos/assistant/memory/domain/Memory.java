@@ -235,6 +235,19 @@ public class Memory {
         return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
     }
 
+    /**
+     * 평문으로 남은 본문의 저장 모양만 암호문으로 바꾼다. 판 번호와 갱신 시각은 건드리지 않는다.
+     *
+     * @throws IllegalStateException 이미 암호문일 때
+     */
+    public void sealInPlace(StoredContent body) {
+        if (sealed()) {
+            throw new IllegalStateException("memory content is already sealed");
+        }
+        this.content = body.content();
+        this.contentKeyId = body.keyId();
+    }
+
     /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. 그룹이 없는 사용자는 GROUP 항목을 보지 못한다. */
     public boolean isReadableBy(Long userId, Long groupId) {
         return scope == MemoryScope.USER

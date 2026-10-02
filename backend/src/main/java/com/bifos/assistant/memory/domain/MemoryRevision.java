@@ -132,6 +132,19 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
     }
 
+    /**
+     * 남긴 판의 뜻은 바뀌지 않는다. 평문으로 남은 민감 판의 저장 모양만 바꾼다(ADR-054).
+     *
+     * @throws IllegalStateException 이미 암호문일 때
+     */
+    public void sealInPlace(StoredContent body) {
+        if (contentKeyId != null) {
+            throw new IllegalStateException("memory revision content is already sealed");
+        }
+        this.content = body.content();
+        this.contentKeyId = body.keyId();
+    }
+
     /** Spring Data 의 {@link Persistable} 이 요구하는 이름이다. 값은 Lombok 이 만든 {@link #id()} 와 같다. */
     @Override
     public MemoryRevisionId getId() {
