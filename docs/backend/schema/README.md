@@ -30,32 +30,43 @@ MySQL 의 DDL 은 되돌려지지 않는다.
 `V56__subagent_usage_ledger.sql` 과 `V57__subagent_usage_backfill.sql` 이 본보기다.
 나누면 DML 이 실패해도 앞의 DDL 파일은 성공한 것으로 남아, 실패한 줄 하나만 고쳐 다시 올릴 수 있다.
 
-### 다른 표의 문자열 칸을 비교할 때 정렬 규칙을 확인한다
+### 모든 표의 정렬 규칙은 `utf8mb4_0900_ai_ci` 하나다
 
-**표마다 정렬 규칙이 다르다.**
+**문자열 칸은 모두 `utf8mb4_0900_ai_ci` 다.** Flyway 가 스스로 만드는 `flyway_schema_history` 만 예외다.
+
 운영 서버의 기본 정렬 규칙은 `utf8mb4_unicode_ci` 다.
 MySQL 8.4 의 `utf8mb4` 기본 정렬 규칙은 `utf8mb4_0900_ai_ci` 다.
 그래서 `CREATE TABLE` 에 `DEFAULT CHARSET = utf8mb4` 를 적은 표는 `utf8mb4_0900_ai_ci` 가 되고,
 적지 않은 표는 서버 기본값인 `utf8mb4_unicode_ci` 가 된다.
 나중에 `ALTER TABLE` 로 더한 칸은 그 표의 정렬 규칙을 따른다.
 
-`utf8mb4_unicode_ci` 인 표는 여덟이다.
+적지 않고 만든 표가 여덟 있었다.
 `agent_token`, `chat_pending_message`, `execution_event`, `memory`, `model_hidden`,
 `model_tier_definition`, `model_tier_group_setting`, `subagent_usage_job`.
-나머지는 `utf8mb4_0900_ai_ci` 다.
+두 정렬 규칙의 칸을 `=`, `<>`, `IN`, 조인 조건으로 비교하면 MySQL 이 오류 1267 로 거절한다. 줄이 하나도 없어도 거절한다.
+V58 부터 V65 까지가 이 여덟 표를 `ALTER TABLE ... CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci` 로 맞췄다.
+H2 의 MySQL 모드도 이 문장을 받는다.
 
-두 정렬 규칙의 칸을 `=`, `<>`, `IN`, 조인 조건으로 비교하면 MySQL 이 오류 1267 로 거절한다.
-줄이 하나도 없어도 거절한다.
-
-- 서로 다른 표의 문자열 칸을 비교하면 양쪽을 `CAST(... AS BINARY)` 로 감싼다.
-  바이트로 비교하므로 대소문자를 구분한다. 식별자 비교에만 쓴다
-- `COLLATE` 는 쓰지 않는다. H2 가 받지 않아 H2 로 도는 검사가 실패한다
-- 숫자 키로 조인할 수 있으면 문자열 비교를 쓰지 않는다
 - **새 표에는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다.**
   적지 않으면 그 표가 `utf8mb4_unicode_ci` 로 생긴다. H2 도 이 구절을 받는다.
   검사: `test/unit/migration-collation.test.ts`. V57 까지의 파일은 이미 적용돼 검사에서 뺀다
+- 정렬 규칙이 하나로 남는지는 `MysqlMigrationTest` 가 실제 MySQL 에서 단언한다
+- 문자열 비교는 대소문자와 악센트를 구분하지 않는다. 끝의 공백은 구분한다.
+  구분해야 하는 식별자 비교는 양쪽을 `CAST(... AS BINARY)` 로 감싼다.
+  `V57__subagent_usage_backfill.sql` 이 profile 이름과 session 번호를 그렇게 비교한다
+- `COLLATE` 구절로 비교식의 정렬 규칙을 바꾸지 않는다. H2 가 받지 않아 H2 로 도는 검사가 실패한다
+- 숫자 키로 조인할 수 있으면 문자열 비교를 쓰지 않는다
 
-애플리케이션의 쿼리도 같은 규칙에 걸린다. 두 표의 문자열 칸을 조인하는 JPQL 과 native 쿼리를 쓰면 실제 MySQL 검사로 확인한다.
+#### 정렬 규칙을 바꾸는 마이그레이션
+
+- **표마다 파일을 나눈다.** `CONVERT TO` 는 표를 다시 만드는 DDL 이고 되돌려지지 않는다.
+  한 문장은 통째로 되거나 통째로 안 되므로, 나누면 실패한 표 하나만 옛 정렬 규칙으로 남고 앞의 표는 성공으로 기록된다
+- **유일 색인이 걸린 문자열 칸은 새 정렬 규칙에서 같아지는 값이 있는지 운영에서 먼저 센다.**
+  `utf8mb4_unicode_ci` 에서 다르던 두 값이 `utf8mb4_0900_ai_ci` 에서 같아질 수 있다.
+  나중에 유니코드에 들어온 결합 문자가 붙은 글자가 그렇다. 그런 줄이 있으면 그 표의 문장이 오류 1062 로 실패한다.
+  세는 방법은 운영 저장소가 갖는다
+- 다시 만드는 동안 그 표에 쓰기가 막힌다. 2026-10-02 에 여덟 표의 줄은 모두 합쳐 2천 개가 안 됐고
+  가장 큰 `execution_event` 가 400KB 가 안 됐다. 같은 크기의 표를 바꾸는 데 1초가 걸리지 않는다
 
 ### 실제 MySQL 검사를 통과해야 한다
 
@@ -65,11 +76,12 @@ scripts/check-mysql-migration.sh
 ```
 
 Docker 로 일회용 MySQL 8.4 를 띄우고 `mysql` 태그가 붙은 검사를 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
-서버를 `--collation-server=utf8mb4_unicode_ci` 로 띄워 위의 정렬 규칙 섞임을 그대로 만든다.
+서버를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄운다. 정렬 규칙을 적지 않은 표가 생기면 그 표만 다른 정렬 규칙이 돼 검사가 실패한다.
 
 | 검사 | 확인하는 것 |
 | --- | --- |
-| `MysqlMigrationTest` | 빈 데이터베이스에서 Flyway 가 처음부터 끝까지 적용되고 Hibernate 의 `ddl-auto: validate` 가 통과한다. 두 정렬 규칙이 운영처럼 섞여 있다 |
+| `MysqlMigrationTest` | 빈 데이터베이스에서 Flyway 가 처음부터 끝까지 적용되고 Hibernate 의 `ddl-auto: validate` 가 통과한다. 서버 기본 정렬 규칙이 운영과 같고, 모든 표와 문자열 칸의 정렬 규칙이 `utf8mb4_0900_ai_ci` 하나다 |
+| `CollationUnifyMysqlMigrationTest` | 줄이 있는 여덟 표가 V58 부터 V65 까지를 지나며 줄과 칸 타입과 유일 색인을 그대로 둔 채 정렬 규칙만 바뀐다. 새 정렬 규칙에서 겹치는 줄이 있으면 그 표에서 멈추고 그 표는 그대로 남는다 |
 | `SubagentUsageLedgerMysqlMigrationTest` | 줄이 있는 상태에서 V55 부터 끝까지 적용되고 결과가 H2 와 같다 |
 | `MemorySourceUniqueMysqlMigrationTest` | 줄이 있는 `memory` 표에 V55 의 유일 색인이 만들어지고 결과가 H2 와 같다 |
 
