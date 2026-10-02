@@ -30,6 +30,8 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 
 `MEMBER` 는 코드의 값이므로 그대로 쓰되, 사람을 가리킬 때는 쓰지 않는다.
 
+**이미 적용된 마이그레이션 파일은 용어를 바꾸려고 고치지 않는다.** Flyway 가 주석까지 체크섬에 넣어 운영 기동이 멈춘다. `test/unit/migration-immutable.test.ts` 가 막는다.
+
 층이 넷이고 서로 다르다.
 
 ```
