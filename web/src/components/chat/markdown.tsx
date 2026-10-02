@@ -147,13 +147,21 @@ async function highlight(
 }
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
-  const [lines, setLines] = useState<HighlightedLine[]>([]);
+  // 어느 코드를 칠한 결과인지 함께 둔다. 코드가 바뀌면 새 결과가 올 때까지 칠하지 않은 글을 보인다.
+  const [highlighted, setHighlighted] = useState<{
+    code: string;
+    language: string;
+    lines: HighlightedLine[];
+  } | null>(null);
+  const lines =
+    highlighted?.code === code && highlighted.language === language
+      ? highlighted.lines
+      : [];
 
   useEffect(() => {
     let active = true;
-    setLines([]);
-    void highlight(code, language).then((highlighted) => {
-      if (active) setLines(highlighted);
+    void highlight(code, language).then((result) => {
+      if (active) setHighlighted({ code, language, lines: result });
     });
     return () => {
       active = false;

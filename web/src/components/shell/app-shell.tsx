@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type Dispatch,
   type SetStateAction,
 } from "react";
@@ -44,6 +45,36 @@ const DisplayNameContext = createContext<string | null>(null);
 /** 역할이 `ADMIN` 인지다. `useAdminView()` 만 읽는다. 관리자 영역 안인지는 그 훅이 경로로 따로 본다. */
 const AdminContext = createContext(false);
 
+const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
+/** 이번 화면에서 접거나 편 값이다. 저장소에 적지 못해도 현재 화면은 이 값을 따른다. 아직 바꾸지 않았으면 null 이다 */
+let collapsedOverride: boolean | null = null;
+const collapsedListeners = new Set<() => void>();
+
+function subscribeCollapsed(onChange: () => void): () => void {
+  collapsedListeners.add(onChange);
+  return () => collapsedListeners.delete(onChange);
+}
+
+function readCollapsed(): boolean {
+  if (collapsedOverride !== null) return collapsedOverride;
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    /* 저장소를 막은 브라우저에서도 화면을 연다. */
+    return false;
+  }
+}
+
+function updateCollapsed(value: boolean): void {
+  collapsedOverride = value;
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, value ? "1" : "0");
+  } catch {
+    /* 저장할 수 없어도 현재 화면은 바꾼다. */
+  }
+  collapsedListeners.forEach((onChange) => onChange());
+}
+
 function isAdminArea(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
@@ -77,7 +108,12 @@ function ShellBody({
   const inAdminArea = isAdminArea(pathname);
   const { startNew } = useConversations();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  // 서버에서 그린 첫 그림과 hydration 동안은 펴 둔다. 저장한 값은 그 뒤에 읽는다.
+  const collapsed = useSyncExternalStore(
+    subscribeCollapsed,
+    readCollapsed,
+    () => false,
+  );
   const appName = useAppName();
   const [title, setTitle] = useState<string | null>(null);
   // 붙박이 사이드바와 서랍이 각자 검색칸을 가진다. 서랍이 닫히면 서랍 쪽 ref 는 null 이 된다.
@@ -88,27 +124,11 @@ function ShellBody({
   // 첫 그림에서 폭을 모르면(null) 붙박이 사이드바를 그리고 CSS 가 좁은 폭에서 숨긴다.
   const wide = useMediaQuery("(min-width: 768px)");
 
-  useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem("sidebar-collapsed") === "1");
-    } catch {
-      /* 저장소를 막은 브라우저에서도 화면을 연다. */
-    }
-  }, []);
-
-  const updateCollapsed = useCallback((value: boolean) => {
-    setCollapsed(value);
-    try {
-      localStorage.setItem("sidebar-collapsed", value ? "1" : "0");
-    } catch {
-      /* 저장할 수 없어도 현재 화면은 바꾼다. */
-    }
-  }, []);
   const toggleSidebar = useCallback(() => {
     if (window.matchMedia("(min-width: 768px)").matches)
       updateCollapsed(!collapsed);
     else setDrawerOpen((open) => !open);
-  }, [collapsed, updateCollapsed]);
+  }, [collapsed]);
   const focusSearch = useCallback(() => {
     if (window.matchMedia("(min-width: 768px)").matches) {
       updateCollapsed(false);
@@ -119,17 +139,21 @@ function ShellBody({
       focusSearchOnOpen.current = true;
       setDrawerOpen(true);
     }
-  }, [updateCollapsed]);
+  }, []);
   // 관리자 영역에는 사이드바와 검색칸이 없어 단축키가 닿을 곳이 없다.
   useShortcuts(signedIn && !inAdminArea, startNew, toggleSidebar, focusSearch);
 
-  // 서랍은 옮기는 동안 열어 둔다. 누른 줄의 회전 표시와 「옮기는 중」 안내가 옮기는 내내 서랍 안에 남는다.
-  // 경로가 바뀌면 여기서 닫는다.
-  useEffect(() => setDrawerOpen(false), [pathname]);
-  // 서랍이 열린 채 넓은 폭이 되면 닫아 둔다. 그대로 두면 다시 좁힐 때 서랍이 저절로 열린다.
-  useEffect(() => {
-    if (wide) setDrawerOpen(false);
-  }, [wide]);
+  // 지난 그림의 경로와 폭이다. 바뀐 것을 그리는 중에 알아채 서랍을 닫는다.
+  const [seen, setSeen] = useState({ pathname, wide });
+  if (seen.pathname !== pathname || seen.wide !== wide) {
+    setSeen({ pathname, wide });
+    // 서랍은 옮기는 동안 열어 둔다. 누른 줄의 회전 표시와 「옮기는 중」 안내가 옮기는 내내 서랍 안에 남는다.
+    // 경로가 바뀌면 여기서 닫는다.
+    // 서랍이 열린 채 넓은 폭이 되면 닫아 둔다. 그대로 두면 다시 좁힐 때 서랍이 저절로 열린다.
+    if (seen.pathname !== pathname || (seen.wide !== wide && wide)) {
+      setDrawerOpen(false);
+    }
+  }
   // 목적지가 지금 경로와 같으면 경로가 바뀌지 않으므로 곧바로 닫는다. 사진을 먼저 올려 주소만 바꾼 경우가
   // 있어 usePathname 대신 주소창의 경로와 견준다.
   const closeIfSamePath = useCallback((href: string) => {
