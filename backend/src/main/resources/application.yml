@@ -98,6 +98,11 @@ assistant:
       approval-ttl: 24h
       # 답이 없는 승인 요청을 만료로 바꾸는 주기
       expire-cron: "0 * * * * *"
+  restart-reconcile:
+    # 기동할 때 RUNNING 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061). 끄면 그 줄이 그대로 남는다
+    enabled: true
+    # 다시 붙어 기다리는 상한. 비우면 hermes.run-timeout 과 같다. 넘으면 중지를 보내고 FAILED 로 적는다
+    max-wait: ${ASSISTANT_RESTART_RECONCILE_MAX_WAIT:}
   delegation-wake:
     # 맡긴 일의 결과가 끝나면 부모 대화의 turn 을 자동으로 연다(ADR-040)
     enabled: true

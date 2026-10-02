@@ -1,6 +1,7 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
@@ -84,6 +86,32 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not stop the Hermes run");
         }
+    }
+
+    /**
+     * 실행 하나를 한 번 읽는다. 종료 상태가 아닌 {@code status} 는 값이 없거나 모르는 값이어도 도는 것으로 본다.
+     * 모르는 값을 실패로 읽으면 도는 실행을 잃기 때문이다.
+     */
+    @Override
+    public HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId) {
+        JsonNode run;
+        try {
+            run = restClient
+                    .get()
+                    .uri(apiBaseUrl + "/v1/runs/{runId}", runId)
+                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (HttpClientErrorException.NotFound ex) {
+            return HermesRunLookup.notFound();
+        } catch (RestClientException ex) {
+            throw HermesCallFailure.of(ex, "could not read the run status");
+        }
+        String status = text(run, "status");
+        if (status != null && TERMINAL.contains(status.toLowerCase())) {
+            return HermesRunLookup.finished(toResult(runId, status, run));
+        }
+        return HermesRunLookup.running();
     }
 
     /**

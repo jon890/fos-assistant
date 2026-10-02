@@ -594,6 +594,8 @@ export type FakeHermes = {
   releaseHeldRun(): void;
   /** 지금 붙잡아 둔 실행의 번호와 session 이다. 붙잡은 것이 없으면 `undefined` 다. 플러그인처럼 `_fos_ctx` 를 서명할 때 쓴다. */
   heldRun(): { runId: string; sessionId: string } | undefined;
+  /** 그 run 을 잊는다. 이 뒤 조회와 중지는 404 다. gateway 가 다시 떴거나 종료 뒤 1시간이 지난 것과 같다. */
+  forgetRun(runId: string): void;
   /**
    * `LONG_ACTIVITY_PROBE` 스트림이 시작만 한 도구 줄을 남기고 기다리는 멈춤 지점 하나를 푼다. 실행 상태는 바꾸지 않는다.
    * 멈춤 지점이 둘이므로 끝까지 흘리려면 두 번 부른다. 기다리는 스트림이 없으면 아무것도 하지 않는다.
@@ -643,6 +645,10 @@ export function startFakeHermes(
    * 고치지 않게 하기 위해서다.
    */
   const keys: Record<string, string> = { ...profileKeys };
+  /** 실제 Hermes 가 모르는 run 에 주는 404 본문이다. 지운 run 과 한 번도 없던 run 이 같다. */
+  const runNotFound = (runId: string) => ({
+    error: { message: `Run not found: ${runId}`, type: "invalid_request_error", code: "run_not_found" },
+  });
   const runs = new Map<string, Run>();
   const sessions = new Map<string, Session>();
   /** 자식 session 응답이 싣는 모델과 provider 다. 비우면 일반 자식처럼 provider 없이 `example-fast` 를 준다. */
@@ -1422,7 +1428,7 @@ export function startFakeHermes(
             return send(response, 401, { error: "bad key for this profile" });
           }
           const run = runs.get(runId);
-          if (!run) return send(response, 404, { error: "no such run" });
+          if (!run) return send(response, 404, runNotFound(runId!));
           response.writeHead(200, {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache",
@@ -1587,7 +1593,7 @@ export function startFakeHermes(
             return send(response, 401, { error: "bad key for this profile" });
           }
           const run = runs.get(runId!);
-          if (!run) return send(response, 404, { error: "no such run" });
+          if (!run) return send(response, 404, runNotFound(runId!));
           run.status = "cancelled";
           if (run.input === "중지 빈 답 검사" || run.input === "중지 조각 전 검사") run.output = "";
           emptyUntilStopped.get(runId!)?.end();
@@ -1725,7 +1731,7 @@ export function startFakeHermes(
         return send(response, 401, { error: "bad key for this profile" });
       }
       const run = runs.get(runId);
-      if (!run) return send(response, 404, { error: "no such run" });
+      if (!run) return send(response, 404, runNotFound(runId!));
       return send(response, 200, run);
     })();
   });
@@ -1783,6 +1789,9 @@ export function startFakeHermes(
           if (releasedRunId === undefined) return;
           const run = runs.get(releasedRunId);
           if (run !== undefined) run.status = "completed";
+        },
+        forgetRun: (runId: string) => {
+          runs.delete(runId);
         },
         heldRun: () => {
           const run = heldRunId === undefined ? undefined : runs.get(heldRunId);
