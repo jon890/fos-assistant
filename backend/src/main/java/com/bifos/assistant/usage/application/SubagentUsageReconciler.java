@@ -40,6 +40,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @Slf4j
 public class SubagentUsageReconciler {
+    private static final int EVENT_MODEL_LIMIT = 128;
+
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
     private final SubagentUsageJobRepository jobs;
@@ -205,7 +207,7 @@ public class SubagentUsageReconciler {
                 .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
                 .subagentName(start == null ? null : start.subagentName())
                 .hermesSessionId(job.childSessionId())
-                .model(usage.model())
+                .model(eventModel(usage.model()))
                 .inputTokens(usage.inclusiveInputTokens())
                 .outputTokens(usage.outputTokens())
                 .durationMs(usage.durationMs())
@@ -213,6 +215,11 @@ public class SubagentUsageReconciler {
                 .detail(start == null ? null : start.detail())
                 .occurredAt(now)
                 .build());
+    }
+
+    /** 사건의 모델 칸 길이를 넘는 이름은 잘라 넣는다. 넘는 값은 저장이 실패해 작업 줄까지 되돌린다. */
+    private static String eventModel(String model) {
+        return model == null || model.length() <= EVENT_MODEL_LIMIT ? model : model.substring(0, EVENT_MODEL_LIMIT);
     }
 
     /** 환산을 시도하기 전에 알 수 있는 금액 미확인 까닭이다. 환산할 수 있으면 null 이다. */

@@ -32,6 +32,9 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SubagentUsageJob {
+    private static final int PROVIDER_LIMIT = 64;
+    private static final int MODEL_LIMIT = 128;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -72,10 +75,10 @@ public class SubagentUsageJob {
     @Column(name = "backoff_attempts", nullable = false)
     private int backoffAttempts;
 
-    @Column(name = "provider", length = 64)
+    @Column(name = "provider", length = PROVIDER_LIMIT)
     private String provider;
 
-    @Column(name = "model", length = 128)
+    @Column(name = "model", length = MODEL_LIMIT)
     private String model;
 
     /** cache 를 뺀 일반 입력 토큰이다. */
@@ -130,8 +133,9 @@ public class SubagentUsageJob {
      * <p>금액을 내지 못했으면 {@code cost} 는 비어 있고 {@code reason} 에 그 까닭이 온다.
      */
     public void record(SubagentSessionUsage usage, ExecutionCost cost, String reason, Instant now) {
-        provider = usage.provider() == null || usage.provider().isBlank() ? null : usage.provider();
-        model = usage.model();
+        provider =
+                usage.provider() == null || usage.provider().isBlank() ? null : cut(usage.provider(), PROVIDER_LIMIT);
+        model = cut(usage.model(), MODEL_LIMIT);
         inputTokens = usage.inputTokens();
         cacheReadTokens = usage.cacheReadTokens();
         cacheWriteTokens = usage.cacheWriteTokens();
@@ -143,6 +147,16 @@ public class SubagentUsageJob {
         recordedAt = now;
         status = "DONE";
         unconfirmedReason = reason;
+    }
+
+    /**
+     * 칸 길이를 넘는 값을 잘라 적는다.
+     *
+     * <p>넘는 값을 그대로 저장하면 저장이 실패해 다음 조회 시각도 함께 되돌려지고, 그 줄이 기한까지 계속 다시
+     * 조회된다.
+     */
+    private static String cut(String value, int limit) {
+        return value == null || value.length() <= limit ? value : value.substring(0, limit);
     }
 
     public void expire() {

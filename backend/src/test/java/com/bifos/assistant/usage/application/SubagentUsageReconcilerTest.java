@@ -445,6 +445,46 @@ class SubagentUsageReconcilerTest {
     }
 
     @Test
+    @DisplayName("칸 길이를 넘는 모델과 provider 의 종료 자식도 잘라 적고 DONE 으로 끝낸다")
+    void pollCutsOverlongModelAndProviderToColumnLength() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        String model = "m".repeat(129);
+        String provider = "p".repeat(65);
+        stubFinalChild(
+                fixtures,
+                new SubagentSessionUsage("child", "subagent", "parent", model, provider, 1.0, 2.5, 10L, 4L, 2L, 3L));
+
+        fixtures.reconciler.poll(10L);
+
+        ArgumentCaptor<ExecutionEvent> event = ArgumentCaptor.forClass(ExecutionEvent.class);
+        verify(fixtures.events).save(event.capture());
+        assertThat(event.getValue().model()).as("완료 사건의 모델").isEqualTo("m".repeat(128));
+        assertThat(fixtures.job.status()).isEqualTo("DONE");
+        assertThat(fixtures.job.model()).isEqualTo("m".repeat(128));
+        assertThat(fixtures.job.provider()).isEqualTo("p".repeat(64));
+        assertThat(fixtures.job.outputTokens()).isEqualTo(4L);
+        assertThat(fixtures.job.unconfirmedReason()).isEqualTo("PRICE_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("환산은 자르기 전 모델 이름으로 가격표를 찾는다")
+    void pollPricesWithUncutModelName() throws ReflectiveOperationException {
+        Fixtures fixtures = fixtures();
+        String model = "m".repeat(129);
+        when(fixtures.prices.find("openai-codex", model))
+                .thenReturn(Optional.of(new CatalogPrice(
+                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
+                        PRICING_VERSION)));
+        stubFinalChild(fixtures, pricedUsage(model));
+
+        fixtures.reconciler.poll(10L);
+
+        assertThat(fixtures.job.model()).isEqualTo("m".repeat(128));
+        assertThat(fixtures.job.estimatedCostMicros()).isEqualTo(PRICED_MICROS);
+        assertThat(fixtures.job.unconfirmedReason()).isNull();
+    }
+
+    @Test
     @DisplayName("이미 사용량을 적은 줄을 다시 조회해도 아무것도 바꾸지 않는다")
     void pollDoesNothingForRecordedJob() throws ReflectiveOperationException {
         Fixtures fixtures = fixtures();
@@ -610,7 +650,8 @@ class SubagentUsageReconcilerTest {
                 new CostEstimator(prices),
                 new TestTransactionManager(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
-        return new Fixtures(reconciler, executions, events, jobs, agents, hermes, defaults, parent, start, job, agent);
+        return new Fixtures(
+                reconciler, executions, events, jobs, agents, hermes, defaults, prices, parent, start, job, agent);
     }
 
     private static void setField(Object target, String name, Object value) throws ReflectiveOperationException {
@@ -627,6 +668,7 @@ class SubagentUsageReconcilerTest {
             AgentService agents,
             HermesRunsClient hermes,
             ProfileModelDefaultsClient defaults,
+            PriceCatalog prices,
             AgentExecution parent,
             ExecutionEvent start,
             SubagentUsageJob job,
