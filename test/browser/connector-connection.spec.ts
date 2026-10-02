@@ -506,6 +506,40 @@ test("허락한 동작이 있으면 제목으로 보이고 다시 묻기를 누�
   expect(revokedPath).toBe("DELETE /api/connector-grants/31");
 });
 
+test("연결을 해제하면 허락 목록을 다시 읽어 거둔 허락이 사라진다", async ({
+  page,
+}) => {
+  let disconnectedNow = false;
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) => {
+    if (route.request().method() === "DELETE") {
+      disconnectedNow = true;
+      return route.fulfill({ json: disconnected });
+    }
+    return route.fulfill({ json: disconnectedNow ? disconnected : ready });
+  });
+  await page.route("**/api/connector-grants", (route) =>
+    route.fulfill({
+      json: disconnectedNow
+        ? []
+        : [
+            {
+              grantId: 31,
+              connectorId: DEMO_ID,
+              toolName: "write_note",
+              title: "메모 쓰기",
+              expiresAt: "2026-10-30T12:00:00Z",
+            },
+          ],
+    }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-grant")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "연결 해제" }).click();
+  await expect(page.getByTestId("connection-status")).toHaveText("연결 안 됨");
+  await expect(page.getByTestId("connector-grants")).toHaveCount(0);
+});
+
 test("허락한 동작이 없으면 그 제목을 보이지 않는다", async ({ page }) => {
   await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
     route.fulfill({ json: ready }),

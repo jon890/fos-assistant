@@ -50,6 +50,27 @@ public class TurnCancellation {
         return handle;
     }
 
+    /**
+     * 그 대화에 도는 turn 이 없으면 잠금을 잡고 작업을 돌린 뒤 푼다. turn 의 모델 실행은 열지 않는다.
+     *
+     * <p>잠금을 푸는 자리에서 닫기 리스너가 불리므로, 그 사이 쌓인 대기 메시지와 결과가 이어서 간다. 도는 turn 이 있어
+     * 잡지 못하면 작업을 돌리지 않고 거짓을 돌려준다. 그 turn 이 닫힐 때 호출한 쪽이 다시 시도해야 한다.
+     *
+     * @return 잠금을 잡아 작업을 돌렸다
+     */
+    public boolean runIfIdle(Long conversationId, Runnable work) {
+        TurnHandle handle = new TurnHandle(null, conversationId);
+        if (byConversation.putIfAbsent(conversationId, handle) != null) {
+            return false;
+        }
+        try {
+            work.run();
+        } finally {
+            close(handle);
+        }
+        return true;
+    }
+
     public synchronized void rekey(TurnHandle handle, Long executionId) {
         Long old = handle.executionId;
         if (old != null) {

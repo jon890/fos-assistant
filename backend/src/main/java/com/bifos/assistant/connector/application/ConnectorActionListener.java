@@ -3,7 +3,7 @@ package com.bifos.assistant.connector.application;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ConversationEventHub;
 import com.bifos.assistant.chat.application.ConversationNotices;
-import com.bifos.assistant.chat.application.DelegationWakeService;
+import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionResult;
@@ -22,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 승인 줄이 생기거나 바뀌면 그 요청이 나온 대화에 알린다(ADR-050).
  *
  * <p>화면에는 {@code approval} 사건을 내 승인 줄을 다시 읽게 한다. 거절과 만료는 알림 줄만 남긴다. 실행한 결과는
- * {@link ConnectorActionResultSource} 가 내고, 여기서는 그 대화를 깨우기만 한다. 방향은 {@code connector} 에서
+ * {@link ConnectorActionResultSource} 가 내고, 여기서는 다음 turn 을 정하는 {@link NextTurnDispatcher} 를 부르기만 한다. 방향은 {@code connector} 에서
  * {@code chat} 으로 하나다.
  *
  * <p>승인이나 정책 판정을 한 스레드에서 그대로 돈다. 줄은 이미 커밋됐으므로 여기서 난 예외를 밖으로 내지 않는다.
@@ -34,7 +34,7 @@ public class ConnectorActionListener {
     private final ConnectorActionService actions;
     private final ConversationEventHub hub;
     private final ConversationNotices notices;
-    private final DelegationWakeService wake;
+    private final NextTurnDispatcher dispatcher;
     private final TurnCancellation turns;
     private final TransactionTemplate ownTransaction;
     private final Clock clock = Clock.systemUTC();
@@ -43,13 +43,13 @@ public class ConnectorActionListener {
             ConnectorActionService actions,
             ConversationEventHub hub,
             ConversationNotices notices,
-            DelegationWakeService wake,
+            NextTurnDispatcher dispatcher,
             TurnCancellation turns,
             PlatformTransactionManager transactionManager) {
         this.actions = actions;
         this.hub = hub;
         this.notices = notices;
-        this.wake = wake;
+        this.dispatcher = dispatcher;
         this.turns = turns;
         // 사건은 연결 해제처럼 다른 트랜잭션이 커밋한 직후의 콜백에서도 온다. 그 자리에서는 끝난 트랜잭션이 아직
         // 묶여 있어, 거기에 참여하면 쓰기가 저장되지 않는다. 늘 새 트랜잭션에서 쓴다.
@@ -76,7 +76,8 @@ public class ConnectorActionListener {
         }
         deliverClosures(conversationId);
         try {
-            wake.tryWake(conversationId);
+            // 다음 turn 을 정하는 자리는 하나다(ADR-048). 보낼 대기 메시지를 먼저 보고 결과를 전한다.
+            dispatcher.tryNext(conversationId);
         } catch (RuntimeException ex) {
             log.warn(
                     "승인 결과를 전할 대화를 깨우지 못했다 conversationId={} kind={}",
@@ -89,27 +90,34 @@ public class ConnectorActionListener {
      * 실행하지 않고 끝난 줄마다 알림 줄을 남긴다. 전했다는 표시와 알림 줄을 한 트랜잭션에 넣는다.
      *
      * <p>그 대화의 turn 이 도는 동안에는 남기지 않는다. 답보다 먼저 알림 줄이 끼면 그 답이 질문이 아니라 알림 줄에
-     * 이어진 것으로 읽힌다. turn 이 닫힐 때 다시 불린다. 표시를 먼저 적어, 두 사건이 겹쳐도 같은 알림 줄이 두 번
-     * 남지 않는다.
+     * 이어진 것으로 읽힌다. turn 이 닫힐 때 다시 불린다. 도는 turn 이 없는지 보는 것과 저장하는 것 사이에 turn 이
+     * 열릴 수 있으므로, turn 잠금을 잡은 채 저장한다. 잠금을 못 잡으면 도는 turn 이 있는 것이라 닫힐 때로 미룬다.
+     * 표시를 먼저 적어, 두 사건이 겹쳐도 같은 알림 줄이 두 번 남지 않는다.
      */
     private void deliverClosures(Long conversationId) {
         try {
-            if (turns.markOf(conversationId).running()) {
+            if (turns.markOf(conversationId).running()
+                    || actions.undeliveredClosures(conversationId).isEmpty()) {
                 return;
             }
-            ownTransaction.executeWithoutResult(status -> {
-                for (ConnectorActionResult closure : actions.undeliveredClosures(conversationId)) {
-                    if (actions.claimDelivery(closure.actionId(), Instant.now(clock))) {
-                        notices.post(conversationId, closureNotice(closure));
-                    }
-                }
-            });
+            // 잠금을 풀 때 닫기 리스너가 다시 불리므로, 남은 줄이 없을 때는 잠금을 잡지 않아 되풀이가 끊긴다.
+            turns.runIfIdle(conversationId, () -> postClosures(conversationId));
         } catch (RuntimeException ex) {
             log.warn(
                     "끝난 승인 요청을 대화에 알리지 못했다 conversationId={} kind={}",
                     conversationId,
                     ex.getClass().getSimpleName());
         }
+    }
+
+    private void postClosures(Long conversationId) {
+        ownTransaction.executeWithoutResult(status -> {
+            for (ConnectorActionResult closure : actions.undeliveredClosures(conversationId)) {
+                if (actions.claimDelivery(closure.actionId(), Instant.now(clock))) {
+                    notices.post(conversationId, closureNotice(closure));
+                }
+            }
+        });
     }
 
     /** 사용자가 거절한 것과 시스템이 실행하지 않고 끝낸 것을 다른 글로 알린다. */
