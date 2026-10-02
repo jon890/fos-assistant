@@ -100,6 +100,22 @@ public class Agent {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    /**
+     * 이 에이전트의 기본 provider 다. {@code defaultModel} 과 함께 채우거나 함께 비운다.
+     *
+     * <p>대화가 모델을 고르지 않았을 때 Hermes 에 명시해 보낸다(ADR-054). 비면 profile 의 값으로 돈다.
+     */
+    @Column(name = "default_model_provider", length = 64)
+    private String defaultModelProvider;
+
+    /** 이 에이전트의 기본 모델이다. */
+    @Column(name = "default_model", length = 128)
+    private String defaultModel;
+
+    /** 이 에이전트의 기본 effort 다. 모델 없이 이 값만 둘 수 있다. */
+    @Column(name = "default_reasoning_effort", length = 16)
+    private String defaultReasoningEffort;
+
     /** 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다. */
     @Transient
     private boolean created;
@@ -211,6 +227,25 @@ public class Agent {
 
     public Instant deletedAt() {
         return deletedAt;
+    }
+
+    public String defaultModelProvider() {
+        return defaultModelProvider;
+    }
+
+    public String defaultModel() {
+        return defaultModel;
+    }
+
+    public String defaultReasoningEffort() {
+        return defaultReasoningEffort;
+    }
+
+    /** 기본 모델과 effort 를 바꾼다. 검증은 부르는 쪽이 끝낸 값만 받는다. 모두 null 이면 profile 의 값으로 돌아간다. */
+    public void changeDefaultModel(String provider, String model, String reasoningEffort) {
+        this.defaultModelProvider = provider;
+        this.defaultModel = model;
+        this.defaultReasoningEffort = reasoningEffort;
     }
 
     /** Control Plane 이 이 에이전트의 profile 을 만들었다고 적는다. 지울 때 그 profile 까지 거둔다. */

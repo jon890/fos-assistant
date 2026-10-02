@@ -440,6 +440,49 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       );
     }
   }
+  await seedModelTiers(token);
+}
+
+/** 단계 정의는 DB 만 갖는다. 관리자 경로로 대역 catalog 의 중립 모델을 저장한다. */
+async function seedModelTiers(token: string): Promise<void> {
+  const response = await fetch(
+    `${CONTROL_PLANE_BASE_URL}/api/v1/chat/model-tiers/group`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tiers: [
+          {
+            tier: "FAST",
+            provider: null,
+            model: "example-fast",
+            reasoningEffort: "low",
+          },
+          {
+            tier: "BALANCED",
+            provider: null,
+            model: "example-balanced",
+            reasoningEffort: "medium",
+          },
+          {
+            tier: "DEEP",
+            provider: null,
+            model: "example-deep",
+            reasoningEffort: "high",
+          },
+        ],
+        defaultTier: null,
+      }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `브라우저 테스트 단계 정의를 저장하지 못했다: ${response.status} ${await response.text()}`,
+    );
+  }
 }
 
 /** 그룹 공개 검사가 쓰는 profile 에 셸·파일 도구가 남지 않도록 API 실행 도구를 초기화한다. */
@@ -484,12 +527,6 @@ function startControlPlane(
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
-      ASSISTANT_MODEL_TIERS_FAST_MODEL: "example-fast",
-      ASSISTANT_MODEL_TIERS_FAST_REASONING_EFFORT: "low",
-      ASSISTANT_MODEL_TIERS_BALANCED_MODEL: "example-balanced",
-      ASSISTANT_MODEL_TIERS_BALANCED_REASONING_EFFORT: "medium",
-      ASSISTANT_MODEL_TIERS_DEEP_MODEL: "example-deep",
-      ASSISTANT_MODEL_TIERS_DEEP_REASONING_EFFORT: "high",
       HERMES_PROFILE_KEY_DIR: keyDir,
       // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,

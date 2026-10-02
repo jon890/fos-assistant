@@ -6,7 +6,6 @@ import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
-import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
 import com.bifos.assistant.chat.application.ModelTierService;
@@ -23,7 +22,6 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ModelOptionsView;
-import com.bifos.assistant.chat.presentation.ChatDtos.ProviderView;
 import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.RunningTurnView;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
@@ -181,15 +179,7 @@ public class ChatController {
      */
     @GetMapping("/model-options")
     public ModelOptionsView modelOptions(@RequestParam(required = false) String agentCode) {
-        ModelOptions options = modelOptions.optionsFor(currentUser.require(), agentCode);
-        return new ModelOptionsView(
-                options.defaultProvider(),
-                options.defaultModel(),
-                options.providers().stream()
-                        .map(provider -> new ProviderView(
-                                provider.slug(), provider.name(), provider.models(), provider.reasoning()))
-                        .toList(),
-                options.reasoningEfforts());
+        return ModelOptionsView.from(modelOptions.optionsFor(currentUser.require(), agentCode));
     }
 
     @GetMapping("/model-tiers")

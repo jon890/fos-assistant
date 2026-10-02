@@ -10,11 +10,13 @@
 | `model_tier_definition` | `id` BIGINT, `(group_id, tier)` 유일 | 그룹 번호, 단계 코드 VARCHAR(16), provider VARCHAR(64) NULL, model VARCHAR(128) NULL, reasoning_effort VARCHAR(16) NULL |
 | `app_user` | 기존 `id` BIGINT | `model_default_tier` VARCHAR(16) NULL 추가 |
 | `model_tier_group_setting` | `group_id` BIGINT | `default_tier` VARCHAR(16) NULL |
+| `model_hidden` | `id` BIGINT, `(group_id, provider, model)` 유일 | 그룹 번호, provider VARCHAR(64), model VARCHAR(128). `model` 이 빈 문자열이면 그 provider 전체를 숨긴 것이다. NULL 은 유일 제약이 겹침을 막지 못해 쓰지 않는다 |
 | `subagent_usage_job` | `id` BIGINT, `(execution_id, child_session_id)` 유일 | profile, API 주소, 부모 session, 자식 session, 상태, 시작/다음 조회/기한 시각, 조회 횟수 |
 
 `conversation`은 `model_selection_mode` VARCHAR(16) NULL과 `model_tier` VARCHAR(16) NULL을 더한다.
 선택 모드는 `DEFAULT`, `TIER`, `CUSTOM`이며 null은 사용자와 그룹 기본값을 따른다.
 `agent_execution`은 `model_tier` VARCHAR(16) NULL과 `reasoning_effort_source` VARCHAR(20) NULL을 더한다.
+출처는 `REQUESTED`, `AGENT_DEFAULT`, `PROFILE_DEFAULT`, `UNKNOWN` 이다.
 `request_received_at`, `submitted_at`, `first_delta_at`은 DATETIME(6) NULL이며
 기존 `finished_at`과 함께 실행 구간을 표시한다. 끝난 실행의 재조회는 `finished_at` 색인을 쓴다.
 첫 assistant delta 본문은 이 칸들과 함께 저장하지 않는다.
@@ -182,11 +184,15 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `enabled` | BOOLEAN | 거짓이면 새 실행을 막는다 |
 | `profile_managed` | BOOLEAN | 참이면 Control Plane 이 이 에이전트의 profile 을 만들었다. 에이전트를 지울 때 profile 까지 지우는 것은 이 값이 참일 때뿐이다. 기본 거짓 |
 | `deleted_at` | DATETIME(6) NULL | 지운 시각. 적히면 목록과 새 대화에서 빠지고 그 에이전트의 대화는 읽기만 된다 |
+| `default_model_provider` | VARCHAR(64) NULL | 기본 provider. `default_model` 과 함께 채우거나 함께 비운다 |
+| `default_model` | VARCHAR(128) NULL | 기본 모델. 대화가 모델을 고르지 않았을 때 Hermes 에 명시해 보낸다 |
+| `default_reasoning_effort` | VARCHAR(16) NULL | 기본 effort. 모델 없이 이 값만 둘 수 있다 |
 
-**에이전트는 모델을 갖지 않는다.** 실행은 대화가 고른 값이나 profile 의 기본값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다.
+**모델과 effort 는 대화가 고르고, 고르지 않으면 에이전트 기본 모델로 돈다.** 세 칸이 모두 비면 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다.
+V48 이 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이그레이션은 넣지 않는다.
+근거는 [ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) 에 있다.
 예전의 `provider`, `model`, `model_synced_at` 칸과 에이전트별 모델 목록 표 `agent_model_option`, 막힌 provider 를 기억하던 표 `provider_state` 는 V27 이 지웠다.
-모델과 effort 는 대화가 고르고, 고르지 않으면 그 profile 의 기본값으로 돈다.
-근거는 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
+대화가 모델을 고르게 한 근거는 [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
 공개 범위가 접근 권한을 정하는 이유는
 [ADR-007](adr/ADR-007-에이전트가-모델과-도구를-함께-정한다.md)에 있다.
 

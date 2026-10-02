@@ -2,6 +2,7 @@ package com.bifos.assistant.user.infra;
 
 import com.bifos.assistant.user.domain.AppUser;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -14,6 +15,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     Optional<AppUser> findByEmail(String email);
 
     boolean existsByGroupId(Long groupId);
+
+    @Query("select distinct u.groupId from AppUser u")
+    List<Long> findDistinctGroupIds();
 
     /**
      * 사용자 한 줄을 쓰기 잠금으로 읽는다.

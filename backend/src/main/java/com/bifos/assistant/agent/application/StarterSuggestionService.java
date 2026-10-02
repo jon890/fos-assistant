@@ -208,8 +208,16 @@ public class StarterSuggestionService {
         try {
             String input = prompt(firstQuestions(user, agent));
             execution = executions.startDetached(user, agent);
+            // 대화가 없는 실행이라 에이전트 기본 모델로 돈다. 비어 있으면 profile 의 값이다(ADR-054).
             HermesRunCommand command = new HermesRunCommand(
-                    agent.hermesProfile(), agent.apiBaseUrl(), input, null, null, null, null, null);
+                    agent.hermesProfile(),
+                    agent.apiBaseUrl(),
+                    input,
+                    null,
+                    null,
+                    agent.defaultModelProvider(),
+                    agent.defaultModel(),
+                    agent.defaultReasoningEffort());
             String runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);

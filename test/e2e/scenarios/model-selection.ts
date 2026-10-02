@@ -20,9 +20,15 @@ const PROFILE_DEFAULT = { provider: "openai-codex", model: "example-model" } as 
 /** 대화에서 고를 모델이다. 기본값과 달라야 고른 값이 실렸는지 알 수 있다. */
 const CHOSEN = { provider: "nvidia", model: "example-provider/example-model-b", reasoningEffort: "high" } as const;
 
+/** 관리자가 에이전트 기본값으로 저장할 모델이다. 대역 catalog 에 있고 profile 기본값과 달라야 한다. */
+const AGENT_DEFAULT = { provider: "openai-codex", model: "example-model-mini", reasoningEffort: "medium" } as const;
+
 type ModelOptionsView = {
   defaultProvider: string | null;
   defaultModel: string | null;
+  defaultReasoningEffort: string | null;
+  defaultFromAgent: boolean;
+  defaultAvailable: boolean;
   providers: { provider: string; name: string; models: string[]; reasoningCapable: Record<string, boolean> }[];
   reasoningEfforts: string[];
 };
@@ -103,7 +109,30 @@ export const modelSelectionScenario: Scenario = {
       `실제로 돈 모델을 적지 않았다: ${JSON.stringify(probed)}`,
     );
 
-    step("세 단계는 실행 설정과 profile catalog로 해석하고 기본값 복귀는 요청 값을 비운다");
+    step("단계 정의는 DB 만 갖는다. 저장 전에는 세 단계가 비어 있고 관리자가 저장한 뒤 그 값을 쓴다");
+    const emptyTiers = expectStatus(
+      await call(context, "/chat/model-tiers?agentCode=dad", { token: context.tokens.dad }),
+      200,
+      "저장 전 단계 조회",
+    ).json<{ tiers: { model: string | null }[] }>();
+    expect(
+      emptyTiers.tiers.length === 3 && emptyTiers.tiers.every((tier) => tier.model === null),
+      `저장 전인데 단계에 모델이 있다: ${JSON.stringify(emptyTiers)}`,
+    );
+    expectStatus(await call(context, "/chat/model-tiers/group", {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: {
+        tiers: [
+          { tier: "FAST", provider: null, model: "example-fast", reasoningEffort: "low" },
+          { tier: "BALANCED", provider: null, model: "example-balanced", reasoningEffort: "medium" },
+          { tier: "DEEP", provider: null, model: "example-deep", reasoningEffort: "high" },
+        ],
+        defaultTier: null,
+      },
+    }), 204, "그룹 단계 저장");
+
+    step("세 단계는 저장한 정의와 profile catalog로 해석하고 기본값 복귀는 요청 값을 비운다");
     const tierConversationId = await emptyConversation(context);
     const tierCases = [
       { tier: "FAST", model: "example-fast", effort: "low" },
@@ -145,6 +174,141 @@ export const modelSelectionScenario: Scenario = {
     const restored = context.hermes.lastSubmittedRuntime();
     expect(restored.provider === undefined && restored.model === undefined && restored.reasoningEffort === undefined,
       "에이전트 기본값 복귀 뒤에도 단계 값이 실렸다");
+
+    step("에이전트 기본 모델을 저장하면 고르지 않은 대화가 그 값을 명시해 보낸다");
+    expectStatus(await call(context, "/admin/agents/dad/model-default", {
+      method: "PUT",
+      token: context.tokens.kid,
+      body: AGENT_DEFAULT,
+    }), 403, "관리자가 아닌 사용자의 기본 모델 저장");
+    expectStatus(await call(context, "/admin/agents/dad/model-default", {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: { provider: PROFILE_DEFAULT.provider, model: "example-missing", reasoningEffort: null },
+    }), 400, "목록에 없는 기본 모델 저장");
+    expectStatus(await call(context, "/admin/agents/dad/model-default", {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: AGENT_DEFAULT,
+    }), 200, "에이전트 기본 모델 저장");
+    const withAgentDefault = expectStatus(
+      await call(context, "/chat/model-options?agentCode=dad", { token: context.tokens.dad }),
+      200,
+      "기본 모델 저장 뒤 목록",
+    ).json<ModelOptionsView>();
+    expect(
+      withAgentDefault.defaultModel === AGENT_DEFAULT.model && withAgentDefault.defaultFromAgent === true
+        && withAgentDefault.defaultAvailable === true
+        && withAgentDefault.defaultReasoningEffort === AGENT_DEFAULT.reasoningEffort,
+      `목록의 기본 모델이 에이전트 기본값이 아니다: ${JSON.stringify(withAgentDefault)}`,
+    );
+    const defaultTurn = expectStatus(await call(context, "/chat/messages", {
+      method: "POST",
+      token: context.tokens.dad,
+      body: { conversationId: tierConversationId, text: "에이전트 기본 모델 검사" },
+    }), 200, "에이전트 기본 모델 대화").json<Turn>();
+    const sentDefault = context.hermes.lastSubmittedRuntime();
+    expect(
+      sentDefault.provider === AGENT_DEFAULT.provider && sentDefault.model === AGENT_DEFAULT.model
+        && sentDefault.reasoningEffort === AGENT_DEFAULT.reasoningEffort,
+      `에이전트 기본 모델이 실리지 않았다: ${JSON.stringify(sentDefault)}`,
+    );
+    const defaultTree = expectStatus(await call(context, `/usage/executions/${defaultTurn.executionId}/tree`, {
+      token: context.tokens.dad,
+    }), 200, "에이전트 기본 모델 실행 기록").json<{ root: { modelTier: string | null; reasoningEffortSource: string } }>();
+    expect(
+      defaultTree.root.modelTier === null && defaultTree.root.reasoningEffortSource === "AGENT_DEFAULT",
+      `effort 출처가 에이전트 기본값이 아니다: ${JSON.stringify(defaultTree.root)}`,
+    );
+
+    step("숨긴 모델은 목록에서 빠지고, 고르거나 그 모델로 실행하면 바꾸지 않고 MODEL_HIDDEN 으로 거절한다");
+    const hiddenEntries = [
+      { provider: AGENT_DEFAULT.provider, model: AGENT_DEFAULT.model },
+      { provider: CHOSEN.provider, model: null },
+    ];
+    expectStatus(await call(context, "/admin/model-hidden", {
+      method: "PUT",
+      token: context.tokens.kid,
+      body: { entries: hiddenEntries },
+    }), 403, "관리자가 아닌 사용자의 숨김 저장");
+    expectStatus(await call(context, "/admin/model-hidden", {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: { entries: hiddenEntries },
+    }), 204, "숨김 저장");
+    try {
+      const hiddenList = expectStatus(
+        await call(context, "/admin/model-hidden", { token: context.tokens.dad }),
+        200,
+        "숨김 조회",
+      ).json<{ entries: { provider: string; model: string | null }[] }>();
+      expect(hiddenList.entries.length === 2, `숨김 목록이 저장한 것과 다르다: ${JSON.stringify(hiddenList)}`);
+      const filtered = expectStatus(
+        await call(context, "/chat/model-options?agentCode=dad", { token: context.tokens.dad }),
+        200,
+        "숨긴 뒤 목록",
+      ).json<ModelOptionsView>();
+      expect(
+        filtered.providers[0]?.models.includes(AGENT_DEFAULT.model) === false
+          && filtered.providers[0]?.models.includes(PROFILE_DEFAULT.model) === true
+          && filtered.defaultAvailable === false,
+        `숨긴 모델이 목록에 남았거나 기본 모델을 쓸 수 있다고 답했다: ${JSON.stringify(filtered)}`,
+      );
+      const settings = expectStatus(
+        await call(context, "/admin/agents/dad/model-settings", { token: context.tokens.dad }),
+        200,
+        "관리자 모델 설정 조회",
+      ).json<{ agentDefault: { model: string | null }; catalog: ModelOptionsView; hidden: { entries: unknown[] } }>();
+      expect(
+        settings.agentDefault.model === AGENT_DEFAULT.model
+          && settings.catalog.providers[0]?.models.includes(AGENT_DEFAULT.model) === true
+          && settings.catalog.defaultModel === PROFILE_DEFAULT.model && settings.hidden.entries.length === 2,
+        `관리자 목록이 숨김을 적용했거나 값이 다르다: ${JSON.stringify(settings)}`,
+      );
+      const hiddenRun = await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { conversationId: tierConversationId, text: "숨긴 기본 모델 검사" },
+      });
+      expect(
+        hiddenRun.status === 409 && hiddenRun.json<{ code?: string }>().code === "MODEL_HIDDEN",
+        `숨긴 모델로 실행했는데 MODEL_HIDDEN 으로 거절하지 않았다: ${hiddenRun.status}`,
+      );
+      const hiddenExecution = (await executionsOf(context))[0];
+      expect(
+        hiddenExecution?.status === "FAILED" && hiddenExecution?.errorCode === "MODEL_HIDDEN",
+        `거절한 실행이 남지 않았다: ${JSON.stringify(hiddenExecution)}`,
+      );
+      const hiddenChoice = await call(context, `/chat/conversations/${tierConversationId}/model`, {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: CHOSEN,
+      });
+      expect(
+        hiddenChoice.status === 409 && hiddenChoice.json<{ code?: string }>().code === "MODEL_HIDDEN",
+        `숨긴 provider 의 모델을 고를 수 있었다: ${hiddenChoice.status}`,
+      );
+    } finally {
+      expectStatus(await call(context, "/admin/model-hidden", {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: { entries: [] },
+      }), 204, "숨김 비우기");
+      expectStatus(await call(context, "/admin/agents/dad/model-default", {
+        method: "PUT",
+        token: context.tokens.dad,
+        body: { provider: null, model: null, reasoningEffort: null },
+      }), 200, "에이전트 기본 모델 비우기");
+    }
+    const restoredOptions = expectStatus(
+      await call(context, "/chat/model-options?agentCode=dad", { token: context.tokens.dad }),
+      200,
+      "기본 모델을 비운 뒤 목록",
+    ).json<ModelOptionsView>();
+    expect(
+      restoredOptions.defaultModel === PROFILE_DEFAULT.model && restoredOptions.defaultFromAgent === false,
+      `기본 모델을 비웠는데 profile 의 값으로 돌아가지 않았다: ${JSON.stringify(restoredOptions)}`,
+    );
 
     step("대화에서 모델과 effort 를 고르면 그 값을 싣는다");
     const conversationId = await emptyConversation(context);

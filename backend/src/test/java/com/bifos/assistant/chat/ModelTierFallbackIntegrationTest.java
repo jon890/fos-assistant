@@ -5,6 +5,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -40,6 +43,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ActiveProfiles("test")
 class ModelTierFallbackIntegrationTest {
 
+    private static final Agent AGENT = Agent.of(
+            "tier-test",
+            "tier-test",
+            "tier-test",
+            "http://hermes.invalid",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            null);
+
     private static final Long GROUP_ID = 9_000_000_002L;
 
     @Autowired
@@ -70,8 +83,8 @@ class ModelTierFallbackIntegrationTest {
             when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.TIER);
             when(conversation.modelTier()).thenReturn(tier);
 
-            ResolvedModelTier direct = tiers.resolveTier(user, tier, (Agent) null);
-            ResolvedModelTier fromConversation = tiers.resolve(user, conversation, (Agent) null);
+            ResolvedModelTier direct = tiers.resolveTier(user, tier, AGENT);
+            ResolvedModelTier fromConversation = tiers.resolve(user, conversation, AGENT);
 
             assertThat(direct.tier()).isEqualTo(tier);
             assertThat(direct.choice()).isEqualTo(ModelChoice.defaults());

@@ -162,7 +162,7 @@ public final class AgentDtos {
     /**
      * 관리 화면이 보는 에이전트 한 줄.
      *
-     * <p>모델 칸을 두지 않는다. 에이전트는 모델을 갖지 않고 대화가 고른다(ADR-030).
+     * <p>모델 칸을 두지 않는다. 에이전트 기본 모델은 {@code chat} 의 관리자 경로가 따로 돌려준다(ADR-054).
      */
     public record AdminAgentView(
             Long id,

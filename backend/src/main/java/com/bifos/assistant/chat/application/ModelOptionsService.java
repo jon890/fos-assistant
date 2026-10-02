@@ -37,6 +37,7 @@ public class ModelOptionsService {
 
     private final AgentService agents;
     private final HermesModelClient hermes;
+    private final ModelVisibilityService visibility;
     private final Duration ttl;
     private final Clock clock;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
@@ -48,13 +49,20 @@ public class ModelOptionsService {
     public ModelOptionsService(
             AgentService agents,
             HermesModelClient hermes,
+            ModelVisibilityService visibility,
             @Value("${assistant.chat.model-options-ttl:10m}") Duration ttl) {
-        this(agents, hermes, ttl, Clock.systemUTC());
+        this(agents, hermes, visibility, ttl, Clock.systemUTC());
     }
 
-    public ModelOptionsService(AgentService agents, HermesModelClient hermes, Duration ttl, Clock clock) {
+    public ModelOptionsService(
+            AgentService agents,
+            HermesModelClient hermes,
+            ModelVisibilityService visibility,
+            Duration ttl,
+            Clock clock) {
         this.agents = agents;
         this.hermes = hermes;
+        this.visibility = visibility;
         this.ttl = ttl;
         this.clock = clock;
     }
@@ -62,12 +70,25 @@ public class ModelOptionsService {
     /** 요청자가 쓸 수 있는 에이전트의 profile 로 고를 수 있는 모델을 돌려준다. */
     public ModelOptions optionsFor(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
-        return optionsForAgent(agent);
+        return optionsForAgent(user.groupId(), agent);
     }
 
-    /** 이미 권한을 확인한 에이전트의 profile 모델 목록을 읽는다. */
-    public ModelOptions optionsForAgent(Agent agent) {
-        return optionsOf(catalogFor(agent));
+    /**
+     * 이미 권한을 확인한 에이전트의 profile 모델 목록을 읽는다.
+     *
+     * <p>그 그룹이 숨긴 provider 와 모델은 뺀다. 기본 모델은 에이전트 기본값이 있으면 그 값이다(ADR-054).
+     */
+    public ModelOptions optionsForAgent(Long groupId, Agent agent) {
+        return optionsOf(catalogFor(agent), agent, visibility.hiddenFor(groupId));
+    }
+
+    /**
+     * 숨김을 적용하지 않은 목록을 읽는다. 관리자가 무엇을 숨길지 고르는 화면이 쓴다.
+     *
+     * <p>기본 모델도 에이전트 기본값을 얹지 않은 profile 의 값이다.
+     */
+    public ModelOptions unfilteredForAgent(Agent agent) {
+        return optionsOf(catalogFor(agent), null, HiddenModels.none());
     }
 
     private HermesModelCatalog catalogFor(Agent agent) {
@@ -90,19 +111,52 @@ public class ModelOptionsService {
         }
     }
 
-    private static ModelOptions optionsOf(HermesModelCatalog catalog) {
-        List<HermesModelCatalog.Provider> providers = new ArrayList<>(catalog.providers().stream()
-                .map(ModelOptionsService::withEveryModelReasoning)
-                .toList());
+    /**
+     * @param agent 기본값을 얹을 에이전트. null 이면 profile 의 값만 쓴다
+     */
+    private static ModelOptions optionsOf(HermesModelCatalog catalog, Agent agent, HiddenModels hidden) {
+        List<HermesModelCatalog.Provider> providers = new ArrayList<>();
+        for (HermesModelCatalog.Provider provider : catalog.providers()) {
+            HermesModelCatalog.Provider visible = withoutHidden(provider, hidden);
+            if (visible != null) {
+                providers.add(withEveryModelReasoning(visible));
+            }
+        }
+        boolean fromAgent = agent != null && agent.defaultModel() != null;
+        String defaultProvider = fromAgent ? agent.defaultModelProvider() : catalog.defaultProvider();
+        String defaultModel = fromAgent ? agent.defaultModel() : catalog.defaultModel();
         // 기본 provider 를 맨 앞에 둔다. 나머지는 Hermes 가 준 차례를 지킨다.
         providers.sort((left, right) -> Boolean.compare(
-                !Objects.equals(left.slug(), catalog.defaultProvider()),
-                !Objects.equals(right.slug(), catalog.defaultProvider())));
+                !Objects.equals(left.slug(), defaultProvider), !Objects.equals(right.slug(), defaultProvider)));
+        // Hermes 가 기본 provider 를 주지 않으면 모델 이름만으로 본다. 없는 값과 견주면 쓸 수 있는 기본 모델도 거짓이 된다.
+        boolean available = defaultModel == null
+                || providers.stream()
+                        .anyMatch(provider ->
+                                (defaultProvider == null || provider.slug().equals(defaultProvider))
+                                        && provider.models().contains(defaultModel));
         return new ModelOptions(
-                catalog.defaultProvider(),
-                catalog.defaultModel(),
+                defaultProvider,
+                defaultModel,
+                agent == null ? null : agent.defaultReasoningEffort(),
+                fromAgent,
+                available,
                 List.copyOf(providers),
                 ModelChoice.REASONING_EFFORTS);
+    }
+
+    /** 숨긴 모델을 뺀 provider 다. provider 전체를 숨겼거나 남는 모델이 없으면 null 이다. */
+    private static HermesModelCatalog.Provider withoutHidden(
+            HermesModelCatalog.Provider provider, HiddenModels hidden) {
+        if (hidden.hidesProvider(provider.slug())) {
+            return null;
+        }
+        List<String> models = provider.models().stream()
+                .filter(model -> !hidden.hides(provider.slug(), model))
+                .toList();
+        if (models.isEmpty()) {
+            return null;
+        }
+        return new HermesModelCatalog.Provider(provider.slug(), provider.name(), models, provider.reasoning());
     }
 
     /**

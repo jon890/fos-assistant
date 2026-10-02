@@ -42,17 +42,24 @@ public class MemoryProposer {
      * 제안을 만들지 못하면 아무것도 만들지 않는다. 원래 대화 실행은 실패시키지 않는다.
      *
      * <p>제안 실행은 원래 실행의 agent와 대화를 이어 받아 같은 실행 기록 계통에 남긴다. 모델과 effort 도
-     * 그 대화가 고른 값을 쓴다.
+     * 원래 실행이 해석한 값을 쓴다. 대화에 적힌 값을 다시 읽으면 단계와 에이전트 기본 모델이 빠진다.
+     *
+     * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort
      */
     public void proposeFrom(
-            CurrentUser user, Conversation conversation, Agent agent, AgentExecution parentExecution, String answer) {
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            AgentExecution parentExecution,
+            String answer,
+            ModelChoice requested) {
         if (!properties.enabled()) {
             return;
         }
 
         AgentExecution proposalExecution = null;
         try {
-            ModelChoice choice = conversation.modelChoice();
+            ModelChoice choice = requested == null ? ModelChoice.defaults() : requested;
             proposalExecution = executions.start(
                     user,
                     conversation,
