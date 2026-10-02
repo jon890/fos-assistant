@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.infra.ArtifactSourceDnsResolver;
+import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
+import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
 import com.bifos.assistant.chat.infra.ArtifactSourceResponse;
 import com.bifos.assistant.chat.infra.ArtifactSourceSocketTransport;
 import com.bifos.assistant.chat.infra.ArtifactSourceTransport;
-import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
-import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -441,8 +441,7 @@ class ArtifactSourceFetcherTest {
         return ArtifactSourceSocketTransport.parse(new Socket(), new ByteArrayInputStream(response.getBytes()));
     }
 
-    private static ArtifactSourceFetcher fetcher(
-            ArtifactSourceDnsResolver dns, ArtifactSourceTransport transport) {
+    private static ArtifactSourceFetcher fetcher(ArtifactSourceDnsResolver dns, ArtifactSourceTransport transport) {
         return new ArtifactSourceFetcher(
                 new ArtifactSourceProperties(
                         List.of("images.example.com"),

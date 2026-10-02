@@ -16,8 +16,8 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.MessageRole;
 import com.bifos.assistant.chat.infra.ArtifactFoundFile;
-import com.bifos.assistant.chat.infra.ArtifactRemoved;
 import com.bifos.assistant.chat.infra.ArtifactProperties;
+import com.bifos.assistant.chat.infra.ArtifactRemoved;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -497,8 +497,7 @@ class ArtifactTest {
                     .extracting(ArtifactFoundFile::path)
                     .contains("ok.html");
 
-            List<ArtifactRemoved> removed =
-                    store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
+            List<ArtifactRemoved> removed = store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
 
             assertThat(removed).extracting(ArtifactRemoved::path).containsExactly("old/old.html");
             assertThat(Files.exists(
@@ -516,8 +515,7 @@ class ArtifactTest {
         writeAt(conversation.id(), "a/photo.png", "png", Instant.now().minus(Duration.ofDays(40)));
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
 
-        List<ArtifactRemoved> removed =
-                store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
+        List<ArtifactRemoved> removed = store.deleteOlderThan(Instant.now().minus(Duration.ofDays(30)));
 
         assertThat(removed).isEmpty();
         assertThat(Files.exists(root.resolve(String.valueOf(conversation.id()))

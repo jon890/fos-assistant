@@ -142,9 +142,7 @@ class AgentToolServiceTest {
 
         AgentToolsetsView result = service.read(owner, agent);
 
-        Assertions.assertThat(result.toolsets())
-                .extracting(AgentToolView::name)
-                .containsExactly("web");
+        Assertions.assertThat(result.toolsets()).extracting(AgentToolView::name).containsExactly("web");
         Assertions.assertThat(result.unclassifiedEnabled()).containsExactly("connections");
     }
 
@@ -198,9 +196,7 @@ class AgentToolServiceTest {
 
         AgentToolsetsView result = service.write(owner, agent, List.of("web", "skills"));
 
-        assertThat(result.toolsets())
-                .extracting(AgentToolView::name)
-                .containsExactly("web", "skills");
+        assertThat(result.toolsets()).extracting(AgentToolView::name).containsExactly("web", "skills");
         verify(toolsets).writeApiServer(agent.hermesProfile(), List.of("web", "skills", "fos-assistant"));
     }
 }

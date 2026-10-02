@@ -190,8 +190,7 @@ public class NextTurnDispatcher {
      * 닫으면 닫기 리스너가 같은 행으로 곧바로 다시 열어 같은 실패를 되풀이한다. 멈추지도 못하면 잠금을 풀기 전에 실패
      * 시각을 적어 한동안 다시 열지 않는다.
      */
-    private void runQueuedTurn(
-            CurrentUser owner, Conversation conversation, TurnHandle handle, List<Long> ids) {
+    private void runQueuedTurn(CurrentUser owner, Conversation conversation, TurnHandle handle, List<Long> ids) {
         Long conversationId = conversation.id();
         try {
             chat.runPendingMessages(owner, conversationId, handle, event -> hub.publish(conversationId, event));

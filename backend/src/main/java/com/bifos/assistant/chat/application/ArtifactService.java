@@ -2,8 +2,8 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactFoundFile;
+import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

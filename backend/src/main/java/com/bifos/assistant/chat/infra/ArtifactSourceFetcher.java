@@ -44,7 +44,10 @@ public class ArtifactSourceFetcher {
         this(properties, InetAddress::getAllByName, new ArtifactSourceSocketTransport());
     }
 
-    public ArtifactSourceFetcher(ArtifactSourceProperties properties, ArtifactSourceDnsResolver dnsResolver, ArtifactSourceTransport transport) {
+    public ArtifactSourceFetcher(
+            ArtifactSourceProperties properties,
+            ArtifactSourceDnsResolver dnsResolver,
+            ArtifactSourceTransport transport) {
         this.properties = properties;
         this.dnsResolver = dnsResolver;
         this.transport = transport;
@@ -75,8 +78,8 @@ public class ArtifactSourceFetcher {
         }
     }
 
-    private byte[] fetchResolved(ValidSource source, String expectedContentType, ArtifactSourceCancellation cancellation)
-            throws Exception {
+    private byte[] fetchResolved(
+            ValidSource source, String expectedContentType, ArtifactSourceCancellation cancellation) throws Exception {
         InetAddress[] addresses = dnsResolver.resolve(source.host());
         if (addresses == null || addresses.length == 0) {
             throw failed("artifact source host has no addresses", null);
@@ -105,7 +108,8 @@ public class ArtifactSourceFetcher {
         throw failed("could not connect to artifact source", last);
     }
 
-    private static byte[] validateResponse(ArtifactSourceResponse response, String expectedContentType) throws IOException {
+    private static byte[] validateResponse(ArtifactSourceResponse response, String expectedContentType)
+            throws IOException {
         if (response.status() != 200) {
             throw failed("artifact source did not return success", null);
         }

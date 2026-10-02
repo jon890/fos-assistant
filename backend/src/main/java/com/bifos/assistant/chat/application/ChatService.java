@@ -147,8 +147,7 @@ public class ChatService {
         Routed routed = route(user, conversationId, text, agentCode, attachmentIds);
         // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
-        TurnHandle handle =
-                turns.open(user.id(), routed.conversation().id());
+        TurnHandle handle = turns.open(user.id(), routed.conversation().id());
         try {
             if (routed.flow() != null) {
                 runFlow(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
@@ -296,11 +295,7 @@ public class ChatService {
      * 실패해도 대기 줄은 멈춘다. 둘 다 turn 잠금을 풀기 전이다.
      */
     private ChatTurn stoppedTurn(
-            TurnHandle handle,
-            PendingTurn pending,
-            HermesRunResult result,
-            ModelChoice choice,
-            Instant startedAt) {
+            TurnHandle handle, PendingTurn pending, HermesRunResult result, ModelChoice choice, Instant startedAt) {
         try {
             return recorded(cancel(pending, result, choice), startedAt);
         } finally {
@@ -314,8 +309,7 @@ public class ChatService {
      * <p>사용자가 중지를 확정한 실행은 {@code RUNNING} 으로 남지 않는다. 예외가 실행 줄을 이미 {@code FAILED} 로 적은
      * 뒤라면 그대로 둔다. 취소 기록이 실패해도 대기 줄은 멈추고, 어느 쪽 실패도 올리지 않아 원래 예외가 그대로 올라간다.
      */
-    private void cancelAndHoldIfStopConfirmed(
-            TurnHandle handle, PendingTurn pending, ModelChoice choice) {
+    private void cancelAndHoldIfStopConfirmed(TurnHandle handle, PendingTurn pending, ModelChoice choice) {
         if (!turns.isStopConfirmed(handle)) {
             return;
         }
@@ -352,8 +346,7 @@ public class ChatService {
      * <p>흐름이 루트 실행을 이미 끝난 상태로 적었으면 그대로 둔다. 실행 줄을 다시 읽어 본다. 흐름이 들고 있는 객체의
      * 상태를 여기서는 알 수 없다. {@code rootExecutionId} 가 null 이면 실행 줄을 만들기 전에 끝난 것이다.
      */
-    private void cancelFlowAndHoldIfStopConfirmed(
-            TurnHandle handle, Long conversationId, Long rootExecutionId) {
+    private void cancelFlowAndHoldIfStopConfirmed(TurnHandle handle, Long conversationId, Long rootExecutionId) {
         if (!turns.isStopConfirmed(handle)) {
             return;
         }
@@ -447,8 +440,7 @@ public class ChatService {
         Conversation conversation = routed.conversation();
         List<Long> attachmentIds =
                 routed.attached().stream().map(ChatAttachment::id).toList();
-        TurnHandle handle =
-                existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
+        TurnHandle handle = existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
             saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
@@ -556,8 +548,7 @@ public class ChatService {
             boolean streaming,
             TurnHandle existingHandle) {
         Conversation conversation = routed.conversation();
-        TurnHandle handle =
-                existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
+        TurnHandle handle = existingHandle == null ? turns.open(user.id(), conversation.id()) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
             if (intent instanceof TurnIntent.Fresh) {
@@ -769,8 +760,7 @@ public class ChatService {
         }
     }
 
-    private void relay(
-            PendingTurn pending, String runId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
+    private void relay(PendingTurn pending, String runId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
         // 중지 유예 시간이 지나면 요청 스레드를 먼저 풀어 상태 조회와 stopped 사건으로 진행한다.
         CompletableFuture<Void> streamDone = new CompletableFuture<>();

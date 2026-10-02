@@ -59,8 +59,7 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
             parameters.setServerNames(List.of(new SNIHostName(host)));
             ssl.setSSLParameters(parameters);
             ssl.startHandshake();
-            String target =
-                    source.getRawPath() == null || source.getRawPath().isEmpty() ? "/" : source.getRawPath();
+            String target = source.getRawPath() == null || source.getRawPath().isEmpty() ? "/" : source.getRawPath();
             if (source.getRawQuery() != null) {
                 target += "?" + source.getRawQuery();
             }

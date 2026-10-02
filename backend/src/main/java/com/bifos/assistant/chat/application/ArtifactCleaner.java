@@ -1,8 +1,8 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.infra.ArtifactProperties;
-import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactRemoved;
+import com.bifos.assistant.chat.infra.ArtifactStore;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
