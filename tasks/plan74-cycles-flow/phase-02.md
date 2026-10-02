@@ -68,12 +68,7 @@ Javadoc 에 「위임 실행의 답을 실행 줄에 적을 길이로 맞춘다.
 
 ### 5. 문서와 ADR 의 구현 상태를 고친다
 
-- `docs/backend/agent-delegation.md` 의 아래 문단은 이 phase 뒤 사실이 아니다
-
-  > **`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.**
-  > 두 패키지는 이미 서로를 import 한다(`TurnCancellation`, `Flow`). 그러나 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.
-
-  둘째 줄을 「사건 `DelegationFinished` 는 `chat` 이 갖고 `orchestration` 이 낸다. `chat` 은 `orchestration` 을 import 하지 않는다. 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.」 로 고친다. 그 문단의 지금 문장은 파일에서 읽어 확인한다
+- `docs/backend/agent-delegation.md` 에서 「두 패키지는 이미 서로를 import 한다(`TurnCancellation`, `Flow`). 위임 서비스가 `ChatService` 를 부르면 그 얽힘이 turn 실행까지 번진다.」 를 「사건 `DelegationFinished` 는 `chat` 이 갖고 `orchestration` 이 낸다. `chat` 은 `orchestration` 을 import 하지 않는다. 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.」 로 고친다. 앞의 굵은 문장은 그대로 둔다
 - ADR-068 의 `status` 줄의 구현 상태와 `docs/adr/INDEX.md` 의 ADR-068 줄의 `Accepted.` 뒤 문장을 아래로 바꾼다
 
 「S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘과 `agent` 가 `people` 을 쓰는 하나(C5), `agent` 가 `skill` 과 `orchestration` 을 쓰는 둘, `agent` 가 `chat` 과 `usage` 를 쓰는 둘(C1), `usage` 와 `memory` 가 `chat` 을 쓰는 둘(C2), `skill` 이 `chat` 을 쓰는 하나, `chat` 이 `orchestration` 을 쓰는 하나(C3, C4)를 끊었다. `memory` 가 `context` 를 쓰는 간선과 C7 은 아직 구현 전이다」
