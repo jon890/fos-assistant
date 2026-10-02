@@ -144,3 +144,4 @@ scripts/check-public-safe.sh
 | `backend/src/test/java/com/bifos/assistant/hermes/HermesRunRequestTest.java` | 수정 |
 | `test/e2e/fake-hermes.ts` | 수정 |
 | `test/e2e/scenarios/model-selection.ts` | 수정 |
+| `docs/backend/conversation.md` | 수정 |
