@@ -1,0 +1,19 @@
+{
+  "name": "plan63-docs-split",
+  "description": "docs 를 공통, backend, frontend 로 나누고 코드와 어긋난 서술과 중복을 정리한다 — 한 주제를 한 파일에서 읽게 한다",
+  "status": "pending",
+  "created_at": "2026-10-02",
+  "total_phases": 9,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "standard" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "deep" },
+    { "number": 5, "file": "phase-05.md", "execution_profile": "deep" },
+    { "number": 6, "file": "phase-06.md", "execution_profile": "standard" },
+    { "number": 7, "file": "phase-07.md", "execution_profile": "standard" },
+    { "number": 8, "file": "phase-08.md", "execution_profile": "standard" },
+    { "number": 9, "file": "phase-09.md", "execution_profile": "standard" }
+  ]
+}
