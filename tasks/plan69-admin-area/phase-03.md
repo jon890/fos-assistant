@@ -104,6 +104,7 @@ scripts/check-public-safe.sh
 | `web/src/app/admin/agents/[code]/page.tsx` | 신규 |
 | `web/src/app/admin/agents/[code]/loading.tsx` | 신규 |
 | `web/src/app/admin/connections/page.tsx` | 신규 |
+| `web/src/app/admin/connections/connector-admin-view.tsx` | 신규 |
 | `web/src/components/agent/agent-admin-panel.tsx` | 수정 |
 | `web/src/components/agent/agent-detail-body.tsx` | 수정 |
 | `web/src/components/agent/agent-access-section.tsx` | 수정 |
