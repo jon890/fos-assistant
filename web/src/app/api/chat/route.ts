@@ -20,21 +20,32 @@ export async function POST(request: Request) {
     attachmentIds?: number[];
   };
   if (!body.text || body.text.trim().length === 0) {
-    return errorResponse("VALIDATION_FAILED", "보낼 내용을 입력해 주세요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "보낼 내용을 입력해 주세요.",
+      400,
+    );
   }
   if (body.conversationId != null && !isConversationId(body.conversationId)) {
-    return errorResponse("VALIDATION_FAILED", "대화 주소가 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "대화 주소가 올바르지 않아요.",
+      400,
+    );
   }
 
-  const result = await callControlPlane<SendMessageResponse>("/api/v1/chat/messages", {
-    method: "POST",
-    body: {
-      conversationId: body.conversationId ?? null,
-      text: body.text,
-      agentCode: body.agentCode ?? null,
-      attachmentIds: body.attachmentIds ?? [],
+  const result = await callControlPlane<SendMessageResponse>(
+    "/api/v1/chat/messages",
+    {
+      method: "POST",
+      body: {
+        conversationId: body.conversationId ?? null,
+        text: body.text,
+        agentCode: body.agentCode ?? null,
+        attachmentIds: body.attachmentIds ?? [],
+      },
     },
-  });
+  );
 
   if (!result.ok) {
     return errorResponse(result.code, result.message, result.status);

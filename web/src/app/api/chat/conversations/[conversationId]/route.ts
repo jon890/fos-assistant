@@ -12,7 +12,11 @@ async function idOf(context: RouteContext): Promise<string | null> {
 }
 
 function invalid() {
-  return errorResponse("VALIDATION_FAILED", "대화 주소가 올바르지 않아요.", 400);
+  return errorResponse(
+    "VALIDATION_FAILED",
+    "대화 주소가 올바르지 않아요.",
+    400,
+  );
 }
 
 function response(result: Awaited<ReturnType<typeof callControlPlane>>) {

@@ -15,7 +15,10 @@ export async function POST(request: Request) {
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
-  const result = await callControlPlane("/api/v1/agents", { method: "POST", body });
+  const result = await callControlPlane("/api/v1/agents", {
+    method: "POST",
+    body,
+  });
   if (!result.ok) {
     return errorResponse(result.code, result.message, result.status);
   }

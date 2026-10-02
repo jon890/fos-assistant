@@ -5,10 +5,17 @@ import { errorResponse } from "@/lib/api-response";
 
 const ID = /^[1-9][0-9]*$/;
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
   const { id } = await context.params;
   if (!ID.test(id)) {
-    return errorResponse("VALIDATION_FAILED", "사용자 번호 형식이 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "사용자 번호 형식이 올바르지 않아요.",
+      400,
+    );
   }
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return parsed.response;

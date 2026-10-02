@@ -15,12 +15,19 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
   if (!isConversationId(conversationId)) {
-    return errorResponse("VALIDATION_FAILED", "대화 주소가 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "대화 주소가 올바르지 않아요.",
+      400,
+    );
   }
 
-  const opened = await requestControlPlane(`/api/v1/chat/conversations/${conversationId}/events`, {
-    signal: request.signal,
-  });
+  const opened = await requestControlPlane(
+    `/api/v1/chat/conversations/${conversationId}/events`,
+    {
+      signal: request.signal,
+    },
+  );
   if (!opened.ok) {
     return errorResponse(opened.code, opened.message, opened.status);
   }

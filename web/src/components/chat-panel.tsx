@@ -633,9 +633,8 @@ export function ChatPanel({
 
   const currentConversation = useConversation(conversationId);
   // 대화 줄이 바뀌면 그리는 중에 그 대화의 에이전트로 맞춘다. 처음 그릴 때 이미 줄이 있으면 그때도 맞춘다.
-  const [seenConversation, setSeenConversation] = useState<
-    typeof currentConversation
-  >(undefined);
+  const [seenConversation, setSeenConversation] =
+    useState<typeof currentConversation>(undefined);
   if (seenConversation !== currentConversation) {
     setSeenConversation(currentConversation);
     if (currentConversation) setAgentCode(currentConversation.agentCode ?? "");

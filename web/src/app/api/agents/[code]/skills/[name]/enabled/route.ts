@@ -5,22 +5,36 @@ import { AGENT_CODE_PATTERN } from "@/lib/agent";
 import { HERMES_SKILL_NAME_PATTERN } from "@/lib/skill";
 import { errorResponse } from "@/lib/api-response";
 
-export async function PUT(request: Request, context: { params: Promise<{ code: string; name: string }> }) {
+export async function PUT(
+  request: Request,
+  context: { params: Promise<{ code: string; name: string }> },
+) {
   const { code, name } = await context.params;
   if (!AGENT_CODE_PATTERN.test(code)) {
-    return errorResponse("VALIDATION_FAILED", "에이전트 코드 형식이 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "에이전트 코드 형식이 올바르지 않아요.",
+      400,
+    );
   }
   // Hermes 기본 스킬도 켜고 끄므로 올린 스킬 규칙이 아니라 Hermes 이름 규칙으로 본다.
   if (!HERMES_SKILL_NAME_PATTERN.test(name)) {
-    return errorResponse("VALIDATION_FAILED", "스킬 이름 형식이 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "스킬 이름 형식이 올바르지 않아요.",
+      400,
+    );
   }
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
-  const result = await callControlPlane(`/api/v1/agents/${code}/skills/${name}/enabled`, {
-    method: "PUT",
-    body,
-  });
+  const result = await callControlPlane(
+    `/api/v1/agents/${code}/skills/${name}/enabled`,
+    {
+      method: "PUT",
+      body,
+    },
+  );
   if (!result.ok) {
     return errorResponse(result.code, result.message, result.status);
   }

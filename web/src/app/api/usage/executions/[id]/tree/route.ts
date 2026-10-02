@@ -3,7 +3,11 @@ import { callControlPlane } from "@/lib/control-plane";
 import { errorResponse } from "@/lib/api-response";
 
 function invalid() {
-  return errorResponse("VALIDATION_FAILED", "실행 번호가 올바르지 않아요.", 400);
+  return errorResponse(
+    "VALIDATION_FAILED",
+    "실행 번호가 올바르지 않아요.",
+    400,
+  );
 }
 
 /**

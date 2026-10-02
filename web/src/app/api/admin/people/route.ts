@@ -18,5 +18,7 @@ export async function POST(request: Request) {
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return parsed.response;
   const body = parsed.body;
-  return response(await callControlPlane("/api/v1/admin/people", { method: "POST", body }));
+  return response(
+    await callControlPlane("/api/v1/admin/people", { method: "POST", body }),
+  );
 }

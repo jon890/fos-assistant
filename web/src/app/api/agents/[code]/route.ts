@@ -3,12 +3,21 @@ import { callControlPlane } from "@/lib/control-plane";
 import { AGENT_CODE_PATTERN } from "@/lib/agent";
 import { errorResponse } from "@/lib/api-response";
 
-export async function DELETE(_request: Request, context: { params: Promise<{ code: string }> }) {
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ code: string }> },
+) {
   const { code } = await context.params;
   if (!AGENT_CODE_PATTERN.test(code)) {
-    return errorResponse("VALIDATION_FAILED", "에이전트 코드 형식이 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "에이전트 코드 형식이 올바르지 않아요.",
+      400,
+    );
   }
-  const result = await callControlPlane(`/api/v1/agents/${code}`, { method: "DELETE" });
+  const result = await callControlPlane(`/api/v1/agents/${code}`, {
+    method: "DELETE",
+  });
   if (!result.ok) {
     return errorResponse(result.code, result.message, result.status);
   }

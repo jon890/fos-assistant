@@ -14,7 +14,9 @@ export async function GET(request: Request) {
   const month = asked.get("month");
   if (month) query.set("month", month);
 
-  const result = await callControlPlane<unknown>(`/api/v1/usage/breakdown?${query.toString()}`);
+  const result = await callControlPlane<unknown>(
+    `/api/v1/usage/breakdown?${query.toString()}`,
+  );
   if (!result.ok) {
     return errorResponse(result.code, result.message, result.status);
   }

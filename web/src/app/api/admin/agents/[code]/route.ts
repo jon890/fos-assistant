@@ -5,10 +5,17 @@ import { errorResponse } from "@/lib/api-response";
 
 const CODE = /^[a-z0-9][a-z0-9-]*$/;
 
-export async function PATCH(request: Request, context: { params: Promise<{ code: string }> }) {
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ code: string }> },
+) {
   const { code } = await context.params;
   if (!CODE.test(code)) {
-    return errorResponse("VALIDATION_FAILED", "에이전트 코드 형식이 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "에이전트 코드 형식이 올바르지 않아요.",
+      400,
+    );
   }
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return parsed.response;

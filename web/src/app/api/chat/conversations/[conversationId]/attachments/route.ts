@@ -11,7 +11,11 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
   if (!isConversationId(conversationId)) {
-    return errorResponse("VALIDATION_FAILED", "대화 주소가 올바르지 않아요.", 400);
+    return errorResponse(
+      "VALIDATION_FAILED",
+      "대화 주소가 올바르지 않아요.",
+      400,
+    );
   }
 
   const opened = await forwardControlPlane(
