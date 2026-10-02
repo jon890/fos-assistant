@@ -6,9 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserRole;
-import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,20 +23,22 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class ConversationWriterTest {
 
+    private static final long WRITER_USER_ID = 9203L;
+
     @Autowired
     ConversationWriter conversationWriter;
 
     @Autowired
     ConversationRepository conversations;
 
-    @Autowired
-    AppUserRepository users;
-
-    /** 다른 검사 클래스와 겹치지 않도록 매번 새 사용자로 제목이 빈 대화를 만든다. */
+    /**
+     * 사용자를 만들지 않고 고정 번호로 제목이 빈 대화만 만든다.
+     *
+     * <p>사용자를 저장하고 남기면 그룹의 첫 사용자 판정이 다른 검사에서 달라진다. 검사는 대화 번호로만
+     * 읽고 고치므로 같은 사용자 번호의 대화가 여럿이어도 서로 흔들리지 않는다.
+     */
     private Conversation newUntitledConversation() {
-        String email = "writer-" + System.nanoTime() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
-        return conversations.save(Conversation.startedBy(user.id(), "", null, Instant.now()));
+        return conversations.save(Conversation.startedBy(WRITER_USER_ID, "", null, Instant.now()));
     }
 
     private String storedTitle(Conversation conversation) {
