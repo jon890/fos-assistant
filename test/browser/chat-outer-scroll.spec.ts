@@ -15,13 +15,25 @@ test("긴 대화에서도 바깥 영역은 스크롤되지 않고 입력창이 �
     await sendAndWait(page, `긴 대화를 만드는 ${index}번째 물음`, index);
   }
   // 도는 중이던 작업 과정이 끝나 저장된 블록과 숨은 안내 글이 함께 쌓이게 한다.
+  // 스트림이 첫 멈춤 지점에 닿은 뒤(살아 있는 블록이 보인 뒤)에 풀어야 저장된 블록까지 간다.
   await hermes.holdNextRun();
-  await page.getByRole("textbox", { name: "메시지" }).fill(LONG_ACTIVITY_PROBE);
-  await page.getByRole("button", { name: "보내기", exact: true }).click();
-  await hermes.waitForHeldRun();
-  await hermes.releaseHeldRun();
-  await hermes.releaseLongActivity();
-  await hermes.releaseLongActivity();
+  let runReleased = false;
+  try {
+    await page.getByRole("textbox", { name: "메시지" }).fill(LONG_ACTIVITY_PROBE);
+    await page.getByRole("button", { name: "보내기", exact: true }).click();
+    await hermes.waitForHeldRun();
+    await expect(page.locator('[data-testid="activity-block"][data-mode="live"]')).toBeVisible();
+    await hermes.releaseLongActivity();
+    await hermes.releaseLongActivity();
+    await hermes.releaseHeldRun();
+    runReleased = true;
+    await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last())
+      .toBeVisible({ timeout: 30_000 });
+  } finally {
+    await hermes.releaseLongActivity();
+    await hermes.releaseLongActivity();
+    if (!runReleased) await hermes.releaseHeldRun();
+  }
   await expect(page.getByTestId("assistant-message")).toHaveCount(10, { timeout: 30_000 });
 
   const list = page.getByTestId("message-scroll");
