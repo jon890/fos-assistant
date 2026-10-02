@@ -123,7 +123,7 @@ ADR 은 결정의 기록이라 본문을 다시 쓰지 않는다. 아래 한 문
 ```bash
 # cwd: 저장소 root
 # 1. 고친 글이 남지 않았다. 출력이 없어야 한다
-git grep -n '지금 읽기만 한다\|POST /api/admin/people\|<member>\|사용자과\|MVP 는 제출과 조회만\|설정만으로 성립한다\|HERMES_BINDING_MISSING\|가족용\|가족 공용\|자동 활성화를 막는 설정을 넣지 않으므로\|취소하는 경로가 없다\.$' -- docs hermes/README.md ':!docs/adr/ADR-0[0-9][0-9]-*' 
+git grep -n '지금 읽기만 한다\|POST /api/admin/people\|<member>\|사용자과\|MVP 는 제출과 조회만\|설정만으로 성립한다\|HERMES_BINDING_MISSING\|가족용\|가족 공용\|자동 활성화를 막는 설정을 넣지 않으므로' -- docs hermes/README.md ':!docs/adr/ADR-0[0-9][0-9]-*' 
 git grep -n 'completed' -- .github/workflows/code-review-prompt.txt
 
 # 2. 링크와 앵커. $DOCS_CHECK_DIR 은 docs-check 스킬 번들 경로다
@@ -134,7 +134,7 @@ node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 출력 없음. 2번 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. 3번 종료 코드 0.
+기대값: 1번 출력 없음. 2번 출력에 `깨진 링크`, `없는 앵커` 가 든 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. 3번 종료 코드 0.
 `node --test` 는 `test/unit/doc-references.test.ts` 를 포함한다.
 
 결과 보고에 표를 남긴다. 발견마다 「고쳤다」, 「이미 고쳐져 있었다」, 「코드가 바뀌어 건너뛰었다」, 「판단이 필요해 남겼다」 가운데 하나와 까닭이다.

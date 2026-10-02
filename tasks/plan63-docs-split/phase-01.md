@@ -229,7 +229,7 @@ scripts/check-public-safe.sh
 기대값이다.
 
 - 1번: 모든 파일이 400줄 이하다. 넘는 파일이 있으면 결과 보고에 파일과 줄 수를 적는다. 이 phase 에서 문장을 줄여 맞추지 않는다.
-- 3번: 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. `표 열 수 불일치` 도 0건이다. `docs/hermes/concurrency.md` 의 헤딩 건너뜀 한 건은 phase 05 가 고친다.
+- 3번: 출력에 `깨진 링크`, `없는 앵커` 가 든 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. `표 열 수 불일치` 도 0건이다. `docs/hermes/concurrency.md` 의 헤딩 건너뜀 한 건은 phase 05 가 고친다.
 - 5번: 모두 종료 코드 0 이다. 주석만 고친 `hermes/tests`, `backend/src`, `test/e2e` 의 테스트가 그대로 통과한다. `gradlew` 는 `backend/` 에 있다. `node test/e2e/run.ts` 는 `gradlew test` 뒤에 돌린다.
 - 「옮기기만 했는지」 의 두 비교가 위에 적은 차이만 낸다.
 

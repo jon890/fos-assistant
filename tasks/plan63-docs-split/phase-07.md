@@ -133,7 +133,7 @@ python3 "$DOCS_CHECK_DIR/scripts/static_check.py" docs/adr docs
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 `backend/AGENTS.md` 가 작업 전보다 100줄 넘게 줄고 `quality.md` 는 400줄 이하. 2번 출력 없음. 3번과 4번 종료 코드 0, `static_check.py` 만 예외다. 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다.
+기대값: 1번 `backend/AGENTS.md` 가 작업 전보다 100줄 넘게 줄고 `quality.md` 는 400줄 이하. 2번 출력 없음. 3번과 4번 종료 코드 0, `static_check.py` 만 예외다. 출력에 `깨진 링크`, `없는 앵커` 가 든 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다.
 `node --test` 는 `test/unit/doc-references.test.ts` 와 `test/unit/quality-script.test.ts` 를 포함한다.
 
 `gradlew` 는 `backend/` 에 있다. 저장소 root 에서 `./gradlew` 를 부르면 없다.

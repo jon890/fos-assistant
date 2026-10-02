@@ -41,7 +41,7 @@ Java 주석, Python 주석, TypeScript 주석, 워크플로 프롬프트가 문�
 `../docs/…` 처럼 앞에 `../` 가 붙은 것도 `docs/` 부터 읽으면 root 기준 경로가 된다.
 자리표시자는 뺀다. 경로에 `NNN`, `<`, `*` 가 있으면 건너뛴다. 예: `docs/adr/NNN-<슬러그>.md`.
 
-**`AGENTS.md` 도 같은 방법으로 본다.** `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md` 뒤에 「」 가 오면 그 파일의 헤딩과 비교한다. 경로 없이 `AGENTS.md` 만 적힌 것은 루트 파일로 읽는다. Javadoc 과 워크플로 프롬프트가 이 세 파일의 절을 이름으로 가리킨다.
+**`AGENTS.md` 도 같은 방법으로 본다.** `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md` 뒤에 「」 가 오면 그 파일의 헤딩과 비교한다. 경로 없이 `AGENTS.md` 만 적힌 것은 루트 파일로 읽는다. `../AGENTS.md` 처럼 앞에 `../` 가 붙은 것도 루트 파일로 읽는다. Javadoc 과 워크플로 프롬프트가 이 세 파일의 절을 이름으로 가리킨다.
 
 **한계.** 경로와 「」 가 줄을 넘어 떨어져 있으면 잡지 못한다. 한 줄 안의 참조만 본다.
 
