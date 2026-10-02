@@ -28,9 +28,9 @@ import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.orchestration.application.FlowRegistry;
-import com.bifos.assistant.people.application.HermesProfileProvisioner;
-import com.bifos.assistant.people.application.PeopleProperties;
-import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.agent.application.ProfileProvisioning;
+import com.bifos.assistant.agent.application.PeopleProperties;
+import com.bifos.assistant.agent.application.ReservedProfileNames;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -62,8 +62,8 @@ class AgentApiBaseUrlUpdateTest {
             agents,
             mock(AgentService.class),
             users,
-            mock(AllowedPersonRepository.class),
-            mock(HermesProfileProvisioner.class),
+            mock(ReservedProfileNames.class),
+            mock(ProfileProvisioning.class),
             hermesToolsets,
             mock(HermesProperties.class),
             mock(PeopleProperties.class),

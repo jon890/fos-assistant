@@ -8,7 +8,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.people.application.PeopleProperties;
+import com.bifos.assistant.agent.application.PeopleProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.user.application.UserProvisioningService;

@@ -7,9 +7,6 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesToolsetClient;
-import com.bifos.assistant.people.application.HermesProfileProvisioner;
-import com.bifos.assistant.people.application.PeopleProperties;
-import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -54,8 +51,8 @@ public class AgentLifecycleService {
     private final AgentRepository agents;
     private final AgentService agentService;
     private final AppUserRepository users;
-    private final AllowedPersonRepository allowedPeople;
-    private final HermesProfileProvisioner provisioner;
+    private final ReservedProfileNames reservedProfileNames;
+    private final ProfileProvisioning provisioner;
     private final HermesToolsetClient hermesToolsets;
     private final HermesProperties hermesProperties;
     private final PeopleProperties peopleProperties;
@@ -244,7 +241,7 @@ public class AgentLifecycleService {
     private boolean isTaken(String code, String profileName) {
         return agents.findByCode(code).isPresent()
                 || agents.existsByHermesProfile(profileName)
-                || allowedPeople.existsByHermesProfile(profileName);
+                || reservedProfileNames.reservedByPerson(profileName);
     }
 
     /**

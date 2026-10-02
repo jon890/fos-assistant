@@ -1,5 +1,6 @@
 package com.bifos.assistant.people.application;
 
+import com.bifos.assistant.agent.application.PeopleProperties;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;

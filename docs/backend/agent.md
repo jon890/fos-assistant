@@ -149,7 +149,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 | 무엇 | 어디 |
 | --- | --- |
 | 만들기, 공개 범위, 지우기의 순서 | `agent/application/AgentLifecycleService` |
-| profile 을 만들고 거두기 | `people/application/HermesProfileProvisioner` 를 쓴다 |
+| profile 을 만들고 거두기 | `agent/application/ProfileProvisioning` port 로 부른다. 구현은 `people/application/HermesProfileProvisioner` 다 |
 | 대시보드 호출 | `hermes` |
 
 ## 페르소나를 고칠 때

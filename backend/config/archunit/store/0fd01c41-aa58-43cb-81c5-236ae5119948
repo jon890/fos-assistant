@@ -1,6 +1,5 @@
 agent -> chat 는 순환에 속한다
 agent -> orchestration 는 순환에 속한다
-agent -> people 는 순환에 속한다
 agent -> skill 는 순환에 속한다
 agent -> usage 는 순환에 속한다
 chat -> agent 는 순환에 속한다
@@ -10,11 +9,6 @@ chat -> orchestration 는 순환에 속한다
 chat -> skill 는 순환에 속한다
 chat -> usage 는 순환에 속한다
 context -> memory 는 순환에 속한다
-mcp -> agent 는 순환에 속한다
-mcp -> chat 는 순환에 속한다
-mcp -> memory 는 순환에 속한다
-mcp -> orchestration 는 순환에 속한다
-mcp -> usage 는 순환에 속한다
 memory -> agent 는 순환에 속한다
 memory -> chat 는 순환에 속한다
 memory -> context 는 순환에 속한다
@@ -23,8 +17,6 @@ orchestration -> agent 는 순환에 속한다
 orchestration -> chat 는 순환에 속한다
 orchestration -> context 는 순환에 속한다
 orchestration -> usage 는 순환에 속한다
-people -> agent 는 순환에 속한다
-people -> mcp 는 순환에 속한다
 skill -> agent 는 순환에 속한다
 skill -> chat 는 순환에 속한다
 usage -> agent 는 순환에 속한다
