@@ -44,7 +44,7 @@ H2 로 도는 테스트는 MySQL 만 거절하는 쿼리(정렬 규칙 섞임, �
 - `Result run(Set<String> excluded)`: 문맥의 `RepositoryFactoryInformation` 빈에서 저장소 인터페이스를 얻고(`getRepositoryInformation().getRepositoryInterface()`), 패키지가 `com.bifos.assistant` 로 시작하는 인터페이스의 `getDeclaredMethods()` 가운데 `default`, `static`, 합성 메서드가 아닌 것을 모두 실행한다. 프록시는 `context.getBean(저장소 인터페이스)` 로 얻는다. 이름은 `인터페이스 단순 이름.메서드 이름` 이다. 같은 이름이 둘 나오면(오버로드, 같은 단순 이름의 인터페이스) `IllegalStateException` 을 던져 검사를 실패시킨다
 - 인자는 파라미터의 제네릭 타입으로 만든다. `Long` 과 `long` 은 `1L`, `Integer` 와 `int` 는 `1`, `boolean` 은 `false`, `String` 은 `"x"`, `Instant` 는 고정한 시각, `UUID` 는 고정 값, `Pageable` 은 `PageRequest.of(0, 1)`, enum 은 첫 상수, `Collection`, `List`, `Set` 은 원소 타입의 값 하나를 담은 것이다. record 는 성분 타입마다 같은 규칙으로 값을 만들어 정식 생성자를 부른다(`MemoryRevisionId` 가 `new MemoryRevisionId(1L, 1)` 이 된다). 이 규칙에 없는 타입은 만들지 않고 `unsupported` 에 담는다
 - 메서드마다 `TransactionTemplate` 으로 트랜잭션을 열어 프록시 메서드를 부르고 `setRollbackOnly()` 로 되돌린다. 반환이 `Stream` 이면 트랜잭션 안에서 닫는다
-- `Result` 는 record 다. `List<String> repositories`(찾은 저장소 인터페이스의 단순 이름. 선언 메서드가 없는 저장소도 담는다), `List<String> executed`, `List<Failure> failures`, `List<String> unsupported`(인자를 만들지 못한 메서드와 그 타입), `Set<String> staleExclusions`(제외 목록에 있는데 찾지 못한 이름). `Failure` 는 `String method`, `Throwable cause` 를 가진 record 다. 예외는 `InvocationTargetException` 을 벗겨 담는다
+- `Result` 는 record 다. `List<String> repositories`(찾은 저장소 인터페이스의 단순 이름. 선언 메서드가 없는 저장소도 담는다), `List<String> executed`(예외 없이 끝난 메서드만 담는다), `List<Failure> failures`, `List<String> unsupported`(인자를 만들지 못한 메서드와 그 타입), `Set<String> staleExclusions`(제외 목록에 있는데 찾지 못한 이름). `Failure` 는 `String method`, `Throwable cause` 를 가진 record 다. 예외는 `InvocationTargetException` 을 벗겨 담는다
 - 실패한 쿼리가 뒤의 메서드를 막지 않는다. 모두 실행한 뒤 결과를 준다
 
 ### 2. `backend/src/test/java/com/bifos/assistant/RepositoryQueryMysqlTest.java` 신규
@@ -67,7 +67,7 @@ H2 로 도는 테스트는 MySQL 만 거절하는 쿼리(정렬 규칙 섞임, �
 | 테스트 | 단언 |
 | --- | --- |
 | 통일하기 전 스키마까지만 올라갔다 | `Flyway` 빈의 `info().current().getVersion().getVersion()` 이 `57` 이다. `information_schema.tables` 에서 `execution_event` 의 `table_collation` 이 `utf8mb4_unicode_ci`, `agent_execution` 이 `utf8mb4_0900_ai_ci` 다 |
-| 저장소 쿼리 검사가 정렬 규칙이 섞인 쿼리를 잡는다 | `RepositoryQuerySweep.run(Set.of())` 의 `failures` 에 `method` 가 `ExecutionEventRepository.findUnscheduledChildren` 인 것이 있고, 그 `cause` 의 원인 사슬에 `SQLException` 이 있으며 `getErrorCode()` 가 `1267` 이다. `failures` 의 모든 항목이 같은 오류 코드다. `executed` 의 크기가 `failures` 보다 크다(실패 뒤에도 나머지를 실행했다) |
+| 저장소 쿼리 검사가 정렬 규칙이 섞인 쿼리를 잡는다 | `RepositoryQuerySweep.run(Set.of())` 의 `failures` 에 `method` 가 `ExecutionEventRepository.findUnscheduledChildren` 인 것이 있고, 그 `cause` 의 원인 사슬에 `SQLException` 이 있으며 `getErrorCode()` 가 `1267` 이다. `failures` 의 모든 항목이 같은 오류 코드다. `failures` 에 `ExecutionEventRepository.countUnscheduledChildren` 도 있다(첫 실패 뒤에도 나머지를 실행했다) |
 
 ### 4. 설명 고치기
 
