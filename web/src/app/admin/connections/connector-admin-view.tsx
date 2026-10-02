@@ -5,7 +5,7 @@ import { ConnectorAdminPanel } from "@/components/connector/connector-admin-pane
 import { Notice } from "@/components/ui/notice";
 import { readConnectors, type ConnectorSummary } from "@/lib/connection";
 
-/** 커넥터를 읽어 연결 반영 확인 패널을 그린다. 확인할 연결이 없으면 그 안내를 보인다. */
+/** 커넥터를 읽어 연결 반영 확인 패널을 그린다. 확인할 연결이 없다는 안내는 패널이 보인다. */
 export function ConnectorAdminView() {
   const [connectors, setConnectors] = useState<ConnectorSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +26,6 @@ export function ConnectorAdminView() {
         </Notice>
       ) : connectors === null ? (
         <p className="text-sm text-muted-foreground">불러오는 중…</p>
-      ) : connectors.length === 0 ? (
-        <p className="text-sm text-muted-foreground">확인할 연결이 없어요.</p>
       ) : (
         <ConnectorAdminPanel connectors={connectors} />
       )}

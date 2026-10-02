@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
 import { NavPending, NAV_PENDING_EVENT } from "./nav-pending";
-import { useShellAccount } from "./app-shell";
+import { useShellAccount } from "./shell-account";
 import { useConversations } from "./conversations-provider";
 
 export function Sidebar({

@@ -1,4 +1,4 @@
-import { loadAgentDetail } from "@/lib/agent-detail";
+import { loadAgentDetail } from "@/components/agent/agent-detail-loader";
 
 export default async function AgentPersonaPage({
   params,

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { UsageScreen } from "@/components/usage/usage-screen";
+import { redirectMemberHome } from "@/lib/me";
 
 export default async function AdminUsagePage({
   searchParams,
@@ -11,6 +12,7 @@ export default async function AdminUsagePage({
   if (!session?.user?.email) {
     redirect("/signin");
   }
+  await redirectMemberHome();
 
   return (
     <UsageScreen

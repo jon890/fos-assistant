@@ -19,8 +19,9 @@ import {
   ConversationsProvider,
   useConversations,
 } from "./conversations-provider";
-import { shellRoleState, type ShellRoleState } from "./role-state";
+import { shellRoleState } from "./role-state";
 import { ScreenTransition } from "./screen-transition";
+import { ShellAccountContext } from "./shell-account";
 import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
@@ -35,25 +36,8 @@ const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(
 );
 /** 레이아웃이 한 번 읽은 사용자 이름이다. 화면마다 다시 읽지 않고 여기서 꺼낸다. 읽지 못했으면 null 이다 */
 const DisplayNameContext = createContext<string | null>(null);
-/** 레이아웃이 확인한 관리자 역할을 로딩 화면에서도 다시 조회하지 않고 쓴다. */
+/** 역할이 `ADMIN` 인지다. `useAdminView()` 만 읽는다. 관리자 영역 안인지는 그 훅이 경로로 따로 본다. */
 const AdminContext = createContext(false);
-
-/** 사이드바 맨 아래 줄이 읽는 값이다. 붙박이 사이드바와 서랍의 사이드바가 같은 값을 읽는다. */
-type ShellAccount = {
-  state: ShellRoleState;
-  displayName: string | null;
-  /** 역할과 이름을 브라우저에서 다시 읽는다. */
-  retry(): void;
-};
-const ShellAccountContext = createContext<ShellAccount>({
-  state: "reading",
-  displayName: null,
-  retry: () => {},
-});
-
-export function useShellAccount(): ShellAccount {
-  return useContext(ShellAccountContext);
-}
 
 function isAdminArea(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
@@ -275,9 +259,15 @@ export function AppShell({
   const [reread, setReread] = useState<ClientMe | null>(null);
   const [retried, setRetried] = useState(false);
 
+  /** 「다시 읽기」 가 도는 중인지다. 도는 동안 다시 눌러도 요청을 겹쳐 보내지 않는다 */
+  const retrying = useRef(false);
+
   const retry = useCallback(() => {
+    if (retrying.current) return;
+    retrying.current = true;
     setRetried(false);
     void fetchMe().then((me) => {
+      retrying.current = false;
       setReread(me);
       setRetried(true);
     });

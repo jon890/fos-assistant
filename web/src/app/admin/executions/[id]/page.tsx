@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { ExecutionDetail } from "@/components/execution/execution-detail";
+import { redirectMemberHome } from "@/lib/me";
 
 export default async function AdminExecutionPage({
   params,
@@ -11,6 +12,7 @@ export default async function AdminExecutionPage({
   if (!session?.user?.email) {
     redirect("/signin");
   }
+  await redirectMemberHome();
 
   const { id } = await params;
   if (!/^\d+$/.test(id)) {

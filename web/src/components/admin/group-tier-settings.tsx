@@ -72,7 +72,7 @@ function TierFields({ item, onChange }: TierFieldsProps) {
 
 /**
  * 그룹의 기본 단계와 단계별 모델을 정한다. 단계 정의는 그룹에 하나뿐이라 어느 에이전트로 읽어도 같다.
- * `agentCode` 는 조회에만 쓰고, 바뀌면 부모가 `key` 로 새로 그린다.
+ * `agentCode` 는 조회에만 쓴다. 부모는 처음 고른 코드를 그대로 넘겨, 저장하지 않은 입력이 다시 읽기로 사라지지 않게 한다.
  */
 export function GroupTierSettings({ agentCode }: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });

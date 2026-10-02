@@ -1,4 +1,5 @@
 import { expect, setSession, test } from "./fixtures.ts";
+import { FAKE_USAGE } from "../e2e/fake-hermes.ts";
 import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 화면 높이(모바일 844px)를 넘길 만큼의 대화 수다. 사이드바는 첫 쪽으로 30개를 읽는다. */
@@ -190,7 +191,12 @@ test("관리자 영역의 사용량에는 금액과 탭 넷이 있고 실행 한
   await expect(link).toHaveCount(1);
   await link.click();
   await expect(page).toHaveURL(new RegExp(`/admin/executions/${executionId}$`), { timeout: 15_000 });
-  await expect(page.getByText("입력 토큰", { exact: true })).toBeVisible();
+  // 라벨만 있고 값이 `-` 로 비면 관리자 영역이 내부 값을 받지 못한 것이다. 가짜 Hermes 가 답한 모델과 토큰 수와 견준다.
+  const valueOf = (label: string) =>
+    page.locator("dl > div").filter({ has: page.getByText(label, { exact: true }) }).locator("dd");
+  await expect(valueOf("모델")).toHaveText("ChatGPT 구독 · example-model");
+  await expect(valueOf("입력 토큰")).toHaveText(String(FAKE_USAGE.input_tokens));
+  await expect(valueOf("출력 토큰")).toHaveText(String(FAKE_USAGE.output_tokens));
   await expect(page.getByText("환산 금액", { exact: true })).toBeVisible();
 });
 
@@ -246,6 +252,25 @@ test("관리자 영역의 모델 화면에서 그룹 기본 단계를 저장하�
     await section.getByRole("button", { name: "저장" }).click();
     await expect(section.getByText("저장했어요", { exact: true })).toBeVisible();
   }
+});
+
+test("모델 화면에서 숨길 모델의 목록을 읽을 에이전트를 바꿔도 저장하지 않은 그룹 기본 단계가 남는다", async ({ page }) => {
+  await page.goto("/admin/models");
+  const section = page.getByRole("region", { name: "그룹 모델 설정" });
+  const defaultTier = section.getByLabel("그룹 기본 단계");
+  await expect(defaultTier).toHaveValue("");
+  await defaultTier.selectOption("BALANCED");
+
+  const hidden = page.getByRole("region", { name: "모델 숨김" });
+  const agent = hidden.getByLabel("숨길 모델의 목록을 읽을 에이전트");
+  const codes = await agent.locator("option").evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+  expect(codes.length, "에이전트가 둘은 있어야 선택을 바꿀 수 있다").toBeGreaterThan(1);
+  await agent.selectOption(codes[1]);
+  await expect(agent).toHaveValue(codes[1]);
+  await expect(hidden.getByRole("button", { name: "저장" })).toBeVisible();
+
+  // 저장하지 않았으므로 다른 검사가 보는 그룹 기본 단계는 그대로다.
+  await expect(defaultTier).toHaveValue("BALANCED");
 });
 
 test("MEMBER 역할이 관리자 영역의 모델 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {

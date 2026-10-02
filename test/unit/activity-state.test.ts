@@ -155,52 +155,30 @@ test("activityLabel 은 같은 도구 항목이 도는 중일 때와 끝났을 �
 });
 
 test("activityLabel 은 도구가 아닌 항목의 이름을 그대로 낸다", () => {
-  const state = applyChatEvent(emptyActivity(0), { type: "switched", text: "다른 모델" }, true);
+  const state = applyChatEvent(emptyActivity(0), { type: "step", stepName: "researcher", stepState: "started" });
 
-  assert.equal(activityLabel(state.items[0]!), state.items[0]!.name);
+  assert.equal(state.items[0]!.kind, "step");
+  assert.equal(activityLabel(state.items[0]!), "조사");
 });
 
-test("글이 빈 switched 사건은 줄을 만들지 않는다", () => {
-  for (const text of [undefined, null, "", "  "]) {
-    const state = applyChatEvent(emptyActivity(0), { type: "switched", text }, true);
+test("switched 사건은 글이 있든 비었든 대화의 작업 과정에 줄을 만들지 않는다", () => {
+  for (const text of [undefined, null, "", "  ", "다른 모델"]) {
+    const state = applyChatEvent(emptyActivity(0), { type: "switched", text });
 
     assert.deepEqual(state.items, [], `text=${JSON.stringify(text)} 인데 줄이 생겼다`);
   }
 });
 
-test("글이 있는 switched 사건은 넘어간 곳을 적은 줄 하나를 만든다", () => {
-  const state = applyChatEvent(emptyActivity(0), { type: "switched", text: "다른 모델" }, true);
-
-  assert.deepEqual(state.items.map((item) => item.name), ["여기부터 다른 모델로 실행해요"]);
-});
-
-test("showSwitched 가 거짓이면 글이 있는 switched 사건도 줄을 만들지 않는다", () => {
-  assert.deepEqual(applyChatEvent(emptyActivity(0), { type: "switched", text: "다른 모델" }).items, []);
-  assert.deepEqual(applyChatEvent(emptyActivity(0), { type: "switched", text: "다른 모델" }, false).items, []);
-});
-
-test("실행 트리의 PROVIDER_SWITCHED 사건은 showSwitched 가 참일 때만 줄을 만든다", () => {
+test("실행 트리의 PROVIDER_SWITCHED 사건은 줄을 만들지 않고 같은 실행의 도구 줄은 남는다", () => {
   const switched: ExecutionEventView = {
     ...toolStarted(1, "검색"),
     eventType: "PROVIDER_SWITCHED",
     toolName: null,
     detail: "다른 모델",
   };
-  const tree = { truncated: false, root: node(1, "SUCCEEDED", [switched]) };
+  const tree = { truncated: false, root: node(1, "SUCCEEDED", [switched, toolStarted(2, "검색")]) };
 
-  assert.deepEqual(fromTree(tree).filter((item) => item.kind === "switched"), []);
-  assert.deepEqual(
-    fromTree(tree, { showSwitched: true }).map((item) => item.name),
-    ["여기부터 다른 모델로 실행해요"],
-  );
-});
-
-test("실행 트리의 PROVIDER_SWITCHED 사건도 글이 비면 줄을 만들지 않는다", () => {
-  const switched: ExecutionEventView = { ...toolStarted(1, "검색"), eventType: "PROVIDER_SWITCHED", toolName: null };
-
-  const items = fromTree({ truncated: false, root: node(1, "SUCCEEDED", [switched]) }, { showSwitched: true });
-
-  assert.deepEqual(items.filter((item) => item.kind === "switched"), []);
+  assert.deepEqual(fromTree(tree).map((item) => [item.kind, item.name]), [["tool", "검색"]]);
 });
 
 test("끝난 블록의 접힌 한 줄은 중지와 오류를 먼저 보고 그 밖에는 도구와 도우미의 수로 고른다", () => {

@@ -17,7 +17,6 @@ import {
 
 type Props = {
   turns: Turn[];
-  isAdmin: boolean;
   loading: boolean;
   sending: boolean;
   activity: ActivityState | null;
@@ -44,7 +43,6 @@ type Props = {
 
 export function MessageList({
   turns,
-  isAdmin,
   loading,
   sending,
   activity,
@@ -214,7 +212,6 @@ export function MessageList({
                     <Fragment key={turn.id}>
                       <MessageBubble
                         turn={turn}
-                        isAdmin={isAdmin}
                         conversationId={conversationId}
                         onOpenSaved={onOpenSaved}
                         initialActivityExpanded={

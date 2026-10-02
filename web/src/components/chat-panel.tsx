@@ -32,11 +32,7 @@ import {
 } from "./shell/conversations-provider";
 import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
 import { Notice } from "./ui/notice";
-import {
-  useShellDisplayName,
-  useAdminView,
-  useShellTitle,
-} from "./shell/app-shell";
+import { useShellDisplayName, useShellTitle } from "./shell/app-shell";
 import { readEventStream } from "@/lib/stream";
 import { agentLabel } from "@/lib/format";
 import type { ChatEvent } from "@/lib/chat-event";
@@ -227,7 +223,6 @@ export function ChatPanel({
   const pathname = usePathname();
   const { refresh, replace, newConversationVersion } = useConversations();
   const displayName = useShellDisplayName();
-  const isAdmin = useAdminView();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(
     initialConversationId,
@@ -453,7 +448,7 @@ export function ChatPanel({
         const tree = await readPayload<ExecutionTreeResponse>(response);
         if (!current() || currentExecutionId.current !== treeExecutionId)
           return;
-        const items = fromTree(tree, { running: true, showSwitched: isAdmin });
+        const items = fromTree(tree, { running: true });
         setActivity((previous) => previous && { ...previous, items });
       } catch {
         // 작업 과정은 다음 주기에 다시 읽는다. 기다리는 표시는 그대로 둔다.
@@ -949,10 +944,8 @@ export function ChatPanel({
     } else if (event.type === "reset") {
       callbacks.onReset?.();
       setActivity((previous) => previous && applyChatEvent(previous, event));
-    } else if (["tool", "subagent", "step", "switched"].includes(event.type)) {
-      setActivity(
-        (previous) => previous && applyChatEvent(previous, event, isAdmin),
-      );
+    } else if (["tool", "subagent", "step"].includes(event.type)) {
+      setActivity((previous) => previous && applyChatEvent(previous, event));
     } else if (
       (event.type === "done" || event.type === "stopped") &&
       event.conversationId
@@ -1892,7 +1885,6 @@ export function ChatPanel({
         {startScreen ? null : (
           <MessageList
             turns={turns}
-            isAdmin={isAdmin}
             loading={messagesLoading}
             sending={sending}
             activity={activity}
