@@ -14,6 +14,7 @@
     "format:check": "files=$(node scripts/changed-files.mjs) && { [ -z \"$files\" ] || printf '%s\\n' \"$files\" | xargs prettier --check; }",
     "format:changed": "files=$(node scripts/changed-files.mjs) && { [ -z \"$files\" ] || printf '%s\\n' \"$files\" | xargs prettier --write; }",
     "test:browser": "playwright test --config ../test/browser/playwright.config.ts",
+    "screenshots": "playwright test --config ../test/screenshots/playwright.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

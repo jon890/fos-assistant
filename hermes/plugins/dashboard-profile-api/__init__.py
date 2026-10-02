@@ -646,7 +646,7 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
 
     하한보다 느슨한 선언은 고쳐서 받지 않고 거절한다. 조용히 엄격하게 읽으면 선언이 틀린 것을 만든 사람이 모른다.
     `schema: 1` 은 도구 정책을 선언하지 않는다. 대시보드가 부르는 읽기 전용 도구만 정책으로 낸다.
-    `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-060). 기본값을 채운 값이고,
+    `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-062). 기본값을 채운 값이고,
     `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
     """
     call_tools = {verify_tool} | set(option_tools)

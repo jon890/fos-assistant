@@ -16,14 +16,14 @@
 ## 컨텍스트
 
 - **계약은 `docs/connectors/gmail.md` 가 갖는다.** 등록 칸, 도구 이름과 인자와 결과, 오류 코드, 자르는 길이, 제한 시간, `TRASH`/`SPAM` 거절이 모두 거기 있다. 그 문서와 다르게 만들지 않는다. 달라져야 하면 멈추고 알린다
-- 결정의 근거는 `docs/adr/ADR-061-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md` 다
+- 결정의 근거는 `docs/adr/ADR-063-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md` 다
 - 디렉터리 모양의 선례는 `hermes/tests/fixtures/demo-connector/` 다(`connector.json`, `.mcp.json`, `.claude-plugin/plugin.json`, `server.py`, `skills/demo/SKILL.md`). 서버는 `from mcp.server.mcpserver import MCPServer`, `from mcp_types import CallToolResult, TextContent, ToolAnnotations` 를 쓰고 `server.run("stdio")` 로 뜬다. 실패는 `CallToolResult(content=[TextContent(type="text", text=json.dumps({"error": {"code": code}}))], is_error=True)` 모양이다
 - `connector.json` 의 형식과 검증은 `docs/connectors.md` 의 「connector.json」 과 `hermes/plugins/dashboard-profile-api/__init__.py` 의 `_load_connector` 가 갖는다. `.mcp.json` 서버 env 는 `fields[].env` 와 정확히 같아야 하고 값은 `"${이름}"` 이다. 스킬 본문은 합쳐 8,000자까지다
 - 승인한 호출은 대시보드가 새 프로세스로 서버를 띄워 한 번 부른다. 도구는 프로세스 안의 상태에 기대지 않는다
 - 검사는 `mcp==2.0.0`, Python 3.13 으로 돈다. `python3 -m unittest discover -s hermes/tests` 가 하위 디렉터리의 검사를 찾으려면 그 디렉터리에 `__init__.py` 가 있어야 한다
 - `test/unit/connector-neutral.test.ts` 는 `git ls-files backend/src/main web/src hermes/plugins` 의 파일에 금지 낱말이 없는지 본다. `hermes/connectors/` 는 대상이 아니다
 
-**근거 문서**: `docs/connectors/gmail.md`, `docs/adr/ADR-061-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md`, `docs/connector-authoring.md` 의 「갖출 것」
+**근거 문서**: `docs/connectors/gmail.md`, `docs/adr/ADR-063-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md`, `docs/connector-authoring.md` 의 「갖출 것」
 
 ## Gmail 과 Google 의 HTTP 계약
 

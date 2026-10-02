@@ -11,7 +11,7 @@
 
 ## 컨텍스트
 
-- 결정은 `docs/adr/ADR-060-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md`, 계약은 `docs/backend/connector-tool-policy.md` 의 「도구 정책」 과 「도구 호출 판정」, `docs/connectors.md` 의 「Control Plane API」 와 「승인 줄과 경로」 에 있다. **이 phase 는 그 문서를 고치지 않는다.**
+- 결정은 `docs/adr/ADR-062-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md`, 계약은 `docs/backend/connector-tool-policy.md` 의 「도구 정책」 과 「도구 호출 판정」, `docs/connectors.md` 의 「Control Plane API」 와 「승인 줄과 경로」 에 있다. **이 phase 는 그 문서를 고치지 않는다.**
 - 대시보드 plugin: `hermes/plugins/dashboard-profile-api/__init__.py` 의 `_connector_tools(declared, verify_tool, option_tools, mcp_server)` 가 도구 선언을 검증해 `{이름: {"risk", "approval", "title"}}` 를 낸다. 지금은 `set(declared_tool) - {"risk", "approval", "title"}` 이 비지 않으면 거절한다. 그 결과가 `_load_connector` 의 반환값 `"tools"` 로 가고 카탈로그 응답에 그대로 실린다. `tools.exclude` 는 `policy["approval"] == "always"` 로만 계산한다. 이것은 바꾸지 않는다
 - Control Plane 이 카탈로그를 읽는 곳: `backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java` 의 `tools(JsonNode declared)` 가 `new ConnectorTool(entry.getKey(), text(policy, "risk"), text(policy, "approval"), text(policy, "title"))` 를 만든다. dto 는 `backend/src/main/java/com/bifos/assistant/hermes/dto/ConnectorTool.java` 의 `record ConnectorTool(String name, String risk, String approval, String title)` 다
 - 정책 읽기: `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorToolPolicies.java` 의 `policy(ConnectorTool)` 가 `new ToolPolicy(risk, approval, tool.title())` 를 만들고 `summaries(manifest)` 가 `new ConnectorToolSummary(tool.name(), policy.title(), policy.risk(), policy.approval())` 를 낸다. `ToolPolicy` 는 `connector/domain/ToolPolicy.java` 의 `record ToolPolicy(ToolRisk risk, ToolApproval approval, String title)` 다
@@ -22,7 +22,7 @@
 - 웹: `web/src/lib/connection.ts` 의 `ConnectorTool` 타입과 `toolPolicyLabel(tool)`, `web/src/lib/connection-route.ts` 의 `safeTools(value)`. 도구 목록을 그리는 곳은 `web/src/components/connector/connector-tools.tsx` 다. 승인 카드(`web/src/components/chat/approval-card.tsx`)는 이미 `action.grantAllowed` 로 「승인하고 묻지 않기」 를 그린다. 카드는 고치지 않는다
 - e2e 의 Hermes 대역: `test/e2e/fake-hermes.ts` 의 카탈로그 `tools` 와 `test/e2e/scenarios/connector.ts` 의 `type ToolView`
 
-**근거 문서**: `docs/adr/ADR-060-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md`, `docs/backend/connector-tool-policy.md` 의 「도구 정책」, `docs/connectors.md` 의 「승인 줄과 경로」
+**근거 문서**: `docs/adr/ADR-062-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md`, `docs/backend/connector-tool-policy.md` 의 「도구 정책」, `docs/connectors.md` 의 「승인 줄과 경로」
 
 ## 의도 메모
 

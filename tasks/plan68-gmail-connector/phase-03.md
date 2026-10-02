@@ -16,13 +16,13 @@
 ## 컨텍스트
 
 - **검사가 보는 항목은 `docs/connector-authoring.md` 의 「공통 검사」 표가 갖는다.** 표의 줄마다 검사 하나를 만든다. 표와 다르게 만들지 않는다. 달라져야 하면 멈추고 알린다
-- 결정은 `docs/adr/ADR-059-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md` 다
+- 결정은 `docs/adr/ADR-061-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md` 다
 - 대시보드 plugin 의 manifest 검증은 `hermes/plugins/dashboard-profile-api/__init__.py` 의 `_load_connector(connector_id, entry)` 다. `entry` 는 `{"root": Path, "command": 실행 파일 경로나 None, "env": {}}` 모양이다. plugin 을 Hermes 없이 읽는 방법은 `hermes/tests/test_connector_manifest.py` 가 갖는다(Hermes 모듈을 가짜로 끼운다). 그 파일의 도움 함수를 `import test_connector_manifest as base` 로 다시 쓴다
 - 서버를 자식으로 띄워 도구를 읽는 선례는 `hermes/tests/test_connector_call.py` 다. `mcp.ClientSession`, `mcp.StdioServerParameters`, `mcp.client.stdio.stdio_client` 를 쓴다. 도구의 읽기 전용 표시는 `tool.annotations.read_only_hint` 다
 - 검사는 CI 의 `hermes` job(`python -m unittest discover -s hermes/tests -v`)과 `scripts/check-local.sh` 의 `check_hermes` 가 돌린다. 새 job 을 만들지 않는다
 - 저장소에 `.github/CODEOWNERS` 가 아직 없다
 
-**근거 문서**: `docs/connector-authoring.md` 의 「공통 검사」, `docs/adr/ADR-059-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md`
+**근거 문서**: `docs/connector-authoring.md` 의 「공통 검사」, `docs/adr/ADR-061-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md`
 
 ## 의도 메모
 
@@ -58,7 +58,7 @@
 ### 2. `.github/CODEOWNERS`
 
 ```
-# 범용 커넥터는 디렉터리마다 소유자를 둔다 (docs/adr/ADR-059). 소유자는 서비스의 API 가 바뀌면 고치고 실제 계정으로 확인한다.
+# 범용 커넥터는 디렉터리마다 소유자를 둔다 (docs/adr/ADR-061). 소유자는 서비스의 API 가 바뀌면 고치고 실제 계정으로 확인한다.
 /hermes/connectors/gmail/ @jon890
 /hermes/tests/connectors/test_gmail.py @jon890
 /docs/connectors/gmail.md @jon890

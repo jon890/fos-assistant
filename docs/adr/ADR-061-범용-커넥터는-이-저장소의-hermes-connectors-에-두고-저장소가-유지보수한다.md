@@ -1,4 +1,4 @@
-## ADR-059: 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다
+## ADR-061: 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다
 
 - **status**: `accepted`
 - Date: 2026-10-02

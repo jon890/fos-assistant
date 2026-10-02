@@ -22,6 +22,8 @@ import com.bifos.assistant.chat.infra.ModelHiddenRepository;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog.Provider;
+import com.bifos.assistant.hermes.dto.ReasoningCapability;
+import com.bifos.assistant.hermes.dto.ReasoningCapability.Support;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -217,6 +219,42 @@ class ModelVisibilityTest {
     }
 
     @Test
+    @DisplayName("에이전트 기본 effort none 은 끄기 지원이 SUPPORTED 인 모델이나 profile 기본 모델에서만 저장한다")
+    void agentDefaultNoneIsSavedOnlyWhereDisablingIsSupported() {
+        Agent agent = agent();
+        AgentModelDefaultService defaults = defaultsWith(agent, disableCatalog("can-off"));
+
+        ModelChoice profileDefault = defaults.save(admin, "helper", ModelChoice.of(null, null, "none"));
+        assertThat(profileDefault).as("모델을 비우면 profile 기본 모델로 판정한다").isEqualTo(ModelChoice.stored(null, null, "none"));
+
+        ModelChoice explicit = defaults.save(admin, "helper", ModelChoice.of("provider-c", "can-off", "none"));
+        assertThat(explicit).isEqualTo(ModelChoice.stored("provider-c", "can-off", "none"));
+
+        for (String model : List.of("cannot-off", "unsaid")) {
+            assertThatThrownBy(() -> defaults.save(admin, "helper", ModelChoice.of("provider-c", model, "none")))
+                    .as("모델 %s", model)
+                    .isInstanceOf(ApiException.class)
+                    .extracting(error -> ((ApiException) error).code())
+                    .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        }
+        assertThat(agent.defaultModel()).as("거절한 저장은 기본값을 바꾸지 않는다").isEqualTo("can-off");
+        assertThat(agent.defaultReasoningEffort()).isEqualTo("none");
+    }
+
+    @Test
+    @DisplayName("profile 기본 모델의 끄기 지원을 모르면 모델을 비운 none 을 저장하지 않는다")
+    void agentDefaultNoneWithoutModelIsRejectedWhenProfileDefaultCannotBeDisabled() {
+        Agent agent = agent();
+        AgentModelDefaultService defaults = defaultsWith(agent, disableCatalog("unsaid"));
+
+        assertThatThrownBy(() -> defaults.save(admin, "helper", ModelChoice.of(null, null, "none")))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThat(agent.defaultReasoningEffort()).isNull();
+    }
+
+    @Test
     @DisplayName("Hermes 가 목록을 답하지 못해도 저장된 기본값과 숨김 목록은 돌려준다")
     void settingsSurviveCatalogFailure() {
         visibility.save(admin, List.of(new HiddenModels.Entry("provider-a", null)));
@@ -261,6 +299,32 @@ class ModelVisibilityTest {
                 mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
 
         assertThat(options.optionsForAgent(GROUP_ID, agent).defaultAvailable()).isTrue();
+    }
+
+    /** 끄기 지원이 SUPPORTED, UNSUPPORTED, UNKNOWN 인 모델을 한 provider 에 둔 목록이다. */
+    private static HermesModelCatalog disableCatalog(String profileDefaultModel) {
+        return new HermesModelCatalog(
+                "provider-c",
+                profileDefaultModel,
+                List.of(new Provider(
+                        "provider-c",
+                        "C",
+                        List.of("can-off", "cannot-off", "unsaid"),
+                        Map.of(
+                                "can-off", new ReasoningCapability(Support.SUPPORTED, Support.SUPPORTED),
+                                "cannot-off", new ReasoningCapability(Support.SUPPORTED, Support.UNSUPPORTED)))));
+    }
+
+    private AgentModelDefaultService defaultsWith(Agent agent, HermesModelCatalog catalog) {
+        AgentRepository agents = mock(AgentRepository.class);
+        when(agents.findByCode("helper")).thenReturn(Optional.of(agent));
+        when(agents.findByCodeForUpdate("helper")).thenReturn(Optional.of(agent));
+        when(agents.save(agent)).thenReturn(agent);
+        HermesModelClient hermes = mock(HermesModelClient.class);
+        when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(catalog);
+        ModelOptionsService options = new ModelOptionsService(
+                mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+        return new AgentModelDefaultService(new AgentService(agents), options, visibility);
     }
 
     private ModelOptionsService optionsService(Agent agent) {

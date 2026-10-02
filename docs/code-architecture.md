@@ -29,7 +29,7 @@ hermes/
     dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
     fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 연결용 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
   connectors/
-    <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-059)
+    <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-061)
   profile-template/
     config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
   bundle.sh                  설치 묶음을 만든다
@@ -49,7 +49,7 @@ hermes/
 
 아래는 아직 만들지 않았다. 스키마와 판정은 이미 받을 수 있게 되어 있다.
 
-- collection 탭, 문서(`DOCUMENT`) 편집과 판 이력 화면, 출처 표시, 민감 항목 표시
+- collection 탭, 문서의 판 이력 화면, 출처 표시
 - 관리자가 에이전트 화면에서 collection 과 민감 허용을 고치는 경로
 - 다른 곳의 개인 지식을 들여오는 API. 사람이 승인한 항목만 들이고 같은 출처를 두 번 들이지 않는다. 절차와 계약은 [ADR-058](adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
 - 민감 항목 본문의 완전 삭제

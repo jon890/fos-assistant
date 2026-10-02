@@ -60,7 +60,7 @@ public record ToolPolicyDecision(
         if (argsBytes > MAX_ARGS_BYTES) {
             return denied(ActionDenyReason.ARGS_TOO_LARGE, policy);
         }
-        // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-060).
+        // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-062).
         if (policy.approval() == ToolApproval.NONE
                 || (policy.approval() == ToolApproval.REQUIRED && granted && policy.grantable())) {
             return new ToolPolicyDecision(ActionDecision.ALLOWED, null, policy.risk(), policy.approval());

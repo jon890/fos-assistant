@@ -76,6 +76,8 @@ const TEST_CLEAR_BUSY_PATH = "/__test/clear-busy";
 const TEST_HOLD_NEXT_CONFIG_PATH = "/__test/hold-next-config";
 const TEST_RELEASE_HELD_CONFIG_PATH = "/__test/release-held-config";
 /** 마지막 실행 요청이 실어 온 provider, 모델, effort 를 돌려준다. 브라우저 검사는 대역을 다른 프로세스에서 띄워 이 길로 묻는다. */
+/** 입력 글과 그 입력에 줄 대본을 받는 경로다. `DemoScript` 를 본다. */
+const TEST_SCRIPT_PATH = "/__test/script";
 const TEST_LAST_SUBMITTED_RUNTIME_PATH = "/__test/last-submitted-runtime";
 
 /** 도구 가리기 검사만 쓰는 가짜 값이다. 실제 연결 값이 아니다. */
@@ -243,6 +245,20 @@ function actualModelFor(input: string, requested: string): string {
   if (input === "무료 모델 검사") return "gpt-zero";
   return requested;
 }
+
+/**
+ * 입력 글 하나에 줄 답과 사건 스트림이다. README 에 싣는 화면을 찍는 스크립트가 `POST /__test/script` 로 넣는다.
+ *
+ * <p>대본이 있는 입력은 다른 분기를 타지 않는다. 답은 `output` 그대로이고, 스트림은 `events` 를 받은 순서대로 보낸 뒤
+ * 닫는다. `pause` 가 참이면 `events` 를 보낸 자리에서 `releaseLongActivity` 를 기다려, 도는 중인 화면을 찍을 수 있다.
+ * `subagent.start` 사건에 `child_session_id` 가 있으면 그 session 의 사용량 조회에도 답한다.
+ */
+export type DemoScript = {
+  input: string;
+  output: string;
+  events?: Record<string, unknown>[];
+  pause?: boolean;
+};
 
 /** 계정이 전부 막혔을 때 Hermes 가 붙이는 고정 접두사다. 실측한 문장이다. */
 const PROVIDER_AUTH_FAILED =
@@ -650,6 +666,8 @@ export function startFakeHermes(
   /** profile 이름과 전역으로 끈 스킬 이름들이다. */
   const disabledSkills = new Map<string, Set<string>>();
   const blockedProviders = new Set<string>();
+  /** 입력 글과 그 입력의 대본이다. */
+  const scripts = new Map<string, DemoScript>();
   let busy = false;
   let submitCount = 0;
   let modelOptionsCalls = 0;
@@ -1288,6 +1306,12 @@ export function startFakeHermes(
         return send(response, 204, null);
       }
 
+      if (request.method === "POST" && path === TEST_SCRIPT_PATH) {
+        const script = JSON.parse(await readBody(request)) as DemoScript;
+        scripts.set(script.input, script);
+        return send(response, 204, null);
+      }
+
       if (request.method === "GET" && path === TEST_LAST_SUBMITTED_RUNTIME_PATH) {
         return send(response, 200, lastSubmittedRuntime);
       }
@@ -1335,9 +1359,15 @@ export function startFakeHermes(
                 name: "OpenAI Codex",
                 authenticated: true,
                 models: [DEFAULT_RUNTIME.model, "example-model-mini", "example-fast", "example-balanced", "example-deep"],
+                // 실제로 can_disable_reasoning 은 aggregator provider 의 모델에만 온다.
+                // 이 대역은 reasoning 끄기(none)를 시험하려고 기본 모델에도 준다.
+                // example-balanced 는 칸이 없는 모델(UNKNOWN)이다.
                 capabilities: {
-                  [DEFAULT_RUNTIME.model]: { reasoning: true },
+                  [DEFAULT_RUNTIME.model]: { reasoning: true, can_disable_reasoning: true },
                   "example-model-mini": { reasoning: false },
+                  "example-fast": { reasoning: true },
+                  "example-balanced": {},
+                  "example-deep": { reasoning: true, can_disable_reasoning: false },
                 },
               },
               { slug: "unconfigured", name: "Unconfigured", authenticated: false, models: [] },
@@ -1398,6 +1428,24 @@ export function startFakeHermes(
               emptyUntilStopped.set(runId!, response);
               response.on("close", () => emptyUntilStopped.delete(runId!));
             }
+            return;
+          }
+          const script = scripts.get(run.input);
+          if (script !== undefined) {
+            for (const scripted of script.events ?? []) {
+              if (scripted.event === "subagent.start" && typeof scripted.child_session_id === "string") {
+                childUsages.set(scripted.child_session_id, { profile: profile!, parent: run.session_id, reads: 0, delayed: false });
+              }
+              event(response, scripted);
+            }
+            if (script.pause === true) {
+              await new Promise<void>((resolve) => {
+                longActivityGate = resolve;
+                response.on("close", resolve);
+              });
+            }
+            event(response, { event: "run.completed" });
+            response.end();
             return;
           }
           // 실제 Hermes v0.21.0 이 보내는 형태다.
@@ -1635,6 +1683,7 @@ export function startFakeHermes(
           output: memoryReadOutput
             ?? connectorOutput
             ?? (registeredChild === undefined ? undefined : `하위 에이전트 session: ${registeredChild}`)
+            ?? scripts.get(input)?.output
             ?? specialOutputFor(input)
             ?? `[${who} on profile ${profile}]${instructionsEcho} ${input}`,
           input,
