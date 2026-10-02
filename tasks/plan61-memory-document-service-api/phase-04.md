@@ -31,7 +31,7 @@
 ## 의도 메모
 
 - e2e 는 backend 테스트가 본 경우를 다시 훑지 않는다. 운영과 같은 조립(보안 설정, 인터셉터, 암호화 설정, Flyway 로 만든 스키마)에서 한 번 왕복하는 것을 본다
-- 테스트 데이터베이스는 엔티티로 표를 만들고 e2e 만 Flyway 를 지난다. `uk_memory_user_document` 제약과 V52, V53 가 실제로 붙는 곳이 e2e 다
+- 테스트 데이터베이스는 엔티티로 표를 만들고 e2e 만 Flyway 를 지난다. `uk_memory_user_document` 제약과 V53, V54 가 실제로 붙는 곳이 e2e 다
 - `docs/flow.md` 에 서비스 토큰을 「셋째 방향」 으로 적는다. 요청자를 origin 실행에서 정하지 않는 유일한 읽기 길이라 따로 보여야 한다
 
 ## 작업 항목
@@ -92,7 +92,7 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
 
 - 「memory」 의 「지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다」 뒤에 「문서 API 가 만드는 줄은 `USER` 범위의 `DOCUMENT` 이고 `ACCEPTED` 다」 를 더한다
 - 「memory_collection」 의 「아직 부르는 API 가 없다」 문장을 고친다. `collectionsOf` 는 `GET /api/v1/memory-collections` 가 부른다. `revisionsOf` 는 아직 부르는 API 가 없다
-- 「agent_token」 절 다음에 「service_token」 과 「service_token_collection」 절을 더한다. 칸 표는 `V53__service_token.sql` 과 같게 적는다. 아래 뜻을 담는다
+- 「agent_token」 절 다음에 「service_token」 과 「service_token_collection」 절을 더한다. 칸 표는 `V54__service_token.sql` 과 같게 적는다. 아래 뜻을 담는다
   - 원문은 발급 응답에서 한 번만 내고 해시만 저장한다
   - **`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다
   - `expires_at` 이 비어 있으면 만료가 없다. 폐기는 줄을 지우지 않는다

@@ -7,7 +7,7 @@
 - `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`
 
 세 plan 가운데 둘째다. **plan60-memory-sensitive-encryption 이 main 에 머지된 뒤에 시작한다.**
-그 plan 이 만든 `MemoryContentCipher`, `StoredContent`, `MemoryService.contentOf`, `Memory.sealed()`, `ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE`, 마이그레이션 V52 이 없으면 `PHASE_BLOCKED: plan60 이 머지되지 않았다` 를 출력하고 멈춘다.
+그 plan 이 만든 `MemoryContentCipher`, `StoredContent`, `MemoryService.contentOf`, `Memory.sealed()`, `ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE`, 마이그레이션 V53 이 없으면 `PHASE_BLOCKED: plan60 이 머지되지 않았다` 를 출력하고 멈춘다.
 화면은 plan62-memory-document-screen 이 만든다.
 
 ## PR 과 계획서 삭제
@@ -23,7 +23,7 @@
 - backend 의 새 코드는 `backend/AGENTS.md` 의 규칙을 지키고 기준 파일에 기대지 않는다. 로거는 `@Slf4j`, 시각은 주입받은 `Clock`, 해시는 `shared.util.Sha256`, `@Enumerated` 의 enum 은 `domain.type`, 요청과 응답 record 는 `MemoryDtos.java`, 테스트에는 한국어 `@DisplayName`
 - `shared` 패키지가 `memory` 를 import 하지 않게 한다(`ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`). `SecurityConfig` 와 `ControlPlaneJwtFilter` 에는 경로 글자만 더한다
 - 기능 변경과 포맷을 한 커밋에 섞지 않는다. 포맷이 필요하면 `scripts/quality.sh fix` 가 바꾼 것을 따로 커밋한다
-- Flyway 번호는 이 계획이 V53 를 쓴다. `origin/main` 을 합칠 때 번호가 겹치면 main 의 최신 다음 번호로 옮긴다
+- Flyway 번호는 이 계획이 V54 를 쓴다. `origin/main` 을 합칠 때 번호가 겹치면 main 의 최신 다음 번호로 옮긴다
 - 주석과 Javadoc 은 한국어로 쓴다
 
 ## 범위 밖

@@ -13,17 +13,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V52 가 이미 있는 Memory 와 판을 잃지 않고 {@code content_key_id} 칸을 더하는지 본다(ADR-055).
+ * V53 가 이미 있는 Memory 와 판을 잃지 않고 {@code content_key_id} 칸을 더하는지 본다(ADR-055).
  *
  * <p>다른 검사들은 엔티티로 스키마를 만들어 이 마이그레이션을 지나지 않는다.
  */
 class MemoryContentKeyMigrationTest {
 
     @Test
-    @DisplayName("V52 는 기존 본문을 그대로 두고 content_key_id 를 비워 둔다")
+    @DisplayName("V53 는 기존 본문을 그대로 두고 content_key_id 를 비워 둔다")
     void keepsContentAndLeavesKeyIdEmpty() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
-        migrate(url, "51");
+        migrate(url, "52");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
                 Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
@@ -41,7 +41,7 @@ class MemoryContentKeyMigrationTest {
                         '개인 항목', '옮기기-전-본문', 'SEARCH', 'NORMAL', CURRENT_TIMESTAMP(6))
                     """);
 
-            migrate(url, "52");
+            migrate(url, "53");
 
             for (String table : new String[] {"memory", "memory_revision"}) {
                 try (ResultSet rows = statement.executeQuery("SELECT content, content_key_id FROM " + table)) {
