@@ -394,7 +394,7 @@ Hermes Agent v0.21.0 배포본으로 측정했고 근거는
 | `document_key` | VARCHAR(128) NULL | `DOCUMENT` 의 이름. 같은 주인과 `collection` 안에서 하나다. `MEMORY` 와 `SOURCE` 는 비어 있다 |
 | `title` | VARCHAR(200) | 색인에 실을 제목 한 줄 |
 | `content` | TEXT | 본문. 민감 항목이면 암호문이다 |
-| `content_key_id` | VARCHAR(32) NULL | 본문을 암호화한 key 의 id. 비어 있으면 `content` 는 평문이다. `SENSITIVE` 인 줄은 늘 채워져 있다 |
+| `content_key_id` | VARCHAR(32) NULL | 본문을 암호화한 key 의 id. 비어 있으면 `content` 는 평문이다. `SENSITIVE` 인 줄은 key 가 있을 때 기동하며 채운다. key 가 없으면 평문으로 남은 줄이 비어 있을 수 있다 |
 | `retrieval` | VARCHAR(20) | `ALWAYS` 는 본문을 매 실행에 싣는다. `SEARCH` 는 제목과 번호만 색인에 싣는다. `ARCHIVE` 는 색인에도 싣지 않는다. 기본값은 `SEARCH` |
 | `always_inject` | BOOLEAN | `retrieval` 로 옮긴 옛 칸. `retrieval` 이 `ALWAYS` 일 때만 참으로 적는다. 읽지 않는다. 다음 배포에서 지운다 |
 | `sensitivity` | VARCHAR(20) | `NORMAL` 또는 `SENSITIVE`. 기본값은 `NORMAL`. `SENSITIVE` 는 `ALWAYS` 로 둘 수 없다 |
