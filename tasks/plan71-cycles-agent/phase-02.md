@@ -64,22 +64,38 @@ public interface KnownFlows {
 
 그 밖의 줄은 바꾸지 않는다. 생성자 인자의 순서는 필드 순서를 따르므로 필드 자리를 옮기지 않는다.
 
-### 4. 기준 파일을 줄인다
+### 4. 이 phase 를 검증하는 테스트
+
+- `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java`: `mock(SkillStore.class)` 를 `mock(ProfileSkillFiles.class)` 로 바꾸고, `when(skillStore.hasUploadedSkills(...)).thenReturn(true)` 두 줄을 `when(skillFiles.hasUploaded(agent.hermesProfile())).thenReturn(true)` 로 고친다. 인자는 그 줄이 지금 넘기는 값을 그대로 쓴다
+- `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java`: `mock(SkillStore.class)` 를 `mock(ProfileSkillFiles.class)` 로, `mock(FlowRegistry.class)` 를 `mock(KnownFlows.class)` 로 바꾼다
+- `backend/src/test/java/com/bifos/assistant/agent/AgentAdminServiceTest.java`: `mock(FlowRegistry.class)` 를 `mock(KnownFlows.class)` 로 바꾼다
+- `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleServiceTest.java` 는 고치지 않는다. `@SpringBootTest` 에 `@MockitoSpyBean SkillStore` 이고 adapter 가 그 빈으로 넘기므로 `verify(skillStore).deleteAll(profile)` 이 그대로 통과한다
+- 위 테스트들의 단언은 바꾸지 않는다
+- `backend/src/test/java/com/bifos/assistant/skill/ProfileSkillFilesAdapterTest.java` 를 새로 만든다. `SkillStoreTest` 가 임시 디렉터리로 `SkillStore` 를 만드는 방식을 따른다
+  - 정상: 스킬을 하나 쓴 profile 은 `hasUploaded` 가 true 이고, `deleteAll` 뒤에는 false 다
+  - 경계: 아무것도 쓰지 않은 profile 은 `hasUploaded` 가 false 이고 `deleteAll` 이 예외 없이 끝난다
+- `backend/src/test/java/com/bifos/assistant/orchestration/FlowRegistryTest.java` 를 새로 만든다. `new FlowRegistry(List.of(흐름 대역), mock(AgentRepository.class))` 로 만든다. 흐름 대역은 `Flow` 인터페이스의 이름 메서드가 고정 이름을 돌려주는 mock 이다
+  - 정상: 등록한 이름은 `known` 이 true 다
+  - 실패: 모르는 이름, null, 빈 문자열은 예외 없이 false 다
+
+### 5. 기준 파일을 줄인다
 
 ```bash
 # cwd: backend/
 ./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
 ```
 
-`agent -> skill`, `agent -> orchestration` 줄이 빠진다. 다른 줄이 함께 빠질 수 있다. 줄이 늘거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다. 끝난 뒤의 줄 수와 빠진 줄을 회신에 적는다.
+이 명령은 테스트 소스도 컴파일한다. 앞 항목의 테스트 수정이 끝난 뒤에 돌린다.
+24 줄에서 22 줄이 된다. 빠지는 두 줄은 `agent -> skill`, `agent -> orchestration` 이다.
+줄 수나 빠진 줄이 이와 다르거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다.
 
-### 5. 이 phase 를 검증하는 테스트
+### 6. ADR 의 구현 상태를 고친다
 
-- `new AgentLifecycleService(`, `new AgentToolService(`, `new AgentAdminService(` 를 부르는 테스트의 인자를 맞춘다. `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java`, `AgentToolServiceTest.java`, `AgentLifecycleServiceTest.java` 가 있다. `git grep -n "new AgentLifecycleService(\|new AgentToolService(\|new AgentAdminService(" -- backend/src/test` 로 모두 찾는다. `SkillStore` 나 `FlowRegistry` 를 실제 객체로 넘기던 자리는 그 객체를 감싼 port 구현(`new ProfileSkillFilesAdapter(skillStore)` 나 그 `FlowRegistry`)을 넘긴다. 단언은 바꾸지 않는다
-- `backend/src/test/java/com/bifos/assistant/skill/ProfileSkillFilesAdapterTest.java` 를 새로 만든다. `SkillStoreTest` 가 임시 디렉터리로 `SkillStore` 를 만드는 방식을 따른다
-  - 정상: 스킬을 하나 쓴 profile 은 `hasUploaded` 가 true 이고, `deleteAll` 뒤에는 false 다
-  - 경계: 아무것도 쓰지 않은 profile 은 `hasUploaded` 가 false 이고 `deleteAll` 이 예외 없이 끝난다
-- `backend/src/test/java/com/bifos/assistant/orchestration/FlowRegistryTest.java` 가 있으면 거기에, 없으면 새로 만들어 테스트 둘을 더한다. 등록된 흐름 이름은 `known` 이 true 이고 모르는 이름과 null 은 false 다. `find(null)` 이 예외를 내면 `known(null)` 도 같은 예외를 내는 것으로 단언한다
+`docs/adr/ADR-068-최상위-패키지는-한-방향-층-순서를-따르고-거꾸로-가는-의존은-port-나-이동으로-끊는다.md` 의 `status` 줄의 구현 상태와 `docs/adr/INDEX.md` 의 ADR-068 줄의 `Accepted.` 뒤 문장을 아래로 바꾼다.
+
+「S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘, `agent` 가 `people` 과 `skill` 과 `orchestration` 을 쓰는 셋을 끊었다(C5). 나머지 간선과 C1 부터 C4, C7 은 아직 구현 전이다」
+
+고친 문서에 `bash /Users/nhn/personal/fos-skills/content-preview/scripts/style-check.sh <파일>` 을 돌려 종료 코드 0 인지 본다.
 
 ## 검증
 
@@ -87,6 +103,7 @@ public interface KnownFlows {
 # cwd: backend/
 ./gradlew test
 ./gradlew checkstyleMain checkstyleTest
+test "$(wc -l < config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948)" -eq 22
 ! grep -n "^agent -> \(people\|skill\|orchestration\) " config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
 ! grep -rnE "^import (static )?com\.bifos\.assistant\.(people|skill|orchestration)\." src/main/java/com/bifos/assistant/agent
 ```
@@ -110,5 +127,10 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentToolService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentAdminService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/skill/ProfileSkillFilesAdapterTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/orchestration/FlowRegistryTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentToolServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentAdminServiceTest.java` | 수정 |
+| `docs/adr/ADR-068-최상위-패키지는-한-방향-층-순서를-따르고-거꾸로-가는-의존은-port-나-이동으로-끊는다.md` | 수정 |
+| `docs/adr/INDEX.md` | 수정 |
 | `backend/config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948` | 수정 |

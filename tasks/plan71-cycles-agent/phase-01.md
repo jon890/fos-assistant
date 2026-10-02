@@ -73,26 +73,30 @@ public interface ReservedProfileNames {
 ### 5. 문서를 고친다
 
 - `docs/backend/agent.md` 의 표에서 「profile 을 만들고 거두기」 줄의 「`people/application/HermesProfileProvisioner` 를 쓴다」 를 「`agent/application/ProfileProvisioning` port 로 부른다. 구현은 `people/application/HermesProfileProvisioner` 다」 로 고친다. 같은 문서의 「`people.application.HermesProfileProvisioner` 와 같은 규칙」 은 위치가 그대로라 고치지 않는다. `PeopleProperties` 의 위치를 적은 문서는 없다
-- `docs/backend/packages.md` 의 `connector` 절에 있는 「`agent` 가 `people` 을 거쳐 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다」 문장을 「`people` 이 `mcp` 를 쓰고 `connector` 는 그 둘을 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다」 로 고친다
+- `docs/backend/packages.md` 의 `connector` 절에 있는 「`agent` 가 `people` 을 거쳐 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다」 문장을 「`connector` 가 `mcp` 를 쓰므로 `mcp` 가 `connector` 를 부르면 순환이 된다」 로 고친다
 
 고친 문서에 `bash /Users/nhn/personal/fos-skills/content-preview/scripts/style-check.sh <파일>` 을 돌려 종료 코드 0 인지 본다.
 
-### 6. 기준 파일을 줄인다
+### 6. 이 phase 를 검증하는 테스트
+
+- `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java`: import 를 고치고 `mock(AllowedPersonRepository.class)` 를 `mock(ReservedProfileNames.class)` 로, `mock(HermesProfileProvisioner.class)` 를 `mock(ProfileProvisioning.class)` 로 바꾼다. 단언은 바꾸지 않는다
+- `backend/src/test/java/com/bifos/assistant/user/FirstSignInTest.java` 와 `backend/src/test/java/com/bifos/assistant/shared/ValidatedPropertiesBindingTest.java`: `PeopleProperties` 의 import 만 고친다
+- `backend/src/test/java/com/bifos/assistant/people/AgentPortsWiringTest.java` 를 새로 만든다. `@SpringBootTest`, `@ActiveProfiles("test")`
+  - 정상: 주입받은 `ProfileProvisioning` 빈이 `isInstanceOf(HermesProfileProvisioner.class)` 다
+  - 준비: profile 이름은 `UUID` 로 겹치지 않게 만들고, `AllowedPerson.of(email, name, profile, Instant.now())` 로 저장한 줄을 `@AfterEach` 에서 지운다. 컨텍스트와 H2 를 다른 테스트와 함께 쓴다
+  - 정상: 허용 목록에 profile 이름 하나를 저장하면 `ReservedProfileNames.reservedByPerson` 이 그 이름에 true 다
+  - 실패: 허용 목록에 없는 이름에는 false 다
+
+### 7. 기준 파일을 줄인다
 
 ```bash
 # cwd: backend/
 ./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
 ```
 
-`agent -> people` 줄이 빠진다. 다른 줄이 함께 빠질 수 있다. 줄이 늘거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다. 끝난 뒤의 줄 수와 빠진 줄을 회신에 적는다.
-
-### 7. 이 phase 를 검증하는 테스트
-
-- `AgentLifecycleService` 를 `new` 로 만드는 테스트의 생성자 인자를 맞춘다. `git grep -n "new AgentLifecycleService(" -- backend/src/test` 로 찾는다. 대역은 port 타입으로 바꾼다. 단언은 바꾸지 않는다
-- `backend/src/test/java/com/bifos/assistant/people/AgentPortsWiringTest.java` 를 새로 만든다. `@SpringBootTest`, `@ActiveProfiles("test")`
-  - 정상: 주입받은 `ProfileProvisioning` 빈의 실제 클래스가 `HermesProfileProvisioner` 다
-  - 정상: 허용 목록에 profile 이름 하나를 저장하면 `ReservedProfileNames.reservedByPerson` 이 그 이름에 true 다
-  - 실패: 허용 목록에 없는 이름에는 false 다
+이 명령은 테스트 소스도 컴파일한다. 앞 항목의 테스트 수정이 끝난 뒤에 돌린다.
+32 줄에서 24 줄이 된다. 빠지는 여덟 줄은 `agent -> people`, `people -> agent`, `people -> mcp`, `mcp -> agent`, `mcp -> chat`, `mcp -> memory`, `mcp -> orchestration`, `mcp -> usage` 다. `people` 과 `mcp` 가 순환 덩어리에서 떨어지기 때문이다.
+줄 수나 빠진 줄이 이와 다르거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다.
 
 ## 검증
 
@@ -100,7 +104,8 @@ public interface ReservedProfileNames {
 # cwd: backend/
 ./gradlew test
 ./gradlew checkstyleMain checkstyleTest
-! grep -n "^agent -> people " config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
+test "$(wc -l < config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948)" -eq 24
+! grep -n "^agent -> people \|^people -> \|^mcp -> " config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
 ! grep -rnE "^import (static )?com\.bifos\.assistant\.people\." src/main/java/com/bifos/assistant/agent
 ```
 
@@ -124,7 +129,9 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/people/application/FirstAgentCreator.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/agent/application/AgentLifecycleService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/people/AgentPortsWiringTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentApiBaseUrlUpdateTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/user/FirstSignInTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/shared/ValidatedPropertiesBindingTest.java` | 수정 |
 | `docs/backend/packages.md` | 수정 |
 | `docs/backend/agent.md` | 수정 |
 | `backend/config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948` | 수정 |
