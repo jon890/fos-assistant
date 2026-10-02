@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.application.AgentMemoryCollectionService;
 import com.bifos.assistant.agent.application.AgentMemoryGrants;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
@@ -22,7 +23,9 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import java.time.Clock;
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,15 +45,113 @@ public class MemoryService {
 
     private static final Sort BY_ID = Sort.by("id");
 
+    /** 문서 이름은 소문자나 숫자로 시작하고 소문자, 숫자, 하이픈만 쓴다. 128자까지다(ADR-057). */
+    private static final Pattern DOCUMENT_KEY = Pattern.compile("[a-z0-9][a-z0-9-]{0,127}");
+
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final AgentMemoryCollectionService agentCollections;
+    private final MemoryCollectionService collections;
     private final MemoryContentCipher cipher;
     private final Clock clock;
 
-    /** 이 사용자가 볼 수 있는 항목만 낸다. 상태로 거르지 않는다. 화면이 제안도 봐야 한다. */
+    /**
+     * 이 사용자가 볼 수 있는 Memory 만 낸다. 상태로 거르지 않는다. 화면이 제안도 봐야 한다.
+     *
+     * <p>문서는 문서 API 가 따로 낸다(ADR-057).
+     */
     public List<Memory> readableBy(CurrentUser user) {
-        return memories.findAll(MemoryQueries.readableBy(user.id(), user.groupId()), BY_ID);
+        return memories.findAll(MemoryQueries.listedFor(user.id(), user.groupId()), BY_ID);
+    }
+
+    /** 요청자가 주인인 USER 범위의 문서를 collection 과 이름 순으로 낸다. 본문은 {@link #contentOf} 로 따로 읽는다. */
+    public List<Memory> documentsOf(CurrentUser user) {
+        return memories.findByScopeAndOwnerUserIdAndEntryTypeOrderByCollectionAscDocumentKeyAsc(
+                MemoryScope.USER, user.id(), MemoryEntryType.DOCUMENT);
+    }
+
+    /** 번호로 문서 하나를 읽는다. 없는 문서와 남의 문서와 문서가 아닌 항목은 같은 MEMORY_NOT_FOUND 다. */
+    public Memory documentFor(CurrentUser user, Long id) {
+        return requireOwnDocument(user, memories.findById(id).orElseThrow(MemoryService::notFound));
+    }
+
+    /**
+     * 서비스 토큰의 주인이 가진 문서 하나를 읽는다. 요청자는 토큰이 정하고 경로는 사용자를 정하지 못한다.
+     *
+     * <p>없는 문서와 읽을 수 없는 문서를 같은 MEMORY_NOT_FOUND 로 숨긴다. 이름이 없는 줄, 승인 전인 항목, 문서가 아닌
+     * 항목, 토큰이 받지 않는 collection, 민감 허용이 없는 민감 문서가 모두 해당한다. 꺼내는 방식으로는 거르지 않는다.
+     */
+    public Memory documentForService(Long userId, MemoryAccess access, String collection, String documentKey) {
+        Memory memory = memories.findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
+                        MemoryScope.USER, userId, collection, documentKey)
+                .orElseThrow(MemoryService::notFound);
+        if (memory.status() != MemoryStatus.ACCEPTED
+                || memory.entryType() != MemoryEntryType.DOCUMENT
+                || !access.allows(memory.collection(), memory.sensitivity())) {
+            throw notFound();
+        }
+        return memory;
+    }
+
+    /**
+     * 요청자의 그룹이 쓰는 collection 이다. 그룹이 없으면 빈 목록이다.
+     *
+     * <p>줄이 없는 그룹이면 기본 목록을 저장하므로 읽기 전용 트랜잭션으로 두지 않는다.
+     */
+    @Transactional
+    public List<MemoryCollection> collectionsFor(CurrentUser user) {
+        return user.groupId() == null ? List.of() : collections.collectionsOf(user.groupId());
+    }
+
+    /**
+     * 문서를 만든다. 곧 ACCEPTED 이고 꺼내는 방식은 SEARCH 다(ADR-057).
+     *
+     * @throws ApiException 이름이나 collection 이 틀리면 VALIDATION_FAILED, 같은 이름이 있으면 MEMORY_DOCUMENT_EXISTS,
+     *     민감 문서인데 key 가 없으면 MEMORY_ENCRYPTION_UNAVAILABLE
+     */
+    @Transactional
+    public Memory createDocument(
+            CurrentUser user,
+            String collection,
+            String documentKey,
+            String title,
+            String content,
+            MemorySensitivity sensitivity) {
+        if (documentKey == null || !DOCUMENT_KEY.matcher(documentKey).matches()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a document key is invalid");
+        }
+        if (collectionsFor(user).stream().noneMatch(candidate -> candidate.key().equals(collection))) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a collection is not available");
+        }
+        if (memories.findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
+                        MemoryScope.USER, user.id(), collection, documentKey)
+                .isPresent()) {
+            throw documentExists();
+        }
+        // 암호화는 저장 전에 한다. key 가 없으면 여기서 거절돼 평문이 저장되지 않는다
+        StoredContent body = stored(content, sensitivity, "USER:" + user.id());
+        try {
+            return memories.saveAndFlush(
+                    Memory.document(user.id(), collection, documentKey, title, body, sensitivity, clock.instant()));
+        } catch (DataIntegrityViolationException e) {
+            // 두 요청이 중복 조회를 함께 지난 경우다. 유일 제약이 막는다
+            throw documentExists();
+        }
+    }
+
+    /**
+     * 문서를 고친다. 화면이 읽은 판이 지금 판이 아니면 거절한다(ADR-057).
+     *
+     * @throws ApiException 판이 다르면 MEMORY_REVISION_CONFLICT
+     */
+    @Transactional
+    public Memory reviseDocument(
+            CurrentUser user, Long id, String content, MemorySensitivity sensitivity, int expectedRevision) {
+        Memory memory = requireOwnDocument(user, memories.findByIdForUpdate(id).orElseThrow(MemoryService::notFound));
+        if (memory.revision() != expectedRevision) {
+            throw new ApiException(ErrorCode.MEMORY_REVISION_CONFLICT, "the document revision has changed");
+        }
+        return revise(user, memory, content, memory.retrieval(), sensitivity);
     }
 
     /**
@@ -140,14 +241,14 @@ public class MemoryService {
 
     @Transactional
     public Memory accept(CurrentUser user, Long id) {
-        Memory memory = requireWritableForUpdate(user, id);
+        Memory memory = requireMemoryForUpdate(user, id);
         memory.accept(user.id(), clock.instant());
         return memories.save(memory);
     }
 
     @Transactional
     public Memory reject(CurrentUser user, Long id) {
-        Memory memory = requireWritableForUpdate(user, id);
+        Memory memory = requireMemoryForUpdate(user, id);
         memory.reject(clock.instant());
         return memories.save(memory);
     }
@@ -164,7 +265,7 @@ public class MemoryService {
      */
     @Transactional
     public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject) {
-        Memory memory = requireWritableForUpdate(user, id);
+        Memory memory = requireMemoryForUpdate(user, id);
         if (memory.sensitivity() == MemorySensitivity.SENSITIVE) {
             throw new ApiException(
                     ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE, "a sensitive memory cannot be edited from the list");
@@ -179,7 +280,7 @@ public class MemoryService {
     @Transactional
     public Memory update(
             CurrentUser user, Long id, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
-        return revise(user, requireWritableForUpdate(user, id), content, retrieval, sensitivity);
+        return revise(user, requireMemoryForUpdate(user, id), content, retrieval, sensitivity);
     }
 
     /** 항목을 지운다. 마지막 값을 판으로 남긴 뒤 줄을 지운다. */
@@ -281,6 +382,27 @@ public class MemoryService {
         return memory;
     }
 
+    /**
+     * 종류가 MEMORY 인 항목만 잠가 읽는다. 문서는 이 경로로 승인하거나 고치지 못한다. 문서는 문서 API 가 고치고, 이
+     * 경로는 항상 싣기를 켤 수 있다(ADR-057).
+     */
+    private Memory requireMemoryForUpdate(CurrentUser user, Long id) {
+        Memory memory = requireWritableForUpdate(user, id);
+        if (memory.entryType() != MemoryEntryType.MEMORY) {
+            throw notFound();
+        }
+        return memory;
+    }
+
+    private static Memory requireOwnDocument(CurrentUser user, Memory memory) {
+        if (memory.scope() != MemoryScope.USER
+                || !user.id().equals(memory.ownerUserId())
+                || memory.entryType() != MemoryEntryType.DOCUMENT) {
+            throw notFound();
+        }
+        return memory;
+    }
+
     private Memory requireReadable(CurrentUser user, Long id) {
         Memory memory = memories.findById(id).orElseThrow(MemoryService::notFound);
         if (!memory.isReadableBy(user.id(), user.groupId())) {
@@ -317,6 +439,10 @@ public class MemoryService {
         if (memory.scope() == MemoryScope.GROUP && !user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
+    }
+
+    private static ApiException documentExists() {
+        return new ApiException(ErrorCode.MEMORY_DOCUMENT_EXISTS, "a document with that name already exists");
     }
 
     private static ApiException notFound() {

@@ -163,6 +163,32 @@ public class Memory {
         return memory;
     }
 
+    /**
+     * 사용자가 직접 쓴 문서다. 곧 ACCEPTED 이고 꺼내는 방식은 SEARCH 로 고정한다. 민감 문서가 항상 층으로 올라갈 길을
+     * 만들지 않는다(ADR-057).
+     */
+    public static Memory document(
+            Long ownerUserId,
+            String collection,
+            String documentKey,
+            String title,
+            StoredContent body,
+            MemorySensitivity sensitivity,
+            Instant now) {
+        Memory memory = accepted(
+                MemoryScope.USER,
+                ownerUserId,
+                null,
+                title,
+                body,
+                new MemoryPlacement(collection, MemoryRetrieval.SEARCH, sensitivity),
+                ownerUserId,
+                now);
+        memory.entryType = MemoryEntryType.DOCUMENT;
+        memory.documentKey = documentKey;
+        return memory;
+    }
+
     public static Memory proposedUser(
             Long ownerUserId,
             String title,
