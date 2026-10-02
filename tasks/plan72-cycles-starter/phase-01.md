@@ -27,7 +27,7 @@
 - `agent/presentation/AgentDtos.java` 안의 record `StartersView` 가 `StarterSuggestions` 를 쓴다. 이 record 를 `chat/presentation/ChatDtos.java` 로 옮긴다. `presentation` 의 요청과 응답 모양은 그 패키지의 `*Dtos.java` 하나에 모은다(`backend/AGENTS.md`).
 - `StarterSuggestionService` 를 쓰는 운영 코드는 `chat/application/ChatService.java` 와 `AgentStarterController` 둘이다. 서비스는 `agent.application.AgentService` 를 쓴다. `chat` 이 `agent` 를 쓰는 것은 층 순서와 맞다.
 - 테스트는 `backend/src/test/java/com/bifos/assistant/agent/StarterSuggestionServiceTest.java`, `backend/src/test/java/com/bifos/assistant/agent/AgentStarterControllerTest.java`, `backend/src/test/java/com/bifos/assistant/shared/ValidatedPropertiesBindingTest.java` 가 이 타입들을 쓴다.
-- 포맷은 이 phase 에서 돌리지 않는다. import 순서를 손으로 정렬하지 않는다. BSD `sed` 는 `\b` 를 모른다. 여러 파일의 이름을 바꿀 때는 `perl -pi -e` 를 쓴다.
+- 포맷은 이 phase 에서 돌리지 않는다. 이 phase 커밋 뒤 team-lead 가 `./gradlew spotlessApply` 결과를 별도 커밋으로 낸다. import 순서를 손으로 정렬하지 않는다. BSD `sed` 는 `\b` 를 모른다. 여러 파일의 이름을 바꿀 때는 `perl -pi -e` 를 쓴다.
 - 주석과 Javadoc 은 한국어로 쓴다. `gradlew` 는 `backend/` 안에 있다.
 
 **근거 문서**: 위 ADR-068 의 C1, `docs/adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md`, `docs/backend/agent.md` 의 「추천 질문」, `docs/backend/packages.md` 의 「패키지와 책임」
@@ -36,6 +36,7 @@
 
 - **동작을 바꾸지 않는다.** 서비스 본문은 `package` 와 import 밖의 줄을 바꾸지 않는다. 주소가 그대로라 웹은 고치지 않는다.
 - 컨트롤러 이름 `AgentStarterController` 는 그대로 둔다. 주소가 `/api/v1/agents` 아래다.
+- `StarterStatus` 와 `StarterSuggestions` 를 `application.model` 로 옮기지 않는다. 이번에는 최상위 패키지만 바꾼다.
 - `ArchitectureRules.java` 를 고치지 않는다.
 
 ## 작업 항목
@@ -73,12 +74,13 @@
 ./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true
 ```
 
-`agent -> chat`, `agent -> usage` 줄이 빠진다. 다른 줄이 함께 빠질 수 있다. 줄이 늘거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다. `LAYER_DIRECTION` 과 `CONTROLLERS_HAVE_NO_NESTED_RECORDS` 에 새 위반이 없어야 한다. 끝난 뒤의 줄 수와 빠진 줄을 회신에 적는다.
+22 줄에서 15 줄이 된다. 빠지는 일곱 줄은 `agent -> chat`, `agent -> usage`, `chat -> agent`, `memory -> agent`, `orchestration -> agent`, `skill -> agent`, `usage -> agent` 다. `agent` 가 순환 덩어리에서 떨어져 기준 파일에 `agent` 가 든 줄이 남지 않는다.
+15 줄이 아니거나 새 위반으로 실패하면 다시 얼리지 말고 보고한다. `LAYER_DIRECTION` 과 `CONTROLLERS_HAVE_NO_NESTED_RECORDS` 에 새 위반이 없어야 한다.
 
 ### 6. 이 phase 를 검증하는 테스트
 
 옮긴 `StarterSuggestionServiceTest.java` 와 `AgentStarterControllerTest.java` 가 단언을 바꾸지 않은 채 통과해야 한다.
-정상: 대화 이력이 있으면 추천 질문을 만들어 `READY` 로 돌려준다(`StarterSuggestionServiceTest`). 실패: 볼 수 없는 에이전트의 추천 질문은 없는 에이전트와 같은 응답이다(`AgentStarterControllerTest`).
+정상: 대화 이력이 있으면 추천 질문을 만들어 `READY` 로 돌려준다(`StarterSuggestionServiceTest`). 실패: 볼 수 없는 에이전트의 추천은 `AGENT_NOT_FOUND` 이고 만들지 않는다(`StarterSuggestionServiceTest`). `AgentStarterControllerTest` 는 응답 모양이 그대로인지 본다.
 `ValidatedPropertiesBindingTest.java` 의 `StarterProperties` import 를 고쳐 설정 바인딩이 그대로인지 확인한다.
 
 ## 검증
@@ -87,7 +89,8 @@
 # cwd: backend/
 ./gradlew test
 ./gradlew checkstyleMain checkstyleTest
-! grep -n "^agent -> \(chat\|usage\) " config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
+test "$(grep -c "" config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948)" -eq 15
+! grep -n "agent" config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
 ! grep -rnE "^import (static )?com\.bifos\.assistant\.(chat|usage)\." src/main/java/com/bifos/assistant/agent
 ! grep -rn "agent\.application\.Starter\|agent\.presentation\.AgentStarter" src
 ```
