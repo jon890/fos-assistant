@@ -49,7 +49,7 @@ class CollationUnifyMysqlMigrationTest {
     private static final String PENDING_CONTENT = "내일 장 볼 것을 정리해 줘.";
 
     /** U+1DC4 는 옛 정렬 규칙에서 무게가 있고 새 정렬 규칙에서 없다. 그래서 새 정렬 규칙에서만 {@code 'a'} 와 같다. */
-    private static final String COMBINED_A = "a᷄";
+    private static final String COMBINED_A = "a\u1DC4";
 
     private MysqlTestDatabase database;
 
@@ -83,7 +83,7 @@ class CollationUnifyMysqlMigrationTest {
                     .isEqualTo(before.get(i).rows());
             assertThat(after.rows()).as("%s 에 넣은 줄이 있다", table).isPositive();
             assertThat(after.columns())
-                    .as("%s 의 칸 이름과 타입과 NULL 허용", table)
+                    .as("%s 의 칸 이름과 타입과 NULL 허용과 기본값과 extra", table)
                     .isEqualTo(before.get(i).columns());
             assertThat(after.indexes())
                     .as("%s 의 색인", table)
@@ -113,7 +113,11 @@ class CollationUnifyMysqlMigrationTest {
                 .as("결합 문자가 ? 로 바뀌지 않고 utf8mb4 로 들어갔다")
                 .containsExactly("61", "61E1B784");
 
-        assertThatThrownBy(() -> migrate(LAST_VERSION)).isInstanceOf(FlywayException.class);
+        assertThatThrownBy(() -> migrate(LAST_VERSION))
+                .isInstanceOf(FlywayException.class)
+                .satisfies(e -> assertThat(sqlErrorCodes(e))
+                        .as("실패 원인은 유일 색인 겹침(MySQL 오류 1062)이다")
+                        .contains(1062));
 
         assertThat(tableCollation("model_hidden"))
                 .as("실패한 model_hidden 의 정렬 규칙")
@@ -132,6 +136,17 @@ class CollationUnifyMysqlMigrationTest {
                                 "SELECT CAST(MAX(CAST(version AS UNSIGNED)) AS CHAR) FROM flyway_schema_history WHERE success = 1"))
                 .as("성공으로 기록된 가장 큰 번호")
                 .containsExactly("61");
+    }
+
+    /** 원인 사슬에 든 {@link SQLException} 의 오류 번호를 모은다. */
+    private static List<Integer> sqlErrorCodes(Throwable thrown) {
+        List<Integer> codes = new ArrayList<>();
+        for (Throwable cause = thrown; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql) {
+                codes.add(sql.getErrorCode());
+            }
+        }
+        return codes;
     }
 
     private void migrate(String version) {
@@ -184,7 +199,9 @@ class CollationUnifyMysqlMigrationTest {
         long rows = Long.parseLong(
                 strings("SELECT CAST(COUNT(*) AS CHAR) FROM " + table).get(0));
         List<String> columns = strings("""
-                SELECT CONCAT(column_name, ' ', column_type, ' ', is_nullable) FROM information_schema.columns
+                SELECT CONCAT(column_name, ' ', column_type, ' ', is_nullable,
+                    ' default=', COALESCE(column_default, '<NULL>'), ' extra=', COALESCE(extra, '<NULL>'))
+                FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND table_name = '%s'
                 ORDER BY ordinal_position
                 """.formatted(table));
