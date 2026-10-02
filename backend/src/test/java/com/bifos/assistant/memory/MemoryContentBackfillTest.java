@@ -16,7 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 기동할 때 평문으로 남은 민감 줄을 암호화하는 보정을 본다(ADR-054). */
+/** 기동할 때 평문으로 남은 민감 줄을 암호화하는 보정을 본다(ADR-055). */
 @SpringBootTest
 @ActiveProfiles("test")
 class MemoryContentBackfillTest {

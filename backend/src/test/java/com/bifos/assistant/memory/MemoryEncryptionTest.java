@@ -26,7 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-/** 민감 항목의 본문이 데이터베이스에 암호문으로만 남는지 본다(ADR-054). 데이터베이스는 JdbcTemplate 으로 직접 읽는다. */
+/** 민감 항목의 본문이 데이터베이스에 암호문으로만 남는지 본다(ADR-055). 데이터베이스는 JdbcTemplate 으로 직접 읽는다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class MemoryEncryptionTest {

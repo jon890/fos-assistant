@@ -19,8 +19,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,11 +29,10 @@ import org.springframework.stereotype.Service;
  * 가격이 바뀔 때 지난달 합계가 따라 움직인다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ExecutionRecorder {
     private final Clock clock;
-
-    private static final Logger log = LoggerFactory.getLogger(ExecutionRecorder.class);
 
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;
@@ -139,6 +137,24 @@ public class ExecutionRecorder {
                 null);
     }
 
+    /**
+     * 보낸 effort 를 누가 정했는지다.
+     *
+     * <p>단계도 대화도 effort 를 정하지 않았는데 보낸 값이 있으면 에이전트 기본값에서 온 것이다(ADR-054).
+     * 단계를 거친 실행은 그 단계의 mapping 이 비어 에이전트 기본값으로 돌았어도 {@code REQUESTED} 로 적는다.
+     */
+    private static ReasoningEffortSource effortSource(
+            Conversation conversation, ModelChoice requested, ModelTier modelTier) {
+        if (requested == null || requested.reasoningEffort() == null) {
+            return ReasoningEffortSource.UNKNOWN;
+        }
+        boolean chosenByConversation =
+                conversation != null && conversation.modelChoice().reasoningEffort() != null;
+        return modelTier == null && !chosenByConversation
+                ? ReasoningEffortSource.AGENT_DEFAULT
+                : ReasoningEffortSource.REQUESTED;
+    }
+
     /** 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다. */
     public AgentExecution start(
             CurrentUser user,
@@ -162,10 +178,7 @@ public class ExecutionRecorder {
                 .provider(requested == null ? null : requested.provider())
                 .model(requested == null ? null : requested.model())
                 .reasoningEffort(requested == null ? null : requested.reasoningEffort())
-                .reasoningEffortSource(
-                        requested != null && requested.reasoningEffort() != null
-                                ? ReasoningEffortSource.REQUESTED
-                                : ReasoningEffortSource.UNKNOWN)
+                .reasoningEffortSource(effortSource(conversation, requested, modelTier))
                 .modelTier(modelTier)
                 .requestReceivedAt(requestReceivedAt)
                 .contextChars(context.contextChars())

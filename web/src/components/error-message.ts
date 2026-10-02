@@ -22,6 +22,8 @@ const MESSAGES: Record<string, string> = {
     "실행을 마치지 못했어요. 사용량 화면에서 기록을 확인해 주세요.",
   PROVIDER_BLOCKED:
     "이 모델은 지금 쓸 수 없어요. 다른 모델을 골라 다시 보내 주세요.",
+  MODEL_HIDDEN:
+    "이 모델은 지금 쓸 수 없어요. 입력창의 설정에서 다른 모델을 골라 주세요.",
   EXECUTION_NOT_RUNNING: "이미 끝난 답이에요.",
   STREAM_INTERRUPTED:
     "응답 연결이 끊겼어요. 실행은 계속될 수 있으니 잠시 뒤 대화 이력을 다시 확인해 주세요.",

@@ -15,7 +15,7 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
 
     Optional<Memory> findByProposalDedupKey(String proposalDedupKey);
 
-    /** 암호화되지 않은 채 남은 줄을 찾는다. 민감도로 좁혀 부른다(ADR-054). */
+    /** 암호화되지 않은 채 남은 줄을 찾는다. 민감도로 좁혀 부른다(ADR-055). */
     List<Memory> findBySensitivityAndContentKeyIdIsNull(MemorySensitivity sensitivity);
 
     /**

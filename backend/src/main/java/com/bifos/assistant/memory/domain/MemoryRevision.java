@@ -133,7 +133,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     }
 
     /**
-     * 남긴 판의 뜻은 바뀌지 않는다. 평문으로 남은 민감 판의 저장 모양만 바꾼다(ADR-054).
+     * 남긴 판의 뜻은 바뀌지 않는다. 평문으로 남은 민감 판의 저장 모양만 바꾼다(ADR-055).
      *
      * @throws IllegalStateException 이미 암호문일 때
      */

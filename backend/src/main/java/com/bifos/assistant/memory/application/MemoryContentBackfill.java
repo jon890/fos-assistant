@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 기동할 때 평문으로 남은 민감 줄을 암호화한다(ADR-054).
+ * 기동할 때 평문으로 남은 민감 줄을 암호화한다(ADR-055).
  *
  * <p>옛 판으로 되돌렸다 다시 올린 경우와 손으로 넣은 줄을 맡는다. 판 번호와 갱신 시각은 바꾸지 않는다. key 가 없으면
  * 옮기지 않고 줄 수만 경고하며, 기동을 막지 않는다.

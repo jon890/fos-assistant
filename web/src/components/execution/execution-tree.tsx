@@ -50,7 +50,8 @@ export type ExecutionTreeNode = {
   latencyMs: number | null;
   startedAt: string;
   reasoningEffort?: string | null;
-  reasoningEffortSource?: "REQUESTED" | "PROFILE_DEFAULT" | "UNKNOWN" | null;
+  reasoningEffortSource?:
+    "REQUESTED" | "AGENT_DEFAULT" | "PROFILE_DEFAULT" | "UNKNOWN" | null;
   modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
   requestReceivedAt?: string | null;
   submittedAt?: string | null;

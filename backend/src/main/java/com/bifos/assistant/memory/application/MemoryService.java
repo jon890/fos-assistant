@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>에이전트의 실행이 받는 항목은 세 조건을 모두 지난 것이다. 범위(USER 의 주인, GROUP 의 같은 그룹), 그 에이전트가
  * 받는 collection, 그 collection 에서 허용받은 민감도다(ADR-053). 사람이 화면에서 보는 목록은 범위만 본다.
  *
- * <p>민감 항목의 본문은 암호문으로 저장한다(ADR-054).
+ * <p>민감 항목의 본문은 암호문으로 저장한다(ADR-055).
  */
 @Service
 @RequiredArgsConstructor

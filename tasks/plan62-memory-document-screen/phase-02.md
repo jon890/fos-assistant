@@ -22,9 +22,9 @@
 - 문서가 지금 적고 있는 것
   - `docs/code-architecture.md` 의 화면 표에 `/memory` 가 「개인과 그룹 공용 Memory」 로 있다. 「Memory」 절의 「다음」 목록에 「collection 탭, 문서(`DOCUMENT`) 편집과 판 이력 화면, 출처 표시, 민감 항목 표시」 가 있다
   - `web/AGENTS.md` 의 「화면 문구」 에 「안에서 부르는 이름 | 화면에서 쓰는 말」 표가 있다
-  - `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 `status` 가 「화면은 아직 구현 전이다」 로 적혀 있다
+  - `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 `status` 가 「화면은 아직 구현 전이다」 로 적혀 있다
 
-**근거 문서**: `docs/adr/ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` 의 「적용 범위」
+**근거 문서**: `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` 의 「적용 범위」
 
 ## 의도 메모
 
@@ -40,7 +40,7 @@
 ```ts
 export type ServiceTokenStatus = "active" | "expiring" | "expired" | "revoked";
 
-/** 만료까지 이 날수 이하로 남으면 「곧 만료」 로 보인다(ADR-055). */
+/** 만료까지 이 날수 이하로 남으면 「곧 만료」 로 보인다(ADR-056). */
 export const EXPIRING_WITHIN_DAYS = 14;
 
 export function serviceTokenStatus(
@@ -131,8 +131,8 @@ Control Plane 은 `import { CONTROL_PLANE_BASE_URL } from "./settings.ts";` 로 
 - `docs/code-architecture.md` 의 화면 표에서 `/memory` 줄을 「개인과 그룹 공용 Memory, 개인 문서, 서비스 토큰」 으로 고친다
 - 같은 문서의 「Memory」 「다음」 목록에서 문서 편집 화면을 적은 줄을 「collection 탭, 문서의 판 이력 화면, 출처 표시」 로 고친다
 - `web/AGENTS.md` 의 「화면 문구」 표에 줄을 더한다: `DOCUMENT` | 문서. collection 은 「영역」, 민감 항목은 「민감」, 판은 「N번째 판」. 서비스 토큰 | 외부 서비스 연결 토큰. 절 제목은 「외부 서비스 연결」
-- `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 `status` 줄을 `` `accepted` `` 만 남기고 고친다
-- `docs/adr/INDEX.md` 의 ADR-056 줄에서 「화면은 아직 구현 전이다」 를 지운다
+- `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 `status` 줄을 `` `accepted` `` 만 남기고 고친다
+- `docs/adr/INDEX.md` 의 ADR-057 줄에서 「화면은 아직 구현 전이다」 를 지운다
 
 ## 검증
 
@@ -146,7 +146,7 @@ scripts/check-public-safe.sh
 scripts/quality.sh check
 ! grep -rn 'style={{' web/src/components/memory
 ! grep -rn 'localStorage\|sessionStorage' web/src/components/memory
-! grep -n "구현 전" docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md
+! grep -n "구현 전" docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md
 ```
 
 - 모두 종료 코드 0. 마지막 세 줄은 일치하는 줄이 없어야 한다
@@ -168,5 +168,5 @@ scripts/quality.sh check
 | `test/browser/service-token.spec.ts` | 신규 |
 | `docs/code-architecture.md` | 수정 |
 | `web/AGENTS.md` | 수정 |
-| `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md` | 수정 |
+| `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md` | 수정 |
 | `docs/adr/INDEX.md` | 수정 |

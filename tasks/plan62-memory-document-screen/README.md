@@ -3,8 +3,8 @@
 `/memory` 화면에 문서를 쓰고 고치는 절과 서비스 토큰을 발급하고 폐기하는 절을 더한다. web 과 브라우저 검사만 바꾼다.
 결정과 계약은 아래 두 문서에 있다.
 
-- `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md`
-- `docs/adr/ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`
+- `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`
+- `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`
 
 세 plan 가운데 셋째다. **plan61-memory-document-service-api 가 main 에 머지된 뒤에 시작한다.**
 `backend/src/main/java/com/bifos/assistant/memory/presentation/MemoryDocumentController.java` 와 `ServiceTokenController.java` 가 없으면 `PHASE_BLOCKED: plan61 이 머지되지 않았다` 를 출력하고 멈춘다.
@@ -12,7 +12,7 @@
 ## PR 과 계획서 삭제
 
 - plan 하나를 PR 하나로 올린다. 그 plan 의 계획서 디렉터리는 그 PR 의 마감 단계에서 지운다. phase 는 `tasks/` 를 바꾸지 않는다
-- 세 plan 의 계획서와 ADR-054, ADR-055, ADR-056 초안은 한 브랜치에서 함께 썼다. 먼저 올리는 PR 에 뒤 plan 의 계획서와 아직 구현하지 않은 ADR 이 함께 실린다. 그 ADR 의 `status` 와 `docs/adr/INDEX.md` 는 「아직 구현 전이다」 로 적혀 있고, 구현한 plan 의 마지막 phase 가 그 글을 지운다
+- 세 plan 의 계획서와 ADR-055, ADR-056, ADR-057 초안은 한 브랜치에서 함께 썼다. 먼저 올리는 PR 에 뒤 plan 의 계획서와 아직 구현하지 않은 ADR 이 함께 실린다. 그 ADR 의 `status` 와 `docs/adr/INDEX.md` 는 「아직 구현 전이다」 로 적혀 있고, 구현한 plan 의 마지막 phase 가 그 글을 지운다
 
 ## 모든 phase 에 걸리는 규칙
 

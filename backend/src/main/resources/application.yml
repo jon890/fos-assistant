@@ -48,7 +48,7 @@ assistant:
     # 고를 수 있는 모델 목록을 profile 마다 메모리에 들고 있는 시간. 지나면 Hermes 에 다시 묻는다
     model-options-ttl: 10m
   model-tiers:
-    # 비어 있으면 해당 단계는 요청 에이전트 profile 의 기본값으로 돈다.
+    # 실행할 때 읽지 않는다. 기동할 때 정의 행이 없는 그룹에 한 번 옮기고, 옮긴 뒤 운영 설정에서 지운다(ADR-054).
     fast:
       provider: ${ASSISTANT_MODEL_TIERS_FAST_PROVIDER:}
       model: ${ASSISTANT_MODEL_TIERS_FAST_MODEL:}
@@ -68,7 +68,7 @@ assistant:
     propose:
       enabled: false
     encryption:
-      # 민감 Memory 본문을 암호화하는 key 다(ADR-054). 둘 다 비우면 기동은 되고 민감 항목의 저장과 읽기만 거절한다
+      # 민감 Memory 본문을 암호화하는 key 다(ADR-055). 둘 다 비우면 기동은 되고 민감 항목의 저장과 읽기만 거절한다
       # 새로 쓸 때 쓰는 key 의 id
       active-key-id: ${ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID:}
       # <id>:<base64 32바이트> 를 쉼표로 이은 목록. 옛 key 를 남겨 두어야 옛 줄을 읽는다

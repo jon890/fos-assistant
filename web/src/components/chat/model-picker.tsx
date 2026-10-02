@@ -42,7 +42,10 @@ export type ModelChoice = {
 /** `GET /api/chat/model-options` 의 응답이다 */
 type ModelOptions = {
   defaultProvider: string | null;
+  /** 고르지 않았을 때 도는 모델이다. 에이전트 기본값이 있으면 그 값이고 없으면 profile 의 값이다 */
   defaultModel: string | null;
+  /** 기본 모델이 `providers` 에 있는가. 그룹이 숨겼거나 목록에서 빠졌으면 거짓이다 */
+  defaultAvailable?: boolean;
   providers: {
     provider: string;
     name: string;
@@ -300,6 +303,26 @@ export function ModelPicker({
                   모델 목록을 불러오고 있어요.
                 </p>
               ) : null}
+              {draftModel === DEFAULT_KEY &&
+              options?.defaultAvailable === false ? (
+                <p
+                  data-testid="model-default-unavailable"
+                  className="text-xs text-warning"
+                >
+                  기본 모델을 지금 쓸 수 없어요. 다른 모델을 골라 주세요.
+                </p>
+              ) : null}
+              {options !== null &&
+              keptKey !== null &&
+              draftModel === keptKey ? (
+                <p
+                  data-testid="model-choice-unlisted"
+                  className="text-xs text-warning"
+                >
+                  이 대화에 적힌 모델이 목록에 없어요. 숨겼거나 없어진 모델이면
+                  답하지 못하니 다른 모델을 골라 주세요.
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <label htmlFor={effortSelectId} className="text-sm font-medium">
@@ -426,6 +449,12 @@ export function ModelTierPicker({
 
   const tiers = state.data?.tiers ?? FALLBACK_TIERS;
   const selectedTier = mode === "TIER" ? tier : null;
+  // 아무것도 고르지 않은 대화는 실행할 때 내 기본 단계, 그룹 기본 단계 차례로 쓴다. 대화에는 적히지 않으므로
+  // 여기서 보여 주지 않으면 기본값을 저장하고도 저장되지 않은 것처럼 보인다.
+  const inheritedTier =
+    mode === null
+      ? (state.data?.userDefaultTier ?? state.data?.groupDefaultTier ?? null)
+      : null;
   const needsTierSetup =
     state.data?.admin === true &&
     state.data.tiers.some((item) => item.model === null);
@@ -513,17 +542,30 @@ export function ModelTierPicker({
           size="sm"
           variant={selectedTier === item.tier ? "secondary" : "ghost"}
           aria-pressed={selectedTier === item.tier}
-          // 고른 단계는 옅은 강조 바탕으로 그린다.
+          data-inherited={inheritedTier === item.tier || undefined}
+          // 고른 단계는 옅은 강조 바탕으로, 고르지 않아 기본값으로 적용되는 단계는 테두리로 그린다.
           className={cn(
             "rounded-full",
             selectedTier === item.tier &&
               "bg-primary-soft text-primary-soft-foreground hover:bg-primary-soft",
+            inheritedTier === item.tier && "border border-border",
           )}
           disabled={disabled || state.loading || state.data === null || saving}
           data-testid={`model-tier-${item.tier.toLowerCase()}`}
           onClick={() => void choose(item.tier)}
         >
           {item.label}
+          {inheritedTier === item.tier ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="text-xs text-muted-foreground"
+              >
+                기본
+              </span>
+              <span className="sr-only">, 지금 적용되는 기본 단계</span>
+            </>
+          ) : null}
         </Button>
       ))}
       <Dialog>

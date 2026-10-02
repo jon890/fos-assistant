@@ -11,6 +11,7 @@ import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -31,9 +32,11 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -106,6 +109,9 @@ class MemoryProposerTest {
         conversation = conversations.save(Conversation.startedBy(USER.id(), "대화", agent.id()));
     }
 
+    /** 본 실행이 단계나 에이전트 기본 모델에서 해석한 값이다. */
+    private static final ModelChoice RESOLVED = ModelChoice.stored("example-provider", "example-agent", "low");
+
     @Test
     @DisplayName("제안을 만들면 부모와 뿌리 실행을 기록하고 PROPOSED로 저장한다")
     void proposalRecordsParentAndRootRunAndSavesAsProposed() {
@@ -120,8 +126,14 @@ class MemoryProposerTest {
                         "provider",
                         TokenUsage.empty()));
 
-        proposer.proposeFrom(USER, conversation, agent, parent, "국수 이야기");
+        proposer.proposeFrom(USER, conversation, agent, parent, "국수 이야기", RESOLVED);
 
+        // 대화에는 고른 모델이 없다. 본 실행이 해석한 값을 그대로 보내야 단계와 에이전트 기본 모델이 빠지지 않는다.
+        assertThat(((StubHermesRunsClient) hermes).received()).last().satisfies(command -> {
+            assertThat(command.provider()).isEqualTo(RESOLVED.provider());
+            assertThat(command.model()).isEqualTo(RESOLVED.model());
+            assertThat(command.reasoningEffort()).isEqualTo(RESOLVED.reasoningEffort());
+        });
         assertThat(memories.findAll()).singleElement().satisfies(memory -> {
             assertThat(memory.status().name()).isEqualTo("PROPOSED");
             assertThat(memory.proposedByExecutionId()).isNotNull();
@@ -133,8 +145,7 @@ class MemoryProposerTest {
                     assertThat(child.parentExecutionId()).isEqualTo(parent.id());
                     assertThat(child.rootExecutionId()).isEqualTo(parent.id());
                     assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
-                                    java.util.List.of(child.id())))
+                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(child.id())))
                             .isEmpty();
                 });
     }
@@ -145,7 +156,7 @@ class MemoryProposerTest {
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
         ((StubHermesRunsClient) hermes).willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
-        proposer.proposeFrom(USER, conversation, agent, parent, "답");
+        proposer.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults());
 
         assertThat(memories.findAll()).isEmpty();
         assertThat(executions.findAll())
@@ -173,7 +184,7 @@ class MemoryProposerTest {
                         HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " every account is blocked",
                         TokenUsage.empty()));
 
-        assertThatCode(() -> proposer.proposeFrom(USER, conversation, agent, parent, "답"))
+        assertThatCode(() -> proposer.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults()))
                 .doesNotThrowAnyException();
 
         assertThat(memories.findAll()).isEmpty();
@@ -183,8 +194,7 @@ class MemoryProposerTest {
                 .satisfies(child -> {
                     assertThat(child.status()).isEqualTo(ExecutionStatus.FAILED);
                     assertThat(child.errorCode()).isEqualTo(ErrorCode.PROVIDER_BLOCKED.name());
-                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
-                                    java.util.List.of(child.id())))
+                    assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(child.id())))
                             .singleElement()
                             .satisfies(event -> {
                                 assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
@@ -200,7 +210,7 @@ class MemoryProposerTest {
         ((StubHermesRunsClient) hermes)
                 .willReturn(HermesRunResult.of(
                         "proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));
-        proposer.proposeFrom(USER, conversation, agent, parent, "답");
+        proposer.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults());
         assertThat(memories.findAll()).isEmpty();
     }
 
@@ -211,15 +221,15 @@ class MemoryProposerTest {
         doThrow(new IllegalStateException("database unavailable"))
                 .when(failingRecorder)
                 .start(
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any());
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.any());
         MemoryProposer isolated = new MemoryProposer(
                 new MemoryProposalProperties(true),
                 mock(MemoryService.class),
@@ -230,7 +240,7 @@ class MemoryProposerTest {
                 new ObjectMapper());
         AgentExecution parent = recorder.start(USER, conversation, agent, null, null, 0L);
 
-        assertThatCode(() -> isolated.proposeFrom(USER, conversation, agent, parent, "답"))
+        assertThatCode(() -> isolated.proposeFrom(USER, conversation, agent, parent, "답", ModelChoice.defaults()))
                 .doesNotThrowAnyException();
     }
 }

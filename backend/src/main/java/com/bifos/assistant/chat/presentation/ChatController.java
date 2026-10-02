@@ -7,7 +7,6 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPage;
-import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
 import com.bifos.assistant.chat.application.ModelTierService;
@@ -25,7 +24,6 @@ import com.bifos.assistant.chat.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatDtos.ModelOptionsView;
-import com.bifos.assistant.chat.presentation.ChatDtos.ProviderView;
 import com.bifos.assistant.chat.presentation.ChatDtos.RenameConversationRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.RunningTurnView;
 import com.bifos.assistant.chat.presentation.ChatDtos.SendMessageRequest;
@@ -37,6 +35,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.UpdateDefaultModelTierRequ
 import com.bifos.assistant.chat.presentation.ChatDtos.UpdateGroupModelTiersRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -193,15 +192,7 @@ public class ChatController {
      */
     @GetMapping("/model-options")
     public ModelOptionsView modelOptions(@RequestParam(required = false) String agentCode) {
-        ModelOptions options = modelOptions.optionsFor(currentUser.require(), agentCode);
-        return new ModelOptionsView(
-                options.defaultProvider(),
-                options.defaultModel(),
-                options.providers().stream()
-                        .map(provider -> new ProviderView(
-                                provider.slug(), provider.name(), provider.models(), provider.reasoning()))
-                        .toList(),
-                options.reasoningEfforts());
+        return ModelOptionsView.from(modelOptions.optionsFor(currentUser.require(), agentCode));
     }
 
     @GetMapping("/model-tiers")
@@ -292,7 +283,7 @@ public class ChatController {
         Set<Long> withChildren = chat.executionIdsHavingChildren(history);
         Map<Long, String> switched = chat.switchedLabels(history);
         Map<Long, ActivitySummary> activity = chat.activitySummaries(history);
-        Map<Long, com.bifos.assistant.usage.domain.ExecutionStatus> statuses = chat.statuses(history);
+        Map<Long, ExecutionStatus> statuses = chat.statuses(history);
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
         return history.stream()

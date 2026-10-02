@@ -5,6 +5,7 @@ import { describeError } from "@/components/error-message";
 import { Notice } from "@/components/ui/notice";
 import { AgentAccessSection } from "./agent-access-section";
 import { AgentAdminSection } from "./agent-admin-section";
+import { AgentModelSection } from "./agent-model-section";
 import { AgentSkillsSection } from "./agent-skills-section";
 import { AgentToolsSection } from "./agent-tools-section";
 import { PersonaEditor } from "./persona-editor";
@@ -157,6 +158,7 @@ export function AgentDetailBody({
           </Notice>
         </section>
       )}
+      {adminAgent ? <AgentModelSection code={code} /> : null}
       {adminAgent && visibility ? (
         <AgentAdminSection initialAgent={adminAgent} visibility={visibility} />
       ) : null}

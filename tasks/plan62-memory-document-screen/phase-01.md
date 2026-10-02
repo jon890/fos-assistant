@@ -30,7 +30,7 @@
 - 브라우저 검사는 `test/browser/` 에 있다. 선례는 `test/browser/memory.spec.ts` 이고 `import { expect, setSession, test } from "./fixtures.ts";` 를 쓴다. Control Plane 은 `test/browser/fixtures.ts` 가 띄우고, 환경 변수는 그 파일의 `env: { ...process.env, ... ASSISTANT_JWT_SECRET: JWT_SECRET, ... }` 블록에서 준다. **지금은 암호화 key 를 주지 않는다**
 - 검사는 `mobile`(폭 390)과 `desktop`(폭 1280) 두 project 로 돈다. 같은 데이터베이스를 함께 쓰므로 만드는 이름에 `testInfo.project.name` 을 넣어 겹치지 않게 한다
 
-**근거 문서**: `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md`, `web/AGENTS.md` 의 「화면 문구」
+**근거 문서**: `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`, `web/AGENTS.md` 의 「화면 문구」
 
 ## 의도 메모
 

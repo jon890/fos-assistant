@@ -1,4 +1,4 @@
-## ADR-054: 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다
+## ADR-055: 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다
 
 - **status**: `accepted`.
 - **결정**: `sensitivity` 가 `SENSITIVE` 인 줄의 본문을 AES-256-GCM 으로 암호화해 `content` 칸에 넣는다.

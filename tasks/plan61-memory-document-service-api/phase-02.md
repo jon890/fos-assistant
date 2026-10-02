@@ -16,9 +16,9 @@
 - collection 과 민감 허용을 묶는 표의 선례는 `agent_memory_collection` 이다. 엔티티는 `backend/src/main/java/com/bifos/assistant/agent/domain/AgentMemoryCollection.java` 와 `AgentMemoryCollectionId.java`(`@EmbeddedId`)다
 - collection key 의 모양은 `MemoryPlacement.isCollectionKey(value)` 가 본다. 그룹의 목록은 phase 01 의 `MemoryService.collectionsFor(user)` 가 낸다
 - 요청과 응답 record 는 `memory/presentation/MemoryDtos.java` 에 모은다. `application` 의 결과 타입은 `memory/application/model/` 에 타입 하나에 파일 하나로 둔다
-- 가장 큰 마이그레이션은 plan60 의 `V48__memory_content_key.sql` 이다. 마이그레이션 테스트의 선례는 `backend/src/test/java/com/bifos/assistant/memory/MemoryV2MigrationTest.java` 다
+- 가장 큰 마이그레이션은 plan60 의 `V52__memory_content_key.sql` 이다. 마이그레이션 테스트의 선례는 `backend/src/test/java/com/bifos/assistant/memory/MemoryV2MigrationTest.java` 다
 
-**근거 문서**: `docs/adr/ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`
+**근거 문서**: `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`
 
 ## 의도 메모
 
@@ -29,10 +29,10 @@
 
 ## 작업 항목
 
-### 1. `backend/src/main/resources/db/migration/V49__service_token.sql`
+### 1. `backend/src/main/resources/db/migration/V53__service_token.sql`
 
 ```sql
--- 다른 서비스가 사용자의 Memory 문서를 읽을 때 쓰는 토큰이다(ADR-055).
+-- 다른 서비스가 사용자의 Memory 문서를 읽을 때 쓰는 토큰이다(ADR-056).
 -- 원문은 저장하지 않고 SHA-256 해시만 둔다. agent_token 과 달리 사용자 한 사람에 묶인다.
 CREATE TABLE service_token (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -58,7 +58,7 @@ CREATE TABLE service_token_collection (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 ```
 
-`origin/main` 에 V49 가 이미 있으면 다음 번호로 옮기고 아래 테스트의 번호도 함께 고친다.
+`origin/main` 에 V53 가 이미 있으면 다음 번호로 옮기고 아래 테스트의 번호도 함께 고친다.
 
 ### 2. 엔티티와 저장소
 
@@ -120,7 +120,7 @@ public record IssuedServiceTokenView(ServiceTokenView info, String token) {}
 
 ### 6. 마이그레이션 테스트 `backend/src/test/java/com/bifos/assistant/memory/ServiceTokenMigrationTest.java`
 
-`MemoryV2MigrationTest` 의 방식이다. V48 까지 올리고 `app_user` 한 줄을 넣은 뒤 V49 를 올린다.
+`MemoryV2MigrationTest` 의 방식이다. V52 까지 올리고 `app_user` 한 줄을 넣은 뒤 V53 를 올린다.
 
 - `service_token` 에 줄을 넣고 `service_token_collection` 에 그 토큰의 줄을 넣을 수 있다
 - 같은 `token_hash` 를 한 번 더 넣으면 실패한다
@@ -162,7 +162,7 @@ scripts/check-public-safe.sh
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/resources/db/migration/V49__service_token.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V53__service_token.sql` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/memory/domain/ServiceToken.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/memory/domain/ServiceTokenCollection.java` | 신규 |

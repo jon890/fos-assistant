@@ -329,6 +329,47 @@ test("내 기본값 저장이 실패하면 창을 유지하고 다시 저장할 
   await expect(failedAlert).toHaveCount(0);
 });
 
+test("내 기본값을 저장하면 고르지 않은 대화의 단계 단추에 기본 표시가 생긴다", async ({
+  page,
+}) => {
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) => route.fulfill({ json: { ...TIERS, groupDefaultTier: "DEEP" } }),
+  );
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers/default",
+    (route) => route.fulfill({ status: 204 }),
+  );
+
+  await page.goto("/");
+  // 내 기본값이 없으면 그룹 기본 단계가 적용된다.
+  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
+    "data-inherited",
+    "true",
+  );
+  await expect(page.getByTestId("model-tier-deep")).toContainText("기본");
+  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+
+  await tierSettings(page).click();
+  await page.getByRole("button", { name: "내 기본값" }).click();
+  await page
+    .getByRole("dialog", { name: "내 기본값" })
+    .getByRole("button", { name: "빠르게" })
+    .click();
+  await page.keyboard.press("Escape");
+
+  await expect(page.getByTestId("model-tier-fast")).toHaveAttribute(
+    "data-inherited",
+    "true",
+  );
+  await expect(page.getByTestId("model-tier-deep")).not.toHaveAttribute(
+    "data-inherited",
+  );
+});
+
 test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저장할 수 있다", async ({
   page,
 }) => {

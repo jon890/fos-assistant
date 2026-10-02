@@ -5,7 +5,12 @@ import com.bifos.assistant.chat.domain.type.ModelTier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-/** 그룹이 저장한 단계 정의가 없을 때 쓰는 배포 초기 설정이다. */
+/**
+ * 예전 배포가 환경 변수로 주던 단계 초기값이다.
+ *
+ * <p>실행할 때는 읽지 않는다. {@link ModelTierSeedImporter} 가 기동할 때 정의 행이 없는 그룹에 한 번 옮긴다.
+ * 옮긴 뒤에는 운영 설정에서 지운다(ADR-054).
+ */
 @Validated
 @ConfigurationProperties(prefix = "assistant.model-tiers")
 public record ModelTierProperties(Tier fast, Tier balanced, Tier deep) {
@@ -14,6 +19,11 @@ public record ModelTierProperties(Tier fast, Tier balanced, Tier deep) {
         fast = fast == null ? Tier.empty() : fast;
         balanced = balanced == null ? Tier.empty() : balanced;
         deep = deep == null ? Tier.empty() : deep;
+    }
+
+    /** 세 단계 가운데 하나라도 모델을 정했는가. */
+    public boolean hasAnyMapping() {
+        return fast.model() != null || balanced.model() != null || deep.model() != null;
     }
 
     public Tier forTier(ModelTier tier) {

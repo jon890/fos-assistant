@@ -21,14 +21,14 @@
 - `shared` 는 다른 최상위 패키지를 import 하지 못한다. `SecurityConfig` 가 `mcp.infra.AgentTokenAuthenticationFilter` 를 import 하는 것은 기준 파일에 든 옛 위반이다. **새 간선 `shared -> memory` 를 만들면 `./gradlew test` 가 실패한다**
 - HTTP 층을 실제로 지나는 테스트의 선례는 `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionEndpointTest.java` 다. `@SpringBootTest(webEnvironment = RANDOM_PORT)` 와 `@LocalServerPort` 로 진짜 요청을 보낸다. 웹 JWT 를 만드는 방법은 `backend/src/test/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilterTest.java` 를 읽는다
 
-**근거 문서**: `docs/adr/ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` 의 「적용 범위」 첫 표
+**근거 문서**: `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` 의 「적용 범위」 첫 표
 
 ## 의도 메모
 
 - 인증을 Spring Security 필터가 아니라 `memory` 패키지의 `HandlerInterceptor` 로 한다. 필터로 하면 `SecurityConfig` 가 `memory` 를 import 해야 한다. `SecurityConfig` 에는 경로를 `permitAll` 로 여는 글자만 둔다
 - 그래서 `/api/v1/service/` 아래의 모든 경로는 인터셉터가 막는다. 컨트롤러가 검사를 빠뜨려도 열리지 않게 경로 패턴으로 건다
 - 요청자는 토큰이 정한다. 경로와 본문은 사용자를 정하지 못한다
-- 꺼내는 방식(`retrieval`)으로 거르지 않는다. 그 칸은 에이전트의 실행에 싣는 방식이다(ADR-055)
+- 꺼내는 방식(`retrieval`)으로 거르지 않는다. 그 칸은 에이전트의 실행에 싣는 방식이다(ADR-056)
 - **`SecurityConfig` 의 응답 코드를 바꾸지 않는다.** 인증 진입점을 더하면 기존 e2e 의 403 단언이 깨진다. 401 은 서비스 경로의 인터셉터만 낸다
 - 401 과 404 의 응답을 경우마다 같게 한다. 다르게 답하면 토큰이나 문서가 있다는 사실이 새어 나간다
 
@@ -37,7 +37,7 @@
 ### 1. `memory/application/model/ServicePrincipal.java`
 
 ```java
-/** 서비스 토큰이 증명한 요청자다. 사용자 한 사람과 그 토큰이 받는 collection 이다(ADR-055). */
+/** 서비스 토큰이 증명한 요청자다. 사용자 한 사람과 그 토큰이 받는 collection 이다(ADR-056). */
 public record ServicePrincipal(Long tokenId, Long userId, MemoryAccess access, Instant expiresAt) {}
 ```
 
@@ -98,12 +98,12 @@ Javadoc: 「이 경로는 `SecurityConfig` 가 `permitAll` 로 열어 둔다. �
 - `SecurityConfig`: `/api/v1/signin/allowed` 의 `permitAll` 아래에 더한다. import 는 더하지 않는다
 
   ```java
-  // 다른 서비스가 서비스 토큰으로 부르는 경로다(ADR-055). 인증은 memory 의 인터셉터가 한다.
+  // 다른 서비스가 서비스 토큰으로 부르는 경로다(ADR-056). 인증은 memory 의 인터셉터가 한다.
   .requestMatchers("/api/v1/service/**")
   .permitAll()
   ```
 
-- `ControlPlaneJwtFilter.shouldNotFilter`: `UNFILTERED_PATHS.contains(uri) || uri.startsWith("/api/v1/service/")` 로 바꾼다. 접두사는 `private static final String SERVICE_API_PREFIX = "/api/v1/service/";` 로 둔다. `UNFILTERED_PATHS` 의 Javadoc 에 「`/api/v1/service/` 아래는 서비스 토큰을 쓰는 다른 인증 경계다(ADR-055)」 를 더한다
+- `ControlPlaneJwtFilter.shouldNotFilter`: `UNFILTERED_PATHS.contains(uri) || uri.startsWith("/api/v1/service/")` 로 바꾼다. 접두사는 `private static final String SERVICE_API_PREFIX = "/api/v1/service/";` 로 둔다. `UNFILTERED_PATHS` 의 Javadoc 에 「`/api/v1/service/` 아래는 서비스 토큰을 쓰는 다른 인증 경계다(ADR-056)」 를 더한다
 
 **`/api/v1/service-tokens` 는 이 접두사에 걸리지 않는다.** 그 경로는 웹 JWT 로 인증한다. 접두사 끝의 `/` 를 빼지 않는다.
 

@@ -2,6 +2,10 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentVisibility;
+import com.bifos.assistant.agent.domain.CostMode;
+import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.chat.application.ModelTierOptions;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
@@ -24,6 +28,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 @ActiveProfiles("test")
 class ModelTierPersistenceTest {
+
+    private static final Agent AGENT = Agent.of(
+            "tier-test",
+            "tier-test",
+            "tier-test",
+            "http://hermes.invalid",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            null);
 
     private static final Long GROUP_ID = 9_000_000_001L;
 
@@ -71,8 +85,8 @@ class ModelTierPersistenceTest {
                 new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null));
 
         tiers.saveGroup(admin, fallback, null);
-        ResolvedModelTier resolved = tiers.resolveTier(admin, ModelTier.FAST, null);
-        ModelTierOptions options = tiers.optionsFor(admin, null);
+        ResolvedModelTier resolved = tiers.resolveTier(admin, ModelTier.FAST, AGENT);
+        ModelTierOptions options = tiers.optionsFor(admin, AGENT);
 
         assertThat(resolved.tier()).isEqualTo(ModelTier.FAST);
         assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());

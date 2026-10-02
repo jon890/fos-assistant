@@ -21,7 +21,7 @@ public enum ErrorCode {
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     /** 민감 항목을 항상 싣게 하려 했다. 조립 판정이 틀려도 민감 본문이 나가지 않게 저장할 때 막는다. */
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
-    /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-054). */
+    /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-055). */
     MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
@@ -137,6 +137,12 @@ public enum ErrorCode {
      */
     SKILL_COMMAND_UNKNOWN(HttpStatus.BAD_REQUEST),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
+    /**
+     * 그룹이 숨긴 provider 나 모델을 고르거나 그것으로 실행하려 했다. 다른 모델로 바꾸지 않는다(ADR-054).
+     *
+     * <p>실행 줄에 남는 이름이기도 하다.
+     */
+    MODEL_HIDDEN(HttpStatus.CONFLICT),
     /** 커넥터의 확인 도구가 입력한 값을 거절했다. 공통 어휘 {@code credential_rejected} 다(ADR-043). */
     CONNECTOR_CREDENTIAL_REJECTED(HttpStatus.BAD_REQUEST),
     /** 입력한 값으로는 그 대상에 접근할 수 없다. 공통 어휘 {@code forbidden} 이다. */

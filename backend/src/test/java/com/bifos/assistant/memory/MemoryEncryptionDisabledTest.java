@@ -30,7 +30,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * key 가 없을 때 민감 본문이 평문으로 저장되는 길이 없는지 본다(ADR-054).
+ * key 가 없을 때 민감 본문이 평문으로 저장되는 길이 없는지 본다(ADR-055).
  *
  * <p>저장과 수정, 일반 항목을 민감으로 고치는 길, 제안을 받아들이는 길을 모두 지난다.
  */

@@ -29,7 +29,7 @@
 - 컨트롤러 선례는 `memory/presentation/MemoryController.java`, 요청과 응답 record 는 `memory/presentation/MemoryDtos.java` 하나에 모은다. 사용자는 `CurrentUserProvider.require()` 로 꺼낸다
 - `ErrorCode` 는 `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` 의 enum 이다
 
-**근거 문서**: `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 「적용 범위」
+**근거 문서**: `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 「적용 범위」
 
 ## 의도 메모
 
@@ -89,7 +89,7 @@ Optional<Memory> findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
 
 기존 메서드를 고친다.
 
-- `readableBy(user)`: 종류가 `MEMORY` 인 줄만 낸다. `MemoryQueries` 에 `listedFor(Long userId, Long groupId)` 를 더해 `readable(...)` 조건에 `entryType == MemoryEntryType.MEMORY` 를 `and` 로 묶고, `readableBy` 가 그것을 쓴다. Javadoc 을 「문서는 문서 API 가 따로 낸다(ADR-056)」 로 고친다
+- `readableBy(user)`: 종류가 `MEMORY` 인 줄만 낸다. `MemoryQueries` 에 `listedFor(Long userId, Long groupId)` 를 더해 `readable(...)` 조건에 `entryType == MemoryEntryType.MEMORY` 를 `and` 로 묶고, `readableBy` 가 그것을 쓴다. Javadoc 을 「문서는 문서 API 가 따로 낸다(ADR-057)」 로 고친다
 - `accept`, `reject`, `update(user, id, content, boolean alwaysInject)`, `update(user, id, content, retrieval, sensitivity)` 넷: `requireWritableForUpdate` 로 잠근 항목의 종류가 `MEMORY` 가 아니면 `notFound()`. 넷이 함께 쓰는 private 메서드 하나로 둔다. 막지 않으면 주인이 `POST /api/v1/memories/{id}/reject` 로 문서를 `REJECTED` 로 만들 수 있다
 - `delete` 는 그대로 둔다. 문서도 이 경로로 지운다
 

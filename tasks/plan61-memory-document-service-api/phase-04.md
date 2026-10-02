@@ -26,12 +26,12 @@
   - 루트 `AGENTS.md` 의 「지켜야 할 것」: 「제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다」
   - `docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md` 의 「다음」 이 서비스 토큰을 앞으로 할 일로 적는다
 
-**근거 문서**: `docs/adr/ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`, `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md`
+**근거 문서**: `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`, `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`
 
 ## 의도 메모
 
 - e2e 는 backend 테스트가 본 경우를 다시 훑지 않는다. 운영과 같은 조립(보안 설정, 인터셉터, 암호화 설정, Flyway 로 만든 스키마)에서 한 번 왕복하는 것을 본다
-- 테스트 데이터베이스는 엔티티로 표를 만들고 e2e 만 Flyway 를 지난다. `uk_memory_user_document` 제약과 V48, V49 가 실제로 붙는 곳이 e2e 다
+- 테스트 데이터베이스는 엔티티로 표를 만들고 e2e 만 Flyway 를 지난다. `uk_memory_user_document` 제약과 V52, V53 가 실제로 붙는 곳이 e2e 다
 - `docs/flow.md` 에 서비스 토큰을 「셋째 방향」 으로 적는다. 요청자를 origin 실행에서 정하지 않는 유일한 읽기 길이라 따로 보여야 한다
 
 ## 작업 항목
@@ -86,23 +86,23 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
   - 이 경로의 인증은 `memory.presentation.ServiceTokenInterceptor` 가 한다. `SecurityConfig` 는 그 경로를 `permitAll` 로 열고 `ControlPlaneJwtFilter` 는 건너뛴다. `shared` 가 `memory` 를 쓰지 않게 하기 위해서다
 - 클래스 표에 `memory.application.ServiceTokenService`, `memory.presentation.ServiceTokenInterceptor`, `memory.presentation.MemoryDocumentController`, `memory.presentation.MemoryDocumentServiceController` 를 더한다
 - 「다음」 목록에서 「다른 서비스가 문서를 읽는 API 와 그 서비스 토큰」 을 지운다. collection 탭과 문서 편집 화면을 적은 줄은 그대로 둔다. 화면은 아직 없다
-- 근거 줄에 ADR-055 와 ADR-056 링크를 더한다
+- 근거 줄에 ADR-056 와 ADR-057 링크를 더한다
 
 ### 5. `docs/data-schema.md`
 
 - 「memory」 의 「지금 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다」 뒤에 「문서 API 가 만드는 줄은 `USER` 범위의 `DOCUMENT` 이고 `ACCEPTED` 다」 를 더한다
 - 「memory_collection」 의 「아직 부르는 API 가 없다」 문장을 고친다. `collectionsOf` 는 `GET /api/v1/memory-collections` 가 부른다. `revisionsOf` 는 아직 부르는 API 가 없다
-- 「agent_token」 절 다음에 「service_token」 과 「service_token_collection」 절을 더한다. 칸 표는 `V49__service_token.sql` 과 같게 적는다. 아래 뜻을 담는다
+- 「agent_token」 절 다음에 「service_token」 과 「service_token_collection」 절을 더한다. 칸 표는 `V53__service_token.sql` 과 같게 적는다. 아래 뜻을 담는다
   - 원문은 발급 응답에서 한 번만 내고 해시만 저장한다
   - **`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다
   - `expires_at` 이 비어 있으면 만료가 없다. 폐기는 줄을 지우지 않는다
-  - 근거는 ADR-055 다
+  - 근거는 ADR-056 다
 - 「지울 때」 에 한 문장을 더한다: 서비스 토큰은 폐기해도 줄이 남는다
 
 ### 6. `docs/flow.md`
 
 - 「두 방향과 두 토큰」 의 토큰 표에 줄을 더한다: ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다. 그 아래 「①은 사용자를 정하고 ③은 profile 만 정한다」 뒤에 「④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다」 를 더한다. 그 절의 mermaid 그림에는 손대지 않는다
-- 「Memory 본문을 읽는 길」 의 「이 왕복은 비싸다」 앞에 「### 다른 서비스가 문서를 읽을 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 다른 서비스, Control Plane, 데이터베이스. 토큰 인증, 문서 조회와 세 조건 판정, 민감 문서 복호화, 본문과 판 번호 응답)와 「갈리는 지점」 표를 둔다. 표의 줄은 ADR-055 의 「적용 범위」 첫 표와 같게 한다
+- 「Memory 본문을 읽는 길」 의 「이 왕복은 비싸다」 앞에 「### 다른 서비스가 문서를 읽을 때」 를 더한다. mermaid `sequenceDiagram` 하나(참가자: 다른 서비스, Control Plane, 데이터베이스. 토큰 인증, 문서 조회와 세 조건 판정, 민감 문서 복호화, 본문과 판 번호 응답)와 「갈리는 지점」 표를 둔다. 표의 줄은 ADR-056 의 「적용 범위」 첫 표와 같게 한다
 
 ### 7. 루트 `AGENTS.md`
 
@@ -111,17 +111,17 @@ backend 를 띄우는 `env` 블록의 `ASSISTANT_JWT_SECRET` 아래에 더한다
 ```
 - Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
   제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다.
-  실행 밖의 서비스는 사용자에 묶인 서비스 토큰으로 문서만 읽는다(ADR-055).
+  실행 밖의 서비스는 사용자에 묶인 서비스 토큰으로 문서만 읽는다(ADR-056).
 ```
 
 `CLAUDE.md` 는 `AGENTS.md` 를 가리키는 링크다. 따로 고치지 않는다.
 
 ### 8. ADR 과 목록
 
-- `docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md` 의 「다음」 끝 문장 「다른 서비스가 문서를 읽는 신원은 …」 뒤에 「이것은 [ADR-055](ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) 가 정했다.」 를 더한다
-- `docs/adr/ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` 의 `status` 줄에서 「아직 구현 전이다.」 를 지운다
-- `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 `status` 줄을 「`accepted`. API 는 있고 화면은 아직 구현 전이다.」 로 고친다
-- `docs/adr/INDEX.md` 의 ADR-055 줄에서 「아직 구현 전이다」 를 지우고, ADR-056 줄을 「화면은 아직 구현 전이다」 로 고친다
+- `docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md` 의 「다음」 끝 문장 「다른 서비스가 문서를 읽는 신원은 …」 뒤에 「이것은 [ADR-056](ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) 가 정했다.」 를 더한다
+- `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` 의 `status` 줄에서 「아직 구현 전이다.」 를 지운다
+- `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md` 의 `status` 줄을 「`accepted`. API 는 있고 화면은 아직 구현 전이다.」 로 고친다
+- `docs/adr/INDEX.md` 의 ADR-056 줄에서 「아직 구현 전이다」 를 지우고, ADR-057 줄을 「화면은 아직 구현 전이다」 로 고친다
 
 ## 검증
 
@@ -132,7 +132,7 @@ node test/e2e/run.ts
 node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
 grep -n "service_token_collection" docs/data-schema.md
-grep -n "ADR-055" docs/code-architecture.md docs/flow.md AGENTS.md
+grep -n "ADR-056" docs/code-architecture.md docs/flow.md AGENTS.md
 ! grep -n "다른 서비스가 문서를 읽는 API 와 그 서비스 토큰" docs/code-architecture.md
 ```
 
@@ -150,6 +150,6 @@ grep -n "ADR-055" docs/code-architecture.md docs/flow.md AGENTS.md
 | `docs/flow.md` | 수정 |
 | `AGENTS.md` | 수정 |
 | `docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md` | 수정 |
-| `docs/adr/ADR-055-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` | 수정 |
-| `docs/adr/ADR-056-문서는-사람이-화면에서-직접-쓰고-고친다.md` | 수정 |
+| `docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md` | 수정 |
+| `docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md` | 수정 |
 | `docs/adr/INDEX.md` | 수정 |

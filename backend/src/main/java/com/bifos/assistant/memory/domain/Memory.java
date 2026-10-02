@@ -28,7 +28,7 @@ import lombok.experimental.Accessors;
  * 과 맞춘다. 읽을 때는 {@code retrieval} 만 본다.
  *
  * <p>{@code content} 는 저장된 글이다. 민감 줄이면 암호문이고 {@code contentKeyId} 가 그 key 를 적는다. 평문은
- * {@code MemoryService.contentOf} 로 읽는다(ADR-054).
+ * {@code MemoryService.contentOf} 로 읽는다(ADR-055).
  */
 @Entity
 @Table(name = "memory")
@@ -230,7 +230,7 @@ public class Memory {
         return contentKeyId != null;
     }
 
-    /** 암호문이 누구의 것인지 적은 글이다. 암호화와 풀기가 같은 값을 써야 한다(ADR-054). */
+    /** 암호문이 누구의 것인지 적은 글이다. 암호화와 풀기가 같은 값을 써야 한다(ADR-055). */
     public String contentBinding() {
         return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
     }

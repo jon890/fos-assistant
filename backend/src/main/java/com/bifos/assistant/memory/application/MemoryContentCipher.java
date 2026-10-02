@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 민감 Memory 본문 하나를 AES-256-GCM 으로 암호화하고 푼다(ADR-054).
+ * 민감 Memory 본문 하나를 AES-256-GCM 으로 암호화하고 푼다(ADR-055).
  *
  * <p>key 가 없으면 암호화 요청을 거절한다. 평문을 돌려주는 길은 없다.
  * {@code binding} 은 이 암호문이 누구의 것인가를 나타내는 글이고, 이 클래스는 그 뜻을 모른다.

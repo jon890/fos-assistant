@@ -13,7 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V52 가 이미 있는 Memory 와 판을 잃지 않고 {@code content_key_id} 칸을 더하는지 본다(ADR-054).
+ * V52 가 이미 있는 Memory 와 판을 잃지 않고 {@code content_key_id} 칸을 더하는지 본다(ADR-055).
  *
  * <p>다른 검사들은 엔티티로 스키마를 만들어 이 마이그레이션을 지나지 않는다.
  */

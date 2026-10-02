@@ -818,7 +818,8 @@ public class ChatService {
         append(pending, ExecutionEventType.RUN_COMPLETED, null);
         String answer = result.output() == null ? "" : result.output();
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
-        memoryProposer.proposeFrom(pending.user(), pending.conversation(), pending.agent(), execution, answer);
+        memoryProposer.proposeFrom(
+                pending.user(), pending.conversation(), pending.agent(), execution, answer, requested);
         starterSuggestions.refreshIfStale(pending.user(), pending.agent());
         return new ChatTurn(
                 pending.conversation().id(),
@@ -1265,7 +1266,7 @@ public class ChatService {
     /**
      * 대화에서 쓸 모델과 effort 를 바꾼다. 그 뒤의 실행이 이 값을 쓴다.
      *
-     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 대화 목록의 순서는 주고받은 시각으로 정하므로
+     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 그룹이 숨긴 모델은 {@code MODEL_HIDDEN} 으로 거절한다. 대화 목록의 순서는 주고받은 시각으로 정하므로
      * {@code updatedAt} 을 건드리지 않는다.
      *
      * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택
@@ -1273,6 +1274,7 @@ public class ChatService {
     @Transactional
     public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {
         access.requireOwn(user, conversationId);
+        modelTiers.requireVisible(user, choice);
         if (conversations.chooseModelIfActive(
                         conversationId,
                         user.id(),
@@ -1286,7 +1288,7 @@ public class ChatService {
         return access.requireOwn(user, conversationId);
     }
 
-    /** 대화가 고른 단계를 저장한다. DEFAULT 는 profile 기본값만 쓰도록 사용자·그룹 기본값도 건너뛴다. */
+    /** 대화가 고른 단계를 저장한다. DEFAULT 는 에이전트 기본 모델만 쓰도록 사용자·그룹 기본값도 건너뛴다. */
     @Transactional
     public Conversation chooseModelTier(
             CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
