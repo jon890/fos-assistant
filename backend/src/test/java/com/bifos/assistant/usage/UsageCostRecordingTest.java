@@ -1,6 +1,7 @@
 package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
@@ -11,10 +12,12 @@ import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.domain.MonthlyCost;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -28,6 +31,8 @@ import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -99,12 +104,181 @@ class UsageCostRecordingTest {
     }
 
     @Test
-    @DisplayName("실패한 실행은 금액을 남기지 않는다")
-    void leavesNoAmountForFailedRun() {
+    @DisplayName("최종 결과를 받지 못한 실패 실행은 금액을 남기지 않는다")
+    void leavesNoAmountForFailedRunWithoutResult() {
         AgentExecution execution = fail();
 
+        assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(execution.errorCode()).isEqualTo("HERMES_RUN_FAILED");
+        assertThat(execution.inputTokens()).isNull();
+        assertThat(execution.outputTokens()).isNull();
+        assertThat(execution.totalTokens()).isNull();
+        assertThat(execution.actualCostMicros()).isNull();
+        assertThat(execution.finishedAt()).isNotNull();
         assertThat(execution.estimatedCostMicros()).isNull();
         assertThat(execution.pricingVersion()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "openai-codex, example-model, 800, 16400",
+        "anthropic, example-model-large, 800, 41700",
+        "openai, gpt-flat, 800, 6000",
+        "openai, example-model, , 20000"
+    })
+    @DisplayName("실패 응답도 실제 provider 의 가격과 캐시 보고 유무에 따라 환산한다")
+    void pricesFailedResultUsingServedProviderAndCache(
+            String provider, String model, Long cached, long expectedMicros) {
+        Agent agent = apiAgent();
+        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        HermesRunResult result = failedRun(new TokenUsage(1_000L, cached, 500L, 1_500L), provider, model);
+
+        AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
+        AgentExecution stored = executions.findById(failed.id()).orElseThrow();
+
+        assertThat(stored.status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(stored.errorCode()).isEqualTo("FAILED");
+        assertThat(stored.hermesRunId()).isEqualTo("failed-run");
+        assertThat(stored.provider()).isEqualTo(provider);
+        assertThat(stored.model()).isEqualTo(model);
+        assertThat(stored.inputTokens()).isEqualTo(1_000L);
+        assertThat(stored.cachedInputTokens()).isEqualTo(cached);
+        assertThat(stored.outputTokens()).isEqualTo(500L);
+        assertThat(stored.totalTokens()).isEqualTo(1_500L);
+        assertThat(stored.estimatedCostMicros()).isEqualTo(expectedMicros);
+        assertThat(stored.actualCostMicros()).isEqualTo(expectedMicros);
+        assertThat(stored.costCurrency()).isEqualTo("USD");
+        assertThat(stored.pricingVersion()).isEqualTo("models.dev@2026-09-17");
+        assertThat(stored.finishedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("실패 응답의 모델이 가격표에 없으면 토큰은 남기고 금액은 비운다")
+    void preservesTokensWithoutInventingPriceForFailedUnknownModel() {
+        Agent agent = apiAgent();
+        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+
+        AgentExecution failed = recorder.fail(
+                execution,
+                agent,
+                failedRun(new TokenUsage(1_000L, 800L, 500L, 1_500L), "openai", UNPRICED_MODEL),
+                requested(agent),
+                "PROVIDER_BLOCKED");
+
+        assertThat(failed.status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(failed.errorCode()).isEqualTo("PROVIDER_BLOCKED");
+        assertThat(failed.model()).isEqualTo(UNPRICED_MODEL);
+        assertThat(failed.totalTokens()).isEqualTo(1_500L);
+        assertThat(failed.estimatedCostMicros()).isNull();
+        assertThat(failed.actualCostMicros()).isNull();
+        assertThat(failed.pricingVersion()).isNull();
+    }
+
+    @Test
+    @DisplayName("실패 응답에 사용량이 없으면 토큰과 금액을 미확인으로 둔다")
+    void leavesMissingFailedUsageUnknown() {
+        Agent agent = apiAgent();
+        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+
+        AgentExecution failed =
+                recorder.fail(execution, agent, failedRun(null, "openai", PRICED_MODEL), requested(agent), "FAILED");
+
+        assertThat(failed.inputTokens()).isNull();
+        assertThat(failed.cachedInputTokens()).isNull();
+        assertThat(failed.outputTokens()).isNull();
+        assertThat(failed.totalTokens()).isNull();
+        assertThat(failed.estimatedCostMicros()).isNull();
+        assertThat(failed.actualCostMicros()).isNull();
+        assertThat(failed.pricingVersion()).isNull();
+    }
+
+    @Test
+    @DisplayName("실패 응답이 합계 토큰만 알려 주면 입력과 출력을 추측해 환산하지 않는다")
+    void leavesFailedCostUnknownWhenOnlyTotalTokensAreReported() {
+        Agent agent = apiAgent();
+        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+
+        AgentExecution failed = recorder.fail(
+                execution,
+                agent,
+                failedRun(new TokenUsage(null, null, null, 1_500L), "openai", PRICED_MODEL),
+                requested(agent),
+                "FAILED");
+
+        assertThat(failed.totalTokens()).isEqualTo(1_500L);
+        assertThat(failed.inputTokens()).isNull();
+        assertThat(failed.outputTokens()).isNull();
+        assertThat(failed.estimatedCostMicros()).isNull();
+        assertThat(failed.actualCostMicros()).isNull();
+    }
+
+    @Test
+    @DisplayName("runtime 없는 실패 응답은 세션의 실제 모델을 읽어 환산한다")
+    void resolvesLegacyFailedRuntimeFromSession() {
+        Agent agent = subscriptionAgent();
+        when(hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), "failed-session"))
+                .thenReturn(new SessionRuntime("example-model-large", "anthropic"));
+        AgentExecution execution = recorder.start(caller(), conversation, agent, null, null, 0L);
+        HermesRunResult result = new HermesRunResult(
+                "failed-run",
+                "failed-session",
+                "failed",
+                null,
+                PRICED_MODEL,
+                PROVIDER,
+                "tool failed",
+                new TokenUsage(1_000L, null, 500L, 1_500L));
+
+        AgentExecution failed = recorder.fail(execution, agent, result, requested(agent), "FAILED");
+
+        assertThat(failed.provider()).isEqualTo("anthropic");
+        assertThat(failed.model()).isEqualTo("example-model-large");
+        assertThat(failed.cachedInputTokens()).isNull();
+        assertThat(failed.estimatedCostMicros()).isEqualTo(52_500L);
+        assertThat(failed.actualCostMicros()).isNull();
+    }
+
+    @Test
+    @DisplayName("월 합계는 사용량을 받은 실패와 취소도 더하고 미확인 실패와 실행 중을 구분한다")
+    void includesPricedFailureAndCancellationInMonthlyTotals() {
+        Agent agent = apiAgent();
+        complete(run(1_000L, null, 500L), agent);
+        recorder.fail(
+                recorder.start(caller(), conversation, agent, null, null, 0L),
+                agent,
+                failedRun(new TokenUsage(1_000L, 800L, 500L, 1_500L), PROVIDER, PRICED_MODEL),
+                requested(agent),
+                "FAILED");
+        recorder.cancel(
+                recorder.start(caller(), conversation, agent, null, null, 0L),
+                agent,
+                run(1_000L, null, 500L),
+                requested(agent));
+        fail();
+        recorder.start(caller(), conversation, agent, null, null, 0L);
+
+        MonthlyCost cost = executions.sumCostBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        MonthlyCostDetail detail = executions.sumCostDetailBetween(
+                USER_ID, Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+
+        assertThat(cost.totalMicros()).isEqualTo(56_400L);
+        assertThat(cost.pricedExecutions()).isEqualTo(3L);
+        assertThat(cost.unpricedExecutions()).isEqualTo(1L);
+        assertThat(detail.actualMicros()).isEqualTo(56_400L);
+    }
+
+    private static HermesRunResult failedRun(TokenUsage usage, String provider, String model) {
+        return new HermesRunResult(
+                "failed-run",
+                "failed-session",
+                "failed",
+                null,
+                "requested-model",
+                "requested-provider",
+                "tool failed",
+                usage,
+                new SessionRuntime(model, provider));
     }
 
     @Test

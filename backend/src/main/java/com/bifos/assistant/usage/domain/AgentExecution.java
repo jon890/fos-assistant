@@ -497,6 +497,22 @@ public class AgentExecution {
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
+    /** 실패 응답에 포함된 모델과 토큰과 금액을 보존하고 FAILED 로 옮긴다. */
+    public void markFailed(
+            String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt) {
+        this.provider = provider;
+        this.model = model;
+        this.inputTokens = usage.inputTokens();
+        this.cachedInputTokens = usage.cachedInputTokens();
+        this.outputTokens = usage.outputTokens();
+        this.totalTokens = usage.totalTokens();
+        this.estimatedCostMicros = cost.estimatedMicros();
+        this.actualCostMicros = cost.actualMicros();
+        this.costCurrency = cost.currency();
+        this.pricingVersion = cost.pricingVersion();
+        markFailed(errorCode, finishedAt);
+    }
+
     /** 끝난 시각과 오류 코드를 채우고 FAILED 로 옮긴다. */
     public void markFailed(String errorCode, Instant finishedAt) {
         this.errorCode = errorCode;
