@@ -1,0 +1,12 @@
+{
+  "name": "plan66-effort-capability",
+  "description": "모델별 reasoning 지원과 끄기 지원을 지원, 미지원, 미확인으로 나눠 싣고 none 선택을 지원이 확인된 모델에만 연다 (이슈 103)",
+  "status": "pending",
+  "created_at": "2026-10-02",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+  ]
+}
