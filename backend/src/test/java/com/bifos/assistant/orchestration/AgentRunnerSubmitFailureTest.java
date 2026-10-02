@@ -3,6 +3,7 @@ package com.bifos.assistant.orchestration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -69,7 +70,7 @@ class AgentRunnerSubmitFailureTest {
 
     @BeforeEach
     void setUp() {
-        when(contextAssembler.assemble(user)).thenReturn(new AssembledContext(null, 0));
+        when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(null, 0));
         when(contextAssembler.withResponseInstructions(any())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(failed.id()).thenReturn(3L);

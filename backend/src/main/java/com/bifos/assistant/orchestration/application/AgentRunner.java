@@ -139,7 +139,7 @@ public class AgentRunner {
             DelegationKey delegationKey) {
         Instant requestReceivedAt = clock.instant();
         AssembledContext context =
-                agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user);
+                agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id());
         context = contextAssembler.withResponseInstructions(context);
         ExecutionContextSnapshot snapshot =
                 new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash());

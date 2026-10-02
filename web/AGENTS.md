@@ -40,8 +40,16 @@ src/
 그래서 인라인으로 적은 값 하나가 그 요소의 반응형과 상태 변화를 함께 막는다.
 색이든 여백이든 이유가 같다.
 
-**브랜드 색을 본문 글자에 쓰지 않는다.**
-읽는 글이 색을 가지면 무엇이 누를 수 있는 것인지 알 수 없게 된다.
+**강조 색(`primary`)은 주 단추, 지금 고른 것, 초점 테두리에만 쓴다.**
+링크와 숫자는 글자색으로, 상태는 의미 색(`success`, `warning`, `info`, `destructive`)으로 그린다.
+읽는 글이 강조 색을 가지면 무엇이 누를 수 있는 것인지 알 수 없게 된다.
+값과 쓰는 곳의 표는 [ADR-051](../docs/adr/ADR-051-화면-색은-새벽-보라로-바꾸고-강조-색은-누를-것과-고른-것과-초점에만-쓴다.md) 이 갖는다.
+
+- 색을 `#` 값이나 `bg-white`, `bg-black` 으로 적지 않는다. 토큰이 없으면 `globals.css` 에 더한다
+- 모서리는 `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-full` 만 쓴다
+- 안내와 오류 상자는 `components/ui/notice.tsx` 의 `Notice` 로, 상태 배지는 `Badge` 의 의미 색 변형으로 그린다
+- 움직임의 길이와 곡선은 토큰(`duration-fast`, `duration-base`, `duration-slow`, `ease-out`, `ease-spring`)만 쓴다.
+  줄인 움직임 설정은 `globals.css` 의 블록 하나가 정하므로 부품에 `motion-reduce:` 를 적지 않는다. 끝없이 도는 회전 표시와 뼈대만 `motion-reduce:animate-none` 을 적고, 그 표시를 문장으로 바꿔 보일 때만 `motion-reduce:hidden`, `motion-reduce:flex`, `motion-reduce:inline` 을 적는다
 
 고쳤으면 아래가 아무것도 내지 않아야 한다.
 
@@ -74,6 +82,7 @@ grep -rn 'style={{' web/src/
 - 비서가 사용자에게 하는 말은 높임을 쓴다. 「무엇을 도와드릴까요?」
 - 사용자가 할 일은 사용자가 주어로 읽히게 쓴다. 「잠시 뒤 다시 보내 주세요.」. 「다시 보낸다」 는 비서가 스스로 하는 일로 읽힌다
 - 일반 사용자에게 보이는 오류는 할 일만 알린다. Hermes, profile, API key 같은 내부 원인은 로그와 관리 화면에 남긴다
+- 모델 이름, 토큰 수, 금액, 오류 코드, 에이전트 코드 같은 내부 값은 `ADMIN` 에게만 그린다. 역할은 `useShellIsAdmin()` 으로 읽는다
 - 버튼과 제목은 명사구나 짧은 동사구로 쓰고 질문형 제목을 쓰지 않는다
 
 화면에서 쓰는 말이다. docs 와 코드 식별자는 원래 이름을 그대로 쓴다.
@@ -82,6 +91,7 @@ grep -rn 'style={{' web/src/
 | --- | --- |
 | Memory | 기억. 제안된 것은 「검토할 기억」, 범위는 「그룹이 함께 아는 것」 과 「나에 대해 아는 것」 |
 | 실행 나무 | 작업 과정 |
+| 하위 에이전트 | 도우미 |
 | 설정 지문 | 설정별 사용량. 비교는 「설정 차이」, 값은 「설정 구분값」 |
 | provider | 모델 제공사 |
 | Hermes API 주소 | 에이전트 연결 주소 |
@@ -208,6 +218,17 @@ BROWSER_WEB_SERVER=dev pnpm test:browser
 
 `test/browser` 는 웹과 Chromium 을 띄워 화면을 검사한다.
 `mobile` 과 `desktop` 두 폭에서 돌고 각각 390px 와 1280px 다.
+
+PR 과 main 의 CI 는 폭마다 `--shard=1/4` 부터 `--shard=4/4` 까지 별도 runner 에서 나란히 돌린다.
+`fullyParallel: false` 와 `workers: 1` 은 유지하므로 파일을 나누되 파일 안의 검사와 서버 상태는 직렬로 처리한다.
+globalSetup 은 shard 마다 새 Control Plane 과 H2 메모리 DB, 실행별 임시 파일을 만든다.
+필수 검사 `browser-mobile` 과 `browser-desktop` 은 해당 폭의 shard 4개가 모두 성공해야 통과한다.
+JSON 결과와 실패 trace 는 폭과 shard 번호를 붙인 CI artifact 에서 읽는다.
+
+한국 시간 매일 04:23 에 main 전체를 다시 검사하며 변경이 없는 날도 건너뛰지 않는다.
+main push 와 매일 실행의 실패는 `브라우저 실패` 이슈에 파일과 폭별로 모은다.
+같은 파일의 열린 이슈에는 재발 횟수와 실행 링크를 남긴다. PR 실패는 이슈를 만들지 않고 그 PR 에서 고친다.
+모인 실패는 한 번에 고치고, 흔들리는 검사는 고치거나 까닭을 적어 이슈를 닫는다.
 
 **운영 코드에 시험용 문을 만들지 않는다.**
 로그인은 테스트가 NextAuth 세션 쿠키를 직접 만들어 넣는다.

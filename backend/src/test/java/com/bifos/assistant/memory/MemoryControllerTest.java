@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.presentation.MemoryController;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;

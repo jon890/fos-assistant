@@ -5,23 +5,49 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Ellipsis } from "lucide-react";
 import {
-  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { focusWithoutTooltip, TooltipButton } from "@/components/ui/tooltip-button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  focusWithoutTooltip,
+  TooltipButton,
+} from "@/components/ui/tooltip-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useExit } from "@/components/ui/use-exit";
 import { useConversations, type Conversation } from "./conversations-provider";
 import { groupByDate } from "./group-by-date";
 import { NavPending } from "./nav-pending";
 import { cn } from "cn";
 
-export function ConversationNav({ onNavigate, query }: { onNavigate(href: string): void; query: string }) {
+export function ConversationNav({
+  onNavigate,
+  query,
+}: {
+  onNavigate(href: string): void;
+  query: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
-  const { conversations, loading, error, rename, remove, startNew } = useConversations();
+  const { conversations, loading, error, rename, remove, drop, startNew } =
+    useConversations();
+  const { exit } = useExit();
+  /** 지우기 요청이 성공해 나가는 움직임을 보이는 줄이다 */
+  const [leavingId, setLeavingId] = useState<string | null>(null);
+  /** 목록을 처음 읽어 왔을 때 있던 대화들이다. 여기 없는 줄만 새 줄로 보고 등장 움직임을 준다 */
+  const [initialIds, setInitialIds] = useState<Set<string> | null>(null);
+  if (initialIds === null && !loading && !error)
+    setInitialIds(new Set(conversations.map((item) => item.id)));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
@@ -37,7 +63,10 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
   const lastDeleteId = useRef<string | null>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const visible = conversations.filter((item) =>
-    (item.title || "새 대화").toLocaleLowerCase("ko-KR").includes(normalizedQuery));
+    (item.title || "새 대화")
+      .toLocaleLowerCase("ko-KR")
+      .includes(normalizedQuery),
+  );
 
   function beginEdit(conversation: Conversation) {
     renameChosen.current = true;
@@ -56,7 +85,11 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
       await rename(conversation.id, title);
       setActionError(null);
     } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : "대화 이름을 바꾸지 못했어요.");
+      setActionError(
+        reason instanceof Error
+          ? reason.message
+          : "대화 이름을 바꾸지 못했어요.",
+      );
     }
   }
 
@@ -67,12 +100,20 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
     try {
       await remove(id);
       setActionError(null);
-      if (pathname === `/chat/${id}`) {
-        startNew();
-        router.push("/");
-      }
+      // 요청이 성공한 뒤에만 줄을 흐리게 하고 뺀다. 실패하면 줄이 그대로 남는다.
+      setLeavingId(id);
+      exit(() => {
+        drop(id);
+        setLeavingId(null);
+        if (pathname === `/chat/${id}`) {
+          startNew();
+          router.push("/");
+        }
+      });
     } catch (reason) {
-      setActionError(reason instanceof Error ? reason.message : "대화를 지우지 못했어요.");
+      setActionError(
+        reason instanceof Error ? reason.message : "대화를 지우지 못했어요.",
+      );
     } finally {
       // 성공이든 실패든 창을 닫는다. 실패한 까닭은 목록 위 알림에 보인다.
       setDeleting(false);
@@ -82,109 +123,209 @@ export function ConversationNav({ onNavigate, query }: { onNavigate(href: string
 
   return (
     <nav aria-label="대화 목록" className="min-h-0 flex-1 overflow-y-auto px-2">
-      {actionError ? <p role="alert" className="mb-2 px-2 text-sm text-destructive">{actionError}</p> : null}
+      {actionError ? (
+        <p role="alert" className="mb-2 px-2 text-sm text-destructive">
+          {actionError}
+        </p>
+      ) : null}
       {loading ? (
-        <div aria-label="대화 목록을 읽고 있어요" className="flex flex-col gap-2 px-1">
-          <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" />
+        <div
+          aria-label="대화 목록을 읽고 있어요"
+          className="flex flex-col gap-2 px-1"
+        >
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
         </div>
       ) : error ? (
         <p className="px-2 text-sm text-muted-foreground">{error}</p>
       ) : visible.length === 0 ? (
-        <p className="px-2 text-sm text-muted-foreground">{normalizedQuery ? "맞는 대화가 없어요" : "아직 대화가 없어요."}</p>
+        <p className="px-2 text-sm text-muted-foreground">
+          {normalizedQuery ? "맞는 대화가 없어요" : "아직 대화가 없어요."}
+        </p>
       ) : (
         groupByDate(visible, new Date()).map((group) => (
           <section key={group.label} className="mb-5">
-            <h2 className="px-2 py-2 text-xs font-medium text-muted-foreground">{group.label}</h2>
+            <h2 className="px-2 py-2 text-xs font-medium text-muted-foreground">
+              {group.label}
+            </h2>
             <ol className="flex flex-col gap-0.5">
               {group.items.map((conversation) => {
                 const title = conversation.title || "새 대화";
-                return <li key={conversation.id} className="group relative flex min-w-0 items-center">
-                  {editingId === conversation.id ? (
-                    <input autoFocus aria-label="대화 이름" data-rename-input="" value={editValue}
-                      onChange={(event) => setEditValue(event.target.value)}
-                      onBlur={() => void finishEdit(conversation)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          cancelledEdit.current = true;
-                          setEditingId(null);
-                        } else if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-                          event.preventDefault();
-                          event.currentTarget.blur();
-                        }
-                      }}
-                      className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-2 text-sm" />
-                  ) : (
-                    <Link href={`/chat/${conversation.id}`} onClick={(event) => {
-                      // 사진을 먼저 올리며 주소만 바뀐 경우 같은 대화로 다시 이동하지 않는다.
-                      if (window.location.pathname === `/chat/${conversation.id}`) event.preventDefault();
-                      onNavigate(`/chat/${conversation.id}`);
+                return (
+                  <li
+                    key={conversation.id}
+                    data-leaving={leavingId === conversation.id || undefined}
+                    className={cn(
+                      "group relative flex min-w-0 items-center",
+                      initialIds !== null &&
+                        !initialIds.has(conversation.id) &&
+                        "animate-message-assistant",
+                    )}
+                    onAnimationEnd={(event) => {
+                      // 한 번 움직인 줄은 처음 있던 줄로 친다. 검색으로 걸러졌다 다시 나타나도 다시 움직이지 않는다.
+                      // 줄 안의 다른 animation 이 끝난 것은 건너뛴다.
+                      if (event.target !== event.currentTarget) return;
+                      setInitialIds((ids) =>
+                        ids === null || ids.has(conversation.id)
+                          ? ids
+                          : new Set(ids).add(conversation.id),
+                      );
                     }}
-                      aria-current={pathname === `/chat/${conversation.id}` ? "page" : undefined}
-                      className={cn("flex min-w-0 flex-1 items-center rounded-md px-2 py-2 text-sm hover:bg-accent",
-                        pathname === `/chat/${conversation.id}` && "bg-accent font-medium")}
-                      title={title}>
-                      <span className="min-w-0 flex-1 truncate">{title}</span>
-                      <NavPending />
-                    </Link>
-                  )}
-                  {/* 모달로 두면 열린 동안 body 의 pointer-events 가 꺼져, 메뉴 바깥을 누른 첫 클릭이 그 자리에 닿지 않는다. 바깥을 누르면 닫히는 것은 모달이 아니어도 같다. */}
-                  <DropdownMenu modal={false}>
-                    <DropdownMenuTrigger asChild>
-                      <TooltipButton label={`${title} 메뉴`}
-                        ref={(node) => { if (node) menuButtons.current.set(conversation.id, node); else menuButtons.current.delete(conversation.id); }}
-                        className={cn("hover:bg-accent aria-expanded:bg-accent focus:opacity-100",
-                          "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:aria-expanded:opacity-100")}>
-                        <Ellipsis aria-hidden="true" />
-                      </TooltipButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" aria-label={`${title} 메뉴`}
-                      onInteractOutside={() => { menuInteractedOutside.current = true; }}
-                      onCloseAutoFocus={(event) => {
-                        // Radix 의 기본 되돌리기는 Tooltip 을 연다. 직접 되돌리되 기본 동작처럼 바깥을 눌러 닫았으면
-                        // 그쪽 초점을 두고, 이름 바꾸기를 골랐으면 입력칸의 초점을 둔다.
-                        event.preventDefault();
-                        const keepFocus = renameChosen.current || menuInteractedOutside.current;
-                        renameChosen.current = false;
-                        menuInteractedOutside.current = false;
-                        if (!keepFocus) focusWithoutTooltip(menuButtons.current.get(conversation.id));
-                      }}>
-                      <DropdownMenuItem onSelect={() => beginEdit(conversation)}>이름 바꾸기</DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => {
-                        lastDeleteId.current = conversation.id;
-                        setDeleteTarget(conversation);
-                        setActionError(null);
-                      }}>지우기</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </li>;
+                  >
+                    {editingId === conversation.id ? (
+                      <input
+                        autoFocus
+                        aria-label="대화 이름"
+                        data-rename-input=""
+                        value={editValue}
+                        onChange={(event) => setEditValue(event.target.value)}
+                        onBlur={() => void finishEdit(conversation)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            cancelledEdit.current = true;
+                            setEditingId(null);
+                          } else if (
+                            event.key === "Enter" &&
+                            !event.nativeEvent.isComposing
+                          ) {
+                            event.preventDefault();
+                            event.currentTarget.blur();
+                          }
+                        }}
+                        className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-2 text-sm"
+                      />
+                    ) : (
+                      <Link
+                        href={`/chat/${conversation.id}`}
+                        onClick={(event) => {
+                          // 사진을 먼저 올리며 주소만 바뀐 경우 같은 대화로 다시 이동하지 않는다.
+                          if (
+                            window.location.pathname ===
+                            `/chat/${conversation.id}`
+                          )
+                            event.preventDefault();
+                          onNavigate(`/chat/${conversation.id}`);
+                        }}
+                        aria-current={
+                          pathname === `/chat/${conversation.id}`
+                            ? "page"
+                            : undefined
+                        }
+                        className={cn(
+                          "flex min-w-0 flex-1 items-center rounded-md px-2 py-2 text-sm hover:bg-accent",
+                          pathname === `/chat/${conversation.id}` &&
+                            "bg-accent font-medium",
+                        )}
+                        title={title}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{title}</span>
+                        <NavPending />
+                      </Link>
+                    )}
+                    {/* 모달로 두면 열린 동안 body 의 pointer-events 가 꺼져, 메뉴 바깥을 누른 첫 클릭이 그 자리에 닿지 않는다. 바깥을 누르면 닫히는 것은 모달이 아니어도 같다. */}
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <TooltipButton
+                          label={`${title} 메뉴`}
+                          ref={(node) => {
+                            if (node)
+                              menuButtons.current.set(conversation.id, node);
+                            else menuButtons.current.delete(conversation.id);
+                          }}
+                          className={cn(
+                            "hover:bg-accent aria-expanded:bg-accent focus:opacity-100",
+                            "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:aria-expanded:opacity-100",
+                          )}
+                        >
+                          <Ellipsis aria-hidden="true" />
+                        </TooltipButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        aria-label={`${title} 메뉴`}
+                        onInteractOutside={() => {
+                          menuInteractedOutside.current = true;
+                        }}
+                        onCloseAutoFocus={(event) => {
+                          // Radix 의 기본 되돌리기는 Tooltip 을 연다. 직접 되돌리되 기본 동작처럼 바깥을 눌러 닫았으면
+                          // 그쪽 초점을 두고, 이름 바꾸기를 골랐으면 입력칸의 초점을 둔다.
+                          event.preventDefault();
+                          const keepFocus =
+                            renameChosen.current ||
+                            menuInteractedOutside.current;
+                          renameChosen.current = false;
+                          menuInteractedOutside.current = false;
+                          if (!keepFocus)
+                            focusWithoutTooltip(
+                              menuButtons.current.get(conversation.id),
+                            );
+                        }}
+                      >
+                        <DropdownMenuItem
+                          onSelect={() => beginEdit(conversation)}
+                        >
+                          이름 바꾸기
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            lastDeleteId.current = conversation.id;
+                            setDeleteTarget(conversation);
+                            setActionError(null);
+                          }}
+                        >
+                          지우기
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </li>
+                );
               })}
             </ol>
           </section>
         ))
       )}
-      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent
-          onEscapeKeyDown={(event) => { if (deleting) event.preventDefault(); }}
+          onEscapeKeyDown={(event) => {
+            if (deleting) event.preventDefault();
+          }}
           onCloseAutoFocus={(event) => {
             const id = lastDeleteId.current;
-            const button = id === null ? undefined : menuButtons.current.get(id);
+            const button =
+              id === null ? undefined : menuButtons.current.get(id);
             if (!button) return;
             event.preventDefault();
             focusWithoutTooltip(button);
-          }}>
+          }}
+        >
           <AlertDialogTitle>대화 지우기</AlertDialogTitle>
           <AlertDialogDescription className="text-foreground">
-            {deleteTarget?.title || "새 대화"} 를 목록에서 지워요. 사용량 기록은 남아요.
+            {deleteTarget?.title || "새 대화"} 를 목록에서 지워요. 사용량 기록은
+            남아요.
           </AlertDialogDescription>
           <AlertDialogFooter>
             {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}
             <AlertDialogCancel asChild>
-              <Button variant="outline" disabled={deleting}>취소</Button>
+              <Button variant="outline" disabled={deleting}>
+                취소
+              </Button>
             </AlertDialogCancel>
-            <Button variant="destructive" loading={deleting} loadingText="지우는 중"
-              onClick={() => void confirmDelete()}>지우기</Button>
+            <Button
+              variant="destructive"
+              loading={deleting}
+              loadingText="지우는 중"
+              onClick={() => void confirmDelete()}
+            >
+              지우기
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

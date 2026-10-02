@@ -1,5 +1,10 @@
 package com.bifos.assistant.memory.domain;
 
+import com.bifos.assistant.memory.domain.type.MemoryEntryType;
+import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -9,16 +14,28 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 
+/**
+ * Memory 한 줄이다. 칸의 뜻은 {@code docs/data-schema.md} 의 「memory」 가 갖는다(ADR-052).
+ *
+ * <p>{@code alwaysInject} 는 {@code retrieval} 로 옮겨 가는 옛 칸이다. 한 배포 동안 남기고 쓸 때마다 {@code retrieval}
+ * 과 맞춘다. 읽을 때는 {@code retrieval} 만 본다.
+ */
 @Entity
 @Table(name = "memory")
 @Getter
+@Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Memory {
+
+    /** 따로 정하지 않은 항목이 가는 collection 이다. 기존 Memory 가 모두 여기 있다. */
+    public static final String DEFAULT_COLLECTION = "core";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,14 +51,45 @@ public class Memory {
     @Column(name = "group_id")
     private Long groupId;
 
+    @Column(nullable = false, length = 64)
+    private String collection;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "entry_type", nullable = false, length = 20)
+    private MemoryEntryType entryType;
+
+    @Column(name = "document_key", length = 128)
+    private String documentKey;
+
     @Column(nullable = false, length = 200)
     private String title;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MemoryRetrieval retrieval;
+
     @Column(name = "always_inject", nullable = false)
     private boolean alwaysInject;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MemorySensitivity sensitivity;
+
+    /** 지금 값의 판 번호다. 1 에서 시작하고 고칠 때마다 1 씩 는다. */
+    @Column(nullable = false)
+    private int revision;
+
+    @Column(name = "source_type", length = 32)
+    private String sourceType;
+
+    @Column(name = "source_ref", length = 512)
+    private String sourceRef;
+
+    @Column(name = "source_date")
+    private LocalDate sourceDate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -65,33 +113,65 @@ public class Memory {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    private Memory(MemoryScope scope, Long ownerUserId, Long groupId, String title, String content,
-            boolean alwaysInject, MemoryStatus status, Long proposedByExecutionId) {
+    private Memory(
+            MemoryScope scope,
+            Long ownerUserId,
+            Long groupId,
+            String title,
+            String content,
+            MemoryPlacement placement,
+            MemoryStatus status,
+            Long proposedByExecutionId,
+            Instant now) {
         this.scope = scope;
         this.ownerUserId = ownerUserId;
         this.groupId = groupId;
         this.title = title;
         this.content = content;
-        this.alwaysInject = alwaysInject;
+        this.collection = placement.collection();
+        this.entryType = MemoryEntryType.MEMORY;
+        this.sensitivity = placement.sensitivity();
+        place(placement.retrieval());
+        this.revision = 1;
         this.status = status;
         this.proposedByExecutionId = proposedByExecutionId;
-        this.createdAt = Instant.now();
-        this.updatedAt = this.createdAt;
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
-    public static Memory accepted(MemoryScope scope, Long ownerUserId, Long groupId, String title,
-            String content, boolean alwaysInject, Long acceptedByUserId) {
-        Memory memory = new Memory(scope, ownerUserId, groupId, title, content, alwaysInject,
-                MemoryStatus.ACCEPTED, null);
+    public static Memory accepted(
+            MemoryScope scope,
+            Long ownerUserId,
+            Long groupId,
+            String title,
+            String content,
+            MemoryPlacement placement,
+            Long acceptedByUserId,
+            Instant now) {
+        Memory memory =
+                new Memory(scope, ownerUserId, groupId, title, content, placement, MemoryStatus.ACCEPTED, null, now);
         memory.acceptedByUserId = acceptedByUserId;
-        memory.acceptedAt = memory.createdAt;
+        memory.acceptedAt = now;
         return memory;
     }
 
-    public static Memory proposedUser(Long ownerUserId, String title, String content,
-            Long proposedByExecutionId, String proposalDedupKey) {
-        Memory memory = new Memory(MemoryScope.USER, ownerUserId, null, title, content, false,
-                MemoryStatus.PROPOSED, proposedByExecutionId);
+    public static Memory proposedUser(
+            Long ownerUserId,
+            String title,
+            String content,
+            Long proposedByExecutionId,
+            String proposalDedupKey,
+            Instant now) {
+        Memory memory = new Memory(
+                MemoryScope.USER,
+                ownerUserId,
+                null,
+                title,
+                content,
+                MemoryPlacement.core(MemoryRetrieval.SEARCH),
+                MemoryStatus.PROPOSED,
+                proposedByExecutionId,
+                now);
         memory.proposalDedupKey = proposalDedupKey;
         return memory;
     }
@@ -105,40 +185,47 @@ public class Memory {
     }
 
     /** 사람이 물린다. 주입되지 않는다. */
-    public void reject() {
+    public void reject(Instant at) {
         status = MemoryStatus.REJECTED;
-        updatedAt = Instant.now();
+        updatedAt = at;
     }
 
-    public void updateContentAndInjection(
-            String content, boolean alwaysInject, String updatedProposalDedupKey) {
+    /**
+     * 본문과 꺼내는 방식과 민감도를 고치고 판을 하나 올린다.
+     *
+     * <p>고치기 전의 값은 부르는 쪽이 {@link MemoryRevision#of} 로 먼저 남긴다.
+     *
+     * @throws IllegalArgumentException 민감 항목을 항상 싣게 하려 할 때. {@link MemoryPlacement#allows} 로 먼저 본다
+     */
+    public void revise(
+            String content,
+            MemoryRetrieval retrieval,
+            MemorySensitivity sensitivity,
+            String updatedProposalDedupKey,
+            Instant at) {
+        if (!MemoryPlacement.allows(retrieval, sensitivity)) {
+            throw new IllegalArgumentException("a sensitive memory cannot always be injected");
+        }
         this.content = content;
-        this.alwaysInject = alwaysInject;
+        this.sensitivity = sensitivity;
+        place(retrieval);
         if (proposalDedupKey != null) {
             proposalDedupKey = updatedProposalDedupKey;
         }
-        this.updatedAt = Instant.now();
+        this.revision += 1;
+        this.updatedAt = at;
     }
 
-    /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. */
+    /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. 그룹이 없는 사용자는 GROUP 항목을 보지 못한다. */
     public boolean isReadableBy(Long userId, Long groupId) {
         return scope == MemoryScope.USER
-                ? Objects.equals(ownerUserId, userId)
-                : Objects.equals(this.groupId, groupId);
+                ? userId != null && Objects.equals(ownerUserId, userId)
+                : groupId != null && Objects.equals(this.groupId, groupId);
     }
 
-    public Long id() { return id; }
-    public MemoryScope scope() { return scope; }
-    public Long ownerUserId() { return ownerUserId; }
-    public Long groupId() { return groupId; }
-    public String title() { return title; }
-    public String content() { return content; }
-    public boolean alwaysInject() { return alwaysInject; }
-    public MemoryStatus status() { return status; }
-    public Long proposedByExecutionId() { return proposedByExecutionId; }
-    public String proposalDedupKey() { return proposalDedupKey; }
-    public Long acceptedByUserId() { return acceptedByUserId; }
-    public Instant acceptedAt() { return acceptedAt; }
-    public Instant createdAt() { return createdAt; }
-    public Instant updatedAt() { return updatedAt; }
+    /** 꺼내는 방식을 적고 옛 칸을 같은 뜻으로 맞춘다. */
+    private void place(MemoryRetrieval retrieval) {
+        this.retrieval = retrieval;
+        this.alwaysInject = retrieval == MemoryRetrieval.ALWAYS;
+    }
 }

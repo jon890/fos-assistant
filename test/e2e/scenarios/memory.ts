@@ -21,7 +21,7 @@ type AgentToken = { id: number; token: string };
 const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
 
 /** 사용량 시나리오보다 먼저 Memory 권한과 주입 확인을 위해 실행하는 대화 수다. */
-export const MEMORY_CONTEXT_TURNS = 2;
+export const MEMORY_CONTEXT_TURNS = 3;
 
 export const memoryScenario: Scenario = {
   name: "Memory 공개 범위",
@@ -225,6 +225,81 @@ export const memoryScenario: Scenario = {
         await call(context, `/memories/${memory.id}`, { method: "DELETE", token: context.tokens.dad }),
         200,
         "긴 Memory 검사 정리",
+      );
+    }
+
+    step("같은 사용자와 같은 에이전트가 받는 Memory 구역은 항상 층 본문과 색인이 정해진 모양 그대로다");
+    // Memory 표를 넓히기 전의 코드가 낸 글과 글자 하나까지 같아야 한다. 표를 넓힌 뒤에도 이 검사가 그대로 통과한다.
+    const groupAlways = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "GROUP", title: "그룹 사실", content: "우리 그룹은 주말에 장을 본다", alwaysInject: true },
+      }),
+      200,
+      "항상 싣는 그룹 Memory 생성",
+    ).json<MemoryView>();
+    const userAlways = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "개인 사실", content: "아빠는 국수를 맵지 않게 먹는다", alwaysInject: true },
+      }),
+      200,
+      "항상 싣는 개인 Memory 생성",
+    ).json<MemoryView>();
+    const userIndexed = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "USER", title: "지원 이력", content: "색인으로만 실리는 본문", alwaysInject: false },
+      }),
+      200,
+      "색인에만 싣는 개인 Memory 생성",
+    ).json<MemoryView>();
+    const groupIndexed = expectStatus(
+      await call(context, "/memories", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { scope: "GROUP", title: "그룹 일정", content: "색인으로만 실리는 그룹 본문", alwaysInject: false },
+      }),
+      200,
+      "색인에만 싣는 그룹 Memory 생성",
+    ).json<MemoryView>();
+    expectStatus(
+      await call(context, "/chat/messages", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: { text: "Memory 구역 모양 검사", agentCode: "dad" },
+      }),
+      200,
+      "Memory 구역 모양을 보는 대화",
+    );
+    const expectedMemorySection = [
+      "# 우리 그룹이 함께 아는 것",
+      `- ${groupAlways.content}`,
+      "# 지금 묻는 사람에 대해 아는 것",
+      `- ${userAlways.content}`,
+      "# 더 물어볼 수 있는 것",
+      "아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.",
+      `- [${userIndexed.id}] ${userIndexed.title}`,
+      `- [${groupIndexed.id}] ${groupIndexed.title}`,
+    ].join("\n\n");
+    const shaped = context.hermes.lastSubmittedInstructions();
+    expect(shaped !== undefined, "Memory 구역 모양을 보는 요청에 instructions 가 없다");
+    expect(
+      shaped.includes(expectedMemorySection),
+      `Memory 구역이 정해진 모양과 다르다:\n${shaped}`,
+    );
+    expect(
+      !shaped.includes(userIndexed.content) && !shaped.includes(groupIndexed.content),
+      "색인에만 싣는 항목의 본문이 instructions 에 들어갔다",
+    );
+    for (const memory of [groupAlways, userAlways, userIndexed, groupIndexed]) {
+      expectStatus(
+        await call(context, `/memories/${memory.id}`, { method: "DELETE", token: context.tokens.dad }),
+        200,
+        "Memory 구역 모양 검사 정리",
       );
     }
 

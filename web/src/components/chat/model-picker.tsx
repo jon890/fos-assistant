@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronDown } from "lucide-react";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -511,6 +512,13 @@ export function ModelTierPicker({
           type="button"
           size="sm"
           variant={selectedTier === item.tier ? "secondary" : "ghost"}
+          aria-pressed={selectedTier === item.tier}
+          // 고른 단계는 옅은 강조 바탕으로 그린다.
+          className={cn(
+            "rounded-full",
+            selectedTier === item.tier &&
+              "bg-primary-soft text-primary-soft-foreground hover:bg-primary-soft",
+          )}
           disabled={disabled || state.loading || state.data === null || saving}
           data-testid={`model-tier-${item.tier.toLowerCase()}`}
           onClick={() => void choose(item.tier)}

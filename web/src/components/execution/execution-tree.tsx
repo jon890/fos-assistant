@@ -92,11 +92,19 @@ function anyNodeTruncated(node: ExecutionTreeNode): boolean {
   return node.truncated || node.children.some(anyNodeTruncated);
 }
 
+/**
+ * 나무를 그린다. `isAdmin` 이면 오류 코드와 도구 결과의 원본 같은 내부 값도 함께 그린다.
+ *
+ * <p>`showRuntime` 이면 노드마다 모델 제공사와 모델과 토큰을 그린다. 실행 상세가 관리자에게만 켠다.
+ * 대화 안 작업 과정은 켜지 않아 역할과 관계없이 단계 이름과 걸린 시간만 보인다.
+ */
 export function ExecutionTree({
   tree,
+  isAdmin,
   showRuntime = false,
 }: {
   tree: ExecutionTreeResponse;
+  isAdmin: boolean;
   showRuntime?: boolean;
 }) {
   // 나무의 truncated 가 참인데 그 안 어느 노드도 truncated 가 아니면, 아래쪽이 아니라 뿌리로
@@ -124,7 +132,12 @@ export function ExecutionTree({
     <>
       {aboveNotice}
       <ul className="min-w-0" data-testid="execution-tree">
-        <ExecutionNode node={tree.root} depth={0} showRuntime={showRuntime} />
+        <ExecutionNode
+          node={tree.root}
+          depth={0}
+          isAdmin={isAdmin}
+          showRuntime={showRuntime}
+        />
       </ul>
     </>
   );

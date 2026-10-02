@@ -1,8 +1,9 @@
 package com.bifos.assistant.context;
 
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -58,10 +59,28 @@ public class ContextAssembler {
      * <p>색인 층에 쓸 자리를 먼저 떼어 두고 항상 층을 담는다. 그러지 않으면 본문이 긴 항목 하나가
      * 상한을 거의 채워 색인이 통째로 빠지고, 색인이 없으면 {@code memory_read} 로 읽을 번호도
      * 사라져 에이전트가 나머지 Memory 에 닿을 길이 없어진다.
+     *
+     * <p>싣는 것은 요청자가 볼 수 있고 그 에이전트가 받는 collection 의 항목뿐이다(ADR-053). 커넥터 에이전트와
+     * 찾지 못한 에이전트는 아무것도 받지 않는다.
+     *
+     * @param agentId 이 실행을 도는 에이전트의 번호
      */
-    public AssembledContext assemble(CurrentUser user) {
-        List<Memory> always = memories.alwaysInjectedFor(user);
-        List<Memory> indexed = memories.indexedFor(user);
+    public AssembledContext assemble(CurrentUser user, Long agentId) {
+        return assemble(user, memories.accessOf(agentId));
+    }
+
+    /**
+     * 사용자가 자기 Memory 목록을 볼 때의 조립이다. collection 과 민감도를 거르지 않는다.
+     *
+     * <p>실행에 보내지 않는다. 목록에서 자리가 없어 빠질 항목에 표시를 다는 데만 쓴다.
+     */
+    public AssembledContext assembleForOwner(CurrentUser user) {
+        return assemble(user, MemoryAccess.owner());
+    }
+
+    private AssembledContext assemble(CurrentUser user, MemoryAccess access) {
+        List<Memory> always = memories.alwaysInjectedFor(user, access);
+        List<Memory> indexed = memories.indexedFor(user, access);
         long maxChars = properties.maxChars();
         long indexBudget = Math.min(indexLength(indexed), maxChars / properties.indexBudgetRatio());
 

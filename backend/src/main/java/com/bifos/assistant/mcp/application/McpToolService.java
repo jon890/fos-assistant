@@ -173,7 +173,8 @@ public class McpToolService {
     public Map<String, Object> readMemory(McpCaller caller, Long id) {
         CurrentUser user = caller.user();
         try {
-            Memory memory = memories.bodyFor(user, id);
+            Memory memory = memories.bodyFor(
+                    user, memories.accessOf(caller.originExecution().agentId()), id);
             log.info("memory read userId={} memoryId={} executionId={}", user.id(), id, caller.executionId());
             return result(memory.content(), false);
         } catch (ApiException ex) {

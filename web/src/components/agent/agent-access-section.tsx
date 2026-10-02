@@ -14,8 +14,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { describeError, describeFailure } from "@/components/error-message";
-import { GROUP_VISIBILITY, PRIVATE_VISIBILITY, type AdminAgent } from "@/lib/agent";
+import {
+  GROUP_VISIBILITY,
+  PRIVATE_VISIBILITY,
+  type AdminAgent,
+} from "@/lib/agent";
 
 type Visibility = AdminAgent["visibility"];
 
@@ -43,7 +48,13 @@ const DELETE_FAILURES: Record<string, string> = {
 };
 
 /** 지우기 확인 창이다. `VisibilityConfirm` 과 같이 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. */
-function DeleteConfirm({ name, busy, error, onCancel, onConfirm }: {
+function DeleteConfirm({
+  name,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+}: {
   name: string;
   busy: boolean;
   error: string | null;
@@ -51,22 +62,45 @@ function DeleteConfirm({ name, busy, error, onCancel, onConfirm }: {
   onConfirm(): void;
 }) {
   return (
-    <AlertDialog open onOpenChange={(open) => { if (!open && !busy) onCancel(); }}>
-      <AlertDialogContent onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}>
+    <AlertDialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onCancel();
+      }}
+    >
+      <AlertDialogContent
+        onEscapeKeyDown={(event) => {
+          if (busy) event.preventDefault();
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{name} 에이전트를 지울까요?</AlertDialogTitle>
           <AlertDialogDescription>
-            에이전트를 지우면 새 대화를 시작할 수 없어요. 지난 대화는 읽을 수 있어요.
+            에이전트를 지우면 새 대화를 시작할 수 없어요. 지난 대화는 읽을 수
+            있어요.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error ? <p role="alert" className="rounded-md bg-muted p-3 text-sm">{error}</p> : null}
+        {error ? (
+          <Notice variant="error" role="alert">
+            {error}
+          </Notice>
+        ) : null}
         <AlertDialogFooter>
           {/* AlertDialogCancel 로 두어야 Radix 가 창을 열 때 「취소」 에 초점을 준다. */}
           <AlertDialogCancel asChild>
-            <Button variant="outline" disabled={busy}>취소</Button>
+            <Button variant="outline" disabled={busy}>
+              취소
+            </Button>
           </AlertDialogCancel>
           {/* AlertDialogAction 은 누르는 즉시 창을 닫아, 지우기가 실패해도 창이 사라지므로 일반 Button 으로 둔다. */}
-          <Button variant="destructive" loading={busy} loadingText="지우는 중" onClick={onConfirm}>지우기</Button>
+          <Button
+            variant="destructive"
+            loading={busy}
+            loadingText="지우는 중"
+            onClick={onConfirm}
+          >
+            지우기
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -74,14 +108,22 @@ function DeleteConfirm({ name, busy, error, onCancel, onConfirm }: {
 }
 
 /** 에이전트를 관리하는 사람이 공개 범위를 바꾸고 에이전트를 지운다. */
-export function AgentAccessSection({ code, name, visibility, onVisibilityChange }: Props) {
+export function AgentAccessSection({
+  code,
+  name,
+  visibility,
+  onVisibilityChange,
+}: Props) {
   const router = useRouter();
   const [pending, setPending] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<"group" | "delete" | null>(null);
   const busy = pending !== null;
 
-  async function changeVisibility(next: Visibility, action: Action): Promise<boolean> {
+  async function changeVisibility(
+    next: Visibility,
+    action: Action,
+  ): Promise<boolean> {
     setPending(action);
     setError(null);
     try {
@@ -133,15 +175,26 @@ export function AgentAccessSection({ code, name, visibility, onVisibilityChange 
   }
 
   return (
-    <section aria-label="공개와 삭제" className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4">
+    <section
+      aria-label="공개와 삭제"
+      className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">공개와 삭제</h2>
-          <p className="mt-1 text-sm text-muted-foreground">그룹에 공개하거나 에이전트를 지울 수 있어요.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            그룹에 공개하거나 에이전트를 지울 수 있어요.
+          </p>
         </div>
-        <Badge variant="outline">{visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}</Badge>
+        <Badge variant="outline">
+          {visibility === PRIVATE_VISIBILITY ? "나만" : "그룹 공개"}
+        </Badge>
       </div>
-      {error && confirming === null ? <p role="alert" className="mt-4 rounded-md bg-muted p-3 text-sm">{error}</p> : null}
+      {error && confirming === null ? (
+        <Notice variant="error" role="alert" className="mt-4">
+          {error}
+        </Notice>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -149,17 +202,42 @@ export function AgentAccessSection({ code, name, visibility, onVisibilityChange 
           disabled={busy}
           loading={pending === "private"}
           loadingText="바꾸는 중"
-          onClick={() => visibility === PRIVATE_VISIBILITY ? setConfirming("group") : void changeVisibility(PRIVATE_VISIBILITY, "private")}
+          onClick={() =>
+            visibility === PRIVATE_VISIBILITY
+              ? setConfirming("group")
+              : void changeVisibility(PRIVATE_VISIBILITY, "private")
+          }
         >
-          {visibility === PRIVATE_VISIBILITY ? "그룹 공개로 변경" : "나만으로 변경"}
+          {visibility === PRIVATE_VISIBILITY
+            ? "그룹 공개로 변경"
+            : "나만으로 변경"}
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirming("delete")}>에이전트 지우기</Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => setConfirming("delete")}
+        >
+          에이전트 지우기
+        </Button>
       </div>
       {confirming === "group" ? (
-        <VisibilityConfirm name={name} busy={pending === "group"} error={error} onCancel={cancel} onConfirm={() => void confirmGroup()} />
+        <VisibilityConfirm
+          name={name}
+          busy={pending === "group"}
+          error={error}
+          onCancel={cancel}
+          onConfirm={() => void confirmGroup()}
+        />
       ) : null}
       {confirming === "delete" ? (
-        <DeleteConfirm name={name} busy={pending === "delete"} error={error} onCancel={cancel} onConfirm={() => void confirmDelete()} />
+        <DeleteConfirm
+          name={name}
+          busy={pending === "delete"}
+          error={error}
+          onCancel={cancel}
+          onConfirm={() => void confirmDelete()}
+        />
       ) : null}
     </section>
   );
