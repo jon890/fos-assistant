@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/shell/app-shell";
@@ -15,6 +15,11 @@ const pretendard = localFont({
 export const metadata: Metadata = {
   title: "우리집 비서",
   description: "함께 쓰는 AI 비서",
+};
+
+// 가상 키보드가 올라오면 레이아웃 뷰포트(h-dvh)가 줄어 입력창이 키보드 위에 남는다. 지원하지 않는 브라우저는 기본 동작 그대로다.
+export const viewport: Viewport = {
+  interactiveWidget: "resizes-content",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
