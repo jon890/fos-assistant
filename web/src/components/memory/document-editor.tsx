@@ -16,13 +16,12 @@ import {
  * <p>판 번호가 달라 거절돼도 폼을 닫지 않는다. 입력 칸에 사용자가 쓴 글이 그대로 남아 있어야 복사해 두고 다시 열 수 있다.
  */
 export function DocumentEditor({
-  document,
-  content,
+  opened,
   onSaved,
   onCancel,
 }: {
-  document: MemoryDocument;
-  content: string;
+  /** 사용자가 연 문서다. 보내는 판 번호와 처음 보이는 본문이 모두 이 값에서 온다. */
+  opened: MemoryDocumentDetail;
   onSaved(saved: MemoryDocumentDetail): Promise<void>;
   onCancel(): void;
 }) {
@@ -38,10 +37,10 @@ export function DocumentEditor({
     setError(undefined);
     setConflict(false);
     try {
-      const result = await updateDocument(document.id, {
+      const result = await updateDocument(opened.id, {
         content: String(form.get("content")),
         sensitive: form.get("sensitive") === "on",
-        expectedRevision: document.revision,
+        expectedRevision: opened.revision,
       });
       if (!result.ok) {
         setError(result.message);
@@ -70,7 +69,7 @@ export function DocumentEditor({
       {/* Textarea 의 기본 field-sizing-content 는 rows 를 무시하므로 고정으로 되돌린다. */}
       <Textarea
         name="content"
-        defaultValue={content}
+        defaultValue={opened.content}
         required
         rows={8}
         maxLength={12000}
@@ -81,7 +80,7 @@ export function DocumentEditor({
         <input
           name="sensitive"
           type="checkbox"
-          defaultChecked={document.sensitive}
+          defaultChecked={opened.sensitive}
           className="accent-primary"
         />
         민감한 내용이에요. 암호화해서 저장해요

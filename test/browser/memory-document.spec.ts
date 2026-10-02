@@ -87,6 +87,43 @@ test("그사이 바뀐 문서는 다시 열게 하고 쓰던 글을 남긴다", 
   await expect(item.getByText("그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.")).toBeVisible();
   await expect(item.getByText("쓰던 글은 아래 입력 칸에 그대로 있어요.", { exact: false })).toBeVisible();
   await expect(item.getByRole("textbox")).toHaveValue("평문-표식-2202");
+
+  // 안내대로 취소하고 닫았다 다시 열면 새 판을 읽어 이어서 고칠 수 있다.
+  await item.getByRole("button", { name: "취소" }).click();
+  await item.getByRole("button", { name: "닫기" }).click();
+  await item.getByRole("button", { name: "열기" }).click();
+  await expect(item.getByText("평문-표식-2201")).toBeVisible();
+  await item.getByRole("button", { name: "고치기" }).click();
+  await item.getByRole("textbox").fill("평문-표식-2203");
+  await item.getByRole("button", { name: "저장" }).click();
+  await expect(item.getByText("3번째 판")).toBeVisible();
+  await expect(item.getByText("평문-표식-2203")).toBeVisible();
+  await removeDocument(page, title);
+});
+
+test("다른 곳에서 고친 문서는 목록을 다시 읽어도 연 본문의 판으로 보내 덮어쓰지 않는다", async ({ page }, testInfo) => {
+  const key = `stale-${testInfo.project.name}`;
+  const title = `오래된 본문 검사 ${testInfo.project.name}`;
+  const other = `stale-other-${testInfo.project.name}`;
+  const otherTitle = `다른 문서 ${testInfo.project.name}`;
+  await page.goto("/memory");
+  await createDocument(page, key, title, "평문-표식-5500", false);
+  const item = documentItem(page, title);
+  await item.getByRole("button", { name: "열기" }).click();
+  await expect(item.getByText("평문-표식-5500")).toBeVisible();
+
+  const documents = (await (await page.request.get("/api/memory-documents")).json()) as { id: number; documentKey: string }[];
+  const id = documents.find((document) => document.documentKey === key)?.id;
+  expect((await page.request.put(`/api/memory-documents/${id}`, { data: { content: "평문-표식-5501", sensitive: false, expectedRevision: 1 } })).ok()).toBe(true);
+
+  // 다른 문서를 만들어 이 탭이 목록을 다시 읽게 한다. 목록의 판은 2 가 되지만 열어 둔 본문은 1 판이다.
+  await createDocument(page, other, otherTitle, "평문-표식-5502", false);
+  await expect(item.getByText("2번째 판")).toBeVisible();
+  await item.getByRole("button", { name: "고치기" }).click();
+  await item.getByRole("textbox").fill("평문-표식-5503");
+  await item.getByRole("button", { name: "저장" }).click();
+  await expect(item.getByText("그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.")).toBeVisible();
+  await removeDocument(page, otherTitle);
   await removeDocument(page, title);
 });
 

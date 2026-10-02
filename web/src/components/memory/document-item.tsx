@@ -8,6 +8,7 @@ import {
   deleteDocument,
   openDocument,
   type MemoryDocument,
+  type MemoryDocumentDetail,
 } from "@/lib/memory-document";
 import { DocumentEditor } from "./document-editor";
 
@@ -21,8 +22,11 @@ export function DocumentItem({
   onChanged(): Promise<void>;
 }) {
   const { leaving, exit } = useExit();
-  /** 연 문서의 본문이다. 열기 전과 닫은 뒤에는 `null` 이라 화면의 상태에 본문이 남지 않는다. */
-  const [content, setContent] = useState<string | null>(null);
+  /**
+   * 연 문서다. 열기 전과 닫은 뒤에는 `null` 이라 화면의 상태에 본문이 남지 않는다.
+   * 고칠 때 보내는 판 번호는 목록의 값이 아니라 이 문서를 연 때의 값이다. 목록이 다시 읽혀도 본문과 판이 어긋나지 않는다.
+   */
+  const [opened, setOpened] = useState<MemoryDocumentDetail | null>(null);
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState<"open" | "remove" | null>(null);
   const [error, setError] = useState<string>();
@@ -32,7 +36,7 @@ export function DocumentItem({
     setError(undefined);
     const result = await openDocument(document.id);
     setPending(null);
-    if (result.ok) setContent(result.data.content);
+    if (result.ok) setOpened(result.data);
     else setError(result.message);
   }
 
@@ -50,7 +54,7 @@ export function DocumentItem({
   }
 
   function close() {
-    setContent(null);
+    setOpened(null);
     setEditing(false);
     setError(undefined);
   }
@@ -73,26 +77,25 @@ export function DocumentItem({
           {error}
         </p>
       ) : null}
-      {content !== null && editing ? (
+      {opened !== null && editing ? (
         <DocumentEditor
-          document={document}
-          content={content}
+          opened={opened}
           onCancel={() => setEditing(false)}
           onSaved={async (saved) => {
-            setContent(saved.content);
+            setOpened(saved);
             setEditing(false);
             await onChanged();
           }}
         />
       ) : (
         <>
-          {content !== null ? (
+          {opened !== null ? (
             <pre className="mt-3 max-w-full whitespace-pre-wrap break-words font-sans text-sm">
-              {content}
+              {opened.content}
             </pre>
           ) : null}
           <div className="mt-3 flex gap-2">
-            {content === null ? (
+            {opened === null ? (
               <Button
                 size="sm"
                 variant="outline"
