@@ -3,10 +3,13 @@
   "description": "저장소 쿼리를 실제 MySQL 8.4 에서 한 번씩 실행하는 검사를 둔다 — H2 로 도는 테스트는 MySQL 만 거절하는 쿼리를 통과시킨다",
   "status": "pending",
   "created_at": "2026-10-02",
-  "total_phases": 2,
+  "total_phases": 1,
   "current_phase": 1,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    }
   ]
 }
