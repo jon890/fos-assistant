@@ -46,7 +46,8 @@ class MemoryContentCipherTest {
     void ivDiffers() {
         MemoryContentCipher cipher = cipher();
 
-        assertThat(cipher.seal(PLAIN, "USER:7").content()).isNotEqualTo(cipher.seal(PLAIN, "USER:7").content());
+        assertThat(cipher.seal(PLAIN, "USER:7").content())
+                .isNotEqualTo(cipher.seal(PLAIN, "USER:7").content());
     }
 
     @Test
@@ -81,7 +82,8 @@ class MemoryContentCipherTest {
         StoredContent sealed = cipher.seal(PLAIN, "USER:7");
 
         assertThatThrownBy(() -> cipher.open(sealed.content(), "gone-1", "USER:7"))
-                .isInstanceOfSatisfying(ApiException.class,
+                .isInstanceOfSatisfying(
+                        ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE));
     }
 
@@ -92,19 +94,22 @@ class MemoryContentCipherTest {
 
         assertThat(cipher.enabled()).isFalse();
         assertThatThrownBy(() -> cipher.seal(PLAIN, "USER:7"))
-                .isInstanceOfSatisfying(ApiException.class,
+                .isInstanceOfSatisfying(
+                        ApiException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE));
     }
 
     @Test
     @DisplayName("옛 key 로 쓴 글을 풀고 새 글은 활성 key 로 쓴다")
     void rotation() {
-        MemoryContentCipher oldOnly = new MemoryContentCipher(new MemoryEncryptionProperties("old-1", "old-1:" + keyOf(1)));
+        MemoryContentCipher oldOnly =
+                new MemoryContentCipher(new MemoryEncryptionProperties("old-1", "old-1:" + keyOf(1)));
         MemoryContentCipher rotated = new MemoryContentCipher(
                 new MemoryEncryptionProperties("new-1", "old-1:" + keyOf(1) + ",new-1:" + keyOf(2)));
         StoredContent oldSealed = oldOnly.seal(PLAIN, "USER:7");
 
-        assertThat(rotated.open(oldSealed.content(), oldSealed.keyId(), "USER:7")).isEqualTo(PLAIN);
+        assertThat(rotated.open(oldSealed.content(), oldSealed.keyId(), "USER:7"))
+                .isEqualTo(PLAIN);
         assertThat(rotated.seal(PLAIN, "USER:7").keyId()).isEqualTo("new-1");
     }
 
@@ -131,12 +136,14 @@ class MemoryContentCipherTest {
 
         assertThatThrownBy(() -> new MemoryEncryptionProperties("short-1", "short-1:" + shortValue))
                 .isInstanceOf(IllegalArgumentException.class)
-                .message().doesNotContain(shortValue);
+                .message()
+                .doesNotContain(shortValue);
     }
 
     @Test
     @DisplayName("설정의 toString 은 key 값을 담지 않는다")
     void toStringHidesKeys() {
-        assertThat(new MemoryEncryptionProperties("test-1", TEST_KEYS).toString()).doesNotContain(KEY_VALUE);
+        assertThat(new MemoryEncryptionProperties("test-1", TEST_KEYS).toString())
+                .doesNotContain(KEY_VALUE);
     }
 }
