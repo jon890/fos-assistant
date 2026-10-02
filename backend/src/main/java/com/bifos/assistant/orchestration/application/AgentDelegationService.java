@@ -245,7 +245,8 @@ public class AgentDelegationService {
         if (!handoff.rowCreated()) {
             if (handoff.failure() instanceof DataIntegrityViolationException) {
                 // 같은 키를 다른 요청이 먼저 저장했다. 트랜잭션 밖에서 그 줄을 다시 읽는다.
-                return executions.findByDelegationKey(delegationKey.value())
+                return executions
+                        .findByDelegationKey(delegationKey.value())
                         .map(raced -> sameCall(user, origin, raced))
                         .orElseGet(() -> rejected(Failure.SUBMIT_FAILED, origin, "저장에 실패했고 다시 읽은 줄도 없다"));
             }
@@ -360,8 +361,10 @@ public class AgentDelegationService {
     private boolean stopDetached(AgentExecution execution) {
         Optional<Agent> found = agents.findById(execution.agentId());
         if (found.isEmpty()) {
-            log.warn("에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
-                    execution.id(), execution.agentId());
+            log.warn(
+                    "에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
+                    execution.id(),
+                    execution.agentId());
             return false;
         }
         try {
@@ -407,7 +410,10 @@ public class AgentDelegationService {
         Long parentId = origin.parentExecutionId();
         while (parentId != null && depth <= properties.maxDepth()) {
             depth++;
-            parentId = executions.findById(parentId).map(AgentExecution::parentExecutionId).orElse(null);
+            parentId = executions
+                    .findById(parentId)
+                    .map(AgentExecution::parentExecutionId)
+                    .orElse(null);
         }
         return depth;
     }

@@ -214,9 +214,7 @@ class RestartReconcilerTest {
         stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
 
         reconciler.claim();
-        assertThat(turns.markOf(conversation.id()))
-                .as("잡기만 한 뒤의 turn 표시")
-                .isEqualTo(new TurnMark(true, row.id()));
+        assertThat(turns.markOf(conversation.id())).as("잡기만 한 뒤의 turn 표시").isEqualTo(new TurnMark(true, row.id()));
         assertThat(stub.lookups()).as("잡기는 Hermes 를 부르지 않는다").isEmpty();
         reconciler.reconcile(LONG_WAIT);
 
@@ -605,9 +603,7 @@ class RestartReconcilerTest {
         reconciler.reconcile(SHORT_WAIT);
 
         AgentExecution saved = awaitStatus(row, ExecutionStatus.FAILED);
-        assertThat(saved.errorCode())
-                .as("Hermes 의 답은 받았으므로 닿지 못한 것이 아니다")
-                .isEqualTo("RECONCILE_TIMEOUT");
+        assertThat(saved.errorCode()).as("Hermes 의 답은 받았으므로 닿지 못한 것이 아니다").isEqualTo("RECONCILE_TIMEOUT");
         awaitIdle(conversation.id());
         assertThat(stub.stopped()).as("이미 끝난 run 에는 중지를 보내지 않는다").isEmpty();
     }
@@ -651,7 +647,9 @@ class RestartReconcilerTest {
                 .hermesRunId("run-" + UUID.randomUUID())
                 .costMode(CostMode.SUBSCRIPTION)
                 .status(ExecutionStatus.SUCCEEDED)
-                .timing(Instant.now().minus(Duration.ofMinutes(2)), Instant.now().minus(Duration.ofMinutes(1)))
+                .timing(
+                        Instant.now().minus(Duration.ofMinutes(2)),
+                        Instant.now().minus(Duration.ofMinutes(1)))
                 .build());
         AgentExecution child = executions.save(AgentExecution.builder()
                 .userId(dad.id())
@@ -753,9 +751,7 @@ class RestartReconcilerTest {
         reconciler.start();
 
         assertThatThrownBy(() -> reconciler.claim()).isInstanceOf(IllegalStateException.class);
-        assertThat(turns.markOf(conversation.id()).running())
-                .as("먼저 잡은 줄의 잠금")
-                .isTrue();
+        assertThat(turns.markOf(conversation.id()).running()).as("먼저 잡은 줄의 잠금").isTrue();
         reconciler.resumeAfterStart();
 
         awaitStatus(claimedRow, ExecutionStatus.SUCCEEDED);
@@ -799,7 +795,9 @@ class RestartReconcilerTest {
                 .hermesRunId("run-" + UUID.randomUUID())
                 .costMode(CostMode.SUBSCRIPTION)
                 .status(ExecutionStatus.SUCCEEDED)
-                .timing(Instant.now().minus(Duration.ofMinutes(2)), Instant.now().minus(Duration.ofMinutes(1)))
+                .timing(
+                        Instant.now().minus(Duration.ofMinutes(2)),
+                        Instant.now().minus(Duration.ofMinutes(1)))
                 .build());
         return executions.save(AgentExecution.builder()
                 .userId(dad.id())
@@ -892,10 +890,7 @@ class RestartReconcilerTest {
     /** 그 run 을 적어도 {@code count} 번 물을 때까지 기다린다. 되풀이해 묻고 있다는 것을 본 뒤에 단언하려고 쓴다. */
     private void awaitLookups(AgentExecution row, int count) {
         awaitUntil(
-                () -> stub.lookups().stream()
-                                .filter(row.hermesRunId()::equals)
-                                .count()
-                        >= count,
+                () -> stub.lookups().stream().filter(row.hermesRunId()::equals).count() >= count,
                 "run " + row.hermesRunId() + " 을 " + count + "번 묻지 않았다");
     }
 

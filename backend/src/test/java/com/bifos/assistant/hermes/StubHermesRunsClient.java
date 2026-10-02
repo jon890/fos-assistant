@@ -12,12 +12,12 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * 실제 Hermes Runtime 없이 Control Plane 을 검사하는 대역이다.
@@ -45,6 +45,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     /** 세션 조회가 답할 값이다. 비어 있으면 읽지 못한 것으로 본다. */
     private volatile SessionRuntime sessionRuntime;
+
     private final List<String> sessionLookups = new CopyOnWriteArrayList<>();
 
     private final Map<String, Deque<HermesRunLookup>> lookupAnswers = new ConcurrentHashMap<>();
@@ -143,8 +144,13 @@ public class StubHermesRunsClient implements HermesRunsClient {
         }
     }
 
-    public void onStop(Consumer<String> action) { this.onStop = action; }
-    public List<String> stopped() { return stopped; }
+    public void onStop(Consumer<String> action) {
+        this.onStop = action;
+    }
+
+    public List<String> stopped() {
+        return stopped;
+    }
 
     public void reset() {
         received.clear();

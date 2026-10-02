@@ -286,10 +286,7 @@ public class RestartReconciler implements SmartLifecycle {
                     throw ex;
                 }
                 // 이 클래스가 잡지 않은 잠금이다. 그 turn 이 닫힐 때 다음 turn 이 정해지므로 잠금 없이 정한다.
-                log.warn(
-                        "다른 turn 이 잠금을 쥐고 있어 잡지 못했다 conversationId={} executionId={}",
-                        row.conversationId(),
-                        row.id());
+                log.warn("다른 turn 이 잠금을 쥐고 있어 잡지 못했다 conversationId={} executionId={}", row.conversationId(), row.id());
                 return null;
             }
             // 흐름 turn 의 자식 줄이면 뿌리 실행 번호를 붙인다. 사용자의 중지와 running 경로가 뿌리 번호로 찾는다.

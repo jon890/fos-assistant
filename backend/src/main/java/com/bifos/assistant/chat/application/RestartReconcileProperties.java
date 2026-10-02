@@ -13,7 +13,8 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.restart-reconcile")
-public record RestartReconcileProperties(@DefaultValue("true") boolean enabled, Duration maxWait) {
+public record RestartReconcileProperties(
+        @DefaultValue("true") boolean enabled, Duration maxWait) {
 
     /** 0 이하이면 기동을 멈춘다. 기동은 성공하는데 남은 실행이 모두 곧바로 실패로 적혀 알아채지 못한다. */
     public RestartReconcileProperties {
