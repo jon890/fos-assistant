@@ -89,6 +89,11 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
             problems.append("닫힌 위험도 %s 선언: %s" % (spec["risk"], tool))
         if spec.get("risk") != "READ" and not str(spec.get("title", "")).strip():
             problems.append("READ 가 아닌 도구에 title 이 없다: %s" % tool)
+        if spec.get("risk") != "READ":
+            if type(spec.get("outbound")) is not bool:
+                problems.append("READ 가 아닌 도구가 outbound 를 boolean 으로 선언하지 않았다: %s" % tool)
+            elif spec["outbound"] and spec.get("grant") is not False:
+                problems.append("outbound 가 참인 도구의 grant 가 false 가 아니다: %s" % tool)
 
     for field in declared.get("fields", []):
         env_name = str(field.get("env", "")).upper()
@@ -186,6 +191,16 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
     def test_write_tool_without_title_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["create_draft"].pop("title")))
         self.assert_reported(problems, "title")
+
+    def test_write_tool_without_outbound_is_reported(self):
+        problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["create_draft"].pop("outbound")))
+        self.assert_reported(problems, "outbound 를 boolean 으로 선언하지 않았다: create_draft")
+
+    def test_outbound_tool_with_open_grant_is_reported(self):
+        problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["send_message"].pop("grant")))
+        self.assert_reported(problems, "grant 가 false 가 아니다: send_message")
+        # plugin 의 검증도 같은 선언을 거절한다. 그 까닭이 위반 글에 든다.
+        self.assert_reported(problems, "manifest 검증 실패: outbound 가 참인 도구")
 
     def test_secret_field_not_marked_secret_is_reported(self):
         def mutate(value):
