@@ -15,6 +15,68 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | [`memory.md`](memory.md) | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection` |
 | [`connector.md`](connector.md) | `connector_connection`, `connector_action`, `connector_tool_grant` |
 
+## 마이그레이션 작성 규칙
+
+운영 MySQL 에서 마이그레이션 하나가 오류 1267(Illegal mix of collations)로 실패해 서비스가 내려간 적이 있다.
+H2 로 도는 검사는 모두 통과한 상태였다. 아래 규칙은 그 일에서 나왔다.
+
+### DDL 과 DML 을 한 파일에 섞지 않는다
+
+MySQL 의 DDL 은 되돌려지지 않는다.
+`ALTER TABLE` 뒤의 `INSERT` 가 실패하면 칸은 더해진 채 남고 Flyway 에는 실패한 줄이 남는다.
+그 상태에서는 이전 판의 애플리케이션도 뜨지 못한다.
+
+칸과 표와 색인을 바꾸는 파일과 줄을 넣고 고치는 파일을 번호를 달리해 나눈다.
+`V56__subagent_usage_ledger.sql` 과 `V57__subagent_usage_backfill.sql` 이 본보기다.
+나누면 DML 이 실패해도 앞의 DDL 파일은 성공한 것으로 남아, 실패한 줄 하나만 고쳐 다시 올릴 수 있다.
+
+### 다른 표의 문자열 칸을 비교할 때 정렬 규칙을 확인한다
+
+**표마다 정렬 규칙이 다르다.**
+운영 서버의 기본 정렬 규칙은 `utf8mb4_unicode_ci` 다.
+MySQL 8.4 의 `utf8mb4` 기본 정렬 규칙은 `utf8mb4_0900_ai_ci` 다.
+그래서 `CREATE TABLE` 에 `DEFAULT CHARSET = utf8mb4` 를 적은 표는 `utf8mb4_0900_ai_ci` 가 되고,
+적지 않은 표는 서버 기본값인 `utf8mb4_unicode_ci` 가 된다.
+나중에 `ALTER TABLE` 로 더한 칸은 그 표의 정렬 규칙을 따른다.
+
+`utf8mb4_unicode_ci` 인 표는 여덟이다.
+`agent_token`, `chat_pending_message`, `execution_event`, `memory`, `model_hidden`,
+`model_tier_definition`, `model_tier_group_setting`, `subagent_usage_job`.
+나머지는 `utf8mb4_0900_ai_ci` 다.
+
+두 정렬 규칙의 칸을 `=`, `<>`, `IN`, 조인 조건으로 비교하면 MySQL 이 오류 1267 로 거절한다.
+줄이 하나도 없어도 거절한다.
+
+- 서로 다른 표의 문자열 칸을 비교하면 양쪽을 `CAST(... AS BINARY)` 로 감싼다.
+  바이트로 비교하므로 대소문자를 구분한다. 식별자 비교에만 쓴다
+- `COLLATE` 는 쓰지 않는다. H2 가 받지 않아 H2 로 도는 검사가 실패한다
+- 숫자 키로 조인할 수 있으면 문자열 비교를 쓰지 않는다
+- **새 표에는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다.**
+  적지 않으면 그 표가 `utf8mb4_unicode_ci` 로 생긴다. H2 도 이 구절을 받는다.
+  검사: `test/unit/migration-collation.test.ts`. V57 까지의 파일은 이미 적용돼 검사에서 뺀다
+
+애플리케이션의 쿼리도 같은 규칙에 걸린다. 두 표의 문자열 칸을 조인하는 JPQL 과 native 쿼리를 쓰면 실제 MySQL 검사로 확인한다.
+
+### 실제 MySQL 검사를 통과해야 한다
+
+```bash
+# cwd: 저장소 root
+scripts/check-mysql-migration.sh
+```
+
+Docker 로 일회용 MySQL 8.4 를 띄우고 `mysql` 태그가 붙은 검사를 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
+서버를 `--collation-server=utf8mb4_unicode_ci` 로 띄워 위의 정렬 규칙 섞임을 그대로 만든다.
+
+| 검사 | 확인하는 것 |
+| --- | --- |
+| `MysqlMigrationTest` | 빈 데이터베이스에서 Flyway 가 처음부터 끝까지 적용되고 Hibernate 의 `ddl-auto: validate` 가 통과한다. 두 정렬 규칙이 운영처럼 섞여 있다 |
+| `SubagentUsageLedgerMysqlMigrationTest` | 줄이 있는 상태에서 V55 부터 끝까지 적용되고 결과가 H2 와 같다 |
+| `MemorySourceUniqueMysqlMigrationTest` | 줄이 있는 `memory` 표에 V55 의 유일 색인이 만들어지고 결과가 H2 와 같다 |
+
+**줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
+H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다.
+`SubagentUsageLedgerMysqlMigrationTest` 가 본보기다.
+
 ## 모델 단계와 재조회
 
 선택의 우선순위와 초기값은 [모델 단계와 실행 기록](../../model-tiers.md)이 정한다.

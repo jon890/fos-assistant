@@ -5,6 +5,7 @@ import {
   type MemoryCollectionOption,
   type MemoryDocument,
 } from "@/components/memory/document-section";
+import { ImportSection } from "@/components/memory/import-section";
 import { MemoryList, type Memory } from "@/components/memory/memory-list";
 import { ServiceTokenPanel } from "@/components/memory/service-token-panel";
 import { callControlPlane } from "@/lib/control-plane";
@@ -36,6 +37,9 @@ export default async function MemoryPage() {
           initialTokens={tokens.data}
           collections={collections.data}
         />
+      ) : null}
+      {documents.ok && collections.ok ? (
+        <ImportSection collections={collections.data} />
       ) : null}
     </>
   );

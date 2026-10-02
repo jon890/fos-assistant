@@ -3,21 +3,31 @@
 이 서비스 밖에 쌓아 둔 개인 지식 저장소를 Memory 로 옮기는 일회성 절차를 만든다.
 결정과 계약은 `docs/adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md` 에 있다.
 
-**plan62-memory-document-screen 이 main 에 머지된 뒤에 시작한다.**
-순서는 민감 본문 암호화(이미 main 에 있다), 문서 API 와 서비스 토큰(plan61), 화면(plan62), 이 plan 이다.
-`backend/src/main/java/com/bifos/assistant/memory/presentation/MemoryDocumentController.java` 와 `web/src/components/memory/document-section.tsx` 가 없으면 `PHASE_BLOCKED: plan62 가 머지되지 않았다` 를 출력하고 멈춘다.
+## 상태
+
+phase 01 부터 04 까지는 구현을 마쳤고 그 phase 문서는 지웠다. 오래 남을 계약은 아래에 있다.
+
+| 구현한 것 | 어디에 남았나 |
+| --- | --- |
+| 결정 파일의 틀과 묶음을 만드는 스크립트, 보고서에서 읽는 칸 | `scripts/brain-import/README.md` |
+| 들이기 API 와 판정, 유일 제약 | `docs/backend/memory.md` 의 「기존 개인 지식을 들일 때」, `docs/backend/schema/memory.md` |
+| 화면 | `docs/frontend/structure.md`, `web/AGENTS.md` 의 「화면 문구」 |
+
+남은 것은 phase 05(신원 항목의 들이기를 연다)와 `remote-verification.md` 다.
+phase 05 는 운영에서 세 조건을 관측한 날짜가 지시문에 적혀 있어야 시작한다. 그 phase 를 끝내는 PR 이 이 디렉터리를 지운다.
+아래 표와 규칙은 phase 05 를 구현할 때도 걸리므로 남긴다.
 
 ## 단계와 이 plan 이 만드는 것
 
 | 단계 | 누가 | 이 plan 이 만드는가 |
 | --- | --- | --- |
 | 분석 | 지식 저장소의 분석기. 보고서 `report.json`(`schema_version` 1)을 만든다 | 만들지 않는다. 그 저장소에 이미 있다 |
-| 검토 | 주인이 결정 파일을 고친다 | 결정 파일의 틀을 만드는 명령(phase 01) |
-| 묶기 | 주인의 기기에서 도는 스크립트 | phase 01 |
-| 들이기 | 주인이 로그인한 `/memory` 화면 | backend(phase 02), 화면(phase 03), e2e 와 문서(phase 04) |
-| 신원 항목 열기 | 위가 운영에서 확인된 뒤 | phase 05 |
+| 검토 | 주인이 결정 파일을 고친다 | 결정 파일의 틀을 만드는 명령(구현했다) |
+| 묶기 | 주인의 기기에서 도는 스크립트 | 구현했다 |
+| 들이기 | 주인이 로그인한 `/memory` 화면 | backend, 화면, e2e 와 문서를 구현했다 |
+| 신원 항목 열기 | 위가 운영에서 확인된 뒤 | phase 05. 아직 구현 전이다 |
 
-분석기를 이 저장소에 다시 만들지 않는다. 이 저장소는 보고서의 모양만 안다(phase 01 의 「보고서에서 읽는 칸」).
+분석기를 이 저장소에 다시 만들지 않는다. 이 저장소는 보고서의 모양만 안다(`scripts/brain-import/README.md` 의 「보고서에서 읽는 칸」).
 분석과 dry-run 은 이미 있어 문서 API 보다 먼저 돌릴 수 있다. 실제로 들이는 길은 문서와 민감 경계가 준비된 뒤에만 연다. 그래서 이 plan 은 plan62 뒤에 시작한다.
 
 ## 지금 옮길 것
@@ -31,8 +41,8 @@
 
 ## PR 과 계획서 삭제
 
-- plan 하나를 PR 하나로 올린다. 계획서 디렉터리는 그 PR 의 마감 단계에서 지운다. phase 는 `tasks/` 를 바꾸지 않는다
-- 이 계획서와 ADR-058 은 구현보다 먼저 main 에 들어와 있다(루트 `AGENTS.md` 의 「머지는 PR 로 한다」 가 그 예외를 정한다). ADR-058 의 `status` 와 `docs/adr/INDEX.md` 는 「아직 구현 전이다」 로 적혀 있고 phase 04 가 그 글을 지운다
+- phase 05 는 phase 01 부터 04 와 따로 PR 을 올린다. 운영에서 관측해야 시작할 수 있기 때문이다. 그 PR 이 이 계획서 디렉터리를 지운다
+- ADR-058 의 `status` 와 `docs/adr/INDEX.md` 는 「신원 항목의 들이기는 아직 구현 전이다」 로 적혀 있고 phase 05 가 그 글을 지운다
 
 ## 모든 phase 에 걸리는 규칙
 
@@ -45,7 +55,6 @@
 - `memory` 가 `people` 과 `user` 를 import 하지 않게 한다. 순환이 된다
 - 화면 문구는 해요체로 쓰고 색과 간격은 테마 토큰을 쓴다(`web/AGENTS.md`). 부품은 `web/src/components/ui/` 에 있는 것을 쓴다
 - 기능 변경과 포맷을 한 커밋에 섞지 않는다
-- Flyway 번호는 phase 02 를 시작할 때 `origin/main` 의 가장 큰 번호 다음을 쓴다. 이 계획서는 그 번호를 `V<N>` 으로 적는다
 - 주석과 Javadoc 은 한국어로 쓴다
 
 ## 화면에서 쓰는 말
