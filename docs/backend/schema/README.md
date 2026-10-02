@@ -76,6 +76,7 @@ scripts/check-mysql-migration.sh
 ```
 
 Docker 로 일회용 MySQL 8.4 를 띄우고 `mysql` 태그가 붙은 검사를 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
+마이그레이션뿐 아니라 저장소 쿼리도 이 서버에서 실행한다. 그 검사는 [`backend/AGENTS.md`](../../../backend/AGENTS.md) 의 「저장소 쿼리는 실제 MySQL 에서도 실행한다」 가 갖는다.
 서버를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄운다. 정렬 규칙을 적지 않은 표가 생기면 그 표만 다른 정렬 규칙이 돼 검사가 실패한다.
 
 | 검사 | 확인하는 것 |

@@ -227,6 +227,25 @@ DDL 과 DML 을 나누는 규칙, 정렬 규칙, 실제 MySQL 검사는
 [`../docs/backend/schema/README.md`](../docs/backend/schema/README.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
 마이그레이션을 고쳤으면 저장소 root 에서 `scripts/check-mysql-migration.sh` 를 돌린다. Docker 가 있어야 한다.
 
+## 저장소 쿼리는 실제 MySQL 에서도 실행한다
+
+다른 테스트는 H2 에서 돌아 MySQL 만 거절하는 쿼리를 통과시킨다.
+실제로 정렬 규칙이 다른 두 표의 문자열 칸을 비교한 JPQL 이 운영에서만 오류 1267 로 실패했고, 그 쿼리를 쓰는 테스트는 저장소를 대역으로 바꿔 끼워 쿼리를 보내지 않았다.
+
+`RepositoryQueryMysqlTest` 가 Flyway 로 만든 실제 MySQL 스키마에서 모든 저장소 인터페이스가 선언한 메서드를 한 번씩 실행한다.
+인자는 타입에 맞춰 스스로 만든다. 줄이 없어도 MySQL 은 정렬 규칙 섞임, 없는 함수, 예약어, 문법 오류를 거절하므로 빈 표로 충분하다.
+`scripts/check-mysql-migration.sh` 가 마이그레이션 검사와 함께 돌린다.
+
+- **저장소에 메서드를 더하면 따로 할 일이 없다.** 검사가 저장소 빈을 스스로 찾는다
+- 인자를 만들지 못하는 타입이 나오면 검사가 실패한다. `RepositoryQuerySweep` 에 그 타입의 값을 더한다.
+  건너뛰게 하지 않는다. 건너뛴 메서드는 검사되지 않은 채 통과로 보인다
+- **저장소 인터페이스 밖에서 쿼리를 만들면 그 쿼리를 `RepositoryQueryMysqlTest` 에 직접 더한다.**
+  `Specification`, `EntityManager`, `JdbcTemplate` 이 그렇다. 지금은 `MemoryQueries` 의 조건 셋이 그렇게 들어 있다
+- 이 검사는 쿼리가 실행되는지만 본다. 줄에 따라 달라지는 결과는 H2 로 도는 테스트가 본다
+
+`CollationMixQueryMysqlTest` 는 정렬 규칙을 통일하기 전 스키마(V57)에서 같은 검사가 오류 1267 을 잡는다는 것을 단언한다.
+이 검사가 실패하면 위 검사가 그 종류의 결함을 더는 잡지 못한다는 뜻이다.
+
 ## 실행 기록
 
 `agent_execution` 한 줄은 실행이 끝난 뒤가 아니라 **시작할 때** 만들어진다.
