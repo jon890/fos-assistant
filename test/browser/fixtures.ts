@@ -525,6 +525,9 @@ function startControlPlane(
       DB_PASSWORD: "",
       SERVER_PORT: String(CONTROL_PLANE_PORT),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
+      // 민감 Memory 문서를 만드는 검사가 쓴다. 운영 값이 아니라 글자 0123456789abcdef0123456789abcdef 의 base64 다.
+      ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID: "test-1",
+      ASSISTANT_MEMORY_ENCRYPTION_KEYS: "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
       // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
       HERMES_PROFILE_KEY_DIR: keyDir,
