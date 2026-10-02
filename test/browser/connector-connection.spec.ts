@@ -399,9 +399,7 @@ test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", as
     .getByTestId("connector-tool")
     .filter({ hasText: "메모 쓰기" });
   await expect(write).toContainText("쓰기");
-  await expect(write).toContainText(
-    "승인 기능이 준비될 때까지 실행하지 않아요",
-  );
+  await expect(write).toContainText("실행 전에 물어봐요");
   await expect(
     page.getByTestId("connector-tool").filter({ hasText: "list_scopes" }),
   ).toContainText("바로 실행해요");
@@ -409,6 +407,152 @@ test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", as
     page.getByTestId("connector-tool").filter({ hasText: "purge_notes" }),
   ).toContainText("아직 쓸 수 없어요");
   await expect(page.getByTestId("connection-undeclared")).toHaveCount(0);
+});
+
+test("쓰기 도구라도 늘 승인을 받게 선언했으면 아직 쓸 수 없다고 보인다", async ({
+  page,
+}) => {
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({
+      json: [
+        {
+          ...demoConnector,
+          tools: [
+            {
+              name: "share_note",
+              title: "메모 공유",
+              risk: "WRITE",
+              approval: "ALWAYS",
+            },
+          ],
+        },
+      ],
+    }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: disconnected }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  const tool = page.getByTestId("connector-tool");
+  await expect(tool).toContainText("메모 공유");
+  await expect(tool).toContainText("아직 쓸 수 없어요");
+  await expect(tool).not.toContainText("실행 전에 물어봐요");
+});
+
+test("승인한 동작을 실행하는 중이면 해제가 거절되고 정해 둔 문구를 보인다", async ({
+  page,
+}) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.request().method() === "DELETE"
+      ? route.fulfill({
+          status: 409,
+          json: { code: "CONNECTOR_ACTION_EXECUTING", message: "raw upstream" },
+        })
+      : route.fulfill({ json: ready }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await page.getByRole("button", { name: "연결 해제" }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "승인한 동작을 실행하는 중이에요. 끝난 뒤 다시 시도해 주세요.",
+  );
+  await expect(page.getByText("raw upstream")).toHaveCount(0);
+  await expect(page.getByTestId("connection-status")).toHaveText("연결됨");
+});
+
+test("허락한 동작이 있으면 제목으로 보이고 다시 묻기를 누르면 거두고 줄이 사라진다", async ({
+  page,
+}) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: ready }),
+  );
+  await page.route("**/api/connector-grants", (route) =>
+    route.fulfill({
+      json: [
+        {
+          grantId: 31,
+          connectorId: DEMO_ID,
+          toolName: "write_note",
+          title: "메모 쓰기",
+          expiresAt: "2026-10-30T12:00:00Z",
+        },
+        {
+          grantId: 32,
+          connectorId: "other-connector",
+          toolName: "other_tool",
+          title: "다른 연결의 동작",
+          expiresAt: "2026-10-30T12:00:00Z",
+        },
+      ],
+    }),
+  );
+  let revokedPath = "";
+  await page.route("**/api/connector-grants/*", (route) => {
+    revokedPath = `${route.request().method()} ${new URL(route.request().url()).pathname}`;
+    return route.fulfill({ status: 204 });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+
+  const grants = page.getByTestId("connector-grants");
+  await expect(grants).toContainText("묻지 않고 실행하는 동작");
+  const row = grants.getByTestId("connector-grant");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("메모 쓰기");
+  await expect(row).toContainText("까지");
+  await expect(row).not.toContainText("write_note");
+  await expect(grants).not.toContainText("다른 연결의 동작");
+
+  await row.getByTestId("grant-revoke").click();
+  await expect(page.getByTestId("connector-grants")).toHaveCount(0);
+  expect(revokedPath).toBe("DELETE /api/connector-grants/31");
+});
+
+test("연결을 해제하면 허락 목록을 다시 읽어 거둔 허락이 사라진다", async ({
+  page,
+}) => {
+  let disconnectedNow = false;
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) => {
+    if (route.request().method() === "DELETE") {
+      disconnectedNow = true;
+      return route.fulfill({ json: disconnected });
+    }
+    return route.fulfill({ json: disconnectedNow ? disconnected : ready });
+  });
+  await page.route("**/api/connector-grants", (route) =>
+    route.fulfill({
+      json: disconnectedNow
+        ? []
+        : [
+            {
+              grantId: 31,
+              connectorId: DEMO_ID,
+              toolName: "write_note",
+              title: "메모 쓰기",
+              expiresAt: "2026-10-30T12:00:00Z",
+            },
+          ],
+    }),
+  );
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-grant")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "연결 해제" }).click();
+  await expect(page.getByTestId("connection-status")).toHaveText("연결 안 됨");
+  await expect(page.getByTestId("connector-grants")).toHaveCount(0);
+});
+
+test("허락한 동작이 없으면 그 제목을 보이지 않는다", async ({ page }) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: ready }),
+  );
+  let read = false;
+  await page.route("**/api/connector-grants", (route) => {
+    read = true;
+    return route.fulfill({ json: [] });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByTestId("connector-tool")).toHaveCount(3);
+  await expect.poll(() => read).toBe(true);
+  await expect(page.getByText("묻지 않고 실행하는 동작")).toHaveCount(0);
 });
 
 test("도구를 선언하지 않은 커넥터는 안내 한 줄을 보인다", async ({ page }) => {
@@ -420,7 +564,7 @@ test("도구를 선언하지 않은 커넥터는 안내 한 줄을 보인다", a
   );
   await page.goto(`/connections/${DEMO_ID}`);
   await expect(page.getByTestId("connector-tools-empty")).toHaveText(
-    "이 연결은 조회를 뺀 동작을 승인 기능이 준비될 때까지 실행하지 않아요.",
+    "이 연결은 조회를 뺀 모든 동작을 실행 전에 물어봐요.",
   );
   await expect(page.getByTestId("connector-tool")).toHaveCount(0);
 });

@@ -3,6 +3,8 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.StarterSuggestionService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.model.AutoTurnDelivery;
+import com.bifos.assistant.chat.application.model.AutoTurnResult;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -52,6 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -59,6 +62,7 @@ import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -78,6 +82,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ChatService {
     private static final int TITLE_LIMIT = 60;
+
+    /** 대화 목록 한 쪽의 상한이다. 웹이 더 크게 요청해도 이만큼만 읽는다. */
+    public static final int MAX_CONVERSATION_PAGE = 100;
 
     private final ConversationRepository conversations;
     private final ConversationSessions sessions;
@@ -104,6 +111,7 @@ public class ChatService {
     private final ModelTierService modelTiers;
     private final Clock clock;
     private final ChatPendingMessageRepository pendingMessages;
+    private final List<AutoTurnResultSource> resultSources;
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
@@ -156,12 +164,14 @@ public class ChatService {
     }
 
     /**
-     * 아직 전하지 않은 끝난 위임 결과를 모아 사용자의 질문 없이 turn 하나를 돌린다(ADR-040).
+     * 아직 전하지 않은 끝난 위임 결과와 승인한 동작의 결과를 모아 사용자의 질문 없이 turn 하나를 돌린다(ADR-040,
+     * ADR-050).
      *
      * <p>부르는 쪽이 그 대화의 turn 잠금을 이미 잡았다. 잠금을 잡기 전에 읽은 목록은 다른 자동 turn 이 이미 전했을 수
      * 있어 여기서 다시 읽는다. 비었으면 아무것도 남기지 않고 돌아간다.
      *
-     * <p>알림 줄 저장, 결과마다 전했다는 표시, 자동 turn 수 증가는 한 트랜잭션이다. 그 뒤 Hermes 가 실패해도 같은
+     * <p>알림 줄은 위임 결과에 한 줄, 그 밖의 결과마다 한 줄이다. 알림 줄 저장, 결과마다 전했다는 표시, 자동 turn 수
+     * 증가는 한 트랜잭션이다. 그 뒤 Hermes 가 실패해도 같은
      * 결과로 다시 깨우지 않는다. 같은 실패를 되풀이하지 않기 위해서다. 실패는 예외로 올라간다.
      *
      * @param owner 대화 주인. 요청이 없으므로 부르는 쪽이 사용자 행으로 만든다
@@ -170,13 +180,35 @@ public class ChatService {
     public void runDelegationResults(
             CurrentUser owner, Long conversationId, TurnCancellation.TurnHandle handle, Consumer<ChatEvent> onEvent) {
         List<AgentExecution> results = executionRepository.findUndeliveredResults(conversationId);
-        if (results.isEmpty()) {
+        List<AutoTurnDelivery> deliveries = new ArrayList<>();
+        List<String> notices = new ArrayList<>();
+        StringBuilder input = new StringBuilder();
+        if (!results.isEmpty()) {
+            Map<Long, Agent> resultAgents =
+                    agents.byIds(results.stream().map(AgentExecution::agentId).toList());
+            input.append(delegationInput(results, resultAgents));
+            notices.add(delegationNotice(results, resultAgents));
+        }
+        // 승인한 동작의 결과처럼 다른 패키지가 가진 결과를 같은 turn 에 모은다. 위임 결과가 없어도 돈다.
+        for (AutoTurnResultSource source : resultSources) {
+            List<AutoTurnResult> extra = source.undelivered(conversationId);
+            if (extra.isEmpty()) {
+                continue;
+            }
+            for (AutoTurnResult result : extra) {
+                if (!input.isEmpty()) {
+                    input.append("\n\n");
+                }
+                input.append(result.input());
+                notices.add(result.notice());
+            }
+            deliveries.add(new AutoTurnDelivery(
+                    source, extra.stream().map(AutoTurnResult::key).toList()));
+        }
+        if (notices.isEmpty()) {
             return;
         }
-        Map<Long, Agent> resultAgents =
-                agents.byIds(results.stream().map(AgentExecution::agentId).toList());
-        String input = delegationInput(results, resultAgents);
-        Routed routed = route(owner, conversationId, input, null, List.of());
+        Routed routed = route(owner, conversationId, input.toString(), null, List.of());
         if (routed.flow() != null) {
             // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
             // 깨우는 쪽이 거르는 것과 별개로 남긴다. 거르기와 잠금 사이에 에이전트의 흐름이 바뀌어도 흐름에 이 입력을 보내지 않는다.
@@ -184,8 +216,8 @@ public class ChatService {
             return;
         }
         List<Long> ids = results.stream().map(AgentExecution::id).toList();
-        TurnIntent intent = new TurnIntent.DelegationResults(ids, delegationNotice(results, resultAgents));
-        ChatTurn turn = runTurn(owner, routed, input, intent, onEvent, true, handle);
+        TurnIntent intent = new TurnIntent.DelegationResults(ids, notices, deliveries);
+        ChatTurn turn = runTurn(owner, routed, input.toString(), intent, onEvent, true, handle);
         onEvent.accept(
                 turn.cancelled()
                         ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
@@ -917,15 +949,19 @@ public class ChatService {
             return;
         }
         if (intent instanceof TurnIntent.DelegationResults results) {
-            // 알림 줄이 곧 전했다는 표시다. 셋이 함께 남거나 함께 빠진다. 제목은 채우지 않는다.
-            ChatMessage notice = transactions.execute(status -> {
-                ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), results.notice()));
-                Instant deliveredAt = Instant.now();
+            // 알림 줄이 곧 전했다는 표시다. 알림 줄, 전했다는 표시, 자동 turn 수가 함께 남거나 함께 빠진다.
+            // 제목은 채우지 않는다.
+            List<ChatMessage> saved = transactions.execute(status -> {
+                List<ChatMessage> lines = results.notices().stream()
+                        .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice)))
+                        .toList();
+                Instant deliveredAt = Instant.now(clock);
                 results.executionIds().forEach(id -> executionRepository.markResultDelivered(id, deliveredAt));
+                results.deliveries().forEach(delivery -> delivery.source().markDelivered(delivery.keys(), deliveredAt));
                 conversations.incrementAutoTurns(conversation.id());
-                return saved;
+                return lines;
             });
-            onEvent.accept(ChatEvent.system(conversation.publicId(), notice.id(), results.notice()));
+            saved.forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
             return;
         }
         if (!(intent instanceof TurnIntent.Fresh fresh)) {
@@ -1187,8 +1223,34 @@ public class ChatService {
         return new RunningTurn(true, mark.executionId(), startedAt);
     }
 
-    public List<Conversation> conversationsOf(CurrentUser user) {
-        return conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user.id());
+    /**
+     * 사용자의 대화를 최근에 바뀐 것부터 한 쪽 읽는다.
+     *
+     * @param cursor 앞 쪽이 돌려준 {@code nextCursor}. 처음이면 null
+     * @param limit 한 쪽의 최대 개수. {@link #MAX_CONVERSATION_PAGE} 를 넘으면 그 값으로 줄인다
+     */
+    public ConversationPage conversationsOf(CurrentUser user, String cursor, int limit) {
+        int size = Math.clamp(limit, 1, MAX_CONVERSATION_PAGE);
+        // 한 줄을 더 읽어 다음 쪽이 있는지 안다. 개수를 한 쪽에 딱 맞게 읽으면 마지막 쪽에서도 빈 쪽을 한 번 더 부르게 된다.
+        PageRequest window = PageRequest.ofSize(size + 1);
+        List<Conversation> rows;
+        if (cursor == null) {
+            rows = conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(user.id(), window);
+        } else {
+            ConversationCursor from = ConversationCursor.decode(cursor);
+            rows = conversations.findPageAfter(user.id(), from.updatedAt(), from.id(), window);
+        }
+        if (rows.size() <= size) {
+            return new ConversationPage(rows, null);
+        }
+        List<Conversation> items = rows.subList(0, size);
+        return new ConversationPage(
+                items, ConversationCursor.of(items.getLast()).encode());
+    }
+
+    /** 사용자의 대화 한 줄을 읽는다. 없거나 남의 것이면 같은 응답으로 숨긴다. */
+    public Conversation conversationOf(CurrentUser user, UUID publicId) {
+        return access.requireOwn(user, publicId);
     }
 
     @Transactional

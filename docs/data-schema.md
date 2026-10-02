@@ -93,19 +93,19 @@ AI credential 은 Hermes profile 의 `.env` 에, profile 의 API server key 는 
 | `decided_at` | `DATETIME(6)` | 승인, 거절, 만료한 시각 |
 | `executed_at` | `DATETIME(6)` | 실행 결과를 적은 시각 |
 | `result_text` | `MEDIUMTEXT` | 실행 결과. 위임 답과 같은 상한으로 자른다 |
-| `error_code` | `VARCHAR(64)` | 공통 오류 어휘 넷과 `TIMEOUT` |
+| `error_code` | `VARCHAR(64)` | 공통 오류 어휘 넷과 `TIMEOUT`. 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `not_executable`(승인할 때 연결이 준비되지 않았거나 정책이 바뀜)이나 `connection_changed`(연결을 해제했거나 값을 다시 등록함)다 |
 | `result_delivered_at` | `DATETIME(6)` | 결과나 거절, 만료를 대화에 전한 시각. `agent_execution` 의 같은 이름 칸과 뜻이 같다 |
 | `created_at` | `DATETIME(6) NOT NULL` | |
 
 - 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다
-- 승인 엔진이 켜지기 전에는 `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 와 `args_json` 이 빈다. 그 호출은 막혀 실행되지 않는다
-- `(conversation_id, status)` 와 `(user_id, created_at)` 에 색인을 둔다
+- `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 가 `PENDING` 으로 시작하며 `args_json` 과 `expires_at` 을 갖는다. 승인 엔진이 켜지기 전에 남은 `NEEDS_APPROVAL` 줄은 `status` 와 `args_json` 이 비어 있어 승인 줄로 다루지 않는다
+- `(conversation_id, status)` 와 `(user_id, created_at)` 에 색인을 둔다. 만료 정리가 찾는 `(status, expires_at)`, 같은 실행의 같은 호출을 찾는 `(origin_execution_id, hermes_tool, args_sha256)`, 연결의 승인 줄을 찾는 `(user_id, connector_id, status)` 에도 둔다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다
 - 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
 
 ## connector_tool_grant
 
-사용자가 도구 하나에 준 상시 허락이다. 승인 엔진과 함께 들어온다.
+사용자가 도구 하나에 준 상시 허락이다. 승인하면서 기간을 골라 준다. 근거는 [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
@@ -219,11 +219,14 @@ V50 이 세 칸을 더했다. 값은 관리자가 화면에서 정하고 마이�
 | `model_provider` | VARCHAR(64) NULL | 이 대화에서 고른 provider. `model` 과 함께 채우거나 함께 비운다 |
 | `model` | VARCHAR(128) NULL | 이 대화에서 고른 모델. 비면 그 profile 의 기본 모델로 돈다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 대화에서 고른 effort. `low`, `medium`, `high`, `xhigh`, `max` 중 하나. 비면 그 profile 의 기본값이다 |
-| `updated_at` | DATETIME(6) | 목록 정렬에 쓴다 |
+| `updated_at` | DATETIME(6) | 목록 정렬에 쓴다. 같은 값이면 `id` 가 큰 쪽이 앞이다 |
 | `deleted_at` | DATETIME(6) NULL | 사용자가 지운 시각. 채워지면 목록과 조회와 보내기에서 없는 대화와 같다 |
 | `auto_turn_count` | INT NOT NULL DEFAULT 0 | 마지막 사용자 질문 뒤로 Control Plane 이 위임 결과를 전하려고 연 turn 수. 사용자 질문을 저장할 때 0 으로 돌린다. `assistant.delegation-wake.max-auto-turns`(기본 10)에 닿으면 더 깨우지 않는다 |
 
 `hermes_session_id` 가 특정 profile 안의 값이라, 대화의 에이전트는 중간에 바뀌지 않는다.
+
+색인은 `(user_id, deleted_at, updated_at, id)` 다(V51). 목록이 사용자의 지우지 않은 대화를 `updated_at desc, id desc` 로 쪽마다 읽는다.
+지운 대화가 쌓여도 한 쪽을 읽는 줄 수가 쪽 크기에 머문다.
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
 에이전트를 지우는 것은 `deleted_at` 을 적는 것이라 정상 경로에서는 행이 사라지지 않는다.

@@ -20,6 +20,7 @@ Hermes core 는 고치지 않는다.
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
+| `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 |
 | `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다. 설치는 plugin 의 스킬 본문을 그 profile 의 SOUL.md 에 쓴다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
@@ -170,6 +171,7 @@ PROBE_ROUTE_RE = re.compile(r"^/api/mcp/servers/([^/]+)/test$")
 CONNECTORS_PATH = "/api/connectors"
 CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
+EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
 
 PROFILES_PATH = "/api/profiles"
@@ -230,6 +232,9 @@ TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "requi
 TOOL_TITLE_MAX_CHARS = 80
 # Hermes 가 MCP 도구의 등록 이름에 허용하는 길이다. 넘으면 앞부분에 해시를 붙여 줄인다.
 HERMES_TOOL_NAME_MAX_CHARS = 64
+# 서버 이름으로 계산한 등록 이름의 앞부분(`mcp__<서버>__`)이 넘지 못하는 길이다.
+# 앞부분이 길면 등록 이름이 잘릴 때 앞부분까지 잘려, Control Plane 이 그 서버의 도구임을 알아보지 못한다.
+HERMES_TOOL_PREFIX_MAX_CHARS = 40
 # 설치가 연결용 profile 의 `SOUL.md` 에 쓰는 스킬 본문의 상한이다. Control Plane 의 성격 본문 상한과 같다.
 CONNECTOR_PERSONA_MAX_CHARS = 8000
 SOUL_FILE = "SOUL.md"
@@ -238,6 +243,8 @@ PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
 # 커넥터 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
 CONNECTOR_CALL_TIMEOUT_SECONDS = 10
 CONNECTOR_CALL_LIMIT = 4
+# 승인한 호출을 실행하는 경로의 시간 제한이다. 쓰기 도구는 확인 도구보다 오래 걸릴 수 있다.
+CONNECTOR_EXECUTE_TIMEOUT_SECONDS = 60
 # 커넥터 도구 호출이 기대는 mcp SDK 의 주 판이다. 다른 판은 결과 속성 이름이 달라 호출하지 않는다.
 MCP_SDK_MAJOR = 2
 # `_mcp_sdk_version` 이 한 번 읽은 판 문자열이다. 설치된 패키지는 프로세스가 도는 동안 바뀌지 않는다.
@@ -784,6 +791,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if (not SERVER_NAME_RE.match(mcp_server)
             or _canonical_server_name(mcp_server) == _canonical_server_name(CONTROL_PLANE_MCP)):
         raise ValueError("MCP 서버 이름이 올바르지 않다")
+    if len(_hermes_tool_name(mcp_server, "")) > HERMES_TOOL_PREFIX_MAX_CHARS:
+        raise ValueError("MCP 서버 이름이 길어 등록 이름의 앞부분이 %d자를 넘는다" % HERMES_TOOL_PREFIX_MAX_CHARS)
     if (not isinstance(server, dict) or set(server) - {"command", "args", "env"}
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):
         raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
@@ -1438,6 +1447,133 @@ async def _connector_call_request(request, connector_id: str):
     return JSONResponse(answer, status_code=200)
 
 
+async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, env: dict, progress: dict):
+    """커넥터 MCP 서버를 자식 프로세스로 한 번 띄워 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
+
+    등록 이름이 같은 도구가 정확히 하나가 아니거나, `schema: 2` 인데 그 도구가 선언에 없으면 부르지 않고 None 이다.
+    도구를 부르기 직전에 `progress["sent"]` 를 참으로 둔다. 그 뒤의 실패는 도구가 실행됐는지 알 수 없다.
+    """
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    server = manifest["server"]
+    params = StdioServerParameters(command=server["command"], args=list(server["args"]), env=env)
+    # 자식의 stderr 에 무엇이 찍힐지 모른다. profile 의 값과 인자가 대시보드 로그로 가지 않게 버린다.
+    with open(os.devnull, "w", encoding="utf-8") as sink:
+        async with stdio_client(params, errlog=sink) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                listed = await session.list_tools()
+                names = [item.name for item in listed.tools
+                         if _hermes_tool_name(manifest["mcp_server"], item.name) == hermes_tool]
+                if len(names) != 1 or (manifest["schema"] == 2 and names[0] not in manifest["tools"]):
+                    return None
+                progress["sent"] = True
+                return await session.call_tool(names[0], args)
+
+
+def _connector_execute_answer(manifest: dict, result) -> dict:
+    """실행 결과를 `{ok, result}` 나 `{ok, error}` 로 바꾼다.
+
+    오류 없이 끝났는데 구조화 결과도 JSON 텍스트도 없으면 첫 텍스트 칸의 글을 `{"text": ...}` 로 싣는다.
+    `call` 처럼 `unavailable` 로 답하면 이미 실행된 쓰기가 실패로 기록된다.
+    """
+    answer = _connector_call_answer(manifest, result)
+    if result.is_error or answer["ok"]:
+        return answer
+    text = next((item.text for item in result.content if item.type == "text"), "")
+    return {"ok": True, "result": {"text": text if isinstance(text, str) else ""}}
+
+
+async def _connector_execute_request(request, connector_id: str):
+    """Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다(ADR-050).
+
+    승인 여부는 다시 확인하지 않는다. 서비스 토큰을 가진 Control Plane 이 승인한 줄로만 부른다.
+    인자와 결과를 로그에 싣지 않는다.
+    실행되지 않은 것이 분명한 실패는 `{"ok": false}` 로, 실행됐는지 모르는 실패는 504 로 답한다.
+    Control Plane 이 앞의 것은 실패로, 뒤의 것은 결과를 모르는 것으로 읽어 다시 돌리지 않는다.
+    """
+    from starlette.responses import JSONResponse
+    global _connector_calls
+
+    def failed(word):
+        return JSONResponse({"ok": False, "error": word}, status_code=200)
+
+    manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
+    if manifest is None:
+        return _rejected("없는 connector 다", 404)
+    body = await _json_object(request)
+    if (body is None or set(body) != {"profile", "hermes_tool", "args"} or not isinstance(body["args"], dict)
+            or not isinstance(body["hermes_tool"], str) or not 1 <= len(body["hermes_tool"]) <= 128):
+        return _rejected("profile, hermes_tool, args 만 필요하다")
+    rejected = _profile_rejection(body["profile"], request)
+    if rejected is not None:
+        return rejected
+    hermes_tool = body["hermes_tool"]
+    try:
+        missing = _missing_profile(body["profile"])
+        if missing is not None:
+            return missing
+        from hermes_cli.profiles import get_profile_dir
+        profile_dir = get_profile_dir(body["profile"])
+        if not (profile_dir / MANAGED_MARKER).is_file():
+            return _rejected("관리 표식이 없는 profile 이다", 401)
+        state_path = profile_dir / CONNECTOR_STATE
+        # 기록을 검증하면서 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
+        state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.is_file() else {}
+        if connector_id not in state:
+            return _rejected("설치하지 않은 connector 다", 404)
+        env_path = profile_dir / ".env"
+        env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
+    except Exception as error:
+        # 자식을 띄우기 전이다. 실행되지 않았다. profile 의 값이 섞일 수 있어 예외의 종류만 남긴다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 를 실행할 profile 을 확인하지 못했다: %s",
+                       connector_id, type(error).__name__)
+        return failed("unavailable")
+    # 그 profile 의 값 가운데 이 커넥터의 칸만 넘긴다. 비운 선택 칸은 빈 문자열이다.
+    env = {field["env"]: _env_value(env_text, field["env"]) for field in manifest["fields"]}
+    server = manifest["server"]
+    env.update({name: server["env"][name] for name in manifest["operator_env"]})
+    # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
+    env["PATH"] = os.path.dirname(server["command"])
+
+    problem = _mcp_sdk_problem()
+    if problem is not None:
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+                       _mcp_sdk_version(), problem)
+        return failed("unavailable")
+
+    # `call` 과 한도를 함께 쓴다. 줄을 세우지 않는다.
+    if _connector_calls >= CONNECTOR_CALL_LIMIT:
+        logger.warning("dashboard-profile-api: 커넥터 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
+        return failed("unavailable")
+    _connector_calls += 1
+    progress = {"sent": False}
+    try:
+        # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
+        result = await asyncio.wait_for(
+            _run_connector_execute(manifest, hermes_tool, body["args"], env, progress),
+            CONNECTOR_EXECUTE_TIMEOUT_SECONDS)
+        answer = None if result is None else _connector_execute_answer(manifest, result)
+    except asyncio.TimeoutError:
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, hermes_tool)
+        return _rejected("도구가 시간 제한을 넘겨 실행 결과를 모른다", 504)
+    except Exception as error:
+        # 예외 본문에는 자식의 출력이 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 실행하지 못했다: %s (mcp SDK %s)",
+                       connector_id, hermes_tool, ", ".join(sorted(set(_leaf_error_types(error)))),
+                       _mcp_sdk_version())
+        if progress["sent"]:
+            # 도구 호출을 보낸 뒤다. 실행됐는지 알 수 없다.
+            return _rejected("도구 호출 뒤에 실패해 실행 결과를 모른다", 504)
+        return failed("unavailable")
+    finally:
+        _connector_calls -= 1
+    if answer is None:
+        return _rejected("실행할 수 없는 도구다")
+    return JSONResponse(answer, status_code=200)
+
+
 async def _check_connector_probe(request):
     """probe 는 그 profile 에 설치한 커넥터의 MCP 서버 이름일 때만 넘긴다."""
     rejected = await _check_skills_list(request)
@@ -1909,8 +2045,9 @@ def _install_gate() -> bool:
             return await asyncio.to_thread(_model_defaults_response, defaults_match.group(1))
 
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
+        execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
         if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
-                or (path == CATALOG_PATH and method == "GET") or call is not None):
+                or (path == CATALOG_PATH and method == "GET") or call is not None or execute is not None):
             principal, _ = seam.authenticate_token(request)
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
@@ -1919,6 +2056,9 @@ def _install_gate() -> bool:
             if call is not None:
                 # profile 쓰기 잠금 밖에서 돈다. 안에서 돌면 도구를 기다리는 동안 모든 profile 요청이 멈춘다.
                 return await _connector_call_request(request, call.group(1))
+            if execute is not None:
+                # `call` 과 같은 까닭으로 profile 쓰기 잠금 밖에서 돈다.
+                return await _connector_execute_request(request, execute.group(1))
             async with PROFILE_WRITE_LOCK:
                 return await _connector_request(request)
 

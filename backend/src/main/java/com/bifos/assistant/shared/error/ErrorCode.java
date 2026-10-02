@@ -153,6 +153,12 @@ public enum ErrorCode {
     CONNECTOR_OPERATION_FAILED(HttpStatus.BAD_GATEWAY),
     /** 선택지 조회, 등록, 연결 확인이 사용자별 호출 제한을 넘었다. 외부를 부르지 않고 거절한다. */
     CONNECTOR_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS),
+    /** 없는 승인 줄과 남의 승인 줄과 남의 상시 허락을 같은 응답으로 숨긴다. 관리자에게도 같다(ADR-050). */
+    CONNECTOR_ACTION_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 그 승인 줄은 이미 승인, 거절, 만료 가운데 하나로 끝났다. 같은 승인을 두 번 눌러도 실행은 한 번이다. */
+    CONNECTOR_ACTION_NOT_PENDING(HttpStatus.CONFLICT),
+    /** 그 연결에 승인해 실행을 보낸 호출이 아직 끝나지 않았다. 끝난 뒤에 다시 등록하거나 해제한다(ADR-050). */
+    CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);

@@ -336,7 +336,7 @@ class ChatAttachmentTurnTest {
 
         assertRejected(() -> chat.send(dad, null, "새 대화", "dad", List.of(photo.id())));
 
-        assertThat(conversations.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(dad.id()))
+        assertThat(chat.conversationsOf(dad, null, 100).items())
                 .extracting(Conversation::id)
                 .containsExactly(existing);
     }

@@ -153,6 +153,14 @@ public final class ChatDtos {
             ModelSelectionMode modelSelectionMode,
             ModelTier modelTier) {}
 
+    /**
+     * 대화 목록의 한 쪽이다.
+     *
+     * @param items 최근에 바뀐 것부터 담은 대화
+     * @param nextCursor 다음 쪽을 읽을 때 {@code cursor} 로 넘기는 값. 마지막 쪽이면 null
+     */
+    public record ConversationPageView(List<ConversationView> items, String nextCursor) {}
+
     /** 옛 대화 번호로 찾은 대화의 공개 식별자다. 옛 링크를 새 주소로 넘길 때만 쓴다. */
     public record ConversationRefView(UUID id) {}
 
