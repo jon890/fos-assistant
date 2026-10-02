@@ -377,7 +377,7 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
               </Notice>
             ) : null}
           </section>
-          <ConnectorGrants connectorId={id} />
+          <ConnectorGrants connectorId={id} refreshKey={connection} />
           {status !== "DISCONNECTED" ? (
             <Button
               disabled={busy}

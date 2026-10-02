@@ -22,7 +22,14 @@ function formatExpires(value: string) {
  *
  * <p>허락이 없거나 읽지 못하면 아무것도 그리지 않는다. 도구의 원래 이름은 내부 값이라 그리지 않는다.
  */
-export function ConnectorGrants({ connectorId }: { connectorId: string }) {
+export function ConnectorGrants({
+  connectorId,
+  refreshKey,
+}: {
+  connectorId: string;
+  /** 바뀌면 허락 목록을 다시 읽는다. 연결 해제나 다시 등록처럼 허락이 사라질 수 있는 뒤에 올린다. */
+  refreshKey?: unknown;
+}) {
   const [grants, setGrants] = useState<ConnectorGrant[]>([]);
   const [revoking, setRevoking] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +45,7 @@ export function ConnectorGrants({ connectorId }: { connectorId: string }) {
     return () => {
       stale = true;
     };
-  }, [connectorId]);
+  }, [connectorId, refreshKey]);
 
   if (grants.length === 0) return null;
 
