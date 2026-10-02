@@ -73,10 +73,18 @@
 빼지 않으면 「가격을 찾지 못한 실행」 으로 세어져,
 아직 안 끝난 것과 가격을 모르는 것이 한 숫자에 섞인다.
 
-기동할 때 `RUNNING` 으로 남아 있는 줄은 `FAILED` 로 바꾸고
-`error_code` 를 `ORPHANED` 로 적는다.
-이 Control Plane 은 한 대만 도므로 기동 시점에 돌고 있는 실행이 없다.
-이렇게 끝난 줄은 사용량 목록에서 「중간에 끊김」으로 보인다.
+기동할 때 `RUNNING` 으로 남아 있는 줄은 Hermes 에 물어 정한다.
+절차는 [`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」 가 갖는다.
+그 경로가 실패로 적을 때 쓰는 `error_code` 는 넷이다.
+
+| `error_code` | 뜻 |
+| --- | --- |
+| `ORPHANED` | run 번호가 없어 묻지 못했다. 흐름 turn 의 뿌리도 이 값이다 |
+| `REMOTE_RUN_LOST` | Hermes 가 그 run 을 모른다(404) |
+| `RECONCILE_TIMEOUT` | 상한까지 끝나지 않아 중지를 보냈다 |
+| `RECONCILE_UNREACHABLE` | 상한까지 Hermes 에 한 번도 닿지 못했다 |
+
+넷 모두 사용량 목록에서 「중간에 중단됨」 으로 보인다.
 
 ## execution_event
 
@@ -207,4 +215,4 @@ profile 플러그인이 `subagent_start` hook 에서 등록한다. 근거는 [AD
 
 하위 에이전트의 하위 에이전트는 부모 등록의 `origin_execution_id` 와 `user_id` 를 그대로 잇는다. 하위 에이전트 몫의 `agent_execution` 줄은 만들지 않는다. 하위 에이전트는 지금처럼 `execution_event` 의 `SUBAGENT_STARTED`, `SUBAGENT_COMPLETED` 로 보인다.
 
-Control Plane 이 다시 뜨면 도는 실행은 `ORPHANED` 로 끝나지만 등록 줄은 그대로다. 이미 등록한 하위 에이전트는 계속 요청자를 찾는다. 다시 뜬 뒤 그 부모 run 이 새로 만든 최상위 자식은 도는 부모가 없어 등록되지 않는다.
+Control Plane 이 다시 떠도 등록 줄은 그대로다. 이미 등록한 하위 에이전트는 계속 요청자를 찾는다. 기동 정리가 다시 붙은 실행은 `RUNNING` 으로 남아 있어 그 run 이 새로 만든 최상위 자식도 등록된다. 실패로 적힌 실행의 run 이 새로 만든 최상위 자식은 도는 부모가 없어 등록되지 않는다.
