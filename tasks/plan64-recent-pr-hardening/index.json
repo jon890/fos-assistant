@@ -3,12 +3,38 @@
   "description": "최근 PR 정합성 보완 — 허락 목록 화면, 실행 기록의 모델 출처, 모델 숨김의 실행 강제, turn 잠금 문서를 실제 동작과 맞춘다",
   "status": "pending",
   "created_at": "2026-10-02",
-  "total_phases": 4,
+  "total_phases": 6,
   "current_phase": 1,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
-    { "number": 4, "file": "phase-04.md", "execution_profile": "fast" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "fast"
+    },
+    {
+      "number": 5,
+      "file": "phase-05.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "execution_profile": "standard"
+    }
   ]
 }

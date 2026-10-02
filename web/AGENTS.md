@@ -93,7 +93,7 @@ grep -rn 'style={{' web/src/
 | 실행 나무 | 작업 과정 |
 | 하위 에이전트 | 도우미 |
 | 설정 지문 | 설정별 사용량. 비교는 「설정 차이」, 값은 「설정 구분값」 |
-| provider | 모델 제공사 |
+| provider | 모델 제공사. 값은 `providerLabel()` 이 준 표시 이름으로 그린다. provider id 원문은 화면에 그리지 않는다 |
 | Hermes API 주소 | 에이전트 연결 주소 |
 | credential 범위 | AI 계정 사용 범위 |
 | Hermes profile | profile (관리 화면에서만) |
