@@ -1,4 +1,4 @@
-## ADR-059: reasoning effort 의 지원은 Hermes 가 알린 것만 확인으로 보이고 모르면 미확인으로 둔다
+## ADR-060: reasoning effort 의 지원은 Hermes 가 알린 것만 확인으로 보이고 모르면 미확인으로 둔다
 
 - **status**: `accepted`.
 - **결정**: 모델마다 reasoning 지원과 reasoning 끄기(`none`) 지원을 각각 `SUPPORTED`, `UNSUPPORTED`, `UNKNOWN` 셋으로 나눠 API 와 화면에 싣는다.

@@ -88,7 +88,7 @@ public class HermesModelClient {
         if (models.isEmpty()) {
             return null;
         }
-        // 모든 모델에 항목을 만든다. Hermes 가 밝히지 않은 칸은 UNKNOWN 으로 두고 참으로 채우지 않는다(ADR-059).
+        // 모든 모델에 항목을 만든다. Hermes 가 밝히지 않은 칸은 UNKNOWN 으로 두고 참으로 채우지 않는다(ADR-060).
         Map<String, ReasoningCapability> reasoning = new LinkedHashMap<>();
         JsonNode capabilities = row.get("capabilities");
         boolean hasCapabilities = capabilities != null && capabilities.isObject();

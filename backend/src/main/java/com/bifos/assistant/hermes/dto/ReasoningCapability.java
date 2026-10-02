@@ -1,7 +1,7 @@
 package com.bifos.assistant.hermes.dto;
 
 /**
- * 한 모델의 reasoning 지원과 reasoning 끄기 지원이다(ADR-059).
+ * 한 모델의 reasoning 지원과 reasoning 끄기 지원이다(ADR-060).
  *
  * <p>Hermes 가 밝힌 값만 {@code SUPPORTED} 나 {@code UNSUPPORTED} 로 두고, 밝히지 않은 칸은 {@code UNKNOWN} 이다.
  * 우리가 없는 값을 참으로 채우지 않는다.

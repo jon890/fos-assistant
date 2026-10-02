@@ -56,7 +56,7 @@ type ModelOptions = {
   reasoningEfforts: string[];
 };
 
-/** 지원 여부다. Hermes 가 밝히지 않았으면 `UNKNOWN` 이다(ADR-059) */
+/** 지원 여부다. Hermes 가 밝히지 않았으면 `UNKNOWN` 이다(ADR-060) */
 type Support = "SUPPORTED" | "UNSUPPORTED" | "UNKNOWN";
 
 type ReasoningCapability = { support: Support; disable: Support };
@@ -213,7 +213,7 @@ export function ModelPicker({
     optionsState.status === "loaded" ? optionsState.options : null;
   const pickedModel = parseModelKey(draftModel);
   const capability = capabilityOf(options, pickedModel);
-  // 지원 미확인도 고르게 둔다. 막으면 고를 수 있는 것을 못 고르게 된다(ADR-059).
+  // 지원 미확인도 고르게 둔다. 막으면 고를 수 있는 것을 못 고르게 된다(ADR-060).
   const effortEnabled = capability.support !== "UNSUPPORTED";
   const effortUnknown =
     options !== null && effortEnabled && capability.support === "UNKNOWN";

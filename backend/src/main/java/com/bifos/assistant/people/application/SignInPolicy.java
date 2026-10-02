@@ -26,4 +26,13 @@ public class SignInPolicy {
         }
         return people.findByEmailAndEnabledTrue(AllowedPerson.normalizeEmail(email));
     }
+
+    /** 그 주소의 줄이 꺼져 있는가. 줄이 없으면 거짓이다(ADR-059). */
+    @Transactional(readOnly = true)
+    public boolean revoked(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return people.existsByEmailAndEnabledFalse(AllowedPerson.normalizeEmail(email));
+    }
 }

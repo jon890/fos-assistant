@@ -24,7 +24,7 @@ public record ModelChoice(String provider, String model, String reasoningEffort)
     /** 고를 수 있는 effort 다. 낮은 것부터 적는다. */
     public static final List<String> REASONING_EFFORTS = List.of("low", "medium", "high", "xhigh", "max");
 
-    /** reasoning 을 끄는 effort 다. 그 모델의 끄기 지원을 확인해야 저장한다(ADR-059). */
+    /** reasoning 을 끄는 effort 다. 그 모델의 끄기 지원을 확인해야 저장한다(ADR-060). */
     public static final String EFFORT_NONE = "none";
 
     /**

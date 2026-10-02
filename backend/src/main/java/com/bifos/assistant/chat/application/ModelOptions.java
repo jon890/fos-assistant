@@ -44,7 +44,7 @@ public record ModelOptions(
     }
 
     /**
-     * 그 모델에서 그 effort 를 고를 수 있는가. {@code none} 만 지원을 확인해야 한다(ADR-059).
+     * 그 모델에서 그 effort 를 고를 수 있는가. {@code none} 만 지원을 확인해야 한다(ADR-060).
      *
      * <p>{@code none} 은 그 모델의 끄기 지원이 {@code SUPPORTED} 이고 reasoning 지원이 {@code UNSUPPORTED} 가 아닐 때만
      * 참이다. 모델을 비웠으면 기본 모델로 판정하고, 기본 모델도 모르거나 목록에 없는 모델이면 거짓이다.
