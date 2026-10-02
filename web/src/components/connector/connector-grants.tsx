@@ -20,7 +20,8 @@ function formatExpires(value: string) {
 /**
  * 이 연결에서 묻지 않고 실행하게 허락한 동작을 보이고 허락을 거두게 한다.
  *
- * <p>허락이 없거나 읽지 못하면 아무것도 그리지 않는다. 도구의 원래 이름은 내부 값이라 그리지 않는다.
+ * <p>허락이 없으면 아무것도 그리지 않는다. 읽지 못하면 옛 허락을 지우고 읽지 못했다고 알리며 다시 확인하게 한다.
+ * 도구의 원래 이름은 내부 값이라 그리지 않는다.
  */
 export function ConnectorGrants({
   connectorId,
@@ -33,21 +34,31 @@ export function ConnectorGrants({
   const [grants, setGrants] = useState<ConnectorGrant[]>([]);
   const [revoking, setRevoking] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 마지막 읽기가 실패했는지다. 참이면 서버의 실제 허락을 알 수 없다 */
+  const [unavailable, setUnavailable] = useState(false);
+  /** 다시 확인을 누른 횟수다 */
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     let stale = false;
     void readConnectorGrants().then((result) => {
-      if (stale || !result.ok) return;
+      if (stale) return;
+      if (!result.ok) {
+        setGrants([]);
+        setUnavailable(true);
+        return;
+      }
       setGrants(
         result.data.filter((grant) => grant.connectorId === connectorId),
       );
+      setUnavailable(false);
     });
     return () => {
       stale = true;
     };
-  }, [connectorId, refreshKey]);
+  }, [connectorId, refreshKey, reloads]);
 
-  if (grants.length === 0) return null;
+  if (grants.length === 0 && !unavailable) return null;
 
   async function revoke(grantId: number) {
     if (revoking !== null) return;
@@ -64,6 +75,21 @@ export function ConnectorGrants({
   return (
     <section className="space-y-2" data-testid="connector-grants">
       <h2 className="text-sm font-semibold">묻지 않고 실행하는 동작</h2>
+      {unavailable ? (
+        <>
+          <Notice variant="warning" data-testid="connector-grants-unavailable">
+            허락 상태를 확인하지 못했어요.
+          </Notice>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="connector-grants-retry"
+            onClick={() => setReloads((count) => count + 1)}
+          >
+            다시 확인
+          </Button>
+        </>
+      ) : null}
       <ul className="space-y-2">
         {grants.map((grant) => (
           <li
