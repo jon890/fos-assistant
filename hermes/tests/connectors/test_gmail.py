@@ -888,6 +888,29 @@ class RecipientDisguiseTest(GmailCase):
 
         self.assertEqual(self.fake.seen(), [])
 
+    def test_combining_marks_in_the_subject_are_rejected_before_any_request(self):
+        self.rejected_everywhere([
+            # 앞 글자에 붙어 아무것도 그리지 않는 결합 문자(범주 Mn)다. 글자 결합 문자와 변이 선택자다.
+            {"subject": "s\u034ft"}, {"subject": "Hi\ufe0f"}, {"subject": "a\ufe00b"},
+            {"subject": "a\U000e0100b"}, {"subject": "a\u180bb"}, {"subject": "e\u0301"},
+            # 이모지 뒤여도 U+FE0F 를 겹쳐 쓰면 받지 않는다. 기호 바로 뒤의 하나만 받는다.
+            {"subject": "\u2764\ufe0f\ufe0f"}, {"subject": "\ufe0f"}, {"subject": "가\ufe0f"},
+        ])
+
+        self.assertEqual(self.fake.seen(), [])
+
+    def test_emoji_presentation_selector_after_a_symbol_in_the_subject_is_sent(self):
+        self.fake.on("POST", "/gmail/messages/send", 200, {"id": "sent-1", "threadId": "thread-2"})
+        for subject in ("생일 축하 \u2764\ufe0f", "\u263a\ufe0f 안녕", "Hello \u00e9 \ud55c\uae00"):
+            with self.subTest(subject=subject):
+                self.fake.requests.clear()
+
+                self.ok("send_message", to="a@example.com", subject=subject, body="b")
+
+                [request] = self.fake.seen("POST", "/gmail/messages/send")
+                _, parsed = self.sent_mail(request)
+                self.assertEqual(str(parsed["Subject"]).strip(), subject.strip())
+
     def test_blank_looking_letters_and_encoded_words_inside_an_address_are_rejected(self):
         self.rejected_everywhere([
             # 범주가 Cf 가 아니어도 빈칸처럼 보이는 글자다.
