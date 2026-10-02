@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.MessageRole;
+import com.bifos.assistant.chat.domain.ModelChoice;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
@@ -207,7 +208,9 @@ public class StarterSuggestionService {
         AgentExecution execution = null;
         try {
             String input = prompt(firstQuestions(user, agent));
-            execution = executions.startDetached(user, agent);
+            ModelChoice choice = ModelChoice.stored(
+                    agent.defaultModelProvider(), agent.defaultModel(), agent.defaultReasoningEffort());
+            execution = executions.startDetached(user, agent, choice);
             // 대화가 없는 실행이라 에이전트 기본 모델로 돈다. 비어 있으면 profile 의 값이다(ADR-054).
             HermesRunCommand command = new HermesRunCommand(
                     agent.hermesProfile(),
@@ -215,9 +218,9 @@ public class StarterSuggestionService {
                     input,
                     null,
                     null,
-                    agent.defaultModelProvider(),
-                    agent.defaultModel(),
-                    agent.defaultReasoningEffort());
+                    choice.provider(),
+                    choice.model(),
+                    choice.reasoningEffort());
             String runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
@@ -238,7 +241,7 @@ public class StarterSuggestionService {
             // 추천은 이미 만들어 캐시에 넣었다. 실행 줄을 끝내다 실패한 것을 만들기 실패로 번지게 하면 사용자는
             // 추천을 보는데 실행이 실패로 남고 재시도 시간 동안 다시 만들지 못한다. 그래서 로그만 남긴다.
             try {
-                executions.complete(execution, agent, result, null);
+                executions.complete(execution, agent, result, choice);
             } catch (RuntimeException ex) {
                 log.warn("추천은 만들었지만 실행 줄을 끝내지 못했다 executionId={}", execution.id(), ex);
             }

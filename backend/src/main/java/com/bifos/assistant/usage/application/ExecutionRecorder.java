@@ -169,6 +169,73 @@ public class ExecutionRecorder {
             DelegationKey delegationKey,
             ModelTier modelTier,
             Instant requestReceivedAt) {
+        return record(
+                user,
+                conversation,
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                context,
+                requested,
+                retryOfExecutionId,
+                hermesSessionId,
+                delegationKey,
+                modelTier,
+                requestReceivedAt,
+                effortSource(conversation, requested, modelTier));
+    }
+
+    /**
+     * 원래 실행에서 이어지는 실행을 RUNNING 으로 만들어 돌려준다. Memory 제안처럼 같은 대화에서 원래 실행의
+     * 값을 이어받아 도는 실행이 쓴다.
+     *
+     * <p>단계는 원래 실행 줄에서 복사하고, effort 출처도 원래 실행 줄에서 읽는다. 대화에서 다시 계산하면 그
+     * 사이 바뀐 대화의 선택이 섞인다. 보낸 effort 가 없으면 출처는 {@code UNKNOWN} 이다. 그래야 완료 뒤
+     * 보완이 그 줄을 찾는다.
+     *
+     * @param parent 원래 실행. 부모와 뿌리 실행 번호가 모두 이 실행이다
+     * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort
+     */
+    public AgentExecution startInheriting(
+            CurrentUser user, Conversation conversation, Agent agent, AgentExecution parent, ModelChoice requested) {
+        ReasoningEffortSource source;
+        if (requested.reasoningEffort() == null) {
+            source = ReasoningEffortSource.UNKNOWN;
+        } else if (parent.reasoningEffortSource() == ReasoningEffortSource.AGENT_DEFAULT) {
+            source = ReasoningEffortSource.AGENT_DEFAULT;
+        } else {
+            source = ReasoningEffortSource.REQUESTED;
+        }
+        return record(
+                user,
+                conversation,
+                agent,
+                parent.id(),
+                parent.id(),
+                ExecutionContextSnapshot.ofChars(0L),
+                requested,
+                null,
+                null,
+                null,
+                parent.modelTier(),
+                null,
+                source);
+    }
+
+    private AgentExecution record(
+            CurrentUser user,
+            Conversation conversation,
+            Agent agent,
+            Long parentExecutionId,
+            Long rootExecutionId,
+            ExecutionContextSnapshot context,
+            ModelChoice requested,
+            Long retryOfExecutionId,
+            String hermesSessionId,
+            DelegationKey delegationKey,
+            ModelTier modelTier,
+            Instant requestReceivedAt,
+            ReasoningEffortSource effortSource) {
         return executions.save(base(user, conversation, agent)
                 .hermesSessionId(hermesSessionId)
                 .delegationKey(delegationKey == null ? null : delegationKey.value())
@@ -178,7 +245,7 @@ public class ExecutionRecorder {
                 .provider(requested == null ? null : requested.provider())
                 .model(requested == null ? null : requested.model())
                 .reasoningEffort(requested == null ? null : requested.reasoningEffort())
-                .reasoningEffortSource(effortSource(conversation, requested, modelTier))
+                .reasoningEffortSource(effortSource)
                 .modelTier(modelTier)
                 .requestReceivedAt(requestReceivedAt)
                 .contextChars(context.contextChars())
@@ -192,11 +259,14 @@ public class ExecutionRecorder {
     /**
      * 속한 대화 없이 도는 실행을 RUNNING 으로 만들어 돌려준다.
      *
-     * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 뿌리, session, 모델 선택을 모두
-     * 비우고 문맥 글자 수는 0 으로 적는다.
+     * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 뿌리, session 을 비우고 문맥 글자
+     * 수는 0 으로 적는다. 보낸 모델 선택은 {@code requested} 로 적고, effort 가 있으면 출처는 에이전트
+     * 기본값이다.
+     *
+     * @param requested Hermes 에 보낸 provider, 모델, effort
      */
-    public AgentExecution startDetached(CurrentUser user, Agent agent) {
-        return start(user, null, agent, null, null, ExecutionContextSnapshot.ofChars(0L), null, null, null);
+    public AgentExecution startDetached(CurrentUser user, Agent agent, ModelChoice requested) {
+        return start(user, null, agent, null, null, ExecutionContextSnapshot.ofChars(0L), requested, null, null);
     }
 
     /** 제출 직후 run 번호를 붙인다. */

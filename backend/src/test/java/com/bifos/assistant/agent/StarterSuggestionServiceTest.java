@@ -30,6 +30,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Clock;
@@ -170,6 +171,50 @@ class StarterSuggestionServiceTest {
             assertThat(row.userId()).isEqualTo(DAD.id());
             assertThat(row.agentId()).isEqualTo(family.id());
             assertThat(row.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
+        });
+    }
+
+    @Test
+    @DisplayName("에이전트 기본값이 있으면 Hermes 에 보낸 세 값이 실행 줄에 적히고 출처는 AGENT DEFAULT 다")
+    void recordsSentAgentDefaultsOnRunRowWithAgentDefaultSource() {
+        family.changeDefaultModel("example-provider", "example-agent", "medium");
+        agents.save(family);
+        answerWith(json(FOUR));
+
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.provider()).isEqualTo("example-provider");
+            assertThat(command.model()).isEqualTo("example-agent");
+            assertThat(command.reasoningEffort()).isEqualTo("medium");
+        });
+        assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.provider()).isEqualTo("example-provider");
+            assertThat(row.model()).isEqualTo("example-agent");
+            assertThat(row.reasoningEffort()).isEqualTo("medium");
+            assertThat(row.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
+        });
+    }
+
+    @Test
+    @DisplayName("에이전트 기본값이 비면 Hermes 에 세 값을 보내지 않고 실행 줄의 세 값은 null 이며 출처는 UNKNOWN 이다")
+    void sendsNothingAndRecordsUnknownSourceWhenAgentHasNoDefaults() {
+        answerWith(json(FOUR));
+
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        assertThat(stub().received()).singleElement().satisfies(command -> {
+            assertThat(command.provider()).isNull();
+            assertThat(command.model()).isNull();
+            assertThat(command.reasoningEffort()).isNull();
+        });
+        assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.provider()).isNull();
+            assertThat(row.model()).isNull();
+            assertThat(row.reasoningEffort()).isNull();
+            assertThat(row.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
         });
     }
 

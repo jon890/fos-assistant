@@ -12,6 +12,8 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.ModelChoice;
+import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -24,11 +26,13 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import com.bifos.assistant.usage.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
@@ -44,6 +48,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = "assistant.memory.propose.enabled=true")
@@ -86,8 +91,12 @@ class MemoryProposerTest {
     @Autowired
     HermesRunsClient hermes;
 
+    @Autowired
+    TransactionTemplate transaction;
+
     private Agent agent;
     private Conversation conversation;
+    private AgentExecution parent;
 
     @BeforeEach
     void setUp() {
@@ -148,6 +157,103 @@ class MemoryProposerTest {
                     assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(child.id())))
                             .isEmpty();
                 });
+    }
+
+    @Test
+    @DisplayName("대화가 고른 단계로 돈 실행의 제안 실행은 같은 단계와 REQUESTED 로 남는다")
+    void proposalKeepsTierAndRequestedSourceOfRunChosenByConversationTier() {
+        assertProposalInherits(
+                ModelTier.BALANCED, false, ModelChoice.stored("example-provider", "example-balanced", "medium"));
+        assertThat(lastProposal()).satisfies(child -> {
+            assertThat(child.modelTier()).isEqualTo(ModelTier.BALANCED);
+            assertThat(child.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
+        });
+    }
+
+    @Test
+    @DisplayName("내 기본 단계나 그룹 기본 단계로 정해진 실행도 실행 줄은 단계와 REQUESTED 라 같은 모양으로 남는다")
+    void proposalKeepsTierAndRequestedSourceOfRunResolvedFromDefaultTier() {
+        assertProposalInherits(ModelTier.DEEP, false, ModelChoice.stored("example-provider", "example-deep", "high"));
+        assertThat(lastProposal()).satisfies(child -> {
+            assertThat(child.modelTier()).isEqualTo(ModelTier.DEEP);
+            assertThat(child.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
+        });
+    }
+
+    @Test
+    @DisplayName("단계 없이 에이전트 기본 effort 로 돈 실행의 제안 실행은 AGENT DEFAULT 로 남는다")
+    void proposalKeepsAgentDefaultSourceOfRunWithoutTier() {
+        assertProposalInherits(null, false, ModelChoice.stored("example-provider", "example-agent", "medium"));
+        assertThat(lastProposal()).satisfies(child -> {
+            assertThat(child.modelTier()).isNull();
+            assertThat(child.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
+        });
+    }
+
+    @Test
+    @DisplayName("단계 없이 대화가 직접 고른 effort 로 돈 실행의 제안 실행은 REQUESTED 로 남는다")
+    void proposalKeepsRequestedSourceOfRunWithEffortChosenByConversation() {
+        assertProposalInherits(null, true, ModelChoice.stored("example-provider", "example-agent", "high"));
+        assertThat(lastProposal()).satisfies(child -> {
+            assertThat(child.modelTier()).isNull();
+            assertThat(child.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
+        });
+    }
+
+    @Test
+    @DisplayName("보낸 effort 가 없으면 원래 실행 줄이 이미 보완됐어도 제안 실행의 출처는 UNKNOWN 이다")
+    void proposalWithoutSentEffortHasUnknownSourceEvenWhenRunWasBackfilled() {
+        assertProposalInherits(null, false, ModelChoice.stored("example-provider", "example-agent", null));
+        assertThat(lastProposal()).satisfies(child -> {
+            assertThat(child.modelTier()).isNull();
+            assertThat(child.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
+        });
+    }
+
+    /** 원래 실행을 만들어 두고 그 실행에서 제안 실행을 돌린다. Hermes 에 보낸 값이 {@code sent} 와 같은지도 본다. */
+    private void assertProposalInherits(ModelTier tier, boolean conversationChoosesEffort, ModelChoice sent) {
+        Conversation source = conversation;
+        if (conversationChoosesEffort) {
+            transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
+                    conversation.id(),
+                    USER.id(),
+                    sent.provider(),
+                    sent.model(),
+                    sent.reasoningEffort(),
+                    ModelSelectionMode.CUSTOM));
+            source = conversations.findById(conversation.id()).orElseThrow();
+        }
+        parent = recorder.start(
+                USER,
+                source,
+                agent,
+                null,
+                null,
+                ExecutionContextSnapshot.ofChars(0L),
+                sent,
+                null,
+                null,
+                null,
+                tier,
+                null);
+        ((StubHermesRunsClient) hermes)
+                .willReturn(HermesRunResult.of(
+                        "proposal", "new", "completed", "NONE", "model", "provider", TokenUsage.empty()));
+
+        proposer.proposeFrom(USER, source, agent, parent, "답", sent);
+
+        assertThat(((StubHermesRunsClient) hermes).received()).last().satisfies(command -> {
+            assertThat(command.provider()).isEqualTo(sent.provider());
+            assertThat(command.model()).isEqualTo(sent.model());
+            assertThat(command.reasoningEffort()).isEqualTo(sent.reasoningEffort());
+        });
+    }
+
+    private AgentExecution lastProposal() {
+        return executions.findAll().stream()
+                .filter(execution -> !execution.id().equals(parent.id()))
+                .findFirst()
+                .orElseThrow();
     }
 
     @Test
@@ -220,11 +326,7 @@ class MemoryProposerTest {
         ExecutionRecorder failingRecorder = mock(ExecutionRecorder.class);
         doThrow(new IllegalStateException("database unavailable"))
                 .when(failingRecorder)
-                .start(
-                        ArgumentMatchers.any(),
-                        ArgumentMatchers.any(),
-                        ArgumentMatchers.any(),
-                        ArgumentMatchers.any(),
+                .startInheriting(
                         ArgumentMatchers.any(),
                         ArgumentMatchers.any(),
                         ArgumentMatchers.any(),
