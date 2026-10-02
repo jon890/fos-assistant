@@ -14,12 +14,12 @@ import com.bifos.assistant.usage.application.ExecutionTreeService;
 import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.MonthlyCostDetail;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
 import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownView;
 import com.bifos.assistant.usage.presentation.UsageDtos.ExecutionView;
 import com.bifos.assistant.usage.presentation.UsageDtos.MonthlyCostView;
 import com.bifos.assistant.usage.presentation.UsageDtos.MySkillUsageView;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -74,24 +74,24 @@ public class UsageController {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
         CurrentUser user = currentUser.require();
         boolean internal = InternalValuePolicy.visibleTo(user);
-        List<AgentExecution> page = executions.findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(
-                user.id(), PageRequest.of(0, size));
+        List<AgentExecution> page =
+                executions.findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(user.id(), PageRequest.of(0, size));
         Set<Long> withChildren = idsHavingChildren(page);
         Map<Long, UUID> publicIds = conversationPublicIds(page);
         // 한 페이지의 실행 번호로 한 번에 읽는다. 줄마다 질의하지 않는다.
-        Map<Long, List<String>> skillNames =
-                skillUsage.skillNamesByExecution(page.stream().map(AgentExecution::id).toList());
+        Map<Long, List<String>> skillNames = skillUsage.skillNamesByExecution(
+                page.stream().map(AgentExecution::id).toList());
         // 에이전트도 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
-        Map<Long, Agent> agentsById = agents.byIds(page.stream().map(AgentExecution::agentId).toList());
+        Map<Long, Agent> agentsById =
+                agents.byIds(page.stream().map(AgentExecution::agentId).toList());
         return page.stream()
-                .map(execution ->
-                        ExecutionView.from(
-                                execution,
-                                agentsById.get(execution.agentId()),
-                                execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
-                                withChildren.contains(execution.id()),
-                                skillNames.getOrDefault(execution.id(), List.of()),
-                                internal))
+                .map(execution -> ExecutionView.from(
+                        execution,
+                        agentsById.get(execution.agentId()),
+                        execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
+                        withChildren.contains(execution.id()),
+                        skillNames.getOrDefault(execution.id(), List.of()),
+                        internal))
                 .toList();
     }
 
@@ -137,8 +137,8 @@ public class UsageController {
         if (page.isEmpty()) {
             return Set.of();
         }
-        return Set.copyOf(
-                executions.findParentIdsHavingChildren(page.stream().map(AgentExecution::id).toList()));
+        return Set.copyOf(executions.findParentIdsHavingChildren(
+                page.stream().map(AgentExecution::id).toList()));
     }
 
     /**
@@ -183,8 +183,7 @@ public class UsageController {
      * @param month {@code 2026-09} 형태의 대상 달. 없으면 이번 달
      */
     @GetMapping("/breakdown")
-    public BreakdownView breakdown(
-            @RequestParam String axis, @RequestParam(required = false) String month) {
+    public BreakdownView breakdown(@RequestParam String axis, @RequestParam(required = false) String month) {
         Long userId = currentUser.requireAdmin().id();
         YearMonth target = parseMonth(month);
         Instant from = target.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
@@ -194,25 +193,32 @@ public class UsageController {
 
     private List<BreakdownRow> rows(String axis, Long userId, Instant from, Instant to) {
         return switch (axis) {
-            case "agent" -> executions.sumByAgentBetween(userId, from, to).stream()
-                    .map(BreakdownRow::of)
-                    .toList();
-            case "model" -> executions.sumByModelBetween(userId, from, to).stream()
-                    .map(BreakdownRow::of)
-                    .toList();
-            case "day" -> executions.sumByDayBetween(userId, from, to).stream()
-                    .map(BreakdownRow::of)
-                    .toList();
-            case "fingerprint" -> executions.sumByFingerprintBetween(userId, from, to).stream()
-                    .map(BreakdownRow::of)
-                    .toList();
-            default -> throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "axis must be one of agent, model, day, fingerprint");
+            case "agent" ->
+                executions.sumByAgentBetween(userId, from, to).stream()
+                        .map(BreakdownRow::of)
+                        .toList();
+            case "model" ->
+                executions.sumByModelBetween(userId, from, to).stream()
+                        .map(BreakdownRow::of)
+                        .toList();
+            case "day" ->
+                executions.sumByDayBetween(userId, from, to).stream()
+                        .map(BreakdownRow::of)
+                        .toList();
+            case "fingerprint" ->
+                executions.sumByFingerprintBetween(userId, from, to).stream()
+                        .map(BreakdownRow::of)
+                        .toList();
+            default ->
+                throw new ApiException(
+                        ErrorCode.VALIDATION_FAILED, "axis must be one of agent, model, day, fingerprint");
         };
     }
 
     private static YearMonth parseMonth(String month) {
-        if (month == null || month.isBlank()) return YearMonth.now(HOUSEHOLD_ZONE);
+        if (month == null || month.isBlank()) {
+            return YearMonth.now(HOUSEHOLD_ZONE);
+        }
         try {
             return YearMonth.parse(month);
         } catch (DateTimeParseException ex) {

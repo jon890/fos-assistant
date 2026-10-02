@@ -21,8 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 잇는다. 한 실행의 자식 수가 많아질 일이 없고, 재귀 질의는 읽기 어렵다.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ExecutionTreeService {
 
@@ -48,8 +48,6 @@ public class ExecutionTreeService {
      * 않는 깊이에 {@code truncated} 가 실려, 잘렸다는 것이 아무 데도 보이지 않게 된다. 함께 바꾼다.
      */
     static final int MAX_DEPTH = 8;
-
-    private static final Logger log = LoggerFactory.getLogger(ExecutionTreeService.class);
 
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;

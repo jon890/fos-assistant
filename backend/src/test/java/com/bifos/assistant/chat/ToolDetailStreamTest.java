@@ -241,8 +241,12 @@ class ToolDetailStreamTest {
 
         assertThat(subagentEvents(events)).hasSize(2).allSatisfy(event -> {
             assertThat(event.hasNonNull("model")).as("model 이 실렸다: %s", event).isFalse();
-            assertThat(event.hasNonNull("inputTokens")).as("inputTokens 가 실렸다: %s", event).isFalse();
-            assertThat(event.hasNonNull("outputTokens")).as("outputTokens 가 실렸다: %s", event).isFalse();
+            assertThat(event.hasNonNull("inputTokens"))
+                    .as("inputTokens 가 실렸다: %s", event)
+                    .isFalse();
+            assertThat(event.hasNonNull("outputTokens"))
+                    .as("outputTokens 가 실렸다: %s", event)
+                    .isFalse();
             assertThat(event.path("goal").asString()).isEqualTo(GOAL);
             assertThat(event.path("subagentId").asString()).isEqualTo("sub-1");
         });
@@ -258,9 +262,9 @@ class ToolDetailStreamTest {
 
         List<JsonNode> events = sent(dad);
 
-        assertThat(subagentEvents(events)).hasSize(2).allSatisfy(event -> assertThat(
-                        event.path("model").asString())
-                .isEqualTo(SUBAGENT_MODEL));
+        assertThat(subagentEvents(events))
+                .hasSize(2)
+                .allSatisfy(event -> assertThat(event.path("model").asString()).isEqualTo(SUBAGENT_MODEL));
         JsonNode completed = subagentEvents(events).get(1);
         assertThat(completed.path("inputTokens").asLong()).isEqualTo(70L);
         assertThat(completed.path("outputTokens").asLong()).isEqualTo(9L);
@@ -294,11 +298,35 @@ class ToolDetailStreamTest {
     private void hermesStreamsSubagent() {
         hermesStreams(
                 new RunEvent(
-                        "subagent.start", null, "researcher", null, null, null, "sub-1", GOAL, SUBAGENT_MODEL, null,
-                        null, null, null, null),
+                        "subagent.start",
+                        null,
+                        "researcher",
+                        null,
+                        null,
+                        null,
+                        "sub-1",
+                        GOAL,
+                        SUBAGENT_MODEL,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null),
                 new RunEvent(
-                        "subagent.complete", null, "researcher", null, 900L, false, "sub-1", GOAL, SUBAGENT_MODEL,
-                        "child-session", 70L, 9L, "completed", null),
+                        "subagent.complete",
+                        null,
+                        "researcher",
+                        null,
+                        900L,
+                        false,
+                        "sub-1",
+                        GOAL,
+                        SUBAGENT_MODEL,
+                        "child-session",
+                        70L,
+                        9L,
+                        "completed",
+                        null),
                 new RunEvent("run.completed", null, null, null, null, null));
     }
 

@@ -104,9 +104,7 @@ class ModelTierServiceTest {
         assertThat(result.tiers())
                 .extracting(ModelTierOptions.Tier::tier, ModelTierOptions.Tier::label)
                 .containsExactly(
-                        tuple(ModelTier.FAST, "빠르게"),
-                        tuple(ModelTier.BALANCED, "균형"),
-                        tuple(ModelTier.DEEP, "깊게"));
+                        tuple(ModelTier.FAST, "빠르게"), tuple(ModelTier.BALANCED, "균형"), tuple(ModelTier.DEEP, "깊게"));
         assertThat(result.tiers()).allSatisfy(tier -> {
             assertThat(tier.provider()).as("provider").isNull();
             assertThat(tier.model()).as("model").isNull();
@@ -136,8 +134,7 @@ class ModelTierServiceTest {
                         ModelTierOptions.Tier::reasoningEffort)
                 .containsExactly(
                         tuple(ModelTier.FAST, "openai-codex", "example-fast", "low"),
-                        tuple(
-                                ModelTier.BALANCED, "openai-codex", "example-balanced", "medium"),
+                        tuple(ModelTier.BALANCED, "openai-codex", "example-balanced", "medium"),
                         tuple(ModelTier.DEEP, "openai-codex", "example-deep", "high"));
         assertThat(result.admin()).isTrue();
     }

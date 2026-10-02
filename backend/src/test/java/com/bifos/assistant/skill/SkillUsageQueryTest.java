@@ -206,8 +206,7 @@ class SkillUsageQueryTest {
                 .containsExactly(
                         new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 2, T2, dadSecond.publicId()));
         assertThat(kidView)
-                .containsExactly(
-                        new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
+                .containsExactly(new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
     }
 
     @Test

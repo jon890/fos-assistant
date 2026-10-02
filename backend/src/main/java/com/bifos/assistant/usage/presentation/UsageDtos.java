@@ -20,8 +20,7 @@ import java.util.UUID;
  */
 public final class UsageDtos {
 
-    private UsageDtos() {
-    }
+    private UsageDtos() {}
 
     /**
      * 한 달치 환산액과 실제 청구액.
@@ -70,8 +69,7 @@ public final class UsageDtos {
      * @param axis 어느 축으로 묶었는지
      * @param rows 묶음 줄. 축마다 정렬 기준이 다르고 그 순서대로 준다
      */
-    public record BreakdownView(String axis, String month, String currency, List<BreakdownRow> rows) {
-    }
+    public record BreakdownView(String axis, String month, String currency, List<BreakdownRow> rows) {}
 
     /**
      * 묶음 한 줄이다. 네 축이 같은 모양을 쓴다.
@@ -236,8 +234,12 @@ public final class UsageDtos {
          * 오류 코드와 걸린 시간과 스킬 이름은 그대로 싣는다.
          */
         static ExecutionView from(
-                AgentExecution execution, Agent agent, UUID conversationPublicId, boolean hasChildren,
-                List<String> skillNames, boolean internal) {
+                AgentExecution execution,
+                Agent agent,
+                UUID conversationPublicId,
+                boolean hasChildren,
+                List<String> skillNames,
+                boolean internal) {
             return new ExecutionView(
                     execution.id(),
                     conversationPublicId,
