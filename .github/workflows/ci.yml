@@ -33,8 +33,9 @@ jobs:
       - name: 백엔드 테스트
         working-directory: backend
         run: ./gradlew test
-      # H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다. 운영과 같은 판과 기본 정렬 규칙으로 띄워 검사한다.
-      - name: 실제 MySQL 마이그레이션 검사
+      # H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다. 운영과 같은 판과 기본 정렬 규칙으로 띄워
+      # 마이그레이션과 저장소 쿼리를 검사한다.
+      - name: 실제 MySQL 검사
         run: scripts/check-mysql-migration.sh
 
   web:
