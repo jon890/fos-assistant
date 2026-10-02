@@ -42,28 +42,41 @@ public interface DelegationOutputClip {
 }
 ```
 
-Javadoc 에 「위임 실행의 답을 실행 줄에 적을 길이로 맞춘다. 상한을 가진 `orchestration` 이 구현한다」 를 적고, 두 메서드의 Javadoc 은 `DelegationOutput` 의 것을 옮겨 적는다.
+Javadoc 에 「위임 실행의 답을 실행 줄에 적을 길이로 맞춘다. 상한을 가진 `orchestration` 이 구현한다」 를 적는다. 두 메서드에는 `DelegationOutput` 의 Javadoc 과 같은 문장을 적는다. `DelegationOutput` 의 Javadoc 은 그대로 둔다.
 
 ### 2. `DelegationOutput` 이 port 를 구현한다
 
-`implements DelegationOutputClip` 과 `@Override` 둘을 더한다. 본문은 바꾸지 않는다.
+`implements DelegationOutputClip` 과 `@Override` 둘을 더한다. 본문과 `TRUNCATED_NOTICE` 의 접근 수준은 바꾸지 않는다.
 
 ### 3. `RecoveredRunRecorder` 의 변경
 
 필드 타입을 `DelegationOutput` 에서 `DelegationOutputClip` 으로 바꾼다. 필드 이름 `delegationOutput` 과 호출 두 줄은 그대로 둔다. `orchestration` 의 import 를 지운다.
 
-### 4. 이 phase 를 검증하는 테스트
+### 4. 이 phase 를 검증하는 `DelegationOutputTest.java`
 
-- `RecoveredRunRecorder` 를 `new` 로 만드는 테스트의 인자를 맞춘다. `git grep -n "new RecoveredRunRecorder(" -- backend/src/test` 로 찾는다. `DelegationOutput` 객체는 그대로 넘길 수 있다. 단언은 바꾸지 않는다
-- `backend/src/test/java/com/bifos/assistant/orchestration/DelegationOutputTest.java` 를 새로 만든다. 같은 이름의 테스트가 이미 있으면 거기에 더한다. `new DelegationOutput(new DelegationProperties(...))` 로 상한을 작게 주어 만든다. `DelegationProperties` 의 칸은 그 record 에서 읽는다
-  - 정상: 상한보다 짧은 답은 `clip` 이 그대로 돌려준다
-  - 경계: 상한을 넘는 답은 상한까지 자르고 잘렸다는 한 줄을 붙인다. 상한 자리에서 대리 쌍이 갈리면 그 앞에서 자른다
-  - 실패: null 은 `clip` 이 빈 글을, `partial` 이 null 을 돌려준다. 공백뿐인 답도 `partial` 이 null 이다
-  - port 타입(`DelegationOutputClip`)으로 받아 불러도 같은 결과다
+`RecoveredRunRecorder` 를 `new` 로 만드는 테스트는 없다. `RecoveredRunRecorderTest` 와 `RestartReconcilerTest` 는 Spring 주입이라 고치지 않는다.
+
+`backend/src/test/java/com/bifos/assistant/orchestration/DelegationOutputTest.java` 를 새로 만든다. Spring 없이 도는 단위 테스트다.
+`DelegationOutputClip clip = new DelegationOutput(new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 5));` 로 만든다. 칸 순서는 `maxDepth`, `maxConcurrentChildren`, `maxActive`, `submitTimeout`, `outputMaxChars` 이고 상한은 5 다. port 타입으로 받아 부른다.
+`TRUNCATED_NOTICE` 는 패키지 전용이라 이 테스트가 읽지 못한다. 기대 문자열을 글자로 적는다.
+
+- 정상: `"가가가"` 는 `clip` 이 그대로 돌려준다
+- 경계: `"가".repeat(6)` 은 `"가".repeat(5) + "\n\n[답이 5자를 넘어 뒷부분을 잘랐다]"` 다
+- 경계: `"가가가가😀가"` 는 상한 자리에서 대리 쌍이 갈리므로 `"가가가가\n\n[답이 5자를 넘어 뒷부분을 잘랐다]"` 다
+- 실패: null 은 `clip` 이 빈 글을, `partial` 이 null 을 돌려준다. 공백뿐인 답도 `partial` 이 null 이다
+- `partial` 에 상한을 넘는 답을 주면 `clip` 과 같은 결과다
 
 ### 5. 문서와 ADR 의 구현 상태를 고친다
 
-- ADR-068 의 `status` 줄의 구현 상태와 `docs/adr/INDEX.md` 의 ADR-068 줄의 `Accepted.` 뒤 문장을 그 시점의 문장을 읽고 고친다. 끊은 간선에 「`chat` 이 `orchestration` 을 쓰는 하나(C3, C4)」 를 더하고 「아직 구현 전」 목록에서 그 간선과 C3, C4 를 뺀다
+- `docs/backend/agent-delegation.md` 의 아래 문단은 이 phase 뒤 사실이 아니다
+
+  > **`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건만 낸다.**
+  > 두 패키지는 이미 서로를 import 한다(`TurnCancellation`, `Flow`). 그러나 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.
+
+  둘째 줄을 「사건 `DelegationFinished` 는 `chat` 이 갖고 `orchestration` 이 낸다. `chat` 은 `orchestration` 을 import 하지 않는다. 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.」 로 고친다. 그 문단의 지금 문장은 파일에서 읽어 확인한다
+- ADR-068 의 `status` 줄의 구현 상태와 `docs/adr/INDEX.md` 의 ADR-068 줄의 `Accepted.` 뒤 문장을 아래로 바꾼다
+
+「S1 부터 S3 까지 구현됐다. 순환 간선 가운데 `user` 가 `people` 과 `agent` 를 쓰는 둘과 `agent` 가 `people` 을 쓰는 하나(C5), `agent` 가 `skill` 과 `orchestration` 을 쓰는 둘, `agent` 가 `chat` 과 `usage` 를 쓰는 둘(C1), `usage` 와 `memory` 가 `chat` 을 쓰는 둘(C2), `skill` 이 `chat` 을 쓰는 하나, `chat` 이 `orchestration` 을 쓰는 하나(C3, C4)를 끊었다. `memory` 가 `context` 를 쓰는 간선과 C7 은 아직 구현 전이다」
 
 고친 문서에 `bash /Users/nhn/personal/fos-skills/content-preview/scripts/style-check.sh <파일>` 을 돌려 종료 코드 0 인지 본다.
 
@@ -85,6 +98,7 @@ Javadoc 에 「위임 실행의 답을 실행 줄에 적을 길이로 맞춘다.
 ./gradlew checkstyleMain checkstyleTest
 test "$(grep -c "" config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948)" -eq 2
 ! grep -n "orchestration\|chat" config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948
+git diff --exit-code -- config/archunit/store ':!config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948'
 ! grep -rnE "^import (static )?com\.bifos\.assistant\.orchestration\." src/main/java/com/bifos/assistant/chat
 ```
 
@@ -103,7 +117,7 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/DelegationOutput.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/RecoveredRunRecorder.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/DelegationOutputTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
+| `docs/backend/agent-delegation.md` | 수정 |
 | `docs/adr/ADR-068-최상위-패키지는-한-방향-층-순서를-따르고-거꾸로-가는-의존은-port-나-이동으로-끊는다.md` | 수정 |
 | `docs/adr/INDEX.md` | 수정 |
 | `backend/config/archunit/store/0fd01c41-aa58-43cb-81c5-236ae5119948` | 수정 |
