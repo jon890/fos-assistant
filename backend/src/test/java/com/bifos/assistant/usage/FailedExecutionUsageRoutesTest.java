@@ -22,6 +22,7 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.orchestration.application.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -163,7 +164,7 @@ class FailedExecutionUsageRoutesTest {
         DelegationKey key =
                 DelegationKey.of(agent.hermesProfile(), "fos-root", "fos-root", "call_" + UUID.randomUUID());
 
-        AgentRunner.Run run;
+        AgentRun run;
         try {
             run = runner.run(
                     user,

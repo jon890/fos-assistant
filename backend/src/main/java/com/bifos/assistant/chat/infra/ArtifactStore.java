@@ -47,7 +47,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ArtifactStore {
 
-    private static final String HTML = "html";
+    static final String HTML = "html";
     private static final AtomicBoolean UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED = new AtomicBoolean();
 
     /**
@@ -74,7 +74,7 @@ public class ArtifactStore {
     private final Path root;
     private final String agentRoot;
     private final boolean forceAtomicMoveFallback;
-    private final AtomicMover atomicMover;
+    private final ArtifactAtomicMover atomicMover;
 
     @Autowired
     public ArtifactStore(ArtifactProperties properties) {
@@ -87,31 +87,11 @@ public class ArtifactStore {
     }
 
     /** 파일 시스템의 원자 교체 실패를 결정적으로 검사할 때 쓴다. */
-    ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback, AtomicMover atomicMover) {
+    ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback, ArtifactAtomicMover atomicMover) {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
         this.agentRoot = stripTrailingSlash(properties.agentRoot());
         this.forceAtomicMoveFallback = forceAtomicMoveFallback;
         this.atomicMover = atomicMover;
-    }
-
-    /**
-     * 폴더 안에서 찾은 파일 하나다.
-     *
-     * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다
-     * @param byteSize 찾았을 때의 크기
-     */
-    public record FoundFile(String path, long byteSize) {}
-
-    /**
-     * 보관 기간이 지나 지운 파일 하나다.
-     *
-     * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다
-     */
-    public record Removed(Long conversationId, String path) {
-
-        public boolean isHtml() {
-            return HTML.equals(extensionOf(path));
-        }
     }
 
     /** 확장자로 정한 형식. 내주지 않는 확장자면 빈 값이다. 대소문자는 가리지 않는다. */
@@ -145,16 +125,16 @@ public class ArtifactStore {
      * <p>심볼릭 링크는 따라가지 않는다. 폴더 밖을 가리키는 링크를 답에 묶지 않으려는 것이다. 폴더가 없으면 빈
      * 목록이다.
      */
-    public List<FoundFile> changedHtmlSince(Long conversationId, Instant since) {
+    public List<ArtifactFoundFile> changedHtmlSince(Long conversationId, Instant since) {
         Path folder = folderOf(conversationId);
         if (!Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS)) {
             return List.of();
         }
-        List<FoundFile> found = new ArrayList<>();
+        List<ArtifactFoundFile> found = new ArrayList<>();
         for (WalkedFile file : regularFilesUnder(folder)) {
             if (HTML.equals(extensionOf(file.path().getFileName().toString()))
                     && !file.modified().isBefore(since)) {
-                found.add(new FoundFile(relativeOf(folder, file.path()), file.byteSize()));
+                found.add(new ArtifactFoundFile(relativeOf(folder, file.path()), file.byteSize()));
             }
         }
         return found;
@@ -273,7 +253,7 @@ public class ArtifactStore {
      *
      * @return 지운 파일들의 대화 번호와 상대 경로
      */
-    public List<Removed> deleteOlderThan(Instant cutoff) {
+    public List<ArtifactRemoved> deleteOlderThan(Instant cutoff) {
         if (!Files.isDirectory(root)) {
             return List.of();
         }
@@ -296,7 +276,7 @@ public class ArtifactStore {
             latestByConversation.merge(
                     conversationId, walked.modified(), (left, right) -> left.isAfter(right) ? left : right);
         }
-        List<Removed> removed = new ArrayList<>();
+        List<ArtifactRemoved> removed = new ArrayList<>();
         for (Map.Entry<Long, List<Path>> entry : filesByConversation.entrySet()) {
             Long conversationId = entry.getKey();
             if (!latestByConversation.get(conversationId).isBefore(cutoff)) {
@@ -306,7 +286,7 @@ public class ArtifactStore {
             for (Path file : entry.getValue()) {
                 try {
                     Files.deleteIfExists(file);
-                    removed.add(new Removed(conversationId, relativeOf(folder, file)));
+                    removed.add(new ArtifactRemoved(conversationId, relativeOf(folder, file)));
                 } catch (IOException | RuntimeException ex) {
                     log.warn("could not delete an expired artifact file conversationId={}", conversationId, ex);
                 }
@@ -466,7 +446,7 @@ public class ArtifactStore {
     }
 
     private static void writeWithAtomicMove(
-            Path parent, Path target, Path folder, byte[] content, AtomicMover atomicMover) throws IOException {
+            Path parent, Path target, Path folder, byte[] content, ArtifactAtomicMover atomicMover) throws IOException {
         Path temporary = null;
         try {
             temporary = Files.createTempFile(parent, ".artifact-", ".tmp");
@@ -533,11 +513,6 @@ public class ArtifactStore {
         }
     }
 
-    @FunctionalInterface
-    interface AtomicMover {
-        void move(Path source, Path target) throws IOException;
-    }
-
     private static ApiException validation(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);
     }
@@ -560,7 +535,7 @@ public class ArtifactStore {
         }
     }
 
-    private static String extensionOf(String path) {
+    static String extensionOf(String path) {
         int slash = path.lastIndexOf('/');
         String name = slash < 0 ? path : path.substring(slash + 1);
         int dot = name.lastIndexOf('.');

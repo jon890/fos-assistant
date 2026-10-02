@@ -17,9 +17,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -205,14 +203,14 @@ public class TurnCancellation {
         if (handle == null) {
             return true;
         }
-        RunRef run;
+        TurnRunRef run;
         synchronized (handle.runs) {
             run = handle.runs.stream()
                     .filter(it -> it.runId.equals(runId))
                     .findFirst()
                     .orElse(null);
             if (run == null) {
-                run = new RunRef(apiBaseUrl, profileName, runId);
+                run = new TurnRunRef(apiBaseUrl, profileName, runId);
                 handle.runs.add(run);
             }
         }
@@ -236,12 +234,12 @@ public class TurnCancellation {
         handle.runs.removeIf(run -> run.runId.equals(runId));
     }
 
-    public List<RunRef> pendingStops(TurnHandle handle) {
+    public List<TurnRunRef> pendingStops(TurnHandle handle) {
         return handle.runs.stream().filter(run -> !run.stopSent.get()).toList();
     }
 
     /** 같은 run 에 중지를 두 번 보내지 않고, 실패한 run 은 다음 요청에서 다시 보낸다. */
-    public boolean stopRun(RunRef run) {
+    public boolean stopRun(TurnRunRef run) {
         synchronized (run) {
             if (run.stopSent.get()) {
                 return true;
@@ -307,49 +305,6 @@ public class TurnCancellation {
             stream.close();
         } catch (Exception ex) {
             log.warn("중지한 turn 의 스트림을 닫지 못했다", ex);
-        }
-    }
-
-    @Getter
-    public static final class TurnHandle {
-        private final Long userId;
-        private final Long conversationId;
-        private final AtomicBoolean cancelled = new AtomicBoolean();
-        private final AtomicBoolean stopConfirmed = new AtomicBoolean();
-        private final AtomicBoolean finished = new AtomicBoolean();
-        private final AtomicBoolean stopped = new AtomicBoolean();
-        private final List<RunRef> runs = new CopyOnWriteArrayList<>();
-        private volatile Long executionId;
-        private volatile Closeable stream;
-        private volatile CompletableFuture<Boolean> firstStop = new CompletableFuture<>();
-        private volatile CompletableFuture<Void> streamGraceExpired = new CompletableFuture<>();
-        private volatile ScheduledFuture<?> closeTask;
-
-        private TurnHandle(Long userId, Long conversationId) {
-            this.userId = userId;
-            this.conversationId = conversationId;
-        }
-
-        public Long userId() {
-            return userId;
-        }
-
-        public AtomicBoolean cancelled() {
-            return cancelled;
-        }
-    }
-
-    @Getter
-    public static final class RunRef {
-        private final String apiBaseUrl;
-        private final String profileName;
-        private final String runId;
-        private final AtomicBoolean stopSent = new AtomicBoolean();
-
-        private RunRef(String apiBaseUrl, String profileName, String runId) {
-            this.apiBaseUrl = apiBaseUrl;
-            this.profileName = profileName;
-            this.runId = runId;
         }
     }
 }

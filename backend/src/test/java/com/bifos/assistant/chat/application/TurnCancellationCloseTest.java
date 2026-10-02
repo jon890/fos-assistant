@@ -36,7 +36,7 @@ class TurnCancellationCloseTest {
     void listenerReceivesStoppedTrueWhenMarkedStopped() {
         List<TurnClosed> closed = new ArrayList<>();
         turns.addCloseListener(closed::add);
-        TurnCancellation.TurnHandle handle = turns.open(1L, 10L);
+        TurnHandle handle = turns.open(1L, 10L);
 
         turns.markStopped(handle);
         turns.close(handle);
@@ -63,7 +63,7 @@ class TurnCancellationCloseTest {
     void listenerIsCalledOnceWhenSameHandleIsClosedTwice() {
         List<TurnClosed> closed = new ArrayList<>();
         turns.addCloseListener(closed::add);
-        TurnCancellation.TurnHandle handle = turns.open(1L, 10L);
+        TurnHandle handle = turns.open(1L, 10L);
 
         turns.close(handle);
         turns.close(handle);

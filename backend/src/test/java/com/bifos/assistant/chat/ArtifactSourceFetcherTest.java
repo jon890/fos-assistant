@@ -3,8 +3,12 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.chat.infra.ArtifactSourceDnsResolver;
 import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
 import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
+import com.bifos.assistant.chat.infra.ArtifactSourceResponse;
+import com.bifos.assistant.chat.infra.ArtifactSourceSocketTransport;
+import com.bifos.assistant.chat.infra.ArtifactSourceTransport;
 import com.bifos.assistant.shared.error.ApiException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -79,7 +83,7 @@ class ArtifactSourceFetcherTest {
                 (address, host, source, connect, read, cancellation) -> {
                     connects.incrementAndGet();
                     assertThat(address.getHostAddress()).isEqualTo("8.8.8.8");
-                    return new ArtifactSourceFetcher.Response(
+                    return new ArtifactSourceResponse(
                             200,
                             Map.of("content-type", "image/png; charset=binary", "content-length", "3"),
                             new ByteArrayInputStream(new byte[] {1, 2, 3}));
@@ -99,7 +103,7 @@ class ArtifactSourceFetcherTest {
                     host -> new InetAddress[] {InetAddress.getByName(address)},
                     (resolved, host, source, connect, read, cancellation) -> {
                         connects.incrementAndGet();
-                        return new ArtifactSourceFetcher.Response(
+                        return new ArtifactSourceResponse(
                                 200, Map.of("content-type", "image/png"), new ByteArrayInputStream(new byte[] {1}));
                     });
             assertThat(publicAddress.fetch(URI.create("https://images.example.com/a.png"), "image/png"))
@@ -156,7 +160,7 @@ class ArtifactSourceFetcherTest {
     void rejectsSizeFormatAndCompressedResponseBeforeSaving() throws Exception {
         ArtifactSourceFetcher tooLarge = fetcher(
                 host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceResponse(
                         200,
                         Map.of("content-type", "image/png"),
                         new ByteArrayInputStream(new byte[ArtifactSourceFetcher.MAX_BYTES + 1])));
@@ -165,7 +169,7 @@ class ArtifactSourceFetcherTest {
 
         ArtifactSourceFetcher gzip = fetcher(
                 host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceResponse(
                         200,
                         Map.of("content-type", "image/png", "content-encoding", "gzip"),
                         new ByteArrayInputStream(new byte[0])));
@@ -174,7 +178,7 @@ class ArtifactSourceFetcherTest {
 
         ArtifactSourceFetcher truncated = fetcher(
                 host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceResponse(
                         200,
                         Map.of("content-type", "image/png", "content-length", "2"),
                         new ByteArrayInputStream(new byte[] {1})));
@@ -199,7 +203,7 @@ class ArtifactSourceFetcherTest {
         for (var entry : types.entrySet()) {
             ArtifactSourceFetcher fetcher = fetcher(
                     host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-                    (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                    (address, host, source, connect, read, cancellation) -> new ArtifactSourceResponse(
                             200,
                             Map.of("content-type", entry.getValue(), "content-length", "1"),
                             new ByteArrayInputStream(new byte[] {1})));
@@ -209,7 +213,7 @@ class ArtifactSourceFetcherTest {
         AtomicInteger closed = new AtomicInteger();
         ArtifactSourceFetcher mismatch = fetcher(
                 host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceResponse(
                         200, Map.of("content-type", "text/html"), new ByteArrayInputStream(new byte[0]) {
                             @Override
                             public void close() {
@@ -221,7 +225,7 @@ class ArtifactSourceFetcherTest {
         assertThat(closed).hasValue(1);
         ArtifactSourceFetcher limit = fetcher(
                 host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceResponse(
                         200,
                         Map.of(
                                 "content-type",
@@ -251,7 +255,7 @@ class ArtifactSourceFetcherTest {
             ArtifactSourceFetcher invalid = fetcher(
                     host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
                     (address, host, source, connect, read, cancellation) ->
-                            new ArtifactSourceFetcher.Response(200, headers, new ByteArrayInputStream(new byte[] {1}) {
+                            new ArtifactSourceResponse(200, headers, new ByteArrayInputStream(new byte[] {1}) {
                                 @Override
                                 public synchronized int read(byte[] bytes, int offset, int length) {
                                     reads.incrementAndGet();
@@ -273,11 +277,11 @@ class ArtifactSourceFetcherTest {
     @Test
     @DisplayName("HTTP 머리글은 실제 CRLF로 끝나야 하고 중복 길이는 거절한다")
     void requiresRealCrlfInHttpHeadersAndRejectsDuplicateLength() throws Exception {
-        assertThat(new String(ArtifactSourceFetcher.SocketTransport.requestBytes("/a?x=1", "images.example.com")))
+        assertThat(new String(ArtifactSourceSocketTransport.requestBytes("/a?x=1", "images.example.com")))
                 .isEqualTo(
                         "GET /a?x=1 HTTP/1.1\r\nHost: images.example.com\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n");
         try (Socket socket = new Socket();
-                ArtifactSourceFetcher.Response response = ArtifactSourceFetcher.SocketTransport.parse(
+                ArtifactSourceResponse response = ArtifactSourceSocketTransport.parse(
                         socket,
                         new ByteArrayInputStream(
                                 "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: 1\r\n\r\nx"
@@ -285,22 +289,22 @@ class ArtifactSourceFetcherTest {
             assertThat(response.status()).isEqualTo(200);
             assertThat(response.headers()).containsEntry("content-length", "1");
         }
-        assertThatThrownBy(() -> ArtifactSourceFetcher.SocketTransport.parse(
+        assertThatThrownBy(() -> ArtifactSourceSocketTransport.parse(
                         new Socket(),
                         new ByteArrayInputStream("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\n".getBytes())))
                 .isInstanceOf(IOException.class);
-        assertThatThrownBy(() -> ArtifactSourceFetcher.SocketTransport.parse(
+        assertThatThrownBy(() -> ArtifactSourceSocketTransport.parse(
                         new Socket(),
                         new ByteArrayInputStream(
                                 "HTTP/1.1 200 OK\r\nContent-Length: 1\r\nContent-Length: 1\r\n\r\n".getBytes())))
                 .isInstanceOf(IOException.class);
-        assertThatThrownBy(() -> ArtifactSourceFetcher.SocketTransport.parse(
+        assertThatThrownBy(() -> ArtifactSourceSocketTransport.parse(
                         new Socket(),
                         new ByteArrayInputStream(
                                 ("HTTP/1.1 200 OK\r\nX: " + "x".repeat(16 * 1024) + "\r\n\r\n").getBytes())))
                 .isInstanceOf(IOException.class);
         for (String header : List.of("Content-Encoding : gzip", "Transfer-Encoding : chunked")) {
-            assertThatThrownBy(() -> ArtifactSourceFetcher.SocketTransport.parse(
+            assertThatThrownBy(() -> ArtifactSourceSocketTransport.parse(
                             new Socket(),
                             new ByteArrayInputStream(("HTTP/1.1 200 OK\r\n" + header + "\r\n\r\n").getBytes())))
                     .isInstanceOf(IOException.class);
@@ -410,7 +414,7 @@ class ArtifactSourceFetcherTest {
                     release.await();
                     return new InetAddress[] {InetAddress.getByName("8.8.8.8")};
                 },
-                (address, host, source, connect, read, cancellation) -> new ArtifactSourceFetcher.Response(
+                (address, host, source, connect, read, cancellation) -> new ArtifactSourceResponse(
                         200,
                         Map.of("content-type", "image/png", "content-length", "0"),
                         new ByteArrayInputStream(new byte[0])));
@@ -433,12 +437,11 @@ class ArtifactSourceFetcherTest {
         }
     }
 
-    private static ArtifactSourceFetcher.Response parsed(String response) throws IOException {
-        return ArtifactSourceFetcher.SocketTransport.parse(new Socket(), new ByteArrayInputStream(response.getBytes()));
+    private static ArtifactSourceResponse parsed(String response) throws IOException {
+        return ArtifactSourceSocketTransport.parse(new Socket(), new ByteArrayInputStream(response.getBytes()));
     }
 
-    private static ArtifactSourceFetcher fetcher(
-            ArtifactSourceFetcher.DnsResolver dns, ArtifactSourceFetcher.Transport transport) {
+    private static ArtifactSourceFetcher fetcher(ArtifactSourceDnsResolver dns, ArtifactSourceTransport transport) {
         return new ArtifactSourceFetcher(
                 new ArtifactSourceProperties(
                         List.of("images.example.com"),

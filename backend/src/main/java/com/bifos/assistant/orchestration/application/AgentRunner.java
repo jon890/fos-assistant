@@ -84,7 +84,7 @@ public class AgentRunner {
      * @param cancelled 참이면 실행을 멈춘다
      * @param instructionAddition 실행 문맥 뒤에 붙일 지시. 없으면 null
      */
-    public Run run(
+    public AgentRun run(
             CurrentUser user,
             Conversation conversation,
             Agent agent,
@@ -121,7 +121,7 @@ public class AgentRunner {
      *
      * @param delegationKey 위임이 아니면 null 이다. 나머지 인자는 11개 인자 판과 같다
      */
-    public Run run(
+    public AgentRun run(
             CurrentUser user,
             Conversation conversation,
             Agent agent,
@@ -178,7 +178,7 @@ public class AgentRunner {
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
             append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 1);
-            return new Run(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
+            return new AgentRun(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
         }
         HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
@@ -212,7 +212,7 @@ public class AgentRunner {
             if (cancelled.getAsBoolean()) {
                 AgentExecution cancelledExecution = executions.cancel(execution);
                 append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
-                return new Run(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
+                return new AgentRun(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
             }
             return fail(execution, ex, 2);
         }
@@ -222,7 +222,7 @@ public class AgentRunner {
                     ? executions.cancel(execution, agent, result, choice)
                     : executions.cancel(execution, agent, result, choice, delegationOutput.partial(result.output()));
             append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
-            return new Run(
+            return new AgentRun(
                     cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), result.sessionId());
         }
 
@@ -233,31 +233,22 @@ public class AgentRunner {
                     : result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
             AgentExecution failed = executions.fail(execution, agent, result, choice, code);
             append(failed, ExecutionEventType.RUN_FAILED, code, 2);
-            return new Run(failed, ChildResult.failed(failed.id(), code), null);
+            return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
         }
 
         AgentExecution completed = delegationKey == null
                 ? executions.complete(execution, agent, result, choice)
                 : executions.complete(execution, agent, result, choice, delegationOutput.clip(result.output()));
         append(completed, ExecutionEventType.RUN_COMPLETED, null, 2);
-        return new Run(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
+        return new AgentRun(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
     }
 
-    /**
-     * 돌린 결과다.
-     *
-     * @param execution 남긴 실행 줄. 부르는 쪽이 이것을 다음 단계의 부모로 쓴다
-     * @param result 성공 여부와 답
-     * @param sessionId Hermes 가 알려 준 session. 대화를 이어 가려면 부르는 쪽이 기억한다
-     */
-    public record Run(AgentExecution execution, ChildResult result, String sessionId) {}
-
-    private Run fail(AgentExecution execution, RuntimeException ex, int sequence) {
+    private AgentRun fail(AgentExecution execution, RuntimeException ex, int sequence) {
         String code = ex instanceof ApiException api ? api.code().name() : UNKNOWN_ERROR;
         AgentExecution failed = executions.fail(execution, code);
         append(failed, ExecutionEventType.RUN_FAILED, code, sequence);
         log.warn("흐름의 한 단계가 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
-        return new Run(failed, ChildResult.failed(failed.id(), code), null);
+        return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
     }
 
     /** 제출한 뒤 실패로 끝내는 run 에 중지를 한 번 보낸다. 보내지 못해도 실패로 끝내는 것은 그대로라 로그만 남긴다. */

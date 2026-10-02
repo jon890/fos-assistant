@@ -22,6 +22,7 @@ import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.orchestration.application.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
@@ -99,7 +100,7 @@ class AgentRunnerSubmitFailureTest {
         when(hermes.submit(any())).thenReturn(RUN_ID);
         doThrow(new IllegalStateException("저장 실패")).when(executions).attachRunId(started, RUN_ID);
 
-        AgentRunner.Run run = run();
+        AgentRun run = run();
 
         verify(hermes).stop(API_BASE_URL, PROFILE, RUN_ID);
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
@@ -116,7 +117,7 @@ class AgentRunnerSubmitFailureTest {
         doThrow(new IllegalStateException("저장 실패")).when(executions).attachRunId(started, RUN_ID);
         doThrow(new IllegalStateException("Hermes 에 닿지 못했다")).when(hermes).stop(API_BASE_URL, PROFILE, RUN_ID);
 
-        AgentRunner.Run run = run();
+        AgentRun run = run();
 
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
         assertThat(run.result().succeeded()).isFalse();
@@ -127,7 +128,7 @@ class AgentRunnerSubmitFailureTest {
     void hasNoRunToStopWhenSubmitItselfFails() {
         when(hermes.submit(any())).thenThrow(new IllegalStateException("제출 실패"));
 
-        AgentRunner.Run run = run();
+        AgentRun run = run();
 
         verify(hermes, never()).stop(any(), any(), any());
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
@@ -140,7 +141,7 @@ class AgentRunnerSubmitFailureTest {
         when(modelTiers.resolve(any(), any(), any()))
                 .thenThrow(new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable"));
 
-        AgentRunner.Run run = run();
+        AgentRun run = run();
 
         verify(executions).fail(started, ErrorCode.VALIDATION_FAILED.name());
         verify(hermes, never()).submit(any());
@@ -148,7 +149,7 @@ class AgentRunnerSubmitFailureTest {
         assertThat(run.result().errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
     }
 
-    private AgentRunner.Run run() {
+    private AgentRun run() {
         return runner.run(
                 user,
                 Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),

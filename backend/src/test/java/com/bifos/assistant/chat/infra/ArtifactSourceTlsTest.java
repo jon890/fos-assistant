@@ -38,16 +38,16 @@ class ArtifactSourceTlsTest {
     void connectsToGivenIpWithOriginalHostSniHostAndSan(@TempDir Path directory) throws Exception {
         TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
         try (TlsServer server = new TlsServer(material.serverContext())) {
-            ArtifactSourceFetcher.SocketTransport transport =
-                    new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());
+            ArtifactSourceSocketTransport transport =
+                    new ArtifactSourceSocketTransport(material.clientFactory(), server.port());
 
-            try (ArtifactSourceFetcher.Response response = transport.get(
+            try (ArtifactSourceResponse response = transport.get(
                     InetAddress.getByName("127.0.0.1"),
                     ORIGINAL_HOST,
                     URI.create("https://" + ORIGINAL_HOST + "/image.png"),
                     Duration.ofSeconds(1),
                     Duration.ofSeconds(1),
-                    new ArtifactSourceFetcher.Cancellation())) {
+                    new ArtifactSourceCancellation())) {
                 assertThat(response.status()).isEqualTo(200);
                 assertThat(response.body().readAllBytes()).containsExactly('o', 'k');
             }
@@ -64,8 +64,8 @@ class ArtifactSourceTlsTest {
     void rejectsSanDifferentFromOriginalHostInHttpsIdentification(@TempDir Path directory) throws Exception {
         TlsMaterial material = tlsMaterial(directory, "other.artifact-test.invalid");
         try (TlsServer server = new TlsServer(material.serverContext())) {
-            ArtifactSourceFetcher.SocketTransport transport =
-                    new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());
+            ArtifactSourceSocketTransport transport =
+                    new ArtifactSourceSocketTransport(material.clientFactory(), server.port());
 
             assertThatThrownBy(() -> transport.get(
                             InetAddress.getByName("127.0.0.1"),
@@ -73,7 +73,7 @@ class ArtifactSourceTlsTest {
                             URI.create("https://" + ORIGINAL_HOST + "/image.png"),
                             Duration.ofSeconds(1),
                             Duration.ofSeconds(1),
-                            new ArtifactSourceFetcher.Cancellation()))
+                            new ArtifactSourceCancellation()))
                     .isInstanceOf(IOException.class);
 
             server.await();
@@ -85,15 +85,15 @@ class ArtifactSourceTlsTest {
     void failsWithReadLimitWhenTlsResponseHeadersAreLate(@TempDir Path directory) throws Exception {
         TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
         try (TlsServer server = new TlsServer(material.serverContext(), Duration.ofMillis(1200), false)) {
-            ArtifactSourceFetcher.SocketTransport transport =
-                    new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());
+            ArtifactSourceSocketTransport transport =
+                    new ArtifactSourceSocketTransport(material.clientFactory(), server.port());
             assertThatThrownBy(() -> transport.get(
                             InetAddress.getByName("127.0.0.1"),
                             ORIGINAL_HOST,
                             URI.create("https://" + ORIGINAL_HOST + "/image.png"),
                             Duration.ofSeconds(1),
                             Duration.ofMillis(300),
-                            new ArtifactSourceFetcher.Cancellation()))
+                            new ArtifactSourceCancellation()))
                     .isInstanceOf(IOException.class);
             server.await();
             assertThat(server.hostHeader()).isEqualTo(ORIGINAL_HOST);
@@ -105,15 +105,15 @@ class ArtifactSourceTlsTest {
     void appliesLimitToEachReadWhenTlsBodyArrivesInDribbles(@TempDir Path directory) throws Exception {
         TlsMaterial material = tlsMaterial(directory, ORIGINAL_HOST);
         try (TlsServer server = new TlsServer(material.serverContext(), Duration.ofMillis(1200), true)) {
-            ArtifactSourceFetcher.SocketTransport transport =
-                    new ArtifactSourceFetcher.SocketTransport(material.clientFactory(), server.port());
-            try (ArtifactSourceFetcher.Response response = transport.get(
+            ArtifactSourceSocketTransport transport =
+                    new ArtifactSourceSocketTransport(material.clientFactory(), server.port());
+            try (ArtifactSourceResponse response = transport.get(
                     InetAddress.getByName("127.0.0.1"),
                     ORIGINAL_HOST,
                     URI.create("https://" + ORIGINAL_HOST + "/image.png"),
                     Duration.ofSeconds(1),
                     Duration.ofMillis(300),
-                    new ArtifactSourceFetcher.Cancellation())) {
+                    new ArtifactSourceCancellation())) {
                 assertThatThrownBy(() -> response.body().readAllBytes()).isInstanceOf(IOException.class);
             }
         }

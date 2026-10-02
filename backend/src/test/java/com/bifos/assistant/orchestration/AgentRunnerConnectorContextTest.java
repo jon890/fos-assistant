@@ -26,6 +26,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.orchestration.application.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
@@ -171,7 +172,7 @@ class AgentRunnerConnectorContextTest {
         Agent agent = connectorAgent();
         DelegationKey key = DelegationKey.of("parent-profile", "fos-root", "fos-root", "call_1");
 
-        AgentRunner.Run run = run(agent, null, key);
+        AgentRun run = run(agent, null, key);
 
         verify(contextAssembler, never()).assemble(any(), any());
         assertThat(submitted().instructions()).contains("GFM", "구분 줄").doesNotContain(MEMORY);
@@ -213,7 +214,7 @@ class AgentRunnerConnectorContextTest {
                 Instant.now());
     }
 
-    private AgentRunner.Run run(Agent agent, String instructionAddition, DelegationKey delegationKey) {
+    private AgentRun run(Agent agent, String instructionAddition, DelegationKey delegationKey) {
         return runner.run(
                 user,
                 Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),

@@ -117,7 +117,7 @@ public class ResearchAndBuildFlow implements Flow {
         AtomicReference<Long> rootExecutionId = new AtomicReference<>();
         // Chief 는 대화의 turn 이다. 보낼 session 과 실행 줄에 적을 루트 session 을 RunSession 으로 함께 넘긴다.
         RunSession session = sessions.ensure(conversation);
-        AgentRunner.Run chief = runner.run(
+        AgentRun chief = runner.run(
                 user,
                 conversation,
                 agent,

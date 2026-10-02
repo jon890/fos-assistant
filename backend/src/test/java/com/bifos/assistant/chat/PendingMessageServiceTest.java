@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.PendingMessageService;
 import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -219,7 +220,7 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("취소한 대기 메시지는 가지 않고 같은 번호를 다시 취소하면 없는 것으로 답한다")
     void sendsOnlyRemainingMessageAfterCancelAndRejectsSecondCancel() {
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         Long cancelledId;
         try {
             PendingQueue queued = pending.enqueue(dad, conversation.id(), "취소할 글");
@@ -244,7 +245,7 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("대기 메시지가 다섯이면 여섯째를 받지 않는다")
     void rejectsSixthMessage() {
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         try {
             for (int index = 1; index <= 5; index++) {
                 pending.enqueue(dad, conversation.id(), "글 " + index);
@@ -262,7 +263,7 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("합친 길이가 8000자를 넘으면 받지 않고 꼭 8000자면 받는다")
     void rejectsWhenMergedLengthExceedsLimitAndAcceptsAtLimit() {
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         try {
             pending.enqueue(dad, conversation.id(), "가".repeat(4000));
 
@@ -451,7 +452,7 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("더한 뒤 에이전트가 꺼지면 대기 줄을 멈춰 두고 오류를 알리며 turn 을 되풀이해 열지 않는다")
     void holdsQueueAndReportsErrorWhenAgentDisabledAfterEnqueue() {
-        TurnCancellation.TurnHandle running = turns.open(dad.id(), conversation.id());
+        TurnHandle running = turns.open(dad.id(), conversation.id());
         List<ChatEvent> received = new CopyOnWriteArrayList<>();
         Runnable unsubscribe = hub.subscribe(conversation.id(), received::add);
         try {

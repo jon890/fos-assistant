@@ -13,6 +13,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.RunningTurn;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -184,7 +185,7 @@ class ChatRunningTurnTest {
     void reportsOnlyRunningWhenMarkExistsBeforeRunIdIsAttached() {
         CurrentUser dad = member("dad");
         Conversation conversation = chat.startEmpty(dad, "dad");
-        TurnCancellation.TurnHandle handle = turns.open(dad.id(), conversation.id());
+        TurnHandle handle = turns.open(dad.id(), conversation.id());
         try {
             assertThat(chat.running(dad, conversation.id())).isEqualTo(new RunningTurn(true, null, null));
         } finally {

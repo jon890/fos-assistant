@@ -1,8 +1,8 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.infra.ArtifactProperties;
+import com.bifos.assistant.chat.infra.ArtifactRemoved;
 import com.bifos.assistant.chat.infra.ArtifactStore;
-import com.bifos.assistant.chat.infra.ArtifactStore.Removed;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,9 +40,9 @@ public class ArtifactCleaner {
      * @return 지운 파일 수
      */
     public int cleanExpired(Instant now) {
-        List<Removed> removed = store.deleteOlderThan(now.minus(Duration.ofDays(properties.retentionDays())));
+        List<ArtifactRemoved> removed = store.deleteOlderThan(now.minus(Duration.ofDays(properties.retentionDays())));
         int failed = 0;
-        for (Removed file : removed) {
+        for (ArtifactRemoved file : removed) {
             if (!file.isHtml()) {
                 continue;
             }
