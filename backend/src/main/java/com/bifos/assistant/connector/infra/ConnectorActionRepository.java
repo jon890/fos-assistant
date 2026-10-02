@@ -51,4 +51,7 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     List<ConnectorAction> findByStatusAndExpiresAtBefore(ActionStatus status, Instant now);
 
     List<ConnectorAction> findByStatus(ActionStatus status);
+
+    /** 그 연결에 그 상태의 승인 줄이 있는가. */
+    boolean existsByUserIdAndConnectorIdAndStatus(Long userId, String connectorId, ActionStatus status);
 }

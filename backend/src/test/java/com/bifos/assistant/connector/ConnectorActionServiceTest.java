@@ -30,6 +30,7 @@ import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
@@ -53,8 +54,11 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -443,14 +447,17 @@ class ConnectorActionServiceTest {
     }
 
     @Test
-    @DisplayName("만료 정리가 돌기 전이라도 만료 시각이 지난 줄을 승인하면 실행하지 않고 EXPIRED 로 둔다")
+    @DisplayName("만료 정리가 돌기 전이라도 만료 시각이 지난 줄을 승인하면 실행하지 않고 EXPIRED 줄을 오류 없이 돌려준다")
     void approvingAnActionPastItsExpiryExpiresIt() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         jdbc.update("UPDATE connector_action SET expires_at = ?", Instant.parse("2020-01-01T00:00:00Z"));
 
-        assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        ConnectorActionView closed = service.approve(me, actionId, null);
 
+        assertThat(closed.status()).isEqualTo(ActionStatus.EXPIRED);
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.EXPIRED);
+        // 이미 끝난 줄을 다시 승인하면 그때는 오류다.
+        assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -548,52 +555,60 @@ class ConnectorActionServiceTest {
     }
 
     @Test
-    @DisplayName("승인할 때 연결이 PENDING 이면 실행하지 않고 줄을 REJECTED 로 둔다")
+    @DisplayName("승인할 때 연결이 PENDING 이면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalOfNotReadyConnectionRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         jdbc.update("UPDATE connector_connection SET status = 'PENDING'");
 
-        assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        ConnectorActionView closed = service.approve(me, actionId, null);
 
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.REJECTED);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("승인할 때 그 도구가 선언에서 빠졌으면 실행하지 않고 줄을 REJECTED 로 둔다")
+    @DisplayName("승인할 때 그 도구가 선언에서 빠졌으면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalOfToolRemovedFromDeclarationRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         catalogBecomes(manifest(List.of(new ConnectorTool("list_scopes", "READ", "none", null))));
 
-        assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        ConnectorActionView closed = service.approve(me, actionId, null);
 
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.REJECTED);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("승인할 때 그 도구의 위험도가 DESTRUCTIVE 로 바뀌었으면 실행하지 않고 줄을 REJECTED 로 둔다")
+    @DisplayName("승인할 때 그 도구의 위험도가 DESTRUCTIVE 로 바뀌었으면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalOfToolThatBecameDestructiveRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         catalogBecomes(manifest(List.of(
                 new ConnectorTool("list_scopes", "READ", "none", null),
                 new ConnectorTool(WRITE, "DESTRUCTIVE", "always", null))));
 
-        assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        ConnectorActionView closed = service.approve(me, actionId, null);
 
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.REJECTED);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("승인할 때 카탈로그를 읽지 못하면 실행하지 않고 줄을 REJECTED 로 둔다")
+    @DisplayName("승인할 때 카탈로그를 읽지 못하면 실행하지 않고 REJECTED 줄을 오류 없이 돌려준다")
     void approvalWithUnreadableCatalogRejectsTheAction() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         ConnectorPolicyTestDoubles.expireCatalog();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
-        assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        ConnectorActionView closed = service.approve(me, actionId, null);
 
+        assertThat(closed.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(closed.errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.REJECTED);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
@@ -651,8 +666,77 @@ class ConnectorActionServiceTest {
                 .extracting(ConnectorAction::status)
                 .containsExactlyInAnyOrder(ActionStatus.SUCCEEDED, ActionStatus.REJECTED);
         assertThat(service.grants(me)).isEmpty();
+        assertThat(actions.findAll())
+                .filteredOn(action -> action.publicId().equals(waiting))
+                .extracting(ConnectorAction::errorCode)
+                .containsExactly(ConnectorAction.CONNECTION_CHANGED);
         assertCode(() -> service.approve(me, waiting, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, times(1)).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("승인한 호출이 실행되는 동안 값을 다시 등록하면 CONNECTOR_ACTION_EXECUTING 이고 env 를 바꾸지 않는다")
+    void registeringWhileAnApprovedCallExecutesIsRefused() throws Exception {
+        when(connector.call(anyString(), anyString(), anyMap()))
+                .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        CountDownLatch executing = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    executing.countDown();
+                    await(release);
+                    return CallResult.success(JSON.readTree("{\"saved\":true}"));
+                });
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<ConnectorActionView> approving = pool.submit(() -> service.approve(me, actionId, null));
+            await(executing);
+
+            // 실행은 앞선 계정 값으로 돌고 있다. 그 사이 값을 바꾸면 그 승인이 새 계정으로 실행된다.
+            assertCode(() -> connectionService.register(me, DEMO, Map.of()), ErrorCode.CONNECTOR_ACTION_EXECUTING);
+            assertCode(() -> connectionService.disconnect(me, DEMO), ErrorCode.CONNECTOR_ACTION_EXECUTING);
+
+            verify(connector, never()).putEnv(anyString(), anyString(), anyString());
+            verify(connector, never()).deleteEnv(anyString(), anyString());
+            verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean());
+            assertThat(connections.findAll())
+                    .extracting(ConnectorConnection::status)
+                    .containsExactly(ConnectionStatus.READY);
+            release.countDown();
+            assertThat(approving.get(10, TimeUnit.SECONDS).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("실행이 끝난 뒤에는 값을 다시 등록할 수 있다")
+    void registeringAfterTheApprovedCallFinishedIsAccepted() {
+        when(connector.putConnector(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new InstallResult(false, false));
+        when(connector.call(anyString(), anyString(), anyMap()))
+                .thenReturn(CallResult.success(JSON.readTree("{\"scopes\":[]}")));
+        service.approve(me, ask(WRITE, ARGS).actionId(), null);
+
+        connectionService.register(me, DEMO, Map.of());
+
+        assertThat(onlyAction().status()).isEqualTo(ActionStatus.SUCCEEDED);
+    }
+
+    @Test
+    @DisplayName("TODAY 허락은 서버 시간대와 상관없이 Asia/Seoul 의 다음 날 0시에 끝난다")
+    void todayGrantEndsAtSeoulMidnightRegardlessOfServerZone() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+
+        service.approve(me, actionId, GrantPeriod.TODAY);
+
+        // 다음 날 0시는 UTC 로는 15시다. 서버 시간대(UTC)의 그날 끝이면 0시가 된다.
+        Instant expiresAt = grants.findAll().getFirst().expiresAt();
+        assertThat(expiresAt.atZone(ZoneId.of("Asia/Seoul")).toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
+        assertThat(Duration.between(Instant.now(Clock.systemUTC()), expiresAt))
+                .isBetween(Duration.ZERO, Duration.ofDays(1));
     }
 
     @Test

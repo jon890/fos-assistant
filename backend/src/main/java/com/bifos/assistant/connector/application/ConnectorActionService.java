@@ -24,9 +24,11 @@ import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -61,9 +63,19 @@ public class ConnectorActionService {
 
     private static final String NOT_PENDING_MESSAGE = "this connector action is not waiting for approval";
 
+    private static final String EXECUTING_MESSAGE = "an approved action of this connection is still executing";
+
+    /**
+     * 「오늘」 의 끝을 정하는 시간대다. 가족이 사는 곳의 날짜로 끝나야 하므로 서버 시간대에 기대지 않는다.
+     *
+     * <p>{@code UsageController} 의 달 경계와 같은 값이다. 그룹마다 시간대를 두게 되면 둘을 함께 고친다.
+     */
+    private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+
     private final ConnectorActionRepository actions;
     private final ConnectorToolGrantRepository grants;
     private final ConnectorConnectionRepository connections;
+    private final AppUserRepository users;
     private final ConnectorCatalogCache catalog;
     private final HermesConnectorClient connector;
     private final DelegationProperties delegation;
@@ -72,12 +84,13 @@ public class ConnectorActionService {
     private final Clock clock;
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
-    // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다. 「오늘」 의 끝은 서버 시간대로 정한다.
+    // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
     public ConnectorActionService(
             ConnectorActionRepository actions,
             ConnectorToolGrantRepository grants,
             ConnectorConnectionRepository connections,
+            AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
             DelegationProperties delegation,
@@ -87,18 +100,20 @@ public class ConnectorActionService {
                 actions,
                 grants,
                 connections,
+                users,
                 catalog,
                 connector,
                 delegation,
                 events,
                 transactionManager,
-                Clock.systemDefaultZone());
+                Clock.systemUTC());
     }
 
     public ConnectorActionService(
             ConnectorActionRepository actions,
             ConnectorToolGrantRepository grants,
             ConnectorConnectionRepository connections,
+            AppUserRepository users,
             ConnectorCatalogCache catalog,
             HermesConnectorClient connector,
             DelegationProperties delegation,
@@ -108,6 +123,7 @@ public class ConnectorActionService {
         this.actions = actions;
         this.grants = grants;
         this.connections = connections;
+        this.users = users;
         this.catalog = catalog;
         this.connector = connector;
         this.delegation = delegation;
@@ -147,6 +163,10 @@ public class ConnectorActionService {
      * {@code @Transactional} 을 붙이지 않는다. 붙이면 실행 호출이 트랜잭션 안으로 들어가고, {@code EXECUTING} 이
      * 커밋되기 전에 실행이 나간다.
      *
+     * <p>요청이 왔을 때 이미 {@code PENDING} 이 아니던 줄은 {@code CONNECTOR_ACTION_NOT_PENDING} 이다. 승인은
+     * 받았으나 실행할 수 없어 여기서 끝낸 줄(기다리는 시간이 지남, 연결이 준비되지 않음, 정책이 바뀜)은 오류가 아니라
+     * 끝난 줄을 그대로 돌려준다. 부른 쪽이 「이미 처리됐다」 와 「승인했지만 실행하지 않았다」 를 구분한다.
+     *
      * @param grant 승인하면서 그 도구에 줄 상시 허락의 기간. 주지 않으면 null
      */
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant) {
@@ -154,7 +174,7 @@ public class ConnectorActionService {
         if (approval.profile() == null) {
             // 실행하지 않고 끝낸 줄이다. 그 상태를 커밋한 뒤에 알린다.
             publish(approval.action());
-            throw notPending();
+            return view(approval.action());
         }
         ConnectorAction waiting = approval.action();
         CallResult result = null;
@@ -256,13 +276,21 @@ public class ConnectorActionService {
      * 그 연결의 답을 기다리는 줄을 모두 거절하고 유효한 상시 허락을 거둔다. 연결을 해제하거나 값을 다시 등록하는
      * 트랜잭션 안에서 부른다.
      *
-     * <p>다른 계정으로 바꾼 뒤 앞선 계정에 한 승인이 실행되지 않게 한다. 줄을 잠그고 읽으므로 같은 줄의 승인이 먼저
-     * 커밋했으면 그 줄은 여기 걸리지 않는다. 사건은 그 트랜잭션이 커밋한 뒤에 낸다.
+     * <p>다른 계정으로 바꾼 뒤 앞선 계정에 한 승인이 실행되지 않게 한다. 사건은 그 트랜잭션이 커밋한 뒤에 낸다.
+     *
+     * <p>승인해 실행을 보낸 줄이 있으면 {@code CONNECTOR_ACTION_EXECUTING} 으로 거절한다. 실행은 트랜잭션 밖에서
+     * 돌고 그때의 계정 값을 읽으므로, 그 사이 값을 바꾸면 앞선 계정에 한 승인이 새 계정으로 실행된다. 부르는 쪽이
+     * 사용자 행을 잠근 채 부르고 승인도 같은 행을 먼저 잠그므로, 여기서 본 뒤에 새로 {@code EXECUTING} 이 되는 줄은
+     * 없다. 외부에 무엇을 반영하기 전에 부른다.
      */
     public void rejectPendingFor(ConnectorConnection connection, Instant now) {
+        if (actions.existsByUserIdAndConnectorIdAndStatus(
+                connection.userId(), connection.connectorId(), ActionStatus.EXECUTING)) {
+            throw new ApiException(ErrorCode.CONNECTOR_ACTION_EXECUTING, EXECUTING_MESSAGE);
+        }
         List<ConnectorAction> pending = actions.findByUserIdAndConnectorIdAndStatusForUpdate(
                 connection.userId(), connection.connectorId(), ActionStatus.PENDING);
-        pending.forEach(action -> action.reject(now));
+        pending.forEach(action -> action.refuse(ConnectorAction.CONNECTION_CHANGED, now));
         List<ConnectorAction> rejected = actions.saveAll(pending);
         List<ConnectorToolGrant> active =
                 grants.findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now);
@@ -292,6 +320,9 @@ public class ConnectorActionService {
      */
     private Approval beginApproval(CurrentUser user, UUID actionId, GrantPeriod grant) {
         Instant now = now();
+        // 연결을 다시 등록하거나 해제하는 쪽과 같은 순서로 잠근다. 사용자 행이 먼저이고 승인 줄이 다음이다.
+        // 그쪽이 값을 바꾸는 동안에는 여기서 기다리고, 그쪽이 커밋한 뒤에는 이 줄이 이미 PENDING 이 아니다.
+        users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionService::notFound);
         ConnectorAction action = requirePending(user, actionId);
         if (!action.expiresAt().isAfter(now)) {
             action.expire(now);
@@ -306,7 +337,7 @@ public class ConnectorActionService {
                 .filter(found -> found.status() == ConnectionStatus.READY)
                 .flatMap(found -> readManifest(found.connectorId()).map(manifest -> redecide(found, manifest, action)));
         if (decision.isEmpty() || decision.get().decision() == ActionDecision.DENIED) {
-            action.reject(now);
+            action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
         }
         if (grant != null) {
@@ -318,7 +349,7 @@ public class ConnectorActionService {
                     action.userId(),
                     action.connectorId(),
                     action.toolName(),
-                    grant.expiresAt(now, clock.getZone()),
+                    grant.expiresAt(now, HOUSEHOLD_ZONE),
                     now));
         }
         action.beginExecution(now);

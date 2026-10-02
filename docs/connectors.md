@@ -406,7 +406,7 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 | `EXECUTING` | 승인했고 실행을 보냈다 | `SUCCEEDED`, `FAILED`, `UNKNOWN` |
 | `SUCCEEDED`, `FAILED` | 실행 결과를 받았다 | |
 | `UNKNOWN` | 실행을 보냈으나 결과를 모른다. 다시 실행하지 않는다 | |
-| `REJECTED` | 사용자가 거절했거나 연결이 해제됐다 | |
+| `REJECTED` | 사용자가 거절했거나 시스템이 실행하지 않고 끝냈다. 뒤의 것은 `errorCode` 가 `not_executable` 이나 `connection_changed` 다 | |
 | `EXPIRED` | 24시간 안에 답이 없었다 | |
 
 | 경로 | 요청 | 결과 |
@@ -419,18 +419,20 @@ profile 하나의 MCP 만 다시 붙이는 공식 경로는 없다. 대화의 `/
 
 - 승인 줄 응답은 `actionId`, `connectorId`, `toolName`, `title`, `risk`, `status`, `argsJson`, `resultText`, `errorCode`, `createdAt`, `expiresAt`, `grantAllowed` 를 갖는다. `actionId` 는 공개 식별자(UUID)다
 - 그 줄의 `user_id` 가 로그인 사용자와 다르면 `CONNECTOR_ACTION_NOT_FOUND`(404) 다. 관리자도 같다
-- `PENDING` 이 아닌 줄의 승인과 거절은 `CONNECTOR_ACTION_NOT_PENDING`(409) 다. 같은 승인을 두 번 눌러도 실행은 한 번이다
-- 승인은 행 잠금 아래에서 `EXECUTING` 으로 바꾸고 커밋한 뒤, 트랜잭션 밖에서 대시보드의 실행 경로를 부른다. 연결이 `READY` 가 아니면 실행하지 않고 `REJECTED` 로 둔다
+- 요청이 왔을 때 이미 `PENDING` 이 아니던 줄의 승인과 거절은 `CONNECTOR_ACTION_NOT_PENDING`(409) 다. 같은 승인을 두 번 눌러도 실행은 한 번이다
+- 승인은 받았으나 실행할 수 없어 그 요청이 끝낸 줄은 오류가 아니라 200 과 끝난 줄을 돌려준다. 기다리는 시간이 지났으면 `EXPIRED`, 연결이 `READY` 가 아니거나 정책이 바뀌었으면 `REJECTED` 와 `errorCode: not_executable` 이다. 부른 쪽은 「이미 처리된 요청」(409)과 「승인했지만 실행하지 않은 요청」(200 의 `status`)을 구분한다
+- 승인은 행 잠금 아래에서 `EXECUTING` 으로 바꾸고 커밋한 뒤, 트랜잭션 밖에서 대시보드의 실행 경로를 부른다. 연결이 `READY` 가 아니면 실행하지 않고 `REJECTED` 로 둔다. 승인은 그 사용자의 행을 먼저 잠그고 승인 줄을 잠근다. 연결을 다시 등록하거나 해제하는 쪽과 같은 순서다
 - 실행 요청이 시간 안에 답하지 않았거나 연결이 끊겼으면 `UNKNOWN` 이다
-- `grant` 는 `approval: required` 인 도구에만 받는다. `always` 이거나 `tool_name` 이 빈 줄이면 `VALIDATION_FAILED` 다. `TODAY` 는 서버 시간대의 그날 끝까지다
+- `grant` 는 `approval: required` 인 도구에만 받는다. `always` 이거나 `tool_name` 이 빈 줄이면 `VALIDATION_FAILED` 다. `TODAY` 는 `Asia/Seoul` 의 그날 끝(다음 날 0시)까지다. 서버의 시간대 설정과 상관없다. 사용량 화면의 달 경계와 같은 고정 시간대다
 - 같은 실행에서 같은 도구와 같은 `args_sha256` 의 `PENDING` 이 이미 있으면 새 줄을 만들지 않고 그 번호를 돌려준다
 - 사건은 줄을 커밋한 뒤에 낸다. 화면이 사건을 받고 읽었을 때 줄이 있어야 한다
 - 대화에는 `approval` 사건을 낸다. 화면은 그 사건을 받으면 승인 줄을 다시 읽는다. 승인 카드는 이 응답으로만 그린다
 - 결과가 `SUCCEEDED`, `FAILED`, `UNKNOWN` 이면 그 대화에 알림 줄을 남기고 자동 turn 을 열어 결과를 전한다. 위임 결과와 같은 잠금과 같은 연속 상한을 쓴다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md))
 - 거절과 만료는 알림 줄만 남긴다. 자동 turn 을 열지 않는다
 - 만료 정리는 1분마다 돈다. 서버가 다시 뜨면 `EXECUTING` 을 `UNKNOWN` 으로 바꾼다
-- 연결을 해제하거나 값을 다시 등록하면 그 연결의 `PENDING` 을 모두 `REJECTED` 로 바꾸고 상시 허락을 거둔다. 다른 계정으로 바꾼 뒤 앞선 계정에 한 승인이 실행되지 않게 한다
-- 승인할 때 정책을 다시 읽는다. 그 도구가 선언에서 빠졌거나 `DESTRUCTIVE`, `FINANCIAL` 이 됐거나 카탈로그를 읽지 못하면 실행하지 않고 `REJECTED` 로 둔다
+- 연결을 해제하거나 값을 다시 등록하면 그 연결의 `PENDING` 을 모두 `REJECTED`(`errorCode: connection_changed`)로 바꾸고 상시 허락을 거둔다. 다른 계정으로 바꾼 뒤 앞선 계정에 한 승인이 실행되지 않게 한다
+- 그 연결에 `EXECUTING` 인 줄이 있으면 해제와 다시 등록을 `CONNECTOR_ACTION_EXECUTING`(409)으로 거절한다. 외부에 아무것도 반영하지 않는다. 실행은 트랜잭션 밖에서 그때의 계정 값으로 돌기 때문에, 그 사이 값을 바꾸면 앞선 계정에 한 승인이 새 계정으로 실행된다. 실행이 끝나거나 기동 정리가 `UNKNOWN` 으로 바꾼 뒤에는 받는다
+- 승인할 때 정책을 다시 읽는다. 그 도구가 선언에서 빠졌거나 `DESTRUCTIVE`, `FINANCIAL` 이 됐거나 카탈로그를 읽지 못하면 실행하지 않고 `REJECTED`(`errorCode: not_executable`)로 둔다
 - 같은 인자의 `PENDING` 이 있어 새 줄을 만들지 않은 호출은 줄이 따로 남지 않는다
 - 사용자가 turn 을 중지해도 `PENDING` 은 남는다
 

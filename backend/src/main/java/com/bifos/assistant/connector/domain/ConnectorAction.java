@@ -43,6 +43,12 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ConnectorAction {
 
+    /** 승인은 받았으나 연결이 준비되지 않았거나 정책이 바뀌어 실행하지 않고 끝낸 줄의 {@code errorCode} 다. */
+    public static final String NOT_EXECUTABLE = "not_executable";
+
+    /** 연결을 해제하거나 값을 다시 등록해 끝낸 줄의 {@code errorCode} 다. */
+    public static final String CONNECTION_CHANGED = "connection_changed";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -222,6 +228,16 @@ public class ConnectorAction {
         require(ActionStatus.PENDING);
         this.status = ActionStatus.REJECTED;
         this.decidedAt = now;
+    }
+
+    /**
+     * 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝냈다. 상태는 거절과 같고 까닭을 {@code errorCode} 에 남긴다.
+     *
+     * @param reason {@link #NOT_EXECUTABLE} 나 {@link #CONNECTION_CHANGED}
+     */
+    public void refuse(String reason, Instant now) {
+        reject(now);
+        this.errorCode = reason;
     }
 
     public void expire(Instant now) {
