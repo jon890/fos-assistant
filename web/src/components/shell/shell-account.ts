@@ -17,6 +17,13 @@ export const ShellAccountContext = createContext<ShellAccount>({
   retry: () => {},
 });
 
+/** 서버가 요청마다 읽어 넘긴 앱 이름이다. 화면 부품은 환경 변수를 직접 읽지 않는다. */
+export const AppNameContext = createContext("");
+
+export function useAppName(): string {
+  return useContext(AppNameContext);
+}
+
 export function useShellAccount(): ShellAccount {
   return useContext(ShellAccountContext);
 }

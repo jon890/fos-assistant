@@ -50,6 +50,8 @@ export default defineConfig({
       AUTH_URL: WEB_BASE_URL,
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       CONTROL_PLANE_BASE_URL,
+      // 앱 이름은 실행할 때 읽는다. 빌드 때의 값과 다른 이름을 주어, 빌드에 굳었으면 검사가 실패하게 한다.
+      APP_NAME: "검사용 비서",
     },
   },
 });

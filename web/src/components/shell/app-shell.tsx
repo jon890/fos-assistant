@@ -21,7 +21,11 @@ import {
 } from "./conversations-provider";
 import { shellRoleState } from "./role-state";
 import { ScreenTransition } from "./screen-transition";
-import { ShellAccountContext } from "./shell-account";
+import {
+  AppNameContext,
+  ShellAccountContext,
+  useAppName,
+} from "./shell-account";
 import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
 import { cn } from "cn";
@@ -31,9 +35,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useMediaQuery } from "@/components/ui/use-media-query";
 import { fetchMe, type ClientMe } from "@/lib/me-client";
 
-const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(
-  null,
-);
+/** 좁은 화면 위 막대의 제목이다. 화면이 정하지 않았으면 `null` 이고 앱 이름을 보인다 */
+const TitleContext = createContext<Dispatch<
+  SetStateAction<string | null>
+> | null>(null);
 /** 레이아웃이 한 번 읽은 사용자 이름이다. 화면마다 다시 읽지 않고 여기서 꺼낸다. 읽지 못했으면 null 이다 */
 const DisplayNameContext = createContext<string | null>(null);
 /** 역할이 `ADMIN` 인지다. `useAdminView()` 만 읽는다. 관리자 영역 안인지는 그 훅이 경로로 따로 본다. */
@@ -56,8 +61,8 @@ export function useShellDisplayName(): string | null {
 export function useShellTitle(title: string | null): void {
   const setTitle = useContext(TitleContext);
   useEffect(() => {
-    setTitle?.(title || "우리집 비서");
-    return () => setTitle?.("우리집 비서");
+    setTitle?.(title || null);
+    return () => setTitle?.(null);
   }, [setTitle, title]);
 }
 
@@ -73,7 +78,8 @@ function ShellBody({
   const { startNew } = useConversations();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [title, setTitle] = useState("우리집 비서");
+  const appName = useAppName();
+  const [title, setTitle] = useState<string | null>(null);
   // 붙박이 사이드바와 서랍이 각자 검색칸을 가진다. 서랍이 닫히면 서랍 쪽 ref 는 null 이 된다.
   const pinnedSearchRef = useRef<HTMLInputElement>(null);
   const drawerSearchRef = useRef<HTMLInputElement>(null);
@@ -225,7 +231,7 @@ function ShellBody({
               <Menu aria-hidden="true" className="size-5" />
             </TooltipButton>
             <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">
-              {title}
+              {title ?? appName}
             </span>
             <TooltipButton label="새 대화" size="icon" asChild>
               <Link href="/" onClick={startNew}>
@@ -245,11 +251,14 @@ function ShellBody({
 export function AppShell({
   role,
   displayName,
+  appName,
   children,
 }: {
   /** 레이아웃이 읽은 역할이다. 읽지 못했으면 `null` 이다 */
   role: "ADMIN" | "MEMBER" | null;
   displayName?: string;
+  /** 서버가 요청마다 환경에서 읽은 앱 이름이다 */
+  appName: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -312,10 +321,12 @@ export function AppShell({
       <AdminContext.Provider value={knownRole === "ADMIN"}>
         <DisplayNameContext.Provider value={knownName}>
           <ShellAccountContext.Provider value={account}>
-            {/* 관리자 영역에서는 대화 목록을 읽지 않는다. */}
-            <ConversationsProvider enabled={signedIn && !inAdminArea}>
-              <ShellBody signedIn={signedIn}>{children}</ShellBody>
-            </ConversationsProvider>
+            <AppNameContext.Provider value={appName}>
+              {/* 관리자 영역에서는 대화 목록을 읽지 않는다. */}
+              <ConversationsProvider enabled={signedIn && !inAdminArea}>
+                <ShellBody signedIn={signedIn}>{children}</ShellBody>
+              </ConversationsProvider>
+            </AppNameContext.Provider>
           </ShellAccountContext.Provider>
         </DisplayNameContext.Provider>
       </AdminContext.Provider>

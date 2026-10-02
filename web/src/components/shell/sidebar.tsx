@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
 import { NavPending, NAV_PENDING_EVENT } from "./nav-pending";
-import { useShellAccount } from "./shell-account";
+import { useAppName, useShellAccount } from "./shell-account";
 import { useConversations } from "./conversations-provider";
 
 export function Sidebar({
@@ -27,6 +27,7 @@ export function Sidebar({
   showStatus?: boolean;
 }) {
   const { startNew } = useConversations();
+  const appName = useAppName();
   const account = useShellAccount();
   const [query, setQuery] = useState("");
   // 이동하는 중인 링크의 개수다. 링크마다 하나씩 NavPending 이 두고, 이동이 끝나거나 그 링크가
@@ -53,14 +54,14 @@ export function Sidebar({
       <div className="mb-5 flex shrink-0 items-center justify-between gap-2 px-2">
         <Link
           href="/"
-          aria-label="우리집 비서 홈"
+          aria-label={`${appName} 홈`}
           onClick={() => {
             startNew();
             onNavigate("/");
           }}
           className="truncate text-base font-semibold"
         >
-          우리집 비서
+          {appName}
         </Link>
         <TooltipButton
           label="사이드바 접기"

@@ -31,9 +31,11 @@ test("머리의 이름을 한 번만 읽고 좁은 화면에서도 한 줄을 �
 
   // 좁은 폭의 서랍은 닫혀 있으면 그리지 않는다. 열어서 본다.
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
-  const home = page.getByRole("link", { name: "우리집 비서 홈" });
+  // 앱 이름은 검사용 서버가 실행할 때 준 값이다.
+  const home = page.getByRole("link", { name: "검사용 비서 홈" });
   await expect(home).toHaveCount(1);
-  await expect(home).toHaveText("우리집 비서");
+  await expect(home).toHaveText("검사용 비서");
+  await expect(page).toHaveTitle("검사용 비서");
 
   if (testInfo.project.name === "mobile") {
     await page.getByRole("button", { name: "사이드바 닫기" }).click();
@@ -51,6 +53,8 @@ test("로그인 화면은 메뉴 없이 가운데 카드와 브랜드 단추만 
   await context.clearCookies();
   await page.goto("/signin");
 
+  await expect(page.getByRole("heading", { name: "검사용 비서", level: 1 })).toBeVisible();
+  await expect(page).toHaveTitle("검사용 비서");
   await expect(page.getByRole("navigation", { name: "주요 화면" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "대화" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "사용량" })).toHaveCount(0);
