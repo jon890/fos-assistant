@@ -281,6 +281,36 @@ public record ChatEvent(
     }
 
     /**
+     * 그 대화의 승인 줄이 생겼거나 상태가 바뀌었다(ADR-050). 화면은 이 사건을 받으면 승인 줄을 다시 읽는다.
+     *
+     * <p>승인 줄의 내용은 싣지 않는다. 승인 카드는 주인만 읽는 조회 응답으로만 그린다.
+     *
+     * @param actionId 승인 요청 번호. {@code detail} 칸에 글로 싣는다
+     */
+    public static ChatEvent approval(UUID conversationId, UUID actionId) {
+        return new ChatEvent(
+                "approval",
+                null,
+                null,
+                actionId.toString(),
+                conversationId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
+
+    /**
      * 대기 메시지를 합쳐 사용자 메시지로 저장했다. 요청한 연결이 없는 turn 이라 화면이 이 사건으로 그 글을 그린다.
      *
      * @param messageId 저장된 {@code USER} 메시지의 번호

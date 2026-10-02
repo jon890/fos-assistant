@@ -3,15 +3,17 @@ package com.bifos.assistant.connector.application.model;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.hermes.ToolDetailRedactor;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * 주인에게 보이는 승인 줄이다(ADR-050). 인자 원문과 결과를 담으므로 주인 밖에는 내지 않는다.
+ * 주인에게 보이는 승인 줄이다(ADR-050). 인자와 결과를 담으므로 주인 밖에는 내지 않는다.
  *
  * @param actionId 승인 요청 번호. 공개 식별자다
  * @param toolName 원래 도구 이름. 확인하지 못한 호출은 null
  * @param title 사람에게 보일 이름. 카탈로그의 선언에 없으면 원래 이름, 그것도 없으면 등록 이름
+ * @param argsJson 승인할 인자. 비밀처럼 보이는 값과 식별자는 가린 글이다. 실행은 저장한 원문으로 한다
  * @param grantAllowed 승인하면서 상시 허락을 줄 수 있는 도구인가
  */
 public record ConnectorActionView(
@@ -41,7 +43,7 @@ public record ConnectorActionView(
                 title,
                 action.risk(),
                 action.status(),
-                action.argsJson(),
+                ToolDetailRedactor.redactArguments(action.argsJson()),
                 action.resultText(),
                 action.errorCode(),
                 action.createdAt(),

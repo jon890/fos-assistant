@@ -71,6 +71,15 @@ public final class ToolDetailRedactor {
         return redacted.substring(0, end) + "…";
     }
 
+    /**
+     * 사용자가 승인하기 전에 읽는 도구 인자에서 비밀값과 식별자를 가린다.
+     *
+     * <p>사용자는 이 글을 읽고 승인하므로 길이로 자르지 않는다. 인자의 크기는 정책 판정이 이미 제한한다.
+     */
+    public static String redactArguments(String argsJson) {
+        return argsJson == null ? null : redactContent(argsJson, new LinkedHashMap<>());
+    }
+
     private static String redactContent(String detail, Map<String, String> identifiers) {
         String stripped = detail.stripLeading();
         if (stripped.startsWith("{") || stripped.startsWith("[")) {

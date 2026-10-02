@@ -726,6 +726,18 @@ class ConnectorActionServiceTest {
     }
 
     @Test
+    @DisplayName("대화가 있는 실행의 승인 요청은 승인 카드와 결과 전달을 약속하고, 대화 없는 실행은 약속하지 않는다")
+    void approvalMessagePromisesOnlyWhatHappens() {
+        assertThat(ask(WRITE, ARGS).message()).contains("승인 카드", "결과가 이 대화로 온다");
+
+        jdbc.update("UPDATE agent_execution SET conversation_id = NULL");
+
+        assertThat(ask("send_note", ARGS).message())
+                .contains("승인받을 화면이 없으므로 실행되지 않는다")
+                .doesNotContain("결과가 이 대화로 온다");
+    }
+
+    @Test
     @DisplayName("TODAY 허락은 서버 시간대와 상관없이 Asia/Seoul 의 다음 날 0시에 끝난다")
     void todayGrantEndsAtSeoulMidnightRegardlessOfServerZone() {
         UUID actionId = ask(WRITE, ARGS).actionId();

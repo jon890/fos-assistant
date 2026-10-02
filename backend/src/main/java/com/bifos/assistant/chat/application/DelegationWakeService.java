@@ -11,15 +11,17 @@ import com.bifos.assistant.orchestration.application.FlowRegistry;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * 맡긴 일의 결과가 끝나면 부모 대화의 turn 을 자동으로 연다(ADR-040).
+ *
+ * <p>승인한 동작의 결과처럼 {@link AutoTurnResultSource} 가 낸 결과도 같은 turn 에 모아 전한다(ADR-050).
  *
  * <p>여는지는 그 대화의 turn 잠금을 잡을 수 있는지로 정한다. 잡지 못하면 그 turn 이 닫힐 때 {@link NextTurnDispatcher} 가 다시 부른다. 기다리는
  * 목록은 따로 두지 않는다. 아직 전하지 않은 끝난 위임 실행 줄이 곧 목록이다.
@@ -59,6 +63,8 @@ public class DelegationWakeService {
     private final AgentService agents;
     private final FlowRegistry flows;
     private final AppUserRepository users;
+    private final List<AutoTurnResultSource> sources;
+    private final Clock clock = Clock.systemUTC();
     /** 결과를 전하기 전에 자동 turn 이 실패한 대화와 그 시각이다. */
     private final Map<Long, Instant> lastFailures = new ConcurrentHashMap<>();
 
@@ -72,7 +78,8 @@ public class DelegationWakeService {
             ChatMessageRepository messages,
             AgentService agents,
             FlowRegistry flows,
-            AppUserRepository users) {
+            AppUserRepository users,
+            List<AutoTurnResultSource> sources) {
         this.properties = properties;
         this.turns = turns;
         this.chat = chat;
@@ -83,11 +90,18 @@ public class DelegationWakeService {
         this.agents = agents;
         this.flows = flows;
         this.users = users;
+        this.sources = List.copyOf(sources);
     }
 
     /** 기동 전에 끝났지만 전하지 못한 결과가 있는 대화를 돌려준다. 이 기능이 꺼져 있으면 비어 있다. */
     public List<Long> conversationsToWake() {
-        return properties.enabled() ? executions.findConversationsWithUndeliveredResults() : List.of();
+        if (!properties.enabled()) {
+            return List.of();
+        }
+        Set<Long> found = new LinkedHashSet<>(executions.findConversationsWithUndeliveredResults());
+        // 기동 정리가 결과를 모르는 것으로 바꾼 승인 줄도 여기서 전해진다.
+        sources.forEach(source -> found.addAll(source.conversationsWithUndelivered()));
+        return List.copyOf(found);
     }
 
     /**
@@ -97,8 +111,7 @@ public class DelegationWakeService {
      * 닫기 리스너가 곧바로 다시 불러 끝없이 돈다. 거른 결과는 실행 줄에 그대로 남는다.
      */
     public void tryWake(Long conversationId) {
-        if (!properties.enabled()
-                || executions.findUndeliveredResults(conversationId).isEmpty()) {
+        if (!properties.enabled() || undeliveredMarks(conversationId).isEmpty()) {
             return;
         }
         if (inFailureBackoff(conversationId)) {
@@ -155,11 +168,9 @@ public class DelegationWakeService {
      * 다시 열지 않는다.
      */
     private void runAutoTurn(CurrentUser owner, Long conversationId, TurnCancellation.TurnHandle handle) {
-        List<Long> pending = List.of();
+        Set<String> pending = Set.of();
         try {
-            pending = executions.findUndeliveredResults(conversationId).stream()
-                    .map(AgentExecution::id)
-                    .toList();
+            pending = undeliveredMarks(conversationId);
             chat.runDelegationResults(owner, conversationId, handle, event -> hub.publish(conversationId, event));
             lastFailures.remove(conversationId);
         } catch (ApiException ex) {
@@ -176,18 +187,32 @@ public class DelegationWakeService {
     }
 
     /** 이 turn 이 전하려던 결과가 아직 남아 있으면 실패 시각을 적는다. 전한 뒤의 실패는 같은 결과로 다시 열지 않으므로 적지 않는다. */
-    private void rememberFailureIfUndelivered(Long conversationId, List<Long> pending) {
+    private void rememberFailureIfUndelivered(Long conversationId, Set<String> pending) {
         try {
-            boolean stillUndelivered = executions.findUndeliveredResults(conversationId).stream()
-                    .anyMatch(result -> pending.contains(result.id()));
+            boolean stillUndelivered = undeliveredMarks(conversationId).stream().anyMatch(pending::contains);
             if (stillUndelivered) {
-                lastFailures.put(conversationId, Instant.now());
+                lastFailures.put(conversationId, Instant.now(clock));
             }
         } catch (RuntimeException ex) {
             // 남았는지 모르면 남은 것으로 본다. 쉬지 않고 다시 여는 것보다 잠시 늦게 전하는 편이 낫다.
             log.warn("자동 turn 이 전하려던 결과가 남았는지 읽지 못했다 conversationId={}", conversationId, ex);
-            lastFailures.put(conversationId, Instant.now());
+            lastFailures.put(conversationId, Instant.now(clock));
         }
+    }
+
+    /**
+     * 그 대화에 아직 전하지 않은 결과들의 표식이다. 위임 결과와 다른 쪽이 낸 결과를 함께 본다.
+     *
+     * <p>표식은 이 클래스 안에서 같은 결과인지 견주는 데만 쓴다.
+     */
+    private Set<String> undeliveredMarks(Long conversationId) {
+        Set<String> marks = new LinkedHashSet<>();
+        executions.findUndeliveredResults(conversationId).forEach(result -> marks.add("execution:" + result.id()));
+        for (int index = 0; index < sources.size(); index++) {
+            String prefix = "source" + index + ":";
+            sources.get(index).undelivered(conversationId).forEach(result -> marks.add(prefix + result.key()));
+        }
+        return marks;
     }
 
     private boolean inFailureBackoff(Long conversationId) {
@@ -195,7 +220,7 @@ public class DelegationWakeService {
         if (failedAt == null) {
             return false;
         }
-        if (failedAt.plus(FAILURE_BACKOFF).isAfter(Instant.now())) {
+        if (failedAt.plus(FAILURE_BACKOFF).isAfter(Instant.now(clock))) {
             return true;
         }
         lastFailures.remove(conversationId, failedAt);

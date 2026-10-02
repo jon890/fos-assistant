@@ -4,11 +4,13 @@ import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -51,6 +53,29 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     List<ConnectorAction> findByStatusAndExpiresAtBefore(ActionStatus status, Instant now);
 
     List<ConnectorAction> findByStatus(ActionStatus status);
+
+    /** 그 대화에서 아직 전하지 않은 끝난 승인 줄이다. 만든 순이다. */
+    List<ConnectorAction> findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(
+            Long conversationId, Collection<ActionStatus> statuses);
+
+    /** 전하지 않은 끝난 승인 줄이 있는 대화들이다. 대화 없이 돈 실행의 줄은 뺀다. */
+    @Query("""
+            select distinct a.conversationId from ConnectorAction a
+            where a.status in :statuses and a.resultDeliveredAt is null and a.conversationId is not null
+            """)
+    List<Long> findConversationsWithUndelivered(@Param("statuses") Collection<ActionStatus> statuses);
+
+    /**
+     * 아직 전하지 않은 줄에만 전한 시각을 적는다.
+     *
+     * @return 적은 줄 수. 이미 전한 줄은 세지 않는다
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ConnectorAction a set a.resultDeliveredAt = :now
+            where a.publicId in :publicIds and a.resultDeliveredAt is null
+            """)
+    int markDelivered(@Param("publicIds") Collection<UUID> publicIds, @Param("now") Instant now);
 
     /** 그 연결에 그 상태의 승인 줄이 있는가. */
     boolean existsByUserIdAndConnectorIdAndStatus(Long userId, String connectorId, ActionStatus status);

@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
+import com.bifos.assistant.connector.application.model.ConnectorActionResult;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
@@ -35,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +64,14 @@ public class ConnectorActionService {
     private static final String NOT_FOUND_MESSAGE = "this connector action does not exist";
 
     private static final String NOT_PENDING_MESSAGE = "this connector action is not waiting for approval";
+
+    /** 실행을 보낸 뒤 끝난 상태들이다. 자동 turn 으로 모델에게 전한다. */
+    private static final Set<ActionStatus> EXECUTED =
+            Set.of(ActionStatus.SUCCEEDED, ActionStatus.FAILED, ActionStatus.UNKNOWN);
+
+    /** 실행하지 않고 끝난 상태들이다. 대화에 알림 줄만 남긴다. */
+    private static final Set<ActionStatus> CLOSED_WITHOUT_EXECUTION =
+            Set.of(ActionStatus.REJECTED, ActionStatus.EXPIRED);
 
     private static final String EXECUTING_MESSAGE = "an approved action of this connection is still executing";
 
@@ -207,11 +217,73 @@ public class ConnectorActionService {
         return view(rejected);
     }
 
+    /** 그 대화에서 결과를 아직 전하지 않은 승인 줄이다. 실행을 보낸 뒤 끝난 것만이고 만든 순이다. */
+    @Transactional(readOnly = true)
+    public List<ConnectorActionResult> undeliveredResults(Long conversationId) {
+        return undelivered(conversationId, EXECUTED);
+    }
+
+    /** 그 대화에서 알림 줄만 남길 줄이다. 실행하지 않고 끝났고 아직 전하지 않은 것이다. */
+    @Transactional(readOnly = true)
+    public List<ConnectorActionResult> undeliveredClosures(Long conversationId) {
+        return undelivered(conversationId, CLOSED_WITHOUT_EXECUTION);
+    }
+
+    /** 대화에 전했다고 적는다. 이미 전한 줄은 건드리지 않는다. 부르는 쪽의 트랜잭션에 함께 묶인다. */
+    @Transactional
+    public void markDelivered(List<UUID> actionIds, Instant now) {
+        if (!actionIds.isEmpty()) {
+            actions.markDelivered(actionIds, now);
+        }
+    }
+
+    /**
+     * 그 줄을 전하는 일을 이 호출이 맡았는가. 먼저 적은 쪽만 참을 받는다.
+     *
+     * <p>같은 줄의 사건이 겹쳐 와도 알림 줄을 한 번만 남기게 한다.
+     */
+    @Transactional
+    public boolean claimDelivery(UUID actionId, Instant now) {
+        return actions.markDelivered(List.of(actionId), now) == 1;
+    }
+
+    /** 실행한 결과를 아직 전하지 않은 대화들이다. 기동할 때 훑는다. */
+    @Transactional(readOnly = true)
+    public List<Long> conversationsWithUndelivered() {
+        return actions.findConversationsWithUndelivered(EXECUTED);
+    }
+
+    private List<ConnectorActionResult> undelivered(Long conversationId, Set<ActionStatus> statuses) {
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
+        return actions
+                .findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(conversationId, statuses)
+                .stream()
+                .map(action -> {
+                    ConnectorActionView view = ConnectorActionView.from(
+                            action,
+                            manifests
+                                    .computeIfAbsent(action.connectorId(), this::readManifest)
+                                    .flatMap(manifest -> ConnectorToolPolicies.find(manifest, action.toolName()))
+                                    .map(ToolPolicy::title)
+                                    .orElse(null));
+                    return new ConnectorActionResult(
+                            action.publicId(), view.title(), action.status(), action.errorCode(), action.resultText());
+                })
+                .toList();
+    }
+
     /** 내 상시 허락 가운데 유효한 것이다. */
     @Transactional(readOnly = true)
     public List<ConnectorGrantView> grants(CurrentUser user) {
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return grants.findActiveByUserId(user.id(), now()).stream()
-                .map(ConnectorGrantView::from)
+                .map(grant -> ConnectorGrantView.from(
+                        grant,
+                        manifests
+                                .computeIfAbsent(grant.connectorId(), this::readManifest)
+                                .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
+                                .map(ToolPolicy::title)
+                                .orElse(null)))
                 .toList();
     }
 

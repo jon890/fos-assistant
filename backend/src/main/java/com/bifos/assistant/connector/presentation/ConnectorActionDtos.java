@@ -17,7 +17,7 @@ public final class ConnectorActionDtos {
     /** @param grant 승인하면서 그 도구에 줄 상시 허락의 기간. 주지 않으면 null */
     public record ApproveRequest(GrantPeriod grant) {}
 
-    /** 주인에게만 내는 승인 줄이다. 인자 원문과 결과를 담는다. */
+    /** 주인에게만 내는 승인 줄이다. 가린 인자와 결과를 담는다. */
     public record ActionView(
             UUID actionId,
             String connectorId,
@@ -49,10 +49,11 @@ public final class ConnectorActionDtos {
         }
     }
 
-    public record GrantView(Long grantId, String connectorId, String toolName, Instant expiresAt) {
+    public record GrantView(Long grantId, String connectorId, String toolName, String title, Instant expiresAt) {
 
         public static GrantView from(ConnectorGrantView grant) {
-            return new GrantView(grant.grantId(), grant.connectorId(), grant.toolName(), grant.expiresAt());
+            return new GrantView(
+                    grant.grantId(), grant.connectorId(), grant.toolName(), grant.title(), grant.expiresAt());
         }
     }
 }

@@ -205,6 +205,10 @@ function startControlPlane(
       ASSISTANT_MODEL_TIERS_DEEP_REASONING_EFFORT: "high",
       // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
+      // 답이 없는 승인 요청이 만료되는 것을 기본값 24시간을 기다리지 않고 본다. 승인과 거절을 보는 단계는
+      // 요청을 만든 직후에 답하므로 이 시간 안에 끝난다. 만료 정리도 1분이 아니라 1초마다 돌린다.
+      ASSISTANT_CONNECTOR_POLICY_APPROVAL_TTL: "15s",
+      ASSISTANT_CONNECTOR_POLICY_EXPIRE_CRON: "* * * * * *",
       HERMES_PROFILE_KEY_DIR: keyDir,
       // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,

@@ -170,15 +170,16 @@ class ConnectorActionControllerTest {
     }
 
     @Test
-    @DisplayName("허락 목록은 grantId, connectorId, toolName, expiresAt 을 낸다")
+    @DisplayName("허락 목록은 grantId, connectorId, toolName, title, expiresAt 을 낸다")
     void grantsReturnContractFields() throws Exception {
         when(service.grants(MEMBER))
-                .thenReturn(List.of(
-                        new ConnectorGrantView(5L, "demo-notes", "write_note", Instant.parse("2026-10-02T00:00:00Z"))));
+                .thenReturn(List.of(new ConnectorGrantView(
+                        5L, "demo-notes", "write_note", "메모 쓰기", Instant.parse("2026-10-02T00:00:00Z"))));
 
         mvc.perform(get("/api/v1/connector-grants"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].length()").value(4))
+                .andExpect(jsonPath("$[0].length()").value(5))
+                .andExpect(jsonPath("$[0].title").value("메모 쓰기"))
                 .andExpect(jsonPath("$[0].grantId").value(5))
                 .andExpect(jsonPath("$[0].connectorId").value("demo-notes"))
                 .andExpect(jsonPath("$[0].toolName").value("write_note"))

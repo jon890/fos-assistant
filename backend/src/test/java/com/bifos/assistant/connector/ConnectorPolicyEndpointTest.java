@@ -635,7 +635,8 @@ class ConnectorPolicyEndpointTest {
         assertThat(UUID.fromString(actionId)).as("action_id: %s", actionId).isNotNull();
         assertThat(body.path("message").asString())
                 .isEqualTo("이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 " + actionId
-                        + " 다. 사용자에게 화면에서 승인해 달라고 알리고, 같은 도구를 다시 부르지 않는다. 승인하면 그대로 실행되고 결과가 이 대화로 온다.");
+                        + " 다. 대화 화면에 승인 카드가 떴으니 사용자에게 거기서 승인해 달라고 알린다. 번호는 사용자에게 말하지 않는다. "
+                        + "같은 도구를 다시 부르지 않는다. 승인하면 저장한 인자 그대로 한 번 실행되고 결과가 이 대화로 온다.");
         return actionId;
     }
 
