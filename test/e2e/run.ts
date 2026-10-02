@@ -145,7 +145,7 @@ async function waitForHealth(url: string, logPath: string): Promise<void> {
 }
 
 /**
- * 결과물 폴더의 뿌리를 실행마다 만든다.
+ * 결과물 폴더의 루트를 실행마다 만든다.
  *
  * <p>Control Plane 이 보는 경로와 에이전트가 보는 경로가 같은 기계의 같은 디렉터리다. 대역이 입력에 적힌 폴더에 곧바로 쓴다.
  */
@@ -156,7 +156,7 @@ async function makeArtifactRoot(work: string): Promise<string> {
 }
 
 /**
- * 스킬 버전 디렉터리의 뿌리를 실행마다 만든다.
+ * 스킬 버전 디렉터리의 루트를 실행마다 만든다.
  *
  * <p>Control Plane 이 쓰는 경로와 Hermes 가 보는 경로가 같은 기계의 같은 디렉터리다. 대역이 게시된 경로에서 `SKILL.md` 를 읽는다.
  */
@@ -214,10 +214,10 @@ function startControlPlane(
       ASSISTANT_ATTACHMENT_ROOT: attachmentRoot,
       // 에이전트 쪽에서 보는 경로다. 검사는 그 경로를 열지 않고 입력에 적힌 글자만 본다.
       ASSISTANT_ATTACHMENT_AGENT_ROOT: "/agent-side/attachments",
-      // 결과물 폴더는 두 뿌리에 같은 경로를 준다. 대역이 같은 기계에서 입력에 적힌 폴더에 파일을 쓴다.
+      // 결과물 폴더는 두 루트에 같은 경로를 준다. 대역이 같은 기계에서 입력에 적힌 폴더에 파일을 쓴다.
       ASSISTANT_ARTIFACT_ROOT: artifactRoot,
       ASSISTANT_ARTIFACT_AGENT_ROOT: artifactRoot,
-      // 스킬 디렉터리도 두 뿌리에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
+      // 스킬 디렉터리도 두 루트에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
       ASSISTANT_SKILL_ROOT: skillRoot,
       ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,

@@ -66,7 +66,7 @@ for (const cancelled of [false, true]) {
       }),
     );
     if (cancelled) {
-      // 흐름에서는 뿌리 실행이 끝난 뒤 중지할 수 있어 답의 취소 상태도 읽어야 한다.
+      // 흐름에서는 루트 실행이 끝난 뒤 중지할 수 있어 답의 취소 상태도 읽어야 한다.
       await page.route(
         "**/api/chat/conversations/*/messages",
         async (route) => {
@@ -113,7 +113,7 @@ for (const cancelled of [false, true]) {
   });
 }
 
-test("끝난 답의 패널에서 실행 나무를 보고 단추와 Esc 로 닫는다", async ({
+test("끝난 답의 패널에서 실행 트리를 보고 단추와 Esc 로 닫는다", async ({
   page,
 }, testInfo) => {
   await send(page, "패널 검사");
@@ -153,7 +153,7 @@ test("끝난 답의 패널에서 실행 나무를 보고 단추와 Esc 로 닫�
   await expect(page.getByRole("textbox", { name: "메시지" })).toBeVisible();
 });
 
-test("도는 중 패널은 사건을 보이고 끝나면 같은 자리에서 나무로 바뀐다", async ({
+test("도는 중 패널은 사건을 보이고 끝나면 같은 자리에서 트리로 바뀐다", async ({
   page,
   hermes,
 }) => {
@@ -189,7 +189,7 @@ test("도는 중 패널은 사건을 보이고 끝나면 같은 자리에서 나
   }
 });
 
-test("패널이 나무를 읽지 못하면 다시 읽을 수 있다", async ({ page }) => {
+test("패널이 트리를 읽지 못하면 다시 읽을 수 있다", async ({ page }) => {
   await send(page, "패널 재시도 검사");
   await page.route("**/api/usage/executions/*/tree", (route) =>
     route.fulfill({ status: 500, body: "{}" }),
@@ -224,7 +224,7 @@ test("중간 폭에서는 패널이 대화 위 오른쪽에 겹친다", async ({
   ).toBeLessThanOrEqual(0);
 });
 
-test("다른 답에서 열면 같은 패널이 그 답의 나무로 바뀐다", async ({
+test("다른 답에서 열면 같은 패널이 그 답의 트리로 바뀐다", async ({
   page,
 }, testInfo) => {
   test.skip(

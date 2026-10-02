@@ -5,7 +5,7 @@ import { FAKE_STARTER_PROMPTS } from "../fake-hermes.ts";
 type StartersView = { prompts: string[]; status: "READY" | "GENERATING" | "NONE" };
 
 /**
- * 이 시나리오가 `dad` 에게 남기는 뿌리 실행 수다. 추천을 만드는 실행도 사용량에 남는다(ADR-036).
+ * 이 시나리오가 `dad` 에게 남기는 루트 실행 수다. 추천을 만드는 실행도 사용량에 남는다(ADR-036).
  *
  * <p>대화를 마칠 때 다시 만드는 것은 추천이 하루보다 오래됐을 때뿐이라 뒤 시나리오에서는 더 늘지 않는다.
  */

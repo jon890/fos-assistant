@@ -77,14 +77,14 @@ export const connectorDelegationScenario: Scenario = {
             contextFor(token, "agent_delegate", rootSession)),
           "agent_delegate",
         );
-      // 끝난 실행을 `agent_status` 로 읽으면 그 결과는 전한 것으로 적혀 자동 turn 이 열리지 않는다. 실행 나무로 본다.
+      // 끝난 실행을 `agent_status` 로 읽으면 그 결과는 전한 것으로 적혀 자동 turn 이 열리지 않는다. 실행 트리로 본다.
       const rootId = rootExecutionId;
       const finish = async (executionId: number, what: string): Promise<string> => {
         const until = Date.now() + 10_000;
         let status: string | undefined;
         while (Date.now() < until) {
           status = expectStatus(
-            await call(context, `/usage/executions/${rootId}/tree`, { token: context.tokens.dad }), 200, "실행 나무",
+            await call(context, `/usage/executions/${rootId}/tree`, { token: context.tokens.dad }), 200, "실행 트리",
           ).json<Tree>().root.children.find((child) => child.executionId === executionId)?.status;
           if (status !== undefined && status !== "RUNNING") return status;
           await new Promise((resolve) => setTimeout(resolve, 100));

@@ -134,7 +134,7 @@ export const streamingScenario: Scenario = {
     const richDone = rich.at(-1)!;
     const richTree = expectStatus(await call(context, `/usage/executions/${richDone.executionId}/tree`, {
       token: context.tokens.dad,
-    }), 200, "하위 에이전트 실행 나무").json<ExecutionTree>();
+    }), 200, "하위 에이전트 실행 트리").json<ExecutionTree>();
     const savedSubagent = richTree.root.events.find((item) => item.eventType === "SUBAGENT_COMPLETED");
     expect(savedSubagent?.model === "z-ai/glm-5.2", "하위 에이전트 모델이 저장되지 않았다");
     expect(savedSubagent?.inputTokens === 12300 && savedSubagent.outputTokens === 410, "하위 에이전트 토큰이 저장되지 않았다");
@@ -156,7 +156,7 @@ export const streamingScenario: Scenario = {
       while (Date.now() < deadline) {
         const childTree = expectStatus(await call(context, `/usage/executions/${doneChild.executionId}/tree`, {
           token: context.tokens.dad,
-        }), 200, "비동기 자식 실행 나무").json<ExecutionTree>();
+        }), 200, "비동기 자식 실행 트리").json<ExecutionTree>();
         const completedChildren = childTree.root.events.filter((item) => item.eventType === "SUBAGENT_COMPLETED");
         expect(completedChildren.length <= 1, "자식 완료가 중복으로 기록됐다");
         recordedChild = completedChildren.at(0);
@@ -190,24 +190,24 @@ export const streamingScenario: Scenario = {
       `[fake hermes on profile ${DAD_BINDING.profileName}] 스트림 중단 검사`,
     );
 
-    step("실행 하나를 나무로 조회하면 사건이 순서대로 들어 있다");
+    step("실행 하나를 트리로 조회하면 사건이 순서대로 들어 있다");
     const tree = expectStatus(
       await call(context, `/usage/executions/${done!.executionId}/tree`, {
         token: context.tokens.dad,
       }),
       200,
-      "실행 나무 조회",
+      "실행 트리 조회",
     ).json<ExecutionTree>();
 
     const savedTool = tree.root.events.find((event) => event.toolName === "fake-tool");
     expect(savedTool?.detail?.includes("[가림]") === true, "저장된 도구 내용에 가리기 표시가 없다");
     expect(savedTool?.detail?.includes("12000") === true, "도구 내용의 일반 금액이 사라졌다");
     for (const secret of TOOL_DETAIL_SECRETS) {
-      expect(!JSON.stringify(tree).includes(secret), "실행 나무 API에 도구 비밀값이나 UUID 원문이 있다");
+      expect(!JSON.stringify(tree).includes(secret), "실행 트리 API에 도구 비밀값이나 UUID 원문이 있다");
     }
 
-    expect(tree.root.executionId === done!.executionId, "물어본 실행이 뿌리로 나오지 않았다");
-    expect(tree.truncated === false, "자를 것이 없는데 나무가 잘렸다고 나왔다");
+    expect(tree.root.executionId === done!.executionId, "물어본 실행이 루트로 나오지 않았다");
+    expect(tree.truncated === false, "자를 것이 없는데 트리가 잘렸다고 나왔다");
     expect(tree.root.truncated === false, "자를 것이 없는데 노드가 잘렸다고 나왔다");
     // Memory 제안이 꺼져 있어 이 실행에는 자식이 달리지 않는다. 켜면 제안 실행이 자식이 된다.
     expect(tree.root.children.length === 0, "자식이 없는데 children 이 비어 있지 않다");
@@ -229,7 +229,7 @@ export const streamingScenario: Scenario = {
         token: context.tokens.kid,
       }),
       404,
-      "남의 실행 나무 조회",
+      "남의 실행 트리 조회",
     ).json<{ code: string }>();
     expect(stolen.code === "EXECUTION_NOT_FOUND", `오류 코드가 다르다: ${stolen.code}`);
   },

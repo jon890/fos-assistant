@@ -85,7 +85,7 @@ function interval(from: string, to: string): string | null {
     : null;
 }
 
-/** 실행 하나의 머리 요약과 나무를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다. */
+/** 실행 하나의 머리 요약과 트리를 함께 읽고 그린다. 화면을 열 때 한 번만 읽는다. */
 export function ExecutionDetail({ executionId }: { executionId: number }) {
   const router = useRouter();
   const isAdmin = useShellIsAdmin();

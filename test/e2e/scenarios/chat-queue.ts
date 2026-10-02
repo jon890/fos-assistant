@@ -274,7 +274,7 @@ async function orderWithDelegation(context: Context): Promise<void> {
     const conversationId = root.started.conversationId!;
     const rootExecutionId = root.started.executionId!;
     const rootRun = context.hermes.heldRun();
-    if (rootRun === undefined) fail("붙잡은 뿌리 turn 의 run 이 없다");
+    if (rootRun === undefined) fail("붙잡은 루트 turn 의 run 이 없다");
 
     // 자식은 붙잡지 않으므로 곧 끝난다.
     const delegated = parsed<Status>(
@@ -300,7 +300,7 @@ async function orderWithDelegation(context: Context): Promise<void> {
 
     await enqueue(context, conversationId, "순서 검사 대기 글");
     context.hermes.releaseHeldRun();
-    await within(root.turn.completed, 5_000, "뿌리 turn 의 스트림이 끝나지 않았다");
+    await within(root.turn.completed, 5_000, "루트 turn 의 스트림이 끝나지 않았다");
     const messages = await awaitMessages(
       context,
       conversationId,

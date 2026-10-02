@@ -145,7 +145,7 @@ export const nativeDelegationScenario: Scenario = {
       const kidMemory = await memoryTitle(context, context.tokens.kid, "아이 위임 검사");
       memoryIds.push({ token: context.tokens.kid, id: kidMemory.id });
 
-      step("두 사용자의 부모 turn 이 끝나면 자식 session 이 각자의 뿌리 아래 등록돼 있다");
+      step("두 사용자의 부모 turn 이 끝나면 자식 session 이 각자의 루트 아래 등록돼 있다");
       const [dadTurn, kidTurn] = await Promise.all([
         send(context, context.tokens.dad, { text: SUBAGENT_MEMORY_PROBE }, "아빠 하위 에이전트 검사 대화"),
         send(context, context.tokens.kid, { text: SUBAGENT_MEMORY_PROBE }, "아이 하위 에이전트 검사 대화"),
@@ -157,7 +157,7 @@ export const nativeDelegationScenario: Scenario = {
       const kidRegistration = registrations.find((entry) => entry.childSessionId === kidChild);
       expect(dadRegistration?.status === 201, `아빠 자식의 등록 상태가 201 이 아니다: ${dadRegistration?.status}`);
       expect(kidRegistration?.status === 201, `아이 자식의 등록 상태가 201 이 아니다: ${kidRegistration?.status}`);
-      expect(dadRegistration?.rootSessionId !== kidRegistration?.rootSessionId, "두 자식의 뿌리 session 이 같다");
+      expect(dadRegistration?.rootSessionId !== kidRegistration?.rootSessionId, "두 자식의 루트 session 이 같다");
 
       step("두 turn 의 실행이 끝난 상태다");
       for (const [who, token, turn] of [

@@ -34,7 +34,7 @@ function conversationNav(page: Page) {
   return page.getByRole("navigation", { name: "대화 목록" });
 }
 
-/** 대화 목록에서 그 대화로 가는 링크다. 대화상자가 열린 동안에는 목록이 접근성 나무에서 빠지므로 역할로 찾지 않는다. */
+/** 대화 목록에서 그 대화로 가는 링크다. 대화상자가 열린 동안에는 목록이 접근성 트리에서 빠지므로 역할로 찾지 않는다. */
 function conversationLink(page: Page, id: string) {
   return page.locator(`nav[aria-label="대화 목록"] a[href="/chat/${id}"]`);
 }
