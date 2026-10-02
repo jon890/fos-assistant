@@ -136,7 +136,7 @@ export const peopleScenario: Scenario = {
     expect(joined !== undefined, "더한 사람이 목록에 없다");
     expect(joined!.joined, "들어온 적 있는 사람이 아직 없는 것으로 보인다");
 
-    step("사용 중지하면 로그인 판정이 거짓이 된다");
+    step("사용 중지하면 로그인 판정이 거짓이 되고 이미 들어온 사람의 요청도 막힌다");
     expectStatus(
       await call(context, `/admin/people/${joined!.id}`, {
         method: "PATCH",
@@ -156,6 +156,21 @@ export const peopleScenario: Scenario = {
       "사용 중지한 주소의 로그인 판정",
     ).json<{ allowed: boolean }>();
     expect(!blocked.allowed, "사용 중지한 주소가 로그인 판정을 통과했다");
+    const revoked = expectStatus(
+      await call(context, "/agents", { token: context.tokens.aunt }),
+      401,
+      "사용 중지한 사람의 에이전트 목록",
+    );
+    expect(
+      revoked.json<{ code: string }>().code === "ACCESS_REVOKED",
+      `사용 중지한 사람의 오류 코드가 다르다: ${revoked.body}`,
+    );
+    // 이 경로는 인증 없이도 열려 있어, 필터가 직접 막는지 본다.
+    expectStatus(
+      await call(context, "/me", { token: context.tokens.aunt }),
+      401,
+      "사용 중지한 사람의 내 정보",
+    );
 
     step("다시 허용하면 통과한다");
     expectStatus(
@@ -177,5 +192,10 @@ export const peopleScenario: Scenario = {
       "다시 허용한 주소의 로그인 판정",
     ).json<{ allowed: boolean }>();
     expect(restored.allowed, "다시 허용한 주소가 로그인 판정을 통과하지 못했다");
+    expectStatus(
+      await call(context, "/agents", { token: context.tokens.aunt }),
+      200,
+      "다시 허용한 사람의 에이전트 목록",
+    );
   },
 };

@@ -38,8 +38,8 @@ public class UserProvisioningService {
     /**
      * 그 메일 주소의 사용자를 찾고, 없으면 만든다.
      *
-     * <p>이 경로는 {@code ControlPlaneJwtFilter} 가 매 요청 부른다. 그래서 **에이전트를 만들려고
-     * 시도하는 것은 사용자를 새로 저장하는 그 순간뿐이다.**
+     * <p>{@code ControlPlaneJwtFilter} 가 {@code AllowedUserResolver} 를 거쳐 매 요청 부른다. 그래서
+     * **에이전트를 만들려고 시도하는 것은 사용자를 새로 저장하는 그 순간뿐이다.**
      *
      * <p>허용 목록에서 그 사람을 찾지 못하면({@code signInPolicy.admit} 가 비면) 사용자만 만들고
      * 에이전트는 만들지 않는다. 그런 사람과, 첫 로그인이 모델을 읽던 때에 에이전트 없이 들어온 사람은
