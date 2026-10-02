@@ -87,8 +87,10 @@ test("MEMBER는 관리 목록과 옛 관리 주소를 쓰지 못한다", async (
   await expect(page.locator('a[href="/agents/browser"]')).toHaveCount(0);
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
 
+  // 관리자 영역의 주소는 MEMBER 역할에게 열리지 않고 홈으로 넘어간다.
   await page.goto("/admin/agents");
-  await expect(page).toHaveURL(/\/agents$/);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toHaveCount(0);
 });
 
 test("그룹 공개로 바꾸기 전에 확인하고 취소와 확인을 반영한다", async ({ page }) => {

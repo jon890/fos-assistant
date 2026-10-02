@@ -33,10 +33,7 @@ export default async function RootLayout({
     <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
       <body className="flex h-dvh overflow-hidden bg-background text-foreground">
         <ThemeProvider>
-          <AppShell
-            isAdmin={me?.role === "ADMIN"}
-            displayName={me?.displayName}
-          >
+          <AppShell role={me?.role ?? null} displayName={me?.displayName}>
             {children}
           </AppShell>
         </ThemeProvider>

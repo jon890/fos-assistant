@@ -7,6 +7,8 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
   await expect(page.getByRole("link", { name: "에이전트", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
   await expect(page.getByText("브라우저 테스트", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("admin-entry")).toBeVisible();
+  await expect(page.getByTestId("admin-entry")).toHaveText("관리자");
 
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   const me = await page.request.get("/api/me");
@@ -21,6 +23,7 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
   await expect(page.getByRole("link", { name: "에이전트", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
   await expect(page.getByText("가족 사용자", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("admin-entry")).toHaveCount(0);
 });
 
 test("머리의 이름을 한 번만 읽고 좁은 화면에서도 한 줄을 유지한다", async ({ page }, testInfo) => {

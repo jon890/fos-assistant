@@ -89,7 +89,7 @@ test("에이전트 목록 뼈대는 레이아웃 역할로 관리자와 일반 �
   assert.doesNotMatch(content, /readMe|await/);
   assert.match(content, /isAdmin[\s\S]*?width="4xl" title description="agent" form="agent"/);
   assert.match(content, /width="2xl" title/);
-  assert.match(shell, /AdminContext\.Provider value=\{isAdmin\}/);
+  assert.match(shell, /AdminContext\.Provider value=\{knownRole === "ADMIN"\}/);
 });
 
 test("loading.tsx 는 뼈대를 두기로 한 경로에만 있다", async () => {

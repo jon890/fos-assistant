@@ -7,16 +7,19 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import { Menu, PanelLeft, SquarePen } from "lucide-react";
+import { AdminShell, LAST_CONVERSATION_KEY } from "./admin-shell";
 import {
   ConversationsProvider,
   useConversations,
 } from "./conversations-provider";
+import { shellRoleState, type ShellRoleState } from "./role-state";
 import { ScreenTransition } from "./screen-transition";
 import { Sidebar } from "./sidebar";
 import { useShortcuts } from "./use-shortcuts";
@@ -25,6 +28,7 @@ import { TooltipButton } from "@/components/ui/tooltip-button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useMediaQuery } from "@/components/ui/use-media-query";
+import { fetchMe, type ClientMe } from "@/lib/me-client";
 
 const TitleContext = createContext<Dispatch<SetStateAction<string>> | null>(
   null,
@@ -34,8 +38,35 @@ const DisplayNameContext = createContext<string | null>(null);
 /** 레이아웃이 확인한 관리자 역할을 로딩 화면에서도 다시 조회하지 않고 쓴다. */
 const AdminContext = createContext(false);
 
+/** 사이드바 맨 아래 줄이 읽는 값이다. 붙박이 사이드바와 서랍의 사이드바가 같은 값을 읽는다. */
+type ShellAccount = {
+  state: ShellRoleState;
+  displayName: string | null;
+  /** 역할과 이름을 브라우저에서 다시 읽는다. */
+  retry(): void;
+};
+const ShellAccountContext = createContext<ShellAccount>({
+  state: "reading",
+  displayName: null,
+  retry: () => {},
+});
+
+export function useShellAccount(): ShellAccount {
+  return useContext(ShellAccountContext);
+}
+
+function isAdminArea(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
 export function useShellIsAdmin(): boolean {
   return useContext(AdminContext);
+}
+
+/** 관리자 전용 표시를 그릴지 정한다. 역할이 `ADMIN` 이어도 관리자 영역 밖에서는 거짓이다. */
+export function useAdminView(): boolean {
+  const isAdmin = useContext(AdminContext);
+  return isAdminArea(usePathname()) && isAdmin;
 }
 
 export function useShellDisplayName(): string | null {
@@ -51,17 +82,14 @@ export function useShellTitle(title: string | null): void {
 }
 
 function ShellBody({
-  isAdmin,
-  displayName,
   children,
   signedIn,
 }: {
-  isAdmin: boolean;
-  displayName?: string;
   children: React.ReactNode;
   signedIn: boolean;
 }) {
   const pathname = usePathname();
+  const inAdminArea = isAdminArea(pathname);
   const { startNew } = useConversations();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -106,7 +134,8 @@ function ShellBody({
       setDrawerOpen(true);
     }
   }, [updateCollapsed]);
-  useShortcuts(signedIn, startNew, toggleSidebar, focusSearch);
+  // 관리자 영역에는 사이드바와 검색칸이 없어 단축키가 닿을 곳이 없다.
+  useShortcuts(signedIn && !inAdminArea, startNew, toggleSidebar, focusSearch);
 
   // 서랍은 옮기는 동안 열어 둔다. 누른 줄의 회전 표시와 「옮기는 중」 안내가 옮기는 내내 서랍 안에 남는다.
   // 경로가 바뀌면 여기서 닫는다.
@@ -130,6 +159,8 @@ function ShellBody({
     );
   }
 
+  if (inAdminArea) return <AdminShell>{children}</AdminShell>;
+
   return (
     <TitleContext.Provider value={setTitle}>
       <div className="flex h-full min-h-0 min-w-0 flex-1">
@@ -143,8 +174,6 @@ function ShellBody({
             )}
           >
             <Sidebar
-              isAdmin={isAdmin}
-              displayName={displayName}
               onNavigate={closeIfSamePath}
               searchRef={pinnedSearchRef}
               onCollapse={() => updateCollapsed(true)}
@@ -175,8 +204,6 @@ function ShellBody({
             <aside aria-label="사이드바" className="h-full min-h-0">
               {/* 닫히며 사라지는 동안에는 붙박이 쪽이 안내 영역을 갖는다. 안내 영역이 한 번에 하나만 있다. */}
               <Sidebar
-                isAdmin={isAdmin}
-                displayName={displayName}
                 onNavigate={closeIfSamePath}
                 searchRef={drawerSearchRef}
                 onCollapse={() => updateCollapsed(true)}
@@ -236,29 +263,74 @@ function ShellBody({
 }
 
 export function AppShell({
-  isAdmin,
+  role,
   displayName,
   children,
 }: {
-  isAdmin: boolean;
+  /** 레이아웃이 읽은 역할이다. 읽지 못했으면 `null` 이다 */
+  role: "ADMIN" | "MEMBER" | null;
   displayName?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const signedIn = pathname !== "/signin";
+  const inAdminArea = isAdminArea(pathname);
+  /** 레이아웃이 역할을 읽지 못했을 때 브라우저에서 다시 읽은 결과다 */
+  const [reread, setReread] = useState<ClientMe | null>(null);
+  const [retried, setRetried] = useState(false);
+
+  const retry = useCallback(() => {
+    setRetried(false);
+    void fetchMe().then((me) => {
+      setReread(me);
+      setRetried(true);
+    });
+  }, []);
+  // 레이아웃이 읽지 못했으면 올라온 뒤 한 번 다시 읽는다. 그래도 못 읽으면 실패로 두고 「다시 읽기」 를 기다린다.
+  useEffect(() => {
+    if (role !== null || !signedIn) return;
+    let stale = false;
+    void fetchMe().then((me) => {
+      if (stale) return;
+      setReread(me);
+      setRetried(true);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [role, signedIn]);
+
+  // 관리자 영역에서 돌아갈 곳이다. 저장소를 막은 브라우저에서는 적지 않고 넘어간다.
+  useEffect(() => {
+    if (!pathname.startsWith("/chat/")) return;
+    try {
+      sessionStorage.setItem(LAST_CONVERSATION_KEY, pathname);
+    } catch {
+      /* 적지 못하면 돌아갈 곳은 새 대화 화면이다. */
+    }
+  }, [pathname]);
+
+  const knownRole = role ?? reread?.role ?? null;
+  const knownName = displayName || reread?.displayName || null;
+  const account = useMemo(
+    () => ({
+      state: shellRoleState(knownRole, retried),
+      displayName: knownName,
+      retry,
+    }),
+    [knownRole, retried, knownName, retry],
+  );
+
   return (
     <TooltipProvider>
-      <AdminContext.Provider value={isAdmin}>
-        <DisplayNameContext.Provider value={displayName || null}>
-          <ConversationsProvider enabled={signedIn}>
-            <ShellBody
-              isAdmin={isAdmin}
-              displayName={displayName}
-              signedIn={signedIn}
-            >
-              {children}
-            </ShellBody>
-          </ConversationsProvider>
+      <AdminContext.Provider value={knownRole === "ADMIN"}>
+        <DisplayNameContext.Provider value={knownName}>
+          <ShellAccountContext.Provider value={account}>
+            {/* 관리자 영역에서는 대화 목록을 읽지 않는다. */}
+            <ConversationsProvider enabled={signedIn && !inAdminArea}>
+              <ShellBody signedIn={signedIn}>{children}</ShellBody>
+            </ConversationsProvider>
+          </ShellAccountContext.Provider>
         </DisplayNameContext.Provider>
       </AdminContext.Provider>
     </TooltipProvider>
