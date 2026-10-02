@@ -188,7 +188,9 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
         </div>
         {editable ? (
           <Button asChild size="sm" variant="outline">
-            <Link href={`/agents/${code}/skills/new`}>스킬 추가</Link>
+            <Link prefetch={false} href={`/agents/${code}/skills/new`}>
+              스킬 추가
+            </Link>
           </Button>
         ) : null}
       </div>
@@ -236,6 +238,7 @@ export function AgentSkillsSection({ code, initialSkills }: Props) {
                     <div className="mt-2 flex gap-2">
                       <Button asChild size="sm" variant="outline">
                         <Link
+                          prefetch={false}
                           href={`/agents/${code}/skills/${skill.name}`}
                           aria-label={`${skill.name} 편집`}
                         >

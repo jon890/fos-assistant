@@ -48,6 +48,7 @@ export function SkillUsageList({ rows }: { rows: SkillUsageRow[] }) {
           <li key={`${row.agentCode}/${row.skillName}`}>
             {row.lastConversationId ? (
               <Link
+                prefetch={false}
                 href={`/chat/${row.lastConversationId}`}
                 className={`${rowClass} hover:bg-muted`}
               >

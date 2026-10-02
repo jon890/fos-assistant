@@ -74,6 +74,7 @@ export function ExecutionTable({
               </TableCell>
               <TableCell className="py-3 whitespace-normal">
                 <Link
+                  prefetch={false}
                   href={`/executions/${execution.id}`}
                   className="font-medium hover:underline"
                   aria-label={`${agentLabel(execution.agentName)} 실행 상세 보기 (${execution.id}번)${

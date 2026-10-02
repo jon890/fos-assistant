@@ -25,7 +25,10 @@ import {
 } from "./chat/activity/activity-panel";
 import { ArtifactPanel } from "./chat/artifact/artifact-panel";
 import type { Turn } from "./chat/message-bubble";
-import { useConversations } from "./shell/conversations-provider";
+import {
+  useConversation,
+  useConversations,
+} from "./shell/conversations-provider";
 import { escapeOnlyClosedTooltip } from "./ui/tooltip-button";
 import { Notice } from "./ui/notice";
 import {
@@ -216,8 +219,7 @@ export function ChatPanel({
   initialConversationId: string | null;
 }) {
   const pathname = usePathname();
-  const { conversations, refresh, replace, newConversationVersion } =
-    useConversations();
+  const { refresh, replace, newConversationVersion } = useConversations();
   const displayName = useShellDisplayName();
   const isAdmin = useShellIsAdmin();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -621,10 +623,10 @@ export function ChatPanel({
     };
   }, [conversationId]);
 
+  const currentConversation = useConversation(conversationId);
   useEffect(() => {
-    const selected = conversations.find((item) => item.id === conversationId);
-    if (selected) setAgentCode(selected.agentCode ?? "");
-  }, [conversations, conversationId]);
+    if (currentConversation) setAgentCode(currentConversation.agentCode ?? "");
+  }, [currentConversation]);
 
   useEffect(() => {
     const previous = previousPathname.current;
@@ -1775,9 +1777,6 @@ export function ChatPanel({
     }
   }
 
-  const currentConversation = conversations.find(
-    (item) => item.id === conversationId,
-  );
   // 에이전트 행이 없는 대화는 agentCode 가 null 이다. 대화 목록이 먼저 읽혀 빈 코드가 첫 에이전트로 채워져도
   // 그 에이전트의 모델과 사진 단추와 스킬이 이 대화에 보이지 않게, 상태가 아니라 이 값으로 막는다.
   const agentMissing =

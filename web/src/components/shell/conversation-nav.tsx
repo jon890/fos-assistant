@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ellipsis } from "lucide-react";
 import {
   AlertDialog,
@@ -39,8 +39,20 @@ export function ConversationNav({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { conversations, loading, error, rename, remove, drop, startNew } =
-    useConversations();
+  const {
+    conversations,
+    loading,
+    error,
+    hasMore,
+    loadingMore,
+    moreError,
+    loadMore,
+    wasPaged,
+    rename,
+    remove,
+    drop,
+    startNew,
+  } = useConversations();
   const { exit } = useExit();
   /** 지우기 요청이 성공해 나가는 움직임을 보이는 줄이다 */
   const [leavingId, setLeavingId] = useState<string | null>(null);
@@ -67,6 +79,29 @@ export function ConversationNav({
       .toLocaleLowerCase("ko-KR")
       .includes(normalizedQuery),
   );
+  const navRef = useRef<HTMLElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const searching = normalizedQuery !== "";
+  const needsMore = hasMore && !loadingMore && moreError === null;
+
+  /** 아직 읽지 않은 대화까지 검색하려면 남은 쪽을 모두 읽어 둬야 한다. 쪽당 최대치로 읽어 요청 수를 줄인다 */
+  useEffect(() => {
+    if (searching && needsMore) void loadMore(100);
+  }, [searching, needsMore, loadMore]);
+
+  /** 목록 끝에 닿으면 다음 쪽을 읽는다. 읽은 뒤에도 끝이 보이면(짧은 화면) 다시 닿은 것으로 쳐서 이어 읽는다 */
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (searching || !needsMore || sentinel === null) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+      },
+      { root: navRef.current, rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [searching, needsMore, loadMore, conversations.length]);
 
   function beginEdit(conversation: Conversation) {
     renameChosen.current = true;
@@ -122,7 +157,11 @@ export function ConversationNav({
   }
 
   return (
-    <nav aria-label="대화 목록" className="min-h-0 flex-1 overflow-y-auto px-2">
+    <nav
+      ref={navRef}
+      aria-label="대화 목록"
+      className="min-h-0 flex-1 overflow-y-auto px-2"
+    >
       {actionError ? (
         <p role="alert" className="mb-2 px-2 text-sm text-destructive">
           {actionError}
@@ -160,6 +199,7 @@ export function ConversationNav({
                       "group relative flex min-w-0 items-center",
                       initialIds !== null &&
                         !initialIds.has(conversation.id) &&
+                        !wasPaged(conversation.id) &&
                         "animate-message-assistant",
                     )}
                     onAnimationEnd={(event) => {
@@ -200,6 +240,8 @@ export function ConversationNav({
                     ) : (
                       <Link
                         href={`/chat/${conversation.id}`}
+                        // 보이는 줄마다 대화 화면을 미리 읽으면 목록이 길 때 요청이 한꺼번에 몰린다.
+                        prefetch={false}
                         onClick={(event) => {
                           // 사진을 먼저 올리며 주소만 바뀐 경우 같은 대화로 다시 이동하지 않는다.
                           if (
@@ -287,6 +329,27 @@ export function ConversationNav({
           </section>
         ))
       )}
+      {!loading && !error && hasMore ? (
+        <div
+          ref={sentinelRef}
+          className="px-2 pb-3 text-sm text-muted-foreground"
+        >
+          {moreError ? (
+            <p role="alert">
+              {moreError}{" "}
+              <button
+                type="button"
+                className="underline"
+                onClick={() => void loadMore()}
+              >
+                다시 읽기
+              </button>
+            </p>
+          ) : loadingMore || searching ? (
+            <Skeleton aria-label="대화를 더 읽고 있어요" className="h-10" />
+          ) : null}
+        </div>
+      ) : null}
       <AlertDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {

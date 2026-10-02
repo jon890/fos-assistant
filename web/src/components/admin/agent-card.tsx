@@ -26,6 +26,7 @@ export function AgentCard({ agent, currentUserId }: Props) {
         </div>
       </div>
       <Link
+        prefetch={false}
         href={`/agents/${agent.code}`}
         className="mt-3 inline-block text-sm text-foreground underline underline-offset-4"
       >

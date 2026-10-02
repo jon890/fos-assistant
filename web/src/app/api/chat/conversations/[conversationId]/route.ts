@@ -28,6 +28,13 @@ function response(result: Awaited<ReturnType<typeof callControlPlane>>) {
     : NextResponse.json(result.data);
 }
 
+export async function GET(_request: Request, context: RouteContext) {
+  const id = await idOf(context);
+  return id === null
+    ? invalid()
+    : response(await callControlPlane(`/api/v1/chat/conversations/${id}`));
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   const id = await idOf(context);
   if (id === null) return invalid();
