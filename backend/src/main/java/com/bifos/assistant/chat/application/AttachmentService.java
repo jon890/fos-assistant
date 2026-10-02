@@ -8,6 +8,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -40,6 +41,7 @@ public class AttachmentService {
     private final ChatAttachmentRepository attachments;
     private final AttachmentStore store;
     private final AttachmentProperties properties;
+    private final Clock clock;
 
     /**
      * 사진 한 장을 올린다.
@@ -67,18 +69,18 @@ public class AttachmentService {
         // 올리지 못한다.
         if (attachments.countByConversationIdAndMessageIdIsNullAndDeletedAtIsNull(conversationId)
                 >= properties.maxFiles()) {
-            throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "too many images are waiting to be sent");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "too many images are waiting to be sent");
         }
 
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
                 conversationId,
                 user.id(),
                 displayName(originalName),
                 normalizedType,
                 byteSize,
-                now.plus(Duration.ofDays(properties.retentionDays()))));
+                now.plus(Duration.ofDays(properties.retentionDays())),
+                now));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), extension));
 
         try (InputStream in = body.getInputStream()) {
@@ -95,8 +97,7 @@ public class AttachmentService {
         if (!attachment.isVisible()) {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
         }
-        return new AttachmentContent(
-                attachment.contentType(), attachment.byteSize(), store.open(attachment));
+        return new AttachmentContent(attachment.contentType(), attachment.byteSize(), store.open(attachment));
     }
 
     /** 보관 기간을 기다리지 않고 지운다. 이미 지워졌으면 아무것도 하지 않는다. 행은 남긴다. */
@@ -107,7 +108,7 @@ public class AttachmentService {
             return;
         }
         store.delete(attachment);
-        attachment.markDeleted(Instant.now());
+        attachment.markDeleted(clock.instant());
     }
 
     /**
@@ -126,8 +127,7 @@ public class AttachmentService {
                 || new HashSet<>(attachmentIds).size() != attachmentIds.size()) {
             throw notAttachable();
         }
-        List<ChatAttachment> found =
-                attachments.findByConversationIdAndIdIn(conversationId, attachmentIds);
+        List<ChatAttachment> found = attachments.findByConversationIdAndIdIn(conversationId, attachmentIds);
         boolean allFree = found.size() == attachmentIds.size()
                 && found.stream().allMatch(it -> it.messageId() == null && it.isVisible());
         if (!allFree) {
@@ -176,8 +176,8 @@ public class AttachmentService {
         String directory = stripTrailingSlash(properties.agentRoot()) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
         String files = attached.stream()
-                .map(it -> "- " + order.get(it.id()) + "번째 사진: " + it.storedName()
-                        + " (올린 이름: " + it.originalName() + ")")
+                .map(it ->
+                        "- " + order.get(it.id()) + "번째 사진: " + it.storedName() + " (올린 이름: " + it.originalName() + ")")
                 .collect(Collectors.joining("\n"));
         return "[이번 메시지에 올린 사진]\n"
                 + directory + "\n"
@@ -209,13 +209,12 @@ public class AttachmentService {
         return attachments.findByConversationIdOrderByIdAsc(conversationId);
     }
 
-    private ChatAttachment requireOwnAttachment(
-            CurrentUser user, Long conversationId, Long attachmentId) {
+    private ChatAttachment requireOwnAttachment(CurrentUser user, Long conversationId, Long attachmentId) {
         access.requireOwn(user, conversationId);
         return attachments
                 .findByIdAndConversationId(attachmentId, conversationId)
-                .orElseThrow(() -> new ApiException(
-                        ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
+                .orElseThrow(
+                        () -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
     }
 
     private static String stripTrailingSlash(String path) {
@@ -227,8 +226,7 @@ public class AttachmentService {
     }
 
     private static ApiException notAttachable() {
-        return new ApiException(
-                ErrorCode.VALIDATION_FAILED, "these attachments cannot be sent with this message");
+        return new ApiException(ErrorCode.VALIDATION_FAILED, "these attachments cannot be sent with this message");
     }
 
     /** {@code image/JPEG; charset=...} 같은 값을 비교할 수 있게 매개변수를 떼고 소문자로 맞춘다. */

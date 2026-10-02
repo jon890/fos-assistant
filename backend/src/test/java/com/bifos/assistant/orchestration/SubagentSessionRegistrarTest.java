@@ -18,6 +18,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -79,8 +80,8 @@ class SubagentSessionRegistrarTest {
             jdbc.update("DELETE FROM conversation WHERE user_id = ?", user.id());
             users.delete(user);
         }));
-        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER));
-        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER));
+        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER, Instant.now()));
+        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER, Instant.now()));
         root = newRoot();
         dadRun = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE_A, root);
     }
@@ -235,7 +236,7 @@ class SubagentSessionRegistrarTest {
     void cannotRegisterValueUsedAsConversationSendOrRootSessionAsSubagent() {
         String compacted = newRoot();
         String conversationRoot = newRoot();
-        Conversation conversation = Conversation.startedBy(dad.id(), "압축된 대화", null);
+        Conversation conversation = Conversation.startedBy(dad.id(), "압축된 대화", null, Instant.now());
         conversation.adoptSessions(compacted, conversationRoot);
         conversations.save(conversation);
 

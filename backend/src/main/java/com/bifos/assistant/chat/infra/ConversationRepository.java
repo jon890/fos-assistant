@@ -12,7 +12,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
@@ -43,8 +42,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     /** 어느 대화가 그 값을 보낼 session 이나 루트 session 으로 쓰는지. 지운 대화도 센다. */
     boolean existsByHermesSessionIdOrHermesRootSessionId(String hermesSessionId, String hermesRootSessionId);
 
+    /** 보낼 session 을 채우고 {@code updatedAt} 을 올린다. session 이 null 이면 있던 값을 둔다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying
-    @Transactional
     @Query(
             "update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")
     int touchSession(@Param("id") Long id, @Param("sessionId") String sessionId, @Param("now") Instant now);
@@ -54,34 +53,33 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
      *
      * <p>turn 을 시작할 때 쓰므로 {@code updatedAt} 을 바꾸지 않는다. 바꾸면 실패한 turn 도 대화를 목록 맨
      * 위로 올린다. 같은 새 대화에 두 turn 이 함께 와도 조건 때문에 한쪽만 채운다.
+     *
+     * <p>트랜잭션은 {@code ConversationWriter} 가 연다.
      */
     @Modifying
-    @Transactional
     @Query("""
             update Conversation c set c.hermesSessionId = :sessionId, c.hermesRootSessionId = :sessionId
              where c.id = :id and c.hermesSessionId is null
             """)
     int assignSessionIfAbsent(@Param("id") Long id, @Param("sessionId") String sessionId);
 
-    /** 사용자의 질문 없이 연 turn 의 수를 0 으로 돌린다. 이미 0 이면 줄을 건드리지 않고 0 을 돌려준다. */
+    /** 사용자의 질문 없이 연 turn 의 수를 0 으로 돌린다. 이미 0 이면 줄을 건드리지 않고 0 을 돌려준다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying
-    @Transactional
     @Query("update Conversation c set c.autoTurnCount = 0 where c.id = :id and c.autoTurnCount <> 0")
     int resetAutoTurns(@Param("id") Long id);
 
-    /** 사용자의 질문 없이 연 turn 의 수를 하나 늘린다. */
+    /** 사용자의 질문 없이 연 turn 의 수를 하나 늘린다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying
-    @Transactional
     @Query("update Conversation c set c.autoTurnCount = c.autoTurnCount + 1 where c.id = :id")
     int incrementAutoTurns(@Param("id") Long id);
 
+    /** 제목이 비어 있을 때만 채운다. 채웠으면 1 이다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying
-    @Transactional
     @Query("update Conversation c set c.title = :title where c.id = :id and c.title = ''")
     int fillTitleIfBlank(@Param("id") Long id, @Param("title") String title);
 
+    /** 그 사용자의 지우지 않은 대화일 때만 제목을 바꾼다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
     @Query("""
             update Conversation c set c.title = :title, c.updatedAt = :now
              where c.id = :id and c.userId = :userId and c.deletedAt is null
@@ -121,8 +119,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
             @Param("mode") ModelSelectionMode mode,
             @Param("tier") ModelTier tier);
 
+    /** 그 사용자의 지우지 않은 대화일 때만 지운 시각을 적는다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
     @Query("""
             update Conversation c set c.deletedAt = :now
              where c.id = :id and c.userId = :userId and c.deletedAt is null

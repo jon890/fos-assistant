@@ -55,6 +55,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
@@ -348,7 +349,7 @@ class ChatAttachmentTurnTest {
         flowed.assignFlow("research-and-build");
         agents.save(flowed);
         Long conversationId = conversations
-                .save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()))
+                .save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()))
                 .id();
         ChatAttachment photo = upload(dad, conversationId, "a.png");
 
@@ -451,7 +452,7 @@ class ChatAttachmentTurnTest {
     }
 
     private CurrentUser member(String email) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -464,7 +465,8 @@ class ChatAttachmentTurnTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id()));
+                owner.id(),
+                Instant.now()));
         return saved;
     }
 

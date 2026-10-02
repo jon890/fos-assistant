@@ -5,13 +5,13 @@ import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import com.bifos.assistant.shared.util.Sha256;
 import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentTokenService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private final AgentTokenRepository tokens;
+    private final Clock clock;
 
     /**
      * profile 에 묶인 새 토큰을 발급한다. 그 profile 에 에이전트가 있는지는 보지 않는다.
@@ -43,7 +44,7 @@ public class AgentTokenService {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        AgentToken saved = tokens.save(AgentToken.issueFor(profileName, hash(raw), label));
+        AgentToken saved = tokens.save(AgentToken.issueFor(profileName, hash(raw), label, clock.instant()));
         return new IssuedToken(saved, raw);
     }
 
@@ -55,7 +56,7 @@ public class AgentTokenService {
     public void revoke(Long id) {
         tokens.findById(id)
                 .orElseThrow(() -> new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such token"))
-                .revoke();
+                .revoke(clock.instant());
     }
 
     /**
@@ -66,7 +67,8 @@ public class AgentTokenService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void revokeAllFor(String profileName) {
-        tokens.findByProfileNameAndRevokedAtIsNull(profileName).forEach(AgentToken::revoke);
+        Instant now = clock.instant();
+        tokens.findByProfileNameAndRevokedAtIsNull(profileName).forEach(token -> token.revoke(now));
     }
 
     /**
@@ -87,17 +89,12 @@ public class AgentTokenService {
             log.warn("profile 이 묶이지 않은 옛 MCP 토큰을 거절했다 tokenId={}", token.id());
             throw new ApiException(ErrorCode.UNAUTHENTICATED, "invalid agent token");
         }
-        token.markUsed();
+        token.markUsed(clock.instant());
         return new McpPrincipal(token.id(), token.profileName(), tokenHash);
     }
 
     public static String hash(String raw) {
-        try {
-            return HexFormat.of()
-                    .formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 is unavailable", ex);
-        }
+        return Sha256.hex(Objects.requireNonNull(raw));
     }
 
     private static void requireProfileName(String profileName) {

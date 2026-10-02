@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +57,7 @@ class ModelTierSeedImportIntegrationTest {
     @Test
     @DisplayName("사용자가 있는 그룹에 정의 행이 없으면 설정의 세 단계를 저장하고, 다시 돌려도 저장된 정의를 바꾸지 않는다")
     void importsOnceIntoRealTables() throws Exception {
-        users.save(AppUser.of(EMAIL, "초기값 이전", GROUP_ID, UserRole.ADMIN));
+        users.save(AppUser.of(EMAIL, "초기값 이전", GROUP_ID, UserRole.ADMIN, Instant.now()));
 
         importer.run(null);
 

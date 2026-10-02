@@ -86,7 +86,8 @@ class ModelOptionsServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                dad.id());
+                dad.id(),
+                Instant.now());
         agent.changeAccess(enabled, AgentVisibility.PRIVATE, dad.id());
         when(agentRepository.findByCode(code)).thenReturn(Optional.of(agent));
     }

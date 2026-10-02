@@ -15,6 +15,7 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -63,7 +64,8 @@ class ContextAssemblerTest {
                         CostMode.API,
                         CredentialScope.DEDICATED,
                         AgentVisibility.GROUP,
-                        null)))
+                        null,
+                        Instant.now())))
                 .id();
     }
 
@@ -89,6 +91,14 @@ class ContextAssemblerTest {
         assertThat(result.chars()).isEqualTo(result.instructions().length()).isGreaterThan(8_000);
         assertThat(result.omittedMemoryIds()).containsExactly(3L);
         assertThat(result.instructionsHash()).isNotEqualTo(memory.instructionsHash());
+    }
+
+    @Test
+    @DisplayName("지문은 앞 16바이트의 고정 값이고 지침이 비면 null 이다")
+    void instructionsHashIsFixedValueAndNullWhenEmpty() {
+        assertThat(new AssembledContext("지침 본문", 5).instructionsHash()).isEqualTo("fd75209d816515dfa7bffe27acfcb25f");
+        assertThat(new AssembledContext("", 0).instructionsHash()).isNull();
+        assertThat(AssembledContext.empty().instructionsHash()).isNull();
     }
 
     @Test
@@ -243,7 +253,8 @@ class ContextAssemblerTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                ADMIN.id());
+                ADMIN.id(),
+                Instant.now());
         connector.markConnectorManaged();
         Long connectorId = agents.save(connector).id();
 

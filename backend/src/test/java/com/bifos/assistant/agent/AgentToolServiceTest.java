@@ -8,11 +8,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.HermesToolsetClient.ToolsetCatalogEntry;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -20,6 +22,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Instant;
 import java.util.List;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +36,8 @@ class AgentToolServiceTest {
 
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final SkillStore skillStore = mock(SkillStore.class);
-    private final AgentToolService service = new AgentToolService(toolsets, skillStore);
+    private final AgentToolService service =
+            new AgentToolService(toolsets, skillStore, mock(AgentService.class), mock(AgentRepository.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
             "tools",
@@ -43,7 +47,8 @@ class AgentToolServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L);
+            1L,
+            Instant.now());
 
     @BeforeEach
     void setUp() {
@@ -79,7 +84,8 @@ class AgentToolServiceTest {
     @DisplayName("그룹 에이전트를 읽을 수 있는 다른 사용자도 주인 등급을 바꾸지 못한다")
     void otherUserReadingGroupAgentCannotChangeOwnerTier() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
-        AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
+        AgentToolService isolatedService = new AgentToolService(
+                isolatedToolsets, mock(SkillStore.class), mock(AgentService.class), mock(AgentRepository.class));
         Agent groupAgent = Agent.of(
                 "group-tools",
                 "그룹 도구",
@@ -88,7 +94,8 @@ class AgentToolServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null);
+                null,
+                Instant.now());
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.write(reader, groupAgent, List.of()))
@@ -103,7 +110,8 @@ class AgentToolServiceTest {
     @DisplayName("그룹 에이전트를 읽을 수 있는 다른 사용자도 도구 목록을 읽지 못한다")
     void otherUserReadingGroupAgentCannotReadToolList() {
         HermesToolsetClient isolatedToolsets = mock(HermesToolsetClient.class);
-        AgentToolService isolatedService = new AgentToolService(isolatedToolsets, mock(SkillStore.class));
+        AgentToolService isolatedService = new AgentToolService(
+                isolatedToolsets, mock(SkillStore.class), mock(AgentService.class), mock(AgentRepository.class));
         Agent groupAgent = Agent.of(
                 "group-read",
                 "그룹 도구",
@@ -112,7 +120,8 @@ class AgentToolServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null);
+                null,
+                Instant.now());
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.read(reader, groupAgent))

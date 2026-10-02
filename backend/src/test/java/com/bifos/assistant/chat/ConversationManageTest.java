@@ -27,6 +27,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -98,7 +99,7 @@ class ConversationManageTest {
     }
 
     private CurrentUser member(String name) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
                 name,
                 name,
@@ -107,7 +108,8 @@ class ConversationManageTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(),
+                Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

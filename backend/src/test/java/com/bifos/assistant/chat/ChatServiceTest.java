@@ -22,6 +22,7 @@ import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ChatTurn;
 import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.SkillCommand;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -172,6 +173,9 @@ class ChatServiceTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -277,7 +281,7 @@ class ChatServiceTest {
     }
 
     private CurrentUser member(String email, String profileName) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
         if (profileName != null) {
             agents.save(Agent.of(
                     profileName,
@@ -287,7 +291,8 @@ class ChatServiceTest {
                     CostMode.SUBSCRIPTION,
                     CredentialScope.SHARED_HOUSEHOLD,
                     AgentVisibility.PRIVATE,
-                    user.id()));
+                    user.id(),
+                    Instant.now()));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -297,7 +302,8 @@ class ChatServiceTest {
     void recordsFailedExecutionWhenStoredTierDefinitionIsMalformed() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id()));
+        Conversation conversation =
+                conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
         transactions.executeWithoutResult(status -> conversations.chooseModelTierIfActive(
                 conversation.id(), dad.id(), ModelSelectionMode.TIER, ModelTier.FAST));
         tierDefinitions.save(ModelTierDefinition.of(dad.groupId(), ModelTier.FAST, null, "example-fast", "low"));
@@ -557,8 +563,8 @@ class ChatServiceTest {
     void oldConversationWithoutRootSendsSessionChosenByHermesAndRecordsIt() {
         CurrentUser dad = member("dad@example.com", "dad");
         Long agentId = agents.findByCode("dad").orElseThrow().id();
-        Conversation legacy = conversations.save(Conversation.startedBy(dad.id(), "옛 대화", agentId));
-        conversations.touchSession(legacy.id(), "hermes-made-session", Instant.now());
+        Conversation legacy = conversations.save(Conversation.startedBy(dad.id(), "옛 대화", agentId, Instant.now()));
+        conversationWriter.touchSession(legacy.id(), "hermes-made-session", Instant.now());
         hermesEchoesSession();
 
         ChatTurn turn = chat.send(dad, legacy.id(), "이어서", "dad");

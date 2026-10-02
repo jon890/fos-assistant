@@ -98,8 +98,8 @@ class SubagentSessionEndpointTest {
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
         users.deleteAll();
-        dad = users.save(AppUser.of("subagent-dad@example.com", "아빠", 1L, UserRole.ADMIN));
-        kid = users.save(AppUser.of("subagent-kid@example.com", "아이", 1L, UserRole.MEMBER));
+        dad = users.save(AppUser.of("subagent-dad@example.com", "아빠", 1L, UserRole.ADMIN, Instant.now()));
+        kid = users.save(AppUser.of("subagent-kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
         tokenA = tokens.issue(PROFILE_A, "a").rawToken();
         tokens.issue(PROFILE_B, "b");
         rootA = McpCallSigner.newRoot();

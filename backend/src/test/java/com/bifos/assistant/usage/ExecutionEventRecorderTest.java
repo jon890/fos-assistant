@@ -14,6 +14,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.ExecutionEventType;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
+import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class ExecutionEventRecorderTest {
     /** 스킬 호출 이력은 따로 적는 자리가 맡는다. 여기서는 그 자리에 무엇을 넘기는지만 본다. */
     private final SkillUseRecorder skillUses = mock(SkillUseRecorder.class);
 
-    private final ExecutionEventRecorder recorder = new ExecutionEventRecorder(skillUses);
+    private final ExecutionEventRecorder recorder = new ExecutionEventRecorder(skillUses, Clock.systemUTC());
 
     private static final AgentExecution EXECUTION = AgentExecution.builder()
             .userId(1L)

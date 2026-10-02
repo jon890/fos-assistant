@@ -14,6 +14,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationEventHub;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.DelegationWakeService;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
@@ -108,6 +109,9 @@ class DelegationWakeServiceTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -147,11 +151,11 @@ class DelegationWakeServiceTest {
         memories.deleteAll();
         users.deleteAll();
 
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         Agent chief = agents.save(agent("dad", "비서", user.id()));
         worker = agents.save(agent("worker", "조사원", user.id()));
-        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id()));
+        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
                 .userId(dad.id())
                 .conversationId(conversation.id())
@@ -551,7 +555,7 @@ class DelegationWakeServiceTest {
 
     private void setAutoTurns(int count) {
         for (int i = 0; i < count; i++) {
-            conversations.incrementAutoTurns(conversation.id());
+            conversationWriter.incrementAutoTurns(conversation.id());
         }
     }
 
@@ -564,7 +568,8 @@ class DelegationWakeServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                ownerId);
+                ownerId,
+                Instant.now());
     }
 
     private static HermesRunResult result(String runId, String output) {

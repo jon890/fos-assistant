@@ -3,6 +3,7 @@ package com.bifos.assistant.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.ArtifactProperties;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
@@ -63,6 +64,9 @@ class McpArtifactWriteToolTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     ArtifactStore store;
 
     @Autowired
@@ -97,7 +101,7 @@ class McpArtifactWriteToolTest {
         tokenRows.deleteAll();
         conversations.deleteAll();
         users.deleteAll();
-        dad = users.save(AppUser.of("mcp-artifact-dad@example.com", "아빠", 1L, UserRole.ADMIN));
+        dad = users.save(AppUser.of("mcp-artifact-dad@example.com", "아빠", 1L, UserRole.ADMIN, Instant.now()));
         dadToken = tokens.issue(PROFILE, "dad").rawToken();
         dadRoot = McpCallSigner.newRoot();
         dadRun = McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
@@ -106,7 +110,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("본인 대화에 HTML을 쓰고 공개 결과만 돌려준다")
     void writesHtmlToOwnConversationAndReturnsOnlyPublicResult() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
 
         JsonNode result = body(call(dadToken, conversation.publicId().toString(), "test/index.html", "<h1>안녕</h1>"));
 
@@ -122,7 +126,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("서명이 맞는 fos ctx 를 떼고 지금과 같이 쓰고 검사한다")
     void stripsValidlySignedFosCtxAndWritesAndChecksAsBefore() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         String fosCtx =
                 McpCallSigner.context(dadToken, "artifact_write", dadRoot).toString();
         String prefix =
@@ -150,7 +154,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("틀린 fos ctx 는 쓰지 않고 거절한다")
     void rejectsWrongFosCtxWithoutWriting() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         String zeroSig = "{\"v\":1,\"session_id\":\"" + dadRoot + "\",\"root_session_id\":\"" + dadRoot
                 + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
         // 결과물 폴더는 디스크에 남아 다른 검사의 대화 번호와 겹칠 수 있으므로 경로를 새로 만든다.
@@ -171,9 +175,10 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("등록한 하위 에이전트는 부모 실행이 끝난 뒤에도 그 사용자의 대화에만 쓴다")
     void registeredSubagentWritesOnlyToItsUsersConversationAfterParentEnds() throws Exception {
-        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        AppUser kid = users.save(AppUser.of("mcp-artifact-subagent-kid@example.com", "아이", 1L, UserRole.MEMBER));
-        Conversation kids = conversations.save(Conversation.startedBy(kid.id(), "", null));
+        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
+        AppUser kid = users.save(
+                AppUser.of("mcp-artifact-subagent-kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        Conversation kids = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
         String subagent = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, subagent);
         jdbc.update(
@@ -200,7 +205,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("등록한 하위 에이전트는 부모 실행이 취소되면 쓰지 못한다")
     void registeredSubagentCannotWriteWhenParentRunIsCancelled() throws Exception {
-        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         String subagent = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, subagent);
         String beforePath = "subagent-" + UUID.randomUUID() + ".html";
@@ -226,7 +231,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("빈 본문과 제어문자가 있는 경로도 유효한 JSON 결과로 돌려준다")
     void returnsValidJsonResultForEmptyBodyAndPathWithControlChars() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
 
         JsonNode empty = body(call(dadToken, conversation.publicId().toString(), "empty.html", ""));
         JsonNode escaped = body(raw(
@@ -256,9 +261,9 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("잘못된 인자와 소유하지 않은 대화는 서로 다른 계약으로 거절한다")
     void rejectsBadArgumentsAndUnownedConversationWithDifferentContracts() throws Exception {
-        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        AppUser kid = users.save(AppUser.of("mcp-artifact-kid@example.com", "아이", 1L, UserRole.MEMBER));
-        Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null));
+        Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
+        AppUser kid = users.save(AppUser.of("mcp-artifact-kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
 
         assertThat(body(raw(
                                 dadToken,
@@ -300,7 +305,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("본문과 URL 방식의 누락 null 숫자 조합은 인자 오류다")
     void bodyAndUrlModeMissingNullAndNumberCombinationsAreArgumentErrors() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         String prefix =
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"artifact_write\",\"arguments\":{\"conversation_id\":\""
                         + conversation.publicId() + "\",\"path\":\"a.html\"";
@@ -323,7 +328,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("인자 오류는 고정한 이유를 돌리고 경로와 URL query를 숨긴다")
     void argumentErrorReturnsFixedReasonAndHidesPathAndUrlQuery() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         String conversationId = conversation.publicId().toString();
 
         JsonNode extension = body(call(dadToken, conversationId, "draft.svg", "x"));
@@ -374,11 +379,12 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("없는 지운 남의 대화는 같은 오류이고 같은 사용자의 다른 대화는 쓴다")
     void missingDeletedAndOthersConversationsGiveSameError() throws Exception {
-        Conversation active = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        Conversation deleted = conversations.save(Conversation.startedBy(dad.id(), "", null));
-        conversations.deleteIfActive(deleted.id(), dad.id(), Instant.now());
-        AppUser kid = users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER));
-        Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null));
+        Conversation active = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
+        Conversation deleted = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
+        conversationWriter.deleteIfActive(deleted.id(), dad.id(), Instant.now());
+        AppUser kid =
+                users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
 
         JsonNode missing = body(call(dadToken, UUID.randomUUID().toString(), "a.html", "x"))
                 .path("result");
@@ -397,7 +403,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("다시 쓴 HTML은 새 본문으로 바뀌고 URL 실패는 기존 이미지를 보존한다")
     void rewrittenHtmlChangesToNewBodyAndUrlFailureKeepsExistingImage() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         body(call(dadToken, conversation.publicId().toString(), "page.html", "첫 본문"));
         body(call(dadToken, conversation.publicId().toString(), "page.html", "새 본문"));
         store.write(conversation.id(), "image.png", "before".getBytes(StandardCharsets.UTF_8));
@@ -421,7 +427,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("대상이 심볼릭 링크면 저장 실패로 돌리고 기존 파일을 보존한다")
     void failsSaveAndKeepsExistingFileWhenTargetIsSymlink() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         store.write(conversation.id(), "original.html", "보존".getBytes(StandardCharsets.UTF_8));
         String path = "linked-" + UUID.randomUUID() + ".html";
         var target = store.resolveForWrite(conversation.id(), path);
@@ -455,7 +461,7 @@ class McpArtifactWriteToolTest {
     @Test
     @DisplayName("URL 실패는 주소 경로나 query를 돌려주지 않는다")
     void urlFailureDoesNotReturnAddressPathOrQuery() throws Exception {
-        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null));
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         String sourceUrl = "https://not-allowed.example/image.png?private=value";
 
         JsonNode result = body(raw(

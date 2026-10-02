@@ -12,6 +12,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesSkillClient;
@@ -82,6 +83,9 @@ class SkillUsageQueryTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     AgentRepository agents;
 
     @Autowired
@@ -127,10 +131,11 @@ class SkillUsageQueryTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                dad.id()));
-        dadFirst = conversations.save(Conversation.startedBy(dad.id(), "장보기 첫째", agent.id()));
-        dadSecond = conversations.save(Conversation.startedBy(dad.id(), "장보기 둘째", agent.id()));
-        kidOnly = conversations.save(Conversation.startedBy(kid.id(), "아이 장보기", agent.id()));
+                dad.id(),
+                Instant.now()));
+        dadFirst = conversations.save(Conversation.startedBy(dad.id(), "장보기 첫째", agent.id(), Instant.now()));
+        dadSecond = conversations.save(Conversation.startedBy(dad.id(), "장보기 둘째", agent.id(), Instant.now()));
+        kidOnly = conversations.save(Conversation.startedBy(kid.id(), "아이 장보기", agent.id(), Instant.now()));
         // 아빠가 둘, 아이가 하나 읽었다. 마지막 호출은 아이의 것이다.
         use(execution(dad, dadFirst), "shopping", SkillUseSource.MODEL, T1);
         use(execution(dad, dadSecond), "shopping", SkillUseSource.COMMAND, T2);
@@ -143,8 +148,8 @@ class SkillUsageQueryTest {
     }
 
     private CurrentUser user(String email, String name) {
-        AppUser user =
-                users.findByEmail(email).orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER)));
+        AppUser user = users.findByEmail(email)
+                .orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER, Instant.now())));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -216,7 +221,7 @@ class SkillUsageQueryTest {
     @Test
     @DisplayName("마지막 호출의 대화를 지웠으면 lastConversationId 가 비고 합계는 남는다")
     void lastConversationIdIsEmptyWhenItsConversationDeletedAndTotalRemains() {
-        conversations.deleteIfActive(dadSecond.id(), dad.id(), Instant.now());
+        conversationWriter.deleteIfActive(dadSecond.id(), dad.id(), Instant.now());
 
         List<UserSkillUsage> usages = query.byUser(dad.id());
 

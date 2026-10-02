@@ -193,11 +193,11 @@ class RestartReconcilerTest {
         memories.deleteAll();
         users.deleteAll();
 
-        AppUser user = users.save(AppUser.of("reconcile-dad@example.com", "dad", 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of("reconcile-dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         chief = agents.save(agent("dad", "비서"));
         worker = agents.save(agent("worker", "조사원"));
-        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id()));
+        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
     }
 
     @AfterEach
@@ -443,7 +443,8 @@ class RestartReconcilerTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+        Conversation flowConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution row = chatTurn(flowConversation, flowed);
         stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
         stub.onStop(runId -> stub.willLookup(runId, finished(row, "cancelled", "")));
@@ -638,7 +639,8 @@ class RestartReconcilerTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+        Conversation flowConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution root = executions.save(AgentExecution.builder()
                 .userId(dad.id())
                 .conversationId(flowConversation.id())
@@ -742,7 +744,7 @@ class RestartReconcilerTest {
     @DisplayName("기동 때의 잡기와 다시 잡기가 모두 도중에 실패해도 이미 잡은 줄은 묻고 잠금을 푼다")
     void asksAlreadyClaimedRowsEvenWhenClaimAndRetryBothFail() {
         AgentExecution claimedRow = chatTurn(conversation, chief);
-        Conversation other = conversations.save(Conversation.startedBy(dad.id(), "다른 대화", worker.id()));
+        Conversation other = conversations.save(Conversation.startedBy(dad.id(), "다른 대화", worker.id(), Instant.now()));
         AgentExecution failingRow = chatTurn(other, worker);
         stub.willLookup(claimedRow.hermesRunId(), finished(claimedRow, "completed", "끝난 답"));
         stub.willLookup(failingRow.hermesRunId(), finished(failingRow, "completed", "묻지 않는 답"));
@@ -782,7 +784,7 @@ class RestartReconcilerTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        return conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+        return conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
     }
 
     /** 루트 줄은 이미 성공으로 끝났고 자식만 아직 도는 흐름 turn 의 자식 줄이다. */
@@ -865,7 +867,8 @@ class RestartReconcilerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                dad.id());
+                dad.id(),
+                Instant.now());
     }
 
     private static HermesRunLookup finished(AgentExecution row, String status, String output) {

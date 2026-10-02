@@ -30,6 +30,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -349,6 +350,7 @@ class ModelVisibilityTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null);
+                null,
+                Instant.now());
     }
 }

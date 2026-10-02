@@ -18,6 +18,7 @@ import com.bifos.assistant.agent.domain.AgentVisibility;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -111,6 +112,9 @@ class StarterSuggestionServiceTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -151,7 +155,8 @@ class StarterSuggestionServiceTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.GROUP,
-                DAD.id()));
+                DAD.id(),
+                Instant.now()));
         service = new StarterSuggestionService(
                 properties,
                 agentService,
@@ -288,7 +293,7 @@ class StarterSuggestionServiceTest {
         conversationOf(DAD, family, "장보기 목록 정리해 줘");
         conversationOf(KID, family, "다른 사용자의 질문");
         Conversation deleted = conversationOf(DAD, family, "지운 대화의 질문");
-        conversations.deleteIfActive(deleted.id(), DAD.id(), Instant.now());
+        conversationWriter.deleteIfActive(deleted.id(), DAD.id(), Instant.now());
         Agent other = agents.save(Agent.of(
                 "starter-other",
                 "다른",
@@ -297,7 +302,8 @@ class StarterSuggestionServiceTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.GROUP,
-                DAD.id()));
+                DAD.id(),
+                Instant.now()));
         conversationOf(DAD, other, "다른 에이전트와 나눈 질문");
         answerWith(json(FOUR));
 
@@ -609,7 +615,8 @@ class StarterSuggestionServiceTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                DAD.id()));
+                DAD.id(),
+                Instant.now()));
         answerWith(json(FOUR));
 
         assertThatThrownBy(() -> service.read(KID, "starter-private"))
@@ -620,11 +627,12 @@ class StarterSuggestionServiceTest {
     }
 
     private Conversation conversationOf(CurrentUser user, Agent agent, String first, String... later) {
-        Conversation conversation = conversations.save(Conversation.startedBy(user.id(), first, agent.id()));
-        messages.save(ChatMessage.fromUser(conversation.id(), user.id(), first));
-        messages.save(ChatMessage.fromAssistant(conversation.id(), "답", null));
+        Conversation conversation =
+                conversations.save(Conversation.startedBy(user.id(), first, agent.id(), Instant.now()));
+        messages.save(ChatMessage.fromUser(conversation.id(), user.id(), first, Instant.now()));
+        messages.save(ChatMessage.fromAssistant(conversation.id(), "답", null, Instant.now()));
         for (String text : later) {
-            messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+            messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, Instant.now()));
         }
         return conversation;
     }

@@ -120,16 +120,16 @@ public class Conversation {
     @Getter
     private Instant deletedAt;
 
-    private Conversation(Long userId, String title, Long agentId) {
+    private Conversation(Long userId, String title, Long agentId, Instant now) {
         this.userId = userId;
         this.title = title;
         this.agentId = agentId;
-        this.createdAt = Instant.now();
+        this.createdAt = now;
         this.updatedAt = this.createdAt;
     }
 
-    public static Conversation startedBy(Long userId, String title, Long agentId) {
-        return new Conversation(userId, title, agentId);
+    public static Conversation startedBy(Long userId, String title, Long agentId, Instant now) {
+        return new Conversation(userId, title, agentId, now);
     }
 
     /**
@@ -173,10 +173,10 @@ public class Conversation {
         this.hermesRootSessionId = rootSessionId;
     }
 
-    public void rememberSession(String sessionId) {
+    public void rememberSession(String sessionId, Instant now) {
         if (sessionId != null && !sessionId.isBlank()) {
             this.hermesSessionId = sessionId;
         }
-        this.updatedAt = Instant.now();
+        this.updatedAt = now;
     }
 }

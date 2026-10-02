@@ -64,31 +64,33 @@ public class ChatMessage {
             String content,
             Long senderUserId,
             Long executionId,
-            Long replacesMessageId) {
+            Long replacesMessageId,
+            Instant now) {
         this.conversationId = conversationId;
         this.role = role;
         this.content = content;
         this.senderUserId = senderUserId;
         this.executionId = executionId;
         this.replacesMessageId = replacesMessageId;
-        this.createdAt = Instant.now();
+        this.createdAt = now;
     }
 
-    public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content) {
-        return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null);
+    public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content, Instant now) {
+        return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null, now);
     }
 
-    public static ChatMessage fromAssistant(Long conversationId, String content, Long executionId) {
-        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, null);
+    public static ChatMessage fromAssistant(Long conversationId, String content, Long executionId, Instant now) {
+        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, null, now);
     }
 
     /** Control Plane 이 적는 메시지다. 보낸 사용자도, 만든 실행도, 대신한 메시지도 없다. */
-    public static ChatMessage fromSystem(Long conversationId, String content) {
-        return new ChatMessage(conversationId, MessageRole.SYSTEM, content, null, null, null);
+    public static ChatMessage fromSystem(Long conversationId, String content, Instant now) {
+        return new ChatMessage(conversationId, MessageRole.SYSTEM, content, null, null, null, now);
     }
 
     public static ChatMessage regeneratedAnswer(
-            Long conversationId, String content, Long executionId, Long replacesMessageId) {
-        return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId);
+            Long conversationId, String content, Long executionId, Long replacesMessageId, Instant now) {
+        return new ChatMessage(
+                conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId, now);
     }
 }

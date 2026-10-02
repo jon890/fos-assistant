@@ -2,7 +2,7 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ArtifactStore.Removed;
-import com.bifos.assistant.chat.infra.ChatArtifactRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -23,13 +23,14 @@ import org.springframework.stereotype.Component;
 public class ArtifactCleaner {
 
     private final ArtifactStore store;
-    private final ChatArtifactRepository artifacts;
+    private final ChatArtifactWriter artifactWriter;
     private final ArtifactProperties properties;
+    private final Clock clock;
 
     /** 첨부의 정리와 같은 시각에 돈다. 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.attachment.cleanup-cron}")
     public void runScheduled() {
-        cleanExpired(Instant.now());
+        cleanExpired(clock.instant());
     }
 
     /**
@@ -45,7 +46,7 @@ public class ArtifactCleaner {
                 continue;
             }
             try {
-                artifacts.markDeleted(file.conversationId(), file.path(), now);
+                artifactWriter.markDeleted(file.conversationId(), file.path(), now);
             } catch (RuntimeException ex) {
                 failed++;
                 log.warn("could not mark an expired artifact conversationId={}", file.conversationId(), ex);

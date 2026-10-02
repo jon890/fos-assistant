@@ -36,6 +36,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,8 @@ class AgentRunnerSubmitFailureTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            1L);
+            1L,
+            Instant.now());
     private final AgentExecution started = mock(AgentExecution.class);
     private final AgentExecution failed = mock(AgentExecution.class);
     private AgentRunner runner;
@@ -149,7 +151,7 @@ class AgentRunnerSubmitFailureTest {
     private AgentRunner.Run run() {
         return runner.run(
                 user,
-                Conversation.startedBy(user.id(), "대화", 2L),
+                Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
                 agent,
                 "일",
                 null,

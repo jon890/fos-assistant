@@ -34,6 +34,7 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -126,7 +127,7 @@ class ChildExecutionRunnerTest {
     }
 
     private CurrentUser member(String email, String agentCode) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
         if (agentCode != null) {
             agents.save(Agent.of(
                     agentCode,
@@ -136,14 +137,15 @@ class ChildExecutionRunnerTest {
                     CostMode.SUBSCRIPTION,
                     CredentialScope.SHARED_HOUSEHOLD,
                     AgentVisibility.PRIVATE,
-                    user.id()));
+                    user.id(),
+                    Instant.now()));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     private Conversation conversationOf(CurrentUser user, String agentCode) {
         Agent agent = agents.findByCode(agentCode).orElseThrow();
-        return conversations.save(Conversation.startedBy(user.id(), "제목", agent.id()));
+        return conversations.save(Conversation.startedBy(user.id(), "제목", agent.id(), Instant.now()));
     }
 
     /** 부모 실행 하나를 루트로 만든다. */

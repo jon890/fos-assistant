@@ -7,6 +7,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import java.time.Clock;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class SubagentSessionRegistrar {
     private final ConversationRepository conversations;
     private final DelegationParentResolver parents;
     private final TransactionTemplate transactions;
+    private final Clock clock;
 
     /**
      * @param profileName 등록 요청의 토큰이 증명한 profile
@@ -92,7 +94,7 @@ public class SubagentSessionRegistrar {
 
         try {
             transactions.executeWithoutResult(status -> bindings.saveAndFlush(HermesSessionBinding.of(
-                    profileName, childSessionId, origin, parentRootSessionId, parentSessionId)));
+                    profileName, childSessionId, origin, parentRootSessionId, parentSessionId, clock.instant())));
         } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
             // 동시에 온 다른 요청이 먼저 저장했거나 잠금에서 밀렸다. 그 줄을 다시 읽어 같은 규칙으로 판정한다.
             HermesSessionBinding raced = bindings.findByProfileNameAndSessionId(profileName, childSessionId)

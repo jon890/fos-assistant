@@ -19,7 +19,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -76,8 +76,10 @@ public class SkillStore {
     private final Path root;
     private final String agentRoot;
     private final int keepVersions;
+    private final Clock clock;
 
-    public SkillStore(SkillProperties properties) {
+    public SkillStore(SkillProperties properties, Clock clock) {
+        this.clock = clock;
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
         this.agentRoot = stripTrailingSlash(properties.agentRoot());
         this.keepVersions = properties.keepVersions();
@@ -338,8 +340,8 @@ public class SkillStore {
         return Files.isRegularFile(versionDir.resolve(PUBLISHED_MARKER), LinkOption.NOFOLLOW_LINKS);
     }
 
-    private static String newVersionName(Path profileDir) {
-        long millis = Instant.now().toEpochMilli();
+    private String newVersionName(Path profileDir) {
+        long millis = clock.millis();
         for (String existing : versionNames(profileDir)) {
             Matcher matcher = VERSION.matcher(existing);
             if (matcher.matches()) {

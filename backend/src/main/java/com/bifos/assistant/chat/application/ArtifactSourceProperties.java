@@ -4,8 +4,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /** 결과물 주소 다운로드에 허용할 호스트와 제한 시간을 정한다. */
+@Validated
 @ConfigurationProperties(prefix = "assistant.artifact.source")
 public record ArtifactSourceProperties(
         List<String> allowedHosts, Duration connectTimeout, Duration readTimeout, Duration totalTimeout) {
@@ -17,10 +19,12 @@ public record ArtifactSourceProperties(
     public ArtifactSourceProperties {
         allowedHosts = allowedHosts == null ? List.of() : List.copyOf(allowedHosts);
         for (String host : allowedHosts) {
-            if (host == null || host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")
+            if (host == null
+                    || host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")
                     || !host.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")
                     || !host.equals(host.toLowerCase(Locale.ROOT))) {
-                throw new IllegalStateException("assistant.artifact.source.allowed-hosts must contain lowercase ASCII DNS names");
+                throw new IllegalStateException(
+                        "assistant.artifact.source.allowed-hosts must contain lowercase ASCII DNS names");
             }
         }
         connectTimeout = positive(connectTimeout, DEFAULT_CONNECT_TIMEOUT, "connect-timeout");

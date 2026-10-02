@@ -43,6 +43,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -153,7 +154,7 @@ class ConversationPublicIdTest {
     }
 
     private CurrentUser member(String name) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
                 name,
                 name,
@@ -162,7 +163,8 @@ class ConversationPublicIdTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(),
+                Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

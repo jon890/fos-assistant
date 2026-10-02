@@ -3,6 +3,7 @@ package com.bifos.assistant.people.application;
 import com.bifos.assistant.agent.domain.CostMode;
 import com.bifos.assistant.agent.domain.CredentialScope;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * 첫 로그인에 만드는 에이전트의 과금 설정이다.
@@ -17,6 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param defaultCostMode 그 에이전트의 비용 방식
  * @param defaultCredentialScope 그 에이전트가 쓰는 AI 계정의 범위
  */
+@Validated
 @ConfigurationProperties(prefix = "assistant.people")
 public record PeopleProperties(CostMode defaultCostMode, CredentialScope defaultCredentialScope) {
 

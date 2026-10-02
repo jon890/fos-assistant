@@ -42,6 +42,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.UserRole;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -127,8 +128,9 @@ class MemoryProposerTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                USER.id()));
-        conversation = conversations.save(Conversation.startedBy(USER.id(), "대화", agent.id()));
+                USER.id(),
+                Instant.now()));
+        conversation = conversations.save(Conversation.startedBy(USER.id(), "대화", agent.id(), Instant.now()));
     }
 
     /** 본 실행이 단계나 에이전트 기본 모델에서 해석한 값이다. */

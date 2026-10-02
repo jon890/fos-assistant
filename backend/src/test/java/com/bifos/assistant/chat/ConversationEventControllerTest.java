@@ -34,6 +34,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -252,7 +253,7 @@ class ConversationEventControllerTest {
 
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */
     private CurrentUser signedIn(String name, UserRole role) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, role));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, role, Instant.now()));
         agents.save(Agent.of(
                 name,
                 name,
@@ -261,7 +262,8 @@ class ConversationEventControllerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(),
+                Instant.now()));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), role);
         when(currentUser.require()).thenReturn(current);
         return current;

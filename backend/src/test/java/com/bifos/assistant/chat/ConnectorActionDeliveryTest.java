@@ -12,6 +12,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ConversationEventHub;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.ChatMessage;
@@ -106,6 +107,9 @@ class ConnectorActionDeliveryTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -155,10 +159,10 @@ class ConnectorActionDeliveryTest {
         users.deleteAll();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
 
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         chief = agents.save(agent("dad", "비서", user.id()));
-        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id()));
+        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
                 .userId(dad.id())
                 .conversationId(conversation.id())
@@ -419,7 +423,7 @@ class ConnectorActionDeliveryTest {
     @DisplayName("연속 상한에 닿았으면 자동 turn 없이 한도 알림을 남기고 결과는 전하지 않은 채 둔다")
     void limitReachedLeavesResultUndelivered() {
         for (int i = 0; i < 10; i++) {
-            conversations.incrementAutoTurns(conversation.id());
+            conversationWriter.incrementAutoTurns(conversation.id());
         }
         UUID actionId = action("SUCCEEDED", "{\"saved\":true}", null, conversation.id());
 
@@ -543,7 +547,8 @@ class ConnectorActionDeliveryTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                ownerId);
+                ownerId,
+                Instant.now());
     }
 
     private void awaitReceived(int count) {

@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.domain.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationPage;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -46,6 +47,9 @@ class ConversationPagingTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -75,7 +79,7 @@ class ConversationPagingTest {
     }
 
     private CurrentUser member(String name) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
                 name,
                 name,
@@ -84,14 +88,15 @@ class ConversationPagingTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(),
+                Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
     /** 대화를 만들고 바뀐 시각을 정한다. 같은 시각을 주면 id 가 순서를 정한다. */
     private Conversation started(CurrentUser user, long secondsAfterBase) {
         Conversation made = chat.startEmpty(user, user.displayName());
-        conversations.touchSession(made.id(), null, BASE.plusSeconds(secondsAfterBase));
+        conversationWriter.touchSession(made.id(), null, BASE.plusSeconds(secondsAfterBase));
         return conversations.findById(made.id()).orElseThrow();
     }
 

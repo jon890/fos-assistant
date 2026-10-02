@@ -35,6 +35,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -110,7 +111,7 @@ class ConversationMissingAgentTest {
                         mock(ModelTierService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         when(currentUser.require()).thenReturn(dad);
     }
@@ -124,12 +125,13 @@ class ConversationMissingAgentTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                dad.id()));
+                dad.id(),
+                Instant.now()));
     }
 
     private UUID conversationOf(Long agentId, String title) {
         return conversations
-                .save(Conversation.startedBy(dad.id(), title, agentId))
+                .save(Conversation.startedBy(dad.id(), title, agentId, Instant.now()))
                 .publicId();
     }
 

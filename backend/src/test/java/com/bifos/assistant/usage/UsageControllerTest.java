@@ -97,7 +97,8 @@ class UsageControllerTest {
                         CostMode.SUBSCRIPTION,
                         CredentialScope.SHARED_HOUSEHOLD,
                         AgentVisibility.PRIVATE,
-                        USER_ID)));
+                        USER_ID,
+                        Instant.now())));
         controller =
                 new UsageController(executions, currentUser, agentService, trees, conversations, skillUsage, summaries);
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
@@ -341,7 +342,8 @@ class UsageControllerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                USER_ID));
+                USER_ID,
+                Instant.now()));
         AgentExecution kept = execution(null, null);
         AgentExecution orphaned = executions.save(AgentExecution.builder()
                 .userId(USER_ID)

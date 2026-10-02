@@ -9,6 +9,7 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.user.application.AllowedUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,7 +56,7 @@ class RevokedUserTest {
     }
 
     private AllowedPerson saveDisabledPerson() {
-        AllowedPerson person = AllowedPerson.of(EMAIL, NAME, PROFILE);
+        AllowedPerson person = AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now());
         person.disable();
         return people.save(person);
     }
@@ -86,7 +87,7 @@ class RevokedUserTest {
     @Test
     @DisplayName("켜진 줄이 있는 주소는 사용자가 생긴다")
     void createsUserForEnabledAddress() {
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
 
         Optional<AppUser> resolved = resolver.resolveAllowed(EMAIL, NAME);
 
@@ -106,7 +107,7 @@ class RevokedUserTest {
     @Test
     @DisplayName("이미 들어온 사용자의 줄을 끄면 막히고 다시 켜면 같은 사용자가 돌아온다")
     void blocksJoinedUserWhenDisabledAndReturnsSameUserWhenEnabledAgain() {
-        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
+        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
         AppUser joined = resolver.resolveAllowed(EMAIL, NAME).orElseThrow();
 
         person.disable();

@@ -109,7 +109,8 @@ class RegenerateDeletedAttachmentTest {
                 "지운.png",
                 "image/png",
                 1,
-                Instant.now().plusSeconds(1)));
+                Instant.now().plusSeconds(1),
+                Instant.now()));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachments.save(attachment);
         attachments.attachToMessage(question.id(), first.conversationId(), List.of(attachment.id()));
@@ -127,7 +128,7 @@ class RegenerateDeletedAttachmentTest {
     }
 
     private CurrentUser member() {
-        AppUser user = users.save(AppUser.of("deleted-photo@example.com", "dad", 1L, UserRole.MEMBER));
+        AppUser user = users.save(AppUser.of("deleted-photo@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
                 "dad",
                 "dad",
@@ -136,7 +137,8 @@ class RegenerateDeletedAttachmentTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(),
+                Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

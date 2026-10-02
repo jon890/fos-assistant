@@ -18,6 +18,7 @@ import com.bifos.assistant.chat.domain.type.ModelTier;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,7 +52,8 @@ class ModelTierFallbackIntegrationTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null);
+            null,
+            Instant.now());
 
     private static final Long GROUP_ID = 9_000_000_002L;
 

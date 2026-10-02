@@ -40,6 +40,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -106,8 +107,8 @@ class FailedExecutionUsageRoutesTest {
     @BeforeEach
     void setUp() {
         String unique = UUID.randomUUID().toString();
-        AppUser saved =
-                users.save(AppUser.of("failed-usage-" + unique + "@example.com", "사용자", 4_201L, UserRole.MEMBER));
+        AppUser saved = users.save(
+                AppUser.of("failed-usage-" + unique + "@example.com", "사용자", 4_201L, UserRole.MEMBER, Instant.now()));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agent = Agent.of(
                 "failed-usage-" + unique,
@@ -117,10 +118,11 @@ class FailedExecutionUsageRoutesTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                user.id());
+                user.id(),
+                Instant.now());
         agent.changeDefaultModel("requested-provider", "requested-model", null);
         agent = agents.save(agent);
-        conversation = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id()));
+        conversation = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));
         when(hermes.submit(any())).thenReturn(RUN_ID);
         when(prices.find(PROVIDER, MODEL))
                 .thenReturn(Optional.of(new CatalogPrice(

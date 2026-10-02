@@ -36,6 +36,7 @@ import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.skill.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
+import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.InternalValuePolicy;
@@ -88,6 +89,7 @@ public class ChatService {
     public static final int MAX_CONVERSATION_PAGE = 100;
 
     private final ConversationRepository conversations;
+    private final ConversationWriter conversationWriter;
     private final ConversationSessions sessions;
     private final ConversationAccess access;
     private final ChatMessageRepository messages;
@@ -98,6 +100,7 @@ public class ChatService {
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
     private final AgentExecutionRepository executionRepository;
+    private final ExecutionDeliveryWriter deliveryWriter;
     private final ContextAssembler contextAssembler;
     private final MemoryProposer memoryProposer;
     private final StarterSuggestionService starterSuggestions;
@@ -453,7 +456,7 @@ public class ChatService {
         try {
             saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
-            Instant startedAt = Instant.now();
+            Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
             SkillCommand command = routed.command();
             String asked = command == null ? text : command.hermesInput();
@@ -563,7 +566,7 @@ public class ChatService {
             if (intent instanceof TurnIntent.Fresh) {
                 fillBlankTitle(conversation, text);
             }
-            Instant startedAt = Instant.now();
+            Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
             String input = artifacts.agentPreamble(conversation)
                     + attachments.agentInput(conversation.id(), routed.attached(), text);
@@ -663,7 +666,7 @@ public class ChatService {
         SkillCommand command = commandOf(agent, flow, text);
         Conversation conversation = existing != null
                 ? existing
-                : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id()));
+                : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id(), clock.instant()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
         return new Routed(conversation, agent, flow, attached, command, requestReceivedAt);
     }
@@ -698,7 +701,7 @@ public class ChatService {
     private void fillBlankTitle(Conversation conversation, String text) {
         if (conversation.title().isBlank()) {
             String title = titleFrom(text);
-            conversations.fillTitleIfBlank(conversation.id(), title);
+            conversationWriter.fillTitleIfBlank(conversation.id(), title);
             conversation.titleIfBlank(title);
         }
     }
@@ -810,11 +813,12 @@ public class ChatService {
     }
 
     private ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
-        pending.conversation().rememberSession(result.sessionId());
-        conversations.touchSession(
+        Instant now = clock.instant();
+        pending.conversation().rememberSession(result.sessionId(), now);
+        conversationWriter.touchSession(
                 pending.conversation().id(),
                 result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
-                Instant.now());
+                now);
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
         append(pending, ExecutionEventType.RUN_COMPLETED, null);
@@ -845,8 +849,9 @@ public class ChatService {
         }
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
         if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
-            pending.conversation().rememberSession(result.sessionId());
-            conversations.touchSession(pending.conversation().id(), result.sessionId(), Instant.now());
+            Instant now = clock.instant();
+            pending.conversation().rememberSession(result.sessionId(), now);
+            conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), now);
         }
         return new ChatTurn(
                 pending.conversation().id(),
@@ -954,13 +959,13 @@ public class ChatService {
             // 알림 줄이 곧 전했다는 표시다. 알림 줄, 전했다는 표시, 자동 turn 수가 함께 남거나 함께 빠진다.
             // 제목은 채우지 않는다.
             List<ChatMessage> saved = transactions.execute(status -> {
-                List<ChatMessage> lines = results.notices().stream()
-                        .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice)))
-                        .toList();
                 Instant deliveredAt = Instant.now(clock);
-                results.executionIds().forEach(id -> executionRepository.markResultDelivered(id, deliveredAt));
+                List<ChatMessage> lines = results.notices().stream()
+                        .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice, deliveredAt)))
+                        .toList();
+                results.executionIds().forEach(id -> deliveryWriter.markResultDelivered(id, deliveredAt));
                 results.deliveries().forEach(delivery -> delivery.source().markDelivered(delivery.keys(), deliveredAt));
-                conversations.incrementAutoTurns(conversation.id());
+                conversationWriter.incrementAutoTurns(conversation.id());
                 return lines;
             });
             saved.forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
@@ -972,10 +977,11 @@ public class ChatService {
         List<Long> pendingIds = fresh.pendingIds();
         ChatMessage question = transactions.execute(status -> {
             fillBlankTitle(conversation, text);
-            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text));
+            ChatMessage saved =
+                    messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
             attachments.attach(saved.id(), conversation.id(), attachmentIds);
             // 사람이 질문했으니 사용자의 질문 없이 연 turn 의 수를 새로 센다.
-            conversations.resetAutoTurns(conversation.id());
+            conversationWriter.resetAutoTurns(conversation.id());
             // 대기 행을 지우는 것과 그 글을 사용자 메시지로 남기는 것은 함께 남거나 함께 빠진다.
             // 지운 수가 읽은 수와 다르면 읽은 뒤 취소된 행이 있다. 취소한 글을 보내지 않게 되돌린다.
             if (!pendingIds.isEmpty() && pendingMessages.deleteAllByIdIn(pendingIds) != pendingIds.size()) {
@@ -989,15 +995,16 @@ public class ChatService {
         }
     }
 
-    private static ChatMessage answerMessage(PendingTurn pending, String answer, Long executionId) {
+    private ChatMessage answerMessage(PendingTurn pending, String answer, Long executionId) {
         if (pending.intent() instanceof TurnIntent.Regenerate regenerate && regenerate.previousAnswer() != null) {
             return ChatMessage.regeneratedAnswer(
                     pending.conversation().id(),
                     answer,
                     executionId,
-                    regenerate.previousAnswer().id());
+                    regenerate.previousAnswer().id(),
+                    clock.instant());
         }
-        return ChatMessage.fromAssistant(pending.conversation().id(), answer, executionId);
+        return ChatMessage.fromAssistant(pending.conversation().id(), answer, executionId, clock.instant());
     }
 
     public void stop(CurrentUser user, Long executionId) {
@@ -1264,7 +1271,7 @@ public class ChatService {
     public Conversation rename(CurrentUser user, Long conversationId, String title) {
         String normalized = Conversation.normalizedTitle(title);
         access.requireOwn(user, conversationId);
-        if (conversations.renameIfActive(conversationId, user.id(), normalized, Instant.now()) == 0) {
+        if (conversationWriter.renameIfActive(conversationId, user.id(), normalized, clock.instant()) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
         return access.requireOwn(user, conversationId);
@@ -1327,7 +1334,7 @@ public class ChatService {
     @Transactional
     public void delete(CurrentUser user, Long conversationId) {
         access.requireOwn(user, conversationId);
-        if (conversations.deleteIfActive(conversationId, user.id(), Instant.now()) == 0) {
+        if (conversationWriter.deleteIfActive(conversationId, user.id(), clock.instant()) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
         // 지운 대화에는 더 보낼 수 없다. 남기면 기동 확인이 보낼 수 없는 행을 계속 만난다.
@@ -1343,7 +1350,7 @@ public class ChatService {
      */
     public Conversation startEmpty(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
-        return conversations.save(Conversation.startedBy(user.id(), "", agent.id()));
+        return conversations.save(Conversation.startedBy(user.id(), "", agent.id(), clock.instant()));
     }
 
     private static String titleFrom(String text) {

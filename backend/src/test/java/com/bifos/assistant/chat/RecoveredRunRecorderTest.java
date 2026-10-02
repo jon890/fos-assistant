@@ -165,10 +165,10 @@ class RecoveredRunRecorderTest {
         memories.deleteAll();
         users.deleteAll();
 
-        dad = users.save(AppUser.of("recovered-dad@example.com", "dad", 1L, UserRole.MEMBER));
+        dad = users.save(AppUser.of("recovered-dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         chief = agents.save(agent("dad", "비서"));
         worker = agents.save(agent("worker", "조사원"));
-        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id()));
+        conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         received.clear();
         unsubscribe = hub.subscribe(conversation.id(), received::add);
     }
@@ -181,7 +181,7 @@ class RecoveredRunRecorderTest {
     @Test
     @DisplayName("성공으로 끝난 대화 turn 은 사용량과 답과 session 을 적고 done 을 낸다")
     void completedChatTurnRecordsUsageAnswerSessionAndPublishesDone() {
-        messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "질문"));
+        messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "질문", Instant.now()));
         AgentExecution row = chatTurn(conversation, chief);
         executionEvents.save(ExecutionEvent.builder()
                 .executionId(row.id())
@@ -318,8 +318,8 @@ class RecoveredRunRecorderTest {
     @Test
     @DisplayName("마지막 메시지가 답인 대화의 turn 은 그 답을 다시 생성한 것으로 적는다")
     void chatTurnAfterAssistantMessageIsSavedAsRegeneratedAnswer() {
-        messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "질문"));
-        ChatMessage previous = messages.save(ChatMessage.fromAssistant(conversation.id(), "앞 답", null));
+        messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "질문", Instant.now()));
+        ChatMessage previous = messages.save(ChatMessage.fromAssistant(conversation.id(), "앞 답", null, Instant.now()));
         AgentExecution row = chatTurn(conversation, chief);
 
         recorder.settle(row.id(), result("completed", "새 답"));
@@ -381,7 +381,8 @@ class RecoveredRunRecorderTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+        Conversation flowConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution row = chatTurn(flowConversation, flowed);
         assertThat(recorder.kindOf(row)).isEqualTo(RecoveredRunKind.FLOW);
         List<ChatEvent> flowEvents = new CopyOnWriteArrayList<>();
@@ -417,8 +418,10 @@ class RecoveredRunRecorderTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation cancelledConversation = conversations.save(Conversation.startedBy(dad.id(), "취소", flowed.id()));
-        Conversation failedConversation = conversations.save(Conversation.startedBy(dad.id(), "실패", flowed.id()));
+        Conversation cancelledConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "취소", flowed.id(), Instant.now()));
+        Conversation failedConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "실패", flowed.id(), Instant.now()));
         AgentExecution cancelled = chatTurn(cancelledConversation, flowed);
         AgentExecution failed = chatTurn(failedConversation, flowed);
         List<ChatEvent> cancelledEvents = new CopyOnWriteArrayList<>();
@@ -453,7 +456,8 @@ class RecoveredRunRecorderTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id()));
+        Conversation flowConversation =
+                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution root = chatTurn(flowConversation, flowed);
         AgentExecution child = executions.save(AgentExecution.builder()
                 .userId(dad.id())
@@ -634,7 +638,8 @@ class RecoveredRunRecorderTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                dad.id());
+                dad.id(),
+                Instant.now());
     }
 
     private static HermesRunResult result(String status, String output) {

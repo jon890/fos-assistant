@@ -44,6 +44,7 @@ import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -192,7 +193,7 @@ class ModelSelectionTest {
         agents.findByCode(AGENT_CODE).ifPresent(agents::delete);
         users.findByEmail("selection@example.com").ifPresent(users::delete);
 
-        AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER));
+        AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER, Instant.now()));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agents.save(Agent.of(
                 AGENT_CODE,
@@ -202,7 +203,8 @@ class ModelSelectionTest {
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                saved.id()));
+                saved.id(),
+                Instant.now()));
     }
 
     @Test

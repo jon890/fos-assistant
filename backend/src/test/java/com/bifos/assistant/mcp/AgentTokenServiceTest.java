@@ -113,6 +113,14 @@ class AgentTokenServiceTest {
         assertThat(tokenRepository.findById(id).orElseThrow().lastUsedAt()).isNull();
     }
 
+    @Test
+    @DisplayName("hash 는 SHA-256 전체를 소문자 16진수로 돌려주고 null 은 거절한다")
+    void hashIsFullSha256AndRejectsNull() {
+        assertThat(AgentTokenService.hash("abc"))
+                .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assertThatThrownBy(() -> AgentTokenService.hash(null)).isInstanceOf(NullPointerException.class);
+    }
+
     private static void assertValidationFailed(ThrowingCallable call, String input) {
         assertThatThrownBy(call)
                 .as("입력 %s", input)

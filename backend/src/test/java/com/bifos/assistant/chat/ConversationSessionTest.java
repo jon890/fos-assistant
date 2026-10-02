@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.ConversationSessions;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.domain.RunSession;
@@ -28,13 +29,16 @@ class ConversationSessionTest {
     ConversationRepository conversations;
 
     @Autowired
+    ConversationWriter conversationWriter;
+
+    @Autowired
     AppUserRepository users;
 
     /** 다른 검사 클래스와 겹치지 않도록 매번 새 사용자로 대화를 만든다. */
     private Conversation newConversation() {
         String email = "session-" + System.nanoTime() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
-        return conversations.save(Conversation.startedBy(user.id(), "제목", null));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        return conversations.save(Conversation.startedBy(user.id(), "제목", null, Instant.now()));
     }
 
     private Conversation reload(Conversation conversation) {
@@ -94,7 +98,7 @@ class ConversationSessionTest {
     @DisplayName("Hermes가 정한 session이 있는 옛 대화는 그대로 쓰고 루트를 채우지 않는다")
     void keepsOldConversationWithHermesSessionAndDoesNotFillRoot() {
         Conversation conversation = newConversation();
-        conversations.touchSession(conversation.id(), "legacy-session", Instant.now());
+        conversationWriter.touchSession(conversation.id(), "legacy-session", Instant.now());
         Conversation legacy = reload(conversation);
 
         RunSession session = sessions.ensure(legacy);

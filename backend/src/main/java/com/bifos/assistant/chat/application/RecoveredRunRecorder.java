@@ -22,6 +22,7 @@ import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,6 +68,7 @@ public class RecoveredRunRecorder {
     private final AgentService agents;
     private final FlowRegistry flows;
     private final ConversationRepository conversations;
+    private final ConversationWriter conversationWriter;
     private final ChatMessageRepository messages;
     private final DelegationOutput delegationOutput;
     private final ArtifactService artifacts;
@@ -210,7 +212,7 @@ public class RecoveredRunRecorder {
                         saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_COMPLETED, null, null, null);
             }
             Long messageId = saveAnswer(saved, result.output() == null ? "" : result.output());
-            conversations.touchSession(conversation.id(), blankToNull(result.sessionId()), clock.instant());
+            conversationWriter.touchSession(conversation.id(), blankToNull(result.sessionId()), clock.instant());
             return new Written(
                     saved,
                     RecoveredRunKind.CHAT_TURN,
@@ -229,7 +231,7 @@ public class RecoveredRunRecorder {
             Long messageId = answer == null || answer.isBlank() ? null : saveAnswer(saved, answer);
             String sessionId = blankToNull(result.sessionId());
             if (sessionId != null) {
-                conversations.touchSession(conversation.id(), sessionId, clock.instant());
+                conversationWriter.touchSession(conversation.id(), sessionId, clock.instant());
             }
             return new Written(
                     saved,
@@ -298,9 +300,10 @@ public class RecoveredRunRecorder {
         Long conversationId = row.conversationId();
         List<ChatMessage> active = activeMessages(conversationId);
         ChatMessage last = active.isEmpty() ? null : active.getLast();
+        Instant now = clock.instant();
         ChatMessage message = last != null && last.role() == MessageRole.ASSISTANT
-                ? ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id())
-                : ChatMessage.fromAssistant(conversationId, answer, row.id());
+                ? ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id(), now)
+                : ChatMessage.fromAssistant(conversationId, answer, row.id(), now);
         return messages.save(message).id();
     }
 

@@ -23,6 +23,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.user.domain.UserRole;
+import java.time.Instant;
 import java.util.Optional;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,6 +160,7 @@ class AgentPersonaControllerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 visibility,
-                ownerUserId);
+                ownerUserId,
+                Instant.now());
     }
 }

@@ -52,16 +52,16 @@ public class AllowedPerson {
 
     protected AllowedPerson() {}
 
-    private AllowedPerson(String email, String displayName, String hermesProfile) {
+    private AllowedPerson(String email, String displayName, String hermesProfile, Instant now) {
         this.email = normalizeEmail(email);
         this.displayName = displayName;
         this.hermesProfile = hermesProfile;
         this.enabled = true;
-        this.createdAt = Instant.now();
+        this.createdAt = now;
     }
 
-    public static AllowedPerson of(String email, String displayName, String hermesProfile) {
-        return new AllowedPerson(email, displayName, hermesProfile);
+    public static AllowedPerson of(String email, String displayName, String hermesProfile, Instant now) {
+        return new AllowedPerson(email, displayName, hermesProfile, now);
     }
 
     /**

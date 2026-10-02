@@ -11,9 +11,10 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.people.application.PeopleProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.user.application.UserProvisioningService;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.domain.UserProvisioningService;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ class FirstSignInTest {
         agents.deleteAll();
         users.deleteAll();
         people.deleteAll();
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
     }
 
     private String expectedApiBaseUrl() {

@@ -10,12 +10,13 @@ import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,12 +53,14 @@ public class AgentDelegationService {
 
     private final AgentService agents;
     private final AgentExecutionRepository executions;
+    private final ExecutionDeliveryWriter deliveryWriter;
     private final ChildExecutionRunner children;
     private final ConversationRepository conversations;
     private final DelegationProperties properties;
     private final TurnCancellation turns;
     private final HermesRunsClient hermes;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
 
     /**
      * 이 프로세스에서 도는 위임 실행의 중지 표시와 run 참조다. 실행 번호가 열쇠다.
@@ -80,20 +83,24 @@ public class AgentDelegationService {
     public AgentDelegationService(
             AgentService agents,
             AgentExecutionRepository executions,
+            ExecutionDeliveryWriter deliveryWriter,
             ChildExecutionRunner children,
             ConversationRepository conversations,
             DelegationProperties properties,
             TurnCancellation turns,
             HermesRunsClient hermes,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            Clock clock) {
         this.agents = agents;
         this.executions = executions;
+        this.deliveryWriter = deliveryWriter;
         this.children = children;
         this.conversations = conversations;
         this.properties = properties;
         this.turns = turns;
         this.hermes = hermes;
         this.events = events;
+        this.clock = clock;
         this.activeDelegations = new Semaphore(properties.maxActive());
         for (int i = 0; i < ROOT_LOCK_STRIPES; i++) {
             rootLocks[i] = new ReentrantLock();
@@ -256,7 +263,7 @@ public class AgentDelegationService {
         boolean settled = handoff.awaitSettled(deadline);
         if (settled && !handoff.submitted()) {
             // 부모는 번호 없이 실패만 받는다. 적지 않으면 번호를 모르는 결과가 부모 대화에 다시 전해진다.
-            executions.markResultDelivered(execution.id(), Instant.now());
+            deliveryWriter.markResultDelivered(execution.id(), clock.instant());
             return rejected(Failure.SUBMIT_FAILED, origin, "제출하기 전에 실행이 끝났다 executionId=" + execution.id());
         }
         // 제한 시간이 지나도 줄이 있으면 번호를 돌려준다. 뒤따르는 결과는 그 줄에 적힌다.

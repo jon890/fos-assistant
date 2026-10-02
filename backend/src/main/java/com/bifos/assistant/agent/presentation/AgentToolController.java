@@ -2,14 +2,10 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.AgentToolService;
-import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.agent.presentation.AgentDtos.ToolsetView;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateToolsetsRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +14,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.transaction.annotation.Transactional;
 
 /** 에이전트 toolset을 읽고 바꾸는 사용자와 관리자 경로다. */
 @RestController
@@ -27,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentToolController {
 
     private final AgentService agents;
-    private final AgentRepository agentRepository;
     private final AgentToolService tools;
     private final CurrentUserProvider currentUser;
 
@@ -38,50 +32,22 @@ public class AgentToolController {
     }
 
     @PutMapping("/agents/{code}/tools")
-    @Transactional
-    public AgentDtos.ToolsetsView write(
-            @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
+    public AgentDtos.ToolsetsView write(@PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
         CurrentUser user = currentUser.require();
-        Agent agent = agents.requireReadableForUpdate(user, code);
-        return view(tools.write(user, agent, request.enabled()));
+        return view(tools.writeReadable(user, code, request.enabled()));
     }
 
     @GetMapping("/admin/agents/{code}/tools")
     public AgentDtos.ToolsetsView readAdmin(@PathVariable String code) {
         CurrentUser user = currentUser.requireAdmin();
-        return view(tools.read(user, requireAgent(code)));
+        return view(tools.readAsAdmin(user, code));
     }
 
     @PutMapping("/admin/agents/{code}/tools")
-    @Transactional
     public AgentDtos.ToolsetsView writeAdmin(
             @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
         CurrentUser user = currentUser.requireAdmin();
-        return view(tools.write(user, requireAgentForUpdate(code), request.enabled()));
-    }
-
-    /** 관리자가 읽을 에이전트다. 지운 에이전트는 없는 에이전트와 같다. */
-    private Agent requireAgent(String code) {
-        Agent agent = agentRepository.findByCode(code)
-                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
-        if (agent.isDeleted()) {
-            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
-        }
-        return agent;
-    }
-
-    /**
-     * 관리자가 고칠 에이전트를 잠그고 읽는다. 지운 에이전트는 없는 에이전트와 같다.
-     *
-     * <p>지운 에이전트의 profile 은 이미 거둬졌을 수 있어 도구를 바꿀 곳이 없다.
-     */
-    private Agent requireAgentForUpdate(String code) {
-        Agent agent = agentRepository.findByCodeForUpdate(code)
-                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
-        if (agent.isDeleted()) {
-            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
-        }
-        return agent;
+        return view(tools.writeAsAdmin(user, code, request.enabled()));
     }
 
     private static AgentDtos.ToolsetsView view(AgentToolService.ToolsetsView source) {

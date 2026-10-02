@@ -124,8 +124,8 @@ class McpMemoryToolTest {
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
         users.deleteAll();
-        dad = users.save(AppUser.of("dad@example.com", "아빠", 1L, UserRole.ADMIN));
-        kid = users.save(AppUser.of("kid@example.com", "아이", 1L, UserRole.MEMBER));
+        dad = users.save(AppUser.of("dad@example.com", "아빠", 1L, UserRole.ADMIN, Instant.now()));
+        kid = users.save(AppUser.of("kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
         dadToken = tokens.issue(PROFILE, "dad").rawToken();
         dadRoot = McpCallSigner.newRoot();
         dadRun = McpCallSigner.running(executions, agents, dad.id(), 1L, PROFILE, dadRoot);

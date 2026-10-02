@@ -24,6 +24,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.domain.UserRole;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -87,7 +88,7 @@ class ChatMemoryProposalTest {
         agents.deleteAll();
         users.deleteAll();
         ((StubHermesRunsClient) hermes).reset();
-        AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER));
+        AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER, Instant.now()));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agents.save(Agent.of(
                 "proposal",
@@ -97,7 +98,8 @@ class ChatMemoryProposalTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.PRIVATE,
-                user.id()));
+                user.id(),
+                Instant.now()));
         doNothing()
                 .when(events)
                 .open(

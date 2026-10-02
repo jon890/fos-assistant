@@ -14,11 +14,11 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
+import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.ExecutionStatus;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,8 +58,9 @@ public class McpToolService {
     private final MemoryService memories;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
-    private final AgentExecutionRepository executions;
+    private final ExecutionDeliveryWriter deliveryWriter;
     private final AgentRepository agents;
+    private final Clock clock;
 
     public List<Map<String, Object>> tools() {
         return List.of(
@@ -302,7 +303,7 @@ public class McpToolService {
     /** 끝난 실행이면 결과를 전했다고 적는다. {@code RUNNING} 은 결과가 아직 없으므로 적지 않는다. */
     private void markDeliveredIfFinished(AgentExecution execution) {
         if (execution.status() != ExecutionStatus.RUNNING) {
-            executions.markResultDelivered(execution.id(), Instant.now());
+            deliveryWriter.markResultDelivered(execution.id(), clock.instant());
         }
     }
 

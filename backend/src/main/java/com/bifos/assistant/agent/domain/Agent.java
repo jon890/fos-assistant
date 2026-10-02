@@ -147,7 +147,8 @@ public class Agent {
             CostMode costMode,
             CredentialScope credentialScope,
             AgentVisibility visibility,
-            Long ownerUserId) {
+            Long ownerUserId,
+            Instant now) {
         this.code = code;
         this.name = name;
         this.hermesProfile = hermesProfile;
@@ -157,7 +158,7 @@ public class Agent {
         this.visibility = visibility;
         this.ownerUserId = ownerUserId;
         this.enabled = true;
-        this.createdAt = Instant.now();
+        this.createdAt = now;
         this.created = true;
     }
 
@@ -184,8 +185,10 @@ public class Agent {
             CostMode costMode,
             CredentialScope credentialScope,
             AgentVisibility visibility,
-            Long ownerUserId) {
-        return new Agent(code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId);
+            Long ownerUserId,
+            Instant now) {
+        return new Agent(
+                code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId, now);
     }
 
     private static String stripTrailingSlash(String url) {

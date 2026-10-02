@@ -89,7 +89,7 @@ class UsageCostRecordingTest {
     @BeforeEach
     void startFromAnEmptyLedger() {
         executions.deleteAll();
-        conversation = conversations.save(Conversation.startedBy(USER_ID, "저녁 메뉴", null));
+        conversation = conversations.save(Conversation.startedBy(USER_ID, "저녁 메뉴", null, Instant.now()));
     }
 
     @Test
@@ -373,7 +373,8 @@ class UsageCostRecordingTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                USER_ID);
+                USER_ID,
+                Instant.now());
     }
 
     private static Agent apiAgent() {
@@ -385,7 +386,8 @@ class UsageCostRecordingTest {
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                USER_ID);
+                USER_ID,
+                Instant.now());
     }
 
     /** 가격표에 없는 모델을 쓰는 API 경로 바인딩이다. 두 금액이 모두 비어 있게 된다. */
@@ -398,7 +400,8 @@ class UsageCostRecordingTest {
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                USER_ID);
+                USER_ID,
+                Instant.now());
     }
 
     private static HermesRunResult run(Long input, Long cached, Long output) {

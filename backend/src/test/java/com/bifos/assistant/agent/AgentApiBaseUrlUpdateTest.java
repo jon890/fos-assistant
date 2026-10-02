@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.application.AgentAdminService;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentProperties;
@@ -36,6 +37,8 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.infra.SkillStore;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,10 +68,11 @@ class AgentApiBaseUrlUpdateTest {
             mock(HermesProperties.class),
             mock(PeopleProperties.class),
             mock(AgentProperties.class),
-            mock(SkillStore.class));
+            mock(SkillStore.class),
+            Clock.systemUTC());
 
-    private final AgentAdminController controller =
-            new AgentAdminController(agents, users, currentUser, lifecycle, endpointProbe, flows);
+    private final AgentAdminController controller = new AgentAdminController(
+            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, Clock.systemUTC()), currentUser);
 
     private Agent agent;
 
@@ -82,7 +86,8 @@ class AgentApiBaseUrlUpdateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.GROUP,
-                null);
+                null,
+                Instant.now());
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
@@ -150,7 +155,8 @@ class AgentApiBaseUrlUpdateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                1L);
+                1L,
+                Instant.now());
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "invalid toolset response"))
@@ -177,7 +183,8 @@ class AgentApiBaseUrlUpdateTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                1L);
+                1L,
+                Instant.now());
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/dad", "dad")).thenReturn(List.of("terminal"));

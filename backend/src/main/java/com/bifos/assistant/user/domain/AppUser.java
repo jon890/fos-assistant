@@ -49,16 +49,16 @@ public class AppUser {
 
     protected AppUser() {}
 
-    private AppUser(String email, String displayName, Long groupId, UserRole role) {
+    private AppUser(String email, String displayName, Long groupId, UserRole role, Instant now) {
         this.email = email;
         this.displayName = displayName;
         this.groupId = groupId;
         this.role = role;
-        this.createdAt = Instant.now();
+        this.createdAt = now;
     }
 
-    public static AppUser of(String email, String displayName, Long groupId, UserRole role) {
-        return new AppUser(email, displayName, groupId, role);
+    public static AppUser of(String email, String displayName, Long groupId, UserRole role, Instant now) {
+        return new AppUser(email, displayName, groupId, role, now);
     }
 
     public boolean isAdmin() {

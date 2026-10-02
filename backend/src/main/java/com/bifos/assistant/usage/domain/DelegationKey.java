@@ -1,9 +1,6 @@
 package com.bifos.assistant.usage.domain;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import com.bifos.assistant.shared.util.Sha256;
 import java.util.regex.Pattern;
 
 /**
@@ -36,22 +33,15 @@ public record DelegationKey(String value) {
      * <p>어느 칸이든 비어 있거나 null 이면 {@link IllegalArgumentException} 을 던진다. 빈 칸으로 만든 키가
      * 다른 호출과 겹치지 않게 하기 위해서다.
      */
-    public static DelegationKey of(
-            String profileName, String rootSessionId, String sessionId, String toolCallId) {
-        String joined = String.join("\n",
+    public static DelegationKey of(String profileName, String rootSessionId, String sessionId, String toolCallId) {
+        String joined = String.join(
+                "\n",
                 "v1",
                 require("profileName", profileName),
                 require("rootSessionId", rootSessionId),
                 require("sessionId", sessionId),
                 require("toolCallId", toolCallId));
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(joined.getBytes(StandardCharsets.UTF_8));
-            return new DelegationKey(HexFormat.of().formatHex(digest));
-        } catch (NoSuchAlgorithmException ex) {
-            // 모든 JVM 이 SHA-256 을 제공한다. 여기 오면 실행 환경이 깨진 것이다.
-            throw new IllegalStateException("SHA-256 is not available", ex);
-        }
+        return new DelegationKey(Sha256.hex(joined));
     }
 
     private static String require(String name, String part) {

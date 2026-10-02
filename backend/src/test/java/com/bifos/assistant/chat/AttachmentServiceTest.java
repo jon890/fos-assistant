@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.chat.application.AttachmentContent;
 import com.bifos.assistant.chat.application.AttachmentProperties;
 import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
@@ -54,6 +55,9 @@ class AttachmentServiceTest {
     @Autowired
     ConversationRepository conversations;
 
+    @Autowired
+    ConversationWriter conversationWriter;
+
     private Path root;
     private Long mine;
     private Long theirs;
@@ -64,10 +68,10 @@ class AttachmentServiceTest {
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
         mine = conversations
-                .save(Conversation.startedBy(OWNER.id(), "내 대화", null))
+                .save(Conversation.startedBy(OWNER.id(), "내 대화", null, Instant.now()))
                 .id();
         theirs = conversations
-                .save(Conversation.startedBy(STRANGER.id(), "남의 대화", null))
+                .save(Conversation.startedBy(STRANGER.id(), "남의 대화", null, Instant.now()))
                 .id();
     }
 
@@ -98,7 +102,7 @@ class AttachmentServiceTest {
     @DisplayName("지운 대화의 첨부는 올리기 읽기 지우기 모두 404이다")
     void attachmentOfDeletedConversationIs404ForUploadReadAndDelete() {
         ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
-        conversations.deleteIfActive(mine, OWNER.id(), Instant.now());
+        conversationWriter.deleteIfActive(mine, OWNER.id(), Instant.now());
 
         assertCode(() -> upload(OWNER, mine, "image/png", IMAGE), ErrorCode.CONVERSATION_NOT_FOUND);
         assertCode(() -> service.read(OWNER, mine, saved.id()), ErrorCode.CONVERSATION_NOT_FOUND);

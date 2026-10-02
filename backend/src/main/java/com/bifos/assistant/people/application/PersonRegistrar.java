@@ -5,6 +5,7 @@ import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.time.Clock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class PersonRegistrar {
     private final AllowedPersonRepository people;
     private final AgentRepository agents;
     private final HermesProfileProvisioner profiles;
+    private final Clock clock;
 
     /**
      * 허용 목록에 한 사람을 더하고 그 사람의 Hermes profile 을 만든다.
@@ -43,7 +45,7 @@ public class PersonRegistrar {
         }
         requireFreeProfileName(hermesProfile);
 
-        AllowedPerson person = people.save(AllowedPerson.of(normalized, displayName, hermesProfile));
+        AllowedPerson person = people.save(AllowedPerson.of(normalized, displayName, hermesProfile, clock.instant()));
         try {
             profiles.provision(hermesProfile);
         } catch (RuntimeException failure) {
