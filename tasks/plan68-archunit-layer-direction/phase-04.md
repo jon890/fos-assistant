@@ -24,7 +24,9 @@
 - 컨트롤러의 다른 메서드는 저장소를 쓰지 않는다. 옮긴 뒤 두 저장소 필드는 컨트롤러에서 사라진다.
 - 지금 이 세 조회에는 트랜잭션이 없다. 각각 자기 트랜잭션으로 돈다.
 - `application` 은 타입 하나에 파일 하나다(`backend/AGENTS.md` 의 「데이터 클래스는 컨트롤러 안에 두지 않는다」). 서비스 안에 공개 중첩 타입을 두지 않는다(`SERVICES_DO_NOT_EXPOSE_NESTED_TYPES`).
-- `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` 는 `@SpringBootTest` 이고 질의 수를 세는 단언이 있을 수 있다(`hibernate.generate_statistics`). 질의 수가 달라지면 안 된다.
+- `backend/src/test/java/com/bifos/assistant/usage/UsageControllerTest.java` 는 `@SpringBootTest` 이고 `new UsageController(...)` 를 인자 일곱으로 부른다.
+  `QUERIES_PER_LIST = 5` 를 `getQueryExecutionCount()` 로 단언한다. 세는 것은 목록, 자식 확인, 대화 공개 식별자, 스킬 이름, 에이전트 질의다. 이 수가 달라지면 안 된다.
+- `HOUSEHOLD_ZONE` 의 Javadoc 은 `AgentExecutionRepository.sumByDayBetween` 을 `{@code}` 로 가리킨다. 이 상수와 Javadoc 은 그대로 둔다.
 
 **근거 문서**: `docs/backend/packages.md` 의 「패키지와 책임」, `docs/adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md`, `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
@@ -51,6 +53,7 @@ Javadoc 에 세 칸의 뜻을 적는다. 생성자에서 `List.copyOf`, `Set.cop
 ### 3. `UsageController` 의 변경
 
 두 저장소 필드와 두 private 메서드를 지우고 `RootExecutionQuery` 를 받는다.
+필드 순서는 `RootExecutionQuery rootExecutions`, `CurrentUserProvider currentUser`, `AgentService agents`, `ExecutionTreeService executionTrees`, `SkillUsageQuery skillUsage`, `UsageSummaryService summaries` 다. Lombok 이 이 순서로 생성자를 만든다.
 `myExecutions` 는 `size` 를 구하고 사용자를 확인한 뒤 `rootExecutions.page(user.id(), size)` 를 부르고, 그 뒤의 스킬 이름과 에이전트 조회와 응답 변환은 지금과 같게 둔다.
 쓰지 않게 된 import 를 지운다.
 
@@ -71,7 +74,7 @@ Javadoc 에 세 칸의 뜻을 적는다. 생성자에서 `List.copyOf`, `Set.cop
 - 경계: 실행이 하나도 없는 사용자는 세 칸이 모두 빈다
 - 경계: `size` 가 1 이면 가장 최근 루트 하나만 온다
 
-`UsageControllerTest` 가 컨트롤러를 `new` 로 만들면 생성자 인자를 맞추고 단언은 바꾸지 않는다.
+`UsageControllerTest` 는 `RootExecutionQuery` 를 `@Autowired` 로 받아 `new UsageController(...)` 의 인자를 위 필드 순서로 맞춘다. 쓰지 않게 된 저장소 주입은 그 테스트가 다른 데 쓰지 않으면 지운다. 단언과 `QUERIES_PER_LIST` 는 바꾸지 않는다.
 
 ## 검증
 
@@ -80,7 +83,7 @@ Javadoc 에 세 칸의 뜻을 적는다. 생성자에서 `List.copyOf`, `Set.cop
 ./gradlew test
 ./gradlew checkstyleMain checkstyleTest
 test "$(wc -l < config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5)" -eq 0
-! grep -n "Repository" src/main/java/com/bifos/assistant/usage/presentation/UsageController.java
+! grep -nE "^import .*\.infra\.|Repository [a-z]+;" src/main/java/com/bifos/assistant/usage/presentation/UsageController.java
 ```
 
 ```bash

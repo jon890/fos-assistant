@@ -70,14 +70,14 @@ Javadoc 에 「profile 토큰으로 인증하는 필터의 타입이다. `Securi
 
 ### 6. 이 phase 를 검증하는 `AgentTokenFilterWiringTest.java`
 
-`backend/src/test/java/com/bifos/assistant/mcp/AgentTokenFilterWiringTest.java` 를 새로 만든다. `@SpringBootTest` 와 `@AutoConfigureMockMvc`(이 저장소의 다른 MockMvc 테스트가 쓰는 방식을 따른다)다.
+`backend/src/test/java/com/bifos/assistant/mcp/AgentTokenFilterWiringTest.java` 를 새로 만든다. `@SpringBootTest` 와 `@ActiveProfiles("test")` 이고 빈을 주입받아 단언한다.
+`@AutoConfigureMockMvc` 는 쓰지 않는다. 이 저장소의 테스트 의존에 없어 컴파일되지 않는다.
 
-- 정상: `SecurityFilterChain` 빈의 필터 목록에서 `AgentTokenAuthenticationFilter` 가 `ControlPlaneJwtFilter` 보다 앞에 있고 각각 한 번만 있다
-- 정상: `AgentTokenFilter` 타입의 `FilterRegistrationBean` 이 `isEnabled()` 가 false 다. 서블릿 필터로 한 번 더 등록되지 않는다는 뜻이다
-- 실패: 토큰 없이 `POST /mcp` 를 부르면 401 이다
-- 실패: `Origin` 헤더를 붙여 `POST /mcp` 를 부르면 403 이다
+- 정상: 주입받은 `SecurityFilterChain` 의 `getFilters()` 에서 `AgentTokenAuthenticationFilter` 가 `ControlPlaneJwtFilter` 보다 앞에 있고 각각 한 번만 있다
+- 정상: 주입받은 `AgentTokenFilter` 빈의 실제 클래스가 `AgentTokenAuthenticationFilter` 다
+- 실패 방지: `FilterRegistrationBean<AgentTokenFilter>` 빈이 감싼 필터가 위와 같은 객체이고 `isEnabled()` 가 false 다. 이 단언이 깨지면 필터가 서블릿 필터로 한 번 더 돈다
 
-같은 단언이 이미 있는 테스트가 있으면 그 단언은 더하지 않고 어느 테스트에 있는지 회신에 적는다.
+토큰이 없을 때의 401 과 `Origin` 이 붙었을 때의 403 은 기존 테스트가 맡는다. `/mcp` 는 `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` 가, 하위 에이전트 등록 경로는 `backend/src/test/java/com/bifos/assistant/mcp/SubagentSessionEndpointTest.java` 가 확인한다. 새로 쓰지 않는다.
 
 ## 검증
 

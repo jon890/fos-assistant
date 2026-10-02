@@ -52,7 +52,7 @@ Javadoc 의 `{@link}` 와 `{@code}` 에 옛 전체 이름이 있으면 같이 �
 ### 3. 문서를 고친다
 
 `docs/backend/artifact.md` 의 표에서 `chat/application/ArtifactSourceProperties` 를 `chat/infra/ArtifactSourceProperties` 로 고친다.
-`git grep -n "application/\(ArtifactSourceProperties\|ArtifactProperties\|AttachmentProperties\|SkillProperties\)\|application\.\(ArtifactSourceProperties\|ArtifactProperties\|AttachmentProperties\|SkillProperties\)" -- docs backend AGENTS.md` 가 0 건이어야 한다.
+`git grep -n "application/\(ArtifactSourceProperties\|ArtifactProperties\|AttachmentProperties\|SkillProperties\)\|application\.\(ArtifactSourceProperties\|ArtifactProperties\|AttachmentProperties\|SkillProperties\)" -- docs backend/src AGENTS.md backend/AGENTS.md` 가 0 건이어야 한다.
 
 ### 4. 기준 파일을 줄인다
 
@@ -99,7 +99,13 @@ node test/e2e/run.ts
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/infra/AttachmentProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/infra/SkillProperties.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/**/*.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactSourceFetcher.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/infra/ArtifactStore.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/infra/AttachmentStore.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/infra/SkillStore.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/ArtifactCleaner.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/application/AttachmentService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/shared/ValidatedPropertiesBindingTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
 | `docs/backend/artifact.md` | 수정 |

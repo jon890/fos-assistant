@@ -39,7 +39,7 @@
 `backend/src/main/java` 와 `backend/src/test/java` 에서 `com.bifos.assistant.skill.application.SkillBundle` 과 `com.bifos.assistant.skill.application.SkillFile` 의 import 를 새 패키지로 바꾼다.
 `SkillFileInfo`, `SkillFileInput` 처럼 이름이 `SkillFile` 로 시작하는 다른 타입을 건드리지 않는다. 패턴 끝을 `;` 로 고정한다.
 같은 패키지라 import 없이 쓰던 `skill.application` 의 클래스에 import 를 더한다. `./gradlew compileJava compileTestJava` 가 통과할 때까지 고친다.
-`docs` 에 옛 위치가 적혀 있으면 고친다. `git grep -n "application[./]\(SkillBundle\|SkillFile\)\b" -- docs backend AGENTS.md` 가 0 건이어야 한다.
+`docs` 에 옛 위치가 적혀 있으면 고친다. `git grep -n "application[./]\(SkillBundle\|SkillFile\)\b" -- docs backend/src AGENTS.md backend/AGENTS.md` 가 0 건이어야 한다.
 
 ### 3. 기준 파일을 줄인다
 
@@ -76,7 +76,8 @@ test "$(wc -l < config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5)" -eq
 | `backend/src/main/java/com/bifos/assistant/skill/application/SkillFile.java` | 삭제 |
 | `backend/src/main/java/com/bifos/assistant/skill/domain/SkillBundle.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/skill/domain/SkillFile.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/skill/**/*.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/infra/SkillStore.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/skill/SkillStoreTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/**/*.java` | 수정 |
 | `backend/config/archunit/store/2790ecd4-faaa-4952-b703-a028b68814d5` | 수정 |
