@@ -1,10 +1,6 @@
 package com.bifos.assistant.context;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.HexFormat;
+import com.bifos.assistant.shared.util.Sha256;
 import java.util.List;
 
 /**
@@ -14,9 +10,6 @@ import java.util.List;
  * 있다.
  */
 public record AssembledContext(String instructions, long chars, List<Long> omittedMemoryIds) {
-
-    /** 지문으로 남기는 해시 길이. SHA-256 앞부분만 쓴다. */
-    private static final int HASH_BYTES = 16;
 
     public AssembledContext {
         omittedMemoryIds = omittedMemoryIds == null ? List.of() : List.copyOf(omittedMemoryIds);
@@ -55,11 +48,6 @@ public record AssembledContext(String instructions, long chars, List<Long> omitt
         if (instructions == null || instructions.isEmpty()) {
             return null;
         }
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(instructions.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(Arrays.copyOf(digest, HASH_BYTES));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 is unavailable", ex);
-        }
+        return Sha256.hex16(instructions);
     }
 }

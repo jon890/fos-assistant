@@ -92,6 +92,14 @@ class ContextAssemblerTest {
     }
 
     @Test
+    @DisplayName("지문은 앞 16바이트의 고정 값이고 지침이 비면 null 이다")
+    void instructionsHashIsFixedValueAndNullWhenEmpty() {
+        assertThat(new AssembledContext("지침 본문", 5).instructionsHash()).isEqualTo("fd75209d816515dfa7bffe27acfcb25f");
+        assertThat(new AssembledContext("", 0).instructionsHash()).isNull();
+        assertThat(AssembledContext.empty().instructionsHash()).isNull();
+    }
+
+    @Test
     @DisplayName("그룹과 개인 항목을 층 순서대로 본문까지 넣는다")
     void assemblesGroupAndUserItemsInLayerOrderWithBodies() {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);

@@ -1,9 +1,6 @@
 package com.bifos.assistant.usage.domain;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import com.bifos.assistant.shared.util.Sha256;
 import java.util.regex.Pattern;
 
 /**
@@ -44,14 +41,7 @@ public record DelegationKey(String value) {
                 require("rootSessionId", rootSessionId),
                 require("sessionId", sessionId),
                 require("toolCallId", toolCallId));
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(joined.getBytes(StandardCharsets.UTF_8));
-            return new DelegationKey(HexFormat.of().formatHex(digest));
-        } catch (NoSuchAlgorithmException ex) {
-            // 모든 JVM 이 SHA-256 을 제공한다. 여기 오면 실행 환경이 깨진 것이다.
-            throw new IllegalStateException("SHA-256 is not available", ex);
-        }
+        return new DelegationKey(Sha256.hex(joined));
     }
 
     private static String require(String name, String part) {

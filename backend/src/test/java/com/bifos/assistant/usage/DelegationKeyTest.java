@@ -63,6 +63,19 @@ class DelegationKeyTest {
     }
 
     @Test
+    @DisplayName("고정 입력 넷의 키는 64글자 고정 값과 같다")
+    void fixedInputsProduceFixedKeys() {
+        assertThat(key("dad", "fos-root", "fos-a", "call-1").value())
+                .isEqualTo("d585e62e29b01440571487c71bb84ea4c611f33d4861f3c9ab5b5b4393970fe5");
+        assertThat(key("mom", "fos-root-2", "fos-b", "call-2").value())
+                .isEqualTo("6a91578d1e8f44ae5ceb19fdca31c46dd2eb170371429e3de505e7226cf7cd39");
+        assertThat(key("가", "나", "다", "라").value())
+                .isEqualTo("abbbd64fd1a5fd555dc7e31d9d3a72b86b0ac96cf2821094e4be4cce84d1a2c1");
+        assertThat(key("x", "y", "z", "w").value())
+                .isEqualTo("ac30f9e596b772bab0e91e57e5663aee34d4c005f957a4ebccae87c0cc3e8761");
+    }
+
+    @Test
     @DisplayName("null이나 빈 칸은 거절한다")
     void rejectsNullOrBlankFields() {
         assertThatThrownBy(() -> key(null, "fos-root", "fos-a", "call-1")).isInstanceOf(IllegalArgumentException.class);
