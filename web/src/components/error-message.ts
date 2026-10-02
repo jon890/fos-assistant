@@ -49,6 +49,14 @@ const MESSAGES: Record<string, string> = {
     "이 스킬을 이 에이전트에서 쓸 수 없어요. 스킬이 꺼졌거나 지워졌는지 확인해 주세요.",
   ATTACHMENT_GONE: "보관 기간이 지나 볼 수 없어요.",
   MEMORY_SENSITIVE_NOT_EDITABLE: "민감한 항목은 여기서 고칠 수 없어요.",
+  MEMORY_DOCUMENT_EXISTS:
+    "같은 이름의 문서가 이미 있어요. 다른 이름을 입력해 주세요.",
+  MEMORY_REVISION_CONFLICT:
+    "그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.",
+  MEMORY_ENCRYPTION_UNAVAILABLE:
+    "민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.",
+  SERVICE_TOKEN_NOT_FOUND:
+    "토큰을 찾지 못했어요. 화면을 새로고침해 확인해 주세요.",
 };
 
 export function describeError(code: string, fallback: string): string {
