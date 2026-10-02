@@ -178,7 +178,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 
 **카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다.
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.
-`tools` 는 `{<이름>: {risk, approval, title, grant}}` 이고 `approval` 과 `grant` 는 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
+`tools` 는 `{<이름>: {risk, approval, title, grant, outbound}}` 이고 `approval`, `grant`, `outbound` 는 기본값을 채운 값이다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
 `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다.
 
 **`POST /api/profiles` 는 틀을 쓰지 못하면 만든 것을 지운다.**
@@ -254,6 +254,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 그 profile 에 관리 표식과 그 커넥터의 소유 기록이 있어야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다
 - 인자와 결과를 로그에 싣지 않는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
+- 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. `call` 에서는 그 코드를 `unavailable` 로 돌려준다
 - 요청과 응답은 [커넥터 연결](../docs/connectors.md) 의 「승인」 이 소유한다. 근거는 [ADR-050](../docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
 
 **소유 기록 `.fos-connectors.json` 은 설치할 때의 서버 정의를 갖고, 요청마다 지금의 manifest 와 같은지 검증한다.**
