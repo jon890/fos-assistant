@@ -27,7 +27,7 @@
 | `scripts/quality.sh` 의 동작 | 그 스크립트의 머리 주석과 루트 `AGENTS.md` |
 | 화면 구조와 동작 | `docs/frontend/*.md` |
 
-**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `docs/code-architecture.md` 의 「web 화면 구조」 절(앞 phase 가 frontend 문서 디렉터리로 옮겼다)
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `AGENTS.md` 의 「확인」 절
 
 ## 의도 메모
 
@@ -55,7 +55,7 @@
 - 폭의 px 값을 적은 문장을 지운다. `web/playwright.config.ts` 가 갖는다. 「`mobile` 과 `desktop` 두 폭에서 돈다」 는 남긴다.
 - CI 의 shard, 필수 검사 판정, artifact, 매일 실행, 실패 이슈를 설명한 두 문단을 지운다. 루트 `AGENTS.md` 의 「확인」 절이 같은 내용을 갖는다.
 - 그 가운데 `fullyParallel: false`, `workers: 1`, globalSetup 이 shard 마다 새 Control Plane 과 메모리 DB 를 만든다는 문장은 남긴다. 검사를 쓰는 사람이 알아야 하는 제약이다.
-- 지운 자리에 「CI 가 이 검사를 어떻게 나눠 돌리는지는 루트 `AGENTS.md` 의 「확인」 절이 갖는다」 한 줄을 둔다.
+- 지운 자리에 「CI 가 이 검사를 어떻게 나눠 돌리는지는 `.github/workflows/ci.yml` 이 갖고, 머지 전에 무엇을 확인하는지는 루트 `AGENTS.md` 의 「확인」 절이 갖는다」 한 줄을 둔다.
 
 ### 4. 머리의 문서 포인터를 확인한다
 
@@ -83,7 +83,7 @@ python3 "$DOCS_CHECK_DIR/scripts/static_check.py" docs/adr docs
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 작업 전보다 40줄 넘게 줄었다. 2번 출력 없음. 3번 종료 코드 0, 링크 위반 0건.
+기대값: 1번 작업 전보다 40줄 넘게 줄었다. 2번 출력 없음. 3번 종료 코드 0, `static_check.py` 만 예외다. 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다.
 `node --test` 는 `test/unit/doc-references.test.ts` 를 포함한다.
 
 ## 변경 파일

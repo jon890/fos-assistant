@@ -12,6 +12,7 @@
 - 두 문서가 함께 적던 중복을 한 곳에 남기는 일과 헤딩 이름은 phase 05 다.
 - ADR 의 「대체된 부분」 표시와 INDEX 는 phase 06 이다. 이 phase 는 ADR 본문의 사실 오류만 고친다.
 - 코드를 고치지 않는다. 문서가 맞고 코드가 틀린 것으로 보이면 고치지 않고 결과 보고에 적는다.
+- 저장 모델 문서를 마이그레이션 전체와 다시 대조하지 않는다. 작업 항목 3 의 표에 적은 칸과 표만 고친다.
 
 ## 컨텍스트
 
@@ -20,7 +21,7 @@
 
 **발견마다 먼저 다시 확인한다.** 감사 뒤에 main 에 머지된 변경이 있다.
 
-1. 「찾을 글」 이 문서에 아직 있는가. 없으면 이미 고쳐진 것이다. 건너뛰고 결과 보고에 적는다.
+1. 「찾을 글」 이 문서에 아직 있는가. `git grep` 에 걸리지 않으면 「지금 있는 곳」 의 그 절을 직접 읽는다. 글자가 조금 다르게 적혀 있을 수 있다. 절을 읽고도 그 서술이 없을 때만 이미 고쳐진 것으로 보고 건너뛴 뒤 결과 보고에 적는다.
 2. 「증명」 의 코드를 열어 지금도 그러한가. 코드가 바뀌어 문서가 맞게 됐으면 건너뛰고 결과 보고에 적는다.
 3. 둘 다 그대로면 「고칠 내용」 대로 고친다. 고칠 문장은 코드에서 읽은 사실로 쓴다. 표의 문장을 그대로 베끼지 않는다.
 
@@ -42,9 +43,9 @@
 | 지금 있는 곳 | 찾을 글 | 현재 사실과 증명 | 고칠 내용 |
 | --- | --- | --- | --- |
 | `docs/backend/people.md` | `지금 읽기만 한다` | `HermesProfileKeyStore` 에 `write` 와 `delete` 가 이미 있다 | 「읽기, 쓰기, 지우기를 모두 갖는다」 로 바꾼다 |
-| `docs/frontend/chat.md` 「모델을 고를 때」 | `profile 기본값으로 돈다` 와 그 절의 그림 | 선택 모드는 `DEFAULT`, `TIER`, `CUSTOM` 셋이다. 선택이 없으면 내 기본 단계, 그룹 기본 단계, profile 기본값 순서다. 증명은 `ModelTierService` 의 해석 메서드와 `docs/model-tiers.md` 의 「모델 선택」 | 순서 설명은 `docs/model-tiers.md` 를 가리키게 바꾼다. 그림의 마지막 분기를 「해석한 단계에 mapping 이 있다 / 없다」 로 고친다 |
+| `docs/frontend/chat.md` 「모델을 고를 때」 | `기본값으로 돈다` 와 그 절의 그림 | 선택 모드는 `DEFAULT`, `TIER`, `CUSTOM` 셋이다. 선택이 없으면 내 기본 단계, 그룹 기본 단계, profile 기본값 순서다. 증명은 `ModelTierService` 의 해석 메서드와 `docs/model-tiers.md` 의 「모델 선택」 | 순서 설명은 `docs/model-tiers.md` 를 가리키게 바꾼다. 그림의 마지막 분기를 「해석한 단계에 mapping 이 있다 / 없다」 로 고친다 |
 | `docs/backend/people.md` 「사람을 더할 때」 의 그림 | `POST /api/admin/people` | Control Plane 의 경로는 `/api/v1/admin/people` 이다(`PeopleAdminController`). 적힌 경로는 Next.js 서버 라우트다 | 관리자 브라우저에서 Control Plane 으로 가는 화살표의 경로를 `/api/v1/admin/people` 로 고친다 |
-| `docs/hermes/runs-api.md` | `세션 조회, 실행의 runtime, 대화가 고른 값` | `ExecutionRecorder` 는 runtime 에 provider 와 모델이 둘 다 있으면 그 짝을 먼저 쓴다. 문서의 순서는 runtime 이 불완전할 때만 칸마다 적용된다 | 「runtime 에 둘 다 있으면 그 짝을 쓴다. 없으면 세션 조회, runtime, 대화가 고른 값 순서로 칸마다 채운다」 는 뜻으로 바꾼다 |
+| `docs/hermes/runs-api.md` | `대화가 고른 값` 이 든 줄. provider 와 모델을 읽는 순서를 적었다 | `ExecutionRecorder` 는 runtime 에 provider 와 모델이 둘 다 있으면 그 짝을 먼저 쓴다. 문서의 순서는 runtime 이 불완전할 때만 칸마다 적용된다 | 「runtime 에 둘 다 있으면 그 짝을 쓴다. 없으면 세션 조회, runtime, 대화가 고른 값 순서로 칸마다 채운다」 는 뜻으로 바꾼다 |
 | `docs/hermes/profiles.md` | `자동 활성화를 막는 설정을 넣지 않으므로` | `hermes/profile-template/config.yaml.template` 이 `platforms.api_server.enabled: false` 를 넣는다. 같은 파일의 뒤쪽 절과도 어긋난다 | 「설정 틀이 이 값을 넣으므로 Control Plane 이 만든 profile 은 경고를 남기지 않는다」 는 뜻으로 바꾼다 |
 
 ADR-018, ADR-002, ADR-019 의 표시 없는 대체는 phase 06 이 다룬다.
@@ -53,7 +54,7 @@ ADR-018, ADR-002, ADR-019 의 표시 없는 대체는 phase 06 이 다룬다.
 
 | 지금 있는 곳 | 찾을 글 | 현재 사실과 증명 | 고칠 내용 |
 | --- | --- | --- | --- |
-| `docs/backend/conversation.md` | `지금은 끝에서 ` 와 `save` | 실제는 `touchSession` 으로 두 칸만 고친다 | 「지금은」 문장을 지우고 까닭 문장만 남긴다 |
+| `docs/backend/conversation.md` | ``끝에서 `save` 한다`` | 실제는 `touchSession` 으로 두 칸만 고친다 | 「지금은」 문장을 지우고 까닭 문장만 남긴다 |
 | `docs/backend/mcp-caller.md` | 이 길을 쓰는 MCP 도구를 넷으로 적은 줄 | 실제는 여섯이다. 같은 절 앞쪽이 이미 같은 사실을 말한다 | 그 줄을 지운다 |
 | `docs/frontend/structure.md` 의 화면 표 | 표에 `/admin/people`, `/connections` 가 없다 | `web/src/app` 에 `admin/people`, `connections`, `connections/[id]` 가 있다. 지금 `web/src/app` 의 경로를 다시 읽어 표와 비교한다 | 빠진 경로를 표에 더한다 |
 | `docs/backend/packages.md` 의 패키지 표 | 표에 `connector`, `shared/config`, `shared/util` 이 없다 | `backend/src/main/java` 의 패키지 목록 | 표에 더한다. `shared` 의 기존 위반이 기준 파일에 있다는 한 줄을 적는다 |
@@ -64,8 +65,8 @@ ADR-018, ADR-002, ADR-019 의 표시 없는 대체는 phase 06 이 다룬다.
 | `docs/frontend/shell.md` | ``화면 경로마다 `loading.tsx` `` | `loading.tsx` 가 없는 경로가 있다. `test/unit/loading-routes.test.ts` 의 `ROUTE_FRAMES` 가 두기로 한 경로다 | 「서버가 데이터를 읽는 화면 경로」 로 범위를 바로 적는다 |
 | `docs/backend/turn-control.md` 「기동할 때 남은 실행 정리」 | 그 절의 그림 | 정리 뒤에 대기 메시지와 위임 결과가 남은 대화를 다시 연다 | 그림 끝에 그 단계를 한 칸 더한다 |
 | `docs/frontend/*.md`, `docs/backend/*.md` | 「」 로 인용한 화면 문구 | 인용한 문구 가운데 실제 문자열과 다른 것이 있다. `web/src` 에서 그 문구를 `git grep` 한다 | 실제 문자열과 같으면 둔다. 풀어 쓴 것이면 「」 를 뺀다. 절 이름을 가리키는 「」 는 건드리지 않는다 |
-| `docs/prd.md`, `docs/frontend/chat.md`, `docs/backend/agent.md` | `가족용`, `가족 공용` | 용어 표가 그룹 단위에 쓰지 않기로 한 말이다 | 「그룹용」, 「그룹 공용」 으로 바꾼다. 「가족이 쓰는 화면」 같은 제품 설명과 ADR 본문은 그대로 둔다 |
-| `docs/backend/packages.md`, `docs/backend/skill.md` | `사용자과` | 조사 오류다 | `사용자와` 로 고친다 |
+| `docs/frontend/chat.md`, `docs/backend/agent.md`, `docs/prd.md` | `가족용`, `가족 공용`, 그룹 단위를 「가족」 으로 적은 줄. `git grep -n '가족' -- docs ':!docs/adr'` 로 찾아 줄마다 판단한다 | 용어 표가 그룹 단위에 쓰지 않기로 한 말이다 | 「그룹용」, 「그룹 공용」 으로 바꾼다. 「가족이 쓰는 화면」 같은 제품 설명과 ADR 본문은 그대로 둔다 |
+| `docs/backend/packages.md` | `사용자과` | 조사 오류다 | `사용자와` 로 고친다 |
 
 ### 3. 저장 모델 문서
 
@@ -75,8 +76,7 @@ ADR-018, ADR-002, ADR-019 의 표시 없는 대체는 phase 06 이 다룬다.
 | `docs/backend/schema/users-agents.md` 「agent」 | 표에 `flow`, `connector_managed`, `connector_attachments` 가 없다 | 마이그레이션과 엔티티 | 세 줄을 더한다 |
 | `docs/backend/schema/execution.md` 「execution_event」 | `event_type` 목록에 `PROVIDER_SWITCHED` 가 없다 | enum 에 값이 있고 쓰는 곳은 없다 | 「옛 실행에만 남은 값」 으로 더한다 |
 | `docs/backend/schema/README.md` 「모델 단계와 재조회」 | 칸 여덟이 이 절의 산문에만 있다 | `model_tier_definition`, `model_tier_group_setting`, `subagent_usage_job` 은 자기 절이 없고, `app_user`, `conversation`, `agent_execution` 의 새 칸은 각 표에 없다 | 표 셋은 `##` 절을 만들어 `users-agents.md`(`model_tier_definition`, `model_tier_group_setting`)와 `execution.md`(`subagent_usage_job`)에 둔다. 칸은 각 표의 줄로 옮긴다. `README.md` 에는 규칙 문장(복사 시점, null 의 뜻, cascade 를 더하지 않음)만 남긴다 |
-| `docs/backend/schema/README.md` | 머리말 | 유일 제약과 FK 를 일부 표만 적었다 | 「색인은 마이그레이션이 갖고 이 문서는 유일 제약과 FK 만 적는다」 를 머리에 둔다. 마이그레이션에서 유일 제약과 FK 를 읽어 빠진 표에 더한다 |
-| `docs/backend/schema/*.md` | 감사 뒤에 생긴 마이그레이션 | `backend/src/main/resources/db/migration` 의 가장 큰 번호까지 읽는다 | 문서에 없는 표와 칸이 있으면 더한다 |
+| `docs/backend/schema/README.md` | 머리말 | 색인을 적은 표와 적지 않은 표가 섞여 있어 무엇을 적는 문서인지 알 수 없다 | 「색인은 마이그레이션이 갖고 이 문서는 유일 제약과 FK 만 적는다」 를 머리에 둔다. 표마다 제약을 전수 대조하는 일은 이 phase 가 하지 않는다 |
 
 ### 4. 제품 문서와 모델 단계 문서
 
@@ -93,9 +93,9 @@ ADR-018, ADR-002, ADR-019 의 표시 없는 대체는 phase 06 이 다룬다.
 | `docs/hermes/README.md` | `hermes -p <member> login` | 용어 표가 사람 자리에 쓰지 않는 말이다 | `<profile>` 로 바꾼다 |
 | `hermes/README.md` 와 `docs/hermes/profiles.md` 의 대시보드 plugin 경로 표 | `model-defaults` 가 표에 없다 | `hermes/plugins/dashboard-profile-api/__init__.py` 가 여는 경로 목록 | plugin 이 여는 경로를 코드에서 읽어 표와 비교하고 빠진 줄을 더한다 |
 | `docs/hermes/profiles.md` | `POST /api/profiles` 의 본문 키를 둘로 적은 줄 | plugin 은 키 셋을 받는다 | 받는 키와 Control Plane 이 보내는 키를 나눠 적는다 |
-| `docs/hermes/runs-api.md`, `docs/hermes/README.md` | `MVP 는 제출과 조회만 쓴다`, `plugin 없이 성립한다` | 둘 다 지금 사실이 아니다. 중지와 steer 를 쓰고 plugin 둘이 있다 | 두 문장을 지운다 |
+| `docs/hermes/runs-api.md`, `docs/hermes/README.md` | `MVP 는 제출과 조회만 쓴다`, `설정만으로 성립한다` | 둘 다 지금 사실이 아니다. 중지와 steer 를 쓰고 plugin 둘이 있다 | 두 문장을 지운다 |
 | `docs/hermes/README.md`, `docs/adr/ADR-002-*.md` | 이 저장소에 없는 스크립트 파일 이름 | `git ls-files scripts` 에 그 이름이 없다 | 이름을 빼고 「운영 저장소의 검사」 로 적는다 |
-| `docs/hermes/kanban.md` | 배포본 버전을 현재형으로 적은 줄, `같은 날 같은 환경` | 다른 문서의 버전과 다르고, 가리키는 앞 문장이 없다 | 조사한 날짜와 버전을 그 문장에 붙인다. 문서 안에 적힌 조사 날짜를 쓴다. 없으면 `git log --follow` 의 첫 커밋 날짜를 쓴다 |
+| `docs/hermes/kanban.md` | 배포본 버전을 현재형으로 적은 줄, `같은 날 같은 격리 환경에서` | 다른 문서의 버전과 다르고, 가리키는 앞 문장이 없다 | 조사한 날짜와 버전을 그 문장에 붙인다. 문서 안에 적힌 조사 날짜를 쓴다. 없으면 `git log --follow` 의 첫 커밋 날짜를 쓴다 |
 | `docs/hermes/README.md` 의 색인 | `mcp-profile-credentials.md` 가 없다 | 저장소 어디에서도 링크하지 않는다 | 색인에 한 줄 더한다. phase 01 이 만든 `fos-ctx.md`, `skills.md` 도 색인에 있는지 본다 |
 
 ### 6. ADR 본문의 사실 오류
@@ -116,14 +116,15 @@ ADR 은 결정의 기록이라 본문을 다시 쓰지 않는다. 아래 한 문
 ### 7. 프롬프트
 
 `.github/workflows/code-review-prompt.txt` 에서 `status` 가 `completed` 인 `tasks/` 파일을 리뷰 제외 대상으로 적은 줄을 지운다. 끝난 계획서는 지우므로 그런 파일이 남지 않는다.
-`test/unit/review-workflow.test.ts` 가 그 줄을 단언하면 테스트도 맞춘다.
+이 파일의 문장을 단언하는 테스트는 없다.
 
 ## 검증
 
 ```bash
 # cwd: 저장소 root
 # 1. 고친 글이 남지 않았다. 출력이 없어야 한다
-git grep -n '지금 읽기만 한다\|POST /api/admin/people\|<member>\|사용자과\|MVP 는 제출과 조회만' -- docs hermes/README.md
+git grep -n '지금 읽기만 한다\|POST /api/admin/people\|<member>\|사용자과\|MVP 는 제출과 조회만\|설정만으로 성립한다\|HERMES_BINDING_MISSING\|가족용\|가족 공용\|자동 활성화를 막는 설정을 넣지 않으므로\|취소하는 경로가 없다\.$' -- docs hermes/README.md ':!docs/adr/ADR-0[0-9][0-9]-*' 
+git grep -n 'completed' -- .github/workflows/code-review-prompt.txt
 
 # 2. 링크와 앵커. $DOCS_CHECK_DIR 은 docs-check 스킬 번들 경로다
 python3 "$DOCS_CHECK_DIR/scripts/static_check.py" docs/adr docs
@@ -133,8 +134,8 @@ node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 출력 없음. 2번 `BROKEN_LINK`, `BROKEN_ANCHOR` 0건. 3번 종료 코드 0.
-`node --test` 는 `test/unit/doc-references.test.ts` 와 `test/unit/review-workflow.test.ts` 를 포함한다.
+기대값: 1번 출력 없음. 2번 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. 3번 종료 코드 0.
+`node --test` 는 `test/unit/doc-references.test.ts` 를 포함한다.
 
 결과 보고에 표를 남긴다. 발견마다 「고쳤다」, 「이미 고쳐져 있었다」, 「코드가 바뀌어 건너뛰었다」, 「판단이 필요해 남겼다」 가운데 하나와 까닭이다.
 
@@ -150,4 +151,3 @@ scripts/check-public-safe.sh
 | `docs/adr/ADR-*.md` | 수정 |
 | `hermes/README.md` | 수정 |
 | `.github/workflows/code-review-prompt.txt` | 수정 |
-| `test/unit/review-workflow.test.ts` | 수정 |

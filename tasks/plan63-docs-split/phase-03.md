@@ -35,11 +35,15 @@ Java 주석, Python 주석, TypeScript 주석, 워크플로 프롬프트가 문�
 **검사 대상 파일.** `git ls-files` 의 결과에서 고른다. `child_process` 의 `execFileSync("git", ["ls-files"])` 를 쓴다. 디렉터리를 직접 훑으면 `node_modules` 와 빌드 결과를 읽는다.
 
 - 넣는다: 확장자가 `.java`, `.kt`, `.kts`, `.sql`, `.xml`, `.py`, `.ts`, `.tsx`, `.mjs`, `.sh`, `.yml`, `.txt`, `.template` 인 파일과 `docs/` 밖의 `.md`(`AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `hermes/README.md`, `README.md`)
-- 뺀다: `docs/**`, `tasks/**`, 이 테스트 파일 자신, `CLAUDE.md`(`AGENTS.md` 와 같은 내용이다)
+- 뺀다: `docs/**`, `tasks/**`, 이 테스트 파일 자신, 심볼릭 링크(`CLAUDE.md`, `backend/CLAUDE.md`, `web/CLAUDE.md` 가 `AGENTS.md` 를 가리킨다. `git ls-files -s` 의 모드 `120000` 으로 가린다)
 
 **경로 검사.** 각 파일에서 정규식 `docs/[A-Za-z0-9_./-]+\.md` 로 경로를 찾고, 저장소 root 기준으로 그 파일이 있는지 확인한다.
 `../docs/…` 처럼 앞에 `../` 가 붙은 것도 `docs/` 부터 읽으면 root 기준 경로가 된다.
 자리표시자는 뺀다. 경로에 `NNN`, `<`, `*` 가 있으면 건너뛴다. 예: `docs/adr/NNN-<슬러그>.md`.
+
+**`AGENTS.md` 도 같은 방법으로 본다.** `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md` 뒤에 「」 가 오면 그 파일의 헤딩과 비교한다. 경로 없이 `AGENTS.md` 만 적힌 것은 루트 파일로 읽는다. Javadoc 과 워크플로 프롬프트가 이 세 파일의 절을 이름으로 가리킨다.
+
+**한계.** 경로와 「」 가 줄을 넘어 떨어져 있으면 잡지 못한다. 한 줄 안의 참조만 본다.
 
 **절 이름 검사.** 경로 바로 뒤에 아래 모양으로 「」 가 오면 그 글을 절 이름으로 본다.
 
@@ -82,10 +86,13 @@ Java 주석을 고쳤으면 `scripts/quality.sh check` 를 돌린다.
 # cwd: 저장소 root
 node --test test/unit/doc-references.test.ts
 node --test 'test/unit/**/*.test.ts'
+python3 -m unittest discover -s hermes/tests
+(cd backend && ./gradlew test)
+node test/e2e/run.ts
 scripts/quality.sh check
 ```
 
-기대값: 셋 다 종료 코드 0.
+기대값: 모두 종료 코드 0. 「변경 파일」 의 Java 밖 경로는 테스트가 위반을 낸 파일만 고친다.
 
 검사가 실제로 실패하는지 한 번 확인한다. Java 주석 하나의 절 이름을 없는 이름으로 바꾸고 첫 명령이 그 `파일:줄` 을 내며 실패하는지 본 뒤 되돌린다. `git status --short` 에 그 파일이 남지 않아야 한다.
 
@@ -95,3 +102,11 @@ scripts/quality.sh check
 |---|---|
 | `test/unit/doc-references.test.ts` | 신규 |
 | `backend/src/**/*.java` | 수정 |
+| `hermes/plugins/**/*.py` | 수정 |
+| `hermes/tests/*.py` | 수정 |
+| `hermes/README.md` | 수정 |
+| `test/e2e/**/*.ts` | 수정 |
+| `web/src/**/*.ts` | 수정 |
+| `.github/workflows/*.txt` | 수정 |
+| `AGENTS.md` | 수정 |
+| `backend/AGENTS.md` | 수정 |

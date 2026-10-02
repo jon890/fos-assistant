@@ -32,7 +32,7 @@
 | 문서 색인 | `docs/README.md` |
 
 `.github/workflows/code-review-prompt.txt` 와 `.github/workflows/architecture-audit-prompt.txt` 가 이 문서의 절을 이름으로 가리킨다.
-절 이름을 바꾸거나 절을 지우면 그 프롬프트도 함께 고친다. `test/unit/review-workflow.test.ts` 와 `test/unit/doc-references.test.ts` 가 일부를 잡는다.
+절 이름을 바꾸거나 절을 지우면 그 프롬프트도 함께 고친다. `test/unit/doc-references.test.ts` 가 「」 로 가리킨 절 이름을 잡는다.
 
 **근거 문서**: `docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md`, `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`
 
@@ -54,7 +54,7 @@
 
 ### 2. 스크립트와 워크플로가 소유한 설명을 덜어 낸다
 
-지우기 전에 같은 내용이 소유자 파일에 있는지 읽어 확인한다. 없으면 소유자 파일의 주석으로 옮긴 뒤 지운다.
+지우기 전에 같은 내용이 소유자 파일에 있는지 읽어 확인한다. 소유자 파일에 없는 설명은 지우지 않고 남긴다. 이 phase 는 스크립트와 워크플로를 고치지 않는다.
 
 | 자리 | 지울 것 | 남길 것 |
 | --- | --- | --- |
@@ -65,7 +65,6 @@
 | 「주간 점검」 | 요일과 시각, 관점 목록, 돌지 않는 조건 | 「점검 이슈는 결함 후보다. 고치기 전에 코드에서 사실인지 확인한다. 사실이 아니면 까닭을 적고 닫는다」 와 워크플로 파일 링크 |
 
 스크립트가 차례로 돌리는 명령의 코드 블록은 남긴다. 한 단계만 다시 돌릴 때 쓴다.
-`scripts/check-local.sh` 의 머리 주석이 「순서는 루트 `AGENTS.md` 의 확인 절이 정한다」 고 적혀 있으면 「순서는 이 스크립트가 정하고 `AGENTS.md` 가 같은 순서를 적는다」 로 고친다.
 
 ### 3. e2e 함정 문장
 
@@ -92,12 +91,12 @@ node test/e2e/run.ts && node test/e2e/run.ts
 
 - 두 프롬프트가 이 문서의 절을 이름으로 가리키는 자리를 `git grep -n 'AGENTS.md' .github/workflows` 로 찾아, 바뀐 절 이름과 맞춘다.
 - 루트에 한 줄을 더한다. 「이 문서의 절 이름을 바꾸면 `.github/workflows/` 의 프롬프트 둘도 함께 고친다」. 「머지는 PR 로 한다」 절의 리뷰 기준 문장 옆에 둔다.
+- `web/AGENTS.md` 와 `backend/AGENTS.md` 가 루트 「확인」 절이나 「운영」 절을 가리키는 문장을 바뀐 내용에 맞춘다. 루트가 더는 갖지 않는 설명(CI 의 shard 구조)을 루트에 있다고 적은 문장은 `.github/workflows/ci.yml` 을 가리키게 고친다.
 - `docs/README.md` 가 루트 「확인」 절이나 「운영」 절을 가리키면 바뀐 제목에 맞춘다. `docs/prd.md` 가 루트 「확인」 절을 가리키는 자리도 본다.
 
-### 6. 이 phase 를 검증하는 `test/unit/review-workflow.test.ts`
+### 6. 절 이름 참조를 `test/unit/doc-references.test.ts` 로 확인한다
 
-프롬프트 둘을 고치면 `test/unit/review-workflow.test.ts` 가 그 파일의 문장을 단언하는 자리가 깨질 수 있다. 깨지면 단언을 새 문장에 맞춘다.
-`scripts/check-local.sh` 는 주석만 바뀐다. `bash -n` 으로 문법을 본다.
+이 테스트는 코드 주석과 프롬프트가 `AGENTS.md` 뒤에 「」 로 가리킨 절이 그 파일의 헤딩에 있는지 본다. 절 이름을 바꾸거나 절을 지운 뒤 이 테스트가 낸 `파일:줄` 을 새 이름에 맞춘다. 테스트 파일은 고치지 않는다.
 
 ## 검증
 
@@ -109,27 +108,24 @@ wc -l AGENTS.md
 # 2. 지운 것이 남지 않았다. 출력이 없어야 한다
 grep -n '여덟 검사\|04:23\|docker ps' AGENTS.md
 
-# 3. 스크립트 주석만 바뀌었다. 문법이 깨지지 않았다
-bash -n scripts/check-local.sh
-
-# 4. 프롬프트 테스트, 문서 경로 검사, 링크. $DOCS_CHECK_DIR 은 docs-check 스킬 번들 경로다
+# 3. 문서 경로와 절 이름 검사, 문서 경로 검사, 링크. $DOCS_CHECK_DIR 은 docs-check 스킬 번들 경로다
 node --test 'test/unit/**/*.test.ts'
 python3 "$DOCS_CHECK_DIR/scripts/static_check.py" docs/adr AGENTS.md
 python3 "$DOCS_CHECK_DIR/scripts/static_check.py" docs/adr docs
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 작업 전보다 30줄 넘게 줄었다. 2번 출력 없음. 3번과 4번 종료 코드 0, 링크 위반 0건.
-`node --test` 는 `test/unit/review-workflow.test.ts` 와 `test/unit/doc-references.test.ts` 를 포함한다.
+기대값: 1번 작업 전보다 30줄 넘게 줄었다. 2번 출력 없음. 3번 종료 코드 0, `static_check.py` 만 예외다. 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다.
+`node --test` 는 `test/unit/doc-references.test.ts` 를 포함한다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
 | `AGENTS.md` | 수정 |
-| `scripts/check-local.sh` | 수정 |
 | `.github/workflows/code-review-prompt.txt` | 수정 |
 | `.github/workflows/architecture-audit-prompt.txt` | 수정 |
 | `docs/README.md` | 수정 |
 | `docs/prd.md` | 수정 |
-| `test/unit/review-workflow.test.ts` | 수정 |
+| `web/AGENTS.md` | 수정 |
+| `backend/AGENTS.md` | 수정 |

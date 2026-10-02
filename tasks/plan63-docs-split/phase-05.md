@@ -57,8 +57,7 @@
 | `docs/backend/packages.md` 의 층 방향 규칙과 `backend/AGENTS.md` 의 같은 세 줄 | `ArchitectureRules.java` 가 강제한다 | `packages.md` 에 남기고 강제하는 규칙 이름을 적는다. `backend/AGENTS.md` 쪽은 phase 07 이 지운다 |
 | `docs/backend/connector-tool-policy.md` 의 `fos-ctx` hook 처리 표와 `hermes/README.md` 의 같은 표 | plugin 옆의 `hermes/README.md` | 빠진 줄을 `hermes/README.md` 에 합치고 문서 쪽은 링크한다 |
 | `docs/connectors.md` 「저장과 비밀값」 의 비밀 앞부분 규칙과 `docs/backend/schema/connector.md` 의 같은 규칙 | 저장 칸 설명은 `schema/connector.md` | `connectors.md` 에는 규칙의 뜻 한 줄과 링크만 남긴다 |
-| `docs/connectors.md` 「Control Plane API」 표의 `model-defaults` 줄 | `docs/model-tiers.md` | 커넥터 경로가 아니다. 표에서 지우고 `model-tiers.md` 를 가리킨다 |
-| `docs/hermes/profiles.md` 의 대시보드 plugin 경로 표와 `hermes/README.md` 의 같은 표 | `hermes/README.md` | 경로 목록은 `hermes/README.md` 가 갖는다. `profiles.md` 는 Hermes 쪽 동작만 적고 목록을 링크한다. `profiles.md` 의 「Control Plane 이 부르는 대시보드 plugin 경로」 헤딩은 코드 주석이 「」 로 가리키므로 남긴다 |
+| 대시보드 plugin 의 경로 표 셋: `docs/hermes/profiles.md`, `docs/backend/connector-install.md` 의 「대시보드 plugin 계약」, `hermes/README.md` | `hermes/README.md` | 경로 목록은 `hermes/README.md` 가 갖는다. 세 표의 줄을 합쳐 그곳에 둔다. `connector-install.md` 는 커넥터가 쓰는 경로의 뜻만 적고 목록을 링크한다. 그 표의 `model-defaults` 줄은 커넥터 경로가 아니므로 지우고 `docs/model-tiers.md` 를 가리킨다. `profiles.md` 는 Hermes 쪽 동작만 적고 목록을 링크한다. 「대시보드 plugin 계약」 헤딩은 코드 주석이 「」 로 가리키므로 남긴다. `profiles.md` 의 「Control Plane 이 부르는 대시보드 plugin 경로」 헤딩은 코드 주석이 「」 로 가리키므로 남긴다 |
 | `docs/backend/connector-install.md` 의 「배포한 뒤 확인할 것」 목록 | `docs/hermes/connector-policy.md` 의 같은 이름 절 | 그 절로 옮기고 링크한다 |
 
 ### 3. 계약이 아닌 것을 덜어 낸다
@@ -67,7 +66,7 @@
 | --- | --- | --- |
 | `docs/backend/*.md`(구조 쪽에서 온 절) | `더한다`, `넓혀 쓴다`, `열었다` 같은 변경 지시 말투 | `갖는다`, `쓴다`, `있다` 로 고친다. 사실이 바뀌지 않게 한다 |
 | `docs/backend/artifact.md` | 없앤 것과 검토 과정을 적은 문단 | 결정의 까닭이면 `docs/adr/ADR-027-*.md` 의 맥락으로 옮기고, 아니면 지운다 |
-| `docs/backend/memory.md` 「이 왕복은 비싸다」 의 손익분기 측정표 | 흐름이 아니라 근거다 | `docs/hermes/tools-and-skills.md` 의 비용을 다루는 절로 옮기고 링크한다 |
+| `docs/backend/memory.md` 「이 왕복은 비싸다」 의 손익분기 측정표 | 흐름이 아니라 근거다 | `docs/backend/mcp-caller.md` 의 「입력 비용은 API 콜 수가 정한다」 절 끝으로 옮기고 링크한다. 그 절은 MCP 왕복의 비용을 적는다 |
 | `docs/frontend/activity.md` 「도구를 보이는 말」 의 문구 표 | `web/src/lib/tool-label.ts` 와 1:1 이다 | 표를 지우고 규칙만 남긴 뒤 그 파일을 가리킨다 |
 | `docs/frontend/shell.md`, `docs/frontend/chat.md` | 단축키와 길이 상한을 숫자로 옮겨 적은 줄 | 코드 상수와 같은 값이면 규칙만 남긴다 |
 | `docs/backend/schema/*.md` | 마이그레이션 이력을 길게 적은 문단 | 칸의 뜻에 필요한 한 줄로 줄인다. 같은 설명이 마이그레이션 주석에 있다 |
@@ -96,6 +95,7 @@
 헤딩 이름을 바꾸거나 절을 지우면 그 절을 「」 로 가리키는 코드 주석이 깨진다.
 같은 파일의 기존 검사가 그 자리를 `파일:줄` 로 낸다. 나온 주석의 경로와 절 이름을 새 헤딩에 맞춘다.
 Java 주석을 고쳤으면 `scripts/quality.sh check` 를 돌린다.
+「변경 파일」 의 Java 밖 코드 경로는 이 검사가 위반을 낸 파일만 고친다.
 
 ## 검증
 
@@ -118,11 +118,14 @@ python3 "$DOCS_CHECK_DIR/scripts/static_check.py" docs/adr backend/AGENTS.md
 
 # 4. 코드가 가리키는 절 이름, 품질 검사, 공개 정보 검사
 node --test 'test/unit/**/*.test.ts'
+python3 -m unittest discover -s hermes/tests
+(cd backend && ./gradlew test)
+node test/e2e/run.ts
 scripts/quality.sh check
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 모든 파일 400줄 이하. 2번 출력 없음. 3번은 `INDEX_DESYNC` 말고 위반 0건. 4번 종료 코드 0.
+기대값: 1번 모든 파일 400줄 이하. 2번 출력 없음. 3번 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. `헤딩 레벨 건너뜀`, `표 열 수 불일치` 도 0건이다. 4번 종료 코드 0.
 `node --test` 는 `test/unit/doc-references.test.ts` 를 포함한다.
 
 결과 보고에 지운 중복마다 「어느 쪽을 남겼는가」 를 표로 남긴다.
@@ -139,4 +142,11 @@ scripts/check-public-safe.sh
 | `docs/adr/ADR-027-*.md` | 수정 |
 | `hermes/README.md` | 수정 |
 | `backend/src/**/*.java` | 수정 |
+| `hermes/plugins/**/*.py` | 수정 |
+| `hermes/tests/*.py` | 수정 |
+| `test/e2e/**/*.ts` | 수정 |
+| `web/src/**/*.ts` | 수정 |
+| `.github/workflows/*.txt` | 수정 |
+| `AGENTS.md` | 수정 |
+| `backend/AGENTS.md` | 수정 |
 | `test/unit/doc-references.test.ts` | 수정 |

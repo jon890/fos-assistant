@@ -27,13 +27,15 @@
 | 왜 이 도구와 이 방식인가 | `docs/adr/ADR-042-*.md` |
 | 기준을 갱신하는 방법, 뺀 규칙, suppress 줄의 모양 | `docs/backend/quality.md`(이 phase 가 만든다) |
 
+층 방향 규칙과 패키지 표는 앞 phase 가 만든 `docs/backend/packages.md` 에 있다.
+
 위 경로는 작업 전에 `git ls-files backend | grep -i 'ArchitectureRules\|checkstyle\|suppressions'` 로 실제 위치를 확인한다.
 
 지금은 소유를 서로 가리키는 고리가 있다.
 `backend/AGENTS.md` 가 `ArchitectureRules.java` 를 소유자로 들고, 그 Javadoc 여러 곳이 「근거: `backend/AGENTS.md` 구조 규칙」 으로 돌아온다. 그 절에는 표의 한 줄 말고 다른 근거가 없다.
 `backend/AGENTS.md` 가 ADR-042 를 가리키고, ADR-042 가 「규칙 목록과 갱신 방법은 두 `AGENTS.md` 가 갖는다」 로 돌아온다.
 
-**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `docs/code-architecture.md` 의 「backend 패키지」 절(앞 phase 가 backend 문서 디렉터리로 옮겼다)
+**근거 문서**: `docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md`, `AGENTS.md` 의 「확인」 절
 
 ## 의도 메모
 
@@ -54,6 +56,7 @@
 ### 2. `docs/backend/quality.md` 를 만든다
 
 조건이 맞을 때만 읽는 절차를 `backend/AGENTS.md` 에서 옮긴다. 문장은 그대로 옮기고 h1 과 소개 두 줄만 새로 쓴다.
+`backend/AGENTS.md` 에는 `### 기준 파일` 이 둘 있다. 한 문서에 같은 헤딩을 둘 두지 않으므로 옮기며 이름을 `## 구조 규칙의 기준 파일`, `## 코드 규칙의 기준 파일` 로 바꾼다. 나머지 헤딩은 `##` 로 둔다.
 
 - 구조 규칙의 「기준 파일」 절(기준을 갱신하는 방법)
 - 코드 규칙의 「뺀 규칙」, 「기준 파일」 절
@@ -67,15 +70,22 @@ OpenRewrite 플러그인 버전을 고정한 까닭은 `backend/gradle/libs.vers
 
 ### 3. Javadoc 의 돌아오는 「근거」 를 직접 적는다
 
-`ArchitectureRules.java` 에서 `backend/AGENTS.md` 를 근거로 가리키는 Javadoc 을 찾는다.
+`ArchitectureRules.java` 의 Javadoc 이 `backend/AGENTS.md` 를 가리키는 자리를 찾는다.
 
 ```bash
 # cwd: 저장소 root
-git grep -n 'AGENTS.md' -- 'backend/src/test/java/**/ArchitectureRules.java'
+git grep -n 'AGENTS.md' -- 'backend/src/test/java/**/ArchitectureRules.java' backend/config backend/build.gradle.kts scripts/quality.sh
 ```
 
-각 자리의 「근거: `backend/AGENTS.md` 구조 규칙」 을 그 규칙이 왜 있는지 한 문장으로 바꾼다. 지우는 표의 「뜻」 칸에 있던 문장이 그 근거다.
-`checkstyle.xml`, `suppressions.xml`, `backend/build.gradle.kts`, `scripts/quality.sh` 의 주석이 `backend/AGENTS.md` 의 **지워지는 절**을 가리키면 `docs/backend/quality.md` 로 바꾼다. 남는 절을 가리키면 그대로 둔다.
+자리마다 가리키는 절에 따라 다르게 한다.
+
+| 가리키는 절 | 할 일 |
+| --- | --- |
+| 「구조 규칙」 을 근거로 든 Javadoc(여섯 곳) | 그 규칙이 왜 있는지 한 문장으로 바꾼다. 지우는 표의 「뜻」 칸에 있던 문장이 그 근거다 |
+| 「패키지 배치」 를 근거로 든 Javadoc(층 방향 규칙 둘) | 층 방향 세 줄이 `docs/backend/packages.md` 로 가므로 `backend/AGENTS.md` 부분을 빼고 `docs/backend/packages.md` 의 그 절만 남긴다 |
+| 「기술 주의점」, 「데이터 클래스는 컨트롤러 안에 두지 않는다」, 「테스트」 | 남는 절이다. 그대로 둔다. 다만 1번에서 그 절의 해당 문장을 지웠으면 근거를 한 문장으로 직접 적는다 |
+| 클래스 Javadoc 의 「기준 파일을 갱신하는 방법은 … 「구조 규칙」 절에 있다」 | `docs/backend/quality.md` 의 「구조 규칙의 기준 파일」 로 바꾼다 |
+| `backend/config/checkstyle/*.xml`, `backend/build.gradle.kts`, `scripts/quality.sh` 의 주석 | 옮겨 간 절(기준 파일, 뺀 규칙, suppress 줄, 자동으로 고치기)을 가리키면 `docs/backend/quality.md` 와 그 절 이름으로 바꾼다. 남는 절을 가리키면 그대로 둔다 |
 
 ### 4. ADR-042 의 소유 문장을 고친다
 
@@ -109,8 +119,8 @@ node test/e2e/run.ts && node test/e2e/run.ts
 # 1. 지침이 줄었다
 wc -l backend/AGENTS.md docs/backend/quality.md
 
-# 2. Javadoc 이 지워진 표를 근거로 가리키지 않는다. 출력이 없어야 한다
-git grep -n '근거: .*AGENTS.md' -- backend/src/test/java
+# 2. 지워진 절을 가리키는 주석이 없다. 출력이 없어야 한다
+git grep -n 'AGENTS.md} 「구조 규칙」\|AGENTS.md} 의 「구조 규칙」\|AGENTS.md} 「패키지 배치」' -- backend/src/test/java backend/config
 
 # 3. 구조 규칙 테스트가 그대로 통과한다. Javadoc 만 바뀌었다
 (cd backend && ./gradlew test --tests '*Architecture*')
@@ -123,7 +133,7 @@ python3 "$DOCS_CHECK_DIR/scripts/static_check.py" docs/adr docs
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 `backend/AGENTS.md` 가 작업 전보다 100줄 넘게 줄고 `quality.md` 는 400줄 이하. 2번 출력 없음. 3번과 4번 종료 코드 0, 링크 위반 0건.
+기대값: 1번 `backend/AGENTS.md` 가 작업 전보다 100줄 넘게 줄고 `quality.md` 는 400줄 이하. 2번 출력 없음. 3번과 4번 종료 코드 0, `static_check.py` 만 예외다. 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다.
 `node --test` 는 `test/unit/doc-references.test.ts` 와 `test/unit/quality-script.test.ts` 를 포함한다.
 
 `gradlew` 는 `backend/` 에 있다. 저장소 root 에서 `./gradlew` 를 부르면 없다.

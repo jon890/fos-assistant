@@ -73,7 +73,7 @@ h1 바로 아래에 표를 둔다. 칸은 「파일」, 「표」 다. 각 파�
 ### 6. 프롬프트의 색인 참조를 맞춘다
 
 `.github/workflows/code-review-prompt.txt` 와 `.github/workflows/architecture-audit-prompt.txt` 가 「읽을 문서」 로 `docs/code-architecture.md` 만 드는 자리에 `docs/README.md` 를 함께 적는다. 문장의 뜻은 바꾸지 않는다.
-이 두 파일을 검사하는 `test/unit/review-workflow.test.ts` 가 깨지지 않는지 본다.
+이 두 파일의 문장을 단언하는 테스트는 없다. 고친 뒤 두 파일을 다시 읽어 문장이 이어지는지 본다.
 
 ## 검증
 
@@ -100,8 +100,7 @@ node --test 'test/unit/**/*.test.ts'
 scripts/check-public-safe.sh
 ```
 
-기대값: 1번 출력 없음. 2번 `BROKEN_LINK`, `BROKEN_ANCHOR` 0건(`INDEX_DESYNC` 는 알려진 오탐). 3번 종료 코드 0.
-`node --test` 는 `test/unit/review-workflow.test.ts` 를 포함한다.
+기대값: 1번 출력 없음. 2번 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. 3번 종료 코드 0.
 
 ## 변경 파일
 

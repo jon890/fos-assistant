@@ -152,7 +152,7 @@ h1 과 첫 절의 글이 같아지는 파일(`packages.md`, `memory.md`, `skill.
 
 ### 3. 문서 안의 Markdown 링크와 앵커를 새 경로로 고친다
 
-대상은 `docs/**`, `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `hermes/README.md`, `README.md` 다.
+대상은 `docs/**`, `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `hermes/README.md` 다.
 
 - 옮긴 절을 가리키는 링크는 새 파일로 바꾼다. 앵커가 붙은 링크는 그 헤딩이 간 파일을 가리킨다.
 - 옮겨 간 파일 안에서 원래 같은 문서였던 다른 절을 가리키는 `#앵커` 링크는 상대 경로를 붙인다.
@@ -175,7 +175,7 @@ git ls-files | grep -v '^docs/' \
 - `docs/data-schema.md` 는 표 이름이 간 `docs/backend/schema/*.md` 로 바꾼다.
 - 대상은 `backend/src/**` 의 Java 주석과 마이그레이션 주석, `hermes/plugins/**`, `hermes/tests/**`, `hermes/README.md`, `test/e2e/**`, `web/src/**`, `.github/workflows/*.txt`, `backend/AGENTS.md`, `AGENTS.md`, `CLAUDE.md` 다. `CLAUDE.md` 가 `AGENTS.md` 의 심볼릭 링크면 한쪽만 고친다.
 - **Java 는 주석만 고친다.** 코드 줄을 바꾸지 않는다. 한 줄이 포맷 한도를 넘으면 줄을 나눈다.
-- `scripts/pr-risk-labels.sh` 는 `docs/hermes/*` 를 보므로 고치지 않는다. Hermes 연동 계약이 `docs/backend/mcp-caller.md`, `docs/backend/connector-install.md`, `docs/backend/connector-tool-policy.md` 로 갔으므로, 이 셋을 Hermes 연동 라벨 경로에 더한다. 그 스크립트의 테스트 `test/unit/pr-risk-labels.test.ts` 에 이 세 경로 가운데 하나가 라벨을 받는 경우를 더한다.
+- `scripts/pr-risk-labels.sh` 는 Hermes 연동 라벨의 경로로 `docs/hermes/*` 를 본다. `docs/hermes/` 에 있던 절을 받는 파일이 둘 생긴다. `docs/backend/mcp-caller.md`(「Control Plane MCP」, 「결과물 쓰기 도구」)와 `docs/backend/conversation.md`(「도구 내용 가리기」)다. 이 두 경로를 그 스크립트의 Hermes 연동 경로 목록에 더한다. 기존 `docs/hermes/*` 줄은 그대로 둔다. `test/unit/pr-risk-labels.test.ts` 에 `docs/backend/mcp-caller.md` 가 그 라벨을 받는 경우를 더한다.
 
 ### 5. 옮기기만 했는지 기계로 비교한다
 
@@ -229,7 +229,7 @@ scripts/check-public-safe.sh
 기대값이다.
 
 - 1번: 모든 파일이 400줄 이하다. 넘는 파일이 있으면 결과 보고에 파일과 줄 수를 적는다. 이 phase 에서 문장을 줄여 맞추지 않는다.
-- 3번: `BROKEN_LINK`, `BROKEN_ANCHOR` 가 0건이다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이라 세지 않는다. `docs/hermes/concurrency.md` 의 헤딩 건너뜀 한 건은 phase 05 가 고친다.
+- 3번: 출력에 `깨진 링크`, `없는 앵커` 로 시작하는 줄이 0건이다. 종료 코드는 보지 않는다. `INDEX_DESYNC` 는 검사기의 알려진 오탐이고 그것 때문에 종료 코드가 늘 1 이다. `표 열 수 불일치` 도 0건이다. `docs/hermes/concurrency.md` 의 헤딩 건너뜀 한 건은 phase 05 가 고친다.
 - 5번: 모두 종료 코드 0 이다. 주석만 고친 `hermes/tests`, `backend/src`, `test/e2e` 의 테스트가 그대로 통과한다. `gradlew` 는 `backend/` 에 있다. `node test/e2e/run.ts` 는 `gradlew test` 뒤에 돌린다.
 - 「옮기기만 했는지」 의 두 비교가 위에 적은 차이만 낸다.
 
