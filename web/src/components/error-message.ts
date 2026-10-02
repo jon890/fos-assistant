@@ -55,6 +55,9 @@ const MESSAGES: Record<string, string> = {
     "그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.",
   MEMORY_ENCRYPTION_UNAVAILABLE:
     "민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.",
+  MEMORY_IMPORT_RETRY:
+    "가져오는 사이에 기록이 바뀌었어요. 파일을 다시 올려 주세요.",
+  MEMORY_IMPORT_TOO_LARGE: "가져올 파일이 너무 커요. 나눠서 올려 주세요.",
   SERVICE_TOKEN_NOT_FOUND:
     "토큰을 찾지 못했어요. 화면을 새로고침해 확인해 주세요.",
 };
