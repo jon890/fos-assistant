@@ -700,7 +700,7 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertEqual(self.requests, [])
 
     def test_missing_state_db_uses_session_as_root(self):
-        """state DB 가 없으면 그 session 을 뿌리로 묻는다."""
+        """state DB 가 없으면 그 session 을 루트로 묻는다."""
         self.db.unlink()
         self.assertIsNone(self.call("mcp__demo__list_scopes"))
         self.assertEqual(self.requests[0]["body"]["root_session_id"], VECTOR_SESSION)

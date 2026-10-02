@@ -5,7 +5,7 @@ Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾는다. 
 
 - key 는 그 profile 의 MCP 토큰을 SHA-256 한 소문자 16진수 문자열의 UTF-8 바이트다.
   서버는 토큰 원문 대신 이 해시만 저장하므로 같은 key 를 갖는다.
-- 서명할 글은 `v1`, 서버 쪽 도구 이름, 뿌리 session, session, tool_call_id 를 줄바꿈 하나로 잇는다.
+- 서명할 글은 `v1`, 서버 쪽 도구 이름, 루트 session, session, tool_call_id 를 줄바꿈 하나로 잇는다.
   도구 인자는 넣지 않는다. Python 과 Java 의 JSON 직렬화를 글자까지 맞추기 어렵다.
 
 Hermes 는 hook 이 돌려준 `args` 를 원래 인자에 얕게 병합하고 hook 의 키가 뒤에 온다.
@@ -20,12 +20,12 @@ hook 이 예외를 던지면 호출이 막힌다.
 
 `delegate_task` 의 자식은 부모 run 이 끝난 뒤에도 백그라운드로 돌 수 있다.
 그때 Control Plane 은 자식의 MCP 호출에서 요청자를 부모 run 으로 찾지 못하므로,
-자식을 만드는 순간 `subagent_start` hook 이 Control Plane 에 자식 session 의 부모와 뿌리를 등록한다.
+자식을 만드는 순간 `subagent_start` hook 이 Control Plane 에 자식 session 의 부모와 루트를 등록한다.
 
 - Hermes 는 자식을 만드는 `_build_children` 안에서 부모 스레드로 이 hook 을 동기로 부른다.
   그래서 등록은 자식의 첫 도구 호출보다 먼저 끝난다
 - 주소는 환경 변수 `FOS_CTX_SUBAGENT_URL` 이 갖는다. 없으면 등록하지 않는다
-- 서명 key 는 `_fos_ctx` 와 같다. 서명할 글은 `v1-subagent`, 부모의 뿌리 session, 부모 session,
+- 서명 key 는 `_fos_ctx` 와 같다. 서명할 글은 `v1-subagent`, 부모의 루트 session, 부모 session,
   자식 session 을 줄바꿈 하나로 잇는다. 인증 헤더는 MCP 와 같은 profile 토큰이다
 - 제한 시간 `REGISTER_TIMEOUT` 초로 부르고, 연결 실패와 5xx 에만 한 번 더 부른다
 - 실패하면 로그만 남긴다. 예외를 내지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다
@@ -50,7 +50,7 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 - session 이나 tool_call_id 가 없으면 막는다
 - 주소는 환경 변수 `FOS_CTX_POLICY_URL` 이 갖는다. 주소나 토큰이 없으면 막는다
 - 인자는 키를 정렬하고 공백 없이 직렬화한 글로 보내고 그 글을 서명한다. 서명할 글은 `v1-connector-policy`,
-  등록 이름, 뿌리 session, session, tool_call_id, 인자 글의 SHA-256 을 줄바꿈 하나로 잇는다
+  등록 이름, 루트 session, session, tool_call_id, 인자 글의 SHA-256 을 줄바꿈 하나로 잇는다
 - 인자 글의 UTF-8 바이트가 `POLICY_ARGS_MAX_BYTES` 를 넘으면 Control Plane 에 보내지 않고 막는다
 - 제한 시간 `POLICY_TIMEOUT` 초로 한 번만 부른다. 기다리는 동안 run 의 스레드가 묶이므로 다시 부르지 않는다
 - 답이 200 의 `allow` 일 때만 통과한다. 200 의 `block` 이고 글이 있으면 그 글로 막고, 그 밖은 정해 둔 글로 막는다
@@ -200,9 +200,9 @@ def build_context(tool: str, session_id: str, tool_call_id: str):
     try:
         root = root_session(session_id)
     except sqlite3.Error as exc:
-        # 뿌리를 못 찾으면 이 session 을 뿌리로 쓴다. 최상위 run 이면 맞는 값이고,
+        # 루트를 못 찾으면 이 session 을 루트로 쓴다. 최상위 run 이면 맞는 값이고,
         # 하위 에이전트라면 서버가 소유 판정에서 거절한다.
-        logger.warning("fos-ctx: state.db 에서 뿌리 session 을 찾지 못했다: %s", type(exc).__name__)
+        logger.warning("fos-ctx: state.db 에서 루트 session 을 찾지 못했다: %s", type(exc).__name__)
         root = session_id
     return {
         "v": CTX_VERSION,
@@ -297,7 +297,7 @@ def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, s
         root = root_session(session_id)
     except sqlite3.Error as exc:
         # `build_context` 와 같다. 최상위 run 이면 맞는 값이고, 아니면 서버가 소유 판정에서 막는다.
-        logger.warning("fos-ctx: state.db 에서 뿌리 session 을 찾지 못했다: %s", type(exc).__name__)
+        logger.warning("fos-ctx: state.db 에서 루트 session 을 찾지 못했다: %s", type(exc).__name__)
         root = session_id
     args_json = json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     if len(args_json.encode("utf-8")) > POLICY_ARGS_MAX_BYTES:
@@ -382,7 +382,7 @@ def build_registration(parent_session_id: str, child_session_id: str, child_suba
     try:
         root = root_session(parent_session_id)
     except sqlite3.Error as exc:
-        logger.warning("fos-ctx: state.db 에서 부모의 뿌리 session 을 찾지 못했다: %s", type(exc).__name__)
+        logger.warning("fos-ctx: state.db 에서 부모의 루트 session 을 찾지 못했다: %s", type(exc).__name__)
         root = parent_session_id
     body = {
         "v": CTX_VERSION,
