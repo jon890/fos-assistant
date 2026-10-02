@@ -147,13 +147,16 @@ class ConversationMissingAgentTest {
 
         mvc.perform(get("/api/v1/chat/conversations"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[?(@.id == '" + keptId + "')].agentCode").value("kept"))
-                .andExpect(jsonPath("$[?(@.id == '" + keptId + "')].agentName").value("kept"))
-                .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].title").value("행이 없는 대화"))
-                .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].agentCode")
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentCode")
+                        .value("kept"))
+                .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentName")
+                        .value("kept"))
+                .andExpect(
+                        jsonPath("$.items[?(@.id == '" + orphanId + "')].title").value("행이 없는 대화"))
+                .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentCode")
                         .value(org.hamcrest.Matchers.contains((Object) null)))
-                .andExpect(jsonPath("$[?(@.id == '" + orphanId + "')].agentName")
+                .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentName")
                         .value(org.hamcrest.Matchers.contains((Object) null)));
     }
 
@@ -206,10 +209,10 @@ class ConversationMissingAgentTest {
 
         mvc.perform(get("/api/v1/chat/conversations"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(id.toString()))
-                .andExpect(jsonPath("$[0].agentCode").value(nullValue()))
-                .andExpect(jsonPath("$[0].agentName").value(nullValue()));
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(id.toString()))
+                .andExpect(jsonPath("$.items[0].agentCode").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].agentName").value(nullValue()));
         mvc.perform(post("/api/v1/chat/messages")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(sendBody(id)))

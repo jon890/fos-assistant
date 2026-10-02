@@ -39,7 +39,7 @@ export const conversationManageScenario: Scenario = {
 
     const listed = expectStatus(await call(context, "/chat/conversations", {
       token: context.tokens.dad,
-    }), 200, "삭제 뒤 목록").json<Conversation[]>();
+    }), 200, "삭제 뒤 목록").json<{ items: Conversation[] }>().items;
     expect(!listed.some((conversation) => conversation.id === id), "지운 대화가 목록에 남았다");
     expectStatus(await call(context, `/chat/conversations/${id}/messages`, {
       token: context.tokens.dad,

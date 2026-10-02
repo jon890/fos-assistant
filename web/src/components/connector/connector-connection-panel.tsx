@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorTools } from "@/components/connector/connector-tools";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -376,6 +377,7 @@ export function ConnectorConnectionPanel({ id }: { id: string }) {
               </Notice>
             ) : null}
           </section>
+          <ConnectorGrants connectorId={id} refreshKey={connection} />
           {status !== "DISCONNECTED" ? (
             <Button
               disabled={busy}

@@ -231,6 +231,19 @@ class ConnectorCatalogTest(ConnectorGateCase):
         # 되돌리면 다시 나온다. 위의 빈 목록이 고친 내용 때문이었음을 확인한다.
         self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
 
+    def test_server_name_length_boundary(self):
+        """등록 이름의 앞부분이 40자인 서버 이름은 받고, 41자가 되는 이름은 카탈로그에서 뺀다."""
+        def rename(name):
+            return lambda value: value.update(mcpServers={name: next(iter(value["mcpServers"].values()))})
+
+        longest = "s" * (40 - len("mcp____"))
+        self.rewrite(".mcp.json", rename(longest))
+        self.assertEqual(len(self.plugin._hermes_tool_name(longest, "")), 40)
+        self.assertEqual([entry["mcp_server"] for entry in self.catalog()], [longest])
+        self.rewrite(".mcp.json", rename(longest + "s"))
+        self.assertEqual(self.catalog(), [])
+        self.assertIsNone(self.plugin._connector_manifest(DEMO))
+
     def test_server_name_is_compared_with_the_control_plane_mcp_in_canonical_form(self):
         """MCP 서버 이름은 등록 규칙으로 바꾸고 소문자로 맞춰 Control Plane MCP 와 견준다."""
         original = (self.connector_root / ".mcp.json").read_bytes()

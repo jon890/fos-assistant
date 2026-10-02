@@ -133,6 +133,7 @@ key 는 그 profile `.env` 의 MCP 토큰에서 나오고, terminal 도구는 He
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
+| `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 |
 | `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 관리 profile 에 설치하고 제거한다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
@@ -211,6 +212,13 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - profile 쓰기 잠금 밖에서 돈다. 도구를 기다리는 동안 다른 profile 요청이 멈추지 않는다
 - 시간을 넘기거나 예외가 나면 SDK 의 정리 구간이 자식의 stdin 을 닫고, 끝나지 않으면 프로세스 묶음을 죽인 뒤에 응답한다
 - `mcp` SDK 는 이 경로 안에서 import 한다. SDK 가 없으면 이 경로만 `unavailable` 이고 나머지는 그대로 돈다
+
+**`POST /api/connectors/<id>/execute` 는 Control Plane 이 승인한 호출만 부른다. 대시보드는 승인 여부를 다시 확인하지 않는다.**
+
+- 그 profile 에 관리 표식과 그 커넥터의 소유 기록이 있어야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다
+- 인자와 결과를 로그에 싣지 않는다
+- 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
+- 요청과 응답은 [커넥터 연결](../docs/connectors.md) 의 「승인」 이 소유한다. 근거는 [ADR-050](../docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
 
 **소유 기록 `.fos-connectors.json` 은 설치할 때의 서버 정의를 갖고, 요청마다 지금의 manifest 와 같은지 검증한다.**
 

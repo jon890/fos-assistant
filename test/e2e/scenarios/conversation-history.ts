@@ -33,12 +33,30 @@ export const conversationHistoryScenario: Scenario = {
       await call(context, "/chat/conversations", { token: context.tokens.dad }),
       200,
       "대화 목록 조회",
-    ).json<Conversation[]>();
+    ).json<{ items: Conversation[]; nextCursor: string | null }>().items;
     expect(
       conversations.findIndex((conversation) => conversation.id === latest.conversationId) <
         conversations.findIndex((conversation) => conversation.id === older.conversationId),
       "최근 대화가 앞에 오지 않았다",
     );
+
+    step("목록은 cursor 로 한 줄씩 이어 읽어도 같은 순서로 나온다");
+    const head = expectStatus(
+      await call(context, "/chat/conversations?limit=1", { token: context.tokens.dad }),
+      200,
+      "목록 첫 쪽",
+    ).json<{ items: Conversation[]; nextCursor: string | null }>();
+    expect(head.items.length === 1, `첫 쪽이 한 줄이 아니다: ${head.items.length}`);
+    expect(head.items[0]?.id === conversations[0]?.id, "첫 쪽의 줄이 목록의 맨 앞이 아니다");
+    expect(head.nextCursor !== null, "다음 쪽이 있는데 nextCursor 가 없다");
+    const next = expectStatus(
+      await call(context, `/chat/conversations?limit=1&cursor=${encodeURIComponent(head.nextCursor!)}`, {
+        token: context.tokens.dad,
+      }),
+      200,
+      "목록 둘째 쪽",
+    ).json<{ items: Conversation[]; nextCursor: string | null }>();
+    expect(next.items[0]?.id === conversations[1]?.id, "둘째 쪽의 줄이 목록의 둘째와 다르다");
 
     step("메시지는 보낸 순서대로 오고 사용자 이름을 포함한다");
     const messages = expectStatus(

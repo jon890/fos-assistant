@@ -313,10 +313,10 @@ async function events(response: Response): Promise<ChatEvent[]> {
 
 async function conversationCount(context: Context): Promise<number> {
   return expectStatus(
-    await call(context, "/chat/conversations", { token: context.tokens.dad }),
+    await call(context, "/chat/conversations?limit=100", { token: context.tokens.dad }),
     200,
     "대화 목록",
-  ).json<unknown[]>().length;
+  ).json<{ items: unknown[] }>().items.length;
 }
 
 async function listOf(context: Context, token: string): Promise<SkillList> {
